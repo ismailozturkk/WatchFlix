@@ -639,6 +639,5 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   primaryButtonText: { color: "#fff", fontSize: 12.5, fontWeight: "800" },
-  appleNote: { fontSize: 10.5, lineHeight: 15, paddingHorizontal: 5, marginTop: 9 },
   note: { fontSize: 11.5, lineHeight: 17, paddingHorizontal: 5, marginTop: 12 },
 });

@@ -19,6 +19,7 @@ import {
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useProfileStats } from "@context/ProfileStatsContext";
@@ -93,12 +94,13 @@ export default function ProfileListPickerModal({ visible, onClose, onSelect }) {
                 )}
               </Text>
             </View>
-            <TouchableOpacity
+            <GlassCloseButton
+              size={34}
+              fallbackRadius={12}
+              iconSize={19}
+              color={theme.text.secondary}
               onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: theme.primary }]}
-            >
-              <Ionicons name="close" size={19} color={theme.text.secondary} />
-            </TouchableOpacity>
+            />
           </View>
 
           {/* Tavan bilgilendirmesi: sayı MAX_SHARED_LIST_ITEMS'tan okunuyor,
@@ -269,13 +271,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 6 },
   title: { fontSize: 18, fontWeight: "900" },
   subtitle: { fontSize: 11.5, marginTop: 3 },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",

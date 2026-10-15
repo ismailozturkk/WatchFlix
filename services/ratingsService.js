@@ -29,13 +29,11 @@ import {
   query,
   orderBy,
   onSnapshot,
-  getDocs,
   serverTimestamp,
   runTransaction,
-  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { trackFirestoreWrite, trackFirestoreDelete, trackFirestoreRead } from "./usageTrackerService";
+import { trackFirestoreWrite, trackFirestoreDelete } from "./usageTrackerService";
 
 export const mediaKey = (mediaType, mediaId) => `${mediaType}_${mediaId}`;
 
@@ -103,14 +101,6 @@ export function subscribeToMyRating(key, uid, callback) {
       if (__DEV__) console.warn("subscribeToMyRating error:", err.message);
     },
   );
-}
-
-/** Tek seferlik agregat okuma (cache/initial için). */
-export async function getAggregate(key) {
-  if (!key) return { count: 0, sum: 0 };
-  const snap = await getDoc(doc(db, "Ratings", key));
-  const d = snap.exists() ? snap.data() : null;
-  return { count: d?.count || 0, sum: d?.sum || 0 };
 }
 
 // ─── WRITE (transaction — agregat tutarlılığı) ─────────────────────────────────
@@ -255,15 +245,4 @@ export function subscribeToMyRatings(uid, callback) {
       if (__DEV__) console.warn("subscribeToMyRatings error:", err.message);
     },
   );
-}
-
-/** Tek seferlik çekme (cache/initial). */
-export async function fetchMyRatings(uid) {
-  if (!uid) return [];
-  const q = query(
-    collection(db, "Users", uid, "myRatings"),
-    orderBy("updatedAt", "desc"),
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }

@@ -3,20 +3,23 @@
 // Ekran içine yerleştirilen tutarlı geri butonu. Native header oku yerine
 // kullanılır (ilgili ekranlarda headerShown:false yapılır).
 //
-// İki varyant:
+// Üç varyant:
 //   variant="solid" (varsayılan) → düz/temalı zeminler için theme.secondary kutu
 //   variant="blur"               → backdrop görsel üzeri ekranlar için koyu blur
+//   variant="plain"              → zeminsiz yalın ok (kutusuz başlıklar)
+//
+// iOS 26+'da (Liquid Glass) her varyant yuvarlak cam düğme olur — sistemin
+// kendi geri düğmesiyle aynı dil. Diğer platformlarda/sürümlerde eski kutu
+// görünümü aynen kalır (bkz. components/common/GlassIconButton.js).
 //
 // Varsayılan olarak SafeArea üst boşluğuna göre absolute konumlanır (sol üst).
 // `absolute={false}` verilirse satır içi (header içinde) kullanılabilir.
 
 import React, { useEffect, useState } from "react";
-import { TouchableOpacity, StyleSheet } from "react-native";
-import AdaptiveBlurView from "./common/AdaptiveBlurView";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme } from "../context/ThemeContext";
+import GlassIconButton from "./common/GlassIconButton";
+import { i18nText } from "../utils/i18nText";
 
 export default function BackButton({
   onPress,
@@ -29,7 +32,6 @@ export default function BackButton({
 }) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
 
   // Geri gidilemiyorsa (ör. tab kökü / ilk ekran) ve özel onPress yoksa gizle.
   // Değer yalnızca ekran odaklıyken tazelenir: stack kökündeki bir ekran,
@@ -59,53 +61,14 @@ export default function BackButton({
       }
     : null;
 
-  if (variant === "blur") {
-    return (
-      <TouchableOpacity
-        onPress={handlePress}
-        activeOpacity={0.8}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        style={[positionStyle, style]}
-      >
-        <AdaptiveBlurView tint="dark" intensity={60} style={styles.blurBox}>
-          <Ionicons name={iconName} size={22} color={color || "#fff"} />
-        </AdaptiveBlurView>
-      </TouchableOpacity>
-    );
-  }
-
   return (
-    <TouchableOpacity
+    <GlassIconButton
+      icon={iconName}
+      variant={variant === "blur" || variant === "plain" ? variant : "solid"}
+      color={color}
       onPress={handlePress}
-      activeOpacity={0.8}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      style={[
-        styles.solidBox,
-        { backgroundColor: theme.secondary, borderColor: theme.border },
-        positionStyle,
-        style,
-      ]}
-    >
-      <Ionicons name={iconName} size={22} color={color || theme.text.primary} />
-    </TouchableOpacity>
+      accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
+      style={[positionStyle, style]}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  solidBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  blurBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-});

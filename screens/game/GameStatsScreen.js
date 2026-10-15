@@ -6,11 +6,21 @@ import { useAuth } from "@context/AuthContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { loadGameData } from "@services/sceneGameService";
+import { effectiveStreak } from "@utils/dailyChallenge";
 import { computeLevel } from "@utils/gameScoring";
 import { GameNavCard, GameScreenShell } from "./GameScreenShell";
-import { getDifficultyConfig, getLocalizedGameLabel, getModeConfig } from "./gameConfig";
+import {
+  POSTER_GAME_ID,
+  getDifficultyConfig,
+  getLocalizedGameLabel,
+  getModeConfig,
+  parseModeScoreKey,
+} from "./gameConfig";
+import usePremiumScreenGuard from "@hooks/usePremiumScreenGuard";
+import { getGameTitle } from "./gameLabels";
 
 export default function GameStatsScreen({ navigation }) {
+  usePremiumScreenGuard("games", navigation);
   const { theme } = useTheme();
   const { language } = useLanguage();
   const { user } = useAuth();
@@ -24,6 +34,8 @@ export default function GameStatsScreen({ navigation }) {
 
   const data = state.data || {};
   const level = useMemo(() => computeLevel(data.totalXp), [data.totalXp]);
+  // Oynanmayan günlerde eski seri gösterilmesin (bkz. effectiveStreak).
+  const dayStreak = useMemo(() => effectiveStreak(data.dayStreak, data.lastPlayDay), [data.dayStreak, data.lastPlayDay]);
 
   const values = useMemo(() => {
     const questions = (data.totalCorrect || 0) + (data.totalWrong || 0);
@@ -42,13 +54,13 @@ export default function GameStatsScreen({ navigation }) {
     if (!byMode || typeof byMode !== "object") return [];
     return Object.entries(byMode)
       .map(([key, score]) => {
-        const underscore = key.lastIndexOf("_");
-        const modeId = key.slice(0, underscore);
-        const difficultyId = key.slice(underscore + 1);
+        const { gameId, modeId, difficultyId } = parseModeScoreKey(key);
+        const base = `${getLocalizedGameLabel(getModeConfig(modeId), language)} · ${getLocalizedGameLabel(getDifficultyConfig(difficultyId), language)}`;
         return {
           key,
           score: Number(score) || 0,
-          label: `${getLocalizedGameLabel(getModeConfig(modeId), language)} · ${getLocalizedGameLabel(getDifficultyConfig(difficultyId), language)}`,
+          // Afiş rekorları Klasik ile karışmasın: oyun adı öne konur.
+          label: gameId === POSTER_GAME_ID ? `${getGameTitle(POSTER_GAME_ID)} · ${base}` : base,
         };
       })
       .sort((a, b) => b.score - a.score);
@@ -72,8 +84,8 @@ export default function GameStatsScreen({ navigation }) {
                 <Text style={[styles.levelXp, { color: theme.text.muted }]}>{tr ? `${level.totalXp} XP toplam` : `${level.totalXp} XP total`}</Text>
               </View>
               <View style={styles.streakWrap}>
-                <Text style={styles.streakValue}>🔥 {Number(data.weeklyStreak) || 0}</Text>
-                <Text style={[styles.streakLabel, { color: theme.text.muted }]}>{tr ? "Haftalık seri" : "Weekly streak"}</Text>
+                <Text style={styles.streakValue}>🔥 {dayStreak}</Text>
+                <Text style={[styles.streakLabel, { color: theme.text.muted }]}>{tr ? "Gün serisi" : "Day streak"}</Text>
               </View>
             </View>
             <View style={[styles.progressTrack, { backgroundColor: theme.primary }]}>
@@ -150,7 +162,6 @@ function StatsSkeleton({ theme }) {
 }
 
 const styles = StyleSheet.create({
-  loading: { marginTop: 80 },
   levelCard: { borderRadius: 20, borderWidth: 1, padding: 16 },
   levelTop: { flexDirection: "row", alignItems: "center", gap: 12 },
   levelBadge: { minWidth: 56, height: 48, borderRadius: 15, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingHorizontal: 10 },

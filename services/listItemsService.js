@@ -25,7 +25,6 @@ import { nestedSummaryFields } from "../utils/firestoreNestedFields";
 import {
   doc,
   collection,
-  setDoc,
   deleteDoc,
   updateDoc,
   getDocs,
@@ -39,13 +38,14 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { trackFirestoreWrite, trackFirestoreDelete, trackFirestoreRead } from "./usageTrackerService";
+import { trackFirestoreWrite, trackFirestoreDelete } from "./usageTrackerService";
 import {
   createWatchEventId,
   materializeMovieWatchEvents,
   normalizeWatchDate,
 } from "../utils/watchHistory";
 import { resolveListName, RESERVED_LIST_NAMES } from "../utils/listShare";
+import { planRootListMerge } from "../utils/rootListMerge";
 import { assertWatchable } from "../utils/watchState";
 import {
   LIBRARY_ERROR,
@@ -650,6 +650,53 @@ export async function addToCustomRootList(uid, listName, item) {
   });
 
   return added;
+}
+
+/**
+ * Birden çok öğeyi ESKİ MODELDEKİ özel listeye TEK işlemde ekler (CineSwipe
+ * sepeti → liste). `addToCustomRootList` gibi idempotenttir: listede zaten olan
+ * öğe tekrar eklenmez, mevcut öğeler korunur. Liste yoksa oluşturulur ve
+ * arkadaş profilinde görünür işaretlenir (CreateListModal ile aynı varsayılan).
+ *
+ * `set(..., { merge: true })` dizi alanını BİRLEŞTİRMEZ, değiştirir; bu yüzden
+ * mevcut dizi işlem İÇİNDE okunup `planRootListMerge` ile birleştirilir.
+ *
+ * @returns {Promise<{ added: number, total: number, created: boolean }>}
+ */
+export async function addItemsToCustomRootList(uid, listName, items) {
+  const incoming = (Array.isArray(items) ? items : []).filter((it) => it?.id != null && it?.type);
+  if (!uid || !listName || incoming.length === 0) return { added: 0, total: 0, created: false };
+  assertCustomListName(listName);
+
+  const ref = doc(db, "Lists", uid);
+  const userRef = doc(db, "Users", uid);
+  let outcome = { added: 0, total: 0, created: false };
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists() ? snap.data() : {};
+    const existing = data[listName];
+    // Aynı ada sahip dizi OLMAYAN bir alan (ör. sayaç haritası) varsa ezme.
+    if (existing !== undefined && !Array.isArray(existing)) {
+      throw Object.assign(new Error("list-name-conflict"), { code: "list-name-conflict" });
+    }
+    const created = !Array.isArray(existing);
+    const plan = planRootListMerge(existing || [], incoming.map(normalizeItem));
+
+    const patch = {
+      [listName]: plan.merged,
+      updatedAt: serverTimestamp(),
+      _schemaVersion: 3,
+    };
+    plan.added.forEach((it) => {
+      patch[`statusIndex.${it.type}.${it.id}.isInOtherLists`] = true;
+    });
+    tx.set(ref, nestedSummaryFields(patch), { merge: true });
+    if (created) tx.set(userRef, { listVisible: { [listName]: true } }, { merge: true });
+    outcome = { added: plan.added.length, total: plan.merged.length, created };
+  });
+
+  return outcome;
 }
 
 /**

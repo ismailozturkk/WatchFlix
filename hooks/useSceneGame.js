@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dimensions } from "react-native";
 import { Image } from "expo-image";
-import { buildTmdbUrl } from "@utils/tmdbImageUtils";
+import { buildQuestionImageUrl } from "@utils/gameImage";
 import {
   buildWatchlistPool,
+  fetchDailyPool,
   fetchTitlePool,
   generateQuestion,
   loadQuestionHistory,
@@ -13,9 +14,14 @@ import {
 import {
   getDifficultyConfig,
   getModeConfig,
+  isPosterGame,
+  MODE_DAILY,
   MODE_SURVIVAL,
+  SCENE_GAME_ID,
 } from "@screens/game/gameConfig";
 import { computeQuestionScore, computeSessionXp } from "@utils/gameScoring";
+import { createStableSource, randomSource } from "@utils/seededRandom";
+import { dailySeed, dayKeyOf } from "@utils/dailyChallenge";
 import { usePremiumDailyGate } from "@hooks/usePremiumGate";
 import { getDailyUsed } from "@services/premiumUsage";
 import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
@@ -51,14 +57,25 @@ export default function useSceneGame({
   currentUser,
   modeId = "classic",
   difficultyId = "normal",
+  // "scene_guess" (sahne) veya "poster_puzzle" (afis). Soru turunu, istatistik
+  // anahtarini ve soru gecmisi kapsamini belirler.
+  gameId = SCENE_GAME_ID,
 }) {
+  const isDaily = modeId === MODE_DAILY;
+  const isPoster = isPosterGame(gameId);
+  // Gunluk oyunun "gunu" oyun baslarken SABITLENIR: gece yarisini asan oyun
+  // sorularin ait oldugu gunun tahtasina yazilir (service dailyKey'i kullanir).
+  const dailyKeyRef = useRef(null);
+  if (isDaily && !dailyKeyRef.current) dailyKeyRef.current = dayKeyOf();
   const modeConfig = getModeConfig(modeId);
   const difficultyConfig = getDifficultyConfig(difficultyId);
   const isSessionTimer = modeConfig.timerType === "session";
   const questionSeconds = difficultyConfig.timeSeconds;
   const timerTotalSeconds = isSessionTimer ? modeConfig.totalSeconds : questionSeconds;
   const questionTotal = modeConfig.questionCount || null;
-  const feedbackDelayMs = isSessionTimer ? 650 : 1400;
+  // Cevap sonrasi otomatik gecis suresi. Oyuncu "Sonraki" ile hemen gecebilir;
+  // bu sure yalnizca sonucu/dogru adi okumaya yetecek kadar uzun tutulur.
+  const feedbackDelayMs = isSessionTimer ? 700 : 2200;
 
   // Günlük oyun hakkı (Free 5 / Premium 20 / Max sınırsız). Hak, oyun GERÇEKTEN
   // başlayınca (ilk soru hazır) harcanır: ağ/havuz hatasında hak yanmaz.
@@ -88,6 +105,9 @@ export default function useSceneGame({
   const [lastPoints, setLastPoints] = useState(0);
   // Bu oturum mod+zorluk rekorunu kirdi mi (Part 13.1). saveGameScore doner.
   const [isNewRecord, setIsNewRecord] = useState(false);
+  // Kayit sonrasi sunucudan donen ilerleme ozeti (seviye atlama, seri) — sonuc
+  // ekrani bunu gosterir. Kayit basarisizsa/reddedildiyse null kalir.
+  const [progressSummary, setProgressSummary] = useState(null);
 
   const [timeLeft, setTimeLeft] = useState(() => timerTotalSeconds);
   const [timerRunning, setTimerRunning] = useState(false);
@@ -108,6 +128,11 @@ export default function useSceneGame({
   const queuedQuestionRef = useRef(null);
   const queuePrefetchPromiseRef = useRef(null);
   const generationRef = useRef(0);
+  // Soru uretiminin rastgelelik kaynagi: normal oyunda Math.random, gunlukte
+  // gunun tohumuyla sabit (herkeste ayni sorular). startGame secer.
+  const randomSourceRef = useRef(randomSource);
+  const questionKindRef = useRef(isPoster ? "poster" : "scene");
+  questionKindRef.current = isPoster ? "poster" : "scene";
   const roundRef = useRef(0);
   const streakRef = useRef(0);
   const timeLeftRef = useRef(timerTotalSeconds);
@@ -133,6 +158,9 @@ export default function useSceneGame({
   const questionJokerRef = useRef({ fifty: false, image: false });
   const sessionJokerCountRef = useRef(0);
   const pausedRef = useRef(false);
+  // Oturum bitirilirken (kayit suruyor) geri bildirim zamanlayicisi bir sonraki
+  // soruyu ekrana basmasin.
+  const endingRef = useRef(false);
   // Cikis onay sayfasi acikken sahne gorseli yuklenirse sayac baslatilmaz;
   // "devam et" denince baslatilmak uzere burada bekletilir.
   const pendingTimerStartRef = useRef(false);
@@ -270,7 +298,13 @@ export default function useSceneGame({
   }, []);
 
   const saveStatsToFirebase = useCallback(async () => {
-    if (!userUid || roundRef.current <= 0) {
+    // Hic soru cevaplanmadiysa (ilk soruda cikis / sure bitmeden kapatma) oyun
+    // sayilmaz: totalPlayed sismez, liderlige 0 skor yazilmaz.
+    if (
+      !userUid ||
+      roundRef.current <= 0 ||
+      (statsRef.current.answeredHistory?.length || 0) === 0
+    ) {
       setSaveStatus("saved");
       return true;
     }
@@ -283,7 +317,7 @@ export default function useSceneGame({
     setSaveStatus("saving");
     const savePromise = (async () => {
       const currentStats = statsRef.current;
-      const isPersonalList = PERSONAL_SOURCES.has(source);
+      const isPersonalList = !isDaily && PERSONAL_SOURCES.has(source);
 
       // XP skordan bagimsizdir; kisisel liste oyunlari da ilerleme kazandirir
       // (Part 11.3). Liderlik (bestScore) ise saveGameScore icinde Klasik+Normal
@@ -292,6 +326,7 @@ export default function useSceneGame({
         correctCount: currentStats.totalCorrect,
         bestStreak: currentStats.bestStreak,
         outcome: outcomeRef.current,
+        isDaily,
       });
       setXpEarned(xp);
 
@@ -312,7 +347,9 @@ export default function useSceneGame({
         sessionId: sessionIdRef.current,
         modeId,
         difficultyId,
-        sourceId: source,
+        sourceId: isDaily ? "daily" : source,
+        gameId,
+        dailyKey: isDaily ? dailyKeyRef.current : null,
         isPersonal: isPersonalList,
         score: currentStats.score,
         bestScore: currentStats.score,
@@ -335,6 +372,7 @@ export default function useSceneGame({
         averageAnswerMs,
         gameVersion: 1,
       };
+      if (currentUser?.photoURL !== undefined) payload.photoURL = currentUser.photoURL || null;
       if (currentUser?.displayName) payload.displayName = currentUser.displayName;
       if (currentUser?.avatarIndex !== undefined) {
         payload.avatarIndex = currentUser.avatarIndex;
@@ -346,14 +384,23 @@ export default function useSceneGame({
       // Yinelenen kayitta rekor durumu degismez; ilk basarili kayitta guncellenir.
       if (saveResult && !saveResult.duplicate && !saveResult.rejected) {
         setIsNewRecord(Boolean(saveResult.newRecord));
+        setProgressSummary({
+          levelBefore: Number(saveResult.levelBefore) || Number(saveResult.level) || 1,
+          level: Number(saveResult.level) || 1,
+          totalXp: Number(saveResult.totalXp) || 0,
+          dayStreak: Number(saveResult.dayStreak) || 0,
+          dailyStreak: Number(saveResult.dailyStreak) || 0,
+        });
       }
 
+      // Gunluk sorular herkese sabit oldugu icin "gordugum sorular" gecmisine
+      // yazilmaz; yoksa normal oyunlarda bu 10 baslik haksiz yere elenirdi.
       let historySaved = true;
-      if (currentStats.answeredHistory.length > 0) {
+      if (!isDaily && currentStats.answeredHistory.length > 0) {
         historySaved = await saveQuestionHistory(
           userUid,
           currentStats.answeredHistory,
-          `${source}_${language || "tr"}`,
+          `${isPoster ? "poster_" : ""}${source}_${language || "tr"}`,
         );
       }
 
@@ -376,10 +423,11 @@ export default function useSceneGame({
 
     savePromiseRef.current = savePromise;
     return savePromise;
-  }, [currentUser, difficultyId, language, modeId, source, userUid]);
+  }, [currentUser, difficultyId, gameId, isDaily, isPoster, language, modeId, source, userUid]);
 
   const finalizeAndEnd = useCallback(
     async (outcomeValue) => {
+      endingRef.current = true;
       generationRef.current += 1;
       setTimerRunning(false);
       timerDeadlineRef.current = null;
@@ -531,7 +579,7 @@ export default function useSceneGame({
     // Part 21.3: modul yuklenirken bir kez okunan Dimensions.get yerine
     // ihtiyac aninda (rotasyon/katlanir cihazda da guncel) okunur.
     const { width: screenW } = Dimensions.get("window");
-    const imageUrl = buildTmdbUrl(question.imagePath, "backdrop", screenW, "good");
+    const imageUrl = buildQuestionImageUrl(question.imagePath, question.kind, screenW);
     if (!imageUrl) return Promise.resolve(false);
     return Image.prefetch(imageUrl)
       .then(() => true)
@@ -559,6 +607,7 @@ export default function useSceneGame({
         queuedRound,
         difficultyConfigRef.current.optionCount,
         difficultyConfigRef.current.id,
+        { source: randomSourceRef.current, kind: questionKindRef.current },
       )
         .then((question) => {
           if (generation !== generationRef.current) return null;
@@ -601,6 +650,7 @@ export default function useSceneGame({
         nextRound,
         difficultyConfigRef.current.optionCount,
         difficultyConfigRef.current.id,
+        { source: randomSourceRef.current, kind: questionKindRef.current },
       )
         .then((question) => {
           if (generation !== generationRef.current) return null;
@@ -653,6 +703,7 @@ export default function useSceneGame({
     async (selectedSource) => {
       const generation = generationRef.current + 1;
       generationRef.current = generation;
+      endingRef.current = false;
       const mode = modeConfigRef.current;
       // Bugünkü hak bittiyse oyun ekranı tam sayfa "hak doldu" durumunu çizer
       // (SceneGuessGameScreen → GameErrorState, "Planları gör").
@@ -692,6 +743,7 @@ export default function useSceneGame({
       sessionJokerCountRef.current = 0;
       setXpEarned(0);
       setIsNewRecord(false);
+      setProgressSummary(null);
       questionStartedAtRef.current = 0;
       setOutcome(null);
       outcomeRef.current = null;
@@ -716,28 +768,43 @@ export default function useSceneGame({
         }
 
         const optionCount = difficultyConfigRef.current.optionCount;
-        const historyScope = `${selectedSource}_${language || "tr"}`;
+        const daily = mode.id === MODE_DAILY;
+        // Gunluk: gunun tohumuyla sabit kaynak → herkeste ayni sorular.
+        randomSourceRef.current = daily
+          ? createStableSource(dailySeed(dailyKeyRef.current || dayKeyOf()))
+          : randomSource;
+        const historyScope = `${isPoster ? "poster_" : ""}${selectedSource}_${language || "tr"}`;
         let historySet = new Set();
-        if (userUid) {
+        if (userUid && !daily) {
           historySet = new Set(
             await loadQuestionHistory(userUid, historyScope),
           );
         }
 
         let titlePool;
-        if (PERSONAL_SOURCES.has(selectedSource)) {
+        if (daily) {
+          titlePool = await fetchDailyPool(apiKey, language, dailyKeyRef.current || dayKeyOf());
+        } else if (PERSONAL_SOURCES.has(selectedSource)) {
           titlePool = buildWatchlistPool(
             getListForSource(allLists, selectedSource),
             selectedSource,
           );
-          if (titlePool.length < optionCount) {
-            throw Object.assign(new Error("Personal source has too few titles"), {
-              code: "insufficient_personal_source",
-              availableCount: titlePool.length,
-            });
-          }
         } else {
           titlePool = await fetchTitlePool(apiKey, language, selectedSource);
+        }
+        // Afis oyununda afisi olmayan yapim soru olamaz; havuz buna gore sayilir.
+        if (isPoster && Array.isArray(titlePool)) {
+          titlePool = titlePool.filter((item) => item.posterPath);
+        }
+        if (
+          PERSONAL_SOURCES.has(selectedSource) &&
+          !daily &&
+          titlePool.length < optionCount
+        ) {
+          throw Object.assign(new Error("Personal source has too few titles"), {
+            code: "insufficient_personal_source",
+            availableCount: titlePool.length,
+          });
         }
 
         if (generation !== generationRef.current) return;
@@ -765,6 +832,7 @@ export default function useSceneGame({
           1,
           optionCount,
           difficultyConfigRef.current.id,
+          { source: randomSourceRef.current, kind: questionKindRef.current },
         );
         if (generation !== generationRef.current) return;
         if (!firstQuestion || !reserveQuestion(firstQuestion)) {
@@ -796,6 +864,7 @@ export default function useSceneGame({
     [
       allLists,
       apiKey,
+      isPoster,
       language,
       prepareNextQuestion,
       reserveQuestion,
@@ -849,6 +918,7 @@ export default function useSceneGame({
         roundRef.current + 1,
         difficultyConfigRef.current.optionCount,
         difficultyConfigRef.current.id,
+        { source: randomSourceRef.current, kind: questionKindRef.current },
       ).catch(() => null);
     }
 
@@ -904,15 +974,10 @@ export default function useSceneGame({
 
   // Cevap geri bildiriminden sonra moda gore devam/bitis karari (Part 8).
   const advanceAfterAnswer = useCallback(async () => {
-    if (phaseRef.current !== "answered") return;
+    if (phaseRef.current !== "answered" || endingRef.current) return;
     const mode = modeConfigRef.current;
 
-    if (mode.id === "classic") {
-      if (roundRef.current >= (mode.questionCount || 10)) {
-        await finalizeAndEnd("completed");
-        return;
-      }
-    } else if (mode.id === MODE_SURVIVAL) {
+    if (mode.id === MODE_SURVIVAL) {
       if (livesRef.current <= 0) {
         await finalizeAndEnd("failed");
         return;
@@ -922,12 +987,17 @@ export default function useSceneGame({
         await finalizeAndEnd("completed");
         return;
       }
+    } else if (roundRef.current >= (mode.questionCount || 10)) {
+      // Sabit soru sayili modlar (Klasik, Gunluk).
+      await finalizeAndEnd("completed");
+      return;
     }
 
     await goToNextQuestion();
   }, [finalizeAndEnd, goToNextQuestion]);
 
   const quitGame = useCallback(async () => {
+    endingRef.current = true;
     generationRef.current += 1;
     setTimerRunning(false);
     timerDeadlineRef.current = null;
@@ -1040,6 +1110,10 @@ export default function useSceneGame({
     xpEarned,
     lastPoints,
     isNewRecord,
+    progressSummary,
+    isDaily,
+    isPoster,
+    dailyKey: dailyKeyRef.current,
     // Mode/difficulty derived values for the UI.
     modeConfig,
     difficultyConfig,

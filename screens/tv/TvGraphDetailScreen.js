@@ -31,7 +31,7 @@ import {
   useApiSettings,
   useImageQualitySettings,
 } from "../../context/AppSettingsContext";
-import ScreenSnow from "../../components/ScreenSnow";
+import ScreenDecor from "../../components/ScreenDecor";
 
 // ─── Rating Renk Sistemi ──────────────────────────────────────────────────────
 // Ortak katmanlar utils/ratingColors.js'te — story "Bölüm Graph" bloğu da kullanır.
@@ -204,7 +204,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const { API_KEY } = useApiSettings();
 
   // Animasyon ref'i – panel geçişi için
@@ -420,7 +420,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
-      <ScreenSnow />
+      <ScreenDecor scope="details" iconOpacity={0.25} />
 
       {/* ── Üst Bilgi Paneli ─────────────────────────────────────────────── */}
       <View style={styles.infoPanelWrapper}>

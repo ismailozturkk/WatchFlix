@@ -1,6 +1,12 @@
 const axios = require("axios");
 
-const token = "Bearer " + "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhOGQ3NjQ0YzNjMjVjMDQzMDgzODgyMTRkOTJjY2UyOSIsIm5iZiI6MTcwMzU0MzE2Ny4wMDgsInN1YiI6IjY1OGEwMTdlNjg4Y2QwNTdlYjg1NzA2NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.LYAmyTf12pDD4vXizwYzLEp2HqpB6r7BurY1_A4eLqE";
+// TMDB "API Read Access Token" depoda tutulmaz: calistirmadan once ortam degiskeni olarak ver.
+//   PowerShell:  $env:TMDB_READ_TOKEN = "..."
+if (!process.env.TMDB_READ_TOKEN) {
+  console.error("TMDB_READ_TOKEN ortam degiskeni gerekli.");
+  process.exit(1);
+}
+const token = "Bearer " + process.env.TMDB_READ_TOKEN;
 
 async function searchTv(name) {
   try {

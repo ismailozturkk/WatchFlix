@@ -9,8 +9,9 @@
 //     iOS `<Ad>.appiconset`)
 // __tests__/appIcons.test.js bu eşliği ve app.json'daki görsel yollarını doğrular.
 //
-// Görseller (assets/icon_default, assets/icon_glass) bileşende require edilir;
-// burada tutulmaz ki katalog jest'te görsel yükleyiciye ihtiyaç duymasın.
+// Görseller (assets/icon_default, assets/icon_glass) components/appLogoSources.js
+// içinde require edilir; burada tutulmaz ki katalog saf kalsın. Seçili simge
+// services/appIconStore.js'te; uygulama içindeki TÜM logolar oradan beslenir.
 
 /** Birincil (varsayılan) simgenin yerel adı. iOS'ta `setAlternateIconName(null)`. */
 export const DEFAULT_NATIVE_NAME = "Default";
@@ -33,6 +34,12 @@ export const APP_ICONS = Object.freeze([
 ]);
 
 export const APP_ICON_NATIVE_NAMES = Object.freeze(APP_ICONS.map((i) => i.nativeName));
+export const APP_ICON_IDS = Object.freeze(APP_ICONS.map((i) => i.id));
+
+/** Katalogda var olan bir simge kimliği mi? (depodan okunan değeri doğrulamak için) */
+export function isKnownIconId(id) {
+  return APP_ICON_IDS.includes(id);
+}
 
 /** Yerel ad → katalog kimliği. Bilinmeyen/boş ad varsayılana düşer. */
 export function iconIdFromNativeName(nativeName) {

@@ -21,10 +21,14 @@ export default function StaggerItem({
   step = 55,      // öğeler arası gecikme (ms)
   maxStaggered = 10, // bu indeksten sonra gecikme sabitlenir (scroll'da takılmasın)
   offsetY = 16,   // başlangıç dikey kayma
+  // false → animasyonsuz, doğrudan tam görünür. YALNIZ bağlanma anında okunur
+  // (bkz. hooks/useEntranceGate.js: ilk yükleme penceresi / Hareketi Azalt).
+  animate = true,
 }) {
-  const anim = useRef(new Animated.Value(0)).current;
+  const anim = useRef(new Animated.Value(animate ? 0 : 1)).current;
 
   useEffect(() => {
+    if (!animate) return;
     Animated.timing(anim, {
       toValue: 1,
       duration,

@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
-  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -11,9 +10,9 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { getAuth } from "firebase/auth";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import { useFriends } from "@context/FriendsContext";
-import { useProfileUi } from "@context/ProfileUiContext";
 import { useTheme } from "@context/ThemeContext";
 import { subscribeUserGroups } from "@services/groupsService";
 import { i18nText } from "@utils/i18nText";
@@ -36,7 +35,6 @@ export default function NewConversationSheet({
   subtitle,
 }) {
   const { theme } = useTheme();
-  const { avatars } = useProfileUi();
   const { friends, loading, isBlocked } = useFriends();
   const [query, setQuery] = useState("");
   const [recipientType, setRecipientType] = useState("friend");
@@ -102,14 +100,14 @@ export default function NewConversationSheet({
             {subtitle || i18nText("autoI18n.sohbet_icin_arkadas_sec", "Sohbet etmek istediğin arkadaşını seç")}
           </Text>
         </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+        <GlassCloseButton
+          size={36}
+          fallbackRadius={12}
+          iconSize={20}
+          color={theme.text.primary}
+          backgroundColor={theme.secondary}
           onPress={close}
-          style={[styles.close, { backgroundColor: theme.secondary }]}
-        >
-          <Ionicons name="close" size={20} color={theme.text.primary} />
-        </TouchableOpacity>
+        />
       </View>
 
       {includeGroups && (
@@ -258,7 +256,6 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 18, fontWeight: "900" },
   subtitle: { fontSize: 11.5, lineHeight: 16, marginTop: 2 },
-  close: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   search: { height: 46, borderRadius: 14, borderWidth: 1, marginTop: 16, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 },
   tabs: { height: 42, borderRadius: 13, borderWidth: 1, marginTop: 15, padding: 3, flexDirection: "row", gap: 4 },
   tab: { flex: 1, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
@@ -269,10 +266,6 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 28 },
   emptyTitle: { fontSize: 14, fontWeight: "700", textAlign: "center" },
   friendRow: { minHeight: 66, borderRadius: 16, borderWidth: 1, paddingHorizontal: 11, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 11 },
-  avatarWrap: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, overflow: "hidden" },
-  avatar: { width: "100%", height: "100%", borderRadius: 22 },
-  avatarFallback: { alignItems: "center", justifyContent: "center" },
-  avatarInitial: { color: "#fff", fontSize: 16, fontWeight: "900" },
   friendCopy: { flex: 1, minWidth: 0 },
   friendName: { fontSize: 14.5, fontWeight: "800" },
   username: { fontSize: 11.5, marginTop: 2 },

@@ -24,14 +24,11 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
 import { i18nText } from "../../utils/i18nText";
 
-import {
-  Ionicons,
-  MaterialCommunityIcons,
-  Fontisto,
-} from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 /**
  * Renge alpha ekle — hem hex (#aabbcc) hem hsl(...) destekler.
@@ -154,50 +151,184 @@ const introStyles = StyleSheet.create({
   },
 });
 
-// ─── HERO STATS CARD ─────────────────────────────────────────────────────────
-//
-// Tepe noktasında büyük gradient kart. Watched count + zaman + rank rozeti.
-// İçeriği toggle ile genişletilebilir (bonus stats: toplam dakika + türler).
+// ─── SEGMENTED CONTROL ───────────────────────────────────────────────────────
+// Grafik dönemi (günlük/aylık/yıllık) ve birim (dk/sa/gün) seçicileri aynı
+// kalıbı paylaşır; tek yerde dursun ki iki seçici hiç ayrışmasın.
 
-export const StatsHeroCard = memo(function StatsHeroCard({
-  theme,
-  primaryCount,
-  primaryLabel,
-  // Büyük sayı tekrarlı toplamı gösterir; alt satır aynı ölçünün tekrarsız
-  // karşılığıdır. İkisi yan yana durmadan "500 film" yanıltıcı okunuyordu.
-  primarySubLabel,
-  secondaryCount,
-  secondaryLabel,
-  secondarySubLabel,
-  tertiaryCount,
-  tertiaryLabel,
-  tertiarySubLabel,
-  chartDataByPeriod = {},
-  rewatchItems = [],
-  expanded,
-  onToggleExpand,
-  rankColor,
-  rankLevel,
-  rankName,
-  totalMinutes,
-  timeDisplayMode,
-  onTimePress,
-  formatDuration,
-  genres = [],
-  genresLabel = i18nText("autoI18n.en_cok_izlenen", "En çok izlenen"),
-  rankLabel = "Seviye",
+const SegmentedControl = memo(function SegmentedControl({
+  options,
+  value,
+  onChange,
+  color,
+  inactiveColor,
+  flex = 1,
 }) {
-  const [chartPeriod, setChartPeriod] = useState("daily");
-  const [chartUnit, setChartUnit] = useState("minutes");
+  return (
+    <View
+      style={[
+        heroStyles.segmented,
+        { flex, borderColor: withAlpha(color, 0.2) },
+      ]}
+    >
+      {options.map((option) => {
+        const active = value === option.key;
+        return (
+          <TouchableOpacity
+            key={option.key}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            onPress={() => onChange(option.key)}
+            activeOpacity={0.78}
+            style={[
+              heroStyles.segmentButton,
+              active && { backgroundColor: withAlpha(color, 0.22) },
+            ]}
+          >
+            <Text
+              allowFontScaling={false}
+              style={[
+                heroStyles.segmentText,
+                { color: active ? color : inactiveColor },
+              ]}
+            >
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+});
+
+// ─── STAT TILE ───────────────────────────────────────────────────────────────
+// Hero'nun sayı kutucuğu: ikon + büyük sayı + etiket + (varsa) tekrarsız rozeti.
+// Büyük sayı tekrarlı toplamı gösterir; alt rozet aynı ölçünün tekrarsız
+// karşılığıdır. İkisi yan yana durmadan "500 film" yanıltıcı okunuyordu.
+
+const StatTile = memo(function StatTile({
+  theme,
+  accent,
+  icon,
+  count,
+  label,
+  subLabel,
+  large,
+}) {
+  const surface = {
+    backgroundColor: withAlpha(theme.primary, 0.42),
+    borderColor: withAlpha(accent, 0.2),
+  };
+
+  // Tek kutucuk tüm genişliği kaplar: köşeye yapışık küçük ikon + sola yaslı
+  // 10.5 pt etiket bu genişlikte kaybolup hizasız duruyordu. Bunun yerine hemen
+  // altındaki "Toplam izlenme" satırıyla aynı kalıp (soldaki ikon kutusu, üstte
+  // etiket, altta değer) kullanılır; iki satırın metin sütunu aynı hizada başlar.
+  if (large) {
+    return (
+      <View style={[heroStyles.tile, heroStyles.tileWide, surface]}>
+        <View style={[heroStyles.tileWideIcon, { backgroundColor: withAlpha(accent, 0.2) }]}>
+          <Ionicons name={icon} size={19} color={accent} />
+        </View>
+        <View style={heroStyles.tileWideCopy}>
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+            style={[heroStyles.tileLabelWide, { color: theme.text.muted }]}
+          >
+            {label}
+          </Text>
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+            style={[heroStyles.tileNumberLarge, { color: theme.text.primary }]}
+          >
+            {count}
+          </Text>
+        </View>
+        {!!subLabel && (
+          <View style={[heroStyles.tileSubWide, { backgroundColor: withAlpha(accent, 0.14) }]}>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+              style={[heroStyles.tileSubTextWide, { color: accent }]}
+            >
+              {subLabel}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={[heroStyles.tile, surface]}>
+      <View style={[heroStyles.tileIcon, { backgroundColor: withAlpha(accent, 0.16) }]}>
+        <Ionicons name={icon} size={15} color={accent} />
+      </View>
+      <Text
+        allowFontScaling={false}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
+        style={[heroStyles.tileNumber, { color: theme.text.primary }]}
+      >
+        {count}
+      </Text>
+      <Text
+        allowFontScaling={false}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+        style={[heroStyles.tileLabel, { color: theme.text.muted }]}
+      >
+        {label}
+      </Text>
+      {!!subLabel && (
+        <View style={[heroStyles.tileSub, { backgroundColor: withAlpha(accent, 0.14) }]}>
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            style={[heroStyles.tileSubText, { color: accent }]}
+          >
+            {subLabel}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+});
+
+// ─── WATCH RHYTHM CHART ──────────────────────────────────────────────────────
+// Günlük/aylık/yıllık izleme sütunları. Yalnız "Daha fazla" alanında çizilir;
+// kapanınca bileşen sökülür. Bu yüzden dönem ve birim seçimi hero'da tutulur
+// (yeniden açınca seçim kaybolmasın), yalnız seçili sütun yerel kalır.
+
+const WatchRhythmChart = memo(function WatchRhythmChart({
+  theme,
+  accent,
+  chartDataByPeriod,
+  chartPeriod,
+  onChartPeriodChange,
+  chartUnit,
+  onChartUnitChange,
+}) {
   const [selectedChartKey, setSelectedChartKey] = useState(null);
-  // Gradient renkleri rank renginden türetiyoruz (dinamik).
-  const grad1 = rankColor || theme.accent;
-  const grad2 = theme.secondary;
+
   const chartData = chartDataByPeriod?.[chartPeriod] || [];
   const chartMax = Math.max(...chartData.map((item) => item.value), 1);
+  const periodTotal = chartData.reduce((sum, item) => sum + item.value, 0);
   const selectedChartPoint = chartData.find((point) => point.key === selectedChartKey)
     || [...chartData].reverse().find((point) => point.value > 0)
     || chartData[chartData.length - 1];
+
   const periodOptions = [
     { key: "daily", label: i18nText("autoI18n.gunluk", "Günlük") },
     { key: "monthly", label: i18nText("autoI18n.aylik", "Aylık") },
@@ -208,6 +339,7 @@ export const StatsHeroCard = memo(function StatsHeroCard({
     { key: "hours", label: i18nText("autoI18n.saat_kisa", "sa") },
     { key: "days", label: i18nText("autoI18n.gun_kisa", "gün") },
   ];
+  const unitSuffix = unitOptions.find((option) => option.key === chartUnit)?.label || "";
   const chartValueLabel = (minutes) => {
     if (!minutes) return "";
     const divisor = chartUnit === "days" ? 1440 : chartUnit === "hours" ? 60 : 1;
@@ -219,9 +351,264 @@ export const StatsHeroCard = memo(function StatsHeroCard({
         : value < 10
           ? 1
           : 0;
-    const suffix = unitOptions.find((option) => option.key === chartUnit)?.label || "";
-    return `${value.toFixed(decimals).replace(/\.0$/, "")}${suffix}`;
+    return `${value.toFixed(decimals).replace(/\.0$/, "")}${unitSuffix}`;
   };
+
+  return (
+    <View
+      style={[
+        heroStyles.chartCard,
+        {
+          backgroundColor: withAlpha(theme.primary, 0.42),
+          borderColor: withAlpha(accent, 0.18),
+        },
+      ]}
+    >
+      <View style={heroStyles.chartHeader}>
+        <View style={heroStyles.chartTitleCol}>
+          <View style={heroStyles.chartTitleRow}>
+            <Ionicons name="stats-chart" size={13} color={accent} />
+            <Text style={[heroStyles.chartTitle, { color: theme.text.secondary }]}>
+              {i18nText("autoI18n.izleme_ritmi", "İzleme ritmi")}
+            </Text>
+          </View>
+          {periodTotal > 0 && (
+            <Text style={[heroStyles.chartTotal, { color: theme.text.muted }]}>
+              {i18nText(
+                "autoI18n.istatistik_donem_toplami",
+                `Toplam ${chartValueLabel(periodTotal)}`,
+                { value: chartValueLabel(periodTotal) },
+              )}
+            </Text>
+          )}
+        </View>
+        {chartData.length > 0 && (
+          <View style={heroStyles.chartRangeWrap}>
+            <Text style={[heroStyles.chartRange, { color: theme.text.muted }]}>
+              {chartData[0].dateLabel} – {chartData[chartData.length - 1].dateLabel}
+            </Text>
+            {!!selectedChartPoint?.value && (
+              <Text style={[heroStyles.chartSelectedValue, { color: accent }]}>
+                {selectedChartPoint.dayLabel} · {chartValueLabel(selectedChartPoint.value)}
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+
+      <View style={heroStyles.chartControls}>
+        <SegmentedControl
+          options={periodOptions}
+          value={chartPeriod}
+          onChange={onChartPeriodChange}
+          color={accent}
+          inactiveColor={theme.text.muted}
+          flex={1.35}
+        />
+        <SegmentedControl
+          options={unitOptions}
+          value={chartUnit}
+          onChange={onChartUnitChange}
+          color={accent}
+          inactiveColor={theme.text.muted}
+        />
+      </View>
+
+      <View style={heroStyles.chartBars}>
+        {chartData.map((point) => {
+          const selected = selectedChartPoint?.key === point.key;
+          const dense = chartData.length > 12;
+          const height = point.value > 0
+            ? Math.max(7, Math.round((point.value / chartMax) * 52))
+            : 4;
+          const barWidth = dense ? 6 : chartData.length > 7 ? 12 : 18;
+          const valueLabel = chartData.length <= 7 || selected
+            ? chartValueLabel(point.value)
+            : "";
+          const visibleValueLabel = dense && selected
+            ? `${point.dayLabel} · ${valueLabel || `0${unitSuffix}`}`
+            : valueLabel;
+          return (
+            <TouchableOpacity
+              key={point.key}
+              activeOpacity={0.75}
+              onPress={() => setSelectedChartKey(point.key)}
+              style={[heroStyles.chartColumn, selected && { zIndex: 10 }]}
+            >
+              <Text
+                numberOfLines={1}
+                style={[
+                  heroStyles.chartValue,
+                  dense && selected && heroStyles.chartValueTooltip,
+                  {
+                    color: dense && selected ? accent : theme.text.muted,
+                    backgroundColor: dense && selected ? theme.secondary : "transparent",
+                    borderColor: dense && selected ? withAlpha(accent, 0.55) : "transparent",
+                  },
+                ]}
+              >
+                {visibleValueLabel}
+              </Text>
+              {/* Sütunun oturduğu soluk kulvar: boş günler de ölçeği okutur. */}
+              <View style={heroStyles.chartTrack}>
+                <View
+                  style={[
+                    heroStyles.chartLane,
+                    {
+                      width: barWidth,
+                      backgroundColor: withAlpha(theme.text.muted, 0.1),
+                    },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={point.value > 0
+                      ? [withAlpha(accent, 0.95), withAlpha(accent, 0.45)]
+                      : [withAlpha(theme.text.muted, 0.2), withAlpha(theme.text.muted, 0.1)]}
+                    style={[
+                      heroStyles.chartBar,
+                      {
+                        height,
+                        borderColor: selected ? accent : "transparent",
+                        borderWidth: selected ? 1 : 0,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+              <Text
+                style={[
+                  heroStyles.chartDay,
+                  dense && heroStyles.chartDayDense,
+                  { color: selected ? accent : theme.text.secondary },
+                ]}
+              >
+                {point.dayLabel}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+});
+
+// ─── GENRE BARS ──────────────────────────────────────────────────────────────
+// En çok izlenen türler: sıra + ad + göreli çubuk + adet. İlk tür rank renginde.
+
+const GenreBars = memo(function GenreBars({ theme, accent, genres, title }) {
+  const rows = genres.slice(0, 5);
+  if (!rows.length) return null;
+  const max = Math.max(...rows.map((g) => g.count), 1);
+
+  return (
+    <View style={heroStyles.genresWrap}>
+      <Text style={[heroStyles.sectionLabel, { color: theme.text.muted }]}>{title}</Text>
+      {rows.map((genre, index) => (
+        <View key={`${genre.name}-${index}`} style={heroStyles.genreRow}>
+          <View style={heroStyles.genreNameCol}>
+            {index === 0 ? (
+              <MaterialCommunityIcons name="crown" size={12} color={accent} />
+            ) : (
+              <Text style={[heroStyles.genreIndex, { color: theme.text.muted }]}>
+                {index + 1}
+              </Text>
+            )}
+            <Text
+              numberOfLines={1}
+              style={[heroStyles.genreName, { color: theme.text.primary }]}
+            >
+              {genre.name}
+            </Text>
+          </View>
+          <View
+            style={[
+              heroStyles.genreTrack,
+              { backgroundColor: withAlpha(theme.text.muted, 0.12) },
+            ]}
+          >
+            <View
+              style={[
+                heroStyles.genreFill,
+                {
+                  width: `${Math.max(6, Math.round((genre.count / max) * 100))}%`,
+                  backgroundColor: index === 0 ? accent : withAlpha(accent, 0.55),
+                },
+              ]}
+            />
+          </View>
+          <Text style={[heroStyles.genreCount, { color: theme.text.secondary }]}>
+            {genre.count}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+});
+
+// ─── HERO STATS CARD ─────────────────────────────────────────────────────────
+//
+// Ekranın tepesindeki özet kartı: rank rozeti, sayı kutucukları ve toplam süre.
+// "Daha fazla" ile açılınca izleme ritmi, tür dağılımı ve en çok tekrar
+// izlenenler gelir. Toplam süre eskiden "Daha fazla"nın arkasındaydı; sayfanın
+// asıl cevabı olduğu için sayılarla birlikte ilk görünene taşındı. İzleme ritmi
+// ise tersine: kart katlanan başlığın içinde olduğundan, hep açık durması liste
+// alanından ~190 pt yer alıyordu; ikincil bilgi olduğu için açılır alana alındı.
+
+export const StatsHeroCard = memo(function StatsHeroCard({
+  theme,
+  primaryCount,
+  primaryLabel,
+  primarySubLabel,
+  primaryIcon = "film-outline",
+  secondaryCount,
+  secondaryLabel,
+  secondarySubLabel,
+  secondaryIcon = "play-circle-outline",
+  tertiaryCount,
+  tertiaryLabel,
+  tertiarySubLabel,
+  tertiaryIcon = "layers-outline",
+  chartDataByPeriod = {},
+  rewatchItems = [],
+  expanded,
+  onToggleExpand,
+  rankColor,
+  rankLevel,
+  rankName,
+  totalMinutes,
+  timeDisplayMode,
+  onTimePress,
+  formatDuration,
+  // [{ name, count }] — izlenme sıklığına göre azalan.
+  genres = [],
+  genresLabel = i18nText("autoI18n.istatistik_en_cok_izlenen_turler", "En çok izlenen türler"),
+}) {
+  // Gradient renkleri rank renginden türetiyoruz (dinamik).
+  const accent = rankColor || theme.accent;
+  const grad2 = theme.secondary;
+
+  // İzleme ritmi grafiği yalnız açılır alanda durur (kapanınca sökülür); dönem ve
+  // birim seçimi burada tutulur ki yeniden açınca sıfırlanmasın.
+  const [chartPeriod, setChartPeriod] = useState("daily");
+  const [chartUnit, setChartUnit] = useState("minutes");
+
+  const stats = [
+    { key: "primary", count: primaryCount, label: primaryLabel, sub: primarySubLabel, icon: primaryIcon },
+    secondaryCount != null && {
+      key: "secondary",
+      count: secondaryCount,
+      label: secondaryLabel,
+      sub: secondarySubLabel,
+      icon: secondaryIcon,
+    },
+    tertiaryCount != null && {
+      key: "tertiary",
+      count: tertiaryCount,
+      label: tertiaryLabel,
+      sub: tertiarySubLabel,
+      icon: tertiaryIcon,
+    },
+  ].filter(Boolean);
 
   return (
     <View
@@ -231,237 +618,104 @@ export const StatsHeroCard = memo(function StatsHeroCard({
       ]}
     >
       <LinearGradient
-        colors={[withAlpha(grad1, 0.27), grad2, theme.primary]}
+        colors={[withAlpha(accent, 0.27), grad2, theme.primary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[heroStyles.card, { borderColor: theme.border }]}
       >
         <View
           pointerEvents="none"
-          style={[heroStyles.decorOrb, { backgroundColor: withAlpha(grad1, 0.11) }]}
+          style={[heroStyles.decorOrb, { backgroundColor: withAlpha(accent, 0.11) }]}
         />
         <View
           pointerEvents="none"
-          style={[heroStyles.accentLine, { backgroundColor: grad1 }]}
+          style={[heroStyles.accentLine, { backgroundColor: accent }]}
         />
 
-        {/* Rank badge — sağ üst */}
-        {rankLevel != null && (
-          <View
-            style={[
-              heroStyles.rankBadge,
-              { backgroundColor: withAlpha(rankColor, 0.2), borderColor: rankColor },
-            ]}
-          >
-            <MaterialCommunityIcons name="shield-star" size={12} color={rankColor} />
-            <Text style={[heroStyles.rankText, { color: rankColor }]}>
-              {rankName || `${rankLabel} ${rankLevel + 1}`}
+        {/* Üst satır: özet başlığı + rank rozeti */}
+        <View style={heroStyles.topRow}>
+          <View style={heroStyles.eyebrowRow}>
+            <View style={[heroStyles.eyebrowDot, { backgroundColor: accent }]} />
+            <Text
+              allowFontScaling={false}
+              style={[heroStyles.eyebrow, { color: theme.text.muted }]}
+            >
+              {i18nText("autoI18n.istatistik_izleme_ozeti", "İzleme özeti")}
             </Text>
           </View>
-        )}
-
-        {/* Main row: count(s) — 1, 2 veya 3 sütun */}
-        <View style={heroStyles.mainRow}>
-          <View style={heroStyles.countCol}>
-            <Text style={[heroStyles.bigNumber, { color: theme.text.primary }]}>
-              {primaryCount}
-            </Text>
-            <Text style={[heroStyles.label, { color: theme.text.muted }]}>
-              {primaryLabel}
-            </Text>
-            {!!primarySubLabel && (
-              <Text style={[heroStyles.subLabel, { color: grad1 }]}>
-                {primarySubLabel}
+          {rankLevel != null && !!rankName && (
+            <View
+              style={[
+                heroStyles.rankBadge,
+                { backgroundColor: withAlpha(accent, 0.18), borderColor: withAlpha(accent, 0.7) },
+              ]}
+            >
+              <MaterialCommunityIcons name="shield-star" size={12} color={accent} />
+              <Text allowFontScaling={false} style={[heroStyles.rankText, { color: accent }]}>
+                {rankName}
               </Text>
-            )}
-          </View>
-
-          {secondaryCount != null && (
-            <>
-              <View style={[heroStyles.vDivider, { backgroundColor: theme.border }]} />
-              <View style={heroStyles.countCol}>
-                <Text style={[heroStyles.bigNumber, { color: theme.text.primary }]}>
-                  {secondaryCount}
-                </Text>
-                <Text style={[heroStyles.label, { color: theme.text.muted }]}>
-                  {secondaryLabel}
-                </Text>
-                {!!secondarySubLabel && (
-                  <Text style={[heroStyles.subLabel, { color: grad1 }]}>
-                    {secondarySubLabel}
-                  </Text>
-                )}
-              </View>
-            </>
-          )}
-
-          {tertiaryCount != null && (
-            <>
-              <View style={[heroStyles.vDivider, { backgroundColor: theme.border }]} />
-              <View style={heroStyles.countCol}>
-                <Text style={[heroStyles.bigNumber, { color: theme.text.primary }]}>
-                  {tertiaryCount}
-                </Text>
-                <Text style={[heroStyles.label, { color: theme.text.muted }]}>
-                  {tertiaryLabel}
-                </Text>
-                {!!tertiarySubLabel && (
-                  <Text style={[heroStyles.subLabel, { color: grad1 }]}>
-                    {tertiarySubLabel}
-                  </Text>
-                )}
-              </View>
-            </>
+            </View>
           )}
         </View>
 
-        {/* Son 7 günlük izleme sütun grafiği */}
-        <View
+        {/* Sayı kutucukları — 1, 2 veya 3 adet */}
+        <View style={heroStyles.tiles}>
+          {stats.map((stat) => (
+            <StatTile
+              key={stat.key}
+              theme={theme}
+              accent={accent}
+              icon={stat.icon}
+              count={stat.count}
+              label={stat.label}
+              subLabel={stat.sub}
+              large={stats.length === 1}
+            />
+          ))}
+        </View>
+
+        {/* Toplam süre — dokununca dk → sa → gün */}
+        <Pressable
+          onPress={onTimePress}
+          accessibilityRole="button"
           style={[
-            heroStyles.chartCard,
+            heroStyles.totalRow,
             {
-              backgroundColor: withAlpha(theme.primary, 0.35),
-              borderColor: withAlpha(grad1, 0.16),
+              backgroundColor: withAlpha(accent, 0.1),
+              borderColor: withAlpha(accent, 0.24),
             },
           ]}
         >
-          <View style={heroStyles.chartHeader}>
-            <View style={heroStyles.chartTitleRow}>
-              <Ionicons name="stats-chart" size={13} color={grad1} />
-              <Text style={[heroStyles.chartTitle, { color: theme.text.secondary }]}>
-                {i18nText("autoI18n.izleme_ritmi", "İzleme ritmi")}
-              </Text>
-            </View>
-            {chartData.length > 0 && (
-              <View style={heroStyles.chartRangeWrap}>
-                <Text style={[heroStyles.chartRange, { color: theme.text.muted }]}>
-                  {chartData[0].dateLabel} – {chartData[chartData.length - 1].dateLabel}
-                </Text>
-                {!!selectedChartPoint?.value && (
-                  <Text style={[heroStyles.chartSelectedValue, { color: grad1 }]}>
-                    {selectedChartPoint.dayLabel} · {chartValueLabel(selectedChartPoint.value)}
-                  </Text>
-                )}
-              </View>
-            )}
+          <View style={[heroStyles.totalIcon, { backgroundColor: withAlpha(accent, 0.2) }]}>
+            <Ionicons name="time-outline" size={19} color={accent} />
           </View>
-          <View style={heroStyles.chartControls}>
-            <View style={[heroStyles.segmented, { borderColor: withAlpha(grad1, 0.2) }]}>
-              {periodOptions.map((option) => {
-                const active = chartPeriod === option.key;
-                return (
-                  <TouchableOpacity
-                    key={option.key}
-                    onPress={() => setChartPeriod(option.key)}
-                    activeOpacity={0.78}
-                    style={[
-                      heroStyles.segmentButton,
-                      active && { backgroundColor: withAlpha(grad1, 0.2) },
-                    ]}
-                  >
-                    <Text style={[
-                      heroStyles.segmentText,
-                      { color: active ? grad1 : theme.text.muted },
-                    ]}>
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <View style={[heroStyles.segmented, heroStyles.unitSegmented, { borderColor: withAlpha(grad1, 0.2) }]}>
-              {unitOptions.map((option) => {
-                const active = chartUnit === option.key;
-                return (
-                  <TouchableOpacity
-                    key={option.key}
-                    onPress={() => setChartUnit(option.key)}
-                    activeOpacity={0.78}
-                    style={[
-                      heroStyles.segmentButton,
-                      active && { backgroundColor: withAlpha(grad1, 0.2) },
-                    ]}
-                  >
-                    <Text style={[
-                      heroStyles.segmentText,
-                      { color: active ? grad1 : theme.text.muted },
-                    ]}>
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+          <View style={heroStyles.totalCopy}>
+            <Text
+              allowFontScaling={false}
+              style={[heroStyles.totalLabelText, { color: theme.text.muted }]}
+            >
+              {i18nText("autoI18n.toplam_izlenme", "Toplam izlenme")}
+            </Text>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              style={[heroStyles.totalValueText, { color: theme.text.primary }]}
+            >
+              {formatDuration?.(totalMinutes || 0, timeDisplayMode)}
+            </Text>
           </View>
-          <View style={heroStyles.chartBars}>
-            {chartData.map((point) => {
-              const selected = selectedChartPoint?.key === point.key;
-              const dense = chartData.length > 12;
-              const height = point.value > 0
-                ? Math.max(7, Math.round((point.value / chartMax) * 52))
-                : 4;
-              const valueLabel = chartData.length <= 7 || selected
-                ? chartValueLabel(point.value)
-                : "";
-              const selectedUnit = unitOptions.find((option) => option.key === chartUnit)?.label || "";
-              const visibleValueLabel = dense && selected
-                ? `${point.dayLabel} · ${valueLabel || `0${selectedUnit}`}`
-                : valueLabel;
-              return (
-                <TouchableOpacity
-                  key={point.key}
-                  activeOpacity={0.75}
-                  onPress={() => setSelectedChartKey(point.key)}
-                  style={[heroStyles.chartColumn, selected && { zIndex: 10 }]}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      heroStyles.chartValue,
-                      dense && selected && heroStyles.chartValueTooltip,
-                      {
-                        color: dense && selected ? grad1 : theme.text.muted,
-                        backgroundColor: dense && selected ? theme.secondary : "transparent",
-                        borderColor: dense && selected ? withAlpha(grad1, 0.55) : "transparent",
-                      },
-                    ]}
-                  >
-                    {visibleValueLabel}
-                  </Text>
-                  <View style={heroStyles.chartTrack}>
-                    <LinearGradient
-                      colors={point.value > 0
-                        ? [withAlpha(grad1, 0.95), withAlpha(grad1, 0.42)]
-                        : [withAlpha(theme.text.muted, 0.18), withAlpha(theme.text.muted, 0.08)]}
-                      style={[
-                        heroStyles.chartBar,
-                        {
-                          height,
-                          width: dense ? 6 : chartData.length > 7 ? 12 : 18,
-                          borderColor: selected ? grad1 : "transparent",
-                          borderWidth: selected ? 1 : 0,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={[
-                    heroStyles.chartDay,
-                    dense && heroStyles.chartDayDense,
-                    { color: selected ? grad1 : theme.text.secondary },
-                  ]}>
-                    {point.dayLabel}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+          <Ionicons name="swap-horizontal" size={17} color={theme.text.muted} />
+        </Pressable>
 
         {/* Expand toggle */}
         <TouchableOpacity
           style={[heroStyles.expandBtn, { borderColor: theme.border }]}
           onPress={onToggleExpand}
           activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: !!expanded }}
         >
           <Ionicons
             name={expanded ? "chevron-up" : "chevron-down"}
@@ -469,70 +723,25 @@ export const StatsHeroCard = memo(function StatsHeroCard({
             color={theme.text.muted}
           />
           <Text style={[heroStyles.expandText, { color: theme.text.muted }]}>
-            {expanded ? "Daha az" : "Daha fazla"}
+            {expanded
+              ? i18nText("autoI18n.daha_az", "Daha az")
+              : i18nText("autoI18n.istatistik_daha_fazla", "Daha fazla")}
           </Text>
         </TouchableOpacity>
 
         {/* Expanded content */}
         {expanded && (
           <View style={[heroStyles.expanded, { borderTopColor: theme.border }]}>
-            {/* Toplam dakika (mode toggle ile) */}
-            <Pressable
-              onPress={onTimePress}
-              style={[
-                heroStyles.totalRow,
-                { backgroundColor: withAlpha(theme.primary, 0.67), borderColor: theme.border },
-              ]}
-            >
-              <View style={heroStyles.totalLabel}>
-                <Fontisto name="stopwatch" size={14} color={theme.text.muted} />
-                <Text style={[heroStyles.totalLabelText, { color: theme.text.muted }]}>
-                  {i18nText("autoI18n.toplam_izlenme", "Toplam izlenme")}
-                </Text>
-              </View>
-              <View style={heroStyles.totalValue}>
-                <Text style={[heroStyles.totalValueText, { color: theme.text.primary }]}>
-                  {formatDuration?.(totalMinutes || 0, timeDisplayMode)}
-                </Text>
-                <Fontisto name="arrow-h" size={12} color={theme.text.muted} />
-              </View>
-            </Pressable>
-
-            {/* Genre chips */}
-            {genres.length > 0 && (
-              <View style={heroStyles.genresWrap}>
-                <Text style={[heroStyles.genresHeader, { color: theme.text.muted }]}>
-                  {genresLabel}
-                </Text>
-                <View style={heroStyles.genreRow}>
-                  {genres.filter(Boolean).slice(0, 3).map((g, i) => (
-                    <View
-                      key={`${g}-${i}`}
-                      style={[
-                        heroStyles.genreChip,
-                        {
-                          backgroundColor: withAlpha(theme.primary, 0.67),
-                          borderColor: i === 0 ? rankColor : theme.border,
-                        },
-                      ]}
-                    >
-                      {i === 0 && (
-                        <MaterialCommunityIcons
-                          name="crown"
-                          size={11}
-                          color={rankColor}
-                        />
-                      )}
-                      <Text
-                        style={[heroStyles.genreText, { color: theme.text.primary }]}
-                      >
-                        {g}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
+            <WatchRhythmChart
+              theme={theme}
+              accent={accent}
+              chartDataByPeriod={chartDataByPeriod}
+              chartPeriod={chartPeriod}
+              onChartPeriodChange={setChartPeriod}
+              chartUnit={chartUnit}
+              onChartUnitChange={setChartUnit}
+            />
+            <GenreBars theme={theme} accent={accent} genres={genres} title={genresLabel} />
             <RewatchHighlights theme={theme} items={rewatchItems} embedded />
           </View>
         )}
@@ -553,7 +762,7 @@ const heroStyles = StyleSheet.create({
   },
   card: {
     borderRadius: 24,
-    padding: 17,
+    padding: 14,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -575,63 +784,153 @@ const heroStyles = StyleSheet.create({
     borderBottomRightRadius: 3,
     opacity: 0.8,
   },
+
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+  eyebrowRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  eyebrowDot: { width: 5, height: 5, borderRadius: 3 },
+  eyebrow: { fontSize: 10, fontWeight: "900", letterSpacing: 1.1, textTransform: "uppercase" },
   rankBadge: {
-    position: "absolute",
-    top: 12,
-    right: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
   },
-  rankText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3 },
+  rankText: { fontSize: 10.5, fontWeight: "800", letterSpacing: 0.3 },
 
-  mainRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 4,
-    marginBottom: 14,
+  tiles: { flexDirection: "row", gap: 8, marginBottom: 10 },
+  tile: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 11,
+    paddingHorizontal: 9,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "flex-start",
   },
-  countCol: { flex: 1, alignItems: "flex-start" },
-  bigNumber: {
-    fontSize: 28,
+  // İkon köşede durur, yerleşimde yer kaybettirmez: üç kutucuklu dizi hero'su
+  // katlanan başlığın içinde olduğu için yükseklik doğrudan liste alanından yer.
+  tileIcon: {
+    position: "absolute",
+    top: 9,
+    right: 9,
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tileNumber: {
+    alignSelf: "stretch",
+    paddingRight: 30,
+    fontSize: 25,
+    lineHeight: 29,
     fontWeight: "800",
     letterSpacing: -0.5,
     includeFontPadding: false,
   },
-  label: { fontSize: 11, marginTop: 2, fontWeight: "600" },
-  subLabel: { fontSize: 9.5, marginTop: 3, fontWeight: "700" },
-  vDivider: { width: 1, height: 36, marginHorizontal: 10 },
-
-  chartCard: {
-    paddingTop: 10,
-    paddingBottom: 8,
+  // Tek kutucuk (film ekranı): yatay düzen. Dolgu ve ikon kutusu "Toplam izlenme"
+  // satırıyla (totalRow/totalIcon) aynı; iki satırın metni aynı sütundan başlar.
+  tileWide: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  tileWideIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  tileWideCopy: { flex: 1, minWidth: 0 },
+  tileLabelWide: { fontSize: 12, fontWeight: "700", letterSpacing: 0.2 },
+  tileNumberLarge: {
+    marginTop: 1,
+    fontSize: 34,
+    lineHeight: 39,
+    fontWeight: "800",
+    letterSpacing: -0.8,
+    includeFontPadding: false,
+  },
+  tileSubWide: {
+    flexShrink: 1,
     paddingHorizontal: 10,
-    borderRadius: 14,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  tileSubTextWide: { fontSize: 11, fontWeight: "800" },
+  tileLabel: { alignSelf: "stretch", fontSize: 10.5, marginTop: 1, fontWeight: "700" },
+  tileSub: {
+    marginTop: 7,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 999,
+    maxWidth: "100%",
+  },
+  tileSubText: { fontSize: 9.5, fontWeight: "800" },
+
+  totalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     borderWidth: 1,
     marginBottom: 10,
   },
-  chartHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  totalIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  totalCopy: { flex: 1, minWidth: 0 },
+  totalLabelText: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.2 },
+  totalValueText: { marginTop: 1, fontSize: 18, lineHeight: 23, fontWeight: "800", letterSpacing: -0.3 },
+
+  chartCard: {
+    paddingTop: 11,
+    paddingBottom: 8,
+    paddingHorizontal: 11,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  chartHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  chartTitleCol: { flexShrink: 1 },
   chartTitleRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  chartTitle: { fontSize: 11, fontWeight: "800" },
-  chartRangeWrap: { alignItems: "flex-end" },
+  chartTitle: { fontSize: 12, fontWeight: "800" },
+  chartTotal: { marginTop: 2, marginLeft: 18, fontSize: 9.5, fontWeight: "700" },
+  chartRangeWrap: { alignItems: "flex-end", flexShrink: 1 },
   chartRange: { fontSize: 9.5, fontWeight: "600" },
-  chartSelectedValue: { marginTop: 1, fontSize: 9, fontWeight: "800" },
-  chartControls: { marginTop: 9, flexDirection: "row", gap: 7 },
+  chartSelectedValue: { marginTop: 1, fontSize: 9.5, fontWeight: "800" },
+  chartControls: { marginTop: 10, flexDirection: "row", gap: 7 },
   segmented: {
-    flex: 1.35,
     minHeight: 30,
     padding: 2,
     borderRadius: 11,
     borderWidth: 1,
     flexDirection: "row",
   },
-  unitSegmented: { flex: 1 },
   segmentButton: { flex: 1, minHeight: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  segmentText: { fontSize: 9, fontWeight: "800" },
+  segmentText: { fontSize: 9.5, fontWeight: "800" },
   chartBars: { height: 87, marginTop: 7, flexDirection: "row", alignItems: "flex-end" },
   chartColumn: { flex: 1, alignItems: "center" },
   chartValue: { height: 18, lineHeight: 16, fontSize: 8, fontWeight: "700", textAlign: "center" },
@@ -645,7 +944,8 @@ const heroStyles = StyleSheet.create({
     overflow: "hidden",
   },
   chartTrack: { height: 52, justifyContent: "flex-end", alignItems: "center" },
-  chartBar: { width: 18, borderRadius: 6 },
+  chartLane: { height: 52, borderRadius: 6, justifyContent: "flex-end", overflow: "hidden" },
+  chartBar: { width: "100%", borderRadius: 6 },
   chartDay: { marginTop: 3, fontSize: 9, fontWeight: "700" },
   chartDayDense: { fontSize: 7 },
 
@@ -654,46 +954,35 @@ const heroStyles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: 1,
   },
-  expandText: { fontSize: 11, fontWeight: "600" },
+  expandText: { fontSize: 11, fontWeight: "700" },
 
   expanded: {
     marginTop: 14,
     paddingTop: 14,
-    borderTopWidth: 1,
-    gap: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 14,
   },
-  totalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  totalLabel: { flexDirection: "row", alignItems: "center", gap: 6 },
-  totalLabelText: { fontSize: 12, fontWeight: "600" },
-  totalValue: { flexDirection: "row", alignItems: "center", gap: 6 },
-  totalValueText: { fontSize: 14, fontWeight: "700" },
 
-  genresWrap: { gap: 6 },
-  genresHeader: { fontSize: 11, fontWeight: "600", marginLeft: 4 },
-  genreRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
-  genreChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
+  genresWrap: { gap: 9 },
+  sectionLabel: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    marginLeft: 2,
   },
-  genreText: { fontSize: 11, fontWeight: "700" },
+  genreRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  genreNameCol: { width: "33%", flexDirection: "row", alignItems: "center", gap: 6 },
+  genreIndex: { width: 12, textAlign: "center", fontSize: 11, fontWeight: "800" },
+  genreName: { flexShrink: 1, fontSize: 12.5, fontWeight: "700" },
+  genreTrack: { flex: 1, height: 7, borderRadius: 4, overflow: "hidden" },
+  genreFill: { height: "100%", borderRadius: 4 },
+  genreCount: { minWidth: 24, textAlign: "right", fontSize: 12, fontWeight: "800" },
 });
 
 // ─── FILTER BAR ──────────────────────────────────────────────────────────────
@@ -887,13 +1176,15 @@ export const StatsFilterModal = memo(function StatsFilterModal({
 
           <View style={modalStyles.header}>
             <Text style={[modalStyles.title, { color: theme.text.primary }]}>{title}</Text>
-            <Pressable
-              onPress={onClose}
+            <GlassCloseButton
+              size={32}
+              fallbackRadius={16}
+              color={theme.text.secondary}
+              backgroundColor="transparent"
+              borderColor={theme.border}
               hitSlop={10}
-              style={[modalStyles.closeBtn, { borderColor: theme.border }]}
-            >
-              <Ionicons name="close" size={18} color={theme.text.secondary} />
-            </Pressable>
+              onPress={onClose}
+            />
           </View>
 
           <ScrollView
@@ -1063,8 +1354,6 @@ const filterStyles = StyleSheet.create({
 });
 
 const modalStyles = StyleSheet.create({
-  root: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0,0,0,0.55)" },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -1090,14 +1379,6 @@ const modalStyles = StyleSheet.create({
     paddingBottom: 12,
   },
   title: { fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   body: { paddingHorizontal: 16, maxHeight: Math.round(SCREEN_H * 0.48) },
   bodyContent: { paddingBottom: 12, gap: 20 },
   group: { gap: 10 },
@@ -1149,143 +1430,137 @@ const modalStyles = StyleSheet.create({
 });
 
 // ─── SECTION HEADER (her tarih grubunun başlığı) ─────────────────────────────
+//
+// Sol: gün/ay "takvim kutucuğu". Orta: tarih + türler. Sağ: adet ve süre
+// rozetleri. Geçersiz tarihli ("Eski Kayıtlar") gruplarda kutucukta ikon çıkar.
+
+const dateTileParts = (title, locale) => {
+  const match = typeof title === "string" ? title.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
+  if (!match) return null;
+  const date = new Date(Date.UTC(+match[1], +match[2] - 1, +match[3], 12));
+  if (Number.isNaN(date.getTime())) return null;
+  return {
+    day: String(+match[3]),
+    month: new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }).format(date),
+  };
+};
 
 export const StatsSectionHeader = memo(function StatsSectionHeader({
   theme,
   title,
   totalMinutes,
+  count,
+  itemIcon = "film-outline",
   genres = [],
   minutesLabel = "dk",
   fallbackTitle = i18nText("autoI18n.eski_kayitlar", "Eski Kayıtlar"),
   formatDate,
-  isFirst,
+  locale,
+  accent,
 }) {
+  const tint = accent || theme.accent;
   const isDateValid = title && !isNaN(new Date(title).getTime());
   const displayTitle = isDateValid ? formatDate?.(title) || title : fallbackTitle;
+  const tile = useMemo(() => dateTileParts(title, locale), [title, locale]);
+  const genreLine = genres.slice(0, 3).join(" · ");
 
   return (
-    <View
-      style={[
-        sectStyles.wrap,
-        { borderLeftColor: theme.border },
-        isFirst && { marginTop: 4 },
-      ]}
-    >
-      {/* Timeline dot */}
-      <View style={[sectStyles.dot, { backgroundColor: theme.accent }]} />
+    <View style={sectStyles.wrap}>
+      <View
+        style={[
+          sectStyles.dateTile,
+          { backgroundColor: withAlpha(tint, 0.14), borderColor: withAlpha(tint, 0.32) },
+        ]}
+      >
+        {tile ? (
+          <>
+            <Text allowFontScaling={false} style={[sectStyles.tileDay, { color: theme.text.primary }]}>
+              {tile.day}
+            </Text>
+            <Text allowFontScaling={false} style={[sectStyles.tileMonth, { color: tint }]}>
+              {tile.month}
+            </Text>
+          </>
+        ) : (
+          <Ionicons name="time-outline" size={20} color={tint} />
+        )}
+      </View>
 
-      {/* Header row */}
-      <View style={sectStyles.headerRow}>
-        <View
-          style={[
-            sectStyles.dateChip,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
+      <View style={sectStyles.copy}>
+        <Text
+          style={[sectStyles.title, { color: theme.text.primary }]}
+          numberOfLines={1}
         >
-          <Ionicons name="calendar-outline" size={12} color={theme.text.primary} />
+          {displayTitle}
+        </Text>
+        {!!genreLine && (
           <Text
-            style={[sectStyles.dateText, { color: theme.text.primary }]}
+            style={[sectStyles.genres, { color: theme.text.muted }]}
             numberOfLines={1}
           >
-            {displayTitle}
+            {genreLine}
           </Text>
-        </View>
+        )}
+      </View>
 
+      <View style={sectStyles.badges}>
+        {count > 0 && (
+          <View style={[sectStyles.badge, { backgroundColor: withAlpha(theme.primary, 0.7) }]}>
+            <Ionicons name={itemIcon} size={11} color={theme.text.secondary} />
+            <Text style={[sectStyles.badgeText, { color: theme.text.secondary }]}>{count}</Text>
+          </View>
+        )}
         {totalMinutes > 0 && (
-          <View
-            style={[
-              sectStyles.minBadge,
-              {
-                backgroundColor: theme.notesColor?.yellowBackground || "#fff8d6",
-              },
-            ]}
-          >
-            <MaterialCommunityIcons
-              name="clock-outline"
-              size={12}
-              color={theme.notesColor?.yellow || "#cb9700"}
-            />
-            <Text
-              style={[
-                sectStyles.minBadgeText,
-                { color: theme.notesColor?.yellow || "#cb9700" },
-              ]}
-            >
+          <View style={[sectStyles.badge, { backgroundColor: withAlpha(tint, 0.16) }]}>
+            <MaterialCommunityIcons name="clock-outline" size={11} color={tint} />
+            <Text style={[sectStyles.badgeText, { color: tint }]}>
               {totalMinutes} {minutesLabel}
             </Text>
           </View>
         )}
       </View>
-
-      {/* Genre chips */}
-      {genres.length > 0 && (
-        <View style={sectStyles.genreRow}>
-          {genres.slice(0, 5).map((g, i) => (
-            <View
-              key={`${g}-${i}`}
-              style={[sectStyles.genreChip, { backgroundColor: theme.secondary }]}
-            >
-              <Text style={[sectStyles.genreText, { color: theme.text.secondary }]}>
-                {g}
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
     </View>
   );
 });
 
 const sectStyles = StyleSheet.create({
   wrap: {
-    paddingLeft: 18,
-    paddingVertical: 10,
-    marginLeft: 16,
-    borderLeftWidth: 1,
-    position: "relative",
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    position: "absolute",
-    left: -4.5,
-    top: 18,
-  },
-  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
+    gap: 11,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 2,
   },
-  dateChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+  dateTile: {
+    width: 46,
+    height: 50,
+    borderRadius: 14,
     borderWidth: 1,
-    maxWidth: 180,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  dateText: { fontSize: 12, fontWeight: "700" },
-  minBadge: {
+  tileDay: { fontSize: 18, lineHeight: 21, fontWeight: "900", letterSpacing: -0.4 },
+  tileMonth: {
+    marginTop: -1,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  copy: { flex: 1, minWidth: 0 },
+  title: { fontSize: 14, fontWeight: "800", letterSpacing: -0.2 },
+  genres: { marginTop: 2, fontSize: 10.5, fontWeight: "600" },
+  badges: { alignItems: "flex-end", gap: 5 },
+  badge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 999,
   },
-  minBadgeText: { fontSize: 11, fontWeight: "700" },
-
-  genreRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 8 },
-  genreChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  genreText: { fontSize: 10, fontWeight: "600" },
+  badgeText: { fontSize: 10.5, fontWeight: "800" },
 });
 
 // ─── POSTER CARD ─────────────────────────────────────────────────────────────
@@ -1430,13 +1705,16 @@ export const StatsDateSection = memo(function StatsDateSection({
   posters = [],
   genres = [],
   totalMinutes = 0,
-  minutesLabel = "dk",
+  count,
+  itemIcon,
   // Poster üzerindeki küçük dakika rozeti başlığın tam kelimesini değil
-  // ("Dakika") kısaltmasını kullanır ("dk") — dar rozette yer kazanır.
+  // ("Dakika") kısaltmasını kullanır ("dk") — dar rozette yer kazanır. Başlıktaki
+  // süre rozeti de aynı kısaltmayı kullanır.
+  minutesLabel = "dk",
   posterMinutesLabel = "dk",
   formatDate,
+  locale,
   rankColor,
-  isFirst,
 }) {
   const renderPoster = useCallback(
     ({ item }) => (
@@ -1455,15 +1733,23 @@ export const StatsDateSection = memo(function StatsDateSection({
   );
 
   return (
-    <View>
+    <View
+      style={[
+        dateSectionStyles.card,
+        { backgroundColor: withAlpha(theme.secondary, 0.62), borderColor: theme.border },
+      ]}
+    >
       <StatsSectionHeader
         theme={theme}
         title={title}
         totalMinutes={totalMinutes}
+        count={count ?? posters.length}
+        itemIcon={itemIcon}
         genres={genres}
-        minutesLabel={minutesLabel}
+        minutesLabel={posterMinutesLabel || minutesLabel}
         formatDate={formatDate}
-        isFirst={isFirst}
+        locale={locale}
+        accent={rankColor}
       />
       <FlatList
         data={posters}
@@ -1483,7 +1769,14 @@ export const StatsDateSection = memo(function StatsDateSection({
 });
 
 const dateSectionStyles = StyleSheet.create({
-  posterRow: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
+  card: {
+    marginHorizontal: 12,
+    marginTop: 10,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  posterRow: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 },
 });
 
 // ─── COLLAPSING LIST ─────────────────────────────────────────────────────────

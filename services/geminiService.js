@@ -18,7 +18,6 @@
 import { trackFunctionCall, trackGeminiUsage } from "./usageTrackerService";
 
 export const GEMINI_MODEL = "gemini-2.5-flash";
-export const GEMINI_TIMEOUT_MS = 30000;
 
 // API'ye gönderilecek azami mesaj sayısı (6 gidiş-geliş). Token şişmesini önler.
 export const MAX_HISTORY_MESSAGES = 12;
@@ -51,49 +50,6 @@ export class GeminiError extends Error {
     this.status = status;
     if (cause) this.cause = cause;
   }
-}
-
-/** Bir hatanın bizim tipli Gemini hatamız olup olmadığını güvenle anlar. */
-export function isGeminiError(err) {
-  return err instanceof GeminiError || typeof err?.code === "string";
-}
-
-/**
- * API anahtarını console'da göstermek için maskeler (sızıntı riskini azaltır).
- * Başındaki 6 + sonundaki 4 karakter + uzunluk gösterilir → hangi anahtar
- * olduğunu doğrulamaya yeter ama tamamını ifşa etmez.
- */
-export function maskKey(key) {
-  if (key === undefined || key === null || key === "") return "(BOŞ / TANIMSIZ)";
-  const k = String(key);
-  if (k.length <= 12) return `${k.slice(0, 3)}…(${k.length} karakter)`;
-  return `${k.slice(0, 6)}…${k.slice(-4)} (${k.length} karakter)`;
-}
-
-/**
- * Bir HTTP hata gövdesini (Gemini JSON formatı) ayrıntılı, okunaklı biçimde
- * console'a yazar. Hem çağıran katmanlar hem de teşhis için.
- */
-export function logHttpError(status, statusText, rawBody, { model, keyMask } = {}) {
-  let parsed = null;
-  try {
-    parsed = JSON.parse(rawBody);
-  } catch {
-    /* düz metin olabilir */
-  }
-  const e = parsed?.error || {};
-  const lines = [
-    `[Gemini] ❌ HTTP ${status}${statusText ? " " + statusText : ""}`,
-    model ? `  • model:   ${model}` : null,
-    keyMask ? `  • anahtar: ${keyMask}` : null,
-    `  • code:    ${e.code ?? status}`,
-    `  • status:  ${e.status ?? "-"}`,
-    `  • message: ${e.message ?? (rawBody || "-")}`,
-    Array.isArray(e.details) && e.details.length
-      ? `  • details: ${JSON.stringify(e.details)}`
-      : null,
-  ].filter(Boolean);
-  console.warn(lines.join("\n"));
 }
 
 // ── Sistem prompt'u ─────────────────────────────────────────────────────────
@@ -188,26 +144,6 @@ export function buildUserPrompt({ message = "", movieGenres = [], tvGenres = [] 
     return `Recommend TV series in these genres: ${tv.join(", ")}.${msg ? " " + msg : ""}`;
   }
   return msg;
-}
-
-/**
- * Konuşma geçmişini + güncel kullanıcı mesajını Gemini `contents` dizisine çevirir.
- * Geçmiş { role: "user" | "assistant", text } biçimindedir; "assistant" → "model".
- * Yalnızca son MAX_HISTORY_MESSAGES mesaj gönderilir.
- */
-export function buildContents(history = [], userText = "") {
-  const recent = history.slice(-MAX_HISTORY_MESSAGES);
-  const contents = recent
-    .filter((m) => m && typeof m.text === "string" && m.text.trim() !== "")
-    .map((m) => ({
-      role: m.role === "assistant" || m.role === "model" ? "model" : "user",
-      parts: [{ text: m.text }],
-    }));
-
-  if (userText && userText.trim() !== "") {
-    contents.push({ role: "user", parts: [{ text: userText }] });
-  }
-  return contents;
 }
 
 // ── Ağ katmanı: callGemini Cloud Function proxy'si ─────────────────────────

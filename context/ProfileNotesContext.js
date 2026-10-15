@@ -1,21 +1,14 @@
 import React, {
-  createContext, useContext, useEffect, useState, useMemo, useRef,
+  createContext, useContext, useState, useMemo,
 } from "react";
-import {
-  doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, onSnapshot, writeBatch,
-} from "firebase/firestore";
-import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
-import { isAuthTransitionError } from "../utils/firestoreError";
 import Toast from "react-native-toast-message";
 import { i18nText } from "../utils/i18nText";
-import { cacheKeys } from "../utils/cacheKeys";
-import { publish, seed } from "../services/snapshotCache";
-import { getActiveUser } from "../services/storage";
-import useStartupGate from "../hooks/useStartupGate";
+import { usePremiumGate } from "../hooks/usePremiumGate";
+import useUserDataDomain from "../hooks/useUserDataDomain";
+import { notesDomain } from "../services/userData";
 
 
 const ProfileNotesContext = createContext();
@@ -27,24 +20,19 @@ export const ProfileNotesProvider = ({ children }) => {
   const { theme } = useTheme();
   const { language } = useLanguage();
 
-  // AÇILIŞ TOHUMU — son oturumun notları diskten SENKRON okunur, yani ilk
-  // karede çizilir. Aşağıdaki listener efekti de aynı tohumu okuyor ama efekt
-  // ilk boyamadan SONRA çalışıyor.
-  const ilkTohum = useMemo(
-    () => {
-      // Firebase oturumu ASENKRON çözülüyor; ilk render'da `uid` genelde
-      // henüz null. Son aktif kullanıcı depodan senkron okunabiliyor.
-      const tohumUid = uid ?? getActiveUser();
-      return tohumUid ? seed(cacheKeys.notes(tohumUid)).data : null;
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  // YEREL-ÖNCELİKLİ: notlar buluttan dinlenmez. Okuma yerel kopyadan SENKRON
+  // (ilk karede dolu), yazma önce yerelde + kalıcı günlükte, buluta arka planda.
+  // Buluttan çekim yalnız yerel kopya yokken TEK SEFER (yeni cihaz, sıfırlama,
+  // hesap değişimi). Bkz. services/userData ve docs/mimari/YEREL_ONCELIKLI_VERI_KATMANI.md
+  const view = useUserDataDomain(notesDomain);
+  const notes = view.lists.items;
+  // Yalnız tek seferlik indirme sürerken "yükleniyor": normal açılışta hep false.
+  const loadingNotes = !view.ready && view.hydrating;
 
-  const [notes,               setNotes]               = useState(
-    Array.isArray(ilkTohum) ? ilkTohum : [],
-  );
-  const [loadingNotes,        setLoadingNotes]        = useState(false);
+  /** Bir notun GÜNCEL hâli (bayat kapanış riski yok: motorun senkron görünümü). */
+  const currentNote = (noteId) => notesDomain.getSnapshot(uid).get("items", noteId);
+  const writeNote = (note) => notesDomain.apply(uid, [{ kind: "items", doc: note }]);
+
   const [selectedNote,        setSelectedNote]        = useState(null);
   const [noteContent,         setNoteContent]         = useState("");
   const [message,             setMessage]             = useState("");
@@ -58,9 +46,24 @@ export const ProfileNotesProvider = ({ children }) => {
   const [todoTitle,  setTodoTitle]  = useState("");
   const [scheduledDate, setScheduledDate] = useState(null);
 
-  // Keep a ref so async handlers always read the latest notes without stale closures
-  const notesRef = useRef([]);
-  useEffect(() => { notesRef.current = notes; }, [notes]);
+  // Not ve yapılacak SAYISI ücretsiz planda sınırlı (registry: notes, todos).
+  // Yalnız YENİ kayıt sayılır; düzenlemek ve silmek hiçbir zaman engellenmez,
+  // abonelik bitince mevcut kayıtlar da silinmez. `type` alanı olmayan eski
+  // kayıtlar not sayılır (NotesScreen ile aynı kural).
+  const notesGate = usePremiumGate("notes");
+  const todosGate = usePremiumGate("todos");
+  const noteCounts = useMemo(() => {
+    let todo = 0;
+    for (const n of notes) if (n?.type === "todo") todo += 1;
+    return { note: notes.length - todo, todo };
+  }, [notes]);
+  const gateFor = (type) => (type === "todo" ? todosGate : notesGate);
+  const countFor = (type) => (type === "todo" ? noteCounts.todo : noteCounts.note);
+  /** Bu tipte yeni kayıt açılabilir mi? (Sessiz; uyarı göstermez.) */
+  const canCreateNote = (type) => gateFor(type).allows(countFor(type));
+  /** Açılabilirse true; doluysa yükseltme sayfasını gösterip false döner. */
+  const checkCanCreateNote = (type, options) =>
+    gateFor(type).check(countFor(type), options);
 
   const formatDate = (timestamp) => {
     if (!timestamp) return "";
@@ -69,91 +72,15 @@ export const ProfileNotesProvider = ({ children }) => {
     return new Intl.DateTimeFormat(language, { day: "numeric", month: "long", year: "numeric" }).format(date);
   };
 
-  const itemsCol = (u) => collection(db, "Notes", u, "items");
-  const itemDoc  = (u, noteId) => doc(db, "Notes", u, "items", noteId);
-
-  // Migrate old Notes/{uid}.notes array → Notes/{uid}/items subcollection
-  const migrateOldNotes = async (u, oldNotes) => {
-    try {
-      const batch = writeBatch(db);
-      oldNotes.forEach((note) => {
-        batch.set(doc(db, "Notes", u, "items", note.id), note);
-      });
-      await batch.commit();
-    } catch (err) {
-      console.error("Migration error:", err);
-    }
-  };
-
-  // İlk kare tohumdan çiziliyor; listener DeviceNotifications'ın not
-  // hatırlatıcı zamanlayıcısını beslediği için kapı ondan önce açılacak şekilde seçildi.
-  // Kademeler: hooks/useStartupGate.js.
-  const startupReady = useStartupGate(2400);
-
-  useEffect(() => {
-    if (!startupReady) return;
-    if (!uid) {
-      // Logout: önceki hesabın notları yeni oturuma sızmasın (bildirim
-      // zamanlayıcı da bu listeden besleniyor).
-      setNotes([]);
-      setLoadingNotes(false);
-      return;
-    }
-    // Offline-first: önce cache'ten seed. İlk render için bu iş yukarıdaki
-    // `ilkTohum` ile zaten yapıldı; burası uid DEĞİŞİMİ (hesap geçişi) içindir.
-    const cached = seed(cacheKeys.notes(uid)).data;
-    if (Array.isArray(cached)) {
-      setNotes(cached);
-      setLoadingNotes(false);
-    } else {
-      setLoadingNotes(true);
-    }
-
-    const unsub = onSnapshot(
-      itemsCol(uid),
-      async (snap) => {
-        if (snap.empty) {
-          // Dual read: check old array and migrate if present
-          try {
-            const oldDoc = await getDoc(doc(db, "Notes", uid));
-            if (oldDoc.exists()) {
-              const oldNotes = oldDoc.data().notes || [];
-              if (oldNotes.length > 0) {
-                await migrateOldNotes(uid, oldNotes);
-                // onSnapshot will fire again with migrated data
-                return;
-              }
-            }
-          } catch (err) {
-            if (!isAuthTransitionError(err) && __DEV__)
-              console.warn("Error checking old notes:", err?.message);
-          }
-          setNotes([]);
-          // "Verileri indir" ayarına bilerek TABİ DEĞİL: o ayar TMDB içeriği
-          // içindir, bu kullanıcının kendi notları.
-          publish(cacheKeys.notes(uid), []);
-          setLoadingNotes(false);
-        } else {
-          const fetched = snap.docs
-            .map((d) => ({ ...d.data(), id: d.id }))
-            .sort((a, b) => b.createdAt - a.createdAt);
-          setNotes(fetched);
-          publish(cacheKeys.notes(uid), fetched);
-          setLoadingNotes(false);
-        }
-      },
-      (err) => {
-        if (!isAuthTransitionError(err) && __DEV__)
-          console.warn("[Notes] snapshot error:", err?.message);
-        setLoadingNotes(false);
-      },
-    );
-
-    return () => unsub();
-  }, [uid, startupReady]);
+  // Eski şema göçü (Notes/{uid}.notes[]) artık tek seferlik indirmenin içinde:
+  // services/userData/domains.js → fetchNotesFromCloud.
 
   const handleAddNote = async () => {
     try {
+      if (!uid) {
+        Toast.show({ type: "error", text1: i18nText("autoI18n.not_eklenemedi", "Not eklenemedi") });
+        return;
+      }
       if (noteType === "note" && message.trim().length === 0) {
         Toast.show({ type: "warning", text1: i18nText("autoI18n.bos_not_olusturulamaz", "Boş not oluşturulamaz") }); return;
       }
@@ -171,16 +98,18 @@ export const ProfileNotesProvider = ({ children }) => {
         scheduledDate: scheduledDate || null, createdAt: Date.now(), updatedAt: Date.now(),
       };
 
-      // Optimistic update
-      setNotes((prev) => [newNote, ...prev]);
+      // Yerel kopya + kalıcı günlük ANINDA; buluta arka planda gider. Ağ
+      // hatası artık kullanıcıya hata olarak yansımaz (çevrimdışıyken de kayıt çalışır).
+      writeNote(newNote);
       setMessage(""); setTodoTitle("");
       setTodoItems([{ id: Date.now().toString(), text: "", done: false }]);
       setScheduledDate(null); setModalVisibleNotesAdd(false);
-
-      await setDoc(itemDoc(uid, newId), newNote);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_eklenemedi", "Not eklenemedi"), text2: err.message }); }
   };
 
+  // Aşağıdaki işleyicilerde DEĞİŞİKLİK TAM BELGE olarak yazılır (kısmi updateDoc
+  // değil): yerel kopya belgenin tamamını taşıyor ve `set` belge bulutta
+  // silinmişse bile çalışır; `updateDoc` "not-found" ile düşerdi.
   const handleToggleTodoItem = async (noteId, todoId) => {
     const applyToggle = (n) =>
       n.id !== noteId ? n : {
@@ -189,17 +118,11 @@ export const ProfileNotesProvider = ({ children }) => {
         updatedAt: Date.now(),
       };
 
-    // Optimistic update
-    setNotes((prev) => prev.map(applyToggle));
-    setSelectedNote((prev) => prev && prev.id === noteId ? applyToggle(prev) : prev);
-
     try {
-      const note = notesRef.current.find((n) => n.id === noteId);
+      const note = currentNote(noteId);
       if (!note) return;
-      const updatedTodos = (note.todos || []).map((t) =>
-        t.id === todoId ? { ...t, done: !t.done } : t,
-      );
-      await updateDoc(itemDoc(uid, noteId), { todos: updatedTodos, updatedAt: Date.now() });
+      writeNote(applyToggle(note));
+      setSelectedNote((prev) => prev && prev.id === noteId ? applyToggle(prev) : prev);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.todo_guncellenemedi", "Todo güncellenemedi") }); }
   };
 
@@ -212,15 +135,11 @@ export const ProfileNotesProvider = ({ children }) => {
         ...n, todos: [...(n.todos || []), newItem], updatedAt: Date.now(),
       };
 
-    setNotes((prev) => prev.map(applyAdd));
-    setSelectedNote((prev) => prev && prev.id === noteId ? applyAdd(prev) : prev);
-
     try {
-      const note = notesRef.current.find((n) => n.id === noteId);
+      const note = currentNote(noteId);
       if (!note) return;
-      await updateDoc(itemDoc(uid, noteId), {
-        todos: [...(note.todos || []), newItem], updatedAt: Date.now(),
-      });
+      writeNote(applyAdd(note));
+      setSelectedNote((prev) => prev && prev.id === noteId ? applyAdd(prev) : prev);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.madde_eklenemedi", "Madde eklenemedi") }); }
   };
 
@@ -230,15 +149,11 @@ export const ProfileNotesProvider = ({ children }) => {
         ...n, todos: (n.todos || []).filter((t) => t.id !== todoId), updatedAt: Date.now(),
       };
 
-    setNotes((prev) => prev.map(applyDelete));
-    setSelectedNote((prev) => prev && prev.id === noteId ? applyDelete(prev) : prev);
-
     try {
-      const note = notesRef.current.find((n) => n.id === noteId);
+      const note = currentNote(noteId);
       if (!note) return;
-      await updateDoc(itemDoc(uid, noteId), {
-        todos: (note.todos || []).filter((t) => t.id !== todoId), updatedAt: Date.now(),
-      });
+      writeNote(applyDelete(note));
+      setSelectedNote((prev) => prev && prev.id === noteId ? applyDelete(prev) : prev);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.madde_silinemedi", "Madde silinemedi") }); }
   };
 
@@ -255,17 +170,11 @@ export const ProfileNotesProvider = ({ children }) => {
         updatedAt: now,
       };
 
-    setNotes((prev) => prev.map(applyUpdate));
-    setSelectedNote((prev) => prev && prev.id === noteId ? applyUpdate(prev) : prev);
-    setModalVisibleNotes(false); setIsEditable(false);
-
     try {
-      await updateDoc(itemDoc(uid, noteId), {
-        content: noteContent, color: borderColorNotes,
-        backgroundColor: backgroundColorNotes,
-        scheduledDate: scheduledDate !== undefined ? scheduledDate : null,
-        updatedAt: now,
-      });
+      const note = currentNote(noteId);
+      if (note) writeNote(applyUpdate(note));
+      setSelectedNote((prev) => prev && prev.id === noteId ? applyUpdate(prev) : prev);
+      setModalVisibleNotes(false); setIsEditable(false);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_guncellenemedi", "Not güncellenemedi") }); }
   };
 
@@ -281,43 +190,66 @@ export const ProfileNotesProvider = ({ children }) => {
         updatedAt: now,
       };
 
-    setNotes((prev) => prev.map(applyUpdate));
-    setSelectedNote((prev) => prev && prev.id === noteId ? applyUpdate(prev) : prev);
-    setModalVisibleNotes(false); setIsEditable(false);
-
     try {
-      await updateDoc(itemDoc(uid, noteId), {
-        title: (newTitle || "").trim(), todos: newTodos,
-        color: newColor || borderColorNotes,
-        backgroundColor: newBg || backgroundColorNotes,
-        scheduledDate: scheduledDate !== undefined ? scheduledDate : null,
-        updatedAt: now,
-      });
+      const note = currentNote(noteId);
+      if (note) writeNote(applyUpdate(note));
+      setSelectedNote((prev) => prev && prev.id === noteId ? applyUpdate(prev) : prev);
+      setModalVisibleNotes(false); setIsEditable(false);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_guncellenemedi", "Not güncellenemedi") }); }
   };
 
   const handleDeleteNote = async (noteId) => {
-    // Optimistic update
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
-    setSelectedNote(null);
-    setModalVisibleNotes(false);
+    try {
+      if (uid) notesDomain.apply(uid, [{ kind: "items", key: noteId }]);
+      setSelectedNote(null);
+      setModalVisibleNotes(false);
+    } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_silinemedi", "Not silinemedi") }); }
+  };
+
+  // Sabitle / sabitlemeyi kaldır. `updatedAt`'e BİLEREK dokunmaz: sabitlemek bir
+  // düzenleme değil — kartın "son düzenleme" tarihi ve grup içi sırası bozulmasın.
+  const handleTogglePin = async (noteId) => {
+    if (!uid) return;
+    const current = currentNote(noteId);
+    if (!current) return;
+    const pinned = !current.pinned;
 
     try {
-      await deleteDoc(itemDoc(uid, noteId));
-    } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_silinemedi", "Not silinemedi") }); }
+      writeNote({ ...current, pinned });
+      setSelectedNote((prev) => (prev && prev.id === noteId ? { ...prev, pinned } : prev));
+    } catch (err) {
+      Toast.show({ type: "error", text1: i18nText("autoI18n.not_guncellenemedi", "Not güncellenemedi") });
+    }
   };
 
   /**
    * Tek noktadan upsert (ekle veya güncelle). Yeni NotesScreen (IslamicGuide
    * düzeni) bunu kullanır: tam not objesini alır, createdAt/updatedAt'i ayarlar,
-   * optimistic günceller ve setDoc ile yazar. Hem "note" hem "todo" için çalışır.
+   * yerel kopyaya yazar (buluta arka planda gider). Hem "note" hem "todo" için çalışır.
    */
   const saveNote = async (note) => {
     if (!uid || !note?.id) return false;
     const now = Date.now();
-    const existingNote = notesRef.current.find((n) => n.id === note.id);
+    const existingNote = currentNote(note.id);
     const exists = !!existingNote;
     const requestedType = note.type === "todo" ? "todo" : "note";
+    // Son savunma hattı: ekranlar limiti zaten açılışta/tip seçerken denetler,
+    // ama başka cihazdan eklenen kayıt sayıyı aradan değiştirmiş olabilir.
+    // Editör bir Modal'dır; yükseltme sayfasını üstüne açamayız, bu yüzden toast.
+    if (!exists && !canCreateNote(requestedType)) {
+      Toast.show({
+        type: "warning",
+        text1:
+          language === "tr"
+            ? requestedType === "todo"
+              ? "Yapılacaklar limitin doldu"
+              : "Not limitin doldu"
+            : requestedType === "todo"
+              ? "You've reached your to-do limit"
+              : "You've reached your notes limit",
+      });
+      return false;
+    }
     const existingType = existingNote
       ? existingNote.type === "todo" ? "todo" : "note"
       : null;
@@ -339,16 +271,9 @@ export const ProfileNotesProvider = ({ children }) => {
       updatedAt: now,
     };
 
-    // Optimistic update
-    setNotes((prev) =>
-      exists
-        ? prev.map((n) => (n.id === note.id ? finalNote : n))
-        : [finalNote, ...prev],
-    );
-    setSelectedNote((prev) => (prev && prev.id === note.id ? finalNote : prev));
-
     try {
-      await setDoc(itemDoc(uid, note.id), finalNote);
+      writeNote(finalNote);
+      setSelectedNote((prev) => (prev && prev.id === note.id ? finalNote : prev));
       return true;
     } catch (err) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.not_kaydedilemedi", "Not kaydedilemedi") });
@@ -366,14 +291,16 @@ export const ProfileNotesProvider = ({ children }) => {
     backgroundColorNotes, setBackgroundColorNotes,
     noteType, setNoteType, todoItems, setTodoItems,
     todoTitle, setTodoTitle, scheduledDate, setScheduledDate,
-    handleAddNote, handleUpdateNote, handleDeleteNote, saveNote,
+    handleAddNote, handleUpdateNote, handleDeleteNote, saveNote, handleTogglePin,
     handleToggleTodoItem, handleAddTodoItem, handleDeleteTodoItem, handleUpdateTodoNote,
     formatDate,
+    noteCounts, canCreateNote, checkCanCreateNote,
   }), [
     notes, loadingNotes, selectedNote, noteContent, message,
     modalVisibleNotesAdd, modalVisibleNotes, isEditable,
     borderColorNotes, backgroundColorNotes,
-    noteType, todoItems, todoTitle, scheduledDate, language,
+    noteType, todoItems, todoTitle, scheduledDate, language, uid,
+    noteCounts, notesGate, todosGate,
   ]);
 
   return (

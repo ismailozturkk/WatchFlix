@@ -24,6 +24,7 @@ import AppIcon from "../AppIcon";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import useSheetTransition from "../../hooks/useSheetTransition";
 import { useTheme } from "../../context/ThemeContext";
+import GlassCloseButton from "../common/GlassCloseButton";
 import { useAuth } from "../../context/AuthContext";
 import { useUserProfile } from "../../context/UserProfileContext";
 import { useListStatusContext } from "../../context/ListStatusContext";
@@ -443,14 +444,18 @@ export default function ImportDataModal({ visible, onClose }) {
           onPress={onClose}
         />
 
+        {/* fit: "CSV metnini yapıştır" kutusu klavyeyi açınca sayfa klavyenin
+            üstünde kalan alana sığacak şekilde kısalır (içerik kendi içinde kayar). */}
         <Animated.View
           onLayout={sheet.onSheetLayout}
           style={[
-            styles.sheet,
-            {
-              backgroundColor: theme.primary,
-              borderColor: theme.border,
-            },
+            sheet.fit([
+              styles.sheet,
+              {
+                backgroundColor: theme.primary,
+                borderColor: theme.border,
+              },
+            ]),
             sheet.sheetStyle,
           ]}
         >
@@ -467,9 +472,14 @@ export default function ImportDataModal({ visible, onClose }) {
               </Text>
             </View>
 
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <AppIcon family="Ionicons" name="close" size={20} color={theme.text.secondary} />
-            </TouchableOpacity>
+            <GlassCloseButton
+              size={32}
+              fallbackRadius={16}
+              iconSize={20}
+              color={theme.text.secondary}
+              backgroundColor="rgba(255,255,255,0.06)"
+              onPress={onClose}
+            />
           </View>
 
           <ScrollView
@@ -920,14 +930,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: "800",
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
   },
   scrollArea: {
     marginTop: 8,

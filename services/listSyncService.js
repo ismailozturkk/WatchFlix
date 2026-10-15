@@ -21,9 +21,7 @@ import { cacheKeys } from "../utils/cacheKeys";
 import {
   seed as seedSnapshot,
   publish as publishSnapshot,
-  getSnapshot,
 } from "./snapshotCache";
-import * as cacheStore from "../utils/cacheStore";
 import { trackFirestoreRead } from "./usageTrackerService";
 
 // In-memory subscribers for UI reactivity without Firestore reads

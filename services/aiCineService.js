@@ -19,7 +19,7 @@ import {
 } from "./geminiService";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 
-export { GeminiError, isGeminiError } from "./geminiService";
+export { GeminiError } from "./geminiService";
 
 export const CINE_VALID_TYPES = [
   "recommendations",

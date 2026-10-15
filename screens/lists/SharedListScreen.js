@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   ScrollView,
   Keyboard,
@@ -29,6 +28,10 @@ import UserAvatar from "@components/common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
 import CreateSharedListModal from "../../components/modals/CreateSharedListModal";
 import ScreenDecor from "@components/ScreenDecor";
+import StaggerItem from "@components/StaggerItem";
+import GlassCloseButton from "@components/common/GlassCloseButton";
+import useEntranceGate from "@hooks/useEntranceGate";
+import { gridEntranceIndex } from "@utils/entranceGate";
 import ListItemActionsSheet from "@components/lists/ListItemActionsSheet";
 import ListSearchBar from "@components/lists/ListSearchBar";
 import GlobalSearchResults from "@components/lists/GlobalSearchResults";
@@ -139,6 +142,9 @@ export default function SharedListScreen({ route, navigation }) {
   const [suggestions, setSuggestions] = useState([]);
   const [addingKey, setAddingKey] = useState(null);
   const [itemsReady, setItemsReady] = useState(false);
+  // Posterler YALNIZ ilk yüklemede kademeli girer; sonradan arama/filtreyle
+  // yeniden bağlanan satırlar animasyonsuz çizilir (bkz. hooks/useEntranceGate).
+  const shouldAnimateEntrance = useEntranceGate(itemsReady);
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("default");
   const [genreFilter, setGenreFilter] = useState([]);
@@ -650,7 +656,7 @@ export default function SharedListScreen({ route, navigation }) {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.3} />
+      <ScreenDecor scope="lists" iconOpacity={0.3} />
       {/* ── Başlık ── */}
       <View style={styles.header}>
         <BackButton absolute={false} />
@@ -773,9 +779,20 @@ export default function SharedListScreen({ route, navigation }) {
           contentContainerStyle={{ paddingHorizontal: GRID_SIDE_PADDING, paddingBottom: 40 }}
           initialNumToRender={8}
           windowSize={7}
-          renderItem={({ item: row }) => (
+          renderItem={({ item: row, index: rowIndex }) => (
             <View style={styles.gridRow}>
-              {row.map(renderPoster)}
+              {row.map((item, colIndex) => (
+                <StaggerItem
+                  key={item.key}
+                  index={gridEntranceIndex(rowIndex, colIndex, gridColumns)}
+                  animate={shouldAnimateEntrance()}
+                  step={40}
+                  maxStaggered={12}
+                  style={{ width: posterW }}
+                >
+                  {renderPoster(item)}
+                </StaggerItem>
+              ))}
               {row.length < gridColumns
                 ? Array.from({ length: gridColumns - row.length }).map((_, i) => (
                     <View key={`sp-${i}`} style={{ width: posterW }} />
@@ -1132,12 +1149,12 @@ export default function SharedListScreen({ route, navigation }) {
                       )}
                 </Text>
               </View>
-              <TouchableOpacity
+              <GlassCloseButton
+                size={30}
+                fallbackRadius={15}
+                iconSize={16}
                 onPress={() => setMembersVisible(false)}
-                style={[styles.closeBtn, { backgroundColor: theme.primary }]}
-              >
-                <Ionicons name="close" size={16} color={theme.text.muted} />
-              </TouchableOpacity>
+              />
             </View>
 
             <FlatList
@@ -1390,13 +1407,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   avatarStack: { flexDirection: "row", alignItems: "center" },
-  stackAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: "rgba(0,0,0,0.4)",
-  },
   membersBtnText: { fontSize: 13, fontWeight: "800" },
 
   // ── Grid ──
@@ -1449,7 +1459,6 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: 5,
   },
-  addedByAvatar: { width: 16, height: 16, borderRadius: 8 },
   addedByName: {
     flex: 1,
     color: "#fff",
@@ -1474,7 +1483,6 @@ const styles = StyleSheet.create({
   },
 
   // ── Üyeler modalı ──
-  overlay: { flex: 1, justifyContent: "flex-end" },
   sheet: {
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -1506,13 +1514,6 @@ const styles = StyleSheet.create({
   },
   sheetTitle: { fontSize: 17, fontWeight: "800" },
   sheetSub: { fontSize: 11, marginTop: 2 },
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   memberRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1521,7 +1522,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 10,
   },
-  memberAvatar: { width: 38, height: 38, borderRadius: 19 },
   memberName: { fontSize: 13, fontWeight: "700", flexShrink: 1 },
   memberUsername: { fontSize: 11, marginTop: 1 },
   ownerChip: {
@@ -1623,9 +1623,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  memberFilterAvatar: { width: 32, height: 32, borderRadius: 16 },
   memberFilterName: { flexShrink: 1, fontSize: 12.5, fontWeight: "800" },
-  memberFilterUsername: { fontSize: 10.5, marginTop: 1 },
   memberFilterTotal: { minWidth: 22, textAlign: "center", fontSize: 11, fontWeight: "800" },
   memberFilterCard: {
     width: "31.8%",
@@ -1637,7 +1635,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  memberFilterCardAvatar: { width: 30, height: 30, borderRadius: 15, marginBottom: 4 },
   memberFilterCardName: { width: "100%", textAlign: "center", fontSize: 10.5, fontWeight: "800" },
   memberFilterCardTotal: { fontSize: 9.5, fontWeight: "700", marginTop: 2 },
   memberFilterCheck: {

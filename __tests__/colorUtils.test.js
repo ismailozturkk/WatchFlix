@@ -113,3 +113,24 @@ describe("readableOn — okunurluk garantisi", () => {
     expect(() => readableOn("bilinmeyen", "renk")).not.toThrow();
   });
 });
+
+describe("shiftLightness", () => {
+  const { shiftLightness, hexToHsl } = require("../utils/colorUtils");
+
+  test("negatif delta koyulaştırır, ton korunur", () => {
+    const koyu = shiftLightness("#3B82F6", -15);
+    expect(hexToHsl(koyu).l).toBeLessThan(hexToHsl("#3B82F6").l);
+    expect(Math.abs(hexToHsl(koyu).h - hexToHsl("#3B82F6").h)).toBeLessThanOrEqual(2);
+  });
+
+  test("0-100 aralığına kenetlenir", () => {
+    expect(shiftLightness("#808080", -500)).toBe("#000000");
+    expect(shiftLightness("#808080", 500)).toBe("#FFFFFF");
+  });
+
+  test("6 haneli hex olmayan girdiyi aynen döner", () => {
+    expect(shiftLightness("rgba(1,2,3,0.5)", -10)).toBe("rgba(1,2,3,0.5)");
+    expect(shiftLightness(null, -10)).toBeNull();
+    expect(shiftLightness("#fff", -10)).toBe("#fff");
+  });
+});

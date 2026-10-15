@@ -5,8 +5,8 @@
 // (dil çipleri + fragman listesi + tam ekran oynatıcı).
 
 import React from "react";
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { Modal, View, Text, StyleSheet, Pressable } from "react-native";
+import GlassCloseButton from "../common/GlassCloseButton";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import TrailerSection from "./TrailerSection";
@@ -27,12 +27,16 @@ export default function TrailerModal({ visible, mediaType, id, apiKey, originalL
           <Text style={[styles.title, { color: theme.text.primary }]}>
             {i18nText("autoI18n.fragmanlar", "Fragmanlar")}
           </Text>
-          <TouchableOpacity
+          <GlassCloseButton
+            icon="chevron-down"
+            size={34}
+            fallbackRadius={12}
+            iconSize={20}
+            color={theme.text.primary}
+            backgroundColor={theme.secondary}
+            accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
             onPress={onClose}
-            style={[styles.closeBtn, { backgroundColor: theme.secondary }]}
-          >
-            <Ionicons name="chevron-down" size={20} color={theme.text.primary} />
-          </TouchableOpacity>
+          />
         </View>
 
         {visible && id ? (
@@ -78,11 +82,4 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: { fontSize: 17, fontWeight: "800" },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

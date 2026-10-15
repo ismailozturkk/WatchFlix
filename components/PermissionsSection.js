@@ -28,6 +28,7 @@ import {
 import * as Notifications from "expo-notifications";
 import * as MediaLibrary from "expo-media-library";
 import AppIcon from "@components/AppIcon";
+import GlassIconButton from "@components/common/GlassIconButton";
 import { appAlert } from "@components/AppAlert";
 import { ensureAndroidChannels } from "@services/pushNotificationsService";
 import { useLanguage } from "@context/LanguageContext";
@@ -235,20 +236,20 @@ export default function PermissionsSection({ colors: C }) {
               {t.permSummary || "İzin özeti"}
             </Text>
           </View>
-          <TouchableOpacity
-            accessibilityRole="button"
+          <GlassIconButton
+            size={30}
+            fallbackRadius={9}
+            fallbackStyle={{ backgroundColor: C.cardAlt, borderColor: C.border, borderWidth: 1 }}
             accessibilityLabel={t.permRefresh || "İzinleri yenile"}
-            style={[ps.refreshBtn, { backgroundColor: C.cardAlt, borderColor: C.border }]}
             onPress={refresh}
             disabled={refreshing || busyKey !== null}
-            activeOpacity={0.7}
           >
             {refreshing ? (
               <ActivityIndicator size="small" color={C.accentStrong} />
             ) : (
               <AppIcon name="refresh" size={17} color={C.accentStrong} />
             )}
-          </TouchableOpacity>
+          </GlassIconButton>
         </View>
         <View style={[ps.progressTrack, { backgroundColor: C.cardAlt }]}>
           <View
@@ -364,14 +365,6 @@ const ps = StyleSheet.create({
   summarySub: {
     fontSize: 10,
     marginTop: 1,
-  },
-  refreshBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   progressTrack: {
     height: 3,

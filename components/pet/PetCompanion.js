@@ -14,7 +14,6 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import LottieView from "lottie-react-native";
 import SpritePet, {
-  PET_STATE_ORDER,
   spriteFrameWidth,
 } from "@components/pet/SpritePet";
 import { usePet } from "@context/PetContext";
@@ -49,7 +48,6 @@ function PetCompanion({ fabRight = AI_FAB_RIGHT, fabBottom = AI_FAB_BOTTOM }) {
     selectedPetId,
     catalog,
     petState,
-    setPetState,
     position,
     setPetPosition,
     petSize,
@@ -125,10 +123,6 @@ function PetCompanion({ fabRight = AI_FAB_RIGHT, fabBottom = AI_FAB_BOTTOM }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [petSize, maxX, maxY, tx, ty]);
 
-  const cycleState = () => {
-    const i = PET_STATE_ORDER.indexOf(petState);
-    setPetState(PET_STATE_ORDER[(i + 1) % PET_STATE_ORDER.length]);
-  };
 
   const openAiChat = () => {
     requestAiChat({

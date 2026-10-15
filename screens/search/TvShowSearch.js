@@ -16,6 +16,7 @@ import {
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
+import GlassIconButton from "../../components/common/GlassIconButton";
 import { SearchSkeleton } from "../../components/Skeleton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import LottieView from "lottie-react-native";
@@ -23,13 +24,15 @@ import Toast from "react-native-toast-message";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import ListBadges from "../../components/ListBadges";
 import { useFocusEffect } from "@react-navigation/native";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { i18nText } from "../../utils/i18nText";
 import { searchMediaWithFuzzyFallback } from "../../services/fuzzyMediaSearch";
-import ScreenSnow from "../../components/ScreenSnow";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import QuickListButtons from "../../components/search/QuickListButtons";
+import GlassField from "@components/common/GlassField";
+import { liquidGlassSupported } from "@services/liquidGlass";
+import { isLightSurface } from "@utils/colorUtils";
 
 
 const { width } = Dimensions.get("window");
@@ -425,18 +428,6 @@ const DiscoverSection = memo(
       [navigation, imageQuality, theme],
     );
 
-    const renderRowItem = useCallback(
-      ({ item, index }) => (
-        <TvRowItem
-          item={item}
-          navigation={navigation}
-          imageQuality={imageQuality}
-          theme={theme}
-          index={index}
-        />
-      ),
-      [navigation, imageQuality, theme],
-    );
 
     const activeData = [popular, onTheAir, topRated][activeTab];
 
@@ -567,17 +558,17 @@ const LayoutToggle = memo(({ viewMode, onToggle, theme }) => {
   }, [viewMode, onToggle]);
 
   return (
-    <TouchableOpacity
+    <GlassIconButton
+      icon={viewMode === "row" ? "grid-outline" : "list-outline"}
+      iconSize={18}
+      size={44}
+      fallbackRadius={14}
+      color={theme.text?.primary ?? "#fff"}
+      fallbackStyle={{ backgroundColor: theme.secondary }}
+      style={styles.layoutToggleBtn}
+      accessibilityLabel={i18nText("autoI18n.gorunumu_degistir", "Görünümü değiştir")}
       onPress={toggle}
-      activeOpacity={0.7}
-      style={[styles.layoutToggleBtn, { backgroundColor: theme.secondary }]}
-    >
-      <Ionicons
-        name={viewMode === "row" ? "grid-outline" : "list-outline"}
-        size={18}
-        color={theme.text?.primary ?? "#fff"}
-      />
-    </TouchableOpacity>
+    />
   );
 });
 
@@ -753,8 +744,11 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
       },
     ],
   };
+  // iOS 26+: Liquid Glass bir atası animasyonlu `opacity` taşıyorsa bozulur
+  // (bkz. components/common/GlassSurface.js) — bu yüzden cam açıkken giriş
+  // yalnız kaymayla yapılır, solma yok.
   const searchBarStyle = {
-    opacity: searchBarAnim,
+    ...(liquidGlassSupported ? null : { opacity: searchBarAnim }),
     transform: [
       {
         translateY: searchBarAnim.interpolate({
@@ -787,8 +781,8 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
     <Container
       style={[styles.container, !isUnified && { backgroundColor: theme.primary }]}
     >
-      {!isUnified && <IconBacground opacity={0.3} />}
-      <ScreenSnow />
+      {/* Gömülü (isUnified) modda dekoru SearchScreen çiziyor. */}
+      {!isUnified && <ScreenDecor scope="search" iconOpacity={0.3} />}
 
       {/* ── Başlık ─────────────────────────────────────────────────────── */}
       {!isUnified && <Animated.Text
@@ -803,11 +797,11 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
 
       {/* ── Arama Kutusu + Toggle ──────────────────────────────────────── */}
       {!isUnified && <Animated.View style={[styles.searchRow, searchBarStyle]}>
-        <View
-          style={[
-            styles.searchBar,
-            { backgroundColor: theme.secondary, flex: 1 },
-          ]}
+        {/* iOS 26+: hap biçimli Liquid Glass arama alanı; diğer yerlerde eski kutu. */}
+        <GlassField
+          height={48}
+          fallbackStyle={[styles.searchBarBox, { backgroundColor: theme.secondary }]}
+          style={[styles.searchBar, { flex: 1 }]}
         >
           <Ionicons
             name="search"
@@ -827,6 +821,7 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
             onChangeText={handleSearch}
             maxLength={80}
             returnKeyType="search"
+            keyboardAppearance={isLightSurface(theme.primary) ? "light" : "dark"}
             onSubmitEditing={() =>
               search.trim().length >= 2 && fetchResults(search)
             }
@@ -848,7 +843,7 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
               />
             </TouchableOpacity>
           ) : null}
-        </View>
+        </GlassField>
         {/* Layout toggle butonu */}
         <LayoutToggle
           viewMode={viewMode}
@@ -958,23 +953,18 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     gap: 10,
   },
+  // Yerleşim iki yolda da geçerli; köşe yalnız eski kutuda (cam kendi şeklini çizer).
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 2,
-    borderRadius: 16,
-    minHeight: 48,
   },
+  searchBarBox: { borderRadius: 16 },
   searchInput: { flex: 1, fontSize: 15, paddingVertical: 10 },
 
   // Layout toggle
   layoutToggleBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
     flexShrink: 0,
   },
 

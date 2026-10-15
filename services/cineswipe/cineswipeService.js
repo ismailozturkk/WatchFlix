@@ -4,6 +4,9 @@
 // Solo mod için dinamik ve sayfalı deste üretir; Film/Dizi kategorileri, türler
 // ve kullanıcının kendi izleme listesinden beslenir.
 // Duo mod için Firestore üzerinde oda kurma, yapılandırma ve eşleşme motoru sunar.
+//
+// Saf mantık (istek kurulumu, kart normalizasyonu, sayfa birleştirme)
+// services/cineswipe/deckModel.js'tedir; burası yalnızca ağ ve Firestore.
 
 import {
   doc,
@@ -19,34 +22,27 @@ import {
 } from "firebase/firestore";
 import axios from "axios";
 import { db } from "../../firebase";
+import {
+  SWIPE_CATEGORIES,
+  GENRE_OPTIONS,
+  cineMediaKey,
+  buildDeckRequests,
+  normalizeDeckItem,
+  normalizeWatchlistItem,
+  normalizeFilters,
+  mergeUniqueCards,
+  interleaveCards,
+  shuffleCards,
+} from "./deckModel";
+
+export { SWIPE_CATEGORIES, GENRE_OPTIONS, cineMediaKey };
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const RAW_KEY = process.env.EXPO_PUBLIC_API_KEY || "";
 const API_KEY = RAW_KEY && !RAW_KEY.startsWith("Bearer ") ? `Bearer ${RAW_KEY}` : RAW_KEY;
 
-export const SWIPE_CATEGORIES = [
-  { id: "trending", label: "Popüler & Trendler", icon: "flame-outline" },
-  { id: "now_playing", label: "Vizyondaki Filmler", icon: "film-outline", mediaType: "movie" },
-  { id: "upcoming", label: "Yakında Gelecekler", icon: "time-outline", mediaType: "movie" },
-  { id: "top_rated_movie", label: "En İyi Filmler (IMDb/TMDB)", icon: "trophy-outline", mediaType: "movie" },
-  { id: "popular_tv", label: "Popüler Diziler", icon: "tv-outline", mediaType: "tv" },
-  { id: "top_rated_tv", label: "Efsane Diziler", icon: "star-outline", mediaType: "tv" },
-  { id: "watchlist", label: "Kendi İzleme Listem", icon: "bookmark-outline" },
-];
-
-export const GENRE_OPTIONS = [
-  { id: null, label: "Tüm Türler" },
-  { id: 28, label: "Aksiyon" },
-  { id: 35, label: "Komedi" },
-  { id: 18, label: "Dram" },
-  { id: 878, label: "Bilim Kurgu" },
-  { id: 27, label: "Korku" },
-  { id: 10749, label: "Romantik" },
-  { id: 16, label: "Animasyon" },
-  { id: 53, label: "Gerilim" },
-  { id: 99, label: "Belgesel" },
-  { id: 80, label: "Suç" },
-];
+// TMDB sayfa sınırı; bunun ötesi 422 döner.
+const MAX_TMDB_PAGES = 500;
 
 /**
  * 6 haneli rastgele oda kodu üretir (örn. "749215").
@@ -55,105 +51,107 @@ export function generateRoomCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-/**
- * CineSwipe için film/dizi destesi çeker.
- * @param {Object} options
- * @param {string} options.language - "tr-TR" | "en-US"
- * @param {string} options.category - "trending" | "now_playing" | "upcoming" | "top_rated_movie" | "popular_tv" | "top_rated_tv" | "watchlist"
- * @param {string} options.mediaType - "all" | "movie" | "tv"
- * @param {number|null} options.genreId - Tür filtresi
- * @param {number} options.page - Sayfa numarası (1, 2, 3...)
- * @param {string|null} options.userId - Kullanıcı izleme listesi çekimi için uid
- */
-export async function fetchSwipeDeck({
-  language = "tr-TR",
-  category = "trending",
-  mediaType = "movie",
-  genreId = null,
-  page = 1,
-  userId = null,
-} = {}) {
+/** Geçici hatada (ağ, 5xx, 429) bir kez daha dener; kalıcı 4xx'te denemez. */
+async function requestDeckPage(request) {
+  const url = `${TMDB_BASE}${request.endpoint}`;
+  const config = {
+    params: request.params,
+    headers: { accept: "application/json", Authorization: API_KEY },
+    timeout: 8000,
+  };
   try {
-    // 1. Kendi İzleme Listemden Çekme
-    if (category === "watchlist" && userId) {
-      const watchlistRef = collection(db, "Lists", userId, "watchList");
-      const snap = await getDocs(watchlistRef);
-      const items = [];
-      snap.forEach((d) => {
-        const data = d.data();
-        if (data && (data.name || data.title) && data.imagePath) {
-          items.push({
-            id: data.id || parseInt(d.id, 10),
-            title: data.name || data.title || "Film",
-            original_title: data.name || data.title || "",
-            mediaType: data.type || "movie",
-            poster_path: data.imagePath,
-            backdrop_path: data.imagePath,
-            release_date: "",
-            vote_average: 0,
-            overview: data.overview || "",
-          });
-        }
-      });
-      // Karıştır
-      return items.sort(() => Math.random() - 0.5);
-    }
-
-    // 2. TMDB Kategori Çözümleme
-    let endpoint = "/trending/all/week";
-    let params = {
-      language,
-      page,
-      include_adult: false,
-    };
-
-    if (category === "now_playing") {
-      endpoint = "/movie/now_playing";
-    } else if (category === "upcoming") {
-      endpoint = "/movie/upcoming";
-    } else if (category === "top_rated_movie") {
-      endpoint = "/movie/top_rated";
-    } else if (category === "popular_tv") {
-      endpoint = "/tv/popular";
-    } else if (category === "top_rated_tv") {
-      endpoint = "/tv/top_rated";
-    } else if (genreId) {
-      endpoint = mediaType === "tv" ? "/discover/tv" : "/discover/movie";
-      params.with_genres = genreId;
-      params.sort_by = "popularity.desc";
-      params["vote_count.gte"] = 80;
-    } else if (mediaType === "tv") {
-      endpoint = "/trending/tv/week";
-    } else if (mediaType === "movie") {
-      endpoint = "/trending/movie/week";
-    }
-
-    const res = await axios.get(`${TMDB_BASE}${endpoint}`, {
-      params,
-      headers: { accept: "application/json", Authorization: API_KEY },
-      timeout: 8000,
-    });
-
-    const results = res.data.results || [];
-    return results
-      .filter((item) => item.poster_path && (item.title || item.name))
-      .map((item) => {
-        const itemType = item.title ? "movie" : item.name ? "tv" : mediaType || "movie";
-        return {
-          id: item.id,
-          title: item.title || item.name || "Film",
-          original_title: item.original_title || item.original_name || "",
-          mediaType: itemType,
-          poster_path: item.poster_path || "",
-          backdrop_path: item.backdrop_path || "",
-          release_date: item.release_date || item.first_air_date || "",
-          vote_average: typeof item.vote_average === "number" ? item.vote_average : 0,
-          overview: item.overview || "",
-        };
-      });
-  } catch (e) {
-    return [];
+    return await axios.get(url, config);
+  } catch (error) {
+    const status = error?.response?.status;
+    if (status >= 400 && status < 500 && status !== 429) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return axios.get(url, config);
   }
+}
+
+/**
+ * CineSwipe için BİR SAYFA film/dizi destesi çeker. Ağ hatasında FIRLATIR
+ * (boş liste "sonuç yok" demektir, hata demek değil) — ekran ikisini ayrı gösterir.
+ *
+ * @param {Object} options
+ * @param {string} options.language - TMDB dil kodu: "tr-TR" | "en-US"
+ * @param {string} options.category - bkz. SWIPE_CATEGORIES
+ * @param {string} options.mediaType - "all" | "movie" | "tv"
+ * @param {number|null} options.genreId - Tür filtresi (film tür kimliği)
+ * @param {number} options.page - Sayfa numarası (1, 2, 3...)
+ * @param {string|null} options.userId - İzleme listesi için uid
+ * @returns {Promise<{ items: Array<Object>, hasMore: boolean }>}
+ */
+export async function fetchSwipeDeckPage(options = {}) {
+  const { language = "tr-TR", page = 1, userId = null } = options;
+  const filters = normalizeFilters(options);
+
+  // 1. Kendi izleme listemden: tek seferde gelir, sayfalama yok.
+  if (filters.category === "watchlist") {
+    if (!userId || page > 1) return { items: [], hasMore: false };
+    const snap = await getDocs(collection(db, "Lists", userId, "watchList"));
+    const items = [];
+    snap.forEach((entry) => {
+      const card = normalizeWatchlistItem(entry.data(), entry.id);
+      if (card && (filters.mediaType === "all" || card.mediaType === filters.mediaType)) {
+        items.push(card);
+      }
+    });
+    return { items: shuffleCards(items), hasMore: false };
+  }
+
+  // 2. TMDB
+  const requests = buildDeckRequests({ ...filters, page, language });
+  if (!requests.length) return { items: [], hasMore: false };
+
+  const settled = await Promise.allSettled(requests.map(requestDeckPage));
+  if (settled.every((entry) => entry.status === "rejected")) throw settled[0].reason;
+
+  const lists = [];
+  let hasMore = false;
+  settled.forEach((entry, index) => {
+    if (entry.status !== "fulfilled") return; // "Karışık"ta bir uç düşse de diğeri gösterilir.
+    const data = entry.value?.data || {};
+    lists.push(
+      (data.results || []).map((raw) => normalizeDeckItem(raw, requests[index].mediaType)).filter(Boolean),
+    );
+    if (page < Math.min(data.total_pages || 1, MAX_TMDB_PAGES)) hasMore = true;
+  });
+
+  const merged = lists.length > 1 ? interleaveCards(lists[0], lists[1]) : lists[0] || [];
+  return { items: mergeUniqueCards([], merged), hasMore };
+}
+
+/**
+ * Duo oda destesini toplar: tekrarsız, en fazla `targetCardsCount` kart.
+ * Hiç kart toplanamazsa `empty-deck` fırlatır (ekranda "içerik yüklenemedi").
+ */
+export async function fetchRoomDeck(config = {}, { language = "tr-TR", userId = null } = {}) {
+  const target = config.targetCardsCount || 20;
+  const filters = normalizeFilters({
+    category: config.category || "trending",
+    mediaType: config.mediaType || "all",
+    genreId: config.genreId ?? null,
+  });
+  const deck = [];
+  const seen = new Set();
+  try {
+    for (let page = 1; deck.length < target && page <= 6; page += 1) {
+      const result = await fetchSwipeDeckPage({ ...filters, language, userId, page });
+      for (const item of result.items) {
+        const key = cineMediaKey(item);
+        if (!seen.has(key)) {
+          seen.add(key);
+          deck.push(item);
+        }
+      }
+      if (!result.hasMore) break;
+    }
+  } catch (error) {
+    if (!deck.length) throw cineRoomError("empty-deck");
+  }
+  if (!deck.length) throw cineRoomError("empty-deck");
+  return deck.slice(0, target);
 }
 
 /**
@@ -183,6 +181,7 @@ export async function createCineRoom(hostUser, deck = [], config = {}) {
     release_date: item.release_date || "",
     vote_average: typeof item.vote_average === "number" ? item.vote_average : 0,
     overview: item.overview || "",
+    genre_ids: Array.isArray(item.genre_ids) ? item.genre_ids.slice(0, 3) : [],
   }));
 
   if (!cleanDeck.length) throw cineRoomError("empty-deck");
@@ -200,6 +199,8 @@ export async function createCineRoom(hostUser, deck = [], config = {}) {
     deck: cleanDeck,
     targetCount,
     category: config.category || "trending",
+    mediaType: config.mediaType || "all",
+    genreId: config.genreId ?? null,
     swipes: {}, // { [mediaId]: { [uid]: "like" | "pass" } }
     matches: [], // [mediaId, ...]
     createdAt: serverTimestamp(),
@@ -265,7 +266,6 @@ export async function joinCineRoom(roomCode, guestUser) {
   });
 }
 
-export const cineMediaKey = (media) => `${media.mediaType || "movie"}_${media.id}`;
 export const cineVotesFor = (room, media) =>
   room.swipes?.[cineMediaKey(media)] || room.swipes?.[String(media.id)] || {};
 

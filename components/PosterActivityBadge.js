@@ -25,7 +25,7 @@ const STAR_COLOR = "#FFB300";
  * `layout`:
  *  - "below"   (varsayılan) — posterin ALTINDA, normal akışta, ortalanmış satır.
  *  - "overlay" — posterin ÜZERİNDE, `corner` köşesine mutlak konumlanmış rozet
- *    (eski davranış; artık kullanılmıyor ama ihtiyaç olursa diye korunuyor).
+ *    (liste ve profil ızgaralarında kullanılır).
  */
 export function PosterActivityBadge({
   hasRating,

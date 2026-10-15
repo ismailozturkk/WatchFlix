@@ -12,6 +12,7 @@ import {
   } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../context/ThemeContext";
+import GlassCloseButton from "./common/GlassCloseButton";
 import { useLanguage } from "../context/LanguageContext";
 import LottieView from "lottie-react-native";
 import { useListStatusContext } from "../context/ListStatusContext";
@@ -478,12 +479,7 @@ const ListViewTv = ({
                   )}
                 </View>
               </View>
-              <TouchableOpacity
-                onPress={closeSheet}
-                style={[styles.closeBtn, { backgroundColor: theme.primary }]}
-              >
-                <Ionicons name="close" size={15} color={theme.text.muted} />
-              </TouchableOpacity>
+              <GlassCloseButton size={28} fallbackRadius={14} iconSize={15} onPress={closeSheet} />
             </View>
 
             {/* Separator */}
@@ -726,13 +722,6 @@ const styles = StyleSheet.create({
   sheetSubtitle: {
     fontSize: 11,
     marginTop: 1,
-  },
-  closeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
   },
 
   /* Grid */

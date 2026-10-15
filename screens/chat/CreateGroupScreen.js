@@ -12,9 +12,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
 } from "react-native";
-import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getAuth } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
@@ -24,6 +22,7 @@ import { useProfileUi } from "@context/ProfileUiContext";
 import { useUserProfile } from "@context/UserProfileContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BackButton from "@components/BackButton";
+import GlassPillButton from "@components/common/GlassPillButton";
 import ScreenDecor from "@components/ScreenDecor";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import GroupAvatarPickerModal from "@components/chat/GroupAvatarPickerModal";
@@ -44,7 +43,7 @@ export default function CreateGroupScreen({ navigation }) {
   const auth = getAuth();
   const user = auth.currentUser;
   const { theme } = useTheme();
-  const { avatars, selectAvatarIndex } = useProfileUi();
+  const { selectAvatarIndex } = useProfileUi();
   const { displayName, username, avatarIndex: profileAvatarIndex, photoURL: profilePhotoURL } = useUserProfile();
 
   const [friends, setFriends] = useState([]);
@@ -216,7 +215,7 @@ export default function CreateGroupScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.3} />
+      <ScreenDecor scope="chat" iconOpacity={0.3} />
 
       <View style={styles.headerRow}>
         <View style={styles.headerSide}>
@@ -307,26 +306,20 @@ export default function CreateGroupScreen({ navigation }) {
       )}
 
       {/* Oluştur butonu */}
-      <TouchableOpacity
-        onPress={handleCreate}
+      <GlassPillButton
+        label={i18nText("autoI18n.grubu_olustur", "Grubu Oluştur")}
+        icon="checkmark-circle"
+        iconSize={20}
+        fontSize={16}
+        height={52}
+        fallbackRadius={18}
+        tint={color}
+        fallbackStyle={[styles.createBtnFallback, { backgroundColor: color }]}
+        loading={creating}
         disabled={!canCreate || creating}
-        activeOpacity={0.85}
-        style={[
-          styles.createBtn,
-          { backgroundColor: color, opacity: canCreate && !creating ? 1 : 0.4 },
-        ]}
-      >
-        {creating ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
-            <Ionicons name="checkmark-circle" size={20} color="#fff" />
-            <Text style={styles.createBtnText}>
-              {i18nText("autoI18n.grubu_olustur", "Grubu Oluştur")}
-            </Text>
-          </>
-        )}
-      </TouchableOpacity>
+        style={styles.createBtn}
+        onPress={handleCreate}
+      />
 
       <GroupAvatarPickerModal
         visible={avatarPickerVisible}
@@ -414,9 +407,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     marginBottom: 8,
   },
-  avatarWrap: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, overflow: "hidden" },
-  avatar: { width: "100%", height: "100%", borderRadius: 23 },
-  avatarPh: { justifyContent: "center", alignItems: "center" },
   friendName: { fontSize: 15, fontWeight: "700" },
   friendUser: { fontSize: 12.5, marginTop: 2 },
   checkDot: {
@@ -437,17 +427,13 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     bottom: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 15,
-    borderRadius: 18,
+  },
+  // Gölge yalnız eski yolda (cam kendi derinliğini çizer).
+  createBtnFallback: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
-  createBtnText: { color: "#fff", fontSize: 16, fontWeight: "800" },
 });

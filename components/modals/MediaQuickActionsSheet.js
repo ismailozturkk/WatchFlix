@@ -40,7 +40,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import axios from "axios";
 import Toast from "react-native-toast-message";
-import { deleteDoc, doc, onSnapshot, setDoc } from "firebase/firestore";
+import useUserDataDomain from "../../hooks/useUserDataDomain";
+import { remindersActions, remindersDomain } from "../../services/userData";
 
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import PosterImage from "../PosterImage";
@@ -52,7 +53,6 @@ import RatingSheetModal from "./RatingSheetModal";
 import WatchHistorySheet from "./WatchHistorySheet";
 import WatchedDateSheet from "../detail/WatchedDateSheet";
 
-import { db } from "../../firebase";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -63,6 +63,7 @@ import {
 } from "../../context/AppSettingsContext";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
+import useReminderGate from "../../hooks/useReminderGate";
 import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
 import {
   markMovieWatched,
@@ -140,12 +141,18 @@ const ActionRow = ({ icon, tint, title, subtitle, onPress, theme }) => (
   </TouchableOpacity>
 );
 
-export default function MediaQuickActionsSheet({ target, onClose }) {
+// `onClose`  → sayfayı kapatır; devir akışları (detay, puan, tarih…) bunu kullanır.
+// `onDismiss` → kullanıcı vazgeçti (dışarı dokunuş, X, geri tuşu); sağlayıcı
+//               hedefin `onDismiss` geri çağrısını da çalıştırır. Verilmezse
+//               `onClose`a düşer.
+export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
+  const handleDismiss = onDismiss || onClose;
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const { needsPermissionPriming, primeNotificationPermission } =
     useDeviceNotifications();
+  const reminderGate = useReminderGate();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const { allLists, statusIndex, watchedMoviesItems } = useListStatusContext();
@@ -179,14 +186,16 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
   const targetKey = id == null ? null : `${mediaType}:${id}`;
 
   const [detailState, setDetailState] = useState({ key: null, data: null });
-  const [reminderState, setReminderState] = useState({ key: null, set: false });
+  // Hatırlatıcı durumu YEREL kopyadan (services/userData): eskiden sayfa her
+  // açıldığında bu film için buluttan bir `onSnapshot` açılıyordu.
+  const remindersView = useUserDataDomain(remindersDomain);
   const [busy, setBusy] = useState(false);
   const [dateSheetVisible, setDateSheetVisible] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [ratingVisible, setRatingVisible] = useState(false);
 
   const details = detailState.key === targetKey ? detailState.data : null;
-  const isReminderSet = reminderState.key === targetKey && reminderState.set;
+  const isReminderSet = !isTv && id != null && remindersView.has("movies", id);
 
   /* ── Açılış / kapanış animasyonu ────────────────────────────────────────
      Modal'ın kendi `animationType="slide"`ı (Ayarlar'daki sayfaların yaptığı)
@@ -331,17 +340,6 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
       cancelled = true;
     };
   }, [targetKey, id, mediaType, language, API_KEY]);
-
-  /* ── Film hatırlatması (detay ekranıyla aynı doküman) ──────────────────── */
-  useEffect(() => {
-    if (!user?.uid || !targetKey || isTv) return undefined;
-    const unsubscribe = onSnapshot(
-      doc(db, "Reminders", user.uid, "movies", String(id)),
-      (snap) => setReminderState({ key: targetKey, set: snap.exists() }),
-      () => setReminderState({ key: targetKey, set: false }),
-    );
-    return () => unsubscribe();
-  }, [user?.uid, targetKey, id, isTv]);
 
   /* ── İzlenme durumu ─────────────────────────────────────────────────────
      `useWatchedShow(null)` dinleyici açmaz; film hedefinde bedeli yok. */
@@ -699,12 +697,19 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
   /* ── Film hatırlatması ──────────────────────────────────────────────────── */
   const toggleReminder = useCallback(async () => {
     if (!user?.uid || !details) return;
+    // Yeni film hatırlatması ücretsiz planda sınırlı (kaldırmak serbest).
+    // Yükseltme sayfası bir Modal: bu sayfa kapanmadan açılırsa iOS ikisini
+    // birden sunamaz, bu yüzden önce kapan, sonra uyar (closeThen deseni).
+    if (!isReminderSet && !reminderGate.canAdd({ type: "movie" })) {
+      closeThen(() => reminderGate.checkAdd({ type: "movie" }));
+      return;
+    }
     try {
-      const ref = doc(db, "Reminders", user.uid, "movies", String(details.id));
+      // Yerel kopyaya + kalıcı günlüğe anında yazılır, buluta arka planda gider.
       if (isReminderSet) {
-        await deleteDoc(ref);
+        remindersActions.removeMovie(user.uid, details.id);
       } else {
-        await setDoc(ref, {
+        remindersActions.setMovie(user.uid, {
           movieId: details.id || "",
           movieName: details.title || "",
           releaseDate: details.release_date || "",
@@ -741,6 +746,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
     needsPermissionPriming,
     primeNotificationPermission,
     closeThen,
+    reminderGate,
   ]);
 
   /* ── Yönlendirmeler ─────────────────────────────────────────────────────── */
@@ -800,7 +806,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
         statusBarTranslucent
         visible={mounted}
         animationType="none"
-        onRequestClose={onClose}
+        onRequestClose={handleDismiss}
       >
         {/* Fade TÜM katmana: blur da sayfa da birlikte beliriyor. Sayfa buna
             EK OLARAK kayıyor — "Diğer Listeler" sayfasının deseni. */}
@@ -808,7 +814,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}
-            onPress={onClose}
+            onPress={handleDismiss}
           >
             <ModalBlurBackdrop intensity={50} />
           </TouchableOpacity>
@@ -968,6 +974,9 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
                         airDate={details.first_air_date}
                         seasonPosterPath={details.poster_path}
                         type="tv"
+                        onLimitReached={(blocked) =>
+                          closeThen(() => reminderGate.checkAdd(blocked))
+                        }
                       />
                     ) : null
                   }
@@ -1069,7 +1078,7 @@ export default function MediaQuickActionsSheet({ target, onClose }) {
               <View style={styles.handle} />
             </View>
             <TouchableOpacity
-              onPress={onClose}
+              onPress={handleDismiss}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={styles.closeBtn}
             >

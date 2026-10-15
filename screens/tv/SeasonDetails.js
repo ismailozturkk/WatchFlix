@@ -26,7 +26,7 @@ import {
   useImageQualitySettings,
 } from "../../context/AppSettingsContext";
 import Reminder from "../../components/Reminder";
-import ScreenSnow from "../../components/ScreenSnow";
+import ScreenDecor from "../../components/ScreenDecor";
 import { daysUntil, parseAirDate } from "../../utils/airDate";
 import ScopedCommentButton from "../../components/comments/ScopedCommentButton";
 import { COMMENT_SCOPE } from "../../utils/commentScope";
@@ -322,7 +322,7 @@ export default function SeasonDetails({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [lineCount, setLineCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
-  const [play, setPlay] = useState("");
+  const [play] = useState("");
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -437,6 +437,8 @@ export default function SeasonDetails({ route, navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
+    {/* Dekor İÇERİĞİN ARKASINDA: eskiden kar ScrollView'ın ÜSTÜNDE çiziliyordu. */}
+    <ScreenDecor scope="details" iconOpacity={0.25} />
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
@@ -721,8 +723,6 @@ export default function SeasonDetails({ route, navigation }) {
         </View>
       </View>
     </ScrollView>
-
-    <ScreenSnow />
 
     <BackButton variant="blur" />
     </View>

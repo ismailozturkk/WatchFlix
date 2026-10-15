@@ -2,10 +2,29 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import { GlowBackdrop } from "@components/game/ui";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
+import BackButton from "@components/BackButton";
 
-export function GameScreenShell({ navigation, title, subtitle, children, scroll = true, onBack, headerRight }) {
+/**
+ * Oyun ekranlarının ortak kabuğu: üstte vurgu ışığı, geri + başlık satırı,
+ * kaydırılan içerik ve (isteğe bağlı) altta SABİT aksiyon çubuğu.
+ *
+ * `footer`: Başlat gibi birincil aksiyon uzun içeriğin altında kaybolmasın
+ * diye kaydırma alanının DIŞINDA durur (kurulum ekranı kullanır).
+ */
+export function GameScreenShell({
+  navigation,
+  title,
+  subtitle,
+  children,
+  scroll = true,
+  onBack,
+  headerRight,
+  footer,
+  glow = true,
+}) {
   const { theme } = useTheme();
   // scroll=false durumunda icerik tum alani kaplar; boylece icerideki bir
   // FlatList sanallastirma yapabilir (Part 14.2).
@@ -13,22 +32,34 @@ export function GameScreenShell({ navigation, title, subtitle, children, scroll 
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: theme.primary }]}>
+      {glow ? <GlowBackdrop color={theme.accent} /> : null}
       <View style={styles.header}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
-          onPress={onBack || (() => navigation.goBack())}
-          style={[styles.backButton, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-        >
-          <AppIcon family="Ionicons" name="arrow-back" size={21} color={theme.text.primary} />
-        </TouchableOpacity>
+        <BackButton absolute={false} onPress={onBack || (() => navigation.goBack())} />
         <View style={styles.headerCopy}>
-          <Text style={[styles.title, { color: theme.text.primary }]}>{title}</Text>
-          {subtitle ? <Text style={[styles.subtitle, { color: theme.text.muted }]}>{subtitle}</Text> : null}
+          <Text style={[styles.title, { color: theme.text.primary }]} numberOfLines={1}>
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text style={[styles.subtitle, { color: theme.text.muted }]} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
         </View>
         {headerRight ? <View style={styles.headerRight}>{headerRight}</View> : null}
       </View>
-      {scroll ? <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>{content}</ScrollView> : content}
+      {scroll ? (
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, footer && styles.scrollContentWithFooter]}
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </ScrollView>
+      ) : (
+        content
+      )}
+      {footer ? (
+        <View style={[styles.footer, { backgroundColor: theme.primary, borderTopColor: theme.border }]}>{footer}</View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -69,15 +100,16 @@ export const gameSharedStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { minHeight: 66, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 12 },
-  backButton: { width: 42, height: 42, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  header: { minHeight: 70, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 12 },
   headerCopy: { flex: 1 },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  title: { fontSize: 22, fontWeight: "900" },
-  subtitle: { fontSize: 12, fontWeight: "600", marginTop: 2 },
+  title: { fontSize: 24, fontWeight: "900", letterSpacing: -0.3 },
+  subtitle: { fontSize: 12, fontWeight: "650", marginTop: 2 },
   scrollContent: { paddingBottom: 34 },
+  scrollContentWithFooter: { paddingBottom: 18 },
   content: { paddingHorizontal: 16, gap: 12 },
   contentFill: { flex: 1 },
+  footer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, borderTopWidth: StyleSheet.hairlineWidth },
   card: { minHeight: 76, borderRadius: 18, borderWidth: 1, padding: 13, flexDirection: "row", alignItems: "center", gap: 12 },
   cardIcon: { width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center" },
   cardCopy: { flex: 1 },

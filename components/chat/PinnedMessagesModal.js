@@ -10,6 +10,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import { alpha } from "../../theme/colors";
@@ -60,12 +61,14 @@ export default function PinnedMessagesModal({
                 {i18nText("autoI18n.n_mesaj_sabitli", "{{n}} mesaj sabitli", { n: pins.length })}
               </Text>
             </View>
-            <TouchableOpacity
+            <GlassCloseButton
+              size={36}
+              fallbackRadius={18}
+              iconSize={21}
+              color={theme.text.primary}
+              backgroundColor={theme.between}
               onPress={onClose}
-              style={[styles.closeButton, { backgroundColor: theme.between }]}
-            >
-              <Ionicons name="close" size={21} color={theme.text.primary} />
-            </TouchableOpacity>
+            />
           </View>
 
           <FlatList
@@ -143,7 +146,6 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, marginLeft: 11 },
   title: { fontSize: 17, fontWeight: "800" },
   subtitle: { fontSize: 11.5, marginTop: 2 },
-  closeButton: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   list: { minHeight: 260 },
   row: { minHeight: 76, flexDirection: "row", alignItems: "center", borderWidth: StyleSheet.hairlineWidth, borderRadius: 15, marginBottom: 8, overflow: "hidden", paddingRight: 10 },
   rowAccent: { alignSelf: "stretch", width: 3 },

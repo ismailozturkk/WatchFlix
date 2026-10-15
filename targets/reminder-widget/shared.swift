@@ -183,4 +183,57 @@ extension View {
       background(color)
     }
   }
+
+  /// iOS 17+ `containerBackground` kullanan widget'a sistem içerik kenar boşluğunu
+  /// (≈16 pt) kendisi verir; eski sürümlerde bu boşluk yoktur. Elle eklenen dolgu
+  /// artık YALNIZ eski sürümlerde uygulanır: cihaz ekran görüntüsünde kenar boşluğu
+  /// 14 + 16 = 30 pt çıkıyor, orta boy widget'ın içeriği (≈98 pt) başlık ve
+  /// satırlara yetmiyor, SwiftUI taşan içeriği ortalayıp iki ucundan kırpıyordu
+  /// (başlık kayboluyordu).
+  @ViewBuilder
+  func widgetContentPadding(_ legacy: CGFloat) -> some View {
+    if #available(iOS 17.0, *) {
+      self
+    } else {
+      padding(legacy)
+    }
+  }
+}
+
+// MARK: - Satır bütçesi
+
+struct RowFit {
+  let rows: Int
+  let showsOverflow: Bool
+}
+
+/// `available` yüksekliğe (başlık dahil) kaç satır sığar.
+///
+/// Önceden satır sayısı aileye göre SABİT sayıydı (orta 3, büyük 6…); içerik
+/// sığmasa da aynı sayıda satır çiziliyordu. Burada gerçek yükseklikten
+/// hesaplanır: n satır = n·row + (n−1)·gap ≤ body. Sığmayan satır yerine (varsa)
+/// "+N daha" etiketi konur; etiket için de yer yoksa hiç konmaz — satırlar etiketten
+/// önceliklidir. En az 1 satır her zaman çizilir.
+///
+/// JS ikizi: screens/tabs/settings/widgets/widgetPlatform.js → `fitRows`
+/// (Ayarlar önizlemesi aynı hesabı yapar; ikisi AYNI kalmalı).
+func fitRows(
+  available: CGFloat,
+  header: CGFloat,
+  row: CGFloat,
+  gap: CGFloat,
+  overflowLabel: CGFloat,
+  total: Int,
+  limit: Int
+) -> RowFit {
+  let wanted = max(0, min(total, limit))
+  if wanted == 0 { return RowFit(rows: 0, showsOverflow: false) }
+  let body = available - header
+  let capacity = body >= row ? Int(((body + gap) / (row + gap)).rounded(.down)) : 0
+  let rows = max(1, min(wanted, capacity))
+  let used = CGFloat(rows) * row + CGFloat(rows - 1) * gap
+  return RowFit(
+    rows: rows,
+    showsOverflow: total > rows && body - used >= gap + overflowLabel
+  )
 }

@@ -65,6 +65,7 @@ import {
 import { resolveCards } from "@services/tmdbLookup";
 import AIChatScreen from "@screens/chat/AIChatScreen";
 import { i18nText } from "@utils/i18nText";
+import GlassIconButton from "@components/common/GlassIconButton";
 import { appAlert } from "@components/AppAlert";
 import { usePet } from "@context/PetContext";
 
@@ -911,16 +912,22 @@ export const ChatModal = () => {
                       CineMatch
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={newChat} style={styles.headerBtn} hitSlop={8}>
+                  <GlassIconButton
+                    variant="plain"
+                    size={36}
+                    accessibilityLabel={i18nText("autoI18n.yeni_sohbet", "Yeni Sohbet")}
+                    onPress={newChat}
+                  >
                     <MaterialCommunityIcons name="chat-plus-outline" size={22} color={theme.text.between} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </GlassIconButton>
+                  <GlassIconButton
+                    variant="plain"
+                    size={36}
+                    accessibilityLabel={i18nText("autoI18n.gecmis", "Geçmiş")}
                     onPress={() => setView("history")}
-                    style={styles.headerBtn}
-                    hitSlop={8}
                   >
                     <MaterialIcons name="history" size={24} color={theme.text.between} />
-                  </TouchableOpacity>
+                  </GlassIconButton>
                 </View>
 
                 <View>
@@ -1172,16 +1179,27 @@ export const ChatModal = () => {
               // ── Geçmiş görünümü ──
               <View style={{ zIndex: 15, width: "100%" }}>
                 <View style={[styles.header, { borderBottomColor: theme.border }]}>
-                  <TouchableOpacity onPress={() => setView("chat")} style={styles.headerBtn} hitSlop={8}>
-                    <Ionicons name="chevron-back" size={26} color={theme.text.primary} />
-                  </TouchableOpacity>
+                  <GlassIconButton
+                    variant="plain"
+                    icon="chevron-back"
+                    iconSize={26}
+                    size={36}
+                    color={theme.text.primary}
+                    accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
+                    onPress={() => setView("chat")}
+                  />
                   <Text style={[styles.headerTitle, { color: theme.text.primary, flex: 1, marginLeft: 4 }]}>
                     {t?.ChatModal?.history}
                   </Text>
                   {conversations.length > 0 && (
-                    <TouchableOpacity onPress={clearAllConversations} style={styles.headerBtn} hitSlop={8}>
+                    <GlassIconButton
+                      variant="plain"
+                      size={36}
+                      accessibilityLabel={i18nText("autoI18n.temizle", "Temizle")}
+                      onPress={clearAllConversations}
+                    >
                       <MaterialCommunityIcons name="delete-sweep-outline" size={22} color={theme.text.between} />
-                    </TouchableOpacity>
+                    </GlassIconButton>
                   )}
                 </View>
 
@@ -1230,12 +1248,6 @@ export const ChatModal = () => {
 };
 
 const styles = StyleSheet.create({
-  fab: {
-    position: "absolute",
-    bottom: 85,
-    right: 25,
-    borderRadius: 40,
-  },
   modalContainer: {
     flex: 1,
     justifyContent: "flex-end",
@@ -1264,7 +1276,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
-  headerBtn: { paddingHorizontal: 6, paddingVertical: 2 },
 
   // Mesaj satırı / baloncuk
   row: { width: "100%", marginBottom: 10, flexDirection: "row" },

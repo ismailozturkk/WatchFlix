@@ -5,8 +5,7 @@ import {
 } from "react-native";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import Animated from "react-native-reanimated";
-
-//import {  } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MovieOscar from "../movie/MovieOscar";
 import MovieProviders from "../movie/MovieProvders";
 import MovieNowPlaying from "../movie/MovieNowPlaying";
@@ -22,6 +21,7 @@ import { useMovie } from "../../context/MovieContex";
 import ScreenDecor from "../../components/ScreenDecor";
 import DiscoverSearchButton from "../../components/home/DiscoverSearchButton";
 import usePullToRefresh from "../../hooks/usePullToRefresh";
+import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
 import {
   useDiscoveryPreferenceSettings,
@@ -32,11 +32,25 @@ import { resolveOnboardingGenreIds } from "../../utils/onboardingPreferences";
 
 const INITIAL_SECTION_COUNT = 2;
 
+// Arama çubuğunun üst boşluğu: güvenli alanın en az SEARCH_TOP_GAP altında,
+// ama eski değerin (50) hiçbir cihazda üstüne çıkmadan.
+const SEARCH_TOP_PADDING_MIN = 50;
+const SEARCH_TOP_GAP = 16;
+
+// iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için listeyi sekme
+// ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js). Modül
+// kapsamında: render içinde kurulursa liste her render'da sökülür.
+const MarkedFlatList = markTabScroll(Animated.FlatList);
+
 export default function MovieScreen({ navigation }) {
   const { contentBottom } = useTabBarLayout();
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { refreshAllMovies } = useMovie();
+  // Ekran kenardan kenara; arama çubuğu durum çubuğuna/çentiğe yapışmasın diye
+  // üst boşluk güvenli alana bağlı (eski sabit 50, Dynamic Island'da yetmiyordu).
+  const insets = useSafeAreaInsets();
+  const searchTopPadding = Math.max(SEARCH_TOP_PADDING_MIN, insets.top + SEARCH_TOP_GAP);
 
   const { streamingProviderIds } = useStreamingProviderSettings();
   const { onboardingGenreKeys } = useDiscoveryPreferenceSettings();
@@ -116,7 +130,7 @@ export default function MovieScreen({ navigation }) {
 
   const renderHeader = useCallback(
     () => (
-      <View style={styles.fakeSearchContainer}>
+      <View style={[styles.fakeSearchContainer, { paddingTop: searchTopPadding }]}>
         <DiscoverSearchButton
           ref={searchInputRef}
           onPress={openSearch}
@@ -125,7 +139,7 @@ export default function MovieScreen({ navigation }) {
         />
       </View>
     ),
-    [animatedSearchStyle, openSearch, t.SearchScreen.searchMovies],
+    [animatedSearchStyle, openSearch, searchTopPadding, t.SearchScreen.searchMovies],
   );
 
   const revealNextSection = useCallback(() => {
@@ -136,8 +150,8 @@ export default function MovieScreen({ navigation }) {
 
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
-      <ScreenDecor iconOpacity={0.3} />
-      <Animated.FlatList
+      <ScreenDecor scope="home" iconOpacity={0.3} />
+      <MarkedFlatList
         data={visibleSections}
         keyExtractor={(item) => item.key}
         renderItem={renderSection}
@@ -168,7 +182,7 @@ const styles = StyleSheet.create({
     paddingBottom: 75,
   },
   fakeSearchContainer: {
-    paddingTop: 50,
+    // paddingTop render'da güvenli alana göre verilir (searchTopPadding).
     paddingHorizontal: 15,
     zIndex: 10, // Listenin üstünde kalması için
   },

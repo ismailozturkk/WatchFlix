@@ -10,7 +10,9 @@ import {
 import AppIcon from "@components/AppIcon";
 import SwitchToggle from "@components/SwitchToggle";
 import SpritePet from "@components/pet/SpritePet";
+import PremiumPill from "@components/premium/PremiumPill";
 import { usePet, PET_SIZES } from "@context/PetContext";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 import { i18nText } from "@utils/i18nText";
 
 // Kart ölçüleri (windowing / getItemLayout için sabit).
@@ -120,6 +122,17 @@ const PetCard = memo(function PetCard({
   );
 });
 
+// `onPress` verilmişse dokunulabilir satır, yoksa düz View. Modül düzeyinde
+// tanımlı: render içinde tanımlansaydı her çizimde yeniden mount olurdu.
+function ToggleRow({ onPress, activeOpacity, style, children }) {
+  if (!onPress) return <View style={style}>{children}</View>;
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={activeOpacity} style={style}>
+      {children}
+    </TouchableOpacity>
+  );
+}
+
 /**
  * Ayarlar ekranındaki "Pet" bölümü: ana açma/kapama anahtarı + pet seçme
  * (yatay pencereli liste) + boyut. `colors` = SettingsScreen'in C paleti.
@@ -128,6 +141,7 @@ function PetSettingsSection({ colors: C, showLabel = true }) {
   const {
     catalog,
     petEnabled,
+    petAllowed,
     changePetEnabled,
     selectedPetId,
     selectPet,
@@ -145,6 +159,12 @@ function PetSettingsSection({ colors: C, showLabel = true }) {
 
   const cachedCount = Object.keys(cachedPets).length;
   const downloadingCount = Object.keys(downloadingPets).length;
+
+  // Pet Premium'da: Free kullanıcıda anahtar KİLİTLİ ve kapalı çizilir; dokununca
+  // anahtar oynamaz, yükseltme sayfası gelir (bkz. SwitchToggle `locked`). Satırın
+  // kendisine basmak da aynı yere götürür. PetContext kayıtlı tercihi silmez.
+  const petGate = usePremiumGate("pet_companion");
+  const openPetUpsell = useCallback(() => petGate.showUpsell(), [petGate]);
 
   // İndirilmiş petler başta gösterilir; geri kalanlar katalog sırasında.
   const orderedCatalog = useMemo(() => {
@@ -215,8 +235,11 @@ function PetSettingsSection({ colors: C, showLabel = true }) {
       )}
 
       <View style={[ps.card, { backgroundColor: C.card, borderColor: C.border }]}>
-        {/* Ana açma/kapama */}
-        <View
+        {/* Ana açma/kapama. Kilitliyken (Free) satırın tamamı yükseltme sayfasını
+            açar; Premium'da düz View kalır ki dokununca boşuna sönmesin. */}
+        <ToggleRow
+          activeOpacity={0.65}
+          onPress={petAllowed ? undefined : openPetUpsell}
           style={[
             ps.toggleRow,
             { borderBottomColor: C.borderMuted },
@@ -239,8 +262,15 @@ function PetSettingsSection({ colors: C, showLabel = true }) {
               </Text>
             </View>
           </View>
-          <SwitchToggle value={petEnabled} onValueChange={changePetEnabled} size={36} />
-        </View>
+          {petAllowed ? null : <PremiumPill style={ps.pill} />}
+          <SwitchToggle
+            value={petEnabled}
+            onValueChange={changePetEnabled}
+            locked={!petAllowed}
+            onLockedPress={openPetUpsell}
+            size={36}
+          />
+        </ToggleRow>
 
         {/* "Pet'i göster" kapalıyken aşağıdaki kısım gizlenir */}
         {petEnabled && (
@@ -377,6 +407,7 @@ const ps = StyleSheet.create({
   toggleRowCollapsed: {
     borderBottomWidth: 0,
   },
+  pill: { marginRight: 8 },
   toggleLeft: {
     flexDirection: "row",
     alignItems: "center",

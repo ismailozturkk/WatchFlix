@@ -25,6 +25,7 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useAuth } from "@context/AuthContext";
@@ -226,12 +227,7 @@ export default function OtherListsPickerModal({
             )}
           </View>
         </View>
-        <TouchableOpacity
-          onPress={onClose}
-          style={[styles.closeBtn, { backgroundColor: theme.primary }]}
-        >
-          <Ionicons name="close" size={15} color={theme.text.muted} />
-        </TouchableOpacity>
+        <GlassCloseButton size={30} fallbackRadius={10} iconSize={15} onPress={onClose} />
       </View>
 
       <View style={[styles.separator, { backgroundColor: theme.border }]} />
@@ -335,7 +331,6 @@ const styles = StyleSheet.create({
   headerIconBg: { width: 32, height: 32, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   sheetTitle: { fontSize: 16, fontWeight: "800" },
   sheetSubtitle: { fontSize: 11, marginTop: 2, fontWeight: "600" },
-  closeBtn: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   separator: { height: StyleSheet.hairlineWidth, marginVertical: 12 },
   gridContainer: { gap: 10, paddingBottom: 4 },
   gridCard: {

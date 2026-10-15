@@ -1,20 +1,26 @@
 // components/settings/SettingPreviews.js
 //
-// Ayar SATIRININ ARKASINDA çalışan küçük önizlemeler. Amaç, "Kar efekti" ve
-// "İkon arka planı" ayarlarının ne yaptığını anlatmak yerine GÖSTERMEK:
-// kullanıcı açmadan önce satırın zemininde efektin küçültülmüş halini görür.
+// Ayar SATIRININ ARKASINDA çalışan küçük önizlemeler. Amaç, "Kar efekti",
+// "Ambiyans arka planı" ve "İkon arka planı" ayarlarının ne yaptığını anlatmak
+// yerine GÖSTERMEK: kullanıcı açmadan önce satırın zemininde efektin
+// küçültülmüş halini görür.
 //
-// İkisi de yalnız dekor: pointerEvents="none" ile dokunmayı geçirir, satırın
+// Hepsi yalnız dekor: pointerEvents="none" ile dokunmayı geçirir, satırın
 // kendi metin/anahtar katmanı üstte kalır. Kırpma satırda yapılır (bkz.
 // settingsUi.SettingRow → background verildiğinde overflow:"hidden").
 
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import LottieView from "lottie-react-native";
 
 import useAppActive from "../../hooks/useAppActive";
 import useReduceMotion from "../../hooks/useReduceMotion";
+import {
+  AmbientBlobs,
+  getSharedAmbientBlobs,
+  useAmbientPlaying,
+} from "../AmbientBackground";
 import {
   getIconBackgroundSource,
   ICON_BACKGROUND_COUNT,
@@ -59,6 +65,46 @@ export function SnowPreview({ opacity = 0.6 }) {
         // Tam ekran karla aynı hızda akınca dar şeritte telaşlı görünüyor.
         speed={0.6}
       />
+    </View>
+  );
+}
+
+/**
+ * Ambiyans önizlemesi: satırın zemininde, gerçek arka planla AYNI renklerde
+ * (oturumun ortak leke seti) yavaşça süzülen ışık lekeleri.
+ *
+ * Ayar AÇIKKEN kullanılmaz — o durumda ışık zaten tüm ekranın arkasında, satırda
+ * ikinci bir katman kurmak boşuna olurdu (bkz. PersonalizationScreen). Satırın
+ * boyutu ölçülür; lekeler alanın uzun kenarına göre ölçeklenir.
+ */
+// Opaklık bilerek düşük: önizleme satırın METNİNİN ARKASINDA duruyor.
+export function AmbientPreview({ intensity = 0.7 }) {
+  const [size, setSize] = useState(null);
+  const playing = useAmbientPlaying(true);
+  const blobs = useMemo(() => getSharedAmbientBlobs().slice(0, 4), []);
+
+  return (
+    <View
+      style={styles.fill}
+      pointerEvents="none"
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setSize((prev) =>
+          prev && prev.width === width && prev.height === height
+            ? prev
+            : { width, height },
+        );
+      }}
+    >
+      {size ? (
+        <AmbientBlobs
+          width={size.width}
+          height={size.height}
+          blobs={blobs}
+          playing={playing}
+          intensity={intensity}
+        />
+      ) : null}
     </View>
   );
 }

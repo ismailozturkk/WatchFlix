@@ -15,6 +15,7 @@ import {
 import { db } from "../../firebase";
 import { updateLocalItem } from "../listSyncService";
 import { RESERVED_LIST_NAMES } from "../../utils/listShare";
+import { normalizeWatchDate } from "../../utils/watchHistory";
 import {
   fillMissingFields,
   importedReviewId,
@@ -83,7 +84,7 @@ export async function writeImportedCustomLists(uid, customLists = []) {
   const reserved = new Set(RESERVED_LIST_NAMES);
   let customListsCount = 0;
   let customListItemsCount = 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = normalizeWatchDate(new Date()); // yerel gün (UTC değil)
 
   for (const sourceList of customLists) {
     const items = Array.isArray(sourceList?.items) ? sourceList.items.filter((item) => item?.id != null) : [];

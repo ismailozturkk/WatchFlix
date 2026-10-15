@@ -8,11 +8,10 @@ import {
   Animated,
 } from "react-native";
 import PosterImage from "../../components/PosterImage";
-import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 //import { API_KEY } from "@env";
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 import { RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import { SeeAllButton } from "../../components/SeeAllHeader";
@@ -83,8 +82,7 @@ const TvBestCard = memo(function TvBestCard({ item, navigation, theme, getTmdbUr
 
 export default function TvShowBests({ navigation }) {
   const { theme } = useTheme();
-  const { t } = useLanguage();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const {
     seriesBest,
     setSelectedCategoryBest,
@@ -231,73 +229,9 @@ const styles = StyleSheet.create({
   categoryItem: {
     paddingVertical: 15,
   },
-  pageButton: {
-    width: 25,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   categoryText: {
     fontSize: 14,
     fontWeight: "600",
-  },
-  genreButton: {
-    marginVertical: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginRight: 10,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  stats: {
-    justifyContent: "center",
-    alignItems: "center",
-    position: "absolute",
-    right: 3,
-    bottom: 3,
-  },
-  genreText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  dropdown: {
-    width: 170,
-    height: 30,
-    paddingHorizontal: 8,
-  },
-  icon: {
-    marginRight: 10,
-  },
-  label: {
-    position: "absolute",
-    backgroundColor: "white",
-    left: 22,
-    top: 8,
-    zIndex: 999,
-    paddingHorizontal: 8,
-    fontSize: 14,
-  },
-  placeholderStyle: {
-    fontSize: 16,
-  },
-  selectedTextStyle: {
-    fontSize: 16,
-  },
-  iconStyle: {
-    width: 20,
-    height: 20,
-  },
-  inputSearchStyle: {
-    height: 40,
-    fontSize: 16,
   },
   similarItem: {
     width: width * 0.4,
@@ -318,46 +252,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
-  },
-  similarTitle: {
-    color: "#fff",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  relaseDate: {
-    position: "absolute",
-    top: 5,
-    right: 5,
-    paddingHorizontal: 5,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  relaseDateCount: {
-    position: "absolute",
-    top: 5,
-    left: 5,
-    paddingHorizontal: 5,
-    //width: 40,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  similarRatingText: {
-    color: "#ffd700",
-    fontSize: 11,
-    marginBottom: 2,
-  },
-  errorText: {
-    color: "red",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  title: {
-    fontSize: 18,
-    uppercase: true,
-    marginBottom: 15,
-    marginLeft: 15,
-    fontWeight: "700",
   },
 });

@@ -17,6 +17,7 @@ import DatePickerModal, { normalizeDate } from "../modals/DatePickerModal";
 import BottomSheetModal from "../common/BottomSheetModal";
 import RatingInput from "../RatingInput";
 import { useTheme } from "../../context/ThemeContext";
+import GlassCloseButton from "../common/GlassCloseButton";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useUserProfile } from "../../context/UserProfileContext";
@@ -331,15 +332,13 @@ export default function WatchedDateSheet({
             </Text>
           )}
         </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-          style={[styles.closeButton, { backgroundColor: theme.between }]}
+        <GlassCloseButton
+          size={34}
+          fallbackRadius={11}
+          backgroundColor={theme.between}
           disabled={isBusy}
           onPress={closeSheet}
-        >
-          <Ionicons name="close" size={18} color={theme.text.muted} />
-        </TouchableOpacity>
+        />
       </View>
 
       <ScrollView
@@ -687,7 +686,6 @@ const styles = StyleSheet.create({
   scopeDot: { width: 5, height: 5, borderRadius: 3 },
   scopeText: { fontSize: 9.5, lineHeight: 12, fontWeight: "800" },
   subtitle: { fontSize: 11.5, lineHeight: 16, marginTop: 2 },
-  closeButton: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   customDate: { minHeight: 68, borderRadius: 17, borderWidth: 1, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 11 },
   optionIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   optionText: { flex: 1 },

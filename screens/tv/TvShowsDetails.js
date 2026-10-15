@@ -46,7 +46,7 @@ import MediaNoteSheet from "@components/detail/MediaNoteSheet";
 import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext";
 import ListViewTv from "../../components/ListViewTv";
 import PosterImage from "../../components/PosterImage";
-import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
+import GlassIconButton from "../../components/common/GlassIconButton";
 import ListBadges from "../../components/ListBadges";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
@@ -80,13 +80,9 @@ import Reminder from "../../components/Reminder";
 import WatchProgressBar from "../../components/tv/WatchProgressBar";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
-const { height, width } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
 
-// Fragman oynatıcısı: 16:9 oranını koruyarak cihaza göre boyutlanır
-// (tablette aşırı genişlememesi için üst sınır var).
-const VIDEO_WIDTH = Math.min(width - 24, 720);
-const VIDEO_HEIGHT = Math.round((VIDEO_WIDTH * 9) / 16);
 // Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
 const CAST_PLACEHOLDER_ICON = Math.round(width * 0.09);
 
@@ -109,7 +105,6 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
   navigation,
   theme,
 }) {
-  const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
   const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
@@ -190,7 +185,7 @@ export default function TvShowsDetails({ route, navigation }) {
   );
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [noteSheetVisible, setNoteSheetVisible] = useState(false);
-  const { mediaNotes } = useMediaNotes();
+  const { mediaNotes, checkCanCreateMediaNote } = useMediaNotes();
   const myMediaNote = mediaNotes.find((n) => n.id === mediaNoteItemKey("tv", id)) || null;
   // Sezon carousel'i: 5+ sezonda tek tek sayfalı görünüm; "Tümünü Gör" düz listeye açar.
   const [showAllSeasons, setShowAllSeasons] = useState(false);
@@ -208,29 +203,6 @@ export default function TvShowsDetails({ route, navigation }) {
   // Tek abonelik: bu dizinin tüm izlenme durumu (kök-dizi yerine subcollection).
   const watched = useWatchedShow(id);
 
-  const [overviewExpanded, setOverviewExpanded] = useState(false);
-  const overviewHeightAnim = useRef(new Animated.Value(80)).current;
-  const overviewOpacity = useRef(new Animated.Value(1)).current;
-  const HALF_W = (width - 30 - 10) / 2;
-  const FULL_W = width - 30;
-  const overviewWidthAnim = useRef(new Animated.Value(HALF_W)).current;
-
-  const toggleOverview = () => {
-    const opening = !overviewExpanded;
-    setOverviewExpanded(opening);
-    Animated.parallel([
-      Animated.timing(overviewHeightAnim, {
-        toValue: opening ? 500 : 80,
-        duration: 280,
-        useNativeDriver: false,
-      }),
-      Animated.timing(overviewWidthAnim, {
-        toValue: opening ? FULL_W : HALF_W,
-        duration: 280,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  };
   const [isLoading, setIsLoading] = useState(false);
 
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
@@ -724,7 +696,7 @@ export default function TvShowsDetails({ route, navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="details" iconOpacity={0.25} />
       <StatusBar
         barStyle="light-content"
         translucent
@@ -1159,7 +1131,10 @@ export default function TvShowsDetails({ route, navigation }) {
           {/* ── NOTUM KARTI ── */}
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => setNoteSheetVisible(true)}
+            onPress={() => {
+              // Ücretsiz planda 20 dizi notu: dolduysa not sayfası hiç açılmaz.
+              if (checkCanCreateMediaNote("tv", id)) setNoteSheetVisible(true);
+            }}
             style={[
               styles.commentsBtn,
               { backgroundColor: theme.secondary, borderColor: theme.border },
@@ -1659,17 +1634,22 @@ export default function TvShowsDetails({ route, navigation }) {
 
 
       {/* ─── ÜST OVERLAY BUTONLARI (her zaman tıklanabilir) ─── */}
-      <TouchableOpacity
-        style={[styles.backBtn, { top: insets.top + 8 }]}
+      {/* iOS 26+: Liquid Glass; diğer yerlerde eski koyu blur kutusu. */}
+      <GlassIconButton
+        variant="blur"
+        size={38}
+        icon="chevron-back"
+        accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
         onPress={() => navigation.goBack()}
-        activeOpacity={0.8}
-      >
-        <AdaptiveBlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
-          <Ionicons name="chevron-back" size={22} color="#fff" />
-        </AdaptiveBlurView>
-      </TouchableOpacity>
+        style={[styles.backBtn, { top: insets.top + 8 }]}
+      />
 
-      <TouchableOpacity
+      <GlassIconButton
+        variant="blur"
+        size={38}
+        icon="share-social-outline"
+        iconSize={20}
+        accessibilityLabel={i18nText("autoI18n.paylas", "Paylaş")}
         style={[styles.storyBtn, { top: insets.top + 8 }]}
         onPress={() =>
           navigation.navigate("StoryShareScreen", {
@@ -1686,12 +1666,7 @@ export default function TvShowsDetails({ route, navigation }) {
             tagline: details.tagline || "",
           })
         }
-        activeOpacity={0.8}
-      >
-        <AdaptiveBlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
-          <Ionicons name="share-social-outline" size={20} color="#fff" />
-        </AdaptiveBlurView>
-      </TouchableOpacity>
+      />
 
       {/* ═══ MODALS ═══ */}
 
@@ -1868,14 +1843,6 @@ const styles = StyleSheet.create({
     zIndex: 50,
     elevation: 50,
   },
-  backBtnBlur: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
 
   /* Info header */
   infoHeader: {
@@ -1923,9 +1890,6 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 4,
   },
-  ratingNum: { fontSize: 16, fontWeight: "700" },
-  voteRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  voteCount: { fontSize: 12, fontWeight: "500" },
 
   /* Body */
   body: { paddingHorizontal: 15 },
@@ -2130,13 +2094,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   ratingPillText: { color: "#FFD700", fontSize: 11, fontWeight: "700" },
-  listDots: {
-    position: "absolute",
-    top: 7,
-    left: 7,
-    flexDirection: "row",
-    gap: 4,
-  },
   stats: {
     position: "absolute",
     bottom: 8,
@@ -2145,52 +2102,6 @@ const styles = StyleSheet.create({
   },
 
   /* Videos */
-  videoItem: { width: width * 0.62 },
-  videoThumbnail: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-  videoImage: { width: "100%", height: "100%" },
-  playIconContainer: {
-    ...StyleSheet.absoluteFill,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  videoTypeBadge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  videoTypeBadgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  videoTitle: { fontSize: 13, marginTop: 9, fontWeight: "600", lineHeight: 18 },
 
   /* Video modal */
-  videoModal: { flex: 1, justifyContent: "center", alignItems: "center" },
-  videoModalContent: {
-    backgroundColor: "#000",
-    position: "relative",
-    width: VIDEO_WIDTH,
-    alignSelf: "center",
-  },
-  videoCloseBtn: { position: "absolute", top: -52, right: 12, zIndex: 10 },
-  videoCloseBtnBlur: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
 });

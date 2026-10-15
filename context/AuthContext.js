@@ -18,10 +18,10 @@ import {
   clearUserScope,
 } from "../services/storage";
 import { resetSnapshotCache } from "../services/snapshotCache";
+import { clearUserLocal } from "../services/userData";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import {
-  GOOGLE_PROFILE_PENDING_KEY,
   isGoogleProfileComplete,
 } from "../services/googleAuthService";
 
@@ -141,6 +141,12 @@ export const AuthProvider = ({ children }) => {
         const previousUid = getActiveUser();
         setActiveUser(null);
         clearUserScope(previousUid);
+        // Yerel-öncelikli veri (notlar, hatırlatıcılar…) cihazda KAYNAK olduğu
+        // için çıkışta açıkça silinir: sonraki hesap görmesin, gizli veri
+        // cihazda kalmasın. Buluta gitmemiş değişiklikler yazma günlüğünde
+        // (Keys.syncOutbox, çıkışta korunur) durur ve aynı hesapla tekrar
+        // girişte buluta gider. Bkz. services/userData.
+        clearUserLocal(previousUid);
         // Anlık görüntü katmanının SÜREÇ İÇİ belleği de sıfırlanmalı: disk
         // temizlense bile "en son şunu yazmıştım" kaydı kalırsa aynı oturumda
         // geri giren kullanıcının ilk snapshot'ı diske hiç inmez, üstelik

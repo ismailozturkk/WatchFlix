@@ -66,6 +66,8 @@ class ReminderWidgetProvider : AppWidgetProvider() {
         R.id.reminder_widget_root,
         appearance.background,
       )
+      // Başlık simgesi, kullanıcının seçtiği uygulama simgesi (AppIconRes.kt).
+      views.setImageViewResource(R.id.reminder_widget_logo, AppIconRes.launcherIcon(context))
       views.setViewVisibility(
         R.id.reminder_widget_logo,
         if (preferences.reminderShowTitle) View.VISIBLE else View.GONE,

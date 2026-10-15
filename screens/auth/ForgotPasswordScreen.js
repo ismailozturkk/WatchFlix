@@ -1,7 +1,8 @@
 import { isLightSurface } from "../../utils/colorUtils";
-// Şifremi unuttum ekranı — IslamicGuide auth tasarım diline göre sadeleştirildi:
-// dikeyde ortalanmış düzen, rozetli başlık bloğu, solid yüzeyli tek kart,
-// dolgulu input kabuğu ve solid accent ana buton. Blur/gradyan yok.
+// Şifremi unuttum ekranı — ortak auth görsel dili (components/auth/AuthKit.js):
+// accent'ten türeyen arka plan ışıması, halkalı rozet, vurgu çizgili tek kart,
+// odakta renk geçişi yapan alan ve degrade ana düğme. Gönderim sonrası kart,
+// onay rozeti + e-posta çipi + "Giriş yap" ana eylemine döner.
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,13 +10,10 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import React, { useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
-import LottieView from "lottie-react-native";
 import * as Haptics from "@services/hapticsService";
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 import Toast from "react-native-toast-message";
@@ -24,10 +22,22 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
+import {
+  AUTH_SUCCESS,
+  AuthBackButton,
+  AuthBackdrop,
+  AuthBadge,
+  AuthCard,
+  AuthField,
+  AuthFooterLink,
+  AuthHero,
+  AuthPrimaryButton,
+  AuthSecondaryButton,
+  Reveal,
+  authColumn,
+} from "../../components/auth/AuthKit";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
-
-const SUCCESS = "rgb(37, 211, 102)";
 
 // Hafif dokunsal geri bildirim — desteklemeyen cihazlarda sessizce geç
 const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -37,12 +47,10 @@ export default function ForgotPasswordScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [isloading, setIsloading] = useState(false);
-  const [emailFocused, setEmailFocused] = useState(false);
   const [sent, setSent] = useState(false);
   const { t } = useLanguage();
 
   const accent = theme.accent;
-  const hairline = theme.border;
   const isLightTheme = isLightSurface(theme.primary);
   const fieldSurface = theme.between;
 
@@ -70,6 +78,8 @@ export default function ForgotPasswordScreen({ navigation }) {
     }
   };
 
+  const goLogin = () => navigation.navigate("LoginScreen");
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
       <StatusBar
@@ -77,8 +87,8 @@ export default function ForgotPasswordScreen({ navigation }) {
         translucent
         backgroundColor="transparent"
       />
-      <ScreenDecor iconOpacity={isLightTheme ? 0.05 : 0.08} />
-
+      <AuthBackdrop accent={accent} isLightTheme={isLightTheme} />
+      <ScreenDecor scope="auth" iconOpacity={isLightTheme ? 0.05 : 0.08} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -90,66 +100,36 @@ export default function ForgotPasswordScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: insets.top + 52, paddingBottom: insets.bottom + 40 },
+            { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 36 },
           ]}
         >
-          {/* Başlık bloğu */}
-          <View style={styles.heroMark}>
-            <View
-              style={[
-                styles.heroIcon,
-                {
-                  backgroundColor: alpha(accent, 0.12),
-                  borderColor: alpha(accent, 0.3),
-                },
-              ]}
-            >
-              <Ionicons name="key-outline" size={28} color={accent} />
-            </View>
-            <Text allowFontScaling={false} style={[styles.brandTitle, { color: theme.text.primary }]}>
-              {i18nText("autoI18n.hesap_erisimini_kurtar", "Hesap erişimini kurtar")}
-            </Text>
-            <Text allowFontScaling={false} style={[styles.brandSub, { color: theme.text.secondary }]}>
-              {i18nText("autoI18n.sifre_sifirlama_baglantisi_epostana_gonderilecek", "Şifre sıfırlama bağlantısı e-postana gönderilecek.")}
-            </Text>
-          </View>
+          {!sent ? (
+            <>
+              <Reveal>
+                <AuthHero
+                  theme={theme}
+                  badge={
+                    <AuthBadge accent={accent} surface={theme.secondary} size={68}>
+                      <Ionicons name="key-outline" size={30} color={accent} />
+                    </AuthBadge>
+                  }
+                  title={i18nText("autoI18n.hesap_erisimini_kurtar", "Hesap erişimini kurtar")}
+                  subtitle={i18nText(
+                    "autoI18n.sifre_sifirlama_baglantisi_epostana_gonderilecek",
+                    "Şifre sıfırlama bağlantısı e-postana gönderilecek.",
+                  )}
+                />
+              </Reveal>
 
-          {/* Kart */}
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: theme.secondary, borderColor: hairline },
-            ]}
-          >
-            {!sent ? (
-              <>
-                <Text allowFontScaling={false} style={[styles.cardTitle, { color: theme.text.primary }]}>
-                  {t.ForgotPasswordScreen.forgotPassword}
-                </Text>
-                <Text allowFontScaling={false} style={[styles.cardSub, { color: theme.text.muted }]}>
-                  {t.ForgotPasswordScreen.forgotPasswordText}
-                </Text>
-
-                {/* E-posta */}
-                <View
-                  style={[
-                    styles.inputShell,
-                    {
-                      backgroundColor: emailFocused ? alpha(accent, 0.08) : fieldSurface,
-                      borderColor: emailFocused ? accent : hairline,
-                    },
-                  ]}
-                >
-                  <Ionicons
-                    name="mail-outline"
-                    size={18}
-                    color={emailFocused ? accent : theme.text.muted}
-                  />
-                  <TextInput
-                    allowFontScaling={false}
-                    style={[styles.textInput, { color: theme.text.primary }]}
+              <Reveal delay={90} style={authColumn}>
+                <AuthCard theme={theme} accent={accent}>
+                  {/* E-posta */}
+                  <AuthField
+                    theme={theme}
+                    accent={accent}
+                    fieldSurface={fieldSurface}
+                    icon="mail-outline"
                     placeholder={t.ForgotPasswordScreen.email}
-                    placeholderTextColor={theme.text.muted}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -160,77 +140,91 @@ export default function ForgotPasswordScreen({ navigation }) {
                     onChangeText={setEmail}
                     value={email}
                     maxLength={254}
-                    onFocus={() => setEmailFocused(true)}
-                    onBlur={() => setEmailFocused(false)}
                   />
-                </View>
 
-                {/* Hızlı e-posta soneki önerileri */}
-                <EmailSuffixRow
-                  email={email}
-                  onApply={setEmail}
+                  {/* Hızlı e-posta soneki önerileri */}
+                  <EmailSuffixRow
+                    email={email}
+                    onApply={setEmail}
+                    theme={theme}
+                    accent={accent}
+                    fieldSurface={fieldSurface}
+                  />
+
+                  <AuthPrimaryButton
+                    label={t.ForgotPasswordScreen.send}
+                    icon="send"
+                    accent={accent}
+                    enabled={emailValid}
+                    loading={isloading}
+                    onPress={() => {
+                      buzz();
+                      resetPassword();
+                    }}
+                  />
+                </AuthCard>
+              </Reveal>
+
+              <Reveal delay={170}>
+                <AuthFooterLink
                   theme={theme}
                   accent={accent}
-                  fieldSurface={fieldSurface}
+                  text={i18nText("autoI18n.sifreni_hatirladin_mi", "Şifreni hatırladın mı?")}
+                  link={t.ForgotPasswordScreen.loginButton}
+                  onPress={goLogin}
                 />
+              </Reveal>
+            </>
+          ) : (
+            /* Başarı durumu */
+            <Reveal style={authColumn}>
+              <AuthCard theme={theme} accent={AUTH_SUCCESS} style={styles.successCard}>
+                <AuthBadge accent={accent} tone={AUTH_SUCCESS} surface={theme.secondary}>
+                  <Ionicons name="checkmark" size={38} color={AUTH_SUCCESS} />
+                </AuthBadge>
 
-                {/* Gönder butonu — solid accent */}
-                <TouchableOpacity
-                  activeOpacity={0.86}
-                  style={[
-                    styles.primaryButton,
-                    { backgroundColor: accent, shadowColor: accent },
-                    !emailValid && { opacity: 0.55 },
-                  ]}
-                  onPress={() => {
-                    buzz();
-                    resetPassword();
-                  }}
-                  disabled={!emailValid || isloading}
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.successTitle, { color: theme.text.primary }]}
                 >
-                  {isloading ? (
-                    <LottieView
-                      source={require("@lottie/loading15.json")}
-                      style={styles.loadingAnim}
-                      autoPlay
-                      loop
-                    />
-                  ) : (
-                    <>
-                      <Text allowFontScaling={false} style={styles.primaryText}>
-                        {t.ForgotPasswordScreen.send}
-                      </Text>
-                      <Ionicons name="send" size={15} color="#fff" />
-                    </>
-                  )}
-                </TouchableOpacity>
-              </>
-            ) : (
-              /* Başarı durumu */
-              <View style={styles.successContainer}>
+                  {i18nText("autoI18n.e_posta_gonderildi", "E-posta Gönderildi!")}
+                </Text>
+
                 <View
                   style={[
-                    styles.successIcon,
+                    styles.emailPill,
                     {
-                      backgroundColor: "rgba(37,211,102,0.12)",
-                      borderColor: "rgba(37,211,102,0.28)",
+                      backgroundColor: alpha(accent, 0.1),
+                      borderColor: alpha(accent, 0.32),
                     },
                   ]}
                 >
-                  <Ionicons name="checkmark-circle" size={44} color={SUCCESS} />
+                  <Ionicons name="mail-outline" size={16} color={accent} />
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    style={[styles.emailPillText, { color: accent }]}
+                  >
+                    {email}
+                  </Text>
                 </View>
-                <Text allowFontScaling={false} style={[styles.successTitle, { color: theme.text.primary }]}>
-                  {i18nText("autoI18n.e_posta_gonderildi", "E-posta Gönderildi!")}
-                </Text>
-                <Text style={[styles.successSubtitle, { color: theme.text.muted }]}>
-                  <Text style={{ color: accent, fontWeight: "700" }}>{email}</Text>{" "}
-                  {i18nText("autoI18n.adresine_sifre_sifirlama_baglantisi_gonderildi_gel", "adresine şifre sıfırlama bağlantısı gönderildi. Gelen kutunuzu kontrol edin.")}
+
+                <Text style={[styles.successSubtitle, { color: theme.text.secondary }]}>
+                  {i18nText(
+                    "autoI18n.adresine_sifre_sifirlama_baglantisi_gonderildi_gel",
+                    "adresine şifre sıfırlama bağlantısı gönderildi. Gelen kutunuzu kontrol edin.",
+                  )}
                 </Text>
 
-                <View style={styles.spamHintRow}>
+                <View
+                  style={[
+                    styles.spamHint,
+                    { backgroundColor: fieldSurface, borderColor: theme.border },
+                  ]}
+                >
                   <Ionicons
                     name="information-circle-outline"
-                    size={14}
+                    size={18}
                     color={theme.text.muted}
                   />
                   <Text style={[styles.spamHintText, { color: theme.text.muted }]}>
@@ -241,59 +235,34 @@ export default function ForgotPasswordScreen({ navigation }) {
                   </Text>
                 </View>
 
-                <TouchableOpacity
-                  style={[
-                    styles.resendButton,
-                    { borderColor: hairline, backgroundColor: fieldSurface },
-                  ]}
-                  onPress={() => {
-                    buzz();
-                    setSent(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="refresh-outline" size={16} color={theme.text.muted} />
-                  <Text style={[styles.resendText, { color: theme.text.muted }]}>
-                    {i18nText("autoI18n.tekrar_gonder", "Tekrar gönder")}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Girişe dön */}
-            <View style={styles.footerRow}>
-              <Text allowFontScaling={false} style={[styles.footerText, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.sifreni_hatirladin_mi", "Şifreni hatırladın mı?")}
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => navigation.navigate("LoginScreen")}
-                hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
-              >
-                <Text allowFontScaling={false} style={[styles.footerLink, { color: accent }]}>
-                  {t.ForgotPasswordScreen.loginButton}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                <View style={styles.successActions}>
+                  <AuthPrimaryButton
+                    label={t.ForgotPasswordScreen.loginButton}
+                    accent={accent}
+                    onPress={() => {
+                      buzz();
+                      goLogin();
+                    }}
+                  />
+                  <AuthSecondaryButton
+                    label={i18nText("autoI18n.tekrar_gonder", "Tekrar gönder")}
+                    icon="refresh-outline"
+                    theme={theme}
+                    fieldSurface={fieldSurface}
+                    onPress={() => {
+                      buzz();
+                      setSent(false);
+                    }}
+                  />
+                </View>
+              </AuthCard>
+            </Reveal>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 
       {/* Geri — sabit sol üst */}
-      <TouchableOpacity
-        style={[
-          styles.backButton,
-          {
-            top: insets.top + 8,
-            backgroundColor: theme.secondary,
-            borderColor: hairline,
-          },
-        ]}
-        onPress={() => navigation.navigate("LoginScreen")}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="arrow-back" size={18} color={theme.text.primary} />
-      </TouchableOpacity>
+      <AuthBackButton onPress={goLogin} theme={theme} top={insets.top + 8} />
     </View>
   );
 }
@@ -303,173 +272,62 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 22,
-    gap: 18,
-  },
-  backButton: {
-    position: "absolute",
-    left: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
-
-  // ── Başlık bloğu ──
-  heroMark: {
-    alignItems: "center",
-    gap: 8,
-  },
-  heroIcon: {
-    width: 62,
-    height: 62,
-    borderRadius: 22,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  brandTitle: {
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: -0.5,
-    textAlign: "center",
-  },
-  brandSub: {
-    maxWidth: 320,
-    fontSize: 13,
-    fontWeight: "600",
-    lineHeight: 19,
-    textAlign: "center",
-  },
-
-  // ── Kart ──
-  card: {
-    width: "100%",
-    maxWidth: 420,
-    alignSelf: "center",
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 18,
-    gap: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 5,
-  },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: "900",
-  },
-  cardSub: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: -6,
-    marginBottom: 2,
-  },
-  inputShell: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "700",
-    paddingVertical: 12,
-  },
-  primaryButton: {
-    height: 52,
-    borderRadius: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.24,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  primaryText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  loadingAnim: {
-    width: 36,
-    height: 36,
+    gap: 22,
   },
 
   // ── Başarı durumu ──
-  successContainer: {
+  successCard: {
     alignItems: "center",
-    paddingVertical: 6,
-  },
-  successIcon: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
+    paddingTop: 30,
+    gap: 12,
   },
   successTitle: {
-    fontSize: 21,
-    fontWeight: "900",
-    marginBottom: 8,
-  },
-  successSubtitle: {
-    fontSize: 13.5,
+    fontSize: 23,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+    marginTop: 6,
     textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 14,
-    paddingHorizontal: 8,
   },
-  spamHintRow: {
+  emailPill: {
+    maxWidth: "100%",
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    marginBottom: 14,
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  emailPillText: {
+    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  successSubtitle: {
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "center",
+    lineHeight: 20,
     paddingHorizontal: 6,
+  },
+  spamHint: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   spamHintText: {
     flex: 1,
-    fontSize: 11.5,
-    lineHeight: 15,
-  },
-  resendButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  resendText: {
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "500",
+    lineHeight: 18,
   },
-  footerRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 5,
-    paddingTop: 2,
-  },
-  footerText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  footerLink: {
-    fontSize: 13,
-    fontWeight: "900",
+  successActions: {
+    alignSelf: "stretch",
+    gap: 10,
+    marginTop: 4,
   },
 });

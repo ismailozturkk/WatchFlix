@@ -40,10 +40,37 @@
 // olur; iki kez yükselmemesi için kaplayıcının ölçülen yüksekliği pencereninkiyle
 // karşılaştırılır ve yalnız kalan fark kaydırılır (`onOverlayLayout` bağlanmazsa
 // tüm klavye yüksekliği kaydırılır — modal pencerenin küçülmediği varsayımı).
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Dimensions, Easing, Keyboard, Platform } from "react-native";
+//
+// SIĞDIRMA: `translateY` yalnız konumu değiştirir. Sayfa "ekran − klavye"den
+// uzunsa (ör. maxHeight: "88%") kaydırılınca TEPESİ ekranın dışına çıkar.
+// Bu yüzden klavye açıkken sayfanın `maxHeight`ı klavyenin üstünde kalan alana
+// indirilir: `sheet.fit(stil)` o sınırı çağıranın stiline ekler (BottomSheetModal
+// bunu kendisi yapar; kendi `Modal`ını kuran sayfalar stilini `fit` ile sarar).
+// Sınırın işe yaraması için sayfanın İÇİNDE küçülebilen bir bölge (ScrollView,
+// FlatList — bkz. components/common/SheetScroll.js) bulunmalı. Hesap:
+// utils/sheetKeyboardFit.js.
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  Keyboard,
+  Platform,
+  StatusBar,
+  StyleSheet,
+} from "react-native";
+import { SafeAreaInsetsContext } from "react-native-safe-area-context";
+import {
+  SHEET_TOP_MARGIN,
+  keyboardFitOverrides,
+  keyboardLift,
+  keyboardSheetBudget,
+} from "@utils/sheetKeyboardFit";
 
 const { height: SCREEN_H } = Dimensions.get("window");
+
+// Güvenli alan sağlayıcısı yoksa (test, yalıtılmış ağaç) durum çubuğu payı.
+const FALLBACK_TOP_INSET = Platform.OS === "ios" ? 47 : StatusBar.currentHeight ?? 24;
 
 // Sayfa ölçülene kadar kullanılan kayma mesafesi. Gerçek yükseklikten FAZLA
 // olmalı: az olursa sayfa ekranın altından değil ortasından belirir.
@@ -60,11 +87,15 @@ const FALLBACK_DISTANCE = Math.round(SCREEN_H * 0.9);
  *   mounted: boolean,                 // Modal'ın `visible` propu
  *   backdropOpacity: Animated.Value,  // blur sarmalayıcısının `opacity`si
  *   sheetStyle: object,               // sayfaya eklenecek transform
+ *   fit: (style: any) => any,         // stile klavye sınırını ekler (sığdırma)
+ *   topGap: number,                   // ekranın üstünde boş kalacak pay (durum çubuğu dahil)
  *   onSheetLayout: (event: any) => void,   // sayfanın `onLayout`u
  *   onOverlayLayout: (event: any) => void, // kaplayıcının `onLayout`u (klavye)
  * }}
  */
 export default function useSheetTransition(visible, { liftWithKeyboard = true } = {}) {
+  const insets = useContext(SafeAreaInsetsContext);
+  const topGap = (insets?.top ?? FALLBACK_TOP_INSET) + SHEET_TOP_MARGIN;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(FALLBACK_DISTANCE)).current;
   const keyboardShift = useRef(new Animated.Value(0)).current;
@@ -159,12 +190,14 @@ export default function useSheetTransition(visible, { liftWithKeyboard = true } 
   }, [mounted, liftWithKeyboard]);
 
   useEffect(() => {
-    const base = baseOverlayHeight.current;
     // Kaplayıcı klavyeyle birlikte daraldıysa sayfa zaten o kadar yükselmiştir.
-    const absorbed =
-      base > 0 && overlayHeight > 0 ? Math.max(0, base - overlayHeight) : 0;
+    const lift = keyboardLift({
+      keyboardHeight,
+      baseOverlayHeight: baseOverlayHeight.current,
+      overlayHeight,
+    });
     const animation = Animated.timing(keyboardShift, {
-      toValue: Math.max(0, keyboardHeight - absorbed),
+      toValue: lift,
       // Kısa gecikme: pencere daralıyorsa `onLayout` bu süre içinde gelir ve
       // hedef daha hareket başlamadan düzelir (yükselip geri inme olmaz).
       delay: keyboardHeight > 0 ? 60 : 0,
@@ -176,12 +209,31 @@ export default function useSheetTransition(visible, { liftWithKeyboard = true } 
     return () => animation.stop();
   }, [keyboardHeight, overlayHeight, keyboardShift]);
 
+  // Klavyenin üstünde kalan alan; klavye kapalıyken null (sınır yok).
+  const keyboardBudget = keyboardSheetBudget({
+    keyboardHeight,
+    baseOverlayHeight: baseOverlayHeight.current,
+    overlayHeight,
+    windowHeight: Dimensions.get("window").height,
+    topGap,
+  });
+
   return useMemo(
     () => ({
       mounted,
       backdropOpacity,
       sheetStyle: {
         transform: [{ translateY: Animated.subtract(translateY, keyboardShift) }],
+      },
+      topGap,
+      // Bütçe yoksa stil AYNEN döner (kimlik korunur, gereksiz yeniden çizim yok).
+      fit: (style) => {
+        const overrides = keyboardFitOverrides(
+          StyleSheet.flatten(style),
+          keyboardBudget,
+          overlayHeight,
+        );
+        return overrides ? [style, overrides] : style;
       },
       onSheetLayout: (event) => {
         const measured = Math.round(event.nativeEvent.layout.height);
@@ -194,6 +246,6 @@ export default function useSheetTransition(visible, { liftWithKeyboard = true } 
         setOverlayHeight(measured);
       },
     }),
-    [mounted, backdropOpacity, translateY, keyboardShift],
+    [mounted, backdropOpacity, translateY, keyboardShift, keyboardBudget, overlayHeight, topGap],
   );
 }

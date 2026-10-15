@@ -234,7 +234,7 @@ export function UserProfileProvider({ children }) {
 
       // counters (denormalize)
       friendsCount: profile?.friendsCount || 0,
-      postsCount: profile?.postsCount || 0,
+      postsCount: Math.max(0, profile?.postsCount || 0), // sayaç sürüklenip negatife düşebilir
       followersCount: profile?.followersCount || 0,
       followingCount: profile?.followingCount || 0,
       pendingRequestsInCount: profile?.pendingRequestsInCount || 0,

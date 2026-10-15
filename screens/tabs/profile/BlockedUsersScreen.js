@@ -29,6 +29,7 @@ import UserAvatar from "../../../components/common/UserAvatar";
 import { appAlert } from "../../../components/AppAlert";
 import ScreenDecor from "../../../components/ScreenDecor";
 import { i18nText } from "../../../utils/i18nText";
+import BackButton from "@components/BackButton";
 
 export default function BlockedUsersScreen({ navigation }) {
   const { theme } = useTheme();
@@ -131,16 +132,10 @@ export default function BlockedUsersScreen({ navigation }) {
       style={[styles.container, { backgroundColor: theme.primary }]}
       edges={["top"]}
     >
-      <ScreenDecor iconOpacity={0.15} />
+      <ScreenDecor scope="profile" iconOpacity={0.15} />
 
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation?.goBack?.()}
-          style={styles.backBtn}
-          hitSlop={10}
-        >
-          <Ionicons name="chevron-back" size={24} color={theme.text.primary} />
-        </TouchableOpacity>
+        <BackButton absolute={false} variant="plain" onPress={() => navigation?.goBack?.()} />
         <Text style={[styles.title, { color: theme.text.primary }]}>
           {i18nText("autoI18n.engellenen_kullanicilar", "Engellenen kullanıcılar")}
         </Text>
@@ -195,7 +190,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  backBtn: { width: 40, alignItems: "flex-start" },
   title: { fontSize: 17, fontWeight: "800", flex: 1, textAlign: "center" },
   intro: { fontSize: 12.5, lineHeight: 18, paddingHorizontal: 18, paddingBottom: 8 },
   listContent: { padding: 16, gap: 10, flexGrow: 1 },
@@ -207,7 +201,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  avatar: { width: 42, height: 42, borderRadius: 21 },
   rowText: { flex: 1, minWidth: 0 },
   name: { fontSize: 14.5, fontWeight: "700" },
   username: { fontSize: 12, marginTop: 1 },

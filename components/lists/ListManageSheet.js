@@ -36,6 +36,7 @@ import { db } from "../../firebase";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import useSheetTransition from "@hooks/useSheetTransition";
 import { useTheme } from "@context/ThemeContext";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useLanguage } from "@context/LanguageContext";
 import { i18nText } from "@utils/i18nText";
 import { describeRenameTarget, MAX_LIST_NAME_LENGTH } from "@utils/listShare";
@@ -187,13 +188,17 @@ export default function ListManageSheet({
 
   const StepHeader = ({ title }) => (
     <View style={styles.stepHeader}>
-      <TouchableOpacity
-        onPress={() => !busy && setStep("actions")}
+      <GlassCloseButton
+        icon="chevron-back"
+        size={34}
+        fallbackRadius={12}
+        iconSize={17}
+        color={theme.text.primary}
+        backgroundColor={theme.secondary}
+        borderColor={theme.border}
         hitSlop={10}
-        style={[styles.backChip, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-      >
-        <Ionicons name="chevron-back" size={17} color={theme.text.primary} />
-      </TouchableOpacity>
+        onPress={() => !busy && setStep("actions")}
+      />
       <Text style={[styles.title, { color: theme.text.primary }]}>{title}</Text>
     </View>
   );
@@ -526,14 +531,6 @@ const styles = StyleSheet.create({
 
   // ── Yeniden adlandırma adımı ──────────────────────────────────────────────
   stepHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 },
-  backChip: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   inputWrap: {
     flexDirection: "row",
     alignItems: "center",

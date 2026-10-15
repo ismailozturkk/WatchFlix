@@ -74,6 +74,10 @@ export const ANALYTICS_EVENTS = {
   // kapı olduğunu söyler; paywall_view.source ile birlikte kapı başına
   // dönüşüm oranı çıkar (utils/premiumFeatures.js).
   PREMIUM_GATE_HIT: "premium_gate_hit",
+  // Yükseltme sayfasında verilen karar: `action` = "upgrade" (ödeme ekranına
+  // geçti) | "dismiss" (vazgeçti). premium_gate_hit ile birlikte kapı başına
+  // sayfa dönüşümü, paywall_view.source ile birlikte nihai dönüşüm çıkar.
+  PREMIUM_UPSELL_ACTION: "premium_upsell_action",
 };
 
 /** Ölçüm hunisinde kullanılan kullanıcı özellikleri. */

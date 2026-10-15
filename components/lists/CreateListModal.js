@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { doc, getDoc, writeBatch } from "firebase/firestore";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
 import { db } from "../../firebase";
@@ -151,12 +152,7 @@ export default function CreateListModal({
             )}
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={close}
-          style={[styles.closeBtn, { backgroundColor: theme.primary }]}
-        >
-          <Ionicons name="close" size={16} color={theme.text.muted} />
-        </TouchableOpacity>
+        <GlassCloseButton size={30} fallbackRadius={15} iconSize={16} onPress={close} />
       </View>
 
       <View
@@ -249,13 +245,6 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 17, fontWeight: "800" },
   subtitle: { fontSize: 11, marginTop: 2 },
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   inputWrap: {
     flexDirection: "row",
     alignItems: "center",

@@ -10,6 +10,7 @@ import {
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import PosterImage from "@components/PosterImage";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
@@ -110,13 +111,15 @@ export default function ListItemActionsSheet({
   const header = (icon, title, subtitle, color = accent) => (
     <View style={styles.header}>
       {step !== "actions" ? (
-        <TouchableOpacity
+        <GlassCloseButton
+          icon="chevron-back"
+          size={38}
+          fallbackRadius={12}
+          iconSize={19}
+          color={theme.text.primary}
           onPress={() => !busy && setStep("actions")}
           disabled={busy}
-          style={[styles.headerIcon, { backgroundColor: theme.primary }]}
-        >
-          <Ionicons name="chevron-back" size={19} color={theme.text.primary} />
-        </TouchableOpacity>
+        />
       ) : (
         <View style={[styles.headerIcon, { backgroundColor: color + "1f" }]}>
           <Feather name={icon} size={18} color={color} />
@@ -126,13 +129,12 @@ export default function ListItemActionsSheet({
         <Text style={[styles.title, { color: theme.text.primary }]}>{title}</Text>
         <Text style={[styles.subtitle, { color: theme.text.muted }]}>{subtitle}</Text>
       </View>
-      <TouchableOpacity
+      <GlassCloseButton
+        size={34}
+        fallbackRadius={11}
         onPress={onClose}
         disabled={busy}
-        style={[styles.close, { backgroundColor: theme.primary }]}
-      >
-        <Feather name="x" size={18} color={theme.text.muted} />
-      </TouchableOpacity>
+      />
     </View>
   );
 
@@ -363,7 +365,6 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, marginHorizontal: 11 },
   title: { fontSize: 18, fontWeight: "800" },
   subtitle: { fontSize: 11.5, marginTop: 2 },
-  close: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   preview: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 16, padding: 10, marginBottom: 12 },
   poster: { width: 48, height: 72, borderRadius: 9 },
   previewCopy: { flex: 1, marginLeft: 12 },

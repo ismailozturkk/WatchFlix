@@ -85,7 +85,7 @@ const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, 
 
 export default function MovieProviders({ navigation }) {
   const { theme } = useTheme();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
   // Sağlayıcıları çek
   const {
@@ -262,29 +262,6 @@ export default function MovieProviders({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingVertical: 10,
-  },
-  genreButton: {
-    marginVertical: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginRight: 10,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  genreText: {
-    color: "white",
-    fontWeight: "bold",
-  },
   similarItem: {
     width: width * 0.4,
     height: width * 0.62,
@@ -304,29 +281,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
-  },
-  similarTitle: {
-    color: "#fff",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  similarRating: {
-    position: "absolute",
-    bottom: 10,
-    right: 5,
-    width: 30,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  similarRatingText: {
-    color: "#ffd700",
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  errorText: {
-    color: "red",
-    fontSize: 16,
-    fontWeight: "bold",
   },
 });

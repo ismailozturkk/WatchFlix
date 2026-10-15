@@ -1,18 +1,13 @@
 import React, {
-  createContext, useContext, useEffect, useState, useMemo, useRef,
+  createContext, useContext, useMemo,
 } from "react";
-import {
-  doc, setDoc, deleteDoc, collection, onSnapshot,
-} from "firebase/firestore";
-import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
-import { isAuthTransitionError } from "../utils/firestoreError";
 import Toast from "react-native-toast-message";
 import { i18nText } from "../utils/i18nText";
-import { cacheKeys } from "../utils/cacheKeys";
-import { publish, seed } from "../services/snapshotCache";
-import { getActiveUser } from "../services/storage";
-import useStartupGate from "../hooks/useStartupGate";
+import { usePremiumGate } from "../hooks/usePremiumGate";
+import useUserDataDomain from "../hooks/useUserDataDomain";
+import { mediaNotesDomain } from "../services/userData";
+import { useLanguage } from "./LanguageContext";
 
 // Film/dizi detay sayfasından yazılan, TEK bir medya öğesine bağlı kişisel not.
 // Genel "Notlar" (context/ProfileNotesContext.js, Notes/{uid}/items) koleksiyonundan
@@ -33,70 +28,58 @@ export const MediaNotesProvider = ({ children }) => {
   const { user } = useAuth();
   const uid = user?.uid;
 
-  // Açılış tohumu: diğer profil context'leriyle (bkz. ProfileNotesContext.js)
-  // aynı desen — son oturumun verisi diskten SENKRON okunur, ilk karede çizilir.
-  const ilkTohum = useMemo(() => {
-    const tohumUid = uid ?? getActiveUser();
-    return tohumUid ? seed(cacheKeys.mediaNotes(tohumUid)).data : null;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // YEREL-ÖNCELİKLİ (bkz. ProfileNotesContext.js): okuma yerel kopyadan senkron,
+  // yazma yerelde + kalıcı günlükte anında, buluttan çekim yalnız kopya yokken
+  // tek seferlik.
+  const view = useUserDataDomain(mediaNotesDomain);
+  const mediaNotes = view.lists.items;
+  const loadingMediaNotes = !view.ready && view.hydrating;
 
-  const [mediaNotes, setMediaNotes] = useState(Array.isArray(ilkTohum) ? ilkTohum : []);
-  const [loadingMediaNotes, setLoadingMediaNotes] = useState(false);
+  // Film ve dizi notu SAYISI ücretsiz planda ayrı ayrı sınırlı (registry:
+  // movie_notes, tv_notes). Her yapımın tek notu olduğu için sayılan şey
+  // not yazılmış farklı yapım sayısıdır. Yalnız YENİ yapım hak harcar:
+  // mevcut notu düzenlemek ve silmek serbest, abonelik bitince notlar silinmez.
+  const { language } = useLanguage();
+  const movieNotesGate = usePremiumGate("movie_notes");
+  const tvNotesGate = usePremiumGate("tv_notes");
+  const mediaNoteCounts = useMemo(() => {
+    let tv = 0;
+    for (const n of mediaNotes) if (n?.type === "tv") tv += 1;
+    return { movie: mediaNotes.length - tv, tv };
+  }, [mediaNotes]);
 
-  const mediaNotesRef = useRef([]);
-  useEffect(() => { mediaNotesRef.current = mediaNotes; }, [mediaNotes]);
-
-  const itemsCol = (u) => collection(db, "MediaNotes", u, "items");
-  const itemDoc = (u, key) => doc(db, "MediaNotes", u, "items", key);
-
-  // Açılış kademesi: hooks/useStartupGate.js'teki KADEME TABLOSU'na göre
-  // ProfileNotesContext'ten (2400) sonraki, NotificationsContext'ten (2800)
-  // önceki boş dilim — aynı anda iki listener birden açılmasın.
-  const startupReady = useStartupGate(2600);
-
-  useEffect(() => {
-    if (!startupReady) return;
-    if (!uid) {
-      setMediaNotes([]);
-      setLoadingMediaNotes(false);
-      return;
-    }
-    const cached = seed(cacheKeys.mediaNotes(uid)).data;
-    if (Array.isArray(cached)) {
-      setMediaNotes(cached);
-      setLoadingMediaNotes(false);
-    } else {
-      setLoadingMediaNotes(true);
-    }
-
-    const unsub = onSnapshot(
-      itemsCol(uid),
-      (snap) => {
-        const fetched = snap.docs
-          .map((d) => ({ ...d.data(), id: d.id }))
-          .sort((a, b) => b.updatedAt - a.updatedAt);
-        setMediaNotes(fetched);
-        publish(cacheKeys.mediaNotes(uid), fetched);
-        setLoadingMediaNotes(false);
-      },
-      (err) => {
-        if (!isAuthTransitionError(err) && __DEV__)
-          console.warn("[MediaNotes] snapshot error:", err?.message);
-        setLoadingMediaNotes(false);
-      },
-    );
-
-    return () => unsub();
-  }, [uid, startupReady]);
+  const gateFor = (type) => (type === "tv" ? tvNotesGate : movieNotesGate);
+  const countFor = (type) => (type === "tv" ? mediaNoteCounts.tv : mediaNoteCounts.movie);
+  const hasNoteFor = (type, mediaId) =>
+    mediaNotes.some((n) => n.id === mediaNoteItemKey(type, mediaId));
+  /** Bu yapıma not yazılabilir mi? Notu varsa (düzenleme) her zaman evet. */
+  const canCreateMediaNote = (type, mediaId) =>
+    hasNoteFor(type, mediaId) || gateFor(type).allows(countFor(type));
+  /** Yazılabilirse true; doluysa yükseltme sayfasını gösterip false döner. */
+  const checkCanCreateMediaNote = (type, mediaId, options) =>
+    hasNoteFor(type, mediaId) || gateFor(type).check(countFor(type), options);
 
   const saveMediaNote = async ({ type, mediaId, title, posterPath, text }) => {
     if (!uid || !mediaId) return false;
     const key = mediaNoteItemKey(type, mediaId);
-    const existing = mediaNotesRef.current.find((n) => n.id === key);
+    const existing = mediaNotesDomain.getSnapshot(uid).get("items", key);
     const now = Date.now();
     const cleanText = String(text || "").trim();
     if (!cleanText) return false;
+
+    // Son savunma hattı: detay sayfaları limiti sayfayı açmadan önce denetler,
+    // ama başka cihazdan eklenen not sayıyı aradan değiştirmiş olabilir. Not
+    // sayfası bir Modal; yükseltme sayfası üstüne açılamaz, bu yüzden toast.
+    if (!existing && !canCreateMediaNote(type === "tv" ? "tv" : "movie", mediaId)) {
+      Toast.show({
+        type: "warning",
+        text1:
+          language === "tr"
+            ? type === "tv" ? "Dizi notu limitin doldu" : "Film notu limitin doldu"
+            : type === "tv" ? "You've reached your show notes limit" : "You've reached your movie notes limit",
+      });
+      return false;
+    }
 
     const finalNote = {
       id: key,
@@ -109,16 +92,9 @@ export const MediaNotesProvider = ({ children }) => {
       updatedAt: now,
     };
 
-    // Optimistic update
-    setMediaNotes((prev) => {
-      const exists = prev.some((n) => n.id === key);
-      return exists
-        ? prev.map((n) => (n.id === key ? finalNote : n))
-        : [finalNote, ...prev];
-    });
-
     try {
-      await setDoc(itemDoc(uid, key), finalNote);
+      // Yerel kopya + kalıcı günlük anında; buluta arka planda gider.
+      mediaNotesDomain.apply(uid, [{ kind: "items", doc: finalNote }]);
       return true;
     } catch (err) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.not_kaydedilemedi", "Not kaydedilemedi") });
@@ -129,9 +105,8 @@ export const MediaNotesProvider = ({ children }) => {
   const deleteMediaNote = async (type, mediaId) => {
     if (!uid || !mediaId) return;
     const key = mediaNoteItemKey(type, mediaId);
-    setMediaNotes((prev) => prev.filter((n) => n.id !== key));
     try {
-      await deleteDoc(itemDoc(uid, key));
+      mediaNotesDomain.apply(uid, [{ kind: "items", key }]);
     } catch (err) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.not_silinemedi", "Not silinemedi") });
     }
@@ -143,7 +118,8 @@ export const MediaNotesProvider = ({ children }) => {
     // ile "bu medyanın notu var mı" diye SENKRON ve her zaman güncel sorabilir.
     mediaNotes, loadingMediaNotes,
     saveMediaNote, deleteMediaNote,
-  }), [mediaNotes, loadingMediaNotes]);
+    mediaNoteCounts, canCreateMediaNote, checkCanCreateMediaNote,
+  }), [mediaNotes, loadingMediaNotes, uid, language, mediaNoteCounts, movieNotesGate, tvNotesGate]);
 
   return (
     <MediaNotesContext.Provider value={value}>

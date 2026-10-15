@@ -172,7 +172,7 @@ istemcinin söylediğine güvenmez, RevenueCat'e kendisi sorar; kullanıcı baş
 15 saniyede bir. Böylece webhook paneli henüz kurulmamışken bile satın alan
 kullanıcı AI kotasında yeni planını görür.
 
-Free kullanıcıda AI kotası 5/gün ve 30/ay, Premium'da 20/gün ve 300/ay,
+Free kullanıcıda AI kotası 3/gün ve 30/ay, Premium'da 20/gün ve 300/ay,
 Premium Max'te 50/gün ve 900/aydır.
 
 ## 6. Uygulama akışı
@@ -217,29 +217,76 @@ Ayarlar kartı ve limit uyarıları bu kayıttan üretilir — kaydı olmayan bi
 
 | Özellik | Free | Premium | Max | Kapı |
 | --- | --- | --- | --- | --- |
-| CineMatch AI | 5/gün · 30/ay | 20 · 300 | 50 · 900 | Sunucu (`callGemini`) |
+| CineMatch AI | 3/gün · 30/ay | 20 · 300 | 50 · 900 | Sunucu (`callGemini`) |
 | Kimlik rozeti (arkadaş profilinde de) | — | Epik | Efsanevi | Sunucu alanı |
-| Arkadaş (istek gönderme) | 30 | 150 | Sınırsız | `FriendsContext.sendRequest` |
-| Sohbet grubu kurma | 2 | 10 | Sınırsız | `CreateGroupScreen` |
-| Özel liste | 5 | 25 | Sınırsız | `ListsViewScreen`, `CreateListModal`, CineSwipe |
+| Arkadaş (istek gönderme) | 2 | 150 | Sınırsız | `FriendsContext.sendRequest` |
+| Sohbet grubu kurma | 1 | 10 | Sınırsız | `CreateGroupScreen` |
+| Özel liste (dört hazır liste her planda) | 1 | 25 | Sınırsız | `ListsViewScreen`, `CreateListModal`, CineSwipe |
 | Ortak liste kurma | 2 | 10 | Sınırsız | `CreateSharedListModal`, CineSwipe |
-| Sahne tahmin oyunu | 5/gün | 20/gün | Sınırsız | `useSceneGame` |
-| CineSwipe oda kurma | 2/gün | 10/gün | Sınırsız | `CineSwipeScreen` |
-| CineSwipe tek başına | 60 kart/gün | 300/gün | Sınırsız | `CineSwipeScreen` |
+| Not | 5 | 50 | Sınırsız | `ProfileNotesContext.saveNote`, `NotesScreen`, `NotesCard` |
+| Yapılacaklar listesi | 5 | 50 | Sınırsız | `ProfileNotesContext.saveNote`, `NotesScreen`, `NotesCard` |
+| Film notu | 20 | 200 | Sınırsız | `MediaNotesContext`, `MovieDetail` |
+| Dizi notu | 20 | 200 | Sınırsız | `MediaNotesContext`, `TvShowsDetails` |
+| Film hatırlatması | 10 | 50 | Sınırsız | `useReminderGate` (`Reminder`, `MovieDetail`, `MediaQuickActionsSheet`) |
+| Dizi hatırlatması | 20 | 100 | Sınırsız | `useReminderGate` (`Reminder`) |
+| Sahne tahmin oyunu | — | 20/gün | Sınırsız | `ProfileGamesModule`, oyun ekranları, `useSceneGame` |
+| CineSwipe oda kurma | — | 10/gün | Sınırsız | `CineSwipeWidget`, `CineSwipeScreen` |
+| CineSwipe tek başına | — | 300/gün | Sınırsız | `CineSwipeWidget`, `CineSwipeScreen` |
+| Turnuvada oy kullanma | Yalnız izleyici | ✓ | ✓ | `TournamentScreen`, `MatchCard` |
 | Özel tema oluşturma | 8 hazır tema | ✓ | ✓ | `SettingsTheme`, `ThemeContext` |
 | Yazı tipi kataloğu | 7 font | 56 font | 56 font | `FontSettingsSection`, `typographySettings` |
+| Uygulama simgesi | Varsayılan | ✓ | ✓ | `AppIconSection` |
+| Kar animasyonu | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen` |
+| İkon arka planı | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen` |
+| Pet / Dost | — | ✓ | ✓ | `PetContext`, `PetSettingsSection` |
 | Platform bildirimi | 10 başlık | 100 | 100 | Sunucu (`dailyStreamingAvailability`) |
-| Wrapped arşivi | Bu yıl + geçen yıl | Tüm yıllar | Tüm yıllar | `WrappedScreen`, `HubWrappedModule` |
+| Wrapped arşivi | Yalnız bu yıl | Son 5 yıl | Tüm yıllar | `WrappedScreen`, `HubWrappedModule` (`canViewWrappedYear`) |
+
+Free planı 10 Ekim 2026 kararıdır (arkadaş 2, grup 1, AI 3/gün · 30/ay, bir
+özel liste, Hub'da oyun ve CineSwipe yok, turnuvada yalnız izleyici, kozmetik
+dört özellik kapalı, 10 film + 20 dizi hatırlatması, 5 not + 5 yapılacak,
+20 film + 20 dizi notu). Premium ve Max değerleri bu kararın PARÇASI DEĞİL,
+önerilen varsayılandır (özellikle not, hatırlatma ve film/dizi notu): satış
+verisi geldikçe `utils/premiumFeatures.js`'ten değişir.
+
+**Wrapped arşivi** (13 Ekim 2026 kararı) bir *yıl penceresidir*: Free yalnız bu
+yılı, Premium bu yıl dahil son 5 yılı görür, Max'te sınır yoktur. Registry'de
+`wrapped_archive` sayılı özellik + `window: true` olarak durur (limitler 1 / 5 /
+sınırsız, `WRAPPED_YEARS_VISIBLE`); kapı `canViewWrappedYear(yıl, plan)` yılın
+bu yıldan kaç yıl geride olduğunu sorar, kilitli satırın hangi planı istediğini
+`requiredPlanForWrappedYear` söyler. "5 yıl" **bu yıl dahil** okundu (bu yıl + 4);
+"bu yıl + 5" demek istenirse yalnız `WRAPPED_YEARS_VISIBLE.premium` 6 olur.
+Pencere her 1 Ocak'ta kayar: Free'nin geçen yıl Wrapped'ı o gün kilitlenir.
+
+Kapalı özellik (Free'de "—") registry'de limiti **0** olan sayılı özelliktir;
+`isLockedFor` ile sorulur ve ekranlar "limit doldu" yerine "Premium özelliği"
+konuşur (`upsell.lockedTitle` + `upsell.message`).
+
+**Kullanım ve haklar ekranı** (Ayarlar → Kullanım ve haklar,
+`PremiumUsageScreen`): her satır registry'den ve kapıların saydığı kaynaktan
+(`hooks/usePremiumUsage.js`) üretilir; ekran kendi başına limit tanımlamaz.
+Satırları `utils/premiumUsageModel.js` kurar (`__tests__/premiumUsageModel.test.js`).
+AI sayacı `AiUsage/{uid}` belgesinden (UTC gün/ay), günlük haklar cihaz
+sayacından, kalan her şey canlı context verisinden okunur.
 
 Kurallar:
 
-- **İşi başlatan sayılır:** isteği kabul etmek, odaya / gruba / ortak listeye
+- **İşi başlatan sayılır:** isteği kabul etmek, gruba / ortak listeye
   katılmak, mesaj almak hiçbir kapıdan geçmez. Premium kullanıcı Free
-  arkadaşlarıyla engelsiz etkileşir.
+  arkadaşlarıyla engelsiz etkileşir. İstisna: CineSwipe ve oyunlar Free'de
+  tümüyle kapalıdır, bir arkadaşın odasına katılmak da dahil (Hub kartı Free'de
+  yükseltme sayfasını açar, ekrana gitmez).
+- **Hatırlatma sayacı yalnız süren kayıtları sayar** (`utils/reminderCounts.js`):
+  çıkışı geçmiş film ve tüm bölümleri yayınlanmış dizi hak harcamaz; bir
+  dizinin tüm bölümleri tek hak sayılır.
+- **Film/dizi notu** yapım başına tek not; limit, not yazılmış farklı yapım
+  sayısıdır. Mevcut notu düzenlemek ve silmek serbest.
 - **Abonelik bitince veri silinmez:** fazla listeler ve arkadaşlar kalır,
   yalnız yenisi engellenir. Özel tema ve premium font seçimi saklanır ama
   varsayılan tema / sistem fontu çizilir; abonelik yenilenince kendiliğinden
-  geri gelir.
+  geri gelir. Aynısı kar animasyonu, ikon arka planı ve pet için de geçerli:
+  tercih saklanır, Free'de kapalı çizilir. Uygulama simgesinde varsayılana
+  dönmek her zaman serbesttir.
 - **Maliyetli ve başkalarına görünen özellikler sunucuda** (AI, platform
   bildirimi, rozet). Kozmetik ve sayı limitleri istemcide; günlük haklar
   cihazda sayılır (`services/premiumUsage.js`). Uygulama verisini silen

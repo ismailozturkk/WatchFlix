@@ -16,6 +16,7 @@ import { Image } from "expo-image";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Dimensions, Easing, StyleSheet, View } from "react-native";
 import { SPLASH_POSTER_CATALOG } from "../data/splashPosterCatalog";
+import useAppLogo from "../hooks/useAppLogo";
 
 // İlk render için tahmin; gerçek ölçü onLayout ile gelir. Android'de "window"
 // ölçüsü sistem çubuklarını dışlayabilirken splash overlay'i gerçek tam ekranı
@@ -128,6 +129,8 @@ function buildTiles(screenW, screenH) {
 }
 
 const SplashPosterWave = () => {
+  // Marka logosu seçili uygulama simgesini izler (hooks/useAppLogo.js).
+  const { logo: appLogo } = useAppLogo();
   // Sıra yalnız bu mount için karıştırılır. Kaynakların tamamı statik require
   // olduğu için ilk karede hazırdır ve çevrimdışı açılışta da aynı davranır.
   const posterSources = useMemo(
@@ -230,7 +233,7 @@ const SplashPosterWave = () => {
           boş olduğundan arkasına ayrıca zemin konmaz. Halkalarla AYNI merkezden
           absolute konumlanır (flex-center değil). */}
       <Image
-        source={require("../assets/icon_default/android-icon-foreground.png")}
+        source={appLogo}
         style={[
           styles.icon,
           {

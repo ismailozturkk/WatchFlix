@@ -12,34 +12,31 @@
 //   Lists/{uid}/watchedMovies          → yeni format filmler (tek seferlik)
 //   Lists/{uid}/watchedTv              → yeni format diziler (tek seferlik)
 
-import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  Animated,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Image as RNImage,
   Modal,
   Pressable,
   useWindowDimensions,
 } from "react-native";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { doc, collection, onSnapshot, getDocs } from "firebase/firestore";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
+import GlassIconButton from "@components/common/GlassIconButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import Feather from "@expo/vector-icons/Feather";
 import { db } from "../../../firebase";
 import Toast from "react-native-toast-message";
 import { useTheme } from "../../../context/ThemeContext";
 import { useAuth } from "../../../context/AuthContext";
 import { getAvatarSource } from "../../../utils/avatars";
-import UserAvatar from "../../../components/common/UserAvatar";
 import { useFriends } from "../../../context/FriendsContext";
 import { appAlert } from "../../../components/AppAlert";
 import ReportReasonSheet from "../../../components/moderation/ReportReasonSheet";
@@ -63,15 +60,27 @@ import {
   formatLastSeen,
 } from "../../../services/presenceService";
 import ScreenDecor from "../../../components/ScreenDecor";
-import BackButton from "../../../components/BackButton";
 import SaveSharedListModal from "../../../components/modals/SaveSharedListModal";
 import AvatarPreviewModal from "../../../components/profile/AvatarPreviewModal";
+import PillButton from "../../../components/friends/PillButton";
+import {
+  ProfileBackdrop,
+  ProfileTopBar,
+  ProfileHero,
+  ProfileStatStrip,
+  SectionHeader,
+  CountChip,
+  WatchSummaryCard,
+  WatchMetricGrid,
+  TopGenresCard,
+  ProfileNoticeCard,
+} from "../../../components/friends/FriendProfileSections";
 import * as Haptics from "../../../services/hapticsService";
 import { i18nText } from "../../../utils/i18nText";
-import IdentityBadgesRow from "../../../components/badges/IdentityBadgesRow";
 import { getIdentityBadges } from "../../../components/badges/badgeCatalog";
 import { PREMIUM_PLAN, resolveServerPlan } from "../../../utils/premium";
 import { listItemToMedia } from "../../../utils/listShare";
+import { useMediaQuickActions } from "../../../context/MediaQuickActionsContext";
 
 
 const PROTECTED_LISTS = ["watchedMovies", "watchedTv", "watchList", "favorites"];
@@ -92,28 +101,6 @@ const LIST_META = {
   favorites:     { icon: "heart",         iconLib: "ion", color: "#e33",     label: i18nText("autoI18n.favoriler", "Favoriler") },
   watchList:     { icon: "bookmark",      iconLib: "ion", color: "#64b4ff",  label: i18nText("autoI18n.izlenecekler", "İzlenecekler") },
 };
-
-const ListIcon = ({ name, iconLib, color, size = 15 }) => {
-  if (iconLib === "mci") return <MaterialCommunityIcons name={name} size={size} color={color} />;
-  if (iconLib === "feather") return <Feather name={name} size={size} color={color} />;
-  return <Ionicons name={name} size={size} color={color} />;
-};
-
-const FriendProfileHeader = ({ title, theme }) => (
-  <View style={styles.screenHeader}>
-    <View style={styles.screenHeaderSide}>
-      <BackButton absolute={false} />
-    </View>
-    <Text
-      allowFontScaling={false}
-      numberOfLines={1}
-      style={[styles.screenHeaderTitle, { color: theme.text?.primary ?? "#fff" }]}
-    >
-      {title || i18nText("profile", "Profil")}
-    </Text>
-    <View style={styles.screenHeaderSide} />
-  </View>
-);
 
 // ── Süre formatı: 12345dk → "8 gün 13 sa" / "3 sa 25 dk" / "45 dk" ──────────
 const formatDuration = (totalMinutes) => {
@@ -136,79 +123,6 @@ const formatMemberSince = (ts, language) => {
   if (!ms) return null;
   return new Intl.DateTimeFormat(language === "tr" ? "tr-TR" : "en-US", { month: "long", year: "numeric" }).format(new Date(ms));
 };
-
-const ProfileMetricPill = ({ icon, label, value, color, theme }) => (
-  <View
-    style={[
-      styles.profileMetricPill,
-      {
-        backgroundColor: theme.primary ?? "#111",
-        borderColor: theme.border ?? "rgba(255,255,255,0.08)",
-      },
-    ]}
-  >
-    <View style={[styles.profileMetricIcon, { backgroundColor: color + "1F" }]}>
-      <Ionicons name={icon} size={14} color={color} />
-    </View>
-    <Text
-      allowFontScaling={false}
-      numberOfLines={1}
-      style={[styles.profileMetricValue, { color: theme.text?.primary ?? "#fff" }]}
-    >
-      {value}
-    </Text>
-    <Text
-      allowFontScaling={false}
-      numberOfLines={1}
-      style={[styles.profileMetricLabel, { color: theme.text?.muted ?? "#666" }]}
-    >
-      {label}
-    </Text>
-  </View>
-);
-
-const WatchMetricTile = ({ icon, iconLib, label, value, detail, color, theme }) => (
-  <View
-    style={[
-      styles.watchMetricTile,
-      {
-        backgroundColor: theme.secondary,
-        borderColor: theme.border ?? "rgba(255,255,255,0.08)",
-      },
-    ]}
-  >
-    <ListIcon name={icon} iconLib={iconLib} color={color} size={16} />
-    <View style={{ marginLeft: 8, flex: 1, justifyContent: "center" }}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4 }}>
-        <Text
-          allowFontScaling={false}
-          numberOfLines={1}
-          style={[styles.watchMetricValue, { color: theme.text?.primary ?? "#fff" }]}
-        >
-          {value}
-        </Text>
-        <Text
-          allowFontScaling={false}
-          numberOfLines={1}
-          style={[styles.watchMetricLabel, { color: theme.text?.secondary ?? "#aaa", marginBottom: 1 }]}
-        >
-          {label}
-        </Text>
-      </View>
-      {detail ? (
-        <Text
-          allowFontScaling={false}
-          numberOfLines={1}
-          style={[styles.watchMetricDetail, { color: theme.text?.muted ?? "#666" }]}
-        >
-          {detail}
-        </Text>
-      ) : null}
-    </View>
-  </View>
-);
-
-
 
 // Kapak düzeni (gridStyle/allCornersRounded) profil rayıyla (ProfileLists) ve
 // Listelerim ekranıyla (ListsViewScreen) BİREBİR aynı görünmek zorunda —
@@ -279,6 +193,7 @@ const SharedListMediaCard = memo(function SharedListMediaCard({
   theme,
   getTmdbUrl,
   onPress,
+  onLongPress,
   activity,
   showRating,
   showComment,
@@ -288,6 +203,8 @@ const SharedListMediaCard = memo(function SharedListMediaCard({
       <TouchableOpacity
         activeOpacity={0.86}
         onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={350}
         style={[
           styles.sharedMediaPoster,
           {
@@ -330,11 +247,22 @@ export default function FriendProfileScreen({ route, navigation }) {
   const { theme } = useTheme();
   const { user: currentUser } = useAuth();
   const { language } = useLanguage();
-  const { avatars, gridStyle, allCornersRounded } = useProfileUi();
+  const { gridStyle, allCornersRounded } = useProfileUi();
   const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  // Kaydırma konumu: hero'daki isim üst çubuğa süzülür, arka plan gradyanı söner.
+  // Native sürücüyle bağlı: kaydırırken JS iş parçacığı yorulmaz.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const onScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+      }),
+    [scrollY],
+  );
   const {
     isFriend,
     hasIncomingFrom,
@@ -362,6 +290,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   const [sharedListColumns, setSharedListColumns] = useState(3);
   const [pendingSaveListPost, setPendingSaveListPost] = useState(null);
   const [saveListPost, setSaveListPost] = useState(null);
+  const [pendingQuickActions, setPendingQuickActions] = useState(null);
   const [unfriendModalVisible, setUnfriendModalVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
@@ -725,6 +654,43 @@ export default function FriendProfileScreen({ route, navigation }) {
     return () => clearTimeout(timer);
   }, [pendingSaveListPost, selectedSharedList]);
 
+  // Posterde basılı tutma: ana ekrandaki hızlı eylem sayfasının aynısı. İki
+  // native Modal'ı üst üste açmamak için (yukarıdaki gerekçe) önce liste sayfası
+  // kapanır, çıkışı bitince hızlı eylem sayfası açılır. Kullanıcı sayfadan
+  // yalnızca vazgeçerse (detaya/puana geçmeden) liste sayfası geri açılır;
+  // aksi hâlde bakmak için basılı tutan kişi listedeki yerini kaybederdi.
+  useEffect(() => {
+    if (!pendingQuickActions || selectedSharedList) return undefined;
+    const { item, mediaType, list } = pendingQuickActions;
+    const timer = setTimeout(() => {
+      setPendingQuickActions(null);
+      openQuickActions({
+        item,
+        mediaType,
+        navigation,
+        onDismiss: () => setTimeout(() => setSelectedSharedList(list), 300),
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [pendingQuickActions, selectedSharedList, openQuickActions, navigation]);
+
+  const openMediaQuickActions = useCallback(
+    (item) => {
+      if (!item?.id || !selectedSharedList) return;
+      // Eski kayıtlarda `type` olmayabiliyor; izlenen diziler alt koleksiyonundan
+      // geliyor (bkz. listItemToMedia'daki aynı geri dönüş).
+      const mediaType =
+        item.type === "movie" || item.type === "tv"
+          ? item.type
+          : selectedSharedList[0] === "watchedTv"
+            ? "tv"
+            : "movie";
+      setPendingQuickActions({ item, mediaType, list: selectedSharedList });
+      setSelectedSharedList(null);
+    },
+    [selectedSharedList],
+  );
+
   const openSaveList = useCallback(() => {
     if (!selectedListName || selectedListItems.length === 0) return;
     const mediaList = selectedListItems
@@ -758,7 +724,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   if (profileLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-        <FriendProfileHeader title={friendName} theme={theme} />
+        <ProfileTopBar title={friendName || i18nText("profile", "Profil")} />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={theme.accent} />
         </View>
@@ -768,7 +734,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   if (!profile) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-        <FriendProfileHeader title={friendName} theme={theme} />
+        <ProfileTopBar title={friendName || i18nText("profile", "Profil")} />
         <View style={styles.centerContent}>
           <Ionicons name="person-outline" size={52} color={theme.text?.muted ?? "#444"} />
           <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.kullanici_bulunamadi", "Kullanıcı bulunamadı")}</Text>
@@ -782,349 +748,198 @@ export default function FriendProfileScreen({ route, navigation }) {
   const orange = theme.colors?.orange ?? "#ff9650";
   const movieShare = stats?.totalMinutes ? Math.round((stats.movieMinutes / stats.totalMinutes) * 100) : 0;
   const tvShare = stats?.totalMinutes ? 100 - movieShare : 0;
-  const topGenreMax = stats?.topGenres?.[0]?.[1] || 1;
+  const genreColors = [orange, blue, green, theme.accent ?? "#8847ff", "#e4ae39"];
+  const presenceInfo = showPresenceText
+    ? {
+        online,
+        text: online
+          ? i18nText("autoI18n.cevrimici", "Çevrimiçi")
+          : lastSeenText || i18nText("autoI18n.cevrimdisi", "Çevrimdışı"),
+      }
+    : null;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.3} />
-      <FriendProfileHeader title={displayName || profile.username || friendName} theme={theme} />
+      <ProfileBackdrop scrollY={scrollY} />
+      <ScreenDecor scope="profile" iconOpacity={0.3} />
+      <ProfileTopBar
+        title={displayName || profile.username || friendName}
+        scrollY={scrollY}
+        onMore={isSelf ? undefined : openModerationMenu}
+        moreLabel={i18nText("autoI18n.secenekler", "Seçenekler")}
+      />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* ── Üst bilgi kartı ──────────────────────────────────────────────── */}
-        <View style={[styles.headerCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-          <LinearGradient
-            pointerEvents="none"
-            colors={[theme.accent + "24", "transparent"]}
-            style={styles.headerGlow}
-          />
+      <Animated.ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        {/* ── Hero: avatar, ad, durum, rozetler, bio ───────────────────────── */}
+        <ProfileHero
+          avatarIndex={profile.avatarIndex}
+          photoURL={profile.photoURL}
+          onAvatarPress={() => setShowAvatarPreview(true)}
+          onAvatarLongPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setShowAvatarPreview(true);
+          }}
+          name={displayName || i18nText("autoI18n.isimsiz_kullanici", "İsimsiz kullanıcı")}
+          username={profile.username}
+          online={online}
+          presence={presenceInfo}
+          badges={identityBadges}
+          language={language}
+          bio={canViewProfile ? profile.bio : null}
+          memberSince={
+            canViewProfile && memberSince
+              ? `${memberSince} ${i18nText("autoI18n.tarihinden_beri_uye", "tarihinden beri üye")}`
+              : null
+          }
+        />
 
-          <View style={styles.profileTopRow}>
-            <View style={styles.avatarBlock}>
-              <UserAvatar
-                avatarIndex={profile.avatarIndex}
-                photoURL={profile.photoURL}
-                size={68}
-                shape="squircle"
-                iconRatio={0.794}
-                borderWidth={2}
-                borderColor={theme.accent + "66"}
-                online={online}
-                onlineBorderColor={theme.secondary}
-                onPress={() => setShowAvatarPreview(true)}
-                onLongPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  setShowAvatarPreview(true);
-                }}
-                delayLongPress={220}
+        {/* ── Eylemler: etiketli, tam genişlik ─────────────────────────────── */}
+        {!isSelf && (
+          <View style={styles.actionRow}>
+            {friend && (
+              <PillButton
+                label={i18nText("autoI18n.mesaj_2", "Mesaj")}
+                icon="chatbubble-ellipses"
+                variant="primary"
+                onPress={() =>
+                  navigation.navigate("ChatScreen", { friendUid, friendName: displayName })
+                }
+                style={styles.actionButton}
               />
-            </View>
-
-            <View style={styles.profileIdentity}>
-              <Text
-                allowFontScaling={false}
-                // Kullanıcının kendi yazdığı ad — ProfileScreen'deki eşiyle
-                // aynı gerekçeyle başlık fontuna girmez (bkz. utils/typographyRoles.js).
-                fontRole="body"
-                style={[styles.displayName, { color: theme.text?.primary ?? "#fff" }]}
-                numberOfLines={2}
-              >
-                {displayName || i18nText("autoI18n.isimsiz_kullanici", "İsimsiz kullanıcı")}
-              </Text>
-              <View style={styles.identityMetaRow}>
-                {profile.username ? (
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.username, { color: theme.text?.secondary ?? "#aaa" }]}
-                    numberOfLines={1}
-                  >
-                    @{profile.username}
-                  </Text>
-                ) : null}
-
-                {showPresenceText && (
-                  <View style={styles.presenceInline}>
-                    <View style={[styles.presenceTinyDot, { backgroundColor: online ? green : (theme.text?.muted ?? "#666") }]} />
-                    <Text
-                      allowFontScaling={false}
-                      numberOfLines={1}
-                      style={[styles.presenceText, { color: online ? green : (theme.text?.muted ?? "#666") }]}
-                    >
-                      {online
-                        ? i18nText("autoI18n.cevrimici", "Çevrimiçi")
-                        : lastSeenText
-                          ? lastSeenText
-                          : i18nText("autoI18n.cevrimdisi", "Çevrimdışı")}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <IdentityBadgesRow
-                badges={identityBadges}
-                theme={theme}
-                language={language}
-              />
-
-              <View style={styles.compactActionsRow}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={relationship.onPress}
-                  style={[
-                    styles.compactActionBtn,
-                    {
-                      backgroundColor: relationship.color + "1A",
-                      borderColor: relationship.color + "44",
-                    },
-                  ]}
-                >
-                  <Ionicons name={relationship.icon} size={14} color={relationship.color} />
-                  <Text
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                    style={[styles.compactActionText, { color: relationship.color }]}
-                  >
-                    {relationship.label}
-                  </Text>
-                </TouchableOpacity>
-
-                {friend && (
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={() =>
-                      navigation.navigate("ChatScreen", { friendUid, friendName: displayName })
-                    }
-                    style={[styles.compactMessageBtn, { backgroundColor: theme.accent }]}
-                    accessibilityLabel={i18nText("autoI18n.mesaj_2", "Mesaj")}
-                  >
-                    <Ionicons name="chatbubble-ellipses" size={15} color="#fff" />
-                    <Text allowFontScaling={false} style={styles.compactMessageText}>
-                      {i18nText("autoI18n.mesaj_2", "Mesaj")}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* Moderasyon menüsü — mağaza şartı: profilden de şikâyet ve
-                    engelleme erişilebilir olmalı. Kendi profilinde çizilmiyor. */}
-                {!isSelf && (
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={openModerationMenu}
-                    style={[
-                      styles.compactActionBtn,
-                      styles.moderationBtn,
-                      { borderColor: theme.border ?? "rgba(255,255,255,0.12)" },
-                    ]}
-                    accessibilityLabel={i18nText("autoI18n.secenekler", "Seçenekler")}
-                  >
-                    <Feather name="more-horizontal" size={16} color={theme.text?.muted ?? "#999"} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
+            )}
+            <PillButton
+              label={relationship.label}
+              icon={relationship.icon}
+              variant={friend || outgoing ? "soft" : "primary"}
+              tone={relationship.color}
+              onPress={relationship.onPress}
+              style={styles.actionButton}
+            />
           </View>
+        )}
 
-          {canViewProfile && profile.bio ? (
-            <View style={[styles.bioBlock, { borderColor: theme.border ?? "rgba(255,255,255,0.08)" }]}>
-              <Ionicons name="chatbox-ellipses-outline" size={14} color={theme.accent} />
-              <Text style={[styles.bio, { color: theme.text?.secondary ?? "#aaa" }]} numberOfLines={2}>
-                {profile.bio}
-              </Text>
-            </View>
-          ) : null}
-
-          {canViewProfile && memberSince && (
-            <View style={styles.profileMetaRow}>
-              <View
-                style={[
-                  styles.memberSinceRow,
-                  {
-                    backgroundColor: theme.primary ?? "#111",
-                    borderColor: theme.border ?? "rgba(255,255,255,0.08)",
-                  },
-                ]}
-              >
-                <Ionicons name="calendar-outline" size={12} color={theme.text?.muted ?? "#666"} />
-                <Text
-                  allowFontScaling={false}
-                  numberOfLines={1}
-                  style={[styles.memberSinceText, { color: theme.text?.muted ?? "#666" }]}
-                >
-                  {memberSince} {i18nText("autoI18n.tarihinden_beri_uye", "tarihinden beri üye")}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {canViewProfile && (
-            <View style={styles.profileStatsGrid}>
-              <ProfileMetricPill
-                icon="people-outline"
-                label={i18nText("autoI18n.arkadas", "Arkadaş")}
-                value={profile.friendsCount ?? 0}
-                color={green}
-                theme={theme}
-              />
-              <ProfileMetricPill
-                icon="newspaper-outline"
-                label={i18nText("autoI18n.gonderi", "Gönderi")}
-                value={profile.postsCount ?? 0}
-                color={orange}
-                theme={theme}
-              />
-              <ProfileMetricPill
-                icon="albums-outline"
-                label={i18nText("autoI18n.icerik", "İçerik")}
-                value={canViewLists ? totalItems : "-"}
-                color={blue}
-                theme={theme}
-              />
-            </View>
-          )}
-
-        </View>
+        {canViewProfile && (
+          <ProfileStatStrip
+            items={[
+              {
+                key: "friends",
+                icon: "people-outline",
+                label: i18nText("autoI18n.arkadas", "Arkadaş"),
+                value: profile.friendsCount ?? 0,
+                color: green,
+              },
+              {
+                key: "posts",
+                icon: "newspaper-outline",
+                label: i18nText("autoI18n.gonderi", "Gönderi"),
+                value: Math.max(0, profile.postsCount ?? 0),
+                color: orange,
+              },
+              {
+                key: "items",
+                icon: "albums-outline",
+                label: i18nText("autoI18n.icerik", "İçerik"),
+                value: canViewLists ? totalItems : "-",
+                color: blue,
+              },
+            ]}
+          />
+        )}
 
         {/* ── İçerik: gizlilik kilitleri / istatistik + listeler ───────────── */}
         {!canViewProfile ? (
-          <View style={styles.lockBox}>
-            <Ionicons name="lock-closed-outline" size={40} color={theme.text?.muted ?? "#555"} />
-            <Text style={[styles.lockText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.bu_profil_gizli", "Bu profil gizli")}</Text>
-          </View>
+          <ProfileNoticeCard
+            icon="lock-closed-outline"
+            title={i18nText("autoI18n.bu_profil_gizli", "Bu profil gizli")}
+          />
         ) : !canViewLists ? (
-          <View style={styles.lockBox}>
-            <Ionicons name="lock-closed-outline" size={40} color={theme.text?.muted ?? "#555"} />
-            <Text style={[styles.lockText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.izleme_verileri", "İzleme verileri")} {privacy.lists === "friends" ? i18nText("autoI18n.yalnizca_arkadaslara_acik", "yalnızca arkadaşlara açık") : i18nText("autoI18n.gizli", "gizli")}
-            </Text>
-          </View>
+          <ProfileNoticeCard
+            icon="lock-closed-outline"
+            title={`${i18nText("autoI18n.izleme_verileri", "İzleme verileri")} ${
+              privacy.lists === "friends"
+                ? i18nText("autoI18n.yalnizca_arkadaslara_acik", "yalnızca arkadaşlara açık")
+                : i18nText("autoI18n.gizli", "gizli")
+            }`}
+          />
         ) : (
           <>
             {/* ── İzleme İstatistikleri ───────────────────────────────────── */}
-            <View style={styles.sectionTitleRow}>
-              <View style={[styles.sectionAccent, { backgroundColor: theme.accent }]} />
-              <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.text?.primary ?? "#fff" }]}>{i18nText("autoI18n.izleme_istatistikleri", "İzleme İstatistikleri")}</Text>
-            </View>
+            <SectionHeader title={i18nText("autoI18n.izleme_istatistikleri", "İzleme İstatistikleri")} />
 
             {stats === null ? (
               <ActivityIndicator size="small" color={theme.accent} style={{ marginVertical: 24 }} />
             ) : (
               <>
-                <View style={[styles.watchSummaryCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-                  <View style={styles.watchSummaryTop}>
-                    <View style={[styles.watchSummaryIcon, { backgroundColor: theme.accent + "20" }]}>
-                      <Ionicons name="time-outline" size={22} color={theme.accent} />
-                    </View>
-                    <View style={styles.watchSummaryCopy}>
-                      <Text allowFontScaling={false} style={[styles.watchSummaryLabel, { color: theme.text?.muted ?? "#666" }]}>
-                        {i18nText("autoI18n.toplam_izleme_suresi", "Toplam izleme süresi")}
-                      </Text>
-                      <Text allowFontScaling={false} numberOfLines={1} fontRole="numeric" style={[styles.watchSummaryValue, { color: theme.text?.primary ?? "#fff" }]}>
-                        {formatDuration(stats.totalMinutes)}
-                      </Text>
-                    </View>
-                    <View style={[styles.watchMinuteBadge, { backgroundColor: theme.primary ?? "#111", borderColor: theme.border ?? "rgba(255,255,255,0.08)" }]}>
-                      <Text allowFontScaling={false} numberOfLines={1} style={[styles.watchMinuteBadgeText, { color: theme.text?.secondary ?? "#aaa" }]}>
-                        {stats.totalMinutes.toLocaleString(language === "tr" ? "tr-TR" : "en-US")} {i18nText("autoI18n.dakika", "dk")}
-                      </Text>
-                    </View>
-                  </View>
+                <WatchSummaryCard
+                  caption={i18nText("autoI18n.toplam_izleme_suresi", "Toplam izleme süresi")}
+                  totalLabel={formatDuration(stats.totalMinutes)}
+                  minutesLabel={`${stats.totalMinutes.toLocaleString(language === "tr" ? "tr-TR" : "en-US")} ${i18nText("autoI18n.dakika", "dk")}`}
+                  movie={{
+                    label: i18nText("autoI18n.film", "Film"),
+                    minutes: stats.movieMinutes,
+                    share: movieShare,
+                    color: blue,
+                  }}
+                  tv={{
+                    label: i18nText("autoI18n.dizi", "Dizi"),
+                    minutes: stats.tvMinutes,
+                    share: tvShare,
+                    color: green,
+                  }}
+                />
 
-                  <View style={styles.watchSplitLabels}>
-                    <View style={styles.watchSplitItem}>
-                      <View style={[styles.watchSplitDot, { backgroundColor: blue }]} />
-                      <Text allowFontScaling={false} numberOfLines={1} style={[styles.watchSplitText, { color: theme.text?.secondary ?? "#aaa" }]}>
-                        {i18nText("autoI18n.film", "Film")} {movieShare}%
-                      </Text>
-                    </View>
-                    <View style={styles.watchSplitItem}>
-                      <View style={[styles.watchSplitDot, { backgroundColor: green }]} />
-                      <Text allowFontScaling={false} numberOfLines={1} style={[styles.watchSplitText, { color: theme.text?.secondary ?? "#aaa" }]}>
-                        {i18nText("autoI18n.dizi", "Dizi")} {tvShare}%
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={[styles.watchBarTrack, { backgroundColor: theme.primary ?? "#111" }]}>
-                    <View style={[styles.watchBarMovie, { width: `${movieShare}%`, backgroundColor: blue }]} />
-                    <View style={[styles.watchBarTv, { width: `${tvShare}%`, backgroundColor: green }]} />
-                  </View>
-                </View>
-
-                <View style={styles.watchMetricGrid}>
-                  <WatchMetricTile
-                    icon="movie-outline"
-                    iconLib="mci"
-                    label={i18nText("autoI18n.film", "Film")}
-                    value={stats.movieCount}
-                    detail={formatDuration(stats.movieMinutes)}
-                    color={blue}
-                    theme={theme}
-                  />
-                  <WatchMetricTile
-                    icon="tv"
-                    iconLib="feather"
-                    label={i18nText("autoI18n.dizi", "Dizi")}
-                    value={stats.showCount}
-                    detail={formatDuration(stats.tvMinutes)}
-                    color={green}
-                    theme={theme}
-                  />
-                  <WatchMetricTile
-                    icon="layers-outline"
-                    iconLib="ion"
-                    label={i18nText("autoI18n.sezon", "Sezon")}
-                    value={stats.seasonCount}
-                    detail={i18nText("autoI18n.izlenen", "İzlenen")}
-                    color={orange}
-                    theme={theme}
-                  />
-                  <WatchMetricTile
-                    icon="play-circle-outline"
-                    iconLib="ion"
-                    label={i18nText("autoI18n.bolum_2", "Bölüm")}
-                    value={stats.episodeCount}
-                    detail={i18nText("autoI18n.toplam", "Toplam")}
-                    color={theme.accent}
-                    theme={theme}
-                  />
-                </View>
+                <WatchMetricGrid
+                  items={[
+                    {
+                      key: "movie",
+                      icon: "movie-outline",
+                      iconLib: "mci",
+                      label: i18nText("autoI18n.film", "Film"),
+                      value: stats.movieCount,
+                      detail: formatDuration(stats.movieMinutes),
+                      color: blue,
+                    },
+                    {
+                      key: "tv",
+                      icon: "tv",
+                      iconLib: "feather",
+                      label: i18nText("autoI18n.dizi", "Dizi"),
+                      value: stats.showCount,
+                      detail: formatDuration(stats.tvMinutes),
+                      color: green,
+                    },
+                    {
+                      key: "season",
+                      icon: "layers-outline",
+                      iconLib: "ion",
+                      label: i18nText("autoI18n.sezon", "Sezon"),
+                      value: stats.seasonCount,
+                      detail: i18nText("autoI18n.izlenen", "İzlenen"),
+                      color: orange,
+                    },
+                    {
+                      key: "episode",
+                      icon: "play-circle-outline",
+                      iconLib: "ion",
+                      label: i18nText("autoI18n.bolum_2", "Bölüm"),
+                      value: stats.episodeCount,
+                      detail: i18nText("autoI18n.toplam", "Toplam"),
+                      color: theme.accent,
+                    },
+                  ]}
+                />
 
                 {stats.topGenres.length > 0 && (
-                  <View style={[styles.genresBlock, { backgroundColor: theme.secondary, borderColor: theme.border ?? "rgba(255,255,255,0.08)" }]}>
-                    <View style={styles.genresHeader}>
-                      <Text allowFontScaling={false} style={[styles.genresTitle, { color: theme.text?.primary ?? "#fff" }]}>{i18nText("autoI18n.en_cok_izlenen_turler", "En Çok İzlenen Türler")}</Text>
-                      <Ionicons name="stats-chart-outline" size={15} color={orange} />
-                    </View>
-                    {(() => {
-                      const totalTopCount = stats.topGenres.reduce((acc, [, c]) => acc + c, 0);
-                      const chartColors = [
-                        orange,
-                        blue,
-                        green,
-                        theme.accent ?? "#8847ff",
-                        "#e4ae39",
-                      ];
-                      return (
-                        <View style={{ marginTop: 6 }}>
-                          <View style={{ flexDirection: "row", height: 10, borderRadius: 5, overflow: "hidden", backgroundColor: theme.primary ?? "#111" }}>
-                            {stats.topGenres.map(([genre, count], idx) => {
-                              const pct = (count / Math.max(totalTopCount, 1)) * 100;
-                              return (
-                                <View key={genre} style={{ width: `${pct}%`, backgroundColor: chartColors[idx % chartColors.length] }} />
-                              );
-                            })}
-                          </View>
-                          <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 14, gap: 12 }}>
-                            {stats.topGenres.map(([genre, count], idx) => (
-                              <View key={genre} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                                <Text allowFontScaling={false} style={{ color: chartColors[idx % chartColors.length], fontSize: 12, fontWeight: "800" }}>{idx + 1}.</Text>
-                                <Text allowFontScaling={false} style={{ color: theme.text?.primary ?? "#fff", fontSize: 11.5, fontWeight: "600" }}>{genre}</Text>
-                                <Text allowFontScaling={false} style={{ color: theme.text?.muted ?? "#666", fontSize: 11, fontWeight: "700" }}>{count}</Text>
-                              </View>
-                            ))}
-                          </View>
-                        </View>
-                      );
-                    })()}
-                  </View>
+                  <TopGenresCard
+                    title={i18nText("autoI18n.en_cok_izlenen_turler", "En Çok İzlenen Türler")}
+                    genres={stats.topGenres}
+                    colors={genreColors}
+                  />
                 )}
               </>
             )}
@@ -1133,55 +948,41 @@ export default function FriendProfileScreen({ route, navigation }) {
             {allLists === null ? (
               <ActivityIndicator size="small" color={theme.accent} style={{ marginTop: 30 }} />
             ) : visibleLists.length === 0 ? (
-              <View style={styles.lockBox}>
-                <Ionicons name="albums-outline" size={40} color={theme.text?.muted ?? "#555"} />
-                <Text style={[styles.lockText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.paylasilan_liste_yok", "Paylaşılan liste yok")}</Text>
-              </View>
+              <ProfileNoticeCard
+                icon="albums-outline"
+                title={i18nText("autoI18n.paylasilan_liste_yok", "Paylaşılan liste yok")}
+              />
             ) : (
               <>
-                <View style={styles.sharedListsPanel}>
-                  <View style={styles.sharedListsPanelHeader}>
-                    <View style={styles.sharedListsTitleWrap}>
-                      <View style={[styles.sectionAccent, { backgroundColor: theme.accent }]} />
-                      <View style={styles.sharedListsTitleText}>
-                        <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.text?.primary ?? "#fff" }]}>
-                          {i18nText("autoI18n.listeler", "Listeler")}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={[styles.openListsButton, { backgroundColor: theme.primary ?? "#111", borderColor: theme.border ?? "rgba(255,255,255,0.08)" }]}>
-                      <Text allowFontScaling={false} style={[styles.openListsButtonText, { color: theme.text?.secondary ?? "#aaa" }]}>
-                        {visibleLists.length}
-                      </Text>
-                      <Ionicons name="grid-outline" size={14} color={theme.accent} />
-                    </View>
-                  </View>
+                <SectionHeader
+                  title={i18nText("autoI18n.listeler", "Listeler")}
+                  trailing={<CountChip value={visibleLists.length} icon="grid-outline" />}
+                />
 
-                  <FlatList
-                    horizontal
-                    data={visibleLists}
-                    keyExtractor={([listName]) => listName}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.sharedListsPreviewContent}
-                    renderItem={({ item: [listName, items] }) => (
-                      <SharedListGridCard
-                        listName={listName}
-                        items={items}
-                        theme={theme}
-                        getTmdbUrl={getTmdbUrl}
-                        gridStyle={gridStyle}
-                        allCornersRounded={allCornersRounded}
-                        onPress={() => setSelectedSharedList([listName, items])}
-                      />
-                    )}
-                  />
-
-                </View>
+                <FlatList
+                  horizontal
+                  data={visibleLists}
+                  keyExtractor={([listName]) => listName}
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.sharedListsRail}
+                  contentContainerStyle={styles.sharedListsPreviewContent}
+                  renderItem={({ item: [listName, items] }) => (
+                    <SharedListGridCard
+                      listName={listName}
+                      items={items}
+                      theme={theme}
+                      getTmdbUrl={getTmdbUrl}
+                      gridStyle={gridStyle}
+                      allCornersRounded={allCornersRounded}
+                      onPress={() => setSelectedSharedList([listName, items])}
+                    />
+                  )}
+                />
               </>
             )}
           </>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       <BottomSheetModal
         visible={!!selectedSharedList}
@@ -1223,15 +1024,18 @@ export default function FriendProfileScreen({ route, navigation }) {
                 </Text>
               </View>
               <View style={styles.listModalHeaderActions}>
-                <Pressable
-                  onPress={openSaveList}
+                <GlassIconButton
+                  icon="file-tray-full-outline"
+                  iconSize={18}
+                  size={38}
+                  fallbackRadius={13}
+                  color="#fff"
+                  tint={theme.accent}
+                  fallbackStyle={{ backgroundColor: theme.accent }}
                   hitSlop={6}
-                  accessibilityRole="button"
                   accessibilityLabel={i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
-                  style={[styles.modalActionButton, { backgroundColor: theme.accent }]}
-                >
-                  <Ionicons name="file-tray-full-outline" size={18} color="#fff" />
-                </Pressable>
+                  onPress={openSaveList}
+                />
 
                 <View
                   style={[
@@ -1273,21 +1077,15 @@ export default function FriendProfileScreen({ route, navigation }) {
                   })}
                 </View>
 
-                <Pressable
+                <GlassCloseButton
+                  size={36}
+                  fallbackRadius={12}
+                  iconSize={21}
+                  color={theme.text?.primary ?? "#fff"}
+                  backgroundColor={theme.primary ?? "#111"}
+                  borderColor={theme.border ?? "rgba(255,255,255,0.08)"}
                   onPress={() => setSelectedSharedList(null)}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-                  style={[
-                    styles.modalCloseBtn,
-                    {
-                      backgroundColor: theme.primary ?? "#111",
-                      borderColor: theme.border ?? "rgba(255,255,255,0.08)",
-                    },
-                  ]}
-                >
-                  <Ionicons name="close" size={21} color={theme.text?.primary ?? "#fff"} />
-                </Pressable>
+                />
               </View>
             </View>
 
@@ -1333,6 +1131,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                           { id: item?.id },
                         );
                       }}
+                      onLongPress={() => openMediaQuickActions(item)}
                     />
                   </View>
                 )}
@@ -1429,329 +1228,20 @@ export default function FriendProfileScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centerContent: { flex: 1, justifyContent: "center", alignItems: "center", gap: 14 },
-  screenHeader: {
-    minHeight: 52,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    zIndex: 2,
-  },
-  screenHeaderSide: { width: 40 },
-  screenHeaderTitle: {
-    flex: 1,
-    paddingHorizontal: 10,
-    fontSize: 17,
-    fontWeight: "800",
-    textAlign: "center",
-  },
   scrollContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   emptyText: { fontSize: 14, textAlign: "center" },
 
-  // ── Üst kart ───────────────────────────────────────────────────────────────
-  headerCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: "stretch",
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    marginBottom: 16,
-    overflow: "hidden",
-  },
-  headerGlow: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 92,
-  },
-  profileTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  avatarBlock: { position: "relative" },
-  avatarWrapper: {
-    width: 68,
-    height: 68,
-    borderRadius: 23,
-    borderWidth: 2,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatar: { width: "100%", height: "100%", borderRadius: 21 },
-  avatarIcon: { width: 54, height: 54 },
-  avatarPlaceholder: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  onlineDot: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#29b864",
-    borderWidth: 2.5,
-  },
-  profileIdentity: {
-    flex: 1,
-    minWidth: 0,
-  },
-  displayName: { fontSize: 18, fontWeight: "800", letterSpacing: -0.2, lineHeight: 22 },
-  identityMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 2,
-    minWidth: 0,
-  },
-  username: { fontSize: 12, flexShrink: 1 },
-  presenceInline: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
-  presenceTinyDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  presenceText: { fontSize: 10.5, fontWeight: "700", flexShrink: 1 },
-  compactActionsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginTop: 8,
-  },
-  compactActionBtn: {
-    flex: 1,
-    minWidth: 0,
-    height: 32,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 9,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-  },
-  compactActionText: { fontSize: 10.5, fontWeight: "800", flexShrink: 1 },
-  // "..." düğmesi metin taşımıyor: flex:1 verilirse ilişki düğmesiyle eşit
-  // yer kapar ve satır dengesiz görünür. Kare kalıyor.
-  moderationBtn: { flex: 0, width: 34, paddingHorizontal: 0 },
-  compactMessageBtn: {
-    height: 32,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-  },
-  compactMessageText: { color: "#fff", fontSize: 10.5, fontWeight: "800" },
-  bioBlock: {
-    alignSelf: "stretch",
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 7,
-    marginTop: 11,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  bio: {
-    flex: 1,
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  profileMetaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 9,
-  },
-  memberSinceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderRadius: 11,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    maxWidth: "100%",
-  },
-  memberSinceText: { fontSize: 10.5, fontWeight: "700", flexShrink: 1 },
-
-  profileStatsGrid: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: 8,
-    marginTop: 11,
-  },
-  profileMetricPill: {
-    flex: 1,
-    minWidth: 0,
-    borderWidth: 1,
-    borderRadius: 15,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    alignItems: "center",
-  },
-  profileMetricIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 6,
-  },
-  profileMetricValue: { fontSize: 16, fontWeight: "900" },
-  profileMetricLabel: { fontSize: 10.5, fontWeight: "700", marginTop: 2 },
-
-  // ── Bölüm başlıkları ───────────────────────────────────────────────────────
-  sectionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 14,
-    paddingHorizontal: 2,
-  },
-  sectionAccent: { width: 4, height: 18, borderRadius: 2 },
-  sectionTitle: { fontSize: 17, fontWeight: "800", letterSpacing: 0, flex: 1 },
-
-  // ── İstatistikler ──────────────────────────────────────────────────────────
-  watchSummaryCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 15,
-    marginBottom: 12,
-  },
-  watchSummaryTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  watchSummaryIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  watchSummaryCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  watchSummaryLabel: { fontSize: 11.5, fontWeight: "700", marginBottom: 2 },
-  watchSummaryValue: { fontSize: 21, fontWeight: "900", letterSpacing: 0 },
-  watchMinuteBadge: {
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    maxWidth: 96,
-  },
-  watchMinuteBadgeText: { fontSize: 11, fontWeight: "800" },
-  watchSplitLabels: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    marginTop: 14,
-  },
-  watchSplitItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minWidth: 0,
-  },
-  watchSplitDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  watchSplitText: { fontSize: 11.5, fontWeight: "700", flexShrink: 1 },
-  watchBarTrack: {
-    height: 9,
-    borderRadius: 10,
-    overflow: "hidden",
-    flexDirection: "row",
-    marginTop: 8,
-  },
-  watchBarMovie: { height: "100%" },
-  watchBarTv: { height: "100%" },
-  watchMetricGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 12,
-  },
-  watchMetricTile: {
-    width: "48%",
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  watchMetricValue: { fontSize: 16, fontWeight: "900" },
-  watchMetricLabel: { fontSize: 11, fontWeight: "700" },
-  watchMetricDetail: { fontSize: 10, fontWeight: "600", marginTop: 2 },
-
-  genresBlock: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 14,
-    marginBottom: 22,
-  },
-  genresHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    marginBottom: 12,
-  },
-  genresTitle: { fontSize: 14, fontWeight: "800" },
-
+  // ── Eylem satırı (Mesaj / ilişki durumu): etiketli, eşit genişlikte ───────
+  actionRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
+  actionButton: { flex: 1, minWidth: 0 },
 
   // ── Listeler ──────────────────────────────────────────────────────────────
-  sharedListsPanel: {
-    marginBottom: 16,
-  },
-  sharedListsPanelHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    marginBottom: 12,
-  },
-  sharedListsTitleWrap: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  sharedListsTitleText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  sharedListsSubtitle: { fontSize: 11.5, fontWeight: "700", marginTop: 2 },
-  openListsButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
-  openListsButtonText: { fontSize: 12, fontWeight: "900" },
+  // Ray ekranın kenarına kadar uzanır (kaydırma içeriğinin 16 px dolgusunu
+  // negatif kenar boşluğu geri alır), ilk kart yine içerikle hizalı başlar.
+  sharedListsRail: { marginHorizontal: -16 },
   sharedListsPreviewContent: {
     gap: 9,
-    paddingRight: 2,
+    paddingHorizontal: 16,
   },
   // ── Liste kartı — ProfileLists (profil rayı) ile BİREBİR aynı çerçeve ────
   railCardBg: {
@@ -1810,16 +1300,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginLeft: "auto",
   },
-  sharedListsHintRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  sharedListsHintText: { fontSize: 12, fontWeight: "800", flexShrink: 1 },
   sharedMediaPoster: {
     width: "100%",
     aspectRatio: 2 / 3,
@@ -1858,27 +1338,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 18, fontWeight: "900", letterSpacing: 0 },
   modalSubtitle: { fontSize: 12, fontWeight: "700", marginTop: 3 },
-  modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   listModalHeaderActions: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
     gap: 7,
     flexShrink: 0,
-  },
-  modalActionButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
   },
   columnSelector: {
     flexDirection: "row",
@@ -1961,10 +1426,5 @@ const styles = StyleSheet.create({
   },
   confirmBtnText: { fontSize: 13, fontWeight: "900", flexShrink: 1, textAlign: "center" },
 
-  lockBox: {
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 36,
-  },
   lockText: { fontSize: 13.5, textAlign: "center" },
 });

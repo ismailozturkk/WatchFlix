@@ -23,8 +23,8 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
-import { doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
-import { db } from "../../firebase";
+import useUserDataDomain from "../../hooks/useUserDataDomain";
+import { remindersActions, remindersDomain } from "../../services/userData";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import MediaNoteSheet from "@components/detail/MediaNoteSheet";
@@ -36,7 +36,7 @@ import AntDesign from "@expo/vector-icons/AntDesign";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import SwipeCard from "@components/SwipeCard";
 import ListBadges from "../../components/ListBadges";
-import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
+import GlassIconButton from "../../components/common/GlassIconButton";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
 import {
@@ -55,6 +55,7 @@ import { movieWatchEvents } from "../../utils/watchHistory";
 import ScreenDecor from "../../components/ScreenDecor";
 import { useAuth } from "../../context/AuthContext";
 import { useDeviceNotifications } from "../../context/DeviceNotificationsContext";
+import useReminderGate from "../../hooks/useReminderGate";
 import CommentSheetModal from "@components/modals/CommentSheetModal";
 import RatingSheetModal from "@components/modals/RatingSheetModal";
 import RatingSummary from "@components/RatingSummary";
@@ -71,12 +72,8 @@ import NewConversationSheet from "@components/chat/NewConversationSheet";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
-// Fragman oynatıcısı: 16:9 oranını koruyarak cihaza göre boyutlanır
-// (tablette aşırı genişlememesi için üst sınır var).
-const VIDEO_WIDTH = Math.min(width - 24, 720);
-const VIDEO_HEIGHT = Math.round((VIDEO_WIDTH * 9) / 16);
 // Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
 const CAST_PLACEHOLDER_ICON = Math.round(width * 0.09);
 // Yatay ray kartı: "Önerilen" ile "Seri" aynı genişliği paylaşıyor.
@@ -93,7 +90,6 @@ const RecommendedMovieItem = memo(function RecommendedMovieItem({
   navigation,
 }) {
   const { theme } = useTheme();
-  const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
   const { openQuickActions } = useMediaQuickActions();
   const scale = React.useRef(new Animated.Value(1)).current;
@@ -279,6 +275,7 @@ export default function MovieDetails({ navigation, route }) {
   const { id, openComments = false } = route.params;
   const { user } = useAuth();
   const { primeNotificationPermission } = useDeviceNotifications();
+  const reminderGate = useReminderGate();
   const { language, t } = useLanguage();
   const providerRegion = language === "tr" ? "TR" : "US";
   const { theme } = useTheme();
@@ -288,9 +285,8 @@ export default function MovieDetails({ navigation, route }) {
   const [commandModalVisible, setCommentModalVisible] = useState(!!openComments);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [noteSheetVisible, setNoteSheetVisible] = useState(false);
-  const { mediaNotes } = useMediaNotes();
+  const { mediaNotes, checkCanCreateMediaNote } = useMediaNotes();
   const myMediaNote = mediaNotes.find((n) => n.id === mediaNoteItemKey("movie", id)) || null;
-  const [headerScale] = useState(new Animated.Value(1));
 
   // Overview accordion (sadece özet, tam genişlik)
   const [expandedCard, setExpandedCard] = useState(null);
@@ -325,7 +321,10 @@ export default function MovieDetails({ navigation, route }) {
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
   const [backdropModalVisible, setBacdropModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isReminderSet, setIsReminderSet] = useState(false);
+  // Hatırlatıcı durumu YEREL kopyadan (services/userData): eskiden her detay
+  // açılışında bu film için buluttan bir `onSnapshot` açılıyordu.
+  const remindersView = useUserDataDomain(remindersDomain);
+  const isReminderSet = id != null && remindersView.has("movies", id);
 
   const openModal = () => setModalVisible(true);
   const closeModal = () => setModalVisible(false);
@@ -559,26 +558,14 @@ export default function MovieDetails({ navigation, route }) {
     [],
   );
 
-  // Yeni model: hatırlatmalar subcollection'da → Reminders/{uid}/movies/{movieId}
-  // (Eski kök-array `Reminders/{uid}.movieReminders[]` BIRAKILDI; okuyucular
-  // ProfileRemindersContext/CalendarContext yalnız subcollection'ı dinliyor.)
-  useEffect(() => {
-    // user null olabilir (oturum düşmesi ekran açıkken) — optional chaining
-    // olmadan hem effect gövdesi hem deps dizisi render'da crash ederdi.
-    if (!user?.uid || !id) return;
-    const unsub = onSnapshot(
-      doc(db, "Reminders", user.uid, "movies", String(id)),
-      (snap) => setIsReminderSet(snap.exists()),
-    );
-    return () => unsub();
-  }, [user?.uid, id]);
-
   const addReminder = async () => {
     try {
       if (!user?.uid || !details) return;
-      const movieRef = doc(db, "Reminders", user.uid, "movies", String(details.id));
+      // Kaldırmak serbest; yeni film hatırlatması ücretsiz planda sınırlı.
+      if (!isReminderSet && !reminderGate.checkAdd({ type: "movie" })) return;
+      // Yerel kopyaya + kalıcı günlüğe anında yazılır, buluta arka planda gider.
       if (!isReminderSet) {
-        await setDoc(movieRef, {
+        remindersActions.setMovie(user.uid, {
           movieId: details.id || "",
           movieName: details.title || "",
           releaseDate: details.release_date || "",
@@ -588,9 +575,8 @@ export default function MovieDetails({ navigation, route }) {
           createdAt: formatDateSave(new Date()),
         });
       } else {
-        await deleteDoc(movieRef);
+        remindersActions.removeMovie(user.uid, details.id);
       }
-      // isReminderSet onSnapshot ile güncelleniyor; optimistic toast:
       Toast.show({
         type: isReminderSet ? "warning" : "success",
         text1: isReminderSet ? i18nText("autoI18n.hatirlatma_kaldirildi", "Hatırlatma kaldırıldı") : i18nText("autoI18n.hatirlatma_eklendi", "Hatırlatma eklendi"),
@@ -886,7 +872,7 @@ export default function MovieDetails({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="details" iconOpacity={0.25} />
       <StatusBar
         barStyle="light-content"
         translucent
@@ -1298,7 +1284,10 @@ export default function MovieDetails({ navigation, route }) {
           {/* ── NOTUM KARTI ── */}
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => setNoteSheetVisible(true)}
+            onPress={() => {
+              // Ücretsiz planda 20 film notu: dolduysa not sayfası hiç açılmaz.
+              if (checkCanCreateMediaNote("movie", id)) setNoteSheetVisible(true);
+            }}
             style={[
               styles.commentsBtn,
               { backgroundColor: theme.secondary, borderColor: theme.border },
@@ -1632,17 +1621,22 @@ export default function MovieDetails({ navigation, route }) {
 
 
       {/* ─── ÜST OVERLAY BUTONLARI (her zaman tıklanabilir) ─── */}
-      <TouchableOpacity
-        style={[styles.backBtn, { top: insets.top + 8 }]}
+      {/* iOS 26+: Liquid Glass; diğer yerlerde eski koyu blur kutusu. */}
+      <GlassIconButton
+        variant="blur"
+        size={38}
+        icon="chevron-back"
+        accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
         onPress={() => navigation.goBack()}
-        activeOpacity={0.8}
-      >
-        <AdaptiveBlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
-          <Ionicons name="chevron-back" size={22} color="#fff" />
-        </AdaptiveBlurView>
-      </TouchableOpacity>
+        style={[styles.backBtn, { top: insets.top + 8 }]}
+      />
 
-      <TouchableOpacity
+      <GlassIconButton
+        variant="blur"
+        size={38}
+        icon="share-social-outline"
+        iconSize={20}
+        accessibilityLabel={i18nText("autoI18n.paylas", "Paylaş")}
         style={[styles.storyBtn, { top: insets.top + 8 }]}
         onPress={() =>
           navigation.navigate("StoryShareScreen", {
@@ -1659,12 +1653,7 @@ export default function MovieDetails({ navigation, route }) {
             tagline: details.tagline || "",
           })
         }
-        activeOpacity={0.8}
-      >
-        <AdaptiveBlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
-          <Ionicons name="share-social-outline" size={20} color="#fff" />
-        </AdaptiveBlurView>
-      </TouchableOpacity>
+      />
 
       {/* ═══════ MODALS ═══════ */}
 
@@ -1833,14 +1822,6 @@ const styles = StyleSheet.create({
     zIndex: 50,
     elevation: 50,
   },
-  backBtnBlur: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
 
   /* Lottie snow */
 
@@ -1891,9 +1872,6 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 4,
   },
-  ratingNum: { fontSize: 16, fontWeight: "700" },
-  voteRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  voteCount: { fontSize: 12, fontWeight: "500" },
 
   /* Body */
   body: { paddingHorizontal: 15 },
@@ -2003,7 +1981,6 @@ const styles = StyleSheet.create({
   },
   seeAllBtn: { paddingHorizontal: 4 },
   seeAllText: { fontSize: 13, fontWeight: "600" },
-  overview: { fontSize: 15, lineHeight: 24 },
 
   /* Accordion */
   accordionCard: {
@@ -2022,14 +1999,6 @@ const styles = StyleSheet.create({
   accordionMore: { fontSize: 11, fontWeight: "600", marginTop: 6 },
 
   /* Tags */
-  tagsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  tag: {
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  tagText: { fontSize: 12, fontWeight: "500" },
 
   /* Cast */
   castItem: { width: width * 0.2, alignItems: "center" },
@@ -2069,13 +2038,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   ratingPillText: { color: "#FFD700", fontSize: 11, fontWeight: "700" },
-  listIndicators: {
-    position: "absolute",
-    top: 7,
-    left: 7,
-    flexDirection: "row",
-    gap: 4,
-  },
   stats: {
     position: "absolute",
     bottom: 8,
@@ -2112,36 +2074,6 @@ const styles = StyleSheet.create({
   },
   collectionYear: { marginTop: 1, fontSize: 11, fontWeight: "600" },
   /* Videos */
-  videoItem: { width: width * 0.62 },
-  videoThumbnail: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-  videoImage: { width: "100%", height: "100%" },
-  playIconContainer: {
-    ...StyleSheet.absoluteFill,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  videoTypeBadge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  videoTypeBadgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  videoTitle: { fontSize: 13, marginTop: 9, fontWeight: "600", lineHeight: 18 },
 
   /* Providers */
   providersRow: { flexDirection: "row", gap: 12, paddingVertical: 4 },
@@ -2157,16 +2089,5 @@ const styles = StyleSheet.create({
   providerName: { fontSize: 10, textAlign: "center", fontWeight: "500" },
 
   /* Video modal */
-  videoModal: { flex: 1, justifyContent: "center", alignItems: "center" },
-  videoModalContent: { backgroundColor: "#000", position: "relative", width: VIDEO_WIDTH, alignSelf: "center" },
-  videoCloseBtn: { position: "absolute", top: -52, right: 12, zIndex: 10 },
-  videoCloseBtnBlur: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
 
 });

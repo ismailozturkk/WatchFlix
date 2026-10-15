@@ -117,6 +117,9 @@ describe("efekt modları (kullanıcı tercihi)", () => {
     expect(desen(orta)).toBeGreaterThan(desen(kapali));
     expect(tam.spriteFpsScale).toBeGreaterThan(orta.spriteFpsScale);
     expect(orta.spriteFpsScale).toBeGreaterThan(kapali.spriteFpsScale);
+    // Ambiyans arka planı: leke sayısı da her basamakta azalır.
+    expect(tam.ambientBlobCount).toBeGreaterThan(orta.ambientBlobCount);
+    expect(orta.ambientBlobCount).toBeGreaterThan(kapali.ambientBlobCount);
   });
 
   test("preset DEĞERLERİ sabitlenir (sessiz kayma testte patlasın)", () => {
@@ -124,18 +127,21 @@ describe("efekt modları (kullanıcı tercihi)", () => {
       iconBackgroundCols: 5,
       iconBackgroundRows: 9,
       spriteFpsScale: 1,
+      ambientBlobCount: 5,
       blurEnabled: true,
     });
     expect(getEffectPreset("balanced")).toEqual({
       iconBackgroundCols: 4,
       iconBackgroundRows: 7,
       spriteFpsScale: 0.7,
+      ambientBlobCount: 4,
       blurEnabled: true,
     });
     expect(getEffectPreset("off")).toEqual({
       iconBackgroundCols: 3,
       iconBackgroundRows: 5,
       spriteFpsScale: 0.5,
+      ambientBlobCount: 3,
       blurEnabled: false,
     });
   });

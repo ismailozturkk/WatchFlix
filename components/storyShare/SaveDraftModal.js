@@ -1,9 +1,8 @@
 import React, { memo } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
+  Animated,
   Modal,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -12,6 +11,7 @@ import {
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
+import useKeyboardInset from "../../hooks/useKeyboardInset";
 
 
 function SaveDraftModalComponent({
@@ -24,6 +24,9 @@ function SaveDraftModalComponent({
   onSave,
 }) {
   const { theme } = useTheme();
+  // KeyboardAvoidingView yerine ölçüm: Android'de modal penceresi klavyeyle
+  // küçülmeyebiliyor (bkz. hooks/useKeyboardInset.js) — kutu klavyenin altında kalırdı.
+  const { animatedInset, onLayout } = useKeyboardInset(visible);
   return (
     <Modal
       visible={visible}
@@ -32,10 +35,7 @@ function SaveDraftModalComponent({
       onRequestClose={() => !saving && onClose()}
       statusBarTranslucent
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.overlay}
-      >
+      <Animated.View style={[styles.overlay, { paddingBottom: animatedInset }]} onLayout={onLayout}>
         <TouchableOpacity
           activeOpacity={1}
           style={StyleSheet.absoluteFill}
@@ -81,7 +81,7 @@ function SaveDraftModalComponent({
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
     </Modal>
   );
 }
@@ -95,7 +95,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 28,
   },
+  // Tablet/katlanırda kutu tüm genişliğe yayılmasın: ortalı, en çok 420 dp.
   box: {
+    width: "100%",
+    maxWidth: 420,
+    alignSelf: "center",
     borderRadius: 20,
     borderWidth: 1,
     padding: 20,

@@ -146,7 +146,7 @@ const NODE = 21;
 const NODE_ACTIVE = 26;
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", marginTop: 8 },
+  row: { flexDirection: "row" },
   stage: { flex: 1, alignItems: "center" },
 
   lineTrack: {
@@ -191,9 +191,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
 
-  label: { color: "#fff", fontSize: 9.5, fontWeight: "800", marginTop: 3 },
-  labelActive: { fontSize: 10 },
-  days: { color: "#fff", fontSize: 8, fontWeight: "600", marginTop: 1 },
+  label: { color: "#fff", fontSize: 10.5, fontWeight: "800", marginTop: 4 },
+  labelActive: { fontSize: 11 },
+  days: { color: "#fff", fontSize: 9, fontWeight: "600", marginTop: 1 },
 });
 
 export default memo(StageTimeline);

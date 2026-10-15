@@ -2,23 +2,27 @@
 //
 // Profil ekranındaki arkadaş aksiyon şeridi: Ara / Arkadaşlar / Mesajlar / İstekler.
 //
-// Tasarım: dört bağımsız kart. Her kartta renkli ikon karosu, etiket ve altında
-// sönük bir bilgi satırı var. Eskiden tek bir şerit içinde dikey çizgilerle
-// ayrılmış butonlar vardı ve HER sayı (arkadaş sayısı, gönderilen istek dahil)
-// aynı bildirim rozetiyle çiziliyordu.
+// Tasarım: TEK hafif kapsayıcı, dört eşit sütun, aralarında ince ayraç. Her
+// sütunda küçük renkli ikon karosu ve altında tek satır etiket var (~75 px;
+// önceki dört ayrı kartlı sürüm ~105 px'ti). Basılı sütun kendi renginde
+// hafifçe aydınlanır.
 //
-// Ayrım (model: utils/friendsBarModel.js):
-//   • Gerçek rozet — ikon karosunun köşesinde, kırmızı, kart rengiyle halkalı:
-//     YALNIZ eylem bekleyen sayılar (okunmamış mesaj, gelen istek).
-//   • Bilgi — etiketin altında sönük metin: arkadaş sayısı, gönderilen istek.
-//     Rozet gibi durmaz, sıfırlanması beklenmez.
+// Sayılar (model: utils/friendsBarModel.js):
+//   • Gerçek rozet — ikon karosunun köşesinde, kırmızı, kapsayıcı rengiyle
+//     halkalı: YALNIZ eylem bekleyen sayılar (okunmamış mesaj, gelen istek).
+//   • Arkadaş sayısı — "Arkadaşlar" karosunda İKONUN YERİNDE düz rakam (karonun
+//     kendi rengiyle). Arkadaş yoksa rakam yerine ikon durur. Rozet gibi durmaz.
 
 import React, { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import AppIcon from "../AppIcon";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
-import { buildFriendsBarModel, formatBadge } from "../../utils/friendsBarModel";
+import {
+  buildFriendsBarModel,
+  formatBadge,
+  formatFriendCount,
+} from "../../utils/friendsBarModel";
 
 // Gerçek bildirim rozeti rengi: temadan bağımsız, her zemin üstünde okunur.
 const BADGE_COLOR = "#FF3B30";
@@ -28,34 +32,22 @@ const COLOR_FRIENDS = "#64b4ff";
 const COLOR_MESSAGES = "#6C63FF";
 const COLOR_REQUESTS = "#29b864";
 
-// Bilgi satırı metinleri. Çoğul eki dile göre değişen İngilizce için tek/çok ayrı.
-const CAPTIONS = {
-  searchHint: ["autoI18n.friendsbar_search_hint", "Kişi bul"],
-  friendsNone: ["autoI18n.friendsbar_friends_none", "Henüz yok"],
-  friendsOne: ["autoI18n.friendsbar_friends_one", "{{n}} kişi"],
-  friendsMany: ["autoI18n.friendsbar_friends_many", "{{n}} kişi"],
-  messagesIdle: ["autoI18n.friendsbar_messages_idle", "Sohbetler"],
-  requestsSent: ["autoI18n.friendsbar_requests_sent", "{{n}} gönderildi"],
-  requestsIdle: ["autoI18n.friendsbar_requests_idle", "Bekleyen yok"],
-};
+// Rakam karoya (32 px) sığsın: hane sayısına göre punto.
+const countFontSize = (text) => (text.length <= 2 ? 15 : text.length === 3 ? 12.5 : 10.5);
 
-function captionText(caption) {
-  const entry = CAPTIONS[caption?.key];
-  if (!entry) return "";
-  return i18nText(entry[0], entry[1], { n: caption.count });
-}
-
-const Tile = memo(function Tile({
+const Item = memo(function Item({
   theme,
   color,
   iconName,
   label,
+  count,
   badge,
-  caption,
   onPress,
 }) {
   const badgeText = formatBadge(badge);
-  const accessibilityLabel = [label, badgeText, caption].filter(Boolean).join(", ");
+  // count verilmiş ve sıfırdan büyükse ikonun yerine rakam çizilir.
+  const countText = count > 0 ? formatFriendCount(count) : "";
+  const accessibilityLabel = [label, countText, badgeText].filter(Boolean).join(", ");
 
   return (
     <Pressable
@@ -63,25 +55,23 @@ const Tile = memo(function Tile({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [
-        styles.tile,
-        {
-          backgroundColor: theme.secondary,
-          borderColor: alpha(theme.border, 0.7),
-        },
-        pressed && styles.tilePressed,
+        styles.item,
+        pressed && { backgroundColor: alpha(color, 0.12) },
       ]}
     >
       <View style={styles.iconSlot}>
-        <View
-          style={[
-            styles.iconWrap,
-            {
-              backgroundColor: alpha(color, 0.14),
-              borderColor: alpha(color, 0.28),
-            },
-          ]}
-        >
-          <AppIcon family="Ionicons" name={iconName} size={21} color={color} />
+        <View style={[styles.iconWrap, { backgroundColor: alpha(color, 0.15) }]}>
+          {countText ? (
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.countText, { color, fontSize: countFontSize(countText) }]}
+            >
+              {countText}
+            </Text>
+          ) : (
+            <AppIcon family="Ionicons" name={iconName} size={18} color={color} />
+          )}
         </View>
         {badgeText ? (
           <View
@@ -107,73 +97,67 @@ const Tile = memo(function Tile({
       >
         {label}
       </Text>
-      <Text
-        allowFontScaling={false}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.8}
-        style={[styles.caption, { color: theme.text.muted }]}
-      >
-        {caption}
-      </Text>
     </Pressable>
   );
 });
+
+function Divider({ theme }) {
+  return <View style={[styles.divider, { backgroundColor: alpha(theme.border, 0.8) }]} />;
+}
 
 function FriendsActionBar({
   theme,
   friendCount,
   unreadMessages,
   incomingRequests,
-  outgoingRequests,
   onSearch,
   onFriends,
   onMessages,
   onRequests,
 }) {
-  const model = buildFriendsBarModel({
-    friendCount,
-    unreadMessages,
-    incomingRequests,
-    outgoingRequests,
-  });
+  const model = buildFriendsBarModel({ friendCount, unreadMessages, incomingRequests });
 
   return (
-    <View style={styles.row}>
-      <Tile
+    <View
+      style={[
+        styles.bar,
+        { backgroundColor: theme.secondary, borderColor: alpha(theme.border, 0.7) },
+      ]}
+    >
+      <Item
         theme={theme}
         color={theme.accent}
         iconName="search"
         label={i18nText("autoI18n.ara_2", "Ara")}
         badge={model.search.badge}
-        caption={captionText(model.search.caption)}
         onPress={onSearch}
       />
-      <Tile
+      <Divider theme={theme} />
+      <Item
         theme={theme}
         color={COLOR_FRIENDS}
         iconName="people"
         label={i18nText("autoI18n.arkadaslar", "Arkadaşlar")}
+        count={model.friends.count}
         badge={model.friends.badge}
-        caption={captionText(model.friends.caption)}
         onPress={onFriends}
       />
-      <Tile
+      <Divider theme={theme} />
+      <Item
         theme={theme}
         color={COLOR_MESSAGES}
         iconName="chatbubble-ellipses"
         label={i18nText("autoI18n.mesajlar", "Mesajlar")}
         badge={model.messages.badge}
-        caption={captionText(model.messages.caption)}
         onPress={onMessages}
       />
-      <Tile
+      <Divider theme={theme} />
+      <Item
         theme={theme}
         color={COLOR_REQUESTS}
         iconName="mail"
         label={i18nText("autoI18n.istekler", "İstekler")}
         badge={model.requests.badge}
-        caption={captionText(model.requests.caption)}
         onPress={onRequests}
       />
     </View>
@@ -183,71 +167,71 @@ function FriendsActionBar({
 export default memo(FriendsActionBar);
 
 const styles = StyleSheet.create({
-  row: {
+  bar: {
     flexDirection: "row",
-    gap: 8,
+    alignItems: "center",
     marginHorizontal: 16,
     marginBottom: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 4,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  tile: {
+  item: {
     flex: 1,
     minWidth: 0,
     alignItems: "center",
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingTop: 12,
-    paddingBottom: 10,
-    paddingHorizontal: 4,
+    paddingTop: 7,
+    paddingBottom: 6,
+    paddingHorizontal: 2,
+    borderRadius: 15,
   },
-  tilePressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.97 }],
+  divider: {
+    width: StyleSheet.hairlineWidth,
+    height: 30,
   },
   // Rozet ikon karosunun köşesine taşar; bu sarmalayıcı kırpmaz.
   iconSlot: {
-    width: 44,
-    height: 44,
-    marginBottom: 8,
+    width: 32,
+    height: 32,
+    marginBottom: 5,
   },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    borderWidth: 1,
+    width: 32,
+    height: 32,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
   badge: {
     position: "absolute",
     top: -6,
-    right: -8,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
+    right: -9,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
     paddingHorizontal: 4,
     alignItems: "center",
     justifyContent: "center",
   },
   badgeText: {
     color: "#FFFFFF",
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: "800",
-    lineHeight: 13,
-    letterSpacing: 0.2,
+    lineHeight: 12,
   },
   label: {
     alignSelf: "stretch",
     textAlign: "center",
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: "700",
     letterSpacing: 0.1,
   },
-  caption: {
-    alignSelf: "stretch",
-    textAlign: "center",
-    marginTop: 2,
-    fontSize: 10,
-    fontWeight: "500",
+  // Arkadaş sayısı: ikon karosunun içinde, ikonun yerinde.
+  countText: {
+    fontWeight: "800",
+    letterSpacing: -0.2,
+    includeFontPadding: false,
   },
 });

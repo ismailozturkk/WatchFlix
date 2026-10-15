@@ -1,34 +1,280 @@
 // components/cineswipe/CineDuoResultsModal.js
 //
-// Duo modunda kartlar tamamlandığında veya eşleşmeler incelenmek istendiğinde
-// iki tarafın da ortak beğendiği tüm içerikleri listeleyen sonuç ekranı alt sayfası (bottom-sheet).
-// Yerinde solan Blur arka planı (useSheetTransition + ModalBlurBackdrop).
-
-import React from "react";
-import {
-  Modal,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Dimensions,
-  Animated,
-  Platform,
-} from "react-native";
+// Duo oyun sonucu: eşleşme halkası, kişi bazında beğeni/pas karşılaştırması,
+// ortak eşleşmeler ve toplu eylemler.
+//
+// Eski sürümden farklar: "Ortak liste oluştur"a art arda basınca birden çok liste
+// açılabiliyordu (artık işlem sürerken/bitince pasif); eylemler durum gösterir
+// (kaydediliyor ✓); sonuçlar halka + karşılaştırma çubuklarıyla özetlenir.
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import AppIcon from "../AppIcon";
-import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
-import useSheetTransition from "../../hooks/useSheetTransition";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import LevelRing from "../game/LevelRing";
+import CineSheet from "./CineSheet";
+import PressableScale from "./PressableScale";
+import { cineColors } from "./cineTheme";
+import useCineCopy from "./useCineCopy";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
+import { cineMediaKey, fillText, posterUrl } from "../../services/cineswipe/deckModel";
 
-const { height: SCREEN_H } = Dimensions.get("window");
-const SHEET_MAX_H = SCREEN_H * 0.88;
+/** 0 → hedef arası kübik yavaşlayan sayaç (halka ve yüzde birlikte dolsun). */
+function useCountUp(target, duration = 900) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    let frame;
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - start) / duration);
+      setValue(target * (1 - Math.pow(1 - t, 3)));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [target, duration]);
+  return value;
+}
 
+function PersonRow({ name, stats, highlight, text, colors }) {
+  const likes = stats.likes || 0;
+  const passes = stats.passes || 0;
+  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+  return (
+    <View style={styles.person}>
+      <View style={[styles.avatar, { backgroundColor: alpha(highlight ? colors.accent : colors.textSecondary, 0.18) }]}>
+        <Text style={[styles.avatarText, { color: highlight ? colors.accent : colors.textSecondary }]}>{initial}</Text>
+      </View>
+      <View style={styles.personBody}>
+        <Text style={[styles.personName, { color: colors.text }]} numberOfLines={1}>
+          {name}
+        </Text>
+        <View style={[styles.bar, { backgroundColor: alpha(colors.text, 0.08) }]}>
+          {likes > 0 ? <View style={{ flex: likes, backgroundColor: colors.like }} /> : null}
+          {passes > 0 ? <View style={{ flex: passes, backgroundColor: colors.pass }} /> : null}
+        </View>
+        <Text style={[styles.personMeta, { color: colors.textSecondary }]}>
+          {likes} {text.likes} · {passes} {text.passes}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function ActionButton({ state, idleIcon, idleLabel, busyLabel, doneLabel, onPress, primary, colors }) {
+  const done = state === "done";
+  const busy = state === "saving";
+  const tint = done ? colors.like : primary ? colors.onAccent : colors.text;
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={done ? doneLabel : busy ? busyLabel : idleLabel}
+      disabled={busy || done}
+      onPress={onPress}
+      style={[
+        primary ? styles.primary : styles.secondary,
+        primary && !done
+          ? { backgroundColor: colors.accent }
+          : {
+              backgroundColor: done ? alpha(colors.like, 0.16) : alpha(colors.surface, 0.75),
+              borderColor: done ? colors.like : colors.border,
+              borderWidth: 1,
+            },
+      ]}
+    >
+      {busy ? (
+        <ActivityIndicator size="small" color={tint} />
+      ) : (
+        <AppIcon family="Ionicons" name={done ? "checkmark-circle" : idleIcon} size={19} color={tint} />
+      )}
+      <Text style={[primary ? styles.primaryText : styles.secondaryText, { color: tint }]} numberOfLines={1}>
+        {done ? doneLabel : busy ? busyLabel : idleLabel}
+      </Text>
+    </PressableScale>
+  );
+}
+
+function ResultsBody({
+  matches,
+  partnerName,
+  summary,
+  isHost,
+  cleanupError,
+  onRetrySave,
+  onSelectMedia,
+  onAddAllToWatchlist,
+  onSaveAsSharedList,
+  onClose,
+  sharedState,
+  watchlistState,
+  text,
+  copy,
+  colors,
+}) {
+  const you = (isHost ? summary?.host : summary?.guest) || {};
+  const partner = (isHost ? summary?.guest : summary?.host) || {};
+  const percent = summary?.matchRate || 0;
+  const animated = useCountUp(percent);
+
+  return (
+    <View>
+      {summary ? (
+        <Animated.View entering={FadeInDown.duration(320)} style={styles.hero}>
+          <LevelRing
+            size={116}
+            stroke={10}
+            progress={animated / 100}
+            color={percent >= 50 ? colors.like : colors.accent}
+            trackColor={alpha(colors.text, 0.1)}
+          >
+            <Text style={[styles.ringValue, { color: colors.text }]}>%{Math.round(animated)}</Text>
+            <Text style={[styles.ringLabel, { color: colors.textSecondary }]}>{text.matchRate}</Text>
+          </LevelRing>
+          <View style={styles.heroStats}>
+            <View style={[styles.stat, { backgroundColor: alpha(colors.accent, 0.1) }]}>
+              <Text style={[styles.statValue, { color: colors.accent }]}>{matches.length}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{text.matches}</Text>
+            </View>
+            <View style={[styles.stat, { backgroundColor: alpha(colors.text, 0.06) }]}>
+              <Text style={[styles.statValue, { color: colors.text }]}>{summary.total}</Text>
+              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{text.total}</Text>
+            </View>
+          </View>
+        </Animated.View>
+      ) : null}
+
+      {summary ? (
+        <Animated.View
+          entering={FadeInDown.delay(80).duration(320)}
+          style={[styles.people, { backgroundColor: alpha(colors.surface, 0.5) }]}
+        >
+          <PersonRow name={text.you} stats={you} highlight text={text} colors={colors} />
+          <PersonRow name={partnerName || text.partner} stats={partner} text={text} colors={colors} />
+        </Animated.View>
+      ) : null}
+
+      {cleanupError ? (
+        <View style={[styles.error, { backgroundColor: alpha(colors.pass, 0.1), borderColor: alpha(colors.pass, 0.35) }]}>
+          <Text accessibilityLiveRegion="polite" style={[styles.errorText, { color: colors.text }]}>
+            {text.saveError}
+          </Text>
+          <PressableScale
+            accessibilityRole="button"
+            onPress={onRetrySave}
+            style={[styles.retry, { borderColor: colors.accent }]}
+          >
+            <Text style={[styles.retryText, { color: colors.accent }]}>{text.retrySave}</Text>
+          </PressableScale>
+        </View>
+      ) : null}
+
+      {matches.length === 0 ? (
+        <View style={styles.empty}>
+          <AppIcon family="Ionicons" name="film-outline" size={46} color={colors.muted} />
+          <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>{text.emptyTitle}</Text>
+          <Text style={[styles.emptyBody, { color: colors.muted }]}>{text.emptyBody}</Text>
+        </View>
+      ) : (
+        <>
+          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+            {fillText(copy.results.matchesHeading, { n: matches.length })}
+          </Text>
+          <View style={styles.list}>
+            {matches.map((item, index) => {
+              const uri = posterUrl(item.poster_path || item.poster, "w342");
+              const year = item.release_date ? item.release_date.split("-")[0] : "";
+              const rating = item.vote_average ? Number(item.vote_average).toFixed(1) : "";
+              return (
+                <Animated.View key={cineMediaKey(item)} entering={FadeInDown.delay(120 + index * 45).duration(300)}>
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.title || item.name} — ${copy.detailsAction}`}
+                    scaleTo={0.97}
+                    onPress={() => {
+                      triggerHaptic("selection");
+                      onClose();
+                      setTimeout(() => onSelectMedia?.(item), 280);
+                    }}
+                    style={[styles.card, { backgroundColor: alpha(colors.surface, 0.6) }]}
+                  >
+                    <View style={[styles.poster, { backgroundColor: colors.between }]}>
+                      {uri ? (
+                        <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                      ) : (
+                        <View style={[StyleSheet.absoluteFill, styles.posterEmpty]}>
+                          <AppIcon family="Ionicons" name="film-outline" size={22} color={colors.muted} />
+                        </View>
+                      )}
+                      <View style={[styles.index, { backgroundColor: colors.accent }]}>
+                        <Text style={styles.indexText}>{index + 1}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.cardBody}>
+                      <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
+                        {item.title || item.name}
+                      </Text>
+                      <View style={styles.cardMeta}>
+                        {year ? <Text style={[styles.cardYear, { color: colors.textSecondary }]}>{year}</Text> : null}
+                        {rating && rating !== "0.0" ? (
+                          <View style={styles.rating}>
+                            <AppIcon family="Ionicons" name="star" size={11} color={colors.gold} />
+                            <Text style={[styles.ratingText, { color: colors.gold }]}>{rating}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      {item.overview ? (
+                        <Text style={[styles.cardOverview, { color: colors.muted }]} numberOfLines={2}>
+                          {item.overview}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <AppIcon family="Ionicons" name="chevron-forward" size={18} color={colors.muted} />
+                  </PressableScale>
+                </Animated.View>
+              );
+            })}
+          </View>
+
+          <View style={styles.actions}>
+            <ActionButton
+              primary
+              state={sharedState}
+              idleIcon="people"
+              idleLabel={text.sharedList}
+              busyLabel={copy.results.creating}
+              doneLabel={copy.results.sharedDone}
+              onPress={() => {
+                triggerHaptic("impact");
+                onSaveAsSharedList?.(matches);
+              }}
+              colors={colors}
+            />
+            <ActionButton
+              state={watchlistState}
+              idleIcon="bookmark-outline"
+              idleLabel={text.watchlist}
+              busyLabel={copy.results.adding}
+              doneLabel={copy.results.watchlistDone}
+              onPress={() => {
+                triggerHaptic("notification");
+                onAddAllToWatchlist?.(matches);
+              }}
+              colors={colors}
+            />
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
+/**
+ * @param {"idle"|"saving"|"done"} sharedState     Ortak liste oluşturma durumu.
+ * @param {"idle"|"saving"|"done"} watchlistState  İzleme listesine ekleme durumu.
+ */
 export default function CineDuoResultsModal({
   visible,
   onClose,
@@ -41,393 +287,262 @@ export default function CineDuoResultsModal({
   onSelectMedia,
   onAddAllToWatchlist,
   onSaveAsSharedList,
+  sharedState = "idle",
+  watchlistState = "idle",
 }) {
   const { theme } = useTheme();
+  const colors = cineColors(theme);
+  const copy = useCineCopy();
   const { t } = useLanguage();
   const text = t.cineRoomResults;
-  const insets = useSafeAreaInsets();
-  const you = (isHost ? summary?.host : summary?.guest) || {};
-  const partner = (isHost ? summary?.guest : summary?.host) || {};
-  const sheet = useSheetTransition(visible);
 
   return (
-    <Modal
-      animationType="none"
-      transparent
-      visible={sheet.mounted}
-      onRequestClose={onClose}
-      statusBarTranslucent
+    <CineSheet
+      visible={visible}
+      onClose={onClose}
+      icon="trophy"
+      iconColor={colors.gold}
+      title={text.title}
+      subtitle={text.subtitle}
+      intensity={40}
+      maxHeight="92%"
     >
-      <View style={styles.overlay} onLayout={sheet.onOverlayLayout}>
-        {/* Blur YERİNDE solar */}
-        <Animated.View
-          style={[StyleSheet.absoluteFill, { opacity: sheet.backdropOpacity }]}
-        >
-          <ModalBlurBackdrop intensity={40} />
-        </Animated.View>
-
-        {/* Backdrop Dismiss */}
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-
-        {/* Slide-Up Bottom Sheet */}
-        <Animated.View
-          onLayout={sheet.onSheetLayout}
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: theme.primary,
-              borderColor: theme.border,
-              paddingBottom: Math.max(insets.bottom, 16),
-            },
-            sheet.sheetStyle,
-          ]}
-        >
-          {/* Drag Indicator Handle */}
-          <View style={[styles.handle, { backgroundColor: theme.border }]} />
-
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerTitleRow}>
-              <View style={[styles.headerIconCircle, { backgroundColor: alpha("#FFD700", 0.18) }]}>
-                <AppIcon family="Ionicons" name="trophy" size={20} color="#FFD700" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.headerTitle, { color: theme.text.primary }]}>
-                  {text.title}
-                </Text>
-                <Text style={[styles.headerSub, { color: theme.text.secondary }]}>
-                  {text.subtitle}
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <AppIcon family="Ionicons" name="close" size={20} color={theme.text.secondary} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-          {summary && (
-            <View style={styles.stats}>
-              {[
-                [text.total, summary.total],
-                [text.matches, matches.length],
-                [text.matchRate, `%${summary.matchRate}`],
-              ].map(([label, value]) => (
-                <View key={label} style={[styles.stat, { backgroundColor: alpha(theme.accent, 0.1) }]}>
-                  <Text style={[styles.statValue, { color: theme.accent }]}>{value}</Text>
-                  <Text style={[styles.statLabel, { color: theme.text.secondary }]}>{label}</Text>
-                </View>
-              ))}
-              <Text style={[styles.personStats, { color: theme.text.primary }]}>
-                {text.you}: {you.likes || 0} {text.likes} · {you.passes || 0} {text.passes}
-              </Text>
-              <Text style={[styles.personStats, { color: theme.text.primary }]}>
-                {partnerName || text.partner}: {partner.likes || 0} {text.likes} · {partner.passes || 0} {text.passes}
-              </Text>
-            </View>
-          )}
-          {cleanupError && (
-            <View style={{ gap: 8, paddingVertical: 12 }}>
-              <Text accessibilityLiveRegion="polite" style={{ color: theme.text.secondary }}>{text.saveError}</Text>
-              <TouchableOpacity onPress={onRetrySave} style={styles.watchlistBtn}>
-                <Text style={{ color: theme.accent }}>{text.retrySave}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          {/* Matches List */}
-          {matches.length === 0 ? (
-            <View style={styles.emptyState}>
-              <AppIcon family="Ionicons" name="film-outline" size={48} color={theme.text.muted} />
-              <Text style={[styles.emptyTitle, { color: theme.text.secondary }]}>
-                {text.emptyTitle}
-              </Text>
-              <Text style={[styles.emptySub, { color: theme.text.muted }]}>
-                {text.emptyBody}
-              </Text>
-            </View>
-          ) : (
-            <View style={[styles.scrollContent, { marginTop: 10 }]}>
-              {matches.map((item, idx) => {
-                const rawPath = item.poster_path || item.poster;
-                const posterUri = rawPath
-                  ? rawPath.startsWith("http")
-                    ? rawPath
-                    : `https://image.tmdb.org/t/p/w342${rawPath}`
-                  : null;
-                const year = item.release_date ? item.release_date.split("-")[0] : "";
-                const rating = item.vote_average ? Number(item.vote_average).toFixed(1) : "";
-
-                return (
-                  <TouchableOpacity
-                    key={`${item.mediaType || "movie"}_${item.id || idx}`}
-                    style={[
-                      styles.matchCard,
-                      { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.6) },
-                    ]}
-                    onPress={() => {
-                      triggerHaptic("selection");
-                      onClose();
-                      onSelectMedia?.(item);
-                    }}
-                  >
-                    <View style={styles.posterBox}>
-                      {posterUri ? (
-                        <Image source={{ uri: posterUri }} style={styles.poster} contentFit="cover" />
-                      ) : (
-                        <View style={[styles.posterPlaceholder, { backgroundColor: theme.between }]}>
-                          <AppIcon family="Ionicons" name="film-outline" size={24} color={theme.text.muted} />
-                        </View>
-                      )}
-                    </View>
-
-                    <View style={styles.cardDetails}>
-                      <Text style={[styles.cardTitle, { color: theme.text.primary }]} numberOfLines={2}>
-                        {item.title || item.name}
-                      </Text>
-                      <View style={styles.metaLine}>
-                        {year ? <Text style={[styles.cardYear, { color: theme.text.secondary }]}>{year}</Text> : null}
-                        {rating && rating !== "0.0" ? (
-                          <View style={styles.ratingBox}>
-                            <AppIcon family="Ionicons" name="star" size={11} color="#FFD700" />
-                            <Text style={styles.ratingText}>{rating}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      {item.overview ? (
-                        <Text style={[styles.cardOverview, { color: theme.text.muted }]} numberOfLines={2}>
-                          {item.overview}
-                        </Text>
-                      ) : null}
-                    </View>
-
-                    <View style={styles.arrowBox}>
-                      <AppIcon family="Ionicons" name="chevron-forward" size={18} color={theme.text.muted} />
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          {/* Action Buttons */}
-          {matches.length > 0 && (
-            <View style={styles.actionsContainer}>
-              <TouchableOpacity
-                style={[styles.sharedListBtn, { backgroundColor: theme.accent || "#138DF0" }]}
-                onPress={() => {
-                  triggerHaptic("impact");
-                  onSaveAsSharedList?.(matches);
-                }}
-              >
-                <AppIcon family="Ionicons" name="people" size={18} color="#FFF" />
-                <Text style={styles.sharedListBtnText}>{text.sharedList}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.watchlistBtn,
-                  { backgroundColor: alpha(theme.secondary || "#333", 0.7), borderColor: theme.border },
-                ]}
-                onPress={() => {
-                  triggerHaptic("notification");
-                  onAddAllToWatchlist?.(matches);
-                }}
-              >
-                <AppIcon family="Ionicons" name="bookmark-outline" size={18} color={theme.text.primary} />
-                <Text style={[styles.watchlistBtnText, { color: theme.text.primary }]}>
-                  {text.watchlist}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          </ScrollView>
-        </Animated.View>
-      </View>
-    </Modal>
+      <ResultsBody
+        matches={matches}
+        partnerName={partnerName}
+        summary={summary}
+        isHost={isHost}
+        cleanupError={cleanupError}
+        onRetrySave={onRetrySave}
+        onSelectMedia={onSelectMedia}
+        onAddAllToWatchlist={onAddAllToWatchlist}
+        onSaveAsSharedList={onSaveAsSharedList}
+        onClose={onClose}
+        sharedState={sharedState}
+        watchlistState={watchlistState}
+        text={text}
+        copy={copy}
+        colors={colors}
+      />
+    </CineSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  stats: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingVertical: 14 },
-  stat: { flex: 1, minWidth: 80, alignItems: "center", padding: 12, borderRadius: 14 },
-  statValue: { fontSize: 24, fontWeight: "900" },
-  statLabel: { fontSize: 11, textAlign: "center", marginTop: 4 },
-  personStats: { width: "100%", fontSize: 13, marginTop: 6 },
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    maxHeight: SHEET_MAX_H,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: Platform.OS === "ios" ? 34 : 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    elevation: 16,
-  },
-  handle: {
-    alignSelf: "center",
-    width: 42,
-    height: 5,
-    borderRadius: 3,
-    marginBottom: 10,
-    opacity: 0.6,
-  },
-  header: {
+  hero: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    gap: 18,
+    paddingBottom: 14,
   },
-  headerTitleRow: {
+  ringValue: {
+    fontSize: 25,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+  ringLabel: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    marginTop: 1,
+  },
+  heroStats: {
     flex: 1,
+    gap: 10,
+  },
+  stat: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 15,
   },
-  headerIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+  statValue: {
+    fontSize: 24,
+    fontWeight: "900",
+    minWidth: 30,
+  },
+  statLabel: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  people: {
+    borderRadius: 18,
+    padding: 14,
+    gap: 14,
+  },
+  person: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerTitle: {
-    fontSize: 17,
+  avatarText: {
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  personBody: {
+    flex: 1,
+    gap: 5,
+  },
+  personName: {
+    fontSize: 14,
     fontWeight: "800",
   },
-  headerSub: {
-    fontSize: 11,
-    marginTop: 2,
+  bar: {
+    flexDirection: "row",
+    height: 8,
+    borderRadius: 4,
+    overflow: "hidden",
   },
-  closeBtn: {
-    width: 32,
-    height: 32,
+  personMeta: {
+    fontSize: 11.5,
+    fontWeight: "600",
+  },
+  error: {
+    marginTop: 14,
+    padding: 14,
     borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    gap: 10,
   },
-  emptyState: {
+  errorText: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  retry: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  retryText: {
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  empty: {
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 50,
+    paddingVertical: 38,
     gap: 8,
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: "700",
-  },
-  emptySub: {
-    fontSize: 12,
+    fontWeight: "800",
     textAlign: "center",
-    maxWidth: 240,
   },
-  scrollArea: {
-    maxHeight: 340,
-    marginTop: 10,
+  emptyBody: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    textAlign: "center",
+    maxWidth: 250,
   },
-  scrollContent: {
-    paddingBottom: 10,
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.9,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  list: {
     gap: 10,
   },
-  matchCard: {
+  card: {
     flexDirection: "row",
     alignItems: "center",
     padding: 10,
-    borderRadius: 16,
+    borderRadius: 18,
     gap: 12,
   },
-  posterBox: {
-    width: 55,
-    height: 80,
-    borderRadius: 10,
+  poster: {
+    width: 56,
+    height: 82,
+    borderRadius: 11,
     overflow: "hidden",
   },
-  poster: {
-    width: "100%",
-    height: "100%",
-  },
-  posterPlaceholder: {
-    width: "100%",
-    height: "100%",
+  posterEmpty: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#202024",
   },
-  cardDetails: {
+  index: {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  indexText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  cardBody: {
     flex: 1,
+    gap: 3,
   },
   cardTitle: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: "800",
-    marginBottom: 4,
   },
-  metaLine: {
+  cardMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 4,
+    gap: 9,
   },
   cardYear: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: "600",
   },
-  ratingBox: {
+  rating: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
   },
   ratingText: {
-    color: "#FFD700",
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: "800",
   },
   cardOverview: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 11.5,
+    lineHeight: 16,
   },
-  actionsContainer: {
-    marginTop: 14,
+  actions: {
+    marginTop: 16,
     gap: 10,
   },
-  sharedListBtn: {
+  primary: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 48,
-    borderRadius: 14,
     gap: 8,
+    height: 52,
+    borderRadius: 17,
   },
-  sharedListBtnText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
+  primaryText: {
+    fontSize: 15,
+    fontWeight: "900",
   },
-  watchlistBtn: {
+  secondary: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
+    gap: 7,
+    height: 46,
+    borderRadius: 14,
   },
-  watchlistBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
+  secondaryText: {
+    fontSize: 13.5,
+    fontWeight: "800",
   },
 });

@@ -32,6 +32,7 @@ import { useWatchProgressContext } from "@context/WatchProgressContext";
 import { withAlpha } from "@components/profile/StatsComponents";
 import { i18nText } from "@utils/i18nText";
 import ScreenDecor from "@components/ScreenDecor";
+import BackButton from "@components/BackButton";
 
 const FILTRELER = [
   { id: "tumu", key: "autoI18n.rozet_filtre_tumu", fallback: "Tümü" },
@@ -162,24 +163,9 @@ export default function WatchBadgesScreen({ navigation }) {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: theme.primary }]}>
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.3} />
+      <ScreenDecor scope="profile" iconOpacity={0.3} />
       <View style={styles.header}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={tr ? "Geri" : "Back"}
-          onPress={() => navigation.goBack()}
-          style={[
-            styles.backButton,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
-          <AppIcon
-            family="Ionicons"
-            name="arrow-back"
-            size={21}
-            color={theme.text.primary}
-          />
-        </TouchableOpacity>
+        <BackButton absolute={false} onPress={() => navigation.goBack()} />
         <View style={styles.headerCopy}>
           <Text
             allowFontScaling={false}
@@ -324,14 +310,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-  },
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   headerCopy: { flex: 1 },
   title: { fontSize: 22, fontWeight: "900" },

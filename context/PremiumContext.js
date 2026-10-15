@@ -31,6 +31,10 @@ import {
 } from "../utils/premium";
 import { higherPlan } from "../utils/premiumFeatures";
 import {
+  applyDevPlanOverride,
+  useDevPlanOverride,
+} from "../services/devPlanOverride";
+import {
   getPremiumPlanSnapshot,
   publishPremiumPlan,
 } from "../services/premiumState";
@@ -172,8 +176,14 @@ export function PremiumProvider({ children }) {
   // RevenueCat cevabı beklenirken son bilinen plan; cevap hiç gelmediyse
   // (hata, desteklenmeyen platform) yalnız sunucu.
   const provisionalPlan = awaitingStore ? getPremiumPlanSnapshot() : PREMIUM_PLAN.FREE;
-  const plan = signedIn
+  const realPlan = signedIn
     ? higherPlan(storePlan ?? provisionalPlan, serverPlan)
+    : PREMIUM_PLAN.FREE;
+  // Geliştirme build'inde plan simülatörü etkin planı zorlayabilir; release'de
+  // `applyDevPlanOverride` gerçek planı aynen döner (services/devPlanOverride.js).
+  const devPlanChoice = useDevPlanOverride();
+  const plan = signedIn
+    ? applyDevPlanOverride(realPlan, devPlanChoice)
     : PREMIUM_PLAN.FREE;
 
   // Tema / yazı tipi gibi React dışı tüketicilere yayın. Oturum ya da
@@ -186,10 +196,11 @@ export function PremiumProvider({ children }) {
 
   // Analytics segmentasyonu: her olay hangi katmandaki kullanıcıdan geldi?
   // Bu özellik olmadan "premium kullanıcı daha çok mu oynuyor / daha az mı
-  // çıkıyor" sorularının hiçbiri cevaplanamaz.
+  // çıkıyor" sorularının hiçbiri cevaplanamaz. Simülatörün SAHTE planı değil
+  // gerçek plan raporlanır; yoksa test oturumları segmentasyonu bozar.
   useEffect(() => {
-    if (planSettled) setAnalyticsUserProperty(USER_PROPERTIES.PREMIUM_TIER, plan);
-  }, [plan, planSettled]);
+    if (planSettled) setAnalyticsUserProperty(USER_PROPERTIES.PREMIUM_TIER, realPlan);
+  }, [realPlan, planSettled]);
 
   // Uzlaştırma: RevenueCat ile sunucu ayrıştıysa sunucuya RevenueCat'i yeniden
   // okut. Aynı ayrışma için oturumda bir kez; sunucu da kendi tarafında
@@ -288,6 +299,9 @@ export function PremiumProvider({ children }) {
         : offeringPackages;
     return {
       plan,
+      // Simülatörsüz gerçek plan (mağaza + sunucu). Yalnız plan simülatörü
+      // kartı "gerçek ne, gösterilen ne" farkını göstermek için okur.
+      realPlan,
       // Mağaza tarafındaki plan (yönetilebilir abonelik). Sunucudan gelen
       // promosyon/yedek plan etkin plana dahildir ama "Aboneliği yönet"
       // yalnız mağaza aboneliğinde anlamlıdır.
@@ -324,6 +338,7 @@ export function PremiumProvider({ children }) {
     openCustomerCenter,
     offerings,
     plan,
+    realPlan,
     purchasePackage,
     refresh,
     restorePurchases,

@@ -12,6 +12,9 @@ const TABS = [
   { id: "style", icon: "color-palette-outline", label: i18nText("autoI18n.stil", "Stil") },
 ];
 
+// Sekmeler eşit genişlikte (flex:1) ve simge üstte, etiket altta: dar telefonda
+// ("Arka Plan" / "Background" gibi uzun etiketler) komşu sekmenin üstüne binmez;
+// etiket sığmazsa tek satırda küçülür.
 function StoryTabsComponent({ activeTab, onChangeTab }) {
   const { theme } = useTheme();
   return (
@@ -27,10 +30,15 @@ function StoryTabsComponent({ activeTab, onChangeTab }) {
             style={styles.tab}
           >
             <Ionicons name={tab.icon} size={19} color={color} />
-            <Text allowFontScaling={false} style={[styles.label, { color }]}>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={[styles.label, { color }]}
+            >
               {tab.label}
             </Text>
-            
           </TouchableOpacity>
         );
       })}
@@ -47,11 +55,12 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
+    minWidth: 0,
     alignItems: "center",
-    flexDirection:"row",
-    paddingBottom:10,
-    gap: 4,
+    justifyContent: "center",
+    gap: 3,
+    paddingHorizontal: 2,
+    paddingBottom: 8,
   },
-  label: { fontSize: 11, fontWeight: "700" },
-  
+  label: { alignSelf: "stretch", textAlign: "center", fontSize: 11, fontWeight: "700" },
 });

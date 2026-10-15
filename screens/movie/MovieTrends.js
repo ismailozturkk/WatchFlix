@@ -20,7 +20,7 @@ import { RatingBadge } from "../../components/PosterInfoBadges";
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
 // Sarmalayıcı yüksekliği poster yüksekliğinden türetilir (ekran yüksekliğinden
 // değil); böylece farklı en/boy oranlı cihazlarda posterin altı kesilmez.
@@ -191,7 +191,7 @@ export default function MovieTrends({ navigation }) {
   const shrink = React.useRef(new Animated.Value(1)).current;
   const focusedPos = React.useRef(new Animated.Value(0)).current;
   const { t } = useLanguage();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const {
     loadingTrends,
     movieTrends,
@@ -378,12 +378,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   categoryRail: { flex: 1, justifyContent: "center" },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginLeft: 15,
-    marginBottom: 15,
-  },
   categoriesList: {
     paddingLeft: 15,
     paddingRight: 4,
@@ -413,27 +407,4 @@ const styles = StyleSheet.create({
     bottom: 8,
   },
   trendListBadges: { position: "absolute", left: 8, bottom: 8 },
-  title: {
-    textAlign: "center",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  genre: {
-    color: "#fff",
-    fontSize: 14,
-  },
-  genreCount: {
-    color: "#666",
-    fontSize: 14,
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 5,
-  },
-  starImage: {
-    width: 12,
-    height: 12,
-    marginRight: 1,
-  },
 });

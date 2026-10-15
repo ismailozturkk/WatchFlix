@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Animated,
   StyleSheet,
-  Dimensions,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -35,8 +34,6 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
 
-const { width } = Dimensions.get("window");
-
 // ─── Puan rengi ───────────────────────────────────────────────────────────────
 const getRatingColor = (r) => {
   if (r >= 8) return "#29b864";
@@ -57,9 +54,9 @@ const SeasonItem = ({
   const { t, language } = useLanguage();
   const { user } = useAuth();
   const { API_KEY } = useApiSettings();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
-  const [play, setPlay] = useState("");
+  const [play] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);

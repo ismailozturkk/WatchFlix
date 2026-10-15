@@ -8,8 +8,6 @@
 
  *  - PALETTE   : Tüm ham renk değerleri tek yerde (değer tekrarı yok)
 
- *  - makeTheme : Tema token'larını PALETTE'ten üreten factory
-
  *  - themes    : { gray, dark, light, blue, green } — tüm temalar
 
  *  - Yardımcı  : getThemeColors, alpha (opacity helper)
@@ -98,8 +96,6 @@ const PALETTE = {
   blue: "#138DF0", // rgb(19, 141, 240)
 
   blueAlt: "#2196F3",
-
-  blueDark: "#0551A3", // (eski dark tema accent'i — artık kullanılmıyor)
 
   blueMid: "#2275B9", // gray tema bold
 
@@ -333,9 +329,6 @@ export const BLUE_THEME_NOTES_COLORS = Object.freeze({
   tealBackground: alpha("#2DD4BF", 0.2),
 });
 
-export const SHARED_COLORS = DARK_THEME_COLORS;
-export const SHARED_NOTES_COLORS = DARK_THEME_NOTES_COLORS;
-
 export function getSemanticColorsForTheme(themeKey, surfaceHex) {
   if (themeKey === "light") {
     return { colors: LIGHT_THEME_COLORS, notesColor: LIGHT_THEME_NOTES_COLORS };
@@ -365,62 +358,6 @@ export function getSemanticColorsForTheme(themeKey, surfaceHex) {
     }
   }
   return { colors: DARK_THEME_COLORS, notesColor: DARK_THEME_NOTES_COLORS };
-}
-
-// ─── Theme factory ────────────────────────────────────────────────────────────
-
-/**
- * Tema token'larını üreten factory fonksiyonu.
- * Her tema yalnızca kendi değerlerini geçirir, shared değerler otomatik eklenir.
- */
-function makeTheme({
-  primary,
-  secondary,
-  between,
-  border,
-  tab,
-  text,
-  accent,
-  bold,
-  shadow,
-  themeKey,
-}) {
-  const semantic = getSemanticColorsForTheme(themeKey, primary);
-  return {
-    // ── Yüzey renkleri ─────────────────────────────────────────────────────
-    primary,
-    secondary,
-    secondaryt: alpha(
-      secondary
-        .replace("rgb(", "rgba(")
-        .replace(")", ", 0.5)")
-        .startsWith("rgba")
-        ? secondary
-        : secondary,
-      0,
-    ),
-    between,
-    border,
-    tab,
-    ai: alpha(tab, 0.4),
-
-    // ── Metin ──────────────────────────────────────────────────────────────
-    text: {
-      primary: text.primary,
-      secondary: text.secondary,
-      between: text.between,
-      muted: text.muted,
-    },
-
-    // ── Vurgu ──────────────────────────────────────────────────────────────
-    accent,
-    bold,
-    shadow,
-
-    // ── Tema Bazlı Renk Setleri ─────────────────────────────────────────────
-    colors: semantic.colors,
-    notesColor: semantic.notesColor,
-  };
 }
 
 // ─── Temalar ──────────────────────────────────────────────────────────────────

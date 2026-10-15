@@ -20,6 +20,7 @@
 // YENİ ANAHTAR EKLERKEN: buraya bir girdi ekle, çağrı yerinde `Keys.<ad>` kullan.
 // Başka hiçbir yere fiziksel anahtar adı yazma.
 
+import { APP_ICON_IDS, DEFAULT_APP_ICON_ID } from "../../utils/appIcons";
 import {
   TYPES,
   oneOf,
@@ -70,6 +71,15 @@ const settingsKeys = {
     // migration.js'teki migrateCustomThemes hallediyor.
   },
   selectedAvatar: { key: "selectedAvatar", type: TYPES.json, default: null },
+  // "Ayarları içe aktar"dan hemen ÖNCEKİ ayarların anlık görüntüsü (yedek dosyasıyla
+  // aynı biçim, bkz. utils/settingsBackup.js). Yanlış dosyayı içe aktaran kullanıcı
+  // tek dokunuşla geri döner. Yedek dosyasına GİRMEZ (kendi kendini yedeklemesin).
+  settingsRestorePoint: {
+    key: "settingsRestorePoint",
+    type: TYPES.json,
+    default: null,
+    validate: plainObject,
+  },
   // Son çözülen premium planı. Tema ve yazı tipi store'ları açılışta SENKRON
   // okur: RevenueCat cevabı gelene kadar (≈1 sn) premium kullanıcının özel
   // teması/fontu varsayılana düşüp geri gelmesin (bkz. services/premiumState.js).
@@ -79,9 +89,29 @@ const settingsKeys = {
     default: "free",
     validate: oneOf("free", "premium", "unlimited"),
   },
+  // YALNIZ geliştirme build'inde (`__DEV__`) etkili plan simülatörü: "real" = gerçek
+  // plan, diğerleri etkin planı zorlar. Release'de hiç okunmaz (bkz.
+  // services/devPlanOverride.js).
+  devPlanOverride: {
+    key: "devPlanOverride",
+    type: TYPES.string,
+    default: "real",
+    validate: oneOf("real", "free", "premium", "unlimited"),
+  },
   adultContent: { key: "adultContent", type: TYPES.boolean, default: false },
   showOngoingTvShows: { key: "showOngoingTvShows", type: TYPES.boolean, default: true },
   showIconBackground: { key: "showIconBackground", type: TYPES.boolean, default: false },
+  // Ambiyans arka planı: bulanık, rengârenk, yavaşça süzülen ışık lekeleri.
+  showAmbientBackground: { key: "showAmbientBackground", type: TYPES.boolean, default: false },
+  // Kar / ikon deseni / ambiyansın hangi ekran GRUPLARINDA gizlendiği:
+  // { snow: [grup…], icon: [grup…], ambient: [grup…] }. Boş/eksik = her yerde
+  // görünür (bkz. utils/decorScopes.js — neden "gizli" listesi saklanıyor).
+  decorScopes: {
+    key: "decorScopes",
+    type: TYPES.json,
+    default: null,
+    validate: plainObject,
+  },
   iconBackgroundMode: {
     key: "iconBackgroundMode",
     type: TYPES.string,
@@ -137,6 +167,24 @@ const settingsKeys = {
     default: null,
     validate: plainObject,
   },
+  // Profil "Hikâyede paylaş" kartının son seçimleri (düzen/renk/poster kaynağı/
+  // anahtarlar). Not metni saklanmaz — her paylaşıma özel (bkz.
+  // utils/profileStoryCard.js persistableStoryOptions).
+  profileStoryCard: {
+    key: "profileStoryCard",
+    type: TYPES.json,
+    default: null,
+    validate: plainObject,
+  },
+  // Wrapped paylaşım kartının son seçimleri (düzen/palet/arka plan/poster içeriği/
+  // bölüm anahtarları). Not metni saklanmaz — her paylaşıma özel (bkz.
+  // utils/wrappedCard.js persistableWrappedCardOptions).
+  wrappedCard: {
+    key: "wrappedCard",
+    type: TYPES.json,
+    default: null,
+    validate: plainObject,
+  },
   seeAllGridColumns: {
     key: "seeAllGridColumns",
     type: TYPES.number,
@@ -179,6 +227,13 @@ const settingsKeys = {
     type: TYPES.string,
     default: "row",
     validate: oneOf("row", "grid"),
+  },
+  // Notlar ekranı: kartlar tek sütun (list) ya da iki sütun (grid).
+  notesViewMode: {
+    key: "notesViewMode",
+    type: TYPES.string,
+    default: "list",
+    validate: oneOf("list", "grid"),
   },
   posterBadges: { key: "showPosterBadges", type: TYPES.json, default: null },
   streamingProviderIds: {
@@ -247,6 +302,16 @@ const settingsKeys = {
   },
   // Görsel efekt modu — sahibi services/effectSettings.js
   effectMode: { key: "effectMode", type: TYPES.string, default: null },
+  // Seçili uygulama simgesi (katalog kimliği) — sahibi services/appIconStore.js.
+  // Gerçek simge işletim sistemindedir; bu anahtar yalnız uygulama içi logoların
+  // (giriş, splash, paylaşım kartları...) AÇILIŞTA SENKRON okuyabilmesi için
+  // önbellektir ve her açılışta sistemle eşitlenir (appIconService.reconcile...).
+  appIcon: {
+    key: "appIconId",
+    type: TYPES.string,
+    default: DEFAULT_APP_ICON_ID,
+    validate: oneOf(...APP_ICON_IDS),
+  },
   // Tipografi — sahibi services/typographySettings.js
   fontRoles: {
     key: "appFontRoles",
@@ -279,6 +344,32 @@ const settingsKeys = {
 /* ================================================================== */
 
 const dataKeys = {
+  // ---- Yerel-öncelikli veri katmanı (services/userData) -------------------
+  //
+  // Buluta henüz YAZILMAMIŞ değişikliklerin kalıcı günlüğü: notlar, medya
+  // notları, hatırlatıcılar. Yerel kopya kaynak olduğu için bu günlük kaybolursa
+  // onaylanmamış kullanıcı değişikliği kaybolur — o yüzden `data` deposunda ve
+  // ÇIKIŞTA SİLİNMEZ: çevrimdışıyken çıkış yapan kullanıcının bekleyen yazımları
+  // aynı hesapla tekrar girince buluta gider (bkz. services/userData/outbox.js).
+  // Hesap SİLİNİRSE açıkça temizlenir (accountService.deleteAccount).
+  // "Bu alan bu cihazda buluttan tam doğrulandı" işareti (services/userData/
+  // hydrationMarker.js). Çıkışta SİLİNİR: yerel kopya da çıkışta silindiği için
+  // işaret onunla birlikte gitmeli.
+  userDataHydrated: {
+    key: "user_data_hydrated_v1:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    validate: plainObject,
+  },
+  syncOutbox: {
+    key: "sync_outbox_v1:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
   cineLastResult: {
     key: "cineswipe_last_result_",
     type: TYPES.json,

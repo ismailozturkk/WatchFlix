@@ -8,6 +8,7 @@ import {
   } from "react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassIconButton from "@components/common/GlassIconButton";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useTheme } from "../../../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -85,7 +86,7 @@ export default function ProfileLists({ navigation }) {
   const { theme } = useTheme();
   const { lists, isLoading: isLoadingLists } = useProfileStats();
   const { user } = useAuth();
-  const { gridStyle, setGridStyle, saveListGridStyle, allCornersRounded, saveAllCornersRounded } = useProfileUi();
+  const { gridStyle, saveListGridStyle, allCornersRounded, saveAllCornersRounded } = useProfileUi();
   const cardW = getCardWidth(gridStyle);
   const [layoutModalVisible, setLayoutModalVisible] = useState(false);
   const [createListVisible, setCreateListVisible] = useState(false);
@@ -180,20 +181,19 @@ export default function ProfileLists({ navigation }) {
           {t.profileScreen.ProfileLists.lists}
         </Text>
         <View style={{ flexDirection: "row", gap: 10 }}>
-          <TouchableOpacity
-            style={[
-              styles.addButton,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
+          <GlassIconButton
+            icon="add"
+            iconSize={18}
+            size={34}
+            fallbackRadius={10}
+            color={theme.text.primary ?? "white"}
+            accessibilityLabel={i18nText("autoI18n.ekle", "Ekle")}
             onPress={() => setCreateListVisible(true)}
-          >
-            <Ionicons name="add" size={18} color={theme.text.primary ?? "white"} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.addButton,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
+          />
+          <GlassIconButton
+            size={34}
+            fallbackRadius={10}
+            accessibilityLabel={i18nText("autoI18n.gorunumu_degistir", "Görünümü değiştir")}
             onPress={() => setLayoutModalVisible(true)}
           >
             <MaterialCommunityIcons
@@ -201,18 +201,18 @@ export default function ProfileLists({ navigation }) {
               size={18}
               color={theme.text.primary ?? "white"}
             />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.addButton,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
+          </GlassIconButton>
+          <GlassIconButton
+            icon="arrow-forward-outline"
+            iconSize={18}
+            size={34}
+            fallbackRadius={10}
+            color={theme.text.primary ?? "white"}
+            accessibilityLabel={i18nText("autoI18n.tum_listeler", "Tüm Listeler")}
             onPress={() => {
               navigation.navigate("ListsViewScreen");
             }}
-          >
-            <Ionicons name="arrow-forward-outline" size={18} color={theme.text.primary ?? "white"} />
-          </TouchableOpacity>
+          />
         </View>
       </View>
       {isLoadingLists ? (
@@ -694,28 +694,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 10,
   },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginRight: 10,
-  },
-  addButton: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
   // Silme onayı artık ListManageSheet'te (Listelerim ekranıyla ortak sayfa).
 
   // ── Layout Modal Styles ──────────────────────────────────────────────────
-  bottomModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
-  },
   bottomModalSheet: {
     width: "100%",
     borderTopLeftRadius: 32,
@@ -737,11 +718,5 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 24,
     textAlign: "center",
-  },
-  layoutOptionsRow: {
-    flexDirection: "row",
-    gap: 16,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
   },
 });

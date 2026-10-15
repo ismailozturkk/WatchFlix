@@ -703,11 +703,6 @@ const asText = (value) => {
   return null; // React elementi vb. — içeriğe göre karar veremeyiz.
 };
 
-export const hasDigit = (value) => {
-  const text = asText(value);
-  return text === null ? false : /\d/.test(text);
-};
-
 // Rakamın yanında duran ama onu "yazı" yapmayan glifler: para birimleri,
 // yaklaşıklık/artı-eksi işaretleri, puan yıldızı, ayraçlar. Yüzde işareti
 // Türkçe'de ÖNDE (%75), İngilizce'de ARKADA (75%) durur — ikisi de rakamdır.

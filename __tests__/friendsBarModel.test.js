@@ -1,7 +1,15 @@
-// Arkadaş şeridi modeli: rozet yalnız EYLEM bekleyen sayılar için, bilgi sayıları
-// caption olarak (bildirim rozeti gibi görünmesin).
+// Arkadaş şeridi modeli: rozet yalnız EYLEM bekleyen sayılar için; bilgi sayısı
+// (arkadaş sayısı) rozet olmaz, "Arkadaşlar" karosunda ikonun yerinde düz rakam olur.
 
-import { BADGE_CAP, buildFriendsBarModel, formatBadge } from "../utils/friendsBarModel";
+import fs from "fs";
+import path from "path";
+import {
+  BADGE_CAP,
+  FRIEND_COUNT_CAP,
+  buildFriendsBarModel,
+  formatBadge,
+  formatFriendCount,
+} from "../utils/friendsBarModel";
 
 describe("formatBadge", () => {
   test("0 ve geçersiz değer rozet üretmez", () => {
@@ -23,21 +31,33 @@ describe("formatBadge", () => {
   });
 });
 
-describe("buildFriendsBarModel", () => {
-  test("arkadaş sayısı ASLA rozet olmaz, caption olur", () => {
-    const m = buildFriendsBarModel({ friendCount: 24 });
-    expect(m.friends.badge).toBe(0);
-    expect(m.friends.caption).toEqual({ key: "friendsMany", count: 24 });
+// Arkadaşlar karosunda sayı İKONUN YERİNDE durur; 0 iken ikon kalır (boş durumda
+// "0" yazmak yerine ikon "arkadaş ekle" çağrısını taşır).
+describe("formatFriendCount", () => {
+  test("0 / geçersiz değer boş metin: çağıran ikonu çizer", () => {
+    expect(formatFriendCount(0)).toBe("");
+    expect(formatFriendCount(-2)).toBe("");
+    expect(formatFriendCount(NaN)).toBe("");
+    expect(formatFriendCount(undefined)).toBe("");
   });
 
-  test("tek arkadaş ayrı anahtar (İngilizce çoğul için), sıfır ayrı anahtar", () => {
-    expect(buildFriendsBarModel({ friendCount: 1 }).friends.caption).toEqual({
-      key: "friendsOne",
-      count: 1,
-    });
-    expect(buildFriendsBarModel({ friendCount: 0 }).friends.caption).toEqual({
-      key: "friendsNone",
-    });
+  test("1..999 sayıyı olduğu gibi yazar", () => {
+    expect(formatFriendCount(1)).toBe("1");
+    expect(formatFriendCount(24)).toBe("24");
+    expect(formatFriendCount(FRIEND_COUNT_CAP)).toBe("999");
+  });
+
+  test("karoya sığması için 999 üstü 999+ olur", () => {
+    expect(formatFriendCount(1000)).toBe("999+");
+    expect(formatFriendCount(54321)).toBe("999+");
+  });
+});
+
+describe("buildFriendsBarModel", () => {
+  test("arkadaş sayısı ASLA rozet olmaz, count olarak döner", () => {
+    const m = buildFriendsBarModel({ friendCount: 24 });
+    expect(m.friends.badge).toBe(0);
+    expect(m.friends.count).toBe(24);
   });
 
   test("okunmamış mesaj ve gelen istek rozet olur", () => {
@@ -46,27 +66,19 @@ describe("buildFriendsBarModel", () => {
     expect(m.requests.badge).toBe(2);
   });
 
-  test("GÖNDERİLEN istek rozet olmaz, caption olur", () => {
-    const m = buildFriendsBarModel({ incomingRequests: 0, outgoingRequests: 4 });
-    expect(m.requests.badge).toBe(0);
-    expect(m.requests.caption).toEqual({ key: "requestsSent", count: 4 });
+  test("Ara ve Arkadaşlar hiçbir koşulda rozet taşımaz", () => {
+    const m = buildFriendsBarModel({ friendCount: 50, unreadMessages: 9, incomingRequests: 9 });
+    expect(m.search.badge).toBe(0);
+    expect(m.friends.badge).toBe(0);
   });
 
-  test("gelen ve giden birlikte: rozet gelen, caption giden", () => {
-    const m = buildFriendsBarModel({ incomingRequests: 1, outgoingRequests: 2 });
-    expect(m.requests.badge).toBe(1);
-    expect(m.requests.caption).toEqual({ key: "requestsSent", count: 2 });
-  });
-
-  test("hiçbir bekleyen yoksa rozet yok, sakin caption'lar", () => {
+  test("hiçbir bekleyen yoksa rozet yok", () => {
     const m = buildFriendsBarModel({});
     expect(m.search.badge).toBe(0);
     expect(m.friends.badge).toBe(0);
+    expect(m.friends.count).toBe(0);
     expect(m.messages.badge).toBe(0);
     expect(m.requests.badge).toBe(0);
-    expect(m.search.caption).toEqual({ key: "searchHint" });
-    expect(m.messages.caption).toEqual({ key: "messagesIdle" });
-    expect(m.requests.caption).toEqual({ key: "requestsIdle" });
   });
 
   test("argümansız çağrı ve bozuk sayılar çökmez", () => {
@@ -75,59 +87,44 @@ describe("buildFriendsBarModel", () => {
       friendCount: -5,
       unreadMessages: NaN,
       incomingRequests: undefined,
-      outgoingRequests: "x",
     });
-    expect(m.friends.caption).toEqual({ key: "friendsNone" });
+    expect(m.friends.count).toBe(0);
     expect(m.messages.badge).toBe(0);
     expect(m.requests.badge).toBe(0);
-    expect(m.requests.caption).toEqual({ key: "requestsIdle" });
+  });
+
+  test("gönderilen istek sayısı şeride taşınmaz (kompakt şerit, eylem istemiyor)", () => {
+    const m = buildFriendsBarModel({ incomingRequests: 0, outgoingRequests: 4 });
+    expect(m.requests.badge).toBe(0);
+    expect(JSON.stringify(m)).not.toContain("4");
   });
 });
 
-// ── Bileşen ↔ model ↔ çeviri paketleri ────────────────────────────────────
-// Model caption'ı bir ANAHTAR olarak döner; metni bileşen üretir. Anahtar adı
-// iki tarafta ayrışırsa kart sessizce boş caption basar; çeviri iki pakette de
-// yoksa EN kullanıcı Türkçe görür. i18nKeys testi bu dosyadaki sabit tabloyu
-// (`i18nText` çağrısı dışı) göremediği için burada ayrıca doğrulanır.
-describe("FriendsActionBar caption tablosu", () => {
-  const fs = require("fs");
-  const path = require("path");
-  const kaynak = fs.readFileSync(
-    path.join(__dirname, "..", "components", "profile", "FriendsActionBar.js"),
-    "utf8",
-  );
-  const girisler = [...kaynak.matchAll(/^ {2}(\w+): \["(autoI18n\.[A-Za-z0-9_]+)"/gm)];
-  const tr = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "..", "translations", "tr.json"), "utf8"),
-  );
-  const en = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "..", "translations", "en.json"), "utf8"),
-  );
+// ── Bileşen ↔ çeviri paketleri ────────────────────────────────────────────
+// Şerit yalnız mevcut ortak anahtarları kullanır; bir etiket anahtarı silinirse
+// ya da yazımı değişirse şerit sessizce Türkçe yedek metne düşer.
+describe("FriendsActionBar etiketleri", () => {
+  const KOK = path.join(__dirname, "..");
+  const kaynak = fs.readFileSync(path.join(KOK, "components", "profile", "FriendsActionBar.js"), "utf8");
+  const tr = JSON.parse(fs.readFileSync(path.join(KOK, "translations", "tr.json"), "utf8"));
+  const en = JSON.parse(fs.readFileSync(path.join(KOK, "translations", "en.json"), "utf8"));
+  const anahtarlar = [...kaynak.matchAll(/i18nText\(\s*"autoI18n\.([A-Za-z0-9_]+)"/g)].map((m) => m[1]);
 
-  test("modelin döndürebileceği her caption anahtarı tabloda var", () => {
-    const tablo = new Set(girisler.map((g) => g[1]));
-    const modelAnahtarlari = new Set();
-    for (const girdi of [
-      { friendCount: 0 },
-      { friendCount: 1 },
-      { friendCount: 5, outgoingRequests: 2 },
-      {},
-    ]) {
-      for (const bolum of Object.values(buildFriendsBarModel(girdi))) {
-        modelAnahtarlari.add(bolum.caption.key);
-      }
-    }
-    for (const anahtar of modelAnahtarlari) {
-      expect(tablo.has(anahtar)).toBe(true);
+  test("dört sekme etiketinin dördü de çeviri anahtarıyla çizilir", () => {
+    expect(new Set(anahtarlar)).toEqual(new Set(["ara_2", "arkadaslar", "mesajlar", "istekler"]));
+  });
+
+  test("etiket anahtarları tr ve en paketlerinde var", () => {
+    for (const ad of anahtarlar) {
+      expect(typeof tr.autoI18n[ad]).toBe("string");
+      expect(typeof en.autoI18n[ad]).toBe("string");
     }
   });
 
-  test("tablodaki her çeviri anahtarı tr ve en paketlerinde var", () => {
-    expect(girisler.length).toBeGreaterThanOrEqual(7);
-    for (const [, , anahtar] of girisler) {
-      const ad = anahtar.replace("autoI18n.", "");
-      expect(typeof tr.autoI18n[ad]).toBe("string");
-      expect(typeof en.autoI18n[ad]).toBe("string");
+  test("kaldırılan bilgi satırı çevirileri artık paketlerde ölü metin olarak durmaz", () => {
+    for (const bundle of [tr, en]) {
+      const kalan = Object.keys(bundle.autoI18n).filter((k) => k.startsWith("friendsbar_"));
+      expect(kalan).toEqual([]);
     }
   });
 });

@@ -43,7 +43,7 @@ export default function GameErrorState({ theme, content, onRetry, onDismiss, onU
         )}
         <TouchableOpacity style={styles.errorSecondaryBtn} onPress={onDismiss} activeOpacity={0.7}>
           <Text style={[styles.errorSecondaryText, { color: theme.text.muted }]}>
-            {i18nText("autoI18n.kaynaklara_don", "Kaynaklara Dön")}
+            {i18nText("autoI18n.geri_don", "Geri Dön")}
           </Text>
         </TouchableOpacity>
       </SafeAreaView>

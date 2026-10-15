@@ -93,17 +93,12 @@ const PosterCard = React.memo(function PosterCard({
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         onPress={() => {
+          const year = String(item.year || 2027);
           const pendingToastMsg =
             mediaType === "tv"
-              ? i18nText("autoI18n.emmy_pending_toast", "{year} yılı Emmy kazananı henüz açıklanmadı.").replace(
-                  "{year}",
-                  String(item.year || 2027),
-                )
-              : i18nText("autoI18n.oscar_pending_toast", "{year} yılı Oscar kazananı henüz açıklanmadı.").replace(
-                  "{year}",
-                  String(item.year || 2027),
-                );
-          toast(pendingToastMsg);
+              ? i18nText("autoI18n.emmy_pending_toast", "{{year}} yılı Emmy kazananı henüz açıklanmadı.", { year })
+              : i18nText("autoI18n.oscar_pending_toast", "{{year}} yılı Oscar kazananı henüz açıklanmadı.", { year });
+          toast.info(pendingToastMsg);
         }}
         style={[styles.item, { width: itemW }]}
       >
@@ -389,7 +384,7 @@ function SeeAllGrid({
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.3} />
+      <ScreenDecor scope="home" iconOpacity={0.3} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         <View style={styles.header}>
           <BackButton absolute={false} />

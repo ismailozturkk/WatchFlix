@@ -58,11 +58,10 @@ import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import {
   createSocialNotification,
   notifyOnComment,
-} from "./notificationsService";
+} from "./socialNotificationsService";
 import {
   trackFirestoreRead,
   trackFirestoreWrite,
-  trackFirestoreDelete,
 } from "./usageTrackerService";
 
 const PAGE = 15;
@@ -515,28 +514,6 @@ export async function addComment(
   return commRef.id;
 }
 
-export async function fetchComments(postId, lastDoc = null) {
-  const base = [orderBy("createdAt", "desc")];
-  let q = query(
-    collection(db, "Posts", postId, "comments"),
-    ...base,
-    limit(20),
-  );
-  if (lastDoc) {
-    q = query(
-      collection(db, "Posts", postId, "comments"),
-      ...base,
-      startAfter(lastDoc),
-      limit(20),
-    );
-  }
-  const snap = await getDocs(q);
-  return {
-    comments: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
-    lastDoc: snap.docs[snap.docs.length - 1] || null,
-  };
-}
-
 export async function deleteComment(postId, commentId, uid = null) {
   // Flat modelde yanıtlar aynı koleksiyonda parentId ile durur. Yalnız üst
   // yorumu silmek yanıtları orphan bırakır (UI'da kaybolur ama commentsCount
@@ -683,14 +660,6 @@ export async function toggleFollow(currentUid, targetUid, currentlyFollowing) {
     batch.update(themRef, { followersCount: increment(1) });
   }
   await batch.commit();
-}
-
-export async function isFollowing(currentUid, targetUid) {
-  if (!currentUid || !targetUid) return false;
-  const snap = await getDoc(
-    doc(db, "Users", currentUid, "following", targetUid),
-  );
-  return snap.exists();
 }
 
 // ─── REPORT ─────────────────────────────────────────────────────────────────

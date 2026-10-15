@@ -1,5 +1,15 @@
+// components/SwitchToggle.js
+//
+// iOS'ta SİSTEM anahtarı (UISwitch): iOS 26+'da Liquid Glass başparmağı ve sistemin
+// kendi yay animasyonu/haptiği otomatik gelir; iOS 18–25'te klasik iOS anahtarı.
+// Diğer platformlarda (Android) aşağıdaki özel animasyonlu anahtar çizilir.
+//
+// Native anahtar sabit 51×31 pt; çağıranların yerleşimi `size`a göre kurulu
+// (genişlik size×1.61, yükseklik size) olduğundan anahtar o kutuya ölçeklenir.
+// Başparmak rengi (`knobColor`) BİLEREK uygulanmaz: renk verilirse sistem cam
+// başparmağı düz renge çevirir.
 import React, { useEffect } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { Platform, Pressable, StyleSheet, Switch, View } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -21,7 +31,58 @@ const PRESS_SPRING = {
   overshootClamping: false,
 };
 
-export default function SwitchToggle({
+// Native UISwitch'in doğal yüksekliği (pt).
+const NATIVE_SWITCH_HEIGHT = 31;
+// `Platform` yoksa (react-native'i kısmen taklit eden testler) özel anahtara düş.
+const USE_NATIVE_SWITCH = Platform?.OS === "ios";
+
+export default function SwitchToggle(props) {
+  return USE_NATIVE_SWITCH ? <NativeSwitchToggle {...props} /> : <AnimatedSwitchToggle {...props} />;
+}
+
+function NativeSwitchToggle({
+  value = false,
+  onValueChange = () => {},
+  size = 36,
+  onColor = "#93ffaae0",
+  offColor = "#cacacaad",
+  disabled = false,
+  locked = false,
+  onLockedPress,
+}) {
+  return (
+    <View
+      style={[
+        styles.nativeBox,
+        // Kilitli anahtar soluk durur ama basılabilir görünmeye devam eder.
+        { width: size * 1.61, height: size, opacity: locked ? 0.6 : 1 },
+      ]}
+    >
+      <Switch
+        value={!!value}
+        onValueChange={onValueChange}
+        disabled={disabled}
+        trackColor={{ false: offColor, true: onColor }}
+        ios_backgroundColor={offColor}
+        style={{ transform: [{ scale: size / NATIVE_SWITCH_HEIGHT }] }}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: !!value, disabled }}
+      />
+      {/* Kilitliyken anahtar OYNAMAZ: dokunuşu şeffaf katman yakalayıp yükseltme
+          sayfasına yollar (özel anahtardaki `locked` davranışının aynısı). */}
+      {locked && !disabled ? (
+        <Pressable
+          onPress={onLockedPress}
+          style={StyleSheet.absoluteFill}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: !!value, disabled }}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function AnimatedSwitchToggle({
   value = false,
   onValueChange = () => {},
   size = 36,
@@ -30,6 +91,8 @@ export default function SwitchToggle({
   knobColor = "#FFF",
   disabledColor = "#757575ad",
   disabled = false,
+  locked = false,
+  onLockedPress,
 }) {
   // Reanimated shared value: represents 0 for off, 1 for on
   const progress = useSharedValue(value ? 1 : 0);
@@ -40,14 +103,22 @@ export default function SwitchToggle({
     progress.value = withSpring(value ? 1 : 0, TOGGLE_SPRING);
   }, [value, progress]);
 
+  // `locked`: özellik bu planda kapalı (ör. Premium'a özel ayar). `disabled`ten
+  // farkı: dokunuş yutulmaz, `onLockedPress`e (yükseltme sayfası) gider. Asıl
+  // önemlisi iyimser animasyon HİÇ başlamaz: aksi halde ebeveyn değeri
+  // değiştirmeyince `value` aynı kalır, yukarıdaki efekt tetiklenmez ve anahtar
+  // görsel olarak "açık"ta takılı kalırdı.
   const toggle = () => {
-    if (!disabled) {
-      const nextValue = !value;
-      // Anında (optimistic) animasyonu başlat
-      progress.value = withSpring(nextValue ? 1 : 0, TOGGLE_SPRING);
-      // Daha sonra state'i güncelle (gecikmeyi önler)
-      onValueChange(nextValue);
+    if (disabled) return;
+    if (locked) {
+      onLockedPress?.();
+      return;
     }
+    const nextValue = !value;
+    // Anında (optimistic) animasyonu başlat
+    progress.value = withSpring(nextValue ? 1 : 0, TOGGLE_SPRING);
+    // Daha sonra state'i güncelle (gecikmeyi önler)
+    onValueChange(nextValue);
   };
 
   const handlePressIn = () => {
@@ -68,7 +139,9 @@ export default function SwitchToggle({
 
     return {
       backgroundColor: disabled ? disabledColor : backgroundColor,
-      opacity: disabled ? 0.72 : 1,
+      // Kilitli anahtar soluk durur ama basılabilir görünmeye devam eder:
+      // dokununca yükseltme sayfası açılıyor, ölü bir düğme değil.
+      opacity: disabled ? 0.72 : locked ? 0.6 : 1,
       transform: [{ scale: 1 - pressed.value * 0.035 }],
     };
   });
@@ -131,6 +204,7 @@ export default function SwitchToggle({
 }
 
 const styles = StyleSheet.create({
+  nativeBox: { alignItems: "center", justifyContent: "center" },
   track: {
     justifyContent: "center",
     padding: 0,

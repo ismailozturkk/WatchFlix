@@ -11,15 +11,21 @@ import React, {
 import Toast from "react-native-toast-message";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import { i18nText } from "../utils/i18nText";
-import { Keys, get, has, set, useStored } from "../services/storage";
+import { Keys, get, set, useStored } from "../services/storage";
+import { usePremiumPlanSnapshot } from "../services/premiumState";
+import { getFeatureLimit } from "../utils/premiumFeatures";
 import { cozumlenmisDil } from "../translations";
 import {
-  DEFAULT_DATA_TYPES,
   normalizeDataTypes,
   setAutoDataCacheEnabled,
   setDataTypes,
 } from "../utils/dataCacheSettings";
 import { normalizeOnboardingGenrePreferences } from "../utils/onboardingPreferences";
+import {
+  normalizeDecorScopes,
+  setDecorEffectVisible,
+  setDecorVisible,
+} from "../utils/decorScopes";
 
 
 const AppSettingsContext = createContext();
@@ -30,6 +36,8 @@ const ContentSettingsContext = createContext();
 const OngoingTvShowsSettingsContext = createContext();
 const ImageQualitySettingsContext = createContext();
 const IconBackgroundSettingsContext = createContext();
+const AmbientBackgroundSettingsContext = createContext();
+const DecorScopeSettingsContext = createContext();
 const AvatarSettingsContext = createContext();
 const ApiSettingsContext = createContext();
 const HapticsSettingsContext = createContext();
@@ -61,14 +69,6 @@ export const IMAGE_QUALITY_PRESETS = {
   good: { poster: "good", backdrop: "good", logo: "good" },
   high: { poster: "high", backdrop: "high", logo: "high" },
   original: { poster: "original", backdrop: "original", logo: "original" },
-};
-
-const LEGACY_TO_LEVEL = {
-  w300: "low",
-  w500: "good",
-  w780: "high",
-  w1280: "high",
-  original: "original",
 };
 
 const RAW_KEY = process.env.EXPO_PUBLIC_API_KEY || "";
@@ -227,6 +227,18 @@ export const AppSettingsProvider = ({ children }) => {
   const [showIconBackground, setShowIconBackground] = useState(() =>
     get(Keys.showIconBackground),
   );
+  // Ambiyans arka planı (bulanık rengârenk süzülen ışık lekeleri). Premium'a
+  // bağlı DEĞİL: kar/ikon deseninden farklı olarak her planda açılabilir.
+  const [showAmbientBackground, setShowAmbientBackground] = useState(() =>
+    get(Keys.showAmbientBackground),
+  );
+  // Kar / ikon / ambiyansın ekran grubu bazında gizlenenleri (genel anahtarların
+  // ÜSTÜNDE bir süzgeç; boş = her yerde). Kayıt bozuksa normalize boşa düşürür.
+  const [decorHidden, setDecorHidden] = useState(() =>
+    normalizeDecorScopes(get(Keys.decorScopes)),
+  );
+  // Ardışık hızlı dokunuşlar state'in güncel hâlinden türesin (kapanış değil).
+  const decorHiddenRef = useRef(decorHidden);
   // İkon arka plan düzeni: "shared" (sabit, her ekranda aynı, performanslı) | "random" (her ekran farklı)
   const [iconBackgroundMode, setIconBackgroundMode] = useState(() =>
     get(Keys.iconBackgroundMode),
@@ -303,11 +315,28 @@ export const AppSettingsProvider = ({ children }) => {
     [imageQualityLevel],
   );
 
-  // Stable setters — only close over React's stable setState refs.
-  const changeShowSnow = useCallback((newVal) => {
-    setShowSnow(newVal);
-    persist(Keys.showSnow, newVal, "ShowSnow kaydedilmedi");
-  }, []);
+  // Kar animasyonu ve ikon arka planı Premium'a özel. Plan Free'ye düşünce
+  // (ya da hiç premium olmayan hesapta eski bir bayrak açık kalmışsa) kayıtlı
+  // tercih SİLİNMEZ; yalnız çizilen değer kapalı olur, abonelik yenilenince geri
+  // gelir — özel tema/yazı tipiyle aynı kural. AppSettingsProvider
+  // PremiumProvider'ın ÜSTÜNDE olduğu için plan React dışı store'dan okunur.
+  const premiumPlan = usePremiumPlanSnapshot();
+  const snowAllowed = Boolean(getFeatureLimit("snow_effect", premiumPlan));
+  const iconBackgroundAllowed = Boolean(getFeatureLimit("icon_background", premiumPlan));
+  const effectiveShowSnow = showSnow && snowAllowed;
+  const effectiveShowIconBackground = showIconBackground && iconBackgroundAllowed;
+
+  // Kar ve ikon arka planı Free'de AÇILAMAZ. Ayarlar ekranı anahtarı kilitleyip
+  // yükseltme sayfasına yönlendiriyor; buradaki kontrol ikinci kapı — başka bir
+  // çağrı yeri eklendiğinde kayıtlı bayrak sessizce açılmasın. Kapatmak serbest.
+  const changeShowSnow = useCallback(
+    (newVal) => {
+      if (newVal && !snowAllowed) return;
+      setShowSnow(newVal);
+      persist(Keys.showSnow, newVal, "ShowSnow kaydedilmedi");
+    },
+    [snowAllowed],
+  );
 
   const changeLanguage = useCallback((newVal) => {
     setSelectedLanguage(newVal);
@@ -372,10 +401,43 @@ export const AppSettingsProvider = ({ children }) => {
     persist(Keys.showOngoingTvShows, newVal, i18nText("autoI18n.devam_eden_diziler_ayari_kaydedilemedi", "Devam eden diziler ayarı kaydedilemedi: "));
   }, []);
 
-  const changeShowIconBackground = useCallback((newVal) => {
-    setShowIconBackground(newVal);
-    persist(Keys.showIconBackground, newVal, IKON_HATASI);
+  const changeShowIconBackground = useCallback(
+    (newVal) => {
+      if (newVal && !iconBackgroundAllowed) return;
+      setShowIconBackground(newVal);
+      persist(Keys.showIconBackground, newVal, IKON_HATASI);
+    },
+    [iconBackgroundAllowed],
+  );
+
+  const changeShowAmbientBackground = useCallback((newVal) => {
+    const enabled = !!newVal;
+    setShowAmbientBackground(enabled);
+    persist(Keys.showAmbientBackground, enabled, GORUNUM_HATASI);
   }, []);
+
+  const applyDecorHidden = useCallback((next) => {
+    decorHiddenRef.current = next;
+    setDecorHidden(next);
+    persist(Keys.decorScopes, next, GORUNUM_HATASI);
+  }, []);
+
+  const changeDecorVisible = useCallback(
+    (effect, scope, visible) =>
+      applyDecorHidden(setDecorVisible(decorHiddenRef.current, effect, scope, !!visible)),
+    [applyDecorHidden],
+  );
+
+  const changeDecorEffectVisible = useCallback(
+    (effect, visible) =>
+      applyDecorHidden(setDecorEffectVisible(decorHiddenRef.current, effect, !!visible)),
+    [applyDecorHidden],
+  );
+
+  const resetDecorScopes = useCallback(
+    () => applyDecorHidden(normalizeDecorScopes(null)),
+    [applyDecorHidden],
+  );
 
   const changeIconBackgroundMode = useCallback((mode) => {
     if (mode !== "shared" && mode !== "random") return;
@@ -551,7 +613,7 @@ export const AppSettingsProvider = ({ children }) => {
 
   const value = useMemo(
     () => ({
-      showSnow,
+      showSnow: effectiveShowSnow,
       changeShowSnow,
       selectedLanguage,
       changeLanguage,
@@ -579,7 +641,7 @@ export const AppSettingsProvider = ({ children }) => {
       changeDataCacheTypes,
     }),
     [
-      showSnow,
+      effectiveShowSnow,
       selectedLanguage,
       selectedTheme,
       selectedAvatar,
@@ -630,10 +692,12 @@ export const AppSettingsProvider = ({ children }) => {
 
   const snowValue = useMemo(
     () => ({
-      showSnow,
+      showSnow: effectiveShowSnow,
+      // Ayarlar ekranı kilit rozetini ve yükseltme akışını buna göre çizer.
+      snowAllowed,
       changeShowSnow,
     }),
-    [showSnow, changeShowSnow],
+    [effectiveShowSnow, snowAllowed, changeShowSnow],
   );
 
   const contentValue = useMemo(
@@ -657,7 +721,8 @@ export const AppSettingsProvider = ({ children }) => {
 
   const iconBackgroundValue = useMemo(
     () => ({
-      showIconBackground,
+      showIconBackground: effectiveShowIconBackground,
+      iconBackgroundAllowed,
       changeShowIconBackground,
       iconBackgroundMode,
       changeIconBackgroundMode,
@@ -665,13 +730,29 @@ export const AppSettingsProvider = ({ children }) => {
       changeIconBackgroundOpacity,
     }),
     [
-      showIconBackground,
+      effectiveShowIconBackground,
+      iconBackgroundAllowed,
       changeShowIconBackground,
       iconBackgroundMode,
       changeIconBackgroundMode,
       iconBackgroundOpacity,
       changeIconBackgroundOpacity,
     ],
+  );
+
+  const ambientBackgroundValue = useMemo(
+    () => ({ showAmbientBackground, changeShowAmbientBackground }),
+    [showAmbientBackground, changeShowAmbientBackground],
+  );
+
+  const decorScopeValue = useMemo(
+    () => ({
+      decorHidden,
+      changeDecorVisible,
+      changeDecorEffectVisible,
+      resetDecorScopes,
+    }),
+    [decorHidden, changeDecorVisible, changeDecorEffectVisible, resetDecorScopes],
   );
 
   const getTmdbUrl = useCallback(
@@ -823,7 +904,15 @@ export const AppSettingsProvider = ({ children }) => {
                                   value={discoveryPreferenceValue}
                                 >
                                   <AppSettingsContext.Provider value={value}>
-                                    {children}
+                                    <AmbientBackgroundSettingsContext.Provider
+                                      value={ambientBackgroundValue}
+                                    >
+                                      <DecorScopeSettingsContext.Provider
+                                        value={decorScopeValue}
+                                      >
+                                        {children}
+                                      </DecorScopeSettingsContext.Provider>
+                                    </AmbientBackgroundSettingsContext.Provider>
                                   </AppSettingsContext.Provider>
                                 </DiscoveryPreferenceSettingsContext.Provider>
                               </StreamingProviderSettingsContext.Provider>
@@ -883,6 +972,15 @@ export const useIconBackgroundSettings = () =>
     "useIconBackgroundSettings",
   );
 
+export const useAmbientBackgroundSettings = () =>
+  useRequiredContext(
+    AmbientBackgroundSettingsContext,
+    "useAmbientBackgroundSettings",
+  );
+
+export const useDecorScopeSettings = () =>
+  useRequiredContext(DecorScopeSettingsContext, "useDecorScopeSettings");
+
 export const useImageQualitySettings = () =>
   useRequiredContext(ImageQualitySettingsContext, "useImageQualitySettings");
 
@@ -918,5 +1016,3 @@ export const useDiscoveryPreferenceSettings = () =>
     DiscoveryPreferenceSettingsContext,
     "useDiscoveryPreferenceSettings",
   );
-
-export const useReminderNotificationSettings = useNotificationSettings;

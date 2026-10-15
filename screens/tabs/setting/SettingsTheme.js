@@ -1,15 +1,17 @@
 // Ayarlar → Görünüm: tema seçici.
 //
 // Tasarım dili:
-//   • Üstte "aktif tema" özet satırı — seçili temanın adı, accent renk küresi
+//   • Üstte "aktif tema" özet satırı — seçili temanın adı, gradyan renk karosu
 //     ve koyu/açık rozeti kaydırmadan görünür (durum görünürlüğü).
-//   • Kartlar mini film-uygulaması önizlemesi taşır: başlık çubuğu, poster
-//     rayı, metin satırları ve alt tab bar — tema gerçek arayüzde nasıl
-//     duracaksa o hissi verir.
-//   • Footer'da temanın gerçek renk swatch üçlüsü + ad; seçim accent halka,
-//     yumuşak büyüme ve check rozetiyle vurgulanır. Kart-kart snap kaydırma
-//     ve seçimde haptic tık.
-import React, { useEffect, useMemo } from "react";
+//   • Kartlar mini film-uygulaması önizlemesi taşır: başlık çubuğu, play
+//     düğmeli öne çıkan banner, poster rayı ve alt tab bar — tema gerçek
+//     arayüzde nasıl duracaksa o hissi verir.
+//   • Footer'da tema adı + gerçek renk swatch üçlüsü; seçim accent halka,
+//     yumuşak büyüme ve check rozetiyle vurgulanır. Basınca yaylı küçülme,
+//     kart-kart snap kaydırma ve seçimde haptic tık.
+//   • Liste açılışta seçili temaya kayar (8 hazır + özel temalarda seçili kart
+//     ekran dışında kalmasın); uçlarda solma, devamı olduğunu söyler.
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View, Text, Pressable, ScrollView } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { useLanguage } from "../../../context/LanguageContext";
@@ -38,9 +40,14 @@ const THEME_CONFIGS = [
   { key: "amber", icon: "film", labelKey: "amberTheme" },
 ];
 
-const CARD_W = 96;
+const CARD_W = 104;
+const MOCK_H = 94;
+const FOOTER_H = 30;
 // halka padding (3×2) + wrapper padding (4×2) + kartlar arası gap (10)
 const SNAP_INTERVAL = CARD_W + 6 + 8 + 10;
+// Kenar solması genişliği ve "uçtayım" eşiği (px).
+const FADE_W = 22;
+const EDGE_EPS = 4;
 
 // Palet açık mı? primary zemininin algısal parlaklığından türetilir
 // (tema tanımlarında ayrı bir mode alanı yok).
@@ -65,6 +72,7 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit, lock
   const p = palette || themes[themeKey] || themes.gray;
 
   const scale = useSharedValue(isSelected ? 1.05 : 1);
+  const pressed = useSharedValue(1);
   const ringWidth = useSharedValue(isSelected ? 2 : 0);
   const checkOpacity = useSharedValue(isSelected ? 1 : 0);
 
@@ -79,7 +87,7 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit, lock
   }, [isSelected]);
 
   const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{ scale: scale.value * pressed.value }],
     borderWidth: ringWidth.value,
   }));
 
@@ -91,6 +99,12 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit, lock
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={() => {
+        pressed.value = withTiming(0.95, { duration: 90 });
+      }}
+      onPressOut={() => {
+        pressed.value = withSpring(1, { mass: 0.4, damping: 12, stiffness: 180 });
+      }}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: isSelected }}
@@ -105,14 +119,6 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit, lock
             locked && styles.cardLocked,
           ]}
         >
-          {/* Üst accent şeridi */}
-          <LinearGradient
-            colors={[p.accent, p.bold || p.accent]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.topStrip}
-          />
-
           {/* Mini uygulama önizlemesi */}
           <View style={[styles.mockup, { backgroundColor: p.primary }]}>
             {/* Başlık çubuğu */}
@@ -122,19 +128,33 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit, lock
               <View style={[styles.mockAvatar, { backgroundColor: p.between }]} />
             </View>
 
-            {/* Poster rayı — film uygulaması hissi */}
-            <View style={styles.mockRail}>
-              <View style={[styles.mockPoster, { backgroundColor: alpha(p.accent, 0.85) }]} />
-              <View style={[styles.mockPoster, { backgroundColor: p.between }]} />
-              <View style={[styles.mockPoster, { backgroundColor: p.secondary }]} />
+            <View style={styles.mockBody}>
+              {/* Öne çıkan banner: accent gradyanı + play düğmesi */}
+              <LinearGradient
+                colors={[p.accent, p.bold || p.accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.mockBanner}
+              >
+                <View style={styles.mockBannerCopy}>
+                  <View style={[styles.mockBannerLine, { width: "78%" }]} />
+                  <View style={[styles.mockBannerLine, styles.mockBannerLineThin, { width: "48%" }]} />
+                </View>
+                <View style={styles.mockPlay}>
+                  <Ionicons name="play" size={7} color="#fff" />
+                </View>
+              </LinearGradient>
+
+              {/* Poster rayı — film uygulaması hissi */}
+              <View style={styles.mockRail}>
+                <View style={[styles.mockPoster, { backgroundColor: alpha(p.accent, 0.85) }]} />
+                <View style={[styles.mockPoster, { backgroundColor: p.between }]} />
+                <View style={[styles.mockPoster, { backgroundColor: p.secondary, borderColor: p.border, borderWidth: 1 }]} />
+                <View style={[styles.mockPoster, { backgroundColor: p.between }]} />
+              </View>
             </View>
 
-            {/* Metin satırı */}
-            <View style={styles.mockLines}>
-              <View style={[styles.mockLine, { backgroundColor: p.between, width: "72%" }]} />
-            </View>
-
-            {/* Alt tab bar */}
+            {/* Alt tab bar: aktif sekme hap şeklinde */}
             <View
               style={[
                 styles.mockTabBar,
@@ -146,20 +166,22 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit, lock
                   key={i}
                   style={[
                     styles.mockTabDot,
-                    { backgroundColor: i === 1 ? p.accent : p.border },
+                    i === 1
+                      ? { backgroundColor: p.accent, width: 15 }
+                      : { backgroundColor: p.border },
                   ]}
                 />
               ))}
             </View>
           </View>
 
-          {/* Footer: gerçek palet swatch'ları + tema adı */}
-          <View style={[styles.cardFooter, { backgroundColor: p.secondary }]}>
-            <View style={styles.swatchRow}>
-              <View style={[styles.swatch, { backgroundColor: p.primary, borderColor: p.border }]} />
-              <View style={[styles.swatch, styles.swatchOverlap, { backgroundColor: p.accent, borderColor: p.secondary }]} />
-              <View style={[styles.swatch, styles.swatchOverlap, { backgroundColor: p.bold || p.between, borderColor: p.secondary }]} />
-            </View>
+          {/* Footer: tema adı + gerçek palet swatch'ları */}
+          <View
+            style={[
+              styles.cardFooter,
+              { backgroundColor: p.secondary, borderTopColor: p.border },
+            ]}
+          >
             <Text
               allowFontScaling={false}
               numberOfLines={1}
@@ -167,6 +189,11 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit, lock
             >
               {label}
             </Text>
+            <View style={styles.swatchRow}>
+              <View style={[styles.swatch, { backgroundColor: p.primary, borderColor: p.border }]} />
+              <View style={[styles.swatch, styles.swatchOverlap, { backgroundColor: p.accent, borderColor: p.secondary }]} />
+              <View style={[styles.swatch, styles.swatchOverlap, { backgroundColor: p.bold || p.between, borderColor: p.secondary }]} />
+            </View>
           </View>
 
           {/* Seçim rozeti */}
@@ -201,6 +228,8 @@ const ThemeCard = ({ themeKey, isSelected, onPress, label, palette, onEdit, lock
 };
 
 /* ── Yeni tema oluştur kartı ────────────────────────────────────────────── */
+// Kesik çizgili çerçeve "buraya yeni bir şey eklenir" der; hazır temalardan
+// bir bakışta ayrılır.
 const AddThemeCard = ({ theme, label, onPress, locked = false }) => (
   <Pressable
     onPress={onPress}
@@ -210,10 +239,10 @@ const AddThemeCard = ({ theme, label, onPress, locked = false }) => (
   >
     <View style={styles.ringPlaceholder}>
       <LinearGradient
-        colors={[alpha(theme.accent, 0.18), alpha(theme.bold || theme.accent, 0.06)]}
+        colors={[alpha(theme.accent, 0.16), alpha(theme.bold || theme.accent, 0.04)]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.addCard, { borderColor: alpha(theme.accent, 0.5) }]}
+        style={[styles.addCard, { borderColor: alpha(theme.accent, 0.55) }]}
       >
         <View style={[styles.addIcon, { backgroundColor: theme.accent }]}>
           <Ionicons name="add" size={20} color="#fff" />
@@ -284,6 +313,43 @@ export default function SettingsTheme() {
 
   const lightActive = isLightPalette(theme);
 
+  /* ── Kaydırma: açılışta seçiliye git + uç solmaları ── */
+  const scrollRef = useRef(null);
+  const viewW = useRef(0);
+  const contentW = useRef(0);
+  const didInitialScroll = useRef(false);
+  const [edge, setEdge] = useState({ start: true, end: false });
+
+  const scrollToSelected = () => {
+    if (didInitialScroll.current || !viewW.current || !contentW.current) return;
+    const keys = [
+      ...THEME_CONFIGS.map((c) => c.key),
+      ...customThemes.map((c) => `custom:${c.id}`),
+    ];
+    const found = keys.indexOf(appliedTheme);
+    // Seçili özel tema listede yoksa özel temalar henüz gelmemiş demektir;
+    // içerik büyüyünce onContentSizeChange yeniden dener.
+    if (found === -1 && String(appliedTheme).startsWith("custom:")) return;
+    didInitialScroll.current = true;
+    const idx = Math.max(0, found);
+    // Seçili kartı soldan ikinci sıraya getir: öncesinden bir kart görünür,
+    // bağlam kopmaz. Hedef snap ızgarasının katı (hizalama bozulmaz).
+    const max = Math.max(0, contentW.current - viewW.current);
+    const x = Math.min(max, Math.max(0, (idx - 1) * SNAP_INTERVAL));
+    if (x > 0) scrollRef.current?.scrollTo({ x, animated: false });
+  };
+
+  const updateEdges = (e) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const start = contentOffset.x <= EDGE_EPS;
+    const end = contentOffset.x + layoutMeasurement.width >= contentSize.width - EDGE_EPS;
+    // Aynı değerde önceki nesneyi döndürmek yeniden çizimi atlar (scroll her karede çağırır).
+    setEdge((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+  };
+
+  const fadeSolid = theme.secondary;
+  const fadeClear = alpha(theme.secondary, 0);
+
   return (
     <View style={styles.container}>
       {/* Aktif tema özeti */}
@@ -292,16 +358,19 @@ export default function SettingsTheme() {
           colors={[theme.accent, theme.bold || theme.accent]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.summaryOrb}
+          style={styles.summaryTile}
         >
-          <Ionicons name="color-palette" size={16} color="#fff" />
+          <Ionicons name="color-palette" size={19} color="#fff" />
         </LinearGradient>
         <View style={{ flex: 1 }}>
           <Text
             allowFontScaling={false}
             style={[styles.summaryKicker, { color: theme.text.muted }]}
           >
-            {i18nText("autoI18n.aktif_tema", "Aktif tema").toUpperCase()}
+            {/* Yerelli büyütme: düz toUpperCase() "Aktif"i "AKTIF" yapıyor (noktalı İ kaybolur) */}
+            {i18nText("autoI18n.aktif_tema", "Aktif tema").toLocaleUpperCase(
+              language === "tr" ? "tr-TR" : "en-US",
+            )}
           </Text>
           <Text
             allowFontScaling={false}
@@ -311,10 +380,10 @@ export default function SettingsTheme() {
             {activeLabel}
           </Text>
         </View>
-        <View style={[styles.modePill, { backgroundColor: alpha(theme.accent, 0.12) }]}>
+        <View style={[styles.modePill, { backgroundColor: alpha(theme.accent, 0.12), borderColor: alpha(theme.accent, 0.22) }]}>
           <Ionicons
             name={lightActive ? "sunny" : "moon"}
-            size={11}
+            size={12}
             color={theme.accent}
           />
           <Text allowFontScaling={false} style={[styles.modePillText, { color: theme.accent }]}>
@@ -325,46 +394,80 @@ export default function SettingsTheme() {
         </View>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        decelerationRate="fast"
-        snapToInterval={SNAP_INTERVAL}
-        snapToAlignment="start"
-      >
-        {THEME_CONFIGS.map((cfg) => (
-          <ThemeCard
-            key={cfg.key}
-            themeKey={cfg.key}
-            isSelected={appliedTheme === cfg.key}
-            onPress={() => handleSelect(cfg.key)}
-            label={t[cfg.labelKey] || cfg.key}
-          />
-        ))}
+      <View>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          decelerationRate="fast"
+          snapToInterval={SNAP_INTERVAL}
+          snapToAlignment="start"
+          scrollEventThrottle={32}
+          onScroll={updateEdges}
+          onLayout={(e) => {
+            viewW.current = e.nativeEvent.layout.width;
+            scrollToSelected();
+          }}
+          onContentSizeChange={(w) => {
+            contentW.current = w;
+            scrollToSelected();
+          }}
+        >
+          {THEME_CONFIGS.map((cfg) => (
+            <ThemeCard
+              key={cfg.key}
+              themeKey={cfg.key}
+              isSelected={appliedTheme === cfg.key}
+              onPress={() => handleSelect(cfg.key)}
+              label={t[cfg.labelKey] || cfg.key}
+            />
+          ))}
 
-        {/* Kaydedilmiş özel temalar — her biri seçilebilir + düzenlenebilir */}
-        {customThemes.map((ct) => (
-          <ThemeCard
-            key={ct.id}
-            themeKey={`custom:${ct.id}`}
-            palette={buildCustomTheme(ct.tokens)}
-            isSelected={appliedTheme === `custom:${ct.id}`}
-            onPress={() => handleSelect(`custom:${ct.id}`)}
-            onEdit={() => openEditor(ct.id)}
-            label={ct.name || i18nText("autoI18n.ozel_tema", "Özel Tema")}
+          {/* Kaydedilmiş özel temalar — her biri seçilebilir + düzenlenebilir */}
+          {customThemes.map((ct) => (
+            <ThemeCard
+              key={ct.id}
+              themeKey={`custom:${ct.id}`}
+              palette={buildCustomTheme(ct.tokens)}
+              isSelected={appliedTheme === `custom:${ct.id}`}
+              onPress={() => handleSelect(`custom:${ct.id}`)}
+              onEdit={() => openEditor(ct.id)}
+              label={ct.name || i18nText("autoI18n.ozel_tema", "Özel Tema")}
+              locked={customLocked}
+            />
+          ))}
+
+          {/* Yeni özel tema oluştur kartı */}
+          <AddThemeCard
+            theme={theme}
+            label={i18nText("autoI18n.ct_olustur", "Tema Oluştur")}
+            onPress={() => openEditor()}
             locked={customLocked}
           />
-        ))}
+        </ScrollView>
 
-        {/* Yeni özel tema oluştur kartı */}
-        <AddThemeCard
-          theme={theme}
-          label={i18nText("autoI18n.ct_olustur", "Tema Oluştur")}
-          onPress={() => openEditor()}
-          locked={customLocked}
-        />
-      </ScrollView>
+        {/* Uç solmaları: listenin devam ettiğini söyler, dokunuşu engellemez */}
+        {edge.start ? null : (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[fadeSolid, fadeClear]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.fade, styles.fadeLeft]}
+          />
+        )}
+        {edge.end ? null : (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[fadeClear, fadeSolid]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.fade, styles.fadeRight]}
+          />
+        )}
+      </View>
+
       {lockedCustomSelected ? (
         <Text
           allowFontScaling={false}
@@ -390,37 +493,40 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 0,
+    paddingTop: 14,
+    paddingBottom: 2,
   },
-  summaryOrb: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  summaryTile: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
   },
   summaryKicker: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "800",
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
   summaryName: {
-    fontSize: 13.5,
+    fontSize: 16,
     fontWeight: "800",
+    letterSpacing: -0.2,
+    marginTop: 1,
   },
   modePill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 999,
+    borderWidth: 1,
   },
   modePillText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: "800",
   },
 
@@ -431,12 +537,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
+  /* Uç solmaları */
+  fade: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: FADE_W,
+  },
+  fadeLeft: { left: 0 },
+  fadeRight: { right: 0 },
+
   /* Kart */
   cardWrapper: {
     padding: 4, // scale animasyonu için taşma payı
   },
   ring: {
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 3,
   },
   ringPlaceholder: {
@@ -444,37 +560,27 @@ const styles = StyleSheet.create({
   },
   card: {
     width: CARD_W,
-    borderRadius: 13,
+    borderRadius: 15,
     borderWidth: 1,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.28,
-    shadowRadius: 5,
-    elevation: 4,
-  },
-
-  /* Üst accent şeridi */
-  topStrip: {
-    height: 3,
-    width: "100%",
+    elevation: 3,
   },
 
   /* Mini uygulama önizlemesi */
   mockup: {
-    height: 86,
+    height: MOCK_H,
     overflow: "hidden",
   },
   mockNav: {
-    height: 16,
+    height: 18,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 7,
     gap: 4,
   },
   mockNavDot: {
-    width: 5,
-    height: 5,
+    width: 6,
+    height: 6,
     borderRadius: 3,
   },
   mockNavLine: {
@@ -483,31 +589,59 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   mockAvatar: {
-    width: 7,
-    height: 7,
+    width: 8,
+    height: 8,
     borderRadius: 4,
+  },
+  mockBody: {
+    paddingHorizontal: 7,
+    paddingTop: 6,
+    gap: 5,
+  },
+  mockBanner: {
+    height: 28,
+    borderRadius: 7,
+    paddingHorizontal: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  mockBannerCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  mockBannerLine: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.78)",
+  },
+  mockBannerLineThin: {
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.5)",
+  },
+  mockPlay: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.28)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 1, // üçgenin optik ortası
   },
   mockRail: {
     flexDirection: "row",
     gap: 4,
-    paddingHorizontal: 7,
-    paddingTop: 6,
   },
   mockPoster: {
-    width: 22,
-    height: 30,
+    flex: 1,
+    height: 20,
     borderRadius: 4,
   },
-  mockLines: {
-    flex: 1,
-    paddingHorizontal: 7,
-    paddingTop: 6,
-  },
-  mockLine: {
-    height: 5,
-    borderRadius: 3,
-  },
   mockTabBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     height: 17,
     flexDirection: "row",
     justifyContent: "space-evenly",
@@ -520,54 +654,52 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 
-  /* Footer: swatch üçlüsü + ad */
+  /* Footer: ad + swatch üçlüsü */
   cardFooter: {
+    height: FOOTER_H,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingHorizontal: 9,
+    borderTopWidth: 1,
   },
   swatchRow: {
     flexDirection: "row",
     alignItems: "center",
   },
   swatch: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
     borderWidth: 1,
   },
   swatchOverlap: {
-    marginLeft: -3,
+    marginLeft: -4,
   },
   cardLabel: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: "700",
     flex: 1,
   },
 
-  /* Yeni tema kartı — yükseklik = şerit 3 + mockup 86 + footer ~22 */
+  /* Yeni tema kartı — yükseklik = mockup + footer + kart kenarlığı (2) */
   addCard: {
     width: CARD_W,
-    height: 111,
-    borderRadius: 13,
-    borderWidth: 1.2,
+    height: MOCK_H + FOOTER_H + 2,
+    borderRadius: 15,
+    borderWidth: 1.4,
+    borderStyle: "dashed",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
+    gap: 8,
     paddingHorizontal: 8,
   },
   addIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.28,
-    shadowRadius: 3,
     elevation: 3,
   },
   addLabel: {
@@ -582,7 +714,7 @@ const styles = StyleSheet.create({
   },
   lockBadge: {
     position: "absolute",
-    bottom: 34,
+    bottom: FOOTER_H + 6,
     right: 6,
     width: 19,
     height: 19,
@@ -629,10 +761,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.85)",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
     elevation: 3,
   },
 });

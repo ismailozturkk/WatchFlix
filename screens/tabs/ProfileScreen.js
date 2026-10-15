@@ -1,18 +1,16 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Animated,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
+import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage } from "../../context/LanguageContext";
-import AppIcon from "../../components/AppIcon";
 import ProfileLists from "./profile/ProfileLists";
 import { useAuth } from "../../context/AuthContext";
 import { useFriends } from "../../context/FriendsContext";
@@ -39,16 +37,20 @@ import { i18nText } from "../../utils/i18nText";
 import * as Haptics from "../../services/hapticsService";
 import ProfileAvatarPickerModal from "../../components/profile/ProfileAvatarPickerModal";
 import AvatarPreviewModal from "../../components/profile/AvatarPreviewModal";
-import IdentityBadgesRow from "../../components/badges/IdentityBadgesRow";
+import ProfileIdentityBlock from "../../components/profile/ProfileIdentityBlock";
 import WatchBadgeStrip from "../../components/profile/WatchBadgeStrip";
 import { useWatchProgressContext } from "../../context/WatchProgressContext";
 import { odulAdi, odulBasligi } from "../../components/badges/badgeMeta";
 import { PERDE_ADLARI } from "../../utils/watchScoring";
 import { toast } from "../../components/AppToast";
-import { appAlert } from "../../components/AppAlert";
-import StoryExportModal from "../../components/storyShare/StoryExportModal";
+import ProfileStoryModal from "../../components/storyShare/ProfileStoryModal";
 import { getIdentityBadges } from "../../components/badges/badgeCatalog";
 import { usePremium } from "../../context/PremiumContext";
+
+// iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için kaydırma
+// görünümünü sekme ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js).
+// Modül kapsamında: render içinde kurulursa içerik her render'da sökülür.
+const MarkedScrollView = markTabScroll(ScrollView);
 
 const ProfileScreen = ({ navigation }) => {
   const { contentBottom } = useTabBarLayout();
@@ -58,11 +60,11 @@ const ProfileScreen = ({ navigation }) => {
   const { user } = useAuth();
   const { profile } = useUserProfile();
   const { isPremium, isUnlimited } = usePremium();
-  const identityBadges = getIdentityBadges({
-    founder: Boolean(profile?.badges?.founder),
-    isPremium,
-    isUnlimited,
-  });
+  const isFounder = Boolean(profile?.badges?.founder);
+  const identityBadges = useMemo(
+    () => getIdentityBadges({ founder: isFounder, isPremium, isUnlimited }),
+    [isFounder, isPremium, isUnlimited]
+  );
   const profileUsername = String(profile?.username || "")
     .trim()
     .replace(/^@/, "");
@@ -80,7 +82,6 @@ const ProfileScreen = ({ navigation }) => {
     watchedMovieCount,
     totalWatchedTime,
     watchedTvCount,
-    totalSeasonsCount,
     totalEpisodesCount,
     totalWatchedTimeTv,
     totalMinutesTime,
@@ -91,13 +92,9 @@ const ProfileScreen = ({ navigation }) => {
     handleTimeClick,
     formatTotalDurationTime,
     borderColorTv,
-    shadowColorTv,
     borderColorMovie,
-    shadowColorMovie,
     rankNameTv,
-    rankLevelTv,
     rankNameMovie,
-    rankLevelMovie,
     // Film+dizi dakikalarının TOPLAMINDAN türeyen birleşik renk — avatarın
     // etrafındaki TEK halkayı besler.
     borderColor,
@@ -154,33 +151,8 @@ const ProfileScreen = ({ navigation }) => {
     kutlamayiKapat();
   }, [kutlama, kutlamayiKapat, language]);
 
-  const convertTimestampToDate = (timestamp) => {
-    const date = new Date(Number(timestamp)); // Timestamp'i Date objesine çevir
-    return date.toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-  };
 
-  const scaleAnimTv = useRef(new Animated.Value(1)).current;
-  const scaleAnimMovie = useRef(new Animated.Value(1)).current;
 
-  const onPressIn = (item) => {
-    Animated.timing(item === "tv" ? scaleAnimTv : scaleAnimMovie, {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (item) => {
-    Animated.timing(item === "tv" ? scaleAnimTv : scaleAnimMovie, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
   const props = {
     activeStrokeWidth: 11,
     inActiveStrokeWidth: 11,
@@ -201,16 +173,18 @@ const ProfileScreen = ({ navigation }) => {
     friendsState?.incomingRequests?.length ??
     profile?.pendingRequestsInCount ??
     0;
-  const sendCount =
-    friendsState?.outgoingRequests?.length ??
-    profile?.pendingRequestsOutCount ??
-    0;
 
   // Mesajlar butonundaki okunmamış rozeti — gelen kutusu index'indeki
   // unreadCount toplamı (ChatScreen sohbet açılınca sıfırlar). Tek listener
   // context/UnreadMessagesContext'te; uygulama simgesi rozeti de oradan besleniyor.
   const { unreadMessages } = useUnreadMessages();
 
+  const goEditProfile = useCallback(
+    () => navigation.navigate("EditProfileScreen"),
+    [navigation]
+  );
+  const openStoryExport = useCallback(() => setShowStoryExport(true), []);
+  const closeStoryExport = useCallback(() => setShowStoryExport(false), []);
   // Şerit kartları memo'lu; yönlendirme referanslarını sabit tutarak ilgisiz
   // profil render'larında dört kartı yeniden çizdirmiyoruz.
   const goSearch = useCallback(
@@ -249,9 +223,9 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
-      <ScreenDecor iconOpacity={0.3} />
+      <ScreenDecor scope="profile" iconOpacity={0.3} />
 
-      <ScrollView
+      <MarkedScrollView
         contentContainerStyle={{ paddingBottom: contentBottom }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -314,122 +288,22 @@ const ProfileScreen = ({ navigation }) => {
                 </View>
               )}
             </TouchableOpacity>
-            <View style={styles.profileInfo}>
-              {/* Avatarın yan tarafında, ismin üst sağ köşesindeki butonlar */}
-              <View style={styles.actionsRow}>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate("EditProfileScreen")}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={i18nText(
-                    "autoI18n.profili_duzenle",
-                    "Profili Düzenle"
-                  )}
-                  style={[
-                    styles.actionBtn,
-                    {
-                      backgroundColor: theme.accent + "18",
-                      borderColor: theme.accent + "66",
-                    },
-                  ]}
-                >
-                  <AppIcon
-                    family="Ionicons"
-                    name="create-outline"
-                    size={16}
-                    color={theme.accent}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setShowStoryExport(true)}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel="Hikayede Paylaş"
-                  style={[
-                    styles.actionBtn,
-                    {
-                      backgroundColor: theme.accent + "18",
-                      borderColor: theme.accent + "66",
-                    },
-                  ]}
-                >
-                  <AppIcon
-                    family="Ionicons"
-                    name="share-social-outline"
-                    size={16}
-                    color={theme.accent}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.profileNameRow}>
-                <View style={styles.profileNameBlock}>
-                  <Text
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                    // Ekranın en büyük metni olsa da bu kullanıcının kendi adı;
-                    // geniş bir başlık fontu tek satırda hemen kırpılır.
-                    fontRole="body"
-                    style={[styles.textName, { color: theme.text.primary }]}
-                  >
-                    {profile?.displayName || user?.displayName}
-                  </Text>
-                  {!!profileUsername && (
-                    <Text
-                      allowFontScaling={false}
-                      numberOfLines={1}
-                      style={[styles.textUsername, { color: theme.text.muted }]}
-                    >
-                      @{profileUsername}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              <IdentityBadgesRow
-                badges={identityBadges}
-                theme={theme}
-                language={language}
-              />
-              <View style={styles.profileMetaRow}>
-                <Text
-                  allowFontScaling={false}
-                  numberOfLines={1}
-                  style={[styles.textEmail, { color: theme.text.primary }]}
-                >
-                  {user?.email}
-                </Text>
-
-                <AppIcon
-                  family="MaterialIcons"
-                  name="verified"
-                  size={14}
-                  color={
-                    user?.emailVerified
-                      ? "rgb(29, 161, 242)"
-                      : "rgb(229, 20, 0)"
-                  }
-                />
-              </View>
-              {/* user, çıkış anındaki render'da null olabilir — doğrudan erişim çökertir */}
-              {!!user && !user.emailVerified && (
-                <Text
-                  style={[styles.textVerified, { color: "rgb(229, 20, 0)" }]}
-                >
-                  {t.profileScreen.emailVerified}
-                </Text>
-              )}
-              {user && user.metadata && (
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.textDate, { color: theme.text.primary }]}
-                >
-                  {i18nText("autoI18n.katilma_tarihi", "Katılma tarihi:")}{" "}
-                  {convertTimestampToDate(user.metadata.createdAt)}
-                </Text>
-              )}
-            </View>
+            <ProfileIdentityBlock
+              theme={theme}
+              language={language}
+              displayName={profile?.displayName || user?.displayName}
+              username={profileUsername}
+              badges={identityBadges}
+              email={user?.email}
+              emailVerified={Boolean(user?.emailVerified)}
+              // user, çıkış anındaki render'da null olabilir — doğrudan erişim çökertir
+              verifyHint={
+                user && !user.emailVerified ? t.profileScreen.emailVerified : ""
+              }
+              joinedAt={user?.metadata?.createdAt}
+              onEdit={goEditProfile}
+              onShare={openStoryExport}
+            />
           </View>
           <View style={styles.profileBadgeStrip}>
             <WatchBadgeStrip
@@ -444,7 +318,6 @@ const ProfileScreen = ({ navigation }) => {
             friendCount={friendCount}
             unreadMessages={unreadMessages}
             incomingRequests={receivedCount}
-            outgoingRequests={sendCount}
             onSearch={goSearch}
             onFriends={goFriends}
             onMessages={goMessages}
@@ -477,11 +350,6 @@ const ProfileScreen = ({ navigation }) => {
           />
           <ProfileLists navigation={navigation} />
           <MyActivityButton navigation={navigation} />
-          {/* Takvim widget'ı şimdilik gizli — takvime giriş RemindersPreviewButton
-              başlığındaki takvim butonundan. Geri açmak için aşağıdaki satırın
-              yorumunu kaldır VE dosyanın başına şu import'u geri ekle:
-              import CalendarWidget from "../../components/profile/CalendarWidget"; */}
-          {/* <CalendarWidget navigation={navigation} /> */}
           <RemindersPreviewButton navigation={navigation} />
           <NotesCard navigation={navigation} />
           <ProfileAvatarPickerModal
@@ -499,14 +367,19 @@ const ProfileScreen = ({ navigation }) => {
             displayName={profile?.name || user?.displayName || ""}
             username={profileUsername}
           />
-          <StoryExportModal
+          <ProfileStoryModal
             visible={showStoryExport}
-            onClose={() => setShowStoryExport(false)}
-            user={user}
-            topMovies={[]}
+            onClose={closeStoryExport}
+            name={profile?.displayName || user?.displayName || ""}
+            username={profileUsername}
+            avatar={avatar}
+            isCustomPhoto={selectAvatarIndex === -1}
+            badges={identityBadges}
+            bio={profile?.bio}
+            joinedAt={user?.metadata?.createdAt || user?.metadata?.creationTime}
           />
         </SafeAreaView>
-      </ScrollView>
+      </MarkedScrollView>
 
     </View>
   );
@@ -529,43 +402,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  actionsRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 6,
-  },
-  actionBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  textName: {
-    flexShrink: 1,
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#000",
-  },
-  profileInfo: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "column",
-  },
-  profileNameRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-  },
-  profileNameBlock: { flex: 1, minWidth: 0 },
-  textUsername: {
-    marginTop: 1,
-    fontSize: 13,
-    fontWeight: "600",
-  },
   editProfileButton: {
     width: 34,
     height: 34,
@@ -573,28 +409,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  profileMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    minWidth: 0,
-  },
-  textEmail: {
-    flexShrink: 1,
-    fontSize: 14,
-    gap: 10,
-    color: "#000",
-  },
-  textVerified: {
-    fontSize: 10,
-    gap: 10,
-    color: "#000",
-  },
-  textDate: {
-    fontSize: 12,
-    gap: 10,
-    color: "#000",
   },
   profilImage: {
     width: "100%",

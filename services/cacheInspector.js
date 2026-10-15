@@ -26,6 +26,7 @@ import { File, Directory, Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import * as cacheStore from "../utils/cacheStore";
 import { DATACACHE_DIRNAME } from "../utils/cacheStore";
+import { resyncUserData } from "./userData";
 import * as petCache from "./petCache";
 import { PETS_DIRNAME } from "./petCache";
 import { clearCachedByPrefix, cachedByteSize } from "../utils/apiCache";
@@ -117,9 +118,15 @@ export async function getBreakdown() {
     { id: "tvContent", bytes: kv.tv },
     { id: "movieContent", bytes: kv.movie },
     { id: "posts", bytes: kv.posts },
-    { id: "lists", bytes: (dc.lists || 0) + kv.listStatus },
-    { id: "reminders", bytes: dc.reminders || 0 },
-    { id: "notes", bytes: dc.notes || 0 },
+    // Notlar/hatırlatıcılar/listeler KALICI dizinde (utils/cacheStore
+    // DURABLE_NAMESPACES): `namespaceSize` hem yeni konumu hem henüz
+    // taşınmamış eski önbellek konumunu sayar.
+    { id: "lists", bytes: cacheStore.namespaceSize("lists") + kv.listStatus },
+    { id: "reminders", bytes: cacheStore.namespaceSize("reminders") },
+    {
+      id: "notes",
+      bytes: cacheStore.namespaceSize("notes") + cacheStore.namespaceSize("mediaNotes"),
+    },
     { id: "profile", bytes: dc.profile || 0 },
     { id: "activity", bytes: (dc.activity || 0) + kv.activity },
     { id: "networkData", bytes: (dc.network || 0) + (dc.tmdbLookup || 0) },
@@ -157,11 +164,15 @@ export async function clearCategory(id) {
       cacheStore.clearNamespace("lists");
       removeKey(Keys.listStatus, { uid });
       break;
+    // Notlar ve hatırlatıcılar yerel-öncelikli: cihazdaki kopya KAYNAK. Burada
+    // "temizle" kopyayı SİLMEZ — buluttan yeniden kurar (bekleyen yerel
+    // değişiklikler korunur; çevrimdışıysa hiçbir şey yapmaz). Bkz.
+    // docs/mimari/YEREL_ONCELIKLI_VERI_KATMANI.md
     case "reminders":
-      cacheStore.clearNamespace("reminders");
+      if (uid) await resyncUserData(uid, ["reminders"]);
       break;
     case "notes":
-      cacheStore.clearNamespace("notes");
+      if (uid) await resyncUserData(uid, ["notes", "mediaNotes"]);
       break;
     case "profile":
       cacheStore.clearNamespace("profile");

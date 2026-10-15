@@ -39,7 +39,7 @@ export const PREMIUM_PLAN_DISPLAY_NAME = Object.freeze({
 });
 
 export const AI_PLAN_LIMITS = Object.freeze({
-  [PREMIUM_PLAN.FREE]: Object.freeze({ daily: 5, monthly: 30 }),
+  [PREMIUM_PLAN.FREE]: Object.freeze({ daily: 3, monthly: 30 }),
   [PREMIUM_PLAN.PREMIUM]: Object.freeze({ daily: 20, monthly: 300 }),
   [PREMIUM_PLAN.UNLIMITED]: Object.freeze({ daily: 50, monthly: 900 }),
 });

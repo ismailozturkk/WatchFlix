@@ -50,6 +50,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import Comment from "@components/Comment"; // kendi Comment bileşenin
 import { useTheme } from "@context/ThemeContext";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
 import useAdaptiveSheetHeight from "@hooks/useAdaptiveSheetHeight";
@@ -68,9 +69,6 @@ const SHEET_MAX_H = SCREEN_H * 0.94;
 const SHEET_MIN_H = SCREEN_H * 0.5;
 
 // ── Renk sabitleri ───────────────────────────────────────
-const ACCENT = "#6C63FF";
-const SHEET_BG = "#0E0E1C";
-const BORDER = "rgba(255,255,255,0.07)";
 
 export default function CommentSheetModal({
   visible,
@@ -87,7 +85,7 @@ export default function CommentSheetModal({
   // Başlıkta film/dizi adı yerine gösterilecek metin (ör. "S2 · B5 — Ozymandias")
   subtitle = null,
 }) {
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -307,19 +305,15 @@ export default function CommentSheetModal({
                 {i18nText("comments", "Yorumlar")}
               </Text>
             </View>
-            <TouchableOpacity
-              style={[
-                styles.closeBtn,
-                {
-                  backgroundColor: theme.between,
-                  borderColor: theme.border,
-                },
-              ]}
+            <GlassCloseButton
+              size={32}
+              fallbackRadius={16}
+              color={theme.text.primary}
+              backgroundColor={theme.between}
+              borderColor={theme.border}
+              hitSlop={10}
               onPress={handleClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={18} color={theme.text.primary} />
-            </TouchableOpacity>
+            />
           </View>
         </View>
 
@@ -364,7 +358,7 @@ const styles = StyleSheet.create({
   // sheet SONRA render edildiğinden (ve elevation'ı olduğundan) dokunuşları
   // kendisi yakalar, buraya yalnız dışındaki boşluk kalır.
   backdropTouchable: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
 
   // ── Sheet ──────────────────────────────────────────────
@@ -490,16 +484,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#fff",
     letterSpacing: 0.2,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-    justifyContent: "center",
-    alignItems: "center",
   },
 
   // Ayırıcı

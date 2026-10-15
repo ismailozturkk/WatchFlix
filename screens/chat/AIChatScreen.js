@@ -1,4 +1,5 @@
-import ComposerBlur, { ComposerBlurTarget, useComposerBlurTarget } from "../../components/chat/ComposerBlur";
+import ComposerBlur, { COMPOSER_GLASS_PILL_STYLE, ComposerBlurTarget, useComposerBlurTarget } from "../../components/chat/ComposerBlur";
+import { useLiquidGlass } from "../../services/liquidGlass";
 // screens/chat/AIChatScreen.js
 //
 // CineMatch Pro — yapılandırılmış (JSON) AI cevap + zengin kart sohbeti.
@@ -83,6 +84,7 @@ import {
 } from "@services/aiCineStore";
 import ChatBubble from "@components/AICineCards";
 import { i18nText } from "@utils/i18nText";
+import GlassIconButton from "@components/common/GlassIconButton";
 import { appAlert } from "@components/AppAlert";
 import { ONBOARDING_GENRES } from "@utils/onboardingPreferences";
 import { AI_PLAN_LIMITS } from "@utils/premium";
@@ -270,6 +272,7 @@ export default function AIChatScreen({
   const scrollRef = useRef(null);
   const [composerHeight, setComposerHeight] = useState(76);
   const composerBlur = useComposerBlurTarget();
+  const glass = useLiquidGlass();
   const scrollToEndSoon = useCallback(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
   }, []);
@@ -847,9 +850,15 @@ export default function AIChatScreen({
         >
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: theme.border }]}>
-            <TouchableOpacity onPress={handleClose} hitSlop={8} style={styles.headerBtn}>
-              <Ionicons name="chevron-down" size={26} color={theme.text.primary} />
-            </TouchableOpacity>
+            <GlassIconButton
+              variant="plain"
+              icon="chevron-down"
+              iconSize={26}
+              size={36}
+              color={theme.text.primary}
+              accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+              onPress={handleClose}
+            />
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
               <LottieView
                 style={{ width: 28, height: 28 }}
@@ -868,25 +877,42 @@ export default function AIChatScreen({
             </View>
             {view === "chat" ? (
               <>
-                <TouchableOpacity onPress={() => setSettingsVisible((v) => !v)} hitSlop={8} style={styles.headerBtn}>
-                  <Ionicons
-                    name="options-outline"
-                    size={22}
-                    color={settingsVisible ? theme.bold : theme.text.between}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={newChat} hitSlop={8} style={styles.headerBtn}>
+                <GlassIconButton
+                  variant="plain"
+                  icon="options-outline"
+                  iconSize={22}
+                  size={36}
+                  color={settingsVisible ? theme.bold : theme.text.between}
+                  accessibilityLabel={i18nText("autoI18n.filtrele", "Filtrele")}
+                  onPress={() => setSettingsVisible((v) => !v)}
+                />
+                <GlassIconButton
+                  variant="plain"
+                  size={36}
+                  accessibilityLabel={i18nText("autoI18n.yeni_sohbet", "Yeni Sohbet")}
+                  onPress={newChat}
+                >
                   <MaterialCommunityIcons name="chat-plus-outline" size={22} color={theme.text.between} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setView("history")} hitSlop={8} style={styles.headerBtn}>
+                </GlassIconButton>
+                <GlassIconButton
+                  variant="plain"
+                  size={36}
+                  accessibilityLabel={i18nText("autoI18n.gecmis", "Geçmiş")}
+                  onPress={() => setView("history")}
+                >
                   <MaterialIcons name="history" size={24} color={theme.text.between} />
-                </TouchableOpacity>
+                </GlassIconButton>
               </>
             ) : (
               conversations.length > 0 && (
-                <TouchableOpacity onPress={clearAll} hitSlop={8} style={styles.headerBtn}>
+                <GlassIconButton
+                  variant="plain"
+                  size={36}
+                  accessibilityLabel={i18nText("autoI18n.temizle", "Temizle")}
+                  onPress={clearAll}
+                >
                   <MaterialCommunityIcons name="delete-sweep-outline" size={22} color={theme.text.between} />
-                </TouchableOpacity>
+                </GlassIconButton>
               )
             )}
           </View>
@@ -895,9 +921,15 @@ export default function AIChatScreen({
             // ── Geçmiş ──
             <View style={{ flex: 1 }}>
               <View style={[styles.header, { borderBottomColor: theme.border }]}>
-                <TouchableOpacity onPress={() => setView("chat")} hitSlop={8} style={styles.headerBtn}>
-                  <Ionicons name="chevron-back" size={24} color={theme.text.primary} />
-                </TouchableOpacity>
+                <GlassIconButton
+                  variant="plain"
+                  icon="chevron-back"
+                  iconSize={24}
+                  size={36}
+                  color={theme.text.primary}
+                  accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
+                  onPress={() => setView("chat")}
+                />
                 <Text style={[styles.headerTitle, { color: theme.text.primary, flex: 1, marginLeft: 4 }]}>
                   {t?.AICineChat?.history || "Sohbetler"}
                 </Text>
@@ -1248,6 +1280,8 @@ export default function AIChatScreen({
                   style={[
                     styles.composerPill,
                     { backgroundColor: "transparent", borderColor: inputBorderColor },
+                    // Cam yolunda çerçeve halkası kalkar (camın arkasında ikinci hap gibi görünüyordu).
+                    glass && COMPOSER_GLASS_PILL_STYLE,
                   ]}
                 >
                   <ComposerBlur target={blurReady ? composerBlur.target : null} theme={theme} />
@@ -1315,7 +1349,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerBtn: { paddingHorizontal: 4, paddingVertical: 2 },
   headerCopy: { flex: 1, minWidth: 0 },
   headerTitle: { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
   headerSub: { fontSize: 11, marginTop: -1 },

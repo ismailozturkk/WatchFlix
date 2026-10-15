@@ -2,7 +2,7 @@
 //
 // "Verileri indir" tür seçiminin SUNUM tarafı (etiket + ikon + renk).
 // Kimlikler `utils/dataCacheSettings.DATA_CACHE_CATEGORIES` ile birebir aynıdır;
-// mantık orada, görünüm burada. Ayarlar > Genel (seçim) ve İzinler & Veriler
+// mantık orada, görünüm burada. Ayarlar > Veri ve depolama (seçim) ve İzinler & Veriler
 // (özet) aynı listeyi kullanır.
 //
 // Etiketler her çağrıda üretilir — dil değişince yeniden hesaplansın diye

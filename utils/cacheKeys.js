@@ -5,6 +5,12 @@
 // veriyi ekranlar birebir aynı anahtardan okur.
 //
 // Her üretici [namespace, key] döner → cacheStore.setJSON(...key(...), data).
+//
+// KALICI AD ALANLARI (utils/cacheStore.js DURABLE_NAMESPACES): notes, mediaNotes,
+// reminders, lists. Bu anahtarların dosyaları sistemin silebileceği önbellek
+// klasöründe değil belge dizininde durur — kullanıcının kendi verisinin yerel
+// kopyası KAYNAKTIR (bkz. services/userData, docs/mimari/YEREL_ONCELIKLI_VERI_KATMANI.md).
+// Anahtar şekli ve disk biçimi (dizi/harita) değişmez.
 
 export const cacheKeys = {
   profile: (uid) => ["profile", uid],                  // obje: { uid, ...userDoc }

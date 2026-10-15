@@ -21,7 +21,7 @@ import ListBadges from "../../components/ListBadges";
 import { RatingBadge } from "../../components/PosterInfoBadges";
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
 // Sarmalayıcı yüksekliği poster yüksekliğinden türetilir (ekran yüksekliğinden
 // değil); böylece farklı en/boy oranlı cihazlarda posterin altı kesilmez.
@@ -195,7 +195,7 @@ export default function TvShowsTrends({ navigation }) {
   const focusedPos = React.useRef(new Animated.Value(0)).current;
   const { t } = useLanguage();
   const { theme } = useTheme();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const {
     seriesTrend,
     loadingTrend,
@@ -390,12 +390,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   categoryRail: { flex: 1, justifyContent: "center" },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginLeft: 15,
-    marginBottom: 15,
-  },
   categoriesList: {
     paddingLeft: 15,
     paddingRight: 4,
@@ -424,19 +418,4 @@ const styles = StyleSheet.create({
     bottom: 8,
   },
   trendListBadges: { position: "absolute", left: 8, bottom: 8 },
-  title: {
-    textAlign: "center",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 5,
-  },
-  starImage: {
-    width: 12,
-    height: 12,
-    marginRight: 1,
-  },
 });

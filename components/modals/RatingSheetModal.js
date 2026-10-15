@@ -37,6 +37,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Toast from "react-native-toast-message";
 import { useTheme } from "@context/ThemeContext";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useAuth } from "@context/AuthContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
@@ -263,13 +264,15 @@ export default function RatingSheetModal({
               {title}
             </Text>
           </View>
-          <TouchableOpacity
-            style={[styles.closeBtn, { backgroundColor: alpha(theme.text.primary, 0.07), borderColor: theme.border }]}
+          <GlassCloseButton
+            size={32}
+            fallbackRadius={16}
+            color={theme.text.secondary}
+            backgroundColor={alpha(theme.text.primary, 0.07)}
+            borderColor={theme.border}
+            hitSlop={10}
             onPress={handleClose}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="close" size={18} color={theme.text.secondary} />
-          </TouchableOpacity>
+          />
         </View>
 
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -451,14 +454,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   mediaTitle: { flex: 1, fontSize: 12, fontWeight: "600" },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   divider: { height: StyleSheet.hairlineWidth },
 
   center: { flex: 1, alignItems: "center", justifyContent: "center" },

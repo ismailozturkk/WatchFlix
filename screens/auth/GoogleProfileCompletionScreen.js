@@ -32,7 +32,6 @@ import {
 } from "../../services/userService";
 import {
   cancelGoogleRegistration,
-  GOOGLE_PROFILE_PENDING_KEY,
 } from "../../services/googleAuthService";
 import { cancelAppleRegistration } from "../../services/appleAuthService";
 import { randomAvatarIndex } from "../../utils/avatars";
@@ -206,7 +205,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={isLight ? 0.05 : 0.08} />
+      <ScreenDecor scope="auth" iconOpacity={isLight ? 0.05 : 0.08} />
       <StatusBar barStyle={isLight ? "dark-content" : "light-content"} />
       <KeyboardAvoidingView
         style={styles.flex}

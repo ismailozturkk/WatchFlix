@@ -20,40 +20,17 @@
 // Kullanım: ekranlara DOĞRUDAN eklenmez, <ScreenDecor /> üzerinden monte edilir.
 // Katman sırası: ekran arka plan rengi → ikon deseni → kar → içerik.
 
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   StyleSheet,
   InteractionManager,
   AppState,
 } from "react-native";
-import { NavigationContext } from "@react-navigation/native";
 import LottieView from "lottie-react-native";
 import { useSnowSettings } from "../context/AppSettingsContext";
 import useReduceMotion from "../hooks/useReduceMotion";
-
-// useIsFocused yerine manuel abonelik: useIsFocused navigator dışında (modal,
-// portal vb.) throw ediyor. Burada context yoksa ekran hep "odakta" sayılır,
-// yani bileşen her yerde güvenle kullanılabilir.
-function useScreenFocused() {
-  const navigation = useContext(NavigationContext);
-  const [focused, setFocused] = useState(
-    () => navigation?.isFocused?.() ?? true,
-  );
-
-  useEffect(() => {
-    if (!navigation) return undefined;
-    setFocused(navigation.isFocused());
-    const unsubFocus = navigation.addListener("focus", () => setFocused(true));
-    const unsubBlur = navigation.addListener("blur", () => setFocused(false));
-    return () => {
-      unsubFocus();
-      unsubBlur();
-    };
-  }, [navigation]);
-
-  return focused;
-}
+import useScreenFocused from "../hooks/useScreenFocused";
 
 // Sistem "Hareketi Azalt" ayarı hooks/useReduceMotion'da: ayarlardaki kar
 // önizlemesi de aynı kontrolü kullanıyor.

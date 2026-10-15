@@ -134,11 +134,49 @@ private struct ReminderProvider: TimelineProvider {
 
 // MARK: - Görünüm
 
+// Satır ve başlık ölçüleri (pt). Satır sayısı bu ölçülerle widget'ın GERÇEK
+// yüksekliğinden hesaplanır (bkz. fitRows, shared.swift). JS ikizi:
+// screens/tabs/settings/widgets/widgetPlatform.js → iosReminderMetrics. Ayarlar
+// önizlemesi aynı sayılarla çizer; ikisi AYNI kalmalı (testle kilitli).
+//
+// textBlock = başlık + alt satır metninin toplam yüksekliği (SF satır yüksekliği).
+// Orta boyda ayraç çizgisi yok ve ölçüler daha sıkı: 158 pt'lik widget'ta sistem
+// kenar boşluğu düşünce yalnız ≈126 pt kalıyor.
+private struct ReminderMetrics {
+  let badge: CGFloat
+  let divider: Bool
+  let icon: CGFloat
+  let padV: CGFloat
+  let gap: CGFloat
+  let title: CGFloat
+  let meta: CGFloat
+  let textBlock: CGFloat
+
+  /// Başlık şeridinin kapladığı yükseklik (rozet + boşluk [+ ayraç + boşluk]).
+  var header: CGFloat { badge + gap + (divider ? 1 + gap : 0) }
+
+  func row(showIcon: Bool) -> CGFloat {
+    max(showIcon ? icon : 0, textBlock) + padV * 2
+  }
+
+  static func make(large: Bool, compact: Bool) -> ReminderMetrics {
+    if large {
+      return compact
+        ? ReminderMetrics(badge: 22, divider: true, icon: 22, padV: 4, gap: 5, title: 11, meta: 8, textBlock: 24)
+        : ReminderMetrics(badge: 26, divider: true, icon: 26, padV: 6, gap: 8, title: 12, meta: 9, textBlock: 26)
+    }
+    return compact
+      ? ReminderMetrics(badge: 20, divider: false, icon: 20, padV: 3, gap: 4, title: 11, meta: 8, textBlock: 24)
+      : ReminderMetrics(badge: 24, divider: false, icon: 24, padV: 5, gap: 6, title: 12, meta: 9, textBlock: 26)
+  }
+}
+
 private struct ReminderRow: View {
   let item: ReminderItem
   let isTurkish: Bool
   let showIcon: Bool
   let showDate: Bool
+  let metrics: ReminderMetrics
   let appearance: WidgetAppearancePreferences
 
   private var isMovie: Bool { item.type == "movie" }
@@ -148,19 +186,19 @@ private struct ReminderRow: View {
   }
 
   var body: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: metrics.gap + 2) {
       if showIcon {
         Text(isMovie ? "F" : "D")
-          .font(.system(size: 12, weight: .bold))
+          .font(.system(size: metrics.icon * 0.46, weight: .bold))
           .foregroundColor(.white)
-          .frame(width: 26, height: 26)
+          .frame(width: metrics.icon, height: metrics.icon)
           .background(isMovie ? Color.wxMovie : appearance.accentColor)
-          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+          .clipShape(RoundedRectangle(cornerRadius: metrics.icon * 0.3, style: .continuous))
       }
 
       VStack(alignment: .leading, spacing: 1) {
         Text(item.title)
-          .font(.system(size: 12, weight: .semibold))
+          .font(.system(size: metrics.title, weight: .semibold))
           .foregroundColor(appearance.textColor)
           .lineLimit(1)
 
@@ -173,7 +211,7 @@ private struct ReminderRow: View {
             .filter { !$0.isEmpty }
             .joined(separator: "  •  ")
         )
-        .font(.system(size: 9))
+        .font(.system(size: metrics.meta))
         .foregroundColor(appearance.secondaryTextColor)
         .lineLimit(1)
       }
@@ -181,7 +219,7 @@ private struct ReminderRow: View {
       Spacer(minLength: 0)
     }
     .padding(.horizontal, 8)
-    .padding(.vertical, 6)
+    .padding(.vertical, metrics.padV)
     .background(appearance.surfaceAltColor)
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
   }
@@ -191,46 +229,64 @@ private struct ReminderWidgetEntryView: View {
   var entry: ReminderEntry
   @Environment(\.widgetFamily) private var family
 
-  private var maxRows: Int {
-    min(
-      entry.preferences.reminderMaxItems,
-      family == .systemLarge
-        ? (entry.preferences.reminderCompact ? 8 : 6)
-        : (entry.preferences.reminderCompact ? 4 : 3)
-    )
+  var body: some View {
+    // GeometryReader: içeriği sabit sayılarla değil widget'ın gerçek (sistem kenar
+    // boşluğu düşülmüş) yüksekliğine göre dizeriz.
+    GeometryReader { proxy in
+      content(available: proxy.size.height)
+    }
+    .widgetContentPadding(14)
+    .widgetBackgroundCompat(entry.preferences.reminderAppearance.backgroundColor)
   }
 
-  var body: some View {
+  private func content(available: CGFloat) -> some View {
+    let prefs = entry.preferences
+    let appearance = prefs.reminderAppearance
+    let metrics = ReminderMetrics.make(
+      large: family == .systemLarge,
+      compact: prefs.reminderCompact
+    )
     let filtered = entry.items.filter {
-      entry.preferences.reminderContent == "all" ||
-        entry.preferences.reminderContent == $0.type
+      prefs.reminderContent == "all" || prefs.reminderContent == $0.type
     }
-    let shown = Array(filtered.prefix(maxRows))
+    let fit = fitRows(
+      available: available,
+      header: prefs.reminderShowTitle ? metrics.header : 0,
+      row: metrics.row(showIcon: prefs.reminderShowPosters),
+      gap: metrics.gap,
+      overflowLabel: 12,
+      total: filtered.count,
+      limit: prefs.reminderMaxItems
+    )
+    let shown = Array(filtered.prefix(fit.rows))
     let overflow = filtered.count - shown.count
-    let appearance = entry.preferences.reminderAppearance
 
-    VStack(alignment: .leading, spacing: 8) {
-      if entry.preferences.reminderShowTitle {
+    return VStack(alignment: .leading, spacing: metrics.gap) {
+      if prefs.reminderShowTitle {
         HStack(spacing: 8) {
           Text("S")
-            .font(.system(size: 13, weight: .bold))
+            .font(.system(size: metrics.badge * 0.5, weight: .bold))
             .foregroundColor(.white)
-            .frame(width: 26, height: 26)
+            .frame(width: metrics.badge, height: metrics.badge)
             .background(appearance.accentColor)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: metrics.badge * 0.3, style: .continuous))
 
           Text(entry.isTurkish ? "Yaklaşanlar" : "Coming Up")
-            .font(.system(size: 15, weight: .bold))
+            .font(.system(size: metrics.badge >= 24 ? 15 : 13, weight: .bold))
             .foregroundColor(appearance.textColor)
+            .lineLimit(1)
 
           Spacer(minLength: 0)
 
           Text(entry.isTurkish ? "\(filtered.count) hatırlatma" : "\(filtered.count) reminders")
             .font(.system(size: 10, weight: .bold))
             .foregroundColor(appearance.accentColor)
+            .lineLimit(1)
         }
 
-        Divider().overlay(Color.white.opacity(0.12))
+        if metrics.divider {
+          Divider().overlay(Color.white.opacity(0.12))
+        }
       }
 
       if shown.isEmpty {
@@ -245,22 +301,21 @@ private struct ReminderWidgetEntryView: View {
           ReminderRow(
             item: item,
             isTurkish: entry.isTurkish,
-            showIcon: entry.preferences.reminderShowPosters,
-            showDate: entry.preferences.reminderShowDates,
+            showIcon: prefs.reminderShowPosters,
+            showDate: prefs.reminderShowDates,
+            metrics: metrics,
             appearance: appearance
           )
         }
-        if overflow > 0 {
+        if fit.showsOverflow {
           Text(entry.isTurkish ? "+\(overflow) daha" : "+\(overflow) more")
             .font(.system(size: 10, weight: .bold))
             .foregroundColor(appearance.accentColor)
             .frame(maxWidth: .infinity, alignment: .center)
         }
-        Spacer(minLength: 0)
       }
     }
-    .padding(14)
-    .widgetBackgroundCompat(appearance.backgroundColor)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 

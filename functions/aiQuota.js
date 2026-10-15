@@ -1,7 +1,7 @@
 "use strict";
 
 const AI_PLAN_LIMITS = Object.freeze({
-  free: Object.freeze({ daily: 5, monthly: 30 }),
+  free: Object.freeze({ daily: 3, monthly: 30 }),
   premium: Object.freeze({ daily: 20, monthly: 300 }),
   unlimited: Object.freeze({ daily: 50, monthly: 900 }),
 });

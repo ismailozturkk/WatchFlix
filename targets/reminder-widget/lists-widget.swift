@@ -115,22 +115,50 @@ private struct ListsProvider: TimelineProvider {
 
 // MARK: - Görünüm
 
+// Satır ve başlık ölçüleri (pt); satır sayısı widget'ın GERÇEK yüksekliğinden
+// hesaplanır (fitRows, shared.swift). JS ikizi: screens/tabs/settings/widgets/
+// widgetPlatform.js → iosListMetrics (testle kilitli, ikisi AYNI kalmalı).
+// `line` = 12/11 pt metnin satır yüksekliği (yukarı yuvarlı).
+private struct ListMetrics {
+  let badge: CGFloat
+  let circle: CGFloat
+  let padV: CGFloat
+  let gap: CGFloat
+  let font: CGFloat
+  let line: CGFloat
+
+  var header: CGFloat { badge + gap }
+  var row: CGFloat { max(circle, line) + padV * 2 }
+
+  static func make(large: Bool, compact: Bool) -> ListMetrics {
+    if large {
+      return compact
+        ? ListMetrics(badge: 20, circle: 20, padV: 5, gap: 5, font: 11, line: 14)
+        : ListMetrics(badge: 24, circle: 22, padV: 7, gap: 7, font: 12, line: 15)
+    }
+    return compact
+      ? ListMetrics(badge: 18, circle: 16, padV: 3, gap: 4, font: 11, line: 14)
+      : ListMetrics(badge: 22, circle: 20, padV: 4, gap: 5, font: 12, line: 15)
+  }
+}
+
 private struct ListRow: View {
   let list: ListSummary
   let showCount: Bool
+  let metrics: ListMetrics
   let appearance: WidgetAppearancePreferences
 
   var body: some View {
     HStack(spacing: 9) {
       Image(systemName: symbolName(for: list.icon))
-        .font(.system(size: 11, weight: .semibold))
+        .font(.system(size: metrics.circle * 0.5, weight: .semibold))
         .foregroundColor(appearance.accentColor)
-        .frame(width: 22, height: 22)
+        .frame(width: metrics.circle, height: metrics.circle)
         .background(appearance.accentColor.opacity(0.16))
         .clipShape(Circle())
 
       Text(list.name)
-        .font(.system(size: 12, weight: .semibold))
+        .font(.system(size: metrics.font, weight: .semibold))
         .foregroundColor(appearance.textColor)
         .lineLimit(1)
 
@@ -138,12 +166,12 @@ private struct ListRow: View {
 
       if showCount {
         Text("\(list.count)")
-          .font(.system(size: 12, weight: .bold))
+          .font(.system(size: metrics.font, weight: .bold))
           .foregroundColor(appearance.accentColor)
       }
     }
     .padding(.horizontal, 8)
-    .padding(.vertical, 7)
+    .padding(.vertical, metrics.padV)
     .background(appearance.surfaceAltColor)
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
   }
@@ -153,29 +181,49 @@ private struct ListsWidgetEntryView: View {
   var entry: ListsEntry
   @Environment(\.widgetFamily) private var family
 
-  private var maxRows: Int {
-    family == .systemLarge
-      ? (entry.preferences.listsCompact ? 8 : 7)
-      : (entry.preferences.listsCompact ? 4 : 3)
+  var body: some View {
+    // Sabit satır sayısı yerine widget'ın gerçek yüksekliğine göre dizilir; orta
+    // boyda başlık artık taşıp kırpılmıyor (bkz. widgetContentPadding, shared.swift).
+    GeometryReader { proxy in
+      content(available: proxy.size.height)
+    }
+    .widgetContentPadding(13)
+    .widgetBackgroundCompat(entry.preferences.listsAppearance.backgroundColor)
   }
 
-  var body: some View {
-    let shown = Array(entry.lists.prefix(maxRows))
-    let appearance = entry.preferences.listsAppearance
+  private func content(available: CGFloat) -> some View {
+    let prefs = entry.preferences
+    let appearance = prefs.listsAppearance
+    let metrics = ListMetrics.make(
+      large: family == .systemLarge,
+      compact: prefs.listsCompact
+    )
+    // "+N daha" etiketi yok (overflowLabel çok büyük → hiç sığmaz); sınır yok (Int.max).
+    let fit = fitRows(
+      available: available,
+      header: prefs.listsShowTitle ? metrics.header : 0,
+      row: metrics.row,
+      gap: metrics.gap,
+      overflowLabel: 10000,
+      total: entry.lists.count,
+      limit: Int.max
+    )
+    let shown = Array(entry.lists.prefix(fit.rows))
 
-    VStack(alignment: .leading, spacing: 7) {
-      if entry.preferences.listsShowTitle {
+    return VStack(alignment: .leading, spacing: metrics.gap) {
+      if prefs.listsShowTitle {
         HStack(spacing: 8) {
           Image(systemName: "square.grid.2x2.fill")
-            .font(.system(size: 11, weight: .bold))
+            .font(.system(size: metrics.badge * 0.46, weight: .bold))
             .foregroundColor(.white)
-            .frame(width: 24, height: 24)
+            .frame(width: metrics.badge, height: metrics.badge)
             .background(appearance.accentColor)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: metrics.badge * 0.33, style: .continuous))
 
           Text(entry.isTurkish ? "Listelerim" : "My Lists")
-            .font(.system(size: 14, weight: .bold))
+            .font(.system(size: metrics.badge >= 22 ? 14 : 12, weight: .bold))
             .foregroundColor(appearance.textColor)
+            .lineLimit(1)
 
           Spacer(minLength: 0)
         }
@@ -192,15 +240,14 @@ private struct ListsWidgetEntryView: View {
         ForEach(shown) { list in
           ListRow(
             list: list,
-            showCount: entry.preferences.listsShowCount,
+            showCount: prefs.listsShowCount,
+            metrics: metrics,
             appearance: appearance
           )
         }
-        Spacer(minLength: 0)
       }
     }
-    .padding(13)
-    .widgetBackgroundCompat(appearance.backgroundColor)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 

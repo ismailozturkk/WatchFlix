@@ -1,21 +1,15 @@
 import { isLightSurface } from "@utils/colorUtils";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   ScrollView,
   StyleSheet,
   StatusBar,
   ActivityIndicator,
-  FlatList,
   KeyboardAvoidingView,
   Platform,
-  Modal,
 } from "react-native";
-import { Image } from "expo-image";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
 import { useTheme } from "../../../context/ThemeContext";
@@ -24,11 +18,9 @@ import { useAuth } from "../../../context/AuthContext";
 import { useUserProfile } from "../../../context/UserProfileContext";
 import { useProfileUi } from "../../../context/ProfileUiContext";
 import {
-  AVATARS,
   clampAvatarIndex,
   CUSTOM_AVATAR_INDEX,
 } from "../../../utils/avatars";
-import UserAvatar from "../../../components/common/UserAvatar";
 import {
   formatUsernameInput,
   isValidUsername,
@@ -53,13 +45,42 @@ import { i18nText } from "../../../utils/i18nText";
 import ScreenDecor from "../../../components/ScreenDecor";
 import BirthDateField from "../../../components/auth/BirthDateField";
 import { MIN_ADULT_AGE, calculateAge, syncAgeRestriction } from "../../../utils/ageGate";
+import {
+  isNearLimit,
+  isProfileEditDirty,
+  usernameFieldState,
+} from "../../../utils/profileEdit";
+import {
+  AUTH_ERROR,
+  AUTH_SUCCESS,
+  AUTH_WARN,
+  AuthBackdrop,
+  AuthField,
+  AuthSectionLabel,
+  Reveal,
+  authColumn,
+} from "../../../components/auth/AuthKit";
+import {
+  DangerRow,
+  DeleteAccountSheet,
+  EditHeader,
+  FieldBlock,
+  FieldHint,
+  FieldLabel,
+  FormSection,
+  ProfileHero,
+} from "../../../components/profile/EditProfileKit";
+import ProfileAvatarPickerModal from "../../../components/profile/ProfileAvatarPickerModal";
 
 
 const BIO_MAX = 160;
+const NAME_MAX = 40;
+const USERNAME_MAX = 20;
 
 export default function EditProfileScreen({ navigation }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
+  const insets = useSafeAreaInsets();
   const tr = language === "tr";
   const { user } = useAuth();
   const { profile, loading, updateField, changeUsername } = useUserProfile();
@@ -76,18 +97,17 @@ export default function EditProfileScreen({ navigation }) {
   const [avatarIndex, setAvatarIndex] = useState(0);
   const [usernameStatus, setUsernameStatus] = useState("idle"); // idle|same|invalid|checking|available|taken
   const [saving, setSaving] = useState(false);
+  // Form profilden doldurulana kadar "değişiklik var mı" hesabı yapılmaz.
+  const [ready, setReady] = useState(false);
+  const [avatarSheet, setAvatarSheet] = useState(false);
 
-  const avatarOptions = useMemo(() => {
-    if (socialPhotoURL) {
-      return [
-        { index: CUSTOM_AVATAR_INDEX, source: { uri: socialPhotoURL }, isSocial: true },
-        ...AVATARS.map((source, i) => ({ index: i, source, isSocial: false })),
-      ];
-    }
-    return AVATARS.map((source, i) => ({ index: i, source, isSocial: false }));
-  }, [socialPhotoURL]);
+  // Klavyede "ileri" tuşu alanlar arasında gezdirir.
+  const usernameRef = useRef(null);
+  const bioRef = useRef(null);
 
-  // Hesap silme
+  // Hesap silme. Onay sayfası ortak BottomSheetModal: şifre kutusu klavyeyi
+  // açınca sayfa klavyenin üstüne çıkar ve içerik küçülüp kayar, Vazgeç / Hesabı
+  // sil düğmeleri görünür kalır (eskiden ortalanmış kutu klavyenin altında kalıyordu).
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -130,6 +150,7 @@ export default function EditProfileScreen({ navigation }) {
         ),
       );
       initRef.current = true;
+      setReady(true);
     }
   }, [profile, selectAvatarIndex]);
 
@@ -161,6 +182,26 @@ export default function EditProfileScreen({ navigation }) {
     usernameStatus === "invalid" ||
     usernameStatus === "taken" ||
     usernameStatus === "checking";
+
+  // Kaydet yalnız değiştirilecek bir şey varken açılır. Başlangıç avatarı,
+  // formun profilden aldığı değerle AYNI formülle hesaplanır (yukarıdaki
+  // doldurma efekti) — profilde avatarIndex yoksa seçili avatar kullanılır.
+  const dirty = isProfileEditDirty({
+    ready,
+    saved: profile
+      ? {
+          displayName: profile.displayName || "",
+          username: normalizeUsername(profile.username || ""),
+          bio: profile.bio || "",
+          avatarIndex: clampAvatarIndex(
+            typeof profile.avatarIndex === "number" ? profile.avatarIndex : selectAvatarIndex,
+          ),
+          birthDate: profile.birthDate || null,
+        }
+      : null,
+    draft: { displayName, username: normalizeUsername(username), bio, avatarIndex, birthDate },
+  });
+  const canSave = dirty && !usernameBlocked;
 
   const onSave = async () => {
     if (saving) return;
@@ -412,572 +453,309 @@ export default function EditProfileScreen({ navigation }) {
     );
   }
 
+  const accent = theme.accent;
+  const lightTheme = isLightSurface(theme.primary);
+  const fieldSurface = theme.between;
+  const socialSelected = !!socialPhotoURL && avatarIndex === CUSTOM_AVATAR_INDEX;
+
+  // Kullanıcı adı durum satırı: alanın kenar tonuyla (AuthField) aynı renkler.
+  const hintColor = hint
+    ? usernameStatus === "available"
+      ? AUTH_SUCCESS
+      : usernameStatus === "checking"
+        ? theme.text.muted
+        : AUTH_ERROR
+    : null;
+  const hintIcon =
+    usernameStatus === "available"
+      ? "checkmark-circle-outline"
+      : usernameStatus === "checking"
+        ? "time-outline"
+        : "alert-circle-outline";
+
+  const usernameRight =
+    usernameStatus === "checking" ? (
+      <ActivityIndicator size="small" color={theme.text.muted} />
+    ) : usernameStatus === "available" ? (
+      <Ionicons name="checkmark-circle" size={19} color={AUTH_SUCCESS} />
+    ) : usernameStatus === "taken" ? (
+      <Ionicons name="close-circle" size={19} color={AUTH_ERROR} />
+    ) : null;
+
+  // Doğum tarihi alt satırı: kilitli / henüz girilmemiş / 18 altı / tamam.
+  const birthHint = birthLocked
+    ? {
+        icon: "lock-closed-outline",
+        color: theme.text.muted,
+        text: i18nText(
+          "autoI18n.dogum_tarihi_kilitli",
+          "Doğum tarihi bir kez kaydedilir. Yanlışsa Ayarlar → Uygulama Hakkında'dan destekle iletişime geç.",
+        ),
+      }
+    : birthAge === null
+      ? {
+          icon: "eye-off-outline",
+          color: theme.text.muted,
+          text: i18nText(
+            "autoI18n.dogum_tarihi_profil_alt",
+            "Profilinde gösterilmez; yalnızca yetişkin içerik ayarı için kullanılır.",
+          ),
+        }
+      : birthAge < MIN_ADULT_AGE
+        ? {
+            icon: "information-circle-outline",
+            color: AUTH_WARN,
+            text: i18nText(
+              "autoI18n.yas_alti_yetiskin_kapali",
+              "{{age}} yaşındasın — yetişkin içerik kapalı kalacak.",
+              { age: birthAge },
+            ),
+          }
+        : {
+            icon: "checkmark-circle-outline",
+            color: theme.text.muted,
+            text: i18nText("autoI18n.yas_bilgisi", "{{age}} yaşındasın.", { age: birthAge }),
+          };
+
+  // Hesap silme sayfasının metinleri (dil dallanması burada kalır).
+  const deleteDescription = verificationProvider
+    ? verificationProvider === "apple"
+      ? (tr
+        ? "Bu işlem geri alınamaz. Devam etmek ve Apple yetkisini iptal etmek için Apple hesabınla doğrula."
+        : "This cannot be undone. Verify with Apple so its authorization can also be revoked.")
+      : i18nText(
+          "autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_google_ile_dogrula",
+          "Bu işlem geri alınamaz. Devam etmek için Google hesabınla doğrula.",
+        )
+    : i18nText("autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_sifreni_gi", "Bu işlem geri alınamaz. Devam etmek için şifreni gir.");
+  const verifyLabel =
+    verificationProvider === "apple"
+      ? (tr ? "Apple ile doğrula" : "Verify with Apple")
+      : i18nText("autoI18n.google_ile_dogrula", "Google ile doğrula");
+
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.25} />
-      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
-      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
-        {/* Başlık */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}
-            style={[styles.backBtn, { backgroundColor: theme.secondary }]}
-          >
-            <Ionicons name="chevron-back" size={22} color={theme.text.primary} />
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.headerTitle, { color: theme.text.primary }]}
-          >{i18nText("autoI18n.profili_duzenle", "Profili Düzenle")}</Text>
-          <TouchableOpacity
-            onPress={onSave}
-            disabled={saving || usernameBlocked}
-            activeOpacity={0.85}
-            style={[
-              styles.saveBtn,
-              {
-                backgroundColor:
-                  saving || usernameBlocked ? theme.border : theme.accent,
-              },
-            ]}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.saveBtnText}>{i18nText("autoI18n.kaydet", "Kaydet")}</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+      <AuthBackdrop accent={accent} isLightTheme={lightTheme} />
+      <ScreenDecor scope="profile" iconOpacity={lightTheme ? 0.07 : 0.12} />
+      <StatusBar barStyle={lightTheme ? "dark-content" : "light-content"} />
+      <SafeAreaView style={styles.flex} edges={["top"]}>
+        <EditHeader
+          theme={theme}
+          title={i18nText("autoI18n.profili_duzenle", "Profili Düzenle")}
+          onBack={() => navigation.goBack()}
+          onSave={onSave}
+          canSave={canSave}
+          saving={saving}
+        />
 
         <KeyboardAvoidingView
-          style={{ flex: 1 }}
+          style={styles.flex}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 40 }}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
           >
-            {/* Avatar önizleme */}
-            <View style={styles.avatarPreviewWrap}>
-              <View style={[styles.avatarRing, { borderColor: theme.accent }]}>
-                <UserAvatar
-                  avatarIndex={avatarIndex}
-                  photoURL={socialPhotoURL}
-                  isCustomPhoto
-                  size={90}
-                />
-              </View>
-              <Text style={[styles.avatarHint, { color: theme.text.muted }]}>
-                {socialPhotoURL && avatarIndex === CUSTOM_AVATAR_INDEX
-                  ? "Sosyal Profil Fotoğrafı"
-                  : i18nText("autoI18n.avatar_sec", "Avatar seç")}
-              </Text>
-            </View>
-
-            {/* Avatar seçici */}
-            <FlatList
-              data={avatarOptions}
-              keyExtractor={(item) => String(item.index)}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.avatarList}
-              initialNumToRender={12}
-              maxToRenderPerBatch={8}
-              windowSize={4}
-              removeClippedSubviews={Platform.OS === "android"}
-              renderItem={({ item }) => {
-                const selected = item.index === avatarIndex;
-                return (
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => setAvatarIndex(item.index)}
-                    style={[
-                      styles.avatarThumbWrap,
-                      {
-                        borderColor: selected ? theme.accent : "transparent",
-                        backgroundColor: theme.secondary,
-                      },
-                    ]}
-                  >
-                    <Image
-                      source={item.source}
-                      style={styles.avatarThumb}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                    />
-                    {item.isSocial && (
-                      <View style={[styles.socialBadge, { backgroundColor: theme.accent }]}>
-                        <Ionicons name="sparkles" size={8} color="#fff" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
-            />
-
-            {/* İsim */}
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: theme.text.secondary }]}>{i18nText("autoI18n.isim", "İsim")}</Text>
-              <TextInput
-                value={displayName}
-                onChangeText={setDisplayName}
-                placeholder={i18nText("autoI18n.adin", "Adın")}
-                placeholderTextColor={theme.text.muted}
-                maxLength={40}
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: theme.secondary,
-                    borderColor: theme.border,
-                    color: theme.text.primary,
-                  },
-                ]}
-              />
-            </View>
-
-            {/* Kullanıcı adı */}
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: theme.text.secondary }]}>{i18nText("autoI18n.kullanici_adi_2", "Kullanıcı adı")}</Text>
-              <View
-                style={[
-                  styles.usernameRow,
-                  {
-                    backgroundColor: theme.secondary,
-                    borderColor:
-                      usernameStatus === "taken" || usernameStatus === "invalid"
-                        ? theme.colors.red
-                        : usernameStatus === "available"
-                          ? theme.colors.green
-                          : theme.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.atSign, { color: theme.text.muted }]}>@</Text>
-                <TextInput
-                  value={username}
-                  onChangeText={(v) => setUsername(formatUsernameInput(v))}
-                  placeholder={i18nText("autoI18n.kullanici_adi_ornegi", "kullanici_adi")}
-                  placeholderTextColor={theme.text.muted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  maxLength={20}
-                  style={[styles.usernameInput, { color: theme.text.primary }]}
-                />
-                {usernameStatus === "checking" && (
-                  <ActivityIndicator size="small" color={theme.text.muted} />
-                )}
-                {usernameStatus === "available" && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={18}
-                    color={theme.colors.green}
-                  />
-                )}
-                {usernameStatus === "taken" && (
-                  <Ionicons
-                    name="close-circle"
-                    size={18}
-                    color={theme.colors.red}
-                  />
-                )}
-              </View>
-              {hint && (
-                <Text style={[styles.hint, { color: hint.color }]}>
-                  {hint.text}
-                </Text>
-              )}
-            </View>
-
-            {/* Doğum tarihi — yetişkin içerik ayarının kapısı buna bakıyor.
-                Kaydedilmişse salt-okunur: kural da tek yazıma izin veriyor
-                (firestore.rules → birthDateKept). */}
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: theme.text.secondary }]}>
-                {i18nText("autoI18n.dogum_tarihi", "Doğum tarihi")}
-              </Text>
-              <BirthDateField
-                value={birthDate}
-                onChange={setBirthDate}
+            {/* Avatar + canlı önizleme */}
+            <Reveal>
+              <ProfileHero
                 theme={theme}
-                accent={theme.accent}
-                fieldSurface={theme.secondary}
-                showHint={false}
-                disabled={birthLocked}
+                avatarIndex={avatarIndex}
+                photoURL={socialPhotoURL}
+                name={displayName}
+                username={username}
+                social={socialSelected}
+                onPress={() => setAvatarSheet(true)}
               />
-              <Text style={[styles.hint, { color: theme.text.muted }]}>
-                {birthLocked
-                  ? i18nText(
-                      "autoI18n.dogum_tarihi_kilitli",
-                      "Doğum tarihi bir kez kaydedilir. Yanlışsa Ayarlar → Uygulama Hakkında'dan destekle iletişime geç.",
-                    )
-                  : birthAge === null
-                    ? i18nText(
-                        "autoI18n.dogum_tarihi_profil_alt",
-                        "Profilinde gösterilmez; yalnızca yetişkin içerik ayarı için kullanılır.",
-                      )
-                    : birthAge < MIN_ADULT_AGE
-                      ? i18nText(
-                          "autoI18n.yas_alti_yetiskin_kapali",
-                          "{{age}} yaşındasın — yetişkin içerik kapalı kalacak.",
-                          { age: birthAge },
-                        )
-                      : i18nText("autoI18n.yas_bilgisi", "{{age}} yaşındasın.", {
-                          age: birthAge,
-                        })}
-              </Text>
-            </View>
+            </Reveal>
 
-            {/* Bio */}
-            <View style={styles.field}>
-              <View style={styles.labelRow}>
-                <Text style={[styles.label, { color: theme.text.secondary }]}>{i18nText("autoI18n.hakkinda", "Hakkında")}</Text>
-                <Text style={[styles.counter, { color: theme.text.muted }]}>
-                  {bio.length}/{BIO_MAX}
-                </Text>
-              </View>
-              <TextInput
-                value={bio}
-                onChangeText={(v) => setBio(v.slice(0, BIO_MAX))}
-                placeholder={i18nText("autoI18n.kendinden_bahset", "Kendinden bahset…")}
-                placeholderTextColor={theme.text.muted}
-                multiline
-                maxLength={BIO_MAX}
-                style={[
-                  styles.input,
-                  styles.bioInput,
-                  {
-                    backgroundColor: theme.secondary,
-                    borderColor: theme.border,
-                    color: theme.text.primary,
-                  },
-                ]}
-              />
-            </View>
+            {/* Profil bilgileri */}
+            <Reveal delay={70} style={authColumn}>
+              <FormSection
+                theme={theme}
+                icon="person-circle-outline"
+                title={i18nText("autoI18n.profil_bilgileri", "Profil bilgileri")}
+              >
+                <FieldBlock>
+                  <FieldLabel
+                    theme={theme}
+                    label={i18nText("autoI18n.isim", "İsim")}
+                    counter={`${displayName.length}/${NAME_MAX}`}
+                  />
+                  <AuthField
+                    theme={theme}
+                    accent={accent}
+                    fieldSurface={fieldSurface}
+                    icon="person-outline"
+                    value={displayName}
+                    onChangeText={setDisplayName}
+                    placeholder={i18nText("autoI18n.adin", "Adın")}
+                    maxLength={NAME_MAX}
+                    returnKeyType="next"
+                    onSubmitEditing={() => usernameRef.current?.focus()}
+                    blurOnSubmit={false}
+                  />
+                </FieldBlock>
+
+                <FieldBlock>
+                  <FieldLabel
+                    theme={theme}
+                    label={i18nText("autoI18n.kullanici_adi_2", "Kullanıcı adı")}
+                    counter={`${username.length}/${USERNAME_MAX}`}
+                  />
+                  <AuthField
+                    ref={usernameRef}
+                    theme={theme}
+                    accent={accent}
+                    fieldSurface={fieldSurface}
+                    icon="at"
+                    state={usernameFieldState(usernameStatus)}
+                    value={username}
+                    onChangeText={(v) => setUsername(formatUsernameInput(v))}
+                    placeholder={i18nText("autoI18n.kullanici_adi_ornegi", "kullanici_adi")}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={USERNAME_MAX}
+                    returnKeyType="next"
+                    onSubmitEditing={() => bioRef.current?.focus()}
+                    blurOnSubmit={false}
+                    right={usernameRight}
+                  />
+                  {hint ? (
+                    <FieldHint icon={hintIcon} color={hintColor}>
+                      {hint.text}
+                    </FieldHint>
+                  ) : null}
+                </FieldBlock>
+
+                <FieldBlock>
+                  <FieldLabel
+                    theme={theme}
+                    label={i18nText("autoI18n.hakkinda", "Hakkında")}
+                    counter={`${bio.length}/${BIO_MAX}`}
+                    warn={isNearLimit(bio.length, BIO_MAX)}
+                  />
+                  <AuthField
+                    ref={bioRef}
+                    theme={theme}
+                    accent={accent}
+                    fieldSurface={fieldSurface}
+                    icon="chatbubble-ellipses-outline"
+                    value={bio}
+                    onChangeText={(v) => setBio(v.slice(0, BIO_MAX))}
+                    placeholder={i18nText("autoI18n.kendinden_bahset", "Kendinden bahset…")}
+                    multiline
+                    maxLength={BIO_MAX}
+                    containerStyle={styles.bioShell}
+                    inputStyle={styles.bioInput}
+                  />
+                </FieldBlock>
+              </FormSection>
+            </Reveal>
+
+            {/* Yalnız kullanıcıya görünen bilgi. Doğum tarihi yetişkin içerik
+                ayarının kapısı; kaydedilmişse salt-okunur (kural da tek yazıma
+                izin veriyor — firestore.rules → birthDateKept). */}
+            <Reveal delay={130} style={authColumn}>
+              <FormSection
+                theme={theme}
+                icon="lock-closed-outline"
+                title={i18nText("autoI18n.profil_sadece_sana_gorunur", "Sadece sana görünür")}
+              >
+                <FieldBlock>
+                  <FieldLabel theme={theme} label={i18nText("autoI18n.dogum_tarihi", "Doğum tarihi")} />
+                  <BirthDateField
+                    value={birthDate}
+                    onChange={setBirthDate}
+                    theme={theme}
+                    accent={accent}
+                    fieldSurface={fieldSurface}
+                    showHint={false}
+                    disabled={birthLocked}
+                    chipIcon
+                    shellStyle={styles.birthShell}
+                  />
+                  <FieldHint icon={birthHint.icon} color={birthHint.color}>
+                    {birthHint.text}
+                  </FieldHint>
+                </FieldBlock>
+              </FormSection>
+            </Reveal>
 
             {/* Tehlikeli bölge */}
-            <View style={styles.dangerZone}>
-              <Text style={[styles.dangerLabel, { color: theme.text.muted }]}>{i18nText("autoI18n.tehlikeli_bolge", "Tehlikeli bölge")}</Text>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={openDeleteModal}
-                style={[
-                  styles.deleteBtn,
-                  {
-                    borderColor: theme.colors.red,
-                    backgroundColor: theme.colors.red + "14",
-                  },
-                ]}
-              >
-                <Ionicons name="trash-outline" size={18} color={theme.colors.red} />
-                <Text style={[styles.deleteBtnText, { color: theme.colors.red }]}>{i18nText("autoI18n.hesabi_sil", "Hesabı Sil")}</Text>
-              </TouchableOpacity>
-              <Text style={[styles.dangerHint, { color: theme.text.muted }]}>{i18nText("autoI18n.hesabin_listelerin_hatirlaticilarin_notlarin_gonde", "Hesabın, listelerin, hatırlatıcıların, notların, gönderilerin ve arkadaşlık bağların kalıcı olarak silinir. Bu işlem geri alınamaz.")}</Text>
-            </View>
+            <Reveal delay={190} style={authColumn}>
+              <View style={styles.dangerBlock}>
+                <AuthSectionLabel theme={theme} accent={theme.colors.red}>
+                  {i18nText("autoI18n.tehlikeli_bolge", "Tehlikeli bölge")}
+                </AuthSectionLabel>
+                <DangerRow
+                  theme={theme}
+                  title={i18nText("autoI18n.hesabi_sil", "Hesabı Sil")}
+                  description={i18nText(
+                    "autoI18n.hesabin_listelerin_hatirlaticilarin_notlarin_gonde",
+                    "Hesabın, listelerin, hatırlatıcıların, notların, gönderilerin ve arkadaşlık bağların kalıcı olarak silinir. Bu işlem geri alınamaz.",
+                  )}
+                  onPress={openDeleteModal}
+                />
+              </View>
+            </Reveal>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      {/* Hesap silme onay modalı */}
-      <Modal
+      {/* Avatar seçici: seçim yalnız forma yazılır, Kaydet ile kalıcı olur. */}
+      <ProfileAvatarPickerModal
+        visible={avatarSheet}
+        selectedIndex={avatarIndex}
+        saving={false}
+        onSelect={(index) => {
+          setAvatarIndex(index);
+          setAvatarSheet(false);
+        }}
+        onClose={() => setAvatarSheet(false)}
+      />
+
+      {/* Hesap silme onayı */}
+      <DeleteAccountSheet
         visible={showDelete}
-        transparent
-        animationType="fade"
-        onRequestClose={() => !deleting && !verifying && setShowDelete(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: theme.secondary }]}>
-            <View
-              style={[
-                styles.modalIcon,
-                { backgroundColor: theme.colors.red + "1F" },
-              ]}
-            >
-              <Ionicons name="warning-outline" size={26} color={theme.colors.red} />
-            </View>
-            <Text style={[styles.modalTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.hesabi_sil_2", "Hesabı sil")}</Text>
-            <Text style={[styles.modalDesc, { color: theme.text.secondary }]}>
-              {verificationProvider
-                ? verificationProvider === "apple"
-                  ? (tr
-                    ? "Bu işlem geri alınamaz. Devam etmek ve Apple yetkisini iptal etmek için Apple hesabınla doğrula."
-                    : "This cannot be undone. Verify with Apple so its authorization can also be revoked.")
-                  : i18nText(
-                      "autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_google_ile_dogrula",
-                      "Bu işlem geri alınamaz. Devam etmek için Google hesabınla doğrula.",
-                    )
-                : i18nText("autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_sifreni_gi", "Bu işlem geri alınamaz. Devam etmek için şifreni gir.")}
-            </Text>
-
-            {/* Doğrulama alanı sağlayıcıya göre değişir. Apple bağlıysa yetki
-                iptali için Apple her zaman önceliklidir. */}
-            {verificationProvider ? (
-              <TouchableOpacity
-                activeOpacity={0.85}
-                disabled={deleting || verifying || providerVerified}
-                onPress={onVerifyWithProvider}
-                style={[
-                  styles.verifyBtn,
-                  {
-                    borderColor: providerVerified ? theme.colors.green : theme.border,
-                    backgroundColor: providerVerified
-                      ? theme.colors.green + "14"
-                      : theme.primary,
-                  },
-                ]}
-              >
-                {verifying ? (
-                  <ActivityIndicator size="small" color={theme.text.primary} />
-                ) : (
-                  <>
-                    <Ionicons
-                      name={
-                        providerVerified
-                          ? "checkmark-circle"
-                          : verificationProvider === "apple"
-                            ? "logo-apple"
-                            : "logo-google"
-                      }
-                      size={18}
-                      color={providerVerified ? theme.colors.green : theme.text.primary}
-                    />
-                    <Text
-                      style={[
-                        styles.verifyBtnText,
-                        {
-                          color: providerVerified
-                            ? theme.colors.green
-                            : theme.text.primary,
-                        },
-                      ]}
-                    >
-                      {providerVerified
-                        ? i18nText("autoI18n.kimligin_dogrulandi", "Kimliğin doğrulandı")
-                        : verificationProvider === "apple"
-                          ? (tr ? "Apple ile doğrula" : "Verify with Apple")
-                          : i18nText("autoI18n.google_ile_dogrula", "Google ile doğrula")}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            ) : (
-              <TextInput
-                value={deletePassword}
-                onChangeText={setDeletePassword}
-                maxLength={128}
-                placeholder={i18nText("autoI18n.sifre", "Şifre")}
-                placeholderTextColor={theme.text.muted}
-                secureTextEntry
-                autoCapitalize="none"
-                editable={!deleting}
-                style={[
-                  styles.input,
-                  {
-                    width: "100%",
-                    marginTop: 14,
-                    backgroundColor: theme.primary,
-                    borderColor: theme.border,
-                    color: theme.text.primary,
-                  },
-                ]}
-              />
-            )}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                disabled={deleting || verifying}
-                onPress={() => setShowDelete(false)}
-                style={[styles.modalBtn, { backgroundColor: theme.primary }]}
-              >
-                <Text style={[styles.modalBtnText, { color: theme.text.primary }]}>{i18nText("autoI18n.vazgec", "Vazgeç")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                disabled={deleteBlocked}
-                onPress={onDeleteAccount}
-                style={[
-                  styles.modalBtn,
-                  {
-                    backgroundColor: theme.colors.red,
-                    opacity: deleteBlocked ? 0.5 : 1,
-                  },
-                ]}
-              >
-                {deleting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={[styles.modalBtnText, { color: "#fff" }]}>{i18nText("autoI18n.hesabi_sil_2", "Hesabı sil")}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowDelete(false)}
+        theme={theme}
+        deleting={deleting}
+        verifying={verifying}
+        title={i18nText("autoI18n.hesabi_sil_2", "Hesabı sil")}
+        description={deleteDescription}
+        provider={verificationProvider}
+        verified={providerVerified}
+        verifyLabel={verifyLabel}
+        verifiedLabel={i18nText("autoI18n.kimligin_dogrulandi", "Kimliğin doğrulandı")}
+        password={deletePassword}
+        onPasswordChange={setDeletePassword}
+        onVerify={onVerifyWithProvider}
+        onConfirm={onDeleteAccount}
+        confirmDisabled={deleteBlocked}
+        cancelLabel={i18nText("autoI18n.vazgec", "Vazgeç")}
+        confirmLabel={i18nText("autoI18n.hesabi_sil_2", "Hesabı sil")}
+        passwordLabel={i18nText("autoI18n.sifre", "Şifre")}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  flex: { flex: 1 },
   center: { justifyContent: "center", alignItems: "center" },
+  content: { paddingHorizontal: 16, paddingTop: 4, gap: 14 },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 12,
+  bioShell: { alignItems: "flex-start", paddingTop: 12, paddingBottom: 6 },
+  bioInput: {
+    minHeight: 92,
+    maxHeight: 170,
+    textAlignVertical: "top",
+    paddingTop: 7,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: { flex: 1, fontSize: 19, fontWeight: "800", letterSpacing: -0.3 },
-  saveBtn: {
-    minWidth: 72,
-    height: 38,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  saveBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-
-  avatarPreviewWrap: { alignItems: "center", marginTop: 8, marginBottom: 14, gap: 8 },
-  avatarRing: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    borderWidth: 3,
-    padding: 4,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarPreview: { width: "100%", height: "100%", borderRadius: 48 },
-  avatarHint: { fontSize: 12, fontWeight: "600" },
-
-  avatarList: { paddingHorizontal: 16, gap: 10, paddingVertical: 4 },
-  avatarThumbWrap: {
-    padding: 2,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  avatarThumb: { width: 56, height: 56, borderRadius: 13 },
-
-  field: { paddingHorizontal: 16, marginTop: 18 },
-  labelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  label: { fontSize: 13, fontWeight: "700", marginBottom: 8 },
-  counter: { fontSize: 11, marginBottom: 8 },
-  input: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-  },
-  bioInput: { minHeight: 96, textAlignVertical: "top" },
-
-  usernameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    gap: 6,
-  },
-  atSign: { fontSize: 16, fontWeight: "700" },
-  usernameInput: { flex: 1, paddingVertical: 12, fontSize: 15 },
-  hint: { fontSize: 12, marginTop: 6, fontWeight: "600" },
-
-  // Tehlikeli bölge
-  dangerZone: { paddingHorizontal: 16, marginTop: 34 },
-  dangerLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 10,
-  },
-  deleteBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingVertical: 13,
-  },
-  deleteBtnText: { fontSize: 15, fontWeight: "800" },
-  dangerHint: { fontSize: 12, lineHeight: 17, marginTop: 10 },
-
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  modalCard: {
-    borderRadius: 22,
-    padding: 22,
-    alignItems: "center",
-  },
-  modalIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  modalTitle: { fontSize: 19, fontWeight: "800", letterSpacing: -0.3 },
-  modalDesc: {
-    fontSize: 13.5,
-    lineHeight: 19,
-    textAlign: "center",
-    marginTop: 6,
-  },
-  modalActions: { flexDirection: "row", gap: 10, marginTop: 18, width: "100%" },
-  modalBtn: {
-    flex: 1,
-    height: 46,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalBtnText: { fontSize: 15, fontWeight: "700" },
-  verifyBtn: {
-    width: "100%",
-    marginTop: 14,
-    height: 46,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderWidth: 1.5,
-    borderRadius: 14,
-  },
-  verifyBtnText: { fontSize: 15, fontWeight: "700" },
-  socialBadge: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: "#fff",
-  },
+  birthShell: { minHeight: 58, borderRadius: 18 },
+  dangerBlock: { gap: 12 },
 });

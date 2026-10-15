@@ -6,7 +6,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
-import { buildWatchChartData } from "../../../utils/watchHistory";
+import { buildWatchChartData, countGenres } from "../../../utils/watchHistory";
 import BackButton from "../../../components/BackButton";
 import ScreenDecor from "../../../components/ScreenDecor";
 import {
@@ -31,10 +31,6 @@ const MovieStatisticsScreen = ({ navigation }) => {
     t,
     selectedDate,
     setSelectedDate,
-    mostWatchedGenre,
-    secondWatchedGenre,
-    threeWatchedGenre,
-    topMovieGenres,
     formatTotalDurationTime,
     timeDisplayMode,
     totalMinutesTime,
@@ -56,38 +52,20 @@ const MovieStatisticsScreen = ({ navigation }) => {
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
 
+  const locale = language === "en" ? "en-US" : "tr-TR";
+
   const chartDataByPeriod = useMemo(
     () => Object.fromEntries(["daily", "monthly", "yearly"].map((period) => [
       period,
-      buildWatchChartData(
-        groupedData,
-        (item) => item.minutes,
-        language === "en" ? "en-US" : "tr-TR",
-        period,
-      ),
+      buildWatchChartData(groupedData, (item) => item.minutes, locale, period),
     ])),
-    [groupedData, language],
+    [groupedData, locale],
   );
 
-  const heroGenres = useMemo(
-    () => topMovieGenres || [mostWatchedGenre, secondWatchedGenre, threeWatchedGenre].filter((g) => g && g !== "-"),
-    [topMovieGenres, mostWatchedGenre, secondWatchedGenre, threeWatchedGenre],
-  );
-
-  // Filtre modalı için tüm türler (izlenme sıklığına göre azalan).
-  const allGenres = useMemo(() => {
-    const counts = {};
-    (groupedData || []).forEach((section) =>
-      (section.data || []).forEach((item) =>
-        (item.genres || []).forEach((g) => {
-          if (g) counts[g] = (counts[g] || 0) + 1;
-        }),
-      ),
-    );
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .map((e) => e[0]);
-  }, [groupedData]);
+  // Hero'daki tür çubukları ve filtre modalındaki tür listesi aynı sayımdan
+  // beslenir (izlenme sıklığına göre azalan).
+  const genreStats = useMemo(() => countGenres(groupedData), [groupedData]);
+  const allGenres = useMemo(() => genreStats.map((g) => g.name), [genreStats]);
 
   // Tek geçişte filtrele (arama + tür) + bölüm meta'sını (tür/dk) ve normalize
   // poster'ları önceden hesapla. Dış liste yalnızca başlık render eder (data: []).
@@ -108,6 +86,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
       .map((s) => ({
         title: s.title,
         data: [],
+        count: s.items.length,
         genres: [...new Set(s.items.flatMap((m) => m.genres || []).filter(Boolean))],
         totalMinutes: s.items.reduce((acc, item) => acc + (item.minutes || 0), 0),
         posters: s.items.map((item) => ({
@@ -129,13 +108,16 @@ const MovieStatisticsScreen = ({ navigation }) => {
         posters={section.posters}
         genres={section.genres}
         totalMinutes={section.totalMinutes}
+        count={section.count}
+        itemIcon="film-outline"
         minutesLabel={t.minutes}
         posterMinutesLabel={t.profileScreen?.minutesShort}
         formatDate={formatDate}
+        locale={locale}
         rankColor={borderColorMovie}
       />
     ),
-    [theme, t.minutes, t.profileScreen?.minutesShort, formatDate, borderColorMovie],
+    [theme, t.minutes, t.profileScreen?.minutesShort, formatDate, locale, borderColorMovie],
   );
 
   const onToggleSearch = useCallback(() => setSearchVisible((v) => !v), []);
@@ -173,6 +155,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
         primaryCount={watchedMovieCount}
         primaryLabel={t.profileScreen.movieWatched}
         primarySubLabel={`${i18nText("autoI18n.tekrarsiz", "Tekrarsız")}: ${uniqueMovieCount}`}
+        primaryIcon="film-outline"
         chartDataByPeriod={chartDataByPeriod}
         expanded={expanded}
         onToggleExpand={onToggleExpand}
@@ -183,7 +166,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
         timeDisplayMode={timeDisplayMode}
         onTimePress={handleTimeClick}
         formatDuration={formatTotalDurationTime}
-        genres={heroGenres}
+        genres={genreStats}
         rewatchItems={(mostRewatchedMovies || []).map(({ item, count }) => ({
           title: item.name,
           count,
@@ -209,7 +192,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="profile" iconOpacity={0.25} />
       <StatsCollapsingList
         theme={theme}
         topInset={insets.top + 6}

@@ -12,11 +12,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   Alert,
   ActivityIndicator,
   Modal,
-  KeyboardAvoidingView,
   Platform,
   Animated,
 } from "react-native";
@@ -57,8 +55,6 @@ import {
   ZONES,
   PRICING,
 } from "../../services/usageTrackerService";
-
-const { width } = Dimensions.get("window");
 
 const TABS = [
   { id: "overview", label: "Genel Bakış", icon: "pie-chart" },
@@ -577,7 +573,7 @@ export default function UsageDebugScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="settings" iconOpacity={0.25} />
 
       {/* ── Üst Başlık ve Hızlı Eylemler (Yenile / Kopyala / Sıfırla) ────────── */}
       <View style={styles.header}>
@@ -1208,7 +1204,7 @@ export default function UsageDebugScreen({ navigation }) {
                 </View>
                 <View>
                   <Text style={[styles.sectionTitle, { color: theme.text?.primary || "#fff", marginBottom: 0 }]}>
-                    1. Hatırlatıcı Bildirimleri (Ayarlar > Hatırlatıcılar)
+                    1. Hatırlatıcı Bildirimleri (Ayarlar &gt; Hatırlatıcılar)
                   </Text>
                   <Text style={{ fontSize: 11, color: theme.text?.muted || "#888" }}>
                     Film, dizi, özel notlar ve yayın platformu bildirimleri
@@ -1319,7 +1315,7 @@ export default function UsageDebugScreen({ navigation }) {
                 </View>
                 <View>
                   <Text style={[styles.sectionTitle, { color: theme.text?.primary || "#fff", marginBottom: 0 }]}>
-                    2. Sosyal Bildirimler (Ayarlar > Sosyal)
+                    2. Sosyal Bildirimler (Ayarlar &gt; Sosyal)
                   </Text>
                   <Text style={{ fontSize: 11, color: theme.text?.muted || "#888" }}>
                     Arkadaşlık, beğeni, yorum ve bahsetmeler
@@ -3531,8 +3527,10 @@ export default function UsageDebugScreen({ navigation }) {
           <Animated.View
             onLayout={backupSheet.onSheetLayout}
             style={[
-              styles.modalCard,
-              { backgroundColor: theme.primary, borderColor: theme.border },
+              backupSheet.fit([
+                styles.modalCard,
+                { backgroundColor: theme.primary, borderColor: theme.border },
+              ]),
               backupSheet.sheetStyle,
             ]}
           >
@@ -3912,18 +3910,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 2,
   },
-  heroDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    marginVertical: 12,
-  },
-  heroSummaryGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  heroSummaryItem: { flex: 1 },
-  heroSummaryLabel: { fontSize: 11, fontWeight: "700" },
-  heroSummaryVal: { fontSize: 13, fontWeight: "800", marginTop: 2 },
   sectionCard: {
     borderRadius: 20,
     borderWidth: 1,
@@ -4044,26 +4030,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
   },
-  statRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  statRowLabel: { fontSize: 13.5, fontWeight: "600" },
-  statRowRight: { alignItems: "flex-end" },
-  statRowVal: { fontSize: 15, fontWeight: "800" },
-  statRowCost: { fontSize: 11, marginTop: 1 },
-  collectionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  collectionName: { fontSize: 13.5, fontWeight: "800" },
-  collectionBadges: { flexDirection: "row", gap: 10 },
-  badgeItem: { fontSize: 12, fontWeight: "600" },
   aiMetricRow: {
     flexDirection: "row",
     gap: 12,
@@ -4079,34 +4045,10 @@ const styles = StyleSheet.create({
   aiBoxHeader: { fontSize: 10.5, fontWeight: "900", letterSpacing: 0.5, marginBottom: 4 },
   aiMetricBoxVal: { fontSize: 18, fontWeight: "900" },
   aiMetricBoxLabel: { fontSize: 11, fontWeight: "700", marginTop: 2 },
-  aiMetricBoxSub: { fontSize: 11, fontWeight: "800", marginTop: 4 },
   aiUnitText: { fontSize: 9.5, marginTop: 2 },
-  optItem: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-  },
-  optItemTitle: { fontSize: 13, fontWeight: "800", marginBottom: 4 },
-  optItemText: { fontSize: 12, lineHeight: 16 },
-  guideCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 12,
-    marginBottom: 10,
-  },
-  guideCardTitle: { fontSize: 14, fontWeight: "900", marginBottom: 2 },
-  logItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
   logDot: { width: 8, height: 8, borderRadius: 4 },
   logTitle: { fontSize: 13, fontWeight: "800" },
   logDetail: { fontSize: 11.5, marginTop: 2 },
-  logTime: { fontSize: 11 },
   simulatorDesc: { fontSize: 12.5, lineHeight: 18, marginBottom: 14 },
   simCard: {
     borderRadius: 14,
@@ -4121,7 +4063,6 @@ const styles = StyleSheet.create({
   },
   simUserCount: { fontSize: 14, fontWeight: "800" },
   simMonthlyUsd: { fontSize: 15, fontWeight: "900" },
-  simMonthlyTry: { fontSize: 13, fontWeight: "700", marginTop: 4 },
   zoneCard: {
     borderRadius: 16,
     borderWidth: 1,
@@ -4168,39 +4109,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   zoneOptText: { fontSize: 11.5, lineHeight: 15 },
-  ecoCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
-  },
-  ecoHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  ecoTitleLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    marginRight: 8,
-  },
-  ecoIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  ecoCardTitle: { fontSize: 15, fontWeight: "900" },
-  ecoCategoryText: { fontSize: 11.5, fontWeight: "600", marginTop: 2 },
-  ecoBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  ecoBadgeText: { fontSize: 10.5, fontWeight: "900" },
   ecoPriceStrip: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -4215,24 +4123,6 @@ const styles = StyleSheet.create({
   ecoPriceLabel: { fontSize: 9.5, fontWeight: "800", letterSpacing: 0.5 },
   ecoPriceUsd: { fontSize: 14.5, fontWeight: "900", marginTop: 2 },
   ecoPriceTry: { fontSize: 14.5, fontWeight: "900", marginTop: 2 },
-  ecoInfoBox: {
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 8,
-  },
-  ecoInfoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  ecoInfoText: { fontSize: 12, flex: 1, lineHeight: 16 },
-  ecoNoteBox: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 8,
-    marginTop: 2,
-  },
-  ecoNoteText: { fontSize: 11.5, lineHeight: 16 },
   paramTitle: {
     fontSize: 13,
     fontWeight: "700",

@@ -32,18 +32,13 @@ const T_FONKSIYON_DESEN = /(?<![\w.])t\(\s*(["'])(autoI18n\.[A-Za-z0-9_.-]+)\1/g
 // okuyan desenleri verir — böylece tabloya satır eklenince test onu da korur.
 const DINAMIK_YERLER = [
   {
-    dosya: "screens/tabs/settings/WidgetSettingsScreen.js",
-    // Dosyaya özel `copy(key, fallback)` sarmalayıcısı `autoI18n.${key}` çağırır.
-    // Ayrıca WIDGETS tablosundaki titleKey'ler copy()'ye değişkenle giriyor.
-    desenler: [/\bcopy\(\s*"([A-Za-z0-9_]+)"/g, /\btitleKey:\s*"([A-Za-z0-9_]+)"/g],
-  },
-  {
     dosya: "components/moderation/ReportReasonSheet.js",
     desenler: [/\bkey:\s*"([A-Za-z0-9_]+)"/g], // REASON_UI tablosu
   },
   {
     dosya: "components/notifications/NotificationPrimingSheet.js",
-    desenler: [/\bkey:\s*"([A-Za-z0-9_]+)"/g], // BENEFITS tablosu
+    // BENEFITS tablosu: metin anahtarı `key`, başlık anahtarı `titleKey`.
+    desenler: [/\bkey:\s*"([A-Za-z0-9_]+)"/g, /\btitleKey:\s*"([A-Za-z0-9_]+)"/g],
   },
   {
     dosya: "components/CacheManagerModal.js",

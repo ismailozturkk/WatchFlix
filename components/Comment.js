@@ -10,7 +10,6 @@ import {
   Platform,
   Animated,
   StyleSheet,
-  Dimensions
 } from "react-native";
 import { db } from "../firebase";
 import {
@@ -45,7 +44,8 @@ import ReportReasonSheet from "./moderation/ReportReasonSheet";
 import { clampAvatarIndex } from "../utils/avatars";
 import { alpha } from "../theme/colors";
 import AdaptiveBlurView from "./common/AdaptiveBlurView";
-import ComposerBlur, { ComposerBlurTarget, useComposerBlurTarget } from "./chat/ComposerBlur";
+import ComposerBlur, { COMPOSER_GLASS_PILL_STYLE, ComposerBlurTarget, useComposerBlurTarget } from "./chat/ComposerBlur";
+import { useLiquidGlass } from "../services/liquidGlass";
 import UserAvatar from "./common/UserAvatar";
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
 import * as Haptics from "@services/hapticsService";
@@ -69,10 +69,8 @@ import CommentScopeBar from "./comments/CommentScopeBar";
 import CommentScopeSheet from "./comments/CommentScopeSheet";
 import CommentScopeBadge, { scopeVisual } from "./comments/CommentScopeBadge";
 import { scopeLong } from "./comments/scopeTexts";
-import IconBacground from "./IconBacground";
+import ScreenDecor from "./ScreenDecor";
 
-
-const { height: SCREEN_H } = Dimensions.get("window");
 
 const resolveTmdbAvatar = (path) => {
   if (!path) return null;
@@ -556,6 +554,7 @@ const Comment = ({
   // Şikâyet sayfasının hedefi; null ise sayfa kapalı.
   const [reportTarget, setReportTarget] = useState(null);
   const composerBlur = useComposerBlurTarget();
+  const glass = useLiquidGlass();
 
   const isTv = collectionName === "TvComment";
   const scopeEnabled = isTv;
@@ -1111,7 +1110,7 @@ const Comment = ({
     >
       {/* Arka plan dekoru — yalnız ikon deseni; kar animasyonu yorum modalında
           İSTENMİYOR (dar/kaydırmalı alanda dikkat dağıtıyordu). */}
-      <IconBacground opacity={0.25} />
+      <ScreenDecor scope="details" iconOpacity={0.25} effects={["icon"]} />
       {scopeEnabled && (
         <CommentScopeBar
           theme={theme}
@@ -1362,9 +1361,16 @@ const Comment = ({
           style={[
             styles.composerPill,
             commentInputState.isSpoiler && styles.composerPillSpoiler,
+            // Cam yolunda çerçeve halkası + RN gölgesi kalkar (camın arkasında ikinci
+            // hap / leke gibi görünüyordu); spoiler uyarısı camın kırmızı tonuyla verilir.
+            glass && COMPOSER_GLASS_PILL_STYLE,
           ]}
         >
-          <ComposerBlur target={blurReady ? composerBlur.target : null} theme={theme} />
+          <ComposerBlur
+            target={blurReady ? composerBlur.target : null}
+            theme={theme}
+            tint={commentInputState.isSpoiler ? alpha(theme.colors.red, 0.28) : undefined}
+          />
           {commentInputState.isSpoiler && (
             <Text
               allowFontScaling={false}

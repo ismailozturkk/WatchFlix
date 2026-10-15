@@ -30,7 +30,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { snapshotErrorHandler } from "../utils/firestoreError";
-import { trackFirestoreRead, trackFirestoreWrite } from "./usageTrackerService";
+import { trackFirestoreRead } from "./usageTrackerService";
 
 const PAGE = 30;
 

@@ -6,7 +6,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
-import { buildWatchChartData } from "../../../utils/watchHistory";
+import { buildWatchChartData, countGenres } from "../../../utils/watchHistory";
 import BackButton from "../../../components/BackButton";
 import ScreenDecor from "../../../components/ScreenDecor";
 import {
@@ -32,10 +32,6 @@ const TvStatisticsScreen = ({ navigation }) => {
     handleTimeClick,
     watchedTvCount,
     totalMinutesTimeTv,
-    mostWatchedGenreTv,
-    secondWatchedGenreTv,
-    thirdWatchedGenreTv,
-    topTvGenres,
     totalEpisodesCount,
     totalSeasonsCount,
     uniqueTvCount,
@@ -64,38 +60,20 @@ const TvStatisticsScreen = ({ navigation }) => {
   // "Tekrarsız" ile birebir aynı sözcük olması bilinçli.
   const tekrarsizLabel = i18nText("autoI18n.tekrarsiz", "Tekrarsız");
 
+  const locale = language === "en" ? "en-US" : "tr-TR";
+
   const chartDataByPeriod = useMemo(
     () => Object.fromEntries(["daily", "monthly", "yearly"].map((period) => [
       period,
-      buildWatchChartData(
-        groupedDataTv,
-        (item) => item.episodeMinutes,
-        language === "en" ? "en-US" : "tr-TR",
-        period,
-      ),
+      buildWatchChartData(groupedDataTv, (item) => item.episodeMinutes, locale, period),
     ])),
-    [groupedDataTv, language],
+    [groupedDataTv, locale],
   );
 
-  const heroGenres = useMemo(
-    () => topTvGenres || [mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv].filter((g) => g && g !== "-"),
-    [topTvGenres, mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv],
-  );
-
-  // Filtre modalı için tüm türler (izlenme sıklığına göre azalan).
-  const allGenres = useMemo(() => {
-    const counts = {};
-    (groupedDataTv || []).forEach((section) =>
-      (section.data || []).forEach((item) =>
-        (item.genres || []).forEach((g) => {
-          if (g) counts[g] = (counts[g] || 0) + 1;
-        }),
-      ),
-    );
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .map((e) => e[0]);
-  }, [groupedDataTv]);
+  // Hero'daki tür çubukları ve filtre modalındaki tür listesi aynı sayımdan
+  // beslenir (izlenme sıklığına göre azalan). Sayım bölüm bazlıdır.
+  const genreStats = useMemo(() => countGenres(groupedDataTv), [groupedDataTv]);
+  const allGenres = useMemo(() => genreStats.map((g) => g.name), [genreStats]);
 
   const sections = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -120,6 +98,7 @@ const TvStatisticsScreen = ({ navigation }) => {
       .map((s) => ({
         title: s.title,
         data: [],
+        count: s.items.length,
         genres: [...new Set(s.items.flatMap((e) => e.genres || []).filter(Boolean))],
         totalMinutes: s.items.reduce((acc, item) => acc + (item.episodeMinutes || 0), 0),
         posters: s.items.map((item) => ({
@@ -143,13 +122,16 @@ const TvStatisticsScreen = ({ navigation }) => {
         posters={section.posters}
         genres={section.genres}
         totalMinutes={section.totalMinutes}
+        count={section.count}
+        itemIcon="play-circle-outline"
         minutesLabel={t.minutes}
         posterMinutesLabel={t.profileScreen?.minutesShort}
         formatDate={formatDate}
+        locale={locale}
         rankColor={borderColorTv}
       />
     ),
-    [theme, t.minutes, t.profileScreen?.minutesShort, formatDate, borderColorTv],
+    [theme, t.minutes, t.profileScreen?.minutesShort, formatDate, locale, borderColorTv],
   );
 
   const onToggleSearch = useCallback(() => setSearchVisible((v) => !v), []);
@@ -187,12 +169,15 @@ const TvStatisticsScreen = ({ navigation }) => {
         primaryCount={watchedTvCount}
         primaryLabel={t.profileScreen.tvShowWatched}
         primarySubLabel={`${tekrarsizLabel}: ${uniqueTvCount}`}
+        primaryIcon="tv-outline"
         secondaryCount={totalEpisodesCount}
         secondaryLabel={t.profileScreen.tvShowEpisodetotalCount}
         secondarySubLabel={`${tekrarsizLabel}: ${uniqueEpisodesCount}`}
+        secondaryIcon="play-circle-outline"
         tertiaryCount={totalSeasonsCount}
         tertiaryLabel={t.profileScreen.tvShowSeasonCount}
         tertiarySubLabel={`${tekrarsizLabel}: ${uniqueSeasonsCount}`}
+        tertiaryIcon="layers-outline"
         chartDataByPeriod={chartDataByPeriod}
         expanded={expanded}
         onToggleExpand={onToggleExpand}
@@ -203,7 +188,7 @@ const TvStatisticsScreen = ({ navigation }) => {
         timeDisplayMode={timeDisplayMode}
         onTimePress={handleTimeClick}
         formatDuration={formatTotalDurationTime}
-        genres={heroGenres}
+        genres={genreStats}
         rewatchItems={(mostRewatchedTv || []).map(({ item, count }) => ({
           title: item.name,
           count,
@@ -229,7 +214,7 @@ const TvStatisticsScreen = ({ navigation }) => {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="profile" iconOpacity={0.25} />
       <StatsCollapsingList
         theme={theme}
         topInset={insets.top + 6}

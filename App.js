@@ -18,6 +18,7 @@ import {
   DeviceEventEmitter,
 } from "react-native";
 import { flushSnapshotWrites } from "./services/snapshotCache";
+import UserDataSyncHost from "./components/UserDataSyncHost";
 import {
   BLUR_SCOPES,
   BlurTargetProvider,
@@ -59,6 +60,7 @@ import Toast from "react-native-toast-message";
 import { i18nText } from "./utils/i18nText";
 import { toastConfig } from "@components/AppToast";
 import { AppAlertHost } from "@components/AppAlert";
+import { PremiumUpsellHost } from "@components/premium/PremiumUpsellSheet";
 import { ensureListsRoot } from "./services/listItemsService";
 import { LIBRARY_ERROR, classifyLibraryError } from "./utils/libraryCore";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -73,6 +75,7 @@ import { UserProfileProvider }      from "./context/UserProfileContext";
 import { FriendsProvider }          from "./context/FriendsContext";
 import { NotificationsProvider }    from "./context/NotificationsContext";
 import { UnreadMessagesProvider }   from "./context/UnreadMessagesContext";
+import { reconcileAppIconWithSystem } from "./services/appIconService";
 import { DeviceNotificationsProvider } from "./context/DeviceNotificationsContext";
 import { PostsProvider }            from "./context/PostsContext";
 import { TvShowProvider } from "./context/TvShowContex";
@@ -398,7 +401,11 @@ function AppContent() {
           getComponent={() => require("./screens/tv/TvShowsDetails").default}
           options={{
             headerShown: false,
-            presentation: "transparentModal",
+            // `transparentModal` iOS'ta UIModalPresentationOverFullScreen olur:
+            // bu bir modal sunumdur, push değil; kenardan kaydırarak geri
+            // gitme hareketi (interactivePopGestureRecognizer) çalışmaz.
+            // Ekran zaten opak (theme.primary) olduğundan şeffaflığa ihtiyacı
+            // yok; MovieDetails ile aynı şekilde normal push olarak açılır.
           }}
         />
         <Stack.Screen
@@ -657,6 +664,16 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="DecorScopesScreen"
+          getComponent={() => require("./screens/tabs/settings/DecorScopesScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PremiumUsageScreen"
+          getComponent={() => require("./screens/tabs/settings/PremiumUsageScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="PosterSettingsScreen"
           getComponent={() => require("./screens/tabs/settings/PosterSettingsScreen").default}
           options={{ headerShown: false }}
@@ -664,6 +681,11 @@ function AppContent() {
         <Stack.Screen
           name="PermissionsDataScreen"
           getComponent={() => require("./screens/tabs/settings/PermissionsDataScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="BackupSettingsScreen"
+          getComponent={() => require("./screens/tabs/settings/BackupSettingsScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
@@ -806,6 +828,9 @@ function AppContent() {
         visibilityTime={3000}
       />
       <AppAlertHost />
+      {/* Premium yükseltme sayfası: kapılar (hooks/usePremiumGate.js) bunu açar.
+          PremiumProvider içinde olmak zorunda (mağaza fiyatını okur). */}
+      <PremiumUpsellHost />
       <StatusBar style={isLightSurface(theme.primary) ? "dark" : "light"} />
     </NavigationContainer>
   );
@@ -833,6 +858,15 @@ export default wrapRoot(function App() {
     return () => {
       alive = false;
     };
+  }, [storageReady]);
+
+  // Uygulama içi logoların kaynağı (appIconStore, MMKV önbelleği) sistemin GERÇEK
+  // simgesiyle eşitlenir: yeniden kurulum ya da sistem tarafı değişiklik sonrası
+  // giriş/splash/paylaşım logoları launcher'daki simgeyle aynı kalsın. Göçten
+  // sonra çalışır — önbellek göçle gelen değeri okumuş olmalı.
+  useEffect(() => {
+    if (!storageReady) return;
+    reconcileAppIconWithSystem();
   }, [storageReady]);
 
   useEffect(() => {
@@ -948,6 +982,12 @@ export default wrapRoot(function App() {
               <ThemeProvider>
               <SnowProvider>
                 <AuthProvider>
+                  {/* Yerel-öncelikli veri katmanı (notlar, medya notları,
+                      hatırlatıcılar): giriş/öne gelme/ağ dönüşünde bekleyen
+                      yazımları buluta boşaltır, kopyası olmayan alanları TEK
+                      SEFER indirir. Görsel çıktısı yok; context'lerden ÖNCE
+                      mount olur ki ilk indirme onları beklemesin. */}
+                  <UserDataSyncHost />
                   {/* UserProfile DIŞTA: PremiumProvider sunucu planını
                       (Users/{uid}.entitlements) profilden okur. */}
                   <UserProfileProvider>

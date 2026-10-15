@@ -2,22 +2,41 @@ import React, { memo } from "react";
 import {
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   Platform,
+  StatusBar,
 } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import GlassIconButton from "../common/GlassIconButton";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 
 function StoryHeaderComponent({ busy, onBack, onOpenDrafts, onSaveDraft }) {
   const { theme } = useTheme();
-  const btn = [styles.btn, { backgroundColor: theme.secondary, opacity: busy ? 0.5 : 1 }];
+  const insets = useSafeAreaInsets();
+  // Üst boşluk cihazın gerçek güvenli alanından gelir (çentik, Dynamic Island,
+  // klasik 20pt durum çubuğu); sabit 56/40 küçük ekranda boşa yer yiyor,
+  // büyük çentikte ise butonları durum çubuğunun altında bırakıyordu.
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0
+  );
+  // Eski (cam yokken) kutu meşgulken yarı saydam kalır; cam yolunda opaklık
+  // verilmez (fallbackStyle yalnız eski yolda uygulanır) — ikonlar soluklaşır.
+  const fallbackBox = { backgroundColor: theme.secondary, opacity: busy ? 0.5 : 1 };
+  const iconColor = busy ? theme.text.muted : theme.text.primary;
   return (
-    <View style={styles.header}>
-      <TouchableOpacity activeOpacity={0.8} onPress={onBack} style={btn}>
-        <Ionicons name="close" size={22} color={theme.text.primary} />
-      </TouchableOpacity>
+    <View style={[styles.header, { paddingTop: topInset + 8 }]}>
+      <GlassIconButton
+        icon="close"
+        iconSize={22}
+        size={40}
+        fallbackRadius={12}
+        color={iconColor}
+        fallbackStyle={fallbackBox}
+        accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+        onPress={onBack}
+      />
       <Text
         allowFontScaling={false}
         style={[styles.title, { color: theme.text.primary }]}
@@ -26,12 +45,28 @@ function StoryHeaderComponent({ busy, onBack, onOpenDrafts, onSaveDraft }) {
         {i18nText("autoI18n.story_tasarla", "Story Tasarla")}
       </Text>
       <View style={styles.right}>
-        <TouchableOpacity activeOpacity={0.8} onPress={onOpenDrafts} disabled={busy} style={btn}>
-          <Ionicons name="folder-open-outline" size={19} color={theme.text.primary} />
-        </TouchableOpacity>
-        <TouchableOpacity activeOpacity={0.8} onPress={onSaveDraft} disabled={busy} style={btn}>
-          <Ionicons name="save-outline" size={19} color={theme.accent} />
-        </TouchableOpacity>
+        <GlassIconButton
+          icon="folder-open-outline"
+          iconSize={19}
+          size={40}
+          fallbackRadius={12}
+          color={iconColor}
+          fallbackStyle={fallbackBox}
+          disabled={busy}
+          accessibilityLabel={i18nText("autoI18n.taslaklar", "Taslaklar")}
+          onPress={onOpenDrafts}
+        />
+        <GlassIconButton
+          icon="save-outline"
+          iconSize={19}
+          size={40}
+          fallbackRadius={12}
+          color={busy ? theme.text.muted : theme.accent}
+          fallbackStyle={fallbackBox}
+          disabled={busy}
+          accessibilityLabel={i18nText("autoI18n.kaydet", "Kaydet")}
+          onPress={onSaveDraft}
+        />
       </View>
     </View>
   );
@@ -45,16 +80,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" ? 56 : 40,
     paddingBottom: 10,
   },
-  btn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: { flex: 1, fontSize: 17, fontWeight: "900" },
+  title: { flex: 1, minWidth: 0, fontSize: 17, fontWeight: "900" },
   right: { flexDirection: "row", gap: 10 },
 });

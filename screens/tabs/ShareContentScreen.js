@@ -10,19 +10,13 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   FlatList,
-  Dimensions,
   RefreshControl,
-  Animated,
-  Pressable,
   ActivityIndicator,
   Modal,
 } from "react-native";
 import { Image } from "expo-image";
 import AppIcon from "../../components/AppIcon";
-import { LinearGradient } from "expo-linear-gradient";
-import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../../context/ThemeContext";
@@ -40,994 +34,45 @@ import SaveSharedListModal from "@components/modals/SaveSharedListModal";
 import PostCommentSheetModal from "@components/modals/PostCommentSheetModal";
 import StaggerItem from "@components/StaggerItem";
 import BackButton from "@components/BackButton";
-import RatingStars from "../../components/RatingStars";
-import PollMessage from "@components/chat/PollMessage";
+import FeedPostCard from "@components/feed/FeedPostCard";
+import {
+  FeedComposerCard,
+  MyPostsLink,
+  FeedTrendingRail,
+  FeedFilterBar,
+  FeedSortBar,
+} from "@components/feed/FeedHeaderSections";
 import { FeedSkeleton } from "@components/Skeleton";
-import UserAvatar from "../../components/common/UserAvatar";
 import { i18nText } from "../../utils/i18nText";
 import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
 import { reportPost } from "../../services/postsService";
 import axios from "axios";
 import ScreenDecor from "@components/ScreenDecor";
-
-const { width } = Dimensions.get("window");
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Feed filtre anahtarları — tip olanlar (review/list/text/poll) composer'ın
-// ürettiği `post.type` değerleriyle birebir aynı olmalı; all/following sanal.
-const POST_TYPES = {
-  ALL: "all",
-  REVIEW: "review",
-  LIST: "list",
-  TEXT: "text",
-  POLL: "poll",
-  FOLLOWING: "following",
-};
-
-const formatTimeAgo = (timestamp, ago) => {
-  if (!timestamp) return "";
-  const diffMs = Date.now() - timestamp;
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) return ago.now;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} ${ago.minute}`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} ${ago.hour}`;
-  const d = Math.floor(hr / 24);
-  if (d < 7) return `${d} ${ago.day}`;
-  const w = Math.floor(d / 7);
-  return `${w} ${ago.week}`;
-};
-
-// ─── Memoized Components ──────────────────────────────────────────────────────
-
-const TrendingRail = memo(function TrendingRail({ theme, label, data, onPressItem }) {
-  const renderItem = useCallback(
-    ({ item, index }) => (
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => onPressItem?.(item)}
-        style={[trStyles.card, { borderColor: theme.border }]}
-      >
-        <Image
-          source={{ uri: item.poster }}
-          style={trStyles.poster}
-          contentFit="cover"
-          recyclingKey={`trending-${item.id}`}
-          cachePolicy="memory-disk"
-          transition={120}
-        />
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.85)"]}
-          style={trStyles.gradient}
-        />
-        <View style={trStyles.rankBadge}>
-          <Text style={trStyles.rankText}>#{index + 1}</Text>
-        </View>
-        <Text style={trStyles.title} numberOfLines={1}>
-          {item.title}
-        </Text>
-      </TouchableOpacity>
-    ),
-    [theme.border, onPressItem],
-  );
-
-  if (!data || data.length === 0) return null;
-
-  return (
-    <View style={trStyles.container}>
-      <View style={trStyles.headerRow}>
-        <AppIcon family="MaterialCommunityIcons" name="fire" size={18} color="#FF8A00" />
-        <Text style={[trStyles.headerLabel, { color: theme.text.primary }]}>
-          {label}
-        </Text>
-      </View>
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={data}
-        keyExtractor={(it) => String(it.id)}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-      />
-    </View>
-  );
-});
-
-const FilterChips = memo(function FilterChips({ theme, t, active, onChange }) {
-  const items = [
-    { key: POST_TYPES.ALL, label: t.filters.all, icon: "apps-outline" },
-    { key: POST_TYPES.REVIEW, label: t.filters.reviews, icon: "star-outline" },
-    { key: POST_TYPES.LIST, label: t.filters.lists, icon: "list-outline" },
-    {
-      key: POST_TYPES.TEXT,
-      label: t.filters.texts,
-      icon: "chatbubble-ellipses-outline",
-    },
-    {
-      key: POST_TYPES.POLL,
-      label: t.filters.polls,
-      icon: "stats-chart-outline",
-    },
-    {
-      key: POST_TYPES.FOLLOWING,
-      label: t.filters.following,
-      icon: "people-outline",
-    },
-  ];
-  return (
-    <View style={chipStyles.container}>
-      {items.map((item) => {
-        const isActive = active === item.key;
-        return (
-          <Pressable
-            key={item.key}
-            onPress={() => onChange(item.key)}
-            style={({ pressed }) => [
-              chipStyles.chip,
-              {
-                backgroundColor: isActive ? theme.accent : theme.secondary,
-                borderColor: isActive ? theme.accent : theme.border,
-                transform: [{ scale: pressed ? 0.96 : 1 }],
-              },
-            ]}
-          >
-            <AppIcon
-              family="Ionicons"
-              name={item.icon}
-              size={14}
-              color={isActive ? "#fff" : theme.text.secondary}
-            />
-            <Text
-              style={[
-                chipStyles.label,
-                {
-                  color: isActive ? "#fff" : theme.text.secondary,
-                  fontWeight: isActive ? "700" : "600",
-                },
-              ]}
-            >
-              {item.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-});
-
-const SortChips = memo(function SortChips({ theme, t, active, onChange }) {
-  const items = [
-    { key: "recent", label: t.sort?.recent || "Tarih", icon: "calendar-outline" },
-    { key: "likes", label: t.sort?.likes || "Beğeni", icon: "heart-outline" },
-    { key: "comments", label: t.sort?.comments || "Yorum", icon: "chatbubble-outline" },
-  ];
-
-  return (
-    <View style={chipStyles.sortSection}>
-      <View style={chipStyles.sortLabelRow}>
-        <AppIcon family="Ionicons" name="swap-vertical" size={14} color={theme.text.muted} />
-        <Text style={[chipStyles.sortLabel, { color: theme.text.muted }]}>
-          {t.sort?.label || "Sırala"}
-        </Text>
-      </View>
-      <View style={chipStyles.sortOptions}>
-        {items.map((item) => {
-          const isActive = active === item.key;
-          return (
-            <Pressable
-              key={item.key}
-              onPress={() => onChange(item.key)}
-              style={({ pressed }) => [
-                chipStyles.sortChip,
-                {
-                  backgroundColor: isActive ? theme.accent + "1F" : theme.secondary,
-                  borderColor: isActive ? theme.accent : theme.border,
-                  opacity: pressed ? 0.75 : 1,
-                },
-              ]}
-            >
-              <AppIcon
-                family="Ionicons"
-                name={item.icon}
-                size={14}
-                color={isActive ? theme.accent : theme.text.secondary}
-              />
-              <Text
-                style={[
-                  chipStyles.sortChipText,
-                  { color: isActive ? theme.accent : theme.text.secondary },
-                ]}
-              >
-                {item.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-});
-
-const LikeButton = memo(function LikeButton({ liked, count, onPress, theme }) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const handlePress = useCallback(() => {
-    Animated.sequence([
-      Animated.spring(scale, { toValue: 1.3, useNativeDriver: true, friction: 4 }),
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 4 }),
-    ]).start();
-    onPress();
-  }, [onPress, scale]);
-
-  return (
-    <TouchableOpacity
-      style={postStyles.actionBtn}
-      onPress={handlePress}
-      activeOpacity={0.7}
-    >
-      <Animated.View style={{ transform: [{ scale }] }}>
-        <AppIcon
-          family="Ionicons"
-          name={liked ? "heart" : "heart-outline"}
-          size={19}
-          color={liked ? "#FF5A5F" : theme.text.secondary}
-        />
-      </Animated.View>
-      <Text
-        style={[
-          postStyles.actionText,
-          { color: liked ? "#FF5A5F" : theme.text.secondary },
-        ]}
-      >
-        {count}
-      </Text>
-    </TouchableOpacity>
-  );
-});
-
-// Spoiler'lı postlarda posterler bulanıklaştırılır; "Spoiler'ı göster/gizle"
-// ile blur açılıp kapanır. Küçük ve geniş posterler için ayrı yarıçap.
-const SPOILER_BLUR = 16;
-const SPOILER_BLUR_WIDE = 22;
-
-const PostCard = memo(function PostCard({
-  post,
-  showTopDivider,
-  theme,
-  t,
-  currentUid,
-  currentUserAvatar,
-  onLike,
-  onBookmark,
-  onComment,
-  onEdit,
-  onDelete,
-  onPressAuthor,
-  onReport,
-  onVote,
-  onSaveList,
-  getTmdbUrl,
-  postListPosterLayout,
-}) {
-  const [spoilerRevealed, setSpoilerRevealed] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const showSpoiler = post.hasSpoiler && !spoilerRevealed;
-  const isOwner = currentUid && (post.authorId === currentUid || post.userId === currentUid);
-
-  const accentColor =
-    post.type === "list"
-      ? theme.colors?.green || "#3ddc84"
-      : post.type === "poll"
-        ? theme.colors?.purple || "#a855f7"
-        : theme.colors?.blue || "#4a7cf6";
-  const typeBadgeLabel =
-    post.type === "list"
-      ? t.badges.list
-      : post.type === "poll"
-        ? i18nText("autoI18n.anket", "Anket")
-        : post.type === "text"
-          ? i18nText("autoI18n.sohbet", "Sohbet")
-          : t.badges.review;
-
-  const timeText = formatTimeAgo(post._createdAtMs || 0, t.timeAgo);
-
-  const joinedListPosters =
-    post.type === "list" && postListPosterLayout === "joined";
-
-  const mediaPreview =
-    !post.mediaList || post.mediaList.length === 0 ? null : post.mediaList.length === 1 ? (
-      <View style={[postStyles.mediaCardWide, { borderColor: theme.border }]}>
-        <Image
-          source={{ uri: post.mediaList[0].poster }}
-          style={postStyles.mediaPosterWide}
-          contentFit="cover"
-          blurRadius={showSpoiler ? SPOILER_BLUR_WIDE : 0}
-        />
-      </View>
-    ) : (
-      <FlatList
-        horizontal
-        data={post.mediaList}
-        keyExtractor={(m) => String(m.id)}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          gap: joinedListPosters ? 0 : 10,
-          paddingVertical: 6,
-          paddingRight: 12,
-        }}
-        renderItem={({ item, index }) => (
-          <View
-            style={[
-              postStyles.mediaCard,
-              { borderColor: theme.border },
-              joinedListPosters && {
-                borderWidth: 0,
-                borderTopLeftRadius: index === 0 ? 13 : 0,
-                borderBottomLeftRadius: index === 0 ? 13 : 0,
-                borderTopRightRadius: index === post.mediaList.length - 1 ? 13 : 0,
-                borderBottomRightRadius: index === post.mediaList.length - 1 ? 13 : 0,
-              },
-            ]}
-          >
-            <Image
-              source={{ uri: item.poster }}
-              style={postStyles.mediaPoster}
-              contentFit="cover"
-              blurRadius={showSpoiler ? SPOILER_BLUR : 0}
-            />
-            {post.ranked && (
-              <View style={[postStyles.rankNum, { backgroundColor: accentColor }]}>
-                <Text style={postStyles.rankNumText}>{index + 1}</Text>
-              </View>
-            )}
-            {item.year ? (
-              <View style={postStyles.mediaYear}>
-                <Text style={postStyles.mediaYearText}>{item.year}</Text>
-              </View>
-            ) : null}
-          </View>
-        )}
-      />
-    );
-
-  return (
-    <View
-      style={[
-        postStyles.card,
-        {
-          backgroundColor: theme.primary,
-          borderColor: theme.border,
-          borderTopWidth: showTopDivider ? StyleSheet.hairlineWidth : 0,
-        },
-      ]}
-    >
-      <View style={postStyles.postLayout}>
-        <TouchableOpacity
-          style={postStyles.avatarColumn}
-          activeOpacity={0.7}
-          onPress={() => onPressAuthor?.(post)}
-        >
-          {isOwner && currentUserAvatar ? (
-            <UserAvatar source={currentUserAvatar} size={42} borderWidth={1.5} borderColor={accentColor + "66"} />
-          ) : (
-            <UserAvatar
-              avatarIndex={post.authorAvatarIndex}
-              photoURL={post.authorPhotoURL || (typeof post.authorAvatar === "string" ? post.authorAvatar : null)}
-              isCustomPhoto
-              size={42}
-              borderWidth={1.5}
-              borderColor={accentColor + "66"}
-            />
-          )}
-        </TouchableOpacity>
-
-        <View style={postStyles.mainColumn}>
-          {/* Kullanıcı + zaman + menü */}
-          <View style={postStyles.header}>
-            <View style={postStyles.identityRow}>
-              <Text
-                style={[postStyles.userName, { color: theme.text.primary }]}
-                numberOfLines={1}
-              >
-                {post.authorName || i18nText("autoI18n.kullanici", "Kullanıcı")}
-              </Text>
-              <Text style={[postStyles.time, { color: theme.text.muted }]}>
-                · {timeText}
-              </Text>
-            </View>
-
-            <View style={postStyles.headerBadges}>
-              <View
-                style={[
-                  postStyles.badge,
-                  {
-                    backgroundColor: accentColor + "1A",
-                    borderColor: accentColor + "44",
-                  },
-                ]}
-              >
-                <Text style={[postStyles.badgeText, { color: accentColor }]}>
-                  {typeBadgeLabel}
-                </Text>
-              </View>
-              {post.hasSpoiler && (
-                <View
-                  style={[
-                    postStyles.badge,
-                    {
-                      backgroundColor: "rgba(240,79,79,0.12)",
-                      borderColor: "rgba(240,79,79,0.4)",
-                    },
-                  ]}
-                >
-                  <Text style={[postStyles.badgeText, { color: "#f04f4f" }]}>
-                    {t.badges.spoiler}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <TouchableOpacity
-              style={postStyles.menuButton}
-              hitSlop={8}
-              onPress={() => setMenuOpen(true)}
-            >
-              <AppIcon
-                family="Feather"
-                name="more-horizontal"
-                size={19}
-                color={theme.text.muted}
-              />
-            </TouchableOpacity>
-          </View>
-
-      {/* Action menu sheet */}
-      <Modal
-        visible={menuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setMenuOpen(false)}
-      >
-        <Pressable
-          style={menuStyles.backdrop}
-          onPress={() => setMenuOpen(false)}
-        >
-          <ModalBlurBackdrop intensity={25} />
-          <View
-            style={[
-              menuStyles.sheet,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <View
-              style={[menuStyles.handle, { backgroundColor: theme.border }]}
-            />
-
-            {/* İçerik önizleme (sohbet ekranı stili minyatür) */}
-            <View
-              style={[
-                menuStyles.previewCard,
-                { backgroundColor: theme.primary, borderColor: theme.border },
-              ]}
-            >
-              {(() => {
-                const posters = (post.mediaList || [])
-                  .filter((m) => m?.poster)
-                  .slice(0, 3);
-                if (posters.length === 0) {
-                  return (
-                    <View
-                      style={[
-                        menuStyles.previewPoster,
-                        {
-                          backgroundColor: theme.border,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        },
-                      ]}
-                    >
-                      <AppIcon
-                        family="Ionicons"
-                        name="film-outline"
-                        size={20}
-                        color={theme.text.muted}
-                      />
-                    </View>
-                  );
-                }
-                // Birden çok poster → arka arkaya yığılmış göster.
-                return (
-                  <View
-                    style={[
-                      menuStyles.previewStack,
-                      { width: 52 + (posters.length - 1) * 16 },
-                    ]}
-                  >
-                    {posters.map((m, i) => (
-                      <Image
-                        key={`${m.id}-${i}`}
-                        source={{ uri: m.poster }}
-                        style={[
-                          menuStyles.previewPoster,
-                          menuStyles.previewStackItem,
-                          {
-                            left: i * 16,
-                            zIndex: posters.length - i,
-                            borderColor: theme.secondary,
-                          },
-                        ]}
-                        contentFit="cover"
-                      />
-                    ))}
-                  </View>
-                );
-              })()}
-              <View style={menuStyles.previewTextCol}>
-                <View
-                  style={[
-                    menuStyles.previewBadge,
-                    {
-                      backgroundColor: accentColor + "22",
-                      borderColor: accentColor + "55",
-                    },
-                  ]}
-                >
-                  <Text style={[menuStyles.previewBadgeText, { color: accentColor }]}>
-                    {typeBadgeLabel}
-                  </Text>
-                </View>
-                <Text
-                  style={[menuStyles.previewTitle, { color: theme.text.primary }]}
-                  numberOfLines={1}
-                >
-                  {post.title}
-                </Text>
-                {post.content ? (
-                  <Text
-                    style={[menuStyles.previewContent, { color: theme.text.secondary }]}
-                    numberOfLines={2}
-                  >
-                    {post.content}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-
-            {/* Aksiyonlar — yan yana */}
-            {isOwner ? (
-              <View style={menuStyles.actionRow}>
-                <Pressable
-                  style={[
-                    menuStyles.actionHalf,
-                    { backgroundColor: theme.primary, borderColor: theme.border },
-                  ]}
-                  onPress={() => {
-                    setMenuOpen(false);
-                    onEdit?.(post);
-                  }}
-                >
-                  <View
-                    style={[
-                      menuStyles.actionIconBox,
-                      { backgroundColor: (theme.colors?.blue || "#4a7cf6") + "22" },
-                    ]}
-                  >
-                    <AppIcon
-                      family="Ionicons"
-                      name="create-outline"
-                      size={20}
-                      color={theme.colors?.blue || "#4a7cf6"}
-                    />
-                  </View>
-                  <Text
-                    style={[menuStyles.actionHalfText, { color: theme.text.primary }]}
-                  >
-                    {t.menu.edit}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    menuStyles.actionHalf,
-                    { backgroundColor: theme.primary, borderColor: theme.border },
-                  ]}
-                  onPress={() => {
-                    setMenuOpen(false);
-                    setConfirmDelete(true);
-                  }}
-                >
-                  <View
-                    style={[
-                      menuStyles.actionIconBox,
-                      { backgroundColor: "rgba(240,79,79,0.15)" },
-                    ]}
-                  >
-                    <AppIcon family="Ionicons" name="trash-outline" size={20} color="#f04f4f" />
-                  </View>
-                  <Text style={[menuStyles.actionHalfText, { color: "#f04f4f" }]}>
-                    {t.menu.delete}
-                  </Text>
-                </Pressable>
-              </View>
-            ) : (
-              <Pressable
-                style={[
-                  menuStyles.actionFull,
-                  { backgroundColor: theme.primary, borderColor: theme.border },
-                ]}
-                onPress={() => {
-                  setMenuOpen(false);
-                  onReport?.(post);
-                }}
-              >
-                <View
-                  style={[
-                    menuStyles.actionIconBox,
-                    { backgroundColor: theme.secondary },
-                  ]}
-                >
-                  <AppIcon family="Ionicons" name="flag-outline" size={20} color={theme.text.primary} />
-                </View>
-                <Text style={[menuStyles.actionHalfText, { color: theme.text.primary }]}>
-                  {t.menu.report}
-                </Text>
-              </Pressable>
-            )}
-
-            <Pressable style={menuStyles.cancelRow} onPress={() => setMenuOpen(false)}>
-              <Text style={[menuStyles.itemText, { color: theme.text.muted }]}>
-                {t.menu.cancel}
-              </Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Delete confirmation */}
-      <Modal
-        visible={confirmDelete}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setConfirmDelete(false)}
-      >
-        <View style={menuStyles.backdrop}>
-          <ModalBlurBackdrop intensity={25} />
-          <View
-            style={[
-              menuStyles.dialog,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <View style={menuStyles.dialogIconWrap}>
-              <AppIcon family="Ionicons" name="alert-circle" size={36} color="#f04f4f" />
-            </View>
-            <Text
-              style={[menuStyles.dialogTitle, { color: theme.text.primary }]}
-            >
-              {t.deleteConfirm.title}
-            </Text>
-            <Text
-              style={[menuStyles.dialogMsg, { color: theme.text.secondary }]}
-            >
-              {t.deleteConfirm.message}
-            </Text>
-            <View style={menuStyles.dialogActions}>
-              <Pressable
-                style={[
-                  menuStyles.dialogBtn,
-                  { backgroundColor: theme.primary, borderColor: theme.border },
-                ]}
-                onPress={() => setConfirmDelete(false)}
-              >
-                <Text
-                  style={[menuStyles.dialogBtnText, { color: theme.text.primary }]}
-                >
-                  {t.deleteConfirm.cancel}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  menuStyles.dialogBtn,
-                  { backgroundColor: "#f04f4f", borderColor: "#f04f4f" },
-                ]}
-                onPress={() => {
-                  setConfirmDelete(false);
-                  onDelete?.(post.id);
-                }}
-              >
-                <Text style={[menuStyles.dialogBtnText, { color: "#fff" }]}>
-                  {t.deleteConfirm.confirm}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Spoiler göster/gizle (post üstünde) */}
-      {post.hasSpoiler && (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setSpoilerRevealed((v) => !v)}
-          style={[
-            postStyles.spoilerToggle,
-            {
-              borderColor: "rgba(240,79,79,0.4)",
-              backgroundColor: "rgba(240,79,79,0.08)",
-            },
-          ]}
-        >
-          <AppIcon
-            family="Ionicons"
-            name={spoilerRevealed ? "eye-off-outline" : "eye-outline"}
-            size={15}
-            color="#f04f4f"
-          />
-          <Text style={postStyles.spoilerToggleText}>
-            {spoilerRevealed
-              ? t.spoiler?.hide || i18nText("autoI18n.spoileri_gizle", "Spoiler'ı gizle")
-              : t.spoiler?.show || i18nText("autoI18n.spoileri_goster", "Spoiler'ı göster")}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Body */}
-      {post.type === "poll" && post.poll ? (
-        <>
-          <Text style={[postStyles.title, { color: theme.text.primary }]}>
-            {post.title}
-          </Text>
-          <View
-            style={[
-              postStyles.pollWrap,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <PollMessage
-              poll={post.poll}
-              currentUid={currentUid}
-              accent={accentColor}
-              getTmdbUrl={getTmdbUrl}
-              onVote={(optId) => onVote?.(post.id, optId)}
-              variant="feed"
-              theme={theme}
-            />
-          </View>
-        </>
-      ) : post.type === "review" && post.mediaList?.length > 0 ? (
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          <View style={{ alignItems: "center" }}>
-            <View
-              style={[
-                postStyles.mediaCard,
-                { borderColor: theme.border },
-              ]}
-            >
-              <Image
-                source={{ uri: post.mediaList[0].poster }}
-                style={postStyles.mediaPoster}
-                contentFit="cover"
-                blurRadius={showSpoiler ? SPOILER_BLUR : 0}
-              />
-            </View>
-            {post.userRating > 0 && (
-              <View
-                style={[
-                  postStyles.ratingPill,
-                  {
-                    backgroundColor: theme.secondary,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <RatingStars rating={post.userRating} max={5} size={11} />
-                <Text
-                  style={[
-                    postStyles.ratingNumber,
-                    { color: theme.text.primary },
-                  ]}
-                >
-                  {post.userRating}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text
-              style={[postStyles.title, { color: theme.text.primary }]}
-              numberOfLines={2}
-            >
-              {post.title}
-            </Text>
-            {showSpoiler ? (
-              // Spoiler kart — content yerine geçer, kayma/taşma yok
-              <Pressable
-                onPress={() => setSpoilerRevealed(true)}
-                style={[
-                  postStyles.spoilerCard,
-                  {
-                    backgroundColor: theme.secondary,
-                    borderColor: "rgba(240,79,79,0.4)",
-                  },
-                ]}
-              >
-                <AppIcon family="Ionicons" name="eye-off" size={20} color="#f04f4f" />
-                <Text
-                  style={[
-                    postStyles.spoilerCardText,
-                    { color: theme.text.primary },
-                  ]}
-                  numberOfLines={2}
-                >
-                  {t.spoiler.hidden}
-                </Text>
-                <View
-                  style={[
-                    postStyles.spoilerCardBtn,
-                    { backgroundColor: "rgba(240,79,79,0.18)" },
-                  ]}
-                >
-                  <Text style={postStyles.spoilerCardBtnText}>
-                    {t.spoiler.reveal}
-                  </Text>
-                </View>
-              </Pressable>
-            ) : (
-              <Text
-                style={[postStyles.content, { color: theme.text.secondary }]}
-              >
-                {post.content}
-              </Text>
-            )}
-          </View>
-        </View>
-      ) : (
-        <>
-          {(!showSpoiler || post.type !== "list") && (
-            <Text style={[postStyles.title, { color: theme.text.primary }]}>
-              {post.title}
-            </Text>
-          )}
-          {showSpoiler ? (
-            <>
-              <Pressable
-                onPress={() => setSpoilerRevealed(true)}
-                style={[
-                  postStyles.spoilerCard,
-                  {
-                    backgroundColor: theme.secondary,
-                    borderColor: "rgba(240,79,79,0.4)",
-                  },
-                ]}
-              >
-                <AppIcon family="Ionicons" name="eye-off" size={20} color="#f04f4f" />
-                <Text
-                  style={[postStyles.spoilerCardText, { color: theme.text.primary }]}
-                  numberOfLines={2}
-                >
-                  {t.spoiler.hidden}
-                </Text>
-                <View
-                  style={[
-                    postStyles.spoilerCardBtn,
-                    { backgroundColor: "rgba(240,79,79,0.18)" },
-                  ]}
-                >
-                  <Text style={postStyles.spoilerCardBtnText}>{t.spoiler.reveal}</Text>
-                </View>
-              </Pressable>
-              {post.type === "list" && mediaPreview}
-            </>
-          ) : (
-            <>
-              <Text style={[postStyles.content, { color: theme.text.secondary }]}>
-                {post.content}
-              </Text>
-              {post.userRating > 0 && (
-                <View
-                  style={[
-                    postStyles.listRatingPill,
-                    { backgroundColor: theme.secondary, borderColor: theme.border },
-                  ]}
-                >
-                  <RatingStars rating={post.userRating} max={5} size={12} />
-                  <Text
-                    style={[postStyles.ratingNumber, { color: theme.text.primary }]}
-                  >
-                    {post.userRating}
-                  </Text>
-                </View>
-              )}
-              {mediaPreview}
-            </>
-          )}
-        </>
-      )}
-
-      {/* Actions */}
-      <View style={[postStyles.actions, { borderTopColor: theme.border }]}>
-        <LikeButton
-          liked={!!post.likedByMe}
-          count={post.likesCount || 0}
-          onPress={() => onLike(post.id)}
-          theme={theme}
-        />
-        {/* Yorum: post'ta yorum varsa dolu ikon (renk nötr kalır) */}
-        <TouchableOpacity
-          style={postStyles.actionBtn}
-          activeOpacity={0.7}
-          onPress={() => onComment?.(post)}
-        >
-          <AppIcon
-            family="Ionicons"
-            name={post.commentsCount > 0 ? "chatbubble" : "chatbubble-outline"}
-            size={18}
-            color={theme.text.secondary}
-          />
-          <Text
-            style={[postStyles.actionText, { color: theme.text.secondary }]}
-          >
-            {post.commentsCount || 0}
-          </Text>
-        </TouchableOpacity>
-        {/* Kaydet: kaydedildiyse dolu + accent (Feather'da dolu varyant yok) */}
-        <TouchableOpacity
-          style={postStyles.actionBtn}
-          activeOpacity={0.7}
-          onPress={() => onBookmark(post.id)}
-        >
-          <AppIcon
-            family="Ionicons"
-            name={post.bookmarkedByMe ? "bookmark" : "bookmark-outline"}
-            size={18}
-            color={post.bookmarkedByMe ? theme.accent : theme.text.secondary}
-          />
-        </TouchableOpacity>
-        {/* Listeyi kaydet — yalnız liste paylaşımlarında. Yer imi post'u
-            saklar, bu ise içeriği kendi listene KOPYALAR; ikisi ayrı iş. */}
-        {post.type === "list" && post.mediaList?.length > 0 && (
-          <TouchableOpacity
-            style={[postStyles.actionBtn, postStyles.saveListBtn, { borderColor: `${accentColor}55` }]}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
-            onPress={() => onSaveList?.(post)}
-          >
-            <AppIcon family="Ionicons" name="albums-outline" size={16} color={accentColor} />
-            <Text style={[postStyles.saveListText, { color: accentColor }]} numberOfLines={1}>
-              {i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-        </View>
-      </View>
-    </View>
-  );
-});
+import { alpha } from "../../theme/colors";
 
 const EmptyState = memo(function EmptyState({ theme, t }) {
   return (
     <View style={emptyStyles.container}>
       <View
         style={[
-          emptyStyles.iconWrap,
-          {
-            backgroundColor: theme.secondary,
-            borderColor: theme.border,
-          },
+          emptyStyles.halo,
+          { backgroundColor: alpha(theme.accent, 0.1), borderColor: alpha(theme.accent, 0.22) },
         ]}
       >
-        <AppIcon
-          family="MaterialCommunityIcons"
-          name="comment-text-multiple-outline"
-          size={42}
-          color={theme.text.muted}
-        />
+        <View
+          style={[
+            emptyStyles.iconWrap,
+            { backgroundColor: theme.secondary, borderColor: theme.border },
+          ]}
+        >
+          <AppIcon
+            family="MaterialCommunityIcons"
+            name="comment-text-multiple-outline"
+            size={38}
+            color={theme.accent}
+          />
+        </View>
       </View>
       <Text style={[emptyStyles.title, { color: theme.text.primary }]}>
         {t.empty.title}
@@ -1244,22 +289,46 @@ export default function ShareContentScreen({ route }) {
     return name ? `${ts.welcome}, ${name}` : ts.welcome;
   }, [user?.displayName, ts.welcome]);
 
-  const renderHeader = useCallback(
+  // Composer: tipsiz açılış (CreatePostModal varsayılan tipte başlar).
+  const handleOpenComposer = useCallback(() => {
+    setEditingPost(null);
+    setInitialPost(null);
+    setModalVisible(true);
+  }, []);
+
+  // Composer kartındaki hızlı tip kutuları: seçili tiple aç (Hub widget'ıyla aynı akış).
+  const handleComposeType = useCallback((postType) => {
+    setEditingPost(null);
+    setInitialPost({ postType });
+    setModalVisible(true);
+  }, []);
+
+  const handleOpenMyPosts = useCallback(
+    () => navigation.navigate("MyPostsScreen"),
+    [navigation],
+  );
+
+  // Eleman olarak verilir (bileşen tipi olarak değil): filtre/sıralama değişince
+  // başlık yeniden mount olmaz, filtre ve trend rayının kaydırma konumu korunur.
+  const header = useMemo(
     () => (
       <View>
         {/* Greeting */}
         <View style={mainStyles.greetingRow}>
           <BackButton absolute={false} style={{ marginRight: 12 }} />
           <View style={{ flex: 1 }}>
-            <Text style={[mainStyles.greeting, { color: theme.text.primary }]}>
+            <Text style={[mainStyles.greeting, { color: theme.text.primary }]} numberOfLines={1}>
               {greeting}
             </Text>
-            <Text style={[mainStyles.greetingSub, { color: theme.text.secondary }]}>
+            <Text style={[mainStyles.greetingSub, { color: theme.text.secondary }]} numberOfLines={1}>
               {ts.subtitle}
             </Text>
           </View>
           {avatar ? (
-            <Image source={avatar} style={mainStyles.headerAvatar} />
+            <Image
+              source={avatar}
+              style={[mainStyles.headerAvatar, { borderColor: alpha(theme.accent, 0.5) }]}
+            />
           ) : (
             <View
               style={[
@@ -1268,7 +337,6 @@ export default function ShareContentScreen({ route }) {
                   backgroundColor: theme.secondary,
                   justifyContent: "center",
                   alignItems: "center",
-                  borderWidth: 1,
                   borderColor: theme.border,
                 },
               ]}
@@ -1278,107 +346,58 @@ export default function ShareContentScreen({ route }) {
           )}
         </View>
 
-        {/* Create post composer */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => {
-            setInitialPost(null);
-            setModalVisible(true);
-          }}
-          style={mainStyles.composerWrap}
-        >
-          <LinearGradient
-            colors={[
-              theme.colors?.blue || "#4c669f",
-              theme.colors?.primary || "#3b5998",
-              theme.colors?.darkBlue || "#192f6a",
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={mainStyles.composer}
-          >
-            {avatar ? (
-              <Image source={avatar} style={mainStyles.composerAvatar} />
-            ) : (
-              <View
-                style={[
-                  mainStyles.composerAvatar,
-                  { backgroundColor: "rgba(255,255,255,0.18)" },
-                ]}
-              >
-                <AppIcon family="Ionicons" name="person" size={18} color="#fff" />
-              </View>
-            )}
-            <Text style={mainStyles.composerText}>{ts.createPostPlaceholder}</Text>
-            <View style={mainStyles.composerActions}>
-              <AppIcon family="Ionicons" name="image-outline" size={20} color="#fff" />
-              <View style={mainStyles.composerPlus}>
-                <AppIcon family="Ionicons" name="add" size={20} color="#fff" />
-              </View>
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
+        {/* Create post composer + hızlı tip kutuları */}
+        <FeedComposerCard
+          theme={theme}
+          avatar={avatar}
+          placeholder={ts.createPostPlaceholder}
+          onOpen={handleOpenComposer}
+          onCompose={handleComposeType}
+        />
 
-        {/* Postlarım butonu */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => navigation.navigate("MyPostsScreen")}
-          style={[
-            mainStyles.myPostsBtn,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
-          <View
-            style={[
-              mainStyles.myPostsIcon,
-              { backgroundColor: (theme.colors?.blue || "#4a7cf6") + "22" },
-            ]}
-          >
-            <AppIcon
-              family="Ionicons"
-              name="albums-outline"
-              size={18}
-              color={theme.colors?.blue || "#4a7cf6"}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[mainStyles.myPostsText, { color: theme.text.primary }]}>
-              {ts.myPosts || i18nText("autoI18n.postlarim", "Postlarım")}
-            </Text>
-            <Text style={[mainStyles.myPostsSub, { color: theme.text.secondary }]}>
-              {ts.myPostsSub || i18nText("autoI18n.paylastigin_gonderileri_gor", "Paylaştığın gönderileri gör")}
-            </Text>
-          </View>
-          <AppIcon
-            family="Ionicons"
-            name="chevron-forward"
-            size={20}
-            color={theme.text.muted}
-          />
-        </TouchableOpacity>
+        {/* Postlarım */}
+        <MyPostsLink
+          theme={theme}
+          title={i18nText("autoI18n.postlarim", "Postlarım")}
+          subtitle={i18nText("autoI18n.paylastigin_gonderileri_gor", "Paylaştığın gönderileri gör")}
+          onPress={handleOpenMyPosts}
+        />
 
         {/* Trending Rail */}
-        <TrendingRail
+        <FeedTrendingRail
           theme={theme}
           label={ts.trending}
           data={trending}
           onPressItem={onPressTrending}
         />
 
-        {/* Filter Chips */}
-        <FilterChips theme={theme} t={ts} active={filter} onChange={setFilter} />
-        <SortChips theme={theme} t={ts} active={sort} onChange={setSort} />
+        {/* Filtre + sıralama */}
+        <FeedFilterBar theme={theme} t={ts} active={filter} onChange={setFilter} />
+        <FeedSortBar theme={theme} t={ts} active={sort} onChange={setSort} />
       </View>
     ),
-    [theme, ts, greeting, avatar, filter, sort, navigation, trending, onPressTrending, setFilter, setSort],
+    [
+      theme,
+      ts,
+      greeting,
+      avatar,
+      filter,
+      sort,
+      trending,
+      onPressTrending,
+      setFilter,
+      setSort,
+      handleOpenComposer,
+      handleComposeType,
+      handleOpenMyPosts,
+    ],
   );
 
   const renderItem = useCallback(
     ({ item, index }) => (
       <StaggerItem index={index}>
-        <PostCard
+        <FeedPostCard
           post={item}
-          showTopDivider={index === 0}
           theme={theme}
           t={ts}
           currentUid={user?.uid}
@@ -1428,12 +447,12 @@ export default function ShareContentScreen({ route }) {
       edges={["top"]}
     >
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="social" iconOpacity={0.25} />
       <FlatList
         data={enrichedPosts}
         keyExtractor={(p) => p.id}
         renderItem={renderItem}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={header}
         ListEmptyComponent={listEmpty}
         ListFooterComponent={listFooter}
         contentContainerStyle={{ paddingBottom: 110 }}
@@ -1493,505 +512,17 @@ const mainStyles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 18,
     paddingTop: 6,
-    paddingBottom: 14,
+    paddingBottom: 16,
   },
-  greeting: { fontSize: 22, fontWeight: "800" },
+  greeting: { fontSize: 24, fontWeight: "800", letterSpacing: -0.4 },
   greetingSub: { fontSize: 13, marginTop: 2 },
-  headerAvatar: { width: 44, height: 44, borderRadius: 22, marginLeft: 12 },
-  composerWrap: { paddingHorizontal: 16, marginBottom: 20 },
-  composer: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  composerAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.35)",
-  },
-  composerText: { flex: 1, color: "#fff", fontSize: 15, fontWeight: "600" },
-  composerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
-  myPostsBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginHorizontal: 16,
-    marginBottom: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  myPostsIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  myPostsText: { fontSize: 15, fontWeight: "700" },
-  myPostsSub: { fontSize: 12, marginTop: 1 },
-  composerPlus: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-});
-
-const trStyles = StyleSheet.create({
-  container: { marginBottom: 18 },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 18,
-    marginBottom: 10,
-  },
-  headerLabel: { fontSize: 15, fontWeight: "700" },
-  card: {
-    width: 110,
-    height: 160,
-    borderRadius: 14,
-    overflow: "hidden",
-    borderWidth: 1,
-  },
-  poster: { width: "100%", height: "100%" },
-  gradient: { position: "absolute", left: 0, right: 0, bottom: 0, height: "55%" },
-  rankBadge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  rankText: { color: "#fff", fontSize: 11, fontWeight: "800" },
-  title: {
-    position: "absolute",
-    bottom: 8,
-    left: 8,
-    right: 8,
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-});
-
-const chipStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  label: { fontSize: 13 },
-  sortSection: {
-    marginHorizontal: 16,
-    marginTop: -6,
-    marginBottom: 16,
-    padding: 10,
-    borderRadius: 16,
-  },
-  sortLabelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginBottom: 8,
-  },
-  sortLabel: { fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
-  sortOptions: { flexDirection: "row", gap: 8 },
-  sortChip: {
-    flex: 1,
-    minHeight: 36,
-    borderRadius: 11,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 8,
-  },
-  sortChipText: { fontSize: 11.5, fontWeight: "700" },
-});
-
-const postStyles = StyleSheet.create({
-  card: {
-    width: "100%",
-    paddingHorizontal: 16,
-    paddingTop: 15,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  postLayout: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
-  avatarColumn: { width: 42, alignItems: "center", paddingTop: 1 },
-  mainColumn: { flex: 1, minWidth: 0 },
-  header: {
-    minHeight: 42,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 6,
-    marginBottom: 6,
-  },
-  identityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    minWidth: 0,
-    flexShrink: 1,
-  },
-  headerBadges: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    flexShrink: 0,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1.5,
-  },
-  userName: { fontSize: 14.5, fontWeight: "800", flexShrink: 1 },
-  menuButton: {
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: "auto",
-    marginTop: -3,
-  },
-  badge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 7,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  badgeText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.45 },
-  time: { fontSize: 12.5, fontWeight: "500", marginLeft: 4 },
-  title: { fontSize: 16, lineHeight: 21, fontWeight: "800", marginBottom: 6 },
-  content: { fontSize: 14, lineHeight: 21, marginBottom: 12 },
-  mediaCard: {
-    width: 86,
-    height: 129,
-    borderRadius: 13,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 7,
-    elevation: 3,
-  },
-  mediaPoster: { width: "100%", height: "100%" },
-  mediaCardWide: {
-    height: 188,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.16,
-    shadowRadius: 9,
-    elevation: 3,
-  },
-  mediaPosterWide: { width: "100%", height: "100%" },
-  mediaYear: {
-    position: "absolute",
-    bottom: 6,
-    right: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    borderRadius: 6,
-  },
-  mediaYearText: { fontSize: 10, color: "#fff", fontWeight: "600" },
-  ratingPill: {
-    position: "absolute",
-    bottom: -10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  ratingNumber: { fontSize: 11, fontWeight: "700", marginLeft: 2 },
-  // Liste için inline puan rozeti (review'deki absolute pill'den farklı)
-  listRatingPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    alignSelf: "flex-start",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 10,
-  },
-  // Post üstündeki spoiler göster/gizle toggle
-  spoilerToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 10,
-  },
-  spoilerToggleText: { color: "#f04f4f", fontSize: 11.5, fontWeight: "700" },
-  // Spoiler kart — content yerine geçen self-contained kart (taşma/kayma yok)
-  spoilerCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  spoilerCardText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 16,
-  },
-  spoilerCardBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  spoilerCardBtnText: {
-    color: "#f04f4f",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    gap: 22,
-    paddingTop: 8,
-    marginTop: 4,
-  },
-  actionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 36,
-    paddingVertical: 7,
-  },
-  actionText: { fontSize: 12, fontWeight: "700" },
-  // Liste kaydetme aksiyonu diğerlerinden ayrılsın diye çerçeveli ve sağa
-  // yaslı: beğeni/yorum sayaçlarıyla aynı görsel ağırlıkta olmamalı.
-  saveListBtn: {
-    marginLeft: "auto",
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: 5,
-    maxWidth: 165,
-  },
-  saveListText: { flexShrink: 1, fontSize: 11, fontWeight: "800" },
-  pollWrap: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 10,
-    marginTop: 3,
-    marginBottom: 5,
-  },
-  // Sıralı liste poster numarası (#1, #2...)
-  rankNum: { position: "absolute", top: 5, left: 5, minWidth: 20, height: 20, paddingHorizontal: 4, borderRadius: 7, alignItems: "center", justifyContent: "center" },
-  rankNumText: { color: "#fff", fontSize: 11, fontWeight: "900" },
-});
-
-const menuStyles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    paddingBottom: 30,
-    paddingTop: 12,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  handle: {
-    alignSelf: "center",
+  headerAvatar: {
     width: 44,
-    height: 5,
-    borderRadius: 3,
-    marginBottom: 16,
-    opacity: 0.5,
+    height: 44,
+    borderRadius: 22,
+    marginLeft: 12,
+    borderWidth: 2,
   },
-  item: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-  },
-  itemText: { fontSize: 16, fontWeight: "600" },
-  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 20 },
-
-  // İçerik önizleme kartı
-  previewCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 14,
-  },
-  previewPoster: {
-    width: 52,
-    height: 78,
-    borderRadius: 9,
-    flexShrink: 0,
-  },
-  previewStack: { height: 78, flexShrink: 0, position: "relative" },
-  previewStackItem: { position: "absolute", top: 0, borderWidth: 1.5 },
-  previewTextCol: { flex: 1, gap: 5 },
-  previewBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  previewBadgeText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.4 },
-  previewTitle: { fontSize: 14, fontWeight: "700" },
-  previewContent: { fontSize: 12, lineHeight: 17 },
-
-  // Yan yana aksiyonlar
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginHorizontal: 16,
-    marginBottom: 6,
-  },
-  actionHalf: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-  },
-  actionFull: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginHorizontal: 16,
-    marginBottom: 6,
-  },
-  actionIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  actionHalfText: { fontSize: 15, fontWeight: "700" },
-  cancelRow: { paddingVertical: 14, alignItems: "center", marginTop: 6 },
-
-  dialog: {
-    margin: 24,
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 1,
-    alignSelf: "center",
-    maxWidth: 360,
-    width: "85%",
-    alignItems: "center",
-    marginTop: "auto",
-    marginBottom: "auto",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 24,
-  },
-  dialogIconWrap: { 
-    marginBottom: 16,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(240,79,79,0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  dialogTitle: {
-    fontSize: 19,
-    fontWeight: "800",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  dialogMsg: {
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  dialogActions: { flexDirection: "row", gap: 12, width: "100%" },
-  dialogBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  dialogBtnText: { fontSize: 15, fontWeight: "700" },
 });
 
 const emptyStyles = StyleSheet.create({
@@ -2001,6 +532,15 @@ const emptyStyles = StyleSheet.create({
     paddingTop: 30,
     paddingBottom: 60,
   },
+  halo: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    marginBottom: 18,
+  },
   iconWrap: {
     width: 88,
     height: 88,
@@ -2008,8 +548,7 @@ const emptyStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    marginBottom: 18,
   },
-  title: { fontSize: 17, fontWeight: "700", marginBottom: 6 },
+  title: { fontSize: 17, fontWeight: "800", marginBottom: 6 },
   subtitle: { fontSize: 13, textAlign: "center", lineHeight: 20 },
 });

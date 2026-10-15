@@ -1,9 +1,11 @@
 // screens/tabs/settings/PersonalizationScreen.js
 //
-// Ayarlar > Kişiselleştirme. Görsel efekt modu + kar efekti + ikon arka planı
-// (görünürlük + opaklık + düzen) + Pet/Dost. Hub'dan ayrı ekrana taşındı.
+// Ayarlar > Kişiselleştirme. Görsel efekt modu + kar efekti + ambiyans arka
+// planı + ikon arka planı (görünürlük + opaklık + düzen) + Pet/Dost. Hub'dan
+// ayrı ekrana taşındı.
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
 import {
   Animated,
   View,
@@ -15,17 +17,22 @@ import {
 import SwitchToggle from "@components/SwitchToggle";
 import AppIcon from "@components/AppIcon";
 import {
+  AmbientPreview,
   IconPatternPreview,
   SnowPreview,
 } from "@components/settings/SettingPreviews";
 import PetSettingsSection from "@components/pet/PetSettingsSection";
 import FontSettingsSection from "@components/typography/FontSettingsSection";
 import AppIconSection from "@components/settings/AppIconSection";
+import PremiumPill from "@components/premium/PremiumPill";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import {
   useSnowSettings,
   useIconBackgroundSettings,
+  useAmbientBackgroundSettings,
+  useDecorScopeSettings,
 } from "@context/AppSettingsContext";
 import {
   onerilenEffectMode,
@@ -35,8 +42,14 @@ import {
 import * as Haptics from "@services/hapticsService";
 import { i18nText } from "@utils/i18nText";
 import { clamp } from "@utils/colorUtils";
+import { isDecorCustomized } from "@utils/decorScopes";
 import { alpha } from "@theme/colors";
-import { SettingsSubScreen, SettingRow, buildUiColors } from "./settingsUi";
+import {
+  SettingsSubScreen,
+  SettingRow,
+  Chevron,
+  buildUiColors,
+} from "./settingsUi";
 
 // İkon arka planı saydamlık kaydırıcısı (0.1–1). Delta-based native 120 FPS PanResponder.
 function OpacitySlider({ value, onChange, colors }) {
@@ -200,15 +213,32 @@ export default function PersonalizationScreen() {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const C = buildUiColors(theme);
-  const { showSnow, changeShowSnow } = useSnowSettings();
+  const { showSnow, snowAllowed, changeShowSnow } = useSnowSettings();
+  const { showAmbientBackground, changeShowAmbientBackground } =
+    useAmbientBackgroundSettings();
+  const { decorHidden } = useDecorScopeSettings();
+  const navigation = useNavigation();
   const {
     showIconBackground,
+    iconBackgroundAllowed,
     changeShowIconBackground,
     iconBackgroundMode,
     changeIconBackgroundMode,
     iconBackgroundOpacity,
     changeIconBackgroundOpacity,
   } = useIconBackgroundSettings();
+
+  // Kar ve ikon arka planı Premium'da. Free kullanıcıda anahtar KİLİTLİ ve kapalı
+  // çizilir (bkz. AppSettingsContext: kayıtlı tercih silinmez, yalnız çizilen değer
+  // kapanır); dokununca anahtar oynamaz, yükseltme sayfası gelir (bkz.
+  // SwitchToggle `locked`). Satırın kendisine basmak da aynı yere götürür.
+  const snowGate = usePremiumGate("snow_effect");
+  const iconBackgroundGate = usePremiumGate("icon_background");
+  const openSnowUpsell = useCallback(() => snowGate.showUpsell(), [snowGate]);
+  const openIconBackgroundUpsell = useCallback(
+    () => iconBackgroundGate.showUpsell(),
+    [iconBackgroundGate],
+  );
 
   // Görsel efekt modu. Cihaz sınıfı yalnız varsayılanı seçer; burada kullanıcı
   // kendi dengesini kurar (bkz. utils/deviceTier.js, services/effectSettings.js).
@@ -240,9 +270,6 @@ export default function PersonalizationScreen() {
       ),
     },
   ];
-  const aktifEfekt =
-    efektSecenekleri.find((o) => o.value === effectMode) || efektSecenekleri[0];
-  const onerilenEtiket = efektSecenekleri.find((o) => o.value === onerilen)?.label;
 
   return (
     <SettingsSubScreen title={t.personalization}>
@@ -390,8 +417,9 @@ export default function PersonalizationScreen() {
 
       <View style={ps.personalizationGap} />
 
-      {/* Uygulama simgesi: destek yoksa (modül yok / cihaz desteklemiyor) hiçbir
-          şey çizmez ve boşluk da bırakmaz. */}
+      {/* Uygulama simgesi: destek yoksa (modül yok / cihaz desteklemiyor) üretimde
+          hiçbir şey çizmez ve boşluk da bırakmaz; geliştirme build'inde nedenini
+          söyleyen soluk bir not çizer. */}
       <AppIconSection colors={C} />
 
       <View
@@ -413,9 +441,41 @@ export default function PersonalizationScreen() {
           iconName={showSnow ? "bulldozer" : "snow-outline"}
           title={t.snow}
           subtitle={t.snowSubtitle}
+          onPress={snowAllowed ? undefined : openSnowUpsell}
           background={showSnow ? null : <SnowPreview />}
           right={
-            <SwitchToggle value={showSnow} onValueChange={changeShowSnow} size={36} />
+            <View style={ps.rowRightGroup}>
+              {snowAllowed ? null : <PremiumPill />}
+              <SwitchToggle
+                value={showSnow}
+                onValueChange={changeShowSnow}
+                locked={!snowAllowed}
+                onLockedPress={openSnowUpsell}
+                size={36}
+              />
+            </View>
+          }
+        />
+        {/* Ambiyans Premium'a bağlı değil: kilit/pill yok, anahtar herkes için
+            açık. Kar gibi KAPALIYKEN satırın zemininde (aynı renklerle) süzülen
+            lekeler görünür; AÇIKKEN ekranın tamamı zaten ambiyans olduğundan
+            önizleme çizilmez. Bulanıklık gerçek blur değil, yumuşak kenarlı
+            degrade — bu yüzden Efektler "Kapalı" modunda da çalışır, yalnız
+            leke sayısı azalır ve hareket yavaşlar. */}
+        <SettingRow
+          colors={C}
+          iconBg={C.iconPurple}
+          iconColor={C.purple}
+          iconName={showAmbientBackground ? "prism" : "prism-outline"}
+          title={t.ambientBackground}
+          subtitle={t.ambientBackgroundSubtitle}
+          background={showAmbientBackground ? null : <AmbientPreview />}
+          right={
+            <SwitchToggle
+              value={showAmbientBackground}
+              onValueChange={changeShowAmbientBackground}
+              size={36}
+            />
           }
         />
         {/* Desen önizlemesi hem açık hem kapalıyken durur: statik ve ucuz,
@@ -429,14 +489,20 @@ export default function PersonalizationScreen() {
           iconName={showIconBackground ? "image-outline" : "image-sharp"}
           title={t.iconBackground}
           subtitle={t.iconBackgroundSubtitle}
+          onPress={iconBackgroundAllowed ? undefined : openIconBackgroundUpsell}
           last={!showIconBackground}
           background={<IconPatternPreview opacity={0.35} />}
           right={
-            <SwitchToggle
-              value={showIconBackground}
-              onValueChange={changeShowIconBackground}
-              size={36}
-            />
+            <View style={ps.rowRightGroup}>
+              {iconBackgroundAllowed ? null : <PremiumPill />}
+              <SwitchToggle
+                value={showIconBackground}
+                onValueChange={changeShowIconBackground}
+                locked={!iconBackgroundAllowed}
+                onLockedPress={openIconBackgroundUpsell}
+                size={36}
+              />
+            </View>
           }
         />
         {showIconBackground && (
@@ -524,6 +590,45 @@ export default function PersonalizationScreen() {
         )}
       </View>
 
+      {/* Efektlerin HANGİ ekran gruplarında görüneceği ayrı sayfada (bkz.
+          DecorScopesScreen). Üstteki anahtarlar genel kapı; bu onun üstünde süzgeç. */}
+      <View style={ps.personalizationGap} />
+      <View
+        style={[
+          ps.card,
+          { backgroundColor: C.card, borderColor: C.border },
+        ]}
+      >
+        <SettingRow
+          colors={C}
+          iconBg={C.iconBlue}
+          iconColor={C.blue}
+          iconName="layers-outline"
+          title={i18nText("autoI18n.dekor_kapsam_satir_baslik", "Ekran bazında ayarla")}
+          subtitle={i18nText(
+            "autoI18n.dekor_kapsam_satir_alt",
+            "Kar, ikon ve ambiyans hangi ekranlarda görünsün",
+          )}
+          onPress={() => navigation.navigate("DecorScopesScreen")}
+          last
+          right={
+            <View style={ps.rowRightGroup}>
+              <View style={[ps.qualityBadge, { backgroundColor: C.accentDim }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[ps.qualityBadgeText, { color: C.accentStrong }]}
+                >
+                  {isDecorCustomized(decorHidden)
+                    ? i18nText("autoI18n.dekor_kapsam_ozel", "Özel")
+                    : i18nText("autoI18n.dekor_kapsam_her_yerde", "Her yerde")}
+                </Text>
+              </View>
+              <Chevron color={C.muted} />
+            </View>
+          }
+        />
+      </View>
+
       <View style={ps.personalizationGap} />
       <PetSettingsSection colors={C} showLabel={false} />
     </SettingsSubScreen>
@@ -543,6 +648,7 @@ const ps = StyleSheet.create({
   rowTitle: { fontSize: 14, fontWeight: "500" },
   rowSub: { fontSize: 11, marginTop: 2 },
   personalizationGap: { height: 10 },
+  rowRightGroup: { flexDirection: "row", alignItems: "center", gap: 8 },
   effectBlock: {
     paddingVertical: 14,
     paddingHorizontal: 14,

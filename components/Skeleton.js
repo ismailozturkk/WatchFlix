@@ -306,27 +306,6 @@ export const AvatarSkeleton = () => {
   // borderRadius 78) ile eşleşir — yükleme sırasında boyut sıçraması olmasın.
   return <Skeleton width={156} height={156} style={{ borderRadius: 78 }} />;
 };
-export const WatchedInfoSkeleton = () => {
-  return (
-    <View style={{ gap: 10 }}>
-      <Skeleton
-        width={"100%"}
-        height={70}
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          paddingHorizontal: 8,
-          borderRadius: 12,
-          marginBottom: 8,
-        }}
-      >
-        <Skeleton width={"49%"} height={55} style={{ borderRadius: 8 }} />
-        <Skeleton width={"49%"} height={55} style={{ borderRadius: 8 }} />
-      </Skeleton>
-    </View>
-  );
-};
 // ProfileLists ile BİRE BİR: yatay scroll, ~152×150 r15 kartlar (collage + etiket),
 // paddingHorizontal 15 + gap 10.
 export const ListsSkeleton = () => {
@@ -634,62 +613,40 @@ export const ActorSkeleton = () => {
   );
 };
 
-// ── Sosyal feed kartı (ShareContentScreen / PostDetail): avatar başlık + başlık
-// + poster rayı + aksiyon satırı. Gerçek PostCard (postStyles.card) ile aynı ölçü.
-export const PostCardSkeleton = ({ fullWidth = false, showTopDivider = false }) => {
+// ── Kompakt sosyal kart (PostDetail): avatar başlık + başlık + poster rayı +
+// aksiyon satırı. Feed'in kendi iskeleti aşağıdaki FeedPostCardSkeleton.
+export const PostCardSkeleton = () => {
   const { theme } = useTheme();
   return (
     <View
-      style={
-        fullWidth
-          ? {
-              width: "100%",
-              paddingHorizontal: 16,
-              paddingTop: 15,
-              paddingBottom: 12,
-              borderTopWidth: showTopDivider ? StyleSheet.hairlineWidth : 0,
-              borderBottomWidth: StyleSheet.hairlineWidth,
-              backgroundColor: theme.primary,
-              borderColor: theme.border,
-            }
-          : {
-              marginHorizontal: 14,
-              marginBottom: 10,
-              borderRadius: 16,
-              padding: 13,
-              borderWidth: StyleSheet.hairlineWidth,
-              borderLeftWidth: 2,
-              backgroundColor: theme.secondary,
-              borderColor: theme.border,
-              borderLeftColor: theme.border,
-            }
-      }
+      style={{
+        marginHorizontal: 14,
+        marginBottom: 10,
+        borderRadius: 16,
+        padding: 13,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderLeftWidth: 2,
+        backgroundColor: theme.secondary,
+        borderColor: theme.border,
+        borderLeftColor: theme.border,
+      }}
     >
       {/* Başlık: avatar + isim/zaman + menü noktası */}
       <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
-        <Skeleton
-          width={fullWidth ? 42 : 34}
-          height={fullWidth ? 42 : 34}
-          style={{ borderRadius: fullWidth ? 21 : 17 }}
-        />
+        <Skeleton width={34} height={34} style={{ borderRadius: 17 }} />
         <View style={{ flex: 1, marginLeft: 10, gap: 6 }}>
           <Skeleton width={"42%"} height={12} style={{ borderRadius: 4 }} />
           <Skeleton width={"26%"} height={9} style={{ borderRadius: 4 }} />
         </View>
         <Skeleton width={4} height={16} style={{ borderRadius: 2 }} />
       </View>
-      <View style={fullWidth ? { marginLeft: 53 } : null}>
+      <View>
         {/* Başlık satırı */}
         <Skeleton width={"70%"} height={15} style={{ borderRadius: 5, marginBottom: 12 }} />
         {/* Poster rayı */}
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
           {[0, 1, 2].map((i) => (
-            <Skeleton
-              key={i}
-              width={fullWidth ? 86 : 78}
-              height={fullWidth ? 129 : 117}
-              style={{ borderRadius: fullWidth ? 13 : 10 }}
-            />
+            <Skeleton key={i} width={78} height={117} style={{ borderRadius: 10 }} />
           ))}
         </View>
         {/* Aksiyon satırı (beğen / yorum / paylaş) */}
@@ -703,50 +660,142 @@ export const PostCardSkeleton = ({ fullWidth = false, showTopDivider = false }) 
   );
 };
 
-// Feed ilk yüklemesi için N adet PostCardSkeleton (FlatList ListEmptyComponent).
+// ── Feed kartı (ShareContentScreen FeedPostCard ile aynı ölçü): yuvarlak
+// yüzeyli kart, avatar başlık + tip rozeti, büyük poster + metin satırları,
+// aksiyon hapları.
+export const FeedPostCardSkeleton = () => {
+  const { theme } = useTheme();
+  return (
+    <View
+      style={{
+        marginHorizontal: 14,
+        marginBottom: 14,
+        borderRadius: 24,
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 12,
+        borderWidth: StyleSheet.hairlineWidth,
+        backgroundColor: theme.secondary,
+        borderColor: theme.border,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+        <Skeleton width={40} height={40} style={{ borderRadius: 20 }} />
+        <View style={{ flex: 1, marginLeft: 10, gap: 6 }}>
+          <Skeleton width={"40%"} height={12} style={{ borderRadius: 4 }} />
+          <Skeleton width={"22%"} height={9} style={{ borderRadius: 4 }} />
+        </View>
+        <Skeleton width={70} height={22} style={{ borderRadius: 11 }} />
+      </View>
+      <View style={{ flexDirection: "row", gap: 14, marginBottom: 12 }}>
+        <Skeleton width={118} height={177} style={{ borderRadius: 18 }} />
+        <View style={{ flex: 1, gap: 9 }}>
+          <Skeleton width={"55%"} height={11} style={{ borderRadius: 4 }} />
+          <Skeleton width={"90%"} height={16} style={{ borderRadius: 5 }} />
+          <Skeleton width={"70%"} height={16} style={{ borderRadius: 5 }} />
+          <Skeleton width={"100%"} height={11} style={{ borderRadius: 4, marginTop: 4 }} />
+          <Skeleton width={"100%"} height={11} style={{ borderRadius: 4 }} />
+          <Skeleton width={"80%"} height={11} style={{ borderRadius: 4 }} />
+        </View>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          paddingTop: 12,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: theme.border,
+        }}
+      >
+        <Skeleton width={58} height={36} style={{ borderRadius: 18 }} />
+        <Skeleton width={58} height={36} style={{ borderRadius: 18 }} />
+        <View style={{ flex: 1 }} />
+        <Skeleton width={40} height={36} style={{ borderRadius: 18 }} />
+      </View>
+    </View>
+  );
+};
+
+// Feed ilk yüklemesi için N adet FeedPostCardSkeleton (FlatList ListEmptyComponent).
 export const FeedSkeleton = ({ count = 4 }) => (
   <View style={{ paddingTop: 6 }}>
     {Array.from({ length: count }).map((_, i) => (
-      <PostCardSkeleton key={i} fullWidth showTopDivider={i === 0} />
+      <FeedPostCardSkeleton key={i} />
     ))}
   </View>
 );
 
-// ── "Postlarım" yatay kompakt kart (MyPostsScreen MyPostCard ile aynı ölçü):
-// sol poster yığını + rozet/zaman + başlık + içerik + istatistik satırı.
-export const MyPostsSkeleton = ({ count = 5 }) => {
+// ── "Postlarım" (MyPostsScreen ile aynı ölçü): üstte 3'lü özet şeridi, altında
+// yuvarlak yüzeyli kartlar — rozet/zaman satırı, poster + metin, istatistik hapları.
+export const MyPostsSkeleton = ({ count = 4 }) => {
   const { theme } = useTheme();
   return (
-    <View style={{ padding: 16 }}>
+    <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+        {[0, 1, 2].map((i) => (
+          <View
+            key={i}
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              padding: 10,
+              borderRadius: 18,
+              borderWidth: StyleSheet.hairlineWidth,
+              backgroundColor: theme.secondary,
+              borderColor: theme.border,
+            }}
+          >
+            <Skeleton width={32} height={32} style={{ borderRadius: 11 }} />
+            <View style={{ gap: 5 }}>
+              <Skeleton width={34} height={13} style={{ borderRadius: 4 }} />
+              <Skeleton width={42} height={9} style={{ borderRadius: 4 }} />
+            </View>
+          </View>
+        ))}
+      </View>
       {Array.from({ length: count }).map((_, i) => (
         <View
           key={i}
           style={{
-            flexDirection: "row",
-            gap: 14,
-            padding: 14,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderLeftWidth: 3,
-            marginBottom: 12,
+            marginBottom: 14,
+            borderRadius: 24,
+            paddingHorizontal: 16,
+            paddingTop: 12,
+            paddingBottom: 12,
+            borderWidth: StyleSheet.hairlineWidth,
             backgroundColor: theme.secondary,
             borderColor: theme.border,
-            borderLeftColor: theme.border,
           }}
         >
-          <Skeleton width={64} height={96} style={{ borderRadius: 10 }} />
-          <View style={{ flex: 1, gap: 8 }}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Skeleton width={54} height={16} style={{ borderRadius: 6 }} />
-              <Skeleton width={40} height={10} style={{ borderRadius: 4, marginLeft: "auto" }} />
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+            <Skeleton width={74} height={22} style={{ borderRadius: 11 }} />
+            <Skeleton width={36} height={10} style={{ borderRadius: 4, marginLeft: "auto" }} />
+          </View>
+          <View style={{ flexDirection: "row", gap: 14 }}>
+            <Skeleton width={80} height={120} style={{ borderRadius: 14 }} />
+            <View style={{ flex: 1, gap: 9 }}>
+              <Skeleton width={"85%"} height={16} style={{ borderRadius: 5 }} />
+              <Skeleton width={"60%"} height={16} style={{ borderRadius: 5 }} />
+              <Skeleton width={"100%"} height={11} style={{ borderRadius: 4, marginTop: 4 }} />
+              <Skeleton width={"90%"} height={11} style={{ borderRadius: 4 }} />
+              <Skeleton width={"55%"} height={11} style={{ borderRadius: 4 }} />
             </View>
-            <Skeleton width={"75%"} height={15} style={{ borderRadius: 5 }} />
-            <Skeleton width={"100%"} height={11} style={{ borderRadius: 4 }} />
-            <Skeleton width={"55%"} height={11} style={{ borderRadius: 4 }} />
-            <View style={{ flexDirection: "row", gap: 16, marginTop: 2 }}>
-              <Skeleton width={44} height={12} style={{ borderRadius: 4 }} />
-              <Skeleton width={44} height={12} style={{ borderRadius: 4 }} />
-            </View>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 8,
+              marginTop: 12,
+              paddingTop: 12,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: theme.border,
+            }}
+          >
+            <Skeleton width={56} height={32} style={{ borderRadius: 16 }} />
+            <Skeleton width={56} height={32} style={{ borderRadius: 16 }} />
           </View>
         </View>
       ))}
@@ -754,8 +803,8 @@ export const MyPostsSkeleton = ({ count = 5 }) => {
   );
 };
 
-// ── Etkinlik listesi satırı (MyActivityScreen row ile aynı ölçü):
-// sol poster 48×70 + meta/başlık/tarih satırları.
+// ── Etkinlik listesi satırı (MyActivityScreen Row ile aynı ölçü):
+// yuvarlak kart, sol poster 56×84, rozet/tarih + başlık satırları, sağda puan rozeti.
 export const ActivityListSkeleton = ({ count = 7 }) => {
   const { theme } = useTheme();
   return (
@@ -767,22 +816,24 @@ export const ActivityListSkeleton = ({ count = 7 }) => {
             flexDirection: "row",
             alignItems: "center",
             gap: 12,
-            paddingVertical: 11,
-            paddingRight: 14,
-            paddingLeft: 16,
-            borderRadius: 18,
-            borderWidth: 1,
+            padding: 12,
+            borderRadius: 22,
+            borderWidth: StyleSheet.hairlineWidth,
             marginBottom: 12,
             backgroundColor: theme.secondary,
             borderColor: theme.border,
           }}
         >
-          <Skeleton width={48} height={70} style={{ borderRadius: 10 }} />
-          <View style={{ flex: 1, gap: 7 }}>
-            <Skeleton width={70} height={12} style={{ borderRadius: 4 }} />
-            <Skeleton width={"72%"} height={14} style={{ borderRadius: 5 }} />
-            <Skeleton width={"40%"} height={11} style={{ borderRadius: 4 }} />
+          <Skeleton width={56} height={84} style={{ borderRadius: 12 }} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Skeleton width={52} height={16} style={{ borderRadius: 8 }} />
+              <Skeleton width={44} height={10} style={{ borderRadius: 4, marginLeft: "auto" }} />
+            </View>
+            <Skeleton width={"78%"} height={15} style={{ borderRadius: 5 }} />
+            <Skeleton width={"45%"} height={12} style={{ borderRadius: 4 }} />
           </View>
+          <Skeleton width={58} height={52} style={{ borderRadius: 16 }} />
         </View>
       ))}
     </View>
@@ -804,128 +855,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     overflow: "hidden",
   },
-  poster: {
-    borderRadius: 25,
-  },
-  infoContainer: {
-    alignItems: "center",
-    marginTop: 20,
-    gap: 10,
-  },
-  infoBestContainer: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    borderRadius: 10,
-  },
-  title: {
-    borderRadius: 10,
-  },
-  rating: {
-    marginTop: 10,
-  },
   stars: {
     borderRadius: 4,
-  },
-  titleOscar: {
-    fontSize: 18,
-    uppercase: true,
-    marginBottom: 15,
-    marginLeft: 15,
-    fontWeight: "700",
   },
   detailsContainer: {
     flex: 1,
   },
-  backdrop: {
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  content: {
-    padding: 20,
-    gap: 20,
-  },
-  header: {
-    flexDirection: "row",
-    gap: 15,
-  },
-  posterSmall: {
-    borderRadius: 10,
-  },
-  headerInfo: {
-    flex: 1,
-    gap: 10,
-  },
-  titleLarge: {
-    borderRadius: 4,
-  },
-  tagline: {
-    borderRadius: 4,
-  },
-  genres: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  genre: {
-    borderRadius: 15,
-  },
-  statsCard: {
-    borderRadius: 10,
-  },
-  overview: {
-    borderRadius: 4,
-  },
-  seasonContainer: {
-    flex: 1,
-    padding: 20,
-  },
-  seasonHeader: {
-    flexDirection: "row",
-    marginBottom: 30,
-  },
-  seasonPoster: {
-    borderRadius: 10,
-  },
-  seasonInfo: {
-    flex: 1,
-    marginLeft: 15,
-  },
-  seasonTitle: {
-    marginBottom: 10,
-    borderRadius: 4,
-  },
-  seasonMeta: {
-    marginBottom: 10,
-    borderRadius: 4,
-  },
-  seasonOverview: {
-    borderRadius: 4,
-  },
-  episodesList: {
-    gap: 15,
-  },
-  episodeCard: {
-    flexDirection: "row",
-    borderRadius: 20,
-    padding: 3,
-    overflow: "hidden",
-  },
-  episodeImage: {
-    borderRadius: 17,
-  },
-  episodeInfo: {
-    flex: 1,
-    padding: 10,
-    gap: 10,
-  },
   episodeTitle: {
     borderRadius: 4,
-  },
-  episodeMetaContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginVertical: 5,
   },
   episodeDate: {
     borderRadius: 4,
@@ -942,67 +879,13 @@ const styles = StyleSheet.create({
   episodeOverview: {
     borderRadius: 4,
   },
-  crew: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  crewMember: {
-    borderRadius: width * 0.135,
-  },
   ratingValue: {
     marginBottom: 5,
-    borderRadius: 4,
-  },
-  castSection: {
-    marginTop: 20,
-  },
-  castList: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 15,
-  },
-  castItem: {
-    alignItems: "center",
-    width: 80,
-  },
-  castImage: {
-    borderRadius: 40,
-    marginBottom: 8,
-  },
-  castName: {
-    marginBottom: 4,
-    borderRadius: 4,
-  },
-  castRole: {
-    borderRadius: 4,
-  },
-  videoSection: {
-    marginTop: 20,
-  },
-  videoList: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 15,
-  },
-  videoItem: {
-    width: 200,
-  },
-  videoThumbnail: {
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  videoTitle: {
     borderRadius: 4,
   },
   searchContainer: {
     flex: 1,
     paddingHorizontal: 15,
-  },
-  searchInputContainer: {
-    marginBottom: 20,
-  },
-  searchInput: {
-    borderRadius: 25,
   },
   searchResults: {
     gap: 15,

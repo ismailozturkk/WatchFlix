@@ -3,12 +3,25 @@
 // MaterialCommunityIcons/Ionicons set, and it mirrors the outline↔filled
 // swap iOS already does natively via sf/selectedSf (see TabButton, which
 // now does the same swap for the custom Android/fallback bar).
+//
+// SOFT CORNERS: every glyph is picked for round silhouettes — no sprocket
+// squares (film), dot grids (apps) or bare heads (person). Each Ionicons pair
+// has an SF Symbol twin with the SAME silhouette, so the native iOS bar and
+// the JS bar (Android glass / blur / solid) read as one icon set:
+//   movies  videocam  ↔ video        (was film: square perforations)
+//   hub     grid      ↔ square.grid.2x2 (was apps: 3×3 dots, and a mismatch
+//                                      with the 2×2 grid iOS already showed)
+//   profile person-circle ↔ person.crop.circle (was a bare person)
+//
+// A wrong SF name renders a BLANK tab icon on iOS with no error, and a wrong
+// Ionicons name renders a red warning glyph — __tests__/tabBarModel.test.js
+// checks every name here against the real glyph maps.
 export const TAB_DEFINITIONS = Object.freeze([
   { name: "tvshows", labelKey: "tvShows", family: "Ionicons", icon: "tv", iconOutline: "tv-outline", sf: "tv", selectedSf: "tv.fill" },
-  { name: "movies", labelKey: "movies", family: "Ionicons", icon: "film", iconOutline: "film-outline", sf: "film", selectedSf: "film.fill" },
-  { name: "share", labelKey: "hub", family: "Ionicons", icon: "apps", iconOutline: "apps-outline", sf: "square.grid.2x2", selectedSf: "square.grid.2x2.fill" },
+  { name: "movies", labelKey: "movies", family: "Ionicons", icon: "videocam", iconOutline: "videocam-outline", sf: "video", selectedSf: "video.fill" },
+  { name: "share", labelKey: "hub", family: "Ionicons", icon: "grid", iconOutline: "grid-outline", sf: "square.grid.2x2", selectedSf: "square.grid.2x2.fill" },
   { name: "settings", labelKey: "settings", family: "Ionicons", icon: "settings", iconOutline: "settings-outline", sf: "gearshape", selectedSf: "gearshape.fill" },
-  { name: "profile", labelKey: "profile", family: "Ionicons", icon: "person", iconOutline: "person-outline", sf: "person", selectedSf: "person.fill" },
+  { name: "profile", labelKey: "profile", family: "Ionicons", icon: "person-circle", iconOutline: "person-circle-outline", sf: "person.crop.circle", selectedSf: "person.crop.circle.fill" },
 ]);
 export const TAB_NAMES = Object.freeze(TAB_DEFINITIONS.map(({ name }) => name));
 export const isTabName = (name) => TAB_NAMES.includes(name);

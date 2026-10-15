@@ -46,6 +46,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { clampAvatarIndex } from "../utils/avatars";
+import { normalizeWatchDate } from "../utils/watchHistory";
 import { snapshotErrorHandler } from "../utils/firestoreError";
 
 export const sharedItemKey = (type, id) => `${type}_${id}`;
@@ -204,7 +205,7 @@ export async function addItemToSharedList({ listId, user, item }) {
     minutes: item.minutes ?? null,
     totalMinutes: item.totalMinutes ?? null,
     genres: item.genres || [],
-    dateAdded: item.dateAdded || new Date().toISOString().slice(0, 10),
+    dateAdded: item.dateAdded || normalizeWatchDate(new Date()),
     addedBy: user.uid,
     addedByName: user.displayName || "",
     addedByUsername: user.username || "",

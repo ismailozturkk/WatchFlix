@@ -3,11 +3,11 @@
 // Onboarding tanıtım slaytları için özellik gösterimleri.
 // Tüm örnek içerikler TMDB'den gelen GERÇEK yapımlarla beslenir
 // (poster/başlık/puan/yıl tutarlı). Kompakt tasarım hedefi:
-//  - AI: 5 cevap stilinin TAMAMI aynı anda açık, 2'li mini kart grid'i
+//  - AI: kullanıcı sorusu + öneri kartı (3 poster) + 5 cevap stili çipi
 //  - Sohbet: birebir sohbet sol üstte, grup sohbeti sağ altta, yanlarında bilgi
 //  - Turnuva: kaydırma gerektirmeyen kompakt mini ağaç (MiniBracket)
 //  - Oyna: sahne tahmini + aylık turnuva + post paylaşımı, sohbetteki çapraz mini kart düzeniyle
-//  - Profil: kendi profilin + arkadaş profili kartı, aynı çapraz kompakt düzen
+//  - Profil: kendi profil kartı (istatistik, Wrapped, favoriler) + arkadaş hareketi
 
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -16,6 +16,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
 import { alpha } from "../../theme/colors";
+import { isLightSurface } from "../../utils/colorUtils";
 
 const GAME_TOKENS = { correct: "#00E676", incorrect: "#FF1744" };
 const GOLD = "#F5C518";
@@ -66,200 +67,124 @@ function LoadingCard({ theme, lang }) {
   );
 }
 
-/* ═══════════════════════ 1. YAPAY ZEKÂ — hepsi açık mini grid ═══════════════ */
+/* ═══════════════════════ 1. YAPAY ZEKÂ — soru + öneri kartı ═════════════════ */
 
-// Mini yıldız + puan
-function MiniStar({ rating, color }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-      <Ionicons name="star" size={8.5} color={GOLD} />
-      <Text style={{ fontSize: 8.5, fontWeight: "800", color }}>{rating}</Text>
-    </View>
-  );
-}
+// Seelogd AI'ın beş cevap stili (ilki örnekte açık, diğerleri çip olarak listelenir).
+const AI_STYLES = [
+  { icon: "sparkles", tr: "Öneri", en: "Picks" },
+  { icon: "git-compare", tr: "Karşılaştırma", en: "Compare" },
+  { icon: "calendar", tr: "İzleme planı", en: "Watch plan" },
+  { icon: "list", tr: "Liste", en: "List" },
+  { icon: "information-circle", tr: "Künye", en: "Spotlight" },
+];
 
-// Mini poster + başlık satırı (öneri/liste kartlarında)
-function AiItemRow({ item, getTmdbUrl, theme }) {
+// Poster + puan rozeti + başlık/yıl. Veri henüz yoksa nötr iskelet çizer.
+function AiPick({ item, getTmdbUrl, theme }) {
   return (
-    <View style={ai.itemRow}>
-      <ExpoImage
-        source={{ uri: getTmdbUrl(item.poster_path, "poster", 200) }}
-        style={ai.itemPoster}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-      />
-      <View style={{ flex: 1 }}>
-        <Text style={[ai.itemTitle, { color: theme.text.primary }]} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 }}>
-          <Text style={[ai.itemMeta, { color: theme.text.muted }]}>{item.year}</Text>
-          <MiniStar rating={item.vote_average} color={theme.text.secondary} />
-        </View>
+    <View style={aiMock.pick}>
+      <View style={[aiMock.posterBox, { backgroundColor: alpha(theme.text.muted, 0.14) }]}>
+        {item ? (
+          <>
+            <ExpoImage
+              source={{ uri: getTmdbUrl(item.poster_path, "poster", 200) }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+            <View style={aiMock.rating}>
+              <Ionicons name="star" size={10} color={GOLD} />
+              <Text style={aiMock.ratingText}>{item.vote_average}</Text>
+            </View>
+          </>
+        ) : null}
       </View>
-    </View>
-  );
-}
-
-// Karşılaştırma metriği: iki taraflı mini bar
-function VsBar({ label, l, r, theme, accent, orange }) {
-  return (
-    <View style={{ marginTop: 7 }}>
-      <Text style={[ai.vsLabel, { color: theme.text.muted }]}>{label}</Text>
-      <View style={[ai.vsTrack, { backgroundColor: alpha(theme.text.muted, 0.14) }]}>
-        <View style={{ flex: l, backgroundColor: accent, borderRadius: 2 }} />
-        <View style={{ width: 3 }} />
-        <View style={{ flex: r, backgroundColor: orange, borderRadius: 2 }} />
-      </View>
-    </View>
-  );
-}
-
-// Grid'deki tek mini özellik kartı
-function AiMiniCard({ theme, accent, icon, label, full, children }) {
-  return (
-    <View
-      style={[
-        ai.card,
-        {
-          backgroundColor: theme.secondary,
-          borderColor: theme.border,
-          width: full ? "100%" : "48%",
-        },
-      ]}
-    >
-      <View style={ai.head}>
-        <View style={[ai.headIcon, { backgroundColor: alpha(accent, 0.15) }]}>
-          <Ionicons name={icon} size={11} color={accent} />
-        </View>
-        <Text style={[ai.headText, { color: theme.text.secondary }]} numberOfLines={1}>
-          {label}
-        </Text>
-      </View>
-      {children}
+      <Text style={[aiMock.pickTitle, { color: theme.text.primary }]} numberOfLines={1}>
+        {item ? item.title : " "}
+      </Text>
+      <Text style={[aiMock.pickMeta, { color: theme.text.muted }]} numberOfLines={1}>
+        {item ? item.year : " "}
+      </Text>
     </View>
   );
 }
 
 export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = "tr" }) {
-  const orange = theme.colors?.orange || "#FF7C25";
-  const movies = useMemo(() => {
-    const mv = mediaItems.filter((x) => x.media_type === "movie");
-    return mv.length >= 5 ? mv : mediaItems;
+  const picks = useMemo(() => {
+    const movies = mediaItems.filter((x) => x.media_type === "movie");
+    const pool = movies.length >= 3 ? movies : mediaItems;
+    return [0, 1, 2].map((i) => pool[i] || null);
   }, [mediaItems]);
-
-  if (movies.length < 5) return <LoadingCard theme={theme} lang={lang} />;
-  const [m0, m1, m2, m3, m4] = movies;
-  const winner = (m0.vote_average || 0) >= (m1.vote_average || 0) ? m0 : m1;
+  const onAccent = isLightSurface(accent) ? "#111827" : "#FFFFFF";
 
   return (
-    <View style={{ width: "100%", maxWidth: 360 }}>
-      {/* Kullanıcı sorusu + AI'ın çoklu-format cevabı hissi */}
-      <View style={[ai.qBubble, { backgroundColor: alpha(accent, 0.14), borderColor: alpha(accent, 0.3) }]}>
-        <Text style={[ai.qText, { color: theme.text.primary }]}>
-          {L(lang, "“Bu akşam ne izlesem?” 🍿", "“What should I watch tonight?” 🍿")}
-        </Text>
-      </View>
-      <View style={ai.hintRow}>
-        <Ionicons name="sparkles" size={11} color={accent} />
-        <Text style={[ai.hintText, { color: theme.text.muted }]}>
-          {L(lang, "Seelogd AI — 5 farklı cevap stili", "Seelogd AI — 5 answer styles")}
+    <View style={aiMock.root}>
+      {/* Kullanıcının sorusu */}
+      <View style={[aiMock.question, { backgroundColor: accent }]}>
+        <Text style={[aiMock.questionText, { color: onAccent }]}>
+          {L(lang, "Bu akşam ne izlesem? 🍿", "What should I watch tonight? 🍿")}
         </Text>
       </View>
 
-      <View style={ai.grid}>
-        {/* Öneri */}
-        <AiMiniCard theme={theme} accent={accent} icon="sparkles" label={L(lang, "Öneri", "Suggest")}>
-          <AiItemRow item={m0} getTmdbUrl={getTmdbUrl} theme={theme} />
-          <AiItemRow item={m1} getTmdbUrl={getTmdbUrl} theme={theme} />
-          <Text style={[ai.footNote, { color: theme.text.muted }]} numberOfLines={1}>
-            {L(lang, "Ruh haline göre seçildi", "Picked for your mood")}
-          </Text>
-        </AiMiniCard>
-
-        {/* Karşılaştır */}
-        <AiMiniCard theme={theme} accent={accent} icon="git-compare" label={L(lang, "Karşılaştır", "Compare")}>
-          <View style={ai.vsHead}>
-            <ExpoImage source={{ uri: getTmdbUrl(m0.poster_path, "poster", 200) }} style={ai.vsPoster} contentFit="cover" cachePolicy="memory-disk" />
-            <View style={[ai.vsBadge, { backgroundColor: alpha(accent, 0.16) }]}>
-              <Text style={[ai.vsBadgeText, { color: accent }]}>VS</Text>
+      {/* AI cevabı */}
+      <View style={aiMock.answerRow}>
+        <View
+          style={[
+            aiMock.aiAvatar,
+            { backgroundColor: alpha(accent, 0.16), borderColor: alpha(accent, 0.36) },
+          ]}
+        >
+          <Ionicons name="sparkles" size={15} color={accent} />
+        </View>
+        <View
+          style={[aiMock.answer, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+        >
+          <View style={aiMock.answerHead}>
+            <Text style={[aiMock.aiName, { color: theme.text.primary }]}>Seelogd AI</Text>
+            <View style={[aiMock.styleTag, { backgroundColor: alpha(accent, 0.14) }]}>
+              <Ionicons name={AI_STYLES[0].icon} size={10} color={accent} />
+              <Text style={[aiMock.styleTagText, { color: accent }]}>{L(lang, AI_STYLES[0].tr, AI_STYLES[0].en)}</Text>
             </View>
-            <ExpoImage source={{ uri: getTmdbUrl(m1.poster_path, "poster", 200) }} style={ai.vsPoster} contentFit="cover" cachePolicy="memory-disk" />
           </View>
-          <VsBar label={L(lang, "Hikâye", "Story")} l={4} r={5} theme={theme} accent={accent} orange={orange} />
-          <VsBar label={L(lang, "Görsellik", "Visuals")} l={5} r={4} theme={theme} accent={accent} orange={orange} />
-          <View style={ai.verdictRow}>
-            <Ionicons name="trophy" size={10} color={GOLD} />
-            <Text style={[ai.verdictText, { color: theme.text.secondary }]} numberOfLines={1}>
-              {winner.title}
+          <Text style={[aiMock.answerText, { color: theme.text.secondary }]}>
+            {L(lang, "Ruh haline göre üç yapım seçtim:", "Three picks matched to your mood:")}
+          </Text>
+
+          <View style={aiMock.picks}>
+            {picks.map((item, i) => (
+              <AiPick key={item ? item.id : `empty-${i}`} item={item} getTmdbUrl={getTmdbUrl} theme={theme} />
+            ))}
+          </View>
+
+          <View style={[aiMock.addRow, { borderTopColor: theme.border }]}>
+            <Ionicons name="bookmark-outline" size={13} color={accent} />
+            <Text style={[aiMock.addText, { color: theme.text.muted }]}>
+              {L(lang, "Tek dokunuşla listene ekle", "Add to your list in one tap")}
             </Text>
           </View>
-        </AiMiniCard>
+        </View>
+      </View>
 
-        {/* İzleme Planı */}
-        <AiMiniCard theme={theme} accent={accent} icon="calendar" label={L(lang, "İzleme Planı", "Watch Plan")}>
-          {[m0, m1, m2].map((m, i) => (
-            <View key={m.id} style={ai.planRow}>
-              <View style={[ai.dayBadge, { backgroundColor: alpha(accent, 0.15) }]}>
-                <Text style={[ai.dayBadgeText, { color: accent }]}>{i + 1}</Text>
-              </View>
-              <ExpoImage source={{ uri: getTmdbUrl(m.poster_path, "poster", 200) }} style={ai.planPoster} contentFit="cover" cachePolicy="memory-disk" />
-              <Text style={[ai.planTitle, { color: theme.text.primary }]} numberOfLines={1}>
-                {m.title}
-              </Text>
-            </View>
-          ))}
-          <Text style={[ai.footNote, { color: theme.text.muted }]} numberOfLines={1}>
-            {L(lang, "Hafta sonu maratonu", "Weekend marathon")}
-          </Text>
-        </AiMiniCard>
-
-        {/* Liste */}
-        <AiMiniCard theme={theme} accent={accent} icon="list" label={L(lang, "Liste", "List")}>
-          {[m2, m3, m4].map((m, i) => (
-            <View key={m.id} style={ai.listRow}>
-              <Ionicons name={i === 0 ? "star" : "bookmark"} size={10} color={i === 0 ? GOLD : accent} />
-              <Text style={[ai.listTitle, { color: theme.text.primary }]} numberOfLines={1}>
-                {m.title}
-              </Text>
-              <MiniStar rating={m.vote_average} color={theme.text.secondary} />
-            </View>
-          ))}
-          <Text style={[ai.footNote, { color: theme.text.muted }]} numberOfLines={1}>
-            {L(lang, "Tek dokunuşla listene ekle", "Add to your list in one tap")}
-          </Text>
-        </AiMiniCard>
-
-        {/* Künye — tam genişlik */}
-        <AiMiniCard theme={theme} accent={accent} icon="information-circle" label={L(lang, "Künye", "Spotlight")} full>
-          <View style={ai.spotRow}>
-            <ExpoImage source={{ uri: getTmdbUrl(m1.poster_path, "poster", 200) }} style={ai.spotPoster} contentFit="cover" cachePolicy="memory-disk" />
-            <View style={{ flex: 1 }}>
-              <Text style={[ai.spotTitle, { color: theme.text.primary }]} numberOfLines={1}>
-                {m1.title}
-              </Text>
-              <View style={ai.chipRow}>
-                {[m1.year, ...(m1.genres || []).slice(0, 2)].filter(Boolean).map((c) => (
-                  <View key={c} style={[ai.chip, { borderColor: theme.border, backgroundColor: theme.between }]}>
-                    <Text style={[ai.chipText, { color: theme.text.secondary }]}>{c}</Text>
-                  </View>
-                ))}
-                <MiniStar rating={m1.vote_average} color={theme.text.secondary} />
-              </View>
-              <Text style={[ai.spotSummary, { color: theme.text.muted }]} numberOfLines={2}>
-                {clip(m1.overview, 90) || L(lang, "Tür, oyuncular, benzer yapımlar ve daha fazlası…", "Genres, cast, similar titles and more…")}
-              </Text>
-              <View style={ai.similarRow}>
-                <Text style={[ai.footNote, { color: theme.text.muted, marginTop: 0 }]}>
-                  {L(lang, "Benzer:", "Similar:")}
-                </Text>
-                {[m0, m2, m3].map((m) => (
-                  <ExpoImage key={m.id} source={{ uri: getTmdbUrl(m.poster_path, "poster", 200) }} style={ai.similarPoster} contentFit="cover" cachePolicy="memory-disk" />
-                ))}
-              </View>
-            </View>
+      {/* Beş cevap stili */}
+      <Text style={[aiMock.label, { color: theme.text.muted }]}>
+        {L(lang, "5 FARKLI CEVAP STİLİ", "5 ANSWER STYLES")}
+      </Text>
+      <View style={aiMock.chips}>
+        {AI_STYLES.map((style, i) => (
+          <View
+            key={style.icon}
+            style={[
+              aiMock.chip,
+              i === 0
+                ? { backgroundColor: alpha(accent, 0.16), borderColor: alpha(accent, 0.45) }
+                : { backgroundColor: alpha(theme.secondary, 0.9), borderColor: theme.border },
+            ]}
+          >
+            <Ionicons name={style.icon} size={12} color={i === 0 ? accent : theme.text.secondary} />
+            <Text style={[aiMock.chipText, { color: i === 0 ? accent : theme.text.secondary }]}>
+              {L(lang, style.tr, style.en)}
+            </Text>
           </View>
-        </AiMiniCard>
+        ))}
       </View>
     </View>
   );
@@ -908,131 +833,163 @@ export function ChatDuoShowcase({ theme, accent, mediaItems = [], getTmdbUrl, la
   );
 }
 
-/* ═══════════════════════ 6. PROFİL — sen + arkadaş profili (çapraz düzen) ═══ */
+/* ═══════════════════════ 6. PROFİL — kendi profilin + arkadaş hareketi ══════ */
 
-export function ProfileShowcase({ theme, accent, posters = [], lang = "tr" }) {
+function ProfileStat({ theme, accent, icon, value, label }) {
+  return (
+    <View style={[pf.stat, { backgroundColor: theme.between, borderColor: theme.border }]}>
+      <Ionicons name={icon} size={14} color={accent} />
+      <Text style={[pf.statValue, { color: theme.text.primary }]}>{value}</Text>
+      <Text style={[pf.statLabel, { color: theme.text.muted }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+// Arkadaş hareketi satırı: avatar + "ad izledi/puanladı" + başlık + mini poster.
+function FriendActivity({ theme, name, color, verb, item, rating, getTmdbUrl, first }) {
+  return (
+    <View
+      style={[
+        pf.activityRow,
+        !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+      ]}
+    >
+      <View style={[pf.friendAvatar, { backgroundColor: alpha(color, 0.2) }]}>
+        <Text style={[pf.friendAvatarText, { color }]}>{name.slice(0, 1).toUpperCase()}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[pf.activityLine, { color: theme.text.secondary }]} numberOfLines={1}>
+          <Text style={{ color: theme.text.primary, fontWeight: "800" }}>{name}</Text> {verb}
+        </Text>
+        <View style={pf.activityMeta}>
+          <Text style={[pf.activityTitle, { color: theme.text.primary }]} numberOfLines={1}>
+            {item ? item.title : " "}
+          </Text>
+          {rating ? (
+            <View style={pf.activityRating}>
+              <Ionicons name="star" size={10} color={GOLD} />
+              <Text style={[pf.activityRatingText, { color: theme.text.secondary }]}>{rating}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+      <View style={[pf.activityPoster, { backgroundColor: alpha(theme.text.muted, 0.14) }]}>
+        {item ? (
+          <ExpoImage
+            source={{ uri: getTmdbUrl(item.poster_path, "poster", 200) }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+export function ProfileShowcase({ theme, accent, posters = [], mediaItems = [], getTmdbUrl, lang = "tr" }) {
   const green = theme.colors?.green || "#3ddc84";
-  const posterAt = (i) => (posters.length ? posters[i % posters.length] : undefined);
+  const blue = theme.colors?.blue || "#4a7cf6";
+  const purple = theme.colors?.purple || "#7C3AED";
+  const posterAt = (i) => (posters.length ? posters[i % posters.length] : null);
+  const year = new Date().getFullYear();
+  const titles = mediaItems.length ? mediaItems : [];
+  const friendA = titles[3] || null;
+  const friendB = titles[6 % Math.max(titles.length, 1)] || null;
 
   return (
-    <View style={{ width: "100%", maxWidth: 360, gap: 12 }}>
-      {/* ÜST — kendi profilin solda, bilgiler sağda */}
-      <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
-        <View
-          style={[
-            duo.card,
-            { backgroundColor: theme.secondary, borderColor: theme.border, padding: 0, overflow: "hidden" },
-          ]}
-        >
-          <View style={{ height: 26, backgroundColor: alpha(accent, 0.2) }} />
-          <View style={{ paddingHorizontal: 9, paddingBottom: 9 }}>
-            <View style={[mini.pAvatar, { backgroundColor: theme.between, borderColor: theme.secondary }]}>
-              <Text style={[mini.pAvatarText, { color: accent }]}>D</Text>
-            </View>
-            <Text style={[mini.pName, { color: theme.text.primary }]} numberOfLines={1}>Deniz A.</Text>
-            <Text style={[mini.pHandle, { color: theme.text.muted }]} numberOfLines={1}>@deniza</Text>
+    <View style={pf.root}>
+      {/* Profil kartı */}
+      <View style={[pf.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+        <View style={pf.cover}>
+          <LinearGradient
+            colors={[alpha(accent, 0.7), alpha(purple, 0.55)]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
 
-            {/* Mini istatistik hücreleri */}
-            <View style={mini.statRow}>
-              {[
-                { n: "312", l: L(lang, "Film", "Movies") },
-                { n: "48", l: L(lang, "Dizi", "Shows") },
-                { n: "18g", l: L(lang, "Süre", "Time") },
-              ].map((s) => (
-                <View
-                  key={s.l}
-                  style={[mini.statCell, { backgroundColor: theme.between, borderColor: theme.border }]}
-                >
-                  <Text style={[mini.statNum, { color: theme.text.primary }]}>{s.n}</Text>
-                  <Text style={[mini.statLabel, { color: theme.text.muted }]}>{s.l}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Wrapped mini şeridi */}
-            <View style={mini.wrappedStrip}>
-              <LinearGradient
-                colors={[accent, "#7C3AED"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <MaterialCommunityIcons name="star-four-points" size={10} color="#fff" />
-              <Text style={mini.wrappedStripText} numberOfLines={1}>Wrapped 2025</Text>
-              <View style={{ flex: 1 }} />
-              <Ionicons name="arrow-forward" size={10} color="#fff" />
-            </View>
+        <View style={pf.headRow}>
+          <View style={[pf.avatar, { backgroundColor: theme.between, borderColor: theme.secondary }]}>
+            <Text style={[pf.avatarText, { color: accent }]}>D</Text>
+          </View>
+          <View style={{ flex: 1, paddingTop: 30 }}>
+            <Text style={[pf.name, { color: theme.text.primary }]} numberOfLines={1}>Deniz A.</Text>
+            <Text style={[pf.handle, { color: theme.text.muted }]} numberOfLines={1}>@deniza</Text>
           </View>
         </View>
 
-        <InfoCol
-          theme={theme}
-          accent={accent}
-          eyebrow={L(lang, "SENİN PROFİLİN", "YOUR PROFILE")}
-          bullets={[
-            { icon: "stats-chart-outline", text: L(lang, "Film & dizi istatistiklerin", "Your movie & show stats") },
-            { icon: "time-outline", text: L(lang, "Toplam izleme süren", "Your total watch time") },
-            { icon: "gift-outline", text: L(lang, "Yıl sonu özetin: Wrapped", "Your year in review: Wrapped") },
-          ]}
-        />
-      </View>
+        <View style={pf.stats}>
+          <ProfileStat theme={theme} accent={accent} icon="film-outline" value="312" label={L(lang, "Film", "Movies")} />
+          <ProfileStat theme={theme} accent={accent} icon="tv-outline" value="48" label={L(lang, "Dizi", "Shows")} />
+          <ProfileStat
+            theme={theme}
+            accent={accent}
+            icon="time-outline"
+            value={L(lang, "18 gün", "18 days")}
+            label={L(lang, "İzleme süresi", "Watch time")}
+          />
+        </View>
 
-      {/* ALT — bilgiler solda, arkadaş profili sağda */}
-      <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
-        <InfoCol
-          theme={theme}
-          accent={accent}
-          align="right"
-          eyebrow={L(lang, "ARKADAŞ PROFİLİ", "FRIEND PROFILES")}
-          bullets={[
-            { icon: "person-add-outline", text: L(lang, "Takip et, takipleş", "Follow and connect") },
-            { icon: "albums-outline", text: L(lang, "Listelerini ve favorilerini gör", "See their lists & favorites") },
-            { icon: "chatbubble-outline", text: L(lang, "Tek dokunuşla sohbet başlat", "Start a chat in one tap") },
-          ]}
-        />
+        {/* Wrapped şeridi */}
+        <View style={pf.wrapped}>
+          <LinearGradient
+            colors={[accent, purple]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <MaterialCommunityIcons name="star-four-points" size={14} color="#fff" />
+          <View style={{ flex: 1 }}>
+            <Text style={pf.wrappedTitle}>Wrapped {year}</Text>
+            <Text style={pf.wrappedSub}>{L(lang, "Yılın izleme özetin hazır", "Your year in watching")}</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={16} color="#fff" />
+        </View>
 
-        <View
-          style={[
-            duo.card,
-            { backgroundColor: theme.secondary, borderColor: theme.border, padding: 0, overflow: "hidden" },
-          ]}
-        >
-          <View style={{ height: 26, backgroundColor: alpha(green, 0.18) }} />
-          <View style={{ paddingHorizontal: 9, paddingBottom: 9 }}>
-            <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" }}>
-              <View style={[mini.pAvatar, { backgroundColor: theme.between, borderColor: theme.secondary }]}>
-                <Text style={[mini.pAvatarText, { color: green }]}>Z</Text>
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingBottom: 2 }}>
-                <View style={[mini.followBtn, { backgroundColor: accent }]}>
-                  <Text style={mini.followBtnText}>{L(lang, "Takip Et", "Follow")}</Text>
-                </View>
-                <View style={[mini.msgBtn, { borderColor: theme.border }]}>
-                  <Ionicons name="chatbubble-outline" size={10} color={theme.text.secondary} />
-                </View>
-              </View>
-            </View>
-            <Text style={[mini.pName, { color: theme.text.primary }]} numberOfLines={1}>Zeynep K.</Text>
-            <Text style={[mini.pHandle, { color: theme.text.muted }]} numberOfLines={1}>
-              @zeynepk · {L(lang, "184 takipçi", "184 followers")}
-            </Text>
-
-            <Text style={[mini.friendLabel, { color: theme.text.muted }]}>
-              {L(lang, "FAVORİLERİ", "THEIR FAVORITES")}
-            </Text>
-            <View style={mini.friendPosters}>
-              {[0, 1, 2].map((k) => (
+        <Text style={[pf.label, { color: theme.text.muted }]}>{L(lang, "FAVORİLERİN", "YOUR FAVORITES")}</Text>
+        <View style={pf.favs}>
+          {[0, 1, 2, 3].map((k) => (
+            <View key={k} style={[pf.fav, { backgroundColor: alpha(theme.text.muted, 0.14) }]}>
+              {posterAt(k + 6) ? (
                 <ExpoImage
-                  key={k}
                   source={{ uri: posterAt(k + 6) }}
-                  style={[mini.friendPoster, { backgroundColor: theme.between }]}
+                  style={StyleSheet.absoluteFill}
                   contentFit="cover"
                   cachePolicy="memory-disk"
                 />
-              ))}
+              ) : null}
             </View>
-          </View>
+          ))}
         </View>
+      </View>
+
+      {/* Arkadaş hareketi */}
+      <View style={[pf.activity, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+        <Text style={[pf.label, { color: theme.text.muted, marginTop: 0 }]}>
+          {L(lang, "ARKADAŞLARIN NE İZLİYOR", "WHAT FRIENDS ARE WATCHING")}
+        </Text>
+        <FriendActivity
+          first
+          theme={theme}
+          name="zeynep"
+          color={green}
+          verb={L(lang, "izledi", "watched")}
+          item={friendA}
+          getTmdbUrl={getTmdbUrl}
+        />
+        <FriendActivity
+          theme={theme}
+          name="can"
+          color={blue}
+          verb={L(lang, "puanladı", "rated")}
+          item={friendB}
+          rating={4.5}
+          getTmdbUrl={getTmdbUrl}
+        />
       </View>
     </View>
   );
@@ -1040,67 +997,154 @@ export function ProfileShowcase({ theme, accent, posters = [], lang = "tr" }) {
 
 /* ═══════════════════════ Stiller ════════════════════════════════════════════ */
 
-// AI mini grid stilleri
-const ai = StyleSheet.create({
-  qBubble: {
+// Yapay zekâ önizlemesi stilleri
+const aiMock = StyleSheet.create({
+  root: { width: "100%", maxWidth: 360 },
+  question: {
     alignSelf: "flex-end",
+    maxWidth: "88%",
+    borderRadius: 18,
+    borderBottomRightRadius: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  questionText: { fontSize: 13.5, fontWeight: "800" },
+  answerRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 12 },
+  aiAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  answer: {
+    flex: 1,
+    borderRadius: 20,
+    borderTopLeftRadius: 6,
+    borderWidth: 1,
+    padding: 12,
+  },
+  answerHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  aiName: { fontSize: 13, fontWeight: "900" },
+  styleTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  styleTagText: { fontSize: 10.5, fontWeight: "800" },
+  answerText: { fontSize: 12.5, lineHeight: 18, marginTop: 8 },
+  picks: { flexDirection: "row", gap: 8, marginTop: 10 },
+  pick: { flex: 1 },
+  posterBox: { width: "100%", aspectRatio: 2 / 3, borderRadius: 10, overflow: "hidden" },
+  rating: {
+    position: "absolute",
+    left: 5,
+    bottom: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.72)",
+  },
+  ratingText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  pickTitle: { fontSize: 11.5, fontWeight: "800", marginTop: 6 },
+  pickMeta: { fontSize: 10.5, fontWeight: "600", marginTop: 1 },
+  addRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  addText: { fontSize: 11.5, fontWeight: "600" },
+  label: { fontSize: 10.5, fontWeight: "900", letterSpacing: 1.1, marginTop: 16, marginBottom: 8 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    height: 30,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipText: { fontSize: 11.5, fontWeight: "800" },
+});
+
+// Profil önizlemesi stilleri
+const pf = StyleSheet.create({
+  root: { width: "100%", maxWidth: 360, gap: 12 },
+  card: { borderRadius: 22, borderWidth: 1, overflow: "hidden", paddingBottom: 14 },
+  cover: { height: 64 },
+  headRow: { flexDirection: "row", gap: 12, paddingHorizontal: 14, marginTop: -30 },
+  avatar: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { fontSize: 24, fontWeight: "900" },
+  name: { fontSize: 16, fontWeight: "900" },
+  handle: { fontSize: 12, fontWeight: "600", marginTop: 1 },
+  stats: { flexDirection: "row", gap: 8, paddingHorizontal: 14, marginTop: 14 },
+  stat: {
+    flex: 1,
+    alignItems: "center",
+    gap: 3,
+    paddingVertical: 9,
     borderRadius: 14,
-    borderTopRightRadius: 4,
-    borderWidth: 1,
-    paddingVertical: 6,
-    paddingHorizontal: 11,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  qText: { fontSize: 11.5, fontWeight: "700" },
-  hintRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8, marginBottom: 10 },
-  hintText: { fontSize: 9.5, fontWeight: "700", letterSpacing: 0.3 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 9, justifyContent: "space-between" },
-  card: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 9,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 3,
+  statValue: { fontSize: 15, fontWeight: "900" },
+  statLabel: { fontSize: 10.5, fontWeight: "600" },
+  wrapped: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
+    overflow: "hidden",
+    marginHorizontal: 14,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  head: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 3 },
-  headIcon: { width: 18, height: 18, borderRadius: 6, alignItems: "center", justifyContent: "center" },
-  headText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3, flex: 1 },
-
-  itemRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
-  itemPoster: { width: 22, height: 33, borderRadius: 5, backgroundColor: "rgba(255,255,255,0.06)" },
-  itemTitle: { fontSize: 10, fontWeight: "700" },
-  itemMeta: { fontSize: 8.5, fontWeight: "500" },
-  footNote: { fontSize: 8.5, fontWeight: "600", marginTop: 8, fontStyle: "italic" },
-
-  vsHead: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 4 },
-  vsPoster: { width: 26, height: 39, borderRadius: 6, backgroundColor: "rgba(255,255,255,0.06)" },
-  vsBadge: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  vsBadgeText: { fontSize: 8, fontWeight: "900" },
-  vsLabel: { fontSize: 8.5, fontWeight: "600", marginBottom: 3 },
-  vsTrack: { flexDirection: "row", height: 4, borderRadius: 2, overflow: "hidden" },
-  verdictRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
-  verdictText: { fontSize: 9, fontWeight: "800", flex: 1 },
-
-  planRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
-  dayBadge: { width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  dayBadgeText: { fontSize: 8.5, fontWeight: "900" },
-  planPoster: { width: 18, height: 27, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.06)" },
-  planTitle: { fontSize: 9.5, fontWeight: "700", flex: 1 },
-
-  listRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 7 },
-  listTitle: { fontSize: 9.5, fontWeight: "700", flex: 1 },
-
-  spotRow: { flexDirection: "row", gap: 10, marginTop: 4 },
-  spotPoster: { width: 44, height: 66, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.06)" },
-  spotTitle: { fontSize: 12, fontWeight: "800" },
-  chipRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4, marginTop: 4 },
-  chip: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, borderWidth: 1 },
-  chipText: { fontSize: 8.5, fontWeight: "700" },
-  spotSummary: { fontSize: 9.5, lineHeight: 13, marginTop: 5 },
-  similarRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 7 },
-  similarPoster: { width: 18, height: 27, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.06)" },
+  wrappedTitle: { color: "#fff", fontSize: 13, fontWeight: "900" },
+  wrappedSub: { color: "rgba(255,255,255,0.82)", fontSize: 11, fontWeight: "600", marginTop: 1 },
+  label: {
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+    marginTop: 14,
+    marginBottom: 8,
+    marginHorizontal: 14,
+  },
+  favs: { flexDirection: "row", gap: 8, paddingHorizontal: 14 },
+  fav: { flex: 1, aspectRatio: 2 / 3, borderRadius: 10, overflow: "hidden" },
+  activity: { borderRadius: 22, borderWidth: 1, paddingTop: 14, paddingBottom: 4 },
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  friendAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  friendAvatarText: { fontSize: 14, fontWeight: "900" },
+  activityLine: { fontSize: 12, fontWeight: "600" },
+  activityMeta: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 },
+  activityTitle: { flexShrink: 1, fontSize: 13, fontWeight: "800" },
+  activityRating: { flexDirection: "row", alignItems: "center", gap: 3 },
+  activityRatingText: { fontSize: 11, fontWeight: "800" },
+  activityPoster: { width: 30, height: 45, borderRadius: 7, overflow: "hidden" },
 });
 
 // Mini bracket stilleri
@@ -1210,24 +1254,6 @@ const mini = StyleSheet.create({
   postText: { fontSize: 8.5, lineHeight: 11.5, marginTop: 3 },
   postFoot: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8, paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth },
   postFootText: { fontSize: 8.5, fontWeight: "700", marginRight: 5 },
-
-  // Mini profil kartları
-  pAvatar: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, alignItems: "center", justifyContent: "center", marginTop: -13 },
-  pAvatarText: { fontSize: 12, fontWeight: "800" },
-  pName: { fontSize: 11, fontWeight: "800", marginTop: 4 },
-  pHandle: { fontSize: 8.5, marginTop: 1 },
-  statRow: { flexDirection: "row", gap: 4, marginTop: 8 },
-  statCell: { flex: 1, alignItems: "center", borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, paddingVertical: 5 },
-  statNum: { fontSize: 10.5, fontWeight: "900" },
-  statLabel: { fontSize: 7.5, marginTop: 1 },
-  wrappedStrip: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 6, marginTop: 8, overflow: "hidden" },
-  wrappedStripText: { color: "#fff", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.2 },
-  followBtn: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999 },
-  followBtnText: { color: "#fff", fontSize: 8.5, fontWeight: "800" },
-  msgBtn: { width: 22, height: 22, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  friendLabel: { fontSize: 7.5, fontWeight: "800", letterSpacing: 0.6, marginTop: 9 },
-  friendPosters: { flexDirection: "row", gap: 4, marginTop: 5 },
-  friendPoster: { flex: 1, aspectRatio: 2 / 3, borderRadius: 6 },
 });
 
 // ── Post / Story / Profil / İstatistik / Liste stilleri (gerçek ekranlarla birebir) ──

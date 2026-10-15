@@ -304,3 +304,12 @@ export function todayListDate(now = new Date()) {
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Özet metni (TMDB `overview`) — hızlı ekle düğmesi için. Detay gövdesi de
+ * arama sonucu da aynı alanı taşır. Boşluklar kırpılır; yoksa boş dize.
+ */
+export function pickOverview(source) {
+  const text = typeof source?.overview === "string" ? source.overview.trim() : "";
+  return text;
+}

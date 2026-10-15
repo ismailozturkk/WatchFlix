@@ -1,8 +1,15 @@
 import { resolveRarity } from "@theme/badgeTokens";
+import { computeLevel } from "@utils/gameScoring";
+import { effectiveStreak } from "@utils/dailyChallenge";
+import { POSTER_GAME_ID, SCENE_GAME_ID } from "./gameConfig";
 
+// Her oyun ayni motoru (useSceneGame) kullanir; fark soru turu ve gorunumdur:
+//   scene_guess   → TMDB sahne kareleri
+//   poster_puzzle → bulanik/ortulu afis, sure ilerledikce acilir
+// `accentColors`: tema anahtari ("accent"/"bold") ya da sabit hex.
 export const GAME_REGISTRY = [
   {
-    id: "scene_guess",
+    id: SCENE_GAME_ID,
     titleKey: "autoI18n.sahne_tahmin_oyunu_title",
     descriptionKey: "autoI18n.sahne_tahmin_aciklama",
     icon: { family: "Ionicons", name: "film-outline" },
@@ -10,24 +17,24 @@ export const GAME_REGISTRY = [
     accentColors: ["accent", "bold"],
     routeName: "SceneGameDetailScreen",
     availability: "available",
-    playerProgress: null,
-    dailyState: null,
   },
   {
-    id: "poster_puzzle",
+    id: POSTER_GAME_ID,
     titleKey: "autoI18n.poster_bulmaca",
     descriptionKey: "autoI18n.poster_bulmaca_aciklama",
     icon: { family: "Ionicons", name: "grid-outline" },
     artwork: { type: "gradient", icon: "image-outline" },
-    accentColors: ["muted", "secondary"],
-    routeName: null,
-    availability: "coming_soon",
-    playerProgress: null,
-    dailyState: null,
+    accentColors: ["#F59E0B", "#E4572E"],
+    routeName: "SceneGameDetailScreen",
+    availability: "available",
   },
 ];
 
+export const getGameEntry = (gameId) =>
+  GAME_REGISTRY.find((game) => game.id === gameId) || GAME_REGISTRY[0];
+
 const resolveColor = (token, theme) => {
+  if (typeof token === "string" && token.startsWith("#")) return token;
   if (token === "accent") return theme.accent;
   if (token === "bold") return theme.bold || theme.accent;
   if (token === "muted") return theme.text.muted;
@@ -38,16 +45,60 @@ const resolveColor = (token, theme) => {
 export const resolveGameAccentColors = (game, theme) =>
   game.accentColors.map((token) => resolveColor(token, theme));
 
-export const buildSceneGameProgress = (stats) => ({
-  level: Number(stats?.level) || 1,
-  weeklyStreak: Number(stats?.weeklyStreak) || 0,
-  bestClassicScore: Number(stats?.bestScore) || 0,
-  totalPlayed: Number(stats?.totalPlayed) || 0,
-});
+// Unvan esikleri (seviye >= esik). Basliklar i18n anahtaridir.
+const PLAYER_TITLES = [
+  { minLevel: 7, key: "autoI18n.sinema_gurusu", fallback: "Sinema Gurusu" },
+  { minLevel: 4, key: "autoI18n.oyun_unvan_sinefil", fallback: "Sinefil" },
+  { minLevel: 2, key: "autoI18n.film_sever", fallback: "Film Sever" },
+  { minLevel: 1, key: "autoI18n.oyun_unvan_yeni", fallback: "Yeni Oyuncu" },
+];
 
-export const buildSceneDailyState = (stats) => {
-  if (stats?.dailyState) return stats.dailyState;
-  return { status: "coming_soon", rewardXp: 0, expiresAt: null };
+export const getPlayerTitle = (level) =>
+  PLAYER_TITLES.find((title) => level >= title.minLevel) || PLAYER_TITLES[PLAYER_TITLES.length - 1];
+
+/**
+ * Oyuncu ilerlemesi. XP/seviye `totalXp`'ten TURETILIR (computeLevel); eskiden
+ * Oyun Merkezi'nde skor ve oyun sayisindan uydurulmus bir formulle cizgi
+ * basiliyordu ve gercek XP ile hic ortusmuyordu.
+ */
+export const buildSceneGameProgress = (stats, now = Date.now()) => {
+  const level = computeLevel(stats?.totalXp);
+  const correct = Number(stats?.totalCorrect) || 0;
+  const wrong = Number(stats?.totalWrong) || 0;
+  const answered = correct + wrong;
+  return {
+    level: level.level,
+    totalXp: level.totalXp,
+    levelProgress: level.progress,
+    xpIntoLevel: level.currentLevelXp,
+    xpForNext: level.nextLevelXp,
+    dayStreak: effectiveStreak(stats?.dayStreak, stats?.lastPlayDay, now),
+    bestClassicScore: Number(stats?.bestScore) || 0,
+    totalPlayed: Number(stats?.totalPlayed) || 0,
+    accuracy: answered ? Math.round((correct / answered) * 100) : 0,
+  };
+};
+
+/**
+ * Bir oyunun en iyi skoru. Sahne: genel tablodaki skor (Klasik + Normal);
+ * Afis: afis modlarinin en yuksegi. Gunluk skorlar ikisine de karismaz.
+ */
+export const bestScoreForGame = (stats, gameId) => {
+  const byMode = stats?.bestScoresByMode;
+  const entries = byMode && typeof byMode === "object" ? Object.entries(byMode) : [];
+  if (gameId === POSTER_GAME_ID) {
+    return entries.reduce(
+      (max, [key, value]) => (key.startsWith("poster_") ? Math.max(max, Number(value) || 0) : max),
+      0,
+    );
+  }
+  const ranked = Number(stats?.bestScore) || 0;
+  const other = entries.reduce(
+    (max, [key, value]) =>
+      key.startsWith("poster_") || key.startsWith("daily_") ? max : Math.max(max, Number(value) || 0),
+    0,
+  );
+  return Math.max(ranked, other);
 };
 
 // En iyi Hayatta Kalma skoru (mod+zorluk farketmeksizin) — survivor basarimi icin.
@@ -185,6 +236,24 @@ export const SCENE_ACHIEVEMENTS = [
     iconSolid: "heart",
     target: 1,
     getProgress: (stats) => (survivalBestOf(stats) > 0 ? 1 : 0),
+  }),
+  defineAchievement({
+    id: "daily_first",
+    titleKey: "autoI18n.basari_gunluk_ilk",
+    descriptionKey: "autoI18n.basari_gunluk_ilk_aciklama",
+    icon: "sunny-outline",
+    iconSolid: "sunny",
+    target: 1,
+    getProgress: (stats) => Number(stats?.totalDailyPlayed) || 0,
+  }),
+  defineAchievement({
+    id: "daily_week",
+    titleKey: "autoI18n.basari_gunluk_hafta",
+    descriptionKey: "autoI18n.basari_gunluk_hafta_aciklama",
+    icon: "calendar-outline",
+    iconSolid: "calendar",
+    target: 7,
+    getProgress: (stats) => Number(stats?.bestDailyStreak) || 0,
   }),
   defineAchievement({
     id: "veteran",

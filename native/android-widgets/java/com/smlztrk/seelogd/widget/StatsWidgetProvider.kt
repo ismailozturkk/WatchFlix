@@ -72,6 +72,8 @@ class StatsWidgetProvider : AppWidgetProvider() {
         R.id.stats_widget_tv_time_panel,
         R.id.stats_widget_duration_strip,
       ).forEach { WidgetThemeViews.tintBackground(views, it, appearance.surfaceAlt) }
+      // Başlık simgesi, kullanıcının seçtiği uygulama simgesi (AppIconRes.kt).
+      views.setImageViewResource(R.id.stats_widget_logo, AppIconRes.launcherIcon(context))
       views.setViewVisibility(
         R.id.stats_widget_logo,
         if (preferences.statsShowTitle) View.VISIBLE else View.GONE,

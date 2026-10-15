@@ -5,10 +5,14 @@
 //
 // Destek yoksa (modül bu binary'de yok — Expo Go / eski build — ya da cihaz
 // alternatif simge desteklemiyor) kart HİÇ çizilmez: kullanıcıya çalışmayan bir
-// seçenek göstermek, hiç göstermemekten kötü.
+// seçenek göstermek, hiç göstermemekten kötü. YALNIZ geliştirme build'inde
+// (__DEV__) kartın yerine nedenini söyleyen soluk bir not çizilir; yoksa kart
+// "kayboldu" sanılıyor ve eski bir native build'de saatlerce aranıyor.
 //
-// Simgenin gerçeği işletim sisteminde; seçim burada saklanmaz, açılışta OS'tan
-// okunur (bkz. services/appIconService.js).
+// Simgenin gerçeği işletim sisteminde; seçim services/appIconStore.js'a da
+// yazılır ve uygulamadaki TÜM logolar (giriş, splash, hakkında, paylaşım
+// kartları...) hooks/useAppLogo.js ile oradan beslenir — simge değişince hepsi
+// birlikte, yeniden başlatma olmadan değişir.
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -17,35 +21,44 @@ import AppIcon from "@components/AppIcon";
 import { toast } from "@components/AppToast";
 import * as Haptics from "@services/hapticsService";
 import {
-  getActiveAppIconId,
-  isAppIconChangeSupported,
+  getAppIconSupportStatus,
+  reconcileAppIconWithSystem,
   setActiveAppIcon,
 } from "@services/appIconService";
+import { useAppIconId } from "@services/appIconStore";
+import { APP_LOGO_SOURCES } from "@components/appLogoSources";
 import { APP_ICONS, DEFAULT_APP_ICON_ID } from "@utils/appIcons";
 import { i18nText } from "@utils/i18nText";
+import { usePremiumGate } from "@hooks/usePremiumGate";
+import PremiumPill from "@components/premium/PremiumPill";
 import { alpha } from "@theme/colors";
 
-// Görseller statik require: Metro bunları derleme anında paketler.
-const PREVIEWS = {
-  default: require("../../assets/icon_default/icon.png"),
-  glass: require("../../assets/icon_glass/icon.png"),
-};
-
 export default function AppIconSection({ colors: C }) {
-  const [supported, setSupported] = useState(false);
-  const [activeId, setActiveId] = useState(DEFAULT_APP_ICON_ID);
+  // null = henüz sorgulanmadı; sonra getAppIconSupportStatus() değerlerinden biri.
+  const [status, setStatus] = useState(null);
+  // Seçili simge uygulama içi logoların da kaynağı olan store'dan okunur: kart
+  // ile giriş/splash/paylaşım logoları AYNI değeri gösterir, ayrı state tutulmaz.
+  const activeId = useAppIconId();
   const [busyId, setBusyId] = useState(null);
   const mountedRef = useRef(true);
+  // Simge değiştirmek Premium'da. Ücretsiz kullanıcı varsayılan simgede kalır;
+  // plan düşmüş olsa bile varsayılana DÖNMEK serbest (kilit yalnız diğer simgeler).
+  const iconGate = usePremiumGate("app_icon");
+  const iconLocked = !iconGate.allows();
 
   useEffect(() => {
     mountedRef.current = true;
     (async () => {
-      const ok = await isAppIconChangeSupported();
-      if (!mountedRef.current || !ok) return;
-      const id = await getActiveAppIconId();
+      const next = await getAppIconSupportStatus();
       if (!mountedRef.current) return;
-      setActiveId(id);
-      setSupported(true);
+      if (next !== "supported") {
+        setStatus(next);
+        return;
+      }
+      // Store açılışta zaten eşitlendi; kart açılırken bir kez daha doğrula.
+      await reconcileAppIconWithSystem();
+      if (!mountedRef.current) return;
+      setStatus(next);
     })();
     return () => {
       mountedRef.current = false;
@@ -55,12 +68,16 @@ export default function AppIconSection({ colors: C }) {
   const onSelect = useCallback(
     async (id) => {
       if (busyId || id === activeId) return;
+      if (iconLocked && id !== DEFAULT_APP_ICON_ID) {
+        iconGate.showUpsell();
+        return;
+      }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setBusyId(id);
       try {
-        const applied = await setActiveAppIcon(id);
+        // Başarıda store da güncellenir: tüm uygulama logoları anında geçer.
+        await setActiveAppIcon(id);
         if (!mountedRef.current) return;
-        setActiveId(applied);
         toast.success(
           i18nText("autoI18n.uygulama_simgesi_degisti", "Simge değişti"),
           // Android başlatıcıları simgeyi gecikmeli yeniler; iOS kendi sistem
@@ -82,10 +99,24 @@ export default function AppIconSection({ colors: C }) {
         if (mountedRef.current) setBusyId(null);
       }
     },
-    [activeId, busyId],
+    [activeId, busyId, iconGate, iconLocked],
   );
 
-  if (!supported) return null;
+  if (status !== "supported") {
+    if (!__DEV__ || !status) return null;
+    return (
+      <View style={[styles.card, styles.devNote, { borderColor: C.borderMuted }]}>
+        <Text allowFontScaling={false} style={[styles.devTitle, { color: C.muted }]}>
+          Uygulama simgesi seçici gizli (yalnız geliştirme build'inde görünür)
+        </Text>
+        <Text allowFontScaling={false} style={[styles.devBody, { color: C.muted }]}>
+          {status === "no-module"
+            ? "Bu yapıda SeelogdAppIcon native modülü yok (Expo Go ya da modülden önce alınmış build). Yeni bir development build gerekir."
+            : "Modül var ama alternatif simge desteği yok. Android'de AndroidManifest'te MainActivityDefault/Glass alias'ları eksik: eski bir android/ klasörü kullanılıyor olabilir, `npx expo prebuild --platform android` ile yeniden üret."}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
@@ -104,12 +135,14 @@ export default function AppIconSection({ colors: C }) {
             )}
           </Text>
         </View>
+        {iconLocked ? <PremiumPill /> : null}
       </View>
 
       <View style={styles.options}>
         {APP_ICONS.map((icon) => {
           const active = icon.id === activeId;
           const pending = busyId === icon.id;
+          const locked = iconLocked && icon.id !== DEFAULT_APP_ICON_ID;
           const label = i18nText(icon.labelKey, icon.labelFallback);
           return (
             <Pressable
@@ -127,11 +160,12 @@ export default function AppIconSection({ colors: C }) {
                 },
                 pressed && styles.optionPressed,
                 !!busyId && !pending && styles.optionDimmed,
+                locked && styles.optionLocked,
               ]}
             >
               <View style={styles.previewWrap}>
                 <Image
-                  source={PREVIEWS[icon.id]}
+                  source={APP_LOGO_SOURCES[icon.id].icon}
                   style={[styles.preview, { borderColor: alpha(C.border, 0.8) }]}
                   contentFit="cover"
                   cachePolicy="memory"
@@ -139,6 +173,10 @@ export default function AppIconSection({ colors: C }) {
                 {active ? (
                   <View style={[styles.check, { backgroundColor: C.accent, borderColor: C.card }]}>
                     <AppIcon name="checkmark" size={11} color={C.white} />
+                  </View>
+                ) : locked ? (
+                  <View style={[styles.check, { backgroundColor: C.accent, borderColor: C.card }]}>
+                    <AppIcon name="diamond" size={10} color={C.white} />
                   </View>
                 ) : null}
               </View>
@@ -183,6 +221,9 @@ const styles = StyleSheet.create({
   headerTexts: { flex: 1 },
   title: { fontSize: 14, fontWeight: "500" },
   sub: { fontSize: 11, marginTop: 2 },
+  devNote: { borderStyle: "dashed", padding: 12, gap: 4, opacity: 0.8 },
+  devTitle: { fontSize: 12, fontWeight: "600" },
+  devBody: { fontSize: 11, lineHeight: 16 },
   options: {
     flexDirection: "row",
     gap: 10,
@@ -200,6 +241,7 @@ const styles = StyleSheet.create({
   },
   optionPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   optionDimmed: { opacity: 0.55 },
+  optionLocked: { opacity: 0.72 },
   previewWrap: { width: 72, height: 72 },
   // iOS simge köşesi ≈ kenarın %22'si.
   preview: { width: 72, height: 72, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },

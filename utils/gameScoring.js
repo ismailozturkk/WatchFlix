@@ -52,17 +52,21 @@ export const XP_GAME_COMPLETION = 25;
 export const XP_PER_STREAK_MILESTONE = 10;
 export const XP_STREAK_MILESTONE_SIZE = 5;
 export const XP_PER_ACHIEVEMENT = 50;
+// Gunluk Meydan Okuma'yi SON SORUYA KADAR bitirmenin odulu (yarida birakan
+// almaz; yoksa herkes ilk sorudan cikip "denedim" bonusu toplardi).
+export const XP_DAILY_BONUS = 50;
 
 /**
  * Bir oturumda kazanilan XP'yi hesaplar (Part 11.3).
- * Kaynaklar: dogru cevap, oyun tamamlama, seri. Basarim/gunluk gorev XP'si
- * ilgili sistemler (Part 15 / 8.4) eklendiginde achievementsUnlocked ile gelir.
+ * Kaynaklar: dogru cevap, oyun tamamlama, seri, gunluk bonus. Basarim XP'si
+ * ilgili sistem (Part 15) eklendiginde achievementsUnlocked ile gelir.
  */
 export function computeSessionXp({
   correctCount = 0,
   bestStreak = 0,
   outcome = null,
   achievementsUnlocked = 0,
+  isDaily = false,
 } = {}) {
   const correctXp = Math.max(0, correctCount) * XP_PER_CORRECT;
   const completionXp = outcome === "completed" ? XP_GAME_COMPLETION : 0;
@@ -70,7 +74,8 @@ export function computeSessionXp({
     Math.floor(Math.max(0, bestStreak) / XP_STREAK_MILESTONE_SIZE) *
     XP_PER_STREAK_MILESTONE;
   const achievementXp = Math.max(0, achievementsUnlocked) * XP_PER_ACHIEVEMENT;
-  return correctXp + completionXp + streakXp + achievementXp;
+  const dailyXp = isDaily && outcome === "completed" ? XP_DAILY_BONUS : 0;
+  return correctXp + completionXp + streakXp + achievementXp + dailyXp;
 }
 
 /* ── Skor Guvenligi (Part 17.3) ───────────────────────────────────────────── */

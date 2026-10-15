@@ -24,6 +24,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileReminders } from "../../../context/ProfileRemindersContext";
 import { useImageQualitySettings, useListLayoutSettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
+import GlassIconButton from "../../../components/common/GlassIconButton";
 import { parseAirDate, startOfDay } from "../../../utils/airDate";
 
 
@@ -293,7 +294,6 @@ export default function RemindersPreviewButton({ navigation }) {
     () => navigation.navigate("RemindersScreen"),
     [navigation],
   );
-  // Gizlenen CalendarWidget'ın yerine takvime giriş buradan yapılır.
   const goCalendar = useCallback(
     () => navigation.navigate("CalendarScreen"),
     [navigation],
@@ -570,13 +570,17 @@ export default function RemindersPreviewButton({ navigation }) {
 
           {/* Takvim butonu — "Tümü" bağlantısının yerinde; hatırlatmaların
               tümü ön karta dokununca açılır. */}
-          <TouchableOpacity
-            style={[styles.calendarBtn, { backgroundColor: theme.accent + "22" }]}
+          <GlassIconButton
+            icon="calendar"
+            iconSize={15}
+            size={28}
+            fallbackRadius={14}
+            color={theme.accent}
+            tint={theme.accent + "55"}
+            fallbackStyle={{ backgroundColor: theme.accent + "22" }}
+            accessibilityLabel={i18nText("autoI18n.takvimi_ac", "Takvimi Aç")}
             onPress={goCalendar}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="calendar" size={15} color={theme.accent} />
-          </TouchableOpacity>
+          />
         </View>
       </View>
 
@@ -648,13 +652,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   countBadgeText: { fontSize: 11, fontWeight: "700" },
-  calendarBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-  },
 
   stack: {
     height: CARD_H + 2 * PEEK + 2,

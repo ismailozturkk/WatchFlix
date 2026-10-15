@@ -1,40 +1,101 @@
 import { Image } from "expo-image";
 import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { captureRef } from "react-native-view-shot";
 import AppIcon from "@components/AppIcon";
 import { toast } from "@components/AppToast";
 import SceneResultShareCard from "@components/game/SceneResultShareCard";
+import UserAvatar from "@components/common/UserAvatar";
+import { PressableScale } from "@components/game/ui";
+import { useAuth } from "@context/AuthContext";
+import { useFriends } from "@context/FriendsContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
-import { i18nText } from "@utils/i18nText";
+import { fetchDailyFriendRows } from "@services/sceneGameService";
 import { buildTmdbUrl } from "@utils/tmdbImageUtils";
+import { alpha } from "../../theme/colors";
 import { GameScreenShell, gameSharedStyles } from "./GameScreenShell";
 import {
   getDifficultyConfig,
   getLocalizedGameLabel,
   getModeConfig,
   getSourceConfig,
+  isDailyMode,
 } from "./gameConfig";
+import { getGameTitle } from "./gameLabels";
+import { getGameEntry, resolveGameAccentColors } from "./gameRegistry";
 import { deleteGameSessionResult, getGameSessionResult } from "./gameSessionStore";
 
 const SHARE_CARD_W = 320;
 const SHARE_CARD_H = 569; // ~9:16
 
+// Skoru 0'dan hedefe sayarak gösterir (sonuç ekranının "ödül" anı).
+function useCountUp(target, duration = 900) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (!target) {
+      setValue(0);
+      return undefined;
+    }
+    const progress = new Animated.Value(0);
+    const id = progress.addListener(({ value: v }) => setValue(Math.round(v)));
+    Animated.timing(progress, { toValue: target, duration, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    return () => {
+      progress.removeListener(id);
+      progress.stopAnimation();
+    };
+  }, [target, duration]);
+  return value;
+}
+
+// Doğruluğa göre kısa değerlendirme (başlık + ikon).
+function verdictFor(accuracy, tr) {
+  if (accuracy >= 100) return { icon: "ribbon", text: tr ? "Kusursuz!" : "Flawless!" };
+  if (accuracy >= 80) return { icon: "star", text: tr ? "Harika iş!" : "Great job!" };
+  if (accuracy >= 60) return { icon: "thumbs-up", text: tr ? "Fena değil" : "Not bad" };
+  return { icon: "flash", text: tr ? "Bir dahaki sefere!" : "Next time!" };
+}
+
 export default function SceneGameResultScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
+  const { user } = useAuth();
+  const { friends = [] } = useFriends() || {};
   const sessionId = route.params?.sessionId;
   const [result, setResult] = useState(() => getGameSessionResult(sessionId));
   const [reviewExpanded, setReviewExpanded] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [dailyBoard, setDailyBoard] = useState(null);
   const shareCardRef = useRef(null);
   const tr = language !== "en";
 
   useEffect(() => {
     setResult(getGameSessionResult(sessionId));
   }, [sessionId]);
+
+  const isDaily = isDailyMode(result?.modeId);
+  const dailyKey = result?.dailyKey;
+
+  // Günlük: arkadaşların bugünkü sonuçları (kendim dahil) → sıramı göster.
+  useEffect(() => {
+    if (!isDaily || !dailyKey || !user?.uid) return undefined;
+    let active = true;
+    const uids = [user.uid, ...friends.map((friend) => friend.friendUid || friend.id)];
+    // Kayıt (Firestore) birkaç yüz ms sürebilir; kendi girdim henüz görünmeyebilir.
+    const timer = setTimeout(() => {
+      fetchDailyFriendRows(dailyKey, uids)
+        .then((rows) => {
+          if (active) setDailyBoard([...rows].sort((a, b) => b.bestScore - a.bestScore));
+        })
+        .catch(() => {});
+    }, 700);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [isDaily, dailyKey, user?.uid, friends]);
 
   const accuracy = useMemo(() => {
     const total = (result?.totalCorrect || 0) + (result?.totalWrong || 0);
@@ -48,6 +109,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
   }, [result]);
 
   const totalQuestions = (result?.totalCorrect || 0) + (result?.totalWrong || 0);
+  const shownScore = useCountUp(result?.score || 0);
 
   const leaveResult = (routeName, params) => {
     deleteGameSessionResult(sessionId);
@@ -75,6 +137,8 @@ export default function SceneGameResultScreen({ navigation, route }) {
   const modeLabel = getLocalizedGameLabel(modeConfig, language);
   const difficultyLabel = getLocalizedGameLabel(difficultyConfig, language);
   const sourceLabel = getLocalizedGameLabel(sourceConfig, language);
+  const gameTitle = getGameTitle(result?.gameId);
+  const colors = resolveGameAccentColors(getGameEntry(result?.gameId), theme);
 
   const handleShare = useCallback(async () => {
     if (sharing || !shareCardRef.current) return;
@@ -89,14 +153,14 @@ export default function SceneGameResultScreen({ navigation, route }) {
       }
       await Sharing.shareAsync(uri, {
         mimeType: "image/png",
-        dialogTitle: i18nText("autoI18n.sahne_tahmin_oyunu_title", "Sahne Tahmin"),
+        dialogTitle: gameTitle,
       });
     } catch (e) {
       toast.error(tr ? "Paylaşılamadı" : "Could not share", e?.message);
     } finally {
       setSharing(false);
     }
-  }, [sharing, tr]);
+  }, [sharing, tr, gameTitle]);
 
   if (!result) {
     return (
@@ -119,28 +183,71 @@ export default function SceneGameResultScreen({ navigation, route }) {
         ? (tr ? "Yarıda bitirildi" : "Ended early")
         : (tr ? "Tamamlandı" : "Completed");
 
+  const verdict = verdictFor(accuracy, tr);
+  const progress = result.progressSummary;
+  const leveledUp = progress && progress.level > progress.levelBefore;
+  const myRank = dailyBoard ? dailyBoard.findIndex((row) => row.uid === user?.uid) + 1 : 0;
+
   return (
     <GameScreenShell navigation={navigation} onBack={() => leaveResult("GameHubScreen")} title={tr ? "Oyun Sonucu" : "Game Result"} subtitle={`${modeLabel} · ${outcomeLabel}`}>
       {/* Hero skor */}
-      <View style={[styles.scoreHero, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-        <View style={styles.trophy}><AppIcon family="Ionicons" name="trophy" size={32} color="#E8B931" /></View>
-        <Text style={[styles.scoreLabel, { color: theme.text.muted }]}>{tr ? "TOPLAM SKOR" : "TOTAL SCORE"}</Text>
-        <Text style={[styles.score, { color: theme.text.primary }]}>{result.score || 0}</Text>
+      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.scoreHero}>
+        <View pointerEvents="none" style={styles.heroGlowOne} />
+        <View pointerEvents="none" style={styles.heroGlowTwo} />
+        <View style={styles.verdictPill}>
+          <AppIcon family="Ionicons" name={verdict.icon} size={13} color="#FFD76A" />
+          <Text style={styles.verdictText} allowFontScaling={false}>{verdict.text}</Text>
+        </View>
+        <Text style={styles.scoreLabel} allowFontScaling={false}>{tr ? "TOPLAM SKOR" : "TOTAL SCORE"}</Text>
+        <Text style={styles.score} allowFontScaling={false}>{shownScore}</Text>
         <View style={styles.heroBadges}>
           {result.isNewRecord ? (
-            <View style={[styles.heroBadge, { backgroundColor: "rgba(232,185,49,0.16)", borderColor: "rgba(232,185,49,0.45)" }]}>
-              <AppIcon family="Ionicons" name="ribbon" size={13} color="#E8B931" />
-              <Text style={[styles.heroBadgeText, { color: "#E8B931" }]}>{tr ? "Yeni Rekor!" : "New Record!"}</Text>
+            <View style={styles.heroBadge}>
+              <AppIcon family="Ionicons" name="ribbon" size={13} color="#FFD76A" />
+              <Text style={styles.heroBadgeText}>{tr ? "Yeni Rekor!" : "New Record!"}</Text>
             </View>
           ) : null}
           {result.xpEarned ? (
-            <View style={[styles.heroBadge, { backgroundColor: `${theme.accent}1A`, borderColor: `${theme.accent}55` }]}>
-              <AppIcon family="Ionicons" name="sparkles" size={13} color={theme.accent} />
-              <Text style={[styles.heroBadgeText, { color: theme.accent }]}>+{result.xpEarned} XP</Text>
+            <View style={styles.heroBadge}>
+              <AppIcon family="Ionicons" name="sparkles" size={13} color="#FFFFFF" />
+              <Text style={styles.heroBadgeText}>+{result.xpEarned} XP</Text>
+            </View>
+          ) : null}
+          {isDaily && progress?.dailyStreak > 0 ? (
+            <View style={styles.heroBadge}>
+              <AppIcon family="Ionicons" name="flame" size={13} color="#FF9F5A" />
+              <Text style={styles.heroBadgeText}>{tr ? `${progress.dailyStreak} günlük seri` : `${progress.dailyStreak}-day streak`}</Text>
             </View>
           ) : null}
         </View>
-      </View>
+      </LinearGradient>
+
+      {/* Seviye atlama */}
+      {leveledUp ? (
+        <View style={[styles.levelUp, { backgroundColor: alpha(theme.accent, 0.14), borderColor: alpha(theme.accent, 0.5) }]}>
+          <View style={[styles.levelUpIcon, { backgroundColor: theme.accent }]}>
+            <AppIcon family="Ionicons" name="trending-up" size={20} color="#FFFFFF" />
+          </View>
+          <View style={styles.levelUpCopy}>
+            <Text style={[styles.levelUpTitle, { color: theme.text.primary }]}>{tr ? "Seviye atladın!" : "Level up!"}</Text>
+            <Text style={[styles.levelUpText, { color: theme.text.muted }]}>
+              {tr ? `Seviye ${progress.levelBefore} → ${progress.level}` : `Level ${progress.levelBefore} → ${progress.level}`}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Soru soru sonuç noktaları */}
+      {result.sessionHistory?.length ? (
+        <View style={[styles.dotsCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+          {result.sessionHistory.map((answer, index) => (
+            <View
+              key={index}
+              style={[styles.dot, { backgroundColor: answer.isCorrect ? "#2ECC71" : "#E74C3C" }]}
+            />
+          ))}
+        </View>
+      ) : null}
 
       {/* Ana metrikler */}
       <View style={gameSharedStyles.metricRow}>
@@ -157,6 +264,34 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <View style={[styles.detailDivider, { backgroundColor: theme.border }]} />
         <DetailItem icon="time-outline" label={tr ? "Ort. süre" : "Avg time"} value={averageMs != null ? `${(averageMs / 1000).toFixed(1)}s` : "–"} theme={theme} />
       </View>
+
+      {/* Günlük: arkadaş sıralaması */}
+      {isDaily && dailyBoard && dailyBoard.length > 0 ? (
+        <View style={[styles.boardCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+          <View style={styles.boardHeader}>
+            <AppIcon family="Ionicons" name="podium-outline" size={18} color={theme.accent} />
+            <Text style={[styles.boardTitle, { color: theme.text.primary }]}>{tr ? "Arkadaşların arasında" : "Among your friends"}</Text>
+            {myRank > 0 ? (
+              <View style={[styles.rankPill, { backgroundColor: alpha(theme.accent, 0.16) }]}>
+                <Text style={[styles.rankPillText, { color: theme.accent }]}>#{myRank}</Text>
+              </View>
+            ) : null}
+          </View>
+          {dailyBoard.slice(0, 3).map((row, index) => {
+            const isSelf = row.uid === user?.uid;
+            return (
+              <View key={row.uid} style={[styles.boardRow, { borderTopColor: theme.border }, isSelf && { backgroundColor: alpha(theme.accent, 0.1) }]}>
+                <Text style={[styles.boardRank, { color: theme.text.muted }]}>{index + 1}</Text>
+                <UserAvatar avatarIndex={row.avatarIndex} photoURL={row.photoURL} isCustomPhoto size={30} />
+                <Text style={[styles.boardName, { color: theme.text.primary }]} numberOfLines={1}>
+                  {isSelf ? (tr ? "Sen" : "You") : row.displayName || (tr ? "Anonim" : "Anonymous")}
+                </Text>
+                <Text style={[styles.boardScore, { color: theme.accent }]}>{row.bestScore}</Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
 
       {/* Cevap incelemesi (acilir/kapanir) */}
       {result.sessionHistory?.length ? (
@@ -221,14 +356,35 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <View style={styles.retry}><ActivityIndicator size="small" color={theme.accent} /><Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydediliyor..." : "Saving result..."}</Text></View>
       ) : null}
 
-      {/* Aksiyonlar (Part 13.3) */}
-      <TouchableOpacity style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent, marginTop: 4 }]} onPress={() => leaveResult("SceneGamePlayScreen", { gameId: result.gameId, modeId: result.modeId, difficultyId: result.difficultyId, sourceId: result.sourceId })}>
-        <AppIcon family="Ionicons" name="refresh" size={19} color="#fff" />
-        <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Tekrar Oyna" : "Play Again"}</Text>
-      </TouchableOpacity>
+      {/* Aksiyonlar (Part 13.3). Günlük tek deneme: "Tekrar Oyna" yerine sıralama. */}
+      {isDaily ? (
+        <PressableScale
+          accessibilityRole="button"
+          onPress={() => navigation.navigate("GameLeaderboardScreen", { gameId: result.gameId, scope: "daily" })}
+          style={styles.primaryWrap}
+        >
+          <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryGradient}>
+            <AppIcon family="Ionicons" name="podium-outline" size={19} color="#fff" />
+            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Günlük Sıralamayı Gör" : "View Daily Ranking"}</Text>
+          </LinearGradient>
+        </PressableScale>
+      ) : (
+        <PressableScale
+          accessibilityRole="button"
+          onPress={() => leaveResult("SceneGamePlayScreen", { gameId: result.gameId, modeId: result.modeId, difficultyId: result.difficultyId, sourceId: result.sourceId })}
+          style={styles.primaryWrap}
+        >
+          <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryGradient}>
+            <AppIcon family="Ionicons" name="refresh" size={19} color="#fff" />
+            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Tekrar Oyna" : "Play Again"}</Text>
+          </LinearGradient>
+        </PressableScale>
+      )}
 
       <View style={styles.actionRow}>
-        <SecondaryAction icon="options-outline" label={tr ? "Mod Seçimi" : "Mode Setup"} theme={theme} onPress={() => leaveResult("SceneGameSetupScreen", { gameId: result.gameId, modeId: result.modeId, difficultyId: result.difficultyId, sourceId: result.sourceId })} />
+        {!isDaily ? (
+          <SecondaryAction icon="options-outline" label={tr ? "Mod Seçimi" : "Mode Setup"} theme={theme} onPress={() => leaveResult("SceneGameSetupScreen", { gameId: result.gameId, modeId: result.modeId, difficultyId: result.difficultyId, sourceId: result.sourceId })} />
+        ) : null}
         <SecondaryAction icon="trophy-outline" label={tr ? "Liderlik" : "Leaderboard"} theme={theme} onPress={() => navigation.navigate("GameLeaderboardScreen", { gameId: result.gameId })} />
         <SecondaryAction icon={sharing ? null : "share-social-outline"} label={tr ? "Paylaş" : "Share"} theme={theme} loading={sharing} onPress={handleShare} />
       </View>
@@ -253,7 +409,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
             bestStreak={result.bestStreak || 0}
             correct={result.totalCorrect || 0}
             total={totalQuestions}
-            brand={i18nText("autoI18n.sahne_tahmin_oyunu_title", "Sahne Tahmin")}
+            brand={gameTitle}
             isNewRecord={Boolean(result.isNewRecord)}
             recordLabel={tr ? "Yeni Rekor" : "New Record"}
             labels={{
@@ -292,18 +448,42 @@ function SecondaryAction({ icon, label, theme, onPress, loading }) {
 }
 
 const styles = StyleSheet.create({
-  scoreHero: { minHeight: 196, borderRadius: 24, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingVertical: 18 },
-  trophy: { width: 58, height: 58, borderRadius: 20, backgroundColor: "rgba(232,185,49,0.14)", alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  scoreLabel: { fontSize: 10, fontWeight: "900", letterSpacing: 1.5 },
-  score: { fontSize: 48, fontWeight: "900", marginTop: 2 },
-  heroBadges: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap", justifyContent: "center" },
-  heroBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
-  heroBadgeText: { fontSize: 13, fontWeight: "900" },
+  scoreHero: { minHeight: 214, borderRadius: 28, alignItems: "center", justifyContent: "center", paddingVertical: 20, overflow: "hidden" },
+  heroGlowOne: { position: "absolute", width: 220, height: 220, borderRadius: 110, right: -70, top: -90, backgroundColor: "rgba(255,255,255,0.14)" },
+  heroGlowTwo: { position: "absolute", width: 140, height: 140, borderRadius: 70, left: -50, bottom: -50, backgroundColor: "rgba(0,0,0,0.14)" },
+  verdictPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.24)", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)" },
+  verdictText: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
+  scoreLabel: { color: "rgba(255,255,255,0.8)", fontSize: 10, fontWeight: "900", letterSpacing: 1.5, marginTop: 14 },
+  score: { color: "#FFFFFF", fontSize: 56, fontWeight: "900", marginTop: 2 },
+  heroBadges: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap", justifyContent: "center", paddingHorizontal: 12 },
+  heroBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.26)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
+  heroBadgeText: { color: "#FFFFFF", fontSize: 12.5, fontWeight: "900" },
+
+  levelUp: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 18, borderWidth: 1.5, padding: 12 },
+  levelUpIcon: { width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  levelUpCopy: { flex: 1 },
+  levelUpTitle: { fontSize: 14.5, fontWeight: "900" },
+  levelUpText: { fontSize: 11, fontWeight: "700", marginTop: 2 },
+
+  dotsCard: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 7, borderRadius: 16, borderWidth: 1, paddingVertical: 12, paddingHorizontal: 14 },
+  dot: { width: 14, height: 14, borderRadius: 7 },
+
   detailStrip: { flexDirection: "row", alignItems: "center", borderRadius: 16, borderWidth: 1, paddingVertical: 12 },
   detailItem: { flex: 1, alignItems: "center", gap: 3, paddingHorizontal: 4 },
   detailValue: { fontSize: 12, fontWeight: "850" },
   detailLabel: { fontSize: 9, fontWeight: "700" },
   detailDivider: { width: StyleSheet.hairlineWidth, height: 36 },
+
+  boardCard: { borderRadius: 18, borderWidth: 1, overflow: "hidden" },
+  boardHeader: { flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 14, minHeight: 50 },
+  boardTitle: { flex: 1, fontSize: 14, fontWeight: "850" },
+  rankPill: { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
+  rankPillText: { fontSize: 12, fontWeight: "900" },
+  boardRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, minHeight: 48, borderTopWidth: StyleSheet.hairlineWidth },
+  boardRank: { width: 16, fontSize: 12, fontWeight: "900" },
+  boardName: { flex: 1, fontSize: 13, fontWeight: "800" },
+  boardScore: { fontSize: 14, fontWeight: "900" },
+
   reviewCard: { borderRadius: 18, borderWidth: 1, overflow: "hidden" },
   reviewHeader: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 14 },
   reviewTitle: { flex: 1, fontSize: 14, fontWeight: "850" },
@@ -321,6 +501,8 @@ const styles = StyleSheet.create({
   reviewPoints: { fontSize: 13, fontWeight: "900" },
   retry: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   retryText: { fontSize: 12, fontWeight: "700" },
+  primaryWrap: { borderRadius: 16, overflow: "hidden", marginTop: 4 },
+  primaryGradient: { minHeight: 54, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, paddingHorizontal: 20 },
   actionRow: { flexDirection: "row", gap: 10 },
   secondaryAction: { flex: 1, minHeight: 64, borderRadius: 15, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 4 },
   secondaryActionText: { fontSize: 11, fontWeight: "800" },

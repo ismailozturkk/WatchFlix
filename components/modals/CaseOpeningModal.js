@@ -17,6 +17,7 @@ import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
 
@@ -383,13 +384,15 @@ export default function CaseOpeningModal({
                   {typeTheme.label}
                 </Text>
               </View>
-              <TouchableOpacity
-                style={styles.closeButton}
+              <GlassCloseButton
+                onImage
+                size={34}
+                fallbackRadius={17}
+                iconSize={20}
+                color="#D7DCE8"
+                backgroundColor="rgba(255,255,255,0.07)"
                 onPress={handleClose}
-                activeOpacity={0.75}
-              >
-                <AppIcon family="Ionicons" name="close" size={20} color="#D7DCE8" />
-              </TouchableOpacity>
+              />
             </View>
           </View>
 
@@ -662,14 +665,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   typeBadgeText: { fontSize: 11, fontWeight: "800" },
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.07)",
-  },
   reelSection: { marginBottom: 14 },
   reelSectionCompact: { marginBottom: 8 },
   reelViewport: {

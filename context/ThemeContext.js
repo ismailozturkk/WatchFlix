@@ -208,7 +208,7 @@ export const ThemeProvider = ({ children }) => {
 const styles = StyleSheet.create({
   // Splash katmanı 9999'da; tema geçişi onun hemen altında kalmalı.
   snapshotOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 9998,
   },
 });

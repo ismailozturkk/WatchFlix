@@ -3,10 +3,16 @@
 // "Etkinliklerim" — kullanıcının tüm aktivitesi tek sayfada, sekmeli:
 //   Puanlamalar | Yorumlar | Postlar | Taslaklar | Story | Etkileşimler
 // Her satırda mümkünse tarih bilgisi gösterilir.
+//
+// Görsel dil: her sekmenin KENDİ rengi var (profildeki MyActivityButton kısayol
+// hücreleriyle aynı) — aktif sekme başlıktaki ışığı ve boş durumu da o renge
+// boyar. Satırlar yumuşak yüzeyli kartlar; post kartları Hub akışı ve
+// Postlarım ile aynı dili (tip rengi, poster yığını, istatistik hapları) kullanır.
 
 import { Image } from "expo-image";
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
+  Animated,
   View,
   Text,
   StyleSheet,
@@ -17,20 +23,21 @@ import {
   Dimensions,
   Modal,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { getPostDrafts } from "../../../services/postDraftService";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
-import { postTypeBadge, tallyVotes } from "@utils/postComposer";
+import { tallyVotes } from "@utils/postComposer";
 import RatingStars from "@components/RatingStars";
 import StaggerItem from "@components/StaggerItem";
+import PosterStack from "@components/feed/PosterStack";
+import StatPill from "@components/feed/StatPill";
+import { postTypeMeta } from "@components/feed/postTypeMeta";
 import { ActivityListSkeleton } from "@components/Skeleton";
 import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
@@ -50,9 +57,12 @@ import {
 import { StoryDraftService } from "@services/StoryDraftService";
 import { readCache, writeCache } from "@utils/cachedRead";
 import { cacheKeys } from "@utils/cacheKeys";
+import useKeyboardInset from "@hooks/useKeyboardInset";
 import { scopeShort } from "@components/comments/scopeTexts";
 import { normalizeScope, scopeKey } from "@utils/commentScope";
 import ScreenDecor from "@components/ScreenDecor";
+import { alpha } from "../../../theme/colors";
+import BackButton from "@components/BackButton";
 
 // ─── Tarih yardımcıları ──────────────────────────────────────────────────────
 const toMs = (v) => {
@@ -93,6 +103,17 @@ const TAB_LABEL_KEY = {
   interactions: "autoI18n.etkilesimler",
 };
 
+// Sekme renkleri profildeki MyActivityButton kısayol hücreleriyle AYNI.
+const tabColor = (key, theme) =>
+  ({
+    ratings: theme.colors?.orange || "#F97316",
+    comments: theme.colors?.green || "#22C55E",
+    posts: theme.colors?.blue || "#3B82F6",
+    drafts: theme.colors?.purple || "#A855F7",
+    story: "#EC4899",
+    interactions: theme.colors?.red || "#EF4444",
+  })[key] || theme.accent;
+
 // Tür → renk/etiket/ikon (label render sırasında i18nText ile çevrilir)
 const KIND_META = {
   movie: { labelKey: "autoI18n.kind_film", label: "FİLM", color: "#138DF0", icon: "film" },
@@ -103,6 +124,17 @@ const KIND_META = {
   like: { labelKey: "autoI18n.kind_begeni", label: "BEĞENİ", color: "#FF3B6B", icon: "heart" },
   bookmark: { labelKey: "autoI18n.kind_kayit", label: "KAYIT", color: "#138DF0", icon: "bookmark" },
 };
+
+const LIKE_RED = "#FF5A5F";
+const SPOILER_RED = "#f04f4f";
+
+// Puan tonu (0-10): yüksek yeşil, orta turuncu, düşük kırmızı.
+const scoreTone = (score, theme) =>
+  score >= 8
+    ? theme.colors?.green || "#22C55E"
+    : score >= 6
+      ? theme.colors?.orange || "#F97316"
+      : theme.colors?.red || "#EF4444";
 
 const STORY_COLS = 3;
 const STORY_GRID_PAD = 16;
@@ -131,6 +163,19 @@ export default function MyActivityScreen({ navigation, route }) {
       setTab(route.params.initialTab);
     }
   }, [route?.params?.initialTab]);
+
+  // Sekme şeridi yatay kaydırılıyor: aktif sekme (ör. kısayoldan açılan
+  // "Etkileşimler") ekran dışında kalmasın diye görünür alana getirilir.
+  const tabScrollRef = useRef(null);
+  const tabX = useRef({});
+  const scrollTabIntoView = useCallback((key, animated) => {
+    const x = tabX.current[key];
+    if (x == null) return;
+    tabScrollRef.current?.scrollTo({ x: Math.max(0, x - 48), animated });
+  }, []);
+  useEffect(() => {
+    scrollTabIntoView(tab, true);
+  }, [tab, scrollTabIntoView]);
 
   const [ratings, setRatings] = useState([]);
   const [comments, setComments] = useState([]);
@@ -316,6 +361,9 @@ export default function MyActivityScreen({ navigation, route }) {
 
   // ── Post yorumu düzenle (modal) ──
   const [editing, setEditing] = useState(null); // myComments item | null
+  // Düzenleme kartı ortalanmış; klavye açılınca KeyboardAvoidingView Android modal
+  // penceresinde güvenilir değil — kaplayıcının alt boşluğu ölçümle verilir.
+  const { animatedInset: editKeyboardInset, onLayout: onEditLayout } = useKeyboardInset(!!editing);
   const [editText, setEditText] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -371,15 +419,8 @@ export default function MyActivityScreen({ navigation, route }) {
             kind={item.mediaType}
             title={item.title}
             date={item.updatedAt}
+            score={Number(item.rating || 0)}
             onPress={() => openMedia(item.mediaType, item.mediaId)}
-            right={
-              <View style={st.scorePill}>
-                <RatingStars rating={item.rating} max={10} size={11} color={theme.colors.orange} />
-                <Text style={[st.scoreTxt, { color: theme.colors.orange }]}>
-                  {Number(item.rating || 0).toFixed(1)}
-                </Text>
-              </View>
-            }
           />
         );
         break;
@@ -457,7 +498,6 @@ export default function MyActivityScreen({ navigation, route }) {
         node = (
           <StoryMini
             theme={theme}
-            draft={item}
             thumbnail={item.thumbnailUri || item.thumbnail || null}
             name={item.name || item.title || i18nText("autoI18n.story_taslagi", "Story taslağı")}
             date={item.updatedAt || item.createdAt}
@@ -489,39 +529,42 @@ export default function MyActivityScreen({ navigation, route }) {
     return <StaggerItem index={index}>{node}</StaggerItem>;
   };
 
+  const activeTab = TABS.find((tb) => tb.key === tab) || TABS[0];
+  const activeColor = tabColor(activeTab.key, theme);
+
   return (
     <SafeAreaView style={[st.container, { backgroundColor: theme.primary }]} edges={["top"]}>
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.25} />
-      {/* ── Gradient başlık ── */}
+      <ScreenDecor scope="profile" iconOpacity={0.25} />
+      {/* ── Aktif sekmenin rengiyle başlık ışığı ── */}
       <LinearGradient
-        colors={[theme.accent + "26", "transparent"]}
+        colors={[alpha(activeColor, 0.2), alpha(activeColor, 0)]}
         style={st.headerGlow}
         pointerEvents="none"
       />
       <View style={st.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.8}
-          style={[st.backBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-        >
-          <Ionicons name="chevron-back" size={22} color={theme.text.primary} />
-        </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={[st.headerTitle, { color: theme.text.primary }]}>
+        <BackButton absolute={false} onPress={() => navigation.goBack()} />
+        <View style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
+          <Text style={[st.headerTitle, { color: theme.text.primary }]} numberOfLines={1}>
             {i18nText("autoI18n.etkinliklerim", "Etkinliklerim")}
           </Text>
-          <Text style={[st.headerSub, { color: theme.text.muted }]}>
+          <Text style={[st.headerSub, { color: theme.text.muted }]} numberOfLines={1}>
             {i18nText("autoI18n.n_etkinlik", "{{n}} etkinlik", { n: total })}
           </Text>
         </View>
-        <View style={[st.headerBadge, { backgroundColor: theme.accent + "1A", borderColor: theme.accent + "44" }]}>
-          <Ionicons name="sparkles" size={18} color={theme.accent} />
-        </View>
+        <LinearGradient
+          colors={[activeColor, alpha(activeColor, 0.7)]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={st.headerBadge}
+        >
+          <Ionicons name="sparkles" size={18} color="#fff" />
+        </LinearGradient>
       </View>
 
       {/* ── Sekmeler ── */}
       <ScrollView
+        ref={tabScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={st.tabRow}
@@ -529,56 +572,80 @@ export default function MyActivityScreen({ navigation, route }) {
       >
         {TABS.map((tb) => {
           const active = tab === tb.key;
-          const Chip = active ? LinearGradient : View;
-          const chipProps = active
-            ? { colors: [theme.accent, theme.accent + "CC"], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } }
-            : {};
+          const color = tabColor(tb.key, theme);
           return (
-            <TouchableOpacity key={tb.key} onPress={() => setTab(tb.key)} activeOpacity={0.85}>
-              <Chip
-                {...chipProps}
+            <TouchableOpacity
+              key={tb.key}
+              onPress={() => setTab(tb.key)}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              onLayout={(e) => {
+                tabX.current[tb.key] = e.nativeEvent.layout.x;
+                if (tb.key === tab) scrollTabIntoView(tb.key, false);
+              }}
+              style={[
+                st.tabChip,
+                active
+                  ? { backgroundColor: alpha(color, 0.16), borderColor: alpha(color, 0.6) }
+                  : { backgroundColor: theme.secondary, borderColor: theme.border },
+              ]}
+            >
+              <View style={[st.tabIcon, { backgroundColor: active ? color : alpha(color, 0.14) }]}>
+                <Ionicons name={tb.icon} size={12} color={active ? "#fff" : color} />
+              </View>
+              <Text
+                allowFontScaling={false}
                 style={[
-                  st.tabChip,
-                  active
-                    ? { shadowColor: theme.accent, borderWidth: 1, borderColor: "transparent" }
-                    : { backgroundColor: theme.secondary, borderColor: theme.border, borderWidth: 1 },
+                  st.tabText,
+                  {
+                    color: active ? theme.text.primary : theme.text.secondary,
+                    fontWeight: active ? "800" : "700",
+                  },
                 ]}
               >
-                <Ionicons name={tb.icon} size={14} color={active ? "#fff" : theme.text.muted} />
-                <Text
-                  allowFontScaling={false}
-                  style={[st.tabText, { color: active ? "#fff" : theme.text.secondary }]}
-                >
-                  {i18nText(TAB_LABEL_KEY[tb.key], tb.label)}
-                </Text>
-                {counts[tb.key] > 0 && (
-                  <View
-                    style={[
-                      st.tabBadge,
-                      { backgroundColor: active ? "rgba(255,255,255,0.28)" : theme.primary },
-                    ]}
-                  >
-                    <Text style={[st.tabBadgeText, { color: active ? "#fff" : theme.text.muted }]}>
-                      {counts[tb.key]}
-                    </Text>
-                  </View>
-                )}
-              </Chip>
+                {i18nText(TAB_LABEL_KEY[tb.key], tb.label)}
+              </Text>
+              {counts[tb.key] > 0 && (
+                <View style={[st.tabBadge, { backgroundColor: active ? color : theme.primary }]}>
+                  <Text style={[st.tabBadgeText, { color: active ? "#fff" : theme.text.muted }]}>
+                    {counts[tb.key]}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
       </ScrollView>
 
       {loading ? (
-        <ActivityListSkeleton count={7} />
+        <ActivityListSkeleton count={6} />
       ) : data.length === 0 ? (
         <View style={st.center}>
-          <View style={[st.emptyCircle, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-            <MaterialCommunityIcons name="timeline-text-outline" size={40} color={theme.text.muted} />
+          <View
+            style={[
+              st.emptyHalo,
+              { backgroundColor: alpha(activeColor, 0.1), borderColor: alpha(activeColor, 0.24) },
+            ]}
+          >
+            <View style={[st.emptyCircle, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+              <Ionicons name={activeTab.icon} size={36} color={activeColor} />
+            </View>
           </View>
           <Text style={[st.emptyText, { color: theme.text.primary }]}>
             {i18nText("autoI18n.bu_bolumde_henuz_kayit_yok", "Bu bölümde henüz kayıt yok")}
           </Text>
+          <View
+            style={[
+              st.emptyChip,
+              { backgroundColor: alpha(activeColor, 0.12), borderColor: alpha(activeColor, 0.35) },
+            ]}
+          >
+            <Ionicons name={activeTab.icon} size={12} color={activeColor} />
+            <Text style={[st.emptyChipText, { color: activeColor }]}>
+              {i18nText(TAB_LABEL_KEY[activeTab.key], activeTab.label)}
+            </Text>
+          </View>
         </View>
       ) : (
         <FlatList
@@ -604,9 +671,9 @@ export default function MyActivityScreen({ navigation, route }) {
         animationType="fade"
         onRequestClose={() => setEditing(null)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={st.editBackdrop}
+        <Animated.View
+          style={[st.editBackdrop, { paddingBottom: Animated.add(24, editKeyboardInset) }]}
+          onLayout={onEditLayout}
         >
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
@@ -615,11 +682,14 @@ export default function MyActivityScreen({ navigation, route }) {
           />
           <View style={[st.editCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
             <View style={st.editHeader}>
-              <View style={[st.editIcon, { backgroundColor: theme.accent + "1A" }]}>
-                <Ionicons name="create-outline" size={18} color={theme.accent} />
+              <View style={[st.editIcon, { backgroundColor: alpha(theme.accent, 0.16) }]}>
+                <Ionicons name="create-outline" size={19} color={theme.accent} />
               </View>
-              <Text style={[st.editTitle, { color: theme.text.primary }]}>
+              <Text style={[st.editTitle, { color: theme.text.primary }]} numberOfLines={1}>
                 {i18nText("autoI18n.yorumu_duzenle", "Yorumu düzenle")}
+              </Text>
+              <Text style={[st.editCounter, { color: editText.length >= 500 ? "#EF4444" : theme.text.muted }]}>
+                {editText.length}/500
               </Text>
             </View>
             <TextInput
@@ -650,240 +720,279 @@ export default function MyActivityScreen({ navigation, route }) {
                 onPress={saveEdit}
                 disabled={saving}
                 activeOpacity={0.85}
-                style={[st.editBtn, { backgroundColor: theme.accent, borderColor: theme.accent, opacity: saving ? 0.7 : 1 }]}
+                style={{ flex: 1, opacity: saving ? 0.7 : 1 }}
               >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={[st.editBtnText, { color: "#fff" }]}>
-                    {i18nText("autoI18n.kaydet", "Kaydet")}
-                  </Text>
-                )}
+                <LinearGradient
+                  colors={[theme.accent, alpha(theme.accent, 0.75)]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[st.editBtn, { borderColor: theme.accent }]}
+                >
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={[st.editBtnText, { color: "#fff" }]}>
+                      {i18nText("autoI18n.kaydet", "Kaydet")}
+                    </Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </Animated.View>
       </Modal>
     </SafeAreaView>
   );
 }
 
-// ─── Genel satır ──────────────────────────────────────────────────────────────
-function Row({ theme, poster, kind, title, subtitle, date, right, onPress, badge, onEdit, onDelete }) {
+// ─── Puanlamalar / Yorumlar satırı ───────────────────────────────────────────
+// [poster] [tür rozeti · tarih / başlık / yorum alıntısı] [puan rozeti | ok]
+// Yorum düzenle/sil aksiyonları (yalnız post yorumlarında) kartın altında.
+function Row({ theme, poster, kind, title, subtitle, date, score, onPress, badge, onEdit, onDelete }) {
   const km = KIND_META[kind] || { label: "", color: theme.accent, icon: "ellipse" };
   const Wrapper = onPress ? TouchableOpacity : View;
   const hasActions = !!(onEdit || onDelete);
+  const tone = score != null ? scoreTone(score, theme) : null;
+
   return (
     <Wrapper
-      {...(onPress ? { onPress, activeOpacity: 0.8 } : {})}
+      {...(onPress ? { onPress, activeOpacity: 0.85 } : {})}
       style={[st.row, { backgroundColor: theme.secondary, borderColor: theme.border }]}
     >
-      {/* Sol renk aksanı */}
-      <View style={[st.accentBar, { backgroundColor: km.color }]} />
+      {/* Tür renginde yumuşak ışık */}
+      <LinearGradient
+        colors={[alpha(km.color, 0.1), alpha(km.color, 0)]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={st.rowWash}
+        pointerEvents="none"
+      />
 
-      {/* Poster veya gradient ikon */}
-      {poster ? (
-        <Image source={{ uri: poster }} style={st.poster} contentFit="cover" cachePolicy="memory-disk" transition={150} />
-      ) : (
-        <LinearGradient
-          colors={[km.color + "33", km.color + "14"]}
-          style={[st.iconBox, { borderColor: km.color + "3A" }]}
-        >
-          <Ionicons name={km.icon} size={22} color={km.color} />
-        </LinearGradient>
-      )}
+      <View style={st.rowMain}>
+        {/* Poster veya gradient ikon */}
+        {poster ? (
+          <Image source={{ uri: poster }} style={st.poster} contentFit="cover" cachePolicy="memory-disk" transition={150} />
+        ) : (
+          <LinearGradient
+            colors={[alpha(km.color, 0.24), alpha(km.color, 0.08)]}
+            style={[st.iconBox, { borderColor: alpha(km.color, 0.3) }]}
+          >
+            <Ionicons name={km.icon} size={24} color={km.color} />
+          </LinearGradient>
+        )}
 
-      {/* Orta */}
-      <View style={st.info}>
-        <View style={st.metaRow}>
-          {km.label ? (
-            <View style={[st.kindChip, { backgroundColor: km.color + "1F" }]}>
-              <Ionicons name={km.icon} size={9} color={km.color} />
-              <Text style={[st.kindChipText, { color: km.color }]}>
-                {km.labelKey ? i18nText(km.labelKey, km.label) : km.label}
+        {/* Orta */}
+        <View style={st.info}>
+          <View style={st.metaRow}>
+            {km.label ? (
+              <View style={[st.kindChip, { backgroundColor: alpha(km.color, 0.14), borderColor: alpha(km.color, 0.3) }]}>
+                <Ionicons name={km.icon} size={9} color={km.color} />
+                <Text style={[st.kindChipText, { color: km.color }]}>
+                  {km.labelKey ? i18nText(km.labelKey, km.label) : km.label}
+                </Text>
+              </View>
+            ) : null}
+            {badge ? (
+              <View style={[st.badge, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+                <Text style={[st.badgeText, { color: theme.text.secondary }]}>{badge}</Text>
+              </View>
+            ) : null}
+            <View style={{ flex: 1 }} />
+            {date ? (
+              <View style={st.dateRow}>
+                <Ionicons name="time-outline" size={11} color={theme.text.muted} />
+                <Text style={[st.date, { color: theme.text.muted }]}>{fmtDate(date)}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <Text style={[st.title, { color: theme.text.primary }]} numberOfLines={2}>
+            {title}
+          </Text>
+
+          {subtitle ? (
+            <View
+              style={[
+                st.quote,
+                { backgroundColor: theme.primary, borderColor: theme.border, borderLeftColor: km.color },
+              ]}
+            >
+              <Text fontRole="body" style={[st.quoteText, { color: theme.text.secondary }]} numberOfLines={3}>
+                {subtitle}
               </Text>
             </View>
           ) : null}
-          {badge ? (
-            <View style={[st.badge, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-              <Text style={[st.badgeText, { color: theme.text.muted }]}>{badge}</Text>
-            </View>
-          ) : null}
         </View>
-        <Text style={[st.title, { color: theme.text.primary }]} numberOfLines={1}>
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text style={[st.subtitle, { color: theme.text.secondary }]} numberOfLines={1}>
-            {subtitle}
-          </Text>
-        ) : null}
-        {date ? (
-          <View style={st.dateRow}>
-            <Ionicons name="time-outline" size={11} color={theme.text.muted} />
-            <Text style={[st.date, { color: theme.text.muted }]}>{fmtDate(date)}</Text>
+
+        {/* Sağ: puan rozeti ya da ok */}
+        {tone != null ? (
+          <View style={[st.score, { backgroundColor: alpha(tone, 0.12), borderColor: alpha(tone, 0.35) }]}>
+            <Text style={[st.scoreNum, { color: tone }]}>{score.toFixed(1)}</Text>
+            <RatingStars rating={score} max={10} size={8} color={tone} spacing={0} />
           </View>
+        ) : onPress ? (
+          <Ionicons name="chevron-forward" size={18} color={theme.text.muted} />
         ) : null}
       </View>
 
-      {/* Sağ */}
-      {right ? (
-        right
-      ) : hasActions ? (
-        <View style={st.rowActions}>
+      {hasActions ? (
+        <View style={[st.rowActions, { borderTopColor: theme.border }]}>
           {onEdit ? (
             <TouchableOpacity
               onPress={onEdit}
               activeOpacity={0.8}
-              hitSlop={8}
-              style={[st.rowActionBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
+              hitSlop={6}
+              style={[st.actionPill, { backgroundColor: alpha(theme.accent, 0.12), borderColor: alpha(theme.accent, 0.35) }]}
             >
-              <Ionicons name="create-outline" size={16} color={theme.accent} />
+              <Ionicons name="create-outline" size={15} color={theme.accent} />
+              <Text style={[st.actionPillText, { color: theme.accent }]}>
+                {i18nText("autoI18n.duzenle", "Düzenle")}
+              </Text>
             </TouchableOpacity>
           ) : null}
           {onDelete ? (
             <TouchableOpacity
               onPress={onDelete}
               activeOpacity={0.8}
-              hitSlop={8}
-              style={[st.rowActionBtn, { backgroundColor: "rgba(239,68,68,0.10)", borderColor: "rgba(239,68,68,0.35)" }]}
+              hitSlop={6}
+              style={[st.actionPill, { backgroundColor: "rgba(239,68,68,0.10)", borderColor: "rgba(239,68,68,0.35)" }]}
             >
-              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+              <Ionicons name="trash-outline" size={15} color="#EF4444" />
+              <Text style={[st.actionPillText, { color: "#EF4444" }]}>
+                {i18nText("autoI18n.sil", "Sil")}
+              </Text>
             </TouchableOpacity>
           ) : null}
         </View>
-      ) : onPress ? (
-        <Ionicons name="chevron-forward" size={18} color={theme.text.muted} />
       ) : null}
     </Wrapper>
   );
 }
 
-// ── Üst üste binen poster yığını (MyPostsScreen görünümü) ──
-function PosterStack({ posters = [], type, theme }) {
-  const list = posters.slice(0, 3);
-  if (list.length === 0) {
-    // Görselsiz tipler (sohbet/anket) boş placeholder yerine rozet renkli tip ikonu alır.
-    if (type === "text" || type === "poll") {
-      const badge = postTypeBadge(type, theme.colors);
-      return (
-        <View style={[st.pPoster, st.pPosterEmpty, { backgroundColor: badge.color + "18" }]}>
-          <Ionicons
-            name={type === "poll" ? "stats-chart" : "chatbubble-ellipses"}
-            size={22}
-            color={badge.color}
-          />
-        </View>
-      );
-    }
-    return (
-      <View style={[st.pPoster, st.pPosterEmpty, { backgroundColor: theme.border }]}>
-        <Ionicons name="film-outline" size={22} color={theme.text.muted} />
-      </View>
-    );
-  }
-  return (
-    <View style={[st.pPosterStack, { width: 60 + (list.length - 1) * 18 }]}>
-      {list.map((p, i) => (
-        <Image
-          key={i}
-          source={{ uri: p }}
-          style={[st.pPoster, st.pPosterStackItem, { left: i * 18, zIndex: list.length - i, borderColor: theme.secondary }]}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={150}
-        />
-      ))}
-    </View>
-  );
-}
-
-// ── Post kartı (Postlar / Taslaklar / Beğeniler) — paylaşım ekranı görünümü ──
+// ── Post kartı (Postlar / Taslaklar / Etkileşimler) — Hub akışı + Postlarım ile aynı dil ──
 function PostMini({ theme, type, poll, posters = [], title, content, userRating, hasSpoiler, date, likes, comments, draft, action, onPress, onRemove }) {
-  // Rozet + vurgu rengi feed'deki PostCard ile ortak (review/list/text/poll).
-  const badge = postTypeBadge(type, theme.colors);
-  const accent = badge.color;
+  // Rozet + vurgu rengi feed'deki kartla ortak (review/list/text/poll).
+  const meta = postTypeMeta(type, theme.colors);
+  const accent = meta.color;
   const Wrapper = onPress ? TouchableOpacity : View;
+  const isText = type === "text";
+  // Sohbet ve anket görselsiz tiplerdir: kart metne/çubuklara kalır.
+  const hasVisual = posters.length > 0 || type === "review" || type === "list" || (!type && !isText);
+  const actionColor = action === "like" ? KIND_META.like.color : theme.accent;
+
   return (
     <Wrapper
       {...(onPress ? { onPress, activeOpacity: 0.85 } : {})}
-      style={[st.pCard, { backgroundColor: theme.secondary, borderColor: theme.border, borderLeftColor: accent }]}
+      style={[st.pCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
     >
-      <PosterStack posters={posters} type={type} theme={theme} />
-      <View style={{ flex: 1 }}>
-        <View style={st.pMeta}>
-          <View style={[st.pBadge, { backgroundColor: accent + "22", borderColor: accent + "55" }]}>
-            <Text style={[st.pBadgeText, { color: accent }]}>
-              {i18nText(badge.labelKey, badge.fallback)}
-            </Text>
-          </View>
-          {hasSpoiler ? (
-            <View style={[st.pBadge, { backgroundColor: "rgba(240,79,79,0.12)", borderColor: "rgba(240,79,79,0.4)" }]}>
-              <Text style={[st.pBadgeText, { color: "#f04f4f" }]}>{i18nText("autoI18n.spoiler", "SPOİLER")}</Text>
-            </View>
-          ) : null}
-          {draft ? (
-            <View style={[st.pBadge, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-              <Text style={[st.pBadgeText, { color: theme.text.muted }]}>{i18nText("autoI18n.taslak_upper", "TASLAK")}</Text>
-            </View>
-          ) : null}
-          {date ? <Text style={[st.pTime, { color: theme.text.muted }]}>{fmtDate(date)}</Text> : null}
+      <LinearGradient
+        colors={[alpha(accent, 0.13), alpha(accent, 0)]}
+        style={st.pWash}
+        pointerEvents="none"
+      />
+
+      {/* Rozet + zaman */}
+      <View style={st.pMeta}>
+        <View style={[st.pBadge, { backgroundColor: alpha(accent, 0.13), borderColor: alpha(accent, 0.32) }]}>
+          <Ionicons name={meta.icon} size={10} color={accent} />
+          <Text style={[st.pBadgeText, { color: accent }]}>{meta.label}</Text>
         </View>
-
-        <Text style={[st.pTitle, { color: theme.text.primary }]} numberOfLines={2}>
-          {title}
-        </Text>
-        {/* Sohbet'te sol görsel alan boş kalmadığından metne bir satır daha yer var */}
-        {content ? (
-          <Text style={[st.pContent, { color: theme.text.secondary }]} numberOfLines={type === "text" ? 3 : 2}>
-            {content}
-          </Text>
-        ) : null}
-
-        {type === "review" && userRating > 0 ? (
-          <View style={st.pRatingRow}>
-            <RatingStars rating={userRating} max={5} size={12} color={theme.colors.orange} />
-            <Text style={[st.pRatingText, { color: theme.text.secondary }]}>{userRating}/5</Text>
+        {hasSpoiler ? (
+          <View style={st.pSpoiler}>
+            <Ionicons name="eye-off" size={10} color={SPOILER_RED} />
+            <Text style={st.pSpoilerText}>{i18nText("autoI18n.spoiler", "SPOİLER")}</Text>
           </View>
         ) : null}
+        {draft ? (
+          <View style={[st.pBadge, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+            <Ionicons name="document-text-outline" size={10} color={theme.text.muted} />
+            <Text style={[st.pBadgeText, { color: theme.text.muted }]}>{i18nText("autoI18n.taslak_upper", "TASLAK")}</Text>
+          </View>
+        ) : null}
+        <View style={{ flex: 1 }} />
+        {date ? (
+          <View style={st.dateRow}>
+            <Ionicons name="time-outline" size={11} color={theme.text.muted} />
+            <Text style={[st.pTime, { color: theme.text.muted }]}>{fmtDate(date)}</Text>
+          </View>
+        ) : null}
+      </View>
 
-        {type === "poll" && poll ? <PollMiniBody poll={poll} accent={accent} theme={theme} /> : null}
+      {/* Gövde: [görsel] + başlık/içerik */}
+      <View style={st.pBody}>
+        {hasVisual ? (
+          posters.length > 0 ? (
+            <PosterStack uris={posters} theme={theme} width={64} height={96} step={14} radius={12} />
+          ) : (
+            <View style={[st.pFallback, { backgroundColor: alpha(accent, 0.12), borderColor: alpha(accent, 0.3) }]}>
+              <Ionicons name="film-outline" size={22} color={accent} />
+            </View>
+          )
+        ) : null}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text fontRole="body" style={[st.pTitle, { color: theme.text.primary }]} numberOfLines={2}>
+            {title}
+          </Text>
+          {content ? (
+            isText ? (
+              <View style={[st.pQuote, { backgroundColor: alpha(accent, 0.07), borderLeftColor: accent }]}>
+                <Text fontRole="body" style={[st.pQuoteText, { color: theme.text.primary }]} numberOfLines={3}>
+                  {content}
+                </Text>
+              </View>
+            ) : (
+              <Text
+                fontRole="body"
+                style={[st.pContent, { color: action ? theme.text.muted : theme.text.secondary }]}
+                numberOfLines={2}
+              >
+                {content}
+              </Text>
+            )
+          ) : null}
 
-        {action ? (
-          <View style={st.pActionRow}>
-            <Ionicons
-              name={action === "like" ? "heart" : "bookmark"}
-              size={14}
-              color={action === "like" ? KIND_META.like.color : theme.accent}
-            />
-            <Text style={[st.pActionText, { color: action === "like" ? KIND_META.like.color : theme.accent }]}>
+          {type === "review" && userRating > 0 ? (
+            <View style={[st.pRating, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+              <RatingStars rating={userRating} max={5} size={12} color={theme.colors.orange} />
+              <Text style={[st.pRatingText, { color: theme.text.primary }]}>{userRating}/5</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {type === "poll" && poll ? <PollMiniBody poll={poll} accent={accent} theme={theme} /> : null}
+
+      {/* Alt satır: etkileşim aksiyonu ya da istatistikler */}
+      {action ? (
+        <View style={[st.pFooter, { borderTopColor: theme.border }]}>
+          <View style={[st.pActionPill, { backgroundColor: alpha(actionColor, 0.12), borderColor: alpha(actionColor, 0.35) }]}>
+            <Ionicons name={action === "like" ? "heart" : "bookmark"} size={14} color={actionColor} />
+            <Text style={[st.pActionText, { color: actionColor }]}>
               {action === "like"
                 ? i18nText("autoI18n.begendin", "Beğendin")
                 : i18nText("autoI18n.kaydettin", "Kaydettin")}
             </Text>
-            {onRemove ? (
-              <TouchableOpacity
-                onPress={onRemove}
-                activeOpacity={0.8}
-                hitSlop={8}
-                style={[st.removePill, { backgroundColor: theme.primary, borderColor: theme.border }]}
-              >
-                <Ionicons name="close-circle" size={13} color={theme.text.secondary} />
-                <Text style={[st.removePillText, { color: theme.text.secondary }]}>
-                  {i18nText("autoI18n.kaldir", "Kaldır")}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
           </View>
-        ) : likes != null || comments != null ? (
-          <View style={st.pStats}>
-            <Ionicons name="heart-outline" size={15} color={theme.text.muted} />
-            <Text style={[st.pStatText, { color: theme.text.muted }]}>{likes || 0}</Text>
-            <Ionicons name="chatbubble-outline" size={14} color={theme.text.muted} style={{ marginLeft: 10 }} />
-            <Text style={[st.pStatText, { color: theme.text.muted }]}>{comments || 0}</Text>
-          </View>
-        ) : null}
-      </View>
+          {onRemove ? (
+            <TouchableOpacity
+              onPress={onRemove}
+              activeOpacity={0.8}
+              hitSlop={8}
+              style={[st.removePill, { backgroundColor: theme.primary, borderColor: theme.border }]}
+            >
+              <Ionicons name="close-circle" size={14} color={theme.text.secondary} />
+              <Text style={[st.removePillText, { color: theme.text.secondary }]}>
+                {i18nText("autoI18n.kaldir", "Kaldır")}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : likes != null || comments != null ? (
+        <View style={[st.pFooter, { borderTopColor: theme.border }]}>
+          <StatPill icon="heart" active={(likes || 0) > 0} activeColor={LIKE_RED} count={likes || 0} theme={theme} />
+          <StatPill icon="chatbubble" active={(comments || 0) > 0} activeColor={theme.accent} count={comments || 0} theme={theme} />
+        </View>
+      ) : null}
     </Wrapper>
   );
 }
@@ -897,27 +1006,35 @@ function PollMiniBody({ poll, accent, theme }) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 2);
   return (
-    <View style={st.pPollBody}>
-      {top.map(({ opt, idx, count }) => {
+    <View style={[st.pPollBody, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+      {top.map(({ opt, idx, count }, rank) => {
         const pct = total > 0 ? Math.round((count / total) * 100) : 0;
         const label =
           (opt?.label || "").trim() ||
           i18nText("autoI18n.secenek_n", "Seçenek {{n}}", { n: idx + 1 });
+        const lead = rank === 0 && total > 0;
         return (
           <View key={opt?.id || idx} style={st.pPollBarRow}>
-            <Text style={[st.pPollBarLabel, { color: theme.text.secondary }]} numberOfLines={1}>
-              {label}
-            </Text>
-            <View style={[st.pPollBarTrack, { backgroundColor: accent + "1F" }]}>
-              <View style={[st.pPollBarFill, { backgroundColor: accent, width: `${pct}%` }]} />
+            <View style={st.pPollBarHead}>
+              <Text style={[st.pPollBarLabel, { color: theme.text.primary }]} numberOfLines={1}>
+                {label}
+              </Text>
+              <Text style={[st.pPollBarPct, { color: lead ? accent : theme.text.muted }]}>%{pct}</Text>
             </View>
-            <Text style={[st.pPollBarPct, { color: accent }]}>%{pct}</Text>
+            <View style={[st.pPollBarTrack, { backgroundColor: theme.border }]}>
+              <View
+                style={[
+                  st.pPollBarFill,
+                  { backgroundColor: lead ? accent : alpha(accent, 0.45), width: `${pct}%` },
+                ]}
+              />
+            </View>
           </View>
         );
       })}
-      <View style={st.pRatingRow}>
-        <Ionicons name="stats-chart" size={12} color={accent} />
-        <Text style={[st.pRatingText, { color: theme.text.secondary }]}>
+      <View style={st.pPollSummary}>
+        <Ionicons name="stats-chart" size={11} color={accent} />
+        <Text style={[st.pPollSummaryText, { color: theme.text.muted }]}>
           {i18nText("autoI18n.anket_ozeti", "{{options}} seçenek · {{votes}} oy", {
             options: poll.options?.length || 0,
             votes: total,
@@ -928,38 +1045,51 @@ function PollMiniBody({ poll, accent, theme }) {
   );
 }
 
-// ── Story taslak kartı (StoryDraftsScreen görünümü) ──
+// ── Story taslak kartı: 9:16 kutucuk, ad ve tarih görselin üstünde ──
 function StoryMini({ theme, thumbnail, name, date, onPress }) {
+  const pink = "#EC4899";
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={st.storyDraftCard}
-    >
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={st.storyDraftCard}>
       <View style={[st.storyDraftThumbWrap, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
         {thumbnail ? (
           <Image source={{ uri: thumbnail }} style={st.storyDraftThumb} contentFit="cover" />
         ) : (
-          <View style={st.storyDraftEmpty}>
-            <Ionicons name="image-outline" size={26} color={theme.text.muted} />
-          </View>
+          <LinearGradient colors={[alpha(pink, 0.28), alpha(pink, 0.08)]} style={st.storyDraftEmpty}>
+            <Ionicons name="image-outline" size={28} color={pink} />
+          </LinearGradient>
         )}
+        <LinearGradient
+          colors={["rgba(0,0,0,0.35)", "transparent"]}
+          style={st.storyTopFade}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.88)"]}
+          style={st.storyBottomFade}
+          pointerEvents="none"
+        />
         <View style={st.storyDraftOverlay} pointerEvents="none">
-          <View style={[st.storyDraftTypeBadge, { backgroundColor: "rgba(0,0,0,0.55)" }]}>
-            <Ionicons name="images" size={10} color="#fff" />
-            <Text style={st.storyDraftTypeText}>{i18nText("autoI18n.kind_story", "STORY")}</Text>
+          <View style={st.storyTopRow}>
+            <View style={st.storyDraftTypeBadge}>
+              <Ionicons name="images" size={10} color="#fff" />
+              <Text style={st.storyDraftTypeText}>{i18nText("autoI18n.kind_story", "STORY")}</Text>
+            </View>
+            <View style={[st.storyDraftEditBadge, { backgroundColor: pink }]}>
+              <Ionicons name="create-outline" size={12} color="#fff" />
+            </View>
           </View>
-          <View style={[st.storyDraftEditBadge, { backgroundColor: theme.accent }]}>
-            <Ionicons name="create-outline" size={12} color="#fff" />
+          <View>
+            <Text allowFontScaling={false} numberOfLines={2} style={st.storyDraftName}>
+              {name}
+            </Text>
+            {!!fmtDate(date) && (
+              <Text allowFontScaling={false} numberOfLines={1} style={st.storyDraftDate}>
+                {fmtDate(date)}
+              </Text>
+            )}
           </View>
         </View>
       </View>
-      <Text allowFontScaling={false} numberOfLines={1} style={[st.storyDraftName, { color: theme.text.primary }]}>
-        {name}
-      </Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[st.storyDraftDate, { color: theme.text.muted }]}>
-        {fmtDate(date)}
-      </Text>
     </TouchableOpacity>
   );
 }
@@ -967,208 +1097,319 @@ function StoryMini({ theme, thumbnail, name, date, onPress }) {
 const st = StyleSheet.create({
   container: { flex: 1 },
 
-  headerGlow: { position: "absolute", top: 0, left: 0, right: 0, height: 160 },
+  headerGlow: { position: "absolute", top: 0, left: 0, right: 0, height: 180 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: { fontSize: 22, fontWeight: "800", letterSpacing: 0.2 },
-  headerSub: { fontSize: 12, fontWeight: "600", marginTop: 1 },
+  headerTitle: { fontSize: 24, fontWeight: "800", letterSpacing: -0.4 },
+  headerSub: { fontSize: 12.5, fontWeight: "600", marginTop: 1 },
   headerBadge: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
 
+  // Sekmeler
   tabRow: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   tabChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 22,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    gap: 7,
+    paddingLeft: 7,
+    paddingRight: 12,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  tabText: { fontSize: 13, fontWeight: "700" },
-  tabBadge: {
-    minWidth: 18,
-    paddingHorizontal: 5,
-    height: 18,
-    borderRadius: 9,
+  tabIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
-  tabBadgeText: { fontSize: 10, fontWeight: "800" },
-
-  row: {
-    flexDirection: "row",
+  tabText: { fontSize: 13 },
+  tabBadge: {
+    minWidth: 20,
+    paddingHorizontal: 6,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: "center",
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 11,
-    paddingRight: 14,
-    paddingLeft: 16,
-    borderRadius: 18,
-    borderWidth: 1,
+  },
+  tabBadgeText: { fontSize: 10.5, fontWeight: "800" },
+
+  // Puanlamalar / Yorumlar satırı
+  row: {
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 12,
     overflow: "hidden",
   },
-  accentBar: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4, borderRadius: 4 },
-  poster: { width: 48, height: 70, borderRadius: 10 },
+  rowWash: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0 },
+  rowMain: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+  },
+  poster: { width: 56, height: 84, borderRadius: 12 },
   iconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 15,
+    width: 56,
+    height: 84,
+    borderRadius: 14,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  info: { flex: 1, gap: 4 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  info: { flex: 1, minWidth: 0, gap: 5 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   kindChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 7,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  kindChipText: { fontSize: 8, fontWeight: "800", letterSpacing: 0.6 },
-  badge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1 },
-  badgeText: { fontSize: 8, fontWeight: "700", letterSpacing: 0.3 },
-  title: { fontSize: 14.5, fontWeight: "700" },
-  subtitle: { fontSize: 12 },
-  dateRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 1 },
+  kindChipText: { fontSize: 8.5, fontWeight: "900", letterSpacing: 0.6 },
+  badge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
+  badgeText: { fontSize: 8.5, fontWeight: "800", letterSpacing: 0.3 },
+  title: { fontSize: 15, fontWeight: "800", lineHeight: 20, letterSpacing: -0.1 },
+  quote: {
+    borderLeftWidth: 3,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  quoteText: { fontSize: 12.5, lineHeight: 18 },
+  dateRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   date: { fontSize: 10.5, fontWeight: "600" },
 
-  scorePill: { alignItems: "flex-end", gap: 3 },
-  scoreTxt: { fontSize: 14, fontWeight: "800" },
-
-  // ── Satır aksiyon butonları (yorum düzenle/sil) ──
-  rowActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  rowActionBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    borderWidth: 1,
-    justifyContent: "center",
+  score: {
+    width: 58,
     alignItems: "center",
+    gap: 3,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
   },
+  scoreNum: { fontSize: 18, fontWeight: "900", letterSpacing: -0.4 },
 
-  // ── Etkileşim "Kaldır" pili ──
+  // Satır aksiyonları (yorum düzenle/sil)
+  rowActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+    marginHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  actionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 17,
+    borderWidth: 1,
+  },
+  actionPillText: { fontSize: 12.5, fontWeight: "800" },
+
+  // Etkileşim "Kaldır" pili
   removePill: {
     marginLeft: "auto",
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 11,
-    borderWidth: 1,
+    gap: 5,
+    height: 32,
+    paddingHorizontal: 11,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  removePillText: { fontSize: 11.5, fontWeight: "700" },
+  removePillText: { fontSize: 12, fontWeight: "700" },
 
-  // ── Yorum düzenleme modalı ──
+  // Yorum düzenleme modalı
   editBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "center",
     paddingHorizontal: 24,
+    paddingVertical: 24,
   },
-  editCard: { borderRadius: 22, borderWidth: 1, padding: 18 },
+  editCard: { flexShrink: 1, borderRadius: 26, borderWidth: StyleSheet.hairlineWidth, padding: 18 },
   editHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
   editIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 13,
     justifyContent: "center",
     alignItems: "center",
   },
-  editTitle: { fontSize: 17, fontWeight: "800" },
+  editTitle: { flex: 1, fontSize: 17, fontWeight: "800" },
+  editCounter: { fontSize: 11.5, fontWeight: "700" },
   editInput: {
-    minHeight: 96,
-    maxHeight: 200,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 12,
+    flexShrink: 1,
+    minHeight: 110,
+    maxHeight: 220,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 14,
     fontSize: 14.5,
+    lineHeight: 21,
     textAlignVertical: "top",
   },
   editActions: { flexDirection: "row", gap: 10, marginTop: 16 },
   editBtn: {
     flex: 1,
-    height: 46,
-    borderRadius: 14,
+    height: 48,
+    borderRadius: 16,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
   editBtnText: { fontSize: 15, fontWeight: "800" },
-  postStats: { flexDirection: "row", alignItems: "center", gap: 3 },
-  statTxt: { fontSize: 11, fontWeight: "700" },
 
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 40 },
-  emptyCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+  // Boş durum
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 40, paddingBottom: 60 },
+  emptyHalo: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  emptyText: { fontSize: 15, fontWeight: "700", textAlign: "center" },
-
-  // ── PostMini (paylaşım kartı görünümü) ──
-  pCard: {
-    flexDirection: "row",
-    gap: 12,
-    padding: 12,
-    borderRadius: 18,
+  emptyCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     borderWidth: 1,
-    borderLeftWidth: 4,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyText: { fontSize: 16, fontWeight: "800", textAlign: "center" },
+  emptyChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  emptyChipText: { fontSize: 12, fontWeight: "800" },
+
+  // PostMini (paylaşım kartı görünümü)
+  pCard: {
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
     marginBottom: 12,
   },
-  pPosterStack: { height: 88 },
-  pPoster: { width: 60, height: 88, borderRadius: 8 },
-  pPosterEmpty: { justifyContent: "center", alignItems: "center" },
-  pPosterStackItem: { position: "absolute", top: 0, borderWidth: 2 },
-  pMeta: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 4 },
-  pBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7, borderWidth: 1 },
-  pBadgeText: { fontSize: 8.5, fontWeight: "800", letterSpacing: 0.5 },
+  pWash: { position: "absolute", left: 0, right: 0, top: 0, height: 120 },
+  pMeta: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
+  pBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  pBadgeText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.4 },
+  pSpoiler: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 7,
+    backgroundColor: "rgba(240,79,79,0.12)",
+  },
+  pSpoilerText: { color: SPOILER_RED, fontSize: 8.5, fontWeight: "900", letterSpacing: 0.4 },
   pTime: { fontSize: 10.5, fontWeight: "600" },
-  pTitle: { fontSize: 15, fontWeight: "800" },
-  pContent: { fontSize: 12.5, marginTop: 2, lineHeight: 17 },
-  pRatingRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
-  pRatingText: { fontSize: 12, fontWeight: "700" },
-  // ── PostMini anket gövdesi (top-2 mini bar) ──
-  pPollBody: { marginTop: 6, gap: 4 },
-  pPollBarRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  pPollBarLabel: { fontSize: 10, fontWeight: "600", maxWidth: 72 },
-  pPollBarTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
-  pPollBarFill: { height: "100%", borderRadius: 2 },
-  pPollBarPct: { fontSize: 10, fontWeight: "800", minWidth: 30, textAlign: "right" },
-  pStats: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
-  pStatText: { fontSize: 12, fontWeight: "700" },
-  pActionRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8 },
+  pBody: { flexDirection: "row", gap: 12 },
+  pFallback: {
+    width: 64,
+    height: 96,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pTitle: { fontSize: 15.5, lineHeight: 21, fontWeight: "800", letterSpacing: -0.1 },
+  pContent: { fontSize: 12.5, marginTop: 3, lineHeight: 18 },
+  pQuote: {
+    borderLeftWidth: 3,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginTop: 6,
+  },
+  pQuoteText: { fontSize: 13, lineHeight: 19 },
+  pRating: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 8,
+  },
+  pRatingText: { fontSize: 11.5, fontWeight: "800" },
+
+  // Anket gövdesi (top-2 mini bar)
+  pPollBody: {
+    gap: 9,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 10,
+    marginTop: 10,
+  },
+  pPollBarRow: { gap: 4 },
+  pPollBarHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  pPollBarLabel: { flex: 1, fontSize: 12, fontWeight: "700" },
+  pPollBarPct: { fontSize: 11.5, fontWeight: "900" },
+  pPollBarTrack: { height: 5, borderRadius: 3, overflow: "hidden" },
+  pPollBarFill: { height: "100%", borderRadius: 3 },
+  pPollSummary: { flexDirection: "row", alignItems: "center", gap: 5 },
+  pPollSummaryText: { fontSize: 10.5, fontWeight: "600" },
+
+  pFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  pActionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
   pActionText: { fontSize: 12, fontWeight: "800" },
 
-  // ── StoryMini: StoryDraftsScreen grid görünümü ──
+  // StoryMini: 9:16 kutucuk ızgarası
   storyGridList: {
     paddingHorizontal: STORY_GRID_PAD,
     paddingTop: 6,
@@ -1181,35 +1422,37 @@ const st = StyleSheet.create({
   storyDraftThumbWrap: {
     width: STORY_ITEM_W,
     height: STORY_ITEM_H,
-    borderRadius: 12,
+    borderRadius: 18,
     overflow: "hidden",
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   storyDraftThumb: { width: "100%", height: "100%" },
   storyDraftEmpty: { flex: 1, alignItems: "center", justifyContent: "center" },
+  storyTopFade: { position: "absolute", left: 0, right: 0, top: 0, height: 56 },
+  storyBottomFade: { position: "absolute", left: 0, right: 0, bottom: 0, height: "46%" },
   storyDraftOverlay: {
     ...StyleSheet.absoluteFill,
     justifyContent: "space-between",
-    padding: 6,
+    padding: 8,
   },
+  storyTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   storyDraftTypeBadge: {
-    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
     paddingHorizontal: 6,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
-  storyDraftTypeText: { color: "#fff", fontSize: 8, fontWeight: "900" },
+  storyDraftTypeText: { color: "#fff", fontSize: 8, fontWeight: "900", letterSpacing: 0.4 },
   storyDraftEditBadge: {
-    alignSelf: "flex-start",
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  storyDraftName: { fontSize: 12, fontWeight: "800", marginTop: 6 },
-  storyDraftDate: { fontSize: 10, marginTop: 1 },
+  storyDraftName: { color: "#fff", fontSize: 12, fontWeight: "800", lineHeight: 15 },
+  storyDraftDate: { color: "rgba(255,255,255,0.75)", fontSize: 10, fontWeight: "600", marginTop: 2 },
 });

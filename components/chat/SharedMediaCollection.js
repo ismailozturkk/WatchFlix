@@ -6,6 +6,10 @@
 // rastgele seçim her izleyende YEREL çalışır (yazma yok), "bu akşam ne izlesek?"
 // kararını eğlenceli hale getirir.
 //
+// Görünüm: üstte ikon karolu başlık + adet rozeti, ortada poster ızgarası,
+// altta ızgara genişliğinde tam genişlik "Rastgele Seç" butonu. Rastgele seçim
+// sırasında vurgulanan kart hafifçe büyür, seçim bitince diğerleri solar.
+//
 // İLERİYE DÖNÜK: aynı items yapısı poll/anket için temel; oylama eklendiğinde
 // her poster bir oy seçeneği olur (kind:"poll" + votes map). Bu bileşen variant
 // prop'u ile o yöne genişletilebilir.
@@ -32,7 +36,7 @@ const GAP = 8;
 // küçülüp sığar. 2→2'li, 3→3'lü, 4→2x2, 5+→3'lü grid.
 const computeLayout = (n) => {
   const cols = n <= 3 ? Math.max(1, n) : n === 4 ? 2 : 3;
-  const targetRow = Math.min(SCREEN_W * 0.7, 320);
+  const targetRow = Math.min(SCREEN_W * 0.74, 330);
   let cardW = Math.floor((targetRow - GAP * (cols - 1)) / cols);
   cardW = Math.max(64, Math.min(cardW, 120));
   return { cols, cardW, gridWidth: cardW * cols + GAP * (cols - 1) };
@@ -46,7 +50,7 @@ const typeMeta = (mt) =>
       : { label: i18nText("autoI18n.kisi_upper", "KİŞİ"), color: "#CE93D8" };
 
 // ─── Tek mini poster kartı ───────────────────────────────────────────────────
-function MiniCard({ item, getTmdbUrl, accent, highlighted, picked, onPress, cardW, isOutgoing, theme }) {
+function MiniCard({ item, getTmdbUrl, accent, highlighted, picked, dimmed, onPress, cardW, isOutgoing, theme }) {
   const poster = item.poster_path || item.profile_path;
   const meta = typeMeta(item.media_type);
   const primaryTextColor = isOutgoing ? "#fff" : theme.text.primary;
@@ -54,7 +58,11 @@ function MiniCard({ item, getTmdbUrl, accent, highlighted, picked, onPress, card
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={() => onPress(item)}
-      style={{ width: cardW }}
+      style={{
+        width: cardW,
+        opacity: dimmed ? 0.45 : 1,
+        transform: [{ scale: highlighted ? 1.05 : 1 }],
+      }}
     >
       <View
         style={[
@@ -173,24 +181,47 @@ export default function SharedMediaCollection({
 
   return (
     <View style={styles.wrap}>
-      {/* Başlık (opsiyonel) */}
-      <View style={[styles.header, isOutgoing && styles.headerOutgoing]}>
-        <Ionicons
-          name={isPersonList ? "people-outline" : listTitle ? "list" : "albums-outline"}
-          size={14}
-          color={isOutgoing ? "#fff" : accent}
-        />
+      {/* Başlık (opsiyonel): ikon karosu + ad + adet rozeti */}
+      <View style={[styles.header, { width: gridWidth }]}>
+        <View
+          style={[
+            styles.headerTile,
+            { backgroundColor: isOutgoing ? "rgba(255,255,255,0.22)" : alpha(accent, 0.18) },
+          ]}
+        >
+          <Ionicons
+            name={isPersonList ? "people-outline" : listTitle ? "list" : "albums-outline"}
+            size={15}
+            color={isOutgoing ? "#fff" : accent}
+          />
+        </View>
         <Text style={[styles.headerText, { color: primaryTextColor }]} numberOfLines={2}>
           {listTitle ||
             (isPersonList
               ? i18nText("autoI18n.n_oyuncu", "{{n}} oyuncu", { n: items.length })
               : i18nText("autoI18n.n_icerik", "{{n}} içerik", { n: items.length }))}
         </Text>
+        {/* Başlık adı verildiyse adet ayrıca rozette; yoksa başlık zaten adet. */}
+        {listTitle ? (
+          <View
+            style={[
+              styles.countPill,
+              { backgroundColor: isOutgoing ? "rgba(255,255,255,0.22)" : alpha(accent, 0.16) },
+            ]}
+          >
+            <Text
+              allowFontScaling={false}
+              style={[styles.countPillText, { color: isOutgoing ? "#fff" : accent }]}
+            >
+              {items.length}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Poster grid — genişlik içerik sayısına göre (computeLayout) */}
       <View
-        style={[styles.grid, { width: gridWidth }, isOutgoing && styles.gridOutgoing]}
+        style={[styles.grid, { width: gridWidth }]}
       >
         {items.map((item, idx) => (
           <MiniCard
@@ -203,34 +234,34 @@ export default function SharedMediaCollection({
             theme={theme}
             highlighted={spinning && highlight === idx}
             picked={picked === idx}
+            dimmed={picked >= 0 && picked !== idx && !spinning}
             onPress={onOpenItem}
           />
         ))}
       </View>
 
-      {/* Rastgele seç (2+ öğe) */}
+      {/* Rastgele seç (2+ öğe): ızgara genişliğinde tam genişlik buton */}
       {canRandom && (
-        <View style={[styles.actionsRow, isOutgoing && styles.actionsRowOutgoing]}>
-          <TouchableOpacity
-            onPress={spin}
-            disabled={spinning}
-            activeOpacity={0.85}
-            style={[
-              styles.randomBtn,
-              {
-                backgroundColor: isOutgoing ? "rgba(255,255,255,0.25)" : accent,
-                opacity: spinning ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Ionicons name="dice-outline" size={15} color="#fff" />
-            <Text style={styles.randomBtnText}>
-              {spinning
-                ? i18nText("autoI18n.seciliyor", "Seçiliyor...")
-                : i18nText("autoI18n.rastgele_sec", "Rastgele Seç")}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={spin}
+          disabled={spinning}
+          activeOpacity={0.85}
+          style={[
+            styles.randomBtn,
+            {
+              width: gridWidth,
+              backgroundColor: isOutgoing ? "rgba(255,255,255,0.25)" : accent,
+              opacity: spinning ? 0.7 : 1,
+            },
+          ]}
+        >
+          <Ionicons name="dice-outline" size={16} color="#fff" />
+          <Text style={styles.randomBtnText}>
+            {spinning
+              ? i18nText("autoI18n.seciliyor", "Seçiliyor...")
+              : i18nText("autoI18n.rastgele_sec", "Rastgele Seç")}
+          </Text>
+        </TouchableOpacity>
       )}
 
       {/* Seçilen sonuç bandı */}
@@ -239,6 +270,7 @@ export default function SharedMediaCollection({
           style={[
             styles.pickedBanner,
             {
+              width: gridWidth,
               backgroundColor: isOutgoing
                 ? "rgba(255,255,255,0.12)"
                 : theme.between,
@@ -278,31 +310,46 @@ export default function SharedMediaCollection({
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginBottom: 9, alignSelf: "flex-start" },
+  wrap: { marginBottom: 2, alignSelf: "flex-start" },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
+    gap: 8,
+    marginBottom: 10,
   },
-  headerOutgoing: { justifyContent: "flex-end" },
+  headerTile: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerText: {
     color: "#fff",
-    fontSize: 13,
+    fontSize: 14.5,
     fontWeight: "800",
+    flex: 1,
     flexShrink: 1,
   },
+  countPill: {
+    minWidth: 24,
+    height: 22,
+    paddingHorizontal: 7,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countPillText: { fontSize: 11.5, fontWeight: "800" },
 
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
-  gridOutgoing: { justifyContent: "flex-end" },
 
   posterBox: {
-    borderRadius: 10,
+    borderRadius: 12,
     overflow: "hidden",
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.08)",
@@ -347,22 +394,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  actionsRow: { flexDirection: "row", marginTop: 10 },
-  actionsRowOutgoing: { justifyContent: "flex-end" },
   randomBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
+    justifyContent: "center",
+    gap: 7,
+    height: 38,
+    marginTop: 10,
+    borderRadius: 19,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 3,
   },
-  randomBtnText: { color: "#fff", fontSize: 12.5, fontWeight: "800" },
+  randomBtnText: { color: "#fff", fontSize: 13, fontWeight: "800" },
 
   pickedBanner: {
     flexDirection: "row",

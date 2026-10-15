@@ -15,7 +15,6 @@ import {
   AVATARS as avatars,
   clampAvatarIndex,
   getAvatarSource,
-  CUSTOM_AVATAR_INDEX,
 } from "../utils/avatars";
 import { i18nText } from "../utils/i18nText";
 

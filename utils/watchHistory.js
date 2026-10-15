@@ -399,3 +399,24 @@ export function buildRecentWatchChartData(
 ) {
   return buildWatchChartData(groupedData, minutesOf, locale, "daily", pointCount);
 }
+
+/**
+ * Tarihe göre gruplanmış geçmişten tür dağılımını çıkarır: [{ name, count }],
+ * adet azalan, eşitlikte alfabetik. ProfileStatsContext.getTopGenreNames ile aynı
+ * sıralamayı kullanır; böylece istatistik ekranındaki tür çubukları ile profildeki
+ * "en çok izlenen" türler birbirinden ayrışmaz. Her kayıt (tekrar izlemeler dahil)
+ * bir kez sayılır.
+ */
+export function countGenres(groupedData = []) {
+  const counts = {};
+  (groupedData || []).forEach((section) =>
+    (section?.data || []).forEach((item) =>
+      (item?.genres || []).forEach((genre) => {
+        if (genre) counts[genre] = (counts[genre] || 0) + 1;
+      }),
+    ),
+  );
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, count]) => ({ name, count }));
+}

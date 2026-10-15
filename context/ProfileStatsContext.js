@@ -1,15 +1,11 @@
 import React, {
   createContext, useContext, useEffect, useState, useMemo, useRef, useCallback,
 } from "react";
-import { doc, collection, onSnapshot } from "firebase/firestore";
 import { Animated } from "react-native";
 import { Keys, get, set, getActiveUser } from "../services/storage";
-import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { useLanguage } from "./LanguageContext";
 import { useListStatusContext } from "./ListStatusContext";
-import { snapshotErrorHandler } from "../utils/firestoreError";
-import { dedupeWatchedTvEntries } from "../services/watchedTvService";
 import {
   clearListsWidget,
   syncListsWidget,
@@ -21,7 +17,6 @@ import {
 import { i18nText } from "../utils/i18nText";
 import { cacheKeys } from "../utils/cacheKeys";
 import { publish, seed } from "../services/snapshotCache";
-import useStartupGate from "../hooks/useStartupGate";
 import {
   countMovieWatchStats,
   countTvWatchStats,
@@ -34,11 +29,6 @@ import {
 
 const ProfileStatsContext = createContext();
 export const useProfileStats = () => useContext(ProfileStatsContext);
-
-// Profil sayaçlarının tekrarlı/tekrarsız kipi. Varsayılan "total": mevcut
-// kullanıcıların alışık olduğu sayı güncellemeyle birlikte değişmesin.
-// Anahtar registry'de (Keys.statsCountMode).
-const STATS_COUNT_MODE_DEFAULT = "total";
 
 // ─── Pure helpers (stable — defined outside component) ───────────────────────
 
@@ -185,14 +175,10 @@ export const ProfileStatsProvider = ({ children }) => {
   const { user } = useAuth();
   const uid = user?.uid;
 
-  // Bu context'in tüketicileri (Profil sekmesi, istatistik ekranları, AI sohbet)
-  // açılışta mount değil; listener'lar + flatEpisodesTv/groupBy türetmeleri ilk
-  // saniyelerde JS thread'i kilitliyordu. Splash sonrası pencerenin dışına ertele.
-  const startupReady = useStartupGate(1600);
   const { t, language } = useLanguage();
   // Öntanımlı listeler (favorites/watchList/watchedMovies) artık subcollection'da;
   // kök doc'tan kalkacakları için profil liste kartları combinedLists'ten beslenir.
-  const { combinedLists, stats: precomputedStats, loading: listsLoading } = useListStatusContext();
+  const { combinedLists, stats: precomputedStats } = useListStatusContext();
 
   const [lists,              setLists]             = useState([]);
 
@@ -219,11 +205,11 @@ export const ProfileStatsProvider = ({ children }) => {
   const [uniqueSeasonsCount,  setUniqueSeasonsCount]  = useState(statsSeed.uniqueSeasonsCount ?? 0);
   const [uniqueEpisodesCount, setUniqueEpisodesCount] = useState(statsSeed.uniqueEpisodesCount ?? 0);
 
-  const [isLoading,          setIsLoading]          = useState(false);
+  const [isLoading]          = useState(false);
   const [loadingTv,          setLoadingTv]          = useState(false);
   const [loadingMovies,      setLoadingMovies]      = useState(false);
-  const [isloadingShowInfo,  setIsLoadingShowInfo]  = useState(false);
-  const [isloadingMovieInfo, setIsLoadingMovieInfo] = useState(false);
+  const [isloadingShowInfo]  = useState(false);
+  const [isloadingMovieInfo] = useState(false);
 
   const [listItems,   setListItems]   = useState([]);
   const [listItemsTv, setListItemsTv] = useState([]);

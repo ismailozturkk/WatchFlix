@@ -21,7 +21,7 @@ import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 // Stable, module-scope item component → no remount → no flicker.
 const MovieGenresCard = memo(function MovieGenresCard({ item, navigation, theme, getTmdbUrl }) {
@@ -80,7 +80,7 @@ const MovieGenresCard = memo(function MovieGenresCard({ item, navigation, theme,
 
 export default function MovieGenres({ navigation }) {
   const { theme } = useTheme();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const {
     genres,
@@ -277,29 +277,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
-  },
-  similarTitle: {
-    color: "#fff",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  similarRating: {
-    position: "absolute",
-    bottom: 10,
-    right: 5,
-    width: 30,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  similarRatingText: {
-    color: "#ffd700",
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  errorText: {
-    color: "red",
-    fontSize: 16,
-    fontWeight: "bold",
   },
 });

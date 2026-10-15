@@ -20,7 +20,7 @@ import {
 } from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { LinearGradient } from "expo-linear-gradient";
-import AdaptiveBlurView from "../../components/common/AdaptiveBlurView";
+import GlassIconButton from "../../components/common/GlassIconButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -339,7 +339,7 @@ const ActorViewScreen = ({ route, navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="details" iconOpacity={0.25} />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* ── Floating header (scroll sonrası görünür) ── */}
@@ -360,14 +360,12 @@ const ActorViewScreen = ({ route, navigation }) => {
 
       {/* ── Back button (daima görünür) ── */}
       <SafeAreaView style={styles.backBtnWrapper} edges={["top"]}>
-        <TouchableOpacity
+        <GlassIconButton
+          variant="blur"
+          icon="chevron-back"
+          accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
           onPress={() => navigation.goBack()}
-          activeOpacity={0.85}
-        >
-          <AdaptiveBlurView tint="dark" intensity={55} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={22} color="#fff" />
-          </AdaptiveBlurView>
-        </TouchableOpacity>
+        />
       </SafeAreaView>
 
       <Animated.ScrollView
@@ -622,14 +620,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 16,
     zIndex: 20,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
   },
 
   // ── Floating header ──────────────────────────────────────────────────────

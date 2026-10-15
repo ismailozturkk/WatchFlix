@@ -39,7 +39,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
-import ComposerBlur, { ComposerBlurTarget, useComposerBlurTarget } from "../chat/ComposerBlur";
+import ComposerBlur, { COMPOSER_GLASS_PILL_STYLE, ComposerBlurTarget, useComposerBlurTarget } from "../chat/ComposerBlur";
+import { useLiquidGlass } from "../../services/liquidGlass";
 import useAdaptiveSheetHeight from "@hooks/useAdaptiveSheetHeight";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -49,6 +50,7 @@ import {
 } from "@expo/vector-icons";
 import * as Haptics from "@services/hapticsService";
 import { useTheme } from "@context/ThemeContext";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { useUserProfile } from "@context/UserProfileContext";
@@ -288,6 +290,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
   const [replyVisibility, setReplyVisibility] = useState({});
   const [input, setInput] = useState(EMPTY_INPUT);
   const composerBlur = useComposerBlurTarget();
+  const glass = useLiquidGlass();
 
   // Sheet yüksekliği İÇERİĞE göre canlı hesaplanır: yorum (+ yanıt) sayısı
   // arttıkça SHEET_MIN_H'tan SHEET_MAX_H'a doğru büyür, klavye açıkken
@@ -455,7 +458,18 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
     } finally {
       setIsSending(false);
     }
-  }, [input, isSending, postId, user, selectAvatarIndex, post]);
+  }, [
+    input,
+    isSending,
+    postId,
+    user,
+    selectAvatarIndex,
+    post,
+    profileDisplayName,
+    profileUsername,
+    profileAvatarIndex,
+    profilePhotoURL,
+  ]);
 
   // ── Sil ──
   const handleDelete = useCallback(
@@ -547,7 +561,19 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
       );
     },
     // repliesByParent/replyVisibility her render'da yeniden hesaplanıyor; kasıtlı
-    [repliesByParent, replyVisibility, user?.uid, avatar, theme, styles],
+    [
+      repliesByParent,
+      replyVisibility,
+      user?.uid,
+      avatar,
+      theme,
+      styles,
+      toggleReplies,
+      handleLike,
+      startReply,
+      startEdit,
+      handleDelete,
+    ],
   );
 
   return (
@@ -610,13 +636,15 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
                 {i18nText("autoI18n.yorumlar", "Yorumlar")}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.closeBtn}
+            <GlassCloseButton
+              size={32}
+              fallbackRadius={16}
+              color={theme.text.secondary}
+              backgroundColor={alpha(theme.text.primary, 0.07)}
+              borderColor={theme.border}
+              hitSlop={10}
               onPress={handleClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={18} color={theme.text.secondary} />
-            </TouchableOpacity>
+            />
           </View>
 
           <View style={styles.miniPost}>
@@ -748,7 +776,8 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
                 composer ile aynı yapı: [input][gönder] tek parça, ikisi de 42px.
                 Sarmalayıcı saydam ve ayırıcı çizgisiz; yalnız hap görünür.
                 Hap arka planı da o composer gibi camsı blur. */}
-            <View style={styles.composerPill}>
+            {/* Cam yolunda çerçeve halkası + RN gölgesi kalkar (camın arkasında ikinci hap / leke gibi görünüyordu). */}
+            <View style={[styles.composerPill, glass && COMPOSER_GLASS_PILL_STYLE]}>
               <ComposerBlur target={blurReady ? composerBlur.target : null} theme={theme} />
               <TextInput
                 ref={commentInputRef}
@@ -789,7 +818,7 @@ const getStyles = (theme) =>
     // sheet SONRA render edildiğinden (ve elevation'ı olduğundan) kendi
     // dokunuşlarını kendisi yakalar, buraya yalnız dışındaki boşluk kalır.
     backdropTouchable: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
     },
 
     // height artık sabit değil: useAdaptiveSheetHeight'ın Animated değeri
@@ -925,16 +954,6 @@ const getStyles = (theme) =>
       fontWeight: "700",
       color: theme.text.primary,
       letterSpacing: 0.2,
-    },
-    closeBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: alpha(theme.text.primary, 0.07),
-      borderWidth: 1,
-      borderColor: theme.border,
-      justifyContent: "center",
-      alignItems: "center",
     },
 
     divider: {

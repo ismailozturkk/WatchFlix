@@ -235,3 +235,19 @@ describe("kimlik imzası ve tarih", () => {
     expect(todayListDate(new Date(2026, 11, 31, 23, 0, 0))).toBe("2026-12-31");
   });
 });
+
+describe("özet (overview) seçimi", () => {
+  const { pickOverview } = require("../utils/mediaFacts");
+
+  test("arama sonucu ve detay gövdesi aynı alanı taşır; boşluk kırpılır", () => {
+    expect(pickOverview({ overview: "  Rüyaların içinde rüya.  " })).toBe("Rüyaların içinde rüya.");
+  });
+
+  test("yok / boş / string olmayan → boş dize", () => {
+    expect(pickOverview({})).toBe("");
+    expect(pickOverview({ overview: "   " })).toBe("");
+    expect(pickOverview({ overview: 42 })).toBe("");
+    expect(pickOverview(null)).toBe("");
+    expect(pickOverview(undefined)).toBe("");
+  });
+});

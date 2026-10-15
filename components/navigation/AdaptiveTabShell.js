@@ -129,6 +129,10 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
     selected: { tabBarItemIconColor: theme.accent, tabBarItemTitleFontColor: theme.accent },
   };
   const appearance = { stacked: itemAppearance, inline: itemAppearance, compactInline: itemAppearance };
+  // `scrollEdgeAppearance` DA aynı verilir: sekme ekranlarının kaydırma görünümü
+  // TabScrollMarker ile UIKit'e tanıtılınca çubuk, içerik kenara dayandığında bu
+  // görünüme geçer. Verilmezse sistem varsayılanı (şeffaf arka plan + sistem
+  // renkleri) devreye girer ve liste sonunda vurgu/pasif simge renkleri kaybolur.
 
   const fallbackScenes = (
     <ScreenContainer style={styles.fill} hasTwoStates>
@@ -156,7 +160,7 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
                     <Tabs.Screen key={tab.name} screenKey={tab.name} title={tab.label} tabBarItemAccessibilityLabel={tab.label}
                       tabBarItemTestID={`tab-${tab.name}`} specialEffects={NO_RESELECT_EFFECTS}
                       nativeContainerStyle={{ backgroundColor: theme.primary }}
-                      ios={{ icon: { type: "sfSymbol", name: tab.sf }, selectedIcon: { type: "sfSymbol", name: tab.selectedSf }, standardAppearance: appearance, overrideScrollViewContentInsetAdjustmentBehavior: false }}>
+                      ios={{ icon: { type: "sfSymbol", name: tab.sf }, selectedIcon: { type: "sfSymbol", name: tab.selectedSf }, standardAppearance: appearance, scrollEdgeAppearance: appearance, overrideScrollViewContentInsetAdjustmentBehavior: false }}>
                       {state.mountedTabs.has(tab.name) ? screens[tab.name] : <View style={styles.loading}><ActivityIndicator color={theme.accent} /></View>}
                     </Tabs.Screen>
                   ))}

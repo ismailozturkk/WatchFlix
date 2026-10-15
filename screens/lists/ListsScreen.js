@@ -66,6 +66,10 @@ import { showLibraryError } from "../../utils/libraryErrorText";
 import { refreshShowMeta } from "../../services/refreshShowMeta";
 import { cachedTmdb } from "../../utils/cachedRead";
 import ScreenDecor from "@components/ScreenDecor";
+import StaggerItem from "@components/StaggerItem";
+import GlassCloseButton from "@components/common/GlassCloseButton";
+import useEntranceGate from "@hooks/useEntranceGate";
+import { gridEntranceIndex } from "@utils/entranceGate";
 import {
   reorderList,
   PREDEFINED_MOVIE_LISTS,
@@ -149,6 +153,9 @@ export default function ListsScreen({ route, navigation }) {
   // demek değil, "henüz okumadım" da olabilir; kip otomatiği bu ikisini
   // ayırt etmek zorunda (bkz. autoModeRef effect'i).
   const [itemsReady, setItemsReady] = useState(false);
+  // Posterler YALNIZ ilk yüklemede kademeli girer; sonradan arama/filtreyle
+  // yeniden bağlanan satırlar animasyonsuz çizilir (bkz. hooks/useEntranceGate).
+  const shouldAnimateEntrance = useEntranceGate(itemsReady);
   const [modalVisible, setModalVisible] = useState(false);
   const [reorderModalVisible, setReorderModalVisible] = useState(false);
   // İki alt sayfa: blur yerinde solar, sayfa kayar
@@ -162,7 +169,7 @@ export default function ListsScreen({ route, navigation }) {
   const [filterType, setFilterType] = useState("mixed");
   // Gesture tracking removed in favor of a cleaner 3-way segmented toggle.
   const [value, setValue] = useState("");
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const handleChange = (text) => {
     // Sadece rakamları al
@@ -300,15 +307,6 @@ export default function ListsScreen({ route, navigation }) {
     outputRange: [0, tabPillWidth / 3, (tabPillWidth / 3) * 2],
   });
 
-  // Animated import'unun eklendiğinden emin olun
-  const formatDate = (timestamp) => {
-    const date = new Date(timestamp);
-    return new Intl.DateTimeFormat(language, {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    }).format(date);
-  };
   const [scaleValues, setScaleValues] = useState({});
   useEffect(() => {
     if (!listItems?.length) return;
@@ -950,7 +948,7 @@ export default function ListsScreen({ route, navigation }) {
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="lists" iconOpacity={0.25} />
       <View style={styles.headerRow}>
         <View style={styles.headerSide}>
           <BackButton absolute={false} />
@@ -1336,7 +1334,7 @@ export default function ListsScreen({ route, navigation }) {
               paddingHorizontal: GRID_SIDE_PADDING,
               paddingBottom: 40,
             }}
-            renderItem={({ item: row }) => (
+            renderItem={({ item: row, index: rowIndex }) => (
               <View
                 style={{
                   flexDirection: "row",
@@ -1346,9 +1344,16 @@ export default function ListsScreen({ route, navigation }) {
                   marginBottom: 12,
                 }}
               >
-                {row.map((item) => (
-                  <TouchableOpacity
+                {row.map((item, colIndex) => (
+                  <StaggerItem
                     key={String(item.id)}
+                    index={gridEntranceIndex(rowIndex, colIndex, gridColumns)}
+                    animate={shouldAnimateEntrance()}
+                    step={40}
+                    maxStaggered={12}
+                    style={{ width: posterW }}
+                  >
+                  <TouchableOpacity
                 activeOpacity={0.8}
                 onPressIn={() => onPressIn(item.id)}
                 onPressOut={() => {
@@ -1509,6 +1514,7 @@ export default function ListsScreen({ route, navigation }) {
                   </Text>
                 ) : null}
               </TouchableOpacity>
+                  </StaggerItem>
                 ))}
                 {row.length < gridColumns
                   ? Array.from({ length: gridColumns - row.length }).map((_, i) => (
@@ -1642,13 +1648,16 @@ export default function ListsScreen({ route, navigation }) {
                       />
 
                       <View style={styles.sheetHandle} />
-                      <TouchableOpacity
+                      <GlassCloseButton
+                        onImage
+                        size={30}
+                        fallbackRadius={15}
+                        iconSize={16}
+                        backgroundColor="rgba(0,0,0,0.4)"
                         style={styles.sheetClose}
-                        onPress={() => setModalVisible(false)}
                         hitSlop={10}
-                      >
-                        <Feather name="x" size={16} color="#fff" />
-                      </TouchableOpacity>
+                        onPress={() => setModalVisible(false)}
+                      />
 
                       <TouchableOpacity
                         style={styles.heroRow}
@@ -2000,16 +2009,12 @@ export default function ListsScreen({ route, navigation }) {
                   )}
                 </Text>
               </View>
-              <TouchableOpacity
-                onPress={closeReorderModal}
+              <GlassCloseButton
+                size={34}
+                fallbackRadius={12}
                 disabled={isReordering}
-                style={[
-                  styles.reorderClose,
-                  { backgroundColor: theme.primary },
-                ]}
-              >
-                <Feather name="x" size={18} color={theme.text.muted} />
-              </TouchableOpacity>
+                onPress={closeReorderModal}
+              />
             </View>
 
             <View
@@ -2643,11 +2648,6 @@ const styles = StyleSheet.create({
   },
   emptyCtaText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 
-  itemTvShow: {
-    width: 120,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 
   minutesBadge: {
     position: "absolute",
@@ -2734,13 +2734,6 @@ const styles = StyleSheet.create({
   reorderHeaderText: { flex: 1, marginHorizontal: 11 },
   reorderTitle: { fontSize: 18, fontWeight: "800", letterSpacing: -0.3 },
   reorderSubtitle: { fontSize: 11.5, marginTop: 2, lineHeight: 16 },
-  reorderClose: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   reorderPreview: {
     flexDirection: "row",
     alignItems: "center",
@@ -2847,13 +2840,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 5,
   },
-  infoContainer: {
-    paddingTop: 15,
-    borderTopRightRadius: 15,
-    borderTopLeftRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   item: {
     alignItems: "center",
     justifyContent: "center",
@@ -2878,51 +2864,6 @@ const styles = StyleSheet.create({
     width: 68,
     height: 102,
     borderRadius: 12,
-  },
-  imageSelected: {
-    width: 100,
-    height: 150,
-    borderRadius: 10,
-    margin: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  title: {
-    fontWeight: "bold",
-    fontSize: 16,
-    textAlign: "center",
-  },
-  detail: {
-    fontSize: 12,
-    textAlign: "center",
-    marginVertical: 3,
-    marginHorizontal: 3,
-  },
-  detailGenres: {
-    fontSize: 12,
-    textAlign: "center",
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    borderRadius: 10,
-  },
-  detailSeason: {
-    fontSize: 11,
-    textAlign: "center",
-  },
-  seasonBox: {
-    padding: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-    //borderTopWidth: 0,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
   },
 
   // ── İzlenen dizi modalı (modern bottom sheet) ─────────────────────────────
@@ -2953,12 +2894,6 @@ const styles = StyleSheet.create({
     top: 14,
     right: 14,
     zIndex: 5,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
   },
   heroRow: { flexDirection: "row", gap: 14 },
   heroPoster: {
@@ -3005,20 +2940,6 @@ const styles = StyleSheet.create({
   heroProgressDetail: { fontSize: 11, fontWeight: "600" },
 
   sheetBody: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 30 },
-  ctaBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 16,
-  },
-  ctaText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "800",
-    letterSpacing: 0.2,
-  },
   sectionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -3101,12 +3022,6 @@ const styles = StyleSheet.create({
   seasonEpText: { fontSize: 9, fontWeight: "800" },
 
   // Count chips
-  countRow: {
-    flexDirection: "row",
-    gap: 7,
-    marginBottom: 8,
-    flexWrap: "wrap",
-  },
   countChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -3121,34 +3036,6 @@ const styles = StyleSheet.create({
   countChipTextGold: { color: "#e4ae39", fontWeight: "700", fontSize: 12 },
 
   // Interactive Segmented Buttons
-  segmentContainer: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    justifyContent: "space-between",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 24,
-    padding: 4,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
-  },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  segmentBtnCenter: {
-    flex: 1.4,
-    marginHorizontal: 4,
-  },
-  segmentText: {
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-  },
 });
 
 // ── Sıralama & filtreleme modalı stilleri ──────────────────────────────────

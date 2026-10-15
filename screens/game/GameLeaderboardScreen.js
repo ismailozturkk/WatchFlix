@@ -2,24 +2,29 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import GlassIconButton from "@components/common/GlassIconButton";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useAuth } from "@context/AuthContext";
 import { useFriends } from "@context/FriendsContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
-import { fetchLeaderboard } from "@services/sceneGameService";
+import { fetchDailyLeaderboard, fetchLeaderboard } from "@services/sceneGameService";
+import { DAILY_MODE_ID, DAILY_QUESTION_COUNT, DAILY_SOURCE_ID, dayKeyOf } from "@utils/dailyChallenge";
 import UserAvatar from "@components/common/UserAvatar";
 import { GameScreenShell, gameSharedStyles } from "./GameScreenShell";
+import usePremiumScreenGuard from "@hooks/usePremiumScreenGuard";
+import { SCENE_GAME_ID } from "./gameConfig";
 
 const PODIUM_COLORS = ["#E8B931", "#C7CDD6", "#CD7F32"];
 
-// Kapsam filtreleri (Part 14.1). Arkadaslar/Global istemci tarafinda calisir;
-// Gunluk/Haftalik/Sezonluk dereceli tablo backend uretimi gerektirdiginden
+// Kapsam filtreleri (Part 14.1). Arkadaslar/Global genel tablodan, Gunluk ise
+// bugunun Gunluk Meydan Okuma tablosundan (GameLeaderboards/scene_daily_<gun>)
+// okunur. Haftalik/Sezonluk dereceli tablo backend uretimi gerektirdiginden
 // (Part 14.4 / 17 — Faz E) bu surumde kilitli "Yakinda" durumundadir.
 const SCOPES = [
   { id: "friends", icon: "people-outline", tr: "Arkadaşlar", en: "Friends", available: true },
   { id: "global", icon: "earth-outline", tr: "Global", en: "Global", available: true },
-  { id: "daily", icon: "sunny-outline", tr: "Günlük", en: "Daily", available: false },
+  { id: "daily", icon: "sunny-outline", tr: "Günlük", en: "Daily", available: true },
   { id: "weekly", icon: "calendar-outline", tr: "Haftalık", en: "Weekly", available: false },
   { id: "season", icon: "ribbon-outline", tr: "Sezonluk", en: "Seasonal", available: false },
 ];
@@ -36,23 +41,44 @@ const compareEntries = (a, b) =>
   (Number(b.totalCorrect) || 0) - (Number(a.totalCorrect) || 0) ||
   (Number(b.bestStreak) || 0) - (Number(a.bestStreak) || 0);
 
-export default function GameLeaderboardScreen({ navigation }) {
+// Hub ve sonuc ekrani `scope` gonderir; gecersiz/kilitli kapsam Global'e duser.
+const initialScopeOf = (value) => (SCOPES.find((item) => item.id === value && item.available) ? value : "global");
+
+export default function GameLeaderboardScreen({ navigation, route }) {
+  usePremiumScreenGuard("games", navigation);
   const { theme } = useTheme();
   const { language } = useLanguage();
   const { user } = useAuth();
   const { friends = [] } = useFriends() || {};
   const tr = language !== "en";
-  const [state, setState] = useState({ status: "loading", data: [] });
-  const [scope, setScope] = useState("global");
+  // Genel ve gunluk tablo ayri kaynaklardir; gunluk ilk acildiginda yuklenir.
+  const [boards, setBoards] = useState({ global: { status: "loading", data: [] }, daily: { status: "idle", data: [] } });
+  const [scope, setScope] = useState(() => initialScopeOf(route?.params?.scope));
+  const source = scope === "daily" ? "daily" : "global";
+  const state = boards[source];
   const [rulesVisible, setRulesVisible] = useState(false);
 
-  const load = useCallback(() => {
-    setState({ status: "loading", data: [] });
-    fetchLeaderboard(50)
-      .then((data) => setState({ status: "success", data: Array.isArray(data) ? data : [] }))
-      .catch(() => setState({ status: "error", data: [] }));
+  const load = useCallback((which) => {
+    const put = (next) => setBoards((current) => ({ ...current, [which]: next }));
+    put({ status: "loading", data: [] });
+    (which === "daily" ? fetchDailyLeaderboard(dayKeyOf(), 50) : fetchLeaderboard(50))
+      .then((data) => put({ status: "success", data: Array.isArray(data) ? data : [] }))
+      .catch(() => put({ status: "error", data: [] }));
   }, []);
-  useEffect(load, [load]);
+  useEffect(() => {
+    load("global");
+  }, [load]);
+  useEffect(() => {
+    if (scope === "daily" && boards.daily.status === "idle") load("daily");
+  }, [scope, boards.daily.status, load]);
+  const reload = useCallback(() => load(source), [load, source]);
+  const playDaily = () =>
+    navigation.navigate("SceneGamePlayScreen", {
+      gameId: SCENE_GAME_ID,
+      modeId: DAILY_MODE_ID,
+      difficultyId: "normal",
+      sourceId: DAILY_SOURCE_ID,
+    });
 
   const friendUids = useMemo(() => {
     const set = new Set(friends.map((f) => f.friendUid || f.id));
@@ -77,7 +103,7 @@ export default function GameLeaderboardScreen({ navigation }) {
         <UserAvatar avatarIndex={item.avatarIndex} photoURL={item.photoURL} isCustomPhoto size={36} />
         <View style={styles.player}>
           <Text style={[styles.name, { color: theme.text.primary }]} numberOfLines={1}>{isSelf ? (tr ? "Sen" : "You") : item.displayName || (tr ? "Anonim" : "Anonymous")}</Text>
-          <Text style={[styles.meta, { color: theme.text.muted }]}>{accuracyOf(item)}% {tr ? "doğruluk" : "accuracy"} · 🔥 {Number(item.bestStreak) || 0}</Text>
+          <Text style={[styles.meta, { color: theme.text.muted }]}>{item.isDaily ? `${Number(item.totalCorrect) || 0}/${DAILY_QUESTION_COUNT} ${tr ? "doğru" : "correct"}` : `${accuracyOf(item)}% ${tr ? "doğruluk" : "accuracy"}`} · 🔥 {Number(item.bestStreak) || 0}</Text>
         </View>
         <Text style={[styles.points, { color: theme.accent }]}>{Number(item.bestScore) || 0}</Text>
       </View>
@@ -85,9 +111,15 @@ export default function GameLeaderboardScreen({ navigation }) {
   }, [theme, user?.uid, tr]);
 
   const headerRight = (
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={tr ? "Sıralama kuralları" : "Ranking rules"} onPress={() => setRulesVisible(true)} style={[styles.infoButton, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      <AppIcon family="Ionicons" name="information-circle-outline" size={19} color={theme.text.primary} />
-    </TouchableOpacity>
+    <GlassIconButton
+      icon="information-circle-outline"
+      iconSize={19}
+      size={38}
+      fallbackRadius={12}
+      color={theme.text.primary}
+      accessibilityLabel={tr ? "Sıralama kuralları" : "Ranking rules"}
+      onPress={() => setRulesVisible(true)}
+    />
   );
 
   const listHeader = (
@@ -101,15 +133,17 @@ export default function GameLeaderboardScreen({ navigation }) {
     <GameScreenShell navigation={navigation} scroll={false} title={tr ? "Liderlik" : "Leaderboard"} subtitle={tr ? "Sahne Tahmin sıralaması" : "Scene Guess ranking"} headerRight={headerRight}>
       <ScopeBar scope={scope} onChange={setScope} theme={theme} tr={tr} />
 
-      {state.status === "loading" ? (
+      {state.status === "loading" || state.status === "idle" ? (
         <State icon="trophy-outline" text={tr ? "Sıralamalar yükleniyor..." : "Loading rankings..."} theme={theme} loading />
       ) : state.status === "error" ? (
-        <State icon="cloud-offline-outline" text={tr ? "Liderlik tablosu yüklenemedi" : "Could not load the leaderboard"} theme={theme} action={load} actionText={tr ? "Tekrar Dene" : "Try Again"} />
+        <State icon="cloud-offline-outline" text={tr ? "Liderlik tablosu yüklenemedi" : "Could not load the leaderboard"} theme={theme} action={reload} actionText={tr ? "Tekrar Dene" : "Try Again"} />
       ) : entries.length === 0 ? (
         <State
-          icon={scope === "friends" ? "people-outline" : "trophy-outline"}
-          text={scope === "friends" ? (tr ? "Arkadaşların henüz sıralamada değil" : "Your friends aren't ranked yet") : (tr ? "Henüz sıralamaya giren oyuncu yok" : "No ranked players yet")}
+          icon={scope === "friends" ? "people-outline" : scope === "daily" ? "sunny-outline" : "trophy-outline"}
+          text={scope === "friends" ? (tr ? "Arkadaşların henüz sıralamada değil" : "Your friends aren't ranked yet") : scope === "daily" ? (tr ? "Bugün henüz kimse Günlük Meydan Okuma'yı oynamadı" : "Nobody has played today's Daily Challenge yet") : (tr ? "Henüz sıralamaya giren oyuncu yok" : "No ranked players yet")}
           theme={theme}
+          action={scope === "daily" ? playDaily : undefined}
+          actionText={tr ? "Günlüğü Oyna" : "Play Daily"}
         />
       ) : (
         <FlatList
@@ -226,7 +260,7 @@ function RulesModal({ visible, onClose, theme, tr }) {
               </View>
             ))}
           </View>
-          <Text style={[styles.sheetNote, { color: theme.text.muted }]}>{tr ? "Global tablo Klasik + Normal sonuçlarından beslenir; kişisel liste oyunları tabloyu etkilemez." : "The global board uses Classic + Normal results; personal-list games don't affect it."}</Text>
+          <Text style={[styles.sheetNote, { color: theme.text.muted }]}>{tr ? "Global tablo Klasik + Normal sonuçlarından beslenir; kişisel liste oyunları tabloyu etkilemez. Günlük sekme yalnızca bugünün Günlük Meydan Okuma sonuçlarını gösterir." : "The global board uses Classic + Normal results; personal-list games don't affect it. The Daily tab only shows today's Daily Challenge results."}</Text>
           <TouchableOpacity onPress={onClose} style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent }]}><Text style={gameSharedStyles.primaryButtonText}>{tr ? "Anladım" : "Got it"}</Text></TouchableOpacity>
       </SafeAreaView>
     </BottomSheetModal>
@@ -234,7 +268,6 @@ function RulesModal({ visible, onClose, theme, tr }) {
 }
 
 const styles = StyleSheet.create({
-  infoButton: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   scopeBarWrap: { flexGrow: 0, marginHorizontal: -16 },
   scopeBar: { gap: 8, paddingHorizontal: 16, paddingVertical: 2 },
   scopeChip: { minHeight: 38, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 6 },
@@ -248,7 +281,6 @@ const styles = StyleSheet.create({
   podiumColWinner: { marginBottom: 4 },
   podiumAvatarWrap: { width: 54, height: 54, borderRadius: 28, borderWidth: 2.5, alignItems: "center", justifyContent: "center", marginBottom: 7 },
   podiumAvatarWrapWinner: { width: 64, height: 64, borderRadius: 33 },
-  podiumAvatar: { width: "100%", height: "100%", borderRadius: 30 },
   podiumRank: { position: "absolute", bottom: -4, alignSelf: "center", minWidth: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingHorizontal: 5, borderWidth: 2, borderColor: "rgba(0,0,0,0.2)" },
   podiumRankText: { color: "#160C24", fontSize: 11, fontWeight: "900" },
   podiumName: { fontSize: 11, fontWeight: "850", maxWidth: "100%" },
@@ -257,7 +289,6 @@ const styles = StyleSheet.create({
   restLabel: { fontSize: 11, fontWeight: "900", letterSpacing: 0.7, marginTop: 6, marginLeft: 2 },
   row: { minHeight: 64, borderRadius: 16, borderWidth: 1, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 11 },
   rank: { width: 32, fontSize: 14, fontWeight: "900" },
-  avatar: { width: 36, height: 36, borderRadius: 18 },
   player: { flex: 1 },
   name: { fontSize: 14, fontWeight: "850" },
   meta: { fontSize: 10, fontWeight: "700", marginTop: 3 },
@@ -266,7 +297,6 @@ const styles = StyleSheet.create({
   stateText: { textAlign: "center", fontSize: 13, fontWeight: "650" },
   stateAction: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 },
   stateActionText: { color: "#fff", fontWeight: "850" },
-  modalRoot: { flex: 1, backgroundColor: "rgba(0,0,0,0.58)", justifyContent: "flex-end" },
   sheet: { borderTopLeftRadius: 27, borderTopRightRadius: 27, borderWidth: 1, paddingHorizontal: 18, paddingTop: 9, paddingBottom: 12 },
   sheetHandle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 16 },
   sheetTitle: { fontSize: 20, fontWeight: "900" },

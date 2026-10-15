@@ -17,7 +17,6 @@ import AppIcon from "../../components/AppIcon";
 import AppBadge from "../../components/badges/AppBadge";
 import {
   IDENTITY_BADGES,
-  badgeDesc,
   badgeLabel,
 } from "../../components/badges/badgeCatalog";
 import { useLanguage } from "../../context/LanguageContext";
@@ -59,7 +58,8 @@ import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
 function buildHighlights(tier, tr) {
   const lang = tr ? "tr" : "en";
   const ai = AI_PLAN_LIMITS[tier];
-  const multiplier = Math.round(ai.daily / AI_PLAN_LIMITS.free.daily);
+  // Aşağı yuvarlanır: 50/3 = 16,7 için "17X" vaat etmek fazla olurdu.
+  const multiplier = Math.floor(ai.daily / AI_PLAN_LIMITS.free.daily);
   const isMax = tier === PREMIUM_PLAN.UNLIMITED;
   const value = (featureId) => formatFeatureValue(featureId, tier, lang);
   return [
@@ -99,8 +99,8 @@ function buildHighlights(tier, tr) {
           : "Unlimited lists, friends, groups, games"
         : `${value("custom_lists")} · ${value("friends")}`,
       desc: tr
-        ? `Sohbet grubu: ${value("chat_groups")} · Oyun: ${value("games")} · CineSwipe odası: ${value("cineswipe_rooms")}.`
-        : `Group chats: ${value("chat_groups")} · Games: ${value("games")} · CineSwipe rooms: ${value("cineswipe_rooms")}.`,
+        ? `Sohbet grubu: ${value("chat_groups")} · Oyun: ${value("games")} · CineSwipe odası: ${value("cineswipe_rooms")} · Turnuvada oy kullanma.`
+        : `Group chats: ${value("chat_groups")} · Games: ${value("games")} · CineSwipe rooms: ${value("cineswipe_rooms")} · Tournament voting.`,
     },
     {
       id: "personal",
@@ -112,8 +112,8 @@ function buildHighlights(tier, tr) {
         ? `Kendi temanı oluştur · ${FONT_CATALOG_SIZE} yazı tipi`
         : `Your own themes · ${FONT_CATALOG_SIZE} fonts`,
       desc: tr
-        ? `Wrapped arşivinin tamamı ve ${value("streaming_alerts")} için platform bildirimi de dahil.`
-        : `Also includes your full Wrapped archive and streaming alerts for ${value("streaming_alerts")}.`,
+        ? `Kar efekti, ikon arka planı, pet, uygulama simgesi seçici, Wrapped arşivi (${value("wrapped_archive")}) ve ${value("streaming_alerts")} için platform bildirimi de dahil.`
+        : `Also includes snowfall, icon background, the on-screen pet, the app icon picker, your Wrapped archive (${value("wrapped_archive")}) and streaming alerts for ${value("streaming_alerts")}.`,
     },
   ];
 }
@@ -1989,69 +1989,15 @@ const styles = StyleSheet.create({
   detailedCardCopy: {
     flex: 1,
   },
-  detailedCardTagRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  detailedCategoryTag: {
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2.5,
-  },
-  detailedCategoryTagText: {
-    fontSize: 8,
-    fontWeight: "900",
-    letterSpacing: 0.6,
-  },
-  detailedPerkBadge: {
-    borderRadius: 6,
-    borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  detailedPerkBadgeText: {
-    fontSize: 8.5,
-    fontWeight: "600",
-  },
   detailedCardTitle: {
     fontSize: 14,
     fontWeight: "800",
     letterSpacing: -0.2,
   },
-  detailedCardSummary: {
-    fontSize: 10.5,
-    marginTop: 3,
-    lineHeight: 15,
-    fontWeight: "500",
-  },
   detailedCardBody: {
     borderTopWidth: 1,
     padding: 12,
     gap: 8,
-  },
-  detailedBulletItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 11,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 9,
-  },
-  detailedBulletIconBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 7,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  detailedBulletText: {
-    flex: 1,
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: "600",
   },
   sourceBanner: {
     flexDirection: "row",
@@ -2125,18 +2071,6 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     lineHeight: 13,
     fontStyle: "italic",
-  },
-  detailedCardFooter: {
-    borderTopWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  detailedCardFooterText: {
-    fontSize: 10,
-    fontWeight: "500",
   },
   secondaryActions: {
     gap: 8,

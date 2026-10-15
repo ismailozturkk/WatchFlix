@@ -1,12 +1,20 @@
 // components/wrapped/WrappedSlides.js
 //
-// Seelogd Wrapped — premium tam ekran hikâye slaytları.
-// Tasarım sistemi: zengin 3-stop gradient + yüzen ışıltı orb'ları + dev soluk
-// motif + kademeli (staggered) reveal + count-up sayaçlar. Ekran (WrappedScreen)
-// aktif slaytı index'e göre render eder; her slayt mount olduğunda animasyonlar
-// baştan oynar. Segmentli üst progress ayrı bileşendir (WrappedProgress).
+// Seelogd Wrapped — tam ekran hikâye slaytları.
+// Tasarım sistemi: zengin 3-stop gradient + SVG radyal ışımalar + ince nokta
+// dokusu + yüzen orb'lar, cam paneller (yarı saydam dolgu + üst ışık + ince
+// kenar), halka/halka-grafik göstergeler, poster yelpazeleri, kademeli (staggered)
+// reveal ve count-up sayaçlar. Ekran (WrappedScreen) aktif slaytı index'e göre
+// render eder; her slayt mount olduğunda animasyonlar baştan oynar. Segmentli üst
+// progress ayrı bileşendir (WrappedProgress).
+//
+// Her slayt şu prop'ları alır:
+//   { recap, str, theme, language, getTmdbUrl, topInset, accent, years,
+//     onSelectYear, pace, step }
+//   pace: getYearPace çıktısı ({ deltaPct, sameWindow }) — geçen yıla kıyas.
+//   step: slaytın sıra numarası (üst etiketteki "02" rozeti).
 
-import React, { memo, useEffect, useRef } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -14,24 +22,29 @@ import {
   Animated,
   Easing,
   ScrollView,
-    Dimensions,
+  Dimensions,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Circle, Defs, Pattern, RadialGradient, Rect, Stop } from "react-native-svg";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import {
+  daysInYear,
   formatNumber,
   minutesBreakdown,
   monthName,
   formatLongDate,
+  weekdayName,
 } from "../../utils/wrapped";
+import { buildYearHeat } from "../../utils/wrappedCard";
 import WrappedYearPath from "./WrappedYearPath";
+import YearHeat from "./YearHeat";
 import RollingNumber from "../animated/RollingNumber";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const PATH_W = SCREEN_W - 56;
 const YEAR_PATH_W = SCREEN_W - 24;
-const LIST_MAX_H = SCREEN_H * 0.6; // kaydırmalı slaytların (tür/dizi) iç yüksekliği
+const BODY_W = SCREEN_W - 56; // içerik genişliği (yatay padding 28)
 
 // Slayt başına ana vurgu renkleri (canlı). Screen index % length ile seçer.
 export const SLIDE_COLORS = [
@@ -59,6 +72,8 @@ const COMPANION = {
   "#5AACF0": "#28628F",
 };
 
+const WHITE = "#FFFFFF";
+
 const withAlpha = (color, alpha = 1) => {
   if (typeof color !== "string") return color;
   if (color.startsWith("#")) {
@@ -69,6 +84,8 @@ const withAlpha = (color, alpha = 1) => {
   }
   return color;
 };
+
+const fill = (template, n) => String(template || "").replace("{n}", String(n));
 
 // ─── Animasyon primitifleri ──────────────────────────────────────────────────
 
@@ -101,6 +118,29 @@ const Reveal = memo(function Reveal({ delay = 0, dy = 20, children, style }) {
     </Animated.View>
   );
 });
+
+/**
+ * 0 → 1 eased ilerleme (rAF). Halka/halka-grafik gibi SVG özniteliklerini
+ * sürmek için: Animated değeri SVG özniteliğine bağlanamaz (yerel sürücü yok),
+ * bu yüzden React durumu üzerinden sayılır — RollingNumber ile aynı teknik.
+ */
+function useEasedProgress(duration = 1300, delay = 0) {
+  const [p, setP] = useState(0);
+  useEffect(() => {
+    let frame = null;
+    const startAt = Date.now() + delay;
+    const tick = () => {
+      const k = Math.min(1, Math.max(0, (Date.now() - startAt) / duration));
+      setP(1 - Math.pow(1 - k, 3));
+      frame = k < 1 ? requestAnimationFrame(tick) : null;
+    };
+    frame = requestAnimationFrame(tick);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [duration, delay]);
+  return p;
+}
 
 /** Yumuşak yüzen ışıltı orb'u (sahte radyal: iç içe 2 katman + döngü). */
 const FloatingOrb = memo(function FloatingOrb({
@@ -146,7 +186,7 @@ const FloatingOrb = memo(function FloatingOrb({
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: withAlpha(color, 0.22),
+          backgroundColor: withAlpha(color, 0.2),
         }}
       />
       <View
@@ -157,7 +197,7 @@ const FloatingOrb = memo(function FloatingOrb({
           top: size * 0.2,
           left: size * 0.2,
           borderRadius: size,
-          backgroundColor: withAlpha(color, 0.28),
+          backgroundColor: withAlpha(color, 0.26),
         }}
       />
     </Animated.View>
@@ -205,24 +245,24 @@ export const WrappedProgress = memo(function WrappedProgress({
 });
 
 const progressStyles = StyleSheet.create({
-  row: { flexDirection: "row", gap: 5, paddingHorizontal: 14 },
+  row: { flexDirection: "row", gap: 4, paddingHorizontal: 14 },
   track: {
     flex: 1,
-    height: 3.5,
+    height: 3,
     borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.25)",
+    backgroundColor: "rgba(255,255,255,0.22)",
     overflow: "hidden",
   },
-  fill: { height: "100%", borderRadius: 2, backgroundColor: "#fff" },
+  fill: { height: "100%", borderRadius: 2, backgroundColor: WHITE },
   activeGlow: {
-    shadowColor: "#fff",
+    shadowColor: WHITE,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.7,
     shadowRadius: 4,
   },
 });
 
-// ─── Slayt çerçevesi (gradient + orb'lar + dev motif + giriş) ─────────────────
+// ─── Slayt çerçevesi (gradient + ışımalar + doku + giriş) ────────────────────
 
 export const WrappedSlideFrame = memo(function WrappedSlideFrame({
   accent = SLIDE_COLORS[0],
@@ -233,6 +273,7 @@ export const WrappedSlideFrame = memo(function WrappedSlideFrame({
   const accent2 = COMPANION[accent] || "#101018";
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(1.04)).current;
+  const gid = useMemo(() => Math.random().toString(36).slice(2, 8), []);
 
   useEffect(() => {
     Animated.parallel([
@@ -266,23 +307,55 @@ export const WrappedSlideFrame = memo(function WrappedSlideFrame({
         end={{ x: 0.9, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      {/* Üst parıltı */}
-      <LinearGradient
+
+      {/* Radyal ışımalar + nokta dokusu: tek SVG katmanı */}
+      <Svg
         pointerEvents="none"
-        colors={[withAlpha("#FFFFFF", 0.14), "transparent"]}
-        style={frameStyles.topSheen}
-      />
+        width={SCREEN_W}
+        height={SCREEN_H}
+        style={StyleSheet.absoluteFill}
+      >
+        <Defs>
+          <RadialGradient
+            id={`ga${gid}`}
+            cx={SCREEN_W * 0.92}
+            cy={SCREEN_H * 0.06}
+            r={SCREEN_W * 0.95}
+            gradientUnits="userSpaceOnUse"
+          >
+            <Stop offset="0" stopColor={WHITE} stopOpacity="0.2" />
+            <Stop offset="1" stopColor={WHITE} stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient
+            id={`gb${gid}`}
+            cx={SCREEN_W * 0.05}
+            cy={SCREEN_H * 0.86}
+            r={SCREEN_W * 0.9}
+            gradientUnits="userSpaceOnUse"
+          >
+            <Stop offset="0" stopColor={accent} stopOpacity="0.34" />
+            <Stop offset="1" stopColor={accent} stopOpacity="0" />
+          </RadialGradient>
+          <Pattern id={`gd${gid}`} width="20" height="20" patternUnits="userSpaceOnUse">
+            <Circle cx="2" cy="2" r="1.1" fill={WHITE} fillOpacity="0.1" />
+          </Pattern>
+        </Defs>
+        <Rect x="0" y="0" width={SCREEN_W} height={SCREEN_H} fill={`url(#gd${gid})`} />
+        <Rect x="0" y="0" width={SCREEN_W} height={SCREEN_H} fill={`url(#ga${gid})`} />
+        <Rect x="0" y="0" width={SCREEN_W} height={SCREEN_H} fill={`url(#gb${gid})`} />
+      </Svg>
+
       {/* Yüzen orb'lar (derinlik) */}
       <FloatingOrb
         color={accent}
-        size={260}
-        style={{ top: -60, right: -70 }}
+        size={240}
+        style={{ top: -50, right: -80 }}
         range={18}
       />
       <FloatingOrb
         color={accent2}
-        size={200}
-        style={{ bottom: 40, left: -80 }}
+        size={190}
+        style={{ bottom: 60, left: -90 }}
         delay={900}
         range={22}
       />
@@ -299,7 +372,7 @@ export const WrappedSlideFrame = memo(function WrappedSlideFrame({
           <MaterialCommunityIcons
             name={motifIcon}
             size={300}
-            color="rgba(255,255,255,0.055)"
+            color="rgba(255,255,255,0.05)"
           />
         </Animated.View>
       ) : null}
@@ -324,7 +397,6 @@ const frameStyles = StyleSheet.create({
     paddingBottom: 128,
     justifyContent: "center",
   },
-  topSheen: { position: "absolute", top: 0, left: 0, right: 0, height: 220 },
   motif: {
     position: "absolute",
     right: -56,
@@ -332,52 +404,266 @@ const frameStyles = StyleSheet.create({
   },
 });
 
-// ─── Ortak küçük parçalar ────────────────────────────────────────────────────
+// ─── Ortak parçalar ──────────────────────────────────────────────────────────
 
-const Kicker = ({ children, delay = 0 }) => (
+/** Cam panel: yarı saydam dolgu + sol-üstten ışık + ince kenar. */
+const GlassCard = ({ children, style, radius = 20, strong = false }) => (
+  <View
+    style={[
+      shared.glass,
+      {
+        borderRadius: radius,
+        backgroundColor: strong ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.1)",
+      },
+      style,
+    ]}
+  >
+    <LinearGradient
+      pointerEvents="none"
+      colors={["rgba(255,255,255,0.22)", "rgba(255,255,255,0)"]}
+      start={{ x: 0.1, y: 0 }}
+      end={{ x: 0.7, y: 0.9 }}
+      style={StyleSheet.absoluteFill}
+    />
+    {children}
+  </View>
+);
+
+/** Üst etiket: cam hap içinde sıra rozeti + başlık. */
+const Kicker = ({ children, step, delay = 0 }) => (
   <Reveal delay={delay}>
-    <View style={shared.kickerRow}>
-      <View style={shared.kickerDot} />
-      <Text style={shared.kicker} allowFontScaling={false}>
+    <View style={shared.kickerPill}>
+      {step != null ? (
+        <View style={shared.kickerStep}>
+          <Text style={shared.kickerStepText} allowFontScaling={false}>
+            {String(step).padStart(2, "0")}
+          </Text>
+        </View>
+      ) : (
+        <View style={shared.kickerDot} />
+      )}
+      <Text style={shared.kicker} allowFontScaling={false} numberOfLines={1}>
         {children}
       </Text>
     </View>
   </Reveal>
 );
 
+/** Küçük afiş: TMDB posteri, yoksa yer tutucu. */
+const Poster = ({ path, getTmdbUrl, width, height, radius = 10, style, glow }) => (
+  <View
+    style={[
+      {
+        width,
+        height,
+        borderRadius: radius,
+        backgroundColor: "rgba(255,255,255,0.12)",
+        borderWidth: 1.5,
+        borderColor: "rgba(255,255,255,0.7)",
+        overflow: "hidden",
+      },
+      glow && shared.posterGlow,
+      style,
+    ]}
+  >
+    {path && getTmdbUrl ? (
+      <Image
+        source={{ uri: getTmdbUrl(path, "poster", 300) }}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        transition={140}
+      />
+    ) : (
+      <View style={shared.posterEmpty}>
+        <MaterialCommunityIcons
+          name="movie-open-outline"
+          size={Math.min(width, height) * 0.36}
+          color="rgba(255,255,255,0.4)"
+        />
+      </View>
+    )}
+  </View>
+);
+
+/** Halka gösterge: ilerleme 0–1 (renk + iz). */
+const Ring = ({ size, stroke, progress, color = WHITE, track = "rgba(255,255,255,0.18)", children }) => {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const p = Math.max(0, Math.min(1, progress));
+  return (
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={track} strokeWidth={stroke} fill="none" />
+        {p > 0 ? (
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            stroke={color}
+            strokeWidth={stroke}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${c * p} ${c}`}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        ) : null}
+      </Svg>
+      {children}
+    </View>
+  );
+};
+
 const shared = StyleSheet.create({
-  kickerRow: {
+  glass: {
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  kickerPill: {
+    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
+    height: 32,
+    paddingLeft: 5,
+    paddingRight: 14,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
     marginBottom: 18,
   },
-  kickerDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#fff" },
+  kickerStep: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 5,
+    backgroundColor: WHITE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  kickerStepText: { color: "#000", fontSize: 10.5, fontWeight: "900", letterSpacing: 0.3 },
+  kickerDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: WHITE, marginLeft: 8 },
   kicker: {
-    color: "#fff",
-    fontSize: 15,
+    color: WHITE,
+    fontSize: 12.5,
     fontWeight: "800",
-    letterSpacing: 0.4,
+    letterSpacing: 0.9,
     textTransform: "uppercase",
+    flexShrink: 1,
   },
   bigNumber: {
-    color: "#fff",
-    fontSize: 82,
+    color: WHITE,
+    fontSize: 78,
+    lineHeight: 84,
     fontWeight: "900",
     letterSpacing: -3.5,
     includeFontPadding: false,
   },
-  bigLabel: { color: "#fff", fontSize: 23, fontWeight: "800", marginTop: 2 },
+  bigLabel: { color: WHITE, fontSize: 22, fontWeight: "800", marginTop: 4 },
   sub: {
-    color: "rgba(255,255,255,0.82)",
+    color: "rgba(255,255,255,0.84)",
     fontSize: 16,
     fontWeight: "600",
     marginTop: 16,
     lineHeight: 23,
   },
+  eyebrow: {
+    color: "rgba(255,255,255,0.62)",
+    fontSize: 10.5,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  posterGlow: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  posterEmpty: { flex: 1, alignItems: "center", justifyContent: "center" },
+});
+
+/** İki satır sayı + etiketli küçük cam kutu. */
+const StatBox = ({ icon, value, label, style }) => (
+  <GlassCard radius={18} style={[statStyles.box, style]}>
+    {icon ? (
+      <View style={statStyles.icon}>
+        <MaterialCommunityIcons name={icon} size={16} color={WHITE} />
+      </View>
+    ) : null}
+    <Text style={statStyles.value} allowFontScaling={false} numberOfLines={1}>
+      {value}
+    </Text>
+    <Text style={statStyles.label} allowFontScaling={false} numberOfLines={1}>
+      {label}
+    </Text>
+  </GlassCard>
+);
+
+const statStyles = StyleSheet.create({
+  box: { flex: 1, paddingHorizontal: 14, paddingVertical: 13 },
+  icon: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  value: { color: WHITE, fontSize: 24, fontWeight: "900", letterSpacing: -0.6 },
+  label: {
+    color: "rgba(255,255,255,0.74)",
+    fontSize: 11.5,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+});
+
+/** "+%24 geçen yıla göre" cam rozeti (kıyas yoksa hiç çizilmez). */
+const PaceBadge = ({ pace, str }) => {
+  if (!pace || pace.deltaPct == null || Math.abs(pace.deltaPct) < 1) return null;
+  const up = pace.deltaPct > 0;
+  const key = up
+    ? pace.sameWindow
+      ? "paceUpSoFar"
+      : "paceUp"
+    : pace.sameWindow
+      ? "paceDownSoFar"
+      : "paceDown";
+  return (
+    <GlassCard radius={16} style={paceStyles.badge}>
+      <View style={[paceStyles.icon, { backgroundColor: up ? "#22C55E" : "#F43F5E" }]}>
+        <Ionicons name={up ? "trending-up" : "trending-down"} size={14} color={WHITE} />
+      </View>
+      <Text style={paceStyles.text} allowFontScaling={false} numberOfLines={2}>
+        {fill(str[key], Math.abs(pace.deltaPct))}
+      </Text>
+    </GlassCard>
+  );
+};
+
+const paceStyles = StyleSheet.create({
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 14,
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+  },
+  icon: { width: 26, height: 26, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  text: { color: WHITE, fontSize: 13, fontWeight: "800", flexShrink: 1 },
 });
 
 // ─── 1) Intro ────────────────────────────────────────────────────────────────
+
+const FAN_ROT = [-12, -6, 0, 6, 12];
+const FAN_DY = [14, 4, 0, 4, 14];
 
 export const IntroSlide = memo(function IntroSlide({
   recap,
@@ -386,8 +672,34 @@ export const IntroSlide = memo(function IntroSlide({
   accent,
   years = [],
   onSelectYear,
+  getTmdbUrl,
 }) {
   const multi = years.length > 1;
+  // Tek yıllıksa alt kısımda kullanıcının kendi posterlerinden bir yelpaze.
+  const fan = useMemo(() => {
+    const shows = (recap.topShows || []).map((s) => s.showImage);
+    const movies = (recap.moviePosters || []).map((m) => m.imagePath);
+    const merged = [];
+    for (let i = 0; i < 5; i += 1) {
+      const next = i % 2 === 0 ? shows.shift() || movies.shift() : movies.shift() || shows.shift();
+      if (next) merged.push(next);
+    }
+    return merged;
+  }, [recap]);
+
+  // Hareket yönü bilgisi: pulsing ok.
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true, easing: Easing.inOut(Easing.quad) }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, useNativeDriver: true, easing: Easing.inOut(Easing.quad) }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
   return (
     <WrappedSlideFrame
       accent={accent}
@@ -395,12 +707,12 @@ export const IntroSlide = memo(function IntroSlide({
       motifIcon="star-four-points"
     >
       <Reveal delay={60}>
-        <View style={introStyles.brandRow}>
-          <MaterialCommunityIcons name="gift" size={18} color="#fff" />
+        <GlassCard radius={16} style={introStyles.brandPill}>
+          <MaterialCommunityIcons name="gift" size={16} color={WHITE} />
           <Text style={introStyles.brand} allowFontScaling={false}>
             {str.brand}
           </Text>
-        </View>
+        </GlassCard>
       </Reveal>
 
       {multi ? (
@@ -435,17 +747,46 @@ export const IntroSlide = memo(function IntroSlide({
             <Text style={shared.sub}>{str.introHello}</Text>
           </Reveal>
           <Reveal delay={520}>
-            <View style={introStyles.tapHint}>
-              <Ionicons
-                name="chevron-forward-circle"
-                size={18}
-                color="rgba(255,255,255,0.75)"
-              />
+            <Animated.View
+              style={[
+                introStyles.tapHint,
+                {
+                  opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
+                  transform: [
+                    { translateX: pulse.interpolate({ inputRange: [0, 1], outputRange: [0, 5] }) },
+                  ],
+                },
+              ]}
+            >
               <Text style={introStyles.tapText} allowFontScaling={false}>
                 {str.introTap}
               </Text>
-            </View>
+              <Ionicons name="arrow-forward" size={15} color="rgba(255,255,255,0.9)" />
+            </Animated.View>
           </Reveal>
+          {fan.length > 0 && (
+            <Reveal delay={680} dy={34} style={introStyles.fanWrap}>
+              {fan.map((path, i) => {
+                const slot = fan.length === 5 ? i : i + Math.floor((5 - fan.length) / 2);
+                return (
+                  <Poster
+                    key={`${path}-${i}`}
+                    path={path}
+                    getTmdbUrl={getTmdbUrl}
+                    width={66}
+                    height={99}
+                    radius={11}
+                    glow
+                    style={{
+                      marginLeft: i === 0 ? 0 : -14,
+                      transform: [{ translateY: FAN_DY[slot] }, { rotate: `${FAN_ROT[slot]}deg` }],
+                      zIndex: slot === 2 ? 5 : 4 - Math.abs(slot - 2),
+                    }}
+                  />
+                );
+              })}
+            </Reveal>
+          )}
         </>
       )}
     </WrappedSlideFrame>
@@ -453,49 +794,56 @@ export const IntroSlide = memo(function IntroSlide({
 });
 
 const introStyles = StyleSheet.create({
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  brandPill: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: 17,
+  },
   brand: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 19,
+    color: "rgba(255,255,255,0.95)",
+    fontSize: 15,
     fontWeight: "800",
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
   },
   pickTitle: {
-    color: "#fff",
+    color: WHITE,
     fontSize: 30,
     fontWeight: "900",
     letterSpacing: -0.8,
     marginTop: 14,
   },
   pickSubtitle: {
-    color: "rgba(255,255,255,0.65)",
+    color: "rgba(255,255,255,0.68)",
     fontSize: 13,
     fontWeight: "600",
     marginTop: 4,
   },
   year: {
-    color: "#fff",
-    fontSize: 104,
+    color: WHITE,
+    fontSize: 116,
     fontWeight: "900",
-    letterSpacing: -5,
+    letterSpacing: -6,
     includeFontPadding: false,
-    marginTop: 6,
+    marginTop: 8,
   },
-  yearRow: { gap: 9, paddingRight: 14, alignItems: "center" },
-  yearChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 999,
-    borderWidth: 1.5,
-  },
-  yearChipText: { fontSize: 15, fontWeight: "800" },
   tapHint: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    marginTop: 30,
+    gap: 8,
+    marginTop: 26,
   },
-  tapText: { color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: "700" },
+  tapText: { color: "rgba(255,255,255,0.9)", fontSize: 13.5, fontWeight: "800" },
+  fanWrap: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    marginTop: 34,
+    paddingBottom: 14,
+  },
 });
 
 // ─── 2) Toplam süre ──────────────────────────────────────────────────────────
@@ -506,15 +854,24 @@ export const TotalTimeSlide = memo(function TotalTimeSlide({
   language,
   topInset,
   accent,
+  pace,
+  step,
 }) {
   const { hours, days } = minutesBreakdown(recap.totalMinutes);
+  const remHours = hours - days * 24;
+  // Yılın kaçını izlemeyle geçirdi: saat / (yıl günü × 24). Görünür olsun diye
+  // halka en az %2 dolar; yazı gerçek yüzdeyi söyler.
+  const yearHours = daysInYear(recap.year) * 24;
+  const share = Math.min(1, hours / yearHours);
+  const pct = share >= 0.1 ? Math.round(share * 100) : Math.round(share * 1000) / 10;
+  const p = useEasedProgress(1500, 250);
   return (
     <WrappedSlideFrame
       accent={accent}
       topInset={topInset}
       motifIcon="clock-time-four"
     >
-      <Kicker>{str.totalTitle}</Kicker>
+      <Kicker step={step}>{str.totalTitle}</Kicker>
       <Reveal delay={180}>
         <RollingNumber
           value={recap.totalMinutes}
@@ -526,54 +883,81 @@ export const TotalTimeSlide = memo(function TotalTimeSlide({
       <Reveal delay={300}>
         <Text style={shared.bigLabel}>{str.minutes}</Text>
       </Reveal>
-      <Reveal delay={440}>
-        <View style={pillStyles.row}>
-          <View style={pillStyles.pill}>
-            <Text style={pillStyles.pillNum} allowFontScaling={false}>
-              {formatNumber(hours, language)}
+
+      <Reveal delay={440} style={{ marginTop: 22 }}>
+        <GlassCard radius={26} style={totalStyles.card}>
+          <Ring size={112} stroke={11} progress={Math.max(0.02, share) * p} color={WHITE}>
+            <Text style={totalStyles.ringValue} allowFontScaling={false}>
+              {language === "tr" ? `%${pct}` : `${pct}%`}
             </Text>
-            <Text style={pillStyles.pillLabel} allowFontScaling={false}>
-              {str.hours}
+            <Text style={totalStyles.ringLabel} allowFontScaling={false}>
+              {str.totalShareLabel}
             </Text>
-          </View>
-          {days > 0 && (
-            <View style={pillStyles.pill}>
-              <Text style={pillStyles.pillNum} allowFontScaling={false}>
-                {formatNumber(days, language)}
-              </Text>
-              <Text style={pillStyles.pillLabel} allowFontScaling={false}>
-                {str.days}
-              </Text>
+          </Ring>
+          <View style={totalStyles.copy}>
+            <Text style={shared.eyebrow} allowFontScaling={false} numberOfLines={2}>
+              {str.totalNonStop}
+            </Text>
+            <View style={totalStyles.chips}>
+              {days > 0 && (
+                <View style={totalStyles.chip}>
+                  <Text style={totalStyles.chipNum} allowFontScaling={false}>
+                    {formatNumber(days, language)}
+                  </Text>
+                  <Text style={totalStyles.chipLabel} allowFontScaling={false}>
+                    {str.days}
+                  </Text>
+                </View>
+              )}
+              <View style={totalStyles.chip}>
+                <Text style={totalStyles.chipNum} allowFontScaling={false}>
+                  {formatNumber(days > 0 ? remHours : hours, language)}
+                </Text>
+                <Text style={totalStyles.chipLabel} allowFontScaling={false}>
+                  {str.hours}
+                </Text>
+              </View>
             </View>
-          )}
-        </View>
+          </View>
+        </GlassCard>
+      </Reveal>
+
+      <Reveal delay={600}>
+        <PaceBadge pace={pace} str={str} />
       </Reveal>
     </WrappedSlideFrame>
   );
 });
 
-const pillStyles = StyleSheet.create({
-  row: { flexDirection: "row", gap: 12, marginTop: 22 },
-  pill: {
+const totalStyles = StyleSheet.create({
+  card: { flexDirection: "row", alignItems: "center", gap: 18, padding: 16 },
+  ringValue: { color: WHITE, fontSize: 24, fontWeight: "900", letterSpacing: -0.8 },
+  ringLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    marginTop: 1,
+  },
+  copy: { flex: 1, minWidth: 0 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  chip: {
     flexDirection: "row",
     alignItems: "baseline",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.22)",
   },
-  pillNum: { color: "#fff", fontSize: 22, fontWeight: "900" },
-  pillLabel: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 13,
-    fontWeight: "700",
-  },
+  chipNum: { color: WHITE, fontSize: 22, fontWeight: "900" },
+  chipLabel: { color: "rgba(255,255,255,0.8)", fontSize: 12, fontWeight: "700" },
 });
 
 // ─── 3) Filmler ──────────────────────────────────────────────────────────────
+
+const MOVIE_FAN_ROT = [-9, -4.5, 0, 4.5, 9];
+const MOVIE_FAN_DY = [12, 4, 0, 4, 12];
 
 export const MoviesSlide = memo(function MoviesSlide({
   recap,
@@ -582,19 +966,23 @@ export const MoviesSlide = memo(function MoviesSlide({
   getTmdbUrl,
   topInset,
   accent,
+  step,
 }) {
   const { hours } = minutesBreakdown(recap.movieMinutes);
-  const posters = (recap.moviePosters || []).slice(0, 6);
+  const posters = (recap.moviePosters || []).slice(0, 5);
+  const longest = (recap.moviePosters || [])[0];
+  const longestH = longest ? Math.floor(longest.minutes / 60) : 0;
+  const longestM = longest ? longest.minutes % 60 : 0;
+  const posterW = Math.min(76, (BODY_W + 4 * 18) / 5);
   return (
     <WrappedSlideFrame
       accent={accent}
       topInset={topInset}
       motifIcon="movie-open"
     >
-      <Kicker>{str.moviesTitle}</Kicker>
+      <Kicker step={step}>{str.moviesTitle}</Kicker>
       <Reveal delay={150}>
         <View style={rowStyles.headlineCompact}>
-          <MaterialCommunityIcons name="movie-open" size={28} color="#fff" />
           <RollingNumber
             value={recap.totalMovies}
             format={(n) => formatNumber(n, language)}
@@ -612,47 +1000,81 @@ export const MoviesSlide = memo(function MoviesSlide({
       </Reveal>
 
       {posters.length > 0 && (
-        <Reveal delay={400} style={{ marginTop: 22 }}>
-          <View style={gridStyles.grid}>
-            {posters.map((m, i) => (
-              <View key={`${m.id}-${i}`} style={gridStyles.cell}>
-                {m.imagePath ? (
-                  <Image
-                    source={{
-                      uri: getTmdbUrl
-                        ? getTmdbUrl(m.imagePath, "poster", 200)
-                        : null,
-                    }}
-                    style={gridStyles.poster}
-                    contentFit="cover"
-                    transition={140}
-                  />
-                ) : (
-                  <View style={[gridStyles.poster, gridStyles.posterPh]} />
-                )}
-              </View>
-            ))}
-          </View>
+        <Reveal delay={400} dy={30} style={movieStyles.fan}>
+          {posters.map((m, i) => {
+            const slot = posters.length === 5 ? i : i + Math.floor((5 - posters.length) / 2);
+            const center = slot === 2;
+            return (
+              <Poster
+                key={`${m.id}-${i}`}
+                path={m.imagePath}
+                getTmdbUrl={getTmdbUrl}
+                width={center ? posterW + 12 : posterW}
+                height={Math.round((center ? posterW + 12 : posterW) * 1.5)}
+                radius={12}
+                glow
+                style={{
+                  marginLeft: i === 0 ? 0 : -18,
+                  transform: [{ translateY: MOVIE_FAN_DY[slot] }, { rotate: `${MOVIE_FAN_ROT[slot]}deg` }],
+                  zIndex: center ? 5 : 4 - Math.abs(slot - 2),
+                }}
+              />
+            );
+          })}
+        </Reveal>
+      )}
+
+      {longest && (
+        <Reveal delay={560} style={{ marginTop: 20 }}>
+          <GlassCard radius={18} style={movieStyles.longest}>
+            <View style={movieStyles.longestIcon}>
+              <MaterialCommunityIcons name="timer-sand" size={18} color={WHITE} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={shared.eyebrow} allowFontScaling={false}>
+                {str.moviesLongest}
+              </Text>
+              <Text style={movieStyles.longestName} allowFontScaling={false} numberOfLines={1}>
+                {longest.name}
+              </Text>
+            </View>
+            <Text style={movieStyles.longestTime} allowFontScaling={false}>
+              {longestH}
+              {str.hoursShort} {String(longestM).padStart(2, "0")}
+              {str.minutesShort}
+            </Text>
+          </GlassCard>
         </Reveal>
       )}
     </WrappedSlideFrame>
   );
 });
 
-const GRID_GAP = 10;
-const GRID_POSTER_W = (PATH_W - GRID_GAP * 2) / 3;
-const gridStyles = StyleSheet.create({
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: GRID_GAP },
-  cell: { width: GRID_POSTER_W },
-  poster: {
-    width: "100%",
-    aspectRatio: 2 / 3,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.8)",
+const movieStyles = StyleSheet.create({
+  fan: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    marginTop: 26,
+    paddingBottom: 10,
   },
-  posterPh: { borderColor: "rgba(255,255,255,0.2)" },
+  longest: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  longestIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  longestName: { color: WHITE, fontSize: 16, fontWeight: "900", marginTop: 2 },
+  longestTime: { color: WHITE, fontSize: 15, fontWeight: "900" },
 });
 
 // ─── 4) Diziler ──────────────────────────────────────────────────────────────
@@ -661,78 +1083,118 @@ export const TvSlide = memo(function TvSlide({
   recap,
   str,
   language,
+  getTmdbUrl,
   topInset,
   accent,
+  step,
 }) {
   const { hours } = minutesBreakdown(recap.tvMinutes);
+  const lead = (recap.topShows || [])[0];
   return (
     <WrappedSlideFrame
       accent={accent}
       topInset={topInset}
       motifIcon="television-classic"
     >
-      <Kicker>{str.tvTitle}</Kicker>
+      <Kicker step={step}>{str.tvTitle}</Kicker>
       <Reveal delay={170}>
-        <View style={rowStyles.headline}>
-          <MaterialCommunityIcons
-            name="television-classic"
-            size={32}
-            color="#fff"
-          />
-          <RollingNumber
-            value={recap.totalEpisodes}
-            format={(n) => formatNumber(n, language)}
-            style={shared.bigNumber}
-          />
-        </View>
+        <RollingNumber
+          value={recap.totalEpisodes}
+          format={(n) => formatNumber(n, language)}
+          style={shared.bigNumber}
+        />
       </Reveal>
       <Reveal delay={290}>
         <Text style={shared.bigLabel}>{str.tvEpisodes}</Text>
       </Reveal>
-      <Reveal delay={420}>
-        <View style={pillStyles.row}>
-          <View style={pillStyles.pill}>
-            <Text style={pillStyles.pillNum} allowFontScaling={false}>
-              {formatNumber(recap.totalShows, language)}
-            </Text>
-            <Text style={pillStyles.pillLabel} allowFontScaling={false}>
-              {str.tvShows}
-            </Text>
-          </View>
-          <View style={pillStyles.pill}>
-            <Text style={pillStyles.pillNum} allowFontScaling={false}>
-              ~{formatNumber(hours, language)}
-            </Text>
-            <Text style={pillStyles.pillLabel} allowFontScaling={false}>
-              {str.hours}
-            </Text>
-          </View>
+      <Reveal delay={400} style={{ marginTop: 22 }}>
+        <View style={tvStyles.boxes}>
+          <StatBox
+            icon="television-classic"
+            value={formatNumber(recap.totalShows, language)}
+            label={str.tvShows}
+          />
+          <StatBox
+            icon="clock-outline"
+            value={`~${formatNumber(hours, language)}`}
+            label={str.hours}
+          />
         </View>
       </Reveal>
+
+      {lead && (
+        <Reveal delay={560} style={{ marginTop: 14 }}>
+          <GlassCard radius={22} strong style={tvStyles.lead}>
+            <Poster
+              path={lead.showImage}
+              getTmdbUrl={getTmdbUrl}
+              width={64}
+              height={96}
+              radius={12}
+              glow
+            />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={shared.eyebrow} allowFontScaling={false}>
+                {str.tvTopShow}
+              </Text>
+              <Text style={tvStyles.leadName} allowFontScaling={false} numberOfLines={2}>
+                {lead.showName}
+              </Text>
+              <View style={tvStyles.leadBadge}>
+                <MaterialCommunityIcons name="play-circle" size={13} color="#000" />
+                <Text style={tvStyles.leadBadgeText} allowFontScaling={false}>
+                  {formatNumber(lead.episodeCount, language)} {str.episodesShort}
+                </Text>
+              </View>
+            </View>
+          </GlassCard>
+        </Reveal>
+      )}
     </WrappedSlideFrame>
   );
 });
 
+const tvStyles = StyleSheet.create({
+  boxes: { flexDirection: "row", gap: 12 },
+  lead: { flexDirection: "row", alignItems: "center", gap: 14, padding: 12 },
+  leadName: { color: WHITE, fontSize: 19, fontWeight: "900", marginTop: 3, letterSpacing: -0.3 },
+  leadBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    backgroundColor: WHITE,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    marginTop: 9,
+  },
+  leadBadgeText: { color: "#000", fontSize: 11.5, fontWeight: "800" },
+});
+
 const rowStyles = StyleSheet.create({
-  headline: { flexDirection: "row", alignItems: "center", gap: 14 },
-  headlineCompact: { flexDirection: "row", alignItems: "center", gap: 10 },
+  headlineCompact: { flexDirection: "row", alignItems: "baseline", gap: 10 },
   countCompact: {
-    color: "#fff",
-    fontSize: 52,
+    color: WHITE,
+    fontSize: 64,
+    lineHeight: 70,
     fontWeight: "900",
-    letterSpacing: -2,
+    letterSpacing: -2.5,
     includeFontPadding: false,
   },
-  countLabel: { color: "#fff", fontSize: 17, fontWeight: "800" },
+  countLabel: { color: WHITE, fontSize: 19, fontWeight: "800" },
   subCompact: {
-    color: "rgba(255,255,255,0.8)",
+    color: "rgba(255,255,255,0.82)",
     fontSize: 14,
     fontWeight: "600",
-    marginTop: 10,
+    marginTop: 6,
   },
 });
 
 // ─── 5) Türler ───────────────────────────────────────────────────────────────
+
+// Halka-grafiğin dilim opaklıkları: birinci beyaz, sonrakiler giderek soluk.
+const DONUT_ALPHAS = [1, 0.78, 0.58, 0.4, 0.26];
 
 export const TopGenresSlide = memo(function TopGenresSlide({
   recap,
@@ -740,91 +1202,157 @@ export const TopGenresSlide = memo(function TopGenresSlide({
   language,
   topInset,
   accent,
+  step,
 }) {
   const genres = recap.allGenres || [];
+  const total = genres.reduce((sum, g) => sum + g.count, 0) || 1;
   const max = genres[0]?.count || 1;
+  const topShare = genres[0] ? Math.round((genres[0].count / total) * 100) : 0;
+  const p = useEasedProgress(1300, 200);
+
+  const SIZE = 132;
+  const STROKE = 20;
+  const r = (SIZE - STROKE) / 2;
+  const c = 2 * Math.PI * r;
+  let cursor = 0;
+  const slices = genres.slice(0, 5).map((g, i) => {
+    const share = g.count / total;
+    const slice = { i, start: cursor, share };
+    cursor += share;
+    return slice;
+  });
+
   return (
     <WrappedSlideFrame
       accent={accent}
       topInset={topInset}
       motifIcon="drama-masks"
     >
-      <Kicker>{str.genresTitle}</Kicker>
+      <Kicker step={step}>{str.genresTitle}</Kicker>
       {genres.length === 0 ? (
         <Text style={shared.sub}>{str.genresEmpty}</Text>
       ) : (
-        <ScrollView
-          style={{ maxHeight: LIST_MAX_H, marginTop: 4 }}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 10 }}
-        >
-          {genres.map((g, i) => (
-            <Reveal
-              key={`${g.genre}-${i}`}
-              delay={120 + Math.min(i, 8) * 70}
-              dy={14}
-            >
-              <View style={genreStyles.item}>
-                <View style={genreStyles.headerRow}>
-                  <Text
-                    style={[genreStyles.rank, i === 0 && genreStyles.rankTop]}
-                    allowFontScaling={false}
-                  >
-                    {i + 1}
+        <>
+          <Reveal delay={140}>
+            <GlassCard radius={24} strong style={genreStyles.hero}>
+              <View style={{ width: SIZE, height: SIZE }}>
+                <Svg width={SIZE} height={SIZE}>
+                  <Circle cx={SIZE / 2} cy={SIZE / 2} r={r} stroke="rgba(255,255,255,0.12)" strokeWidth={STROKE} fill="none" />
+                  {slices.map((s) => {
+                    const len = Math.max(0, c * s.share * p - 2);
+                    return (
+                      <Circle
+                        key={s.i}
+                        cx={SIZE / 2}
+                        cy={SIZE / 2}
+                        r={r}
+                        stroke={WHITE}
+                        strokeOpacity={DONUT_ALPHAS[s.i]}
+                        strokeWidth={STROKE}
+                        fill="none"
+                        strokeDasharray={`${len} ${c}`}
+                        strokeDashoffset={-c * s.start * p}
+                        transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+                      />
+                    );
+                  })}
+                </Svg>
+                <View style={genreStyles.donutCenter} pointerEvents="none">
+                  <Text style={genreStyles.donutValue} allowFontScaling={false}>
+                    {language === "tr" ? `%${topShare}` : `${topShare}%`}
                   </Text>
-                  <Text
-                    style={[genreStyles.name, i === 0 && genreStyles.nameTop]}
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                  >
-                    {g.genre}
-                  </Text>
-                  <Text style={genreStyles.count} allowFontScaling={false}>
-                    {formatNumber(g.count, language)}
-                  </Text>
-                </View>
-                <View style={genreStyles.barTrack}>
-                  <View
-                    style={[
-                      genreStyles.barFill,
-                      {
-                        width: `${Math.max(10, (g.count / max) * 100)}%`,
-                        backgroundColor:
-                          i === 0 ? "#fff" : "rgba(255,255,255,0.5)",
-                      },
-                    ]}
-                  />
                 </View>
               </View>
-            </Reveal>
-          ))}
-        </ScrollView>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={shared.eyebrow} allowFontScaling={false}>
+                  {str.genresTopLabel}
+                </Text>
+                <Text
+                  style={genreStyles.heroName}
+                  allowFontScaling={false}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
+                  {genres[0].genre}
+                </Text>
+                <Text style={genreStyles.heroShare} allowFontScaling={false} numberOfLines={2}>
+                  {fill(str.genresTopShare, topShare)}
+                </Text>
+              </View>
+            </GlassCard>
+          </Reveal>
+
+          <ScrollView
+            style={{ maxHeight: SCREEN_H * 0.36, marginTop: 16 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 10 }}
+          >
+            {genres.map((g, i) => (
+              <Reveal
+                key={`${g.genre}-${i}`}
+                delay={260 + Math.min(i, 8) * 60}
+                dy={14}
+              >
+                <View style={genreStyles.item}>
+                  <View style={genreStyles.headerRow}>
+                    <View style={[genreStyles.dot, { opacity: DONUT_ALPHAS[Math.min(i, 4)] }]} />
+                    <Text
+                      style={[genreStyles.name, i === 0 && genreStyles.nameTop]}
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                    >
+                      {g.genre}
+                    </Text>
+                    <Text style={genreStyles.count} allowFontScaling={false}>
+                      {formatNumber(g.count, language)}
+                    </Text>
+                  </View>
+                  <View style={genreStyles.barTrack}>
+                    <View
+                      style={[
+                        genreStyles.barFill,
+                        {
+                          width: `${Math.max(8, (g.count / max) * 100)}%`,
+                          backgroundColor: i === 0 ? WHITE : "rgba(255,255,255,0.55)",
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              </Reveal>
+            ))}
+          </ScrollView>
+        </>
       )}
     </WrappedSlideFrame>
   );
 });
 
 const genreStyles = StyleSheet.create({
-  item: { marginBottom: 17 },
-  headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 7 },
-  rank: {
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 14,
-    fontWeight: "900",
-    width: 24,
+  hero: { flexDirection: "row", alignItems: "center", gap: 16, padding: 16 },
+  donutCenter: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  rankTop: { color: "#fff", fontSize: 16 },
-  name: { color: "#fff", fontSize: 18, fontWeight: "800", flex: 1 },
-  nameTop: { fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
-  count: { color: "rgba(255,255,255,0.75)", fontSize: 14, fontWeight: "800" },
+  donutValue: { color: WHITE, fontSize: 24, fontWeight: "900", letterSpacing: -0.8 },
+  heroName: { color: WHITE, fontSize: 30, fontWeight: "900", letterSpacing: -1, marginTop: 4, lineHeight: 34 },
+  heroShare: { color: "rgba(255,255,255,0.78)", fontSize: 13, fontWeight: "700", marginTop: 6 },
+  item: { marginBottom: 14 },
+  headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 7, gap: 9 },
+  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: WHITE },
+  name: { color: WHITE, fontSize: 16, fontWeight: "800", flex: 1 },
+  nameTop: { fontSize: 18, fontWeight: "900" },
+  count: { color: "rgba(255,255,255,0.78)", fontSize: 14, fontWeight: "800" },
   barTrack: {
-    height: 9,
-    borderRadius: 5,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: "rgba(255,255,255,0.16)",
     overflow: "hidden",
-    marginLeft: 24,
+    marginLeft: 18,
   },
-  barFill: { height: "100%", borderRadius: 5 },
+  barFill: { height: "100%", borderRadius: 4 },
 });
 
 // ─── 6) En çok izlenen diziler ───────────────────────────────────────────────
@@ -836,62 +1364,89 @@ export const TopShowsSlide = memo(function TopShowsSlide({
   getTmdbUrl,
   topInset,
   accent,
+  step,
 }) {
   const shows = recap.allShows || [];
+  const lead = shows[0];
+  const rest = shows.slice(1);
+  const max = lead?.episodeCount || 1;
   return (
     <WrappedSlideFrame accent={accent} topInset={topInset} motifIcon="trophy">
-      <Kicker>{str.topShowsTitle}</Kicker>
+      <Kicker step={step}>{str.topShowsTitle}</Kicker>
       <ScrollView
-        style={{ maxHeight: LIST_MAX_H, marginTop: 4 }}
+        style={{ maxHeight: SCREEN_H * 0.62 }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 10 }}
       >
-        {shows.map((s, i) => (
-          <Reveal
-            key={`${s.showId}-${i}`}
-            delay={120 + Math.min(i, 8) * 60}
-            dy={14}
-          >
-            <View style={[showStyles.row, i === 0 && showStyles.rowTop]}>
-              <Text
-                style={[showStyles.rank, i === 0 && showStyles.rankTop]}
-                allowFontScaling={false}
-              >
-                {i + 1}
-              </Text>
-              {s.showImage ? (
-                <Image
-                  source={{
-                    uri: getTmdbUrl
-                      ? getTmdbUrl(s.showImage, "poster", 200)
-                      : null,
-                  }}
-                  style={[showStyles.poster, i === 0 && showStyles.posterTop]}
-                  contentFit="cover"
-                  transition={140}
-                />
-              ) : (
-                <View style={[showStyles.poster, showStyles.posterPh]} />
-              )}
-              <View style={showStyles.meta}>
-                <Text
-                  style={[showStyles.name, i === 0 && showStyles.nameTop]}
-                  allowFontScaling={false}
-                  numberOfLines={2}
-                >
-                  {s.showName}
+        {lead && (
+          <Reveal delay={120} dy={16}>
+            <GlassCard radius={24} strong style={showStyles.lead}>
+              <View style={showStyles.crown}>
+                <MaterialCommunityIcons name="crown" size={13} color="#000" />
+                <Text style={showStyles.crownText} allowFontScaling={false}>
+                  {str.showsLeadLabel}
                 </Text>
-                <View style={showStyles.badge}>
-                  <MaterialCommunityIcons
-                    name="play-circle"
-                    size={12}
-                    color="#000"
-                  />
-                  <Text style={showStyles.badgeText} allowFontScaling={false}>
-                    {formatNumber(s.episodeCount, language)} {str.episodesShort}
+              </View>
+              <View style={showStyles.leadRow}>
+                <Poster
+                  path={lead.showImage}
+                  getTmdbUrl={getTmdbUrl}
+                  width={84}
+                  height={126}
+                  radius={14}
+                  glow
+                  style={{ borderColor: WHITE, borderWidth: 2 }}
+                />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={showStyles.leadName} allowFontScaling={false} numberOfLines={3}>
+                    {lead.showName}
                   </Text>
+                  <View style={showStyles.badge}>
+                    <MaterialCommunityIcons name="play-circle" size={13} color="#000" />
+                    <Text style={showStyles.badgeText} allowFontScaling={false}>
+                      {formatNumber(lead.episodeCount, language)} {str.episodesShort}
+                    </Text>
+                  </View>
                 </View>
               </View>
+            </GlassCard>
+          </Reveal>
+        )}
+
+        {rest.map((s, i) => (
+          <Reveal
+            key={`${s.showId}-${i}`}
+            delay={240 + Math.min(i, 8) * 60}
+            dy={14}
+          >
+            <View style={showStyles.row}>
+              <Text style={showStyles.rank} allowFontScaling={false}>
+                {i + 2}
+              </Text>
+              <Poster
+                path={s.showImage}
+                getTmdbUrl={getTmdbUrl}
+                width={42}
+                height={63}
+                radius={8}
+                style={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" }}
+              />
+              <View style={showStyles.meta}>
+                <Text style={showStyles.name} allowFontScaling={false} numberOfLines={1}>
+                  {s.showName}
+                </Text>
+                <View style={showStyles.barTrack}>
+                  <View
+                    style={[
+                      showStyles.barFill,
+                      { width: `${Math.max(8, (s.episodeCount / max) * 100)}%` },
+                    ]}
+                  />
+                </View>
+              </View>
+              <Text style={showStyles.count} allowFontScaling={false}>
+                {formatNumber(s.episodeCount, language)}
+              </Text>
             </View>
           </Reveal>
         ))}
@@ -901,44 +1456,51 @@ export const TopShowsSlide = memo(function TopShowsSlide({
 });
 
 const showStyles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
-  rowTop: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderRadius: 16,
-    padding: 10,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+  lead: { padding: 14, marginBottom: 16 },
+  crown: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    backgroundColor: WHITE,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginBottom: 12,
   },
-  rank: {
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 18,
-    fontWeight: "900",
-    width: 28,
-  },
-  rankTop: { color: "#fff", fontSize: 24 },
-  poster: {
-    width: 48,
-    height: 72,
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.1)",
-  },
-  posterTop: { width: 60, height: 90, borderWidth: 2, borderColor: "#fff" },
-  posterPh: { borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
-  meta: { flex: 1, marginLeft: 13 },
-  name: { color: "#fff", fontSize: 16, fontWeight: "800", marginBottom: 7 },
-  nameTop: { fontSize: 19, fontWeight: "900" },
+  crownText: { color: "#000", fontSize: 10.5, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase" },
+  leadRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  leadName: { color: WHITE, fontSize: 22, fontWeight: "900", letterSpacing: -0.5, lineHeight: 26 },
   badge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
     alignSelf: "flex-start",
-    backgroundColor: "#fff",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 999,
+    marginTop: 10,
   },
-  badgeText: { color: "#000", fontSize: 11, fontWeight: "800" },
+  badgeText: { color: WHITE, fontSize: 11.5, fontWeight: "800" },
+  row: { flexDirection: "row", alignItems: "center", marginBottom: 12, gap: 12 },
+  rank: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 17,
+    fontWeight: "900",
+    width: 20,
+    textAlign: "center",
+  },
+  meta: { flex: 1, minWidth: 0 },
+  name: { color: WHITE, fontSize: 15, fontWeight: "800", marginBottom: 8 },
+  barTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    overflow: "hidden",
+  },
+  barFill: { height: "100%", borderRadius: 3, backgroundColor: "rgba(255,255,255,0.8)" },
+  count: { color: WHITE, fontSize: 15, fontWeight: "900", minWidth: 34, textAlign: "right" },
 });
 
 // ─── 7) En yoğun zamanlar ────────────────────────────────────────────────────
@@ -949,83 +1511,94 @@ export const BusiestSlide = memo(function BusiestSlide({
   language,
   topInset,
   accent,
+  step,
 }) {
   const monthly = recap.monthly || [];
   const max = Math.max(1, ...monthly);
+  const peak = recap.busiestMonth ? recap.busiestMonth.month : -1;
+  const grow = useEasedProgress(1100, 300);
   return (
     <WrappedSlideFrame
       accent={accent}
       topInset={topInset}
       motifIcon="calendar-month"
     >
-      <Kicker>{str.busiestTitle}</Kicker>
+      <Kicker step={step}>{str.busiestTitle}</Kicker>
 
       {recap.busiestMonth && (
-        <Reveal delay={170}>
-          <View style={busyStyles.block}>
-            <Text style={busyStyles.label} allowFontScaling={false}>
-              {str.busiestMonth}
-            </Text>
-            <Text style={busyStyles.value} allowFontScaling={false}>
-              {monthName(recap.busiestMonth.month, language)}
-            </Text>
-          </View>
+        <Reveal delay={150}>
+          <Text style={busyStyles.label} allowFontScaling={false}>
+            {str.busiestMonth}
+          </Text>
+          <Text style={busyStyles.value} allowFontScaling={false}>
+            {monthName(recap.busiestMonth.month, language)}
+          </Text>
         </Reveal>
       )}
 
-      <Reveal delay={320}>
-        <View style={busyStyles.chart}>
-          {monthly.map((min, i) => {
-            const h = Math.max(5, (min / max) * 92);
-            const isPeak = recap.busiestMonth && i === recap.busiestMonth.month;
-            return (
-              <View key={i} style={busyStyles.barCol}>
-                <Text
-                  style={[
-                    busyStyles.barValue,
-                    isPeak && busyStyles.barValuePeak,
-                  ]}
-                  allowFontScaling={false}
-                  numberOfLines={1}
-                >
-                  {min > 0 ? formatNumber(min, language) : ""}
-                </Text>
-                <View
-                  style={[
-                    busyStyles.bar,
-                    {
-                      height: h,
-                      backgroundColor: isPeak
-                        ? "#fff"
-                        : "rgba(255,255,255,0.38)",
-                    },
-                  ]}
-                />
-                <Text style={busyStyles.barLabel} allowFontScaling={false}>
-                  {monthName(i, language).slice(0, 1)}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-        <Text style={busyStyles.chartUnit} allowFontScaling={false}>
-          {str.perMonthMinutes}
-        </Text>
+      <Reveal delay={300} style={{ marginTop: 18 }}>
+        <GlassCard radius={22} style={busyStyles.chartCard}>
+          <View style={busyStyles.chart}>
+            {monthly.map((min, i) => {
+              const h = Math.max(6, (min / max) * 96) * grow;
+              const isPeak = i === peak;
+              return (
+                <View key={i} style={busyStyles.barCol}>
+                  <Text
+                    style={[busyStyles.barValue, isPeak && busyStyles.barValuePeak]}
+                    allowFontScaling={false}
+                  >
+                    {isPeak ? formatNumber(min, language) : ""}
+                  </Text>
+                  <View
+                    style={[
+                      busyStyles.bar,
+                      {
+                        height: Math.max(4, h),
+                        backgroundColor: isPeak ? WHITE : "rgba(255,255,255,0.36)",
+                      },
+                      isPeak && busyStyles.barPeak,
+                    ]}
+                  />
+                  <Text
+                    style={[busyStyles.barLabel, isPeak && { color: WHITE }]}
+                    allowFontScaling={false}
+                  >
+                    {monthName(i, language).slice(0, 1).toUpperCase()}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+          <Text style={busyStyles.chartUnit} allowFontScaling={false}>
+            {str.perMonthMinutes}
+          </Text>
+        </GlassCard>
       </Reveal>
 
       {recap.busiestDay && (
-        <Reveal delay={460}>
-          <View style={busyStyles.block}>
-            <Text style={busyStyles.label} allowFontScaling={false}>
-              {str.busiestDay}
-            </Text>
-            <Text style={busyStyles.value} allowFontScaling={false}>
-              {formatLongDate(recap.busiestDay.date, language)}
-            </Text>
-            <Text style={busyStyles.sub} allowFontScaling={false}>
-              {formatNumber(recap.busiestDay.count, language)} {str.itemsShort}
-            </Text>
-          </View>
+        <Reveal delay={480} style={{ marginTop: 12 }}>
+          <GlassCard radius={20} strong style={busyStyles.dayCard}>
+            <View style={busyStyles.dayIcon}>
+              <MaterialCommunityIcons name="fire" size={20} color={WHITE} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={busyStyles.label} allowFontScaling={false}>
+                {str.busiestDay}
+              </Text>
+              <Text style={busyStyles.dayValue} allowFontScaling={false} numberOfLines={1}>
+                {formatLongDate(recap.busiestDay.date, language)}
+              </Text>
+            </View>
+            <View style={busyStyles.dayCount}>
+              <Text style={busyStyles.dayCountNum} allowFontScaling={false}>
+                {formatNumber(recap.busiestDay.count, language)}
+              </Text>
+              <Text style={busyStyles.dayCountLabel} allowFontScaling={false}>
+                {str.itemsShort}
+              </Text>
+            </View>
+          </GlassCard>
         </Reveal>
       )}
     </WrappedSlideFrame>
@@ -1033,57 +1606,73 @@ export const BusiestSlide = memo(function BusiestSlide({
 });
 
 const busyStyles = StyleSheet.create({
-  block: { marginTop: 18 },
   label: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 12,
-    fontWeight: "800",
+    color: "rgba(255,255,255,0.64)",
+    fontSize: 11,
+    fontWeight: "900",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.9,
   },
   value: {
-    color: "#fff",
-    fontSize: 30,
+    color: WHITE,
+    fontSize: 40,
     fontWeight: "900",
     marginTop: 3,
-    letterSpacing: -0.6,
+    letterSpacing: -1.2,
   },
-  sub: {
-    color: "rgba(255,255,255,0.72)",
-    fontSize: 13,
-    fontWeight: "700",
-    marginTop: 3,
-  },
+  chartCard: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 12 },
   chart: {
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    height: 142,
-    marginTop: 22,
+    height: 150,
   },
   barCol: { flex: 1, alignItems: "center", justifyContent: "flex-end" },
-  bar: { width: 9, borderRadius: 5 },
-  barValue: {
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 7.5,
-    fontWeight: "800",
-    marginBottom: 4,
+  bar: { width: 12, borderRadius: 6 },
+  barPeak: {
+    shadowColor: WHITE,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
   },
-  barValuePeak: { color: "#fff", fontSize: 8.5 },
+  // Sütun ~27px; değer kutusu ondan geniş ve ortalı (taşan kısım iki yana eşit).
+  barValue: {
+    width: 56,
+    textAlign: "center",
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 9,
+    fontWeight: "800",
+    marginBottom: 5,
+    minHeight: 12,
+  },
+  barValuePeak: { color: WHITE, fontSize: 11 },
   barLabel: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 8,
-    fontWeight: "700",
-    marginTop: 6,
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 7,
   },
   chartUnit: {
-    color: "rgba(255,255,255,0.5)",
+    color: "rgba(255,255,255,0.55)",
     fontSize: 10,
     fontWeight: "700",
     textAlign: "center",
-    marginTop: 8,
+    marginTop: 10,
     letterSpacing: 0.3,
   },
+  dayCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 13 },
+  dayIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dayValue: { color: WHITE, fontSize: 18, fontWeight: "900", marginTop: 2, letterSpacing: -0.3 },
+  dayCount: { alignItems: "flex-end" },
+  dayCountNum: { color: WHITE, fontSize: 24, fontWeight: "900", letterSpacing: -0.6 },
+  dayCountLabel: { color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "700" },
 });
 
 // ─── 7b) En yoğun ayın istatistikleri ───────────────────────────────────────
@@ -1094,18 +1683,24 @@ export const BusiestMonthSlide = memo(function BusiestMonthSlide({
   language,
   topInset,
   accent,
+  step,
 }) {
   const bm = recap.busiestMonth;
   const { hours } = minutesBreakdown(bm?.minutes || 0);
+  // O ayın diğer aylara göre payı: yıl toplamından ne kadarı o ay geçti.
+  const sharePct = recap.totalMinutes
+    ? Math.round(((bm?.minutes || 0) / recap.totalMinutes) * 100)
+    : 0;
+  const p = useEasedProgress(1200, 250);
   return (
     <WrappedSlideFrame
       accent={accent}
       topInset={topInset}
       motifIcon="calendar-star"
     >
-      <Kicker>{str.busiestMonthTitle}</Kicker>
+      <Kicker step={step}>{str.busiestMonthTitle}</Kicker>
       <Reveal delay={150}>
-        <Text style={bmStyles.monthName} allowFontScaling={false}>
+        <Text style={bmStyles.monthName} allowFontScaling={false} numberOfLines={1} adjustsFontSizeToFit>
           {bm ? monthName(bm.month, language) : "-"}
         </Text>
       </Reveal>
@@ -1122,34 +1717,27 @@ export const BusiestMonthSlide = memo(function BusiestMonthSlide({
         </View>
       </Reveal>
       <Reveal delay={380}>
-        <Text style={rowStyles.subCompact} allowFontScaling={false}>
-          ~{formatNumber(hours, language)} {str.hours}
-        </Text>
+        <View style={bmStyles.shareRow}>
+          <View style={bmStyles.shareTrack}>
+            <View style={[bmStyles.shareFill, { width: `${Math.max(3, sharePct) * p}%` }]} />
+          </View>
+          <Text style={bmStyles.shareText} allowFontScaling={false}>
+            ~{formatNumber(hours, language)} {str.hours} · {language === "tr" ? `%${sharePct}` : `${sharePct}%`}
+          </Text>
+        </View>
       </Reveal>
       <Reveal delay={520}>
         <View style={bmStyles.pillRow}>
-          <View style={bmStyles.infoPill}>
-            <MaterialCommunityIcons name="movie-open" size={18} color="#fff" />
-            <Text style={bmStyles.infoNum} allowFontScaling={false}>
-              {formatNumber(bm?.movieCount || 0, language)}
-            </Text>
-            <Text style={bmStyles.infoLabel} allowFontScaling={false}>
-              {str.moviesShort}
-            </Text>
-          </View>
-          <View style={bmStyles.infoPill}>
-            <MaterialCommunityIcons
-              name="television-classic"
-              size={18}
-              color="#fff"
-            />
-            <Text style={bmStyles.infoNum} allowFontScaling={false}>
-              {formatNumber(bm?.episodeCount || 0, language)}
-            </Text>
-            <Text style={bmStyles.infoLabel} allowFontScaling={false}>
-              {str.tvEpisodes}
-            </Text>
-          </View>
+          <StatBox
+            icon="movie-open"
+            value={formatNumber(bm?.movieCount || 0, language)}
+            label={str.moviesShort}
+          />
+          <StatBox
+            icon="television-classic"
+            value={formatNumber(bm?.episodeCount || 0, language)}
+            label={str.tvEpisodes}
+          />
         </View>
       </Reveal>
     </WrappedSlideFrame>
@@ -1158,76 +1746,309 @@ export const BusiestMonthSlide = memo(function BusiestMonthSlide({
 
 const bmStyles = StyleSheet.create({
   monthName: {
-    color: "#fff",
-    fontSize: 46,
+    color: WHITE,
+    fontSize: 54,
     fontWeight: "900",
-    letterSpacing: -1.5,
-    marginBottom: 10,
+    letterSpacing: -2,
+    marginBottom: 6,
   },
-  pillRow: { flexDirection: "row", gap: 12, marginTop: 24 },
-  infoPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+  shareRow: { marginTop: 14, gap: 8 },
+  shareTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    overflow: "hidden",
   },
-  infoNum: { color: "#fff", fontSize: 22, fontWeight: "900" },
-  infoLabel: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 13,
-    fontWeight: "700",
-  },
+  shareFill: { height: "100%", borderRadius: 4, backgroundColor: WHITE },
+  shareText: { color: "rgba(255,255,255,0.82)", fontSize: 13, fontWeight: "700" },
+  pillRow: { flexDirection: "row", gap: 12, marginTop: 22 },
 });
 
-// ─── 8) Kişilik ──────────────────────────────────────────────────────────────
+// ─── 8) Düzenin (ısı haritası + seri) ───────────────────────────────────────
+
+export const ConsistencySlide = memo(function ConsistencySlide({
+  recap,
+  str,
+  language,
+  topInset,
+  accent,
+  step,
+}) {
+  const days = daysInYear(recap.year);
+  const grid = useMemo(
+    () => buildYearHeat(recap.year, recap.dayHeat || []),
+    [recap.year, recap.dayHeat]
+  );
+  const heatW = BODY_W - 24; // cam kart iç boşluğu
+  const pitch = heatW / grid.cols;
+  const fav = recap.favoriteWeekday;
+  return (
+    <WrappedSlideFrame
+      accent={accent}
+      topInset={topInset}
+      motifIcon="calendar-check"
+    >
+      <Kicker step={step}>{str.consistencyTitle}</Kicker>
+      <Reveal delay={150}>
+        <View style={rowStyles.headlineCompact}>
+          <RollingNumber
+            value={recap.activeDays}
+            format={(n) => formatNumber(n, language)}
+            style={shared.bigNumber}
+          />
+        </View>
+      </Reveal>
+      <Reveal delay={260}>
+        <Text style={consistencyStyles.sub} allowFontScaling={false}>
+          {str.cardActiveDays} {fill(str.consistencyOutOf, days)}
+        </Text>
+      </Reveal>
+
+      <Reveal delay={380} style={{ marginTop: 18 }}>
+        <GlassCard radius={22} style={consistencyStyles.heatCard}>
+          <YearHeat
+            year={recap.year}
+            dayHeat={recap.dayHeat || []}
+            width={heatW}
+            color={WHITE}
+            trackColor="rgba(255,255,255,0.12)"
+          />
+          <View style={{ height: 12, marginTop: 6 }}>
+            {grid.monthCols.map((col, i) => (
+              <Text
+                key={i}
+                style={[consistencyStyles.monthTick, { left: col * pitch }]}
+                allowFontScaling={false}
+                numberOfLines={1}
+              >
+                {monthName(i, language).slice(0, 3)}
+              </Text>
+            ))}
+          </View>
+          <View style={consistencyStyles.legend}>
+            <Text style={consistencyStyles.legendText} allowFontScaling={false}>
+              {str.legendLess}
+            </Text>
+            {[0, 0.3, 0.52, 0.76, 1].map((o, i) => (
+              <View
+                key={i}
+                style={[
+                  consistencyStyles.legendCell,
+                  { backgroundColor: i === 0 ? "rgba(255,255,255,0.12)" : `rgba(255,255,255,${o})` },
+                ]}
+              />
+            ))}
+            <Text style={consistencyStyles.legendText} allowFontScaling={false}>
+              {str.legendMore}
+            </Text>
+          </View>
+        </GlassCard>
+      </Reveal>
+
+      <Reveal delay={540} style={{ marginTop: 12 }}>
+        <View style={consistencyStyles.boxes}>
+          <GlassCard radius={18} strong style={consistencyStyles.box}>
+            <View style={consistencyStyles.boxIcon}>
+              <MaterialCommunityIcons name="fire" size={16} color={WHITE} />
+            </View>
+            <Text style={shared.eyebrow} allowFontScaling={false} numberOfLines={1}>
+              {str.consistencyStreakLabel}
+            </Text>
+            <View style={consistencyStyles.boxValueRow}>
+              <Text style={consistencyStyles.boxValue} allowFontScaling={false}>
+                {formatNumber(recap.longestStreak, language)}
+              </Text>
+              <Text style={consistencyStyles.boxUnit} allowFontScaling={false} numberOfLines={1}>
+                {str.consistencyStreakUnit}
+              </Text>
+            </View>
+          </GlassCard>
+          {fav != null && (
+            <GlassCard radius={18} strong style={consistencyStyles.box}>
+              <View style={consistencyStyles.boxIcon}>
+                <MaterialCommunityIcons name="calendar-heart" size={16} color={WHITE} />
+              </View>
+              <Text style={shared.eyebrow} allowFontScaling={false} numberOfLines={1}>
+                {str.consistencyFavDay}
+              </Text>
+              <Text
+                style={consistencyStyles.boxValueText}
+                allowFontScaling={false}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {weekdayName(fav, language)}
+              </Text>
+            </GlassCard>
+          )}
+        </View>
+      </Reveal>
+    </WrappedSlideFrame>
+  );
+});
+
+const consistencyStyles = StyleSheet.create({
+  sub: { color: "rgba(255,255,255,0.84)", fontSize: 17, fontWeight: "800", marginTop: 2 },
+  heatCard: { padding: 12 },
+  monthTick: {
+    position: "absolute",
+    top: 0,
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 8.5,
+    fontWeight: "800",
+  },
+  legend: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+    marginTop: 10,
+  },
+  legendText: { color: "rgba(255,255,255,0.55)", fontSize: 9.5, fontWeight: "700", marginHorizontal: 3 },
+  legendCell: { width: 10, height: 10, borderRadius: 3 },
+  boxes: { flexDirection: "row", gap: 12 },
+  box: { flex: 1, padding: 14 },
+  boxIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 9,
+  },
+  boxValueRow: { flexDirection: "row", alignItems: "baseline", gap: 5, marginTop: 4 },
+  boxValue: { color: WHITE, fontSize: 28, fontWeight: "900", letterSpacing: -0.8 },
+  boxUnit: { color: "rgba(255,255,255,0.78)", fontSize: 11.5, fontWeight: "700", flexShrink: 1 },
+  boxValueText: { color: WHITE, fontSize: 24, fontWeight: "900", letterSpacing: -0.6, marginTop: 4 },
+});
+
+// ─── 9) Kişilik ──────────────────────────────────────────────────────────────
 
 export const PersonalitySlide = memo(function PersonalitySlide({
   recap,
   str,
   topInset,
   accent,
+  step,
 }) {
+  const genres = (recap.topGenres || []).slice(0, 3);
+  const spin = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 16000, easing: Easing.linear, useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [spin]);
   return (
     <WrappedSlideFrame
       accent={accent}
       topInset={topInset}
       motifIcon="account-star"
     >
-      <Kicker>{str.personalityTitle}</Kicker>
+      <Kicker step={step}>{str.personalityTitle}</Kicker>
       <Reveal delay={180}>
-        <Text style={personalityStyles.emoji} allowFontScaling={false}>
-          {recap.personality?.emoji}
-        </Text>
+        <View style={personalityStyles.emojiWrap}>
+          <Animated.View
+            style={[
+              personalityStyles.halo,
+              { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }) }] },
+            ]}
+          />
+          <View style={personalityStyles.haloInner} />
+          <Text style={personalityStyles.emoji} allowFontScaling={false}>
+            {recap.personality?.emoji}
+          </Text>
+        </View>
       </Reveal>
       <Reveal delay={320}>
         <Text style={personalityStyles.title} allowFontScaling={false}>
           {recap.personality?.title}
         </Text>
       </Reveal>
-      <Reveal delay={460}>
-        <Text style={shared.sub}>
-          {str.personalityBased}
-          {recap.topGenres?.[0]?.genre ? `: ${recap.topGenres[0].genre}` : ""}
-        </Text>
-      </Reveal>
+      {recap.personality?.desc ? (
+        <Reveal delay={420}>
+          <Text style={personalityStyles.desc}>{recap.personality.desc}</Text>
+        </Reveal>
+      ) : null}
+      {genres.length > 0 && (
+        <Reveal delay={540} style={{ marginTop: 22 }}>
+          <Text style={shared.eyebrow} allowFontScaling={false}>
+            {str.personalityTopGenres}
+          </Text>
+          <View style={personalityStyles.chips}>
+            {genres.map((g, i) => (
+              <View key={`${g.genre}-${i}`} style={[personalityStyles.chip, i === 0 && personalityStyles.chipTop]}>
+                <Text
+                  style={[personalityStyles.chipText, i === 0 && { color: "#000" }]}
+                  allowFontScaling={false}
+                  numberOfLines={1}
+                >
+                  {g.genre}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </Reveal>
+      )}
     </WrappedSlideFrame>
   );
 });
 
 const personalityStyles = StyleSheet.create({
-  emoji: { fontSize: 108, marginBottom: 6 },
+  emojiWrap: {
+    width: 150,
+    height: 150,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  halo: {
+    position: "absolute",
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.4)",
+    borderStyle: "dashed",
+  },
+  haloInner: {
+    position: "absolute",
+    width: 118,
+    height: 118,
+    borderRadius: 59,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  emoji: { fontSize: 72, lineHeight: 88 },
   title: {
-    color: "#fff",
-    fontSize: 44,
+    color: WHITE,
+    fontSize: 42,
     fontWeight: "900",
     letterSpacing: -1.2,
-    lineHeight: 48,
+    lineHeight: 46,
   },
+  desc: {
+    color: "rgba(255,255,255,0.84)",
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 23,
+    marginTop: 12,
+  },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.26)",
+    maxWidth: "100%",
+  },
+  chipTop: { backgroundColor: WHITE, borderColor: WHITE },
+  chipText: { color: WHITE, fontSize: 13.5, fontWeight: "800" },
 });
 
 const styles = StyleSheet.create({

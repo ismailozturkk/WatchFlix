@@ -8,7 +8,7 @@ const {
 describe("AI plan quotas", () => {
   test("uses the configured daily and monthly limits", () => {
     expect(AI_PLAN_LIMITS).toEqual({
-      free: { daily: 5, monthly: 30 },
+      free: { daily: 3, monthly: 30 },
       premium: { daily: 20, monthly: 300 },
       unlimited: { daily: 50, monthly: 900 },
     });

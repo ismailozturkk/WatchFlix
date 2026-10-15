@@ -4,9 +4,28 @@
 // Firebase JS SDK + React Native'de Firestore'un yerleşik disk persistence'ı
 // çalışmadığı için (IndexedDB yok), çekilen veriyi BİZ diske yazıyoruz.
 //
-// Konum: <cache>/datacache/<ns>/<readable>_<hash>.json
-//   - ns  : namespace (örn 'lists', 'notes', 'tmdb', 'profile')
-//   - key : serbest string (URL, uid, contextId...) — dosya adına hash'lenir
+// İKİ KONUM VAR:
+//
+//   1) ÖNBELLEK (varsayılan) — <cache>/datacache/<ns>/<readable>_<hash>.json
+//      Sistem depolama azalınca bu klasörü SİLEBİLİR (Android "önbelleği
+//      temizle", iOS Caches boşaltma). Yeniden üretilebilir veri için uygun:
+//      TMDB yanıtları, profil (sunucu kaynaklı), türetilmiş istatistik.
+//
+//   2) KALICI (DURABLE_NAMESPACES) — <document>/userdata/<ns>/...
+//      Kullanıcının KENDİ ürettiği ve buluttan artık her açılışta çekmediğimiz
+//      veri: notlar, medya notları, hatırlatıcılar, listeler. Bu veri için
+//      yerel kopya "tohum" değil KAYNAKTIR; sistem silerse tek seferlik
+//      yeniden indirme gerekirdi ve bekleyen yazımlar tehlikeye girerdi. Belge
+//      dizini sistem tarafından silinmez.
+//
+//   `ns` kalıcı kümedeyse çağrı yerleri DEĞİŞMEZ: aynı setJSON/getJSON, aynı
+//   `cacheKeys` anahtarları (snapshotCache, listSyncService, dataDownloader
+//   hepsi olduğu gibi çalışır).
+//
+// ESKİ KONUMDAN TAŞIMA: bu sürümden önce kalıcı ad alanları da önbellek
+// klasöründeydi. Okuma, kayıt kalıcı konumda yoksa eski konumda arar, bulursa
+// HAM METNİ (zaman damgası dahil) kalıcı konuma kopyalayıp eskisini siler.
+// Yani güncellemeyi alan kullanıcı buluttan bir şey İNDİRMEZ.
 //
 // Her kayıt { t: zaman(ms), v: veri } olarak saklanır → maxAge kontrolü mümkün.
 // expo-file-system v19: exists/size/delete/create/write/textSync SENKRON'dur.
@@ -15,8 +34,29 @@ import { File, Directory, Paths } from "expo-file-system";
 
 // <cache>/datacache klasör adı (cacheInspector da bunu okur).
 export const DATACACHE_DIRNAME = "datacache";
+// <document>/userdata — kalıcı kullanıcı verisi.
+export const DURABLE_DIRNAME = "userdata";
+
+/**
+ * Sistemin silemeyeceği yere yazılan ad alanları. Yeni bir kullanıcı-sahipli
+ * Firestore verisi eklenirse BURAYA ekle (ve `services/userData`'ya bir alan).
+ *
+ * `profile`/`activity`/`stats` BİLEREK yok: profil başkalarının yazımıyla da
+ * değişir (arkadaş sayacı vb.) ve canlı dinlenmeye devam eder; geri kalanı
+ * kaynağından yeniden türetilebilir.
+ */
+export const DURABLE_NAMESPACES = Object.freeze([
+  "notes",
+  "mediaNotes",
+  "reminders",
+  "lists",
+]);
+const DURABLE_SET = new Set(DURABLE_NAMESPACES);
+
+export const isDurableNamespace = (ns) => DURABLE_SET.has(ns);
 
 const ROOT = new Directory(Paths.cache, DATACACHE_DIRNAME);
+const DURABLE_ROOT = new Directory(Paths.document, DURABLE_DIRNAME);
 
 // Kısa, çakışmasız dosya adı üretimi.
 function hashKey(s) {
@@ -27,13 +67,24 @@ function hashKey(s) {
 function sanitize(s, max) {
   return String(s).replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, max);
 }
-function nsDir(ns) {
+/** Önbellek (silinebilir) klasörü — kalıcı ad alanları için ESKİ konum. */
+function cacheNsDir(ns) {
   return new Directory(ROOT, sanitize(ns, 60));
 }
-function keyFile(ns, key) {
+function nsDir(ns) {
+  const root = isDurableNamespace(ns) ? DURABLE_ROOT : ROOT;
+  return new Directory(root, sanitize(ns, 60));
+}
+function fileName(key) {
   const k = String(key);
-  const name = `${sanitize(k, 90)}_${hashKey(k)}.json`;
-  return new File(nsDir(ns), name);
+  return `${sanitize(k, 90)}_${hashKey(k)}.json`;
+}
+function keyFile(ns, key) {
+  return new File(nsDir(ns), fileName(key));
+}
+/** Yalnız kalıcı ad alanları için: eski (önbellek) konumdaki dosya. */
+function legacyKeyFile(ns, key) {
+  return new File(cacheNsDir(ns), fileName(key));
 }
 function ensureDir(dir) {
   try {
@@ -48,9 +99,43 @@ export function setJSON(ns, key, data) {
   try {
     ensureDir(nsDir(ns));
     keyFile(ns, key).write(JSON.stringify({ t: Date.now(), v: data }));
+    if (isDurableNamespace(ns)) {
+      // Eski konumdaki kopya artık BAYAT: bırakılırsa bir sonraki okuma ya da
+      // taşıma yeni veriyi eskisiyle ezebilirdi.
+      try {
+        const eski = legacyKeyFile(ns, key);
+        if (eski.exists) eski.delete();
+      } catch {
+        // yok say
+      }
+    }
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Kalıcı ad alanı için eski konumdan taşıma. Ham metni kopyalar (zaman damgası
+ * korunur); kopya yazılamazsa eski dosya SİLİNMEZ, bir sonraki okumada tekrar
+ * denenir.
+ */
+function migrateFromCacheDir(ns, key) {
+  try {
+    const eski = legacyKeyFile(ns, key);
+    if (!eski.exists) return null;
+    const ham = eski.textSync();
+    const parsed = JSON.parse(ham);
+    ensureDir(nsDir(ns));
+    keyFile(ns, key).write(ham);
+    try {
+      eski.delete();
+    } catch {
+      // kopya yazıldı; eski dosyanın silinememesi veriyi bozmaz
+    }
+    return parsed;
+  } catch {
+    return null;
   }
 }
 
@@ -58,9 +143,13 @@ export function setJSON(ns, key, data) {
 function getEntry(ns, key) {
   try {
     const file = keyFile(ns, key);
-    if (!file.exists) return null;
-    return JSON.parse(file.textSync());
+    if (file.exists) return JSON.parse(file.textSync());
+    if (isDurableNamespace(ns)) return migrateFromCacheDir(ns, key);
+    return null;
   } catch {
+    // Bozuk JSON: "kayıt yok" say. Kalıcı ad alanlarında bu, tek seferlik
+    // yeniden indirmeyi tetikler; bekleyen yazımlar ayrı bir günlükte
+    // (services/userData/outbox) durduğu için kaybolmaz.
     return null;
   }
 }
@@ -84,7 +173,7 @@ export function getAge(ns, key) {
   return entry ? Date.now() - entry.t : null;
 }
 
-/** Tek bir kaydı sil. */
+/** Tek bir kaydı sil (kalıcı ad alanlarında eski konumdaki kopya da). */
 export function remove(ns, key) {
   try {
     const f = keyFile(ns, key);
@@ -92,9 +181,17 @@ export function remove(ns, key) {
   } catch {
     // yok say
   }
+  if (isDurableNamespace(ns)) {
+    try {
+      const eski = legacyKeyFile(ns, key);
+      if (eski.exists) eski.delete();
+    } catch {
+      // yok say
+    }
+  }
 }
 
-/** Bir namespace'in tamamını sil. */
+/** Bir namespace'in tamamını sil (kalıcı ad alanında her iki konum). */
 export function clearNamespace(ns) {
   try {
     const d = nsDir(ns);
@@ -102,12 +199,35 @@ export function clearNamespace(ns) {
   } catch {
     // yok say
   }
+  if (isDurableNamespace(ns)) {
+    try {
+      const eski = cacheNsDir(ns);
+      if (eski.exists) eski.delete();
+    } catch {
+      // yok say
+    }
+  }
 }
 
-/** Tüm veri cache'ini sil. */
+/**
+ * Tüm ÖNBELLEK klasörünü sil.
+ *
+ * KALICI ad alanlarına (notlar, hatırlatıcılar, listeler…) DOKUNMAZ: "önbelleği
+ * temizle" kullanıcının kendi verisinin tek yerel kopyasını silmemeli. Kalıcı
+ * veriyi silmek için `clearNamespace` / `clearAllDurable` açıkça çağrılır.
+ */
 export function clearAll() {
   try {
     if (ROOT.exists) ROOT.delete();
+  } catch {
+    // yok say
+  }
+}
+
+/** Kalıcı kullanıcı verisinin tamamını sil (çıkış / hesap silme / sıfırlama). */
+export function clearAllDurable() {
+  try {
+    if (DURABLE_ROOT.exists) DURABLE_ROOT.delete();
   } catch {
     // yok say
   }
@@ -127,7 +247,14 @@ function dirSize(dir) {
   return total;
 }
 
-/** Toplam veri-cache boyutu (byte). */
+/** Toplam ÖNBELLEK boyutu (byte). Kalıcı kullanıcı verisi dahil değil. */
 export function totalSize() {
   return dirSize(ROOT);
+}
+
+/** Bir ad alanının bayt boyutu (kalıcıysa yeni + henüz taşınmamış eski konum). */
+export function namespaceSize(ns) {
+  let total = dirSize(nsDir(ns));
+  if (isDurableNamespace(ns)) total += dirSize(cacheNsDir(ns));
+  return total;
 }

@@ -40,7 +40,6 @@ import {
   getSharedListAccent,
   SHARED_LIST_ACCENT,
 } from "@utils/listAppearance";
-import { trackFirestoreRead } from "../../services/usageTrackerService";
 
 const { width } = Dimensions.get("window");
 // 2 sütunlu ızgaranın TABAN kart genişliği/yüksekliği — kart yüksekliği her
@@ -611,7 +610,7 @@ export default function ListsViewScreen({ navigation }) {
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.3} />
+      <ScreenDecor scope="lists" iconOpacity={0.3} />
       <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
 
       {/* ── Başlık ──────────────────────────────────────────────────────── */}

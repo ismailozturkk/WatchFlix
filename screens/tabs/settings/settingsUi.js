@@ -140,7 +140,7 @@ export function SettingsSubScreen({
   const C = buildUiColors(theme);
   return (
     <View style={[ui.root, { backgroundColor: C.bg }]}>
-      <ScreenDecor iconOpacity={0.15} />
+      <ScreenDecor scope="settings" iconOpacity={0.15} />
       {background}
       <View style={[ui.header, { paddingTop: insets.top + 8 }]}>
         <BackButton absolute={false} />

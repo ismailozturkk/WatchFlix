@@ -1,5 +1,5 @@
 import { isLightSurface } from "@utils/colorUtils";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   StyleSheet,
   View,
@@ -9,22 +9,22 @@ import {
   FlatList,
   StatusBar,
   Platform,
-    Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@context/ThemeContext";
 import { StoryDraftService } from "@services/StoryDraftService";
 import { i18nText } from "@utils/i18nText";
+import { storyDraftGrid } from "@utils/storyCanvasLayout";
 import { appAlert } from "@components/AppAlert";
 import ScreenDecor from "@components/ScreenDecor";
+import BackButton from "@components/BackButton";
 
 
-const COLS = 3;
 const GRID_PAD = 12;
 const GRID_GAP = 10;
-const ITEM_W = (Dimensions.get("window").width - GRID_PAD * 2 - GRID_GAP * (COLS - 1)) / COLS;
-const ITEM_H = (ITEM_W * 16) / 9;
 
 const formatDate = (ts) => {
   if (!ts) return "";
@@ -34,6 +34,20 @@ const formatDate = (ts) => {
 
 export default function StoryDraftsScreen({ navigation }) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
+  // Sütun sayısı/kart boyu pencereden hesaplanır (modül yüklenirken Dimensions
+  // okumak katlanır ekran ve bölünmüş pencerede eskirdi); üst boşluk cihazın
+  // gerçek güvenli alanından gelir (sabit 56/40, büyük çentikte butonları
+  // durum çubuğunun altında bırakıyordu — StoryHeader ile aynı kural).
+  const grid = useMemo(
+    () => storyDraftGrid(winW, { pad: GRID_PAD, gap: GRID_GAP }),
+    [winW]
+  );
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0
+  );
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -77,9 +91,21 @@ export default function StoryDraftsScreen({ navigation }) {
   };
 
   const renderItem = ({ item }) => (
-    <TouchableOpacity activeOpacity={0.85} onPress={() => handleEdit(item)} style={styles.card}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => handleEdit(item)}
+      style={{ width: grid.itemW }}
+    >
       <View
-        style={[styles.thumbWrap, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+        style={[
+          styles.thumbWrap,
+          {
+            width: grid.itemW,
+            height: grid.itemH,
+            backgroundColor: theme.secondary,
+            borderColor: theme.border,
+          },
+        ]}
       >
         {item.thumbnailUri ? (
           <Image source={{ uri: item.thumbnailUri }} style={styles.thumb} resizeMode="cover" />
@@ -112,27 +138,26 @@ export default function StoryDraftsScreen({ navigation }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.3} />
+      <ScreenDecor scope="social" iconOpacity={0.3} />
       <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={[styles.backBtn, { backgroundColor: theme.secondary }]}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="chevron-back" size={22} color={theme.text.primary} />
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: topInset + 8 }]}>
+        <BackButton absolute={false} onPress={() => navigation.goBack()} />
         <Text allowFontScaling={false} style={[styles.title, { color: theme.text.primary }]}>{i18nText("autoI18n.taslaklarim", "Taslaklarım")}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <FlatList
+        // numColumns değişince FlatList'in yeniden kurulması gerekir.
+        key={`cols-${grid.cols}`}
         data={drafts}
         keyExtractor={(d) => d.id}
         renderItem={renderItem}
-        numColumns={COLS}
+        numColumns={grid.cols}
         columnWrapperStyle={{ gap: GRID_GAP }}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          { paddingBottom: GRID_PAD + insets.bottom + 8 },
+        ]}
         ListEmptyComponent={
           !loading ? (
             <View style={styles.empty}>
@@ -153,22 +178,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === "ios" ? 56 : 40,
     paddingBottom: 10,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
   },
   title: { fontSize: 18, fontWeight: "900" },
   list: { padding: GRID_PAD, gap: 14, flexGrow: 1 },
-  card: { width: ITEM_W },
+  /* width/height pencereden hesaplanır (storyDraftGrid) */
   thumbWrap: {
-    width: ITEM_W,
-    height: ITEM_H,
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,

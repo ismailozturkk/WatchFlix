@@ -7,14 +7,62 @@
 // Oylar message.poll.votes = { [uid]: optionId } olarak Firestore'da; sayım UI'da
 // (postComposer.tallyVotes — sohbet, feed ve post detayı aynı sayımı paylaşır).
 
-import React, { useMemo } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useEffect, useMemo, useRef } from "react";
+import {
+  Animated,
+  Easing,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { tallyVotes } from "../../utils/postComposer";
 import { alpha } from "../../theme/colors";
+
+// Sonuç barı: oy değişince genişlik yumuşakça yeni yüzdeye akar (eskiden anında
+// zıplıyordu). İlk çizimde animasyon yok — anket zaten balonla birlikte giriyor.
+function OptionBar({ pct, color, style }) {
+  const anim = useRef(new Animated.Value(pct)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: pct,
+      duration: 380,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false, // genişlik layout özelliği
+    }).start();
+  }, [pct, anim]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.bar,
+        style,
+        {
+          backgroundColor: color,
+          width: anim.interpolate({ inputRange: [0, 100], outputRange: ["0%", "100%"] }),
+        },
+      ]}
+    />
+  );
+}
+
+// Oy işareti belirirken yaylanarak büyür.
+function PopIn({ style, children }) {
+  const scale = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 5,
+      tension: 180,
+    }).start();
+  }, [scale]);
+  return <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>;
+}
 
 export default function PollMessage({
   poll,
@@ -41,12 +89,23 @@ export default function PollMessage({
   const primaryTextColor = isOutgoing ? "#fff" : activeTheme.text.primary;
   const mutedTextColor = isOutgoing ? "rgba(255,255,255,0.75)" : activeTheme.text.muted;
   const secondaryTextColor = isOutgoing ? "rgba(255,255,255,0.9)" : activeTheme.text.secondary;
-  const optBgColor = isOutgoing ? "rgba(255,255,255,0.12)" : activeTheme.between;
+  // Feed'de anket, kartın içindeki `primary` zeminli panelde durur; seçenekler
+  // `secondary` ile paneldan ayrışır. Sohbet balonunda eski `between` kalır.
+  const optBgColor = isOutgoing
+    ? "rgba(255,255,255,0.12)"
+    : isFeed
+      ? activeTheme.secondary
+      : activeTheme.between;
+  // Az seçenekte posterler büyük, 4'te dört sütun (eski sabit %23.5 iki
+  // seçenekte posterleri minik bırakıyordu).
+  const feedMediaWidth =
+    options.length <= 2 ? "34%" : options.length === 3 ? "31%" : "23.5%";
   const optBorderColor = isOutgoing ? "rgba(255,255,255,0.25)" : activeTheme.border;
 
   return (
     <View style={[styles.wrap, isFeed && styles.feedWrap]}>
-      {/* Başlık */}
+      {/* Başlık — feed'de kartın kendi tip rozeti var, burada tekrarlanmaz */}
+      {!isFeed && (
       <View style={styles.head}>
         <View
           style={[
@@ -79,19 +138,20 @@ export default function PollMessage({
           {i18nText("autoI18n.n_oy", "{{n}} oy", { n: total })}
         </Text>
       </View>
+      )}
 
       {/* Stili başlık imzası taşısa da bu, KULLANICININ yazdığı anket sorusu —
           dekoratif başlık fontuna sokulmamalı (bkz. utils/typographyRoles.js). */}
       <Text
         fontRole="body"
-        style={[styles.question, { color: primaryTextColor }]}
+        style={[styles.question, isFeed && styles.feedQuestion, { color: primaryTextColor }]}
       >
         {question}
       </Text>
 
       {/* ── METİN ANKETİ ── */}
       {type === "text" && (
-        <View style={{ gap: 7, marginTop: 8 }}>
+        <View style={{ gap: isFeed ? 8 : 7, marginTop: isFeed ? 12 : 8 }}>
           {options.map((opt) => {
             const voted = userVote === opt.id;
             const p = pct(opt.id);
@@ -102,6 +162,7 @@ export default function PollMessage({
                 onPress={() => onVote(opt.id)}
                 style={[
                   styles.textOpt,
+                  isFeed && styles.feedTextOpt,
                   {
                     borderColor: voted
                       ? isOutgoing
@@ -113,20 +174,18 @@ export default function PollMessage({
                 ]}
               >
                 {/* Sonuç barı (zemin) */}
-                <View
-                  style={[
-                    styles.bar,
-                    {
-                      width: `${p}%`,
-                      backgroundColor: voted
-                        ? isOutgoing
-                          ? "rgba(255,255,255,0.3)"
-                          : alpha(activeAccent, 0.28)
-                        : isOutgoing
-                          ? "rgba(255,255,255,0.08)"
-                          : alpha(activeTheme.border, 0.5),
-                    },
-                  ]}
+                <OptionBar
+                  pct={p}
+                  style={isFeed && styles.feedBar}
+                  color={
+                    voted
+                      ? isOutgoing
+                        ? "rgba(255,255,255,0.3)"
+                        : alpha(activeAccent, 0.28)
+                      : isOutgoing
+                        ? "rgba(255,255,255,0.08)"
+                        : alpha(activeTheme.border, 0.5)
+                  }
                 />
                 <View style={styles.textOptRow}>
                   <Ionicons
@@ -162,7 +221,14 @@ export default function PollMessage({
 
       {/* ── MEDYA ANKETİ ── */}
       {type === "media" && (
-        <View style={[styles.mediaGrid, isFeed && styles.feedMediaGrid]}>
+        <View
+          style={[
+            styles.mediaGrid,
+            isFeed && styles.feedMediaGrid,
+            isFeed && options.length < 4 && { justifyContent: "center" },
+            isFeed && { marginTop: 12 },
+          ]}
+        >
           {options.map((opt) => {
             const voted = userVote === opt.id;
             const p = pct(opt.id);
@@ -172,7 +238,11 @@ export default function PollMessage({
                 key={opt.id}
                 activeOpacity={0.85}
                 onPress={() => onVote(opt.id)}
-                style={[styles.mediaOpt, isFeed && styles.feedMediaOpt]}
+                style={[
+                  styles.mediaOpt,
+                  isFeed && styles.feedMediaOpt,
+                  isFeed && { width: feedMediaWidth },
+                ]}
               >
                 <View
                   style={[
@@ -216,7 +286,7 @@ export default function PollMessage({
                     </View>
                   )}
                   {voted && (
-                    <View
+                    <PopIn
                       style={[
                         styles.voteCheck,
                         {
@@ -230,7 +300,7 @@ export default function PollMessage({
                         size={12}
                         color={isOutgoing ? activeAccent : "#fff"}
                       />
-                    </View>
+                    </PopIn>
                   )}
                   {total > 0 && (
                     <View style={styles.pctTag}>
@@ -254,7 +324,8 @@ export default function PollMessage({
         </View>
       )}
 
-      <Text style={[styles.hint, { color: mutedTextColor }]}>
+      <Text style={[styles.hint, isFeed && styles.feedHint, { color: mutedTextColor }]}>
+        {isFeed ? `${i18nText("autoI18n.n_oy", "{{n}} oy", { n: total })} · ` : ""}
         {userVote
           ? i18nText("autoI18n.oyunu_degistirmek_icin_dokun", "Oyunu değiştirmek için dokun")
           : i18nText("autoI18n.oy_vermek_icin_dokun", "Oy vermek için dokun")}
@@ -284,6 +355,7 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 10.5, fontWeight: "800", letterSpacing: 0.3 },
   totalText: { fontSize: 11, fontWeight: "700" },
   question: { fontSize: 15, fontWeight: "800", lineHeight: 20 },
+  feedQuestion: { fontSize: 17, lineHeight: 23, letterSpacing: -0.2 },
 
   // text
   textOpt: {
@@ -294,6 +366,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   bar: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 10 },
+  feedTextOpt: { borderRadius: 14, minHeight: 48 },
+  feedBar: { borderRadius: 12 },
   textOptRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -341,11 +415,12 @@ const styles = StyleSheet.create({
   },
   pctTagText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   mediaLabel: { fontSize: 10.5, fontWeight: "600", marginTop: 4, lineHeight: 13 },
-  feedMediaLabel: { fontSize: 9, lineHeight: 11.5, marginTop: 4 },
+  feedMediaLabel: { fontSize: 10.5, lineHeight: 13, marginTop: 6 },
 
   hint: {
     fontSize: 10.5,
     fontStyle: "italic",
     marginTop: 9,
   },
+  feedHint: { fontStyle: "normal", fontWeight: "600", fontSize: 11.5, marginTop: 12 },
 });

@@ -19,8 +19,6 @@ import { i18nText } from "@utils/i18nText";
 import { withAlpha } from "@components/profile/StatsComponents";
 import { badgeAciklama, badgeAd, formatBadgeAralik } from "./watchBadgeCatalog";
 
-const sayi = (n, lang) => Math.round(Number(n) || 0).toLocaleString(lang === "tr" ? "tr-TR" : "en-US");
-
 function WatchBadgeCard({ badge, onPress, compact = false }) {
   const { theme } = useTheme();
   const { language } = useLanguage();

@@ -12,9 +12,9 @@ import { collection, onSnapshot } from "firebase/firestore";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { db } from "../../firebase";
 import { useTheme } from "@context/ThemeContext";
-import { useProfileUi } from "@context/ProfileUiContext";
 import { useUserProfile } from "@context/UserProfileContext";
 import {
   addGroupMember,
@@ -48,7 +48,6 @@ export default function GroupInfoModal({
   onOpenProfile,
 }) {
   const { theme } = useTheme();
-  const { avatars } = useProfileUi();
   const { profile } = useUserProfile();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState("members");
@@ -506,19 +505,14 @@ export default function GroupInfoModal({
                 })}
               </Text>
             </View>
-            <TouchableOpacity
+            <GlassCloseButton
+              size={36}
+              fallbackRadius={18}
+              iconSize={21}
+              color={theme.text?.primary || "#fff"}
+              backgroundColor={theme.primary || "rgba(255,255,255,0.06)"}
               onPress={onClose}
-              style={[
-                styles.closeButton,
-                { backgroundColor: theme.primary || "rgba(255,255,255,0.06)" },
-              ]}
-            >
-              <Ionicons
-                name="close"
-                size={21}
-                color={theme.text?.primary || "#fff"}
-              />
-            </TouchableOpacity>
+            />
           </View>
 
           <View
@@ -706,11 +700,6 @@ export default function GroupInfoModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.68)",
-  },
   sheet: {
     maxHeight: "82%",
     minHeight: 430,
@@ -744,13 +733,6 @@ const styles = StyleSheet.create({
   groupCopy: { flex: 1 },
   groupName: { fontSize: 18, fontWeight: "800", letterSpacing: -0.3 },
   groupCount: { fontSize: 12, marginTop: 2, fontWeight: "600" },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   tabs: {
     flexDirection: "row",
     padding: 4,
@@ -784,9 +766,6 @@ const styles = StyleSheet.create({
     minHeight: 68,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  avatar: { width: 43, height: 43, borderRadius: 22 },
-  avatarFallback: { alignItems: "center", justifyContent: "center" },
-  avatarLetter: { fontSize: 16, fontWeight: "800" },
   memberCopy: { flex: 1, marginLeft: 11, marginRight: 8 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 7 },
   memberName: { flexShrink: 1, fontSize: 14.5, fontWeight: "700" },

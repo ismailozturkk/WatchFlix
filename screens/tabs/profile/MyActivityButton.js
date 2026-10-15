@@ -85,7 +85,7 @@ export default function MyActivityButton({ navigation }) {
     const unsubB = subscribeToMyBookmarks(uid, (list) => setBookmarkCount(list.length));
     const unsubU = onSnapshot(
       doc(db, "Users", uid),
-      (snap) => setPostCount(snap.exists() ? snap.data()?.postsCount || 0 : 0),
+      (snap) => setPostCount(snap.exists() ? Math.max(0, snap.data()?.postsCount || 0) : 0),
       () => {},
     );
     return () => {

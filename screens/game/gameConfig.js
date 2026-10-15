@@ -1,4 +1,5 @@
 export const SCENE_GAME_ID = "scene_guess";
+export const POSTER_GAME_ID = "poster_puzzle";
 export const DEFAULT_MODE_ID = "classic";
 export const DEFAULT_DIFFICULTY_ID = "normal";
 
@@ -6,6 +7,7 @@ export const DEFAULT_DIFFICULTY_ID = "normal";
 export const MODE_CLASSIC = "classic";
 export const MODE_TIME_ATTACK = "time_attack";
 export const MODE_SURVIVAL = "survival";
+export const MODE_DAILY = "daily";
 
 /* ── Mode definitions ───────────────────────────────────────────────────────
    timerType:
@@ -64,7 +66,33 @@ export const SCENE_GAME_MODES = [
     leaderboardEligible: false,
     available: true,
   },
+  {
+    // Gunluk Meydan Okuma: herkese ayni 10 sahne, gunde tek deneme. Kurulum
+    // ekraninda SECILMEZ (selectable:false); yalniz Hub/Oyun Merkezi'ndeki
+    // gunluk kartindan acilir. Kurallar Klasik ile ayni, zorluk Normal'e sabit.
+    id: MODE_DAILY,
+    icon: "sunny-outline",
+    titleKey: "autoI18n.gunluk_meydan_okuma",
+    ruleKey: "autoI18n.gunluk_mod_kural",
+    metaKey: "autoI18n.gunluk_mod_meta",
+    tr: "Günlük Meydan Okuma",
+    en: "Daily Challenge",
+    timerType: "per_question",
+    questionCount: 10,
+    estimatedMinutes: 3,
+    initialJokers: 2,
+    endsOnWrong: false,
+    leaderboardEligible: false,
+    available: true,
+    selectable: false,
+    daily: true,
+  },
 ];
+
+/* Kurulum ekraninda secilebilen modlar (gunluk mod haric). */
+export const SELECTABLE_GAME_MODES = SCENE_GAME_MODES.filter(
+  (mode) => mode.available && mode.selectable !== false,
+);
 
 /* ── Difficulty definitions ─────────────────────────────────────────────── */
 export const SCENE_GAME_DIFFICULTIES = [
@@ -117,6 +145,9 @@ export const SCENE_GAME_SOURCES = [
   { id: "favorites", icon: "heart-outline", labelKey: "autoI18n.favoriler", tr: "Favoriler", en: "Favorites", personal: true, listKey: "favorites", group: "personal" },
   { id: "watchedMovies", icon: "checkmark-circle-outline", labelKey: "autoI18n.izlenen_filmler", tr: "İzlenen Filmler", en: "Watched Movies", personal: true, listKey: "watchedMovies", group: "personal" },
   { id: "watchedTv", icon: "checkmark-done-outline", labelKey: "autoI18n.izlenen_diziler", tr: "İzlenen Diziler", en: "Watched Series", personal: true, listKey: "watchedTv", group: "personal" },
+  // Gunluk meydan okumanin sabit havuzu. Kurulum listesinde gorunmez
+  // (group:"daily"); sonuc/istatistik ekranlari etiketi buradan okur.
+  { id: "daily", icon: "sunny-outline", labelKey: "autoI18n.gunluk_meydan_okuma", tr: "Günlük Meydan Okuma", en: "Daily Challenge", group: "daily" },
 ];
 
 /* ── Lookups ────────────────────────────────────────────────────────────── */
@@ -132,7 +163,25 @@ export const getSourceConfig = (sourceId) =>
 
 export const isPersonalSource = (sourceId) => Boolean(getSourceConfig(sourceId)?.personal);
 
-export const availableModeCount = SCENE_GAME_MODES.filter((mode) => mode.available).length;
+export const isPosterGame = (gameId) => gameId === POSTER_GAME_ID;
+export const isDailyMode = (modeId) => modeId === MODE_DAILY;
 
 export const getLocalizedGameLabel = (item, language) =>
   language === "en" ? item.en : item.tr;
+
+/**
+ * `bestScoresByMode` anahtarını ("classic_normal", "poster_classic_normal",
+ * "daily_normal") parçalar. Afiş oyunu anahtarı `poster_` önekiyle yazar;
+ * öneki atmadan bölmek "poster_classic"i bilinmeyen mod sayıp Klasik'e düşürürdü.
+ */
+export function parseModeScoreKey(key) {
+  const text = String(key || "");
+  const poster = text.startsWith("poster_");
+  const rest = poster ? text.slice("poster_".length) : text;
+  const cut = rest.lastIndexOf("_");
+  return {
+    gameId: poster ? POSTER_GAME_ID : SCENE_GAME_ID,
+    modeId: cut < 0 ? rest : rest.slice(0, cut),
+    difficultyId: cut < 0 ? "" : rest.slice(cut + 1),
+  };
+}

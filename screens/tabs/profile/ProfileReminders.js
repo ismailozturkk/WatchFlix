@@ -16,6 +16,9 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings, useListLayoutSettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
 import Skeleton from "../../../components/Skeleton";
+import StaggerItem from "../../../components/StaggerItem";
+import GlassIconButton from "../../../components/common/GlassIconButton";
+import useReduceMotion from "../../../hooks/useReduceMotion";
 
 
 const { width } = Dimensions.get("window");
@@ -79,7 +82,7 @@ function MovieCard({
   formatDate,
   calculateDateDifference,
 }) {
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const diff = calculateDateDifference(reminder.releaseDate);
@@ -230,7 +233,7 @@ function EpisodeCard({
   // okuyor ve bunlar yalnız notesColor'da var (theme.colors'ta yok) — yanlış
   // palet verilince dizi kartlarında geri sayım dolgusu undefined kalıyordu.
   const countdown = getCountdownStyle(diff, theme.notesColor);
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const pressIn = useCallback(
     () =>
@@ -383,6 +386,11 @@ export default function ProfileReminders({ navigation }) {
     formatDate,
     calculateDateDifference,
   } = useProfileReminders();
+  // Kartlar her bağlanışta kademeli girer: ilk yükleme (iskeletten sonra) ve
+  // Film↔Dizi sekme geçişi. Anahtarlar sabit olduğundan veri tazelenince
+  // mevcut kartlar yeniden animasyon oynatmaz, yalnız yeni eklenen girer.
+  // "Hareketi Azalt" açıkken animasyon yok.
+  const reduceMotion = useReduceMotion();
 
   // ── Tab geçiş animasyonu: translateX ile (useNativeDriver: true) ──────────
   // Tab pill genişliği yaklaşık ekran - 32px padding; her tab yarısı.
@@ -494,13 +502,17 @@ export default function ProfileReminders({ navigation }) {
           )}
 
           {/* Takvim butonu — profil önizleme başlığındakiyle aynı */}
-          <TouchableOpacity
-            style={[styles.calendarBtn, { backgroundColor: theme.accent + "22" }]}
+          <GlassIconButton
+            icon="calendar"
+            iconSize={15}
+            size={28}
+            fallbackRadius={14}
+            color={theme.accent}
+            tint={theme.accent + "55"}
+            fallbackStyle={{ backgroundColor: theme.accent + "22" }}
+            accessibilityLabel={i18nText("autoI18n.takvimi_ac", "Takvimi Aç")}
             onPress={() => navigation.navigate("CalendarScreen")}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="calendar" size={15} color={theme.accent} />
-          </TouchableOpacity>
+          />
         </View>
       </View>
 
@@ -612,15 +624,22 @@ export default function ProfileReminders({ navigation }) {
       ) : activeTab === "movie" ? (
         sortedMovieReminders.length > 0 ? (
           <View style={styles.gridWrap}>
-            {sortedMovieReminders.map((reminder) => (
-              <MovieCard
+            {sortedMovieReminders.map((reminder, idx) => (
+              <StaggerItem
                 key={reminder.movieId}
-                reminder={reminder}
-                navigation={navigation}
-                theme={theme}
-                formatDate={formatDate}
-                calculateDateDifference={calculateDateDifference}
-              />
+                index={idx}
+                animate={!reduceMotion}
+                step={45}
+                maxStaggered={14}
+              >
+                <MovieCard
+                  reminder={reminder}
+                  navigation={navigation}
+                  theme={theme}
+                  formatDate={formatDate}
+                  calculateDateDifference={calculateDateDifference}
+                />
+              </StaggerItem>
             ))}
           </View>
         ) : (
@@ -641,19 +660,26 @@ export default function ProfileReminders({ navigation }) {
       ) : flatTvReminders.length > 0 ? (
         <View style={styles.gridWrap}>
           {flatTvReminders.map(({ show, season, episode }, idx) => (
-            <EpisodeCard
+            <StaggerItem
               key={
                 episode.episodeId ||
                 `${show.showId}-${season.seasonNumber}-${episode.episodeNumber}-${idx}`
               }
-              show={show}
-              season={season}
-              episode={episode}
-              navigation={navigation}
-              theme={theme}
-              formatDate={formatDate}
-              calculateDateDifference={calculateDateDifference}
-            />
+              index={idx}
+              animate={!reduceMotion}
+              step={45}
+              maxStaggered={14}
+            >
+              <EpisodeCard
+                show={show}
+                season={season}
+                episode={episode}
+                navigation={navigation}
+                theme={theme}
+                formatDate={formatDate}
+                calculateDateDifference={calculateDateDifference}
+              />
+            </StaggerItem>
           ))}
         </View>
       ) : (
@@ -706,13 +732,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 13, textTransform: "uppercase", letterSpacing: 1 },
 
   countRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  calendarBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   countBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -763,7 +782,6 @@ const styles = StyleSheet.create({
   tabBadgeText: { fontSize: 10, fontWeight: "700" },
 
   /* Liste */
-  listContent: { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
   gridWrap: {
     flexDirection: "row",
     flexWrap: "wrap",

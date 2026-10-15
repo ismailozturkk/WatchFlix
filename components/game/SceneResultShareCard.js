@@ -10,8 +10,8 @@ import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
+import useAppLogo from "@hooks/useAppLogo";
 
-const APP_LOGO = require("../../assets/icon_default/android-icon-foreground.png");
 const REF_H = 640; // referans tuval yuksekligi (9:16 -> genislik 360)
 
 const withAlpha = (color, alpha = 1) => {
@@ -42,6 +42,8 @@ const SceneResultShareCard = memo(function SceneResultShareCard({
   isNewRecord = false,
   labels = {},
 }) {
+  // Marka logosu seçili uygulama simgesini izler (hooks/useAppLogo.js).
+  const { logo: appLogo } = useAppLogo();
   const s = (height || REF_H) / REF_H;
   const u = (v) => Math.round(v * s);
   const deep = bold || accent;
@@ -109,7 +111,7 @@ const SceneResultShareCard = memo(function SceneResultShareCard({
 
       {/* Filigran */}
       <View style={[styles.watermark, { bottom: u(14), right: u(16), paddingRight: u(11), borderRadius: u(999) }]}>
-        <Image source={APP_LOGO} style={{ width: u(30), height: u(30) }} contentFit="contain" />
+        <Image source={appLogo} style={{ width: u(30), height: u(30) }} contentFit="contain" />
         <Text style={[styles.wmText, { fontSize: u(12) }]} allowFontScaling={false}>Seelogd</Text>
       </View>
     </View>

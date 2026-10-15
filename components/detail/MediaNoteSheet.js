@@ -11,7 +11,9 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "../common/BottomSheetModal";
+import SheetScroll from "../common/SheetScroll";
 import { useTheme } from "../../context/ThemeContext";
+import GlassCloseButton from "../common/GlassCloseButton";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext";
 import { alpha } from "../../theme/colors";
@@ -93,6 +95,9 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
     >
       <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
+      {/* Klavye açıkken sayfa küçülür: başlık + not alanı kayar, Kaydet/Sil
+          satırı klavyenin hemen üstünde sabit kalır. */}
+      <SheetScroll>
       <View style={styles.header}>
         {posterPath ? (
           <Image source={{ uri: getTmdbUrl(posterPath, "poster", 200) }} style={styles.poster} />
@@ -116,15 +121,13 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
             </Text>
           </View>
         </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-          style={[styles.closeButton, { backgroundColor: theme.between }]}
+        <GlassCloseButton
+          size={34}
+          fallbackRadius={11}
+          backgroundColor={theme.between}
           disabled={isBusy}
           onPress={closeSheet}
-        >
-          <Ionicons name="close" size={18} color={theme.text.muted} />
-        </TouchableOpacity>
+        />
       </View>
 
       <View style={[styles.textField, { backgroundColor: theme.primary, borderColor: theme.border }]}>
@@ -147,6 +150,7 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
           {Math.max(0, NOTE_TEXT_LIMIT - text.length)}
         </Text>
       </View>
+      </SheetScroll>
 
       <View style={styles.actionsRow}>
         {!!existing && (
@@ -207,7 +211,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: "800", letterSpacing: -0.25 },
   scopePill: { alignSelf: "flex-start", marginTop: 5, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2, flexDirection: "row", alignItems: "center", gap: 4 },
   scopeText: { fontSize: 9.5, lineHeight: 12, fontWeight: "800" },
-  closeButton: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },
 
   textField: { position: "relative", borderRadius: 14, borderWidth: 1, overflow: "hidden" },
   textInput: {

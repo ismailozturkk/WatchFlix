@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -10,48 +10,88 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
+import { planStoryActionBar } from "../../utils/storyCanvasLayout";
 
-
+// Ölçüler pencere genişliğinden HESAPLANIR (utils/storyCanvasLayout.js →
+// planStoryActionBar): eskiden `genişlik < 400` eşiğiyle iki sabit düzen vardı
+// ve 400–440 dp arasında "Tasarımı Paylaş" kırpılıyordu. Metin sığmıyorsa kısa
+// etiket seçilir; sığan en uzun başlık gösterilir.
 function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings, onSaveImage }) {
   const { theme } = useTheme();
   const { width } = useWindowDimensions();
-  const compact = width < 400;
-  const secondaryWidth = width < 350 ? 44 : compact ? 48 : 56;
+
+  const fullTitle = i18nText("autoI18n.tasarimi_paylas", "Tasarımı Paylaş");
+  const shortTitle = i18nText("autoI18n.paylas", "Paylaş");
+  const busyTitle = i18nText("autoI18n.gorsel_hazirlaniyor", "Görsel hazırlanıyor");
+  const subText = i18nText("autoI18n.png_olarak_disa_aktar", "PNG olarak dışa aktar");
+
+  const plan = useMemo(
+    () =>
+      planStoryActionBar(width, {
+        titles: busy ? [busyTitle, shortTitle] : [fullTitle, shortTitle],
+        // Düzen meşgulken değişmesin: çubuk yüksekliği sıçrayıp tuvali oynatmasın.
+        variantTitle: fullTitle,
+        sub: subText,
+      }),
+    [width, busy, busyTitle, shortTitle, fullTitle, subText]
+  );
+
+  const secondary = [
+    styles.iconBtn,
+    {
+      width: plan.secondaryW,
+      minHeight: plan.rowH,
+      backgroundColor: theme.secondary,
+      borderColor: theme.border,
+    },
+  ];
+
   return (
-    <View style={[styles.row, compact && styles.rowCompact]}>
+    <View style={[styles.row, { gap: plan.gap }]}>
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={onShare}
         disabled={busy}
         style={[
           styles.shareBtn,
-          compact && styles.shareBtnCompact,
-          { backgroundColor: theme.accent, opacity: busy ? 0.7 : 1 },
+          {
+            minHeight: plan.rowH,
+            gap: plan.innerGap,
+            paddingHorizontal: plan.pad.x,
+            paddingVertical: plan.pad.y,
+            backgroundColor: theme.accent,
+            opacity: busy ? 0.7 : 1,
+          },
         ]}
       >
         <View style={styles.glow} />
-        <View style={[styles.iconWrap, compact && styles.iconWrapCompact]}>
+        <View
+          style={[
+            styles.iconWrap,
+            { width: plan.icon, height: plan.icon, borderRadius: Math.round(plan.icon * 0.33) },
+          ]}
+        >
           {busy ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Ionicons name="share-social" size={22} color="#fff" />
+            <Ionicons name="share-social" size={plan.icon >= 42 ? 22 : 20} color="#fff" />
           )}
         </View>
         <View style={styles.copy}>
+          {/* adjustsFontSizeToFit: hesaplanan genişlik gerçek yazı tipinden dar
+              kalırsa (Android Roboto Black gibi) kırpmak yerine küçülür. */}
           <Text
             allowFontScaling={false}
             numberOfLines={1}
-            style={[styles.title, compact && styles.titleCompact]}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+            style={[styles.title, { fontSize: plan.titleSize }]}
           >
-            {busy
-              ? i18nText("autoI18n.gorsel_hazirlaniyor", "Görsel hazırlanıyor")
-              : compact
-                ? i18nText("autoI18n.paylas", "Paylaş")
-                : i18nText("autoI18n.tasarimi_paylas", "Tasarımı Paylaş")}
+            {plan.title}
           </Text>
-          {!compact && (
+          {plan.showSub && (
             <Text allowFontScaling={false} numberOfLines={1} style={styles.sub}>
-              {i18nText("autoI18n.png_olarak_disa_aktar", "PNG olarak dışa aktar")}
+              {subText}
             </Text>
           )}
         </View>
@@ -63,13 +103,10 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
           activeOpacity={0.85}
           onPress={onShareSticker}
           disabled={busy}
-          style={[
-            styles.iconBtn,
-            { width: secondaryWidth, backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
+          style={secondary}
         >
           <Ionicons name="cut-outline" size={22} color={theme.text.secondary} />
-          <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
+          <Text allowFontScaling={false} numberOfLines={1} style={[styles.iconLabel, { color: theme.text.muted }]}>
             {i18nText("autoI18n.sticker", "Sticker")}
           </Text>
         </TouchableOpacity>
@@ -79,13 +116,10 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
         activeOpacity={0.85}
         onPress={onSaveImage}
         disabled={busy}
-        style={[
-          styles.iconBtn,
-          { width: secondaryWidth, backgroundColor: theme.secondary, borderColor: theme.border },
-        ]}
+        style={secondary}
       >
         <Ionicons name="download-outline" size={22} color={theme.text.secondary} />
-        <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[styles.iconLabel, { color: theme.text.muted }]}>
           {i18nText("autoI18n.galeri", "Galeri")}
         </Text>
       </TouchableOpacity>
@@ -94,13 +128,12 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
         activeOpacity={0.85}
         onPress={onOpenSettings}
         disabled={busy}
-        style={[
-          styles.iconBtn,
-          { width: secondaryWidth, backgroundColor: theme.secondary, borderColor: theme.border },
-        ]}
+        style={secondary}
       >
         <Ionicons name="color-wand-outline" size={22} color={theme.accent} />
-        <Text allowFontScaling={false} style={[styles.iconLabel, { color: theme.text.muted }]}>{i18nText("autoI18n.duzenle", "Düzenle")}</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[styles.iconLabel, { color: theme.text.muted }]}>
+          {i18nText("autoI18n.duzenle", "Düzenle")}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -109,31 +142,20 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
 export const StoryActionBar = memo(StoryActionBarComponent);
 
 const styles = StyleSheet.create({
-  row: { width: "100%", flexDirection: "row", alignItems: "stretch", gap: 8 },
-  rowCompact: { gap: 6 },
+  row: { width: "100%", flexDirection: "row", alignItems: "stretch" },
   shareBtn: {
     flex: 1,
     minWidth: 0,
-    minHeight: 60,
     borderRadius: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.24,
     shadowRadius: 18,
     elevation: 10,
-  },
-  shareBtnCompact: {
-    minHeight: 56,
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
   },
   glow: {
     position: "absolute",
@@ -145,25 +167,20 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.16)",
   },
   iconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
-  iconWrapCompact: { width: 36, height: 36, borderRadius: 12 },
   copy: { flex: 1, minWidth: 0, gap: 2 },
-  title: { color: "#fff", fontSize: 16, fontWeight: "900" },
-  titleCompact: { fontSize: 13.5 },
+  title: { color: "#fff", fontWeight: "900" },
   sub: { color: "rgba(255,255,255,0.78)", fontSize: 11, fontWeight: "800" },
   iconBtn: {
-    minHeight: 56,
     borderRadius: 16,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: 3,
+    paddingHorizontal: 2,
   },
-  iconLabel: { fontSize: 10, fontWeight: "800" },
+  iconLabel: { fontSize: 10, fontWeight: "800", alignSelf: "stretch", textAlign: "center" },
 });

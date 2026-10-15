@@ -25,9 +25,7 @@ import { nestedSummaryFields } from "../utils/firestoreNestedFields";
 
 import {
   doc,
-  collection,
   runTransaction,
-  getDocs,
   writeBatch,
   deleteField,
   increment,
@@ -40,7 +38,7 @@ import {
   normalizeWatchDate,
 } from "../utils/watchHistory";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
-import { trackFirestoreWrite, trackFirestoreDelete } from "./usageTrackerService";
+import { trackFirestoreDelete } from "./usageTrackerService";
 import { trackFirstContentActivation } from "./activationAnalytics";
 import {
   assertWatchable,
@@ -54,10 +52,6 @@ import { updateLocalItem, deleteLocalItem } from "./listSyncService";
 // prefix'i zorunlu; tutarlılık için watchedTv de aynı şemayı kullanır.
 const showRef = (uid, showId) =>
   doc(db, "Lists", uid, "watchedTv", `tv_${showId}`);
-// Eski ayrı seasons alt-koleksiyonu BARE id altındaydı (`watchedTv/${id}/seasons`);
-// legacy okuma için bare path korunur (migrateSeasonSubdocs).
-const seasonsCol = (uid, showId) =>
-  collection(db, "Lists", uid, "watchedTv", String(showId), "seasons");
 
 function normalizeEpisode(ep, watchDate) {
   return {
@@ -193,52 +187,6 @@ function mergeWatchEvents(...groups) {
     });
   });
   return [...byId.values()];
-}
-
-// İki sezon dizisini BİRLEŞTİRİR (seasonNumber'a göre; bölümler episodeNumber
-// union'ı). İkilenen bare+tv_ doküman birleştirmesinde veri kaybını önler.
-function mergeSeasons(a, b) {
-  const bySeason = new Map();
-  [...(a || []), ...(b || [])].forEach((s) => {
-    if (!s || s.seasonNumber == null) return;
-    const existing = bySeason.get(s.seasonNumber);
-    if (!existing) {
-      bySeason.set(s.seasonNumber, { ...s, episodes: [...(s.episodes || [])] });
-      return;
-    }
-    const epNums = new Set(existing.episodes.map((e) => e.episodeNumber));
-    (s.episodes || []).forEach((e) => {
-      if (!epNums.has(e.episodeNumber)) {
-        existing.episodes.push(e);
-        epNums.add(e.episodeNumber);
-      } else {
-        const episodeIndex = existing.episodes.findIndex(
-          (episode) => episode.episodeNumber === e.episodeNumber,
-        );
-        const previousEpisode = existing.episodes[episodeIndex];
-        existing.episodes[episodeIndex] = {
-          ...e,
-          ...previousEpisode,
-          watchEvents: mergeWatchEvents(
-            previousEpisode?.watchEvents || [],
-            e?.watchEvents || [],
-          ),
-        };
-      }
-    });
-    existing.seasonPosterPath =
-      existing.seasonPosterPath ?? s.seasonPosterPath ?? null;
-    existing.seasonEpisodes =
-      existing.seasonEpisodes || s.seasonEpisodes || existing.episodes.length;
-    existing.addedSeasonDate =
-      existing.addedSeasonDate || s.addedSeasonDate || null;
-  });
-  return [...bySeason.values()]
-    .map((s) => ({
-      ...s,
-      episodes: (s.episodes || []).sort((x, y) => x.episodeNumber - y.episodeNumber),
-    }))
-    .sort((x, y) => x.seasonNumber - y.seasonNumber);
 }
 
 /**
@@ -671,49 +619,6 @@ export async function reorderWatchedShows(
 }
 
 /**
- * Eski BARE doc id'li (`watchedTv/1399`) show doküman'larını yeni `tv_${id}`
- * şemasına taşır VE bare+tv_ İKİLEMESİNİ giderir (ikileme = listelerde/
- * istatistikte aynı dizinin iki kez görünmesi).
- *
- * pendingRekey: [{ docId (bare), data (bare doc), existing (tv_ doc | null) }]
- *   - existing yok  → bare'i tv_ olarak kopyala, bare'i sil.
- *   - existing var  → tv_ kanonik; bare'in sezonlarını tv_'ye BİRLEŞTİR
- *                     (veri kaybı yok), bare'i sil.
- */
-export async function migrateWatchedTvDocIds(uid, pendingRekey) {
-  if (!uid || !Array.isArray(pendingRekey) || pendingRekey.length === 0) return false;
-  for (let i = 0; i < pendingRekey.length; i += 200) {
-    const batch = writeBatch(db);
-    pendingRekey.slice(i, i + 200).forEach(({ docId, data, existing }) => {
-      const id = data?.id ?? docId;
-      const tvRef = doc(db, "Lists", uid, "watchedTv", `tv_${id}`);
-      if (existing) {
-        const seasons = mergeSeasons(existing.seasons || [], data?.seasons || []);
-        batch.set(
-          tvRef,
-          {
-            ...data, // bare metadata (eksik alanlar için)
-            ...existing, // tv_ metadata öncelikli (daha güncel)
-            seasons,
-            watchEvents: mergeWatchEvents(
-              existing.watchEvents || [],
-              data?.watchEvents || [],
-            ),
-            ...recomputeAggregates(seasons),
-          },
-          { merge: true },
-        );
-      } else {
-        batch.set(tvRef, data, { merge: true });
-      }
-      batch.delete(doc(db, "Lists", uid, "watchedTv", docId));
-    });
-    await batch.commit();
-  }
-  return true;
-}
-
-/**
  * Eski kök-dizi modelindeki ({ ..., seasons:[{ seasonNumber, episodes:[...] }] })
  * tek bir diziyi tek-doküman modeline taşır — YALNIZ yeni modelde belgesi
  * olmayanlar için.
@@ -795,45 +700,4 @@ export async function clearLegacyWatchedTv(uid) {
     cleared = true;
   });
   return cleared;
-}
-
-/**
- * Eski SeasonItem'ın yazdığı `watchedTv/{showId}/seasons/{n}` AYRI alt-koleksiyon
- * doküman'larını show doküman'ına GÖMER (yeni model) ve alt-koleksiyonu siler.
- * `seasons` alanı zaten varsa hiçbir şey yapmaz. Bir şey taşındıysa true döner.
- */
-export async function migrateSeasonSubdocs(uid, showId) {
-  if (!uid || showId == null) return false;
-  const ref = showRef(uid, showId);
-  const seasonsSnap = await getDocs(seasonsCol(uid, showId));
-  if (seasonsSnap.empty) return false;
-
-  const seasons = seasonsSnap.docs
-    .map((d) => d.data())
-    .filter((s) => s && s.seasonNumber != null && (s.episodes || []).length > 0)
-    .map((s) => ({
-      seasonNumber: s.seasonNumber,
-      seasonPosterPath: s.seasonPosterPath || null,
-      seasonEpisodes: s.seasonEpisodes || (s.episodes || []).length,
-      addedSeasonDate: s.addedSeasonDate || null,
-      episodes: (s.episodes || [])
-        .map((e) => ({
-          episodeNumber: e.episodeNumber,
-          episodePosterPath: e.episodePosterPath || null,
-          episodeName: e.episodeName || "Unknown",
-          episodeRatings: e.episodeRatings || 0,
-          episodeMinutes: e.episodeMinutes || 0,
-          episodeWatchTime: e.episodeWatchTime || s.addedSeasonDate || null,
-        }))
-        .sort((a, b) => a.episodeNumber - b.episodeNumber),
-    }))
-    .sort((a, b) => a.seasonNumber - b.seasonNumber);
-
-  const batch = writeBatch(db);
-  if (seasons.length > 0) {
-    batch.set(ref, { seasons, ...recomputeAggregates(seasons) }, { merge: true });
-  }
-  seasonsSnap.docs.forEach((d) => batch.delete(d.ref));
-  await batch.commit();
-  return seasons.length > 0;
 }

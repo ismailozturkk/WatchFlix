@@ -1,388 +1,473 @@
 // screens/cineswipe/CineSwipeScreen.js
 //
-// CineSwipe ("Birlikte Ne İzlesek?") 2.0 ana oyun ve eşleşme ekranı.
-// Solo modda zengin kategori/tür filtreleme, kesintisiz sonsuz deste ve çoklu Beğeni Sepeti;
-// Duo modda yapılandırılabilir oda kurulumu, beklemede iptal butonu ve tüm eşleşmeler sonuç galerisi sunar.
+// CineSwipe ("Birlikte Ne İzlesek?") ana ekranı. Burada yalnız ORKESTRASYON var:
+//   • Solo deste durumu  → hooks/useCineSoloDeck (soloReducer + ağ),
+//   • deste / filtre / oda mantığı → services/cineswipe/*,
+//   • görünüm → components/cineswipe/*.
+//
+// Solo ↔ Duo geçişi solo desteyi ve sepeti korur. Duo'da oy sırası yerel
+// (`roomIndex`); oy yazılana kadar ilerlemez, yazma hatasında kart geri döner.
+// Odadan çıkış (geri tuşu / kaydırma / başlık oku) onay ister: bekleyen oda
+// kapatılır, oynanan oda yarım bırakılır.
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  TextInput,
-  Share,
-  Dimensions,
-  ScrollView,
-} from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { doc, writeBatch } from "firebase/firestore";
-import { db } from "../../firebase";
+import * as Clipboard from "expo-clipboard";
+import Toast from "react-native-toast-message";
 import AppIcon from "../../components/AppIcon";
-import { useTheme } from "../../context/ThemeContext";
-import { useLanguage } from "../../context/LanguageContext";
+import GlassCloseButton from "../../components/common/GlassCloseButton";
+import CineActionBar from "../../components/cineswipe/CineActionBar";
+import CineCardStack from "../../components/cineswipe/CineCardStack";
+import CineDuoLobby from "../../components/cineswipe/CineDuoLobby";
+import CineDuoProgress from "../../components/cineswipe/CineDuoProgress";
+import CineDuoResultsModal from "../../components/cineswipe/CineDuoResultsModal";
+import CineEmptyState from "../../components/cineswipe/CineEmptyState";
+import CineFilterSheet from "../../components/cineswipe/CineFilterSheet";
+import CineLikedBasketModal from "../../components/cineswipe/CineLikedBasketModal";
+import CineMatchModal from "../../components/cineswipe/CineMatchModal";
+import CineRoomConfigModal from "../../components/cineswipe/CineRoomConfigModal";
+import CineSegmented from "../../components/cineswipe/CineSegmented";
+import CineWaitingRoom from "../../components/cineswipe/CineWaitingRoom";
+import PressableScale from "../../components/cineswipe/PressableScale";
+import { cineColors } from "../../components/cineswipe/cineTheme";
+import { describeFilters } from "../../components/cineswipe/filterLabels";
+import useCineCopy from "../../components/cineswipe/useCineCopy";
 import { useAuth } from "../../context/AuthContext";
+import { useLanguage } from "../../context/LanguageContext";
+import { useListStatusContext } from "../../context/ListStatusContext";
+import { useSharedLists } from "../../context/SharedListsContext";
+import { useTheme } from "../../context/ThemeContext";
+import useCineSoloDeck from "../../hooks/useCineSoloDeck";
+import { usePremiumDailyGate, usePremiumGate } from "../../hooks/usePremiumGate";
+import usePremiumScreenGuard from "../../hooks/usePremiumScreenGuard";
 import { alpha } from "../../theme/colors";
 import {
-  fetchSwipeDeck,
+  assertCineRoomAvailable,
+  cineMediaKey,
+  cineVotesFor,
   createCineRoom,
+  deleteCineRoom,
+  fetchRoomDeck,
   joinCineRoom,
   recordSwipe,
   subscribeToCineRoom,
-  deleteCineRoom,
-  assertCineRoomAvailable,
   summarizeCineRoom,
-  cineVotesFor,
-  cineMediaKey,
 } from "../../services/cineswipe/cineswipeService";
 import { persistCineResults } from "../../services/cineswipe/cineResultsStore";
-import { Keys, get } from "../../services/storage";
-import { addToList } from "../../services/listItemsService";
-import { writeImportedItems } from "../../services/import/importWriter";
-import { createSharedList, addItemToSharedList } from "../../services/sharedListsService";
-import SwipeCard from "../../components/cineswipe/SwipeCard";
-import CineMatchModal from "../../components/cineswipe/CineMatchModal";
-import CineFilterSheet from "../../components/cineswipe/CineFilterSheet";
-import CineLikedBasketModal from "../../components/cineswipe/CineLikedBasketModal";
-import CineRoomConfigModal from "../../components/cineswipe/CineRoomConfigModal";
-import CineDuoResultsModal from "../../components/cineswipe/CineDuoResultsModal";
+import {
+  basketListName,
+  extractRoomCode,
+  fillText,
+  shuffleCards,
+  tmdbLanguage,
+  toListItem,
+} from "../../services/cineswipe/deckModel";
 import { triggerHaptic } from "../../services/hapticsService";
-import { useListStatusContext } from "../../context/ListStatusContext";
-import { useSharedLists } from "../../context/SharedListsContext";
-import { usePremiumDailyGate, usePremiumGate } from "../../hooks/usePremiumGate";
-import { getDailyUsed } from "../../services/premiumUsage";
-import Toast from "react-native-toast-message";
+import { addItemsToCustomRootList } from "../../services/listItemsService";
+import { addManyToMembership, setListMembership } from "../../services/libraryActions";
+import { addItemToSharedList, createSharedList } from "../../services/sharedListsService";
+import { Keys, get } from "../../services/storage";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const IDLE_ROOM = { state: "idle", id: null };
 
 export default function CineSwipeScreen({ route, navigation }) {
   const { theme } = useTheme();
+  const colors = useMemo(() => cineColors(theme), [theme]);
+  const copy = useCineCopy();
   const { user } = useAuth();
   const { t, language } = useLanguage();
+  const uid = user?.uid || null;
   const resultText = t.cineRoomResults;
   const joinText = t.cineRoomJoin;
-  const [joinError, setJoinError] = useState(null);
+
+  const [mode, setMode] = useState(route?.params?.initialMode === "duo" ? "duo" : "solo");
+
+  // ── Solo ───────────────────────────────────────────────────────────────────
+  const solo = useCineSoloDeck({ enabled: mode === "solo", language, userId: uid });
+  const { state: soloState, view } = solo;
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [showLikedBasket, setShowLikedBasket] = useState(false);
+  const [matchedMedia, setMatchedMedia] = useState(null);
+  const [matchIsWinner, setMatchIsWinner] = useState(false);
+  const [showMatchModal, setShowMatchModal] = useState(false);
+  const announcedWinner = useRef(null);
+
+  // ── Duo ────────────────────────────────────────────────────────────────────
+  const [roomState, setRoomState] = useState("idle"); // idle | created | playing | finished
+  const [roomId, setRoomId] = useState(null);
+  const [roomCode, setRoomCode] = useState("");
+  const [roomMeta, setRoomMeta] = useState(null);
+  const [roomDeck, setRoomDeck] = useState([]);
+  const [roomIndex, setRoomIndex] = useState(0);
+  const [inputCode, setInputCode] = useState("");
+  const [partnerName, setPartnerName] = useState(null);
+  const [currentRoomData, setCurrentRoomData] = useState(null);
+  const [allMatches, setAllMatches] = useState([]);
+  const [result, setResult] = useState(null);
+  const [lastResult, setLastResult] = useState(() => (uid ? get(Keys.cineLastResult, { uid }) : null));
+  const [cleanupError, setCleanupError] = useState(false);
   const [joining, setJoining] = useState(false);
-  const joinAttempt = useRef(0);
-  const joinBusy = useRef(false);
-  const codeInputRef = useRef(null);
-  const deckRequest = useRef(0);
-  const roomSession = useRef(0);
-  const swipeBusy = useRef(false);
-  const finishedRoom = useRef(null);
+  const [joinError, setJoinError] = useState(null);
   const [savingSwipe, setSavingSwipe] = useState(false);
   const [swipeError, setSwipeError] = useState(false);
   const [cardRevision, setCardRevision] = useState(0);
+  const [showRoomConfig, setShowRoomConfig] = useState(false);
+  const [showDuoResults, setShowDuoResults] = useState(false);
+  const [sharedState, setSharedState] = useState("idle");
+  const [watchlistState, setWatchlistState] = useState("idle");
+
+  const codeInputRef = useRef(null);
+  const stackRef = useRef(null);
+  const joinAttempt = useRef(0);
+  const joinBusy = useRef(false);
+  const roomSession = useRef(0);
+  const swipeBusy = useRef(false);
+  const finishedRoom = useRef(null);
+  const roomRef = useRef(IDLE_ROOM); // geri tuşu dinleyicisi için güncel oda durumu
+  roomRef.current = roomState === "created" || roomState === "playing" ? { state: roomState, id: roomId } : IDLE_ROOM;
+
   // Premium hakları: oda KURMA ve tek başına kaydırma günlük; sonuçları yeni
   // özel/ortak listeye kaydetmek liste limitlerine tabi. Odaya katılmak ve
   // odadaki ortak kaydırmalar serbest (işi başlatan sayılır).
+  // CineSwipe Premium'da: Hub kartı Free'de zaten yükseltme sayfasını açar; bu,
+  // ekrana başka bir yoldan ulaşılırsa ikinci kapıdır (bkz. hooks/usePremiumScreenGuard).
+  usePremiumScreenGuard("cineswipe_swipes", navigation);
   const roomsGate = usePremiumDailyGate("cineswipe_rooms");
   const swipesGate = usePremiumDailyGate("cineswipe_swipes");
   const customListsGate = usePremiumGate("custom_lists");
   const sharedListsGate = usePremiumGate("shared_lists");
   const { otherListKeys = [] } = useListStatusContext() || {};
   const { sharedLists = [] } = useSharedLists() || {};
-  const [result, setResult] = useState(null);
-  const [cleanupError, setCleanupError] = useState(false);
-  const [lastResult, setLastResult] = useState(() => user?.uid ? get(Keys.cineLastResult, { uid: user.uid }) : null);
-  useEffect(() => () => { joinAttempt.current += 1; roomSession.current += 1; }, []);
+
+  useEffect(
+    () => () => {
+      joinAttempt.current += 1;
+      roomSession.current += 1;
+    },
+    [],
+  );
 
   const resetRoom = useCallback(() => {
     roomSession.current += 1;
     finishedRoom.current = null;
     swipeBusy.current = false;
+    roomRef.current = IDLE_ROOM;
     setSavingSwipe(false);
     setSwipeError(false);
     setResult(null);
     setCleanupError(false);
     setRoomId(null);
     setRoomCode("");
+    setRoomMeta(null);
     setRoomState("idle");
     setCurrentRoomData(null);
     setPartnerName(null);
     setAllMatches([]);
-    setMatchedMedia(null);
-    setShowMatchModal(false);
+    setRoomDeck([]);
+    setRoomIndex(0);
     setShowDuoResults(false);
-    setCurrentIndex(0);
-    setHistory([]);
+    setSharedState("idle");
+    setWatchlistState("idle");
   }, []);
+
+  // Hesap değişince oda ve son sonuç sıfırlanır (solo deste kendi kancasında yenilenir).
   useEffect(() => {
     joinAttempt.current += 1;
     joinBusy.current = false;
     setJoining(false);
-    setLastResult(user?.uid ? get(Keys.cineLastResult, { uid: user.uid }) : null);
+    setLastResult(uid ? get(Keys.cineLastResult, { uid }) : null);
     resetRoom();
-  }, [user?.uid, resetRoom]);
+  }, [uid, resetRoom]);
 
-  const showRoomError = useCallback((error) => {
-    resetRoom();
-    setMode("duo");
-    setLoadingDeck(false);
-    setJoinError(error?.code?.replace(/^firestore\//, "") || "unknown");
-  }, [resetRoom]);
+  const showRoomError = useCallback(
+    (error) => {
+      resetRoom();
+      setMode("duo");
+      setJoinError(error?.code?.replace(/^firestore\//, "") || "unknown");
+    },
+    [resetRoom],
+  );
+
   const returnToHub = () => {
     joinAttempt.current += 1;
     resetRoom();
     navigation.navigate("TabScreen", { initialTab: "share" });
   };
-  const initialMode = route?.params?.initialMode || "solo";
 
-  const [mode, setMode] = useState(initialMode); // "solo" | "duo"
-  const [deck, setDeck] = useState([]);
-  const [loadingDeck, setLoadingDeck] = useState(true);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [history, setHistory] = useState([]);
-  const [page, setPage] = useState(1);
-  const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
-
-  // Solo Filtreleme Ayarları
-  const [category, setCategory] = useState("trending");
-  const [mediaType, setMediaType] = useState("movie");
-  const [genreId, setGenreId] = useState(null);
-
-  // Solo Beğenilenler Sepeti
-  const [likedBasket, setLikedBasket] = useState([]);
-
-  // Modallar
-  const [showFilterSheet, setShowFilterSheet] = useState(false);
-  const [showLikedBasket, setShowLikedBasket] = useState(false);
-  const [showRoomConfig, setShowRoomConfig] = useState(false);
-  const [showDuoResults, setShowDuoResults] = useState(false);
-
-  // Duo Oda Durumları
-  const [roomState, setRoomState] = useState("idle"); // "idle" | "created" | "playing" | "finished"
-  const [roomCode, setRoomCode] = useState("");
-  const [inputCode, setInputCode] = useState("");
-  const [roomId, setRoomId] = useState(null);
-  const [partnerName, setPartnerName] = useState(null);
-  const [currentRoomData, setCurrentRoomData] = useState(null);
-  const [allMatches, setAllMatches] = useState([]);
-
-  // Eşleşme Spotlight Modalı
-  const [matchedMedia, setMatchedMedia] = useState(null);
-  const [showMatchModal, setShowMatchModal] = useState(false);
-
-  // Desteyi Yükle
-  const loadDeck = useCallback(
-    async (customCategory = category, customMediaType = mediaType, customGenre = genreId) => {
-      const request = ++deckRequest.current;
-      setLoadingDeck(true);
-      setPage(1);
-      const items = await fetchSwipeDeck({
-        language: "tr-TR",
-        category: customCategory,
-        mediaType: customMediaType,
-        genreId: customGenre,
-        page: 1,
-        userId: user?.uid || null,
-      });
-      if (request !== deckRequest.current) return;
-      setDeck(items);
-      setCurrentIndex(0);
-      setHistory([]);
-      setLoadingDeck(false);
-    },
-    [category, mediaType, genreId, user?.uid]
+  // ── Odadan çıkış onayı ─────────────────────────────────────────────────────
+  useEffect(
+    () =>
+      navigation.addListener("beforeRemove", (event) => {
+        const { state, id } = roomRef.current;
+        if (state === "idle") return;
+        event.preventDefault();
+        Alert.alert(
+          copy.leave.title,
+          state === "created" ? copy.leave.bodyWaiting : copy.leave.bodyPlaying,
+          [
+            { text: copy.leave.stay, style: "cancel" },
+            {
+              text: copy.leave.confirm,
+              style: "destructive",
+              onPress: () => {
+                if (state === "created" && id) {
+                  // Kendi silmemiz: dinleyicinin "oda silindi" hatası arayüzü bozmasın.
+                  finishedRoom.current = id;
+                  deleteCineRoom(id).catch(() => {});
+                }
+                roomRef.current = IDLE_ROOM;
+                navigation.dispatch(event.data.action);
+              },
+            },
+          ],
+        );
+      }),
+    [navigation, copy],
   );
 
-  useEffect(() => {
-    if (mode === "solo" && roomState === "idle") loadDeck();
-  }, [loadDeck, mode, roomState]);
+  // ── Ortak yardımcılar ──────────────────────────────────────────────────────
+  const openDetails = useCallback(
+    (media) => {
+      if (!media) return;
+      navigation.navigate(media.mediaType === "tv" ? "TvShowDetailsScreen" : "MovieDetailsScreen", {
+        movieId: media.id,
+        tvShowId: media.id,
+        media: {
+          id: media.id,
+          type: media.mediaType || "movie",
+          title: media.title,
+          name: media.name,
+          poster_path: media.poster_path,
+        },
+      });
+    },
+    [navigation],
+  );
 
-  // Sonsuz Kaydırma: Deste azaldıkça sonraki sayfayı çek
-  const checkNextPage = async (nextIndex) => {
-    if (mode !== "solo" || category === "watchlist" || isFetchingNextPage) return;
-    if (nextIndex >= deck.length - 4) {
-      setIsFetchingNextPage(true);
+  /** CineMatchModal "Eklendi ✓" göstersin diye başarıyı döndürür. */
+  const addOneToWatchlist = useCallback(
+    async (media) => {
+      if (!uid || !media) return false;
       try {
-        const nextPage = page + 1;
-        const nextItems = await fetchSwipeDeck({
-          language: "tr-TR",
-          category,
-          mediaType,
-          genreId,
-          page: nextPage,
-          userId: user?.uid || null,
+        await setListMembership({
+          uid,
+          listKey: "watchList",
+          item: toListItem(media),
+          desired: true,
         });
-        if (nextItems && nextItems.length > 0) {
-          setPage(nextPage);
-          setDeck((prev) => [...prev, ...nextItems]);
-        }
-      } catch (e) {
-        // sessizce geç
-      } finally {
-        setIsFetchingNextPage(false);
+        return true;
+      } catch (error) {
+        Toast.show({ type: "error", text1: copy.toasts.watchlistError });
+        return false;
       }
+    },
+    [uid, copy],
+  );
+
+  const addManyToWatchlist = useCallback(
+    async (items) => {
+      if (!uid || !items?.length) return false;
+      try {
+        // Eskiden içe aktarma yazıcısından geçiyordu: eser başına transaction +
+        // tüm yorumları okuma + sonunda profil istatistiğini BÜTÜN listeleri
+        // tarayarak yeniden hesaplama. Sepeti izlenecekler listesine eklemek için
+        // 100'lük parçalar hâlinde tek transaction yeter.
+        await addManyToMembership({
+          uid,
+          listKey: "watchList",
+          items: items.map((item) => toListItem(item)),
+        });
+        Toast.show({
+          type: "success",
+          text1: copy.toasts.watchlistBulkTitle,
+          text2: fillText(copy.toasts.watchlistBulkBody, { n: items.length }),
+        });
+        return true;
+      } catch (error) {
+        Toast.show({ type: "error", text1: copy.toasts.watchlistError });
+        return false;
+      }
+    },
+    [uid, copy],
+  );
+
+  // ── Solo ───────────────────────────────────────────────────────────────────
+  const swipesAllowedSolo = swipesGate.allows(swipesGate.used);
+  const isSoloLoading = soloState.status === "loading" || view.waitingMore;
+  const soloCards = soloState.status === "ready" ? soloState.deck.slice(soloState.index, soloState.index + 3) : [];
+
+  const handleSoloSwipe = (direction, media) => {
+    // Üstteki kart ile durum makinesinin kartı ayrışırsa oy sayılmaz.
+    if (!view.current || cineMediaKey(media) !== cineMediaKey(view.current)) return;
+    if (!swipesGate.tryConsume()) {
+      setCardRevision((value) => value + 1); // Hak bitti: kart ortaya döner.
+      return;
+    }
+    solo.swipe(direction);
+  };
+
+  const handleUndo = () => {
+    if (!view.canUndo) return;
+    triggerHaptic("selection");
+    solo.undo();
+    swipesGate.refund(); // Geri alınan kart yeniden kaydırılacak: hakkı iade et.
+  };
+
+  const openMatch = (media, winner = false) => {
+    setMatchedMedia(media);
+    setMatchIsWinner(winner);
+    setShowMatchModal(true);
+  };
+
+  const handleReroll = () => {
+    const pool = soloState.basket.filter((item) => cineMediaKey(item) !== cineMediaKey(matchedMedia));
+    if (pool.length) setMatchedMedia(pool[Math.floor(Math.random() * pool.length)]);
+  };
+
+  const startSecondRound = (items) => {
+    solo.startFinal(shuffleCards(items));
+    Toast.show({ type: "success", text1: copy.solo.finalStartedTitle, text2: copy.solo.finalStartedBody });
+  };
+
+  const saveBasketAsList = async (items) => {
+    if (!uid || !items?.length) return;
+    const name = basketListName();
+    // Aynı günün listesi varsa ona eklenir (yeni liste açılmaz, limit dışı).
+    if (!otherListKeys.includes(name) && !customListsGate.check(otherListKeys.length)) return;
+    try {
+      const outcome = await addItemsToCustomRootList(uid, name, items.map((item) => toListItem(item)));
+      if (outcome.added === 0) {
+        Toast.show({ type: "info", text1: fillText(copy.toasts.listNothingNew, { name }) });
+      } else {
+        Toast.show({
+          type: "success",
+          text1: copy.toasts.listSavedTitle,
+          text2: fillText(copy.toasts.listSavedBody, { name, n: outcome.added }),
+        });
+      }
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1:
+          error?.code === "list-name-conflict"
+            ? fillText(copy.toasts.listConflict, { name })
+            : copy.toasts.listError,
+      });
     }
   };
 
-  const receiveResults = useCallback(async (rId, roomData) => {
-    const summary = summarizeCineRoom(roomData);
-    if (finishedRoom.current === rId) return;
-    if (!summary.complete) { showRoomError({ code: "room-expired" }); return; }
-    finishedRoom.current = rId;
-    const finalResult = {
-      roomId: rId, summary,
-      room: { hostUid: roomData.hostUid, guestUid: roomData.guestUid,
-        hostName: roomData.hostName || "", guestName: roomData.guestName || "",
-        hostAvatar: roomData.hostAvatar || null, guestAvatar: roomData.guestAvatar || null },
-    };
-    setResult(finalResult);
-    setCurrentRoomData(finalResult.room);
-    setAllMatches(summary.matches);
-    setRoomState("finished");
-    setShowDuoResults(true);
-    setRoomId(null); // Detach before expected server deletion; keep the local result.
-    setSavingSwipe(false);
-    triggerHaptic("notification");
-    const session = roomSession.current;
-    try {
-      const saved = await persistCineResults(finalResult, user.uid);
-      if (session === roomSession.current) { setLastResult(saved); setCleanupError(false); }
-    } catch (error) {
-      if (session === roomSession.current) {
-        setLastResult(get(Keys.cineLastResult, { uid: user.uid }));
-        setCleanupError(true);
-      }
-    }
-  }, [user?.uid, showRoomError]);
-
-  const retryResultSave = async () => {
-    if (!result || !user?.uid) return;
-    const session = roomSession.current;
-    try {
-      const saved = await persistCineResults(result, user.uid);
-      if (session === roomSession.current) { setLastResult(saved); setCleanupError(false); }
-    } catch (error) {
-      if (session === roomSession.current) {
-        setLastResult(get(Keys.cineLastResult, { uid: user.uid }));
-        setCleanupError(true);
-      }
-    }
-  };
-
-  // Final results open once, only after both participants finish every card.
+  // 2. tur sonunda tek içerik kalırsa kazanan sayfası kendiliğinden açılır (bir kez).
+  const winnerKey = view.winner ? `${soloState.requestId}_${cineMediaKey(view.winner)}` : null;
   useEffect(() => {
-    if (!roomId) return;
-    let active = true;
-    const unsub = subscribeToCineRoom(roomId, (roomData) => {
-      if (!active || finishedRoom.current === roomId) return;
-      try { assertCineRoomAvailable(roomData, user?.uid); }
-      catch (error) { showRoomError(error); return; }
-      if (roomData.status === "finished") {
-        receiveResults(roomId, roomData);
+    if (!winnerKey || mode !== "solo" || announcedWinner.current === winnerKey) return;
+    announcedWinner.current = winnerKey;
+    setMatchedMedia(view.winner);
+    setMatchIsWinner(true);
+    setShowMatchModal(true);
+  }, [winnerKey, mode, view.winner]);
+
+  // ── Duo: oda yaşam döngüsü ─────────────────────────────────────────────────
+  const receiveResults = useCallback(
+    async (rId, roomData) => {
+      const summary = summarizeCineRoom(roomData);
+      if (finishedRoom.current === rId) return;
+      if (!summary.complete) {
+        showRoomError({ code: "room-expired" });
         return;
       }
-      setCurrentRoomData(roomData);
-      if (roomData.status === "active") {
-        setRoomState("playing");
-        setPartnerName(roomData.hostUid === user?.uid ? roomData.guestName : roomData.hostName);
+      finishedRoom.current = rId;
+      const finalResult = {
+        roomId: rId,
+        summary,
+        room: {
+          hostUid: roomData.hostUid,
+          guestUid: roomData.guestUid,
+          hostName: roomData.hostName || "",
+          guestName: roomData.guestName || "",
+          hostAvatar: roomData.hostAvatar || null,
+          guestAvatar: roomData.guestAvatar || null,
+        },
+      };
+      setResult(finalResult);
+      setCurrentRoomData(finalResult.room);
+      setAllMatches(summary.matches);
+      setRoomState("finished");
+      setShowDuoResults(true);
+      setRoomId(null); // Beklenen sunucu silmesinden önce ayrıl; yerel sonuç kalır.
+      setSavingSwipe(false);
+      triggerHaptic("notification");
+      const session = roomSession.current;
+      try {
+        const saved = await persistCineResults(finalResult, uid);
+        if (session === roomSession.current) {
+          setLastResult(saved);
+          setCleanupError(false);
+        }
+      } catch (error) {
+        if (session === roomSession.current) {
+          setLastResult(get(Keys.cineLastResult, { uid }));
+          setCleanupError(true);
+        }
       }
-    }, (error) => {
-      if (active && finishedRoom.current !== roomId) showRoomError(error);
-    });
-    return () => { active = false; unsub(); };
-  }, [roomId, user?.uid, receiveResults, showRoomError]);
+    },
+    [uid, showRoomError],
+  );
 
-  const handleDuoSwipe = async (media, direction) => {
-    if (swipeBusy.current || !roomId || !user?.uid || roomState !== "playing" || !media) return;
-    if (cineMediaKey(media) !== cineMediaKey(deck[currentIndex] || {})) return;
-    swipeBusy.current = true;
-    setSavingSwipe(true);
-    setSwipeError(false);
+  const retryResultSave = async () => {
+    if (!result || !uid) return;
     const session = roomSession.current;
     try {
-      const { roomData } = await recordSwipe(roomId, user.uid, media, direction);
-      if (session !== roomSession.current) return;
-      setCurrentIndex((index) => index + 1);
-      if (roomData.status === "finished") receiveResults(roomId, roomData);
-    } catch (error) {
-      if (session !== roomSession.current || finishedRoom.current) return;
-      if (["permission-denied", "unauthenticated", "room-deleted", "room-expired"].includes(error?.code?.replace(/^firestore\//, ""))) {
-        showRoomError(error);
-      } else {
-        setSwipeError(true);
-        setCardRevision((value) => value + 1); // Return the animated card after a failed write.
-      }
-    } finally {
+      const saved = await persistCineResults(result, uid);
       if (session === roomSession.current) {
-        swipeBusy.current = false;
-        setSavingSwipe(false);
+        setLastResult(saved);
+        setCleanupError(false);
+      }
+    } catch (error) {
+      if (session === roomSession.current) {
+        setLastResult(get(Keys.cineLastResult, { uid }));
+        setCleanupError(true);
       }
     }
   };
 
-  // Sağa Kaydırma (Beğen)
-  // Solo kaydırma hakkı: doluysa kart geri döner ve uyarı çıkar.
-  const consumeSoloSwipe = () => {
-    if (!swipesGate.allows(getDailyUsed("cineswipe_swipes"))) {
-      setCardRevision((value) => value + 1);
-      swipesGate.showUpsell();
-      return false;
-    }
-    swipesGate.consume();
-    return true;
-  };
+  // Sonuç yalnız iki katılımcı da tüm kartları bitirince, bir kez açılır.
+  useEffect(() => {
+    if (!roomId) return undefined;
+    let active = true;
+    const unsubscribe = subscribeToCineRoom(
+      roomId,
+      (roomData) => {
+        if (!active || finishedRoom.current === roomId) return;
+        try {
+          assertCineRoomAvailable(roomData, uid);
+        } catch (error) {
+          showRoomError(error);
+          return;
+        }
+        if (roomData.status === "finished") {
+          receiveResults(roomId, roomData);
+          return;
+        }
+        setCurrentRoomData(roomData);
+        if (roomData.status === "active") {
+          setRoomState("playing");
+          setPartnerName(roomData.hostUid === uid ? roomData.guestName : roomData.hostName);
+        }
+      },
+      (error) => {
+        if (active && finishedRoom.current !== roomId) showRoomError(error);
+      },
+    );
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [roomId, uid, receiveResults, showRoomError]);
 
-  const handleSwipeRight = async (media) => {
-    if (mode === "duo") return handleDuoSwipe(media, "like");
-    if (!consumeSoloSwipe()) return;
-    const nextIdx = currentIndex + 1;
-    setHistory((prev) => [...prev, { media, direction: "like", index: currentIndex }]);
-    setCurrentIndex(nextIdx);
-
-    // Beğeni Sepetine Ekle (Solo)
-    setLikedBasket((prev) => {
-      if (prev.some((m) => String(m.id) === String(media.id))) return prev;
-      return [...prev, media];
-    });
-
-    checkNextPage(nextIdx);
-
-
-  };
-
-  // Sola Kaydırma (Pas)
-  const handleSwipeLeft = async (media) => {
-    if (mode === "duo") return handleDuoSwipe(media, "pass");
-    if (!consumeSoloSwipe()) return;
-    const nextIdx = currentIndex + 1;
-    setHistory((prev) => [...prev, { media, direction: "pass", index: currentIndex }]);
-    setCurrentIndex(nextIdx);
-
-    checkNextPage(nextIdx);
-
-
-  };
-
-  // Son Hareketi Geri Al
-  const handleUndo = () => {
-    if (mode !== "solo" || history.length === 0 || currentIndex === 0) return;
-    triggerHaptic("selection");
-    const lastAction = history[history.length - 1];
-    if (lastAction?.direction === "like") {
-      setLikedBasket((prev) => prev.filter((m) => String(m.id) !== String(lastAction.media?.id)));
-    }
-    setHistory((prev) => prev.slice(0, -1));
-    setCurrentIndex((prev) => Math.max(0, prev - 1));
-    // Geri alınan kart yeniden kaydırılacak: hakkı iade et.
-    swipesGate.refund();
-  };
-
-  // Filtreleri Uygula
-  const handleApplyFilters = ({ category: cat, mediaType: mType, genreId: gId }) => {
-    setCategory(cat);
-    setMediaType(mType);
-    setGenreId(gId);
-    loadDeck(cat, mType, gId);
-  };
-
-  // Duo Oda Kurulumunu Başlat
   const handleOpenRoomConfig = () => {
     if (!user) {
-      Toast.show({ type: "info", text1: "Oda kurmak için giriş yapmalısınız." });
+      Toast.show({ type: "info", text1: copy.toasts.needLogin });
       return;
     }
     // Günlük oda kurma hakkı; harcama oda gerçekten kurulunca.
@@ -391,79 +476,77 @@ export default function CineSwipeScreen({ route, navigation }) {
     setShowRoomConfig(true);
   };
 
-  // Oda Yapılandırmasını Onayla & Kur
   const handleConfirmCreateRoom = async (config) => {
     if (joinBusy.current) return;
     joinBusy.current = true;
     setJoining(true);
     setJoinError(null);
-    deckRequest.current += 1;
     resetRoom();
     const session = roomSession.current;
-    setLoadingDeck(true);
     try {
-      const freshDeck = [];
-      const seen = new Set();
-      const target = config.targetCardsCount || 20;
-      for (let page = 1; freshDeck.length < target && page <= 5; page += 1) {
-        const items = await fetchSwipeDeck({
-          language: language === "tr" ? "tr-TR" : "en-US",
-          category: config.category || "trending", mediaType: "all", page, userId: user?.uid,
-        });
-        if (!items.length) break;
-        for (const item of items) {
-          if (!seen.has(cineMediaKey(item))) { freshDeck.push(item); seen.add(cineMediaKey(item)); }
-        }
-        if (config.category === "watchlist") break;
-      }
-
+      const freshDeck = await fetchRoomDeck(config, { language: tmdbLanguage(language), userId: uid });
       if (session !== roomSession.current) return;
-      const { roomId: rId, roomCode: rCode } = await createCineRoom(user, freshDeck, config);
+      const { roomId: newId, roomCode: newCode } = await createCineRoom(user, freshDeck, config);
       if (session !== roomSession.current) {
-        await deleteCineRoom(rId);
+        await deleteCineRoom(newId).catch(() => {});
         return;
       }
-      setRoomId(rId);
-      setRoomCode(rCode);
-      setDeck(freshDeck.slice(0, config.targetCardsCount || 20));
+      setRoomId(newId);
+      setRoomCode(newCode);
+      setRoomDeck(freshDeck);
+      setRoomIndex(0);
+      setRoomMeta({
+        count: freshDeck.length,
+        category: config.category,
+        mediaType: config.mediaType,
+        genreId: config.genreId ?? null,
+      });
       setRoomState("created");
       roomsGate.consume();
       triggerHaptic("notification");
-    } catch (e) {
-      if (session === roomSession.current) showRoomError(e);
+    } catch (error) {
+      if (session === roomSession.current) showRoomError(error);
     } finally {
       joinBusy.current = false;
       setJoining(false);
-      setLoadingDeck(false);
     }
   };
 
-  // Beklemedeki Odayı İptal Et
   const handleCancelRoom = async () => {
     if (!roomId) return;
-    try { await deleteCineRoom(roomId); resetRoom(); }
-    catch (error) { showRoomError(error); }
+    finishedRoom.current = roomId; // Kendi silmemiz: "oda silindi" hatası gösterilmesin.
+    try {
+      await deleteCineRoom(roomId);
+      resetRoom();
+    } catch (error) {
+      finishedRoom.current = null;
+      showRoomError(error);
+    }
   };
 
-  // Odaya Katıl
   const handleJoinRoom = async () => {
     if (joinBusy.current) return;
     joinBusy.current = true;
     const attempt = ++joinAttempt.current;
-    deckRequest.current += 1;
     setJoining(true);
     setJoinError(null);
     try {
-      const { roomId: rId, roomData } = await joinCineRoom(inputCode, user);
+      const { roomId: joinedId, roomData } = await joinCineRoom(inputCode, user);
       if (attempt !== joinAttempt.current) return;
       resetRoom();
-      setRoomId(rId);
+      const cards = roomData.deck || [];
+      const nextIndex = cards.findIndex((media) => !cineVotesFor(roomData, media)[uid]);
+      setRoomId(joinedId);
       setRoomCode(roomData.roomCode || inputCode.trim());
-      setDeck(roomData.deck || []);
-      const nextIndex = (roomData.deck || []).findIndex((media) => !cineVotesFor(roomData, media)[user.uid]);
-      setCurrentIndex(nextIndex < 0 ? (roomData.deck || []).length : nextIndex);
-      setLoadingDeck(false);
-      setPartnerName(roomData.hostUid === user.uid ? roomData.guestName : roomData.hostName);
+      setRoomDeck(cards);
+      setRoomIndex(nextIndex < 0 ? cards.length : nextIndex);
+      setRoomMeta({
+        count: cards.length,
+        category: roomData.category || "trending",
+        mediaType: roomData.mediaType || "all",
+        genreId: roomData.genreId ?? null,
+      });
+      setPartnerName(roomData.hostUid === uid ? roomData.guestName : roomData.hostName);
       setRoomState(roomData.status === "waiting" ? "created" : "playing");
       triggerHaptic("notification");
     } catch (error) {
@@ -474,129 +557,113 @@ export default function CineSwipeScreen({ route, navigation }) {
     }
   };
 
-  // Oda Kodunu Paylaş
+  const handleDuoSwipe = async (direction, media) => {
+    if (swipeBusy.current || !roomId || !uid || roomState !== "playing" || !media) return;
+    if (cineMediaKey(media) !== cineMediaKey(roomDeck[roomIndex] || {})) return;
+    swipeBusy.current = true;
+    setSavingSwipe(true);
+    setSwipeError(false);
+    const session = roomSession.current;
+    try {
+      const { roomData } = await recordSwipe(roomId, uid, media, direction);
+      if (session !== roomSession.current) return;
+      setRoomIndex((index) => index + 1);
+      if (roomData.status === "finished") receiveResults(roomId, roomData);
+    } catch (error) {
+      if (session !== roomSession.current || finishedRoom.current) return;
+      if (["permission-denied", "unauthenticated", "room-deleted", "room-expired"].includes(error?.code?.replace(/^firestore\//, ""))) {
+        showRoomError(error);
+      } else {
+        setSwipeError(true);
+        setCardRevision((value) => value + 1); // Yazma hatası: animasyonlu kart geri döner.
+      }
+    } finally {
+      if (session === roomSession.current) {
+        swipeBusy.current = false;
+        setSavingSwipe(false);
+      }
+    }
+  };
+
+  const handleSwipe = (direction, media) => {
+    if (mode === "duo") handleDuoSwipe(direction, media);
+    else handleSoloSwipe(direction, media);
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      await Clipboard.setStringAsync(roomCode);
+      triggerHaptic("selection");
+      Toast.show({ type: "success", text1: copy.toasts.codeCopied });
+    } catch (error) {
+      // Pano kullanılamıyorsa paylaşım yolu hâlâ açık.
+    }
+  };
+
   const handleShareCode = async () => {
     try {
-      await Share.share({
-        message: `Seelogd'da bu akşam ne izleyeceğimizi seçiyoruz! Oda Kodum: ${roomCode}`,
-      });
-    } catch (e) {
-      // sessizce geç
+      await Share.share({ message: fillText(copy.room.shareMessage, { code: roomCode }) });
+    } catch (error) {
+      // Paylaşım sayfası kapatıldı.
     }
   };
 
-  // İzleme Listesine Tek Ekle
-  const handleAddToWatchlist = async (media) => {
-    if (!user?.uid || !media) return;
+  const handlePasteCode = async () => {
+    let code = "";
     try {
-      await addToList(user.uid, "watchList", {
-        id: media.id,
-        type: media.mediaType || "movie",
-        name: media.title || media.name,
-        imagePath: media.poster_path,
-        minutes: null,
-        genres: [],
-      });
-      Toast.show({ type: "success", text1: "İzleme listesine eklendi!" });
-    } catch (e) {
-      Toast.show({ type: "error", text1: "Listeye eklenemedi." });
+      code = extractRoomCode(await Clipboard.getStringAsync());
+    } catch (error) {
+      code = "";
+    }
+    if (code) {
+      setInputCode(code);
+      setJoinError(null);
+    } else {
+      Toast.show({ type: "info", text1: copy.toasts.pasteEmpty });
     }
   };
 
-  // Toplu İzleme Listesine Ekle
-  const handleAddAllToWatchlist = async (items) => {
-    if (!user?.uid || !items || items.length === 0) return;
-    try {
-      const formatted = items.map((it) => ({
-        ...it,
-        targetList: "watchList",
-      }));
-      await writeImportedItems(user.uid, formatted);
-      Toast.show({
-        type: "success",
-        text1: "Tümü İçe Aktarıldı!",
-        text2: `${items.length} film izleme listenize eklendi.`,
-      });
-    } catch (e) {
-      Toast.show({ type: "error", text1: "Toplu ekleme başarısız oldu." });
-    }
+  const openLastResult = () => {
+    if (!lastResult?.room || !lastResult?.summary) return;
+    setResult(lastResult);
+    setCleanupError(!!lastResult.receiptPending);
+    setCurrentRoomData(lastResult.room);
+    setAllMatches(lastResult.summary.matches);
+    setPartnerName(lastResult.room.hostUid === uid ? lastResult.room.guestName : lastResult.room.hostName);
+    setSharedState("idle");
+    setWatchlistState("idle");
+    setRoomState("finished");
+    setShowDuoResults(true);
   };
 
-  // Solo: Kişisel Özel Liste Oluştur
-  const handleSaveAsPersonalCustomList = async (items) => {
-    if (!user?.uid || !items || items.length === 0) return;
-    const dateStr = new Date().toLocaleDateString("tr-TR");
-    const listName = `CineSwipe (${dateStr})`;
-    // Aynı günün listesi varsa ona eklenir (yeni liste açılmaz, limit dışı).
-    if (
-      !otherListKeys.includes(listName) &&
-      !customListsGate.check(otherListKeys.length, {
-        onUpgrade: () => setShowLikedBasket(false),
-      })
-    ) {
-      return;
-    }
-    try {
-      const docRef = doc(db, "Lists", user.uid);
-      const userRef = doc(db, "Users", user.uid);
-
-      const normalizedItems = items.map((it) => ({
-        id: it.id,
-        type: it.mediaType || "movie",
-        name: it.title || it.name || "Film",
-        imagePath: it.poster_path || null,
-        minutes: null,
-        genres: [],
-        dateAdded: new Date().toISOString().slice(0, 10),
-      }));
-
-      const listEntry = {
-        listId: `cine_${Date.now()}`,
-        name: listName,
-        createdAt: new Date().toISOString(),
-      };
-
-      const batch = writeBatch(db);
-      batch.set(docRef, { [listName]: normalizedItems }, { merge: true });
-      batch.set(userRef, { listVisible: { [listName]: true } }, { merge: true });
-      await batch.commit();
-
-      Toast.show({
-        type: "success",
-        text1: "Özel Liste Oluşturuldu! 📑",
-        text2: `"${listName}" listenize ${items.length} içerik kaydedildi.`,
-      });
-    } catch (e) {
-      Toast.show({ type: "error", text1: "Özel liste oluşturulamadı: " + e.message });
-    }
+  // Duo sonucu: izleme listesine toplu ekleme ve ortak liste (durumlu düğmeler).
+  const addMatchesToWatchlist = async (items) => {
+    if (watchlistState !== "idle") return;
+    setWatchlistState("saving");
+    const ok = await addManyToWatchlist(items);
+    setWatchlistState(ok ? "done" : "idle");
   };
 
-  // Duo: Ortak Liste Oluştur
-  const handleSaveAsSharedList = async (items) => {
-    if (!user?.uid || !items || items.length === 0) return;
-    const ownedSharedLists = sharedLists.filter((l) => l.ownerId === user.uid).length;
-    if (
-      !sharedListsGate.check(ownedSharedLists, {
-        onUpgrade: () => setShowDuoResults(false),
-      })
-    ) {
-      return;
-    }
+  const saveMatchesAsSharedList = async (items) => {
+    if (!uid || !items?.length || sharedState !== "idle") return;
+    const ownedSharedLists = sharedLists.filter((list) => list.ownerId === uid).length;
+    if (!sharedListsGate.check(ownedSharedLists, { onUpgrade: () => setShowDuoResults(false) })) return;
+    setSharedState("saving");
     try {
-      const partnerDisplayName = partnerName || "Arkadaş";
-      const listName = `CineSwipe (${partnerDisplayName} & ${user.displayName || "Ben"})`;
-
-      // Partner arkadaş nesnesi
-      const isHost = currentRoomData?.hostUid === user.uid;
+      const partnerLabel = partnerName || copy.results.friend;
+      const listName = fillText(copy.results.listName, {
+        a: partnerLabel,
+        b: user.displayName || copy.results.me,
+      });
+      const isHost = currentRoomData?.hostUid === uid;
       const partnerUid = isHost ? currentRoomData?.guestUid : currentRoomData?.hostUid;
       const partnerAvatar = isHost ? currentRoomData?.guestAvatar : currentRoomData?.hostAvatar;
-
       const friends = partnerUid
         ? [
             {
               uid: partnerUid,
-              name: partnerDisplayName,
-              username: partnerDisplayName,
+              name: partnerLabel,
+              username: partnerLabel,
               avatarIndex: typeof partnerAvatar === "number" ? partnerAvatar : 0,
               canAdd: true,
               canRemove: true,
@@ -604,476 +671,490 @@ export default function CineSwipeScreen({ route, navigation }) {
             },
           ]
         : [];
-
-      const listId = await createSharedList({
-        owner: user,
-        name: listName,
-        friends,
-      });
-
-      for (const it of items) {
+      const listId = await createSharedList({ owner: user, name: listName, friends });
+      for (const item of items) {
         await addItemToSharedList({
           listId,
           user,
           item: {
-            id: it.id,
-            type: it.mediaType || "movie",
-            name: it.title || it.name || "Film",
-            imagePath: it.poster_path || null,
+            id: item.id,
+            type: item.mediaType === "tv" ? "tv" : "movie",
+            name: item.title || item.name || "",
+            imagePath: item.poster_path || null,
             genres: [],
           },
         });
       }
-
-      Toast.show({
-        type: "success",
-        text1: "Ortak Liste Oluşturuldu! 👥",
-        text2: `"${listName}" listesi arkadaşınızla paylaşıldı.`,
-      });
-    } catch (e) {
-      Toast.show({ type: "error", text1: "Ortak liste oluşturulamadı: " + e.message });
+      setSharedState("done");
+    } catch (error) {
+      setSharedState("idle");
+      Toast.show({ type: "error", text1: copy.results.sharedError });
     }
   };
 
-  // Sepetten 2. Tur Oyna (Final Turu)
-  const handlePlaySecondRound = (basketItems) => {
-    setDeck([...basketItems]);
-    setCurrentIndex(0);
-    setHistory([]);
-    setLikedBasket([]);
-    Toast.show({
-      type: "success",
-      text1: "2. Tur Başladı! 🎬",
-      text2: "Yalnızca beğendiğiniz filmlerle eleme yapıyorsunuz.",
-    });
+  // ── Görünüm ────────────────────────────────────────────────────────────────
+  const duoCards = roomDeck.slice(roomIndex, roomIndex + 3);
+  const duoUpcoming = roomDeck.slice(roomIndex + 1, roomIndex + 7);
+  const progress = roomState === "playing" && currentRoomData ? summarizeCineRoom(currentRoomData) : null;
+  const partnerProgress = currentRoomData?.hostUid === uid ? progress?.guest : progress?.host;
+  const isHost = currentRoomData?.hostUid === uid;
+  const duoStatusText = swipeError ? resultText.voteError : savingSwipe ? resultText.saving : "";
+
+  const waitingSummary = roomMeta
+    ? fillText(copy.room.summary, {
+        count: roomMeta.count,
+        filters: describeFilters(roomMeta, copy)
+          .map((part) => part.label)
+          .join(" · "),
+      })
+    : "";
+
+  const subtitle =
+    mode === "solo"
+      ? copy.header.solo
+      : partnerName
+        ? fillText(copy.header.duoWith, { name: partnerName })
+        : copy.header.duo;
+
+  const modeOptions = [
+    { id: "solo", icon: "person", label: copy.modes.solo },
+    { id: "duo", icon: "people", label: copy.modes.duo },
+  ];
+
+  const openFilters = () => {
+    triggerHaptic("selection");
+    setShowFilterSheet(true);
   };
 
-  // Detay Sayfasını Aç
-  const handleViewDetails = (media) => {
-    const routeName = media.mediaType === "tv" ? "TvShowDetailsScreen" : "MovieDetailsScreen";
-    navigation.navigate(routeName, {
-      movieId: media.id,
-      tvShowId: media.id,
-      media: {
-        id: media.id,
-        type: media.mediaType || "movie",
-        title: media.title,
-        name: media.name,
-        poster_path: media.poster_path,
-      },
-    });
+  const openBasket = () => {
+    triggerHaptic("selection");
+    setShowLikedBasket(true);
   };
 
-  const progress = currentRoomData ? summarizeCineRoom(currentRoomData) : null;
-  const partnerProgress = currentRoomData?.hostUid === user?.uid ? progress?.guest : progress?.host;
-  const visibleCards = deck.slice(currentIndex, currentIndex + 3).reverse();
+  const centered = (node) => <View style={styles.center}>{node}</View>;
+
+  const renderSolo = () => {
+    const watchlistSource = solo.filters.category === "watchlist";
+    const basketCount = soloState.basket.length;
+    const restartAction = {
+      key: "restart",
+      icon: "refresh",
+      label: copy.solo.restart,
+      onPress: () => solo.reload({ clearSeen: true }),
+    };
+
+    if (soloState.status === "error") {
+      return centered(
+        <CineEmptyState
+          icon="cloud-offline-outline"
+          tint={colors.pass}
+          title={copy.solo.errorTitle}
+          body={copy.solo.errorBody}
+          colors={colors}
+          actions={[{ key: "retry", icon: "refresh", label: copy.solo.retry, onPress: () => solo.reload() }]}
+        />,
+      );
+    }
+
+    if (view.noResults) {
+      return centered(
+        <CineEmptyState
+          icon={watchlistSource ? "bookmark-outline" : "film-outline"}
+          title={watchlistSource ? copy.solo.watchlistEmptyTitle : copy.solo.noResultsTitle}
+          body={watchlistSource ? copy.solo.watchlistEmptyBody : copy.solo.noResultsBody}
+          colors={colors}
+          actions={[
+            { key: "filters", icon: "options-outline", label: copy.solo.changeFilters, onPress: openFilters },
+            {
+              key: "reset",
+              icon: "refresh",
+              label: copy.solo.resetFilters,
+              variant: "secondary",
+              onPress: () => solo.resetFilters(),
+            },
+          ]}
+        />,
+      );
+    }
+
+    if (view.moreError) {
+      return centered(
+        <CineEmptyState
+          icon="cloud-offline-outline"
+          tint={colors.pass}
+          title={copy.solo.moreErrorTitle}
+          body={copy.solo.moreErrorBody}
+          colors={colors}
+          actions={[{ key: "retry", icon: "refresh", label: copy.solo.retry, onPress: solo.retryMore }]}
+        />,
+      );
+    }
+
+    if (view.finalOver) {
+      if (view.winner) {
+        return centered(
+          <CineEmptyState
+            icon="trophy"
+            tint={colors.gold}
+            title={copy.solo.winnerTitle}
+            body={copy.solo.winnerBody}
+            colors={colors}
+            actions={[
+              { key: "winner", icon: "trophy-outline", label: copy.solo.showWinner, tint: colors.gold, onPress: () => openMatch(view.winner, true) },
+              { ...restartAction, variant: "secondary" },
+            ]}
+          />,
+        );
+      }
+      if (basketCount > 1) {
+        return centered(
+          <CineEmptyState
+            icon="heart"
+            tint={colors.heart}
+            title={copy.solo.finalOverTitle}
+            body={fillText(copy.solo.finalOverBody, { n: basketCount })}
+            colors={colors}
+            actions={[
+              { key: "basket", icon: "heart", label: fillText(copy.solo.viewBasket, { n: basketCount }), tint: colors.heart, onPress: openBasket },
+              { ...restartAction, variant: "secondary" },
+            ]}
+          />,
+        );
+      }
+      return centered(
+        <CineEmptyState
+          icon="heart-dislike-outline"
+          title={copy.solo.finalNoneTitle}
+          body={copy.solo.finalNoneBody}
+          colors={colors}
+          actions={[restartAction]}
+        />,
+      );
+    }
+
+    if (view.finished) {
+      return centered(
+        <CineEmptyState
+          icon="checkmark-done-circle-outline"
+          title={copy.solo.doneTitle}
+          body={basketCount > 0 ? fillText(copy.solo.doneBodyLikes, { n: basketCount }) : copy.solo.doneBodyNone}
+          colors={colors}
+          actions={[
+            ...(basketCount > 0
+              ? [{ key: "basket", icon: "heart", label: fillText(copy.solo.viewBasket, { n: basketCount }), tint: colors.heart, onPress: openBasket }]
+              : []),
+            restartAction,
+            { key: "filters", icon: "options-outline", label: copy.solo.changeFilters, variant: "secondary", onPress: openFilters },
+          ]}
+        />,
+      );
+    }
+
+    return (
+      <View style={styles.flex}>
+        {soloState.round === 1 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.chipsScroll}
+            contentContainerStyle={styles.chips}
+          >
+            {describeFilters(solo.filters, copy).map((part) => (
+              <PressableScale
+                key={part.key}
+                accessibilityRole="button"
+                accessibilityLabel={copy.openFilters}
+                onPress={openFilters}
+                style={[styles.chip, { backgroundColor: alpha(colors.accent, 0.13), borderColor: alpha(colors.accent, 0.3) }]}
+              >
+                <AppIcon family="Ionicons" name={part.icon} size={14} color={colors.accent} />
+                <Text style={[styles.chipText, { color: colors.accent }]} numberOfLines={1}>
+                  {part.label}
+                </Text>
+              </PressableScale>
+            ))}
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={copy.openFilters}
+              onPress={openFilters}
+              style={[styles.chip, { backgroundColor: alpha(colors.surface, 0.7), borderColor: colors.border }]}
+            >
+              <AppIcon family="Ionicons" name="options-outline" size={15} color={colors.textSecondary} />
+            </PressableScale>
+          </ScrollView>
+        ) : (
+          <View style={[styles.roundChip, { backgroundColor: alpha(colors.heart, 0.14), borderColor: alpha(colors.heart, 0.35) }]}>
+            <AppIcon family="Ionicons" name="repeat" size={14} color={colors.heart} />
+            <Text style={[styles.roundChipText, { color: colors.heart }]}>
+              {fillText(copy.solo.roundChip, { n: soloState.round, count: Math.max(0, view.remaining) })}
+            </Text>
+          </View>
+        )}
+
+        <CineCardStack
+          ref={stackRef}
+          cards={soloCards}
+          revision={cardRevision}
+          loading={isSoloLoading}
+          swipesAllowed={swipesAllowedSolo}
+          upcoming={view.upcoming}
+          onSwipe={handleSwipe}
+          onBlocked={() => swipesGate.check()}
+          onOpenDetails={openDetails}
+          copy={copy}
+          colors={colors}
+        />
+        <CineActionBar
+          showUndo
+          canUndo={view.canUndo}
+          disabled={!view.current}
+          onPass={() => stackRef.current?.swipe("pass")}
+          onLike={() => stackRef.current?.swipe("like")}
+          onUndo={handleUndo}
+          onInfo={() => openDetails(view.current)}
+          copy={copy}
+          colors={colors}
+        />
+      </View>
+    );
+  };
+
+  const renderDuo = () => {
+    if (roomState === "idle") {
+      return (
+        <CineDuoLobby
+          copy={copy}
+          joinText={joinText}
+          resultText={resultText}
+          colors={colors}
+          joining={joining}
+          inputCode={inputCode}
+          onChangeCode={(value) => {
+            setInputCode(value);
+            setJoinError(null);
+          }}
+          inputRef={codeInputRef}
+          onCreate={handleOpenRoomConfig}
+          onJoin={handleJoinRoom}
+          onPaste={handlePasteCode}
+          joinError={joinError}
+          onRetryJoin={() => {
+            setJoinError(null);
+            setInputCode("");
+            codeInputRef.current?.focus();
+          }}
+          onHub={returnToHub}
+          hasLastResult={!!lastResult}
+          onOpenLastResult={openLastResult}
+        />
+      );
+    }
+
+    if (roomState === "created") {
+      return (
+        <CineWaitingRoom
+          roomCode={roomCode}
+          summary={waitingSummary}
+          onCopy={handleCopyCode}
+          onShare={handleShareCode}
+          onCancel={handleCancelRoom}
+          copy={copy}
+          colors={colors}
+        />
+      );
+    }
+
+    if (roomState === "finished") {
+      return centered(
+        <CineEmptyState
+          icon="trophy"
+          tint={colors.gold}
+          title={resultText.title}
+          body={resultText.subtitle}
+          colors={colors}
+          actions={[
+            { key: "results", icon: "trophy-outline", label: resultText.showResults, tint: colors.gold, onPress: () => setShowDuoResults(true) },
+            {
+              key: "new",
+              icon: "add-circle-outline",
+              label: resultText.newRoom,
+              variant: "secondary",
+              onPress: () => {
+                resetRoom();
+                setInputCode("");
+              },
+            },
+            { key: "hub", icon: "home-outline", label: joinText.hub, variant: "secondary", onPress: returnToHub },
+          ]}
+        />,
+      );
+    }
+
+    // playing
+    const progressBar = (
+      <CineDuoProgress
+        youCount={roomIndex}
+        partnerCount={partnerProgress?.reviewed || 0}
+        total={roomDeck.length}
+        partnerName={partnerName}
+        statusText={duoStatusText}
+        copy={copy}
+        colors={colors}
+      />
+    );
+
+    if (roomIndex >= roomDeck.length) {
+      return (
+        <View style={styles.flex}>
+          {progressBar}
+          {centered(<CineEmptyState loading title={resultText.waitingTitle} body={resultText.waitingBody} colors={colors} />)}
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.flex}>
+        {progressBar}
+        <CineCardStack
+          ref={stackRef}
+          cards={duoCards}
+          revision={cardRevision}
+          disabled={savingSwipe}
+          upcoming={duoUpcoming}
+          onSwipe={handleSwipe}
+          onOpenDetails={openDetails}
+          copy={copy}
+          colors={colors}
+        />
+        <CineActionBar
+          showUndo={false}
+          canUndo={false}
+          disabled={savingSwipe}
+          onPass={() => stackRef.current?.swipe("pass")}
+          onLike={() => stackRef.current?.swipe("like")}
+          onUndo={() => {}}
+          onInfo={() => openDetails(roomDeck[roomIndex])}
+          copy={copy}
+          colors={colors}
+        />
+      </View>
+    );
+  };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.primary || "#141414" }]}>
-      {/* Top Header Bar */}
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          style={styles.backBtn}
-        >
-          <AppIcon family="Ionicons" name="chevron-back" size={24} color={theme.text.primary} />
-        </TouchableOpacity>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { borderBottomColor: alpha(colors.text, 0.08) }]}>
+        <View style={[styles.side, styles.sideStart]}>
+          <GlassCloseButton
+            icon="chevron-back"
+            size={40}
+            fallbackRadius={20}
+            iconSize={22}
+            color={colors.text}
+            backgroundColor={alpha(colors.text, 0.07)}
+            hitSlop={10}
+            accessibilityLabel={copy.back}
+            onPress={() => navigation.goBack()}
+          />
+        </View>
 
         <View style={styles.titleWrap}>
-          <Text style={[styles.screenTitle, { color: theme.text.primary }]}>CineSwipe</Text>
-          <Text style={[styles.screenSubtitle, { color: theme.text.secondary }]}>
-            {mode === "solo"
-              ? "Bugün Ne İzlesem?"
-              : partnerName
-              ? `${partnerName} ile Eşleşme`
-              : "Birlikte Ne İzlesek?"}
+          <Text style={[styles.title, { color: colors.text }]}>{copy.title}</Text>
+          <Text numberOfLines={1} style={[styles.subtitle, { color: colors.textSecondary }]}>
+            {subtitle}
           </Text>
         </View>
 
-        {/* Right Header Action Hub */}
-        <View style={styles.rightActions}>
-          {mode === "solo" && (
-            <>
-              {/* Liked Basket Badge Button */}
-              <TouchableOpacity
-                style={[
-                  styles.basketBtn,
-                  { backgroundColor: alpha("#FF3B5C", likedBasket.length > 0 ? 0.2 : 0.08) },
-                ]}
-                onPress={() => {
-                  triggerHaptic("selection");
-                  setShowLikedBasket(true);
-                }}
-              >
-                <AppIcon family="Ionicons" name="heart" size={16} color="#FF3B5C" />
-                <Text style={[styles.basketCount, { color: "#FF3B5C" }]}>
-                  {likedBasket.length}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Filter Button */}
-              <TouchableOpacity
-                onPress={() => {
-                  triggerHaptic("selection");
-                  setShowFilterSheet(true);
-                }}
-                style={styles.filterBtn}
-              >
-                <AppIcon family="Ionicons" name="options-outline" size={20} color={theme.accent || "#138DF0"} />
-              </TouchableOpacity>
-            </>
-          )}
-
-          {mode === "duo" && roomState === "finished" && (
-            <TouchableOpacity
-              style={[styles.basketBtn, { backgroundColor: alpha("#FFD700", 0.18) }]}
+        <View style={[styles.side, styles.sideEnd]}>
+          {mode === "solo" ? (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={copy.openBasket}
+              onPress={openBasket}
+              style={[styles.pill, { backgroundColor: alpha(colors.heart, soloState.basket.length > 0 ? 0.2 : 0.1) }]}
+            >
+              <AppIcon family="Ionicons" name="heart" size={16} color={colors.heart} />
+              <Text style={[styles.pillText, { color: colors.heart }]}>{soloState.basket.length}</Text>
+            </PressableScale>
+          ) : roomState === "finished" ? (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={resultText.showResults}
               onPress={() => {
                 triggerHaptic("selection");
                 setShowDuoResults(true);
               }}
+              style={[styles.pill, { backgroundColor: alpha(colors.gold, 0.18) }]}
             >
-              <AppIcon family="Ionicons" name="trophy-outline" size={16} color="#FFD700" />
-              <Text style={[styles.basketCount, { color: "#FFD700" }]}>
-                {allMatches.length}
-              </Text>
-            </TouchableOpacity>
-          )}
+              <AppIcon family="Ionicons" name="trophy-outline" size={16} color={colors.gold} />
+              <Text style={[styles.pillText, { color: colors.gold }]}>{allMatches.length}</Text>
+            </PressableScale>
+          ) : null}
         </View>
       </View>
 
-      {/* Mode Selector */}
-      {roomState === "idle" && !joining && (
-        <View style={[styles.modeToggle, { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.6) }]}>
-          <TouchableOpacity
-            style={[
-              styles.modeBtn,
-              mode === "solo" && [styles.modeBtnActive, { backgroundColor: theme.accent || "#138DF0" }],
-            ]}
-            onPress={() => {
-              triggerHaptic("selection");
-              setMode("solo");
-            }}
-          >
-            <AppIcon family="Ionicons" name="person" size={16} color={mode === "solo" ? "#FFF" : theme.text.secondary} />
-            <Text style={[styles.modeText, { color: mode === "solo" ? "#FFF" : theme.text.secondary }]}>
-              Solo Keşif
-            </Text>
-          </TouchableOpacity>
+      {roomState === "idle" && !joining ? (
+        <CineSegmented
+          options={modeOptions}
+          value={mode}
+          onChange={setMode}
+          colors={colors}
+          style={styles.segment}
+        />
+      ) : null}
 
-          <TouchableOpacity
-            style={[
-              styles.modeBtn,
-              mode === "duo" && [styles.modeBtnActive, { backgroundColor: theme.accent || "#138DF0" }],
-            ]}
-            onPress={() => {
-              triggerHaptic("selection");
-              setMode("duo");
-            }}
-          >
-            <AppIcon family="Ionicons" name="people" size={16} color={mode === "duo" ? "#FFF" : theme.text.secondary} />
-            <Text style={[styles.modeText, { color: mode === "duo" ? "#FFF" : theme.text.secondary }]}>
-              Duo Eşleşme
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <View style={styles.flex}>{mode === "solo" ? renderSolo() : renderDuo()}</View>
 
-      {/* Duo Mode Setup Screen */}
-      {mode === "duo" && roomState === "idle" && (
-        <ScrollView contentContainerStyle={styles.duoSetupCard} keyboardShouldPersistTaps="handled">
-          <AppIcon family="MaterialCommunityIcons" name="cards-playing-heart-multiple-outline" size={54} color={theme.accent} />
-          <Text style={[styles.duoSetupTitle, { color: theme.text.primary }]}>Birlikte Ne İzleyeceğinizi Bulun!</Text>
-          <Text style={[styles.duoSetupDesc, { color: theme.text.secondary }]}>
-            Kart sayısını ve kategori türünü seçerek oda kurun veya arkadaşınızın kodunu girin. İkiniz de aynı filmi beğendiğinizde eşleşme yakalarsınız!
-          </Text>
-
-          <TouchableOpacity
-            style={[styles.duoActionBtn, { backgroundColor: theme.accent || "#138DF0" }]}
-            disabled={joining}
-            onPress={handleOpenRoomConfig}
-          >
-            <AppIcon family="Ionicons" name="add-circle-outline" size={20} color="#FFF" />
-            <Text style={styles.duoActionBtnText}>Yeni Oda Kur & Ayarla</Text>
-          </TouchableOpacity>
-
-          <View style={styles.orDivider}>
-            <View style={[styles.orLine, { backgroundColor: theme.border || "#444" }]} />
-            <Text style={[styles.orText, { color: theme.text.secondary }]}>VEYA</Text>
-            <View style={[styles.orLine, { backgroundColor: theme.border || "#444" }]} />
-          </View>
-
-          <View style={styles.joinRow}>
-            <TextInput
-              style={[styles.codeInput, { color: theme.text.primary, borderColor: theme.border || "#555" }]}
-              ref={codeInputRef}
-              editable={!joining}
-              accessibilityLabel={joinText.placeholder}
-              placeholder={joinText.placeholder}
-              placeholderTextColor={theme.text.secondary}
-              value={inputCode}
-              onChangeText={(value) => { setInputCode(value); setJoinError(null); }}
-              keyboardType="number-pad"
-              maxLength={6}
-            />
-            <TouchableOpacity
-              style={[styles.joinBtn, { backgroundColor: alpha(theme.secondary || "#333", 0.9) }]}
-              disabled={joining}
-              accessibilityState={{ busy: joining, disabled: joining }}
-              onPress={handleJoinRoom}
-            >
-              <Text style={[styles.joinBtnText, { color: theme.text.primary }]}>{joining ? joinText.joining : joinText.join}</Text>
-            </TouchableOpacity>
-          </View>
-          {joinError && (
-            <View accessibilityLiveRegion="polite" style={{ width: "100%", gap: 12 }}>
-              <Text style={[styles.duoSetupTitle, { color: theme.text.primary }]}>{joinText.title}</Text>
-              <Text style={[styles.duoSetupDesc, { color: theme.text.secondary }]}>{joinText[joinError] || joinText.unknown}</Text>
-              <TouchableOpacity style={styles.joinBtn} onPress={() => {
-                setJoinError(null);
-                setInputCode("");
-                codeInputRef.current?.focus();
-              }}>
-                <Text style={{ color: theme.accent }}>{joinText.retry}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.joinBtn} onPress={returnToHub}>
-                <Text style={{ color: theme.accent }}>{joinText.hub}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </ScrollView>
-      )}
-
-      {mode === "duo" && roomState === "idle" && lastResult && (
-        <TouchableOpacity style={styles.joinBtn} onPress={() => {
-          setResult(lastResult);
-          setCleanupError(!!lastResult.receiptPending);
-          setCurrentRoomData(lastResult.room);
-          setAllMatches(lastResult.summary.matches);
-          setPartnerName(lastResult.room.hostUid === user?.uid ? lastResult.room.guestName : lastResult.room.hostName);
-          setRoomState("finished");
-          setShowDuoResults(true);
-        }}>
-          <Text style={{ color: theme.accent }}>{resultText.lastResult}</Text>
-        </TouchableOpacity>
-      )}
-
-      {mode === "duo" && roomState === "finished" && (
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>{resultText.title}</Text>
-          <TouchableOpacity style={styles.joinBtn} onPress={() => setShowDuoResults(true)}>
-            <Text style={{ color: theme.accent }}>{resultText.showResults}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.joinBtn} onPress={() => { resetRoom(); setInputCode(""); }}>
-            <Text style={{ color: theme.accent }}>{resultText.newRoom}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.joinBtn} onPress={returnToHub}>
-            <Text style={{ color: theme.accent }}>{joinText.hub}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Duo Room Waiting Screen */}
-      {mode === "duo" && roomState === "created" && (
-        <View style={styles.waitingContainer}>
-          <View style={[styles.codeBadge, { backgroundColor: alpha(theme.accent, 0.16), borderColor: theme.accent }]}>
-            <Text style={[styles.codeLabel, { color: theme.text.secondary }]}>ODA KODUNUZ</Text>
-            <Text style={[styles.codeValue, { color: theme.accent }]}>{roomCode}</Text>
-          </View>
-
-          <ActivityIndicator size="large" color={theme.accent} style={{ marginVertical: 20 }} />
-          <Text style={[styles.waitingTitle, { color: theme.text.primary }]}>Arkadaşınız Bekleniyor...</Text>
-          <Text style={[styles.waitingDesc, { color: theme.text.secondary }]}>
-            Bu kodu arkadaşınızla paylaşın. Arkadaşınız katıldığında kartlar aynı anda açılacaktır.
-          </Text>
-
-          <View style={styles.waitingActionsRow}>
-            <TouchableOpacity
-              style={[styles.shareCodeBtn, { backgroundColor: theme.accent || "#138DF0" }]}
-              onPress={handleShareCode}
-            >
-              <AppIcon family="Ionicons" name="share-social-outline" size={18} color="#FFF" />
-              <Text style={styles.shareCodeBtnText}>Kodu Paylaş</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.cancelRoomBtn, { backgroundColor: alpha("#FF3B30", 0.15), borderColor: alpha("#FF3B30", 0.4) }]}
-              onPress={handleCancelRoom}
-            >
-              <AppIcon family="Ionicons" name="close-circle-outline" size={18} color="#FF3B30" />
-              <Text style={styles.cancelRoomText}>Odayı İptal Et</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* Main Swipe Arena (Solo or Duo Playing) */}
-      {(mode === "solo" || roomState === "playing") && (
-        <View style={styles.arena}>
-          {loadingDeck ? (
-            <ActivityIndicator size="large" color={theme.accent} style={{ marginTop: 100 }} />
-          ) : mode === "duo" && currentIndex >= deck.length ? (
-            <View style={styles.emptyContainer}>
-              <ActivityIndicator color={theme.accent} size="large" />
-              <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>{resultText.waitingTitle}</Text>
-              <Text style={[styles.emptyDesc, { color: theme.text.secondary }]}>{resultText.waitingBody}</Text>
-              <Text style={{ color: theme.text.secondary }}>{partnerName}: {partnerProgress?.reviewed || 0}/{deck.length}</Text>
-            </View>
-          ) : currentIndex >= deck.length ? (
-            <View style={styles.emptyContainer}>
-              <View style={[styles.emptyIconCircle, { backgroundColor: alpha(theme.accent, 0.15) }]}>
-                <AppIcon family="Ionicons" name="checkmark-done-circle-outline" size={54} color={theme.accent} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>Bu Deste Tamamlandı!</Text>
-              <Text style={[styles.emptyDesc, { color: theme.text.secondary }]}>
-                {likedBasket.length > 0
-                  ? `Toplam ${likedBasket.length} içerik beğendiniz. Beğenilenler sepetinden rastgele seçim yapabilir veya yeni deste yükleyebilirsiniz.`
-                  : "Farklı tür veya kategoriler seçerek keşfetmeye devam edebilirsiniz."}
-              </Text>
-
-              <View style={styles.emptyActionsRow}>
-                {likedBasket.length > 0 && (
-                  <TouchableOpacity
-                    style={[styles.emptyActionBtn, { backgroundColor: "#FF3B5C" }]}
-                    onPress={() => setShowLikedBasket(true)}
-                  >
-                    <AppIcon family="Ionicons" name="heart" size={18} color="#FFF" />
-                    <Text style={styles.emptyActionBtnText}>Beğendiklerimi Gör ({likedBasket.length})</Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={[styles.emptyActionBtn, { backgroundColor: theme.accent || "#138DF0" }]}
-                  onPress={() => loadDeck()}
-                >
-                  <AppIcon family="Ionicons" name="refresh-outline" size={18} color="#FFF" />
-                  <Text style={styles.emptyActionBtnText}>Yeni Deste Yükle</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.cardStack}>
-              {visibleCards.map((media, i) => {
-                const isTop = i === visibleCards.length - 1;
-                return (
-                  <SwipeCard
-                    // Revizyon değişince kart yeniden kurulup ortaya döner:
-                    // duo'da yazma hatası, solo'da günlük kaydırma hakkı bitti.
-                    key={`${cineMediaKey(media)}_${cardRevision}`}
-                    disabled={mode === "duo" && savingSwipe}
-                    media={media}
-                    isTop={isTop}
-                    onSwipeLeft={handleSwipeLeft}
-                    onSwipeRight={handleSwipeRight}
-                    theme={theme}
-                  />
-                );
-              })}
-            </View>
-          )}
-
-          {mode === "duo" && (
-            <Text accessibilityLiveRegion="polite" style={[styles.emptyDesc, { color: theme.text.secondary }]}>
-              {swipeError ? resultText.voteError : savingSwipe ? resultText.saving : `${currentIndex}/${deck.length}`}
-            </Text>
-          )}
-          {/* Bottom Action Controls */}
-          {!loadingDeck && currentIndex < deck.length && (
-            <View style={styles.controlsRow}>
-              {/* Pass Button */}
-              <TouchableOpacity
-                style={[styles.controlBtn, styles.passBtn]}
-                disabled={savingSwipe}
-                onPress={() => handleSwipeLeft(deck[currentIndex])}
-                activeOpacity={0.8}
-              >
-                <AppIcon family="Ionicons" name="close" size={30} color="#FF3232" />
-              </TouchableOpacity>
-
-              {/* Undo is local-only and available in Solo. */}
-              {mode === "solo" && <TouchableOpacity
-                style={[styles.controlBtn, styles.undoBtn, { backgroundColor: alpha(theme.secondary || "#333", 0.7) }]}
-                onPress={handleUndo}
-                disabled={history.length === 0}
-                activeOpacity={0.8}
-              >
-                <AppIcon
-                  family="Ionicons"
-                  name="arrow-undo"
-                  size={22}
-                  color={history.length > 0 ? theme.text.primary : theme.text.secondary}
-                />
-              </TouchableOpacity>}
-
-              {/* Like Button */}
-              <TouchableOpacity
-                style={[styles.controlBtn, styles.likeBtn]}
-                disabled={savingSwipe}
-                onPress={() => handleSwipeRight(deck[currentIndex])}
-                activeOpacity={0.8}
-              >
-                <AppIcon family="Ionicons" name="heart" size={30} color="#64FF64" />
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* Solo Filtreleme Alt Sayfası */}
       <CineFilterSheet
         visible={showFilterSheet}
         onClose={() => setShowFilterSheet(false)}
-        currentCategory={category}
-        currentMediaType={mediaType}
-        currentGenreId={genreId}
-        onApplyFilters={handleApplyFilters}
+        filters={solo.filters}
+        onApply={solo.applyFilters}
       />
 
-      {/* Solo Beğenilenler Sepeti Modalı */}
       <CineLikedBasketModal
         visible={showLikedBasket}
         onClose={() => setShowLikedBasket(false)}
-        likedItems={likedBasket}
-        onRandomPick={(picked) => {
-          setMatchedMedia(picked);
-          setShowMatchModal(true);
-        }}
-        onPlaySecondRound={handlePlaySecondRound}
-        onSaveAsCustomList={handleSaveAsPersonalCustomList}
-        onAddAllToWatchlist={handleAddAllToWatchlist}
-        onClearBasket={() => setLikedBasket([])}
+        items={soloState.basket}
+        onRandomPick={(picked) => openMatch(picked, false)}
+        onSecondRound={startSecondRound}
+        onSaveList={saveBasketAsList}
+        onAddWatchlist={addManyToWatchlist}
+        onClear={solo.clearBasket}
+        onRemove={(media) => solo.removeFromBasket(cineMediaKey(media))}
+        onOpenDetails={openDetails}
       />
 
-      {/* Duo Oda Kurulum Ayarları Modalı */}
       <CineRoomConfigModal
         visible={showRoomConfig}
         onClose={() => setShowRoomConfig(false)}
         onConfirmCreate={handleConfirmCreateRoom}
       />
 
-      {/* Duo Eşleşme Sonuç Galerisi Modalı */}
       <CineDuoResultsModal
         visible={showDuoResults && roomState === "finished"}
+        onClose={() => setShowDuoResults(false)}
         summary={result?.summary}
-        isHost={currentRoomData?.hostUid === user?.uid}
+        isHost={isHost}
         cleanupError={cleanupError}
         onRetrySave={retryResultSave}
-        onClose={() => setShowDuoResults(false)}
         matches={allMatches}
         partnerName={partnerName}
-        onSelectMedia={handleViewDetails}
-        onAddAllToWatchlist={handleAddAllToWatchlist}
-        onSaveAsSharedList={handleSaveAsSharedList}
+        onSelectMedia={openDetails}
+        onAddAllToWatchlist={addMatchesToWatchlist}
+        onSaveAsSharedList={saveMatchesAsSharedList}
+        sharedState={sharedState}
+        watchlistState={watchlistState}
       />
 
-      {/* CineMatch Spotlight Modalı */}
       <CineMatchModal
         visible={mode === "solo" && showMatchModal}
         matchedMedia={matchedMedia}
-        partnerName={partnerName}
+        isWinner={matchIsWinner}
         onClose={() => setShowMatchModal(false)}
-        onViewDetails={handleViewDetails}
-        onAddToWatchlist={handleAddToWatchlist}
+        onViewDetails={openDetails}
+        onAddToWatchlist={addOneToWatchlist}
+        onReroll={!matchIsWinner && soloState.basket.length > 1 ? handleReroll : undefined}
       />
     </SafeAreaView>
   );
@@ -1083,313 +1164,99 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+  flex: {
+    flex: 1,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  center: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  titleWrap: {
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  side: {
+    width: 76,
+    flexDirection: "row",
     alignItems: "center",
   },
-  screenTitle: {
+  sideStart: {
+    justifyContent: "flex-start",
+  },
+  sideEnd: {
+    justifyContent: "flex-end",
+  },
+  titleWrap: {
+    flex: 1,
+    alignItems: "center",
+  },
+  title: {
     fontSize: 18,
     fontWeight: "900",
     letterSpacing: -0.3,
   },
-  screenSubtitle: {
-    fontSize: 11,
+  subtitle: {
+    fontSize: 11.5,
     fontWeight: "600",
+    marginTop: 1,
   },
-  rightActions: {
+  pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 5,
+    paddingHorizontal: 12,
+    height: 36,
+    borderRadius: 18,
   },
-  basketBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  basketCount: {
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  filterBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  modeToggle: {
-    flexDirection: "row",
-    marginHorizontal: 20,
-    marginVertical: 12,
-    borderRadius: 14,
-    padding: 4,
-  },
-  modeBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 9,
-    borderRadius: 10,
-    gap: 6,
-  },
-  modeBtnActive: {
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  modeText: {
+  pillText: {
     fontSize: 13,
-    fontWeight: "700",
-  },
-  duoSetupCard: {
-    margin: 20,
-    padding: 24,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    alignItems: "center",
-    gap: 12,
-  },
-  duoSetupTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  duoSetupDesc: {
-    fontSize: 13,
-    textAlign: "center",
-    lineHeight: 18,
-  },
-  duoActionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
-    height: 48,
-    borderRadius: 14,
-    gap: 8,
-    marginTop: 8,
-  },
-  duoActionBtnText: {
-    color: "#FFF",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  orDivider: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-    marginVertical: 12,
-    gap: 10,
-  },
-  orLine: {
-    flex: 1,
-    height: 1,
-  },
-  orText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  joinRow: {
-    flexDirection: "row",
-    width: "100%",
-    gap: 10,
-  },
-  codeInput: {
-    flex: 1,
-    height: 46,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    fontSize: 15,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  joinBtn: {
-    paddingHorizontal: 22,
-    height: 46,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  joinBtnText: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  waitingContainer: {
-    margin: 20,
-    padding: 24,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    alignItems: "center",
-  },
-  codeBadge: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    alignItems: "center",
-  },
-  codeLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  codeValue: {
-    fontSize: 32,
-    fontWeight: "900",
-    letterSpacing: 4,
-  },
-  waitingTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-  waitingDesc: {
-    fontSize: 13,
-    textAlign: "center",
-    lineHeight: 18,
-    marginBottom: 20,
-  },
-  waitingActionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    width: "100%",
-  },
-  shareCodeBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 48,
-    borderRadius: 14,
-    gap: 8,
-  },
-  shareCodeBtnText: {
-    color: "#FFF",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  cancelRoomBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 6,
-  },
-  cancelRoomText: {
-    color: "#FF3B30",
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  arena: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cardStack: {
-    flex: 1,
-    width: SCREEN_WIDTH,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  controlsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 22,
-    paddingBottom: 24,
-  },
-  controlBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  passBtn: {
-    backgroundColor: "rgba(255, 50, 50, 0.15)",
-    borderWidth: 2,
-    borderColor: "#FF3232",
-  },
-  undoBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
-  likeBtn: {
-    backgroundColor: "rgba(100, 255, 100, 0.15)",
-    borderWidth: 2,
-    borderColor: "#64FF64",
-  },
-  emptyContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 30,
-    gap: 12,
-  },
-  emptyIconCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    fontSize: 20,
     fontWeight: "900",
   },
-  emptyDesc: {
-    fontSize: 13,
-    textAlign: "center",
-    lineHeight: 19,
-  },
-  emptyActionsRow: {
-    gap: 10,
-    width: "100%",
+  segment: {
+    marginHorizontal: 16,
     marginTop: 12,
+    marginBottom: 4,
   },
-  emptyActionBtn: {
+  chipsScroll: {
+    flexGrow: 0,
+  },
+  chips: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    alignItems: "center",
+  },
+  chip: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    height: 48,
-    borderRadius: 14,
-    gap: 8,
+    gap: 6,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  emptyActionBtnText: {
-    color: "#FFF",
-    fontSize: 14,
+  chipText: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    maxWidth: 190,
+  },
+  roundChip: {
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 32,
+    paddingHorizontal: 14,
+    marginVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  roundChipText: {
+    fontSize: 12.5,
     fontWeight: "800",
   },
 });

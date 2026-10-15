@@ -44,6 +44,8 @@ export default function EmailSuffixRow({
                 { color: active ? accent : theme.text.secondary },
               ]}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
             >
               {sfx}
             </Text>
@@ -58,20 +60,21 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     gap: 7,
-    marginTop: -3,
-    marginBottom: 10,
+    // Alanın hemen altına yapışık dursun: üstteki alana 8, alttakine 14 boşluk
+    // (kart içi satır aralığı 14).
+    marginTop: -6,
   },
   chip: {
     flex: 1,
-    height: 30,
+    height: 34,
     borderRadius: 999,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
   },
   chipText: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: "700",
   },
 });

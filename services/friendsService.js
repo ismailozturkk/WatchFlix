@@ -18,7 +18,6 @@ import {
   collection,
   query,
   where,
-      getDocs,
   onSnapshot,
   writeBatch,
   serverTimestamp,
@@ -27,7 +26,7 @@ import {
 import { db } from "../firebase";
 import { clampAvatarIndex } from "../utils/avatars";
 import { snapshotErrorHandler } from "../utils/firestoreError";
-import { trackFirestoreRead, trackFirestoreWrite, trackFirestoreDelete } from "./usageTrackerService";
+import { trackFirestoreRead } from "./usageTrackerService";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -399,18 +398,9 @@ export async function unblockUser(currentUid, targetUid) {
 }
 
 /**
- * Engellenenler listesi.
- */
-export async function fetchBlockedUsers(uid) {
-  if (!uid) return [];
-  const snap = await getDocs(collection(db, "Users", uid, "blocked"));
-  return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
-}
-
-/**
  * Realtime: engellenen kullanıcılar.
  *
- * Tek seferlik fetchBlockedUsers yeterli DEĞİL: engelin etkisi (feed, yorum,
+ * Tek seferlik okuma yeterli DEĞİL: engelin etkisi (feed, yorum,
  * sohbet, arama süzgeçleri) anında görünmeli. Kullanıcı birini engelledikten
  * sonra o kişinin gönderisi ekranda kalmaya devam ederse engelleme çalışmıyor
  * gibi duruyor — mağaza incelemesinde de ilk bakılan şey bu.

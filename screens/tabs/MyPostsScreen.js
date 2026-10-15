@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -11,219 +11,121 @@ import {
   Pressable,
 } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "../../components/AppIcon";
 import RatingStars from "../../components/RatingStars";
 import StaggerItem from "../../components/StaggerItem";
+import PosterStack, { STACK_POSTER_H, STACK_POSTER_W } from "../../components/feed/PosterStack";
+import { postTypeMeta } from "../../components/feed/postTypeMeta";
+import StatPill from "../../components/feed/StatPill";
 import CreatePostModal from "@components/modals/CreatePostModal";
 import { MyPostsSkeleton } from "@components/Skeleton";
 import { useTheme } from "../../context/ThemeContext";
+import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { usePosts } from "../../context/PostsContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { fetchUserPosts } from "../../services/postsService";
 import { i18nText } from "../../utils/i18nText";
+import { formatTimeAgo } from "../../utils/postTime";
 import { postTypeBadge, tallyVotes } from "../../utils/postComposer";
+import { alpha } from "../../theme/colors";
 import ScreenDecor from "@components/ScreenDecor";
+import BackButton from "@components/BackButton";
 
+const LIKE_RED = "#FF5A5F";
+const SPOILER_RED = "#f04f4f";
 
-// Basit göreli zaman (TR)
-const timeAgo = (ms) => {
-  if (!ms) return "";
-  const sec = Math.floor((Date.now() - ms) / 1000);
-  if (sec < 60) return i18nText("autoI18n.simdi", "şimdi");
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} dk`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} sa`;
-  const d = Math.floor(hr / 24);
-  if (d < 7) return `${d} g`;
-  const w = Math.floor(d / 7);
-  return `${w} hf`;
-};
-
-// Sol taraftaki poster yığını (liste tipinde birden çok poster arka arkaya)
-function PosterStack({ mediaList, theme }) {
-  const posters = (mediaList || []).filter((m) => m?.poster).slice(0, 3);
-  if (posters.length === 0) {
-    return (
-      <View
-        style={[
-          styles.poster,
-          { backgroundColor: theme.border, alignItems: "center", justifyContent: "center" },
-        ]}
-      >
-        <AppIcon family="Ionicons" name="film-outline" size={22} color={theme.text.muted} />
-      </View>
-    );
+// Kartın sol görseli için poster adresleri. review/list: paylaşımın posterleri;
+// medya anketi: seçenek posterleri. Sohbet ve metin anketinde görsel yok —
+// kartın tamamı metne kalır.
+function postPosterUris(post, getTmdbUrl) {
+  if (post.type === "poll") {
+    return post.poll?.type === "media"
+      ? (post.poll.options || [])
+          .filter((o) => o?.media?.poster_path)
+          .map((o) => getTmdbUrl(o.media.poster_path, "poster", 200))
+      : [];
   }
-  return (
-    <View style={[styles.stack, { width: 64 + (posters.length - 1) * 18 }]}>
-      {posters.map((m, i) => (
-        <Image
-          key={`${m.id}-${i}`}
-          source={{ uri: m.poster }}
-          style={[
-            styles.poster,
-            styles.stackItem,
-            { left: i * 18, zIndex: posters.length - i, borderColor: theme.secondary },
-          ]}
-          contentFit="cover"
-        />
-      ))}
-    </View>
-  );
+  if (post.type === "text") return [];
+  return (post.mediaList || []).map((m) => m?.poster).filter(Boolean);
 }
 
-// Görseli olmayan tipler (text/poll) için poster ölçülerinde tip ikonlu kutu
-function TypeIconBox({ icon, accent }) {
-  return (
-    <View
-      style={[
-        styles.poster,
-        { backgroundColor: accent + "18", alignItems: "center", justifyContent: "center" },
-      ]}
-    >
-      <AppIcon family="Ionicons" name={icon} size={24} color={accent} />
-    </View>
-  );
-}
-
-function MyPostCard({ post, theme, onMenu }) {
-  // Rozet + vurgu rengi feed'deki PostCard ile ortak (review/list/text/poll).
-  const badge = postTypeBadge(post.type, theme.colors);
-  const accent = badge.color;
+function MyPostCard({ post, theme, t, onMenu }) {
+  // Rozet + vurgu rengi feed'deki kartla ortak (review/list/text/poll).
+  const meta = postTypeMeta(post.type, theme.colors);
+  const accent = meta.color;
   const { getTmdbUrl } = useImageQualitySettings();
 
-  // Sol görsel alan: review/list poster yığını; text ikon kutusu;
-  // poll'de medya anketiyse seçenek posterleri, yoksa ikon kutusu.
-  let visual;
-  if (post.type === "text") {
-    visual = <TypeIconBox icon="chatbubble-ellipses" accent={accent} />;
-  } else if (post.type === "poll") {
-    const pollPosters =
-      post.poll?.type === "media"
-        ? (post.poll.options || [])
-            .filter((o) => o?.media?.poster_path)
-            .slice(0, 3)
-            .map((o, i) => ({
-              id: o.id ?? i,
-              poster: getTmdbUrl(o.media.poster_path, "poster", 200),
-            }))
-        : [];
-    visual =
-      pollPosters.length > 0 ? (
-        <PosterStack mediaList={pollPosters} theme={theme} />
-      ) : (
-        <TypeIconBox icon="stats-chart" accent={accent} />
-      );
-  } else {
-    visual = <PosterStack mediaList={post.mediaList} theme={theme} />;
-  }
+  const timeText = formatTimeAgo(post._createdAtMs, t.shareScreen?.timeAgo);
+  const likes = post.likesCount || 0;
+  const comments = post.commentsCount || 0;
 
-  return (
-    <View
-      style={[
-        styles.card,
-        {
-          backgroundColor: theme.secondary,
-          borderColor: theme.border,
-          borderLeftColor: accent,
-        },
-      ]}
-    >
-      {visual}
+  const posterUris = postPosterUris(post, getTmdbUrl);
+  // Poster bekleyen (review/list) ama görseli olmayan kayıt: tip ikonlu kutu.
+  const hasVisual =
+    posterUris.length > 0 || post.type === "review" || post.type === "list";
+  const visual =
+    posterUris.length > 0 ? (
+      <PosterStack uris={posterUris} theme={theme} />
+    ) : (
+      <View
+        style={[
+          st.visualFallback,
+          { backgroundColor: alpha(accent, 0.12), borderColor: alpha(accent, 0.3) },
+        ]}
+      >
+        <AppIcon family="Ionicons" name="film-outline" size={26} color={accent} />
+      </View>
+    );
 
-      <View style={{ flex: 1 }}>
-        <View style={styles.metaRow}>
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: accent + "22", borderColor: accent + "55" },
-            ]}
-          >
-            <Text style={[styles.badgeText, { color: accent }]}>
-              {i18nText(badge.labelKey, badge.fallback)}
-            </Text>
-          </View>
-          {post.hasSpoiler && (
-            <View
-              style={[
-                styles.badge,
-                {
-                  backgroundColor: "rgba(240,79,79,0.12)",
-                  borderColor: "rgba(240,79,79,0.4)",
-                },
-              ]}
-            >
-              <Text style={[styles.badgeText, { color: "#f04f4f" }]}>{i18nText("autoI18n.spoiler", "SPOİLER")}</Text>
-            </View>
-          )}
-          <Text style={[styles.time, { color: theme.text.muted }]}>
-            {timeAgo(post._createdAtMs)}
-          </Text>
-          <TouchableOpacity
-            hitSlop={8}
-            onPress={() => onMenu(post)}
-            style={styles.dotsBtn}
-          >
-            <AppIcon
-              family="MaterialCommunityIcons"
-              name="dots-vertical"
-              size={18}
-              color={theme.text.secondary}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <Text style={[styles.title, { color: theme.text.primary }]} numberOfLines={2}>
-          {post.title}
-        </Text>
-        {post.content ? (
-          // Sohbet'te görsel alan boş kalmadığından metne bir satır daha yer var
-          <Text
-            style={[styles.content, { color: theme.text.secondary }]}
-            numberOfLines={post.type === "text" ? 3 : 2}
-          >
-            {post.content}
-          </Text>
-        ) : null}
-
-        {/* Anket gövdesi: en çok oy alan 2 seçenek mini bar + özet (poll verisi yoksa çizilmez) */}
-        {post.type === "poll" && post.poll?.options?.length > 0 && (() => {
+  // Anket gövdesi: en çok oy alan en fazla 3 seçenek + özet (poll verisi yoksa çizilmez).
+  const pollBlock =
+    post.type === "poll" && post.poll?.options?.length > 0
+      ? (() => {
           const { counts, total } = tallyVotes(post.poll.votes);
           // Composer dışı/eski veride null seçenek veya id'siz seçenek olabilir
-          const top2 = post.poll.options
+          const top = post.poll.options
             .map((o, i) => ({ ...(o || {}), _idx: i, _count: counts[o?.id] || 0 }))
             .sort((a, b) => b._count - a._count)
-            .slice(0, 2);
+            .slice(0, 3);
           return (
-            <View style={styles.pollBox}>
-              {top2.map((o) => {
+            <View
+              style={[st.pollBox, { backgroundColor: theme.primary, borderColor: theme.border }]}
+            >
+              {top.map((o, rank) => {
                 const p = total > 0 ? Math.round((o._count / total) * 100) : 0;
                 return (
-                  <View key={o.id ?? o._idx} style={styles.pollRow}>
-                    <Text
-                      style={[styles.pollLabel, { color: theme.text.secondary }]}
-                      numberOfLines={1}
-                    >
-                      {o.label ||
-                        i18nText("autoI18n.secenek_n", "Seçenek {{n}}", { n: o._idx + 1 })}
-                    </Text>
-                    <View style={[styles.pollBarTrack, { backgroundColor: theme.border }]}>
+                  <View key={o.id ?? o._idx} style={st.pollRow}>
+                    <View style={st.pollRowHead}>
+                      <Text
+                        style={[st.pollLabel, { color: theme.text.primary }]}
+                        numberOfLines={1}
+                      >
+                        {o.label ||
+                          i18nText("autoI18n.secenek_n", "Seçenek {{n}}", { n: o._idx + 1 })}
+                      </Text>
+                      <Text style={[st.pollPct, { color: rank === 0 && total > 0 ? accent : theme.text.muted }]}>
+                        %{p}
+                      </Text>
+                    </View>
+                    <View style={[st.pollTrack, { backgroundColor: theme.border }]}>
                       <View
                         style={[
-                          styles.pollBarFill,
-                          { width: `${p}%`, backgroundColor: accent },
+                          st.pollFill,
+                          {
+                            width: `${p}%`,
+                            backgroundColor: rank === 0 && total > 0 ? accent : alpha(accent, 0.45),
+                          },
                         ]}
                       />
                     </View>
-                    <Text style={[styles.pollPct, { color: theme.text.muted }]}>%{p}</Text>
                   </View>
                 );
               })}
-              <Text style={[styles.pollSummary, { color: theme.text.muted }]}>
+              <Text style={[st.pollSummary, { color: theme.text.muted }]}>
                 {i18nText("autoI18n.anket_ozeti", "{{options}} seçenek · {{votes}} oy", {
                   options: post.poll.options.length,
                   votes: total,
@@ -231,43 +133,206 @@ function MyPostCard({ post, theme, onMenu }) {
               </Text>
             </View>
           );
-        })()}
+        })()
+      : null;
 
-        {post.type === "review" && post.userRating > 0 && (
-          <View style={styles.ratingRow}>
-            <RatingStars rating={post.userRating} max={5} size={12} />
-            <Text style={[styles.ratingText, { color: theme.text.secondary }]}>
-              {post.userRating}/5
-            </Text>
-          </View>
-        )}
+  return (
+    <View
+      style={[st.shadow, { shadowColor: theme.shadow || "#000", backgroundColor: theme.secondary }]}
+    >
+      <View style={[st.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+        {/* Tip rengiyle üstten yumuşak ışık */}
+        <LinearGradient
+          colors={[alpha(accent, 0.13), alpha(accent, 0)]}
+          style={st.wash}
+          pointerEvents="none"
+        />
 
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <AppIcon family="Ionicons" name="heart-outline" size={15} color={theme.text.muted} />
-            <Text style={[styles.statText, { color: theme.text.muted }]}>
-              {post.likesCount || 0}
-            </Text>
+        {/* Rozet + zaman + menü */}
+        <View style={st.metaRow}>
+          <View
+            style={[
+              st.typePill,
+              { backgroundColor: alpha(accent, 0.13), borderColor: alpha(accent, 0.32) },
+            ]}
+          >
+            <AppIcon family="Ionicons" name={meta.icon} size={11} color={accent} />
+            <Text style={[st.typeText, { color: accent }]}>{meta.label}</Text>
           </View>
-          <View style={styles.stat}>
+          {post.hasSpoiler && (
+            <View style={st.spoilerPill}>
+              <AppIcon family="Ionicons" name="eye-off" size={10} color={SPOILER_RED} />
+              <Text style={st.spoilerText}>{i18nText("autoI18n.spoiler", "SPOİLER")}</Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }} />
+          {!!timeText && (
+            <Text style={[st.time, { color: theme.text.muted }]}>{timeText}</Text>
+          )}
+          <TouchableOpacity
+            hitSlop={8}
+            onPress={() => onMenu(post)}
+            style={st.dotsBtn}
+            accessibilityRole="button"
+          >
             <AppIcon
-              family="Ionicons"
-              name="chatbubble-outline"
-              size={15}
-              color={theme.text.muted}
+              family="MaterialCommunityIcons"
+              name="dots-vertical"
+              size={19}
+              color={theme.text.secondary}
             />
-            <Text style={[styles.statText, { color: theme.text.muted }]}>
-              {post.commentsCount || 0}
+          </TouchableOpacity>
+        </View>
+
+        {/* Gövde: [görsel] + başlık/içerik */}
+        <View style={st.body}>
+          {hasVisual && <View style={st.visualCol}>{visual}</View>}
+          <View style={st.copy}>
+            <Text
+              fontRole="body"
+              style={[st.title, { color: theme.text.primary }]}
+              numberOfLines={2}
+            >
+              {post.title}
             </Text>
+            {post.content ? (
+              post.type === "text" ? (
+                <View
+                  style={[
+                    st.quote,
+                    { backgroundColor: alpha(accent, 0.07), borderLeftColor: accent },
+                  ]}
+                >
+                  <Text
+                    fontRole="body"
+                    style={[st.quoteText, { color: theme.text.primary }]}
+                    numberOfLines={4}
+                  >
+                    {post.content}
+                  </Text>
+                </View>
+              ) : (
+                <Text
+                  fontRole="body"
+                  style={[st.content, { color: theme.text.secondary }]}
+                  numberOfLines={hasVisual ? 4 : 3}
+                >
+                  {post.content}
+                </Text>
+              )
+            ) : null}
+
+            {post.type === "review" && post.userRating > 0 && (
+              <View
+                style={[st.ratingPill, { backgroundColor: theme.primary, borderColor: theme.border }]}
+              >
+                <RatingStars rating={post.userRating} max={5} size={12} />
+                <Text style={[st.ratingText, { color: theme.text.primary }]}>
+                  {post.userRating}/5
+                </Text>
+              </View>
+            )}
           </View>
+        </View>
+
+        {pollBlock}
+
+        {/* İstatistikler */}
+        <View style={[st.footer, { borderTopColor: theme.border }]}>
+          <StatPill
+            icon="heart"
+            active={likes > 0}
+            activeColor={LIKE_RED}
+            count={likes}
+            theme={theme}
+          />
+          <StatPill
+            icon="chatbubble"
+            active={comments > 0}
+            activeColor={theme.accent}
+            count={comments}
+            theme={theme}
+          />
+          {post.type === "list" && (post.mediaList || []).length > 0 && (
+            <View style={st.footerRight}>
+              <AppIcon family="Ionicons" name="albums-outline" size={14} color={accent} />
+              <Text style={[st.footerRightText, { color: accent }]}>
+                {i18nText("autoI18n.n_icerik", "{{n}} içerik", { n: post.mediaList.length })}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </View>
   );
 }
 
+// Üst özet şeridi: yüklenen paylaşımların toplam sayısı / beğeni / yorum.
+// Sayfalama bitmediyse değerler "+" ile biter (henüz hepsi yüklenmedi).
+function SummaryStrip({ posts, hasMore, theme }) {
+  const totals = useMemo(
+    () =>
+      posts.reduce(
+        (acc, p) => ({
+          likes: acc.likes + (p.likesCount || 0),
+          comments: acc.comments + (p.commentsCount || 0),
+        }),
+        { likes: 0, comments: 0 },
+      ),
+    [posts],
+  );
+  const suffix = hasMore ? "+" : "";
+  const items = [
+    {
+      key: "posts",
+      icon: "albums",
+      color: theme.accent,
+      value: `${posts.length}${suffix}`,
+      label: i18nText("autoI18n.myposts_stat_paylasim", "Paylaşım"),
+    },
+    {
+      key: "likes",
+      icon: "heart",
+      color: LIKE_RED,
+      value: `${totals.likes}${suffix}`,
+      label: i18nText("autoI18n.myposts_stat_begeni", "Beğeni"),
+    },
+    {
+      key: "comments",
+      icon: "chatbubble",
+      color: theme.colors?.blue || theme.accent,
+      value: `${totals.comments}${suffix}`,
+      label: i18nText("autoI18n.myposts_stat_yorum", "Yorum"),
+    },
+  ];
+
+  return (
+    <View style={st.summary}>
+      {items.map((it) => (
+        <View
+          key={it.key}
+          style={[st.summaryTile, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+        >
+          <View style={[st.summaryIcon, { backgroundColor: alpha(it.color, 0.15) }]}>
+            <AppIcon family="Ionicons" name={it.icon} size={16} color={it.color} />
+          </View>
+          <View style={{ minWidth: 0 }}>
+            <Text style={[st.summaryValue, { color: theme.text.primary }]} numberOfLines={1}>
+              {it.value}
+            </Text>
+            <Text style={[st.summaryLabel, { color: theme.text.muted }]} numberOfLines={1}>
+              {it.label}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function MyPostsScreen({ navigation }) {
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const { deletePost: ctxDeletePost, editPost: ctxEditPost } = usePosts();
   const { getTmdbUrl } = useImageQualitySettings(); // menü önizlemesi (medya anketi posterleri)
@@ -374,38 +439,56 @@ export default function MyPostsScreen({ navigation }) {
     load({ append: true });
   }, [loadingMore, hasMore, loading, load]);
 
+  // Eleman olarak verilir (bileşen tipi değil): liste güncellenince başlık
+  // yeniden mount olmaz.
+  const listHeader = useMemo(
+    () =>
+      posts.length > 0 ? <SummaryStrip posts={posts} hasMore={hasMore} theme={theme} /> : null,
+    [posts, hasMore, theme],
+  );
+
+  const subtitle =
+    !loading && posts.length > 0
+      ? i18nText("autoI18n.myposts_n_paylasim", "{{n}} paylaşım", {
+          n: `${posts.length}${hasMore ? "+" : ""}`,
+        })
+      : null;
+
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.primary }]}
+      style={[st.container, { backgroundColor: theme.primary }]}
       edges={["top"]}
     >
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="social" iconOpacity={0.25} />
       {/* Başlık */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.8}
-          style={[styles.backBtn, { backgroundColor: theme.secondary }]}
-        >
-          <AppIcon family="Ionicons" name="chevron-back" size={22} color={theme.text.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.postlarim", "Postlarım")}</Text>
-        <View style={{ width: 40 }} />
+      <View style={st.header}>
+        <BackButton absolute={false} onPress={() => navigation.goBack()} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[st.headerTitle, { color: theme.text.primary }]} numberOfLines={1}>
+            {i18nText("autoI18n.postlarim", "Postlarım")}
+          </Text>
+          {!!subtitle && (
+            <Text style={[st.headerSub, { color: theme.text.secondary }]} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          )}
+        </View>
       </View>
 
       {loading ? (
-        <MyPostsSkeleton count={5} />
+        <MyPostsSkeleton count={4} />
       ) : (
         <FlatList
           data={posts}
           keyExtractor={(p) => p.id}
           renderItem={({ item, index }) => (
             <StaggerItem index={index}>
-              <MyPostCard post={item} theme={theme} onMenu={setMenuPost} />
+              <MyPostCard post={item} theme={theme} t={t} onMenu={setMenuPost} />
             </StaggerItem>
           )}
-          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          ListHeaderComponent={listHeader}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
@@ -417,22 +500,29 @@ export default function MyPostsScreen({ navigation }) {
             />
           }
           ListEmptyComponent={
-            <View style={styles.empty}>
+            <View style={st.empty}>
               <View
                 style={[
-                  styles.emptyIcon,
-                  { backgroundColor: theme.secondary, borderColor: theme.border },
+                  st.emptyHalo,
+                  { backgroundColor: alpha(theme.accent, 0.1), borderColor: alpha(theme.accent, 0.22) },
                 ]}
               >
-                <AppIcon
-                  family="MaterialCommunityIcons"
-                  name="post-outline"
-                  size={40}
-                  color={theme.text.muted}
-                />
+                <View
+                  style={[
+                    st.emptyIcon,
+                    { backgroundColor: theme.secondary, borderColor: theme.border },
+                  ]}
+                >
+                  <AppIcon
+                    family="MaterialCommunityIcons"
+                    name="post-outline"
+                    size={38}
+                    color={theme.accent}
+                  />
+                </View>
               </View>
-              <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.henuz_paylasim_yok", "Henüz paylaşım yok")}</Text>
-              <Text style={[styles.emptySub, { color: theme.text.secondary }]}>{i18nText("autoI18n.paylastigin_incelemeler_ve_listeler_burada_gorunur", "Paylaştığın incelemeler ve listeler burada görünür.")}</Text>
+              <Text style={[st.emptyTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.henuz_paylasim_yok", "Henüz paylaşım yok")}</Text>
+              <Text style={[st.emptySub, { color: theme.text.secondary }]}>{i18nText("autoI18n.paylastigin_incelemeler_ve_listeler_burada_gorunur", "Paylaştığın incelemeler ve listeler burada görünür.")}</Text>
             </View>
           }
           ListFooterComponent={
@@ -682,75 +772,170 @@ export default function MyPostsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const st = StyleSheet.create({
   container: { flex: 1 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 6,
+    paddingBottom: 14,
     gap: 12,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: { flex: 1, fontSize: 19, fontWeight: "800", letterSpacing: -0.3 },
+  headerTitle: { fontSize: 24, fontWeight: "800", letterSpacing: -0.4 },
+  headerSub: { fontSize: 13, marginTop: 1 },
 
-  card: {
+  // Özet şeridi
+  summary: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  summaryTile: {
+    flex: 1,
     flexDirection: "row",
-    gap: 14,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderLeftWidth: 3,
-    marginBottom: 12,
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  poster: { width: 64, height: 96, borderRadius: 10, flexShrink: 0 },
-  stack: { height: 96, flexShrink: 0, position: "relative" },
-  stackItem: { position: "absolute", top: 0, borderWidth: 1.5 },
+  summaryIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  summaryValue: { fontSize: 17, fontWeight: "900", letterSpacing: -0.3 },
+  summaryLabel: { fontSize: 10.5, fontWeight: "700", marginTop: 1 },
 
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
-  badge: {
+  // Kart (iOS gölgesi overflow:hidden ile kırpılır → gölge dış sarmalayıcıda)
+  shadow: {
+    marginBottom: 14,
+    borderRadius: 24,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  card: {
+    borderRadius: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  wash: { position: "absolute", left: 0, right: 0, top: 0, height: 140 },
+
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
+  typePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  typeText: { fontSize: 9.5, fontWeight: "900", letterSpacing: 0.4 },
+  spoilerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
     paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
+    paddingVertical: 3,
+    borderRadius: 7,
+    backgroundColor: "rgba(240,79,79,0.12)",
   },
-  badgeText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.4 },
-  time: { fontSize: 11, marginLeft: "auto" },
-  dotsBtn: { marginLeft: 6, padding: 2 },
-  title: { fontSize: 15, fontWeight: "700", marginBottom: 4 },
-  content: { fontSize: 13, lineHeight: 18, marginBottom: 6 },
-  ratingRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
-  ratingText: { fontSize: 12, fontWeight: "600" },
-  pollBox: { gap: 5, marginBottom: 6 },
-  pollRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  pollLabel: { fontSize: 10, fontWeight: "600", maxWidth: "38%" },
-  pollBarTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
-  pollBarFill: { height: "100%", borderRadius: 2 },
-  pollPct: { fontSize: 10, fontWeight: "700", minWidth: 28, textAlign: "right" },
-  pollSummary: { fontSize: 10, marginTop: 1 },
-  statsRow: { flexDirection: "row", gap: 16, marginTop: 2 },
-  stat: { flexDirection: "row", alignItems: "center", gap: 4 },
-  statText: { fontSize: 12, fontWeight: "600" },
+  spoilerText: { color: SPOILER_RED, fontSize: 8.5, fontWeight: "900", letterSpacing: 0.4 },
+  time: { fontSize: 12, fontWeight: "500" },
+  dotsBtn: { padding: 2 },
 
-  empty: { alignItems: "center", paddingTop: 70, paddingHorizontal: 32 },
+  body: { flexDirection: "row", gap: 14 },
+  visualCol: { flexShrink: 0 },
+  visualFallback: {
+    width: STACK_POSTER_W,
+    height: STACK_POSTER_H,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  copy: { flex: 1, minWidth: 0 },
+  title: { fontSize: 17, lineHeight: 23, fontWeight: "800", marginBottom: 6, letterSpacing: -0.2 },
+  content: { fontSize: 13.5, lineHeight: 20, marginBottom: 8 },
+  quote: {
+    borderLeftWidth: 3,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  quoteText: { fontSize: 14, lineHeight: 21 },
+  ratingPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  ratingText: { fontSize: 11.5, fontWeight: "800" },
+
+  // Anket gövdesi
+  pollBox: {
+    gap: 10,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 12,
+    marginTop: 10,
+  },
+  pollRow: { gap: 5 },
+  pollRowHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  pollLabel: { flex: 1, fontSize: 12.5, fontWeight: "700" },
+  pollPct: { fontSize: 12, fontWeight: "900" },
+  pollTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
+  pollFill: { height: "100%", borderRadius: 3 },
+  pollSummary: { fontSize: 11, fontWeight: "600", marginTop: 1 },
+
+  // İstatistikler
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  footerRight: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  footerRightText: { fontSize: 12, fontWeight: "800" },
+
+  empty: { alignItems: "center", paddingTop: 50, paddingHorizontal: 32 },
+  emptyHalo: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 18,
+  },
   emptyIcon: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    marginBottom: 16,
   },
-  emptyTitle: { fontSize: 17, fontWeight: "700", marginBottom: 6 },
+  emptyTitle: { fontSize: 17, fontWeight: "800", marginBottom: 6 },
   emptySub: { fontSize: 13, textAlign: "center", lineHeight: 19 },
 });
 

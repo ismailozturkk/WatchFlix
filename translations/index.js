@@ -8,8 +8,6 @@ import {
 import en from "./en.json";
 import tr from "./tr.json";
 
-const STORE_LANGUAGE_KEY = Keys.language.key;
-
 // Kayıtlı dil YOKSA cihaz dili. `get()` kayıt yokken registry varsayılanını
 // ("tr") döndürdüğü için "hiç seçilmemiş" ile "Türkçe seçilmiş" ancak `has()`
 // ile ayrılabiliyor — ayrım olmadan yabancı kullanıcı Türkçe açılıyordu.

@@ -50,8 +50,6 @@ export const IDENTITY_BADGES = Object.freeze({
 });
 
 export const badgeLabel = (badge, lang) => (lang === "tr" ? badge?.tr : badge?.en) || badge?.en || "";
-export const badgeDesc = (badge, lang) => (lang === "tr" ? badge?.descTr : badge?.descEn) || badge?.descEn || "";
-
 /**
  * Profilde gösterilecek kimlik rozetleri, önem sırasına göre.
  * Premium ve Unlimited AYNI ANDA verilmez — Unlimited üst kademe olduğu için

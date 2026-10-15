@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
+import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import {
   StyleSheet,
   View,
@@ -12,18 +13,16 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  PanResponder,
   ActivityIndicator,
   Animated,
-  Easing,
   InteractionManager,
 } from "react-native";
 import axios from "axios";
 import { useNavigation } from "@react-navigation/native";
-import * as Haptics from "@services/hapticsService";
-import { clamp } from "../../utils/colorUtils";
+import { flushUserData } from "../../services/userData";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
+import GlassCloseButton from "../../components/common/GlassCloseButton";
 import { useTheme } from "../../context/ThemeContext";
 import SettingsTheme from "./setting/SettingsTheme";
 import {
@@ -31,20 +30,17 @@ import {
   useImageQualitySettings,
   useOngoingTvShowsSettings,
   useHapticsSettings,
-  useNotificationSettings,
   useAutoDataCacheSettings,
   useStreamingProviderSettings,
   STREAMING_PROVIDERS,
   useApiSettings,
 } from "../../context/AppSettingsContext";
-import { useDeviceNotifications } from "../../context/DeviceNotificationsContext";
 import SwitchToggle from "@components/SwitchToggle";
 import SwipeCard from "@components/SwipeCard";
 import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import ConfirmSheet from "@components/common/ConfirmSheet";
 import useSheetTransition from "@hooks/useSheetTransition";
-import { LinearGradient } from "expo-linear-gradient";
 import Constants from "expo-constants";
 import CountryFlag from "react-native-country-flag";
 import ScreenDecor from "../../components/ScreenDecor";
@@ -56,12 +52,8 @@ import { Image } from "expo-image";
 import TmdbLogo from "../../components/TmdbLogo";
 import JustWatchLogo from "../../components/JustWatchLogo";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
-import { usePremium } from "../../context/PremiumContext";
-import {
-  AI_PLAN_LIMITS,
-  getPremiumPlanDisplayName,
-  PREMIUM_PLAN,
-} from "../../utils/premium";
+import PremiumSettingsCard from "@components/settings/PremiumSettingsCard";
+import DevPlanSimulatorCard from "@components/settings/DevPlanSimulatorCard";
 import {
   DATA_TYPE_COUNT,
   buildAllTypes,
@@ -69,6 +61,9 @@ import {
   getDataTypeOptions,
 } from "./settings/dataTypes";
 import ImportDataModal from "../../components/import/ImportDataModal";
+import useAppLogo from "@hooks/useAppLogo";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { tabTitleTopSpacing } from "../../utils/screenTopSpacing";
 
 const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
 
@@ -83,64 +78,6 @@ const IMAGE_QUALITIES = [
   { labelKey: "imageQualityGood", value: "good" },
   { labelKey: "imageQualityHigh", value: "high" },
   { labelKey: "imageQualityOriginal", value: "original" },
-];
-
-const REMINDER_NOTIFICATION_TIMINGS = [
-  { labelKey: "onReleaseDay", value: 0 },
-  { labelKey: "oneDayBefore", value: 1 },
-  { labelKey: "threeDaysBefore", value: 3 },
-  { labelKey: "oneWeekBefore", value: 7 },
-];
-
-const NOTIFICATION_ROWS = [
-  {
-    key: "friendRequestsEnabled",
-    titleKey: "friendRequestNotifications",
-    subtitleKey: "friendRequestNotificationsSubtitle",
-    iconName: "person-add-outline",
-    colorKey: "blue",
-    bgKey: "iconBlue",
-  },
-  {
-    key: "friendAcceptedEnabled",
-    titleKey: "friendAcceptedNotifications",
-    subtitleKey: "friendAcceptedNotificationsSubtitle",
-    iconName: "people-outline",
-    colorKey: "green",
-    bgKey: "iconGreen",
-  },
-  {
-    key: "messagesEnabled",
-    titleKey: "messageNotifications",
-    subtitleKey: "messageNotificationsSubtitle",
-    iconName: "chatbubble-ellipses-outline",
-    colorKey: "teal",
-    bgKey: "iconTeal",
-  },
-  {
-    key: "postLikesEnabled",
-    titleKey: "postLikeNotifications",
-    subtitleKey: "postLikeNotificationsSubtitle",
-    iconName: "heart-outline",
-    colorKey: "amber",
-    bgKey: "iconAmber",
-  },
-  {
-    key: "postCommentsEnabled",
-    titleKey: "postCommentNotifications",
-    subtitleKey: "postCommentNotificationsSubtitle",
-    iconName: "chatbox-outline",
-    colorKey: "purple",
-    bgKey: "iconPurple",
-  },
-  {
-    key: "mentionsEnabled",
-    titleKey: "mentionNotifications",
-    subtitleKey: "mentionNotificationsSubtitle",
-    iconName: "at-outline",
-    colorKey: "blue",
-    bgKey: "iconBlue",
-  },
 ];
 
 function buildUiColors(theme) {
@@ -236,164 +173,6 @@ function SettingRow({
       </View>
       <View style={s.rowRight}>{right}</View>
     </TouchableOpacity>
-  );
-}
-
-// İkon saydamlık çarpanı için hafif kaydırıcı (0.1–1). Delta-based native 120 FPS PanResponder.
-function OpacitySlider({ value, onChange, colors }) {
-  const MIN = 0.1;
-  const MAX = 1;
-  const [trackW, setTrackW] = useState(0);
-  const widthRef = useRef(0);
-  const dragStartXRef = useRef(0);
-  const isDraggingRef = useRef(false);
-  const latestValRef = useRef(value);
-  latestValRef.current = value;
-  const rafIdRef = useRef(null);
-
-  const changeRef = useRef(onChange);
-  changeRef.current = onChange;
-
-  const thumbAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const lastBoundaryHitRef = useRef(null);
-
-  // Prop değeri değiştiğinde (sürükleme yapılmıyorsa) animasyonlu pozisyonu güncelle
-  useEffect(() => {
-    if (!isDraggingRef.current && trackW > 0) {
-      const r = clamp((value - MIN) / (MAX - MIN), 0, 1);
-      const maxTravel = Math.max(0, trackW - 22);
-      thumbAnim.setValue(r * maxTravel);
-    }
-  }, [value, trackW, thumbAnim]);
-
-  const updatePosition = useCallback(
-    (x, isImmediateCommit = false) => {
-      const w = widthRef.current;
-      if (!w) return;
-      const maxTravel = Math.max(0, w - 22);
-      const clampedRatio = clamp((x - 11) / Math.max(1, maxTravel), 0, 1);
-      const targetX = clampedRatio * maxTravel;
-
-      // 1) Anlık 120 FPS native görsel güncelleme (0ms gecikme)
-      thumbAnim.setValue(targetX);
-
-      // 2) Sınır haptikleri
-      if (clampedRatio === 0 && lastBoundaryHitRef.current !== "min") {
-        lastBoundaryHitRef.current = "min";
-        Haptics.selectionAsync();
-      } else if (clampedRatio === 1 && lastBoundaryHitRef.current !== "max") {
-        lastBoundaryHitRef.current = "max";
-        Haptics.selectionAsync();
-      } else if (clampedRatio > 0.02 && clampedRatio < 0.98) {
-        lastBoundaryHitRef.current = null;
-      }
-
-      const val = MIN + clampedRatio * (MAX - MIN);
-      latestValRef.current = val;
-
-      if (isImmediateCommit) {
-        if (rafIdRef.current) {
-          cancelAnimationFrame(rafIdRef.current);
-          rafIdRef.current = null;
-        }
-        changeRef.current?.(val);
-      } else if (!rafIdRef.current) {
-        rafIdRef.current = requestAnimationFrame(() => {
-          rafIdRef.current = null;
-          changeRef.current?.(latestValRef.current);
-        });
-      }
-    },
-    [thumbAnim],
-  );
-
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
-        isDraggingRef.current = true;
-        dragStartXRef.current = e.nativeEvent.locationX;
-        updatePosition(e.nativeEvent.locationX, true);
-        Animated.spring(scaleAnim, {
-          toValue: 1.25,
-          useNativeDriver: true,
-          friction: 7,
-          tension: 250,
-        }).start();
-      },
-      onPanResponderMove: (_, g) => {
-        updatePosition(dragStartXRef.current + g.dx, false);
-      },
-      onPanResponderRelease: (_, g) => {
-        isDraggingRef.current = false;
-        updatePosition(dragStartXRef.current + g.dx, true);
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          friction: 7,
-          tension: 250,
-        }).start();
-      },
-      onPanResponderTerminate: () => {
-        isDraggingRef.current = false;
-        if (rafIdRef.current) {
-          cancelAnimationFrame(rafIdRef.current);
-          rafIdRef.current = null;
-        }
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          friction: 7,
-          tension: 250,
-        }).start();
-      },
-    }),
-  ).current;
-
-  const ratio = clamp((value - MIN) / (MAX - MIN), 0, 1);
-
-  return (
-    <View
-      {...pan.panHandlers}
-      onLayout={(e) => {
-        const w = e.nativeEvent.layout.width;
-        widthRef.current = w;
-        setTrackW(w);
-      }}
-      style={s.opacitySliderContainer}
-      hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}
-    >
-      <View
-        pointerEvents="none"
-        style={[
-          s.opacityTrackBg,
-          { backgroundColor: colors.cardAlt, borderColor: colors.border },
-        ]}
-      >
-        <View
-          style={[
-            s.opacityFill,
-            { width: ratio * trackW, backgroundColor: colors.accent },
-          ]}
-        />
-      </View>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          s.opacityThumb,
-          {
-            backgroundColor: colors.accent,
-            borderColor: colors.white,
-            transform: [
-              { translateX: thumbAnim },
-              { scale: scaleAnim },
-            ],
-          },
-        ]}
-      />
-    </View>
   );
 }
 
@@ -511,10 +290,21 @@ function DataTypePicker({ types, colors, onChange, onToggleAll }) {
   );
 }
 
+// iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için kaydırma
+// görünümünü sekme ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js).
+// Modül kapsamında: render içinde kurulursa içerik her render'da sökülür.
+const MarkedScrollView = markTabScroll(ScrollView);
+
 export default function SettingsScreen() {
+  // Marka logosu seçili uygulama simgesini izler (hooks/useAppLogo.js).
+  const { logo: appLogo } = useAppLogo();
   const { contentBottom } = useTabBarLayout();
   const onTabBarScroll = useTabBarScrollSync();
   const navigation = useNavigation();
+  // İçerik ekranın tepesinden başlıyor (durum çubuğu / Dynamic Island altında
+  // değil): başlığın üst boşluğu güvenli alana bağlı, sabit değer değil.
+  const insets = useSafeAreaInsets();
+  const titleTop = tabTitleTopSpacing(insets.top);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
   const [modalVisibleLogout, setModalVisibleLogout] = useState(false);
@@ -534,6 +324,13 @@ export default function SettingsScreen() {
   const handleSignOut = async () => {
     try {
       const auth = getAuth();
+      // Çıkıştan ÖNCE buluta gitmemiş notları/hatırlatıcıları göndermeyi dene:
+      // çıkıştan sonra yetkisiz kalınır. En çok 4 sn bekler; çevrimdışıysa
+      // vazgeçer — değişiklikler yazma günlüğünde durur ve aynı hesapla tekrar
+      // girişte gider (çıkışı asla kilitlemez).
+      if (auth.currentUser?.uid) {
+        await flushUserData(auth.currentUser.uid, { timeoutMs: 4000 }).catch(() => {});
+      }
       await auth.signOut();
       navigation.reset({
         index: 0,
@@ -574,59 +371,14 @@ export default function SettingsScreen() {
   const { API_KEY } = useApiSettings();
   const { hapticsEnabled, changeHapticsEnabled } = useHapticsSettings();
   const {
-    notificationSettings,
-    changeNotificationSettings,
-  } = useNotificationSettings();
-  const {
     autoDataCacheEnabled,
     changeAutoDataCacheEnabled,
     dataCacheTypes,
     changeDataCacheType,
     changeDataCacheTypes,
   } = useAutoDataCacheSettings();
-  const { permissionStatus, requestPermission } = useDeviceNotifications();
   const { streamingProviderIds, changeStreamingProviderIds } =
     useStreamingProviderSettings();
-  const { isPremium, isUnlimited, loading: premiumLoading } = usePremium();
-  // Kartın tanıttığı plan: abone kendi planını, Free kullanıcı Premium'u görür
-  // (Free'nin kendi 5 mesajı bir "ayrıcalık" değil).
-  const showcasePlan = isUnlimited ? PREMIUM_PLAN.UNLIMITED : PREMIUM_PLAN.PREMIUM;
-  const premiumLimits = AI_PLAN_LIMITS[showcasePlan];
-  const premiumMotion = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(premiumMotion, {
-          toValue: 1,
-          duration: 4200,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(premiumMotion, {
-          toValue: 0,
-          duration: 4200,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [premiumMotion]);
-
-  const premiumWashOpacity = premiumMotion.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.2, 0.72, 0.28],
-  });
-  const premiumShineX = premiumMotion.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-190, 260],
-  });
-  const premiumIconScale = premiumMotion.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, 1.08, 1],
-  });
 
   useEffect(() => {
     let active = true;
@@ -710,9 +462,6 @@ export default function SettingsScreen() {
 
   const currentQualityLabel =
     t[IMAGE_QUALITIES.find((q) => q.value === imageQualityLevel)?.labelKey] ?? "—";
-  const notificationsEnabled = notificationSettings.enabled;
-  const remindersEnabled =
-    notificationsEnabled && notificationSettings.remindersEnabled;
   const selectedProviderNames = providerCatalog
     .filter((provider) => streamingProviderIds.includes(provider.id))
     .map((provider) => provider.name);
@@ -753,32 +502,15 @@ export default function SettingsScreen() {
     );
   };
 
-  const updateNotifications = (patch) => {
-    changeNotificationSettings(patch);
-  };
 
-  // Ana anahtar açılınca OS bildirim iznini iste; reddedilirse yönlendir.
-  const handleToggleMaster = async (enabled) => {
-    updateNotifications({ enabled });
-    if (enabled && permissionStatus !== "granted") {
-      const granted = await requestPermission();
-      if (!granted) {
-        appAlert(t.notifPermissionTitle, t.notifPermissionMessage);
-      }
-    }
-  };
 
-  const masterSubtitle =
-    notificationsEnabled && permissionStatus === "denied"
-      ? t.notifPermissionDenied
-      : t.allNotificationsSubtitle;
 
   return (
     <View style={[s.root, { backgroundColor: C.bg }]}>
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.15} />
+      <ScreenDecor scope="settings" iconOpacity={0.15} />
 
-      <ScrollView
+      <MarkedScrollView
         style={s.scroll}
         contentContainerStyle={[s.scrollContent, { paddingBottom: contentBottom }]}
         showsVerticalScrollIndicator={false}
@@ -786,11 +518,145 @@ export default function SettingsScreen() {
         onScroll={onTabBarScroll}
         scrollEventThrottle={16}
       >
-        <Text allowFontScaling={false} style={[s.pageTitle, { color: C.text }]}>
+        <Text
+          allowFontScaling={false}
+          style={[s.pageTitle, { color: C.text, marginTop: titleTop }]}
+        >
           {t.settings}
         </Text>
 
-        <SectionLabel color={C.muted} first>{t.language.toUpperCase()}</SectionLabel>
+        {/* ── Premium: abonelik vitrini en üstte ── */}
+        <SectionLabel color={C.muted} first>SEELOGD PREMIUM</SectionLabel>
+        <PremiumSettingsCard />
+        <View
+          style={[
+            s.card,
+            s.cardStacked,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconPurple}
+            iconColor={C.purple}
+            iconName="speedometer-outline"
+            title={i18nText("autoI18n.kullanim_haklar_baslik", "Kullanım ve haklar")}
+            subtitle={i18nText(
+              "autoI18n.kullanim_haklar_aciklama",
+              "Planının limitleri ve kalan hakların",
+            )}
+            onPress={() => navigation.navigate("PremiumUsageScreen")}
+            right={<Chevron color={C.muted} />}
+            last
+          />
+        </View>
+        {/* Yalnız geliştirme build'inde: premium kapılarını mağazasız dene */}
+        {__DEV__ ? <DevPlanSimulatorCard /> : null}
+
+        {/* ── Hesap: kimlik doğrulama yöntemleri ve gizlilik ── */}
+        <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_hesap", "Hesap").toUpperCase()}</SectionLabel>
+        <View
+          style={[
+            s.card,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="person-circle-outline"
+            title={i18nText("autoI18n.hesap_baglantilari", "Hesap bağlantıları")}
+            subtitle={i18nText("autoI18n.hesap_baglantilari_aciklama", "Google, Apple ve parola yöntemleri")}
+            onPress={() => navigation.navigate("AccountConnectionsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="lock-closed-outline"
+            title={i18nText("autoI18n.gizlilik", "Gizlilik")}
+            subtitle={i18nText(
+              "autoI18n.gizlilik_aciklama",
+              "Profil, listeler, gönderiler ve çevrimiçi durumu kimler görsün",
+            )}
+            onPress={() => navigation.navigate("PrivacySettingsScreen")}
+            right={<Chevron color={C.muted} />}
+            last
+          />
+        </View>
+
+        {/* ── Görünüm: tema, kişiselleştirme, poster düzeni, widget'lar, dokunsal geri bildirim ── */}
+        <SectionLabel color={C.muted}>{t.appearance.toUpperCase()}</SectionLabel>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          {/* Ayrı "Görünüm" başlık satırı kaldırıldı — SettingsTheme'in kendi
+              "Aktif tema" özet satırı bu görevi üstleniyor. */}
+          <SettingsTheme />
+        </View>
+        <View
+          style={[
+            s.card,
+            s.cardStacked,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="color-palette-outline"
+            title={t.personalization}
+            subtitle={i18nText(
+              "autoI18n.kisisellestirme_aciklama",
+              "Kar efekti, ikon arka planı ve pet",
+            )}
+            onPress={() => navigation.navigate("PersonalizationScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconPurple}
+            iconColor={C.purple}
+            iconName="images-outline"
+            title={i18nText("autoI18n.poster_gorunumu", "Poster görünümü")}
+            subtitle={i18nText("autoI18n.poster_gorunumu_aciklama", "Afiş boyutu, köşeler ve düzen")}
+            onPress={() => navigation.navigate("PosterSettingsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="grid-outline"
+            title={i18nText("autoI18n.widget_settings_title", "Widget’lar")}
+            subtitle={i18nText(
+              "autoI18n.widget_settings_description",
+              "Ana ekran widget’larının görünümünü özelleştir",
+            )}
+            onPress={() => navigation.navigate("WidgetSettingsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconAmber}
+            iconColor={C.amber}
+            iconName={hapticsEnabled ? "phone-portrait-outline" : "phone-portrait"}
+            title={t.haptics}
+            subtitle={t.hapticsSubtitle}
+            right={
+              <SwitchToggle
+                value={hapticsEnabled}
+                onValueChange={changeHapticsEnabled}
+                size={36}
+              />
+            }
+            last
+          />
+        </View>
+
+        {/* ── Dil ve içerik: uygulama dili, izleme platformları, içerik tercihleri ── */}
+        <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_dil_icerik", "Dil ve içerik").toUpperCase()}</SectionLabel>
         <TouchableOpacity
           style={[s.langCard, { backgroundColor: C.card, borderColor: C.border }]}
           onPress={() => {
@@ -823,15 +689,115 @@ export default function SettingsScreen() {
             <Chevron color={C.muted} />
           </View>
         </TouchableOpacity>
-
-        <SectionLabel color={C.muted}>{t.theme.toUpperCase()}</SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          {/* Ayrı "Görünüm" başlık satırı kaldırıldı — SettingsTheme'in kendi
-              "Aktif tema" özet satırı bu görevi üstleniyor. */}
-          <SettingsTheme />
+        <View
+          style={[
+            s.card,
+            s.cardStacked,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="play-circle-outline"
+            title={i18nText("autoI18n.platform_uyeliklerim", "Platform üyeliklerim")}
+            subtitle={providerSummary}
+            onPress={() => {
+              setProviderSearch("");
+              setProviderModalVisible(true);
+            }}
+            right={
+              <View style={s.providerCountWrap}>
+                {streamingProviderIds.length > 0 && (
+                  <View style={[s.providerCount, { backgroundColor: C.accentDim }]}>
+                    <Text style={[s.providerCountText, { color: C.accent }]}>
+                      {streamingProviderIds.length}
+                    </Text>
+                  </View>
+                )}
+                <Chevron color={C.muted} />
+              </View>
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName={showOngoingTvShows ? "play-circle-outline" : "pause-circle-outline"}
+            title={t.showOngoingTvShows}
+            subtitle={t.showOngoingTvShowsSubtitle}
+            last={ageRestricted}
+            right={
+              <SwitchToggle
+                value={showOngoingTvShows}
+                onValueChange={changeShowOngoingTvShows}
+                size={36}
+              />
+            }
+          />
+          {/* Yetişkin içerik — 18 altı hesapta satır HİÇ ÇİZİLMEZ. Kapalı bir
+              anahtar göstermek "neden açamıyorum" sorusunu doğuruyor; içerik
+              süzgeci zaten ayrıca kilitli (bkz. utils/tmdbAdultGuard.js). */}
+          {!ageRestricted && (
+            <SettingRow
+              colors={C}
+              iconBg={C.iconPurple}
+              iconColor={C.purple}
+              iconName={adultContent ? "eye-outline" : "eye-off-outline"}
+              title={t.adultContent}
+              subtitle={t.adultContentSubtitle}
+              last
+              right={
+                <SwitchToggle
+                  value={adultContent}
+                  onValueChange={() => chaneAdultContent(!adultContent)}
+                  size={36}
+                />
+              }
+            />
+          )}
         </View>
 
-        <SectionLabel color={C.muted}>{t.quality.toUpperCase()}</SectionLabel>
+        {/* ── Bildirimler ── */}
+        <SectionLabel color={C.muted}>{t.notifications.toUpperCase()}</SectionLabel>
+        <View
+          style={[
+            s.card,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName="alarm-outline"
+            title={t.reminderNotificationGroup}
+            subtitle={i18nText(
+              "autoI18n.hatirlaticilar_aciklama",
+              "Film ve dizi hatırlatmaları, bildirim zamanı",
+            )}
+            onPress={() => navigation.navigate("ReminderNotificationsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconAmber}
+            iconColor={C.amber}
+            iconName="chatbubbles-outline"
+            title={t.socialNotificationGroup}
+            subtitle={i18nText(
+              "autoI18n.sosyal_mesajlar_aciklama",
+              "Arkadaşlık, beğeni, yorum ve mesaj bildirimleri",
+            )}
+            onPress={() => navigation.navigate("SocialNotificationsScreen")}
+            right={<Chevron color={C.muted} />}
+            last
+          />
+        </View>
+
+        {/* ── Veri ve depolama: görsel kalitesi, çevrimdışı veri, izinler, içe aktarma ── */}
+        <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_veri_depolama", "Veri ve depolama").toUpperCase()}</SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <View style={s.qualityHeader}>
             <View style={[s.iconWrap, { backgroundColor: C.iconPurple }]}>
@@ -884,240 +850,13 @@ export default function SettingsScreen() {
             })}
           </View>
         </View>
-
-        <SectionLabel color={C.muted}>SEELOGD PREMIUM</SectionLabel>
-        <TouchableOpacity
-          activeOpacity={0.88}
-          onPress={() => navigation.navigate("PremiumScreen")}
-          accessibilityRole="button"
-          accessibilityLabel="Seelogd Premium"
-          style={[s.premiumCard, { borderColor: alpha(C.accent, 0.42) }]}
+        <View
+          style={[
+            s.card,
+            s.cardStacked,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
         >
-          <LinearGradient
-            colors={[
-              alpha(C.purple || "#6366F1", 0.38),
-              alpha(C.accent, 0.22),
-              C.card,
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={s.premiumGradient}
-          >
-            <View style={s.premiumGlow} />
-            <View style={s.premiumRing} />
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                s.premiumAnimatedWash,
-                {
-                  opacity: premiumWashOpacity,
-                  transform: [
-                    {
-                      scale: premiumMotion.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1, 1.2],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <LinearGradient
-                colors={[
-                  alpha(C.purple || "#6366F1", 0.55),
-                  alpha(C.accent, 0.42),
-                  alpha(C.blue || "#3B82F6", 0.22),
-                ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-            </Animated.View>
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                s.premiumShine,
-                { transform: [{ translateX: premiumShineX }, { rotate: "16deg" }] },
-              ]}
-            >
-              <LinearGradient
-                colors={["transparent", "rgba(255,255,255,0.18)", "transparent"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={StyleSheet.absoluteFill}
-              />
-            </Animated.View>
-
-            {/* Top Brand & Status Row */}
-            <View style={s.premiumHeader}>
-              <Animated.View
-                style={[
-                  s.premiumIcon,
-                  {
-                    backgroundColor: alpha(C.purple || "#6366F1", 0.22),
-                    transform: [{ scale: premiumIconScale }],
-                  },
-                ]}
-              >
-                <LinearGradient
-                  colors={[alpha(C.accent, 0.95), alpha(C.purple || "#6366F1", 0.95)]}
-                  style={s.premiumIconFill}
-                >
-                  <AppIcon
-                    name={isUnlimited ? "infinite" : "diamond"}
-                    size={22}
-                    color="#FFFFFF"
-                  />
-                </LinearGradient>
-              </Animated.View>
-
-              <View style={s.premiumHeaderCopy}>
-                <View style={s.premiumBrandTagRow}>
-                  <Text style={[s.premiumEyebrow, { color: C.accent }]}>SEELOGD PRO</Text>
-                  <View style={[s.premiumDot, { backgroundColor: alpha(C.accent, 0.5) }]} />
-                  <Text style={[s.premiumTierTag, { color: C.muted }]}>
-                    {getPremiumPlanDisplayName(
-                      isUnlimited ? PREMIUM_PLAN.UNLIMITED : PREMIUM_PLAN.PREMIUM
-                    )}
-                  </Text>
-                </View>
-                <Text style={[s.premiumTitle, { color: C.text }]}>
-                  {isPremium
-                    ? language === "tr" ? "Ayrıcalıkların Aktif" : "Your Benefits Are Active"
-                    : language === "tr" ? "Sinemanın Sınırlarını Kaldır" : "Unlock Boundless Cinema"}
-                </Text>
-              </View>
-
-              {premiumLoading ? (
-                <ActivityIndicator size="small" color={C.accent} />
-              ) : (
-                <View
-                  style={[
-                    s.premiumPlanBadge,
-                    {
-                      backgroundColor: isPremium ? C.iconGreen : alpha(C.accent, 0.14),
-                      borderColor: isPremium ? alpha(C.green, 0.3) : alpha(C.accent, 0.3),
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      s.premiumStatusDot,
-                      { backgroundColor: isPremium ? C.green : C.accent },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      s.premiumPlanBadgeText,
-                      { color: isPremium ? C.green : C.accent },
-                    ]}
-                  >
-                    {isUnlimited
-                      ? "PREMIUM MAX"
-                      : isPremium
-                        ? i18nText("autoI18n.aktif_upper", "AKTİF")
-                        : "PRO"}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Benefit Chips / Highlights */}
-            <View style={s.premiumChipsContainer}>
-              <View style={[s.premiumChip, { backgroundColor: alpha(C.cardAlt, 0.8), borderColor: alpha(C.accent, 0.16) }]}>
-                <AppIcon name="sparkles" size={13} color={C.accent} />
-                <Text style={[s.premiumChipText, { color: C.text }]}>
-                  {language === "tr"
-                    ? `Günde ${premiumLimits.daily} CineMatch AI mesajı`
-                    : `${premiumLimits.daily} CineMatch AI messages / day`}
-                </Text>
-              </View>
-
-              <View style={[s.premiumChip, { backgroundColor: alpha(C.cardAlt, 0.8), borderColor: alpha(C.purple, 0.16) }]}>
-                <AppIcon name="diamond" size={13} color={C.purple || "#A855F7"} />
-                <Text style={[s.premiumChipText, { color: C.text }]}>
-                  {language === "tr"
-                    ? isUnlimited ? "Efsanevi Profil Rozeti" : "Özel Profil Kimlik Rozeti"
-                    : isUnlimited ? "Legendary Profile Badge" : "Exclusive Profile Badge"}
-                </Text>
-              </View>
-
-              <View style={[s.premiumChip, { backgroundColor: alpha(C.cardAlt, 0.8), borderColor: alpha(C.green, 0.16) }]}>
-                <AppIcon name="people" size={13} color={C.green} />
-                <Text style={[s.premiumChipText, { color: C.text }]}>
-                  {showcasePlan === PREMIUM_PLAN.UNLIMITED
-                    ? language === "tr"
-                      ? "Sınırsız liste, arkadaş ve oyun"
-                      : "Unlimited lists, friends and games"
-                    : language === "tr"
-                      ? "Daha fazla liste, arkadaş ve oyun"
-                      : "More lists, friends and games"}
-                </Text>
-              </View>
-            </View>
-
-            {/* Action Bar */}
-            <View style={[s.premiumAction, { backgroundColor: C.accent }]}>
-              <LinearGradient
-                colors={[C.accent, C.purple || C.accent]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <View style={s.premiumActionCopy}>
-                <Text style={s.premiumActionText}>
-                  {isPremium
-                    ? i18nText("autoI18n.yonet", "Aboneliğimi Yönet")
-                    : language === "tr"
-                    ? "Ayrıcalıkları ve Fiyatları Gör"
-                    : "View Plans & Pricing"}
-                </Text>
-                <Text style={s.premiumActionSubtext}>
-                  {isPremium
-                    ? language === "tr" ? "Plan detaylarını ve faturalandırmayı yönet" : "Manage plan and billing"
-                    : language === "tr" ? "Doğrudan fiyatlandırma · Dilediğin an iptal" : "Direct pricing · Cancel anytime"}
-                </Text>
-              </View>
-              <View style={s.premiumActionChevron}>
-                <AppIcon name="arrow-forward" size={15} color="#FFFFFF" />
-              </View>
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <SectionLabel color={C.muted}>
-          {i18nText("autoI18n.izleme_platformlarim_upper", "İZLEME PLATFORMLARIM")}
-        </SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <SettingRow
-            colors={C}
-            iconBg={C.iconTeal}
-            iconColor={C.teal}
-            iconName="play-circle-outline"
-            title={i18nText("autoI18n.platform_uyeliklerim", "Platform üyeliklerim")}
-            subtitle={providerSummary}
-            onPress={() => {
-              setProviderSearch("");
-              setProviderModalVisible(true);
-            }}
-            last
-            right={
-              <View style={s.providerCountWrap}>
-                {streamingProviderIds.length > 0 && (
-                  <View style={[s.providerCount, { backgroundColor: C.accentDim }]}>
-                    <Text style={[s.providerCountText, { color: C.accent }]}>
-                      {streamingProviderIds.length}
-                    </Text>
-                  </View>
-                )}
-                <Chevron color={C.muted} />
-              </View>
-            }
-          />
-        </View>
-
-        <SectionLabel color={C.muted}>{t.general.toUpperCase()}</SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <SettingRow
             colors={C}
             iconBg={C.iconAmber}
@@ -1148,137 +887,6 @@ export default function SettingsScreen() {
               onToggleAll={(enabled) => changeDataCacheTypes(buildAllTypes(enabled))}
             />
           )}
-          {/* Yetişkin içerik — 18 altı hesapta satır HİÇ ÇİZİLMEZ. Kapalı bir
-              anahtar göstermek "neden açamıyorum" sorusunu doğuruyor; içerik
-              süzgeci zaten ayrıca kilitli (bkz. utils/tmdbAdultGuard.js). */}
-          {!ageRestricted && (
-            <SettingRow
-              colors={C}
-              iconBg={C.iconPurple}
-              iconColor={C.purple}
-              iconName={adultContent ? "eye-outline" : "eye-off-outline"}
-              title={t.adultContent}
-              subtitle={t.adultContentSubtitle}
-              right={
-                <SwitchToggle
-                  value={adultContent}
-                  onValueChange={() => chaneAdultContent(!adultContent)}
-                  size={36}
-                />
-              }
-            />
-          )}
-          <SettingRow
-            colors={C}
-            iconBg={C.iconGreen}
-            iconColor={C.green}
-            iconName={showOngoingTvShows ? "play-circle-outline" : "pause-circle-outline"}
-            title={t.showOngoingTvShows}
-            subtitle={t.showOngoingTvShowsSubtitle}
-            right={
-              <SwitchToggle
-                value={showOngoingTvShows}
-                onValueChange={changeShowOngoingTvShows}
-                size={36}
-              />
-            }
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconAmber}
-            iconColor={C.amber}
-            iconName={hapticsEnabled ? "phone-portrait-outline" : "phone-portrait"}
-            title={t.haptics}
-            subtitle={t.hapticsSubtitle}
-            last
-            right={
-              <SwitchToggle
-                value={hapticsEnabled}
-                onValueChange={changeHapticsEnabled}
-                size={36}
-              />
-            }
-          />
-        </View>
-
-        {/* Kişiselleştirme: kar + ikon arka planı + pet aynı alanda toplandı */}
-        {/* Genel'in altındaki yönlendirme grubu → ayrı ayar ekranları */}
-        <SectionLabel color={C.muted}>
-          {i18nText("autoI18n.dahaFazla", "Daha fazla").toUpperCase()}
-        </SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <SettingRow
-            colors={C}
-            iconBg={C.iconBlue}
-            iconColor={C.blue}
-            iconName="person-circle-outline"
-            title={i18nText("autoI18n.hesap_baglantilari", "Hesap bağlantıları")}
-            subtitle={i18nText("autoI18n.hesap_baglantilari_aciklama", "Google, Apple ve parola yöntemleri")}
-            onPress={() => navigation.navigate("AccountConnectionsScreen")}
-            right={<Chevron color={C.muted} />}
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconGreen}
-            iconColor={C.green}
-            iconName="alarm-outline"
-            title={t.reminderNotificationGroup}
-            subtitle={i18nText(
-              "autoI18n.hatirlaticilar_aciklama",
-              "Film ve dizi hatırlatmaları, bildirim zamanı",
-            )}
-            onPress={() => navigation.navigate("ReminderNotificationsScreen")}
-            right={<Chevron color={C.muted} />}
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconAmber}
-            iconColor={C.amber}
-            iconName="chatbubbles-outline"
-            title={t.socialNotificationGroup}
-            subtitle={i18nText(
-              "autoI18n.sosyal_mesajlar_aciklama",
-              "Arkadaşlık, beğeni, yorum ve mesaj bildirimleri",
-            )}
-            onPress={() => navigation.navigate("SocialNotificationsScreen")}
-            right={<Chevron color={C.muted} />}
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconTeal}
-            iconColor={C.teal}
-            iconName="color-palette-outline"
-            title={t.personalization}
-            subtitle={i18nText(
-              "autoI18n.kisisellestirme_aciklama",
-              "Kar efekti, ikon arka planı ve pet",
-            )}
-            onPress={() => navigation.navigate("PersonalizationScreen")}
-            right={<Chevron color={C.muted} />}
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconPurple}
-            iconColor={C.purple}
-            iconName="images-outline"
-            title={i18nText("autoI18n.poster_gorunumu", "Poster görünümü")}
-            subtitle={i18nText("autoI18n.poster_gorunumu_aciklama", "Afiş boyutu, köşeler ve düzen")}
-            onPress={() => navigation.navigate("PosterSettingsScreen")}
-            right={<Chevron color={C.muted} />}
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconTeal}
-            iconColor={C.teal}
-            iconName="grid-outline"
-            title={i18nText("autoI18n.widget_settings_title", "Widget’lar")}
-            subtitle={i18nText(
-              "autoI18n.widget_settings_description",
-              "Ana ekran widget’larının görünümünü özelleştir",
-            )}
-            onPress={() => navigation.navigate("WidgetSettingsScreen")}
-            right={<Chevron color={C.muted} />}
-          />
           <SettingRow
             colors={C}
             iconBg={C.iconBlue}
@@ -1294,6 +902,19 @@ export default function SettingsScreen() {
           />
           <SettingRow
             colors={C}
+            iconBg={C.iconPurple}
+            iconColor={C.purple}
+            iconName="archive-outline"
+            title={i18nText("autoI18n.ayar_yedek_baslik", "Ayarları Yedekle ve Geri Yükle")}
+            subtitle={i18nText(
+              "autoI18n.ayar_yedek_alt",
+              "Tema, özel temalar ve tüm tercihlerini dosyaya aktar",
+            )}
+            onPress={() => navigation.navigate("BackupSettingsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
             iconBg={C.iconAmber}
             iconColor={C.amber}
             iconName="file-tray-full-outline"
@@ -1301,49 +922,11 @@ export default function SettingsScreen() {
             subtitle="İzleme geçmişinizi ve puanlarınızı Seelogd'a taşıyın"
             onPress={() => setShowImportModal(true)}
             right={<Chevron color={C.muted} />}
-          />
-          <SettingRow
-            colors={C}
-            iconBg={C.iconBlue}
-            iconColor={C.blue}
-            iconName="lock-closed-outline"
-            title={i18nText("autoI18n.gizlilik", "Gizlilik")}
-            subtitle={i18nText(
-              "autoI18n.gizlilik_aciklama",
-              "Profil, listeler, gönderiler ve çevrimiçi durumu kimler görsün",
-            )}
             last
-            onPress={() => navigation.navigate("PrivacySettingsScreen")}
-            right={<Chevron color={C.muted} />}
           />
         </View>
 
-        <View style={[s.card, s.debugCard, { backgroundColor: C.card, borderColor: C.border }]}>
-          <SettingRow colors={C} iconBg={C.iconBlue} iconColor={C.blue}
-            iconName="analytics-outline" title="Debug"
-            onPress={() => navigation.navigate("UsageDebugScreen")}
-            right={<Chevron color={C.muted} />} last />
-        </View>
-
-        {/* Çıkış Yap — Hakkında bölümünün hemen üstünde */}
-        <SectionLabel color={C.danger}>
-          {(t.logout || "Çıkış Yap").toUpperCase()}
-        </SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <SettingRow
-            colors={C}
-            iconBg={C.dangerDim}
-            iconColor={C.danger}
-            iconName="log-out-outline"
-            title={t.logout || "Çıkış Yap"}
-            subtitle={i18nText("autoI18n.cikis_yap_aciklama", "Hesabından güvenli bir şekilde çıkış yap")}
-            danger
-            last
-            onPress={() => setModalVisibleLogout(true)}
-            right={<Chevron color={C.danger} />}
-          />
-        </View>
-
+        {/* ── Hakkında + hata ayıklama ── */}
         <SwipeCard>
           <SectionLabel color={C.muted}>{t.about.toUpperCase()}</SectionLabel>
 
@@ -1364,7 +947,7 @@ export default function SettingsScreen() {
               ]}
             >
               <Image
-                source={require("../../assets/icon_default/android-icon-foreground.png")}
+                source={appLogo}
                 style={{ width: 50, height: 50 }}
                 contentFit="contain"
               />
@@ -1399,6 +982,32 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </SwipeCard>
 
+        <View style={[s.card, s.debugCard, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow colors={C} iconBg={C.iconBlue} iconColor={C.blue}
+            iconName="analytics-outline" title="Debug"
+            onPress={() => navigation.navigate("UsageDebugScreen")}
+            right={<Chevron color={C.muted} />} last />
+        </View>
+
+        {/* ── Çıkış: tehlikeli işlem en altta ── */}
+        <SectionLabel color={C.danger}>
+          {(t.logout || "Çıkış Yap").toUpperCase()}
+        </SectionLabel>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow
+            colors={C}
+            iconBg={C.dangerDim}
+            iconColor={C.danger}
+            iconName="log-out-outline"
+            title={t.logout || "Çıkış Yap"}
+            subtitle={i18nText("autoI18n.cikis_yap_aciklama", "Hesabından güvenli bir şekilde çıkış yap")}
+            danger
+            last
+            onPress={() => setModalVisibleLogout(true)}
+            right={<Chevron color={C.danger} />}
+          />
+        </View>
+
         <BottomSheetModal
           visible={providerModalVisible}
           onClose={() => {
@@ -1419,15 +1028,17 @@ export default function SettingsScreen() {
                     {i18nText("autoI18n.platform_uyeliklerim", "Platform üyeliklerim")}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={[s.closeBtn, { backgroundColor: C.closeBg }]}
+                <GlassCloseButton
+                  size={30}
+                  fallbackRadius={15}
+                  iconSize={16}
+                  color={C.muted}
+                  backgroundColor={C.closeBg}
                   onPress={() => {
                     setProviderModalVisible(false);
                     setProviderSearch("");
                   }}
-                >
-                  <AppIcon name="close" size={16} color={C.muted} />
-                </TouchableOpacity>
+                />
               </View>
               <Text allowFontScaling={false} style={[s.providerHelp, { color: C.muted }]}>
                 {i18nText("autoI18n.platform_uyelikleri_aciklama", "Üyesi olduğun servisleri seç. Film ve dizi ana ekranlarında sana özel bir alan oluşturulur.")}
@@ -1587,11 +1198,15 @@ export default function SettingsScreen() {
               >
                 <ModalBlurBackdrop intensity={40} />
               </Animated.View>
+              {/* fit: arama kutusu klavyeyi açınca sayfa, klavyenin üstünde kalan
+                  alana sığacak şekilde kısalır (liste kendi içinde kayar). */}
               <Animated.View
                 onLayout={langSheet.onSheetLayout}
                 style={[
-                  s.sheet,
-                  { backgroundColor: C.card, borderColor: C.border },
+                  langSheet.fit([
+                    s.sheet,
+                    { backgroundColor: C.card, borderColor: C.border },
+                  ]),
                   langSheet.sheetStyle,
                 ]}
               >
@@ -1607,15 +1222,17 @@ export default function SettingsScreen() {
                       {t.language}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    style={[s.closeBtn, { backgroundColor: C.closeBg }]}
+                  <GlassCloseButton
+                    size={30}
+                    fallbackRadius={15}
+                    iconSize={16}
+                    color={C.muted}
+                    backgroundColor={C.closeBg}
                     onPress={() => {
                       setLangModalVisible(false);
                       setLangSearch("");
                     }}
-                  >
-                    <AppIcon name="close" size={16} color={C.muted} />
-                  </TouchableOpacity>
+                  />
                 </View>
 
                 <View
@@ -1737,7 +1354,7 @@ export default function SettingsScreen() {
           visible={showImportModal}
           onClose={() => setShowImportModal(false)}
         />
-      </ScrollView>
+      </MarkedScrollView>
     </View>
   );
 }
@@ -1805,13 +1422,17 @@ const s = StyleSheet.create({
   scrollContent: {
     paddingBottom: 110,
   },
+  // Üst boşluk (marginTop) çalışma zamanında güvenli alandan gelir: bkz.
+  // utils/screenTopSpacing.js. Sabit satır yüksekliği iOS/Android'de başlık
+  // kutusunu eşitler (Android'in font dolgusu yüzünden farklı yükseklik çıkmasın).
   pageTitle: {
     fontSize: 26,
+    lineHeight: 32,
     fontWeight: "700",
     textAlign: "center",
-    marginTop: 36,
     marginBottom: 8,
     letterSpacing: -0.5,
+    includeFontPadding: false,
   },
   firstSectionLabel: {
     marginTop: 8,
@@ -1829,60 +1450,13 @@ const s = StyleSheet.create({
     borderWidth: 1,
     overflow: "hidden",
   },
+  // Aynı grup etiketinin altında alt alta duran kartlar arası boşluk (dil kartı +
+  // satır kartı, tema kartı + satır kartı, kalite kartı + satır kartı).
+  cardStacked: {
+    marginTop: 10,
+  },
   debugCard: {
     marginTop: 12,
-  },
-  personalizationGap: {
-    height: 10,
-  },
-  iconBgMode: {
-    paddingTop: 13,
-  },
-  iconBgModeHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  iconBgOpacity: {
-    paddingTop: 13,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-  },
-  iconBgSliderWrap: {
-    paddingHorizontal: 16,
-  },
-  opacitySliderContainer: {
-    height: 32,
-    justifyContent: "center",
-  },
-  opacityTrackBg: {
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    overflow: "hidden",
-    justifyContent: "center",
-  },
-  opacityFill: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    opacity: 0.35,
-  },
-  opacityThumb: {
-    position: "absolute",
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 3,
-    top: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 4,
   },
   row: {
     flexDirection: "row",
@@ -1924,32 +1498,6 @@ const s = StyleSheet.create({
   providerCountWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
   providerCount: { minWidth: 24, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   providerCountText: { fontSize: 11, fontWeight: "800" },
-  premiumCard: { borderRadius: 24, borderWidth: 1.5, overflow: "hidden" },
-  premiumGradient: { minHeight: 224, padding: 18, overflow: "hidden" },
-  premiumGlow: { position: "absolute", width: 150, height: 150, borderRadius: 75, right: -52, top: -76, backgroundColor: "rgba(255,255,255,0.055)" },
-  premiumRing: { position: "absolute", width: 170, height: 170, borderRadius: 85, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", right: -88, bottom: -102 },
-  premiumAnimatedWash: { position: "absolute", width: 230, height: 230, borderRadius: 115, right: -75, top: -92, overflow: "hidden" },
-  premiumShine: { position: "absolute", top: -55, bottom: -55, width: 74 },
-  premiumHeader: { flexDirection: "row", alignItems: "center" },
-  premiumIcon: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  premiumIconFill: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
-  premiumHeaderCopy: { flex: 1, marginLeft: 12 },
-  premiumBrandTagRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  premiumEyebrow: { fontSize: 8.5, fontWeight: "900", letterSpacing: 1.3 },
-  premiumDot: { width: 3, height: 3, borderRadius: 1.5 },
-  premiumTierTag: { fontSize: 8.5, fontWeight: "700" },
-  premiumTitle: { fontSize: 16, fontWeight: "900", letterSpacing: -0.3, marginTop: 2 },
-  premiumPlanBadge: { minHeight: 26, borderRadius: 9, borderWidth: 1, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 5 },
-  premiumStatusDot: { width: 5, height: 5, borderRadius: 2.5 },
-  premiumPlanBadgeText: { fontSize: 8.5, fontWeight: "900", letterSpacing: 0.55 },
-  premiumChipsContainer: { gap: 6, marginTop: 14 },
-  premiumChip: { flexDirection: "row", alignItems: "center", gap: 7, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
-  premiumChipText: { fontSize: 11, fontWeight: "700" },
-  premiumAction: { minHeight: 52, borderRadius: 15, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10, marginTop: 14, overflow: "hidden" },
-  premiumActionCopy: { flex: 1 },
-  premiumActionText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
-  premiumActionSubtext: { color: "rgba(255,255,255,0.78)", fontSize: 9, fontWeight: "600", marginTop: 1 },
-  premiumActionChevron: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
   providerSheet: { maxHeight: "88%" },
   providerHelp: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
   providerSearchBox: { height: 44, borderRadius: 13, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 9 },
@@ -2024,31 +1572,6 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
   },
-  notificationTiming: {
-    paddingTop: 13,
-  },
-  notificationTimingHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  notificationTimingSegment: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  notificationGroup: {
-    borderBottomWidth: 1,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
-  },
-  notificationGroupText: {
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-  },
   segment: {
     flexDirection: "row",
     borderTopWidth: 1,
@@ -2110,48 +1633,6 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalBox: {
-    borderRadius: 22,
-    padding: 28,
-    marginHorizontal: 32,
-    width: "85%",
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: 16,
-    textAlign: "center",
-    fontWeight: "500",
-    marginBottom: 22,
-    lineHeight: 22,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    gap: 10,
-    width: "100%",
-  },
-  btnCancel: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
-    alignItems: "center",
-    borderWidth: 1,
-  },
-  btnConfirm: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-  btnText: {
-    fontWeight: "700",
-    fontSize: 14,
-  },
   sheetOverlay: {
     flex: 1,
     justifyContent: "flex-end",
@@ -2186,13 +1667,6 @@ const s = StyleSheet.create({
   sheetTitle: {
     fontSize: 18,
     fontWeight: "700",
-  },
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
   },
   searchBox: {
     flexDirection: "row",

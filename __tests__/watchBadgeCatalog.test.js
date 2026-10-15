@@ -308,9 +308,13 @@ describe("performans sozlesmesi", () => {
 
   test("52 rozetin tamami 1 ms altinda degerlendirilir", () => {
     const stats = { filmSayisi: 300, bolumSayisi: 1500, perde: 12, turSayaci: new Map([["horror", 30]]) };
-    const t0 = process.hrtime.bigint();
-    for (let i = 0; i < 100; i++) evaluateWatchBadges(stats, []);
-    const msPerCall = Number(process.hrtime.bigint() - t0) / 1e6 / 100;
+    // En hizli parti olculur (bkz. watchScoring.test.js: tek olcum yuk altinda gurultulu).
+    let msPerCall = Infinity;
+    for (let batch = 0; batch < 5; batch++) {
+      const t0 = process.hrtime.bigint();
+      for (let i = 0; i < 100; i++) evaluateWatchBadges(stats, []);
+      msPerCall = Math.min(msPerCall, Number(process.hrtime.bigint() - t0) / 1e6 / 100);
+    }
     expect(msPerCall).toBeLessThan(1);
   });
 });

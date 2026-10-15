@@ -466,7 +466,7 @@ exports.revokeAppleAuthorization = onCall(
 //    yeni bir anahtar üret ve yalnız yukarıdaki secret'a koy)
 //
 // Kota: kullanıcı başına günlük + aylık mesaj tavanı — AiUsage/{uid}
-// dokümanında transaction'lı sayaç (UTC). Free 5/30, Premium 20/300,
+// dokümanında transaction'lı sayaç (UTC). Free 3/30, Premium 20/300,
 // Unlimited 50/900.
 // Premium durumu Users/{uid}.entitlements.premium alanından okunur (Faz 1'de
 // RevenueCat webhook'u bu alanı dolduracak; alan yoksa herkes free'dir).

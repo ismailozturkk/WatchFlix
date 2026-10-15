@@ -1,16 +1,18 @@
 // services/premiumUpsell.js
 //
 // Limit dolduğunda ya da Premium'a özel bir özelliğe dokunulduğunda gösterilen
-// TEK uyarı ve ödeme ekranına geçiş. Kapılar (hooks/usePremiumGate.js) bunu
-// çağırır; metin utils/premiumFeatures.js'ten üretilir.
-import i18n from "../translations";
-import { appAlert } from "../components/AppAlert";
-import { buildLimitCopy } from "../utils/premiumFeatures";
+// TEK yükseltme akışı ve ödeme ekranına geçiş. Kapılar (hooks/usePremiumGate.js)
+// bunu çağırır.
+//
+// Eskiden burası genel bir uyarı kutusu (appAlert: "Limite ulaştın" + paragraf)
+// açıyordu. Artık özelliğe özel bir yükseltme sayfası açılır
+// (components/premium/PremiumUpsellSheet.js): ne doldu, planlar arasındaki fark,
+// başka ne kazanırsın, gerçek mağaza fiyatı. İçerik modeli
+// utils/premiumUpsellContent.js'te, imperatif köprü services/premiumUpsellHost.js'te.
+import { nextPlanFor, normalizePlan } from "../utils/premiumFeatures";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
+import { presentUpsell } from "./premiumUpsellHost";
 import { navigateRoot } from "./rootNavigation";
-
-const currentLanguage = () =>
-  String(i18n.language || "tr").startsWith("tr") ? "tr" : "en";
 
 /**
  * PremiumScreen'i açar. `source` hangi kapının ödeme ekranına getirdiğini
@@ -21,41 +23,20 @@ export function openPremiumScreen(source = "unknown") {
 }
 
 /**
- * Limit uyarısı: plan limitini ve üst planların değerini söyler, "Planları gör"
- * ile ödeme ekranına geçer. Üst plan yoksa (Premium Max'te dolan limit) yalnız
- * bilgi verir.
+ * Yükseltme sayfasını gösterir. Üst plan yoksa (Premium Max'te dolan limit)
+ * sayfa yalnız bilgi verir ve tek "Tamam" düğmesi sunar.
+ *
+ * @param {string} featureId
+ * @param {string} plan
+ * @param {{ used?: number, onUpgrade?: () => void, onDismiss?: () => void }} [options]
+ *   used: sayılı özellikte sahip olunan adet / günlük kullanım (gösterge için)
  */
-export function showPremiumLimitAlert(featureId, plan, { onUpgrade, onDismiss } = {}) {
-  const language = currentLanguage();
-  const tr = language === "tr";
-  const { title, message, canUpgrade } = buildLimitCopy(featureId, plan, language);
-
+export function showPremiumLimitAlert(featureId, plan, { used, onUpgrade, onDismiss } = {}) {
   trackEvent(ANALYTICS_EVENTS.PREMIUM_GATE_HIT, {
     feature: featureId,
     plan,
-    can_upgrade: canUpgrade,
+    can_upgrade: Boolean(nextPlanFor(featureId, normalizePlan(plan))),
   });
 
-  if (!canUpgrade) {
-    appAlert(title, message, [
-      { text: tr ? "Tamam" : "OK", onPress: onDismiss },
-    ]);
-    return;
-  }
-
-  appAlert(
-    title,
-    message,
-    [
-      { text: tr ? "Şimdi değil" : "Not now", style: "cancel", onPress: onDismiss },
-      {
-        text: tr ? "Planları gör" : "See plans",
-        onPress: () => {
-          onUpgrade?.();
-          openPremiumScreen(featureId);
-        },
-      },
-    ],
-    { type: "info" },
-  );
+  presentUpsell({ featureId, plan, used, onUpgrade, onDismiss });
 }

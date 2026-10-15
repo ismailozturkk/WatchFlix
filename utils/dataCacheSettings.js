@@ -22,9 +22,6 @@
 
 import { Keys, get, set as write, subscribe } from "../services/storage";
 
-export const AUTO_DATA_CACHE_KEY = Keys.autoDataCache.key;
-export const DATA_TYPES_KEY = Keys.dataCacheTypes.key;
-
 /**
  * İndirilebilir veri türleri. `services/cacheInspector.js` kategorileriyle
  * (Önbellek ekranı) aynı adlandırma kullanılır ki kullanıcı neyi seçtiyse

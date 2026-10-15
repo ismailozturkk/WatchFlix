@@ -53,14 +53,9 @@ import {
 import {
   getLocalList,
   hasLocalList,
-  setLocalList,
   subscribeLocalList,
   fetchFullListOnce,
 } from "../services/listSyncService";
-import {
-  materializeTvWatchState,
-  countTvWatchStats,
-} from "../utils/watchHistory";
 
 const RESERVED_SET = new Set(RESERVED_LIST_NAMES);
 

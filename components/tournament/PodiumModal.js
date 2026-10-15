@@ -11,11 +11,12 @@
 // (blur YERİNDE solar, sayfa TAM OPAKLIKTA aşağıdan yukarı kayar).
 
 import React, { memo, useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import { alpha } from "@theme/colors";
 import { i18nText } from "@utils/i18nText";
@@ -294,15 +295,14 @@ function PodiumModal({ visible, onClose, periodId, theme, getTmdbUrl, lang = "tr
             </Text>
           )}
         </View>
-        <Pressable
-          onPress={onClose}
+        <GlassCloseButton
+          size={32}
+          fallbackRadius={11}
+          color={theme.text.secondary}
+          backgroundColor={theme.between}
           hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-          style={[styles.closeBtn, { backgroundColor: theme.between }]}
-        >
-          <AppIcon family="Ionicons" name="close" size={18} color={theme.text.secondary} />
-        </Pressable>
+          onPress={onClose}
+        />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 6 }}>
@@ -403,7 +403,6 @@ const styles = StyleSheet.create({
   headerIconBadge: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   headerTitle: { fontSize: 17, fontWeight: "900", letterSpacing: -0.2 },
   headerSub: { fontSize: 12, fontWeight: "600", marginTop: 2 },
-  closeBtn: { width: 32, height: 32, borderRadius: 11, alignItems: "center", justifyContent: "center" },
 
   podiumRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "center", gap: 10 },
   col: { flex: 1, alignItems: "center" },

@@ -127,3 +127,76 @@ export function tallyVotes(votes = {}) {
   });
   return { counts, total };
 }
+
+/**
+ * Alan, eklenecek metni ZATEN içeriyor mu? (büyük/küçük harf duyarsız)
+ * Yalnız ilk 60 karakter aranır: sınıra sığmayıp "…" ile kırpılarak eklenmiş
+ * uzun bir özet de "eklenmiş" sayılsın, ikinci dokunuş onu ikilemesin.
+ */
+export function isQuickTextPresent(current, addition) {
+  const base = typeof current === "string" ? current.trim().toLowerCase() : "";
+  const extra = typeof addition === "string" ? addition.trim() : "";
+  if (!base || !extra) return false;
+  return base.includes(extra.slice(0, 60).toLowerCase());
+}
+
+/**
+ * "Hızlı ekle": başlığa film adı / açıklamaya özet eklerken kullanıcının
+ * yazdığını ASLA ezmez (bkz. handleImportList'teki aynı kural).
+ *   • eklenecek metin boş            → değişmez            (reason: "empty")
+ *   • alan boş                       → ek metin yazılır    (gerekirse kırpılır)
+ *   • alan ek metni zaten içeriyor   → değişmez            (reason: "duplicate";
+ *     çift dokunuş metni ikilemesin)
+ *   • sonuna `separator` ile eklenir; sınıra sığmazsa ek metin "…" ile
+ *     kırpılır, kırpılacak yer 12 karakterden azsa hiç dokunulmaz
+ *     (reason: "full").
+ * @returns {{ text: string, changed: boolean, reason: "empty"|"duplicate"|"full"|null }}
+ */
+export function appendQuickText(current, addition, { max = Infinity, separator = "\n\n" } = {}) {
+  const base = typeof current === "string" ? current : "";
+  const extra = typeof addition === "string" ? addition.trim() : "";
+  if (!extra) return { text: base, changed: false, reason: "empty" };
+
+  if (!base.trim()) {
+    const text = extra.length > max ? `${extra.slice(0, Math.max(0, max - 1)).trimEnd()}…` : extra;
+    return { text, changed: true, reason: null };
+  }
+  if (isQuickTextPresent(base, extra)) {
+    return { text: base, changed: false, reason: "duplicate" };
+  }
+
+  const head = `${base.trimEnd()}${separator}`;
+  const room = max - head.length;
+  if (extra.length <= room) return { text: head + extra, changed: true, reason: null };
+  if (room < 12) return { text: base, changed: false, reason: "full" };
+  return { text: `${head}${extra.slice(0, room - 1).trimEnd()}…`, changed: true, reason: null };
+}
+
+/**
+ * Kullanıcı "kapat" dediğinde (çarpı / yukarıdan çekme / donanım geri) ne
+ * olacağını söyler. Karar saf tutulur: kapatma akışı iOS'ta iki native pencerenin
+ * üst üste binmesiyle bozulmuştu, o yüzden hangi yolun seçildiği ayrı ve
+ * test edilebilir olmalı.
+ *
+ *   • "leave-prompt"  → onay sayfası açık: geri/çarpı onu KAPATIR, pencereye dokunmaz
+ *   • "close-search"  → içerik araması açık: önce aramadan çık
+ *   • "close"         → kaybedilecek bir şey yok (ya da taslak zaten kayıtlı): kapat
+ *   • "confirm-edit"  → var olan gönderi düzenleniyor ve değişiklik var: "iptal et?"
+ *   • "confirm-draft" → yeni paylaşım, kaydedilmemiş içerik var: "taslağa kaydet?"
+ *
+ * @returns {"leave-prompt"|"close-search"|"close"|"confirm-edit"|"confirm-draft"}
+ */
+export function resolveCloseIntent({
+  promptOpen = false,
+  searchActive = false,
+  hasContent = false,
+  isEditing = false,
+  isSavedDraft = false,
+} = {}) {
+  if (promptOpen) return "leave-prompt";
+  if (searchActive) return "close-search";
+  if (!hasContent) return "close";
+  if (isEditing) return "confirm-edit";
+  if (isSavedDraft) return "close";
+  return "confirm-draft";
+}

@@ -31,7 +31,6 @@ import {
   onDisconnect,
   update,
   push,
-  get,
   serverTimestamp as rtdbServerTimestamp,
 } from "firebase/database";
 import { createPresenceSession } from "./presenceSession";
@@ -169,17 +168,4 @@ export function subscribeToUserPresence(uid, callback) {
     (snap) => callback(snap.exists() ? snap.val() : null),
     (err) => __DEV__ && console.warn("subscribeToUserPresence:", err.message),
   );
-}
-
-/**
- * Tek seferlik presence çekme (liste ekranlarında uygun).
- */
-export async function getUserPresence(uid) {
-  if (!uid || !rtdb) return null;
-  try {
-    const snap = await get(presenceRef(uid));
-    return snap.exists() ? snap.val() : null;
-  } catch {
-    return null;
-  }
 }

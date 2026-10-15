@@ -1,5 +1,11 @@
 import { isLightSurface } from "@utils/colorUtils";
-import ComposerBlur, { ComposerBlurTarget, useComposerBlurTarget } from "../../components/chat/ComposerBlur";
+import ComposerBlur, {
+  COMPOSER_GLASS_PILL_STYLE,
+  COMPOSER_TARGET_IS_NATIVE,
+  ComposerBlurTarget,
+  useComposerBlurTarget,
+} from "../../components/chat/ComposerBlur";
+import { useLiquidGlass } from "../../services/liquidGlass";
 import { Image } from "expo-image";
 import React, {
   useEffect,
@@ -55,7 +61,7 @@ import {
   deleteField,
   increment,
 } from "firebase/firestore";
-import { trackFirestoreRead, trackFirestoreWrite } from "../../services/usageTrackerService";
+import { trackFirestoreRead } from "../../services/usageTrackerService";
 import { useTheme } from "@context/ThemeContext";
 import { alpha } from "../../theme/colors";
 import LottieView from "lottie-react-native";
@@ -63,6 +69,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  useAmbientBackgroundSettings,
   useApiSettings,
   useContentSettings,
   useHapticsSettings,
@@ -86,7 +93,6 @@ import { dismissChatNotifications } from "@services/pushNotificationsService";
 import { useIsFocused } from "@react-navigation/native";
 import {
   subscribeGroup,
-  memberColor,
   nextVote,
 } from "@services/groupsService";
 import axios from "axios";
@@ -96,24 +102,33 @@ import {
   FontAwesome,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
-import IconBacground from "@components/IconBacground"; // Arka plan dekor
+import ScreenDecor from "@components/ScreenDecor"; // Arka plan dekor
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
+import GlassIconButton from "@components/common/GlassIconButton";
 import { i18nText } from "@utils/i18nText";
 import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
-import SharedMediaMessage from "@components/chat/SharedMediaMessage";
-import SharedMediaCollection from "@components/chat/SharedMediaCollection";
-import PollMessage from "@components/chat/PollMessage";
+import MessageBubble from "@components/chat/MessageBubble";
+import ChatHeader, { CHAT_HEADER_AVATAR_SIZE } from "@components/chat/ChatHeader";
+import BounceIn from "@components/chat/BounceIn";
+import useReduceMotion from "../../hooks/useReduceMotion";
 import useAppActive from "../../hooks/useAppActive";
+import useDecorVisibility from "../../hooks/useDecorVisibility";
+import {
+  detectFreshMessages,
+  entranceFor,
+  recordFresh,
+} from "@utils/chatEntrance";
 import TextPollComposer from "@components/chat/TextPollComposer";
 import GroupInfoModal from "@components/chat/GroupInfoModal";
 import GroupAvatar from "@components/chat/GroupAvatar";
-import MessageReplyPreview from "@components/chat/MessageReplyPreview";
+import ComposerReplyBar from "@components/chat/ComposerReplyBar";
+import { buildReplySnapshot } from "@utils/chatReply";
 import PinnedMessagesModal from "@components/chat/PinnedMessagesModal";
 import ReportReasonSheet from "@components/moderation/ReportReasonSheet";
 import { useFriends } from "@context/FriendsContext";
 import { reportMessage } from "@services/reportService";
-import SwipeReplyContainer from "@components/chat/SwipeReplyContainer";
 import {
   canManageGroup,
   isGroupCreator,
@@ -149,6 +164,15 @@ const DANGER = "#FF6B6B";
 const EDIT_COLOR = "#4FC3F7";
 const LATEST_MESSAGE_BUTTON_THRESHOLD = 420;
 
+// Arka plan dekoru katmanlara BÖLÜNÜR (ScreenDecor `effects`):
+//   • ambiyans → kökte, TAM EKRAN: başlığın arkası ve güvenli alan şeridi de dolsun.
+//     Mesaj alanının içine konunca üstte başlık, altta `paddingBottom` şeridi
+//     ambiyanssız kalıyor, lekeler de o kadar kırpılıyordu.
+//   • ikon deseni → mesaj hedefinin İÇİNDE (Android blur'ü onu da görsün).
+const AMBIENT_ONLY = ["ambient"];
+const ICON_ONLY = ["icon"];
+const AMBIENT_FRAME_HEIGHT = Dimensions.get("screen").height;
+
 // ─── Tarih yardımcıları (mesaj gruplama + gün ayracı) ───────────────────────
 const tsToDate = (ts) => {
   if (!ts) return null;
@@ -158,19 +182,6 @@ const tsToDate = (ts) => {
     return null;
   }
 };
-// Bir media öğesini (tekli veya koleksiyon içindeki) detay ekranına yönlendir.
-const openMediaDetail = (navigation, m) => {
-  if (!m) return;
-  const route =
-    m.media_type === "movie"
-      ? "MovieDetails"
-      : m.media_type === "tv"
-        ? "TvShowsDetails"
-        : "ActorViewScreen";
-  const params = m.media_type === "person" ? { personId: m.id } : { id: m.id };
-  navigation.push(route, params);
-};
-
 // Arama sonucunu (TMDB) Firestore'a yazılabilir hafif media payload'a çevir.
 // Firestore undefined kabul etmez — eksik alanlar null'a indirilir.
 const buildMediaPayload = (item) => {
@@ -241,244 +252,6 @@ const messagePreview = (message) => {
 };
 
 const timestampMs = (value) => value?.toMillis?.() || value?.toDate?.()?.getTime?.() || 0;
-
-// ─── Mesaj balonu ────────────────────────────────────────────────────────────
-const MessageBubble = memo(
-  ({
-    item,
-    currentUser,
-    theme,
-    navigation,
-    getTmdbUrl,
-    onLongPress,
-    renderMessageText,
-    onOpenTrailer,
-    groupTop,
-    groupBottom,
-    dateLabel,
-    isGroup,
-    avatars,
-    memberInfo,
-    onVote,
-    onReply,
-    onJumpToMessage,
-    highlighted,
-  }) => {
-    const isMe = item.senderId === currentUser.uid;
-    const hasItems = Array.isArray(item.items) && item.items.length > 0;
-    const hasPoll = item.kind === "poll" && !!item.poll;
-    // Grupta gelen mesajda gönderen rengi (baloncuk + ad tutarlı renkte).
-    const senderColor = isGroup && !isMe ? memberColor(item.senderId) : null;
-    // Gönderen ad/avatarı CANLI grup memberInfo'dan çöz (profil değişince eski
-    // mesajlar da güncel görünür); üye gruptan ayrıldıysa mesajdaki donmuş değere düş.
-    const minfo = isGroup ? memberInfo?.[item.senderId] : null;
-    const senderName = minfo?.name || item.senderName || "";
-    const senderAvatarIndex =
-      typeof minfo?.avatarIndex === "number" ? minfo.avatarIndex : item.senderAvatarIndex;
-    const senderPhotoURL = minfo?.photoURL || item.senderPhotoURL || null;
-    // Gönderen başlığı yalnızca ardışık bloğun İLK mesajında (groupTop yokken).
-    const showSenderHeader = isGroup && !isMe && !groupTop;
-    const scaleAnim = useRef(new Animated.Value(0.88)).current;
-    const opacAnim = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-      Animated.parallel([
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          friction: 9,
-          tension: 65,
-        }),
-        Animated.timing(opacAnim, {
-          toValue: 1,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, []);
-
-    const getStatusIcon = () => {
-      const iconMuted = isMe ? "rgba(255,255,255,0.7)" : (theme?.text?.muted ?? "rgba(255,255,255,0.38)");
-      if (item.status === "sending")
-        return <Ionicons name="time-outline" size={12} color={iconMuted} />;
-      if (item.status === "seen")
-        return <Ionicons name="checkmark-done" size={13} color={SEEN_COLOR} />;
-      if (item.status === "delivered")
-        return (
-          <Ionicons
-            name="checkmark-done"
-            size={13}
-            color={iconMuted}
-          />
-        );
-      return (
-        <Ionicons name="checkmark" size={13} color={iconMuted} />
-      );
-    };
-
-    const formatTime = (ts) => {
-      if (!ts) return "";
-      const date = ts.toDate?.() || new Date(ts);
-      return (
-        date.getHours().toString().padStart(2, "0") +
-        ":" +
-        date.getMinutes().toString().padStart(2, "0")
-      );
-    };
-
-    // Aynı göndericiden hemen altında yeni mesaj varsa, üstte kalan balonun
-    // gönderici tarafındaki alt köşesi de üst "kuyruk" köşesiyle aynı radius'a iner.
-    const groupedCorner = groupBottom
-      ? isMe
-        ? styles.myGroupedBottomCorner
-        : styles.friendGroupedBottomCorner
-      : null;
-    const meta = (
-      <View
-        style={[
-          styles.msgMeta,
-          { justifyContent: isMe ? "flex-end" : "flex-start" },
-        ]}
-      >
-        {item.edited && (
-          <Text
-            style={[
-              styles.editedTag,
-              { color: isMe ? "rgba(255,255,255,0.75)" : (theme?.text?.muted ?? "rgba(255,255,255,0.4)") },
-            ]}
-          >
-            {i18nText("autoI18n.duzenlendi", "düzenlendi")}
-          </Text>
-        )}
-        <Text
-          style={[
-            styles.timestamp,
-            { color: isMe ? "rgba(255,255,255,0.75)" : (theme?.text?.muted ?? "rgba(255,255,255,0.4)") },
-          ]}
-        >
-          {formatTime(item.timestamp)}
-        </Text>
-        {isMe && getStatusIcon()}
-      </View>
-    );
-
-    return (
-      <View>
-        {dateLabel ? (
-          <View style={styles.dateSep}>
-            <View style={[styles.dateSepLine, { backgroundColor: theme?.border ?? "rgba(255,255,255,0.12)" }]} />
-            <Text
-              allowFontScaling={false}
-              style={[
-                styles.dateSepText,
-                {
-                  color: theme?.text?.muted ?? "rgba(255,255,255,0.6)",
-                  backgroundColor: theme?.between ?? "rgba(255,255,255,0.07)",
-                },
-              ]}
-            >
-              {dateLabel}
-            </Text>
-            <View style={[styles.dateSepLine, { backgroundColor: theme?.border ?? "rgba(255,255,255,0.12)" }]} />
-          </View>
-        ) : null}
-        <SwipeReplyContainer onReply={() => onReply(item)}>
-        <Animated.View
-          style={[
-            { transform: [{ scale: scaleAnim }], opacity: opacAnim },
-            isMe ? styles.myMsgWrapper : styles.friendMsgWrapper,
-            // Ardışık aynı-gönderici mesajlarda araları sıkılaştır.
-            groupTop && styles.groupedTop,
-            groupBottom && styles.groupedBottom,
-          ]}
-        >
-        {/* Grupta gönderen başlığı (avatar + ad) */}
-        {showSenderHeader && (
-          <View style={styles.senderHeader}>
-            <UserAvatar
-              avatarIndex={senderAvatarIndex}
-              photoURL={senderPhotoURL}
-              isCustomPhoto
-              size={20}
-            />
-            <Text style={[styles.senderName, { color: senderColor }]} numberOfLines={1}>
-              {senderName || i18nText("autoI18n.uye", "Üye")}
-            </Text>
-          </View>
-        )}
-        <TouchableOpacity
-          style={[
-            styles.message,
-            (item.media || hasItems || hasPoll) && styles.mediaMessage,
-            isMe
-              ? [styles.myMsg, { backgroundColor: theme?.accent ?? "#17245cff" }]
-              : [
-                  styles.friendMsg,
-                  {
-                    backgroundColor: theme?.secondary ?? "rgba(68, 68, 68, 1)",
-                    borderColor: theme?.border ?? "rgba(255,255,255,0.2)",
-                  },
-                ],
-            highlighted && styles.highlightedMessage,
-            // Grupta gelen baloncukta gönderen renginde ince sol vurgu.
-            senderColor && { borderColor: senderColor + "66" },
-            groupedCorner,
-          ]}
-          onLongPress={() => onLongPress(item)}
-          activeOpacity={0.8}
-          onPress={() =>
-            item.media ? openMediaDetail(navigation, item.media) : null
-          }
-        >
-          <MessageReplyPreview
-            reply={item.replyTo}
-            onPress={item.replyTo?.messageId ? () => onJumpToMessage(item.replyTo.messageId) : undefined}
-          />
-          {/* ── Anket ── */}
-          {hasPoll ? (
-            <PollMessage
-              poll={item.poll}
-              currentUid={currentUser.uid}
-              accent={theme?.accent ?? ACCENT}
-              getTmdbUrl={getTmdbUrl}
-              theme={theme}
-              isOutgoing={isMe}
-              onVote={(optionId) => onVote?.(item, optionId)}
-            />
-          ) : hasItems ? (
-            <SharedMediaCollection
-              items={item.items}
-              listTitle={item.listTitle}
-              accent={theme?.accent ?? ACCENT}
-              getTmdbUrl={getTmdbUrl}
-              isOutgoing={isMe}
-              onOpenItem={(it) => openMediaDetail(navigation, it)}
-            />
-          ) : item.media ? (
-            /* ── Tekli media kartı (eğik poster + çipler) ── */
-            <SharedMediaMessage
-              item={item}
-              media={item.media}
-              text={item.text}
-              accent={theme?.accent ?? ACCENT}
-              getTmdbUrl={getTmdbUrl}
-              onOpenTrailer={() => onOpenTrailer?.(item.media)}
-              isOutgoing={isMe}
-            />
-          ) : (
-            /* ── Düz metin ── */
-            <View>{renderMessageText(item.text, isMe)}</View>
-          )}
-
-          {/* ── Alt meta ── */}
-          {meta}
-        </TouchableOpacity>
-        </Animated.View>
-        </SwipeReplyContainer>
-      </View>
-    );
-  },
-);
 
 // ─── Arama Sonuç Kartı ──────────────────────────────────────────────────────
 const SearchResultCard = memo(({ item, onPress, getTmdbUrl, theme, selected }) => {
@@ -596,7 +369,7 @@ export default function ChatScreen({ route, navigation }) {
   const isGroup = !!groupId;
   const auth = getAuth();
   const currentUser = auth.currentUser;
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
   const locale = language === "tr" ? "tr-TR" : "en-US";
 
   const { API_KEY } = useApiSettings();
@@ -705,6 +478,29 @@ export default function ChatScreen({ route, navigation }) {
   const [showLatestMessageButton, setShowLatestMessageButton] = useState(false);
   const [composerHeight, setComposerHeight] = useState(76);
   const composerBlur = useComposerBlurTarget();
+  const glass = useLiquidGlass();
+
+  // Ambiyans bu sohbette görünüyor mu (genel anahtar VE "Ekran bazında > Sohbet
+  // içi")? Başlık yalnız o zaman yarı saydam olur; kapalıyken eskisi gibi opak.
+  const { showAmbientBackground } = useAmbientBackgroundSettings();
+  const ambientScopeVisible = useDecorVisibility("conversation", AMBIENT_ONLY).ambient;
+  const ambientVisible = showAmbientBackground && ambientScopeVisible;
+
+  // Yalnız Android 12+ (BlurTargetView): hedefin opak arka planı kökteki ambiyansı
+  // örter, bu yüzden hedefin içine AYNI desenin ekranla hizalı bir kopyası konur.
+  // Hizalama için mesaj alanının pencere içindeki üst konumu gerekir (başlık +
+  // sabitlenmiş mesaj bandı yüksekliği). iOS'ta/eski Androidde hedef sıradan bir
+  // View ve saydam: tek ambiyans kökte kalır, ölçüm yok.
+  const messageViewportRef = useRef(null);
+  const [messageViewportTop, setMessageViewportTop] = useState(0);
+  const measureMessageViewport = useCallback(() => {
+    if (!COMPOSER_TARGET_IS_NATIVE) return;
+    messageViewportRef.current?.measureInWindow?.((_x, y) => {
+      if (!Number.isFinite(y)) return;
+      setMessageViewportTop((prev) => (Math.abs(prev - y) < 0.5 ? prev : y));
+    });
+  }, []);
+
   const latestButtonVisibleRef = useRef(false);
   const handledInitialMediaRef = useRef(null);
   const { theme } = useTheme();
@@ -909,6 +705,9 @@ export default function ChatScreen({ route, navigation }) {
 
   const [chatData, setChatData] = useState({
     messages: [],
+    // İlk mesaj snapshot'ı geldi mi? Yüklenmeden önceki boş liste "boş sohbet"
+    // sayılmasın ki ilk yükleme yeni mesaj animasyonu tetiklemesin.
+    loaded: false,
     friendTyping: false,
     friendIsOnline: false,
     friendInChat: false,
@@ -1047,6 +846,7 @@ export default function ChatScreen({ route, navigation }) {
       });
       setChatData((prev) => ({
         ...prev,
+        loaded: true,
         messages: mergeServerMessages(msgs, prev.messages, chatId),
       }));
 
@@ -1285,13 +1085,12 @@ export default function ChatScreen({ route, navigation }) {
       if (!message?.id) return;
       if (hapticsEnabled) Haptics.selectionAsync().catch(() => {});
       setEditingMessage(null);
-      setReplyingTo({
-        messageId: message.id,
-        senderId: message.senderId || "",
-        senderName: resolveSenderName(message),
-        preview: messagePreview(message),
-        kind: message.kind || (message.media ? "media" : "text"),
-      });
+      setReplyingTo(
+        buildReplySnapshot(message, {
+          senderName: resolveSenderName(message),
+          preview: messagePreview(message),
+        }),
+      );
       setOptionsVisible(false);
       setTimeout(() => messageInputRef.current?.focus(), 100);
     },
@@ -1745,12 +1544,6 @@ export default function ChatScreen({ route, navigation }) {
     [],
   );
 
-  const formatDate = useCallback((timestamp) => {
-    if (!timestamp) return "";
-    const date = timestamp.toDate?.() || new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }, []);
-
   const fetchSearchResults = useCallback(
     async (type, currentQuery) => {
       const queryText = currentQuery || searchText;
@@ -1842,10 +1635,31 @@ export default function ChatScreen({ route, navigation }) {
     });
   }, [theme.accent, theme.text.primary]);
 
-  const memoizedMessages = useMemo(
-    () => chatData.messages,
-    [chatData.messages],
-  );
+  // Yeni gelen/giden mesajları "sekme" animasyonu için işaretle. Tespit
+  // renderdan ÖNCE (balonlar bağlanırken registry dolu olsun) ve idempotent:
+  // aynı liste iki kez değerlendirilse (StrictMode) ikinci geçiş boş döner,
+  // ilkinin kaydı kalır. Ayrıntı: utils/chatEntrance.js.
+  const reduceMotion = useReduceMotion();
+  const entranceRegistryRef = useRef(new Map());
+  const prevMessagesRef = useRef(null);
+  const memoizedMessages = useMemo(() => {
+    const next = chatData.messages;
+    if (!chatData.loaded) {
+      prevMessagesRef.current = null;
+      return next;
+    }
+    // İlk yüklenen liste taban çizgisidir: animasyon yok.
+    if (prevMessagesRef.current !== null && prevMessagesRef.current !== next) {
+      const fresh = detectFreshMessages(
+        prevMessagesRef.current,
+        next,
+        currentUser.uid,
+      );
+      if (fresh.length > 0) recordFresh(entranceRegistryRef.current, fresh);
+    }
+    prevMessagesRef.current = next;
+    return next;
+  }, [chatData.messages, chatData.loaded, currentUser.uid]);
 
   const scrollToMessage = useCallback(
     (messageId) => {
@@ -2056,10 +1870,16 @@ export default function ChatScreen({ route, navigation }) {
           onReply={beginReply}
           onJumpToMessage={jumpToMessage}
           highlighted={highlightedMessageId === item.id}
+          entrance={
+            reduceMotion
+              ? null
+              : entranceFor(entranceRegistryRef.current, item.clientId || item.id)
+          }
         />
       );
     },
     [
+      reduceMotion,
       theme,
       navigation,
       currentUser,
@@ -2289,10 +2109,6 @@ export default function ChatScreen({ route, navigation }) {
     typeof friendIdentity.avatarIndex === "number"
       ? friendIdentity.avatarIndex
       : friendAvatarIndex;
-  const friendInitial = resolvedFriendName
-    ? resolvedFriendName.charAt(0).toUpperCase()
-    : "?";
-
   const handleHeaderPress = useCallback(() => {
     if (isGroup) {
       setGroupInfoVisible(true);
@@ -2304,20 +2120,15 @@ export default function ChatScreen({ route, navigation }) {
     });
   }, [isGroup, navigation, friendUid, resolvedFriendName]);
 
-  const statusColor = chatData.friendInChat
-    ? "#64B5F6"
-    : chatData.friendIsOnline
-      ? SEEN_COLOR
-      : "rgba(255,255,255,0.35)";
-  const statusText = chatData.friendInChat
-    ? i18nText("autoI18n.sohbette", "Sohbette")
-    : chatData.friendIsOnline
-      ? i18nText("autoI18n.cevrimici", "Çevrimiçi")
-      : i18nText("autoI18n.last_seen_value", "Son görülme {{value}}", {
-        value: chatData.friendPresence?.lastSeen
-          ? formatDate(chatData.friendPresence.lastSeen)
-          : i18nText("autoI18n.bilinmiyor", "bilinmiyor"),
-      });
+  // Grup başlığının alt satırı: kendin hariç üye adları (canlı memberInfo).
+  const groupMemberNames = useMemo(() => {
+    if (!isGroup) return null;
+    const info = groupData?.memberInfo || {};
+    return (groupData?.members || [])
+      .filter((uid) => uid !== currentUser.uid)
+      .map((uid) => info[uid]?.name)
+      .filter(Boolean);
+  }, [isGroup, groupData?.members, groupData?.memberInfo, currentUser.uid]);
 
   // Kategori butonları
   const CATEGORIES = [
@@ -2335,106 +2146,54 @@ export default function ChatScreen({ route, navigation }) {
     >
       <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
 
-      {/* ── HEADER ── */}
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: theme.secondary || "rgba(255,255,255,0.04)",
-            borderBottomColor: theme.border || "rgba(255,255,255,0.06)",
-          },
-        ]}
-      >
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={26}
-            color={theme.text.primary || "#fff"}
-          />
-        </TouchableOpacity>
+      {/* Ambiyans arka planı: kökün ilk çocuğu = en altta, TAM EKRAN (durum
+          çubuğundan alt kenara). Başlık ve mesaj alanı bunun üstünde durur;
+          mesaj hedefi saydam olduğundan (iOS/eski Android) lekeler içeriden de
+          görünür. Android 12+'ta hedefin içinde hizalı kopyası var (aşağıda). */}
+      <ScreenDecor scope="conversation" effects={AMBIENT_ONLY} />
 
-        <TouchableOpacity
-          activeOpacity={0.72}
-          onPress={handleHeaderPress}
-          style={styles.headerIdentity}
-          accessibilityRole="button"
-          accessibilityLabel={isGroup ? i18nText("autoI18n.grup_bilgilerini_ac", "Grup bilgilerini aç") : i18nText("autoI18n.arkadas_profilini_ac", "Arkadaş profilini aç")}
-        >
-        <View style={styles.avatarWrapper}>
-          {isGroup ? (
+      {/* ── HEADER ── */}
+      <ChatHeader
+        translucent={ambientVisible}
+        title={
+          isGroup
+            ? groupData?.name || groupName || i18nText("autoI18n.grup", "Grup")
+            : resolvedFriendName
+        }
+        isGroup={isGroup}
+        avatar={
+          isGroup ? (
             <GroupAvatar
               avatarIndex={groupData?.avatarIndex ?? groupAvatarIndex}
               color={groupData?.color || theme.accent || ACCENT}
-              size={42}
-              iconSize={29}
-              style={{ borderWidth: 1.5, borderColor: theme.border }}
+              size={CHAT_HEADER_AVATAR_SIZE}
+              iconSize={30}
             />
           ) : (
             <UserAvatar
               avatarIndex={resolvedFriendAvatarIndex}
               photoURL={friendIdentity?.photoURL || chatData?.friendPhotoURL}
               isCustomPhoto
-              size={42}
-              borderWidth={1.5}
-              borderColor={(theme.accent || ACCENT) + "55"}
-              online={chatData.friendIsOnline || chatData.friendInChat}
-              onlineColor={statusColor}
-              onlineBorderColor="#0F0F1A"
+              size={CHAT_HEADER_AVATAR_SIZE}
             />
-          )}
-        </View>
-
-        <View style={styles.headerInfo}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.headerName, { color: theme.text.primary || "#fff" }]}
-            numberOfLines={1}
-          >
-            {isGroup ? groupData?.name || groupName || i18nText("autoI18n.grup", "Grup") : resolvedFriendName}
-          </Text>
-          {isGroup ? (
-            <Text
-              allowFontScaling={false}
-              style={[styles.headerStatus, { color: theme.text.muted || "rgba(255,255,255,0.5)" }]}
-              numberOfLines={1}
-            >
-              {i18nText("autoI18n.n_uye", "{{n}} üye", { n: groupData?.members?.length || 0 })}
-            </Text>
-          ) : (
-            <View style={styles.statusRow}>
-              <View
-                style={[styles.statusDot, { backgroundColor: statusColor }]}
-              />
-              <Text
-                allowFontScaling={false}
-                style={[styles.headerStatus, { color: statusColor }]}
-                numberOfLines={1}
-              >
-                {statusText}
-              </Text>
-            </View>
-          )}
-        </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.headerAction}
-          onPress={handleHeaderPress}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityRole="button"
-          accessibilityLabel={isGroup ? i18nText("autoI18n.grup_bilgilerini_ac", "Grup bilgilerini aç") : i18nText("autoI18n.arkadas_profilini_ac", "Arkadaş profilini aç")}
-        >
-          <Ionicons
-            name={isGroup ? "people-outline" : "person-outline"}
-            size={21}
-            color={theme.text.secondary || "rgba(255,255,255,0.75)"}
-          />
-        </TouchableOpacity>
-      </View>
+          )
+        }
+        status={
+          isGroup
+            ? null
+            : {
+                typing: chatData.friendTyping,
+                inChat: chatData.friendInChat,
+                online: chatData.friendIsOnline,
+                presence: chatData.friendPresence,
+              }
+        }
+        memberNames={groupMemberNames}
+        memberCount={groupData?.members?.length || 0}
+        groupColor={groupData?.color}
+        onBack={() => navigation.goBack()}
+        onOpenInfo={handleHeaderPress}
+      />
 
       <Reanimated.View
         style={[
@@ -2504,14 +2263,42 @@ export default function ChatScreen({ route, navigation }) {
               />
             </TouchableOpacity>
           )}
-          <View style={styles.messageViewport}>
-          <ComposerBlurTarget attach={composerBlur.attach} backgroundColor={theme.primary} style={{ flex: 1 }}>
-          {/* Arka plan dekor ikonu — hedef View'ın OPAK arka planının ÜSTÜNDE,
-              mesaj listesinin ALTINDA: Android'de blur bu görünümü fotoğrafladığı
-              için desen buraya, hedefin İÇİNE girmeli (dışına konursa opak katman
-              onu görünmez kılar ve blur'a hiç yansımaz). */}
+          <View
+            ref={messageViewportRef}
+            style={styles.messageViewport}
+            onLayout={measureMessageViewport}
+          >
+          {/* Hedefin arka planı yalnız Android 12+'ta (gerçek BlurTargetView) OPAK
+              olmak zorunda; diğerlerinde saydam ki kökteki tam ekran ambiyans
+              mesaj alanının arkasında da görünsün. */}
+          <ComposerBlurTarget
+            attach={composerBlur.attach}
+            backgroundColor={COMPOSER_TARGET_IS_NATIVE ? theme.primary : "transparent"}
+            style={{ flex: 1 }}
+          >
+          {/* Android 12+: opak hedef kökteki ambiyansı örter ve blur yalnız hedefin
+              içini kaydeder. Bu yüzden AYNI deseni (ortak saat + ortak lekeler)
+              ekranla hizalı çizen bir kopya burada durur: ambiyansın koordinatı
+              ekranın sol-üstüne göre, mesaj alanı ise başlığın altından başlıyor
+              → çerçeve `-messageViewportTop` kadar yukarı kayar, klip mesaj alanı
+              kadar. Böylece kökteki ambiyansla dikişsiz birleşir (üst üste binmez). */}
+          {COMPOSER_TARGET_IS_NATIVE && ambientVisible ? (
+            <View style={styles.ambientClip} pointerEvents="none">
+              <View
+                style={[styles.ambientFrame, { top: -messageViewportTop }]}
+                pointerEvents="none"
+              >
+                <ScreenDecor scope="conversation" effects={AMBIENT_ONLY} />
+              </View>
+            </View>
+          ) : null}
+          {/* Arka plan dekor ikonu — hedefin İÇİNDE, mesaj listesinin ALTINDA:
+              Android'de blur bu görünümü fotoğrafladığı için desen buraya girmeli
+              (dışına konursa opak katman onu görünmez kılar ve blur'a hiç yansımaz).
+              Birebir VE grup sohbeti aynı ekran (isGroup); grup "conversation":
+              Ekran bazında > Sohbet içi. Kar yok — grup tablosu desteklemiyor. */}
           <View style={styles.iconBgWrapper} pointerEvents="none">
-            <IconBacground opacity={0.5} />
+            <ScreenDecor scope="conversation" iconOpacity={0.5} effects={ICON_ONLY} />
           </View>
           <FlatList
             ref={flatListRef}
@@ -2536,14 +2323,16 @@ export default function ChatScreen({ route, navigation }) {
             }}
             ListHeaderComponent={
               chatData.friendTyping ? (
-                <View style={styles.typingBubble}>
-                  <LottieView
-                    source={require("@lottie/typingAnimation.json")}
-                    autoPlay
-                    loop
-                    style={{ width: 68, height: 34 }}
-                  />
-                </View>
+                <BounceIn kind={reduceMotion ? null : "receive"}>
+                  <View style={styles.typingBubble}>
+                    <LottieView
+                      source={require("@lottie/typingAnimation.json")}
+                      autoPlay
+                      loop
+                      style={{ width: 68, height: 34 }}
+                    />
+                  </View>
+                </BounceIn>
               ) : null
             }
           />
@@ -2551,26 +2340,32 @@ export default function ChatScreen({ route, navigation }) {
           </ComposerBlurTarget>
 
           {showLatestMessageButton && (
-            <TouchableOpacity
-              activeOpacity={0.84}
-              onPress={scrollToLatestMessage}
-              style={[
-                styles.latestMessageButton,
+            <GlassIconButton
+              icon="chevron-down"
+              iconSize={21}
+              size={44}
+              fallbackRadius={22}
+              color={theme.text.primary}
+              fallbackStyle={[
+                styles.latestMessageFallback,
                 {
-                  bottom: composerHeight + 12,
                   backgroundColor: theme.secondary,
                   borderColor: theme.border,
                 },
               ]}
-              accessibilityRole="button"
+              style={[styles.latestMessageButton, { bottom: composerHeight + 12 }]}
+              overlay={
+                <View
+                  pointerEvents="none"
+                  style={[styles.latestMessageDot, { backgroundColor: theme.accent }]}
+                />
+              }
               accessibilityLabel={i18nText(
                 "autoI18n.son_mesaja_git",
                 "Son mesaja git",
               )}
-            >
-              <Ionicons name="chevron-down" size={21} color={theme.text.primary} />
-              <View style={[styles.latestMessageDot, { backgroundColor: theme.accent }]} />
-            </TouchableOpacity>
+              onPress={scrollToLatestMessage}
+            />
           )}
 
           {/* FAB menüsü açıkken listeyi karartan / menüyü kapatan katman */}
@@ -2588,20 +2383,22 @@ export default function ChatScreen({ route, navigation }) {
             pointerEvents="box-none"
             onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
           >
-              {/* Düzenleme banner */}
+              {/* Alıntı kartı */}
               {replyingTo && (
-                <View style={styles.replyingBanner}>
-                  <MessageReplyPreview reply={replyingTo} composer />
-                  <TouchableOpacity
-                    onPress={() => setReplyingTo(null)}
-                    hitSlop={8}
-                    style={styles.replyingClose}
-                    accessibilityLabel={i18nText("autoI18n.alintiyi_iptal_et", "Alıntıyı iptal et")}
-                  >
-                    <Ionicons name="close-circle" size={20} color="rgba(255,255,255,0.42)" />
-                  </TouchableOpacity>
-                </View>
+                <ComposerReplyBar
+                  reply={replyingTo}
+                  isSelf={replyingTo.senderId === currentUser.uid}
+                  blurTarget={composerBlur.target}
+                  getTmdbUrl={getTmdbUrl}
+                  onClose={() => setReplyingTo(null)}
+                  onPress={
+                    replyingTo.messageId
+                      ? () => jumpToMessage(replyingTo.messageId)
+                      : undefined
+                  }
+                />
               )}
+              {/* Düzenleme banner */}
               {editingMessage && (
                 <View style={styles.editingBanner}>
                   <View style={styles.editingAccent} />
@@ -2718,9 +2515,16 @@ export default function ChatScreen({ route, navigation }) {
                     backgroundColor: "transparent",
                     borderColor: searchOption ? theme.accent : inputBorderColor,
                   },
+                  // Cam yolunda çerçeve halkası kalkar (camın arkasında ikinci hap
+                  // gibi görünüyordu); "# arama" kipi camın tonuyla belli edilir.
+                  glass && COMPOSER_GLASS_PILL_STYLE,
                 ]}
               >
-                <ComposerBlur target={composerBlur.target} theme={theme} />
+                <ComposerBlur
+                  target={composerBlur.target}
+                  theme={theme}
+                  tint={searchOption ? alpha(theme.accent, 0.22) : undefined}
+                />
                 {/* Üst glow şeridi */}
                 <View
                   style={[
@@ -2806,6 +2610,10 @@ export default function ChatScreen({ route, navigation }) {
           // Bu sayfanın KENDİ klavye kaldırması var (modalKeyboardStyle →
           // paddingBottom). Kabuğunki de çalışsaydı ikisi toplanırdı.
           liftWithKeyboard={false}
+          // paddingBottom sayfayı yukarı ittiği için sayfa ekrandan uzunsa tepesi
+          // taşardı (sonuç ızgarası + seçim tepsisi + başlık kutusu). Sarmalayıcı
+          // küçülebilir olur, sonuç listesi kalan alana sığıp kendi içinde kayar.
+          shrinkToFit
           // autoFocus yerine: açılış animasyonu BİTTİKTEN sonra odakla.
           // Aksi halde açılış + klavye aynı anda çakışıp zıplama yapıyordu.
           onShow={() => {
@@ -2818,7 +2626,7 @@ export default function ChatScreen({ route, navigation }) {
             }, 260);
           }}
         >
-            <Reanimated.View style={modalKeyboardStyle}>
+            <Reanimated.View style={[styles.searchModalShrink, modalKeyboardStyle]}>
                 <View
                   style={[
                     styles.searchModal,
@@ -2847,16 +2655,14 @@ export default function ChatScreen({ route, navigation }) {
                     <Text style={[styles.searchModalTitle, { color: theme.text.primary }]}>
                       {i18nText("autoI18n.film_dizi_ara", "Film & Dizi Ara")}
                     </Text>
-                    <TouchableOpacity
+                    <GlassCloseButton
+                      size={32}
+                      fallbackRadius={16}
+                      iconSize={20}
+                      color={theme.text.primary}
+                      backgroundColor={theme.between}
                       onPress={() => closeSearchModal()}
-                      style={[styles.searchCloseBtn, { backgroundColor: theme.between }]}
-                    >
-                      <Ionicons
-                        name="close"
-                        size={20}
-                        color={theme.text.primary}
-                      />
-                    </TouchableOpacity>
+                    />
                   </View>
 
                   {/* Arama girişi (modaldaki) */}
@@ -3549,68 +3355,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ── Header ──────────────────────────────────────────────
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingTop: Platform.OS === "ios" ? 52 : 42,
-    paddingBottom: 12,
-    paddingHorizontal: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backBtn: { marginRight: 2, padding: 4 },
-  headerIdentity: { flex: 1, flexDirection: "row", alignItems: "center", minWidth: 0 },
-  avatarWrapper: { position: "relative", marginRight: 10 },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1.5,
-  },
-  avatarText: { fontSize: 17, fontWeight: "700", color: "#fff" },
-  onlineDot: {
-    position: "absolute",
-    bottom: 1,
-    right: 1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: "#0F0F1A",
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 2,
-  },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  headerInfo: { flex: 1 },
-  headerName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#fff",
-    letterSpacing: 0.1,
-  },
-  headerStatus: { fontSize: 11.5, marginTop: 1 },
-  headerAction: { padding: 6, marginLeft: 4 },
-
   // ── Mesaj listesi ──────────────────────────────────────
   chatList: { flex: 1 },
   listContent: { padding: 14, paddingBottom: 18 },
   latestMessageButton: {
     position: "absolute",
     right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
     zIndex: 8,
     elevation: 7,
+  },
+  // Gölge/çerçeve YALNIZ eski yolda (cam kendi derinliğini çizer; RN gölgesi
+  // cam yüzeyde eklenmez — bkz. GlassSurface kuralları).
+  latestMessageFallback: {
+    borderWidth: StyleSheet.hairlineWidth,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.24,
@@ -3661,100 +3418,13 @@ const styles = StyleSheet.create({
   },
   pinnedCountText: { color: "#C3C0FF", fontSize: 10.5, fontWeight: "800" },
 
-  // wrapper — hizalama için
-  myMsgWrapper: { alignItems: "flex-end", marginVertical: 3 },
-  friendMsgWrapper: { alignItems: "flex-start", marginVertical: 3 },
-
-  // grup: gönderen başlığı
-  senderHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginLeft: 8,
-    marginBottom: 3,
-  },
-  senderAvatar: { width: 20, height: 20, borderRadius: 10 },
-  senderAvatarPh: { justifyContent: "center", alignItems: "center" },
-  senderAvatarInitial: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  senderName: { fontSize: 11.5, fontWeight: "800", maxWidth: 180 },
-  // Ardışık aynı-gönderici mesajlar: dikey aralık 6px -> 1px (üst 0 + alt 1).
-  groupedTop: { marginTop: 0 },
-  groupedBottom: { marginBottom: 3 },
-
-  // gün ayracı (yatay çizgi + ortada tarih)
-  dateSep: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginVertical: 14,
-    paddingHorizontal: 8,
-  },
-  dateSepLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.12)" },
-  dateSepText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.6)",
-    backgroundColor: "rgba(255,255,255,0.07)",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-
-  message: {
-    paddingVertical: 9,
-    paddingHorizontal: 9,
-    borderRadius: 22,
-    maxWidth: "78%",
-    shadowColor: "#000",
-    shadowOpacity: 0.22,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  mediaMessage: {
-    maxWidth: "88%",
-  },
-  myMsg: {
-    backgroundColor: "#17245cff",
-    borderTopRightRadius: 6,
-    borderWidth: 1,
-    borderColor: "rgba(108,99,255,0.35)",
-  },
-  myGroupedBottomCorner: {
-    borderBottomRightRadius: 6,
-  },
-  friendMsg: {
-    backgroundColor: "rgba(68, 68, 68, 1)",
-    borderTopLeftRadius: 6,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  friendGroupedBottomCorner: {
-    borderBottomLeftRadius: 6,
-  },
   messageText: { fontSize: 15, lineHeight: 22, color: "#fff" },
-  highlightedMessage: {
-    borderColor: "#FFD166",
-    borderWidth: 1.5,
-    shadowColor: "#FFD166",
-    shadowOpacity: 0.34,
-  },
   linkText: {
     color: "#82B4FF",
     textDecorationLine: "underline",
     fontSize: 15,
     lineHeight: 22,
   },
-  msgMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 0 },
-  timestamp: { fontSize: 10.5, color: "rgba(255,255,255,0.38)" },
-  editedTag: {
-    fontSize: 10,
-    color: "rgba(255,255,255,0.3)",
-    fontStyle: "italic",
-    marginRight: 2,
-  },
-
   // ── Media kart ─────────────────────────────────────────
   mediaCard: {
     flexDirection: "row",
@@ -3850,10 +3520,22 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255,255,255,0.1)",
     borderRadius: 20,
-    borderTopLeftRadius: 5,
     paddingHorizontal: 4,
     paddingVertical: 2,
     marginBottom: 4,
+  },
+
+  // ── Ambiyans (Android 12+ hedef içi kopya) ─────────────
+  ambientClip: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+    zIndex: 0,
+  },
+  ambientFrame: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: AMBIENT_FRAME_HEIGHT,
   },
 
   // ── IconBg wrapper ─────────────────────────────────────
@@ -3882,18 +3564,6 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: Platform.OS === "ios" ? 8 : 12,
     zIndex: 20,
-  },
-  replyingBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  replyingClose: {
-    width: 34,
-    height: 34,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 4,
-    marginBottom: 9,
   },
   composerPill: {
     flexDirection: "row",
@@ -3964,7 +3634,7 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   attachBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.35)",
     zIndex: 15,
   },
@@ -4029,7 +3699,10 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.65)",
   },
+  // shrinkToFit zinciri: BottomSheetModal sarmalayıcısı → bu görünüm → searchModal.
+  searchModalShrink: { flexShrink: 1 },
   searchModal: {
+    flexShrink: 1,
     backgroundColor: "#14142B",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -4061,14 +3734,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#fff",
     letterSpacing: 0.2,
-  },
-  searchCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    justifyContent: "center",
-    alignItems: "center",
   },
   searchInputWrapper: {
     flexDirection: "row",

@@ -15,6 +15,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import ScreenDecor from "../../../components/ScreenDecor";
 import ProfileReminders from "./ProfileReminders";
 import { i18nText } from "../../../utils/i18nText";
+import BackButton from "@components/BackButton";
 
 
 /**
@@ -30,17 +31,11 @@ export default function RemindersScreen({ navigation }) {
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
       <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="profile" iconOpacity={0.25} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Başlık */}
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}
-            style={[styles.backBtn, { backgroundColor: theme.secondary }]}
-          >
-            <Ionicons name="chevron-back" size={22} color={theme.text.primary} />
-          </TouchableOpacity>
+          <BackButton absolute={false} onPress={() => navigation.goBack()} />
           <Text
             allowFontScaling={false}
             style={[styles.headerTitle, { color: theme.text.primary }]}
@@ -70,13 +65,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
   },
   headerTitle: { flex: 1, fontSize: 20, fontWeight: "800", letterSpacing: -0.3 },
   headerSpacer: { width: 40 },

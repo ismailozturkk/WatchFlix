@@ -73,7 +73,7 @@ export default function PermissionsDataScreen() {
         i18nText("autoI18n.veri_indirme_kapali", "Veri indirme kapalı"),
         i18nText(
           "autoI18n.veri_indirme_kapali_aciklama",
-          "Çevrimdışı veri indirmek için Ayarlar > Genel bölümünden \"Verileri İndir\" ayarını aç.",
+          "Çevrimdışı veri indirmek için Ayarlar > Veri ve depolama bölümünden \"Verileri İndir\" ayarını aç.",
         ),
       );
       return;
@@ -83,7 +83,7 @@ export default function PermissionsDataScreen() {
         i18nText("autoI18n.veri_turu_secilmedi", "Veri türü seçilmedi"),
         i18nText(
           "autoI18n.veri_turu_secilmedi_aciklama",
-          "Ayarlar > Genel bölümünden en az bir veri türü seç.",
+          "Ayarlar > Veri ve depolama bölümünden en az bir veri türü seç.",
         ),
       );
       return;
@@ -124,11 +124,11 @@ export default function PermissionsDataScreen() {
           ),
           "no-types": i18nText(
             "autoI18n.veri_turu_secilmedi_aciklama",
-            "Ayarlar > Genel bölümünden en az bir veri türü seç.",
+            "Ayarlar > Veri ve depolama bölümünden en az bir veri türü seç.",
           ),
           disabled: i18nText(
             "autoI18n.veri_indirme_kapali_aciklama",
-            "Çevrimdışı veri indirmek için Ayarlar > Genel bölümünden \"Verileri İndir\" ayarını aç.",
+            "Çevrimdışı veri indirmek için Ayarlar > Veri ve depolama bölümünden \"Verileri İndir\" ayarını aç.",
           ),
         };
         appAlert(
@@ -172,7 +172,7 @@ export default function PermissionsDataScreen() {
               : !autoDataCacheEnabled
                 ? i18nText(
                     "autoI18n.verileriIndirKapaliAlt",
-                    'Kapalı — Ayarlar > Genel\'den "Verileri İndir"i aç',
+                    'Kapalı — Ayarlar > Veri ve depolama\'dan "Verileri İndir"i aç',
                   )
                 : enabledTypeCount === 0
                   ? i18nText(

@@ -36,8 +36,6 @@ import { decideForegroundPresentation } from "../utils/notificationPresentation"
 const pushDocRef = (uid) => doc(db, "Users", uid, "private", "push");
 
 export const REMINDER_PREFIX = "reminder_";
-export const SOCIAL_PREFIX = "social_";
-
 export const CHANNELS = {
   default: "default",
   reminders: "reminders",
@@ -328,33 +326,9 @@ export async function getAllScheduled() {
   }
 }
 
-/**
- * Verilen prefix ile başlayan tüm zamanlanmış bildirimleri iptal et.
- */
-export async function cancelScheduledByPrefix(prefix) {
-  const all = await getAllScheduled();
-  await Promise.all(
-    all
-      .filter((n) => typeof n.identifier === "string" && n.identifier.startsWith(prefix))
-      .map((n) => cancelScheduledNotification(n.identifier)),
-  );
-}
-
-// Listener helper'ları — React tarafı bunları kullanır.
-export function addNotificationReceivedListener(cb) {
-  return Notifications.addNotificationReceivedListener(cb);
-}
-
+// Listener helper'ı — React tarafı kullanır.
 export function addNotificationResponseReceivedListener(cb) {
   return Notifications.addNotificationResponseReceivedListener(cb);
-}
-
-export async function getLastNotificationResponse() {
-  try {
-    return await Notifications.getLastNotificationResponseAsync();
-  } catch {
-    return null;
-  }
 }
 
 /**

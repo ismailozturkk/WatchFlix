@@ -25,10 +25,10 @@ import Animated, {
 import * as Haptics from "@services/hapticsService";
 import BackButton from "@components/BackButton";
 import AppIcon from "@components/AppIcon";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { toast } from "@components/AppToast";
 import MatchCard from "@components/tournament/MatchCard";
 import BracketTree from "@components/tournament/BracketTree";
-import CountdownTimer from "@components/tournament/CountdownTimer";
 import NomineeSearchModal from "@components/tournament/NomineeSearchModal";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
@@ -38,6 +38,7 @@ import {
   useLanguageSettings,
 } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 import {
   ROUNDS, getPeriodId, getScheduleEntry, parsePeriodId, getPeriodStartMs,
   monthLabel, mediaLabel, roundLabel, getPhaseInfo, buildBracket, tallyVotes,
@@ -50,43 +51,20 @@ import {
   subscribeTournamentAgg, subscribeMyVote, subscribeTournamentPool,
   castVote, setNomination, addPoolCandidate, fetchTmdbItem,
 } from "@services/tournamentService";
-import StageTimeline from "@components/tournament/StageTimeline";
+import TournamentHero from "@components/tournament/TournamentHero";
+import RoundRail from "@components/tournament/RoundRail";
 import PodiumModal from "@components/tournament/PodiumModal";
 import ScreenDecor from "@components/ScreenDecor";
-
-// Her faz kendi gradyanı + 4 bilgi kartı (Tür/Ortam/Ay/Aşama) için kendi renk
-// paletiyle gelir; hero her fazda görsel olarak FARKLI hissettirsin diye
-// (mavi=seçim, turuncu/kırmızı=oylama, altın=sonuç, gri=yakında).
-const PHASE_META = {
-  selection: {
-    tr: "Aday Belirleme", en: "Selection", icon: "list",
-    color: "#3B82F6",
-    gradient: ["#2563EB", "#7C3AED"],
-    grid: ["#60A5FA", "#818CF8", "#38BDF8", "#A78BFA"],
-  },
-  voting: {
-    tr: "Oylama", en: "Voting", icon: "flame",
-    color: "#F59E0B",
-    gradient: ["#EA580C", "#DC2626"],
-    grid: ["#FBBF24", "#FB923C", "#F87171", "#FCD34D"],
-  },
-  results: {
-    tr: "Sonuçlar", en: "Results", icon: "trophy",
-    color: "#F5C518",
-    gradient: ["#D97706", "#F5C518"],
-    grid: ["#FDE047", "#FACC15", "#F59E0B", "#FBBF24"],
-  },
-  upcoming: {
-    tr: "Yakında", en: "Upcoming", icon: "time",
-    color: "#6B7280",
-    gradient: ["#4B5563", "#1F2937"],
-    grid: ["#9CA3AF", "#6B7280", "#4B5563", "#9CA3AF"],
-  },
-};
+// Faz kimliği (renk/gradyan/ikon) Hub kartıyla ortak: components/tournament/phaseMeta.js
+import { PHASE_META } from "@components/tournament/phaseMeta";
 
 // Onay katmanında artık okunacak iki seçenek var; eski 2.6 sn karar vermeye
 // yetmiyordu (MatchCard'daki PENDING_TIMEOUT ile aynı).
 const NOM_PENDING_TIMEOUT = 6000;
+
+// Ağaç modalı kapanırken ardından açılacak yükseltme sayfası için pay: kapanış
+// animasyonu bitmeden ikinci bir Modal açılırsa iOS onu sunamaz.
+const TREE_MODAL_HANDOFF_MS = 350;
 
 // Uygulamanın onay/başarı yeşili — finalist rozeti ve "Hype verildi" çipiyle
 // AYNI değer (temada `success` belirteci yok, turnuva ekranı bunu sabit kullanır).
@@ -254,8 +232,14 @@ export default function TournamentScreen() {
   const { selectedLanguage: lang } = useLanguageSettings();
   const uid = user?.uid;
 
+  // Oy kullanmak (maç oyu + aday "hype"ı) Premium'a özel; Free kullanıcı turnuvayı
+  // yalnız izler. Kapı, ilk dokunuşta yükseltme sayfasını açar — oy zaten iki
+  // adımlı onaydan geçtiği için reddi onaydan SONRAya bırakmak kullanıcıyı yorardı.
+  const voteGate = usePremiumGate("tournament_vote");
+  const canVoteHere = voteGate.allows();
+
   const periodId = useMemo(() => getPeriodId(), []);
-  const { monthIndex } = useMemo(() => parsePeriodId(periodId), [periodId]);
+  const { year, monthIndex } = useMemo(() => parsePeriodId(periodId), [periodId]);
   const entry = useMemo(() => getScheduleEntry(monthIndex), [monthIndex]);
 
   const [docData, setDocData] = useState(null);
@@ -355,7 +339,7 @@ export default function TournamentScreen() {
   const poolGenreId = docData?.genreId || entry.genreId;
   // Aramadan aday eklemek TEK hype hakkını harcar; hak bitmişse arama yalnız
   // inceleme moduna düşer (havuz + TMDB listelenir, buton çıkmaz).
-  const canHype = nominationOpen && !!uid && myNoms.size < MAX_NOMINATIONS;
+  const canHype = nominationOpen && !!uid && myNoms.size < MAX_NOMINATIONS && canVoteHere;
 
   const bracket = useMemo(
     () => buildBracket({ nominees: finalists, tallies, periodId, ms: nowMs }),
@@ -379,6 +363,9 @@ export default function TournamentScreen() {
   const handleVote = useCallback(
     (matchId, side) => {
       if (!uid) { toast.error(i18nText("autoI18n.giris_gerekli", "Giriş gerekli")); return; }
+      // Savunma: MatchCard ilk dokunuşta zaten engeller; yine de buraya ulaşan
+      // bir oy (ör. plan arada düştüyse) yazılmaz.
+      if (!canVoteHere) { voteGate.showUpsell(); return; }
       if (myPicks[matchId]) {
         toast.warning(i18nText("autoI18n.tournament_vote_locked", "Bu maçtaki oyun kesin — değiştirilemez"));
         return;
@@ -402,7 +389,7 @@ export default function TournamentScreen() {
           toast.error(i18nText("autoI18n.tournament_vote_fail", "Oy kaydedilemedi"));
         });
     },
-    [uid, periodId, myPicks],
+    [uid, periodId, myPicks, canVoteHere, voteGate],
   );
 
   // ── Hype'ı KESİN kaydet (grid onayından veya arama modalından gelir) ───────
@@ -410,6 +397,7 @@ export default function TournamentScreen() {
     (nomineeId) => {
       const key = String(nomineeId);
       if (!uid) { toast.error(i18nText("autoI18n.giris_gerekli", "Giriş gerekli")); return; }
+      if (!canVoteHere) { voteGate.showUpsell(); return; }
       if (myNoms.size >= MAX_NOMINATIONS) {
         toast.warning(i18nText("autoI18n.tournament_hype_used", "Hype hakkını kullandın"));
         return;
@@ -431,7 +419,7 @@ export default function TournamentScreen() {
           toast.error(i18nText("autoI18n.tournament_vote_fail", "Oy kaydedilemedi"));
         });
     },
-    [uid, periodId, myNoms, hapticsEnabled],
+    [uid, periodId, myNoms, hapticsEnabled, canVoteHere, voteGate],
   );
 
   // ── Yarışmacının detay sayfası (onay katmanındaki "Bilgi") ─────────────────
@@ -458,6 +446,7 @@ export default function TournamentScreen() {
     async (candidate) => {
       const key = String(candidate?.id ?? "");
       if (!uid) { toast.error(i18nText("autoI18n.giris_gerekli", "Giriş gerekli")); return; }
+      if (!canVoteHere) { voteGate.showUpsell(); return; }
       if (!key || key === "undefined") return;
       if (myNoms.size >= MAX_NOMINATIONS) {
         toast.warning(i18nText("autoI18n.tournament_hype_used", "Hype hakkını kullandın"));
@@ -501,7 +490,7 @@ export default function TournamentScreen() {
         toast.warning(i18nText("autoI18n.tournament_pool_add_retry", "Hype'ın kaydedildi, aday birazdan eklenecek"));
       }
     },
-    [uid, periodId, myNoms, hapticsEnabled],
+    [uid, periodId, myNoms, hapticsEnabled, canVoteHere, voteGate],
   );
 
   // ── Kendini onarma: hype var ama havuzda aday yok ───────────────────────────
@@ -543,13 +532,15 @@ export default function TournamentScreen() {
       // Katman posteri TAM kapladığı için bu basış açıkken yalnız posterin
       // DIŞINDAN (altındaki başlık şeridi) gelebilir → vazgeçme yolu budur.
       if (pendingNom === key) { clearPendingNom(); return; }
+      // Seyirci (Free): onay katmanı açılmaz, yükseltme sayfası gelir.
+      if (!canVoteHere) { voteGate.showUpsell(); return; }
       // Onay artık "aynı yere tekrar basmak" değil, katmandaki açık seçim.
       if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       setPendingNom(key);
       if (nomTimer.current) clearTimeout(nomTimer.current);
       nomTimer.current = setTimeout(() => setPendingNom(null), NOM_PENDING_TIMEOUT);
     },
-    [uid, myNoms, hapticsEnabled, openContestant, pool, nominationOpen, pendingNom, clearPendingNom],
+    [uid, myNoms, hapticsEnabled, openContestant, pool, nominationOpen, pendingNom, clearPendingNom, canVoteHere, voteGate],
   );
 
   const handleNomineeConfirm = useCallback(
@@ -582,7 +573,7 @@ export default function TournamentScreen() {
       activeOpacity={0.85}
       accessibilityRole="button"
       accessibilityLabel={`${i18nText("autoI18n.tournament_last_winner", "Geçen Ayın Kazananı")} — ${i18nText("autoI18n.tournament_podium_sub", "İlk 3 · oy sayıları · geçmiş kazananlar")}`}
-      style={[styles.podiumBtn, { backgroundColor: theme.secondary, borderColor: "#F5C51855" }]}
+      style={[styles.podiumBtn, { backgroundColor: "#F5C51822", borderColor: "#F5C51866" }]}
     >
       <AppIcon family="Ionicons" name="trophy" size={17} color="#F5C518" />
     </TouchableOpacity>
@@ -620,11 +611,6 @@ export default function TournamentScreen() {
         ? `${roundLabel(ROUNDS[phaseInfo.activeRound], lang)} ` + i18nText("autoI18n.tournament_ends_in", "bitişine")
         : i18nText("autoI18n.tournament_next_in", "Yeni turnuvaya");
 
-  const deadlineText = new Date(phaseInfo.nextDeadlineMs).toLocaleDateString(
-    lang === "tr" ? "tr-TR" : "en-US",
-    { day: "numeric", month: "long" },
-  );
-
   // Aşama çizelgesinden tur seçimi (oylama/sonuç fazlarında ilgili tura atlar).
   const handleStagePress = useCallback((s) => {
     if (s.roundIndex == null) return;
@@ -632,94 +618,47 @@ export default function TournamentScreen() {
     setViewMode("list");
   }, []);
 
-  // Tek satırlık bilgi şeridi: Tür / Ortam / Ay — eşit genişlikte 3 sütun.
-  // Aşama zaten Header'daki phaseChip'te gösteriliyor, burada tekrar etmiyor.
-  const heroGridItems = [
-    { key: "theme", icon: "pricetag", label: i18nText("autoI18n.tournament_genre", "Tür"), value: theTheme },
-    { key: "media", icon: entry.mediaType === "tv" ? "tv" : "film", label: i18nText("autoI18n.tournament_format", "Ortam"), value: mediaLabel(entry.mediaType, lang) },
-    { key: "month", icon: "calendar", label: i18nText("autoI18n.tournament_month", "Ay"), value: monthLabel(monthIndex, lang) },
-  ];
-
+  // Tür başlığı + ay/ortam çipleri + geri sayım paneli + interaktif aşama çizelgesi.
   const Hero = (
-    <LinearGradient
-      colors={phaseMeta.gradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.hero}
-    >
-      <View pointerEvents="none" style={styles.heroGlow} />
-      <Text style={styles.heroTheme} numberOfLines={1}>{theTheme}</Text>
-
-      {/* Bilgi şeridi — tür/ortam/ay, eşit genişlikte 3 sütun; her sütunda ikon
-          solda, etiket+değer sağında YATAY (kompakt, dikey yer kaplamasın). */}
-      <View style={styles.heroGrid}>
-        {heroGridItems.map((item, i) => (
-          <View key={item.key} style={styles.heroGridCell}>
-            <View style={[styles.heroGridIcon, { backgroundColor: phaseMeta.grid[i] }]}>
-              <AppIcon family="Ionicons" name={item.icon} size={12} color="#1a1a1a" />
-            </View>
-            <View style={styles.heroGridTextWrap}>
-              <Text style={styles.heroGridLabel} numberOfLines={1}>{item.label}</Text>
-              <Text style={styles.heroGridValue} numberOfLines={1}>{item.value}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.heroCountdownRow}>
-        <Text style={styles.heroSub}>{heroLabel}</Text>
-        <View style={{ marginTop: 6 }}>
-          <CountdownTimer deadlineMs={phaseInfo.nextDeadlineMs} lang={lang} size="lg" />
-        </View>
-        <Text style={styles.heroDeadline}>
-          {i18nText("autoI18n.tournament_deadline", "Bitiş")}: {deadlineText}
-        </Text>
-      </View>
-
-      {/* İnteraktif aşama çizelgesi — düğüme bas: o turun listesine git */}
-      <StageTimeline periodId={periodId} nowMs={nowMs} lang={lang} onStagePress={handleStagePress} />
-    </LinearGradient>
+    <TournamentHero
+      phaseMeta={phaseMeta}
+      theTheme={theTheme}
+      mediaType={entry.mediaType}
+      monthIndex={monthIndex}
+      year={year}
+      lang={lang}
+      label={heroLabel}
+      deadlineMs={phaseInfo.nextDeadlineMs}
+      periodId={periodId}
+      nowMs={nowMs}
+      onStagePress={handleStagePress}
+    />
   );
 
-  // ── Tur çipleri ───────────────────────────────────────────────────────────────
+  // ── Tur seçici ────────────────────────────────────────────────────────────────
   const RoundChips = (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-      {ROUNDS.map((r, i) => {
-        const round = bracket.rounds[i];
-        const isActive = phaseInfo.phase === "voting" && i === phaseInfo.activeRound;
-        const isSelected = tab === i;
-        const locked = !round?.decided && !round?.votable && !(phaseInfo.phase === "results");
-        return (
-          <TouchableOpacity
-            key={r.key}
-            onPress={() => setTab(i)}
-            style={[
-              styles.chip,
-              {
-                backgroundColor: isSelected ? theme.accent : theme.secondary,
-                borderColor: isActive ? theme.accent : theme.border,
-              },
-            ]}
-          >
-            <Text style={[styles.chipText, { color: isSelected ? "#fff" : theme.text.secondary }]}>
-              {roundLabel(r, lang)}
-            </Text>
-            {round?.decided && <AppIcon family="Ionicons" name="checkmark-circle" size={12} color={isSelected ? "#fff" : "#22C55E"} />}
-            {locked && <AppIcon family="Ionicons" name="lock-closed" size={11} color={isSelected ? "#fff" : theme.text.muted} />}
-            {isActive && !round?.decided && <View style={styles.liveDot} />}
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
+    <RoundRail
+      rounds={bracket.rounds}
+      phase={phaseInfo.phase}
+      activeRound={phaseInfo.activeRound}
+      selected={tab}
+      onSelect={setTab}
+      myPicks={myPicks}
+      theme={theme}
+      lang={lang}
+    />
   );
 
   // ── Liste/Ağaç anahtarı ─────────────────────────────────────────────────────
+  // Parça (segmented) kontrol: seçili segment accent dolgulu, diğeri şeffaf.
   const ViewToggle = (
     <View style={[styles.toggle, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       {["list", "tree"].map((m) => (
         <Pressable
           key={m}
           onPress={() => setViewMode(m)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: viewMode === m }}
           style={[styles.toggleBtn, viewMode === m && { backgroundColor: theme.accent }]}
         >
           <AppIcon
@@ -757,6 +696,8 @@ export default function TournamentScreen() {
           mySide={myPicks[m.matchId] || null}
           votable={m.votable && !!m.a && !!m.b && !myPicks[m.matchId]}
           onVote={handleVote}
+          canVote={canVoteHere}
+          onVoteBlocked={voteGate.showUpsell}
           onInfo={openContestant}
           theme={theme}
           getTmdbUrl={getTmdbUrl}
@@ -767,13 +708,29 @@ export default function TournamentScreen() {
     </View>
   );
 
+  // Seçili turun alt satırı: "16 maç · Oyların 5/16" (giriş yapılmamışsa yalnız maç sayısı).
+  const selectedMatchCount = selectedRound?.matches.length || 0;
+  const selectedMyCount = selectedRound
+    ? selectedRound.matches.reduce((n, m) => n + (myPicks[m.matchId] ? 1 : 0), 0)
+    : 0;
+  const browserSub = selectedRound
+    ? `${selectedMatchCount} ${i18nText("autoI18n.tournament_widget_match", "maç")}${
+        uid ? ` · ${i18nText("autoI18n.tournament_my_votes", "Oyların")} ${selectedMyCount}/${selectedMatchCount}` : ""
+      }`
+    : "";
+
   const RoundsBrowser = (
     <View>
       {RoundChips}
       <View style={styles.browserHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.text.muted, marginBottom: 0 }]}>
-          {selectedRound ? roundLabel(selectedRound.def, lang) : ""}
-        </Text>
+        <View style={styles.browserTitleWrap}>
+          <Text numberOfLines={1} style={[styles.browserTitle, { color: theme.text.primary }]}>
+            {selectedRound ? roundLabel(selectedRound.def, lang) : ""}
+          </Text>
+          <Text numberOfLines={1} style={[styles.browserSub, { color: theme.text.muted }]}>
+            {browserSub}
+          </Text>
+        </View>
         <View style={styles.browserHeaderRight}>
           <TouchableOpacity
             onPress={() => setInfoVisible(true)}
@@ -816,12 +773,15 @@ export default function TournamentScreen() {
             <Text style={[styles.matchModalTitle, { color: theme.text.primary }]}>
               {i18nText("autoI18n.tournament_info", "Bilgi")}
             </Text>
-            <Pressable
+            <GlassCloseButton
+              size={30}
+              fallbackRadius={10}
+              iconSize={16}
+              color={theme.text.secondary}
+              backgroundColor={theme.secondary}
+              borderColor={theme.border}
               onPress={() => setInfoVisible(false)}
-              style={[styles.matchModalClose, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-            >
-              <AppIcon family="Ionicons" name="close" size={16} color={theme.text.secondary} />
-            </Pressable>
+            />
           </View>
 
           <View style={[styles.notice, { backgroundColor: theme.accent + "1A", borderColor: theme.accent + "44" }]}>
@@ -850,6 +810,13 @@ export default function TournamentScreen() {
   // ── Ağaçtan seçilen maçın oy modalı ─────────────────────────────────────────
   // matchId üzerinden CANLI bracket'ten çözülür ki oy sonrası yüzdeler/rozet
   // modal açıkken de güncellensin.
+  // Seyirci (Free) ağaç modalında oy vermeye kalkarsa: önce modal kalkar, sonra
+  // yükseltme sayfası açılır — iOS iki Modal'ı aynı anda sunamaz.
+  const handleTreeVoteBlocked = useCallback(() => {
+    setTreeMatchId(null);
+    setTimeout(() => voteGate.showUpsell(), TREE_MODAL_HANDOFF_MS);
+  }, [voteGate]);
+
   const treeMatch = useMemo(() => {
     if (!treeMatchId) return null;
     for (const r of bracket.rounds) {
@@ -874,12 +841,15 @@ export default function TournamentScreen() {
                 <Text style={[styles.matchModalTitle, { color: theme.text.primary }]}>
                   {roundLabel(ROUNDS[treeMatch.round], lang)} · {i18nText("autoI18n.tournament_match", "Maç")} {treeMatch.index + 1}
                 </Text>
-                <Pressable
+                <GlassCloseButton
+                  size={30}
+                  fallbackRadius={10}
+                  iconSize={16}
+                  color={theme.text.secondary}
+                  backgroundColor={theme.secondary}
+                  borderColor={theme.border}
                   onPress={() => setTreeMatchId(null)}
-                  style={[styles.matchModalClose, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-                >
-                  <AppIcon family="Ionicons" name="close" size={16} color={theme.text.secondary} />
-                </Pressable>
+                />
               </View>
 
               <MatchCard
@@ -887,6 +857,8 @@ export default function TournamentScreen() {
                 mySide={myPicks[treeMatch.matchId] || null}
                 votable={treeMatch.votable && !!treeMatch.a && !!treeMatch.b && !myPicks[treeMatch.matchId]}
                 onVote={handleVote}
+                canVote={canVoteHere}
+                onVoteBlocked={handleTreeVoteBlocked}
                 onInfo={openContestant}
                 theme={theme}
                 getTmdbUrl={getTmdbUrl}
@@ -1036,28 +1008,79 @@ export default function TournamentScreen() {
   // yapımı); hype'lar geldikçe canlı olarak oy sayısına göre yeniden sıralanır
   // (rankPool: oy desc → havuz sırası asc). İlk 32 yeşil rozet, kalanı soluk.
   // Postere İKİ KEZ bas = tek ve kesin hype (onay katmanı + değiştirilemez).
-  const NomineeGrid = () => (
-    <View style={styles.grid}>
-      {rankedPool.map((n) => (
-        <NomineeCell
-          key={n.id}
-          id={n.id}
-          title={n.title}
-          posterPath={n.posterPath}
-          rank={n.rank}
-          nomVotes={n.nomVotes}
-          finalist={n.finalist}
-          mine={myNoms.has(String(n.id))}
-          isPending={pendingNom === String(n.id)}
-          onPress={handleNomineePress}
-          onConfirm={handleNomineeConfirm}
-          onInfo={handleNomineeInfo}
-          theme={theme}
-          getTmdbUrl={getTmdbUrl}
-        />
-      ))}
-    </View>
+  //
+  // Izgara İKİYE bölünür: ilk 32 (turnuvaya girenler) ile geri kalan. Arada bir
+  // "eleme sınırı" ayracı durur; böylece yeşil/soluk rozet farkı tek başına
+  // bırakılmaz, sınırın nerede olduğu görülür. Havuz ≤ 32 ise ayraç çıkmaz.
+  const renderNominee = (n) => (
+    <NomineeCell
+      key={n.id}
+      id={n.id}
+      title={n.title}
+      posterPath={n.posterPath}
+      rank={n.rank}
+      nomVotes={n.nomVotes}
+      finalist={n.finalist}
+      mine={myNoms.has(String(n.id))}
+      isPending={pendingNom === String(n.id)}
+      onPress={handleNomineePress}
+      onConfirm={handleNomineeConfirm}
+      onInfo={handleNomineeInfo}
+      theme={theme}
+      getTmdbUrl={getTmdbUrl}
+    />
   );
+
+  const NomineeGrid = () => {
+    const inList = rankedPool.filter((n) => n.finalist);
+    const outList = rankedPool.filter((n) => !n.finalist);
+    return (
+      <View>
+        <View style={styles.grid}>{inList.map(renderNominee)}</View>
+        {outList.length > 0 && (
+          <>
+            <View style={styles.cutline}>
+              <View style={styles.cutlineRow}>
+                <View style={[styles.cutlineRule, { backgroundColor: theme.border }]} />
+                <View style={[styles.cutlinePill, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+                  <AppIcon family="Ionicons" name="cut" size={12} color={theme.text.muted} />
+                  <Text style={[styles.cutlineText, { color: theme.text.secondary }]}>
+                    {i18nText("autoI18n.tournament_cutline", "Eleme sınırı")}
+                  </Text>
+                </View>
+                <View style={[styles.cutlineRule, { backgroundColor: theme.border }]} />
+              </View>
+              <Text style={[styles.cutlineSub, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.tournament_cutline_sub", "Altındakiler dışarıda kalır")}
+              </Text>
+            </View>
+            <View style={styles.grid}>{outList.map(renderNominee)}</View>
+          </>
+        )}
+      </View>
+    );
+  };
+
+  // ── Seyirci bandı (Free) ──────────────────────────────────────────────────────
+  // Ücretsiz planda turnuva yalnız izlenir. Bant, oy verilebilen fazlarda (aday
+  // seçimi + eleme turları) nedenini söyler ve yükseltme sayfasına götürür; aksi
+  // halde postere basınca "bir şey olmuyor" hissi verirdi.
+  const spectatorNotice =
+    !canVoteHere && !!uid && (nominationOpen || phaseInfo.phase === "voting") ? (
+      <Pressable
+        onPress={() => voteGate.showUpsell()}
+        accessibilityRole="button"
+        style={[styles.notice, { backgroundColor: theme.accent + "1A", borderColor: theme.accent + "44" }]}
+      >
+        <AppIcon family="Ionicons" name="eye" size={16} color={theme.accent} />
+        <Text style={[styles.noticeText, { color: theme.text.secondary }]}>
+          {lang === "tr"
+            ? "Turnuvayı seyirci olarak izliyorsun. Oy kullanmak Premium'a özel."
+            : "You're watching as a spectator. Voting is a Premium perk."}
+        </Text>
+        <AppIcon family="Ionicons" name="chevron-forward" size={14} color={theme.text.muted} />
+      </Pressable>
+    ) : null;
 
   // ── Body ──────────────────────────────────────────────────────────────────────
   let body;
@@ -1083,16 +1106,22 @@ export default function TournamentScreen() {
     body = (
       <View>
         {Hero}
+        {spectatorNotice}
 
-        {/* Aday hype başlığı + kişisel hak durumu.
+        {/* Aday hype kartı: ikon + başlık + kişisel hak çipi, alt metin ve arama.
             Başlık ve çip TEK satırda (dikeyde ortalı), alt metin altlarında tam
             genişlikte. Çip sol sütunun içinde değil ki alt metin iki satıra
             çıkınca çip aşağı kaymasın. */}
-        <View style={styles.nomHeader}>
+        <View style={[styles.nomCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <View style={styles.nomTitleRow}>
+            <View style={[styles.nomIconTile, { backgroundColor: theme.accent + "1F" }]}>
+              <AppIcon family="Ionicons" name={nominationOpen ? "flame" : "list"} size={16} color={theme.accent} />
+            </View>
             <Text
               numberOfLines={1}
-              style={[styles.sectionTitle, { color: theme.text.muted, marginBottom: 0, flex: 1 }]}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={[styles.nomTitle, { color: theme.text.primary }]}
             >
               {nominationOpen
                 ? i18nText("autoI18n.tournament_pick32_title", "İlk 32'yi Sen Seç")
@@ -1139,23 +1168,23 @@ export default function TournamentScreen() {
                   )}
             </Text>
           )}
-        </View>
 
-        {/* Arama çubuğu görünümlü buton → aday arama ekranı (oradan hype verilir) */}
-        <Pressable
-          onPress={() => setSearchVisible(true)}
-          style={[styles.searchBar, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-          accessibilityRole="button"
-          accessibilityLabel={i18nText("autoI18n.tournament_search_ph", "Aday ara…")}
-        >
-          <AppIcon family="Ionicons" name="search" size={15} color={theme.text.muted} />
-          <Text style={[styles.searchBarText, { color: theme.text.muted }]} numberOfLines={1}>
-            {i18nText("autoI18n.tournament_search_ph", "Aday ara…")}
-          </Text>
-          <View style={[styles.searchBarBadge, { backgroundColor: theme.accent + "1A" }]}>
-            <AppIcon family="Ionicons" name="flame" size={11} color={theme.accent} />
-          </View>
-        </Pressable>
+          {/* Arama çubuğu görünümlü buton → aday arama ekranı (oradan hype verilir) */}
+          <Pressable
+            onPress={() => setSearchVisible(true)}
+            style={[styles.searchBar, { backgroundColor: theme.between, borderColor: theme.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={i18nText("autoI18n.tournament_search_ph", "Aday ara…")}
+          >
+            <AppIcon family="Ionicons" name="search" size={15} color={theme.text.muted} />
+            <Text style={[styles.searchBarText, { color: theme.text.muted }]} numberOfLines={1}>
+              {i18nText("autoI18n.tournament_search_ph", "Aday ara…")}
+            </Text>
+            <View style={[styles.searchBarBadge, { backgroundColor: theme.accent + "1A" }]}>
+              <AppIcon family="Ionicons" name="flame" size={11} color={theme.accent} />
+            </View>
+          </Pressable>
+        </View>
 
         {NomineeGrid()}
 
@@ -1165,14 +1194,16 @@ export default function TournamentScreen() {
           activeOpacity={0.8}
           style={[styles.projToggle, { backgroundColor: theme.secondary, borderColor: theme.border }]}
         >
-          <AppIcon family="Ionicons" name="git-compare" size={14} color={theme.text.secondary} />
-          <Text style={[styles.projToggleText, { color: theme.text.secondary }]}>
+          <View style={[styles.projIcon, { backgroundColor: theme.accent + "1F" }]}>
+            <AppIcon family="Ionicons" name="git-compare" size={15} color={theme.accent} />
+          </View>
+          <Text numberOfLines={1} style={[styles.projToggleText, { color: theme.text.primary }]}>
             {i18nText("autoI18n.tournament_projection", "İlk Tur Eşleşme Projeksiyonu")}
           </Text>
           <AppIcon
             family="Ionicons"
             name={showProjection ? "chevron-up" : "chevron-down"}
-            size={14}
+            size={16}
             color={theme.text.muted}
           />
         </TouchableOpacity>
@@ -1208,6 +1239,7 @@ export default function TournamentScreen() {
     body = (
       <View>
         {Hero}
+        {spectatorNotice}
         {RoundsBrowser}
       </View>
     );
@@ -1226,7 +1258,7 @@ export default function TournamentScreen() {
   return (
     <SafeAreaView edges={["top"]} style={[styles.container, { backgroundColor: theme.primary }]}>
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="more" iconOpacity={0.25} />
       {Header}
       {__DEV__ && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.devStrip}>
@@ -1311,35 +1343,7 @@ const styles = StyleSheet.create({
   },
   phaseChipText: { fontSize: 11, fontWeight: "800" },
 
-  hero: { borderRadius: 20, padding: 14, marginTop: 6, overflow: "hidden" },
-  heroGlow: {
-    position: "absolute", width: 190, height: 190, borderRadius: 95,
-    right: -60, top: -80, backgroundColor: "rgba(255,255,255,0.10)",
-  },
-  heroTheme: { color: "#fff", fontSize: 19, fontWeight: "900" },
-
-  heroGrid: {
-    flexDirection: "row",
-    marginTop: 8, marginHorizontal: -4,
-  },
-  heroGridCell: {
-    flex: 1, flexDirection: "row", alignItems: "center", gap: 6,
-    paddingHorizontal: 4, paddingVertical: 3,
-  },
-  heroGridIcon: {
-    width: 21, height: 21, borderRadius: 7,
-    alignItems: "center", justifyContent: "center",
-  },
-  heroGridTextWrap: { flex: 1, minWidth: 0 },
-  heroGridLabel: { color: "rgba(255,255,255,0.75)", fontSize: 8.5, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.3 },
-  heroGridValue: { color: "#fff", fontSize: 11.5, fontWeight: "800" },
-
-  heroCountdownRow: {
-    marginTop: 6, paddingTop: 8,
-    borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.18)",
-  },
-  heroSub: { color: "rgba(255,255,255,0.92)", fontSize: 12, fontWeight: "700" },
-  heroDeadline: { color: "rgba(255,255,255,0.75)", fontSize: 10.5, fontWeight: "700", marginTop: 4 },
+  // Hero kartı artık components/tournament/TournamentHero.js içinde.
 
   podiumBtn: {
     width: 34, height: 34, borderRadius: 12,
@@ -1347,14 +1351,31 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
 
-  nomHeader: { marginTop: 18 },
+  // Aday hype kartı: başlık + çip + alt metin + arama tek yüzeyde.
+  nomCard: { marginTop: 16, marginBottom: 14, padding: 14, borderRadius: 22, borderWidth: 1 },
   // Başlık ile çip dikeyde ORTALANIR (flex-start'ta çip başlığa göre kayıyordu).
-  nomTitleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 },
+  nomTitleRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  nomIconTile: {
+    width: 32, height: 32, borderRadius: 11,
+    alignItems: "center", justifyContent: "center",
+  },
+  nomTitle: { flex: 1, fontSize: 16, fontWeight: "900" },
   // İki satırlık SABİT slot: metin kısalsa da yükseklik değişmez → kayma yok.
   nomSubtitle: {
     fontSize: 11.5, fontWeight: "600", lineHeight: 15,
-    minHeight: 30, marginBottom: 8,
+    minHeight: 30, marginBottom: 10,
   },
+
+  // Eleme sınırı ayracı (ilk 32 ile geri kalan arasında).
+  cutline: { marginTop: 6, marginBottom: 12 },
+  cutlineRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  cutlineRule: { flex: 1, height: 1, borderRadius: 1 },
+  cutlinePill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999, borderWidth: 1,
+  },
+  cutlineText: { fontSize: 11.5, fontWeight: "800" },
+  cutlineSub: { fontSize: 10.5, fontWeight: "600", textAlign: "center", marginTop: 5 },
   nomCounter: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4,
     paddingHorizontal: 9, paddingVertical: 5, borderRadius: 11, borderWidth: 1,
@@ -1365,28 +1386,26 @@ const styles = StyleSheet.create({
   nomCounterText: { fontSize: 12, fontWeight: "900" },
 
   projToggle: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
-    borderRadius: 13, borderWidth: 1, paddingVertical: 11, marginTop: 6, marginBottom: 10,
+    flexDirection: "row", alignItems: "center", gap: 10,
+    borderRadius: 18, borderWidth: 1, padding: 12, marginTop: 6, marginBottom: 12,
   },
-  projToggleText: { fontSize: 12.5, fontWeight: "800" },
-
-  chipsRow: { gap: 8, paddingVertical: 14, paddingRight: 8 },
-  chip: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    paddingHorizontal: 13, paddingVertical: 9, borderRadius: 12, borderWidth: 1,
-  },
-  chipText: { fontSize: 12.5, fontWeight: "800" },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#EF4444" },
-
-  browserHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  browserHeaderRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  sectionTitle: { fontSize: 13, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 10 },
-  infoBtn: {
-    width: 28, height: 28, borderRadius: 9, borderWidth: 1,
+  projIcon: {
+    width: 30, height: 30, borderRadius: 10,
     alignItems: "center", justifyContent: "center",
   },
-  toggle: { flexDirection: "row", borderRadius: 11, borderWidth: 1, padding: 3, gap: 2 },
-  toggleBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  projToggleText: { flex: 1, fontSize: 13, fontWeight: "800" },
+
+  browserHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 },
+  browserTitleWrap: { flex: 1, minWidth: 0 },
+  browserTitle: { fontSize: 20, fontWeight: "900", letterSpacing: -0.3 },
+  browserSub: { fontSize: 11.5, fontWeight: "700", marginTop: 2 },
+  browserHeaderRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  infoBtn: {
+    width: 32, height: 32, borderRadius: 11, borderWidth: 1,
+    alignItems: "center", justifyContent: "center",
+  },
+  toggle: { flexDirection: "row", borderRadius: 13, borderWidth: 1, padding: 3, gap: 2 },
+  toggleBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10 },
   toggleText: { fontSize: 12, fontWeight: "800" },
 
   notice: {
@@ -1467,7 +1486,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4, marginBottom: 8 },
   gridItem: { width: "25%", padding: 4 },
   gridPosterWrap: {
-    width: "100%", aspectRatio: 2 / 3, borderRadius: 9, overflow: "hidden",
+    width: "100%", aspectRatio: 2 / 3, borderRadius: 12, overflow: "hidden",
     borderWidth: 2.5, // rengi duruma göre değişir; kalınlık sabit (bkz. NomineeCell)
   },
   gridPoster: { width: "100%", height: "100%" },
@@ -1504,8 +1523,7 @@ const styles = StyleSheet.create({
 
   searchBar: {
     flexDirection: "row", alignItems: "center", gap: 8,
-    borderRadius: 13, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10,
-    marginBottom: 10,
+    borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11,
   },
   searchBarText: { flex: 1, fontSize: 12.5, fontWeight: "600" },
   searchBarBadge: {
@@ -1525,10 +1543,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   matchModalTitle: { fontSize: 14, fontWeight: "900" },
-  matchModalClose: {
-    width: 30, height: 30, borderRadius: 10, borderWidth: 1,
-    alignItems: "center", justifyContent: "center",
-  },
   matchModalHint: { fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 2 },
 
   devStrip: { gap: 6, paddingHorizontal: 12, paddingBottom: 6 },

@@ -17,6 +17,7 @@ import React, {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import * as Haptics from "@services/hapticsService";
@@ -55,10 +56,22 @@ const normalizeMedia = (item, mediaType) => {
 
 export const MediaQuickActionsProvider = ({ children }) => {
   const [target, setTarget] = useState(null);
+  // `onDismiss` kapanış anında hedeften okunuyor; state'i updater içinde
+  // okumak yan etkiyi StrictMode'da iki kez çalıştırırdı.
+  const targetRef = useRef(null);
   const { hapticsEnabled } = useHapticsSettings();
 
+  const setActiveTarget = useCallback((next) => {
+    targetRef.current = next;
+    setTarget(next);
+  }, []);
+
+  // `onDismiss` (isteğe bağlı): sayfa yalnızca KAPATILINCA — dışarı dokunuş,
+  // X, geri tuşu — çağrılır. Başka bir sayfaya/ekrana devredilirken (detay,
+  // puan, tarih…) çağrılmaz. Sayfayı bir Modal'ın içinden açan çağıran, o
+  // Modal'ı kapatıp açtığı için, vazgeçilince geri açmak için bunu kullanır.
   const openQuickActions = useCallback(
-    ({ item, mediaType, navigation }) => {
+    ({ item, mediaType, navigation, onDismiss }) => {
       const media = normalizeMedia(item, mediaType);
       // navigation olmadan sayfanın alt yönlendirmeleri ölü düğmeye dönerdi;
       // eksikse hiç açma.
@@ -66,12 +79,21 @@ export const MediaQuickActionsProvider = ({ children }) => {
       if (hapticsEnabled) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
-      setTarget({ media, navigation });
+      setActiveTarget({ media, navigation, onDismiss });
     },
-    [hapticsEnabled],
+    [hapticsEnabled, setActiveTarget],
   );
 
-  const closeQuickActions = useCallback(() => setTarget(null), []);
+  const closeQuickActions = useCallback(
+    () => setActiveTarget(null),
+    [setActiveTarget],
+  );
+
+  const dismissQuickActions = useCallback(() => {
+    const onDismiss = targetRef.current?.onDismiss;
+    setActiveTarget(null);
+    onDismiss?.();
+  }, [setActiveTarget]);
 
   const value = useMemo(
     () => ({ openQuickActions, closeQuickActions }),
@@ -81,7 +103,11 @@ export const MediaQuickActionsProvider = ({ children }) => {
   return (
     <MediaQuickActionsContext.Provider value={value}>
       {children}
-      <MediaQuickActionsSheet target={target} onClose={closeQuickActions} />
+      <MediaQuickActionsSheet
+        target={target}
+        onClose={closeQuickActions}
+        onDismiss={dismissQuickActions}
+      />
     </MediaQuickActionsContext.Provider>
   );
 };

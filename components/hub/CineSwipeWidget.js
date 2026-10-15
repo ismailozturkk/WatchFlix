@@ -1,278 +1,272 @@
 // components/hub/CineSwipeWidget.js
 //
-// Hub sekmesindeki modern, gösterişli ve animasyonlu CineSwipe banner widget'ı.
-// Üst üste binen mini kartlar, parlama efektleri ve yay etkileşimi içerir.
+// Hub'daki CineSwipe ("Birlikte Ne İzlesek?") kartı. İki parça:
+//   • Sol  — rozetler, başlık, tek cümlelik açıklama.
+//   • Sağ  — üç gerçek afişten yelpaze: ön afiş sağa yatık ve kalp rozetli, yani
+//            "sağa kaydır = beğen" jesti kartın kendisinde anlatılır. Afişler
+//            uygulamayla paketlenen splash havuzundan, günün tohumuyla seçilir
+//            (her gün farklı üçlü, ağ gerekmez). Yelpaze çok hafif süzülür;
+//            sistemin "Hareketi azalt" ayarına uyar.
+// Altta iki eşit düğme: "Tek başına" / "Arkadaşınla". Kartın geri kalanına
+// basmak da solo'yu açar (eskisi gibi).
+//
+// Dış kart `accessible={false}`: VoiceOver iç düğmeleri tek tek okuyabilsin
+// (erişilebilir bir üst öğe çocuklarını yutar).
 
-import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import React, { memo, useEffect, useMemo } from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
 import Animated, {
-  useSharedValue,
+  cancelAnimation,
+  Easing,
+  ReduceMotion,
   useAnimatedStyle,
-  withSpring,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from "react-native-reanimated";
-import AppIcon from "../AppIcon";
-import { alpha } from "../../theme/colors";
-import { triggerHaptic } from "../../services/hapticsService";
+import AppIcon from "@components/AppIcon";
+import HubCard, { GlassPill } from "@components/hub/HubCard";
+import { PressableScale } from "@components/game/ui";
+import PremiumPill from "@components/premium/PremiumPill";
+import { usePremiumGate } from "@hooks/usePremiumGate";
+import { i18nText } from "@utils/i18nText";
+import { hashString } from "@utils/seededRandom";
+import { triggerHaptic } from "@services/hapticsService";
+import { SPLASH_POSTER_CATALOG } from "../../data/splashPosterCatalog";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const SPRING_CONFIG = { mass: 0.4, damping: 12, stiffness: 180 };
+const COLORS = ["#E11D48", "#9F1239", "#25091A"];
+const ROSE = "#E11D48";
+const GOLD = "#FFD76A";
+const RM = ReduceMotion.System;
 
-export default function CineSwipeWidget({ navigation, theme }) {
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+// Üç afişin yelpaze yerleşimi (soldan sağa; sonuncusu öne gelir).
+const FAN = [
+  { left: 0, top: 22, rotate: "-13deg", scale: 0.92, opacity: 0.78 },
+  { left: 19, top: 8, rotate: "-3deg", scale: 0.97, opacity: 0.92 },
+  { left: 40, top: 24, rotate: "9deg", scale: 1, opacity: 1 },
+];
+
+function pickPosters(dayKey) {
+  const total = SPLASH_POSTER_CATALOG.length;
+  const picked = [];
+  let salt = 0;
+  while (picked.length < FAN.length && salt < 30) {
+    const index = hashString(`${dayKey}|cine|${salt}`) % total;
+    if (!picked.includes(index)) picked.push(index);
+    salt += 1;
+  }
+  return picked.map((index) => SPLASH_POSTER_CATALOG[index]);
+}
+
+// Yelpazenin yavaş süzülmesi: UI thread'de, sonsuz ama çok ucuz.
+function useFloat() {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    const cfg = { duration: 2800, easing: Easing.inOut(Easing.sin), reduceMotion: RM };
+    t.value = withRepeat(
+      withSequence(withTiming(1, cfg), withTiming(0, cfg)),
+      -1,
+      false,
+      undefined,
+      RM,
+    );
+    return () => cancelAnimation(t);
+  }, [t]);
+  return useAnimatedStyle(() => ({
+    transform: [{ translateY: -5 * t.value }, { rotate: `${t.value * 1.6}deg` }],
   }));
+}
 
-  const handlePressIn = () => {
-    scale.value = withSpring(0.97, SPRING_CONFIG);
-  };
+function CineSwipeWidget({ navigation }) {
+  const floatStyle = useFloat();
+  const posters = useMemo(() => {
+    const d = new Date();
+    return pickPosters(`${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`);
+  }, []);
 
-  const handlePressOut = () => {
-    scale.value = withSpring(1, SPRING_CONFIG);
-  };
+  // CineSwipe Premium'da (tek başına + arkadaşla oda). Free kullanıcıda kart
+  // görünür kalır, her iki giriş de yükseltme sayfasını açar. Günlük hakkı biten
+  // Premium kullanıcı kilitli SAYILMAZ (allows(0) yalnız planda hiç hak yoksa
+  // false); hak bitişini ekranın içindeki kapılar söyler.
+  const swipesGate = usePremiumGate("cineswipe_swipes");
+  const roomsGate = usePremiumGate("cineswipe_rooms");
+  const soloLocked = !swipesGate.allows(0);
+  const duoLocked = !roomsGate.allows(0);
 
-  const handleOpen = (initialMode = "solo") => {
+  const open = (initialMode) => {
     triggerHaptic("impact");
+    const gate = initialMode === "duo" ? roomsGate : swipesGate;
+    if (!gate.allows(0)) {
+      gate.showUpsell();
+      return;
+    }
     navigation.navigate("CineSwipeScreen", { initialMode });
   };
 
-  const accent = theme.accent || "#138DF0";
-  const bold = theme.bold || "#0A65B7";
+  const title = i18nText("autoI18n.hub_cine_title", "Birlikte Ne İzlesek?");
+  const solo = i18nText("autoI18n.hub_cine_solo", "Tek başına");
+  const duo = i18nText("autoI18n.hub_cine_duo", "Arkadaşınla");
 
   return (
-    <AnimatedPressable
-      style={[styles.wrapper, animStyle]}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      onPress={() => handleOpen("solo")}
+    <HubCard
+      colors={COLORS}
+      shadowColor={ROSE}
+      onPress={() => open("solo")}
+      accessible={false}
+      cardStyle={styles.card}
     >
-      <LinearGradient
-        colors={[
-          "#E50914",
-          "#B81D24",
-          "#221F1F",
-        ]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.container}
-      >
-        {/* Ambient Glows */}
-        <View style={styles.ambientGlow} />
-
-        {/* Content Area */}
-        <View style={styles.content}>
-          {/* Top Pill */}
-          <View style={styles.topBadgeRow}>
-            <View style={styles.liveBadge}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveText}>CINESWIPE</Text>
-            </View>
-            <View style={styles.modeBadge}>
-              <AppIcon family="Ionicons" name="sparkles" size={12} color="#FFD700" />
-              <Text style={styles.modeBadgeText}>YENİ</Text>
-            </View>
+      <View style={styles.top}>
+        <View style={styles.copy}>
+          <View style={styles.badges}>
+            <GlassPill icon="film" text="CINESWIPE" tone="dark" />
+            {soloLocked && duoLocked ? <PremiumPill tone="onDark" /> : null}
+            <GlassPill
+              icon="sparkles"
+              iconColor={GOLD}
+              text={i18nText("autoI18n.hub_cine_new", "Yeni")}
+              style={styles.newPill}
+              textStyle={styles.newPillText}
+            />
           </View>
-
-          {/* Main Title & Subtitle */}
-          <Text style={styles.title}>Birlikte Ne İzlesek?</Text>
-          <Text style={styles.subtitle}>
-            Arkadaşınla oda kurup sağa kaydırarak eşleş veya tek başına bu akşamki filmini seç!
+          <Text style={styles.title} allowFontScaling={false}>
+            {title}
           </Text>
-
-          {/* Quick Action Buttons */}
-          <View style={styles.actionRow}>
-            <Pressable
-              style={styles.actionChip}
-              onPress={() => handleOpen("solo")}
-            >
-              <AppIcon family="Ionicons" name="person" size={13} color="#FFF" />
-              <Text style={styles.actionChipText}>Tek Başına</Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.actionChip, styles.actionChipDuo]}
-              onPress={() => handleOpen("duo")}
-            >
-              <AppIcon family="Ionicons" name="people" size={13} color="#FFF" />
-              <Text style={styles.actionChipText}>Arkadaşınla</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.subtitle} allowFontScaling={false}>
+            {i18nText(
+              "autoI18n.hub_cine_subtitle",
+              "Kartları kaydır, arkadaşınla eşleş, bu akşamki filmi seç.",
+            )}
+          </Text>
         </View>
 
-        {/* Decorative Floating Mini Cards (Right Side) */}
-        <View style={styles.cardsVisualContainer}>
-          {/* Back Card */}
-          <View style={[styles.miniCard, styles.miniCardBack]}>
-            <AppIcon family="Ionicons" name="film" size={24} color="rgba(255,255,255,0.4)" />
-          </View>
-          {/* Front Card */}
-          <View style={[styles.miniCard, styles.miniCardFront]}>
-            <AppIcon family="Ionicons" name="heart" size={28} color="#FF3B5C" />
-            <View style={styles.miniCardHeartGlow} />
-          </View>
-        </View>
-      </LinearGradient>
-    </AnimatedPressable>
+        <Animated.View pointerEvents="none" style={[styles.fan, floatStyle]}>
+          {posters.map((poster, index) => {
+            const layout = FAN[index];
+            const front = index === FAN.length - 1;
+            return (
+              <View
+                key={`${poster.mediaType}-${poster.id}`}
+                style={[
+                  styles.posterWrap,
+                  {
+                    left: layout.left,
+                    top: layout.top,
+                    opacity: layout.opacity,
+                    transform: [{ rotate: layout.rotate }, { scale: layout.scale }],
+                  },
+                ]}
+              >
+                <View style={styles.poster}>
+                  <Image source={poster.source} style={styles.posterImage} contentFit="cover" />
+                </View>
+                {front && (
+                  <View style={styles.heart}>
+                    <AppIcon family="Ionicons" name="heart" size={15} color={ROSE} />
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </Animated.View>
+      </View>
+
+      <View style={styles.actions}>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`${title} — ${solo}`}
+          onPress={() => open("solo")}
+          scaleTo={0.96}
+          style={[styles.btn, styles.btnGlass]}
+        >
+          <AppIcon family="Ionicons" name={soloLocked ? "lock-closed" : "person"} size={15} color="#FFFFFF" />
+          <Text style={styles.btnGlassText} allowFontScaling={false} numberOfLines={1}>
+            {solo}
+          </Text>
+        </PressableScale>
+
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`${title} — ${duo}`}
+          onPress={() => open("duo")}
+          scaleTo={0.96}
+          style={[styles.btn, styles.btnWhite]}
+        >
+          <AppIcon family="Ionicons" name={duoLocked ? "lock-closed" : "people"} size={17} color={ROSE} />
+          <Text style={styles.btnWhiteText} allowFontScaling={false} numberOfLines={1}>
+            {duo}
+          </Text>
+        </PressableScale>
+      </View>
+    </HubCard>
   );
 }
 
+export default memo(CineSwipeWidget);
+
 const styles = StyleSheet.create({
-  wrapper: {
-    width: "90%",
-    borderRadius: 24,
-    shadowColor: "#E50914",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 10,
-    marginBottom: 8,
-  },
-  container: {
-    borderRadius: 24,
-    padding: 20,
-    overflow: "hidden",
-    position: "relative",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-    minHeight: 160,
-    justifyContent: "center",
-  },
-  ambientGlow: {
-    position: "absolute",
-    top: -40,
-    right: -40,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: "rgba(255, 75, 75, 0.25)",
-  },
-  content: {
-    width: "72%",
-    zIndex: 2,
-  },
-  topBadgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  },
-  liveBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#64FF64",
-  },
-  liveText: {
-    color: "#FFF",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-  modeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: "rgba(255, 215, 0, 0.18)",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255, 215, 0, 0.35)",
-  },
-  modeBadgeText: {
-    color: "#FFD700",
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
+  card: { padding: 16 },
+  top: { flexDirection: "row", alignItems: "center", gap: 4 },
+  copy: { flex: 1 },
+  badges: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, rowGap: 6 },
+  newPill: { backgroundColor: "rgba(255,215,0,0.16)", borderColor: "rgba(255,215,0,0.38)" },
+  newPillText: { color: GOLD, letterSpacing: 0.4 },
   title: {
     color: "#FFFFFF",
-    fontSize: 20,
+    fontSize: 22,
+    lineHeight: 26,
     fontWeight: "900",
     letterSpacing: -0.3,
-    marginBottom: 4,
+    marginTop: 10,
   },
   subtitle: {
-    color: "rgba(255,255,255,0.85)",
+    color: "rgba(255,255,255,0.86)",
     fontSize: 12,
     lineHeight: 16,
-    marginBottom: 14,
+    fontWeight: "600",
+    marginTop: 4,
   },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  actionChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+
+  fan: { width: 104, height: 132 },
+  posterWrap: { position: "absolute", width: 62, height: 93 },
+  poster: {
+    flex: 1,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
-  },
-  actionChipDuo: {
-    backgroundColor: "rgba(0,0,0,0.35)",
-    borderColor: "rgba(255,255,255,0.15)",
-  },
-  actionChipText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  cardsVisualContainer: {
-    position: "absolute",
-    right: 12,
-    top: "50%",
-    transform: [{ translateY: -40 }],
-    width: 80,
-    height: 90,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  miniCard: {
-    width: 58,
-    height: 80,
-    borderRadius: 12,
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  miniCardBack: {
-    backgroundColor: "#1F1F24",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    transform: [{ rotate: "-14deg" }, { translateX: -8 }],
-  },
-  miniCardFront: {
-    backgroundColor: "#2C2C34",
+    overflow: "hidden",
     borderWidth: 1.5,
-    borderColor: "rgba(255, 59, 92, 0.4)",
-    transform: [{ rotate: "10deg" }, { translateX: 6 }],
+    borderColor: "rgba(255,255,255,0.45)",
+    backgroundColor: "rgba(0,0,0,0.25)",
   },
-  miniCardHeartGlow: {
+  posterImage: { width: "100%", height: "100%" },
+  heart: {
     position: "absolute",
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 59, 92, 0.2)",
+    left: -9,
+    bottom: -9,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
   },
+
+  actions: { flexDirection: "row", gap: 8, marginTop: 14 },
+  btn: {
+    flex: 1,
+    height: 42,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+  btnGlass: {
+    backgroundColor: "rgba(0,0,0,0.28)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  btnWhite: { backgroundColor: "#FFFFFF" },
+  btnGlassText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900", flexShrink: 1 },
+  btnWhiteText: { color: ROSE, fontSize: 13, fontWeight: "900", flexShrink: 1 },
 });

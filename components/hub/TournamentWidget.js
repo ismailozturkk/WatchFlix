@@ -10,20 +10,25 @@
 // final) tek bakışta okunan iki taraflı bir huni olarak çizilir. Basınca
 // TournamentScreen'e gider.
 //
+// Kartın rengi/ikonu fazdan gelir (components/tournament/phaseMeta.js) — karta
+// basıp açılan ekranın hero'suyla aynı gradyan. Üst satır: kimlik çipi +
+// katılımcı sayısı + beyaz "aç" düğmesi.
+//
 // Hafiftir: aday listesini OLUŞTURMAZ (getTournamentDoc — yoksa null); sayımlar
 // tek agregat dokümandan (fetchAggOnce), kişisel durum tek kendi-oy dokümanından
 // (fetchMyVoteOnce) okunur. Tür/faz/geri sayım motordan (ağ gerekmez) gelir.
 
 import React, { memo, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, withRepeat, withSequence, withTiming,
+  useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming,
   ReduceMotion,
 } from "react-native-reanimated";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import AppIcon from "@components/AppIcon";
+import HubCard, { GlassPill, HubArrow } from "@components/hub/HubCard";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useImageQualitySettings, useLanguageSettings } from "@context/AppSettingsContext";
@@ -37,10 +42,7 @@ import {
   getTournamentDoc, fetchVotesOnce, fetchAggOnce, fetchMyVoteOnce,
 } from "@services/tournamentService";
 import CountdownTimer from "@components/tournament/CountdownTimer";
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const SPRING = { mass: 0.4, damping: 12, stiffness: 180 };
-const PHASE_COLOR = { selection: "#3B82F6", voting: "#F59E0B", results: "#F5C518", upcoming: "#6B7280" };
+import { PHASE_META } from "@components/tournament/phaseMeta";
 
 // ─── Eleme ağacı önizlemesi ───────────────────────────────────────────────────
 // Ölçüler tek yerden türer (BracketTree'nin yaptığı gibi); tuval genişliği
@@ -396,9 +398,6 @@ export default function TournamentWidget({ navigation }) {
   const [agg, setAgg] = useState(null);       // { noms, picks, voters } | null
   const [myVote, setMyVote] = useState(null); // kendi oy dokümanım | null
 
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
   useEffect(() => {
     const id = setInterval(() => setNowMs(now()), 30000);
     return () => clearInterval(id);
@@ -452,7 +451,7 @@ export default function TournamentWidget({ navigation }) {
     [seed, periodId, nowMs],
   );
 
-  const phaseColor = PHASE_COLOR[phaseInfo.phase] || PHASE_COLOR.selection;
+  const meta = PHASE_META[phaseInfo.phase] || PHASE_META.selection;
   const theTheme = lang === "tr" ? entry.tr : entry.en;
 
   // Kişisel durum: hype hakkı / aktif turdaki oy sayısı.
@@ -495,119 +494,92 @@ export default function TournamentWidget({ navigation }) {
       : `${done} of ${TOTAL_MATCHES} matches complete`;
   }, [bracketPreview, lang]);
 
-  // Katılım satırı (agg varsa): "N katılımcı".
-  const votersLine =
-    agg?.voters > 0
-      ? `${agg.voters} ${i18nText("autoI18n.tournament_widget_voters", "katılımcı")}`
-      : null;
+  // Katılımcı sayısı (agg varsa). Kartta yalnız sayı + ikon görünür (dar
+  // ekranda İngilizce kimlik çipiyle yan yana sığsın); kelime ekran okuyucuda.
+  const voters = agg?.voters > 0 ? agg.voters : 0;
+  const votersLabel = voters
+    ? `${voters} ${i18nText("autoI18n.tournament_widget_voters", "katılımcı")}`
+    : null;
 
   return (
-    <AnimatedPressable
-      accessibilityRole="button"
-      accessibilityLabel={`${i18nText("autoI18n.tournament_open", "Aylık turnuvayı aç")} — ${theTheme}, ${phaseLabel}${bracketProgress ? `, ${bracketProgress}` : ""}`}
-      onPressIn={() => { scale.value = withSpring(0.97, SPRING); }}
-      onPressOut={() => { scale.value = withSpring(1, SPRING); }}
+    <HubCard
+      colors={meta.gradient}
+      shadowColor={meta.gradient[0]}
       onPress={() => navigation.navigate("TournamentScreen")}
-      style={[styles.shadow, { shadowColor: theme.shadow || phaseColor }, animStyle]}
+      accessibilityRole="button"
+      accessibilityLabel={`${i18nText("autoI18n.tournament_open", "Aylık turnuvayı aç")} — ${theTheme}, ${phaseLabel}${votersLabel ? `, ${votersLabel}` : ""}${bracketProgress ? `, ${bracketProgress}` : ""}`}
+      cardStyle={styles.card}
     >
-      <LinearGradient
-        colors={[phaseColor, theme.accent, theme.bold || theme.accent]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.card}
-      >
-        <View pointerEvents="none" style={styles.glowOne} />
-        <View pointerEvents="none" style={styles.glowTwo} />
+      {/* Faz ikonu: hero'daki filigranın küçük kardeşi */}
+      <View pointerEvents="none" style={styles.watermark}>
+        <AppIcon family="Ionicons" name={meta.icon} size={150} color="rgba(255,255,255,0.10)" />
+      </View>
 
-        <View style={styles.topRow}>
-          <View style={styles.left}>
-            <View style={styles.titleRow}>
-              <AppIcon family="Ionicons" name="trophy" size={16} color="#fff" />
-              <Text style={styles.kicker}>{i18nText("autoI18n.tournament_monthly", "AYLIK TURNUVA")}</Text>
-            </View>
-            <Text style={styles.theme} numberOfLines={1}>
-              {theTheme} {mediaLabel(entry.mediaType, lang)}
-            </Text>
-            <Text style={styles.phaseLabel} numberOfLines={1}>{phaseLabel}</Text>
-          </View>
-
-          <View style={styles.openIcon}>
-            <AppIcon family="Ionicons" name="arrow-forward" size={17} color="#fff" />
-          </View>
-        </View>
-
-        <View style={styles.countdownRow}>
-          <CountdownTimer deadlineMs={phaseInfo.nextDeadlineMs} lang={lang} size="sm" />
-          {votersLine && (
-            <View style={styles.votersPill}>
-              <AppIcon family="Ionicons" name="people" size={10} color="#fff" />
-              <Text style={styles.votersText}>{votersLine}</Text>
-            </View>
-          )}
-        </View>
-
-        <TournamentTreePreview
-          bracket={bracketPreview}
-          getTmdbUrl={getTmdbUrl}
-          accent={theme.accent}
-          lang={lang}
-          phase={phaseInfo.phase}
-          activeRound={phaseInfo.activeRound}
-          myPicks={myPicks}
+      <View style={styles.topRow}>
+        {/* Kimlik çipi dar ekranda küçülüp kısalabilir; sayı ve ok yerinde kalır. */}
+        <GlassPill
+          icon="trophy"
+          text={i18nText("autoI18n.tournament_monthly", "AYLIK TURNUVA")}
+          style={styles.kickerPill}
         />
-      </LinearGradient>
-    </AnimatedPressable>
+        {voters > 0 && (
+          <GlassPill icon="people" text={String(voters)} tone="dark" textStyle={styles.votersText} />
+        )}
+        <View style={styles.topSpacer} />
+        <HubArrow color={meta.gradient[0]} />
+      </View>
+
+      <Text style={styles.theme} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+        {theTheme} {mediaLabel(entry.mediaType, lang)}
+      </Text>
+      <Text style={styles.phaseLabel} numberOfLines={2}>{phaseLabel}</Text>
+
+      <View style={styles.countdownRow}>
+        <CountdownTimer
+          deadlineMs={phaseInfo.nextDeadlineMs}
+          lang={lang}
+          size="sm"
+          boxColor="rgba(0,0,0,0.24)"
+        />
+      </View>
+
+      <TournamentTreePreview
+        bracket={bracketPreview}
+        getTmdbUrl={getTmdbUrl}
+        accent={theme.accent}
+        lang={lang}
+        phase={phaseInfo.phase}
+        activeRound={phaseInfo.activeRound}
+        myPicks={myPicks}
+      />
+    </HubCard>
   );
 }
 
 const styles = StyleSheet.create({
-  shadow: {
-    width: "90%",
-    borderRadius: 24,
-    elevation: 8,
-    shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    marginBottom: 14,
-  },
-  card: {
-    minHeight: 226,
-    borderRadius: 24,
-    padding: 18,
-    overflow: "hidden",
-  },
-  glowOne: {
-    position: "absolute", width: 170, height: 170, borderRadius: 85,
-    right: -50, top: -70, backgroundColor: "rgba(255,255,255,0.10)",
-  },
-  glowTwo: {
-    position: "absolute", width: 100, height: 100, borderRadius: 50,
-    left: -30, bottom: -50, backgroundColor: "rgba(255,255,255,0.07)",
-  },
-  topRow: { flexDirection: "row", alignItems: "flex-start" },
-  left: { flex: 1, paddingRight: 10 },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  kicker: { color: "rgba(255,255,255,0.9)", fontSize: 11, fontWeight: "900", letterSpacing: 1 },
-  theme: { color: "#fff", fontSize: 20, fontWeight: "900", marginTop: 6 },
-  phaseLabel: { color: "rgba(255,255,255,0.92)", fontSize: 11.5, fontWeight: "800", marginTop: 6, marginBottom: 5 },
-  countdownRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 },
-  votersPill: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9,
-  },
-  votersText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  card: { padding: 16 },
+  watermark: { position: "absolute", right: -14, top: 34, transform: [{ rotate: "-12deg" }] },
 
-  openIcon: {
-    width: 34, height: 34, borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center",
+  topRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  kickerPill: { flexShrink: 1 },
+  topSpacer: { flex: 1 },
+  votersText: { letterSpacing: 0 },
+
+  theme: {
+    color: "#fff", fontSize: 24, lineHeight: 30, fontWeight: "900", letterSpacing: -0.4,
+    marginTop: 12,
+    textShadowColor: "rgba(0,0,0,0.18)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
   },
+  phaseLabel: {
+    color: "rgba(255,255,255,0.92)", fontSize: 12, lineHeight: 16, fontWeight: "800", marginTop: 3,
+  },
+  countdownRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
 
   // ── Eleme ağacı önizlemesi ──────────────────────────────────────────────────
   // Panelin yüksekliği SABİT DEĞİL: başlık (26) + tuval (TREE_H) kadar büyür,
   // böylece eski 105/28/76 uyuşmazlığı yapısal olarak imkânsız.
   treePreview: {
-    width: "100%", marginTop: 10, borderRadius: 16,
+    width: "100%", marginTop: 12, borderRadius: 18,
     backgroundColor: "rgba(5,10,24,0.40)", overflow: "hidden",
     borderWidth: 1, borderColor: "rgba(255,255,255,0.16)",
   },

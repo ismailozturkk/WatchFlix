@@ -93,7 +93,7 @@ export default function GroupsListScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.3} />
+      <ScreenDecor scope="chat" iconOpacity={0.3} />
 
       <View style={styles.headerRow}>
         <BackButton absolute={false} />

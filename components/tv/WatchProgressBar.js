@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   labelRow: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

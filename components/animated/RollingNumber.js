@@ -57,7 +57,6 @@ export const RollingDigit = memo(function RollingDigit({
 const RollingNumber = memo(function RollingNumber({
   value = 0,
   duration = 1100,
-  digitDuration = 190, // API uyumu için korunur (artık kullanılmıyor)
   format = (number) => String(number),
   style,
 }) {

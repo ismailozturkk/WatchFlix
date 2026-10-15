@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
@@ -310,13 +311,14 @@ function LicenseDetailModal({ C, isTr, db, item, onClose }) {
                 {item.publisher ? ` · ${item.publisher}` : ""}
               </Text>
             </View>
-            <TouchableOpacity
+            <GlassCloseButton
+              size={30}
+              fallbackRadius={15}
+              iconSize={16}
+              color={C.text}
+              backgroundColor={C.closeBg}
               onPress={onClose}
-              style={[s.close, { backgroundColor: C.closeBg }]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <AppIcon family="Ionicons" name="close" size={16} color={C.text} />
-            </TouchableOpacity>
+            />
           </View>
 
           {repo ? (
@@ -420,7 +422,6 @@ const s = StyleSheet.create({
   badgeText: { fontSize: 10, fontWeight: "700" },
   empty: { fontSize: 12, textAlign: "center", paddingVertical: 30 },
 
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.55)" },
   sheet: {
     maxHeight: "85%",
     borderTopLeftRadius: 22,
@@ -433,13 +434,6 @@ const s = StyleSheet.create({
   sheetHead: { flexDirection: "row", alignItems: "center", gap: 12 },
   sheetTitle: { fontSize: 16, fontWeight: "700" },
   sheetSub: { fontSize: 11, marginTop: 3 },
-  close: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   repo: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 10, borderBottomWidth: 1 },
   repoText: { flex: 1, fontSize: 11.5 },
   textScroll: { marginTop: 14 },

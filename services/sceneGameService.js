@@ -14,11 +14,19 @@ import {
   orderBy,
   query,
   runTransaction,
+  where,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { computeLevel, validateSessionResult } from "../utils/gameScoring";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { cachedRead } from "../utils/cachedRead";
+import { createStableSource, randomSource } from "../utils/seededRandom";
+import {
+  dailyBoardId,
+  dailySeed,
+  dayKeyOf,
+  nextStreak,
+} from "../utils/dailyChallenge";
 
 // ── Cache ────────────────────────────────────────────────────────────────────
 // Bellek ici cache: ayni oturumda tekrar tekrar API istegi yapmayi onler.
@@ -217,6 +225,67 @@ export async function fetchTitlePool(apiKey, language = "tr", source = "popular"
   return titleCache.get(cacheKey) || [];
 }
 
+const DAILY_POOL_MAX_AGE = 24 * 60 * 60 * 1000;
+const dailyPoolCacheKey = (dayKey, language) => `scene:daily:${dayKey}:${language}:v1`;
+
+/**
+ * Günlük Meydan Okuma'nın sabit havuzu. Havuz TOHUMDAN türetilir (rastgele sayfa
+ * yok): herkes aynı TMDB "en yüksek puanlı" sayfalarını okur ve havuz id'ye göre
+ * sıralanır; soru üretimi de hash sıralamalı kaynakla (createStableSource)
+ * yapıldığı için sonuç herkeste aynı çıkar.
+ *
+ * Sayfaların TAMAMI gelmezse HATA fırlatılır — eksik havuzla "biraz farklı"
+ * sorular üretmek herkese aynı sorular vaadini sessizce bozardı. Gün içinde
+ * bir kez başarıyla çekilen havuz önbellekten (cevrimdisi dahil) kullanılır.
+ */
+export async function fetchDailyPool(apiKey, language = "tr", dayKey = dayKeyOf()) {
+  const pick = createStableSource(`${dailySeed(dayKey)}|pool`);
+  // Ayrik araliklar → sayfalar birbirinden farkli olmak zorunda. Ilk 14 film
+  // ve 9 dizi sayfasi (en yuksek puanlilar) → taninabilir yapimlar.
+  const jobs = [
+    { url: "https://api.themoviedb.org/3/movie/top_rated", page: pick.int(1, 6, "movie:a") },
+    { url: "https://api.themoviedb.org/3/movie/top_rated", page: pick.int(7, 14, "movie:b") },
+    { url: "https://api.themoviedb.org/3/tv/top_rated", page: pick.int(1, 4, "tv:a") },
+    { url: "https://api.themoviedb.org/3/tv/top_rated", page: pick.int(5, 9, "tv:b") },
+  ];
+  const lang = language === "tr" ? "tr-TR" : "en-US";
+
+  const fetchFresh = async () => {
+    const responses = await Promise.all(
+      jobs.map((job) =>
+        axios.get(job.url, { params: { language: lang, page: job.page }, headers: HEADERS(apiKey) }),
+      ),
+    );
+    const seen = new Set();
+    const items = [];
+    responses.forEach((res) => {
+      (res.data?.results || []).forEach((raw) => {
+        if (!raw.backdrop_path) return;
+        const item = normalizeMediaItem(raw, "daily");
+        if (seen.has(item.mediaKey)) return;
+        seen.add(item.mediaKey);
+        items.push(item);
+      });
+    });
+    if (items.length < 20) {
+      throw Object.assign(new Error("Daily pool is too small"), { code: "empty_pool_fetch" });
+    }
+    // Kanonik sira: TMDB'nin sayfa ici sirasi saatler icinde oynasa da ayni kalir.
+    return items.sort((a, b) => (a.mediaKey < b.mediaKey ? -1 : a.mediaKey > b.mediaKey ? 1 : 0));
+  };
+
+  const { data } = await cachedRead(
+    GAME_CACHE_NS,
+    dailyPoolCacheKey(dayKey, language),
+    fetchFresh,
+    { maxAge: DAILY_POOL_MAX_AGE, fallbackToCache: true },
+  );
+  if (!Array.isArray(data) || data.length === 0) {
+    throw Object.assign(new Error("Daily pool is unavailable"), { code: "empty_pool_fetch" });
+  }
+  return data;
+}
+
 /**
  * Kullanıcının izleme listesinden başlık havuzu oluşturur (normalize edilmiş).
  * Görseli olmayan kayıtlar elenir (Part 10.1 adım 3).
@@ -237,7 +306,13 @@ export function buildWatchlistPool(watchList, sourceId) {
  * TMDB backdrop listesi kabaca oy/popülerliğe göre sıralı olduğundan index
  * büyüdükçe sahne daha az tanınır olur.
  */
-export async function getDetailedSceneImage(apiKey, item, language = "tr", difficulty = "normal") {
+export async function getDetailedSceneImage(
+  apiKey,
+  item,
+  language = "tr",
+  difficulty = "normal",
+  source = randomSource,
+) {
   try {
     const res = await axios.get(
       `https://api.themoviedb.org/3/${item.type}/${item.id}`,
@@ -281,7 +356,7 @@ export async function getDetailedSceneImage(apiKey, item, language = "tr", diffi
           minIndex = Math.min(1, last);
           maxIndex = last;
         }
-        const randomIndex = randomInt(minIndex, maxIndex);
+        const randomIndex = source.int(minIndex, maxIndex, `image:${mediaKeyOf(item.type, item.id)}`);
         const mainImage = pool[randomIndex].file_path;
         // Diğer resimleri ipucu (hint) olarak ayır
         const hints = pool.filter((_, idx) => idx !== randomIndex).map(b => b.file_path);
@@ -298,8 +373,6 @@ export async function getDetailedSceneImage(apiKey, item, language = "tr", diffi
 }
 
 // ── Akıllı Soru Üretimi ──────────────────────────────────────────────────────
-
-const shuffle = (arr) => [...arr].sort(() => Math.random() - 0.5);
 
 const sharesGenre = (item, correctGenres) => {
   if (!item.genreIds) return false;
@@ -337,7 +410,11 @@ const franchiseKey = (t) => {
  *   - hard  : aynı tür + yakın yıl + benzer popülerlik bandı (en zorlayıcı).
  * Şıklar benzersiz görünen başlıklara sahip olur; havuz küçükse kural gevşetilir.
  */
-function getSmartOptions(pool, correctItem, count = 3, difficulty = "normal") {
+function getSmartOptions(pool, correctItem, count = 3, difficulty = "normal", source = randomSource) {
+  // Tuz: ayni dogru cevap icin her karistirma bagimsiz, ama stabil kaynakta
+  // (gunluk) herkeste ayni olsun.
+  const salt = `opt:${mediaKeyOf(correctItem.type, correctItem.id)}`;
+  const shuffle = (list, tag) => source.shuffle(list, `${salt}:${tag}`);
   const correctGenres = new Set(correctItem.genreIds || []);
   const correctNorm = normalizeTitle(correctItem.title);
   const correctFranchise = franchiseKey(correctItem.title);
@@ -361,7 +438,7 @@ function getSmartOptions(pool, correctItem, count = 3, difficulty = "normal") {
   let candidates;
   if (difficulty === "easy") {
     const different = typed.filter((item) => !sharesGenre(item, correctGenres));
-    candidates = shuffle(different.length >= count ? different : typed);
+    candidates = shuffle(different.length >= count ? different : typed, "easy");
   } else if (difficulty === "hard") {
     const sameGenre = typed.filter((item) => sharesGenre(item, correctGenres));
     const base = sameGenre.length >= count ? sameGenre : typed;
@@ -377,9 +454,10 @@ function getSmartOptions(pool, correctItem, count = 3, difficulty = "normal") {
     };
     candidates = shuffle(
       [...base].sort((a, b) => closeness(a) - closeness(b)).slice(0, Math.max(count * 3, count)),
+      "hard",
     );
   } else {
-    candidates = shuffle(typed.filter((item) => sharesGenre(item, correctGenres)));
+    candidates = shuffle(typed.filter((item) => sharesGenre(item, correctGenres)), "normal");
   }
 
   // Başlıkları benzersiz tutarak seç (aynı isim/franchise tekrar etmesin).
@@ -403,14 +481,14 @@ function getSmartOptions(pool, correctItem, count = 3, difficulty = "normal") {
   }
   // Yetersizse benzersizlik koruyarak tüm uygun havuzdan tamamla.
   if (chosen.length < count) {
-    for (const item of shuffle(baseAll)) {
+    for (const item of shuffle(baseAll, "fill")) {
       if (chosen.length >= count) break;
       tryAdd(item);
     }
   }
   // Hâlâ yetersizse (çok küçük havuz) benzersizlik kuralını gevşet.
   if (chosen.length < count) {
-    for (const item of shuffle(otherItems)) {
+    for (const item of shuffle(otherItems, "relax")) {
       if (chosen.length >= count) break;
       if (!chosen.some((o) => o.id === item.id && o.type === item.type)) chosen.push(item);
     }
@@ -435,8 +513,16 @@ function disambiguateOptionTitles(options) {
 
 /**
  * Havuzdan benzersiz, akıllı ve optimize edilmiş bir soru üretir.
+ *
  * @param {number} optionCount Toplam şık sayısı (zorluğa göre 3 veya 4).
- * @returns {Promise<Object|null>} question = { correctItem, imagePath, options[], correctIndex }
+ * @param {object} [extra]
+ * @param {object} [extra.source] Rastgelelik kaynağı (utils/seededRandom).
+ *   Varsayılan her oyunda farklıdır; Günlük Meydan Okuma createStableSource
+ *   verir ve herkeste aynı soru çıkar.
+ * @param {"scene"|"poster"} [extra.kind] "poster": görsel olarak afiş döner
+ *   (detay isteği yok, ipucu görseli yok); "scene": TMDB sahne görseli.
+ * @returns {Promise<Object|null>} question =
+ *   { correctItem, imagePath, hints, options[], correctIndex, kind }
  */
 export async function generateQuestion(
   pool,
@@ -446,51 +532,64 @@ export async function generateQuestion(
   round = 1,
   optionCount = 4,
   difficulty = "normal",
+  { source = randomSource, kind = "scene" } = {},
 ) {
   // Şık sayısı kadar (en az 3) başlık gerekir.
   const totalOptions = Math.max(3, Math.min(Number(optionCount) || 4, 4));
   const wrongNeeded = totalOptions - 1;
   if (!pool || pool.length < totalOptions) return null;
 
-  // Daha önce kullanılmamış başlıkları filtrele
-  const available = pool.filter((item) => !usedIds.has(`${item.type}_${item.id}`));
+  const isPoster = kind === "poster";
+  // Daha önce kullanılmamış başlıkları filtrele (afiş oyununda afişi olmayan da elenir).
+  const available = pool.filter(
+    (item) => !usedIds.has(`${item.type}_${item.id}`) && (!isPoster || item.posterPath),
+  );
   // Yalnizca dogru cevap yeni olmak zorunda. Yanlis secenekler tum havuzdan
   // uretildigi icin son dort kayda gelince oyunu erken bitirme.
   if (available.length < 1) return null;
 
-  // Doğru cevabı seç (rastgele)
-  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  // Doğru cevabı seç. Tuz = tur numarası: stabil kaynakta her tur bağımsız ama
+  // herkeste aynı kayıt çıkar.
+  const shuffled = source.shuffle(available, `correct:${round}`);
   let correctItem = null;
   let imagePath = null;
   let hints = [];
 
-  // Uygun bir resim bulana kadar dene (çok beklememek için max 3 deneme)
-  for (let i = 0; i < Math.min(3, shuffled.length); i++) {
-    const candidate = shuffled[i];
-    const fetchedImageObj = await getDetailedSceneImage(apiKey, candidate, language, difficulty);
-    if (fetchedImageObj && fetchedImageObj.mainImage) {
-      correctItem = candidate;
-      imagePath = fetchedImageObj.mainImage;
-      hints = fetchedImageObj.hints;
-      break;
+  if (isPoster) {
+    correctItem = shuffled[0];
+    imagePath = correctItem.posterPath;
+  } else {
+    // Uygun bir resim bulana kadar dene (çok beklememek için max 3 deneme)
+    for (let i = 0; i < Math.min(3, shuffled.length); i++) {
+      const candidate = shuffled[i];
+      const fetchedImageObj = await getDetailedSceneImage(apiKey, candidate, language, difficulty, source);
+      if (fetchedImageObj && fetchedImageObj.mainImage) {
+        correctItem = candidate;
+        imagePath = fetchedImageObj.mainImage;
+        hints = fetchedImageObj.hints;
+        break;
+      }
+    }
+
+    // Eğer detaylı resim bulunamazsa fallback olarak backdrop_path olan ilkini al
+    if (!correctItem) {
+      correctItem = shuffled.find((c) => c.backdropPath);
+      if (!correctItem) return null;
+      imagePath = correctItem.backdropPath;
+      hints = [];
     }
   }
 
-  // Eğer detaylı resim bulunamazsa fallback olarak backdrop_path olan ilkini al
-  if (!correctItem) {
-    correctItem = shuffled.find(c => c.backdropPath);
-    if (!correctItem) return null;
-    imagePath = correctItem.backdropPath;
-    hints = [];
-  }
-
   // Akıllı şıkları getir (zorluğa göre)
-  const wrongOptions = getSmartOptions(pool, correctItem, wrongNeeded, difficulty);
+  const wrongOptions = getSmartOptions(pool, correctItem, wrongNeeded, difficulty, source);
   if (wrongOptions.length < wrongNeeded) return null;
 
   // Şıkları klonla (cache'deki havuz nesnelerini bozmadan başlık ayarlamak için)
   // ve karıştır; aynı isimli şıklarda yıl bilgisini göster (Part 10.3).
-  const options = shuffle([correctItem, ...wrongOptions].map((o) => ({ ...o })));
+  const options = source.shuffle(
+    [correctItem, ...wrongOptions].map((o) => ({ ...o })),
+    `options:${round}`,
+  );
   disambiguateOptionTitles(options);
   const correctIndex = options.findIndex(
     (o) => o.id === correctItem.id && o.type === correctItem.type,
@@ -502,6 +601,7 @@ export async function generateQuestion(
     hints,
     options,
     correctIndex,
+    kind: isPoster ? "poster" : "scene",
   };
 }
 
@@ -534,8 +634,11 @@ const gameSessionsCol = (uid) => collection(db, "Users", uid, "gameSessions");
 // fazda BILEREK uygulanmadi). Mod+zorluk kombinasyonu stabil bir boardId
 // uretir; kisisel kaynak oturumlari (mevcut davranista oldugu gibi) hicbir
 // boardId'ye yazilmaz.
-const leaderboardBoardId = (modeId, difficultyId) =>
-  `${SCENE_GAME_ID}_${modeId || "classic"}_${difficultyId || "normal"}`;
+// Afis oyunu kendi tahtalarina yazar ("poster_classic_normal"); sahne
+// tahtalariyla (scene_*) karismaz.
+const leaderboardBoardId = (modeId, difficultyId, isPoster = false) =>
+  `${isPoster ? "poster" : SCENE_GAME_ID}_${modeId || "classic"}_${difficultyId || "normal"}`;
+const POSTER_GAME_ID = "poster_puzzle";
 const leaderboardEntryRef = (boardId, uid) =>
   doc(db, "GameLeaderboards", boardId, "entries", uid);
 
@@ -599,40 +702,6 @@ export async function loadGameData(uid) {
   }
 }
 
-/**
- * Part 16 dual-read: yeni Users/{uid}/gameProfile/summary belgesini tercih
- * eder; yoksa eski SceneGame/{uid} belgesinden ayni sekli (shape) uretir.
- * Hicbir yazim yapmaz (migration sadece saveGameScore icindeki transaction'da
- * olur); bu fonksiyon salt okunur bir fallback'tir.
- */
-export async function loadGameProfile(uid) {
-  try {
-    const snap = await getDoc(gameProfileRef(uid));
-    if (snap.exists()) return snap.data();
-  } catch {
-    // yeni belge okunamadi (kurallar henuz deploy edilmemis olabilir) — eski belgeye dus.
-  }
-  const oldData = await loadGameData(uid);
-  if (!oldData) return null;
-  return deriveProfileFromOldDoc(oldData, oldData.updatedAt || new Date().toISOString());
-}
-
-/**
- * Part 16 dual-read: yeni Users/{uid}/gameStats/{gameId} belgesini tercih
- * eder; yoksa eski SceneGame/{uid} belgesinden ayni sekli uretir.
- */
-export async function loadGameStats(uid, gameId = SCENE_GAME_ID) {
-  try {
-    const snap = await getDoc(gameStatsRef(uid, gameId));
-    if (snap.exists()) return snap.data();
-  } catch {
-    // yeni belge okunamadi — eski belgeye dus.
-  }
-  const oldData = await loadGameData(uid);
-  if (!oldData) return null;
-  return deriveStatsFromOldDoc(oldData, oldData.updatedAt || new Date().toISOString());
-}
-
 export async function saveGameScore(uid, gameData) {
   try {
     // Skor guvenligi (Part 17.3): backend olmadigi icin liderlik "dogrulanmamis"
@@ -668,7 +737,14 @@ export async function saveGameScore(uid, gameData) {
     const modeIdForBoard = gameData.modeId || "classic";
     const difficultyIdForBoard = gameData.difficultyId || "normal";
     const isPersonalForBoard = Boolean(gameData.isPersonal);
-    const boardId = leaderboardBoardId(modeIdForBoard, difficultyIdForBoard);
+    const isPoster = gameData.gameId === POSTER_GAME_ID;
+    // Gunluk oturum: dailyKey, SORULARIN ait oldugu gundur (gece yarisini asan
+    // oyun yine o gunun tahtasina yazilir).
+    const dailyKey = gameData.modeId === "daily" ? String(gameData.dailyKey || "") : "";
+    const isDaily = Boolean(dailyKey);
+    const boardId = isDaily
+      ? dailyBoardId(dailyKey)
+      : leaderboardBoardId(modeIdForBoard, difficultyIdForBoard, isPoster);
     // Kisisel liste oyunlari hicbir leaderboard board'una yazilmaz (Part 8.5
     // ile ayni davranis korunur).
     const leaderboardRef = isPersonalForBoard ? null : leaderboardEntryRef(boardId, uid);
@@ -704,8 +780,17 @@ export async function saveGameScore(uid, gameData) {
       // ayni tabloda karistirilmaz. Diger kombinasyonlar bestScoresByMode altinda
       // mod+zorluk bazinda ayri tutulur.
       const isRanked =
-        modeId === "classic" && difficultyId === "normal" && !gameData.isPersonal;
-      const modeKey = `${modeId}_${difficultyId}`;
+        modeId === "classic" &&
+        difficultyId === "normal" &&
+        !gameData.isPersonal &&
+        !isPoster;
+      const modeKey = `${isPoster ? "poster_" : ""}${modeId}_${difficultyId}`;
+      // Gunluk: ayni gun ikinci deneme "antrenman"dir; gunluk durumu, seriyi ve
+      // tahtayi DEGISTIRMEZ (rekor/XP normal akar).
+      const alreadyDoneDaily = isDaily && existing.dailyState?.dayKey === dailyKey;
+      const countsAsDaily = isDaily && !alreadyDoneDaily;
+      const todayKey = dayKeyOf(Date.now());
+      const levelBefore = computeLevel(existing.totalXp).level;
       // Bu oturum, bu mod+zorluk kombinasyonunun onceki rekorunu gecti mi (Part 13.1).
       const previousModeBest = Number(existing.bestScoresByMode?.[modeKey]) || 0;
       const newRecord = sessionScore > previousModeBest;
@@ -746,10 +831,21 @@ export async function saveGameScore(uid, gameData) {
           (Number(existing.totalJokersUsed) || 0) + (Number(gameData.jokerCount) || 0),
         lastPlayedAt: gameData.lastPlayedAt || now,
         updatedAt: now,
-        lastModeId: gameData.modeId || existing.lastModeId || "classic",
-        lastDifficultyId:
-          gameData.difficultyId || existing.lastDifficultyId || "normal",
-        lastSourceId: gameData.sourceId || existing.lastSourceId || "popular",
+        // Gunluk oyun "son tercih" sayilmaz: Hizli Oyna gunluk modu tekrar
+        // baslatmaya calisirdi (tek deneme zaten bitmis olurdu).
+        lastModeId: isDaily
+          ? existing.lastModeId || "classic"
+          : gameData.modeId || existing.lastModeId || "classic",
+        lastDifficultyId: isDaily
+          ? existing.lastDifficultyId || "normal"
+          : gameData.difficultyId || existing.lastDifficultyId || "normal",
+        lastSourceId: isDaily
+          ? existing.lastSourceId || "popular"
+          : gameData.sourceId || existing.lastSourceId || "popular",
+        lastGameId: isPoster ? POSTER_GAME_ID : "scene_guess",
+        // Kesintisiz oynama serisi (herhangi bir oyun, gun bazli).
+        dayStreak: nextStreak(existing.dayStreak, existing.lastPlayDay, todayKey),
+        lastPlayDay: todayKey,
         recentSessionIds: sessionId
           ? [...recentSessionIds, sessionId].slice(-MAX_RECENT_SESSION_IDS)
           : recentSessionIds,
@@ -757,6 +853,22 @@ export async function saveGameScore(uid, gameData) {
 
       // Toplam XP'den seviye turetilir (Part 11.3 / 15.1).
       data.level = computeLevel(data.totalXp).level;
+
+      if (countsAsDaily) {
+        data.dailyStreak = nextStreak(existing.dailyStreak, existing.lastDailyDay, dailyKey);
+        data.lastDailyDay = dailyKey;
+        data.bestDailyStreak = Math.max(Number(existing.bestDailyStreak) || 0, data.dailyStreak);
+        data.totalDailyPlayed = (Number(existing.totalDailyPlayed) || 0) + 1;
+        data.dailyState = {
+          dayKey: dailyKey,
+          score: sessionScore,
+          correctCount: Number(gameData.totalCorrect) || 0,
+          totalCount: (Number(gameData.totalCorrect) || 0) + (Number(gameData.totalWrong) || 0),
+          outcome: gameData.outcome || "completed",
+          xpEarned: Number(gameData.xpEarned) || 0,
+          completedAt: now,
+        };
+      }
 
       if (!snap.exists()) data.createdAt = now;
       if (gameData.displayName) data.displayName = gameData.displayName;
@@ -836,7 +948,8 @@ export async function saveGameScore(uid, gameData) {
         transaction.set(
           sessionRef,
           {
-            gameId: SCENE_GAME_ID,
+            gameId: isPoster ? "poster" : SCENE_GAME_ID,
+            ...(isDaily ? { dailyKey } : {}),
             modeId: modeIdForBoard,
             difficultyId: difficultyIdForBoard,
             sourceId,
@@ -862,7 +975,7 @@ export async function saveGameScore(uid, gameData) {
       // orderBy bestScore) DEGISTIRILMEDI/KALDIRILMADI; bu sadece ek bir yazimdir.
       // verified: false her zaman (Part 17 bulgusu: backend yok, dogrulama
       // yapilamiyor).
-      if (leaderboardRef) {
+      if (leaderboardRef && (!isDaily || countsAsDaily)) {
         const prevEntry = leaderboardSnap?.exists() ? leaderboardSnap.data() : {};
         const prevBest = Number(prevEntry.score) || 0;
         if (sessionScore >= prevBest) {
@@ -875,7 +988,12 @@ export async function saveGameScore(uid, gameData) {
                 gameData.avatarIndex !== undefined
                   ? gameData.avatarIndex
                   : prevEntry.avatarIndexSnapshot ?? null,
+              photoURLSnapshot:
+                gameData.photoURL !== undefined
+                  ? gameData.photoURL || null
+                  : prevEntry.photoURLSnapshot ?? null,
               score: sessionScore,
+              bestStreak: Number(gameData.bestStreak) || 0,
               correctCount: Number(gameData.totalCorrect) || 0,
               totalAnswerMs: responseMsTotal,
               jokerCount: Number(gameData.jokerCount) || 0,
@@ -889,7 +1007,7 @@ export async function saveGameScore(uid, gameData) {
         }
       }
 
-      return { ...existing, ...data, duplicate: false, newRecord };
+      return { ...existing, ...data, duplicate: false, newRecord, levelBefore };
     });
 
     // Oyun oturumu tamamlandı. Tekrar (duplicate) yazımları saymıyoruz;
@@ -975,6 +1093,67 @@ export async function fetchLeaderboard(limitCount = 50) {
     return results;
   } catch (e) {
     if (__DEV__) console.warn("fetchLeaderboard error:", e?.message);
+    throw e;
+  }
+}
+
+// ── Günlük tahta ─────────────────────────────────────────────────────────────
+// GameLeaderboards/scene_daily_<gün>/entries/{uid} — saveGameScore yazar.
+// Genel tablo (fetchLeaderboard) ile AYNI şekle çevrilir, böylece Liderlik
+// ekranı iki kaynağı tek satır bileşeniyle çizer.
+const dailyEntryToRow = (id, data) => ({
+  uid: data.uid || id,
+  displayName: data.displayNameSnapshot || null,
+  avatarIndex: data.avatarIndexSnapshot ?? null,
+  photoURL: data.photoURLSnapshot || null,
+  bestScore: Number(data.score) || 0,
+  totalCorrect: Number(data.correctCount) || 0,
+  totalWrong: 0,
+  bestStreak: Number(data.bestStreak) || 0,
+  isDaily: true,
+});
+
+export async function fetchDailyLeaderboard(dayKey = dayKeyOf(), limitCount = 50) {
+  try {
+    const q = query(
+      collection(db, "GameLeaderboards", dailyBoardId(dayKey), "entries"),
+      orderBy("score", "desc"),
+      limit(limitCount),
+    );
+    const snap = await getDocs(q);
+    const rows = [];
+    snap.forEach((entry) => rows.push(dailyEntryToRow(entry.id, entry.data())));
+    return rows;
+  } catch (e) {
+    if (__DEV__) console.warn("fetchDailyLeaderboard error:", e?.message);
+    throw e;
+  }
+}
+
+const FRIEND_QUERY_CHUNK = 10; // Firestore "in" sorgusu en fazla 10 değer alır.
+const FRIEND_QUERY_MAX = 60; // Okuma maliyetini sınırla (6 sorgu).
+
+/**
+ * Yalnızca verilen kullanıcıların (arkadaşlar + ben) günlük sonuçları. Genel
+ * ilk-50 listesini süzmek arkadaşı sıralamanın dışında kalan oyuncuyu gizlerdi.
+ */
+export async function fetchDailyFriendRows(dayKey = dayKeyOf(), uids = []) {
+  const unique = [...new Set((uids || []).filter(Boolean))].slice(0, FRIEND_QUERY_MAX);
+  if (unique.length === 0) return [];
+  try {
+    const col = collection(db, "GameLeaderboards", dailyBoardId(dayKey), "entries");
+    const chunks = [];
+    for (let i = 0; i < unique.length; i += FRIEND_QUERY_CHUNK) {
+      chunks.push(unique.slice(i, i + FRIEND_QUERY_CHUNK));
+    }
+    const snaps = await Promise.all(
+      chunks.map((chunk) => getDocs(query(col, where("uid", "in", chunk)))),
+    );
+    const rows = [];
+    snaps.forEach((snap) => snap.forEach((entry) => rows.push(dailyEntryToRow(entry.id, entry.data()))));
+    return rows;
+  } catch (e) {
+    if (__DEV__) console.warn("fetchDailyFriendRows error:", e?.message);
     throw e;
   }
 }

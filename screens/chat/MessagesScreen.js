@@ -4,37 +4,43 @@
 //   - Sohbetler: 1-1 konuşmalar (Users/{uid}/conversations index'i)
 //   - Gruplar:   kullanıcının grupları (+ yeni grup)
 // Çok arkadaş olsa da yalnızca gerçekten mesajlaşılanlar görünür.
+//
+// Görünüm components/friends/* ortak bileşenlerinden gelir. Okunmamış sohbet:
+// satır vurgu rengiyle aydınlanır, ad kalınlaşır, saat vurgulanır ve sağda
+// okunmamış sayısı rozeti durur (eskiden yalnız çerçeve rengi değişiyordu).
 
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
-import { Image } from "expo-image";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getAuth } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useTheme } from "@context/ThemeContext";
-import { useProfileUi } from "@context/ProfileUiContext";
 import { useFriends } from "@context/FriendsContext";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import BackButton from "@components/BackButton";
 import ScreenDecor from "@components/ScreenDecor";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import ChatCreateFab from "@components/chat/ChatCreateFab";
 import NewConversationSheet from "@components/chat/NewConversationSheet";
+import FriendsScreenHeader from "@components/friends/FriendsScreenHeader";
+import FriendsSegmentedTabs from "@components/friends/FriendsSegmentedTabs";
+import FriendsSearchField from "@components/friends/FriendsSearchField";
+import FriendsEmptyState from "@components/friends/FriendsEmptyState";
+import PersonRow from "@components/friends/PersonRow";
+import { UNREAD_BADGE } from "@components/friends/friendsTokens";
+import { formatBadge } from "@utils/friendsBarModel";
+import {
+  filterConversations,
+  filterGroups,
+  shouldShowFilter,
+  toEpochMs,
+  totalUnread,
+} from "@utils/friendsListModel";
 import { i18nText } from "@utils/i18nText";
-import UserAvatar from "@components/common/UserAvatar";
 import { subscribeUserGroups } from "@services/groupsService";
 import { trackFirestoreRead } from "@services/usageTrackerService";
 
-const toMs = (ts) => ts?.toMillis?.() || 0;
 const formatTime = (ts) => {
-  const ms = toMs(ts);
+  const ms = toEpochMs(ts);
   if (!ms) return "";
   const d = new Date(ms);
   const now = new Date();
@@ -47,13 +53,24 @@ const formatTime = (ts) => {
     : d.toLocaleDateString([], { day: "2-digit", month: "2-digit" });
 };
 
+/** Okunmamış sayısı rozeti — satırın sağ ucunda. */
+function UnreadPill({ count }) {
+  return (
+    <View style={styles.unreadPill}>
+      <Text allowFontScaling={false} style={styles.unreadText}>
+        {formatBadge(count)}
+      </Text>
+    </View>
+  );
+}
+
 export default function MessagesScreen({ navigation }) {
   const auth = getAuth();
   const user = auth.currentUser;
   const { theme } = useTheme();
-  const { avatars } = useProfileUi();
 
   const [tab, setTab] = useState("dm"); // "dm" | "group"
+  const [query, setQuery] = useState("");
   const [newConversationVisible, setNewConversationVisible] = useState(false);
   const [convs, setConvs] = useState([]);
   const { isBlocked } = useFriends();
@@ -66,7 +83,7 @@ export default function MessagesScreen({ navigation }) {
       (snap) => {
         trackFirestoreRead("Users/conversations", snap.docs.length);
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        list.sort((a, b) => toMs(b.lastTime) - toMs(a.lastTime));
+        list.sort((a, b) => toEpochMs(b.lastTime) - toEpochMs(a.lastTime));
         setConvs(list);
       },
       (err) => __DEV__ && console.warn("conversations:", err.message),
@@ -80,96 +97,6 @@ export default function MessagesScreen({ navigation }) {
     return () => unsub();
   }, [user]);
 
-  // ── 1-1 satırı ──
-  // Okunmamış mesaj varsa kart border'ı accent'e döner (sohbet açılınca
-  // ChatScreen sayacı sıfırlar, border normale döner).
-  const renderConv = ({ item }) => (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() =>
-        navigation.navigate("ChatScreen", {
-          friendUid: item.withUid,
-          friendName: item.withName,
-          friendAvatarIndex: item.withAvatarIndex,
-        })
-      }
-      style={[
-        styles.row,
-        {
-          backgroundColor: theme.secondary,
-          borderColor: (item.unreadCount || 0) > 0 ? theme.accent : theme.border,
-        },
-      ]}
-    >
-      <UserAvatar
-        avatarIndex={item.withAvatarIndex}
-        photoURL={item.withPhotoURL}
-        size={50}
-        borderWidth={2}
-        borderColor={theme.accent + "55"}
-      />
-      <View style={{ flex: 1 }}>
-        <View style={styles.rowTop}>
-          <Text style={[styles.name, { color: theme.text?.primary ?? "#fff" }]} numberOfLines={1}>
-            {item.withName || i18nText("autoI18n.kullanici", "Kullanıcı")}
-          </Text>
-          {!!item.lastTime && (
-            <Text style={[styles.time, { color: theme.text?.muted ?? "#777" }]}>
-              {formatTime(item.lastTime)}
-            </Text>
-          )}
-        </View>
-        <Text style={[styles.last, { color: theme.text?.secondary ?? "#aaa" }]} numberOfLines={1}>
-          {item.lastText || ""}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // ── Grup satırı ──
-  const renderGroup = ({ item }) => {
-    const last = item.lastMessage;
-    const lastSenderName =
-      item.memberInfo?.[last?.senderId]?.name || last?.senderName || "";
-    return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() =>
-          navigation.navigate("ChatScreen", {
-            groupId: item.id,
-            groupName: item.name,
-            groupAvatarIndex: item.avatarIndex,
-          })
-        }
-        style={[styles.row, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-      >
-        <GroupAvatar
-          avatarIndex={item.avatarIndex}
-          color={item.color || theme.accent}
-          size={50}
-          iconSize={34}
-        />
-        <View style={{ flex: 1 }}>
-          <View style={styles.rowTop}>
-            <Text style={[styles.name, { color: theme.text?.primary ?? "#fff" }]} numberOfLines={1}>
-              {item.name}
-            </Text>
-            {!!last?.time && (
-              <Text style={[styles.time, { color: theme.text?.muted ?? "#777" }]}>
-                {formatTime(last.time)}
-              </Text>
-            )}
-          </View>
-          <Text style={[styles.last, { color: theme.text?.secondary ?? "#aaa" }]} numberOfLines={1}>
-            {last
-              ? (lastSenderName ? lastSenderName + ": " : "") + (last.text || "")
-              : i18nText("autoI18n.n_uye", "{{n}} üye", { n: item.members?.length || 0 })}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   const isDm = tab === "dm";
   // Engellenen kişinin sohbeti listede görünmez. Konuşma kaydı SİLİNMİYOR:
   // engel kaldırıldığında geçmiş geri gelsin (engel geri alınabilir bir
@@ -178,67 +105,176 @@ export default function MessagesScreen({ navigation }) {
     () => convs.filter((c) => !isBlocked(c.withUid)),
     [convs, isBlocked],
   );
+  const unreadTotal = useMemo(() => totalUnread(visibleConvs), [visibleConvs]);
 
-  const data = isDm ? visibleConvs : groups;
+  const baseData = isDm ? visibleConvs : groups;
+  const showFilter = shouldShowFilter(baseData.length);
+  const data = useMemo(
+    () => (isDm ? filterConversations(visibleConvs, query) : filterGroups(groups, query)),
+    [isDm, visibleConvs, groups, query],
+  );
+
+  const switchTab = (next) => {
+    setTab(next);
+    setQuery("");
+  };
+
+  // ── 1-1 satırı ──
+  const renderConv = ({ item, index }) => {
+    const unread = (item.unreadCount || 0) > 0;
+    return (
+      <PersonRow
+        avatar={{ avatarIndex: item.withAvatarIndex, photoURL: item.withPhotoURL }}
+        title={item.withName || i18nText("autoI18n.kullanici", "Kullanıcı")}
+        titleStrong={unread}
+        subtitle={item.lastText || ""}
+        subtitleStrong={unread}
+        meta={formatTime(item.lastTime)}
+        metaAccent={unread}
+        highlighted={unread}
+        trailing={unread ? <UnreadPill count={item.unreadCount} /> : null}
+        first={index === 0}
+        last={index === data.length - 1}
+        onPress={() =>
+          navigation.navigate("ChatScreen", {
+            friendUid: item.withUid,
+            friendName: item.withName,
+            friendAvatarIndex: item.withAvatarIndex,
+          })
+        }
+      />
+    );
+  };
+
+  // ── Grup satırı ──
+  const renderGroup = ({ item, index }) => {
+    const last = item.lastMessage;
+    const lastSenderName =
+      item.memberInfo?.[last?.senderId]?.name || last?.senderName || "";
+    return (
+      <PersonRow
+        avatarNode={
+          <GroupAvatar
+            avatarIndex={item.avatarIndex}
+            color={item.color || theme.accent}
+            size={52}
+            iconSize={36}
+          />
+        }
+        title={item.name}
+        subtitle={
+          last
+            ? (lastSenderName ? lastSenderName + ": " : "") + (last.text || "")
+            : i18nText("autoI18n.n_uye", "{{n}} üye", { n: item.members?.length || 0 })
+        }
+        meta={formatTime(last?.time)}
+        first={index === 0}
+        last={index === data.length - 1}
+        onPress={() =>
+          navigation.navigate("ChatScreen", {
+            groupId: item.id,
+            groupName: item.name,
+            groupAvatarIndex: item.avatarIndex,
+          })
+        }
+      />
+    );
+  };
+
+  const subtitle = isDm
+    ? unreadTotal > 0
+      ? i18nText("autoI18n.friends_ui_unread_count", "{{n}} okunmamış mesaj", { n: unreadTotal })
+      : visibleConvs.length
+        ? i18nText("autoI18n.friends_ui_chats_count", "{{n}} sohbet", { n: visibleConvs.length })
+        : undefined
+    : groups.length
+      ? i18nText("autoI18n.friends_ui_groups_count", "{{n}} grup", { n: groups.length })
+      : undefined;
+
+  let empty = null;
+  if (baseData.length === 0) {
+    empty = isDm ? (
+      <FriendsEmptyState
+        icon="chatbubbles"
+        title={i18nText("autoI18n.friends_ui_no_chats_title", "Henüz sohbet yok")}
+        description={i18nText(
+          "autoI18n.friends_ui_no_chats_desc",
+          "Bir arkadaşına mesaj atarak ilk sohbetini başlat.",
+        )}
+      />
+    ) : (
+      <FriendsEmptyState
+        icon="people-circle"
+        title={i18nText("autoI18n.friends_ui_no_groups_title", "Henüz grubun yok")}
+        description={i18nText(
+          "autoI18n.friends_ui_no_groups_desc",
+          "Arkadaşlarınla ortak sohbet için yeni bir grup oluştur.",
+        )}
+      />
+    );
+  } else if (data.length === 0) {
+    empty = (
+      <FriendsEmptyState
+        icon="search"
+        title={i18nText("autoI18n.friends_ui_no_match_title", "Eşleşen kimse yok")}
+        description={i18nText(
+          "autoI18n.friends_ui_no_match_desc",
+          "“{{q}}” ile eşleşen biri bulunamadı.",
+          { q: query.trim() },
+        )}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.3} />
+      <ScreenDecor scope="chat" iconOpacity={0.3} />
 
-      <View style={styles.headerRow}>
-        <BackButton absolute={false} />
-        <Text
-          allowFontScaling={false}
-          numberOfLines={1}
-          style={[styles.title, { color: theme.text?.primary ?? "#fff" }]}
-        >
-          {i18nText("autoI18n.mesajlar", "Mesajlar")}
-        </Text>
-      </View>
+      <FriendsScreenHeader
+        title={i18nText("autoI18n.mesajlar", "Mesajlar")}
+        subtitle={subtitle}
+      />
 
-      {/* Segment toggle */}
-      <View style={[styles.segment, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-        <TouchableOpacity
-          style={[styles.segBtn, isDm && { backgroundColor: theme.accent }]}
-          onPress={() => setTab("dm")}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="chatbubble-ellipses" size={16} color={isDm ? "#fff" : theme.text?.muted ?? "#888"} />
-          <Text style={[styles.segText, { color: isDm ? "#fff" : theme.text?.secondary ?? "#aaa" }]}>
-            {i18nText("autoI18n.sohbetler", "Sohbetler")}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.segBtn, !isDm && { backgroundColor: theme.accent }]}
-          onPress={() => setTab("group")}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="people" size={16} color={!isDm ? "#fff" : theme.text?.muted ?? "#888"} />
-          <Text style={[styles.segText, { color: !isDm ? "#fff" : theme.text?.secondary ?? "#aaa" }]}>
-            {i18nText("autoI18n.gruplar", "Gruplar")}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <FriendsSegmentedTabs
+        value={tab}
+        onChange={switchTab}
+        tabs={[
+          {
+            key: "dm",
+            label: i18nText("autoI18n.sohbetler", "Sohbetler"),
+            icon: "chatbubble-ellipses",
+            badge: unreadTotal,
+            badgeColor: UNREAD_BADGE,
+          },
+          {
+            key: "group",
+            label: i18nText("autoI18n.gruplar", "Gruplar"),
+            icon: "people",
+          },
+        ]}
+      />
 
-      {data.length === 0 ? (
-        <View style={styles.empty}>
-          <Ionicons
-            name={isDm ? "chatbubbles-outline" : "people-circle-outline"}
-            size={58}
-            color={theme.text?.muted ?? "#444"}
-          />
-          <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>
-            {isDm
-              ? i18nText("autoI18n.henuz_sohbet_yok", "Henüz sohbet yok. Arkadaşlarından birine mesaj at!")
-              : i18nText("autoI18n.henuz_grup_yok", "Henüz grubun yok. Yeni bir grup oluştur!")}
-          </Text>
-        </View>
-      ) : (
+      {showFilter ? (
+        <FriendsSearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder={
+            isDm
+              ? i18nText("autoI18n.friends_ui_filter_chats", "Sohbetlerde ara")
+              : i18nText("autoI18n.friends_ui_filter_groups", "Gruplarda ara")
+          }
+          returnKeyType="done"
+        />
+      ) : null}
+
+      {empty || (
         <FlatList
           data={data}
           keyExtractor={(it) => it.id}
           renderItem={isDm ? renderConv : renderGroup}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -274,55 +310,16 @@ export default function MessagesScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 10 },
-  // Geri butonu satır içinde duruyor (absolute değil): eskiden başlığın
-  // üstüne binip "Mesajlar" yazısını kapatıyordu.
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 16,
-    marginBottom: 12,
-    marginTop: 4,
-  },
-  title: { flex: 1, fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
-  segment: {
-    flexDirection: "row",
-    marginHorizontal: 16,
-    marginBottom: 14,
-    padding: 4,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 4,
-  },
-  segBtn: {
-    flex: 1,
-    flexDirection: "row",
+  // FAB (alt sağ) son satırı kapatmasın.
+  listContent: { paddingBottom: 100 },
+  unreadPill: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    paddingHorizontal: 7,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    paddingVertical: 9,
-    borderRadius: 11,
+    backgroundColor: UNREAD_BADGE,
   },
-  segText: { fontSize: 13.5, fontWeight: "800" },
-
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  avatarWrap: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, overflow: "hidden" },
-  avatar: { width: "100%", height: "100%", borderRadius: 25 },
-  avatarPh: { justifyContent: "center", alignItems: "center" },
-  avatarInitial: { color: "#fff", fontSize: 18, fontWeight: "800" },
-  rowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  name: { fontSize: 15.5, fontWeight: "700", flex: 1 },
-  time: { fontSize: 11, fontWeight: "600" },
-  last: { fontSize: 13, marginTop: 3 },
-
-  empty: { flex: 1, justifyContent: "center", alignItems: "center", gap: 14, paddingHorizontal: 32 },
-  emptyText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  unreadText: { color: "#fff", fontSize: 12, fontWeight: "800", lineHeight: 15 },
 });

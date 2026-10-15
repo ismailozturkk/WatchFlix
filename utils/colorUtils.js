@@ -176,3 +176,14 @@ function computeReadableOn(color, surface, target) {
   }
   return best;
 }
+
+/**
+ * Hex rengin açıklığını `delta` puan kaydırır (negatif = koyulaştır). Aynı
+ * rengin degrade ucunu üretmek için; renk tonu ve doygunluk korunur. 6 haneli
+ * hex değilse girdiyi AYNEN döner (tema renkleri bazen rgba olabiliyor).
+ */
+export function shiftLightness(hex, delta) {
+  if (typeof hex !== "string" || !/^#[0-9a-f]{6}$/i.test(hex.trim())) return hex;
+  const { h, s, l } = hexToHsl(hex.trim());
+  return hslToHex(h, s, clamp(l + delta, 0, 100));
+}

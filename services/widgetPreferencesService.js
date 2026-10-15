@@ -2,8 +2,6 @@ import { Platform } from "react-native";
 import { callWidget } from "./widgetBridge";
 import { Keys, get, set } from "./storage";
 
-export const WIDGET_PREFERENCES_KEY = Keys.widgetPreferences.key;
-
 const PURPLE_APPEARANCE = Object.freeze({
   themeId: "purple",
   themeName: "Gece Moru",

@@ -13,6 +13,10 @@
 //
 // Ayrıca: canlı oy yüzdesi barları, "senin oyun" rozeti, tur bittiğinde kazanan
 // kupası + kaybedenin solması, henüz belli olmayan rakip için "?" yer tutucu.
+//
+// GÖRÜNÜM: kartın üstünde "Maç N" + durum çipi (Oylama açık / Oyun kayıtlı /
+// Tamamlandı) durur; iki poster arasındaki VS rozeti postere BİNEN ayrı bir
+// katmandır (pointerEvents none) — yer kaplamadığı için posterler daha geniştir.
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
@@ -36,6 +40,7 @@ const PRESS_SCALE = 0.95;
 // Uygulamanın onay/başarı yeşili — finalist rozeti ve "Hype verildi" çipiyle
 // AYNI değer (temada `success` belirteci yok, turnuva ekranı bunu sabit kullanır).
 const CONFIRM_GREEN = "#22C55E";
+const GOLD = "#F5C518";
 // Katmanda artık okunacak iki seçenek var; eski 2.6 sn karar vermeye yetmiyordu.
 const PENDING_TIMEOUT = 6000;
 
@@ -61,7 +66,7 @@ function Cell({
 
   const empty = !contestant;
   const uri = !empty && contestant.posterPath ? getTmdbUrl(contestant.posterPath, "poster", 185) : null;
-  const ringColor = isMyPick ? theme.accent : isWinner ? "#F5C518" : "transparent";
+  const ringColor = isMyPick ? theme.accent : isWinner ? GOLD : "transparent";
 
   return (
     <AnimatedPressable
@@ -90,30 +95,36 @@ function Cell({
           </View>
         )}
 
-        {/* Seed rozeti */}
+        {/* Seed rozeti — koyu cam: posterin rengi ne olursa olsun okunur */}
         {!empty && (
-          <View style={[styles.seedBadge, { backgroundColor: theme.primary + "E6" }]}>
-            <Text style={[styles.seedText, { color: theme.text.secondary }]}>#{contestant.seed}</Text>
+          <View style={styles.seedBadge}>
+            <Text style={styles.seedText}>#{contestant.seed}</Text>
           </View>
         )}
 
         {/* Kazanan kupası */}
         {isWinner && (
           <View style={styles.crown}>
-            <AppIcon family="Ionicons" name="trophy" size={16} color="#F5C518" />
+            <AppIcon family="Ionicons" name="trophy" size={14} color="#5B3A00" />
           </View>
         )}
 
-        {/* Senin oyun rozeti */}
-        {isMyPick && !isWinner && (
-          <View style={[styles.myPickBadge, { backgroundColor: theme.accent }]}>
+        {/* Senin oyun rozeti — kazananı seçtiysem kupanın yanına kayar */}
+        {isMyPick && (
+          <View
+            style={[
+              styles.myPickBadge,
+              { backgroundColor: theme.accent },
+              isWinner && styles.myPickBadgeBesideCrown,
+            ]}
+          >
             <AppIcon family="Ionicons" name="checkmark" size={13} color="#fff" />
           </View>
         )}
 
         {/* Alt: başlık + oy barı */}
         <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.85)"]}
+          colors={["transparent", "rgba(0,0,0,0.88)"]}
           style={styles.posterFooter}
           pointerEvents="none"
         >
@@ -126,7 +137,10 @@ function Cell({
                 <View
                   style={[
                     styles.barFill,
-                    { width: `${pct}%`, backgroundColor: isMyPick ? theme.accent : "#F5C518" },
+                    {
+                      width: `${pct}%`,
+                      backgroundColor: isMyPick ? theme.accent : isWinner ? GOLD : "rgba(255,255,255,0.92)",
+                    },
                   ]}
                 />
               </View>
@@ -203,6 +217,10 @@ function Cell({
 export default function MatchCard({
   match, mySide, votable, onVote, onInfo,
   theme, getTmdbUrl, lang = "tr", hapticsEnabled = true,
+  // Oy kullanma hakkı (Premium). false ise kart yine "açık" görünür ama postere
+  // basış onay katmanı açmaz; `onVoteBlocked` çağrılır (yükseltme sayfası).
+  // Onay iki adım sürdükten SONRA reddetmek kullanıcıyı boşa yorardı.
+  canVote = true, onVoteBlocked,
 }) {
   const [pending, setPending] = useState(null); // "a" | "b" | null
   const timer = useRef(null);
@@ -221,12 +239,16 @@ export default function MatchCard({
       if (!votable) return;
       const contestant = side === "a" ? match.a : match.b;
       if (!contestant) return;
+      if (!canVote) {
+        onVoteBlocked?.();
+        return;
+      }
       if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       setPending(side);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setPending(null), PENDING_TIMEOUT);
     },
-    [votable, match, hapticsEnabled],
+    [votable, match, hapticsEnabled, canVote, onVoteBlocked],
   );
 
   const handleConfirm = useCallback(
@@ -253,122 +275,205 @@ export default function MatchCard({
   const bPct = total > 0 ? Math.max(0, 100 - aPct) : 0;
   const showWinner = match.decided && !!match.winnerSide;
 
+  // Durum çipi: bitti > oyum kayıtlı > oylama açık. Diğer durumlarda (tur
+  // kilitli / seçim projeksiyonu) çip yok — söyleyecek bir şey yok.
+  const chip = showWinner
+    ? {
+        icon: "checkmark-done", color: theme.text.muted, bg: theme.between,
+        text: i18nText("autoI18n.tournament_state_done", "Tamamlandı"),
+      }
+    : mySide
+      ? {
+          icon: "checkmark-circle", color: CONFIRM_GREEN, bg: CONFIRM_GREEN + "22",
+          text: i18nText("autoI18n.tournament_state_voted", "Oyun kayıtlı"),
+        }
+      : votable
+        ? {
+            dot: true, color: theme.accent, bg: theme.accent + "1F",
+            text: i18nText("autoI18n.tournament_state_open", "Oylama açık"),
+          }
+        : null;
+
   return (
     // Butonlar posteri tam kapladığı için vazgeçme alanı posterin DIŞINDA:
     // kartın boşluğuna (VS dairesi / kenarlar) basmak katmanı kapatır.
     <Pressable
       onPress={pending ? clearPending : undefined}
-      style={[styles.match, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+      style={[
+        styles.match,
+        {
+          backgroundColor: theme.secondary,
+          borderColor: votable ? theme.accent + "66" : theme.border,
+        },
+      ]}
     >
-      <Cell
-        side="a"
-        contestant={match.a}
-        votes={match.aVotes}
-        total={total}
-        pct={aPct}
-        isMyPick={mySide === "a"}
-        isWinner={showWinner && match.winnerSide === "a"}
-        isLoser={showWinner && match.winnerSide === "b"}
-        isPending={pending === "a"}
-        locked={!votable}
-        onPress={handlePress}
-        onConfirm={handleConfirm}
-        onInfo={handleInfo}
-        theme={theme}
-        getTmdbUrl={getTmdbUrl}
-        lang={lang}
-      />
-
-      <View style={styles.vsWrap}>
-        <View style={[styles.vsCircle, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-          <Text style={[styles.vsText, { color: theme.text.secondary }]}>VS</Text>
-        </View>
+      <View style={styles.header}>
+        <Text style={[styles.headerLabel, { color: theme.text.muted }]}>
+          {i18nText("autoI18n.tournament_match", "Maç")} {match.index + 1}
+        </Text>
+        {chip && (
+          <View style={[styles.stateChip, { backgroundColor: chip.bg }]}>
+            {chip.dot ? (
+              <View style={[styles.stateDot, { backgroundColor: chip.color }]} />
+            ) : (
+              <AppIcon family="Ionicons" name={chip.icon} size={12} color={chip.color} />
+            )}
+            <Text style={[styles.stateText, { color: chip.color }]}>{chip.text}</Text>
+          </View>
+        )}
       </View>
 
-      <Cell
-        side="b"
-        contestant={match.b}
-        votes={match.bVotes}
-        total={total}
-        pct={bPct}
-        isMyPick={mySide === "b"}
-        isWinner={showWinner && match.winnerSide === "b"}
-        isLoser={showWinner && match.winnerSide === "a"}
-        isPending={pending === "b"}
-        locked={!votable}
-        onPress={handlePress}
-        onConfirm={handleConfirm}
-        onInfo={handleInfo}
-        theme={theme}
-        getTmdbUrl={getTmdbUrl}
-        lang={lang}
-      />
+      <View style={styles.posters}>
+        <Cell
+          side="a"
+          contestant={match.a}
+          votes={match.aVotes}
+          total={total}
+          pct={aPct}
+          isMyPick={mySide === "a"}
+          isWinner={showWinner && match.winnerSide === "a"}
+          isLoser={showWinner && match.winnerSide === "b"}
+          isPending={pending === "a"}
+          locked={!votable}
+          onPress={handlePress}
+          onConfirm={handleConfirm}
+          onInfo={handleInfo}
+          theme={theme}
+          getTmdbUrl={getTmdbUrl}
+          lang={lang}
+        />
+
+        <Cell
+          side="b"
+          contestant={match.b}
+          votes={match.bVotes}
+          total={total}
+          pct={bPct}
+          isMyPick={mySide === "b"}
+          isWinner={showWinner && match.winnerSide === "b"}
+          isLoser={showWinner && match.winnerSide === "a"}
+          isPending={pending === "b"}
+          locked={!votable}
+          onPress={handlePress}
+          onConfirm={handleConfirm}
+          onInfo={handleInfo}
+          theme={theme}
+          getTmdbUrl={getTmdbUrl}
+          lang={lang}
+        />
+
+        {/* VS rozeti: iki postere BİNEN katman. Bitmiş maçta sönükleşir. */}
+        <View pointerEvents="none" style={styles.vsOverlay}>
+          <View
+            style={[
+              styles.vsCircle,
+              {
+                backgroundColor: showWinner ? theme.between : theme.accent,
+                borderColor: theme.secondary,
+              },
+            ]}
+          >
+            <Text style={[styles.vsText, { color: showWinner ? theme.text.muted : "#fff" }]}>VS</Text>
+          </View>
+        </View>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   match: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 14,
+  },
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 10,
-    marginBottom: 12,
+    justifyContent: "space-between",
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
+  headerLabel: { fontSize: 12, fontWeight: "800", letterSpacing: 0.3 },
+  stateChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  stateDot: { width: 7, height: 7, borderRadius: 3.5 },
+  stateText: { fontSize: 11, fontWeight: "800" },
+
+  posters: { flexDirection: "row", gap: 12 },
   cell: { flex: 1 },
   posterWrap: {
     width: "100%",
     aspectRatio: 2 / 3,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: "hidden",
   },
   poster: { width: "100%", height: "100%" },
   posterEmpty: { alignItems: "center", justifyContent: "center" },
   seedBadge: {
     position: "absolute",
-    top: 6,
-    left: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 7,
+    top: 7,
+    left: 7,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.58)",
   },
-  seedText: { fontSize: 10, fontWeight: "800" },
+  seedText: { color: "#fff", fontSize: 10.5, fontWeight: "900" },
   crown: {
     position: "absolute",
-    top: 6,
-    right: 6,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    borderRadius: 11,
-    padding: 4,
+    top: 7,
+    right: 7,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: GOLD,
+    borderWidth: 2,
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
   },
   myPickBadge: {
     position: "absolute",
-    top: 6,
-    right: 6,
-    borderRadius: 11,
-    padding: 3,
+    top: 7,
+    right: 7,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
   },
+  // Kazananı seçtiysem iki rozet yan yana: kupa sağda, onay solunda.
+  myPickBadgeBesideCrown: { right: 37 },
   posterFooter: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 7,
-    paddingTop: 16,
-    paddingBottom: 7,
+    paddingHorizontal: 9,
+    paddingTop: 28,
+    paddingBottom: 9,
   },
-  title: { color: "#fff", fontSize: 11.5, fontWeight: "700", lineHeight: 14 },
-  barRow: { flexDirection: "row", alignItems: "center", marginTop: 5 },
+  title: { color: "#fff", fontSize: 12, fontWeight: "800", lineHeight: 15 },
+  barRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   barTrack: {
     flex: 1,
-    height: 5,
+    height: 6,
     borderRadius: 3,
     backgroundColor: "rgba(255,255,255,0.25)",
     overflow: "hidden",
   },
   barFill: { height: "100%", borderRadius: 3 },
-  pctText: { color: "#fff", fontSize: 10, fontWeight: "800", marginLeft: 6, width: 34, textAlign: "right" },
+  pctText: { color: "#fff", fontSize: 11, fontWeight: "900", marginLeft: 7, width: 38, textAlign: "right" },
   // Posteri tam kaplayan iki yarım buton (üst: Onayla, alt: Bilgi).
   confirmOverlay: { ...StyleSheet.absoluteFill, flexDirection: "column" },
   confirmHalf: { flex: 1 },
@@ -393,14 +498,19 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   confirmHalfText: { fontSize: 13, fontWeight: "900", letterSpacing: 0.2 },
-  vsWrap: { width: 34, alignItems: "center", justifyContent: "center" },
-  vsCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1,
+  vsOverlay: {
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },
-  vsText: { fontSize: 10, fontWeight: "900" },
+  // Kart rengindeki kalın çerçeve rozeti postere "oyulmuş" gösterir.
+  vsCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  vsText: { fontSize: 11, fontWeight: "900", letterSpacing: 0.3 },
 });

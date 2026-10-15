@@ -12,6 +12,7 @@ import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useUserProfile } from "@context/UserProfileContext";
@@ -154,13 +155,14 @@ export default function ProfileAvatarPickerModal({
             })}
           </Text>
         </View>
-        <TouchableOpacity
+        <GlassCloseButton
+          size={35}
+          fallbackRadius={18}
+          iconSize={20}
+          color={theme.text.primary}
           disabled={saving}
           onPress={onClose}
-          style={[styles.close, { backgroundColor: theme.primary }]}
-        >
-          <Ionicons name="close" size={20} color={theme.text.primary} />
-        </TouchableOpacity>
+        />
       </View>
 
       <FlatList
@@ -223,13 +225,6 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   title: { fontSize: 18, fontWeight: "800", letterSpacing: -0.3 },
   subtitle: { fontSize: 11, fontWeight: "600", marginTop: 2 },
-  close: {
-    width: 35,
-    height: 35,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   grid: { paddingTop: 2, paddingBottom: 10 },
   row: { justifyContent: "space-between" },
   cell: {

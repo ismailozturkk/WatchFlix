@@ -13,9 +13,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import SheetScroll from "@components/common/SheetScroll";
 import { useTheme } from "@context/ThemeContext";
 import * as Haptics from "@services/hapticsService";
-import { clamp, hexToHsl, hslToHex, normalizeHex, readableTextOn } from "@utils/colorUtils";
+import { clamp, contrastRatio, hexToHsl, hslToHex, normalizeHex, readableTextOn } from "@utils/colorUtils";
 
 const HUE_GRADIENT = ["#FF0000", "#FFFF00", "#00FF00", "#00FFFF", "#0000FF", "#FF00FF", "#FF0000"];
 const OFFSET_GRADIENT = ["#000000", "#808080", "#FFFFFF"];
@@ -107,6 +108,7 @@ function ColorSlider({ value, max, onChange, gradient, thumbColor, theme }) {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
         isDraggingRef.current = true;
         dragStartXRef.current = e.nativeEvent.locationX;
@@ -185,7 +187,13 @@ function ColorSlider({ value, max, onChange, gradient, thumbColor, theme }) {
   );
 }
 
-export default function ColorPickerSheet({ visible, initialValue, title, isEn = false, sources = [], onClose, onConfirm }) {
+/**
+ * @param {string} [originalHex]   düzenlenen rengin ÇÖZÜLMÜŞ hex'i; verilirse yanında
+ *                                 "önceki" kutusu çıkar, dokununca renge geri döner
+ * @param {{color: string, label: string}} [contrastAgainst] verilirse seçilen rengin
+ *                                 bu renge karşı kontrastı canlı gösterilir
+ */
+export default function ColorPickerSheet({ visible, initialValue, title, isEn = false, sources = [], originalHex, contrastAgainst, onClose, onConfirm }) {
   const { theme } = useTheme();
   const t = (trText, enText) => (isEn ? enText : trText);
 
@@ -229,6 +237,20 @@ export default function ColorPickerSheet({ visible, initialValue, title, isEn = 
     else onConfirm(absHex);
   };
 
+  const restoreOriginal = () => {
+    const base = normalizeHex(originalHex);
+    if (!base) return;
+    Haptics.selectionAsync().catch(() => {});
+    setMode("absolute");
+    setHsl(hexToHsl(base));
+  };
+
+  // Canlı kontrast: seçilen renk, `contrastAgainst` üzerinde yazı gibi çizilir.
+  const against = contrastAgainst ? normalizeHex(contrastAgainst.color) : null;
+  const ratio = against ? contrastRatio(displayHex, against) : 0;
+  const ratioTone = ratio >= 4.5 ? theme.colors.green : ratio >= 3 ? theme.colors.orange : theme.colors.red;
+  const ratioIcon = ratio >= 4.5 ? "checkmark-circle" : ratio >= 3 ? "alert-circle" : "warning";
+
   const satGradient = [hslToHex(hsl.h, 0, hsl.l), hslToHex(hsl.h, 100, hsl.l)];
   const lightGradient = ["#000000", hslToHex(hsl.h, hsl.s, 50), "#FFFFFF"];
   const offsetLabel = (v) => `${v > 0 ? "+" : ""}${Math.round(v)}`;
@@ -243,11 +265,42 @@ export default function ColorPickerSheet({ visible, initialValue, title, isEn = 
       <SafeAreaView edges={["bottom"]} style={[styles.sheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
+          {/* Hex kutusuna odaklanınca klavye açılır ve sayfa küçülür: önizleme +
+              kanallar kayar, Vazgeç/Seç satırı klavyenin hemen üstünde sabit kalır. */}
+          <SheetScroll>
           {/* Büyük önizleme */}
-          <View style={[styles.preview, { backgroundColor: displayHex, borderColor: theme.border }]}>
-            <Text style={[styles.previewTitle, { color: previewText }]} numberOfLines={1}>{title}</Text>
-            <Text style={[styles.previewHex, { color: previewText }]}>{displayHex}</Text>
+          <View style={styles.previewRow}>
+            <View style={[styles.preview, styles.previewMain, { backgroundColor: displayHex, borderColor: theme.border }]}>
+              <Text style={[styles.previewTitle, { color: previewText }]} numberOfLines={1}>{title}</Text>
+              <Text style={[styles.previewHex, { color: previewText }]}>{displayHex}</Text>
+            </View>
+            {normalizeHex(originalHex) ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${t("Önceki renk", "Previous color")} ${normalizeHex(originalHex)}`}
+                onPress={restoreOriginal}
+                style={[styles.preview, styles.previewPrev, { backgroundColor: normalizeHex(originalHex), borderColor: theme.border }]}
+              >
+                <AppIcon family="Ionicons" name="arrow-undo" size={15} color={readableTextOn(normalizeHex(originalHex))} />
+                <Text style={[styles.previewPrevText, { color: readableTextOn(normalizeHex(originalHex)) }]} numberOfLines={1}>
+                  {t("Önceki", "Previous")}
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
+
+          {against ? (
+            <View style={[styles.contrastRow, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+              <View style={[styles.contrastSample, { backgroundColor: against, borderColor: theme.border }]}>
+                <Text style={[styles.contrastSampleText, { color: displayHex }]}>Aa</Text>
+              </View>
+              <Text style={[styles.contrastLabel, { color: theme.text.secondary }]} numberOfLines={1}>
+                {contrastAgainst.label}
+              </Text>
+              <Text style={[styles.contrastRatio, { color: ratioTone }]}>{ratio.toFixed(1)}:1</Text>
+              <AppIcon family="Ionicons" name={ratioIcon} size={17} color={ratioTone} />
+            </View>
+          ) : null}
 
           {/* Mod seçimi */}
           {sources.length > 0 ? (
@@ -336,6 +389,7 @@ export default function ColorPickerSheet({ visible, initialValue, title, isEn = 
               </View>
             </>
           )}
+          </SheetScroll>
 
           <View style={styles.actions}>
             <Pressable onPress={onClose} style={[styles.cancelBtn, { borderColor: theme.border }]}>
@@ -370,9 +424,18 @@ function Channel({ label, theme, children }) {
 }
 
 const styles = StyleSheet.create({
-  sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: 1, paddingHorizontal: 18, paddingTop: 9, paddingBottom: 14 },
+  sheet: { flexShrink: 1, borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: 1, paddingHorizontal: 18, paddingTop: 9, paddingBottom: 14 },
   handle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 14 },
+  previewRow: { flexDirection: "row", gap: 10 },
   preview: { height: 72, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 3 },
+  previewMain: { flex: 1 },
+  previewPrev: { width: 76 },
+  previewPrevText: { fontSize: 11, fontWeight: "800" },
+  contrastRow: { marginTop: 10, minHeight: 44, borderRadius: 13, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 10 },
+  contrastSample: { width: 38, height: 28, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  contrastSampleText: { fontSize: 13, fontWeight: "900" },
+  contrastLabel: { flex: 1, fontSize: 12, fontWeight: "750" },
+  contrastRatio: { fontSize: 12.5, fontWeight: "900", letterSpacing: 0.3 },
   previewTitle: { fontSize: 14, fontWeight: "850" },
   previewHex: { fontSize: 13, fontWeight: "800", letterSpacing: 1 },
   segment: { flexDirection: "row", marginTop: 12, padding: 4, borderRadius: 14, borderWidth: 1, gap: 4 },

@@ -15,6 +15,7 @@ import {
   StyleSheet,
   } from "react-native";
 import AppIcon from "./AppIcon";
+import GlassIconButton from "./common/GlassIconButton";
 import { i18nText } from "../utils/i18nText";
 import { appAlert } from "./AppAlert";
 import {
@@ -36,6 +37,9 @@ const META = {
   activity: { tr: "Etkinliklerim", family: "Ionicons", icon: "sparkles-outline", color: "#F97316" },
   networkData: { tr: "İnternet verileri", family: "Ionicons", icon: "cloud-done-outline", color: "#14B8A6" },
 };
+
+// Yerel-öncelikli veri: bu satırlarda düğme SİLMEZ, buluttan yeniden kurar.
+const RESYNC_IDS = new Set(["notes", "reminders"]);
 
 const fmt = (b) => {
   if (!b) return "0 KB";
@@ -135,9 +139,16 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} hitSlop={10}>
-              <AppIcon family="Ionicons" name="close" size={22} color={C.muted} />
-            </TouchableOpacity>
+            <GlassIconButton
+              variant="plain"
+              icon="close"
+              iconSize={22}
+              size={34}
+              color={C.muted}
+              hitSlop={10}
+              accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+              onPress={onClose}
+            />
           </View>
 
           {loading ? (
@@ -153,6 +164,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
                 const meta = META[cat.id] || {};
                 const pct = Math.round((cat.bytes / maxBytes) * 100);
                 const empty = cat.bytes === 0;
+                const resync = RESYNC_IDS.has(cat.id);
                 return (
                   <View key={cat.id} style={styles.row}>
                     <View style={[styles.rowIcon, { backgroundColor: `${meta.color}22` }]}>
@@ -187,7 +199,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
                     </View>
                     <TouchableOpacity
                       onPress={() => onClearCategory(cat.id)}
-                      disabled={empty || busyId === cat.id}
+                      disabled={(empty && !resync) || busyId === cat.id}
                       hitSlop={8}
                       style={styles.trashBtn}
                     >
@@ -196,9 +208,9 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
                       ) : (
                         <AppIcon
                           family="Ionicons"
-                          name="trash-outline"
+                          name={resync ? "cloud-download-outline" : "trash-outline"}
                           size={17}
-                          color={empty ? C.border : C.danger}
+                          color={resync ? C.blue : empty ? C.border : C.danger}
                         />
                       )}
                     </TouchableOpacity>

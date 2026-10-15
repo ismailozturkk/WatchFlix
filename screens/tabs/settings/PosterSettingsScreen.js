@@ -1139,11 +1139,6 @@ const ps = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: "rgba(0,0,0,0.55)",
   },
-  badgePillDense: {
-    gap: 1,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
   previewRatingPill: {
     position: "absolute",
     flexDirection: "row",

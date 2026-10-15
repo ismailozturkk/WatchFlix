@@ -10,6 +10,8 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Reanimated from "react-native-reanimated";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
+import SheetScroll from "@components/common/SheetScroll";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { alpha } from "../../theme/colors";
@@ -75,9 +77,13 @@ export default function TextPollComposer({
       intensity={35}
       dimColor="rgba(0,0,0,0.4)"
       liftWithKeyboard={false}
+      // Klavye kaldırması çağıranın paddingBottom'u (keyboardAvoidanceStyle):
+      // 6 seçenekli anket ekrandan uzun kalıp tepesi taşmasın diye sarmalayıcı
+      // küçülür, seçenekler SheetScroll içinde kayar.
+      shrinkToFit
       onShow={handleShow}
     >
-      <Reanimated.View style={keyboardAvoidanceStyle}>
+      <Reanimated.View style={[styles.shrink, keyboardAvoidanceStyle]}>
         <View
           style={[
             styles.sheet,
@@ -101,14 +107,17 @@ export default function TextPollComposer({
             <Text style={[styles.title, { color: theme.text.primary }]}>
               {i18nText("autoI18n.metin_anketi", "Metin Anketi")}
             </Text>
-            <TouchableOpacity
+            <GlassCloseButton
+              size={32}
+              fallbackRadius={16}
+              iconSize={20}
+              color={theme.text.primary}
+              backgroundColor={theme.between}
               onPress={close}
-              style={[styles.closeBtn, { backgroundColor: theme.between }]}
-            >
-              <Ionicons name="close" size={20} color={theme.text.primary} />
-            </TouchableOpacity>
+            />
           </View>
 
+          <SheetScroll>
           {/* Soru */}
           <TextInput
             ref={questionInputRef}
@@ -172,6 +181,7 @@ export default function TextPollComposer({
               </Text>
             </TouchableOpacity>
           )}
+          </SheetScroll>
 
           <TouchableOpacity
             onPress={create}
@@ -194,7 +204,9 @@ export default function TextPollComposer({
 }
 
 const styles = StyleSheet.create({
+  shrink: { flexShrink: 1 },
   sheet: {
+    flexShrink: 1,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
@@ -219,13 +231,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: { flex: 1, fontSize: 17, fontWeight: "700" },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   questionInput: {
     borderRadius: 14,
     borderWidth: 1,

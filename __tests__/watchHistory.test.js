@@ -8,6 +8,7 @@ const {
   mostRewatched,
   buildRecentWatchChartData,
   buildWatchChartData,
+  countGenres,
   tvWatchEvents,
 } = require("../utils/watchHistory");
 
@@ -257,5 +258,26 @@ describe("tekrarlı / tekrarsız sayaçlar", () => {
 
     expect(countTvWatchStats(shows.map(materializeTvWatchState)).episodes.total)
       .toBe(flattenTvEpisodeWatchEntries(shows).length);
+  });
+});
+
+describe("tür dağılımı", () => {
+  const sections = [
+    { title: "2026-01-02", data: [{ genres: ["Dram", "Gerilim"] }, { genres: ["Dram"] }] },
+    { title: "2026-01-01", data: [{ genres: ["Komedi", "Gerilim"] }, { genres: [] }, {}] },
+  ];
+
+  test("adet azalan, eşitlikte alfabetik sıralar", () => {
+    expect(countGenres(sections)).toEqual([
+      { name: "Dram", count: 2 },
+      { name: "Gerilim", count: 2 },
+      { name: "Komedi", count: 1 },
+    ]);
+  });
+
+  test("boş ve eksik girdilerde patlamaz", () => {
+    expect(countGenres()).toEqual([]);
+    expect(countGenres(null)).toEqual([]);
+    expect(countGenres([{ title: "x" }, null])).toEqual([]);
   });
 });

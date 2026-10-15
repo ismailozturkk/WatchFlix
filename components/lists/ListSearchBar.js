@@ -29,6 +29,9 @@ import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { i18nText } from "@utils/i18nText";
 import { LIST_SEARCH_MODE, listAcceptedTypes } from "@utils/listSearch";
+import GlassField from "@components/common/GlassField";
+import GlassIconButton from "@components/common/GlassIconButton";
+import { useGlassScheme } from "@components/common/GlassSurface";
 
 const placeholderFor = (mode, listName) => {
   if (mode === LIST_SEARCH_MODE.IN_LIST) {
@@ -110,6 +113,7 @@ function ListSearchBar({
 }) {
   const isGlobal = mode === LIST_SEARCH_MODE.GLOBAL;
   const inputRef = useRef(null);
+  const scheme = useGlassScheme();
 
   // Kipi ELLE değiştiren kullanıcı doğrudan yazmaya başlayabilsin. Odak yalnız
   // burada veriliyor — boş listede kipin kendiliğinden global açılması (bkz.
@@ -122,14 +126,20 @@ function ListSearchBar({
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
-        <View
-          style={[
-            styles.inputWrap,
+        {/* iOS 26+: hap biçimli Liquid Glass (Tüm içerikler kipinde vurgu tonlu);
+            diğer yerlerde eski kutu. */}
+        <GlassField
+          height={42}
+          focused={isGlobal}
+          accent={accent}
+          fallbackStyle={[
+            styles.inputBox,
             {
               backgroundColor: theme.secondary,
               borderColor: isGlobal ? accent + "66" : theme.border,
             },
           ]}
+          style={styles.inputWrap}
         >
           <Ionicons
             name={isGlobal ? "globe-outline" : "search"}
@@ -146,6 +156,7 @@ function ListSearchBar({
             maxLength={80}
             autoCorrect={false}
             returnKeyType="search"
+            keyboardAppearance={scheme}
           />
           {globalLoading ? (
             <ActivityIndicator size="small" color={accent} />
@@ -158,32 +169,37 @@ function ListSearchBar({
               />
             </TouchableOpacity>
           ) : null}
-        </View>
+        </GlassField>
 
-        <TouchableOpacity
-          activeOpacity={0.8}
+        {/* Filtre düğmesi: iOS 26+'da cam daire (etkin filtre sayısı camın DIŞINDA
+            rozet olarak durur); diğer yerlerde eski kutu. */}
+        <GlassIconButton
+          size={42}
+          hitSlop={4}
           onPress={onOpenFilters}
-          style={[
-            styles.filterBtn,
-            {
-              backgroundColor: theme.secondary,
-              borderColor: activeFilterCount > 0 ? accent : theme.border,
-            },
-          ]}
+          tint={activeFilterCount > 0 ? alpha(accent, 0.28) : undefined}
+          accessibilityLabel={i18nText("autoI18n.filtrele", "Filtrele")}
+          fallbackStyle={{
+            backgroundColor: theme.secondary,
+            borderColor: activeFilterCount > 0 ? accent : theme.border,
+            borderWidth: 1,
+          }}
+          overlay={
+            !filtering && activeFilterCount > 0 ? (
+              <View pointerEvents="none" style={[styles.filterDot, { backgroundColor: accent }]}>
+                <Text allowFontScaling={false} style={[styles.filterDotText, { color: readableTextOn(accent) }]}>
+                  {activeFilterCount}
+                </Text>
+              </View>
+            ) : null
+          }
         >
           {filtering ? (
             <ActivityIndicator size="small" color={accent} />
           ) : (
             <Feather name="sliders" size={18} color={theme.text.primary} />
           )}
-          {!filtering && activeFilterCount > 0 ? (
-            <View style={[styles.filterDot, { backgroundColor: accent }]}>
-              <Text allowFontScaling={false} style={[styles.filterDotText, { color: readableTextOn(accent) }]}>
-                {activeFilterCount}
-              </Text>
-            </View>
-          ) : null}
-        </TouchableOpacity>
+        </GlassIconButton>
       </View>
 
       <View
@@ -218,25 +234,17 @@ function ListSearchBar({
 const styles = StyleSheet.create({
   wrap: { width: "95%", alignSelf: "center", marginBottom: 10 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // Yerleşim iki yolda da geçerli; köşe/çerçeve yalnız eski kutuda (cam kendi
+  // şeklini çizer).
   inputWrap: {
     flex: 1,
-    height: 42,
-    borderRadius: 12,
-    borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
     gap: 8,
   },
+  inputBox: { borderRadius: 12, borderWidth: 1 },
   input: { flex: 1, height: "100%", padding: 0, fontSize: 14 },
-  filterBtn: {
-    width: 44,
-    height: 42,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   filterDot: {
     position: "absolute",
     top: -5,

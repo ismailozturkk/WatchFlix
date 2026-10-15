@@ -58,6 +58,10 @@ export default function BirthDateField({
    * kullanıcıyı baştan reddedilecek bir kayda sürüklerdi.
    */
   disabled = false,
+  /** Kabuğun boyut/yarıçap ayarı: kayıt ekranındaki alanlarla aynı hizaya getirmek için. */
+  shellStyle,
+  /** Soldaki ikon, kayıt ekranındaki alanlar gibi renkli bir yuvarlak-kare içinde çizilsin. */
+  chipIcon = false,
 }) {
   const { language } = useLanguage();
   const isEn = language === "en";
@@ -103,13 +107,34 @@ export default function BirthDateField({
             borderColor: secili && !disabled ? alpha(accent, 0.55) : theme.border,
           },
           disabled && styles.shellDisabled,
+          shellStyle,
         ]}
       >
-        <Ionicons
-          name={disabled ? "lock-closed-outline" : "calendar-outline"}
-          size={18}
-          color={secili && !disabled ? accent : theme.text.muted}
-        />
+        {chipIcon ? (
+          <View
+            style={[
+              styles.iconChip,
+              {
+                backgroundColor: alpha(
+                  secili && !disabled ? accent : theme.text.muted,
+                  secili && !disabled ? 0.16 : 0.1,
+                ),
+              },
+            ]}
+          >
+            <Ionicons
+              name={disabled ? "lock-closed-outline" : "calendar-outline"}
+              size={17}
+              color={secili && !disabled ? accent : theme.text.muted}
+            />
+          </View>
+        ) : (
+          <Ionicons
+            name={disabled ? "lock-closed-outline" : "calendar-outline"}
+            size={18}
+            color={secili && !disabled ? accent : theme.text.muted}
+          />
+        )}
         <Text
           allowFontScaling={false}
           numberOfLines={1}
@@ -175,6 +200,13 @@ export default function BirthDateField({
 
 const styles = StyleSheet.create({
   wrap: { gap: 6 },
+  iconChip: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   shellDisabled: { opacity: 0.7 },
   shell: {
     minHeight: 52,
@@ -187,11 +219,11 @@ const styles = StyleSheet.create({
   },
   valueText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
   },
   hint: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: "600",
     marginLeft: 4,
   },

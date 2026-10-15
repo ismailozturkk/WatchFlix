@@ -1,9 +1,13 @@
 // components/chat/SharedMediaMessage.js
 //
-// Sohbette paylaşılan dizi/film/kişi mesajının gövdesi: hafif EĞİK poster +
-// yanında çip butonlar. "Özet" çipi genel özeti animasyonlu açar; "Fragman"
-// çipi (yalnızca dizi/film) fragman modalını açar. Postere/balona basınca
-// yönlendirme dış TouchableOpacity tarafından yapılır (poster düz View'dir).
+// Sohbette paylaşılan dizi/film/kişi mesajının gövdesi: solda poster, sağda
+// tür rozeti + başlık + yıl, altta yazılı eylem butonları. "Özet" butonu genel
+// özeti animasyonlu açar; "Fragman" (yalnızca dizi/film) fragman modalını açar.
+// Postere/balona basınca yönlendirme dış TouchableOpacity tarafından yapılır
+// (poster düz View'dir).
+//
+// Tür renkleri (film turuncu, dizi mavi, oyuncu mor) arama sonucu kartı ve
+// liste balonuyla aynı — aynı içerik her yerde aynı renkte tanınır.
 
 import React, { useState } from "react";
 import {
@@ -21,8 +25,8 @@ import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { alpha } from "../../theme/colors";
 
-const POSTER_WIDTH = 70;
-const POSTER_HEIGHT = 105;
+const POSTER_WIDTH = 92;
+const POSTER_HEIGHT = 138;
 const MEDIA_GAP = 12;
 
 if (
@@ -32,14 +36,11 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const typeLabel = (mt) =>
-  mt === "movie"
-    ? i18nText("autoI18n.film", "Film")
-    : mt === "tv"
-      ? i18nText("autoI18n.dizi", "Dizi")
-      : mt === "person"
-        ? i18nText("autoI18n.oyuncu", "Oyuncu")
-        : "";
+const TYPE_META = {
+  movie: { color: "#FF8A65", label: () => i18nText("autoI18n.film", "Film") },
+  tv: { color: "#64B5F6", label: () => i18nText("autoI18n.dizi", "Dizi") },
+  person: { color: "#CE93D8", label: () => i18nText("autoI18n.oyuncu", "Oyuncu") },
+};
 
 export default function SharedMediaMessage({
   item,
@@ -57,6 +58,7 @@ export default function SharedMediaMessage({
   const isPerson = media?.media_type === "person";
   const text = item?.text || media?.title || media?.name || "";
   const summary = media?.overview;
+  const typeMeta = TYPE_META[media?.media_type];
 
   const rawDate = media?.release_date || media?.first_air_date;
   const releaseDateText = rawDate ? String(rawDate).slice(0, 4) : "";
@@ -71,15 +73,20 @@ export default function SharedMediaMessage({
   };
 
   const primaryTextColor = isOutgoing ? "#fff" : theme.text.primary;
-  const secondaryTextColor = isOutgoing ? "rgba(255,255,255,0.75)" : theme.text.secondary;
+  const secondaryTextColor = isOutgoing ? "rgba(255,255,255,0.8)" : theme.text.secondary;
   const mutedTextColor = isOutgoing ? "rgba(255,255,255,0.65)" : theme.text.muted;
+
+  // Giden balon vurgu renginde: rozet/buton zeminleri beyaz-şeffaf, gelende tür/vurgu renkli.
+  const pillBg = isOutgoing
+    ? "rgba(255,255,255,0.2)"
+    : alpha(typeMeta?.color || accent, 0.16);
+  const pillInk = isOutgoing ? "#fff" : typeMeta?.color || accent;
 
   return (
     <View style={styles.wrap}>
-      <View style={[styles.row, isOutgoing && styles.rowOutgoing]}>
-        <View style={styles.posterColumn}>
-          {/* Eğik poster (basınca dış balon yönlendirir) */}
-          <View style={[styles.posterTilt, isOutgoing && styles.posterTiltOutgoing]}>
+      <View style={styles.row}>
+        {/* Poster (basınca dış balon yönlendirir) */}
+        <View style={styles.posterShadow}>
           {poster ? (
             <Image
               source={{ uri: getTmdbUrl(poster, "poster", 500) }}
@@ -104,130 +111,127 @@ export default function SharedMediaMessage({
             >
               <Ionicons
                 name={isPerson ? "person" : "film-outline"}
-                size={26}
+                size={28}
                 color={mutedTextColor}
               />
             </View>
           )}
           {media?.vote_average > 0 && (
             <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={9} color="#FFD54F" />
+              <Ionicons name="star" size={10} color="#FFD54F" />
               <Text allowFontScaling={false} style={styles.ratingText}>
                 {media.vote_average.toFixed(1)}
               </Text>
             </View>
           )}
-          </View>
-
-          {isPerson && (
-            <Text
-              style={[styles.personPosterName, { color: primaryTextColor }]}
-              numberOfLines={2}
-            >
-              {text}
-            </Text>
-          )}
         </View>
 
-        {/* Sağ sütun: tür + başlık + çipler */}
-        <View style={[styles.side, !isPerson && styles.sideWithActions, isOutgoing && styles.sideOutgoing, !isPerson && isOutgoing && styles.sideOutgoingWithActions]}>
-          {!!typeLabel(media?.media_type) && (
+        {/* Sağ sütun: tür rozeti + başlık + yıl; altta eylemler */}
+        <View style={styles.side}>
+          <View style={styles.sideTop}>
+            {!!typeMeta && (
+              <View style={[styles.typePill, { backgroundColor: pillBg }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.typePillText, { color: pillInk }]}
+                >
+                  {typeMeta.label()}
+                </Text>
+              </View>
+            )}
             <Text
-              allowFontScaling={false}
-              style={[
-                styles.type,
-                { color: mutedTextColor },
-                isOutgoing && styles.textOutgoing,
-              ]}
-            >
-              {typeLabel(media?.media_type)}
-            </Text>
-          )}
-          {!isPerson && (
-            <Text
-              style={[
-                styles.title,
-                { color: primaryTextColor },
-                isOutgoing && styles.textOutgoing,
-              ]}
+              style={[styles.title, { color: primaryTextColor }]}
               numberOfLines={3}
             >
               {text}
             </Text>
-          )}
 
-          {!!releaseDateText && (
-            <View style={[styles.releaseRow, isOutgoing && styles.releaseRowOutgoing]}>
-              <Ionicons
-                name="calendar-outline"
-                size={12}
-                color={mutedTextColor}
-              />
+            {!!releaseDateText && !isPerson && (
+              <View style={styles.releaseRow}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={12}
+                  color={mutedTextColor}
+                />
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.releaseText, { color: secondaryTextColor }]}
+                  numberOfLines={1}
+                >
+                  {releaseDateLabel}: {releaseDateText}
+                </Text>
+              </View>
+            )}
+
+            {/* Oyuncuda overview alanı "bilinen yapımlar" listesidir. */}
+            {isPerson && !!summary && (
               <Text
-                allowFontScaling={false}
-                style={[styles.releaseText, { color: secondaryTextColor }]}
-                numberOfLines={1}
+                style={[styles.knownFor, { color: secondaryTextColor }]}
+                numberOfLines={3}
               >
-                {releaseDateLabel}: {releaseDateText}
+                {summary}
               </Text>
-            </View>
-          )}
+            )}
+          </View>
 
           {!isPerson && (
-            <View style={[styles.chips, isOutgoing && styles.chipsOutgoing]}>
-            <TouchableOpacity
-              onPress={toggleSummary}
-              activeOpacity={0.85}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              style={[
-                styles.chip,
-                styles.chipPrimary,
-                { backgroundColor: isOutgoing ? "rgba(255,255,255,0.2)" : accent },
-                summaryOpen && styles.chipPrimaryActive,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={i18nText("autoI18n.ozet", "Özet")}
-              accessibilityState={{ expanded: summaryOpen }}
-            >
-              <Ionicons
-                name={summaryOpen ? "chevron-up-outline" : "document-text-outline"}
-                size={14}
-                color="#fff"
-                style={styles.chipIcon}
-              />
-
-            </TouchableOpacity>
+            <View style={styles.actions}>
+              <TouchableOpacity
+                onPress={toggleSummary}
+                activeOpacity={0.85}
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                style={[
+                  styles.action,
+                  styles.actionPrimary,
+                  { backgroundColor: isOutgoing ? "rgba(255,255,255,0.24)" : accent },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={i18nText("autoI18n.ozet", "Özet")}
+                accessibilityState={{ expanded: summaryOpen }}
+              >
+                <Ionicons
+                  name={summaryOpen ? "chevron-up" : "document-text-outline"}
+                  size={14}
+                  color="#fff"
+                />
+                <Text allowFontScaling={false} style={[styles.actionText, { color: "#fff" }]}>
+                  {i18nText("autoI18n.ozet", "Özet")}
+                </Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={onOpenTrailer}
                 activeOpacity={0.85}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                 style={[
-                  styles.chip,
-                  styles.chipOutline,
+                  styles.action,
+                  styles.actionOutline,
                   {
                     backgroundColor: isOutgoing
-                      ? "rgba(255,255,255,0.12)"
-                      : theme.between,
+                      ? "rgba(255,255,255,0.1)"
+                      : "transparent",
                     borderColor: isOutgoing
-                      ? "rgba(255,255,255,0.3)"
-                      : alpha(accent, 0.45),
+                      ? "rgba(255,255,255,0.4)"
+                      : alpha(accent, 0.5),
                   },
-                  ]}
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel={i18nText("autoI18n.fragman", "Fragman")}
               >
                 <Ionicons
                   name="play-circle-outline"
-                  size={14}
+                  size={15}
                   color={isOutgoing ? "#fff" : accent}
-                  style={styles.chipIcon}
                 />
-
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.actionText, { color: isOutgoing ? "#fff" : accent }]}
+                >
+                  {i18nText("autoI18n.fragman", "Fragman")}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
-
         </View>
       </View>
 
@@ -256,41 +260,28 @@ export default function SharedMediaMessage({
 }
 
 const styles = StyleSheet.create({
-  wrap: { width: "100%", marginBottom: 9 },
+  wrap: { width: "100%", minWidth: 250 },
   row: {
     flexDirection: "row",
     alignItems: "stretch",
     gap: MEDIA_GAP,
   },
-  rowOutgoing: {
-    flexDirection: "row-reverse",
-  },
 
-  posterColumn: {
-    width: POSTER_WIDTH + 8,
+  posterShadow: {
+    width: POSTER_WIDTH,
+    height: POSTER_HEIGHT,
     flexShrink: 0,
-    alignItems: "center",
-  },
-  posterTilt: {
-    flexShrink: 0,
-    marginTop: 4,
-    marginLeft: 2,
-    transform: [{ rotate: "-5deg" }],
+    borderRadius: 14,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.35,
     shadowRadius: 8,
-    elevation: 6,
-  },
-  posterTiltOutgoing: {
-    marginLeft: 0,
-    marginRight: 2,
-    transform: [{ rotate: "5deg" }],
+    elevation: 5,
   },
   poster: {
     width: POSTER_WIDTH,
     height: POSTER_HEIGHT,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.06)",
   },
   posterPlaceholder: {
@@ -301,127 +292,80 @@ const styles = StyleSheet.create({
   },
   ratingBadge: {
     position: "absolute",
-    bottom: 4,
-    right: 4,
+    bottom: 6,
+    left: 6,
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 3,
     backgroundColor: "rgba(0,0,0,0.72)",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 9,
   },
-  ratingText: { color: "#fff", fontSize: 9, fontWeight: "700" },
-  personPosterName: {
-    width: "100%",
-    marginTop: 8,
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 15,
-    textAlign: "center",
-  },
+  ratingText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
   side: {
     flex: 1,
-    flexShrink: 1,
     minWidth: 0,
-    minHeight: POSTER_HEIGHT + 4,
-    justifyContent: "flex-start",
-    paddingTop: 2,
-    gap: 4,
+    minHeight: POSTER_HEIGHT,
+    justifyContent: "space-between",
+    gap: 8,
   },
-  sideWithActions: {
-    paddingLeft: 36,
+  sideTop: { gap: 5 },
+  typePill: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 8,
   },
-  sideOutgoingWithActions: {
-    paddingLeft: 0,
-    paddingRight: 36,
-  },
-  sideOutgoing: {
-    alignItems: "stretch",
-  },
-  textOutgoing: {
-    textAlign: "right",
-  },
-  type: {
+  typePillText: {
     fontSize: 10,
-    color: "rgba(255,255,255,0.5)",
-    fontWeight: "700",
-    letterSpacing: 0.3,
+    fontWeight: "800",
+    letterSpacing: 0.4,
     textTransform: "uppercase",
   },
-  title: { fontSize: 14, fontWeight: "800", color: "#fff", lineHeight: 18 },
+  title: { fontSize: 15.5, fontWeight: "800", lineHeight: 20 },
   releaseRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: 1,
-  },
-  releaseRowOutgoing: {
-    justifyContent: "flex-end",
   },
   releaseText: {
-    color: "rgba(255,255,255,0.58)",
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: "700",
-    lineHeight: 13,
+    lineHeight: 14,
     includeFontPadding: false,
   },
+  knownFor: { fontSize: 11.5, lineHeight: 16 },
 
-  // Aksiyonlar metnin altına eklenmez; sütunun alt kenarına sabitlenir.
-  // Metinde ayrılan yan boşluk uzun başlıklarla çakışmayı önler.
-  chips: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    flexDirection: "column",
-    alignItems: "center",
-    gap: 6,
-  },
-  chipsOutgoing: {
-    left: "auto",
-    right: 0,
-  },
-  chip: {
+  actions: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  action: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    alignSelf: "flex-start",
-    gap: 3,
-    height: 28,
-    width: 28,
-    borderRadius: 14,
-    flexShrink: 0,
+    gap: 5,
+    height: 30,
+    paddingHorizontal: 11,
+    borderRadius: 15,
   },
-  // Birincil aksiyon (Özet): dolu accent + hafif gölge
-  chipPrimary: {
+  actionPrimary: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.22,
+    shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 2,
   },
-  chipPrimaryActive: {
-    opacity: 0.9,
-  },
-  // İkincil aksiyon (Fragman): accent dış-çizgili, şeffaf zemin
-  chipOutline: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-  },
-  chipIcon: {
-    flexShrink: 0,
-  },
+  actionOutline: { borderWidth: 1 },
+  actionText: { fontSize: 12, fontWeight: "800" },
+
   summaryBox: {
-    marginTop: 9,
+    marginTop: 10,
     padding: 10,
     borderRadius: 12,
     borderWidth: 1,
   },
   summaryText: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 12.5,
+    lineHeight: 18,
   },
 });

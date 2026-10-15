@@ -1,29 +1,54 @@
 // services/storyShare/storyShareService.js
 //
-// Sinema kartlarını yüksek çözünürlükte yakalayıp Instagram Story,
+// Sinema/profil kartlarını yüksek çözünürlükte yakalayıp Instagram Story,
 // WhatsApp veya galeriye aktaran servis.
 
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
+// SDK 57: `saveToLibraryAsync` ana giriste calisma aninda hata firlatiyor;
+// legacy girisinden alinmali (izin fonksiyonlari ana giriste gecerli).
+import { saveToLibraryAsync } from "expo-media-library/legacy";
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Belirtilen görünümün (ref) yüksek çözünürlüklü ekran görüntüsünü alır.
+ *
+ * Gradient ve expo-image katmanları boyanmadan yakalama boş/yarım çıkabiliyor;
+ * kısa bir bekleme + tek yeniden deneme bunu önler (WrappedScreen ile aynı gerekçe).
+ *
  * @param {React.RefObject} viewRef
+ * @param {{ width?: number, height?: number }} [size]  Verilirse çıktı bu piksel
+ *        boyutuna ölçeklenerek yeniden çizilir (ör. 1080x1920 Story).
  * @returns {Promise<string>} Geçici dosya URI'si
  */
-export async function captureStoryCard(viewRef) {
+export async function captureStoryCard(viewRef, size = {}) {
   if (!viewRef || !viewRef.current) {
     throw new Error("Görünüm referansı bulunamadı.");
   }
 
-  const uri = await captureRef(viewRef, {
-    format: "png",
-    quality: 1.0,
-    result: "tmpfile",
-  });
+  const options = { format: "png", quality: 1.0, result: "tmpfile" };
+  if (size.width && size.height) {
+    options.width = size.width;
+    options.height = size.height;
+  }
 
-  return uri;
+  await wait(100);
+  try {
+    return await captureRef(viewRef, options);
+  } catch {
+    await wait(140);
+    return captureRef(viewRef, options);
+  }
+}
+
+/**
+ * view-shot bazı platformlarda şemasız yol döndürür; expo-sharing yerel dosya
+ * için file:// bekler (Android'de eksikse sessizce başarısız olur).
+ */
+export function toShareableUri(fileUri) {
+  return /^(file|content):\/\//.test(fileUri) ? fileUri : `file://${fileUri}`;
 }
 
 /**
@@ -36,7 +61,7 @@ export async function shareStoryImage(fileUri) {
     throw new Error("Bu cihazda paylaşım özelliği desteklenmiyor.");
   }
 
-  await Sharing.shareAsync(fileUri, {
+  await Sharing.shareAsync(toShareableUri(fileUri), {
     mimeType: "image/png",
     dialogTitle: "Sinema Kartını Paylaş",
     UTI: "public.png",
@@ -56,5 +81,5 @@ export async function saveStoryToGallery(fileUri) {
     throw new Error("Galeriye kaydetmek için medya izni gereklidir.");
   }
 
-  await MediaLibrary.saveToLibraryAsync(fileUri);
+  await saveToLibraryAsync(toShareableUri(fileUri));
 }

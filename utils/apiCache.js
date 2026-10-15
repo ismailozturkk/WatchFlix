@@ -151,14 +151,6 @@ export const setCachedValue = (
 };
 
 /**
- * Removes an entry from both layers.
- */
-export const removeCachedValue = (key) => {
-  mem.delete(key);
-  store.remove(key);
-};
-
-/**
  * Belirli bir önekteki tüm apicache girdilerini (bellek + MMKV) siler.
  * prefix "" verilirse tüm apicache temizlenir. Örn: clearCachedByPrefix("movie_").
  */

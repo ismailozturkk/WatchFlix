@@ -7,207 +7,55 @@
 //
 // İçerik:
 //   • Selamlama başlığı + avatar
-//   • Sosyal: Feed'e yönlendiren büyük, interaktif gradyan widget; içinde
-//     hızlı paylaşım (compose) satırı + tip çipleri (İnceleme/Liste/Sohbet/Anket)
+//   • Sosyal: Paylaşımlar kartı (components/hub/FeedWidget) — feed'e gider;
+//     içinde hızlı paylaşım çubuğu + tür karoları (İnceleme/Liste/Sohbet/Anket)
+//   • CineSwipe ve Turnuva vitrin kartları (components/hub/*)
+//   • Wrapped / yıllık arşiv
 //   • Oyunlar: taşınan ProfileGamesModule (öne çıkan oyun + istatistik)
+//
+// Üç vitrin bölümü aynı SectionHeader'ı kullanır (Oyunlar modülüyle aynı başlık
+// dili); kartların ortak kabuğu components/hub/HubCard.js.
 
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
+import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   ScrollView,
 } from "react-native";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from "react-native-reanimated";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import ScreenDecor from "@components/ScreenDecor";
 import ProfileGamesModule from "@components/profile/ProfileGamesModule";
+import FeedWidget from "@components/hub/FeedWidget";
 import TournamentWidget from "@components/hub/TournamentWidget";
 import HubWrappedModule from "@components/hub/HubWrappedModule";
 import CineSwipeWidget from "@components/hub/CineSwipeWidget";
+import { SectionHeader } from "@components/game/ui";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
-import { usePosts } from "@context/PostsContext";
-import { getAvatarSource } from "@utils/avatars";
-import UserAvatar from "@components/common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
-import { alpha } from "../../theme/colors";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const SPRING = { mass: 0.4, damping: 12, stiffness: 180 };
-
-// ─── Feed yönlendirme widget'ı (interaktif) ─────────────────────────────────
-const getPostAvatar = (post, currentUid, currentAvatar) => {
-  if (currentUid && post?.authorId === currentUid && currentAvatar) {
-    return currentAvatar;
-  }
-  return getAvatarSource(
-    post?.authorAvatarIndex,
-    post?.authorPhotoURL || (typeof post?.authorAvatar === "string" ? post.authorAvatar : null)
-  );
-};
-
-function FeedWidget({ navigation, theme, posts, avatar, currentUid }) {
-  const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-
-  // Hızlı paylaşım: ShareContentScreen'in composePost mekanizması — feed'e
-  // gidip seçili tiple CreatePostModal'ı açar (eski QuickComposeBar davranışı).
-  const goCompose = (postType) =>
-    navigation.navigate("ShareContentScreen", {
-      composePost: { postType, composeKey: `${postType}-${Date.now()}` },
-    });
-  const composeChips = [
-    { key: "review", icon: "create", label: i18nText("autoI18n.inceleme", "İnceleme") },
-    { key: "list", icon: "list", label: i18nText("autoI18n.liste_2", "Liste") },
-    { key: "text", icon: "chatbubble-ellipses", label: i18nText("autoI18n.sohbet", "Sohbet") },
-    { key: "poll", icon: "stats-chart", label: i18nText("autoI18n.anket", "Anket") },
-  ];
-
-  const recentAuthors = (posts || [])
-    .filter((post, index, all) =>
-      post?.authorId && all.findIndex((item) => item?.authorId === post.authorId) === index,
-    )
-    .slice(0, 3);
-
-  const blue = theme.colors?.blue || "#4a7cf6";
-  const colors = [
-    blue,
-    theme.colors?.primary || "#3b5998",
-    theme.colors?.darkBlue || "#192f6a",
-  ];
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.98, SPRING);
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, SPRING);
-  };
-
+// Başlık + kart: bölüm genişliği ve başlık hizası tek yerde.
+function HubSection({ title, theme, children }) {
   return (
-    <Animated.View
-      style={[styles.widgetShadow, { shadowColor: theme.shadow || blue }, animStyle]}
-    >
-      <LinearGradient
-        colors={colors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.widget}
-      >
-        <View pointerEvents="none" style={styles.glowOne} />
-        <View pointerEvents="none" style={styles.glowTwo} />
-        <View pointerEvents="none" style={styles.widgetArtwork}>
-          <AppIcon family="Ionicons" name="chatbubbles" size={124} color="rgba(255,255,255,0.07)" />
-        </View>
-
-        <AnimatedPressable
-          accessibilityRole="button"
-          accessibilityLabel={i18nText("autoI18n.paylasimlari_ac", "Paylaşımları aç")}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          onPress={() => navigation.navigate("ShareContentScreen")}
-          style={styles.widgetHeader}
-        >
-          <View style={styles.widgetIcon}>
-            <AppIcon family="Ionicons" name="newspaper" size={24} color="#fff" />
-          </View>
-
-          <View style={styles.widgetCopy}>
-            <Text style={styles.widgetTitle}>
-              {i18nText("autoI18n.hub_paylasimlar", "Paylaşımlar")}
-            </Text>
-            <Text style={styles.widgetDesc} numberOfLines={1}>
-              {i18nText("autoI18n.hub_feed_aciklama", "Topluluk feed'i, incelemeler ve listeler")}
-            </Text>
-          </View>
-
-          {recentAuthors.length > 0 && (
-            <View style={styles.recentAvatars}>
-              {recentAuthors.map((post, index) => (
-                <UserAvatar
-                  key={post.authorId}
-                  source={getPostAvatar(post, currentUid, avatar)}
-                  isCustomPhoto
-                  size={25}
-                  borderWidth={2}
-                  borderColor="rgba(255,255,255,0.72)"
-                  style={{ marginLeft: index === 0 ? 0 : -8 }}
-                />
-              ))}
-            </View>
-          )}
-
-          <View style={styles.widgetCta}>
-            <AppIcon family="Ionicons" name="arrow-forward" size={19} color="#fff" />
-          </View>
-        </AnimatedPressable>
-
-        <View style={styles.widgetDivider} />
-
-        {/* Hızlı paylaşım — eskiden widget'ın altındaki ayrı çubuktaydı,
-            son gönderi kartının yerine widget'ın içine taşındı. */}
-        <View style={styles.composeArea}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={i18nText("autoI18n.ne_paylasmak_istersin", "Ne paylaşmak istersin?")}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            onPress={() => goCompose("review")}
-            style={({ pressed }) => [
-              styles.composePrompt,
-              { backgroundColor: pressed ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.11)" },
-            ]}
-          >
-            {avatar ? (
-              <Image source={avatar} style={styles.composeAvatar} />
-            ) : (
-              <View style={[styles.composeAvatar, styles.composeAvatarFallback]}>
-                <AppIcon family="Ionicons" name="person" size={16} color="rgba(255,255,255,0.8)" />
-              </View>
-            )}
-            <Text style={styles.composePromptText} numberOfLines={1}>
-              {i18nText("autoI18n.ne_paylasmak_istersin", "Ne paylaşmak istersin?")}
-            </Text>
-            <View style={styles.composePlus}>
-              <AppIcon family="Ionicons" name="add" size={18} color="#fff" />
-            </View>
-          </Pressable>
-
-          <View style={styles.composeChips}>
-            {composeChips.map((c) => (
-              <Pressable
-                key={c.key}
-                style={({ pressed }) => [
-                  styles.composeChip,
-                  pressed && { backgroundColor: "rgba(255,255,255,0.2)" },
-                ]}
-                onPress={() => goCompose(c.key)}
-              >
-                <AppIcon family="Ionicons" name={c.icon} size={14} color="rgba(255,255,255,0.92)" />
-                <Text style={styles.composeChipText} numberOfLines={1}>
-                  {c.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      </LinearGradient>
-    </Animated.View>
+    <View style={styles.section}>
+      <SectionHeader title={title} theme={theme} style={styles.sectionHeader} />
+      {children}
+    </View>
   );
 }
+
+// iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için kaydırma
+// görünümünü sekme ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js).
+// Modül kapsamında: render içinde kurulursa içerik her render'da sökülür.
+const MarkedScrollView = markTabScroll(ScrollView);
 
 export default function HubScreen({ navigation }) {
   const { contentBottom } = useTabBarLayout();
@@ -216,7 +64,27 @@ export default function HubScreen({ navigation }) {
   const { language } = useLanguage();
   const { user } = useAuth();
   const { avatar } = useProfileUi();
-  const { posts } = usePosts();
+
+  // Wrapped modülü sayfanın alt yarısında: giriş animasyonu mount anında değil,
+  // kart ekrana girerken oynamalı. Bayrak yalnız bir kez açılır (state tek
+  // sefer değişir), kaydırma başına yeniden çizim yok.
+  const [wrappedSeen, setWrappedSeen] = useState(false);
+  const wrappedTop = useRef(null); // modülün içerik içindeki y'si
+  const viewportH = useRef(0); // ScrollView'ın görünür yüksekliği
+  const scrollTop = useRef(0);
+  const checkWrappedSeen = useCallback(() => {
+    if (wrappedTop.current == null || !viewportH.current) return;
+    // Kartın üstünden ~120px içeri girince başlar.
+    if (scrollTop.current + viewportH.current > wrappedTop.current + 120) setWrappedSeen(true);
+  }, []);
+  const handleScroll = useCallback(
+    (event) => {
+      onTabBarScroll(event);
+      scrollTop.current = event?.nativeEvent?.contentOffset?.y ?? 0;
+      if (!wrappedSeen) checkWrappedSeen();
+    },
+    [onTabBarScroll, wrappedSeen, checkWrappedSeen],
+  );
 
   // language dependency'de olmalı; yoksa dil değişince selamlama eski dilde kalır.
   const greeting = useMemo(() => {
@@ -228,12 +96,16 @@ export default function HubScreen({ navigation }) {
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.15} />
+      <ScreenDecor scope="home" iconOpacity={0.15} />
       <SafeAreaView edges={["top"]} style={styles.container}>
-        <ScrollView
+        <MarkedScrollView
           contentContainerStyle={[styles.scroll, { paddingBottom: contentBottom }]}
           showsVerticalScrollIndicator={false}
-          onScroll={onTabBarScroll}
+          onScroll={handleScroll}
+          onLayout={(e) => {
+            viewportH.current = e.nativeEvent.layout.height;
+            checkWrappedSeen();
+          }}
           scrollEventThrottle={16}
         >
         {/* Başlık */}
@@ -265,35 +137,34 @@ export default function HubScreen({ navigation }) {
         </View>
 
         {/* Sosyal */}
-        <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>
-          {i18nText("autoI18n.sosyal", "Sosyal")}
-        </Text>
-        <FeedWidget
-          navigation={navigation}
-          theme={theme}
-          posts={posts}
-          avatar={avatar}
-          currentUid={user?.uid}
-        />
+        <HubSection title={i18nText("autoI18n.sosyal", "Sosyal")} theme={theme}>
+          <FeedWidget navigation={navigation} />
+        </HubSection>
 
         {/* CineSwipe (Birlikte Ne İzlesek?) */}
-        <Text style={[styles.sectionTitle, { color: theme.text.muted, marginTop: 18 }]}>
-          CINESWIPE
-        </Text>
-        <CineSwipeWidget navigation={navigation} theme={theme} />
+        <HubSection title="CINESWIPE" theme={theme}>
+          <CineSwipeWidget navigation={navigation} />
+        </HubSection>
 
         {/* Turnuva */}
-        <Text style={[styles.sectionTitle, { color: theme.text.muted, marginTop: 18 }]}>
-          {i18nText("autoI18n.tournament_section", "Turnuva")}
-        </Text>
-        <TournamentWidget navigation={navigation} />
+        <HubSection title={i18nText("autoI18n.tournament_section", "Turnuva")} theme={theme}>
+          <TournamentWidget navigation={navigation} />
+        </HubSection>
 
         {/* Wrapped ve Yıllık Arşiv (profilden taşındı) */}
-        <HubWrappedModule navigation={navigation} />
+        <View
+          style={styles.wrappedHost}
+          onLayout={(e) => {
+            wrappedTop.current = e.nativeEvent.layout.y;
+            checkWrappedSeen();
+          }}
+        >
+          <HubWrappedModule navigation={navigation} revealed={wrappedSeen} />
+        </View>
 
         {/* Oyunlar */}
         <ProfileGamesModule navigation={navigation} />
-        </ScrollView>
+        </MarkedScrollView>
       </SafeAreaView>
     </View>
   );
@@ -302,6 +173,7 @@ export default function HubScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { alignItems: "center", paddingTop: 10, paddingBottom: 110 },
+  wrappedHost: { width: "100%" },
 
   headerRow: {
     width: "90%",
@@ -314,149 +186,7 @@ const styles = StyleSheet.create({
   greetingSub: { fontSize: 13, marginTop: 2 },
   avatar: { width: 44, height: 44, borderRadius: 22, marginLeft: 12 },
 
-  sectionTitle: {
-    width: "90%",
-    fontSize: 14,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: 12,
-    paddingHorizontal: 10,
-  },
-
-  // Feed widget
-  widgetShadow: {
-    width: "90%",
-    borderRadius: 24,
-    elevation: 8,
-    shadowOffset: { width: 0, height: 7 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    marginBottom: 6,
-  },
-  widget: {
-    borderRadius: 24,
-    overflow: "hidden",
-  },
-  widgetHeader: {
-    minHeight: 88,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  glowOne: {
-    position: "absolute",
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    right: -50,
-    top: -70,
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
-  glowTwo: {
-    position: "absolute",
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    right: 30,
-    bottom: -50,
-    backgroundColor: "rgba(255,255,255,0.07)",
-  },
-  widgetArtwork: {
-    position: "absolute",
-    right: -6,
-    bottom: -10,
-    transform: [{ rotate: "-8deg" }],
-  },
-  widgetIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.17)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  widgetCopy: { flex: 1, marginLeft: 14 },
-  widgetTitle: { color: "#fff", fontSize: 19, fontWeight: "900" },
-  widgetDesc: {
-    color: "rgba(255,255,255,0.82)",
-    fontSize: 11.5,
-    lineHeight: 15,
-    fontWeight: "600",
-    marginTop: 3,
-  },
-  recentAvatars: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginLeft: 6,
-  },
-  recentAvatar: {
-    width: 25,
-    height: 25,
-    borderRadius: 12.5,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.72)",
-  },
-  widgetCta: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 10,
-  },
-  widgetDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    marginHorizontal: 16,
-  },
-  // Hızlı paylaşım (widget içi — gradient üstünde beyaz-saydam yüzeyler)
-  composeArea: { margin: 12, marginTop: 10 },
-  composePrompt: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: 14,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-  },
-  composeAvatar: { width: 32, height: 32, borderRadius: 16 },
-  composeAvatarFallback: {
-    backgroundColor: "rgba(255,255,255,0.14)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  composePromptText: {
-    flex: 1,
-    fontSize: 13.5,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.85)",
-  },
-  composePlus: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.22)",
-  },
-  composeChips: { flexDirection: "row", gap: 8, marginTop: 10 },
-  composeChip: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
-  composeChipText: { fontSize: 11, fontWeight: "700", color: "rgba(255,255,255,0.92)" },
+  // Vitrin bölümü: başlık + kart, ekranın %90'ı (Oyunlar/Wrapped ile aynı genişlik).
+  section: { width: "90%", marginBottom: 20 },
+  sectionHeader: { marginTop: 0, marginBottom: 10, paddingHorizontal: 10 },
 });

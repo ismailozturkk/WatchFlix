@@ -2,27 +2,24 @@ import React, {
   createContext,
   useContext,
   useState,
-  useEffect,
   useCallback,
   useMemo,
 } from "react";
 import {
   useImageQualitySettings,
 } from "./AppSettingsContext";
-import { useAuth } from "./AuthContext";
-import { db } from "../firebase";
-import { collection, onSnapshot } from "firebase/firestore";
-import { snapshotErrorHandler } from "../utils/firestoreError";
-import { trackFirestoreRead } from "../services/usageTrackerService";
+import useUserDataDomain from "../hooks/useUserDataDomain";
+import { notesDomain, remindersDomain } from "../services/userData";
 
 const CalendarContext = createContext();
 
-// Eski kullanım için saklandı (artık aktif değil)
-export const RANGE_OPTIONS = [
-  { label: "1 Ay", days: 30 },
-  { label: "2 Ay", days: 60 },
-  { label: "3 Ay", days: 90 },
-];
+// Tür renkleri — takvimdeki noktalar, açıklama çipleri ve ajanda satırları aynı
+// değerleri okur. Daha önce nokta (128,0,128) ile çipler (#AF00AF) farklıydı.
+export const EVENT_COLORS = {
+  note: "#138DF0",
+  movie: "#FF7C25",
+  tv: "#AF00AF",
+};
 
 function toDateStr(date) {
   // Yerel tarih bileşenleri: toISOString UTC gösterdiği için UTC+3'te
@@ -36,12 +33,44 @@ function toDateStr(date) {
 
 export const CalendarProvider = ({ children }) => {
   const { getTmdbUrl } = useImageQualitySettings();
-  const { user } = useAuth();
 
-  // Kullanıcı verileri
-  const [noteEvents,          setNoteEvents]          = useState({});
-  const [movieReminderEvents, setMovieReminderEvents] = useState({});
-  const [tvReminderEpisodes,  setTvReminderEpisodes]  = useState([]); // flat list of episode docs
+  // Takvim ayrı Firestore dinleyicisi AÇMAZ: notlar ve hatırlatıcılar profil
+  // ekranlarıyla AYNI yerel kopyadan (services/userData) türetilir. Eskiden
+  // burası Notes + Reminders'ı (2 + N dinleyici) ikinci kez, tüm belgeleriyle
+  // okuyordu; bir not eklenince iki ekran iki ayrı yoldan güncelleniyordu.
+  const notesView = useUserDataDomain(notesDomain);
+  const remindersView = useUserDataDomain(remindersDomain);
+  const tvReminderEpisodes = remindersView.lists.episodes; // flat list of episode docs
+
+  // Zamanlanmış notlar → tarih bazlı harita
+  const noteEvents = useMemo(() => {
+    const nMap = {};
+    notesView.lists.items.forEach((n) => {
+      if (!n.scheduledDate) return;
+      if (!nMap[n.scheduledDate]) nMap[n.scheduledDate] = [];
+      nMap[n.scheduledDate].push({ ...n, eventType: "note", date: n.scheduledDate });
+    });
+    return nMap;
+  }, [notesView]);
+
+  // Film hatırlatıcıları → tarih bazlı harita
+  const movieReminderEvents = useMemo(() => {
+    const mMap = {};
+    remindersView.lists.movies.forEach((m) => {
+      const date = m.releaseDate;
+      if (!date) return;
+      if (!mMap[date]) mMap[date] = [];
+      mMap[date].push({
+        id:        m.movieId,
+        title:     m.movieName,
+        poster:    m.posterPath ? getTmdbUrl(m.posterPath, "poster", 200) : null,
+        type:      "movie",
+        eventType: "reminder_movie",
+        date,
+      });
+    });
+    return mMap;
+  }, [remindersView, getTmdbUrl]);
 
   // Tüm hatırlatıcıları tek bir tarih-bazlı map olarak birleştir
   const reminderEvents = useMemo(() => {
@@ -73,104 +102,13 @@ export const CalendarProvider = ({ children }) => {
     return rMap;
   }, [movieReminderEvents, tvReminderEpisodes]);
 
-  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
-
-  /* ── Firebase: Notes dinleyici (Notes/{uid}/items subcollection) ── */
-  useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(collection(db, "Notes", user.uid, "items"), (snap) => {
-      trackFirestoreRead("Notes", snap.docs.length);
-      const nMap = {};
-      snap.docs.forEach((d) => {
-        const n = d.data();
-        if (!n.scheduledDate) return;
-        if (!nMap[n.scheduledDate]) nMap[n.scheduledDate] = [];
-        nMap[n.scheduledDate].push({ ...n, eventType: "note", date: n.scheduledDate });
-      });
-      setNoteEvents(nMap);
-    }, snapshotErrorHandler("Calendar/notes"));
-    return unsub;
-  }, [user]);
-
-  /* ── Firebase: Reminders dinleyici (subcollections) ── */
-  useEffect(() => {
-    if (!user) return;
-    const uid = user.uid;
-    setIsLoadingEvents(true);
-
-    // Movie reminders subcollection
-    const movieUnsub = onSnapshot(
-      collection(db, "Reminders", uid, "movies"),
-      (snap) => {
-        trackFirestoreRead("Reminders/movies", snap.docs.length);
-        const mMap = {};
-        snap.docs.forEach((d) => {
-          const m = d.data();
-          const date = m.releaseDate;
-          if (!date) return;
-          if (!mMap[date]) mMap[date] = [];
-          mMap[date].push({
-            id:        m.movieId,
-            title:     m.movieName,
-            poster:    m.posterPath ? getTmdbUrl(m.posterPath, "poster", 200) : null,
-            type:      "movie",
-            eventType: "reminder_movie",
-            date,
-          });
-        });
-        setMovieReminderEvents(mMap);
-        setIsLoadingEvents(false);
-      },
-      (err) => {
-        snapshotErrorHandler("Calendar/movies")(err);
-        setIsLoadingEvents(false);
-      },
-    );
-
-    // TV show subcollection → dynamic per-show episode subscriptions
-    const epUnsubs  = {};
-    const epDataMap = {}; // showId → episode[]
-
-    const showsUnsub = onSnapshot(
-      collection(db, "Reminders", uid, "tvShows"),
-      (showsSnap) => {
-        trackFirestoreRead("Reminders/tvShows", showsSnap.docs.length);
-        const activeShowIds = new Set(showsSnap.docs.map((d) => d.id));
-
-        // Remove stale episode listeners
-        Object.keys(epUnsubs).forEach((sid) => {
-          if (!activeShowIds.has(sid)) {
-            epUnsubs[sid]();
-            delete epUnsubs[sid];
-            delete epDataMap[sid];
-          }
-        });
-
-        if (showsSnap.empty) { setTvReminderEpisodes([]); return; }
-
-        showsSnap.docs.forEach((showDoc) => {
-          const sid = showDoc.id;
-          if (epUnsubs[sid]) return;
-          epUnsubs[sid] = onSnapshot(
-            collection(db, "Reminders", uid, "tvShows", sid, "episodes"),
-            (epSnap) => {
-              trackFirestoreRead("Reminders/episodes", epSnap.docs.length);
-              epDataMap[sid] = epSnap.docs.map((d) => d.data());
-              setTvReminderEpisodes(Object.values(epDataMap).flat());
-            },
-            snapshotErrorHandler("Calendar/episodes"),
-          );
-        });
-      },
-      snapshotErrorHandler("Calendar/tvShows"),
-    );
-
-    return () => {
-      movieUnsub();
-      showsUnsub();
-      Object.values(epUnsubs).forEach((u) => u());
-    };
-  }, [user]);
+  // Yerel kopya hazır değilken (yalnız yeni cihazda tek seferlik indirme sırasında)
+  // yükleniyor görünür; normal açılışta hep false.
+  const isLoadingEventsBase =
+    (!notesView.ready && notesView.hydrating) ||
+    (!remindersView.ready && remindersView.hydrating);
+  const [flash, setFlash] = useState(false);
+  const isLoadingEvents = isLoadingEventsBase || flash;
 
   /* ── Takvim için markedDates (sadece kullanıcı verileri) ── */
   const markedDates = useMemo(() => {
@@ -182,13 +120,13 @@ export const CalendarProvider = ({ children }) => {
     allDates.forEach((d) => {
       const dots = [];
       if (noteEvents[d]?.length) {
-        dots.push({ key: "note", color: "rgb(19, 141, 240)" });
+        dots.push({ key: "note", color: EVENT_COLORS.note });
       }
       if (reminderEvents[d]?.some((i) => i.eventType === "reminder_movie")) {
-        dots.push({ key: "movie", color: "rgb(255, 124, 37)" });
+        dots.push({ key: "movie", color: EVENT_COLORS.movie });
       }
       if (reminderEvents[d]?.some((i) => i.eventType === "reminder_tv")) {
-        dots.push({ key: "tv", color: "rgb(128, 0, 128)" });
+        dots.push({ key: "tv", color: EVENT_COLORS.tv });
       }
       if (dots.length) result[d] = { dots, marked: true };
     });
@@ -222,9 +160,10 @@ export const CalendarProvider = ({ children }) => {
   }, [noteEvents, reminderEvents]);
 
   const refreshEvents = useCallback(() => {
-    // Firestore listener'ları zaten canlı; sadece UI feedback için kısa flash
-    setIsLoadingEvents(true);
-    setTimeout(() => setIsLoadingEvents(false), 300);
+    // Veri yerel kopyadan geliyor ve her yazmada anında güncelleniyor; yenileme
+    // buluta gitmez. Yalnız UI geri bildirimi için kısa flash.
+    setFlash(true);
+    setTimeout(() => setFlash(false), 300);
   }, []);
 
   return (

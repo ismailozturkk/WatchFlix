@@ -1,40 +1,85 @@
-// Özel tema oluşturucu.
+// Özel tema stüdyosu.
 //
-// Tasarım: kullanıcıların %90'ı için "hızlı kurulum" yeterli — bir zemin + bir
-// vurgu rengi seç, "Paleti Üret" tüm 11 token'ı HSL ölçeğiyle türetsin; hazır
-// vurgu şeridi ve rastgele zar da tek dokunuşluk yollar. Tek tek renk ayarı
-// isteyenler için gruplu token listesi katlanabilir "İnce Ayar" bölümünde
-// durur (düzenleme modunda varsayılan açık). Önizleme altındaki kontrast
-// rozeti okunabilirliği anlık puanlar.
-import React, { useMemo, useRef, useState } from "react";
+// Tek ekranda üç sekme; üstte HER ZAMAN canlı önizleme:
+//   • Kur       — zemin + vurgu (iki büyük kutu, hazır renkler, zeminden hesaplanan
+//                 uyumlu vurgu önerileri, kontrast/yüzey stili). Zemin değişince
+//                 tüm palet o zeminden yeniden türetilir.
+//   • Keşfet    — ruh haline göre ALTI rastgele aday; zemin/vurgu kilitlenebilir;
+//                 beğenilen adaya dokunulur (tek adım geri alınabilir).
+//   • İnce ayar — 11 token'ı tek tek ayarla; metin kademelerinin zemine kontrastı
+//                 satır başında görünür.
+// Her değişiklik bir geçmiş adımıdır (geri al / yinele). Okunabilirlik özeti
+// önizlemenin altında; sorun varsa tek dokunuşla düzeltilir. Kaydedilmemiş
+// değişiklikle çıkarken onay istenir.
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
+  Animated,
   LayoutAnimation,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "@services/hapticsService";
 import AppIcon from "@components/AppIcon";
+import GlassIconButton from "@components/common/GlassIconButton";
 import { toast } from "@components/AppToast";
 import { appAlert } from "@components/AppAlert";
 import ColorPickerSheet from "@components/theme/ColorPickerSheet";
 import ThemePreviewCard from "@components/theme/ThemePreviewCard";
+import ThemeShuffleDeck from "@components/theme/ThemeShuffleDeck";
+import {
+  ColorTile,
+  GhostButton,
+  HarmonyRow,
+  MiniLabel,
+  PaletteStrip,
+  ReadabilityPanel,
+  ReadabilityPill,
+  Segmented,
+  SectionHeader,
+  StudioTabs,
+  SwatchRow,
+  TokenRow,
+} from "@components/theme/ThemeStudioKit";
+import {
+  getStudioCopy,
+  harmonyLabel,
+  hueLabel,
+  moodLabel,
+  suggestedThemeName,
+} from "@components/theme/themeStudioCopy";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
+import useReduceMotion from "@hooks/useReduceMotion";
 import { i18nText } from "@utils/i18nText";
-import { clamp, hexToHsl, hslToHex, luminance } from "@utils/colorUtils";
+import { isLightSurface, shiftLightness, toHex } from "@utils/colorUtils";
+import {
+  ACCENT_PRESETS,
+  BACKGROUND_PRESETS,
+  CONTRAST_LEVELS,
+  SURFACE_MODES,
+  analyzeContrast,
+  describeTheme,
+  fitAccent,
+  fixReadability,
+  generateCandidates,
+  generateTokensFromSeeds,
+  suggestAccents,
+  uniqueName,
+} from "@utils/themeStudio";
+import { canRedo, canUndo, createHistory, historyReducer } from "@utils/draftHistory";
 import ScreenDecor from "@components/ScreenDecor";
 import { usePremiumGate } from "@hooks/usePremiumGate";
+import BackButton from "@components/BackButton";
 import {
-  applyRelative,
-  buildCustomTheme,
   CUSTOM_THEME_GROUPS,
   CUSTOM_THEME_TOKENS,
-  DEFAULT_CUSTOM_TOKENS,
+  buildCustomTheme,
   getThemeColors,
   isRelativeToken,
   resolveThemeTokens,
@@ -53,24 +98,25 @@ const BASE_THEMES = [
   { key: "amber", labelKey: "amberTheme", fallback: "Kızıl Sinema" },
 ];
 
-// Hazır vurgu renkleri — tek dokunuşla accent + bold güncellenir.
-const ACCENT_PRESETS = [
-  "#3B82F6", "#6C63FF", "#8B5CF6", "#EC4899", "#EF4444",
-  "#F97316", "#F59E0B", "#22C55E", "#14B8A6", "#06B6D4",
-];
+// ColorPickerSheet, `sources` kimliği değişince durumunu sıfırlar; her render'da
+// yeni `[]` vermek sürükleme sırasında seçiciyi sıfırlardı.
+const NO_SOURCES = [];
 
-const contrastRatio = (a, b) => {
-  const la = luminance(a);
-  const lb = luminance(b);
-  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+const CANDIDATE_COUNT = 6;
+
+// Bir token'ın okunurluğu hangi yüzeye karşı ölçülür (yoksa satırda gösterilmez).
+const RATIO_AGAINST = {
+  textPrimary: "primary",
+  textSecondary: "secondary",
+  textBetween: "primary",
+  textMuted: "primary",
+  accent: "primary",
 };
 
 const tokenLabel = (key) => {
   const tok = CUSTOM_THEME_TOKENS.find((x) => x.key === key);
   return tok ? i18nText(tok.labelKey, tok.fallback) : key;
 };
-
-const tokenByKey = (key) => CUSTOM_THEME_TOKENS.find((x) => x.key === key) || null;
 
 const describeRelative = (value) => {
   const parts = [];
@@ -79,97 +125,255 @@ const describeRelative = (value) => {
   return `${tokenLabel(value.from)}${parts.length ? ` · ${parts.join(" ")}` : ""}`;
 };
 
-/**
- * Zemin + vurgu renginden tam 11 token'lık uyumlu palet türetir. Zeminin
- * algısal parlaklığına göre koyu/açık ölçek seçilir; yüzeyler zeminin hue'sunu
- * korur, metin ölçeği aynı hue ailesinden okunur kademelerle kurulur.
- */
-const generateTokensFromSeeds = (bgHex, accentHex) => {
-  const bg = hexToHsl(bgHex);
-  const T = (h, s, l) => hslToHex(h, clamp(s, 0, 100), clamp(l, 0, 100));
-  const isDarkBg = bg.l < 55;
-  if (isDarkBg) {
-    return {
-      primary: bgHex,
-      secondary: T(bg.h, bg.s, bg.l + 6),
-      between: T(bg.h, bg.s, bg.l + 3),
-      tab: T(bg.h, bg.s, bg.l + 2),
-      border: T(bg.h, Math.max(bg.s - 4, 0), bg.l + 14),
-      accent: accentHex,
-      bold: applyRelative(accentHex, { l: -10 }),
-      textPrimary: T(bg.h, 8, 96),
-      textSecondary: T(bg.h, 10, 82),
-      textBetween: T(bg.h, 10, 66),
-      textMuted: T(bg.h, 8, 52),
-    };
+const haptic = (fn) => {
+  try {
+    fn().catch(() => {});
+  } catch {
+    /* haptics yoksa sessizce geç */
   }
-  return {
-    primary: bgHex,
-    secondary: T(bg.h, Math.min(bg.s + 4, 100), Math.min(bg.l + 5, 98)),
-    between: T(bg.h, bg.s, bg.l - 5),
-    tab: T(bg.h, Math.min(bg.s + 4, 100), Math.min(bg.l + 5, 98)),
-    border: T(bg.h, bg.s, bg.l - 13),
-    accent: accentHex,
-    bold: applyRelative(accentHex, { l: -9 }),
-    textPrimary: T(bg.h, 22, 13),
-    textSecondary: T(bg.h, 16, 30),
-    textBetween: T(bg.h, 12, 44),
-    textMuted: T(bg.h, 10, 55),
-  };
 };
+const tick = () => haptic(() => Haptics.selectionAsync());
+const bump = () => haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
 
 export default function CustomThemeScreen({ navigation, route }) {
   const { theme, selectedTheme, customThemes = [], changeTheme, saveCustomTheme, deleteCustomTheme } = useTheme();
   const { language } = useLanguage();
   const isEn = language === "en";
+  const copy = useMemo(() => getStudioCopy(isEn), [isEn]);
+  const locale = isEn ? "en-US" : "tr-TR";
+  const reduceMotion = useReduceMotion();
+  // Kısa ekranda (iPhone SE gibi) sabit önizleme mini kipe geçer; kaydırılan alana yer kalır.
+  const { height: windowHeight } = useWindowDimensions();
+  const miniPreview = windowHeight < 700;
 
   const editingId = route?.params?.themeId || null;
   const existing = editingId ? customThemes.find((tm) => tm.id === editingId) : null;
 
-  const [name, setName] = useState(existing?.name || "");
-  const [draft, setDraft] = useState(() =>
-    existing?.tokens ||
-    themeToTokens(THEME_NAMES.includes(selectedTheme) ? selectedTheme : "dark"),
-  );
-  const [activeToken, setActiveToken] = useState(null);
-  // Yeni temada ince ayar kapalı başlar (hızlı kurulum öne çıkar);
-  // mevcut temayı düzenlerken açık başlar.
-  const [advancedOpen, setAdvancedOpen] = useState(!!editingId);
+  // Açılış anındaki değerler: "başlangıca dön" ve kirli-durum karşılaştırması için.
+  const initialRef = useRef(null);
+  if (initialRef.current === null) {
+    initialRef.current = {
+      tokens:
+        existing?.tokens || themeToTokens(THEME_NAMES.includes(selectedTheme) ? selectedTheme : "dark"),
+      name: existing?.name || "",
+    };
+  }
+
+  const [history, dispatch] = useReducer(historyReducer, initialRef.current.tokens, createHistory);
+  const draft = history.present;
+  const commit = useCallback((next) => dispatch({ type: "commit", value: next }), []);
+
+  const [name, setName] = useState(initialRef.current.name);
+  // Yeni temada Keşfet (hazır adaylar), mevcut temada İnce ayar açılır.
+  const [tab, setTab] = useState(editingId ? "fine" : "discover");
+  const [scene, setScene] = useState("home");
+  const [style, setStyle] = useState({ contrast: "balanced", surfaces: "tinted" });
+  const [moodId, setMoodId] = useState(null);
+  const [locks, setLocks] = useState({ bg: false, accent: false });
+  const [readabilityOpen, setReadabilityOpen] = useState(false);
+  const [picker, setPicker] = useState(null); // { kind: "bg" | "accent" | "token", token? }
+  const [origin, setOrigin] = useState(null); // en son uygulanan adayın ruh hali
+  const [shuffleKey, setShuffleKey] = useState(0);
+  const [candidates, setCandidates] = useState(() => generateCandidates(CANDIDATE_COUNT));
 
   const resolved = useMemo(() => resolveThemeTokens(draft), [draft]);
   const previewTheme = useMemo(() => buildCustomTheme(draft), [draft]);
+  const analysis = useMemo(() => analyzeContrast(resolved), [resolved]);
+  const draftJson = useMemo(() => JSON.stringify(draft), [draft]);
 
-  const setColor = (key, value) => setDraft((prev) => ({ ...prev, [key]: value }));
+  /* ── Önizleme "nabzı": toplu bir değişiklikte hafifçe yaylanır ── */
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulse = useCallback(() => {
+    if (reduceMotion) return;
+    pulseAnim.setValue(0.982);
+    Animated.spring(pulseAnim, { toValue: 1, friction: 6, tension: 170, useNativeDriver: true }).start();
+  }, [pulseAnim, reduceMotion]);
 
-  const seedFrom = (themeName) => {
-    Haptics.selectionAsync().catch(() => {});
-    setDraft(themeToTokens(themeName));
-    toast.info(i18nText("autoI18n.ct_taban_uygulandi", "Taban tema yüklendi"));
+  /* ── Sekme içeriği geçişi ── */
+  const tabFade = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (reduceMotion) return undefined;
+    tabFade.setValue(0);
+    const run = Animated.timing(tabFade, { toValue: 1, duration: 200, useNativeDriver: true });
+    run.start();
+    return () => run.stop();
+  }, [tab, tabFade, reduceMotion]);
+
+  /* ── İsim ── */
+  const described = useMemo(() => describeTheme(resolved), [resolved]);
+  const suggestion = useMemo(() => {
+    const mood = origin && origin.json === draftJson ? origin.moodId : null;
+    const base = suggestedThemeName(copy, { moodId: mood, ...described });
+    const others = customThemes.filter((c) => c.id !== editingId).map((c) => c.name);
+    return uniqueName(base, others);
+  }, [origin, draftJson, copy, described, customThemes, editingId]);
+
+  /* ── Kaydedilmemiş değişiklikle çıkış koruması ── */
+  const dirty = draftJson !== JSON.stringify(initialRef.current.tokens) || name.trim() !== initialRef.current.name.trim();
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
+  const leavingRef = useRef(false);
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
+      if (leavingRef.current || !dirtyRef.current) return;
+      e.preventDefault();
+      appAlert(copy.leaveTitle, copy.leaveBody, [
+        { text: copy.leaveKeep, style: "cancel" },
+        {
+          text: copy.leaveDiscard,
+          style: "destructive",
+          onPress: () => {
+            leavingRef.current = true;
+            navigation.dispatch(e.data.action);
+          },
+        },
+      ]);
+    });
+    return unsubscribe;
+  }, [navigation, copy]);
+
+  /* ── Geçmiş ── */
+  const undo = () => {
+    if (!canUndo(history)) return;
+    tick();
+    dispatch({ type: "undo" });
+    setOrigin(null);
+  };
+  const redo = () => {
+    if (!canRedo(history)) return;
+    tick();
+    dispatch({ type: "redo" });
+    setOrigin(null);
+  };
+  const resetToStart = () => {
+    bump();
+    commit(initialRef.current.tokens);
+    setOrigin(null);
+    pulse();
   };
 
-  const applyAccentPreset = (hex) => {
-    Haptics.selectionAsync().catch(() => {});
-    setDraft((prev) => ({ ...prev, accent: hex, bold: applyRelative(hex, { l: -10 }) }));
+  /* ── Renk uygulayıcılar ── */
+  const accentPatch = useCallback(
+    (hex) => ({ accent: hex, bold: shiftLightness(hex, isLightSurface(resolved.primary) ? -9 : -10) }),
+    [resolved.primary],
+  );
+
+  const applyAccent = (hex) => {
+    tick();
+    commit({ ...draft, ...accentPatch(toHex(hex)) });
+    setOrigin(null);
   };
 
-  const generatePalette = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    setDraft(generateTokensFromSeeds(resolved.primary, resolved.accent));
+  const applyBackground = (hex, { announce = true } = {}) => {
+    tick();
+    const bg = toHex(hex);
+    commit(generateTokensFromSeeds(bg, fitAccent(resolved.accent, bg), style));
+    setOrigin(null);
+    pulse();
+    if (announce) toast.info(copy.bgMatched);
+  };
+
+  const rebuildPalette = () => {
+    bump();
+    commit(generateTokensFromSeeds(resolved.primary, resolved.accent, style));
+    setOrigin(null);
+    pulse();
     toast.success(i18nText("autoI18n.ct_palet_uretildi", "Palet iki renkten üretildi"));
   };
 
-  const randomize = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    const hue = Math.floor(Math.random() * 360);
-    const darkBg = Math.random() < 0.72; // koyu temalar uygulamaya daha çok yakışıyor
-    const bg = darkBg
-      ? hslToHex(hue, 18 + Math.floor(Math.random() * 14), 9 + Math.floor(Math.random() * 5))
-      : hslToHex(hue, 16 + Math.floor(Math.random() * 12), 90 + Math.floor(Math.random() * 5));
-    const accentHue = (hue + 120 + Math.floor(Math.random() * 120)) % 360;
-    const accent = hslToHex(accentHue, 72 + Math.floor(Math.random() * 16), darkBg ? 58 : 42);
-    setDraft(generateTokensFromSeeds(bg, accent));
+  const changeStyle = (patch) => {
+    tick();
+    const next = { ...style, ...patch };
+    setStyle(next);
+    commit(generateTokensFromSeeds(resolved.primary, resolved.accent, next));
+    setOrigin(null);
+    pulse();
   };
 
+  const fixReadable = () => {
+    const patch = fixReadability(resolved);
+    if (!Object.keys(patch).length) return;
+    bump();
+    commit({ ...draft, ...patch });
+    setOrigin(null);
+    pulse();
+    toast.success(copy.fixed);
+  };
+
+  /* ── Keşfet ── */
+  const regenerate = (over = {}) => {
+    const nextMood = "moodId" in over ? over.moodId : moodId;
+    const nextLocks = over.locks || locks;
+    const lock = {
+      bg: nextLocks.bg ? resolved.primary : null,
+      accent: nextLocks.accent ? resolved.accent : null,
+    };
+    setCandidates((prev) =>
+      generateCandidates(CANDIDATE_COUNT, {
+        moodId: nextMood,
+        lock,
+        avoid: over.fresh ? [] : prev,
+        contrast: style.contrast,
+        surfaces: style.surfaces,
+      }),
+    );
+    setShuffleKey((k) => k + 1);
+  };
+
+  const shuffle = () => {
+    bump();
+    regenerate();
+  };
+
+  const pickMood = (id) => {
+    tick();
+    setMoodId(id);
+    regenerate({ moodId: id, fresh: true });
+  };
+
+  const toggleLock = (kind) => {
+    tick();
+    const next = { ...locks, [kind]: !locks[kind] };
+    setLocks(next);
+    regenerate({ locks: next, fresh: true });
+  };
+
+  const pickCandidate = (item) => {
+    tick();
+    commit(item.tokens);
+    setOrigin({ json: JSON.stringify(item.tokens), moodId: item.moodId });
+    pulse();
+  };
+
+  const pickBase = (key) => {
+    tick();
+    commit(themeToTokens(key));
+    setOrigin(null);
+    pulse();
+    toast.info(i18nText("autoI18n.ct_taban_uygulandi", "Taban tema yüklendi"));
+  };
+
+  const appliedKey = useMemo(
+    () => candidates.find((c) => JSON.stringify(c.tokens) === draftJson)?.key || null,
+    [candidates, draftJson],
+  );
+  const candidateLabel = useCallback(
+    (item) => `${moodLabel(copy, item.moodId)} · ${hueLabel(copy, item.family)}`,
+    [copy],
+  );
+  const bases = useMemo(
+    () =>
+      BASE_THEMES.map((b) => ({
+        key: b.key,
+        label: i18nText(b.labelKey, b.fallback),
+        colors: getThemeColors(b.key),
+      })),
+    // i18nText aktif dile bakar; dil değişince etiketler yenilenmeli.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [language],
+  );
+
+  /* ── Kaydet / sil ── */
   // Cross-fade bitene kadar ekran etkileşimli kaldığından ikinci bir dokunuş
   // yeni bir tema kaydı daha üretebilirdi; ilk dokunuşta kilitlenir.
   const savingRef = useRef(false);
@@ -181,15 +385,17 @@ export default function CustomThemeScreen({ navigation, route }) {
     if (savingRef.current) return;
     if (!customThemesGate.check()) return;
     savingRef.current = true;
+    leavingRef.current = true;
+    const finalName = name.trim() || suggestion;
     // Aktif temanın kendisi düzenleniyorsa token yazımı geçişin apply adımına
     // bırakılır: erken yazılırsa ekran görüntü alınmadan yeni renklere boyanır
     // ve solma "yeniden yeniye" olduğu için görünmez olur.
     const isActiveEdit = editingId && selectedTheme === `custom:${editingId}`;
     const done = isActiveEdit
       ? changeTheme(`custom:${editingId}`, {
-          onApply: () => saveCustomTheme({ id: editingId, name, tokens: draft }),
+          onApply: () => saveCustomTheme({ id: editingId, name: finalName, tokens: draft }),
         })
-      : changeTheme(`custom:${saveCustomTheme({ id: editingId, name, tokens: draft })}`);
+      : changeTheme(`custom:${saveCustomTheme({ id: editingId, name: finalName, tokens: draft })}`);
     // Toast ve geri dönüş cross-fade bitince: erken çağrılırlarsa toast
     // ekran görüntüsünün altında gizli kalıyor, pop animasyonu da görüntünün
     // alınmasıyla yarışıp yarım kalmış kare donduruyor.
@@ -210,6 +416,7 @@ export default function CustomThemeScreen({ navigation, route }) {
           text: i18nText("autoI18n.sil", "Sil"),
           style: "destructive",
           onPress: () => {
+            leavingRef.current = true;
             const wasActive = selectedTheme === `custom:${editingId}`;
             deleteCustomTheme(editingId);
             // animated:false — onay alert'i (RN Modal) daha kapanırken görüntü
@@ -225,239 +432,352 @@ export default function CustomThemeScreen({ navigation, route }) {
     );
   };
 
-  const toggleAdvanced = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setAdvancedOpen((v) => !v);
-  };
-
-  // Picker için kaynak token listesi (kendisi hariç) — bağıl mod kaynakları.
-  const pickerSources = useMemo(() => {
-    if (!activeToken) return [];
-    return CUSTOM_THEME_TOKENS.filter((tok) => tok.key !== activeToken.key).map((tok) => ({
+  /* ── Renk seçici ── */
+  // Kaynak token listesi (kendisi hariç) — bağıl mod kaynakları. Yalnız ince
+  // ayardaki token'lar bağlanabilir; zemin/vurgu kutuları mutlak renk ister.
+  const tokenSources = useMemo(() => {
+    if (picker?.kind !== "token") return NO_SOURCES;
+    return CUSTOM_THEME_TOKENS.filter((tok) => tok.key !== picker.token.key).map((tok) => ({
       key: tok.key,
       label: i18nText(tok.labelKey, tok.fallback),
       color: resolved[tok.key],
     }));
-  }, [activeToken, resolved]);
+  }, [picker, resolved]);
 
-  // Kontrast skoru: ana metin ↔ zemin.
-  const ratio = contrastRatio(resolved.primary, resolved.textPrimary);
-  const ratioText = `${ratio.toFixed(1)}:1`;
-  const ratioMeta =
-    ratio >= 7
-      ? { tone: theme.colors.green, label: "AAA", icon: "shield-checkmark" }
-      : ratio >= 4.5
-        ? { tone: theme.colors.green, label: "AA", icon: "checkmark-circle" }
-        : ratio >= 3
-          ? { tone: theme.colors.orange, label: i18nText("autoI18n.ct_dusuk", "Düşük"), icon: "alert-circle" }
-          : { tone: theme.colors.red, label: i18nText("autoI18n.ct_yetersiz", "Yetersiz"), icon: "warning" };
+  const pickerView = useMemo(() => {
+    if (!picker) return { title: "", initialValue: "#000000", sources: NO_SOURCES, original: null, against: null };
+    if (picker.kind === "bg") {
+      return {
+        title: tokenLabel("primary"),
+        initialValue: resolved.primary,
+        sources: NO_SOURCES,
+        original: resolved.primary,
+        against: null,
+      };
+    }
+    if (picker.kind === "accent") {
+      return {
+        title: tokenLabel("accent"),
+        initialValue: resolved.accent,
+        sources: NO_SOURCES,
+        original: resolved.accent,
+        against: { color: resolved.primary, label: tokenLabel("primary") },
+      };
+    }
+    const key = picker.token.key;
+    const againstKey = key === "bold" ? "primary" : RATIO_AGAINST[key];
+    return {
+      title: tokenLabel(key),
+      // Kayıtlı tema eski/eksik token taşıyabilir: çözülmüş değere düş.
+      initialValue: draft[key] ?? resolved[key],
+      sources: tokenSources,
+      original: resolved[key],
+      against: againstKey ? { color: resolved[againstKey], label: tokenLabel(againstKey) } : null,
+    };
+  }, [picker, resolved, draft, tokenSources]);
 
-  const QuickCard = ({ tokenKey, icon, label }) => (
-    <TouchableOpacity
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      activeOpacity={0.8}
-      onPress={() => setActiveToken(tokenByKey(tokenKey))}
-      style={[styles.quickCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-    >
-      <View style={[styles.quickSwatch, { backgroundColor: resolved[tokenKey], borderColor: theme.border }]}>
-        <AppIcon
-          family="Ionicons"
-          name={icon}
-          size={16}
-          color={hexToHsl(resolved[tokenKey] || "#000000").l > 55 ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.85)"}
+  const confirmPicker = (value) => {
+    if (!picker) return;
+    if (picker.kind === "bg") applyBackground(value);
+    else if (picker.kind === "accent") applyAccent(value);
+    else {
+      commit({ ...draft, [picker.token.key]: value });
+      setOrigin(null);
+    }
+    setPicker(null);
+  };
+
+  /* ── Türetilmiş görünüm verisi ── */
+  const harmonyItems = useMemo(
+    () =>
+      suggestAccents(resolved.primary, resolved.accent).map((item) => ({
+        ...item,
+        label: harmonyLabel(copy, item.id),
+      })),
+    [resolved.primary, resolved.accent, copy],
+  );
+
+  const tabs = useMemo(
+    () => [
+      { key: "setup", label: copy.tabSetup, icon: "color-palette-outline" },
+      { key: "discover", label: copy.tabDiscover, icon: "dice-outline" },
+      { key: "fine", label: copy.tabFine, icon: "options-outline" },
+    ],
+    [copy],
+  );
+  const sceneOptions = useMemo(
+    () => [
+      { key: "home", label: copy.sceneHome },
+      { key: "detail", label: copy.sceneDetail },
+    ],
+    [copy],
+  );
+  const contrastOptions = useMemo(
+    () => CONTRAST_LEVELS.map((key) => ({ key, label: copy[`contrast${key.charAt(0).toUpperCase()}${key.slice(1)}`] })),
+    [copy],
+  );
+  const surfaceOptions = useMemo(
+    () => SURFACE_MODES.map((key) => ({ key, label: copy[`surfaces${key.charAt(0).toUpperCase()}${key.slice(1)}`] })),
+    [copy],
+  );
+
+  const toggleReadability = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setReadabilityOpen((v) => !v);
+  };
+
+  const undoable = canUndo(history);
+  const redoable = canRedo(history);
+
+  /* ───────────── Sekme içerikleri ───────────── */
+
+  const setupContent = (
+    <View style={styles.stack}>
+      <SectionHeader icon="color-palette-outline" title={copy.sectionColors} sub={copy.sectionColorsSub} theme={theme} />
+      <View style={styles.tileRow}>
+        <ColorTile
+          label={tokenLabel("primary")}
+          sub={copy.bgSub}
+          color={resolved.primary}
+          icon="layers-outline"
+          onPress={() => setPicker({ kind: "bg" })}
+          theme={theme}
+        />
+        <ColorTile
+          label={tokenLabel("accent")}
+          sub={copy.accentSub}
+          color={resolved.accent}
+          icon="color-wand-outline"
+          onPress={() => setPicker({ kind: "accent" })}
+          theme={theme}
         />
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.quickLabel, { color: theme.text.primary }]} numberOfLines={1}>{label}</Text>
-        <Text style={[styles.quickHex, { color: theme.text.muted }]}>{String(resolved[tokenKey] || "").toUpperCase()}</Text>
+
+      <View style={styles.block}>
+        <MiniLabel theme={theme}>{copy.readyBackgrounds.toLocaleUpperCase(locale)}</MiniLabel>
+        <SwatchRow colors={BACKGROUND_PRESETS} selected={resolved.primary} onPick={applyBackground} theme={theme} shape="square" />
       </View>
-      <AppIcon family="Ionicons" name="chevron-forward" size={15} color={theme.text.muted} />
-    </TouchableOpacity>
+
+      <View style={styles.block}>
+        <MiniLabel theme={theme}>{copy.readyAccents.toLocaleUpperCase(locale)}</MiniLabel>
+        <SwatchRow colors={ACCENT_PRESETS} selected={resolved.accent} onPick={applyAccent} theme={theme} />
+      </View>
+
+      <View style={styles.block}>
+        <MiniLabel theme={theme}>{copy.harmonyTitle.toLocaleUpperCase(locale)}</MiniLabel>
+        <HarmonyRow items={harmonyItems} selected={resolved.accent} onPick={applyAccent} theme={theme} />
+        <Text style={[styles.hint, { color: theme.text.muted }]}>{copy.harmonyHint}</Text>
+      </View>
+
+      <SectionHeader icon="speedometer-outline" title={copy.sectionStyle} theme={theme} />
+      <View style={styles.block}>
+        <MiniLabel theme={theme}>{copy.styleContrast.toLocaleUpperCase(locale)}</MiniLabel>
+        <Segmented options={contrastOptions} value={style.contrast} onChange={(key) => changeStyle({ contrast: key })} theme={theme} />
+      </View>
+      <View style={styles.block}>
+        <MiniLabel theme={theme}>{copy.styleSurfaces.toLocaleUpperCase(locale)}</MiniLabel>
+        <Segmented options={surfaceOptions} value={style.surfaces} onChange={(key) => changeStyle({ surfaces: key })} theme={theme} />
+        <Text style={[styles.hint, { color: theme.text.muted }]}>{copy.styleHint}</Text>
+      </View>
+
+      <View style={styles.ghostRow}>
+        <GhostButton icon="refresh" label={copy.rebuild} onPress={rebuildPalette} theme={theme} />
+        <GhostButton icon="arrow-undo-outline" label={copy.resetToStart} onPress={resetToStart} disabled={!dirty} theme={theme} />
+      </View>
+    </View>
+  );
+
+  const discoverContent = (
+    <ThemeShuffleDeck
+      theme={theme}
+      copy={copy}
+      locale={locale}
+      candidates={candidates}
+      appliedKey={appliedKey}
+      candidateLabel={candidateLabel}
+      moodId={moodId}
+      onMood={pickMood}
+      lockBg={locks.bg}
+      lockAccent={locks.accent}
+      lockColors={{ bg: resolved.primary, accent: resolved.accent }}
+      onToggleLock={toggleLock}
+      onShuffle={shuffle}
+      onPick={pickCandidate}
+      shuffleKey={shuffleKey}
+      bases={bases}
+      onBase={pickBase}
+      reduceMotion={reduceMotion}
+    />
+  );
+
+  const fineContent = (
+    <View style={styles.stack}>
+      <View style={styles.block}>
+        <PaletteStrip resolved={resolved} height={14} theme={theme} />
+        <Text style={[styles.hint, { color: theme.text.muted }]}>{copy.fineHint}</Text>
+      </View>
+      {CUSTOM_THEME_GROUPS.map((group) => {
+        const tokens = CUSTOM_THEME_TOKENS.filter((token) => token.group === group.id);
+        return (
+          <View key={group.id} style={styles.block}>
+            <MiniLabel theme={theme}>{i18nText(group.labelKey, group.fallback).toLocaleUpperCase(locale)}</MiniLabel>
+            <View style={[styles.panel, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+              {tokens.map((token, index) => {
+                const value = draft[token.key];
+                const relative = isRelativeToken(value);
+                const againstKey = RATIO_AGAINST[token.key];
+                return (
+                  <TokenRow
+                    key={token.key}
+                    label={i18nText(token.labelKey, token.fallback)}
+                    color={resolved[token.key]}
+                    hex={String(resolved[token.key] || "").toUpperCase()}
+                    linked={relative}
+                    linkText={relative ? describeRelative(value) : ""}
+                    ratioAgainst={againstKey ? resolved[againstKey] : null}
+                    last={index === tokens.length - 1}
+                    onPress={() => setPicker({ kind: "token", token })}
+                    theme={theme}
+                  />
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
+    </View>
   );
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: theme.primary }]} edges={["top"]}>
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.12} />
+      <ScreenDecor scope="settings" iconOpacity={0.12} />
       <View style={styles.header}>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel={isEn ? "Back" : "Geri"} onPress={() => navigation.goBack()} style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-          <AppIcon family="Ionicons" name="arrow-back" size={21} color={theme.text.primary} />
-        </TouchableOpacity>
+        <BackButton absolute={false} onPress={() => navigation.goBack()} />
         <View style={styles.headerCopy}>
-          <Text style={[styles.title, { color: theme.text.primary }]} numberOfLines={1}>{editingId ? i18nText("autoI18n.ct_temayi_duzenle", "Temayı Düzenle") : i18nText("autoI18n.ozel_tema", "Özel Tema")}</Text>
-          <Text style={[styles.subtitle, { color: theme.text.muted }]} numberOfLines={1}>{i18nText("autoI18n.ct_alt_baslik_v2", "İki renk seç, gerisini biz kuralım")}</Text>
+          <Text style={[styles.title, { color: theme.text.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>
+            {editingId ? i18nText("autoI18n.ct_temayi_duzenle", "Temayı Düzenle") : i18nText("autoI18n.ozel_tema", "Özel Tema")}
+          </Text>
+          <Text style={[styles.subtitle, { color: theme.text.muted }]} numberOfLines={1}>
+            {i18nText("autoI18n.ct_alt_baslik_v2", "İki renk seç, gerisini biz kuralım")}
+          </Text>
         </View>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel={isEn ? "Random" : "Rastgele"} onPress={randomize} style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-          <AppIcon family="Ionicons" name="dice-outline" size={19} color={theme.text.primary} />
-        </TouchableOpacity>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel={isEn ? "Reset" : "Sıfırla"} onPress={() => setDraft(DEFAULT_CUSTOM_TOKENS)} style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-          <AppIcon family="Ionicons" name="refresh" size={19} color={theme.text.primary} />
-        </TouchableOpacity>
+        {/* Devre dışı: eski kutuda opaklık 0.4; cam yolunda opaklık YOK, ikon soluk. */}
+        <GlassIconButton
+          icon="arrow-undo"
+          iconSize={18}
+          size={40}
+          fallbackRadius={13}
+          color={undoable ? theme.text.primary : theme.text.muted}
+          fallbackStyle={{
+            backgroundColor: theme.secondary,
+            borderColor: theme.border,
+            borderWidth: 1,
+            opacity: undoable ? 1 : 0.4,
+          }}
+          accessibilityLabel={copy.undo}
+          disabled={!undoable}
+          onPress={undo}
+        />
+        <GlassIconButton
+          icon="arrow-redo"
+          iconSize={18}
+          size={40}
+          fallbackRadius={13}
+          color={redoable ? theme.text.primary : theme.text.muted}
+          fallbackStyle={{
+            backgroundColor: theme.secondary,
+            borderColor: theme.border,
+            borderWidth: 1,
+            opacity: redoable ? 1 : 0.4,
+          }}
+          accessibilityLabel={copy.redo}
+          disabled={!redoable}
+          onPress={redo}
+        />
+      </View>
+
+      {/* Canlı önizleme SABİT: aşağıdaki denetimlerde gezinirken (ya da bir
+          aday seçerken) sonuç gözden kaçmasın. Yalnız altındaki içerik kayar. */}
+      <View style={[styles.pinned, { borderBottomColor: theme.border }]}>
+        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+          <ThemePreviewCard theme={previewTheme} isEn={isEn} scene={scene} compact mini={miniPreview} />
+        </Animated.View>
+        <View style={styles.previewBar}>
+          <View style={styles.sceneToggle}>
+            <Segmented options={sceneOptions} value={scene} onChange={setScene} theme={theme} dense />
+          </View>
+          <ReadabilityPill analysis={analysis} copy={copy} open={readabilityOpen} onPress={toggleReadability} theme={theme} />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {/* En üstte canlı önizleme + kontrast rozeti */}
-        <View>
-          <ThemePreviewCard theme={previewTheme} isEn={isEn} />
-          <View style={[styles.ratioPill, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-            <AppIcon family="Ionicons" name={ratioMeta.icon} size={13} color={ratioMeta.tone} />
-            <Text style={[styles.ratioText, { color: theme.text.secondary }]}>
-              {i18nText("autoI18n.ct_kontrast", "Kontrast")} {ratioText}
-            </Text>
-            <View style={[styles.ratioBadge, { backgroundColor: `${ratioMeta.tone}22` }]}>
-              <Text style={[styles.ratioBadgeText, { color: ratioMeta.tone }]}>{ratioMeta.label}</Text>
-            </View>
-          </View>
-        </View>
+        {readabilityOpen ? <ReadabilityPanel analysis={analysis} copy={copy} onFix={fixReadable} theme={theme} /> : null}
 
-        {/* Tema adı */}
+        {/* Tema adı (+ öneri) */}
         <View style={[styles.nameRow, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <AppIcon family="Ionicons" name="pricetag-outline" size={17} color={theme.text.muted} />
           <TextInput
             value={name}
             onChangeText={setName}
             maxLength={32}
-            placeholder={i18nText("autoI18n.ct_isim_placeholder", "Temana bir isim ver")}
+            placeholder={suggestion || i18nText("autoI18n.ct_isim_placeholder", "Temana bir isim ver")}
             placeholderTextColor={theme.text.muted}
             style={[styles.nameInput, { color: theme.text.primary }]}
           />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={copy.suggestName}
+            activeOpacity={0.75}
+            onPress={() => {
+              tick();
+              setName(suggestion);
+            }}
+            style={[styles.nameMagic, { backgroundColor: `${theme.accent}22` }]}
+          >
+            <AppIcon family="Ionicons" name="sparkles" size={15} color={theme.accent} />
+          </TouchableOpacity>
         </View>
 
-        {/* ── Hızlı kurulum ── */}
-        <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{i18nText("autoI18n.ct_hizli_kurulum", "Hızlı kurulum").toUpperCase()}</Text>
-        <View style={styles.quickRow}>
-          <QuickCard tokenKey="primary" icon="layers-outline" label={i18nText("autoI18n.ct_arka_plan", "Arka Plan")} />
-          <QuickCard tokenKey="accent" icon="color-wand-outline" label={i18nText("autoI18n.ct_vurgu", "Vurgu")} />
-        </View>
+        <StudioTabs tabs={tabs} value={tab} onChange={(key) => { tick(); setTab(key); }} theme={theme} reduceMotion={reduceMotion} />
 
-        {/* Hazır vurgu renkleri */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
-          {ACCENT_PRESETS.map((hex) => {
-            const selected = String(resolved.accent).toUpperCase() === hex.toUpperCase();
-            return (
-              <TouchableOpacity
-                key={hex}
-                accessibilityRole="button"
-                accessibilityLabel={hex}
-                activeOpacity={0.8}
-                onPress={() => applyAccentPreset(hex)}
-                style={[
-                  styles.presetDot,
-                  { backgroundColor: hex, borderColor: selected ? theme.text.primary : "transparent" },
-                ]}
-              >
-                {selected ? <AppIcon family="Ionicons" name="checkmark" size={13} color="#fff" /> : null}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Zemin + vurgudan tam palet üret */}
-        <TouchableOpacity
-          accessibilityRole="button"
-          activeOpacity={0.85}
-          onPress={generatePalette}
-          style={[styles.generateBtn, { backgroundColor: `${resolved.accent}1F`, borderColor: `${resolved.accent}66` }]}
+        <Animated.View
+          style={{
+            opacity: tabFade,
+            transform: [{ translateY: tabFade.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+          }}
         >
-          <AppIcon family="Ionicons" name="sparkles" size={17} color={resolved.accent} />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.generateTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.ct_paleti_uret", "Paleti Üret")}</Text>
-            <Text style={[styles.generateSub, { color: theme.text.muted }]} numberOfLines={1}>{i18nText("autoI18n.ct_paleti_uret_aciklama", "Zemin + vurgudan tüm renkleri türet")}</Text>
-          </View>
-          <AppIcon family="Ionicons" name="arrow-forward-circle" size={22} color={resolved.accent} />
-        </TouchableOpacity>
-
-        {/* Taban temadan başlat */}
-        <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{i18nText("autoI18n.ct_tabandan_basla", "Bir tabandan başla").toUpperCase()}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.baseRow}>
-          {BASE_THEMES.map((base) => {
-            const p = getThemeColors(base.key);
-            return (
-              <TouchableOpacity key={base.key} accessibilityRole="button" activeOpacity={0.8} onPress={() => seedFrom(base.key)} style={[styles.baseChip, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-                <View style={styles.baseSwatches}>
-                  <View style={[styles.baseSwatch, { backgroundColor: p.primary }]} />
-                  <View style={[styles.baseSwatch, { backgroundColor: p.secondary }]} />
-                  <View style={[styles.baseSwatch, { backgroundColor: p.accent }]} />
-                </View>
-                <Text style={[styles.baseLabel, { color: theme.text.secondary }]} numberOfLines={1}>{i18nText(base.labelKey, base.fallback)}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* ── İnce ayar (katlanabilir) ── */}
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityState={{ expanded: advancedOpen }}
-          activeOpacity={0.75}
-          onPress={toggleAdvanced}
-          style={[styles.advancedHeader, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-        >
-          <AppIcon family="Ionicons" name="options-outline" size={17} color={theme.accent} />
-          <Text style={[styles.advancedTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.ct_ince_ayar", "İnce Ayar")}</Text>
-          <Text style={[styles.advancedCount, { color: theme.text.muted }]}>{CUSTOM_THEME_TOKENS.length}</Text>
-          <AppIcon family="Ionicons" name={advancedOpen ? "chevron-up" : "chevron-down"} size={17} color={theme.text.muted} />
-        </TouchableOpacity>
-
-        {advancedOpen
-          ? CUSTOM_THEME_GROUPS.map((group) => (
-              <View key={group.id} style={styles.group}>
-                <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{i18nText(group.labelKey, group.fallback).toUpperCase()}</Text>
-                <View style={[styles.panel, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-                  {CUSTOM_THEME_TOKENS.filter((token) => token.group === group.id).map((token, index, arr) => {
-                    const value = draft[token.key];
-                    const relative = isRelativeToken(value);
-                    return (
-                      <TouchableOpacity
-                        key={token.key}
-                        accessibilityRole="button"
-                        accessibilityLabel={i18nText(token.labelKey, token.fallback)}
-                        activeOpacity={0.7}
-                        onPress={() => setActiveToken(token)}
-                        style={[styles.colorRow, index !== arr.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
-                      >
-                        <View style={[styles.swatch, { backgroundColor: resolved[token.key], borderColor: theme.border }]}>
-                          {relative ? <View style={styles.linkBadge}><AppIcon family="Ionicons" name="link" size={10} color="#fff" /></View> : null}
-                        </View>
-                        <View style={styles.colorCopy}>
-                          <Text style={[styles.colorLabel, { color: theme.text.primary }]}>{i18nText(token.labelKey, token.fallback)}</Text>
-                          {relative ? <Text style={[styles.colorSub, { color: theme.accent }]} numberOfLines={1}>{describeRelative(value)}</Text> : null}
-                        </View>
-                        <Text style={[styles.colorHex, { color: theme.text.muted }]}>{String(resolved[token.key] || "").toUpperCase()}</Text>
-                        <AppIcon family="Ionicons" name="chevron-forward" size={17} color={theme.text.muted} />
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            ))
-          : null}
+          {tab === "setup" ? setupContent : tab === "discover" ? discoverContent : fineContent}
+        </Animated.View>
 
         <View style={{ height: 8 }} />
       </ScrollView>
 
-      {/* Alt sabit aksiyon */}
+      {/* Alt sabit aksiyon: sil / kaydet */}
       <View style={[styles.footer, { backgroundColor: theme.primary, borderTopColor: theme.border }]}>
-        {editingId ? (
-          <TouchableOpacity accessibilityRole="button" accessibilityLabel={i18nText("autoI18n.sil", "Sil")} activeOpacity={0.85} onPress={remove} style={[styles.deleteBtn, { borderColor: `${theme.colors.red}88` }]}>
-            <AppIcon family="Ionicons" name="trash-outline" size={20} color={theme.colors.red} />
+        <View style={styles.footerRow}>
+          {editingId ? (
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel={i18nText("autoI18n.sil", "Sil")} activeOpacity={0.85} onPress={remove} style={[styles.deleteBtn, { borderColor: `${theme.colors.red}88` }]}>
+              <AppIcon family="Ionicons" name="trash-outline" size={20} color={theme.colors.red} />
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={save} style={[styles.saveBtn, { backgroundColor: theme.accent }]}>
+            <AppIcon family="Ionicons" name="checkmark-circle" size={20} color="#fff" />
+            <Text style={styles.saveText}>{i18nText("autoI18n.ct_kaydet_uygula", "Kaydet ve Uygula")}</Text>
           </TouchableOpacity>
-        ) : null}
-        <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={save} style={[styles.saveBtn, { backgroundColor: theme.accent }]}>
-          <AppIcon family="Ionicons" name="checkmark-circle" size={20} color="#fff" />
-          <Text style={styles.saveText}>{i18nText("autoI18n.ct_kaydet_uygula", "Kaydet ve Uygula")}</Text>
-        </TouchableOpacity>
+        </View>
       </View>
 
       <ColorPickerSheet
-        visible={!!activeToken}
+        visible={!!picker}
         isEn={isEn}
-        initialValue={activeToken ? draft[activeToken.key] : "#000000"}
-        title={activeToken ? i18nText(activeToken.labelKey, activeToken.fallback) : ""}
-        sources={pickerSources}
-        onClose={() => setActiveToken(null)}
-        onConfirm={(value) => { if (activeToken) setColor(activeToken.key, value); setActiveToken(null); }}
+        initialValue={pickerView.initialValue}
+        title={pickerView.title}
+        sources={pickerView.sources}
+        originalHex={pickerView.original}
+        contrastAgainst={pickerView.against}
+        onClose={() => setPicker(null)}
+        onConfirm={confirmPicker}
       />
     </SafeAreaView>
   );
@@ -466,105 +786,30 @@ export default function CustomThemeScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { minHeight: 60, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 10 },
-  iconBtn: { width: 42, height: 42, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   headerCopy: { flex: 1 },
   title: { fontSize: 21, fontWeight: "900" },
   subtitle: { fontSize: 12, fontWeight: "600", marginTop: 2 },
-  content: { paddingHorizontal: 16, paddingBottom: 24, gap: 13 },
+  pinned: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 9, gap: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  content: { paddingHorizontal: 16, paddingTop: 13, paddingBottom: 24, gap: 13 },
 
-  /* Kontrast rozeti */
-  ratioPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    alignSelf: "flex-start",
-    marginTop: 9,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  ratioText: { fontSize: 11.5, fontWeight: "750" },
-  ratioBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999 },
-  ratioBadgeText: { fontSize: 10, fontWeight: "900" },
+  previewBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  sceneToggle: { width: 160 },
 
-  nameRow: { minHeight: 50, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14 },
+  nameRow: { minHeight: 50, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 14, paddingRight: 7 },
   nameInput: { flex: 1, fontSize: 15, fontWeight: "750", paddingVertical: 11 },
-  sectionTitle: { fontSize: 12, fontWeight: "900", letterSpacing: 0.7, marginLeft: 2, marginBottom: -4 },
+  nameMagic: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
 
-  /* Hızlı kurulum */
-  quickRow: { flexDirection: "row", gap: 10 },
-  quickCard: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: 15,
-    borderWidth: 1,
-    padding: 11,
-  },
-  quickSwatch: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickLabel: { fontSize: 12.5, fontWeight: "800" },
-  quickHex: { fontSize: 10, fontWeight: "700", marginTop: 1, letterSpacing: 0.4 },
-  presetRow: { gap: 9, paddingVertical: 2, paddingRight: 8 },
-  presetDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  generateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    borderRadius: 15,
-    borderWidth: 1,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-  },
-  generateTitle: { fontSize: 13.5, fontWeight: "850" },
-  generateSub: { fontSize: 10.5, fontWeight: "650", marginTop: 1 },
+  stack: { gap: 16 },
+  block: { gap: 9 },
+  tileRow: { flexDirection: "row", gap: 10 },
+  hint: { fontSize: 11, fontWeight: "650", lineHeight: 15, marginLeft: 2 },
+  ghostRow: { flexDirection: "row", gap: 10 },
 
-  baseRow: { gap: 9, paddingVertical: 2, paddingRight: 8 },
-  baseChip: { minWidth: 96, borderRadius: 14, borderWidth: 1, padding: 10, gap: 8, alignItems: "center" },
-  baseSwatches: { flexDirection: "row", gap: 4 },
-  baseSwatch: { width: 18, height: 18, borderRadius: 6 },
-  baseLabel: { fontSize: 11, fontWeight: "800" },
-
-  /* İnce ayar */
-  advancedHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 13,
-    minHeight: 48,
-  },
-  advancedTitle: { flex: 1, fontSize: 13.5, fontWeight: "850" },
-  advancedCount: { fontSize: 11, fontWeight: "800" },
-
-  group: { gap: 9 },
   panel: { borderRadius: 18, borderWidth: 1, paddingHorizontal: 14 },
-  colorRow: { minHeight: 58, flexDirection: "row", alignItems: "center", gap: 13 },
-  swatch: { width: 34, height: 34, borderRadius: 11, borderWidth: 1.5, alignItems: "flex-end", justifyContent: "flex-end" },
-  linkBadge: { width: 16, height: 16, borderRadius: 8, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", margin: -1 },
-  colorCopy: { flex: 1 },
-  colorLabel: { fontSize: 14, fontWeight: "750" },
-  colorSub: { fontSize: 10, fontWeight: "800", marginTop: 2 },
-  colorHex: { fontSize: 12, fontWeight: "800", letterSpacing: 0.5 },
 
-  footer: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: "row", gap: 11 },
+  footer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  footerRow: { flexDirection: "row", gap: 11 },
   deleteBtn: { width: 52, minHeight: 52, borderRadius: 16, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
-  saveBtn: { flex: 1, minHeight: 52, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },
+  saveBtn: { flex: 1, minHeight: 50, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },
   saveText: { color: "#fff", fontSize: 16, fontWeight: "900" },
 });

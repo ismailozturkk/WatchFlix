@@ -5,7 +5,7 @@
 // expo-image disk cache'ine indirir. Böylece internet yokken/azken bu veriler
 // ve görseller hazır olur.
 //
-// Kapsam (her biri ayrı bir veri türü — Ayarlar > Genel'den seçilir):
+// Kapsam (her biri ayrı bir veri türü — Ayarlar > Veri ve depolama'dan seçilir):
 //   profil · listeler · notlar · hatırlatıcılar · gönderiler · etkinlikler ·
 //   film içerikleri · dizi içerikleri · görseller (posterler)
 //
@@ -16,8 +16,9 @@
 // NOT: Koleksiyon yolları mevcut context'lerden doğrulandı:
 //   Users/{uid}                       (UserProfileContext)
 //   Lists/{uid} + alt: favorites|watchList|watchedMovies|watchedTv (ListStatusContext)
-//   Notes/{uid}/items                 (ProfileNotesContext)
-//   Reminders/{uid}/movies|tvShows    (ProfileRemindersContext)
+//   Notes/{uid}/items                 (services/userData — notesDomain)
+//   Reminders/{uid}/movies|tvShows    (services/userData — remindersDomain)
+// Notlar/hatırlatıcılar yerel-öncelikli: "indir" = yerel kopyayı buluttan yeniden kur.
 
 import { Keys, set as writeStorage } from "./storage";
 import axios from "axios";
@@ -26,18 +27,24 @@ import { auth, db } from "../firebase";
 import * as cacheStore from "../utils/cacheStore";
 import { prefetchImages } from "./imagePrefetch";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
-import { cacheKeys } from "../utils/cacheKeys";
 import { i18nText } from "../utils/i18nText";
 import { setCachedValue } from "../utils/apiCache";
+import { cacheKeys } from "../utils/cacheKeys";
 import {
   getAutoDataCacheEnabled,
   getDataTypes,
   normalizeDataTypes,
 } from "../utils/dataCacheSettings";
 import * as PostsApi from "./postsService";
+import {
+  mediaNotesDomain,
+  notesDomain,
+  remindersDomain,
+  resyncUserData,
+} from "./userData";
 
 // Cache anahtarları tek kaynaktan (context read-through ile AYNI).
-export const CACHE = cacheKeys;
+const CACHE = cacheKeys;
 
 const LIST_SUBCOLLECTIONS = ["favorites", "watchList", "watchedMovies", "watchedTv"];
 const POSTER_KEY_RE = /poster|still|backdrop/i;
@@ -259,40 +266,28 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
       category: "notes",
       label: i18nText("autoI18n.notlar", "Notlar"),
       run: async () => {
-        const snap = await getDocs(collection(db, "Notes", uid, "items"));
-        // Şekil ProfileNotesContext ile ayni: dizi, createdAt azalan.
-        const arr = snap.docs
-          .map((d) => ({ ...d.data(), id: d.id }))
-          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-        cacheStore.setJSON(...CACHE.notes(uid), arr);
-        cachedDocs += snap.size;
+        // Notlar ve medya notları yerel-öncelikli katmanda (services/userData):
+        // yerel kopya KAYNAK, buluttan tek seferlik çekilir. "İndir" burada
+        // "yerel kopyayı buluttan yeniden kur" demek — bekleyen yerel
+        // değişiklikler korunur (üstüne bindirilir), kaybolmaz.
+        const ok = await resyncUserData(uid, ["notes", "mediaNotes"]);
+        if (!ok) throw new Error("notes-resync-failed");
+        const notes = notesDomain.getSnapshot(uid).lists.items;
+        const mediaNotes = mediaNotesDomain.getSnapshot(uid).lists.items;
+        collectPosterPaths(mediaNotes, posterPaths);
+        cachedDocs += notes.length + mediaNotes.length;
       },
     },
     {
       category: "reminders",
       label: i18nText("autoI18n.hatirlaticilar", "Hatırlatıcılar"),
       run: async () => {
-        // movies → dizi (ProfileRemindersContext.movieReminders ile aynı)
-        const moviesSnap = await getDocs(collection(db, "Reminders", uid, "movies"));
-        const movies = moviesSnap.docs.map((d) => d.data());
-        cacheStore.setJSON(...CACHE.reminders(uid, "movies"), movies);
+        const ok = await resyncUserData(uid, ["reminders"]);
+        if (!ok) throw new Error("reminders-resync-failed");
+        const { movies, episodes } = remindersDomain.getSnapshot(uid).lists;
         collectPosterPaths(movies, posterPaths);
-
-        // tvShows → her show'un episodes alt koleksiyonu düzleştirilir
-        // (ProfileRemindersContext.allTvEpisodes ile aynı şekil).
-        const showsSnap = await getDocs(collection(db, "Reminders", uid, "tvShows"));
-        const episodes = [];
-        for (const showDoc of showsSnap.docs) {
-          collectPosterPaths(showDoc.data(), posterPaths);
-          const epSnap = await getDocs(
-            collection(db, "Reminders", uid, "tvShows", showDoc.id, "episodes"),
-          );
-          epSnap.docs.forEach((d) => episodes.push(d.data()));
-        }
-        cacheStore.setJSON(...CACHE.reminders(uid, "episodes"), episodes);
         collectPosterPaths(episodes, posterPaths);
-
-        cachedDocs += moviesSnap.size + episodes.length;
+        cachedDocs += movies.length + episodes.length;
       },
     },
     {

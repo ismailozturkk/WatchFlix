@@ -34,6 +34,7 @@ import SaveSharedListModal from "@components/modals/SaveSharedListModal";
 import { PostCardSkeleton } from "@components/Skeleton";
 import { fetchPost, isPostLiked, toggleLike, votePoll } from "@services/postsService";
 import ScreenDecor from "@components/ScreenDecor";
+import BackButton from "@components/BackButton";
 
 // Basit göreli zaman (MyPostsScreen ile aynı kısaltmalar).
 const timeAgo = (ms) => {
@@ -166,16 +167,10 @@ export default function PostDetailScreen({ route, navigation }) {
       edges={["top"]}
     >
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="social" iconOpacity={0.25} />
       {/* Başlık */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.8}
-          style={[styles.backBtn, { backgroundColor: theme.secondary }]}
-        >
-          <AppIcon family="Ionicons" name="chevron-back" size={22} color={theme.text.primary} />
-        </TouchableOpacity>
+        <BackButton absolute={false} onPress={() => navigation.goBack()} />
         <Text style={[styles.headerTitle, { color: theme.text.primary }]}>
           {i18nText("autoI18n.gonderi", "Gönderi")}
         </Text>
@@ -390,17 +385,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 12,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   headerTitle: { flex: 1, fontSize: 19, fontWeight: "800", letterSpacing: -0.3 },
 
   authorRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 14 },
-  avatar: { width: 44, height: 44, borderRadius: 22 },
   authorName: { fontSize: 15, fontWeight: "700" },
   time: { fontSize: 12, marginTop: 2 },
 

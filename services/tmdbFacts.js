@@ -11,7 +11,7 @@
 
 import { cachedTmdb } from "../utils/cachedRead";
 import { mapWithConcurrency } from "./upNextService";
-import { extractMediaFacts, factsKey, factsUrl, langOf } from "../utils/mediaFacts";
+import { extractMediaFacts, factsKey, factsUrl, langOf, pickOverview } from "../utils/mediaFacts";
 
 // `${type}:${id}|${lang}` → Facts | null | Promise
 // Promise de saklanır: aynı eser için ikinci istek HİÇ atılmaz (composer arka
@@ -75,6 +75,46 @@ export async function fetchMediaFacts({ apiKey, id, mediaType, language = "en" }
 
   remember(key, request);
   return request;
+}
+
+/**
+ * Eserin ÖZETİNİ (overview) çözer — composer'ın "hızlı ekle" düğmesi için.
+ * Olgularla AYNI detay URL'ini ve cache kategorisini kullanır: o eser için
+ * hidrasyon zaten çalıştıysa ağa hiç çıkılmaz.
+ *
+ * TMDB'de birçok eserin Türkçe özeti boş; o zaman İngilizceye düşülür (boş
+ * düğme yerine bir şey vermek daha iyi). ASLA throw etmez.
+ * @returns {Promise<string|null>} özet; eserde hiç yoksa ""; istek başarısızsa null
+ */
+export async function fetchMediaOverview({ apiKey, id, mediaType, language = "en" }) {
+  if (!apiKey || id == null) return null;
+  const read = async (lang) => {
+    const { data } = await cachedTmdb(
+      factsUrl({ id, mediaType, language: lang }),
+      { headers: { accept: "application/json", Authorization: apiKey } },
+      {
+        maxAge: FACTS_TTL,
+        category: mediaType === "tv" ? "tvContent" : "movieContent",
+      },
+    );
+    return pickOverview(data);
+  };
+
+  let text;
+  try {
+    text = await read(language);
+  } catch {
+    return null;
+  }
+  if (text || langOf(language) === "en-US") return text;
+
+  // Yedek dil isteği başarısız olsa bile "özet yok" doğru cevap: ilk istek
+  // başarılıydı ve gerçekten boş döndü.
+  try {
+    return await read("en");
+  } catch {
+    return "";
+  }
 }
 
 /** Çözülmüş olguyu SENKRON okur (ağa çıkmaz). Cache sıcaksa "boş" aşama olmaz. */

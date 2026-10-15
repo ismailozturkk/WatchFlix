@@ -28,6 +28,7 @@ import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import { legalUrl, SUPPORT_EMAIL } from "@utils/legalLinks";
 import { SettingsSubScreen, buildUiColors } from "./settingsUi";
+import useAppLogo from "@hooks/useAppLogo";
 
 if (
   Platform.OS === "android" &&
@@ -42,6 +43,8 @@ if (
 const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
 
 export default function AboutAppScreen() {
+  // Marka logosu seçili uygulama simgesini izler (hooks/useAppLogo.js).
+  const { logo: appLogo } = useAppLogo();
   const navigation = useNavigation();
   const { language } = useLanguage();
   const { theme } = useTheme();
@@ -144,8 +147,8 @@ export default function AboutAppScreen() {
         ? "Seelogd Premium avantajları nelerdir?"
         : "What are Seelogd Premium benefits?",
       a: isTr
-        ? "Premium; CineMatch AI için günde 20 / ayda 300 mesaj, arkadaşlarının da gördüğü kimlik rozeti, daha yüksek liste, arkadaş, grup ve oyun limitleri, kendi temanı oluşturma, tüm yazı tipleri, Wrapped arşivi ve 100 başlığa kadar platform bildirimi sunar. Premium Max günde 50 / ayda 900 AI mesajı, efsanevi rozet ve sınırsız liste, arkadaş, grup ve oyun ekler. Tüm limitler Premium ekranındaki karşılaştırmada listelenir."
-        : "Premium includes 20 CineMatch AI messages per day / 300 per month, an identity badge your friends can see, higher list, friend, group and game limits, your own themes, every font, the Wrapped archive and streaming alerts for up to 100 titles. Premium Max adds 50 AI messages per day / 900 per month, a legendary badge and unlimited lists, friends, groups and games. Every limit is listed in the comparison on the Premium screen.",
+        ? "Free plan; günde 3 / ayda 30 CineMatch AI mesajı, 2 arkadaş, 1 sohbet grubu, dört hazır liste ve 1 özel liste, 5 not, 5 yapılacak, 20 film ve 20 dizi notu, 10 film ve 20 dizi hatırlatması sunar; turnuvayı izleyebilir, Wrapped arşivinde yalnız bu yılı görürsün. Premium; günde 20 / ayda 300 AI mesajı, arkadaşlarının da gördüğü kimlik rozeti, çok daha yüksek liste, arkadaş, grup, not ve hatırlatma limitleri, oyunlar, CineSwipe, turnuvada oy kullanma, kendi temanı oluşturma, tüm yazı tipleri, uygulama simgesi, kar efekti, ikon arka planı, pet, Wrapped arşivinde son 5 yıl ve 100 başlığa kadar platform bildirimi sunar. Premium Max günde 50 / ayda 900 AI mesajı, efsanevi rozet, Wrapped'ta tüm yıllar ve sınırsız liste, arkadaş, grup, not, hatırlatma ve oyun ekler. Ne kadarını kullandığını Ayarlar > Kullanım ve haklar ekranında, tüm limitleri Premium ekranındaki karşılaştırmada görebilirsin."
+        : "The Free plan includes 3 CineMatch AI messages per day / 30 per month, 2 friends, 1 group chat, the four built-in lists plus 1 custom list, 5 notes, 5 to-do lists, 20 movie and 20 show notes, and 10 movie and 20 show reminders; you can watch the tournament and see only this year in Wrapped. Premium adds 20 AI messages per day / 300 per month, an identity badge your friends can see, much higher list, friend, group, note and reminder limits, games, CineSwipe, tournament voting, your own themes, every font, the app icon picker, snowfall, icon background, the on-screen pet, the Wrapped archive for the last 5 years and streaming alerts for up to 100 titles. Premium Max adds 50 AI messages per day / 900 per month, a legendary badge, every Wrapped year and unlimited lists, friends, groups, notes, reminders and games. See your usage under Settings > Usage & limits, and every limit in the comparison on the Premium screen.",
       icon: "star-outline",
     },
     {
@@ -216,44 +219,6 @@ export default function AboutAppScreen() {
     },
   ];
 
-  const FEATURES = [
-    {
-      title: isTr ? "Akıllı Takip & Düzen" : "Smart Tracking",
-      desc: isTr
-        ? "Sezon ve bölüm bazlı otomatik izleme takibi"
-        : "Automated season and episode progress tracking",
-      icon: "tv-outline",
-      color: C.blue,
-      bg: C.iconBlue,
-    },
-    {
-      title: isTr ? "Yapay Zeka Desteği" : "AI Recommendations",
-      desc: isTr
-        ? "Zevkinize özel AI CineCards öneri motoru"
-        : "Personalized AI CineCards recommendation engine",
-      icon: "sparkles-outline",
-      color: C.purple,
-      bg: C.iconPurple,
-    },
-    {
-      title: isTr ? "Oyunlaştırma & Turnuva" : "Gamification & Cups",
-      desc: isTr
-        ? "Rozetler, seviyeler ve film turnuvaları"
-        : "Badges, level progression, and movie brackets",
-      icon: "ribbon-outline",
-      color: C.amber,
-      bg: C.iconAmber,
-    },
-    {
-      title: isTr ? "Sosyal Etkileşim" : "Social & Community",
-      desc: isTr
-        ? "Gruplar, mesajlaşma, anketler ve ortak listeler"
-        : "Groups, direct chat, polls, and shared lists",
-      icon: "people-outline",
-      color: C.green,
-      bg: C.iconGreen,
-    },
-  ];
 
   return (
     <SettingsSubScreen
@@ -269,7 +234,7 @@ export default function AboutAppScreen() {
         >
           <View style={[styles.appIconWrap, { borderColor: C.border }]}>
             <Image
-              source={require("../../../assets/icon_default/android-icon-foreground.png")}
+              source={appLogo}
               style={{ width: 54, height: 54 }}
               contentFit="contain"
             />

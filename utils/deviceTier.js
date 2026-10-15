@@ -25,6 +25,8 @@ export const DEVICE_TIERS = ["low", "mid", "high"];
 //   • blurEnabled          — her karede GPU'da yeniden çizilir (en pahalısı)
 //   • iconBackgroundCols/Rows — desen öğe sayısı (mount maliyeti + bellek)
 //   • spriteFpsScale       — sürekli çalışan animasyonun kare hızı
+//                            (ambiyans arka planında hareket hızı)
+//   • ambientBlobCount     — ambiyans arka planındaki ışık lekesi sayısı
 //
 //   full     "Tam"    kısıtsız: üçü de tam. Görüntü odaklı.
 //   balanced "Orta"   blur KALIR (arayüzün kimliği odur), sürekli/yığın
@@ -39,6 +41,7 @@ export const EFFECT_MODE_PRESETS = {
     iconBackgroundCols: 5,
     iconBackgroundRows: 9,
     spriteFpsScale: 1,
+    ambientBlobCount: 5,
     blurEnabled: true,
   },
   balanced: {
@@ -46,6 +49,7 @@ export const EFFECT_MODE_PRESETS = {
     iconBackgroundCols: 4,
     iconBackgroundRows: 7,
     spriteFpsScale: 0.7,
+    ambientBlobCount: 4,
     blurEnabled: true,
   },
   off: {
@@ -53,6 +57,7 @@ export const EFFECT_MODE_PRESETS = {
     iconBackgroundCols: 3,
     iconBackgroundRows: 5,
     spriteFpsScale: 0.5,
+    ambientBlobCount: 3,
     blurEnabled: false,
   },
 };

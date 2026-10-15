@@ -24,7 +24,7 @@ import {
   useApiSettings,
   useImageQualitySettings,
 } from "../../context/AppSettingsContext";
-import ScreenSnow from "../../components/ScreenSnow";
+import ScreenDecor from "../../components/ScreenDecor";
 import ScopedCommentButton from "../../components/comments/ScopedCommentButton";
 import { COMMENT_SCOPE } from "../../utils/commentScope";
 
@@ -144,7 +144,7 @@ export default function EpisodeDetails({ route, navigation }) {
 
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [check, setChecked] = useState(false);
+  const [check] = useState(false);
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
@@ -268,7 +268,7 @@ export default function EpisodeDetails({ route, navigation }) {
 
       {/* ── İçerik ───────────────────────────────────────────────────────── */}
       <View style={[styles.content, { backgroundColor: theme.primary }]}>
-        <ScreenSnow />
+        <ScreenDecor scope="details" iconOpacity={0.25} />
 
         {/* ── Başlık Bloğu ─────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>

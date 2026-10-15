@@ -51,6 +51,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "@context/ThemeContext";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useLanguage } from "@context/LanguageContext";
 import { alpha } from "@theme/colors";
 import { i18nText } from "@utils/i18nText";
@@ -79,10 +80,6 @@ const getWheelItemLayout = (_, index) => ({
   index,
 });
 
-export const DAYS_LIST = Array.from({ length: 31 }, (_, i) =>
-  String(i + 1).padStart(2, "0"),
-);
-
 export const MONTHS_TR = [
   "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
   "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
@@ -100,11 +97,6 @@ const WEEKDAYS_TR = [
 const WEEKDAYS_EN = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 ];
-
-const currentYear = new Date().getFullYear();
-export const YEARS_LIST = Array.from({ length: 150 }, (_, i) =>
-  String(currentYear - i),
-);
 
 // Sınır verilmediğinde açılacak varsayılan yıl penceresi.
 const YEARS_BACK = 100;
@@ -129,34 +121,6 @@ const isoToParts = (iso) => {
   const [y, m, d] = iso.split("-").map(Number);
   return { y, m: m - 1, d };
 };
-
-/**
- * Geriye dönük uyumluluk: modül seviyesindeki YEARS_LIST üzerinden index üretir.
- * Bileşen artık sınırlardan türetilen kendi yıl listesini kullanıyor.
- */
-export function isoToIndices(iso) {
-  if (!iso || !iso.includes("-")) {
-    return { day: 0, month: 0, year: 0 }; // Bugün → ilk yıl (currentYear)
-  }
-  const [y, m, d] = iso.split("-");
-  const dayIdx = Math.max(0, parseInt(d, 10) - 1);
-  const monthIdx = Math.max(0, parseInt(m, 10) - 1);
-  const yearIdx = Math.max(0, YEARS_LIST.indexOf(y));
-  return {
-    day: Math.min(dayIdx, DAYS_LIST.length - 1),
-    month: Math.min(monthIdx, 11),
-    year: yearIdx >= 0 ? yearIdx : 0,
-  };
-}
-
-export function indicesToIso(day, month, year) {
-  const y = YEARS_LIST[year] ?? YEARS_LIST[0];
-  const maxDay = daysInMonth(month, parseInt(y, 10));
-  const clampedDay = Math.min(day + 1, maxDay);
-  const d = String(clampedDay).padStart(2, "0");
-  const m = String(month + 1).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 export function normalizeDate(d) {
   if (!d) return null;
@@ -1034,22 +998,12 @@ export default function DatePickerModal({
               </Text>
             )}
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-            hitSlop={8}
+          <GlassCloseButton
+            size={32}
+            fallbackRadius={11}
+            backgroundColor={alpha(theme.text.muted, 0.12)}
             onPress={onClose}
-            style={({ pressed }) => [
-              styles.closeButton,
-              {
-                backgroundColor: pressed
-                  ? alpha(theme.text.muted, 0.22)
-                  : alpha(theme.text.muted, 0.12),
-              },
-            ]}
-          >
-            <Ionicons name="close" size={18} color={theme.text.muted} />
-          </Pressable>
+          />
         </View>
 
         {/* Seçili tarih önizlemesi */}
@@ -1330,13 +1284,6 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     lineHeight: 17,
     marginTop: 3,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
   },
   previewCard: {
     alignSelf: "center",

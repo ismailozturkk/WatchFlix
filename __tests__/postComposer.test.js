@@ -95,3 +95,107 @@ describe("tallyVotes", () => {
     expect(tallyVotes({}).total).toBe(0);
   });
 });
+
+describe("appendQuickText (hızlı ekle)", () => {
+  const { appendQuickText } = require("../utils/postComposer");
+
+  test("boş alana doğrudan yazar", () => {
+    expect(appendQuickText("", "Inception", { max: 100 })).toEqual({
+      text: "Inception",
+      changed: true,
+      reason: null,
+    });
+    // yalnız boşluk da boş sayılır
+    expect(appendQuickText("   ", "Inception", { max: 100 }).text).toBe("Inception");
+  });
+
+  test("dolu alanı EZMEZ, sonuna ayraçla ekler", () => {
+    const r = appendQuickText("Harika bir film", "Inception", { max: 100, separator: " · " });
+    expect(r).toEqual({ text: "Harika bir film · Inception", changed: true, reason: null });
+  });
+
+  test("varsayılan ayraç paragraf boşluğu (açıklama için)", () => {
+    expect(appendQuickText("Notum", "Özet metni").text).toBe("Notum\n\nÖzet metni");
+  });
+
+  test("zaten içeriyorsa tekrar eklemez (büyük/küçük harf duyarsız)", () => {
+    const r = appendQuickText("INCEPTION hakkında", "Inception", { max: 100 });
+    expect(r).toEqual({ text: "INCEPTION hakkında", changed: false, reason: "duplicate" });
+  });
+
+  test("eklenecek metin boşsa hiçbir şey değişmez", () => {
+    expect(appendQuickText("abc", "  ", { max: 10 })).toEqual({ text: "abc", changed: false, reason: "empty" });
+    expect(appendQuickText("abc", null, { max: 10 }).reason).toBe("empty");
+  });
+
+  test("sınıra sığmıyorsa ek metin … ile kırpılır", () => {
+    const r = appendQuickText("Not", "x".repeat(50), { max: 30, separator: "\n\n" });
+    expect(r.changed).toBe(true);
+    expect(r.text.length).toBeLessThanOrEqual(30);
+    expect(r.text.startsWith("Not\n\n")).toBe(true);
+    expect(r.text.endsWith("…")).toBe(true);
+  });
+
+  test("boş alanda sınırı aşan metin de kırpılır", () => {
+    const r = appendQuickText("", "y".repeat(40), { max: 20 });
+    expect(r.text.length).toBeLessThanOrEqual(20);
+    expect(r.text.endsWith("…")).toBe(true);
+  });
+
+  test("kırpılacak yer 12 karakterden azsa hiç dokunmaz (reason: full)", () => {
+    const base = "a".repeat(95);
+    const r = appendQuickText(base, "Film adı", { max: 100, separator: " · " });
+    expect(r).toEqual({ text: base, changed: false, reason: "full" });
+  });
+
+  test("string olmayan alan boş sayılır", () => {
+    expect(appendQuickText(undefined, "Ad", { max: 10 }).text).toBe("Ad");
+  });
+
+  test("kırpılarak eklenmiş uzun özet ikinci dokunuşta ikilenmez", () => {
+    const ozet = "Rüyaların içine girerek fikir çalan bir hırsız. ".repeat(6).trim();
+    const ilk = appendQuickText("Notum", ozet, { max: 120 });
+    expect(ilk.changed).toBe(true);
+    const ikinci = appendQuickText(ilk.text, ozet, { max: 120 });
+    expect(ikinci.changed).toBe(false);
+    expect(ikinci.reason).toBe("duplicate");
+  });
+
+  test("isQuickTextPresent: boş girdilerde false", () => {
+    const { isQuickTextPresent } = require("../utils/postComposer");
+    expect(isQuickTextPresent("", "x")).toBe(false);
+    expect(isQuickTextPresent("abc", "")).toBe(false);
+    expect(isQuickTextPresent("Merhaba Inception", "inception")).toBe(true);
+  });
+});
+
+describe("resolveCloseIntent", () => {
+  const { resolveCloseIntent } = require("../utils/postComposer");
+
+  test("onay sayfası açıkken geri/çarpı yalnız onu kapatır", () => {
+    // Pencerenin kendisi kapanmamalı: iOS'ta çarpı "çalışmıyor" hatasının tersi.
+    expect(resolveCloseIntent({ promptOpen: true, hasContent: true })).toBe("leave-prompt");
+    expect(resolveCloseIntent({ promptOpen: true, searchActive: true })).toBe("leave-prompt");
+  });
+
+  test("içerik araması açıkken önce aramadan çıkılır", () => {
+    expect(resolveCloseIntent({ searchActive: true, hasContent: true })).toBe("close-search");
+  });
+
+  test("kaybedilecek içerik yoksa doğrudan kapanır", () => {
+    expect(resolveCloseIntent({})).toBe("close");
+    expect(resolveCloseIntent({ hasContent: false, isEditing: true })).toBe("close");
+  });
+
+  test("içerik varken düzenleme 'iptal et?', yeni paylaşım 'taslağa kaydet?' sorar", () => {
+    expect(resolveCloseIntent({ hasContent: true, isEditing: true })).toBe("confirm-edit");
+    expect(resolveCloseIntent({ hasContent: true })).toBe("confirm-draft");
+  });
+
+  test("taslak zaten kayıtlıysa sormadan kapanır; düzenlemede bu geçerli değil", () => {
+    expect(resolveCloseIntent({ hasContent: true, isSavedDraft: true })).toBe("close");
+    expect(resolveCloseIntent({ hasContent: true, isEditing: true, isSavedDraft: true })).toBe(
+      "confirm-edit",
+    );
+  });
+});

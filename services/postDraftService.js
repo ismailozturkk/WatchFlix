@@ -24,24 +24,6 @@ export function setPostDrafts(list) {
   return set(Keys.postDrafts, Array.isArray(list) ? list : []);
 }
 
-/** Taslağı ekler ya da aynı id varsa günceller. Yeni listeyi döner. */
-export function upsertPostDraft(draft) {
-  const current = getPostDrafts();
-  const exists = current.some((d) => d.id === draft.id);
-  const next = exists
-    ? current.map((d) => (d.id === draft.id ? draft : d))
-    : [draft, ...current];
-  setPostDrafts(next);
-  return next;
-}
-
-/** Taslağı siler. Yeni listeyi döner. */
-export function deletePostDraft(id) {
-  const next = getPostDrafts().filter((d) => d.id !== id);
-  setPostDrafts(next);
-  return next;
-}
-
 export function countPostDrafts() {
   return getPostDrafts().length;
 }

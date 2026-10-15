@@ -1,5 +1,4 @@
 import { isLightSurface } from "@utils/colorUtils";
-import { Image } from "expo-image";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   View,
@@ -10,41 +9,60 @@ import {
   ActivityIndicator,
   StatusBar,
 } from "react-native";
-import { Calendar } from "react-native-calendars";
+import { Calendar, LocaleConfig } from "react-native-calendars";
 import { useFontFamilyForRole } from "@components/typography/AppText";
 import { useTheme } from "@context/ThemeContext";
-import { useCalendar } from "@context/CalendarContext";
+import { useCalendar, EVENT_COLORS } from "@context/CalendarContext";
 import { useLanguage } from "@context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { i18nText } from "@utils/i18nText";
 import ScreenDecor from "@components/ScreenDecor";
 import {
-  CalendarFilterPanel,
+  CalendarControls,
   CalendarRangePicker,
+  CalendarTypeChips,
   getCalendarRangeLabel,
 } from "@components/calendar/CalendarFilterPanel";
+import { AgendaDay } from "@components/calendar/CalendarAgendaDay";
+import BackButton from "@components/BackButton";
+import GlassIconButton from "@components/common/GlassIconButton";
+import {
+  countEventsInMonth,
+  dayDiff,
+  monthKeyOf,
+  toLocalDateStr,
+} from "@utils/calendarAgenda";
 
 import {
   buildEventKey,
   loadSavedKeysSet,
-  saveEventToPhoneCalendar,
   saveManyEventsToPhoneCalendar,
-  removeEventFromPhoneCalendar,
   removeManyEventsFromPhoneCalendar,
 } from "@utils/phoneCalendar";
 
-// Yerel takvim günü. toISOString() UTC gününü verir; UTC+3'te yerel gece yarısı
-// bir önceki güne düşüyordu. Etkinlik anahtarları yerel YYYY-MM-DD biçiminde
-// tutuluyor (bkz. context/CalendarContext.js toDateStr) — iki taraf aynı
-// takvimde konuşmalı.
-function toLocalDateStr(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+/* ── Takvim yerelleştirmesi ──
+   react-native-calendars ay/gün adlarını xdate'ten okur ve varsayılan yerel
+   İngilizce; ayar yapılmadığı için Türkçe kullanıcı "October 2026 / Mon Tue"
+   görüyordu. Kütüphane yalnız bu ekranda kullanılıyor, global ayar güvenli. */
+LocaleConfig.locales.tr = {
+  monthNames: [
+    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+  ],
+  monthNamesShort: [
+    "Oca", "Şub", "Mar", "Nis", "May", "Haz",
+    "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara",
+  ],
+  dayNames: ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"],
+  dayNamesShort: ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"],
+  today: "Bugün",
+};
+
+const applyCalendarLocale = (language) => {
+  LocaleConfig.defaultLocale = language === "tr" ? "tr" : "";
+};
 
 /* ── Tarih formatlama ── */
 function formatDisplayDate(dateStr, lang) {
@@ -58,39 +76,14 @@ function formatDisplayDate(dateStr, lang) {
   });
 }
 
-function dayRelativeLabel(dateStr) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr + "T00:00:00");
-  const diff = Math.round((target - today) / 86400000);
-  if (diff === 0)  return i18nText("autoI18n.bugun", "Bugün");
-  if (diff === 1)  return i18nText("autoI18n.yarin", "Yarın");
+function dayRelativeLabel(dateStr, todayStr) {
+  const diff = dayDiff(dateStr, todayStr);
+  if (diff == null) return "";
+  if (diff === 0) return i18nText("autoI18n.bugun", "Bugün");
+  if (diff === 1) return i18nText("autoI18n.yarin", "Yarın");
   if (diff === -1) return i18nText("autoI18n.dun", "Dün");
-  if (diff > 0)    return i18nText("autoI18n.days_after", "{{count}} gün sonra", { count: diff });
+  if (diff > 0) return i18nText("autoI18n.days_after", "{{count}} gün sonra", { count: diff });
   return i18nText("autoI18n.days_before", "{{count}} gün önce", { count: Math.abs(diff) });
-}
-
-/* ── Tarih tile parçaları (gün / ay / gün adı) ── */
-function dateTileParts(dateStr, lang) {
-  const d = new Date(dateStr + "T00:00:00");
-  if (isNaN(d.getTime())) return { day: "", month: "", weekday: "" };
-  const loc = lang === "tr" ? "tr-TR" : "en-US";
-  return {
-    day: d.getDate(),
-    month: d.toLocaleDateString(loc, { month: "short" }).replace(".", ""),
-    weekday: d.toLocaleDateString(loc, { weekday: "long" }),
-  };
-}
-
-function urgencyColor(dateStr) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr + "T00:00:00");
-  const diff = Math.round((target - today) / 86400000);
-  if (diff < 0)   return "#94a3b8";  // geçmiş
-  if (diff === 0) return "#ef4444";  // bugün
-  if (diff <= 3)  return "#f97316";  // 3 gün
-  if (diff <= 7)  return "#eab308";  // hafta
-  return null;                       // normal
 }
 
 function rangeTitle(viewMode, rangeMonths) {
@@ -106,281 +99,11 @@ function rangeTitle(viewMode, rangeMonths) {
     : i18nText("autoI18n.past_range", "Geçmiş {{range}}", { range: rangeLabel });
 }
 
-/* ── Küçük badge (poster üstü) — moda göre + / ✓ / 🗑 ── */
-const SaveBadge = ({ item, savedSet, onSavedChange, accentColor, viewMode }) => {
-  const key = buildEventKey(item);
-  const isSaved = savedSet.has(key);
-  const isPast = viewMode === "past";
-
-  // Geçmiş + telefonda yok → rozet gösterme (silinecek bir şey yok)
-  if (isPast && !isSaved) return null;
-
-  if (isPast) {
-    // Geçmiş + kayıtlı → kırmızı çöp
-    return (
-      <TouchableOpacity
-        onPress={async (e) => {
-          e.stopPropagation?.();
-          const res = await removeEventFromPhoneCalendar(item);
-          if (res.ok) onSavedChange(key, false);
-        }}
-        activeOpacity={0.7}
-        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-        style={[
-          styles.saveBadge,
-          { backgroundColor: "#ef4444", borderColor: "#ef4444" },
-        ]}
-      >
-        <Ionicons name="trash" size={11} color="#fff" />
-      </TouchableOpacity>
-    );
-  }
-
-  // Gelecek mod: kayıtlı → yeşil ✓, değil → + (kaydet)
-  return (
-    <TouchableOpacity
-      onPress={async (e) => {
-        e.stopPropagation?.();
-        if (isSaved) return;
-        const res = await saveEventToPhoneCalendar(item);
-        if (res.ok || res.alreadySaved) onSavedChange(key, true);
-      }}
-      activeOpacity={0.7}
-      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-      style={[
-        styles.saveBadge,
-        {
-          backgroundColor: isSaved ? "#22c55e" : "#00000088",
-          borderColor: isSaved ? "#22c55e" : accentColor + "88",
-        },
-      ]}
-    >
-      <Ionicons name={isSaved ? "checkmark" : "add"} size={12} color="#fff" />
-    </TouchableOpacity>
-  );
-};
-
-/* ── Note poster kart ── */
-const PosterNoteCard = ({ item, theme, onPress, savedSet, onSavedChange, viewMode }) => {
-  const isNote = item.type !== "todo";
-  const color = item.color || "rgb(19, 141, 240)";
-  return (
-    <TouchableOpacity
-      style={[styles.posterCard, { borderColor: color + "55" }]}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <View
-        style={[
-          styles.posterTop,
-          { backgroundColor: item.backgroundColor || color + "33" },
-        ]}
-      >
-        <Ionicons
-          name={isNote ? "document-text" : "checkmark-done"}
-          size={32}
-          color={color}
-        />
-        {item.type === "todo" && item.todos?.length > 0 && (
-          <Text
-            allowFontScaling={false}
-            style={[styles.posterTodoCount, { color }]}
-          >
-            {item.todos.filter((t) => t.done).length}/{item.todos.length}
-          </Text>
-        )}
-        <SaveBadge
-          item={item}
-          savedSet={savedSet}
-          onSavedChange={onSavedChange}
-          accentColor={color}
-          viewMode={viewMode}
-        />
-      </View>
-      <View
-        style={[
-          styles.posterBottom,
-          { backgroundColor: theme.secondary, borderTopColor: color + "33" },
-        ]}
-      >
-        <Text
-          allowFontScaling={false}
-          style={[styles.posterTitle, { color: theme.text.primary }]}
-          numberOfLines={2}
-        >
-          {item.title || item.content || i18nText("autoI18n.not", "Not")}
-        </Text>
-        <View style={[styles.posterTagDot, { backgroundColor: color }]} />
-      </View>
-    </TouchableOpacity>
-  );
-};
-
-/* ── Media poster kart ── */
-const PosterMediaCard = ({ item, theme, onPress, savedSet, onSavedChange, viewMode }) => {
-  const isMovie = item.type === "movie";
-  const accentColor = isMovie ? "rgb(255, 124, 37)" : "rgb(175, 0, 175)";
-  const fallbackBg = isMovie ? "rgba(255, 124, 37, 0.25)" : "rgba(175, 0, 175, 0.25)";
-
-  return (
-    <TouchableOpacity
-      style={[styles.posterCard, { borderColor: accentColor + "55" }]}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <View style={styles.posterTop}>
-        {item.poster ? (
-          <Image source={{ uri: item.poster }} style={styles.posterImage} />
-        ) : (
-          <View style={[styles.posterImage, { backgroundColor: fallbackBg, justifyContent: "center", alignItems: "center" }]}>
-            <Ionicons
-              name={isMovie ? "film" : "tv"}
-              size={32}
-              color={accentColor}
-            />
-          </View>
-        )}
-        <View style={[styles.posterTypeChip, { backgroundColor: accentColor }]}>
-          <Ionicons name={isMovie ? "film" : "tv"} size={9} color="#fff" />
-        </View>
-        <SaveBadge
-          item={item}
-          savedSet={savedSet}
-          onSavedChange={onSavedChange}
-          accentColor={accentColor}
-          viewMode={viewMode}
-        />
-      </View>
-      <View
-        style={[
-          styles.posterBottom,
-          { backgroundColor: theme.secondary, borderTopColor: accentColor + "33" },
-        ]}
-      >
-        <Text
-          allowFontScaling={false}
-          style={[styles.posterTitle, { color: theme.text.primary }]}
-          numberOfLines={2}
-        >
-          {item.title}
-        </Text>
-        <View style={[styles.posterTagDot, { backgroundColor: accentColor }]} />
-      </View>
-    </TouchableOpacity>
-  );
-};
-
-const AgendaGroup = React.memo(function AgendaGroup({
-  group,
-  language,
-  theme,
-  savedSet,
-  onSavedChange,
-  viewMode,
-  onFocus,
-  onNotePress,
-  onMoviePress,
-  onTvPress,
-}) {
-  const { dateStr, notes, movies, tvs, count } = group;
-  const headerColor = urgencyColor(dateStr) || theme.accent;
-  const parts = dateTileParts(dateStr, language);
-  const cards = useMemo(
-    () => [
-      ...notes.map((item, index) => ({ key: `note-${item.id}-${index}`, kind: "note", item })),
-      ...movies.map((item, index) => ({ key: `movie-${item.id}-${index}`, kind: "movie", item })),
-      ...tvs.map((item, index) => ({
-        key: `tv-${item.id}-${item.episodeNumber || index}-${index}`,
-        kind: "tv",
-        item,
-      })),
-    ],
-    [movies, notes, tvs],
-  );
-
-  const renderCard = useCallback(({ item: card }) => {
-    if (card.kind === "note") {
-      return (
-        <PosterNoteCard
-          item={card.item}
-          theme={theme}
-          onPress={onNotePress}
-          savedSet={savedSet}
-          onSavedChange={onSavedChange}
-          viewMode={viewMode}
-        />
-      );
-    }
-    return (
-      <PosterMediaCard
-        item={card.item}
-        theme={theme}
-        onPress={() => (card.kind === "movie" ? onMoviePress(card.item) : onTvPress(card.item))}
-        savedSet={savedSet}
-        onSavedChange={onSavedChange}
-        viewMode={viewMode}
-      />
-    );
-  }, [onMoviePress, onNotePress, onSavedChange, onTvPress, savedSet, theme, viewMode]);
-
-  return (
-    <View style={styles.dateGroup}>
-      <TouchableOpacity
-        onPress={() => onFocus(dateStr)}
-        activeOpacity={0.7}
-        style={styles.groupHeader}
-      >
-        <View
-          style={[
-            styles.groupTile,
-            { backgroundColor: headerColor + "1A", borderColor: headerColor + "33" },
-          ]}
-        >
-          <Text allowFontScaling={false} style={[styles.groupTileDay, { color: headerColor }]}>
-            {parts.day}
-          </Text>
-          <Text allowFontScaling={false} style={[styles.groupTileMonth, { color: headerColor }]}>
-            {parts.month}
-          </Text>
-        </View>
-        <View style={styles.groupInfo}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.groupWeekday, { color: theme.text.primary }]}
-            numberOfLines={1}
-          >
-            {parts.weekday}
-          </Text>
-          <Text allowFontScaling={false} style={[styles.groupRel, { color: headerColor }]}>
-            {dayRelativeLabel(dateStr)}
-          </Text>
-        </View>
-        <View style={[styles.groupCount, { backgroundColor: headerColor + "1A" }]}>
-          <Text allowFontScaling={false} style={[styles.groupCountText, { color: headerColor }]}>
-            {count}
-          </Text>
-        </View>
-      </TouchableOpacity>
-
-      <FlatList
-        horizontal
-        data={cards}
-        renderItem={renderCard}
-        keyExtractor={(card) => card.key}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.posterScrollContent}
-        initialNumToRender={4}
-        maxToRenderPerBatch={4}
-        windowSize={5}
-      />
-    </View>
-  );
-});
-
 /* ── Ana bileşen ── */
 export default function CalendarScreen({ navigation }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
+  const insets = useSafeAreaInsets();
   const {
     noteEvents,
     reminderEvents,
@@ -390,6 +113,8 @@ export default function CalendarScreen({ navigation }) {
     refreshEvents,
   } = useCalendar();
 
+  applyCalendarLocale(language);
+
   const [activeFilter, setActiveFilter] = useState("all");
   const [viewMode, setViewMode] = useState("future");   // "future" | "past"
   const [rangeMonths, setRangeMonths] = useState(1);    // 1, 3, 6, 12, "all"
@@ -397,6 +122,10 @@ export default function CalendarScreen({ navigation }) {
   const [savedSet, setSavedSet] = useState(new Set());
   const [showRangeDropdown, setShowRangeDropdown] = useState(false);
   const [isBulkLoading, setIsBulkLoading] = useState(false);
+  // Takvimin gösterdiği ay ("YYYY-MM"). Başlıktaki ay özeti ve "Bugün" düğmesinin
+  // görünürlüğü buna bağlı; `calendarKey` "Bugün"e basınca takvimi o aya geri
+  // getirmek için (Calendar yalnız `initialDate` DEĞİŞİNCE ay atlar).
+  const [calendarKey, setCalendarKey] = useState(0);
 
   // Telefon takvimine eklenmiş eventleri başta oku
   useEffect(() => {
@@ -415,6 +144,8 @@ export default function CalendarScreen({ navigation }) {
   /* ── Bugün (yerel) ── modül kapsamında hesaplanırsa uygulama gece yarısını
      açık geçtiğinde bayat kalıyordu; bileşen içinde tutuluyor. */
   const todayLocal = useMemo(() => toLocalDateStr(new Date()), []);
+  const todayMonth = monthKeyOf(todayLocal);
+  const [visibleMonth, setVisibleMonth] = useState(todayMonth);
 
   /* ── Aralık başlangıç/bitiş tarihleri ── */
   const { startDate, endDate } = useMemo(() => {
@@ -476,7 +207,7 @@ export default function CalendarScreen({ navigation }) {
   }, [dateGroups, activeFilter]);
 
   // Dikey ajandayı tek tek React elemanlarıyla bir ScrollView içine basmak,
-  // uzun hatırlatıcı geçmişinde görünmeyen tüm posterleri de aynı anda
+  // uzun hatırlatıcı geçmişinde görünmeyen tüm satırları da aynı anda
   // oluşturuyordu. FlatList yalnız görünür tarih gruplarını mount eder.
   const agendaGroups = useMemo(
     () =>
@@ -506,6 +237,21 @@ export default function CalendarScreen({ navigation }) {
     });
     return { all: note + movie + tv, note, movie, tv };
   }, [dateGroups]);
+
+  /* Takvimin gösterdiği ayın tür dağılımı (açıklama çiplerinde + başlıkta) */
+  const monthCounts = useMemo(
+    () => countEventsInMonth(noteEvents, reminderEvents, visibleMonth),
+    [noteEvents, reminderEvents, visibleMonth],
+  );
+
+  const monthLabel = useMemo(() => {
+    const d = new Date(`${visibleMonth}-01T00:00:00`);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
+      month: "long",
+      year: "numeric",
+    });
+  }, [visibleMonth, language]);
 
   // Range tetikleyicileri focus modunu temizler
   const changeViewMode = useCallback((m) => {
@@ -612,29 +358,31 @@ export default function CalendarScreen({ navigation }) {
       // Aile adı doğru ağırlık dosyasını zaten gösteriyor; ayrıca fontWeight
       // vermek Android'de sentetik kalınlık ekler.
       textDayFontFamily: gunFontu,
-      textDayFontWeight: gunFontu ? "400" : "500",
+      textDayFontWeight: gunFontu ? "400" : "600",
       textMonthFontFamily: ayFontu,
-      textMonthFontWeight: ayFontu ? "400" : "700",
+      textMonthFontWeight: ayFontu ? "400" : "800",
       textDayHeaderFontFamily: gunBasligiFontu,
-      textMonthFontSize: 16,
-      textDayHeaderFontSize: 11,
+      textDayHeaderFontWeight: gunBasligiFontu ? "400" : "700",
+      textMonthFontSize: 18,
+      textDayFontSize: 15,
+      textDayHeaderFontSize: 11.5,
     }),
     [ayFontu, gunBasligiFontu, gunFontu, theme],
   );
 
-  /* ── markedDates + odak gün ── */
+  /* ── markedDates + odak gün ──
+     Bir gün seçiliyse dolu vurgu; seçili yokken bugün yalnızca yumuşak halka
+     (ajanda aralık modunda olduğundan "bir şey seçilmiş" izlenimi vermesin). */
   const combinedMarked = useMemo(() => {
     const base = { ...markedDates };
     const sel = focusDate || todayLocal;
-    if (base[sel]) {
-      base[sel] = {
-        ...base[sel],
-        selected: true,
-        selectedColor: theme.accent,
-      };
-    } else {
-      base[sel] = { selected: true, selectedColor: theme.accent };
-    }
+    const solid = Boolean(focusDate);
+    base[sel] = {
+      ...(base[sel] || {}),
+      selected: true,
+      selectedColor: solid ? theme.accent : theme.accent + "30",
+      selectedTextColor: solid ? "#fff" : theme.accent,
+    };
     return base;
   }, [markedDates, focusDate, theme.accent, todayLocal]);
 
@@ -645,33 +393,43 @@ export default function CalendarScreen({ navigation }) {
     [],
   );
 
+  const onMonthChange = useCallback((month) => {
+    const key = monthKeyOf(month?.dateString);
+    if (key) setVisibleMonth(key);
+  }, []);
+
   const focusOnDate = useCallback((dateStr) => {
     setFocusDate(dateStr);
   }, []);
 
-  const handleNotePress = useCallback(() => {
-    // TabScreen gerçek bir navigator değil; sekme seçimi initialTab param'ıyla
-    // yapılır ("screen" param'ı sessizce yok sayılıyordu → hep dizi sekmesi açılırdı).
-    navigation.navigate("TabScreen", { initialTab: "profile" });
-  }, [navigation]);
+  // "Bugün": bugünü seç, takvimi bu aya getir. Takvim yalnız `initialDate`
+  // değişince ay atladığı için (bugün zaten seçiliyse değişmez) yeniden mount.
+  const goToToday = useCallback(() => {
+    setFocusDate(todayLocal);
+    setVisibleMonth(todayMonth);
+    setCalendarKey((key) => key + 1);
+  }, [todayLocal, todayMonth]);
 
-  const handleMoviePress = useCallback(
-    (item) => {
-      navigation.navigate("MovieDetails", { id: item.id });
-    },
-    [navigation],
-  );
+  const showTodayButton = focusDate !== todayLocal || visibleMonth !== todayMonth;
 
-  const handleTvPress = useCallback(
-    (item) => {
-      navigation.navigate("TvShowsDetails", { id: item.id });
+  const handleItemPress = useCallback(
+    (entry) => {
+      if (entry.kind === "note") {
+        // TabScreen gerçek bir navigator değil; sekme seçimi initialTab param'ıyla
+        // yapılır ("screen" param'ı sessizce yok sayılıyordu → hep dizi sekmesi açılırdı).
+        navigation.navigate("TabScreen", { initialTab: "profile" });
+      } else if (entry.kind === "movie") {
+        navigation.navigate("MovieDetails", { id: entry.item.id });
+      } else {
+        navigation.navigate("TvShowsDetails", { id: entry.item.id });
+      }
     },
     [navigation],
   );
 
   const agendaRows = useMemo(
     () => [
-      { type: "filters", key: "filters" },
+      { type: "controls", key: "controls" },
       { type: "summary", key: "summary" },
       ...(agendaGroups.length
         ? agendaGroups.map((group) => ({ type: "group", key: group.dateStr, group }))
@@ -681,18 +439,14 @@ export default function CalendarScreen({ navigation }) {
   );
 
   const renderAgendaRow = useCallback(({ item }) => {
-    if (item.type === "filters") {
+    if (item.type === "controls") {
       return (
-        <CalendarFilterPanel
+        <CalendarControls
           theme={theme}
           viewMode={viewMode}
           onViewModeChange={changeViewMode}
           rangeLabel={currentRangeLabel}
           onRangePress={() => setShowRangeDropdown(true)}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-          filterCounts={filterCounts}
-          resultCount={totalCount}
           bulkActionCount={bulkActionCount}
           isBulkLoading={isBulkLoading}
           onBulkAction={handleBulkAction}
@@ -700,51 +454,97 @@ export default function CalendarScreen({ navigation }) {
       );
     }
 
+    // Sabit (sticky) blok: başlık + tür çipleri. Arka planı OPAK olmak zorunda;
+    // yoksa altından kayan ajanda satırları başlığın içinden görünür.
     if (item.type === "summary") {
       return (
-        <View style={styles.dateHeader}>
-          <View style={{ flex: 1 }}>
-            <Text allowFontScaling={false} style={[styles.dateTitle, { color: theme.text.primary }]}>
-              {focusDate
-                ? formatDisplayDate(focusDate, language)
-                : rangeTitle(viewMode, rangeMonths)}
-            </Text>
-            {focusDate && (
-              <Text allowFontScaling={false} style={[styles.dateSubTitle, { color: theme.text.muted }]}>
-                {dayRelativeLabel(focusDate)}
+        <View
+          style={[
+            styles.stickyBlock,
+            { backgroundColor: theme.primary, borderBottomColor: theme.border },
+          ]}
+        >
+          <View style={styles.summaryRow}>
+            <View style={styles.summaryCopy}>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                style={[styles.summaryTitle, { color: theme.text.primary }]}
+              >
+                {focusDate
+                  ? formatDisplayDate(focusDate, language)
+                  : rangeTitle(viewMode, rangeMonths)}
               </Text>
-            )}
-          </View>
-          {focusDate && (
-            <TouchableOpacity
-              onPress={() => setFocusDate(null)}
+              {focusDate ? (
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.summarySub, { color: theme.accent }]}
+                >
+                  {dayRelativeLabel(focusDate, todayLocal)}
+                </Text>
+              ) : null}
+            </View>
+            {focusDate ? (
+              <TouchableOpacity
+                onPress={() => setFocusDate(null)}
+                style={[
+                  styles.clearFocusBtn,
+                  { borderColor: theme.border, backgroundColor: theme.secondary },
+                ]}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+              >
+                <Ionicons name="close" size={13} color={theme.text.muted} />
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.clearFocusText, { color: theme.text.muted }]}
+                >
+                  {i18nText("autoI18n.araliga_don", "Aralığa dön")}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            <View
               style={[
-                styles.clearFocusBtn,
-                { borderColor: theme.border, backgroundColor: theme.secondary },
+                styles.countBadge,
+                { backgroundColor: theme.accent + "22", borderColor: theme.accent + "55" },
               ]}
-              activeOpacity={0.8}
             >
-              <Ionicons name="close" size={12} color={theme.text.muted} />
-              <Text allowFontScaling={false} style={[styles.clearFocusText, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.araliga_don", "Aralığa dön")}
+              <Text allowFontScaling={false} style={[styles.countText, { color: theme.accent }]}>
+                {totalCount}
               </Text>
-            </TouchableOpacity>
-          )}
-          <View
-            style={[
-              styles.countBadge,
-              { backgroundColor: theme.accent + "22", borderColor: theme.accent + "55" },
-            ]}
-          >
-            <Text allowFontScaling={false} style={[styles.countText, { color: theme.accent }]}>
-              {totalCount}
-            </Text>
+            </View>
           </View>
+          <CalendarTypeChips
+            theme={theme}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            filterCounts={filterCounts}
+          />
         </View>
       );
     }
 
     if (item.type === "empty") {
+      // Boş ekranda tek dokunuşla çıkış: filtre yüzünden boşsa filtreyi aç,
+      // gün odağındaysa aralığa dön, aralık dardaysa tüm zamanı göster.
+      let action = null;
+      if (activeFilter !== "all" && filterCounts.all > 0) {
+        action = {
+          label: i18nText("autoI18n.filtreyi_temizle", "Filtreyi temizle"),
+          onPress: () => setActiveFilter("all"),
+        };
+      } else if (focusDate) {
+        action = {
+          label: i18nText("autoI18n.araliga_don", "Aralığa dön"),
+          onPress: () => setFocusDate(null),
+        };
+      } else if (rangeMonths !== "all") {
+        action = {
+          label: i18nText("autoI18n.takvim_tum_zamani_goster", "Tüm zamanı göster"),
+          onPress: () => changeRangeMonths("all"),
+        };
+      }
+
       return (
         <View style={styles.emptyState}>
           <View style={[styles.emptyIcon, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
@@ -763,49 +563,149 @@ export default function CalendarScreen({ navigation }) {
               "Notlarınıza tarih ekleyerek veya film/dizi hatırlatması kurarak burada görebilirsiniz",
             )}
           </Text>
+          {action ? (
+            <TouchableOpacity
+              onPress={action.onPress}
+              activeOpacity={0.82}
+              style={[
+                styles.emptyAction,
+                { backgroundColor: theme.accent + "18", borderColor: theme.accent + "55" },
+              ]}
+              accessibilityRole="button"
+            >
+              <Text allowFontScaling={false} style={[styles.emptyActionText, { color: theme.accent }]}>
+                {action.label}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       );
     }
 
     return (
-      <AgendaGroup
+      <AgendaDay
         group={item.group}
+        todayStr={todayLocal}
         language={language}
         theme={theme}
         savedSet={savedSet}
         onSavedChange={onSavedChange}
         viewMode={viewMode}
         onFocus={focusOnDate}
-        onNotePress={handleNotePress}
-        onMoviePress={handleMoviePress}
-        onTvPress={handleTvPress}
+        onItemPress={handleItemPress}
       />
     );
   }, [
     activeFilter,
     bulkActionCount,
+    changeRangeMonths,
     changeViewMode,
     currentRangeLabel,
     filterCounts,
     focusDate,
     focusOnDate,
     handleBulkAction,
-    handleMoviePress,
-    handleNotePress,
-    handleTvPress,
+    handleItemPress,
     isBulkLoading,
     language,
     onSavedChange,
     rangeMonths,
     savedSet,
     theme,
+    todayLocal,
     totalCount,
     viewMode,
   ]);
 
+  const calendarHeader = useMemo(
+    () => (
+      <View
+        style={[
+          styles.calendarWrapper,
+          { backgroundColor: theme.secondary, borderColor: theme.border },
+        ]}
+      >
+        {isLoadingEvents && (
+          <View style={styles.loadingOverlay} pointerEvents="none">
+            <ActivityIndicator color={theme.accent} />
+          </View>
+        )}
+        <Calendar
+          // Dil/tema değişince Calendar yeniden kurulmalı: stil ve yerel adlar
+          // yalnız mount'ta okunuyor.
+          key={`cal-${language}-${theme.accent}-${theme.secondary}-${calendarKey}`}
+          initialDate={focusDate || todayLocal}
+          onDayPress={onDayPress}
+          onMonthChange={onMonthChange}
+          markingType="multi-dot"
+          markedDates={combinedMarked}
+          theme={calendarTheme}
+          firstDay={language === "tr" ? 1 : 0}
+          enableSwipeMonths
+          hideExtraDays
+          renderArrow={(direction) => (
+            <View
+              style={[
+                styles.arrowBtn,
+                { backgroundColor: theme.primary, borderColor: theme.border },
+              ]}
+            >
+              <Ionicons
+                name={direction === "left" ? "chevron-back" : "chevron-forward"}
+                size={16}
+                color={theme.accent}
+              />
+            </View>
+          )}
+          style={styles.calendar}
+        />
+        <View style={[styles.legend, { borderTopColor: theme.border }]}>
+          {[
+            { key: "note", label: i18nText("autoI18n.not", "Not") },
+            { key: "movie", label: i18nText("autoI18n.film", "Film") },
+            { key: "tv", label: i18nText("autoI18n.dizi", "Dizi") },
+          ].map((legend) => {
+            const color = EVENT_COLORS[legend.key];
+            const count = monthCounts[legend.key];
+            return (
+              <View
+                key={legend.key}
+                style={[
+                  styles.legendChip,
+                  { backgroundColor: color + "1A", opacity: count ? 1 : 0.55 },
+                ]}
+              >
+                <View style={[styles.legendDot, { backgroundColor: color }]} />
+                <Text allowFontScaling={false} style={[styles.legendText, { color }]}>
+                  {legend.label}
+                </Text>
+                <Text allowFontScaling={false} style={[styles.legendCount, { color }]}>
+                  {count}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    ),
+    [
+      calendarKey,
+      calendarTheme,
+      combinedMarked,
+      focusDate,
+      isLoadingEvents,
+      language,
+      monthCounts,
+      onDayPress,
+      onMonthChange,
+      theme,
+      todayLocal,
+    ],
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.25} />
+      <ScreenDecor scope="more" iconOpacity={0.25} />
       <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
 
       {/* Header */}
@@ -816,13 +716,7 @@ export default function CalendarScreen({ navigation }) {
         end={{ x: 1, y: 1 }}
       />
       <SafeAreaView style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="chevron-back" size={22} color={theme.text.primary} />
-        </TouchableOpacity>
+        <BackButton absolute={false} onPress={() => navigation.goBack()} />
         <View style={styles.headerCenter}>
           <Text
             allowFontScaling={false}
@@ -832,26 +726,45 @@ export default function CalendarScreen({ navigation }) {
           </Text>
           <Text
             allowFontScaling={false}
+            numberOfLines={1}
             style={[styles.headerSub, { color: theme.text.muted }]}
           >
-            {i18nText("autoI18n.n_etkinlik", "{{count}} etkinlik", { count: totalCount })}
+            {monthLabel}
+            {" · "}
+            {monthCounts.total
+              ? i18nText("autoI18n.n_etkinlik", "{{count}} etkinlik", { count: monthCounts.total })
+              : i18nText("autoI18n.takvim_ay_bos", "Etkinlik yok")}
           </Text>
         </View>
-        <TouchableOpacity
+        {showTodayButton ? (
+          <TouchableOpacity
+            onPress={goToToday}
+            style={[
+              styles.todayBtn,
+              { backgroundColor: theme.accent + "1F", borderColor: theme.accent + "55" },
+            ]}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={i18nText("autoI18n.takvim_bugune_git", "Bugüne git")}
+          >
+            <Ionicons name="today-outline" size={15} color={theme.accent} />
+            <Text allowFontScaling={false} style={[styles.todayBtnText, { color: theme.accent }]}>
+              {i18nText("autoI18n.bugun", "Bugün")}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+        <GlassIconButton
+          icon="refresh"
+          iconSize={18}
+          color={theme.accent}
+          size={40}
+          fallbackRadius={12}
           onPress={refreshEvents}
           disabled={isLoadingEvents}
-          style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-          activeOpacity={0.8}
-          accessibilityRole="button"
           accessibilityLabel={language === "tr" ? "Takvimi yenile" : "Refresh calendar"}
-          accessibilityState={{ disabled: isLoadingEvents }}
         >
-          {isLoadingEvents ? (
-            <ActivityIndicator size="small" color={theme.accent} />
-          ) : (
-            <Ionicons name="refresh" size={18} color={theme.accent} />
-          )}
-        </TouchableOpacity>
+          {isLoadingEvents ? <ActivityIndicator size="small" color={theme.accent} /> : null}
+        </GlassIconButton>
       </SafeAreaView>
 
       <FlatList
@@ -863,48 +776,8 @@ export default function CalendarScreen({ navigation }) {
         initialNumToRender={5}
         maxToRenderPerBatch={5}
         windowSize={7}
-        contentContainerStyle={styles.agendaContent}
-        ListHeaderComponent={(
-          <View
-            style={[
-              styles.calendarWrapper,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            {isLoadingEvents && (
-              <View style={styles.loadingOverlay} pointerEvents="none">
-                <ActivityIndicator color={theme.accent} />
-              </View>
-            )}
-            <Calendar
-              initialDate={focusDate || todayLocal}
-              onDayPress={onDayPress}
-              markingType="multi-dot"
-              markedDates={combinedMarked}
-              theme={calendarTheme}
-              enableSwipeMonths
-              hideExtraDays
-              style={styles.calendar}
-            />
-            <View style={[styles.legend, { borderTopColor: theme.border }]}>
-              {[
-                { c: "#138DF0", label: i18nText("autoI18n.not", "Not") },
-                { c: "#FF7C25", label: i18nText("autoI18n.film", "Film") },
-                { c: "#AF00AF", label: i18nText("autoI18n.dizi", "Dizi") },
-              ].map((legend) => (
-                <View
-                  key={legend.label}
-                  style={[styles.legendChip, { backgroundColor: legend.c + "1A" }]}
-                >
-                  <View style={[styles.legendDot, { backgroundColor: legend.c }]} />
-                  <Text allowFontScaling={false} style={[styles.legendText, { color: legend.c }]}>
-                    {legend.label}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
+        ListHeaderComponent={calendarHeader}
       />
 
       <CalendarRangePicker
@@ -933,32 +806,41 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
+    gap: 10,
   },
-  iconBtn: {
-    width: 40,
+  headerCenter: { flex: 1, minWidth: 0 },
+  headerTitle: { fontSize: 22, fontWeight: "800", letterSpacing: -0.4 },
+  headerSub: { fontSize: 12, marginTop: 1, fontWeight: "600" },
+  todayBtn: {
     height: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
     borderRadius: 12,
+    borderWidth: 1,
+  },
+  todayBtnText: { fontSize: 13, fontWeight: "800" },
+
+  calendarWrapper: {
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 14,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  calendar: { borderRadius: 24, paddingBottom: 4 },
+  arrowBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  headerCenter: { flex: 1, alignItems: "center" },
-  headerTitle: { fontSize: 20, fontWeight: "800", letterSpacing: -0.2 },
-  headerSub: { fontSize: 11, marginTop: 1, fontWeight: "500" },
-
-  calendarWrapper: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  calendar: { borderRadius: 20 },
-  agendaContent: { paddingBottom: 100 },
   loadingOverlay: {
     position: "absolute",
     zIndex: 10,
@@ -974,154 +856,61 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 10,
+    paddingVertical: 11,
     paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#ffffff11",
+    borderTopWidth: StyleSheet.hairlineWidth,
     flexWrap: "wrap",
   },
   legendChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderRadius: 999,
   },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, fontWeight: "700" },
+  legendText: { fontSize: 12, fontWeight: "700" },
+  legendCount: { fontSize: 12, fontWeight: "900" },
 
-  dateHeader: {
+  stickyBlock: {
+    paddingTop: 6,
+    paddingBottom: 10,
+    gap: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: 14,
+  },
+  summaryRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
     gap: 8,
   },
-  dateTitle: { fontSize: 15, fontWeight: "700" },
-  dateSubTitle: { fontSize: 11, marginTop: 2 },
+  summaryCopy: { flex: 1, minWidth: 0 },
+  summaryTitle: { fontSize: 16, fontWeight: "800", letterSpacing: -0.2 },
+  summarySub: { fontSize: 12, fontWeight: "700", marginTop: 2 },
   clearFocusBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
     borderRadius: 12,
     borderWidth: 1,
   },
-  clearFocusText: { fontSize: 11, fontWeight: "600" },
+  clearFocusText: { fontSize: 12, fontWeight: "700" },
   countBadge: {
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
+    minWidth: 30,
+    height: 30,
+    borderRadius: 15,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 6,
-  },
-  countText: { fontSize: 12, fontWeight: "700" },
-
-  dateGroup: { marginBottom: 14 },
-
-  /* Tarih grubu başlığı (ajanda tile) */
-  groupHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  groupTile: {
-    width: 42,
-    height: 46,
-    borderRadius: 11,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  groupTileDay: { fontSize: 17, fontWeight: "800", lineHeight: 19 },
-  groupTileMonth: {
-    fontSize: 9,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  groupInfo: { flex: 1, gap: 2 },
-  groupWeekday: { fontSize: 13, fontWeight: "700", textTransform: "capitalize" },
-  groupRel: { fontSize: 11, fontWeight: "600" },
-  groupCount: {
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
-    paddingHorizontal: 7,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  groupCountText: { fontSize: 12, fontWeight: "800" },
-
-  /* Poster kartlar */
-  posterScrollContent: { paddingHorizontal: 16, paddingVertical: 4, gap: 10 },
-  posterCard: {
-    width: 106,
-    borderWidth: 1,
-    borderRadius: 14,
-    overflow: "hidden",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  posterTop: {
-    width: "100%",
-    height: 140,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-  posterImage: { width: "100%", height: "100%" },
-  posterBottom: {
     paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderTopWidth: 1,
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
   },
-  posterTitle: { fontSize: 11, fontWeight: "700", lineHeight: 13, flex: 1 },
-  posterTagDot: { width: 6, height: 6, borderRadius: 3 },
-  posterTypeChip: {
-    position: "absolute",
-    top: 6,
-    left: 6,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  posterTodoCount: {
-    position: "absolute",
-    bottom: 8,
-    left: 8,
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  saveBadge: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  countText: { fontSize: 13, fontWeight: "800" },
 
-  emptyState: { alignItems: "center", paddingTop: 40, gap: 12, paddingHorizontal: 16 },
+  emptyState: { alignItems: "center", paddingTop: 28, gap: 12, paddingHorizontal: 16 },
   emptyIcon: {
     width: 72,
     height: 72,
@@ -1131,12 +920,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 2,
   },
-  emptyText: { fontSize: 15, fontWeight: "700" },
+  emptyText: { fontSize: 16, fontWeight: "700", textAlign: "center" },
   emptySubText: {
-    fontSize: 12,
+    fontSize: 13,
     textAlign: "center",
     paddingHorizontal: 20,
-    lineHeight: 18,
+    lineHeight: 19,
   },
-
+  emptyAction: {
+    marginTop: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  emptyActionText: { fontSize: 13.5, fontWeight: "800" },
 });

@@ -1,381 +1,559 @@
 // components/cineswipe/SwipeCard.js
 //
-// Reanimated 4 ve PanGesture ile 60/120 FPS akıcılıkta kaydırılabilir film kartı.
-// Üzerinde ListBadges rozetleri, yıl/puan meta satırı ve basıldığında genişleyen
-// akıcı özet (expandable overview) metni barındırır.
-
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Dimensions,
-  TouchableOpacity,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-} from "react-native";
+// Kaydırılabilir film/dizi kartı (Reanimated 4 + RNGH Pan).
+//
+// Eski sürüme göre:
+//  • Düğmeyle verilen oy da AYNI fırlatma animasyonunu oynatır (`ref.swipe`);
+//    önceden kart olduğu yerde anında kayboluyordu.
+//  • Hızlı fırlatma (flick) kısa mesafede de oy sayılır.
+//  • Arkadaki kartlar derinliğe göre küçük/aşağıda durur ve üstteki kart
+//    sürüklendikçe öne yükselir (`dragX` yığın tarafından paylaşılır).
+//  • Eşik aşılınca tek seferlik titreşim, renkli sürükleme yıkaması, kenetli
+//    (clamp) damga animasyonu — eski interpolasyon sınırsızdı, damga şişiyordu.
+//  • Kart boyutu ekrandan değil yığının ölçülen alanından gelir.
+//  • Özet genişleme animasyonu Reanimated layout geçişi; LayoutAnimation /
+//    UIManager deneysel bayrağı kalktı.
+//  • Günlük kaydırma hakkı bitmişse kart hiç fırlamaz, yerine döner.
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
-  useSharedValue,
+  Easing,
+  LinearTransition,
+  interpolate,
+  runOnJS,
   useAnimatedStyle,
+  useSharedValue,
+  withSequence,
   withSpring,
   withTiming,
-  runOnJS,
-  interpolate,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import AppIcon from "../AppIcon";
 import ListBadges from "../ListBadges";
+import PressableScale from "./PressableScale";
+import { ON_POSTER } from "./cineTheme";
 import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
+import { cardGenreNames, posterUrl } from "../../services/cineswipe/deckModel";
 
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+const FLICK_VELOCITY = 900;
+const STACK_OFFSET = 14; // her derinlik basamağında aşağı kayma (px)
+const STACK_SCALE_STEP = 0.055; // her derinlik basamağında küçülme
+const STACK_SPRING = { damping: 18, stiffness: 190, mass: 0.8 };
+const SETTLE_SPRING = { damping: 16, stiffness: 220, mass: 0.7 };
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const CARD_WIDTH = SCREEN_WIDTH - 36;
-const CARD_HEIGHT = SCREEN_HEIGHT * 0.64;
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.28;
-
-export default function SwipeCard({
-  media,
-  isTop,
-  disabled = false,
-  onSwipeLeft,
-  onSwipeRight,
-  theme,
-}) {
+const SwipeCard = forwardRef(function SwipeCard(
+  {
+    media,
+    depth,
+    dragX,
+    width,
+    height,
+    disabled = false,
+    swipesAllowed = true,
+    onSwipe,
+    onBlocked,
+    onOpenDetails,
+    copy,
+    colors,
+  },
+  ref,
+) {
   const [expanded, setExpanded] = useState(false);
+  const [posterFailed, setPosterFailed] = useState(false);
+  const isTop = depth === 0;
+  const threshold = width * 0.32;
+  const flingDistance = width * 1.6;
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
+  const busy = useSharedValue(0); // 1: fırlatıldı, yeni dokunuş yok sayılır
+  const crossed = useSharedValue(0); // eşik titreşimi mandalı
+  const allowed = useSharedValue(swipesAllowed ? 1 : 0);
+  const depthAnim = useSharedValue(depth);
+  const entrance = useSharedValue(0);
+  const expandAnim = useSharedValue(0);
 
-  const toggleExpand = () => {
-    triggerHaptic("selection");
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded((prev) => !prev);
+  // Üst bileşenin işleyicileri her render değişir; kart bunları ref ile okur ki
+  // fırlatma animasyonu bitişinde bayat bir kapanış çağrılmasın.
+  const onSwipeRef = useRef(onSwipe);
+  const onBlockedRef = useRef(onBlocked);
+  onSwipeRef.current = onSwipe;
+  onBlockedRef.current = onBlocked;
+  const live = useRef({ isTop, disabled, swipesAllowed });
+  live.current = { isTop, disabled, swipesAllowed };
+
+  useEffect(() => {
+    allowed.value = swipesAllowed ? 1 : 0;
+  }, [swipesAllowed, allowed]);
+
+  useEffect(() => {
+    depthAnim.value = withSpring(depth, STACK_SPRING);
+  }, [depth, depthAnim]);
+
+  useEffect(() => {
+    entrance.value = withSpring(1, { damping: 16, stiffness: 150, mass: 0.9 });
+  }, [entrance]);
+
+  useEffect(() => {
+    expandAnim.value = withTiming(expanded ? 1 : 0, { duration: 220 });
+  }, [expanded, expandAnim]);
+
+  // JS tarafı geri çağrıları (worklet'ten runOnJS ile çağrılır).
+  const commit = useCallback(
+    (direction) => onSwipeRef.current?.(direction === 1 ? "like" : "pass", media),
+    [media],
+  );
+  const blocked = useCallback(() => onBlockedRef.current?.(), []);
+  const tick = useCallback(() => triggerHaptic("selection"), []);
+  const thump = useCallback((direction) => triggerHaptic(direction === 1 ? "impact" : "selection"), []);
+
+  const settle = () => {
+    "worklet";
+    translateX.value = withSpring(0, SETTLE_SPRING);
+    translateY.value = withSpring(0, SETTLE_SPRING);
+    dragX.value = withSpring(0, SETTLE_SPRING);
   };
 
-  const panGesture = Gesture.Pan()
+  const flingTo = (direction) => {
+    "worklet";
+    busy.value = 1;
+    translateY.value = withTiming(translateY.value - 26, { duration: 240 });
+    dragX.value = withTiming(direction * threshold * 1.2, { duration: 240 });
+    translateX.value = withTiming(
+      direction * flingDistance,
+      { duration: 240, easing: Easing.out(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(commit)(direction);
+      },
+    );
+  };
+
+  const shake = () => {
+    translateX.value = withSequence(
+      withTiming(-14, { duration: 60 }),
+      withTiming(14, { duration: 80 }),
+      withTiming(-8, { duration: 70 }),
+      withTiming(0, { duration: 60 }),
+    );
+  };
+
+  // Düğmeler: aynı fırlatma animasyonu, aynı kapılar.
+  useImperativeHandle(
+    ref,
+    () => ({
+      swipe: (action) => {
+        const state = live.current;
+        if (!state.isTop || state.disabled || busy.value === 1) return false;
+        if (!state.swipesAllowed) {
+          triggerHaptic("notification");
+          shake();
+          onBlockedRef.current?.();
+          return false;
+        }
+        const direction = action === "like" ? 1 : -1;
+        triggerHaptic(direction === 1 ? "impact" : "selection");
+        flingTo(direction);
+        return true;
+      },
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [threshold, flingDistance, commit],
+  );
+
+  const pan = Gesture.Pan()
     .enabled(isTop && !disabled)
-    .onUpdate((e) => {
-      translateX.value = e.translationX;
-      translateY.value = e.translationY;
-    })
-    .onEnd((e) => {
-      if (translateX.value > SWIPE_THRESHOLD) {
-        // Sağa Fırlat (Beğen)
-        translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 250 }, () => {
-          runOnJS(onSwipeRight)(media);
-        });
-        runOnJS(triggerHaptic)("impact");
-      } else if (translateX.value < -SWIPE_THRESHOLD) {
-        // Sola Fırlat (Pas)
-        translateX.value = withTiming(-SCREEN_WIDTH * 1.5, { duration: 250 }, () => {
-          runOnJS(onSwipeLeft)(media);
-        });
-        runOnJS(triggerHaptic)("selection");
-      } else {
-        // Merkeze Dön
-        translateX.value = withSpring(0, { damping: 15 });
-        translateY.value = withSpring(0, { damping: 15 });
+    .minDistance(4)
+    .onUpdate((event) => {
+      if (busy.value === 1) return;
+      translateX.value = event.translationX;
+      translateY.value = event.translationY * 0.55;
+      dragX.value = event.translationX;
+      const over = Math.abs(event.translationX) > threshold;
+      if (over && crossed.value === 0) {
+        crossed.value = 1;
+        runOnJS(tick)();
+      } else if (!over && crossed.value === 1) {
+        crossed.value = 0;
       }
+    })
+    .onEnd((event) => {
+      if (busy.value === 1) return;
+      const x = translateX.value;
+      const right = x > threshold || (event.velocityX > FLICK_VELOCITY && x > 24);
+      const left = x < -threshold || (event.velocityX < -FLICK_VELOCITY && x < -24);
+      if (!right && !left) {
+        settle();
+        return;
+      }
+      if (allowed.value === 0) {
+        settle();
+        runOnJS(blocked)();
+        return;
+      }
+      runOnJS(thump)(right ? 1 : -1);
+      flingTo(right ? 1 : -1);
+    })
+    .onFinalize((_event, success) => {
+      crossed.value = 0;
+      // Hareket iptal edildiyse (ör. kart pasifleşti) kart ortada kalmasın.
+      if (!success && busy.value === 0) settle();
     });
 
-  const cardAnimatedStyle = useAnimatedStyle(() => {
-    const rotate = interpolate(
-      translateX.value,
-      [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
-      [-12, 0, 12],
-    );
-
+  const cardStyle = useAnimatedStyle(() => {
+    const progress = Math.min(Math.abs(dragX.value) / threshold, 1);
+    const depthNow = depthAnim.value > 0 ? Math.max(0, depthAnim.value - progress) : 0;
+    const rotate = interpolate(translateX.value, [-width, 0, width], [-14, 0, 14], "clamp");
+    const enter = entrance.value;
     return {
+      opacity: enter,
       transform: [
         { translateX: translateX.value },
-        { translateY: translateY.value },
+        { translateY: translateY.value + depthNow * STACK_OFFSET + (1 - enter) * 18 },
         { rotate: `${rotate}deg` },
+        { scale: (1 - depthNow * STACK_SCALE_STEP) * (0.94 + 0.06 * enter) },
       ],
     };
   });
 
-  // Beğen Rozeti (Sağa çekince yeşil yanar)
-  const likeBadgeStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD * 0.7], [0, 1]),
+  const dimStyle = useAnimatedStyle(() => {
+    const progress = Math.min(Math.abs(dragX.value) / threshold, 1);
+    const depthNow = depthAnim.value > 0 ? Math.max(0, depthAnim.value - progress) : 0;
+    return { opacity: Math.min(0.5, depthNow * 0.3) };
+  });
+
+  const likeStamp = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [0, threshold * 0.55, threshold], [0, 0.85, 1], "clamp"),
     transform: [
-      {
-        scale: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0.8, 1.1]),
-      },
+      { rotate: "-14deg" },
+      { scale: interpolate(translateX.value, [0, threshold], [0.7, 1.05], "clamp") },
     ],
   }));
-
-  // Pas Rozeti (Sola çekince kırmızı yanar)
-  const nopeBadgeStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD * 0.7, 0], [1, 0]),
+  const passStamp = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [-threshold, -threshold * 0.55, 0], [1, 0.85, 0], "clamp"),
     transform: [
-      {
-        scale: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1.1, 0.8]),
-      },
+      { rotate: "14deg" },
+      { scale: interpolate(translateX.value, [-threshold, 0], [1.05, 0.7], "clamp") },
     ],
   }));
+  const likeWash = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [0, threshold], [0, 0.34], "clamp"),
+  }));
+  const passWash = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [-threshold, 0], [0.34, 0], "clamp"),
+  }));
+  const gradientStyle = useAnimatedStyle(() => ({
+    height: height * (0.6 + 0.16 * expandAnim.value),
+  }));
 
-  const posterUri = media?.poster_path
-    ? `https://image.tmdb.org/t/p/w780${media.poster_path}`
-    : null;
-
+  const uri = posterUrl(media?.poster_path);
   const year = media?.release_date ? media.release_date.split("-")[0] : "";
   const rating = media?.vote_average ? Number(media.vote_average).toFixed(1) : "";
-  const mediaTypeLabel = media?.mediaType === "tv" ? "Dizi" : "Film";
+  const typeLabel = media?.mediaType === "tv" ? copy.tv : copy.movie;
+  const genres = cardGenreNames(media, copy.genreNames);
+  const title = media?.title || media?.name || "";
+
+  const toggleExpand = () => {
+    triggerHaptic("selection");
+    setExpanded((value) => !value);
+  };
 
   return (
-    <GestureDetector gesture={panGesture}>
-      <Animated.View style={[styles.card, cardAnimatedStyle]}>
-        {/* Poster Image */}
-        {posterUri ? (
+    <GestureDetector gesture={pan}>
+      <Animated.View
+        pointerEvents={isTop ? "auto" : "none"}
+        style={[styles.card, { width, height, backgroundColor: colors.between }, cardStyle]}
+      >
+        {uri && !posterFailed ? (
           <Image
-            source={{ uri: posterUri }}
-            style={styles.poster}
+            source={{ uri }}
+            style={StyleSheet.absoluteFill}
             contentFit="cover"
-            transition={200}
+            transition={180}
+            priority={isTop ? "high" : "normal"}
+            cachePolicy="memory-disk"
+            onError={() => setPosterFailed(true)}
+            accessibilityIgnoresInvertColors
           />
         ) : (
-          <View style={[styles.noPoster, { backgroundColor: "#2A2A2E" }]}>
-            <AppIcon family="MaterialCommunityIcons" name="movie-outline" size={64} color="#666" />
+          <View style={[StyleSheet.absoluteFill, styles.noPoster, { backgroundColor: colors.between }]}>
+            <AppIcon family="MaterialCommunityIcons" name="movie-open-outline" size={64} color={colors.muted} />
+            <Text style={[styles.noPosterText, { color: colors.muted }]}>{copy.posterMissing}</Text>
           </View>
         )}
 
-        {/* List Badges (İzleme Durumu Rozeti) */}
-        {media?.id ? (
-          <View style={styles.badgeOverlay}>
-            <ListBadges
-              mediaId={media.id}
-              mediaType={media.mediaType || "movie"}
-              variant="chip"
-              vertical={false}
-              chipSize={22}
-              iconSize={12}
-            />
-          </View>
-        ) : null}
+        <Animated.View pointerEvents="none" style={[styles.gradientWrap, gradientStyle]}>
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.5)", "rgba(0,0,0,0.96)"]}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
 
-        {/* Gradient Overlay for Text Readability */}
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.45)", "rgba(0,0,0,0.95)"]}
-          style={[styles.gradient, expanded && { height: "70%" }]}
+        {/* Sürükleme yıkaması: yön rengi kartın tamamına yayılır. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.like }, likeWash]}
         />
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.pass }, passWash]}
+        />
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.dim, dimStyle]} />
 
-        {/* LIKE Stamp */}
-        <Animated.View style={[styles.badge, styles.likeBadge, likeBadgeStyle]}>
-          <Text style={styles.likeBadgeText}>BEĞEN</Text>
+        <View style={styles.topRow} pointerEvents="box-none">
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={copy.detailsAction}
+            hitSlop={8}
+            onPress={() => onOpenDetails?.(media)}
+            style={styles.infoButton}
+          >
+            <AppIcon family="Ionicons" name="information" size={19} color={ON_POSTER.text} />
+          </PressableScale>
+          {media?.id ? (
+            <View pointerEvents="none">
+              <ListBadges
+                mediaId={media.id}
+                mediaType={media.mediaType || "movie"}
+                variant="chip"
+                vertical={false}
+                chipSize={24}
+                iconSize={13}
+              />
+            </View>
+          ) : null}
+        </View>
+
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.stamp, styles.likeStamp, { borderColor: colors.like }, likeStamp]}
+        >
+          <Text style={[styles.stampText, { color: colors.like }]}>{copy.like}</Text>
+        </Animated.View>
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.stamp, styles.passStamp, { borderColor: colors.pass }, passStamp]}
+        >
+          <Text style={[styles.stampText, { color: colors.pass }]}>{copy.pass}</Text>
         </Animated.View>
 
-        {/* NOPE Stamp */}
-        <Animated.View style={[styles.badge, styles.nopeBadge, nopeBadgeStyle]}>
-          <Text style={styles.nopeBadgeText}>PAS</Text>
-        </Animated.View>
-
-        {/* Media Details & Expandable Overview */}
-        <View style={styles.infoContainer}>
-          {/* Title */}
+        <Animated.View layout={LinearTransition.duration(220)} style={styles.info}>
           <Text style={styles.title} numberOfLines={expanded ? 3 : 2}>
-            {media.title || media.name}
+            {title}
           </Text>
 
-          {/* Subtitle: Yıl + Puan + Tür */}
           <View style={styles.metaRow}>
             {year ? (
-              <View style={styles.metaPill}>
-                <AppIcon family="Ionicons" name="calendar-outline" size={12} color="#FFF" />
-                <Text style={styles.metaPillText}>{year}</Text>
+              <View style={styles.pill}>
+                <AppIcon family="Ionicons" name="calendar-outline" size={12} color={ON_POSTER.text} />
+                <Text style={styles.pillText}>{year}</Text>
               </View>
             ) : null}
-
             {rating && rating !== "0.0" ? (
-              <View style={[styles.metaPill, styles.ratingPill]}>
-                <AppIcon family="Ionicons" name="star" size={12} color="#FFD700" />
-                <Text style={styles.ratingText}>{rating}</Text>
+              <View style={[styles.pill, styles.ratingPill]}>
+                <AppIcon family="Ionicons" name="star" size={12} color={ON_POSTER.gold} />
+                <Text style={[styles.pillText, { color: ON_POSTER.gold }]}>{rating}</Text>
               </View>
             ) : null}
-
-            <View style={[styles.metaPill, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
-              <Text style={styles.metaPillText}>{mediaTypeLabel}</Text>
+            <View style={styles.pill}>
+              <AppIcon
+                family="Ionicons"
+                name={media?.mediaType === "tv" ? "tv-outline" : "film-outline"}
+                size={12}
+                color={ON_POSTER.text}
+              />
+              <Text style={styles.pillText}>{typeLabel}</Text>
             </View>
           </View>
 
-          {/* Basılınca Genişleyen Açıklama (Expandable Overview) */}
-          {media.overview ? (
-            <TouchableOpacity
-              activeOpacity={0.85}
+          {genres.length ? (
+            <Text style={styles.genres} numberOfLines={1}>
+              {genres.join(" · ")}
+            </Text>
+          ) : null}
+
+          {media?.overview ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={expanded ? copy.hideOverview : copy.readOverview}
               onPress={toggleExpand}
-              style={styles.overviewBox}
+              style={[styles.overviewBox, { backgroundColor: alpha("#000000", 0.38) }]}
             >
-              <Text
-                style={styles.overview}
-                numberOfLines={expanded ? undefined : 2}
-              >
+              <Text style={styles.overview} numberOfLines={expanded ? 9 : 2}>
                 {media.overview}
               </Text>
-              <View style={styles.expandHintRow}>
-                <Text style={styles.expandHintText}>
-                  {expanded ? "Daha az göster" : "Özeti oku"}
-                </Text>
+              <View style={styles.expandHint}>
+                <Text style={styles.expandHintText}>{expanded ? copy.hideOverview : copy.readOverview}</Text>
                 <AppIcon
                   family="Ionicons"
                   name={expanded ? "chevron-up" : "chevron-down"}
                   size={12}
-                  color="rgba(255,255,255,0.6)"
+                  color={ON_POSTER.textMuted}
                 />
               </View>
-            </TouchableOpacity>
+            </Pressable>
           ) : null}
-        </View>
+        </Animated.View>
       </Animated.View>
     </GestureDetector>
   );
-}
+});
+
+export default SwipeCard;
 
 const styles = StyleSheet.create({
   card: {
     position: "absolute",
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: 26,
+    borderRadius: 28,
     overflow: "hidden",
-    backgroundColor: "#1C1C1E",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    elevation: 12,
-  },
-  poster: {
-    ...StyleSheet.absoluteFillObject,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.38,
+    shadowRadius: 20,
+    elevation: 14,
   },
   noPoster: {
-    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
   },
-  badgeOverlay: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    zIndex: 10,
+  noPosterText: {
+    fontSize: 13,
+    fontWeight: "700",
   },
-  gradient: {
+  gradientWrap: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: "58%",
   },
-  badge: {
+  dim: {
+    backgroundColor: "#000",
+  },
+  topRow: {
     position: "absolute",
-    top: 24,
+    top: 14,
+    left: 14,
+    right: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    zIndex: 10,
+  },
+  infoButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderWidth: 1,
+    borderColor: ON_POSTER.chipBorder,
+  },
+  stamp: {
+    position: "absolute",
+    top: 70,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 12,
-    borderWidth: 3,
-    zIndex: 10,
+    borderWidth: 3.5,
+    backgroundColor: "rgba(0,0,0,0.28)",
+    zIndex: 12,
   },
-  likeBadge: {
-    left: 20,
-    borderColor: "#4CD964",
-    backgroundColor: "rgba(76, 217, 100, 0.25)",
-    transform: [{ rotate: "-15deg" }],
+  likeStamp: {
+    left: 22,
   },
-  likeBadgeText: {
-    color: "#4CD964",
-    fontSize: 22,
+  passStamp: {
+    right: 22,
+  },
+  stampText: {
+    fontSize: 23,
     fontWeight: "900",
-    letterSpacing: 1.5,
+    letterSpacing: 1.8,
   },
-  nopeBadge: {
-    right: 20,
-    borderColor: "#FF3B30",
-    backgroundColor: "rgba(255, 59, 48, 0.25)",
-    transform: [{ rotate: "15deg" }],
-  },
-  nopeBadgeText: {
-    color: "#FF3B30",
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-  },
-  infoContainer: {
+  info: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
-    padding: 18,
+    bottom: 0,
+    paddingHorizontal: 18,
+    paddingBottom: 18,
     zIndex: 5,
   },
   title: {
-    color: "#FFFFFF",
-    fontSize: 22,
+    color: ON_POSTER.text,
+    fontSize: 24,
     fontWeight: "900",
-    lineHeight: 26,
-    letterSpacing: -0.3,
-    marginBottom: 8,
-    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    lineHeight: 28,
+    letterSpacing: -0.4,
+    marginBottom: 9,
+    textShadowColor: "rgba(0,0,0,0.75)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 10,
+    flexWrap: "wrap",
+    gap: 7,
   },
-  metaPill: {
+  pill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(0, 0, 0, 0.55)",
-    paddingHorizontal: 8,
+    backgroundColor: ON_POSTER.chip,
+    paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 9,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-  },
-  metaPillText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
+    borderColor: ON_POSTER.chipBorder,
   },
   ratingPill: {
-    backgroundColor: "rgba(255, 215, 0, 0.15)",
-    borderColor: "rgba(255, 215, 0, 0.3)",
+    backgroundColor: "rgba(255,200,61,0.16)",
+    borderColor: "rgba(255,200,61,0.34)",
   },
-  ratingText: {
-    color: "#FFD700",
+  pillText: {
+    color: ON_POSTER.text,
     fontSize: 12,
     fontWeight: "800",
   },
+  genres: {
+    color: ON_POSTER.textSoft,
+    fontSize: 12.5,
+    fontWeight: "600",
+    marginTop: 8,
+  },
   overviewBox: {
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-    padding: 10,
-    borderRadius: 12,
+    marginTop: 10,
+    padding: 11,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
   overview: {
-    color: "rgba(255, 255, 255, 0.88)",
-    fontSize: 12,
-    lineHeight: 17,
+    color: ON_POSTER.textSoft,
+    fontSize: 12.5,
+    lineHeight: 18,
   },
-  expandHintRow: {
+  expandHint: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
     gap: 4,
-    marginTop: 4,
+    marginTop: 5,
   },
   expandHintText: {
-    color: "rgba(255,255,255,0.6)",
+    color: ON_POSTER.textMuted,
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: "700",
   },
 });

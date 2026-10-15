@@ -1,32 +1,43 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Image,
-  Dimensions,
-} from "react-native";
+// screens/tabs/profile/FriendRequestsScreen.js
+//
+// Arkadaşlık istekleri: Gelen / Gönderilen sekmeleri.
+//
+//   • Gelen: her istek kendi kartında — kim olduğu + ne zaman geldiği, altında
+//     iki ETİKETLİ düğme (Kabul et / Reddet). Eskiden yalnız ✓ ve ✕ ikonları
+//     vardı; hangisinin ne yaptığı okunmuyor, parmakla zor vuruluyordu.
+//   • Gönderilen: ortak grup kartı satırları; sağda "Geri çek".
+//
+// Görünüm components/friends/* ortak bileşenlerinden gelir. Tüm yazma mantığı
+// FriendsContext + friendsService'te (atomic batch); burada yalnız çağrılır.
 
-const { width: SCREEN_W } = Dimensions.get("window");
-// Tab bar: marginHorizontal 16 her iki yan → bar genişliği = SCREEN_W - 32
-// 2 sekme eşit bölünür
-const TAB_W = (SCREEN_W - 32) / 2;
+import React, { useMemo, useState } from "react";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../../context/ThemeContext";
-import { useProfileUi } from "../../../context/ProfileUiContext";
+import { useLanguage } from "../../../context/LanguageContext";
 import { useFriends } from "../../../context/FriendsContext";
 import ScreenDecor from "../../../components/ScreenDecor";
-import { SafeAreaView } from "react-native-safe-area-context";
-import BackButton from "../../../components/BackButton";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { i18nText } from "../../../utils/i18nText";
+import StaggerItem from "../../../components/StaggerItem";
 import UserAvatar from "../../../components/common/UserAvatar";
+import FriendsScreenHeader from "../../../components/friends/FriendsScreenHeader";
+import FriendsSegmentedTabs from "../../../components/friends/FriendsSegmentedTabs";
+import FriendsEmptyState from "../../../components/friends/FriendsEmptyState";
+import PersonRow from "../../../components/friends/PersonRow";
+import PillButton from "../../../components/friends/PillButton";
+import { FRIEND_GREEN, PENDING_AMBER } from "../../../components/friends/friendsTokens";
+import * as Haptics from "../../../services/hapticsService";
+import { alpha } from "../../../theme/colors";
+import { toEpochMs } from "../../../utils/friendsListModel";
+import { formatTimeAgo } from "../../../utils/postTime";
+import { i18nText } from "../../../utils/i18nText";
 
-export default function FriendRequestsScreen() {
+/** "@kullanici · 2 gün önce" — zaman henüz çözülmediyse (sunucu damgası) yalnız ad. */
+const handleLine = (username, ago) => (ago ? `@${username} · ${ago}` : `@${username}`);
+
+export default function FriendRequestsScreen({ navigation }) {
   const [tab, setTab] = useState("received");
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const {
     incomingRequests,
     outgoingRequests,
@@ -36,7 +47,7 @@ export default function FriendRequestsScreen() {
   } = useFriends();
 
   // Context (alt koleksiyon modeli) verisini kartın beklediği
-  // {id, uid, displayName, username, avatarIndex, photoURL} şekline normalize et.
+  // {id, uid, displayName, username, avatarIndex, photoURL, createdAt} şekline normalize et.
   const requests = useMemo(
     () =>
       incomingRequests.map((r) => ({
@@ -46,6 +57,7 @@ export default function FriendRequestsScreen() {
         username: r.fromUsername,
         avatarIndex: r.fromAvatarIndex,
         photoURL: r.fromPhotoURL || null,
+        createdAt: r.createdAt,
       })),
     [incomingRequests],
   );
@@ -58,246 +70,190 @@ export default function FriendRequestsScreen() {
         username: r.toUsername,
         avatarIndex: r.toAvatarIndex,
         photoURL: r.toPhotoURL || null,
+        createdAt: r.createdAt,
       })),
     [outgoingRequests],
   );
 
-  const tabAnim = useRef(new Animated.Value(0)).current;
-  const titleAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(titleAnim, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  const switchTab = (t) => {
-    setTab(t);
-    Animated.spring(tabAnim, {
-      toValue: t === "received" ? 0 : 1,
-      speed: 16,
-      bounciness: 5,
-      useNativeDriver: true,
-    }).start();
-  };
-
   // Tüm yazma mantığı FriendsContext + friendsService'te (atomic batch).
-  const handleAccept = (friend) => acceptRequest(friend.uid);
+  const handleAccept = (friend) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    acceptRequest(friend.uid);
+  };
   const handleDecline = (friend) => declineRequest(friend.uid);
   const handleCancelSent = (friend) => cancelRequest(friend.uid);
 
-  const renderItem = ({ item }) => (
+  const openProfile = (item) =>
+    navigation?.navigate("FriendProfileScreen", {
+      friendUid: item.uid,
+      friendName: item.displayName,
+    });
+  const goSearch = () => navigation?.navigate("SearchFriendsScreen");
+
+  const agoOf = (item) => formatTimeAgo(toEpochMs(item.createdAt), t.shareScreen?.timeAgo);
+
+  const isReceived = tab === "received";
+  const activeData = isReceived ? requests : sentRequests;
+
+  // ── Gelen istek kartı ──
+  const renderReceived = ({ item, index }) => (
+    <StaggerItem index={index}>
       <View
         style={[
-          styles.requestCard,
-          { backgroundColor: theme.secondary, borderColor: theme.border },
+          styles.card,
+          { backgroundColor: theme.secondary, borderColor: alpha(theme.border, 0.7) },
         ]}
       >
-        {/* Avatar */}
-        <UserAvatar
-          avatarIndex={item?.avatarIndex}
-          photoURL={item?.photoURL}
-          isCustomPhoto
-          size={52}
-          borderWidth={2}
-          borderColor={
-            tab === "received"
-              ? (theme.colors?.green ?? "#29b864") + "88"
-              : "#ff965088"
-          }
-        />
-
-        {/* Bilgiler */}
-        <View style={styles.userInfo}>
-          <Text
-            style={[
-              styles.displayName,
-              { color: theme.text?.primary ?? "#fff" },
-            ]}
-            numberOfLines={1}
-          >
-            {item.displayName}
-          </Text>
-          <Text
-            style={[
-              styles.username,
-              { color: theme.text?.secondary ?? "#aaa" },
-            ]}
-            numberOfLines={1}
-          >
-            @{item.username}
-          </Text>
-        </View>
-
-        {/* İşlem butonları — eski kaydırma işlemlerinin yerine */}
-        <View style={styles.actionsWrapper}>
-          {tab === "received" ? (
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={[
-                  styles.actionBtn,
-                  {
-                    backgroundColor: (theme.colors?.green ?? "#29b864") + "22",
-                  },
-                ]}
-                onPress={() => handleAccept(item)}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              >
-                <Ionicons
-                  name="checkmark"
-                  size={18}
-                  color={theme.colors?.green ?? "#29b864"}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#c44f4f22" }]}
-                onPress={() => handleDecline(item)}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              >
-                <Ionicons name="close" size={18} color="#c44f4f" />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: "#ff965022" }]}
-              onPress={() => handleCancelSent(item)}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        <Pressable
+          onPress={() => openProfile(item)}
+          style={({ pressed }) => [styles.cardTop, pressed && { opacity: 0.8 }]}
+        >
+          <UserAvatar
+            avatarIndex={item.avatarIndex}
+            photoURL={item.photoURL}
+            isCustomPhoto
+            size={56}
+            borderWidth={2}
+            borderColor={alpha(FRIEND_GREEN, 0.55)}
+          />
+          <View style={styles.cardCopy}>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.cardName, { color: theme.text?.primary ?? "#fff" }]}
             >
-              <Ionicons name="close" size={18} color="#ff9650" />
-            </TouchableOpacity>
-          )}
+              {item.displayName}
+            </Text>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.cardMeta, { color: theme.text?.muted ?? "#888" }]}
+            >
+              {handleLine(item.username, agoOf(item))}
+            </Text>
+          </View>
+        </Pressable>
+
+        <View style={styles.cardActions}>
+          <PillButton
+            style={styles.flex}
+            variant="primary"
+            tone={FRIEND_GREEN}
+            icon="checkmark"
+            label={i18nText("autoI18n.friends_ui_accept", "Kabul et")}
+            onPress={() => handleAccept(item)}
+          />
+          <PillButton
+            style={styles.flex}
+            variant="ghost"
+            icon="close"
+            label={i18nText("autoI18n.friends_ui_decline", "Reddet")}
+            onPress={() => handleDecline(item)}
+          />
         </View>
       </View>
+    </StaggerItem>
   );
 
-  const activeData = tab === "received" ? requests : sentRequests;
+  // ── Gönderilen istek satırı ──
+  const renderSent = ({ item, index }) => {
+    const ago = agoOf(item);
+    return (
+      <PersonRow
+        avatar={{ avatarIndex: item.avatarIndex, photoURL: item.photoURL, isCustomPhoto: true }}
+        ringColor={alpha(PENDING_AMBER, 0.55)}
+        title={item.displayName}
+        subtitle={
+          <Text allowFontScaling={false} numberOfLines={1} style={styles.sentSubtitle}>
+            <Text style={{ color: theme.text?.muted ?? "#888" }}>@{item.username}</Text>
+            <Text style={{ color: PENDING_AMBER, fontWeight: "700" }}>
+              {` · ${i18nText("autoI18n.friends_ui_pending", "Bekliyor")}`}
+            </Text>
+            {ago ? <Text style={{ color: theme.text?.muted ?? "#888" }}>{` · ${ago}`}</Text> : null}
+          </Text>
+        }
+        trailing={
+          <PillButton
+            size="sm"
+            variant="soft"
+            tone={PENDING_AMBER}
+            label={i18nText("autoI18n.friends_ui_withdraw", "Geri çek")}
+            onPress={() => handleCancelSent(item)}
+          />
+        }
+        onPress={() => openProfile(item)}
+        first={index === 0}
+        last={index === sentRequests.length - 1}
+      />
+    );
+  };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.primary }]}
-    >
-      <ScreenDecor iconOpacity={0.3} />
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
+      <ScreenDecor scope="profile" iconOpacity={0.3} />
 
-      {/* Geri + başlık */}
-      <View style={styles.headerBar}>
-        <View style={styles.headerSide}>
-          <BackButton absolute={false} />
-        </View>
-        <Animated.Text
-          allowFontScaling={false}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.75}
-          style={[
-            styles.pageTitle,
-            { color: theme.text?.primary ?? "#fff" },
-            {
-              opacity: titleAnim,
-              transform: [
-                {
-                  translateY: titleAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-16, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >{i18nText("autoI18n.arkadaslik_istekleri", "Arkadaşlık İstekleri")}</Animated.Text>
-        {/* Başlık geri butonuna rağmen ortalı kalsın diye simetrik boşluk */}
-        <View style={styles.headerSide} />
-      </View>
+      <FriendsScreenHeader
+        title={i18nText("autoI18n.arkadaslik_istekleri", "Arkadaşlık İstekleri")}
+        subtitle={
+          requests.length
+            ? i18nText("autoI18n.friends_ui_requests_pending", "{{n}} bekleyen istek", {
+                n: requests.length,
+              })
+            : i18nText("autoI18n.friends_ui_requests_none", "Bekleyen istek yok")
+        }
+      />
 
-      {/* Sekme çubuğu */}
-      <View style={[styles.tabBar, { backgroundColor: theme.secondary }]}>
-        <Animated.View
-          style={[
-            styles.tabIndicator,
-            {
-              backgroundColor: theme.primary,
-              width: TAB_W - 8,
-              transform: [
-                {
-                  translateX: tabAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [4, TAB_W + 4],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
-        {[
-          { key: "received", label: i18nText("autoI18n.gelen_istekler", "Gelen İstekler"), count: requests.length },
-          { key: "sent", label: i18nText("autoI18n.gonderilenler", "Gönderilenler"), count: sentRequests.length },
-        ].map((t) => (
-          <TouchableOpacity
-            key={t.key}
-            style={styles.tabBtn}
-            onPress={() => switchTab(t.key)}
-            activeOpacity={0.75}
-          >
-            <Text
-              style={[
-                styles.tabLabel,
-                {
-                  color:
-                    tab === t.key
-                      ? (theme.text?.primary ?? "#fff")
-                      : (theme.text?.secondary ?? "#aaa"),
-                },
-                tab === t.key && { fontWeight: "700" },
-              ]}
-            >
-              {t.label}
-            </Text>
-            {t.count > 0 && (
-              <View
-                style={[
-                  styles.countDot,
-                  {
-                    backgroundColor:
-                      t.key === "received"
-                        ? (theme.colors?.green ?? "#29b864")
-                        : "#ff9650",
-                  },
-                ]}
-              >
-                <Text style={styles.countDotText}>{t.count}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
+      <FriendsSegmentedTabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          {
+            key: "received",
+            label: i18nText("autoI18n.gelen_istekler", "Gelen İstekler"),
+            badge: requests.length,
+            badgeColor: FRIEND_GREEN,
+          },
+          {
+            key: "sent",
+            label: i18nText("autoI18n.gonderilenler", "Gönderilenler"),
+            badge: sentRequests.length,
+            badgeColor: PENDING_AMBER,
+          },
+        ]}
+      />
 
-      {/* Liste veya boş durum */}
       {activeData.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons
-            name={
-              tab === "received" ? "mail-open-outline" : "paper-plane-outline"
-            }
-            size={52}
-            color={theme.text?.muted ?? "#444"}
-          />
-          <Text
-            style={[
-              styles.emptyText,
-              { color: theme.text?.secondary ?? "#aaa" },
-            ]}
-          >
-            {tab === "received"
+        <FriendsEmptyState
+          icon={isReceived ? "mail-open" : "paper-plane"}
+          tone={isReceived ? FRIEND_GREEN : PENDING_AMBER}
+          title={
+            isReceived
               ? i18nText("autoI18n.gelen_arkadaslik_istegi_yok", "Gelen arkadaşlık isteği yok")
-              : i18nText("autoI18n.gonderilen_arkadaslik_istegi_yok", "Gönderilen arkadaşlık isteği yok")}
-          </Text>
-        </View>
+              : i18nText("autoI18n.gonderilen_arkadaslik_istegi_yok", "Gönderilen arkadaşlık isteği yok")
+          }
+          description={
+            isReceived
+              ? i18nText(
+                  "autoI18n.friends_ui_empty_received_desc",
+                  "Biri sana istek gönderdiğinde burada görünür.",
+                )
+              : i18nText(
+                  "autoI18n.friends_ui_empty_sent_desc",
+                  "Gönderdiğin istekler kabul edilene kadar burada bekler.",
+                )
+          }
+          actionLabel={i18nText("autoI18n.arkadas_ara", "Arkadaş Ara")}
+          actionIcon="search"
+          onAction={goSearch}
+        />
       ) : (
         <FlatList
+          // Sekme değişince liste sıfırdan çizilsin: StaggerItem giriş animasyonu
+          // yalnız mount'ta çalışır, aynı FlatList'te veri değişirse tekrarlanmaz.
+          key={tab}
           data={activeData}
           keyExtractor={(item) => item.uid}
-          renderItem={renderItem}
+          renderItem={isReceived ? renderReceived : renderSent}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         />
@@ -308,106 +264,23 @@ export default function FriendRequestsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 10 },
+  flex: { flex: 1 },
+  listContent: { paddingBottom: 30 },
 
-  // Geri butonu satır içinde: eskiden absolute olduğu için başlığın üstüne
-  // biniyordu. headerSide iki yanda eşit boşluk bırakıp başlığı ortalı tutar.
-  headerBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    marginTop: 4,
-  },
-  headerSide: { width: 40 },
-  pageTitle: {
-    flex: 1,
-    fontSize: 26,
-    fontWeight: "800",
-    textAlign: "center",
-    letterSpacing: -0.5,
-  },
-
-  // ── Tab bar ──────────────────────────────────────────────────────────────
-  tabBar: {
-    flexDirection: "row",
+  // ── Gelen istek kartı ────────────────────────────────────────────────────
+  card: {
     marginHorizontal: 16,
-    marginBottom: 14,
-    borderRadius: 14,
-    height: 46,
-    position: "relative",
-    overflow: "hidden",
-  },
-  tabIndicator: {
-    position: "absolute",
-    top: 4,
-    bottom: 4,
-    borderRadius: 10,
-  },
-  tabBtn: {
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-    gap: 6,
-  },
-  tabLabel: { fontSize: 13, fontWeight: "500" },
-  countDot: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 4,
-  },
-  countDotText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-
-  listContent: { paddingHorizontal: 16, paddingBottom: 30 },
-
-  // ── Request card ─────────────────────────────────────────────────────────
-  requestCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 10,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 20,
     borderWidth: 1,
-    gap: 12,
-  },
-  avatarWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
-    overflow: "hidden",
-  },
-  avatar: { width: "100%", height: "100%", borderRadius: 26 },
-  avatarPlaceholder: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  userInfo: { flex: 1, gap: 3 },
-  displayName: { fontSize: 15, fontWeight: "700" },
-  username: { fontSize: 13 },
-  actionsWrapper: { alignItems: "center", justifyContent: "center" },
-  actionsRow: { flexDirection: "row", gap: 8 },
-  actionBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  // ── Empty state ──────────────────────────────────────────────────────────
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
     gap: 14,
-    paddingHorizontal: 32,
   },
-  emptyText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  cardTop: { flexDirection: "row", alignItems: "center", gap: 14 },
+  cardCopy: { flex: 1, minWidth: 0, gap: 3 },
+  cardName: { fontSize: 17, fontWeight: "800", letterSpacing: -0.2 },
+  cardMeta: { fontSize: 13 },
+  cardActions: { flexDirection: "row", gap: 10 },
+
+  sentSubtitle: { fontSize: 13 },
 });

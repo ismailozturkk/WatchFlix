@@ -20,7 +20,7 @@ import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges
 import { SeeAllButton } from "../../components/SeeAllHeader";
 import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 // Tür çipi: dikey dolgu 10+10, tek satır yazı ≈ 17 → 37.
 const GENRE_CHIP_HEIGHT = 37;
 
@@ -78,7 +78,7 @@ const TvGenresCard = memo(function TvGenresCard({ item, navigation, theme, getTm
 
 export default function TvShowsGenres({ navigation }) {
   const { theme } = useTheme();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const {
     selectedGenres,
@@ -231,13 +231,6 @@ const styles = StyleSheet.create({
     marginTop: 0,
     marginBottom: 0,
   },
-  pageButton: {
-    width: 25,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   genreButton: {
     paddingVertical: 10,
     paddingHorizontal: 15,
@@ -274,29 +267,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
-  },
-  similarTitle: {
-    color: "#fff",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  similarRating: {
-    position: "absolute",
-    bottom: 10,
-    right: 5,
-    width: 30,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  similarRatingText: {
-    color: "#ffd700",
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  errorText: {
-    color: "red",
-    fontSize: 16,
-    fontWeight: "bold",
   },
 });

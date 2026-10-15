@@ -37,7 +37,8 @@ export function usePremiumGate(featureId) {
   const check = useCallback(
     (used = 0, options) => {
       if (canUseFeature(featureId, plan, used)) return true;
-      showPremiumLimitAlert(featureId, plan, options);
+      // used: yükseltme sayfasındaki kullanım göstergesi (ör. "5 / 5 liste").
+      showPremiumLimitAlert(featureId, plan, { ...options, used });
       return false;
     },
     [featureId, plan],

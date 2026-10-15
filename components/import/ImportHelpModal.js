@@ -19,6 +19,7 @@ import AppIcon from "../AppIcon";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import useSheetTransition from "../../hooks/useSheetTransition";
 import { useTheme } from "../../context/ThemeContext";
+import GlassCloseButton from "../common/GlassCloseButton";
 import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
 
@@ -83,13 +84,15 @@ export default function ImportHelpModal({ visible, onClose }) {
                 Dışa Aktarma Rehberi
               </Text>
             </View>
-            <TouchableOpacity
+            <GlassCloseButton
+              size={32}
+              fallbackRadius={16}
+              iconSize={20}
+              color={theme.text.secondary}
+              backgroundColor="rgba(255,255,255,0.06)"
+              hitSlop={12}
               onPress={onClose}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              style={styles.closeBtn}
-            >
-              <AppIcon family="Ionicons" name="close" size={20} color={theme.text.secondary} />
-            </TouchableOpacity>
+            />
           </View>
 
           {/* Segmented Tab */}
@@ -321,14 +324,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: "800",
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
   },
   tabBar: {
     flexDirection: "row",

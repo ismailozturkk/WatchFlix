@@ -21,6 +21,8 @@ import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "react-native-toast-message";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
+import SheetScroll from "@components/common/SheetScroll";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -172,6 +174,9 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
     >
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
+          {/* Klavye açıkken sayfa küçülür: alanlar kayar, "Profilime ekle"
+              düğmesi klavyenin hemen üstünde sabit kalır. */}
+          <SheetScroll>
           <View style={styles.header}>
             <View
               style={[styles.iconWrap, { backgroundColor: `${theme.accent}22` }]}
@@ -189,12 +194,13 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
                 )}
               </Text>
             </View>
-            <TouchableOpacity
+            <GlassCloseButton
+              size={34}
+              fallbackRadius={12}
+              iconSize={19}
+              color={theme.text.secondary}
               onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: theme.primary }]}
-            >
-              <Ionicons name="close" size={19} color={theme.text.secondary} />
-            </TouchableOpacity>
+            />
           </View>
 
           {items.length > 0 && (
@@ -294,6 +300,7 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
               </Text>
             </View>
           )}
+          </SheetScroll>
 
           <TouchableOpacity
             disabled={!canSave || saving}
@@ -340,13 +347,6 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 17, fontWeight: "900" },
   subtitle: { fontSize: 11.5, lineHeight: 16, marginTop: 3 },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   posterRow: { flexDirection: "row", gap: 6, marginTop: 16 },
   poster: {
     width: 42,

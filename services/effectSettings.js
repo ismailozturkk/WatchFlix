@@ -22,8 +22,6 @@ import {
 import { deviceTier } from "./deviceTier";
 import { Keys, get, set, subscribe } from "./storage";
 
-export const EFFECT_MODE_STORAGE_KEY = Keys.effectMode.key;
-
 // MMKV GEÇİŞİ: tercih artık AÇILIŞTA SENKRON okunuyor. Eskiden cihaz sınıfının
 // kararıyla başlanıp async okuma sonrası düzeltiliyordu; "efektler kapalı" diyen
 // kullanıcı her açılışta bir kare boyunca tam efektli ekran görüyordu. Bununla

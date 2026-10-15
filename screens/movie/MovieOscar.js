@@ -15,6 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
 import PosterImage from "../../components/PosterImage";
 import AppIcon from "../../components/AppIcon";
+import GlassIconButton from "../../components/common/GlassIconButton";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -466,12 +467,15 @@ export default function MovieOscar({ navigation }) {
                 <Text allowFontScaling={false} style={[styles.modalTitle, { color: theme.text.primary }]}>
                   {i18nText("autoI18n.oscar_select_year", "Oscar Yılı Seçin")}
                 </Text>
-                <TouchableOpacity
+                <GlassIconButton
+                  variant="plain"
+                  icon="close"
+                  iconSize={22}
+                  size={34}
+                  color={theme.text.secondary}
+                  accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
                   onPress={() => setYearModalVisible(false)}
-                  style={styles.modalCloseBtn}
-                >
-                  <AppIcon family="Ionicons" name="close" size={22} color={theme.text.secondary} />
-                </TouchableOpacity>
+                />
               </View>
 
               <FlatList
@@ -702,9 +706,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 17,
     fontWeight: "800",
-  },
-  modalCloseBtn: {
-    padding: 4,
   },
   yearGrid: {
     paddingBottom: 24,

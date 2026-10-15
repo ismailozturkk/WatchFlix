@@ -1,12 +1,13 @@
 import { isLightSurface } from "@utils/colorUtils";
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import {
   StyleSheet,
   View,
   Text,
   Image,
   TouchableOpacity,
-  Dimensions,
+  useWindowDimensions,
+  Keyboard,
   StatusBar,
   TextInput,
   ScrollView,
@@ -33,6 +34,7 @@ import {
   useApiSettings,
   useImageQualitySettings,
 } from "@context/AppSettingsContext";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { StoryHeader } from "@components/storyShare/StoryHeader";
 import { StoryTabs } from "@components/storyShare/StoryTabs";
 import { StoryActionBar } from "@components/storyShare/StoryActionBar";
@@ -41,33 +43,35 @@ import StorySlider from "@components/storyShare/StorySlider";
 import { StoryDraftService } from "@services/StoryDraftService";
 import { i18nText } from "@utils/i18nText";
 import { getRatingColors } from "@utils/ratingColors";
+import useAppLogo from "@hooks/useAppLogo";
+import {
+  fitStoryCanvas,
+  storyScale,
+  planStorySheet,
+  liftSheetForKeyboard,
+  stackBlocksVertically,
+  storyTitleSize,
+  planStoryActionBar,
+} from "@utils/storyCanvasLayout";
 
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-
-/* ── Boyutları açık/kapalı duruma göre optimize et ──
+/* ── Tuval ölçüleri EKRANDAN ölçülür (utils/storyCanvasLayout.js) ──
+   Eskiden modül yüklenirken Dimensions + sabit header/alt çubuk yüksekliğiyle
+   hesaplanıyordu; gerçek alt çubuk (home indicator / navigasyon dolgusu) sabit
+   100px'ten uzun olduğundan tuval çubuğun altına taşıyordu. Şimdi `canvasArea`
+   onLayout ile ölçülür, tuval o alana 9:16 sığdırılır.
    Kapalı: tuval, header ile alt çubuk arasındaki tüm boşluğu kullanır.
-   Açık:   tuval, header ile modal (sheet) arasına tam sığacak kadar küçülür. */
-const HEADER_H = (Platform.OS === "ios" ? 56 : 40) + 48;
-const ACTION_H = 100;
-const GAP = 16;
+   Açık:   tuval, header ile ayar sayfası arasına sığacak kadar küçülür. */
+const CANVAS_TOP_GAP = 16; // canvasArea paddingTop (10) + canvasShadow marginTop (6)
+const CANVAS_BOTTOM_GAP = 12;
+const SIDE_PAD = 16;
+const SHRINK_PREFERRED = 0.5;
+const MIN_SHEET_H = 320;
+const MIN_SHEET_H_FLOOR = 270;
+/* Alt çubuğun ölçüm gelmeden önceki tahmini: kenarlık 1 + üst dolgu 8 + buton
+   satırı (56 ya da 66; planStoryActionBar'dan) + alt dolgu (ilk karede doğru
+   çıkar, sonra gerçek ölçü devralır). */
+const HEADER_EXTRA = 8 + 40 + 10; // StoryHeader: üst boşluk + buton + alt boşluk
 
-let CANVAS_W = SCREEN_W - 32;
-let CANVAS_H = (CANVAS_W * 16) / 9;
-const MAX_CLOSED_H = SCREEN_H - HEADER_H - ACTION_H - GAP;
-if (CANVAS_H > MAX_CLOSED_H) {
-  CANVAS_H = MAX_CLOSED_H;
-  CANVAS_W = (CANVAS_H * 9) / 16;
-}
-
-/* Modal açılınca tuval bu orana küçülür (üst kenar sabit kalır) */
-const SHRINK = 0.5;
-const CANVAS_TOP = HEADER_H + 10; // header + canvasArea paddingTop
-/* Modal, küçülen tuvalin hemen 4px altından başlar ve ekranın altına kadar uzanır */
-const SHEET_TOP = CANVAS_TOP + Math.round(CANVAS_H * SHRINK) + 16;
-const SHEET_H = SCREEN_H - SHEET_TOP;
-
-const APP_LOGO = require("@assets/icon_default/android-icon-foreground.png");
 
 const TEXT_COLORS = [
   "#FFFFFF",
@@ -86,11 +90,18 @@ const WM_POSITIONS = [
   { id: "top-right", icon: "arrow-up" },
   { id: "top-left", icon: "arrow-up" },
 ];
-const WM_STYLE = {
-  "bottom-right": { bottom: 12, right: 12 },
-  "bottom-left": { bottom: 12, left: 12 },
-  "top-right": { top: 12, right: 12 },
-  "top-left": { top: 12, left: 12 },
+/* Filigran kenar boşluğu tuvalle birlikte ölçeklenir (off = 12 * ölçek). */
+const wmStyle = (pos, off) => {
+  switch (pos) {
+    case "bottom-left":
+      return { bottom: off, left: off };
+    case "top-right":
+      return { top: off, right: off };
+    case "top-left":
+      return { top: off, left: off };
+    default:
+      return { bottom: off, right: off };
+  }
 };
 
 const BG_COLORS = [
@@ -148,6 +159,16 @@ const hqUrl = (path, type) =>
   path ? `https://image.tmdb.org/t/p/${HQ_SIZE[type] || "w780"}${path}` : null;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+/* Ölçülen kutuyu birleştirir: aynı pencere boyutu/genişlikte yükseklik yalnız
+   büyür (klavyenin yol açtığı geçici küçülme tuvali yeniden sığdırmasın);
+   pencere boyutu değişince (katlanır, bölünmüş ekran) yeni ölçü esas alınır. */
+const mergeBox = (prev, next, key) => {
+  const same = prev && prev.key === key && prev.w === next.w;
+  const h = same ? Math.max(prev.h, next.h) : next.h;
+  if (same && prev.h === h && prev.y === next.y) return prev;
+  return { ...next, h, key };
+};
 
 /* #RRGGBB + opaklık → #RRGGBBAA */
 const hexA = (hex, a) => {
@@ -288,8 +309,10 @@ function EpisodeGraph({ block, width }) {
 }
 
 export default function StoryShareScreen({ route, navigation }) {
+  // Marka logosu seçili uygulama simgesini izler (hooks/useAppLogo.js).
+  const { logo: appLogo } = useAppLogo();
   const { theme } = useTheme();
-  const { t, language } = useLanguage();
+  const { language } = useLanguage();
   const insets = useSafeAreaInsets();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
@@ -308,13 +331,16 @@ export default function StoryShareScreen({ route, navigation }) {
   } = params;
 
   const viewShotRef = useRef(null);
+  const rootRef = useRef(null);
   const positionsRef = useRef({});
   const sizesRef = useRef({});
   const respondersRef = useRef({});
   const dragStartRef = useRef({ x: 0, y: 0 });
-  const bgPaddingRef = useRef(0);
   const bgInitRef = useRef(false);
   const dragScaleRef = useRef(1);
+  // Sürükleme/konum geri çağrıları ilk render'da önbelleğe alınır; güncel tuval
+  // ölçüsüne (w/h px, k içerik ölçeği, pad çevre boşluğu px) bu ref'ten erişir.
+  const metricsRef = useRef({ w: 0, h: 0, k: 1, pad: 0 });
 
   /* ── Görsel havuzu (TMDB) ── */
   const [posterChoices, setPosterChoices] = useState(
@@ -337,6 +363,121 @@ export default function StoryShareScreen({ route, navigation }) {
   const [bgColor, setBgColor] = useState(null);
   const [bgColorBottom, setBgColorBottom] = useState(null);
   const [posterLinked, setPosterLinked] = useState(false);
+
+  /* ── Ekran ölçüleri: tuval, ayar sayfası, klavye ── */
+  const { width: winW, height: winH } = useWindowDimensions();
+  const winKey = `${winW}x${winH}`;
+  // Kök görünüm ve tuval alanı ÖLÇÜLÜR; aynı pencere boyutunda yalnız büyürler
+  // (Android'de klavye pencereyi geçici küçültünce tuval yeniden sığıp zıplamasın).
+  const [rootBox, setRootBox] = useState(null);
+  const [areaBox, setAreaBox] = useState(null);
+  // Klavye açıkken { visibleH, rootH }: kökün klavyeyle örtüşmeyen yüksekliği.
+  const [kb, setKb] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // İlk kare için tahmin (ölçüm gelince gerçek değer devralır).
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0
+  );
+  const estAreaY = topInset + HEADER_EXTRA;
+  // Buton satırı yüksekliği StoryActionBar ile AYNI hesaptan gelir (eşik tutmazsa
+  // ilk karedeki tuval, ölçüm gelince sıçrar).
+  const estBarH =
+    1 +
+    8 +
+    planStoryActionBar(winW, {
+      titles: [
+        i18nText("autoI18n.tasarimi_paylas", "Tasarımı Paylaş"),
+        i18nText("autoI18n.paylas", "Paylaş"),
+      ],
+      variantTitle: i18nText("autoI18n.tasarimi_paylas", "Tasarımı Paylaş"),
+    }).rowH +
+    Math.max(24, insets.bottom + 14);
+  const area =
+    areaBox && areaBox.key === winKey
+      ? areaBox
+      : { y: estAreaY, w: winW, h: Math.max(0, winH - estAreaY - estBarH) };
+  const root = rootBox && rootBox.key === winKey ? rootBox : { w: winW, h: winH };
+
+  const canvasFit = useMemo(
+    () =>
+      fitStoryCanvas(area.w, area.h, {
+        sidePad: SIDE_PAD,
+        topGap: CANVAS_TOP_GAP,
+        bottomGap: CANVAS_BOTTOM_GAP,
+      }),
+    [area.w, area.h]
+  );
+  const CANVAS_W = canvasFit.w;
+  const CANVAS_H = canvasFit.h;
+  // İçerik (yazı, dolgu, köşe, filigran) bu çarpanla ölçeklenir; kaydedilen
+  // değerler referans (360px tuval) biriminde kalır → taslaklar cihazlar arası taşınır.
+  const k = storyScale(CANVAS_W);
+  const padPx = bgPadding * k;
+  metricsRef.current = { w: CANVAS_W, h: CANVAS_H, k, pad: padPx };
+
+  const sheetPlan = planStorySheet({
+    areaY: area.y,
+    topGap: CANVAS_TOP_GAP,
+    canvasH: CANVAS_H,
+    containerH: root.h,
+    preferredShrink: SHRINK_PREFERRED,
+    // Kısa ekranda sayfa ekranın yarısını geçmesin: tuval ancak o zaman
+    // düzenlerken görülebilecek kadar büyük kalır (568 dp'de 320 dp'lik sayfa
+    // tuvali ~78 dp genişliğe indiriyordu).
+    minSheetH: clamp(Math.round(root.h * 0.5), MIN_SHEET_H_FLOOR, MIN_SHEET_H),
+  });
+  const SHRINK = sheetPlan.shrink;
+  let sheetTop = sheetPlan.sheetTop;
+  let sheetBottom = 0;
+  // Yalnız sayfa açıkken: kapalıyken (ör. taslak adı penceresinin klavyesi)
+  // ekran dışına itilmiş sayfa klavyeyle birlikte yukarı kaymasın.
+  if (kb && settingsOpen) {
+    const lifted = liftSheetForKeyboard({
+      sheetTop,
+      containerH: kb.rootH,
+      visibleH: kb.visibleH,
+      minSheetH: 300,
+      minTop: area.y,
+    });
+    sheetTop = lifted.top;
+    sheetBottom = lifted.bottom;
+  }
+  const sheetW = Math.min(winW, 640);
+
+  const onRootLayout = (e) => {
+    const { width, height } = e.nativeEvent.layout;
+    setRootBox((p) => mergeBox(p, { w: width, h: height }, winKey));
+  };
+  const onAreaLayout = (e) => {
+    const { y, width, height } = e.nativeEvent.layout;
+    setAreaBox((p) => mergeBox(p, { y, w: width, h: height }, winKey));
+  };
+
+  /* Klavye: ayar sayfası klavyenin üstüne oturur (yazı kutusu örtülmesin). */
+  useEffect(() => {
+    const ios = Platform.OS === "ios";
+    const onShow = (e) => {
+      const screenY = e?.endCoordinates?.screenY;
+      rootRef.current?.measureInWindow?.((x, y, w, h) => {
+        if (!h) return;
+        const raw = Number.isFinite(screenY) ? screenY - y : h;
+        if (raw >= h - 1) {
+          setKb(null);
+          return;
+        }
+        // Güvenlik: bozuk screenY tüm ekranı klavye saymasın.
+        setKb({ visibleH: Math.max(h * 0.4, raw), rootH: h });
+      });
+    };
+    const onHide = () => setKb(null);
+    const subs = [
+      Keyboard.addListener(ios ? "keyboardWillChangeFrame" : "keyboardDidShow", onShow),
+      Keyboard.addListener(ios ? "keyboardWillHide" : "keyboardDidHide", onHide),
+    ];
+    return () => subs.forEach((s) => s.remove());
+  }, []);
 
   /* ── Bloklar ── */
   const genreText = (genres || [])
@@ -381,7 +522,9 @@ export default function StoryShareScreen({ route, navigation }) {
         x: (1 - 0.42) / 2,
         y: 0.1,
       });
-    els.push(makeText(title, { size: 26, bold: true, x: cx, y: 0.5 }));
+    els.push(
+      makeText(title, { size: storyTitleSize(title), bold: true, x: cx, y: 0.5 })
+    );
     if (year || genreText)
       els.push(
         makeText([year, genreText].filter(Boolean).join("  •  "), {
@@ -421,7 +564,6 @@ export default function StoryShareScreen({ route, navigation }) {
   const [currentDraftId, setCurrentDraftId] = useState(params.draftId || null);
 
   /* ── Ayar modalı (alt sheet) + tuval küçülme animasyonu ── */
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const sheetAnim = useRef(new Animated.Value(0)).current;
   const openSettings = () => {
     dragScaleRef.current = SHRINK;
@@ -451,7 +593,7 @@ export default function StoryShareScreen({ route, navigation }) {
   });
   const sheetTranslateY = sheetAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [SHEET_H + 60, 0],
+    outputRange: [sheetPlan.sheetH + 60, 0],
   });
   const actionBarOpacity = sheetAnim.interpolate({
     inputRange: [0, 1],
@@ -508,8 +650,19 @@ export default function StoryShareScreen({ route, navigation }) {
     if (!params.draftId) return;
     let active = true;
     (async () => {
-      const d = await StoryDraftService.getDraftById(params.draftId);
-      if (!active || !d) return;
+      let d = null;
+      try {
+        d = await StoryDraftService.getDraftById(params.draftId);
+      } catch {
+        /* okunamayan taslak = bulunamayan taslak */
+      }
+      if (!active) return;
+      if (!d) {
+        // Taslak yok: varsayılan bloklar olduğu gibi gösterilsin (yığma yapılmaz).
+        autoStackRef.current.pending = false;
+        setStackReady(true);
+        return;
+      }
       const e = d.editor || {};
       if (Array.isArray(e.blocks)) setBlocks(e.blocks);
       if (Array.isArray(e.backgrounds)) setBackgrounds(e.backgrounds);
@@ -523,6 +676,9 @@ export default function StoryShareScreen({ route, navigation }) {
       if (e.watermarkPos) setWatermarkPos(e.watermarkPos);
       setDraftName(d.name || "");
       setCurrentDraftId(d.id);
+      // Taslak blokları yerleşip ölçülünce (runAutoStack) gösterilir.
+      autoStackRef.current.draftApplied = true;
+      scheduleAutoStack();
     })();
     return () => {
       active = false;
@@ -607,23 +763,117 @@ export default function StoryShareScreen({ route, navigation }) {
   const syncPosition = useCallback(
     (block) => {
       const size = sizesRef.current[block.id] || { w: 0, h: 0 };
-      const pad = bgPaddingRef.current;
-      const x = clamp(block.x * CANVAS_W, pad, Math.max(pad, CANVAS_W - size.w - pad));
-      const y = clamp(block.y * CANVAS_H, pad, Math.max(pad, CANVAS_H - size.h - pad));
+      const { w: cw, h: ch, pad } = metricsRef.current;
+      const x = clamp(block.x * cw, pad, Math.max(pad, cw - size.w - pad));
+      const y = clamp(block.y * ch, pad, Math.max(pad, ch - size.h - pad));
       getPosition(block.id).setValue({ x, y });
     },
     [getPosition]
   );
 
-  /* bgPadding değişince hem ref güncelle hem blokları yeniden sınırla */
+  /* Tuval ölçüsü ya da çevre boşluğu değişince blokları yeniden sınırla */
   useEffect(() => {
-    bgPaddingRef.current = bgPadding;
     blocks.forEach(syncPosition);
-  }, [bgPadding]);
+  }, [CANVAS_W, CANVAS_H, padPx]);
 
   useEffect(() => {
     blocks.forEach(syncPosition);
   }, [blocks, syncPosition]);
+
+  /* ── İlk yerleşim: varsayılan blokları üst üste binmeden alt alta diz ──
+     Bloklar sabit y oranlarıyla doğar; başlık uzunluğu/tuval boyutu/yazı
+     ölçeği değişince bir önceki satırın üstüne binebilir. Tüm bloklar
+     ölçülünce (taslak değilse) bir kez ölçülen yüksekliklerle dikey olarak
+     yığılır; sığmazsa poster küçülür. O ana dek bloklar gizli tutulur.
+     Taslakta yığma YOK ama gizleme var: taslak yüklenene dek ekranda
+     varsayılan (üst üste binen) bloklar parlayıp sönmesin diye bloklar,
+     taslak uygulanıp ölçülünce gösterilir. */
+  const autoStackRef = useRef({
+    pending: true,
+    timer: null,
+    draft: !!params.draftId,
+    draftApplied: false,
+  });
+  const areaReadyRef = useRef(false);
+  areaReadyRef.current = !!areaBox;
+  const [stackReady, setStackReady] = useState(false);
+  const runAutoStack = () => {
+    const st = autoStackRef.current;
+    if (!st.pending || !areaReadyRef.current) return;
+    const list = dragStateRef.current.blocks;
+    // Geç yığma: bloklar zaten gösterildi; kullanıcı dokunup düzeni değiştirdiyse bırak.
+    if (st.fallbackBlocks && st.fallbackBlocks !== list) {
+      st.pending = false;
+      return;
+    }
+    const measured = list.every((b) => sizesRef.current[b.id]?.h > 0);
+    if (st.draft) {
+      if (!st.draftApplied || !measured) return;
+      st.pending = false;
+      setStackReady(true);
+      return;
+    }
+    if (!list.length || !measured) return;
+    st.pending = false;
+
+    const m = metricsRef.current;
+    const items = list.map((b) => ({
+      id: b.id,
+      h: sizesRef.current[b.id].h,
+      flex: b.id === "poster",
+    }));
+    const { tops, resized } = stackBlocksVertically(items, m.h, {
+      gap: 10 * m.k,
+      marginTop: Math.max(0.06 * m.h, 24 * m.k),
+      // alt boşluk filigranı da içerir (36 logo + 12 kenar)
+      marginBottom: Math.max(0.06 * m.h, 56 * m.k),
+      minFlexH: 0.18 * m.w * 1.5,
+    });
+    setBlocks((prev) =>
+      prev.map((b) => {
+        if (tops[b.id] === undefined) return b;
+        const patch = { y: tops[b.id] / m.h };
+        if (b.id === "poster" && resized.poster !== undefined) {
+          const wf = clamp(resized.poster / 1.5 / m.w, 0.18, 0.95);
+          patch.widthFrac = wf;
+          patch.x = (1 - wf) / 2;
+        }
+        return { ...b, ...patch };
+      })
+    );
+    // Hemen göstermek (setStackReady) bir kare boyunca blokları ESKİ konumda
+    // görünür yapıyordu: yeni konumlar Animated değerlerine bir efektte
+    // yazılıyor. Konumlar yazıldıktan sonra gösterilir (aşağıdaki efekt).
+    st.reveal = true;
+  };
+  useEffect(() => {
+    if (autoStackRef.current.reveal) setStackReady(true);
+  }, [blocks]);
+  // Her ölçüm olayında kısa bir gecikmeyle dener: aynı karedeki tüm blok
+  // ölçümleri ve tuval alanı ölçümü geldikten sonra, güncel yüksekliklerle çalışır.
+  const scheduleAutoStack = () => {
+    const st = autoStackRef.current;
+    if (!st.pending) return;
+    clearTimeout(st.timer);
+    st.timer = setTimeout(runAutoStack, 90);
+  };
+  // Tuval alanı ölçüldüğünde (bloklar ondan önce ölçülmüş olabilir) bir deneme daha.
+  useEffect(() => {
+    if (areaBox) scheduleAutoStack();
+  }, [areaBox]);
+  // Ölçüm hiç tamamlanmazsa içerik sonsuza dek gizli kalmasın. Yığma İPTAL
+  // EDİLMEZ: yavaş cihazda ölçüm 1.2 sn'den geç gelirse bloklar yine üst üste
+  // binmeden dizilir. Kullanıcı bu arada bir bloğa dokunduysa (blocks dizisi
+  // değiştiyse) onun düzeni ezilmez — runAutoStack bunu `fallbackBlocks` ile ayırır.
+  useEffect(() => {
+    if (stackReady) return;
+    const timer = setTimeout(() => {
+      autoStackRef.current.fallbackBlocks = dragStateRef.current.blocks;
+      setStackReady(true);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [stackReady]);
+  useEffect(() => () => clearTimeout(autoStackRef.current.timer), []);
 
   /* Poster yuvarlaklığını arka plana bağla (padding hesaba katılır) */
   useEffect(() => {
@@ -660,40 +910,38 @@ export default function StoryShareScreen({ route, navigation }) {
           },
           onPanResponderMove: (_, g) => {
             const size = sizesRef.current[bid] || { w: 0, h: 0 };
-            const pad = bgPaddingRef.current;
+            const { w: cw, h: ch, pad } = metricsRef.current;
             const s = dragScaleRef.current || 1;
             const nx = clamp(
               dragStartRef.current.x + g.dx / s,
               pad,
-              Math.max(pad, CANVAS_W - size.w - pad)
+              Math.max(pad, cw - size.w - pad)
             );
             const ny = clamp(
               dragStartRef.current.y + g.dy / s,
               pad,
-              Math.max(pad, CANVAS_H - size.h - pad)
+              Math.max(pad, ch - size.h - pad)
             );
             getPosition(bid).setValue({ x: nx, y: ny });
           },
           onPanResponderRelease: (_, g) => {
             const size = sizesRef.current[bid] || { w: 0, h: 0 };
-            const pad = bgPaddingRef.current;
+            const { w: cw, h: ch, pad } = metricsRef.current;
             const s = dragScaleRef.current || 1;
             const nx = clamp(
               dragStartRef.current.x + g.dx / s,
               pad,
-              Math.max(pad, CANVAS_W - size.w - pad)
+              Math.max(pad, cw - size.w - pad)
             );
             const ny = clamp(
               dragStartRef.current.y + g.dy / s,
               pad,
-              Math.max(pad, CANVAS_H - size.h - pad)
+              Math.max(pad, ch - size.h - pad)
             );
             getPosition(bid).setValue({ x: nx, y: ny });
             setBlocks((prev) =>
               prev.map((b) =>
-                b.id === bid
-                  ? { ...b, x: nx / CANVAS_W, y: ny / CANVAS_H }
-                  : b
+                b.id === bid ? { ...b, x: nx / cw, y: ny / ch } : b
               )
             );
           },
@@ -820,15 +1068,6 @@ export default function StoryShareScreen({ route, navigation }) {
       return [...prev, path];
     });
 
-  const resizeSelected = (delta) => {
-    if (!selected) return;
-    if (selected.type === "text")
-      updateSelected({ size: clamp(selected.size + delta * 3, 10, 80) });
-    else if (selected.type === "image" || selected.type === "graph")
-      updateSelected({
-        widthFrac: clamp(selected.widthFrac + delta * 0.04, 0.18, 0.95),
-      });
-  };
 
   /* ── Yakalama ── */
   const capture = async (asSticker = false) => {
@@ -919,6 +1158,9 @@ export default function StoryShareScreen({ route, navigation }) {
     const position = getPosition(block.id);
     const responder = makeResponder(block.id);
     const isSel = selectedId === block.id && !capturing;
+    // Köşe/dolgu/yazı referans (360px tuval) biriminde saklanır; çizimde k ile
+    // ölçeklenir → küçük ve büyük telefonda aynı oranlı, üst üste binmeyen görünüm.
+    const radiusPx = (block.radius || 0) * k;
     return (
       <Animated.View
         key={block.id}
@@ -928,15 +1170,17 @@ export default function StoryShareScreen({ route, navigation }) {
             h: e.nativeEvent.layout.height,
           };
           if (selectedId !== block.id) syncPosition(block);
+          scheduleAutoStack();
         }}
         style={[
           position.getLayout(),
-          { position: "absolute" },
+          // İlk yerleşim bitene dek gizli: bloklar sıçrayarak oturmasın.
+          { position: "absolute", opacity: stackReady ? 1 : 0 },
           isSel && {
             borderWidth: 1.5,
             borderColor: "#ffffffdd",
             borderStyle: "dashed",
-            borderRadius: (block.radius || 0) + (block.type === "image" ? 2 : 0),
+            borderRadius: radiusPx + (block.type === "image" ? 2 : 0),
           },
         ]}
         {...responder.panHandlers}
@@ -947,7 +1191,7 @@ export default function StoryShareScreen({ route, navigation }) {
             style={{
               width: block.widthFrac * CANVAS_W,
               height: block.widthFrac * CANVAS_W * 1.5,
-              borderRadius: block.radius || 0,
+              borderRadius: radiusPx,
             }}
           />
         ) : block.type === "graph" ? (
@@ -961,26 +1205,29 @@ export default function StoryShareScreen({ route, navigation }) {
                   StyleSheet.absoluteFill,
                   {
                     backgroundColor: hexA(block.bgColor, block.bgOpacity),
-                    borderRadius: block.radius || 0,
+                    borderRadius: radiusPx,
                   },
                 ]}
               />
             )}
+            {/* Tuval yazısı sistem yazı boyutu ayarından etkilenmez: dışa aktarılan
+                görsel ve blok yerleşimi her cihazda aynı kalır. */}
             <Text
+              allowFontScaling={false}
               style={{
                 color: block.color,
-                fontSize: block.size,
+                fontSize: block.size * k,
                 fontFamily: fontFamilyOf(block.font),
                 fontWeight: block.bold ? "900" : "600",
                 fontStyle: block.italic ? "italic" : "normal",
                 textDecorationLine: block.underline ? "underline" : "none",
                 textAlign: block.align,
                 width: CANVAS_W * (block.width ?? DEFAULTS.textWidth),
-                paddingHorizontal: block.padding,
-                paddingVertical: block.padding * 0.7,
+                paddingHorizontal: block.padding * k,
+                paddingVertical: block.padding * 0.7 * k,
                 textShadowColor: block.bg ? "transparent" : "rgba(0,0,0,0.55)",
                 textShadowOffset: { width: 0, height: 1 },
-                textShadowRadius: 5,
+                textShadowRadius: 5 * k,
               }}
             >
               {block.text || (isSel ? "Yaz..." : " ")}
@@ -992,7 +1239,12 @@ export default function StoryShareScreen({ route, navigation }) {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.primary }]}>
+    <View
+      ref={rootRef}
+      collapsable={false}
+      onLayout={onRootLayout}
+      style={[styles.root, { backgroundColor: theme.primary }]}
+    >
       <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
       <StoryHeader
         busy={busy}
@@ -1002,7 +1254,7 @@ export default function StoryShareScreen({ route, navigation }) {
       />
 
       {/* ══════ TUVAL (modal açılınca küçülür) ══════ */}
-      <View style={styles.canvasArea}>
+      <View style={styles.canvasArea} onLayout={onAreaLayout}>
         <Animated.View
           style={[
             styles.canvasShadow,
@@ -1015,7 +1267,9 @@ export default function StoryShareScreen({ route, navigation }) {
             style={[
               styles.canvas,
               {
-                borderRadius: bgRadius,
+                width: CANVAS_W,
+                height: CANVAS_H,
+                borderRadius: bgRadius * k,
                 // Sticker yakalamada tuval saydam — PNG alfa kanalı korunur.
                 backgroundColor: stickerCapturing ? "transparent" : "#000",
               },
@@ -1029,11 +1283,11 @@ export default function StoryShareScreen({ route, navigation }) {
               <View
                 style={{
                   position: "absolute",
-                  top: bgPadding,
-                  left: bgPadding,
-                  right: bgPadding,
-                  bottom: bgPadding,
-                  borderRadius: Math.max(0, bgRadius - bgPadding),
+                  top: padPx,
+                  left: padPx,
+                  right: padPx,
+                  bottom: padPx,
+                  borderRadius: Math.max(0, bgRadius - bgPadding) * k,
                   overflow: "hidden",
                   // Sticker yakalamada arka plan katmanları gizlenir.
                   opacity: stickerCapturing ? 0 : 1,
@@ -1074,11 +1328,25 @@ export default function StoryShareScreen({ route, navigation }) {
 
             {/* Filigran (sabit, zorunlu) */}
             <View
-              style={[styles.watermark, WM_STYLE[watermarkPos]]}
+              style={[
+                styles.watermark,
+                wmStyle(watermarkPos, 12 * k),
+                {
+                  paddingLeft: 2 * k,
+                  paddingRight: 8 * k,
+                  borderRadius: 22 * k,
+                },
+              ]}
               pointerEvents="none"
             >
-              <Image source={APP_LOGO} style={styles.wmLogo} resizeMode="contain" />
-              <Text style={styles.wmText}>Seelogd</Text>
+              <Image
+                source={appLogo}
+                style={{ width: 36 * k, height: 36 * k }}
+                resizeMode="contain"
+              />
+              <Text allowFontScaling={false} style={[styles.wmText, { fontSize: 12 * k }]}>
+                Seelogd
+              </Text>
             </View>
           </ViewShot>
         </Animated.View>
@@ -1111,7 +1379,12 @@ export default function StoryShareScreen({ route, navigation }) {
         style={[
           styles.sheet,
           {
-            top: SHEET_TOP,
+            top: sheetTop,
+            // Klavye açıkken sayfanın altı klavyenin üst kenarına oturur.
+            bottom: sheetBottom,
+            // Tabletlerde/katlanırda sayfa tam genişliğe yayılmaz.
+            left: (winW - sheetW) / 2,
+            right: (winW - sheetW) / 2,
             backgroundColor: theme.primary,
             borderColor: theme.border,
             transform: [{ translateY: sheetTranslateY }],
@@ -1125,12 +1398,16 @@ export default function StoryShareScreen({ route, navigation }) {
               allowFontScaling={false}
               style={[styles.sheetTitle, { color: theme.text.primary }]}
             >{i18nText("autoI18n.duzenle", "Düzenle")}</Text>
-            <TouchableOpacity
+            <GlassCloseButton
+              icon="chevron-down"
+              size={36}
+              fallbackRadius={12}
+              iconSize={22}
+              color={theme.text.primary}
+              backgroundColor={theme.secondary}
+              accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
               onPress={closeSettings}
-              style={[styles.sheetClose, { backgroundColor: theme.secondary }]}
-            >
-              <Ionicons name="chevron-down" size={22} color={theme.text.primary} />
-            </TouchableOpacity>
+            />
           </View>
         </View>
 
@@ -1982,13 +2259,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sheetTitle: { fontSize: 19, fontWeight: "900" },
-  sheetClose: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   sheetTabs: { marginBottom: 4 },
   sheetScroll: { paddingBottom: 34, paddingTop: 2 },
 
@@ -2000,20 +2270,11 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 14,
   },
+  /* width/height/borderRadius ölçülen alana göre inline verilir */
   canvas: {
-    width: CANVAS_W,
-    height: CANVAS_H,
-    borderRadius: 22,
     overflow: "hidden",
   },
 
-  block: { position: "absolute", padding: 6 },
-  blockSelected: {
-    borderWidth: 1,
-    borderColor: "#ffffffcc",
-    borderStyle: "dashed",
-    borderRadius: 8,
-  },
 
   watermark: {
     position: "absolute",
@@ -2026,10 +2287,8 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     
   },
-  wmLogo: { width: 36, height: 36, marginRight: 0 },
   wmText: { color: "#fff", fontSize: 12, fontWeight: "800", letterSpacing: 0.3 },
 
-  panel: { width: CANVAS_W, marginTop: 16 },
   label: { fontSize: 12, fontWeight: "800", marginTop: 14, marginBottom: 8 },
 
   thumbRow: { gap: 10, paddingVertical: 2 },

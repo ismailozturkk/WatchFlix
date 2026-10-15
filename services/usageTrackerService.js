@@ -376,8 +376,6 @@ export function resolveZoneFromCollection(collectionName = "") {
   return "profile";
 }
 
-const STORAGE_KEY = "dev_usage_telemetry_stats_v2";
-
 export function getTodayKey(d = new Date()) {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");

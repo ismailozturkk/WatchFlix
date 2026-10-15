@@ -9,6 +9,8 @@ import React, {
 import { InteractionManager } from "react-native";
 import { Keys, get, set } from "../services/storage";
 import * as petCache from "../services/petCache";
+import { usePremiumPlanSnapshot } from "../services/premiumState";
+import { getFeatureLimit } from "../utils/premiumFeatures";
 import { toast } from "../components/AppToast";
 import { i18nText } from "../utils/i18nText";
 
@@ -58,13 +60,6 @@ export const PET_SIZES = [
   { key: "m", labelKey: "autoI18n.pet_boy_orta", label: "Orta", value: 124 },
   { key: "l", labelKey: "autoI18n.pet_boy_buyuk", label: "Büyük", value: 152 },
 ];
-const DEFAULT_SIZE = 124;
-
-// Eski event adı dışarıdaki olası dinleyiciler için tutuluyor. Uygulama içi AI
-// açılışı artık aşağıdaki kalıcı context isteğini kullanır; böylece ChatModal'ın
-// gecikmeli mount edildiği ilk saniyelerde dokunuş kaybolmaz.
-export const AI_CHAT_EVENT = "pet:openAiChat";
-
 // Anahtar adları artık services/storage/registry.js'de (Keys.pet*).
 
 const PetContext = createContext(undefined);
@@ -72,7 +67,13 @@ const PetContext = createContext(undefined);
 export const PetProvider = ({ children }) => {
   // Yeni kurulumlarda pet kapalıdır; daha önce seçim yapan kullanıcıların
   // AsyncStorage'daki tercihi açılışta aşağıda geri yüklenir.
-  const [petEnabled, setPetEnabled] = useState(() => get(Keys.petEnabled));
+  const [storedPetEnabled, setPetEnabled] = useState(() => get(Keys.petEnabled));
+  // Pet Premium'a özel. Plan Free'ye düşünce kayıtlı tercih (açık/kapalı, seçili
+  // pet, konum, boyut) SİLİNMEZ; yalnız çizilen değer kapalı olur ve abonelik
+  // yenilenince pet kendiliğinden geri gelir — özel tema/yazı tipiyle aynı kural.
+  const premiumPlan = usePremiumPlanSnapshot();
+  const petAllowed = Boolean(getFeatureLimit("pet_companion", premiumPlan));
+  const petEnabled = storedPetEnabled && petAllowed;
   const [ownedPets, setOwnedPets] = useState(() => ({
     ...DEFAULT_OWNED,
     ...(get(Keys.petOwned) || {}),
@@ -198,10 +199,16 @@ export const PetProvider = ({ children }) => {
     [petSizes],
   );
 
-  const changePetEnabled = useCallback((value) => {
-    setPetEnabled(value);
-    set(Keys.petEnabled, !!value);
-  }, []);
+  // Free'de AÇILAMAZ: Ayarlar anahtarı kilitleyip yükseltme sayfasına yönlendiriyor,
+  // buradaki kontrol ikinci kapı. Kapatmak serbest.
+  const changePetEnabled = useCallback(
+    (value) => {
+      if (value && !petAllowed) return;
+      setPetEnabled(value);
+      set(Keys.petEnabled, !!value);
+    },
+    [petAllowed],
+  );
 
   // Bir peti "aç" (kilidini kaldır).
   const openPet = useCallback((id) => {
@@ -247,6 +254,7 @@ export const PetProvider = ({ children }) => {
     () => ({
       catalog: PET_CATALOG,
       petEnabled,
+      petAllowed,
       changePetEnabled,
       ownedPets,
       openPet,
@@ -274,6 +282,7 @@ export const PetProvider = ({ children }) => {
     }),
     [
       petEnabled,
+      petAllowed,
       changePetEnabled,
       ownedPets,
       openPet,

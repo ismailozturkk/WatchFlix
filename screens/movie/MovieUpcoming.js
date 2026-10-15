@@ -96,7 +96,7 @@ export default function MovieUpcoming({ navigation }) {
     RelaseCount,
     activateMovieSection,
   } = useMovie();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   useEffect(() => {
     activateMovieSection("upcoming");

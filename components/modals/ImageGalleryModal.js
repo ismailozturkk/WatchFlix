@@ -14,6 +14,8 @@ import {
   Text
 } from "react-native";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
+import GlassSurface from "../common/GlassSurface";
+import GlassIconButton from "../common/GlassIconButton";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import axios from "axios";
 import {
@@ -272,7 +274,7 @@ const ImageGalleryModal = ({
   initialImage, // fallback/initial path
 }) => {
   const { API_KEY } = useApiSettings();
-  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const { language } = useLanguage();
   const insets = useSafeAreaInsets();
   const imageLanguageOrder = language === "tr" ? "tr,en,null" : "en,tr,null";
@@ -588,7 +590,12 @@ const ImageGalleryModal = ({
 
         {/* Yuklenirken hic buton yok; bos bir hap gorunmesin. */}
         {images.length > 0 && (
-        <View style={styles.actionCluster}>
+        <GlassSurface
+          radius={22}
+          scheme="dark"
+          style={styles.actionCluster}
+          fallbackStyle={styles.actionClusterFallback}
+        >
           {!isGrid && (
             <TouchableOpacity
               style={styles.clusterButton}
@@ -650,17 +657,20 @@ const ImageGalleryModal = ({
               />
             </TouchableOpacity>
           )}
-        </View>
+        </GlassSurface>
         )}
 
-        <TouchableOpacity
-          style={styles.closeButton}
-          onPress={onClose}
-          accessibilityRole="button"
+        <GlassIconButton
+          icon="close"
+          iconSize={22}
+          size={38}
+          fallbackRadius={19}
+          variant="blur"
+          flatFallback
+          fallbackStyle={styles.closeButtonFallback}
           accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-        >
-          <Ionicons name="close" size={22} color="#fff" />
-        </TouchableOpacity>
+          onPress={onClose}
+        />
       </View>
 
       <View style={styles.contentContainer} pointerEvents="box-none">
@@ -798,12 +808,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   // Eylemler tek kapsayici icinde: dagilmis daireler yerine tek bir kume.
+  // Eylem hapı iOS 26+'da tek bir Liquid Glass kapsül; içindeki düğmeler
+  // saydam kalır (cam içine cam konmaz). Zemin/çerçeve yalnız eski yolda.
   actionCluster: {
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
     padding: 3,
-    borderRadius: 22,
+  },
+  actionClusterFallback: {
     backgroundColor: "rgba(0,0,0,0.45)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
@@ -832,13 +845,8 @@ const styles = StyleSheet.create({
     color: "#FFD700",
   },
   // Kapat ayri duruyor: eylem degil, cikis.
-  closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  closeButtonFallback: {
     backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
   },
@@ -875,11 +883,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   flashOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#fff",
   },
   feedbackLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "center",
     alignItems: "center",
   },

@@ -101,6 +101,9 @@ import {
 // mirror'ı kaldır) postsService'te zaten var — purge onu yeniden kullanır.
 import { deleteComment } from "./postsService";
 import { deleteSharedList, leaveSharedList } from "./sharedListsService";
+// Yerel-öncelikli veri katmanı (notlar, hatırlatıcılar…). Bu dosyadaki
+// `purgeUserData` BULUTU siler; yerel kopya + bekleyen yazımlar için ayrı ad.
+import { purgeUserData as purgeLocalUserData } from "./userData";
 
 const CHUNK = 450; // Firestore batch limiti 500 — güvenli pay bıraktık.
 
@@ -800,6 +803,11 @@ export async function deleteAccount({
   if (getSignInMethods(user).hasApple) {
     await revokeAppleAuthorization(authorizationCode);
   }
+
+  // 1.5) Yerel kopya VE bekleyen yazımlar, bulut silinmeden ÖNCE gider: yazma
+  // günlüğü açık kalırsa arka plan işçisi silinen hesabın belgelerini bulutta
+  // geri oluşturabilirdi (silme ile deleteUser arasındaki pencerede).
+  purgeLocalUserData(uid);
 
   // 2) Firestore izlerini temizle (hâlâ kimlik doğrulanmışken).
   await purgeUserData(uid);

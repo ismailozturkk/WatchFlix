@@ -167,20 +167,63 @@ private struct StatsProvider: TimelineProvider {
 
 // MARK: - Görünüm
 
+// İki düzen var:
+//   • BÜYÜK: kartlar kalan yüksekliği paylaşır (esner). Eskiden küçük puntolu sayılar
+//     dev kutuların ortasında kalıyor, çok boşluk görünüyordu; punto büyütüldü.
+//   • ORTA: sıkı, boşluksuz düzen — iki kart yan yana (film | dizi), altında süre
+//     şeridi. Yükseklik yetmezse (başlık açık / küçük telefon) önce şerit düşer.
+// JS ikizi: screens/tabs/settings/widgets/IosPreviews.js (StatsPreview) ve
+// widgetPlatform.js → IOS_STATS_MEDIUM / iosStatsMediumPlan.
+
+private struct StatsScale {
+  let countValue: CGFloat
+  let countLabel: CGFloat
+  let unitValue: CGFloat
+  let unitLabel: CGFloat
+  let durationValue: CGFloat
+  let durationLabel: CGFloat
+  let durationIcon: CGFloat
+  let panelPadV: CGFloat
+
+  static let large = StatsScale(
+    countValue: 26, countLabel: 10, unitValue: 18, unitLabel: 9,
+    durationValue: 12, durationLabel: 9, durationIcon: 13, panelPadV: 8
+  )
+  static let medium = StatsScale(
+    countValue: 17, countLabel: 8, unitValue: 13, unitLabel: 7,
+    durationValue: 11, durationLabel: 8, durationIcon: 11, panelPadV: 4
+  )
+}
+
+// Orta boyda parçaların yükseklik bütçesi (pt). Şerit için yer var mı diye bakılır.
+private enum StatsMediumBudget {
+  static let title: CGFloat = 25
+  static let bothCards: CGFloat = 83
+  static let wideCard: CGFloat = 47
+  static let strip: CGFloat = 31
+  static let gap: CGFloat = 5
+}
+
 private struct StatBlock: View {
   let value: String
   let label: String
+  let valueSize: CGFloat
+  let labelSize: CGFloat
   let appearance: WidgetAppearancePreferences
 
   var body: some View {
     VStack(spacing: 1) {
       Text(value)
-        .font(.system(size: 15, weight: .bold))
+        .font(.system(size: valueSize, weight: .bold))
         .foregroundColor(appearance.textColor)
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+      // "Dakika" gibi uzun etiketler "Dak…" diye kesilmesin: kırpmak yerine küçülür.
       Text(label)
-        .font(.system(size: 8))
+        .font(.system(size: labelSize))
         .foregroundColor(appearance.mutedColor)
         .lineLimit(1)
+        .minimumScaleFactor(0.6)
     }
     .frame(maxWidth: .infinity)
   }
@@ -188,13 +231,15 @@ private struct StatBlock: View {
 
 private struct StatsPanel<Content: View>: View {
   let appearance: WidgetAppearancePreferences
+  let padV: CGFloat
+  let stretch: Bool
   @ViewBuilder let content: Content
 
   var body: some View {
     content
-      .padding(.vertical, 6)
+      .padding(.vertical, padV)
       .padding(.horizontal, 4)
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .frame(maxWidth: .infinity, maxHeight: stretch ? CGFloat.infinity : nil)
       .background(appearance.surfaceAltColor)
       .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
   }
@@ -204,28 +249,52 @@ private struct StatsCard: View {
   let leading: AnyView
   let time: StatsTime
   let units: [String]
+  let scale: StatsScale
+  /// true: iki panel alt alta (orta boyda yan yana iki kart); false: yan yana.
+  let stacked: Bool
+  /// true: panel kalan yüksekliği doldurur (büyük boy).
+  let stretch: Bool
   let appearance: WidgetAppearancePreferences
 
-  var body: some View {
-    HStack(spacing: 5) {
-      StatsPanel(appearance: appearance) { leading }
-        .frame(maxWidth: .infinity)
-      StatsPanel(appearance: appearance) {
-        HStack(spacing: 0) {
-          ForEach(Array(time.values.enumerated()), id: \.offset) { index, value in
-            StatBlock(
-              value: "\(value)",
-              label: units.indices.contains(index) ? units[index] : "",
-              appearance: appearance
-            )
-          }
+  private var leadingPanel: some View {
+    StatsPanel(appearance: appearance, padV: scale.panelPadV, stretch: stretch) {
+      leading
+    }
+  }
+
+  private var timePanel: some View {
+    StatsPanel(appearance: appearance, padV: scale.panelPadV, stretch: stretch) {
+      HStack(spacing: 0) {
+        ForEach(Array(time.values.enumerated()), id: \.offset) { index, value in
+          StatBlock(
+            value: "\(value)",
+            label: units.indices.contains(index) ? units[index] : "",
+            valueSize: scale.unitValue,
+            labelSize: scale.unitLabel,
+            appearance: appearance
+          )
         }
       }
-      .frame(maxWidth: .infinity)
     }
-    .padding(6)
+  }
+
+  var body: some View {
+    Group {
+      if stacked {
+        VStack(spacing: 3) {
+          leadingPanel
+          timePanel
+        }
+      } else {
+        HStack(spacing: 5) {
+          leadingPanel
+          timePanel
+        }
+      }
+    }
+    .padding(stretch ? 6 : 4)
     .background(appearance.surfaceColor)
-    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: stretch ? 16 : 12, style: .continuous))
   }
 }
 
@@ -235,21 +304,24 @@ private struct DurationItem: View {
   let label: String
   let tint: Color
   let muted: Color
+  let scale: StatsScale
 
   var body: some View {
     HStack(spacing: 5) {
       Image(systemName: systemName)
-        .font(.system(size: 11))
+        .font(.system(size: scale.durationIcon))
         .foregroundColor(muted)
       VStack(alignment: .leading, spacing: 0) {
         Text(value)
-          .font(.system(size: 11, weight: .bold))
+          .font(.system(size: scale.durationValue, weight: .bold))
           .foregroundColor(tint)
           .lineLimit(1)
+          .minimumScaleFactor(0.7)
         Text(label)
-          .font(.system(size: 8))
+          .font(.system(size: scale.durationLabel))
           .foregroundColor(muted)
           .lineLimit(1)
+          .minimumScaleFactor(0.7)
       }
       Spacer(minLength: 0)
     }
@@ -257,102 +329,230 @@ private struct DurationItem: View {
   }
 }
 
-private struct StatsWidgetEntryView: View {
-  var entry: StatsEntry
+private struct DurationStrip: View {
+  let stats: StatsData
+  let scale: StatsScale
+  let padV: CGFloat
+  let appearance: WidgetAppearancePreferences
 
   var body: some View {
-    let stats = entry.stats
-    let appearance = entry.preferences.statsAppearance
+    HStack(spacing: 0) {
+      DurationItem(
+        systemName: "clock",
+        value: stats.totalText,
+        label: stats.totalLabel,
+        tint: appearance.accentColor,
+        muted: appearance.mutedColor,
+        scale: scale
+      )
+      DurationItem(
+        systemName: "film",
+        value: stats.movieText,
+        label: stats.movieLabel,
+        tint: appearance.accentColor,
+        muted: appearance.mutedColor,
+        scale: scale
+      )
+      DurationItem(
+        systemName: "tv",
+        value: stats.tvText,
+        label: stats.tvLabel,
+        tint: appearance.boldColor,
+        muted: appearance.mutedColor,
+        scale: scale
+      )
+    }
+    .padding(.horizontal, 8)
+    .padding(.vertical, padV)
+    .background(appearance.surfaceAltColor)
+    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+  }
+}
 
-    VStack(alignment: .leading, spacing: 7) {
-      if entry.preferences.statsShowTitle {
-        HStack(spacing: 8) {
-          Text("S")
-            .font(.system(size: 13, weight: .bold))
-            .foregroundColor(.white)
-            .frame(width: 24, height: 24)
-            .background(appearance.accentColor)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-          Text(stats.title)
-            .font(.system(size: 14, weight: .bold))
-            .foregroundColor(appearance.textColor)
-          Spacer(minLength: 0)
-        }
+private struct StatsWidgetEntryView: View {
+  var entry: StatsEntry
+  @Environment(\.widgetFamily) private var family
+
+  var body: some View {
+    // Düzen widget'ın gerçek (sistem kenar boşluğu düşülmüş) yüksekliğine bakar.
+    GeometryReader { proxy in
+      layout(height: proxy.size.height)
+    }
+    .widgetContentPadding(entry.preferences.statsCompact ? 9 : 13)
+    .widgetBackgroundCompat(entry.preferences.statsAppearance.backgroundColor)
+  }
+
+  @ViewBuilder
+  private func layout(height: CGFloat) -> some View {
+    if family == .systemLarge {
+      largeLayout()
+    } else {
+      mediumLayout(height: height)
+    }
+  }
+
+  private func movieLeading(_ stats: StatsData, _ scale: StatsScale, _ appearance: WidgetAppearancePreferences) -> AnyView {
+    AnyView(
+      StatBlock(
+        value: stats.movieCount,
+        label: stats.movieCountLabel,
+        valueSize: scale.countValue,
+        labelSize: scale.countLabel,
+        appearance: appearance
+      )
+    )
+  }
+
+  private func tvLeading(_ stats: StatsData, _ scale: StatsScale, _ appearance: WidgetAppearancePreferences) -> AnyView {
+    AnyView(
+      HStack(spacing: 0) {
+        StatBlock(
+          value: stats.showCount,
+          label: stats.showCountLabel,
+          valueSize: scale.countValue,
+          labelSize: scale.countLabel,
+          appearance: appearance
+        )
+        StatBlock(
+          value: stats.episodeCount,
+          label: stats.episodeCountLabel,
+          valueSize: scale.countValue,
+          labelSize: scale.countLabel,
+          appearance: appearance
+        )
+      }
+    )
+  }
+
+  private func titleRow(_ stats: StatsData, _ appearance: WidgetAppearancePreferences, badge: CGFloat, font: CGFloat) -> some View {
+    HStack(spacing: 8) {
+      Text("S")
+        .font(.system(size: badge * 0.54, weight: .bold))
+        .foregroundColor(.white)
+        .frame(width: badge, height: badge)
+        .background(appearance.accentColor)
+        .clipShape(RoundedRectangle(cornerRadius: badge * 0.33, style: .continuous))
+      Text(stats.title)
+        .font(.system(size: font, weight: .bold))
+        .foregroundColor(appearance.textColor)
+        .lineLimit(1)
+      Spacer(minLength: 0)
+    }
+  }
+
+  private func largeLayout() -> some View {
+    let stats = entry.stats
+    let prefs = entry.preferences
+    let appearance = prefs.statsAppearance
+    let scale = StatsScale.large
+
+    return VStack(alignment: .leading, spacing: 8) {
+      if prefs.statsShowTitle {
+        titleRow(stats, appearance, badge: 24, font: 14)
       }
 
-      if entry.preferences.statsShowMovies {
+      if prefs.statsShowMovies {
         StatsCard(
-          leading: AnyView(
-            VStack(spacing: 1) {
-              Text(stats.movieCount)
-                .font(.system(size: 19, weight: .bold))
-                .foregroundColor(appearance.textColor)
-              Text(stats.movieCountLabel)
-                .font(.system(size: 9))
-                .foregroundColor(appearance.mutedColor)
-                .lineLimit(1)
-            }
-          ),
+          leading: movieLeading(stats, scale, appearance),
           time: stats.movieTime,
           units: stats.units,
+          scale: scale,
+          stacked: false,
+          stretch: true,
           appearance: appearance
         )
       }
 
-      if entry.preferences.statsShowDuration {
-        HStack(spacing: 0) {
-          DurationItem(
-            systemName: "clock",
-            value: stats.totalText,
-            label: stats.totalLabel,
-            tint: appearance.accentColor,
-            muted: appearance.mutedColor
-          )
-          DurationItem(
-            systemName: "film",
-            value: stats.movieText,
-            label: stats.movieLabel,
-            tint: appearance.accentColor,
-            muted: appearance.mutedColor
-          )
-          DurationItem(
-            systemName: "tv",
-            value: stats.tvText,
-            label: stats.tvLabel,
-            tint: appearance.boldColor,
-            muted: appearance.mutedColor
-          )
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .background(appearance.surfaceAltColor)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+      if prefs.statsShowDuration {
+        DurationStrip(stats: stats, scale: scale, padV: 9, appearance: appearance)
       }
 
-      if entry.preferences.statsShowTv {
+      if prefs.statsShowTv {
         StatsCard(
-          leading: AnyView(
-            HStack(spacing: 0) {
-              StatBlock(
-                value: stats.showCount,
-                label: stats.showCountLabel,
-                appearance: appearance
-              )
-              StatBlock(
-                value: stats.episodeCount,
-                label: stats.episodeCountLabel,
-                appearance: appearance
-              )
-            }
-          ),
+          leading: tvLeading(stats, scale, appearance),
           time: stats.tvTime,
           units: stats.units,
+          scale: scale,
+          stacked: false,
+          stretch: true,
           appearance: appearance
         )
       }
     }
-    .padding(entry.preferences.statsCompact ? 9 : 13)
-    .widgetBackgroundCompat(appearance.backgroundColor)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+  }
+
+  private func mediumLayout(height: CGFloat) -> some View {
+    let stats = entry.stats
+    let prefs = entry.preferences
+    let appearance = prefs.statsAppearance
+    let scale = StatsScale.medium
+
+    let bothCards = prefs.statsShowMovies && prefs.statsShowTv
+    let anyCard = prefs.statsShowMovies || prefs.statsShowTv
+    let titleBlock: CGFloat = prefs.statsShowTitle ? StatsMediumBudget.title : 0
+    let cardsBlock: CGFloat =
+      bothCards ? StatsMediumBudget.bothCards : (anyCard ? StatsMediumBudget.wideCard : 0)
+    let stripBlock: CGFloat =
+      (anyCard ? StatsMediumBudget.gap : 0) + StatsMediumBudget.strip
+    // Şerit en son feda edilir: kartlar + başlık yerleşince kalan yere sığıyorsa konur.
+    let showStrip = prefs.statsShowDuration && (titleBlock + cardsBlock + stripBlock <= height)
+
+    return VStack(alignment: .leading, spacing: StatsMediumBudget.gap) {
+      if prefs.statsShowTitle {
+        titleRow(stats, appearance, badge: 20, font: 13)
+      }
+
+      if bothCards {
+        HStack(spacing: StatsMediumBudget.gap) {
+          StatsCard(
+            leading: movieLeading(stats, scale, appearance),
+            time: stats.movieTime,
+            units: stats.units,
+            scale: scale,
+            stacked: true,
+            stretch: false,
+            appearance: appearance
+          )
+          StatsCard(
+            leading: tvLeading(stats, scale, appearance),
+            time: stats.tvTime,
+            units: stats.units,
+            scale: scale,
+            stacked: true,
+            stretch: false,
+            appearance: appearance
+          )
+        }
+      } else if prefs.statsShowMovies {
+        StatsCard(
+          leading: movieLeading(stats, scale, appearance),
+          time: stats.movieTime,
+          units: stats.units,
+          scale: scale,
+          stacked: false,
+          stretch: false,
+          appearance: appearance
+        )
+      } else if prefs.statsShowTv {
+        StatsCard(
+          leading: tvLeading(stats, scale, appearance),
+          time: stats.tvTime,
+          units: stats.units,
+          scale: scale,
+          stacked: false,
+          stretch: false,
+          appearance: appearance
+        )
+      }
+
+      if showStrip {
+        DurationStrip(stats: stats, scale: scale, padV: 4, appearance: appearance)
+      }
+
+      Spacer(minLength: 0)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   }
 }
 
@@ -367,6 +567,6 @@ struct StatsWidget: Widget {
     }
     .configurationDisplayName("Seelogd İstatistikler")
     .description("İzleme istatistiklerini ana ekranda gösterir.")
-    .supportedFamilies([.systemLarge])
+    .supportedFamilies([.systemMedium, .systemLarge])
   }
 }

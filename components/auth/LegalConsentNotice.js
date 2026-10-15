@@ -62,6 +62,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     marginBottom: 12,
   },
-  text: { fontSize: 11.5, lineHeight: 17 },
-  link: { fontSize: 11.5, lineHeight: 17, fontWeight: "700", textDecorationLine: "underline" },
+  text: { fontSize: 12.5, lineHeight: 18 },
+  link: { fontSize: 12.5, lineHeight: 18, fontWeight: "700", textDecorationLine: "underline" },
 });

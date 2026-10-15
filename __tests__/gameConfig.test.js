@@ -67,3 +67,27 @@ describe("getLocalizedGameLabel", () => {
     expect(getLocalizedGameLabel(item, "tr")).toBe("Klasik Mod");
   });
 });
+
+describe("parseModeScoreKey", () => {
+  const { parseModeScoreKey, getModeConfig } = require("../screens/game/gameConfig");
+
+  test("sahne oyunu anahtari mod ve zorluga ayrilir", () => {
+    expect(parseModeScoreKey("classic_normal")).toEqual({ gameId: "scene_guess", modeId: "classic", difficultyId: "normal" });
+    expect(parseModeScoreKey("time_attack_hard")).toEqual({ gameId: "scene_guess", modeId: "time_attack", difficultyId: "hard" });
+  });
+
+  test("afis anahtari poster_ onekini atar; mod Klasik'e dusmez", () => {
+    const parsed = parseModeScoreKey("poster_classic_normal");
+    expect(parsed).toEqual({ gameId: "poster_puzzle", modeId: "classic", difficultyId: "normal" });
+    expect(getModeConfig(parsed.modeId).id).toBe("classic");
+    // Eski davranis: onek kalinca "poster_classic" bilinmeyen mod sayilirdi.
+    expect(getModeConfig("poster_classic").id).toBe("classic");
+    expect(parsed.modeId).not.toBe("poster_classic");
+  });
+
+  test("gunluk anahtar gunluk moda cozulur; alt cizgisiz girdi cokmez", () => {
+    expect(parseModeScoreKey("daily_normal").modeId).toBe("daily");
+    expect(parseModeScoreKey("garip")).toEqual({ gameId: "scene_guess", modeId: "garip", difficultyId: "" });
+    expect(parseModeScoreKey(undefined).modeId).toBe("");
+  });
+});

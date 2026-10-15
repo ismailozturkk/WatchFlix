@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BottomSheetModal from "../common/BottomSheetModal";
 import { useTheme } from "../../context/ThemeContext";
+import GlassCloseButton from "../common/GlassCloseButton";
 import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
@@ -330,15 +331,13 @@ export default function WatchHistorySheet({
             )}
           </Text>
         </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
+        <GlassCloseButton
+          size={35}
+          fallbackRadius={11}
+          backgroundColor={theme.between}
           disabled={busy || !!deletingId}
           onPress={closeSheet}
-          style={[styles.closeButton, { backgroundColor: theme.between }]}
-        >
-          <Ionicons name="close" size={18} color={theme.text.muted} />
-        </TouchableOpacity>
+        />
       </View>
 
       <View style={styles.summaryRow}>
@@ -446,7 +445,6 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 18, fontWeight: "900", letterSpacing: -0.35 },
   subtitle: { fontSize: 11.5, lineHeight: 16, marginTop: 2 },
-  closeButton: { width: 35, height: 35, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   summaryRow: { flexDirection: "row", gap: 8, marginTop: 15 },
   summaryCard: { flex: 1, minHeight: 70, borderRadius: 15, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 9, justifyContent: "center" },
   summaryValue: { fontSize: 16, lineHeight: 20, fontWeight: "900", marginTop: 3 },

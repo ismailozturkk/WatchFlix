@@ -23,6 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BackButton from "@components/BackButton";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import PosterImage from "@components/PosterImage";
 import ScreenDecor from "@components/ScreenDecor";
@@ -312,12 +313,14 @@ function ManageShowsModal({
                 {labels.manageSubtitle}
               </Text>
             </View>
-            <Pressable
+            <GlassCloseButton
+              size={36}
+              fallbackRadius={12}
+              iconSize={19}
+              color={theme.text.secondary}
+              backgroundColor={theme.between}
               onPress={onClose}
-              style={[styles.closeButton, { backgroundColor: theme.between }]}
-            >
-              <Ionicons name="close" size={19} color={theme.text.secondary} />
-            </Pressable>
+            />
           </View>
 
           {hiddenShowIds.size > 0 && (
@@ -442,7 +445,7 @@ export default function UpNextScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ScreenDecor iconOpacity={0.11} />
+      <ScreenDecor scope="home" iconOpacity={0.11} />
       <SafeAreaView edges={["top"]} style={styles.container}>
         <View style={styles.header}>
           {/* Sekme değil yığın ekranı: geri okunu ekran kendi taşır
@@ -790,11 +793,6 @@ const styles = StyleSheet.create({
   discoverText: { color: "#fff", fontSize: 13, fontWeight: "900" },
   retryButton: { padding: 12, marginTop: 4 },
   retryText: { fontSize: 12, fontWeight: "700" },
-  modalRoot: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.58)",
-  },
   manageSheet: {
     maxHeight: "82%",
     borderTopLeftRadius: 28,
@@ -814,13 +812,6 @@ const styles = StyleSheet.create({
   manageHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   manageTitle: { fontSize: 19, fontWeight: "900" },
   manageSubtitle: { fontSize: 11.5, lineHeight: 16, marginTop: 4 },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   showAllButton: {
     alignSelf: "flex-start",
     flexDirection: "row",

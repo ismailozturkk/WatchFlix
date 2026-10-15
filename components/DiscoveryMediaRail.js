@@ -473,8 +473,6 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 11, marginTop: -4, paddingHorizontal: 15, marginBottom: 12 },
   rail: { paddingHorizontal: 15 },
   item: { marginRight: 10, marginBottom: 5 },
-  rating: { position: "absolute", right: 5, bottom: 10, minWidth: 30, borderRadius: 10, alignItems: "center" },
-  ratingText: { color: "#FFD700", fontSize: 12, paddingHorizontal: 4, paddingBottom: 2 },
   badges: { position: "absolute", left: 2, bottom: 8 },
   providerBadges: {
     position: "absolute",

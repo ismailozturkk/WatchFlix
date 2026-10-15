@@ -3,12 +3,12 @@ import {
   Text,
   View,
   FlatList,
-  Dimensions,
   TouchableOpacity,
 } from "react-native";
 import PosterImage from "../../components/PosterImage";
 import React, { useEffect, useMemo, useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
+import GlassCloseButton from "../../components/common/GlassCloseButton";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieCollectionSkeleton } from "../../components/Skeleton";
@@ -18,8 +18,6 @@ import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useListLayoutSettings } from "../../context/AppSettingsContext";
-
-const { width } = Dimensions.get("window");
 
 const yearOf = (dateStr) =>
   dateStr && dateStr.length >= 4 ? dateStr.slice(0, 4) : "";
@@ -205,13 +203,15 @@ export default function MovieCollection({ navigation }) {
       {selected ? (
         // ── Açık: koleksiyon başlığı + kapat ──
         <View style={styles.headerRow}>
-          <TouchableOpacity
+          <GlassCloseButton
+            icon="chevron-back"
+            size={34}
+            fallbackRadius={10}
+            color={theme.text.primary}
+            backgroundColor={theme.secondary}
+            borderColor={theme.border}
             onPress={() => setSelected(null)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-          >
-            <Ionicons name="chevron-back" size={18} color={theme.text.primary} />
-          </TouchableOpacity>
+          />
           <View style={{ flex: 1 }}>
             <Text
               allowFontScaling={false}
@@ -227,13 +227,14 @@ export default function MovieCollection({ navigation }) {
               {countLabel(parts.length)}
             </Text>
           </View>
-          <TouchableOpacity
+          <GlassCloseButton
+            size={34}
+            fallbackRadius={10}
+            color={theme.text.secondary}
+            backgroundColor={theme.secondary}
+            borderColor={theme.border}
             onPress={() => setSelected(null)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={[styles.iconBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-          >
-            <Ionicons name="close" size={18} color={theme.text.secondary} />
-          </TouchableOpacity>
+          />
         </View>
       ) : (
         <Text
@@ -301,14 +302,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 1,
   },
-  iconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   railContent: {
     paddingHorizontal: 15,
     gap: 14,
@@ -346,20 +339,5 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontSize: 11,
     fontWeight: "500",
-  },
-  ratingBadge: {
-    position: "absolute",
-    bottom: 8,
-    right: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  ratingText: {
-    color: "#ffd700",
-    fontSize: 11,
-    fontWeight: "700",
   },
 });

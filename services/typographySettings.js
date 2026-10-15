@@ -30,10 +30,6 @@ import { canUseFeature, isFontPresetFree } from "../utils/premiumFeatures";
 import { Keys, get, set, subscribe } from "./storage";
 import { getPremiumPlanSnapshot, subscribePremiumPlan } from "./premiumState";
 
-export const FONT_ROLES_STORAGE_KEY = Keys.fontRoles.key;
-/** Rol ayrımından önceki tek anahtar; göçte üç role birden taşınır. */
-export const LEGACY_FONT_STORAGE_KEY = "appFontFamily";
-
 // MMKV GEÇİŞİ: roller AÇILIŞTA SENKRON okunuyor. Eskiden sistem fontuyla
 // başlanıp async okuma sonrası düzeltiliyordu — seçtiği fontu her açılışta bir
 // kare boyunca göremeyen kullanıcı deneyimi buradan geliyordu. Hidrasyon

@@ -9,14 +9,14 @@
 // motordan gelir → setDebugNow ile dondurulduğunda sayaç da durur (önizleme).
 
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, useWindowDimensions } from "react-native";
 import { now } from "@services/tournamentEngine";
 import { RollingDigit } from "../animated/RollingNumber";
 
 const DUR = 420;
 
 // ─── Bir birim (2 haneli kutu + etiket) ───────────────────────────────────────
-function Unit({ value, label, dims, textColor, boxColor, labelColor }) {
+function Unit({ value, label, dims, textColor, boxColor, labelColor, fill }) {
   const s = String(value).padStart(2, "0");
   const digitStyle = {
     width: dims.w,
@@ -28,8 +28,14 @@ function Unit({ value, label, dims, textColor, boxColor, labelColor }) {
     fontVariant: ["tabular-nums"],
   };
   return (
-    <View style={{ alignItems: "center" }}>
-      <View style={[styles.box, { backgroundColor: boxColor, gap: dims.gap, paddingHorizontal: dims.pad }]}>
+    <View style={fill ? styles.unitFill : styles.unit}>
+      <View
+        style={[
+          styles.box,
+          fill && styles.boxFill,
+          { backgroundColor: boxColor, gap: dims.gap, paddingHorizontal: dims.pad, borderRadius: dims.radius || 8 },
+        ]}
+      >
         <RollingDigit
           value={s[0]}
           height={dims.h}
@@ -67,7 +73,11 @@ export default function CountdownTimer({
   textColor = "#fff",
   boxColor = "rgba(255,255,255,0.16)",
   labelColor = "rgba(255,255,255,0.72)",
+  // fill: dört kutu satırın tamamına eşit yayılır (hero paneli); aksi halde
+  // içeriği kadar yer kaplar (Hub kartı).
+  fill = false,
 }) {
+  const { width: screenW } = useWindowDimensions();
   const [, force] = useState(0);
   useEffect(() => {
     const id = setInterval(() => force((x) => (x + 1) % 1e6), 1000);
@@ -81,16 +91,19 @@ export default function CountdownTimer({
   const m = Math.floor((tot % 3600) / 60);
   const s = tot % 60;
 
+  // lg: dar ekranda (≤ 350dp) hero panelinin içine sığsın diye bir kademe küçülür.
   const dims =
     size === "lg"
-      ? { h: 30, w: 20, font: 25, label: 10, gap: 3, pad: 6 }
-      : { h: 19, w: 14, font: 15, label: 7, gap: 2, pad: 5 };
+      ? screenW <= 350
+        ? { h: 28, w: 17, font: 22, label: 9, gap: 3, pad: 5, radius: 10 }
+        : { h: 32, w: 20, font: 27, label: 10, gap: 3, pad: 6, radius: 10 }
+      : { h: 19, w: 14, font: 15, label: 7, gap: 2, pad: 5, radius: 8 };
   const labels =
     lang === "tr" ? ["GÜN", "SAAT", "DK", "SN"] : ["DAY", "HR", "MIN", "SEC"];
   const values = [d, h, m, s];
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, fill && styles.rowFill]}>
       {values.map((v, i) => (
         <React.Fragment key={i}>
           <Unit
@@ -100,6 +113,7 @@ export default function CountdownTimer({
             textColor={textColor}
             boxColor={boxColor}
             labelColor={labelColor}
+            fill={fill}
           />
           {i < 3 && (
             <Text
@@ -123,11 +137,16 @@ export default function CountdownTimer({
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "flex-start" },
+  rowFill: { alignSelf: "stretch" },
+  unit: { alignItems: "center" },
+  unitFill: { flex: 1, alignItems: "center" },
   box: {
     flexDirection: "row",
     borderRadius: 8,
     paddingHorizontal: 4,
     paddingVertical: 3,
   },
+  // Kutu, birimin tüm genişliğini doldurur; rakamlar ortada kalır.
+  boxFill: { alignSelf: "stretch", justifyContent: "center", paddingVertical: 5 },
   sep: { fontWeight: "900", marginHorizontal: 3, alignSelf: "center" },
 });

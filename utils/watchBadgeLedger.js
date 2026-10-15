@@ -21,7 +21,7 @@ import {
   aktifligiGuncelle, rekorYukselt,
 } from "./watchLedgerCore";
 import { bugunAnahtari, GUN_TUT, serileriHesapla } from "./watchActivity";
-import { Keys, get, set, remove } from "../services/storage";
+import { Keys, get, set } from "../services/storage";
 
 // Üç ayrı anahtar yerine TEK doküman: baseline/earned/seen aynı anda tutarlı
 // olmalı. Ayrı anahtarlarda kısmi bir yazma (uygulama öldürülmesi, dolu disk)
@@ -37,10 +37,6 @@ export async function loadLedger(uid) {
 export async function saveLedger(uid, ledger) {
   // false → disk dolu / kota; puan yine hesaplanır, sadece hafıza yok.
   return set(Keys.watchLedger, normalizeLedger(ledger), { uid });
-}
-
-export async function clearLedger(uid) {
-  return remove(Keys.watchLedger, { uid });
 }
 
 /**

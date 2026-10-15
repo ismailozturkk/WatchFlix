@@ -2,7 +2,7 @@
   "expo": {
     "name": "Seelogd",
     "slug": "seelogd",
-    "version": "1.4.7",
+    "version": "1.4.8",
     "orientation": "portrait",
     "icon": "./assets/icon_default/icon.png",
     "userInterfaceStyle": "automatic",
@@ -88,6 +88,7 @@
       "@react-native-firebase/app",
       "@react-native-firebase/analytics",
       "./plugins/withRNFirebaseCocoaPods.js",
+      "./plugins/withRNScreensGamma.js",
       [
         "@sentry/react-native/expo",
         {

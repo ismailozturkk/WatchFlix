@@ -18,6 +18,7 @@ import { useUserProfile } from "../../../context/UserProfileContext";
 import Toast from "react-native-toast-message";
 import { i18nText } from "../../../utils/i18nText";
 import ScreenDecor from "../../../components/ScreenDecor";
+import BackButton from "@components/BackButton";
 
 
 const OPTIONS = {
@@ -111,16 +112,10 @@ export default function PrivacySettingsScreen({ navigation }) {
       edges={["top"]}
     >
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor iconOpacity={0.15} />
+      <ScreenDecor scope="settings" iconOpacity={0.15} />
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation?.goBack?.()}
-          style={styles.backBtn}
-          hitSlop={10}
-        >
-          <Ionicons name="chevron-back" size={24} color={theme.text.primary} />
-        </TouchableOpacity>
+        <BackButton absolute={false} variant="plain" onPress={() => navigation?.goBack?.()} />
         <Text style={[styles.title, { color: theme.text.primary }]}>{i18nText("autoI18n.gizlilik_ayarlari", "Gizlilik Ayarları")}</Text>
         <View style={{ width: 40 }} />
       </View>
@@ -191,10 +186,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 8,
-  },
-  backBtn: {
-    width: 40, height: 40,
-    justifyContent: "center", alignItems: "center",
   },
   title: { fontSize: 18, fontWeight: "800" },
   blockedRow: {

@@ -17,6 +17,15 @@ import NetInfo from "@react-native-community/netinfo";
 let _online = true;
 export const getIsOnline = () => _online;
 
+// "Bağlantı geri geldi" haberi (React dışı kod için): yerel-öncelikli veri
+// katmanı bekleyen yazımlarını buna bakarak hemen boşaltır. Yalnız çevrimdışı →
+// çevrimiçi geçişte tetiklenir (ağ türü değişimi gürültü olmasın).
+const onlineListeners = new Set();
+export const subscribeOnline = (listener) => {
+  onlineListeners.add(listener);
+  return () => onlineListeners.delete(listener);
+};
+
 const ConnectivityContext = createContext({
   isOnline: true,
   isInternetReachable: true,
@@ -33,7 +42,17 @@ export const ConnectivityProvider = ({ children }) => {
       // isInternetReachable null olabilir (henüz bilinmiyor) → online say.
       const reachable = state?.isInternetReachable !== false;
       const online = !!state?.isConnected && reachable;
+      const wasOnline = _online;
       _online = online;
+      if (online && !wasOnline) {
+        for (const fn of Array.from(onlineListeners)) {
+          try {
+            fn();
+          } catch {
+            // dinleyici hatası bağlantı durumunu bozmasın
+          }
+        }
+      }
       setIsOnline(online);
       setIsInternetReachable(reachable);
     };

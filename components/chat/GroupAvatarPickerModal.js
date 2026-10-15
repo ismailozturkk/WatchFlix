@@ -1,8 +1,9 @@
 import React, { useCallback } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import GroupAvatarGrid, {
@@ -71,19 +72,14 @@ export default function GroupAvatarPickerModal({
                 })}
               </Text>
             </View>
-            <TouchableOpacity
+            <GlassCloseButton
+              size={34}
+              fallbackRadius={17}
+              iconSize={20}
+              color={theme.text?.primary || "#fff"}
+              backgroundColor={theme.primary || "rgba(255,255,255,0.06)"}
               onPress={onClose}
-              style={[
-                styles.closeButton,
-                { backgroundColor: theme.primary || "rgba(255,255,255,0.06)" },
-              ]}
-            >
-              <Ionicons
-                name="close"
-                size={20}
-                color={theme.text?.primary || "#fff"}
-              />
-            </TouchableOpacity>
+            />
           </View>
 
           <GroupAvatarGrid
@@ -127,11 +123,4 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   title: { fontSize: 17, fontWeight: "800", letterSpacing: -0.25 },
   subtitle: { fontSize: 11, fontWeight: "600", marginTop: 2 },
-  closeButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

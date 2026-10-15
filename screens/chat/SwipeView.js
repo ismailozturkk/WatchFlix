@@ -1,11 +1,8 @@
 import React, { useRef } from "react";
 import { Animated } from "react-native";
-import LottieView from "lottie-react-native";
 import { PanGestureHandler, State } from "react-native-gesture-handler";
 import { ChatModal } from "@components/modals/ChatModal";
 import { useNavigation } from "@react-navigation/native";
-const AnimatedLottieView = Animated.createAnimatedComponent(LottieView);
-
 const SwipeView = () => {
   const navigation = useNavigation();
   const translateX = useRef(new Animated.Value(0)).current;

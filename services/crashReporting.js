@@ -156,7 +156,3 @@ export function registerNavigationContainer(ref) {
     navigationIntegration?.registerNavigationContainer?.(ref);
   } catch {}
 }
-
-export function isCrashReportingActive() {
-  return initialized;
-}

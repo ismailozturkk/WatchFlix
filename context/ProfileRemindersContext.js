@@ -1,20 +1,10 @@
 import React, {
-  createContext, useContext, useEffect, useState, useMemo, useRef,
+  createContext, useContext, useEffect, useState, useMemo,
 } from "react";
-import {
-  doc, getDoc, collection, onSnapshot, writeBatch,
-} from "firebase/firestore";
-import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import { useLanguage } from "./LanguageContext";
-import {
-  isAuthTransitionError,
-  snapshotErrorHandler,
-} from "../utils/firestoreError";
-import { cacheKeys } from "../utils/cacheKeys";
-import { publish, seed } from "../services/snapshotCache";
-import { getActiveUser } from "../services/storage";
-import useStartupGate from "../hooks/useStartupGate";
+import useUserDataDomain from "../hooks/useUserDataDomain";
+import { remindersDomain } from "../services/userData";
 import {
   clearReminderWidget,
   syncReminderWidget,
@@ -35,46 +25,6 @@ const buildDateText = (airDate, t) => {
   const rem    = days % 30;
   if (months > 0) return rem > 0 ? `${months} ${t.month} ${rem} ${t.days}` : `${months} ${t.month}`;
   return `${days} ${t.days}`;
-};
-
-// Migrate Reminders/{uid} doc arrays → subcollections
-const migrateOldReminders = async (uid, oldData) => {
-  try {
-    const batch = writeBatch(db);
-
-    (oldData.movieReminders || []).forEach((movie) => {
-      batch.set(doc(db, "Reminders", uid, "movies", String(movie.movieId)), movie);
-    });
-
-    (oldData.tvReminders || []).forEach((show) => {
-      batch.set(doc(db, "Reminders", uid, "tvShows", String(show.showId)), {
-        showId: show.showId,
-        showName: show.showName,
-        showPosterPath: show.showPosterPath || "",
-      });
-      (show.seasons || []).forEach((season) => {
-        (season.episodes || []).forEach((ep) => {
-          const epId = String(ep.episodeId || `${show.showId}-${season.seasonNumber}-${ep.episodeNumber}`);
-          batch.set(
-            doc(db, "Reminders", uid, "tvShows", String(show.showId), "episodes", epId),
-            {
-              ...ep,
-              episodeId: epId,
-              showId: show.showId,
-              showName: show.showName,
-              showPosterPath: show.showPosterPath || "",
-              seasonNumber: season.seasonNumber,
-              seasonPosterPath: season.seasonPosterPath || null,
-            },
-          );
-        });
-      });
-    });
-
-    await batch.commit();
-  } catch (err) {
-    console.error("Reminders migration error:", err);
-  }
 };
 
 // Reconstruct tvReminders shape [ { showId, showName, seasons: [{ seasonNumber, episodes: [] }] } ]
@@ -111,156 +61,28 @@ export const ProfileRemindersProvider = ({ children }) => {
   const uid = user?.uid;
   const { t, language } = useLanguage();
 
-  // AÇILIŞ TOHUMU — son oturumun hatırlatıcıları diskten SENKRON okunur, yani
-  // ilk karede çizilir. Aşağıdaki listener efekti de aynı tohumu okuyor ama
-  // efekt ilk boyamadan SONRA çalıştığı için önbellek dolu olsa bile bir kare
-  // "yükleniyor" görünüyordu.
-  const ilkTohum = useMemo(
-    () => {
-      // Firebase oturumu ASENKRON çözülüyor; ilk render'da `uid` genelde henüz
-      // null olur ve tohum hiç okunmazdı. Son aktif kullanıcı depodan senkron
-      // okunabiliyor (aynı desen: ListStatusContext).
-      const tohumUid = uid ?? getActiveUser();
-      if (!tohumUid) return { movies: null, episodes: null };
-      return {
-        movies: seed(cacheKeys.reminders(tohumUid, "movies")).data,
-        episodes: seed(cacheKeys.reminders(tohumUid, "episodes")).data,
-      };
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
-  const [movieReminders, setMovieReminders] = useState(
-    Array.isArray(ilkTohum.movies) ? ilkTohum.movies : [],
-  );
-  const [allTvEpisodes,  setAllTvEpisodes]  = useState(
-    Array.isArray(ilkTohum.episodes) ? ilkTohum.episodes : [],
-  );
-  const [loading,        setLoading]        = useState(
-    !Array.isArray(ilkTohum.movies) && !Array.isArray(ilkTohum.episodes),
-  );
+  // YEREL-ÖNCELİKLİ: hatırlatıcılar buluttan dinlenmez. Eskiden burada 2 + N
+  // Firestore dinleyicisi (filmler, diziler, HER DİZİ İÇİN bölümler) açılışta
+  // tüm belgeleri okuyordu; Takvim aynısını ikinci kez yapıyordu. Artık okuma
+  // yerel kopyadan SENKRON, yazma yerelde + kalıcı günlükte anında (buluta
+  // arka planda), buluttan çekim yalnız kopya yokken TEK SEFER.
+  // Bkz. services/userData ve docs/mimari/YEREL_ONCELIKLI_VERI_KATMANI.md
+  const view = useUserDataDomain(remindersDomain);
+  const movieReminders = view.lists.movies;
+  const allTvEpisodes = view.lists.episodes;
+  // Yalnız tek seferlik indirme sürerken "yükleniyor": normal açılışta hep false.
+  const loading = !view.ready && view.hydrating;
   const [activeTab,      setActiveTab]      = useState("movie");
-
-  // Refs to manage per-show episode subscriptions
-  const epUnsubsRef = useRef({});
-  const epDataRef   = useRef({}); // showId → episode[]
-
-  // İlk kare + ana ekran widget'ı tohumdan besleniyor (aşağıdaki widget
-  // effect'i kapıya TABİ DEĞİL, seed'i hemen aynalar). Buradaki 2+N listener
-  // kümesi (dizi başına episodes aboneliği) açılışın en pahalı ikinci Firestore
-  // yükü. Kademeler: hooks/useStartupGate.js.
-  const startupReady = useStartupGate(2200);
-
-  useEffect(() => {
-    if (!startupReady) return;
-    if (!uid) {
-      setMovieReminders([]);
-      setAllTvEpisodes([]);
-      setLoading(false);
-      clearReminderWidget();
-      return;
-    }
-
-    // Offline-first: önce cache'ten seed.
-    const cachedMovies = seed(cacheKeys.reminders(uid, "movies")).data;
-    const cachedEpisodes = seed(cacheKeys.reminders(uid, "episodes")).data;
-    if (Array.isArray(cachedMovies)) setMovieReminders(cachedMovies);
-    if (Array.isArray(cachedEpisodes)) setAllTvEpisodes(cachedEpisodes);
-    if (Array.isArray(cachedMovies) || Array.isArray(cachedEpisodes)) {
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
-
-    // ── Movies subcollection ────────────────────────────────────────────────
-    const movieUnsub = onSnapshot(
-      collection(db, "Reminders", uid, "movies"),
-      async (snap) => {
-        if (snap.empty) {
-          // Dual read: check old model and migrate if needed
-          try {
-            const oldDoc = await getDoc(doc(db, "Reminders", uid));
-            if (oldDoc.exists()) {
-              const d = oldDoc.data();
-              if (d.movieReminders?.length || d.tvReminders?.length) {
-                await migrateOldReminders(uid, d);
-                return; // onSnapshot fires again after migration
-              }
-            }
-          } catch (err) {
-            if (!isAuthTransitionError(err) && __DEV__)
-              console.warn("Error checking old reminders:", err?.message);
-          }
-          setMovieReminders([]);
-          publish(cacheKeys.reminders(uid, "movies"), []);
-        } else {
-          const movies = snap.docs.map((d) => d.data());
-          setMovieReminders(movies);
-          publish(cacheKeys.reminders(uid, "movies"), movies);
-        }
-        setLoading(false);
-      },
-      (err) => {
-        if (!isAuthTransitionError(err) && __DEV__)
-          console.warn("[Reminders/movies] snapshot error:", err?.message);
-        setLoading(false);
-      },
-    );
-
-    // ── TV shows subcollection → dynamic episode subscriptions ──────────────
-    const showsUnsub = onSnapshot(
-      collection(db, "Reminders", uid, "tvShows"),
-      (showsSnap) => {
-        const activeShowIds = new Set(showsSnap.docs.map((d) => d.id));
-
-        // Remove stale episode listeners
-        Object.keys(epUnsubsRef.current).forEach((sid) => {
-          if (!activeShowIds.has(sid)) {
-            epUnsubsRef.current[sid]();
-            delete epUnsubsRef.current[sid];
-            delete epDataRef.current[sid];
-          }
-        });
-
-        if (showsSnap.empty) {
-          setAllTvEpisodes([]);
-          publish(cacheKeys.reminders(uid, "episodes"), []);
-          return;
-        }
-
-        // Subscribe to episodes of new shows
-        showsSnap.docs.forEach((showDoc) => {
-          const sid = showDoc.id;
-          if (epUnsubsRef.current[sid]) return;
-          epUnsubsRef.current[sid] = onSnapshot(
-            collection(db, "Reminders", uid, "tvShows", sid, "episodes"),
-            (epSnap) => {
-              epDataRef.current[sid] = epSnap.docs.map((d) => d.data());
-              const all = Object.values(epDataRef.current).flat();
-              setAllTvEpisodes(all);
-              publish(cacheKeys.reminders(uid, "episodes"), all);
-            },
-            snapshotErrorHandler("Reminders/episodes"),
-          );
-        });
-      },
-      snapshotErrorHandler("Reminders/tvShows"),
-    );
-
-    return () => {
-      movieUnsub();
-      showsUnsub();
-      Object.values(epUnsubsRef.current).forEach((u) => u());
-      epUnsubsRef.current = {};
-      epDataRef.current   = {};
-    };
-  }, [uid, startupReady]);
 
   const reminders = useMemo(() => ({
     movieReminders,
     tvReminders: buildTvReminders(allTvEpisodes),
   }), [movieReminders, allTvEpisodes]);
+
+  // Çıkış: ana ekran widget'ı önceki hesabın hatırlatıcılarını göstermesin.
+  useEffect(() => {
+    if (!uid) clearReminderWidget();
+  }, [uid]);
 
   // Android ana ekran widget'ı Firestore'a ikinci bir bağlantı açmaz. Context'in
   // canonical verisinin küçük bir özetini yerel native depoya aktarır; widget

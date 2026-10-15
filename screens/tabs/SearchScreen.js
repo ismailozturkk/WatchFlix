@@ -14,7 +14,7 @@ import {
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import AppIcon from "../../components/AppIcon";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import MovieSearch from "../search/MovieSearch";
 import TvShowSearch from "../search/TvShowSearch";
 import ActorSearch from "../search/ActorSearch";
@@ -23,6 +23,9 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
+import GlassField from "../../components/common/GlassField";
+import { liquidGlassSupported } from "../../services/liquidGlass";
+import { isLightSurface } from "../../utils/colorUtils";
 import { useFocusEffect } from "@react-navigation/native";
 import { i18nText } from "../../utils/i18nText";
 import { Keys, get, set } from "../../services/storage";
@@ -188,8 +191,11 @@ export default function SearchScreen({ navigation, route }) {
     };
   }, [contentRevealAnim, expandAnim, hasSearchOrigin, searchBarAnim]);
 
+  // iOS 26+: Liquid Glass bir atası animasyonlu `opacity` taşıyorsa bozulur
+  // (bkz. components/common/GlassSurface.js) — bu yüzden cam açıkken giriş
+  // yalnız kaymayla yapılır, solma yok. Geri düğmesi ve arama alanı bu satırda.
   const searchBarStyle = {
-    opacity: searchBarAnim,
+    ...(liquidGlassSupported ? null : { opacity: searchBarAnim }),
     transform: [
       {
         translateY: searchBarAnim.interpolate({
@@ -263,16 +269,19 @@ export default function SearchScreen({ navigation, route }) {
             { paddingTop: topInset + (Platform.OS === "android" ? 10 : 0) },
           ]}
         >
-          <IconBacground opacity={0.3} />
+          <ScreenDecor scope="search" iconOpacity={0.3} />
 
       {/* ── Arama Kutusu ──────────────────────────────────────── */}
       <Animated.View style={[styles.searchContainer, searchBarStyle]}>
         <BackButton absolute={false} style={{ alignSelf: "center" }} />
-        <View
-          style={[
-            styles.searchBar,
+        {/* iOS 26+: hap biçimli Liquid Glass arama alanı; diğer yerlerde eski kutu. */}
+        <GlassField
+          height={40}
+          fallbackStyle={[
+            styles.searchBarBox,
             { backgroundColor: theme.secondary, borderColor: theme.border },
           ]}
+          style={styles.searchBar}
         >
           <AppIcon
             family="Ionicons"
@@ -296,6 +305,7 @@ export default function SearchScreen({ navigation, route }) {
             onChangeText={setSearchQuery}
             maxLength={80}
             returnKeyType="search"
+            keyboardAppearance={isLightSurface(theme.primary) ? "light" : "dark"}
             onSubmitEditing={() => Keyboard.dismiss()}
           />
           {searchQuery.length > 0 && (
@@ -311,7 +321,7 @@ export default function SearchScreen({ navigation, route }) {
               />
             </TouchableOpacity>
           )}
-        </View>
+        </GlassField>
         <LayoutToggle
           viewMode={viewMode}
           onToggle={setViewMode}
@@ -408,16 +418,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 10,
   },
+  // Yerleşim iki yolda da geçerli; köşe/çerçeve yalnız eski kutuda (cam kendi
+  // şeklini çizer).
   searchBar: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 0,
-    borderRadius: 12,
-    borderWidth: 1,
-    height: 40,
   },
+  searchBarBox: { borderRadius: 12, borderWidth: 1 },
   layoutToggleBtn: {
     width: 40,
     height: 40,

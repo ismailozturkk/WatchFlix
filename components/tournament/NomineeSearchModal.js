@@ -24,8 +24,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import AppIcon from "@components/AppIcon";
+import GlassCloseButton from "@components/common/GlassCloseButton";
 import { i18nText } from "@utils/i18nText";
 import { searchCandidates } from "@services/tournamentService";
+import useKeyboardInset from "@hooks/useKeyboardInset";
 
 const PENDING_TIMEOUT = 2600;
 const SEARCH_DEBOUNCE = 380;
@@ -133,6 +135,9 @@ export default function NomineeSearchModal({
   mediaType, genreId, theme, getTmdbUrl, lang = "tr",
 }) {
   const [q, setQ] = useState("");
+  // Arama kutusu klavyeyi açınca listenin son satırları klavyenin altında
+  // kalıyordu; liste alt boşluğu klavye kadar uzar, son aday da kaydırılabilir.
+  const { inset: keyboardInset, onLayout: onContainerLayout } = useKeyboardInset(visible);
   const [pendingId, setPendingId] = useState(null);
   const [remote, setRemote] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -243,7 +248,11 @@ export default function NomineeSearchModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView edges={["top", "bottom"]} style={[styles.container, { backgroundColor: theme.primary }]}>
+      <SafeAreaView
+        edges={["top", "bottom"]}
+        onLayout={onContainerLayout}
+        style={[styles.container, { backgroundColor: theme.primary }]}
+      >
         {/* Başlık + arama kutusu */}
         <View style={styles.header}>
           <View style={[styles.searchBox, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
@@ -268,12 +277,14 @@ export default function NomineeSearchModal({
               </Pressable>
             ) : null}
           </View>
-          <Pressable
+          <GlassCloseButton
+            size={38}
+            fallbackRadius={13}
+            color={theme.text.secondary}
+            backgroundColor={theme.secondary}
+            borderColor={theme.border}
             onPress={onClose}
-            style={[styles.closeBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-          >
-            <AppIcon family="Ionicons" name="close" size={18} color={theme.text.secondary} />
-          </Pressable>
+          />
         </View>
 
         <FlatList
@@ -282,7 +293,7 @@ export default function NomineeSearchModal({
           renderItem={renderItem}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: 30 + keyboardInset }]}
           initialNumToRender={12}
           maxToRenderPerBatch={12}
           windowSize={7}
@@ -323,10 +334,6 @@ const styles = StyleSheet.create({
     borderRadius: 13, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9,
   },
   searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
-  closeBtn: {
-    width: 38, height: 38, borderRadius: 13, borderWidth: 1,
-    alignItems: "center", justifyContent: "center",
-  },
   listContent: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 30 },
 
   row: {

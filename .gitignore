@@ -17,6 +17,9 @@ expo-env.d.ts
 # prebuild ciktisi haric tutulmali.
 /android/
 /ios/
+# Yerel Expo modullerinin Gradle derleme ciktisi (modules/<ad>/android/build/):
+# kaynak degil; EAS'a yuklenip eski ara ciktiyla karismasin.
+modules/*/android/build/
 *.orig.*
 *.jks
 *.p8
