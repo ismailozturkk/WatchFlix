@@ -8,6 +8,10 @@
 //   • Oynatıcı karartılmış sinema modalında açılır; cihazın mevcut yönüne göre
 //     16:9 oranını taşmadan sığdırır ve YouTube dışa açma/kapatma kontrollerini
 //     videodan bağımsız sabit tutar.
+//   • İki yerleşim: `variant="section"` (varsayılan) Film/Dizi detayındaki başlıklı,
+//     yatay kaydırmalı şerit; `variant="sheet"` sohbetteki fragman sayfasının
+//     (TrailerModal) içeriği — başlıksız, dikey liste, kenardan kenara çipler.
+//     Veri çekme, dil sırası ve oynatıcı iki yerleşimde de AYNI.
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
@@ -26,15 +30,21 @@ import {
 } from "react-native";
 import axios from "axios";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AdaptiveBlurView from "../common/AdaptiveBlurView";
+import BottomSheetModal from "../common/BottomSheetModal";
+import GlassCloseButton from "../common/GlassCloseButton";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
+import SheetScroll from "../common/SheetScroll";
 import { Image } from "expo-image";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { i18nText } from "../../utils/i18nText";
 import { normalizeAppLanguage } from "../../utils/appLanguages";
+import { alpha } from "../../theme/colors";
 import MovieVideoItem from "../../screens/movie/components/MovieVideoItem";
+import TrailerVideoList, { SHEET_GUTTER } from "./TrailerVideoList";
 import {
   TRAILER_LANGUAGES,
   buildTrailerLanguageOrder,
@@ -236,6 +246,7 @@ function TrailerPlayerModal({ visible, video, onClose, theme }) {
 
 /* ───────────────────────── Dil seçim sayfası ───────────────────────── */
 function LanguageSheet({ visible, selected, originalLanguage, onSelect, onClose, theme }) {
+  const insets = useSafeAreaInsets();
   const languages = useMemo(() => {
     const original = trailerLanguageOf(originalLanguage);
     return TRAILER_LANGUAGES.some((language) => language.code === original.code)
@@ -243,41 +254,81 @@ function LanguageSheet({ visible, selected, originalLanguage, onSelect, onClose,
       : [original, ...TRAILER_LANGUAGES];
   }, [originalLanguage]);
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.sheetBackdrop} onPress={onClose} />
-      <View style={[styles.sheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-        <View style={styles.sheetHandle} />
-        <Text style={[styles.sheetTitle, { color: theme.text.primary }]}>
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      intensity={35}
+      dimColor="rgba(0,0,0,0.42)"
+      sheetStyle={[
+        styles.sheet,
+        {
+          backgroundColor: theme.secondary,
+          borderColor: theme.border,
+          paddingBottom: Math.max(insets.bottom, 18),
+        },
+      ]}
+    >
+      <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
+      <View style={styles.sheetHeader}>
+        <View style={[styles.sheetTitleIcon, { backgroundColor: alpha(theme.accent, 0.16) }]}>
+          <Ionicons name="globe-outline" size={19} color={theme.accent} />
+        </View>
+        <Text style={[styles.sheetTitle, { color: theme.text.primary }]} numberOfLines={1}>
           {i18nText("autoI18n.video_dili", "Video Dili")}
         </Text>
-        <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-          {languages.map((l) => {
-            const active = l.code === selected;
-            return (
-              <TouchableOpacity
-                key={l.code}
-                style={[styles.sheetRow, { borderColor: theme.border }]}
-                onPress={() => onSelect(l.code)}
-              >
-                <Text style={[styles.sheetRowText, { color: theme.text.primary }]}>{l.label}</Text>
-                {active ? (
-                  <Ionicons name="checkmark-circle" size={20} color={theme.accent} />
-                ) : (
-                  <View style={[styles.sheetRowDot, { borderColor: theme.border }]} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <GlassCloseButton
+          size={36}
+          fallbackRadius={18}
+          iconSize={21}
+          color={theme.text.primary}
+          backgroundColor={theme.between}
+          onPress={onClose}
+        />
       </View>
-    </Modal>
+      <SheetScroll contentContainerStyle={styles.sheetList}>
+        {languages.map((l) => {
+          const active = l.code === selected;
+          return (
+            <TouchableOpacity
+              key={l.code}
+              activeOpacity={0.8}
+              style={[
+                styles.sheetRow,
+                {
+                  backgroundColor: active ? alpha(theme.accent, 0.14) : theme.between,
+                  borderColor: active ? alpha(theme.accent, 0.5) : theme.border,
+                },
+              ]}
+              onPress={() => onSelect(l.code)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+            >
+              <Text style={[styles.sheetRowText, { color: theme.text.primary }]}>{l.label}</Text>
+              {active ? (
+                <Ionicons name="checkmark-circle" size={21} color={theme.accent} />
+              ) : (
+                <View style={[styles.sheetRowDot, { borderColor: theme.border }]} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </SheetScroll>
+    </BottomSheetModal>
   );
 }
 
 /* ───────────────────────── Ana bölüm ───────────────────────── */
-export default function TrailerSection({ mediaType, id, apiKey, originalLanguage }) {
+export default function TrailerSection({
+  mediaType,
+  id,
+  apiKey,
+  originalLanguage,
+  variant = "section",
+  bottomInset = 0,
+}) {
   const { theme } = useTheme();
   const { language, t } = useLanguage();
+  const isSheet = variant === "sheet";
   // Uygulama dili fragman dili de olabilir (TRAILER_LANGUAGES: tr/en/es/…); tanınmayan → en.
   const appLangCode = normalizeAppLanguage(language);
 
@@ -389,17 +440,20 @@ export default function TrailerSection({ mediaType, id, apiKey, originalLanguage
   }, [appLangCode, normalizedOriginalLanguage, selectedLang]);
 
   return (
-    <View style={styles.section}>
-      <View style={styles.headerRow}>
-        <View style={[styles.accent, { backgroundColor: theme.accent }]} />
-        <Text style={[styles.title, { color: theme.text.primary }]}>{t.videos}</Text>
-      </View>
+    <View style={isSheet ? styles.sheetSection : styles.section}>
+      {!isSheet ? (
+        <View style={styles.headerRow}>
+          <View style={[styles.accent, { backgroundColor: theme.accent }]} />
+          <Text style={[styles.title, { color: theme.text.primary }]}>{t.videos}</Text>
+        </View>
+      ) : null}
 
       {/* Dil seçici */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipRow}
+        style={isSheet ? styles.chipScrollSheet : undefined}
+        contentContainerStyle={isSheet ? styles.chipRowSheet : styles.chipRow}
       >
         {chipCodes.map((code) => {
           const active = code === selectedLang;
@@ -409,8 +463,13 @@ export default function TrailerSection({ mediaType, id, apiKey, originalLanguage
               onPress={() => handleSelectLang(code)}
               style={[
                 styles.chip,
+                isSheet && styles.chipSheet,
                 {
-                  backgroundColor: active ? theme.accent : theme.secondary,
+                  backgroundColor: active
+                    ? theme.accent
+                    : isSheet
+                      ? theme.between
+                      : theme.secondary,
                   borderColor: active ? theme.accent : theme.border,
                 },
               ]}
@@ -425,17 +484,36 @@ export default function TrailerSection({ mediaType, id, apiKey, originalLanguage
         })}
         <TouchableOpacity
           onPress={() => setSheetVisible(true)}
-          style={[styles.chip, styles.chipMore, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+          style={[
+            styles.chip,
+            styles.chipMore,
+            isSheet && styles.chipSheet,
+            {
+              backgroundColor: isSheet ? theme.between : theme.secondary,
+              borderColor: theme.border,
+            },
+          ]}
         >
           <Ionicons name="globe-outline" size={14} color={theme.text.secondary} />
           <Text style={[styles.chipText, { color: theme.text.secondary }]}>
             {i18nText("autoI18n.diger_diller", "Diğer diller")}
           </Text>
+          {isSheet ? (
+            <Ionicons name="chevron-down" size={13} color={theme.text.muted} />
+          ) : null}
         </TouchableOpacity>
       </ScrollView>
 
       {/* İçerik */}
-      {loading ? (
+      {isSheet ? (
+        <TrailerVideoList
+          videos={videos}
+          loading={loading}
+          theme={theme}
+          onPress={setSelectedVideo}
+          bottomInset={bottomInset}
+        />
+      ) : loading ? (
         <View style={styles.stateBox}>
           <ActivityIndicator size="small" color={theme.accent} />
         </View>
@@ -587,36 +665,48 @@ const styles = StyleSheet.create({
   },
   playerErrorBtnText: { color: "#fff", fontSize: 12.5, fontWeight: "800" },
 
+  // Sayfa yerleşimi (TrailerModal içinde). Kök küçülebilir: sayfa maxHeight'a
+  // dayanınca çipler yerinde kalır, yalnız video listesi kısalıp kayar.
+  sheetSection: { flexShrink: 1 },
+  chipScrollSheet: { flexGrow: 0, flexShrink: 0 },
+  chipRowSheet: { gap: 8, paddingHorizontal: SHEET_GUTTER, paddingBottom: 14 },
+  chipSheet: { height: 34, paddingHorizontal: 14, borderRadius: 17 },
+
   // Dil sayfası
-  sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
   sheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 28,
+    maxHeight: "72%",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
   },
   sheetHandle: {
     alignSelf: "center",
-    width: 40,
+    width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(150,150,150,0.5)",
-    marginBottom: 12,
+    marginTop: 10,
+    marginBottom: 15,
   },
-  sheetTitle: { fontSize: 16, fontWeight: "800", marginBottom: 8 },
+  sheetHeader: { flexDirection: "row", alignItems: "center", gap: 11, marginBottom: 12 },
+  sheetTitleIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetTitle: { flex: 1, fontSize: 17, fontWeight: "800" },
+  sheetList: { gap: 8 },
   sheetRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    minHeight: 52,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   sheetRowText: { fontSize: 15, fontWeight: "600" },
-  sheetRowDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5 },
+  sheetRowDot: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5 },
 });
