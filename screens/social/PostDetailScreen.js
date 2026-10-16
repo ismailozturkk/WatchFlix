@@ -8,7 +8,7 @@
 // Post'u fetchPost ile getirir, beğeni durumunu isPostLiked ile çözer; yorumlar
 // için mevcut PostCommentSheetModal yeniden kullanılır.
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -35,6 +35,9 @@ import { PostCardSkeleton } from "@components/Skeleton";
 import { fetchPost, isPostLiked, toggleLike, votePoll } from "@services/postsService";
 import ScreenDecor from "@components/ScreenDecor";
 import BackButton from "@components/BackButton";
+import GlassIconButton from "@components/common/GlassIconButton";
+import ShareToChatSheet from "@components/chat/ShareToChatSheet";
+import { buildPostShare } from "@utils/chatShare";
 
 // Basit göreli zaman (MyPostsScreen ile aynı kısaltmalar).
 const timeAgo = (ms) => {
@@ -63,6 +66,7 @@ export default function PostDetailScreen({ route, navigation }) {
   const [likesCount, setLikesCount] = useState(0);
   const [commentsVisible, setCommentsVisible] = useState(false);
   const [saveListVisible, setSaveListVisible] = useState(false);
+  const [sendVisible, setSendVisible] = useState(false);
 
   const load = useCallback(async () => {
     if (!postId) {
@@ -157,6 +161,9 @@ export default function PostDetailScreen({ route, navigation }) {
     });
   }, [postId]);
 
+  // Sohbete gönderilecek gövde; özel (takipçilere) gönderide null → düğme çıkmaz.
+  const sendShare = useMemo(() => buildPostShare(post), [post]);
+
   // Rozet + vurgu rengi feed'deki PostCard ile ortak (review/list/text/poll).
   const typeBadge = postTypeBadge(post?.type, theme.colors);
   const accent = typeBadge.color;
@@ -174,8 +181,24 @@ export default function PostDetailScreen({ route, navigation }) {
         <Text style={[styles.headerTitle, { color: theme.text.primary }]}>
           {i18nText("autoI18n.gonderi", "Gönderi")}
         </Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 40 }}>
+          {sendShare ? (
+            <GlassIconButton
+              icon="paper-plane-outline"
+              iconSize={20}
+              size={40}
+              onPress={() => setSendVisible(true)}
+              accessibilityLabel={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+            />
+          ) : null}
+        </View>
       </View>
+
+      <ShareToChatSheet
+        visible={sendVisible}
+        share={sendShare}
+        onClose={() => setSendVisible(false)}
+      />
 
       {loading ? (
         <View style={{ paddingTop: 8 }}>

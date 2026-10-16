@@ -12,6 +12,7 @@
 //   • sessionRuntime         izleme planı oturumlarının toplam süresi
 //   • conversation*          geçmiş ekranı için önizleme, arama, gruplama
 //   • buildShareText / collectLibraryItems   paylaşım ve "hepsini listeye ekle"
+//   • buildChatShare         cevabı sohbet/grup mesajına gömülecek özete çevirir
 //
 // Neden ayrı dosya: ekranda satır içi duran filtre/özet mantığı test edilemiyordu
 // ve her kota harcayan mesaj için doğru çalışması kritik. Burada test edilir.
@@ -26,6 +27,7 @@ import {
 } from "./aiCineService";
 import { foldForSearch } from "../utils/friendsListModel";
 import { copyLanguage, pickByLanguage } from "../utils/appLanguages";
+import { buildAiShare } from "../utils/chatShare";
 
 const clean = (value, max = 80) =>
   toStr(value).replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
@@ -628,6 +630,91 @@ export function buildShareText(response, posterMap, { language = "en", appName =
     es: `${appName} · recomendaciones de CineMatch`,
   });
   return [head, "", ...lines].join("\n");
+}
+
+// ── Sohbete gönder ───────────────────────────────────────────────────────────
+
+const shareNote = (value) => clean(value, 160);
+
+/** Cevaptaki tek başlık → paylaşım öğesi. Bulunduysa TMDB kimliği/posteri taşır. */
+function sharePickOf(item, posterMap) {
+  const mediaType = normMediaType(item?.mediaType);
+  const title = toStr(item?.title).trim();
+  if (!title) return null;
+  const card = (posterMap || {})[posterKey(mediaType, title)];
+  const found = !!card?.found && card.id != null;
+  return {
+    media_type: found ? normMediaType(card.mediaType || mediaType) : mediaType,
+    title: found ? toStr(card.title) || title : title,
+    ...(found
+      ? {
+          id: card.id,
+          poster_path: card.posterPath || undefined,
+          year: card.year ? String(card.year) : undefined,
+          rating: safeNum(card.rating) > 0 ? safeNum(card.rating) : undefined,
+        }
+      : {}),
+    note: shareNote(item?.reason || item?.why || item?.hook || item?.note),
+    must: item?.mustWatch === true,
+  };
+}
+
+/**
+ * CineMatch cevabını arkadaşa/gruba gönderilecek ZENGİN mesaj gövdesine çevirir
+ * (bkz. utils/chatShare.js). `question` kullanıcının o cevabı doğuran sorusu —
+ * alıcı cevabı bağlamıyla okur. Gönderilecek içerik yoksa null.
+ *
+ * Düz metin paylaşımının (`buildShareText`) yerini ALMAZ: sistem paylaşım menüsü
+ * hâlâ onu kullanır; bu, uygulama içi sohbet balonunun verisidir.
+ */
+export function buildChatShare(response, posterMap, { question } = {}) {
+  if (!response || typeof response !== "object") return null;
+  const picksOf = (items) =>
+    safeArr(items).map((item) => sharePickOf(item, posterMap)).filter(Boolean);
+
+  const base = { variant: response.type, question: toStr(question) };
+  switch (response.type) {
+    case "recommendations":
+      return buildAiShare({ ...base, sections: [{ picks: picksOf(response.items) }] });
+    case "comparison":
+      return buildAiShare({
+        ...base,
+        versus: true,
+        summary: toStr(response.verdict),
+        sections: [{ picks: picksOf([response.left, response.right]) }],
+      });
+    case "watch_plan":
+      return buildAiShare({
+        ...base,
+        sections: safeArr(response.sessions).map((session) => ({
+          label: toStr(session?.label),
+          note: toStr(session?.note),
+          picks: picksOf(session?.items),
+        })),
+      });
+    case "watchlist":
+      return buildAiShare({
+        ...base,
+        sections: safeArr(response.sections).map((section) => ({
+          labelKey: toStr(section?.key),
+          label: toStr(section?.name),
+          picks: picksOf(section?.items),
+        })),
+      });
+    case "title_spotlight":
+      return buildAiShare({
+        ...base,
+        summary: toStr(response.take || response.summary),
+        sections: [{ picks: picksOf([response]) }],
+      });
+    default:
+      return buildAiShare({
+        ...base,
+        variant: "general",
+        summary: toStr(response.content || response.summary),
+        sections: [{ picks: picksOf(response.items) }],
+      });
+  }
 }
 
 // ── Geçmiş ekranı ────────────────────────────────────────────────────────────

@@ -40,6 +40,9 @@ import DatePickerModal from "@components/modals/DatePickerModal";
 import ListSearchBar from "@components/lists/ListSearchBar";
 import GlobalSearchResults from "@components/lists/GlobalSearchResults";
 import ListItemActionsSheet from "@components/lists/ListItemActionsSheet";
+import GlassIconButton from "@components/common/GlassIconButton";
+import ShareToChatSheet from "@components/chat/ShareToChatSheet";
+import { buildListShare } from "@utils/chatShare";
 import ListPosterInfoControls from "@components/lists/ListPosterInfoControls";
 import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
 import Feather from "@expo/vector-icons/Feather";
@@ -93,6 +96,7 @@ export default function ListsScreen({ route, navigation }) {
   const { theme } = useTheme();
   const { listName } = route.params;
   const [listItems, setListItems] = useState([]);
+  const [shareVisible, setShareVisible] = useState(false);
   const [listModalItems, setListModalItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState(""); // iki kipte de ORTAK sorgu
   // ── Arama kipi ────────────────────────────────────────────────────────────
@@ -944,6 +948,32 @@ export default function ListsScreen({ route, navigation }) {
     return { watchedCountById: counts, durationTextById: durations };
   }, [listItems, durationLabels]);
 
+  // Başlık: öntanımlı dört liste çevrilmiş ad, özel listede kullanıcının adı.
+  const listTitle =
+    listName == "watchedMovies"
+      ? i18nText("autoI18n.izlenen_filmler", "İzlenen Filmler")
+      : listName == "watchedTv"
+        ? i18nText("autoI18n.izlenen_diziler", "İzlenen Diziler")
+        : listName == "favorites"
+          ? i18nText("autoI18n.favoriler", "Favoriler")
+          : listName == "watchList"
+            ? i18nText("autoI18n.izlenecekler", "İzlenecekler")
+            : listName;
+
+  // Sohbete gönderilecek gövde: TÜM liste (arama/filtre değil), ekranda görülen
+  // sırada. Dizi izlenenlerinde `type` alanı olmayan eski kayıtlar için yedek tür.
+  const shareablePayload = useMemo(
+    () =>
+      buildListShare({
+        title: listTitle,
+        items: listItems,
+        listKey: listName,
+        fallbackType: listName === "watchedTv" ? "tv" : "movie",
+        source: "profile",
+      }),
+    [listTitle, listItems, listName],
+  );
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
@@ -959,18 +989,27 @@ export default function ListsScreen({ route, navigation }) {
           numberOfLines={1}
           style={[styles.header, { color: theme.text.primary }]}
         >
-          {listName == "watchedMovies"
-            ? i18nText("autoI18n.izlenen_filmler", "İzlenen Filmler")
-            : listName == "watchedTv"
-              ? i18nText("autoI18n.izlenen_diziler", "İzlenen Diziler")
-              : listName == "favorites"
-                ? i18nText("autoI18n.favoriler", "Favoriler")
-                : listName == "watchList"
-                  ? i18nText("autoI18n.izlenecekler", "İzlenecekler")
-                  : listName}
+          {listTitle}
         </Text>
-        <View style={styles.headerSide} />
+        <View style={styles.headerSide}>
+          {/* Listeyi sohbete / gruba gönder: alıcı seçilir, ChatScreen listeyi
+              zengin bir balon olarak yazar (utils/chatShare.js). */}
+          {!isLoading && shareablePayload ? (
+            <GlassIconButton
+              icon="paper-plane-outline"
+              iconSize={20}
+              size={40}
+              onPress={() => setShareVisible(true)}
+              accessibilityLabel={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+            />
+          ) : null}
+        </View>
       </View>
+      <ShareToChatSheet
+        visible={shareVisible}
+        share={shareablePayload}
+        onClose={() => setShareVisible(false)}
+      />
 
       {isLoading ? (
         renderSkeleton()

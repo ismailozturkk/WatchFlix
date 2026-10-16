@@ -17,6 +17,9 @@ import Feather from "@expo/vector-icons/Feather";
 import Toast from "react-native-toast-message";
 import * as Haptics from "@services/hapticsService";
 import BackButton from "../../components/BackButton";
+import GlassIconButton from "../../components/common/GlassIconButton";
+import ShareToChatSheet from "../../components/chat/ShareToChatSheet";
+import { buildListShare } from "../../utils/chatShare";
 import PosterImage from "@components/PosterImage";
 import SwitchToggle from "../../components/SwitchToggle";
 import appAlert from "../../components/AppAlert";
@@ -133,6 +136,7 @@ export default function SharedListScreen({ route, navigation }) {
   const [list, setList] = useState(undefined); // undefined=yükleniyor, null=yok/erişim yok
   const [items, setItems] = useState([]);
   const [membersVisible, setMembersVisible] = useState(false);
+  const [shareVisible, setShareVisible] = useState(false);
   const [addMemberVisible, setAddMemberVisible] = useState(false);
   const [queryText, setQueryText] = useState("");
   const [searchMode, setSearchMode] = useState(LIST_SEARCH_MODE.IN_LIST);
@@ -187,6 +191,18 @@ export default function SharedListScreen({ route, navigation }) {
         return (a.addedAt || 0) - (b.addedAt || 0);
       });
   }, [list, uid, avatar]);
+
+  // Sohbete gönderilecek gövde (utils/chatShare.js): listenin o anki hâli.
+  // Ekrandaki filtre/arama değil, TÜM liste; sıra ekrandaki varsayılan sıra.
+  const shareablePayload = useMemo(
+    () =>
+      buildListShare({
+        title: list?.name,
+        items,
+        source: "shared",
+      }),
+    [list?.name, items],
+  );
 
   const availableGenres = useMemo(() => {
     const genres = new Set();
@@ -675,6 +691,18 @@ export default function SharedListScreen({ route, navigation }) {
           </Text>
         </View>
 
+        {/* Listeyi sohbete / gruba gönder */}
+        {shareablePayload ? (
+          <GlassIconButton
+            icon="paper-plane-outline"
+            iconSize={19}
+            size={36}
+            onPress={() => setShareVisible(true)}
+            accessibilityLabel={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+            style={styles.shareBtn}
+          />
+        ) : null}
+
         {/* Üyeler butonu — avatar destesi + sayı */}
         <TouchableOpacity
           activeOpacity={0.8}
@@ -702,6 +730,12 @@ export default function SharedListScreen({ route, navigation }) {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <ShareToChatSheet
+        visible={shareVisible}
+        share={shareablePayload}
+        onClose={() => setShareVisible(false)}
+      />
 
       <ListSearchBar
         theme={theme}
@@ -1406,6 +1440,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginBottom: 2,
   },
+  shareBtn: { marginBottom: 2 },
   avatarStack: { flexDirection: "row", alignItems: "center" },
   membersBtnText: { fontSize: 13, fontWeight: "800" },
 

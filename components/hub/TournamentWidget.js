@@ -28,7 +28,9 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import AppIcon from "@components/AppIcon";
-import HubCard, { GlassPill, HubArrow } from "@components/hub/HubCard";
+import HubCard, { GlassPill, HubArrow, HubSendButton } from "@components/hub/HubCard";
+import ShareToChatSheet from "@components/chat/ShareToChatSheet";
+import { buildTournamentShare } from "@utils/chatShare";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useImageQualitySettings, useLanguageSettings } from "@context/AppSettingsContext";
@@ -397,6 +399,7 @@ export default function TournamentWidget({ navigation }) {
   const [seed, setSeed] = useState(null);     // { finalists, tallies } | null
   const [agg, setAgg] = useState(null);       // { noms, picks, voters } | null
   const [myVote, setMyVote] = useState(null); // kendi oy dokümanım | null
+  const [sendVisible, setSendVisible] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setNowMs(now()), 30000);
@@ -499,7 +502,27 @@ export default function TournamentWidget({ navigation }) {
     ? `${voters} ${i18nText("autoI18n.tournament_widget_voters", "katılımcı")}`
     : null;
 
+  // Sohbete gönderilecek gövde (utils/chatShare.js): ay + faz + (bittiyse) şampiyon
+  // + katılımcı sayısı. Tür/tema adı ve güncel faz alıcının cihazında çözülür.
+  const sendShare = useMemo(() => {
+    const champion = bracketPreview?.championDecided ? bracketPreview.champion : null;
+    return buildTournamentShare({
+      periodId,
+      phase: phaseInfo.phase,
+      champion: champion
+        ? {
+            id: champion.id,
+            title: champion.title,
+            posterPath: champion.posterPath,
+            mediaType: champion.mediaType,
+          }
+        : undefined,
+      voters,
+    });
+  }, [periodId, phaseInfo.phase, bracketPreview, voters]);
+
   return (
+    <>
     <HubCard
       colors={meta.gradient}
       shadowColor={meta.gradient[0]}
@@ -539,6 +562,11 @@ export default function TournamentWidget({ navigation }) {
           size="sm"
           boxColor="rgba(0,0,0,0.24)"
         />
+        <View style={styles.topSpacer} />
+        <HubSendButton
+          onPress={() => setSendVisible(true)}
+          label={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+        />
       </View>
 
       <TournamentTreePreview
@@ -551,6 +579,12 @@ export default function TournamentWidget({ navigation }) {
         myPicks={myPicks}
       />
     </HubCard>
+    <ShareToChatSheet
+      visible={sendVisible && !!sendShare}
+      share={sendShare}
+      onClose={() => setSendVisible(false)}
+    />
+    </>
   );
 }
 

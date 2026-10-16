@@ -32,6 +32,8 @@ import {
 } from "../../context/AppSettingsContext";
 import CreatePostModal from "@components/modals/CreatePostModal";
 import SaveSharedListModal from "@components/modals/SaveSharedListModal";
+import ShareToChatSheet from "@components/chat/ShareToChatSheet";
+import { buildPostShare } from "@utils/chatShare";
 import PostCommentSheetModal from "@components/modals/PostCommentSheetModal";
 import StaggerItem from "@components/StaggerItem";
 import BackButton from "@components/BackButton";
@@ -177,6 +179,12 @@ export default function ShareContentScreen({ route }) {
   // "Listeyi kaydet" sayfası kart başına değil ekran başına: 30 kartın her
   // biri kendi modalını taşısaydı gereksiz ağaç kurulurdu.
   const [saveListPost, setSaveListPost] = useState(null);
+  // "Sohbete gönder": seçilen gönderinin paylaşım gövdesi (alıcı sayfası açıkken dolu).
+  const [sendShare, setSendShare] = useState(null);
+  const handleSendPost = useCallback((post) => {
+    const share = buildPostShare(post);
+    if (share) setSendShare(share);
+  }, []);
   const consumedComposeKey = useRef(null);
 
   useEffect(() => {
@@ -412,12 +420,13 @@ export default function ShareContentScreen({ route }) {
           onReport={handleReportPost}
           onVote={votePoll}
           onSaveList={setSaveListPost}
+          onSend={handleSendPost}
           getTmdbUrl={getTmdbUrl}
           postListPosterLayout={postListPosterLayout}
         />
       </StaggerItem>
     ),
-    [theme, ts, user?.uid, avatar, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleReportPost, votePoll, getTmdbUrl, postListPosterLayout],
+    [theme, ts, user?.uid, avatar, toggleLike, toggleBookmark, handleOpenComments, handleOpenProfile, handleEditRequest, deletePost, handleReportPost, votePoll, handleSendPost, getTmdbUrl, postListPosterLayout],
   );
 
   const listFooter = useMemo(() => {
@@ -494,6 +503,12 @@ export default function ShareContentScreen({ route }) {
           onClose={handleCloseComments}
         />
       </Modal>
+
+      <ShareToChatSheet
+        visible={sendShare != null}
+        share={sendShare}
+        onClose={() => setSendShare(null)}
+      />
 
       <SaveSharedListModal
         visible={saveListPost != null}

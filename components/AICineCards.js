@@ -743,6 +743,9 @@ const ErrorBubble = memo(({ text, retry, upsell, onRetry, onUpgrade, theme, t })
  * Mesajı role/type'a göre doğru bileşene yönlendirir.
  * msg: { id, role, text?, display?, attachment?, aiResponse?, posterMap?, notes?, status?, retry? }
  *
+ * `onShareToChat(msg)` verilirse cevabın altında "Sohbete gönder" düğmesi çıkar
+ * (zengin balon olarak arkadaşa/gruba; AI hakkı harcamaz).
+ *
  * `baseCtx` ekran düzeyindeki ortak bağlam (tema, dil, tıklama işleyicisi…);
  * mesajın kendi posterMap'i burada eklenir. `isLast` yalnız son cevapta devam
  * çiplerini ve "yeniden öner"i açar.
@@ -758,6 +761,7 @@ export const ChatBubble = memo(
     onUpgrade,
     onFollowUp,
     onRegenerate,
+    onShareToChat,
   }) => {
     const ctx = useMemo(() => ({ ...baseCtx, posterMap: msg.posterMap }), [baseCtx, msg.posterMap]);
     const { theme, t, getTmdbUrl, onTitlePress } = baseCtx;
@@ -805,6 +809,7 @@ export const ChatBubble = memo(
             showBulk={data.type !== "title_spotlight"}
             onFollowUp={onFollowUp}
             onRegenerate={isLast ? onRegenerate : undefined}
+            onShare={onShareToChat ? () => onShareToChat(msg) : undefined}
           />
         </View>
       </Reanimated.View>

@@ -18,6 +18,7 @@ import Animated, {
 import AppIcon from "../AppIcon";
 import PressableScale from "./PressableScale";
 import { alpha } from "../../theme/colors";
+import { i18nText } from "../../utils/i18nText";
 
 function PulseRing({ color, delay }) {
   const progress = useSharedValue(0);
@@ -41,8 +42,18 @@ function PulseRing({ color, delay }) {
 /**
  * @param {string} roomCode
  * @param {string} summary  "20 kart · Popüler & Trendler"
+ * @param {() => void} [onSendToChat]  Verilirse kodu sohbette davet kartı olarak göndermek için düğme çıkar.
  */
-export default function CineWaitingRoom({ roomCode, summary, onCopy, onShare, onCancel, copy, colors }) {
+export default function CineWaitingRoom({
+  roomCode,
+  summary,
+  onCopy,
+  onShare,
+  onSendToChat,
+  onCancel,
+  copy,
+  colors,
+}) {
   const digits = String(roomCode || "").split("");
 
   return (
@@ -97,6 +108,20 @@ export default function CineWaitingRoom({ roomCode, summary, onCopy, onShare, on
         </PressableScale>
       </View>
 
+      {onSendToChat ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+          onPress={onSendToChat}
+          style={[styles.chatInvite, { backgroundColor: alpha(colors.accent, 0.12), borderColor: alpha(colors.accent, 0.5) }]}
+        >
+          <AppIcon family="Ionicons" name="paper-plane-outline" size={18} color={colors.accent} />
+          <Text style={[styles.chatInviteText, { color: colors.accent }]}>
+            {i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+          </Text>
+        </PressableScale>
+      ) : null}
+
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={copy.waiting.cancel}
@@ -111,6 +136,18 @@ export default function CineWaitingRoom({ roomCode, summary, onCopy, onShare, on
 }
 
 const styles = StyleSheet.create({
+  chatInvite: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 48,
+    marginTop: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  chatInviteText: { fontSize: 14.5, fontWeight: "800" },
   scroll: {
     flex: 1,
     alignSelf: "stretch",

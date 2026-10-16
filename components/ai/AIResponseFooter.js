@@ -2,7 +2,8 @@
 //
 // Bir CineMatch cevabının altındaki şerit:
 //   • notlar        filtre/kısaltma raporu ("2 öneri filtrene uymadığı için elendi")
-//   • toplu eylemler  hepsini izleme listesine ekle · paylaş (hak HARCAMAZ)
+//   • toplu eylemler  hepsini izleme listesine ekle · paylaş · sohbete gönder
+//                     (hiçbiri AI hakkı HARCAMAZ)
 //   • devam çipleri   türe göre sıradaki adım + "yeniden öner" (her biri bir AI
 //                     mesajıdır; yalnız son cevapta çizilir)
 
@@ -14,7 +15,12 @@ import { alpha } from "../../theme/colors";
 import { useAuth } from "../../context/AuthContext";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import { addManyToMembership } from "../../services/libraryActions";
-import { buildFollowUps, buildShareText, collectLibraryItems } from "../../services/aiCineInsights";
+import {
+  buildChatShare,
+  buildFollowUps,
+  buildShareText,
+  collectLibraryItems,
+} from "../../services/aiCineInsights";
 import { libraryErrorMessage } from "../../utils/libraryErrorText";
 import { todayListDate } from "../../utils/mediaFacts";
 import { fillCopy } from "../../utils/aiCopy";
@@ -33,7 +39,7 @@ function useWatchlistState(items) {
   }, [items, statusIndex]);
 }
 
-function BulkActions({ response, ctx }) {
+function BulkActions({ response, ctx, showAdd, onShare }) {
   const { theme, copy, posterMap, language } = ctx;
   const { user } = useAuth();
   const items = useMemo(() => collectLibraryItems(response, posterMap), [response, posterMap]);
@@ -86,19 +92,30 @@ function BulkActions({ response, ctx }) {
     Share.share({ message }).catch(() => {});
   }, [language, posterMap, response]);
 
-  if (items.length === 0) return null;
+  // Sohbete gönder: uygulama içi zengin balon (utils/chatShare.js). Gönderilecek
+  // bir şey yoksa (boş genel cevap) düğme hiç çıkmaz.
+  const canSend = useMemo(
+    () => typeof onShare === "function" && buildChatShare(response, posterMap) !== null,
+    [onShare, response, posterMap],
+  );
+  // Ekleme ve sistem paylaşımı yalnız bulunmuş başlık varken ve cevap türü
+  // izin veriyorsa (yapım detayında toplu ekleme anlamsız).
+  const canAdd = showAdd && items.length > 0;
+  const canShare = canAdd;
+
+  if (!canAdd && !canSend) return null;
 
   const allIn = pending.length === 0;
   const tint = allIn ? theme.colors.green : theme.accent;
 
   return (
     <View style={s.bulkWrap}>
-      <View style={s.bulkRow}>
+      {canAdd && (
         <TouchableOpacity
           activeOpacity={0.8}
           disabled={busy || allIn}
           onPress={addAll}
-          style={[s.bulkBtn, { backgroundColor: alpha(tint, 0.14), borderColor: alpha(tint, 0.5), flex: 1 }]}
+          style={[s.bulkBtn, { backgroundColor: alpha(tint, 0.14), borderColor: alpha(tint, 0.5) }]}
         >
           <Ionicons name={allIn ? "checkmark-done" : "bookmarks-outline"} size={14} color={tint} />
           <Text style={[s.bulkText, { color: tint }]} numberOfLines={1}>
@@ -109,16 +126,41 @@ function BulkActions({ response, ctx }) {
                 : fillCopy(copy.actions.addAll, { n: pending.length })}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={share}
-          accessibilityLabel={copy.actions.share}
-          style={[s.bulkBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-        >
-          <Ionicons name="share-outline" size={15} color={theme.text.secondary} />
-          <Text style={[s.bulkText, { color: theme.text.secondary }]}>{copy.actions.share}</Text>
-        </TouchableOpacity>
-      </View>
+      )}
+      {(canShare || canSend) && (
+        <View style={[s.bulkRow, canAdd && s.bulkRowGap]}>
+          {canShare && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={share}
+              accessibilityLabel={copy.actions.share}
+              style={[s.bulkBtn, s.bulkHalf, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+            >
+              <Ionicons name="share-outline" size={15} color={theme.text.secondary} />
+              <Text style={[s.bulkText, { color: theme.text.secondary }]} numberOfLines={1}>
+                {copy.actions.share}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {canSend && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={onShare}
+              accessibilityLabel={copy.actions.sendToChat}
+              style={[
+                s.bulkBtn,
+                s.bulkHalf,
+                { backgroundColor: alpha(theme.accent, 0.14), borderColor: alpha(theme.accent, 0.5) },
+              ]}
+            >
+              <Ionicons name="paper-plane-outline" size={15} color={theme.accent} />
+              <Text style={[s.bulkText, { color: theme.accent }]} numberOfLines={1}>
+                {copy.actions.sendToChat}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
       {!!feedback.text && (
         <Text style={[s.feedback, { color: feedback.error ? theme.colors.red : theme.colors.green }]}>
           {feedback.text}
@@ -206,13 +248,14 @@ function AIResponseFooter({
   showFollowUps,
   onFollowUp,
   onRegenerate,
+  onShare,
   showBulk = true,
 }) {
   const hasFollowUps = isLast && showFollowUps && buildFollowUps(response, { limit: 1 }).length > 0;
   return (
     <View>
       <Notes notes={notes} ctx={ctx} />
-      {showBulk && <BulkActions response={response} ctx={ctx} />}
+      <BulkActions response={response} ctx={ctx} showAdd={showBulk} onShare={onShare} />
       {isLast && (hasFollowUps || onRegenerate) ? (
         <FollowUps
           response={response}
@@ -235,6 +278,8 @@ const s = StyleSheet.create({
 
   bulkWrap: { marginTop: 8 },
   bulkRow: { flexDirection: "row", gap: 8 },
+  bulkRowGap: { marginTop: 8 },
+  bulkHalf: { flex: 1 },
   bulkBtn: {
     flexDirection: "row",
     alignItems: "center",

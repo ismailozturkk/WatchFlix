@@ -55,6 +55,8 @@ import {
   summarizeCineRoom,
 } from "../../services/cineswipe/cineswipeService";
 import { persistCineResults } from "../../services/cineswipe/cineResultsStore";
+import ShareToChatSheet from "../../components/chat/ShareToChatSheet";
+import { buildCineRoomShare } from "../../utils/chatShare";
 import {
   basketListName,
   extractRoomCode,
@@ -81,7 +83,12 @@ export default function CineSwipeScreen({ route, navigation }) {
   const resultText = t.cineRoomResults;
   const joinText = t.cineRoomJoin;
 
-  const [mode, setMode] = useState(route?.params?.initialMode === "duo" ? "duo" : "solo");
+  // Sohbetteki CineSwipe davetinden gelindiyse (utils/chatShare.shareRoute) oda
+  // kodu kutuya HAZIR yazılır; katılmak için "Katıl"a basmak alıcıya kalır.
+  const inviteCode = extractRoomCode(route?.params?.inviteCode || "");
+  const [mode, setMode] = useState(
+    route?.params?.initialMode === "duo" || inviteCode ? "duo" : "solo",
+  );
 
   // ── Solo ───────────────────────────────────────────────────────────────────
   const solo = useCineSoloDeck({ enabled: mode === "solo", language, userId: uid });
@@ -100,7 +107,7 @@ export default function CineSwipeScreen({ route, navigation }) {
   const [roomMeta, setRoomMeta] = useState(null);
   const [roomDeck, setRoomDeck] = useState([]);
   const [roomIndex, setRoomIndex] = useState(0);
-  const [inputCode, setInputCode] = useState("");
+  const [inputCode, setInputCode] = useState(inviteCode);
   const [partnerName, setPartnerName] = useState(null);
   const [currentRoomData, setCurrentRoomData] = useState(null);
   const [allMatches, setAllMatches] = useState([]);
@@ -600,6 +607,17 @@ export default function CineSwipeScreen({ route, navigation }) {
     }
   };
 
+  // Bekleme odasındaki kodu arkadaşa/gruba sohbette davet kartı olarak gönder.
+  const [inviteShare, setInviteShare] = useState(null);
+  const handleSendInvite = () => {
+    const share = buildCineRoomShare({
+      code: roomCode,
+      host: user?.displayName || "",
+      count: roomMeta?.count,
+    });
+    if (share) setInviteShare(share);
+  };
+
   const handleShareCode = async () => {
     try {
       await Share.share({ message: fillText(copy.room.shareMessage, { code: roomCode }) });
@@ -957,6 +975,7 @@ export default function CineSwipeScreen({ route, navigation }) {
           summary={waitingSummary}
           onCopy={handleCopyCode}
           onShare={handleShareCode}
+          onSendToChat={handleSendInvite}
           onCancel={handleCancelRoom}
           copy={copy}
           colors={colors}
@@ -1155,6 +1174,12 @@ export default function CineSwipeScreen({ route, navigation }) {
         onViewDetails={openDetails}
         onAddToWatchlist={addOneToWatchlist}
         onReroll={!matchIsWinner && soloState.basket.length > 1 ? handleReroll : undefined}
+      />
+
+      <ShareToChatSheet
+        visible={inviteShare != null}
+        share={inviteShare}
+        onClose={() => setInviteShare(null)}
       />
     </SafeAreaView>
   );

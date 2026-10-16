@@ -10,9 +10,11 @@
 //                 (içindeki parçalar kendi basma davranışını taşır).
 //   • GlassPill — ikon + metinli yarı saydam çip (rozet, sayaç, durum).
 //   • HubArrow  — beyaz yuvarlak "aç" düğmesi; ok rengi kartın rengidir.
+//   • HubSendButton — cam yuvarlak "sohbete gönder" düğmesi; kartın içinde kendi
+//                 basmasını taşır (kartın geri kalanı hâlâ kartı açar).
 
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import { PressableScale } from "@components/game/ui";
@@ -79,6 +81,25 @@ export function HubArrow({ color, size = 36 }) {
   );
 }
 
+/** Cam yuvarlak "sohbete gönder" düğmesi; basış kartın kendi basışına geçmez. */
+export function HubSendButton({ onPress, size = 36, label }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        styles.send,
+        { width: size, height: size, borderRadius: size / 2 },
+        pressed && styles.sendPressed,
+      ]}
+    >
+      <AppIcon family="Ionicons" name="paper-plane-outline" size={Math.round(size * 0.5)} color="#FFFFFF" />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   shadow: {
     borderRadius: 26,
@@ -124,6 +145,15 @@ const styles = StyleSheet.create({
   pillLight: { backgroundColor: "rgba(255,255,255,0.18)", borderColor: "rgba(255,255,255,0.26)" },
   pillDark: { backgroundColor: "rgba(0,0,0,0.24)", borderColor: "rgba(255,255,255,0.14)" },
   pillText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "900", letterSpacing: 0.6, flexShrink: 1 },
+
+  send: {
+    backgroundColor: "rgba(255,255,255,0.20)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.30)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendPressed: { backgroundColor: "rgba(255,255,255,0.34)" },
 
   arrow: {
     backgroundColor: "#FFFFFF",

@@ -410,6 +410,7 @@ const FeedPostCard = memo(function FeedPostCard({
   onReport,
   onVote,
   onSaveList,
+  onSend,
   getTmdbUrl,
   postListPosterLayout,
 }) {
@@ -903,6 +904,23 @@ const FeedPostCard = memo(function FeedPostCard({
                 <Text style={[st.saveListText, { color: accentColor }]} numberOfLines={1}>
                   {i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
                 </Text>
+              </Pressable>
+            )}
+            {/* Sohbete gönder: gönderiyi arkadaşa/gruba zengin kart olarak yollar
+                (utils/chatShare.js). Yalnız herkese açık gönderide — "takipçilere
+                özel" içeriği sohbete gömmek yetkisiz kişilere sızdırırdı. */}
+            {onSend && (post.visibility || "public") === "public" && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+                style={[
+                  st.pill,
+                  st.iconPill,
+                  { backgroundColor: theme.primary, borderColor: theme.border },
+                ]}
+                onPress={() => onSend(post)}
+              >
+                <AppIcon family="Ionicons" name="paper-plane-outline" size={17} color={theme.text.secondary} />
               </Pressable>
             )}
             {/* Kaydet: kaydedildiyse dolu + accent (Feather'da dolu varyant yok) */}

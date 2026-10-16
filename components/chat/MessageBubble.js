@@ -1,16 +1,19 @@
 // components/chat/MessageBubble.js
 //
-// Sohbet/grup mesaj balonu (screens/chat/ChatScreen.js'ten ayrıldı). Dört gövde
-// türü: düz metin, tekli medya kartı, çoklu içerik listesi, anket. Şekil/renk
+// Sohbet/grup mesaj balonu (screens/chat/ChatScreen.js'ten ayrıldı). Gövde
+// türleri: düz metin, tekli medya kartı, çoklu içerik listesi, anket ve sohbete
+// gönderilen liste / CineMatch cevabı / Hub gönderisi / turnuva / CineSwipe daveti
+// (utils/chatShare.js). Şekil/renk
 // kararları utils/chatBubbleStyle.js'te, giriş (sekme) animasyonu BounceIn'de.
 
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import UserAvatar from "../common/UserAvatar";
 import { memberColor } from "@services/groupsService";
 import { i18nText } from "@utils/i18nText";
+import { readShare, shareRoute } from "@utils/chatShare";
 import { countEmojiClusters, isEmojiOnly } from "@utils/emojiText";
 import {
   bubbleRadii,
@@ -20,8 +23,13 @@ import {
 import BounceIn from "./BounceIn";
 import MessageReplyPreview from "./MessageReplyPreview";
 import PollMessage from "./PollMessage";
+import SharedAiMessage from "./SharedAiMessage";
+import SharedCineRoomMessage from "./SharedCineRoomMessage";
+import SharedListMessage from "./SharedListMessage";
 import SharedMediaCollection from "./SharedMediaCollection";
 import SharedMediaMessage from "./SharedMediaMessage";
+import SharedPostMessage from "./SharedPostMessage";
+import SharedTournamentMessage from "./SharedTournamentMessage";
 import SwipeReplyContainer from "./SwipeReplyContainer";
 
 const ACCENT = "#6C63FF";
@@ -29,7 +37,7 @@ const SEEN_COLOR = "#5EE8A0";
 
 
 // Bir media öğesini (tekli veya koleksiyon içindeki) detay ekranına yönlendir.
-const openMediaDetail = (navigation, m) => {
+export const openMediaDetail = (navigation, m) => {
   if (!m) return;
   const route =
     m.media_type === "movie"
@@ -39,6 +47,12 @@ const openMediaDetail = (navigation, m) => {
         : "ActorViewScreen";
   const params = m.media_type === "person" ? { personId: m.id } : { id: m.id };
   navigation.push(route, params);
+};
+
+// Hedefi olan paylaşımlar (gönderi, turnuva, CineSwipe daveti) kendi ekranına gider.
+const openShareTarget = (navigation, share) => {
+  const route = shareRoute(share);
+  if (route) navigation.push(route.name, route.params);
 };
 
 const formatClock = (ts) => {
@@ -73,6 +87,8 @@ const MessageBubble = memo(
     avatars,
     memberInfo,
     onVote,
+    onSaveList,
+    onOpenList,
     onReply,
     onJumpToMessage,
     highlighted,
@@ -81,7 +97,9 @@ const MessageBubble = memo(
     const isMe = item.senderId === currentUser.uid;
     const hasItems = Array.isArray(item.items) && item.items.length > 0;
     const hasPoll = item.kind === "poll" && !!item.poll;
-    const isRich = !!item.media || hasItems || hasPoll;
+    // Sohbete gönderilen liste / CineMatch cevabı; bozuk kayıt null → düz metne düşer.
+    const share = useMemo(() => readShare(item), [item.kind, item.share]);
+    const isRich = !!item.media || hasItems || hasPoll || !!share;
     const bodyText = typeof item.text === "string" ? item.text : "";
     // 1–3 emoji (yanıt alıntısı yoksa): balon yok, büyük emoji.
     const emojiOnly = !isRich && !item.replyTo && isEmojiOnly(bodyText);
@@ -242,6 +260,45 @@ const MessageBubble = memo(
               theme={theme}
               isOutgoing={isMe}
               onVote={(optionId) => onVote?.(item, optionId)}
+            />
+          ) : share?.type === "list" ? (
+            <SharedListMessage
+              share={share}
+              accent={theme?.accent ?? ACCENT}
+              getTmdbUrl={getTmdbUrl}
+              isOutgoing={isMe}
+              onOpenItem={(it) => openMediaDetail(navigation, it)}
+              onOpenList={onOpenList ? () => onOpenList(item, share) : undefined}
+              onSave={onSaveList ? () => onSaveList(item, share) : undefined}
+            />
+          ) : share?.type === "ai" ? (
+            <SharedAiMessage
+              share={share}
+              accent={theme?.accent ?? ACCENT}
+              getTmdbUrl={getTmdbUrl}
+              isOutgoing={isMe}
+              onOpenItem={(it) => openMediaDetail(navigation, it)}
+            />
+          ) : share?.type === "post" ? (
+            <SharedPostMessage
+              share={share}
+              getTmdbUrl={getTmdbUrl}
+              isOutgoing={isMe}
+              onOpenPost={() => openShareTarget(navigation, share)}
+              onOpenItem={(it) => openMediaDetail(navigation, it)}
+            />
+          ) : share?.type === "tournament" ? (
+            <SharedTournamentMessage
+              share={share}
+              getTmdbUrl={getTmdbUrl}
+              isOutgoing={isMe}
+              onOpen={() => openShareTarget(navigation, share)}
+            />
+          ) : share?.type === "cineRoom" ? (
+            <SharedCineRoomMessage
+              share={share}
+              isOutgoing={isMe}
+              onOpen={() => openShareTarget(navigation, share)}
             />
           ) : hasItems ? (
             <SharedMediaCollection

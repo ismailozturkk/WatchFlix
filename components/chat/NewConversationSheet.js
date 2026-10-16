@@ -30,6 +30,7 @@ export default function NewConversationSheet({
   visible,
   onClose,
   onSelect,
+  onDismissed,
   includeGroups = false,
   title,
   subtitle,
@@ -81,6 +82,7 @@ export default function NewConversationSheet({
     <BottomSheetModal
       visible={visible}
       onClose={close}
+      onDismissed={onDismissed}
       dimColor="rgba(0,0,0,0.42)"
       sheetStyle={[
         styles.sheet,

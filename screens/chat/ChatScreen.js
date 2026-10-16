@@ -110,7 +110,8 @@ import GlassIconButton from "@components/common/GlassIconButton";
 import { i18nText } from "@utils/i18nText";
 import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
-import MessageBubble from "@components/chat/MessageBubble";
+import MessageBubble, { openMediaDetail } from "@components/chat/MessageBubble";
+import SharedListSheet from "@components/chat/SharedListSheet";
 import ChatHeader, { CHAT_HEADER_AVATAR_SIZE } from "@components/chat/ChatHeader";
 import BounceIn from "@components/chat/BounceIn";
 import useReduceMotion from "../../hooks/useReduceMotion";
@@ -126,6 +127,8 @@ import GroupInfoModal from "@components/chat/GroupInfoModal";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import ComposerReplyBar from "@components/chat/ComposerReplyBar";
 import { buildReplySnapshot } from "@utils/chatReply";
+import { buildShareMessage, readShare, sharePreview } from "@utils/chatShare";
+import SaveSharedListModal from "@components/modals/SaveSharedListModal";
 import { groupUnreadCount, groupUnreadIncrements } from "@utils/friendsListModel";
 import PinnedMessagesModal from "@components/chat/PinnedMessagesModal";
 import ReportReasonSheet from "@components/moderation/ReportReasonSheet";
@@ -244,6 +247,8 @@ const messagePreview = (message) => {
   if (message.kind === "poll") {
     return `📊 ${message.poll?.question || message.text || i18nText("autoI18n.anket", "Anket")}`;
   }
+  const share = readShare(message);
+  if (share) return sharePreview(share);
   if (Array.isArray(message.items) && message.items.length > 0) {
     return message.listTitle || i18nText("autoI18n.n_icerik", "{{n}} içerik", { n: message.items.length });
   }
@@ -367,6 +372,8 @@ export default function ChatScreen({ route, navigation }) {
     groupAvatarIndex,
     initialMedia,
     initialMediaKey,
+    initialShare,
+    initialShareKey,
   } = route.params;
   const isGroup = !!groupId;
   const auth = getAuth();
@@ -505,6 +512,18 @@ export default function ChatScreen({ route, navigation }) {
 
   const latestButtonVisibleRef = useRef(false);
   const handledInitialMediaRef = useRef(null);
+  const handledInitialShareRef = useRef(null);
+  // Alıcının "Listeyi kaydet"i: görünürlük ile liste ayrı tutulur ki kapanış
+  // animasyonu sürerken sayfa içeriği (ad, afişler) boşalmasın.
+  const [saveListPost, setSaveListPost] = useState(null);
+  const [saveListVisible, setSaveListVisible] = useState(false);
+  // Balondaki yığın karta basınca açılan tam liste sayfası. Görünürlük ile liste
+  // ayrı: kapanış animasyonu sürerken sayfa içeriği boşalmasın. Sayfadaki
+  // "Listeyi kaydet" kayıt modalını AÇMAZ, ref'e yazar; kayıt modalı sayfa
+  // tamamen kalkınca açılır (iOS iki Modal'ı üst üste sunamaz).
+  const [listSheet, setListSheet] = useState(null);
+  const [listSheetVisible, setListSheetVisible] = useState(false);
+  const pendingSavePostRef = useRef(null);
   const { theme } = useTheme();
 
   const handleMessageListScroll = useCallback((event) => {
@@ -1772,6 +1791,7 @@ export default function ChatScreen({ route, navigation }) {
     selectedMessage?.senderId === currentUser.uid &&
       !selectedMessage?.media &&
       !selectedMessage?.items &&
+      !selectedMessage?.share &&
       selectedMessage?.kind !== "poll",
   );
   const canDeleteSelected = Boolean(
@@ -1891,6 +1911,8 @@ export default function ChatScreen({ route, navigation }) {
           avatars={avatars}
           memberInfo={groupData?.memberInfo}
           onVote={handleVote}
+          onSaveList={openSaveList}
+          onOpenList={openListSheet}
           onReply={beginReply}
           onJumpToMessage={jumpToMessage}
           highlighted={highlightedMessageId === item.id}
@@ -1916,6 +1938,8 @@ export default function ChatScreen({ route, navigation }) {
       avatars,
       groupData?.memberInfo,
       handleVote,
+      openSaveList,
+      openListSheet,
       beginReply,
       jumpToMessage,
       highlightedMessageId,
@@ -2127,6 +2151,107 @@ export default function ChatScreen({ route, navigation }) {
     navigation,
     senderFields,
   ]);
+
+  // "Sohbete gönder" ile gelen liste / CineMatch cevabı (utils/chatShare.js):
+  // initialMedia ile AYNI kalıp — ekran açılınca mesajı kendisi gönderir,
+  // parametreyi temizler, anahtar çift gönderimi önler. Grup üyeleri yüklenmeden
+  // gönderilmez (aksi halde mesaj gider ama diğer üyelere bildirim oluşmaz).
+  useEffect(() => {
+    if (!initialShare || !initialShareKey) return;
+    if (handledInitialShareRef.current === initialShareKey) return;
+    if (isGroup && !groupData) return;
+
+    handledInitialShareRef.current = initialShareKey;
+    navigation.setParams({ initialShare: undefined, initialShareKey: undefined });
+
+    const fields = buildShareMessage(initialShare);
+    if (!fields) {
+      toast.warning(
+        i18nText("autoI18n.paylas_icerik_yok", "Paylaşılacak içerik yok"),
+      );
+      return;
+    }
+
+    const sendInitialShare = async () => {
+      try {
+        await postMessage(
+          {
+            ...fields,
+            senderId: currentUser.uid,
+            timestamp: serverTimestamp(),
+            status: "sent",
+            ...senderFields(),
+          },
+          fields.text,
+        );
+      } catch (error) {
+        console.error("shareToChatSend:", error);
+        appAlert(
+          i18nText("autoI18n.hata", "Hata"),
+          i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."),
+        );
+      }
+    };
+
+    sendInitialShare();
+  }, [
+    currentUser.uid,
+    postMessage,
+    groupData,
+    initialShare,
+    initialShareKey,
+    isGroup,
+    navigation,
+    senderFields,
+  ]);
+
+  // Alıcı bir liste paylaşımını kendi profiline kaydetmek istedi: kayıt modalı
+  // zaten "paylaşım gönderisi" şeklini (id, başlık, mediaList) okuyor.
+  const savePostOf = useCallback(
+    (message, share) => ({
+      id: message?.id,
+      title: share?.title || "",
+      mediaList: share?.items || [],
+    }),
+    [],
+  );
+  const openSaveList = useCallback(
+    (message, share) => {
+      if (!share?.items?.length) return;
+      setSaveListPost(savePostOf(message, share));
+      setSaveListVisible(true);
+    },
+    [savePostOf],
+  );
+
+  const openListSheet = useCallback((message, share) => {
+    if (!share?.items?.length) return;
+    setListSheet({ message, share });
+    setListSheetVisible(true);
+  }, []);
+  const closeListSheet = useCallback(() => setListSheetVisible(false), []);
+  // Sayfada bir afişe basıldı: sayfa kapanır ve detay açılır (arkadaş profilindeki
+  // liste sayfasıyla aynı akış).
+  const openListSheetItem = useCallback(
+    (item) => {
+      if (!item?.id) return;
+      setListSheetVisible(false);
+      openMediaDetail(navigation, item);
+    },
+    [navigation],
+  );
+  const saveFromListSheet = useCallback(() => {
+    if (!listSheet) return;
+    pendingSavePostRef.current = savePostOf(listSheet.message, listSheet.share);
+    setListSheetVisible(false);
+  }, [listSheet, savePostOf]);
+  const handleListSheetDismissed = useCallback(() => {
+    const post = pendingSavePostRef.current;
+    pendingSavePostRef.current = null;
+    if (!post) return;
+    setSaveListPost(post);
+    setSaveListVisible(true);
+  }, []);
 
   const resolvedFriendName = friendIdentity.displayName || friendName || "";
   const resolvedFriendAvatarIndex =
@@ -3340,10 +3465,9 @@ export default function ChatScreen({ route, navigation }) {
 
         <TrailerModal
           visible={!!trailerMedia}
-          mediaType={trailerMedia?.media_type}
-          id={trailerMedia?.id}
+          media={trailerMedia}
           apiKey={API_KEY}
-          originalLanguage={trailerMedia?.original_language}
+          getTmdbUrl={getTmdbUrl}
           onClose={() => setTrailerMedia(null)}
         />
 
@@ -3352,6 +3476,24 @@ export default function ChatScreen({ route, navigation }) {
           onClose={closeTextPollModal}
           onCreate={sendTextPoll}
           keyboardAvoidanceStyle={modalKeyboardStyle}
+        />
+
+        <SharedListSheet
+          visible={listSheetVisible}
+          share={listSheet?.share}
+          getTmdbUrl={getTmdbUrl}
+          onClose={closeListSheet}
+          onDismissed={handleListSheetDismissed}
+          onOpenItem={openListSheetItem}
+          onSave={
+            listSheet?.message?.senderId !== currentUser.uid ? saveFromListSheet : undefined
+          }
+        />
+
+        <SaveSharedListModal
+          visible={saveListVisible}
+          post={saveListPost}
+          onClose={() => setSaveListVisible(false)}
         />
 
         {isGroup && (
