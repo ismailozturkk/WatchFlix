@@ -9,7 +9,10 @@ her `expo prebuild`'de (yerel + EAS bulut) bu dosyaları üretilen projeye enjek
   (plugin bunu MainApplication'a kaydeder).
 - **res/xml/** — appwidget-provider tanımları (boyutlar, önizleme, 30 dk update peryodu)
 - **res/layout/**, **res/drawable/** — widget arayüzleri ve önizlemeleri
-- **res/values/widget_strings.xml** — manifest label + açıklama string'leri
+- **res/values/widget_strings.xml** — manifest label + açıklama string'leri (Türkçe, varsayılan).
+  **res/values-en/**, **res/values-es/** aynı anahtarların çevirisi: SİSTEM diline göre seçilir
+  (widget galerisi adı/açıklaması, layout yer tutucuları); widget'ın gerçek içeriği uygulama dilini
+  `WidgetLanguage.kt` ile izler. Yeni dil = yeni `values-xx/` (anahtar kümesi aynı; test denetler)
 
 JS tarafı: [services/widgetBridge.js](../../services/widgetBridge.js) →
 `NativeModules.{Reminder,Lists,Stats}WidgetModule`; veri `SharedPreferences`

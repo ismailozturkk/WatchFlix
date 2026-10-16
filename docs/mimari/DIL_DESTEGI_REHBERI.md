@@ -144,10 +144,12 @@ Bölüm 5, 6. JS paketlerinden bağımsız; ayrı deploy/derleme ister.
 | JS → native yük | `services/reminderWidgetService.js`, `statsWidgetService.js`, `listsWidgetService.js`, `widgetBridge.js` | Yük JS'te kurulur (`pickByLanguage`), `language` kodu da native'e geçer (`UserDefaults` App Group anahtarı `"language"` / Android `SharedPreferences`) |
 | **Android sabit metinler** | `native/android-widgets/java/com/smlztrk/seelogd/widget/WidgetLanguage.kt` (+ `ReminderWidgetProvider.kt`, `ReminderWidgetRemoteViewsService.kt`, `ListsWidgetProvider.kt`, `StatsWidgetProvider.kt`) | `WidgetLanguage.of(raw)` → `"tr"/"es"` ya da `"en"` (bilinmeyen → İngilizce, **kayıt yoksa `"tr"`**); metin `WidgetLanguage.pick(lang, tr, en, es)`; tarih `WidgetLanguage.locale(lang)`. Config eklentisi (`plugins/withAndroidWidgets.js`) `java/` klasörünü **bütün olarak** kopyalar — yeni `.kt` için eklenti değişmez |
 | **iOS sabit metinler** | `targets/reminder-widget/shared.swift` (`widgetSupportedLanguages`, `widgetLanguage()`, `widgetPick(lang, tr:, en:, es:)`), `index.swift`, `lists-widget.swift`, `stats-widget.swift` | Aynı yapı. `stats-widget.swift` sabit metin taşımaz (başlık/etiket JS yükünden gelir). Eski `isTurkish` kalıbı kalktı |
-| Widget **adları** (sistem seçicisi) | iOS `.configurationDisplayName("Seelogd Yaklaşanlar")` (Swift'te sabit Türkçe); Android `native/android-widgets/res/values/widget_strings.xml` (yalnız `values/`, Türkçe) | **Uygulama dilini değil**, sabit Türkçe; `values-en/`, `values-es/` yok. **Yapılmadı** — İngilizce için de yoktu. Yerelleştirmek için Android `values-xx/`, iOS `Localizable.strings`/`LocalizedStringResource` gerekir (sistem diline göre çalışır, uygulama diline değil) |
+| Widget **adları/açıklamaları** (sistem seçicisi) | **iOS:** `targets/reminder-widget/{tr,en,es}.lproj/Localizable.strings` + Swift'te `.configurationDisplayName(LocalizedStringKey("English text"))` / `.description(LocalizedStringKey(…))` (3 widget x 2 = 6 anahtar; **anahtar = İngilizce metin**). **Android:** `native/android-widgets/res/values/widget_strings.xml` (Türkçe, VARSAYILAN) + `values-en/`, `values-es/` `widget_strings.xml` (25 string; manifest `@string/*_widget_name`, appwidget `description`, layout yer tutucu metinleri) | **SİSTEM dilini** izler — widget'ın İÇ metni ise uygulama dilini (`WidgetLanguage`/`widgetPick`). Aynı cihazda sistem İngilizce + uygulama Türkçe olabilir; tutarsızlık değil, iki ayrı kaynak. **iOS:** tanımsız sistem dili İngilizceye düşer (anahtar zaten İngilizce). **Android:** Türkçe dışındaki her kayıtlı dilin `values-xx/` klasörü zorunlu; **tanımsız sistem dili (ör. Almanca) Türkçe varsayılana düşer** — "bilinmeyen → İngilizce" kuralının TEK istisnası (bkz. Durum, açık 4) |
 | Uygulama içi önizleme | `IosPreviews.js`, `AndroidPreviews.js`, `widgetSamples.js` | Gerçek widget'ın birebir çizimi; metinler native ile **aynı** olmalı. `isTr = language !== "en"` kalıbı kalktı |
 | Native değişikliği | Kotlin/Swift | **Yeni native build şart** (EAS). OTA yetmez. Eski build'de İspanyolca widget metni İngilizce görünür (`isTurkish` ikilisinde `es` → İngilizce) |
 | Koruma | `__tests__/widgetNativeLanguage.test.js` | Kotlin `SUPPORTED` ve Swift `widgetSupportedLanguages` kayıtla aynı mı, `pick`/`widgetPick` her dili taşıyor mu, `isTurkish` geri girdi mi |
+
+**Yeni dil için widget ADLARI**: Android `res/values-xx/widget_strings.xml` (varsayılandaki tüm anahtarlar, kaçışsız `'` yok); iOS `targets/reminder-widget/xx.lproj/Localizable.strings` (anahtarlar İngilizce metin). Eklenti `res/` klasörünü bütün olarak kopyalar; apple-targets `.lproj` klasörünü senkronize grup olarak alır — ikisi için de config değişmez. `widgetNativeLanguage.test.js` eksik klasörü/anahtarı yakalar.
 
 **Yeni dil için native**: `WidgetLanguage.kt` `SUPPORTED`'e kod + `pick(...)` imzasına ve `when`'e kol +
 `locale()`; her `WidgetLanguage.pick(...)` çağrısına yeni parametre (şu an 4 dosya, 11 çağrı). Swift'te
@@ -182,7 +184,8 @@ Android `WidgetLanguage.of`), `Keys.language` varsayılanı `"tr"`.
 | `__tests__/deviceLanguage.test.js` | Cihaz dili → uygulama dili (tr/en/es/yedek) |
 | `__tests__/copyTablesSpanish.test.js` | `BACKUP_COPY`, `STUDIO_COPY`, `AI_COPY`, `ONBOARDING_COPY`, `FAVORITES_COPY`, `getWrappedStrings` — üç dilde aynı anahtar/yer tutucu/işlev parametre sayısı; pozitif kontrol; bilinmeyen dil İngilizce |
 | `__tests__/{aiCopy,favoritesCopy,onboardingCopy}.test.js` | Tek tek tablo davranışları (ES kolları dahil) |
-| `__tests__/widgetNativeLanguage.test.js` | Native widget dil listeleri kayıtla aynı (bölüm 6) |
+| `__tests__/widgetNativeLanguage.test.js` | Native widget dil listeleri kayıtla aynı (bölüm 6); widget **adları**: her kayıtlı dilin Android `values-xx/` ve iOS `xx.lproj/Localizable.strings` dosyası var, anahtar kümeleri eşit, çevrilmemiş kopya/kaçışsız `'`/Swift'te sabit ad geri girmesi yok |
+| `__tests__/nativePermissionLocales.test.js` | Sistem izin metinleri: `expo.locales` her kayıtlı dili kapsar, `native/locales/*.json` anahtar kümeleri eşit ve Expo yazıcısını bozacak karakter yok, her `…Permission` seçeneği eşlenmiş (yeni izin = çeviri kararı), Info.plist yedeği İngilizce, `CFBundleLocalizations` = kayıtlı diller |
 | `__tests__/settingsBackup.test.js` | Kayıtlı her dil kodu yedekten geri yüklenir; geçersiz dil (`"fr"`) reddedilir |
 | `__tests__/premiumFeatures.test.js` | İspanyolca hücre/uyarı metinleri, bilinmeyen dil İngilizce, karşılaştırma tablosu üç dilde aynı satırlar |
 | `__tests__/trailerLanguages.test.js`, `tmdbTitleFallback.test.js` | Fragman sırası, TMDB başlık düşüşü |
@@ -221,8 +224,9 @@ Kod ADI = ISO 639-1 (`"xx"`). Aşağıda `xx` yerine onu koy. İspanyolca bu lis
 **Native**
 10. Widget (bölüm 6): Kotlin `WidgetLanguage.kt` + 4 sağlayıcı, Swift `shared.swift` + `index.swift` + `lists-widget.swift`,
     widget önizlemeleri (`IosPreviews.js`, `AndroidPreviews.js`, `widgetSamples.js`) → **yeni EAS native build**.
-11. `app.json` izin metinleri (`photosPermission`, `calendarPermission` Türkçe sabit) ve `expo.locales` /
-    `CFBundleLocalizations`: yerelleştirme **yapılmadı** (bkz. Durum).
+11. Sistem izin metinleri (iOS `NS*UsageDescription`): `native/locales/xx.json` (yalnız `"ios"` anahtarı; 5 anahtar, `$(PRODUCT_NAME)` KULLANMA — `.strings`te çözülmez, "Seelogd" yaz) +
+    `app.json` `expo.locales.xx` + `ios.infoPlist.CFBundleLocalizations`'a kod. `app.json` içindeki `photosPermission`/`calendarPermission` metinleri **yedek**tir ve İngilizce kalmalı
+    (en.json ile birebir). Widget adları: bölüm 6. Android'in izin iletişim kutusu sistem metnidir, yapılacak bir şey yok. Bekçi: `nativePermissionLocales.test.js`.
 
 **Dışarısı**
 12. Mağaza: `store/play/xx-XX/` metinleri + ekran görüntüleri (şu an `en-US`, `tr-TR`).
@@ -267,7 +271,7 @@ Windows/Bash notu: `node -e` içinde `\n`/`\` bozuluyor → betik dosyası kulla
 
 ## Durum (2026-10-16, İspanyolca çalışmasının sonu)
 
-**Yapıldı** (otomatik doğrulama: tam jest 206 paket / 3.620 test yeşil; değişen 179 dosyada babel sözdizimi
+**Yapıldı** (otomatik doğrulama: tam jest 206 paket / 3.620 test yeşil (widget adı + izin yerelleştirmesi sonrası, 16 Eki: 210 paket / 3.688 test); değişen 179 dosyada babel sözdizimi
 temiz; tanımsız-değişken taramasında tek bulgu `plugins/withAndroidWidgets.js` `__dirname` = CommonJS yanlış alarm;
 `node --check functions/index.js` temiz):
 
@@ -283,6 +287,8 @@ temiz; tanımsız-değişken taramasında tek bulgu `plugins/withAndroidWidgets.
 | Cloud Functions `STRINGS`/`STREAM_STRINGS`/`pickNotificationLang` | Kodda tamam, **deploy EDİLMEDİ** |
 | Android widget (Kotlin `WidgetLanguage`) | Kodda tamam, **derlenmedi / native build şart** |
 | iOS widget (Swift `widgetPick`) | Kodda tamam, **derlenmedi (Windows)** / EAS build şart |
+| Widget **adları/açıklamaları** (Android `values-en/`+`values-es/`, iOS `{tr,en,es}.lproj/Localizable.strings`) | Kodda tamam (16 Eki); Kotlin/Swift/aapt **derlenmedi**; iOS'ta `.lproj`'ın widget hedefine girdiği EAS çıktısında doğrulanmalı |
+| Sistem izin metinleri (`expo.locales` + `native/locales/{tr,en,es}.json`, `CFBundleLocalizations`) | Kodda tamam (16 Eki); `expo prebuild` / native build ile **doğrulanmadı** |
 | Widget önizleme, takvim, tarih seçici, Wrapped, rozetler, Premium, turnuva, oyunlar, auth, onboarding | Tamam |
 
 **Bilinen açıklar / yapılmayanlar**
@@ -292,9 +298,12 @@ temiz; tanımsız-değişken taramasında tek bulgu `plugins/withAndroidWidgets.
 2. **Functions deploy** edilmezse İspanyolca kullanıcı push bildirimini **İngilizce** alır (`es` sunucuda tanınmıyor).
    Yeni `notificationLanguage: "es"` yazımı eski sunucuda `"en"`e düşer; zararsız.
 3. **Native build** olmadan widget'ın sabit metinleri (başlık, "Hoy/Mañana", "Película/Serie") İngilizce kalır.
-4. Widget **adları** (iOS `configurationDisplayName`, Android `widget_strings.xml`) uygulama diline bağlı değil, sabit Türkçe.
-5. `app.json` izin metinleri (`photosPermission`, `calendarPermission`) Türkçe sabit; `expo.locales` /
-   `CFBundleLocalizations` tanımlı değil → sistem izin iletişim kutuları İspanyolca kullanıcıda Türkçe.
+4. ~~Widget **adları** sabit Türkçe~~ **Kodda KAPANDI (16 Eki):** Android `values-en/`, `values-es/`; iOS `LocalizedStringKey` + `*.lproj/Localizable.strings` (bölüm 6). Kalanlar:
+    (a) **Android varsayılan `values/` hâlâ Türkçe** (bilinçli: mevcut davranış korundu) → sistem dili tanımsız (ör. Almanca) ise widget adı Türkçe görünür; "bilinmeyen → İngilizce" kuralına uymak için `values/`'i İngilizceye çevirip Türkçeyi `values-tr/`'ye taşı
+    (1 dosya taşıma + `widgetNativeLanguage.test.js` içindeki `ANDROID_VARSAYILAN_DIL`); (b) derlenmedi, cihazda sistem dili tr/en/es yapılıp widget galerisinde görülmedi.
+5. ~~`app.json` izin metinleri Türkçe sabit~~ **Kodda KAPANDI (16 Eki):** `expo.locales` → `tr/en/es.lproj/InfoPlist.strings` (5 anahtar: Photo Library, Photo Library Add, Calendars, Calendars Full Access, Face ID), `app.json` yedek metinleri İngilizce, `CFBundleLocalizations` [en,tr,es]. Kalanlar:
+    (a) prebuild/native build ile doğrulanmadı (Windows); (b) `.lproj`lar eklendi diye iOS sistem arayüzü (İptal/Tamam vb.) artık tr/en/es cihaz dilini izler ve Ayarlar > Seelogd'da "Dil" seçici (uygulama başına dil) çıkar — yan etki, istenmiyorsa `locales`+`CFBundleLocalizations` geri alınır;
+    (c) `NSFaceIDUsageDescription` yerelleştirildi ama uygulama biyometri kullanmıyor (yalnız expo-secure-store varsayılanı); (d) Android izin diyaloğu sistem metnidir, yapılacak yok; Expo `locales` Android için boş `values-b+xx/strings.xml` üretir (zararsız).
 6. `store/play/es-ES/` yok (Play mağaza sayfası); App Store metni de ayrıca gerekir.
 7. Web yasal sayfaları yalnız `tr`/`en` → İspanyolca kullanıcı İngilizce sayfayı görür.
 8. `SharedListsContext.js:68`, `utils/listSearch.js:239` `localeCompare(…, "tr")` — İspanyolca sıralamada `ñ`/aksan farkı.

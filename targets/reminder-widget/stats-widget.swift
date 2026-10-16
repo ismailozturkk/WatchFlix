@@ -565,8 +565,8 @@ struct StatsWidget: Widget {
     StaticConfiguration(kind: kind, provider: StatsProvider()) { entry in
       StatsWidgetEntryView(entry: entry)
     }
-    .configurationDisplayName("Seelogd İstatistikler")
-    .description("İzleme istatistiklerini ana ekranda gösterir.")
+    .configurationDisplayName(LocalizedStringKey("Seelogd Statistics"))
+    .description(LocalizedStringKey("Shows your watching statistics on the home screen."))
     .supportedFamilies([.systemMedium, .systemLarge])
   }
 }

@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "Allow the app to save the story image you create to your photo library.",
+    "NSPhotoLibraryAddUsageDescription": "Allow the app to save the story image you create to your photo library.",
+    "NSCalendarsUsageDescription": "Allow access to your calendar so movie, series and note reminders can be added to your phone's calendar and removed from it.",
+    "NSCalendarsFullAccessUsageDescription": "Allow access to your calendar so movie, series and note reminders can be added to your phone's calendar and removed from it.",
+    "NSFaceIDUsageDescription": "Allow Seelogd to access your Face ID biometric data."
+  }
+}

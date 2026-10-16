@@ -7,6 +7,11 @@
     "icon": "./assets/icon_default/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "seelogd",
+    "locales": {
+      "en": "./native/locales/en.json",
+      "tr": "./native/locales/tr.json",
+      "es": "./native/locales/es.json"
+    },
     "ios": {
       "bundleIdentifier": "com.smlztrk.seelogd",
       "appleTeamId": "KN77DDXC9U",
@@ -14,7 +19,12 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleLocalizations": [
+          "en",
+          "tr",
+          "es"
+        ]
       },
       "entitlements": {
         "com.apple.security.application-groups": [
@@ -77,8 +87,8 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "Uygulamanın oluşturduğun story görselini galerine kaydetmesine izin ver.",
-          "savePhotosPermission": "Uygulamanın oluşturduğun story görselini galerine kaydetmesine izin ver.",
+          "photosPermission": "Allow the app to save the story image you create to your photo library.",
+          "savePhotosPermission": "Allow the app to save the story image you create to your photo library.",
           "isAccessMediaLocationEnabled": false,
           "granularPermissions": [
             "photo"
@@ -117,7 +127,7 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "Film, dizi ve not hatırlatmalarını telefonunun takvimine eklemek ve oradan kaldırmak için takvimine erişmeye izin ver.",
+          "calendarPermission": "Allow access to your calendar so movie, series and note reminders can be added to your phone's calendar and removed from it.",
           "remindersPermission": false
         }
       ],

@@ -260,8 +260,8 @@ struct ListsWidget: Widget {
     StaticConfiguration(kind: kind, provider: ListsProvider()) { entry in
       ListsWidgetEntryView(entry: entry)
     }
-    .configurationDisplayName("Seelogd Listelerim")
-    .description("Listelerini ve içerik sayılarını ana ekranda gösterir.")
+    .configurationDisplayName(LocalizedStringKey("Seelogd My Lists"))
+    .description(LocalizedStringKey("Shows your lists and how many items they hold on the home screen."))
     .supportedFamilies([.systemMedium, .systemLarge])
   }
 }

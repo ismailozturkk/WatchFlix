@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "Uygulamanın oluşturduğun story görselini galerine kaydetmesine izin ver.",
+    "NSPhotoLibraryAddUsageDescription": "Uygulamanın oluşturduğun story görselini galerine kaydetmesine izin ver.",
+    "NSCalendarsUsageDescription": "Film, dizi ve not hatırlatmalarını telefonunun takvimine eklemek ve oradan kaldırmak için takvimine erişmeye izin ver.",
+    "NSCalendarsFullAccessUsageDescription": "Film, dizi ve not hatırlatmalarını telefonunun takvimine eklemek ve oradan kaldırmak için takvimine erişmeye izin ver.",
+    "NSFaceIDUsageDescription": "Seelogd'un Face ID biyometrik verilerine erişmesine izin ver."
+  }
+}

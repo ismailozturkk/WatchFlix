@@ -319,7 +319,7 @@ private struct ReminderWidgetEntryView: View {
   }
 }
 
-// MARK: - Widget
+// MARK: - Widget (galeri adı/açıklaması SİSTEM diline göre: <dil>.lproj/Localizable.strings, anahtar = İngilizce metin)
 
 struct ReminderWidget: Widget {
   let kind = "ReminderWidget"
@@ -328,8 +328,8 @@ struct ReminderWidget: Widget {
     StaticConfiguration(kind: kind, provider: ReminderProvider()) { entry in
       ReminderWidgetEntryView(entry: entry)
     }
-    .configurationDisplayName("Seelogd Yaklaşanlar")
-    .description("Yaklaşan film ve dizi bölümlerini gösterir.")
+    .configurationDisplayName(LocalizedStringKey("Seelogd Coming Up"))
+    .description(LocalizedStringKey("Shows upcoming movies and TV episodes."))
     .supportedFamilies([.systemMedium, .systemLarge])
   }
 }

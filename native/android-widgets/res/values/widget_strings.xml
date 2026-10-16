@@ -3,7 +3,10 @@
      android/app/src/main/res/values/ altına kopyalar; Android, values
      altındaki tüm dosyaları otomatik birleştirdiği için stok strings.xml'e
      dokunmak gerekmez. Manifest receiver label'ları (@string/*_widget_name)
-     ve appwidget info description'ları buradaki tanımlara başvurur. -->
+     ve appwidget info description'ları buradaki tanımlara başvurur.
+     Bu klasör VARSAYILAN (Türkçe). İngilizce/İspanyolca karşılıkları values-en/ ve values-es/
+     altında, AYNI anahtar kümesiyle yaşar ve SİSTEM diline göre seçilir; yeni string eklerken
+     üçüne birden ekle (__tests__/widgetNativeLanguage.test.js anahtar eşitliğini denetler). -->
 <resources>
   <string name="reminder_widget_name">Seelogd Yaklaşanlar</string>
   <string name="reminder_widget_description">Yaklaşan film ve dizi bölümlerini gösterir</string>

@@ -1,0 +1,35 @@
+<!-- Textos de los widgets de la pantalla de inicio de Seelogd — ESPAÑOL (values-es/).
+     Android elige esta carpeta según el idioma del SISTEMA (no el de la app), así que solo
+     afecta al nombre/descripción en el selector de widgets, a la etiqueta del manifiesto y al
+     texto provisional de los layouts antes de la primera actualización. El contenido real del
+     widget sigue el idioma de la app mediante WidgetLanguage.kt. La carpeta values/ por
+     defecto sigue en turco.
+     El conjunto de claves DEBE coincidir con values/widget_strings.xml (lo vigila
+     __tests__/widgetNativeLanguage.test.js). Evita los apóstrofos (exigen escape \'). -->
+<resources>
+  <string name="reminder_widget_name">Seelogd Próximos</string>
+  <string name="reminder_widget_description">Muestra las próximas películas y episodios de series</string>
+  <string name="reminder_widget_preview_title">Próximos</string>
+  <string name="reminder_widget_preview_count">0 recordatorios</string>
+  <string name="reminder_widget_empty">No hay películas ni episodios próximos</string>
+  <string name="reminder_widget_more">+0 más</string>
+  <string name="lists_widget_name">Seelogd Mis listas</string>
+  <string name="lists_widget_description">Muestra los pósteres de tus listas en una cuadrícula</string>
+  <string name="lists_widget_preview_title">Favoritos</string>
+  <string name="lists_widget_preview_position">1/4</string>
+  <string name="lists_widget_empty">Esta lista aún está vacía</string>
+  <string name="lists_widget_prev">Lista anterior</string>
+  <string name="lists_widget_next">Lista siguiente</string>
+  <string name="stats_widget_name">Seelogd Estadísticas</string>
+  <string name="stats_widget_description">Muestra tus estadísticas de visualización en la pantalla de inicio</string>
+  <string name="stats_widget_preview_title">Estadísticas</string>
+  <string name="stats_widget_preview_total">Duración total</string>
+  <string name="stats_widget_preview_movies">Películas</string>
+  <string name="stats_widget_preview_shows">Series</string>
+  <string name="stats_widget_preview_episodes">Episodios</string>
+  <string name="stats_widget_preview_years">Años</string>
+  <string name="stats_widget_preview_months">Meses</string>
+  <string name="stats_widget_preview_days">Días</string>
+  <string name="stats_widget_preview_hours">Horas</string>
+  <string name="stats_widget_preview_minutes">Minutos</string>
+</resources>

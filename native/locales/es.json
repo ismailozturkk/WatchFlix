@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "Permite que la app guarde en tu galería la imagen de historia que crees.",
+    "NSPhotoLibraryAddUsageDescription": "Permite que la app guarde en tu galería la imagen de historia que crees.",
+    "NSCalendarsUsageDescription": "Permite acceder a tu calendario para agregar los recordatorios de películas, series y notas al calendario del teléfono y eliminarlos de él.",
+    "NSCalendarsFullAccessUsageDescription": "Permite acceder a tu calendario para agregar los recordatorios de películas, series y notas al calendario del teléfono y eliminarlos de él.",
+    "NSFaceIDUsageDescription": "Permite que Seelogd acceda a los datos biométricos de Face ID."
+  }
+}
