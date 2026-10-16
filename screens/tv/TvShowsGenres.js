@@ -236,14 +236,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 20,
     marginRight: 5,
+    // Küçük çip (≈37 px) için hafif gölge. Eskisi afiş gölgesinden kopyaydı
+    // (opaklık 0.94, yarıçap 10, 8 px aşağı): çiplerin arasına siyah leke düşüyor,
+    // yatay liste de gölgeyi çip yüksekliğinde kesip alt kenarı sert bırakıyordu.
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.16,
+    shadowRadius: 4,
+    elevation: 2,
   },
   genreText: {
     color: "white",
