@@ -23,6 +23,9 @@ const {
   updateDoc,
   deleteDoc,
   getDoc,
+  getDocs,
+  query,
+  where,
   deleteField,
   runTransaction,
   serverTimestamp,
@@ -936,5 +939,134 @@ describe("grup okunmamis sayaci", () => {
 
   test("gerileme: son mesaj silinince ozet alani temizlenebilir (syncThreadPreview)", async () => {
     await assertSucceeds(updateDoc(groupRef(bob), { lastMessage: deleteField() }));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Uygulama içi geri bildirim: hata bildirimi Premium+, özellik isteği yalnız Max
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Feedback (geri bildirim kutusu)", () => {
+  // alice = Premium, bob = Premium Max, carol = Free (entitlements yok).
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "Users", ALICE), {
+        entitlements: { premium: true, premiumUnlimited: false, premiumPlan: "premium" },
+      });
+      await setDoc(doc(db, "Users", BOB), {
+        entitlements: { premium: true, premiumUnlimited: true, premiumPlan: "unlimited" },
+      });
+      await setDoc(doc(db, "Users", CAROL), { displayName: "carol" });
+    });
+  });
+
+  const hata = (uid, extra = {}) => ({
+    uid,
+    kind: "bug",
+    category: "crash",
+    severity: "annoying",
+    title: "Liste ekrani aciliyor kapaniyor",
+    message: "Listelerim ekranina girince uygulama kendiliginden kapaniyor.",
+    status: "open",
+    language: "tr",
+    appVersion: "1.4.8",
+    platform: "ios",
+    osVersion: "26.0",
+    deviceModel: "iPhone 16",
+    createdAt: serverTimestamp(),
+    ...extra,
+  });
+  const istek = (uid, extra = {}) => ({
+    uid,
+    kind: "feature",
+    category: "lists",
+    title: "Listeleri siralayabilmek",
+    message: "Ozel listelerimi surukleyerek siralayabilmek istiyorum.",
+    status: "open",
+    language: "tr",
+    createdAt: serverTimestamp(),
+    ...extra,
+  });
+  const yaz = (db, data) => addDoc(collection(db, "Feedback"), data);
+
+  test("Premium hata bildirimi yazabilir", async () => {
+    await assertSucceeds(yaz(alice, hata(ALICE)));
+  });
+
+  test("Premium Max hem hata hem ozellik istegi yazabilir", async () => {
+    await assertSucceeds(yaz(bob, hata(BOB)));
+    await assertSucceeds(yaz(bob, istek(BOB)));
+  });
+
+  test("Premium ozellik istegi YAZAMAZ (yalniz Max)", async () => {
+    await assertFails(yaz(alice, istek(ALICE)));
+  });
+
+  test("Free hicbirini yazamaz", async () => {
+    await assertFails(yaz(carol, hata(CAROL)));
+    await assertFails(yaz(carol, istek(CAROL)));
+  });
+
+  test("cihaz bilgisi olmadan da yazilir", async () => {
+    const { appVersion, platform, osVersion, deviceModel, ...yalin } = hata(ALICE);
+    await assertSucceeds(yaz(alice, yalin));
+  });
+
+  test("BASKASININ adina yazilamaz", async () => {
+    await assertFails(yaz(alice, hata(BOB)));
+  });
+
+  test("durum yalnizca open olabilir; sunucu zamani sart", async () => {
+    await assertFails(yaz(alice, hata(ALICE, { status: "done" })));
+    await assertFails(yaz(alice, hata(ALICE, { createdAt: new Date() })));
+  });
+
+  test("fazladan alan, bilinmeyen kategori ve yanlis tur reddedilir", async () => {
+    await assertFails(yaz(alice, hata(ALICE, { reply: "x" })));
+    await assertFails(yaz(alice, hata(ALICE, { category: "design" })));
+    await assertFails(yaz(bob, istek(BOB, { category: "crash" })));
+    await assertFails(yaz(alice, hata(ALICE, { kind: "post" })));
+    await assertFails(yaz(alice, hata(ALICE, { severity: "apocalypse" })));
+    await assertFails(yaz(bob, istek(BOB, { severity: "minor" })));
+  });
+
+  test("ozellik isteginde cihaz bilgisi serbest", async () => {
+    await assertSucceeds(yaz(bob, istek(BOB, { appVersion: "1.4.8" })));
+  });
+
+  test("uzunluk sinirlari: kisa baslik/mesaj ve asiri uzun metin reddedilir", async () => {
+    await assertFails(yaz(alice, hata(ALICE, { title: "ab" })));
+    await assertFails(yaz(alice, hata(ALICE, { message: "kisa" })));
+    await assertFails(yaz(alice, hata(ALICE, { title: "a".repeat(81) })));
+    await assertFails(yaz(alice, hata(ALICE, { message: "a".repeat(1001) })));
+    await assertFails(yaz(alice, hata(ALICE, { deviceModel: "a".repeat(41) })));
+    await assertSucceeds(yaz(alice, hata(ALICE, { title: "a".repeat(80), message: "a".repeat(1000) })));
+  });
+
+  test("sahibi kendi kayitlarini listeler; baskasininkini okuyamaz", async () => {
+    let id;
+    await seed(async (db) => {
+      const ref = await addDoc(collection(db, "Feedback"), { ...hata(ALICE), createdAt: new Date() });
+      id = ref.id;
+    });
+    await assertSucceeds(getDoc(doc(alice, "Feedback", id)));
+    await assertFails(getDoc(doc(bob, "Feedback", id)));
+    await assertSucceeds(
+      getDocs(query(collection(alice, "Feedback"), where("uid", "==", ALICE))),
+    );
+    // uid suzgeci olmayan sorgu (herkesin kaydini ceker) reddedilir.
+    await assertFails(getDocs(collection(alice, "Feedback")));
+    await assertFails(
+      getDocs(query(collection(bob, "Feedback"), where("uid", "==", ALICE))),
+    );
+  });
+
+  test("kayit guncellenemez ve silinemez (durum/yanit konsoldan degisir)", async () => {
+    let id;
+    await seed(async (db) => {
+      const ref = await addDoc(collection(db, "Feedback"), { ...hata(ALICE), createdAt: new Date() });
+      id = ref.id;
+    });
+    await assertFails(updateDoc(doc(alice, "Feedback", id), { status: "done" }));
+    await assertFails(deleteDoc(doc(alice, "Feedback", id)));
   });
 });

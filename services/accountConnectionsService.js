@@ -9,6 +9,7 @@ import {
   unlink,
 } from "firebase/auth";
 import { auth } from "../firebase";
+import { legacyFlagToLanguage, pickByLanguage } from "../utils/appLanguages";
 
 export const AccountConnectionCode = {
   NO_SESSION: "account-connection/no-session",
@@ -59,47 +60,63 @@ const ERROR_TEXT = {
   [AccountConnectionCode.NO_SESSION]: {
     tr: "Oturum bulunamadı. Lütfen tekrar giriş yap.",
     en: "No active session. Please sign in again.",
+    es: "No hay ninguna sesión activa. Inicia sesión de nuevo.",
   },
   [AccountConnectionCode.NO_EMAIL]: {
     tr: "Bu hesapta parola bağlanabilecek bir e-posta adresi yok.",
     en: "This account has no email address that can be linked to a password.",
+    es: "Esta cuenta no tiene ningún correo electrónico al que se pueda vincular una contraseña.",
   },
   [AccountConnectionCode.PASSWORD_MISMATCH]: {
     tr: "Girdiğin parolalar eşleşmiyor.",
     en: "The passwords do not match.",
+    es: "Las contraseñas no coinciden.",
   },
   [AccountConnectionCode.WEAK_PASSWORD]: {
     tr: "Parolan en az 6 karakter olmalı.",
     en: "Your password must be at least 6 characters.",
+    es: "Tu contraseña debe tener al menos 6 caracteres.",
   },
   [AccountConnectionCode.ALREADY_LINKED]: {
     tr: "E-posta ve parola girişi bu hesapta zaten etkin.",
     en: "Email and password sign-in is already active on this account.",
+    es: "El inicio de sesión con correo y contraseña ya está activo en esta cuenta.",
   },
   [AccountConnectionCode.EMAIL_IN_USE]: {
     tr: "Bu e-posta başka bir giriş kaydı tarafından kullanılıyor.",
     en: "This email is already used by another sign-in record.",
+    es: "Este correo ya lo usa otro registro de inicio de sesión.",
   },
   [AccountConnectionCode.REQUIRES_RECENT_LOGIN]: {
     tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra yeniden dene.",
     en: "For security, sign out and sign in again before retrying.",
+    es: "Por seguridad, cierra sesión y vuelve a iniciarla antes de reintentarlo.",
   },
   [AccountConnectionCode.LAST_PROVIDER]: {
     tr: "Hesabındaki tek giriş yöntemi kaldırılamaz.",
     en: "The only sign-in method on your account cannot be removed.",
+    es: "El único método de inicio de sesión de tu cuenta no se puede quitar.",
   },
   [AccountConnectionCode.NETWORK]: {
     tr: "İnternet bağlantısı kurulamadı. Bağlantını kontrol et.",
     en: "Could not reach the network. Check your connection.",
+    es: "No se pudo conectar a la red. Revisa tu conexión.",
   },
 };
 
-export function describeAccountConnectionError(error, tr = true) {
+/**
+ * @param {boolean|string} language  Eski çağrılar `true` (Türkçe) / `false` (İngilizce)
+ *   geçiyordu; artık uygulama dili ("tr" | "en" | "es") da verilebilir.
+ */
+export function describeAccountConnectionError(error, language = "tr") {
+  const code = legacyFlagToLanguage(language);
   const entry = ERROR_TEXT[error?.code];
-  if (entry) return tr ? entry.tr : entry.en;
-  return tr
-    ? "İşlem tamamlanamadı. Lütfen tekrar dene."
-    : "The action could not be completed. Please try again.";
+  if (entry) return entry[code] ?? entry.en;
+  return pickByLanguage(code, {
+    tr: "İşlem tamamlanamadı. Lütfen tekrar dene.",
+    en: "The action could not be completed. Please try again.",
+    es: "No se pudo completar la acción. Inténtalo de nuevo.",
+  });
 }
 
 export async function addPasswordSignIn({ password, confirmation }) {

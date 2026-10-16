@@ -50,7 +50,7 @@ class StatsWidgetProvider : AppWidgetProvider() {
       widgetId: Int,
     ) {
       val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      val isTurkish = (prefs.getString(KEY_LANGUAGE, "tr") ?: "tr").startsWith("tr")
+      val lang = WidgetLanguage.of(prefs.getString(KEY_LANGUAGE, "tr"))
       val stats = parse(prefs.getString(KEY_STATS, "") ?: "")
       val preferences = WidgetPreferences.load(context)
       val appearance = preferences.statsAppearance
@@ -98,7 +98,7 @@ class StatsWidgetProvider : AppWidgetProvider() {
       views.setTextViewText(
         R.id.stats_widget_title,
         stats?.optString("title")?.takeIf { it.isNotBlank() }
-          ?: if (isTurkish) "İstatistikler" else "Statistics",
+          ?: WidgetLanguage.pick(lang, "İstatistikler", "Statistics", "Estadísticas"),
       )
       views.setTextColor(R.id.stats_widget_title, appearance.text)
 

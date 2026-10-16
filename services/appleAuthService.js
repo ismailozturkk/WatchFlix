@@ -22,6 +22,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db, fns } from "../firebase";
 import { Keys, get, remove, set } from "./storage";
 import { isGoogleProfileComplete } from "./googleAuthService";
+import { legacyFlagToLanguage, pickByLanguage } from "../utils/appLanguages";
 
 export const APPLE_PROVIDER_ID = "apple.com";
 
@@ -111,59 +112,78 @@ const ERROR_TEXT = {
   [AppleAuthCode.UNAVAILABLE]: {
     tr: "Apple ile giriş bu cihazda kullanılamıyor.",
     en: "Sign in with Apple is unavailable on this device.",
+    es: "Iniciar sesión con Apple no está disponible en este dispositivo.",
   },
   [AppleAuthCode.ACCOUNT_REQUIRES_LINK]: {
     tr: "Bu e-posta ile zaten bir Seelogd hesabı var. Önce mevcut yönteminle giriş yap, ardından Ayarlar > Hesap bağlantıları bölümünden Apple'ı bağla.",
     en: "A Seelogd account already uses this email. Sign in with the existing method, then connect Apple from Settings > Account connections.",
+    es: "Ya existe una cuenta de Seelogd con este correo. Inicia sesión con tu método actual y después vincula Apple desde Ajustes > Cuentas vinculadas.",
   },
   [AppleAuthCode.ALREADY_LINKED_ELSEWHERE]: {
     tr: "Bu Apple hesabı başka bir Seelogd hesabına bağlı.",
     en: "This Apple account is linked to another Seelogd account.",
+    es: "Esta cuenta de Apple está vinculada a otra cuenta de Seelogd.",
   },
   [AppleAuthCode.ALREADY_LINKED_HERE]: {
     tr: "Apple hesabın zaten bağlı.",
     en: "Your Apple account is already connected.",
+    es: "Tu cuenta de Apple ya está vinculada.",
   },
   [AppleAuthCode.WRONG_ACCOUNT]: {
     tr: "Oturumu açtığın Apple hesabını seç.",
     en: "Choose the Apple account used for this session.",
+    es: "Elige la cuenta de Apple que usaste para esta sesión.",
   },
   [AppleAuthCode.REQUIRES_RECENT_LOGIN]: {
     tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra dene.",
     en: "For security, sign out and sign in again, then retry.",
+    es: "Por seguridad, cierra sesión, vuelve a iniciarla e inténtalo de nuevo.",
   },
   [AppleAuthCode.LAST_PROVIDER]: {
     tr: "Apple şu anda tek giriş yöntemin, kaldırılamaz.",
     en: "Apple is your only sign-in method and cannot be removed.",
+    es: "Apple es ahora tu único método de inicio de sesión y no se puede quitar.",
   },
   [AppleAuthCode.NETWORK]: {
     tr: "İnternet bağlantısı kurulamadı. Bağlantını kontrol et.",
     en: "Could not reach the network. Check your connection.",
+    es: "No se pudo conectar a la red. Revisa tu conexión.",
   },
   [AppleAuthCode.NO_ID_TOKEN]: {
     tr: "Apple kimliğini doğrulayamadı. Lütfen tekrar dene.",
     en: "Apple could not verify your identity. Please try again.",
+    es: "Apple no pudo verificar tu identidad. Inténtalo de nuevo.",
   },
   [AppleAuthCode.NO_SESSION]: {
     tr: "Oturum bulunamadı. Tekrar giriş yap.",
     en: "No active session. Please sign in again.",
+    es: "No hay ninguna sesión activa. Inicia sesión de nuevo.",
   },
   [AppleAuthCode.IN_PROGRESS]: {
     tr: "Apple ile giriş zaten sürüyor.",
     en: "Sign in with Apple is already in progress.",
+    es: "Ya hay un inicio de sesión con Apple en curso.",
   },
   [AppleAuthCode.REVOCATION_FAILED]: {
     tr: "Apple yetkilendirmesi kaldırılamadı. Lütfen tekrar dene.",
     en: "Apple authorization could not be revoked. Please try again.",
+    es: "No se pudo revocar la autorización de Apple. Inténtalo de nuevo.",
   },
 };
 
-export function describeAppleAuthError(error, tr = true) {
+/**
+ * @param {boolean|string} language  Eski çağrılar `true` (Türkçe) / `false` (İngilizce)
+ *   geçiyordu; artık uygulama dili ("tr" | "en" | "es") da verilebilir.
+ */
+export function describeAppleAuthError(error, language = "tr") {
+  const code = legacyFlagToLanguage(language);
   const entry = ERROR_TEXT[error?.code];
-  if (entry) return tr ? entry.tr : entry.en;
-  return tr
-    ? "İşlem tamamlanamadı. Lütfen tekrar dene."
-    : "The action could not be completed. Please try again.";
+  if (entry) return entry[code] ?? entry.en;
+  return pickByLanguage(code, {
+    tr: "İşlem tamamlanamadı. Lütfen tekrar dene.",
+    en: "The action could not be completed. Please try again.",
+    es: "No se pudo completar la acción. Inténtalo de nuevo.",
+  });
 }
 
 let busy = false;

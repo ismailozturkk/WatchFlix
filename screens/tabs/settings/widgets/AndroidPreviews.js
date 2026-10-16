@@ -5,6 +5,7 @@
 // (IosPreviews.js) ve sahne (WidgetStage.js) ayrı dosyalara bölününce buraya taşındı.
 // Ölçüler ve kurallar değişmedi: native kaynaklardaki dp/sp değerleri 1:1.
 
+import { copyLanguage, normalizeAppLanguage } from "../../../../utils/appLanguages";
 import React, { useMemo } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -105,10 +106,11 @@ function ReminderPreview({ settings }) {
   const p = settings.appearance;
   const { language } = useLanguage();
   // Provider dizeleri dile göre kendisi yazar (ReminderWidgetProvider.kt).
-  const isTr = language !== "en";
+  const isTr = copyLanguage(language, ["tr", "en"]) === "tr";
+  const es = normalizeAppLanguage(language) === "es";
   const compact = settings.density === "compact";
   // Geri sayım ve tarih bugünden türetilir (saf, dile göre): bkz. widgetSamples.js.
-  const samples = useMemo(() => buildReminderSamples({ isTr }), [isTr]);
+  const samples = useMemo(() => buildReminderSamples({ isTr: language }), [language]);
   const filtered =
     settings.content === "all"
       ? samples
@@ -119,7 +121,7 @@ function ReminderPreview({ settings }) {
   // render etmek de Ayarlar ekranını gereksiz yorardı.
   const display = filtered.slice(0, Math.min(settings.maxItems, 8));
   const typeLabel = (type) =>
-    type === "movie" ? (isTr ? "Film" : "Movie") : isTr ? "Dizi" : "TV";
+    type === "movie" ? (isTr ? "Film" : es ? "Película" : "Movie") : isTr ? "Dizi" : es ? "Serie" : "TV";
 
   return (
     <View
@@ -141,7 +143,7 @@ function ReminderPreview({ settings }) {
               numberOfLines={1}
               style={[styles.remTitle, { color: p.text }]}
             >
-              {isTr ? "Yaklaşanlar" : "Coming Up"}
+              {isTr ? "Yaklaşanlar" : es ? "Próximos" : "Coming Up"}
             </Text>
           </>
         )}
@@ -154,7 +156,7 @@ function ReminderPreview({ settings }) {
             allowFontScaling={false}
             style={[styles.remCountText, { color: p.accent }]}
           >
-            {display.length} {isTr ? "hatırlatma" : "reminders"}
+            {display.length} {isTr ? "hatırlatma" : es ? "recordatorios" : "reminders"}
           </Text>
         </View>
       </View>
@@ -171,9 +173,7 @@ function ReminderPreview({ settings }) {
           {/* İkon sabit gri (reminder_widget_ic_empty), yalnız metin temaya uyar. */}
           <AppIcon name="calendar-outline" size={30} color="#9AA3B8" />
           <Text style={[styles.remEmptyText, { color: p.muted }]}>
-            {isTr
-              ? "Yaklaşan film veya bölüm yok"
-              : "No upcoming movies or episodes"}
+            {isTr ? "Yaklaşan film veya bölüm yok" : es ? "No hay películas ni episodios próximos" : "No upcoming movies or episodes"}
           </Text>
         </View>
       ) : (
@@ -260,7 +260,8 @@ function ReminderPreview({ settings }) {
 function ListsPreview({ settings }) {
   const p = settings.appearance;
   const { language } = useLanguage();
-  const isTr = language !== "en";
+  const isTr = copyLanguage(language, ["tr", "en"]) === "tr";
+  const es = normalizeAppLanguage(language) === "es";
   const compact = settings.density === "compact";
   // Gerçek widget hücreleri 3 sütunda 6dp aralıkla dizilir. Eskiden hücre
   // yüksekliği SABİT 112dp'ydi ve poster "fitCenter" ile sığdırılıyordu; 2:3
@@ -303,7 +304,7 @@ function ListsPreview({ settings }) {
               allowFontScaling={false}
               style={[styles.listsTitle, { color: p.text }]}
             >
-              {isTr ? "Listelerim" : "My Lists"}
+              {isTr ? "Listelerim" : es ? "Mis listas" : "My Lists"}
             </Text>
           </>
         )}
@@ -411,21 +412,22 @@ function StatsCard({ palette, style, children }) {
 function StatsPreview({ settings }) {
   const p = settings.appearance;
   const { t, language } = useLanguage();
-  const isTr = language !== "en";
+  const isTr = copyLanguage(language, ["tr", "en"]) === "tr";
+  const es = normalizeAppLanguage(language) === "es";
   const compact = settings.density === "compact";
   // Etiketler widget'a hangi anahtarlardan gidiyorsa buraya da oradan gelir
   // (ProfileStatsContext.labels → statsWidgetService payload).
   const ps = t?.profileScreen || {};
-  const saatEtiketi = etiket(ps.hours, isTr ? "Saat" : "Hours");
+  const saatEtiketi = etiket(ps.hours, isTr ? "Saat" : es ? "Horas" : "Hours");
   // Yoğunluk bu widget'ta YALNIZCA kök dolguyu değiştirir (StatsWidgetProvider
   // setViewPadding); bölüm araları ve punto sabittir.
   const birimler = (values) =>
     [
-      [values[0], etiket(ps.years, isTr ? "Yıl" : "Years")],
-      [values[1], etiket(ps.months, isTr ? "Ay" : "Months")],
-      [values[2], etiket(ps.days, isTr ? "Gün" : "Days")],
+      [values[0], etiket(ps.years, isTr ? "Yıl" : es ? "Años" : "Years")],
+      [values[1], etiket(ps.months, isTr ? "Ay" : es ? "Meses" : "Months")],
+      [values[2], etiket(ps.days, isTr ? "Gün" : es ? "Días" : "Days")],
       [values[3], saatEtiketi],
-      [values[4], etiket(ps.minutes, isTr ? "Dakika" : "Minutes")],
+      [values[4], etiket(ps.minutes, isTr ? "Dakika" : es ? "Minutos" : "Minutes")],
     ].map(([value, label]) => (
       <TimeUnit key={label} value={value} label={label} palette={p} />
     ));
@@ -450,7 +452,7 @@ function StatsPreview({ settings }) {
             allowFontScaling={false}
             style={[styles.statsHeaderTitle, { color: p.text }]}
           >
-            {isTr ? "İstatistikler" : "Statistics"}
+            {isTr ? "İstatistikler" : es ? "Estadísticas" : "Statistics"}
           </Text>
         </View>
       )}
@@ -460,7 +462,7 @@ function StatsPreview({ settings }) {
           <View style={[styles.statsPanel, styles.statsCountPanel, { backgroundColor: alpha(p.surfaceAlt, 0.85) }]}>
             <CountBlock
               value="184"
-              label={etiket(ps.movieWatched, isTr ? "İzlenen Filmler" : "Movies Watched")}
+              label={etiket(ps.movieWatched, isTr ? "İzlenen Filmler" : es ? "Películas vistas" : "Movies Watched")}
               palette={p}
             />
           </View>
@@ -481,9 +483,9 @@ function StatsPreview({ settings }) {
           ]}
         >
           {[
-            ["time-outline", "1.284", etiket(ps.totalDuration, isTr ? "Toplam Süre" : "Total Duration"), p.accent],
-            ["film-outline", "356", etiket(t?.movies, isTr ? "Filmler" : "Movies"), p.accent],
-            ["tv-outline", "928", etiket(t?.tvShows, isTr ? "Diziler" : "TV Shows"), p.bold],
+            ["time-outline", "1.284", etiket(ps.totalDuration, isTr ? "Toplam Süre" : es ? "Duración total" : "Total Duration"), p.accent],
+            ["film-outline", "356", etiket(t?.movies, isTr ? "Filmler" : es ? "Películas" : "Movies"), p.accent],
+            ["tv-outline", "928", etiket(t?.tvShows, isTr ? "Diziler" : es ? "Series" : "TV Shows"), p.bold],
           ].map(([icon, value, label, tint]) => (
             <View key={icon} style={styles.durationGroup}>
               {/* Üç ikon da sabit gri: provider bunları yeniden boyamaz. */}
@@ -526,7 +528,7 @@ function StatsPreview({ settings }) {
               value="912"
               label={etiket(
                 ps.tvShowEpisodetotalCount,
-                isTr ? "Bölüm Sayısı" : "Episode Count",
+                isTr ? "Bölüm Sayısı" : es ? "Nº de episodios" : "Episode Count",
               )}
               palette={p}
             />

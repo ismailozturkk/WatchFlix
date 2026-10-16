@@ -1,8 +1,10 @@
 // components/theme/themeStudioCopy.js
 //
 // Tema stüdyosunun (özel tema oluşturucu) metinleri. CacheManagerModal ve
-// ThemePreviewCard gibi yerel tr/en çiftleri burada tek yerde toplandı; iki dil
+// ThemePreviewCard gibi yerel tr/en/es kopyaları burada tek yerde toplandı; iki dil
 // aynı anahtar kümesine sahip olmak zorunda (bkz. __tests__/themeStudioCopy.test.js).
+
+import { copyLanguage } from "../../utils/appLanguages";
 
 const tr = {
   // sekmeler
@@ -207,10 +209,113 @@ const en = {
   huePink: "Pink",
 };
 
-export const STUDIO_COPY = { tr, en };
+const es = {
+  tabSetup: "Ajustar",
+  tabDiscover: "Descubrir",
+  tabFine: "Ajuste fino",
 
-/** Dile göre sözlük. */
-export const getStudioCopy = (isEn) => (isEn ? en : tr);
+  undo: "Deshacer",
+  redo: "Rehacer",
+  resetToStart: "Volver al inicio",
+
+  sceneHome: "Inicio",
+  sceneDetail: "Detalle",
+  readability: "Legibilidad",
+  levelGreat: "Excelente",
+  levelOk: "Buena",
+  levelLow: "Justa",
+  levelFail: "Deficiente",
+  issuesOne: "1 problema",
+  issuesMany: "{n} problemas",
+  checkTitle: "Texto de títulos",
+  checkCard: "Texto de tarjetas",
+  checkMuted: "Texto atenuado",
+  checkAccent: "Acento sobre fondo",
+  checkButton: "Texto de botón (blanco)",
+  fixReadability: "Corregir la legibilidad",
+  fixed: "Legibilidad corregida",
+  nothingToFix: "Todo se lee bien",
+
+  suggestName: "Sugerir un nombre",
+
+  sectionColors: "Colores",
+  sectionColorsSub: "Elige dos colores y el resto se adapta",
+  bgSub: "Reajusta toda la paleta",
+  accentSub: "Botones y elementos destacados",
+  readyBackgrounds: "Fondos predefinidos",
+  readyAccents: "Acentos predefinidos",
+  harmonyTitle: "Ideas de acentos a juego",
+  harmonyHint: "Calculadas según el tono de tu fondo",
+  harmonyComplementary: "Complementario",
+  harmonySplit: "Dividido",
+  harmonyTriadic: "Tríada",
+  harmonyAnalogousR: "Cercano +",
+  harmonyAnalogousL: "Cercano −",
+  harmonyMono: "Monotono",
+  sectionStyle: "Estilo",
+  styleContrast: "Contraste",
+  styleSurfaces: "Superficies",
+  contrastSoft: "Suave",
+  contrastBalanced: "Equilibrado",
+  contrastHigh: "Alto",
+  surfacesNeutral: "Neutras",
+  surfacesTinted: "Con color",
+  styleHint: "Cambiar el estilo reconstruye la paleta a partir del fondo y el acento; puedes deshacerlo.",
+  rebuild: "Reconstruir la paleta",
+  bgMatched: "Paleta ajustada al nuevo fondo",
+
+  discoverTitle: "Descubrimiento aleatorio",
+  discoverSub: "Elige un ambiente, pulsa Mezclar y toca el que te guste",
+  shuffle: "Mezclar",
+  shuffleAgain: "Nuevos candidatos",
+  moodMix: "Mezcla",
+  moodMidnight: "Medianoche",
+  moodAmoled: "AMOLED",
+  moodForest: "Bosque",
+  moodSunset: "Atardecer",
+  moodOcean: "Océano",
+  moodMocha: "Moca",
+  moodNeon: "Neón",
+  moodPastel: "Pastel",
+  moodPaper: "Papel",
+  lockBg: "Fijar el fondo",
+  lockAccent: "Fijar el acento",
+  lockHint: "Un color fijado no cambia al mezclar",
+  lockedBoth: "Ambos fijados: solo varía el estilo",
+  applied: "Aplicado",
+  startFrom: "Empezar desde un tema predefinido",
+
+  fineHint: "Toca un color para ajustarlo. Los colores vinculados siguen a su origen.",
+  fineLinked: "Vinculado",
+
+  leaveTitle: "¿Descartar los cambios?",
+  leaveBody: "Perderás los cambios que no hayas guardado.",
+  leaveKeep: "Seguir editando",
+  leaveDiscard: "Descartar",
+
+  polarityDark: "Oscuro",
+  polarityLight: "Claro",
+  hueGray: "Gris",
+  hueRed: "Rojo",
+  hueOrange: "Naranja",
+  hueYellow: "Amarillo",
+  hueGreen: "Verde",
+  hueTeal: "Turquesa",
+  hueBlue: "Azul",
+  hueViolet: "Violeta",
+  huePink: "Rosa",
+};
+
+export const STUDIO_COPY = { tr, en, es };
+
+/**
+ * Dile göre sözlük. Eski çağrılar `isEn` boolean'ı geçiyordu (true → İngilizce);
+ * artık uygulama dili de verilebilir ("tr" | "en" | "es"; bilinmeyen → İngilizce).
+ */
+export const getStudioCopy = (language) =>
+  typeof language === "boolean"
+    ? language ? en : tr
+    : STUDIO_COPY[copyLanguage(language, Object.keys(STUDIO_COPY))];
 
 const cap = (id) => id.charAt(0).toUpperCase() + id.slice(1);
 

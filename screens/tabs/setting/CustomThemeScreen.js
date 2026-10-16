@@ -11,6 +11,7 @@
 // Her değişiklik bir geçmiş adımıdır (geri al / yinele). Okunabilirlik özeti
 // önizlemenin altında; sorun varsa tek dokunuşla düzeltilir. Kaydedilmemiş
 // değişiklikle çıkarken onay istenir.
+import { intlLocaleOf } from "../../../utils/appLanguages";
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   Animated,
@@ -138,9 +139,8 @@ const bump = () => haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.
 export default function CustomThemeScreen({ navigation, route }) {
   const { theme, selectedTheme, customThemes = [], changeTheme, saveCustomTheme, deleteCustomTheme } = useTheme();
   const { language } = useLanguage();
-  const isEn = language === "en";
-  const copy = useMemo(() => getStudioCopy(isEn), [isEn]);
-  const locale = isEn ? "en-US" : "tr-TR";
+  const copy = useMemo(() => getStudioCopy(language), [language]);
+  const locale = intlLocaleOf(language);
   const reduceMotion = useReduceMotion();
   // Kısa ekranda (iPhone SE gibi) sabit önizleme mini kipe geçer; kaydırılan alana yer kalır.
   const { height: windowHeight } = useWindowDimensions();
@@ -701,7 +701,7 @@ export default function CustomThemeScreen({ navigation, route }) {
           aday seçerken) sonuç gözden kaçmasın. Yalnız altındaki içerik kayar. */}
       <View style={[styles.pinned, { borderBottomColor: theme.border }]}>
         <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-          <ThemePreviewCard theme={previewTheme} isEn={isEn} scene={scene} compact mini={miniPreview} />
+          <ThemePreviewCard theme={previewTheme} language={language} scene={scene} compact mini={miniPreview} />
         </Animated.View>
         <View style={styles.previewBar}>
           <View style={styles.sceneToggle}>
@@ -770,7 +770,7 @@ export default function CustomThemeScreen({ navigation, route }) {
 
       <ColorPickerSheet
         visible={!!picker}
-        isEn={isEn}
+        language={language}
         initialValue={pickerView.initialValue}
         title={pickerView.title}
         sources={pickerView.sources}

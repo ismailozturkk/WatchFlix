@@ -85,13 +85,16 @@ export const ANALYTICS_EVENTS = {
   // Film/Dizi sekmesindeki "Favorilerine Göre" rayından bir içeriğin açılması.
   // Önerilerin işe yarayıp yaramadığını söyleyen tek sinyal.
   FAVORITES_REC_OPENED: "favorites_rec_opened",
+  // Uygulama içi geri bildirim gönderildi (Ayarlar > Destek ve geri bildirim).
+  // `kind` = "bug" | "feature", `category` listeden. Metin ASLA gönderilmez.
+  FEEDBACK_SUBMITTED: "feedback_submitted",
 };
 
 /** Ölçüm hunisinde kullanılan kullanıcı özellikleri. */
 export const USER_PROPERTIES = {
   PREMIUM_TIER: "premium_tier", // "free" | "pro" | "unlimited"
   DEVICE_TIER: "device_tier",   // utils/deviceTier.js sınıfı
-  APP_LANGUAGE: "app_language", // "tr" | "en"
+  APP_LANGUAGE: "app_language", // uygulama dil kodu: "tr" | "en" | "es" …
 };
 
 export function isValidEventName(name) {

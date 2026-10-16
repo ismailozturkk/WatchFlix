@@ -110,7 +110,7 @@ class ListsWidgetProvider : AppWidgetProvider() {
       widgetId: Int,
     ) {
       val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      val isTurkish = (prefs.getString(KEY_LANGUAGE, "tr") ?: "tr").startsWith("tr")
+      val lang = WidgetLanguage.of(prefs.getString(KEY_LANGUAGE, "tr"))
       val lists = parseLists(prefs.getString(KEY_LISTS, "[]") ?: "[]")
       val total = lists.length()
       val index = selectedIndex(context, widgetId, total)
@@ -142,7 +142,7 @@ class ListsWidgetProvider : AppWidgetProvider() {
       views.setTextViewText(
         R.id.lists_widget_title,
         selected?.optString("name")?.takeIf { it.isNotBlank() }
-          ?: if (isTurkish) "Listelerim" else "My Lists",
+          ?: WidgetLanguage.pick(lang, "Listelerim", "My Lists", "Mis listas"),
       )
       views.setTextColor(R.id.lists_widget_title, appearance.text)
       views.setTextViewText(
@@ -187,7 +187,7 @@ class ListsWidgetProvider : AppWidgetProvider() {
 
       views.setTextViewText(
         R.id.lists_widget_empty_text,
-        if (isTurkish) "Bu listede henüz içerik yok" else "Nothing in this list yet",
+        WidgetLanguage.pick(lang, "Bu listede henüz içerik yok", "Nothing in this list yet", "Esta lista aún está vacía"),
       )
 
       // Izgara adaptörü — servise widgetId'yi veri olarak koy ki her örnek

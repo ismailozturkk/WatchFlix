@@ -24,6 +24,7 @@ import { normalizeDecorScopes } from "./decorScopes";
 import { normalizeFontRoles } from "./typographyRoles";
 import { EFFECT_MODES } from "./deviceTier";
 import { DATA_CACHE_CATEGORIES } from "./dataCacheSettings";
+import { isSupportedAppLanguage } from "./appLanguages";
 
 export const BACKUP_FORMAT = "seelogd-settings-backup";
 export const BACKUP_VERSION = 1;
@@ -131,7 +132,6 @@ export const BACKUP_EXCLUDED = Object.freeze({
   selectedAvatar: "Profil görseli hesaba bağlı ve bulutta tutuluyor.",
   hasSeenOnboarding: "Cihaza özel; yedekten dönünce tanıtım yeniden atlanırdı/açılırdı.",
   pendingFourFavorites: "Hesaba ait veri; kayıt sonrası profile aktarılıp silinen geçici kopya.",
-  favoritesInviteDismissed: "Cihaza özel ipucu bayrağı; yedekten dönünce davet gereksiz yere gizli kalırdı.",
   notificationPrimeShown: "İşletim sistemi bildirim iznine bağlı, cihaza özel.",
   recentUsers: "Hızlı giriş çipleri kullanıcı kimlikleri içerir; dosyada dolaşmamalı.",
   usageStats: "Tanılama sayaçları.",
@@ -171,7 +171,8 @@ const isPositiveIntList = (v) =>
 
 // Kimliğe özel kurallar. check: false → geçersiz. normalize: değeri kanonik biçime çeker.
 const RULES = {
-  language: { check: (v) => v === "tr" || v === "en" },
+  // Desteklenen diller utils/appLanguages.js'ten: yeni dil eklenince yedek de onu kabul eder.
+  language: { check: isSupportedAppLanguage },
   theme: { check: isThemeId },
   effectMode: { check: (v) => EFFECT_MODES.includes(v) },
   imageQualityLevel: { check: (v) => ["low", "medium", "good", "high", "original"].includes(v) },

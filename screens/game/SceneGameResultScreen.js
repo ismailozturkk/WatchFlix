@@ -1,3 +1,4 @@
+import { copyLanguage, normalizeAppLanguage } from "../../utils/appLanguages";
 import { Image } from "expo-image";
 import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -51,11 +52,11 @@ function useCountUp(target, duration = 900) {
 }
 
 // Doğruluğa göre kısa değerlendirme (başlık + ikon).
-function verdictFor(accuracy, tr) {
-  if (accuracy >= 100) return { icon: "ribbon", text: tr ? "Kusursuz!" : "Flawless!" };
-  if (accuracy >= 80) return { icon: "star", text: tr ? "Harika iş!" : "Great job!" };
-  if (accuracy >= 60) return { icon: "thumbs-up", text: tr ? "Fena değil" : "Not bad" };
-  return { icon: "flash", text: tr ? "Bir dahaki sefere!" : "Next time!" };
+function verdictFor(accuracy, tr, es) {
+  if (accuracy >= 100) return { icon: "ribbon", text: tr ? "Kusursuz!" : es ? "¡Impecable!" : "Flawless!" };
+  if (accuracy >= 80) return { icon: "star", text: tr ? "Harika iş!" : es ? "¡Buen trabajo!" : "Great job!" };
+  if (accuracy >= 60) return { icon: "thumbs-up", text: tr ? "Fena değil" : es ? "Nada mal" : "Not bad" };
+  return { icon: "flash", text: tr ? "Bir dahaki sefere!" : es ? "¡A la próxima!" : "Next time!" };
 }
 
 export default function SceneGameResultScreen({ navigation, route }) {
@@ -69,7 +70,8 @@ export default function SceneGameResultScreen({ navigation, route }) {
   const [sharing, setSharing] = useState(false);
   const [dailyBoard, setDailyBoard] = useState(null);
   const shareCardRef = useRef(null);
-  const tr = language !== "en";
+  const tr = copyLanguage(language, ["tr", "en"]) === "tr";
+  const es = normalizeAppLanguage(language) === "es";
 
   useEffect(() => {
     setResult(getGameSessionResult(sessionId));
@@ -148,7 +150,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
       await new Promise((r) => setTimeout(r, 90));
       const uri = await captureRef(shareCardRef, { format: "png", quality: 1, result: "tmpfile" });
       if (!(await Sharing.isAvailableAsync())) {
-        toast.error(tr ? "Paylaşım kullanılamıyor" : "Sharing is unavailable");
+        toast.error(tr ? "Paylaşım kullanılamıyor" : es ? "Compartir no está disponible" : "Sharing is unavailable");
         return;
       }
       await Sharing.shareAsync(uri, {
@@ -156,7 +158,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
         dialogTitle: gameTitle,
       });
     } catch (e) {
-      toast.error(tr ? "Paylaşılamadı" : "Could not share", e?.message);
+      toast.error(tr ? "Paylaşılamadı" : es ? "No se pudo compartir" : "Could not share", e?.message);
     } finally {
       setSharing(false);
     }
@@ -164,12 +166,12 @@ export default function SceneGameResultScreen({ navigation, route }) {
 
   if (!result) {
     return (
-      <GameScreenShell navigation={navigation} title={tr ? "Oyun Sonucu" : "Game Result"} scroll={false}>
+      <GameScreenShell navigation={navigation} title={tr ? "Oyun Sonucu" : es ? "Resultado de la partida" : "Game Result"} scroll={false}>
         <View style={styles.missing}>
           <AppIcon family="Ionicons" name="alert-circle-outline" size={42} color={theme.text.muted} />
-          <Text style={[styles.missingText, { color: theme.text.secondary }]}>{tr ? "Bu oturumun sonucu artık kullanılamıyor." : "This session result is no longer available."}</Text>
+          <Text style={[styles.missingText, { color: theme.text.secondary }]}>{tr ? "Bu oturumun sonucu artık kullanılamıyor." : es ? "El resultado de esta sesión ya no está disponible." : "This session result is no longer available."}</Text>
           <TouchableOpacity style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent, alignSelf: "stretch", marginHorizontal: 24 }]} onPress={() => navigation.navigate("GameHubScreen")}>
-            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Oyun Merkezine Dön" : "Back to Game Hub"}</Text>
+            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Oyun Merkezine Dön" : es ? "Volver al centro de juegos" : "Back to Game Hub"}</Text>
           </TouchableOpacity>
         </View>
       </GameScreenShell>
@@ -178,18 +180,18 @@ export default function SceneGameResultScreen({ navigation, route }) {
 
   const outcomeLabel =
     result.outcome === "failed"
-      ? (tr ? "Oyun bitti" : "Game over")
+      ? (tr ? "Oyun bitti" : es ? "Fin de la partida" : "Game over")
       : result.outcome === "quit"
-        ? (tr ? "Yarıda bitirildi" : "Ended early")
-        : (tr ? "Tamamlandı" : "Completed");
+        ? (tr ? "Yarıda bitirildi" : es ? "Terminada antes de tiempo" : "Ended early")
+        : (tr ? "Tamamlandı" : es ? "Completada" : "Completed");
 
-  const verdict = verdictFor(accuracy, tr);
+  const verdict = verdictFor(accuracy, tr, es);
   const progress = result.progressSummary;
   const leveledUp = progress && progress.level > progress.levelBefore;
   const myRank = dailyBoard ? dailyBoard.findIndex((row) => row.uid === user?.uid) + 1 : 0;
 
   return (
-    <GameScreenShell navigation={navigation} onBack={() => leaveResult("GameHubScreen")} title={tr ? "Oyun Sonucu" : "Game Result"} subtitle={`${modeLabel} · ${outcomeLabel}`}>
+    <GameScreenShell navigation={navigation} onBack={() => leaveResult("GameHubScreen")} title={tr ? "Oyun Sonucu" : es ? "Resultado de la partida" : "Game Result"} subtitle={`${modeLabel} · ${outcomeLabel}`}>
       {/* Hero skor */}
       <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.scoreHero}>
         <View pointerEvents="none" style={styles.heroGlowOne} />
@@ -198,13 +200,13 @@ export default function SceneGameResultScreen({ navigation, route }) {
           <AppIcon family="Ionicons" name={verdict.icon} size={13} color="#FFD76A" />
           <Text style={styles.verdictText} allowFontScaling={false}>{verdict.text}</Text>
         </View>
-        <Text style={styles.scoreLabel} allowFontScaling={false}>{tr ? "TOPLAM SKOR" : "TOTAL SCORE"}</Text>
+        <Text style={styles.scoreLabel} allowFontScaling={false}>{tr ? "TOPLAM SKOR" : es ? "PUNTUACIÓN TOTAL" : "TOTAL SCORE"}</Text>
         <Text style={styles.score} allowFontScaling={false}>{shownScore}</Text>
         <View style={styles.heroBadges}>
           {result.isNewRecord ? (
             <View style={styles.heroBadge}>
               <AppIcon family="Ionicons" name="ribbon" size={13} color="#FFD76A" />
-              <Text style={styles.heroBadgeText}>{tr ? "Yeni Rekor!" : "New Record!"}</Text>
+              <Text style={styles.heroBadgeText}>{tr ? "Yeni Rekor!" : es ? "¡Nuevo récord!" : "New Record!"}</Text>
             </View>
           ) : null}
           {result.xpEarned ? (
@@ -216,7 +218,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
           {isDaily && progress?.dailyStreak > 0 ? (
             <View style={styles.heroBadge}>
               <AppIcon family="Ionicons" name="flame" size={13} color="#FF9F5A" />
-              <Text style={styles.heroBadgeText}>{tr ? `${progress.dailyStreak} günlük seri` : `${progress.dailyStreak}-day streak`}</Text>
+              <Text style={styles.heroBadgeText}>{tr ? `${progress.dailyStreak} günlük seri` : es ? `racha de ${progress.dailyStreak} días` : `${progress.dailyStreak}-day streak`}</Text>
             </View>
           ) : null}
         </View>
@@ -229,9 +231,9 @@ export default function SceneGameResultScreen({ navigation, route }) {
             <AppIcon family="Ionicons" name="trending-up" size={20} color="#FFFFFF" />
           </View>
           <View style={styles.levelUpCopy}>
-            <Text style={[styles.levelUpTitle, { color: theme.text.primary }]}>{tr ? "Seviye atladın!" : "Level up!"}</Text>
+            <Text style={[styles.levelUpTitle, { color: theme.text.primary }]}>{tr ? "Seviye atladın!" : es ? "¡Subes de nivel!" : "Level up!"}</Text>
             <Text style={[styles.levelUpText, { color: theme.text.muted }]}>
-              {tr ? `Seviye ${progress.levelBefore} → ${progress.level}` : `Level ${progress.levelBefore} → ${progress.level}`}
+              {tr ? `Seviye ${progress.levelBefore} → ${progress.level}` : es ? `Nivel ${progress.levelBefore} → ${progress.level}` : `Level ${progress.levelBefore} → ${progress.level}`}
             </Text>
           </View>
         </View>
@@ -251,18 +253,18 @@ export default function SceneGameResultScreen({ navigation, route }) {
 
       {/* Ana metrikler */}
       <View style={gameSharedStyles.metricRow}>
-        <Metric value={`${result.totalCorrect || 0}/${totalQuestions}`} label={tr ? "Doğru" : "Correct"} color="#2ECC71" theme={theme} />
-        <Metric value={`${accuracy}%`} label={tr ? "Doğruluk" : "Accuracy"} color={theme.accent} theme={theme} />
-        <Metric value={result.bestStreak || 0} label={tr ? "En iyi seri" : "Best streak"} color="#FF6B6B" theme={theme} />
+        <Metric value={`${result.totalCorrect || 0}/${totalQuestions}`} label={tr ? "Doğru" : es ? "Aciertos" : "Correct"} color="#2ECC71" theme={theme} />
+        <Metric value={`${accuracy}%`} label={tr ? "Doğruluk" : es ? "Precisión" : "Accuracy"} color={theme.accent} theme={theme} />
+        <Metric value={result.bestStreak || 0} label={tr ? "En iyi seri" : es ? "Mejor racha" : "Best streak"} color="#FF6B6B" theme={theme} />
       </View>
 
       {/* Ayrinti seridi: zorluk · kaynak · ortalama sure */}
       <View style={[styles.detailStrip, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-        <DetailItem icon="speedometer-outline" label={tr ? "Zorluk" : "Difficulty"} value={difficultyLabel} theme={theme} />
+        <DetailItem icon="speedometer-outline" label={tr ? "Zorluk" : es ? "Dificultad" : "Difficulty"} value={difficultyLabel} theme={theme} />
         <View style={[styles.detailDivider, { backgroundColor: theme.border }]} />
-        <DetailItem icon="albums-outline" label={tr ? "Kaynak" : "Source"} value={sourceLabel} theme={theme} />
+        <DetailItem icon="albums-outline" label={tr ? "Kaynak" : es ? "Fuente" : "Source"} value={sourceLabel} theme={theme} />
         <View style={[styles.detailDivider, { backgroundColor: theme.border }]} />
-        <DetailItem icon="time-outline" label={tr ? "Ort. süre" : "Avg time"} value={averageMs != null ? `${(averageMs / 1000).toFixed(1)}s` : "–"} theme={theme} />
+        <DetailItem icon="time-outline" label={tr ? "Ort. süre" : es ? "Tiempo medio" : "Avg time"} value={averageMs != null ? `${(averageMs / 1000).toFixed(1)}s` : "–"} theme={theme} />
       </View>
 
       {/* Günlük: arkadaş sıralaması */}
@@ -270,7 +272,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <View style={[styles.boardCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <View style={styles.boardHeader}>
             <AppIcon family="Ionicons" name="podium-outline" size={18} color={theme.accent} />
-            <Text style={[styles.boardTitle, { color: theme.text.primary }]}>{tr ? "Arkadaşların arasında" : "Among your friends"}</Text>
+            <Text style={[styles.boardTitle, { color: theme.text.primary }]}>{tr ? "Arkadaşların arasında" : es ? "Entre tus amigos" : "Among your friends"}</Text>
             {myRank > 0 ? (
               <View style={[styles.rankPill, { backgroundColor: alpha(theme.accent, 0.16) }]}>
                 <Text style={[styles.rankPillText, { color: theme.accent }]}>#{myRank}</Text>
@@ -284,7 +286,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
                 <Text style={[styles.boardRank, { color: theme.text.muted }]}>{index + 1}</Text>
                 <UserAvatar avatarIndex={row.avatarIndex} photoURL={row.photoURL} isCustomPhoto size={30} />
                 <Text style={[styles.boardName, { color: theme.text.primary }]} numberOfLines={1}>
-                  {isSelf ? (tr ? "Sen" : "You") : row.displayName || (tr ? "Anonim" : "Anonymous")}
+                  {isSelf ? (tr ? "Sen" : es ? "Tú" : "You") : row.displayName || (tr ? "Anonim" : es ? "Anónimo" : "Anonymous")}
                 </Text>
                 <Text style={[styles.boardScore, { color: theme.accent }]}>{row.bestScore}</Text>
               </View>
@@ -298,13 +300,13 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <View style={[styles.reviewCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel={tr ? "Cevapları incele" : "Review answers"}
+            accessibilityLabel={tr ? "Cevapları incele" : es ? "Revisar respuestas" : "Review answers"}
             activeOpacity={0.75}
             onPress={() => setReviewExpanded((v) => !v)}
             style={styles.reviewHeader}
           >
             <AppIcon family="Ionicons" name="list-outline" size={18} color={theme.text.secondary} />
-            <Text style={[styles.reviewTitle, { color: theme.text.primary }]}>{tr ? "Cevapları İncele" : "Review Answers"}</Text>
+            <Text style={[styles.reviewTitle, { color: theme.text.primary }]}>{tr ? "Cevapları İncele" : es ? "Revisar respuestas" : "Review Answers"}</Text>
             <View style={[styles.reviewCount, { backgroundColor: theme.primary }]}><Text style={[styles.reviewCountText, { color: theme.text.muted }]}>{result.sessionHistory.length}</Text></View>
             <AppIcon family="Ionicons" name={reviewExpanded ? "chevron-up" : "chevron-down"} size={18} color={theme.text.muted} />
           </TouchableOpacity>
@@ -329,7 +331,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
                     <View style={styles.reviewCopy}>
                       <Text style={[styles.reviewName, { color: theme.text.primary }]} numberOfLines={1}>{answer.item?.title || "?"}</Text>
                       {wrongAnswer ? (
-                        <Text style={[styles.reviewWrong, { color: theme.text.muted }]} numberOfLines={1}>{(tr ? "Cevabın: " : "You: ") + answer.userAnswer.title}</Text>
+                        <Text style={[styles.reviewWrong, { color: theme.text.muted }]} numberOfLines={1}>{(tr ? "Cevabın: " : es ? "Tú: " : "You: ") + answer.userAnswer.title}</Text>
                       ) : (
                         <Text style={[styles.reviewMeta, { color: theme.text.muted }]} numberOfLines={1}>{Number.isFinite(answer.responseMs) ? `${(answer.responseMs / 1000).toFixed(1)}s` : ""}</Text>
                       )}
@@ -349,11 +351,11 @@ export default function SceneGameResultScreen({ navigation, route }) {
       {result.saveStatus === "error" ? (
         <TouchableOpacity style={styles.retry} onPress={async () => { setResult((c) => ({ ...c, saveStatus: "saving" })); const saved = await result.retrySave?.(); setResult((c) => ({ ...c, saveStatus: saved ? "saved" : "error" })); }}>
           <AppIcon family="Ionicons" name="cloud-upload-outline" size={18} color="#FF6B6B" />
-          <Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydedilemedi. Tekrar dene" : "Result was not saved. Try again"}</Text>
+          <Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydedilemedi. Tekrar dene" : es ? "El resultado no se guardó. Inténtalo de nuevo" : "Result was not saved. Try again"}</Text>
         </TouchableOpacity>
       ) : null}
       {result.saveStatus === "saving" ? (
-        <View style={styles.retry}><ActivityIndicator size="small" color={theme.accent} /><Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydediliyor..." : "Saving result..."}</Text></View>
+        <View style={styles.retry}><ActivityIndicator size="small" color={theme.accent} /><Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydediliyor..." : es ? "Guardando el resultado..." : "Saving result..."}</Text></View>
       ) : null}
 
       {/* Aksiyonlar (Part 13.3). Günlük tek deneme: "Tekrar Oyna" yerine sıralama. */}
@@ -365,7 +367,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
         >
           <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryGradient}>
             <AppIcon family="Ionicons" name="podium-outline" size={19} color="#fff" />
-            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Günlük Sıralamayı Gör" : "View Daily Ranking"}</Text>
+            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Günlük Sıralamayı Gör" : es ? "Ver la clasificación diaria" : "View Daily Ranking"}</Text>
           </LinearGradient>
         </PressableScale>
       ) : (
@@ -376,21 +378,21 @@ export default function SceneGameResultScreen({ navigation, route }) {
         >
           <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryGradient}>
             <AppIcon family="Ionicons" name="refresh" size={19} color="#fff" />
-            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Tekrar Oyna" : "Play Again"}</Text>
+            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Tekrar Oyna" : es ? "Jugar otra vez" : "Play Again"}</Text>
           </LinearGradient>
         </PressableScale>
       )}
 
       <View style={styles.actionRow}>
         {!isDaily ? (
-          <SecondaryAction icon="options-outline" label={tr ? "Mod Seçimi" : "Mode Setup"} theme={theme} onPress={() => leaveResult("SceneGameSetupScreen", { gameId: result.gameId, modeId: result.modeId, difficultyId: result.difficultyId, sourceId: result.sourceId })} />
+          <SecondaryAction icon="options-outline" label={tr ? "Mod Seçimi" : es ? "Elegir modo" : "Mode Setup"} theme={theme} onPress={() => leaveResult("SceneGameSetupScreen", { gameId: result.gameId, modeId: result.modeId, difficultyId: result.difficultyId, sourceId: result.sourceId })} />
         ) : null}
-        <SecondaryAction icon="trophy-outline" label={tr ? "Liderlik" : "Leaderboard"} theme={theme} onPress={() => navigation.navigate("GameLeaderboardScreen", { gameId: result.gameId })} />
-        <SecondaryAction icon={sharing ? null : "share-social-outline"} label={tr ? "Paylaş" : "Share"} theme={theme} loading={sharing} onPress={handleShare} />
+        <SecondaryAction icon="trophy-outline" label={tr ? "Liderlik" : es ? "Clasificación" : "Leaderboard"} theme={theme} onPress={() => navigation.navigate("GameLeaderboardScreen", { gameId: result.gameId })} />
+        <SecondaryAction icon={sharing ? null : "share-social-outline"} label={tr ? "Paylaş" : es ? "Compartir" : "Share"} theme={theme} loading={sharing} onPress={handleShare} />
       </View>
 
       <TouchableOpacity style={[styles.ghostButton, { borderColor: theme.border }]} onPress={() => leaveResult("GameHubScreen")}>
-        <Text style={[styles.ghostText, { color: theme.text.secondary }]}>{tr ? "Oyun Merkezine Dön" : "Back to Game Hub"}</Text>
+        <Text style={[styles.ghostText, { color: theme.text.secondary }]}>{tr ? "Oyun Merkezine Dön" : es ? "Volver al centro de juegos" : "Back to Game Hub"}</Text>
       </TouchableOpacity>
 
       {/* Gizli paylasim karti (captureRef hedefi) — spoiler gorsel icermez */}
@@ -402,7 +404,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
             accent={theme.accent}
             bold={theme.bold}
             score={result.score || 0}
-            scoreLabel={tr ? "Skor" : "Score"}
+            scoreLabel={tr ? "Skor" : es ? "Puntuación" : "Score"}
             modeLabel={modeLabel}
             difficultyLabel={difficultyLabel}
             accuracy={accuracy}
@@ -411,11 +413,11 @@ export default function SceneGameResultScreen({ navigation, route }) {
             total={totalQuestions}
             brand={gameTitle}
             isNewRecord={Boolean(result.isNewRecord)}
-            recordLabel={tr ? "Yeni Rekor" : "New Record"}
+            recordLabel={tr ? "Yeni Rekor" : es ? "Nuevo récord" : "New Record"}
             labels={{
-              accuracy: tr ? "Doğruluk" : "Accuracy",
-              correct: tr ? "Doğru" : "Correct",
-              streak: tr ? "En iyi seri" : "Best streak",
+              accuracy: tr ? "Doğruluk" : es ? "Precisión" : "Accuracy",
+              correct: tr ? "Doğru" : es ? "Aciertos" : "Correct",
+              streak: tr ? "En iyi seri" : es ? "Mejor racha" : "Best streak",
             }}
           />
         </View>

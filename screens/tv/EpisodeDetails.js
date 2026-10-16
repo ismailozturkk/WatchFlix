@@ -1,3 +1,4 @@
+import { tmdbLanguageOf } from "../../utils/appLanguages";
 import React, { useState, useEffect, useCallback, memo } from "react";
 import {
   StyleSheet,
@@ -170,7 +171,7 @@ export default function EpisodeDetails({ route, navigation }) {
           `https://api.themoviedb.org/3/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
           {
             params: {
-              language: language === "tr" ? "tr-TR" : "en-US",
+              language: tmdbLanguageOf(language),
               // credits.cast = bölümdeki ana kadro (dizinin düzenli oyuncuları);
               // guest_stars/crew zaten kök yanıtta gelir.
               append_to_response: "credits",

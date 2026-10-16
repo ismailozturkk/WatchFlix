@@ -1,11 +1,14 @@
 // components/favorites/FavoritesShowcase.js
 //
-// Profildeki salt-okunur "favori seçimleri" kartı: dolu kategorilerin satırları,
-// görsele dokunmak detay sayfasını açar. Arkadaş profilinde ve kendi
-// profilinde aynı kart. Hiç favori yoksa HİÇBİR ŞEY çizilmez (boş kart, "bu kişi
-// henüz seçmemiş" demek yerine profili uzatırdı).
+// Arkadaş profilindeki salt-okunur "favori seçimleri" kartı. KOMPAKT: tek kart,
+// kategori başına tek satır — solda tür ikonu + etiket, sağda küçük posterler
+// (oyuncuda yuvarlak portre). Görsele dokunmak detay sayfasını açar; başlıklar
+// görünmez ama erişilebilirlik etiketinde (ve detayda) duruyor. Hiç favori yoksa
+// HİÇBİR ŞEY çizilmez (boş kart, "bu kişi henüz seçmemiş" demek yerine profili
+// uzatırdı).
 //
 // Bölüm başlığını çağıran verir (arkadaş profili SectionHeader kullanıyor).
+// Kendi profilde gösterilmez: favoriler yalnız Profili Düzenle'de düzenlenir.
 
 import React, { memo, useCallback } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -19,14 +22,16 @@ import FavoriteSlots from "./FavoriteSlots";
 
 const ROUTE = { movies: "MovieDetails", shows: "TvShowsDetails", people: "ActorViewScreen" };
 
+// Yuva genişliği satırdan türer ama bu tavanı aşmaz: geniş ekranda posterler
+// şişip kartı uzatmasın. 54 → poster 54x81.
+const THUMB_MAX_WIDTH = 54;
+const THUMB_GAP = 8;
+const THUMB_RADIUS = 10;
+
 const paramsFor = (kind, entry) =>
   kind === "people" ? { personId: entry.id } : { id: entry.id };
 
-/**
- * @param {boolean} [props.bare=false] Kart zemini/çerçevesi OLMADAN (çağıran kendi
- *   kartının içine koyuyor — kart içinde kart çift çerçeve olurdu).
- */
-function FavoritesShowcase({ favorites, navigation, bare = false }) {
+function FavoritesShowcase({ favorites, navigation }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const copy = getFavoritesCopy(language);
@@ -45,39 +50,48 @@ function FavoritesShowcase({ favorites, navigation, bare = false }) {
   if (!kinds.length) return null;
 
   return (
-    <View
-      style={
-        bare
-          ? styles.bare
-          : [styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]
-      }
-    >
-      {kinds.map((kind) => {
+    <View style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      {kinds.map((kind, index) => {
         const kindCopy = copy.kinds[kind];
         return (
-          <View key={kind} style={styles.block}>
-            <View style={styles.head}>
-              <View style={[styles.headIcon, { backgroundColor: alpha(theme.accent, 0.14) }]}>
-                <Ionicons name={kindCopy.icon} size={14} color={theme.accent} />
+          <View
+            key={kind}
+            style={[
+              styles.row,
+              index > 0 && {
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: alpha(theme.border, 0.9),
+              },
+            ]}
+          >
+            <View style={styles.kind}>
+              <View style={[styles.kindIcon, { backgroundColor: alpha(theme.accent, 0.14) }]}>
+                <Ionicons name={kindCopy.icon} size={15} color={theme.accent} />
               </View>
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
-                style={[styles.headLabel, { color: theme.text.primary }]}
+                style={[styles.kindLabel, { color: theme.text.secondary }]}
               >
                 {kindCopy.label}
               </Text>
             </View>
-            <FavoriteSlots
-              kind={kind}
-              items={safe[kind]}
-              theme={theme}
-              readOnly
-              openLabel={copy.profile.open}
-              addLabel=""
-              removeLabel={copy.picker.removeLabel}
-              onOpen={open}
-            />
+            <View style={styles.slots}>
+              <FavoriteSlots
+                kind={kind}
+                items={safe[kind]}
+                theme={theme}
+                readOnly
+                showTitles={false}
+                gap={THUMB_GAP}
+                maxSlotWidth={THUMB_MAX_WIDTH}
+                radius={THUMB_RADIUS}
+                openLabel={copy.profile.open}
+                addLabel=""
+                removeLabel={copy.picker.removeLabel}
+                onOpen={open}
+              />
+            </View>
           </View>
         );
       })}
@@ -88,16 +102,23 @@ function FavoritesShowcase({ favorites, navigation, bare = false }) {
 export default memo(FavoritesShowcase);
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 22, borderWidth: 1, padding: 16, gap: 20, marginBottom: 6 },
-  bare: { gap: 20 },
-  block: { gap: 10 },
-  head: { flexDirection: "row", alignItems: "center", gap: 8 },
-  headIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
+  card: {
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 2,
+    marginBottom: 6,
+  },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11 },
+  kind: { width: 64, alignItems: "center", gap: 6 },
+  kindIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  headLabel: { flex: 1, fontSize: 13.5, fontWeight: "800" },
+  kindLabel: { fontSize: 11, fontWeight: "800", textAlign: "center" },
+  // Soldaki etiket sütunundan kalan genişlik: FavoriteSlots bunu ölçüp yuvalar.
+  slots: { flex: 1, minWidth: 0 },
 });

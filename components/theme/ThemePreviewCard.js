@@ -18,6 +18,7 @@
 // (yerleşik temaların hepsi beyaza karşı >= 3.2:1); önizleme gerçeği yansıtsın,
 // zayıf bir vurgu burada da zayıf görünsün.
 
+import { pickByLanguage } from "../../utils/appLanguages";
 import React, { memo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -48,9 +49,9 @@ function HomeScene({ theme, t, compact, mini }) {
       {mini ? null : (
         <View style={[styles.topBar, compact && styles.topBarCompact, { backgroundColor: theme.secondary, borderBottomColor: theme.border }]}>
           <View style={styles.topCopy}>
-            <Text style={[styles.topTitle, { color: theme.text.primary }]} numberOfLines={1}>{t("Önizleme", "Preview")}</Text>
+            <Text style={[styles.topTitle, { color: theme.text.primary }]} numberOfLines={1}>{t("Önizleme", "Preview", "Vista previa")}</Text>
             {compact ? null : (
-              <Text style={[styles.topSub, { color: theme.text.muted }]} numberOfLines={1}>{t("Temanın görünümü", "Your theme in action")}</Text>
+              <Text style={[styles.topSub, { color: theme.text.muted }]} numberOfLines={1}>{t("Temanın görünümü", "Your theme in action", "Tu tema en acción")}</Text>
             )}
           </View>
           <View style={[styles.topAction, { backgroundColor: theme.accent }]}>
@@ -66,17 +67,17 @@ function HomeScene({ theme, t, compact, mini }) {
             <AppIcon family="Ionicons" name="film-outline" size={20} color={theme.text.muted} />
           </View>
           <View style={styles.heroCopy}>
-            <Text style={[styles.heroTitle, { color: theme.text.primary }]} numberOfLines={1}>{t("Başlık metni", "Title text")}</Text>
-            <Text style={[styles.heroLine, { color: theme.text.secondary }]} numberOfLines={1}>{t("İkincil açıklama satırı", "Secondary description line")}</Text>
+            <Text style={[styles.heroTitle, { color: theme.text.primary }]} numberOfLines={1}>{t("Başlık metni", "Title text", "Texto de título")}</Text>
+            <Text style={[styles.heroLine, { color: theme.text.secondary }]} numberOfLines={1}>{t("İkincil açıklama satırı", "Secondary description line", "Línea de descripción secundaria")}</Text>
             {compact ? null : (
-              <Text style={[styles.heroLine, { color: theme.text.muted }]} numberOfLines={1}>{t("Soluk yardımcı metin", "Muted helper text")}</Text>
+              <Text style={[styles.heroLine, { color: theme.text.muted }]} numberOfLines={1}>{t("Soluk yardımcı metin", "Muted helper text", "Texto de ayuda atenuado")}</Text>
             )}
             <View style={[styles.chipRow, compact && styles.chipRowCompact]}>
               <View style={[styles.chip, { backgroundColor: `${theme.accent}26`, borderColor: theme.accent }]}>
-                <Text style={[styles.chipText, { color: theme.accent }]}>{t("Vurgu", "Accent")}</Text>
+                <Text style={[styles.chipText, { color: theme.accent }]}>{t("Vurgu", "Accent", "Acento")}</Text>
               </View>
               <View style={[styles.chip, { backgroundColor: theme.between, borderColor: theme.border }]}>
-                <Text style={[styles.chipText, { color: theme.text.between }]}>{t("Ara", "Between")}</Text>
+                <Text style={[styles.chipText, { color: theme.text.between }]}>{t("Ara", "Between", "Intermedio")}</Text>
               </View>
             </View>
           </View>
@@ -85,7 +86,7 @@ function HomeScene({ theme, t, compact, mini }) {
         {/* İstatistik şeridi */}
         {compact ? null : (
           <View style={styles.statRow}>
-            {[{ v: "1.2K", k: t("Skor", "Score") }, { v: "87%", k: t("Doğruluk", "Accuracy") }, { v: "12", k: t("Seri", "Streak") }].map((item) => (
+            {[{ v: "1.2K", k: t("Skor", "Score", "Puntuación") }, { v: "87%", k: t("Doğruluk", "Accuracy", "Precisión") }, { v: "12", k: t("Seri", "Streak", "Racha") }].map((item) => (
               <View key={item.k} style={[styles.statCell, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                 <Text style={[styles.statValue, { color: theme.accent }]}>{item.v}</Text>
                 <Text style={[styles.statLabel, { color: theme.text.muted }]}>{item.k}</Text>
@@ -97,7 +98,7 @@ function HomeScene({ theme, t, compact, mini }) {
         {/* Vurgu butonu */}
         <View style={[styles.primaryBtn, compact && styles.primaryBtnCompact, { backgroundColor: theme.accent }]}>
           <AppIcon family="Ionicons" name="play" size={15} color={ON_ACCENT} />
-          <Text style={[styles.primaryBtnText, { color: ON_ACCENT }]}>{t("Oyna", "Play")}</Text>
+          <Text style={[styles.primaryBtnText, { color: ON_ACCENT }]}>{t("Oyna", "Play", "Jugar")}</Text>
         </View>
       </View>
     </>
@@ -123,18 +124,18 @@ function DetailScene({ theme, t, compact, mini }) {
       </LinearGradient>
 
       <View style={[styles.detailBody, compact && styles.detailBodyCompact]}>
-        <Text style={[styles.heroTitle, { color: theme.text.primary }]} numberOfLines={1}>{t("Film Adı", "Movie Title")}</Text>
+        <Text style={[styles.heroTitle, { color: theme.text.primary }]} numberOfLines={1}>{t("Film Adı", "Movie Title", "Título de la película")}</Text>
         <View style={styles.metaRow}>
           <AppIcon family="Ionicons" name="star" size={13} color={theme.accent} />
           <Text style={[styles.metaScore, { color: theme.text.primary }]}>8.4</Text>
-          <Text style={[styles.metaMuted, { color: theme.text.muted }]} numberOfLines={1}>2024 · 128 {t("dk", "min")}</Text>
+          <Text style={[styles.metaMuted, { color: theme.text.muted }]} numberOfLines={1}>2024 · 128 {t("dk", "min", "min")}</Text>
           <View style={[styles.chip, { backgroundColor: theme.between, borderColor: theme.border }]}>
-            <Text style={[styles.chipText, { color: theme.text.between }]}>{t("Bilim Kurgu", "Sci-Fi")}</Text>
+            <Text style={[styles.chipText, { color: theme.text.between }]}>{t("Bilim Kurgu", "Sci-Fi", "Ciencia ficción")}</Text>
           </View>
         </View>
         {compact ? null : (
           <Text style={[styles.synopsis, { color: theme.text.secondary }]} numberOfLines={2}>
-            {t("Kısa özet metni burada görünür; ikincil metin rengi okunur olmalı.", "A short synopsis appears here; the secondary text color must stay readable.")}
+            {t("Kısa özet metni burada görünür; ikincil metin rengi okunur olmalı.", "A short synopsis appears here; the secondary text color must stay readable.", "Aquí aparece una sinopsis breve; el color del texto secundario debe seguir siendo legible.")}
           </Text>
         )}
 
@@ -150,7 +151,7 @@ function DetailScene({ theme, t, compact, mini }) {
 
         {/* Sekmeler */}
         <View style={[styles.tabsRow, { borderBottomColor: theme.border }]}>
-          {[t("Genel", "Overview"), t("Oyuncular", "Cast"), t("Yorumlar", "Reviews")].map((label, i) => (
+          {[t("Genel", "Overview", "Sinopsis"), t("Oyuncular", "Cast", "Reparto"), t("Yorumlar", "Reviews", "Reseñas")].map((label, i) => (
             <View key={label} style={[styles.tabItem, i === 0 && { borderBottomColor: theme.bold || theme.accent, borderBottomWidth: 2 }]}>
               <Text style={[styles.tabItemText, { color: i === 0 ? theme.text.primary : theme.text.muted }]}>{label}</Text>
             </View>
@@ -161,7 +162,7 @@ function DetailScene({ theme, t, compact, mini }) {
         {compact ? null : (
           <View style={[styles.switchRow, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
             <AppIcon family="Ionicons" name="notifications-outline" size={16} color={theme.text.between} />
-            <Text style={[styles.switchLabel, { color: theme.text.primary }]} numberOfLines={1}>{t("Hatırlat", "Remind me")}</Text>
+            <Text style={[styles.switchLabel, { color: theme.text.primary }]} numberOfLines={1}>{t("Hatırlat", "Remind me", "Recordarme")}</Text>
             <View style={[styles.switchTrack, { backgroundColor: theme.accent }]}>
               <View style={styles.switchKnob} />
             </View>
@@ -172,8 +173,9 @@ function DetailScene({ theme, t, compact, mini }) {
   );
 }
 
-const ThemePreviewCard = memo(function ThemePreviewCard({ theme, isEn = false, scene = "home", compact = false, mini = false }) {
-  const t = (trText, enText) => (isEn ? enText : trText);
+const ThemePreviewCard = memo(function ThemePreviewCard({ theme, language = "tr", scene = "home", compact = false, mini = false }) {
+  // Üç dilli seçici: es verilmezse İngilizce (utils/appLanguages kuralı).
+  const t = (trText, enText, esText) => pickByLanguage(language, { tr: trText, en: enText, es: esText ?? enText });
   const dense = compact || mini;
 
   return (

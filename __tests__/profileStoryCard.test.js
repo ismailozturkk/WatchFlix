@@ -5,6 +5,10 @@
 
 const {
   DEFAULT_PROFILE_STORY_OPTIONS,
+  FAVORITE_RIBBON,
+  FAVORITE_SHELF,
+  PICKS_BUDGET,
+  STORY_INNER_H,
   STORY_LAYOUT_IDS,
   STORY_NOTE_MAX,
   STORY_POSTER_COUNT,
@@ -20,12 +24,21 @@ const {
   formatMemberSince,
   formatStoryNumber,
   hslStringToHex,
+  isFavoritesActive,
   persistableStoryOptions,
   pickShowcaseBadges,
+  pickStoryFavorites,
   pickStoryPosters,
+  planFavoriteShelves,
+  planPicksLayout,
+  resolveStoryLayout,
+  ribbonMetrics,
+  sanitizeFavoriteKinds,
   sanitizeStoryOptions,
   toStoryBadge,
+  toggleStoryKind,
 } = require("../utils/profileStoryCard");
+const { FAVORITE_KINDS } = require("../utils/fourFavorites");
 
 // Kart paleti Wrapped paletlerinden gelir (utils/wrappedCard.js, ilk altısı
 // ortak); kimlikler ayrışırsa seçili tema sessizce "signature"a düşerdi.
@@ -372,5 +385,294 @@ describe("Profil rengi teması", () => {
     expect(buildRankPalette(null)).toBeNull();
     expect(buildRankPalette(["hsl(1, 1%, 1%)"])).toBeNull();
     expect(buildRankPalette(["red", "blue"])).toBeNull();
+  });
+});
+
+// ── Dört favori (profil vitrini) ─────────────────────────────────────────────
+
+const entry = (id, extra = {}) => ({ id, title: `Başlık ${id}`, image: `/i${id}.jpg`, ...extra });
+const FAVS = {
+  movies: [entry(1, { year: "2010" }), entry(2), entry(3), entry(4)],
+  shows: [entry(11), entry(12)],
+  people: [entry(21, { image: null })],
+};
+
+describe("dört favori: seçenekler", () => {
+  test("varsayılan: anahtar açık, üç kategori seçili", () => {
+    expect(DEFAULT_PROFILE_STORY_OPTIONS.showFavorites).toBe(true);
+    expect([...DEFAULT_PROFILE_STORY_OPTIONS.favoriteKinds]).toEqual([...FAVORITE_KINDS]);
+  });
+
+  test("eski kayıtta olmayan favori anahtarları varsayılanı alır", () => {
+    const out = sanitizeStoryOptions({ layout: "wall", showStats: false });
+    expect(out.showFavorites).toBe(true);
+    expect(out.favoriteKinds).toEqual([...FAVORITE_KINDS]);
+  });
+
+  test("Seçki düzeni kabul edilir ve liste posteri almaz", () => {
+    expect(STORY_LAYOUT_IDS).toContain("picks");
+    expect(sanitizeStoryOptions({ layout: "picks" }).layout).toBe("picks");
+    expect(STORY_POSTER_COUNT.picks).toBe(0);
+    // Her düzenin poster sayısı tanımlı (modal `??` ile okur; 0 geçerli).
+    for (const id of STORY_LAYOUT_IDS) expect(typeof STORY_POSTER_COUNT[id]).toBe("number");
+  });
+
+  test("kategori listesi: sıra kanonik, tekrar/bilinmeyen atılır, boşsa hepsi", () => {
+    expect(sanitizeFavoriteKinds(["people", "movies", "movies", "yok"])).toEqual(["movies", "people"]);
+    expect(sanitizeFavoriteKinds([])).toEqual([...FAVORITE_KINDS]);
+    expect(sanitizeFavoriteKinds(["yok"])).toEqual([...FAVORITE_KINDS]);
+    for (const bad of [undefined, null, "movies", 5, {}]) {
+      expect(sanitizeFavoriteKinds(bad)).toEqual([...FAVORITE_KINDS]);
+    }
+    expect(sanitizeStoryOptions({ favoriteKinds: ["shows"], showFavorites: "x" })).toMatchObject({
+      favoriteKinds: ["shows"],
+      showFavorites: true, // boolean değil → varsayılan
+    });
+  });
+
+  test("seçimler diske yazılır (not hariç)", () => {
+    const saved = persistableStoryOptions({ layout: "picks", favoriteKinds: ["people"], showFavorites: false });
+    expect(saved).toMatchObject({ layout: "picks", favoriteKinds: ["people"], showFavorites: false });
+    expect(saved).not.toHaveProperty("note");
+  });
+});
+
+describe("pickStoryFavorites", () => {
+  test("kategoriler kanonik sırada, giriş sırası korunur, sayaç doğru", () => {
+    const pick = pickStoryFavorites(FAVS, ["people", "shows", "movies"]);
+    expect(pick.groups.map((g) => g.kind)).toEqual(["movies", "shows", "people"]);
+    expect(pick.kinds).toEqual(["movies", "shows", "people"]);
+    expect(pick.count).toBe(7);
+    expect(pick.groups[0].items.map((i) => i.key)).toEqual(["movies-1", "movies-2", "movies-3", "movies-4"]);
+    expect(pick.groups[0].items[0]).toEqual({ key: "movies-1", title: "Başlık 1", imagePath: "/i1.jpg", year: "2010" });
+  });
+
+  test("görseli olmayan favori atılmaz, imagePath null olur", () => {
+    const people = pickStoryFavorites(FAVS, ["people"]).groups[0].items;
+    expect(people).toHaveLength(1);
+    expect(people[0].imagePath).toBeNull();
+  });
+
+  test("yalnız seçili kategoriler gelir", () => {
+    const pick = pickStoryFavorites(FAVS, ["shows"]);
+    expect(pick.kinds).toEqual(["shows"]);
+    expect(pick.count).toBe(2);
+  });
+
+  test("boş kategori grup üretmez", () => {
+    const pick = pickStoryFavorites({ movies: FAVS.movies }, [...FAVORITE_KINDS]);
+    expect(pick.kinds).toEqual(["movies"]);
+  });
+
+  test("seçili kategorilerin hepsi boşsa tüm kategorilere genişler (bayat seçim)", () => {
+    const pick = pickStoryFavorites({ movies: FAVS.movies }, ["people"]);
+    expect(pick.kinds).toEqual(["movies"]);
+    expect(pick.count).toBe(4);
+  });
+
+  test("favori yoksa / bozuk veride boş", () => {
+    for (const bad of [undefined, null, {}, "x", { movies: "yok" }]) {
+      expect(pickStoryFavorites(bad, ["movies"])).toEqual({ groups: [], kinds: [], count: 0 });
+    }
+  });
+
+  test("bozuk girişler (kimlik/başlık yok, fazla kayıt) normalize edilir", () => {
+    const messy = { movies: [entry(1), { id: 2 }, { title: "x" }, entry(1), entry(3), entry(4), entry(5), entry(6)] };
+    expect(pickStoryFavorites(messy, ["movies"]).groups[0].items.map((i) => i.key)).toEqual([
+      "movies-1",
+      "movies-3",
+      "movies-4",
+      "movies-5",
+    ]);
+  });
+});
+
+describe("dört favori: etkinlik ve düzen çözümü", () => {
+  const pick = pickStoryFavorites(FAVS, [...FAVORITE_KINDS]);
+  const none = pickStoryFavorites({}, [...FAVORITE_KINDS]);
+
+  test("etkin = anahtar açık VE gösterilecek öğe var", () => {
+    expect(isFavoritesActive({ showFavorites: true }, pick)).toBe(true);
+    expect(isFavoritesActive({ showFavorites: false }, pick)).toBe(false);
+    expect(isFavoritesActive({ showFavorites: true }, none)).toBe(false);
+    expect(isFavoritesActive(undefined, pick)).toBe(false);
+    expect(isFavoritesActive({ showFavorites: true }, undefined)).toBe(false);
+  });
+
+  test("Seçki yalnız favori etkinken çizilir, yoksa Vitrin'e düşer", () => {
+    expect(resolveStoryLayout("picks", true)).toBe("picks");
+    expect(resolveStoryLayout("picks", false)).toBe("showcase");
+    for (const id of ["showcase", "identity", "wall", "minimal"]) {
+      expect(resolveStoryLayout(id, false)).toBe(id);
+      expect(resolveStoryLayout(id, true)).toBe(id);
+    }
+    expect(resolveStoryLayout("yok", true)).toBe(DEFAULT_PROFILE_STORY_OPTIONS.layout);
+  });
+});
+
+describe("toggleStoryKind", () => {
+  test("seçili kategori kapanır, kapalı olan (dolu) açılır; sıra kanonik", () => {
+    expect(toggleStoryKind(["movies", "shows", "people"], "shows", FAVS)).toEqual(["movies", "people"]);
+    expect(toggleStoryKind(["movies", "people"], "shows", FAVS)).toEqual(["movies", "shows", "people"]);
+  });
+
+  test("son görünen kategori kapatılamaz", () => {
+    expect(toggleStoryKind(["shows"], "shows", FAVS)).toEqual(["shows"]);
+  });
+
+  test("boş kategori seçilemez", () => {
+    expect(toggleStoryKind(["movies"], "people", { movies: FAVS.movies })).toEqual(["movies"]);
+  });
+
+  test("varsayılan 'hepsi' seçimi, boş kategorileri yok sayarak çalışır", () => {
+    // Yalnız film var: seçili üç kategori görünürde tek kategori; kapatılamaz.
+    expect(toggleStoryKind([...FAVORITE_KINDS], "movies", { movies: FAVS.movies })).toEqual(["movies"]);
+    // Film + dizi var: filmi kapatınca dizi kalır.
+    expect(toggleStoryKind([...FAVORITE_KINDS], "movies", { movies: FAVS.movies, shows: FAVS.shows })).toEqual(["shows"]);
+  });
+
+  test("bilinmeyen kategori / favorisiz durumda dokunulmaz", () => {
+    expect(toggleStoryKind(["movies"], "yok", FAVS)).toEqual(["movies"]);
+    expect(toggleStoryKind(["movies"], "movies", {})).toEqual([]);
+  });
+});
+
+describe("planFavoriteShelves", () => {
+  const S = FAVORITE_SHELF;
+
+  test("kategori yoksa plan yok", () => {
+    expect(planFavoriteShelves({ kinds: [], available: 400 })).toBeNull();
+    expect(planFavoriteShelves({ kinds: ["yok"], available: 400 })).toBeNull();
+  });
+
+  test("bol yerde: 3 kategori yan etiketli, adlı, en büyük boy", () => {
+    const plan = planFavoriteShelves({ kinds: [...FAVORITE_KINDS], available: 400 });
+    expect(plan).toMatchObject({ style: "side", names: true, width: S.sideMaxW });
+    expect(plan.rows.map((r) => r.kind)).toEqual(["movies", "shows", "people"]);
+    // Poster 2:3, oyuncu yuvarlak (genişlik = yükseklik).
+    expect(plan.rows[0].artH).toBe(Math.round(S.sideMaxW * 1.5));
+    expect(plan.rows[2].artH).toBe(S.sideMaxW);
+    expect(plan.height).toBeLessThanOrEqual(400);
+  });
+
+  test("1-2 kategori: etiket üstte, daha geniş posterler", () => {
+    for (const kinds of [["movies"], ["shows", "people"]]) {
+      const plan = planFavoriteShelves({ kinds, available: 400 });
+      expect(plan.style).toBe("top");
+      expect(plan.width).toBe(S.topMaxW);
+      expect(plan.width).toBeGreaterThan(S.sideMaxW);
+    }
+  });
+
+  test("dar yerde önce ad satırı düşer, sonra poster küçülür; yükseklik alana sığar", () => {
+    const tight = planFavoriteShelves({ kinds: [...FAVORITE_KINDS], available: 230 });
+    expect(tight.names).toBe(false);
+    expect(tight.width).toBeGreaterThanOrEqual(S.minW);
+    expect(tight.height).toBeLessThanOrEqual(230);
+    const roomy = planFavoriteShelves({ kinds: [...FAVORITE_KINDS], available: 360 });
+    expect(roomy.width).toBeGreaterThan(tight.width);
+  });
+
+  test("alan arttıkça: ad satırı bir kez açılır ve kalır; aynı kipte boyut azalmaz", () => {
+    // Ad satırı açılınca poster bir miktar küçülür (adlar yer ister) — bilinçli;
+    // bu yüzden genişlik yalnız AYNI ad kipinde tek yönlüdür.
+    let last = { names: false, width: 0 };
+    for (let available = 180; available <= 420; available += 10) {
+      const plan = planFavoriteShelves({ kinds: [...FAVORITE_KINDS], available });
+      if (last.names) expect(plan.names).toBe(true);
+      if (plan.names === last.names) expect(plan.width).toBeGreaterThanOrEqual(last.width);
+      if (plan.names && !last.names) expect(plan.width).toBeGreaterThanOrEqual(FAVORITE_SHELF.namesMinW);
+      last = plan;
+    }
+  });
+
+  test("oyuncu rafı poster rafından kısa (yuvarlak portre)", () => {
+    const people = planFavoriteShelves({ kinds: ["people"], available: 400 });
+    const movies = planFavoriteShelves({ kinds: ["movies"], available: 400 });
+    expect(people.height).toBeLessThan(movies.height);
+  });
+});
+
+describe("Seçki düzeni: dikey bütçe", () => {
+  const KIND_SETS = [
+    ["movies"],
+    ["shows"],
+    ["people"],
+    ["movies", "shows"],
+    ["movies", "people"],
+    ["shows", "people"],
+    ["movies", "shows", "people"],
+  ];
+  const bools = [false, true];
+
+  test("her anahtar × kategori birleşiminde kart 600 pikseli aşmaz", () => {
+    let checked = 0;
+    for (const kinds of KIND_SETS) {
+      for (const hasNote of bools) {
+        for (const showStats of bools) {
+          for (const showPerde of bools) {
+            for (const showGenres of bools) {
+              for (const showPills of bools) {
+                const plan = planPicksLayout({ kinds, hasNote, showStats, showPerde, showGenres, showPills });
+                const label = JSON.stringify({ kinds, hasNote, showStats, showPerde, showGenres, showPills });
+                expect({ label, fits: plan.used + PICKS_BUDGET.safety <= STORY_INNER_H }).toEqual({ label, fits: true });
+                expect(plan.shelf.width).toBeGreaterThanOrEqual(FAVORITE_SHELF.minW);
+                checked += 1;
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(checked).toBe(7 * 32);
+  });
+
+  test("en kalabalık kart (hepsi açık, 2 satır not, 3 kategori) hâlâ okunur boyutta", () => {
+    const plan = planPicksLayout({
+      kinds: [...FAVORITE_KINDS],
+      hasNote: true,
+      showStats: true,
+      showPerde: true,
+      showGenres: true,
+      showPills: true,
+    });
+    expect(plan.shelf.width).toBeGreaterThanOrEqual(34);
+    expect(plan.used).toBeLessThanOrEqual(STORY_INNER_H);
+  });
+
+  test("sade kartta raflar tam boy ve adlı", () => {
+    const plan = planPicksLayout({
+      kinds: [...FAVORITE_KINDS],
+      hasNote: false,
+      showStats: true,
+      showPerde: false,
+      showGenres: false,
+      showPills: false,
+    });
+    expect(plan.shelf).toMatchObject({ names: true, width: FAVORITE_SHELF.sideMaxW });
+  });
+
+  test("bölüm kapanınca raflara kalan alan artar", () => {
+    const base = { kinds: [...FAVORITE_KINDS], hasNote: true, showStats: true, showPerde: true, showGenres: true, showPills: true };
+    const full = planPicksLayout(base);
+    expect(planPicksLayout({ ...base, showPerde: false }).available).toBeGreaterThan(full.available);
+    expect(planPicksLayout({ ...base, hasNote: false }).available).toBeGreaterThan(full.available);
+    expect(planPicksLayout({ ...base, showGenres: false, showPills: false }).available).toBeGreaterThan(full.available);
+  });
+});
+
+describe("dört favori şeridi (eski düzenlerin poster alanı)", () => {
+  test("şerit, poster alanının yüksekliğine ve kart genişliğine sığar", () => {
+    for (const [layout, { slot, thumb }] of Object.entries(FAVORITE_RIBBON)) {
+      const m = ribbonMetrics(thumb);
+      expect({ layout, fits: m.height <= slot }).toEqual({ layout, fits: true });
+      // 3 kategorinin destesi + aralarındaki en az 10 px, 320 px iç genişliğe sığar.
+      expect({ layout, fits: m.stackW * 3 + 20 <= 320 }).toEqual({ layout, fits: true });
+    }
+  });
+
+  test("deste ölçüleri: 4 poster üst üste, ofset yarıdan biraz büyük", () => {
+    const m = ribbonMetrics(38);
+    expect(m).toMatchObject({ thumb: 38, thumbH: 57, offset: 20, stackW: 98, height: 75 });
   });
 });

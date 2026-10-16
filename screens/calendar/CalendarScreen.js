@@ -1,3 +1,5 @@
+import { normalizeAppLanguage, pickByLanguage } from "@utils/appLanguages";
+import { intlLocaleOf } from "../../utils/appLanguages";
 import { isLightSurface } from "@utils/colorUtils";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
@@ -60,15 +62,31 @@ LocaleConfig.locales.tr = {
   today: "Bugün",
 };
 
+LocaleConfig.locales.es = {
+  monthNames: [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  ],
+  monthNamesShort: [
+    "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+    "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+  ],
+  dayNames: ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"],
+  dayNamesShort: ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"],
+  today: "Hoy",
+};
+
+// "" = kütüphanenin varsayılanı (İngilizce). YENİ DİL: yukarıya LocaleConfig.locales.<kod> ekle.
 const applyCalendarLocale = (language) => {
-  LocaleConfig.defaultLocale = language === "tr" ? "tr" : "";
+  const code = normalizeAppLanguage(language);
+  LocaleConfig.defaultLocale = code === "en" ? "" : code;
 };
 
 /* ── Tarih formatlama ── */
 function formatDisplayDate(dateStr, lang) {
   if (!dateStr) return "";
   const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", {
+  return d.toLocaleDateString(intlLocaleOf(lang), {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -247,7 +265,7 @@ export default function CalendarScreen({ navigation }) {
   const monthLabel = useMemo(() => {
     const d = new Date(`${visibleMonth}-01T00:00:00`);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
+    return d.toLocaleDateString(intlLocaleOf(language), {
       month: "long",
       year: "numeric",
     });
@@ -640,7 +658,7 @@ export default function CalendarScreen({ navigation }) {
           markingType="multi-dot"
           markedDates={combinedMarked}
           theme={calendarTheme}
-          firstDay={language === "tr" ? 1 : 0}
+          firstDay={normalizeAppLanguage(language) === "en" ? 0 : 1}
           enableSwipeMonths
           hideExtraDays
           renderArrow={(direction) => (
@@ -761,7 +779,7 @@ export default function CalendarScreen({ navigation }) {
           fallbackRadius={12}
           onPress={refreshEvents}
           disabled={isLoadingEvents}
-          accessibilityLabel={language === "tr" ? "Takvimi yenile" : "Refresh calendar"}
+          accessibilityLabel={pickByLanguage(language, { tr: "Takvimi yenile", en: "Refresh calendar", es: "Actualizar calendario" })}
         >
           {isLoadingEvents ? <ActivityIndicator size="small" color={theme.accent} /> : null}
         </GlassIconButton>

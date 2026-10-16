@@ -10,6 +10,7 @@
 // pazarlama iletisi); öyle bir şey eklenirse AYRI bir kutu gerekir, bu satır
 // onun yerine geçmez.
 
+import { copyLanguage } from "../../utils/appLanguages";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useLanguage } from "../../context/LanguageContext";
@@ -18,7 +19,7 @@ import { i18nText } from "../../utils/i18nText";
 
 export default function LegalConsentNotice({ theme, accent }) {
   const { language } = useLanguage();
-  const lang = language === "en" ? "en" : "tr";
+  const lang = copyLanguage(language, ["tr", "en"]);
   const muted = theme?.text?.muted ?? "#999";
 
   // BOŞLUKLAR VE EKLER ÇEVİRİ METNİNİN İÇİNDE — bilerek. Türkçede bağlantı

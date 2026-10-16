@@ -4,6 +4,7 @@
 // rekorların, hangi modlarla oynanacağı ve tek dokunuşla Hızlı Oyna. Her iki oyun
 // aynı ekranı kullanır; hero, kurallar ve metinler `gameId`'ye göre değişir.
 
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -433,7 +434,7 @@ function formatLastPlayed(value, language) {
   if (!value) return i18nText("autoI18n.son_oynanma", "Son oynama");
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return i18nText("autoI18n.son_oynanma", "Son oynama");
-  return new Intl.DateTimeFormat(language === "en" ? "en-US" : "tr-TR", { day: "numeric", month: "short", year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat(intlLocaleOf(language), { day: "numeric", month: "short", year: "numeric" }).format(date);
 }
 
 const styles = StyleSheet.create({

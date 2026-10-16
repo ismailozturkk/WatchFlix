@@ -7,6 +7,7 @@
 // Card = { key, mediaType, query, found, id?, title?, posterPath?, backdropPath?, year?, rating?,
 //          overview?, tagline?, runtimeMinutes?, genres?, director?, cast?, providers?, similar? }
 
+import { tmdbLanguageOf, tmdbRegionOf } from "../utils/appLanguages";
 import * as cacheStore from "../utils/cacheStore";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
 import { adultContentAllowed } from "../utils/ageGate";
@@ -19,12 +20,12 @@ const cache = new Map(); // key -> Card
 // Kart şekli değişince artır: diskteki eski kartlar (ör. backdropPath yok) yeniden çekilir.
 const CARD_VERSION = "v2";
 
-const langOf = (language) => (language === "tr" ? "tr-TR" : "en-US");
+const langOf = (language) => (tmdbLanguageOf(language));
 // Yetişkin içerik açıkken anahtara "+adult" ekleniyor: ayar sonradan
 // kapatıldığında önbellekte kalmış yetişkin kart geri dönmesin.
 const cacheKey = (mediaType, language, title, includeDetails = false, includeAdult = false) =>
   `${mediaType}|${langOf(language)}|${title.toLowerCase().trim()}|${includeDetails === "lite" ? "lite" : includeDetails ? "details" : "card"}${includeAdult ? "|+adult" : ""}|${CARD_VERSION}`;
-const regionOf = (language) => (language === "tr" ? "TR" : "US");
+const regionOf = (language) => (tmdbRegionOf(language));
 
 function cardFromResult(result, mediaType, query) {
   const dateStr = result?.release_date || result?.first_air_date || "";

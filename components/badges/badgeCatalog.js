@@ -12,6 +12,7 @@
 // rozeti yazabilir.
 
 import { RARITY } from "@theme/badgeTokens";
+import { copyLanguage } from "../../utils/appLanguages";
 
 export const IDENTITY_BADGES = Object.freeze({
   founder: {
@@ -21,9 +22,9 @@ export const IDENTITY_BADGES = Object.freeze({
     rarity: RARITY.legendary,
     ornate: true,
     tr: "Kurucu",
-    en: "Founder",
+    en: "Founder", es: "Fundador",
     descTr: "Lansman öncesi katıldın",
-    descEn: "Joined before launch",
+    descEn: "Joined before launch", descEs: "Se unió antes del lanzamiento",
   },
   premium: {
     id: "premium",
@@ -32,9 +33,9 @@ export const IDENTITY_BADGES = Object.freeze({
     rarity: RARITY.epic,
     ornate: true,
     tr: "Premium",
-    en: "Premium",
+    en: "Premium", es: "Premium",
     descTr: "Seelogd Premium abonesi",
-    descEn: "Seelogd Premium subscriber",
+    descEn: "Seelogd Premium subscriber", descEs: "Suscripción a Seelogd Premium",
   },
   unlimited: {
     id: "unlimited",
@@ -43,13 +44,14 @@ export const IDENTITY_BADGES = Object.freeze({
     rarity: RARITY.legendary,
     ornate: true,
     tr: "Premium Max",
-    en: "Premium Max",
+    en: "Premium Max", es: "Premium Max",
     descTr: "Günde 50, ayda 900 CineMatch AI mesajı",
-    descEn: "50 CineMatch AI messages per day, 900 per month",
+    descEn: "50 CineMatch AI messages per day, 900 per month", descEs: "50 mensajes de IA de CineMatch al día, 900 al mes",
   },
 });
 
-export const badgeLabel = (badge, lang) => (lang === "tr" ? badge?.tr : badge?.en) || badge?.en || "";
+export const badgeLabel = (badge, lang) =>
+  badge?.[copyLanguage(lang, ["tr", "en", "es"])] || badge?.en || "";
 /**
  * Profilde gösterilecek kimlik rozetleri, önem sırasına göre.
  * Premium ve Unlimited AYNI ANDA verilmez — Unlimited üst kademe olduğu için

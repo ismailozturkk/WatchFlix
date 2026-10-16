@@ -1,3 +1,4 @@
+import { tmdbLanguageOf } from "../utils/appLanguages";
 import axios from "axios";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
@@ -744,7 +745,7 @@ export async function fetchOscarByCategory({
     return { items: [], hasMore: false, nextPage: page };
   }
 
-  const langCode = language === "tr" ? "tr-TR" : "en-US";
+  const langCode = tmdbLanguageOf(language);
   const authHeader = apiKey?.startsWith("Bearer ") ? apiKey : `Bearer ${apiKey}`;
 
   const resolved = await Promise.all(
@@ -830,7 +831,7 @@ export async function fetchOscarByYear({
     return [];
   }
 
-  const langCode = language === "tr" ? "tr-TR" : "en-US";
+  const langCode = tmdbLanguageOf(language);
   const authHeader = apiKey?.startsWith("Bearer ") ? apiKey : `Bearer ${apiKey}`;
 
   const results = await Promise.all(

@@ -4,12 +4,13 @@
 // kalsın diye i18n burada). Detay, kurulum ve sonuç ekranları aynı mod özetini
 // ve aynı oyun adını gösterir.
 
+import { copyLanguage } from "../../utils/appLanguages";
 import { i18nText } from "@utils/i18nText";
 import { getGameEntry } from "./gameRegistry";
 
 /** "10 soru · ~3 dk · Liderlik" gibi mod özeti. */
 export function getModeMetaLine(mode, language) {
-  const en = language === "en";
+  const en = copyLanguage(language, ["tr", "en"]) === "en";
   const parts = [];
   if (mode.questionCount) parts.push(`${mode.questionCount} ${i18nText("autoI18n.soru", en ? "questions" : "soru")}`);
   if (mode.totalSeconds) parts.push(`${mode.totalSeconds} ${i18nText("autoI18n.saniye", en ? "sec" : "sn")}`);

@@ -37,6 +37,7 @@ import { resolveGenreIds } from "../utils/discoveryPersonalization";
 import { applyFacts, langOf, todayListDate } from "../utils/mediaFacts";
 import { getReleaseState, RELEASE_STATE } from "../utils/watchState";
 import { mediaToListItem } from "../utils/listShare";
+import { APP_LANGUAGES } from "../utils/appLanguages";
 import { addItemToSharedList } from "./sharedListsService";
 import {
   listAcceptedTypes,
@@ -124,8 +125,8 @@ export async function searchForList({
  * Liste öğelerindeki tür ADLARINI bu medya tipinin TMDB tür ID'lerine çevirir.
  *
  * NEDEN AD→ID: liste öğeleri türü yerelleştirilmiş ad olarak saklıyor
- * (utils/listShare.mediaToListItem), discover ise id istiyor. Tablo HEM tr-TR
- * HEM en-US çekilir çünkü öğeler, o an hangi dil açıksa o dilde kaydedilmiş
+ * (utils/listShare.mediaToListItem), discover ise id istiyor. Tablo DESTEKLENEN HER
+ * dilde (tr-TR, en-US, es-ES …) çekilir çünkü öğeler, o an hangi dil açıksa o dilde kaydedilmiş
  * olabilir — Türkçe kaydedilmiş "Aksiyon", arayüz İngilizceyken de çözülmeli.
  *
  * Film ve dizi tür ID'leri AYRI evrenlerdir (film 28 "Aksiyon", dizi 10759
@@ -135,7 +136,7 @@ export async function searchForList({
 async function resolveListGenreIds({ type, genreNames, apiKey }) {
   if (!genreNames?.length) return [];
   const catalogs = await Promise.all(
-    ["tr-TR", "en-US"].map(async (locale) => {
+    APP_LANGUAGES.map((entry) => entry.tmdbLanguage).map(async (locale) => {
       try {
         const { data } = await cachedTmdb(
           `${TMDB}/genre/${type}/list?language=${locale}`,

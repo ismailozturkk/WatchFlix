@@ -18,6 +18,7 @@
 // sayısı sığdırmayla seçildiği için içerik normalde çerçeveye SIĞAR — yine de
 // `overflow: hidden` korunur, taşma olursa gerçekte olduğu gibi kırpılır.
 
+import { copyLanguage, normalizeAppLanguage } from "../../../../utils/appLanguages";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import AppIcon from "@components/AppIcon";
@@ -63,13 +64,13 @@ const frameHeightOf = (width, widgetId, family) =>
 
 // ─── Yaklaşanlar ─────────────────────────────────────────────────────────────
 
-function ReminderRow({ item, isTr, showIcon, showDate, metrics: m, p }) {
+function ReminderRow({ item, isTr, es, lang, showIcon, showDate, metrics: m, p }) {
   const isMovie = item.type === "movie";
-  const typeLabel = isMovie ? (isTr ? "Film" : "Movie") : isTr ? "Dizi" : "TV";
+  const typeLabel = isMovie ? (isTr ? "Film" : es ? "Película" : "Movie") : isTr ? "Dizi" : es ? "Serie" : "TV";
   const meta = [
     typeLabel,
     item.sub,
-    showDate ? countdownLabel(item.daysLeft, isTr) : "",
+    showDate ? countdownLabel(item.daysLeft, lang) : "",
   ]
     .filter(Boolean)
     .join("  •  ");
@@ -141,11 +142,12 @@ function ReminderRow({ item, isTr, showIcon, showDate, metrics: m, p }) {
 function ReminderPreview({ settings, family, width }) {
   const p = settings.appearance;
   const { language } = useLanguage();
-  const isTr = language !== "en";
+  const isTr = copyLanguage(language, ["tr", "en"]) === "tr";
+  const es = normalizeAppLanguage(language) === "es";
   const compact = settings.density === "compact";
   const m = iosReminderMetrics({ family, compact });
   const frameHeight = frameHeightOf(width, "reminders", family);
-  const samples = useMemo(() => buildReminderSamples({ isTr }), [isTr]);
+  const samples = useMemo(() => buildReminderSamples({ isTr: language }), [language]);
   const filtered =
     settings.content === "all"
       ? samples
@@ -210,16 +212,14 @@ function ReminderPreview({ settings, family, width }) {
                   },
                 ]}
               >
-                {isTr ? "Yaklaşanlar" : "Coming Up"}
+                {isTr ? "Yaklaşanlar" : es ? "Próximos" : "Coming Up"}
               </Text>
               <Text
                 numberOfLines={1}
                 allowFontScaling={false}
                 style={[styles.remCount, { color: p.accent }]}
               >
-                {isTr
-                  ? `${filtered.length} hatırlatma`
-                  : `${filtered.length} reminders`}
+                {isTr ? `${filtered.length} hatırlatma` : es ? `${filtered.length} recordatorios` : `${filtered.length} reminders`}
               </Text>
             </View>
             {m.divider && <View style={styles.divider} />}
@@ -232,9 +232,7 @@ function ReminderPreview({ settings, family, width }) {
               allowFontScaling={false}
               style={[styles.emptyText, { color: p.muted }]}
             >
-              {isTr
-                ? "Yaklaşan film veya bölüm yok"
-                : "No upcoming movies or episodes"}
+              {isTr ? "Yaklaşan film veya bölüm yok" : es ? "No hay películas ni episodios próximos" : "No upcoming movies or episodes"}
             </Text>
           </View>
         ) : (
@@ -244,6 +242,8 @@ function ReminderPreview({ settings, family, width }) {
                 key={item.id}
                 item={item}
                 isTr={isTr}
+                es={es}
+                lang={language}
                 showIcon={settings.showPosters}
                 showDate={settings.showDates}
                 metrics={m}
@@ -255,7 +255,7 @@ function ReminderPreview({ settings, family, width }) {
                 allowFontScaling={false}
                 style={[styles.overflow, { color: p.accent }]}
               >
-                {isTr ? `+${overflow} daha` : `+${overflow} more`}
+                {isTr ? `+${overflow} daha` : es ? `+${overflow} más` : `+${overflow} more`}
               </Text>
             )}
           </>
@@ -317,11 +317,12 @@ function ListRow({ list, showCount, metrics: m, p }) {
 function ListsPreview({ settings, family, width }) {
   const p = settings.appearance;
   const { language } = useLanguage();
-  const isTr = language !== "en";
+  const isTr = copyLanguage(language, ["tr", "en"]) === "tr";
+  const es = normalizeAppLanguage(language) === "es";
   const compact = settings.density === "compact";
   const m = iosListMetrics({ family, compact });
   const frameHeight = frameHeightOf(width, "lists", family);
-  const lists = useMemo(() => buildListSamples({ isTr }), [isTr]);
+  const lists = useMemo(() => buildListSamples({ isTr: language }), [language]);
   // "+N daha" etiketi yok (label çok büyük → sığmaz), sınır yok (Infinity).
   const fit = fitRows({
     available: iosContentHeight(frameHeight),
@@ -371,7 +372,7 @@ function ListsPreview({ settings, family, width }) {
                 },
               ]}
             >
-              {isTr ? "Listelerim" : "My Lists"}
+              {isTr ? "Listelerim" : es ? "Mis listas" : "My Lists"}
             </Text>
           </View>
         )}
@@ -522,18 +523,19 @@ function DurationItem({ icon, value, label, tint, scale, p }) {
 function StatsPreview({ settings, family, width }) {
   const p = settings.appearance;
   const { t, language } = useLanguage();
-  const isTr = language !== "en";
+  const isTr = copyLanguage(language, ["tr", "en"]) === "tr";
+  const es = normalizeAppLanguage(language) === "es";
   const large = family === "large";
   const scale = large ? IOS_STATS_SCALE.large : IOS_STATS_SCALE.medium;
   const frameHeight = frameHeightOf(width, "stats", family);
   const ps = t?.profileScreen || {};
-  const hours = etiket(ps.hours, isTr ? "Saat" : "Hours");
+  const hours = etiket(ps.hours, isTr ? "Saat" : es ? "Horas" : "Hours");
   const units = [
-    etiket(ps.years, isTr ? "Yıl" : "Years"),
-    etiket(ps.months, isTr ? "Ay" : "Months"),
-    etiket(ps.days, isTr ? "Gün" : "Days"),
+    etiket(ps.years, isTr ? "Yıl" : es ? "Años" : "Years"),
+    etiket(ps.months, isTr ? "Ay" : es ? "Meses" : "Months"),
+    etiket(ps.days, isTr ? "Gün" : es ? "Días" : "Days"),
     hours,
-    etiket(ps.minutes, isTr ? "Dakika" : "Minutes"),
+    etiket(ps.minutes, isTr ? "Dakika" : es ? "Minutos" : "Minutes"),
   ];
   // Kenar boşluğu: iOS 17+ sistem boşluğu (statsCompact yalnız iOS < 17'de dolguyu değiştirir).
   const inset = IOS_SYSTEM_MARGIN;
@@ -552,7 +554,7 @@ function StatsPreview({ settings, family, width }) {
     <View style={styles.timeRow}>
       <StatBlock
         value="184"
-        label={etiket(ps.movieWatched, isTr ? "İzlenen Filmler" : "Movies Watched")}
+        label={etiket(ps.movieWatched, isTr ? "İzlenen Filmler" : es ? "Películas vistas" : "Movies Watched")}
         valueSize={scale.countValue}
         labelSize={scale.countLabel}
         p={p}
@@ -563,7 +565,7 @@ function StatsPreview({ settings, family, width }) {
     <View style={styles.timeRow}>
       <StatBlock
         value="37"
-        label={etiket(ps.tvShowCount, isTr ? "Dizi Sayısı" : "Shows")}
+        label={etiket(ps.tvShowCount, isTr ? "Dizi Sayısı" : es ? "Series" : "Shows")}
         valueSize={scale.countValue}
         labelSize={scale.countLabel}
         p={p}
@@ -572,7 +574,7 @@ function StatsPreview({ settings, family, width }) {
         value="912"
         label={etiket(
           ps.tvShowEpisodetotalCount,
-          isTr ? "Bölüm Sayısı" : "Episodes",
+          isTr ? "Bölüm Sayısı" : es ? "Episodios" : "Episodes",
         )}
         valueSize={scale.countValue}
         labelSize={scale.countLabel}
@@ -593,7 +595,7 @@ function StatsPreview({ settings, family, width }) {
       <DurationItem
         icon="time-outline"
         value={`1.284 ${hours}`}
-        label={etiket(ps.totalDuration, isTr ? "Toplam Süre" : "Total Duration")}
+        label={etiket(ps.totalDuration, isTr ? "Toplam Süre" : es ? "Duración total" : "Total Duration")}
         tint={p.accent}
         scale={scale}
         p={p}
@@ -601,7 +603,7 @@ function StatsPreview({ settings, family, width }) {
       <DurationItem
         icon="film-outline"
         value={`356 ${hours}`}
-        label={etiket(t?.movies, isTr ? "Filmler" : "Movies")}
+        label={etiket(t?.movies, isTr ? "Filmler" : es ? "Películas" : "Movies")}
         tint={p.accent}
         scale={scale}
         p={p}
@@ -609,7 +611,7 @@ function StatsPreview({ settings, family, width }) {
       <DurationItem
         icon="tv-outline"
         value={`928 ${hours}`}
-        label={etiket(t?.tvShows, isTr ? "Diziler" : "TV Shows")}
+        label={etiket(t?.tvShows, isTr ? "Diziler" : es ? "Series" : "TV Shows")}
         tint={p.bold}
         scale={scale}
         p={p}
@@ -652,7 +654,7 @@ function StatsPreview({ settings, family, width }) {
           },
         ]}
       >
-        {isTr ? "İstatistikler" : "Statistics"}
+        {isTr ? "İstatistikler" : es ? "Estadísticas" : "Statistics"}
       </Text>
     </View>
   );

@@ -1,3 +1,4 @@
+import { intlLocaleOf, tmdbLanguageOf } from "../../utils/appLanguages";
 import { isLightSurface } from "@utils/colorUtils";
 import ComposerBlur, {
   COMPOSER_GLASS_PILL_STYLE,
@@ -231,7 +232,7 @@ const formatDateLabel = (date, language) => {
   yest.setDate(now.getDate() - 1);
   if (isSameDay(date, now)) return i18nText("autoI18n.bugun", "Bugün");
   if (isSameDay(date, yest)) return i18nText("autoI18n.dun", "Dün");
-  return date.toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
+  return date.toLocaleDateString(intlLocaleOf(language), {
     day: "numeric",
     month: "long",
     ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
@@ -371,7 +372,7 @@ export default function ChatScreen({ route, navigation }) {
   const auth = getAuth();
   const currentUser = auth.currentUser;
   const { language } = useLanguage();
-  const locale = language === "tr" ? "tr-TR" : "en-US";
+  const locale = intlLocaleOf(language);
 
   const { API_KEY } = useApiSettings();
   const { hapticsEnabled } = useHapticsSettings();
@@ -1587,7 +1588,7 @@ export default function ChatScreen({ route, navigation }) {
         const params = {
           query: queryText.trim(),
           include_adult: adultContent,
-          language: language === "tr" ? "tr-TR" : "en-US",
+          language: tmdbLanguageOf(language),
           page: 1,
         };
         const response = await axios.get(url, {

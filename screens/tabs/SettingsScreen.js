@@ -57,6 +57,7 @@ import useAiPrefs from "@hooks/useAiPrefs";
 import { getAiCopy } from "@utils/aiCopy";
 import { countCustomizedPrefs } from "@utils/aiPrefs";
 import DevPlanSimulatorCard from "@components/settings/DevPlanSimulatorCard";
+import FeedbackSettingsGroup from "@components/settings/FeedbackSettingsGroup";
 import {
   DATA_TYPE_COUNT,
   buildAllTypes,
@@ -67,13 +68,19 @@ import ImportDataModal from "../../components/import/ImportDataModal";
 import useAppLogo from "@hooks/useAppLogo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { tabTitleTopSpacing } from "../../utils/screenTopSpacing";
+import {
+  APP_LANGUAGES,
+  intlLocaleOf,
+  pickByLanguage,
+  tmdbLanguageOf,
+  tmdbRegionOf,
+} from "../../utils/appLanguages";
 
 const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
 
-const LANGUAGES = [
-  { code: "tr", name: "Türkçe", nativeName: "Türkçe", flag: "tr" },
-  { code: "en", name: "English", nativeName: "English", flag: "us" },
-];
+// Seçilebilir diller utils/appLanguages.js'ten gelir (yeni dil = oraya kayıt +
+// translations/<kod>.json). Rehber: docs/mimari/DIL_DESTEGI_REHBERI.md
+const LANGUAGES = APP_LANGUAGES;
 
 const IMAGE_QUALITIES = [
   { labelKey: "imageQualityLow", value: "low" },
@@ -388,8 +395,8 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     let active = true;
-    const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
-    const tmdbRegion = language === "tr" ? "TR" : "US";
+    const tmdbLanguage = tmdbLanguageOf(language);
+    const tmdbRegion = tmdbRegionOf(language);
     const cacheKey = `settings_provider_catalog_${tmdbLanguage}_${tmdbRegion}`;
 
     const applyCatalog = (rawProviders) => {
@@ -474,23 +481,24 @@ export default function SettingsScreen() {
   const providerSummary = streamingProviderIds.length
     ? selectedProviderNames.length
       ? selectedProviderNames.join(", ")
-      : language === "tr"
-        ? `${streamingProviderIds.length} platform seçili`
-        : `${streamingProviderIds.length} services selected`
-    : language === "tr"
-      ? "Henüz platform seçilmedi"
-      : "No services selected yet";
+      : pickByLanguage(language, {
+          tr: `${streamingProviderIds.length} platform seçili`,
+          en: `${streamingProviderIds.length} services selected`,
+          es: `${streamingProviderIds.length} servicios seleccionados`,
+        })
+    : pickByLanguage(language, {
+        tr: "Henüz platform seçilmedi",
+        en: "No services selected yet",
+        es: "Aún no has elegido servicios",
+      });
 
   const filteredProviders = useMemo(() => {
-    const query = providerSearch.trim().toLocaleLowerCase(
-      language === "tr" ? "tr-TR" : "en-US",
-    );
+    const locale = intlLocaleOf(language);
+    const query = providerSearch.trim().toLocaleLowerCase(locale);
     return providerCatalog
       .filter((provider) =>
         query
-          ? provider.name
-              .toLocaleLowerCase(language === "tr" ? "tr-TR" : "en-US")
-              .includes(query)
+          ? provider.name.toLocaleLowerCase(locale).includes(query)
           : true,
       )
       .sort((a, b) => {
@@ -952,6 +960,9 @@ export default function SettingsScreen() {
             last
           />
         </View>
+
+        {/* ── Destek ve geri bildirim: hata bildirimi (Premium+), özellik isteği (Max) ── */}
+        <FeedbackSettingsGroup C={C} />
 
         {/* ── Hakkında + hata ayıklama ── */}
         <SwipeCard>

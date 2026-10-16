@@ -6,6 +6,7 @@
 // Satır düzeni başlığı tam gösteriyor, ne tür bir etkinlik olduğunu yazıyor ve
 // telefon takvimine ekleme düğmesini her satırın SAĞINDA, sabit yerde tutuyor.
 
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { memo, useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Image } from "expo-image";
@@ -44,7 +45,7 @@ function dayRelativeLabel(diff) {
 function dateTileParts(dateStr, language) {
   const date = new Date(`${dateStr}T00:00:00`);
   if (Number.isNaN(date.getTime())) return { day: "", month: "", weekday: "" };
-  const locale = language === "tr" ? "tr-TR" : "en-US";
+  const locale = intlLocaleOf(language);
   return {
     day: date.getDate(),
     month: date.toLocaleDateString(locale, { month: "short" }).replace(".", ""),

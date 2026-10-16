@@ -11,6 +11,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, useWindowDimensions } from "react-native";
 import { now } from "@services/tournamentEngine";
+import { pickByLanguage } from "@utils/appLanguages";
 import { RollingDigit } from "../animated/RollingNumber";
 
 const DUR = 420;
@@ -98,8 +99,11 @@ export default function CountdownTimer({
         ? { h: 28, w: 17, font: 22, label: 9, gap: 3, pad: 5, radius: 10 }
         : { h: 32, w: 20, font: 27, label: 10, gap: 3, pad: 6, radius: 10 }
       : { h: 19, w: 14, font: 15, label: 7, gap: 2, pad: 5, radius: 8 };
-  const labels =
-    lang === "tr" ? ["GÜN", "SAAT", "DK", "SN"] : ["DAY", "HR", "MIN", "SEC"];
+  const labels = pickByLanguage(lang, {
+    tr: ["GÜN", "SAAT", "DK", "SN"],
+    en: ["DAY", "HR", "MIN", "SEC"],
+    es: ["DÍAS", "H", "MIN", "S"],
+  });
   const values = [d, h, m, s];
 
   return (

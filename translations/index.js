@@ -6,6 +6,7 @@ import {
   cihazDilindenSec,
 } from "../utils/deviceLanguage";
 import en from "./en.json";
+import es from "./es.json";
 import tr from "./tr.json";
 
 // Kayıtlı dil YOKSA cihaz dili. `get()` kayıt yokken registry varsayılanını
@@ -35,8 +36,11 @@ const languageDetector = {
   cacheUserLanguage: () => {},
 };
 
+// Yeni dil: utils/appLanguages.js'e kayıt + buraya paket (statik import şart —
+// Metro dinamik require'ı paketlemez). Rehber: docs/mimari/DIL_DESTEGI_REHBERI.md
 const resources = {
   en: { translation: en },
+  es: { translation: es },
   tr: { translation: tr },
 };
 
@@ -45,7 +49,9 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng: "tr",
+    // Eksik anahtar önce İngilizce'ye, sonra Türkçe'ye düşer (es için). tr/en eskisi
+    // gibi Türkçe'ye düşer — paketleri tam eşit olduğundan bu yalnız güvenlik ağı.
+    fallbackLng: { es: ["en", "tr"], default: ["tr"] },
     compatibilityJSON: "v3", // React Native Android için gereklidir
     interpolation: {
       escapeValue: false, // React XSS'e karşı kendi korumasına sahip

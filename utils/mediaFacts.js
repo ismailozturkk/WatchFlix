@@ -1,7 +1,8 @@
 // utils/mediaFacts.js
 //
 // Paylaşım medyasının "olguları" (süre, bölüm/sezon sayısı, tür adları) —
-// SAF çekirdek. Hiçbir import yok: RN, Firebase, axios, i18nText dahil.
+// SAF çekirdek. Yalnız saf bir import var (utils/appLanguages); RN, Firebase, axios,
+// i18nText YOK.
 //
 // NEDEN VAR: composer'daki TMDB ARAMA sonucu hafiftir (id, title, poster_path,
 // genre_ids, release_date) — süre YOKTUR. Profil listesi öğesi ise `minutes`
@@ -22,6 +23,8 @@
 // süresi hesapları `movies.reduce((a, m) => a + (m.minutes || 0), 0)` deseniyle
 // çalışıyor, diziye minutes sızdırmak o toplamları ve rank rengini şişirirdi.
 
+import { tmdbLanguageOf } from "./appLanguages";
+
 export const FACT_KEYS = [
   "minutes",
   "episodeMinutes",
@@ -41,7 +44,8 @@ const typeOf = (media) => {
 };
 
 export function langOf(language) {
-  return language === "tr" || language === "tr-TR" ? "tr-TR" : "en-US";
+  // "tr-TR" gibi bölgeli kodlar da gelebilir: appLanguages taban kodu çözer.
+  return tmdbLanguageOf(language);
 }
 
 /** Olgu haritalarının anahtarı. Aynı TMDB id'li film ve dizi AYRI kayıttır. */

@@ -1,3 +1,4 @@
+import { tmdbLanguageOf } from "../../utils/appLanguages";
 import { Image } from "expo-image";
 import React, { useCallback, useState, useRef, useEffect, memo } from "react";
 import {
@@ -299,7 +300,7 @@ const DiscoverSection = memo(
     useEffect(() => {
       const fetchAll = async () => {
         try {
-          const lang = language === "tr" ? "tr-TR" : "en-US";
+          const lang = tmdbLanguageOf(language);
           const headers = { Authorization: API_KEY };
           const [pop, trend] = await Promise.all([
             axios.get("https://api.themoviedb.org/3/person/popular", {
@@ -557,7 +558,7 @@ export default function ActorSearch({ navigation, route, isUnified, unifiedQuery
             mediaType: "person",
             query: searchText,
             adultContent,
-            language: language === "tr" ? "tr-TR" : "en-US",
+            language: tmdbLanguageOf(language),
             API_KEY,
           });
         if (requestId !== searchRequestRef.current) return;

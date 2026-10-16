@@ -6,6 +6,7 @@
 // Her rolde 9'arlı yatay kaydırılabilir sayfa (3x3 sabit boyutlu grid) yapısı
 // kullanılarak üstteki canlı önizleme ve rol sekmelerinin daima görünür kalması
 // ve font karakterlerinden bağımsız kusursuz kart hizalaması sağlanır.
+import { copyLanguage } from "../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Platform,
@@ -96,7 +97,7 @@ export default function FontSettingsSection({ colors, language }) {
   const saklananSecimVar = TEXT_ROLES.some(
     (rol) => durum.selected && durum.selected[rol] !== durum[rol],
   );
-  const locale = language === "en" ? "en" : "tr";
+  const locale = copyLanguage(language, ["tr", "en", "es"]);
   const [aktifRol, setAktifRol] = useState("heading");
   const [aktifSayfa, setAktifSayfa] = useState(0);
   const [galleryWidth, setGalleryWidth] = useState(0);
@@ -581,7 +582,9 @@ export default function FontSettingsSection({ colors, language }) {
         >
           {locale === "tr"
             ? "Seçtiğin premium yazı tipleri saklı; Premium ile geri gelir."
-            : "Your premium font picks are saved and return with Premium."}
+            : locale === "es"
+              ? "Las fuentes Premium que elegiste están guardadas y vuelven con Premium."
+              : "Your premium font picks are saved and return with Premium."}
         </Text>
       ) : null}
 

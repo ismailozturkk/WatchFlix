@@ -12,6 +12,7 @@
 //   Lists/{uid}/watchedMovies          → yeni format filmler (tek seferlik)
 //   Lists/{uid}/watchedTv              → yeni format diziler (tek seferlik)
 
+import { intlLocaleOf } from "../../../utils/appLanguages";
 import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import {
   View,
@@ -29,6 +30,7 @@ import { Image } from "expo-image";
 import { doc, collection, onSnapshot, getDocs } from "firebase/firestore";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import ConfirmSheet from "@components/common/ConfirmSheet";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import GlassIconButton from "@components/common/GlassIconButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -38,7 +40,6 @@ import { useTheme } from "../../../context/ThemeContext";
 import { useAuth } from "../../../context/AuthContext";
 import { getAvatarSource } from "../../../utils/avatars";
 import { useFriends } from "../../../context/FriendsContext";
-import { appAlert } from "../../../components/AppAlert";
 import ReportReasonSheet from "../../../components/moderation/ReportReasonSheet";
 import { reportUser } from "../../../services/reportService";
 import { useProfileUi } from "../../../context/ProfileUiContext";
@@ -70,11 +71,10 @@ import {
   ProfileStatStrip,
   SectionHeader,
   CountChip,
-  WatchSummaryCard,
-  WatchMetricGrid,
-  TopGenresCard,
+  WatchStatsCard,
   ProfileNoticeCard,
 } from "../../../components/friends/FriendProfileSections";
+import ProfileOptionsSheet from "../../../components/friends/ProfileOptionsSheet";
 import * as Haptics from "../../../services/hapticsService";
 import FavoritesShowcase from "../../../components/favorites/FavoritesShowcase";
 import { getFavoritesCopy } from "../../../utils/favoritesCopy";
@@ -124,7 +124,7 @@ const formatDuration = (totalMinutes) => {
 const formatMemberSince = (ts, language) => {
   const ms = ts?.toMillis?.();
   if (!ms) return null;
-  return new Intl.DateTimeFormat(language === "tr" ? "tr-TR" : "en-US", { month: "long", year: "numeric" }).format(new Date(ms));
+  return new Intl.DateTimeFormat(intlLocaleOf(language), { month: "long", year: "numeric" }).format(new Date(ms));
 };
 
 // Kapak düzeni (gridStyle/allCornersRounded) profil rayıyla (ProfileLists) ve
@@ -296,6 +296,14 @@ export default function FriendProfileScreen({ route, navigation }) {
   const [pendingQuickActions, setPendingQuickActions] = useState(null);
   const [unfriendModalVisible, setUnfriendModalVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
+  // "⋯" menüsü + engelleme onayı. Menü satırı başka bir Modal açar; iOS kapanmakta
+  // olan Modal'ın üstüne ikincisini sunamaz → seçilen işi ref'te tutup menü
+  // tamamen kalkınca (onDismissed) çalıştırıyoruz.
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [blockConfirmVisible, setBlockConfirmVisible] = useState(false);
+  // Onay sayfası kapanırken (≈260 ms) metni/ikonu değişmesin diye ayrı tutulur.
+  const [blockConfirmUnblock, setBlockConfirmUnblock] = useState(false);
+  const afterMenuRef = useRef(null);
   const [showAvatarPreview, setShowAvatarPreview] = useState(false);
 
   const friend = isFriend(friendUid);
@@ -521,7 +529,7 @@ export default function FriendProfileScreen({ route, navigation }) {
       ...PROTECTED_LISTS.map((n) => entries.find(([ln]) => ln === n)).filter(Boolean),
       ...entries
         .filter(([ln]) => !PROTECTED_LISTS.includes(ln))
-        .sort((a, b) => a[0].localeCompare(b[0], language === "tr" ? "tr" : "en")),
+        .sort((a, b) => a[0].localeCompare(b[0], intlLocaleOf(language))),
     ];
   }, [allLists, profile, language, subMovies, subShows, subFavorites, subWatchList, subCustomItems]);
 
@@ -558,59 +566,41 @@ export default function FriendProfileScreen({ route, navigation }) {
   );
 
   const openModerationMenu = useCallback(() => {
-    // Engelliyken tek anlamlı eylem engeli kaldırmak; şikâyet yolu yine açık
-    // kalıyor (engellemek bildirmenin yerine geçmez).
-    appAlert(
-      i18nText("autoI18n.secenekler", "Seçenekler"),
-      undefined,
-      [
-        {
-          text: i18nText("autoI18n.sikayet_et", "Şikayet et"),
-          onPress: () => setReportVisible(true),
-        },
-        blocked
-          ? {
-              text: i18nText("autoI18n.engeli_kaldir", "Engeli kaldır"),
-              onPress: () =>
-                appAlert(
-                  i18nText("autoI18n.engeli_kaldir", "Engeli kaldır"),
-                  i18nText(
-                    "autoI18n.engeli_kaldir_onay_metni",
-                    "Bu kullanıcının gönderilerini ve mesajlarını yeniden görebileceksin.",
-                  ),
-                  [
-                    { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
-                    {
-                      text: i18nText("autoI18n.engeli_kaldir", "Engeli kaldır"),
-                      onPress: () => unblock(friendUid),
-                    },
-                  ],
-                ),
-            }
-          : {
-              text: i18nText("autoI18n.kullaniciyi_engelle", "Kullanıcıyı engelle"),
-              style: "destructive",
-              onPress: () =>
-                appAlert(
-                  i18nText("autoI18n.kullaniciyi_engelle", "Kullanıcıyı engelle"),
-                  i18nText(
-                    "autoI18n.engelle_onay_metni",
-                    "Gönderilerini, yorumlarını ve mesajlarını görmezsin. Arkadaşsanız arkadaşlık da kalkar.",
-                  ),
-                  [
-                    { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
-                    {
-                      text: i18nText("autoI18n.engelle", "Engelle"),
-                      style: "destructive",
-                      onPress: () => block(friendUid),
-                    },
-                  ],
-                ),
-            },
-        { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
-      ],
-    );
-  }, [blocked, block, unblock, friendUid]);
+    // Bayat bir iş (menü açılıp vazgeçilen) sonraki açılışta tetiklenmesin.
+    afterMenuRef.current = null;
+    setMenuVisible(true);
+  }, []);
+
+  const closeMenu = useCallback(() => setMenuVisible(false), []);
+  const chooseFromMenu = useCallback((next) => {
+    afterMenuRef.current = next;
+    setMenuVisible(false);
+  }, []);
+  const handleMenuDismissed = useCallback(() => {
+    const next = afterMenuRef.current;
+    afterMenuRef.current = null;
+    next?.();
+  }, []);
+
+  // Engelliyken tek anlamlı eylem engeli kaldırmak; şikâyet yolu yine açık
+  // kalıyor (engellemek bildirmenin yerine geçmez).
+  const chooseReport = useCallback(
+    () => chooseFromMenu(() => setReportVisible(true)),
+    [chooseFromMenu],
+  );
+  const chooseBlockToggle = useCallback(
+    () =>
+      chooseFromMenu(() => {
+        setBlockConfirmUnblock(blocked);
+        setBlockConfirmVisible(true);
+      }),
+    [chooseFromMenu, blocked],
+  );
+  const confirmBlockToggle = useCallback(() => {
+    setBlockConfirmVisible(false);
+    if (blockConfirmUnblock) unblock(friendUid);
+    else block(friendUid);
+  }, [blockConfirmUnblock, block, unblock, friendUid]);
 
   // ── İlişki butonu ─────────────────────────────────────────────────────────
   const confirmUnfriend = useCallback(() => setUnfriendModalVisible(true), []);
@@ -890,33 +880,31 @@ export default function FriendProfileScreen({ route, navigation }) {
               <ActivityIndicator size="small" color={theme.accent} style={{ marginVertical: 24 }} />
             ) : (
               <>
-                <WatchSummaryCard
+                <WatchStatsCard
                   caption={i18nText("autoI18n.toplam_izleme_suresi", "Toplam izleme süresi")}
                   totalLabel={formatDuration(stats.totalMinutes)}
-                  minutesLabel={`${stats.totalMinutes.toLocaleString(language === "tr" ? "tr-TR" : "en-US")} ${i18nText("autoI18n.dakika", "dk")}`}
+                  minutesLabel={`${stats.totalMinutes.toLocaleString(intlLocaleOf(language))} ${i18nText("autoI18n.dakika", "dk")}`}
                   movie={{
                     label: i18nText("autoI18n.film", "Film"),
                     minutes: stats.movieMinutes,
                     share: movieShare,
                     color: blue,
+                    durationLabel: formatDuration(stats.movieMinutes),
                   }}
                   tv={{
                     label: i18nText("autoI18n.dizi", "Dizi"),
                     minutes: stats.tvMinutes,
                     share: tvShare,
                     color: green,
+                    durationLabel: formatDuration(stats.tvMinutes),
                   }}
-                />
-
-                <WatchMetricGrid
-                  items={[
+                  metrics={[
                     {
                       key: "movie",
                       icon: "movie-outline",
                       iconLib: "mci",
                       label: i18nText("autoI18n.film", "Film"),
-                      value: stats.movieCount,
-                      detail: formatDuration(stats.movieMinutes),
+                      value: stats.movieCount.toLocaleString(intlLocaleOf(language)),
                       color: blue,
                     },
                     {
@@ -924,8 +912,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                       icon: "tv",
                       iconLib: "feather",
                       label: i18nText("autoI18n.dizi", "Dizi"),
-                      value: stats.showCount,
-                      detail: formatDuration(stats.tvMinutes),
+                      value: stats.showCount.toLocaleString(intlLocaleOf(language)),
                       color: green,
                     },
                     {
@@ -933,8 +920,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                       icon: "layers-outline",
                       iconLib: "ion",
                       label: i18nText("autoI18n.sezon", "Sezon"),
-                      value: stats.seasonCount,
-                      detail: i18nText("autoI18n.izlenen", "İzlenen"),
+                      value: stats.seasonCount.toLocaleString(intlLocaleOf(language)),
                       color: orange,
                     },
                     {
@@ -942,20 +928,14 @@ export default function FriendProfileScreen({ route, navigation }) {
                       icon: "play-circle-outline",
                       iconLib: "ion",
                       label: i18nText("autoI18n.bolum_2", "Bölüm"),
-                      value: stats.episodeCount,
-                      detail: i18nText("autoI18n.toplam", "Toplam"),
+                      value: stats.episodeCount.toLocaleString(intlLocaleOf(language)),
                       color: theme.accent,
                     },
                   ]}
+                  genresTitle={i18nText("autoI18n.en_cok_izlenen_turler", "En Çok İzlenen Türler")}
+                  genres={stats.topGenres}
+                  genreColors={genreColors}
                 />
-
-                {stats.topGenres.length > 0 && (
-                  <TopGenresCard
-                    title={i18nText("autoI18n.en_cok_izlenen_turler", "En Çok İzlenen Türler")}
-                    genres={stats.topGenres}
-                    colors={genreColors}
-                  />
-                )}
               </>
             )}
 
@@ -1159,6 +1139,49 @@ export default function FriendProfileScreen({ route, navigation }) {
         post={saveListPost}
         onClose={() => setSaveListPost(null)}
         onSaved={() => setSaveListPost(null)}
+      />
+
+      <ProfileOptionsSheet
+        visible={menuVisible}
+        onClose={closeMenu}
+        onDismissed={handleMenuDismissed}
+        name={displayName || profile.username || friendName}
+        username={profile.username}
+        avatarIndex={profile.avatarIndex}
+        photoURL={profile.photoURL}
+        blocked={blocked}
+        onReport={chooseReport}
+        onToggleBlock={chooseBlockToggle}
+      />
+
+      <ConfirmSheet
+        visible={blockConfirmVisible}
+        onClose={() => setBlockConfirmVisible(false)}
+        onConfirm={confirmBlockToggle}
+        tone={blockConfirmUnblock ? "accent" : "danger"}
+        icon={blockConfirmUnblock ? "lock-open-outline" : "ban-outline"}
+        title={
+          blockConfirmUnblock
+            ? i18nText("autoI18n.engeli_kaldir", "Engeli kaldır")
+            : i18nText("autoI18n.kullaniciyi_engelle", "Kullanıcıyı engelle")
+        }
+        message={
+          blockConfirmUnblock
+            ? i18nText(
+                "autoI18n.engeli_kaldir_onay_metni",
+                "Bu kullanıcının gönderilerini ve mesajlarını yeniden görebileceksin.",
+              )
+            : i18nText(
+                "autoI18n.engelle_onay_metni",
+                "Gönderilerini, yorumlarını ve mesajlarını görmezsin. Arkadaşsanız arkadaşlık da kalkar.",
+              )
+        }
+        confirmLabel={
+          blockConfirmUnblock
+            ? i18nText("autoI18n.engeli_kaldir", "Engeli kaldır")
+            : i18nText("autoI18n.engelle", "Engelle")
+        }
+        cancelLabel={i18nText("autoI18n.iptal", "İptal")}
       />
 
       <ReportReasonSheet

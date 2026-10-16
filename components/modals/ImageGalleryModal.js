@@ -33,6 +33,7 @@ import { saveToLibraryAsync } from "expo-media-library/legacy";
 import { File, Paths } from "expo-file-system";
 import Toast from "react-native-toast-message";
 import { i18nText } from "@utils/i18nText";
+import { tmdbImageLanguageOrderOf, tmdbImageLanguagesOf } from "@utils/appLanguages";
 import * as Haptics from "@services/hapticsService";
 
 
@@ -277,7 +278,8 @@ const ImageGalleryModal = ({
   const { getTmdbUrl } = useImageQualitySettings();
   const { language } = useLanguage();
   const insets = useSafeAreaInsets();
-  const imageLanguageOrder = language === "tr" ? "tr,en,null" : "en,tr,null";
+  const imageLanguages = tmdbImageLanguagesOf(language);
+  const imageLanguageOrder = tmdbImageLanguageOrderOf(language);
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isGrid, setIsGrid] = useState(false);
@@ -331,12 +333,11 @@ const ImageGalleryModal = ({
 
         if (dataArray && dataArray.length > 0) {
           // Dile göre grupla
-          const grouped = { tr: [], en: [], null: [] };
+          // Gruplar uygulama dilinin görsel öncelik sırasını izler (utils/appLanguages).
+          const grouped = Object.fromEntries([...imageLanguages, "null"].map((code) => [code, []]));
           dataArray.forEach((img) => {
-            const lang = img.iso_639_1;
-            if (lang === "tr") grouped.tr.push(img);
-            else if (lang === "en") grouped.en.push(img);
-            else if (lang === null) grouped.null.push(img);
+            const code = img.iso_639_1 === null ? "null" : img.iso_639_1;
+            if (grouped[code]) grouped[code].push(img);
           });
 
           // Puanlarına (vote_average) göre yüksekten düşüğe sıralama fonksiyonu
@@ -345,13 +346,9 @@ const ImageGalleryModal = ({
           // Adet siniri yok: TMDB'nin dondurdugu tum gorseller gosteriliyor.
           // Sadece siralama uygulanir (once kullanicinin dili, sonra diger dil,
           // en son dilsiz gorseller; her grup kendi icinde puana gore).
-          const trSorted = grouped.tr.sort(sortByVotes);
-          const enSorted = grouped.en.sort(sortByVotes);
-          const nullSorted = grouped.null.sort(sortByVotes);
-
-          const primaryImages = language === "tr" ? trSorted : enSorted;
-          const secondaryImages = language === "tr" ? enSorted : trSorted;
-          const finalImages = [...primaryImages, ...secondaryImages, ...nullSorted];
+          const finalImages = [...imageLanguages, "null"].flatMap((code) =>
+            grouped[code].sort(sortByVotes),
+          );
 
           setImages(finalImages);
         } else {

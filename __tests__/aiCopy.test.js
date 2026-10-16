@@ -24,13 +24,14 @@ const leaves = (value, path = "") => {
 
 const placeholders = (text) => (String(text).match(/\{(\w+)\}/g) || []).sort();
 
-describe("aiCopy tr/en paritesi", () => {
-  test("iki dilin anahtar şekli aynı", () => {
+describe("aiCopy tr/en/es paritesi", () => {
+  test("üç dilin anahtar şekli aynı", () => {
     expect(shapeOf(AI_COPY.tr)).toEqual(shapeOf(AI_COPY.en));
+    expect(shapeOf(AI_COPY.es)).toEqual(shapeOf(AI_COPY.tr));
   });
 
   test("hiçbir metin boş değil ve hepsi metin", () => {
-    ["tr", "en"].forEach((lang) => {
+    ["tr", "en", "es"].forEach((lang) => {
       leaves(AI_COPY[lang]).forEach(([path, value]) => {
         expect(typeof value).toBe("string");
         expect(`${lang}:${path}:${value.trim().length > 0}`).toBe(`${lang}:${path}:true`);
@@ -40,14 +41,17 @@ describe("aiCopy tr/en paritesi", () => {
 
   test("her anahtarda yer tutucular iki dilde aynı", () => {
     const en = Object.fromEntries(leaves(AI_COPY.en));
+    const es = Object.fromEntries(leaves(AI_COPY.es));
     leaves(AI_COPY.tr).forEach(([path, value]) => {
       expect(`${path}:${placeholders(value).join(",")}`).toBe(`${path}:${placeholders(en[path]).join(",")}`);
+      expect(`${path}:${placeholders(value).join(",")}`).toBe(`${path}:${placeholders(es[path]).join(",")}`);
     });
   });
 
-  test("getAiCopy yalnız 'tr' için Türkçe verir", () => {
+  test("getAiCopy yalnız 'tr' için Türkçe, 'es' için İspanyolca verir; bilinmeyen dil İngilizce", () => {
     expect(getAiCopy("tr")).toBe(AI_COPY.tr);
     expect(getAiCopy("en")).toBe(AI_COPY.en);
+    expect(getAiCopy("es")).toBe(AI_COPY.es);
     expect(getAiCopy("de")).toBe(AI_COPY.en);
     expect(getAiCopy(undefined)).toBe(AI_COPY.en);
   });

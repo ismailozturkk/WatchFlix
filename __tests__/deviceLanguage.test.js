@@ -20,6 +20,15 @@ describe("cihazDilindenSec", () => {
     expect(cihazDilindenSec([locale("en")])).toBe("en");
   });
 
+  it("İspanyolca cihaz İspanyolca açılır (bölgeli etiketler dahil)", () => {
+    expect(cihazDilindenSec([locale("es")])).toBe("es");
+    expect(cihazDilindenSec([locale("es-ES")])).toBe("es");
+    expect(cihazDilindenSec([locale("es_MX")])).toBe("es");
+    expect(cihazDilindenSec([locale("es"), locale("tr")])).toBe("es");
+    // Birinci dil desteklenmiyorsa listede ilerideki "es" onu kurtarmaz.
+    expect(cihazDilindenSec([locale("fr"), locale("es")])).toBe("en");
+  });
+
   it("desteklenmeyen dil yedek dile düşer (Türkçe'ye DEĞİL)", () => {
     expect(cihazDilindenSec([locale("de")])).toBe("en");
     expect(cihazDilindenSec([locale("ar")])).toBe("en");

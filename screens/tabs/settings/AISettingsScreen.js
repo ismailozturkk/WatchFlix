@@ -7,6 +7,7 @@
 // Şema ve doğrulama: utils/aiPrefs.js. Bu ekran yalnız tercihleri değiştirir;
 // hiçbir değişiklik yapay zeka hakkı harcamaz.
 
+import { intlLocaleOf } from "../../../utils/appLanguages";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -63,7 +64,7 @@ export default function AISettingsScreen() {
   const { language } = useLanguage();
   const { theme } = useTheme();
   const C = buildUiColors(theme);
-  const locale = language === "tr" ? "tr-TR" : "en-US";
+  const locale = intlLocaleOf(language);
   const copy = useMemo(() => getAiCopy(language), [language]);
   const text = copy.settings;
   const { prefs, updatePrefs, resetPrefs } = useAiPrefs();

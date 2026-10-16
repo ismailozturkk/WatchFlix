@@ -11,6 +11,7 @@
 //     kart-kart snap kaydırma ve seçimde haptic tık.
 //   • Liste açılışta seçili temaya kayar (8 hazır + özel temalarda seçili kart
 //     ekran dışında kalmasın); uçlarda solma, devamı olduğunu söyler.
+import { tmdbLanguageOf } from "../../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View, Text, Pressable, ScrollView } from "react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -369,7 +370,7 @@ export default function SettingsTheme() {
           >
             {/* Yerelli büyütme: düz toUpperCase() "Aktif"i "AKTIF" yapıyor (noktalı İ kaybolur) */}
             {i18nText("autoI18n.aktif_tema", "Aktif tema").toLocaleUpperCase(
-              language === "tr" ? "tr-TR" : "en-US",
+              tmdbLanguageOf(language),
             )}
           </Text>
           <Text

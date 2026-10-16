@@ -1,3 +1,4 @@
+import { intlLocaleOf } from "../utils/appLanguages";
 import React, {
   createContext, useContext, useEffect, useState, useMemo, useRef, useCallback,
 } from "react";
@@ -422,7 +423,7 @@ export const ProfileStatsProvider = ({ children }) => {
   // "1.234 Dakika" yerine "1.234 dk". Uzun etiketler baştaki boşluğu taşıdığı
   // için trim'lenir, kısa etiketler zaten temiz gelir.
   const formatTotalDurationTime = (totalMinutes, mode, { short = false } = {}) => {
-    const locale = language === "tr" ? "tr-TR" : "en-US";
+    const locale = intlLocaleOf(language);
     const label = (key) =>
       short
         ? (t.profileScreen[`${key}Short`] || t.profileScreen[key] || "").trim()

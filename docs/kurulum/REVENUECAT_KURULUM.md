@@ -242,6 +242,8 @@ Ayarlar kartı ve limit uyarıları bu kayıttan üretilir — kaydı olmayan bi
 | Pet / Dost | — | ✓ | ✓ | `PetContext`, `PetSettingsSection` |
 | Platform bildirimi | 10 başlık | 100 | 100 | Sunucu (`dailyStreamingAvailability`) |
 | Wrapped arşivi | Yalnız bu yıl | Son 5 yıl | Tüm yıllar | `WrappedScreen`, `HubWrappedModule` (`canViewWrappedYear`) |
+| Hata bildirimi (uygulama içi) | Yalnız e-posta | ✓ | ✓ | `FeedbackScreen`, `FeedbackSettingsGroup`; sunucu: `firestore.rules` → `Feedback` |
+| Özellik isteği (uygulama içi) | Yalnız e-posta | Yalnız e-posta | ✓ | `FeedbackScreen`, `FeedbackSettingsGroup`; sunucu: `firestore.rules` → `Feedback` |
 
 Free planı 10 Ekim 2026 kararıdır (arkadaş 2, grup 1, AI 3/gün · 30/ay, bir
 özel liste, Hub'da oyun ve CineSwipe yok, turnuvada yalnız izleyici, kozmetik
@@ -254,6 +256,8 @@ ham tercih bayrağının kapıyı atlayarak okunmadığını doğrular.
 Premium ve Max değerleri bu kararın PARÇASI DEĞİL,
 önerilen varsayılandır (özellikle not, hatırlatma ve film/dizi notu): satış
 verisi geldikçe `utils/premiumFeatures.js`'ten değişir.
+
+**Geri bildirim kutusu** (16 Ekim 2026): Ayarlar > Destek ve geri bildirim. Hata bildirimi Premium ve üstünde, özellik isteği yalnız Premium Max'te açılır; Free'de e-posta desteği (Hakkında) aynen kalır. Kayıtlar `Feedback` koleksiyonuna yazılır; plan kapısı İSTEMCİDE (`bug_report` / `feature_request`) ve SUNUCUDA (`firestore.rules`, `Users/{uid}.entitlements`) birlikte zorlanır — kural dağıtılmadan form `permission-denied` verir (`firebase deploy --only firestore:rules`). Koleksiyon create-only + "kendi kayıtlarını oku"dur; kayıtları Firebase konsolunda `Feedback` altında görür, durumu `status` (`open` → `reviewing` / `planned` / `done` / `declined`) ve isteğe bağlı `reply` (kullanıcıya görünen yanıt) alanlarını konsoldan değiştirirsin; kullanıcı bunları "Gönderdiklerim" listesinde görür. Alan listesi/sınırlar `utils/feedbackValidation.js` ile kuralda aynı olmak zorundadır (`__tests__/feedbackRulesParity.test.js`).
 
 **Wrapped arşivi** (13 Ekim 2026 kararı) bir *yıl penceresidir*: Free yalnız bu
 yılı, Premium bu yıl dahil son 5 yılı görür, Max'te sınır yoktur. Registry'de

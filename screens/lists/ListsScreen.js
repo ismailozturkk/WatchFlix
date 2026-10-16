@@ -1,3 +1,4 @@
+import { tmdbLanguageOf } from "../../utils/appLanguages";
 import { Image } from "expo-image";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
@@ -250,7 +251,7 @@ export default function ListsScreen({ route, navigation }) {
     (async () => {
       try {
         const { data } = await cachedTmdb(
-          `https://api.themoviedb.org/3/tv/${item.id}?language=${language === "tr" ? "tr-TR" : "en-US"}`,
+          `https://api.themoviedb.org/3/tv/${item.id}?language=${tmdbLanguageOf(language)}`,
           { headers: { accept: "application/json", Authorization: API_KEY } },
           { maxAge: 6 * 60 * 60 * 1000, category: "tvContent" },
         );

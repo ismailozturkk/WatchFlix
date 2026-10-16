@@ -34,6 +34,7 @@ Temel özellikler ücretsizdir. Ücretli planlar şunları ekler:
 • Oyunlar, CineSwipe ve aylık turnuvada oy kullanma (Free turnuvayı izleyebilir)
 • Kendi temanı oluşturma, 56 yazı tipinin tamamı, uygulama simgesi seçici, kar animasyonu, ambiyans arka planı, ikon arka planı ve ekranda gezen pet
 • Wrapped arşivi (Free yalnız bu yıl · Premium son 5 yıl · Max tüm yıllar) ve 100 başlığa kadar platform bildirimi (Free: 10)
+• Uygulama içinden hata bildirimi (Premium ve Max) ve özellik isteği gönderme (yalnız Max)
 
 Türkçe ve İngilizce dil desteği. Karanlık tema. Ücretsiz kullanılabilir.
 

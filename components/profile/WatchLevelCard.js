@@ -9,6 +9,7 @@
 // SOMUT EYLEME çevrilir: "≈ 14 film ya da 63 bölüm". Ölçek olarak
 // __tests__/watchScoring.test.js'te sabitlenen ortalama değerler kullanılır.
 
+import { copyLanguage, intlLocaleOf, normalizeAppLanguage } from "../../utils/appLanguages";
 import React, { memo, useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -30,7 +31,7 @@ const ORT_FILM = 165;
 const ORT_BOLUM = 37;
 
 const sayi = (n, lang) =>
-  Math.round(Number(n) || 0).toLocaleString(lang === "tr" ? "tr-TR" : "en-US");
+  Math.round(Number(n) || 0).toLocaleString(intlLocaleOf(lang));
 
 // `showNearest`: kartın alt şeridi (hedefe en yakın iki rozet). Rozet ekranında kendi
 // "Sıradaki hedefler" rafı var; aynı bilgiyi iki kez göstermemek için orada kapatılır.
@@ -38,7 +39,9 @@ const sayi = (n, lang) =>
 function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const tr = language !== "en";
+  const tr = copyLanguage(language, ["tr", "en"]) === "tr";
+  const es = normalizeAppLanguage(language) === "es";
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
   const {
     loading,
     kare,
@@ -119,7 +122,7 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
   const kalan = perde.kalanKare;
   const filmKarsiligi = Math.max(1, Math.round(kalan / ORT_FILM));
   const bolumKarsiligi = Math.max(1, Math.round(kalan / ORT_BOLUM));
-  const perdeAdi = tr ? perde.ad : perde.adEn;
+  const perdeAdi = tr ? perde.ad : es ? perde.adEs : perde.adEn;
 
   const hedefParam = { film: filmKarsiligi, bolum: bolumKarsiligi };
   const kalanMetni = perde.tabanDevrede
@@ -372,7 +375,7 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
                     numberOfLines={1}
                     style={[styles.yakinAd, { color: theme.text.primary }]}
                   >
-                    {badgeAd(b.hedef, tr ? "tr" : "en")}
+                    {badgeAd(b.hedef, lang)}
                   </Text>
                   <Text
                     allowFontScaling={false}
@@ -383,7 +386,7 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
                       b.hedef,
                       b.hedef.ilerleme,
                       b.hedef.target,
-                      tr ? "tr" : "en"
+                      lang
                     )}
                   </Text>
                 </View>

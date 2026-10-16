@@ -13,21 +13,24 @@
 
 // Nadirlik adları katalog emsaliyle INLINE tutulur (81 rozet metni de öyle):
 // beş kademe × iki dil = 10 dize için autoI18n anahtarı açmaya değmez.
+import { copyLanguage } from "../../utils/appLanguages";
+
 export const NADIRLIK_AD = Object.freeze({
-  common: { tr: "Yaygın", en: "Common" },
-  uncommon: { tr: "Az Bulunur", en: "Uncommon" },
-  rare: { tr: "Nadir", en: "Rare" },
-  epic: { tr: "Destansı", en: "Epic" },
-  legendary: { tr: "Efsanevi", en: "Legendary" },
+  common: { tr: "Yaygın", en: "Common", es: "Común" },
+  uncommon: { tr: "Az Bulunur", en: "Uncommon", es: "Poco común" },
+  rare: { tr: "Nadir", en: "Rare", es: "Rara" },
+  epic: { tr: "Destansı", en: "Epic", es: "Épica" },
+  legendary: { tr: "Efsanevi", en: "Legendary", es: "Legendaria" },
 });
 
 /** Bilinmeyen nadirlikte anahtarın kendisini döndürür (boş etiket çizmez). */
 export const nadirlikAdi = (rarity, lang = "tr") =>
-  NADIRLIK_AD[rarity]?.[lang === "en" ? "en" : "tr"] || String(rarity || "");
+  NADIRLIK_AD[rarity]?.[copyLanguage(lang, ["tr", "en", "es"])] || String(rarity || "");
 
 const AYLAR = Object.freeze({
   tr: ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"],
   en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  es: ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
 });
 
 /**
@@ -41,7 +44,10 @@ export function formatTarih(gunAnahtari, lang = "tr") {
   const ay = Number(m[2]);
   const gun = Number(m[3]);
   if (ay < 1 || ay > 12 || gun < 1 || gun > 31) return null;
-  return lang === "en" ? `${AYLAR.en[ay - 1]} ${gun}, ${yil}` : `${gun} ${AYLAR.tr[ay - 1]} ${yil}`;
+  const code = copyLanguage(lang, ["tr", "en", "es"]);
+  if (code === "en") return `${AYLAR.en[ay - 1]} ${gun}, ${yil}`;
+  if (code === "es") return `${gun} de ${AYLAR.es[ay - 1]} de ${yil}`;
+  return `${gun} ${AYLAR.tr[ay - 1]} ${yil}`;
 }
 
 /**
@@ -56,6 +62,6 @@ export function yuzde(oran) {
   return Math.min(99, Math.max(1, Math.round(o * 100)));
 }
 
-/** Yüzde işareti dile göre: Türkçe "%47", İngilizce "47%". */
+/** Yüzde işareti dile göre: Türkçe "%47", diğerleri "47%". */
 export const yuzdeMetni = (oran, lang = "tr") =>
-  lang === "en" ? `${yuzde(oran)}%` : `%${yuzde(oran)}`;
+  copyLanguage(lang, ["tr", "en", "es"]) === "tr" ? `%${yuzde(oran)}` : `${yuzde(oran)}%`;

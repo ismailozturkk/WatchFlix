@@ -1,3 +1,4 @@
+import { intlLocaleOf, tmdbLanguageOf } from "../../utils/appLanguages";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
@@ -133,7 +134,7 @@ const SearchResultItem = ({ item, onPress, getTmdbUrl, theme }) => {
 export default function CreatePostModal({ visible, onClose, onSubmit, editingPost, initialPost }) {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
-  const locale = language === "tr" ? "tr-TR" : "en-US";
+  const locale = intlLocaleOf(language);
   const { API_KEY } = useApiSettings();
   const { adultContent } = useContentSettings();
   const { getTmdbUrl } = useImageQualitySettings();
@@ -424,7 +425,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       const endpoint = searchType === "movie" ? "movie/popular" : "tv/popular";
       const response = await axios.get(`https://api.themoviedb.org/3/${endpoint}`, {
         params: {
-          language: language === "tr" ? "tr-TR" : "en-US",
+          language: tmdbLanguageOf(language),
           page: "1",
         },
         headers: { Authorization: API_KEY },
@@ -449,7 +450,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
         params: {
           query: searchQuery.trim(),
           include_adult: adultContent,
-          language: language === "tr" ? "tr-TR" : "en-US",
+          language: tmdbLanguageOf(language),
           page: "1",
         },
         headers: { Authorization: API_KEY },

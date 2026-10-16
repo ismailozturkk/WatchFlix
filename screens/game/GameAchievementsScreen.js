@@ -1,3 +1,4 @@
+import { copyLanguage, normalizeAppLanguage } from "../../utils/appLanguages";
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import AppIcon from "@components/AppIcon";
@@ -15,7 +16,8 @@ export default function GameAchievementsScreen({ navigation }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const { user } = useAuth();
-  const tr = language !== "en";
+  const tr = copyLanguage(language, ["tr", "en"]) === "tr";
+  const es = normalizeAppLanguage(language) === "es";
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export default function GameAchievementsScreen({ navigation }) {
   const unlockedCount = achievements.filter((item) => item.unlocked).length;
 
   return (
-    <GameScreenShell navigation={navigation} title={tr ? "Başarımlar" : "Achievements"} subtitle={`${unlockedCount}/${achievements.length} ${tr ? "açıldı" : "unlocked"}`}>
+    <GameScreenShell navigation={navigation} title={tr ? "Başarımlar" : es ? "Logros" : "Achievements"} subtitle={`${unlockedCount}/${achievements.length} ${tr ? "açıldı" : es ? "desbloqueados" : "unlocked"}`}>
       {achievements.map((item) => {
         const ratio = item.target ? item.progress / item.target : 0;
         return (

@@ -19,6 +19,7 @@
 // GİZLİ ROZET: kilitliyken ne adı ne hedefi görünür ("???" + "Gizli"). İlerleme
 // çubuğu da çizilmez — oran, rozetin ne ölçtüğünü ele verirdi.
 
+import { copyLanguage } from "../../utils/appLanguages";
 import React, { memo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -36,7 +37,7 @@ export const TILE_YUKSEKLIK = 164;
 function WatchBadgeTile({ badge, onPress }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = language === "en" ? "en" : "tr";
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
 
   const acik = badge.acik;
   const nadirlik = rarityStyle(badge.rarity, theme);

@@ -19,10 +19,14 @@
 // göre değişiyor (bkz. hooks/useSheetTransition.js; ChatModal'da KAV
 // "height" modalde hiç tepki vermedi). Burada kaplayıcının klavye KAPALIYKEN
 // ölçülen yüksekliği ile şimdikisi karşılaştırılır; pencere zaten küçüldüyse
-// o kısım tekrar eklenmez (çift kayma olmaz). Hesap useSheetTransition ile
-// aynı: utils/sheetKeyboardFit.js → keyboardLift.
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, Easing, Keyboard, Platform } from "react-native";
+// o kısım tekrar eklenmez (çift kayma olmaz). Ölçüm hooks/useKeyboardMetrics.js,
+// hesap utils/sheetKeyboardFit.js → keyboardLift.
+//
+// `active` false olunca ölçüm sıfırlanır ve boşluk 0'a iner: modal yeniden
+// açılınca önceki oturumun klavye boşluğuyla başlamaz.
+import { useEffect, useRef } from "react";
+import { Animated, Easing } from "react-native";
+import useKeyboardMetrics from "@hooks/useKeyboardMetrics";
 import { keyboardLift } from "@utils/sheetKeyboardFit";
 
 /**
@@ -34,47 +38,15 @@ import { keyboardLift } from "@utils/sheetKeyboardFit";
  * }}
  */
 export default function useKeyboardInset(active = true) {
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const keyboardHeightRef = useRef(0);
-  const baseOverlayHeight = useRef(0);
-  const [overlayHeight, setOverlayHeight] = useState(0);
+  const { keyboardHeight, overlayHeight, baseOverlayHeight, onOverlayLayout } =
+    useKeyboardMetrics(active);
   const animatedInset = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    if (!active) return undefined;
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const apply = (height) => {
-      keyboardHeightRef.current = height;
-      setKeyboardHeight(height);
-    };
-    const showSub = Keyboard.addListener(showEvent, (event) =>
-      apply(event?.endCoordinates?.height ?? 0),
-    );
-    const hideSub = Keyboard.addListener(hideEvent, () => apply(0));
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-      apply(0);
-    };
-  }, [active]);
-
-  const onLayout = useCallback((event) => {
-    const measured = Math.round(event.nativeEvent.layout.height);
-    if (measured <= 0) return;
-    if (keyboardHeightRef.current === 0) baseOverlayHeight.current = measured;
-    setOverlayHeight(measured);
-  }, []);
-
-  const inset = keyboardLift({
-    keyboardHeight,
-    baseOverlayHeight: baseOverlayHeight.current,
-    overlayHeight,
-  });
+  const inset = keyboardLift({ keyboardHeight, baseOverlayHeight, overlayHeight });
 
   useEffect(() => {
+    // `active` false iken `inset` zaten 0'dır (ölçüm sıfırlandı); iOS'ta modal
+    // solarken boşluk yumuşakça iner.
     const animation = Animated.timing(animatedInset, {
       toValue: inset,
       duration: inset > 0 ? 240 : 200,
@@ -86,5 +58,5 @@ export default function useKeyboardInset(active = true) {
     return () => animation.stop();
   }, [inset, animatedInset]);
 
-  return { inset, animatedInset, onLayout };
+  return { inset, animatedInset, onLayout: onOverlayLayout };
 }

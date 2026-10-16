@@ -11,6 +11,7 @@
 // Metinler uygulamada değil SİTEDE tutuluyor: metin değiştiğinde yeni sürüm
 // yayınlamak gerekmiyor ve mağaza formları zaten URL istiyor.
 
+import { legalLanguageOf } from "./appLanguages";
 import * as WebBrowser from "expo-web-browser";
 import { Linking } from "react-native";
 
@@ -29,11 +30,12 @@ export const LEGAL_PAGES = Object.freeze({
  *
  * `?lang=` ŞART: sayfa dili tarayıcıdan seçiyor, yani Türkçe uygulamayı
  * İngilizce cihazda kullanan biri metni İngilizce görürdü. Uygulamanın
- * dilini açıkça geçiyoruz.
+ * dilini açıkça geçiyoruz. Site yalnız tr/en biliyor; başka dil İngilizce sayfaya
+ * düşer (utils/appLanguages `legalLang`). Siteye yeni dil eklenince kayıttan açılır.
  */
 export function legalUrl(page, language) {
   const file = LEGAL_PAGES[page] || page;
-  return `${LEGAL_SITE}/${file}?lang=${language === "en" ? "en" : "tr"}`;
+  return `${LEGAL_SITE}/${file}?lang=${legalLanguageOf(language)}`;
 }
 
 /**

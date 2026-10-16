@@ -12,10 +12,12 @@
 // ARAMA ise tersine harf biçimine DUYARSIZ olmalı (fold): `tr-TR` küçültmesi
 // "ALI"yı "alı" yapar ve "Ali"yi bulamaz; "cagla" yazan da "Çağla"yı bulmalı.
 
+import { intlLocaleOf } from "./appLanguages";
+
 /** Süzme alanının görünmesi için gereken en az öğe sayısı. */
 export const FILTER_MIN_ITEMS = 6;
 
-const localeOf = (language) => (language === "tr" ? "tr-TR" : "en-US");
+const localeOf = (language) => intlLocaleOf(language);
 
 const text = (value) => (typeof value === "string" ? value : value == null ? "" : String(value));
 

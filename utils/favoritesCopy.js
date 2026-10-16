@@ -1,11 +1,13 @@
 // utils/favoritesCopy.js
 //
-// "Dört favori" özelliğinin metinleri (tr / en). Üç yerde ortak kullanılır:
+// "Dört favori" özelliğinin metinleri (tr / en / es). Üç yerde ortak kullanılır:
 // onboarding (oturum ve dil ayarı açılmadan ÖNCE gösterilir, çeviri paketi
 // yerine buradan okur), Profili Düzenle ve arkadaş profili.
 //
 // Saf veri: RN içe aktarması yok, jest ile doğrudan test edilebilir.
 // Bkz. utils/wrappedStrings.js — aynı desen.
+
+import { copyLanguage } from "./appLanguages";
 
 export const FAVORITES_COPY = {
   tr: {
@@ -59,14 +61,6 @@ export const FAVORITES_COPY = {
     profile: {
       title: "Favori seçimleri",
       open: "Aç",
-    },
-    own: {
-      edit: "Düzenle",
-      emptyTitle: "Dört favorini seç",
-      emptyDesc:
-        "Film, dizi ve oyuncu favorilerin profilinde görünür; öneriler de buna göre şekillenir.",
-      cta: "Favorilerini seç",
-      dismiss: "Gizle",
     },
     rail: {
       title: "Favorilerine Göre",
@@ -125,21 +119,71 @@ export const FAVORITES_COPY = {
       title: "Favorite picks",
       open: "Open",
     },
-    own: {
-      edit: "Edit",
-      emptyTitle: "Pick your four favorites",
-      emptyDesc:
-        "Your favorite movies, shows and actors appear on your profile — and shape your suggestions.",
-      cta: "Choose favorites",
-      dismiss: "Dismiss",
-    },
     rail: {
       title: "Because of Your Favorites",
       subtitle: (names) => `Because you picked ${names}`,
       more: (count) => `+${count}`,
     },
   },
+  es: {
+    kinds: {
+      movies: {
+        label: "Películas",
+        add: "Añadir película",
+        pickTitle: "Elige tus películas favoritas",
+        search: "Buscar películas…",
+        icon: "film-outline",
+      },
+      shows: {
+        label: "Series",
+        add: "Añadir serie",
+        pickTitle: "Elige tus series favoritas",
+        search: "Buscar series…",
+        icon: "tv-outline",
+      },
+      people: {
+        label: "Actores",
+        add: "Añadir actor",
+        pickTitle: "Elige tus actores favoritos",
+        search: "Buscar actores…",
+        icon: "person-outline",
+      },
+    },
+    counter: (count, max) => `${count}/${max}`,
+    section: {
+      title: "Tus cuatro favoritos",
+      hint: "Quien pueda ver tu perfil los verá. Elige hasta 4 por categoría o déjalo vacío.",
+    },
+    picker: {
+      done: "Listo",
+      full: "Completo · quita uno para cambiar",
+      suggestions: "Sugerencias",
+      popular: "Populares",
+      basedOnPicks: "Según tus elecciones",
+      castOfPicks: "Del reparto de lo que has elegido",
+      results: "Resultados",
+      noResults: "No se encontraron resultados",
+      searchError: "No se pudo buscar. Revisa tu conexión.",
+      loadError: "No se pudo cargar la lista.",
+      retry: "Reintentar",
+      typeMore: "Escribe al menos 2 letras para buscar",
+      remove: "Quitar",
+      selected: "Elegido",
+      add: (title) => `Añadir ${title}`,
+      removeLabel: (title) => `Quitar ${title} de favoritos`,
+    },
+    profile: {
+      title: "Favoritos elegidos",
+      open: "Abrir",
+    },
+    rail: {
+      title: "Por tus favoritos",
+      subtitle: (names) => `Porque elegiste ${names}`,
+      more: (count) => `+${count}`,
+    },
+  },
 };
 
+// Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getFavoritesCopy = (language) =>
-  FAVORITES_COPY[language === "en" ? "en" : "tr"];
+  FAVORITES_COPY[copyLanguage(language, Object.keys(FAVORITES_COPY))];

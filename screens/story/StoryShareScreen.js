@@ -44,6 +44,7 @@ import { SaveDraftModal } from "@components/storyShare/SaveDraftModal";
 import StorySlider from "@components/storyShare/StorySlider";
 import { StoryDraftService } from "@services/StoryDraftService";
 import { i18nText } from "@utils/i18nText";
+import { tmdbImageLanguageOrderOf } from "@utils/appLanguages";
 import { getRatingColors } from "@utils/ratingColors";
 import useAppLogo from "@hooks/useAppLogo";
 import {
@@ -318,7 +319,7 @@ export default function StoryShareScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
-  const imageLanguageOrder = language === "tr" ? "tr,en,null" : "en,tr,null";
+  const imageLanguageOrder = tmdbImageLanguageOrderOf(language);
 
   const params = route.params || {};
   const {

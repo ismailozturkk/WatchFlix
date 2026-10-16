@@ -1,3 +1,4 @@
+import { tmdbLanguageOf, tmdbRegionOf } from "../../utils/appLanguages";
 import { alpha } from "@theme/colors";
 import React, {
   useState,
@@ -198,7 +199,7 @@ export default function TvShowsDetails({ route, navigation }) {
   const { getTmdbUrl } = useImageQualitySettings();
   const { allLists, statusIndex } = useListStatusContext();
   // İzleme sağlayıcıları bölgesi — MovieDetail ile aynı seçim.
-  const providerRegion = language === "tr" ? "TR" : "US";
+  const providerRegion = tmdbRegionOf(language);
 
   // Tek abonelik: bu dizinin tüm izlenme durumu (kök-dizi yerine subcollection).
   const watched = useWatchedShow(id);
@@ -266,7 +267,7 @@ export default function TvShowsDetails({ route, navigation }) {
           method: "GET",
           url: `https://api.themoviedb.org/3/tv/${id}`,
           params: {
-            language: language === "tr" ? "tr-TR" : "en-US",
+            language: tmdbLanguageOf(language),
             append_to_response:
               "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,translations,videos,watch/providers",
           },
@@ -323,7 +324,7 @@ export default function TvShowsDetails({ route, navigation }) {
         method: "GET",
         url: `https://api.themoviedb.org/3/tv/${id}/recommendations`,
         params: {
-          language: language === "tr" ? "tr-TR" : "en-US",
+          language: tmdbLanguageOf(language),
           page: railState.page + 1,
         },
         headers: { accept: "application/json", Authorization: API_KEY },

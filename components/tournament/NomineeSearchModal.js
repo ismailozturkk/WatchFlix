@@ -17,6 +17,7 @@
 // bildirir; PENDING_TIMEOUT boyunca dokunulmazsa iptal. Kaydetme/geri alma/
 // toast mantığı parent'tadır (tek doğruluk kaynağı).
 
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, ActivityIndicator,
@@ -35,7 +36,7 @@ const MIN_QUERY = 2;
 
 // Türkçe uyumlu, aksan bağışlayıcı küçük harf karşılaştırma.
 const norm = (s, lang) =>
-  String(s || "").toLocaleLowerCase(lang === "tr" ? "tr-TR" : "en-US");
+  String(s || "").toLocaleLowerCase(intlLocaleOf(lang));
 
 // ─── Aday satırı ──────────────────────────────────────────────────────────────
 // Havuzdaki satır sıra rozeti + hype sayacı taşır; havuzda olmayan (external)

@@ -4,6 +4,7 @@
 // Popüler başlıkları rastgele sayfalardan çeker, zorlaştırılmış sahne görselleri alır,
 // türe göre akıllı şıklar üretir ve Firebase işlemlerini yönetir.
 
+import { tmdbLanguageOf } from "../utils/appLanguages";
 import axios from "axios";
 import {
   collection,
@@ -185,7 +186,7 @@ export async function fetchTitlePool(apiKey, language = "tr", source = "popular"
     return state.items;
   }
 
-  const lang = language === "tr" ? "tr-TR" : "en-US";
+  const lang = tmdbLanguageOf(language);
   const url = poolEndpointOf(source);
   const maxPage = maxPageForSource(source);
 
@@ -273,7 +274,7 @@ export async function fetchDailyPool(apiKey, language = "tr", dayKey = dayKeyOf(
     { url: "https://api.themoviedb.org/3/tv/top_rated", page: pick.int(1, 4, "tv:a") },
     { url: "https://api.themoviedb.org/3/tv/top_rated", page: pick.int(5, 9, "tv:b") },
   ];
-  const lang = language === "tr" ? "tr-TR" : "en-US";
+  const lang = tmdbLanguageOf(language);
 
   const fetchFresh = async () => {
     const responses = await Promise.all(

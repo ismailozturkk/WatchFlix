@@ -16,17 +16,27 @@ const shape = (value) => {
 };
 
 describe("onboarding metinleri", () => {
-  it("tr ve en aynı yapıda", () => {
+  it("tr, en ve es aynı yapıda", () => {
     expect(shape(ONBOARDING_COPY.en)).toEqual(shape(ONBOARDING_COPY.tr));
+    expect(shape(ONBOARDING_COPY.es)).toEqual(shape(ONBOARDING_COPY.tr));
   });
 
-  it("bilinmeyen dil Türkçeye düşer", () => {
-    expect(getOnboardingCopy("de")).toBe(ONBOARDING_COPY.tr);
+  it("bilinmeyen dil İngilizceye düşer (Türkçeye DEĞİL)", () => {
+    expect(getOnboardingCopy("de")).toBe(ONBOARDING_COPY.en);
+    expect(getOnboardingCopy(undefined)).toBe(ONBOARDING_COPY.en);
     expect(getOnboardingCopy("en")).toBe(ONBOARDING_COPY.en);
+    expect(getOnboardingCopy("tr")).toBe(ONBOARDING_COPY.tr);
+    expect(getOnboardingCopy("es")).toBe(ONBOARDING_COPY.es);
+  });
+
+  it("dil düğmesi etiketi döngüde SIRADAKİ dili adlandırır (tr → en → es → tr)", () => {
+    expect(ONBOARDING_COPY.tr.language).toBe("English");
+    expect(ONBOARDING_COPY.en.language).toBe("Español");
+    expect(ONBOARDING_COPY.es.language).toBe("Türkçe");
   });
 
   it("vurgulanan kelime başlığın içinde geçiyor (yoksa vurgu sessizce kaybolur)", () => {
-    for (const lang of ["tr", "en"]) {
+    for (const lang of ["tr", "en", "es"]) {
       const copy = ONBOARDING_COPY[lang];
       const titled = [
         ...copy.features,
@@ -45,6 +55,9 @@ describe("onboarding metinleri", () => {
     expect(ONBOARDING_COPY.tr.provider.selected(0)).toBe("Henüz seçmedin");
     expect(ONBOARDING_COPY.tr.provider.selected(3)).toBe("3 platform seçildi");
     expect(ONBOARDING_COPY.en.provider.selected(2)).toBe("2 selected");
+    expect(ONBOARDING_COPY.es.provider.selected(0)).toBe("Aún no has elegido ninguna");
+    expect(ONBOARDING_COPY.es.provider.selected(1)).toBe("1 elegida");
+    expect(ONBOARDING_COPY.es.provider.selected(3)).toBe("3 elegidas");
   });
 });
 

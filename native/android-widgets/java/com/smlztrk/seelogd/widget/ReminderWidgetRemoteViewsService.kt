@@ -22,7 +22,6 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
@@ -50,7 +49,7 @@ private class ReminderRemoteViewsFactory(
 ) : RemoteViewsService.RemoteViewsFactory {
 
   private var items: List<WidgetItem> = emptyList()
-  private var isTurkish: Boolean = true
+  private var lang: String = "tr"
   private var preferences: WidgetPreferences = WidgetPreferences()
 
   override fun onCreate() { /* veri onDataSetChanged'de yüklenir */ }
@@ -60,7 +59,7 @@ private class ReminderRemoteViewsFactory(
       ReminderWidgetProvider.PREFS_NAME,
       Context.MODE_PRIVATE,
     )
-    isTurkish = (prefs.getString(ReminderWidgetProvider.KEY_LANGUAGE, "tr") ?: "tr").startsWith("tr")
+    lang = WidgetLanguage.of(prefs.getString(ReminderWidgetProvider.KEY_LANGUAGE, "tr"))
     preferences = WidgetPreferences.load(context)
     items = parseItems(prefs.getString(ReminderWidgetProvider.KEY_ITEMS, "[]") ?: "[]")
       .filter { it.dateEpoch >= startOfToday() }
@@ -110,11 +109,10 @@ private class ReminderRemoteViewsFactory(
     val appearance = preferences.reminderAppearance
     rv.setTextColor(R.id.reminder_widget_item_title, appearance.text)
 
-    val typeLabel = when {
-      isMovie && isTurkish -> "Film"
-      isMovie -> "Movie"
-      isTurkish -> "Dizi"
-      else -> "TV"
+    val typeLabel = if (isMovie) {
+      WidgetLanguage.pick(lang, "Film", "Movie", "Película")
+    } else {
+      WidgetLanguage.pick(lang, "Dizi", "TV", "Serie")
     }
     val meta = listOf(typeLabel, item.subtitle).filter { it.isNotBlank() }.joinToString("  •  ")
     rv.setTextViewText(R.id.reminder_widget_item_meta, meta)
@@ -213,15 +211,14 @@ private class ReminderRemoteViewsFactory(
   private fun countdown(epoch: Long): String {
     val diff = daysUntil(epoch)
     return when (diff) {
-      0L -> if (isTurkish) "Bugün" else "Today"
-      1L -> if (isTurkish) "Yarın" else "Tomorrow"
-      else -> if (isTurkish) "$diff gün" else "$diff days"
+      0L -> WidgetLanguage.pick(lang, "Bugün", "Today", "Hoy")
+      1L -> WidgetLanguage.pick(lang, "Yarın", "Tomorrow", "Mañana")
+      else -> WidgetLanguage.pick(lang, "$diff gün", "$diff days", "$diff días")
     }
   }
 
   private fun shortDate(epoch: Long): String {
-    val locale = if (isTurkish) Locale("tr") else Locale.ENGLISH
-    return SimpleDateFormat("d MMM", locale).format(Date(epoch))
+    return SimpleDateFormat("d MMM", WidgetLanguage.locale(lang)).format(Date(epoch))
   }
 
   private fun startOfToday(): Long = startOfDay(System.currentTimeMillis())

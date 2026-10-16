@@ -11,6 +11,7 @@
 // Güven modeli: Ratings/userRatings ve gruplardaki anket oyuyla aynı — istemci
 // taraflı (bu fazda backend yok). Kullanıcı yalnız KENDİ oy dokümanını yazar.
 
+import { tmdbLanguageOf } from "../utils/appLanguages";
 import { db } from "../firebase";
 import {
   doc,
@@ -44,7 +45,7 @@ const POOL_COUNT = 64;
 // Kullanıcının aramayla havuza eklediği adaylar (tournaments/{periodId}/pool).
 const POOL_COL = "pool";
 
-const tmdbLang = (lang) => (lang === "tr" ? "tr-TR" : "en-US");
+const tmdbLang = (lang) => (tmdbLanguageOf(lang));
 
 // TMDB ham sonucu → havuz adayı. fetchNominees (discover), searchCandidates
 // (search) ve fetchTmdbItem (detay) AYNI şekli üretsin diye tek yerde: havuz

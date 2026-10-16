@@ -4,6 +4,7 @@
 // ve vitrin içerikleri) ile bölgeye uygun izleme platformları. Ağ başarısız olursa
 // sessizce boş kalır; slaytlar veri olmadan da düzgün görünür.
 
+import { tmdbLanguageOf, tmdbRegionOf } from "../../utils/appLanguages";
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { STREAMING_PROVIDERS } from "../../context/AppSettingsContext";
@@ -67,7 +68,7 @@ export default function useOnboardingData({ apiKey, language, getTmdbUrl, accent
 
   useEffect(() => {
     let alive = true;
-    const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
+    const tmdbLanguage = tmdbLanguageOf(language);
     const headers = { accept: "application/json", Authorization: apiKey };
 
     (async () => {
@@ -114,8 +115,8 @@ export default function useOnboardingData({ apiKey, language, getTmdbUrl, accent
   // varlığı birleştirilir ve gerçek logo_path korunur.
   useEffect(() => {
     let alive = true;
-    const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
-    const region = language === "tr" ? "TR" : "US";
+    const tmdbLanguage = tmdbLanguageOf(language);
+    const region = tmdbRegionOf(language);
     const headers = { accept: "application/json", Authorization: apiKey };
 
     (async () => {

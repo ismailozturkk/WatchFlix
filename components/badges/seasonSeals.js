@@ -38,10 +38,10 @@ export const ILK_DONEM = "2026-yaz";
 // Kuzey yarımküre mevsimleri. Aralık, TAKİP EDEN yılın kışına sayılır — yoksa
 // tek bir kış iki ayrı mühre bölünür ve ikisi de eşiğe ulaşamaz.
 const DONEM_TANIM = [
-  { id: "kis", aylar: [12, 1, 2], icon: "snow-outline", iconSolid: "snow", tr: "Kışı", en: "Winter" },
-  { id: "ilkbahar", aylar: [3, 4, 5], icon: "flower-outline", iconSolid: "flower", tr: "İlkbaharı", en: "Spring" },
-  { id: "yaz", aylar: [6, 7, 8], icon: "sunny-outline", iconSolid: "sunny", tr: "Yazı", en: "Summer" },
-  { id: "sonbahar", aylar: [9, 10, 11], icon: "leaf-outline", iconSolid: "leaf", tr: "Sonbaharı", en: "Autumn" },
+  { id: "kis", aylar: [12, 1, 2], icon: "snow-outline", iconSolid: "snow", tr: "Kışı", en: "Winter", es: "Invierno" },
+  { id: "ilkbahar", aylar: [3, 4, 5], icon: "flower-outline", iconSolid: "flower", tr: "İlkbaharı", en: "Spring", es: "Primavera" },
+  { id: "yaz", aylar: [6, 7, 8], icon: "sunny-outline", iconSolid: "sunny", tr: "Yazı", en: "Summer", es: "Verano" },
+  { id: "sonbahar", aylar: [9, 10, 11], icon: "leaf-outline", iconSolid: "leaf", tr: "Sonbaharı", en: "Autumn", es: "Otoño" },
 ];
 
 const DONEM_BY_AY = (() => {

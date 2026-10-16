@@ -1,3 +1,4 @@
+import { tmdbLanguageOf, tmdbRegionOf } from "../utils/appLanguages";
 import { createContext, useContext, useCallback, useEffect, useState, useMemo, useRef } from "react";
 import {
   useApiSettings,
@@ -122,8 +123,8 @@ export const MovieProvider = ({ children }) => {
   // trending/now_playing gibi uçlar ayardan bağımsız; onlar `dropAdult` ile süzülür.
   const adultKey = (key) => adultScoped(key, adultContent);
   const { language, t } = useLanguage();
-  const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
-  const tmdbRegion = language === "tr" ? "TR" : "US";
+  const tmdbLanguage = tmdbLanguageOf(language);
+  const tmdbRegion = tmdbRegionOf(language);
   const [activeSections, setActiveSections] = useState({});
 
   // ── AÇILIŞ TOHUMLARI ──────────────────────────────────────────────────────
@@ -190,7 +191,7 @@ export const MovieProvider = ({ children }) => {
   };
 
   const fetchMoviesBests = (page = 1, append = false, forceRefresh = false) => {
-    const lang = language === "tr" ? "tr-TR" : "en-US";
+    const lang = tmdbLanguageOf(language);
     const gen = append ? currentGen("bests") : beginFreshRequest("bests");
     return loadPage({
       cacheKey: adultKey(`movie_bests_${lang}_${selectedCategoryBests}_page_${page}`),
@@ -266,7 +267,7 @@ export const MovieProvider = ({ children }) => {
     useState("trending");
 
   const fetchSeriesTrends = async (page = 1, append = false, forceRefresh = false) => {
-    const lang = language === "tr" ? "tr-TR" : "en-US";
+    const lang = tmdbLanguageOf(language);
     const gen = append ? currentGen("trends") : beginFreshRequest("trends");
     const isStale = () => currentGen("trends") !== gen;
     const baseKey = `movie_trends_${lang}_${selectedCategoryTrends}_${selectedCategoryTrendsMovie}`;
@@ -562,7 +563,7 @@ export const MovieProvider = ({ children }) => {
   };
 
   const fetchMoviesCollection = async () => {
-    const lang = language === "tr" ? "tr-TR" : "en-US";
+    const lang = tmdbLanguageOf(language);
     const cacheKey = `movie_collection_${lang}`;
     const cached = await getCachedValue(cacheKey, TTL.COLLECTION);
     if (cached && cached.length) {

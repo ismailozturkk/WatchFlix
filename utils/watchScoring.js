@@ -412,6 +412,16 @@ export const PERDE_ADLARI_EN = [
   "Archivist", "Collector", "Festival Goer", "Cinematheque Member", "Curator",
   "Master Archivist", "Era Witness", "Cinema Memory", "Legendary Viewer", "Silver Screen Legend",
 ];
+export const PERDE_ADLARI_ES = [
+  "Titular de entrada", "Habitual de la sala", "Fan de las sesiones", "Turno de noche", "Fondista de maratones",
+  "Fiel a las temporadas", "Vigía de los créditos", "Crítico de sofá", "Cinéfilo", "Cazador de cine de culto",
+  "Archivero", "Coleccionista", "Trotafestivales", "Socio de la filmoteca", "Curador",
+  "Maestro archivero", "Testigo de una época", "Memoria del cine", "Espectador legendario", "Leyenda de la gran pantalla",
+];
+
+/** Perde adları: dile uygun liste, bilinmeyen dil İngilizce. */
+export const perdeAdlariOf = (lang) =>
+  lang === "tr" ? PERDE_ADLARI : lang === "es" ? PERDE_ADLARI_ES : PERDE_ADLARI_EN;
 
 /**
  * @param {number} kare
@@ -458,6 +468,7 @@ export function computePerde(kare, tabanPerde = 1, tabanMakara = 0) {
     perde: goruntulenen,
     ad: PERDE_ADLARI[goruntulenen - 1],
     adEn: PERDE_ADLARI_EN[goruntulenen - 1],
+    adEs: PERDE_ADLARI_ES[goruntulenen - 1],
     makara,
     zirve,
     tabanDevrede,

@@ -34,6 +34,7 @@ The core features are free. Paid plans add:
 • Games, CineSwipe and voting in the monthly tournament (Free can watch the tournament)
 • Your own themes, all 56 fonts, app icon picker, snowfall, ambient background, icon background and the on-screen pet
 • Wrapped archive (Free this year only · Premium last 5 years · Max every year) and streaming alerts for up to 100 titles (Free: 10)
+• In-app bug reports (Premium and Max) and feature requests (Max only)
 
 Available in English and Turkish. Dark theme included. Free to use.
 

@@ -8,6 +8,7 @@
 // tercihleri ve işaretleme hooks/useUpNextQueue'da — ray ile paylaşılır. Bu
 // ekranda kalan tek fazlalık dizi YÖNETİMİ (gizle/göster) ve geniş kart.
 
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -94,7 +95,7 @@ const formatShortDate = (value, language) => {
   if (!value) return null;
   const date = new Date(`${value}T12:00:00`);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(language === "en" ? "en-US" : "tr-TR", {
+  return new Intl.DateTimeFormat(intlLocaleOf(language), {
     day: "numeric",
     month: "short",
   }).format(date);

@@ -28,7 +28,7 @@ import {
 const buildStages = (lang) => [
   {
     key: "selection", icon: "checkbox", roundIndex: null,
-    label: lang === "tr" ? "Seçim" : "Picks",
+    label: lang === "tr" ? "Seçim" : lang === "es" ? "Elección" : "Picks",
     startDay: 0, endDay: SELECTION_DAYS,
   },
   ...ROUNDS.map((r, i) => ({
@@ -38,15 +38,15 @@ const buildStages = (lang) => [
     label:
       r.key === "r32" ? "32"
       : r.key === "r16" ? "16"
-      : r.key === "qf" ? (lang === "tr" ? "ÇF" : "QF")
-      : r.key === "sf" ? (lang === "tr" ? "YF" : "SF")
-      : (lang === "tr" ? "Final" : "Final"),
+      : r.key === "qf" ? (lang === "tr" ? "ÇF" : lang === "es" ? "CF" : "QF")
+      : r.key === "sf" ? (lang === "tr" ? "YF" : lang === "es" ? "SF" : "SF")
+      : (lang === "tr" ? "Final" : lang === "es" ? "Final" : "Final"),
     startDay: r.startDay,
     endDay: r.endDay,
   })),
   {
     key: "results", icon: "trophy", roundIndex: ROUNDS.length - 1,
-    label: lang === "tr" ? "Kupa" : "Cup",
+    label: lang === "tr" ? "Kupa" : lang === "es" ? "Copa" : "Cup",
     startDay: RESULTS_START_DAY, endDay: 31,
   },
 ];

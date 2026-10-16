@@ -8,7 +8,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-n
 import { Image as ExpoImage } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { AuthPressable } from "../../components/auth/AuthKit";
-import { ONBOARDING_GENRES } from "../../utils/onboardingPreferences";
+import { ONBOARDING_GENRES, onboardingGenreLabel } from "../../utils/onboardingPreferences";
 import { alpha } from "../../theme/colors";
 import { isLightSurface } from "../../utils/colorUtils";
 import {
@@ -21,12 +21,8 @@ import {
 } from "./OnboardingParts";
 
 // Dizi için TMDB'nin birleşik tür adları ("Aksiyon & Macera") varsa onlar gösterilir.
-export const genreLabel = (genre, mediaType, isEnglish) =>
-  mediaType === "tv"
-    ? (isEnglish ? genre.tvEn || genre.en : genre.tvTr || genre.tr)
-    : isEnglish
-      ? genre.en
-      : genre.tr;
+export const genreLabel = (genre, mediaType, language) =>
+  onboardingGenreLabel(genre, mediaType, language);
 
 const GRID_GAP = 10;
 const CONTENT_W = PAGE_W - SIDE_PAD * 2;
@@ -223,7 +219,7 @@ function ProviderTile({ theme, provider, selected, logoUri, onPress }) {
 export default function PreferenceSlide({
   kind,
   copy,
-  isEnglish,
+  language,
   theme,
   accent,
   isLightTheme,
@@ -329,7 +325,7 @@ export default function PreferenceSlide({
                     key={genre.key}
                     theme={theme}
                     accent={accent}
-                    label={genreLabel(genre, mediaType, isEnglish)}
+                    label={genreLabel(genre, mediaType, language)}
                     icon={genre.icon}
                     order={at + 1}
                     locked={at < 0 && activeGenres.length >= MAX_GENRES}

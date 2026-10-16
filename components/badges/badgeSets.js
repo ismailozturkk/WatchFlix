@@ -52,22 +52,22 @@ export const BADGE_SETS = [
   {
     id: "set_ilk_adim",
     icon: "footsteps-outline", iconSolid: "footsteps", rarity: RARITY.uncommon,
-    tr: "Merdivenin Başı", en: "First Rungs",
-    descTr: "Her ailenin ilk kademesini aç", descEn: "Unlock the first tier of every family",
+    tr: "Merdivenin Başı", en: "First Rungs", es: "Primeros peldaños",
+    descTr: "Her ailenin ilk kademesini aç", descEn: "Unlock the first tier of every family", descEs: "Desbloquea el primer nivel de cada familia",
     uyeler: () => kademeIdleri(1),
   },
   {
     id: "set_mevsim",
     icon: "snow-outline", iconSolid: "snow", rarity: RARITY.rare,
-    tr: "Mevsim Kolyesi", en: "Season Necklace",
-    descTr: "Tüm mevsimsel rozetleri topla", descEn: "Collect every seasonal badge",
+    tr: "Mevsim Kolyesi", en: "Season Necklace", es: "Collar de temporadas",
+    descTr: "Tüm mevsimsel rozetleri topla", descEn: "Collect every seasonal badge", descEs: "Reúne todas las insignias de temporada",
     uyeler: () => idler((b) => b.section === BOLUM.MEVSIM),
   },
   {
     id: "set_uzman",
     icon: "ribbon-outline", iconSolid: "ribbon", rarity: RARITY.rare,
-    tr: "Tür Uzmanı", en: "Genre Specialist",
-    descTr: "Dört tür uzmanlık rozetini de kazan", descEn: "Earn all four genre specialist badges",
+    tr: "Tür Uzmanı", en: "Genre Specialist", es: "Especialista en géneros",
+    descTr: "Dört tür uzmanlık rozetini de kazan", descEn: "Earn all four genre specialist badges", descEs: "Consigue las cuatro insignias de especialista en géneros",
     // Tür ailesinin kademeleri DEĞİL, tek tek tür rozetleri (korku/animasyon/
     // belgesel/komedi): çeşitlilik değil DERİNLİK ölçen set budur.
     uyeler: () => idler((b) => b.section === BOLUM.TUR && !b.family),
@@ -75,22 +75,22 @@ export const BADGE_SETS = [
   {
     id: "set_yari_yol",
     icon: "trending-up-outline", iconSolid: "trending-up", rarity: RARITY.rare,
-    tr: "Yarı Yol", en: "Halfway",
-    descTr: "Her ailenin 3. kademesine ulaş", descEn: "Reach the 3rd tier of every family",
+    tr: "Yarı Yol", en: "Halfway", es: "A medio camino",
+    descTr: "Her ailenin 3. kademesine ulaş", descEn: "Reach the 3rd tier of every family", descEs: "Llega al tercer nivel de cada familia",
     uyeler: () => kademeIdleri(3),
   },
   {
     id: "set_sir",
     icon: "eye-outline", iconSolid: "eye", rarity: RARITY.epic,
-    tr: "Sır Toplayıcı", en: "Secret Keeper",
-    descTr: "Tüm gizli rozetleri ortaya çıkar", descEn: "Uncover every hidden badge",
+    tr: "Sır Toplayıcı", en: "Secret Keeper", es: "Guardián de secretos",
+    descTr: "Tüm gizli rozetleri ortaya çıkar", descEn: "Uncover every hidden badge", descEs: "Descubre todas las insignias ocultas",
     uyeler: () => idler((b) => b.hidden),
   },
   {
     id: "set_panteon",
     icon: "trophy-outline", iconSolid: "trophy", rarity: RARITY.epic,
-    tr: "Panteon", en: "Pantheon",
-    descTr: "Her ailenin zirvesine ulaş", descEn: "Reach the peak of every family",
+    tr: "Panteon", en: "Pantheon", es: "Panteón",
+    descTr: "Her ailenin zirvesine ulaş", descEn: "Reach the peak of every family", descEs: "Llega a la cima de cada familia",
     uyeler: zirveIdleri,
   },
 ];

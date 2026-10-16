@@ -18,6 +18,7 @@
 // AsyncStorage anahtarı üzerinde yarışırdı — tohumlama geri alınamaz olduğu için
 // bu yarışın bedeli kalıcı olurdu.
 
+import { copyLanguage, pickByLanguage } from "../../utils/appLanguages";
 import React, { memo, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppIcon from "@components/AppIcon";
@@ -35,7 +36,7 @@ const KOMPAKT_ROZET_BOYUT = 30;
 function WatchBadgeStrip({ progress, onPress, compact = false }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = language === "en" ? "en" : "tr";
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
   const { loading, kartlar, acikSayisi, toplamRozet } = progress || {};
   // Simgeye dokunmak DETAY MODALINI açar, Rozetler ekranına GİTMEZ. Gezinme
   // sonundaki sayaç çipinde kalır: raf bir vitrin, her simge kendi hikâyesini
@@ -73,7 +74,7 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
         <TouchableOpacity
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={lang === "tr" ? "Tüm rozetler" : "All badges"}
+          accessibilityLabel={pickByLanguage(lang, { tr: "Tüm rozetler", en: "All badges", es: "Todas las insignias" })}
           onPress={onPress}
           style={[
             styles.hepsi,

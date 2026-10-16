@@ -11,6 +11,7 @@
 // Nadirlik sütunları "hangi liglerde ilerledim?" sorusunu cevaplar: 8/12 yaygın
 // ama 0/3 efsanevi olan kullanıcı sıradaki büyük hedefini bir bakışta görür.
 
+import { copyLanguage } from "../../utils/appLanguages";
 import React, { memo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
@@ -59,7 +60,7 @@ function Halka({ oran, renk, iz, metin, metinRenk }) {
 function BadgeSummaryCard({ acik, toplam, dagilim, style }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = language === "en" ? "en" : "tr";
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
   const oran = toplam > 0 ? acik / toplam : 0;
 
   return (

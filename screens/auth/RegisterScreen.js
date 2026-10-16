@@ -217,9 +217,7 @@ export default function RegisterScreen({ navigation }) {
       Toast.show({
         type: "error",
         text1: isAllDigits
-          ? (language === "tr"
-              ? "Kullanıcı adı sadece rakamlardan oluşamaz (en az bir harf içermelidir)."
-              : "Username cannot consist only of numbers (must contain at least one letter).")
+          ? (language === "tr" ? "Kullanıcı adı sadece rakamlardan oluşamaz (en az bir harf içermelidir)." : language === "es" ? "El nombre de usuario no puede ser solo números (debe contener al menos una letra)." : "Username cannot consist only of numbers (must contain at least one letter).")
           : i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "Geçersiz kullanıcı adı (3-20 karakter, en az bir harf, a-z 0-9 _)"),
       });
       return;
@@ -227,9 +225,7 @@ export default function RegisterScreen({ navigation }) {
     if (usernameChecking || usernameAvailable === null) {
       Toast.show({
         type: "info",
-        text1: language === "tr"
-          ? "Kullanıcı adı kontrol ediliyor, lütfen bekleyin..."
-          : "Checking username availability, please wait...",
+        text1: language === "tr" ? "Kullanıcı adı kontrol ediliyor, lütfen bekleyin..." : language === "es" ? "Comprobando la disponibilidad del nombre de usuario, espera un momento..." : "Checking username availability, please wait...",
       });
       return;
     }
@@ -324,9 +320,7 @@ export default function RegisterScreen({ navigation }) {
               username,
               email,
             })
-          : language === "tr"
-          ? "Hesabın oluşturuldu. Doğrulama e-postasını giriş ekranından yeniden gönderebilirsin."
-          : "Your account was created. You can resend verification from the sign-in screen.",
+          : language === "tr" ? "Hesabın oluşturuldu. Doğrulama e-postasını giriş ekranından yeniden gönderebilirsin." : language === "es" ? "Tu cuenta se ha creado. Puedes reenviar la verificación desde la pantalla de inicio de sesión." : "Your account was created. You can resend verification from the sign-in screen.",
       });
       navigation.reset({ index: 0, routes: [{ name: "LoginScreen" }] });
     } catch (error) {
@@ -338,24 +332,14 @@ export default function RegisterScreen({ navigation }) {
       }
       const message =
         error?.code === "auth/email-already-in-use"
-          ? language === "tr"
-            ? "Bu e-posta ile zaten bir hesap var. Mevcut giriş yöntemini kullan; Google hesabıysan Google ile giriş yap."
-            : "An account already uses this email. Use its existing sign-in method; if it is a Google account, sign in with Google."
+          ? language === "tr" ? "Bu e-posta ile zaten bir hesap var. Mevcut giriş yöntemini kullan; Google hesabıysan Google ile giriş yap." : language === "es" ? "Ya existe una cuenta con este correo. Usa su método de inicio de sesión actual; si es una cuenta de Google, inicia sesión con Google." : "An account already uses this email. Use its existing sign-in method; if it is a Google account, sign in with Google."
           : error?.code === UserProfileErrorCode.USERNAME_TAKEN
-          ? language === "tr"
-            ? "Bu kullanıcı adı az önce alındı. Başka bir kullanıcı adı dene."
-            : "That username was just taken. Try another username."
+          ? language === "tr" ? "Bu kullanıcı adı az önce alındı. Başka bir kullanıcı adı dene." : language === "es" ? "Alguien acaba de usar ese nombre de usuario. Prueba con otro." : "That username was just taken. Try another username."
           : error?.code === "auth/invalid-email"
-          ? language === "tr"
-            ? "Geçerli bir e-posta adresi gir."
-            : "Enter a valid email address."
+          ? language === "tr" ? "Geçerli bir e-posta adresi gir." : language === "es" ? "Introduce un correo electrónico válido." : "Enter a valid email address."
           : error?.code === "auth/weak-password"
-          ? language === "tr"
-            ? "Daha güçlü bir şifre belirle."
-            : "Choose a stronger password."
-          : language === "tr"
-          ? "Kayıt tamamlanamadı. Bağlantını kontrol edip tekrar dene."
-          : "Registration could not be completed. Check your connection and try again.";
+          ? language === "tr" ? "Daha güçlü bir şifre belirle." : language === "es" ? "Elige una contraseña más segura." : "Choose a stronger password."
+          : language === "tr" ? "Kayıt tamamlanamadı. Bağlantını kontrol edip tekrar dene." : language === "es" ? "No se pudo completar el registro. Revisa tu conexión e inténtalo de nuevo." : "Registration could not be completed. Check your connection and try again.";
       Toast.show({
         type: "error",
         text1: i18nText("autoI18n.kayit_sirasinda_hata_olustu", "Kayıt sırasında hata oluştu"),
@@ -391,7 +375,7 @@ export default function RegisterScreen({ navigation }) {
       Toast.show({
         type: "error",
         text1: i18nText("autoI18n.google_ile_giris_basarisiz", "Google ile giriş başarısız."),
-        text2: describeGoogleAuthError(error, language === "tr"),
+        text2: describeGoogleAuthError(error, language),
       });
     } finally {
       setIsGoogleLoading(false);
@@ -415,7 +399,7 @@ export default function RegisterScreen({ navigation }) {
           type: "success",
           text1:
             i18nText("autoI18n.hos_geldin", "Hoş geldin, ") +
-            (user.displayName || user.email || (language === "tr" ? "Apple kullanıcısı" : "Apple user")),
+            (user.displayName || user.email || (language === "tr" ? "Apple kullanıcısı" : language === "es" ? "Usuario de Apple" : "Apple user")),
         });
         navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
       }
@@ -423,8 +407,8 @@ export default function RegisterScreen({ navigation }) {
       if (error?.code === AppleAuthCode.CANCELLED) return;
       Toast.show({
         type: "error",
-        text1: language === "tr" ? "Apple ile kayıt başarısız" : "Sign up with Apple failed",
-        text2: describeAppleAuthError(error, language === "tr"),
+        text1: language === "tr" ? "Apple ile kayıt başarısız" : language === "es" ? "No se pudo registrar con Apple" : "Sign up with Apple failed",
+        text2: describeAppleAuthError(error, language),
       });
     } finally {
       setIsAppleLoading(false);
@@ -576,9 +560,7 @@ export default function RegisterScreen({ navigation }) {
               )}
               {username.length >= 3 && !usernameValid && /^[0-9_]+$/.test(username) && (
                 <Text style={[styles.hintText, { color: ERROR }]}>
-                  {language === "tr"
-                    ? "Kullanıcı adı sadece rakamlardan veya alt çizgiden oluşamaz (en az bir harf içermelidir)."
-                    : "Username cannot be only numbers or underscores (must contain at least one letter)."}
+                  {language === "tr" ? "Kullanıcı adı sadece rakamlardan veya alt çizgiden oluşamaz (en az bir harf içermelidir)." : language === "es" ? "El nombre de usuario no puede ser solo números o guiones bajos (debe contener al menos una letra)." : "Username cannot be only numbers or underscores (must contain at least one letter)."}
                 </Text>
               )}
               {username.length >= 3 && !usernameValid && !/^[0-9_]+$/.test(username) && (

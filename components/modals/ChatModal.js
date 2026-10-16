@@ -1,3 +1,4 @@
+import { SUPPORTED_LANGUAGE_CODES, nextAppLanguage, normalizeAppLanguage } from "../../utils/appLanguages";
 import ComposerBlur, { ComposerBlurTarget, useComposerBlurTarget } from "../chat/ComposerBlur";
 import React, {
   useEffect,
@@ -1014,27 +1015,30 @@ export const ChatModal = () => {
                       </View>
 
                       <TouchableOpacity
-                        onPress={() => toggleLanguage(language === "tr" ? "en" : "tr")}
+                        onPress={() => toggleLanguage(nextAppLanguage(language))}
                         hitSlop={6}
                         style={styles.langToggle}
                       >
-                        <Text
-                          style={[
-                            styles.langText,
-                            { color: language === "tr" ? theme.text.primary : theme.text.muted },
-                          ]}
-                        >
-                          TR
-                        </Text>
-                        <Text style={[styles.langText, { color: theme.text.muted }]}> · </Text>
-                        <Text
-                          style={[
-                            styles.langText,
-                            { color: language === "en" ? theme.text.primary : theme.text.muted },
-                          ]}
-                        >
-                          EN
-                        </Text>
+                        {SUPPORTED_LANGUAGE_CODES.map((code, index) => (
+                          <React.Fragment key={code}>
+                            {index > 0 ? (
+                              <Text style={[styles.langText, { color: theme.text.muted }]}> · </Text>
+                            ) : null}
+                            <Text
+                              style={[
+                                styles.langText,
+                                {
+                                  color:
+                                    normalizeAppLanguage(language) === code
+                                      ? theme.text.primary
+                                      : theme.text.muted,
+                                },
+                              ]}
+                            >
+                              {code.toUpperCase()}
+                            </Text>
+                          </React.Fragment>
+                        ))}
                       </TouchableOpacity>
                     </View>
 

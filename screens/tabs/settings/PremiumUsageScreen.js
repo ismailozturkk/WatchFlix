@@ -9,6 +9,7 @@
 // gelir; satırları utils/premiumUsageModel.js kurar. Kayıtta yeni bir özellik
 // açılınca bu ekranda kendiliğinden bir satır olur.
 
+import { intlLocaleOf, normalizeAppLanguage } from "../../../utils/appLanguages";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import AppIcon from "@components/AppIcon";
@@ -42,19 +43,17 @@ function stateColor(state, C) {
 }
 
 /** Sağ üst köşedeki kısa değer: "3 / 5", "Sınırsız", "Açık", Premium rozeti. */
-function ValueChip({ row, C, tr }) {
+function ValueChip({ row, C, tr, es }) {
   if (row.state === "locked") return <PremiumPill />;
   const color = stateColor(row.state, C);
   let text;
-  if (row.state === "included") text = tr ? "Açık" : "On";
-  else if (row.state === "unlimited") text = tr ? "Sınırsız" : "Unlimited";
+  if (row.state === "included") text = tr ? "Açık" : es ? "Activado" : "On";
+  else if (row.state === "unlimited") text = tr ? "Sınırsız" : es ? "Ilimitado" : "Unlimited";
   else if (row.kind === "ai_quota") {
     text =
       row.remaining === null
         ? "—"
-        : tr
-          ? `${row.remaining} kaldı`
-          : `${row.remaining} left`;
+        : tr ? `${row.remaining} kaldı` : es ? `${row.remaining} restantes` : `${row.remaining} left`;
   } else {
     text = `${row.used === null ? "–" : row.used} / ${row.limit}`;
   }
@@ -68,36 +67,34 @@ function ValueChip({ row, C, tr }) {
 }
 
 /** Başlığın altındaki tek satırlık durum cümlesi. */
-function statusLine(row, tr) {
+function statusLine(row, tr, es) {
   switch (row.state) {
     case "locked":
       return row.kind === "access"
-        ? tr ? "Bu planda kapalı" : "Not included in this plan"
-        : tr ? "Bu planda dahil değil" : "Not included in this plan";
+        ? tr ? "Bu planda kapalı" : es ? "No incluido en este plan" : "Not included in this plan"
+        : tr ? "Bu planda dahil değil" : es ? "No incluido en este plan" : "Not included in this plan";
     case "included":
       return row.valueLabel;
     case "unlimited":
       return row.used !== null
-        ? tr ? `${row.used} kullanılıyor` : `${row.used} in use`
-        : tr ? "Sınırsız kullanım" : "Unlimited use";
+        ? tr ? `${row.used} kullanılıyor` : es ? `${row.used} en uso` : `${row.used} in use`
+        : tr ? "Sınırsız kullanım" : es ? "Uso ilimitado" : "Unlimited use";
     case "unknown":
-      return tr ? "Yükleniyor…" : "Loading…";
+      return tr ? "Yükleniyor…" : es ? "Cargando…" : "Loading…";
     case "full":
       return row.kind === "ai_quota"
-        ? tr ? "Şu an mesaj gönderemezsin" : "You can't send messages right now"
-        : tr ? "Hak doldu" : "Limit reached";
+        ? tr ? "Şu an mesaj gönderemezsin" : es ? "Ahora mismo no puedes enviar mensajes" : "You can't send messages right now"
+        : tr ? "Hak doldu" : es ? "Límite alcanzado" : "Limit reached";
     default:
       break;
   }
   if (row.kind === "ai_quota") {
-    return tr
-      ? `Şu an ${row.remaining} mesaj gönderebilirsin`
-      : `You can send ${row.remaining} more messages right now`;
+    return tr ? `Şu an ${row.remaining} mesaj gönderebilirsin` : es ? `Aún puedes enviar ${row.remaining} mensajes más` : `You can send ${row.remaining} more messages right now`;
   }
-  return tr ? `Kalan: ${row.remaining}` : `${row.remaining} left`;
+  return tr ? `Kalan: ${row.remaining}` : es ? `${row.remaining} restantes` : `${row.remaining} left`;
 }
 
-function UsageRow({ row, C, tr, last, onPress }) {
+function UsageRow({ row, C, tr, es, last, onPress }) {
   const color = stateColor(row.state, C);
   const locked = row.state === "locked";
   const Body = onPress ? Pressable : View;
@@ -119,15 +116,13 @@ function UsageRow({ row, C, tr, last, onPress }) {
           >
             {row.title}
           </Text>
-          <ValueChip row={row} C={C} tr={tr} />
+          <ValueChip row={row} C={C} tr={tr} es={es} />
         </View>
 
         <Text allowFontScaling={false} style={[st.rowStatus, { color: row.state === "full" ? C.danger : C.muted }]}>
-          {statusLine(row, tr)}
+          {statusLine(row, tr, es)}
           {row.overflow > 0
-            ? tr
-              ? ` · ${row.overflow} yapım takip dışı`
-              : ` · ${row.overflow} not tracked`
+            ? tr ? ` · ${row.overflow} yapım takip dışı` : es ? ` · ${row.overflow} sin contabilizar` : ` · ${row.overflow} not tracked`
             : ""}
         </Text>
 
@@ -177,6 +172,7 @@ export default function PremiumUsageScreen({ navigation }) {
   const { language } = useLanguage();
   const C = buildUiColors(theme);
   const tr = language === "tr";
+  const es = normalizeAppLanguage(language) === "es";
   const { plan, usage } = usePremiumUsage();
 
   // Geri sayımlar (yenilenmesine X sa Y dk) ekran açıkken kendini yeniler.
@@ -194,13 +190,13 @@ export default function PremiumUsageScreen({ navigation }) {
   const { counts } = model.summary;
   const summaryLine = [
     counts.locked > 0
-      ? tr ? `${counts.locked} özellik bu planda kapalı` : `${counts.locked} features not in this plan`
+      ? tr ? `${counts.locked} özellik bu planda kapalı` : es ? `${counts.locked} funciones no incluidas en este plan` : `${counts.locked} features not in this plan`
       : null,
     counts.full > 0
-      ? tr ? `${counts.full} hak doldu` : `${counts.full} limits reached`
+      ? tr ? `${counts.full} hak doldu` : es ? `${counts.full} límites alcanzados` : `${counts.full} limits reached`
       : null,
     counts.low > 0
-      ? tr ? `${counts.low} hak azalıyor` : `${counts.low} running low`
+      ? tr ? `${counts.low} hak azalıyor` : es ? `${counts.low} a punto de agotarse` : `${counts.low} running low`
       : null,
   ].filter(Boolean);
 
@@ -213,7 +209,7 @@ export default function PremiumUsageScreen({ navigation }) {
 
   const utcResetLocal = useMemo(() => {
     try {
-      return new Intl.DateTimeFormat(tr ? "tr-TR" : "en-US", {
+      return new Intl.DateTimeFormat(intlLocaleOf(language), {
         hour: "2-digit",
         minute: "2-digit",
       }).format(nextUtcMidnight(now));
@@ -237,7 +233,7 @@ export default function PremiumUsageScreen({ navigation }) {
           </View>
           <View style={{ flex: 1 }}>
             <Text allowFontScaling={false} style={[st.summaryEyebrow, { color: C.muted }]}>
-              {tr ? "AKTİF PLAN" : "CURRENT PLAN"}
+              {tr ? "AKTİF PLAN" : es ? "PLAN ACTUAL" : "CURRENT PLAN"}
             </Text>
             <Text allowFontScaling={false} style={[st.summaryPlan, { color: C.text }]}>
               {model.planName}
@@ -247,9 +243,7 @@ export default function PremiumUsageScreen({ navigation }) {
         <Text allowFontScaling={false} style={[st.summaryLine, { color: C.muted }]}>
           {summaryLine.length > 0
             ? summaryLine.join(" · ")
-            : tr
-              ? "Tüm haklarının durumu aşağıda."
-              : "Here's where all your limits stand."}
+            : tr ? "Tüm haklarının durumu aşağıda." : es ? "Así van todos tus límites." : "Here's where all your limits stand."}
         </Text>
         {model.canUpgrade ? (
           <Pressable
@@ -258,7 +252,7 @@ export default function PremiumUsageScreen({ navigation }) {
             style={[st.summaryCta, { backgroundColor: C.accent }]}
           >
             <Text allowFontScaling={false} style={st.summaryCtaText}>
-              {tr ? "Planları ve fiyatları gör" : "View plans & pricing"}
+              {tr ? "Planları ve fiyatları gör" : es ? "Ver planes y precios" : "View plans & pricing"}
             </Text>
             <AppIcon family="Ionicons" name="arrow-forward" size={14} color="#FFFFFF" />
           </Pressable>
@@ -275,6 +269,7 @@ export default function PremiumUsageScreen({ navigation }) {
                 row={row}
                 C={C}
                 tr={tr}
+                es={es}
                 last={index === section.rows.length - 1}
                 onPress={pressFor(row)}
               />
@@ -284,9 +279,7 @@ export default function PremiumUsageScreen({ navigation }) {
       ))}
 
       <Text allowFontScaling={false} style={[st.footnote, { color: C.muted }]}>
-        {tr
-          ? `Oyun ve CineSwipe hakları gece yarısı (yerel saat) yenilenir. AI mesajları UTC 00:00'da, yani senin saatinle ${utcResetLocal}'da yenilenir; aylık hak her ayın başında sıfırlanır.\n\nLimit dolsa bile mevcut verilerin silinmez; yalnızca yeni ekleme durur.`
-          : `Game and CineSwipe limits reset at midnight (local time). AI messages reset at 00:00 UTC, which is ${utcResetLocal} for you; the monthly limit resets at the start of each month.\n\nHitting a limit never deletes what you already have; it only stops new additions.`}
+        {tr ? `Oyun ve CineSwipe hakları gece yarısı (yerel saat) yenilenir. AI mesajları UTC 00:00'da, yani senin saatinle ${utcResetLocal}'da yenilenir; aylık hak her ayın başında sıfırlanır.\n\nLimit dolsa bile mevcut verilerin silinmez; yalnızca yeni ekleme durur.` : es ? `Los límites de juegos y CineSwipe se restablecen a medianoche (hora local). Los mensajes de IA se restablecen a las 00:00 UTC, que para ti son las ${utcResetLocal}; el límite mensual se restablece al empezar cada mes.\n\nAlcanzar un límite nunca borra lo que ya tienes; solo impide añadir cosas nuevas.` : `Game and CineSwipe limits reset at midnight (local time). AI messages reset at 00:00 UTC, which is ${utcResetLocal} for you; the monthly limit resets at the start of each month.\n\nHitting a limit never deletes what you already have; it only stops new additions.`}
       </Text>
     </SettingsSubScreen>
   );

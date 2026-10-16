@@ -8,6 +8,8 @@
 // gününü verir; UTC+3'te yerel gece yarısı bir önceki güne düşerdi (bkz.
 // context/CalendarContext.js toDateStr — iki taraf aynı takvimde konuşmalı).
 
+import { pickByLanguage } from "./appLanguages";
+
 const DAY_MS = 86400000;
 
 export function toLocalDateStr(date) {
@@ -80,5 +82,5 @@ export function countEventsInMonth(noteEvents, reminderEvents, monthKey) {
 /** "S1B3" (TR) / "S1E3" (EN). Sezon ya da bölüm yoksa boş dizgi. */
 export function formatEpisodeCode(seasonNumber, episodeNumber, language) {
   if (seasonNumber == null || episodeNumber == null) return "";
-  return `S${seasonNumber}${language === "tr" ? "B" : "E"}${episodeNumber}`;
+  return `${pickByLanguage(language, { tr: "S", en: "S", es: "T" })}${seasonNumber}${pickByLanguage(language, { tr: "B", en: "E", es: "E" })}${episodeNumber}`;
 }

@@ -35,6 +35,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db, fns } from "../firebase";
+import { legacyFlagToLanguage, pickByLanguage } from "../utils/appLanguages";
 
 export const GOOGLE_PROFILE_PENDING_KEY = Keys.googleProfilePendingUid.key;
 
@@ -158,50 +159,62 @@ const ERROR_TEXT = {
   [GoogleAuthCode.ALREADY_LINKED_ELSEWHERE]: {
     tr: "Bu Google hesabı başka bir Seelogd hesabına bağlı. Önce o hesaptan bağlantıyı kaldır.",
     en: "This Google account is linked to another Seelogd account. Disconnect it there first.",
+    es: "Esta cuenta de Google está vinculada a otra cuenta de Seelogd. Desvincúlala primero allí.",
   },
   [GoogleAuthCode.ALREADY_LINKED_HERE]: {
     tr: "Google hesabın zaten bağlı.",
     en: "Your Google account is already connected.",
+    es: "Tu cuenta de Google ya está vinculada.",
   },
   [GoogleAuthCode.WRONG_ACCOUNT]: {
     tr: "Farklı bir Google hesabı seçtin. Oturumu açtığın hesabı seç.",
     en: "You picked a different Google account. Choose the one you signed in with.",
+    es: "Has elegido una cuenta de Google distinta. Elige aquella con la que iniciaste sesión.",
   },
   [GoogleAuthCode.REQUIRES_RECENT_LOGIN]: {
     tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra dene.",
     en: "For security, sign out and sign in again, then retry.",
+    es: "Por seguridad, cierra sesión, vuelve a iniciarla e inténtalo de nuevo.",
   },
   [GoogleAuthCode.NETWORK]: {
     tr: "İnternet bağlantısı kurulamadı. Bağlantını kontrol et.",
     en: "Could not reach the network. Check your connection.",
+    es: "No se pudo conectar a la red. Revisa tu conexión.",
   },
   [GoogleAuthCode.ACCOUNT_REQUIRES_LINK]: {
     tr: "Bu e-posta ile zaten bir Seelogd hesabı var. Önce e-posta ve şifrenle giriş yap, ardından Ayarlar > Hesap bağlantıları bölümünden Google'ı bağla.",
     en: "A Seelogd account already uses this email. Sign in with email and password first, then connect Google from Settings > Account connections.",
+    es: "Ya existe una cuenta de Seelogd con este correo. Inicia sesión primero con tu correo y contraseña y después vincula Google desde Ajustes > Cuentas vinculadas.",
   },
   [GoogleAuthCode.PLAY_SERVICES]: {
     tr: "Google Play Hizmetleri bu cihazda kullanılamıyor.",
     en: "Google Play Services is unavailable on this device.",
+    es: "Google Play Services no está disponible en este dispositivo.",
   },
   [GoogleAuthCode.MISCONFIGURED]: {
     tr: "Google girişi bu uygulama sürümünde kullanılamıyor.",
     en: "Google sign-in is unavailable in this build.",
+    es: "El inicio de sesión con Google no está disponible en esta versión de la app.",
   },
   [GoogleAuthCode.LAST_PROVIDER]: {
     tr: "Google şu anda tek giriş yöntemin, kaldırılamaz.",
     en: "Google is your only sign-in method and cannot be removed.",
+    es: "Google es ahora tu único método de inicio de sesión y no se puede quitar.",
   },
   [GoogleAuthCode.IN_PROGRESS]: {
     tr: "Google girişi zaten sürüyor.",
     en: "Google sign-in is already in progress.",
+    es: "Ya hay un inicio de sesión con Google en curso.",
   },
   [GoogleAuthCode.NO_ID_TOKEN]: {
     tr: "Google kimlik doğrulaması tamamlanamadı. Tekrar dene.",
     en: "Google could not verify your identity. Please try again.",
+    es: "Google no pudo verificar tu identidad. Inténtalo de nuevo.",
   },
   [GoogleAuthCode.NO_SESSION]: {
     tr: "Oturum bulunamadı. Tekrar giriş yap.",
     en: "No active session. Please sign in again.",
+    es: "No hay ninguna sesión activa. Inicia sesión de nuevo.",
   },
 };
 
@@ -209,12 +222,19 @@ const ERROR_TEXT = {
  * Hata → kullanıcıya gösterilebilir metin. Ham Firebase/native mesajları
  * ("Firebase: Error (auth/...)") hiçbir zaman kullanıcıya sızmaz.
  */
-export function describeGoogleAuthError(error, tr = true) {
+/**
+ * @param {boolean|string} language  Eski çağrılar `true` (Türkçe) / `false` (İngilizce)
+ *   geçiyordu; artık uygulama dili ("tr" | "en" | "es") da verilebilir.
+ */
+export function describeGoogleAuthError(error, language = "tr") {
+  const code = legacyFlagToLanguage(language);
   const entry = ERROR_TEXT[error?.code];
-  if (entry) return tr ? entry.tr : entry.en;
-  return tr
-    ? "Beklenmeyen bir hata oluştu. Lütfen tekrar dene."
-    : "Something went wrong. Please try again.";
+  if (entry) return entry[code] ?? entry.en;
+  return pickByLanguage(code, {
+    tr: "Beklenmeyen bir hata oluştu. Lütfen tekrar dene.",
+    en: "Something went wrong. Please try again.",
+    es: "Ha ocurrido un error. Inténtalo de nuevo.",
+  });
 }
 
 // ── Yapılandırma ────────────────────────────────────────────────────────────

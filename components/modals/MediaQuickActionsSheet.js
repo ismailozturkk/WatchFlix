@@ -23,6 +23,7 @@
 // "Diğer Listeler" ızgarası + bu sayfa — ki bu, uygulamada zaten kanıtlanmış
 // derinlik (WatchedDateSheet → DatePickerModal).
 
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -305,7 +306,7 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
      (utils/dataCacheSettings.js → categoryForCacheKey) buradan okuyor. */
   useEffect(() => {
     if (!targetKey) return undefined;
-    const locale = language === "tr" ? "tr-TR" : "en-US";
+    const locale = intlLocaleOf(language);
     const cacheKey = `${mediaType}_quickactions_detail_${id}_${locale}`;
 
     // Sonuç `targetKey` ile etiketleniyor; ayrıca "eskisini temizle" adımı

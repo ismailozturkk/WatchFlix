@@ -15,6 +15,7 @@
 // kademeli aile tek karttır ve kimliği ULAŞILAN kademeden gelir; peşinde koşulan
 // hedef ayrı bir alanda (`sonrakiHedef`) taşınır.
 
+import { copyLanguage } from "../../utils/appLanguages";
 import { RARITY_ORDER } from "@theme/badgeTokens";
 import { BOLUM_SIRA } from "./watchBadgeCatalog";
 
@@ -184,13 +185,13 @@ export function prestijBilgisi(kart) {
 // Prestij adımının BİRİM adı. Süre ailesi (`sure`) burada yok: onun birimi çeviriciden
 // (dk/sa/gün) geliyor ve formatBadgeDeger zaten ekliyor.
 const PRESTIJ_EK = Object.freeze({
-  film: { tr: "film", en: "films" },
-  bolum: { tr: "bölüm", en: "episodes" },
-  final: { tr: "dizi", en: "series" },
-  gun: { tr: "gün", en: "days" },
-  uzunMetraj: { tr: "uzun film", en: "long films" },
+  film: { tr: "film", en: "films", es: "películas" },
+  bolum: { tr: "bölüm", en: "episodes", es: "episodios" },
+  final: { tr: "dizi", en: "series", es: "series" },
+  gun: { tr: "gün", en: "days", es: "días" },
+  uzunMetraj: { tr: "uzun film", en: "long films", es: "películas largas" },
 });
-export const prestijEk = (family, lang = "tr") => PRESTIJ_EK[family]?.[lang === "en" ? "en" : "tr"] || "";
+export const prestijEk = (family, lang = "tr") => PRESTIJ_EK[family]?.[copyLanguage(lang, ["tr", "en", "es"])] || "";
 
 /**
  * Rozeti bir kart listesinde bulur: kartın kendi id'si ya da kademeli ailenin

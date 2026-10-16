@@ -1,3 +1,4 @@
+import { intlLocaleOf, nextAppLanguage } from "../../utils/appLanguages";
 import { isLightSurface, shiftLightness } from "../../utils/colorUtils";
 // Giriş ekranı — ortak auth görsel dili (components/auth/AuthKit.js): accent'ten
 // türeyen arka plan ışıması, halkalı marka rozeti, vurgu çizgili tek kart,
@@ -159,7 +160,7 @@ export default function LoginScreen({ navigation }) {
     try {
       const newUser = {
         email,
-        date: new Date().toLocaleString(language === "tr" ? "tr-TR" : "en-US"),
+        date: new Date().toLocaleString(intlLocaleOf(language)),
       };
       let updatedUsers = [newUser, ...recentUsers];
       updatedUsers = updatedUsers.filter(
@@ -273,7 +274,7 @@ export default function LoginScreen({ navigation }) {
       Toast.show({
         type: "error",
         text1: i18nText("autoI18n.google_ile_giris_basarisiz", "Google ile giriş başarısız."),
-        text2: describeGoogleAuthError(error, language === "tr"),
+        text2: describeGoogleAuthError(error, language),
       });
     } finally {
       setIsGoogleLoading(false);
@@ -297,7 +298,7 @@ export default function LoginScreen({ navigation }) {
           type: "success",
           text1:
             i18nText("autoI18n.hos_geldin", "Hoş geldin, ") +
-            (user.displayName || user.email || (language === "tr" ? "Apple kullanıcısı" : "Apple user")),
+            (user.displayName || user.email || (language === "tr" ? "Apple kullanıcısı" : language === "es" ? "Usuario de Apple" : "Apple user")),
         });
         navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
       }
@@ -305,8 +306,8 @@ export default function LoginScreen({ navigation }) {
       if (error?.code === AppleAuthCode.CANCELLED) return;
       Toast.show({
         type: "error",
-        text1: language === "tr" ? "Apple ile giriş başarısız" : "Sign in with Apple failed",
-        text2: describeAppleAuthError(error, language === "tr"),
+        text1: language === "tr" ? "Apple ile giriş başarısız" : language === "es" ? "No se pudo iniciar sesión con Apple" : "Sign in with Apple failed",
+        text2: describeAppleAuthError(error, language),
       });
     } finally {
       setIsAppleLoading(false);
@@ -621,7 +622,7 @@ export default function LoginScreen({ navigation }) {
           borderWidth: 1,
         }}
         style={[styles.languageButton, { top: insets.top + 8 }]}
-        onPress={() => toggleLanguage(language === "tr" ? "en" : "tr")}
+        onPress={() => toggleLanguage(nextAppLanguage(language))}
       />
     </View>
   );

@@ -1,3 +1,4 @@
+import { tmdbLanguageOf } from "../../utils/appLanguages";
 import {
   StyleSheet,
   Text,
@@ -228,7 +229,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         `https://api.themoviedb.org/3/tv/${id}`,
         {
           params: {
-            language: language === "tr" ? "tr-TR" : "en-US",
+            language: tmdbLanguageOf(language),
             append_to_response: "external_ids",
           },
           headers: { accept: "application/json", Authorization: API_KEY },
@@ -287,7 +288,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         const tmdbRes = await axios.get(
           `https://api.themoviedb.org/3/tv/${id}/season/${season.season_number}`,
           {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
+            params: { language: tmdbLanguageOf(language) },
             headers: { accept: "application/json", Authorization: API_KEY },
           },
         );

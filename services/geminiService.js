@@ -16,6 +16,7 @@
 //
 // Bu modül React'tan bağımsızdır (saf JS) — test edilebilir ve UI'dan ayrıktır.
 import { trackFunctionCall, trackGeminiUsage } from "./usageTrackerService";
+import { aiPromptLanguageOf } from "../utils/appLanguages";
 
 export const GEMINI_MODEL = "gemini-2.5-flash";
 
@@ -104,7 +105,7 @@ export function buildSystemInstruction({
     tasteBlock,
 
     `RESPONSE STYLE:
-- Always respond in ${language}.
+- Always respond in ${aiPromptLanguageOf(language)}.
 - Use clean, scannable Markdown. Open with one short framing sentence, then a list of picks.
 - Make every title **bold-worthy**, but rely on the tagging rules below for the actual title text.
 - For each recommendation, keep it compact (1–3 lines): a one-sentence spoiler-free hook, a quick "why it fits you", and a meta line like: year · main genre · ~IMDb rating · key cast/director · streaming platform (omit any part you are unsure of).

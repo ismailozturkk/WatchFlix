@@ -22,6 +22,7 @@
 // Seçimler (düzen/renk/poster kaynağı/anahtarlar) MMKV'de hatırlanır; not
 // hatırlanmaz (Keys.profileStoryCard, utils/profileStoryCard.js).
 
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, {
   memo,
   useCallback,
@@ -61,6 +62,8 @@ import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { SHEET_TOP_MARGIN } from "../../utils/sheetKeyboardFit";
+import { getFavoritesCopy } from "../../utils/favoritesCopy";
+import { FAVORITE_KINDS, countFavorites } from "../../utils/fourFavorites";
 import { triggerHaptic } from "../../services/hapticsService";
 import { Keys, get, set } from "../../services/storage";
 import {
@@ -81,11 +84,15 @@ import {
   buildStoryStreak,
   cleanStoryNote,
   formatMemberSince,
+  isFavoritesActive,
   persistableStoryOptions,
   pickShowcaseBadges,
+  pickStoryFavorites,
   pickStoryPosters,
+  resolveStoryLayout,
   sanitizeStoryOptions,
   toStoryBadge,
+  toggleStoryKind,
 } from "../../utils/profileStoryCard";
 
 const TABS = [
@@ -99,6 +106,7 @@ const LAYOUT_LABELS = {
   identity: () => i18nText("autoI18n.profil_story_duzen_kimlik", "Kimlik"),
   wall: () => i18nText("autoI18n.profil_story_duzen_duvar", "Duvar"),
   minimal: () => i18nText("autoI18n.profil_story_duzen_minimal", "Minimal"),
+  picks: () => i18nText("autoI18n.profil_story_duzen_secki", "Seçki"),
 };
 const LAYOUTS = STORY_LAYOUT_IDS.map((id) => ({ id, label: LAYOUT_LABELS[id] }));
 
@@ -120,7 +128,7 @@ const SOURCES = [
   { id: "shows", label: () => i18nText("autoI18n.profil_story_kaynak_diziler", "Diziler") },
 ];
 
-// İki satıra bölünür (yatay kaydırmalı ızgara): her satırda dört anahtar.
+// İki satıra bölünür (yatay kaydırmalı ızgara): üstte dört, altta kalanlar.
 // `needs`: bu anahtarın göstereceği veri yoksa düğme pasif kalır (boş kart
 // bölümü çizilmez, kullanıcı da neden çalışmadığını görür).
 const TOGGLES = [
@@ -129,6 +137,7 @@ const TOGGLES = [
   { key: "showGenres", icon: "pie-chart-outline", needs: "genres", label: () => i18nText("autoI18n.profil_story_ogr_tur", "Türler") },
   { key: "showStreak", icon: "flame-outline", needs: "streak", label: () => i18nText("autoI18n.profil_story_ogr_seri", "Seri") },
   { key: "showPosters", icon: "images-outline", needs: "posters", label: () => i18nText("autoI18n.profil_story_ogr_poster", "Poster") },
+  { key: "showFavorites", icon: "star-outline", needs: "favorites", label: () => i18nText("autoI18n.profil_story_ogr_dort_fav", "Dört favori") },
   { key: "showBadges", icon: "ribbon-outline", needs: "badges", label: () => i18nText("autoI18n.profil_story_ogr_rozet", "Rozetler") },
   { key: "showMember", icon: "calendar-outline", needs: "member", label: () => i18nText("autoI18n.profil_story_ogr_uyelik", "Üyelik") },
   { key: "showUsername", icon: "at-outline", label: () => i18nText("autoI18n.profil_story_ogr_kullanici", "Kullanıcı adı") },
@@ -143,6 +152,16 @@ const TOGGLE_ROWS = [TOGGLES.slice(0, 4), TOGGLES.slice(4)];
 const CHROME_H = 416;
 const PANEL_H = 132;
 const KEYBOARD_CHROME_H = 214;
+
+const noFavoritesText = () =>
+  i18nText(
+    "autoI18n.profil_story_fav_yok",
+    "Henüz dört favorin yok. Profili Düzenle'den ekleyebilirsin.",
+  );
+
+// Önizleme üstündeki geri bildirim bandı: başarı, hata ve "neden pasif" bilgisi.
+const FEEDBACK_TONE = { success: "#067647", error: "#B42318", info: "#344054" };
+const FEEDBACK_ICON = { success: "checkmark-circle", error: "alert-circle", info: "information-circle" };
 
 // ── Küçük denetim parçaları ──────────────────────────────────────────────────
 
@@ -165,6 +184,39 @@ const Segmented = memo(function Segmented({ theme, items, value, onChange }) {
               style={[styles.segmentedText, { color: active ? "#FFFFFF" : theme.text.secondary }]}
             >
               {item.label()}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+});
+
+// Segmented'in çoklu seçimli kardeşi: birden çok parça aynı anda dolu olabilir.
+// `disabled` parça (ör. boş kategori) soluk çizilir ama basışı yine iletir.
+const MultiSegmented = memo(function MultiSegmented({ theme, items, selected, onToggle }) {
+  return (
+    <View style={[styles.segmented, { backgroundColor: theme.secondary, borderColor: alpha(theme.border, 0.8) }]}>
+      {items.map((item) => {
+        const active = selected.includes(item.id);
+        return (
+          <Pressable
+            key={item.id}
+            onPress={() => onToggle(item.id)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active, disabled: !!item.disabled }}
+            style={[
+              styles.segmentedItem,
+              active && { backgroundColor: theme.accent },
+              item.disabled && { opacity: 0.4 },
+            ]}
+          >
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.segmentedText, { color: active ? "#FFFFFF" : theme.text.secondary }]}
+            >
+              {item.label}
             </Text>
           </Pressable>
         );
@@ -258,22 +310,42 @@ function LayoutThumb({ id, color }) {
           <Block l={5} t={72} w={42} h={3} r={1.5} color={color} o={0.35} />
         </>
       )}
+      {/* Seçki: kimlik satırı, üç kategori rafı (4'er poster), istatistik şeridi */}
+      {id === "picks" && (
+        <>
+          <Block l={5} t={5} w={9} h={9} round color={color} />
+          <Block l={17} t={7} w={18} h={3} color={color} />
+          <Block l={17} t={12} w={10} h={2} color={color} o={0.5} />
+          {[0, 1, 2].map((row) => (
+            <View key={`s${row}`}>
+              <Block l={5} t={22 + row * 16} w={5} h={5} round color={color} o={0.55} />
+              {[0, 1, 2, 3].map((i) => (
+                <Block key={`p${row}${i}`} l={13 + i * 9.5} t={19 + row * 16} w={8} h={12} r={row === 2 ? 4 : 1.5} color={color} o={row === 2 ? 0.55 : 0.85} />
+              ))}
+            </View>
+          ))}
+          <Block l={5} t={67} w={42} h={6} r={3} color={color} o={0.4} />
+        </>
+      )}
     </View>
   );
 }
 
-const LayoutCard = memo(function LayoutCard({ theme, item, active, onPress }) {
+// `disabled`: düzen şu an çizilemiyor (Seçki, favori yokken). Basış yine
+// `onPress`e gider — çağıran nedenini söyleyen bir bildirim gösterir.
+const LayoutCard = memo(function LayoutCard({ theme, item, active, disabled, onPress }) {
   const color = active ? theme.accent : theme.text.muted;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityState={{ selected: active }}
+      accessibilityState={{ selected: active, disabled: !!disabled }}
       style={[
         styles.layoutCard,
         {
           backgroundColor: active ? alpha(theme.accent, 0.14) : theme.secondary,
           borderColor: active ? alpha(theme.accent, 0.7) : alpha(theme.border, 0.8),
+          opacity: disabled ? 0.45 : 1,
         },
       ]}
     >
@@ -326,11 +398,12 @@ const Swatch = memo(function Swatch({ theme, item, accent, ringColors, active, o
   );
 });
 
+// Pasif düğme de basışı iletir: çağıran, nedenini söyleyen bir bildirim gösterebilir
+// ("Henüz dört favorin yok"). Pasifken DEĞER değiştirmek çağıranın sorumluluğu.
 const ToggleChip = memo(function ToggleChip({ theme, item, on, disabled, onPress }) {
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
       accessibilityRole="switch"
       accessibilityState={{ checked: on, disabled }}
       style={[
@@ -361,7 +434,7 @@ const ToggleChip = memo(function ToggleChip({ theme, item, on, disabled, onPress
 
 // ── Düzenleyici ──────────────────────────────────────────────────────────────
 
-function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, badges, bio, joinedAt }) {
+function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, badges, bio, joinedAt, favorites }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -413,24 +486,52 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
     setNoteDraft(cleanStoryNote(bio));
   }, [bio]);
 
-  // Rastgele düzen + renk: mevcut seçimden FARKLI bir çift seçer (aynısı çıkarsa
-  // düğmeye basmak hiçbir şey değiştirmemiş gibi görünürdü).
-  const shuffle = useCallback(() => {
-    const pick = (list, current) => {
-      const others = list.filter((id) => id !== current);
-      return others[Math.floor(Math.random() * others.length)] || current;
-    };
-    update({
-      layout: pick(STORY_LAYOUT_IDS, options.layout),
-      themeId: pick(STORY_THEME_IDS, options.themeId),
-    });
-  }, [update, options.layout, options.themeId]);
-
   const showFeedback = useCallback((type, text) => {
     clearTimeout(feedbackTimer.current);
     setFeedback({ type, text });
     feedbackTimer.current = setTimeout(() => setFeedback(null), 2800);
   }, []);
+
+  // ── Etkileşimler: pasif düğmeler NEDENİNİ söyler ──
+  // Pasif ≠ ölü düğme: dokununca kullanıcı neden çalışmadığını bandta görür.
+  const blockedReason = (item) => {
+    if (item.needs && !available[item.needs]) return item.key === "showFavorites" ? "noFavorites" : "noData";
+    if (item.key === "showPosters" && favoritesActive) return "replaced";
+    return null;
+  };
+
+  const onToggle = (item) => {
+    const reason = blockedReason(item);
+    if (reason === "noFavorites") return showFeedback("info", noFavoritesText());
+    if (reason === "replaced") {
+      return showFeedback(
+        "info",
+        i18nText("autoI18n.profil_story_poster_favde", "Dört favori açıkken posterlerin yerini favorilerin alır."),
+      );
+    }
+    if (reason) return undefined;
+    return update({ [item.key]: !options[item.key] });
+  };
+
+  const onPickLayout = (id) => {
+    if (id === "picks" && !hasFavorites) return showFeedback("info", noFavoritesText());
+    // Seçki favorileri gösterir: anahtar kapalıysa birlikte açılır.
+    return update(id === "picks" ? { layout: id, showFavorites: true } : { layout: id });
+  };
+
+  const onToggleKind = (kind) => {
+    if (countFavorites(favorites, kind) === 0) {
+      return showFeedback("info", i18nText("autoI18n.profil_story_kategori_bos", "Bu kategoride favorin yok."));
+    }
+    const next = toggleStoryKind(options.favoriteKinds, kind, favorites);
+    if (next.length === favoritePick.kinds.length && next.every((k, i) => k === favoritePick.kinds[i])) {
+      return showFeedback(
+        "info",
+        i18nText("autoI18n.profil_story_kategori_son", "En az bir kategori açık kalmalı."),
+      );
+    }
+    return update({ favoriteKinds: next });
+  };
 
   // ── Veri ──
   const cardOptions = useMemo(
@@ -453,11 +554,63 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
     [sources],
   );
 
+  // ── Dört favori ──
+  // `layoutId`: kartın GERÇEKTEN çizeceği düzen (Seçki favorisiz Vitrin'e düşer).
+  const favoritesCopy = useMemo(() => getFavoritesCopy(language), [language]);
+  const hasFavorites = useMemo(() => countFavorites(favorites) > 0, [favorites]);
+  const favoritePick = useMemo(
+    () => pickStoryFavorites(favorites, options.favoriteKinds),
+    [favorites, options.favoriteKinds],
+  );
+  const favoritesActive = isFavoritesActive(options, favoritePick);
+  const layoutId = resolveStoryLayout(options.layout, favoritesActive);
+
+  // Kartın beklediği biçim: görsel adresleri ve büyük harfli kategori adları burada.
+  const cardFavorites = useMemo(() => {
+    if (!favoritesActive) return null;
+    const locale = intlLocaleOf(language);
+    return {
+      count: favoritePick.count,
+      groups: favoritePick.groups.map((group) => ({
+        kind: group.kind,
+        label: favoritesCopy.kinds[group.kind].label.toLocaleUpperCase(locale),
+        items: group.items.map((item) => ({
+          key: item.key,
+          title: item.title,
+          // 200: yuvalar kartta en çok ~110 piksel (Duvar hücresi) çizilir; 12 görselin
+          // "original" indirilmemesi için liste postersinin 400'ünden küçük istenir.
+          uri: item.imagePath
+            ? getTmdbUrl(item.imagePath, group.kind === "people" ? "profile" : "poster", 200)
+            : null,
+        })),
+      })),
+    };
+  }, [favoritesActive, favoritePick, favoritesCopy, language, getTmdbUrl]);
+
+  // Rastgele düzen + renk: mevcut seçimden FARKLI bir çift seçer (aynısı çıkarsa
+  // düğmeye basmak hiçbir şey değiştirmemiş gibi görünürdü). Seçki favorisiz
+  // çizilemez → o durumda aday olmaz.
+  const shuffle = useCallback(() => {
+    const pick = (list, current) => {
+      const others = list.filter((id) => id !== current);
+      return others[Math.floor(Math.random() * others.length)] || current;
+    };
+    const layout = pick(
+      STORY_LAYOUT_IDS.filter((id) => id !== "picks" || hasFavorites),
+      layoutId,
+    );
+    update({
+      layout,
+      themeId: pick(STORY_THEME_IDS, options.themeId),
+      ...(layout === "picks" ? { showFavorites: true } : null),
+    });
+  }, [update, layoutId, options.themeId, hasFavorites]);
+
   const posters = useMemo(() => {
     const pick = pickStoryPosters(
       sources,
       options.posterSource,
-      STORY_POSTER_COUNT[options.layout] || 4,
+      STORY_POSTER_COUNT[layoutId] || 4,
     );
     return {
       source: pick.source,
@@ -465,7 +618,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
         .map((item) => ({ ...item, uri: getTmdbUrl(item.imagePath, "poster", 400) }))
         .filter((item) => item.uri),
     };
-  }, [sources, options.posterSource, options.layout, getTmdbUrl]);
+  }, [sources, options.posterSource, layoutId, getTmdbUrl]);
 
   // Sayılar profildeki kartlarla AYNI kipte okunur (tekrarlı/tekrarsız): ham
   // sayaçlar kartta başka bir sayı gösterip profille çelişirdi.
@@ -535,6 +688,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
     genres: genres.top.length > 0,
     streak: !!streak,
     posters: hasAnyPoster,
+    favorites: hasFavorites,
     badges: !!badgeInfo || (badges?.length || 0) > 0,
     member: !!member,
   };
@@ -567,6 +721,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
       dayUnit: i18nText("autoI18n.profil_story_gun_birim", "GÜN"),
       badges: i18nText("autoI18n.profil_story_rozetler", "ROZETLER"),
       cta: i18nText("autoI18n.profil_story_cta", "İzlediklerini sen de kaydet"),
+      favTitle: i18nText("autoI18n.profil_story_baslik_dort_fav", "DÖRT FAVORİM"),
       posterTitle: {
         favorites: i18nText("autoI18n.profil_story_baslik_fav", "FAVORİLERİM"),
         movies: i18nText("autoI18n.profil_story_baslik_film", "SON İZLEDİĞİM FİLMLER"),
@@ -586,12 +741,16 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
     setLoaded((current) => (current[uri] ? current : { ...current, [uri]: true }));
   }, []);
 
-  const pendingKey = options.showPosters
-    ? posters.items
-        .filter((item) => !loaded[item.uri])
-        .map((item) => item.uri)
-        .join("|")
-    : "";
+  // Bekleyeceğimiz görseller kartta GERÇEKTEN çizilenlerdir: dört favori açıksa
+  // onlar (Duvar'da ilk 9'u), değilse poster alanı.
+  const shownUris = useMemo(() => {
+    if (cardFavorites) {
+      const uris = cardFavorites.groups.flatMap((group) => group.items.map((item) => item.uri)).filter(Boolean);
+      return layoutId === "wall" ? uris.slice(0, 9) : uris;
+    }
+    return options.showPosters ? posters.items.map((item) => item.uri) : [];
+  }, [cardFavorites, layoutId, options.showPosters, posters]);
+  const pendingKey = shownUris.filter((uri) => !loaded[uri]).join("|");
 
   useEffect(() => {
     setGiveUp(false);
@@ -727,6 +886,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
                 streak={streak}
                 member={member}
                 posters={posters}
+                favorites={cardFavorites}
                 str={str}
                 onImageSettled={onImageSettled}
               />
@@ -739,12 +899,12 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
             pointerEvents="none"
             style={[
               styles.feedback,
-              { backgroundColor: feedback.type === "error" ? "#B42318" : "#067647" },
+              { backgroundColor: FEEDBACK_TONE[feedback.type] || FEEDBACK_TONE.success },
             ]}
           >
             <AppIcon
               family="Ionicons"
-              name={feedback.type === "error" ? "alert-circle" : "checkmark-circle"}
+              name={FEEDBACK_ICON[feedback.type] || FEEDBACK_ICON.success}
               size={16}
               color="#FFFFFF"
             />
@@ -818,8 +978,9 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
                 key={item.id}
                 theme={theme}
                 item={item}
-                active={options.layout === item.id}
-                onPress={() => update({ layout: item.id })}
+                active={layoutId === item.id}
+                disabled={item.id === "picks" && !hasFavorites}
+                onPress={() => onPickLayout(item.id)}
               />
             ))}
           </View>
@@ -854,7 +1015,18 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
 
         {tab === "content" && (
           <View style={styles.contentPanel}>
-            {hasAnyPoster ? (
+            {favoritesActive ? (
+              <MultiSegmented
+                theme={theme}
+                selected={favoritePick.kinds}
+                items={FAVORITE_KINDS.map((kind) => ({
+                  id: kind,
+                  label: favoritesCopy.kinds[kind].label,
+                  disabled: countFavorites(favorites, kind) === 0,
+                }))}
+                onToggle={onToggleKind}
+              />
+            ) : hasAnyPoster ? (
               <Segmented
                 theme={theme}
                 value={options.posterSource}
@@ -878,8 +1050,8 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
                       theme={theme}
                       item={item}
                       on={options[item.key]}
-                      disabled={!!item.needs && !available[item.needs]}
-                      onPress={() => update({ [item.key]: !options[item.key] })}
+                      disabled={blockedReason(item) !== null}
+                      onPress={() => onToggle(item)}
                     />
                   ))}
                 </View>
@@ -1029,7 +1201,7 @@ const styles = StyleSheet.create({
 
   panel: { height: PANEL_H, justifyContent: "center" },
 
-  layoutRow: { flexDirection: "row", gap: 8 },
+  layoutRow: { flexDirection: "row", gap: 6 },
   layoutCard: {
     flex: 1,
     height: PANEL_H,

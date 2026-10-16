@@ -1,3 +1,4 @@
+import { intlLocaleOf, pickByLanguage } from "../utils/appLanguages";
 import { callWidget } from "./widgetBridge";
 
 /**
@@ -16,7 +17,7 @@ import { callWidget } from "./widgetBridge";
 
 const ANDROID_MODULE = "StatsWidgetModule";
 
-const localeOf = (language) => (language === "tr" ? "tr-TR" : "en-US");
+const localeOf = (language) => (intlLocaleOf(language));
 
 const num = (value, language) =>
   Number(value || 0).toLocaleString(localeOf(language));
@@ -37,16 +38,16 @@ const timeParts = (time) => ({
 
 /**
  * @param {object} stats ProfileStatsContext'ten türetilen ham değerler
- * @param {string} language "tr" | "en"
+ * @param {string} language uygulama dil kodu ("tr" | "en" | "es" …)
  */
 export const buildStatsWidgetPayload = (stats = {}, language = "tr") => {
   const labels = stats.labels || {};
-  const hoursLabel = labels.hours || (language === "tr" ? "Saat" : "Hours");
+  const hoursLabel = labels.hours || pickByLanguage(language, { tr: "Saat", en: "Hours", es: "Horas" });
   const movieMinutes = Number(stats.movieMinutes || 0);
   const tvMinutes = Number(stats.tvMinutes || 0);
 
   return {
-    title: labels.sectionTitle || (language === "tr" ? "İstatistikler" : "Statistics"),
+    title: labels.sectionTitle || pickByLanguage(language, { tr: "İstatistikler", en: "Statistics", es: "Estadísticas" }),
     movie: {
       count: num(stats.movieCount, language),
       countLabel: labels.movieWatched || "",

@@ -33,6 +33,7 @@ import YoutubePlayer from "react-native-youtube-iframe";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { i18nText } from "../../utils/i18nText";
+import { normalizeAppLanguage } from "../../utils/appLanguages";
 import MovieVideoItem from "../../screens/movie/components/MovieVideoItem";
 import {
   TRAILER_LANGUAGES,
@@ -277,7 +278,8 @@ function LanguageSheet({ visible, selected, originalLanguage, onSelect, onClose,
 export default function TrailerSection({ mediaType, id, apiKey, originalLanguage }) {
   const { theme } = useTheme();
   const { language, t } = useLanguage();
-  const appLangCode = language === "tr" ? "tr" : "en";
+  // Uygulama dili fragman dili de olabilir (TRAILER_LANGUAGES: tr/en/es/…); tanınmayan → en.
+  const appLangCode = normalizeAppLanguage(language);
 
   const normalizedOriginalLanguage = normalizeTrailerLanguageCode(originalLanguage);
   const [selectedLang, setSelectedLang] = useState(appLangCode);

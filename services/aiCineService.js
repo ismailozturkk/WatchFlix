@@ -19,6 +19,7 @@ import {
 } from "./geminiService";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { AI_RESPONSE_STYLES, AI_SPOILER_LEVELS } from "../utils/aiPrefs";
+import { aiPromptLanguageOf } from "../utils/appLanguages";
 
 export { GeminiError } from "./geminiService";
 
@@ -432,7 +433,7 @@ The user's title-specific question refers ONLY to this exact TMDB record. Return
 - The JSON MUST have a "type" field set to one of: recommendations | comparison | watch_plan | watchlist | title_spotlight | general.
 - Every referenced title MUST be an object {"title": "Exact Title", "mediaType": "movie" | "tv"}. mediaType is REQUIRED.
 - Never invent TMDB IDs or factual metadata. Seelogd resolves IDs, posters, year, rating, genres, runtime, cast, crew, providers and similar titles from TMDB.
-- ${rules.combinedRule} Write human-readable text in ${language}.`,
+- ${rules.combinedRule} Write human-readable text in ${aiPromptLanguageOf(language)}.`,
 
     tasteBlock,
 

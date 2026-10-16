@@ -21,6 +21,7 @@
 // daha çizer, ama çağıran taraf rozeti hemen null'lar. Son rozet burada ref'te
 // saklanır, yoksa sayfa boşalarak aşağı kayardı.
 
+import { copyLanguage } from "../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -57,7 +58,7 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const insets = useSafeAreaInsets();
-  const lang = language === "en" ? "en" : "tr";
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
 
   // Koleksiyon üyelerini çözmek ve üyeye dokununca onun kartını bulmak için
   // bağlamdan okunur. Çağıranlara ek prop taşımak (ekran + profil rafı) iki yerde
@@ -340,7 +341,7 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
                         {/* Büyük harfe JS'te çevriliyor: style textTransform Android'de
                             cihaz yereline göre çalışıyor ve Türkçe yerelli telefonda
                             İngilizce arayüzde "min" → "MİN" oluyordu. */}
-                        {(lang === "tr" ? b.ekTr : b.ekEn).toUpperCase()}
+                        {(lang === "tr" ? b.ekTr : lang === "es" ? b.ekEs : b.ekEn).toUpperCase()}
                       </Text>
                     </TouchableOpacity>
                   );

@@ -697,6 +697,11 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="FeedbackScreen"
+          getComponent={() => require("./screens/tabs/settings/FeedbackScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="BackupSettingsScreen"
           getComponent={() => require("./screens/tabs/settings/BackupSettingsScreen").default}
           options={{ headerShown: false }}

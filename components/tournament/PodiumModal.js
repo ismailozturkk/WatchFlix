@@ -22,6 +22,7 @@
 // Kabuk: BottomSheetModal — diğer tüm alt sayfalarla aynı blur+kayma davranışı
 // (blur YERİNDE solar, sayfa TAM OPAKLIKTA aşağıdan yukarı kayar).
 
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   View, Text, StyleSheet, ActivityIndicator, ScrollView, Pressable, LayoutAnimation,
@@ -61,7 +62,7 @@ const trUpper = (s, lang) =>
   (lang === "tr" ? String(s).replace(/i/g, "İ") : String(s)).toUpperCase();
 
 const formatNumber = (n, lang) =>
-  Number(n || 0).toLocaleString(lang === "tr" ? "tr-TR" : "en-US");
+  Number(n || 0).toLocaleString(intlLocaleOf(lang));
 
 // Önceki ay verisinden podyumu türet (saf hesap — motorla aynı determinizm).
 // Sayımlar agg dokümanından (tercih) veya ham oy dokümanlarından gelir —
@@ -330,7 +331,8 @@ const WinnerCard = memo(({ w, expanded, onToggle, theme, getTmdbUrl, lang }) => 
   const c = w.champion;
   const uri = c?.posterPath ? getTmdbUrl(c.posterPath, "poster", 185) : null;
   const entry = getScheduleEntry(w.monthIndex);
-  const genreText = (lang === "tr" ? w.theme : w.themeEn) || themeLabel(entry, lang);
+  // Arşivde yalnız tr (theme) ve en (themeEn) adı saklı; başka dil takvimden türetilir.
+  const genreText = (lang === "tr" ? w.theme : lang === "en" ? w.themeEn : null) || themeLabel(entry, lang);
   const monthName = monthLabel(w.monthIndex, lang);
   const mon = trUpper(monthName.slice(0, 3), lang);
   const monthNo = String((w.monthIndex ?? 0) + 1).padStart(2, "0");

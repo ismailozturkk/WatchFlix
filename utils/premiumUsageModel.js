@@ -12,6 +12,7 @@
 //   { [featureId]: number }       sayılı/günlük özellikler (bilinmiyorsa anahtar yok)
 //   ai: { dailyUsed, monthlyUsed } | null     (bkz. readAiUsageDoc)
 
+import { copyLanguage, intlLocaleOf, normalizeAppLanguage } from "./appLanguages";
 import { getPremiumPlanDisplayName } from "./premium";
 import {
   FEATURE_CATEGORIES,
@@ -37,7 +38,7 @@ export const LOW_RATIO = 0.8;
 const INFORMATIONAL = Object.freeze(new Set(["streaming_alerts"]));
 
 const pick = (copy, language) =>
-  (language === "tr" ? copy?.tr : copy?.en) ?? copy?.en ?? copy?.tr ?? "";
+  copy?.[copyLanguage(language, ["tr", "en", "es"])] ?? copy?.en ?? copy?.tr ?? "";
 
 const toCount = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -100,36 +101,38 @@ export function readAiUsageDoc(data, now = new Date()) {
  */
 export function formatCountdown(ms, language = "en") {
   const tr = language === "tr";
+  const es = normalizeAppLanguage(language) === "es";
   const totalMinutes = Math.max(1, Math.ceil((Number(ms) || 0) / 60000));
   const days = Math.floor(totalMinutes / 1440);
   const hours = Math.floor((totalMinutes % 1440) / 60);
   const minutes = totalMinutes % 60;
   const parts = [];
-  if (days > 0) parts.push(tr ? `${days} gün` : `${days}d`);
-  if (hours > 0) parts.push(tr ? `${hours} sa` : `${hours}h`);
+  if (days > 0) parts.push(tr ? `${days} gün` : es ? `${days} d` : `${days}d`);
+  if (hours > 0) parts.push(tr ? `${hours} sa` : es ? `${hours} h` : `${hours}h`);
   // Gün gösteriliyorsa dakika gürültü olur.
-  if (minutes > 0 && days === 0) parts.push(tr ? `${minutes} dk` : `${minutes}m`);
+  if (minutes > 0 && days === 0) parts.push(tr ? `${minutes} dk` : es ? `${minutes} min` : `${minutes}m`);
   return parts.join(" ");
 }
 
 /** "Yenilenmesine 5 sa 12 dk" — 48 saati aşan sürelerde tarih verilir (ay başı). */
 export function formatResetLabel(resetAt, now = new Date(), language = "en") {
   const tr = language === "tr";
+  const es = normalizeAppLanguage(language) === "es";
   const ms = resetAt.getTime() - now.getTime();
   if (ms > 2 * 86400000) {
     let date;
     try {
-      date = new Intl.DateTimeFormat(tr ? "tr-TR" : "en-US", {
+      date = new Intl.DateTimeFormat(intlLocaleOf(language), {
         day: "numeric",
         month: "long",
       }).format(resetAt);
     } catch {
       date = resetAt.toISOString().slice(0, 10);
     }
-    return tr ? `${date} tarihinde yenilenir` : `Resets on ${date}`;
+    return tr ? `${date} tarihinde yenilenir` : es ? `Se restablece el ${date}` : `Resets on ${date}`;
   }
   const left = formatCountdown(ms, language);
-  return tr ? `${left} sonra yenilenir` : `Resets in ${left}`;
+  return tr ? `${left} sonra yenilenir` : es ? `Se restablece en ${left}` : `Resets in ${left}`;
 }
 
 // ── Satır üretimi ────────────────────────────────────────────────────────────
@@ -158,8 +161,9 @@ function meterFor({ label, used, limit }) {
 export function buildUsageRow(featureId, plan, usage = {}, now = new Date(), language = "en") {
   const definition = PREMIUM_FEATURES[featureId];
   if (!definition) return null;
-  const lang = language === "tr" ? "tr" : "en";
+  const lang = normalizeAppLanguage(language);
   const tr = lang === "tr";
+  const es = normalizeAppLanguage(lang) === "es";
   const current = normalizePlan(plan);
   const category = FEATURE_CATEGORIES.find((c) => c.id === definition.category) || null;
 
@@ -189,12 +193,12 @@ export function buildUsageRow(featureId, plan, usage = {}, now = new Date(), lan
     const limits = getFeatureLimit(featureId, current);
     const ai = usage.ai || null;
     const daily = meterFor({
-      label: tr ? "Bugün" : "Today",
+      label: tr ? "Bugün" : es ? "Hoy" : "Today",
       used: ai ? ai.dailyUsed : null,
       limit: limits.daily,
     });
     const monthly = meterFor({
-      label: tr ? "Bu ay" : "This month",
+      label: tr ? "Bu ay" : es ? "Este mes" : "This month",
       used: ai ? ai.monthlyUsed : null,
       limit: limits.monthly,
     });
@@ -272,7 +276,7 @@ export function buildUsageRow(featureId, plan, usage = {}, now = new Date(), lan
  * `summary.counts`: kilitli / dolu / azalan satır sayısı (üst şeritte gösterilir).
  */
 export function buildUsageModel({ plan, usage = {}, now = new Date(), language = "en" } = {}) {
-  const lang = language === "tr" ? "tr" : "en";
+  const lang = normalizeAppLanguage(language);
   const current = normalizePlan(plan);
   const rows = FEATURE_IDS.map((id) => buildUsageRow(id, current, usage, now, lang)).filter(Boolean);
 

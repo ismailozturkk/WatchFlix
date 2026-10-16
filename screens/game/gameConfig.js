@@ -1,3 +1,5 @@
+import { copyLanguage } from "../../utils/appLanguages";
+
 export const SCENE_GAME_ID = "scene_guess";
 export const POSTER_GAME_ID = "poster_puzzle";
 export const DEFAULT_MODE_ID = "classic";
@@ -22,7 +24,7 @@ export const SCENE_GAME_MODES = [
     ruleKey: "autoI18n.klasik_mod_kural",
     metaKey: "autoI18n.klasik_mod_meta",
     tr: "Klasik Mod",
-    en: "Classic Mode",
+    en: "Classic Mode", es: "Modo clásico",
     timerType: "per_question",
     questionCount: 10,
     estimatedMinutes: 3,
@@ -38,7 +40,7 @@ export const SCENE_GAME_MODES = [
     ruleKey: "autoI18n.zamana_karsi_kural",
     metaKey: "autoI18n.zamana_karsi_meta",
     tr: "Zamana Karşı",
-    en: "Time Attack",
+    en: "Time Attack", es: "Contrarreloj",
     timerType: "session",
     totalSeconds: 60,
     wrongPenaltySeconds: 5,
@@ -55,7 +57,7 @@ export const SCENE_GAME_MODES = [
     ruleKey: "autoI18n.hayatta_kalma_kural",
     metaKey: "autoI18n.hayatta_kalma_meta",
     tr: "Hayatta Kalma",
-    en: "Survival",
+    en: "Survival", es: "Supervivencia",
     timerType: "per_question",
     lives: 3,
     maxLives: 5,
@@ -76,7 +78,7 @@ export const SCENE_GAME_MODES = [
     ruleKey: "autoI18n.gunluk_mod_kural",
     metaKey: "autoI18n.gunluk_mod_meta",
     tr: "Günlük Meydan Okuma",
-    en: "Daily Challenge",
+    en: "Daily Challenge", es: "Reto diario",
     timerType: "per_question",
     questionCount: 10,
     estimatedMinutes: 3,
@@ -102,7 +104,7 @@ export const SCENE_GAME_DIFFICULTIES = [
     titleKey: "autoI18n.kolay",
     descriptionKey: "autoI18n.kolay_aciklama",
     tr: "Kolay",
-    en: "Easy",
+    en: "Easy", es: "Fácil",
     timeSeconds: 15,
     optionCount: 3,
     scoreMultiplier: 1.0,
@@ -114,7 +116,7 @@ export const SCENE_GAME_DIFFICULTIES = [
     titleKey: "autoI18n.normal",
     descriptionKey: "autoI18n.normal_aciklama",
     tr: "Normal",
-    en: "Normal",
+    en: "Normal", es: "Normal",
     timeSeconds: 12,
     optionCount: 4,
     scoreMultiplier: 1.25,
@@ -126,7 +128,7 @@ export const SCENE_GAME_DIFFICULTIES = [
     titleKey: "autoI18n.zor",
     descriptionKey: "autoI18n.zor_aciklama",
     tr: "Zor",
-    en: "Hard",
+    en: "Hard", es: "Difícil",
     timeSeconds: 8,
     optionCount: 4,
     scoreMultiplier: 1.5,
@@ -136,18 +138,18 @@ export const SCENE_GAME_DIFFICULTIES = [
 
 /* ── Source definitions ─────────────────────────────────────────────────── */
 export const SCENE_GAME_SOURCES = [
-  { id: "popular", icon: "flame-outline", labelKey: "autoI18n.populer", tr: "Popüler", en: "Popular", group: "discover" },
-  { id: "top_rated_movie", icon: "star-outline", labelKey: "autoI18n.en_iyi_filmler", tr: "En İyi Filmler", en: "Top Rated Movies", group: "discover" },
-  { id: "top_rated_tv", icon: "tv-outline", labelKey: "autoI18n.en_iyi_diziler", tr: "En İyi Diziler", en: "Top Rated Series", group: "discover" },
-  { id: "popular_movie", icon: "film-outline", labelKey: "autoI18n.populer_filmler", tr: "Popüler Filmler", en: "Popular Movies", group: "discover" },
-  { id: "popular_tv", icon: "radio-outline", labelKey: "autoI18n.populer_diziler", tr: "Popüler Diziler", en: "Popular Series", group: "discover" },
-  { id: "watchlist", icon: "bookmark-outline", labelKey: "autoI18n.izleme_listem", tr: "İzleme Listem", en: "My Watchlist", personal: true, listKey: "watchList", group: "personal" },
-  { id: "favorites", icon: "heart-outline", labelKey: "autoI18n.favoriler", tr: "Favoriler", en: "Favorites", personal: true, listKey: "favorites", group: "personal" },
-  { id: "watchedMovies", icon: "checkmark-circle-outline", labelKey: "autoI18n.izlenen_filmler", tr: "İzlenen Filmler", en: "Watched Movies", personal: true, listKey: "watchedMovies", group: "personal" },
-  { id: "watchedTv", icon: "checkmark-done-outline", labelKey: "autoI18n.izlenen_diziler", tr: "İzlenen Diziler", en: "Watched Series", personal: true, listKey: "watchedTv", group: "personal" },
+  { id: "popular", icon: "flame-outline", labelKey: "autoI18n.populer", tr: "Popüler", en: "Popular", es: "Populares", group: "discover" },
+  { id: "top_rated_movie", icon: "star-outline", labelKey: "autoI18n.en_iyi_filmler", tr: "En İyi Filmler", en: "Top Rated Movies", es: "Películas mejor valoradas", group: "discover" },
+  { id: "top_rated_tv", icon: "tv-outline", labelKey: "autoI18n.en_iyi_diziler", tr: "En İyi Diziler", en: "Top Rated Series", es: "Series mejor valoradas", group: "discover" },
+  { id: "popular_movie", icon: "film-outline", labelKey: "autoI18n.populer_filmler", tr: "Popüler Filmler", en: "Popular Movies", es: "Películas populares", group: "discover" },
+  { id: "popular_tv", icon: "radio-outline", labelKey: "autoI18n.populer_diziler", tr: "Popüler Diziler", en: "Popular Series", es: "Series populares", group: "discover" },
+  { id: "watchlist", icon: "bookmark-outline", labelKey: "autoI18n.izleme_listem", tr: "İzleme Listem", en: "My Watchlist", es: "Mi lista de seguimiento", personal: true, listKey: "watchList", group: "personal" },
+  { id: "favorites", icon: "heart-outline", labelKey: "autoI18n.favoriler", tr: "Favoriler", en: "Favorites", es: "Favoritos", personal: true, listKey: "favorites", group: "personal" },
+  { id: "watchedMovies", icon: "checkmark-circle-outline", labelKey: "autoI18n.izlenen_filmler", tr: "İzlenen Filmler", en: "Watched Movies", es: "Películas vistas", personal: true, listKey: "watchedMovies", group: "personal" },
+  { id: "watchedTv", icon: "checkmark-done-outline", labelKey: "autoI18n.izlenen_diziler", tr: "İzlenen Diziler", en: "Watched Series", es: "Series vistas", personal: true, listKey: "watchedTv", group: "personal" },
   // Gunluk meydan okumanin sabit havuzu. Kurulum listesinde gorunmez
   // (group:"daily"); sonuc/istatistik ekranlari etiketi buradan okur.
-  { id: "daily", icon: "sunny-outline", labelKey: "autoI18n.gunluk_meydan_okuma", tr: "Günlük Meydan Okuma", en: "Daily Challenge", group: "daily" },
+  { id: "daily", icon: "sunny-outline", labelKey: "autoI18n.gunluk_meydan_okuma", tr: "Günlük Meydan Okuma", en: "Daily Challenge", es: "Reto diario", group: "daily" },
 ];
 
 /* ── Lookups ────────────────────────────────────────────────────────────── */
@@ -166,8 +168,9 @@ export const isPersonalSource = (sourceId) => Boolean(getSourceConfig(sourceId)?
 export const isPosterGame = (gameId) => gameId === POSTER_GAME_ID;
 export const isDailyMode = (modeId) => modeId === MODE_DAILY;
 
+// Bilinmeyen dil İngilizce (utils/appLanguages kuralı); `es` alanı olmayan öğe İngilizceye düşer.
 export const getLocalizedGameLabel = (item, language) =>
-  language === "en" ? item.en : item.tr;
+  item[copyLanguage(language, ["tr", "en", "es"])] ?? item.en;
 
 /**
  * `bestScoresByMode` anahtarını ("classic_normal", "poster_classic_normal",

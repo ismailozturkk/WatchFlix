@@ -1,3 +1,4 @@
+import { tmdbLanguageOf } from "../../utils/appLanguages";
 import React, { useState, useEffect, useCallback, memo } from "react";
 import {
   StyleSheet,
@@ -402,7 +403,7 @@ export default function SeasonDetails({ route, navigation }) {
         const res = await axios.get(
           `https://api.themoviedb.org/3/tv/${showId}/season/${seasonNumber}`,
           {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
+            params: { language: tmdbLanguageOf(language) },
             headers: { accept: "application/json", Authorization: API_KEY },
           },
         );

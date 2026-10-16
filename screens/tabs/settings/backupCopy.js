@@ -1,8 +1,10 @@
 // screens/tabs/settings/backupCopy.js
 //
-// "Ayarları Yedekle" ekranının metinleri (yerel tr/en çifti; iki dilin anahtar
+// "Ayarları Yedekle" ekranının metinleri (yerel tr/en/es üçlüsü; iki dilin anahtar
 // eşitliği __tests__/backupCopy.test.js'te bekçilenir). Hata kodları
 // services/settingsBackupFiles.js + utils/settingsBackup.js sözleşmesindendir.
+
+import { copyLanguage } from "../../../utils/appLanguages";
 
 const tr = {
   title: "Ayarları Yedekle",
@@ -196,9 +198,111 @@ const en = {
   platformAndroid: "Android",
 };
 
-export const BACKUP_COPY = { tr, en };
+const es = {
+  title: "Copia de seguridad de ajustes",
 
-export const getBackupCopy = (isEn) => (isEn ? en : tr);
+  heroTitle: "Tus ajustes en un solo archivo",
+  heroText:
+    "Se guardan juntos tu tema, tus temas personalizados, la fuente, los efectos, el diseño y tus preferencias de notificaciones y widgets. Restáuralos en un dispositivo nuevo o tras una instalación limpia.",
+
+  sectionIncluded: "Qué incluye",
+  groupAppearance: "Apariencia",
+  groupAppearanceSub: "Tema, temas personalizados, fuente, efectos, fondos",
+  groupLayout: "Diseño de pósteres y listas",
+  groupLayoutSub: "Columnas, esquinas, insignias, preferencias de vista",
+  groupContent: "Idioma y contenido",
+  groupContentSub: "Idioma, plataformas, géneros, calidad de imagen",
+  groupNotifications: "Notificaciones y vibración",
+  groupNotificationsSub: "Tipos de notificaciones y vibración háptica",
+  groupData: "Descarga de datos",
+  groupDataSub: "Preferencias de datos sin conexión",
+  groupWidgets: "Widgets",
+  groupWidgetsSub: "Aspecto y contenido de los widgets",
+  groupSharing: "Tarjetas para compartir",
+  groupSharingSub: "Últimas elecciones de las tarjetas de historia y de Wrapped",
+  groupPet: "Mascota",
+  groupPetSub: "Activada o no, tamaño y posición",
+  customized: "{n} personalizados",
+  allDefault: "Predeterminado",
+  themeCount: "{n} temas personalizados",
+  themeCountOne: "1 tema personalizado",
+  notIncluded:
+    "No incluye: datos de la cuenta, contraseñas, icono de la app, caché, permisos de notificaciones ni estado de la suscripción.",
+
+  sectionExport: "Exportar",
+  exportFile: "Guardar como archivo",
+  exportFileSub: "Guardar en Archivos o compartir · {name}",
+  exportClipboard: "Copiar al portapapeles",
+  exportClipboardSub: "Como texto, para enviarlo en un mensaje",
+  exported: "Copia lista",
+  copied: "Copia de seguridad copiada al portapapeles",
+
+  sectionImport: "Importar",
+  importFile: "Importar desde un archivo",
+  importFileSub: "Elige una copia de seguridad de ajustes de Seelogd",
+  importClipboard: "Importar desde el portapapeles",
+  importClipboardSub: "Usa el texto de una copia que hayas copiado",
+  nothingToImport: "Esta copia no tiene ajustes que aplicar",
+
+  sectionRestore: "Deshacer",
+  restoreTitle: "Deshacer la última importación",
+  restoreSub: "Volver a tus ajustes de antes del {date}",
+  restoreConfirmTitle: "¿Volver a tus ajustes anteriores?",
+  restoreConfirmBody:
+    "Se quitarán los ajustes y los temas personalizados que trajo la última importación. La app se reiniciará.",
+  restoreAction: "Deshacer",
+  restored: "Ajustes anteriores restaurados",
+
+  sheetTitle: "Copia encontrada",
+  sheetFile: "Archivo",
+  sheetWillApply: "Se aplicarán {n} ajustes",
+  sheetWillApplyOne: "Se aplicará 1 ajuste",
+  sheetGroupLine: "{n} ajustes",
+  sheetGroupLineOne: "1 ajuste",
+  sheetThemes: "Temas personalizados",
+  sheetThemesNew: "{n} nuevos",
+  sheetThemesUpdated: "{n} actualizados",
+  sheetThemesKept: "{n} de tus temas actuales no se tocarán",
+  sheetThemesKeptOne: "1 de tus temas actuales no se tocará",
+  warnInvalid: "{n} ajustes no son válidos y se omitirán",
+  warnInvalidOne: "1 ajuste no es válido y se omitirá",
+  warnThemeMissing: "No se encontró el tema seleccionado en la copia, así que se usará el tema predeterminado",
+  warnThemesDropped: "{n} temas personalizados no son válidos o superan el límite y no se añadirán",
+  warnThemesDroppedOne: "1 tema personalizado no es válido o supera el límite y no se añadirá",
+  restartNote: "La app se reiniciará. Tus ajustes actuales se conservan por si quieres deshacerlo.",
+  confirm: "Importar",
+  cancel: "Cancelar",
+  applying: "Aplicando…",
+
+  imported: "Ajustes importados",
+  importedPartial: "No se pudieron aplicar {n} ajustes",
+  importedPartialOne: "No se pudo aplicar 1 ajuste",
+  manualRestartTitle: "Reiniciar",
+  manualRestartBody: "Los ajustes se han guardado. Cierra y vuelve a abrir la app para que todos surtan efecto.",
+
+  errEmpty: "No se encontró ninguna copia dentro",
+  errNotBackup: "Esto no es una copia de seguridad de ajustes de Seelogd",
+  errTooNew: "Esta copia se hizo con una versión más reciente de la app. Actualiza la app primero.",
+  errTooLarge: "El archivo es demasiado grande",
+  errReadFailed: "No se pudo leer el archivo",
+  errWriteFailed: "No se pudo crear el archivo de copia",
+  errSharing: "Compartir no está disponible en este dispositivo. Prueba a copiarlo al portapapeles.",
+  errClipboard: "No se pudo acceder al portapapeles",
+
+  platformIos: "iOS",
+  platformAndroid: "Android",
+};
+
+export const BACKUP_COPY = { tr, en, es };
+
+/**
+ * Dile uygun metin paketi. Eski çağrılar `isEn` boolean'ı geçiyordu (true → İngilizce);
+ * artık uygulama dili de verilebilir ("tr" | "en" | "es"; bilinmeyen → İngilizce).
+ */
+export const getBackupCopy = (language) =>
+  typeof language === "boolean"
+    ? language ? en : tr
+    : BACKUP_COPY[copyLanguage(language, Object.keys(BACKUP_COPY))];
 
 /** "{n}" gibi yer tutucuları doldurur. */
 export const fill = (text, values = {}) =>

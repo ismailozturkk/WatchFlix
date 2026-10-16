@@ -29,6 +29,7 @@
 //     "ölü" durumda kalmaz.
 // ============================================================
 
+import { copyLanguage } from "../../utils/appLanguages";
 import React, {
   memo,
   useCallback,
@@ -90,6 +91,11 @@ export const MONTHS_EN = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+export const MONTHS_ES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
 const WEEKDAYS_TR = [
   "Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi",
 ];
@@ -97,6 +103,26 @@ const WEEKDAYS_TR = [
 const WEEKDAYS_EN = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 ];
+
+const WEEKDAYS_ES = [
+  "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado",
+];
+
+const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES };
+const WEEKDAY_NAMES = { tr: WEEKDAYS_TR, en: WEEKDAYS_EN, es: WEEKDAYS_ES };
+
+/** Dile uygun ay adları (0-11); bilinmeyen dil İngilizce. YENİ DİL: tabloya ekle. */
+export const monthNamesOf = (language) =>
+  MONTH_NAMES[copyLanguage(language, Object.keys(MONTH_NAMES))];
+
+/** "1998-03-05" parçaları → dile uygun uzun tarih: "5 Mart 1998" / "March 5, 1998" / "5 de marzo de 1998". */
+export function formatLongDateParts(language, { day, monthIndex, year }) {
+  const lang = copyLanguage(language, Object.keys(MONTH_NAMES));
+  const month = MONTH_NAMES[lang][monthIndex];
+  if (lang === "en") return `${month} ${day}, ${year}`;
+  if (lang === "es") return `${day} de ${month.toLowerCase()} de ${year}`;
+  return `${day} ${month} ${year}`;
+}
 
 // Sınır verilmediğinde açılacak varsayılan yıl penceresi.
 const YEARS_BACK = 100;
@@ -581,13 +607,13 @@ export default function DatePickerModal({
 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const isEn = language === "en";
+  const lang = copyLanguage(language, Object.keys(MONTH_NAMES));
 
   const minIso = normalizeDate(minDate);
   const maxIso = normalizeDate(maxDate);
 
-  const months = isEn ? MONTHS_EN : MONTHS_TR;
-  const weekdays = isEn ? WEEKDAYS_EN : WEEKDAYS_TR;
+  const months = MONTH_NAMES[lang];
+  const weekdays = WEEKDAY_NAMES[lang];
   const years = useMemo(() => buildYears(minIso, maxIso), [minIso, maxIso]);
 
   // Sınırlar dışına taşan her seçimi en yakın geçerli tarihe çeker.
@@ -914,9 +940,11 @@ export default function DatePickerModal({
   // ─── Önizleme ──────────────────────────────────────────────────────────────
 
   const previewDate = new Date(parts.y, parts.m, parts.d);
-  const previewText = isEn
-    ? `${months[parts.m]} ${parts.d}, ${parts.y}`
-    : `${parts.d} ${months[parts.m]} ${parts.y}`;
+  const previewText = formatLongDateParts(language, {
+    day: parts.d,
+    monthIndex: parts.m,
+    year: parts.y,
+  });
   const previewWeekday = weekdays[previewDate.getDay()];
 
   const hintText =

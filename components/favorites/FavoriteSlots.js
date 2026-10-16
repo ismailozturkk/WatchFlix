@@ -32,6 +32,7 @@ function FilledSlot({
   theme,
   readOnly,
   showTitle,
+  radius,
   removeLabel,
   openLabel,
   onRemove,
@@ -39,7 +40,7 @@ function FilledSlot({
 }) {
   const height = kind === "people" ? width : Math.round(width * POSTER_RATIO);
   const art = (
-    <FavoriteArt path={entry.image} kind={kind} width={width} height={height} />
+    <FavoriteArt path={entry.image} kind={kind} width={width} height={height} radius={radius} />
   );
   return (
     <View style={{ width }}>
@@ -122,6 +123,10 @@ function EmptySlot({ kind, width, theme, accent, active, label, onPress, showTit
  * @param {string} [props.accent]
  * @param {boolean} [props.readOnly=false]
  * @param {boolean} [props.showTitles=true]
+ * @param {number} [props.gap]               yuvalar arası boşluk
+ * @param {number} [props.maxSlotWidth]      yuva genişliği tavanı (kompakt vitrin);
+ *   satır genişse yuvalar büyümez, soldan dizilir
+ * @param {number} [props.radius]            poster köşe yarıçapı
  * @param {string} props.addLabel            boş yuvanın erişilebilirlik etiketi
  * @param {(title:string)=>string} props.removeLabel
  * @param {string} [props.openLabel]
@@ -136,6 +141,9 @@ function FavoriteSlots({
   accent,
   readOnly = false,
   showTitles = true,
+  gap = GAP,
+  maxSlotWidth = Infinity,
+  radius,
   addLabel,
   removeLabel,
   openLabel = "",
@@ -144,7 +152,9 @@ function FavoriteSlots({
   onOpen,
 }) {
   const [rowWidth, setRowWidth] = useState(0);
-  const slotWidth = rowWidth ? Math.floor((rowWidth - GAP * (MAX_FAVORITES - 1)) / MAX_FAVORITES) : 0;
+  const slotWidth = rowWidth
+    ? Math.min(maxSlotWidth, Math.floor((rowWidth - gap * (MAX_FAVORITES - 1)) / MAX_FAVORITES))
+    : 0;
   const list = Array.isArray(items) ? items : [];
   const highlight = accent || theme.accent;
   // Başlık yeri yalnız satırda başlıklı bir yuva VARKEN ayrılır; boş satır
@@ -153,7 +163,7 @@ function FavoriteSlots({
 
   return (
     <View
-      style={styles.row}
+      style={[styles.row, { gap }]}
       onLayout={(event) => {
         const next = Math.round(event.nativeEvent.layout.width);
         setRowWidth((current) => (current === next ? current : next));
@@ -172,6 +182,7 @@ function FavoriteSlots({
                   theme={theme}
                   readOnly={readOnly}
                   showTitle={showTitles}
+                  radius={radius}
                   removeLabel={removeLabel}
                   openLabel={openLabel}
                   onRemove={onRemove}
@@ -204,7 +215,7 @@ function FavoriteSlots({
 export default memo(FavoriteSlots);
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", gap: GAP, alignItems: "flex-start", minHeight: 40 },
+  row: { flexDirection: "row", alignItems: "flex-start", minHeight: 40 },
   title: { marginTop: 6, fontSize: TITLE_SIZE, lineHeight: TITLE_LINE_HEIGHT, fontWeight: "700" },
   empty: {
     alignItems: "center",

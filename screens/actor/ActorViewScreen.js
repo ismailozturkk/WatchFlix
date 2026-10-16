@@ -1,3 +1,4 @@
+import { intlLocaleOf, tmdbLanguageOf } from "../../utils/appLanguages";
 import { Image } from "expo-image";
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -275,7 +276,7 @@ const ActorViewScreen = ({ route, navigation }) => {
           `https://api.themoviedb.org/3/person/${personId}`,
           {
             params: {
-              language: language === "tr" ? "tr-TR" : "en-US",
+              language: tmdbLanguageOf(language),
               append_to_response: "movie_credits,tv_credits",
             },
             headers: { Authorization: API_KEY },
@@ -327,7 +328,7 @@ const ActorViewScreen = ({ route, navigation }) => {
   const formatDate = (d) => {
     if (!d) return null;
     try {
-      return new Date(d).toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
+      return new Date(d).toLocaleDateString(intlLocaleOf(language), {
         day: "numeric",
         month: "long",
         year: "numeric",

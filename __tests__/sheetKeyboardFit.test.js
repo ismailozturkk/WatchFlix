@@ -2,9 +2,98 @@ import {
   MIN_SHEET_BUDGET,
   keyboardFitOverrides,
   keyboardLift,
+  keyboardOverlap,
   keyboardSheetBudget,
+  nextBaseOverlay,
+  nextNaturalHeight,
   resolveSheetLength,
+  sheetExitDistance,
 } from "../utils/sheetKeyboardFit";
+
+describe("keyboardOverlap", () => {
+  it("iOS'ta pencereyle örtüşmeyi screenY'den hesaplar", () => {
+    expect(keyboardOverlap({ screenY: 464, height: 336 }, 800, true)).toBe(336);
+  });
+
+  it("iOS'ta ekranın altına inen klavye 0 verir (height sıfırdan büyük kalsa da)", () => {
+    expect(keyboardOverlap({ screenY: 800, height: 336 }, 800, true)).toBe(0);
+    expect(keyboardOverlap({ screenY: 900, height: 336 }, 800, true)).toBe(0);
+  });
+
+  it("Android'de çerçeve yüksekliğini pencereyle sınırlar", () => {
+    expect(keyboardOverlap({ height: 300 }, 800, false)).toBe(300);
+    expect(keyboardOverlap({ height: 1200 }, 800, false)).toBe(800);
+    expect(keyboardOverlap({ height: 0 }, 800, false)).toBe(0);
+  });
+
+  it("eksik/bozuk veride 0", () => {
+    expect(keyboardOverlap(null, 800, true)).toBe(0);
+    expect(keyboardOverlap({ height: NaN }, 800, false)).toBe(0);
+    expect(keyboardOverlap({ height: 300 }, 0, false)).toBe(0);
+  });
+});
+
+describe("nextBaseOverlay", () => {
+  const empty = { height: 0, window: 0 };
+
+  it("ilk ölçüm tabandır", () => {
+    expect(nextBaseOverlay(empty, 800, 800)).toEqual({ height: 800, window: 800 });
+  });
+
+  it("pencere klavyeyle daralınca taban küçülmez (onLayout olaydan önce gelse bile)", () => {
+    const base = nextBaseOverlay(empty, 800, 800);
+    expect(nextBaseOverlay(base, 500, 800).height).toBe(800);
+  });
+
+  it("pencere klavye inince geri büyürse taban en büyük ölçüyü izler", () => {
+    // Taban yanlışlıkla daralmış boyla başladıysa (klavye açıkken açılış) düzelir.
+    const shrunkStart = nextBaseOverlay(empty, 500, 800);
+    expect(nextBaseOverlay(shrunkStart, 800, 800).height).toBe(800);
+  });
+
+  it("pencere yüksekliği değiştiyse (döndürme) taban yeniden başlar", () => {
+    const base = nextBaseOverlay(empty, 800, 800);
+    expect(nextBaseOverlay(base, 360, 390)).toEqual({ height: 360, window: 390 });
+  });
+
+  it("geçersiz ölçüm tabana dokunmaz", () => {
+    const base = nextBaseOverlay(empty, 800, 800);
+    expect(nextBaseOverlay(base, 0, 800)).toBe(base);
+  });
+});
+
+describe("sheetExitDistance", () => {
+  it("sayfa boyu + klavye yükselmesi (sayfa ekranda asılı kalmaz)", () => {
+    expect(sheetExitDistance(520, 336)).toBe(856);
+  });
+
+  it("klavye yokken yalnız sayfa boyu", () => {
+    expect(sheetExitDistance(520, 0)).toBe(520);
+    expect(sheetExitDistance(520, undefined)).toBe(520);
+  });
+
+  it("negatif/boş girdide taşmaz", () => {
+    expect(sheetExitDistance(-5, -5)).toBe(0);
+    expect(sheetExitDistance(undefined, undefined)).toBe(0);
+  });
+});
+
+describe("nextNaturalHeight", () => {
+  it("klavye kapalıyken ölçü doğal boydur (içerik küçülebilir)", () => {
+    expect(nextNaturalHeight(720, 520, false)).toBe(520);
+    expect(nextNaturalHeight(520, 400, false)).toBe(400);
+  });
+
+  it("klavye açıkken kısılmış ölçü doğal boyu küçültmez, büyüyeni kabul eder", () => {
+    expect(nextNaturalHeight(520, 406, true)).toBe(520);
+    expect(nextNaturalHeight(520, 560, true)).toBe(560);
+  });
+
+  it("geçersiz ölçümde mevcut değer kalır", () => {
+    expect(nextNaturalHeight(520, 0, true)).toBe(520);
+    expect(nextNaturalHeight(520, NaN, false)).toBe(520);
+  });
+});
 
 describe("resolveSheetLength", () => {
   it("sayıyı olduğu gibi, yüzdeyi tabana göre çözer", () => {

@@ -19,6 +19,7 @@
 // 1. sayfadan yükler. TvShowProvider uygulama kökünde olduğundan dizi dalı
 // doğrudan mevcut context'i kullanır.
 
+import { tmdbLanguageOf, tmdbRegionOf } from "../../utils/appLanguages";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
@@ -680,8 +681,8 @@ function useDiscoverPagination({ mediaType, genreIds, providerId, preset }) {
   const { API_KEY } = useApiSettings();
   const { language } = useLanguage();
   const { streamingProviderIds } = useStreamingProviderSettings();
-  const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
-  const tmdbRegion = language === "tr" ? "TR" : "US";
+  const tmdbLanguage = tmdbLanguageOf(language);
+  const tmdbRegion = tmdbRegionOf(language);
 
   const [data, setData] = useState([]);
   const [page, setPage] = useState(1);

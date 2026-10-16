@@ -14,6 +14,7 @@
 // paylaşıyordu; iki biçim ayrı kararlar (3 sütun, kademe şeridi, YENİ etiketi)
 // gerektirince tek dosyada birbirine dolanmıştı. Artık ayrı bileşenler.
 
+import { copyLanguage } from "../../utils/appLanguages";
 import React, { memo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppIcon from "@components/AppIcon";
@@ -29,7 +30,7 @@ import { badgeAciklama, badgeAd, formatBadgeAralik } from "./watchBadgeCatalog";
 function WatchBadgeRow({ badge, onPress }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = language === "en" ? "en" : "tr";
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
 
   const acik = badge.acik;
   const nadirlik = rarityStyle(badge.rarity, theme);

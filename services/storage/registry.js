@@ -260,13 +260,6 @@ const settingsKeys = {
     default: null,
     validate: (value) => !!value && typeof value === "object" && !Array.isArray(value),
   },
-  // Profilde "dört favorini seç" davet kartı kapatıldı mı. CİHAZA özel ipucu:
-  // yedeğe girmez, hesaba da yazılmaz (kart zaten favori seçilince kalkıyor).
-  favoritesInviteDismissed: {
-    key: "favoritesInviteDismissed",
-    type: TYPES.boolean,
-    default: false,
-  },
   // Profil/liste görünümü
   // ---- Cihaz düzeyi, çıkışta KORUNUR ------------------------------------
   // Bu ikisi bilinçli olarak `settings` deposunda: `session` deposu çıkışta

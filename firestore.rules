@@ -653,6 +653,83 @@ service cloud.firestore {
                     && request.resource.data.targetPreview.size() <= 300;
     }
 
+    // ─── Uygulama içi geri bildirim (Ayarlar > Destek ve geri bildirim) ──
+    // Hata bildirimi: Premium ve üstü. Özellik isteği: yalnız Premium Max.
+    // Plan, Users/{uid}.entitlements'tan okunur — bu alanı istemci YAZAMAZ
+    // (Users kuralı), bu yüzden istemcinin söylediği plana güvenilmez.
+    //
+    // Sahibi yalnız KENDİ kayıtlarını okur ("Gönderdiklerim": durum + yanıt);
+    // sorgu `where('uid', '==', uid)` taşımak zorunda. Durum (`status`) ve yanıt
+    // (`reply`) konsoldan değişir: update/delete istemciye kapalı.
+    //
+    // Alan listesi, kategoriler ve uzunluklar istemcideki utils/feedbackValidation.js
+    // ile BİREBİR aynı olmalı; eşitliği __tests__/feedbackRulesParity.test.js korur.
+    match /Feedback/{feedbackId} {
+      function entitlements() {
+        return get(/databases/$(database)/documents/Users/$(request.auth.uid))
+                 .data.get('entitlements', {});
+      }
+      function isMaxPlan() {
+        return entitlements().get('premiumUnlimited', false) == true
+            || entitlements().get('premiumPlan', 'free') == 'unlimited';
+      }
+      function isPaidPlan() {
+        return isMaxPlan() || entitlements().get('premium', false) == true;
+      }
+      // Cihaz alanları isteğe bağlı: yoksa serbest, varsa kısa bir string.
+      function optionalShort(field) {
+        return !(field in request.resource.data)
+            || (request.resource.data[field] is string
+                && request.resource.data[field].size() <= 40);
+      }
+
+      allow get, list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+      allow create: if isSignedIn()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.keys().hasAll([
+                         'uid', 'kind', 'category', 'title', 'message',
+                         'status', 'language', 'createdAt'
+                       ])
+                    && request.resource.data.keys().hasOnly([
+                         'uid', 'kind', 'category', 'severity', 'title', 'message',
+                         'status', 'language', 'appVersion', 'platform',
+                         'osVersion', 'deviceModel', 'createdAt'
+                       ])
+                    && request.resource.data.status == 'open'
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() >= 3
+                    && request.resource.data.title.size() <= 80
+                    && request.resource.data.message is string
+                    && request.resource.data.message.size() >= 10
+                    && request.resource.data.message.size() <= 1000
+                    && request.resource.data.language is string
+                    && request.resource.data.language.size() <= 5
+                    && optionalShort('appVersion')
+                    && optionalShort('platform')
+                    && optionalShort('osVersion')
+                    && optionalShort('deviceModel')
+                    && (
+                         (request.resource.data.kind == 'bug'
+                          && isPaidPlan()
+                          && request.resource.data.category in [
+                               'crash', 'display', 'data', 'notifications',
+                               'performance', 'other'
+                             ]
+                          && (!('severity' in request.resource.data)
+                              || request.resource.data.severity in
+                                   ['minor', 'annoying', 'blocking']))
+                         ||
+                         (request.resource.data.kind == 'feature'
+                          && isMaxPlan()
+                          && request.resource.data.category in [
+                               'discover', 'lists', 'social', 'ai', 'design', 'other'
+                             ]
+                          && !('severity' in request.resource.data))
+                       );
+    }
+
     // ─── Presence (online status, ayrı koleksiyon) ──────────────────────
     // Heartbeat'i Users üzerindeki listener fan-out'undan kaçırmak için
     // ayrı koleksiyon. Tüm signed-in kullanıcılar okur (privacy filtresi

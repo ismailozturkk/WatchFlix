@@ -17,6 +17,7 @@
 // Sürekli dönen animasyonlar yalnız ekran odaktayken ve sistem "Hareketi Azalt"
 // kapalıyken çalışır (bkz. hooks/useReduceMotion.js); hepsi native sürücüde.
 
+import { normalizeAppLanguage } from "../../utils/appLanguages";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -119,6 +120,7 @@ export default function PremiumSettingsCard() {
   const { language } = useLanguage();
   const { isPremium, isUnlimited, loading } = usePremium();
   const tr = language === "tr";
+  const es = normalizeAppLanguage(language) === "es";
 
   const accent = theme.accent;
   const purple = theme.colors.purple || "#8B5CF6";
@@ -193,25 +195,15 @@ export default function PremiumSettingsCard() {
   };
 
   const title = isPremium
-    ? tr
-      ? "Ayrıcalıkların Aktif"
-      : "Your Benefits Are Active"
-    : tr
-      ? "Sinemanın Sınırlarını Kaldır"
-      : "Unlock Boundless Cinema";
+    ? tr ? "Ayrıcalıkların Aktif" : es ? "Tus ventajas están activas" : "Your Benefits Are Active"
+    : tr ? "Sinemanın Sınırlarını Kaldır" : es ? "Desbloquea el cine sin límites" : "Unlock Boundless Cinema";
 
   const ctaTitle = isPremium
     ? i18nText("autoI18n.yonet", "Aboneliğimi Yönet")
-    : tr
-      ? "Ayrıcalıkları ve Fiyatları Gör"
-      : "View Plans & Pricing";
+    : tr ? "Ayrıcalıkları ve Fiyatları Gör" : es ? "Ver planes y precios" : "View Plans & Pricing";
   const ctaSubtitle = isPremium
-    ? tr
-      ? "Plan detaylarını ve faturalandırmayı yönet"
-      : "Manage plan and billing"
-    : tr
-      ? "Doğrudan fiyatlandırma · Dilediğin an iptal"
-      : "Direct pricing · Cancel anytime";
+    ? tr ? "Plan detaylarını ve faturalandırmayı yönet" : es ? "Gestionar el plan y la facturación" : "Manage plan and billing"
+    : tr ? "Doğrudan fiyatlandırma · Dilediğin an iptal" : es ? "Precios claros · Cancela cuando quieras" : "Direct pricing · Cancel anytime";
 
   const orbAShift = {
     transform: [
@@ -361,7 +353,7 @@ export default function PremiumSettingsCard() {
                 icon="sparkles"
                 tint={accent}
                 value={String(limits.daily)}
-                label={tr ? "AI mesajı / gün" : "AI chats / day"}
+                label={tr ? "AI mesajı / gün" : es ? "Chats de IA / día" : "AI chats / day"}
               />
               <BenefitTile
                 theme={theme}
@@ -369,14 +361,10 @@ export default function PremiumSettingsCard() {
                 tint={gold}
                 value={
                   isUnlimited
-                    ? tr
-                      ? "Efsanevi"
-                      : "Legend"
-                    : tr
-                      ? "Epik"
-                      : "Epic"
+                    ? tr ? "Efsanevi" : es ? "Legendaria" : "Legend"
+                    : tr ? "Epik" : es ? "Épica" : "Epic"
                 }
-                label={tr ? "Profil rozeti" : "Profile badge"}
+                label={tr ? "Profil rozeti" : es ? "Insignia de perfil" : "Profile badge"}
               />
               <BenefitTile
                 theme={theme}
@@ -384,14 +372,10 @@ export default function PremiumSettingsCard() {
                 tint={green}
                 value={
                   isUnlimited
-                    ? tr
-                      ? "Sınırsız"
-                      : "Unlimited"
-                    : tr
-                      ? "Daha fazla"
-                      : "More"
+                    ? tr ? "Sınırsız" : es ? "Ilimitado" : "Unlimited"
+                    : tr ? "Daha fazla" : es ? "Más" : "More"
                 }
-                label={tr ? "Sosyal limitler" : "Social limits"}
+                label={tr ? "Sosyal limitler" : es ? "Límites sociales" : "Social limits"}
               />
             </View>
 

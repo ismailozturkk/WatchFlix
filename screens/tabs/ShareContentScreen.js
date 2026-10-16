@@ -1,3 +1,4 @@
+import { tmdbLanguageOf } from "../../utils/appLanguages";
 import React, {
   memo,
   useCallback,
@@ -102,7 +103,7 @@ export default function ShareContentScreen({ route }) {
 
   useEffect(() => {
     let active = true;
-    const lang = language === "tr" ? "tr-TR" : "en-US";
+    const lang = tmdbLanguageOf(language);
     (async () => {
       try {
         const res = await axios.get(

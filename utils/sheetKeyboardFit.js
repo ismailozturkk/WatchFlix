@@ -21,6 +21,73 @@ export const MIN_SHEET_BUDGET = 140;
 export const SHEET_TOP_MARGIN = 8;
 
 /**
+ * Klavye olayındaki çerçeveden, klavyenin pencereyle ÖRTÜŞEN yüksekliği.
+ * iOS'ta `screenY` pencere koordinatındadır (RCTKeyboardObserver çerçeveyi ana
+ * pencereye çevirir): klavyenin ekran dışına inmesi (screenY ≥ pencere
+ * yüksekliği) doğal olarak 0 verir. `height` ise çerçevenin kendi boyudur ve
+ * klavye gizlenirken bile sıfırdan büyük kalabilir; bu yüzden gizlenme
+ * `keyboardWillChangeFrame` ile gelse bile sayfayı eski boyda bırakmaz.
+ *
+ * @param {{screenY?: number, height?: number} | null | undefined} coords
+ * @param {number} windowHeight
+ * @param {boolean} ios  Platform.OS === "ios"
+ */
+export function keyboardOverlap(coords, windowHeight, ios) {
+  if (!coords || !(windowHeight > 0)) return 0;
+  if (ios && typeof coords.screenY === "number") {
+    return Math.min(Math.max(0, windowHeight - coords.screenY), windowHeight);
+  }
+  const height = Number(coords.height);
+  return Number.isFinite(height) && height > 0 ? Math.min(height, windowHeight) : 0;
+}
+
+/**
+ * Kaplayıcının "klavye KAPALI" yüksekliğinin (taban) bir sonraki değeri.
+ *
+ * Eskiden taban, ölçüm geldiği an klavye açık görünmüyorsa güncelleniyordu. Ama
+ * Android'de pencere klavyeyle daralınca `onLayout`, `keyboardDidShow` olayından
+ * ÖNCE gelebilir: daralmış boy "klavye kapalı" sanılıp taban yanlış kaydediliyor,
+ * sayfa çift kayıyordu; klavye inerken de tersi olunca taban küçük KALIYORDU.
+ * Pencere yalnız klavye yüzünden küçülür, o yüzden taban gözlenen EN BÜYÜK
+ * ölçüdür. Pencere yüksekliği değiştiyse (döndürme, bölünmüş ekran) eski taban
+ * geçersizdir ve ölçüden yeniden başlar.
+ *
+ * @param {{height: number, window: number}} prev
+ * @param {number} measured      Kaplayıcının şimdiki ölçüsü.
+ * @param {number} windowHeight  Şimdiki pencere yüksekliği.
+ */
+export function nextBaseOverlay(prev, measured, windowHeight) {
+  if (!(measured > 0)) return prev;
+  const fresh = prev && prev.window === windowHeight && prev.height > 0;
+  return {
+    height: fresh ? Math.max(prev.height, measured) : measured,
+    window: windowHeight,
+  };
+}
+
+/**
+ * Sayfayı ekranın altına tamamen indirmek için `translateY`nin varacağı değer.
+ *
+ * Sayfa klavye yüzünden `lift` kadar yukarıda duruyor (`translateY − keyboardShift`
+ * bileşimi). Çıkış mesafesi yalnız sayfanın boyu olursa sayfa `lift` kadar ekranda
+ * ASILI kalır, hareket bitince birden kaybolur. Sayfa boyu "doğal" (klavyesiz)
+ * boydur: klavye sayfayı küçültmüş olsa bile gerçek boydan KÜÇÜK olamaz.
+ */
+export function sheetExitDistance(naturalHeight, lift) {
+  return Math.max(0, naturalHeight || 0) + Math.max(0, lift || 0);
+}
+
+/**
+ * Sayfanın klavyesiz ("doğal") yüksekliği. Klavye açıkken ölçülen boy `fit` ile
+ * kısılmıştır; onu doğal boy sanıp çıkış/giriş mesafesi yapmak sayfayı ekranda
+ * yarım bırakır, bu yüzden klavye açıkken yalnız BÜYÜYEN ölçü kabul edilir.
+ */
+export function nextNaturalHeight(current, measured, keyboardOpen) {
+  if (!(measured > 0)) return current;
+  return keyboardOpen ? Math.max(current || 0, measured) : measured;
+}
+
+/**
  * 320 | "78%" | undefined → piksel. Yüzde `base`e göre çözülür (Yoga'nın
  * kaplayıcı yüksekliğine çözdüğüyle aynı). Çözülemeyen değer için null.
  */

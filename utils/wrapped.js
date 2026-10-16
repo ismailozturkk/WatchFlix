@@ -7,6 +7,8 @@
 // Tüm fonksiyonlar saftır: aynı girdi → aynı çıktı. Ekran tarafında useMemo
 // ile sarılır, böylece her render'da yeniden hesaplanmaz.
 
+import { copyLanguage, intlLocaleOf } from "./appLanguages";
+
 // "YYYY-MM-DD" — uygulamanın dateAdded/episodeWatchTime için ürettiği biçim
 // (bkz. utils/mediaFacts.todayListDate, utils/watchHistory.normalizeWatchDate).
 // Sonu kapalı ($) tutuluyor ki saat içeren tam ISO string'ler bu daldan geçmesin.
@@ -200,30 +202,31 @@ export const longestStreakOf = (dayKeys = []) => {
 // ─── Kişilik (tür → izleyici kişiliği rozeti) ────────────────────────────────
 
 const PERSONALITIES = [
-  { key: "comedy",      emoji: "😂", tr: "Kahkaha Avcısı",       en: "Laugh Hunter",      match: ["komedi", "comedy"],
-    trDesc: "Kötü bir günün ilacı hep bir komedi.", enDesc: "A good comedy fixes any bad day." },
-  { key: "horror",      emoji: "😱", tr: "Cesur Yürek",          en: "Brave Heart",       match: ["korku", "horror"],
-    trDesc: "Işıklar kapalı, ses sonuna kadar açık.", enDesc: "Lights off, volume all the way up." },
-  { key: "thriller",    emoji: "🔪", tr: "Gerilim Ustası",       en: "Thrill Seeker",     match: ["gerilim", "thriller"],
-    trDesc: "Bir sonraki sürprizi hep sen tahmin edersin.", enDesc: "You always call the next twist." },
-  { key: "action",      emoji: "💥", tr: "Adrenalin Bağımlısı",  en: "Adrenaline Junkie", match: ["aksiyon", "action", "macera", "adventure"],
-    trDesc: "Tempo düşmesin, patlama eksik olmasın.", enDesc: "Keep the pace up and the explosions coming." },
-  { key: "scifi",       emoji: "🚀", tr: "Zaman Yolcusu",        en: "Time Traveler",     match: ["bilim kurgu", "science fiction", "sci-fi", "fantastik", "fantasy"],
-    trDesc: "Gerçeklik sana dar gelir, yeni evrenler ararsın.", enDesc: "Reality feels small — you want new worlds." },
+  { key: "comedy",      emoji: "😂", tr: "Kahkaha Avcısı",       en: "Laugh Hunter",      match: ["komedi", "comedy", "comedia"],
+    trDesc: "Kötü bir günün ilacı hep bir komedi.", enDesc: "A good comedy fixes any bad day.", es: "Cazarrisas", esDesc: "Una buena comedia arregla cualquier mal día." },
+  { key: "horror",      emoji: "😱", tr: "Cesur Yürek",          en: "Brave Heart",       match: ["korku", "horror", "terror"],
+    trDesc: "Işıklar kapalı, ses sonuna kadar açık.", enDesc: "Lights off, volume all the way up.", es: "Corazón valiente", esDesc: "Luces apagadas y volumen al máximo." },
+  { key: "thriller",    emoji: "🔪", tr: "Gerilim Ustası",       en: "Thrill Seeker",     match: ["gerilim", "thriller", "suspense", "suspenso"],
+    trDesc: "Bir sonraki sürprizi hep sen tahmin edersin.", enDesc: "You always call the next twist.", es: "Instinto de suspense", esDesc: "Siempre adivinas el siguiente giro." },
+  { key: "action",      emoji: "💥", tr: "Adrenalin Bağımlısı",  en: "Adrenaline Junkie", match: ["aksiyon", "action", "macera", "adventure", "acción", "aventura"],
+    trDesc: "Tempo düşmesin, patlama eksik olmasın.", enDesc: "Keep the pace up and the explosions coming.", es: "Adicción a la adrenalina", esDesc: "Que no baje el ritmo y que no falten las explosiones." },
+  { key: "scifi",       emoji: "🚀", tr: "Zaman Yolcusu",        en: "Time Traveler",     match: ["bilim kurgu", "science fiction", "sci-fi", "fantastik", "fantasy", "ciencia ficción", "fantasía"],
+    trDesc: "Gerçeklik sana dar gelir, yeni evrenler ararsın.", enDesc: "Reality feels small — you want new worlds.", es: "Viajero en el tiempo", esDesc: "La realidad se te queda pequeña: buscas mundos nuevos." },
   { key: "drama",       emoji: "🎭", tr: "Duygu Yolcusu",        en: "Soul Wanderer",     match: ["dram", "drama"],
-    trDesc: "Karakterlerle yaşar, finalde derin bir nefes alırsın.", enDesc: "You live with the characters, then exhale at the finale." },
+    trDesc: "Karakterlerle yaşar, finalde derin bir nefes alırsın.", enDesc: "You live with the characters, then exhale at the finale.", es: "Alma errante", esDesc: "Vives con los personajes y respiras hondo en el final." },
   { key: "romance",     emoji: "💘", tr: "Romantik Ruh",         en: "Hopeless Romantic", match: ["romantik", "romance"],
-    trDesc: "Bir aşk hikâyesine hep yer vardır.", enDesc: "There's always room for a love story." },
-  { key: "animation",   emoji: "🎨", tr: "Çizgi Düşler",         en: "Animated Dreamer",  match: ["animasyon", "animation"],
-    trDesc: "Çizilmiş dünyalar sana hiç çocukça gelmez.", enDesc: "Drawn worlds never feel childish to you." },
-  { key: "documentary", emoji: "🔭", tr: "Bilge Gözlemci",       en: "Wise Observer",     match: ["belgesel", "documentary"],
-    trDesc: "Gerçek hikâyeler her kurgudan çok sarar.", enDesc: "Real stories beat fiction every time." },
-  { key: "crime",       emoji: "🕵️", tr: "Dosya Avcısı",         en: "Case Cracker",      match: ["suç", "crime", "gizem", "mystery"],
-    trDesc: "Her ipucunu izler, dosyayı sen kapatırsın.", enDesc: "You follow every clue and close the case." },
+    trDesc: "Bir aşk hikâyesine hep yer vardır.", enDesc: "There's always room for a love story.", es: "Alma romántica", esDesc: "Siempre hay sitio para una historia de amor." },
+  { key: "animation",   emoji: "🎨", tr: "Çizgi Düşler",         en: "Animated Dreamer",  match: ["animasyon", "animation", "animación"],
+    trDesc: "Çizilmiş dünyalar sana hiç çocukça gelmez.", enDesc: "Drawn worlds never feel childish to you.", es: "Sueños dibujados", esDesc: "Los mundos dibujados nunca te parecen infantiles." },
+  { key: "documentary", emoji: "🔭", tr: "Bilge Gözlemci",       en: "Wise Observer",     match: ["belgesel", "documentary", "documental"],
+    trDesc: "Gerçek hikâyeler her kurgudan çok sarar.", enDesc: "Real stories beat fiction every time.", es: "Mirada sabia", esDesc: "Las historias reales ganan a la ficción siempre." },
+  { key: "crime",       emoji: "🕵️", tr: "Dosya Avcısı",         en: "Case Cracker",      match: ["suç", "crime", "gizem", "mystery", "crimen", "misterio"],
+    trDesc: "Her ipucunu izler, dosyayı sen kapatırsın.", enDesc: "You follow every clue and close the case.", es: "Olfato de detective", esDesc: "Sigues cada pista y cierras el caso." },
 ];
 const DEFAULT_PERSONALITY = {
-  key: "default", emoji: "🍿", tr: "Sinefil", en: "Cinephile",
+  key: "default", emoji: "🍿", tr: "Sinefil", en: "Cinephile", es: "Cinéfilo",
   trDesc: "Her türden izlersin; sinema sana geniş bir alan.", enDesc: "You watch everything — cinema is wide open to you.",
+  esDesc: "Ves de todo: el cine es un territorio amplio para ti.",
 };
 
 export const getPersonality = (genre, language = "tr") => {
@@ -231,12 +234,12 @@ export const getPersonality = (genre, language = "tr") => {
   const found =
     (g && PERSONALITIES.find((p) => p.match.some((m) => g.includes(m)))) ||
     DEFAULT_PERSONALITY;
-  const tr = language === "tr";
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
   return {
     key: found.key,
     emoji: found.emoji,
-    title: tr ? found.tr : found.en,
-    desc: tr ? found.trDesc : found.enDesc,
+    title: lang === "tr" ? found.tr : lang === "es" ? found.es : found.en,
+    desc: lang === "tr" ? found.trDesc : lang === "es" ? found.esDesc : found.enDesc,
   };
 };
 
@@ -388,7 +391,7 @@ export const buildYearlyRecap = ({ movies = [], episodes = [], year, language = 
 // ─── Biçimlendirme yardımcıları ──────────────────────────────────────────────
 
 export const formatNumber = (n, language = "tr") =>
-  Number(n || 0).toLocaleString(language === "tr" ? "tr-TR" : "en-US");
+  Number(n || 0).toLocaleString(intlLocaleOf(language));
 
 /** Toplam dakikadan {hours, days} türetir (özet kartı için). */
 export const minutesBreakdown = (minutes = 0) => {
@@ -400,7 +403,7 @@ export const minutesBreakdown = (minutes = 0) => {
 /** language'a göre uzun ay adı (0-11). */
 export const monthName = (index, language = "tr") => {
   try {
-    return new Intl.DateTimeFormat(language === "tr" ? "tr-TR" : "en-US", {
+    return new Intl.DateTimeFormat(intlLocaleOf(language), {
       month: "long",
     }).format(new Date(2020, index, 1));
   } catch {
@@ -412,7 +415,7 @@ export const monthName = (index, language = "tr") => {
 export const weekdayName = (index, language = "tr") => {
   try {
     // 2024-01-01 bir Pazartesi.
-    return new Intl.DateTimeFormat(language === "tr" ? "tr-TR" : "en-US", {
+    return new Intl.DateTimeFormat(intlLocaleOf(language), {
       weekday: "long",
     }).format(new Date(2024, 0, 1 + index));
   } catch {
@@ -425,7 +428,7 @@ export const formatLongDate = (value, language = "tr") => {
   const d = toDate(value);
   if (!d) return "";
   try {
-    return new Intl.DateTimeFormat(language === "tr" ? "tr-TR" : "en-US", {
+    return new Intl.DateTimeFormat(intlLocaleOf(language), {
       day: "numeric",
       month: "long",
       year: "numeric",

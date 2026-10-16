@@ -41,7 +41,7 @@ import { i18nText } from "@utils/i18nText";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import {
   ROUNDS, getPeriodId, getScheduleEntry, parsePeriodId, getPeriodStartMs,
-  monthLabel, mediaLabel, roundLabel, getPhaseInfo, buildBracket, tallyVotes,
+  monthLabel, mediaLabel, roundLabel, themeLabel, getPhaseInfo, buildBracket, tallyVotes,
   getMyPicks, getPrevPeriodId, now, setDebugNow, DAY,
   FINALIST_COUNT, MAX_NOMINATIONS, tallyNominations, getMyNominations,
   rankPool, mergePool, selectFinalists, getChampionStats,
@@ -56,7 +56,7 @@ import RoundRail from "@components/tournament/RoundRail";
 import PodiumModal from "@components/tournament/PodiumModal";
 import ScreenDecor from "@components/ScreenDecor";
 // Faz kimliği (renk/gradyan/ikon) Hub kartıyla ortak: components/tournament/phaseMeta.js
-import { PHASE_META } from "@components/tournament/phaseMeta";
+import { PHASE_META, phaseLabel } from "@components/tournament/phaseMeta";
 
 // Onay katmanında artık okunacak iki seçenek var; eski 2.6 sn karar vermeye
 // yetmiyordu (MatchCard'daki PENDING_TIMEOUT ile aynı).
@@ -561,7 +561,7 @@ export default function TournamentScreen() {
     [clearPendingNom, openContestant, pool],
   );
 
-  const theTheme = lang === "tr" ? entry.tr : entry.en;
+  const theTheme = themeLabel(entry, lang);
   const phaseMeta = PHASE_META[phaseInfo.phase] || PHASE_META.selection;
 
   // ── Geçen ayın kazananı (ilk 3 + oy sayıları) — küçük kupa ikonu, podyum
@@ -594,7 +594,7 @@ export default function TournamentScreen() {
       <View style={[styles.phaseChip, { backgroundColor: phaseMeta.color + "22", borderColor: phaseMeta.color + "55" }]}>
         <AppIcon family="Ionicons" name={phaseMeta.icon} size={13} color={phaseMeta.color} />
         <Text style={[styles.phaseChipText, { color: phaseMeta.color }]}>
-          {lang === "tr" ? phaseMeta.tr : phaseMeta.en}
+          {phaseLabel(phaseMeta, lang)}
         </Text>
       </View>
       {PodiumButton}
@@ -1074,9 +1074,7 @@ export default function TournamentScreen() {
       >
         <AppIcon family="Ionicons" name="eye" size={16} color={theme.accent} />
         <Text style={[styles.noticeText, { color: theme.text.secondary }]}>
-          {lang === "tr"
-            ? "Turnuvayı seyirci olarak izliyorsun. Oy kullanmak Premium'a özel."
-            : "You're watching as a spectator. Voting is a Premium perk."}
+          {lang === "tr" ? "Turnuvayı seyirci olarak izliyorsun. Oy kullanmak Premium'a özel." : lang === "es" ? "Estás viendo el torneo como espectador. Votar es una ventaja Premium." : "You're watching as a spectator. Voting is a Premium perk."}
         </Text>
         <AppIcon family="Ionicons" name="chevron-forward" size={14} color={theme.text.muted} />
       </Pressable>

@@ -46,7 +46,7 @@ private func loadItems() -> [ReminderItem] {
   .sorted { $0.date < $1.date }
 }
 
-private func countdownText(_ date: Date, isTurkish: Bool) -> String {
+private func countdownText(_ date: Date, lang: String) -> String {
   let cal = Calendar.current
   let days = cal.dateComponents(
     [.day],
@@ -54,9 +54,9 @@ private func countdownText(_ date: Date, isTurkish: Bool) -> String {
     to: cal.startOfDay(for: date)
   ).day ?? 0
 
-  if days <= 0 { return isTurkish ? "Bugün" : "Today" }
-  if days == 1 { return isTurkish ? "Yarın" : "Tomorrow" }
-  return isTurkish ? "\(days) gün" : "\(days) days"
+  if days <= 0 { return widgetPick(lang, tr: "Bugün", en: "Today", es: "Hoy") }
+  if days == 1 { return widgetPick(lang, tr: "Yarın", en: "Tomorrow", es: "Mañana") }
+  return widgetPick(lang, tr: "\(days) gün", en: "\(days) days", es: "\(days) días")
 }
 
 private let sampleItems: [ReminderItem] = [
@@ -88,7 +88,7 @@ private let sampleItems: [ReminderItem] = [
 private struct ReminderEntry: TimelineEntry {
   let date: Date
   let items: [ReminderItem]
-  let isTurkish: Bool
+  let lang: String
   let preferences: WidgetDisplayPreferences
 }
 
@@ -97,7 +97,7 @@ private struct ReminderProvider: TimelineProvider {
     ReminderEntry(
       date: Date(),
       items: sampleItems,
-      isTurkish: loadLanguage().hasPrefix("tr"),
+      lang: widgetLanguage(),
       preferences: loadWidgetPreferences()
     )
   }
@@ -109,7 +109,7 @@ private struct ReminderProvider: TimelineProvider {
       ReminderEntry(
         date: Date(),
         items: displayItems,
-        isTurkish: loadLanguage().hasPrefix("tr"),
+        lang: widgetLanguage(),
         preferences: loadWidgetPreferences()
       )
     )
@@ -119,7 +119,7 @@ private struct ReminderProvider: TimelineProvider {
     let entry = ReminderEntry(
       date: Date(),
       items: loadItems(),
-      isTurkish: loadLanguage().hasPrefix("tr"),
+      lang: widgetLanguage(),
       preferences: loadWidgetPreferences()
     )
     // Geri sayımlar doğru kalsın diye gece yarısından hemen sonra yenile.
@@ -173,7 +173,7 @@ private struct ReminderMetrics {
 
 private struct ReminderRow: View {
   let item: ReminderItem
-  let isTurkish: Bool
+  let lang: String
   let showIcon: Bool
   let showDate: Bool
   let metrics: ReminderMetrics
@@ -181,8 +181,8 @@ private struct ReminderRow: View {
 
   private var isMovie: Bool { item.type == "movie" }
   private var typeLabel: String {
-    if isMovie { return isTurkish ? "Film" : "Movie" }
-    return isTurkish ? "Dizi" : "TV"
+    if isMovie { return widgetPick(lang, tr: "Film", en: "Movie", es: "Película") }
+    return widgetPick(lang, tr: "Dizi", en: "TV", es: "Serie")
   }
 
   var body: some View {
@@ -206,7 +206,7 @@ private struct ReminderRow: View {
           [
             typeLabel,
             item.subtitle,
-            showDate ? countdownText(item.date, isTurkish: isTurkish) : ""
+            showDate ? countdownText(item.date, lang: lang) : ""
           ]
             .filter { !$0.isEmpty }
             .joined(separator: "  •  ")
@@ -271,14 +271,14 @@ private struct ReminderWidgetEntryView: View {
             .background(appearance.accentColor)
             .clipShape(RoundedRectangle(cornerRadius: metrics.badge * 0.3, style: .continuous))
 
-          Text(entry.isTurkish ? "Yaklaşanlar" : "Coming Up")
+          Text(widgetPick(entry.lang, tr: "Yaklaşanlar", en: "Coming Up", es: "Próximos"))
             .font(.system(size: metrics.badge >= 24 ? 15 : 13, weight: .bold))
             .foregroundColor(appearance.textColor)
             .lineLimit(1)
 
           Spacer(minLength: 0)
 
-          Text(entry.isTurkish ? "\(filtered.count) hatırlatma" : "\(filtered.count) reminders")
+          Text(widgetPick(entry.lang, tr: "\(filtered.count) hatırlatma", en: "\(filtered.count) reminders", es: "\(filtered.count) recordatorios"))
             .font(.system(size: 10, weight: .bold))
             .foregroundColor(appearance.accentColor)
             .lineLimit(1)
@@ -291,7 +291,7 @@ private struct ReminderWidgetEntryView: View {
 
       if shown.isEmpty {
         Spacer()
-        Text(entry.isTurkish ? "Yaklaşan film veya bölüm yok" : "No upcoming movies or episodes")
+        Text(widgetPick(entry.lang, tr: "Yaklaşan film veya bölüm yok", en: "No upcoming movies or episodes", es: "No hay películas ni episodios próximos"))
           .font(.system(size: 12))
           .foregroundColor(appearance.mutedColor)
           .frame(maxWidth: .infinity, alignment: .center)
@@ -300,7 +300,7 @@ private struct ReminderWidgetEntryView: View {
         ForEach(shown) { item in
           ReminderRow(
             item: item,
-            isTurkish: entry.isTurkish,
+            lang: entry.lang,
             showIcon: prefs.reminderShowPosters,
             showDate: prefs.reminderShowDates,
             metrics: metrics,
@@ -308,7 +308,7 @@ private struct ReminderWidgetEntryView: View {
           )
         }
         if fit.showsOverflow {
-          Text(entry.isTurkish ? "+\(overflow) daha" : "+\(overflow) more")
+          Text(widgetPick(entry.lang, tr: "+\(overflow) daha", en: "+\(overflow) more", es: "+\(overflow) más"))
             .font(.system(size: 10, weight: .bold))
             .foregroundColor(appearance.accentColor)
             .frame(maxWidth: .infinity, alignment: .center)

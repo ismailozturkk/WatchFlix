@@ -1,8 +1,10 @@
 // screens/onboarding/onboardingCopy.js
 //
 // Tanıtım akışının metinleri. Onboarding oturum ve dil ayarı açılmadan ÖNCE
-// gösterildiği için çeviri dosyasına değil buraya yazılır (tr / en).
+// gösterildiği için çeviri dosyasına değil buraya yazılır (tr / en / es).
 // Saf veri: RN içe aktarması yok, jest ile doğrudan test edilebilir.
+
+import { copyLanguage } from "../../utils/appLanguages";
 
 export const ONBOARDING_COPY = {
   tr: {
@@ -97,7 +99,7 @@ export const ONBOARDING_COPY = {
     next: "Continue",
     start: "Final Step",
     back: "Back",
-    language: "Türkçe",
+    language: "Español",
     features: [
       {
         kind: "discover",
@@ -173,10 +175,96 @@ export const ONBOARDING_COPY = {
       trust: "Free · No credit card · Ready in a minute",
     },
   },
+  es: {
+    tagline: "Descubre qué ver. Recuerda lo que te encantó. Comparte tu historia.",
+    introEyebrow: "TU UNIVERSO DE CINE Y SERIES",
+    introTap: "Toca para continuar",
+    skip: "Omitir",
+    next: "Continuar",
+    start: "Último paso",
+    back: "Atrás",
+    language: "Türkçe",
+    features: [
+      {
+        kind: "discover",
+        icon: "compass-outline",
+        eyebrow: "DESCUBRE Y SIGUE",
+        title: "Tu próximo favorito está aquí.",
+        titleAccent: "favorito",
+        desc: "Descubre miles de películas y series, y organiza en un solo lugar todo lo que has visto, lo que te ha encantado y lo que quieres ver.",
+        tags: ["Descubrimiento inteligente", "Listas personales", "Películas y series"],
+      },
+      {
+        kind: "ai",
+        icon: "sparkles-outline",
+        eyebrow: "SEELOGD IA",
+        title: "Se acabó el «¿qué veo?».",
+        titleAccent: "«¿qué veo?»",
+        desc: "Una pregunta, cinco estilos de respuesta: recomendaciones, comparaciones, planes de visionado, listas y fichas, todo a la vez.",
+        tags: ["Recomendaciones personales", "Comparar", "Planes de visionado"],
+      },
+      {
+        kind: "profile",
+        icon: "stats-chart-outline",
+        eyebrow: "COMPARTE Y RECUERDA",
+        title: "Tu historia como espectador es solo tuya.",
+        titleAccent: "solo tuya",
+        desc: "Consulta tus estadísticas y tu Wrapped, compártelos con tus amigos, compite en el juego de escenas y no pierdas la cuenta de nada.",
+        tags: ["Wrapped", "Amigos", "Juegos"],
+      },
+    ],
+    genre: {
+      eyebrow: "DESCUBRIMIENTO PARA TI",
+      title: "Afinemos juntos tus gustos.",
+      titleAccent: "gustos",
+      desc: "Elige hasta 3 géneros para películas y otros 3 para series; tu descubrimiento se adaptará a ellos.",
+      movies: "Películas",
+      shows: "Series",
+      max: "Máximo 3",
+      pickHint: "Elige un género",
+    },
+    provider: {
+      eyebrow: "TUS PLATAFORMAS",
+      title: "¿Qué plataformas usas?",
+      titleAccent: "plataformas",
+      desc: "Mostramos los catálogos reales de películas y series de tu región. Lo que elijas define las sugerencias de suscripción y el orden de las plataformas.",
+      movies: "Películas",
+      shows: "Series",
+      selected: (n) => (n === 0 ? "Aún no has elegido ninguna" : n === 1 ? "1 elegida" : `${n} elegidas`),
+      more: "Mostrar más",
+      less: "Mostrar menos",
+      hint: "Puedes cambiarlo cuando quieras en Ajustes.",
+    },
+    favorites: {
+      eyebrow: "EL ESCAPARATE DE TU PERFIL",
+      title: "Los favoritos que te definen.",
+      titleAccent: "te definen",
+      desc: "Elige hasta 4 favoritos en cada categoría. Tus amigos los verán en tu perfil y tus recomendaciones se adaptarán a ellos.",
+      selected: (n) => (n === 0 ? "Aún no has elegido ninguno" : n === 1 ? "1 favorito elegido" : `${n} favoritos elegidos`),
+      hint: "Si quieres, sáltalo; también puedes añadirlos más tarde en Editar perfil.",
+    },
+    cta: {
+      freeBadge: "EMPIEZA GRATIS",
+      title: "Tu historia como espectador empieza ahora.",
+      titleAccent: "ahora",
+      desc: "Crea tu cuenta gratuita y empieza hoy a descubrir, coleccionar y compartir.",
+      benefits: [
+        { icon: "cloud-done-outline", text: "Tus listas, en todos tus dispositivos" },
+        { icon: "sparkles-outline", text: "Descubrimiento a la medida de tus gustos" },
+        { icon: "people-outline", text: "Un espacio compartido con tus amigos" },
+      ],
+      register: "Regístrate gratis",
+      haveAccount: "¿Ya tienes una cuenta?",
+      login: "Iniciar sesión",
+      trust: "Gratis · Sin tarjeta de crédito · Listo en un minuto",
+    },
+  },
 };
 
+// Bilinmeyen dil İngilizce (utils/appLanguages kuralı). Dil, onboarding'de
+// `copyLanguage(language, Object.keys(ONBOARDING_COPY))` ile zaten normalize gelir.
 export const getOnboardingCopy = (language) =>
-  ONBOARDING_COPY[language === "en" ? "en" : "tr"];
+  ONBOARDING_COPY[copyLanguage(language, Object.keys(ONBOARDING_COPY))];
 
 // Akışın sırası. `kind` analitik adım adıyla (step_name) birebir bağlıdır:
 // değiştirirsen mevcut huni raporları bozulur.

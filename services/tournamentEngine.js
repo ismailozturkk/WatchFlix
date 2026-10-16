@@ -11,6 +11,8 @@
 // aynı kuralla aynı sonucu hesaplar. Bu dosya tek doğruluk kaynağıdır.
 
 // ─── Zaman yardımcıları ───────────────────────────────────────────────────────
+import { copyLanguage } from "../utils/appLanguages";
+
 export const DAY = 24 * 60 * 60 * 1000;
 
 // Test/önizleme için "şimdi" geçersiz kılınabilir (ör. ileri bir güne sarıp
@@ -29,31 +31,35 @@ const pad2 = (n) => String(n).padStart(2, "0");
 // karşılığı yoktur → bunlar film aylarına düşer). sortBy, aynı TV genre'ına
 // düşen iki ayı (SciFi/Fantastik=10765, Aksiyon/Macera=10759) farklılaştırır.
 export const SCHEDULE = [
-  { monthIndex: 0,  tr: "Bilim Kurgu", en: "Sci-Fi",     mediaType: "tv",    genreId: 10765, sortBy: "popularity.desc" },
-  { monthIndex: 1,  tr: "Romantik",    en: "Romance",    mediaType: "movie", genreId: 10749, sortBy: "popularity.desc" },
-  { monthIndex: 2,  tr: "Aksiyon",     en: "Action",     mediaType: "tv",    genreId: 10759, sortBy: "popularity.desc" },
-  { monthIndex: 3,  tr: "Komedi",      en: "Comedy",     mediaType: "movie", genreId: 35,    sortBy: "popularity.desc" },
-  { monthIndex: 4,  tr: "Macera",      en: "Adventure",  mediaType: "tv",    genreId: 10759, sortBy: "vote_count.desc"  },
-  { monthIndex: 5,  tr: "Suç",         en: "Crime",      mediaType: "movie", genreId: 80,    sortBy: "popularity.desc" },
-  { monthIndex: 6,  tr: "Animasyon",   en: "Animation",  mediaType: "tv",    genreId: 16,    sortBy: "popularity.desc" },
-  { monthIndex: 7,  tr: "Gerilim",     en: "Thriller",   mediaType: "movie", genreId: 53,    sortBy: "popularity.desc" },
-  { monthIndex: 8,  tr: "Dram",        en: "Drama",      mediaType: "tv",    genreId: 18,    sortBy: "popularity.desc" },
-  { monthIndex: 9,  tr: "Korku",       en: "Horror",     mediaType: "movie", genreId: 27,    sortBy: "popularity.desc" },
-  { monthIndex: 10, tr: "Fantastik",   en: "Fantasy",    mediaType: "tv",    genreId: 10765, sortBy: "vote_count.desc"  },
-  { monthIndex: 11, tr: "Aile",        en: "Family",     mediaType: "movie", genreId: 10751, sortBy: "popularity.desc" },
+  { monthIndex: 0,  tr: "Bilim Kurgu", en: "Sci-Fi", es: "Ciencia ficción",     mediaType: "tv",    genreId: 10765, sortBy: "popularity.desc" },
+  { monthIndex: 1,  tr: "Romantik",    en: "Romance", es: "Romance",    mediaType: "movie", genreId: 10749, sortBy: "popularity.desc" },
+  { monthIndex: 2,  tr: "Aksiyon",     en: "Action", es: "Acción",     mediaType: "tv",    genreId: 10759, sortBy: "popularity.desc" },
+  { monthIndex: 3,  tr: "Komedi",      en: "Comedy", es: "Comedia",     mediaType: "movie", genreId: 35,    sortBy: "popularity.desc" },
+  { monthIndex: 4,  tr: "Macera",      en: "Adventure", es: "Aventura",  mediaType: "tv",    genreId: 10759, sortBy: "vote_count.desc"  },
+  { monthIndex: 5,  tr: "Suç",         en: "Crime", es: "Crimen",      mediaType: "movie", genreId: 80,    sortBy: "popularity.desc" },
+  { monthIndex: 6,  tr: "Animasyon",   en: "Animation", es: "Animación",  mediaType: "tv",    genreId: 16,    sortBy: "popularity.desc" },
+  { monthIndex: 7,  tr: "Gerilim",     en: "Thriller", es: "Suspense",   mediaType: "movie", genreId: 53,    sortBy: "popularity.desc" },
+  { monthIndex: 8,  tr: "Dram",        en: "Drama", es: "Drama",      mediaType: "tv",    genreId: 18,    sortBy: "popularity.desc" },
+  { monthIndex: 9,  tr: "Korku",       en: "Horror", es: "Terror",     mediaType: "movie", genreId: 27,    sortBy: "popularity.desc" },
+  { monthIndex: 10, tr: "Fantastik",   en: "Fantasy", es: "Fantasía",    mediaType: "tv",    genreId: 10765, sortBy: "vote_count.desc"  },
+  { monthIndex: 11, tr: "Aile",        en: "Family", es: "Familia",     mediaType: "movie", genreId: 10751, sortBy: "popularity.desc" },
 ];
 
 const MONTHS_TR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 const MONTHS_EN = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTHS_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES };
+// Bilinmeyen dil İngilizce (utils/appLanguages kuralı). YENİ DİL: SCHEDULE/ROUNDS satırlarına `<kod>` alanı + MONTH_NAMES.
+const langKey = (lang) => copyLanguage(lang, ["tr", "en", "es"]);
 
 export const getScheduleEntry = (monthIndex) => SCHEDULE[((monthIndex % 12) + 12) % 12];
-export const themeLabel = (entry, lang) => (lang === "tr" ? entry?.tr : entry?.en) || entry?.en || "";
+export const themeLabel = (entry, lang) => entry?.[langKey(lang)] || entry?.en || "";
 export const monthLabel = (monthIndex, lang) =>
-  (lang === "tr" ? MONTHS_TR : MONTHS_EN)[((monthIndex % 12) + 12) % 12];
+  MONTH_NAMES[langKey(lang)][((monthIndex % 12) + 12) % 12];
 export const mediaLabel = (mediaType, lang) =>
   mediaType === "tv"
-    ? (lang === "tr" ? "Dizi" : "TV")
-    : (lang === "tr" ? "Film" : "Movie");
+    ? { tr: "Dizi", en: "TV", es: "Serie" }[langKey(lang)]
+    : { tr: "Film", en: "Movie", es: "Película" }[langKey(lang)];
 
 // ─── Tur tanımları ────────────────────────────────────────────────────────────
 // startDay/endDay = ayın başından gün ofseti. Her erken tur 2 gün, final 6 gün.
@@ -61,13 +67,13 @@ export const mediaLabel = (mediaType, lang) =>
 export const SELECTION_DAYS = 7;
 export const RESULTS_START_DAY = 21;
 export const ROUNDS = [
-  { key: "r32",   tr: "Son 32",       en: "Round of 32",  matches: 16, startDay: 7,  endDay: 9  },
-  { key: "r16",   tr: "Son 16",       en: "Round of 16",  matches: 8,  startDay: 9,  endDay: 11 },
-  { key: "qf",    tr: "Çeyrek Final", en: "Quarterfinals", matches: 4, startDay: 11, endDay: 13 },
-  { key: "sf",    tr: "Yarı Final",   en: "Semifinals",   matches: 2,  startDay: 13, endDay: 15 },
-  { key: "final", tr: "Final",        en: "Final",        matches: 1,  startDay: 15, endDay: 21 },
+  { key: "r32",   tr: "Son 32",       en: "Round of 32", es: "Dieciseisavos",  matches: 16, startDay: 7,  endDay: 9  },
+  { key: "r16",   tr: "Son 16",       en: "Round of 16", es: "Octavos",  matches: 8,  startDay: 9,  endDay: 11 },
+  { key: "qf",    tr: "Çeyrek Final", en: "Quarterfinals", es: "Cuartos de final", matches: 4, startDay: 11, endDay: 13 },
+  { key: "sf",    tr: "Yarı Final",   en: "Semifinals", es: "Semifinales",   matches: 2,  startDay: 13, endDay: 15 },
+  { key: "final", tr: "Final",        en: "Final", es: "Final",        matches: 1,  startDay: 15, endDay: 21 },
 ];
-export const roundLabel = (round, lang) => (lang === "tr" ? round?.tr : round?.en) || round?.en || "";
+export const roundLabel = (round, lang) => round?.[langKey(lang)] || round?.en || "";
 
 // ─── Period (ay) yardımcıları ─────────────────────────────────────────────────
 export function getPeriodId(ms = now()) {
@@ -404,9 +410,7 @@ export function formatCountdown(msLeft, lang = "tr") {
   const d = Math.floor(totalMin / (60 * 24));
   const h = Math.floor((totalMin % (60 * 24)) / 60);
   const m = totalMin % 60;
-  const L = lang === "tr"
-    ? { d: "g", h: "sa", m: "dk" }
-    : { d: "d", h: "h", m: "m" };
+  const L = { tr: { d: "g", h: "sa", m: "dk" }, en: { d: "d", h: "h", m: "m" }, es: { d: "d", h: "h", m: "min" } }[langKey(lang)];
   if (d > 0) return `${d}${L.d} ${h}${L.h}`;
   if (h > 0) return `${h}${L.h} ${m}${L.m}`;
   return `${m}${L.m}`;

@@ -13,6 +13,7 @@
 //   • Tamamlananları tek dokunuşla temizle, ilerleme şeridi, kelime sayacı,
 //     sabitle anahtarı, renk seçicide seçili işareti.
 
+import { intlLocaleOf } from "../../../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ScrollView,
@@ -54,7 +55,7 @@ export const NOTE_CONTENT_LIMIT = 5000;
 export const TODO_ITEM_LIMIT = 240;
 export const NOTE_TITLE_LIMIT = 120;
 
-const localeOf = (language) => (language === "tr" ? "tr-TR" : "en-US");
+const localeOf = (language) => (intlLocaleOf(language));
 
 // Sayaç yalnız sınıra yaklaşınca belirir (%85+); aksi halde ekranı kirletir.
 const LimitCounter = ({ value, limit, theme, style }) => {

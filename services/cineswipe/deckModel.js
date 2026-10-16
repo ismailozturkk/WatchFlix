@@ -8,6 +8,8 @@
 // NOT — `include_adult` bilerek YAZILMAZ: yetişkin içerik ayarı ve yaş kapısı
 // utils/tmdbAdultGuard.js tarafından /discover isteklerine merkezden eklenir.
 
+import { tmdbLanguageOf } from "../../utils/appLanguages";
+
 /** Film/dizi kimliği aynı sayı olabilir: oy ve sepet anahtarı tür ile ayrışır. */
 export const cineMediaKey = (media) => `${media?.mediaType || "movie"}_${media?.id}`;
 
@@ -81,11 +83,8 @@ export const sameFilters = (a, b) =>
 
 // ── Dil ──────────────────────────────────────────────────────────────────────
 
-const TMDB_LANGUAGES = { tr: "tr-TR", en: "en-US" };
-
-/** Uygulama dil kodu ("tr" | "en") → TMDB `language` parametresi. */
-export const tmdbLanguage = (language) =>
-  TMDB_LANGUAGES[String(language || "").slice(0, 2).toLowerCase()] || "en-US";
+/** Uygulama dil kodu ("tr" | "en" | "es" …) → TMDB `language` parametresi. */
+export const tmdbLanguage = (language) => tmdbLanguageOf(language);
 
 // ── İstek kurulumu ───────────────────────────────────────────────────────────
 

@@ -21,7 +21,6 @@ import ScreenDecor from "../../components/ScreenDecor";
 // (TabScreenNavigator), stack'e push edilmez — buton yalnızca üstteki ekrandan
 // dönerken "hayalet" olarak belirip kalıyordu.
 import StatisticsSection from "./profile/StatisticsSection";
-import OwnFavoritesCard from "../../components/favorites/OwnFavoritesCard";
 import { useUserProfile } from "../../context/UserProfileContext";
 import { propagateProfileChange } from "../../services/profilePropagation";
 import * as Haptics from "../../services/hapticsService";
@@ -34,6 +33,7 @@ import { useWatchProgressContext } from "../../context/WatchProgressContext";
 import ProfileStoryModal from "../../components/storyShare/ProfileStoryModal";
 import { getIdentityBadges } from "../../components/badges/badgeCatalog";
 import { usePremium } from "../../context/PremiumContext";
+import { readProfileFavorites } from "../../utils/fourFavorites";
 
 // iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için kaydırma
 // görünümünü sekme ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js).
@@ -56,6 +56,13 @@ const ProfileScreen = ({ navigation }) => {
   const profileUsername = String(profile?.username || "")
     .trim()
     .replace(/^@/, "");
+  // "Profili paylaş" kartı dört favoriyi de gösterebilir (Users/{uid}.fourFavorites).
+  const storyFavorites = useMemo(
+    () => readProfileFavorites(profile),
+    // Yalnız favori alanı değişince; profilin diğer alanları kartı yeniden hesaplatmasın.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profile?.fourFavorites]
+  );
   const {
     avatar,
     selectAvatarIndex,
@@ -267,7 +274,6 @@ const ProfileScreen = ({ navigation }) => {
             onTimeClick={handleTimeClick}
             t={t}
           />
-          <OwnFavoritesCard navigation={navigation} />
           <ProfileLists navigation={navigation} />
           <MyActivityButton navigation={navigation} />
           <RemindersPreviewButton navigation={navigation} />
@@ -297,6 +303,7 @@ const ProfileScreen = ({ navigation }) => {
             badges={identityBadges}
             bio={profile?.bio}
             joinedAt={user?.metadata?.createdAt || user?.metadata?.creationTime}
+            favorites={storyFavorites}
           />
         </SafeAreaView>
       </MarkedScrollView>

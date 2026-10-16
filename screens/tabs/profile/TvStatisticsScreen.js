@@ -1,3 +1,4 @@
+import { intlLocaleOf } from "../../../utils/appLanguages";
 import React, { useCallback, useMemo, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -60,7 +61,7 @@ const TvStatisticsScreen = ({ navigation }) => {
   // "Tekrarsız" ile birebir aynı sözcük olması bilinçli.
   const tekrarsizLabel = i18nText("autoI18n.tekrarsiz", "Tekrarsız");
 
-  const locale = language === "en" ? "en-US" : "tr-TR";
+  const locale = intlLocaleOf(language);
 
   const chartDataByPeriod = useMemo(
     () => Object.fromEntries(["daily", "monthly", "yearly"].map((period) => [

@@ -2,8 +2,9 @@
 // için Expo config plugin'i.
 //
 // Native kaynak tek yerde yaşar: native/android-widgets/
-//   java/com/smlztrk/seelogd/widget/*.kt  → 9 Kotlin dosyası (3 modül, 3 provider,
-//                                           2 RemoteViewsService, 1 ReactPackage)
+//   java/com/smlztrk/seelogd/widget/*.kt  → 10 Kotlin dosyası (3 modül, 3 provider,
+//                                           2 RemoteViewsService, 1 ReactPackage,
+//                                           1 WidgetLanguage = dil kararı)
 //   res/{xml,layout,drawable,values}/     → appwidget info + layout + drawable +
 //                                           widget string'leri
 //

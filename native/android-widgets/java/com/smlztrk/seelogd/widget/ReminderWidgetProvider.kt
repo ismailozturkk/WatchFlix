@@ -51,8 +51,7 @@ class ReminderWidgetProvider : AppWidgetProvider() {
       widgetId: Int,
     ) {
       val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      val language = prefs.getString(KEY_LANGUAGE, "tr") ?: "tr"
-      val isTurkish = language.startsWith("tr")
+      val lang = WidgetLanguage.of(prefs.getString(KEY_LANGUAGE, "tr"))
       val preferences = WidgetPreferences.load(context)
       val count = countUpcoming(
         prefs.getString(KEY_ITEMS, "[]") ?: "[]",
@@ -78,17 +77,22 @@ class ReminderWidgetProvider : AppWidgetProvider() {
       )
       views.setTextViewText(
         R.id.reminder_widget_title,
-        if (isTurkish) "Yaklaşanlar" else "Coming Up",
+        WidgetLanguage.pick(lang, "Yaklaşanlar", "Coming Up", "Próximos"),
       )
       views.setTextColor(R.id.reminder_widget_title, appearance.text)
       views.setTextViewText(
         R.id.reminder_widget_count,
-        if (isTurkish) "$count hatırlatma" else "$count reminders",
+        WidgetLanguage.pick(lang, "$count hatırlatma", "$count reminders", "$count recordatorios"),
       )
       views.setTextColor(R.id.reminder_widget_count, appearance.accent)
       views.setTextViewText(
         R.id.reminder_widget_empty_text,
-        if (isTurkish) "Yaklaşan film veya bölüm yok" else "No upcoming movies or episodes",
+        WidgetLanguage.pick(
+          lang,
+          "Yaklaşan film veya bölüm yok",
+          "No upcoming movies or episodes",
+          "No hay películas ni episodios próximos",
+        ),
       )
       views.setTextColor(R.id.reminder_widget_empty_text, appearance.muted)
 

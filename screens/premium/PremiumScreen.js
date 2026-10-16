@@ -1,3 +1,4 @@
+import { normalizeAppLanguage } from "../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -55,8 +56,10 @@ import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
 // bir fayda eklemek için önce registry'e girdi ve kapı ekle, sonra buraya.
 // (P0.2: elle yazılmış vaat listeleri uygulamada karşılığı olmayan
 // "reklamsız", "tüm Wrapped yılları" gibi iddialara dönüşmüştü.)
-function buildHighlights(tier, tr) {
-  const lang = tr ? "tr" : "en";
+function buildHighlights(tier, language) {
+  const tr = language === "tr";
+  const es = language === "es";
+  const lang = normalizeAppLanguage(language);
   const ai = AI_PLAN_LIMITS[tier];
   // Aşağı yuvarlanır: 50/3 = 16,7 için "17X" vaat etmek fazla olurdu.
   const multiplier = Math.floor(ai.daily / AI_PLAN_LIMITS.free.daily);
@@ -67,53 +70,39 @@ function buildHighlights(tier, tr) {
       id: "ai",
       icon: "sparkles",
       color: "#8B5CF6",
-      badge: tr ? `${multiplier}X KOTA` : `${multiplier}X QUOTA`,
+      badge: tr ? `${multiplier}X KOTA` : es ? `${multiplier}X CUOTA` : `${multiplier}X QUOTA`,
       title: "CineMatch AI",
-      tagline: tr
-        ? `Günde ${ai.daily}, ayda ${ai.monthly} mesaj`
-        : `${ai.daily} per day, ${ai.monthly} per month`,
-      desc: tr
-        ? "Ruh haline ve izleme geçmişine göre nokta atışı film ve dizi önerileri."
-        : "Spot-on movie and TV picks based on your mood and watch history.",
+      tagline: tr ? `Günde ${ai.daily}, ayda ${ai.monthly} mesaj` : es ? `${ai.daily} al día, ${ai.monthly} al mes` : `${ai.daily} per day, ${ai.monthly} per month`,
+      desc: tr ? "Ruh haline ve izleme geçmişine göre nokta atışı film ve dizi önerileri." : es ? "Recomendaciones de películas y series a tu medida, según tu estado de ánimo y tu historial." : "Spot-on movie and TV picks based on your mood and watch history.",
     },
     {
       id: "badge",
       icon: "diamond",
       color: "#F59E0B",
-      badge: isMax ? (tr ? "EFSANEVİ" : "LEGENDARY") : tr ? "EPİK" : "EPIC",
-      title: tr ? "Kimlik Rozeti" : "Identity Badge",
-      tagline: tr ? "Arkadaşların da görür" : "Your friends see it too",
-      desc: tr
-        ? "Profilinde ve arkadaşlarının gördüğü profil sayfanda parıldayan plan rozeti."
-        : "A plan badge on your profile and on the profile your friends see.",
+      badge: isMax ? (tr ? "EFSANEVİ" : es ? "LEGENDARIA" : "LEGENDARY") : tr ? "EPİK" : es ? "ÉPICA" : "EPIC",
+      title: tr ? "Kimlik Rozeti" : es ? "Insignia de identidad" : "Identity Badge",
+      tagline: tr ? "Arkadaşların da görür" : es ? "Tus amigos también la ven" : "Your friends see it too",
+      desc: tr ? "Profilinde ve arkadaşlarının gördüğü profil sayfanda parıldayan plan rozeti." : es ? "Una insignia de plan en tu perfil y en el perfil que ven tus amigos." : "A plan badge on your profile and on the profile your friends see.",
     },
     {
       id: "social",
       icon: "people",
       color: "#EC4899",
-      badge: isMax ? (tr ? "SINIRSIZ" : "UNLIMITED") : tr ? "DAHA FAZLA" : "MORE",
-      title: tr ? "Sosyal & Oyun" : "Social & Games",
+      badge: isMax ? (tr ? "SINIRSIZ" : es ? "ILIMITADO" : "UNLIMITED") : tr ? "DAHA FAZLA" : es ? "MÁS" : "MORE",
+      title: tr ? "Sosyal & Oyun" : es ? "Social y juegos" : "Social & Games",
       tagline: isMax
-        ? tr
-          ? "Liste, arkadaş, grup ve oyun sınırsız"
-          : "Unlimited lists, friends, groups, games"
+        ? tr ? "Liste, arkadaş, grup ve oyun sınırsız" : es ? "Listas, amigos, grupos y juegos ilimitados" : "Unlimited lists, friends, groups, games"
         : `${value("custom_lists")} · ${value("friends")}`,
-      desc: tr
-        ? `Sohbet grubu: ${value("chat_groups")} · Oyun: ${value("games")} · CineSwipe odası: ${value("cineswipe_rooms")} · Turnuvada oy kullanma.`
-        : `Group chats: ${value("chat_groups")} · Games: ${value("games")} · CineSwipe rooms: ${value("cineswipe_rooms")} · Tournament voting.`,
+      desc: tr ? `Sohbet grubu: ${value("chat_groups")} · Oyun: ${value("games")} · CineSwipe odası: ${value("cineswipe_rooms")} · Turnuvada oy kullanma.` : es ? `Chats de grupo: ${value("chat_groups")} · Juegos: ${value("games")} · Salas de CineSwipe: ${value("cineswipe_rooms")} · Votación en el torneo.` : `Group chats: ${value("chat_groups")} · Games: ${value("games")} · CineSwipe rooms: ${value("cineswipe_rooms")} · Tournament voting.`,
     },
     {
       id: "personal",
       icon: "color-palette",
       color: "#10B981",
-      badge: tr ? "KİŞİSEL" : "PERSONAL",
-      title: tr ? "Tema & Yazı Tipi" : "Themes & Fonts",
-      tagline: tr
-        ? `Kendi temanı oluştur · ${FONT_CATALOG_SIZE} yazı tipi`
-        : `Your own themes · ${FONT_CATALOG_SIZE} fonts`,
-      desc: tr
-        ? `Kar efekti, ikon arka planı, pet, uygulama simgesi seçici, Wrapped arşivi (${value("wrapped_archive")}) ve ${value("streaming_alerts")} için platform bildirimi de dahil.`
-        : `Also includes snowfall, icon background, the on-screen pet, the app icon picker, your Wrapped archive (${value("wrapped_archive")}) and streaming alerts for ${value("streaming_alerts")}.`,
+      badge: tr ? "KİŞİSEL" : es ? "PERSONAL" : "PERSONAL",
+      title: tr ? "Tema & Yazı Tipi" : es ? "Temas y fuentes" : "Themes & Fonts",
+      tagline: tr ? `Kendi temanı oluştur · ${FONT_CATALOG_SIZE} yazı tipi` : es ? `Tus propios temas · ${FONT_CATALOG_SIZE} fuentes` : `Your own themes · ${FONT_CATALOG_SIZE} fonts`,
+      desc: tr ? `Kar efekti, ikon arka planı, pet, uygulama simgesi seçici, Wrapped arşivi (${value("wrapped_archive")}) ve ${value("streaming_alerts")} için platform bildirimi de dahil.` : es ? `Incluye también nieve, fondo de iconos, la mascota en pantalla, el selector de icono de la app, tu archivo de Wrapped (${value("wrapped_archive")}) y avisos de streaming para ${value("streaming_alerts")}.` : `Also includes snowfall, icon background, the on-screen pet, the app icon picker, your Wrapped archive (${value("wrapped_archive")}) and streaming alerts for ${value("streaming_alerts")}.`,
     },
   ];
 }
@@ -121,67 +110,79 @@ function buildHighlights(tier, tr) {
 // Mağazada tanımlı giriş teklifinin (lansman indirimi) vurgusu.
 const OFFER_COLOR = "#EC4899";
 
-function packageTitle(aPackage, tr) {
+function packageTitle(aPackage, language) {
+  const tr = language === "tr";
+  const es = language === "es";
   const key = getPackagePeriodKey(aPackage);
-  if (key === "annual") return tr ? "Yıllık Plan" : "Annual Plan";
-  if (key === "monthly") return tr ? "Aylık Plan" : "Monthly Plan";
-  if (key === "weekly") return tr ? "Haftalık Plan" : "Weekly Plan";
-  if (key === "lifetime") return tr ? "Ömür Boyu" : "Lifetime";
+  if (key === "annual") return tr ? "Yıllık Plan" : es ? "Plan anual" : "Annual Plan";
+  if (key === "monthly") return tr ? "Aylık Plan" : es ? "Plan mensual" : "Monthly Plan";
+  if (key === "weekly") return tr ? "Haftalık Plan" : es ? "Plan semanal" : "Weekly Plan";
+  if (key === "lifetime") return tr ? "Ömür Boyu" : es ? "De por vida" : "Lifetime";
   return aPackage?.product?.title || aPackage?.identifier || "Plan";
 }
 
-function packagePeriodLabel(aPackage, tr) {
+function packagePeriodLabel(aPackage, language) {
+  const tr = language === "tr";
+  const es = language === "es";
   const key = getPackagePeriodKey(aPackage);
-  if (key === "annual") return tr ? "/ yıl" : "/ year";
-  if (key === "monthly") return tr ? "/ ay" : "/ month";
-  if (key === "weekly") return tr ? "/ hafta" : "/ week";
+  if (key === "annual") return tr ? "/ yıl" : es ? "/ año" : "/ year";
+  if (key === "monthly") return tr ? "/ ay" : es ? "/ mes" : "/ month";
+  if (key === "weekly") return tr ? "/ hafta" : es ? "/ semana" : "/ week";
   return "";
 }
 
-function packageRenewalNote(aPackage, tr) {
+function packageRenewalNote(aPackage, language) {
+  const tr = language === "tr";
+  const es = language === "es";
   const key = getPackagePeriodKey(aPackage);
-  if (key === "annual") return tr ? "Yıllık tek faturalandırma" : "Billed annually";
+  if (key === "annual") return tr ? "Yıllık tek faturalandırma" : es ? "Facturación anual única" : "Billed annually";
   if (key === "monthly") {
-    return tr ? "Aylık yenilenir, dilediğinde iptal" : "Renews monthly, cancel anytime";
+    return tr ? "Aylık yenilenir, dilediğinde iptal" : es ? "Se renueva cada mes; cancela cuando quieras" : "Renews monthly, cancel anytime";
   }
-  return tr ? "Dilediğinde iptal" : "Cancel anytime";
+  return tr ? "Dilediğinde iptal" : es ? "Cancela cuando quieras" : "Cancel anytime";
 }
 
 // Giriş teklifinin süresi: "İlk 3 ay", "İlk yıl" (faz birimi × tekrar sayısı).
-function offerDurationLabel(offer, tr) {
+function offerDurationLabel(offer, language) {
+  const tr = language === "tr";
+  const es = language === "es";
   const count = (offer.cycles || 1) * (offer.unitCount || 1);
   const one = count === 1;
   const units = {
-    day: tr ? "gün" : one ? "day" : "days",
-    week: tr ? "hafta" : one ? "week" : "weeks",
-    month: tr ? "ay" : one ? "month" : "months",
-    year: tr ? "yıl" : one ? "year" : "years",
+    day: tr ? "gün" : es ? (one ? "día" : "días") : one ? "day" : "days",
+    week: tr ? "hafta" : es ? (one ? "semana" : "semanas") : one ? "week" : "weeks",
+    month: tr ? "ay" : es ? (one ? "mes" : "meses") : one ? "month" : "months",
+    year: tr ? "yıl" : es ? (one ? "año" : "años") : one ? "year" : "years",
   };
   const unit = units[offer.unit];
-  if (!unit) return tr ? "İlk dönem" : "Intro period";
-  if (one) return tr ? `İlk ${unit}` : `First ${unit}`;
-  return tr ? `İlk ${count} ${unit}` : `First ${count} ${unit}`;
+  if (!unit) return tr ? "İlk dönem" : es ? "Periodo inicial" : "Intro period";
+  if (one) return tr ? `İlk ${unit}` : es ? `${unit} inicial` : `First ${unit}`;
+  return tr ? `İlk ${count} ${unit}` : es ? `${count} ${unit} iniciales` : `First ${count} ${unit}`;
 }
 
 // Teklif fazının fatura aralığı ("/ ay"); faz birden uzun birimse boş.
-function offerPeriodLabel(offer, tr) {
+function offerPeriodLabel(offer, language) {
+  const tr = language === "tr";
+  const es = language === "es";
   if ((offer.unitCount || 1) !== 1) return "";
-  if (offer.unit === "year") return tr ? "/ yıl" : "/ year";
-  if (offer.unit === "month") return tr ? "/ ay" : "/ month";
-  if (offer.unit === "week") return tr ? "/ hafta" : "/ week";
+  if (offer.unit === "year") return tr ? "/ yıl" : es ? "/ año" : "/ year";
+  if (offer.unit === "month") return tr ? "/ ay" : es ? "/ mes" : "/ month";
+  if (offer.unit === "week") return tr ? "/ hafta" : es ? "/ semana" : "/ week";
   return "";
 }
 
 // Mağaza kuralı: teklif fiyatının yanında sonrasında ödenecek tutar açıkça
 // yazmalı. "İlk 3 ay ₺29,99/ay, sonra ₺59,99/ay".
-function offerDisclosure(offer, aPackage, tr) {
-  const duration = offerDurationLabel(offer, tr);
-  const after = `${offer.regularPriceString}${packagePeriodLabel(aPackage, tr).replace(" ", "")}`;
+function offerDisclosure(offer, aPackage, language) {
+  const tr = language === "tr";
+  const es = language === "es";
+  const duration = offerDurationLabel(offer, language);
+  const after = `${offer.regularPriceString}${packagePeriodLabel(aPackage, language).replace(" ", "")}`;
   if (offer.free) {
-    return tr ? `${duration} ücretsiz, sonra ${after}` : `${duration} free, then ${after}`;
+    return tr ? `${duration} ücretsiz, sonra ${after}` : es ? `${duration} gratis, después ${after}` : `${duration} free, then ${after}`;
   }
-  const intro = `${offer.priceString}${offerPeriodLabel(offer, tr).replace(" ", "")}`;
-  return tr ? `${duration} ${intro}, sonra ${after}` : `${duration} ${intro}, then ${after}`;
+  const intro = `${offer.priceString}${offerPeriodLabel(offer, language).replace(" ", "")}`;
+  return tr ? `${duration} ${intro}, sonra ${after}` : es ? `${duration} ${intro}, después ${after}` : `${duration} ${intro}, then ${after}`;
 }
 
 export default function PremiumScreen() {
@@ -189,7 +190,8 @@ export default function PremiumScreen() {
   const { theme } = useTheme();
   const C = buildUiColors(theme);
   const tr = language === "tr";
-  const localized = tr ? "tr" : "en";
+  const es = normalizeAppLanguage(language) === "es";
+  const localized = normalizeAppLanguage(language);
 
   const {
     isPremium,
@@ -326,7 +328,7 @@ export default function PremiumScreen() {
     selectedTier === PREMIUM_PLAN.UNLIMITED
       ? IDENTITY_BADGES.unlimited
       : IDENTITY_BADGES.premium;
-  const highlights = buildHighlights(selectedTier, tr);
+  const highlights = buildHighlights(selectedTier, language);
 
   const handleSelectTier = (tier) => {
     if (isUnlimited && tier !== PREMIUM_PLAN.UNLIMITED) return;
@@ -352,14 +354,14 @@ export default function PremiumScreen() {
       await purchasePackage(selectedPackage);
       Toast.show({
         type: "success",
-        text1: tr ? "Seelogd Premium aktif edildi!" : "Seelogd Premium is active!",
-        text2: tr ? "Tüm ayrıcalıkların kullanıma hazır." : "All your benefits are ready.",
+        text1: tr ? "Seelogd Premium aktif edildi!" : es ? "¡Seelogd Premium está activo!" : "Seelogd Premium is active!",
+        text2: tr ? "Tüm ayrıcalıkların kullanıma hazır." : es ? "Todas tus ventajas están listas." : "All your benefits are ready.",
       });
     } catch (error) {
       if (error?.userCancelled) return;
       Toast.show({
         type: "error",
-        text1: tr ? "Satın alma tamamlanamadı" : "Purchase could not be completed",
+        text1: tr ? "Satın alma tamamlanamadı" : es ? "No se pudo completar la compra" : "Purchase could not be completed",
         text2: error?.message,
       });
     }
@@ -373,17 +375,13 @@ export default function PremiumScreen() {
       Toast.show({
         type: restored ? "success" : "info",
         text1: restored
-          ? tr
-            ? "Satın alımın başarıyla geri yüklendi"
-            : "Purchase successfully restored"
-          : tr
-          ? "Aktif bir abonelik bulunamadı"
-          : "No active subscription found",
+          ? tr ? "Satın alımın başarıyla geri yüklendi" : es ? "Compra restaurada correctamente" : "Purchase successfully restored"
+          : tr ? "Aktif bir abonelik bulunamadı" : es ? "No se encontró ninguna suscripción activa" : "No active subscription found",
       });
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: tr ? "Satın alımlar geri yüklenemedi" : "Purchases could not be restored",
+        text1: tr ? "Satın alımlar geri yüklenemedi" : es ? "No se pudieron restaurar las compras" : "Purchases could not be restored",
         text2: error?.message,
       });
     }
@@ -396,7 +394,7 @@ export default function PremiumScreen() {
     } catch (error) {
       Toast.show({
         type: "error",
-        text1: tr ? "Abonelik ayarları açılamadı" : "Subscription settings could not be opened",
+        text1: tr ? "Abonelik ayarları açılamadı" : es ? "No se pudieron abrir los ajustes de la suscripción" : "Subscription settings could not be opened",
         text2: error?.message,
       });
     }
@@ -482,14 +480,14 @@ export default function PremiumScreen() {
               <View style={[styles.heroStatusPill, { backgroundColor: C.iconGreen }]}>
                 <View style={[styles.statusDot, { backgroundColor: C.green }]} />
                 <Text style={[styles.heroStatusText, { color: C.green }]}>
-                  {isUnlimited ? "PREMIUM MAX" : tr ? "AKTİF" : "ACTIVE"}
+                  {isUnlimited ? "PREMIUM MAX" : tr ? "AKTİF" : es ? "ACTIVO" : "ACTIVE"}
                 </Text>
               </View>
             ) : (
               <View style={[styles.heroStatusPill, { backgroundColor: alpha(C.accent, 0.15) }]}>
                 <AppIcon name="sparkles" size={11} color={C.accent} />
                 <Text style={[styles.heroStatusText, { color: C.accent }]}>
-                  {tr ? "AYRICALIKLARI AÇ" : "UNLOCK ALL"}
+                  {tr ? "AYRICALIKLARI AÇ" : es ? "DESBLOQUEA TODO" : "UNLOCK ALL"}
                 </Text>
               </View>
             )}
@@ -498,21 +496,13 @@ export default function PremiumScreen() {
           <View style={styles.heroBody}>
             <Text style={[styles.heroTitle, { color: C.text }]}>
               {isUnlimited
-                ? tr
-                  ? "Premium Max ile sınırları kaldır."
-                  : "Boundless with Premium Max."
+                ? tr ? "Premium Max ile sınırları kaldır." : es ? "Sin límites con Premium Max." : "Boundless with Premium Max."
                 : isPremium
-                ? tr
-                  ? "Premium ayrıcalıkların seninle."
-                  : "Your Premium benefits are active."
-                : tr
-                ? "Sinema Deneyimini Zirveye Taşı."
-                : "Elevate Your Cinema Experience."}
+                ? tr ? "Premium ayrıcalıkların seninle." : es ? "Tus ventajas Premium están activas." : "Your Premium benefits are active."
+                : tr ? "Sinema Deneyimini Zirveye Taşı." : es ? "Lleva tu experiencia de cine al siguiente nivel." : "Elevate Your Cinema Experience."}
             </Text>
             <Text style={[styles.heroSubtitle, { color: C.muted }]}>
-              {tr
-                ? "CineMatch AI önerileri, arkadaşlarının da gördüğü kimlik rozeti, daha geniş sosyal limitler ve kişiselleştirme tek abonelikte."
-                : "CineMatch AI picks, an identity badge your friends can see, higher social limits and personalization in one subscription."}
+              {tr ? "CineMatch AI önerileri, arkadaşlarının da gördüğü kimlik rozeti, daha geniş sosyal limitler ve kişiselleştirme tek abonelikte." : es ? "Recomendaciones de CineMatch IA, una insignia de identidad que ven tus amigos, límites sociales más altos y personalización en una sola suscripción." : "CineMatch AI picks, an identity badge your friends can see, higher social limits and personalization in one subscription."}
             </Text>
           </View>
 
@@ -525,7 +515,7 @@ export default function PremiumScreen() {
                   {AI_PLAN_LIMITS[selectedTier].daily}
                 </Text>
                 <Text style={[styles.quickMetricLabel, { color: C.muted }]}>
-                  {tr ? "AI / gün" : "AI / day"}
+                  {tr ? "AI / gün" : es ? "IA / día" : "AI / day"}
                 </Text>
               </View>
             </View>
@@ -537,7 +527,7 @@ export default function PremiumScreen() {
                   {AI_PLAN_LIMITS[selectedTier].monthly}
                 </Text>
                 <Text style={[styles.quickMetricLabel, { color: C.muted }]}>
-                  {tr ? "AI / ay" : "AI / month"}
+                  {tr ? "AI / ay" : es ? "IA / mes" : "AI / month"}
                 </Text>
               </View>
             </View>
@@ -546,10 +536,10 @@ export default function PremiumScreen() {
               <AppIcon name="diamond" size={15} color="#F59E0B" />
               <View>
                 <Text style={[styles.quickMetricNum, { color: C.text }]}>
-                  {selectedTier === PREMIUM_PLAN.UNLIMITED ? (tr ? "Efsanevi" : "Legend") : (tr ? "Epik" : "Epic")}
+                  {selectedTier === PREMIUM_PLAN.UNLIMITED ? (tr ? "Efsanevi" : es ? "Legendaria" : "Legend") : (tr ? "Epik" : es ? "Épica" : "Epic")}
                 </Text>
                 <Text style={[styles.quickMetricLabel, { color: C.muted }]}>
-                  {tr ? "Rozet Statüsü" : "Badge Rarity"}
+                  {tr ? "Rozet Statüsü" : es ? "Rareza de la insignia" : "Badge Rarity"}
                 </Text>
               </View>
             </View>
@@ -561,12 +551,10 @@ export default function PremiumScreen() {
       <View style={styles.pricingSection}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: C.text }]}>
-            {tr ? "Planını ve Fiyatını Seç" : "Select Your Plan & Price"}
+            {tr ? "Planını ve Fiyatını Seç" : es ? "Elige tu plan y tu precio" : "Select Your Plan & Price"}
           </Text>
           <Text style={[styles.sectionSubtitle, { color: C.muted }]}>
-            {tr
-              ? "Tüm paketler doğrudan listelenir. İstediğin an iptal edebilirsin."
-              : "All packages listed transparently. Cancel anytime."}
+            {tr ? "Tüm paketler doğrudan listelenir. İstediğin an iptal edebilirsin." : es ? "Todos los paquetes, con precios claros. Cancela cuando quieras." : "All packages listed transparently. Cancel anytime."}
           </Text>
         </View>
 
@@ -614,7 +602,7 @@ export default function PremiumScreen() {
                     {isMax && (
                       <View style={[styles.tierTabMiniBadge, { backgroundColor: isSelected ? "rgba(255,255,255,0.22)" : alpha("#F59E0B", 0.16) }]}>
                         <Text style={[styles.tierTabMiniBadgeText, { color: isSelected ? "#fff" : "#F59E0B" }]}>
-                          {tr ? "EN GÜÇLÜ" : "MAX"}
+                          {tr ? "EN GÜÇLÜ" : es ? "MAX" : "MAX"}
                         </Text>
                       </View>
                     )}
@@ -626,12 +614,8 @@ export default function PremiumScreen() {
                     ]}
                   >
                     {isMax
-                      ? tr
-                        ? `Günde ${AI_PLAN_LIMITS.unlimited.daily} AI · Efsanevi Rozet`
-                        : `${AI_PLAN_LIMITS.unlimited.daily} AI/day · Legendary Badge`
-                      : tr
-                      ? `Günde ${AI_PLAN_LIMITS.premium.daily} AI · Epik Rozet`
-                      : `${AI_PLAN_LIMITS.premium.daily} AI/day · Epic Badge`}
+                      ? tr ? `Günde ${AI_PLAN_LIMITS.unlimited.daily} AI · Efsanevi Rozet` : es ? `${AI_PLAN_LIMITS.unlimited.daily} IA/día · Insignia legendaria` : `${AI_PLAN_LIMITS.unlimited.daily} AI/day · Legendary Badge`
+                      : tr ? `Günde ${AI_PLAN_LIMITS.premium.daily} AI · Epik Rozet` : es ? `${AI_PLAN_LIMITS.premium.daily} IA/día · Insignia épica` : `${AI_PLAN_LIMITS.premium.daily} AI/day · Epic Badge`}
                   </Text>
                 </View>
               </Pressable>
@@ -690,15 +674,13 @@ export default function PremiumScreen() {
                   ]}
                 >
                   {selectedTier === PREMIUM_PLAN.UNLIMITED
-                    ? tr ? "EFSANEVİ ROZET" : "LEGENDARY"
-                    : tr ? "EPİK ROZET" : "EPIC"}
+                    ? tr ? "EFSANEVİ ROZET" : es ? "LEGENDARIA" : "LEGENDARY"
+                    : tr ? "EPİK ROZET" : es ? "ÉPICA" : "EPIC"}
                 </Text>
               </View>
             </View>
             <Text style={[styles.badgePreviewDesc, { color: C.muted }]}>
-              {tr
-                ? "Profilinde ve arkadaşlarının gördüğü profil sayfanda statü sembolün olarak parıldar."
-                : "Shown on your profile and on the profile page your friends see."}
+              {tr ? "Profilinde ve arkadaşlarının gördüğü profil sayfanda statü sembolün olarak parıldar." : es ? "Se muestra en tu perfil y en la página de perfil que ven tus amigos." : "Shown on your profile and on the profile page your friends see."}
             </Text>
           </View>
         </View>
@@ -708,7 +690,7 @@ export default function PremiumScreen() {
           <View style={styles.packagesLoader}>
             <ActivityIndicator size="large" color={C.accent} />
             <Text style={[styles.packagesLoaderText, { color: C.muted }]}>
-              {tr ? "Mağaza fiyatları alınıyor…" : "Loading store prices…"}
+              {tr ? "Mağaza fiyatları alınıyor…" : es ? "Cargando precios de la tienda…" : "Loading store prices…"}
             </Text>
           </View>
         ) : selectedTierPackages.length > 0 ? (
@@ -768,13 +750,13 @@ export default function PremiumScreen() {
                       <View style={[styles.popularBadge, { backgroundColor: "#F59E0B" }]}>
                         <AppIcon name="flame" size={11} color="#fff" />
                         <Text style={styles.popularBadgeText}>
-                          {tr ? "EN AVANTAJLI" : "BEST VALUE"}
+                          {tr ? "EN AVANTAJLI" : es ? "MEJOR PRECIO" : "BEST VALUE"}
                         </Text>
                       </View>
                     ) : (
                       <View style={[styles.flexibleBadge, { backgroundColor: C.cardAlt }]}>
                         <Text style={[styles.flexibleBadgeText, { color: C.muted }]}>
-                          {tr ? "ESNEK DÖNEM" : "FLEXIBLE"}
+                          {tr ? "ESNEK DÖNEM" : es ? "FLEXIBLE" : "FLEXIBLE"}
                         </Text>
                       </View>
                     )}
@@ -803,10 +785,10 @@ export default function PremiumScreen() {
                   <View style={styles.pricingContentRow}>
                     <View style={styles.pricingTitleWrap}>
                       <Text style={[styles.pricingPeriodTitle, { color: C.text }]}>
-                        {packageTitle(aPackage, tr)}
+                        {packageTitle(aPackage, language)}
                       </Text>
                       <Text style={[styles.pricingPeriodSub, { color: C.muted }]}>
-                        {packageRenewalNote(aPackage, tr)}
+                        {packageRenewalNote(aPackage, language)}
                       </Text>
                     </View>
 
@@ -816,15 +798,15 @@ export default function PremiumScreen() {
                           <View style={[styles.savingsPill, { backgroundColor: alpha(OFFER_COLOR, 0.16) }]}>
                             <Text style={[styles.savingsText, { color: OFFER_COLOR }]}>
                               {offer.free
-                                ? tr ? "ÜCRETSİZ DENEME" : "FREE TRIAL"
-                                : tr ? `%${offer.percent} İNDİRİM` : `${offer.percent}% OFF`}
+                                ? tr ? "ÜCRETSİZ DENEME" : es ? "PRUEBA GRATIS" : "FREE TRIAL"
+                                : tr ? `%${offer.percent} İNDİRİM` : es ? `${offer.percent}% DE DESCUENTO` : `${offer.percent}% OFF`}
                             </Text>
                           </View>
                         )}
                         {savings && (
                           <View style={[styles.savingsPill, { backgroundColor: C.iconGreen }]}>
                             <Text style={[styles.savingsText, { color: C.green }]}>
-                              {tr ? `%${savings.percent} TASARRUF` : `SAVE ${savings.percent}%`}
+                              {tr ? `%${savings.percent} TASARRUF` : es ? `AHORRA ${savings.percent}%` : `SAVE ${savings.percent}%`}
                             </Text>
                           </View>
                         )}
@@ -839,10 +821,10 @@ export default function PremiumScreen() {
                           </Text>
                           <View style={styles.priceRow}>
                             <Text fontRole="numeric" style={[styles.priceString, { color: C.text }]}>
-                              {offer.free ? (tr ? "Ücretsiz" : "Free") : offer.priceString}
+                              {offer.free ? (tr ? "Ücretsiz" : es ? "Gratis" : "Free") : offer.priceString}
                             </Text>
                             <Text style={[styles.pricePeriod, { color: C.muted }]}>
-                              {offer.free ? "" : offerPeriodLabel(offer, tr)}
+                              {offer.free ? "" : offerPeriodLabel(offer, language)}
                             </Text>
                           </View>
                         </>
@@ -852,7 +834,7 @@ export default function PremiumScreen() {
                             {regular.priceString}
                           </Text>
                           <Text style={[styles.pricePeriod, { color: C.muted }]}>
-                            {packagePeriodLabel(aPackage, tr)}
+                            {packagePeriodLabel(aPackage, language)}
                           </Text>
                         </View>
                       )}
@@ -871,7 +853,7 @@ export default function PremiumScreen() {
                     >
                       <AppIcon name="pricetag-outline" size={13} color={OFFER_COLOR} />
                       <Text style={[styles.monthlyEquivalentText, { color: C.text, flex: 1 }]}>
-                        {offerDisclosure(offer, aPackage, tr)}
+                        {offerDisclosure(offer, aPackage, language)}
                       </Text>
                     </View>
                   )}
@@ -880,11 +862,11 @@ export default function PremiumScreen() {
                     <View style={[styles.monthlyEquivalentCallout, { backgroundColor: alpha(C.accent, 0.08), borderColor: alpha(C.accent, 0.16) }]}>
                       <AppIcon name="calculator-outline" size={13} color={C.accent} />
                       <Text style={[styles.monthlyEquivalentText, { color: C.text }]}>
-                        {tr ? "Sadece " : "Only "}
+                        {tr ? "Sadece " : es ? "Solo " : "Only "}
                         <Text style={{ color: C.accent, fontWeight: "900" }}>
                           {monthlyEquivalent}
                         </Text>
-                        {tr ? " / aya denk gelir" : " / month equivalent"}
+                        {tr ? " / aya denk gelir" : es ? " / mes (equivalente)" : " / month equivalent"}
                       </Text>
                     </View>
                   )}
@@ -897,12 +879,8 @@ export default function PremiumScreen() {
             <AppIcon family="Ionicons" name="construct-outline" size={20} color={C.amber} />
             <Text style={[styles.noticeText, { color: C.muted }]}>
               {configurationError === "missing-api-key"
-                ? tr
-                  ? "RevenueCat API anahtarı bekleniyor."
-                  : "RevenueCat API key is missing."
-                : tr
-                ? `${selectedPlanName} mağaza paketleri henüz hazır değil.`
-                : `${selectedPlanName} packages not loaded yet.`}
+                ? tr ? "RevenueCat API anahtarı bekleniyor." : es ? "Falta la clave de la API de RevenueCat." : "RevenueCat API key is missing."
+                : tr ? `${selectedPlanName} mağaza paketleri henüz hazır değil.` : es ? `Los paquetes de ${selectedPlanName} aún no se han cargado.` : `${selectedPlanName} packages not loaded yet.`}
             </Text>
           </View>
         )}
@@ -969,17 +947,17 @@ export default function PremiumScreen() {
                 <View style={styles.ctaTextContainer}>
                   <Text style={styles.ctaMainText}>
                     {selectedTier === plan
-                      ? tr ? "Aboneliği Yönet" : "Manage Subscription"
+                      ? tr ? "Aboneliği Yönet" : es ? "Gestionar suscripción" : "Manage Subscription"
                       : isPremium
-                      ? tr ? `${selectedPlanName}'e Yükselt` : `Upgrade to ${selectedPlanName}`
-                      : tr ? "Hemen Başla" : "Get Started Now"}
+                      ? tr ? `${selectedPlanName}'e Yükselt` : es ? `Pasar a ${selectedPlanName}` : `Upgrade to ${selectedPlanName}`
+                      : tr ? "Hemen Başla" : es ? "Empieza ahora" : "Get Started Now"}
                   </Text>
                   {selectedTier !== plan && selectedDisplayPackage && (
                     <Text style={styles.ctaSubText}>
                       {selectedOffer
-                        ? offerDisclosure(selectedOffer, selectedDisplayPackage, tr)
-                        : `${getPackageRegularPrice(selectedDisplayPackage).priceString} ${packagePeriodLabel(selectedDisplayPackage, tr)}`}
-                      {tr ? " · İstediğin an iptal et" : " · Cancel anytime"}
+                        ? offerDisclosure(selectedOffer, selectedDisplayPackage, language)
+                        : `${getPackageRegularPrice(selectedDisplayPackage).priceString} ${packagePeriodLabel(selectedDisplayPackage, language)}`}
+                      {tr ? " · İstediğin an iptal et" : es ? " · Cancela cuando quieras" : " · Cancel anytime"}
                     </Text>
                   )}
                 </View>
@@ -994,19 +972,19 @@ export default function PremiumScreen() {
           <View style={styles.trustBadgeItem}>
             <AppIcon name="shield-checkmark" size={13} color={C.green} />
             <Text style={[styles.trustBadgeText, { color: C.muted }]}>
-              {tr ? "Güvenli Ödeme" : "Secure Payment"}
+              {tr ? "Güvenli Ödeme" : es ? "Pago seguro" : "Secure Payment"}
             </Text>
           </View>
           <View style={styles.trustBadgeItem}>
             <AppIcon name="flash" size={13} color={C.accent} />
             <Text style={[styles.trustBadgeText, { color: C.muted }]}>
-              {tr ? "Anında Aktivasyon" : "Instant Access"}
+              {tr ? "Anında Aktivasyon" : es ? "Acceso inmediato" : "Instant Access"}
             </Text>
           </View>
           <View style={styles.trustBadgeItem}>
             <AppIcon name="sync" size={13} color={C.purple} />
             <Text style={[styles.trustBadgeText, { color: C.muted }]}>
-              {tr ? "Kolay İptal" : "Easy Cancel"}
+              {tr ? "Kolay İptal" : es ? "Cancelación fácil" : "Easy Cancel"}
             </Text>
           </View>
         </View>
@@ -1019,17 +997,15 @@ export default function PremiumScreen() {
             <View style={[styles.sectionBadgePill, { backgroundColor: alpha(C.accent, 0.14) }]}>
               <AppIcon name="sparkles" size={11} color={C.accent} />
               <Text style={[styles.sectionBadgeText, { color: C.accent }]}>
-                {tr ? "AYRICALIKLAR" : "HIGHLIGHTS"}
+                {tr ? "AYRICALIKLAR" : es ? "VENTAJAS" : "HIGHLIGHTS"}
               </Text>
             </View>
           </View>
           <Text style={[styles.sectionTitle, { color: C.text }]}>
-            {tr ? "Neler Kazanacaksın?" : "What You Will Get"}
+            {tr ? "Neler Kazanacaksın?" : es ? "Qué conseguirás" : "What You Will Get"}
           </Text>
           <Text style={[styles.sectionSubtitle, { color: C.muted }]}>
-            {tr
-              ? "Seelogd Premium ile film ve dizi dünyanı bir üst seviyeye taşı."
-              : "Elevate your cinema journey with Seelogd Premium privileges."}
+            {tr ? "Seelogd Premium ile film ve dizi dünyanı bir üst seviyeye taşı." : es ? "Lleva tu recorrido cinéfilo más lejos con los privilegios de Seelogd Premium." : "Elevate your cinema journey with Seelogd Premium privileges."}
           </Text>
         </View>
 
@@ -1122,23 +1098,19 @@ export default function PremiumScreen() {
               <View style={[styles.accordionSmallBadge, { backgroundColor: alpha(C.accent, 0.14) }]}>
                 <View style={[styles.accordionDot, { backgroundColor: C.accent }]} />
                 <Text style={[styles.accordionSmallBadgeText, { color: C.accent }]}>
-                  {tr ? "PLAN KARŞILAŞTIRMA" : "PLAN COMPARISON"}
+                  {tr ? "PLAN KARŞILAŞTIRMA" : es ? "COMPARACIÓN DE PLANES" : "PLAN COMPARISON"}
                 </Text>
               </View>
               <Text style={[styles.accordionFeatureCount, { color: C.muted }]}>
-                {tr
-                  ? `${comparisonSections.length} Kategori · ${comparisonRowCount} Özellik`
-                  : `${comparisonSections.length} Categories · ${comparisonRowCount} Features`}
+                {tr ? `${comparisonSections.length} Kategori · ${comparisonRowCount} Özellik` : es ? `${comparisonSections.length} categorías · ${comparisonRowCount} funciones` : `${comparisonSections.length} Categories · ${comparisonRowCount} Features`}
               </Text>
             </View>
 
             <Text style={[styles.accordionToggleTitle, { color: C.text }]}>
-              {tr ? "Planları Karşılaştır" : "Compare Plans"}
+              {tr ? "Planları Karşılaştır" : es ? "Comparar planes" : "Compare Plans"}
             </Text>
             <Text style={[styles.accordionToggleSub, { color: C.muted }]}>
-              {tr
-                ? "Free, Premium ve Premium Max'te her özelliğin sınırı"
-                : "Every feature's limit on Free, Premium and Premium Max"}
+              {tr ? "Free, Premium ve Premium Max'te her özelliğin sınırı" : es ? "El límite de cada función en Gratis, Premium y Premium Max" : "Every feature's limit on Free, Premium and Premium Max"}
             </Text>
           </View>
 
@@ -1167,7 +1139,7 @@ export default function PremiumScreen() {
               contentContainerStyle={styles.categoryFilterRow}
             >
               {[
-                { id: "all", title: tr ? "✦ Tümü" : "✦ All", icon: "sparkles", color: "#6366F1" },
+                { id: "all", title: tr ? "✦ Tümü" : es ? "✦ Todo" : "✦ All", icon: "sparkles", color: "#6366F1" },
                 ...comparisonSections,
               ].map((cat) => {
                 const isCatActive = categoryFilter === cat.id;
@@ -1335,7 +1307,7 @@ export default function PremiumScreen() {
             <ActivityIndicator size="small" color={C.accent} />
           ) : (
             <Text style={[styles.restoreBtnText, { color: C.accent }]}>
-              {tr ? "Önceki Satın Alımları Geri Yükle" : "Restore Previous Purchases"}
+              {tr ? "Önceki Satın Alımları Geri Yükle" : es ? "Restaurar compras anteriores" : "Restore Previous Purchases"}
             </Text>
           )}
         </Pressable>
@@ -1344,19 +1316,17 @@ export default function PremiumScreen() {
       {/* LEGAL FOOTER */}
       <View style={styles.legalSection}>
         <Text style={[styles.legalDisclaimer, { color: C.muted }]}>
-          {tr
-            ? "Satın alma tutarı uygulama mağazası hesabınızdan tahsil edilir. Abonelik, geçerli dönemin bitiminden en az 24 saat önce iptal edilmediği sürece otomatik olarak yenilenir. İstediğiniz zaman mağaza hesap ayarlarınızdan iptal edebilir veya yönetebilirsiniz."
-            : "Payment will be charged to your store account. The subscription automatically renews unless canceled at least 24 hours before the end of the current period. You can manage or cancel anytime in your store account settings."}
+          {tr ? "Satın alma tutarı uygulama mağazası hesabınızdan tahsil edilir. Abonelik, geçerli dönemin bitiminden en az 24 saat önce iptal edilmediği sürece otomatik olarak yenilenir. İstediğiniz zaman mağaza hesap ayarlarınızdan iptal edebilir veya yönetebilirsiniz." : es ? "El pago se cargará a tu cuenta de la tienda. La suscripción se renueva automáticamente salvo que la canceles al menos 24 horas antes de que termine el periodo actual. Puedes gestionarla o cancelarla en cualquier momento en los ajustes de tu cuenta de la tienda." : "Payment will be charged to your store account. The subscription automatically renews unless canceled at least 24 hours before the end of the current period. You can manage or cancel anytime in your store account settings."}
         </Text>
 
         <View style={styles.legalLinksRow}>
-          <Pressable onPress={() => openLegalPage("terms", tr ? "tr" : "en")} hitSlop={8}>
+          <Pressable onPress={() => openLegalPage("terms", language)} hitSlop={8}>
             <Text style={[styles.legalLink, { color: C.accent }]}>
               {i18nText("autoI18n.kullanim_kosullari", "Kullanım Koşulları")}
             </Text>
           </Pressable>
           <Text style={[styles.legalBullet, { color: C.muted }]}>•</Text>
-          <Pressable onPress={() => openLegalPage("privacy", tr ? "tr" : "en")} hitSlop={8}>
+          <Pressable onPress={() => openLegalPage("privacy", language)} hitSlop={8}>
             <Text style={[styles.legalLink, { color: C.accent }]}>
               {i18nText("autoI18n.gizlilik_politikasi", "Gizlilik Politikası")}
             </Text>

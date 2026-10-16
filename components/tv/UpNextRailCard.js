@@ -14,6 +14,7 @@
 //   • item === null      → çözüldü, sıradaki bölüm yok (yeni sezon bekleniyor)
 //   • item.isAired false → bölüm var ama yayınlanmadı (işaretlenemez)
 
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { memo } from "react";
 import {
   Animated,
@@ -36,7 +37,7 @@ const formatAirDate = (value, language) => {
   if (!value) return null;
   const date = new Date(`${value}T12:00:00`);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(language === "en" ? "en-US" : "tr-TR", {
+  return new Intl.DateTimeFormat(intlLocaleOf(language), {
     day: "numeric",
     month: "short",
   }).format(date);

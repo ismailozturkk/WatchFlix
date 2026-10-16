@@ -9,6 +9,7 @@
 // Akış: intro → [keşfet, türler, AI, platformlar, profil] → kayıt/giriş. "Atla"
 // akıştan çıkarmaz, doğrudan son (kayıt) slayta götürür.
 
+import { copyLanguage, nextAppLanguage } from "../../utils/appLanguages";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Dimensions, StatusBar, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -40,6 +41,7 @@ import FavoritesSlide from "./OnboardingFavorites";
 import { readPendingFavorites, writePendingFavorites } from "../../services/pendingFavorites";
 import { countFavorites, emptyFavorites } from "../../utils/fourFavorites";
 import {
+  ONBOARDING_COPY,
   ONBOARDING_STEP_ORDER,
   getOnboardingCopy,
   onboardingStepName,
@@ -71,7 +73,7 @@ export default function OnboardingScreen({ navigation }) {
 
   const accent = theme.accent;
   const isLightTheme = isLightSurface(theme.primary);
-  const lang = language === "en" ? "en" : "tr";
+  const lang = copyLanguage(language, Object.keys(ONBOARDING_COPY));
   const copy = getOnboardingCopy(lang);
 
   const [phase, setPhase] = useState("intro"); // "intro" | "main"
@@ -295,7 +297,7 @@ export default function OnboardingScreen({ navigation }) {
           {...common}
           kind={item.kind}
           copy={copy}
-          isEnglish={lang === "en"}
+          language={lang}
           selectedGenreKeys={selectedGenreKeys}
           selectedProviderIds={selectedProviderIds}
           providerCatalog={providerCatalog}
@@ -382,7 +384,7 @@ export default function OnboardingScreen({ navigation }) {
             logo={appLogo}
             copy={copy}
             language={lang}
-            onToggleLanguage={() => toggleLanguage(lang === "tr" ? "en" : "tr")}
+            onToggleLanguage={() => toggleLanguage(nextAppLanguage(lang))}
             showSkip={!isCta}
             onSkip={handleSkip}
             count={count}

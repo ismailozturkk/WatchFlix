@@ -74,7 +74,7 @@ private let sampleLists: [ListSummary] = [
 private struct ListsEntry: TimelineEntry {
   let date: Date
   let lists: [ListSummary]
-  let isTurkish: Bool
+  let lang: String
   let preferences: WidgetDisplayPreferences
 }
 
@@ -83,7 +83,7 @@ private struct ListsProvider: TimelineProvider {
     ListsEntry(
       date: Date(),
       lists: sampleLists,
-      isTurkish: isTurkishLanguage(),
+      lang: widgetLanguage(),
       preferences: loadWidgetPreferences()
     )
   }
@@ -95,7 +95,7 @@ private struct ListsProvider: TimelineProvider {
       ListsEntry(
         date: Date(),
         lists: shown,
-        isTurkish: isTurkishLanguage(),
+        lang: widgetLanguage(),
         preferences: loadWidgetPreferences()
       )
     )
@@ -106,7 +106,7 @@ private struct ListsProvider: TimelineProvider {
     let entry = ListsEntry(
       date: Date(),
       lists: loadLists(),
-      isTurkish: isTurkishLanguage(),
+      lang: widgetLanguage(),
       preferences: loadWidgetPreferences()
     )
     completion(Timeline(entries: [entry], policy: .never))
@@ -220,7 +220,7 @@ private struct ListsWidgetEntryView: View {
             .background(appearance.accentColor)
             .clipShape(RoundedRectangle(cornerRadius: metrics.badge * 0.33, style: .continuous))
 
-          Text(entry.isTurkish ? "Listelerim" : "My Lists")
+          Text(widgetPick(entry.lang, tr: "Listelerim", en: "My Lists", es: "Mis listas"))
             .font(.system(size: metrics.badge >= 22 ? 14 : 12, weight: .bold))
             .foregroundColor(appearance.textColor)
             .lineLimit(1)
@@ -231,7 +231,7 @@ private struct ListsWidgetEntryView: View {
 
       if shown.isEmpty {
         Spacer()
-        Text(entry.isTurkish ? "Henüz liste yok" : "No lists yet")
+        Text(widgetPick(entry.lang, tr: "Henüz liste yok", en: "No lists yet", es: "Aún no hay listas"))
           .font(.system(size: 12))
           .foregroundColor(appearance.mutedColor)
           .frame(maxWidth: .infinity, alignment: .center)

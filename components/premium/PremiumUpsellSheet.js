@@ -35,6 +35,7 @@
 // gerçekten kalktıktan sonra) çalıştırır; üstteki bir Modal'ı kapatıp ardından bu
 // sayfayı açmak isteyen çağıran da kapanışı bekletmeli (bkz. HubWrappedModule).
 
+import { intlLocaleOf, normalizeAppLanguage } from "../../utils/appLanguages";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, {
@@ -152,7 +153,7 @@ const CountUp = memo(function CountUp({
   }, [value, reduceMotion, delay, duration]);
   return (
     <Text allowFontScaling={false} style={style}>
-      {shown.toLocaleString(language === "tr" ? "tr-TR" : "en-US")}
+      {shown.toLocaleString(intlLocaleOf(language))}
     </Text>
   );
 });
@@ -568,9 +569,9 @@ const MeterCard = memo(function MeterCard({ content, theme, language, reduceMoti
  * Satır yüksekliği de elle verilir: özel yazı tiplerinin doğal satır yüksekliği
  * etiket ve kart ölçülerini kaydırmasın.
  */
-const TierCard = memo(function TierCard({ tier, theme, tr, color, ambient, delay, typo }) {
+const TierCard = memo(function TierCard({ tier, theme, tr, es, color, ambient, delay, typo }) {
   const target = tier.isTarget;
-  const flag = target ? (tr ? "Önerilen" : "Best pick") : tier.isCurrent ? (tr ? "Şu an" : "Now") : null;
+  const flag = target ? (tr ? "Önerilen" : es ? "La mejor opción" : "Best pick") : tier.isCurrent ? (tr ? "Şu an" : es ? "Ahora" : "Now") : null;
   const figure = typo.mode === "figure";
 
   // Hale yalnız opaklıkla nefes alır: ölçekleyen halenin kenarı komşu karta ve
@@ -708,13 +709,13 @@ const TierCard = memo(function TierCard({ tier, theme, tr, color, ambient, delay
 // ── Kazanç satırları ─────────────────────────────────────────────────────────
 
 /** "Premium ile ayrıca": gerçek kapılardan kazanç satırları, sağdan kayarak girer. */
-const PerksCard = memo(function PerksCard({ content, theme, tr, delay }) {
+const PerksCard = memo(function PerksCard({ content, theme, tr, es, delay }) {
   return (
     <Rise delay={delay} dy={18} style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       <View style={styles.perksHead}>
         <MaterialCommunityIcons name="star-four-points" size={12} color={GOLD} />
         <Text allowFontScaling={false} style={[styles.perksHeading, { color: theme.text.muted }]}>
-          {tr ? `${content.targetName} ile ayrıca` : `Also with ${content.targetName}`}
+          {tr ? `${content.targetName} ile ayrıca` : es ? `También con ${content.targetName}` : `Also with ${content.targetName}`}
         </Text>
       </View>
       {content.perks.map((perk, index) => (
@@ -836,6 +837,7 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
   content,
   priceHint,
   tr,
+  es,
   onPrimary,
   onSecondary,
   onDismissed,
@@ -930,6 +932,7 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
                 tier={tier}
                 theme={theme}
                 tr={tr}
+                es={es}
                 color={color}
                 ambient={ambient}
                 delay={tiersDelay}
@@ -940,7 +943,7 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
         ) : null}
 
         {content.perks.length > 0 ? (
-          <PerksCard content={content} theme={theme} tr={tr} delay={perksDelay} />
+          <PerksCard content={content} theme={theme} tr={tr} es={es} delay={perksDelay} />
         ) : null}
 
         {content.note ? (
@@ -1059,7 +1062,7 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
 export function PremiumUpsellHost() {
   const { language } = useLanguage();
   const { packages, introEligibleIds, usingTestStore } = usePremium();
-  const lang = language === "tr" ? "tr" : "en";
+  const lang = normalizeAppLanguage(language);
 
   const [visible, setVisible] = useState(false);
   const [request, setRequest] = useState(null);
@@ -1172,6 +1175,7 @@ export function PremiumUpsellHost() {
       content={content}
       priceHint={priceHint}
       tr={lang === "tr"}
+      es={lang === "es"}
       onPrimary={onPrimary}
       onSecondary={onSecondary}
       onDismissed={closeGate.finish}

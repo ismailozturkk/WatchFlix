@@ -1,12 +1,14 @@
 // utils/aiCopy.js
 //
-// CineMatch'in YENİ arayüz metinleri için yerel tr/en çifti (bkz. settings/
+// CineMatch'in YENİ arayüz metinleri için yerel tr/en/es üçlüsü (bkz. settings/
 // backupCopy.js ile aynı yöntem). Eski metinler `t.AICineChat` paketinde kalır;
 // bu dosya yalnız yeni eklenen bileşenlerin (hoş geldin/ruh hali, kart eylemleri,
 // takip çipleri, geçmiş, Ayarlar > Yapay zeka) metinlerini taşır.
 //
 // Şekil iki dilde birebir aynı olmak zorunda — __tests__/aiCopy.test.js doğrular.
 // Yer tutucular `{ad}` biçimindedir; `fillCopy` doldurur.
+
+import { copyLanguage } from "./appLanguages";
 
 const TR = {
   moment: {
@@ -324,10 +326,168 @@ const EN = {
   },
 };
 
-export const AI_COPY = Object.freeze({ tr: TR, en: EN });
+const ES = {
+  moment: {
+    morning: "Un buen comienzo del día",
+    afternoon: "Pausa de la tarde",
+    evening: "Para ver esta noche",
+    lateNight: "Elección de madrugada",
+    weekend: "Para ver el fin de semana",
+  },
+  vibe: {
+    title: "Encuentra según tu estado de ánimo",
+    subtitle: "Tres toques para una recomendación a medida",
+    moodLabel: "Tu estado de ánimo",
+    lengthLabel: "Duración",
+    companyLabel: "Con quién lo ves",
+    mood: {
+      cozy: "Acogedor",
+      thrilling: "Emocionante",
+      funny: "Divertido",
+      emotional: "Emotivo",
+      mindbending: "Para pensar",
+      adventurous: "Aventurero",
+    },
+    length: { short: "Corta", medium: "Media", long: "Larga" },
+    company: {
+      solo: "Solo yo",
+      partner: "En pareja",
+      friends: "Con amigos",
+      family: "En familia",
+    },
+    cta: "Sugiéreme algo",
+    pickOne: "Elige al menos una opción",
+    clear: "Borrar selección",
+    surprise: "🎲 Sorpréndeme",
+    surprisePrompt: "Sorpréndeme con una gran recomendación que probablemente aún no haya visto.",
+  },
+  quota: {
+    perDay: "{n} al día",
+    left: "Te quedan {n} hoy",
+    leftOne: "Último de hoy",
+    empty: "Hoy no te quedan mensajes",
+    upgrade: "Ver planes para tener más",
+  },
+  thinking: [
+    "Revisando tus gustos…",
+    "Buscando títulos…",
+    "Recuperando pósteres…",
+    "Últimos retoques…",
+  ],
+  actions: {
+    watchlist: "Lista de seguimiento",
+    inWatchlist: "En la lista",
+    favorite: "Favorito",
+    detail: "Detalles",
+    addAll: "Añadir todo a mi lista de seguimiento ({n})",
+    addedAll: "{n} títulos añadidos a tu lista de seguimiento",
+    allAlreadyIn: "Todo estaba ya en tu lista de seguimiento",
+    adding: "Añadiendo…",
+    share: "Compartir",
+    signIn: "Inicia sesión para añadir títulos a una lista",
+    matchLabel: "Afinidad con tus gustos",
+    regenerate: "Reintentar",
+    followUps: "¿Y ahora qué?",
+    costHint: "Cada pregunta de seguimiento consume un mensaje de IA",
+    minutes: "min",
+    titles: "títulos",
+  },
+  notes: {
+    filtered: "{n} sugerencias ocultas por no coincidir con tus filtros",
+    relaxed: "Nada coincide exactamente con tus filtros; se muestran las opciones más cercanas",
+    seen: "Se han quitado {n} títulos que ya habías visto",
+    truncated: "La respuesta se acortó por ser demasiado larga",
+    runtimeMovies: "{time} · {n} películas",
+    runtimeSeries: "+ {n} series",
+  },
+  history: {
+    title: "Chats",
+    search: "Buscar chats",
+    noResults: "No hay chats que coincidan",
+    clearAll: "Eliminar todo",
+    clearAllTitle: "¿Eliminar todos los chats?",
+    clearAllMessage: "No se puede deshacer.",
+    cancel: "Cancelar",
+    delete: "Eliminar",
+    buckets: {
+      today: "Hoy",
+      yesterday: "Ayer",
+      week: "Esta semana",
+      earlier: "Anteriores",
+    },
+  },
+  panel: {
+    styleTitle: "Estilo de respuesta",
+    style: { concise: "Breve", balanced: "Equilibrado", detailed: "Detallado" },
+    spoilerTitle: "Spoilers",
+    spoiler: { none: "Ninguno", light: "Suaves" },
+    countTitle: "Número de recomendaciones",
+    allSettings: "Todos los ajustes de IA",
+  },
+  settings: {
+    title: "Asistente de IA",
+    rowTitle: "Asistente de IA (CineMatch)",
+    rowSubtitle: "Estilo de respuesta, filtros, personalización e historial",
+    rowBadge: "{n} ajustes personalizados",
+    heroTitle: "CineMatch",
+    heroText: "Tu asistente de cine y series. Cambia estas preferencias aquí o desde el chat.",
+    usage: "Ver uso",
+    sectionPersonal: "Personalización",
+    sectionFilters: "Filtros de descubrimiento",
+    sectionStyle: "Estilo de respuesta",
+    sectionHistory: "Historial de chats",
+    sectionReset: "Restablecer",
+    useLists: "Usar mis listas",
+    useListsHint: "Personaliza las recomendaciones con tu lista de seguimiento, tus favoritos y lo que has visto (consume más tokens).",
+    lists: {
+      watchList: "Lista de seguimiento",
+      favorites: "Favoritos",
+      custom: "Listas personalizadas",
+      watched: "Vistos (resumen)",
+    },
+    timeContext: "Tener en cuenta la hora del día",
+    timeContextHint: "En peticiones como «esta noche» o «este fin de semana», ajusta la duración y el tono al momento.",
+    avoidRepeats: "Evitar repeticiones",
+    avoidRepeatsHint: "No sugerirá títulos que ya haya sugerido en el mismo chat.",
+    matchScore: "Insignia de afinidad",
+    matchScoreHint: "Muestra un porcentaje de afinidad en las recomendaciones según tus géneros favoritos.",
+    followUps: "Sugerencias de siguiente paso",
+    followUpsHint: "Ofrece preguntas de seguimiento con un toque bajo cada respuesta.",
+    mediaType: "Tipo de contenido",
+    platforms: "Plataformas",
+    platformsHint: "Déjalo vacío para buscar en todas las plataformas.",
+    genres: "Géneros",
+    genresHint: "Puedes elegir más de un género.",
+    clearFilters: "Borrar filtros",
+    styleLength: "Longitud de la respuesta",
+    styleLengthHint: "Controla cuánto dura la nota bajo cada recomendación.",
+    spoilerHint: "Suaves: solo describe el planteamiento; nunca revela giros, finales ni muertes.",
+    itemCount: "Número de recomendaciones",
+    itemCountHint: "El máximo de títulos que se sugieren en una sola respuesta.",
+    historyLimit: "Chats que conservar",
+    historyLimitHint: "Al superar el límite se eliminan los chats más antiguos.",
+    historyCount: "{n} chats guardados",
+    clearHistory: "Borrar el historial de chats",
+    clearHistoryMessage: "Se eliminarán todos los chats guardados de CineMatch. No se puede deshacer.",
+    resetAll: "Restaurar valores predeterminados",
+    resetAllHint: "Devuelve todos los ajustes de IA a su valor original. No toca los chats.",
+    resetConfirmTitle: "¿Restablecer los ajustes?",
+    resetConfirmMessage: "Tus ajustes de IA vuelven a los valores predeterminados.",
+    reset: "Restablecer",
+    cancel: "Cancelar",
+    deleteAction: "Eliminar",
+    footnote: "Cada mensaje de IA cuenta para tu límite diario y mensual. Cambiar estos ajustes, añadir a listas y compartir no consume mensajes.",
+    all: "Todos",
+    mediaAll: "Películas y series",
+    mediaMovie: "Solo películas",
+    mediaTv: "Solo series",
+  },
+};
 
-/** "tr" ise Türkçe, aksi hâlde İngilizce metin paketi. */
-export const getAiCopy = (language) => (language === "tr" ? TR : EN);
+export const AI_COPY = Object.freeze({ tr: TR, en: EN, es: ES });
+
+/** Dile uygun metin paketi (tr / en / es); bilinmeyen dil İngilizce. */
+export const getAiCopy = (language) => AI_COPY[copyLanguage(language, Object.keys(AI_COPY))];
 
 /** `{ad}` yer tutucularını doldurur; eksik değer boş kalır. */
 export function fillCopy(template, values = {}) {

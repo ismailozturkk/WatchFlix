@@ -8,6 +8,7 @@
 // Önceki ayarlar "geri alma noktası" olarak saklanır (bkz. services/
 // settingsBackupService.js). Biçim/doğrulama: utils/settingsBackup.js.
 
+import { intlLocaleOf } from "../../../utils/appLanguages";
 import React, { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -69,9 +70,8 @@ const fmtDate = (iso, locale) => {
 export default function BackupSettingsScreen() {
   const { language } = useLanguage();
   const { theme } = useTheme();
-  const isEn = language === "en";
-  const locale = isEn ? "en-US" : "tr-TR";
-  const copy = useMemo(() => getBackupCopy(isEn), [isEn]);
+  const locale = intlLocaleOf(language);
+  const copy = useMemo(() => getBackupCopy(language), [language]);
   const C = buildUiColors(theme);
 
   const [busy, setBusy] = useState(null); // "export-file" | "export-clipboard" | "import-file" | "import-clipboard"

@@ -12,7 +12,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { alpha } from "../../theme/colors";
 import SwitchToggle from "../SwitchToggle";
 import { STREAMING_PROVIDERS } from "../../context/AppSettingsContext";
-import { ONBOARDING_GENRES } from "../../utils/onboardingPreferences";
+import { ONBOARDING_GENRES, onboardingGenreLabel } from "../../utils/onboardingPreferences";
 import {
   AI_MAX_ITEM_CHOICES,
   AI_RESPONSE_STYLES,
@@ -31,11 +31,8 @@ const LIST_TOGGLES = [
 const genreSupported = (genre, mediaType) =>
   mediaType === "movie" ? genre.movieId : mediaType === "tv" ? genre.tvId : genre.movieId || genre.tvId;
 
-export const genreLabel = (genre, mediaType, language) => {
-  const tr = language === "tr";
-  if (mediaType === "tv") return genre[tr ? "tvTr" : "tvEn"] || genre[tr ? "tr" : "en"];
-  return genre[tr ? "tr" : "en"];
-};
+export const genreLabel = (genre, mediaType, language) =>
+  onboardingGenreLabel(genre, mediaType, language);
 
 function AIPrefsPanel({ theme, t, copy, language, prefs, updatePrefs, onOpenAllSettings }) {
   const filterCount = countDiscoveryFilters(prefs);

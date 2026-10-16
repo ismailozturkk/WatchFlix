@@ -1,3 +1,9 @@
+import {
+  APP_LANGUAGES,
+  pickByLanguage,
+  tmdbLanguageOf,
+  tmdbRegionOf,
+} from "../utils/appLanguages";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import axios from "axios";
@@ -195,7 +201,8 @@ export default function DiscoveryMediaRail({
   const [resolvedGenreIds, setResolvedGenreIds] = useState(normalizedPreferredGenreIds);
   const [genreResolutionComplete, setGenreResolutionComplete] = useState(preset !== "topGenres");
 
-  const isTr = language === "tr";
+  // Metinler tr/en/es; bilinmeyen dil İngilizce (utils/appLanguages.pickByLanguage).
+  const L = (tr, en, es) => pickByLanguage(language, { tr, en, es });
   const genreNamesKey = JSON.stringify(
     [...new Set((genreNames || []).filter((name) => name && name !== "-"))].slice(0, 3),
   );
@@ -206,31 +213,45 @@ export default function DiscoveryMediaRail({
   const section = useMemo(() => {
     if (preset === "subscriptions") {
       return {
-        title: isTr ? "Platform Favorileri" : "Service Favorites",
-        subtitle: isTr
-          ? "Seçtiğin platformlarda izleyebileceğin içerikler"
-          : "Titles available on your selected services",
+        title: L("Platform Favorileri", "Service Favorites", "Favoritos de tus plataformas"),
+        subtitle: L(
+          "Seçtiğin platformlarda izleyebileceğin içerikler",
+          "Titles available on your selected services",
+          "Títulos disponibles en las plataformas que has elegido",
+        ),
       };
     }
     if (preset === "hiddenGems") {
       return {
-        title: isTr ? "Gizli cevherler" : "Hidden gems",
-        subtitle: isTr ? "Az bilinen, yüksek puanlı seçimler" : "Lesser-known, highly rated picks",
+        title: L("Gizli cevherler", "Hidden gems", "Joyas ocultas"),
+        subtitle: L(
+          "Az bilinen, yüksek puanlı seçimler",
+          "Lesser-known, highly rated picks",
+          "Opciones poco conocidas y muy bien valoradas",
+        ),
       };
     }
     if (preset === "topGenres") {
       return {
-        title: isTr ? "Favori Türlerin" : "Favorite Genres",
+        title: L("Favori Türlerin", "Favorite Genres", "Tus géneros favoritos"),
         subtitle:
           normalizedGenreNames.join("  •  ") ||
-          (isTr ? "Başlangıçta seçtiğin türlere göre" : "Based on your onboarding picks"),
+          L(
+            "Başlangıçta seçtiğin türlere göre",
+            "Based on your onboarding picks",
+            "Según los géneros que elegiste al empezar",
+          ),
       };
     }
     return {
-      title: isTr ? "Yeni Beğenilenler" : "Recent Favorites",
-      subtitle: isTr ? "Yeni ve güçlü izleyici puanına sahip" : "Recent titles with strong audience scores",
+      title: L("Yeni Beğenilenler", "Recent Favorites", "Favoritos recientes"),
+      subtitle: L(
+        "Yeni ve güçlü izleyici puanına sahip",
+        "Recent titles with strong audience scores",
+        "Títulos recientes con buena puntuación del público",
+      ),
     };
-  }, [isTr, normalizedGenreNames, preset]);
+  }, [language, normalizedGenreNames, preset]);
 
   useEffect(() => {
     if (preset !== "subscriptions" || streamingProviderIds.length === 0) return;
@@ -242,8 +263,8 @@ export default function DiscoveryMediaRail({
         if (!data) {
           data = (await axios.get(`https://api.themoviedb.org/3/watch/providers/${mediaType}`, {
             params: {
-              language: isTr ? "tr-TR" : "en-US",
-              watch_region: isTr ? "TR" : "US",
+              language: tmdbLanguageOf(language),
+              watch_region: tmdbRegionOf(language),
             },
             headers: { accept: "application/json", Authorization: API_KEY },
           })).data;
@@ -261,7 +282,7 @@ export default function DiscoveryMediaRail({
     };
     loadProviderCatalog();
     return () => { active = false; };
-  }, [API_KEY, isTr, language, mediaType, preset, streamingProviderIds]);
+  }, [API_KEY, language, mediaType, preset, streamingProviderIds]);
 
   useEffect(() => {
     if (preset !== "topGenres") return;
@@ -281,7 +302,8 @@ export default function DiscoveryMediaRail({
 
     const loadGenreIds = async () => {
       try {
-        const catalogs = await Promise.all(["tr-TR", "en-US"].map(async (locale) => {
+        // Tür adları, kaydedildiği andaki uygulama dilinde gelebilir: desteklenen HER dilin kataloğu.
+        const catalogs = await Promise.all(APP_LANGUAGES.map((entry) => entry.tmdbLanguage).map(async (locale) => {
           const cacheKey = `genre_catalog_${mediaType}_${locale}`;
           const cached = await getCachedValue(cacheKey, TTL.GENRES);
           if (cached) return cached.genres || [];
@@ -306,14 +328,14 @@ export default function DiscoveryMediaRail({
   const buildParams = useCallback(
     (requestedPage) => {
       const params = {
-        language: isTr ? "tr-TR" : "en-US",
+        language: tmdbLanguageOf(language),
         page: requestedPage,
         sort_by: preset === "hiddenGems" ? "vote_average.desc" : "popularity.desc",
         "vote_count.gte": preset === "hiddenGems" ? 120 : 300,
       };
 
       if (preset === "subscriptions") {
-        params.watch_region = isTr ? "TR" : "US";
+        params.watch_region = tmdbRegionOf(language);
         params.with_watch_providers = streamingProviderIds.join("|");
         params.with_watch_monetization_types = "flatrate";
       }
@@ -332,7 +354,7 @@ export default function DiscoveryMediaRail({
 
       return params;
     },
-    [resolvedGenreIds, isTr, mediaType, preset, streamingProviderIds],
+    [resolvedGenreIds, language, mediaType, preset, streamingProviderIds],
   );
 
   const load = useCallback(

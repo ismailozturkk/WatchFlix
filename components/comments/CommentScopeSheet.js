@@ -10,6 +10,7 @@
 // içinde yaşıyor ve iç içe modal Android'de kapanma/klavye sorunları çıkarıyor.
 // Bunun yerine yorum bileşeninin üstüne mutlak konumlu bir katman serilir.
 
+import { tmdbLanguageOf } from "../../utils/appLanguages";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
@@ -179,7 +180,7 @@ export default function CommentScopeSheet({
         const res = await axios.get(
           `https://api.themoviedb.org/3/tv/${showId}/season/${seasonNumber}`,
           {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
+            params: { language: tmdbLanguageOf(language) },
             headers: { accept: "application/json", Authorization: API_KEY },
           },
         );

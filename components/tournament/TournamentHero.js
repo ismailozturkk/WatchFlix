@@ -10,6 +10,7 @@
 // gri=yakında. Üzerindeki her şey beyaz/yarı saydam beyazdır, bu yüzden tema
 // (açık/koyu) değişse de okunurluk değişmez. Şampiyon kartı (results) ayrıdır.
 
+import { tmdbLanguageOf } from "../../utils/appLanguages";
 import React, { memo, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -38,7 +39,7 @@ function TournamentHero({
 }) {
   const deadlineText = useMemo(
     () => new Date(deadlineMs).toLocaleDateString(
-      lang === "tr" ? "tr-TR" : "en-US",
+      tmdbLanguageOf(lang),
       { day: "numeric", month: "long" },
     ),
     [deadlineMs, lang],

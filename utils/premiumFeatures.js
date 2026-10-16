@@ -23,6 +23,12 @@ import {
   PREMIUM_PLAN,
   getPremiumPlanDisplayName,
 } from "./premium";
+import {
+  copyLanguage,
+  intlLocaleOf,
+  normalizeAppLanguage,
+  pickByLanguage,
+} from "./appLanguages";
 
 export const UNLIMITED = Infinity;
 
@@ -74,43 +80,49 @@ export const FEATURE_CATEGORIES = Object.freeze([
     id: "ai",
     icon: "sparkles",
     color: "#8B5CF6",
-    title: { tr: "CineMatch AI", en: "CineMatch AI" },
+    title: { tr: "CineMatch AI", en: "CineMatch AI", es: "CineMatch IA" },
   },
   {
     id: "social",
     icon: "people",
     color: "#EC4899",
-    title: { tr: "Sosyal", en: "Social" },
+    title: { tr: "Sosyal", en: "Social", es: "Social" },
   },
   {
     id: "library",
     icon: "albums",
     color: "#10B981",
-    title: { tr: "Kütüphane", en: "Library" },
+    title: { tr: "Kütüphane", en: "Library", es: "Biblioteca" },
   },
   {
     id: "notes",
     icon: "document-text",
     color: "#14B8A6",
-    title: { tr: "Notlar", en: "Notes" },
+    title: { tr: "Notlar", en: "Notes", es: "Notas" },
   },
   {
     id: "play",
     icon: "game-controller",
     color: "#3B82F6",
-    title: { tr: "Oyun, CineSwipe & Turnuva", en: "Games, CineSwipe & Tournament" },
+    title: { tr: "Oyun, CineSwipe & Turnuva", en: "Games, CineSwipe & Tournament", es: "Juegos, CineSwipe y torneo" },
   },
   {
     id: "personal",
     icon: "color-palette",
     color: "#F59E0B",
-    title: { tr: "Kişiselleştirme", en: "Personalization" },
+    title: { tr: "Kişiselleştirme", en: "Personalization", es: "Personalización" },
   },
   {
     id: "alerts",
     icon: "notifications",
     color: "#06B6D4",
-    title: { tr: "Bildirim & Arşiv", en: "Alerts & Archive" },
+    title: { tr: "Bildirim & Arşiv", en: "Alerts & Archive", es: "Avisos y archivo" },
+  },
+  {
+    id: "support",
+    icon: "chatbubble-ellipses",
+    color: "#EF4444",
+    title: { tr: "Destek & Geri bildirim", en: "Support & Feedback", es: "Soporte y comentarios" },
   },
 ]);
 
@@ -160,17 +172,19 @@ export const PREMIUM_FEATURES = Object.freeze({
     icon: "sparkles",
     enforcedBy: "server",
     limits: AI_PLAN_LIMITS,
-    title: { tr: "CineMatch AI mesajı", en: "CineMatch AI messages" },
+    title: { tr: "CineMatch AI mesajı", en: "CineMatch AI messages", es: "Mensajes de CineMatch IA" },
     upsell: {
-      title: { tr: "Bugünkü AI mesaj hakkın bitti", en: "You're out of AI messages for today" },
+      title: { tr: "Bugünkü AI mesaj hakkın bitti", en: "You're out of AI messages for today", es: "Se te han acabado los mensajes de IA de hoy" },
     },
     detail: {
       tr: "Ruh haline ve izleme geçmişine göre film/dizi önerileri",
       en: "Movie and TV picks based on your mood and watch history",
+      es: "Recomendaciones de películas y series según tu estado de ánimo y tu historial",
     },
     phrase: {
       tr: (n) => `günde ${n} CineMatch AI mesajı gönderebilirsin`,
       en: (n) => `you can send ${n} CineMatch AI messages per day`,
+      es: (n) => `puedes enviar ${n} mensajes de IA de CineMatch al día`,
     },
   }),
   identity_badge: feature({
@@ -180,21 +194,23 @@ export const PREMIUM_FEATURES = Object.freeze({
     icon: "diamond",
     enforcedBy: "server",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Profil kimlik rozeti", en: "Profile identity badge" },
+    title: { tr: "Profil kimlik rozeti", en: "Profile identity badge", es: "Insignia de identidad del perfil" },
     upsell: {
-      title: { tr: "Profil rozeti Premium'da", en: "The profile badge is a Premium perk" },
+      title: { tr: "Profil rozeti Premium'da", en: "The profile badge is a Premium perk", es: "La insignia del perfil es una ventaja Premium" },
       message: {
         tr: "Profilinde ve arkadaşlarının gördüğü sayfada parlayan bir kimlik rozeti kazan.",
         en: "Get a badge that shines on your profile and on the page your friends see.",
+        es: "Consigue una insignia que luce en tu perfil y en la página que ven tus amigos.",
       },
     },
     detail: {
       tr: "Profilinde ve arkadaşlarının gördüğü profil sayfanda",
       en: "On your profile and on the profile your friends see",
+      es: "En tu perfil y en el perfil que ven tus amigos",
     },
     planValue: {
-      [PREMIUM_PLAN.PREMIUM]: { tr: "Epik rozet", en: "Epic badge" },
-      [PREMIUM_PLAN.UNLIMITED]: { tr: "Efsanevi rozet", en: "Legendary badge" },
+      [PREMIUM_PLAN.PREMIUM]: { tr: "Epik rozet", en: "Epic badge", es: "Insignia épica" },
+      [PREMIUM_PLAN.UNLIMITED]: { tr: "Efsanevi rozet", en: "Legendary badge", es: "Insignia legendaria" },
     },
   }),
   friends: feature({
@@ -203,18 +219,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "social",
     icon: "person-add",
     limits: { free: 2, premium: 150, unlimited: UNLIMITED },
-    title: { tr: "Arkadaş", en: "Friends" },
+    title: { tr: "Arkadaş", en: "Friends", es: "Amigos" },
     upsell: {
-      title: { tr: "Arkadaş listen doldu", en: "Your friends list is full" },
+      title: { tr: "Arkadaş listen doldu", en: "Your friends list is full", es: "Tu lista de amigos está llena" },
     },
-    unit: { tr: "arkadaş", en: "friends" },
+    unit: { tr: "arkadaş", en: "friends", es: "amigos" },
     note: {
       tr: "Gelen istekleri kabul etmek her zaman serbest",
       en: "Accepting incoming requests is always free",
+      es: "Aceptar las solicitudes recibidas siempre es gratis",
     },
     phrase: {
       tr: (n) => `en fazla ${n} arkadaş ekleyebilirsin`,
       en: (n) => `you can add up to ${n} friends`,
+      es: (n) => `puedes añadir hasta ${n} amigos`,
     },
   }),
   chat_groups: feature({
@@ -223,18 +241,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "social",
     icon: "chatbubbles",
     limits: { free: 1, premium: 10, unlimited: UNLIMITED },
-    title: { tr: "Kurduğun sohbet grubu", en: "Group chats you create" },
+    title: { tr: "Kurduğun sohbet grubu", en: "Group chats you create", es: "Chats de grupo que creas" },
     upsell: {
-      title: { tr: "Grup kurma limitin doldu", en: "You've reached your group limit" },
+      title: { tr: "Grup kurma limitin doldu", en: "You've reached your group limit", es: "Has alcanzado tu límite de grupos" },
     },
-    unit: { tr: "grup", en: "groups" },
+    unit: { tr: "grup", en: "groups", es: "grupos" },
     note: {
       tr: "Birebir mesajlaşmak ve gruplara katılmak serbest",
       en: "Direct messages and joining groups are free",
+      es: "Los mensajes directos y unirte a grupos son gratis",
     },
     phrase: {
       tr: (n) => `en fazla ${n} sohbet grubu kurabilirsin`,
       en: (n) => `you can create up to ${n} group chat${n === 1 ? "" : "s"}`,
+      es: (n) => `puedes crear hasta ${n} ${n === 1 ? "chat de grupo" : "chats de grupo"}`,
     },
   }),
   custom_lists: feature({
@@ -243,18 +263,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "library",
     icon: "list",
     limits: { free: 1, premium: 25, unlimited: UNLIMITED },
-    title: { tr: "Özel liste", en: "Custom lists" },
+    title: { tr: "Özel liste", en: "Custom lists", es: "Listas personalizadas" },
     upsell: {
-      title: { tr: "Liste limitin doldu", en: "You've reached your list limit" },
+      title: { tr: "Liste limitin doldu", en: "You've reached your list limit", es: "Has alcanzado tu límite de listas" },
     },
-    unit: { tr: "liste", en: "lists" },
+    unit: { tr: "liste", en: "lists", es: "listas" },
     note: {
       tr: "İzleme listesi, izlenenler (film/dizi) ve favoriler her planda sınırsız",
       en: "Watchlist, watched (movies/shows) and favorites are unlimited on every plan",
+      es: "La lista de seguimiento, lo visto (películas y series) y los favoritos son ilimitados en todos los planes",
     },
     phrase: {
       tr: (n) => `en fazla ${n} özel liste oluşturabilirsin`,
       en: (n) => `you can create up to ${n} custom list${n === 1 ? "" : "s"}`,
+      es: (n) => `puedes crear hasta ${n} ${n === 1 ? "lista personalizada" : "listas personalizadas"}`,
     },
   }),
   shared_lists: feature({
@@ -263,18 +285,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "library",
     icon: "people-circle",
     limits: { free: 2, premium: 10, unlimited: UNLIMITED },
-    title: { tr: "Kurduğun ortak liste", en: "Shared lists you create" },
+    title: { tr: "Kurduğun ortak liste", en: "Shared lists you create", es: "Listas compartidas que creas" },
     upsell: {
-      title: { tr: "Ortak liste limitin doldu", en: "You've reached your shared list limit" },
+      title: { tr: "Ortak liste limitin doldu", en: "You've reached your shared list limit", es: "Has alcanzado tu límite de listas compartidas" },
     },
-    unit: { tr: "liste", en: "lists" },
+    unit: { tr: "liste", en: "lists", es: "listas" },
     note: {
       tr: "Davet edildiğin listelere katılmak serbest",
       en: "Joining lists you're invited to is free",
+      es: "Unirte a las listas a las que te inviten es gratis",
     },
     phrase: {
       tr: (n) => `en fazla ${n} ortak liste kurabilirsin`,
       en: (n) => `you can create up to ${n} shared lists`,
+      es: (n) => `puedes crear hasta ${n} listas compartidas`,
     },
   }),
   notes: feature({
@@ -283,18 +307,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "document-text",
     limits: { free: 5, premium: 50, unlimited: UNLIMITED },
-    title: { tr: "Not", en: "Notes" },
+    title: { tr: "Not", en: "Notes", es: "Notas" },
     upsell: {
-      title: { tr: "Not limitin doldu", en: "You've reached your notes limit" },
+      title: { tr: "Not limitin doldu", en: "You've reached your notes limit", es: "Has alcanzado tu límite de notas" },
     },
-    unit: { tr: "not", en: "notes" },
+    unit: { tr: "not", en: "notes", es: "notas" },
     note: {
       tr: "Mevcut notlarını düzenlemek ve silmek her zaman serbest",
       en: "Editing and deleting your notes is always free",
+      es: "Editar y eliminar tus notas siempre es gratis",
     },
     phrase: {
       tr: (n) => `en fazla ${n} not tutabilirsin`,
       en: (n) => `you can keep up to ${n} notes`,
+      es: (n) => `puedes guardar hasta ${n} notas`,
     },
   }),
   todos: feature({
@@ -303,18 +329,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "checkbox",
     limits: { free: 5, premium: 50, unlimited: UNLIMITED },
-    title: { tr: "Yapılacaklar listesi", en: "To-do lists" },
+    title: { tr: "Yapılacaklar listesi", en: "To-do lists", es: "Listas de tareas" },
     upsell: {
-      title: { tr: "Yapılacaklar limitin doldu", en: "You've reached your to-do limit" },
+      title: { tr: "Yapılacaklar limitin doldu", en: "You've reached your to-do limit", es: "Has alcanzado tu límite de tareas" },
     },
-    unit: { tr: "liste", en: "lists" },
+    unit: { tr: "liste", en: "lists", es: "listas" },
     note: {
       tr: "Bir listedeki madde sayısı sınırsız",
       en: "The number of items inside a list is unlimited",
+      es: "El número de elementos dentro de una lista es ilimitado",
     },
     phrase: {
       tr: (n) => `en fazla ${n} yapılacaklar listesi tutabilirsin`,
       en: (n) => `you can keep up to ${n} to-do lists`,
+      es: (n) => `puedes tener hasta ${n} listas de tareas`,
     },
   }),
   movie_notes: feature({
@@ -323,18 +351,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "film",
     limits: { free: 20, premium: 200, unlimited: UNLIMITED },
-    title: { tr: "Film notu", en: "Movie notes" },
+    title: { tr: "Film notu", en: "Movie notes", es: "Notas de películas" },
     upsell: {
-      title: { tr: "Film notu limitin doldu", en: "You've reached your movie notes limit" },
+      title: { tr: "Film notu limitin doldu", en: "You've reached your movie notes limit", es: "Has alcanzado tu límite de notas de películas" },
     },
-    unit: { tr: "film", en: "movies" },
+    unit: { tr: "film", en: "movies", es: "películas" },
     note: {
       tr: "Her film için tek not; mevcut notu düzenlemek serbest",
       en: "One note per movie; editing an existing note is free",
+      es: "Una nota por película; editar una nota existente es gratis",
     },
     phrase: {
       tr: (n) => `en fazla ${n} filme not yazabilirsin`,
       en: (n) => `you can write notes for up to ${n} movies`,
+      es: (n) => `puedes escribir notas para hasta ${n} películas`,
     },
   }),
   tv_notes: feature({
@@ -343,18 +373,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "notes",
     icon: "tv",
     limits: { free: 20, premium: 200, unlimited: UNLIMITED },
-    title: { tr: "Dizi notu", en: "Show notes" },
+    title: { tr: "Dizi notu", en: "Show notes", es: "Notas de series" },
     upsell: {
-      title: { tr: "Dizi notu limitin doldu", en: "You've reached your show notes limit" },
+      title: { tr: "Dizi notu limitin doldu", en: "You've reached your show notes limit", es: "Has alcanzado tu límite de notas de series" },
     },
-    unit: { tr: "dizi", en: "shows" },
+    unit: { tr: "dizi", en: "shows", es: "series" },
     note: {
       tr: "Her dizi için tek not; mevcut notu düzenlemek serbest",
       en: "One note per show; editing an existing note is free",
+      es: "Una nota por serie; editar una nota existente es gratis",
     },
     phrase: {
       tr: (n) => `en fazla ${n} diziye not yazabilirsin`,
       en: (n) => `you can write notes for up to ${n} shows`,
+      es: (n) => `puedes escribir notas para hasta ${n} series`,
     },
   }),
   games: feature({
@@ -363,21 +395,23 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "game-controller",
     limits: { free: 0, premium: 20, unlimited: UNLIMITED },
-    title: { tr: "Sahne tahmin oyunu", en: "Scene guess games" },
+    title: { tr: "Sahne tahmin oyunu", en: "Scene guess games", es: "Juegos de adivinar escenas" },
     upsell: {
       // `title`: limit dolunca (Premium'da günlük hak bitti); `lockedTitle` +
       // `message`: planda hiç yokken (Free). Bkz. utils/premiumUpsellContent.js.
-      title: { tr: "Bugünkü oyun hakkın bitti", en: "You're out of games for today" },
-      lockedTitle: { tr: "Oyunlar Premium'da", en: "Games are a Premium perk" },
+      title: { tr: "Bugünkü oyun hakkın bitti", en: "You're out of games for today", es: "Se te han acabado las partidas de hoy" },
+      lockedTitle: { tr: "Oyunlar Premium'da", en: "Games are a Premium perk", es: "Los juegos son una ventaja Premium" },
       message: {
         tr: "Sahne tahmin oyunlarını, liderlik tablosunu ve istatistiklerini Premium ile aç.",
         en: "Unlock the scene guess games, leaderboards and stats with Premium.",
+        es: "Desbloquea los juegos de adivinar escenas, las clasificaciones y las estadísticas con Premium.",
       },
     },
-    unit: { tr: "oyun", en: "games" },
+    unit: { tr: "oyun", en: "games", es: "partidas" },
     phrase: {
       tr: (n) => `günde ${n} oyun oynayabilirsin`,
       en: (n) => `you can play ${n} games per day`,
+      es: (n) => `puedes jugar ${n} partidas al día`,
     },
   }),
   cineswipe_rooms: feature({
@@ -386,19 +420,21 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "people",
     limits: { free: 0, premium: 10, unlimited: UNLIMITED },
-    title: { tr: "CineSwipe odası kurma", en: "CineSwipe rooms you host" },
+    title: { tr: "CineSwipe odası kurma", en: "CineSwipe rooms you host", es: "Salas de CineSwipe que creas" },
     upsell: {
-      title: { tr: "Bugünkü oda hakkın bitti", en: "You've hosted all of today's rooms" },
-      lockedTitle: { tr: "Arkadaşınla CineSwipe Premium'da", en: "CineSwipe with friends is a Premium perk" },
+      title: { tr: "Bugünkü oda hakkın bitti", en: "You've hosted all of today's rooms", es: "Has creado todas las salas de hoy" },
+      lockedTitle: { tr: "Arkadaşınla CineSwipe Premium'da", en: "CineSwipe with friends is a Premium perk", es: "CineSwipe con amigos es una ventaja Premium" },
       message: {
         tr: "Arkadaşınla ortak oda kur, kaydırdıkça eşleşin ve bu akşamki filmi birlikte seçin.",
         en: "Host a shared room with a friend, match as you swipe and pick tonight's movie together.",
+        es: "Crea una sala compartida con un amigo, haced match mientras deslizáis y elegid juntos la película de esta noche.",
       },
     },
-    unit: { tr: "oda", en: "rooms" },
+    unit: { tr: "oda", en: "rooms", es: "salas" },
     phrase: {
       tr: (n) => `günde ${n} CineSwipe odası kurabilirsin`,
       en: (n) => `you can host ${n} CineSwipe rooms per day`,
+      es: (n) => `puedes crear ${n} salas de CineSwipe al día`,
     },
   }),
   cineswipe_swipes: feature({
@@ -407,19 +443,21 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "swap-horizontal",
     limits: { free: 0, premium: 300, unlimited: UNLIMITED },
-    title: { tr: "Tek başına CineSwipe", en: "Solo CineSwipe" },
+    title: { tr: "Tek başına CineSwipe", en: "Solo CineSwipe", es: "CineSwipe en solitario" },
     upsell: {
-      title: { tr: "Bugünkü kaydırma hakkın bitti", en: "You're out of swipes for today" },
-      lockedTitle: { tr: "CineSwipe Premium'da", en: "CineSwipe is a Premium perk" },
+      title: { tr: "Bugünkü kaydırma hakkın bitti", en: "You're out of swipes for today", es: "Se te han acabado los deslizamientos de hoy" },
+      lockedTitle: { tr: "CineSwipe Premium'da", en: "CineSwipe is a Premium perk", es: "CineSwipe es una ventaja Premium" },
       message: {
         tr: "Kartları kaydırarak sana uygun film ve dizileri keşfet.",
         en: "Swipe through cards to discover movies and shows you'll like.",
+        es: "Desliza tarjetas para descubrir películas y series que te gustarán.",
       },
     },
-    unit: { tr: "kart", en: "cards" },
+    unit: { tr: "kart", en: "cards", es: "tarjetas" },
     phrase: {
       tr: (n) => `günde ${n} kart kaydırabilirsin`,
       en: (n) => `you can swipe ${n} cards per day`,
+      es: (n) => `puedes deslizar ${n} tarjetas al día`,
     },
   }),
   tournament_vote: feature({
@@ -428,16 +466,17 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "play",
     icon: "trophy",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Turnuvada oy kullanma", en: "Voting in the tournament" },
+    title: { tr: "Turnuvada oy kullanma", en: "Voting in the tournament", es: "Votar en el torneo" },
     upsell: {
-      title: { tr: "Turnuvada oy Premium'da", en: "Tournament voting is a Premium perk" },
+      title: { tr: "Turnuvada oy Premium'da", en: "Tournament voting is a Premium perk", es: "Votar en el torneo es una ventaja Premium" },
       message: {
         tr: "Turnuvayı herkes izleyebilir; aday gösterme ve maç oyları Premium'a özel.",
         en: "Anyone can follow the tournament; nominating and voting on matches is for Premium.",
+        es: "Cualquiera puede seguir el torneo; nominar y votar en los partidos es solo para Premium.",
       },
     },
-    freeValue: { tr: "Yalnız izleyici", en: "Spectator only" },
-    paidValue: { tr: "Oy kullanabilir", en: "Can vote" },
+    freeValue: { tr: "Yalnız izleyici", en: "Spectator only", es: "Solo espectador" },
+    paidValue: { tr: "Oy kullanabilir", en: "Can vote", es: "Puede votar" },
   }),
   custom_themes: feature({
     id: "custom_themes",
@@ -445,19 +484,21 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "color-palette",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Kendi temanı oluştur", en: "Create your own themes" },
+    title: { tr: "Kendi temanı oluştur", en: "Create your own themes", es: "Crea tus propios temas" },
     upsell: {
-      title: { tr: "Kendi temanı tasarla", en: "Design your own theme" },
+      title: { tr: "Kendi temanı tasarla", en: "Design your own theme", es: "Diseña tu propio tema" },
       message: {
         tr: "Renkleri sen seç, temanı kaydet ve istediğin an değiştir.",
         en: "Pick your own colors, save your theme and switch whenever you like.",
+        es: "Elige tus colores, guarda tu tema y cámbialo cuando quieras.",
       },
     },
     freeValue: {
       tr: `${PRESET_THEME_COUNT} hazır tema`,
       en: `${PRESET_THEME_COUNT} preset themes`,
+      es: `${PRESET_THEME_COUNT} temas predefinidos`,
     },
-    paidValue: { tr: "Sınırsız özel tema", en: "Unlimited custom themes" },
+    paidValue: { tr: "Sınırsız özel tema", en: "Unlimited custom themes", es: "Temas personalizados ilimitados" },
   }),
   font_catalog: feature({
     id: "font_catalog",
@@ -465,21 +506,24 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "text",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Yazı tipi kataloğu", en: "Font catalog" },
+    title: { tr: "Yazı tipi kataloğu", en: "Font catalog", es: "Catálogo de fuentes" },
     upsell: {
-      title: { tr: `${FONT_CATALOG_SIZE} yazı tipinin kilidini aç`, en: `Unlock all ${FONT_CATALOG_SIZE} fonts` },
+      title: { tr: `${FONT_CATALOG_SIZE} yazı tipinin kilidini aç`, en: `Unlock all ${FONT_CATALOG_SIZE} fonts`, es: `Desbloquea las ${FONT_CATALOG_SIZE} fuentes` },
       message: {
         tr: "Başlık, gövde ve rakamlar için istediğin yazı tipini seç.",
         en: "Pick the font you like for headings, body text and numbers.",
+        es: "Elige la fuente que prefieras para títulos, texto y números.",
       },
     },
     freeValue: {
       tr: `${FREE_FONT_PRESET_IDS.length} yazı tipi`,
       en: `${FREE_FONT_PRESET_IDS.length} fonts`,
+      es: `${FREE_FONT_PRESET_IDS.length} fuentes`,
     },
     paidValue: {
       tr: `${FONT_CATALOG_SIZE} yazı tipi`,
       en: `${FONT_CATALOG_SIZE} fonts`,
+      es: `${FONT_CATALOG_SIZE} fuentes`,
     },
   }),
   app_icon: feature({
@@ -488,16 +532,17 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "apps",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Uygulama simgesi", en: "App icon" },
+    title: { tr: "Uygulama simgesi", en: "App icon", es: "Icono de la app" },
     upsell: {
-      title: { tr: "Simgeyi değiştir", en: "Change your app icon" },
+      title: { tr: "Simgeyi değiştir", en: "Change your app icon", es: "Cambia el icono de la app" },
       message: {
         tr: "Ana ekranında görünecek Seelogd simgesini kendin seç.",
         en: "Pick the Seelogd icon that shows on your home screen.",
+        es: "Elige el icono de Seelogd que aparece en tu pantalla de inicio.",
       },
     },
-    freeValue: { tr: "Varsayılan simge", en: "Default icon" },
-    paidValue: { tr: "Simge seçici", en: "Icon picker" },
+    freeValue: { tr: "Varsayılan simge", en: "Default icon", es: "Icono predeterminado" },
+    paidValue: { tr: "Simge seçici", en: "Icon picker", es: "Selector de iconos" },
   }),
   snow_effect: feature({
     id: "snow_effect",
@@ -505,16 +550,17 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "snow",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Kar animasyonu", en: "Snow animation" },
+    title: { tr: "Kar animasyonu", en: "Snow animation", es: "Animación de nieve" },
     upsell: {
-      title: { tr: "Kar yağışı Premium'da", en: "Snowfall is a Premium perk" },
+      title: { tr: "Kar yağışı Premium'da", en: "Snowfall is a Premium perk", es: "La nevada es una ventaja Premium" },
       message: {
         tr: "Ekranlarının üzerine hafif hafif kar yağdır.",
         en: "Let a gentle snowfall drift across your screens.",
+        es: "Deja que una suave nevada caiga sobre tus pantallas.",
       },
     },
-    freeValue: { tr: "Kapalı", en: "Off" },
-    paidValue: { tr: "Kar yağışı", en: "Snowfall" },
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado" },
+    paidValue: { tr: "Kar yağışı", en: "Snowfall", es: "Nevada" },
   }),
   ambient_background: feature({
     id: "ambient_background",
@@ -522,16 +568,17 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "prism",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Ambiyans arka planı", en: "Ambient background" },
+    title: { tr: "Ambiyans arka planı", en: "Ambient background", es: "Fondo ambiental" },
     upsell: {
-      title: { tr: "Ambiyans Premium'da", en: "Ambient background is a Premium perk" },
+      title: { tr: "Ambiyans Premium'da", en: "Ambient background is a Premium perk", es: "El fondo ambiental es una ventaja Premium" },
       message: {
         tr: "Ekranlarının arkasında bulanık, rengârenk ışıklar süzülsün.",
         en: "Let soft, colorful lights drift behind your screens.",
+        es: "Deja que luces suaves y de colores floten tras tus pantallas.",
       },
     },
-    freeValue: { tr: "Kapalı", en: "Off" },
-    paidValue: { tr: "Süzülen ışıklar", en: "Drifting lights" },
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado" },
+    paidValue: { tr: "Süzülen ışıklar", en: "Drifting lights", es: "Luces flotantes" },
   }),
   icon_background: feature({
     id: "icon_background",
@@ -539,16 +586,17 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "image",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "İkon arka planı", en: "Icon background" },
+    title: { tr: "İkon arka planı", en: "Icon background", es: "Fondo de iconos" },
     upsell: {
-      title: { tr: "İkon arka planı Premium'da", en: "Icon background is a Premium perk" },
+      title: { tr: "İkon arka planı Premium'da", en: "Icon background is a Premium perk", es: "El fondo de iconos es una ventaja Premium" },
       message: {
         tr: "Ekran arka planlarına desen ekle; saydamlığını ve düzenini ayarla.",
         en: "Add a pattern behind your screens and tune its opacity and layout.",
+        es: "Añade un patrón tras tus pantallas y ajusta su opacidad y su disposición.",
       },
     },
-    freeValue: { tr: "Kapalı", en: "Off" },
-    paidValue: { tr: "Desenli arka plan", en: "Patterned background" },
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado" },
+    paidValue: { tr: "Desenli arka plan", en: "Patterned background", es: "Fondo con patrón" },
   }),
   pet_companion: feature({
     id: "pet_companion",
@@ -556,16 +604,17 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "personal",
     icon: "paw",
     minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Pet / Dost", en: "Pet companion" },
+    title: { tr: "Pet / Dost", en: "Pet companion", es: "Mascota compañera" },
     upsell: {
-      title: { tr: "Pet Premium'da", en: "The pet companion is a Premium perk" },
+      title: { tr: "Pet Premium'da", en: "The pet companion is a Premium perk", es: "La mascota compañera es una ventaja Premium" },
       message: {
         tr: "Ekranında dolaşan bir dost edin; dokununca durumu değişir, basılı tutunca AI açılır.",
         en: "Get a companion that roams your screen; tap it to change its mood, hold it to open the AI.",
+        es: "Consigue una mascota que pasea por tu pantalla; tócala para cambiar su estado de ánimo y mantenla pulsada para abrir la IA.",
       },
     },
-    freeValue: { tr: "Kapalı", en: "Off" },
-    paidValue: { tr: "Ekranda pet", en: "On-screen pet" },
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado" },
+    paidValue: { tr: "Ekranda pet", en: "On-screen pet", es: "Mascota en pantalla" },
   }),
   streaming_alerts: feature({
     id: "streaming_alerts",
@@ -574,18 +623,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     icon: "notifications",
     enforcedBy: "server",
     limits: { free: 10, premium: 100, unlimited: 100 },
-    title: { tr: "Platform bildirimi", en: "Streaming alerts" },
+    title: { tr: "Platform bildirimi", en: "Streaming alerts", es: "Avisos de streaming" },
     upsell: {
-      title: { tr: "Takip limitin doldu", en: "Tracking limit reached" },
+      title: { tr: "Takip limitin doldu", en: "Tracking limit reached", es: "Has alcanzado el límite de seguimiento" },
     },
-    unit: { tr: "başlık", en: "titles" },
+    unit: { tr: "başlık", en: "titles", es: "títulos" },
     detail: {
       tr: "İzleme listene son eklediğin yapımlar bir platforma gelince haber verir",
       en: "Tells you when your latest watchlist titles start streaming",
+      es: "Te avisa cuando los últimos títulos de tu lista de seguimiento llegan a una plataforma",
     },
     phrase: {
       tr: (n) => `izleme listene son eklediğin ${n} başlık takip edilir`,
       en: (n) => `your ${n} most recent watchlist titles are tracked`,
+      es: (n) => `se siguen tus ${n} títulos más recientes de la lista de seguimiento`,
     },
   }),
   movie_reminders: feature({
@@ -594,18 +645,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "alerts",
     icon: "film",
     limits: { free: 10, premium: 50, unlimited: UNLIMITED },
-    title: { tr: "Film hatırlatması", en: "Movie reminders" },
+    title: { tr: "Film hatırlatması", en: "Movie reminders", es: "Recordatorios de películas" },
     upsell: {
-      title: { tr: "Film hatırlatma limitin doldu", en: "You've reached your movie reminder limit" },
+      title: { tr: "Film hatırlatma limitin doldu", en: "You've reached your movie reminder limit", es: "Has alcanzado tu límite de recordatorios de películas" },
     },
-    unit: { tr: "film", en: "movies" },
+    unit: { tr: "film", en: "movies", es: "películas" },
     note: {
       tr: "Çıkışı geçmiş filmler sayılmaz",
       en: "Movies that have already released don't count",
+      es: "Las películas ya estrenadas no cuentan",
     },
     phrase: {
       tr: (n) => `aynı anda en fazla ${n} filmin çıkışı için hatırlatma kurabilirsin`,
       en: (n) => `you can have reminders for up to ${n} upcoming movies at once`,
+      es: (n) => `puedes tener recordatorios de hasta ${n} próximos estrenos de películas a la vez`,
     },
   }),
   tv_reminders: feature({
@@ -614,18 +667,20 @@ export const PREMIUM_FEATURES = Object.freeze({
     category: "alerts",
     icon: "tv",
     limits: { free: 20, premium: 100, unlimited: UNLIMITED },
-    title: { tr: "Dizi hatırlatması", en: "Show reminders" },
+    title: { tr: "Dizi hatırlatması", en: "Show reminders", es: "Recordatorios de series" },
     upsell: {
-      title: { tr: "Dizi hatırlatma limitin doldu", en: "You've reached your show reminder limit" },
+      title: { tr: "Dizi hatırlatma limitin doldu", en: "You've reached your show reminder limit", es: "Has alcanzado tu límite de recordatorios de series" },
     },
-    unit: { tr: "dizi", en: "shows" },
+    unit: { tr: "dizi", en: "shows", es: "series" },
     note: {
       tr: "Bir dizinin tüm bölümleri tek hak sayılır; yayınlanmış bölümler sayılmaz",
       en: "All episodes of one show use a single slot; aired episodes don't count",
+      es: "Todos los episodios de una serie usan un solo hueco; los ya emitidos no cuentan",
     },
     phrase: {
       tr: (n) => `aynı anda en fazla ${n} dizi için bölüm hatırlatması kurabilirsin`,
       en: (n) => `you can have episode reminders for up to ${n} shows at once`,
+      es: (n) => `puedes tener recordatorios de episodios de hasta ${n} series a la vez`,
     },
   }),
   wrapped_archive: feature({
@@ -642,25 +697,27 @@ export const PREMIUM_FEATURES = Object.freeze({
       premium: WRAPPED_YEARS_VISIBLE.premium,
       unlimited: UNLIMITED,
     },
-    title: { tr: "Wrapped arşivi", en: "Wrapped archive" },
-    unit: { tr: "yıl", en: "years" },
+    title: { tr: "Wrapped arşivi", en: "Wrapped archive", es: "Archivo de Wrapped" },
+    unit: { tr: "yıl", en: "years", es: "años" },
     upsell: {
-      title: { tr: "Geçmiş yıllar Premium'da", en: "Past years are a Premium perk" },
+      title: { tr: "Geçmiş yıllar Premium'da", en: "Past years are a Premium perk", es: "Los años anteriores son una ventaja Premium" },
       // Premium'un penceresi dolunca (5 yıldan eski) hedef plan Max olur.
       titleByTarget: {
         [PREMIUM_PLAN.UNLIMITED]: {
           tr: "Tüm yıllar Premium Max'te",
           en: "Every year is a Premium Max perk",
+          es: "Todos los años son una ventaja Premium Max",
         },
       },
     },
     planValue: {
-      [PREMIUM_PLAN.FREE]: { tr: "Yalnız bu yıl", en: "This year only" },
+      [PREMIUM_PLAN.FREE]: { tr: "Yalnız bu yıl", en: "This year only", es: "Solo este año" },
       [PREMIUM_PLAN.PREMIUM]: {
         tr: `Son ${WRAPPED_YEARS_VISIBLE.premium} yıl`,
         en: `Last ${WRAPPED_YEARS_VISIBLE.premium} years`,
+        es: `Últimos ${WRAPPED_YEARS_VISIBLE.premium} años`,
       },
-      [PREMIUM_PLAN.UNLIMITED]: { tr: "Tüm yıllar", en: "Every year" },
+      [PREMIUM_PLAN.UNLIMITED]: { tr: "Tüm yıllar", en: "Every year", es: "Todos los años" },
     },
     phrase: {
       tr: (n) =>
@@ -675,14 +732,73 @@ export const PREMIUM_FEATURES = Object.freeze({
           : Number.isFinite(n)
             ? `you can view your Wrapped recaps from the last ${n} years`
             : "you can view your Wrapped recaps from every year",
+      es: (n) =>
+        n === 1
+          ? "solo puedes ver el resumen de Wrapped de este año"
+          : Number.isFinite(n)
+            ? `puedes ver los resúmenes de Wrapped de los últimos ${n} años`
+            : "puedes ver los resúmenes de Wrapped de todos los años",
     },
+  }),
+  // Uygulama içi geri bildirim kutusu (Ayarlar > Destek ve geri bildirim). Free'de
+  // e-posta desteği (Hakkında) açık kalır; bu iki kapı yalnız UYGULAMA İÇİ formu
+  // ve "gönderdiklerim" geçmişini açar. Plan kuralı sunucuda da zorlanır
+  // (firestore.rules → Feedback); iki taraf birlikte değişmeli.
+  bug_report: feature({
+    id: "bug_report",
+    kind: ACCESS,
+    category: "support",
+    icon: "bug",
+    enforcedBy: "server",
+    minPlan: PREMIUM_PLAN.PREMIUM,
+    title: { tr: "Hata bildirimi", en: "Bug reports", es: "Informes de errores" },
+    upsell: {
+      title: { tr: "Hata bildirimi Premium'da", en: "Bug reports are a Premium perk", es: "Los informes de errores son una ventaja Premium" },
+      message: {
+        tr: "Karşılaştığın sorunu uygulamadan doğrudan ilet; cihaz ve sürüm bilgisi kendiliğinden eklenir.",
+        en: "Send the problem you ran into straight from the app; device and version details are attached for you.",
+        es: "Envía el problema que encontraste directamente desde la app; los datos del dispositivo y la versión se añaden solos.",
+      },
+    },
+    detail: {
+      tr: "Uygulamadan, cihaz ve sürüm bilgisiyle birlikte",
+      en: "From inside the app, with device and version details",
+      es: "Desde la app, con los datos del dispositivo y la versión",
+    },
+    freeValue: { tr: "Yalnız e-posta", en: "Email only", es: "Solo correo" },
+    paidValue: { tr: "Uygulamadan bildir", en: "Report in-app", es: "Informar en la app" },
+  }),
+  feature_request: feature({
+    id: "feature_request",
+    kind: ACCESS,
+    category: "support",
+    icon: "bulb",
+    enforcedBy: "server",
+    minPlan: PREMIUM_PLAN.UNLIMITED,
+    title: { tr: "Özellik isteği", en: "Feature requests", es: "Solicitudes de funciones" },
+    upsell: {
+      title: { tr: "Özellik isteği Premium Max'te", en: "Feature requests are a Premium Max perk", es: "Las solicitudes de funciones son una ventaja Premium Max" },
+      message: {
+        tr: "Görmek istediğin özelliği doğrudan bize ilet; gönderdiklerinin durumunu uygulamadan takip et.",
+        en: "Tell us the feature you want to see, and follow the status of what you sent right in the app.",
+        es: "Cuéntanos la función que quieres ver y sigue en la app el estado de lo que enviaste.",
+      },
+    },
+    detail: {
+      tr: "Fikrini doğrudan bize ilet, durumunu takip et",
+      en: "Send your idea straight to us and follow its status",
+      es: "Envía tu idea directamente y sigue su estado",
+    },
+    freeValue: { tr: "Yalnız e-posta", en: "Email only", es: "Solo correo" },
+    paidValue: { tr: "Uygulamadan öner", en: "Suggest in-app", es: "Sugerir en la app" },
   }),
 });
 
 export const FEATURE_IDS = Object.freeze(Object.keys(PREMIUM_FEATURES));
 
+// Bilinmeyen dil İngilizce (utils/appLanguages kuralı); `es` kolu olmayan girdi İngilizceye düşer.
 const pick = (copy, language) =>
-  (language === "tr" ? copy?.tr : copy?.en) ?? copy?.en ?? copy?.tr ?? "";
+  copy?.[copyLanguage(language, ["tr", "en", "es"])] ?? copy?.en ?? copy?.tr ?? "";
 
 /** Sayısal karşılaştırma için limit (AI kotasında günlük tavan). */
 const numericLimit = (definition, limit) =>
@@ -808,7 +924,14 @@ export function requiredPlanForWrappedYear(year, now = new Date()) {
   return PLAN_ORDER.find((plan) => canViewWrappedYear(year, plan, now)) ?? null;
 }
 
-const unlimitedWord = (language) => (language === "tr" ? "Sınırsız" : "Unlimited");
+const unlimitedWord = (language) =>
+  pickByLanguage(language, { tr: "Sınırsız", en: "Unlimited", es: "Ilimitado" });
+
+/** Cümle içinde plan adı: Free planı İspanyolcada "Gratis" (ekranlardaki plan adıyla aynı). */
+const planNameFor = (plan, language) =>
+  plan === PREMIUM_PLAN.FREE && normalizeAppLanguage(language) === "es"
+    ? "Gratis"
+    : getPremiumPlanDisplayName(plan);
 
 /**
  * Özelliğin birim adı ("liste", "lists"). Kayıttaki İngilizce birimler çoğul
@@ -829,12 +952,14 @@ export function formatFeatureValue(featureId, plan, language = "en") {
   if (!definition) return "—";
   const normalized = normalizePlan(plan);
   const limit = getFeatureLimit(featureId, normalized);
-  const tr = language === "tr";
+  const lang = normalizeAppLanguage(language);
 
   if (definition.kind === AI_QUOTA) {
-    return tr
-      ? `${limit.daily}/gün · ${limit.monthly}/ay`
-      : `${limit.daily}/day · ${limit.monthly}/mo`;
+    return pickByLanguage(lang, {
+      tr: `${limit.daily}/gün · ${limit.monthly}/ay`,
+      en: `${limit.daily}/day · ${limit.monthly}/mo`,
+      es: `${limit.daily}/día · ${limit.monthly}/mes`,
+    });
   }
   if (definition.kind === ACCESS) {
     if (!limit) return definition.freeValue ? pick(definition.freeValue, language) : "—";
@@ -852,7 +977,11 @@ export function formatFeatureValue(featureId, plan, language = "en") {
   if (limit <= 0) return definition.freeValue ? pick(definition.freeValue, language) : "—";
   const unit = unitLabel(definition, limit, language);
   if (definition.kind === DAILY) {
-    return tr ? `${limit} ${unit}/gün` : `${limit} ${unit}/day`;
+    return pickByLanguage(lang, {
+      tr: `${limit} ${unit}/gün`,
+      en: `${limit} ${unit}/day`,
+      es: `${limit} ${unit}/día`,
+    });
   }
   return `${limit} ${unit}`;
 }
@@ -861,7 +990,7 @@ export function formatFeatureValue(featureId, plan, language = "en") {
 function upgradeSentence(featureId, plan, language) {
   const definition = getFeature(featureId);
   if (!definition || definition.kind === ACCESS) return "";
-  const tr = language === "tr";
+  const lang = normalizeAppLanguage(language);
   const current = numericLimit(definition, getFeatureLimit(featureId, plan));
   const parts = [];
   for (const candidate of PLAN_ORDER.slice(planRank(plan) + 1)) {
@@ -869,14 +998,18 @@ function upgradeSentence(featureId, plan, language) {
     if (!(limit > current)) continue;
     // Pencere özelliğinde çıplak "5" anlamsız kalır: "son 5 yıl" / "tüm yıllar".
     const value = definition.window
-      ? formatFeatureValue(featureId, candidate, language).toLocaleLowerCase(tr ? "tr" : "en")
+      ? formatFeatureValue(featureId, candidate, language).toLocaleLowerCase(intlLocaleOf(lang))
       : Number.isFinite(limit)
         ? String(limit)
-        : tr
-          ? "sınırsız"
-          : "unlimited";
+        : pickByLanguage(lang, { tr: "sınırsız", en: "unlimited", es: "ilimitado" });
     const name = getPremiumPlanDisplayName(candidate);
-    parts.push(tr ? `${name} ile ${value}` : `with ${name}: ${value}`);
+    parts.push(
+      pickByLanguage(lang, {
+        tr: `${name} ile ${value}`,
+        en: `with ${name}: ${value}`,
+        es: `con ${name}: ${value}`,
+      }),
+    );
   }
   if (!parts.length) return "";
   const sentence = `${parts.join(", ")}.`;
@@ -893,15 +1026,17 @@ export function describeCurrentLimit(featureId, plan, language = "en") {
   if (!definition || definition.kind === ACCESS) return "";
   // Kapalı özellikte "günde 0 oyun oynayabilirsin" demek yerine cümle yok.
   if (isLockedFor(featureId, plan)) return "";
-  const tr = language === "tr";
+  const lang = normalizeAppLanguage(language);
   const normalized = normalizePlan(plan);
-  const planName = getPremiumPlanDisplayName(normalized);
+  const planName = planNameFor(normalized, lang);
   const cap = numericLimit(definition, getFeatureLimit(featureId, normalized));
   const phrase = definition.phrase ? pick(definition.phrase, language) : null;
   if (typeof phrase !== "function") return "";
-  return tr
-    ? `${planName} planında ${phrase(cap)}.`
-    : `On ${planName}, ${phrase(cap)}.`;
+  return pickByLanguage(lang, {
+    tr: `${planName} planında ${phrase(cap)}.`,
+    en: `On ${planName}, ${phrase(cap)}.`,
+    es: `Con el plan ${planName}, ${phrase(cap)}.`,
+  });
 }
 
 /**
@@ -910,13 +1045,14 @@ export function describeCurrentLimit(featureId, plan, language = "en") {
  */
 export function buildLimitCopy(featureId, plan, language = "en") {
   const definition = getFeature(featureId);
-  const tr = language === "tr";
+  const lang = normalizeAppLanguage(language);
+  const L = (tr, en, es) => pickByLanguage(lang, { tr, en, es });
   const normalized = normalizePlan(plan);
   const canUpgrade = Boolean(nextPlanFor(featureId, normalized));
 
   if (!definition) {
     return {
-      title: tr ? "Premium özelliği" : "Premium feature",
+      title: L("Premium özelliği", "Premium feature", "Función Premium"),
       message: "",
       canUpgrade: false,
     };
@@ -925,11 +1061,26 @@ export function buildLimitCopy(featureId, plan, language = "en") {
   // ACCESS ya da bu planda kapalı (limit 0) bir sayılı özellik.
   if (definition.kind === ACCESS || isLockedFor(featureId, normalized)) {
     const title = pick(definition.title, language);
+    // Yalnız Max'in açtığı erişim özelliği (özellik isteği) "Premium ve Premium
+    // Max'te açık" demez: Premium'da kilitlidir.
+    if (definition.kind === ACCESS && definition.minPlan === PREMIUM_PLAN.UNLIMITED) {
+      return {
+        title: L("Premium Max özelliği", "Premium Max feature", "Función Premium Max"),
+        message: L(
+          `${title} yalnızca Premium Max planında açık.`,
+          `${title} is included in Premium Max only.`,
+          `${title} está incluido solo en Premium Max.`,
+        ),
+        canUpgrade,
+      };
+    }
     return {
-      title: tr ? "Premium özelliği" : "Premium feature",
-      message: tr
-        ? `${title} Premium ve Premium Max planlarında açık.`
-        : `${title} is included in Premium and Premium Max.`,
+      title: L("Premium özelliği", "Premium feature", "Función Premium"),
+      message: L(
+        `${title} Premium ve Premium Max planlarında açık.`,
+        `${title} is included in Premium and Premium Max.`,
+        `${title} está incluido en Premium y Premium Max.`,
+      ),
       canUpgrade,
     };
   }
@@ -938,20 +1089,14 @@ export function buildLimitCopy(featureId, plan, language = "en") {
   const upgrade = canUpgrade ? upgradeSentence(featureId, normalized, language) : "";
   const renew =
     definition.kind === DAILY
-      ? tr
-        ? "Hakların yarın yenilenir."
-        : "Your limit resets tomorrow."
+      ? L("Hakların yarın yenilenir.", "Your limit resets tomorrow.", "Tu límite se restablece mañana.")
       : "";
 
   return {
     title:
       definition.kind === DAILY
-        ? tr
-          ? "Bugünkü hakkın doldu"
-          : "Today's limit reached"
-        : tr
-          ? "Limite ulaştın"
-          : "Limit reached",
+        ? L("Bugünkü hakkın doldu", "Today's limit reached", "Has alcanzado el límite de hoy")
+        : L("Limite ulaştın", "Limit reached", "Has alcanzado el límite"),
     message: [base, upgrade, renew].filter(Boolean).join(" "),
     canUpgrade,
   };

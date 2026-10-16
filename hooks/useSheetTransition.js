@@ -48,23 +48,34 @@
 // bunu kendisi yapar; kendi `Modal`ını kuran sayfalar stilini `fit` ile sarar).
 // Sınırın işe yaraması için sayfanın İÇİNDE küçülebilen bir bölge (ScrollView,
 // FlatList — bkz. components/common/SheetScroll.js) bulunmalı. Hesap:
-// utils/sheetKeyboardFit.js.
+// utils/sheetKeyboardFit.js; klavye/kaplayıcı ölçümü: hooks/useKeyboardMetrics.js.
+//
+// KAPANIŞ: `visible` düştüğü an klavye geometrisi (yükselme + küçülme) DONDURULUR.
+// Klavye kapanışla birlikte inerse (çağıran `Keyboard.dismiss()` yapar, kullanıcı
+// klavyeyi önce kapatır, iOS modal inerken klavyeyi indirir) sayfa çıkış sırasında
+// ne yeniden büyür ne de yerinden oynar; çıkış mesafesi de "doğal boy + o anki
+// yükselme" olduğundan sayfa her koşulda ekranın altına tamamen iner. Dondurmasaydık
+// sayfa, klavyesi inmiş ekranda klavye açıkmış gibi kısa ve yarım yükseklikte
+// asılı kalıp hareket bitince birden kayboluyordu. Pencere kalkınca (`mounted`
+// false) klavye durumu, kaplayıcı ölçüsü ve yükselme tümüyle sıfırlanır.
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
   Easing,
-  Keyboard,
   Platform,
   StatusBar,
   StyleSheet,
 } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
+import useKeyboardMetrics from "@hooks/useKeyboardMetrics";
 import {
   SHEET_TOP_MARGIN,
   keyboardFitOverrides,
   keyboardLift,
   keyboardSheetBudget,
+  nextNaturalHeight,
+  sheetExitDistance,
 } from "@utils/sheetKeyboardFit";
 
 const { height: SCREEN_H } = Dimensions.get("window");
@@ -99,11 +110,42 @@ export default function useSheetTransition(visible, { liftWithKeyboard = true } 
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(FALLBACK_DISTANCE)).current;
   const keyboardShift = useRef(new Animated.Value(0)).current;
-  // Kayma mesafesi sayfanın GERÇEK yüksekliği; içerik değiştikçe (adım, sezon
-  // sayısı, filtre satırları) `onSheetLayout` ile tazelenir.
+  // Kayma mesafesi sayfanın GERÇEK ve klavyesiz ("doğal") yüksekliği; içerik
+  // değiştikçe (adım, sezon sayısı, filtre satırları) `onSheetLayout` ile
+  // tazelenir. Klavye sayfayı küçülttüyse küçülmüş ölçü buraya YAZILMAZ.
   const distance = useRef(FALLBACK_DISTANCE);
   const [mounted, setMounted] = useState(false);
   const mountedRef = useRef(false);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+
+  // ── Klavye ölçümü (açık/kapalı + kaplayıcı boyu) ────────────────────────
+  // Kaplayıcının KLAVYE KAPALIYKEN boyu: "pencere küçüldü mü" sorusunun tek
+  // doğru referansı. Pencere yüksekliğiyle karşılaştırmak yanıltıyor — durum
+  // çubuğu, KeyboardAvoidingView dolgusu ve translucent modal farkı her
+  // platformda başka bir sabit fark bırakıyor.
+  const { keyboardHeight, overlayHeight, baseOverlayHeight, isKeyboardOpen, onOverlayLayout } =
+    useKeyboardMetrics(mounted, { track: liftWithKeyboard });
+
+  // Klavyenin sayfayı fiilen kaldırdığı miktar ve bütçe (klavye kapalıyken null).
+  const liveLift = keyboardLift({ keyboardHeight, baseOverlayHeight, overlayHeight });
+  const liveBudget = keyboardSheetBudget({
+    keyboardHeight,
+    baseOverlayHeight,
+    overlayHeight,
+    windowHeight: Dimensions.get("window").height,
+    topGap,
+  });
+
+  // Açıkken son bilinen geometri. Kapanış başlayınca bu değerler DONAR; pencere
+  // kalkınca sıfırlanır. (Efektle yazılır: kapanışın ilk render'ında bir önceki
+  // `visible` render'ının değerini hâlâ taşır.)
+  const lastOpenGeometry = useRef({ lift: 0, budget: null });
+  useEffect(() => {
+    if (visible) lastOpenGeometry.current = { lift: liveLift, budget: liveBudget };
+    else if (!mounted) lastOpenGeometry.current = { lift: 0, budget: null };
+  });
+  const keyboardBudget = visible ? liveBudget : lastOpenGeometry.current.budget;
 
   useEffect(() => {
     if (visible) {
@@ -119,7 +161,9 @@ export default function useSheetTransition(visible, { liftWithKeyboard = true } 
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
-        toValue: distance.current,
+        // `translateY − keyboardShift` bileşiminde sayfa `lift` kadar yukarıda;
+        // yalnız sayfa boyu kadar inilirse `lift` kadar ekranda asılı kalır.
+        toValue: sheetExitDistance(distance.current, lastOpenGeometry.current.lift),
         duration: 260,
         easing: Easing.in(Easing.ease),
         useNativeDriver: true,
@@ -159,45 +203,20 @@ export default function useSheetTransition(visible, { liftWithKeyboard = true } 
   }, [mounted, visible, backdropOpacity, translateY]);
 
   // ── Klavye ile birlikte yükselme ────────────────────────────────────────
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const keyboardHeightRef = useRef(0);
-  // Kaplayıcının KLAVYE KAPALIYKEN ölçülen yüksekliği: "pencere küçüldü mü"
-  // sorusunun tek doğru referansı. Pencere yüksekliğiyle karşılaştırmak
-  // yanıltıyor — durum çubuğu, KeyboardAvoidingView dolgusu ve translucent
-  // modal farkı her platformda başka bir sabit fark bırakıyor.
-  const baseOverlayHeight = useRef(0);
-  const [overlayHeight, setOverlayHeight] = useState(0);
-
   useEffect(() => {
-    if (!mounted || !liftWithKeyboard) return undefined;
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const apply = (height) => {
-      keyboardHeightRef.current = height;
-      setKeyboardHeight(height);
-    };
-    const showSub = Keyboard.addListener(showEvent, (event) =>
-      apply(event?.endCoordinates?.height ?? 0),
-    );
-    const hideSub = Keyboard.addListener(hideEvent, () => apply(0));
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-      apply(0);
-    };
-  }, [mounted, liftWithKeyboard]);
-
-  useEffect(() => {
-    // Kaplayıcı klavyeyle birlikte daraldıysa sayfa zaten o kadar yükselmiştir.
-    const lift = keyboardLift({
-      keyboardHeight,
-      baseOverlayHeight: baseOverlayHeight.current,
-      overlayHeight,
-    });
+    // Pencere kalktı: yükselmeyi ANİMASYONSUZ sıfırla. Sıfırlanmazsa bir sonraki
+    // açılış önceki oturumun klavye yükselmesiyle başlayabilir.
+    if (!mounted) {
+      keyboardShift.setValue(0);
+      return undefined;
+    }
+    // Kapanış sürüyor: yükselme donuk kalır (bkz. dosya başı "KAPANIŞ"). Klavye
+    // bu sırada inse bile sayfa çıkış hareketinin ortasında yer değiştirmez.
+    if (!visible) return undefined;
     const animation = Animated.timing(keyboardShift, {
-      toValue: lift,
+      // Kaplayıcı klavyeyle birlikte daraldıysa sayfa zaten o kadar yükselmiştir
+      // (`liveLift` bunu düşer).
+      toValue: liveLift,
       // Kısa gecikme: pencere daralıyorsa `onLayout` bu süre içinde gelir ve
       // hedef daha hareket başlamadan düzelir (yükselip geri inme olmaz).
       delay: keyboardHeight > 0 ? 60 : 0,
@@ -207,16 +226,7 @@ export default function useSheetTransition(visible, { liftWithKeyboard = true } 
     });
     animation.start();
     return () => animation.stop();
-  }, [keyboardHeight, overlayHeight, keyboardShift]);
-
-  // Klavyenin üstünde kalan alan; klavye kapalıyken null (sınır yok).
-  const keyboardBudget = keyboardSheetBudget({
-    keyboardHeight,
-    baseOverlayHeight: baseOverlayHeight.current,
-    overlayHeight,
-    windowHeight: Dimensions.get("window").height,
-    topGap,
-  });
+  }, [mounted, visible, keyboardHeight, liveLift, keyboardShift]);
 
   return useMemo(
     () => ({
@@ -236,16 +246,24 @@ export default function useSheetTransition(visible, { liftWithKeyboard = true } 
         return overrides ? [style, overrides] : style;
       },
       onSheetLayout: (event) => {
+        // Kapanırken ölçü güncellenmez: klavye inip sayfa dondurulmuş boyda
+        // kalırken küçülmüş boy "doğal boy" diye kaydedilmesin.
+        if (!visibleRef.current) return;
         const measured = Math.round(event.nativeEvent.layout.height);
-        if (measured > 0) distance.current = measured;
+        distance.current = nextNaturalHeight(distance.current, measured, isKeyboardOpen());
       },
-      onOverlayLayout: (event) => {
-        const measured = Math.round(event.nativeEvent.layout.height);
-        if (measured <= 0) return;
-        if (keyboardHeightRef.current === 0) baseOverlayHeight.current = measured;
-        setOverlayHeight(measured);
-      },
+      onOverlayLayout,
     }),
-    [mounted, backdropOpacity, translateY, keyboardShift, keyboardBudget, overlayHeight, topGap],
+    [
+      mounted,
+      backdropOpacity,
+      translateY,
+      keyboardShift,
+      keyboardBudget,
+      overlayHeight,
+      topGap,
+      isKeyboardOpen,
+      onOverlayLayout,
+    ],
   );
 }

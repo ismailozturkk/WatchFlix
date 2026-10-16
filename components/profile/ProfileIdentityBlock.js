@@ -14,6 +14,7 @@
 // Sütun dar (360 px'lik ekranda ~158 px) — bu yüzden e-posta ortadan kısaltılır
 // (alan adı görünür kalır) ve tarih kısa ay adıyla tek satıra sığar.
 
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import AppIcon from "../AppIcon";
@@ -30,7 +31,7 @@ const UNVERIFIED_COLOR = "rgb(229, 20, 0)";
 function formatJoinDate(timestamp, language) {
   const date = new Date(Number(timestamp));
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(language === "tr" ? "tr-TR" : "en-US", {
+  return date.toLocaleDateString(intlLocaleOf(language), {
     day: "2-digit",
     month: "short",
     year: "numeric",

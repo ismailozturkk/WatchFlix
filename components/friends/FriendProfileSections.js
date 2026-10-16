@@ -30,7 +30,7 @@ const AVATAR_SIZE = 100;
 // UserAvatar squircle yarıçapı `round(size * 0.33)`; halka onun etrafında
 // padding + çerçeve kadar büyür ki iç içe köşeler paralel dursun.
 const RING_PADDING = 5;
-const RING_BORDER = 2;
+const RING_BORDER = 3;
 const RING_RADIUS = Math.round(AVATAR_SIZE * 0.33) + RING_PADDING + RING_BORDER;
 
 // Backdrop'un kaydırmayla sönme / yukarı kayma mesafesi.
@@ -161,25 +161,28 @@ export const ProfileHero = memo(function ProfileHero({
         },
       ]}
     >
-      <View
-        style={[
-          styles.avatarRing,
-          {
-            borderColor: alpha(theme.accent, 0.5),
-            backgroundColor: alpha(theme.accent, 0.1),
-          },
-        ]}
-      >
-        <UserAvatar
-          avatarIndex={avatarIndex}
-          photoURL={photoURL}
-          size={AVATAR_SIZE}
-          shape="squircle"
-          iconRatio={0.794}
-          onPress={onAvatarPress}
-          onLongPress={onAvatarLongPress}
-          delayLongPress={220}
-        />
+      <View style={styles.avatarWrap}>
+        {/* Degrade çerçeve + tema renginde iç disk: avatar zeminden "kesilmiş"
+            gibi durur, arkadaki accent gradyanı çerçevenin dışında kalır. */}
+        <LinearGradient
+          colors={[theme.accent, alpha(theme.accent, 0.28)]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.avatarRing}
+        >
+          <View style={[styles.avatarInner, { backgroundColor: theme.primary }]}>
+            <UserAvatar
+              avatarIndex={avatarIndex}
+              photoURL={photoURL}
+              size={AVATAR_SIZE}
+              shape="squircle"
+              iconRatio={0.794}
+              onPress={onAvatarPress}
+              onLongPress={onAvatarLongPress}
+              delayLongPress={220}
+            />
+          </View>
+        </LinearGradient>
         {/* Çevrimiçi noktası avatarın DIŞINDA: UserAvatar kabı taşanı kırpar,
             squircle köşesinde nokta yarım görünürdü. */}
         {online ? (
@@ -247,7 +250,7 @@ export const ProfileHero = memo(function ProfileHero({
       ) : null}
 
       {memberSince ? (
-        <View style={styles.memberSince}>
+        <View style={[styles.memberSince, { borderColor: alpha(theme.border, 0.95) }]}>
           <Ionicons name="calendar-outline" size={12} color={theme.text?.muted ?? "#666"} />
           <Text
             allowFontScaling={false}
@@ -314,6 +317,7 @@ export function SectionHeader({ title, trailing }) {
   const { theme } = useTheme();
   return (
     <View style={styles.sectionHeader}>
+      <View style={[styles.sectionBar, { backgroundColor: theme.accent }]} />
       <Text
         allowFontScaling={false}
         numberOfLines={1}
@@ -344,206 +348,197 @@ export function CountChip({ value, icon }) {
   );
 }
 
-// ── Toplam izleme süresi kartı ───────────────────────────────────────────────
-export const WatchSummaryCard = memo(function WatchSummaryCard({
+// ── İzleme istatistikleri: tek kompakt kart ─────────────────────────────────
+// Eskiden üç ayrı kart (toplam süre, 2×2 karolar, tür çubukları) ≈ 700 px
+// tutuyordu; artık tek kart üç bölüm: (1) toplam süre + film/dizi dağılımı,
+// (2) dört sayaç tek şeritte, (3) en çok izlenen türler çip olarak.
+//
+//   movie / tv : { label, minutes, share, color, durationLabel }
+//   metrics    : [{ key, icon, iconLib, label, value, color }]
+//   genres     : [[ad, adet], ...] azalan sırada; `genreColors` sıraya göre döner.
+export const WatchStatsCard = memo(function WatchStatsCard({
   caption,
   totalLabel,
   minutesLabel,
   movie,
   tv,
+  metrics,
+  genresTitle,
+  genres,
+  genreColors,
 }) {
   const { theme } = useTheme();
-  // movie/tv = { label, minutes, share, color }
   const hasSplit = movie.minutes + tv.minutes > 0;
+  const divider = { backgroundColor: alpha(theme.border, 0.9) };
 
   return (
     <View
       style={[
-        styles.summaryCard,
+        styles.statsCard,
         { backgroundColor: theme.secondary, borderColor: theme.border },
       ]}
     >
       <LinearGradient
         pointerEvents="none"
-        colors={[alpha(theme.accent, 0.2), alpha(theme.accent, 0)]}
+        colors={[alpha(theme.accent, 0.16), alpha(theme.accent, 0)]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
 
-      <View style={styles.summaryTop}>
-        <View style={styles.summaryCopy}>
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            style={[styles.summaryCaption, { color: theme.text?.secondary ?? "#aaa" }]}
-          >
-            {caption}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-            fontRole="numeric"
-            style={[styles.summaryValue, { color: theme.text?.primary ?? "#fff" }]}
-          >
-            {totalLabel}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            style={[styles.summaryMinutes, { color: theme.text?.muted ?? "#666" }]}
-          >
-            {minutesLabel}
-          </Text>
-        </View>
-        <View style={[styles.summaryIcon, { backgroundColor: alpha(theme.accent, 0.18) }]}>
-          <Ionicons name="time-outline" size={28} color={theme.accent} />
-        </View>
-      </View>
-
-      <View style={[styles.splitTrack, { backgroundColor: theme.primary ?? "#111" }]}>
-        {hasSplit && movie.minutes > 0 ? (
-          <View style={[styles.splitSegment, { flexGrow: movie.minutes, backgroundColor: movie.color }]} />
-        ) : null}
-        {hasSplit && tv.minutes > 0 ? (
-          <View style={[styles.splitSegment, { flexGrow: tv.minutes, backgroundColor: tv.color }]} />
-        ) : null}
-      </View>
-
-      <View style={styles.splitLegend}>
-        {[movie, tv].map((part) => (
-          <View key={part.label} style={styles.splitItem}>
-            <View style={[styles.splitDot, { backgroundColor: part.color }]} />
+      {/* (1) Toplam süre + film/dizi dağılımı */}
+      <View style={styles.statsTotal}>
+        <View style={styles.statsTotalTop}>
+          <View style={styles.statsTotalCopy}>
             <Text
               allowFontScaling={false}
               numberOfLines={1}
-              style={[styles.splitLabel, { color: theme.text?.secondary ?? "#aaa" }]}
+              style={[styles.statsCaption, { color: theme.text?.secondary ?? "#aaa" }]}
             >
-              {part.label}
+              {caption}
             </Text>
             <Text
               allowFontScaling={false}
               numberOfLines={1}
-              style={[styles.splitShare, { color: theme.text?.primary ?? "#fff" }]}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+              fontRole="numeric"
+              style={[styles.statsTotalValue, { color: theme.text?.primary ?? "#fff" }]}
             >
-              {part.share}%
+              {totalLabel}
+            </Text>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.statsMinutes, { color: theme.text?.muted ?? "#666" }]}
+            >
+              {minutesLabel}
             </Text>
           </View>
-        ))}
-      </View>
-    </View>
-  );
-});
+          <View style={[styles.statsClock, { backgroundColor: alpha(theme.accent, 0.16) }]}>
+            <Ionicons name="time-outline" size={24} color={theme.accent} />
+          </View>
+        </View>
 
-// ── 2×2 metrik karoları ──────────────────────────────────────────────────────
-// items: [{ key, icon, iconLib, label, value, detail, color }]
-export const WatchMetricGrid = memo(function WatchMetricGrid({ items }) {
-  const { theme } = useTheme();
-  return (
-    <View style={styles.metricGrid}>
-      {items.map((item) => (
-        <View
-          key={item.key}
-          style={[
-            styles.metricTile,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
-          ]}
-        >
-          <View style={styles.metricTop}>
-            <View style={[styles.metricIcon, { backgroundColor: alpha(item.color, 0.15) }]}>
-              <ListIcon name={item.icon} iconLib={item.iconLib} color={item.color} size={17} />
-            </View>
-            {item.detail ? (
+        <View style={[styles.splitTrack, { backgroundColor: theme.primary ?? "#111" }]}>
+          {hasSplit && movie.minutes > 0 ? (
+            <View style={[styles.splitSegment, { flexGrow: movie.minutes, backgroundColor: movie.color }]} />
+          ) : null}
+          {hasSplit && tv.minutes > 0 ? (
+            <View style={[styles.splitSegment, { flexGrow: tv.minutes, backgroundColor: tv.color }]} />
+          ) : null}
+        </View>
+
+        <View style={styles.splitLegend}>
+          {[movie, tv].map((part) => (
+            <View key={part.label} style={styles.splitItem}>
+              <View style={[styles.splitDot, { backgroundColor: part.color }]} />
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
-                style={[styles.metricDetail, { color: theme.text?.muted ?? "#666" }]}
+                style={[styles.splitLabel, { color: theme.text?.primary ?? "#fff" }]}
               >
-                {item.detail}
+                {part.label}
               </Text>
-            ) : null}
-          </View>
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            fontRole="numeric"
-            style={[styles.metricValue, { color: theme.text?.primary ?? "#fff" }]}
-          >
-            {item.value}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            style={[styles.metricLabel, { color: theme.text?.secondary ?? "#aaa" }]}
-          >
-            {item.label}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-});
-
-// ── En çok izlenen türler ────────────────────────────────────────────────────
-// genres: [[ad, adet], ...] azalan sırada. Her satırın çubuğu en kalabalık
-// türe göre ölçeklenir (toplama göre değil): 5 tür yan yana kıyaslanabilsin.
-export const TopGenresCard = memo(function TopGenresCard({ title, genres, colors }) {
-  const { theme } = useTheme();
-  const max = genres[0]?.[1] || 1;
-
-  return (
-    <View
-      style={[
-        styles.genresCard,
-        { backgroundColor: theme.secondary, borderColor: theme.border },
-      ]}
-    >
-      <Text
-        allowFontScaling={false}
-        numberOfLines={1}
-        style={[styles.genresTitle, { color: theme.text?.primary ?? "#fff" }]}
-      >
-        {title}
-      </Text>
-      {genres.map(([genre, count], index) => {
-        const color = colors[index % colors.length];
-        return (
-          <View key={genre} style={styles.genreRow}>
-            <View style={[styles.genreRank, { backgroundColor: alpha(color, 0.16) }]}>
-              <Text allowFontScaling={false} style={[styles.genreRankText, { color }]}>
-                {index + 1}
+              {/* Dar ekranda kırpılan TEK parça süre: etiket ve yüzde hep okunur. */}
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                style={[styles.splitDuration, { color: theme.text?.muted ?? "#666" }]}
+              >
+                {part.durationLabel || ""}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                style={[styles.splitShare, { color: part.color }]}
+              >
+                {part.share}%
               </Text>
             </View>
-            <View style={styles.genreBody}>
-              <View style={styles.genreLine}>
+          ))}
+        </View>
+      </View>
+
+      {/* (2) Dört sayaç tek şeritte */}
+      <View style={[styles.statsDivider, divider]} />
+      <View style={styles.metricStrip}>
+        {metrics.map((item, index) => (
+          <React.Fragment key={item.key}>
+            {index > 0 ? <View style={[styles.metricDivider, divider]} /> : null}
+            <View
+              style={styles.metricCell}
+              accessible
+              accessibilityLabel={`${item.label}: ${item.value}`}
+            >
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+                fontRole="numeric"
+                style={[styles.metricValue, { color: theme.text?.primary ?? "#fff" }]}
+              >
+                {item.value}
+              </Text>
+              <View style={styles.metricLabelRow}>
+                <ListIcon name={item.icon} iconLib={item.iconLib} color={item.color} size={12} />
                 <Text
                   allowFontScaling={false}
                   numberOfLines={1}
-                  style={[styles.genreName, { color: theme.text?.primary ?? "#fff" }]}
+                  style={[styles.metricLabel, { color: theme.text?.muted ?? "#666" }]}
                 >
-                  {genre}
+                  {item.label}
                 </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.genreCount, { color: theme.text?.muted ?? "#666" }]}
-                >
-                  {count}
-                </Text>
-              </View>
-              <View style={[styles.genreTrack, { backgroundColor: theme.primary ?? "#111" }]}>
-                <View
-                  style={[
-                    styles.genreFill,
-                    { width: `${Math.max(6, (count / max) * 100)}%`, backgroundColor: color },
-                  ]}
-                />
               </View>
             </View>
+          </React.Fragment>
+        ))}
+      </View>
+
+      {/* (3) En çok izlenen türler */}
+      {genres.length > 0 ? (
+        <>
+          <View style={[styles.statsDivider, divider]} />
+          <View style={styles.genresBlock}>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.genresTitle, { color: theme.text?.secondary ?? "#aaa" }]}
+            >
+              {genresTitle}
+            </Text>
+            <View style={styles.genreChips}>
+              {genres.map(([genre, count], index) => {
+                const color = genreColors[index % genreColors.length];
+                return (
+                  <View
+                    key={genre}
+                    style={[
+                      styles.genreChip,
+                      {
+                        backgroundColor: alpha(color, index === 0 ? 0.22 : 0.13),
+                        borderColor: alpha(color, index === 0 ? 0.55 : 0),
+                      },
+                    ]}
+                  >
+                    <Text
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                      style={[styles.genreChipName, { color: theme.text?.primary ?? "#fff" }]}
+                    >
+                      {genre}
+                    </Text>
+                    <Text allowFontScaling={false} style={[styles.genreChipCount, { color }]}>
+                      {count}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
-        );
-      })}
+        </>
+      ) : null}
     </View>
   );
 });
@@ -604,10 +599,14 @@ const styles = StyleSheet.create({
 
   // ── Hero ───────────────────────────────────────────────────────────────────
   hero: { alignItems: "center", marginTop: 6, marginBottom: 20 },
+  avatarWrap: { alignSelf: "center" },
   avatarRing: {
-    padding: RING_PADDING,
-    borderWidth: RING_BORDER,
+    padding: RING_BORDER,
     borderRadius: RING_RADIUS,
+  },
+  avatarInner: {
+    padding: RING_PADDING,
+    borderRadius: RING_RADIUS - RING_BORDER,
   },
   onlineDot: {
     position: "absolute",
@@ -661,7 +660,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginTop: 12,
+    marginTop: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    maxWidth: "100%",
   },
   memberSinceText: { fontSize: 12, fontWeight: "700" },
 
@@ -685,11 +689,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-    marginTop: 28,
+    marginTop: 26,
     marginBottom: 12,
     paddingHorizontal: 2,
   },
-  sectionTitle: { flex: 1, fontSize: 19, fontWeight: "800", letterSpacing: -0.3 },
+  sectionBar: { width: 4, height: 18, borderRadius: 2 },
+  sectionTitle: { flex: 1, fontSize: 18, fontWeight: "800", letterSpacing: -0.3 },
   countChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -700,99 +705,72 @@ const styles = StyleSheet.create({
   },
   countChipText: { fontSize: 12.5, fontWeight: "900" },
 
-  // ── Toplam izleme süresi ───────────────────────────────────────────────────
-  summaryCard: {
+  // ── İzleme istatistikleri kartı ────────────────────────────────────────────
+  statsCard: {
     borderRadius: 22,
     borderWidth: 1,
-    padding: 18,
-    marginBottom: 10,
     overflow: "hidden",
+    marginBottom: 6,
   },
-  summaryTop: { flexDirection: "row", alignItems: "center", gap: 14 },
-  summaryCopy: { flex: 1, minWidth: 0 },
-  summaryCaption: { fontSize: 12.5, fontWeight: "700" },
-  summaryValue: { fontSize: 32, fontWeight: "900", letterSpacing: -0.8, marginTop: 2 },
-  summaryMinutes: { fontSize: 12, fontWeight: "700", marginTop: 1 },
-  summaryIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
+  statsTotal: { padding: 16 },
+  statsTotalTop: { flexDirection: "row", alignItems: "center", gap: 12 },
+  statsTotalCopy: { flex: 1, minWidth: 0 },
+  statsCaption: { fontSize: 12.5, fontWeight: "700" },
+  statsTotalValue: { fontSize: 30, fontWeight: "900", letterSpacing: -0.8, marginTop: 1 },
+  statsMinutes: { fontSize: 12, fontWeight: "700" },
+  statsClock: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },
   splitTrack: {
-    height: 10,
-    borderRadius: 5,
+    height: 8,
+    borderRadius: 4,
     overflow: "hidden",
     flexDirection: "row",
     gap: 3,
-    marginTop: 18,
+    marginTop: 14,
   },
-  splitSegment: { flexBasis: 0, height: "100%", borderRadius: 5 },
+  splitSegment: { flexBasis: 0, height: "100%", borderRadius: 4 },
   splitLegend: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 18,
-    marginTop: 12,
+    gap: 14,
+    marginTop: 10,
   },
   splitItem: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6 },
   splitDot: { width: 8, height: 8, borderRadius: 4 },
-  splitLabel: { fontSize: 12.5, fontWeight: "700", flexShrink: 1 },
-  splitShare: { fontSize: 12.5, fontWeight: "900", marginLeft: "auto" },
+  splitLabel: { flexShrink: 0, fontSize: 12.5, fontWeight: "800" },
+  splitDuration: { flexShrink: 1, flexGrow: 1, fontSize: 12, fontWeight: "700" },
+  splitShare: { flexShrink: 0, fontSize: 12.5, fontWeight: "900" },
+  statsDivider: { height: StyleSheet.hairlineWidth * 2, marginHorizontal: 16 },
 
-  // ── Metrik karoları ────────────────────────────────────────────────────────
-  metricGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 10 },
-  // flexBasis 45% + flexGrow: bir satıra iki karo sığar, üçüncü sığmaz; artan
-  // boşluğu karolar paylaşır (sabit %48 + gap, dar ekranda taşabiliyordu).
-  metricTile: {
-    flexGrow: 1,
-    flexBasis: "45%",
-    minWidth: 0,
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 14,
-  },
-  metricTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    marginBottom: 12,
-  },
-  metricIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  metricDetail: { fontSize: 11, fontWeight: "700", flexShrink: 1 },
-  metricValue: { fontSize: 24, fontWeight: "900", letterSpacing: -0.4 },
-  metricLabel: { fontSize: 12.5, fontWeight: "700", marginTop: 1 },
+  // ── Sayaç şeridi (film / dizi / sezon / bölüm) ─────────────────────────────
+  metricStrip: { flexDirection: "row", alignItems: "stretch", paddingVertical: 12 },
+  metricCell: { flex: 1, minWidth: 0, alignItems: "center", gap: 3, paddingHorizontal: 6 },
+  metricDivider: { width: StyleSheet.hairlineWidth * 2, marginVertical: 4 },
+  metricValue: { fontSize: 20, fontWeight: "900", letterSpacing: -0.3 },
+  metricLabelRow: { flexDirection: "row", alignItems: "center", gap: 4, maxWidth: "100%" },
+  metricLabel: { fontSize: 11.5, fontWeight: "700", flexShrink: 1 },
 
   // ── Türler ─────────────────────────────────────────────────────────────────
-  genresCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 6,
-  },
-  genresTitle: { fontSize: 15, fontWeight: "800", marginBottom: 14 },
-  genreRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 13 },
-  genreRank: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
+  genresBlock: { padding: 16, paddingTop: 13 },
+  genresTitle: { fontSize: 12.5, fontWeight: "800", marginBottom: 10 },
+  genreChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  genreChip: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    maxWidth: "100%",
   },
-  genreRankText: { fontSize: 12.5, fontWeight: "900" },
-  genreBody: { flex: 1, minWidth: 0 },
-  genreLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  genreName: { flex: 1, fontSize: 13.5, fontWeight: "700" },
-  genreCount: { fontSize: 12.5, fontWeight: "800" },
-  genreTrack: { height: 6, borderRadius: 3, overflow: "hidden", marginTop: 6 },
-  genreFill: { height: "100%", borderRadius: 3 },
+  genreChipName: { fontSize: 12.5, fontWeight: "700", flexShrink: 1 },
+  genreChipCount: { fontSize: 12, fontWeight: "900" },
 
   // ── Bildirim kartı ─────────────────────────────────────────────────────────
   notice: {

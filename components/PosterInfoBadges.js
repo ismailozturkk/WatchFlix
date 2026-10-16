@@ -9,6 +9,7 @@
 // (railPosterSize / listsGridColumns / posterWidth) bağlı `s` ölçek çarpanıyla
 // orantılı olarak küçülür. Böylesine rozetler hiçbir posterden taşmaz.
 
+import { copyLanguage } from "../utils/appLanguages";
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -71,13 +72,15 @@ function daysUntil(dateStr) {
 
 const MONTHS_TR = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const SHORT_MONTHS = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES };
 
-function formatReleaseDate(dateStr, variant, isEn) {
+function formatReleaseDate(dateStr, variant, language) {
   if (!dateStr) return "";
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return String(dateStr).slice(0, 4);
   if (variant === "year") return String(d.getFullYear());
-  const mon = (isEn ? MONTHS_EN : MONTHS_TR)[d.getMonth()];
+  const mon = SHORT_MONTHS[copyLanguage(language, Object.keys(SHORT_MONTHS))][d.getMonth()];
   if (variant === "full") return `${d.getDate()} ${mon} ${d.getFullYear()}`;
   return `${d.getDate()} ${mon}`;
 }
@@ -153,7 +156,7 @@ export function CountdownBadge({ date, days: daysProp, corner, style, scale, pos
   const { posterBadges } = useListLayoutSettings();
   const { language } = useLanguage();
   const { s, r, box } = usePillMetrics(scale, posterWidth);
-  const isEn = language === "en";
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
 
   if (posterBadges?.countdown === false) return null;
   const days = daysProp != null ? Number(daysProp) : daysUntil(date);
@@ -162,10 +165,10 @@ export function CountdownBadge({ date, days: daysProp, corner, style, scale, pos
   const bg = days <= 7 ? "#ff7a45" : "#22b866";
   const label =
     days === 0
-      ? isEn ? "Today" : "Bugün"
+      ? { tr: "Bugün", en: "Today", es: "Hoy" }[lang]
       : days === 1
-        ? isEn ? "Tomorrow" : "Yarın"
-        : `${days} ${isEn ? "d" : "gün"}`;
+        ? { tr: "Yarın", en: "Tomorrow", es: "Mañana" }[lang]
+        : `${days} ${{ tr: "gün", en: "d", es: "d" }[lang]}`;
 
   return (
     <View style={[styles.solidPill, box, { backgroundColor: bg }, cornerStyle(corner, s), style]}>
@@ -184,7 +187,7 @@ export function ReleaseDateBadge({ date, variant = "day", corner, style, scale, 
   const { s, r, box } = usePillMetrics(scale, posterWidth);
 
   if (posterBadges?.releaseDate === false) return null;
-  const label = formatReleaseDate(date, variant, language === "en");
+  const label = formatReleaseDate(date, variant, language);
   if (!label) return null;
 
   return (

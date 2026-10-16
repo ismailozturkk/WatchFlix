@@ -1,3 +1,4 @@
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -225,7 +226,7 @@ export default function WatchHistorySheet({
   const [confirmingId, setConfirmingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const resetTimer = useRef(null);
-  const locale = language === "tr" ? "tr-TR" : "en-US";
+  const locale = intlLocaleOf(language);
 
   useEffect(() => {
     if (visible) return undefined;

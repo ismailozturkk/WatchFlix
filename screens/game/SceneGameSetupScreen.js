@@ -127,9 +127,7 @@ export default function SceneGameSetupScreen({ navigation, route }) {
       </PressableScale>
       {!gamesGate.unlimited ? (
         <Text style={[styles.dailyAllowance, { color: theme.text.muted }]} allowFontScaling={false}>
-          {language === "tr"
-            ? `Bugün ${gamesGate.remaining}/${gamesGate.limit} oyun hakkın kaldı`
-            : `${gamesGate.remaining}/${gamesGate.limit} games left today`}
+          {language === "tr" ? `Bugün ${gamesGate.remaining}/${gamesGate.limit} oyun hakkın kaldı` : language === "es" ? `${gamesGate.remaining}/${gamesGate.limit} partidas restantes hoy` : `${gamesGate.remaining}/${gamesGate.limit} games left today`}
         </Text>
       ) : null}
     </View>

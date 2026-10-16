@@ -1,3 +1,4 @@
+import { intlLocaleOf } from "../../../utils/appLanguages";
 import React, { useCallback, useMemo, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -52,7 +53,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
 
-  const locale = language === "en" ? "en-US" : "tr-TR";
+  const locale = intlLocaleOf(language);
 
   const chartDataByPeriod = useMemo(
     () => Object.fromEntries(["daily", "monthly", "yearly"].map((period) => [

@@ -20,6 +20,7 @@
 //   Reminders/{uid}/movies|tvShows    (services/userData — remindersDomain)
 // Notlar/hatırlatıcılar yerel-öncelikli: "indir" = yerel kopyayı buluttan yeniden kur.
 
+import { tmdbLanguageOf, tmdbRegionOf } from "../utils/appLanguages";
 import { Keys, set as writeStorage } from "./storage";
 import axios from "axios";
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
@@ -186,8 +187,8 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
   const skipped = [];
   let cachedDocs = 0;
   const posterPaths = new Set();
-  const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
-  const tmdbRegion = language === "tr" ? "TR" : "US";
+  const tmdbLanguage = tmdbLanguageOf(language);
+  const tmdbRegion = tmdbRegionOf(language);
 
   // Ana anahtar kapalıysa indirme yok (ekran da butonu kilitler; bu ikinci hat).
   if (!getAutoDataCacheEnabled()) {
@@ -341,7 +342,7 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
       label: i18nText("autoI18n.film_icerikleri", "Film içerikleri"),
       run: async () => {
         let count = 0;
-        const shortLang = language === "tr" ? "tr-TR" : "en-US";
+        const shortLang = tmdbLanguageOf(language);
 
         for (const sort of ["vote_count.desc", "popularity.desc"]) {
           // `/discover` tabanlı listeler yetişkin izniyle kapsamlanır: ekranlar
@@ -427,7 +428,7 @@ export async function downloadAllData({ language = "tr", types, onProgress } = {
       label: i18nText("autoI18n.dizi_icerikleri", "Dizi içerikleri"),
       run: async () => {
         let count = 0;
-        const shortLang = language === "tr" ? "tr-TR" : "en-US";
+        const shortLang = tmdbLanguageOf(language);
 
         for (const window of ["week", "day"]) {
           count += await cacheArrayTmdb(

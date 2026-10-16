@@ -1,3 +1,4 @@
+import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -166,7 +167,7 @@ export default function WatchedDateSheet({
 
   const formatter = useMemo(
     () =>
-      new Intl.DateTimeFormat(language === "tr" ? "tr-TR" : "en-US", {
+      new Intl.DateTimeFormat(intlLocaleOf(language), {
         day: "numeric",
         month: "long",
         year: "numeric",

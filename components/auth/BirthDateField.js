@@ -19,10 +19,7 @@
 import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import DatePickerModal, {
-  MONTHS_EN,
-  MONTHS_TR,
-} from "../modals/DatePickerModal";
+import DatePickerModal, { formatLongDateParts } from "../modals/DatePickerModal";
 import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
@@ -33,14 +30,15 @@ import { calculateAge, MAX_AGE, MIN_ADULT_AGE, parseBirthDate } from "../../util
 // yerden başlasın.
 const VARSAYILAN_ACILIS_YAS = 20;
 
-/** "1998-03-05" → "5 Mart 1998" / "March 5, 1998" */
-function tarihEtiketi(iso, isEn) {
+/** "1998-03-05" → "5 Mart 1998" / "March 5, 1998" / "5 de marzo de 1998" */
+function tarihEtiketi(iso, language) {
   const parts = parseBirthDate(iso);
   if (!parts) return null;
-  const ay = (isEn ? MONTHS_EN : MONTHS_TR)[parts.month - 1];
-  return isEn
-    ? `${ay} ${parts.day}, ${parts.year}`
-    : `${parts.day} ${ay} ${parts.year}`;
+  return formatLongDateParts(language, {
+    day: parts.day,
+    monthIndex: parts.month - 1,
+    year: parts.year,
+  });
 }
 
 export default function BirthDateField({
@@ -64,11 +62,10 @@ export default function BirthDateField({
   chipIcon = false,
 }) {
   const { language } = useLanguage();
-  const isEn = language === "en";
   const [acik, setAcik] = useState(false);
 
   const age = useMemo(() => calculateAge(value), [value]);
-  const etiket = useMemo(() => tarihEtiketi(value, isEn), [value, isEn]);
+  const etiket = useMemo(() => tarihEtiketi(value, language), [value, language]);
 
   // Sınırlar: gelecekte doğum yok, 120 yaştan eskisi de gerçekçi değil.
   // Çark bu aralığın dışını zaten kapalı gösteriyor.

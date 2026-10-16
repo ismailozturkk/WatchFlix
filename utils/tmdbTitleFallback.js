@@ -8,6 +8,7 @@
 
 import axios from "axios";
 import * as cacheStore from "./cacheStore";
+import { isSupportedAppLanguage, tmdbLanguageOf } from "./appLanguages";
 
 const TMDB_HOST = "themoviedb.org";
 const CACHE_NS = "tmdbTitles";
@@ -25,8 +26,9 @@ const baseLanguage = (value) => clean(value).toLowerCase().split(/[-_]/)[0] || "
 export function tmdbLanguageForApp(language) {
   const value = clean(language).replace("_", "-");
   const base = baseLanguage(value);
-  if (base === "tr") return "tr-TR";
-  if (base === "en") return "en-US";
+  // Kayıtlı uygulama dilleri (tr/en/es …) utils/appLanguages'tan; tanınmayan kod
+  // (ör. içeriğin özgün dili "ja") olduğu gibi TMDB'ye gider.
+  if (isSupportedAppLanguage(base)) return tmdbLanguageOf(base);
   return value || "en-US";
 }
 

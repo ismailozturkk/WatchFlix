@@ -9,6 +9,7 @@
 // belirgin. Yapılacak kartındaki daireye dokunmak maddeyi kartı açmadan
 // tamamlar.
 
+import { intlLocaleOf } from "../../../../utils/appLanguages";
 import React, { memo } from "react";
 import {
   Image,
@@ -26,7 +27,7 @@ import { alpha } from "../../../../theme/colors";
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
-const localeOf = (language) => (language === "tr" ? "tr-TR" : "en-US");
+const localeOf = (language) => (intlLocaleOf(language));
 
 /** Bugün / Dün / "2 Eki" / "2 Eki 2025" — son düzenleme tarihi için kısa metin. */
 export function formatNoteDate(timestamp, language, now = new Date()) {

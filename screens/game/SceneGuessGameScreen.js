@@ -483,7 +483,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
         message: copy.message,
         retryable: false,
         upgrade: copy.canUpgrade,
-        upgradeLabel: language === "tr" ? "Planları gör" : "See plans",
+        upgradeLabel: language === "tr" ? "Planları gör" : language === "es" ? "Ver planes" : "See plans",
       };
     }
     if (error?.code === "insufficient_personal_source") {

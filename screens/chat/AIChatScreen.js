@@ -1,3 +1,4 @@
+import { pickByLanguage } from "@utils/appLanguages";
 import ComposerBlur, { COMPOSER_GLASS_PILL_STYLE, ComposerBlurTarget, useComposerBlurTarget } from "../../components/chat/ComposerBlur";
 import { useLiquidGlass } from "../../services/liquidGlass";
 // screens/chat/AIChatScreen.js
@@ -378,11 +379,11 @@ export default function AIChatScreen({
 
   const filterSummary = useMemo(() => {
     const parts = [];
-    if (prefs.mediaType === "movie") parts.push(language === "tr" ? "Film" : "Movies");
-    if (prefs.mediaType === "tv") parts.push(language === "tr" ? "Dizi" : "Series");
+    if (prefs.mediaType === "movie") parts.push(pickByLanguage(language, { tr: "Film", en: "Movies", es: "Películas" }));
+    if (prefs.mediaType === "tv") parts.push(pickByLanguage(language, { tr: "Dizi", en: "Series", es: "Series" }));
     if (selectedProviders.length) parts.push(selectedProviders.map((provider) => provider.name).join(", "));
     if (selectedGenreLabels.length) parts.push(selectedGenreLabels.join(", "));
-    if (prefs.enabled) parts.push(language === "tr" ? "Listelerim açık" : "My lists on");
+    if (prefs.enabled) parts.push(pickByLanguage(language, { tr: "Listelerim açık", en: "My lists on", es: "Mis listas activadas" }));
     return parts.join(" · ");
   }, [language, prefs.enabled, prefs.mediaType, selectedGenreLabels, selectedProviders]);
 
@@ -392,7 +393,7 @@ export default function AIChatScreen({
     const list = Array.isArray(base) ? [...base] : [];
     if (activeTab === "explore" && discoveryPreferences) {
       list.unshift({
-        label: language === "tr" ? "🎯 Seçimlerime göre öner" : "🎯 Recommend from my filters",
+        label: pickByLanguage(language, { tr: "🎯 Seçimlerime göre öner", en: "🎯 Recommend from my filters", es: "🎯 Recomienda según mis filtros" }),
         prompt: language === "tr"
           ? "Seçtiğim platform, içerik türü ve tür filtrelerine göre bana en uygun 5 yapımı öner"
           : "Recommend the 5 best titles matching my selected streaming, content-type and genre filters",
@@ -601,7 +602,7 @@ export default function AIChatScreen({
           upsell: limitCopy?.canUpgrade
             ? {
                 message: limitCopy.message,
-                cta: language === "tr" ? "Planları gör" : "See plans",
+                cta: pickByLanguage(language, { tr: "Planları gör", en: "See plans", es: "Ver planes" }),
               }
             : null,
         };

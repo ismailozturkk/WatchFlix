@@ -778,11 +778,36 @@ const STRINGS = {
     mention: "💬 mentioned you",
     mention_text: "💬 mentioned you: {text}",
   },
+  es: {
+    someone: "Alguien",
+    notification: "Notificación",
+    messageFallback: "te ha enviado un mensaje",
+    friend_request: "👤 te ha enviado una solicitud de amistad",
+    friend_accepted: "🤝 ha aceptado tu solicitud de amistad",
+    post_like: "❤️ le ha dado me gusta a tu publicación",
+    post_comment: "💬 ha comentado tu publicación",
+    post_comment_text: "💬 ha comentado: {text}",
+    comment_reply: "💬 ha respondido a tu comentario",
+    comment_reply_text: "💬 ha respondido: {text}",
+    mention: "💬 te ha mencionado",
+    mention_text: "💬 te ha mencionado: {text}",
+  },
 };
 
-// notification.type → {title, body}. lang: "tr" | "en".
+// Push dili: istemci Users/{uid}.notificationLanguage'a uygulama dilini yazar
+// (utils/appLanguages.js ile AYNI kodlar). Alan yoksa eski kullanıcıdır → "tr"
+// (alan yokken varsayılan her zaman Türkçeydi). Alan var ama bu listede yoksa
+// (ileride eklenecek bir dil, bu deploy'dan önce) → İNGİLİZCE: yabancı kullanıcıya
+// Türkçe push gitmesin. YENİ DİL: STRINGS + STREAM_STRINGS'e giriş + bu liste.
+const NOTIFICATION_LANGUAGES = ["tr", "en", "es"];
+function pickNotificationLang(value) {
+  if (!value) return "tr";
+  return NOTIFICATION_LANGUAGES.includes(value) ? value : "en";
+}
+
+// notification.type → {title, body}. lang: "tr" | "en" | "es".
 function buildContent(n, lang) {
-  const S = STRINGS[lang === "en" ? "en" : "tr"];
+  const S = STRINGS[pickNotificationLang(lang)];
   const name = n.fromName || S.someone;
   const text = n.text ? String(n.text) : "";
   switch (n.type) {
@@ -952,8 +977,8 @@ exports.onSocialNotificationCreated = onDocumentCreated(
       return;
     }
 
-    // Dil: istemci Users/{uid}.notificationLanguage'a yansıtır (tr varsayılan).
-    const lang = userData.notificationLanguage === "en" ? "en" : "tr";
+    // Dil: istemci Users/{uid}.notificationLanguage'a yansıtır (alan yoksa tr).
+    const lang = pickNotificationLang(userData.notificationLanguage);
     const { title, body } = buildContent(n, lang);
 
     // Uygulama simgesi rozeti (iOS): MUTLAK sayı, artış değil. Eskiden push
@@ -1541,6 +1566,11 @@ const STREAM_STRINGS = {
     multi: (ps) => `📺 Now streaming on: ${ps}`,
     fallbackTitle: "Your watchlist",
   },
+  es: {
+    single: (p) => `📺 Ya disponible en ${p}`,
+    multi: (ps) => `📺 Ya disponible en: ${ps}`,
+    fallbackTitle: "Tu lista de seguimiento",
+  },
 };
 
 /** TMDB watch/providers — tek başlık (timeout'lu; hata → null). */
@@ -1581,7 +1611,7 @@ async function processUserStreaming(userDoc, getProviders) {
   if (tokens.length === 0) return 0;
 
   const region = typeof sp.region === "string" && sp.region ? sp.region : "US";
-  const lang = u.notificationLanguage === "en" ? "en" : "tr";
+  const lang = pickNotificationLang(u.notificationLanguage);
   const S = STREAM_STRINGS[lang];
 
   // İzleme listesi (maliyet freni).

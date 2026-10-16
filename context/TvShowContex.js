@@ -1,3 +1,4 @@
+import { tmdbLanguageOf, tmdbRegionOf } from "../utils/appLanguages";
 import { createContext, useContext, useCallback, useEffect, useState, useMemo, useRef } from "react";
 import {
   useApiSettings,
@@ -147,7 +148,7 @@ export const TvShowProvider = ({ children }) => {
   //
   // `useMemo(..., [])`: tohum yalnız ilk render için. Kategori/dil değişimini
   // ilgili efekt zaten yeniden çekiyor.
-  const seedLang = language === "tr" ? "tr-TR" : "en-US";
+  const seedLang = tmdbLanguageOf(language);
   const trendSeed = useMemo(
     () => seedList(`tv_trends_${seedLang}_week_trending`, { maxAge: TTL.TREND }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,8 +178,8 @@ export const TvShowProvider = ({ children }) => {
   const [selectedCategoryTrend, setSelectedCategoryTrend] = useState("week");
   const [selectedCategoryTrendShow, setSelectedCategoryTrendShow] =
     useState("trending");
-  const tmdbLanguage = language === "tr" ? "tr-TR" : "en-US";
-  const tmdbRegion = language === "tr" ? "TR" : "US";
+  const tmdbLanguage = tmdbLanguageOf(language);
+  const tmdbRegion = tmdbRegionOf(language);
   const { t } = useLanguage();
   // İzlenen dizilerin tek kaynağı yeni watchedTv subcollection listener'ıdır.
   // Kök dokümandaki legacy watchedTv[] migration sonrasında boşaltıldığı için onu
@@ -215,7 +216,7 @@ export const TvShowProvider = ({ children }) => {
   };
 
   const fetchSeriesTrends = async (page = 1, append = false, forceRefresh = false) => {
-    const lang = language === "tr" ? "tr-TR" : "en-US";
+    const lang = tmdbLanguageOf(language);
     const gen = append ? currentGen("trends") : beginFreshRequest("trends");
     const isStale = () => currentGen("trends") !== gen;
     const baseKey = `tv_trends_${lang}_${selectedCategoryTrend}_${selectedCategoryTrendShow}`;
@@ -308,7 +309,7 @@ export const TvShowProvider = ({ children }) => {
   };
 
   const fetchSeriesBest = (page = 1, append = false, forceRefresh = false) => {
-    const lang = language === "tr" ? "tr-TR" : "en-US";
+    const lang = tmdbLanguageOf(language);
     const gen = append ? currentGen("best") : beginFreshRequest("best");
     return loadPage({
       cacheKey: adultKey(`tv_bests_${lang}_${selectedCategoryBestShow}_${selectedCategoryBest}_page_${page}`),

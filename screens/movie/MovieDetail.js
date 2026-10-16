@@ -1,3 +1,4 @@
+import { tmdbLanguageOf, tmdbRegionOf } from "../../utils/appLanguages";
 import { alpha } from "@theme/colors";
 import React, { useEffect, useState, useMemo, useCallback, useRef, memo } from "react";
 import {
@@ -277,7 +278,7 @@ export default function MovieDetails({ navigation, route }) {
   const { primeNotificationPermission } = useDeviceNotifications();
   const reminderGate = useReminderGate();
   const { language, t } = useLanguage();
-  const providerRegion = language === "tr" ? "TR" : "US";
+  const providerRegion = tmdbRegionOf(language);
   const { theme } = useTheme();
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -385,7 +386,7 @@ export default function MovieDetails({ navigation, route }) {
           method: "GET",
           url: `https://api.themoviedb.org/3/movie/${id}`,
           params: {
-            language: language === "tr" ? "tr-TR" : "en-US",
+            language: tmdbLanguageOf(language),
             append_to_response:
               "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,translations,videos,watch/providers",
           },
@@ -441,7 +442,7 @@ export default function MovieDetails({ navigation, route }) {
         method: "GET",
         url: `https://api.themoviedb.org/3/movie/${id}/recommendations`,
         params: {
-          language: language === "tr" ? "tr-TR" : "en-US",
+          language: tmdbLanguageOf(language),
           page: railState.page + 1,
         },
         headers: { accept: "application/json", Authorization: API_KEY },
@@ -477,7 +478,7 @@ export default function MovieDetails({ navigation, route }) {
     setCollection(null);
     if (!collectionId) return;
 
-    const lang = language === "tr" ? "tr-TR" : "en-US";
+    const lang = tmdbLanguageOf(language);
     const cacheKey = `movie_collection_detail_${collectionId}_${lang}`;
 
     const loadCollection = async () => {

@@ -41,28 +41,33 @@ export const GENRE_IDS = Object.freeze([
   "thriller", "war", "western", "reality", "tvmovie",
 ]);
 
-// id → katlanmış ad varyantları (TR + EN). Aynı id'ye birden çok ad düşebilir.
+// id → katlanmış ad varyantları (TR + EN + ES). Aynı id'ye birden çok ad düşebilir.
+// YENİ DİL: o dilin TMDB tür adlarını (film + dizi, bölgesel varyantlar dahil) buraya
+// ekle — yoksa tür "other" kovasına düşer ve tür puanı/rozetleri sessizce bozulur.
 const ALIASES = {
-  action: ["action", "aksiyon", "action adventure", "aksiyon macera"],
-  adventure: ["adventure", "macera"],
-  animation: ["animation", "animasyon"],
-  comedy: ["comedy", "komedi"],
-  crime: ["crime", "suc"],
-  documentary: ["documentary", "belgesel", "news", "haber"],
-  drama: ["drama", "dram", "soap", "pembe dizi"],
-  family: ["family", "aile", "kids", "cocuk"],
-  fantasy: ["fantasy", "fantastik", "fantezi"],
-  history: ["history", "tarih"],
-  horror: ["horror", "korku"],
-  music: ["music", "muzik"],
-  mystery: ["mystery", "gizem"],
+  action: ["action", "aksiyon", "action adventure", "aksiyon macera", "accion", "accion y aventura"],
+  adventure: ["adventure", "macera", "aventura"],
+  animation: ["animation", "animasyon", "animacion"],
+  comedy: ["comedy", "komedi", "comedia"],
+  crime: ["crime", "suc", "crimen"],
+  documentary: ["documentary", "belgesel", "news", "haber", "documental", "noticias"],
+  drama: ["drama", "dram", "soap", "pembe dizi", "telenovela"],
+  family: ["family", "aile", "kids", "cocuk", "familia", "infantil"],
+  fantasy: ["fantasy", "fantastik", "fantezi", "fantasia"],
+  history: ["history", "tarih", "historia"],
+  horror: ["horror", "korku", "terror"],
+  music: ["music", "muzik", "musica"],
+  mystery: ["mystery", "gizem", "misterio"],
   romance: ["romance", "romantik", "romantizm"],
-  scifi: ["science fiction", "bilim kurgu", "sci fi fantasy", "bilim kurgu fantazi", "bilim kurgu fantezi", "scifi", "sci fi"],
-  thriller: ["thriller", "gerilim"],
-  war: ["war", "savas", "war politics", "savas politika"],
+  scifi: [
+    "science fiction", "bilim kurgu", "sci fi fantasy", "bilim kurgu fantazi", "bilim kurgu fantezi", "scifi", "sci fi",
+    "ciencia ficcion", "ciencia ficcion y fantasia",
+  ],
+  thriller: ["thriller", "gerilim", "suspense", "suspenso"],
+  war: ["war", "savas", "war politics", "savas politika", "belica", "belica y politica", "guerra"],
   western: ["western", "vahsi bati", "kovboy"],
-  reality: ["reality", "realite", "talk", "program", "talk show"],
-  tvmovie: ["tv movie", "tv film", "tv filmi"],
+  reality: ["reality", "realite", "talk", "program", "talk show", "programa de entrevistas"],
+  tvmovie: ["tv movie", "tv film", "tv filmi", "pelicula de tv", "cine tv"],
 };
 
 const LOOKUP = new Map();

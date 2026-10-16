@@ -8,13 +8,20 @@
 // uygulamanın açılışta çökmesini önlemek için okuma güvenli bir sınır içinde
 // yapılıyor.
 
-export const DESTEKLENEN_DILLER = ["tr", "en"];
+import {
+  FALLBACK_LANGUAGE,
+  SUPPORTED_LANGUAGE_CODES,
+} from "./appLanguages";
+
+// Tek kaynak: utils/appLanguages.js. Yeni dil orada kayıt edilince cihaz dili
+// seçimi de onu tanır (ör. İspanyolca cihaz → "es").
+export const DESTEKLENEN_DILLER = SUPPORTED_LANGUAGE_CODES;
 
 // Cihaz dili okunamadığında "tr" DEĞİL "en" seçilir: kayıtlı dili olmayan bir
 // kullanıcının Türk olma ihtimali, dili hiç bildirmeyen bir cihazda düşük —
 // Türkçe cihazlar dilini zaten bildiriyor. Yanlış tahminin bedeli asimetrik:
 // İngilizce açılan Türk kullanıcı ayarı bulur, Türkçe açılan yabancı bulamaz.
-export const YEDEK_DIL = "en";
+export const YEDEK_DIL = FALLBACK_LANGUAGE;
 
 /**
  * expo-localization native modülü eski bir development/preview uygulamasında

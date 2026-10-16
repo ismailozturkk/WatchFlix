@@ -1,3 +1,5 @@
+import { intlLocaleOf } from "./appLanguages";
+
 export const PREMIUM_ENTITLEMENT_ID = "com.smlztrk.seelogd Pro";
 
 // Mağaza ürün kimlikleri — Play ve App Store'da AYNI. Kimlik bir kez
@@ -227,7 +229,7 @@ export function getPackagePeriodKey(aPackage) {
 export function formatStorePrice(price, currency, language) {
   if (!Number.isFinite(price) || price <= 0 || !currency) return null;
   try {
-    return new Intl.NumberFormat(language === "tr" ? "tr-TR" : "en-US", {
+    return new Intl.NumberFormat(intlLocaleOf(language), {
       style: "currency",
       currency,
       currencyDisplay: "narrowSymbol",

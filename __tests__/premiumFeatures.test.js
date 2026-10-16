@@ -304,6 +304,33 @@ describe("metinler", () => {
     expect(formatFeatureValue("font_catalog", PREMIUM, "en")).toBe("56 fonts");
   });
 
+  test("İspanyolca karşılaştırma hücreleri ve uyarılar", () => {
+    expect(formatFeatureValue("custom_lists", FREE, "es")).toBe("1 lista");
+    expect(formatFeatureValue("custom_lists", MAX, "es")).toBe("Ilimitado");
+    expect(formatFeatureValue("ai_messages", FREE, "es")).toBe("3/día · 30/mes");
+    expect(formatFeatureValue("identity_badge", FREE, "es")).toBe("—");
+    const copy = buildLimitCopy("custom_lists", FREE, "es");
+    expect(copy.canUpgrade).toBe(true);
+    // Türkçeye ya da İngilizceye düşmediğini ve plan adlarının yerine oturduğunu kilitler.
+    expect(copy.message).toMatch(/Gratis/);
+    expect(copy.message).toMatch(/Premium Max/);
+    expect(copy.message).not.toMatch(/Free planında|On Free|only/i);
+  });
+
+  test("bilinmeyen dil İngilizce metin alır, Türkçe değil", () => {
+    expect(formatFeatureValue("games", PREMIUM, "fr")).toBe(formatFeatureValue("games", PREMIUM, "en"));
+    expect(buildLimitCopy("custom_lists", FREE, "fr").message).toBe(
+      buildLimitCopy("custom_lists", FREE, "en").message,
+    );
+  });
+
+  test("karşılaştırma tablosu üç dilde de aynı satırlara sahip", () => {
+    const kimlikler = (dil) =>
+      getComparisonSections(dil).flatMap((section) => section.rows.map((row) => row.id)).sort();
+    expect(kimlikler("es")).toEqual(kimlikler("tr"));
+    expect(kimlikler("en")).toEqual(kimlikler("tr"));
+  });
+
   test("sayılı limit uyarısı üst planların değerini söyler", () => {
     const copy = buildLimitCopy("custom_lists", FREE, "tr");
     expect(copy.canUpgrade).toBe(true);
@@ -464,7 +491,7 @@ describe("yeni özelliklerin kayıt bütünlüğü", () => {
   });
 
   test("erişim özelliklerinin ücretsiz ve ücretli değeri tanımlı (karşılaştırma tablosu '—' basmasın)", () => {
-    for (const id of ["tournament_vote", "app_icon", "snow_effect", "ambient_background", "icon_background", "pet_companion"]) {
+    for (const id of ["tournament_vote", "app_icon", "snow_effect", "ambient_background", "icon_background", "pet_companion", "bug_report", "feature_request"]) {
       const feature = PREMIUM_FEATURES[id];
       expect(feature.freeValue.tr && feature.freeValue.en).toBeTruthy();
       expect(feature.paidValue.tr && feature.paidValue.en).toBeTruthy();
@@ -479,5 +506,59 @@ describe("yeni özelliklerin kayıt bütünlüğü", () => {
       expect(feature.upsell.lockedTitle.tr && feature.upsell.lockedTitle.en).toBeTruthy();
       expect(feature.upsell.message.tr && feature.upsell.message.en).toBeTruthy();
     }
+  });
+});
+
+// ── Geri bildirim kutusu: hata bildirimi Premium+, özellik isteği yalnız Max ──
+// Plan kuralı sunucuda da zorlanır (firestore.rules → Feedback); emülatör testi
+// __tests__/rules/firestore.rules.test.js'te, alan/sınır eşitliği
+// __tests__/feedbackRulesParity.test.js'te.
+describe("geri bildirim kapıları", () => {
+  test("hata bildirimi: Free kapalı, Premium ve Max açık", () => {
+    expect(canUseFeature("bug_report", FREE)).toBe(false);
+    expect(canUseFeature("bug_report", PREMIUM)).toBe(true);
+    expect(canUseFeature("bug_report", MAX)).toBe(true);
+  });
+
+  test("özellik isteği: yalnız Max açık (Premium'da KAPALI)", () => {
+    expect(canUseFeature("feature_request", FREE)).toBe(false);
+    expect(canUseFeature("feature_request", PREMIUM)).toBe(false);
+    expect(canUseFeature("feature_request", MAX)).toBe(true);
+  });
+
+  test("kilitli planda hangi planın açtığı doğru önerilir", () => {
+    expect(nextPlanFor("bug_report", FREE)).toBe(PREMIUM);
+    expect(nextPlanFor("bug_report", PREMIUM)).toBeNull();
+    expect(nextPlanFor("feature_request", FREE)).toBe(MAX);
+    expect(nextPlanFor("feature_request", PREMIUM)).toBe(MAX);
+    expect(nextPlanFor("feature_request", MAX)).toBeNull();
+  });
+
+  test("uyarı metni yalnız-Max özelliğini 'Premium ve Max'te açık' diye vaat etmez", () => {
+    const bug = buildLimitCopy("bug_report", FREE, "tr");
+    expect(bug.title).toBe("Premium özelliği");
+    expect(bug.message).toContain("Premium ve Premium Max");
+
+    const request = buildLimitCopy("feature_request", PREMIUM, "tr");
+    expect(request.title).toBe("Premium Max özelliği");
+    expect(request.message).toContain("yalnızca Premium Max");
+    expect(request.message).not.toContain("Premium ve Premium Max");
+    expect(request.canUpgrade).toBe(true);
+    expect(buildLimitCopy("feature_request", PREMIUM, "en").message).toContain("Premium Max only");
+    expect(buildLimitCopy("feature_request", PREMIUM, "es").message).toContain("solo en Premium Max");
+  });
+
+  test("karşılaştırma tablosunda 'Destek' kategorisinde, doğru hücrelerle", () => {
+    const support = getComparisonSections("tr").find((section) => section.id === "support");
+    expect(support.rows.map((row) => row.id)).toEqual(["bug_report", "feature_request"]);
+    const [bug, request] = support.rows;
+    expect(bug.values).toEqual({ free: "Yalnız e-posta", premium: "Uygulamadan bildir", unlimited: "Uygulamadan bildir" });
+    expect(request.values).toEqual({ free: "Yalnız e-posta", premium: "Yalnız e-posta", unlimited: "Uygulamadan öner" });
+  });
+
+  test("sunucu planı ile aynı: kayıt 'unlimited' diye çözümlenen plan özellik isteğini açar", () => {
+    expect(resolvePremiumPlan({ premiumUnlimited: true })).toBe(MAX);
+    expect(canUseFeature("feature_request", resolvePremiumPlan({ premium: true, premiumPlan: "unlimited" }))).toBe(true);
+    expect(canUseFeature("feature_request", resolvePremiumPlan({ premium: true, premiumPlan: "premium" }))).toBe(false);
   });
 });

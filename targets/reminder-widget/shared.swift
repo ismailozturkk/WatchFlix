@@ -18,8 +18,25 @@ func loadLanguage() -> String {
   UserDefaults(suiteName: appGroupId)?.string(forKey: languageKey) ?? "tr"
 }
 
-func isTurkishLanguage() -> Bool {
-  loadLanguage().hasPrefix("tr")
+/// Widget'ların dil kararı. JS tarafı uygulama dil kodunu ("tr" | "en" | "es" …)
+/// App Group'a yazar. KURAL (utils/appLanguages.js ve Android WidgetLanguage.kt ile
+/// AYNI): bilinmeyen dil → İNGİLİZCE; kayıt yoksa eski davranış korunur ("tr").
+/// YENİ DİL: `widgetSupportedLanguages`'e kodu ekle ve her widgetPick(...) çağrısına
+/// metni ver.
+let widgetSupportedLanguages: Set<String> = ["tr", "es"]
+
+func widgetLanguage() -> String {
+  let raw = loadLanguage().trimmingCharacters(in: .whitespaces).lowercased()
+  let base = raw.split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map(String.init) ?? "tr"
+  return widgetSupportedLanguages.contains(base) ? base : "en"
+}
+
+func widgetPick(_ lang: String, tr: String, en: String, es: String) -> String {
+  switch lang {
+  case "tr": return tr
+  case "es": return es
+  default: return en
+  }
 }
 
 struct WidgetAppearancePreferences {

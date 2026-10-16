@@ -25,10 +25,21 @@
 // Palet: Wrapped kartıyla AYNI (WRAPPED_CARD_THEMES) + kullanıcının halka rengi
 // ("rank"); iki kart yan yana paylaşıldığında aynı marka dilini konuşur.
 //
+// DÖRT FAVORİ (Users/{uid}.fourFavorites): `favorites` verilir ve
+// `options.showFavorites` açıksa favoriler POSTER ALANININ yerine geçer —
+//   Vitrin/Kimlik/Minimal → kategori başına üst üste binen küçük poster destesi
+//   (şerit; alan yüksekliği değişmez, FAVORITE_RIBBON),
+//   Duvar                → kolaj hücreleri favori afişleriyle dolar,
+//   Seçki ("picks")      → favorilerin büyük, adlı raflarla gösterildiği düzen.
+// Seçki'nin dikey bütçesi anahtarlara göre ÇÖZÜLÜR (planPicksLayout, testli);
+// favori yoksa Seçki çizilmez, kart Vitrin'e düşer (resolveStoryLayout).
+//
 // Dışa açılan sözleşme (ProfileStoryModal bağımlı):
 //   STORY_CARD_W / STORY_CARD_H, getStoryPalette
 //   props: { options, theme, language, profile, badges, badgeInfo, stats, perde,
-//            genres, streak, member, posters, str, onImageSettled }
+//            genres, streak, member, posters, favorites, str, onImageSettled }
+//   favorites: { count, groups: [{ kind, label, items: [{ key, title, uri }] }] }
+//   (uri yoksa kart tür simgeli yer tutucu çizer)
 
 import React, { memo, useId } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -47,7 +58,16 @@ import {
   foregroundForPalette,
   getWrappedCardPalette,
 } from "../wrapped/WrappedShareCard";
-import { buildRankPalette, formatStoryNumber } from "../../utils/profileStoryCard";
+import {
+  FAVORITE_RIBBON,
+  PICKS_BUDGET,
+  buildRankPalette,
+  formatStoryNumber,
+  isFavoritesActive,
+  planPicksLayout,
+  resolveStoryLayout,
+  ribbonMetrics,
+} from "../../utils/profileStoryCard";
 
 export const STORY_CARD_W = 360;
 export const STORY_CARD_H = 640;
@@ -339,7 +359,9 @@ function Note({ ctx, centered }) {
   );
 }
 
-function Poster({ item, width, height, ctx, style, radius }) {
+// `icon`: görseli olmayan (uri yok) öğede çizilen yer tutucu simgesi — yalnız
+// dört favoride olur (profil belgesinde görsel yolu boş olabilir).
+function Poster({ item, width, height, ctx, style, radius, icon }) {
   return (
     <View
       style={[
@@ -348,15 +370,26 @@ function Poster({ item, width, height, ctx, style, radius }) {
         style,
       ]}
     >
-      <Image
-        source={{ uri: item.uri }}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        transition={0}
-        priority="high"
-        cachePolicy="memory-disk"
-        onLoadEnd={() => ctx.onImageSettled?.(item.uri)}
-      />
+      {item.uri ? (
+        <Image
+          source={{ uri: item.uri }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          transition={0}
+          priority="high"
+          cachePolicy="memory-disk"
+          onLoadEnd={() => ctx.onImageSettled?.(item.uri)}
+        />
+      ) : (
+        <View style={styles.posterEmpty}>
+          <AppIcon
+            family="Ionicons"
+            name={icon || "image-outline"}
+            size={Math.max(12, Math.round(Math.min(width, height) * 0.4))}
+            color={alpha(WHITE, 0.5)}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -524,20 +557,23 @@ function GenreBars({ ctx, style }) {
   );
 }
 
-// Tür haplarının yatay hâli (geniş ve alçak yerlerde).
-function GenreChips({ ctx, centered }) {
+// Tür haplarının yatay hâli (geniş ve alçak yerlerde). `nowrap`: tek satıra
+// zorlanır, uzun adlar kısalır (Seçki'nin dikey bütçesi tek satır varsayar).
+// Dizi biçimleri `nowrap` kapalıyken eskisiyle AYNI (referans testi bunu korur).
+function GenreChips({ ctx, centered, nowrap }) {
   const { genres, palette, language } = ctx;
   return (
-    <View style={[styles.chipRow, centered && { justifyContent: "center" }]}>
+    <View style={[styles.chipRow, centered && { justifyContent: "center" }, ...(nowrap ? [styles.chipRowNoWrap] : [])]}>
       {genres.top.map((genre, index) => (
         <View
           key={genre.id}
           style={[
             styles.chip,
             index === 0 && { backgroundColor: alpha(palette.accent, 0.2), borderColor: alpha(palette.accent, 0.6) },
+            ...(nowrap ? [styles.chipShrink] : []),
           ]}
         >
-          <CardText numberOfLines={1} style={styles.chipText}>
+          <CardText numberOfLines={1} style={nowrap ? [styles.chipText, styles.chipShrink] : styles.chipText}>
             {genre.label}
           </CardText>
           <CardText numberOfLines={1} style={[styles.chipPct, { color: palette.tint }]}>
@@ -639,17 +675,222 @@ function BadgeRail({ ctx, style }) {
   );
 }
 
+// Tek satır dört sayaç (saat / film / dizi / bölüm). Duvar'ın istatistik şeridi
+// ve Seçki'nin istatistik satırı AYNI parçayı kullanır; `style` yüksekliği verir.
+function StatStrip({ ctx, style }) {
+  const { stats, str } = ctx;
+  return (
+    <Glass radius={18} style={style}>
+      {[
+        [compact(ctx, stats.movies), str.movies],
+        [compact(ctx, stats.shows), str.shows],
+        [compact(ctx, stats.episodes), str.episodes],
+        [compact(ctx, stats.hours), str.hours],
+      ].map(([value, label], index) => (
+        <View
+          key={label}
+          style={[
+            styles.wallStat,
+            index > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: alpha(WHITE, 0.2) },
+          ]}
+        >
+          <CardText numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={styles.wallStatValue}>
+            {value}
+          </CardText>
+          <CardText numberOfLines={1} style={styles.wallStatLabel}>
+            {label}
+          </CardText>
+        </View>
+      ))}
+    </Glass>
+  );
+}
+
+// Tür hapları + seri/rozet hapları. Kimlik, Duvar, Minimal ve Seçki ortak
+// kullanır; `style` sarmalayıcının yerleşimini (boşluk/hizalama) belirler.
+function ExtrasBlock({ ctx, centered, style, nowrap }) {
+  const { options, genres, streak, badgeInfo } = ctx;
+  const showGenres = options.showGenres && genres?.top?.length > 0;
+  const showStreak = options.showStreak && streak;
+  const showBadges = options.showBadges && badgeInfo?.showcase?.length > 0;
+  if (!showGenres && !showStreak && !showBadges) return null;
+  return (
+    <View style={style}>
+      {showGenres ? <GenreChips ctx={ctx} centered={centered} nowrap={nowrap} /> : null}
+      {showStreak || showBadges ? (
+        <View style={styles.extrasRow}>
+          {showStreak ? <StreakPill ctx={ctx} /> : null}
+          {showBadges ? (
+            <View style={styles.badgePill}>
+              <CardText style={styles.badgePillCount}>
+                {badgeInfo.earned}
+                <CardText style={styles.badgeTotal}>/{badgeInfo.total}</CardText>
+              </CardText>
+              <ShowcaseBadges ctx={ctx} size={24} />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+// ── Dört favori ──────────────────────────────────────────────────────────────
+
+const KIND_ICON = { movies: "film-outline", shows: "tv-outline", people: "person-outline" };
+// Üst üste binen posterlerin arasını açan koyu halka (kart zeminiyle aynı ton).
+const STACK_RING = "rgba(10,7,16,0.9)";
+
+// Kategori başlığı: simge + büyük harfli ad. Şeritte ve üst etiketli rafta ortak.
+function KindLabel({ ctx, group }) {
+  return (
+    <View style={styles.kindLabel}>
+      <AppIcon family="Ionicons" name={KIND_ICON[group.kind]} size={10} color={ctx.palette.tint} />
+      <CardText numberOfLines={1} style={styles.kindLabelText}>
+        {group.label}
+      </CardText>
+    </View>
+  );
+}
+
+// Eski düzenlerin poster alanının yerine geçen şerit: her kategori için ilki en
+// üstte olan, sağa doğru taşan küçük bir poster destesi. Alan yüksekliği
+// `FAVORITE_RIBBON[layoutId].slot` (düzenin poster alanıyla aynı), içerik ortalanır.
+function FavoritesRibbon({ ctx, layoutId }) {
+  const { slot, thumb } = FAVORITE_RIBBON[layoutId];
+  const m = ribbonMetrics(thumb);
+  const groups = ctx.favorites.groups;
+  const spread = groups.length >= 3;
+  return (
+    <View
+      style={[
+        styles.ribbon,
+        { height: slot, justifyContent: spread ? "space-between" : "center", gap: spread ? 0 : 28 },
+      ]}
+    >
+      {groups.map((group) => {
+        const people = group.kind === "people";
+        const items = group.items.slice(0, 4);
+        return (
+          <View key={group.kind} style={{ width: m.stackW }}>
+            <KindLabel ctx={ctx} group={group} />
+            <View style={{ width: m.stackW, height: m.thumbH }}>
+              {items.map((item, index) => (
+                <Poster
+                  key={item.key}
+                  item={item}
+                  ctx={ctx}
+                  width={thumb}
+                  height={people ? thumb : m.thumbH}
+                  radius={people ? thumb / 2 : 7}
+                  icon={KIND_ICON[group.kind]}
+                  style={{
+                    position: "absolute",
+                    left: index * m.offset,
+                    top: people ? Math.round((m.thumbH - thumb) / 2) : 0,
+                    zIndex: items.length - index,
+                    borderWidth: 1.5,
+                    borderColor: STACK_RING,
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// Seçki düzeninin ana bölümü: başlık + cam panelde kategori rafları. Boyutlar
+// `plan` (planFavoriteShelves) ile gelir; 3 kategoride etiket solda, 1–2'de rafın
+// üstünde (daha büyük posterler).
+function FavoriteShelves({ ctx, plan }) {
+  const { favorites, palette, str } = ctx;
+  const side = plan.style === "side";
+  // Cam panelin iç genişliği: kart − 2×PAD − 2×12 iç boşluk − 2 kenar.
+  const innerW = W - PAD * 2 - 24 - 2;
+  const slotsW = side ? innerW - SHELF_LABEL_W - SHELF_LABEL_GAP : innerW;
+  const gap = Math.max(6, Math.floor((slotsW - 4 * plan.width) / 3));
+  return (
+    <View>
+      <View style={styles.shelfTitle}>
+        <SectionTitle ctx={ctx} title={str.favTitle} />
+      </View>
+      <Glass radius={18} style={styles.shelfPanel}>
+        {favorites.groups.map((group) => {
+          const row = plan.rows.find((r) => r.kind === group.kind);
+          if (!row) return null;
+          const people = group.kind === "people";
+          const slots = (
+            <View style={styles.shelfSlots}>
+              {group.items.slice(0, 4).map((item, index) => (
+                <View key={item.key} style={{ width: row.artW, marginLeft: index ? gap : 0 }}>
+                  <Poster
+                    item={item}
+                    ctx={ctx}
+                    width={row.artW}
+                    height={row.artH}
+                    radius={people ? row.artW / 2 : undefined}
+                    icon={KIND_ICON[group.kind]}
+                  />
+                  {plan.names ? (
+                    <CardText numberOfLines={1} style={[styles.shelfName, { width: row.artW }]}>
+                      {item.title}
+                    </CardText>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          );
+          return side ? (
+            <View key={group.kind} style={styles.shelfRow}>
+              <View style={[styles.shelfLabelCol, { height: row.artH }]}>
+                <View style={[styles.shelfLabelIcon, { backgroundColor: alpha(palette.accent, 0.22) }]}>
+                  <AppIcon family="Ionicons" name={KIND_ICON[group.kind]} size={13} color={palette.tint} />
+                </View>
+                <CardText numberOfLines={1} style={styles.shelfLabelText}>
+                  {group.label}
+                </CardText>
+              </View>
+              {slots}
+            </View>
+          ) : (
+            <View key={group.kind}>
+              <KindLabel ctx={ctx} group={group} />
+              {slots}
+            </View>
+          );
+        })}
+      </Glass>
+    </View>
+  );
+}
+
+// Soldaki kategori etiketi sütunu (3 kategorili raf).
+const SHELF_LABEL_W = 58;
+const SHELF_LABEL_GAP = 8;
+
+// Duvar kolajı için favori afişleri: görseli olanlar, kategori sırasıyla.
+function favoriteWallItems(favorites, limit) {
+  return (favorites?.groups || [])
+    .flatMap((group) => group.items)
+    .filter((item) => item.uri)
+    .slice(0, limit)
+    .map((item) => ({ key: item.key, name: item.title, uri: item.uri }));
+}
+
 // ── Düzen 1: Vitrin (bento) ──────────────────────────────────────────────────
 // Bütçe (hepsi açık, 2 satır not): 28 başlık + 64 kimlik + 52 not + 50 Perde
 // + 96 sayaçlar + 80 tür/seri + 48 rozet + 104 poster + 28 altbilgi = 550 / 600
 // (içerik alanı = 640 - 2×20); kalan 50, 8 boşluğa dağılır.
 function ShowcaseLayout({ ctx }) {
-  const { options, perde, badgeInfo, genres, streak, posters} = ctx;
+  const { options, perde, badgeInfo, genres, streak, posters, favoritesActive } = ctx;
   const showPerde = options.showPerde && perde;
   const showGenres = options.showGenres && genres?.top?.length > 0;
   const showStreak = options.showStreak && streak;
   const showBadges = options.showBadges && badgeInfo?.showcase?.length > 0;
-  const showPosters = options.showPosters && posters.items.length > 0;
+  const showPosters = !favoritesActive && options.showPosters && posters.items.length > 0;
   const gap = 8;
   const count = 5;
   const posterW = Math.floor((W - PAD * 2 - gap * (count - 1)) / count);
@@ -690,6 +931,15 @@ function ShowcaseLayout({ ctx }) {
 
       {showBadges ? <BadgeRail ctx={ctx} /> : null}
 
+      {favoritesActive ? (
+        <View>
+          <SectionTitle ctx={ctx} title={ctx.str.favTitle} />
+          <View style={{ marginTop: 8 }}>
+            <FavoritesRibbon ctx={ctx} layoutId="showcase" />
+          </View>
+        </View>
+      ) : null}
+
       {showPosters ? (
         <View>
           <SectionTitle ctx={ctx} title={ctx.str.posterTitle[posters.source]} />
@@ -708,12 +958,9 @@ function ShowcaseLayout({ ctx }) {
 
 // ── Düzen 2: Kimlik (üyelik kartı) ───────────────────────────────────────────
 function IdentityLayout({ ctx }) {
-  const { options, perde, badgeInfo, genres, streak, posters, stats, str, palette, language } = ctx;
+  const { options, perde, posters, stats, str, palette, language, favoritesActive } = ctx;
   const showPerde = options.showPerde && perde;
-  const showGenres = options.showGenres && genres?.top?.length > 0;
-  const showStreak = options.showStreak && streak;
-  const showBadges = options.showBadges && badgeInfo?.showcase?.length > 0;
-  const showPosters = options.showPosters && posters.items.length > 0;
+  const showPosters = !favoritesActive && options.showPosters && posters.items.length > 0;
   const items = posters.items.slice(0, 3);
   const sub = daysHoursText(ctx);
   return (
@@ -796,25 +1043,9 @@ function IdentityLayout({ ctx }) {
         </View>
       </View>
 
-      {showGenres || showStreak || showBadges ? (
-        <View style={styles.passExtras}>
-          {showGenres ? <GenreChips ctx={ctx} centered /> : null}
-          {showStreak || showBadges ? (
-            <View style={styles.extrasRow}>
-              {showStreak ? <StreakPill ctx={ctx} /> : null}
-              {showBadges ? (
-                <View style={styles.badgePill}>
-                  <CardText style={styles.badgePillCount}>
-                    {badgeInfo.earned}
-                    <CardText style={styles.badgeTotal}>/{badgeInfo.total}</CardText>
-                  </CardText>
-                  <ShowcaseBadges ctx={ctx} size={24} />
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-      ) : null}
+      <ExtrasBlock ctx={ctx} centered style={styles.passExtras} />
+
+      {favoritesActive ? <FavoritesRibbon ctx={ctx} layoutId="identity" /> : null}
 
       {showPosters ? (
         <View style={styles.fan}>
@@ -850,12 +1081,12 @@ function IdentityLayout({ ctx }) {
 const WALL_H = 390;
 
 function WallLayout({ ctx }) {
-  const { palette, options, perde, badgeInfo, genres, streak, posters, stats, str } = ctx;
+  const { palette, options, perde, posters, favorites, favoritesActive } = ctx;
   const showPerde = options.showPerde && perde;
-  const showGenres = options.showGenres && genres?.top?.length > 0;
-  const showStreak = options.showStreak && streak;
-  const showBadges = options.showBadges && badgeInfo?.showcase?.length > 0;
-  const showPosters = options.showPosters && posters.items.length > 0;
+  // Dört favori açıkken kolajı favori afişleri doldurur (görseli olanlar); yoksa
+  // liste posterleri. Hücre kaynağı bu ikisinden biridir.
+  const wallItems = favoritesActive ? favoriteWallItems(favorites, 9) : posters.items;
+  const showPosters = (favoritesActive || options.showPosters) && wallItems.length > 0;
 
   // Duvar 4 sütun x 3 sıra; poster azsa döngüyle doldurulur. Çift sütunlar
   // yukarı kayık (kolaj hissi), tüm ızgara hafif eğik.
@@ -865,7 +1096,7 @@ function WallLayout({ ctx }) {
   const cellH = 177;
   const cells = [];
   if (showPosters) {
-    for (let i = 0; i < cols * rows; i += 1) cells.push(posters.items[i % posters.items.length]);
+    for (let i = 0; i < cols * rows; i += 1) cells.push(wallItems[i % wallItems.length]);
   }
   const bg = palette.colors[3];
   const mid = palette.colors[2];
@@ -925,31 +1156,7 @@ function WallLayout({ ctx }) {
           </View>
         ) : null}
 
-        {options.showStats ? (
-          <Glass radius={18} style={styles.wallStats}>
-            {[
-              [compact(ctx, stats.movies), str.movies],
-              [compact(ctx, stats.shows), str.shows],
-              [compact(ctx, stats.episodes), str.episodes],
-              [compact(ctx, stats.hours), str.hours],
-            ].map(([value, label], index) => (
-              <View
-                key={label}
-                style={[
-                  styles.wallStat,
-                  index > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: alpha(WHITE, 0.2) },
-                ]}
-              >
-                <CardText numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={styles.wallStatValue}>
-                  {value}
-                </CardText>
-                <CardText numberOfLines={1} style={styles.wallStatLabel}>
-                  {label}
-                </CardText>
-              </View>
-            ))}
-          </Glass>
-        ) : null}
+        {options.showStats ? <StatStrip ctx={ctx} style={styles.wallStats} /> : null}
 
         {showPerde ? (
           <Glass radius={18} style={[styles.perdePanel, { marginTop: 8 }]}>
@@ -957,25 +1164,7 @@ function WallLayout({ ctx }) {
           </Glass>
         ) : null}
 
-        {showGenres || showStreak || showBadges ? (
-          <View style={styles.wallExtras}>
-            {showGenres ? <GenreChips ctx={ctx} /> : null}
-            {showStreak || showBadges ? (
-              <View style={styles.extrasRow}>
-                {showStreak ? <StreakPill ctx={ctx} /> : null}
-                {showBadges ? (
-                  <View style={styles.badgePill}>
-                    <CardText style={styles.badgePillCount}>
-                      {badgeInfo.earned}
-                      <CardText style={styles.badgeTotal}>/{badgeInfo.total}</CardText>
-                    </CardText>
-                    <ShowcaseBadges ctx={ctx} size={24} />
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-        ) : null}
+        <ExtrasBlock ctx={ctx} style={styles.wallExtras} />
 
         <View style={styles.wallFooter}>
           <Footer ctx={ctx} />
@@ -987,12 +1176,9 @@ function WallLayout({ ctx }) {
 
 // ── Düzen 4: Minimal (tipografik) ────────────────────────────────────────────
 function MinimalLayout({ ctx }) {
-  const { palette, options, perde, genres, streak, posters, stats, str, language, badgeInfo } = ctx;
+  const { palette, options, perde, posters, stats, str, language, favoritesActive } = ctx;
   const showPerde = options.showPerde && perde;
-  const showGenres = options.showGenres && genres?.top?.length > 0;
-  const showStreak = options.showStreak && streak;
-  const showBadges = options.showBadges && badgeInfo?.showcase?.length > 0;
-  const showPosters = options.showPosters && posters.items.length > 0;
+  const showPosters = !favoritesActive && options.showPosters && posters.items.length > 0;
   const sub = daysHoursText(ctx);
   const count = 5;
   const posterW = 52;
@@ -1065,25 +1251,9 @@ function MinimalLayout({ ctx }) {
 
       {showPerde ? <PerdeModule ctx={ctx} /> : null}
 
-      {showGenres || showStreak || showBadges ? (
-        <View style={{ gap: 8 }}>
-          {showGenres ? <GenreChips ctx={ctx} /> : null}
-          {showStreak || showBadges ? (
-            <View style={styles.extrasRow}>
-              {showStreak ? <StreakPill ctx={ctx} /> : null}
-              {showBadges ? (
-                <View style={styles.badgePill}>
-                  <CardText style={styles.badgePillCount}>
-                    {badgeInfo.earned}
-                    <CardText style={styles.badgeTotal}>/{badgeInfo.total}</CardText>
-                  </CardText>
-                  <ShowcaseBadges ctx={ctx} size={24} />
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-      ) : null}
+      <ExtrasBlock ctx={ctx} style={{ gap: 8 }} />
+
+      {favoritesActive ? <FavoritesRibbon ctx={ctx} layoutId="minimal" /> : null}
 
       {showPosters ? (
         <View style={[styles.posterRow, { height: posterH, justifyContent: posters.items.length >= count ? "space-between" : "center", gap: posters.items.length >= count ? 0 : 14 }]}>
@@ -1098,11 +1268,62 @@ function MinimalLayout({ ctx }) {
   );
 }
 
+// ── Düzen 5: Seçki (dört favori) ─────────────────────────────────────────────
+// Dikey bütçe BURADA elle değil planPicksLayout ile (utils/profileStoryCard.js)
+// hesaplanır; bu düzendeki her sabit yükseklik PICKS_BUDGET'tan gelir ve testle
+// "her anahtar birleşiminde 600 piksele sığar" diye kilitlidir. Bölüm sırası:
+// üst bilgi, kimlik (+not), favoriler, istatistik, Perde, tür/seri/rozet, altbilgi.
+function PicksLayout({ ctx }) {
+  const { options, perde, genres, streak, badgeInfo, favorites } = ctx;
+  const showPerde = Boolean(options.showPerde && perde);
+  const showGenres = Boolean(options.showGenres && genres?.top?.length > 0);
+  const showStreak = Boolean(options.showStreak && streak);
+  const showBadges = Boolean(options.showBadges && badgeInfo?.showcase?.length > 0);
+  const plan = planPicksLayout({
+    kinds: favorites.groups.map((group) => group.kind),
+    hasNote: Boolean(options.note),
+    showStats: Boolean(options.showStats),
+    showPerde,
+    showGenres,
+    showPills: showStreak || showBadges,
+  });
+  return (
+    <View style={styles.layout}>
+      <Header ctx={ctx} />
+
+      <View style={{ gap: PICKS_BUDGET.noteGap }}>
+        <View style={[styles.identityRow, { height: PICKS_BUDGET.identity }]}>
+          <RingAvatar ctx={ctx} size={40} />
+          <View style={styles.identityCopy}>
+            <Name ctx={ctx} size={22} />
+            <View style={styles.metaRow}>
+              <Username ctx={ctx} />
+              <IdentityTags ctx={ctx} />
+            </View>
+          </View>
+        </View>
+        <Note ctx={ctx} />
+      </View>
+
+      {plan.shelf ? <FavoriteShelves ctx={ctx} plan={plan.shelf} /> : null}
+
+      {options.showStats ? <StatStrip ctx={ctx} style={styles.statStrip} /> : null}
+
+      {showPerde ? <PerdeModule ctx={ctx} /> : null}
+
+      <ExtrasBlock ctx={ctx} style={{ gap: PICKS_BUDGET.extrasGap, alignItems: "center" }} centered nowrap />
+
+      <Footer ctx={ctx} />
+    </View>
+  );
+}
+
 const LAYOUTS = {
   showcase: ShowcaseLayout,
   identity: IdentityLayout,
   wall: WallLayout,
   minimal: MinimalLayout,
+  picks: PicksLayout,
 };
 
 const ProfileStoryCard = memo(function ProfileStoryCard({
@@ -1118,12 +1339,15 @@ const ProfileStoryCard = memo(function ProfileStoryCard({
   streak = null,
   member = "",
   posters,
+  favorites = null,
   str,
   onImageSettled,
 }) {
   const { logo } = useAppLogo();
   const palette = getStoryPalette(options.themeId, theme?.accent || "#7C3AED", profile.ringColors);
-  const Layout = LAYOUTS[options.layout] || ShowcaseLayout;
+  // Dört favori etkinse poster alanını o doldurur; Seçki favorisiz çizilemez.
+  const favoritesActive = isFavoritesActive(options, favorites);
+  const Layout = LAYOUTS[resolveStoryLayout(options.layout, favoritesActive)] || ShowcaseLayout;
   const ctx = {
     options,
     palette,
@@ -1137,6 +1361,8 @@ const ProfileStoryCard = memo(function ProfileStoryCard({
     streak,
     member,
     posters,
+    favorites,
+    favoritesActive,
     str,
     logo,
     onImageSettled,
@@ -1256,6 +1482,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.2)",
   },
   posterRow: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  posterEmpty: { flex: 1, alignItems: "center", justifyContent: "center" },
   sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   sectionDot: { width: 6, height: 6, borderRadius: 3 },
   sectionTitle: { flexShrink: 1, color: "rgba(255,255,255,0.78)", fontSize: 9.5, fontWeight: "900", letterSpacing: 1.5 },
@@ -1307,6 +1534,9 @@ const styles = StyleSheet.create({
   },
   chipText: { color: WHITE, fontSize: 10.5, fontWeight: "800" },
   chipPct: { fontSize: 9.5, fontWeight: "900" },
+  // Seçki: tek satır, uzun ad kısalır (dikey bütçe tek satır varsayar).
+  chipRowNoWrap: { flexWrap: "nowrap", maxWidth: W - PAD * 2 },
+  chipShrink: { flexShrink: 1 },
 
   // seri
   streakTile: { paddingHorizontal: 12, paddingVertical: 10, justifyContent: "space-between" },
@@ -1385,6 +1615,20 @@ const styles = StyleSheet.create({
   wallStatLabel: { color: "rgba(255,255,255,0.62)", fontSize: 8, fontWeight: "800", letterSpacing: 1.2, marginTop: 1 },
   wallExtras: { gap: 8, marginTop: 10 },
   wallFooter: { marginTop: "auto" },
+
+  // dört favori: şerit (eski düzenler) + raflar (Seçki)
+  ribbon: { flexDirection: "row", alignItems: "center" },
+  kindLabel: { flexDirection: "row", alignItems: "center", gap: 4, height: 14, marginBottom: 4 },
+  kindLabelText: { flexShrink: 1, color: "rgba(255,255,255,0.72)", fontSize: 8, fontWeight: "800", letterSpacing: 1 },
+  shelfTitle: { height: 14, marginBottom: 8 },
+  shelfPanel: { paddingVertical: 10, paddingHorizontal: 12, gap: 8 },
+  shelfRow: { flexDirection: "row", alignItems: "flex-start" },
+  shelfLabelCol: { width: SHELF_LABEL_W, marginRight: SHELF_LABEL_GAP, alignItems: "center", justifyContent: "center", gap: 2 },
+  shelfLabelIcon: { width: 22, height: 22, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  shelfLabelText: { color: "rgba(255,255,255,0.72)", fontSize: 7.5, fontWeight: "800", letterSpacing: 0.4 },
+  shelfSlots: { flexDirection: "row", alignItems: "flex-start" },
+  shelfName: { marginTop: 4, height: 12, textAlign: "center", color: "rgba(255,255,255,0.82)", fontSize: 8.5, lineHeight: 12, fontWeight: "700" },
+  statStrip: { flexDirection: "row", alignItems: "center", height: 54 },
 
   // minimal
   minimalIdentity: { flexDirection: "row", alignItems: "center", gap: 12 },

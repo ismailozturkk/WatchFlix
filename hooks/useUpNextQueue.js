@@ -10,6 +10,7 @@
 // ağ tarafındaki tekrar `resolveUpNextEpisodeCached` ile ortadan kalkar —
 // aynı dizi iki kez çözülmez.
 
+import { tmdbLanguageOf } from "../utils/appLanguages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Toast from "react-native-toast-message";
 
@@ -205,7 +206,7 @@ export default function useUpNextQueue({
           try {
             const item = await resolveUpNextEpisodeCached(show, {
               apiKey: API_KEY,
-              language: language === "en" ? "en-US" : "tr-TR",
+              language: tmdbLanguageOf(language),
               refresh: force,
             });
             if (!alive) return null;

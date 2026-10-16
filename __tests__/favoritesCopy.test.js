@@ -12,18 +12,21 @@ const shape = (value) => {
 };
 
 describe("dört favori metinleri", () => {
-  it("tr ve en aynı yapıda", () => {
+  it("tr, en ve es aynı yapıda", () => {
     expect(shape(FAVORITES_COPY.en)).toEqual(shape(FAVORITES_COPY.tr));
+    expect(shape(FAVORITES_COPY.es)).toEqual(shape(FAVORITES_COPY.tr));
   });
 
-  it("bilinmeyen dil Türkçeye düşer", () => {
-    expect(getFavoritesCopy("de")).toBe(FAVORITES_COPY.tr);
-    expect(getFavoritesCopy(undefined)).toBe(FAVORITES_COPY.tr);
+  it("bilinmeyen dil İngilizceye düşer (Türkçeye DEĞİL)", () => {
+    expect(getFavoritesCopy("de")).toBe(FAVORITES_COPY.en);
+    expect(getFavoritesCopy(undefined)).toBe(FAVORITES_COPY.en);
+    expect(getFavoritesCopy("tr")).toBe(FAVORITES_COPY.tr);
     expect(getFavoritesCopy("en")).toBe(FAVORITES_COPY.en);
+    expect(getFavoritesCopy("es")).toBe(FAVORITES_COPY.es);
   });
 
   it("her kategori için tüm etiketler dolu", () => {
-    for (const lang of ["tr", "en"]) {
+    for (const lang of ["tr", "en", "es"]) {
       for (const kind of FAVORITE_KINDS) {
         const k = FAVORITES_COPY[lang].kinds[kind];
         for (const key of ["label", "add", "pickTitle", "search", "icon"]) {
@@ -35,7 +38,7 @@ describe("dört favori metinleri", () => {
   });
 
   it("işlev metinleri başlığı içeriyor ve sayaç doğru biçimde", () => {
-    for (const lang of ["tr", "en"]) {
+    for (const lang of ["tr", "en", "es"]) {
       const copy = FAVORITES_COPY[lang];
       expect(copy.counter(2, MAX_FAVORITES)).toBe("2/4");
       expect(copy.picker.add("Heat")).toContain("Heat");

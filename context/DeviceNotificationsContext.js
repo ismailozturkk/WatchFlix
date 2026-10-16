@@ -12,6 +12,7 @@
 // Tüm bu hook'lara erişebilmesi için sağlayıcılar (Auth, AppSettings,
 // Notifications, ProfileReminders, ProfileNotes, Language) ÜSTTE olmalı.
 
+import { normalizeAppLanguage, tmdbRegionOf } from "../utils/appLanguages";
 import React, {
   createContext,
   useCallback,
@@ -331,11 +332,12 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
           streamingEnabled: settings.streamingEnabled === true,
         },
         // Backend push'unun dilini bilmesi için (foreground/background tutarlılığı).
-        notificationLanguage: language === "en" ? "en" : "tr",
+        // Sunucu push dili (functions/index.js pickNotificationLang): uygulama dili aynen.
+        notificationLanguage: normalizeAppLanguage(language),
         // Streaming bildirimleri: abone olunan sağlayıcılar + TMDB bölgesi.
         streamingProviders: {
           ids: streamingProviderIds,
-          region: language === "en" ? "US" : "TR",
+          region: tmdbRegionOf(language),
         },
       }).catch(() => {});
     }, 600);

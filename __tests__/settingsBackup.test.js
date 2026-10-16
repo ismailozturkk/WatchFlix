@@ -169,6 +169,14 @@ describe("planImport — değerler", () => {
     expect(plan.meta).toEqual({ createdAt: "2026-10-15T10:00:00.000Z", appVersion: "1.4.8", platform: "ios" });
   });
 
+  test("kayıtlı her dil kodu yedekten geri yüklenebilir (İspanyolca dahil)", () => {
+    for (const language of ["tr", "en", "es"]) {
+      const plan = planImport(yedekOlustur({ language }));
+      expect(yaz(plan)).toEqual({ language });
+      expect(plan.skipped).toEqual([]);
+    }
+  });
+
   test("null → anahtarı sil (varsayılana dön); yazım olarak planlanır", () => {
     const plan = planImport(yedekOlustur({ language: null, effectMode: null, theme: null }));
     expect(yaz(plan)).toEqual({ language: null, effectMode: null, theme: null });

@@ -25,6 +25,7 @@ import {
   toStr,
 } from "./aiCineService";
 import { foldForSearch } from "../utils/friendsListModel";
+import { copyLanguage, pickByLanguage } from "../utils/appLanguages";
 
 const clean = (value, max = 80) =>
   toStr(value).replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
@@ -168,11 +169,29 @@ const GENRE_ALIASES = {
   tarih: "history",
   muzik: "music",
   "vahsi bati": "western",
+  // İspanyolca (katlanmış, aksansız)
+  "ciencia ficcion": "sci-fi",
+  accion: "action",
+  aventura: "adventure",
+  comedia: "comedy",
+  terror: "horror",
+  suspense: "thriller",
+  suspenso: "thriller",
+  crimen: "crime",
+  misterio: "mystery",
+  fantasia: "fantasy",
+  animacion: "animation",
+  familia: "family",
+  documental: "documentary",
+  belica: "war",
+  guerra: "war",
+  historia: "history",
+  musica: "music",
 };
 
 function genreTokens(value) {
   return foldForSearch(toStr(value))
-    .split(/[&/,]|\s+ve\s+|\s+and\s+/)
+    .split(/[&/,]|\s+ve\s+|\s+and\s+|\s+y\s+/)
     .map((part) => part.trim())
     .filter(Boolean)
     .map((part) => GENRE_ALIASES[part] || part);
@@ -379,8 +398,11 @@ export function formatDuration(minutes, language = "en") {
   if (total <= 0) return "";
   const h = Math.floor(total / 60);
   const m = total % 60;
-  const hourUnit = language === "tr" ? "sa" : "h";
-  const minUnit = language === "tr" ? "dk" : "m";
+  const { hour: hourUnit, minute: minUnit } = pickByLanguage(language, {
+    tr: { hour: "sa", minute: "dk" },
+    en: { hour: "h", minute: "m" },
+    es: { hour: "h", minute: "min" },
+  });
   if (h === 0) return `${m} ${minUnit}`;
   return m === 0 ? `${h} ${hourUnit}` : `${h} ${hourUnit} ${m} ${minUnit}`;
 }
@@ -453,6 +475,26 @@ const FOLLOW_UP_COPY = {
     movies: "Suggest movies",
     series: "Suggest series",
   },
+  es: {
+    different: "Muéstrame otras",
+    pickOne: "¿Cuál veo?",
+    shorter: "Más cortas",
+    similarTo: "Más como {title}",
+    watchFirst: "¿Cuál primero?",
+    third: "Una tercera opción",
+    makePlan: "Crear un plan de visionado",
+    shortenPlan: "Acortar el plan",
+    weekend: "Que quepa en un fin de semana",
+    swapOne: "Cambiar una",
+    moreLikeThis: "Más como esta",
+    hiddenGems: "Solo joyas ocultas",
+    toPlan: "Convertir en plan",
+    similar: "Sugerir similares",
+    pitch: "Presentación sin spoilers",
+    versus: "Comparar con {a}",
+    movies: "Sugerir películas",
+    series: "Sugerir series",
+  },
 };
 
 const fill = (template, values) =>
@@ -472,14 +514,14 @@ const short = (title, max = 18) => {
  *
  * @param {object} response
  * @param {object} [options]
- * @param {"tr"|"en"} [options.language]
+ * @param {"tr"|"en"|"es"} [options.language]
  * @param {number} [options.limit]
  * @param {object} [options.posterMap]  spotlight için TMDB "benzer" önerisi
  * @returns {{ id: string, icon: string, label: string, prompt: string }[]}
  */
 export function buildFollowUps(response, { language = "en", limit = 3, posterMap } = {}) {
   if (!response || typeof response !== "object") return [];
-  const copy = FOLLOW_UP_COPY[language === "tr" ? "tr" : "en"];
+  const copy = FOLLOW_UP_COPY[copyLanguage(language, Object.keys(FOLLOW_UP_COPY))];
   const out = [];
   const add = (id, icon, label, prompt) => out.push({ id: `${response.type}:${id}`, icon, label, prompt });
 
@@ -580,7 +622,11 @@ export function buildShareText(response, posterMap, { language = "en", appName =
     const rating = safeNum(card?.rating) > 0 ? ` ★${safeNum(card.rating).toFixed(1)}` : "";
     return `${index + 1}. ${name}${year}${rating}`;
   });
-  const head = language === "tr" ? `${appName} · CineMatch önerileri` : `${appName} · CineMatch picks`;
+  const head = pickByLanguage(language, {
+    tr: `${appName} · CineMatch önerileri`,
+    en: `${appName} · CineMatch picks`,
+    es: `${appName} · recomendaciones de CineMatch`,
+  });
   return [head, "", ...lines].join("\n");
 }
 
@@ -637,15 +683,19 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  */
 export function formatRelativeTime(timestamp, language = "en", now = Date.now()) {
   if (!timestamp || !Number.isFinite(Number(timestamp))) return "";
-  const tr = language === "tr";
+  const u = pickByLanguage(language, {
+    tr: { minute: "dk", hour: "sa", yesterday: "dün", day: "g" },
+    en: { minute: "m", hour: "h", yesterday: "1d", day: "d" },
+    es: { minute: "min", hour: "h", yesterday: "ayer", day: "d" },
+  });
   const minutes = Math.floor((now - timestamp) / 60000);
   if (minutes < 1) return "•";
-  if (minutes < 60) return `${minutes} ${tr ? "dk" : "m"}`;
+  if (minutes < 60) return `${minutes} ${u.minute}`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ${tr ? "sa" : "h"}`;
+  if (hours < 24) return `${hours} ${u.hour}`;
   const days = Math.floor(hours / 24);
-  if (days === 1) return tr ? "dün" : "1d";
-  if (days < 7) return `${days} ${tr ? "g" : "d"}`;
+  if (days === 1) return u.yesterday;
+  if (days < 7) return `${days} ${u.day}`;
   const date = new Date(timestamp);
   const dd = String(date.getDate()).padStart(2, "0");
   const mm = String(date.getMonth() + 1).padStart(2, "0");

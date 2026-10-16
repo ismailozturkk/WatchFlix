@@ -10,6 +10,7 @@
 // Raf içeriği KÜÇÜK (en çok 6-8 öğe) olduğu için FlatList değil ScrollView:
 // sanallaştırma 8 kart için yük bindirir, kazandırmaz.
 
+import { copyLanguage } from "../../utils/appLanguages";
 import React, { memo } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppBadge from "@components/badges/AppBadge";
@@ -55,7 +56,7 @@ export function BadgeRail({ baslik, altBaslik, children }) {
 export const HedefKarti = memo(function HedefKarti({ kart, onPress }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = language === "en" ? "en" : "tr";
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
   const uye = hedefUyesi(kart);
   if (!uye) return null;
 
@@ -107,7 +108,7 @@ export const HedefKarti = memo(function HedefKarti({ kart, onPress }) {
 export const SonKarti = memo(function SonKarti({ kart, onPress, simdi }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = language === "en" ? "en" : "tr";
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
 
   const sekil = kademeSekli(kart.tier, kart.aileToplam);
   const kadRenk = kademeRengi(sekil.kademe, theme);
