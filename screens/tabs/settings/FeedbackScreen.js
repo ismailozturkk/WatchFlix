@@ -203,8 +203,10 @@ export default function FeedbackScreen() {
         }))
       : [];
 
+  // Hazırken düğmenin altında veri kullanımı notu durur (gönderim anındaki
+  // bilgilendirme); eksik alan varken önce ne eksik olduğu söylenir.
   const submitHint = check.ready
-    ? null
+    ? copy.common.privacyNote
     : check.titleOk
       ? fill(copy.common.messageNeed, { n: FEEDBACK_LIMITS.messageMin })
       : copy.common.submitNeed;

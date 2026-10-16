@@ -20,6 +20,7 @@ const tr = {
   common: {
     deviceTitle: "Cihaz bilgisini ekle",
     deviceHint: "Yalnızca sorunu yeniden üretmek için kullanılır.",
+    privacyNote: "Gönderdiğin kayıt hesabınla ilişkilendirilir; destek geçmişi için hesabını silsen de saklanabilir.",
     titleLabel: "Kısa başlık",
     counter: "{n}/{max}",
     messageNeed: "En az {n} karakter yaz",
@@ -119,6 +120,7 @@ const en = {
   common: {
     deviceTitle: "Include device info",
     deviceHint: "Used only to reproduce the problem.",
+    privacyNote: "What you send is tied to your account and may be kept for support history even after you delete the account.",
     titleLabel: "Short title",
     counter: "{n}/{max}",
     messageNeed: "Write at least {n} characters",
@@ -218,6 +220,7 @@ const es = {
   common: {
     deviceTitle: "Incluir datos del dispositivo",
     deviceHint: "Solo se usan para reproducir el problema.",
+    privacyNote: "Lo que envías queda vinculado a tu cuenta y puede conservarse como historial de soporte aunque la elimines.",
     titleLabel: "Título breve",
     counter: "{n}/{max}",
     messageNeed: "Escribe al menos {n} caracteres",

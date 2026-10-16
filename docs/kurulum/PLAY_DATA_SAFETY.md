@@ -121,4 +121,30 @@ reklam, veri satışı veya kendi amaçları için kullanmıyor. Dolayısıyla h
 
 ---
 
+## 7. 16 Ekim 2026 güncellemesi — 24 Eylül taramasından SONRA eklenenler
+
+Gizlilik politikası 1.1 (`website/privacy.html`) bu listeye göre yazıldı. Formu doldururken/güncellerken
+tablo 2'ye şunlar eklenir (hepsi **linked**, **Shared: Hayır**, **Required** — kapatma anahtarı yok):
+
+| Play kategorisi | Ne | Kaynak | Amaç |
+|---|---|---|---|
+| Messages › **Other in-app messages** | AI sohbet GEÇMİŞİ artık hesapta saklanıyor (`AiConversations/{uid}/items`) — tablo 2'deki "AI sohbet metinleri"nin saklama kısmı | `services/userData/aiConversations.js` | App functionality |
+| App activity › **Other user-generated content** | Geri bildirim kutusu: başlık, açıklama, kategori, önem, dil (`Feedback`) + dört favori (`Users.fourFavorites`) | `feedbackService.js`, `fourFavoritesService.js` | App functionality |
+| App info and performance › **Diagnostics** | Geri bildirimde isteğe bağlı cihaz bilgisi: uygulama sürümü, platform, OS sürümü, cihaz modeli | `FeedbackScreen.js` (`includeDevice`) | App functionality |
+| Personal info › **Email address / Name** | Apple ile giriş (Apple'ın paylaştığı e-posta/ad, gizli yönlendirme adresi olabilir) | `appleAuthService.js` | App functionality, Account management |
+
+- **Reklam kimliği:** 16 Ekim'de hâlâ toplanıyor (`google_analytics_adid_collection_enabled=true`, AD_ID izni).
+  Gizlilik politikası bunu artık AÇIKÇA söylüyor ("yalnız ölçüm, reklam yok"). Kararı değiştirip B yolunu
+  (kapatma) seçersen politikadaki "Kullanım ölçümü" bölümü ve "Toplamadığımız veriler" kutusundaki cümleler de
+  sadeleşmeli.
+- **Takvim:** `READ_CALENDAR`+`WRITE_CALENDAR` izni var ama yalnız uygulamanın kendi etkinliklerini yazar/siler,
+  veri çıkmaz → formda yine "Hayır" (tablo 3 geçerli). İzin sebebi politikada "Telefon takvimi (isteğe bağlı)".
+- **Sentry performans** (`tracesSampleRate: 0.15`) tablo 2'de zaten var; politika artık "performans ölçümü" diyor.
+- **iOS App Store gizlilik etiketi** (App Privacy) için de aynı döküm: Contact Info (e-posta, ad), User Content,
+  Identifiers (kullanıcı kimliği, cihaz kimliği), Usage Data, Diagnostics, Purchases; Tracking = YOK
+  (ATT istenmiyor). Apple 5.1.2(i): üçüncü taraf AI'a kişisel veri gidiyorsa açık bilgilendirme/izin beklenir —
+  AI Ayarları'nda "Listelerimi kullan" varsayılan KAPALI ve ipucu metni Gemini'yi açıkça söylüyor.
+
+---
+
 **İlgili:** `REVENUECAT_KURULUM.md` (abonelik tarafı), `YAYIN_ONCESI_AI_GOREV_PLANI.md` C5.

@@ -119,6 +119,7 @@ body {
   color: var(--ink-muted); font-size: clamp(16px, 2vw, 18px);
   max-width: var(--measure);
 }
+.hero-lead + .hero-lead { margin-top: 12px; }
 .stamp {
   display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px;
 }

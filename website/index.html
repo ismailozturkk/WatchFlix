@@ -376,6 +376,7 @@
   .join-form button:active { transform: scale(.96); }
   .join-note { margin-top: 14px; font-size: 13px; color: var(--ink-dim); }
   .join-note b { color: var(--ink-muted); }
+  .join-note a { color: var(--blue-hi); text-decoration: underline; text-underline-offset: 2px; }
   .form-error { margin-top: 12px; font-size: 13.5px; color: #ff8f6b; min-height: 1.2em; }
 
   /* bilet */
@@ -1055,7 +1056,7 @@
         <span class="t-hole-b"></span>
       </div>
 
-      <p class="join-note" data-i18n="joinNote" data-i18n-html="1">No spam. Just <b>one email</b> on launch day. You can leave the list anytime.</p>
+      <p class="join-note" data-i18n="joinNote" data-i18n-html="1">No spam. Just <b>one email</b> on launch day. You can leave the list anytime. By joining you agree that we use your address only to announce the launch, as described in the <a href="privacy.html">Privacy Policy</a>.</p>
     </div>
   </section>
 
@@ -1207,7 +1208,7 @@ const I18N = {
     joinBtn: "JOIN WAITLIST",
     joinBtnLoading: "…",
     joinBtnRetry: "JOIN WAITLIST",
-    joinNote: 'No spam. Just <b>one email</b> on launch day. You can leave the list anytime.',
+    joinNote: 'No spam. Just <b>one email</b> on launch day. You can leave the list anytime. By joining you agree that we use your address only to announce the launch, as described in the <a href="privacy.html">Privacy Policy</a>.',
     formErrInvalid: "Please enter a valid email address.",
     formErrDup: "This email is already in line — your spot is ready! 🎟️",
     formErrGeneric: "Something went wrong, would you try again?",
@@ -1258,7 +1259,7 @@ const I18N = {
     joinBtn: "SIRAYA GİR",
     joinBtnLoading: "…",
     joinBtnRetry: "SIRAYA GİR",
-    joinNote: 'Spam yok. Sadece lansman günü <b>tek bir e-posta</b>. İstediğin zaman ayrılabilirsin.',
+    joinNote: 'Spam yok. Sadece lansman günü <b>tek bir e-posta</b>. İstediğin zaman ayrılabilirsin. Katılarak adresinin yalnızca lansmanı duyurmak için, <a href="privacy.html">Gizlilik Politikası</a>’nda anlatıldığı şekilde kullanılmasını kabul etmiş olursun.',
     formErrInvalid: "Geçerli bir e-posta adresi girmelisin.",
     formErrDup: "Bu e-posta zaten sırada — yerin hazır! 🎟️",
     formErrGeneric: "Bir şeyler ters gitti, tekrar dener misin?",

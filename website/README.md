@@ -24,11 +24,19 @@ geçersiz kılar. Telefonun dili uygulamanın diliyle aynı olmak zorunda değil
 metin kullanıcının uygulamada seçtiği dilde açılmalı. Parametre ayrıca
 `wf_lang`'e yazılır, böylece sayfalar arası gezinmede dil sabit kalır.
 
-> ⚠️ Sayfalarda `mark.todo` ile işaretlenmiş **doldurulmayı bekleyen alanlar**
-> var: veri sorumlusunun kimliği/ülkesi ve yetkili mahkeme. Mağazaya
-> göndermeden önce doldur; tarayıcıda amber renkte göründükleri için gözden
-> kaçmazlar. Sayfalardaki tarihleri (`Yürürlük` / `Son güncelleme`) de metni
-> değiştirdiğinde güncelle.
+> ✅ `mark.todo` ile işaretli boş alan kalmadı: veri sorumlusu (ISO STUDIOS) ve
+> yetkili mahkeme (Tokat) dolduruldu. Yeni bir boşluk bırakırsan aynı işareti
+> kullan; tarayıcıda amber renkte görünür.
+>
+> **Metni değiştirdiğinde:** `Yürürlük` / `Son güncelleme` / `Sürüm` damgasını ve
+> gizlilik/şartlar sayfalarının sonundaki "Sürüm geçmişi" satırını güncelle.
+> Üç sayfa uygulamanın gerçek davranışına bağlı — bir özellik veri
+> toplamaya/göndermeye başlıyorsa (yeni koleksiyon, analitik, üçüncü taraf,
+> izin) aynı PR'da `privacy.html`, silme kapsamı değişiyorsa
+> `delete-account.html` (ve `services/accountService.js` başlık listesi),
+> plan/limit değişiyorsa `terms.html` güncellenmeli. Mağaza formu karşılığı:
+> `docs/kurulum/PLAY_DATA_SAFETY.md`. Site yalnız `tr`/`en` biliyor; uygulama
+> `es` için İngilizce sayfaya düşer (`utils/appLanguages` `legalLanguageOf`).
 
 - **Renkler:** Vurgu rengi uygulamanın mavisi (`theme/colors.js` → `blue #138DF0`,
   `blueDark #0551A3`); CSS değişkenleri `--blue / --blue-hi / --blue-deep`.

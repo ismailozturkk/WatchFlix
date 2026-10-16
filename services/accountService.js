@@ -31,6 +31,8 @@
 //     Usernames/{usernameLower}
 //     Lists/{uid} (+ watchedTv/{showId}/seasons, wrapped alt koleksiyonları)
 //     Notes/{uid}/items
+//     MediaNotes/{uid}/items (film/dizi sayfasına bağlı notlar)
+//     AiConversations/{uid}/items (CineMatch AI sohbet geçmişi)
 //     Reminders/{uid} (movies, tvShows/{showId}/episodes)
 //     UserStats/{uid}
 //     Presence/{uid} (Firestore kalıntı) + RTDB /presence/{uid}
@@ -60,6 +62,11 @@
 //     - tournaments/*/votes/{uid}: kural gereği silinemez (oy değiştirme
 //       exploit'ini önlemek için delete kapalı); temizlik ileride admin/CF ile.
 //     - PostReports/{id} (reporterId == uid): moderasyon kararının dayanağı.
+//     - Feedback/{id} (uid == kullanıcı): kural yalnız create + kendi kaydını
+//       okuma; istemci silemez. Gizlilik politikası ve delete-account.html
+//       "Silinmeyen kayıtlar" bunu açıkça söylüyor; silme e-postayla, konsoldan.
+//     - CineRooms/{roomId}: oda sonucu iki taraf alınca ya da en geç 24 saatte
+//       sunucu (cleanupDeliveredCineRoom / cleanupExpiredCineRooms) siler.
 //     - Başkalarının BENİM medya yorumuma yazdığı yanıtlar: kural yalnız
 //       yanıtın yazarına silme izni verir (Posts'taki "post sahibi de silebilir"
 //       yolunun MovieComment/TvComment karşılığı yok). Tekil yorum silmede de
@@ -506,6 +513,22 @@ export async function purgeUserData(uid) {
     await deleteCollection(collection(db, "Notes", uid, "items"));
     await deleteDoc(doc(db, "Notes", uid));
   });
+
+  // ── MediaNotes/{uid}/items (film/dizi sayfasına bağlı notlar) ──────────────
+  // Genel notlardan (Notes) AYRI koleksiyon. Kök belge yok, yalnız alt
+  // koleksiyon. delete-account.html "tüm notlarınız" diyor — bu adım olmadan
+  // sayfadaki vaat eksik kalıyordu.
+  await safe("media-notes", () =>
+    deleteCollection(collection(db, "MediaNotes", uid, "items")),
+  );
+
+  // ── AiConversations/{uid}/items (CineMatch sohbet geçmişi) ─────────────────
+  // Yerel-öncelikli alan (services/userData); `purgeLocalUserData` yerel kopyayı
+  // ve bekleyen yazımları temizler — burası bulutu siler. Kök belge yok
+  // (yalnız alt koleksiyon), bu yüzden ayrıca deleteDoc gerekmez.
+  await safe("ai-conversations", () =>
+    deleteCollection(collection(db, "AiConversations", uid, "items")),
+  );
 
   // ── Reminders (movies, tvShows/{showId}/episodes) + Reminders/{uid} ───────
   await safe("reminders", async () => {
