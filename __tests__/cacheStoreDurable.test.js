@@ -29,7 +29,7 @@ describe("kalıcı ad alanları", () => {
     const { cacheStore } = load();
     expect(cacheStore.isDurableNamespace("profile")).toBe(false);
     expect(cacheStore.isDurableNamespace("activity")).toBe(false);
-    for (const ns of ["notes", "mediaNotes", "reminders", "lists"]) {
+    for (const ns of ["notes", "mediaNotes", "aiConversations", "reminders", "lists"]) {
       expect(cacheStore.isDurableNamespace(ns)).toBe(true);
     }
   });

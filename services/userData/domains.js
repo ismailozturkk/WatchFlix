@@ -106,6 +106,30 @@ export const mediaNotesSpec = {
 };
 
 /* ================================================================== */
+/* AI SOHBETLERİ — AiConversations/{uid}/items/{conversationId}        */
+/* ================================================================== */
+
+// Şema, boyut bütçesi ve depo API'si: services/userData/aiConversations.js.
+// Yalnız bu kullanıcının istemcisi yazar (Cloud Function'ın AiUsage kotası
+// AYRI bir koleksiyondur) — ön koşul sağlanıyor.
+export const aiConversationsSpec = {
+  name: "aiConversations",
+  kinds: {
+    items: {
+      cacheKey: (uid) => cacheKeys.aiConversations(uid),
+      keyOf: (doc) => doc.id,
+      pathOf: (uid, key) => `AiConversations/${uid}/items/${key}`,
+      // Geçmiş ekranının sırası: en son konuşulan en üstte.
+      compare: (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0),
+    },
+  },
+  fetchCloud: async (uid, remote) => {
+    const docs = await remote.fetchCollection(`AiConversations/${uid}/items`);
+    return { items: docs.map(({ id, data }) => ({ ...data, id })) };
+  },
+};
+
+/* ================================================================== */
 /* HATIRLATICILAR — Reminders/{uid}/movies + tvShows/{id}/episodes     */
 /* ================================================================== */
 

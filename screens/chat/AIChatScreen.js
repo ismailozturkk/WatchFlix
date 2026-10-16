@@ -51,6 +51,7 @@ import { useNavigation } from "@react-navigation/native";
 import useModalKeyboardLift from "@hooks/useModalKeyboardLift";
 import useAiPrefs from "@hooks/useAiPrefs";
 import useAiQuota from "@hooks/useAiQuota";
+import useAiConversations from "@hooks/useAiConversations";
 
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
@@ -81,6 +82,7 @@ import { buildLibraryContext, applyWatchedFilter } from "@services/aiUserContext
 import {
   applyDiscoveryFilters,
   buildAvoidBlock,
+  buildChatShare,
   buildContextBlock,
   buildTargetCard,
   buildVibePrompt,
@@ -90,17 +92,9 @@ import {
   quotaMeter,
 } from "@services/aiCineInsights";
 import { resolveCards } from "@services/tmdbLookup";
-import {
-  loadCineConversations,
-  persistCineConversations,
-  saveCineConversation,
-  upsertCineConversation,
-  removeCineConversation,
-  clearCineConversations,
-  makeId,
-  summarizeTitle,
-} from "@services/aiCineStore";
+import { makeId, summarizeTitle } from "@services/aiCineStore";
 import ChatBubble from "@components/AICineCards";
+import ShareToChatSheet from "@components/chat/ShareToChatSheet";
 import AIThinking from "@components/ai/AIThinking";
 import AIWelcome from "@components/ai/AIWelcome";
 import AIHistory from "@components/ai/AIHistory";
@@ -186,7 +180,19 @@ export default function AIChatScreen({
 
   const [messages, setMessages] = useState([]);
   const [activeId, setActiveId] = useState(null);
-  const [conversations, setConversations] = useState([]);
+  // Sohbet geçmişi hesaba (Firestore) yedeklenir ve yerel kopyadan SENKRON okunur
+  // (hooks/useAiConversations). Yazmalar yerelde anında, buluta arka planda gider.
+  const {
+    conversations,
+    ready: chatsReady,
+    hydrating: chatsHydrating,
+    waiting: chatsWaiting,
+    save: saveConversation,
+    remove: removeConversation,
+    clearAll: clearConversations,
+    refresh: refreshConversations,
+  } = useAiConversations();
+  const [refreshingChats, setRefreshingChats] = useState(false);
   // Aynı initialPrompt ile ikinci kez sohbet açılmasın (panel yeniden render
   // olduğunda efekt tekrar çalışır); panel kapanınca sıfırlanır.
   const initialPromptRef = useRef(null);
@@ -320,11 +326,6 @@ export default function AIChatScreen({
     outputRange: [theme.border, theme.accent],
   });
 
-  // Kayıtlı sohbetleri yükle (bir kez)
-  useEffect(() => {
-    loadCineConversations().then(setConversations).catch(() => {});
-  }, []);
-
   // Kullanıcı kütüphanesi bağlamı — yalnızca ayar açıkken kurulur (kapalıyken 0 token)
   // Dört favori ("profilimin vitrini") AI'a da gider: kullanıcının açıkça seçtiği
   // en güçlü zevk işareti. Aynı ana anahtara (prefs.enabled) bağlı — kütüphane
@@ -427,26 +428,28 @@ export default function AIChatScreen({
     return list;
   }, [t, activeTab, mostWatchedGenre, prefs.enabled, prefs.watchList, allLists, discoveryPreferences, language, copy]);
 
-  // ── Aktif sohbeti diske kaydet ──
+  // ── Aktif sohbeti kaydet (yerel kopya + kalıcı günlük anında, bulut arka planda) ──
+  // Oluşturulma zamanı depoda korunur; saklama sınırını aşan en eski sohbetler
+  // aynı adımda hem cihazdan hem hesaptan silinir.
   const saveActive = useCallback((msgs, id) => {
     if (!id || !msgs.length) return;
     const now = Date.now();
     const firstUser = msgs.find((m) => m.role === "user");
-    const conv = {
-      id,
-      // Detaydan açılan sohbette ilk mesajın metni uzun bir yönerge olabiliyor;
-      // iliştirilmiş yapımın adı geçmiş listesinde çok daha okunur bir başlık.
-      title: summarizeTitle(
-        firstUser?.attachment?.title || firstUser?.display || firstUser?.text || "…",
-      ),
-      messages: msgs,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    setConversations((prev) => upsertCineConversation(prev, conv));
-    saveCineConversation(conv, { limit: prefs.historyLimit }).then(setConversations).catch(() => {});
-  }, [prefs.historyLimit]);
+    saveConversation(
+      {
+        id,
+        // Detaydan açılan sohbette ilk mesajın metni uzun bir yönerge olabiliyor;
+        // iliştirilmiş yapımın adı geçmiş listesinde çok daha okunur bir başlık.
+        title: summarizeTitle(
+          firstUser?.attachment?.title || firstUser?.display || firstUser?.text || "…",
+        ),
+        messages: msgs,
+        createdAt: now,
+        updatedAt: now,
+      },
+      { limit: prefs.historyLimit },
+    );
+  }, [prefs.historyLimit, saveConversation]);
 
   // ── Asistanı çalıştır ──
   // options.avoidSource: "tekrar öneri engeli" için taranacak mesajlar. "Yeniden
@@ -743,23 +746,30 @@ export default function AIChatScreen({
 
   const deleteConversation = useCallback(
     (id) => {
-      setConversations((prev) => {
-        const next = removeCineConversation(prev, id);
-        persistCineConversations(next, prefs.historyLimit);
-        return next;
-      });
+      removeConversation(id);
       if (id === activeId) newChat();
     },
-    [activeId, newChat, prefs.historyLimit],
+    [activeId, newChat, removeConversation],
   );
 
   const clearAll = useCallback(() => {
-    setConversations([]);
-    clearCineConversations();
+    clearConversations();
     // Açık sohbet de silinmiş sayılır; sonraki mesaj eski bir kayda yazmasın.
     setMessages([]);
     setActiveId(null);
-  }, []);
+  }, [clearConversations]);
+
+  // Geçmişte aşağı çek: başka cihazdaki sohbetleri hesaptan getirir (yerel kopya
+  // buluttan YENİDEN kurulur; bekleyen yerel değişiklikler korunur).
+  const refreshChats = useCallback(async () => {
+    if (refreshingChats) return;
+    setRefreshingChats(true);
+    try {
+      await refreshConversations();
+    } finally {
+      setRefreshingChats(false);
+    }
+  }, [refreshConversations, refreshingChats]);
 
   // ── Poster / başlık tıklama → detay veya arama (modal kapanır) ──
   const handleTitlePress = useCallback(
@@ -783,6 +793,23 @@ export default function AIChatScreen({
     navigation.navigate("PremiumScreen", { source: "ai_messages" });
     handleClose();
   }, [navigation, handleClose]);
+
+  // "Sohbete gönder": cevap, sorulan soruyla birlikte zengin bir balon olarak
+  // arkadaşa/gruba gider (utils/chatShare.js). Alıcı seçilince ChatScreen açılır
+  // ve mesajı kendisi yazar; panel alıcı sayfası TAMAMEN kapandıktan sonra
+  // kapanır (iki Modal'ın üst üste kapanması iOS'ta sorunlu).
+  const [shareDraft, setShareDraft] = useState(null);
+  const handleShareToChat = useCallback(
+    (msg) => {
+      const at = messages.findIndex((item) => item.id === msg?.id);
+      const asked = at > 0 && messages[at - 1]?.role === "user" ? messages[at - 1] : null;
+      const share = buildChatShare(msg?.aiResponse, msg?.posterMap, {
+        question: asked ? asked.display || asked.text : "",
+      });
+      if (share) setShareDraft(share);
+    },
+    [messages],
+  );
 
   // Üst çubuktaki kota ölçerine dokunuş: ayrıntılı kullanım ekranı.
   const handleOpenUsage = useCallback(() => {
@@ -981,6 +1008,9 @@ export default function AIChatScreen({
               onOpen={openConversation}
               onDelete={deleteConversation}
               onClearAll={clearAll}
+              sync={{ ready: chatsReady, hydrating: chatsHydrating, waiting: chatsWaiting }}
+              onRefresh={refreshChats}
+              refreshing={refreshingChats}
             />
           ) : (
             // ── Sohbet ──
@@ -1045,6 +1075,7 @@ export default function AIChatScreen({
                         onUpgrade={handleUpgrade}
                         onFollowUp={handleFollowUp}
                         onRegenerate={handleRegenerate}
+                        onShareToChat={handleShareToChat}
                       />
                     </View>
                   ))
@@ -1120,6 +1151,16 @@ export default function AIChatScreen({
           )}
         </View>
       </Animated.View>
+
+      {/* "Sohbete gönder" alıcı sayfası bu Modal'ın İÇİNDE durur: iOS ikinci bir
+          Modal'ı ancak ilkinin çocuğu olarak sunabilir. Alıcı seçilip sayfa
+          kapandıktan sonra panel de kapanır ve açılmış sohbet ortaya çıkar. */}
+      <ShareToChatSheet
+        visible={!!shareDraft}
+        share={shareDraft}
+        onClose={() => setShareDraft(null)}
+        onSent={handleClose}
+      />
     </Modal>
   );
 }

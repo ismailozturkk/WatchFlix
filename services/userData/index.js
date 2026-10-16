@@ -6,6 +6,7 @@
 // (syncWorker) ve günlük (outbox) Firebase'siz, enjekte edilebilir parçalar.
 //
 //   notesDomain · mediaNotesDomain · remindersDomain   okuma (senkron) + apply
+//   aiConversationsDomain · aiConversations            AI sohbet geçmişi (+ depo API'si)
 //   remindersActions                                    hatırlatıcı yazma
 //   startUserData(uid)                                  giriş: işçi + indirme
 //   clearUserLocal(uid)                                 çıkış
@@ -16,13 +17,16 @@
 import { auth } from "../../firebase";
 import { getIsOnline, subscribeOnline } from "../../context/ConnectivityContext";
 import * as snapshot from "../snapshotCache";
+import { Keys, get as readKey, remove as removeKey } from "../storage";
 import { cacheKeys } from "../../utils/cacheKeys";
 import * as outbox from "./outbox";
 import { createFirestoreRemote } from "./firestoreRemote";
 import { createSyncWorker } from "./syncWorker";
 import { marker } from "./hydrationMarker";
 import { createUserDataDomain } from "./createDomain";
+import { createAiConversationsApi } from "./aiConversations";
 import {
+  aiConversationsSpec,
   createRemindersActions,
   mediaNotesSpec,
   notesSpec,
@@ -55,9 +59,24 @@ const deps = {
 export const notesDomain = createUserDataDomain(notesSpec, deps);
 export const mediaNotesDomain = createUserDataDomain(mediaNotesSpec, deps);
 export const remindersDomain = createUserDataDomain(remindersSpec, deps);
-export const ALL_DOMAINS = Object.freeze([notesDomain, mediaNotesDomain, remindersDomain]);
+export const aiConversationsDomain = createUserDataDomain(aiConversationsSpec, deps);
+export const ALL_DOMAINS = Object.freeze([
+  notesDomain,
+  mediaNotesDomain,
+  remindersDomain,
+  aiConversationsDomain,
+]);
 
 export const remindersActions = createRemindersActions(remindersDomain);
+
+/**
+ * AI sohbet geçmişi. Bulut öncesi sürümün yerel (MMKV) geçmişi ilk girişte
+ * buluta taşınır ve yerel anahtar silinir (`migrateLegacy`).
+ */
+export const aiConversations = createAiConversationsApi(aiConversationsDomain, {
+  read: (uid) => readKey(Keys.aiCineConversations, { uid }),
+  clear: (uid) => removeKey(Keys.aiCineConversations, { uid }),
+});
 
 let activeUid = null;
 
@@ -81,6 +100,13 @@ export function startUserData(uid) {
   activeUid = uid;
   worker.start(uid);
   retryUserData();
+  // İndirme başladıktan SONRA: taşınan sohbetler indirme günlüğüne düşer ve
+  // gelen bulut verisinin üstüne bindirilir (createDomain.js "İNDİRME SIRASINDA").
+  try {
+    aiConversations.migrateLegacy(uid);
+  } catch {
+    // eski geçmiş taşınamadı: yerel anahtar yerinde kalır, bir sonraki girişte tekrar
+  }
 }
 
 export function stopUserData(uid) {

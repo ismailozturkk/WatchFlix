@@ -8,7 +8,7 @@
 // hiçbir değişiklik yapay zeka hakkı harcamaz.
 
 import { intlLocaleOf } from "../../../utils/appLanguages";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import AppIcon from "@components/AppIcon";
@@ -21,6 +21,7 @@ import { STREAMING_PROVIDERS } from "@context/AppSettingsContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import useAiPrefs from "@hooks/useAiPrefs";
+import useAiConversations from "@hooks/useAiConversations";
 import { fillCopy, getAiCopy } from "@utils/aiCopy";
 import {
   AI_HISTORY_LIMITS,
@@ -30,11 +31,6 @@ import {
   countDiscoveryFilters,
 } from "@utils/aiPrefs";
 import { ONBOARDING_GENRES } from "@utils/onboardingPreferences";
-import {
-  clearCineConversations,
-  loadCineConversations,
-  trimCineConversations,
-} from "@services/aiCineStore";
 import { SettingsSubScreen, SectionLabel, SettingRow, Chevron, buildUiColors, ui } from "./settingsUi";
 
 const LIST_KEYS = ["watchList", "favorites", "custom", "watched"];
@@ -68,14 +64,10 @@ export default function AISettingsScreen() {
   const copy = useMemo(() => getAiCopy(language), [language]);
   const text = copy.settings;
   const { prefs, updatePrefs, resetPrefs } = useAiPrefs();
-  const [savedChats, setSavedChats] = useState(null);
-
-  const refreshChats = useCallback(() => {
-    loadCineConversations()
-      .then((list) => setSavedChats(list.length))
-      .catch(() => setSavedChats(null));
-  }, []);
-  useEffect(refreshChats, [refreshChats]);
+  // Sohbet geçmişi hesaba yedeklenir; sayı yerel kopyadan canlı gelir. Kopya
+  // henüz yoksa (yeni telefon, indirme sürüyor) sayı gösterilmez.
+  const { conversations, ready: chatsReady, trim: trimChats, clearAll: clearChats } = useAiConversations();
+  const savedChats = chatsReady || conversations.length > 0 ? conversations.length : null;
 
   const filterCount = countDiscoveryFilters(prefs);
 
@@ -142,8 +134,8 @@ export default function AISettingsScreen() {
 
   const changeHistoryLimit = (limit) => {
     updatePrefs({ historyLimit: limit });
-    // Yeni sınır geçmişten küçükse en eski sohbetler hemen silinir.
-    trimCineConversations(limit).then((list) => setSavedChats(list.length)).catch(() => {});
+    // Yeni sınır geçmişten küçükse en eski sohbetler hemen silinir (hesaptan da).
+    trimChats(limit);
   };
 
   const confirmClearHistory = () => {
@@ -152,9 +144,8 @@ export default function AISettingsScreen() {
       {
         text: text.deleteAction,
         style: "destructive",
-        onPress: async () => {
-          await clearCineConversations();
-          setSavedChats(0);
+        onPress: () => {
+          clearChats();
         },
       },
     ]);

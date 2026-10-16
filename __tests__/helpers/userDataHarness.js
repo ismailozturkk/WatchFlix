@@ -91,6 +91,18 @@ function boot({ online = true, authed = true, workerOptions = {} } = {}) {
     mods.mediaNotes = createUserDataDomain(mods.domains.mediaNotesSpec, deps);
     mods.reminders = createUserDataDomain(mods.domains.remindersSpec, deps);
     mods.remindersActions = mods.domains.createRemindersActions(mods.reminders);
+
+    // AI sohbetleri. Eski yerel (MMKV) geçmiş bağdaştırıcısı services/userData/index.js ile aynı.
+    const storage = require("../../services/storage");
+    mods.storage = storage;
+    mods.aiConversations = createUserDataDomain(mods.domains.aiConversationsSpec, deps);
+    mods.aiApi = require("../../services/userData/aiConversations").createAiConversationsApi(
+      mods.aiConversations,
+      {
+        read: (uid) => storage.get(storage.Keys.aiCineConversations, { uid }),
+        clear: (uid) => storage.remove(storage.Keys.aiCineConversations, { uid }),
+      },
+    );
   }
   wire();
 

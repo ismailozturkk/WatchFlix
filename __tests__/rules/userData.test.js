@@ -33,8 +33,10 @@ const {
   notesSpec,
   mediaNotesSpec,
   remindersSpec,
+  aiConversationsSpec,
   createRemindersActions,
 } = require("../../services/userData/domains");
+const { createAiConversationsApi } = require("../../services/userData/aiConversations");
 
 const UID = "alice";
 let testEnv;
@@ -69,7 +71,18 @@ function build() {
   const notes = createUserDataDomain(notesSpec, deps);
   const mediaNotes = createUserDataDomain(mediaNotesSpec, deps);
   const reminders = createUserDataDomain(remindersSpec, deps);
-  return { remote, worker, notes, mediaNotes, reminders, actions: createRemindersActions(reminders) };
+  const aiConversations = createUserDataDomain(aiConversationsSpec, deps);
+  const aiApi = createAiConversationsApi(aiConversations);
+  return {
+    remote,
+    worker,
+    notes,
+    mediaNotes,
+    reminders,
+    aiConversations,
+    aiApi,
+    actions: createRemindersActions(reminders),
+  };
 }
 
 const adminSeed = async (fn) => {
@@ -169,6 +182,100 @@ describe("yazma (gerçek SDK + gerçek kurallar)", () => {
     const yazilan = await readDoc(`Notes/${UID}/items/n1`);
     expect(yazilan).not.toBeNull();
     expect("pinned" in yazilan).toBe(false);
+  });
+});
+
+describe("AI sohbet geçmişi: AiConversations/{uid}/items (gerçek SDK + gerçek kurallar)", () => {
+  const aiChat = (n, extra = {}) => ({
+    id: `chat-${n}`,
+    title: `Sohbet ${n}`,
+    messages: [
+      { id: `u${n}`, role: "user", text: "Korku filmi öner" },
+      {
+        id: `a${n}`,
+        role: "assistant",
+        aiResponse: { type: "recommendations", items: [{ title: "Hereditary", mediaType: "movie" }] },
+        posterMap: { "movie|hereditary": { found: true, id: 1, title: "Hereditary", genres: ["Korku"], cast: ["a", "b"] } },
+      },
+    ],
+    createdAt: n,
+    updatedAt: n,
+    ...extra,
+  });
+
+  test("sohbet gerçek Firestore'a yazılır, ölü işlem yok; model çıktısındaki iç içe dizi/undefined engel olmaz", async () => {
+    const h = build();
+    await h.aiConversations.ensureHydrated(UID);
+    h.aiApi.save(UID, aiChat(1));
+    // Serbest biçimli model çıktısı: iç içe dizi + undefined (ham SDK ikisini de reddeder)
+    h.aiApi.save(UID, aiChat(2, {
+      messages: [{ id: "a", role: "assistant", aiResponse: { rows: [[1, 2], [3]], gizli: undefined } }],
+    }));
+    await h.worker.flush(UID);
+
+    expect(await listIds(`AiConversations/${UID}/items`)).toEqual(["chat-1", "chat-2"]);
+    expect(await readDoc(`AiConversations/${UID}/items/chat-1`)).toMatchObject({
+      v: 1, id: "chat-1", messageCount: 2,
+    });
+    expect((await readDoc(`AiConversations/${UID}/items/chat-2`)).messages[0].aiResponse.rows).toEqual([1, 2, 3]);
+    expect(outbox.counts(UID)).toEqual({ pending: 0, dead: 0 });
+  });
+
+  test("YENİ TELEFON: yerel kopya silinse de sohbetler gerçek koleksiyondan birebir döner", async () => {
+    const h = build();
+    await h.aiConversations.ensureHydrated(UID);
+    h.aiApi.save(UID, aiChat(1));
+    h.aiApi.save(UID, aiChat(2));
+    await h.worker.flush(UID);
+
+    h.aiConversations.clearLocal(UID);
+    expect(h.aiApi.list(UID)).toEqual([]);
+    expect(await h.aiConversations.ensureHydrated(UID)).toBe(true);
+    expect(h.aiApi.list(UID).map((c) => c.id)).toEqual(["chat-2", "chat-1"]);
+    expect(h.aiApi.get(UID, "chat-1").messages).toEqual(aiChat(1).messages);
+  });
+
+  test("saklama sınırı ve silme gerçek belgeleri siler", async () => {
+    const h = build();
+    await h.aiConversations.ensureHydrated(UID);
+    for (let n = 1; n <= 4; n += 1) h.aiApi.save(UID, aiChat(n), { limit: 3 });
+    await h.worker.flush(UID);
+    expect(await listIds(`AiConversations/${UID}/items`)).toEqual(["chat-2", "chat-3", "chat-4"]);
+
+    h.aiApi.remove(UID, "chat-3");
+    await h.worker.flush(UID);
+    expect(await listIds(`AiConversations/${UID}/items`)).toEqual(["chat-2", "chat-4"]);
+
+    h.aiApi.clearAll(UID);
+    await h.worker.flush(UID);
+    expect(await listIds(`AiConversations/${UID}/items`)).toEqual([]);
+  });
+
+  test("başkasının sohbetleri OKUNAMAZ ve YAZILAMAZ (sahibine özel)", async () => {
+    await adminSeed(async (db) => {
+      await setDoc(doc(db, "AiConversations/bob/items/gizli"), { id: "gizli", title: "Bob", messages: [], updatedAt: 1 });
+    });
+    const h = build();
+    await expect(h.aiConversations.ensureHydrated("bob")).resolves.toBe(false);
+    expect(h.aiConversations.getSnapshot("bob").error).toBe("permission-denied");
+    expect(h.aiApi.list("bob")).toEqual([]);
+
+    outbox.enqueue(UID, [{ path: "AiConversations/bob/items/x", op: "set", data: { id: "x" } }]);
+    for (let i = 0; i < 3; i += 1) await h.worker.flush(UID);
+    expect(outbox.counts(UID)).toEqual({ pending: 0, dead: 1 });
+    asUser("bob");
+    expect(await readDoc("AiConversations/bob/items/x")).toBeNull();
+  });
+
+  test("AI kotası (AiUsage) bu koleksiyondan AYRI: sohbet yazmak kotaya dokunmaz, kotaya istemci yazamaz", async () => {
+    const h = build();
+    await h.aiConversations.ensureHydrated(UID);
+    h.aiApi.save(UID, aiChat(1));
+    await h.worker.flush(UID);
+    expect(await readDoc(`AiUsage/${UID}`)).toBeNull();
+    await expect(setDoc(doc(mockHolder.db, `AiUsage/${UID}`), { dailyUsed: 0 })).rejects.toMatchObject({
+      code: "permission-denied",
+    });
   });
 });
 

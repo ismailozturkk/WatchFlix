@@ -127,6 +127,8 @@ export async function getBreakdown() {
       id: "notes",
       bytes: cacheStore.namespaceSize("notes") + cacheStore.namespaceSize("mediaNotes"),
     },
+    // AI sohbet geçmişi de kalıcı dizinde (DURABLE_NAMESPACES).
+    { id: "aiChats", bytes: cacheStore.namespaceSize("aiConversations") },
     { id: "profile", bytes: dc.profile || 0 },
     { id: "activity", bytes: (dc.activity || 0) + kv.activity },
     { id: "networkData", bytes: (dc.network || 0) + (dc.tmdbLookup || 0) },
@@ -173,6 +175,9 @@ export async function clearCategory(id) {
       break;
     case "notes":
       if (uid) await resyncUserData(uid, ["notes", "mediaNotes"]);
+      break;
+    case "aiChats":
+      if (uid) await resyncUserData(uid, ["aiConversations"]);
       break;
     case "profile":
       cacheStore.clearNamespace("profile");

@@ -13,7 +13,7 @@
 //
 //   2) KALICI (DURABLE_NAMESPACES) — <document>/userdata/<ns>/...
 //      Kullanıcının KENDİ ürettiği ve buluttan artık her açılışta çekmediğimiz
-//      veri: notlar, medya notları, hatırlatıcılar, listeler. Bu veri için
+//      veri: notlar, medya notları, AI sohbetleri, hatırlatıcılar, listeler. Bu veri için
 //      yerel kopya "tohum" değil KAYNAKTIR; sistem silerse tek seferlik
 //      yeniden indirme gerekirdi ve bekleyen yazımlar tehlikeye girerdi. Belge
 //      dizini sistem tarafından silinmez.
@@ -48,6 +48,7 @@ export const DURABLE_DIRNAME = "userdata";
 export const DURABLE_NAMESPACES = Object.freeze([
   "notes",
   "mediaNotes",
+  "aiConversations",
   "reminders",
   "lists",
 ]);

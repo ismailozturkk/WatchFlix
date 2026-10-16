@@ -385,6 +385,13 @@ service cloud.firestore {
     match /MediaNotes/{uid}/{document=**} {
       allow read, write: if isOwner(uid);
     }
+    // CineMatch (AI) sohbet geçmişi: AiConversations/{uid}/items/{conversationId},
+    // sohbet başına bir belge (şema: services/userData/aiConversations.js). Yalnız
+    // sahibi okur/yazar. Günlük/aylık kota sayacı AiUsage'tır — AYRI ve yalnız
+    // Cloud Function yazar; ikisini karıştırma (burada kota sıfırlanamaz).
+    match /AiConversations/{uid}/{document=**} {
+      allow read, write: if isOwner(uid);
+    }
     match /Reminders/{uid}/{document=**} {
       allow read, write: if isOwner(uid);
     }

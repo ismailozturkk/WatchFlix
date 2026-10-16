@@ -43,6 +43,7 @@ ya da başka bir transaction aynı belgeyi değiştiriyorsa yerel kopya bayatlar
 | Notlar `Notes/{uid}/items` | evet | **yerel kaynak** | ✅ Faz 1 |
 | Film/dizi notları `MediaNotes/{uid}/items` | evet | **yerel kaynak** | ✅ Faz 1 |
 | Hatırlatıcılar `Reminders/{uid}/movies`, `tvShows/{id}/episodes` | evet (Functions okumuyor/yazmıyor) | **yerel kaynak** | ✅ Faz 2 |
+| AI sohbet geçmişi `AiConversations/{uid}/items/{id}` (CineMatch) | evet (kota sayacı `AiUsage` AYRI ve yalnız Functions yazar) | **yerel kaynak** | ✅ Bkz. Bölüm 8 |
 | Takvim (notlar + hatırlatıcılardan türev) | türev | aynı yerel kopyadan türetilir | ✅ Faz 2 |
 | Listeler `Lists/{uid}/favorites·watchList·watchedMovies·watchedTv` | evet | zaten **bir kez iner**, yerel güncellenir (`ListStatusContext`) | ✅ önceden vardı; yalnız dosya konumu kalıcılaştırıldı |
 | Liste kök belgesi `Lists/{uid}` | evet (transaction'larla) | 1 okuma/açılış kalıyor | ⏳ Faz 4 |
@@ -81,15 +82,17 @@ ya da başka bir transaction aynı belgeyi değiştiriyorsa yerel kopya bayatlar
 
 | Dosya | Sorumluluk |
 |---|---|
-| `utils/cacheStore.js` | Kalıcı ad alanları (`notes`, `mediaNotes`, `reminders`, `lists`) **belge dizinine** yazılır; eski önbellek konumundan tembel taşıma. `clearAll()` kalıcı veriye **dokunmaz**. |
+| `utils/cacheStore.js` | Kalıcı ad alanları (`notes`, `mediaNotes`, `aiConversations`, `reminders`, `lists`) **belge dizinine** yazılır; eski önbellek konumundan tembel taşıma. `clearAll()` kalıcı veriye **dokunmaz**. |
 | `utils/cacheKeys.js` | Anahtarlar değişmedi (tek kaynak). Disk biçimi (dizi/harita) aynı → geri dönüş güvenli. |
 | `services/userData/outbox.js` | Buluta gitmemiş işlemlerin **kalıcı günlüğü**. Aynı belge için ardışık işlem tek işleme iner. |
 | `services/userData/syncWorker.js` | Günlüğü boşaltır: toplu commit, çevrimdışı bekleme, geri çekilme (2→5→15→45→120→300 sn), zaman aşımı, zehirli işlem izolasyonu, ölü harf. |
 | `services/userData/createDomain.js` | Alan motoru: senkron yükleme, `apply`, tek seferlik `ensureHydrated`, `resync`, `clearLocal`. React'siz, Firebase'siz. |
 | `services/userData/domains.js` | Alan tanımları (yollar, sıralama, indirme, **eski şema göçü**) + hatırlatıcı eylemleri (dizi belgesi yerel sayımdan türetilir). |
+| `services/userData/aiConversations.js` | AI sohbetlerinin **şeması, boyut bütçesi, depo API'si** (`save/remove/clearAll/trim/migrateLegacy`). Firebase'siz. |
 | `services/userData/hydrationMarker.js` | "Bu alan bu cihazda buluttan tam doğrulandı" işareti (MMKV, çıkışta silinir). |
 | `services/userData/firestoreRemote.js` | Tek Firestore kapısı (okuma/yazma maliyeti `usageTrackerService`e işlenir). |
 | `services/userData/index.js` | Varsayılan kablolama + `startUserData` / `clearUserLocal` / `purgeUserData` / `resyncUserData` / `flushUserData`. |
+| `hooks/useAiConversations.js` | AI sohbet geçmişi için React bağlayıcısı (`conversations`, `save`, `remove`, `trim`, `clearAll`, `refresh`). |
 | `hooks/useUserDataDomain.js`, `hooks/useSyncStatus.js` | React bağlayıcıları. `useSyncStatus` → `{ pending, dead, syncing, lastSyncedAt, waiting }` (arayüz henüz yok). |
 | `components/UserDataSyncHost.js` | Yaşam döngüsü: giriş, öne gelme, arka plan, ağ dönüşü. `App.js`'te `AuthProvider` içinde. |
 
@@ -221,3 +224,64 @@ Geliştirme ortamı (Windows) cihaz çalıştıramıyor; aşağıdakiler yalnız
 - [ ] Film detayı / bölüm listesinde çan simgesi anında doğru durumda; Takvim noktaları güncel.
 - [ ] iOS: Ayarlar > Önbellek > Notlar satırı simgesi ☁️↓, dokununca veri kaybolmadan yenileniyor.
 - [ ] Hesap silme akışı sonrası bulutta belge yeniden oluşmuyor.
+
+---
+
+## 8. AI sohbet geçmişi (CineMatch) — bulut yedekli
+
+Eskiden yalnız cihazdaki MMKV'de duruyordu (telefon değişince / uygulama silinince giderdi). Artık
+yukarıdaki motorun bir alanıdır: okuma yerel kopyadan senkron, yazma yerelde + günlükte anında,
+indirme yalnız yerel kopya yokken tek seferlik.
+
+**Şema.** `AiConversations/{uid}/items/{conversationId}` — sohbet başına **bir belge**:
+`{ v, id, title, messages[], messageCount, createdAt, updatedAt }`. Mesaj şekli `services/aiCineStore.js`
+başında belgeli (`aiResponse`, `posterMap`, `attachment`, …). Kurallar: yalnız sahibi okur/yazar
+(`firestore.rules`). `AiUsage/{uid}` (günlük/aylık kota) **ayrı** ve yalnız Cloud Function yazar.
+
+**Neden tek belge, alt koleksiyon değil.** Mesajları bölmek ilk indirmede okuma sayısını ~20 kat artırır
+(sohbet + her sohbetin mesaj koleksiyonu). Tek belgede: indirme = sohbet başına 1 okuma, her cevap = 1
+yazma, aynı sohbetin hızlı ardışık güncellemeleri günlükte tek işleme iner. Bedeli Firestore'un 1 MiB
+belge tavanı → aşağıdaki bütçe.
+
+**Boyut bütçesi** (`aiConversations.js`): bir belge `MAX_DOC_BYTES` (450 000 UTF-8 bayt; karakter değil —
+ASCII dışı metin 2-4 bayt) veya
+`MAX_MESSAGES` (200) sınırını aşarsa **en eski tam turlar** (kullanıcı + asistan) belgeden düşer; başlık
+ayrı saklandığı için kaybolmaz. Ayrıca Firestore'un reddettiği iki şey yazmadan önce temizlenir:
+`undefined` (motor) ve **iç içe dizi** (`flattenNestedArrays` — model çıktısı serbest biçimli).
+
+**Saklama sınırı** (Ayarlar > Yapay zeka > Saklanacak sohbet: 10/25/50): aşan en eski sohbetler
+aynı adımda **cihazdan ve hesaptan** silinir. "Tümünü sil" ve tek sohbet silme de buluta gider; ilgili
+metinler (tr/en/es) bunu söyler.
+
+**Eski geçmişin taşınması.** `startUserData(uid)` indirmeyi başlattıktan SONRA `migrateLegacy` çalışır:
+eski MMKV anahtarındaki (`Keys.aiCineConversations`) sohbetler `apply` ile günlüğe girer, ardından anahtar
+silinir (günlük MMKV'de kalıcı olduğundan ağ yokken de kayıp yok). İdempotent; buluttaki/yerel daha
+yeni sürümü ezmez. Eski CineMatch'in (`Keys.aiConversations`, `aiConversationsStore`) ayrı geçmişi
+kapsam dışı — o arayüz artık açılmıyor.
+
+**Çok cihaz (Faz 6, seçenek A'nın AI karşılığı).** Geçmiş ekranında aşağı çekmek `refresh()` çağırır:
+önce bekleyen yazımlar gönderilir, sonra `resync` (N okuma, yalnız kullanıcı isteyince). Başka cihazda
+silinen sohbet bu cihazda aşağı çekilene kadar görünür; o arada bu cihazda devam ettirilirse buluta
+yeniden yazılır (diriltme) — bilinen, kabul edilen sınır.
+
+**Diğer yerler:** hesap silme `AiConversations/{uid}/items`i siler (`accountService`) ve yerel
+kopya + günlük `purgeUserData` ile temizlenir; Önbellek ekranında "Yapay zeka sohbetleri" satırı
+(düğme silmez, buluttan yeniden kurar); `website/delete-account.html` ve `privacy.html` güncellendi.
+
+**Doğrulama:** `aiConversationStore` + `aiConversationsCloud` (motor/depo, yeni telefon, çevrimdışı,
+taşıma, kural reddi), `aiConversationsWiring` (gerçek `services/userData` + hook), `aiHistoryCloudStates`
+(arayüz durumları), `rules/userData` (gerçek SDK + gerçek kurallar; kural satırı kaldırılınca 4 test
+kırmızı). Bellek içi mutasyon kontrolü: depo 9/9, kablolama 4/4 yakalandı.
+
+**Cihazda görülmedi:**
+
+- [ ] Güncelleme sonrası ilk giriş: eski sohbetler geçmişte duruyor ve Firestore konsolunda
+      `AiConversations/{uid}/items` altında görünüyor.
+- [ ] Uygulamayı sil → yeniden kur → giriş: geçmiş (poster/kartlarıyla) geri geliyor.
+- [ ] Uçak modunda cevap al → kapat → bağlantıyı aç: sohbet buluta gidiyor.
+- [ ] Geçmişte aşağı çek (iki cihaz): diğer cihazdaki sohbet geliyor; boş liste de çekilebiliyor.
+- [ ] Saklama sınırını 10'a indir: fazla sohbetler hem cihazdan hem konsoldan siliniyor.
+
+> **Dağıtım sırası:** `firestore.rules` (yeni `AiConversations` kuralı) uygulamadan ÖNCE yayınlanmalı.
+> Yayınlanmadan sürüm çıkarsa yazmalar `permission-denied` ile ölü harfe ayrılır; sohbetler cihazda
+> görünmeye devam eder ve kural yayınlanınca (yeni oturumda) buluta gider — kayıp olmaz.

@@ -33,13 +33,14 @@ const META = {
   lists: { tr: "İzleme listesi", family: "Ionicons", icon: "bookmark-outline", color: "#06B6D4" },
   reminders: { tr: "Hatırlatıcılar", family: "Ionicons", icon: "alarm-outline", color: "#EF4444" },
   notes: { tr: "Notlar", family: "Ionicons", icon: "document-text-outline", color: "#EAB308" },
+  aiChats: { tr: "Yapay zeka sohbetleri", family: "Ionicons", icon: "sparkles-outline", color: "#A855F7" },
   profile: { tr: "Profil", family: "Ionicons", icon: "person-outline", color: "#64748B" },
   activity: { tr: "Etkinliklerim", family: "Ionicons", icon: "sparkles-outline", color: "#F97316" },
   networkData: { tr: "İnternet verileri", family: "Ionicons", icon: "cloud-done-outline", color: "#14B8A6" },
 };
 
 // Yerel-öncelikli veri: bu satırlarda düğme SİLMEZ, buluttan yeniden kurar.
-const RESYNC_IDS = new Set(["notes", "reminders"]);
+const RESYNC_IDS = new Set(["notes", "reminders", "aiChats"]);
 
 const fmt = (b) => {
   if (!b) return "0 KB";

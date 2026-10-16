@@ -4,9 +4,24 @@
 // daha eski) ve her satırda son cevabın posterleri + son soru önizlemesi.
 // "Tümünü sil" geri alınamadığı için satır içi onay ister (CineMatch bir Modal
 // içinde olduğundan appAlert iOS'ta görünmez; onay bu yüzden ekranın içinde).
+//
+// Sohbetler hesaba (Firestore) yedeklenir (bkz. hooks/useAiConversations):
+//   • yeni telefonda ilk açılışta liste indirilirken "yükleniyor", çevrimdışıysa
+//     "bağlan" durumu gösterilir (boş liste gibi görünüp kullanıcıyı yanıltmasın),
+//   • aşağı çekmek başka cihazdaki değişiklikleri getirir (`onRefresh`).
 
 import React, { memo, useCallback, useMemo, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, SectionList, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  SectionList,
+  ScrollView,
+  RefreshControl,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -79,7 +94,22 @@ const Row = memo(({ conversation, isActive, theme, t, language, getTmdbUrl, onOp
   );
 });
 
-function AIHistory({ theme, t, copy, language, conversations, activeId, getTmdbUrl, onOpen, onDelete, onClearAll }) {
+function AIHistory({
+  theme,
+  t,
+  copy,
+  language,
+  conversations,
+  activeId,
+  getTmdbUrl,
+  onOpen,
+  onDelete,
+  onClearAll,
+  // Bulut durumu: { ready, hydrating, waiting } — hooks/useAiConversations
+  sync,
+  onRefresh,
+  refreshing = false,
+}) {
   const [query, setQuery] = useState("");
   const [confirming, setConfirming] = useState(false);
 
@@ -99,14 +129,48 @@ function AIHistory({ theme, t, copy, language, conversations, activeId, getTmdbU
     onClearAll();
   }, [onClearAll]);
 
+  const refreshControl = onRefresh ? (
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      tintColor={theme.text.muted}
+      colors={[theme.accent]}
+    />
+  ) : undefined;
+
   if (conversations.length === 0) {
+    // Yerel kopya yokken (yeni telefon / yeniden kurulum) boş liste gerçek bir
+    // "sohbet yok" DEĞİL: hesaptan iniyor ya da bağlantı bekleniyor.
+    const loadingCloud = sync && !sync.ready && sync.hydrating;
+    const waitingCloud = sync && !sync.ready && !sync.hydrating && sync.waiting;
     return (
-      <View style={s.empty}>
-        <MaterialCommunityIcons name="message-off-outline" size={46} color={theme.text.muted} />
-        <Text style={[s.emptyText, { color: theme.text.muted }]}>
-          {t?.AICineChat?.noConversations || "Henüz kayıtlı sohbet yok"}
-        </Text>
-      </View>
+      <ScrollView
+        contentContainerStyle={s.emptyScroll}
+        refreshControl={refreshControl}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={s.emptyInner}>
+          {loadingCloud ? (
+            <ActivityIndicator color={theme.text.muted} />
+          ) : (
+            <MaterialCommunityIcons
+              name={waitingCloud ? "cloud-off-outline" : "message-off-outline"}
+              size={46}
+              color={theme.text.muted}
+            />
+          )}
+          <Text style={[s.emptyText, { color: theme.text.muted }]}>
+            {loadingCloud
+              ? copy.history.loading
+              : waitingCloud
+                ? copy.history.waiting
+                : t?.AICineChat?.noConversations || "Henüz kayıtlı sohbet yok"}
+          </Text>
+          {!loadingCloud && !waitingCloud && (
+            <Text style={[s.cloudNote, { color: theme.text.muted }]}>{copy.history.cloudNote}</Text>
+          )}
+        </View>
+      </ScrollView>
     );
   }
 
@@ -144,6 +208,7 @@ function AIHistory({ theme, t, copy, language, conversations, activeId, getTmdbU
           keyExtractor={(item) => item.id}
           stickySectionHeadersEnabled={false}
           keyboardShouldPersistTaps="handled"
+          refreshControl={refreshControl}
           contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
           renderSectionHeader={({ section }) => (
             <Text style={[s.sectionTitle, { color: theme.text.muted }]}>{section.title}</Text>
@@ -163,6 +228,10 @@ function AIHistory({ theme, t, copy, language, conversations, activeId, getTmdbU
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           ListFooterComponent={
             <View style={s.footer}>
+              <View style={s.cloudRow}>
+                <MaterialCommunityIcons name="cloud-check-outline" size={14} color={theme.text.muted} />
+                <Text style={[s.cloudNoteInline, { color: theme.text.muted }]}>{copy.history.cloudNote}</Text>
+              </View>
               {confirming ? (
                 <View style={[s.confirm, { backgroundColor: alpha(theme.colors.red, 0.1), borderColor: alpha(theme.colors.red, 0.35) }]}>
                   <Text style={[s.confirmTitle, { color: theme.text.primary }]}>{copy.history.clearAllTitle}</Text>
@@ -200,7 +269,14 @@ export default memo(AIHistory);
 
 const s = StyleSheet.create({
   empty: { flex: 1, justifyContent: "center", alignItems: "center", gap: 10, padding: 30 },
+  // ScrollView içinde `flex: 1` + otomatik yükseklik cihazda çöker: kap flexGrow
+  // ile büyür, içerik kendi boyutunda ortalanır.
+  emptyScroll: { flexGrow: 1, justifyContent: "center" },
+  emptyInner: { alignItems: "center", gap: 10, padding: 30 },
   emptyText: { fontSize: 13, textAlign: "center" },
+  cloudNote: { fontSize: 11.5, textAlign: "center", marginTop: 2 },
+  cloudRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 10, paddingHorizontal: 16 },
+  cloudNoteInline: { fontSize: 11.5, textAlign: "center", flexShrink: 1 },
   search: {
     flexDirection: "row",
     alignItems: "center",
