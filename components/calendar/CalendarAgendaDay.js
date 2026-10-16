@@ -7,7 +7,7 @@
 // telefon takvimine ekleme düğmesini her satırın SAĞINDA, sabit yerde tutuyor.
 
 import { intlLocaleOf } from "../../utils/appLanguages";
-import React, { memo, useMemo } from "react";
+import React, { memo, useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -54,64 +54,79 @@ function dateTileParts(dateStr, language) {
 }
 
 /* ── Telefon takvimine ekle / kaldır düğmesi ─────────────────────────────── */
+// Üç hâl: eklenebilir (+), eklenmiş (yeşil tik), geçmişte eklenmiş (kırmızı çöp).
+// Eklenmiş iki hâl de dokununca KALDIRIR; ekleme ve kaldırma toast'ında "Geri Al"
+// çıkar (phoneCalendar), bu yüzden yanlışlıkla dokunmak zarar vermez.
 const SaveButton = ({ item, savedSet, onSavedChange, viewMode, theme }) => {
   const key = buildEventKey(item);
   const isSaved = savedSet.has(key);
   const isPast = viewMode === "past";
+  // İşlem sürerken ikinci dokunuş "ekle"nin hemen ardından "kaldır"ı tetiklemesin.
+  const [busy, setBusy] = useState(false);
+
+  const toggle = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (isSaved) {
+        const res = await removeEventFromPhoneCalendar(item, { onSavedChange });
+        if (res.ok) onSavedChange(key, false);
+      } else {
+        const res = await saveEventToPhoneCalendar(item, { onSavedChange });
+        if (res.ok || res.alreadySaved) onSavedChange(key, true);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, isSaved, item, key, onSavedChange]);
 
   // Geçmiş + telefonda yok → silinecek bir şey yok, düğme gösterme.
   if (isPast && !isSaved) return <View style={styles.actionSlot} />;
 
-  if (isPast) {
-    return (
-      <TouchableOpacity
-        onPress={async () => {
-          const res = await removeEventFromPhoneCalendar(item);
-          if (res.ok) onSavedChange(key, false);
-        }}
-        activeOpacity={0.7}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityRole="button"
-        accessibilityLabel={i18nText(
-          "autoI18n.telefon_takviminden_kaldir",
-          "Telefon takviminden kaldır",
-        )}
-        style={[styles.actionBtn, { backgroundColor: "#ef444418", borderColor: "#ef444444" }]}
-      >
-        <Ionicons name="trash-outline" size={16} color="#ef4444" />
-      </TouchableOpacity>
-    );
-  }
+  const look = !isSaved
+    ? {
+        icon: "add",
+        size: 19,
+        color: theme.text.secondary,
+        backgroundColor: theme.primary,
+        borderColor: theme.border,
+      }
+    : isPast
+      ? {
+          icon: "trash-outline",
+          size: 16,
+          color: "#ef4444",
+          backgroundColor: "#ef444418",
+          borderColor: "#ef444444",
+        }
+      : {
+          icon: "checkmark",
+          size: 17,
+          color: "#22c55e",
+          backgroundColor: "#22c55e22",
+          borderColor: "#22c55e66",
+        };
 
   return (
     <TouchableOpacity
-      onPress={async () => {
-        if (isSaved) return;
-        const res = await saveEventToPhoneCalendar(item);
-        if (res.ok || res.alreadySaved) onSavedChange(key, true);
-      }}
+      onPress={toggle}
       activeOpacity={0.7}
-      disabled={isSaved}
+      disabled={busy}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
-      accessibilityState={{ selected: isSaved }}
+      accessibilityState={{ selected: isSaved, busy }}
       accessibilityLabel={
         isSaved
-          ? i18nText("autoI18n.telefon_takviminde", "Telefon takviminde")
+          ? i18nText("autoI18n.telefon_takviminden_kaldir", "Telefon takviminden kaldır")
           : i18nText("autoI18n.takvim_telefona_ekle", "Telefon takvimine ekle")
       }
       style={[
         styles.actionBtn,
-        isSaved
-          ? { backgroundColor: "#22c55e22", borderColor: "#22c55e66" }
-          : { backgroundColor: theme.primary, borderColor: theme.border },
+        { backgroundColor: look.backgroundColor, borderColor: look.borderColor },
+        busy && styles.actionBtnBusy,
       ]}
     >
-      <Ionicons
-        name={isSaved ? "checkmark" : "add"}
-        size={isSaved ? 17 : 19}
-        color={isSaved ? "#22c55e" : theme.text.secondary}
-      />
+      <Ionicons name={look.icon} size={look.size} color={look.color} />
     </TouchableOpacity>
   );
 };
@@ -395,4 +410,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  actionBtnBusy: { opacity: 0.5 },
 });

@@ -11,10 +11,15 @@ import React, { useRef, useEffect, useCallback } from "react";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileReminders } from "../../../context/ProfileRemindersContext";
+import { useAuth } from "../../../context/AuthContext";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings, useListLayoutSettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
+import {
+  removeEpisodeReminderWithUndo,
+  removeMovieReminderWithUndo,
+} from "../../../utils/reminderQuickDelete";
 import Skeleton from "../../../components/Skeleton";
 import StaggerItem from "../../../components/StaggerItem";
 import GlassIconButton from "../../../components/common/GlassIconButton";
@@ -35,6 +40,8 @@ function getCountdownStyle(diff, colors) {
       background: colors.greenBackground,
       icon: "checkmark-circle",
       label: i18nText("autoI18n.yayinlandi", "Yayınlandı"),
+      // "Yayınlandı" görünen kart: yanında kaldırma düğmesi çıkar.
+      released: true,
     };
   }
   const { days, months } = diff;
@@ -74,6 +81,76 @@ function getCountdownStyle(diff, colors) {
   };
 }
 
+// ─── Geri sayım rozeti (+ yayınlanmışsa kaldırma düğmesi) ─────────────────────
+// Yayınlanmış kartta rozet ve çöp düğmesi TEK hap: ayrı iki öğe yan yana 3 sütunlu
+// kartın (~95 dp iç genişlik) sığmıyor, "Yayınlandı" kesiliyordu. Düğme hapın sağ
+// kenarında, ince ayraçla ayrılmış bir dilim; etiket dar ekranda küçülür, o da
+// yetmezse tek satırda "…" ile kesilir (düğme asla itilmez/taşmaz).
+// Rozet Ayarlar > Poster görünümü'nden kapalıysa "Yayınlandı" yazısı yoktur; düğme
+// de görünmez (kısayol o rozete bağlı).
+//
+// Yoga ölçümü (Türkçe "Yayınlandı", en uzun etiket): kart iç genişliği ~94 dp'de
+// (390 dp ekran) yazı tam boyda sığar; 375 dp ve altında baştaki tik simgesiyle yazı
+// ~%87'ye kadar küçülüyordu, 320 dp'de kesiliyordu. Dar kartlarda tik atılır (çöp
+// dilimi zaten hapın anlamını taşır) → 320 dp'ye kadar yazı ≥ %78'de sığar.
+const RELEASED_ICON_MIN_CARD_W = 112;
+
+function CountdownBadge({ countdown, colors, onDelete, deleteLabel }) {
+  if (!(countdown.released && onDelete)) {
+    return (
+      <View
+        style={[
+          styles.countdownBadge,
+          { backgroundColor: countdown.background, borderColor: countdown.color },
+        ]}
+      >
+        <Ionicons name={countdown.icon} size={10} color={countdown.color} />
+        <Text style={[styles.countdownText, { color: countdown.color }]} numberOfLines={1}>
+          {countdown.label}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.releasedPill,
+        { backgroundColor: countdown.background, borderColor: countdown.color },
+      ]}
+    >
+      <View style={styles.releasedLabel}>
+        {CARD_W >= RELEASED_ICON_MIN_CARD_W ? (
+          <Ionicons name={countdown.icon} size={10} color={countdown.color} />
+        ) : null}
+        <Text
+          style={[styles.countdownText, styles.releasedText, { color: countdown.color }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+        >
+          {countdown.label}
+        </Text>
+      </View>
+      <TouchableOpacity
+        onPress={onDelete}
+        activeOpacity={0.6}
+        // Dilim küçük (≈21×17): dokunma alanı kartın içinde kalacak kadar genişletildi
+        // (kart alt/yan boşluğu 9 dp; dışına taşan alan kırpılır).
+        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+        accessibilityRole="button"
+        accessibilityLabel={deleteLabel}
+        style={[
+          styles.releasedDelete,
+          { backgroundColor: colors.redBackground, borderLeftColor: countdown.color },
+        ]}
+      >
+        <Ionicons name="trash-outline" size={11} color={colors.red} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 // ─── Film hatırlatma kartı ────────────────────────────────────────────────────
 function MovieCard({
   reminder,
@@ -81,6 +158,7 @@ function MovieCard({
   theme,
   formatDate,
   calculateDateDifference,
+  onDelete,
 }) {
   const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
@@ -192,23 +270,12 @@ function MovieCard({
           )}
 
           {posterBadges?.countdown !== false && (
-            <View
-              style={[
-                styles.countdownBadge,
-                {
-                  backgroundColor: countdown.background,
-                  borderColor: countdown.color,
-                },
-              ]}
-            >
-              <Ionicons name={countdown.icon} size={10} color={countdown.color} />
-              <Text
-                style={[styles.countdownText, { color: countdown.color }]}
-                numberOfLines={1}
-              >
-                {countdown.label}
-              </Text>
-            </View>
+            <CountdownBadge
+              countdown={countdown}
+              colors={theme.notesColor}
+              onDelete={onDelete}
+              deleteLabel={i18nText("autoI18n.hatirlatmayi_kaldir", "Hatırlatmayı kaldır")}
+            />
           )}
         </View>
       </Animated.View>
@@ -225,6 +292,7 @@ function EpisodeCard({
   theme,
   formatDate,
   calculateDateDifference,
+  onDelete,
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const { posterBadges } = useListLayoutSettings();
@@ -350,23 +418,12 @@ function EpisodeCard({
           )}
 
           {posterBadges?.countdown !== false && (
-            <View
-              style={[
-                styles.countdownBadge,
-                {
-                  backgroundColor: countdown.background,
-                  borderColor: countdown.color,
-                },
-              ]}
-            >
-              <Ionicons name={countdown.icon} size={10} color={countdown.color} />
-              <Text
-                style={[styles.countdownText, { color: countdown.color }]}
-                numberOfLines={1}
-              >
-                {countdown.label}
-              </Text>
-            </View>
+            <CountdownBadge
+              countdown={countdown}
+              colors={theme.notesColor}
+              onDelete={onDelete}
+              deleteLabel={i18nText("autoI18n.hatirlatmayi_kaldir", "Hatırlatmayı kaldır")}
+            />
           )}
         </View>
       </Animated.View>
@@ -386,6 +443,16 @@ export default function ProfileReminders({ navigation }) {
     formatDate,
     calculateDateDifference,
   } = useProfileReminders();
+  const uid = useAuth().user?.uid;
+  // "Yayınlandı" kartındaki çöp düğmesi: onaysız kaldırır, toast'ta Geri Al çıkar.
+  const deleteMovie = useCallback(
+    (reminder) => removeMovieReminderWithUndo(uid, reminder),
+    [uid],
+  );
+  const deleteEpisode = useCallback(
+    (episode) => removeEpisodeReminderWithUndo(uid, episode),
+    [uid],
+  );
   // Kartlar her bağlanışta kademeli girer: ilk yükleme (iskeletten sonra) ve
   // Film↔Dizi sekme geçişi. Anahtarlar sabit olduğundan veri tazelenince
   // mevcut kartlar yeniden animasyon oynatmaz, yalnız yeni eklenen girer.
@@ -638,6 +705,7 @@ export default function ProfileReminders({ navigation }) {
                   theme={theme}
                   formatDate={formatDate}
                   calculateDateDifference={calculateDateDifference}
+                  onDelete={() => deleteMovie(reminder)}
                 />
               </StaggerItem>
             ))}
@@ -678,6 +746,7 @@ export default function ProfileReminders({ navigation }) {
                 theme={theme}
                 formatDate={formatDate}
                 calculateDateDifference={calculateDateDifference}
+                onDelete={() => deleteEpisode(episode)}
               />
             </StaggerItem>
           ))}
@@ -858,6 +927,33 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   countdownText: { fontSize: 9, fontWeight: "700" },
+
+  /* Yayınlanmış kart: rozet + çöp dilimi tek hap */
+  releasedPill: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    borderRadius: 8,
+    borderWidth: 0.7,
+    overflow: "hidden",
+  },
+  releasedLabel: {
+    flexShrink: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingLeft: 5,
+    paddingRight: 5,
+    paddingVertical: 3,
+  },
+  releasedText: { flexShrink: 1 },
+  releasedDelete: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 5,
+    borderLeftWidth: 0.7,
+  },
 
   /* Boş durum */
   emptyContainer: {

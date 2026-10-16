@@ -318,7 +318,7 @@ export default function CalendarScreen({ navigation }) {
     setIsBulkLoading(true);
     try {
       if (viewMode === "future") {
-        const res = await saveManyEventsToPhoneCalendar(flatRangeItems);
+        const res = await saveManyEventsToPhoneCalendar(flatRangeItems, { onSavedChange });
         if (res.addedKeys && res.addedKeys.length > 0) {
           setSavedSet((prev) => {
             const next = new Set(prev);
@@ -332,7 +332,7 @@ export default function CalendarScreen({ navigation }) {
           savedSet.has(buildEventKey(it)),
         );
         if (itemsToDelete.length === 0) return;
-        const res = await removeManyEventsFromPhoneCalendar(itemsToDelete);
+        const res = await removeManyEventsFromPhoneCalendar(itemsToDelete, { onSavedChange });
         if (res.removedKeys && res.removedKeys.length > 0) {
           setSavedSet((prev) => {
             const next = new Set(prev);
@@ -344,7 +344,7 @@ export default function CalendarScreen({ navigation }) {
     } finally {
       setIsBulkLoading(false);
     }
-  }, [flatRangeItems, isBulkLoading, viewMode, savedSet]);
+  }, [flatRangeItems, isBulkLoading, viewMode, savedSet, onSavedChange]);
 
   const currentRangeLabel = useMemo(
     () => getCalendarRangeLabel(rangeMonths),

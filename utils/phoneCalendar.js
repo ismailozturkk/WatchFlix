@@ -6,6 +6,51 @@ import { Keys, get, set } from "../services/storage";
 
 const CALENDAR_NAME = "Seelogd";
 
+// "Geri Al" düğmeli toast'ın süresi: varsayılan 3 sn, düğmeyi bulup basmaya yetmez.
+const UNDO_TOAST_MS = 6000;
+
+// Ekleme/silme sonucu toast'ı. `onUndo` varsa kartta "Geri Al" düğmesi çıkar.
+// `silent`: yalnız BAŞARI toast'ını susturur (geri alma gibi iç çağrılar kendi
+// mesajını verir); hata toast'ları her zaman gösterilir.
+function notify({ silent, onUndo, ...toast }) {
+  if (silent) return;
+  if (!onUndo) {
+    Toast.show(toast);
+    return;
+  }
+  Toast.show({
+    ...toast,
+    visibilityTime: UNDO_TOAST_MS,
+    props: { action: { label: i18nText("autoI18n.geri_al", "Geri Al"), onPress: onUndo } },
+  });
+}
+
+function notifyUndone() {
+  Toast.show({ type: "info", text1: i18nText("autoI18n.takvim_geri_alindi", "Geri alındı") });
+}
+
+// Eklemeyi geri almak = o etkinlikleri takvimden kaldırmak. Geri almanın kendisi
+// tekrar geri alınmaz (sonsuz ileri-geri zinciri olmasın), yalnız "Geri alındı" denir.
+function undoAddition(items, onSavedChange) {
+  return async () => {
+    const res = await removeManyEventsFromPhoneCalendar(items, { silent: true });
+    if (!res.removedKeys?.length) return;
+    res.removedKeys.forEach((key) => onSavedChange(key, false));
+    notifyUndone();
+  };
+}
+
+// Silmeyi geri almak = silinenleri aynı kayıtla yeniden eklemek (yeni etkinlik
+// kimliğiyle; telefon takvimi silinen etkinliği geri getirmez).
+function undoRemoval(items, onSavedChange) {
+  return async () => {
+    const res = await saveManyEventsToPhoneCalendar(items, { silent: true });
+    if (!res.addedKeys?.length) return;
+    res.addedKeys.forEach((key) => onSavedChange(key, true));
+    notifyUndone();
+  };
+}
+
 // Kayıt bilerek uid'siz: burada cihazın takvimine YAZILMIŞ etkinliklerin
 // kimlikleri duruyor. Kullanıcıya göre kapsansaydı, hesap değişiminde eski
 // kayıtlar erişilemez olur ve takvimde sahipsiz etkinlikler kalırdı.
@@ -30,6 +75,25 @@ export function buildEventKey(item) {
 export async function loadSavedKeysSet() {
   const map = await getSavedMap();
   return new Set(Object.keys(map));
+}
+
+// Seelogd'un telefonun takvimine yazdığı etkinlik sayısı (kayıtlı kimlikler).
+export async function countSavedPhoneEvents() {
+  return Object.keys(await getSavedMap()).length;
+}
+
+// Ayarlar > İzinlerim > Takvim. `request...` değil `get...`: durumu okumak
+// kullanıcıya sistem diyaloğu çıkarmamalı.
+export async function getCalendarPermissionState() {
+  const res = await Calendar.getCalendarPermissions();
+  return {
+    status: res?.status ?? "undetermined",
+    canAskAgain: res?.canAskAgain !== false,
+  };
+}
+
+export async function requestCalendarAccess() {
+  return Calendar.requestCalendarPermissions();
 }
 
 // expo-calendar 57'de `...Async` fonksiyonları bilerek hata fırlatıyor
@@ -120,7 +184,9 @@ function buildEventPayload(item) {
   };
 }
 
-export async function saveEventToPhoneCalendar(item) {
+// `onSavedChange(key, saved)` verilirse başarı toast'ında "Geri Al" çıkar ve geri
+// alınınca ekranın kayıt kümesini güncellemek için çağrılır.
+export async function saveEventToPhoneCalendar(item, { onSavedChange, silent } = {}) {
   try {
     if (!(await hasCalendarPermission())) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.takvim_izni_reddedildi", "Takvim izni reddedildi") });
@@ -143,7 +209,12 @@ export async function saveEventToPhoneCalendar(item) {
     map[key] = { eventId, savedAt: Date.now() };
     await setSavedMap(map);
 
-    Toast.show({ type: "success", text1: i18nText("autoI18n.telefon_takvimine_eklendi", "Telefonun takvimine eklendi") });
+    notify({
+      silent,
+      type: "success",
+      text1: i18nText("autoI18n.telefon_takvimine_eklendi", "Telefonun takvimine eklendi"),
+      onUndo: onSavedChange && undoAddition([item], onSavedChange),
+    });
     return { ok: true, eventId };
   } catch (err) {
     console.error("Phone calendar save error:", err);
@@ -156,7 +227,7 @@ export async function saveEventToPhoneCalendar(item) {
   }
 }
 
-export async function saveManyEventsToPhoneCalendar(items) {
+export async function saveManyEventsToPhoneCalendar(items, { onSavedChange, silent } = {}) {
   if (!items || items.length === 0) {
     return { added: 0, skipped: 0, failed: 0, total: 0 };
   }
@@ -184,6 +255,7 @@ export async function saveManyEventsToPhoneCalendar(items) {
     let skipped = 0;
     let failed = 0;
     const addedKeys = [];
+    const addedItems = [];
 
     for (const item of items) {
       const key = buildEventKey(item);
@@ -195,6 +267,7 @@ export async function saveManyEventsToPhoneCalendar(items) {
         const eventId = await createPhoneEvent(calendar, item);
         map[key] = { eventId, savedAt: Date.now() };
         addedKeys.push(key);
+        addedItems.push(item);
         added++;
       } catch (err) {
         console.warn("Bulk save failed for item:", item, err);
@@ -209,7 +282,8 @@ export async function saveManyEventsToPhoneCalendar(items) {
     if (skipped > 0) parts.push(i18nText("autoI18n.n_zaten_vardi", "{{count}} zaten vardı", { count: skipped }));
     if (failed > 0)  parts.push(i18nText("autoI18n.n_basarisiz", "{{count}} başarısız", { count: failed }));
 
-    Toast.show({
+    notify({
+      silent,
       type: added > 0 ? "success" : "info",
       text1:
         added > 0
@@ -218,6 +292,7 @@ export async function saveManyEventsToPhoneCalendar(items) {
             ? i18nText("autoI18n.hepsi_zaten_ekliydi", "Hepsi zaten ekliydi")
             : i18nText("autoI18n.aktarim_tamamlandi", "Aktarım tamamlandı"),
       text2: parts.join(" • "),
+      onUndo: added > 0 && onSavedChange ? undoAddition(addedItems, onSavedChange) : undefined,
     });
 
     return { added, skipped, failed, total: items.length, addedKeys };
@@ -232,11 +307,19 @@ export async function saveManyEventsToPhoneCalendar(items) {
   }
 }
 
-export async function removeEventFromPhoneCalendar(item) {
+// `onSavedChange(key, saved)` verilirse başarı toast'ında "Geri Al" çıkar (silineni
+// yeniden ekler) ve geri alınınca ekranın kayıt kümesini güncellemek için çağrılır.
+export async function removeEventFromPhoneCalendar(item, { onSavedChange, silent } = {}) {
   try {
     const key = buildEventKey(item);
     const map = await getSavedMap();
     if (!map[key]) return { ok: false };
+    // İzin kapalıyken silme sessizce başarısız olur; kaydı yine de silmek
+    // etkinliği takvimde SAHİPSİZ bırakırdı (bkz. getSavedMap). Toplu silmeyle aynı kural.
+    if (!(await hasCalendarPermission())) {
+      Toast.show({ type: "error", text1: i18nText("autoI18n.takvim_izni_reddedildi", "Takvim izni reddedildi") });
+      return { ok: false };
+    }
     try {
       await deletePhoneEvent(map[key].eventId);
     } catch (err) {
@@ -244,7 +327,12 @@ export async function removeEventFromPhoneCalendar(item) {
     }
     delete map[key];
     await setSavedMap(map);
-    Toast.show({ type: "info", text1: i18nText("autoI18n.telefon_takviminden_kaldirildi", "Telefonun takviminden kaldırıldı") });
+    notify({
+      silent,
+      type: "info",
+      text1: i18nText("autoI18n.telefon_takviminden_kaldirildi", "Telefonun takviminden kaldırıldı"),
+      onUndo: onSavedChange && undoRemoval([item], onSavedChange),
+    });
     return { ok: true };
   } catch (err) {
     console.error("Phone calendar remove error:", err);
@@ -252,7 +340,47 @@ export async function removeEventFromPhoneCalendar(item) {
   }
 }
 
-export async function removeManyEventsFromPhoneCalendar(items) {
+// Seelogd'un eklediği TÜM etkinlikleri telefonun takviminden siler (Ayarlar >
+// İzinlerim > Takvim). Toast göstermez; sonucu çağıran ekran kendi anlatır.
+//
+// İzin kapalıyken silinemez. Bu yüzden izin YOKSA kayda dokunmadan `blocked`
+// döner: kaydı silip etkinlikleri takvimde bırakmak, sahipsiz etkinlik yaratırdı
+// (bkz. getSavedMap). İzin açıkken telefonda artık bulunamayan etkinlik
+// (kullanıcı takvim uygulamasından kendisi silmiş olabilir) kayıttan da
+// temizlenir — yoksa sayaç hiç sıfırlanmazdı; `removeManyEventsFromPhoneCalendar`
+// ile aynı kural.
+export async function removeAllEventsFromPhoneCalendar() {
+  const map = await getSavedMap();
+  const keys = Object.keys(map);
+  if (keys.length === 0) return { removed: 0, missing: 0, total: 0 };
+
+  let granted = false;
+  try {
+    granted = (await getCalendarPermissionState()).status === "granted";
+  } catch {
+    granted = false;
+  }
+  if (!granted) {
+    return { blocked: "no-permission", removed: 0, missing: 0, total: keys.length };
+  }
+
+  let removed = 0;
+  let missing = 0;
+  for (const key of keys) {
+    try {
+      await deletePhoneEvent(map[key].eventId);
+      removed++;
+    } catch (err) {
+      console.warn("Phone calendar delete error:", err);
+      missing++;
+    }
+    delete map[key];
+  }
+  await setSavedMap(map);
+  return { removed, missing, total: keys.length };
+}
+
+export async function removeManyEventsFromPhoneCalendar(items, { onSavedChange, silent } = {}) {
   if (!items || items.length === 0) {
     return { removed: 0, skipped: 0, failed: 0, total: 0 };
   }
@@ -296,13 +424,22 @@ export async function removeManyEventsFromPhoneCalendar(items) {
     if (removed > 0) parts.push(i18nText("autoI18n.n_silindi", "{{count}} silindi", { count: removed }));
     if (skipped > 0) parts.push(i18nText("autoI18n.n_zaten_yoktu", "{{count}} zaten yoktu", { count: skipped }));
 
-    Toast.show({
+    const removedKeySet = new Set(removedKeys);
+    notify({
+      silent,
       type: removed > 0 ? "success" : "info",
       text1:
         removed > 0
           ? i18nText("autoI18n.telefon_takviminden_silindi", "Telefon takviminden silindi")
           : i18nText("autoI18n.silinecek_kayit_yok", "Silinecek kayıt yok"),
       text2: parts.join(" • ") || undefined,
+      onUndo:
+        removed > 0 && onSavedChange
+          ? undoRemoval(
+              items.filter((item) => removedKeySet.has(buildEventKey(item))),
+              onSavedChange,
+            )
+          : undefined,
     });
 
     return { removed, skipped, failed, total: items.length, removedKeys };

@@ -14,6 +14,7 @@ const mockState = {
   nextId: 1,
   createCalendarCalls: [],
   legacyCalls: [],
+  requestCalls: 0,
 };
 
 // Fabrika import'lar çalışırken (const başlatılmadan) tetiklenir; Platform
@@ -63,7 +64,13 @@ jest.mock("expo-calendar", () => {
     deleteEventAsync: legacy("deleteEventAsync"),
     getDefaultCalendarAsync: legacy("getDefaultCalendarAsync"),
 
+    async getCalendarPermissions() {
+      return mockState.permissionGranted
+        ? { granted: true, status: "granted", canAskAgain: true }
+        : { granted: false, status: "denied", canAskAgain: false };
+    },
     async requestCalendarPermissions() {
+      mockState.requestCalls++;
       return mockState.permissionGranted
         ? { granted: true, status: "granted" }
         : { granted: false, status: "denied" };
@@ -102,7 +109,10 @@ import { __resetStores } from "../services/storage/instances";
 import { __resetStoreCaches } from "../services/storage/store";
 import {
   buildEventKey,
+  countSavedPhoneEvents,
+  getCalendarPermissionState,
   loadSavedKeysSet,
+  removeAllEventsFromPhoneCalendar,
   removeEventFromPhoneCalendar,
   removeManyEventsFromPhoneCalendar,
   saveEventToPhoneCalendar,
@@ -132,6 +142,7 @@ beforeEach(() => {
   mockState.nextId = 1;
   mockState.createCalendarCalls = [];
   mockState.legacyCalls = [];
+  mockState.requestCalls = 0;
   Toast.show.mockClear();
   jest.spyOn(console, "warn").mockImplementation(() => {});
   jest.spyOn(console, "error").mockImplementation(() => {});
@@ -262,5 +273,193 @@ describe("silme", () => {
     expect(mockState.events.size).toBe(0);
     expect((await loadSavedKeysSet()).size).toBe(0);
     expect(mockState.legacyCalls).toEqual([]);
+  });
+});
+
+describe("geri al (Takvim ekranı)", () => {
+  // Toast.show'un son çağrısındaki "Geri Al" eylemi.
+  const lastUndo = () => {
+    const calls = Toast.show.mock.calls;
+    return calls[calls.length - 1][0].props?.action;
+  };
+
+  it("tek eklemede toast'a Geri Al koyar; basınca etkinliği kaldırır ve kümeyi günceller", async () => {
+    const onSavedChange = jest.fn();
+    await saveEventToPhoneCalendar(movie, { onSavedChange });
+
+    const toast = Toast.show.mock.calls[0][0];
+    expect(toast.type).toBe("success");
+    // Varsayılan 3 sn düğmeye basmaya yetmez.
+    expect(toast.visibilityTime).toBeGreaterThan(3000);
+    expect(toast.props.action.label).toBe("Geri Al");
+
+    await toast.props.action.onPress();
+
+    expect(mockState.events.size).toBe(0);
+    expect((await loadSavedKeysSet()).size).toBe(0);
+    expect(onSavedChange).toHaveBeenCalledWith(buildEventKey(movie), false);
+    // Geri almanın kendisi tekrar geri alınmaz: yalnız bilgi toast'ı.
+    expect(lastUndo()).toBeUndefined();
+    expect(Toast.show).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: "info", text1: "Geri alındı" }),
+    );
+  });
+
+  it("onSavedChange verilmezse eskisi gibi düz toast gösterir (Geri Al yok)", async () => {
+    await saveEventToPhoneCalendar(movie);
+    expect(Toast.show.mock.calls[0][0].props).toBeUndefined();
+  });
+
+  it("tek silmede toast'a Geri Al koyar; basınca etkinliği yeniden ekler", async () => {
+    await saveEventToPhoneCalendar(movie);
+    Toast.show.mockClear();
+    const onSavedChange = jest.fn();
+
+    expect(await removeEventFromPhoneCalendar(movie, { onSavedChange })).toEqual({ ok: true });
+    expect(mockState.events.size).toBe(0);
+
+    await lastUndo().onPress();
+
+    expect(mockState.events.size).toBe(1);
+    expect((await loadSavedKeysSet()).has(buildEventKey(movie))).toBe(true);
+    expect(onSavedChange).toHaveBeenCalledWith(buildEventKey(movie), true);
+    expect(lastUndo()).toBeUndefined();
+  });
+
+  it("izin kapalıyken tek silme kayda ve takvime dokunmaz (sahipsiz etkinlik bırakmaz)", async () => {
+    await saveEventToPhoneCalendar(movie);
+    mockState.permissionGranted = false;
+    Toast.show.mockClear();
+
+    const res = await removeEventFromPhoneCalendar(movie, { onSavedChange: jest.fn() });
+
+    expect(res).toEqual({ ok: false });
+    expect(mockState.events.size).toBe(1);
+    expect(await countSavedPhoneEvents()).toBe(1);
+    expect(Toast.show).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
+  });
+
+  it("toplu eklemeyi geri alır: yalnız bu çağrıda eklenenleri kaldırır", async () => {
+    await saveEventToPhoneCalendar(movie); // önceden vardı → geri alma dokunmamalı
+    Toast.show.mockClear();
+    const onSavedChange = jest.fn();
+
+    const res = await saveManyEventsToPhoneCalendar([movie, episode, note], { onSavedChange });
+    expect(res).toMatchObject({ added: 2, skipped: 1 });
+
+    await lastUndo().onPress();
+
+    expect(mockState.events.size).toBe(1);
+    expect([...(await loadSavedKeysSet())]).toEqual([buildEventKey(movie)]);
+    expect(onSavedChange).toHaveBeenCalledTimes(2);
+    expect(onSavedChange).toHaveBeenCalledWith(buildEventKey(episode), false);
+    expect(onSavedChange).toHaveBeenCalledWith(buildEventKey(note), false);
+  });
+
+  it("hiçbir şey eklenmediyse toplu toast'ta Geri Al yok", async () => {
+    await saveManyEventsToPhoneCalendar([movie]);
+    Toast.show.mockClear();
+
+    await saveManyEventsToPhoneCalendar([movie], { onSavedChange: jest.fn() });
+
+    expect(lastUndo()).toBeUndefined();
+  });
+
+  it("toplu silmeyi geri alır: silinenleri yeniden ekler", async () => {
+    await saveManyEventsToPhoneCalendar([movie, episode, note]);
+    Toast.show.mockClear();
+    const onSavedChange = jest.fn();
+
+    const res = await removeManyEventsFromPhoneCalendar([movie, episode], { onSavedChange });
+    expect(res.removedKeys).toEqual([buildEventKey(movie), buildEventKey(episode)]);
+    expect(mockState.events.size).toBe(1);
+
+    await lastUndo().onPress();
+
+    expect(mockState.events.size).toBe(3);
+    expect((await loadSavedKeysSet()).size).toBe(3);
+    expect(onSavedChange).toHaveBeenCalledWith(buildEventKey(movie), true);
+    expect(onSavedChange).toHaveBeenCalledWith(buildEventKey(episode), true);
+    expect(mockState.legacyCalls).toEqual([]);
+  });
+
+  it("silent: başarı toast'ını susturur", async () => {
+    await saveEventToPhoneCalendar(movie, { silent: true });
+    await removeEventFromPhoneCalendar(movie, { silent: true });
+    await saveManyEventsToPhoneCalendar([movie], { silent: true });
+    await removeManyEventsFromPhoneCalendar([movie], { silent: true });
+
+    expect(Toast.show).not.toHaveBeenCalled();
+  });
+});
+
+describe("Ayarlar > İzinlerim > Takvim", () => {
+  it("izin durumunu okur ve sistem diyaloğu AÇMAZ", async () => {
+    expect(await getCalendarPermissionState()).toEqual({
+      status: "granted",
+      canAskAgain: true,
+    });
+
+    mockState.permissionGranted = false;
+    expect(await getCalendarPermissionState()).toEqual({
+      status: "denied",
+      canAskAgain: false,
+    });
+    expect(mockState.requestCalls).toBe(0);
+  });
+
+  it("Seelogd'un eklediği etkinlikleri sayar", async () => {
+    expect(await countSavedPhoneEvents()).toBe(0);
+    await saveManyEventsToPhoneCalendar([movie, episode, note]);
+    expect(await countSavedPhoneEvents()).toBe(3);
+  });
+
+  it("hepsini kaldırır: telefondan siler, kaydı sıfırlar, eski API'ye dokunmaz", async () => {
+    await saveManyEventsToPhoneCalendar([movie, episode, note]);
+    expect(mockState.events.size).toBe(3);
+    Toast.show.mockClear(); // yukarıdaki ekleme toast'ı sayılmasın
+
+    const res = await removeAllEventsFromPhoneCalendar();
+
+    expect(res).toEqual({ removed: 3, missing: 0, total: 3 });
+    expect(mockState.events.size).toBe(0);
+    expect(await countSavedPhoneEvents()).toBe(0);
+    expect(mockState.legacyCalls).toEqual([]);
+    // Toplu kaldırma sonucu kendi sayfasında anlatılır; toast çıkmaz.
+    expect(Toast.show).not.toHaveBeenCalled();
+  });
+
+  it("telefonda artık bulunamayan etkinliği ayrı sayar ve kayıttan da temizler", async () => {
+    await saveManyEventsToPhoneCalendar([movie, episode]);
+    // Kullanıcı etkinliklerden birini takvim uygulamasından kendisi silmiş.
+    mockState.events.delete([...mockState.events.keys()][0]);
+
+    const res = await removeAllEventsFromPhoneCalendar();
+
+    expect(res).toEqual({ removed: 1, missing: 1, total: 2 });
+    expect(await countSavedPhoneEvents()).toBe(0);
+  });
+
+  it("izin kapalıyken kayda ve takvime dokunmaz (sahipsiz etkinlik bırakmaz)", async () => {
+    await saveManyEventsToPhoneCalendar([movie, episode]);
+    mockState.permissionGranted = false;
+    const requestsBefore = mockState.requestCalls;
+
+    const res = await removeAllEventsFromPhoneCalendar();
+
+    expect(res).toEqual({ blocked: "no-permission", removed: 0, missing: 0, total: 2 });
+    expect(mockState.events.size).toBe(2);
+    expect(await countSavedPhoneEvents()).toBe(2);
+    // İzin kapalıyken izin DİYALOĞU da açılmamalı (yalnız durum okunur).
+    expect(mockState.requestCalls).toBe(requestsBefore);
+  });
+
+  it("kayıt boşsa izne bakmadan sıfır döner", async () => {
+    mockState.permissionGranted = false;
+    expect(await removeAllEventsFromPhoneCalendar()).toEqual({
+      removed: 0,
+      missing: 0,
+      total: 0,
+    });
   });
 });

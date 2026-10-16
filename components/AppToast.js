@@ -39,7 +39,11 @@ const TYPE_META = {
   info: { icon: "information", color: "#3B82F6", softColor: "#7DD3FC" },
 };
 
-const ToastCard = React.memo(function ToastCard({ type, text1, text2, onPress }) {
+// `action` (Toast.show'un `props.action`'ı): { label, onPress } → kartın sağında
+// "Geri Al" gibi tek bir eylem düğmesi; varken kapat çarpısının yerini alır (kart
+// yine dokununca kapanır). Eylemli toast'ın süresini çağıran uzatır
+// (`visibilityTime`): varsayılan 3 sn dokunmaya yetmez.
+const ToastCard = React.memo(function ToastCard({ type, text1, text2, onPress, action }) {
   const { theme } = useTheme();
   const meta = TYPE_META[type] || TYPE_META.info;
 
@@ -108,9 +112,34 @@ const ToastCard = React.memo(function ToastCard({ type, text1, text2, onPress })
           ) : null}
         </View>
 
-        <View style={[styles.closeButton, { backgroundColor: `${meta.color}12` }]}>
-          <Ionicons name="close" size={16} color={theme.text.secondary} />
-        </View>
+        {action ? (
+          <Pressable
+            onPress={() => {
+              Toast.hide();
+              action.onPress?.();
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            style={[
+              styles.actionButton,
+              { backgroundColor: `${meta.color}1F`, borderColor: `${meta.color}55` },
+            ]}
+          >
+            <Ionicons name="arrow-undo" size={14} color={meta.color} />
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.actionText, { color: theme.text.primary }]}
+            >
+              {action.label}
+            </Text>
+          </Pressable>
+        ) : (
+          <View style={[styles.closeButton, { backgroundColor: `${meta.color}12` }]}>
+            <Ionicons name="close" size={16} color={theme.text.secondary} />
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -213,10 +242,10 @@ const BadgeToastCard = React.memo(function BadgeToastCard({ text1, text2, props,
 
 // ── react-native-toast-message config (MODÜL düzeyinde — stabil referans) ──
 export const toastConfig = {
-  success: (p) => <ToastCard type="success" text1={p.text1} text2={p.text2} onPress={p.onPress} />,
-  error: (p) => <ToastCard type="error" text1={p.text1} text2={p.text2} onPress={p.onPress} />,
-  warning: (p) => <ToastCard type="warning" text1={p.text1} text2={p.text2} onPress={p.onPress} />,
-  info: (p) => <ToastCard type="info" text1={p.text1} text2={p.text2} onPress={p.onPress} />,
+  success: (p) => <ToastCard type="success" text1={p.text1} text2={p.text2} onPress={p.onPress} action={p.props?.action} />,
+  error: (p) => <ToastCard type="error" text1={p.text1} text2={p.text2} onPress={p.onPress} action={p.props?.action} />,
+  warning: (p) => <ToastCard type="warning" text1={p.text1} text2={p.text2} onPress={p.onPress} action={p.props?.action} />,
+  info: (p) => <ToastCard type="info" text1={p.text1} text2={p.text2} onPress={p.onPress} action={p.props?.action} />,
   badge: (p) => <BadgeToastCard text1={p.text1} text2={p.text2} props={p.props} onPress={p.onPress} />,
 };
 
@@ -292,6 +321,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    minHeight: 34,
+    paddingHorizontal: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  actionText: { fontSize: 13, fontWeight: "800" },
 });
 
 export default toast;

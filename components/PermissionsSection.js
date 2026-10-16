@@ -4,6 +4,8 @@
 //   - Bildirimler   (expo-notifications)
 //   - Galeri/Medya  (expo-media-library — story/Wrapped görselini kaydetme;
 //                    YALNIZCA yazma izni, galeri hiç okunmuyor)
+//   - Takvim        (expo-calendar — hatırlatma/not etkinliklerini telefonun
+//                    takvimine yazma; mevcut etkinlikler okunmuyor)
 //
 // Her satır: durum rozeti (Verildi / Reddedildi / Belirsiz) + aksiyon.
 //   • İzin verilmemişse  → "İzin ver" (tekrar sorulabiliyorsa sistem sorar,
@@ -11,6 +13,9 @@
 //   • İzin verilmişse     → "Geri çek" (mobil OS uygulamanın kendi iznini
 //                          program ile geri almasına izin VERMEZ; bu yüzden
 //                          sistem ayarları açılır, kullanıcı oradan kapatır).
+//   • `detail: true` olan satır (Takvim) genel akışa girmez: basınca kendi bilgi
+//     + yönetim sayfasını açar (CalendarPermissionSheet) — orada neyin
+//     eklendiği anlatılır, eklenenler kaldırılır, izin geri çekilir.
 //
 // Durumlar uygulama öne geldikçe (AppState 'active') tazelenir — kullanıcı
 // sistem ayarından izni değiştirip döndüğünde ekran güncel kalır.
@@ -27,9 +32,12 @@ import {
 } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as MediaLibrary from "expo-media-library";
+import * as Calendar from "expo-calendar";
 import AppIcon from "@components/AppIcon";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { appAlert } from "@components/AppAlert";
+import CalendarPermissionSheet from "@components/permissions/CalendarPermissionSheet";
+import StatusPill from "@components/permissions/StatusPill";
 import { ensureAndroidChannels } from "@services/pushNotificationsService";
 import { useLanguage } from "@context/LanguageContext";
 
@@ -60,35 +68,22 @@ const PERMISSIONS = [
     get: () => MediaLibrary.getPermissionsAsync(true),
     request: () => MediaLibrary.requestPermissionsAsync(true),
   },
+  {
+    key: "calendar",
+    icon: "calendar-outline",
+    colorKey: "purple",
+    bgKey: "iconPurple",
+    titleKey: "permCalendar",
+    descKey: "permCalendarDesc",
+    // expo-calendar 57: `...Async` sürümleri bilerek hata fırlatır (bkz.
+    // utils/phoneCalendar.js); nesne tabanlı API kullanılır.
+    get: () => Calendar.getCalendarPermissions(),
+    request: () => Calendar.requestCalendarPermissions(),
+    detail: true,
+  },
 ];
 
 const DEFAULT_STATE = { status: "undetermined", canAskAgain: true };
-
-function StatusPill({ status, colors: C, t }) {
-  let label = t.permUndetermined || "Belirsiz";
-  let color = C.muted;
-  let bg = C.borderMuted;
-  let icon = "help-circle-outline";
-  if (status === "granted") {
-    label = t.permGranted || "Verildi";
-    color = C.green;
-    bg = C.iconGreen;
-    icon = "checkmark-circle";
-  } else if (status === "denied") {
-    label = t.permDenied || "Reddedildi";
-    color = C.danger;
-    bg = C.dangerDim;
-    icon = "close-circle";
-  }
-  return (
-    <View style={[ps.pill, { backgroundColor: bg }]}>
-      <AppIcon name={icon} size={12} color={color} />
-      <Text allowFontScaling={false} style={[ps.pillText, { color }]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
 
 export default function PermissionsSection({ colors: C }) {
   const { t } = useLanguage();
@@ -98,6 +93,7 @@ export default function PermissionsSection({ colors: C }) {
   const [refreshing, setRefreshing] = useState(true);
   const [busyKey, setBusyKey] = useState(null);
   const busyRef = useRef(false);
+  const [calendarSheetVisible, setCalendarSheetVisible] = useState(false);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -187,6 +183,19 @@ export default function PermissionsSection({ colors: C }) {
     [states, refresh, t],
   );
 
+  // Takvim sayfasından istek: sayfa AÇIKKEN `appAlert` iOS'ta sunulamaz (modal
+  // üstünde), bu yüzden hata/kalıcı ret burada sessiz geçilir — sayfa durum
+  // değişince "Sistem ayarlarını aç" düğmesini kendisi gösterir.
+  const requestCalendar = useCallback(async () => {
+    const perm = PERMISSIONS.find((p) => p.key === "calendar");
+    try {
+      await perm.request();
+    } catch {
+      // izin diyaloğu açılamadı; durum aşağıda yeniden okunur
+    }
+    await refresh();
+  }, [refresh]);
+
   // OS, uygulamanın kendi iznini program ile geri almasına izin vermez →
   // sistem ayarlarını açıp kullanıcıya bırakıyoruz.
   const handleRevoke = useCallback(
@@ -271,7 +280,7 @@ export default function PermissionsSection({ colors: C }) {
             key={perm.key}
             accessibilityRole="button"
             accessibilityLabel={`${t[perm.titleKey] || perm.key}: ${
-              granted
+              granted || perm.detail
                 ? t.permManage || "Yönet"
                 : st.canAskAgain === false
                   ? t.permOpenSettings || "Ayarları aç"
@@ -282,7 +291,13 @@ export default function PermissionsSection({ colors: C }) {
               { borderBottomColor: C.borderMuted },
               last && { borderBottomWidth: 0 },
             ]}
-            onPress={() => (granted ? handleRevoke(perm) : handleGrant(perm))}
+            onPress={() =>
+              perm.detail
+                ? setCalendarSheetVisible(true)
+                : granted
+                  ? handleRevoke(perm)
+                  : handleGrant(perm)
+            }
             disabled={busy || refreshing}
             activeOpacity={0.65}
           >
@@ -312,7 +327,7 @@ export default function PermissionsSection({ colors: C }) {
                   <StatusPill status={st.status} colors={C} t={t} />
                   <View style={ps.manageRow}>
                     <Text allowFontScaling={false} style={[ps.manageText, { color: C.muted }]}>
-                      {granted
+                      {granted || perm.detail
                         ? t.permManage || "Yönet"
                         : st.canAskAgain === false
                           ? t.permOpenSettings || "Ayarları aç"
@@ -326,6 +341,14 @@ export default function PermissionsSection({ colors: C }) {
           </TouchableOpacity>
         );
       })}
+
+      <CalendarPermissionSheet
+        visible={calendarSheetVisible}
+        onClose={() => setCalendarSheetVisible(false)}
+        colors={C}
+        state={states.calendar || DEFAULT_STATE}
+        onRequest={requestCalendar}
+      />
     </View>
   );
 }
@@ -403,18 +426,6 @@ const ps = StyleSheet.create({
     fontSize: 9.5,
     marginTop: 1,
     lineHeight: 13,
-  },
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  pillText: {
-    fontSize: 9,
-    fontWeight: "700",
   },
   rowAction: {
     alignItems: "center",
