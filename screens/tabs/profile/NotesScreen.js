@@ -56,12 +56,15 @@ import { alpha } from "../../../theme/colors";
 import NoteEditorSheet from "./notes/NoteEditorSheet";
 import { MediaNoteCard, NoteCard, NotesEmptyState, NotesSkeleton } from "./notes/NoteCards";
 import { NotesFilterRow, NotesTabBar, RevealBox } from "./notes/NotesChrome";
+import NotesMasonry from "./notes/NotesMasonry";
 import BackButton from "@components/BackButton";
 import useReduceMotion from "../../../hooks/useReduceMotion";
 import { useLiquidGlass } from "../../../services/liquidGlass";
 
 const GRID_PAD = 16;
 const GRID_GAP = 10;
+// Izgarada kartlar arası dikey boşluk; liste kipindeki `styles.list.gap` ile aynı.
+const GRID_ROW_GAP = 12;
 const SEARCH_H = 46;
 const SEARCH_GAP = 10;
 const TAB_ORDER = ["note", "todo", "media"];
@@ -360,6 +363,18 @@ export default function NotesScreen({ navigation }) {
     { key: "done", label: i18nText("autoI18n.notes_filtre_biten", "Biten") },
   ];
 
+  // Liste boşken ya da yüklenirken gösterilen düğüm (liste ve ızgara ortak).
+  const emptyNode = isListLoading ? (
+    <NotesSkeleton theme={theme} layout={isGrid ? "grid" : "list"} width={gridWidth} />
+  ) : (
+    <NotesEmptyState
+      tab={tab}
+      theme={theme}
+      searching={searching}
+      onCreate={tab === "media" ? undefined : openNew}
+    />
+  );
+
   const accent = theme.accent;
   const fabLabel =
     tab === "todo"
@@ -498,31 +513,29 @@ export default function NotesScreen({ navigation }) {
               : (tabDirRef.current > 0 ? FadeInRight : FadeInLeft).duration(260)
           }
         >
-          <FlatList
-            // numColumns değişince FlatList yeniden kurulmalı.
-            key={isGrid ? "grid" : "list"}
-            data={listData}
-            keyExtractor={(item) => item.id}
-            numColumns={isGrid ? 2 : 1}
-            columnWrapperStyle={isGrid ? styles.gridRow : undefined}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            ListEmptyComponent={
-              isListLoading ? (
-                <NotesSkeleton theme={theme} layout={isGrid ? "grid" : "list"} width={gridWidth} />
-              ) : (
-                <NotesEmptyState
-                  tab={tab}
-                  theme={theme}
-                  searching={searching}
-                  onCreate={tab === "media" ? undefined : openNew}
-                />
-              )
-            }
-            renderItem={renderItem}
-          />
+          {isGrid ? (
+            // İki sütun, boşluksuz (masonry): kısa kartın altına sıradaki kart girer.
+            <NotesMasonry
+              data={listData}
+              columnWidth={gridWidth}
+              columnGap={GRID_GAP}
+              rowGap={GRID_ROW_GAP}
+              contentContainerStyle={styles.list}
+              renderItem={renderItem}
+              empty={emptyNode}
+            />
+          ) : (
+            <FlatList
+              data={listData}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              ListEmptyComponent={emptyNode}
+              renderItem={renderItem}
+            />
+          )}
         </Animated.View>
 
         {/* FAB — "media" sekmesinde yok: bu notlar buradan değil, ilgili film/dizi
@@ -624,7 +637,6 @@ const styles = StyleSheet.create({
   // List
   listWrap: { flex: 1 },
   list: { paddingHorizontal: GRID_PAD, paddingBottom: 120, gap: 12, flexGrow: 1 },
-  gridRow: { gap: GRID_GAP, alignItems: "flex-start" },
 
   // FAB (genişletilmiş)
   fabWrap: { position: "absolute", bottom: 28, right: 20 },

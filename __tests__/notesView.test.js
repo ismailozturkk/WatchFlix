@@ -14,6 +14,9 @@ const {
   badgeLabel,
   tabDirection,
   TAB_BAR_PADDING,
+  wrappedLineCount,
+  estimateGridCardHeight,
+  splitIntoColumns,
 } = require("../utils/notesView");
 
 describe("sortNotes", () => {

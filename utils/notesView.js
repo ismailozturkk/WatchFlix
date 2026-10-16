@@ -149,6 +149,127 @@ export function buildNoteColorPairs(notesColor) {
   ];
 }
 
+// ─── Izgara (masonry) yerleşimi ───────────────────────────────────────────────
+//
+// İki sütunlu görünümde kartlar satır satır değil SÜTUN SÜTUN dizilir: her kart,
+// o ana kadar en kısa kalan sütuna girer. Satır tabanlı ızgarada (FlatList
+// numColumns) bir satırın yüksekliğini en uzun kart belirler; kısa kartın altı
+// boş kalırdı. Sütun içinde kartlar arka arkaya durduğundan boşluk oluşmaz — kart
+// yüksekliği tahmini sapsa bile yalnız iki sütunun toplam boyu biraz farklı çıkar.
+//
+// Gerçek yükseklik render'dan önce bilinmez; ölçüp yeniden dağıtmak kartları
+// sütunlar arasında zıplatırdı. Bu yüzden yükseklik NoteCard'ın düzen sabitlerinden
+// ve metin uzunluğundan TAHMİN edilir (kararlı: aynı not + genişlik = aynı sütun).
+
+// NoteCard (grid) düzen sabitleri — screens/tabs/profile/notes/NoteCards.js `st`.
+const CARD_CHROME = 2 + 4 + 10 + 10; // kenarlık + üst şerit + üst/alt iç boşluk
+const HEAD_ROW = 22 + 8;
+const DUE_CHIP_ROW = 22 + 8;
+const TITLE_LINE = 21;
+const TITLE_GAP = 6;
+const CONTENT_LINE = 20;
+const CONTENT_GAP = 8;
+const CONTENT_MAX_LINES = 7;
+const TITLE_MAX_LINES = 2;
+const TODO_ROW = 18;
+const TODO_GAP = 6;
+const TODO_MORE = 14;
+const TODO_PROGRESS = 4 + 14;
+const TODO_LIST_GAP = 6;
+const TODO_PREVIEW_MAX = 4;
+const FOOTER = 6 + 28;
+const BODY_PADDING_X = 14 * 2 + 2;
+// Ortalama karakter genişliği (px): başlık 16pt/800, içerik 13.5pt.
+const TITLE_CHAR_W = 8.8;
+const CONTENT_CHAR_W = 6.9;
+
+/**
+ * `text`in `charsPerLine` genişlikte kaç satıra sarıldığı (kelime sınırında,
+ * yeni satırlar korunur). Üst sınır `maxLines`; boş metin 0 satır.
+ */
+export function wrappedLineCount(text, charsPerLine, maxLines = Infinity) {
+  const perLine = Math.max(1, Math.floor(charsPerLine));
+  const source = String(text ?? "");
+  if (!source.trim()) return 0;
+  let lines = 0;
+  for (const paragraph of source.split(/\r?\n/)) {
+    if (lines >= maxLines) break;
+    let used = 0;
+    let count = 1;
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      // Satırdan uzun kelime birden çok satıra bölünür.
+      let rest = word.length;
+      if (used > 0 && used + 1 + rest <= perLine) {
+        used += 1 + rest;
+        continue;
+      }
+      if (used > 0) count += 1;
+      while (rest > perLine) {
+        count += 1;
+        rest -= perLine;
+      }
+      used = rest;
+    }
+    lines += count;
+  }
+  return Math.min(lines, maxLines);
+}
+
+/**
+ * Izgara kartının (NoteCard layout="grid") yaklaşık yüksekliği. `width` kartın
+ * dış genişliği; metin genişliği buradan türetilir.
+ */
+export function estimateGridCardHeight(note, width) {
+  const textWidth = Math.max(40, (Number(width) || 0) - BODY_PADDING_X);
+  const titleLines = Math.max(
+    1,
+    wrappedLineCount(note?.title, textWidth / TITLE_CHAR_W, TITLE_MAX_LINES),
+  );
+  let height = CARD_CHROME + HEAD_ROW + titleLines * TITLE_LINE + TITLE_GAP + FOOTER;
+  if (note?.scheduledDate) height += DUE_CHIP_ROW;
+
+  if (note?.type === "todo") {
+    const todos = Array.isArray(note.todos) ? note.todos : [];
+    const active = todos.filter((todo) => !todo?.done);
+    const shown = active.length > 0 ? active : todos;
+    const rows = Math.min(shown.length, TODO_PREVIEW_MAX);
+    const hidden = shown.length > rows;
+    const children = rows + (hidden ? 1 : 0) + (todos.length > 0 ? 1 : 0);
+    height += rows * TODO_ROW + Math.max(0, children - 1) * TODO_GAP + TODO_LIST_GAP;
+    if (hidden) height += TODO_MORE;
+    if (todos.length > 0) height += TODO_PROGRESS;
+  } else {
+    // Boş içerikte "İçerik yok" yer tutucusu bir satır kaplar.
+    const contentLines = Math.max(
+      1,
+      wrappedLineCount(note?.content, textWidth / CONTENT_CHAR_W, CONTENT_MAX_LINES),
+    );
+    height += contentLines * CONTENT_LINE + CONTENT_GAP;
+  }
+  return height;
+}
+
+/**
+ * Kartları `columnCount` sütuna dağıtır: sırayla, o ana kadar en kısa sütuna
+ * (eşitlikte soldakine). Her sütun kendi içinde girdi sırasını korur; sabitlenmiş
+ * (önde gelen) kartlar böylece üst sıralarda kalır.
+ * @returns {Array<Array>} sütun başına kart listesi
+ */
+export function splitIntoColumns(items, getHeight, columnCount = 2) {
+  const count = Math.max(1, columnCount);
+  const columns = Array.from({ length: count }, () => []);
+  const heights = new Array(count).fill(0);
+  for (const item of Array.isArray(items) ? items : []) {
+    let target = 0;
+    for (let i = 1; i < count; i += 1) {
+      if (heights[i] < heights[target]) target = i;
+    }
+    columns[target].push(item);
+    heights[target] += getHeight(item);
+  }
+  return columns;
+}
+
 // ─── Sekme çubuğu geometrisi (NotesChrome) ────────────────────────────────────
 
 /** Sekme çubuğunun iç dolgusu (pt). Hap ve sekmeler bu boşluğun içinde durur. */

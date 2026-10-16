@@ -6,6 +6,7 @@ import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
 import Toast from "react-native-toast-message";
 import { i18nText } from "../utils/i18nText";
+import { addTodoOnTop, toggleTodoItem } from "../utils/todoOrder";
 import { usePremiumGate } from "../hooks/usePremiumGate";
 import useUserDataDomain from "../hooks/useUserDataDomain";
 import { notesDomain } from "../services/userData";
@@ -114,7 +115,7 @@ export const ProfileNotesProvider = ({ children }) => {
     const applyToggle = (n) =>
       n.id !== noteId ? n : {
         ...n,
-        todos: (n.todos || []).map((t) => t.id === todoId ? { ...t, done: !t.done } : t),
+        todos: toggleTodoItem(n.todos, todoId),
         updatedAt: Date.now(),
       };
 
@@ -132,7 +133,7 @@ export const ProfileNotesProvider = ({ children }) => {
 
     const applyAdd = (n) =>
       n.id !== noteId ? n : {
-        ...n, todos: [...(n.todos || []), newItem], updatedAt: Date.now(),
+        ...n, todos: addTodoOnTop(n.todos, newItem), updatedAt: Date.now(),
       };
 
     try {

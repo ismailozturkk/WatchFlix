@@ -39,7 +39,12 @@ import {
   saveNoteTodoDraft,
   todoDraftKey,
 } from "../../../../services/noteTodoDraftService";
-import { getTodoMoveAvailability, moveTodoItem } from "../../../../utils/todoOrder";
+import {
+  addTodoOnTop,
+  getTodoMoveAvailability,
+  moveTodoItem,
+  toggleTodoItem,
+} from "../../../../utils/todoOrder";
 import {
   countWords,
   dateOffsetISO,
@@ -229,12 +234,11 @@ export default function NoteEditorSheet({
 
   const addTodo = () => {
     if (!newTodoText.trim()) return;
-    setTodos((prev) => [...prev, { id: uid(), text: newTodoText.trim(), done: false }]);
+    setTodos((prev) => addTodoOnTop(prev, { id: uid(), text: newTodoText.trim(), done: false }));
     setNewTodoText("");
     setTimeout(() => todoInputRef.current?.focus(), 50);
   };
-  const toggleTodo = (id) =>
-    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  const toggleTodo = (id) => setTodos((prev) => toggleTodoItem(prev, id));
   const deleteTodo = (id) => {
     if (editingTodoId === id) {
       setEditingTodoId(null);
