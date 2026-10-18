@@ -1,7 +1,6 @@
 import React, { memo, useEffect, useRef } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   FlatList,
   Dimensions,
@@ -18,7 +17,7 @@ import { useImageQualitySettings, useListLayoutSettings } from "../../context/Ap
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
-import SeeAllHeader from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 const { width } = Dimensions.get("window");
@@ -96,15 +95,27 @@ export default function MovieNowPlaying({ navigation }) {
     activateMovieSection("nowPlaying");
   }, [activateMovieSection]);
 
+  // Başlık yüklenirken de AYNI bileşenden gelir: düz bir Text ile "Tümü" düğmeli satırın yüksekliği
+  // farklıdır, ray veri gelince aşağı zıplar.
+  const nowPlayingHeader = (
+    <SectionHeader
+      section="nowPlaying"
+      mediaType="movie"
+      title={t.movieScreens.theaters}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "movie",
+          section: "nowPlaying",
+          title: t.movieScreens.theaters,
+        })
+      }
+    />
+  );
+
   if (loadingNowPlaying) {
     return (
       <View style={{ flex: 1, paddingVertical: 10 }}>
-        <Text
-          allowFontScaling={false}
-          style={[styles.title, { color: theme.text.secondary }]}
-        >
-          {t.movieScreens.theaters}
-        </Text>
+        {nowPlayingHeader}
 
         <FlatList
           data={[1, 2, 3]}
@@ -133,16 +144,7 @@ export default function MovieNowPlaying({ navigation }) {
   };
   return (
     <View style={{ flex: 1, paddingVertical: 10 }}>
-      <SeeAllHeader
-        title={t.movieScreens.theaters}
-        onPress={() =>
-          navigation.navigate("SeeAllScreen", {
-            mediaType: "movie",
-            section: "nowPlaying",
-            title: t.movieScreens.theaters,
-          })
-        }
-      />
+      {nowPlayingHeader}
 
       <PaginatedRail
         data={moviesNowPlaying}
@@ -162,13 +164,6 @@ export default function MovieNowPlaying({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 18,
-    uppercase: true,
-    marginBottom: 15,
-    marginLeft: 15,
-    fontWeight: "700",
-  },
   similarItem: {
     width: width * 0.4,
     height: width * 0.62,

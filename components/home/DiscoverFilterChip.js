@@ -12,6 +12,8 @@
 //   filled   : dolu vurgu (birincil eylem — "Filtreler · 2")
 //   disabled : tıklanmaz, soluk (tür sınırına ulaşıldı)
 //   icon     : Ionicons adı; `trailingIcon` sağda (ör. kaldırma çarpısı)
+//   leading  : simge yerine herhangi bir düğüm (ör. platform logosu)
+//   marked   : seçili OLMADAN öne çıkar — vurgu çerçevesi + sağda onay simgesi (ör. üyeliğin olan platform)
 import React, { memo } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -24,6 +26,8 @@ function DiscoverFilterChip({
   label,
   icon,
   trailingIcon,
+  leading,
+  marked = false,
   selected = false,
   filled = false,
   disabled = false,
@@ -38,9 +42,10 @@ function DiscoverFilterChip({
   const accent = theme.accent ?? "#3B82F6";
 
   const backgroundColor = filled ? accent : selected ? alpha(accent, 0.16) : theme.secondary;
-  const borderColor = filled ? accent : selected ? accent : theme.border;
+  const borderColor = filled ? accent : selected ? accent : marked ? alpha(accent, 0.55) : theme.border;
   const color = filled ? "#FFFFFF" : selected ? theme.text.primary : theme.text.secondary;
   const iconColor = filled ? "#FFFFFF" : selected ? accent : theme.text.muted;
+  const endIcon = trailingIcon ?? (marked ? "checkmark-circle" : null);
 
   return (
     <Pressable
@@ -58,7 +63,7 @@ function DiscoverFilterChip({
         style,
       ]}
     >
-      {icon ? <Ionicons name={icon} size={15} color={iconColor} /> : null}
+      {leading ?? (icon ? <Ionicons name={icon} size={15} color={iconColor} /> : null)}
       <Text
         allowFontScaling={false}
         numberOfLines={1}
@@ -66,7 +71,7 @@ function DiscoverFilterChip({
       >
         {label}
       </Text>
-      {trailingIcon ? <Ionicons name={trailingIcon} size={14} color={iconColor} /> : null}
+      {endIcon ? <Ionicons name={endIcon} size={14} color={marked && !trailingIcon ? accent : iconColor} /> : null}
     </Pressable>
   );
 }

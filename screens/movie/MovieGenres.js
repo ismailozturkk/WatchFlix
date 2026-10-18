@@ -1,6 +1,5 @@
 import React, { memo, useEffect, useRef } from "react";
 import {
-  Text,
   TouchableOpacity,
   StyleSheet,
   FlatList,
@@ -11,14 +10,21 @@ import {
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
-import { MovieSkeleton } from "../../components/Skeleton";
+import { ChipRowSkeleton, MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-import { SeeAllButton } from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
+import {
+  SectionChipRail,
+  SECTION_CHIP_GAP,
+  SECTION_CHIP_HEIGHT,
+  SECTION_RAIL_PADDING,
+} from "../../components/home/SectionChips";
+import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
@@ -99,36 +105,57 @@ export default function MovieGenres({ navigation }) {
     activateMovieSection("genres");
   }, [activateMovieSection]);
 
+  const genreTitle = selectedGenres.length
+    ? genres
+        .filter((g) => selectedGenres.includes(g.id))
+        .map((g) => g.name)
+        .join(", ")
+    : i18nText("autoI18n.turler", "Türler");
+
+  // Başlık yükleme sırasında da AYNI öğedir (bkz. TvShowsGenres): "Türler" + çipler + "Tümü". Alt başlık:
+  // seçim yokken ipucu ("bir ya da birden fazla tür seç"), seçim varsa seçilen türlerin adları.
+  const genreHeader = (
+    <SectionHeader
+      section="genres"
+      mediaType="movie"
+      subtitle={selectedGenres.length ? genreTitle : undefined}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "movie",
+          section: "genres",
+          title: genreTitle,
+          genreIds: selectedGenres,
+        })
+      }
+    >
+      {genres.length > 0 ? (
+        <SectionChipRail
+          data={genres}
+          keyExtractor={(item) => item.id.toString()}
+          extraData={selectedGenres}
+          renderChip={(item) => (
+            <DiscoverFilterChip
+              label={item.name}
+              selected={selectedGenres.includes(item.id)}
+              onPress={() => toggleGenre(item.id)}
+            />
+          )}
+        />
+      ) : (
+        <ChipRowSkeleton
+          chipHeight={SECTION_CHIP_HEIGHT}
+          radius={SECTION_CHIP_HEIGHT / 2}
+          gap={SECTION_CHIP_GAP}
+          style={styles.chipSkeleton}
+        />
+      )}
+    </SectionHeader>
+  );
+
   if (loadingGenres || moviesGenres.length < 1) {
     return (
       <View style={styles.container}>
-        <FlatList
-          data={genres}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15 }}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.genreButton,
-                {
-                  backgroundColor: selectedGenres.includes(item.id)
-                    ? theme.accent
-                    : theme.secondary,
-                },
-              ]}
-              onPress={() => toggleGenre(item.id)}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {item.name}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
+        {genreHeader}
         <FlatList
           data={[1, 2, 3]}
           renderItem={() => <MovieSkeleton />}
@@ -151,56 +178,9 @@ export default function MovieGenres({ navigation }) {
       />
     );
   };
-  const genreTitle = selectedGenres.length
-    ? genres
-        .filter((g) => selectedGenres.includes(g.id))
-        .map((g) => g.name)
-        .join(", ")
-    : i18nText("autoI18n.turler", "Türler");
   return (
     <View style={styles.container}>
-      <View style={styles.genreHeaderRow}>
-        <View style={styles.genreListWrap}>
-          <FlatList
-            data={genres}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.genreListContent}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.genreButton,
-                  {
-                    backgroundColor: selectedGenres.includes(item.id)
-                      ? theme.accent
-                      : theme.secondary,
-                  },
-                ]}
-                onPress={() => toggleGenre(item.id)}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.genreText, { color: theme.text.primary }]}
-                >
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-        <SeeAllButton
-          style={styles.genreSeeAllButton}
-          onPress={() =>
-            navigation.navigate("SeeAllScreen", {
-              mediaType: "movie",
-              section: "genres",
-              title: genreTitle,
-              genreIds: selectedGenres,
-            })
-          }
-        />
-      </View>
+      {genreHeader}
       <PaginatedRail
         data={moviesGenres}
         contentContainerStyle={{ paddingHorizontal: 15 }}
@@ -223,41 +203,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
   },
-  genreHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingRight: 12,
-    marginBottom: 20,
-  },
-  genreListWrap: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  genreListContent: {
-    paddingHorizontal: 15,
-    alignItems: "center",
-  },
-  genreSeeAllButton: {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-  genreButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginRight: 5,
-    // Küçük çip (≈37 px) için hafif gölge. Eskisi afiş gölgesinden kopyaydı
-    // (opaklık 0.94, yarıçap 10, 8 px aşağı): çiplerin arasına siyah leke düşüyor,
-    // yatay liste de gölgeyi çip yüksekliğinde kesip alt kenarı sert bırakıyordu.
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.16,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  genreText: {
-    color: "white",
-    fontWeight: "bold",
+  chipSkeleton: {
+    paddingHorizontal: SECTION_RAIL_PADDING,
   },
   similarItem: {
     width: width * 0.4,

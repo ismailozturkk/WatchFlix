@@ -24,7 +24,9 @@ import { useListLayoutSettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
-import { SeeAllButton } from "../../components/SeeAllHeader";
+import SectionHeader, { SECTION_GOLD } from "../../components/home/SectionHeader";
+import { SectionChipRail, SectionSegmented } from "../../components/home/SectionChips";
+import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { toast } from "../../components/AppToast";
 import { triggerHaptic } from "../../services/hapticsService";
@@ -251,132 +253,82 @@ export default function MovieOscar({ navigation }) {
     setYearModalVisible(false);
   };
 
+  // Dil değişince etiketler yenilensin diye `t`ye bağlı.
+  const modeOptions = React.useMemo(
+    () => [
+      { key: "category", label: i18nText("autoI18n.oscar_mode_category", "Kategori") },
+      { key: "year", label: i18nText("autoI18n.oscar_mode_year", "Yıl") },
+    ],
+    [t],
+  );
+
+  // Başlık = altın kupa kutusu + ad + "Tümü"; altında TEK satırlık denetimler: Kategori | Yıl anahtarı
+  // ve yanında moda göre kategori çipleri ya da yıl seçici. Eskiden üç ayrı satırdı (başlık/anahtar/çipler).
   const headerComponent = (
-    <View style={styles.headerContainer}>
-      <View style={styles.headerRow}>
-        <View style={styles.headerTitleWrap}>
-          <AppIcon family="MaterialCommunityIcons" name="trophy-award" size={20} color="#ffd700" />
-          <Text allowFontScaling={false} style={[styles.title, { color: theme.text.secondary }]}>
-            {t.movieScreens.oscar}
-          </Text>
-        </View>
-
+    <SectionHeader
+      section="oscar"
+      mediaType="movie"
+      title={t.movieScreens.oscar}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "movie",
+          section: "oscar",
+          title: t.movieScreens.oscar,
+        })
+      }
+    >
+      <View style={styles.controlsRow}>
         {/* Mod Seçici (Kategori | Yıl) */}
-        <View style={[styles.modeToggle, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => handleModeChange("category")}
-            style={[
-              styles.modeButton,
-              oscarMode === "category" && { backgroundColor: theme.accent },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[
-                styles.modeButtonText,
-                { color: oscarMode === "category" ? "#ffffff" : theme.text.secondary },
-              ]}
-            >
-              {i18nText("autoI18n.oscar_mode_category", "Kategori")}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => handleModeChange("year")}
-            style={[
-              styles.modeButton,
-              oscarMode === "year" && { backgroundColor: theme.accent },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[
-                styles.modeButtonText,
-                { color: oscarMode === "year" ? "#ffffff" : theme.text.secondary },
-              ]}
-            >
-              {i18nText("autoI18n.oscar_mode_year", "Yıl")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <SeeAllButton
-          onPress={() =>
-            navigation.navigate("SeeAllScreen", {
-              mediaType: "movie",
-              section: "oscar",
-              title: t.movieScreens.oscar,
-            })
-          }
+        <SectionSegmented
+          options={modeOptions}
+          value={oscarMode}
+          onChange={handleModeChange}
         />
-      </View>
 
-      {/* MOD 1: Kategori Çipleri Barı */}
-      {oscarMode === "category" ? (
-        <FlatList
-          data={OSCAR_CATEGORIES || []}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.key}
-          contentContainerStyle={styles.categoryChipsContainer}
-          renderItem={({ item }) => {
-            const isSelected = selectedOscarCategory === item.key;
-            return (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => handleCategorySelect(item.key)}
-                style={[
-                  styles.categoryChip,
-                  {
-                    backgroundColor: isSelected ? theme.accent : theme.secondary,
-                    borderColor: isSelected ? theme.accent : theme.border,
-                  },
-                ]}
-              >
-                <AppIcon
-                  family="MaterialCommunityIcons"
-                  name={item.icon || "trophy"}
-                  size={14}
-                  color={isSelected ? "#ffffff" : theme.text.secondary}
+        {oscarMode === "category" ? (
+          /* MOD 1: Kategori çipleri */
+          <SectionChipRail
+            style={styles.controlsRail}
+            contentContainerStyle={styles.controlsRailContent}
+            data={OSCAR_CATEGORIES || []}
+            keyExtractor={(item) => item.key}
+            extraData={selectedOscarCategory}
+            renderChip={(item) => {
+              const isSelected = selectedOscarCategory === item.key;
+              return (
+                <DiscoverFilterChip
+                  label={i18nText(item.labelKey, item.tr)}
+                  selected={isSelected}
+                  onPress={() => handleCategorySelect(item.key)}
+                  leading={
+                    <AppIcon
+                      family="MaterialCommunityIcons"
+                      name={item.icon || "trophy"}
+                      size={15}
+                      color={isSelected ? theme.accent : theme.text.muted}
+                    />
+                  }
                 />
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.categoryChipText,
-                    {
-                      color: isSelected ? "#ffffff" : theme.text.secondary,
-                      fontWeight: isSelected ? "700" : "500",
-                    },
-                  ]}
-                >
-                  {i18nText(item.labelKey, item.tr)}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      ) : (
-        /* MOD 2: Yıl Seçici Barı */
-        <View style={styles.yearSelectorRow}>
-          <TouchableOpacity
-            activeOpacity={0.85}
+              );
+            }}
+          />
+        ) : (
+          /* MOD 2: Yıl seçici */
+          <DiscoverFilterChip
+            style={styles.yearChip}
+            label={`${selectedOscarYear} ${i18nText("autoI18n.oscar_year_title", "Oscar Kazananları").replace("{{year}}", "").trim()}`}
+            trailingIcon="chevron-down"
             onPress={() => {
               triggerHaptic("selection");
               setYearModalVisible(true);
             }}
-            style={[styles.yearPickerButton, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-          >
-            <AppIcon family="MaterialCommunityIcons" name="calendar-star" size={16} color="#ffd700" />
-            <Text allowFontScaling={false} style={[styles.yearPickerButtonText, { color: theme.text.primary }]}>
-              {selectedOscarYear} {i18nText("autoI18n.oscar_year_title", "Oscar Kazananları").replace("{{year}}", "").trim()}
-            </Text>
-            <AppIcon family="MaterialCommunityIcons" name="chevron-down" size={16} color={theme.text.secondary} />
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+            leading={
+              <AppIcon family="MaterialCommunityIcons" name="calendar-star" size={16} color={SECTION_GOLD} />
+            }
+          />
+        )}
+      </View>
+    </SectionHeader>
   );
 
   const isLoading = oscarMode === "category" ? loadingOscar : loadingOscarYear;
@@ -528,76 +480,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
   },
-  headerContainer: {
-    marginBottom: 8,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    marginBottom: 8,
-  },
-  headerTitleWrap: {
+  // Kategori | Yıl anahtarı solda sabit; yanındaki çip satırı (ya da yıl seçici) kalan genişliği alır.
+  controlsRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    paddingLeft: 15,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  modeToggle: {
-    flexDirection: "row",
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 2,
-    alignItems: "center",
-  },
-  modeButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  modeButtonText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  categoryChipsContainer: {
-    paddingHorizontal: 15,
-    gap: 8,
-    paddingBottom: 4,
-  },
-  categoryChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  categoryChipText: {
-    fontSize: 12,
-  },
-  yearSelectorRow: {
-    paddingHorizontal: 15,
-    paddingBottom: 4,
-  },
-  yearPickerButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  yearPickerButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
+  controlsRail: { flex: 1 },
+  controlsRailContent: { paddingLeft: 8, paddingRight: 15 },
+  yearChip: { marginLeft: 8, marginRight: 15, flexShrink: 1 },
   sideYearCol: {
     width: 22,
     justifyContent: "space-around",

@@ -9,6 +9,7 @@ import PosterImage from "../../components/PosterImage";
 import React, { useEffect, useMemo, useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import GlassCloseButton from "../../components/common/GlassCloseButton";
+import SectionHeader from "../../components/home/SectionHeader";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieCollectionSkeleton } from "../../components/Skeleton";
@@ -78,12 +79,7 @@ export default function MovieCollection({ navigation }) {
   if (loadingCollection) {
     return (
       <View style={styles.container}>
-        <Text
-          allowFontScaling={false}
-          style={[styles.title, { color: theme.text.secondary }]}
-        >
-          {t.movieScreens.collection}
-        </Text>
+        <SectionHeader section="collection" mediaType="movie" title={t.movieScreens.collection} />
         <FlatList
           data={[1, 2, 3]}
           renderItem={() => <MovieCollectionSkeleton />}
@@ -201,48 +197,27 @@ export default function MovieCollection({ navigation }) {
   return (
     <View style={styles.container}>
       {selected ? (
-        // ── Açık: koleksiyon başlığı + kapat ──
-        <View style={styles.headerRow}>
-          <GlassCloseButton
-            icon="chevron-back"
-            size={34}
-            fallbackRadius={10}
-            color={theme.text.primary}
-            backgroundColor={theme.secondary}
-            borderColor={theme.border}
-            onPress={() => setSelected(null)}
-          />
-          <View style={{ flex: 1 }}>
-            <Text
-              allowFontScaling={false}
-              numberOfLines={1}
-              style={[styles.headerTitle, { color: theme.text.primary }]}
-            >
-              {selected.name}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.headerSub, { color: theme.text.muted }]}
-            >
-              {countLabel(parts.length)}
-            </Text>
-          </View>
-          <GlassCloseButton
-            size={34}
-            fallbackRadius={10}
-            color={theme.text.secondary}
-            backgroundColor={theme.secondary}
-            borderColor={theme.border}
-            onPress={() => setSelected(null)}
-          />
-        </View>
+        // ── Açık: geri düğmesi (ikon kutusunun yerinde) + koleksiyon adı + film sayısı ──
+        // Eskiden geri ve kapat düğmeleri AYNI işi yapıyordu; tek geri düğmesi kaldı.
+        <SectionHeader
+          section="collection"
+          mediaType="movie"
+          title={selected.name}
+          subtitle={countLabel(parts.length)}
+          leading={
+            <GlassCloseButton
+              icon="chevron-back"
+              size={36}
+              fallbackRadius={12}
+              color={theme.text.primary}
+              backgroundColor={theme.secondary}
+              borderColor={theme.border}
+              onPress={() => setSelected(null)}
+            />
+          }
+        />
       ) : (
-        <Text
-          allowFontScaling={false}
-          style={[styles.title, { color: theme.text.secondary }]}
-        >
-          {t.movieScreens.collection}
-        </Text>
+        <SectionHeader section="collection" mediaType="movie" title={t.movieScreens.collection} />
       )}
 
       {selected ? (
@@ -280,27 +255,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingVertical: 10,
-  },
-  title: {
-    fontSize: 18,
-    marginBottom: 15,
-    marginLeft: 15,
-    fontWeight: "700",
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 15,
-    marginBottom: 14,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  headerSub: {
-    fontSize: 12,
-    marginTop: 1,
   },
   railContent: {
     paddingHorizontal: 15,

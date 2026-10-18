@@ -3,8 +3,6 @@ import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   StyleSheet,
   View,
-  Text,
-  FlatList,
   Dimensions,
   Animated,
   TouchableOpacity,
@@ -17,7 +15,9 @@ import { useTheme } from "../../context/ThemeContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge } from "../../components/PosterInfoBadges";
-import { SeeAllButton } from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
+import { SectionChipRail } from "../../components/home/SectionChips";
+import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 const { width } = Dimensions.get("window");
@@ -233,36 +233,6 @@ export default function MovieTrends({ navigation }) {
     activateMovieSection("trends");
   }, [activateMovieSection]);
 
-  const renderCategory = ({ item }) => (
-    <TouchableOpacity
-      onPress={() => setSelectedCategoryTrends(item)}
-      style={[
-        styles.categoryItem,
-        {
-          justifyContent: "flex-end",
-        },
-      ]}
-    >
-      <Text
-        // Seçili filtre çipi 20px'e büyüyor ama başlık değil, bir butondur.
-        fontRole="body"
-        style={[
-          selectedCategoryTrends === item
-            ? styles.selectedCategoryText
-            : styles.categoryText,
-          {
-            color:
-              selectedCategoryTrends === item
-                ? theme.text.primary
-                : theme.text.secondary,
-          },
-        ]}
-      >
-        {getCategoryTitleTrends(item)}
-      </Text>
-    </TouchableOpacity>
-  );
-
   const renderItem = ({ item, index }) => {
     return (
       <MovieTrendCard
@@ -278,28 +248,34 @@ export default function MovieTrends({ navigation }) {
     );
   };
 
+  // Başlık yükleme sırasında da AYNI öğedir (ray başlığın altında; yükseklik değişirse zıplar).
+  // Eskiden bu raf başlıksızdı: yalnız kategori sekmeleri vardı, bölümün adı hiç yazmıyordu.
   const trendHeader = (
-    <View style={styles.header}>
-      <View style={styles.categoryRail}>
-        <FlatList
-          data={categoriesTrends}
-          renderItem={renderCategory}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-        />
-      </View>
-      <SeeAllButton
-        onPress={() =>
-          navigation.navigate("SeeAllScreen", {
-            mediaType: "movie",
-            section: "trends",
-            title: t.movieScreens.title,
-          })
-        }
+    <SectionHeader
+      section="trends"
+      mediaType="movie"
+      title={t.movieScreens.title}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "movie",
+          section: "trends",
+          title: t.movieScreens.title,
+        })
+      }
+    >
+      <SectionChipRail
+        data={categoriesTrends}
+        keyExtractor={(item) => item}
+        extraData={selectedCategoryTrends}
+        renderChip={(item) => (
+          <DiscoverFilterChip
+            label={getCategoryTitleTrends(item)}
+            selected={selectedCategoryTrends === item}
+            onPress={() => setSelectedCategoryTrends(item)}
+          />
+        )}
       />
-    </View>
+    </SectionHeader>
   );
 
   if (loadingTrends) {
@@ -370,32 +346,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.44,
     shadowRadius: 10.32,
     elevation: 16,
-  },
-  header: {
-    marginBottom: 8,
-    paddingRight: 12,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  categoryRail: { flex: 1, justifyContent: "center" },
-  categoriesList: {
-    paddingLeft: 15,
-    paddingRight: 4,
-  },
-  categoryItem: {
-    marginRight: 5,
-    paddingVertical: 5,
-  },
-
-  categoryText: {
-    color: "#666",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  selectedCategoryText: {
-    color: "#666",
-    fontSize: 20,
-    fontWeight: "600",
   },
   poster: {
     width: "100%",

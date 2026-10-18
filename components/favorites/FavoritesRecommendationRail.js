@@ -16,12 +16,11 @@
 // ek okuma yok ve izleme durumu değişince ray ağa çıkmadan güncellenir.
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import PaginatedRail from "../PaginatedRail";
-import SeeAllHeader from "../SeeAllHeader";
+import SectionHeader from "../home/SectionHeader";
 import { RailSkeleton } from "../Skeleton";
 import { DiscoveryCard } from "../DiscoveryMediaRail";
-import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useApiSettings } from "../../context/AppSettingsContext";
 import { useUserProfile } from "../../context/UserProfileContext";
@@ -39,7 +38,6 @@ const EMPTY_CATALOG = Object.freeze({});
 const VISIBLE_LIMIT = 20;
 
 export default function FavoritesRecommendationRail({ mediaType, navigation }) {
-  const { theme } = useTheme();
   const { language } = useLanguage();
   const { API_KEY } = useApiSettings();
   const { profile } = useUserProfile();
@@ -121,10 +119,12 @@ export default function FavoritesRecommendationRail({ mediaType, navigation }) {
 
   return (
     <View style={styles.section}>
-      <SeeAllHeader title={copy.rail.title} style={styles.header} />
-      <Text allowFontScaling={false} style={[styles.subtitle, { color: theme.text.muted }]} numberOfLines={1}>
-        {subtitle}
-      </Text>
+      <SectionHeader
+        title={copy.rail.title}
+        subtitle={subtitle}
+        section="fromFavorites"
+        mediaType={mediaType}
+      />
       {state.status === "loading" ? (
         <RailSkeleton />
       ) : (
@@ -144,7 +144,5 @@ export default function FavoritesRecommendationRail({ mediaType, navigation }) {
 
 const styles = StyleSheet.create({
   section: { paddingVertical: 10 },
-  header: { marginBottom: 0 },
-  subtitle: { fontSize: 11, marginTop: -4, paddingHorizontal: 15, marginBottom: 12 },
   rail: { paddingHorizontal: 15 },
 });

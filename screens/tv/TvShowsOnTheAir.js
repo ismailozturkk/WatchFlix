@@ -11,7 +11,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
-import SeeAllHeader from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
@@ -98,9 +98,11 @@ export default function TvShowsOnTheAir({ navigation }) {
   // Text, sonrasında "tümünü gör" hapı olan bir satır çizilirse başlık yüksekliği
   // değişir ve ray aşağı zıplar.
   const onTheAirHeader = (
-    <SeeAllHeader
+    <SectionHeader
+      section="onTheAir"
+      mediaType="tv"
       title={t.tvShowScreens.onTheAir}
-      onPress={() =>
+      onPressAction={() =>
         navigation.navigate("SeeAllScreen", {
           mediaType: "tv",
           section: "onTheAir",

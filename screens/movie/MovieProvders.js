@@ -1,18 +1,16 @@
 import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   FlatList,
   Dimensions,
   StyleSheet,
   Animated,
 } from "react-native";
-import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
-import { MovieSkeleton } from "../../components/Skeleton";
+import { ChipRowSkeleton, MovieSkeleton } from "../../components/Skeleton";
 import {
   useImageQualitySettings,
   useListLayoutSettings,
@@ -23,8 +21,14 @@ import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { SeeAllButton } from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
+import {
+  SectionChipRail,
+  SECTION_CHIP_GAP,
+  SECTION_CHIP_HEIGHT_LOGO,
+  SECTION_RAIL_PADDING,
+} from "../../components/home/SectionChips";
+import ProviderChip from "../../components/home/ProviderChip";
 import { i18nText } from "../../utils/i18nText";
 const { width } = Dimensions.get("window");
 
@@ -119,60 +123,6 @@ export default function MovieProviders({ navigation }) {
     activateMovieSection("providers");
   }, [activateMovieSection]);
 
-  const renderProvider = ({ item }) => (
-    <TouchableOpacity
-      style={{
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 5,
-        marginRight: 5,
-        gap: 5,
-        backgroundColor:
-          selectedProvider === item.provider_id
-            ? theme.accent
-            : streamingProviderIds.includes(item.provider_id)
-              ? theme.between
-              : theme.secondary,
-        borderRadius: 15,
-      }}
-      onPress={() => fetchMoviesByProvider(item.provider_id)}
-    >
-      <Image
-        source={{
-          uri: getTmdbUrl(item.logo_path, 'logo', 150),
-        }}
-        style={{ width: 30, height: 30, borderRadius: 10 }}
-        cachePolicy="memory-disk"
-        transition={120}
-      />
-      <View
-        style={{
-          justifyContent: "center",
-          alignItems: "center",
-          height: 40,
-        }}
-      >
-        {streamingProviderIds.includes(item.provider_id) && (
-          <Ionicons
-            name="checkmark-circle"
-            size={14}
-            color={selectedProvider === item.provider_id ? "#FFFFFF" : theme.accent}
-          />
-        )}
-        <Text
-          style={{
-            color: theme.text.primary,
-            fontSize: 12,
-            textAlign: "center",
-          }}
-        >
-          {item.provider_name}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-
   const renderMovieItem = ({ item }) => {
     if (!item.poster_path) return null;
     return (
@@ -184,21 +134,55 @@ export default function MovieProviders({ navigation }) {
       />
     );
   };
+  const providerName =
+    providers.find((p) => p.provider_id === selectedProvider)?.provider_name ||
+    i18nText("autoI18n.saglayicilar", "Sağlayıcılar");
+
+  // Başlık yükleme sırasında da AYNI öğedir (bkz. TvShowsProvders): "Platformlar" + çipler + "Tümü".
+  // Sağlayıcılar henüz gelmediyse yerlerini aynı yükseklikte iskelet çipler tutar.
+  const providerHeader = (
+    <SectionHeader
+      section="providers"
+      mediaType="movie"
+      title={i18nText("autoI18n.saglayicilar", "Sağlayıcılar")}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "movie",
+          section: "providers",
+          title: providerName,
+          providerId: selectedProvider,
+        })
+      }
+    >
+      {displayedProviders.length > 0 ? (
+        <SectionChipRail
+          data={displayedProviders}
+          keyExtractor={(item) => item.provider_id.toString()}
+          extraData={selectedProvider}
+          renderChip={(item) => (
+            <ProviderChip
+              provider={item}
+              selected={selectedProvider === item.provider_id}
+              subscribed={streamingProviderIds.includes(item.provider_id)}
+              onPress={() => fetchMoviesByProvider(item.provider_id)}
+            />
+          )}
+        />
+      ) : (
+        <ChipRowSkeleton
+          chipHeight={SECTION_CHIP_HEIGHT_LOGO}
+          radius={SECTION_CHIP_HEIGHT_LOGO / 2}
+          gap={SECTION_CHIP_GAP}
+          style={styles.chipSkeleton}
+        />
+      )}
+    </SectionHeader>
+  );
+
   if (loadingMovieProvider || loadingProvider) {
     return (
       <View style={{ flex: 1, paddingVertical: 10 }}>
-        <FlatList
-          data={displayedProviders}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.provider_id.toString()}
-          renderItem={renderProvider}
-          contentContainerStyle={{
-            paddingHorizontal: 15,
-            marginRight: 10,
-            marginBottom: 20,
-          }}
-        />
+        {providerHeader}
         <FlatList
           data={[1, 2, 3]}
           renderItem={() => <MovieSkeleton />}
@@ -214,41 +198,15 @@ export default function MovieProviders({ navigation }) {
     );
   }
 
-  const providerName =
-    providers.find((p) => p.provider_id === selectedProvider)?.provider_name ||
-    i18nText("autoI18n.saglayicilar", "Sağlayıcılar");
   return (
     <View style={{ flex: 1, paddingVertical: 10 }}>
-      {/* İzleme sağlayıcıları */}
-
-      <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}>
-        <View style={{ flex: 1 }}>
-          <FlatList
-            data={displayedProviders}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.provider_id.toString()}
-            renderItem={renderProvider}
-            contentContainerStyle={{ paddingHorizontal: 15 }}
-          />
-        </View>
-        <SeeAllButton
-          onPress={() =>
-            navigation.navigate("SeeAllScreen", {
-              mediaType: "movie",
-              section: "providers",
-              title: providerName,
-              providerId: selectedProvider,
-            })
-          }
-        />
-      </View>
+      {providerHeader}
 
       <PaginatedRail
         data={moviesProvider}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMovieItem}
-        contentContainerStyle={{ paddingHorizontal: 15, marginTop: 20 }}
+        contentContainerStyle={{ paddingHorizontal: 15 }}
         onLoadMore={loadMoreProvider}
         loadingMore={loadingMoreProvider}
         hasMore={pageProvider < totalPagesProvider}
@@ -262,6 +220,9 @@ export default function MovieProviders({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  chipSkeleton: {
+    paddingHorizontal: SECTION_RAIL_PADDING,
+  },
   similarItem: {
     width: width * 0.4,
     height: width * 0.62,

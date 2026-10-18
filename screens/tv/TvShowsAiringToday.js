@@ -11,7 +11,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
-import SeeAllHeader from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
@@ -99,9 +99,11 @@ export default function TvShowsAiringToday({ navigation }) {
   // Text ile "tümünü gör" haplı satırın yüksekliği farklı, aradaki fark ray'ı
   // zıplatıyordu.
   const airingTodayHeader = (
-    <SeeAllHeader
+    <SectionHeader
+      section="airingToday"
+      mediaType="tv"
       title={t.tvShowScreens.airingToday}
-      onPress={() =>
+      onPressAction={() =>
         navigation.navigate("SeeAllScreen", {
           mediaType: "tv",
           section: "airingToday",

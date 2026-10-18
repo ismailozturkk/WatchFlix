@@ -1,14 +1,11 @@
 import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
-  FlatList,
   Dimensions,
   StyleSheet,
   Animated,
 } from "react-native";
-import { Image } from "expo-image";
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
@@ -19,8 +16,14 @@ import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { SeeAllButton } from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
+import {
+  SectionChipRail,
+  SECTION_CHIP_GAP,
+  SECTION_CHIP_HEIGHT_LOGO,
+  SECTION_RAIL_PADDING,
+} from "../../components/home/SectionChips";
+import ProviderChip from "../../components/home/ProviderChip";
 import { i18nText } from "../../utils/i18nText";
 import {
   useImageQualitySettings,
@@ -28,8 +31,6 @@ import {
   useStreamingProviderSettings,
 } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
-// Sağlayıcı çipi: içindeki logo/ad sütunu 40 yüksekliğinde sabit.
-const PROVIDER_CHIP_HEIGHT = 40;
 
 // Stable, module-scope item component → no remount → no flicker.
 const TvProvidersCard = memo(function TvProvidersCard({ item, navigation, theme, getTmdbUrl }) {
@@ -117,61 +118,6 @@ export default function TvShowsProvders({ navigation }) {
     activateTvSection("providers");
   }, [activateTvSection]);
 
-  const renderProvider = ({ item }) => (
-    <TouchableOpacity
-      style={{
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 5,
-        marginRight: 5,
-        gap: 5,
-        backgroundColor:
-          selectedProvider === item.provider_id
-            ? theme.accent
-            : streamingProviderIds.includes(item.provider_id)
-              ? theme.between
-              : theme.secondary,
-        borderRadius: 15,
-      }}
-      activeOpacity={0.8}
-      onPress={() => fetchMoviesByProvider(item.provider_id)}
-    >
-      <Image
-        source={{
-          uri: getTmdbUrl(item.logo_path, 'logo', 150),
-        }}
-        style={{ width: 30, height: 30, borderRadius: 10 }}
-        cachePolicy="memory-disk"
-        transition={120}
-      />
-      <View
-        style={{
-          justifyContent: "center",
-          alignItems: "center",
-          height: 40,
-        }}
-      >
-        {streamingProviderIds.includes(item.provider_id) && (
-          <Ionicons
-            name="checkmark-circle"
-            size={14}
-            color={selectedProvider === item.provider_id ? "#FFFFFF" : theme.accent}
-          />
-        )}
-        <Text
-          style={{
-            color: theme.text.primary,
-            fontSize: 12,
-            textAlign: "center",
-          }}
-        >
-          {item.provider_name}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-
   const renderMovieItem = ({ item }) => {
     if (!item.poster_path) return null;
     return (
@@ -187,50 +133,53 @@ export default function TvShowsProvders({ navigation }) {
     providers.find((p) => p.provider_id === selectedProvider)?.provider_name ||
     i18nText("autoI18n.saglayicilar", "Sağlayıcılar");
 
-  // Sağlayıcılar henüz gelmediyse yerlerini aynı yükseklikte (40) iskelet çipler
-  // tutar. Aksi hâlde ray, çipler düştükçe aşağı kayıyordu.
+  // Başlık yükleme sırasında da AYNI öğedir: "Platformlar" + çipler + "Tümü". Sağlayıcılar henüz
+  // gelmediyse yerlerini aynı yükseklikte iskelet çipler tutar. Aksi hâlde ray, çipler düştükçe
+  // aşağı kayıyordu.
   const providerHeader = (
-    <>
-      <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}>
-        <View style={{ flex: 1 }}>
-          {displayedProviders.length > 0 ? (
-            <FlatList
-              data={displayedProviders}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.provider_id.toString()}
-              renderItem={renderProvider}
-              contentContainerStyle={{ paddingHorizontal: 15 }}
-            />
-          ) : (
-            <ChipRowSkeleton
-              chipHeight={PROVIDER_CHIP_HEIGHT}
-              radius={15}
-              style={{ paddingHorizontal: 15 }}
+    <SectionHeader
+      section="providers"
+      mediaType="tv"
+      title={i18nText("autoI18n.saglayicilar", "Sağlayıcılar")}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "tv",
+          section: "providers",
+          title: providerName,
+          providerId: selectedProvider,
+        })
+      }
+    >
+      {displayedProviders.length > 0 ? (
+        <SectionChipRail
+          data={displayedProviders}
+          keyExtractor={(item) => item.provider_id.toString()}
+          extraData={selectedProvider}
+          renderChip={(item) => (
+            <ProviderChip
+              provider={item}
+              selected={selectedProvider === item.provider_id}
+              subscribed={streamingProviderIds.includes(item.provider_id)}
+              onPress={() => fetchMoviesByProvider(item.provider_id)}
             />
           )}
-        </View>
-        <SeeAllButton
-          onPress={() =>
-            navigation.navigate("SeeAllScreen", {
-              mediaType: "tv",
-              section: "providers",
-              title: providerName,
-              providerId: selectedProvider,
-            })
-          }
         />
-      </View>
-
-    </>
+      ) : (
+        <ChipRowSkeleton
+          chipHeight={SECTION_CHIP_HEIGHT_LOGO}
+          radius={SECTION_CHIP_HEIGHT_LOGO / 2}
+          gap={SECTION_CHIP_GAP}
+          style={styles.chipSkeleton}
+        />
+      )}
+    </SectionHeader>
   );
 
   if (loadingMoviesByProvider || loadingProvider) {
     return (
       <View style={styles.container}>
         {providerHeader}
-        {/* marginTop 20: gerçek rayın contentContainerStyle'ındaki üst boşluk */}
-        <RailSkeleton style={{ marginTop: 20 }} />
+        <RailSkeleton />
       </View>
     );
   }
@@ -244,7 +193,7 @@ export default function TvShowsProvders({ navigation }) {
         data={moviesProviders}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMovieItem}
-        contentContainerStyle={{ paddingHorizontal: 15, marginTop: 20 }}
+        contentContainerStyle={{ paddingHorizontal: 15 }}
         onLoadMore={loadMoreProvider}
         loadingMore={loadingMoreProvider}
         hasMore={pageProvider < totalPagesProvider}
@@ -261,6 +210,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingVertical: 10,
+  },
+  chipSkeleton: {
+    paddingHorizontal: SECTION_RAIL_PADDING,
   },
   similarItem: {
     width: width * 0.4,

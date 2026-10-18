@@ -37,7 +37,7 @@ jest.mock("../components/PosterInfoBadges", () => ({
   RatingBadge: "RatingBadge",
   POSTER_BADGE_POS: { bottomRight: {} },
 }));
-jest.mock("../components/SeeAllHeader", () => "SeeAllHeader");
+jest.mock("../components/home/SectionHeader", () => "SectionHeader");
 jest.mock("../components/Skeleton", () => ({ RailSkeleton: "RailSkeleton" }));
 jest.mock("../components/PaginatedRail", () => (props) => {
   mockRail = props;

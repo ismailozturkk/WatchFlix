@@ -17,14 +17,12 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   View,
-  Text,
-  TouchableOpacity,
   FlatList,
   StyleSheet,
   InteractionManager,
 } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
 
+import SectionHeader, { SectionBadge } from "../../components/home/SectionHeader";
 import UpNextRailCard from "../../components/tv/UpNextRailCard";
 import WatchedDateSheet from "../../components/detail/WatchedDateSheet";
 import { useTheme } from "../../context/ThemeContext";
@@ -34,7 +32,7 @@ import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { useHomeRenderKey } from "../../hooks/useHomeContentSettings";
 import useUpNextQueue from "../../hooks/useUpNextQueue";
 import { i18nText } from "../../utils/i18nText";
-import { alpha } from "../../theme/colors";
+import { getSeeAllLabel } from "../../utils/homeSectionCopy";
 
 // Rayda çözülecek dizi sayısı. Her dizi en az bir dizi + bir sezon isteği
 // demek; ana ekran açılışında bunun sınırsız olması pahalı olurdu. Kalanı
@@ -153,54 +151,22 @@ export default function TvOngoingSection({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text
-          numberOfLines={1}
-          allowFontScaling={false}
-          style={[styles.title, { color: theme.text.secondary }]}
-        >
-          {i18nText("autoI18n.devam_eden_dizilerim", "Devam Edenler")}
-        </Text>
-
-        {readyCount > 0 ? (
-          <View
-            style={[
-              styles.readyBadge,
-              { backgroundColor: alpha(theme.accent, 0.16) },
-            ]}
-          >
-            <Ionicons
-              name="play-skip-forward"
-              size={11}
-              color={theme.accent}
-            />
-            <Text
-              allowFontScaling={false}
-              style={[styles.readyText, { color: theme.accent }]}
-            >
-              {readyCount}
-            </Text>
-          </View>
-        ) : null}
-
-        <View style={styles.headerSpacer} />
-
-        <TouchableOpacity
-          style={[styles.seeAll, { backgroundColor: theme.secondary }]}
-          onPress={() => navigation.navigate("UpNextScreen")}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.seeAllText, { color: theme.text.muted }]}
-          >
-            {/* Ray ilk RAIL_LIMIT diziyi gösterir; kesildiğini sayı söylesin. */}
-            {totalCount > shows.length
-              ? `${i18nText("autoI18n.tumu", "Tümü")} (${totalCount})`
-              : i18nText("autoI18n.tumu", "Tümü")}
-          </Text>
-          <Ionicons name="chevron-forward" size={13} color={theme.text.muted} />
-        </TouchableOpacity>
-      </View>
+      <SectionHeader
+        section="ongoing"
+        mediaType="tv"
+        title={i18nText("autoI18n.devam_eden_dizilerim", "Devam Edenler")}
+        // Sırası gelmiş (bir sonraki bölümü hazır) dizi sayısı.
+        badge={
+          readyCount > 0 ? <SectionBadge icon="play-skip-forward" text={readyCount} /> : null
+        }
+        // Ray ilk RAIL_LIMIT diziyi gösterir; kesildiğini sayı söylesin.
+        actionLabel={
+          totalCount > shows.length
+            ? `${getSeeAllLabel(language)} (${totalCount})`
+            : undefined
+        }
+        onPressAction={() => navigation.navigate("UpNextScreen")}
+      />
 
       <FlatList
         data={shows}
@@ -250,37 +216,5 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    paddingLeft: 15,
-    paddingRight: 12,
-    marginBottom: 6,
-  },
-  headerSpacer: { flex: 1 },
-  title: {
-    flexShrink: 1,
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  readyBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 9,
-  },
-  readyText: { fontSize: 11, fontWeight: "800" },
-  seeAll: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 2,
-  },
-  seeAllText: { fontSize: 12 },
   list: { paddingHorizontal: 15 },
 });

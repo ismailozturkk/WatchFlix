@@ -12,7 +12,7 @@ import PosterImage from "./PosterImage";
 import ListBadges from "./ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "./PosterInfoBadges";
 import PaginatedRail from "./PaginatedRail";
-import SeeAllHeader from "./SeeAllHeader";
+import SectionHeader from "./home/SectionHeader";
 import { RailSkeleton } from "./Skeleton";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -169,7 +169,6 @@ export default function DiscoveryMediaRail({
   genreNames = EMPTY_GENRES,
   genreIds: preferredGenreIds = EMPTY_GENRES,
 }) {
-  const { theme } = useTheme();
   const { language } = useLanguage();
   const { API_KEY } = useApiSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
@@ -210,47 +209,22 @@ export default function DiscoveryMediaRail({
     () => JSON.parse(genreNamesKey),
     [genreNamesKey],
   );
+  // Başlıklar burada; alt başlıklar utils/homeSectionCopy tablosunda (SectionHeader `section` ile alır).
+  // Tek istisna "Favori Türlerin": alt başlık kullanıcının üç türünün adı (yoksa tablodaki cümle).
   const section = useMemo(() => {
     if (preset === "subscriptions") {
-      return {
-        title: L("Platform Favorileri", "Service Favorites", "Favoritos de tus plataformas"),
-        subtitle: L(
-          "Seçtiğin platformlarda izleyebileceğin içerikler",
-          "Titles available on your selected services",
-          "Títulos disponibles en las plataformas que has elegido",
-        ),
-      };
+      return { title: L("Platform Favorileri", "Service Favorites", "Favoritos de tus plataformas") };
     }
     if (preset === "hiddenGems") {
-      return {
-        title: L("Gizli cevherler", "Hidden gems", "Joyas ocultas"),
-        subtitle: L(
-          "Az bilinen, yüksek puanlı seçimler",
-          "Lesser-known, highly rated picks",
-          "Opciones poco conocidas y muy bien valoradas",
-        ),
-      };
+      return { title: L("Gizli cevherler", "Hidden gems", "Joyas ocultas") };
     }
     if (preset === "topGenres") {
       return {
         title: L("Favori Türlerin", "Favorite Genres", "Tus géneros favoritos"),
-        subtitle:
-          normalizedGenreNames.join("  •  ") ||
-          L(
-            "Başlangıçta seçtiğin türlere göre",
-            "Based on your onboarding picks",
-            "Según los géneros que elegiste al empezar",
-          ),
+        subtitle: normalizedGenreNames.join("  •  ") || undefined,
       };
     }
-    return {
-      title: L("Yeni Beğenilenler", "Recent Favorites", "Favoritos recientes"),
-      subtitle: L(
-        "Yeni ve güçlü izleyici puanına sahip",
-        "Recent titles with strong audience scores",
-        "Títulos recientes con buena puntuación del público",
-      ),
-    };
+    return { title: L("Yeni Beğenilenler", "Recent Favorites", "Favoritos recientes") };
   }, [language, normalizedGenreNames, preset]);
 
   useEffect(() => {
@@ -491,10 +465,12 @@ export default function DiscoveryMediaRail({
 
   return (
     <View style={styles.section}>
-      <SeeAllHeader
+      <SectionHeader
         title={section.title}
-        style={styles.header}
-        onPress={() =>
+        subtitle={section.subtitle}
+        section={preset}
+        mediaType={mediaType}
+        onPressAction={() =>
           navigation.navigate("SeeAllScreen", {
             mediaType,
             section: preset,
@@ -503,12 +479,6 @@ export default function DiscoveryMediaRail({
           })
         }
       />
-      <Text
-        allowFontScaling={false}
-        style={[styles.subtitle, { color: theme.text.muted }]}
-      >
-        {section.subtitle}
-      </Text>
       {loading ? (
         <RailSkeleton />
       ) : (
@@ -531,8 +501,6 @@ export default function DiscoveryMediaRail({
 
 const styles = StyleSheet.create({
   section: { paddingVertical: 10 },
-  header: { marginBottom: 0 },
-  subtitle: { fontSize: 11, marginTop: -4, paddingHorizontal: 15, marginBottom: 12 },
   rail: { paddingHorizontal: 15 },
   item: { marginRight: 10, marginBottom: 5 },
   badges: { position: "absolute", left: 2, bottom: 8 },

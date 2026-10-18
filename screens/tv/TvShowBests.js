@@ -1,8 +1,6 @@
 import {
   StyleSheet,
   View,
-  Text,
-  FlatList,
   Dimensions,
   TouchableOpacity,
   Animated,
@@ -14,7 +12,9 @@ import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 const { width } = Dimensions.get("window");
 import { RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
-import { SeeAllButton } from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
+import { SectionChipRail } from "../../components/home/SectionChips";
+import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { i18nText } from "../../utils/i18nText";
 import { useTvShow } from "../../context/TvShowContex";
@@ -101,76 +101,35 @@ export default function TvShowBests({ navigation }) {
     activateTvSection("best");
   }, [activateTvSection]);
 
-  const renderCategory = ({ item }) => (
-    <TouchableOpacity
-      onPress={() => setSelectedCategoryBest(item)}
-      style={[
-        styles.categoryItem,
-        {
-          borderColor:
-            selectedCategoryBest === item
-              ? theme.text.primary
-              : theme.text.muted,
-        },
-        {
-          paddingVertical: 7,
-          borderRadius: 13,
-          paddingHorizontal: 12,
-          backgroundColor: theme.primary,
-        },
-      ]}
-    >
-      <Text
-        style={[
-          styles.categoryText,
-          {
-            color:
-              selectedCategoryBest === item
-                ? theme.text.primary
-                : theme.text.muted,
-          },
-        ]}
-      >
-        {getCategoryTitleBest(item)}
-      </Text>
-    </TouchableOpacity>
-  );
-  // Başlık yükleme sırasında da AYNI kurguyla çizilir (kategori sekmeleri +
-  // "tümünü gör" hapı): iskeletten veriye geçerken sekmeler yana kaymasın,
-  // altındaki ray zıplamasın.
+  // Başlık yükleme sırasında da AYNI kurguyla çizilir (kategori çipleri + "Tümü"): iskeletten veriye
+  // geçerken çipler yana kaymasın, altındaki ray zıplamasın. Eskiden bu raf başlıksızdı.
+  const bestsTitle = i18nText("autoI18n.en_iyi_diziler", "En İyi Diziler");
   const bestsHeader = (
-    <View
-      style={{
-        paddingLeft: 15,
-        paddingRight: 12,
-        marginBottom: 8,
-        flexDirection: "row",
-        alignItems: "center",
-      }}
+    <SectionHeader
+      section="bests"
+      mediaType="tv"
+      title={bestsTitle}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "tv",
+          section: "best",
+          title: bestsTitle,
+        })
+      }
     >
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <FlatList
-          data={categoriesBest}
-          renderItem={renderCategory}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.categoriesList,
-            { backgroundColor: theme.secondary },
-          ]}
-        />
-      </View>
-      <SeeAllButton
-        onPress={() =>
-          navigation.navigate("SeeAllScreen", {
-            mediaType: "tv",
-            section: "best",
-            title: i18nText("autoI18n.en_iyi_diziler", "En İyi Diziler"),
-          })
-        }
+      <SectionChipRail
+        data={categoriesBest}
+        keyExtractor={(item) => item}
+        extraData={selectedCategoryBest}
+        renderChip={(item) => (
+          <DiscoverFilterChip
+            label={getCategoryTitleBest(item)}
+            selected={selectedCategoryBest === item}
+            onPress={() => setSelectedCategoryBest(item)}
+          />
+        )}
       />
-    </View>
+    </SectionHeader>
   );
 
   if (loadingBest) {
@@ -218,20 +177,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingVertical: 10,
-  },
-  categoriesList: {
-    borderRadius: 15,
-    paddingVertical: 3,
-    paddingHorizontal: 3,
-    marginBottom: 10,
-    gap: 3,
-  },
-  categoryItem: {
-    paddingVertical: 15,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: "600",
   },
   similarItem: {
     width: width * 0.4,

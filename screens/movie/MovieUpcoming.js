@@ -1,6 +1,5 @@
 import React, { memo, useEffect, useRef } from "react";
 import {
-  Text,
   TouchableOpacity,
   StyleSheet,
   FlatList,
@@ -12,7 +11,6 @@ import PosterImage from "../../components/PosterImage";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
@@ -20,7 +18,9 @@ import { useImageQualitySettings, useListLayoutSettings } from "../../context/Ap
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { CountdownBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
-import { SeeAllButton } from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
+import { SectionChipRail } from "../../components/home/SectionChips";
+import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import { triggerHaptic } from "../../services/hapticsService";
 
 const { width } = Dimensions.get("window");
@@ -109,78 +109,33 @@ export default function MovieUpcoming({ navigation }) {
     addTimeToDate?.(val);
   };
 
-  const renderDateFilterItem = ({ item }) => {
-    const isSelected = valueUpcoming === item.value;
-    return (
-      <TouchableOpacity
-        activeOpacity={0.75}
-        onPress={() => handleSelectDate(item.value)}
-        style={[
-          styles.chip,
-          {
-            backgroundColor: isSelected ? theme.accent : (theme.secondary || "rgba(255,255,255,0.06)"),
-            borderColor: isSelected ? theme.accent : (theme.border || "rgba(255,255,255,0.12)"),
-          },
-          isSelected && {
-            shadowColor: theme.accent,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.35,
-            shadowRadius: 4,
-            elevation: 3,
-          },
-        ]}
-      >
-        <Ionicons
-          name="calendar-outline"
-          size={13}
-          color={isSelected ? "#fff" : theme.text.muted}
-          style={{ marginRight: 5 }}
-        />
-        <Text
-          style={[
-            styles.chipText,
-            {
-              color: isSelected ? "#fff" : theme.text.secondary,
-              fontWeight: isSelected ? "700" : "500",
-            },
-          ]}
-        >
-          {item.label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
   const headerComponent = (
-    <View style={styles.headerContainer}>
-      <View style={styles.titleRow}>
-        <Text
-          allowFontScaling={false}
-          style={[styles.title, { color: theme.text.secondary }]}
-        >
-          {t.movieScreens.movieUpcaming.upcaming}
-        </Text>
-        <SeeAllButton
-          onPress={() =>
-            navigation.navigate("SeeAllScreen", {
-              mediaType: "movie",
-              section: "upcoming",
-              title: t.movieScreens.movieUpcaming.upcaming,
-            })
-          }
-        />
-      </View>
-
-      <FlatList
+    <SectionHeader
+      section="upcoming"
+      mediaType="movie"
+      title={t.movieScreens.movieUpcaming.upcaming}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "movie",
+          section: "upcoming",
+          title: t.movieScreens.movieUpcaming.upcaming,
+        })
+      }
+    >
+      <SectionChipRail
         data={dateData}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        renderItem={renderDateFilterItem}
         keyExtractor={(item) => item.value}
-        contentContainerStyle={styles.chipsContent}
-        style={styles.chipsList}
+        extraData={valueUpcoming}
+        renderChip={(item) => (
+          <DiscoverFilterChip
+            icon="calendar-outline"
+            label={item.label}
+            selected={valueUpcoming === item.value}
+            onPress={() => handleSelectDate(item.value)}
+          />
+        )}
       />
-    </View>
+    </SectionHeader>
   );
 
   if (loadingUpcoming) {
@@ -235,41 +190,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingVertical: 10,
-  },
-  headerContainer: {
-    marginBottom: 12,
-  },
-  titleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingRight: 15,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 18,
-    uppercase: true,
-    marginLeft: 15,
-    fontWeight: "700",
-  },
-  chipsList: {
-    marginBottom: 4,
-  },
-  chipsContent: {
-    paddingHorizontal: 15,
-    gap: 8,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  chipText: {
-    fontSize: 12,
-    letterSpacing: 0.2,
   },
   similarItem: {
     width: width * 0.4,

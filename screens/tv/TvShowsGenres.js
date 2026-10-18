@@ -1,9 +1,7 @@
 import React, { memo, useEffect, useRef } from "react";
 import {
-  Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   View,
   Dimensions,
   Animated,
@@ -17,12 +15,17 @@ import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
-import { SeeAllButton } from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
+import {
+  SectionChipRail,
+  SECTION_CHIP_GAP,
+  SECTION_CHIP_HEIGHT,
+  SECTION_RAIL_PADDING,
+} from "../../components/home/SectionChips";
+import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
-// Tür çipi: dikey dolgu 10+10, tek satır yazı ≈ 17 → 37.
-const GENRE_CHIP_HEIGHT = 37;
 
 // Stable, module-scope item component → no remount → no flicker.
 const TvGenresCard = memo(function TvGenresCard({ item, navigation, theme, getTmdbUrl }) {
@@ -113,58 +116,46 @@ export default function TvShowsGenres({ navigation }) {
         .join(", ")
     : i18nText("autoI18n.turler", "Türler");
 
-  const renderGenreChip = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.genreButton,
-        {
-          backgroundColor: selectedGenres.includes(item.id)
-            ? theme.accent
-            : theme.secondary,
-        },
-      ]}
-      onPress={() => toggleGenre(item.id)}
-    >
-      <Text
-        allowFontScaling={false}
-        style={[styles.genreText, { color: theme.text.primary }]}
-      >
-        {item.name}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  // Başlık satırı yükleme sırasında da AYNI kurguda: tür çipleri + "tümünü gör"
-  // hapı. Türler henüz gelmediyse yerlerini aynı yükseklikte iskelet çipler
-  // tutar — yoksa satır 0'dan gerçek yüksekliğe sıçrıyor, ray zıplıyordu.
+  // Başlık yükleme sırasında da AYNI kurguda: "Türler" + çipler + "Tümü". Türler henüz gelmediyse
+  // yerlerini aynı yükseklikte iskelet çipler tutar — yoksa satır 0'dan gerçek yüksekliğe sıçrıyor,
+  // ray zıplıyordu. Alt başlık: seçim yokken ipucu ("bir ya da birden fazla tür seç"), seçim varsa
+  // seçilen türlerin adları.
   const genreHeader = (
-    <View style={styles.genreHeaderRow}>
-      <View style={styles.genreListWrap}>
-        {genres.length > 0 ? (
-          <FlatList
-            data={genres}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.genreListContent}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={renderGenreChip}
-          />
-        ) : (
-          <ChipRowSkeleton chipHeight={GENRE_CHIP_HEIGHT} style={styles.genreListContent} />
-        )}
-      </View>
-      <SeeAllButton
-        style={styles.genreSeeAllButton}
-        onPress={() =>
-          navigation.navigate("SeeAllScreen", {
-            mediaType: "tv",
-            section: "genres",
-            title: genreTitle,
-            genreIds: selectedGenres,
-          })
-        }
-      />
-    </View>
+    <SectionHeader
+      section="genres"
+      mediaType="tv"
+      subtitle={selectedGenres.length ? genreTitle : undefined}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "tv",
+          section: "genres",
+          title: genreTitle,
+          genreIds: selectedGenres,
+        })
+      }
+    >
+      {genres.length > 0 ? (
+        <SectionChipRail
+          data={genres}
+          keyExtractor={(item) => item.id.toString()}
+          extraData={selectedGenres}
+          renderChip={(item) => (
+            <DiscoverFilterChip
+              label={item.name}
+              selected={selectedGenres.includes(item.id)}
+              onPress={() => toggleGenre(item.id)}
+            />
+          )}
+        />
+      ) : (
+        <ChipRowSkeleton
+          chipHeight={SECTION_CHIP_HEIGHT}
+          radius={SECTION_CHIP_HEIGHT / 2}
+          gap={SECTION_CHIP_GAP}
+          style={styles.chipSkeleton}
+        />
+      )}
+    </SectionHeader>
   );
 
   if (loadingGenres || moviesGenres.length < 1) {
@@ -213,41 +204,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
   },
-  genreHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingRight: 12,
-    marginBottom: 20,
-  },
-  genreListWrap: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  genreListContent: {
-    paddingHorizontal: 15,
-    alignItems: "center",
-  },
-  genreSeeAllButton: {
-    marginTop: 0,
-    marginBottom: 0,
-  },
-  genreButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginRight: 5,
-    // Küçük çip (≈37 px) için hafif gölge. Eskisi afiş gölgesinden kopyaydı
-    // (opaklık 0.94, yarıçap 10, 8 px aşağı): çiplerin arasına siyah leke düşüyor,
-    // yatay liste de gölgeyi çip yüksekliğinde kesip alt kenarı sert bırakıyordu.
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.16,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  genreText: {
-    color: "white",
-    fontWeight: "bold",
+  chipSkeleton: {
+    paddingHorizontal: SECTION_RAIL_PADDING,
   },
   similarItem: {
     width: width * 0.4,

@@ -20,7 +20,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import PosterImage from "../PosterImage";
 import ListBadges from "../ListBadges";
 import PaginatedRail from "../PaginatedRail";
-import SeeAllHeader from "../SeeAllHeader";
+import SectionHeader, { SectionIconAction } from "../home/SectionHeader";
 import { RailSkeleton } from "../Skeleton";
 import { CountdownBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../PosterInfoBadges";
 import FollowedPeopleSheet from "./FollowedPeopleSheet";
@@ -42,6 +42,7 @@ import {
   saveManyEventsToPhoneCalendar,
 } from "../../utils/phoneCalendar";
 import { getFollowedPeopleCopy } from "../../utils/followedPeopleCopy";
+import { alpha } from "../../theme/colors";
 
 const VISIBLE_LIMIT = 24;
 
@@ -256,7 +257,14 @@ export default function FollowedUpcomingRail({ mediaType, navigation }) {
             pressed && styles.pressed,
           ]}
         >
-          <Ionicons name="notifications-outline" size={18} color={theme.accent} />
+          <View
+            style={[
+              styles.quietTile,
+              { backgroundColor: alpha(theme.accent, 0.14), borderColor: alpha(theme.accent, 0.3) },
+            ]}
+          >
+            <Ionicons name="notifications-outline" size={19} color={theme.accent} />
+          </View>
           <View style={styles.quietText}>
             <Text style={[styles.quietTitle, { color: theme.text.primary }]} numberOfLines={1}>
               {copy.rail.quietTitle}
@@ -274,32 +282,29 @@ export default function FollowedUpcomingRail({ mediaType, navigation }) {
 
   return (
     <View style={styles.section}>
-      <SeeAllHeader title={copy.rail.title} style={styles.header} />
-      <View style={styles.subtitleRow}>
-        <Text allowFontScaling={false} style={[styles.subtitle, { color: theme.text.muted }]} numberOfLines={1}>
-          {state.status === "loading" ? " " : names}
-        </Text>
-        <Pressable
-          onPress={addAllToCalendar}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={copy.rail.addAll}
-          style={({ pressed }) => [styles.addAll, pressed && styles.pressed]}
-        >
-          <Ionicons name="calendar-outline" size={16} color={theme.accent} />
-        </Pressable>
-        <Pressable
-          onPress={openSheet}
-          hitSlop={10}
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.manage, pressed && styles.pressed]}
-        >
-          <Text allowFontScaling={false} style={[styles.manageText, { color: theme.accent }]} numberOfLines={1}>
-            {copy.rail.manage}
-          </Text>
-          <Ionicons name="chevron-forward" size={12} color={theme.accent} />
-        </Pressable>
-      </View>
+      {/* Başlık metni uzun ("Takip ettiklerinin yaklaşanları"): iki satıra izin verilir, eylemler yalnız
+          simge (Yönet = etiketi "Takip ettiklerim" gibi uzun, hap olarak başlığı kemirirdi). */}
+      <SectionHeader
+        title={copy.rail.title}
+        subtitle={state.status === "loading" ? " " : names}
+        section="followedPeople"
+        mediaType={mediaType}
+        titleLines={2}
+        trailing={
+          <>
+            <SectionIconAction
+              icon="calendar-outline"
+              onPress={addAllToCalendar}
+              accessibilityLabel={copy.rail.addAll}
+            />
+            <SectionIconAction
+              icon="people-outline"
+              onPress={openSheet}
+              accessibilityLabel={copy.rail.manage}
+            />
+          </>
+        }
+      />
       {state.status === "loading" ? (
         <RailSkeleton />
       ) : (
@@ -320,17 +325,6 @@ export default function FollowedUpcomingRail({ mediaType, navigation }) {
 
 const styles = StyleSheet.create({
   section: { paddingVertical: 10 },
-  header: { marginBottom: 0 },
-  subtitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 15,
-    marginTop: -4,
-    marginBottom: 12,
-  },
-  subtitle: { flexShrink: 1, flexGrow: 1, fontSize: 11 },
-  addAll: { flexShrink: 0 },
   calendarBtn: {
     position: "absolute",
     right: 6,
@@ -342,8 +336,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.55)",
   },
-  manage: { flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 0 },
-  manageText: { fontSize: 11, fontWeight: "700" },
   rail: { paddingHorizontal: 15 },
   badges: { position: "absolute", left: 2, bottom: 8 },
   quiet: {
@@ -351,10 +343,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 12,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  quietTile: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
   },
   quietText: { flexGrow: 1, flexShrink: 1, gap: 2 },
   quietTitle: { fontSize: 13, fontWeight: "700" },

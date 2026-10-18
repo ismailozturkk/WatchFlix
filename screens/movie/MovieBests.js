@@ -2,7 +2,6 @@ import React, { memo, useEffect, useRef } from "react";
 import {
   StyleSheet,
   View,
-  Text,
   FlatList,
   Dimensions,
   TouchableOpacity,
@@ -16,7 +15,9 @@ import { MovieBestsSkeleton } from "../../components/Skeleton";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
-import { SeeAllButton } from "../../components/SeeAllHeader";
+import SectionHeader from "../../components/home/SectionHeader";
+import { SectionChipRail } from "../../components/home/SectionChips";
+import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { i18nText } from "../../utils/i18nText";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
@@ -99,61 +100,41 @@ export default function MovieBests({ navigation }) {
     activateMovieSection("bests");
   }, [activateMovieSection]);
 
-  const renderCategory = ({ item }) => (
-    <TouchableOpacity
-      onPress={() => setSelectedCategoryBests(item)}
-      style={[
-        styles.categoryItem,
-        {
-          borderColor:
-            selectedCategoryBests === item
-              ? theme.text.primary
-              : theme.text.muted,
-        },
-        {
-          paddingVertical: 7,
-          borderRadius: 13,
-          paddingHorizontal: 12,
-          backgroundColor: theme.primary,
-        },
-      ]}
+  // Başlık yükleme sırasında da AYNI öğedir (kategori çipleri + "Tümü"): iskeletten veriye geçerken
+  // çipler yana kaymasın, altındaki ray zıplamasın. Eskiden bu raf başlıksızdı; yalnız kategori vardı.
+  const bestsTitle = i18nText("autoI18n.en_iyi_filmler", "En İyi Filmler");
+  const bestsHeader = (
+    <SectionHeader
+      section="bests"
+      mediaType="movie"
+      title={bestsTitle}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "movie",
+          section: "bests",
+          title: bestsTitle,
+        })
+      }
     >
-      <Text
-        style={[
-          styles.categoryText,
-          {
-            color:
-              selectedCategoryBests === item
-                ? theme.text.primary
-                : theme.text.secondary,
-          },
-        ]}
-      >
-        {getCategoryTitleBests(item)}
-      </Text>
-    </TouchableOpacity>
+      <SectionChipRail
+        data={categorieBests}
+        keyExtractor={(item) => item}
+        extraData={selectedCategoryBests}
+        renderChip={(item) => (
+          <DiscoverFilterChip
+            label={getCategoryTitleBests(item)}
+            selected={selectedCategoryBests === item}
+            onPress={() => setSelectedCategoryBests(item)}
+          />
+        )}
+      />
+    </SectionHeader>
   );
+
   if (loadingBests) {
     return (
-      <View style={{ flex: 1, paddingVertical: 10 }}>
-        <View
-          style={{
-            paddingLeft: 15,
-            justifyContent: "center",
-          }}
-        >
-          <FlatList
-            data={categorieBests}
-            renderItem={renderCategory}
-            keyExtractor={(item) => item}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[
-              styles.categoriesList,
-              { backgroundColor: theme.secondary },
-            ]}
-          />
-        </View>
+      <View style={styles.container}>
+        {bestsHeader}
 
         <FlatList
           data={[1, 2, 3]}
@@ -180,38 +161,7 @@ export default function MovieBests({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View
-        style={{
-          paddingLeft: 15,
-          paddingRight: 12,
-          marginBottom: 8,
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <View style={{ flex: 1, justifyContent: "center" }}>
-          <FlatList
-            data={categorieBests}
-            renderItem={renderCategory}
-            keyExtractor={(item) => item}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[
-              styles.categoriesList,
-              { backgroundColor: theme.secondary },
-            ]}
-          />
-        </View>
-        <SeeAllButton
-          onPress={() =>
-            navigation.navigate("SeeAllScreen", {
-              mediaType: "movie",
-              section: "bests",
-              title: i18nText("autoI18n.en_iyi_filmler", "En İyi Filmler"),
-            })
-          }
-        />
-      </View>
+      {bestsHeader}
       <PaginatedRail
         data={movieBests}
         contentContainerStyle={{ paddingHorizontal: 15 }}
@@ -232,21 +182,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingVertical: 10,
-  },
-  categoriesList: {
-    borderRadius: 15,
-    paddingVertical: 3,
-    paddingHorizontal: 3,
-    marginBottom: 10,
-    gap: 3,
-  },
-  categoryItem: {
-    paddingVertical: 15,
-  },
-
-  categoryText: {
-    fontSize: 14,
-    fontWeight: "600",
   },
   similarItem: {
     width: width * 0.4,
