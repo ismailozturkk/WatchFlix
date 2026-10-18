@@ -109,6 +109,8 @@
   "reminderNotifications": "Hatırlatıcı Bildirimleri",
   "reminderNotificationsSubtitle": "Film, dizi ve not hatırlatıcılarını yönet",
   "streamingNotifications": "Yayına gelince bildir",
+  "weeklyDigestNotifications": "Haftalık özet",
+  "weeklyDigestNotificationsSubtitle": "Her Pazar, izleme listendeki yapımlardan o hafta çıkacakları tek bildirimde gör",
   "streamingNotificationsSubtitle": "İzleme listendeki yapım, abone olduğun platforma eklenince haber ver",
   "movieReminderNotifications": "Film Hatırlatıcıları",
   "movieReminderNotificationsSubtitle": "Yaklaşan film tarihleri için bildir",

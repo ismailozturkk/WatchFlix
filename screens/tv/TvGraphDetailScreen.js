@@ -25,6 +25,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
+import { fetchSeasonRatings, fetchTitleRatings } from "../../services/externalRatings";
+import { mergeEpisodeRatings, pickMainRating } from "../../utils/externalRatings";
 import { getRatingColors } from "../../utils/ratingColors";
 import { TV_GRAPH_GRID_SIZES } from "../../utils/tvGraphGrid";
 
@@ -236,31 +238,10 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         },
       );
 
+      // IMDb puanları OMDb'den, Cloud Function proxy'si üzerinden (anahtar sunucuda; services/externalRatings.js).
+      // Ulaşılamazsa null döner ve TMDB puanı kullanılır.
       const imdbId = tvShowResponse.data.external_ids?.imdb_id;
-      let imdbMainInfo = {
-        rating: tvShowResponse.data.vote_average,
-        votes: tvShowResponse.data.vote_count,
-      };
-
-      if (imdbId) {
-        try {
-          const omdbMainRes = await axios.get(
-            `https://www.omdbapi.com/?i=${imdbId}&apikey=38aaeabe`,
-          );
-          if (omdbMainRes.data.Response === "True") {
-            imdbMainInfo = {
-              rating:
-                omdbMainRes.data.imdbRating !== "N/A"
-                  ? parseFloat(omdbMainRes.data.imdbRating)
-                  : tvShowResponse.data.vote_average,
-              votes:
-                omdbMainRes.data.imdbVotes || tvShowResponse.data.vote_count,
-            };
-          }
-        } catch (e) {
-          console.log(i18nText("autoI18n.omdb_ana_hata", "OMDb Ana Hata:"), e);
-        }
-      }
+      const imdbMainInfo = pickMainRating(await fetchTitleRatings(imdbId), tvShowResponse.data);
 
       if (isStale()) return;
       setShowDetail({
@@ -293,30 +274,8 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
           },
         );
 
-        let omdbEpisodes = [];
-        if (imdbId) {
-          try {
-            const omdbRes = await axios.get(
-              `https://www.omdbapi.com/?i=${imdbId}&Season=${season.season_number}&apikey=38aaeabe`,
-            );
-            omdbEpisodes = omdbRes.data.Episodes || [];
-          } catch (e) {
-            console.log(i18nText("autoI18n.omdb_sezon_hata", "OMDb Sezon Hata:"), e);
-          }
-        }
-
-        const enrichedEpisodes = tmdbRes.data.episodes.map((ep) => {
-          const omdbEp = omdbEpisodes.find(
-            (o) => parseInt(o.Episode) === ep.episode_number,
-          );
-          return {
-            ...ep,
-            vote_average:
-              omdbEp && omdbEp.imdbRating !== "N/A"
-                ? parseFloat(omdbEp.imdbRating)
-                : ep.vote_average,
-          };
-        });
+        const seasonRatings = await fetchSeasonRatings(imdbId, season.season_number);
+        const enrichedEpisodes = mergeEpisodeRatings(tmdbRes.data.episodes, seasonRatings?.episodes);
 
         return { ...tmdbRes.data, episodes: enrichedEpisodes };
       });

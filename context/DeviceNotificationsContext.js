@@ -330,6 +330,8 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
           // Streaming uygunluk push'u (opt-in, varsayılan kapalı). Backend
           // (dailyStreamingAvailability) yalnız true olanları işler.
           streamingEnabled: settings.streamingEnabled === true,
+          // Haftalık özet (opt-in, varsayılan kapalı). Backend (weeklyReleaseDigest) yalnız true olanları işler.
+          weeklyDigestEnabled: settings.weeklyDigestEnabled === true,
         },
         // Backend push'unun dilini bilmesi için (foreground/background tutarlılığı).
         // Sunucu push dili (functions/index.js pickNotificationLang): uygulama dili aynen.
@@ -355,6 +357,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
     settings.mentionsEnabled,
     settings.messagesEnabled,
     settings.streamingEnabled,
+    settings.weeklyDigestEnabled,
     streamingProviderIds,
     language,
   ]);
@@ -668,6 +671,9 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
             data.mediaType === "movie" ? "MovieDetails" : "TvShowsDetails",
             { id: Number(data.tmdbId) },
           );
+        } else if (data.kind === "weeklyDigest") {
+          // Haftalık özet → bu haftanın çıkışlarını gösteren takvim ekranı.
+          nav.navigate("CalendarScreen");
         }
         // Reminder dokunuşları uygulamayı açar; özel yönlendirme gerekmez.
       } catch {

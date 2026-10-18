@@ -109,6 +109,8 @@
   "reminderNotifications": "Reminder Notifications",
   "reminderNotificationsSubtitle": "Manage movie, TV, and note reminders",
   "streamingNotifications": "Notify when available",
+  "weeklyDigestNotifications": "Weekly digest",
+  "weeklyDigestNotificationsSubtitle": "Every Sunday, one notification with what on your watchlist comes out that week",
   "streamingNotificationsSubtitle": "Get notified when a watchlist title lands on a service you use",
   "movieReminderNotifications": "Movie Reminders",
   "movieReminderNotificationsSubtitle": "Notify for upcoming movie dates",

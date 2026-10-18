@@ -192,6 +192,25 @@ export default function ReminderNotificationsScreen() {
             />
           }
         />
+        <SettingRow
+          colors={C}
+          iconBg={C.iconAmber}
+          iconColor={C.amber}
+          iconName="calendar-outline"
+          title={t.weeklyDigestNotifications || "Haftalık özet"}
+          subtitle={
+            t.weeklyDigestNotificationsSubtitle ||
+            "Her Pazar, izleme listendeki yapımlardan o hafta çıkacakları tek bildirimde gör"
+          }
+          right={
+            <SwitchToggle
+              value={notificationsEnabled && notificationSettings.weeklyDigestEnabled}
+              onValueChange={(v) => updateNotifications({ weeklyDigestEnabled: v })}
+              disabled={!notificationsEnabled}
+              size={36}
+            />
+          }
+        />
         <View style={ns.notificationTiming}>
           <View style={ns.notificationTimingHeader}>
             <View style={[ns.iconWrap, { backgroundColor: C.iconGreen }]}>

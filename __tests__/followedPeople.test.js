@@ -255,3 +255,32 @@ describe("metin tablosu", () => {
     expect(FOLLOWED_PEOPLE_COPY.en.rail.quietBody(1)).toBe("You follow 1 person");
   });
 });
+
+describe("telefon takvimi öğesi", () => {
+  // phoneCalendar yalnız anahtar üretimi için yüklenir; native modüller taklit.
+  jest.mock("expo-calendar", () => ({}));
+  jest.mock("react-native", () => ({ Platform: { OS: "ios" } }));
+  jest.mock("../components/AppToast", () => ({ __esModule: true, default: { show: jest.fn() }, toast: {} }));
+  jest.mock("../utils/i18nText", () => ({ i18nText: (_key, fallback) => fallback }));
+  const { upcomingToCalendarItem } = require("../utils/followedPeople");
+  const { buildEventKey } = require("../utils/phoneCalendar");
+
+  it("film: hatırlatıcıyla AYNI anahtar (takvimde çift etkinlik açılmaz)", () => {
+    const item = upcomingToCalendarItem({ id: 7, title: "Film", _date: "2027-03-01" }, "movie");
+    expect(item).toEqual({ eventType: "reminder_movie", id: 7, title: "Film", date: "2027-03-01" });
+    expect(buildEventKey(item)).toBe("movie_7_2027-03-01");
+  });
+
+  it("dizi: ilk bölüm (S1E1) olarak, hatırlatıcıyla aynı anahtar", () => {
+    const item = upcomingToCalendarItem({ id: 9, name: "Dizi", _date: "2027-02-02" }, "tv");
+    expect(item).toMatchObject({ eventType: "reminder_tv", id: 9, title: "Dizi", seasonNumber: 1, episodeNumber: 1 });
+    expect(buildEventKey(item)).toBe("tv_9_1_1_2027-02-02");
+  });
+
+  it("tarihi, kimliği ya da adı olmayan öğede null", () => {
+    expect(upcomingToCalendarItem({ id: 1, title: "x" }, "movie")).toBeNull();
+    expect(upcomingToCalendarItem({ id: 0, title: "x", _date: "2027-01-01" }, "movie")).toBeNull();
+    expect(upcomingToCalendarItem({ id: 1, title: " ", _date: "2027-01-01" }, "movie")).toBeNull();
+    expect(upcomingToCalendarItem(null, "movie")).toBeNull();
+  });
+});

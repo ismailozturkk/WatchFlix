@@ -33,12 +33,19 @@ import useFollowedPeople from "../../hooks/useFollowedPeople";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { trackEvent, ANALYTICS_EVENTS } from "../../services/analytics";
 import { fetchFollowedUpcoming } from "../../services/followedUpcoming";
-import { describePeople } from "../../utils/followedPeople";
+import { describePeople, upcomingToCalendarItem } from "../../utils/followedPeople";
+import {
+  buildEventKey,
+  loadSavedKeysSet,
+  removeEventFromPhoneCalendar,
+  saveEventToPhoneCalendar,
+  saveManyEventsToPhoneCalendar,
+} from "../../utils/phoneCalendar";
 import { getFollowedPeopleCopy } from "../../utils/followedPeopleCopy";
 
 const VISIBLE_LIMIT = 24;
 
-const UpcomingCard = memo(function UpcomingCard({ item, mediaType, navigation, onOpen }) {
+const UpcomingCard = memo(function UpcomingCard({ item, mediaType, navigation, onOpen, saved, onToggleSave, copy }) {
   const { theme } = useTheme();
   const { posterBadges } = useListLayoutSettings();
   const rail = useRailPosterStyle();
@@ -87,6 +94,22 @@ const UpcomingCard = memo(function UpcomingCard({ item, mediaType, navigation, o
           theme={theme}
           style={styles.badges}
         />
+        {onToggleSave ? (
+          <Pressable
+            onPress={() => onToggleSave(item)}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityState={{ selected: saved }}
+            accessibilityLabel={
+              saved
+                ? copy.rail.removeFromCalendar(item.title || item.name || "")
+                : copy.rail.addToCalendar(item.title || item.name || "")
+            }
+            style={styles.calendarBtn}
+          >
+            <Ionicons name={saved ? "calendar" : "calendar-outline"} size={15} color="#FFFFFF" />
+          </Pressable>
+        ) : null}
       </Animated.View>
     </TouchableOpacity>
   );
@@ -100,6 +123,25 @@ export default function FollowedUpcomingRail({ mediaType, navigation }) {
   const copy = getFollowedPeopleCopy(language);
   const { people, count } = useFollowedPeople();
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Telefon takvimine eklenmiş etkinlik anahtarları (utils/phoneCalendar). Okunamazsa boş küme: düğmeler "ekle" der.
+  const [savedKeys, setSavedKeys] = useState(() => new Set());
+  useEffect(() => {
+    let active = true;
+    loadSavedKeysSet()
+      .then((keys) => active && setSavedKeys(keys))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  const onSavedChange = useCallback((key, isSaved) => {
+    setSavedKeys((current) => {
+      const next = new Set(current);
+      if (isSaved) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
   const [state, setState] = useState({ status: "loading", items: [] });
 
   // Firestore değil MMKV: `people` her depo olayında yeni dizi üretir; efekti dizinin değil
@@ -156,9 +198,45 @@ export default function FollowedUpcomingRail({ mediaType, navigation }) {
     () => trackEvent(ANALYTICS_EVENTS.FOLLOWED_UPCOMING_OPENED, { media_type: mediaType }),
     [mediaType],
   );
+  const toggleSave = useCallback(
+    async (item) => {
+      const calendarItem = upcomingToCalendarItem(item, mediaType);
+      if (!calendarItem) return;
+      const key = buildEventKey(calendarItem);
+      if (savedKeys.has(key)) {
+        const res = await removeEventFromPhoneCalendar(calendarItem, { onSavedChange });
+        if (res.ok) onSavedChange(key, false);
+      } else {
+        const res = await saveEventToPhoneCalendar(calendarItem, { onSavedChange });
+        if (res.ok || res.alreadySaved) onSavedChange(key, true);
+      }
+    },
+    [mediaType, onSavedChange, savedKeys],
+  );
+  const addAllToCalendar = useCallback(async () => {
+    const pending = visible
+      .map((item) => upcomingToCalendarItem(item, mediaType))
+      .filter((calendarItem) => calendarItem && !savedKeys.has(buildEventKey(calendarItem)));
+    if (pending.length === 0) return;
+    const res = await saveManyEventsToPhoneCalendar(pending, { onSavedChange });
+    (res.addedKeys || []).forEach((key) => onSavedChange(key, true));
+  }, [mediaType, onSavedChange, savedKeys, visible]);
   const renderItem = useCallback(
-    ({ item }) => <UpcomingCard item={item} mediaType={mediaType} navigation={navigation} onOpen={handleOpen} />,
-    [handleOpen, mediaType, navigation],
+    ({ item }) => {
+      const calendarItem = upcomingToCalendarItem(item, mediaType);
+      return (
+        <UpcomingCard
+          item={item}
+          mediaType={mediaType}
+          navigation={navigation}
+          onOpen={handleOpen}
+          copy={copy}
+          onToggleSave={calendarItem ? toggleSave : null}
+          saved={!!calendarItem && savedKeys.has(buildEventKey(calendarItem))}
+        />
+      );
+    },
+    [copy, handleOpen, mediaType, navigation, savedKeys, toggleSave],
   );
 
   if (count === 0 || state.status === "empty" || state.status === "error") return null;
@@ -202,6 +280,15 @@ export default function FollowedUpcomingRail({ mediaType, navigation }) {
           {state.status === "loading" ? " " : names}
         </Text>
         <Pressable
+          onPress={addAllToCalendar}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={copy.rail.addAll}
+          style={({ pressed }) => [styles.addAll, pressed && styles.pressed]}
+        >
+          <Ionicons name="calendar-outline" size={16} color={theme.accent} />
+        </Pressable>
+        <Pressable
           onPress={openSheet}
           hitSlop={10}
           accessibilityRole="button"
@@ -243,6 +330,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   subtitle: { flexShrink: 1, flexGrow: 1, fontSize: 11 },
+  addAll: { flexShrink: 0 },
+  calendarBtn: {
+    position: "absolute",
+    right: 6,
+    bottom: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
   manage: { flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 0 },
   manageText: { fontSize: 11, fontWeight: "700" },
   rail: { paddingHorizontal: 15 },

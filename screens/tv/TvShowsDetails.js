@@ -66,6 +66,7 @@ import PaginatedRail from "../../components/PaginatedRail";
 import CommentSheetModal from "@components/modals/CommentSheetModal";
 import RatingSheetModal from "@components/modals/RatingSheetModal";
 import RatingSummary from "@components/RatingSummary";
+import ExternalRatingsRow from "@components/detail/ExternalRatingsRow";
 import CertificationBadge from "../../components/detail/CertificationBadge";
 import { i18nText } from "../../utils/i18nText";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
@@ -819,6 +820,7 @@ export default function TvShowsDetails({ route, navigation }) {
                 onPressRate={() => setRatingModalVisible(true)}
               />
             </View>
+            <ExternalRatingsRow imdbId={details.external_ids?.imdb_id} />
           </View>
         </View>
 

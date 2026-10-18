@@ -87,6 +87,8 @@ const DEFAULT_NOTIFICATION_SETTINGS = {
   postCommentsEnabled: true,
   mentionsEnabled: true,
   streamingEnabled: false,
+  // Haftalık "Bu hafta çıkacaklar" özeti (functions/weeklyReleaseDigest). Opt-in, varsayılan kapalı.
+  weeklyDigestEnabled: false,
   leadTimeDays: 0,
 };
 
@@ -140,6 +142,7 @@ const normalizeNotificationSettings = (settings) => {
     postCommentsEnabled: getBooleanSetting(next, "postCommentsEnabled"),
     mentionsEnabled: getBooleanSetting(next, "mentionsEnabled"),
     streamingEnabled: getBooleanSetting(next, "streamingEnabled"),
+    weeklyDigestEnabled: getBooleanSetting(next, "weeklyDigestEnabled"),
     leadTimeDays: [0, 1, 3, 7].includes(next.leadTimeDays)
       ? next.leadTimeDays
       : DEFAULT_NOTIFICATION_SETTINGS.leadTimeDays,

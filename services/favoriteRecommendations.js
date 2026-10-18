@@ -27,10 +27,13 @@ const categoryOf = (type) => (type === "tv" ? "tvContent" : "movieContent");
 
 export const tmdbHeaders = (apiKey) => ({ accept: "application/json", Authorization: apiKey });
 
-/** Önbellekli TMDB GET. Sorgu dizgisi URL'e gömülür (bkz. dosya başlığı). */
-export async function readTmdb(path, { apiKey, language, type = "movie", maxAge = TTL }) {
+/**
+ * Önbellekli TMDB GET. Sorgu dizgisi URL'e gömülür (bkz. dosya başlığı).
+ * `query`: ek sorgu parametreleri ("external_source=imdb_id"); `language`dan SONRA eklenir.
+ */
+export async function readTmdb(path, { apiKey, language, type = "movie", maxAge = TTL, query = "" }) {
   const { data } = await cachedTmdb(
-    `${TMDB}${path}?language=${langOf(language)}`,
+    `${TMDB}${path}?language=${langOf(language)}${query ? `&${query}` : ""}`,
     { headers: tmdbHeaders(apiKey) },
     { maxAge, category: categoryOf(type) },
   );

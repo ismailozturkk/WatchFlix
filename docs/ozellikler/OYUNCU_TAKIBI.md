@@ -51,7 +51,7 @@ Kaynak: `docs/planlama/GELISTIRME_ONERI_ADAYLARI_2026-10-17.md` 1. aday.
 ## Bilerek yapılmadı (sonraki adımlar)
 
 - **Push bildirimi** ("X'in yeni filmi 3 gün sonra") — aşama 2; functions + liste sunucuya yazılmalı (şu an cihazda) → **local-first motora/Firestore'a taşıma kararı** gerekir.
-- **Takvim kaydı** ("yaklaşanı telefon takvimine ekle") — `phoneCalendar` servisi var; ayrı iş, izin akışı (İzinlerim > Takvim) hazır.
+- ~~**Takvim kaydı**~~ — **yapıldı (18 Ekim)**: kart üstünde düğme + "hepsini ekle"; ayrıntı `EK_OZELLIKLER_18_EKIM.md` 4. bölüm.
 - **Haftalık özet bildirimi** (8. aday) bu listeyi besler.
 - **Arama sonuçlarından / film detayındaki kadrodan** doğrudan takip (bugün yalnız kişi sayfasından).
 - **Kişi başına poster altı etiket** (kimin işi olduğu): kartta yok, yalnız başlık altı özet + erişilebilirlik etiketi.

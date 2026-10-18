@@ -178,6 +178,24 @@ export function describePeople(names, { limit = 2, more = (n) => `+${n}` } = {})
   return `${list.slice(0, limit).join(", ")} ${more(list.length - limit)}`;
 }
 
+/**
+ * Yaklaşan yapım → telefon takvimi öğesi (utils/phoneCalendar.js biçimi). Aynı yapım ve tarih için anahtar,
+ * Seelogd hatırlatıcılarının anahtarıyla AYNIDIR (`movie_<id>_<tarih>`, `tv_<id>_1_1_<tarih>`): aynı yapımı
+ * hem hatırlatıcıdan hem buradan eklemek takvimde iki etkinlik açmaz ("zaten eklendi" der).
+ * Dizi için `first_air_date` ilk bölümün (S1E1) tarihidir.
+ * @returns {object|null} tarihi ya da kimliği olmayan öğede null
+ */
+export function upcomingToCalendarItem(item, mediaType) {
+  const id = Number(item?.id);
+  const date = typeof item?._date === "string" ? item._date : null;
+  const title = (item?.title || item?.name || "").trim();
+  if (!isPositiveInt(id) || !date || !title) return null;
+  if (mediaType === "tv") {
+    return { eventType: "reminder_tv", id, title, date, seasonNumber: 1, episodeNumber: 1 };
+  }
+  return { eventType: "reminder_movie", id, title, date };
+}
+
 /** Gün farkı (yerel takvim günü): bugün 0, yarın 1. Tarih geçersizse null. */
 export function daysUntil(dateKey, now = new Date()) {
   if (typeof dateKey !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;

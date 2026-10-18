@@ -11,7 +11,13 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useLanguage } from "../../context/LanguageContext";
+import { useApiSettings } from "../../context/AppSettingsContext";
+import { toast } from "../../components/AppToast";
+import { looksLikeMediaLink, parseMediaLink } from "../../utils/mediaLinks";
+import { resolveMediaLink } from "../../services/mediaLinkResolver";
+import { getMediaLinkCopy } from "../../utils/mediaLinkCopy";
 import { useTheme } from "../../context/ThemeContext";
 import AppIcon from "../../components/AppIcon";
 import ScreenDecor from "../../components/ScreenDecor";
@@ -81,7 +87,10 @@ const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
 });
 
 export default function SearchScreen({ navigation, route }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { API_KEY } = useApiSettings();
+  const linkCopy = getMediaLinkCopy(language);
+  const linkBusy = useRef(false);
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -109,6 +118,52 @@ export default function SearchScreen({ navigation, route }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewModeState] = useState(() => get(Keys.searchResultsViewMode));
   const inputRef = useRef(null);
+
+  // ── Bağlantıdan aç (TMDB / IMDb) ───────────────────────────────────────────
+  // Alana yapıştırılan ya da panodaki film/dizi bağlantısı doğrudan o yapımın detayını açar (ekle / izledim
+  // düğmeleri orada). IMDb kimliği TMDB'ye /find ile çevrilir; bulunamazsa toast. Aynı anda tek çözümleme.
+  const openMediaLink = useCallback(
+    async (text) => {
+      const link = parseMediaLink(text);
+      if (!link) return false;
+      if (linkBusy.current) return true;
+      linkBusy.current = true;
+      try {
+        const target = await resolveMediaLink(link, { apiKey: API_KEY, language });
+        if (!target) {
+          toast.info(linkCopy.notFound);
+          return true;
+        }
+        Keyboard.dismiss();
+        navigation.navigate(target.type === "movie" ? "MovieDetails" : "TvShowsDetails", { id: target.id });
+        return true;
+      } finally {
+        linkBusy.current = false;
+      }
+    },
+    [API_KEY, language, linkCopy, navigation],
+  );
+  const handleChangeText = useCallback(
+    (text) => {
+      // Yapıştırılan bağlantı arama sorgusu OLMAZ; alana yazılmadan açılır.
+      if (looksLikeMediaLink(text)) {
+        openMediaLink(text);
+        return;
+      }
+      setSearchQuery(text);
+    },
+    [openMediaLink],
+  );
+  const pasteLink = useCallback(async () => {
+    let text = "";
+    try {
+      text = await Clipboard.getStringAsync();
+    } catch {
+      toast.info(linkCopy.clipboardFailed);
+      return;
+    }
+    if (!(await openMediaLink(text))) toast.info(linkCopy.emptyClipboard);
+  }, [linkCopy, openMediaLink]);
 
   const setViewMode = useCallback((nextMode) => {
     if (nextMode !== "row" && nextMode !== "grid") return;
@@ -303,12 +358,27 @@ export default function SearchScreen({ navigation, route }) {
             }
             placeholderTextColor={theme.text?.muted ?? "#666"}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={handleChangeText}
             maxLength={80}
             returnKeyType="search"
             keyboardAppearance={isLightSurface(theme.primary) ? "light" : "dark"}
             onSubmitEditing={() => Keyboard.dismiss()}
           />
+          {searchQuery.length === 0 && (
+            <TouchableOpacity
+              onPress={pasteLink}
+              accessibilityRole="button"
+              accessibilityLabel={linkCopy.pasteLabel}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <AppIcon
+                family="Ionicons"
+                name="link-outline"
+                size={21}
+                color={theme.text?.muted ?? "#666"}
+              />
+            </TouchableOpacity>
+          )}
           {searchQuery.length > 0 && (
             <TouchableOpacity
               onPress={() => setSearchQuery("")}

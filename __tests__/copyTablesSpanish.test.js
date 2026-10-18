@@ -20,6 +20,7 @@ const { FOLLOWED_PEOPLE_COPY } = require("../utils/followedPeopleCopy");
 const { PROVIDER_WATCH_COPY } = require("../utils/providerWatchCopy");
 const { LIBRARY_EXPORT_COPY } = require("../screens/tabs/settings/libraryExportCopy");
 const { TASTE_MATCH_COPY } = require("../utils/tasteMatchCopy");
+const { MEDIA_LINK_COPY } = require("../utils/mediaLinkCopy");
 
 // `{ad}`, `{{ad}}`, `%d` biçimli yer tutucuları çıkarır.
 const yerTutucular = (metin) =>
@@ -83,6 +84,7 @@ const TABLOLAR = {
   "Platformlarımda süzgeci (providerWatchCopy)": () => PROVIDER_WATCH_COPY,
   "Kütüphane dışa aktarma (libraryExportCopy)": () => LIBRARY_EXPORT_COPY,
   "Zevk uyumu (tasteMatchCopy)": () => TASTE_MATCH_COPY,
+  "Bağlantıdan aç (mediaLinkCopy)": () => MEDIA_LINK_COPY,
   "Wrapped (wrappedStrings)": () => ({
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),

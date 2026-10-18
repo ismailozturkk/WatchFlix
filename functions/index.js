@@ -39,6 +39,8 @@ const { getDatabase } = require("firebase-admin/database");
 const { Expo } = require("expo-server-sdk");
 const { createHash, timingSafeEqual } = require("node:crypto");
 const { extractRegionProviders, computeNewlyAvailable } = require("./streamingDiff");
+const externalRatings = require("./externalRatings");
+const weeklyDigest = require("./weeklyDigest");
 const tournamentBracket = require("./tournamentBracket");
 const {
   buildProfileIdentityChanges,
@@ -742,6 +744,71 @@ exports.callGemini = onCall(
       }
       console.error("[callGemini] hata:", err?.message);
       throw new HttpsError("internal", "AI request failed");
+    }
+  },
+);
+
+// ───────────────────────────────────────────────────────────────────────────
+// HARİCİ PUANLAR (OMDb proxy): getExternalRatings
+//
+// IMDb / Rotten Tomatoes / Metascore puanları ve dizi bölüm puanları. OMDb anahtarı ESKİDEN istemciye
+// gömülüydü (paketten çıkarılabilirdi); artık yalnız burada, Secret Manager'da.
+// Kurulum: firebase functions:secrets:set OMDB_API_KEY   (ESKİ gömülü anahtar yenilenmeli — sızmış sayılır)
+//
+// Girdi sıkı doğrulanır (yalnız IMDb kimliği + sezon): istemci anahtarı başka sorgu için kullanamaz.
+// Örnek içi önbellek (başlık 12 sa, sezon 24 sa) OMDb günlük kotasını korur; kullanıcı başına dakikada
+// 60 çağrı sınırı kötüye kullanımı caydırır (dağıtık değil — kesin kota değil).
+// Hata kuralı: OMDb ulaşılamaz / kota doluysa { found:false } döner; istemci TMDB puanına düşer.
+// ───────────────────────────────────────────────────────────────────────────
+const OMDB_API_KEY = defineSecret("OMDB_API_KEY");
+const omdbTitleCache = externalRatings.createTtlCache({ ttlMs: 12 * 60 * 60 * 1000 });
+const omdbSeasonCache = externalRatings.createTtlCache({ ttlMs: 24 * 60 * 60 * 1000 });
+const omdbAllow = externalRatings.createRateLimiter({ limit: 60, windowMs: 60 * 1000 });
+
+exports.getExternalRatings = onCall(
+  { secrets: [OMDB_API_KEY], timeoutSeconds: 20, enforceAppCheck: false },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+    const req = externalRatings.validateRatingsRequest(request.data);
+    if (!req.ok) throw new HttpsError("invalid-argument", req.reason);
+    if (!omdbAllow(request.auth.uid)) throw new HttpsError("resource-exhausted", "Too many requests");
+
+    const cache = req.kind === "title" ? omdbTitleCache : omdbSeasonCache;
+    const cacheKey = `${req.imdbId}:${req.season ?? ""}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
+    const apiKey = OMDB_API_KEY.value();
+    if (!apiKey) {
+      console.error("[getExternalRatings] OMDB_API_KEY secret tanımsız!");
+      return { found: false, reason: "not-configured" };
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(
+        externalRatings.buildOmdbUrl({ imdbId: req.imdbId, season: req.season, apiKey }),
+        { signal: controller.signal },
+      );
+      const json = await res.json().catch(() => null);
+      if (externalRatings.isQuotaResponse(json)) return { found: false, reason: "quota" };
+      const parsed =
+        req.kind === "title"
+          ? externalRatings.parseTitleResponse(json)
+          : externalRatings.parseSeasonResponse(json);
+      const out =
+        req.kind === "title"
+          ? parsed ? { found: true, ...parsed } : { found: false, reason: "not-found" }
+          : parsed ? { found: true, episodes: parsed } : { found: false, reason: "not-found" };
+      // Yalnız KESİN sonuç önbelleğe girer (geçici hata / kota 12 saat sabitlenmesin).
+      if (out.found || out.reason === "not-found") cache.set(cacheKey, out);
+      return out;
+    } catch (err) {
+      console.warn("[getExternalRatings] OMDb isteği başarısız:", err?.message);
+      return { found: false, reason: "unavailable" };
+    } finally {
+      clearTimeout(timer);
     }
   },
 );
@@ -1777,6 +1844,155 @@ exports.dailyStreamingAvailability = onSchedule(
 
     console.log(
       `[streaming] tamam — kullanıcı: ${usersSnap.size}, bildirilen başlık: ${totalTitles}, benzersiz TMDB sorgusu: ${providerCache.size}`,
+    );
+  },
+);
+
+// ───────────────────────────────────────────────────────────────────────────
+// HAFTALIK ÖZET BİLDİRİMİ ("Bu hafta çıkacaklar") — her Pazar 10:00 (Europe/Istanbul)
+//
+// Kullanıcının izleme listesindeki (Lists/{uid}/watchList) yapımlardan önümüzdeki 7 günde çıkacak olanları
+// tek bildirimde toplar. Mantık saf + testli: weeklyDigest.js. Opt-in: notificationSettings.weeklyDigestEnabled
+// === true (varsayılan KAPALI) ve notificationSettings.enabled !== false. Takip edilen oyuncu / yönetmenler
+// ve hatırlatıcılar bu özete girmez (bkz. weeklyDigest.js başlığı).
+//
+// MALİYET: kullanıcı başına en çok 60 başlık (en son eklenenler); aynı (tür|id) için TMDB çalışma boyunca
+// TEK kez sorulur — popüler başlıklar kullanıcılar arasında tekrar çekilmez. Kurulum: TMDB_API_KEY secret'ı
+// (dailyStreamingAvailability ile ortak).
+// ───────────────────────────────────────────────────────────────────────────
+const DIGEST_MAX_USERS = 3000;
+const DIGEST_MAX_TITLES_PER_USER = 60;
+
+async function fetchTitleDetails(mediaType, tmdbId, apiKey) {
+  const url = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiKey}`, accept: "application/json" },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Bir kullanıcıya özeti gönderir; gönderilen yapım sayısını döner (0 = bildirim yok). */
+async function processUserDigest(userDoc, getDetails, window) {
+  const uid = userDoc.id;
+  const u = userDoc.data() || {};
+  const ns = u.notificationSettings || {};
+  if (ns.enabled === false || ns.weeklyDigestEnabled !== true) return 0;
+
+  const { tokens, priv } = await loadPushTokens(uid, u);
+  if (tokens.length === 0) return 0;
+
+  const wlSnap = await db
+    .collection(`Lists/${uid}/watchList`)
+    .limit(STREAM_MAX_WATCHLIST_PER_USER)
+    .get();
+  if (wlSnap.empty) return 0;
+
+  const toMillis = (value) =>
+    value?.toMillis?.() ?? (typeof value === "string" ? Date.parse(value) || 0 : 0);
+  const tracked = pickTrackedTitles(
+    wlSnap.docs.map((itemDoc) => ({ itemDoc, updatedAtMs: toMillis(itemDoc.get("updatedAt")) })),
+    DIGEST_MAX_TITLES_PER_USER,
+  ).map((entry) => entry.itemDoc);
+
+  const entries = [];
+  for (const itemDoc of tracked) {
+    const it = itemDoc.data() || {};
+    const type = it.type === "tv" ? "tv" : "movie";
+    const tmdbId = Number(it.id);
+    if (!Number.isInteger(tmdbId) || tmdbId <= 0) continue;
+    const details = await getDetails(type, tmdbId);
+    const release = weeklyDigest.releaseInWindow(type, details, window);
+    if (release) entries.push({ key: `${type}_${tmdbId}`, title: it.name || details?.title || details?.name || "", type, tmdbId, release });
+  }
+
+  const items = weeklyDigest.pickDigestItems(entries);
+  const lang = pickNotificationLang(u.notificationLanguage);
+  const message = weeklyDigest.buildDigestMessage(lang, items);
+  if (!message) return 0;
+
+  const messages = tokens.map((to) => ({
+    to,
+    sound: "default",
+    title: message.title,
+    body: message.body,
+    channelId: "reminders",
+    data: { kind: "weeklyDigest", count: String(items.length) },
+  }));
+
+  const deadTokens = [];
+  for (const chunk of expo.chunkPushNotifications(messages)) {
+    try {
+      const tickets = await expo.sendPushNotificationsAsync(chunk);
+      tickets.forEach((ticket, i) => {
+        if (ticket.status === "error" && ticket.details && ticket.details.error === "DeviceNotRegistered") {
+          deadTokens.push(chunk[i].to);
+        }
+      });
+    } catch (e) {
+      console.error("[weeklyDigest] push hatası:", e && e.message);
+    }
+  }
+  await clearDeadPushTokens(uid, u, priv, deadTokens);
+  return items.length;
+}
+
+exports.weeklyReleaseDigest = onSchedule(
+  {
+    schedule: "0 10 * * 0", // her Pazar 10:00
+    timeZone: "Europe/Istanbul",
+    secrets: [TMDB_API_KEY],
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async () => {
+    const apiKey = TMDB_API_KEY.value();
+    if (!apiKey) {
+      console.error("[weeklyDigest] TMDB_API_KEY secret tanımsız — atlandı.");
+      return;
+    }
+    const usersSnap = await db
+      .collection("Users")
+      .where("notificationSettings.weeklyDigestEnabled", "==", true)
+      .limit(DIGEST_MAX_USERS)
+      .get();
+    if (usersSnap.empty) {
+      console.log("[weeklyDigest] özellik açık kullanıcı yok.");
+      return;
+    }
+
+    const window = weeklyDigest.weekWindow(new Date());
+    const detailsCache = new Map();
+    const getDetails = async (type, id) => {
+      const key = `${type}|${id}`;
+      if (detailsCache.has(key)) return detailsCache.get(key);
+      const details = await fetchTitleDetails(type, id, apiKey);
+      detailsCache.set(key, details);
+      return details;
+    };
+
+    let users = 0;
+    let titles = 0;
+    for (const userDoc of usersSnap.docs) {
+      try {
+        const sent = await processUserDigest(userDoc, getDetails, window);
+        if (sent > 0) users += 1;
+        titles += sent;
+      } catch (e) {
+        console.error(`[weeklyDigest] kullanıcı ${userDoc.id}:`, e && e.message);
+      }
+    }
+    console.log(
+      `[weeklyDigest] tamam — pencere ${window.from}..${window.to}, kullanıcı: ${usersSnap.size}, bildirim: ${users}, yapım: ${titles}, benzersiz TMDB sorgusu: ${detailsCache.size}`,
     );
   },
 );

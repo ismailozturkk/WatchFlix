@@ -109,6 +109,8 @@
   "reminderNotifications": "Notificaciones de recordatorios",
   "reminderNotificationsSubtitle": "Gestiona los recordatorios de películas, series y notas",
   "streamingNotifications": "Avisar cuando esté disponible",
+  "weeklyDigestNotifications": "Resumen semanal",
+  "weeklyDigestNotificationsSubtitle": "Cada domingo, una notificación con lo que sale esa semana de tu lista de pendientes",
   "streamingNotificationsSubtitle": "Recibe un aviso cuando un título de tu lista llegue a una plataforma que usas",
   "movieReminderNotifications": "Recordatorios de películas",
   "movieReminderNotificationsSubtitle": "Avisa de los próximos estrenos de películas",
