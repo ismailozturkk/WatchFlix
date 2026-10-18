@@ -94,6 +94,13 @@ export const ANALYTICS_EVENTS = {
   DISCOVER_FILTER_APPLIED: "discover_filter_applied",
   // "Şaşırt beni" sonucu: `outcome` = "opened" | "none" | "error".
   DISCOVER_SURPRISE: "discover_surprise",
+  // İzleme listesindeki "Ne izlesem?" seçici (components/lists/WatchPickerSheet.js): bir seçim YAPILDI.
+  // `media_type` = "mixed" | "movie" | "tv", `pool_size` havuzdaki yapım sayısı, `reroll` ilk seçimden sonraki
+  // her yeni seçimde true. Özelliğin kullanımını ve "başka biri" oranını (seçimin işe yarayıp yaramadığını) söyler.
+  WATCH_PICK_ROLLED: "watch_pick_rolled",
+  // Seçilen yapımın detayına GİDİLDİ: `media_type`, `rerolls` (kaç kez "başka biri" denendi). rolled'a oranı
+  // seçicinin dönüşüm oranıdır.
+  WATCH_PICK_OPENED: "watch_pick_opened",
   // Yıllık izleme hedefi (profildeki halka, utils/yearlyGoal.js): hedef KONDU / DEĞİŞTİ /
   // KALDIRILDI. `action` = "set" | "changed" | "cleared", `unit` = "all" | "movie" | "tv",
   // `target` hedef sayısı. Özelliğin benimsenmesini ve hangi birimin seçildiğini söyler.

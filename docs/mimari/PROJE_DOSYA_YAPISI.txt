@@ -907,7 +907,6 @@ Seelogd/
 │   │   ├── ListManageSheet.js
 │   │   └── ListSearchBar.js
 │   ├── modals/
-│   │   ├── CaseOpeningModal.js
 │   │   ├── ChatModal.js
 │   │   ├── CommentSheetModal.js
 │   │   ├── CreatePostModal.js

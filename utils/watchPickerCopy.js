@@ -1,0 +1,135 @@
+// utils/watchPickerCopy.js
+//
+// "Ne izlesem?" (izleme listesinden rastgele seçim) metinleri — tr / en / es. Saf veri.
+// __tests__/copyTablesSpanish.test.js üç dilin aynı şekle sahip olduğunu denetler.
+// `{n}` yer tutucusu fillPickerCopy ile doldurulur.
+
+import { copyLanguage } from "./appLanguages";
+
+export const WATCH_PICKER_COPY = {
+  tr: {
+    entry: {
+      title: "Ne izlesem?",
+      movie: "Film",
+      tv: "Dizi",
+      empty: "Önce listene bir şeyler ekle",
+      filteredNote: "Süzdüğün listeden seçilir",
+      a11yRandom: "Ne izlesem? İzleme listenden rastgele bir yapım seç",
+      a11yMovie: "İzleme listenden rastgele bir film seç",
+      a11yTv: "İzleme listenden rastgele bir dizi seç",
+    },
+    sheet: {
+      title: "Ne izlesem?",
+      pool: "{n} yapım arasından",
+      poolFiltered: "Süzülmüş listenden · {n} yapım",
+      shuffling: "Karıştırılıyor…",
+      reroll: "Başka biri",
+      open: "Detaylara git",
+      history: "Az önce çıkanlar",
+      cycled: "Hepsini gördün, baştan karıştırdık",
+      emptyType: "Bu türde listende yapım yok",
+      unreleased: "Henüz yayınlanmadı. Başka biri seçmek ister misin?",
+      close: "Kapat",
+      types: { mixed: "Karışık", movie: "Film", tv: "Dizi" },
+      kind: { movie: "Film", tv: "Dizi" },
+      units: { hour: "sa", minute: "dk", season: "sezon", episode: "bölüm" },
+    },
+    reasons: {
+      waitingMonths: "{n} aydır listende bekliyor",
+      waitingDays: "{n} gündür listende bekliyor",
+      fresh: "Yeni eklendi",
+      shortFilm: "Kısa: {n} dakikada biter",
+      longFilm: "Uzun bir akşam filmi",
+      oneSeason: "Tek sezon, çabuk biter",
+      longRun: "{n} sezonluk uzun soluklu bir seri",
+    },
+  },
+  en: {
+    entry: {
+      title: "What to watch?",
+      movie: "Movie",
+      tv: "Show",
+      empty: "Add something to your list first",
+      filteredNote: "Picks from your filtered list",
+      a11yRandom: "What to watch? Pick a random title from your watchlist",
+      a11yMovie: "Pick a random movie from your watchlist",
+      a11yTv: "Pick a random show from your watchlist",
+    },
+    sheet: {
+      title: "What should I watch?",
+      pool: "Out of {n} titles",
+      poolFiltered: "From your filtered list · {n} titles",
+      shuffling: "Shuffling…",
+      reroll: "Another one",
+      open: "Go to details",
+      history: "Just rolled",
+      cycled: "You've seen them all, so we reshuffled",
+      emptyType: "No titles of this kind on your list",
+      unreleased: "Not out yet. Want to pick another one?",
+      close: "Close",
+      types: { mixed: "Mixed", movie: "Movies", tv: "Shows" },
+      kind: { movie: "Movie", tv: "Show" },
+      units: { hour: "h", minute: "min", season: "seasons", episode: "episodes" },
+    },
+    reasons: {
+      waitingMonths: "Waiting on your list for {n} months",
+      waitingDays: "Waiting on your list for {n} days",
+      fresh: "Just added",
+      shortFilm: "Short: done in {n} minutes",
+      longFilm: "A long-evening movie",
+      oneSeason: "One season, over quickly",
+      longRun: "A long-running series: {n} seasons",
+    },
+  },
+  es: {
+    entry: {
+      title: "¿Qué veo?",
+      movie: "Peli",
+      tv: "Serie",
+      empty: "Primero añade algo a tu lista",
+      filteredNote: "Elige de tu lista filtrada",
+      a11yRandom: "¿Qué veo? Elige una obra al azar de tu lista de pendientes",
+      a11yMovie: "Elige una película al azar de tu lista de pendientes",
+      a11yTv: "Elige una serie al azar de tu lista de pendientes",
+    },
+    sheet: {
+      title: "¿Qué veo?",
+      pool: "Entre {n} obras",
+      poolFiltered: "De tu lista filtrada · {n} obras",
+      shuffling: "Mezclando…",
+      reroll: "Otra",
+      open: "Ir a los detalles",
+      history: "Las últimas",
+      cycled: "Ya las viste todas, así que volvimos a mezclar",
+      emptyType: "No hay obras de este tipo en tu lista",
+      unreleased: "Aún no se estrena. ¿Quieres elegir otra?",
+      close: "Cerrar",
+      types: { mixed: "Mixto", movie: "Películas", tv: "Series" },
+      kind: { movie: "Película", tv: "Serie" },
+      units: { hour: "h", minute: "min", season: "temporadas", episode: "episodios" },
+    },
+    reasons: {
+      waitingMonths: "Lleva {n} meses esperando en tu lista",
+      waitingDays: "Lleva {n} días esperando en tu lista",
+      fresh: "Recién añadida",
+      shortFilm: "Corta: termina en {n} minutos",
+      longFilm: "Una película para una noche larga",
+      oneSeason: "Una temporada, se acaba rápido",
+      longRun: "Una serie larga: {n} temporadas",
+    },
+  },
+};
+
+// Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
+export const getWatchPickerCopy = (language) =>
+  WATCH_PICKER_COPY[copyLanguage(language, Object.keys(WATCH_PICKER_COPY))];
+
+/** "{n}" yer tutucusunu doldurur. */
+export const fillPickerCopy = (template, n) => String(template ?? "").replace("{n}", String(n));
+
+/** Gerekçe cümlesi ({kind, value} → metin); gerekçe yoksa null. */
+export function reasonText(copy, reason) {
+  if (!reason) return null;
+  const template = copy?.reasons?.[reason.kind];
+  return template ? fillPickerCopy(template, reason.value ?? "") : null;
+}

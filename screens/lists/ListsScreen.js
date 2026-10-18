@@ -41,7 +41,9 @@ import PlatformFilterSection from "@components/lists/PlatformFilterSection";
 import { classifyTitle, planPlatformFilter } from "@utils/providerWatch";
 import { getProviderWatchCopy } from "@utils/providerWatchCopy";
 import { trackEvent, ANALYTICS_EVENTS } from "@services/analytics";
-import CaseOpeningModal from "@components/modals/CaseOpeningModal";
+import WatchPickerEntry from "@components/lists/WatchPickerEntry";
+import WatchPickerSheet from "@components/lists/WatchPickerSheet";
+import { getWatchPickerCopy } from "@utils/watchPickerCopy";
 import DatePickerModal from "@components/modals/DatePickerModal";
 import ListSearchBar from "@components/lists/ListSearchBar";
 import GlobalSearchResults from "@components/lists/GlobalSearchResults";
@@ -184,9 +186,8 @@ export default function ListsScreen({ route, navigation }) {
   const [reorderItems, setReorderItems] = useState(null);
   const [isReordering, setIsReordering] = useState(false);
   const suppressNextPressRef = useRef(false);
-  const [randomModalVisible, setRandomModalVisible] = useState(false);
-  const [filterType, setFilterType] = useState("mixed");
-  // Gesture tracking removed in favor of a cleaner 3-way segmented toggle.
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerType, setPickerType] = useState("mixed");
   const [value, setValue] = useState("");
   const { getTmdbUrl } = useImageQualitySettings();
 
@@ -935,36 +936,22 @@ export default function ListsScreen({ route, navigation }) {
       </View>
     </SkeletonPlaceholder>
   );
-  const chooseRandomly = (selectedType) => {
-    const pool =
-      selectedType === "mixed"
-        ? filteredItems
-        : filteredItems.filter((item) => item.type === selectedType);
-    if (pool.length === 0) {
-      Toast.show({
-        type: "warning",
-        text1:
-          selectedType === "movie"
-            ? i18nText("autoI18n.listede_hic_film_yok", "Listede hiç film yok!")
-            : selectedType === "tv"
-              ? i18nText("autoI18n.listede_hic_dizi_yok", "Listede hiç dizi yok!")
-              : i18nText("autoI18n.liste_bos_lutfen_icerik_ekleyiniz", "Liste boş, lütfen içerik ekleyiniz"),
-      });
+  // "Ne izlesem?": havuz, o an görünen (arama / süzgeç uygulanmış) liste. Tür seçimi sayfanın içinde.
+  const pickerCopy = useMemo(() => getWatchPickerCopy(language), [language]);
+  const pickerFiltered =
+    activeFilterCount > 0 ||
+    (searchMode === LIST_SEARCH_MODE.IN_LIST && searchQuery.trim().length > 0);
+  const openPicker = (type = "mixed") => {
+    if (filteredItems.length === 0) {
+      Toast.info(pickerCopy.entry.empty);
       return;
     }
-    setFilterType(selectedType);
-    setRandomModalVisible(true);
+    setPickerType(type);
+    setPickerVisible(true);
   };
-
-  // List counts
-  const movieCount = useMemo(
-    () => filteredItems.filter((i) => i.type === "movie").length,
-    [filteredItems],
-  );
-  const tvCount = useMemo(
-    () => filteredItems.filter((i) => i.type === "tv").length,
-    [filteredItems],
-  );
+  const openPickedItem = (item) => {
+    navigation.navigate(item.type === "movie" ? "MovieDetails" : "TvShowsDetails", { id: item.id });
+  };
 
   // Süre etiketleri saf mediaFacts fonksiyonlarına PARAMETRE geçilir
   // (o modül i18nText import etmiyor).
@@ -1125,179 +1112,13 @@ export default function ListsScreen({ route, navigation }) {
           ) : (
         <>
           {listName == "watchList" && (
-            <View style={{ marginBottom: 95, marginHorizontal: 15 }}>
-              {/* Interactive 3-Way Random Selector & Stats */}
-              <SwipeCard
-                leftButton={{
-                  label: i18nText("autoI18n.sadece_dizi", "📺 Sadece\nDizi"),
-                  color: "#8847ff",
-                  onPress: () => chooseRandomly("tv"),
-                }}
-                rightButton={{
-                  label: i18nText("autoI18n.sadece_film", "🎬 Sadece\nFilm"),
-                  color: "#4b69ff",
-                  onPress: () => chooseRandomly("movie"),
-                }}
-              >
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => chooseRandomly("mixed")}
-                  style={{
-                    width: "100%",
-                    height: 90,
-                    backgroundColor: theme.secondary,
-                    borderColor: theme.border,
-                    borderWidth: 1,
-                    borderRadius: 24,
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    overflow: "hidden",
-                  }}
-                >
-                  <LinearGradient
-                    colors={["#396fe415", "transparent"]}
-                    style={StyleSheet.absoluteFill}
-                  />
-
-                  {/* Main Call to Action */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 6,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 22,
-                        backgroundColor: "#3961e433",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        borderWidth: 1,
-                        borderColor: "#3961e466",
-                      }}
-                    >
-                      <Text style={{ fontSize: 16 }}>🎲</Text>
-                    </View>
-                    <View>
-                      <Text
-                        style={{
-                          color: "#3983e4ff",
-                          fontSize: 14,
-                          fontWeight: "bold",
-                          letterSpacing: 0.5,
-                        }}
-                      >{i18nText("autoI18n.rastgele_ne_izlesem", "Rastgele Ne İzlesem?")}</Text>
-                      <Text
-                        style={{
-                          color: "#3983e4aa",
-                          fontSize: 10,
-                          marginTop: 2,
-                          fontWeight: "500",
-                        }}
-                      >{i18nText("autoI18n.karisik_icin_bas_dizi_film_icin_kaydir", "Karışık için bas, Dizi/Film için kaydır")}</Text>
-                    </View>
-                  </View>
-
-                  {/* Context Stats (Count chips) wrapped inside */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      width: "100%",
-                      justifyContent: "space-between",
-                      gap: 8,
-                    }}
-                  >
-                    <View
-                      style={[
-                        styles.countChip,
-                        {
-                          flex: 1,
-                          paddingVertical: 3,
-                          borderColor: "#4b69ff44",
-                          backgroundColor: "#4b69ff15",
-                        },
-                      ]}
-                    >
-                      <Feather name="chevron-left" size={14} color="#4b69ff" />
-                      <Text
-                        style={[styles.countChipTextBlue, { fontSize: 14 }]}
-                      >
-                        {movieCount}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          color: "#4b69ff88",
-                          fontWeight: "600",
-                          marginTop: 2,
-                        }}
-                      >{i18nText("autoI18n.film_2", "FİLM")}</Text>
-                    </View>
-
-                    <View
-                      style={[
-                        styles.countChip,
-                        {
-                          flex: 1,
-                          paddingVertical: 3,
-                          borderColor: "#e4ae3944",
-                          backgroundColor: "#e4ae3915",
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[styles.countChipTextGold, { fontSize: 14 }]}
-                      >
-                        ∑ {filteredItems.length}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          color: "#e4ae3988",
-                          fontWeight: "600",
-                          marginTop: 2,
-                        }}
-                      >
-                        {i18nText("autoI18n.toplam_upper", "TOPLAM")}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={[
-                        styles.countChip,
-                        {
-                          flex: 1,
-                          paddingVertical: 3,
-                          borderColor: "#8847ff44",
-                          backgroundColor: "#8847ff15",
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[styles.countChipTextPurple, { fontSize: 14 }]}
-                      >
-                        📺 {tvCount}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          color: "#8847ff88",
-                          fontWeight: "600",
-                          marginTop: 2,
-                        }}
-                      >{i18nText("autoI18n.dizi_2", "DİZİ")}</Text>
-                      <Feather name="chevron-right" size={14} color="#8847ff" />
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              </SwipeCard>
-            </View>
+            <WatchPickerEntry
+              theme={theme}
+              copy={pickerCopy}
+              filtered={pickerFiltered}
+              items={filteredItems}
+              onPick={openPicker}
+            />
           )}
           {listName == "watchedTv" && (
             <>
@@ -2020,17 +1841,13 @@ export default function ListsScreen({ route, navigation }) {
         </View>
         <ModalToastHost visible={modalVisible} />
       </Modal>
-      <CaseOpeningModal
-        visible={randomModalVisible}
-        onClose={() => setRandomModalVisible(false)}
+      <WatchPickerSheet
+        visible={pickerVisible}
+        initialType={pickerType}
+        onClose={() => setPickerVisible(false)}
         items={filteredItems}
-        filterType={filterType}
-        onNavigate={(item) => {
-          navigation.navigate(
-            item.type === "movie" ? "MovieDetails" : "TvShowsDetails",
-            { id: item.id },
-          );
-        }}
+        filtered={pickerFiltered}
+        onOpen={openPickedItem}
       />
       <ListItemActionsSheet
         visible={reorderModalVisible}
@@ -3122,20 +2939,6 @@ const styles = StyleSheet.create({
   },
   seasonName: { flex: 1, color: "#fff", fontSize: 10, fontWeight: "700" },
   seasonEpText: { fontSize: 9, fontWeight: "800" },
-
-  // Count chips
-  countChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    paddingHorizontal: 5,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  countChipTextBlue: { color: "#4b69ff", fontWeight: "700", fontSize: 12 },
-  countChipTextPurple: { color: "#8847ff", fontWeight: "700", fontSize: 12 },
-  countChipTextGold: { color: "#e4ae39", fontWeight: "700", fontSize: 12 },
 
   // Interactive Segmented Buttons
 });

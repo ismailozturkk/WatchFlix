@@ -22,6 +22,7 @@ const { LIBRARY_EXPORT_COPY } = require("../screens/tabs/settings/libraryExportC
 const { TASTE_MATCH_COPY } = require("../utils/tasteMatchCopy");
 const { MEDIA_LINK_COPY } = require("../utils/mediaLinkCopy");
 const { EXTERNAL_ENTRY_COPY } = require("../utils/externalEntryCopy");
+const { WATCH_PICKER_COPY } = require("../utils/watchPickerCopy");
 const { RATING_SUMMARY_COPY } = require("../utils/ratingSummaryCopy");
 const { EXTERNAL_RATINGS_COPY } = require("../utils/externalRatingsCopy");
 
@@ -89,6 +90,7 @@ const TABLOLAR = {
   "Zevk uyumu (tasteMatchCopy)": () => TASTE_MATCH_COPY,
   "Bağlantıdan aç (mediaLinkCopy)": () => MEDIA_LINK_COPY,
   "Dış giriş: paylaşım + kısayollar (externalEntryCopy)": () => EXTERNAL_ENTRY_COPY,
+  "Ne izlesem? (watchPickerCopy)": () => WATCH_PICKER_COPY,
   "Puan özeti (ratingSummaryCopy)": () => RATING_SUMMARY_COPY,
   "Harici puanlar (externalRatingsCopy)": () => EXTERNAL_RATINGS_COPY,
   "Wrapped (wrappedStrings)": () => ({

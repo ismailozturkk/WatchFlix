@@ -64,7 +64,7 @@ const COVERED = [
   ["components/CacheManagerModal.js", ICON],
   ["components/cineswipe/CineSheet.js", CLOSE],
   ["components/cineswipe/CineLikedBasketModal.js", CLOSE],
-  ["components/modals/CaseOpeningModal.js", CLOSE],
+  ["components/lists/WatchPickerSheet.js", CLOSE],
   ["components/tournament/NomineeSearchModal.js", CLOSE],
   ["components/tournament/PodiumModal.js", CLOSE],
   ["components/game/GameTopBar.js", CLOSE],
