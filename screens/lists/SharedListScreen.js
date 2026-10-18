@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -20,7 +20,6 @@ import BackButton from "../../components/BackButton";
 import GlassIconButton from "../../components/common/GlassIconButton";
 import ShareToChatSheet from "../../components/chat/ShareToChatSheet";
 import { buildListShare } from "../../utils/chatShare";
-import PosterImage from "@components/PosterImage";
 import SwitchToggle from "../../components/SwitchToggle";
 import appAlert from "../../components/AppAlert";
 import { useTheme } from "@context/ThemeContext";
@@ -39,7 +38,16 @@ import ListItemActionsSheet from "@components/lists/ListItemActionsSheet";
 import ListSearchBar from "@components/lists/ListSearchBar";
 import GlobalSearchResults from "@components/lists/GlobalSearchResults";
 import ListPosterInfoControls from "@components/lists/ListPosterInfoControls";
-import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
+import ListPosterCard from "@components/lists/ListPosterCard";
+import {
+  GRID_COLUMN_GAP,
+  GRID_SIDE_PADDING,
+  initialRowsFor,
+  posterHeightFor,
+  posterKeyOf,
+  posterWidthFor,
+  rowHeightFor,
+} from "@utils/listPosterLayout";
 import {
   useApiSettings,
   useContentSettings,
@@ -77,10 +85,6 @@ import {
 
 const ACCENT = "#38bdf8"; // ListsViewScreen'deki ortak liste vurgusuyla aynı
 const SHARED_SEARCH_LIST = "__shared__";
-const GRID_SIDE_PADDING = 12;
-const GRID_COLUMN_GAP = 8;
-const POSTER_ASPECT_RATIO = 1.52;
-
 // Diziyi 3'lük satırlara böl (ListsScreen'deki elle grid deseni — Android'de
 // dinamik numColumns çökmesine karşı).
 const chunk = (arr, size) => {
@@ -109,7 +113,7 @@ const FilterChip = ({ label, selected, onPress, theme }) => (
 );
 
 export default function SharedListScreen({ route, navigation }) {
-  const { width } = useWindowDimensions();
+  const { width, height: windowHeight } = useWindowDimensions();
   const { listId } = route.params || {};
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -126,10 +130,9 @@ export default function SharedListScreen({ route, navigation }) {
     listPosterInfo,
     changeListPosterInfo,
   } = useListLayoutSettings();
-  const posterW =
-    (width - GRID_SIDE_PADDING * 2 - GRID_COLUMN_GAP * (gridColumns - 1)) /
-    gridColumns;
-  const posterH = posterW * POSTER_ASPECT_RATIO;
+  // Ölçü kararları saf çekirdekte (utils/listPosterLayout); ListsScreen ile AYNI hesap.
+  const posterW = posterWidthFor({ windowWidth: width, columns: gridColumns });
+  const posterH = posterHeightFor(posterW);
   const profile = useUserProfile();
   const genreMap = useMemo(() => buildGenreMap(), [language]);
 
@@ -530,6 +533,28 @@ export default function SharedListScreen({ route, navigation }) {
     }).catch((e) => Toast.show({ type: "error", text1: e.message }));
   };
 
+  // Poster kartı işleyicileri (kararlı kimlik → memo'lu kart gereksiz yere yeniden çizilmez).
+  const typeLabels = useMemo(
+    () => ({ movie: i18nText("autoI18n.film", "Film"), tv: i18nText("autoI18n.dizi", "Dizi") }),
+    [language],
+  );
+  const handlePosterPress = useCallback(
+    (item) => {
+      if (suppressPressRef.current) {
+        suppressPressRef.current = false;
+        return;
+      }
+      navigation.navigate(item.type === "movie" ? "MovieDetails" : "TvShowsDetails", { id: item.id });
+    },
+    [navigation],
+  );
+  const handlePosterLongPress = useCallback((item) => {
+    suppressPressRef.current = true;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setActionItem(item);
+  }, []);
+  const rowHeight = rowHeightFor({ posterWidth: posterW, showTitle: !!listPosterInfo.title });
+
   // ── Durumlar ───────────────────────────────────────────────────────────────
 
   if (list === undefined) {
@@ -569,105 +594,46 @@ export default function SharedListScreen({ route, navigation }) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const renderPoster = (item) => (
-    <TouchableOpacity
-      key={item.key}
-      activeOpacity={0.85}
-      onPress={() => {
-        if (suppressPressRef.current) {
-          suppressPressRef.current = false;
-          return;
-        }
-        navigation.navigate(
-          item.type === "movie" ? "MovieDetails" : "TvShowsDetails",
-          { id: item.id },
-        );
-      }}
-      onLongPress={() => {
-        suppressPressRef.current = true;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-        setActionItem(item);
-      }}
-      style={[styles.posterItem, { width: posterW }]}
-    >
-      <View
-        style={[
-          styles.posterWrap,
-          { width: posterW, height: posterH, borderRadius: posterRadius },
-        ]}
-      >
-        <PosterImage
-          path={item.imagePath}
-          type={item.type}
-          size={200}
-          style={[styles.poster, { borderRadius: posterRadius }]}
-        />
-        {listPosterInfo.mediaType ? (
-          <Text
-            style={[
-              styles.typeBadge,
-              {
-                backgroundColor:
-                  item.type === "movie"
-                    ? theme.notesColor?.blueBackground ?? "#138df040"
-                    : theme.notesColor?.greenBackground ?? "#29b86440",
-              },
-            ]}
-          >
-            {item.type === "movie"
-              ? i18nText("autoI18n.film", "Film")
-              : i18nText("autoI18n.dizi", "Dizi")}
-          </Text>
-        ) : null}
-        {listPosterInfo.duration && (item.totalMinutes || item.minutes) ? (
-          <Text style={styles.durationBadge}>
-            {(item.totalMinutes || item.minutes) + " " + (t?.minutes || i18nText("autoI18n.dakika", "dk"))}
-          </Text>
-        ) : null}
-        {listPosterInfo.addedBy ? (
-          <View style={styles.addedByChip}>
-            {item.addedBy === uid && avatar ? (
-              <UserAvatar source={avatar} isCustomPhoto size={16} />
-            ) : (
-              <UserAvatar
-                avatarIndex={list?.members?.[item.addedBy]?.avatarIndex ?? item.addedByAvatarIndex}
-                photoURL={list?.members?.[item.addedBy]?.photoURL ?? item.addedByPhotoURL}
-                isCustomPhoto
-                size={16}
-              />
-            )}
-            <Text numberOfLines={1} style={styles.addedByName}>
-              {item.addedBy === uid
-                ? i18nText("autoI18n.sen", "Sen")
-                : list?.members?.[item.addedBy]?.name ||
-                  item.addedByName ||
-                  i18nText("autoI18n.uye", "Üye")}
-            </Text>
-          </View>
-        ) : null}
-        {/* Kişisel puan (yıldız) + yorum ikonu — posterin ÜZERİNDE, alt
-            kısmına yaslı. "Ekleyen" çipi de açıksa onun üstüne biner. */}
-        <MyPosterActivityBadge
-          mediaId={item.id}
-          mediaType={item.type}
-          posterWidth={posterW}
-          showRating={listPosterInfo.rating}
-          showComment={listPosterInfo.comment}
-          layout="overlay"
-          corner="bottomLeft"
-          style={listPosterInfo.addedBy ? { bottom: 32 } : null}
-        />
-      </View>
-      {listPosterInfo.title ? (
-        <Text
-          numberOfLines={1}
-          style={[styles.posterTitle, { color: theme.text.secondary }]}
-        >
-          {item.name}
+  // "Ekleyen" çipi posterin dibine yaslanır; kişisel puan rozeti onun üstüne kalkar (bottomSlotHeight).
+  const ADDED_BY_SLOT = 26;
+  const renderPoster = (item) => {
+    const memberOf = list?.members?.[item.addedBy];
+    const addedBySlot = listPosterInfo.addedBy ? (
+      <View style={styles.addedByChip}>
+        {item.addedBy === uid && avatar ? (
+          <UserAvatar source={avatar} isCustomPhoto size={16} />
+        ) : (
+          <UserAvatar
+            avatarIndex={memberOf?.avatarIndex ?? item.addedByAvatarIndex}
+            photoURL={memberOf?.photoURL ?? item.addedByPhotoURL}
+            isCustomPhoto
+            size={16}
+          />
+        )}
+        <Text numberOfLines={1} style={styles.addedByName}>
+          {item.addedBy === uid
+            ? i18nText("autoI18n.sen", "Sen")
+            : memberOf?.name || item.addedByName || i18nText("autoI18n.uye", "Üye")}
         </Text>
-      ) : null}
-    </TouchableOpacity>
-  );
+      </View>
+    ) : null;
+    return (
+      <ListPosterCard
+        item={item}
+        posterWidth={posterW}
+        radius={posterRadius}
+        info={listPosterInfo}
+        listName="shared"
+        theme={theme}
+        durationMinutes={item.totalMinutes || item.minutes}
+        typeLabels={typeLabels}
+        onPress={handlePosterPress}
+        onLongPress={handlePosterLongPress}
+        bottomSlot={addedBySlot}
+        bottomSlotHeight={addedBySlot ? ADDED_BY_SLOT : 0}
+      />
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
@@ -811,10 +777,13 @@ export default function SharedListScreen({ route, navigation }) {
           keyExtractor={(row, i) => `${row[0]?.key ?? "r"}-${i}`}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: GRID_SIDE_PADDING, paddingBottom: 40 }}
-          initialNumToRender={8}
+          // Satırlar eşit yükseklikte (başlık tek satır, sabit lineHeight): kaydırmada ölçüm yok.
+          getItemLayout={(_, i) => ({ length: rowHeight, offset: rowHeight * i, index: i })}
+          initialNumToRender={initialRowsFor({ windowHeight, rowHeight })}
+          maxToRenderPerBatch={6}
           windowSize={7}
           renderItem={({ item: row, index: rowIndex }) => (
-            <View style={styles.gridRow}>
+            <View style={[styles.gridRow, { height: rowHeight }]}>
               {row.map((item, colIndex) => (
                 <StaggerItem
                   key={item.key}
@@ -1449,37 +1418,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-start",
     gap: GRID_COLUMN_GAP,
-    marginBottom: 14,
-  },
-  posterItem: {},
-  posterWrap: {
-    overflow: "hidden",
-  },
-  poster: { width: "100%", height: "100%" },
-  typeBadge: {
-    position: "absolute",
-    top: 6,
-    left: 6,
-    color: "#fff",
-    fontSize: 9,
-    fontWeight: "700",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  durationBadge: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    color: "#fff",
-    backgroundColor: "rgba(0,0,0,0.68)",
-    fontSize: 9,
-    fontWeight: "700",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    overflow: "hidden",
   },
   addedByChip: {
     position: "absolute",
@@ -1500,7 +1438,6 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: "700",
   },
-  posterTitle: { fontSize: 11, fontWeight: "600", marginTop: 5 },
 
   // ── Boş durum ──
   emptyIcon: {

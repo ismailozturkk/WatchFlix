@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
   Dimensions,
+  useWindowDimensions,
   Animated,
     ActivityIndicator,
   Keyboard,
@@ -24,9 +25,8 @@ import { useLanguage } from "@context/LanguageContext";
 import { useAuth } from "@context/AuthContext";
 import SkeletonPlaceholder from "react-native-skeleton-placeholder";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Progress from "react-native-progress";
 import Toast from "@components/AppToast";
-import SwipeCard from "@components/SwipeCard";
+import ListPosterCard from "@components/lists/ListPosterCard";
 import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
 import useSheetTransition from "@hooks/useSheetTransition";
 import {
@@ -58,7 +58,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "@services/hapticsService";
 import { i18nText } from "@utils/i18nText";
 import { buildGenreMap } from "@utils/genreLabels";
-import { todayListDate, formatMinutes } from "@utils/mediaFacts";
+import { todayListDate } from "@utils/mediaFacts";
 import {
   buildListKeySet,
   GLOBAL_SEARCH_MIN_CHARS,
@@ -88,11 +88,16 @@ import {
 } from "../../services/listItemsService";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import {
+  GRID_COLUMN_GAP,
+  GRID_SIDE_PADDING,
+  initialRowsFor,
+  posterHeightFor,
+  posterKeyOf,
+  posterWidthFor,
+  rowHeightFor,
+} from "@utils/listPosterLayout";
 const { width, height } = Dimensions.get("window");
-const GRID_SIDE_PADDING = 12;
-const GRID_COLUMN_GAP = 8;
-const POSTER_ASPECT_RATIO = 1.52;
-
 // Diziyi `size`'lık satırlara böler (elle grid için — Android'de dinamik
 // numColumns'lu FlatList "addViewAt: failed to insert view" çökmesine yol açıyor).
 const chunk = (arr, size) => {
@@ -141,12 +146,12 @@ export default function ListsScreen({ route, navigation }) {
     listPosterInfo,
     changeListPosterInfo,
   } = useListLayoutSettings();
-  // Sütun sayısına göre afiş boyutu. Genişlik, sabit kolon boşluğu üzerinden
-  // hesaplanır; space-between kalan alanı şişirip poster aralarını açmasın.
-  const posterW =
-    (width - GRID_SIDE_PADDING * 2 - GRID_COLUMN_GAP * (gridColumns - 1)) /
-    gridColumns;
-  const posterH = posterW * POSTER_ASPECT_RATIO;
+  // Sütun sayısına göre afiş boyutu — PENCERE genişliğinden (dönme / katlanır ekran / bölünmüş pencerede
+  // güncel kalır; eskiden modül yüklenirken bir kez okunan Dimensions.get idi). Ölçü kararları saf
+  // çekirdekte: utils/listPosterLayout.
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const posterW = posterWidthFor({ windowWidth, columns: gridColumns });
+  const posterH = posterHeightFor(posterW);
   // Görünür vurgu rengi (theme.between bazı temalarda tanımsız/kontrastsız olabilir)
   const accent = theme.between || theme.accent || "#4b69ff";
   const { t, language } = useLanguage();
@@ -326,40 +331,6 @@ export default function ListsScreen({ route, navigation }) {
     inputRange: [0, 1, 2],
     outputRange: [0, tabPillWidth / 3, (tabPillWidth / 3) * 2],
   });
-
-  const [scaleValues, setScaleValues] = useState({});
-  useEffect(() => {
-    if (!listItems?.length) return;
-    setScaleValues((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      listItems.forEach((item) => {
-        if (!next[item.id]) {
-          next[item.id] = new Animated.Value(1);
-          changed = true;
-        }
-      });
-      return changed ? next : prev;
-    });
-  }, [listItems]);
-
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
 
   useEffect(() => {
     const sourceLoading =
@@ -953,35 +924,56 @@ export default function ListsScreen({ route, navigation }) {
     navigation.navigate(item.type === "movie" ? "MovieDetails" : "TvShowsDetails", { id: item.id });
   };
 
-  // Süre etiketleri saf mediaFacts fonksiyonlarına PARAMETRE geçilir
-  // (o modül i18nText import etmiyor).
-  const durationLabels = useMemo(
-    () => ({
-      hourLabel: i18nText("autoI18n.saat_kisa_birim", "sa"),
-      minuteLabel: i18nText("autoI18n.dakika_kisa_birim", "dk"),
-      seasonLabel: i18nText("autoI18n.sezon_birim", "sezon"),
-      episodeLabel: i18nText("autoI18n.bolum_birim", "bölüm"),
-      perEpisodeLabel: i18nText("autoI18n.dk_bolum", "dk/bölüm"),
-    }),
-    [language],
-  );
-
-  // İzlenen bölüm sayısı ve toplam süre: renderItem içinde her çizimde
-  // reduce/loop çalıştırmak yerine öğe başına bir kez hesaplanır.
-  const { watchedCountById, durationTextById } = useMemo(() => {
+  // İzlenen bölüm sayısı ve toplam süre (dk): öğe başına bir kez hesaplanır, anahtar TÜR+id (karışık listede film
+  // ve dizi aynı TMDB id'sini paylaşabilir; eskiden yalnız id idi ve biri ötekinin verisini gösterebilirdi).
+  const { watchedCountByKey, durationMinutesByKey } = useMemo(() => {
     const counts = {};
     const durations = {};
     listItems.forEach((item) => {
-      counts[item.id] = Array.isArray(item.seasons)
+      const key = posterKeyOf(item);
+      counts[key] = Array.isArray(item.seasons)
         ? item.seasons.reduce(
             (acc, s) => acc + (s.episodes ? s.episodes.length : 0),
             0,
           )
         : 0;
-      durations[item.id] = formatMinutes(getItemMinutes(item), durationLabels);
+      durations[key] = getItemMinutes(item);
     });
-    return { watchedCountById: counts, durationTextById: durations };
-  }, [listItems, durationLabels]);
+    return { watchedCountByKey: counts, durationMinutesByKey: durations };
+  }, [listItems]);
+
+  // Poster kartı işleyicileri: kararlı kimlik → memo'lu kart gereksiz yere yeniden çizilmez.
+  const typeLabels = useMemo(() => ({ movie: t.typeMovies, tv: t.typeTvSeries }), [t]);
+  const handlePosterPress = useCallback(
+    (item) => {
+      if (suppressNextPressRef.current) {
+        suppressNextPressRef.current = false;
+        return;
+      }
+      if (listName !== "watchedTv") {
+        navigation.navigate(item.type === "movie" ? "MovieDetails" : "TvShowsDetails", { id: item.id });
+      } else {
+        setModalVisible(true);
+      }
+      setListModalItems([item]); // Tek bir öğeyi modalda göstermek için diziye sarın
+    },
+    [listName, navigation],
+  );
+  const handlePosterLongPress = useCallback(
+    (item) => {
+      suppressNextPressRef.current = true;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      setReorderModalVisible(true);
+      const originalIndex = listItems.findIndex(
+        (i) => i.type === item.type && String(i.id) === String(item.id),
+      );
+      setIndex(originalIndex);
+      setReorderItems(item);
+      setValue(String(originalIndex + 1));
+    },
+    [listItems],
+  );
+  const rowHeight = rowHeightFor({ posterWidth: posterW, showTitle: !!listPosterInfo.title });
 
   // Başlık: öntanımlı dört liste çevrilmiş ad, özel listede kullanıcının adı.
   const listTitle =
@@ -1230,199 +1222,46 @@ export default function ListsScreen({ route, navigation }) {
           )}
           <FlatList
             data={gridRows}
-            initialNumToRender={8}
-            maxToRenderPerBatch={8}
+            // Satırlar eşit yükseklikte (başlık tek satır, sabit lineHeight): FlatList kaydırmada ölçmez.
+            getItemLayout={(_, i) => ({ length: rowHeight, offset: rowHeight * i, index: i })}
+            initialNumToRender={initialRowsFor({ windowHeight, rowHeight })}
+            maxToRenderPerBatch={6}
             windowSize={7}
             // Android'de dinamik numColumns'lu FlatList "addViewAt: failed to insert
             // view" çökmesine yol açtığından, çok sütunlu görünüm numColumns yerine
             // elle satırlara bölünüp tek sütunlu listede render edilir.
             removeClippedSubviews={false}
-            keyExtractor={(row, i) => `${row[0] ? row[0].id : "r"}-${i}`}
+            keyExtractor={(row, i) => `${row[0] ? posterKeyOf(row[0]) : "r"}-${i}`}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
               paddingHorizontal: GRID_SIDE_PADDING,
               paddingBottom: 40,
             }}
             renderItem={({ item: row, index: rowIndex }) => (
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "flex-start",
-                  gap: GRID_COLUMN_GAP,
-                  width: "100%",
-                  marginBottom: 12,
-                }}
-              >
+              <View style={{ flexDirection: "row", justifyContent: "flex-start", gap: GRID_COLUMN_GAP, width: "100%", height: rowHeight }}>
                 {row.map((item, colIndex) => (
                   <StaggerItem
-                    key={String(item.id)}
+                    key={posterKeyOf(item)}
                     index={gridEntranceIndex(rowIndex, colIndex, gridColumns)}
                     animate={shouldAnimateEntrance()}
                     step={40}
                     maxStaggered={12}
                     style={{ width: posterW }}
                   >
-                  <TouchableOpacity
-                activeOpacity={0.8}
-                onPressIn={() => onPressIn(item.id)}
-                onPressOut={() => {
-                  onPressOut(item.id);
-                }}
-                onLongPress={() => {
-                  suppressNextPressRef.current = true;
-                  Haptics.impactAsync(
-                    Haptics.ImpactFeedbackStyle.Medium,
-                  ).catch(() => {});
-                  setReorderModalVisible(true);
-                  const originalIndex = listItems.findIndex(
-                    (i) => String(i.id) === String(item.id),
-                  );
-                  setIndex(originalIndex);
-                  setReorderItems(item);
-                  setValue(String(originalIndex + 1));
-                }}
-                onPress={() => {
-                  if (suppressNextPressRef.current) {
-                    suppressNextPressRef.current = false;
-                    return;
-                  }
-                  listName !== "watchedTv"
-                    ? navigation.navigate(
-                        item.type === "movie"
-                          ? "MovieDetails"
-                          : "TvShowsDetails",
-                        { id: item.id },
-                      )
-                    : setModalVisible(true);
-                  setListModalItems([item]); // Tek bir öğeyi modalda göstermek için diziye sarın
-                }}
-                style={[styles.item, { width: posterW }]}
-              >
-                <SwipeCard>
-                  <Animated.View
-                    style={{
-                      // Alta yapışık ilerleme çubuğu poster köşesinden taşmasın
-                      // diye köşe yarıçapıyla kırpılır.
-                      overflow: "hidden",
-                      borderRadius: posterRadius,
-                      transform: [{ scale: scaleValues[item.id] || 1 }],
-                    }}
-                  >
-                    <PosterImage
-                      path={item.imagePath}
-                      type={item.type}
-                      size={200}
-                      style={[
-                        styles.image,
-                        { width: posterW, height: posterH, borderRadius: posterRadius },
-                      ]}
-                    />
-                    {/* İzlenme ilerlemesi — poster altına yapışık tam genişlik
-                        bar (yeşil=bitti, turuncu=devam ediyor) */}
-                    {listName === "watchedTv" && item.showEpisodeCount ? (
-                      <>
-                        <LinearGradient
-                          colors={["transparent", "rgba(0,0,0,0.80)"]}
-                          style={{
-                            position: "absolute",
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            height: posterH * 0.4,
-                            borderBottomLeftRadius: posterRadius,
-                            borderBottomRightRadius: posterRadius,
-                          }}
-                        />
-                        <View style={styles.posterProgress}>
-                          <Progress.Bar
-                            progress={Math.min(
-                              (watchedCountById[item.id] || 0) /
-                                item.showEpisodeCount,
-                              1,
-                            )}
-                            width={posterW}
-                            height={3}
-                            borderWidth={0}
-                            borderRadius={2}
-                            color={
-                              item.showEpisodeCount ===
-                              (watchedCountById[item.id] || 0)
-                                ? theme.colors.green
-                                : theme.colors.orange
-                            }
-                            unfilledColor="rgba(255,255,255,0.2)"
-                          />
-                        </View>
-                      </>
-                    ) : null}
-                    {listPosterInfo.mediaType ? (
-                      <Text
-                        allowFontScaling={false}
-                        numberOfLines={1}
-                        style={[
-                          styles.typeBadge,
-                          {
-                            backgroundColor:
-                              item.type === "movie"
-                                ? theme.notesColor.blueBackground
-                                : theme.notesColor.greenBackground,
-                          },
-                        ]}
-                      >
-                        {item.type === "movie" ? t.typeMovies : t.typeTvSeries}
-                      </Text>
-                    ) : null}
-                    {listPosterInfo.duration && (listName !== "watchedTv" ? (
-                      item.minutes ? (
-                        <Text
-                          allowFontScaling={false}
-                          numberOfLines={1}
-                          style={[
-                            styles.minutesBadge,
-                            {
-                              backgroundColor: theme.secondaryt,
-                              color: theme.text.primary,
-                            },
-                          ]}
-                        >
-                          {item.minutes + " " + t.minutes}
-                        </Text>
-                      ) : null
-                    ) : durationTextById[item.id] ? (
-                      <Text
-                        allowFontScaling={false}
-                        numberOfLines={1}
-                        style={[
-                          styles.nameBadge,
-                          { backgroundColor: theme.secondaryt },
-                        ]}
-                      >
-                        {durationTextById[item.id]}
-                      </Text>
-                    ) : null)}
-                    {/* Kişisel puan (yıldız) + yorum ikonu — posterin ÜZERİNDE,
-                        alt kısmına yaslı (kapalıysa hiç yer kaplamaz) */}
-                    <MyPosterActivityBadge
-                      mediaId={item.id}
-                      mediaType={item.type}
+                    <ListPosterCard
+                      item={item}
                       posterWidth={posterW}
-                      showRating={listPosterInfo.rating}
-                      showComment={listPosterInfo.comment}
-                      layout="overlay"
-                      corner="bottomLeft"
+                      radius={posterRadius}
+                      info={listPosterInfo}
+                      listName={listName}
+                      theme={theme}
+                      durationMinutes={durationMinutesByKey[posterKeyOf(item)]}
+                      watchedCount={watchedCountByKey[posterKeyOf(item)]}
+                      totalCount={item.showEpisodeCount}
+                      typeLabels={typeLabels}
+                      onPress={handlePosterPress}
+                      onLongPress={handlePosterLongPress}
                     />
-                  </Animated.View>
-                </SwipeCard>
-                {listPosterInfo.title ? (
-                  <Text
-                    allowFontScaling={false}
-                    numberOfLines={1}
-                    style={[styles.posterTitle, { color: theme.text.secondary }]}
-                  >
-                    {item.name}
-                  </Text>
-                ) : null}
-              </TouchableOpacity>
                   </StaggerItem>
                 ))}
                 {row.length < gridColumns
@@ -2568,43 +2407,6 @@ const styles = StyleSheet.create({
   emptyCtaText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 
 
-  minutesBadge: {
-    position: "absolute",
-    top: 3,
-    right: 3,
-    fontSize: 9,
-    paddingVertical: 2,
-    paddingHorizontal: 5,
-    borderRadius: 10,
-  },
-  typeBadge: {
-    position: "absolute",
-    top: 3,
-    left: 3,
-    fontSize: 9,
-    backgroundColor: "#555",
-    color: "#fff",
-    paddingVertical: 2,
-    paddingHorizontal: 5,
-    borderRadius: 10,
-  },
-  nameBadge: {
-    position: "absolute",
-    top: 3,
-    right: 3,
-    fontSize: 9,
-    textAlign: "center",
-    backgroundColor: "#555",
-    color: "#fff",
-    paddingVertical: 1,
-    paddingHorizontal: 5,
-    borderRadius: 10,
-  },
-  posterTitle: {
-    marginTop: 5,
-    fontSize: 11,
-    fontWeight: "600",
-  },
   modalContainer: {
     flex: 1,
     justifyContent: "center",
@@ -2758,26 +2560,6 @@ const styles = StyleSheet.create({
     height: 15,
     borderRadius: 10,
     marginTop: 5,
-  },
-  item: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    width: width * 0.3,
-    height: height * 0.22,
-    borderRadius: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  posterProgress: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
   },
   imageReorder: {
     width: 68,
