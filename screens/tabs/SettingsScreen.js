@@ -67,6 +67,7 @@ import {
   getDataTypeOptions,
 } from "./settings/dataTypes";
 import ImportDataModal from "../../components/import/ImportDataModal";
+import { getLibraryExportCopy } from "./settings/libraryExportCopy";
 import useAppLogo from "@hooks/useAppLogo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { tabTitleTopSpacing } from "../../utils/screenTopSpacing";
@@ -375,6 +376,7 @@ export default function SettingsScreen() {
   const [providerCatalogLoading, setProviderCatalogLoading] = useState(true);
 
   const { t, language, toggleLanguage } = useLanguage();
+  const copyExport = getLibraryExportCopy(language);
   const aiCopy = useMemo(() => getAiCopy(language), [language]);
   const { prefs: aiPrefs } = useAiPrefs();
   const aiCustomCount = countCustomizedPrefs(aiPrefs);
@@ -955,6 +957,16 @@ export default function SettingsScreen() {
               "Tema, özel temalar ve tüm tercihlerini dosyaya aktar",
             )}
             onPress={() => navigation.navigate("BackupSettingsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName="share-outline"
+            title={copyExport.rowTitle}
+            subtitle={copyExport.rowSub}
+            onPress={() => navigation.navigate("LibraryExportScreen")}
             right={<Chevron color={C.muted} />}
           />
           <SettingRow

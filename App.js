@@ -718,6 +718,11 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="LibraryExportScreen"
+          getComponent={() => require("./screens/tabs/settings/LibraryExportScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="AISettingsScreen"
           getComponent={() => require("./screens/tabs/settings/AISettingsScreen").default}
           options={{ headerShown: false }}
