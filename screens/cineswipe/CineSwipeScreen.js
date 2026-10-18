@@ -56,11 +56,13 @@ import {
 } from "../../services/cineswipe/cineswipeService";
 import { persistCineResults } from "../../services/cineswipe/cineResultsStore";
 import ShareToChatSheet from "../../components/chat/ShareToChatSheet";
-import { buildCineRoomShare } from "../../utils/chatShare";
+import { buildCineRoomShare, chatParamsForShare } from "../../utils/chatShare";
+import { trackEvent, ANALYTICS_EVENTS } from "../../services/analytics";
 import {
   basketListName,
   extractRoomCode,
   fillText,
+  normalizeWatchlistItem,
   shuffleCards,
   tmdbLanguage,
   toListItem,
@@ -87,7 +89,7 @@ export default function CineSwipeScreen({ route, navigation }) {
   // kodu kutuya HAZIR yazılır; katılmak için "Katıl"a basmak alıcıya kalır.
   const inviteCode = extractRoomCode(route?.params?.inviteCode || "");
   const [mode, setMode] = useState(
-    route?.params?.initialMode === "duo" || inviteCode ? "duo" : "solo",
+    route?.params?.initialMode === "duo" || inviteCode || route?.params?.together ? "duo" : "solo",
   );
 
   // ── Solo ───────────────────────────────────────────────────────────────────
@@ -483,7 +485,9 @@ export default function CineSwipeScreen({ route, navigation }) {
     setShowRoomConfig(true);
   };
 
-  const handleConfirmCreateRoom = async (config) => {
+  // `presetDeck`: hazır deste (arkadaş profilinden "Birlikte izleyelim"); verilmezse TMDB'den toplanır.
+  // Oda kurulursa { code, count } döner (çağıran daveti gönderebilsin), aksi halde undefined.
+  const handleConfirmCreateRoom = async (config, presetDeck = null) => {
     if (joinBusy.current) return;
     joinBusy.current = true;
     setJoining(true);
@@ -491,7 +495,9 @@ export default function CineSwipeScreen({ route, navigation }) {
     resetRoom();
     const session = roomSession.current;
     try {
-      const freshDeck = await fetchRoomDeck(config, { language: tmdbLanguage(language), userId: uid });
+      const freshDeck = presetDeck?.length
+        ? presetDeck
+        : await fetchRoomDeck(config, { language: tmdbLanguage(language), userId: uid });
       if (session !== roomSession.current) return;
       const { roomId: newId, roomCode: newCode } = await createCineRoom(user, freshDeck, config);
       if (session !== roomSession.current) {
@@ -511,6 +517,7 @@ export default function CineSwipeScreen({ route, navigation }) {
       setRoomState("created");
       roomsGate.consume();
       triggerHaptic("notification");
+      return { code: newCode, count: freshDeck.length };
     } catch (error) {
       if (session === roomSession.current) showRoomError(error);
     } finally {
@@ -518,6 +525,42 @@ export default function CineSwipeScreen({ route, navigation }) {
       setJoining(false);
     }
   };
+
+  // ── Arkadaş profilinden "Birlikte izleyelim" ──────────────────────────────
+  // Rota parametresi `together: { deck, friend }` ile gelinirse oda BİR KEZ otomatik kurulur (günlük oda hakkı
+  // aynı kapıdan geçer) ve davet kartı o arkadaşın sohbetine gönderilir. Kurulum başarısızsa kullanıcı
+  // normal duo ekranında kalır (hata mesajı showRoomError'dan). Davet sohbet ekranını açar; geri dönünce
+  // bekleme odası burada durur.
+  const together = route?.params?.together || null;
+  const togetherStarted = useRef(false);
+  const screenAlive = useRef(true);
+  useEffect(() => {
+    screenAlive.current = true;
+    return () => {
+      screenAlive.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!together || !uid || togetherStarted.current || roomState !== "idle") return;
+    const deck = (together.deck || []).map((entry) => normalizeWatchlistItem(entry)).filter(Boolean);
+    if (!together.friend?.uid || deck.length === 0) return;
+    togetherStarted.current = true;
+    if (!roomsGate.check()) return;
+    handleConfirmCreateRoom({ targetCardsCount: deck.length, category: "together", mediaType: "all" }, deck).then(
+      (created) => {
+        if (!created || !screenAlive.current) return;
+        const params = chatParamsForShare(
+          { uid: together.friend.uid, name: together.friend.name, avatarIndex: together.friend.avatarIndex },
+          buildCineRoomShare({ code: created.code, host: user?.displayName || "", count: created.count }),
+        );
+        if (!params) return;
+        trackEvent(ANALYTICS_EVENTS.TOGETHER_ROOM_INVITED, { cards: created.count });
+        navigation.navigate("ChatScreen", params);
+      },
+    );
+    // Tek seferlik: ref koruması var; oda durumu ve kapı değişince yeniden tetiklenmesin.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [together, uid]);
 
   const handleCancelRoom = async () => {
     if (!roomId) return;

@@ -84,6 +84,11 @@ import { getIdentityBadges } from "../../../components/badges/badgeCatalog";
 import { PREMIUM_PLAN, resolveServerPlan } from "../../../utils/premium";
 import { listItemToMedia } from "../../../utils/listShare";
 import { useMediaQuickActions } from "../../../context/MediaQuickActionsContext";
+import { useListStatusContext } from "../../../context/ListStatusContext";
+import TasteMatchCard from "../../../components/friends/TasteMatchCard";
+import { candidatesToDeckSource, computeTasteMatch, findTogetherCandidates } from "../../../utils/tasteMatch";
+import { trackEvent, ANALYTICS_EVENTS } from "../../../services/analytics";
+import { getTasteMatchCopy } from "../../../utils/tasteMatchCopy";
 
 
 import ModalToastHost from "@components/toast/ModalToastHost";
@@ -538,6 +543,69 @@ export default function FriendProfileScreen({ route, navigation }) {
     () => visibleLists.reduce((acc, [, items]) => acc + items.length, 0),
     [visibleLists],
   );
+
+  // ── Zevk uyumu + birlikte izleyelim ───────────────────────────────────────
+  // Arkadaşın bir listesi YALNIZ `listVisible`ta açıksa hesaba girer; kapalı olan `null` gider (bilinmiyor,
+  // boş değil). Veri tamamen inene kadar (alt koleksiyonlar) hesap yapılmaz. Bkz. utils/tasteMatch.js.
+  const myLists = useListStatusContext() || {};
+  const friendSide = useMemo(() => {
+    if (
+      !canViewLists || !profile || !allLists ||
+      subMovies === null || subShows === null || subFavorites === null || subWatchList === null
+    ) {
+      return null;
+    }
+    const raw = profile.listVisible;
+    const shared = new Set(
+      Array.isArray(raw)
+        ? raw.filter((m) => Object.values(m)[0] === true).map((m) => Object.keys(m)[0])
+        : Object.entries(raw || {}).filter(([, v]) => v === true).map(([k]) => k),
+    );
+    return {
+      watchedMovies: shared.has("watchedMovies")
+        ? mergeById(subMovies, (allLists.watchedMovies || []).filter((m) => m.type === "movie"))
+        : null,
+      watchedShows: shared.has("watchedTv") ? mergeById(subShows, allLists.watchedTv || []) : null,
+      watchList: shared.has("watchList") ? mergeById(subWatchList, allLists.watchList || []) : null,
+      favorites: shared.has("favorites") ? mergeById(subFavorites, allLists.favorites || []) : null,
+      ratings: allLists.activityIndex?.ratings || {},
+    };
+  }, [canViewLists, profile, allLists, subMovies, subShows, subFavorites, subWatchList]);
+  const mySide = useMemo(
+    () => ({
+      watchedMovies: myLists.watchedMoviesItems || [],
+      watchedShows: Object.values(myLists.watchedTvMap || {}),
+      watchList: myLists.watchListItems || [],
+      favorites: myLists.favoritesItems || [],
+      ratings: myLists.activityIndex?.ratings || {},
+    }),
+    [myLists.watchedMoviesItems, myLists.watchedTvMap, myLists.watchListItems, myLists.favoritesItems, myLists.activityIndex],
+  );
+  const tasteReady = !!friendSide && !myLists.loading && !!myLists.watchedTvLoaded;
+  const tasteMatch = useMemo(() => (tasteReady ? computeTasteMatch(mySide, friendSide) : null), [tasteReady, mySide, friendSide]);
+  const together = useMemo(() => (tasteReady ? findTogetherCandidates(mySide, friendSide) : null), [tasteReady, mySide, friendSide]);
+
+  const inviteToRoom = useCallback(() => {
+    if (!together?.candidates.length || !friendUid) return;
+    const deck = candidatesToDeckSource(together.candidates);
+    if (!deck.length) return;
+    trackEvent(ANALYTICS_EVENTS.TOGETHER_ROOM_STARTED, {
+      candidates: deck.length,
+      both: together.counts.both,
+      score: tasteMatch?.score ?? -1,
+    });
+    navigation.navigate("CineSwipeScreen", {
+      initialMode: "duo",
+      together: {
+        deck,
+        friend: {
+          uid: friendUid,
+          name: profile?.displayName || friendName || "",
+          avatarIndex: profile?.avatarIndex,
+        },
+      },
+    });
+  }, [together, friendUid, tasteMatch, profile?.displayName, profile?.avatarIndex, friendName, navigation]);
   // ── Moderasyon: şikâyet + engelle ─────────────────────────────────────────
   const isSelf = !!currentUser?.uid && currentUser.uid === friendUid;
 
@@ -939,6 +1007,22 @@ export default function FriendProfileScreen({ route, navigation }) {
                 />
               </>
             )}
+
+            {/* ── Zevk uyumu + birlikte izleyelim (kendi profilinde yok) ──────── */}
+            {tasteMatch && together && currentUser?.uid !== friendUid ? (
+              <>
+                <SectionHeader title={getTasteMatchCopy(language).title} />
+                <TasteMatchCard
+                  match={tasteMatch}
+                  together={together}
+                  friendName={profile?.displayName || friendName || ""}
+                  friendListHidden={friendSide?.watchList === null}
+                  noWatchedVisible={friendSide?.watchedMovies === null && friendSide?.watchedShows === null}
+                  canInvite={friend}
+                  onInvite={inviteToRoom}
+                />
+              </>
+            ) : null}
 
             {/* ── Paylaşılan Listeler ─────────────────────────────────────── */}
             {allLists === null ? (

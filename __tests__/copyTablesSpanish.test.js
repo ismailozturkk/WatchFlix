@@ -19,6 +19,7 @@ const { YEARLY_GOAL_COPY } = require("../components/profile/yearlyGoalCopy");
 const { FOLLOWED_PEOPLE_COPY } = require("../utils/followedPeopleCopy");
 const { PROVIDER_WATCH_COPY } = require("../utils/providerWatchCopy");
 const { LIBRARY_EXPORT_COPY } = require("../screens/tabs/settings/libraryExportCopy");
+const { TASTE_MATCH_COPY } = require("../utils/tasteMatchCopy");
 
 // `{ad}`, `{{ad}}`, `%d` biçimli yer tutucuları çıkarır.
 const yerTutucular = (metin) =>
@@ -81,6 +82,7 @@ const TABLOLAR = {
   "Oyuncu / yönetmen takibi (followedPeopleCopy)": () => FOLLOWED_PEOPLE_COPY,
   "Platformlarımda süzgeci (providerWatchCopy)": () => PROVIDER_WATCH_COPY,
   "Kütüphane dışa aktarma (libraryExportCopy)": () => LIBRARY_EXPORT_COPY,
+  "Zevk uyumu (tasteMatchCopy)": () => TASTE_MATCH_COPY,
   "Wrapped (wrappedStrings)": () => ({
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),

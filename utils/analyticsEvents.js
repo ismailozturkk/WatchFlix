@@ -106,6 +106,11 @@ export const ANALYTICS_EVENTS = {
   // izlenebilen, `unknown` sunucunun henüz taramadığı, `total` listedeki başlık sayısı. Süzgecin
   // benimsenmesini ve kapsamın (unknown oranı) yeterli olup olmadığını söyler.
   WATCHLIST_PLATFORM_FILTER: "watchlist_platform_filter",
+  // Arkadaş profilinden "Birlikte izleyelim" odası BAŞLATILDI (components/friends/TasteMatchCard). `candidates`
+  // odaya giren aday sayısı, `both` iki listede de olanlar, `score` zevk uyumu (-1: hesaplanamadı). İsim/kimlik YOK.
+  TOGETHER_ROOM_STARTED: "together_room_started",
+  // Oda gerçekten kuruldu ve davet sohbete gönderildi (CineSwipeScreen). Başlatılanla farkı = kota / hata kaybı.
+  TOGETHER_ROOM_INVITED: "together_room_invited",
   // Film/Dizi sekmesindeki "Takip ettiklerinin yaklaşanları" rafından bir yapımın açılması.
   // Rafın işe yarayıp yaramadığını söyleyen tek sinyal. `media_type` = "movie" | "tv".
   FOLLOWED_UPCOMING_OPENED: "followed_upcoming_opened",
