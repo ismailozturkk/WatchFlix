@@ -36,6 +36,9 @@ Aynı veri üç yerde işe yarar:
    `/movie/{id}/recommendations` listesi + oyuncuların en bilinen filmleri; dizi rayı aynısı diziler için. Çapraz tip yok.
    Sıralama saf: iki favorinin ortak önerisi öne çıkar, tek favori listeyi domine etmez (`rankRecommendations`).
    Favorileri ve **izlenmişleri eler** (`ListStatusContext.statusIndex`). Kaynak yoksa bölüm listeye hiç eklenmez.
+   Raf en çok 20 poster gösterir; başlıktaki **"Tümü"** `SeeAllScreen`'in `fromFavorites` bölümünü (`FavoritesSeeAll`)
+   açar: aynı kaynak/eleme, ama 100'e kadar öneri tek seferde (önerilerin TMDB sayfalaması yok). URL başına
+   12 saatlik önbellek paylaşıldığından raf açıkken ağa çıkmaz.
 2. **Seçici sayfası, sorgu yokken**: seçimlere göre öneri (oyuncuda: seçilen yapımların kadrosu), seçim yoksa popüler.
 3. **AI sohbeti**: `buildFavoritesPrompt` → `buildLibraryContext(..., { favoritesBlock })`. "Kütüphane bağlamı" ana anahtarına
    bağlı; kapalıyken hiçbir kişisel veri modele gitmez.

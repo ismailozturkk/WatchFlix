@@ -13,6 +13,7 @@
 //   ortak: "genres" (genreIds ile) | "providers" (providerId ile) |
 //          "subscriptions" | "recentFavorites" | "hiddenGems" — bunlar
 //          context yerine bağımsız discover isteğiyle yüklenir (bkz. DiscoverSeeAll).
+//          "fromFavorites" — dört favoriden türeyen öneriler (bkz. FavoritesSeeAll).
 //
 // Not: MovieProvider yalnız Movies sekmesini sardığı için (uygulama kökünde
 // değil), film dalı kendi MovieProvider örneğiyle sarılır — bağımsız olarak
@@ -51,6 +52,11 @@ import AppIcon from "../../components/AppIcon";
 import { LinearGradient } from "expo-linear-gradient";
 import { toast } from "../../components/AppToast";
 import { i18nText } from "../../utils/i18nText";
+import { useUserProfile } from "../../context/UserProfileContext";
+import { useListStatusContext } from "../../context/ListStatusContext";
+import { fetchFavoriteRecommendations } from "../../services/favoriteRecommendations";
+import { getFavoritesCopy } from "../../utils/favoritesCopy";
+import { readProfileFavorites, recommendationSources } from "../../utils/fourFavorites";
 
 const { width } = Dimensions.get("window");
 const SIDE = 12;
@@ -810,6 +816,87 @@ function useDiscoverPagination({ mediaType, genreIds, providerId, preset }) {
   return { data, loadMore, loadingMore, hasMore: page < totalPages };
 }
 
+// ── Favorilerine Göre dalı ──
+// Ray (components/favorites/FavoritesRecommendationRail) ile AYNI kaynak ve aynı elemeyi kullanır:
+// dört favoriden türeyen öneriler, izlenmişler çıkarılmış. Önerilerin TMDB'de sayfalaması yok (her
+// kaynak tek liste, istemcide harmanlanıyor) — ray 20 gösterir, burada hepsi tek seferde gelir.
+// URL başına 12 saatlik önbellek paylaşıldığı için ray açıkken bu ekran ağa çıkmaz.
+const FAVORITES_SEE_ALL_LIMIT = 100;
+
+function FavoritesSeeAll({ mediaType, title, navigation }) {
+  const { theme } = useTheme();
+  const { API_KEY } = useApiSettings();
+  const { language } = useLanguage();
+  const { profile } = useUserProfile();
+  const { statusIndex } = useListStatusContext() || {};
+  const copy = getFavoritesCopy(language);
+
+  const favorites = useMemo(() => readProfileFavorites(profile), [profile]);
+  // Profil belgesi her anlık görüntüde yeni nesne olur; isteği nesneye değil kaynak kimliğine bağla.
+  const sourceKey = useMemo(
+    () => recommendationSources(favorites, mediaType).map((source) => source.key).join("|"),
+    [favorites, mediaType],
+  );
+
+  const [feed, setFeed] = useState({ status: "loading", items: [] });
+  useEffect(() => {
+    if (!sourceKey || !API_KEY) {
+      setFeed({ status: "ready", items: [] });
+      return undefined;
+    }
+    let active = true;
+    fetchFavoriteRecommendations({
+      favorites,
+      mediaType,
+      apiKey: API_KEY,
+      language,
+      limit: FAVORITES_SEE_ALL_LIMIT,
+    })
+      .then(({ items }) => {
+        if (active) setFeed({ status: "ready", items });
+      })
+      .catch(() => {
+        if (active) setFeed((current) => (current.items.length ? current : { status: "error", items: [] }));
+      });
+    return () => {
+      active = false;
+    };
+    // `favorites` kimliği sourceKey'den türüyor (yukarıdaki not).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [API_KEY, language, mediaType, sourceKey]);
+
+  const data = useMemo(() => {
+    const seen = statusIndex?.[mediaType] || {};
+    return feed.items.filter((item) => !seen[item.id]?.isWatched);
+  }, [feed.items, mediaType, statusIndex]);
+
+  const emptyMessage =
+    feed.status === "error"
+      ? copy.picker.loadError
+      : feed.status === "ready"
+        ? copy.picker.noResults
+        : null;
+
+  return (
+    <SeeAllGrid
+      title={title}
+      mediaType={mediaType}
+      navigation={navigation}
+      data={data}
+      hasMore={false}
+      emptyComponent={
+        emptyMessage ? (
+          <View style={styles.empty}>
+            <Text allowFontScaling={false} style={{ color: theme.text.muted, fontSize: 14 }}>
+              {emptyMessage}
+            </Text>
+          </View>
+        ) : undefined
+      }
+    />
+  );
+}
+
 function DiscoverSeeAll({
   mediaType,
   title,
@@ -834,6 +921,11 @@ function DiscoverSeeAll({
 
 export default function SeeAllScreen({ route, navigation }) {
   const { mediaType, section, title, genreIds, providerId } = route.params || {};
+
+  // Favorilerine Göre: öneriler favorilerden istemcide türetilir, discover/context akışı yok.
+  if (section === "fromFavorites") {
+    return <FavoritesSeeAll mediaType={mediaType} title={title} navigation={navigation} />;
+  }
 
   // Genres / Providers: taze context yerine bağımsız discover akışı.
   if (

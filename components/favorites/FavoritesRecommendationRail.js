@@ -124,6 +124,13 @@ export default function FavoritesRecommendationRail({ mediaType, navigation }) {
         subtitle={subtitle}
         section="fromFavorites"
         mediaType={mediaType}
+        onPressAction={() =>
+          navigation.navigate("SeeAllScreen", {
+            mediaType,
+            section: "fromFavorites",
+            title: copy.rail.title,
+          })
+        }
       />
       {state.status === "loading" ? (
         <RailSkeleton />
