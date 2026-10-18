@@ -17,6 +17,7 @@ const { DISCOVER_FILTERS_COPY } = require("../screens/shared/discoverFiltersCopy
 const { getWrappedStrings } = require("../utils/wrappedStrings");
 const { YEARLY_GOAL_COPY } = require("../components/profile/yearlyGoalCopy");
 const { FOLLOWED_PEOPLE_COPY } = require("../utils/followedPeopleCopy");
+const { PROVIDER_WATCH_COPY } = require("../utils/providerWatchCopy");
 
 // `{ad}`, `{{ad}}`, `%d` biçimli yer tutucuları çıkarır.
 const yerTutucular = (metin) =>
@@ -77,6 +78,7 @@ const TABLOLAR = {
   "Ne izlesem? (discoverFiltersCopy)": () => DISCOVER_FILTERS_COPY,
   "Yıllık izleme hedefi (yearlyGoalCopy)": () => YEARLY_GOAL_COPY,
   "Oyuncu / yönetmen takibi (followedPeopleCopy)": () => FOLLOWED_PEOPLE_COPY,
+  "Platformlarımda süzgeci (providerWatchCopy)": () => PROVIDER_WATCH_COPY,
   "Wrapped (wrappedStrings)": () => ({
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),

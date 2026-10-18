@@ -1,4 +1,4 @@
-import { tmdbLanguageOf } from "../../utils/appLanguages";
+import { tmdbLanguageOf, tmdbRegionOf } from "../../utils/appLanguages";
 import { Image } from "expo-image";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
@@ -34,7 +34,13 @@ import {
   useContentSettings,
   useImageQualitySettings,
   useListLayoutSettings,
+  useStreamingProviderSettings,
 } from "@context/AppSettingsContext";
+import useProviderWatch from "@hooks/useProviderWatch";
+import PlatformFilterSection from "@components/lists/PlatformFilterSection";
+import { classifyTitle, planPlatformFilter } from "@utils/providerWatch";
+import { getProviderWatchCopy } from "@utils/providerWatchCopy";
+import { trackEvent, ANALYTICS_EVENTS } from "@services/analytics";
 import CaseOpeningModal from "@components/modals/CaseOpeningModal";
 import DatePickerModal from "@components/modals/DatePickerModal";
 import ListSearchBar from "@components/lists/ListSearchBar";
@@ -120,6 +126,7 @@ export default function ListsScreen({ route, navigation }) {
   const [typeFilter, setTypeFilter] = useState("all"); // all | movie | tv
   const [dateRange, setDateRange] = useState("all"); // all | 7 | 30 | 365
   const [genreFilter, setGenreFilter] = useState([]); // seçili tür isimleri
+  const [platformOnly, setPlatformOnly] = useState(false); // yalnız platformlarımda izlenebilenler (izleme listesi)
   const [filtering, setFiltering] = useState(false); // sıralama/filtre yükleniyor
   const filterFirstRef = useRef(true);
   // ── Görünüm ayarları — uygulama açılışında hidrate edilen ortak ayardan gelir
@@ -144,6 +151,12 @@ export default function ListsScreen({ route, navigation }) {
   const { user } = useAuth();
   const { API_KEY } = useApiSettings();
   const { adultContent } = useContentSettings();
+  // "Platformlarımda" süzgeci YALNIZ izleme listesinde: sunucu snapshot'ı (ProviderWatch) yalnız o listeyi
+  // kapsıyor. Dinleyici diğer listelerde açılmaz.
+  const isWatchList = listName === "watchList";
+  const { streamingProviderIds } = useStreamingProviderSettings();
+  const { snapshot: providerSnapshot } = useProviderWatch({ active: isWatchList });
+  const providerCopy = getProviderWatchCopy(language);
   // Tür id → ad tablosu: global aramadan eklenen öğe tür adlarını KAYDEDENİN
   // dilinde alsın (TMDB arama sonucu yalnız id taşıyor).
   const genreMap = useMemo(() => buildGenreMap(), [language]);
@@ -500,12 +513,29 @@ export default function ListsScreen({ route, navigation }) {
     [listItems],
   );
 
+  // "Platformlarımda": sayılar HAM listeden (diğer süzgeçlerden bağımsız) hesaplanır ki çipteki sayı
+  // süzgeç değiştikçe oynamasın. Veri kullanılamıyorsa (belge yok, bölge farklı…) süzgeç etkisizdir.
+  const platformPlan = useMemo(
+    () =>
+      isWatchList
+        ? planPlatformFilter({
+            snapshot: providerSnapshot,
+            myProviderIds: streamingProviderIds,
+            region: tmdbRegionOf(language),
+            items: listItems,
+          })
+        : null,
+    [isWatchList, providerSnapshot, streamingProviderIds, language, listItems],
+  );
+  const platformActive = platformOnly && platformPlan?.state === "ready";
+
   // Aktif filtre/sıralama göstergesi
   const sortActive = sortBy !== "default";
   const activeFilterCount =
     (typeFilter !== "all" ? 1 : 0) +
     (dateRange !== "all" ? 1 : 0) +
-    (genreFilter.length > 0 ? 1 : 0);
+    (genreFilter.length > 0 ? 1 : 0) +
+    (platformActive ? 1 : 0);
 
   // Bir öğenin toplam süresi (dk): film → runtime, dizi → bölüm sürelerinin toplamı.
   const getItemMinutes = (item) => {
@@ -552,6 +582,7 @@ export default function ListsScreen({ route, navigation }) {
       )
         return false;
       if (typeFilter !== "all" && item.type !== typeFilter) return false;
+      if (platformActive && classifyTitle(providerSnapshot, item, streamingProviderIds) !== "yes") return false;
       if (dateRange !== "all") {
         if (!item.dateAdded) return false;
         const ts = new Date(item.dateAdded).getTime();
@@ -589,6 +620,9 @@ export default function ListsScreen({ route, navigation }) {
     typeFilter,
     dateRange,
     genreFilter,
+    platformActive,
+    providerSnapshot,
+    streamingProviderIds,
     sortBy,
     sortDir,
     language,
@@ -606,6 +640,19 @@ export default function ListsScreen({ route, navigation }) {
     setTypeFilter("all");
     setDateRange("all");
     setGenreFilter([]);
+    setPlatformOnly(false);
+  };
+
+  const togglePlatformOnly = () => {
+    const next = !platformOnly;
+    setPlatformOnly(next);
+    if (next) {
+      trackEvent(ANALYTICS_EVENTS.WATCHLIST_PLATFORM_FILTER, {
+        yes: platformPlan?.counts.yes ?? 0,
+        unknown: platformPlan?.counts.unknown ?? 0,
+        total: platformPlan?.counts.total ?? 0,
+      });
+    }
   };
 
   const toggleGenre = (g) =>
@@ -623,7 +670,7 @@ export default function ListsScreen({ route, navigation }) {
     setFiltering(true);
     const id = setTimeout(() => setFiltering(false), 280);
     return () => clearTimeout(id);
-  }, [tvShowStatus, typeFilter, dateRange, genreFilter, sortBy, sortDir]);
+  }, [tvShowStatus, typeFilter, dateRange, genreFilter, platformActive, sortBy, sortDir]);
 
   // ── Global arama (TMDB) ────────────────────────────────────────────────────
   // Bu listede zaten olan eserler sonuçta "tik"le işaretlenir; anahtar tip+id
@@ -2502,6 +2549,18 @@ export default function ListsScreen({ route, navigation }) {
                     })}
                   </View>
                 </>
+              ) : null}
+
+              {/* Platformlarım (yalnız izleme listesi; sunucu snapshot'ı) */}
+              {isWatchList && platformPlan ? (
+                <PlatformFilterSection
+                  plan={platformPlan}
+                  selected={platformOnly}
+                  onToggle={togglePlatformOnly}
+                  copy={providerCopy}
+                  theme={theme}
+                  accent={accent}
+                />
               ) : null}
 
               {/* Eklenme tarihi aralığı */}

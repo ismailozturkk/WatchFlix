@@ -102,6 +102,10 @@ export const ANALYTICS_EVENTS = {
   // `action` = "follow" | "unfollow", `source` = "profile" (kişi sayfası) | "sheet" (takip
   // listesi), `department` TMDB bölümü ("Acting" | "Directing" | …). İsim/kimlik GÖNDERİLMEZ.
   PERSON_FOLLOW: "person_follow",
+  // İzleme listesinde "Platformlarımda" süzgeci AÇILDI (utils/providerWatch.js). `yes` platformlarında
+  // izlenebilen, `unknown` sunucunun henüz taramadığı, `total` listedeki başlık sayısı. Süzgecin
+  // benimsenmesini ve kapsamın (unknown oranı) yeterli olup olmadığını söyler.
+  WATCHLIST_PLATFORM_FILTER: "watchlist_platform_filter",
   // Film/Dizi sekmesindeki "Takip ettiklerinin yaklaşanları" rafından bir yapımın açılması.
   // Rafın işe yarayıp yaramadığını söyleyen tek sinyal. `media_type` = "movie" | "tv".
   FOLLOWED_UPCOMING_OPENED: "followed_upcoming_opened",
