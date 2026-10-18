@@ -30,7 +30,7 @@
 import React, { useRef, useState, memo } from "react";
 import { StyleSheet, View, TouchableOpacity, Animated } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";

@@ -33,7 +33,7 @@ const episode = (showId, epId, extra = {}) => ({
 
 async function setup() {
   const h = boot();
-  jest.doMock("react-native-toast-message", () => ({ __esModule: true, default: mockToast }));
+  jest.doMock("../components/AppToast", () => ({ __esModule: true, default: mockToast, toast: mockToast }));
   jest.doMock("../utils/i18nText", () => ({ i18nText: (_key, fallback) => fallback }));
   jest.doMock("../services/userData", () => ({ remindersActions: h.mods.remindersActions }));
   const util = require("../utils/reminderQuickDelete");

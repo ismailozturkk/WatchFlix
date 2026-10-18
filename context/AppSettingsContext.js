@@ -8,7 +8,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import { i18nText } from "../utils/i18nText";
 import { Keys, get, set, useStored } from "../services/storage";

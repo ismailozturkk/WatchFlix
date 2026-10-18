@@ -16,8 +16,9 @@
 // önizleme + not alanı kalır (kalanı gizlenir, odak kaybolmasın diye
 // unmount edilmez).
 //
-// Geri bildirim sayfa İÇİNDE (banner): AppToast kökte render olur, native Modal
-// pencerelerinin ARKASINDA kalır — burada toast görünmezdi.
+// Geri bildirim sayfa İÇİNDE (banner): paylaş/kaydet sonucu, işlemi başlatan düğmenin
+// hemen yanında okunur. (Sayfa bir BottomSheetModal olduğu için toast da görünürdü —
+// bkz. components/toast/ToastHost.js — ama banner bağlamı korur.)
 //
 // Seçimler (düzen/renk/poster kaynağı/anahtarlar) MMKV'de hatırlanır; not
 // hatırlanmaz (Keys.profileStoryCard, utils/profileStoryCard.js).

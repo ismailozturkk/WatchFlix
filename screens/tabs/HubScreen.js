@@ -19,6 +19,8 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
+import useScreenSections from "../../hooks/useSectionVisibility";
+import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import {
   View,
@@ -64,6 +66,9 @@ export default function HubScreen({ navigation }) {
   const { language } = useLanguage();
   const { user } = useAuth();
   const { avatar } = useProfileUi();
+  // Ayarlar > Kişiselleştirme > Ekran bölümleri'nde gizlenen kartlar
+  // (utils/sectionVisibility.js "hub"). Selamlama başlığı her zaman görünür.
+  const { isVisible: show, allHidden } = useScreenSections("hub");
 
   // Wrapped modülü sayfanın alt yarısında: giriş animasyonu mount anında değil,
   // kart ekrana girerken oynamalı. Bayrak yalnız bir kez açılır (state tek
@@ -137,33 +142,44 @@ export default function HubScreen({ navigation }) {
         </View>
 
         {/* Sosyal */}
-        <HubSection title={i18nText("autoI18n.sosyal", "Sosyal")} theme={theme}>
-          <FeedWidget navigation={navigation} />
-        </HubSection>
+        {show("feed") && (
+          <HubSection title={i18nText("autoI18n.sosyal", "Sosyal")} theme={theme}>
+            <FeedWidget navigation={navigation} />
+          </HubSection>
+        )}
 
         {/* CineSwipe (Birlikte Ne İzlesek?) */}
-        <HubSection title="CINESWIPE" theme={theme}>
-          <CineSwipeWidget navigation={navigation} />
-        </HubSection>
+        {show("cineswipe") && (
+          <HubSection title="CINESWIPE" theme={theme}>
+            <CineSwipeWidget navigation={navigation} />
+          </HubSection>
+        )}
 
         {/* Turnuva */}
-        <HubSection title={i18nText("autoI18n.tournament_section", "Turnuva")} theme={theme}>
-          <TournamentWidget navigation={navigation} />
-        </HubSection>
+        {show("tournament") && (
+          <HubSection title={i18nText("autoI18n.tournament_section", "Turnuva")} theme={theme}>
+            <TournamentWidget navigation={navigation} />
+          </HubSection>
+        )}
 
-        {/* Wrapped ve Yıllık Arşiv (profilden taşındı) */}
-        <View
-          style={styles.wrappedHost}
-          onLayout={(e) => {
-            wrappedTop.current = e.nativeEvent.layout.y;
-            checkWrappedSeen();
-          }}
-        >
-          <HubWrappedModule navigation={navigation} revealed={wrappedSeen} />
-        </View>
+        {/* Wrapped ve Yıllık Arşiv (profilden taşındı). Gizliyken hiç çizilmez; yeniden
+            gösterilince `onLayout` konumu tazeler (giriş animasyonu bayrağı tek yönlüdür). */}
+        {show("wrapped") && (
+          <View
+            style={styles.wrappedHost}
+            onLayout={(e) => {
+              wrappedTop.current = e.nativeEvent.layout.y;
+              checkWrappedSeen();
+            }}
+          >
+            <HubWrappedModule navigation={navigation} revealed={wrappedSeen} />
+          </View>
+        )}
 
         {/* Oyunlar */}
-        <ProfileGamesModule navigation={navigation} />
+        {show("games") && <ProfileGamesModule navigation={navigation} />}
+
+        {allHidden && <SectionsHiddenNotice navigation={navigation} screen="hub" />}
         </MarkedScrollView>
       </SafeAreaView>
     </View>

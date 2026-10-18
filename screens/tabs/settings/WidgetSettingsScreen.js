@@ -30,6 +30,7 @@ import { useTheme } from "@context/ThemeContext";
 import { alpha, buildCustomTheme, themes } from "../../../theme/colors";
 import { isLightSurface, toHex } from "../../../utils/colorUtils";
 import { i18nText } from "@utils/i18nText";
+import { toast } from "@components/AppToast";
 import {
   DEFAULT_WIDGET_PREFERENCES,
   POSTER_LIMIT_OPTIONS,
@@ -263,6 +264,7 @@ export default function WidgetSettingsScreen() {
       const defaults = await resetWidgetPreferences();
       dirty.current = false;
       setPreferences(defaults);
+      toast.success(i18nText("autoI18n.toast_widget_sifirlandi", "Widget ayarları sıfırlandı"));
     } catch {
       setSaveFailed(true);
     } finally {

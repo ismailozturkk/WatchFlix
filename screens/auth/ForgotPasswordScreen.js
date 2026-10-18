@@ -16,7 +16,7 @@ import React, { useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import * as Haptics from "@services/hapticsService";
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

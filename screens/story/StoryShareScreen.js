@@ -28,7 +28,7 @@ import { saveToLibraryAsync } from "expo-media-library/legacy";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import axios from "axios";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";

@@ -35,7 +35,7 @@ import GlassCloseButton from "@components/common/GlassCloseButton";
 import GlassIconButton from "@components/common/GlassIconButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { db } from "../../../firebase";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useTheme } from "../../../context/ThemeContext";
 import { useAuth } from "../../../context/AuthContext";
 import { getAvatarSource } from "../../../utils/avatars";
@@ -86,6 +86,7 @@ import { listItemToMedia } from "../../../utils/listShare";
 import { useMediaQuickActions } from "../../../context/MediaQuickActionsContext";
 
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const PROTECTED_LISTS = ["watchedMovies", "watchedTv", "watchList", "favorites"];
 // Bu sayı ve üzeri içerikte liste modalı sabit yükseklik yerine ekranı
 // kaplayacak şekilde büyür (bkz. FriendProfileScreen liste modalı).
@@ -1248,6 +1249,7 @@ export default function FriendProfileScreen({ route, navigation }) {
             </View>
           </View>
         </View>
+        <ModalToastHost visible={unfriendModalVisible} />
       </Modal>
 
       <AvatarPreviewModal

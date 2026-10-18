@@ -19,7 +19,7 @@ import React, {
   useState,
 } from "react";
 import { Keys, get, set } from "../services/storage";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import * as PostsApi from "../services/postsService";
 import { useAuth } from "./AuthContext";
 import { useFriends } from "./FriendsContext";

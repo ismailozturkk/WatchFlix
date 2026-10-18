@@ -1,6 +1,6 @@
 // hooks/useWatchProgress.js
 //
-// İzleme puanı (Kare), Perde ve 81 rozetin TEK giriş noktası.
+// İzleme puanı (Kare), Perde ve 140+ rozetin TEK giriş noktası.
 //
 // Katalog üstünde ÜÇ ödül katmanı daha buradan birleşir:
 //   • KOLEKSİYON (badgeSets.js)   — girdisi rozetlerin kendisi
@@ -16,7 +16,7 @@
 // için tek seferlik bir doküman okuması yapılır (getDoc, listener değil) ve
 // başarısız olursa sistem sessizce onsuz çalışır.
 //
-// TEK useMemo: 81 rozetin hiçbiri listeyi ayrıca taramaz; hepsi
+// TEK useMemo: rozetlerin hiçbiri listeyi ayrıca taramaz; hepsi
 // computeWatchScore'un tek geçişinden çıkan `stats` objesini okur. 512 film +
 // 3.400 bölümde tek geçiş node'da ~30 ms (bkz. __tests__/watchScoring.test.js).
 
@@ -27,16 +27,20 @@ import { loadGameData } from "@services/sceneGameService";
 import { computePerde, computeWatchScore, hesapYasiYil } from "@utils/watchScoring";
 import { kanonikTur } from "@utils/genreCanon";
 import {
+  bilinenRozetIdleri,
   evaluateWatchBadges,
   gruplaAileler,
+  KATALOG_SURUMU,
   prestijIdleri,
-  WATCH_BADGE_IDS,
 } from "@components/badges/watchBadgeCatalog";
-import { BADGE_SET_IDS, evaluateBadgeSets } from "@components/badges/badgeSets";
+import { Keys, set as setStored } from "@services/storage";
+import { bilinenSetIdleri, evaluateBadgeSets } from "@components/badges/badgeSets";
 import { muhurIdleri, muhurleriHesapla } from "@components/badges/seasonSeals";
 import { kutlanacaklar, loadLedger, markCelebrated, reconcileLedger } from "@utils/watchBadgeLedger";
 import { serileriHesapla } from "@utils/watchActivity";
 import { kartlariDekorle } from "@components/badges/badgeInsights";
+import useKesifSignals from "@hooks/useKesifSignals";
+import { kesifHazirImzasi } from "@utils/kesifSignals";
 
 const BOS_ROZETLER = [];
 const BOS_TARIHLER = Object.freeze({});
@@ -165,12 +169,24 @@ export default function useWatchProgress() {
     setTohumRozetSayisi(0);
   }, [uid]);
 
+  // Keşif rozetlerinin girdisi (not, liste, hatırlatıcı, arkadaş, profil, CineMatch).
+  // İZLEME VERİSİNDEN DEĞİL ve computeWatchScore'a GİRMEZ: puana girmez, yeni
+  // dinleyici açmaz (hooks/useKesifSignals.js). Referans yalnız içerik değişince değişir.
+  const kesif = useKesifSignals();
+
+  // ── AĞIR HESAP ─────────────────────────────────────────────────────────────
+  // computeWatchScore 512 film + 3.400 bölümü tek geçişte tarar (~30 ms). Girdisi
+  // YALNIZ izleme verisi; ayrı memo olduğu için Perde tabanı, defter, seri ya da
+  // Keşif sinyali değişince (ilk notu yazmak gibi) yeniden KOŞMAZ.
+  const hesap = useMemo(() => {
+    if (!veriHazir) return null;
+    return computeWatchScore({ movies: listItems, shows: listItemsTv, kanonikTur });
+  }, [veriHazir, listItems, listItemsTv]);
+
   // ── TEK HESAP ──────────────────────────────────────────────────────────────
   const sonuc = useMemo(() => {
-    if (!veriHazir) return null;
-    const { toplam, kirilim, stats } = computeWatchScore({
-      movies: listItems, shows: listItemsTv, kanonikTur,
-    });
+    if (!hesap) return null;
+    const { toplam, kirilim, stats } = hesap;
     const perde = computePerde(toplam, perdeFloor, makaraFloor);
     // seri_* rozetleri artık `rekorHaftaSerisi`den besleniyor, `enUzunSeri`den
     // DEĞİL. Gerekçe utils/watchActivity.js'te: eski ölçüt kullanıcının seçtiği
@@ -183,6 +199,10 @@ export default function useWatchProgress() {
       perde: perde.perde, oyunSeviye, hesapYili,
       rekorHaftaSerisi: seriler?.rekorHafta || 0,
       rekorGunSerisi: seriler?.rekorGun || 0,
+      // Keşif: sayılar + hangi kaynağın yüklendiği (ikincisi deftere gidecek id
+      // listesini belirler, bkz. mutabakat effect'i).
+      kesif: kesif.sayilar,
+      kesifHazir: kesif.hazir,
     };
     const rozetler = evaluateWatchBadges(zenginStats, kazanilmis);
     const aileKartlari = gruplaAileler(rozetler);
@@ -211,7 +231,7 @@ export default function useWatchProgress() {
     // kartına "doğrulanmamış" etiketi basmanın kimseye faydası yok. Fonksiyon
     // utils/watchScoring.js'te duruyor çünkü sunucu tarafına geçildiğinde
     // (docs §8.4) orada gerçek bir tüketicisi olacak.
-  }, [veriHazir, listItems, listItemsTv, perdeFloor, makaraFloor, oyunSeviye, hesapYili, seriler, aktifGunler, kazanilmis]);
+  }, [hesap, perdeFloor, makaraFloor, oyunSeviye, hesapYili, seriler, aktifGunler, kazanilmis, kesif]);
 
   // ── Defter mutabakatı ──────────────────────────────────────────────────────
   // Yalnızca açık rozet kümesi ya da Perde gerçekten değiştiğinde çalışır;
@@ -233,9 +253,16 @@ export default function useWatchProgress() {
     // yanlış olurdu: ikisi de doğaları gereği kazanıldıkları anda ilk kez
     // ortaya çıkar. O yüzden güncel dönem mührü kazanılmadan ÖNCE, prestijin
     // bir SONRAKİ basamağı da ulaşılmadan önce listeye yazılır.
+    //
+    // KEŞİF İSTİSNASI: kaynağı henüz yüklenmemiş Keşif rozetleri (ve onlara bağlı
+    // koleksiyon) bu listeye YAZILMAZ. Yüklenmemiş kaynakta rozet "hak edilmedi"
+    // görünür; id `known`a girerse kaynak gelince eski kullanıcıya "İlk Not" konfetisi
+    // yağar. Yazılmazsa kaynak hazır olunca id ilk kez görülür ve hak ediliyorsa
+    // sessiz emilir (utils/kesifSignals.js YÜKLENME YARIŞI).
+    const kesifHazir = sonuc.stats.kesifHazir;
     const tumIds = [
-      ...WATCH_BADGE_IDS,
-      ...BADGE_SET_IDS,
+      ...bilinenRozetIdleri(kesifHazir),
+      ...bilinenSetIdleri(kesifHazir, kazanilmis),
       ...muhurIdleri({ kazanilmis }),
       ...prestijIdleri(sonuc.kartlar, { sonraki: 1 }),
     ];
@@ -244,7 +271,12 @@ export default function useWatchProgress() {
     // oluşsaydı, hiçbir rozeti açmayan sıradan bir işaretleme (ki neredeyse
     // hepsi öyle) mutabakatı hiç tetiklemez ve o gün SERİYE HİÇ YAZILMAZDI.
     const icerikSayisi = sonuc.stats.filmSayisi + sonuc.stats.bolumSayisi;
-    const imza = `${sonuc.perde.perde}.${sonuc.perde.makara}|${icerikSayisi}|${acikIds.join(",")}`;
+    // Hangi Keşif kaynaklarının hazır olduğu da imzada: bir kaynak hazır olduğunda
+    // açık rozet kümesi DEĞİŞMEYEBİLİR (0 arkadaş, hazır) ama `tumIds` değişir; imza
+    // bunu görmezse id `known`a hiç yazılmaz ve kullanıcının İLK arkadaşı geldiğinde
+    // "ilk kez görüldü + hak edildi" diye SESSİZCE emilirdi — gerçek kazanım kutlanmazdı.
+    const kesifImza = kesifHazirImzasi(kesifHazir);
+    const imza = `${sonuc.perde.perde}.${sonuc.perde.makara}|${icerikSayisi}|${kesifImza}|${acikIds.join(",")}`;
     if (imza === sonImza.current) return;
     sonImza.current = imza;
 
@@ -276,6 +308,12 @@ export default function useWatchProgress() {
       .then((r) => {
         yerlesti = true;
         if (iptal) return;
+        // Defteri BU build'de ilk kez kuran kullanıcı için "yeni rozetler eklendi"
+        // duyurusu anlamsız: kataloğun eski halini hiç görmedi, her şey onun için
+        // yeni. Sürümü "görüldü" yazarak duyuruyu baştan kapatıyoruz. Defteri
+        // önceki sürümle kurmuş kullanıcıda bu satıra girilmez (ilkTohum false) ve
+        // duyuru rozet ekranında çıkar.
+        if (r.ilkTohum) setStored(Keys.watchCatalogSeen, KATALOG_SURUMU, { uid });
         setDefter(r.ledger);
         setKazanmaTarihleri((o) => (ayniHarita(o, r.ledger.earnedAt) ? o : r.ledger.earnedAt));
         setIlkTohum(r.ilkTohum);

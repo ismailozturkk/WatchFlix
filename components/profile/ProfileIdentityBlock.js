@@ -10,18 +10,31 @@
 //
 // Şimdi yukarıdan aşağıya tek okuma yönü:
 //   ad → @kullanıcı adı → rozetler → küçük ikonlu meta satırları → eylemler.
-// Eylemler sütunun ALTINDA: etiketli birincil "Düzenle" hapı + kare "Paylaş".
+// Eylemler sütunun ALTINDA: etiketli birincil "Düzenle" hapı + kare "Paylaş" + (açıksa)
+// yıllık hedef halkası. Üçü de 36 pt yüksekliğinde.
 // Sütun dar (360 px'lik ekranda ~158 px) — bu yüzden e-posta ortadan kısaltılır
 // (alan adı görünür kalır) ve tarih kısa ay adıyla tek satıra sığar.
+//
+// EYLEM SATIRI DARLIĞI. Üç düğmeyle "Düzenle"ye 360 pt'te ~70 px kalır (158 − 2×36 − 2×8):
+//   • "Düzenle" kendi genişliği `EDIT_ICON_MIN`in altındaysa simgesini bırakır, yalnız etiket
+//     kalır (ölçüm onLayout ile; simge yeniden sığınca geri gelir). Etiket 13 punto ~50 px,
+//     dolgu dahil `EDIT_MIN` (62) altına inmez.
+//   • Sütun `EDIT_MIN` + iki kare + boşluklara (150 px) yetmeyecek kadar darsa (320 pt) satır
+//     SARILIR: halka düğmesi alt satıra iner. Tek satıra zorlamak "Düzenle"yi 30 px'e ezerdi.
 
 import { intlLocaleOf } from "../../utils/appLanguages";
-import React, { memo } from "react";
+import React, { memo, useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import AppIcon from "../AppIcon";
 import GlassIconButton from "../common/GlassIconButton";
 import IdentityBadgesRow from "../badges/IdentityBadgesRow";
+import YearlyGoalButton from "./YearlyGoalButton";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
+
+// "Düzenle" hapının asgari genişliği (yalnız etiket) ve simgenin de sığdığı genişlik.
+const EDIT_MIN = 62;
+const EDIT_ICON_MIN = 96;
 
 // Doğrulama renkleri temadan bağımsız: her zeminde okunur (eski ekranla aynı).
 const VERIFIED_COLOR = "rgb(29, 161, 242)";
@@ -60,7 +73,15 @@ function ProfileIdentityBlock({
   joinedAt,
   onEdit,
   onShare,
+  showGoal = false,
 }) {
+  // İlk ölçüme kadar simge YOK: dar ekranda simge önce çizilip sonra kaybolmasın.
+  const [editWidth, setEditWidth] = useState(0);
+  const onEditLayout = useCallback((event) => {
+    const width = Math.round(event.nativeEvent.layout.width);
+    setEditWidth((previous) => (previous === width ? previous : width));
+  }, []);
+  const showEditIcon = editWidth >= EDIT_ICON_MIN;
   const joinDate = joinedAt ? formatJoinDate(joinedAt, language) : null;
   const editLabel = i18nText("autoI18n.profili_duzenle", "Profili Düzenle");
 
@@ -162,6 +183,7 @@ function ProfileIdentityBlock({
       <View style={styles.actions}>
         <Pressable
           onPress={onEdit}
+          onLayout={onEditLayout}
           hitSlop={4}
           accessibilityRole="button"
           accessibilityLabel={editLabel}
@@ -173,12 +195,14 @@ function ProfileIdentityBlock({
             },
           ]}
         >
-          <AppIcon
-            family="Ionicons"
-            name="create-outline"
-            size={16}
-            color={theme.accent}
-          />
+          {showEditIcon ? (
+            <AppIcon
+              family="Ionicons"
+              name="create-outline"
+              size={16}
+              color={theme.accent}
+            />
+          ) : null}
           <Text
             allowFontScaling={false}
             numberOfLines={1}
@@ -205,6 +229,8 @@ function ProfileIdentityBlock({
           accessibilityLabel={i18nText("autoI18n.paylas", "Paylaş")}
           onPress={onShare}
         />
+
+        {showGoal ? <YearlyGoalButton /> : null}
       </View>
     </View>
   );
@@ -264,12 +290,17 @@ const styles = StyleSheet.create({
   actions: {
     marginTop: 12,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 8,
   },
+  // flex: 1 DEĞİL: flexBasis 0 sarmayı hiç tetiklemez (satır asla taşmış sayılmaz).
+  // Açık taban + büyüme: boş yeri doldurur, ama EDIT_MIN altına inmeden önce satır sarılır.
   editBtn: {
-    flex: 1,
-    minWidth: 0,
+    flexGrow: 1,
+    flexShrink: 0,
+    flexBasis: EDIT_MIN,
+    minWidth: EDIT_MIN,
     height: 36,
     flexDirection: "row",
     alignItems: "center",

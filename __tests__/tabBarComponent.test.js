@@ -159,13 +159,13 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
 
   const defaultLayout = getTabBarLayout({ width: 390, bottomInset: 34, mode: "legacy-blur" });
 
-  it("renders 5 tabs as icon-only capsule buttons with accessible labels", () => {
+  it("renders 4 tabs as icon-only capsule buttons with accessible labels (no AI button unless asked)", () => {
     let renderer;
     act(() => {
       renderer = create(
         <TabBar
           tabs={tabs}
-          activeTab="tvshows"
+          activeTab="discover"
           onSelect={jest.fn()}
           mode="legacy-blur"
           layout={defaultLayout}
@@ -178,7 +178,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
     });
 
     const buttons = renderer.root.findAllByType("button");
-    expect(buttons).toHaveLength(5);
+    expect(buttons).toHaveLength(4);
 
     tabs.forEach((tab) => {
       const button = renderer.root.find((node) => node.props["data-testid"] === `tab-${tab.name}`);
@@ -190,8 +190,8 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       expect(labelNodes).toHaveLength(0);
 
       // Verify icon is rendered inside — filled when selected, outline
-      // otherwise (only "tvshows" is active here).
-      const expectedIcon = tab.name === "tvshows" ? tab.icon : (tab.iconOutline || tab.icon);
+      // otherwise (only "discover" is active here).
+      const expectedIcon = tab.name === "discover" ? tab.icon : (tab.iconOutline || tab.icon);
       const iconNode = button.find((node) => node.type === "i" && node.props["data-icon"] === expectedIcon);
       expect(iconNode).toBeDefined();
     });
@@ -203,7 +203,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       renderer = create(
         <TabBar
           tabs={tabs}
-          activeTab="movies"
+          activeTab="share"
           onSelect={jest.fn()}
           mode="legacy-blur"
           layout={defaultLayout}
@@ -215,13 +215,13 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       );
     });
 
-    const activeBtn = renderer.root.find((node) => node.props["data-testid"] === "tab-movies");
+    const activeBtn = renderer.root.find((node) => node.props["data-testid"] === "tab-share");
     expect(activeBtn.props["aria-selected"]).toBe(true);
 
     const activeIcon = activeBtn.find((node) => node.type === "i");
     expect(activeIcon.props["data-color"]).toBe(darkTheme.accent);
 
-    const inactiveBtn = renderer.root.find((node) => node.props["data-testid"] === "tab-tvshows");
+    const inactiveBtn = renderer.root.find((node) => node.props["data-testid"] === "tab-discover");
     expect(inactiveBtn.props["aria-selected"]).toBe(false);
 
     const inactiveIcon = inactiveBtn.find((node) => node.type === "i");
@@ -235,7 +235,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       renderer = create(
         <TabBar
           tabs={tabs}
-          activeTab="tvshows"
+          activeTab="discover"
           onSelect={onSelect}
           mode="legacy-blur"
           layout={defaultLayout}
@@ -261,7 +261,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       renderer = create(
         <TabBar
           tabs={tabs}
-          activeTab="tvshows"
+          activeTab="discover"
           onSelect={jest.fn()}
           mode="legacy-blur"
           layout={defaultLayout}
@@ -287,7 +287,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       renderer = create(
         <TabBar
           tabs={tabs}
-          activeTab="tvshows"
+          activeTab="discover"
           onSelect={jest.fn()}
           mode="android-glass"
           layout={defaultLayout}
@@ -349,7 +349,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       renderer = create(
         <TabBar
           tabs={tabs}
-          activeTab="tvshows"
+          activeTab="discover"
           onSelect={jest.fn()}
           mode="android-glass"
           layout={defaultLayout}
@@ -373,7 +373,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       act(() => {
         renderer = create(
           <TabBarLayoutContext.Provider value={{ contentBottom: 110, tabBarCollapse: { value: progress }, tabBarLastScrollY: { value: -1 }, onTabBarScroll: () => {} }}>
-            <TabBar tabs={tabs} activeTab="tvshows" onSelect={jest.fn()} mode="legacy-blur" layout={defaultLayout}
+            <TabBar tabs={tabs} activeTab="discover" onSelect={jest.fn()} mode="legacy-blur" layout={defaultLayout}
               theme={darkTheme} blurTarget={{ current: {} }} reduceMotion={false} onGlassFailure={jest.fn()} />
           </TabBarLayoutContext.Provider>
         );
@@ -413,7 +413,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       create(
         <TabBar
           tabs={tabs}
-          activeTab="tvshows"
+          activeTab="discover"
           onSelect={onSelect}
           mode="legacy-blur"
           layout={defaultLayout}
@@ -429,19 +429,19 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
     expect(typeof latestGestureHandlers.onUpdate).toBe("function");
 
     // event.x is relative to the bar view itself, and the pill is centered
-    // under the touch point (not left-edge-aligned to it): padding = 6,
-    // slotWidth = 66, so dragCenterOffset = 6 + 66/2 = 39. x = 105 puts the
-    // pill's center exactly on slot 1's rest position (66px in) ->
-    // round(66/66) = 1.
-    latestGestureHandlers.onBegin({ x: 105 });
+    // under the touch point (not left-edge-aligned to it): dragCenterOffset =
+    // padding + slotWidth / 2. x = dragCenterOffset + slotWidth puts the
+    // pill's center exactly on slot 1's rest position -> round(slot / slot) = 1.
+    const dragX = defaultLayout.padding + defaultLayout.slotWidth / 2 + defaultLayout.slotWidth;
+    latestGestureHandlers.onBegin({ x: dragX });
     latestGestureHandlers.onStart();
-    latestGestureHandlers.onUpdate({ x: 105 });
+    latestGestureHandlers.onUpdate({ x: dragX });
     // Mid-drag must NOT switch the screen — only preview/haptic.
     expect(onSelect).not.toHaveBeenCalled();
 
     latestGestureHandlers.onEnd();
     // Release commits the nearest tab.
-    expect(onSelect).toHaveBeenCalledWith("movies");
+    expect(onSelect).toHaveBeenCalledWith("share");
 
     latestGestureHandlers.onFinalize();
   });
@@ -452,7 +452,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       create(
         <TabBar
           tabs={tabs}
-          activeTab="tvshows"
+          activeTab="discover"
           onSelect={onSelect}
           mode="legacy-blur"
           layout={defaultLayout}
@@ -486,7 +486,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       renderer = create(
         <TabBar
           tabs={tabs}
-          activeTab="tvshows"
+          activeTab="discover"
           onSelect={jest.fn()}
           mode="legacy-blur"
           layout={defaultLayout}
@@ -531,7 +531,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       renderer = create(
         <TabBar
           tabs={tabs}
-          activeTab="tvshows"
+          activeTab="discover"
           onSelect={onSelect}
           mode="legacy-blur"
           layout={defaultLayout}
@@ -544,13 +544,13 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
     });
 
     // Tap the ALREADY-active tab: grow (onBegin) then release (onPressOut).
-    // A real onSelect("tvshows") here would be a no-op — activeTab doesn't
+    // A real onSelect("discover") here would be a no-op — activeTab doesn't
     // actually change in response, which the test mirrors by not updating
     // the prop below.
     act(() => {
       latestGestureHandlers.onBegin({ x: 0 });
-      const tvshowsButton = renderer.root.find((node) => node.props["data-testid"] === "tab-tvshows");
-      tvshowsButton.props.onPressOut();
+      const discoverButton = renderer.root.find((node) => node.props["data-testid"] === "tab-discover");
+      discoverButton.props.onPressOut();
     });
 
     const callsBeforeExternalChange = withSpring.mock.calls.length;
@@ -582,7 +582,7 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       create(
         <TabBar
           tabs={tabs}
-          activeTab="tvshows"
+          activeTab="discover"
           onSelect={onSelect}
           mode="legacy-blur"
           layout={defaultLayout}
@@ -601,6 +601,99 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       latestGestureHandlers.onFinalize();
     }).not.toThrow();
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  describe("ayrık yuvarlak yapay zeka düğmesi", () => {
+    function renderBar({ aiAction, mode = "legacy-blur", onSelect = jest.fn(), theme = darkTheme } = {}) {
+      let renderer;
+      act(() => {
+        renderer = create(
+          <TabBar
+            tabs={tabs}
+            activeTab="discover"
+            onSelect={onSelect}
+            aiAction={aiAction}
+            mode={mode}
+            layout={defaultLayout}
+            theme={theme}
+            blurTarget={{ current: {} }}
+            reduceMotion={false}
+            onGlassFailure={jest.fn()}
+          />
+        );
+      });
+      return renderer;
+    }
+    const findAi = (renderer) => renderer.root.find((node) => node.props["data-testid"] === "tab-ai");
+
+    it("eylem verilince dördüncü sekmenin yanında BEŞİNCİ bir düğme olarak çizilir, sekme değildir", () => {
+      const renderer = renderBar({ aiAction: { label: "CineMatch", onPress: jest.fn() } });
+      expect(renderer.root.findAllByType("button")).toHaveLength(5);
+      const ai = findAi(renderer);
+      expect(ai.props.role).toBe("button");
+      expect(ai.props["aria-label"]).toBe("CineMatch");
+      // Seçili durumu yoktur: sekme değil, eylem.
+      expect(ai.props["aria-selected"]).toBeUndefined();
+    });
+
+    it("eylem verilmezse düğme hiç çizilmez", () => {
+      const renderer = renderBar({ aiAction: null });
+      expect(renderer.root.findAll((node) => node.props["data-testid"] === "tab-ai")).toHaveLength(0);
+    });
+
+    it("dokununca eylemi çağırır ve hiçbir sekmeyi seçmez", () => {
+      const onPress = jest.fn();
+      const onSelect = jest.fn();
+      const renderer = renderBar({ aiAction: { label: "CineMatch", onPress }, onSelect });
+      act(() => { findAi(renderer).props.onClick(); });
+      expect(onPress).toHaveBeenCalledTimes(1);
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it("simgesi vurgu renginde ve çubuk yüksekliğinde bir daire içinde durur", () => {
+      const renderer = renderBar({ aiAction: { label: "CineMatch", onPress: jest.fn() } });
+      const icon = findAi(renderer).find((node) => node.type === "i");
+      expect(icon.props["data-icon"]).toBe("sparkles");
+      expect(icon.props["data-color"]).toBe(darkTheme.accent);
+      const shadow = renderer.root.find((node) => node.props["data-testid"] === "tab-bar-ai-shadow");
+      expect(shadow.props.style[1]).toMatchObject({
+        width: defaultLayout.height,
+        height: defaultLayout.height,
+        borderRadius: defaultLayout.height / 2,
+      });
+    });
+
+    it("çubukla AYNI cam levhayı kullanır (android-glass'ta iki cam yüzey)", () => {
+      mockAndroidGlass = function MockGlass({ testID }) {
+        return <div data-testid={testID} />;
+      };
+      const renderer = renderBar({ aiAction: { label: "CineMatch", onPress: jest.fn() }, mode: "android-glass" });
+      expect(renderer.root.findAll((node) => node.props["data-testid"] === "tab-glass-surface")).toHaveLength(2);
+      mockAndroidGlass = null;
+    });
+
+    it("bulanıklık kipinde de çubuk ve düğme ikisi de bulanık levha çizer", () => {
+      const renderer = renderBar({ aiAction: { label: "CineMatch", onPress: jest.fn() } });
+      expect(renderer.root.findAll((node) => node.props["data-testid"] === "adaptive-blur-view")).toHaveLength(2);
+    });
+
+    it("kaydırınca çubuk ve düğme TEK grup olarak birlikte küçülür", () => {
+      const hasTranslateY = (style) => Boolean(style?.transform?.some?.((t) => "translateY" in t));
+      let renderer;
+      act(() => {
+        renderer = create(
+          <TabBarLayoutContext.Provider value={{ contentBottom: 110, tabBarCollapse: { value: 1 }, tabBarLastScrollY: { value: -1 }, onTabBarScroll: () => {} }}>
+            <TabBar tabs={tabs} activeTab="discover" onSelect={jest.fn()} aiAction={{ label: "CineMatch", onPress: jest.fn() }}
+              mode="legacy-blur" layout={defaultLayout} theme={darkTheme} blurTarget={{ current: {} }} reduceMotion={false} onGlassFailure={jest.fn()} />
+          </TabBarLayoutContext.Provider>
+        );
+      });
+      // Dönüşümü taşıyan TEK görünüm var ve hem çubuğu hem düğmeyi kapsıyor.
+      const scaled = renderer.root.findAll((node) => node.type === "div" && Array.isArray(node.props.style) && node.props.style.some(hasTranslateY));
+      expect(scaled).toHaveLength(1);
+      expect(scaled[0].findAll((node) => node.props["data-testid"] === "tab-ai").length).toBeGreaterThan(0);
+      expect(scaled[0].findAll((node) => node.props["data-testid"] === "tab-discover").length).toBeGreaterThan(0);
+    });
   });
 });
 

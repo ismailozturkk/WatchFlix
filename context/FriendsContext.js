@@ -12,7 +12,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useAuth } from "./AuthContext";
 import {
   subscribeToFriends,

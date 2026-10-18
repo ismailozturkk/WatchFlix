@@ -23,9 +23,10 @@ import ModalBlurBackdrop from "./common/ModalBlurBackdrop";
 import ListActionIcon from "./common/ListActionIcon";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as Haptics from "@services/hapticsService";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { i18nText } from "../utils/i18nText";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 /* ─── Küçük yardımcı ─────────────────────────────────── */
 const formatDateSave = (timestamp) => {
   const date = new Date(timestamp);
@@ -637,6 +638,7 @@ const ListView = ({
             )}
           </Animated.View>
         </Animated.View>
+        <ModalToastHost visible={modalVisible} />
       </Modal>
     </View>
   );

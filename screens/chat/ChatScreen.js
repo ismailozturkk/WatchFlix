@@ -1416,6 +1416,7 @@ export default function ChatScreen({ route, navigation }) {
         });
       } catch (err) {
         if (__DEV__) console.warn("vote:", err.message);
+        toast.error(i18nText("autoI18n.toast_oy_kaydedilemedi", "Oyun kaydedilemedi"), i18nText("autoI18n.toast_yeniden_dene", "Bağlantını kontrol edip tekrar dene."));
       }
     },
     [messagesRef, currentUser.uid],
@@ -1446,7 +1447,7 @@ export default function ChatScreen({ route, navigation }) {
         setReplyingTo(null);
       } catch (err) {
         console.error("textPoll:", err);
-        appAlert(i18nText("autoI18n.hata", "Hata"), i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
+        toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
       }
     },
     [currentUser.uid, replyFields, senderFields, postMessage, closeTextPollModal],
@@ -1507,7 +1508,7 @@ export default function ChatScreen({ route, navigation }) {
         setText((current) => current || outgoing);
         setTextLink(isLink(outgoing));
         console.error(i18nText("autoI18n.mesaj_duzenleme_hatasi", "Mesaj düzenleme hatası:"), error);
-        appAlert(i18nText("autoI18n.hata", "Hata"), i18nText("autoI18n.mesaj_duzenlenemedi", "Mesaj düzenlenemedi."));
+        toast.error(i18nText("autoI18n.mesaj_duzenlenemedi", "Mesaj düzenlenemedi."));
       }
       return;
     }
@@ -1563,7 +1564,7 @@ export default function ChatScreen({ route, navigation }) {
       setTextLink(isLink(outgoing));
       if (replySnapshot) setReplyingTo((current) => current || replySnapshot);
       console.error(i18nText("autoI18n.mesaj_gonderme_hatasi", "Mesaj gönderme hatası:"), error);
-      appAlert(i18nText("autoI18n.hata", "Hata"), i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
+      toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
     }
   }, [
     text,
@@ -2093,7 +2094,7 @@ export default function ChatScreen({ route, navigation }) {
       setReplyingTo(null);
     } catch (err) {
       console.error(i18nText("autoI18n.arama_sonucu_gonderme_hatasi", "Arama sonucu gönderme hatası:"), err);
-      appAlert(i18nText("autoI18n.hata", "Hata"), i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
+      toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
     }
   }, [
     selectedItems,
@@ -2133,10 +2134,7 @@ export default function ChatScreen({ route, navigation }) {
         );
       } catch (error) {
         console.error("detailMediaSend:", error);
-        appAlert(
-          i18nText("autoI18n.hata", "Hata"),
-          i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."),
-        );
+        toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
       }
     };
 
@@ -2186,10 +2184,7 @@ export default function ChatScreen({ route, navigation }) {
         );
       } catch (error) {
         console.error("shareToChatSend:", error);
-        appAlert(
-          i18nText("autoI18n.hata", "Hata"),
-          i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."),
-        );
+        toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
       }
     };
 

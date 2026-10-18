@@ -30,7 +30,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { deleteField, doc, FieldPath, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
@@ -44,6 +44,7 @@ import { getListAccent, getListIcon } from "@utils/listAppearance";
 import { renameCustomRootList } from "@services/listItemsService";
 import { moveListVisibility } from "@services/userService";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const DANGER = "#ef4444";
 
 /**
@@ -465,6 +466,7 @@ export default function ListManageSheet({
           )}
         </Animated.View>
       </View>
+      <ModalToastHost visible={visible} />
     </Modal>
   );
 }

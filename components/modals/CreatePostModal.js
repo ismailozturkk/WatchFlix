@@ -31,7 +31,7 @@ import { useApiSettings, useContentSettings, useImageQualitySettings } from "@co
 import axios from "axios";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getPostDrafts, setPostDrafts } from "../../services/postDraftService";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { Octicons } from "@expo/vector-icons";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
@@ -80,6 +80,7 @@ import {
 import { DraftCard, DraftsEmpty } from "./createPost/DraftCard";
 import LeaveSheet from "./createPost/LeaveSheet";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 // Karakter sınırları — büyük Firestore dökümanlarını ve aşırı uzun
 // içerikleri önler. Sayaçlar bu sabitlere göre gösterilir.
 const MAX_TITLE = 100;
@@ -1674,6 +1675,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
         onClose={() => setListPickerVisible(false)}
         onSelect={handleImportList}
       />
+      <ModalToastHost visible={visible} />
     </Modal>
   );
 }

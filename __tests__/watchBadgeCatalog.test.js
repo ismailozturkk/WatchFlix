@@ -18,10 +18,56 @@ const sayimlar = () => WATCH_BADGES.reduce((acc, b) => {
 }, {});
 
 describe("katalog butunlugu", () => {
-  test("81 rozet ve benzersiz id", () => {
-    expect(WATCH_BADGES).toHaveLength(81);
-    expect(new Set(WATCH_BADGES.map((b) => b.id)).size).toBe(81);
-    expect(Object.keys(WATCH_BADGE_BY_ID)).toHaveLength(81);
+  test("154 rozet ve benzersiz id", () => {
+    // v1: 81 rozet. v2 (KATALOG_SURUMU 2): +60 — hedef "100'un uzerinde, her asamada
+    // elinin altinda bir sonraki rozet". v3: +13 Kesif (izleme disi ozellikler).
+    expect(WATCH_BADGES).toHaveLength(154);
+    expect(new Set(WATCH_BADGES.map((b) => b.id)).size).toBe(154);
+    expect(Object.keys(WATCH_BADGE_BY_ID)).toHaveLength(154);
+  });
+
+  test("katalog surumleri: ilk 81 rozet v1, 60 rozet v2, 13 Kesif rozeti v3 (v1 ids degismedi)", () => {
+    const { KATALOG_SURUMU } = require("../components/badges/watchBadgeCatalog");
+    expect(KATALOG_SURUMU).toBe(3);
+    expect(WATCH_BADGES.filter((b) => b.since === 1)).toHaveLength(81);
+    expect(WATCH_BADGES.filter((b) => b.since === 2)).toHaveLength(60);
+    expect(WATCH_BADGES.filter((b) => b.since === 3)).toHaveLength(13);
+    // v1'deki HER id katalogda durmali: kullanicinin defterindeki kazanilmis rozet
+    // katalogda karsiliksiz kalirsa ekrandan SILINIR (watchLedgerCore).
+    const v1 = [
+      "ilk_kare", "film_10", "film_50", "film_150", "film_500", "film_2000",
+      "bolum_25", "bolum_100", "bolum_500", "bolum_2000", "bolum_10000", "dizi_100",
+      "final_1", "final_10", "final_25", "final_50", "final_100",
+      "sure_hafta", "sure_ay", "sure_3ay", "sure_6ay", "sure_yil",
+      "uzun_metraj", "uzun_metraj_25", "uzun_metraj_50", "uzun_metraj_100",
+      "seri_3", "seri_7", "seri_21", "seri_30", "seri_60",
+      "gun_25", "gun_50", "gun_100", "gun_200", "gun_500",
+      "ay_3", "ay_6", "ay_9", "ay_12", "maraton_3film", "maraton_5film", "maraton_8film",
+      "tek_oturusta", "tek_oturusta_13", "tek_oturusta_22", "sadik_izleyici",
+      "tur_3", "tur_6", "tur_9", "tur_12", "tur_20",
+      "korku_25", "animasyon_40", "belgesel_20", "komedi_75",
+      "cadilar_gecesi", "yil_devrilirken", "kirmizi_perde", "yaz_sezonu", "kis_kampi",
+      "yil_1", "yil_2", "yil_3", "yil_5", "yil_10",
+      "perde_4", "perde_8", "perde_14", "perde_17", "perde_20", "cift_kariyer",
+      "gizli_cift_perde", "gizli_vitrin", "gizli_alfabe", "gizli_geri_donus",
+      "gizli_cift_dunya", "gizli_uc_gece", "gizli_dort_mevsim", "gizli_alfabe_tam", "gizli_yol_arkadasi",
+    ];
+    expect(v1).toHaveLength(81);
+    for (const id of v1) {
+      expect([id, WATCH_BADGE_BY_ID[id]?.since]).toEqual([id, 1]);
+    }
+  });
+
+  test("ayni (olcut, hedef) cifti iki rozette yazilmamis", () => {
+    // Ayni ham alani ayni hedefle okuyan iki rozet ayni anda acilir ve kullanici
+    // ayni basariyi iki kez "kazanir". Aile kademeleri ve baslangic mikro-rozetleri
+    // ayni ham alani okur ama HEDEFLERI farklidir.
+    const gorulen = new Set();
+    for (const b of WATCH_BADGES) {
+      const anahtar = b.getProgress.toString() + "|" + b.target;
+      expect([b.id, gorulen.has(anahtar)]).toEqual([b.id, false]);
+      gorulen.add(anahtar);
+    }
   });
 
   test("AILE TAVANI 5 KADEME ve tier'lar 1'den ARDISIK", () => {
@@ -33,7 +79,7 @@ describe("katalog butunlugu", () => {
       if (b.family) (acc[b.family] = acc[b.family] || []).push(b.tier);
       return acc;
     }, {});
-    expect(Object.keys(aileler)).toHaveLength(13);
+    expect(Object.keys(aileler)).toHaveLength(20);
     for (const [ad, tierler] of Object.entries(aileler)) {
       const sirali = [...tierler].sort((a, b) => a - b);
       expect([ad, sirali.length]).toEqual([ad, expect.any(Number)]);
@@ -50,11 +96,16 @@ describe("katalog butunlugu", () => {
     // degil isaretleme davranisi olurdu.
     expect(uzunluk("maraton")).toBe(3);
     expect(uzunluk("tekOturus")).toBe(3);
-    // Yil ici ay sayisi 12'de doyar, uzun metraj ikiye katlanarak 100'e gider.
+    // Yil ici ay sayisi 12'de doyar.
     expect(uzunluk("ay")).toBe(4);
-    expect(uzunluk("uzunMetraj")).toBe(4);
-    // Genis araliktaki olcutler tam merdiven kullanir.
-    for (const fam of ["film", "bolum", "final", "sure", "seri", "gun", "tur", "yil", "perde"]) {
+    // v2 aileleri: dort kademe (sezon, eser, gunluk seri, hafta sonu, tekrar, sadakat).
+    for (const fam of ["sezon", "eser", "ardisik", "haftaSonu", "tekrar", "sadik"]) {
+      expect([fam, uzunluk(fam)]).toEqual([fam, 4]);
+    }
+    // Genis araliktaki olcutler tam merdiven kullanir. Uzun metraj v2'de 200'e
+    // uzadi (ikiye katlanan merdiven devam etti), dizi sayisi tek rozetten 5
+    // kademeli aileye cevrildi.
+    for (const fam of ["film", "bolum", "final", "sure", "seri", "gun", "tur", "yil", "perde", "uzunMetraj", "dizi"]) {
       expect([fam, uzunluk(fam)]).toEqual([fam, 5]);
     }
   });
@@ -96,11 +147,20 @@ describe("katalog butunlugu", () => {
 });
 
 describe("nadirlik kotalari (rozet enflasyonuna karsi)", () => {
-  test("dagilim 12 common / 31 uncommon / 27 rare / 8 epic / 3 legendary", () => {
-    // Dort tekil rozet aileye cevrilip (uzun metraj, ay, maraton, tek oturus)
-    // alti "seni taniyoruz" rozeti eklenince kaydi. Medyan uncommon KALDI —
-    // profil mor duvara donmuyor (asagidaki test kilitliyor).
-    expect(sayimlar()).toEqual({ common: 12, uncommon: 31, rare: 27, epic: 8, legendary: 3 });
+  test("dagilim 35 common / 60 uncommon / 46 rare / 10 epic / 3 legendary", () => {
+    // v1: 12/31/27/8/3. v2 +60 rozet: 13 common, 26 uncommon, 18 rare, 3 epic
+    // (eser_3000, uzun_metraj_200, gizli_altin_koleksiyon) ve uzun_metraj_100
+    // epic'ten rare'e indi (aile 5. kademeye uzadi). v3 +13 Kesif: 10 common, 3
+    // uncommon, hic rare/epic. LEGENDARY KOTASI DEGISMEDI.
+    // Medyan uncommon KALDI — profil mor duvara donmuyor (asagidaki test kilitliyor).
+    expect(sayimlar()).toEqual({ common: 35, uncommon: 60, rare: 46, epic: 10, legendary: 3 });
+  });
+
+  test("nadir rozet ORANI buyumedi (rare+ payi v1'den fazla degil)", () => {
+    // v1: (27+8+3)/81 = %46,9. Genisleme nadir duvari buyutmemeli.
+    const s = sayimlar();
+    const nadirPay = (s.rare + s.epic + s.legendary) / WATCH_BADGES.length;
+    expect(nadirPay).toBeLessThanOrEqual(38 / 81 + 1e-9);
   });
 
   test("LEGENDARY KOTASI = 3 ve ucu de gercekten ZIRVE hedefi", () => {
@@ -171,9 +231,9 @@ describe("nadirlik kotalari (rozet enflasyonuna karsi)", () => {
     for (const b of gun) expect(b.getProgress({ gunSayisi: 777 })).toBe(777);
   });
 
-  test("UZUN METRAJ ailesi 10-25-50-100 (ikiye katlanan merdiven)", () => {
+  test("UZUN METRAJ ailesi 10-25-50-100-200 (ikiye katlanan merdiven)", () => {
     const um = WATCH_BADGES.filter((b) => b.family === "uzunMetraj").sort((a, b) => a.tier - b.tier);
-    expect(um.map((b) => b.target)).toEqual([10, 25, 50, 100]);
+    expect(um.map((b) => b.target)).toEqual([10, 25, 50, 100, 200]);
     expect(um[0].id).toBe("uzun_metraj");     // eski tekil id ZIRVEDE degil TABANDA kaldi
     for (const b of um) expect(b.getProgress({ uzunMetraj: 42 })).toBe(42);
     // Sure turevi, tarih turevi DEGIL -> zirve epic olabilir.
@@ -259,6 +319,15 @@ describe("nadirlik kotalari (rozet enflasyonuna karsi)", () => {
       "gizli_cift_perde", "gizli_geri_donus",
       // Yeni "seni taniyoruz" rozetlerinin tarih bileseni olanlari
       "gizli_uc_gece", "gizli_dort_mevsim", "gizli_yol_arkadasi",
+      // v2: gunluk seri, hafta sonu, sadakat, takvim olaylari, mevsimler, tekrar
+      "ardisik_3", "ardisik_7", "ardisik_14", "ardisik_30",
+      "hafta_sonu_5", "hafta_sonu_20", "hafta_sonu_50", "hafta_sonu_100",
+      "sadik_10", "sadik_60", "sadik_100", "gun_3",
+      "cuma_13", "mayis_4", "nisan_1", "bahar_esintisi", "sonbahar_yapragi",
+      "gizli_kis_uykusu",
+      // Tekrar izleme olaylari kullanici girdisi (tarih secici + tekrar ekle) —
+      // ayni gerekceyle rare tavani.
+      "tekrar_1", "tekrar_5", "tekrar_15", "tekrar_40", "gizli_basucu",
     ]);
     for (const b of WATCH_BADGES) {
       if (!tarihTuremli.has(b.id)) continue;
@@ -306,16 +375,42 @@ describe("performans sozlesmesi", () => {
     expect(okunan.size).toBeGreaterThan(10);
   });
 
-  test("52 rozetin tamami 1 ms altinda degerlendirilir", () => {
+  test("154 rozetin tamami 2 ms altinda degerlendirilir", () => {
     const stats = { filmSayisi: 300, bolumSayisi: 1500, perde: 12, turSayaci: new Map([["horror", 30]]) };
     // En hizli parti olculur (bkz. watchScoring.test.js: tek olcum yuk altinda gurultulu).
-    let msPerCall = Infinity;
-    for (let batch = 0; batch < 5; batch++) {
+    //
+    // Butce rozet sayisiyla ORANTILI olceklendi: 81 rozette 1 ms, 141 rozette 2 ms.
+    // Izole olcum 141 rozet icin ≈0,4 ms (rozet basina ≈3 µs; maliyetin cogu her
+    // rozet icin 14 alanli nesne kopyasi). Tam jest paketi paralel kosarken ayni
+    // olcum 1 ms'yi asabiliyor — 2 ms, gercek bir regresyonu (bir rozetin liste
+    // taramasi) yakalamaya yetecek kadar siki, CPU gurultusune dayanacak kadar genis.
+    // Hesap veri degistiginde BIR KEZ yapilir (useWatchProgress tek useMemo), 512
+    // film + 3.400 bolumluk ~30 ms'lik tek gecisin yaninda onemsizdir.
+    //
+    // YÜK DÜZELTMESİ (v3): tam paket ~22 işçiyle paralel koşarken (ve makinede başka
+    // oturumlar çalışırken) aynı ölçüm 4–7 ms çıkıyor; tek başına/--runInBand 1 ms. Mutlak
+    // bütçe makine hızına bağlı olduğu için, AYNI süreçte ölçülen bir referansla
+    // ölçeklenir: referans = katalogun dolaştığı nesne kopyalama işi (maliyetin çoğu
+    // buradadır) mantık OLMADAN. Sakin makinede bütçe hâlâ 2 ms; yükte referansla birlikte
+    // büyür. Asıl regresyon bekçisi bir önceki test (hiçbir rozet izleme listesini
+    // okumaz); bu yalnız "rozet başına maliyet katlandı mı"yı yakalar.
+    //
+    // İki ölçüm SIRAYLA DEĞİL İÇ İÇE alınır: ardışık alınırsa bir gürültü patlaması yalnız
+    // birine denk gelip oranı bozuyordu (tam pakette 3 koşudan 1'i kırıldı).
+    const sure = (fn) => {
       const t0 = process.hrtime.bigint();
-      for (let i = 0; i < 100; i++) evaluateWatchBadges(stats, []);
-      msPerCall = Math.min(msPerCall, Number(process.hrtime.bigint() - t0) / 1e6 / 100);
+      for (let i = 0; i < 100; i++) fn();
+      return Number(process.hrtime.bigint() - t0) / 1e6 / 100;
+    };
+    const degerlendir = () => evaluateWatchBadges(stats, []);
+    const kopyala = () => WATCH_BADGES.map((b) => ({ ...b, ham: 0, ilerleme: 0, oran: 0, acik: false }));
+    let msPerCall = Infinity;
+    let referans = Infinity;
+    for (let batch = 0; batch < 16; batch++) {
+      msPerCall = Math.min(msPerCall, sure(degerlendir));
+      referans = Math.min(referans, sure(kopyala));
     }
-    expect(msPerCall).toBeLessThan(1);
+    expect(msPerCall).toBeLessThan(Math.max(2, referans * 6));
   });
 });
 
@@ -397,7 +492,7 @@ describe("kesisim rozetleri: TEK sayac buyuterek alinamaz", () => {
     expect(acik("gizli_alfabe_tam", { harfSayisi: 24 })).toBe(true);
   });
 
-  test("dizi_100 katalogda diziSayisi okuyan TEK rozet", () => {
+  test("diziSayisi'ni YALNIZ dizi ailesi okur; zirve dizi_100 (v1 id'si, hedefi ayni)", () => {
     const okuyan = WATCH_BADGES.filter((b) => {
       let gordu = false;
       const proxy = new Proxy({ turSayaci: new Map() }, {
@@ -410,24 +505,30 @@ describe("kesisim rozetleri: TEK sayac buyuterek alinamaz", () => {
       b.getProgress(proxy);
       return gordu;
     });
-    expect(okuyan.map((b) => b.id)).toEqual(["dizi_100"]);
+    expect(okuyan.map((b) => b.id).sort()).toEqual(["dizi_100", "dizi_15", "dizi_30", "dizi_5", "dizi_60"]);
+    expect(okuyan.every((b) => b.family === "dizi")).toBe(true);
+    const dizi = WATCH_BADGES.filter((b) => b.family === "dizi").sort((a, b) => a.tier - b.tier);
+    expect(dizi.map((b) => b.target)).toEqual([5, 15, 30, 60, 100]);
+    expect(dizi[dizi.length - 1].id).toBe("dizi_100");     // eski tekil rozet zirve oldu
     expect(acik("dizi_100", { diziSayisi: 100 })).toBe(true);
+    expect(acik("dizi_100", { diziSayisi: 99 })).toBe(false);
   });
 });
 
 describe("kademeli aileler tek karta iner", () => {
   const grupla = (stats) => gruplaAileler(evaluateWatchBadges({ turSayaci: new Map(), ...stats }, []));
 
-  test("13 aile karti + 22 ailesiz rozet = 35 kart", () => {
+  test("20 aile karti + 65 ailesiz rozet = 85 kart", () => {
     const kartlar = grupla({});
     expect(kartlar.length).toBeLessThan(WATCH_BADGES.length);
-    // 13 aile 59 uyeyi 13 karta indirir. 16 yeni rozet eklendi ama ekran
-    // yalnizca 6 kart uzadi: 10'u mevcut/yeni aile kartlarinin ICINE indi.
+    // 20 aile 89 uyeyi 20 karta indirir. v2'de 60 rozet eklendi ama ekran 37 kart
+    // uzadi (35 → 72): 23'u mevcut/yeni aile kartlarinin ICINE indi. v3'un 13 Kesif
+    // rozeti tekil: ekran 13 kart uzar (72 → 85).
     const uye = WATCH_BADGES.filter((b) => b.family).length;
     const aile = new Set(WATCH_BADGES.filter((b) => b.family).map((b) => b.family)).size;
-    expect([uye, aile]).toEqual([59, 13]);
+    expect([uye, aile]).toEqual([89, 20]);
     expect(kartlar.length).toBe(WATCH_BADGES.length - uye + aile);
-    expect(kartlar.length).toBe(35);
+    expect(kartlar.length).toBe(85);
   });
 
   test("kidem ailesi de tek karta iner ve sonraki hedefi tasir", () => {
@@ -607,7 +708,7 @@ describe("metinler", () => {
 
   test("gizli rozetler isaretli", () => {
     const gizli = WATCH_BADGES.filter((b) => b.hidden);
-    expect(gizli).toHaveLength(9);
+    expect(gizli).toHaveLength(15);
     expect(gizli.every((b) => b.section === BOLUM.GIZLI)).toBe(true);
     // GIZLI bolumundeki HER rozet gizli olmali; yarisi acik bir bolum
     // kullaniciya "burada surpriz var" sozunu tutmaz.

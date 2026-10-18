@@ -54,6 +54,7 @@ import axios from "axios";
 import ScreenDecor from "@components/ScreenDecor";
 import { alpha } from "../../theme/colors";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const EmptyState = memo(function EmptyState({ theme, t }) {
   return (
     <View style={emptyStyles.container}>
@@ -502,6 +503,7 @@ export default function ShareContentScreen({ route }) {
           post={commentPost}
           onClose={handleCloseComments}
         />
+        <ModalToastHost visible={commentPost != null} />
       </Modal>
 
       <ShareToChatSheet

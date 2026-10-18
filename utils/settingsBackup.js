@@ -21,6 +21,8 @@ import { Keys } from "../services/storage/registry";
 import { THEME_NAMES, CUSTOM_THEME_TOKENS } from "../theme/colors";
 import { normalizeHex } from "./colorUtils";
 import { normalizeDecorScopes } from "./decorScopes";
+import { normalizeSectionVisibility } from "./sectionVisibility";
+import { normalizePresets } from "./discoverFilters";
 import { normalizeFontRoles } from "./typographyRoles";
 import { EFFECT_MODES } from "./deviceTier";
 import { DATA_CACHE_CATEGORIES } from "./dataCacheSettings";
@@ -62,6 +64,8 @@ export const BACKUP_GROUPS = Object.freeze([
     id: "layout",
     icon: "grid-outline",
     keys: [
+      "sectionVisibility",
+      "discoverPresets",
       "listsGridColumns",
       "listsPosterRadius",
       "listPosterInfo",
@@ -138,6 +142,8 @@ export const BACKUP_EXCLUDED = Object.freeze({
   appIcon: "Gerçek simge işletim sisteminde; yalnızca önbelleği tutuluyor.",
   petOwned: "Kilidi açılmış petler ilerleme verisi, ayar değil.",
   petSelected: "Seçili pet sahip olunan petlere bağlı.",
+  homeMediaType: "Film/Dizi sekmesinde son bakılan bölüm; gezinme durumu, ayar değil.",
+  discoverFilters: "Ne izlesem? ekranında en son kullanılan süzgeç; gezinme durumu (kayıtlı süzgeçler yedeğe girer).",
   settingsRestorePoint: "Geri alma noktası kendi kendini yedeklememeli.",
 });
 
@@ -183,6 +189,8 @@ const RULES = {
   },
   fontRoles: { check: isPlain, normalize: normalizeFontRoles },
   decorScopes: { check: isPlain, normalize: normalizeDecorScopes },
+  sectionVisibility: { check: isPlain, normalize: normalizeSectionVisibility },
+  discoverPresets: { check: Array.isArray, normalize: normalizePresets },
   dataCacheTypes: {
     check: isPlain,
     normalize: (v) => Object.fromEntries(DATA_CACHE_CATEGORIES.map((id) => [id, v[id] !== false])),

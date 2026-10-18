@@ -31,6 +31,7 @@ Seelogd/
 │   ├── chatOptimistic.test.js
 │   ├── colorUtils.test.js
 │   ├── commentScope.test.js
+│   ├── connectivityToast.test.js
 │   ├── dataCacheSettings.test.js
 │   ├── datePickerWheel.test.js
 │   ├── deviceLanguage.test.js
@@ -65,6 +66,9 @@ Seelogd/
 │   ├── styleSheetCompat.test.js
 │   ├── tmdbAdultGuard.test.js
 │   ├── tmdbLookup.test.js
+│   ├── toastFacade.test.js
+│   ├── toastStore.test.js
+│   ├── toastUi.test.js
 │   ├── tournamentEngine.test.js
 │   ├── tournamentWinnerArchive.test.js
 │   ├── typographyRoles.test.js
@@ -943,6 +947,15 @@ Seelogd/
 │   ├── theme/
 │   │   ├── ColorPickerSheet.js
 │   │   └── ThemePreviewCard.js
+│   ├── toast/
+│   │   ├── ConnectivityToast.js
+│   │   ├── ModalToastHost.js
+│   │   ├── ScreenToastHost.js
+│   │   ├── ToastCards.js
+│   │   ├── ToastHost.js
+│   │   ├── ToastItem.js
+│   │   ├── ToastOrb.js
+│   │   └── toastPalette.js
 │   ├── tournament/
 │   │   ├── BracketTree.js
 │   │   ├── CountdownTimer.js
@@ -1420,6 +1433,7 @@ Seelogd/
 │   ├── chatOptimistic.js
 │   ├── colorUtils.js
 │   ├── commentScope.js
+│   ├── connectivityToast.js
 │   ├── dataCacheSettings.js
 │   ├── datePickerWheel.js
 │   ├── deviceLanguage.js
@@ -1449,6 +1463,7 @@ Seelogd/
 │   ├── styleSheetCompat.js
 │   ├── tmdbAdultGuard.js
 │   ├── tmdbImageUtils.js
+│   ├── toastStore.js
 │   ├── typographyRoles.js
 │   ├── upNext.js
 │   ├── watchActivity.js

@@ -30,6 +30,7 @@ import { i18nText } from "@utils/i18nText";
 import { searchCandidates } from "@services/tournamentService";
 import useKeyboardInset from "@hooks/useKeyboardInset";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const PENDING_TIMEOUT = 2600;
 const SEARCH_DEBOUNCE = 380;
 const MIN_QUERY = 2;
@@ -320,6 +321,7 @@ export default function NomineeSearchModal({
           }
         />
       </SafeAreaView>
+      <ModalToastHost visible={visible} />
     </Modal>
   );
 }

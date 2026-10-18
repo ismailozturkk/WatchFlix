@@ -17,7 +17,7 @@ import { doc, getDoc, onSnapshot, setDoc, writeBatch, collection, getDocs, limit
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { db } from "../../firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";

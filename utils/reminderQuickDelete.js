@@ -9,7 +9,7 @@
 // kalıcı günlük anında, bulut arka planda; ana ekran widget'ı ve Takvim yerel kopyadan
 // kendiliğinden tazelenir.
 
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { remindersActions } from "../services/userData";
 import { i18nText } from "./i18nText";
 
@@ -21,7 +21,9 @@ function announceRemoved(undo) {
     type: "info",
     text1: i18nText("autoI18n.hatirlatma_kaldirildi", "Hatırlatma kaldırıldı"),
     visibilityTime: UNDO_TOAST_MS,
-    props: { action: { label: i18nText("autoI18n.geri_al", "Geri Al"), onPress: undo } },
+    props: {
+      action: { label: i18nText("autoI18n.geri_al", "Geri Al"), icon: "arrow-undo", onPress: undo },
+    },
   });
 }
 

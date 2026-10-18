@@ -34,6 +34,7 @@ import { i18nText } from "../../utils/i18nText";
 import { formatTimeAgo } from "../../utils/postTime";
 import { postTypeMeta } from "./postTypeMeta";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 // İNCELEME posteri: eski 86×129'dan büyütüldü (2:3 oranı korunur).
 const REVIEW_POSTER_W = 118;
 const REVIEW_POSTER_H = 177;
@@ -303,6 +304,7 @@ function PostMenuSheet({
           </Pressable>
         </View>
       </Pressable>
+      <ModalToastHost visible={visible} />
     </Modal>
   );
 }
@@ -358,6 +360,7 @@ function DeleteConfirmDialog({ visible, onClose, onConfirm, theme, t }) {
           </View>
         </View>
       </View>
+      <ModalToastHost visible={visible} />
     </Modal>
   );
 }

@@ -2,7 +2,7 @@ import React, {
   createContext, useContext, useMemo,
 } from "react";
 import { useAuth } from "./AuthContext";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { i18nText } from "../utils/i18nText";
 import { usePremiumGate } from "../hooks/usePremiumGate";
 import useUserDataDomain from "../hooks/useUserDataDomain";

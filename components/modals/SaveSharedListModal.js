@@ -19,7 +19,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import SheetScroll from "@components/common/SheetScroll";

@@ -12,7 +12,7 @@
 
 import { tmdbLanguageOf } from "../utils/appLanguages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 
 import { useApiSettings } from "../context/AppSettingsContext";
 import { useAuth } from "../context/AuthContext";

@@ -19,7 +19,7 @@ import {
   arrayRemove,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { db } from "../../../firebase";
 import { useTheme } from "../../../context/ThemeContext";

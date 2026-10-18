@@ -284,3 +284,190 @@ describe("bolum sirasi", () => {
     expect(i(BOLUM.SET)).toBeLessThan(i(BOLUM.GIZLI));
   });
 });
+
+// ── KATALOG v2: yeni koleksiyonlar, rozet sayisi merdiveni, genisleme korumasi ──
+
+describe("v2 koleksiyonlari", () => {
+  const set = (id) => BADGE_SETS.find((s) => s.id === id);
+
+  test("Tur Hakimi: bolumdeki HER tekil tur rozeti (klasik dort + v2'nin on ikisi)", () => {
+    const uyeler = set("set_tur_hakimi").uyeler();
+    expect(uyeler).toHaveLength(16);
+    expect(uyeler).toEqual(expect.arrayContaining(["korku_25", "animasyon_40", "belgesel_20", "komedi_75"]));
+    for (const id of uyeler) {
+      expect([id, WATCH_BADGE_BY_ID[id].section, WATCH_BADGE_BY_ID[id].family]).toEqual([id, BOLUM.TUR, null]);
+    }
+    // set_uzman (klasik dort) AYRI kaldi: "dort tur uzmanligi" cumlesi dogru.
+    expect(set("set_uzman").uyeler()).toHaveLength(4);
+    expect(set("set_tur_hakimi").rarity).toBe("epic");
+  });
+
+  test("Saglam Baslangic = Baslangic bolumu (7), Vefali Seyirci = Baglilik bolumu (8)", () => {
+    expect(set("set_baslangic").uyeler().sort()).toEqual(
+      WATCH_BADGES.filter((b) => b.section === BOLUM.BASLANGIC).map((b) => b.id).sort(),
+    );
+    expect(set("set_baslangic").uyeler()).toHaveLength(7);
+    expect(set("set_baglilik").uyeler().sort()).toEqual(
+      WATCH_BADGES.filter((b) => b.section === BOLUM.BAGLILIK).map((b) => b.id).sort(),
+    );
+    expect(set("set_baglilik").uyeler()).toHaveLength(8);
+  });
+
+  test("Baslangic bolumu YENI kullanicinin ilk gunlerinde tamamlanabilir", () => {
+    // 1 film, 1 bolum, ilk uzun film, 25 eser, 3 gun = yedi rozetin hepsi.
+    const stats = { ...bosStats, filmSayisi: 14, bolumSayisi: 11, uzunMetraj: 1, gunSayisi: 3 };
+    const rozetler = evaluateWatchBadges(stats, []);
+    const baslangic = rozetler.filter((b) => b.section === BOLUM.BASLANGIC);
+    expect(baslangic).toHaveLength(7);
+    expect(baslangic.every((b) => b.acik)).toBe(true);
+    expect(evaluateBadgeSets(rozetler, []).find((s) => s.id === "set_baslangic").acik).toBe(true);
+    // ...ve hepsi common: yeni kullaniciya zor bir sey sorulmuyor.
+    expect(baslangic.every((b) => b.rarity === "common")).toBe(true);
+  });
+});
+
+describe("rozet sayisi merdiveni (esikli koleksiyonlar)", () => {
+  const esikliler = BADGE_SETS.filter((s) => s.esik);
+
+  test("esikler 10-25-50-75-100-125, katalog rozet sayisini ASMIYOR", () => {
+    expect(esikliler.map((s) => s.esik)).toEqual([10, 25, 50, 75, 100, 125]);
+    expect(esikliler.map((s) => s.id)).toEqual([
+      "set_sayi_10", "set_sayi_25", "set_sayi_50", "set_sayi_75", "set_sayi_100", "set_sayi_125",
+    ]);
+    for (const s of esikliler) expect(s.esik).toBeLessThanOrEqual(WATCH_BADGES.length);
+    // Merdiven monoton: ust esik ayni ya da daha nadir.
+    const sira = esikliler.map((s) => RARITY_ORDER.indexOf(s.rarity));
+    expect([...sira].sort((a, b) => a - b)).toEqual(sira);
+  });
+
+  test("ilerleme ACIK KATALOG rozeti sayisidir ve esige kirpilir", () => {
+    const ids = WATCH_BADGES.slice(0, 30).map((b) => b.id);
+    const rozetler = evaluateWatchBadges(bosStats, ids);
+    const setler = evaluateBadgeSets(rozetler, []);
+    const s10 = setler.find((s) => s.id === "set_sayi_10");
+    const s25 = setler.find((s) => s.id === "set_sayi_25");
+    const s50 = setler.find((s) => s.id === "set_sayi_50");
+    expect([s10.ilerleme, s10.target, s10.acik]).toEqual([10, 10, true]);     // 30 acik → 30/10 DEGIL 10/10
+    expect([s25.ilerleme, s25.target, s25.acik]).toEqual([25, 25, true]);
+    expect([s50.ilerleme, s50.target, s50.acik]).toEqual([30, 50, false]);
+    expect(s50.oran).toBeCloseTo(0.6, 10);
+  });
+
+  test("esikli sette uye listesi GOSTERILMEZ ama dizi bos (null degil)", () => {
+    // null olsaydi detay sayfasi sete 'Tek kademeli rozet' yazardi (uyeIdleri varligina bakiyor).
+    const setler = evaluateBadgeSets(evaluateWatchBadges(bosStats, []), []);
+    for (const s of setler.filter((x) => x.esik)) {
+      expect([s.id, s.esikli, s.uyeIdleri]).toEqual([s.id, true, []]);
+    }
+    // Esiksiz setler eskisi gibi uyelerini tasir.
+    const ilkAdim = setler.find((s) => s.id === "set_ilk_adim");
+    expect(ilkAdim.esikli).toBe(false);
+    expect(ilkAdim.uyeIdleri.length).toBeGreaterThan(0);
+  });
+
+  test("koleksiyon/muhur ACIKLARI sayima GIRMEZ (payda her donem buyumesin)", () => {
+    // set_* id'leri 'acik' listesinde olsa bile katalog sayimi degismez.
+    const rozetler = evaluateWatchBadges(bosStats, ["set_panteon", "muhur_2026_yaz"]);
+    const setler = evaluateBadgeSets(rozetler, []);
+    expect(setler.find((s) => s.id === "set_sayi_10").ilerleme).toBe(0);
+  });
+
+  test("esik, katalog kuculurse uye sayisina iner (ulasilamaz hedef kurulmaz)", () => {
+    const rozetler = evaluateWatchBadges(bosStats, []);
+    const yedek = BADGE_SETS.find((s) => s.id === "set_sayi_125");
+    const eski = yedek.uyeler;
+    try {
+      yedek.uyeler = () => WATCH_BADGES.slice(0, 40).map((b) => b.id);
+      const s = evaluateBadgeSets(rozetler, []).find((x) => x.id === "set_sayi_125");
+      expect(s.target).toBe(40);
+    } finally {
+      yedek.uyeler = eski;
+    }
+  });
+
+  test("tum koleksiyon ikonlari Ionicons'ta var (AppIcon kirmizi uyari ucgeni basmasin)", () => {
+    const IONICONS = require("@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json");
+    const eksik = [];
+    for (const s of BADGE_SETS) {
+      if (!(s.icon in IONICONS)) eksik.push(`${s.id}.icon=${s.icon}`);
+      if (!(s.iconSolid in IONICONS)) eksik.push(`${s.id}.iconSolid=${s.iconSolid}`);
+    }
+    expect(eksik).toEqual([]);
+  });
+});
+
+describe("katalog genislemesi mevcut kullaniciya SESSIZ gelir (kutlama yagmuru yok)", () => {
+  const { birlestir, normalizeLedger } = require("../utils/watchLedgerCore");
+
+  test("v1 defteri olan agir kullanici: hak ettigi v2 rozetleri sahiplenir ama KUTLANMAZ", () => {
+    // v1 katalogu = since:1 rozetler; v1 setleri = v2 seti olmayanlar.
+    const v1Idler = WATCH_BADGES.filter((b) => b.since === 1).map((b) => b.id);
+    const v1Setler = ["set_ilk_adim", "set_mevsim", "set_uzman", "set_yari_yol", "set_sir", "set_panteon"];
+    const agir = { filmSayisi: 600, bolumSayisi: 4000, diziSayisi: 80, gunSayisi: 400, uzunMetraj: 60, perde: 15,
+      tekrarFilm: 6, haftaSonuGun: 60, izlenenSezon: 90 };
+    const kazanilanV1 = evaluateWatchBadges({ ...bosStats, ...agir }, [])
+      .filter((b) => b.acik && b.since === 1).map((b) => b.id);
+
+    // Kullanici v1'de: defter v1 katalogunu biliyor (known), kazandiklari earned+seen.
+    const defter = normalizeLedger({
+      baseline: { kare: 1, perde: 1, badgeIds: kazanilanV1, seenAt: "x" },
+      earned: { badgeIds: kazanilanV1, perdeFloor: 15, makaraFloor: 0 },
+      seen: kazanilanV1,
+      known: [...v1Idler, ...v1Setler],
+    });
+
+    // v2 acilisi: tum rozetler + setler yeniden degerlendirilir.
+    const rozetler = evaluateWatchBadges({ ...bosStats, ...agir }, defter.earned.badgeIds);
+    const setler = evaluateBadgeSets(rozetler, defter.earned.badgeIds);
+    const acikIds = [...rozetler.filter((b) => b.acik).map((b) => b.id), ...setler.filter((s) => s.acik).map((s) => s.id)];
+    const sonuc = birlestir(defter, {
+      badgeIds: acikIds,
+      tumIds: [...WATCH_BADGES.map((b) => b.id), ...BADGE_SET_IDS],
+      perde: 15, bugun: "2026-10-16",
+    });
+
+    const yeniV2 = acikIds.filter((id) => !kazanilanV1.includes(id) && !v1Setler.includes(id));
+    expect(yeniV2.length).toBeGreaterThan(10);              // gercekten cok sey hak etmis
+    expect(sonuc.yeniRozetler).toEqual([]);                  // ...ve hicbiri kutlanmaz
+    for (const id of yeniV2) {
+      expect(sonuc.ledger.earned.badgeIds).toContain(id);    // sahiplenildi
+      expect(sonuc.ledger.seen).toContain(id);               // gorulmus sayildi
+      expect(sonuc.ledger.earnedAt[id]).toBeUndefined();     // tarih UYDURULMADI ("Onceden kazanildi")
+    }
+    // Hak etmedikleri hala kilitli ve ileride NORMAL kutlanacak.
+    const kilitli = WATCH_BADGES.find((b) => b.since === 2 && !acikIds.includes(b.id));
+    expect(kilitli).toBeTruthy();
+    expect(sonuc.ledger.known).toContain(kilitli.id);
+  });
+
+  test("v2'de YENI kazanilan rozet normal kutlanir ve tarih damgasi alir", () => {
+    const tumIds = [...WATCH_BADGES.map((b) => b.id), ...BADGE_SET_IDS];
+    const defter = normalizeLedger({
+      baseline: { kare: 0, perde: 1, badgeIds: [], seenAt: "x" },
+      earned: { badgeIds: [], perdeFloor: 1, makaraFloor: 0 },
+      seen: [], known: tumIds,
+    });
+    const sonuc = birlestir(defter, { badgeIds: ["ilk_film", "ilk_kare"], tumIds, perde: 1, bugun: "2026-10-16" });
+    expect(sonuc.yeniRozetler.sort()).toEqual(["ilk_film", "ilk_kare"]);
+    expect(sonuc.ledger.earnedAt.ilk_film).toBe("2026-10-16");
+  });
+});
+
+describe("v2 bolumleri", () => {
+  test("Baslangic ekranin en ustunde, Baglilik ritimden hemen sonra", () => {
+    expect(BOLUM_SIRA[0]).toBe(BOLUM.BASLANGIC);
+    expect(BOLUM_SIRA.indexOf(BOLUM.BAGLILIK)).toBe(BOLUM_SIRA.indexOf(BOLUM.RITIM) + 1);
+    expect(BOLUM_BASLIK.baslangic).toEqual({ tr: "Başlangıç", en: "Getting Started", es: "Primeros pasos" });
+    expect(BOLUM_BASLIK.baglilik).toEqual({ tr: "Bağlılık", en: "Devotion", es: "Fidelidad" });
+  });
+
+  test("bolum basliklari ekranin i18n anahtarlariyla ayni (tr/en/es JSON'da var)", () => {
+    for (const dil of ["tr", "en", "es"]) {
+      const json = require(`../translations/${dil}.json`);
+      const oto = json.autoI18n || json;
+      for (const b of Object.values(BOLUM)) {
+        expect([dil, b, typeof oto[`rozet_bolum_${b}`]]).toEqual([dil, b, "string"]);
+      }
+    }
+  });
+});

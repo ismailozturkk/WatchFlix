@@ -22,7 +22,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Constants from "expo-constants";
 import AppIcon from "@components/AppIcon";
 import TmdbLogo from "@components/TmdbLogo";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useNavigation } from "@react-navigation/native";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";

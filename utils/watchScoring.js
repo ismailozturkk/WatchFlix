@@ -106,6 +106,24 @@ const gunIndex = (key) => {
   return Math.round(Date.UTC(y, m - 1, d) / 86400000);
 };
 
+// 0 = Pazartesi … 6 = Pazar. 1 Ocak 1970 Perşembeydi (gün indeksi 0), bu yüzden
+// +3 kaydırma Pazartesi'yi 0'a oturtur. Yerel `Date#getDay()` KULLANILMAZ:
+// "YYYY-MM-DD" anahtarı zaten lokal bir takvim günüdür ve gün indeksi saat
+// dilimi/DST'den bağımsızdır.
+const haftaninGunu = (key) => (((gunIndex(key) + 3) % 7) + 7) % 7;
+
+/**
+ * Film başına izleme adedi. `watchEvents` her tekrar izlemeyi ayrı olay olarak
+ * taşır (services/listItemsService.js addMovieWatch); eski kayıtta dizi yoksa
+ * `watchCount`, o da yoksa 1. Bozuk/devasa değer tavanlanır — tek bir kaydın
+ * tekrar sayacını şişirmesi rozetleri tek hamlede açmasın.
+ */
+export const filmIzlemeAdedi = (m) => {
+  const olay = Array.isArray(m?.watchEvents) ? m.watchEvents.length : 0;
+  const sayac = Math.floor(num(m?.watchCount));
+  return clamp(Math.max(olay, sayac, 1), 1, 200);
+};
+
 /**
  * Hesabın kaç TAM yılını doldurduğu.
  *
@@ -180,6 +198,11 @@ export function computeWatchScore({
   let tamamlananDizi = 0;
   const diziGunBonusu = new Map();   // bitiş günü (ya da null) -> o güne düşen ham bonus
   let cadilar = 0, yilDevri = 0, sevgililer = 0;
+  // Takvim olayı rozetleri (bkz. aşağıdaki `takvimOlayi`). Puana GİRMEZ.
+  let cuma13 = 0, mayis4 = 0, nisan1 = 0;
+  // Tekrar izleme: film başına izleme olayı sayısından türer (puana girmez).
+  let tekrarFilm = 0, enCokTekrar = 0;
+  let izlenenSezon = 0;
 
   const gunKaydi = (g) => {
     let r = gunler.get(g);
@@ -206,6 +229,17 @@ export function computeWatchScore({
     const c = s.toLocaleUpperCase("tr-TR")[0];
     if (/\p{L}/u.test(c)) harfler.add(c);
   };
+  // TAKVİM OLAYI ROZETLERİ. cadilar/yilDevri/sevgililer ile aynı sözleşme: bir
+  // tarih + (bazen) bir tür kesişimi, bayrak biçiminde (0/1). Hepsi izleme
+  // tarihinden türediği için katalogda `rare` tavanındadır.
+  //   • cuma13  — Cuma 13'ünde bir KORKU içeriği
+  //   • mayis4  — 4 Mayıs'ta bir BİLİM KURGU içeriği ("May the Fourth")
+  //   • nisan1  — 1 Nisan'da bir KOMEDİ içeriği
+  const takvimOlayi = (g, md, turIds) => {
+    if (g.slice(8) === "13" && haftaninGunu(g) === 4 && turIds.includes("horror")) cuma13 = 1;
+    if (md === "05-04" && turIds.includes("scifi")) mayis4 = 1;
+    if (md === "04-01" && turIds.includes("comedy")) nisan1 = 1;
+  };
 
   // ── Filmler ───────────────────────────────────────────────────────────────
   for (const m of movies) {
@@ -219,6 +253,12 @@ export function computeWatchScore({
     if (!(num(m?.minutes) > 0)) tahminiEser++;
     if (num(m?.minutes) >= 150) uzunMetraj++;
 
+    // Tekrar izleme. Puana GİRMEZ (puan türetilmişliği ve formülü değişmedi);
+    // yalnızca "Bağlılık" rozetlerinin ölçütü.
+    const adet = filmIzlemeAdedi(m);
+    if (adet >= 2) tekrarFilm++;
+    if (adet > enCokTekrar) enCokTekrar = adet;
+
     const turIds = (Array.isArray(m?.genres) ? m.genres : []).map(kanonikTur);
     turEkle(m?.genres, 1);
 
@@ -230,6 +270,7 @@ export function computeWatchScore({
     if (md === "10-31" && turIds.includes("horror")) cadilar = 1;
     if (md === "12-31" || md === "01-01") yilDevri = 1;
     if (md === "02-14" && turIds.includes("romance")) sevgililer = 1;
+    takvimOlayi(g, md, turIds);
   }
 
   // ── Diziler ───────────────────────────────────────────────────────────────
@@ -245,6 +286,9 @@ export function computeWatchScore({
     for (const sez of Array.isArray(s?.seasons) ? s.seasons : []) {
       const eps = Array.isArray(sez?.episodes) ? sez.episodes : [];
       izlenenBolum += eps.length;
+      // Sezon sayısı: en az BİR bölümü izlenmiş sezonlar. Boş bir sezon kabuğu
+      // (bölümü işaretlenmemiş) sayılmaz.
+      if (eps.length > 0) izlenenSezon++;
       for (const e of eps) {
         bolumSayisi++;
         etkinDakikaToplam += etkinBolumDk(e);
@@ -261,6 +305,7 @@ export function computeWatchScore({
         if (md === "10-31" && turIds.includes("horror")) cadilar = 1;
         if (md === "12-31" || md === "01-01") yilDevri = 1;
         if (md === "02-14" && turIds.includes("romance")) sevgililer = 1;
+        takvimOlayi(g, md, turIds);
 
         if (sonIzlemeGunu === null || g > sonIzlemeGunu) sonIzlemeGunu = g;
         if (!diziGunleri.has(showKey)) diziGunleri.set(showKey, new Set());
@@ -342,11 +387,24 @@ export function computeWatchScore({
   // watchedTvService.markShow tüm bölümlere TEK bir tarih yazıyor, yani 120
   // bölümlük bir diziyi 15 Temmuz'a işaretlemek "yaz sezonu" rozetini tek
   // dokunuşla açıyordu. Farklı gün sayısı bu istismara kapalıdır.
-  let yazGun = 0, kisGun = 0;
+  let yazGun = 0, kisGun = 0, ilkbaharGun = 0, sonbaharGun = 0, haftaSonuGun = 0;
   for (const g of gunListesi) {
     const ay = Number(g.slice(5, 7));
     if (ay >= 6 && ay <= 8) yazGun++;
     else if (ay === 12 || ay === 1 || ay === 2) kisGun++;
+    else if (ay >= 3 && ay <= 5) ilkbaharGun++;
+    else sonbaharGun++;                     // Eylül–Kasım: geriye kalan tek dilim
+    if (haftaninGunu(g) >= 5) haftaSonuGun++;   // Cumartesi (5) ya da Pazar (6)
+  }
+
+  // Tür derinliği (kanonik kovalar; "other"/boş hariç): en kalabalık türün
+  // adedi ve en az 10 içeriği olan tür sayısı. Tür sayacı zaten tek geçişte
+  // kurulduğu için ekstra maliyet 21 anahtarlık bir tarama.
+  let enCokTur = 0, tur10 = 0;
+  for (const [id, adet] of turSayaci) {
+    if (!id || id === "other") continue;
+    if (adet > enCokTur) enCokTur = adet;
+    if (adet >= 10) tur10++;
   }
 
   let enUzunAra = 0;
@@ -376,6 +434,9 @@ export function computeWatchScore({
       uzunMetraj, yuksekPuanliBolum, harfSayisi: harfler.size,
       enCokAyliYil, sadikDiziGun, tekOturusta, maxGunFilm, ciftPerde,
       cadilar, yilDevri, sevgililer, yazGun, kisGun,
+      // v2 katalog (140+ rozet): hiçbiri puana girmez.
+      ilkbaharGun, sonbaharGun, haftaSonuGun, cuma13, mayis4, nisan1,
+      tekrarFilm, enCokTekrar, izlenenSezon, enCokTur, tur10,
     },
   };
 }

@@ -14,7 +14,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { TAB_DEFINITIONS } = require("../utils/tabBarModel");
+const { AI_ACTION, TAB_DEFINITIONS } = require("../utils/tabBarModel");
 
 const KOK = path.join(__dirname, "..");
 const ENAZ_YEREL_IOS = 18;
@@ -55,8 +55,8 @@ describe("sekme çubuğu simgeleri", () => {
     expect(ionicons["bu-simge-yok"]).toBeUndefined();
   });
 
-  it("beş sekmenin hepsi tam tanımlı ve Ionicons ailesinde", () => {
-    expect(TAB_DEFINITIONS).toHaveLength(5);
+  it("dört sekmenin hepsi tam tanımlı ve Ionicons ailesinde", () => {
+    expect(TAB_DEFINITIONS).toHaveLength(4);
     for (const tab of TAB_DEFINITIONS) {
       expect(tab.family).toBe("Ionicons");
       for (const alan of ["icon", "iconOutline", "sf", "selectedSf"]) {
@@ -97,5 +97,23 @@ describe("sekme çubuğu simgeleri", () => {
       const adlar = TAB_DEFINITIONS.map((tab) => tab[alan]);
       expect(new Set(adlar).size).toBe(adlar.length);
     }
+  });
+
+  // Yapay zeka sekme DEĞİL ama aynı çubukta durur: yanlış ad iOS'ta boş yuvarlak
+  // düğme (SF), Android'de kırmızı uyarı simgesi (Ionicons) çizer.
+  describe("yapay zeka düğmesi", () => {
+    it("Ionicons adı gerçekten var, SF Symbol adı var ve yerel modun ilk iOS sürümünde mevcut", () => {
+      expect(AI_ACTION.family).toBe("Ionicons");
+      expect(ionicons[AI_ACTION.icon]).toBeDefined();
+      expect(sf.has(AI_ACTION.sf)).toBe(true);
+      expect(sf.get(AI_ACTION.sf)).toBeLessThanOrEqual(ENAZ_YEREL_IOS);
+    });
+
+    it("hiçbir sekmenin simgesiyle karışmıyor", () => {
+      for (const tab of TAB_DEFINITIONS) {
+        expect([tab.icon, tab.iconOutline]).not.toContain(AI_ACTION.icon);
+        expect([tab.sf, tab.selectedSf]).not.toContain(AI_ACTION.sf);
+      }
+    });
   });
 });

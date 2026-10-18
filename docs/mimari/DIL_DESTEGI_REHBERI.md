@@ -63,6 +63,8 @@ karşılaştırır (anahtar kümesi, yer tutucu, işlev parametre sayısı) — 
 |---|---|---|
 | `utils/aiCopy.js` | `getAiCopy(lang)` → `TR`/`EN`/`ES` | CineMatch arayüz metinleri |
 | `utils/favoritesCopy.js` | `getFavoritesCopy` | Dört favori |
+| `screens/tabs/settings/sectionVisibilityCopy.js` | `getSectionVisibilityCopy` | Ayarlar > Kişiselleştirme > Ekran bölümleri (her bölümün adı + açıklaması; kayıt `utils/sectionVisibility.js`) |
+| `screens/shared/discoverFiltersCopy.js` | `getDiscoverFiltersCopy` | Ne izlesem? (Filtreli Keşif): kart, filtre sayfası, ekran, durum kartları; tür/dönem/süre/dil etiketleri ve hazır süzgeç adları (seçenekler `utils/discoverFilters.js`) |
 | `utils/wrappedStrings.js` | `getWrappedStrings` | Wrapped slaytları |
 | `utils/wrapped.js` | `lang === "tr" ? … : lang === "es" ? … : …` | Wrapped hesap metinleri, kişilikler |
 | `utils/premiumFeatures.js` | `unitLabel`, `formatFeatureValue`, `buildLimitCopy` | Plan kapıları metinleri |

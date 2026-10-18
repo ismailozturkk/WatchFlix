@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import AppIcon from "../../components/AppIcon";
 import AppBadge from "../../components/badges/AppBadge";
 import {
@@ -352,8 +352,9 @@ export default function PremiumScreen() {
     if (!selectedPackage || busy) return;
     try {
       await purchasePackage(selectedPackage);
+      // Premium kutlaması: altın kart + kıvılcım (components/toast).
       Toast.show({
-        type: "success",
+        type: "premium",
         text1: tr ? "Seelogd Premium aktif edildi!" : es ? "¡Seelogd Premium está activo!" : "Seelogd Premium is active!",
         text2: tr ? "Tüm ayrıcalıkların kullanıma hazır." : es ? "Todas tus ventajas están listas." : "All your benefits are ready.",
       });
@@ -373,7 +374,7 @@ export default function PremiumScreen() {
       const info = await restorePurchases();
       const restored = Boolean(info?.entitlements?.active?.[entitlementId]);
       Toast.show({
-        type: restored ? "success" : "info",
+        type: restored ? "premium" : "info",
         text1: restored
           ? tr ? "Satın alımın başarıyla geri yüklendi" : es ? "Compra restaurada correctamente" : "Purchase successfully restored"
           : tr ? "Aktif bir abonelik bulunamadı" : es ? "No se encontró ninguna suscripción activa" : "No active subscription found",

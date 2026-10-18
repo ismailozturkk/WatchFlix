@@ -62,7 +62,7 @@ function Fixture({ name, theme }) {
 
 function QaApp() {
   const [light, setLight] = useState(false);
-  const [route, setRoute] = useState({ params: { initialTab: "tvshows" } });
+  const [route, setRoute] = useState({ params: { initialTab: "discover" } });
   const [aiModal, setAiModal] = useState(false);
   const [fontsReady, setFontsReady] = useState(false);
   const effect = useEffectMode();
@@ -78,7 +78,8 @@ function QaApp() {
   }), []);
   const tabs = useMemo(() => TAB_DEFINITIONS.map((tab) => ({ ...tab, label: tab.name })), []);
   const screens = useMemo(() => Object.fromEntries(tabs.map(({ name }) => [name, <Fixture key={name} name={name} theme={theme} />])), [tabs, theme]);
-  const companion = useCallback((layout) => <TouchableOpacity testID="qa-cinematch" accessibilityLabel="CineMatch" onPress={() => setAiModal(true)} style={{ position: "absolute", right: layout.fabRight, bottom: layout.fabBottom, width: 44, height: 44, zIndex: 40, alignItems: "center", justifyContent: "center" }}><Text style={{ fontSize: 25 }}>✦</Text></TouchableOpacity>, []);
+  // Yapay zeka girişi artık çubuğun yanındaki ayrık yuvarlak düğme (onAiPress).
+  const openAi = useCallback(() => setAiModal(true), []);
   return <View style={[styles.fill, { paddingTop: inset.top, backgroundColor: theme.primary }]}>
     <Text style={{ color: theme.text.primary, paddingHorizontal: 12 }} testID="qa-status">{Platform.OS} · shader {String(tabBarNativeSupport.androidGlassAvailable)} · {effect}</Text>
     <View style={styles.row}>
@@ -88,7 +89,7 @@ function QaApp() {
       <QaButton id="theme-toggle" label="Theme" onPress={() => setLight((value) => !value)} />
       <QaButton id="jump-profile" label="Profile" onPress={() => setRoute({ params: { initialTab: "profile" } })} />
     </View>
-    {fontsReady && <AdaptiveTabShell navigation={navigation} route={route} tabs={tabs} screens={screens} theme={theme} renderCompanion={companion} />}
+    {fontsReady && <AdaptiveTabShell navigation={navigation} route={route} tabs={tabs} screens={screens} theme={theme} onAiPress={openAi} aiLabel="CineMatch" />}
     <QaModal visible={aiModal} title="CineMatch" onClose={() => setAiModal(false)} />
   </View>;
 }

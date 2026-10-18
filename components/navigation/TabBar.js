@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef } from "react";
 import { I18nManager, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -9,12 +9,11 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "../AppIcon";
-import AdaptiveBlurView from "../common/AdaptiveBlurView";
-import { tabBarNativeSupport } from "../../services/tabBarCapabilities";
+import TabBarGlassPlate from "./TabBarGlass";
+import TabBarAiButton from "./TabBarAiButton";
 import { selectionAsync } from "../../services/hapticsService";
 import { alpha } from "../../theme/colors";
 import { isLightSurface } from "../../utils/colorUtils";
-import { surfaceBlurAppearance } from "../../utils/surfaceBlur";
 import { TAB_BAR_COLLAPSE_SCALE_DELTA } from "../../utils/tabBarCollapse";
 import { TAB_NAMES } from "../../utils/tabBarModel";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
@@ -44,50 +43,6 @@ const DRAG_SCALE_Y = 1.22;
 // imported module object.)
 const COLLAPSE_SCALE_DELTA = TAB_BAR_COLLAPSE_SCALE_DELTA;
 const COLLAPSE_TRANSLATE_Y = 8;
-
-class GlassBoundary extends React.Component {
-  state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch() { this.props.onFailure(); }
-  render() { return this.state.failed ? null : this.props.children; }
-}
-
-function AndroidGlassSurface({ theme, onFailure, cornerRadius = 32 }) {
-  const [ready, setReady] = useState(false);
-  const Glass = tabBarNativeSupport.AndroidGlass;
-  const blur = surfaceBlurAppearance(theme.tab || theme.secondary);
-  if (!Glass) return null;
-  return (
-    <GlassBoundary onFailure={onFailure}>
-      <Glass
-        testID="tab-glass-surface"
-        providerId="seelogd-tabs"
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-        cornerRadius={cornerRadius}
-        tint={alpha(blur.surface, blur.tint === "light" ? 0.26 : 0.32)}
-        blurRadius={12}
-        refractionHeight={8}
-        refractionAmount={5}
-        saturation={1.15}
-        chromaticAberration={0.025}
-        noiseAlpha={0.008}
-        highlightAlpha={blur.tint === "light" ? 0.5 : 0.32}
-        highlightWidth={0.75}
-        onRenderStatus={({ nativeEvent }) => {
-          if (nativeEvent.status === "failed") onFailure();
-          else if (nativeEvent.status === "ready") setReady(true);
-        }}
-      />
-      {!ready && (
-        <View
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { backgroundColor: alpha(blur.surface, 0.9) }]}
-        />
-      )}
-    </GlassBoundary>
-  );
-}
 
 const TabButton = memo(function TabButton({ tab, selected, onPress, onReleasePill, theme, modern, reduceMotion, isLight }) {
   const scale = useSharedValue(1);
@@ -132,6 +87,7 @@ export default function TabBar({
   tabs,
   activeTab,
   onSelect,
+  aiAction,
   mode,
   layout,
   theme,
@@ -141,7 +97,6 @@ export default function TabBar({
 }) {
   const modern = mode === "android-glass";
   const isLight = isLightSurface(theme.primary);
-  const blur = surfaceBlurAppearance(theme.tab || theme.secondary);
   const { tabBarCollapse } = useTabBarLayout();
   const index = TAB_NAMES.indexOf(activeTab);
   const visualIndex = I18nManager.isRTL ? TAB_NAMES.length - 1 - index : index;
@@ -401,132 +356,114 @@ export default function TabBar({
     ? [alpha("#ffffff", 0.75), alpha("#e5e5ea", 0.45)]
     : [alpha(theme.accent, 0.26), alpha(theme.accent, 0.10)];
 
+  // Çubuk + yanındaki yuvarlak yapay zeka düğmesi TEK grup: kaydırınca birlikte
+  // küçülürler (collapse dönüşümü gruba uygulanır) ve aynı alt kenarda kalırlar.
+  // Satır yönü RN'de RTL'de kendiliğinden döner: düğme çubuğun "sonunda" durur.
   return (
     <View pointerEvents="box-none" testID={`tab-bar-${mode}`} style={[styles.position, { bottom: layout.bottom }]}>
-      <GestureDetector gesture={panGesture}>
-        <Animated.View
-          style={[
-            styles.shadow,
-            {
-              width: layout.width,
-              height: layout.height,
-              borderRadius: barRadius,
-              shadowColor: theme.shadow || "#000000",
-              shadowOpacity: isLight ? 0.12 : 0.35,
-            },
-            collapseAnimatedStyle,
-          ]}
-        >
+      <Animated.View
+        pointerEvents="box-none"
+        style={[styles.group, { gap: layout.aiGap, height: layout.height }, collapseAnimatedStyle]}
+      >
+        <GestureDetector gesture={panGesture}>
           <View
             style={[
-              styles.glassContainer,
+              styles.shadow,
               {
+                width: layout.width,
                 height: layout.height,
                 borderRadius: barRadius,
-                borderColor: isLight ? "rgba(0, 0, 0, 0.08)" : "rgba(255, 255, 255, 0.16)",
+                shadowColor: theme.shadow || "#000000",
+                shadowOpacity: isLight ? 0.12 : 0.35,
               },
             ]}
           >
-            {modern ? (
-              <AndroidGlassSurface theme={theme} onFailure={onGlassFailure} cornerRadius={barRadius} />
-            ) : mode === "legacy-solid" ? (
-              <View
-                pointerEvents="none"
-                style={[StyleSheet.absoluteFill, { backgroundColor: alpha(blur.surface, blur.fallbackAlpha) }]}
-              />
-            ) : (
-              <AdaptiveBlurView
-                pointerEvents="none"
-                style={StyleSheet.absoluteFill}
-                tint={blur.tint}
-                intensity={blur.intensity}
-                blurTarget={blurTarget}
-                fallbackColor={blur.surface}
-                fallbackAlpha={blur.fallbackAlpha}
-              >
-                <View
-                  style={[StyleSheet.absoluteFill, { backgroundColor: alpha(blur.surface, blur.overlayAlpha) }]}
-                />
-              </AdaptiveBlurView>
-            )}
-
-            {/* Specular top highlight reflection */}
-            <LinearGradient
-              pointerEvents="none"
-              colors={[alpha("#ffffff", isLight ? 0.32 : 0.12), alpha("#ffffff", 0)]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 0.55 }}
-              style={StyleSheet.absoluteFill}
-            />
-
-            {/* Sliding active pill indicator */}
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.indicator,
-                {
-                  left: layout.padding,
-                  top: layout.padding,
-                  width: layout.slotWidth,
-                  height: indicatorHeight,
-                },
-                indicatorStyle,
-              ]}
+            <TabBarGlassPlate
+              mode={mode}
+              theme={theme}
+              blurTarget={blurTarget}
+              onGlassFailure={onGlassFailure}
+              radius={barRadius}
+              style={{ height: layout.height }}
             >
-              <View
+              {/* Sliding active pill indicator */}
+              <Animated.View
+                pointerEvents="none"
                 style={[
-                  styles.indicatorPill,
+                  styles.indicator,
                   {
-                    width: indicatorWidth,
+                    left: layout.padding,
+                    top: layout.padding,
+                    width: layout.slotWidth,
                     height: indicatorHeight,
-                    borderRadius: indicatorRadius,
-                    backgroundColor: pillBg,
-                    borderColor: pillBorder,
                   },
+                  indicatorStyle,
                 ]}
               >
-                <LinearGradient
-                  colors={pillGradients}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              </View>
-            </Animated.View>
+                <View
+                  style={[
+                    styles.indicatorPill,
+                    {
+                      width: indicatorWidth,
+                      height: indicatorHeight,
+                      borderRadius: indicatorRadius,
+                      backgroundColor: pillBg,
+                      borderColor: pillBorder,
+                    },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={pillGradients}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                </View>
+              </Animated.View>
 
-            {/* Tab items */}
-            <View style={[styles.items, { padding: layout.padding }]}>
-              {tabs.map((tab) => (
-                <TabButton
-                  key={tab.name}
-                  tab={tab}
-                  selected={activeTab === tab.name}
-                  onPress={onSelect}
-                  onReleasePill={releasePill}
-                  theme={theme}
-                  modern={modern}
-                  reduceMotion={reduceMotion}
-                  isLight={isLight}
-                />
-              ))}
-            </View>
+              {/* Tab items */}
+              <View style={[styles.items, { padding: layout.padding }]}>
+                {tabs.map((tab) => (
+                  <TabButton
+                    key={tab.name}
+                    tab={tab}
+                    selected={activeTab === tab.name}
+                    onPress={onSelect}
+                    onReleasePill={releasePill}
+                    theme={theme}
+                    modern={modern}
+                    reduceMotion={reduceMotion}
+                    isLight={isLight}
+                  />
+                ))}
+              </View>
+            </TabBarGlassPlate>
           </View>
-        </Animated.View>
-      </GestureDetector>
+        </GestureDetector>
+        {aiAction ? (
+          <TabBarAiButton
+            label={aiAction.label}
+            onPress={aiAction.onPress}
+            mode={mode}
+            layout={layout}
+            theme={theme}
+            blurTarget={blurTarget}
+            reduceMotion={reduceMotion}
+            onGlassFailure={onGlassFailure}
+          />
+        ) : null}
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   position: { position: "absolute", left: 0, right: 0, alignItems: "center", zIndex: 20 },
+  group: { flexDirection: "row", alignItems: "center" },
   shadow: {
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 18,
     elevation: 10,
-  },
-  glassContainer: {
-    overflow: "hidden",
-    borderWidth: StyleSheet.hairlineWidth,
   },
   items: { flex: 1, flexDirection: "row", alignItems: "stretch" },
   tab: { flex: 1, height: "100%", justifyContent: "center", alignItems: "center" },

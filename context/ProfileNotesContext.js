@@ -4,7 +4,7 @@ import React, {
 import { useAuth } from "./AuthContext";
 import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { i18nText } from "../utils/i18nText";
 import { addTodoOnTop, toggleTodoItem } from "../utils/todoOrder";
 import { usePremiumGate } from "../hooks/usePremiumGate";

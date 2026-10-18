@@ -755,3 +755,118 @@ describe("hesapYasiYil — kidem rozetlerinin sahtelenemez olcutu", () => {
     expect(hesapYasiYil({ seconds: Math.floor(d.getTime() / 1000) }, simdi)).toBe(3);
   });
 });
+
+describe("v2 rozet olcutleri (katalog 141): puana GIRMEZ, tek gecisten turer", () => {
+  const stat = (movies, shows) => puanla(movies, shows).stats;
+
+  test("tekrar izleme: watchEvents uzunlugu, yoksa watchCount, yoksa 1", () => {
+    const olay = (n) => Array.from({ length: n }, (_, i) => ({ id: `e${i}`, watchedAt: "2026-01-10", scope: "movie" }));
+    const s = stat([
+      film({ id: 1, watchEvents: olay(3) }),                // 3 kez
+      film({ id: 2, watchCount: 2 }),                       // eski kayit: yalniz sayac
+      film({ id: 3 }),                                      // tek izleme
+      film({ id: 4, watchEvents: olay(1), watchCount: 1 }),
+    ]);
+    expect(s.tekrarFilm).toBe(2);        // 1 ve 2 numarali filmler
+    expect(s.enCokTekrar).toBe(3);
+  });
+
+  test("filmIzlemeAdedi bozuk/devasa degerde sismez ve en az 1 doner", () => {
+    const { filmIzlemeAdedi } = require("../utils/watchScoring");
+    expect(filmIzlemeAdedi({})).toBe(1);
+    expect(filmIzlemeAdedi(null)).toBe(1);
+    expect(filmIzlemeAdedi({ watchCount: -4 })).toBe(1);
+    expect(filmIzlemeAdedi({ watchCount: "x" })).toBe(1);
+    expect(filmIzlemeAdedi({ watchCount: 9999999 })).toBe(200);
+    expect(filmIzlemeAdedi({ watchEvents: new Array(500).fill({}) })).toBe(200);
+  });
+
+  test("tekrar izleme PUANI DEGISTIRMEZ (formul ve kalibrasyon sabit)", () => {
+    const olay = (n) => Array.from({ length: n }, (_, i) => ({ id: `e${i}`, watchedAt: "2026-01-10", scope: "movie" }));
+    const tek = puanla([film({ id: 1 })]);
+    const cok = puanla([film({ id: 1, watchEvents: olay(9), watchCount: 9 })]);
+    expect(cok.toplam).toBe(tek.toplam);
+    expect(cok.kirilim).toEqual(tek.kirilim);
+  });
+
+  test("izlenen sezon: en az bir bolumu olan sezonlar sayilir, bos sezon kabugu sayilmaz", () => {
+    const s = stat([], [
+      dizi({ id: 1, seasons: [
+        { seasonNumber: 1, episodes: [bolum()] },
+        { seasonNumber: 2, episodes: [bolum(), bolum()] },
+        { seasonNumber: 3, episodes: [] },                  // kabuk
+      ] }),
+      dizi({ id: 2, seasons: [{ seasonNumber: 1, episodes: [bolum()] }] }),
+    ]);
+    expect(s.izlenenSezon).toBe(3);
+  });
+
+  test("hafta sonu gunu: Cumartesi ve Pazar FARKLI gunler, ayni gun tekrar sayilmaz", () => {
+    // 2026-01-10 Cumartesi, 01-11 Pazar, 01-12 Pazartesi
+    const s = stat([
+      film({ id: 1, dateAdded: "2026-01-10" }),
+      film({ id: 2, dateAdded: "2026-01-10" }),             // ayni Cumartesi
+      film({ id: 3, dateAdded: "2026-01-11" }),
+      film({ id: 4, dateAdded: "2026-01-12" }),             // Pazartesi
+    ]);
+    expect(s.haftaSonuGun).toBe(2);
+    expect(s.gunSayisi).toBe(3);
+  });
+
+  test("ilkbahar ve sonbahar gunleri: Mart-Mayis ve Eylul-Kasim, yaz/kis ile cakismaz", () => {
+    const s = stat([
+      film({ id: 1, dateAdded: "2026-03-05" }),
+      film({ id: 2, dateAdded: "2026-05-31" }),
+      film({ id: 3, dateAdded: "2026-09-01" }),
+      film({ id: 4, dateAdded: "2026-11-30" }),
+      film({ id: 5, dateAdded: "2026-06-01" }),             // yaz
+      film({ id: 6, dateAdded: "2026-12-01" }),             // kis
+      film({ id: 7, dateAdded: "2026-02-28" }),             // kis
+    ]);
+    expect(s.ilkbaharGun).toBe(2);
+    expect(s.sonbaharGun).toBe(2);
+    expect(s.yazGun).toBe(1);
+    expect(s.kisGun).toBe(2);
+  });
+
+  test("Cuma 13: YALNIZ Cuma gunu 13'unde bir KORKU icerigiyle", () => {
+    // 2026-02-13 Cuma. 2026-06-13 Cumartesi. 2026-03-13 Cuma.
+    expect(stat([film({ genres: ["Korku"], dateAdded: "2026-02-13" })]).cuma13).toBe(1);
+    expect(stat([film({ genres: ["Horror"], dateAdded: "2026-03-13" })]).cuma13).toBe(1);
+    expect(stat([film({ genres: ["Komedi"], dateAdded: "2026-02-13" })]).cuma13).toBe(0);   // tur yanlis
+    expect(stat([film({ genres: ["Korku"], dateAdded: "2026-06-13" })]).cuma13).toBe(0);    // Cumartesi
+    expect(stat([film({ genres: ["Korku"], dateAdded: "2026-02-12" })]).cuma13).toBe(0);    // 13'u degil
+    // Dizi bolumu de sayilir
+    const korkuDizi = dizi({ genres: ["Korku"], seasons: [{ seasonNumber: 1, episodes: [bolum({ episodeWatchTime: "2026-02-13" })] }] });
+    expect(stat([], [korkuDizi]).cuma13).toBe(1);
+  });
+
+  test("4 Mayis (bilim kurgu) ve 1 Nisan (komedi)", () => {
+    expect(stat([film({ genres: ["Bilim Kurgu"], dateAdded: "2026-05-04" })]).mayis4).toBe(1);
+    expect(stat([film({ genres: ["Science Fiction"], dateAdded: "2025-05-04" })]).mayis4).toBe(1);
+    expect(stat([film({ genres: ["Drama"], dateAdded: "2026-05-04" })]).mayis4).toBe(0);
+    expect(stat([film({ genres: ["Bilim Kurgu"], dateAdded: "2026-05-05" })]).mayis4).toBe(0);
+    expect(stat([film({ genres: ["Komedi"], dateAdded: "2026-04-01" })]).nisan1).toBe(1);
+    expect(stat([film({ genres: ["Comedy"], dateAdded: "2026-04-02" })]).nisan1).toBe(0);
+    expect(stat([film({ genres: ["Korku"], dateAdded: "2026-04-01" })]).nisan1).toBe(0);
+  });
+
+  test("tur derinligi: en kalabalik tur ve en az 10 icerikli tur sayisi ('other' sayilmaz)", () => {
+    const filmler = [];
+    for (let i = 0; i < 12; i++) filmler.push(film({ id: `d${i}`, genres: ["Drama"], dateAdded: "2026-01-10" }));
+    for (let i = 0; i < 10; i++) filmler.push(film({ id: `k${i}`, genres: ["Komedi"], dateAdded: "2026-01-10" }));
+    for (let i = 0; i < 9; i++) filmler.push(film({ id: `a${i}`, genres: ["Aksiyon"], dateAdded: "2026-01-10" }));
+    for (let i = 0; i < 40; i++) filmler.push(film({ id: `z${i}`, genres: ["Zurna Filmleri"], dateAdded: "2026-01-10" }));
+    const s = stat(filmler);
+    expect(s.enCokTur).toBe(12);          // 40 tanimsiz film 'other' kovasinda, sayilmaz
+    expect(s.tur10).toBe(2);              // drama (12) ve komedi (10); aksiyon 9
+  });
+
+  test("v2 olcutleri bos veride sifir, undefined/NaN degil", () => {
+    const s = stat([], []);
+    for (const alan of ["ilkbaharGun", "sonbaharGun", "haftaSonuGun", "cuma13", "mayis4", "nisan1",
+      "tekrarFilm", "enCokTekrar", "izlenenSezon", "enCokTur", "tur10"]) {
+      expect([alan, s[alan]]).toEqual([alan, 0]);
+    }
+  });
+});

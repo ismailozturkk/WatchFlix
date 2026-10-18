@@ -11,7 +11,7 @@ import {
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useTheme } from "@context/ThemeContext";
 import { useFriends } from "@context/FriendsContext";
 import { useUserProfile } from "@context/UserProfileContext";

@@ -20,7 +20,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import AppIcon from "../AppIcon";
 import GlassCloseButton from "../common/GlassCloseButton";
 import CineSheet from "./CineSheet";

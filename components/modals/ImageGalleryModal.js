@@ -31,12 +31,13 @@ import * as MediaLibrary from "expo-media-library";
 // girisinden alinmali. Alternatifi yeni sinif tabanli `Asset.create()` API'si.
 import { saveToLibraryAsync } from "expo-media-library/legacy";
 import { File, Paths } from "expo-file-system";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { i18nText } from "@utils/i18nText";
 import { tmdbImageLanguageOrderOf, tmdbImageLanguagesOf } from "@utils/appLanguages";
 import * as Haptics from "@services/hapticsService";
 
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -771,6 +772,7 @@ const ImageGalleryModal = ({
           </>
         )}
       </View>
+      <ModalToastHost visible={visible} />
     </Modal>
   );
 };

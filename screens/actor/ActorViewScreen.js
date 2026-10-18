@@ -28,6 +28,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ActorSkeleton } from "../../components/Skeleton";
 import { i18nText } from "../../utils/i18nText";
 import ScreenDecor from "../../components/ScreenDecor";
+import FollowPersonButton from "../../components/person/FollowPersonButton";
 
 
 const { width } = Dimensions.get("window");
@@ -433,6 +434,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                 </View>
               )}
             </View>
+            <FollowPersonButton person={actor} style={styles.followBtn} />
           </View>
         </View>
 
@@ -681,6 +683,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   popText: { color: "#f5c518", fontSize: 12, fontWeight: "700" },
+  followBtn: { marginTop: 12 },
 
   // ── Info pills ────────────────────────────────────────────────────────────
   pillsRow: {

@@ -7,9 +7,10 @@
 // (sıralı, iyimser, hatada geri alır). Durum `useListStatus`tan gelir ve iyimser
 // bindirmeyi içerir; burada ayrı bir "eklendi" state'i TUTULMAZ.
 //
-// GERİ BİLDİRİM YEREL: CineMatch paneli bir RN Modal içinde ve Toast/appAlert
-// modalın ARKASINDA kalır (iOS'ta hiç görünmez). Bu yüzden sonuç düğmenin kendi
-// durumuyla ve satır içi bir hata metniyle bildirilir.
+// GERİ BİLDİRİM YEREL: sonuç, düğmenin kendi durumuyla ve satır içi bir hata metniyle
+// bildirilir (düğme tam ekran paneldeki kartın İÇİNDE; toast'ın yerine bağlam gösterir).
+// Not: CineMatch paneli bir RN Modal; toast artık orada da görünür (AIChatScreen kendi
+// <ModalToastHost>unu taşır) ama appAlert hâlâ modalın arkasında kalır.
 
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";

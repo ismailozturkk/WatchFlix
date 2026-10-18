@@ -122,7 +122,128 @@
 >   aile → yol, koleksiyon → üyeler, mühür → geri sayım, tamamlanmış aile → prestij).
 >   Cihazda görülmedi; react-native-web önizlemesinde (görsel) ve jest'te doğrulandı.
 
-**Birim:** 1 puan = 1 **Kare** · **Seviye:** **Perde** (20 + sınırsız *Makara*) · **Rozet:** 46 izleme rozeti
+> **ROZET KATALOĞU v2 (2026-10-16): 81 → 141 rozet.** Puan formülüne, Perde
+> eşiklerine ve defter sözleşmesine DOKUNULMADI; katalog 60 rozet büyüdü
+> (`KATALOG_SURUMU = 2`, yeni rozetler `since: 2`). Amaç: kullanıcı her aşamada bir
+> sonraki rozeti elinin altında görsün ("heyecan ve daha çok rozet umudu").
+>
+> **Tasarım ilkesi — "çölleri doldur".** v1'de rozetler arasında aylarca ödülsüz
+> aralıklar vardı (film 150→500, bölüm 500→2000, Perde 8→14, yalnız dizi izleyenin
+> tür sütunu, yeni kullanıcının ilk dakikası). v2 her aralığa en az bir ara
+> basamak koyar ve yeni izleme tarzlarına hedef verir.
+>
+> - **Yeni bölümler.** *Başlangıç* (7 rozet, hepsi common, ilk günlerde tamamlanır;
+>   ekranın en üstü) ve *Bağlılık* (8 rozet: tekrar izleme + aynı diziye sadakat).
+> - **Yeni aileler** (hepsi ≤ 5 kademe): `dizi` (5-15-30-60-100; eski tekil
+>   `dizi_100` zirve oldu), `sezon` (izlenen sezon sayısı), `eser` (film+bölüm
+>   toplamı 100-300-1000-3000: film/bölüm çöllerinin ortasına basamak),
+>   `ardisik` (günlük seri REKORU 3-7-14-30), `haftaSonu` (Cumartesi/Pazar günleri),
+>   `tekrar` (tekrar izlenen farklı film), `sadik` (eski `sadik_izleyici` 2. kademe
+>   oldu). `uzunMetraj` 4→5 kademe (+200; 100'lük kademe epic→rare).
+> - **12 tür uzmanlığı** (aksiyon, macera, bilim kurgu, dram, romantik, gerilim, suç,
+>   fantastik, gizem, aile, tarih, savaş) — `turSayaci`'ndan okur, yeni sayaç yok.
+> - **5 mevsimsel/takvim rozeti:** Bahar Esintisi, Sonbahar Yaprağı (yaz/kış'ın
+>   eksik yarısı), Uğursuz Cuma (Cuma 13'ünde korku), Güç Seninle Olsun (4 Mayıs
+>   bilim kurgu), Bir Nisan Şakası (1 Nisan komedi).
+> - **6 gizli rozet:** Başucu Filmi, İki Ekran, Çok Yönlü, Tür Bağımlısı, Kış Uykusu,
+>   Altın Koleksiyon. **3 Perde ara basamağı:** Perde 3 / 6 / 11 (aileye girmez,
+>   kademe şeklini bozmasın diye tekil).
+> - **Yeni koleksiyonlar:** Tür Hâkimi (16 tür uzmanlığı), Sağlam Başlangıç,
+>   Vefalı Seyirci ve ROZET SAYISI MERDİVENİ (`esik`: 10-25-50-75-100-125 rozet).
+>   Sayı merdiveni, hangi rozetin açıldığına bakmaz — her yeni rozet bir eşiğe
+>   yaklaştırır, katalog büyük olsa da "yakın bir ödül" hep ufukta durur.
+> - **Yeni sayaçlar** (`utils/watchScoring.js`, aynı tek geçiş, PUANA GİRMEZ):
+>   `tekrarFilm`, `enCokTekrar` (`watchEvents`'ten), `izlenenSezon`, `haftaSonuGun`,
+>   `ilkbaharGun`, `sonbaharGun`, `cuma13`, `mayis4`, `nisan1`, `enCokTur`, `tur10`.
+>   Ayrıca zaten hesaplanan `rekorGunSerisi` ilk kez bir rozete bağlandı.
+> - **Kurallar korundu:** legendary kotası 3 (v2 legendary EKLEMEDİ); tarih ve
+>   kullanıcı-olayı türevi rozetler rare tavanında; medyan uncommon. Dağılım
+>   12·31·27·8·3 → 25·57·46·10·3 (nadir payı %46,9 → %41,8: düştü).
+> - **Mevcut kullanıcıda SESSİZ.** Defterin katalog genişleme koruması (watchLedgerCore
+>   `known`) hak edilen yeni rozetleri kutlamasız sahiplenir, tarih UYDURMAZ
+>   ("Önceden kazanıldı"). `__tests__/badgeMeta.test.js`'te 600 filmlik ağır
+>   kullanıcı senaryosu bunu kilitler.
+> - **Ekran:** "N yeni rozet eklendi — M tanesine zaten sahipsin" duyuru kartı (bir
+>   kez, kapatılabilir; `Keys.watchCatalogSeen`; yeni tohumlanan kullanıcıda hiç
+>   çıkmaz), kartlarda çerçeveli "YENİ" (kataloğa eklendi; dolgulu YENİ = son 7 günde
+>   kazanıldı), "Yeni" süzgeci, ve **Takvimde yakında** rafı (31 Ekim, Cuma 13,
+>   14 Şubat… ve ayı biten dönem mührü için geri sayım; `badgeInsights.takvimFirsatlari`).
+> - **Kapsam dışı / açık:** Keşif rozetleri (not, liste, arkadaş, hatırlatıcı gibi
+>   izleme dışı özellikler) v2'de bilerek eklenmedi — o veriler izleme motorunun "tek
+>   geçiş, yeni listener yok" sözleşmesinin dışında; ayrı bir tasarım ister → **v3'te
+>   yapıldı (aşağıda).** Cihazda görülmedi (react-native-web önizlemesi + jest).
+
+> **ROZET KATALOĞU v3 — KEŞİF (2026-10-16): 141 → 154 rozet.** Puan formülüne, Perde
+> eşiklerine ve defter sözleşmesine DOKUNULMADI. `KATALOG_SURUMU = 3`, yeni 13 rozet
+> `since: 3`. Uygulamanın İZLEME DIŞI özelliklerini ilk kez kullanınca açılan küçük
+> rozetler; amaç ödül değil KEŞİF (hiç hatırlatıcı kurmamış kullanıcı kilitli
+> "Aklında Olsun"u görür ve özelliğin var olduğunu öğrenir).
+>
+> - **Bölüm:** yeni `BOLUM.KESIF` ("Keşif" / "Discover" / "Descubre"), ekranda
+>   Başlangıç'ın hemen arkasında (`BOLUM_SIRA`), katalog dizisinde SONDA (eşit oranlı
+>   hedeflerde "Sıradaki hedefler" rafı izleme rozetlerini öne alsın). Başlangıç'a ek
+>   DEĞİL: Başlangıç "izleme" ekseni ve `set_baslangic` onu sayıyor.
+> - **13 rozet** (hepsi tekil, hedef 1; `kesif_dort_favori` hedef 4): `kesif_ilk_not`,
+>   `kesif_yapilacaklar`, `kesif_medya_notu`, `kesif_ozel_liste`, `kesif_favori`,
+>   `kesif_izleme_listesi`, `kesif_hatirlatici`, `kesif_ortak_liste`, `kesif_arkadas`,
+>   `kesif_paylasim`, `kesif_dort_favori`, `kesif_biyografi`, `kesif_cinematch`.
+>   Koleksiyon: `set_kesif` ("Kâşif", uncommon, 13/13).
+> - **Nadirlik:** 10 common + 3 uncommon (ortak liste, arkadaş, paylaşım — başkasının
+>   ya da topluluğun varlığını isteyenler). Dağılım 25·57·46·10·3 → 35·60·46·10·3;
+>   legendary kotası 3 aynen, medyan uncommon.
+> - **Veri kaynakları — yeni dinleyici/sorgu YOK.** Girdi `computeWatchScore`'a GİRMEZ
+>   (tek geçiş sözleşmesi bozulmasın); `utils/kesifSignals.js` (saf) + `hooks/useKesifSignals.js`
+>   ayrı üretir, `useWatchProgress` `oyunSeviye`/`hesapYili` gibi `stats.kesif` olarak
+>   bindirir. Notlar/film-dizi notları/hatırlatıcılar/CineMatch geçmişi: yerel-öncelikli
+>   motorun senkron görünümü (`useUserDataDomain`, ağa gitmez). Özel liste/favori/izleme
+>   listesi/ortak liste/arkadaş/profil: ilgili bağlamın ZATEN açık dinleyicisi.
+>   `WatchProgressProvider` ağaçta ProfileNotes/MediaNotes/Reminders'ın DIŞINDA olduğu
+>   için bağlamları değil motoru okur — App.js sağlayıcı sırası DEĞİŞMEDİ.
+> - **Elenen adaylar ve gerekçe:** profil FOTOĞRAFI (Google/Apple girişte otomatik
+>   dolar, kayıtta avatar rastgele → "kullanıcı yaptı" sinyali güvenilmez; yerine
+>   biyografi), ilk fragman (hiçbir yerde kalıcı iz yok), yorum/puan verme (toplu veri
+>   bağlamda yok, yeni sorgu gerekir), oyun/CineSwipe (Free'de kapalı), özel
+>   tema (Premium), takipçi (başkasının eylemi).
+> - **Free ulaşılabilirliği (5. kural):** her Keşif rozeti Free planda kazanılabilir ve
+>   hedefi Free sınırının altında (özel liste 1, arkadaş 2, not 5…): bu yüzden hepsi
+>   "ilk kez", kademe yok — "5 not yaz" Free kullanıcıyı "limitin doldu" duvarına
+>   çarptırırdı.
+> - **Gizlilik:** yalnız SAYI ve boolean okunur; not içeriği, mesaj, kişi kimliği hiçbir
+>   yere taşınmaz. Deftere (yerel MMKV) yalnız rozet id'si + gün yazılır. Sistem
+>   kişisel kalır; arkadaş/gönderi sayıları zaten `Users/{uid}` belgesinde açık sayaç.
+> - **YÜKLENME YARIŞI (asıl tuzak).** Defter koruması "id katalogda İLK görüldüğünde ve
+>   hak ediliyorsa sessiz emilir; hak edilmiyorsa `known`a yazılır, sonra kazanılırsa
+>   KUTLANIR" der. Keşif kaynakları (not motoru, arkadaş dinleyicisi, liste haritaları,
+>   profil) izleme verisinden BAĞIMSIZ ve farklı anlarda hazır olur; yüklenmemiş kaynakta
+>   rozet "hak edilmedi" görünür, `known`a girerse kaynak gelince 3 yıldır not tutan
+>   kullanıcıya "İlk Not" konfetisi yağardı. Çözüm: her Keşif rozeti bir `kaynak` taşır
+>   (`KESIF_KAYNAK`); `stats.kesifHazir[kaynak]` false iken id `known`a yazılmaz
+>   (`bilinenRozetIdleri`, `bilinenSetIdleri`). Hazırlık imzası mutabakat imzasına girer
+>   (`kesifHazirImzasi`) — yoksa kaynak hazır olduğunda açık küme değişmediği için
+>   mutabakat koşmaz ve kullanıcının İLK arkadaşı sessiz emilirdi. Hazır olma ölçütleri:
+>   domain `view.ready`; arkadaş `!loading`; liste `!loading && watchedTvLoaded` (kök belge
+>   `loading`i erken kapatıyor, favori/izleme listesi sonradan iniyor); ortak liste
+>   `!loading`; profil `!loading && profile.uid === uid`.
+> - **Mevcut kullanıcıda SESSİZ** (v2 gibi). Bilinçli ayrıntı: sessizce emilen Keşif
+>   rozetleri ROZET SAYISI merdivenine (`set_sayi_N`) girer; eşik gerçekten geçilirse
+>   o türetilmiş koleksiyon bir kez kutlanır (ör. 40 rozetli kullanıcı 53'e çıkar →
+>   "Rozet Koleksiyoncusu"). Keşif rozetlerinin ve `set_kesif`in kendisi asla kutlanmaz.
+>   Bunu da susturmak istenirse çözüm `birlestir` çekirdeğinde "sessiz emilimle aynı
+>   turda eşik geçen sayaç koleksiyonu da sessiz" kuralıdır (şimdilik yapılmadı).
+> - **Performans.** `useWatchProgress`'taki tek `useMemo` ikiye bölündü: ağır
+>   `computeWatchScore` (512 film + 3.400 bölüm) yalnız izleme verisi değişince koşar;
+>   ucuz kısım (Perde, 154 rozet ≈ 0,5 ms, koleksiyonlar) Keşif sinyali de değişince.
+>   Sinyal sayıları `KESIF_TAVAN`'a (4) kırpılır, içerik aynıysa referans korunur
+>   (`kesifAyni`): 6. notu yazmak rozet listesini yeniden kurmaz.
+> - **Bilerek yapılmadı:** rozet detayında "şuraya git" derin bağlantısı (navigasyon
+>   haritası ister), `set_sayi_*` merdivenine 150 basamağı (125 "Neredeyse Hepsi" artık
+>   154'ün %81'i), ikinci kademeler (Free sınırı).
+> - **Testler:** `__tests__/kesifBadges.test.js` (38 test: sinyal modülü, katalog
+>   sözleşmesi, Free ulaşılabilirliği, İZLEME VERİSİNDEN BAĞIMSIZLIK, yükleme yarışı
+>   senaryoları — doğru davranış + hatanın kendisini gösteren KONTRAST testi).
+>   `watchBadgeCatalog`/`badgeInsights` sayıları 154'e güncellendi. Cihazda görülmedi.
+
+**Birim:** 1 puan = 1 **Kare** · **Seviye:** **Perde** (20 + sınırsız *Makara*) · **Rozet:** 154 izleme rozeti (v1: 46 → 81 → v2: 141 → v3: 154)
 **Kapsam:** tamamen türetilmiş, tamamen kişisel, sıfır yeni Firestore alanı, sıfır yeni listener.
 
 ---

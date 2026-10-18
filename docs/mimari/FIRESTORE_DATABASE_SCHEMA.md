@@ -13,11 +13,10 @@ Firestore Root
 │   │   ├── uid: string = "usr_abc123xyz789"
 │   │   ├── username: string = "ismail_oz"
 │   │   ├── usernameLower: string = "ismail_oz"
-│   │   ├── email: string = "ismail@example.com"
 │   │   ├── displayName: string = "İsmail Öztürk"
 │   │   ├── bio: string = "Sinema tutkunu, bilim kurgu ve gerilim hayranı 🎬🍿"
 │   │   ├── avatarIndex: int = 12
-│   │   ├── birthDate: string = "1998-05-14"
+│   │   │                                        // e-posta + doğum tarihi KÖKTE DEĞİL: private/account (kök belge tüm oturumlulara okunur)
 │   │   ├── _schemaVersion: int = 2
 │   │   ├── friendsCount: int (counter) = 42
 │   │   ├── postsCount: int (counter) = 15
@@ -144,9 +143,12 @@ Firestore Root
 │   │       ├── unreadCount: int = 0
 │   │       └── timestamp: timestamp = 2026-08-21T02:50:00Z
 │   │
-│   ├── 📁 private/{docId} (Örn: "push")
-│   │       ├── expoPushTokens: array<string> = [ "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" ]
-│   │       └── updatedAt: timestamp = 2026-08-21T01:00:00Z
+│   ├── 📁 private/{docId} (Örn: "push" | "account" | "entitlements") — YALNIZ sahibi okur
+│   │       ├── [push]    expoPushTokens: array<string> = [ "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" ]
+│   │       ├── [push]    updatedAt: timestamp = 2026-08-21T01:00:00Z
+│   │       ├── [account] email: string = "ismail@example.com"
+│   │       ├── [account] birthDate: string = "1998-05-14"   // "YYYY-MM-DD"; BİR KEZ yazılır (kural), yaş kapısı buradan türer
+│   │       └── [account] updatedAt: timestamp               // göç: docs/mimari/KULLANICI_OZEL_ALAN_GOCU.md
 │   │
 │   ├── 📁 gameProfile/summary
 │   │       ├── totalXp: int = 4850

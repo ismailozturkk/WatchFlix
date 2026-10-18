@@ -11,7 +11,13 @@ const mockTx = { get: jest.fn(), set: jest.fn(), delete: jest.fn() };
 const mockGetDoc = jest.fn();
 
 jest.mock("firebase/firestore", () => ({
-  doc: (_db, col, id) => ({ path: `${col}/${id}`, col, id }),
+  // Alt belgeler de çözülsün (Users/u1/private/account): `col` ve `id` her
+  // zaman SON koleksiyon/belge — "Users" filtresi alt belgeleri yakalamasın.
+  doc: (_db, ...segs) => ({
+    path: segs.join("/"),
+    col: segs[segs.length - 2],
+    id: segs[segs.length - 1],
+  }),
   getDoc: (...a) => mockGetDoc(...a),
   setDoc: jest.fn(),
   updateDoc: jest.fn(),
@@ -279,5 +285,109 @@ describe("createUserProfile", () => {
       createUserProfile({ uid: "u1", username: "123456", email: "a@b.c" }),
     ).rejects.toMatchObject({ code: UserProfileErrorCode.INVALID_USERNAME });
     expect(mockTx.set).not.toHaveBeenCalled();
+  });
+
+  // Users/{uid} kök belgesi TÜM oturumlulara okunur; e-posta ve doğum tarihi
+  // orada durursa başkası API ile okuyabilir. Yeri: private/account.
+  describe("gizli alanlar (e-posta, doğum tarihi)", () => {
+    const privateSets = () =>
+      mockTx.set.mock.calls.filter(([ref]) => ref.path === "Users/u1/private/account");
+
+    it("yeni profil: KÖKE yazılmaz, aynı transaction'da gizli belgeye yazılır", async () => {
+      primeTx({});
+
+      await createUserProfile({
+        uid: "u1",
+        username: "Ali_42",
+        email: "a@b.c",
+        birthDate: "1998-03-05",
+      });
+
+      const [, rootPayload] = setsOn("Users")[0];
+      expect(rootPayload).not.toHaveProperty("email");
+      expect(rootPayload).not.toHaveProperty("birthDate");
+
+      expect(privateSets()).toHaveLength(1);
+      const [, payload, options] = privateSets()[0];
+      expect(payload).toEqual({ email: "a@b.c", birthDate: "1998-03-05", updatedAt: "TS" });
+      expect(options).toEqual({ merge: true });
+    });
+
+    it("mevcut profili tazelerken kök yine gizli alan taşımaz", async () => {
+      primeTx({
+        "Usernames/ali_42": { uid: "u1" },
+        "Users/u1": { uid: "u1", usernameLower: "ali_42" },
+      });
+
+      await createUserProfile({ uid: "u1", username: "Ali_42", email: "a@b.c" });
+
+      const [, rootPayload] = setsOn("Users")[0];
+      expect(rootPayload).not.toHaveProperty("email");
+      // Tarih bu çağrıda gelmedi → gizli belgeye de yazılmaz (var olan SİLİNMEZ).
+      const [, payload] = privateSets()[0];
+      expect(payload).not.toHaveProperty("birthDate");
+    });
+
+    it("bozuk doğum tarihi gizli belgeye de girmez (kayıt düşmez)", async () => {
+      primeTx({});
+
+      await createUserProfile({
+        uid: "u1",
+        username: "Ali_42",
+        email: "a@b.c",
+        birthDate: "31-12-1998",
+      });
+
+      const [, payload] = privateSets()[0];
+      expect(payload).not.toHaveProperty("birthDate");
+    });
+
+    it("e-posta yoksa (örn. gizli Apple) gizli belge hiç yazılmaz", async () => {
+      primeTx({});
+
+      await createUserProfile({ uid: "u1", username: "Ali_42", email: null });
+
+      expect(privateSets()).toHaveLength(0);
+    });
+  });
+});
+
+describe("updateUserProfile — gizli alan yönlendirmesi", () => {
+  const { setDoc, updateDoc } = require("firebase/firestore");
+  const { updateUserProfile } = require("../services/userService");
+
+  it("doğum tarihi gizli belgeye gider, kök yamasında YOKTUR", async () => {
+    await updateUserProfile("u1", { birthDate: "1998-03-05", bio: "selam" });
+
+    expect(setDoc).toHaveBeenCalledWith(
+      { path: "Users/u1/private/account", col: "private", id: "account" },
+      { birthDate: "1998-03-05", updatedAt: "TS" },
+      { merge: true },
+    );
+    const rootPatch = updateDoc.mock.calls[0][1];
+    expect(rootPatch).toEqual({ bio: "selam", updatedAt: "TS" });
+  });
+
+  it("yalnız gizli alan değiştiyse kök belgeye hiç dokunmaz", async () => {
+    await updateUserProfile("u1", { birthDate: "1998-03-05" });
+
+    expect(setDoc).toHaveBeenCalledTimes(1);
+    expect(updateDoc).not.toHaveBeenCalled();
+  });
+
+  it("gizli yazım düşerse kök yazımı başlamaz", async () => {
+    setDoc.mockRejectedValueOnce(new Error("permission-denied"));
+
+    await expect(
+      updateUserProfile("u1", { birthDate: "1998-03-05", bio: "selam" }),
+    ).rejects.toThrow("permission-denied");
+    expect(updateDoc).not.toHaveBeenCalled();
+  });
+
+  it("gizli alan içermeyen yama eskisi gibi tek kök yazımıdır", async () => {
+    await updateUserProfile("u1", { displayName: "Ali" });
+
+    expect(setDoc).not.toHaveBeenCalled();
+    expect(updateDoc.mock.calls[0][1]).toEqual({ displayName: "Ali", updatedAt: "TS" });
   });
 });

@@ -2,7 +2,8 @@
 //
 // Ayarlar > Kullanım ve haklar. Planın her özellikteki limitini ve ne kadarını
 // kullandığını tek yerde gösterir: kalan hak, dolu çubuk, kilitli özellikler ve
-// yenilenme zamanı.
+// yenilenme zamanı. Mağaza aboneliği olan kullanıcıya "Aboneliği yönet" düğmesi de buradan açılır
+// (Ayarlar'daki küçük abone çubuğu bu ekrana gelir: components/settings/PremiumMemberBar.js).
 //
 // Bu ekran hiçbir limit ya da vaat ÜRETMEZ. Limitler utils/premiumFeatures.js
 // kaydından, harcananlar kapıların saydığı kaynaklardan (hooks/usePremiumUsage)
@@ -11,10 +12,12 @@
 
 import { intlLocaleOf, normalizeAppLanguage } from "../../../utils/appLanguages";
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import AppIcon from "@components/AppIcon";
+import Toast from "@components/AppToast";
 import PremiumPill from "@components/premium/PremiumPill";
 import { useLanguage } from "@context/LanguageContext";
+import { usePremium } from "@context/PremiumContext";
 import { useTheme } from "@context/ThemeContext";
 import usePremiumUsage from "@hooks/usePremiumUsage";
 import { showPremiumLimitAlert } from "@services/premiumUpsell";
@@ -174,6 +177,22 @@ export default function PremiumUsageScreen({ navigation }) {
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const { plan, usage } = usePremiumUsage();
+  const { storePlan, openCustomerCenter, busyAction } = usePremium();
+  // Yönetilecek bir MAĞAZA aboneliği yalnız mağazadan gelen planda var; sunucu promosyonu ya da
+  // geliştirme simülatörü planında açılacak bir abonelik yoktur.
+  const canManage = storePlan !== PREMIUM_PLAN.FREE;
+  const managing = busyAction === "customer-center";
+  const manage = async () => {
+    if (managing) return;
+    try {
+      await openCustomerCenter();
+    } catch (error) {
+      Toast.error(
+        tr ? "Abonelik ayarları açılamadı" : es ? "No se pudieron abrir los ajustes de la suscripción" : "Subscription settings could not be opened",
+        error,
+      );
+    }
+  };
 
   // Geri sayımlar (yenilenmesine X sa Y dk) ekran açıkken kendini yeniler.
   const [now, setNow] = useState(() => new Date());
@@ -255,6 +274,41 @@ export default function PremiumUsageScreen({ navigation }) {
               {tr ? "Planları ve fiyatları gör" : es ? "Ver planes y precios" : "View plans & pricing"}
             </Text>
             <AppIcon family="Ionicons" name="arrow-forward" size={14} color="#FFFFFF" />
+          </Pressable>
+        ) : null}
+        {canManage ? (
+          // Yükseltme düğmesi varken ikincil (çerçeveli); tek eylemse birincil (dolu).
+          <Pressable
+            testID="premium-usage-manage"
+            onPress={manage}
+            disabled={managing}
+            accessibilityRole="button"
+            accessibilityState={{ busy: managing }}
+            style={[
+              st.summaryCta,
+              model.canUpgrade
+                ? { backgroundColor: "transparent", borderWidth: 1, borderColor: alpha(C.accent, 0.45), marginTop: 10 }
+                : { backgroundColor: C.accent },
+            ]}
+          >
+            {managing ? (
+              <ActivityIndicator size="small" color={model.canUpgrade ? C.accent : "#FFFFFF"} />
+            ) : (
+              <>
+                <AppIcon
+                  family="Ionicons"
+                  name="card-outline"
+                  size={15}
+                  color={model.canUpgrade ? C.accent : "#FFFFFF"}
+                />
+                <Text
+                  allowFontScaling={false}
+                  style={[st.summaryCtaText, model.canUpgrade && { color: C.accent }]}
+                >
+                  {tr ? "Aboneliği yönet" : es ? "Gestionar suscripción" : "Manage subscription"}
+                </Text>
+              </>
+            )}
           </Pressable>
         ) : null}
       </View>

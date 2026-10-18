@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Feather from "@expo/vector-icons/Feather";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import * as Haptics from "@services/hapticsService";
 import BackButton from "../../components/BackButton";
 import GlassIconButton from "../../components/common/GlassIconButton";

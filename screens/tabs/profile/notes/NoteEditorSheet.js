@@ -284,8 +284,8 @@ export default function NoteEditorSheet({
     if (!item.text?.trim()) return;
     await Clipboard.setStringAsync(item.text);
     toast.success(i18nText("autoI18n.panoya_kopyalandi", "Panoya kopyalandı"));
-    // Toast kök seviyede duruyor ve alt-sheet'in altında kalabiliyor; satırda da
-    // kısa bir onay göster.
+    // Toast sayfanın üstünde görünür (BottomSheetModal kendi host'unu taşır); ayrıca
+    // satırda da kısa bir onay göster — kullanıcının gözü zaten oradadır.
     setCopiedTodoId(item.id);
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
     copyTimerRef.current = setTimeout(() => setCopiedTodoId(null), 1200);

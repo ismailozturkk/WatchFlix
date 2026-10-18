@@ -53,6 +53,8 @@ import TmdbLogo from "../../components/TmdbLogo";
 import JustWatchLogo from "../../components/JustWatchLogo";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
 import PremiumSettingsCard from "@components/settings/PremiumSettingsCard";
+import { usePremium } from "@context/PremiumContext";
+import { shouldShowMemberBar } from "@utils/premiumMemberBar";
 import useAiPrefs from "@hooks/useAiPrefs";
 import { getAiCopy } from "@utils/aiCopy";
 import { countCustomizedPrefs } from "@utils/aiPrefs";
@@ -76,6 +78,7 @@ import {
   tmdbRegionOf,
 } from "../../utils/appLanguages";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
 
 // Seçilebilir diller utils/appLanguages.js'ten gelir (yeni dil = oraya kayıt +
@@ -376,6 +379,10 @@ export default function SettingsScreen() {
   const { prefs: aiPrefs } = useAiPrefs();
   const aiCustomCount = countCustomizedPrefs(aiPrefs);
   const { theme } = useTheme();
+  // Abone küçük "Aboneliği yönet" çubuğunu görür; o çubuk zaten Kullanım ve haklar'ı açtığı için
+  // alttaki ayrı satır yalnız vitrin gören Free kullanıcıda kalır.
+  const { plan: premiumPlan } = usePremium();
+  const hasMemberBar = shouldShowMemberBar(premiumPlan);
   const { adultContent, chaneAdultContent, ageRestricted } = useContentSettings();
   const { showOngoingTvShows, changeShowOngoingTvShows } =
     useOngoingTvShowsSettings();
@@ -542,28 +549,30 @@ export default function SettingsScreen() {
         {/* ── Premium: abonelik vitrini en üstte ── */}
         <SectionLabel color={C.muted} first>SEELOGD PREMIUM</SectionLabel>
         <PremiumSettingsCard />
-        <View
-          style={[
-            s.card,
-            s.cardStacked,
-            { backgroundColor: C.card, borderColor: C.border },
-          ]}
-        >
-          <SettingRow
-            colors={C}
-            iconBg={C.iconPurple}
-            iconColor={C.purple}
-            iconName="speedometer-outline"
-            title={i18nText("autoI18n.kullanim_haklar_baslik", "Kullanım ve haklar")}
-            subtitle={i18nText(
-              "autoI18n.kullanim_haklar_aciklama",
-              "Planının limitleri ve kalan hakların",
-            )}
-            onPress={() => navigation.navigate("PremiumUsageScreen")}
-            right={<Chevron color={C.muted} />}
-            last
-          />
-        </View>
+        {hasMemberBar ? null : (
+          <View
+            style={[
+              s.card,
+              s.cardStacked,
+              { backgroundColor: C.card, borderColor: C.border },
+            ]}
+          >
+            <SettingRow
+              colors={C}
+              iconBg={C.iconPurple}
+              iconColor={C.purple}
+              iconName="speedometer-outline"
+              title={i18nText("autoI18n.kullanim_haklar_baslik", "Kullanım ve haklar")}
+              subtitle={i18nText(
+                "autoI18n.kullanim_haklar_aciklama",
+                "Planının limitleri ve kalan hakların",
+              )}
+              onPress={() => navigation.navigate("PremiumUsageScreen")}
+              right={<Chevron color={C.muted} />}
+              last
+            />
+          </View>
+        )}
         {/* Yalnız geliştirme build'inde: premium kapılarını mağazasız dene */}
         {__DEV__ ? <DevPlanSimulatorCard /> : null}
 
@@ -1364,6 +1373,7 @@ export default function SettingsScreen() {
               </Animated.View>
             </View>
           </KeyboardAvoidingView>
+          <ModalToastHost visible={langModalVisible} />
         </Modal>
 
         {/* Çıkış onayı alt sayfası */}

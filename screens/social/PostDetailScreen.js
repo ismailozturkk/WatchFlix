@@ -25,6 +25,7 @@ import { useProfileUi } from "@context/ProfileUiContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import UserAvatar from "@components/common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
+import { toast } from "@components/AppToast";
 import { postTypeBadge } from "@utils/postComposer";
 import AppIcon from "@components/AppIcon";
 import RatingStars from "@components/RatingStars";
@@ -39,6 +40,7 @@ import GlassIconButton from "@components/common/GlassIconButton";
 import ShareToChatSheet from "@components/chat/ShareToChatSheet";
 import { buildPostShare } from "@utils/chatShare";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 // Basit göreli zaman (MyPostsScreen ile aynı kısaltmalar).
 const timeAgo = (ms) => {
   if (!ms) return "";
@@ -121,6 +123,10 @@ export default function PostDetailScreen({ route, navigation }) {
       setLiked(liked);
       setLikesCount((c) => Math.max(0, c + (next ? -1 : 1)));
       if (__DEV__) console.warn("PostDetail like:", e?.message);
+      toast.error(
+        i18nText("autoI18n.toast_begeni_kaydedilemedi", "Beğeni kaydedilemedi"),
+        i18nText("autoI18n.toast_yeniden_dene", "Bağlantını kontrol edip tekrar dene."),
+      );
     }
   }, [post, user, liked, selectAvatarIndex]);
 
@@ -148,6 +154,10 @@ export default function PostDetailScreen({ route, navigation }) {
       } catch (e) {
         applyVote(currentVote); // rollback
         if (__DEV__) console.warn("PostDetail vote:", e?.message);
+        toast.error(
+          i18nText("autoI18n.toast_oy_kaydedilemedi", "Oyun kaydedilemedi"),
+          i18nText("autoI18n.toast_yeniden_dene", "Bağlantını kontrol edip tekrar dene."),
+        );
       }
     },
     [post, user?.uid],
@@ -385,6 +395,7 @@ export default function PostDetailScreen({ route, navigation }) {
           post={post}
           onClose={onCloseComments}
         />
+        <ModalToastHost visible={commentsVisible} />
       </Modal>
 
       <SaveSharedListModal

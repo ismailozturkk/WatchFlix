@@ -41,6 +41,10 @@
 // <SheetScroll> (ya da FlatList/ScrollView) içinde olmalı, yoksa taşan kısım
 // klavyenin altında kalır. Bkz. components/common/SheetScroll.js.
 //
+// TOAST: kökteki toast native Modal'ın ARKASINDA kalır, bu yüzden her sayfa kendi
+// <ToastHost scoped> örneğini taşır (`visible` iken kayıtlı). Sayfa kapanmaya başlayınca
+// kayıt düşer ve görünen toast kalan süresiyle köke devredilir (bkz. components/toast/ToastHost.js).
+//
 // DİKKAT — İKİ MODAL ARDARDA: iOS, kapanmakta olan bir Modal'ın üstüne ikincisini
 // sunamaz (UIKit "already presenting" der, ikinci pencere hiç çizilmez ama React
 // onu açık sanır → ekran kilitlenmiş gibi kalır). Bir sayfa kapanırken ARDINDAN
@@ -50,6 +54,7 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, Modal, Pressable, StyleSheet, View } from "react-native";
 import ModalBlurBackdrop from "./ModalBlurBackdrop";
+import ToastHost from "../toast/ToastHost";
 import useSheetTransition from "@hooks/useSheetTransition";
 import { i18nText } from "@utils/i18nText";
 
@@ -175,6 +180,13 @@ export default function BottomSheetModal({
         >
           {children}
         </Animated.View>
+
+        {/* Sayfanın üstünde: toast sayfa açıkken de görünsün. */}
+        <ToastHost
+          scoped
+          enabled={!!visible}
+          topInset={statusBarTranslucent ? undefined : 0}
+        />
       </View>
     </Modal>
   );

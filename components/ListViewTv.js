@@ -30,6 +30,7 @@ import {
 } from "../utils/watchState";
 
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 /* ─── Küçük buton sarmalayıcı ─────────────────── */
 const ActionButton = ({
   onPress,
@@ -565,6 +566,7 @@ const ListViewTv = ({
             )}
           </Animated.View>
         </Animated.View>
+        <ModalToastHost visible={modalVisible} />
       </Modal>
     </View>
   );

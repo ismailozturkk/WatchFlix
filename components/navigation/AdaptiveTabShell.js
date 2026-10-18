@@ -6,7 +6,7 @@ import { useSharedValue, withTiming } from "react-native-reanimated";
 import { BlurTargetSurface, BLUR_SCOPES, useBlurTargetRef } from "../common/BlurTarget";
 import { TabBarLayoutContext } from "../../context/TabBarLayoutContext";
 import { tabBarNativeSupport, useTabBarCapabilities } from "../../services/tabBarCapabilities";
-import { TAB_NAMES, createTabState, getTabBarLayout, isTabName, tabStateReducer } from "../../utils/tabBarModel";
+import { AI_ACTION, TAB_NAMES, createTabState, getAiButtonCenter, getTabBarLayout, isTabName, tabStateReducer } from "../../utils/tabBarModel";
 import { isLightSurface } from "../../utils/colorUtils";
 import { selectionAsync } from "../../services/hapticsService";
 import { TAB_BAR_SCROLL_UNSET, advanceTabBarCollapse } from "../../utils/tabBarCollapse";
@@ -28,18 +28,30 @@ class NativeHostBoundary extends React.Component {
   }
 }
 
+// Yerel iOS çubuğundaki yapay zeka öğesinin içeriği: öğe asla seçilmez
+// (`preventNativeSelection`), bu yüzden sahne hiç görünmez; boş bir görünüm yeter.
+const AI_SCENE = <View />;
+
 // The scene container stays fixed. Only the native bar visibility and overlay
 // change; effect/accessibility preferences never remount screen state.
-export default function AdaptiveTabShell({ navigation, route, tabs, screens, theme, renderCompanion }) {
+//
+// `onAiPress` (isteğe bağlı): çubuğun yanındaki AYRIK yuvarlak yapay zeka düğmesi.
+// Bir sekme değildir — dokununca `onAiPress(origin)` çağrılır (origin: sohbetin
+// büyüyerek açılacağı ekran noktası), hiçbir sekme seçilmez. Verilmezse düğme yoktur.
+//   • iOS yerel çubuk: `systemItem: "search"` sekmesi iOS 26'da sistemin kendi AYRIK
+//     yuvarlak cam düğmesi olarak çizilir (çubukla aynı hizada). iOS 18–25'te sıradan
+//     bir son öğe gibi görünür ama yine seçilmez, yalnız sohbeti açar.
+//   • JS çubuğu (Android cam / bulanıklık / düz): TabBarAiButton, çubukla aynı levha.
+export default function AdaptiveTabShell({ navigation, route, tabs, screens, theme, renderCompanion, onAiPress, aiLabel }) {
   const [state, dispatch] = useReducer(tabStateReducer, route?.params?.initialTab, createTabState);
   const [rendererFailed, setRendererFailed] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const appActive = useAppActive();
   const blurTarget = useBlurTargetRef(BLUR_SCOPES.screen);
   const { mode, reduceMotion } = useTabBarCapabilities({ hasBlurTarget: Boolean(blurTarget), rendererFailed });
-  const layout = useMemo(() => getTabBarLayout({ width, bottomInset: insets.bottom, mode, rtl: I18nManager.isRTL }), [width, insets.bottom, mode]);
+  const layout = useMemo(() => getTabBarLayout({ width, bottomInset: insets.bottom, mode }), [width, insets.bottom, mode]);
 
   // Continuous 0..1 progress instead of a minimized/expanded flag — the bar
   // keeps resizing for as long as the scroll gesture continues, in whatever
@@ -107,7 +119,7 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
   useEffect(() => {
     const timers = [];
     const task = InteractionManager.runAfterInteractions(() => {
-      TAB_NAMES.filter((name) => name !== "tvshows").forEach((name, index) => {
+      TAB_NAMES.filter((name) => name !== "discover").forEach((name, index) => {
         timers.push(setTimeout(() => dispatch({ type: "warm", name }), 6000 + 1200 * index));
       });
     });
@@ -123,6 +135,24 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
   const onNativeRejected = useCallback(({ nativeEvent }) => dispatch({ type: "native", event: nativeEvent, rejected: true }), []);
   const onGlassFailure = useCallback(() => setRendererFailed(true), []);
   const nativeBarVisible = mode === "native-ios" && !keyboardVisible;
+
+  // Yapay zeka düğmesi: iki yoldan (JS düğmesi / yerel öğenin "seçimi engellendi"
+  // olayı) AYNI işleve gelir. Sekme durumuna dokunmaz.
+  const aiCenter = useMemo(
+    () => getAiButtonCenter({ width, height, layout, mode, bottomInset: insets.bottom, rtl: I18nManager.isRTL }),
+    [width, height, layout, mode, insets.bottom],
+  );
+  const openAi = useCallback(() => {
+    selectionAsync().catch(() => {});
+    onAiPress?.(aiCenter);
+  }, [onAiPress, aiCenter]);
+  const onNativePrevented = useCallback(({ nativeEvent }) => {
+    if (nativeEvent?.preventedScreenKey === AI_ACTION.key) openAi();
+  }, [openAi]);
+  const aiAction = useMemo(
+    () => (onAiPress ? { label: aiLabel || "CineMatch", onPress: openAi } : null),
+    [onAiPress, aiLabel, openAi],
+  );
   // iOS 26+ with the tab-bar-scale module in the binary: the real UIKit bar is
   // scaled 20% by the shared scroll progress (NativeTabBarScale), so the
   // system's own minimize is switched off — two shrink effects would stack.
@@ -161,6 +191,7 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
               <NativeHostBoundary fallback={fallbackScenes} onFailure={onGlassFailure}>
                 <Tabs.Host navStateRequest={{ selectedScreenKey: state.activeTab, baseProvenance: state.provenance }}
                   rejectStaleNavStateUpdates onTabSelected={onNativeSelect} onTabSelectionRejected={onNativeRejected}
+                  onTabSelectionPrevented={onNativePrevented}
                   tabBarHidden={!nativeBarVisible} colorScheme={dark ? "dark" : "light"}
                   direction={I18nManager.isRTL ? "rtl" : "ltr"} nativeContainerStyle={{ backgroundColor: theme.primary }}
                   ios={{ tabBarTintColor: theme.accent, tabBarMinimizeBehavior: nativeScaleActive ? "never" : "onScrollDown", tabBarControllerMode: "tabBar" }}>
@@ -172,6 +203,18 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
                       {state.mountedTabs.has(tab.name) ? screens[tab.name] : <View style={styles.loading}><ActivityIndicator color={theme.accent} /></View>}
                     </Tabs.Screen>
                   ))}
+                  {/* Yapay zeka: SON öğe (iOS 26'da sistemin ayrık yuvarlak cam düğmesi).
+                      `preventNativeSelection` ile hiçbir zaman seçilmez; dokunuş
+                      `onTabSelectionPrevented` olarak gelir ve sohbeti açar. */}
+                  {aiAction ? (
+                    <Tabs.Screen key={AI_ACTION.key} screenKey={AI_ACTION.key} title={aiAction.label}
+                      tabBarItemAccessibilityLabel={aiAction.label} tabBarItemTestID={`tab-${AI_ACTION.key}`}
+                      preventNativeSelection specialEffects={NO_RESELECT_EFFECTS}
+                      nativeContainerStyle={{ backgroundColor: theme.primary }}
+                      ios={{ systemItem: "search", icon: { type: "sfSymbol", name: AI_ACTION.sf }, standardAppearance: appearance, scrollEdgeAppearance: appearance, overrideScrollViewContentInsetAdjustmentBehavior: false }}>
+                      {AI_SCENE}
+                    </Tabs.Screen>
+                  ) : null}
                 </Tabs.Host>
               </NativeHostBoundary>
             ) : (
@@ -191,6 +234,7 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
             tabs={tabs}
             activeTab={state.activeTab}
             onSelect={onSelect}
+            aiAction={aiAction}
             mode={mode}
             layout={layout}
             theme={theme}

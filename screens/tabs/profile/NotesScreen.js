@@ -61,6 +61,7 @@ import BackButton from "@components/BackButton";
 import useReduceMotion from "../../../hooks/useReduceMotion";
 import { useLiquidGlass } from "../../../services/liquidGlass";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const GRID_PAD = 16;
 const GRID_GAP = 10;
 // Izgarada kartlar arası dikey boşluk; liste kipindeki `styles.list.gap` ile aynı.
@@ -105,6 +106,7 @@ const DeleteModal = ({ visible, onConfirm, onClose, theme }) => (
         </View>
       </View>
     </View>
+    <ModalToastHost visible={visible} />
   </Modal>
 );
 

@@ -3,6 +3,8 @@ import { View, StyleSheet, ScrollView } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
+import useScreenSections from "../../hooks/useSectionVisibility";
+import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage } from "../../context/LanguageContext";
@@ -45,6 +47,9 @@ const ProfileScreen = ({ navigation }) => {
   const onTabBarScroll = useTabBarScrollSync();
   const { t, language } = useLanguage();
   const { theme } = useTheme();
+  // Ayarlar > Kişiselleştirme > Ekran bölümleri'nde gizlenen bölümler
+  // (utils/sectionVisibility.js "profile"). Kimlik bloğu (avatar + ad) her zaman görünür.
+  const { isVisible: showSection, allHidden: allSectionsHidden } = useScreenSections("profile");
   const { user } = useAuth();
   const { profile } = useUserProfile();
   const { isPremium, isUnlimited } = usePremium();
@@ -229,55 +234,67 @@ const ProfileScreen = ({ navigation }) => {
               joinedAt={user?.metadata?.createdAt}
               onEdit={goEditProfile}
               onShare={openStoryExport}
+              // Yıllık hedef halkası düğmesi (Düzenle / Paylaş'ın yanında). Ayarlar > Ekran
+              // bölümleri > Profil > "Yıllık izleme hedefi" ile gizlenir.
+              showGoal={showSection("goal")}
             />
           </View>
-          <View style={styles.profileBadgeStrip}>
-            <WatchBadgeStrip
-              progress={watchProgress}
-              onPress={acRozetler}
-              compact
-            />
-          </View>
+          {showSection("badges") && (
+            <View style={styles.profileBadgeStrip}>
+              <WatchBadgeStrip
+                progress={watchProgress}
+                onPress={acRozetler}
+                compact
+              />
+            </View>
+          )}
           {/* ── Arkadaş aksiyonları ── */}
-          <FriendsActionBar
-            theme={theme}
-            friendCount={friendCount}
-            unreadMessages={unreadMessages}
-            incomingRequests={receivedCount}
-            onSearch={goSearch}
-            onFriends={goFriends}
-            onMessages={goMessages}
-            onRequests={goRequests}
-          />
+          {showSection("friends") && (
+            <FriendsActionBar
+              theme={theme}
+              friendCount={friendCount}
+              unreadMessages={unreadMessages}
+              incomingRequests={receivedCount}
+              onSearch={goSearch}
+              onFriends={goFriends}
+              onMessages={goMessages}
+              onRequests={goRequests}
+            />
+          )}
 
-          <StatisticsSection
-            theme={theme}
-            isloadingShowInfo={isloadingShowInfo}
-            isloadingMovieInfo={isloadingMovieInfo}
-            watchedMovieCount={watchedMovieCount}
-            watchedTvCount={watchedTvCount}
-            totalEpisodesCount={totalEpisodesCount}
-            totalWatchedTime={totalWatchedTime}
-            totalWatchedTimeTv={totalWatchedTimeTv}
-            totalMinutesTime={totalMinutesTime}
-            totalMinutesTimeTv={totalMinutesTimeTv}
-            timeDisplayMode={timeDisplayMode}
-            rankNameMovie={rankNameMovie}
-            rankNameTv={rankNameTv}
-            borderColorMovie={borderColorMovie}
-            borderColorTv={borderColorTv}
-            formatTotalDurationTime={formatTotalDurationTime}
-            onNavigateMovieStats={() =>
-              navigation.navigate("MovieStatisticsScreen")
-            }
-            onNavigateTvStats={() => navigation.navigate("TvStatisticsScreen")}
-            onTimeClick={handleTimeClick}
-            t={t}
-          />
-          <ProfileLists navigation={navigation} />
-          <MyActivityButton navigation={navigation} />
-          <RemindersPreviewButton navigation={navigation} />
-          <NotesCard navigation={navigation} />
+          {showSection("stats") && (
+            <StatisticsSection
+              theme={theme}
+              isloadingShowInfo={isloadingShowInfo}
+              isloadingMovieInfo={isloadingMovieInfo}
+              watchedMovieCount={watchedMovieCount}
+              watchedTvCount={watchedTvCount}
+              totalEpisodesCount={totalEpisodesCount}
+              totalWatchedTime={totalWatchedTime}
+              totalWatchedTimeTv={totalWatchedTimeTv}
+              totalMinutesTime={totalMinutesTime}
+              totalMinutesTimeTv={totalMinutesTimeTv}
+              timeDisplayMode={timeDisplayMode}
+              rankNameMovie={rankNameMovie}
+              rankNameTv={rankNameTv}
+              borderColorMovie={borderColorMovie}
+              borderColorTv={borderColorTv}
+              formatTotalDurationTime={formatTotalDurationTime}
+              onNavigateMovieStats={() =>
+                navigation.navigate("MovieStatisticsScreen")
+              }
+              onNavigateTvStats={() => navigation.navigate("TvStatisticsScreen")}
+              onTimeClick={handleTimeClick}
+              t={t}
+            />
+          )}
+          {showSection("lists") && <ProfileLists navigation={navigation} />}
+          {showSection("activity") && <MyActivityButton navigation={navigation} />}
+          {showSection("reminders") && <RemindersPreviewButton navigation={navigation} />}
+          {showSection("notes") && <NotesCard navigation={navigation} />}
+          {allSectionsHidden && (
+            <SectionsHiddenNotice navigation={navigation} screen="profile" />
+          )}
           <ProfileAvatarPickerModal
             visible={modalVisible}
             selectedIndex={selectAvatarIndex}

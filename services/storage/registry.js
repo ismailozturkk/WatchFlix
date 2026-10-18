@@ -112,6 +112,15 @@ const settingsKeys = {
     default: null,
     validate: plainObject,
   },
+  // Film / Dizi / Hub / Profil ekranlarında kullanıcının GİZLEDİĞİ bölümler:
+  // { tv: [bölüm…], movie: [...], hub: [...], profile: [...] }. Boş/eksik = hepsi
+  // görünür (bkz. utils/sectionVisibility.js — neden "gizli" listesi saklanıyor).
+  sectionVisibility: {
+    key: "sectionVisibility",
+    type: TYPES.json,
+    default: null,
+    validate: plainObject,
+  },
   iconBackgroundMode: {
     key: "iconBackgroundMode",
     type: TYPES.string,
@@ -347,6 +356,29 @@ const settingsKeys = {
   petSelected: { key: "pet_selected", type: TYPES.string, default: null },
   petPosition: { key: "pet_position", type: TYPES.json, default: null },
   petSize: { key: "pet_size", type: TYPES.number, default: 124 },
+  // Film/Dizi sekmesinde (screens/tabs/DiscoverScreen.js) en son seçilen bölüm:
+  // uygulama o bölümle açılır. "tv" | "movie".
+  homeMediaType: {
+    key: "homeMediaType",
+    type: TYPES.string,
+    default: "tv",
+    validate: oneOf("tv", "movie"),
+  },
+  // "Ne izlesem?" (Filtreli Keşif, utils/discoverFilters.js): her medya türünün en son kullanılan
+  // süzgeci { movie: {...}, tv: {...} }. Hiçbiri özelleştirilmemişse null.
+  discoverFilters: {
+    key: "discoverFilters",
+    type: TYPES.json,
+    default: null,
+    validate: plainObject,
+  },
+  // Kullanıcının kaydettiği süzgeçler: [{ id, name, mediaType, filters }] (en çok 8). Yedekte.
+  discoverPresets: {
+    key: "discoverPresets",
+    type: TYPES.json,
+    default: null,
+    validate: arrayOf(),
+  },
 };
 
 /* ================================================================== */
@@ -462,6 +494,41 @@ const dataKeys = {
     default: null,
     scope: "user",
     keepOnLogout: true,
+  },
+  // Kullanıcının "yeni rozetler eklendi" duyurusunu kapattığı KATALOG SÜRÜMÜ
+  // (components/badges/watchBadgeCatalog.js KATALOG_SURUMU). Defterin içine
+  // konmadı: defter kutlama/kazanma sözleşmesini taşıyor, bu yalnızca bir
+  // arayüz tercihi — ikisini karıştırmak duyuru kartı için defter şemasına
+  // sürüm atlatırdı. Çıkışta SİLİNMEZ; silinirse aynı duyuru tekrar çıkar.
+  watchCatalogSeen: {
+    key: "watch_progress:catalog_seen:",
+    type: TYPES.number,
+    default: 0,
+    scope: "user",
+    keepOnLogout: true,
+  },
+  // Yıllık izleme hedefi: { "2026": { target, unit } } (bkz. utils/yearlyGoal.js).
+  // Yalnız bu cihazda tutulur (buluta yazılmaz). Çıkışta SİLİNMEZ: kullanıcı kendi
+  // koyduğu hedefi çıkış-giriş yapınca yeniden kurmak zorunda kalmamalı ve bulut
+  // kopyası olmadığından silinen hedef geri getirilemez.
+  yearlyGoals: {
+    key: "yearly_watch_goals:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
+  // Takip edilen oyuncu / yönetmenler (utils/followedPeople.js): { "<kişiId>": { id, name, photo,
+  // department, at } }. Yalnız bu cihazda tutulur (buluta yazılmaz) ve çıkışta SİLİNMEZ: bulut
+  // kopyası olmadığından silinen liste geri getirilemez (yearlyGoals ile aynı karar).
+  followedPeople: {
+    key: "followed_people:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
   },
   // İlk içerik aktivasyon damgası. Çıkışta SİLİNMEZ — silinirse kullanıcı geri
   // döndüğünde aynı analytics olayı ikinci kez üretilir ve metrik şişer.

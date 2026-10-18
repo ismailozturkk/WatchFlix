@@ -21,7 +21,7 @@ import GlassIconButton from "../../components/common/GlassIconButton";
 import { SearchSkeleton } from "../../components/Skeleton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import LottieView from "lottie-react-native";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
 import ListBadges from "../../components/ListBadges";
 import { useFocusEffect } from "@react-navigation/native";

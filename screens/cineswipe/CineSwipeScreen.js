@@ -14,7 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import AppIcon from "../../components/AppIcon";
 import GlassCloseButton from "../../components/common/GlassCloseButton";
 import CineActionBar from "../../components/cineswipe/CineActionBar";

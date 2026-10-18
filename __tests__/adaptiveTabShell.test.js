@@ -79,15 +79,15 @@ it("changes only the bar across full/blur/off, retaining the same native host an
 
 it("native selection and legacy bar presses share one state without losing visited scenes", async () => {
   await render();
-  await act(() => renderer.root.findByType("NativeTabs").props.onTabSelected({ nativeEvent: { selectedScreenKey: "movies", provenance: 1, actionOrigin: "user" } }));
-  expect(mounts.movies).toBe(1);
+  await act(() => renderer.root.findByType("NativeTabs").props.onTabSelected({ nativeEvent: { selectedScreenKey: "share", provenance: 1, actionOrigin: "user" } }));
+  expect(mounts.share).toBe(1);
   mockMode = "legacy-blur";
   await update();
-  expect(renderer.root.findByType("OverlayBar").props.activeTab).toBe("movies");
+  expect(renderer.root.findByType("OverlayBar").props.activeTab).toBe("share");
   await act(() => renderer.root.findByType("OverlayBar").props.onSelect("profile"));
   expect(renderer.root.findByType("NativeTabs").props.navStateRequest.selectedScreenKey).toBe("profile");
   expect(mounts.profile).toBe(1);
-  expect(mounts.movies).toBe(1);
+  expect(mounts.share).toBe(1);
 });
 
 it("consumes repeated initialTab navigation and preserves the current destination", async () => {
@@ -174,12 +174,84 @@ describe("iOS 26 native bar scaling", () => {
   });
 });
 
-it("registers exactly five native scenes and disables native reselect side effects", async () => {
+it("registers exactly four native scenes and disables native reselect side effects", async () => {
   await render();
   const scenes = renderer.root.findAllByType("NativeScene");
-  expect(scenes).toHaveLength(5);
+  expect(scenes.map((scene) => scene.props.screenKey)).toEqual(["discover", "share", "settings", "profile"]);
   scenes.forEach((scene) => {
     expect(scene.props.specialEffects.repeatedTabSelection).toEqual({ popToRoot: false, scrollToTop: false });
     expect(scene.props.ios.overrideScrollViewContentInsetAdjustmentBehavior).toBe(false);
+    expect(scene.props.preventNativeSelection).toBeFalsy();
+  });
+});
+
+describe("yapay zeka düğmesi", () => {
+  const aiScene = () => renderer.root.findAllByType("NativeScene").find((scene) => scene.props.screenKey === "ai");
+
+  it("onAiPress yoksa ne yerel öğe ne JS düğmesi vardır", async () => {
+    await render();
+    expect(aiScene()).toBeUndefined();
+    mockMode = "legacy-blur";
+    await update();
+    expect(renderer.root.findByType("OverlayBar").props.aiAction).toBeNull();
+  });
+
+  it("iOS'ta son yerel öğe: iOS 26'da ayrık yuvarlak cam düğme, asla seçilmez", async () => {
+    props = { ...props, onAiPress: jest.fn(), aiLabel: "CineMatch" };
+    await render();
+    const scenes = renderer.root.findAllByType("NativeScene");
+    expect(scenes).toHaveLength(5);
+    expect(scenes[scenes.length - 1].props.screenKey).toBe("ai");
+    const ai = aiScene();
+    expect(ai.props.preventNativeSelection).toBe(true);
+    expect(ai.props.title).toBe("CineMatch");
+    expect(ai.props.tabBarItemAccessibilityLabel).toBe("CineMatch");
+    expect(ai.props.ios.systemItem).toBe("search");
+    expect(ai.props.ios.icon).toEqual({ type: "sfSymbol", name: "sparkles" });
+    expect(ai.props.specialEffects.repeatedTabSelection).toEqual({ popToRoot: false, scrollToTop: false });
+  });
+
+  it("yerel öğeye dokunuş (seçim engellendi olayı) sohbeti merkezle açar, sekmeyi DEĞİŞTİRMEZ", async () => {
+    const onAiPress = jest.fn();
+    props = { ...props, onAiPress, route: { params: { initialTab: "share" } } };
+    await render();
+    await act(() => renderer.root.findByType("NativeTabs").props.onTabSelectionPrevented({
+      nativeEvent: { selectedScreenKey: "share", provenance: 0, preventedScreenKey: "ai" },
+    }));
+    expect(onAiPress).toHaveBeenCalledTimes(1);
+    const origin = onAiPress.mock.calls[0][0];
+    expect(origin.x).toBeGreaterThan(390 / 2);
+    expect(origin.y).toBeGreaterThan(844 / 2);
+    expect(renderer.root.findByType("NativeTabs").props.navStateRequest.selectedScreenKey).toBe("share");
+  });
+
+  it("başka bir ekranın engellenen seçimi sohbeti açmaz", async () => {
+    const onAiPress = jest.fn();
+    props = { ...props, onAiPress };
+    await render();
+    await act(() => renderer.root.findByType("NativeTabs").props.onTabSelectionPrevented({
+      nativeEvent: { selectedScreenKey: "profile", provenance: 0, preventedScreenKey: "settings" },
+    }));
+    expect(onAiPress).not.toHaveBeenCalled();
+  });
+
+  it("JS çubuğunda aynı eylem çubuğa verilir ve aynı işleve gelir", async () => {
+    const onAiPress = jest.fn();
+    props = { ...props, onAiPress, aiLabel: "CineMatch" };
+    mockMode = "legacy-blur";
+    await render();
+    const { aiAction } = renderer.root.findByType("OverlayBar").props;
+    expect(aiAction.label).toBe("CineMatch");
+    await act(() => aiAction.onPress());
+    expect(onAiPress).toHaveBeenCalledTimes(1);
+    // Çubuktaki sekme durumuna dokunulmadı.
+    expect(renderer.root.findByType("OverlayBar").props.activeTab).toBe("profile");
+  });
+
+  it("etiket verilmezse marka adı kullanılır", async () => {
+    props = { ...props, onAiPress: jest.fn() };
+    mockMode = "legacy-blur";
+    await render();
+    expect(renderer.root.findByType("OverlayBar").props.aiAction.label).toBe("CineMatch");
   });
 });

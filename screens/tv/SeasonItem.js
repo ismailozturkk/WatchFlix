@@ -10,7 +10,7 @@ import {
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import Reminder from "../../components/Reminder";
 import { markSeasonWatched, removeTvWatch } from "../../services/libraryActions";
 import { showLibraryError } from "../../utils/libraryErrorText";

@@ -15,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "../../../context/ThemeContext";
 import { useUserProfile } from "../../../context/UserProfileContext";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { i18nText } from "../../../utils/i18nText";
 import ScreenDecor from "../../../components/ScreenDecor";
 import BackButton from "@components/BackButton";

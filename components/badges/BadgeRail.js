@@ -1,11 +1,12 @@
 // components/badges/BadgeRail.js
 //
-// Rozet ekranındaki YATAY RAFLAR: "Sıradaki hedefler" ve "Son kazanılanlar".
+// Rozet ekranındaki YATAY RAFLAR: "Sıradaki hedefler", "Takvimde yakında" ve
+// "Son kazanılanlar".
 //
-// NEDEN RAF: ızgara 80 rozeti bölüm bölüm gösterir, envanter dilidir. Kullanıcının
-// iki acil sorusu ise ızgaranın dibinde kalıyordu: "şimdi neyin peşinde
-// koşmalıyım?" ve "en son ne kazandım?". Raflar bu iki soruyu ekranın tepesine
-// çıkarır; ızgara arşiv olarak altta kalır.
+// NEDEN RAF: ızgara 140+ rozeti bölüm bölüm gösterir, envanter dilidir. Kullanıcının
+// üç acil sorusu ise ızgaranın dibinde kalıyordu: "şimdi neyin peşinde
+// koşmalıyım?", "yakında kaçıracağım bir şey var mı?" ve "en son ne kazandım?".
+// Raflar bu soruları ekranın tepesine çıkarır; ızgara arşiv olarak altta kalır.
 //
 // Raf içeriği KÜÇÜK (en çok 6-8 öğe) olduğu için FlatList değil ScrollView:
 // sanallaştırma 8 kart için yük bindirir, kazandırmaz.
@@ -148,6 +149,80 @@ export const SonKarti = memo(function SonKarti({ kart, onPress, simdi }) {
   );
 });
 
+/**
+ * Takvim fırsatı kartı: yılda bir gelen bir günün (31 Ekim, 14 Şubat, Cuma 13…) ya
+ * da bitmekte olan dönem mührünün geri sayımı. Rozet KİLİTLİ ve soluk çizilir ama
+ * zaman rozeti dolgun: kartın asıl bilgisi "ne kadar kaldı".
+ *
+ * Aciliyet iki kademeli: 7 günden azsa hap dolgulu (vurgu rengi, beyaz yazı), değilse
+ * çerçeveli. Kart sayfaya götürür; rozetin ne istediği orada yazar.
+ */
+export const FirsatKarti = memo(function FirsatKarti({ firsat, onPress }) {
+  const { theme } = useTheme();
+  const { language } = useLanguage();
+  const lang = copyLanguage(language, ["tr", "en", "es"]);
+  const { kart, tur, gunKaldi, eksikGun } = firsat;
+
+  const sekil = kademeSekli(kart.tier, kart.aileToplam);
+  const kadRenk = kademeRengi(sekil.kademe, theme);
+  const vurgu = kadRenk || rarityStyle(kart.rarity, theme).color;
+  const acil = gunKaldi <= 7;
+
+  let zaman;
+  if (gunKaldi <= 0) zaman = i18nText("autoI18n.rozet_takvim_bugun", "Bugün!");
+  else if (gunKaldi === 1) zaman = i18nText("autoI18n.rozet_takvim_yarin", "Yarın");
+  else zaman = i18nText("autoI18n.rozet_takvim_gun_kaldi", `${gunKaldi} gün kaldı`, { n: gunKaldi });
+
+  const alt =
+    tur === "muhur" && eksikGun > 0
+      ? i18nText("autoI18n.rozet_takvim_eksik", `Eksik gün: ${eksikGun}`, { n: eksikGun })
+      : null;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${badgeAd(kart, lang)}, ${zaman}`}
+      style={[styles.firsat, { backgroundColor: theme.secondary, borderColor: withAlpha(vurgu, 0.4) }]}
+    >
+      <AppBadge
+        glyph={kart.icon}
+        glyphSolid={kart.iconSolid}
+        rarity={kart.rarity}
+        unlocked={false}
+        progress={tur === "muhur" ? Number(kart.oran) || 0 : 0}
+        size={52}
+        sides={sekil.kenar}
+        color={kadRenk}
+      />
+      <Text allowFontScaling={false} numberOfLines={2} style={[styles.firsatAd, { color: theme.text.primary }]}>
+        {badgeAd(kart, lang)}
+      </Text>
+      <View
+        style={[
+          styles.firsatHap,
+          acil
+            ? { backgroundColor: theme.accent, borderColor: theme.accent }
+            : { backgroundColor: "transparent", borderColor: withAlpha(theme.accent, 0.55) },
+        ]}
+      >
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[styles.firsatZaman, { color: acil ? "#FFFFFF" : theme.accent }]}
+        >
+          {zaman}
+        </Text>
+      </View>
+      {/* Yer HER ZAMAN ayrılır: alt satırı olan ve olmayan kartlar aynı yükseklikte kalsın. */}
+      <Text allowFontScaling={false} numberOfLines={1} style={[styles.firsatAlt, { color: theme.text.muted }]}>
+        {alt || " "}
+      </Text>
+    </TouchableOpacity>
+  );
+});
+
 const styles = StyleSheet.create({
   raf: { marginTop: 22 },
   rafBaslikSatir: { flexDirection: "row", alignItems: "baseline", gap: 8, paddingHorizontal: 16, marginBottom: 10 },
@@ -162,6 +237,12 @@ const styles = StyleSheet.create({
   iz: { height: 5, borderRadius: 3, overflow: "hidden", marginTop: 8 },
   dolgu: { height: "100%", borderRadius: 3 },
   hedefKalan: { marginTop: 6, fontSize: 11, fontWeight: "700" },
+
+  firsat: { width: 128, borderRadius: 20, borderWidth: 1, paddingTop: 14, paddingBottom: 10, paddingHorizontal: 8, alignItems: "center" },
+  firsatAd: { marginTop: 9, minHeight: 30, fontSize: 12, lineHeight: 15, fontWeight: "800", textAlign: "center" },
+  firsatHap: { marginTop: 7, borderRadius: 11, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 3 },
+  firsatZaman: { fontSize: 11, fontWeight: "900" },
+  firsatAlt: { marginTop: 5, fontSize: 10.5, fontWeight: "700" },
 
   son: { width: 112, borderRadius: 20, borderWidth: 1, paddingVertical: 14, paddingHorizontal: 8, alignItems: "center" },
   sonAd: { marginTop: 9, minHeight: 30, fontSize: 12, lineHeight: 15, fontWeight: "800", textAlign: "center" },

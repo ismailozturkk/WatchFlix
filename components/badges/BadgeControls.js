@@ -1,10 +1,10 @@
 // components/badges/BadgeControls.js
 //
-// Rozet ekranının süzgeçleri: durum (Tümü / Açık / Kilitli) ve bölüm (Kilometre
-// taşları, Ritim, Türler…). İkisi birlikte çalışır — "Türler" bölümünde yalnızca
-// kilitliler gibi.
+// Rozet ekranının süzgeçleri: durum (Tümü / Açık / Kilitli, duyuru varken + Yeni) ve
+// bölüm (Başlangıç, Kilometre taşları, Ritim…). İkisi birlikte çalışır — "Türler"
+// bölümünde yalnızca kilitliler gibi.
 //
-// BÖLÜM ÇİPİ KAYDIRMAZ, SÜZER. 80 rozetlik, başlıkları ve satırları farklı
+// BÖLÜM ÇİPİ KAYDIRMAZ, SÜZER. 140+ rozetlik, başlıkları ve satırları farklı
 // yükseklikte bir FlatList'te bir bölüme atlamak getItemLayout ister; satır
 // yükseklikleri sabit olmadığı için atlama kayardı. Süzmek hem sağlam hem de
 // küçük ekranda bir bölümün tamamını tek bakışta gösterir.
@@ -23,13 +23,19 @@ export const DURUM_FILTRELERI = [
   { id: "kilitli", key: "autoI18n.rozet_filtre_kilitli", fallback: "Kilitli" },
 ];
 
-function BadgeControls({ filtre, onFiltre, bolum, onBolum, ozetler, bolumAd }) {
+// Dördüncü segment YALNIZ yeni-rozet duyurusu görünürken eklenir: duyuru kartındaki
+// "yenileri göster" bağının düşeceği süzgeç. Duyuru kapanınca segment de kalkar
+// (kalıcı bir "Yeni" sekmesi, ilk haftadan sonra hep boş/anlamsız kalırdı).
+export const YENI_FILTRE = { id: "yeni", key: "autoI18n.rozet_filtre_yeni", fallback: "Yeni" };
+
+function BadgeControls({ filtre, onFiltre, bolum, onBolum, ozetler, bolumAd, yeniVar = false }) {
   const { theme } = useTheme();
+  const filtreler = yeniVar ? [...DURUM_FILTRELERI, YENI_FILTRE] : DURUM_FILTRELERI;
 
   return (
     <View style={styles.kap}>
       <View style={[styles.segment, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-        {DURUM_FILTRELERI.map((f) => {
+        {filtreler.map((f) => {
           const secili = filtre === f.id;
           return (
             <TouchableOpacity
@@ -40,9 +46,18 @@ function BadgeControls({ filtre, onFiltre, bolum, onBolum, ozetler, bolumAd }) {
               onPress={() => onFiltre(f.id)}
               style={[styles.segmentOge, secili && { backgroundColor: withAlpha(theme.accent, 0.18) }]}
             >
+              {/* Tek satır + küçülme: dört segmentte ("Desbloqueadas" gibi uzun İspanyolca
+                  etiket) metin komşusuna taşıyordu. Kompakt kipte punto da bir kademe düşer. */}
               <Text
                 allowFontScaling={false}
-                style={[styles.segmentYazi, { color: secili ? theme.accent : theme.text.muted }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+                style={[
+                  styles.segmentYazi,
+                  filtreler.length > 3 && styles.segmentYaziKompakt,
+                  { color: secili ? theme.accent : theme.text.muted },
+                ]}
               >
                 {i18nText(f.key, f.fallback)}
               </Text>
@@ -99,8 +114,9 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 1,
   },
-  segmentOge: { flex: 1, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  segmentOge: { flex: 1, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
   segmentYazi: { fontSize: 13, fontWeight: "900" },
+  segmentYaziKompakt: { fontSize: 11.5 },
   cipSatir: { paddingHorizontal: 14, gap: 8 },
   cip: {
     flexDirection: "row",

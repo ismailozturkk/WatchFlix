@@ -1,5 +1,5 @@
 import * as Calendar from "expo-calendar";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { Platform } from "react-native";
 import { i18nText } from "./i18nText";
 import { Keys, get, set } from "../services/storage";
@@ -21,7 +21,9 @@ function notify({ silent, onUndo, ...toast }) {
   Toast.show({
     ...toast,
     visibilityTime: UNDO_TOAST_MS,
-    props: { action: { label: i18nText("autoI18n.geri_al", "Geri Al"), onPress: onUndo } },
+    props: {
+      action: { label: i18nText("autoI18n.geri_al", "Geri Al"), icon: "arrow-undo", onPress: onUndo },
+    },
   });
 }
 

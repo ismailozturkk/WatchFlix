@@ -33,7 +33,9 @@ import {
   useIconBackgroundSettings,
   useAmbientBackgroundSettings,
   useDecorScopeSettings,
+  useOngoingTvShowsSettings,
 } from "@context/AppSettingsContext";
+import { useSectionVisibilityMap } from "@hooks/useSectionVisibility";
 import {
   onerilenEffectMode,
   setEffectMode,
@@ -43,6 +45,7 @@ import * as Haptics from "@services/hapticsService";
 import { i18nText } from "@utils/i18nText";
 import { clamp } from "@utils/colorUtils";
 import { isDecorCustomized } from "@utils/decorScopes";
+import { countHiddenSections } from "@utils/sectionVisibility";
 import { alpha } from "@theme/colors";
 import {
   SettingsSubScreen,
@@ -50,6 +53,7 @@ import {
   Chevron,
   buildUiColors,
 } from "./settingsUi";
+import { fillCopy, getSectionVisibilityCopy } from "./sectionVisibilityCopy";
 
 // İkon arka planı saydamlık kaydırıcısı (0.1–1). Delta-based native 120 FPS PanResponder.
 function OpacitySlider({ value, onChange, colors }) {
@@ -217,6 +221,13 @@ export default function PersonalizationScreen() {
   const { showAmbientBackground, ambientAllowed, changeShowAmbientBackground } =
     useAmbientBackgroundSettings();
   const { decorHidden } = useDecorScopeSettings();
+  // Ekran bölümleri: gizlenen bölüm sayısı satırdaki rozeti besler. "Devam Edenler"in
+  // kendi ayarı (Dil ve içerik) de aynı listeye girdiği için o da sayılır.
+  const sectionCopy = getSectionVisibilityCopy(language);
+  const sectionsHidden = useSectionVisibilityMap();
+  const { showOngoingTvShows } = useOngoingTvShowsSettings();
+  const hiddenSectionCount =
+    countHiddenSections(sectionsHidden) + (showOngoingTvShows === false ? 1 : 0);
   const navigation = useNavigation();
   const {
     showIconBackground,
@@ -630,6 +641,42 @@ export default function PersonalizationScreen() {
                   {isDecorCustomized(decorHidden)
                     ? i18nText("autoI18n.dekor_kapsam_ozel", "Özel")
                     : i18nText("autoI18n.dekor_kapsam_her_yerde", "Her yerde")}
+                </Text>
+              </View>
+              <Chevron color={C.muted} />
+            </View>
+          }
+        />
+      </View>
+
+      {/* Film, Dizi, Hub ve Profil'de hangi BÖLÜMLERİN görüneceği ayrı sayfada
+          (bkz. SectionVisibilityScreen). */}
+      <View style={ps.personalizationGap} />
+      <View
+        style={[
+          ps.card,
+          { backgroundColor: C.card, borderColor: C.border },
+        ]}
+      >
+        <SettingRow
+          colors={C}
+          iconBg={C.iconPurple}
+          iconColor={C.purple}
+          iconName="albums-outline"
+          title={sectionCopy.ui.title}
+          subtitle={sectionCopy.ui.rowSub}
+          onPress={() => navigation.navigate("SectionVisibilityScreen")}
+          last
+          right={
+            <View style={ps.rowRightGroup}>
+              <View style={[ps.qualityBadge, { backgroundColor: C.accentDim }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[ps.qualityBadgeText, { color: C.accentStrong }]}
+                >
+                  {hiddenSectionCount > 0
+                    ? fillCopy(sectionCopy.ui.badgeHidden, { n: hiddenSectionCount })
+                    : sectionCopy.ui.badgeAll}
                 </Text>
               </View>
               <Chevron color={C.muted} />

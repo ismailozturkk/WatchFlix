@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@context/ThemeContext";
 import { StoryDraftService } from "@services/StoryDraftService";

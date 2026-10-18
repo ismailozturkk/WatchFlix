@@ -24,7 +24,7 @@ import { doc, getDoc, writeBatch } from "firebase/firestore";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { db } from "../../firebase";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";

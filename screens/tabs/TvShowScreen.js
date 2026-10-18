@@ -20,10 +20,11 @@ import { DeviceEventEmitter } from "react-native";
 import {
   useOngoingTvShowsSettings,
 } from "../../context/AppSettingsContext";
-import { useLanguage } from "../../context/LanguageContext";
 import ScreenDecor from "../../components/ScreenDecor";
-import DiscoverSearchHeader from "../../components/home/DiscoverSearchHeader";
+import DiscoverHeaderSpacer from "../../components/home/DiscoverHeaderSpacer";
+import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import usePullToRefresh from "../../hooks/usePullToRefresh";
+import useScreenSections from "../../hooks/useSectionVisibility";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
 import { useStreamingProviderSettings } from "../../context/AppSettingsContext";
@@ -31,6 +32,8 @@ import { useDiscoveryPreferenceSettings } from "../../context/AppSettingsContext
 import { useProfileStats } from "../../context/ProfileStatsContext";
 import { resolveOnboardingGenreIds } from "../../utils/onboardingPreferences";
 import FavoritesRecommendationRail from "../../components/favorites/FavoritesRecommendationRail";
+import FollowedUpcomingRail from "../../components/person/FollowedUpcomingRail";
+import useFollowedPeople from "../../hooks/useFollowedPeople";
 import { useUserProfile } from "../../context/UserProfileContext";
 import { hasRecommendationSignal, readProfileFavorites } from "../../utils/fourFavorites";
 
@@ -41,7 +44,9 @@ const INITIAL_SECTION_COUNT = 2;
 // kapsamında: render içinde kurulursa liste her render'da sökülür.
 const MarkedFlatList = markTabScroll(Animated.FlatList);
 
-export default function TvShowScreen({ navigation }) {
+// `headerTopOffset`: ekranın tepesinde yüzen satırın (Film/Dizi anahtarı + arama düğmesi)
+// yüksekliği (screens/tabs/DiscoverScreen.js); ilk raf onun altından başlar.
+export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
   const { contentBottom } = useTabBarLayout();
   const { theme } = useTheme();
   const { showOngoingTvShows } = useOngoingTvShowsSettings();
@@ -59,10 +64,13 @@ export default function TvShowScreen({ navigation }) {
     () => hasRecommendationSignal(readProfileFavorites(profile), "tv"),
     [profile],
   );
-  const { t } = useLanguage();
+  // Takip edilen kişi var mı? Yoksa raf bölüm listesine hiç girmez (boş bölüm sayacı şişirmesin).
+  const { count: followedCount } = useFollowedPeople();
   const { loadingTrend, refreshAllTvShows } = useTvShow();
-  const { refreshing, animatedSearchStyle, onScroll, handleRefresh } =
+  const { refreshing, onScroll, handleRefresh } =
     usePullToRefresh(refreshAllTvShows);
+  // Ayarlar > Kişiselleştirme > Ekran bölümleri'nde gizlenen raflar (utils/sectionVisibility.js).
+  const { filter: filterHiddenSections } = useScreenSections("tv");
 
   useEffect(() => {
     if (!loadingTrend) {
@@ -77,6 +85,9 @@ export default function TvShowScreen({ navigation }) {
         ? { key: "ongoing", Component: TvOngoingSection }
         : null,
       { key: "best", Component: TvShowBests },
+      ...(followedCount > 0
+        ? [{ key: "followedPeople", Component: FollowedUpcomingRail }]
+        : []),
       ...(hasFavoriteSignal
         ? [{ key: "fromFavorites", Component: FavoritesRecommendationRail }]
         : []),
@@ -97,8 +108,10 @@ export default function TvShowScreen({ navigation }) {
       { key: "airingToday", Component: TvShowsAiringToday },
     ];
 
-    return items.filter(Boolean);
-  }, [hasFavoriteSignal, onboardingGenreIds, showOngoingTvShows, streamingProviderIds, topTvGenres]);
+    // Raf kimlikleri (`key`) utils/sectionVisibility.js'teki "tv" bölümleriyle aynı;
+    // "ongoing" ise kendi ayarıyla (showOngoingTvShows) yukarıda zaten elendi.
+    return filterHiddenSections(items.filter(Boolean));
+  }, [filterHiddenSections, followedCount, hasFavoriteSignal, onboardingGenreIds, showOngoingTvShows, streamingProviderIds, topTvGenres]);
 
   const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
 
@@ -123,18 +136,12 @@ export default function TvShowScreen({ navigation }) {
     [navigation],
   );
 
-  // ELEMENT olarak verilir (geri çağrı değil): FlatList fonksiyonu bileşen tipi
-  // sayar, kimliği değişince başlık sökülüp yeniden kurulur ve düğme sıfırlanır.
-  const searchHeader = useMemo(
-    () => (
-      <DiscoverSearchHeader
-        navigation={navigation}
-        mediaType="tv"
-        placeholder={t.SearchScreen.searchTvShows}
-        animatedStyle={animatedSearchStyle}
-      />
-    ),
-    [animatedSearchStyle, navigation, t.SearchScreen.searchTvShows],
+  // Liste başlığı: yüzen Film/Dizi satırının (anahtar + arama düğmesi) altında kalan boşluk.
+  // ELEMENT olarak verilir (geri çağrı değil): FlatList fonksiyonu bileşen tipi sayar,
+  // kimliği değişince başlık sökülüp yeniden kurulur.
+  const listHeader = useMemo(
+    () => <DiscoverHeaderSpacer topOffset={headerTopOffset} />,
+    [headerTopOffset],
   );
 
   const revealNextSection = useCallback(() => {
@@ -143,6 +150,13 @@ export default function TvShowScreen({ navigation }) {
     );
   }, [sections.length]);
 
+  // Tüm raflar gizliyse (ya da kalanlar veri/ayar yüzünden çizilmiyorsa) boş ekran yerine
+  // nedenini söyleyen kart. ELEMENT olarak verilir (geri çağrı değil), başlıktaki gibi.
+  const emptyNotice = useMemo(
+    () => <SectionsHiddenNotice navigation={navigation} screen="tv" />,
+    [navigation],
+  );
+
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
       <ScreenDecor scope="home" iconOpacity={0.3} />
@@ -150,7 +164,8 @@ export default function TvShowScreen({ navigation }) {
         data={visibleSections}
         keyExtractor={(item) => item.key}
         renderItem={renderSection}
-        ListHeaderComponent={searchHeader}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={emptyNotice}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.container, { paddingBottom: contentBottom }]}
         initialNumToRender={INITIAL_SECTION_COUNT}

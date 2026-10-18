@@ -26,7 +26,7 @@ import {
   signInWithEmailAndPassword,
 } from "firebase/auth";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useLanguage } from "../../context/LanguageContext";
 import { Keys, get, set } from "../../services/storage";
 import * as SecureStore from "expo-secure-store";

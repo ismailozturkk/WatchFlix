@@ -40,7 +40,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import axios from "axios";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import useUserDataDomain from "../../hooks/useUserDataDomain";
 import { remindersActions, remindersDomain } from "../../services/userData";
 
@@ -91,6 +91,7 @@ import {
   isAired,
 } from "../../utils/watchState";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const { width, height } = Dimensions.get("window");
 const BACKDROP_H = Math.round(width * (9 / 16) * 0.72);
 const POSTER_W = Math.round(width * 0.25);
@@ -1087,6 +1088,7 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
             </TouchableOpacity>
           </Animated.View>
         </Animated.View>
+        <ModalToastHost visible={!!target} />
       </Modal>
 
       {/* ── Kardeş sayfalar (iç içe modal yok) ── */}
@@ -1156,6 +1158,7 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
           details={details || { title, poster_path: posterPath }}
           releaseDate={releaseDate}
         />
+        <ModalToastHost visible={ratingVisible} />
       </Modal>
     </>
   );

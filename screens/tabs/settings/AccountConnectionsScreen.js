@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { auth } from "../../../firebase";
 import AppIcon from "../../../components/AppIcon";
 import { useLanguage } from "../../../context/LanguageContext";

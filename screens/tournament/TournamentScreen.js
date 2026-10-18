@@ -58,6 +58,7 @@ import ScreenDecor from "@components/ScreenDecor";
 // Faz kimliği (renk/gradyan/ikon) Hub kartıyla ortak: components/tournament/phaseMeta.js
 import { PHASE_META, phaseLabel } from "@components/tournament/phaseMeta";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 // Onay katmanında artık okunacak iki seçenek var; eski 2.6 sn karar vermeye
 // yetmiyordu (MatchCard'daki PENDING_TIMEOUT ile aynı).
 const NOM_PENDING_TIMEOUT = 6000;
@@ -804,6 +805,7 @@ export default function TournamentScreen() {
           </View>
         </Pressable>
       </Pressable>
+      <ModalToastHost visible={infoVisible} />
     </Modal>
   );
 
@@ -879,6 +881,7 @@ export default function TournamentScreen() {
           )}
         </Pressable>
       </Pressable>
+      <ModalToastHost visible={!!treeMatch} />
     </Modal>
   );
 

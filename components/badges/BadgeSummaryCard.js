@@ -4,7 +4,7 @@
 // nadirlik sütunu. Perde kartı (WatchLevelCard) ilerlemeyi PUAN cinsinden söyler;
 // bu kart aynı kullanıcıyı KOLEKSİYON cinsinden söyler — iki ayrı soru, iki ayrı kart.
 //
-// SAYAÇ KATALOG ROZETLERİNİ sayar (81), koleksiyon/mühür/prestij dahil değil:
+// SAYAÇ KATALOG ROZETLERİNİ sayar (154), koleksiyon/mühür/prestij dahil değil:
 // payda her dönem başında büyürse kullanıcı hiçbir şey yapmadan "42/95"ten
 // "42/96"ya düşmüş görünürdü (hooks/useWatchProgress.js → acikSayisi ile aynı sözleşme).
 //

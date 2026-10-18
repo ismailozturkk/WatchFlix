@@ -17,7 +17,14 @@ jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
 }));
 jest.mock("@expo/vector-icons/Ionicons", () => ({ __esModule: true, default: "Icon" }));
-jest.mock("react-native-toast-message", () => ({ __esModule: true, default: { show: jest.fn() } }));
+jest.mock("../components/AppToast", () => {
+  const mockApi = {
+    show: jest.fn(), hide: jest.fn(), success: jest.fn(), error: jest.fn(), warning: jest.fn(),
+    info: jest.fn(), loading: jest.fn(), badge: jest.fn(), premium: jest.fn(), undo: jest.fn(),
+    update: jest.fn(), promise: jest.fn(), clear: jest.fn(),
+  };
+  return { __esModule: true, default: mockApi, toast: mockApi, showToast: mockApi.show };
+});
 jest.mock("../utils/i18nText", () => ({ i18nText: (_key, fallback) => fallback }));
 jest.mock("../components/ScreenDecor", () => ({ __esModule: true, default: "Decor" }));
 jest.mock("../components/auth/BirthDateField", () => ({ __esModule: true, default: "BirthDateField" }));
@@ -50,7 +57,7 @@ jest.mock("../components/profile/EditProfileKit", () => ({
   FieldLabel: "FieldLabel", FieldHint: "FieldHint", DangerRow: "DangerRow", DeleteAccountSheet: "DeleteSheet",
 }));
 
-const mockToast = require("react-native-toast-message").default;
+const mockToast = require("../components/AppToast").default;
 const mockTheme = {
   primary: "#111111", secondary: "#1b1b1b", between: "#222222", border: "#333333", accent: "#3388ff",
   text: { primary: "#fff", secondary: "#bbb", muted: "#888" }, colors: { red: "#e11", green: "#1e1" },

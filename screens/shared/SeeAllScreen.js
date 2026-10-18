@@ -280,7 +280,9 @@ const LayoutControls = React.memo(function LayoutControls({
 });
 
 // Ortak sunum bileşeni — hangi context'ten geldiğinden bağımsız grid.
-function SeeAllGrid({
+// `emptyComponent`: liste boşken gösterilecek öğe (varsayılan: yükleniyor göstergesi). Filtreli Keşif
+// (screens/shared/DiscoverFiltersScreen.js) "sonuç yok" ve "yüklenemedi" durumlarını buradan verir.
+export function SeeAllGrid({
   title,
   mediaType,
   navigation,
@@ -290,6 +292,7 @@ function SeeAllGrid({
   hasMore,
   onActivate,
   headerExtra,
+  emptyComponent,
 }) {
   const { theme } = useTheme();
   const {
@@ -436,9 +439,11 @@ function SeeAllGrid({
           windowSize={7}
           removeClippedSubviews={false}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <ActivityIndicator size="large" color={theme.accent} />
-            </View>
+            emptyComponent ?? (
+              <View style={styles.empty}>
+                <ActivityIndicator size="large" color={theme.accent} />
+              </View>
+            )
           }
           ListFooterComponent={
             loadingMore ? (

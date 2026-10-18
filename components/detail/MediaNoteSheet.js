@@ -18,6 +18,7 @@ import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
+import { toast } from "../AppToast";
 
 const NOTE_TEXT_LIMIT = 2000;
 
@@ -59,7 +60,10 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
     setSubmitting(true);
     try {
       const ok = await saveMediaNote({ type: mediaType, mediaId, title, posterPath, text });
-      if (ok) onClose?.();
+      if (ok) {
+        onClose?.();
+        toast.success(i18nText("autoI18n.toast_not_kaydedildi", "Not kaydedildi"));
+      }
     } finally {
       submitLock.current = false;
       setSubmitting(false);
@@ -72,6 +76,7 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
     try {
       await deleteMediaNote(mediaType, mediaId);
       onClose?.();
+      toast.info(i18nText("autoI18n.toast_not_silindi", "Not silindi"));
     } finally {
       setDeleting(false);
     }

@@ -25,7 +25,7 @@ import { useAuth } from "@context/AuthContext";
 import SkeletonPlaceholder from "react-native-skeleton-placeholder";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import SwipeCard from "@components/SwipeCard";
 import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
 import useSheetTransition from "@hooks/useSheetTransition";
@@ -79,6 +79,7 @@ import {
   PREDEFINED_MOVIE_LISTS,
 } from "../../services/listItemsService";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const { width, height } = Dimensions.get("window");
 const GRID_SIDE_PADDING = 12;
 const GRID_COLUMN_GAP = 8;
@@ -1970,6 +1971,7 @@ export default function ListsScreen({ route, navigation }) {
                 );
               })()}
         </View>
+        <ModalToastHost visible={modalVisible} />
       </Modal>
       <CaseOpeningModal
         visible={randomModalVisible}
@@ -2596,6 +2598,7 @@ export default function ListsScreen({ route, navigation }) {
             </TouchableOpacity>
           </Animated.View>
         </View>
+        <ModalToastHost visible={filterModalVisible} />
       </Modal>
 
       {/* ── İzleme tarihi — global aramadan izlenenler listesine ekleme ── */}

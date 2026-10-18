@@ -13,6 +13,7 @@ import { i18nText } from "../../utils/i18nText";
 import { normalizeScope } from "../../utils/commentScope";
 import { scopeLong } from "./scopeTexts";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 export default function ScopedCommentButton({
   theme,
   showId,
@@ -101,6 +102,7 @@ export default function ScopedCommentButton({
           initialScope={normalized}
           subtitle={scopeLong(normalized)}
         />
+        <ModalToastHost visible={visible} />
       </Modal>
     </>
   );

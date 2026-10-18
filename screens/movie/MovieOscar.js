@@ -29,6 +29,7 @@ import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { toast } from "../../components/AppToast";
 import { triggerHaptic } from "../../services/hapticsService";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const { width, height } = Dimensions.get("window");
 
 // Dikey yıl metni
@@ -516,6 +517,7 @@ export default function MovieOscar({ navigation }) {
             </View>
           </SafeAreaView>
         </TouchableOpacity>
+        <ModalToastHost visible={yearModalVisible} />
       </Modal>
     </View>
   );

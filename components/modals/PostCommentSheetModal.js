@@ -57,6 +57,7 @@ import { useUserProfile } from "@context/UserProfileContext";
 import UserAvatar from "../common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
 import appAlert from "@components/AppAlert";
+import { toast } from "@components/AppToast";
 import { alpha } from "../../theme/colors";
 import {
   subscribeToPostComments,
@@ -455,6 +456,10 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
       requestAnimationFrame(() => commentInputRef.current?.clear());
     } catch (e) {
       if (__DEV__) console.warn("post comment submit failed:", e.message);
+      toast.error(
+        i18nText("autoI18n.yorum_gonderilemedi", "Yorum gönderilemedi"),
+        i18nText("autoI18n.toast_yeniden_dene", "Bağlantını kontrol edip tekrar dene."),
+      );
     } finally {
       setIsSending(false);
     }
@@ -481,6 +486,10 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
         setInput((p) => (p.editId === item.id ? EMPTY_INPUT : p));
       } catch (e) {
         if (__DEV__) console.warn("post comment delete failed:", e.message);
+        toast.error(
+          i18nText("autoI18n.toast_yorum_silinemedi", "Yorum silinemedi"),
+          i18nText("autoI18n.toast_yeniden_dene", "Bağlantını kontrol edip tekrar dene."),
+        );
       }
     },
     [postId, user?.uid],
@@ -494,6 +503,10 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
         await toggleCommentLike(postId, item.id, user.uid, isLiked);
       } catch (e) {
         if (__DEV__) console.warn("post comment like failed:", e.message);
+        toast.error(
+          i18nText("autoI18n.toast_begeni_kaydedilemedi", "Beğeni kaydedilemedi"),
+          i18nText("autoI18n.toast_yeniden_dene", "Bağlantını kontrol edip tekrar dene."),
+        );
       }
     },
     [postId, user?.uid],

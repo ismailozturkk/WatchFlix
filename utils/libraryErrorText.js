@@ -6,7 +6,7 @@
 // offline.", yetkisizken ham SDK metni görünüyordu. Karar `LibraryError.code`
 // üzerinden (utils/libraryCore) verilir, metin burada.
 
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 
 import { captureError } from "../services/crashReporting";
 import { i18nText } from "./i18nText";

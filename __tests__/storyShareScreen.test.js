@@ -78,7 +78,14 @@ jest.mock("expo-media-library/legacy", () => ({ saveToLibraryAsync: jest.fn() })
 jest.mock("expo-linear-gradient", () => ({ LinearGradient: "Gradient" }));
 jest.mock("@expo/vector-icons/Ionicons", () => ({ __esModule: true, default: "Icon" }));
 jest.mock("axios", () => ({ __esModule: true, default: { get: jest.fn(() => Promise.reject(new Error("offline"))) } }));
-jest.mock("react-native-toast-message", () => ({ __esModule: true, default: { show: jest.fn() } }));
+jest.mock("../components/AppToast", () => {
+  const mockApi = {
+    show: jest.fn(), hide: jest.fn(), success: jest.fn(), error: jest.fn(), warning: jest.fn(),
+    info: jest.fn(), loading: jest.fn(), badge: jest.fn(), premium: jest.fn(), undo: jest.fn(),
+    update: jest.fn(), promise: jest.fn(), clear: jest.fn(),
+  };
+  return { __esModule: true, default: mockApi, toast: mockApi, showToast: mockApi.show };
+});
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
 }));

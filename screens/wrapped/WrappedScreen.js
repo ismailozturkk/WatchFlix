@@ -31,7 +31,8 @@ import * as MediaLibrary from "expo-media-library";
 import { saveToLibraryAsync } from "expo-media-library/legacy";
 import * as Haptics from "@services/hapticsService";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
+import ScreenToastHost from "@components/toast/ScreenToastHost";
 
 import { useTheme } from "../../context/ThemeContext";
 import GlassIconButton from "../../components/common/GlassIconButton";
@@ -575,6 +576,8 @@ export default function WrappedScreen({ route, navigation }) {
           top={insets.top + 18}
         />
       )}
+      {/* Tam ekran modal: iOS'ta kökteki toast bu sayfanın ARKASINDA kalır. */}
+      <ScreenToastHost />
     </View>
   );
 }

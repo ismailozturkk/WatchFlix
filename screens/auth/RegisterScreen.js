@@ -25,7 +25,7 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {

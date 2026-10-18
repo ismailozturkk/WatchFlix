@@ -32,7 +32,7 @@ import TVShowItem from "../../components/TVShowItem";
 import { LinearGradient } from "expo-linear-gradient";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useAuth } from "../../context/AuthContext";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import SeasonItem from "./SeasonItem";
 import SeasonDeck from "./SeasonDeck";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
@@ -66,6 +66,7 @@ import PaginatedRail from "../../components/PaginatedRail";
 import CommentSheetModal from "@components/modals/CommentSheetModal";
 import RatingSheetModal from "@components/modals/RatingSheetModal";
 import RatingSummary from "@components/RatingSummary";
+import CertificationBadge from "../../components/detail/CertificationBadge";
 import { i18nText } from "../../utils/i18nText";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
 import { refreshShowMeta } from "../../services/refreshShowMeta";
@@ -81,6 +82,7 @@ import Reminder from "../../components/Reminder";
 import WatchProgressBar from "../../components/tv/WatchProgressBar";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const { width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
 
@@ -269,7 +271,7 @@ export default function TvShowsDetails({ route, navigation }) {
           params: {
             language: tmdbLanguageOf(language),
             append_to_response:
-              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,translations,videos,watch/providers",
+              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,content_ratings,translations,videos,watch/providers",
           },
           headers: { accept: "application/json", Authorization: API_KEY },
         });
@@ -785,6 +787,7 @@ export default function TvShowsDetails({ route, navigation }) {
               </Text>
             ) : null}
             <View style={styles.genreRow}>
+              <CertificationBadge mediaType="tv" details={details} region={providerRegion} />
               {details.genres.slice(0, 3).map((g) => (
                 <View
                   key={g.id}
@@ -1754,6 +1757,7 @@ export default function TvShowsDetails({ route, navigation }) {
           seasons={details?.seasons}
           initialScope={commentScope}
         />
+        <ModalToastHost visible={commentModalVisible} />
       </Modal>
 
       {/* Derecelendirme */}
@@ -1774,6 +1778,7 @@ export default function TvShowsDetails({ route, navigation }) {
           details={details}
           releaseDate={details.first_air_date}
         />
+        <ModalToastHost visible={ratingModalVisible} />
       </Modal>
 
       <AIChatScreen

@@ -64,7 +64,8 @@ describe("hedefi + yaklasanlar", () => {
   });
 
   test("kilitli tekil rozetin hedefi kendisidir, tamamlanmis kartin hedefi yoktur", () => {
-    const kilitli = kart("sadik_izleyici");
+    // Tekil (ailesiz) kilitli rozet: komedi uzmanligi. (sadik_izleyici v2'de aileye girdi.)
+    const kilitli = kart("komedi_75");
     expect(hedefi(kilitli)).toBe(kilitli);
     const tam = kurKartlar({ filmSayisi: 5000 }).kartlar.find((k) => k.family === "film");
     expect(tam.sonrakiHedef).toBeNull();
@@ -80,7 +81,7 @@ describe("hedefi + yaklasanlar", () => {
     expect(uye.tier).toBe(3);                                   // sekli/rengi cizmek icin
     expect(uye.rarity).toBe("rare");
     expect(uye.icon).toBe("film-outline");
-    const tekil = kart("sadik_izleyici");
+    const tekil = kart("komedi_75");
     expect(hedefUyesi(tekil)).toBe(tekil);
     expect(hedefUyesi(null)).toBeNull();
   });
@@ -89,12 +90,24 @@ describe("hedefi + yaklasanlar", () => {
     const sonuc = yaklasanlar(kartlar, { limit: 50 });
     const oranlar = sonuc.map((x) => x.hedef.oran);
     expect([...oranlar].sort((a, b) => b - a)).toEqual(oranlar);
+    // KOLEKSIYONLAR hedef siralamasina girer (v2: "Saglam Baslangic 6/7" gibi bir set
+    // en yakin hedef olabilir — kullaniciya bilincli olarak gosterilir). Katalog
+    // rozetleri arasindaki sirayi ayri kontrol ediyoruz.
+    const katalog = sonuc.filter((x) => x.kart.section !== "set" && x.kart.section !== "muhur");
     // 80 bolum → bolum_100 %80; 20 gun → gun_25 de %80. Esitlikte kalan mesafesi
     // kucuk olan (5 gun < 20 bolum) once gelir.
-    expect(sonuc.find((x) => x.kart.family === "bolum").hedef.oran).toBeCloseTo(0.8, 5);
-    expect(sonuc[0].hedef.oran).toBeCloseTo(0.8, 5);
-    expect(sonuc[0].hedef.id).toBe("gun_25");
-    expect(sonuc[1].hedef.id).toBe("bolum_100");
+    expect(katalog.find((x) => x.kart.family === "bolum").hedef.oran).toBeCloseTo(0.8, 5);
+    expect(katalog[0].hedef.oran).toBeCloseTo(0.8, 5);
+    expect(katalog[0].hedef.id).toBe("gun_25");
+    expect(katalog[1].hedef.id).toBe("bolum_100");
+  });
+
+  test("v2: yaklasan koleksiyon da hedeftir (Baslangic seti 6/7)", () => {
+    const sonuc = yaklasanlar(kartlar, { limit: 50 });
+    const set = sonuc.find((x) => x.kart.id === "set_baslangic");
+    expect(set).toBeTruthy();
+    expect(set.hedef.ilerleme).toBe(6);     // yalniz ilk_destan (uzun metraj) eksik
+    expect(set.hedef.target).toBe(7);
   });
 
   test("GIZLI kilitli rozet oraniyla bile listeye GIRMEZ (17/18 harf sizdirmaz)", () => {
@@ -172,10 +185,12 @@ describe("kartlariDekorle + sonKazanilanlar", () => {
 describe("bolumOzetleri + nadirlikDagilimi", () => {
   const { kartlar, rozetler } = kurKartlar({ filmSayisi: 60, bolumSayisi: 30, gunSayisi: 30 });
 
-  test("sayim kademe duzeyinde: toplam 81 katalog rozeti + koleksiyon + muhur", () => {
+  test("sayim kademe duzeyinde: katalog rozetleri + koleksiyon + muhur", () => {
+    const { BADGE_SETS } = require("../components/badges/badgeSets");
     const ozet = bolumOzetleri(kartlar);
     const toplam = ozet.reduce((n, o) => n + o.toplam, 0);
-    expect(toplam).toBe(WATCH_BADGES.length + 6 /* koleksiyon */ + 1 /* guncel muhur */);
+    expect(WATCH_BADGES).toHaveLength(154);
+    expect(toplam).toBe(WATCH_BADGES.length + BADGE_SETS.length /* koleksiyon */ + 1 /* guncel muhur */);
     for (const o of ozet) {
       expect(o.acik).toBeLessThanOrEqual(o.toplam);
       expect(o.oran).toBeCloseTo(o.acik / o.toplam, 10);
@@ -191,14 +206,18 @@ describe("bolumOzetleri + nadirlikDagilimi", () => {
 
   test("kademeli ailenin ACIK kademeleri bolum sayacina tek tek girer", () => {
     const ozet = bolumOzetleri(kartlar).find((o) => o.bolum === "kilometre");
-    // film 60 → ilk iki kademe, bolum 30 → ilk kademe, + ilk_kare (1 film/bolum) = 4
-    expect(ozet.acik).toBeGreaterThanOrEqual(4);
+    // film 60 → ilk iki kademe, bolum 30 → ilk kademe = 3 (ilk_kare v2'de Baslangic bolumune tasindi)
+    expect(ozet.acik).toBeGreaterThanOrEqual(3);
+    // ...ve Baslangic bolumunde sayilir: 7 rozetin 6'si acik (yalniz ilk_destan eksik).
+    const baslangic = bolumOzetleri(kartlar).find((o) => o.bolum === "baslangic");
+    expect(baslangic.toplam).toBe(7);
+    expect(baslangic.acik).toBe(6);
   });
 
-  test("nadirlik dagilimi: bes kademe, toplam 81, acik <= toplam", () => {
+  test("nadirlik dagilimi: bes kademe, toplam 154, acik <= toplam", () => {
     const d = nadirlikDagilimi(rozetler);
     expect(d.map((x) => x.rarity)).toEqual(RARITY_ORDER);
-    expect(d.reduce((n, x) => n + x.toplam, 0)).toBe(81);
+    expect(d.reduce((n, x) => n + x.toplam, 0)).toBe(154);
     for (const x of d) expect(x.acik).toBeLessThanOrEqual(x.toplam);
     expect(d.find((x) => x.rarity === "legendary").toplam).toBe(3);   // katalog kotasi
     expect(nadirlikDagilimi(null).every((x) => x.toplam === 0)).toBe(true);
@@ -520,5 +539,196 @@ describe("prestijEk: prestij adiminin birim adi", () => {
     expect(prestijEk("film", "tr")).toBe("film");
     expect(prestijEk("bolum", "en")).toBe("episodes");
     expect(prestijEk("yok", "tr")).toBe("");
+  });
+});
+
+// ── KATALOG v2/v3: yeni etiketi, duyuru ozeti, takvim firsatlari ─────────────
+//
+// "Yeni" HER ZAMAN son surumdur (KATALOG_SURUMU). v3 gelince v2'nin 60 rozeti yeni
+// SAYILMAZ — duyuru karti yalniz son genislemeyi anlatir. v2 davranisi `surum`
+// parametresiyle (2) ayrica kilitli kalir.
+
+describe("v2: yeni eklenen rozetler (yeniEklendi / yeniRozetOzeti)", () => {
+  const { yeniEklendi, yeniRozetOzeti } = require("../components/badges/badgeInsights");
+
+  test("surum 2 verilince: kart, uyelerinden BIRI v2 ise yenidir; tamamen v1 olan aile ve v1 tekil degildir", () => {
+    const { kartlar } = kurKartlar({});
+    const kart = (id) => kartlar.find((k) => k.id === id || k.aileUyeleri?.some((u) => u.id === id));
+    expect(yeniEklendi(kart("ilk_film"), 2)).toBe(true);          // v2 tekil
+    expect(yeniEklendi(kart("film_10"), 2)).toBe(false);          // v1 ailesi
+    expect(yeniEklendi(kart("korku_25"), 2)).toBe(false);         // v1 tekil
+    expect(yeniEklendi(kart("dizi_5"), 2)).toBe(true);            // 4/5 uyesi yeni
+    expect(yeniEklendi(kart("uzun_metraj"), 2)).toBe(true);       // 1/5 uyesi yeni (200)
+    expect(yeniEklendi(kart("sadik_izleyici"), 2)).toBe(true);    // 3/4 uyesi yeni
+    expect(yeniEklendi(null, 2)).toBe(false);
+    expect(yeniEklendi({}, 2)).toBe(false);
+  });
+
+  test("varsayilan surum = v3: yalniz 13 Kesif rozeti yeni, v2'nin rozetleri artik degil", () => {
+    const { kartlar } = kurKartlar({});
+    const kart = (id) => kartlar.find((k) => k.id === id || k.aileUyeleri?.some((u) => u.id === id));
+    expect(yeniEklendi(kart("kesif_ilk_not"))).toBe(true);
+    expect(yeniEklendi(kart("kesif_cinematch"))).toBe(true);
+    expect(yeniEklendi(kart("ilk_film"))).toBe(false);          // v2 artik eski
+    expect(yeniEklendi(kart("dizi_5"))).toBe(false);
+    expect(yeniEklendi(kart("film_10"))).toBe(false);
+  });
+
+  test("koleksiyon ve muhur kartlari YENI sayilmaz (rozet degiller, katalog surumleri yok)", () => {
+    const { kartlar } = kurKartlar({});
+    const dekore = kartlariDekorle(kartlar, {});
+    for (const k of dekore.filter((x) => x.section === "set" || x.section === "muhur")) {
+      expect([k.id, k.yeniKatalog]).toEqual([k.id, false]);
+    }
+  });
+
+  test("kartlariDekorle yeniKatalog'u ekler ve `yeni` (kazanildi) ile KARISMAZ", () => {
+    const { kartlar } = kurKartlar({ filmSayisi: 3 }, ["kesif_ilk_not", "film_10"]);
+    const dekore = kartlariDekorle(kartlar, { kesif_ilk_not: "2026-10-14" }, { simdi: SIMDI });
+    const ilkNot = dekore.find((k) => k.id === "kesif_ilk_not");
+    expect(ilkNot.yeniKatalog).toBe(true);      // kataloga yeni
+    expect(ilkNot.yeni).toBe(true);             // ...VE bu hafta kazanildi
+    const film10 = dekore.find((k) => k.family === "film");
+    expect(film10.yeniKatalog).toBe(false);     // v1 ailesi
+    const kilitliYeni = dekore.find((k) => k.id === "kesif_arkadas");
+    expect([kilitliYeni.yeniKatalog, kilitliYeni.yeni]).toEqual([true, false]);   // kilitli ama yeni hedef
+    const eskiV2 = dekore.find((k) => k.id === "aksiyon_50");
+    expect(eskiV2.yeniKatalog).toBe(false);     // v2 rozeti v3 geldikten sonra "yeni" degil
+  });
+
+  test("ozet: kac rozet eklendi, kaci ZATEN acik (hak edilmis odul) — v3: 13 Kesif rozeti", () => {
+    const bos = kurKartlar({}).rozetler;
+    expect(yeniRozetOzeti(bos)).toEqual({ toplam: 13, acik: 0 });
+    const { rozetler } = kurKartlar({
+      filmSayisi: 30, bolumSayisi: 30, diziSayisi: 6,
+      kesif: { not: 1, favori: 2, dortFavori: 4, arkadas: 1 },
+    });
+    const o = yeniRozetOzeti(rozetler);
+    expect(o.toplam).toBe(13);
+    const beklenen = rozetler.filter((r) => r.since === 3 && r.acik).length;
+    expect(o.acik).toBe(beklenen);
+    expect(o.acik).toBe(4);   // kesif_ilk_not, kesif_favori, kesif_dort_favori, kesif_arkadas
+    expect(yeniRozetOzeti(null)).toEqual({ toplam: 0, acik: 0 });
+    // Eski surumde (1) "yeni" diye bir sey yok.
+    expect(yeniRozetOzeti(rozetler, 1)).toEqual({ toplam: 0, acik: 0 });
+  });
+
+  test("ozet surum 2 ile: v2'nin 60 rozeti (kilitli kayit)", () => {
+    const bos = kurKartlar({}).rozetler;
+    expect(yeniRozetOzeti(bos, 2)).toEqual({ toplam: 60, acik: 0 });
+    const { rozetler } = kurKartlar({ filmSayisi: 30, bolumSayisi: 30, diziSayisi: 6 });
+    const o = yeniRozetOzeti(rozetler, 2);
+    expect(o.toplam).toBe(60);
+    expect(o.acik).toBe(rozetler.filter((r) => r.since === 2 && r.acik).length);
+    expect(o.acik).toBeGreaterThanOrEqual(5);
+  });
+
+  test("izgara 'yeni' suzgeci: yalniz kataloga yeni eklenen kartlar, bolum sirasiyla", () => {
+    const { kartlar } = kurKartlar({ filmSayisi: 5 });
+    const dekore = kartlariDekorle(kartlar, {});
+    const satirlar = izgaraSatirlari(dekore, "yeni", null);
+    const kartSayisi = satirlar.filter((s) => s.tur === "rozetSatiri").reduce((n, s) => n + s.rozetler.length, 0);
+    // v3: 13 Kesif rozeti, hepsi tekil (aile yok) → 13 kart, tek bolum.
+    expect(kartSayisi).toBe(13);
+    expect(satirlar.filter((s) => s.tur === "baslik").map((s) => s.bolum)).toEqual(["kesif"]);
+    for (const s of satirlar.filter((x) => x.tur === "rozetSatiri")) {
+      for (const k of s.rozetler) expect([k.id, k.yeniKatalog]).toEqual([k.id, true]);
+    }
+    // film ailesi (tamamen v1) listede YOK
+    const hepsi = satirlar.filter((s) => s.tur === "rozetSatiri").flatMap((s) => s.rozetler);
+    expect(hepsi.some((k) => k.family === "film")).toBe(false);
+    // Bolum basliklari BOLUM_SIRA'da
+    const { BOLUM_SIRA } = require("../components/badges/watchBadgeCatalog");
+    const basliklar = satirlar.filter((s) => s.tur === "baslik").map((s) => s.bolum);
+    expect(basliklar).toEqual(BOLUM_SIRA.filter((b) => basliklar.includes(b)));
+    // Bilinmeyen suzgec "tumu" gibi davranir (eski surumle uyum).
+    expect(izgaraSatirlari(dekore, "bilinmeyen", null).length).toBeGreaterThan(satirlar.length);
+  });
+});
+
+describe("v2: takvim firsatlari", () => {
+  const { takvimFirsatlari } = require("../components/badges/badgeInsights");
+
+  const firsat = (simdi, kazanilmis = [], opts = {}) => {
+    const { rozetler, setler } = kurKartlar({}, kazanilmis);
+    const aile = gruplaAileler(rozetler);
+    const muhurler = muhurleriHesapla([], { simdi, kazanilmis });
+    return takvimFirsatlari(kartlariDekorle([...aile, ...muhurler, ...setler], {}), { simdi, ...opts });
+  };
+
+  test("15 Ekim: Cadilar (16 gun) ve Cuma 13 (13 Kasim, 29 gun) yaklasiyor, sirali", () => {
+    // 2026-10-15 Persembe. Sonraki Cuma 13 = 2026-11-13.
+    const f = firsat(an(2026, 10, 15));
+    expect(f.map((x) => x.kart.id)).toEqual(["cadilar_gecesi", "cuma_13"]);
+    expect(f.map((x) => x.gunKaldi)).toEqual([16, 29]);
+    expect(f.every((x) => x.tur === "olay")).toBe(true);
+    // Pencere disindakiler yok: 14 Subat (122 gun), yilbasi (77 gun), 1 Nisan, 4 Mayis.
+  });
+
+  test("gun gelince 0, ertesi gun listeden duser (bir yil sonrasi 45 gunluk pencerede degil)", () => {
+    expect(firsat(an(2026, 10, 31))[0]).toMatchObject({ gunKaldi: 0 });
+    expect(firsat(an(2026, 10, 31))[0].kart.id).toBe("cadilar_gecesi");
+    const ertesi = firsat(an(2026, 11, 1));
+    expect(ertesi.some((x) => x.kart.id === "cadilar_gecesi")).toBe(false);
+  });
+
+  test("KAZANILMIS olay listede yok (bir sonraki yili beklemek firsat degil)", () => {
+    const f = firsat(an(2026, 10, 15), ["cadilar_gecesi"]);
+    expect(f.map((x) => x.kart.id)).toEqual(["cuma_13"]);
+  });
+
+  test("yilbasi iki gunluk pencere: 31 Aralik ve 1 Ocak ikisi de 0, 30 Aralik 1", () => {
+    const id = (simdi) => firsat(simdi).find((x) => x.kart.id === "yil_devrilirken");
+    expect(id(an(2026, 12, 31)).gunKaldi).toBe(0);
+    expect(id(an(2027, 1, 1)).gunKaldi).toBe(0);
+    expect(id(an(2026, 12, 30)).gunKaldi).toBe(1);
+    expect(id(an(2027, 1, 2))).toBeUndefined();         // pencere disi
+  });
+
+  test("Cuma 13 bugunse 0; yil sinirini asar (Aralik'ta bir sonraki: Agustos 2027)", () => {
+    // 2026-11-13 Cuma
+    const bugun = firsat(an(2026, 11, 13)).find((x) => x.kart.id === "cuma_13");
+    expect(bugun.gunKaldi).toBe(0);
+    // 2026-12-01'den sonra 2027-08-13: pencere 400 gun olsun.
+    const uzak = firsat(an(2026, 12, 1), [], { pencere: 400 }).find((x) => x.kart.id === "cuma_13");
+    expect(uzak.gunKaldi).toBe(255);
+  });
+
+  test("pencere ve limit uygulanir", () => {
+    expect(firsat(an(2026, 10, 15), [], { pencere: 20 }).map((x) => x.kart.id)).toEqual(["cadilar_gecesi"]);
+    expect(firsat(an(2026, 10, 15), [], { limit: 1 })).toHaveLength(1);
+    expect(firsat(an(2026, 10, 15), [], { limit: 0 })).toEqual([]);
+    expect(takvimFirsatlari(null)).toEqual([]);
+  });
+
+  test("donem muhuru YALNIZ son 30 gunde ve hala yetisebiliyorsa firsattir", () => {
+    // Sonbahar 2026 30 Kasim'da biter. 15 Ekim'de 46 gun var → listede degil.
+    expect(firsat(an(2026, 10, 15)).some((x) => x.tur === "muhur")).toBe(false);
+    // 20 Kasim: 10 gun kaldi, 8 gun eksik (hic isaretleme yok) → 10+1 >= 8: yetisir.
+    const f = firsat(an(2026, 11, 20));
+    const muhur = f.find((x) => x.tur === "muhur");
+    expect(muhur).toBeTruthy();
+    expect(muhur.gunKaldi).toBe(10);
+    expect(muhur.eksikGun).toBe(8);
+    // 28 Kasim: 2 gun kaldi, 8 eksik → YETISMEZ → firsat degil (umut degil hayal kirikligi olurdu).
+    expect(firsat(an(2026, 11, 28)).some((x) => x.tur === "muhur")).toBe(false);
+  });
+
+  test("ilk gun olaylar donem mührüyle birlikte en yakin once siralanir", () => {
+    const f = firsat(an(2026, 11, 20));
+    const gunler = f.map((x) => x.gunKaldi);
+    expect([...gunler].sort((a, b) => a - b)).toEqual(gunler);
+  });
+
+  test("takvim kurallari watchScoring ile AYNI tarihleri kullanir", () => {
+    // 31 Ekim (korku), 31 Aralik/1 Ocak, 14 Subat (romantik), 1 Nisan (komedi),
+    // 4 Mayis (bilim kurgu), Cuma 13 (korku): katalog aciklamalari tarihi soyluyor.
+    const { WATCH_BADGE_BY_ID } = require("../components/badges/watchBadgeCatalog");
+    expect(WATCH_BADGE_BY_ID.cadilar_gecesi.descTr).toMatch(/31 Ekim/);
+    expect(WATCH_BADGE_BY_ID.kirmizi_perde.descTr).toMatch(/14 Şubat/);
+    expect(WATCH_BADGE_BY_ID.nisan_1.descTr).toMatch(/1 Nisan/);
+    expect(WATCH_BADGE_BY_ID.mayis_4.descTr).toMatch(/4 Mayıs/);
+    expect(WATCH_BADGE_BY_ID.cuma_13.descTr).toMatch(/Cuma 13/);
+    expect(WATCH_BADGE_BY_ID.yil_devrilirken.descTr).toMatch(/31 Aralık ya da 1 Ocak/);
   });
 });

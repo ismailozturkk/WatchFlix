@@ -12,7 +12,11 @@ const { STUDIO_COPY } = require("../components/theme/themeStudioCopy");
 const { AI_COPY } = require("../utils/aiCopy");
 const { ONBOARDING_COPY } = require("../screens/onboarding/onboardingCopy");
 const { FAVORITES_COPY } = require("../utils/favoritesCopy");
+const { SECTION_VISIBILITY_COPY } = require("../screens/tabs/settings/sectionVisibilityCopy");
+const { DISCOVER_FILTERS_COPY } = require("../screens/shared/discoverFiltersCopy");
 const { getWrappedStrings } = require("../utils/wrappedStrings");
+const { YEARLY_GOAL_COPY } = require("../components/profile/yearlyGoalCopy");
+const { FOLLOWED_PEOPLE_COPY } = require("../utils/followedPeopleCopy");
 
 // `{ad}`, `{{ad}}`, `%d` biçimli yer tutucuları çıkarır.
 const yerTutucular = (metin) =>
@@ -69,6 +73,10 @@ const TABLOLAR = {
   "Yapay zeka (aiCopy)": () => AI_COPY,
   "Onboarding (onboardingCopy)": () => ONBOARDING_COPY,
   "Favoriler (favoritesCopy)": () => FAVORITES_COPY,
+  "Ekran bölümleri (sectionVisibilityCopy)": () => SECTION_VISIBILITY_COPY,
+  "Ne izlesem? (discoverFiltersCopy)": () => DISCOVER_FILTERS_COPY,
+  "Yıllık izleme hedefi (yearlyGoalCopy)": () => YEARLY_GOAL_COPY,
+  "Oyuncu / yönetmen takibi (followedPeopleCopy)": () => FOLLOWED_PEOPLE_COPY,
   "Wrapped (wrappedStrings)": () => ({
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),

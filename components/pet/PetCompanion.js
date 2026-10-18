@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   StyleSheet,
-  TouchableOpacity,
   useWindowDimensions,
 } from "react-native";
 import Animated, {
@@ -12,22 +11,19 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import LottieView from "lottie-react-native";
 import SpritePet, {
   spriteFrameWidth,
 } from "@components/pet/SpritePet";
 import { usePet } from "@context/PetContext";
-import useAppActive from "@hooks/useAppActive";
 
 const MIN_X = 6;
 const MIN_Y = 50;
 const BOTTOM_GAP = 40; // alt tab bar payı
 
-// Pet tercihinden bağımsız CineMatch FAB'ı. Tab bar'ın sağ üst kenarına
-// hizalanır; dokununca doğrudan AI sohbetini açar.
-export const AI_FAB_SIZE = 44;
-const AI_FAB_RIGHT = 20;
-const AI_FAB_BOTTOM = 86;
+// NOT: Pet kapalıyken görünen yüzen CineMatch düğmesi (FAB) KALDIRILDI. Yapay zeka
+// girişi artık alt çubuğun yanındaki ayrık yuvarlak düğme (bkz.
+// components/navigation/AdaptiveTabShell.js `onAiPress`); pet açıkken pet'e dokunmak
+// da hâlâ sohbeti açar.
 
 const clamp = (v, min, max) => {
   "worklet";
@@ -37,11 +33,10 @@ const clamp = (v, min, max) => {
 /**
  * Tab navigator üzerinde duran, sürüklenebilir SEÇİLİ PET.
  * - Sürükle → taşı (bırakınca clamp + kalıcı kaydet).
- * - Dokun → pet durumunu sıradakine geçir (PET_STATE_ORDER).
- * - Basılı tut → doğrudan CineMatch sohbetini açar.
+ * - Dokun / basılı tut → doğrudan CineMatch sohbetini açar.
  * `petEnabled` ile gösterilir/gizlenir; boyut ayarlardan (petSize) gelir.
  */
-function PetCompanion({ fabRight = AI_FAB_RIGHT, fabBottom = AI_FAB_BOTTOM }) {
+function PetCompanion() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const {
     petEnabled,
@@ -58,10 +53,6 @@ function PetCompanion({ fabRight = AI_FAB_RIGHT, fabBottom = AI_FAB_BOTTOM }) {
     requestAiChat,
   } = usePet();
 
-  // AI animasyonunu uygulamanın ön plan durumuna bağla; arka planda pil harcamasın.
-  const appActive = useAppActive();
-  const aiFabRef = useRef(null);
-
   const pet = catalog.find((p) => p.id === selectedPetId);
   // Sprite source önbellekten gelir; indirilmemişse null.
   const petSource = pet ? getPetSource(pet.id) : null;
@@ -75,13 +66,6 @@ function PetCompanion({ fabRight = AI_FAB_RIGHT, fabBottom = AI_FAB_BOTTOM }) {
       downloadPet(pet.id);
     }
   }, [cacheReady, petEnabled, pet, petSource, downloadingPets, downloadPet]);
-
-  // AI FAB Lottie'sini ön plan durumuna bağla. `autoPlay` yalnız mount anında
-  // geçerli olduğu için arka plandan dönüşte oynatmayı ref üzerinden sürdürüyoruz.
-  useEffect(() => {
-    if (appActive) aiFabRef.current?.play();
-    else aiFabRef.current?.pause();
-  }, [appActive]);
 
   // Boyuta bağlı sınırlar (her render'da güncellenir → gesture worklet'i yakalar).
   const petW = spriteFrameWidth(petSize);
@@ -220,51 +204,14 @@ function PetCompanion({ fabRight = AI_FAB_RIGHT, fabBottom = AI_FAB_BOTTOM }) {
     ],
   }));
 
-  const openAiChatFromFab = () => {
-    requestAiChat({
-      origin: {
-        x: screenWidth - fabRight - AI_FAB_SIZE / 2,
-        y: screenHeight - fabBottom - AI_FAB_SIZE / 2,
-      },
-    });
-  };
+  if (!visible) return null;
 
   return (
-    <>
-      {visible ? (
-        <GestureDetector gesture={gesture}>
-          <Animated.View style={[styles.petWrap, petStyle]}>
-            <SpritePet source={petSource} state={displayState} size={petSize} />
-          </Animated.View>
-        </GestureDetector>
-      ) : null}
-
-      {/* Pet açıkken FAB gizlenir: pet zaten aynı işlevi (AI sohbet aç) görüyor. */}
-      {!petEnabled && (
-        <TouchableOpacity
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="CineMatch"
-          onPress={openAiChatFromFab}
-          style={[
-            styles.aiFab,
-            {
-              right: fabRight,
-              bottom: fabBottom,
-            },
-          ]}
-        >
-          <LottieView
-            ref={aiFabRef}
-            style={styles.aiFabLottie}
-            source={require("@lottie/gemini.json")}
-            autoPlay={appActive}
-            loop={false}
-          />
-        </TouchableOpacity>
-      )}
-
-    </>
+    <GestureDetector gesture={gesture}>
+      <Animated.View style={[styles.petWrap, petStyle]}>
+        <SpritePet source={petSource} state={displayState} size={petSize} />
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -274,18 +221,6 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     zIndex: 40,
-  },
-  aiFab: {
-    position: "absolute",
-    width: AI_FAB_SIZE,
-    height: AI_FAB_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 42,
-  },
-  aiFabLottie: {
-    width: "100%",
-    height: "100%",
   },
 });
 

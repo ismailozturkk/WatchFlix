@@ -88,6 +88,23 @@ export const ANALYTICS_EVENTS = {
   // Uygulama içi geri bildirim gönderildi (Ayarlar > Destek ve geri bildirim).
   // `kind` = "bug" | "feature", `category` listeden. Metin ASLA gönderilmez.
   FEEDBACK_SUBMITTED: "feedback_submitted",
+  // "Ne izlesem?" (Filtreli Keşif, screens/shared/DiscoverFiltersScreen.js): bir süzgeç UYGULANDI.
+  // `source` = "preset" (ekrandaki hazır çip) | "saved" (kayıtlı süzgeç) | "manual" (filtre sayfası);
+  // `filter_count` etkin süzgeç sayısı. Özelliğin benimsenmesini ve hangi kapıdan girildiğini söyler.
+  DISCOVER_FILTER_APPLIED: "discover_filter_applied",
+  // "Şaşırt beni" sonucu: `outcome` = "opened" | "none" | "error".
+  DISCOVER_SURPRISE: "discover_surprise",
+  // Yıllık izleme hedefi (profildeki halka, utils/yearlyGoal.js): hedef KONDU / DEĞİŞTİ /
+  // KALDIRILDI. `action` = "set" | "changed" | "cleared", `unit` = "all" | "movie" | "tv",
+  // `target` hedef sayısı. Özelliğin benimsenmesini ve hangi birimin seçildiğini söyler.
+  YEARLY_GOAL: "yearly_goal",
+  // Oyuncu / yönetmen takibi (utils/followedPeople.js): kişi TAKİBE ALINDI / BIRAKILDI.
+  // `action` = "follow" | "unfollow", `source` = "profile" (kişi sayfası) | "sheet" (takip
+  // listesi), `department` TMDB bölümü ("Acting" | "Directing" | …). İsim/kimlik GÖNDERİLMEZ.
+  PERSON_FOLLOW: "person_follow",
+  // Film/Dizi sekmesindeki "Takip ettiklerinin yaklaşanları" rafından bir yapımın açılması.
+  // Rafın işe yarayıp yaramadığını söyleyen tek sinyal. `media_type` = "movie" | "tv".
+  FOLLOWED_UPCOMING_OPENED: "followed_upcoming_opened",
 };
 
 /** Ölçüm hunisinde kullanılan kullanıcı özellikleri. */

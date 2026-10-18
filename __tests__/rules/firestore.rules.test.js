@@ -642,6 +642,283 @@ describe("birthDate kilidi", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 6b) Gizli hesap belgesi: e-posta + doğum tarihi yalnız sahibine
+//     (docs/mimari/KULLANICI_OZEL_ALAN_GOCU.md)
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Users/{uid}/private/account", () => {
+  const account = (db, uid = ALICE) => doc(db, "Users", uid, "private", "account");
+  const profil = (extra = {}) => ({
+    uid: ALICE,
+    username: "alice",
+    usernameLower: "alice",
+    displayName: "Alice",
+    friendsCount: 0,
+    ...extra,
+  });
+
+  test("sahibi e-posta + dogum tarihini yazip okuyabilir", async () => {
+    await assertSucceeds(
+      setDoc(account(alice), { email: "a@b.co", birthDate: "1998-03-05" }),
+    );
+    await assertSucceeds(getDoc(account(alice)));
+  });
+
+  test("BASKA kullanici OKUYAMAZ — asil acik buydu", async () => {
+    await seed((db) =>
+      setDoc(account(db), { email: "a@b.co", birthDate: "1998-03-05" }),
+    );
+    await assertFails(getDoc(account(bob)));
+    const anon = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(account(anon)));
+  });
+
+  test("BASKA kullanici YAZAMAZ", async () => {
+    await assertFails(setDoc(account(bob, ALICE), { birthDate: "2010-01-01" }));
+  });
+
+  test("kok belge hala herkese okunur ama artik bu alanlari tasimaz", async () => {
+    // Kural okuma yolunu kapatamaz (alan bazlı okuma yok) — kapatan şey
+    // alanların kökte OLMAMASI. Bu test sözleşmeyi yazıyor: göçten sonra kökte
+    // bulunmayan alan, başkasının okuduğu belgede de yoktur.
+    await seed(async (db) => {
+      await setDoc(doc(db, "Users", ALICE), profil());
+      await setDoc(account(db), { email: "a@b.co", birthDate: "1998-03-05" });
+    });
+    const snap = await getDoc(doc(bob, "Users", ALICE));
+    expect(snap.data()).not.toHaveProperty("birthDate");
+    expect(snap.data()).not.toHaveProperty("email");
+  });
+
+  test("yazilmis tarih DEGISTIRILEMEZ ve SILINEMEZ", async () => {
+    await seed((db) => setDoc(account(db), { birthDate: "1998-03-05" }));
+    await assertFails(updateDoc(account(alice), { birthDate: "2010-01-01" }));
+    await assertFails(updateDoc(account(alice), { birthDate: deleteField() }));
+  });
+
+  test("tarih dururken e-posta guncellenebilir", async () => {
+    await seed((db) =>
+      setDoc(account(db), { email: "a@b.co", birthDate: "1998-03-05" }),
+    );
+    await assertSucceeds(updateDoc(account(alice), { email: "yeni@b.co" }));
+  });
+
+  test("tarihi olmayan hesap bir kez yazabilir", async () => {
+    await seed((db) => setDoc(account(db), { email: "a@b.co" }));
+    await assertSucceeds(updateDoc(account(alice), { birthDate: "1998-03-05" }));
+  });
+
+  test("bilinmeyen alan ve bozuk bicim reddedilir", async () => {
+    await assertFails(setDoc(account(alice), { email: "a@b.co", isAdmin: true }));
+    await assertFails(setDoc(account(alice), { birthDate: "1998" }));
+    await assertFails(setDoc(account(alice), { birthDate: 19980305 }));
+    await assertFails(setDoc(account(alice), { email: "x".repeat(400) }));
+    await assertFails(setDoc(account(alice), { email: 12345 }));
+  });
+
+  test("kokte tarih varsa gizli kopya onunla CELISEMEZ", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "Users", ALICE), profil({ birthDate: "1998-03-05" })),
+    );
+    // Küçük görünmek için ikinci bir tarih yazma yolu kapalı:
+    await assertFails(setDoc(account(alice), { birthDate: "2010-01-01" }));
+    await assertSucceeds(setDoc(account(alice), { birthDate: "1998-03-05" }));
+  });
+
+  test("GOC: gizli kopya hazirsa sahibi tarihi ve e-postayi kokten silebilir", async () => {
+    await seed(async (db) => {
+      await setDoc(
+        doc(db, "Users", ALICE),
+        profil({ birthDate: "1998-03-05", email: "a@b.co" }),
+      );
+      await setDoc(account(db), { email: "a@b.co", birthDate: "1998-03-05" });
+    });
+    await assertSucceeds(
+      updateDoc(doc(alice, "Users", ALICE), {
+        birthDate: deleteField(),
+        email: deleteField(),
+      }),
+    );
+  });
+
+  test("GOC: gizli kopya YOKKEN ya da FARKLIYKEN kokten silinemez", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "Users", ALICE), profil({ birthDate: "1998-03-05" })),
+    );
+    // Kopya yok → silmek yaş kaydını yok ederdi.
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { birthDate: deleteField() }),
+    );
+    await seed((db) => setDoc(account(db), { birthDate: "2010-01-01" }));
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { birthDate: deleteField() }),
+    );
+  });
+
+  test("GOC SONRASI: kokte tarih yeniden yazilirsa gizli kopyayla ayni olmali", async () => {
+    // Eski istemci tarihi kökte "boş" görüp seçici açabilir; farklı bir tarihi
+    // yazamamalı (18 altı kullanıcı kapıyı açmasın).
+    await seed(async (db) => {
+      await setDoc(doc(db, "Users", ALICE), profil());
+      await setDoc(account(db), { birthDate: "2010-01-01" });
+    });
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { birthDate: "1990-01-01" }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(alice, "Users", ALICE), { birthDate: "2010-01-01" }),
+    );
+  });
+
+  test("sahibi gizli belgesini silebilir (hesap silme purge'u)", async () => {
+    await seed((db) => setDoc(account(db), { email: "a@b.co" }));
+    await assertSucceeds(deleteDoc(account(alice)));
+  });
+
+  test("ESKI ISTEMCI uyumu: kayit ekrani e-posta + tarihi hala kok belgeye yazabilir", async () => {
+    // Aşama 3 anahtarı açıkken (şimdiki durum) bozulmamalı.
+    await assertSucceeds(
+      setDoc(doc(alice, "Users", ALICE), profil({
+        email: "a@b.co",
+        birthDate: "1998-03-05",
+      })),
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6c) AŞAMA 3: legacyRootAccountWrites() = false
+//     Anahtar kuralların içinde sabit `true`; deploy edilmeden önce burada
+//     metin olarak çevrilip ayrı bir proje kimliğinde denenir.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Asama 3 anahtari kapali (kokte ozel alan yazimi yasak)", () => {
+  let strictEnv;
+  let sAlice;
+  let sBob;
+
+  const profil = (extra = {}) => ({
+    uid: ALICE,
+    username: "alice",
+    usernameLower: "alice",
+    displayName: "Alice",
+    friendsCount: 0,
+    ...extra,
+  });
+
+  beforeAll(async () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, "..", "..", "firestore.rules"),
+      "utf8",
+    );
+    const strict = source.replace(
+      /(function legacyRootAccountWrites\(\) \{ return )true;/,
+      "$1false;",
+    );
+    // Çeviri sessizce tutmazsa bu blok hiçbir şeyi kanıtlamaz.
+    expect(strict).not.toBe(source);
+    strictEnv = await initializeTestEnvironment({
+      projectId: "seelogd-rules-test-strict",
+      firestore: { rules: strict, host: "127.0.0.1", port: 8085 },
+    });
+  });
+
+  afterAll(async () => {
+    if (strictEnv) await strictEnv.cleanup();
+  });
+
+  beforeEach(async () => {
+    await strictEnv.clearFirestore();
+    sAlice = strictEnv.authenticatedContext(ALICE).firestore();
+    sBob = strictEnv.authenticatedContext(BOB).firestore();
+  });
+
+  const sSeed = (fn) =>
+    strictEnv.withSecurityRulesDisabled((ctx) => fn(ctx.firestore()));
+
+  test("yeni profil kok belgede e-posta/tarih/jeton TASIYAMAZ", async () => {
+    await assertFails(
+      setDoc(doc(sAlice, "Users", ALICE), profil({ email: "a@b.co" })),
+    );
+    await assertFails(
+      setDoc(doc(sAlice, "Users", ALICE), profil({ birthDate: "1998-03-05" })),
+    );
+    await assertFails(
+      setDoc(doc(sAlice, "Users", ALICE), profil({ expoPushTokens: ["t"] })),
+    );
+  });
+
+  test("yeni profil bu alanlar OLMADAN acilir, gizli belge yazilabilir", async () => {
+    await assertSucceeds(setDoc(doc(sAlice, "Users", ALICE), profil()));
+    await assertSucceeds(
+      setDoc(doc(sAlice, "Users", ALICE, "private", "account"), {
+        email: "a@b.co",
+        birthDate: "1998-03-05",
+      }),
+    );
+  });
+
+  test("kokte e-posta/tarih/jeton EKLENEMEZ", async () => {
+    await sSeed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertFails(
+      updateDoc(doc(sAlice, "Users", ALICE), { email: "a@b.co" }),
+    );
+    await assertFails(
+      updateDoc(doc(sAlice, "Users", ALICE), { birthDate: "1998-03-05" }),
+    );
+    await assertFails(
+      updateDoc(doc(sAlice, "Users", ALICE), { expoPushToken: "t" }),
+    );
+  });
+
+  test("kokteki eski alanlar SILINEBILIR ve digerleri guncellenmeye devam eder", async () => {
+    await sSeed(async (db) => {
+      await setDoc(
+        doc(db, "Users", ALICE),
+        profil({
+          email: "a@b.co",
+          birthDate: "1998-03-05",
+          expoPushToken: "t",
+          expoPushTokens: ["t"],
+        }),
+      );
+      await setDoc(doc(db, "Users", ALICE, "private", "account"), {
+        email: "a@b.co",
+        birthDate: "1998-03-05",
+      });
+    });
+    // Eski alanlar dururken ilgisiz yazım (sayaç, profil) engellenmemeli:
+    await assertSucceeds(
+      updateDoc(doc(sAlice, "Users", ALICE), { displayName: "Alice B" }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(sBob, "Users", ALICE), { friendsCount: 1 }),
+    );
+    // B3 + bu göç: sahibi kendi kök alanlarını siler.
+    await assertSucceeds(
+      updateDoc(doc(sAlice, "Users", ALICE), {
+        email: deleteField(),
+        birthDate: deleteField(),
+        expoPushToken: deleteField(),
+        expoPushTokens: deleteField(),
+      }),
+    );
+  });
+
+  test("gizli belge kurallari anahtardan bagimsiz calisir", async () => {
+    await sSeed((db) =>
+      setDoc(doc(db, "Users", ALICE, "private", "account"), {
+        birthDate: "1998-03-05",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(sAlice, "Users", ALICE, "private", "account"), {
+        birthDate: "2010-01-01",
+      }),
+    );
+    await assertFails(getDoc(doc(sBob, "Users", ALICE, "private", "account")));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Dört favori: kategori başına en fazla 4 giriş (utils/fourFavorites.js)
 // ─────────────────────────────────────────────────────────────────────────────
 describe("dort favori siniri", () => {

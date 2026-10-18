@@ -63,6 +63,7 @@ function NativeSwitchToggle({
   disabled = false,
   locked = false,
   onLockedPress,
+  accessibilityLabel,
 }) {
   const [nativeBox, setNativeBox] = useState(initialNativeBox);
   // `onLayout` dönüşümden ÖNCEKİ (ölçeksiz) kutuyu verir: sistemin gerçek boyu.
@@ -93,6 +94,7 @@ function NativeSwitchToggle({
         // olduğundan sola yaslı bırakmak görüntüyü kutunun soluna kaydırır.
         style={{ alignSelf: "center", transform: [{ scale: plan.scale }] }}
         accessibilityRole="switch"
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{ checked: !!value, disabled }}
       />
       {/* Kilitliyken anahtar OYNAMAZ: dokunuşu şeffaf katman yakalayıp yükseltme
@@ -102,6 +104,7 @@ function NativeSwitchToggle({
           onPress={onLockedPress}
           style={StyleSheet.absoluteFill}
           accessibilityRole="switch"
+          accessibilityLabel={accessibilityLabel}
           accessibilityState={{ checked: !!value, disabled }}
         />
       ) : null}
@@ -120,6 +123,7 @@ function AnimatedSwitchToggle({
   disabled = false,
   locked = false,
   onLockedPress,
+  accessibilityLabel,
 }) {
   // Reanimated shared value: represents 0 for off, 1 for on
   const progress = useSharedValue(value ? 1 : 0);
@@ -200,6 +204,7 @@ function AnimatedSwitchToggle({
       disabled={disabled}
       hitSlop={8}
       accessibilityRole="switch"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: !!value, disabled }}
     >
       <Animated.View

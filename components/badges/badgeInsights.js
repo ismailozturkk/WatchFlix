@@ -17,7 +17,7 @@
 
 import { copyLanguage } from "../../utils/appLanguages";
 import { RARITY_ORDER } from "@theme/badgeTokens";
-import { BOLUM_SIRA } from "./watchBadgeCatalog";
+import { BOLUM_SIRA, KATALOG_SURUMU } from "./watchBadgeCatalog";
 
 const GUN_ANAHTARI = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -100,8 +100,121 @@ export function kartlariDekorle(kartlar, tarihler, { simdi = Date.now(), yeniGun
   return (kartlar || []).map((kart) => {
     const kazanmaTarihi = kart.acik && typeof harita[kart.id] === "string" ? harita[kart.id] : null;
     const once = kazanmaTarihi ? kacGunOnce(kazanmaTarihi, simdi) : null;
-    return { ...kart, kazanmaTarihi, yeni: once !== null && once < yeniGun };
+    return { ...kart, kazanmaTarihi, yeni: once !== null && once < yeniGun, yeniKatalog: yeniEklendi(kart) };
   });
+}
+
+/**
+ * Kart, son katalog genişlemesinde eklenen bir rozet mi (ya da eklenen bir
+ * KADEME taşıyan bir aile mi)? `yeni` ("son 7 günde kazanıldı") ile KARIŞMASIN:
+ * o kullanıcının kazanımıdır, bu kataloğun yeniliği — kilitli bir kart da
+ * katalog açısından yeni olabilir ve asıl işlevi tam da bu: "burada yeni bir
+ * hedef var"ı söylemek.
+ *
+ * Aile kartında kimlik ulaşılan kademeden geldiği için `since` kartın kendisine
+ * değil ÜYELERİNE bakılır: 5 kademeli `dizi` ailesinin 4'ü yeni, zirvesi eski.
+ */
+export function yeniEklendi(kart, surum = KATALOG_SURUMU) {
+  if (!kart) return false;
+  const uyeler = kart.aileUyeleri?.length ? kart.aileUyeleri : [kart];
+  return uyeler.some((u) => (Number(u?.since) || 1) === surum && surum > 1);
+}
+
+/**
+ * Son genişlemenin özeti, KATALOG rozetleri üzerinden (düz liste): kaç rozet
+ * eklendi, bunlardan kaçına kullanıcı zaten sahip. "60 yeni rozet — 14'üne
+ * şimdiden sahipsin" duyurusu buradan beslenir; ikinci sayı kullanıcıya
+ * karşılanmış bir ödül gibi okunur (ve doğrudur: katalog genişleme koruması
+ * zaten hak edilenleri sessizce sahiplendirir).
+ */
+export function yeniRozetOzeti(rozetler, surum = KATALOG_SURUMU) {
+  const yeniler = (rozetler || []).filter((r) => surum > 1 && (Number(r?.since) || 1) === surum);
+  return { toplam: yeniler.length, acik: yeniler.filter((r) => r.acik).length };
+}
+
+// ── Takvim fırsatları ───────────────────────────────────────────────────────
+//
+// Bazı rozetler YILDA BİR kez kazanılabilir (31 Ekim'de korku, 14 Şubat'ta
+// romantik içerik…). Kullanıcı bunları ancak o gün hatırlarsa kazanır; hatırlamazsa
+// bir yıl bekler. Bu liste onları gün gelmeden ÖNCE ekrana çıkarır ve "N gün
+// kaldı" der — rozet ekranını geriye bakan bir envanterden ileriye bakan bir
+// takvime çevirir. Rozet kazanma heyecanının en ucuz kaynağı budur: sürpriz
+// değil, planlı bekleyiş.
+//
+// Tanım KATALOGDAKİ kurallarla birebir olmalı (utils/watchScoring.js `md ===`
+// karşılaştırmaları ve `takvimOlayi`); test ikisini birlikte kilitler.
+const TAKVIM_OLAYLARI = Object.freeze([
+  { id: "cadilar_gecesi", gunler: [[10, 31]] },
+  { id: "yil_devrilirken", gunler: [[12, 31], [1, 1]] },
+  { id: "kirmizi_perde", gunler: [[2, 14]] },
+  { id: "nisan_1", gunler: [[4, 1]] },
+  { id: "mayis_4", gunler: [[5, 4]] },
+  { id: "cuma_13", cuma13: true },
+]);
+
+/** Verilen andan itibaren (bugün dahil) ilk "ay/gün" tarihine kaç gün var? */
+function sonrakiTarihFarki(ay, gun, simdi) {
+  const d = new Date(simdi);
+  const bugun = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  for (const yil of [d.getFullYear(), d.getFullYear() + 1]) {
+    const hedef = Date.UTC(yil, ay - 1, gun);
+    if (hedef >= bugun) return Math.round((hedef - bugun) / 86400000);
+  }
+  return null;
+}
+
+/** Bugünden itibaren ilk Cuma 13'üne kaç gün var? (bugün dahil) */
+function sonrakiCuma13Farki(simdi) {
+  const d = new Date(simdi);
+  const bugun = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  // En geç 14 ay içinde bir Cuma 13 vardır (her yılda 1–3 tane).
+  for (let k = 0; k < 15; k++) {
+    const hedef = new Date(d.getFullYear(), d.getMonth() + k, 13);
+    if (hedef.getDay() !== 5) continue;
+    const t = Date.UTC(hedef.getFullYear(), hedef.getMonth(), hedef.getDate());
+    if (t >= bugun) return Math.round((t - bugun) / 86400000);
+  }
+  return null;
+}
+
+/**
+ * Yaklaşan, henüz kazanılmamış takvim rozetleri ve (kazanılmamış) güncel dönem
+ * mührü; bitişi en yakın olan önce.
+ *
+ * @param {object[]} kartlar  kartlariDekorle çıktısı (katalog + mühür + set)
+ * @param {object}   opts     { simdi, pencere: kaç gün ilerisine bakılsın }
+ * @returns {{ kart: object, tur: "olay"|"muhur", gunKaldi: number, eksikGun?: number }[]}
+ *   gunKaldi: olay için "gününe", mühür için "dönem bitimine" kalan gün; 0 = bugün.
+ */
+export function takvimFirsatlari(kartlar, { simdi = Date.now(), pencere = 45, limit = 6 } = {}) {
+  const liste = kartlar || [];
+  const sonuc = [];
+
+  for (const olay of TAKVIM_OLAYLARI) {
+    const kart = liste.find((k) => k.id === olay.id);
+    if (!kart || kart.acik) continue;
+    const farklar = olay.cuma13
+      ? [sonrakiCuma13Farki(simdi)]
+      : olay.gunler.map(([ay, gun]) => sonrakiTarihFarki(ay, gun, simdi));
+    const gunKaldi = Math.min(...farklar.filter((f) => f !== null));
+    if (!Number.isFinite(gunKaldi) || gunKaldi > pencere) continue;
+    sonuc.push({ kart, tur: "olay", gunKaldi });
+  }
+
+  // Güncel dönem mührü: yalnızca dönem BİTMEK ÜZEREYKEN ve hâlâ yetişebiliyorsa.
+  // Dönemin tamamı boyunca listede durursa (≈90 gün) "fırsat" diye bir şey
+  // kalmaz; son ay içinde ise gerçek bir geri sayım.
+  for (const kart of liste) {
+    if (kart.section !== "muhur" || !kart.guncelDonem || kart.acik) continue;
+    if (!Number.isFinite(kart.kalanGun) || kart.kalanGun < 0 || kart.kalanGun > 30) continue;
+    if (kart.yetisir === false) continue;
+    sonuc.push({ kart, tur: "muhur", gunKaldi: kart.kalanGun, eksikGun: kart.eksikGun });
+  }
+
+  const rank = (r) => RARITY_ORDER.indexOf(r);
+  return sonuc
+    .sort((a, b) => a.gunKaldi - b.gunKaldi || rank(b.kart.rarity) - rank(a.kart.rarity))
+    .slice(0, Math.max(0, limit));
 }
 
 /**
@@ -223,6 +336,9 @@ export function izgaraSatirlari(kartlar, filtre, bolum, sutun = 3) {
     if (bolum && b.section !== bolum) return false;
     if (filtre === "acik") return b.acik;
     if (filtre === "kilitli") return !b.acik || !!b.sonrakiHedef;
+    // Son genişlemede eklenenler (kilitli ya da açık fark etmez): duyuru kartındaki
+    // "yeni olanları göster" bağı buraya düşer.
+    if (filtre === "yeni") return !!b.yeniKatalog;
     return true;
   });
 

@@ -9,7 +9,7 @@
 // değil BAŞKA ROZETLERİ toplayarak açılır.
 //
 // İKİ FAYDASI VAR:
-//   • Var olan 81 rozetin hepsini daha değerli yapar — tek başına "önemsiz"
+//   • Var olan rozetlerin hepsini daha değerli yapar — tek başına "önemsiz"
 //     görünen bir mevsimsel rozet artık bir setin eksik parçasıdır.
 //   • Yeni ölçüt, yeni sayaç, yeni Firestore alanı GEREKTİRMEZ. Girdi zaten
 //     hesaplanmış rozet listesidir; maliyeti bir dizi taraması kadardır.
@@ -23,9 +23,15 @@
 // koleksiyonlar o sigortayı dolaylı yoldan delmemeli.
 
 import { RARITY } from "@theme/badgeTokens";
-import { BOLUM, WATCH_BADGES } from "./watchBadgeCatalog";
+import { BOLUM, WATCH_BADGES, WATCH_BADGE_BY_ID } from "./watchBadgeCatalog";
 
 const idler = (fn) => WATCH_BADGES.filter(fn).map((b) => b.id);
+
+// Dört klasik tür uzmanlığı. `set_uzman` bunlara AYRI kaldı: v2'de tür bölümüne
+// on iki uzmanlık daha eklendi, "bölümdeki tüm tekil tür rozetleri" tanımı
+// otomatik olarak 16'ya çıkıp "dört tür uzmanlığı" cümlesini yalana çevirirdi.
+// Yeni on iki rozet `set_tur_hakimi`de (hepsi birlikte).
+const KLASIK_TUR_UZMANLIKLARI = ["korku_25", "animasyon_40", "belgesel_20", "komedi_75"];
 
 // Her ailenin BELİRLİ kademesi. 3 kademeli ailelerde 4. kademe yoktur; bu
 // yüzden "kademe >= n" değil "o ailenin n. kademesi VARSA" mantığı kullanılır.
@@ -70,7 +76,43 @@ export const BADGE_SETS = [
     descTr: "Dört tür uzmanlık rozetini de kazan", descEn: "Earn all four genre specialist badges", descEs: "Consigue las cuatro insignias de especialista en géneros",
     // Tür ailesinin kademeleri DEĞİL, tek tek tür rozetleri (korku/animasyon/
     // belgesel/komedi): çeşitlilik değil DERİNLİK ölçen set budur.
+    uyeler: () => idler((b) => KLASIK_TUR_UZMANLIKLARI.includes(b.id)),
+  },
+  {
+    id: "set_tur_hakimi",
+    icon: "color-palette-outline", iconSolid: "color-palette", rarity: RARITY.epic,
+    tr: "Tür Hâkimi", en: "Genre Master", es: "Maestro de géneros",
+    descTr: "Tüm tür uzmanlık rozetlerini kazan", descEn: "Earn every genre specialist badge", descEs: "Consigue todas las insignias de especialista en géneros",
+    // Bölümdeki HER tekil tür rozeti (klasik dört + v2'nin on ikisi). Tanım
+    // çalışma anında çözülür: yeni bir tür uzmanlığı eklendiğinde set kendiliğinden büyür.
     uyeler: () => idler((b) => b.section === BOLUM.TUR && !b.family),
+  },
+  {
+    id: "set_baslangic",
+    icon: "thumbs-up-outline", iconSolid: "thumbs-up", rarity: RARITY.uncommon,
+    tr: "Sağlam Başlangıç", en: "Strong Start", es: "Buen comienzo",
+    descTr: "Başlangıç bölümündeki tüm rozetleri kazan", descEn: "Earn every Getting Started badge", descEs: "Consigue todas las insignias de Primeros pasos",
+    // Yeni kullanıcının ilk günlerinde tamamlayabileceği tek koleksiyon: yedi küçük
+    // rozet, hepsi birkaç işaretlemeye sığar.
+    uyeler: () => idler((b) => b.section === BOLUM.BASLANGIC),
+  },
+  {
+    id: "set_baglilik",
+    icon: "ribbon-outline", iconSolid: "ribbon", rarity: RARITY.rare,
+    tr: "Vefalı Seyirci", en: "Faithful Viewer", es: "Espectador leal",
+    descTr: "Bağlılık bölümündeki tüm rozetleri kazan", descEn: "Earn every Devotion badge", descEs: "Consigue todas las insignias de Fidelidad",
+    uyeler: () => idler((b) => b.section === BOLUM.BAGLILIK),
+  },
+  {
+    id: "set_kesif",
+    icon: "compass-outline", iconSolid: "compass", rarity: RARITY.uncommon,
+    tr: "Kâşif", en: "Explorer", es: "Explorador",
+    descTr: "Keşif bölümündeki tüm rozetleri kazan", descEn: "Earn every Discover badge", descEs: "Consigue todas las insignias de Descubre",
+    // Uygulamanın izleme dışı yüzünü gezmiş olmanın bitiş çizgisi. Üç üye (arkadaş,
+    // ortak liste, gönderi) başka birinin ya da topluluğun varlığını ister — yine de
+    // uncommon: hiçbiri tarihe/kullanıcı girdisine bağlı sahtelenebilir bir sayı değil
+    // ve koleksiyonlar legendary'ye dokunmaz.
+    uyeler: () => idler((b) => b.section === BOLUM.KESIF),
   },
   {
     id: "set_yari_yol",
@@ -93,9 +135,95 @@ export const BADGE_SETS = [
     descTr: "Her ailenin zirvesine ulaş", descEn: "Reach the peak of every family", descEs: "Llega a la cima de cada familia",
     uyeler: zirveIdleri,
   },
+  // ── ROZET SAYISI MERDİVENİ ─────────────────────────────────────────────────
+  // "Toplam N rozet aç." Diğer koleksiyonlar BELİRLİ rozetleri ister; bunlar
+  // herhangi N tanesini. İki işi var:
+  //   • Her rozet, hangisi olursa olsun, bir sonraki eşiğe yaklaştırır. Yani
+  //     kullanıcı hangi türde, hangi bölümde ilerlerse ilerlesin "Rozet
+  //     Koleksiyoncusu 48/50" gibi yakın bir ödül hep ufukta olur — kataloğun
+  //     büyük kısmı kilitliyken bile umut kaybolmaz.
+  //   • Katalog büyüdükçe merdiven kendiliğinden anlam kazanır; eşikler sabit,
+  //     üyeler değil (üye listesi 140+ id olurdu ve sayfada hiçbir şey anlatmazdı).
+  //
+  // Sayım KATALOG rozetleridir (koleksiyon/mühür/prestij değil): ekrandaki "x/154"
+  // sayacıyla birebir aynı sayı. `esik` verilen set, üye listesini göstermez.
+  {
+    id: "set_sayi_10", esik: 10,
+    icon: "podium-outline", iconSolid: "podium", rarity: RARITY.uncommon,
+    tr: "İlk On", en: "First Ten", es: "Los diez primeros",
+    descTr: "Toplam 10 rozet kazan", descEn: "Earn 10 badges in total", descEs: "Consigue 10 insignias en total",
+    uyeler: () => idler(() => true),
+  },
+  {
+    id: "set_sayi_25", esik: 25,
+    icon: "podium-outline", iconSolid: "podium", rarity: RARITY.uncommon,
+    tr: "Rozet Meraklısı", en: "Badge Enthusiast", es: "Aficionado a las insignias",
+    descTr: "Toplam 25 rozet kazan", descEn: "Earn 25 badges in total", descEs: "Consigue 25 insignias en total",
+    uyeler: () => idler(() => true),
+  },
+  {
+    id: "set_sayi_50", esik: 50,
+    icon: "podium-outline", iconSolid: "podium", rarity: RARITY.rare,
+    tr: "Rozet Koleksiyoncusu", en: "Badge Collector", es: "Coleccionista de insignias",
+    descTr: "Toplam 50 rozet kazan", descEn: "Earn 50 badges in total", descEs: "Consigue 50 insignias en total",
+    uyeler: () => idler(() => true),
+  },
+  {
+    id: "set_sayi_75", esik: 75,
+    icon: "podium-outline", iconSolid: "podium", rarity: RARITY.rare,
+    tr: "Rozet Ustası", en: "Badge Master", es: "Maestro de insignias",
+    descTr: "Toplam 75 rozet kazan", descEn: "Earn 75 badges in total", descEs: "Consigue 75 insignias en total",
+    uyeler: () => idler(() => true),
+  },
+  {
+    id: "set_sayi_100", esik: 100,
+    icon: "podium-outline", iconSolid: "podium", rarity: RARITY.epic,
+    tr: "Yüzlük Vitrin", en: "Century Showcase", es: "Vitrina de cien",
+    descTr: "Toplam 100 rozet kazan", descEn: "Earn 100 badges in total", descEs: "Consigue 100 insignias en total",
+    uyeler: () => idler(() => true),
+  },
+  {
+    id: "set_sayi_125", esik: 125,
+    icon: "podium-outline", iconSolid: "podium", rarity: RARITY.epic,
+    tr: "Neredeyse Hepsi", en: "Almost Everything", es: "Casi todas",
+    descTr: "Toplam 125 rozet kazan", descEn: "Earn 125 badges in total", descEs: "Consigue 125 insignias en total",
+    uyeler: () => idler(() => true),
+  },
 ];
 
 export const BADGE_SET_IDS = Object.freeze(BADGE_SETS.map((s) => s.id));
+
+/**
+ * Defterin `known` listesine yazılacak koleksiyon id'leri: hepsi, AMA üyelerinden
+ * birinin KAYNAĞI henüz yüklenmemişse (ve o üye defterde kazanılmış da değilse) o
+ * koleksiyon hariç. `bilinenRozetIdleri` (watchBadgeCatalog) ile aynı gerekçe —
+ * üyeler henüz "hak edilmedi" görünürken koleksiyon `known`a girerse, kaynaklar
+ * yüklenince eski kullanıcıya koleksiyon kutlaması yağar.
+ *
+ * Defterde ZATEN kazanılmış üye kaynağın hazır olmasına bağlı değildir: kaynak
+ * yüklenmemişken son eksik rozet gerçekten kazanılırsa koleksiyonun kutlanması gerekir;
+ * onu da hariç tutmak gerçek bir başarıyı sessizce yutardı.
+ *
+ * Eşikli ("herhangi N rozet") koleksiyonlar hariç tutulmaz: yüklenmemiş kaynak onları
+ * yalnız GEÇİKTİRİR, ve gerçek bir eşik geçişini sessiz emmek, yanlış bir kutlamadan
+ * daha kötü bir hata olurdu.
+ *
+ * @param {Record<string, boolean>} [kesifHazir] stats.kesifHazir
+ * @param {Set<string>|string[]} [kazanilmis]    defterdeki monoton "earned" kümesi
+ */
+export function bilinenSetIdleri(kesifHazir, kazanilmis) {
+  const hazir = kesifHazir || {};
+  const defter = kazanilmis instanceof Set ? kazanilmis : new Set(kazanilmis || []);
+  return BADGE_SETS
+    .filter((s) => (
+      s.esik > 0
+      || s.uyeler().every((id) => {
+        const kaynak = WATCH_BADGE_BY_ID[id]?.kaynak;
+        return !kaynak || hazir[kaynak] === true || defter.has(id);
+      })
+    ))
+    .map((s) => s.id);
+}
 
 export const BADGE_SET_BY_ID = Object.freeze(
   BADGE_SETS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {}),
@@ -115,8 +243,13 @@ export function evaluateBadgeSets(degerlendirilmis, kazanilmis) {
 
   return BADGE_SETS.map((s) => {
     const uyeler = s.uyeler();
-    const target = uyeler.length;
-    const ilerleme = uyeler.filter((id) => acikSet.has(id)).length;
+    const sayilan = uyeler.filter((id) => acikSet.has(id)).length;
+    // `esik`li set "herhangi N tanesi" der: hedef eşiğin kendisi, ilerleme de o
+    // eşiğe KIRPILIR (kart 130/125 göstermesin). Eşik üye sayısından büyükse
+    // (katalog küçüldüyse) ulaşılamaz bir hedef kurmamak için üye sayısına iner.
+    const esikli = Number.isFinite(s.esik) && s.esik > 0;
+    const target = esikli ? Math.min(s.esik, uyeler.length) : uyeler.length;
+    const ilerleme = esikli ? Math.min(sayilan, target) : sayilan;
     // Defter üyeliği burada da kazandırır: koleksiyonu bir kez tamamlayan
     // kullanıcı, sonradan bir kaydını silse bile koleksiyonu kaybetmez.
     const acik = defter.has(s.id) || (target > 0 && ilerleme >= target);
@@ -127,7 +260,11 @@ export function evaluateBadgeSets(degerlendirilmis, kazanilmis) {
       tier: 0,
       hidden: false,
       birim: null,
-      uyeIdleri: uyeler,
+      // Eşikli sette üye listesi GÖSTERİLMEZ (140+ rozetin tamamı olurdu) ama dizi
+      // boş olarak kalır, null değil: detay sayfası `uyeIdleri` varlığına bakıp
+      // koleksiyon bloğunu kuruyor, null olsaydı sete "Tek kademeli rozet" yazardı.
+      uyeIdleri: esikli ? [] : uyeler,
+      esikli,
       ham: ilerleme,
       target,
       ilerleme,

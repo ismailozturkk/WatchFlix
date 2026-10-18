@@ -18,12 +18,14 @@ import AppIcon from "./AppIcon";
 import GlassIconButton from "./common/GlassIconButton";
 import { i18nText } from "../utils/i18nText";
 import { appAlert } from "./AppAlert";
+import { toast } from "./AppToast";
 import {
   getBreakdown,
   clearCategory,
   clearAllCaches,
 } from "../services/cacheInspector";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const META = {
   images: { tr: "Posterler ve görseller", family: "Ionicons", icon: "images-outline", color: "#3B82F6" },
   pets: { tr: "Pet'ler", family: "MaterialCommunityIcons", icon: "paw", color: "#F59E0B" },
@@ -76,6 +78,9 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
       try {
         await clearCategory(id);
         await load();
+        toast.success(i18nText("autoI18n.toast_onbellek_temizlendi", "Önbellek temizlendi"));
+      } catch {
+        toast.error(i18nText("autoI18n.toast_onbellek_temizlenemedi", "Önbellek temizlenemedi"));
       } finally {
         setBusyId(null);
       }
@@ -100,6 +105,9 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
             try {
               await clearAllCaches();
               await load();
+              toast.success(i18nText("autoI18n.toast_onbellek_temizlendi", "Önbellek temizlendi"));
+            } catch {
+              toast.error(i18nText("autoI18n.toast_onbellek_temizlenemedi", "Önbellek temizlenemedi"));
             } finally {
               setClearingAll(false);
             }
@@ -248,6 +256,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
           </TouchableOpacity>
         </View>
       </View>
+      <ModalToastHost visible={visible} />
     </Modal>
   );
 }

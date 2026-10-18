@@ -31,6 +31,10 @@ import {
   changeUsername as changeUsernameService,
   DEFAULT_PRIVACY,
 } from "../services/userService";
+import {
+  migrateRootAccountFields,
+  subscribeAccountPrivate,
+} from "../services/accountPrivateService";
 import { adoptPendingFavorites } from "../services/fourFavoritesService";
 import { readPendingFavorites } from "../services/pendingFavorites";
 import useStartupGate from "../hooks/useStartupGate";
@@ -44,6 +48,21 @@ import { trackFirestoreRead } from "../services/usageTrackerService";
 
 const UserProfileContext = createContext();
 export const useUserProfile = () => useContext(UserProfileContext);
+
+// Doğum tarihi artık kök belgede değil, gizli belgede (private/account; kök
+// herkese okunur). Uygulamanın geri kalanı `profile.birthDate` okumaya devam
+// etsin diye iki kaynak burada birleşir. Gizli belge KAZANIR; kökteki alan yalnız
+// henüz taşınmamış eski hesabın yedeği.
+function withAccount(root, account) {
+  if (!root || !account?.birthDate) return root;
+  return { ...root, birthDate: account.birthDate };
+}
+
+// Kökte taşınması gereken eski kopya var mı? (alan VAR olması yeterli: geçersiz
+// değer de kökten temizlenir.)
+function hasLegacyAccountFields(data) {
+  return !!data && ("birthDate" in data || "email" in data);
+}
 
 export function UserProfileProvider({ children }) {
   // `loading`: Firebase oturumu HENÜZ çözmedi. Yaş kısıtı aynasında "çıkış
@@ -76,6 +95,26 @@ export function UserProfileProvider({ children }) {
   const [migrating, setMigrating] = useState(false);
 
   const migrationDoneRef = useRef(new Set());
+
+  // Kök belge ve gizli belge AYRI dinleniyor; `profile` ikisinin birleşimi.
+  // `accountRef`: undefined = henüz bilinmiyor, null = belge yok, nesne = veri.
+  const rootRef = useRef(null);
+  const accountRef = useRef(undefined);
+  const accountMigrationTried = useRef(new Set());
+  const [accountUid, setAccountUid] = useState(null);
+  const applyProfile = useCallback((forUid) => {
+    // Kök henüz gelmediyse DOKUNMA: state'te önbellekten tohumlanmış profil var,
+    // null'lamak onu boşa düşürürdü.
+    if (!rootRef.current) return;
+    const merged = withAccount(rootRef.current, accountRef.current);
+    setProfile(merged);
+    // "Verileri indir" ayarına bilerek TABİ DEĞİL: o ayar TMDB içeriğini
+    // indirmekle ilgili, bu kullanıcının kendi profili. Tutmamak veri
+    // tasarrufu sağlamıyor, yalnızca her açılışı yavaşlatıyordu.
+    // Birleşik hâl yayınlanıyor: soğuk açılışta tohumda tarih de olsun, yaş
+    // kapısı gizli belge okunana kadar boşa düşmesin.
+    publish(cacheKeys.profile(forUid), merged);
+  }, []);
 
   // Açılış karesi profili tohumdan çiziyor (yukarıdaki ilkTohum, senkron);
   // migration round-trip'i ve canlı listener splash penceresinin dışına
@@ -125,13 +164,21 @@ export function UserProfileProvider({ children }) {
       (snap) => {
         trackFirestoreRead("Users", 1);
         if (snap.exists()) {
-          const p = { uid: snap.id, ...snap.data() };
-          setProfile(p);
-          // "Verileri indir" ayarına bilerek TABİ DEĞİL: o ayar TMDB içeriğini
-          // indirmekle ilgili, bu kullanıcının kendi profili. Tutmamak veri
-          // tasarrufu sağlamıyor, yalnızca her açılışı yavaşlatıyordu.
-          publish(cacheKeys.profile(uid), p);
+          const data = snap.data();
+          rootRef.current = { uid: snap.id, ...data };
+          applyProfile(uid);
+          // Kökte eski e-posta/doğum tarihi kopyası kaldıysa sahibi olarak
+          // gizli belgeye taşı ve kökten sil (oturum + hesap başına bir kez; bir
+          // hata sessizce geçilir — kurallar henüz yayında değilse silme
+          // reddedilir, sonraki oturumda yeniden denenir).
+          if (hasLegacyAccountFields(data) && !accountMigrationTried.current.has(uid)) {
+            accountMigrationTried.current.add(uid);
+            migrateRootAccountFields(uid, data).catch((e) => {
+              if (__DEV__) console.warn("[UserProfile] hesap göçü:", e?.message);
+            });
+          }
         } else {
+          rootRef.current = null;
           setProfile(null);
         }
         setLoading(false);
@@ -142,8 +189,42 @@ export function UserProfileProvider({ children }) {
         setLoading(false);
       },
     );
-    return () => unsub();
-  }, [uid, startupReady]);
+    return () => {
+      unsub();
+      rootRef.current = null;
+    };
+  }, [uid, startupReady, applyProfile]);
+
+  // ── 2b) Gizli hesap belgesi (private/account) ────────────────────────────
+  //
+  // Doğum tarihi burada. Tek küçük belge; tarih yazılırken (kayıt, profil
+  // düzenleme) anında yansısın diye tek seferlik okuma yerine dinleniyor.
+  // `accountUid`: hangi hesap için ilk anlık görüntünün geldiği — hesap
+  // değişince önceki hesabın "biliniyor" durumu yeni hesaba SIZMASIN.
+  useEffect(() => {
+    if (!startupReady) return undefined;
+    if (!uid) return undefined;
+    accountRef.current = undefined;
+    const unsub = subscribeAccountPrivate(
+      uid,
+      (data) => {
+        trackFirestoreRead("Users", 1);
+        accountRef.current = data;
+        setAccountUid(uid);
+        applyProfile(uid);
+      },
+      (err) => {
+        // Okunamadı = BİLİNMİYOR (izin/ağ). "Tarih yok" sayılmaz; yaş kapısı
+        // elindeki değeri korur (aşağıdaki efekt).
+        if (!isAuthTransitionError(err) && __DEV__)
+          console.warn("[UserProfile] private/account error:", err.message);
+      },
+    );
+    return () => {
+      unsub();
+      accountRef.current = undefined;
+    };
+  }, [uid, startupReady, applyProfile]);
 
   // ── 3) Yaş kısıtı aynası ─────────────────────────────────────────────────
   //
@@ -161,8 +242,15 @@ export function UserProfileProvider({ children }) {
   // Firebase oturumu çözene kadar `uid` null; bunu "çıkış yapılmış" sayıp
   // temizleseydik 18 altı bir cihaz her açılışta birkaç saniye korumasız
   // kalırdı. Aynı şekilde profil henüz gelmediyse de eldeki değer korunur.
+  //
+  // DOĞUM TARİHİ GİZLİ BELGEDE (private/account). Taşınmış bir hesapta kök
+  // belgede tarih YOKTUR; gizli belge okunmadan "tarih yok" sonucuna varmak
+  // 18 altı hesabın kısıtını kaldırırdı. Bu yüzden tarih elde yokken (önbellek
+  // tohumu da tarihi taşır) karar, gizli belgenin ilk anlık görüntüsüne kadar
+  // BEKLER; okunamazsa (izin/ağ) bayrak olduğu gibi kalır.
   const birthDate = profile?.birthDate ?? null;
   const profilVar = !!profile;
+  const accountKnown = accountUid === uid;
   useEffect(() => {
     if (authLoading) return;
     if (!uid) {
@@ -170,8 +258,9 @@ export function UserProfileProvider({ children }) {
       return;
     }
     if (!profilVar) return;
+    if (!birthDate && !accountKnown) return;
     syncAgeRestriction(birthDate);
-  }, [authLoading, uid, profilVar, birthDate]);
+  }, [authLoading, uid, profilVar, birthDate, accountKnown]);
 
   // ── 4) Tanıtımda seçilen "dört favori"yi hesaba taşı ──────────────────────
   //

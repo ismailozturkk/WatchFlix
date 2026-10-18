@@ -1,9 +1,28 @@
 // components/badges/watchBadgeCatalog.js
 //
-// İZLEME rozetleri — 81 adet: 13 kademeli aile (59 üye) + 22 tekil. Kimlik
+// İZLEME rozetleri — 154 adet: 20 kademeli aile (89 üye) + 65 tekil. Kimlik
 // rozetlerinden (badgeCatalog.js) ve oyun başarımlarından
 // (screens/game/gameRegistry.js) ayrı bir aile, aynı render altyapısını
 // (AppBadge) kullanır.
+//
+// KATALOG SÜRÜMLERİ (`since` alanı, `KATALOG_SURUMU`):
+//   v1 — 81 rozet (Kilometre, Ritim, Türler, Mevsimsel, Kıdem, Perde, Gizli).
+//   v2 — +60 rozet. İki yeni bölüm (BAŞLANGIÇ: ilk dakikada kazanılan küçükler;
+//        BAĞLILIK: tekrar izleme + aynı diziye sadakat), yeni aileler (dizi, sezon,
+//        eser, günlük seri, hafta sonu, tekrar), on iki tür uzmanlığı, beş
+//        mevsimsel/takvim rozeti, altı gizli rozet, üç Perde ara basamağı.
+//   v3 — +13 rozet, tek yeni bölüm: KEŞİF. İZLEME VERİSİNE BAĞLI DEĞİL: uygulamanın
+//        diğer özelliklerini (not, yapılacaklar, film/dizi notu, özel liste, favori,
+//        izleme listesi, hatırlatıcı, ortak liste, arkadaş, gönderi, dört favori,
+//        biyografi, CineMatch) ilk kez kullanınca açılır. Girdileri computeWatchScore'dan
+//        değil utils/kesifSignals.js'ten gelir (bkz. oradaki YÜKLENME YARIŞI notu).
+//   Genişlemenin amacı "her aşamada elinin altında bir sonraki rozet olsun":
+//   v1'de kilometre taşları arasında aylarca ödülsüz çöller vardı (ör. 150→500
+//   film, Perde 8→14, yalnız dizi izleyenin tür sütunu). v2 bu çölleri doldurur,
+//   yeni kullanıcıya ilk dakikada 3-4 rozet verir ve her izleme tarzına
+//   (tekrar izleyen, hafta sonu izleyen, tek türe adanmış…) bir hedef koyar. v3
+//   aynı şeyi izleme dışı özellikler için yapar: hiç hatırlatıcı kurmamış kullanıcı,
+//   Keşif bölümünde kilitli bir "İlk hatırlatıcı"yı ve nasıl açılacağını görür.
 //
 // AİLE UZUNLUĞU TAVANI = 5 KADEME. Aileler eşit uzunlukta değildir (3–5), ama
 // hiçbiri 5'i aşmaz: altıncı kademe `kademeSekli`nin beş şekil/renk basamağına
@@ -14,7 +33,7 @@
 // sürer. Konum orana çevrildiği için her ailenin zirvesi — kaç kademe olursa
 // olsun — altın sekizgene oturur.
 //
-// DÖRT KURAL — yeni rozet eklerken bunlara uy:
+// BEŞ KURAL — yeni rozet eklerken bunlara uy:
 //
 // 0. YENİ ROZET EKLEMEK MEVCUT KULLANICIDA SESSİZDİR. Defter (watchLedgerCore.js)
 //    katalogda ilk kez gördüğü bir id'yi, kullanıcı onu zaten hak ediyorsa
@@ -24,7 +43,7 @@
 //
 // 1. LEGENDARY KOTASI = 3 (`film_2000`, `bolum_10000`, `perde_20`). Dördüncü bir
 //    legendary eklemek için mevcut birini düşürmek gerekir; nadirlik enflasyonu
-//    rozet sisteminin bilinen ölüm biçimi.
+//    rozet sisteminin bilinen ölüm biçimi. (v3 Keşif rozetleri legendary EKLEMEDİ.)
 //
 //    KOTA 2'DEN 3'E BİLEREK ÇIKARILDI. Eskiden `film_500` legendary'ydi ve
 //    ailenin zirvesiydi. Film/bölüm aileleri 5 kademeye çıkınca zirve 2.000 film
@@ -32,8 +51,8 @@
 //    yerine gelen iki hedef eskisinden dört kat zor. İkisi kabaca eşit emek
 //    istiyor (2.000 × 165 ≈ 330.000 Kare, 10.000 × 37 ≈ 370.000 Kare), bu yüzden
 //    birini legendary yapıp diğerini epic bırakmak bir izleme biçimini
-//    ödüllendirip diğerini cezalandırmak olurdu. 81 rozette 3 legendary = %3,7;
-//    hâlâ nadir.
+//    ödüllendirip diğerini cezalandırmak olurdu. 154 rozette 3 legendary = %1,9
+//    (v1'de 81 rozette %3,7 idi); hâlâ nadir ve v2/v3 legendary EKLEMEDİ.
 //
 // 2. TARİH TÜREVİ ROZET TAVANI = rare. Gün/seri/mevsim rozetleri kullanıcının
 //    kendi girdiği izleme tarihinden türer (DatePickerModal geçmişe onlarca yıl
@@ -41,9 +60,22 @@
 //
 // 3. RARITY ELLE YAZILIR — resolveRarity(target) KULLANILMAZ. Hedefin büyüklüğü
 //    zorluğu ölçmez: 2000 bölüm otomatik legendary olurdu ama 12 farklı türde
-//    içerik izlemek çok daha zordur. Dağılım kasıtlı: 12 common · 31 uncommon ·
-//    27 rare · 8 epic · 3 legendary — medyan uncommon, yani profil mor bir
-//    duvara dönüşmez.
+//    içerik izlemek çok daha zordur. Dağılım kasıtlı: 35 common · 60 uncommon ·
+//    46 rare · 10 epic · 3 legendary — medyan uncommon, yani profil mor bir
+//    duvara dönüşmez. (v1: 12 · 31 · 27 · 8 · 3. v2'nin eklediği 60 rozetin
+//    13'ü common, 26'sı uncommon, 18'i rare, 3'ü epic; ayrıca `uzun_metraj_100`
+//    epic'ten rare'e indi, çünkü aile 5. kademeye uzadı: yeni kitle ağırlıkla
+//    yaygın/az bulunur, nadir duvarı büyümüyor. v3'ün 13 Keşif rozetinin 10'u
+//    common, 3'ü uncommon — ilk gün bloğu: hiçbiri rare'e çıkmaz.)
+//
+// 4. KEŞİF ROZETLERİ FREE PLANDA KAZANILABİLİR OLMALI ve hedefleri Free SINIRININ
+//    ALTINDA kalmalı. Hepsi "ilk kez" (hedef 1): özel liste Free'de 1 tane, arkadaş 2,
+//    not 5 — "5 not yaz" gibi bir kademe Free kullanıcıyı sınıra itip hemen ardından
+//    "Not limitin doldu" duvarına çarptırırdı. Oyun/CineSwipe (Free'de kapalı) ve özel
+//    tema (Premium) bu yüzden Keşif'e girmedi. Her Keşif rozeti bir `kaynak` taşır
+//    (utils/kesifSignals.js KESIF_KAYNAK): kaynak yüklenmeden id deftere "bilinen"
+//    yazılmaz, yoksa kaynak gelince eski kullanıcıya kutlama yağar (bkz.
+//    `bilinenRozetIdleri`).
 //
 //    TEK İSTİSNA: KIDEM ailesi tarih tavanına tabi değildir (aşağıdaki uzun
 //    gerekçe) — ölçütü sunucunun yazdığı hesap açılış tarihidir.
@@ -52,20 +84,28 @@
 // beşgen → altıgen, theme/badgeTokens.js `kademeSekli`). Renk nadirliği, kenar
 // sayısı kademeyi kodlar; ikisi bağımsız iki eksendir.
 //
-// METİNLER İNLİNE: 81 rozet × 2 metin × 2 dil = 324 autoI18n anahtarı yazmak
-// yerine tr/en/descTr/descEn burada durur (badgeCatalog.js emsali). i18n
-// maliyeti yalnızca ekranın ~24 UI dizesine iner.
+// METİNLER İNLİNE: 154 rozet × 2 metin × 3 dil = 924 autoI18n anahtarı yazmak
+// yerine tr/en/es + descTr/descEn/descEs burada durur (badgeCatalog.js emsali).
+// i18n maliyeti yalnızca ekranın UI dizelerine iner.
 //
 // PERFORMANS SÖZLEŞMESİ: her getProgress YALNIZCA `stats` okur. Hiçbir rozet
-// izleme listesini ayrıca taramaz — 81 rozet × 3.900 kayıt taraması JS
+// izleme listesini ayrıca taramaz — 154 rozet × 3.900 kayıt taraması JS
 // thread'ini kilitlerdi. Tüm ölçütler computeWatchScore'un tek geçişinden çıkar.
+// v2'nin yeni ölçütleri (tekrar, sezon, hafta sonu, takvim olayları, tür derinliği)
+// da o geçişe eklendi — rozet başına ayrı tarama YOK, puan formülü DEĞİŞMEDİ.
+// v3 Keşif rozetleri `stats.kesif` (küçük sayılar nesnesi) okur; o da hook'ta
+// computeWatchScore'dan AYRI üretilir, hiçbir liste taranmaz.
 
 import { copyLanguage, intlLocaleOf } from "../../utils/appLanguages";
 import { RARITY } from "@theme/badgeTokens";
 import { GENRE } from "@utils/genreCanon";
+import { KESIF_KAYNAK } from "@utils/kesifSignals";
 
 // Rozet ekranındaki bölümler.
 export const BOLUM = Object.freeze({
+  BASLANGIC: "baslangic",
+  KESIF: "kesif",
+  BAGLILIK: "baglilik",
   KILOMETRE: "kilometre",
   RITIM: "ritim",
   TUR: "tur",
@@ -78,6 +118,9 @@ export const BOLUM = Object.freeze({
 });
 
 export const BOLUM_BASLIK = Object.freeze({
+  baslangic: { tr: "Başlangıç", en: "Getting Started", es: "Primeros pasos" },
+  kesif: { tr: "Keşif", en: "Discover", es: "Descubre" },
+  baglilik: { tr: "Bağlılık", en: "Devotion", es: "Fidelidad" },
   kilometre: { tr: "Kilometre Taşları", en: "Milestones", es: "Hitos" },
   ritim: { tr: "Ritim", en: "Rhythm", es: "Ritmo" },
   tur: { tr: "Türler", en: "Genres", es: "Géneros" },
@@ -94,9 +137,22 @@ export const BOLUM_BASLIK = Object.freeze({
 // sonda ekleniyor — sıra karttan türeseydi ikisi de ekranın dibinde kalırdı.
 // Mühür/koleksiyon ortada durur: yeni kullanıcı önce ulaşılabilir kilometre
 // taşlarını görür, "0/6 koleksiyon" ilk izlenim olmaz.
+//
+// BAŞLANGIÇ EN ÜSTTE: ilk dakikada kazanılabilen, bir iki işaretlemelik rozetler.
+// Yeni kullanıcının ekranı "0/…" duvarı değil, hemen dolacak küçük bir ilk
+// satırla açılır; deneyimli kullanıcıda bölüm zaten tamamdır ve satırı kısadır.
+// BAĞLILIK ritmin hemen arkasında: ritim "ne sıklıkla", bağlılık "aynı şeye ne
+// kadar dönüyorsun" sorusunu cevaplar.
+// KEŞİF BAŞLANGIÇ'IN HEMEN ARKASINDA: ilk gün bloğu iki küçük satırdan oluşur —
+// "izlemeye başla" ve "uygulamanın geri kalanını dene". İkisi de birkaç dokunuşta
+// dolar; deneyimli kullanıcıda bölüm zaten tamamdır ve Kilometre'yi yalnız birkaç
+// satır aşağı iter. Sona almak isteyen tek satırı buradan taşır.
 export const BOLUM_SIRA = Object.freeze([
+  BOLUM.BASLANGIC,
+  BOLUM.KESIF,
   BOLUM.KILOMETRE,
   BOLUM.RITIM,
+  BOLUM.BAGLILIK,
   BOLUM.TUR,
   BOLUM.MEVSIM,
   BOLUM.MUHUR,
@@ -106,10 +162,24 @@ export const BOLUM_SIRA = Object.freeze([
   BOLUM.GIZLI,
 ]);
 
-// gameRegistry.defineAchievement ile AYNI sözleşme + üç ek alan:
-// `family` (kademe ailesi), `tier` (aile içi sıra), `hidden` (gizli rozet).
+// KATALOG SÜRÜMÜ. Kataloğa rozet eklendiği her güncellemede bir artar; yeni
+// rozetler `since: <yeni sürüm>` ile damgalanır. Ekran bunu yalnızca "YENİ"
+// etiketi ve "N yeni rozet eklendi" duyurusu için okur — defter/kazanma mantığı
+// ona BAKMAZ (yeni rozetin sessiz emilmesi `WATCH_BADGE_IDS`e dayanır, bkz. 0.
+// kural). Sürüm 1 = ilk 81 rozet; sürüm 2 = Başlangıç/Bağlılık genişlemesi;
+// sürüm 3 = Keşif bölümü (izleme dışı özellikler).
+export const KATALOG_SURUMU = 3;
+const S2 = 2;
+const S3 = 3;
+
+// gameRegistry.defineAchievement ile AYNI sözleşme + beş ek alan:
+// `family` (kademe ailesi), `tier` (aile içi sıra), `hidden` (gizli rozet),
+// `since` (rozetin eklendiği katalog sürümü; verilmezse 1), `kaynak` (yalnız Keşif
+// rozetleri: ilerlemesini okuduğu KESIF_KAYNAK — hazır olmadan `known`a yazılmaz).
 const defineWatchBadge = (def) => ({
   ...def,
+  since: def.since || 1,
+  kaynak: def.kaynak || null,
   // iconSolid ELLE yazılır. Eskiden icon.replace("-outline","") ile türetiliyordu;
   // Ionicons'ta her outline ikonun dolu ikizi yok ve AppIcon tanınmayan isimde
   // kırmızı uyarı üçgeni basıyor — hata sessizce kullanıcıya gidiyordu.
@@ -128,6 +198,9 @@ const defineWatchBadge = (def) => ({
 
 const turSayisi = (stats, id) => Number(stats?.turSayaci?.get?.(id)) || 0;
 const say = (stats, alan) => Number(stats?.[alan]) || 0;
+// Keşif sinyali: `stats.kesif` hook'ta (computeWatchScore'dan AYRI) bindirilir;
+// kaynak hazır değilse alan yoktur ve 0 okunur.
+const kesifSay = (stats, alan) => Number(stats?.kesif?.[alan]) || 0;
 
 // Süre ailesi ham DAKİKA toplar (etkinDakikaToplam) ve VARSAYILAN OLARAK da
 // dakika gösterir (kullanıcı isteği). Tek bir sabit birim seçmek zorunda
@@ -208,13 +281,56 @@ export function formatBadgeAralik(badge, ilerleme, target, lang, birimOverride) 
 }
 
 export const WATCH_BADGES = [
-  // ── Kilometre taşları ─────────────────────────────────────────────────────
+  // ── Başlangıç ─────────────────────────────────────────────────────────────
+  // İLK DAKİKADA KAZANILAN küçük rozetler. Amaç yeni kullanıcıya "ilk işaretleme
+  // bile bir şey kazandırıyor" demek ve her adımın arkasında bir sonraki küçük
+  // hedefi göstermek: ilk film → ilk bölüm → 10 eser → 25 eser. Hepsi common, hiçbiri
+  // 30 işaretlemeden fazla istemez. Deneyimli kullanıcı için BEDAVA ve sessiz:
+  // katalog genişleme koruması (0. kural) bunları kutlamasız emer.
   defineWatchBadge({
-    id: "ilk_kare", icon: "footsteps-outline", iconSolid: "footsteps", rarity: RARITY.common,
+    id: "ilk_kare", section: BOLUM.BASLANGIC, icon: "footsteps-outline", iconSolid: "footsteps", rarity: RARITY.common,
     tr: "İlk Kare", en: "First Frame", es: "Primer fotograma",
     descTr: "İlk film ya da bölümünü işaretle", descEn: "Mark your first film or episode", descEs: "Marca tu primera película o episodio",
     target: 1, getProgress: (s) => say(s, "filmSayisi") + say(s, "bolumSayisi"),
   }),
+  defineWatchBadge({
+    id: "ilk_film", since: S2, section: BOLUM.BASLANGIC, icon: "ticket-outline", iconSolid: "ticket", rarity: RARITY.common,
+    tr: "İlk Seans", en: "First Screening", es: "Primera sesión",
+    descTr: "İlk filmini izle", descEn: "Watch your first film", descEs: "Ve tu primera película",
+    target: 1, getProgress: (s) => say(s, "filmSayisi"),
+  }),
+  defineWatchBadge({
+    id: "ilk_bolum", since: S2, section: BOLUM.BASLANGIC, icon: "play-circle-outline", iconSolid: "play-circle", rarity: RARITY.common,
+    tr: "Pilot Bölüm", en: "Pilot Episode", es: "Episodio piloto",
+    descTr: "İlk dizi bölümünü izle", descEn: "Watch your first episode", descEs: "Ve tu primer episodio",
+    target: 1, getProgress: (s) => say(s, "bolumSayisi"),
+  }),
+  defineWatchBadge({
+    id: "eser_10", since: S2, section: BOLUM.BASLANGIC, icon: "stopwatch-outline", iconSolid: "stopwatch", rarity: RARITY.common,
+    tr: "Isınma Turu", en: "Warm-Up Lap", es: "Vuelta de calentamiento",
+    descTr: "Toplam 10 film ya da bölüm işaretle", descEn: "Mark 10 films or episodes in total", descEs: "Marca 10 películas o episodios en total",
+    target: 10, getProgress: (s) => say(s, "filmSayisi") + say(s, "bolumSayisi"),
+  }),
+  defineWatchBadge({
+    id: "eser_25", since: S2, section: BOLUM.BASLANGIC, icon: "speedometer-outline", iconSolid: "speedometer", rarity: RARITY.common,
+    tr: "Rayına Oturdu", en: "Hitting Stride", es: "Cogiendo ritmo",
+    descTr: "Toplam 25 film ya da bölüm işaretle", descEn: "Mark 25 films or episodes in total", descEs: "Marca 25 películas o episodios en total",
+    target: 25, getProgress: (s) => say(s, "filmSayisi") + say(s, "bolumSayisi"),
+  }),
+  defineWatchBadge({
+    id: "gun_3", since: S2, section: BOLUM.BASLANGIC, icon: "calendar-clear-outline", iconSolid: "calendar-clear", rarity: RARITY.common,
+    tr: "Üç Ayrı Gün", en: "Three Separate Days", es: "Tres días distintos",
+    descTr: "3 farklı günde izleme işaretle", descEn: "Log a watch on 3 separate days", descEs: "Registra un visionado en 3 días distintos",
+    target: 3, getProgress: (s) => say(s, "gunSayisi"),
+  }),
+  defineWatchBadge({
+    id: "ilk_destan", since: S2, section: BOLUM.BASLANGIC, icon: "bookmarks-outline", iconSolid: "bookmarks", rarity: RARITY.common,
+    tr: "İlk Destan", en: "First Epic", es: "Primera epopeya",
+    descTr: "150 dakikadan uzun bir film izle", descEn: "Watch a film over 150 minutes", descEs: "Ve una película de más de 150 minutos",
+    target: 1, getProgress: (s) => say(s, "uzunMetraj"),
+  }),
+
+  // ── Kilometre taşları ─────────────────────────────────────────────────────
   defineWatchBadge({
     id: "film_10", icon: "film-outline", iconSolid: "film", rarity: RARITY.common,
     family: "film", tier: 1, tr: "İlk Bilet", en: "First Ticket", es: "Primera entrada",
@@ -290,11 +406,98 @@ export const WATCH_BADGES = [
   // Film/bölüm aileleri "ne kadar" izlediğini sayar; bu rozet KAÇ FARKLI dizinin
   // peşine düştüğünü söyler. 100 farklı dizi, bitirmeyi değil KEŞFETMEYİ
   // ödüllendirir — final ailesinin (bitirilen dizi) tam karşı kutbu.
+  //
+  // v2'de TEK rozetten 5 kademeli aileye çevrildi: 100 diziye giden yolda hiçbir
+  // şey yoktu, yani "kaç dizi takip ediyorum?" sorusu ilk 100'e kadar ödülsüzdü.
+  // `dizi_100` id'si ve hedefi AYNI kaldı (zirve oldu) — kazanılmış rozet kaymaz.
+  defineWatchBadge({
+    id: "dizi_5", since: S2, icon: "grid-outline", iconSolid: "grid", rarity: RARITY.common,
+    family: "dizi", tier: 1, tr: "Dizi Merakı", en: "Series Curiosity", es: "Curiosidad por las series",
+    descTr: "5 farklı diziyi takip et", descEn: "Track 5 different series", descEs: "Sigue 5 series distintas",
+    target: 5, getProgress: (s) => say(s, "diziSayisi"),
+  }),
+  defineWatchBadge({
+    id: "dizi_15", since: S2, icon: "grid-outline", iconSolid: "grid", rarity: RARITY.uncommon,
+    family: "dizi", tier: 2, tr: "Dizi Rafı", en: "Series Shelf", es: "Estantería de series",
+    descTr: "15 farklı diziyi takip et", descEn: "Track 15 different series", descEs: "Sigue 15 series distintas",
+    target: 15, getProgress: (s) => say(s, "diziSayisi"),
+  }),
+  defineWatchBadge({
+    id: "dizi_30", since: S2, icon: "grid-outline", iconSolid: "grid", rarity: RARITY.uncommon,
+    family: "dizi", tier: 3, tr: "Dizi Kütüphanesi", en: "Series Library", es: "Biblioteca de series",
+    descTr: "30 farklı diziyi takip et", descEn: "Track 30 different series", descEs: "Sigue 30 series distintas",
+    target: 30, getProgress: (s) => say(s, "diziSayisi"),
+  }),
+  defineWatchBadge({
+    id: "dizi_60", since: S2, icon: "grid-outline", iconSolid: "grid", rarity: RARITY.rare,
+    family: "dizi", tier: 4, tr: "Dizi Arşivi", en: "Series Archive", es: "Archivo de series",
+    descTr: "60 farklı diziyi takip et", descEn: "Track 60 different series", descEs: "Sigue 60 series distintas",
+    target: 60, getProgress: (s) => say(s, "diziSayisi"),
+  }),
   defineWatchBadge({
     id: "dizi_100", icon: "grid-outline", iconSolid: "grid", rarity: RARITY.rare,
-    tr: "Yüz Dizi", en: "Hundred Series", es: "Cien series",
+    family: "dizi", tier: 5, tr: "Yüz Dizi", en: "Hundred Series", es: "Cien series",
     descTr: "100 farklı diziyi takip et", descEn: "Track 100 different series", descEs: "Sigue 100 series distintas",
     target: 100, getProgress: (s) => say(s, "diziSayisi"),
+  }),
+  // SEZON AİLESİ — izlenen SEZON sayısı (en az bir bölümü işaretli sezonlar).
+  // Dizi sayısı "kaç farklı dünya", bölüm sayısı "kaç saat" der; sezon bunların
+  // arasındaki birimdir: 8 sezonluk tek bir dizi de, 8 farklı mini diziyle de
+  // aynı ölçüde "sezon" sayılır. Puana girmez; toplu işaretlemeyle (markShow)
+  // kolay şişirilebildiği için tavan rare.
+  defineWatchBadge({
+    id: "sezon_10", since: S2, icon: "file-tray-stacked-outline", iconSolid: "file-tray-stacked", rarity: RARITY.common,
+    family: "sezon", tier: 1, tr: "Sezon Sepeti", en: "Season Basket", es: "Cesta de temporadas",
+    descTr: "Toplam 10 sezon izle", descEn: "Watch 10 seasons in total", descEs: "Ve 10 temporadas en total",
+    target: 10, getProgress: (s) => say(s, "izlenenSezon"),
+  }),
+  defineWatchBadge({
+    id: "sezon_30", since: S2, icon: "file-tray-stacked-outline", iconSolid: "file-tray-stacked", rarity: RARITY.uncommon,
+    family: "sezon", tier: 2, tr: "Sezon Koleksiyonu", en: "Season Collection", es: "Colección de temporadas",
+    descTr: "Toplam 30 sezon izle", descEn: "Watch 30 seasons in total", descEs: "Ve 30 temporadas en total",
+    target: 30, getProgress: (s) => say(s, "izlenenSezon"),
+  }),
+  defineWatchBadge({
+    id: "sezon_75", since: S2, icon: "file-tray-stacked-outline", iconSolid: "file-tray-stacked", rarity: RARITY.rare,
+    family: "sezon", tier: 3, tr: "Sezon Hazinesi", en: "Season Treasure", es: "Tesoro de temporadas",
+    descTr: "Toplam 75 sezon izle", descEn: "Watch 75 seasons in total", descEs: "Ve 75 temporadas en total",
+    target: 75, getProgress: (s) => say(s, "izlenenSezon"),
+  }),
+  defineWatchBadge({
+    id: "sezon_200", since: S2, icon: "file-tray-stacked-outline", iconSolid: "file-tray-stacked", rarity: RARITY.rare,
+    family: "sezon", tier: 4, tr: "Sezon Okyanusu", en: "Season Ocean", es: "Océano de temporadas",
+    descTr: "Toplam 200 sezon izle", descEn: "Watch 200 seasons in total", descEs: "Ve 200 temporadas en total",
+    target: 200, getProgress: (s) => say(s, "izlenenSezon"),
+  }),
+  // ESER AİLESİ — film + bölüm TOPLAMI. Film ve bölüm aileleri kendi eksenlerinde
+  // uzun çöller taşıyor (film 150→500, bölüm 500→2000); yalnızca dizi izleyen ya da
+  // yalnızca film izleyen kullanıcı o aralıkta aylarca rozet görmüyordu. Toplam
+  // eser ölçütü iki izleme biçimini TEK merdivende buluşturur, çöllerin içine
+  // 300 ve 1.000 basamaklarını koyar. İlk iki mikro basamak (10, 25) Başlangıç
+  // bölümünde durur (eser_10, eser_25) — aile 100'den başlar.
+  defineWatchBadge({
+    id: "eser_100", since: S2, icon: "flag-outline", iconSolid: "flag", rarity: RARITY.uncommon,
+    family: "eser", tier: 1, tr: "Yüzlük Kulüp", en: "Century Club", es: "Club de los cien",
+    descTr: "Toplam 100 film ya da bölüm işaretle", descEn: "Mark 100 films or episodes in total", descEs: "Marca 100 películas o episodios en total",
+    target: 100, getProgress: (s) => say(s, "filmSayisi") + say(s, "bolumSayisi"),
+  }),
+  defineWatchBadge({
+    id: "eser_300", since: S2, icon: "flag-outline", iconSolid: "flag", rarity: RARITY.uncommon,
+    family: "eser", tier: 2, tr: "Büyüyen Arşiv", en: "Growing Archive", es: "Archivo en crecimiento",
+    descTr: "Toplam 300 film ya da bölüm işaretle", descEn: "Mark 300 films or episodes in total", descEs: "Marca 300 películas o episodios en total",
+    target: 300, getProgress: (s) => say(s, "filmSayisi") + say(s, "bolumSayisi"),
+  }),
+  defineWatchBadge({
+    id: "eser_1000", since: S2, icon: "flag-outline", iconSolid: "flag", rarity: RARITY.rare,
+    family: "eser", tier: 3, tr: "Bin Eser", en: "A Thousand Titles", es: "Mil títulos",
+    descTr: "Toplam 1000 film ya da bölüm işaretle", descEn: "Mark 1000 films or episodes in total", descEs: "Marca 1000 películas o episodios en total",
+    target: 1000, getProgress: (s) => say(s, "filmSayisi") + say(s, "bolumSayisi"),
+  }),
+  defineWatchBadge({
+    id: "eser_3000", since: S2, icon: "flag-outline", iconSolid: "flag", rarity: RARITY.epic,
+    family: "eser", tier: 4, tr: "Devasa Arşiv", en: "Colossal Archive", es: "Archivo colosal",
+    descTr: "Toplam 3000 film ya da bölüm işaretle", descEn: "Mark 3000 films or episodes in total", descEs: "Marca 3000 películas o episodios en total",
+    target: 3000, getProgress: (s) => say(s, "filmSayisi") + say(s, "bolumSayisi"),
   }),
   defineWatchBadge({
     id: "final_1", icon: "checkmark-done-outline", iconSolid: "checkmark-done", rarity: RARITY.common,
@@ -403,11 +606,20 @@ export const WATCH_BADGES = [
     descTr: "150 dakikadan uzun 50 film izle", descEn: "Watch 50 films over 150 minutes", descEs: "Ve 50 películas de más de 150 minutos",
     target: 50, getProgress: (s) => say(s, "uzunMetraj"),
   }),
+  // v2: aile 5. kademeye (200) uzatıldı ve 100'lük kademe epic'ten rare'e indi —
+  // zirve epic kalsın, merdiven monoton olsun (u → u → r → r → e). Nadirlik
+  // kozmetiktir, defteri etkilemez; kazanılmış rozet kaymaz.
   defineWatchBadge({
-    id: "uzun_metraj_100", icon: "layers-outline", iconSolid: "layers", rarity: RARITY.epic,
+    id: "uzun_metraj_100", icon: "layers-outline", iconSolid: "layers", rarity: RARITY.rare,
     family: "uzunMetraj", tier: 4, tr: "Yüz Destan", en: "Hundred Epics", es: "Cien epopeyas",
     descTr: "150 dakikadan uzun 100 film izle", descEn: "Watch 100 films over 150 minutes", descEs: "Ve 100 películas de más de 150 minutos",
     target: 100, getProgress: (s) => say(s, "uzunMetraj"),
+  }),
+  defineWatchBadge({
+    id: "uzun_metraj_200", since: S2, icon: "layers-outline", iconSolid: "layers", rarity: RARITY.epic,
+    family: "uzunMetraj", tier: 5, tr: "İki Yüz Destan", en: "Two Hundred Epics", es: "Doscientas epopeyas",
+    descTr: "150 dakikadan uzun 200 film izle", descEn: "Watch 200 films over 150 minutes", descEs: "Ve 200 películas de más de 150 minutos",
+    target: 200, getProgress: (s) => say(s, "uzunMetraj"),
   }),
 
   // ── Ritim ─────────────────────────────────────────────────────────────────
@@ -576,11 +788,126 @@ export const WATCH_BADGES = [
     descTr: "Bir sezonun 22 bölümünü aynı güne işaretle", descEn: "Mark 22 episodes of one season on one day", descEs: "Marca 22 episodios de una temporada en un solo día",
     target: 22, getProgress: (s) => say(s, "tekOturusta"),
   }),
+  // GÜNLÜK SERİ — `rekorGunSerisi` (defterdeki gerçek işaretleme günleri).
+  //
+  // HAFTALIK seri ailesinin YANINA, kısa vadeli bir hedef olarak eklendi. Haftalık
+  // ailenin gerekçesi (günlük CEZA kullanıcıyı sahte işaretlemeye iter) burada da
+  // geçerli, ama bu aile ceza taşımıyor: REKOR okur, mevcut seri değil — bir gün
+  // kaçıran kullanıcı hiçbir şey kaybetmez, sadece bir sonraki koşusuna yeniden
+  // başlar. Eşikler bilerek kısa (3 → 30 gün): "bu akşam yine bir şey işaretlersem
+  // 3 günü tamamlarım" hissi haftalık merdivenin veremediği günlük merak.
+  // Tarih türevi (cihaz saati) → rare tavanı.
   defineWatchBadge({
-    id: "sadik_izleyici", section: BOLUM.RITIM, icon: "heart-outline", iconSolid: "heart", rarity: RARITY.uncommon,
-    tr: "Sadık İzleyici", en: "Loyal Viewer", es: "Espectador fiel",
+    id: "ardisik_3", since: S2, section: BOLUM.RITIM, icon: "pulse-outline", iconSolid: "pulse", rarity: RARITY.common,
+    family: "ardisik", tier: 1, tr: "Üç Gün Üst Üste", en: "Three-Day Streak", es: "Tres días seguidos",
+    descTr: "3 gün art arda işaretleme yap", descEn: "Mark something 3 days in a row", descEs: "Marca algo 3 días seguidos",
+    target: 3, getProgress: (s) => say(s, "rekorGunSerisi"),
+  }),
+  defineWatchBadge({
+    id: "ardisik_7", since: S2, section: BOLUM.RITIM, icon: "pulse-outline", iconSolid: "pulse", rarity: RARITY.uncommon,
+    family: "ardisik", tier: 2, tr: "Tam Bir Hafta", en: "A Full Week", es: "Una semana completa",
+    descTr: "7 gün art arda işaretleme yap", descEn: "Mark something 7 days in a row", descEs: "Marca algo 7 días seguidos",
+    target: 7, getProgress: (s) => say(s, "rekorGunSerisi"),
+  }),
+  defineWatchBadge({
+    id: "ardisik_14", since: S2, section: BOLUM.RITIM, icon: "pulse-outline", iconSolid: "pulse", rarity: RARITY.rare,
+    family: "ardisik", tier: 3, tr: "İki Hafta Kesintisiz", en: "Two Weeks Straight", es: "Dos semanas seguidas",
+    descTr: "14 gün art arda işaretleme yap", descEn: "Mark something 14 days in a row", descEs: "Marca algo 14 días seguidos",
+    target: 14, getProgress: (s) => say(s, "rekorGunSerisi"),
+  }),
+  defineWatchBadge({
+    id: "ardisik_30", since: S2, section: BOLUM.RITIM, icon: "pulse-outline", iconSolid: "pulse", rarity: RARITY.rare,
+    family: "ardisik", tier: 4, tr: "Otuz Gün Ateşi", en: "Thirty-Day Blaze", es: "Treinta días de fuego",
+    descTr: "30 gün art arda işaretleme yap", descEn: "Mark something 30 days in a row", descEs: "Marca algo 30 días seguidos",
+    target: 30, getProgress: (s) => say(s, "rekorGunSerisi"),
+  }),
+  // HAFTA SONU AİLESİ — Cumartesi/Pazar günlerinden kaçında izleme yapıldı.
+  // `gunSayisi` gün sayar ama haftanın hangi günü olduğuna bakmaz; bu aile
+  // "hafta içi sıkıştırdığım" ile "hafta sonu keyfine ayırdığım" izleyicisini
+  // ayırır. Farklı GÜN sayar (aynı gün 5 film = 1) → toplu işaretlemeyle
+  // şişirilemez. Tarih türevi → rare tavanı.
+  defineWatchBadge({
+    id: "hafta_sonu_5", since: S2, section: BOLUM.RITIM, icon: "home-outline", iconSolid: "home", rarity: RARITY.common,
+    family: "haftaSonu", tier: 1, tr: "Hafta Sonu Keyfi", en: "Weekend Treat", es: "Capricho de fin de semana",
+    descTr: "5 farklı hafta sonu gününde izleme işaretle", descEn: "Log a watch on 5 separate weekend days", descEs: "Registra un visionado en 5 días de fin de semana distintos",
+    target: 5, getProgress: (s) => say(s, "haftaSonuGun"),
+  }),
+  defineWatchBadge({
+    id: "hafta_sonu_20", since: S2, section: BOLUM.RITIM, icon: "home-outline", iconSolid: "home", rarity: RARITY.uncommon,
+    family: "haftaSonu", tier: 2, tr: "Hafta Sonu Müdavimi", en: "Weekend Regular", es: "Habitual del finde",
+    descTr: "20 farklı hafta sonu gününde izleme işaretle", descEn: "Log a watch on 20 separate weekend days", descEs: "Registra un visionado en 20 días de fin de semana distintos",
+    target: 20, getProgress: (s) => say(s, "haftaSonuGun"),
+  }),
+  defineWatchBadge({
+    id: "hafta_sonu_50", since: S2, section: BOLUM.RITIM, icon: "home-outline", iconSolid: "home", rarity: RARITY.rare,
+    family: "haftaSonu", tier: 3, tr: "Kanepe Kampı", en: "Couch Camp", es: "Campamento de sofá",
+    descTr: "50 farklı hafta sonu gününde izleme işaretle", descEn: "Log a watch on 50 separate weekend days", descEs: "Registra un visionado en 50 días de fin de semana distintos",
+    target: 50, getProgress: (s) => say(s, "haftaSonuGun"),
+  }),
+  defineWatchBadge({
+    id: "hafta_sonu_100", since: S2, section: BOLUM.RITIM, icon: "home-outline", iconSolid: "home", rarity: RARITY.rare,
+    family: "haftaSonu", tier: 4, tr: "Hafta Sonu Efsanesi", en: "Weekend Legend", es: "Leyenda del finde",
+    descTr: "100 farklı hafta sonu gününde izleme işaretle", descEn: "Log a watch on 100 separate weekend days", descEs: "Registra un visionado en 100 días de fin de semana distintos",
+    target: 100, getProgress: (s) => say(s, "haftaSonuGun"),
+  }),
+
+  // ── Bağlılık ──────────────────────────────────────────────────────────────
+  // "Aynı şeye ne kadar dönüyorsun?" Ritim bölümü ne SIKLIKLA izlediğini, Kilometre
+  // ne KADAR izlediğini ölçer; bu bölüm üçüncü eksen: tekrar ve sadakat.
+  //
+  // TEKRAR İZLEME `watchEvents`ten gelir (puana girmez, bkz. watchScoring). Olay
+  // kullanıcı girdisi olduğu için tavan rare.
+  defineWatchBadge({
+    id: "tekrar_1", since: S2, section: BOLUM.BAGLILIK, icon: "repeat-outline", iconSolid: "repeat", rarity: RARITY.common,
+    family: "tekrar", tier: 1, tr: "İkinci Gösterim", en: "Encore", es: "Bis",
+    descTr: "Bir filmi ikinci kez izle", descEn: "Watch a film a second time", descEs: "Ve una película por segunda vez",
+    target: 1, getProgress: (s) => say(s, "tekrarFilm"),
+  }),
+  defineWatchBadge({
+    id: "tekrar_5", since: S2, section: BOLUM.BAGLILIK, icon: "repeat-outline", iconSolid: "repeat", rarity: RARITY.uncommon,
+    family: "tekrar", tier: 2, tr: "Konfor Filmleri", en: "Comfort Films", es: "Pelis de confort",
+    descTr: "5 farklı filmi tekrar izle", descEn: "Rewatch 5 different films", descEs: "Vuelve a ver 5 películas distintas",
+    target: 5, getProgress: (s) => say(s, "tekrarFilm"),
+  }),
+  defineWatchBadge({
+    id: "tekrar_15", since: S2, section: BOLUM.BAGLILIK, icon: "repeat-outline", iconSolid: "repeat", rarity: RARITY.rare,
+    family: "tekrar", tier: 3, tr: "Eski Dostlar", en: "Old Friends", es: "Viejos amigos",
+    descTr: "15 farklı filmi tekrar izle", descEn: "Rewatch 15 different films", descEs: "Vuelve a ver 15 películas distintas",
+    target: 15, getProgress: (s) => say(s, "tekrarFilm"),
+  }),
+  defineWatchBadge({
+    id: "tekrar_40", since: S2, section: BOLUM.BAGLILIK, icon: "repeat-outline", iconSolid: "repeat", rarity: RARITY.rare,
+    family: "tekrar", tier: 4, tr: "Sonsuz Döngü", en: "Endless Loop", es: "Bucle infinito",
+    descTr: "40 farklı filmi tekrar izle", descEn: "Rewatch 40 different films", descEs: "Vuelve a ver 40 películas distintas",
+    target: 40, getProgress: (s) => say(s, "tekrarFilm"),
+  }),
+  // SADAKAT AİLESİ — AYNI dizi için farklı izleme günü. Eskiden tek rozetti
+  // (`sadik_izleyici`, 30 gün); id ve hedef AYNI kaldı, 2. kademe oldu.
+  // Tek dizinin günlerini saymak toplu işaretlemeyle şişirilemez (markShow tüm
+  // bölümlere TEK tarih yazar) — gerçek, gün gün takip ister. Tarih türevi → rare.
+  defineWatchBadge({
+    id: "sadik_10", since: S2, section: BOLUM.BAGLILIK, icon: "heart-outline", iconSolid: "heart", rarity: RARITY.common,
+    family: "sadik", tier: 1, tr: "Sıkı Takipçi", en: "Keen Follower", es: "Seguidor entusiasta",
+    descTr: "Aynı diziyi 10 farklı günde izle", descEn: "Watch one series on 10 separate days", descEs: "Ve una misma serie en 10 días distintos",
+    target: 10, getProgress: (s) => say(s, "sadikDiziGun"),
+  }),
+  defineWatchBadge({
+    id: "sadik_izleyici", section: BOLUM.BAGLILIK, icon: "heart-outline", iconSolid: "heart", rarity: RARITY.uncommon,
+    family: "sadik", tier: 2, tr: "Sadık İzleyici", en: "Loyal Viewer", es: "Espectador fiel",
     descTr: "Aynı diziyi 30 farklı günde izle", descEn: "Watch one series on 30 separate days", descEs: "Ve una misma serie en 30 días distintos",
     target: 30, getProgress: (s) => say(s, "sadikDiziGun"),
+  }),
+  defineWatchBadge({
+    id: "sadik_60", since: S2, section: BOLUM.BAGLILIK, icon: "heart-outline", iconSolid: "heart", rarity: RARITY.rare,
+    family: "sadik", tier: 3, tr: "Can Dost", en: "Dear Friend", es: "Amigo del alma",
+    descTr: "Aynı diziyi 60 farklı günde izle", descEn: "Watch one series on 60 separate days", descEs: "Ve una misma serie en 60 días distintos",
+    target: 60, getProgress: (s) => say(s, "sadikDiziGun"),
+  }),
+  defineWatchBadge({
+    id: "sadik_100", since: S2, section: BOLUM.BAGLILIK, icon: "heart-outline", iconSolid: "heart", rarity: RARITY.rare,
+    family: "sadik", tier: 4, tr: "Ömür Boyu Hayran", en: "Lifelong Fan", es: "Fan de por vida",
+    descTr: "Aynı diziyi 100 farklı günde izle", descEn: "Watch one series on 100 separate days", descEs: "Ve una misma serie en 100 días distintos",
+    target: 100, getProgress: (s) => say(s, "sadikDiziGun"),
   }),
 
   // ── Türler ────────────────────────────────────────────────────────────────
@@ -657,6 +984,89 @@ export const WATCH_BADGES = [
     descTr: "Komedi türünde 75 içerik izle", descEn: "Watch 75 comedies", descEs: "Ve 75 comedias",
     target: 75, getProgress: (s) => turSayisi(s, GENRE.COMEDY),
   }),
+  // ── Tür uzmanlıkları (v2) ──────────────────────────────────────────────────
+  // Dört uzmanlık (korku, animasyon, belgesel, komedi) kataloğun yalnız dört zevk
+  // grubuna rozet veriyordu; bir bilim kurgu ya da dram izleyicisinin tür
+  // sütununda peşinden koşacağı hiçbir şey yoktu. Her biri `turSayaci`ndan okur
+  // (yeni sayaç yok, tek-geçiş sözleşmesi korunur) ve eşik, türün gerçekçi
+  // hacmine göre seçildi: geniş türler (dram, aksiyon) yüksek, dar türler (savaş,
+  // tarih) düşük. Tür sayısı içerikten gelir, izleme tarihinden değil → rare
+  // tavanına takılmaz; yine de hepsi uncommon/rare.
+  //
+  // `set_uzman` (dört tür) ayrı kalır; bu on iki rozet `set_tur_hakimi`nin
+  // üyesidir (components/badges/badgeSets.js).
+  defineWatchBadge({
+    id: "aksiyon_50", since: S2, section: BOLUM.TUR, icon: "car-sport-outline", iconSolid: "car-sport", rarity: RARITY.uncommon,
+    tr: "Adrenalin Bağımlısı", en: "Adrenaline Junkie", es: "Adicto a la adrenalina",
+    descTr: "Aksiyon türünde 50 içerik izle", descEn: "Watch 50 action titles", descEs: "Ve 50 títulos de acción",
+    target: 50, getProgress: (s) => turSayisi(s, GENRE.ACTION),
+  }),
+  defineWatchBadge({
+    id: "macera_30", since: S2, section: BOLUM.TUR, icon: "map-outline", iconSolid: "map", rarity: RARITY.uncommon,
+    tr: "Haritasız Yol", en: "Off the Map", es: "Fuera del mapa",
+    descTr: "Macera türünde 30 içerik izle", descEn: "Watch 30 adventure titles", descEs: "Ve 30 títulos de aventura",
+    target: 30, getProgress: (s) => turSayisi(s, GENRE.ADVENTURE),
+  }),
+  defineWatchBadge({
+    id: "bilimkurgu_30", since: S2, section: BOLUM.TUR, icon: "rocket-outline", iconSolid: "rocket", rarity: RARITY.uncommon,
+    tr: "Yıldız Gezgini", en: "Star Voyager", es: "Viajero estelar",
+    descTr: "Bilim kurgu türünde 30 içerik izle", descEn: "Watch 30 sci-fi titles", descEs: "Ve 30 títulos de ciencia ficción",
+    target: 30, getProgress: (s) => turSayisi(s, GENRE.SCIFI),
+  }),
+  defineWatchBadge({
+    id: "dram_75", since: S2, section: BOLUM.TUR, icon: "water-outline", iconSolid: "water", rarity: RARITY.rare,
+    tr: "Derin Duygular", en: "Deep Feelings", es: "Emociones profundas",
+    descTr: "Dram türünde 75 içerik izle", descEn: "Watch 75 dramas", descEs: "Ve 75 dramas",
+    target: 75, getProgress: (s) => turSayisi(s, GENRE.DRAMA),
+  }),
+  defineWatchBadge({
+    id: "romantik_30", since: S2, section: BOLUM.TUR, icon: "heart-half-outline", iconSolid: "heart-half", rarity: RARITY.uncommon,
+    tr: "Kalp Atışı", en: "Heartbeat", es: "Latido",
+    descTr: "Romantik türünde 30 içerik izle", descEn: "Watch 30 romance titles", descEs: "Ve 30 títulos románticos",
+    target: 30, getProgress: (s) => turSayisi(s, GENRE.ROMANCE),
+  }),
+  defineWatchBadge({
+    id: "gerilim_40", since: S2, section: BOLUM.TUR, icon: "alert-circle-outline", iconSolid: "alert-circle", rarity: RARITY.uncommon,
+    tr: "Tırnak Yeme Vakti", en: "Edge of Your Seat", es: "Al borde del asiento",
+    descTr: "Gerilim türünde 40 içerik izle", descEn: "Watch 40 thrillers", descEs: "Ve 40 thrillers",
+    target: 40, getProgress: (s) => turSayisi(s, GENRE.THRILLER),
+  }),
+  defineWatchBadge({
+    id: "suc_30", since: S2, section: BOLUM.TUR, icon: "finger-print-outline", iconSolid: "finger-print", rarity: RARITY.uncommon,
+    tr: "Suç Dosyası", en: "Case File", es: "Expediente criminal",
+    descTr: "Suç türünde 30 içerik izle", descEn: "Watch 30 crime titles", descEs: "Ve 30 títulos de crimen",
+    target: 30, getProgress: (s) => turSayisi(s, GENRE.CRIME),
+  }),
+  defineWatchBadge({
+    id: "fantastik_30", since: S2, section: BOLUM.TUR, icon: "color-wand-outline", iconSolid: "color-wand", rarity: RARITY.uncommon,
+    tr: "Büyülü Diyar", en: "Enchanted Realm", es: "Reino encantado",
+    descTr: "Fantastik türünde 30 içerik izle", descEn: "Watch 30 fantasy titles", descEs: "Ve 30 títulos de fantasía",
+    target: 30, getProgress: (s) => turSayisi(s, GENRE.FANTASY),
+  }),
+  defineWatchBadge({
+    id: "gizem_20", since: S2, section: BOLUM.TUR, icon: "search-outline", iconSolid: "search", rarity: RARITY.uncommon,
+    tr: "Katil Kim?", en: "Whodunit", es: "¿Quién fue?",
+    descTr: "Gizem türünde 20 içerik izle", descEn: "Watch 20 mystery titles", descEs: "Ve 20 títulos de misterio",
+    target: 20, getProgress: (s) => turSayisi(s, GENRE.MYSTERY),
+  }),
+  defineWatchBadge({
+    id: "aile_30", since: S2, section: BOLUM.TUR, icon: "people-outline", iconSolid: "people", rarity: RARITY.uncommon,
+    tr: "Aile Boyu", en: "Family Night", es: "Noche en familia",
+    descTr: "Aile türünde 30 içerik izle", descEn: "Watch 30 family titles", descEs: "Ve 30 títulos familiares",
+    target: 30, getProgress: (s) => turSayisi(s, GENRE.FAMILY),
+  }),
+  defineWatchBadge({
+    id: "tarih_15", since: S2, section: BOLUM.TUR, icon: "newspaper-outline", iconSolid: "newspaper", rarity: RARITY.uncommon,
+    tr: "Zaman Yolcusu", en: "Time Traveler", es: "Viajero del tiempo",
+    descTr: "Tarih türünde 15 içerik izle", descEn: "Watch 15 history titles", descEs: "Ve 15 títulos de historia",
+    target: 15, getProgress: (s) => turSayisi(s, GENRE.HISTORY),
+  }),
+  defineWatchBadge({
+    id: "savas_12", since: S2, section: BOLUM.TUR, icon: "shield-outline", iconSolid: "shield", rarity: RARITY.uncommon,
+    tr: "Cephe Hattı", en: "Front Line", es: "Primera línea",
+    descTr: "Savaş türünde 12 içerik izle", descEn: "Watch 12 war titles", descEs: "Ve 12 títulos de guerra",
+    target: 12, getProgress: (s) => turSayisi(s, GENRE.WAR),
+  }),
 
   // ── Mevsimsel ─────────────────────────────────────────────────────────────
   defineWatchBadge({
@@ -691,6 +1101,42 @@ export const WATCH_BADGES = [
     tr: "Kış Kampı", en: "Winter Camp", es: "Campamento de invierno",
     descTr: "Aralık-Şubat arasında 20 farklı günde izle", descEn: "Watch on 20 separate days between December and February", descEs: "Ve algo en 20 días distintos entre diciembre y febrero",
     target: 20, getProgress: (s) => say(s, "kisGun"),
+  }),
+  // ── Mevsimsel (v2) ─────────────────────────────────────────────────────────
+  // Yaz/kış sezonlarının eksik yarısı (ilkbahar, sonbahar) ve üç yeni TAKVİM
+  // OLAYI. Takvim olayları kataloğun en "yaşayan" rozetleridir: yılda bir kez
+  // gelen bir gün, kullanıcıya "o güne ne işaretleyeyim" diye plan yaptırır.
+  // Ekran bunlara yaklaşırken geri sayım gösterir (badgeInsights.takvimFirsatlari).
+  // Hepsi izleme tarihinden türer → rare tavanı.
+  defineWatchBadge({
+    id: "bahar_esintisi", since: S2, section: BOLUM.MEVSIM, icon: "flower-outline", iconSolid: "flower", rarity: RARITY.uncommon,
+    tr: "Bahar Esintisi", en: "Spring Breeze", es: "Brisa primaveral",
+    descTr: "Mart-Mayıs arasında 25 farklı günde izle", descEn: "Watch on 25 separate days between March and May", descEs: "Ve algo en 25 días distintos entre marzo y mayo",
+    target: 25, getProgress: (s) => say(s, "ilkbaharGun"),
+  }),
+  defineWatchBadge({
+    id: "sonbahar_yapragi", since: S2, section: BOLUM.MEVSIM, icon: "rainy-outline", iconSolid: "rainy", rarity: RARITY.uncommon,
+    tr: "Sonbahar Yaprağı", en: "Autumn Leaf", es: "Hoja de otoño",
+    descTr: "Eylül-Kasım arasında 25 farklı günde izle", descEn: "Watch on 25 separate days between September and November", descEs: "Ve algo en 25 días distintos entre septiembre y noviembre",
+    target: 25, getProgress: (s) => say(s, "sonbaharGun"),
+  }),
+  defineWatchBadge({
+    id: "cuma_13", since: S2, section: BOLUM.MEVSIM, icon: "warning-outline", iconSolid: "warning", rarity: RARITY.rare,
+    tr: "Uğursuz Cuma", en: "Friday the 13th", es: "Viernes 13",
+    descTr: "Cuma 13'ünde bir korku içeriği işaretle", descEn: "Mark a horror title on a Friday the 13th", descEs: "Marca un título de terror un viernes 13",
+    target: 1, getProgress: (s) => say(s, "cuma13"),
+  }),
+  defineWatchBadge({
+    id: "mayis_4", since: S2, section: BOLUM.MEVSIM, icon: "telescope-outline", iconSolid: "telescope", rarity: RARITY.uncommon,
+    tr: "Güç Seninle Olsun", en: "May the Fourth", es: "Que la fuerza te acompañe",
+    descTr: "4 Mayıs'ta bir bilim kurgu içeriği işaretle", descEn: "Mark a sci-fi title on May 4", descEs: "Marca un título de ciencia ficción el 4 de mayo",
+    target: 1, getProgress: (s) => say(s, "mayis4"),
+  }),
+  defineWatchBadge({
+    id: "nisan_1", since: S2, section: BOLUM.MEVSIM, icon: "balloon-outline", iconSolid: "balloon", rarity: RARITY.uncommon,
+    tr: "Bir Nisan Şakası", en: "April Fools' Laugh", es: "Inocentada de abril",
+    descTr: "1 Nisan'da bir komedi işaretle", descEn: "Mark a comedy on April 1", descEs: "Marca una comedia el 1 de abril",
+    target: 1, getProgress: (s) => say(s, "nisan1"),
   }),
 
   // ── Kıdem ─────────────────────────────────────────────────────────────────
@@ -743,6 +1189,31 @@ export const WATCH_BADGES = [
   }),
 
   // ── Perde ─────────────────────────────────────────────────────────────────
+  // ARA BASAMAKLAR (v2). Aile 5 kademe tavanında (4-8-14-17-20); aradaki
+  // çöller büyüktü: Perde 8 (10.000 Kare) ile Perde 14 (40.000) arasında altı
+  // seviye boyunca hiçbir rozet yoktu. Üç tekil rozet bu boşlukları kapatır,
+  // adları Perde'nin KENDİ adlarıdır (PERDE_ADLARI): rozet "Perde 11" demez,
+  // "Arşivci" der — o seviyenin kimliğini. Ailenin kademe şeklini bozmamak için
+  // aileye girmezler. Perde'ye bağlı olduğu için tarih tavanına tabi değil
+  // (Kare'nin tarih bileşeni zaten RITIM_TAVAN ile sınırlı).
+  defineWatchBadge({
+    id: "perde_3", since: S2, section: BOLUM.PERDE, icon: "trending-up-outline", iconSolid: "trending-up", rarity: RARITY.common,
+    tr: "Seans Takipçisi", en: "Showtime Follower", es: "Fan de las sesiones",
+    descTr: "Perde 3'e ulaş", descEn: "Reach Act 3", descEs: "Llega al acto 3",
+    target: 3, getProgress: (s) => say(s, "perde"),
+  }),
+  defineWatchBadge({
+    id: "perde_6", since: S2, section: BOLUM.PERDE, icon: "trending-up-outline", iconSolid: "trending-up", rarity: RARITY.uncommon,
+    tr: "Sezon Takipçisi", en: "Season Follower", es: "Fiel a las temporadas",
+    descTr: "Perde 6'ya ulaş", descEn: "Reach Act 6", descEs: "Llega al acto 6",
+    target: 6, getProgress: (s) => say(s, "perde"),
+  }),
+  defineWatchBadge({
+    id: "perde_11", since: S2, section: BOLUM.PERDE, icon: "trending-up-outline", iconSolid: "trending-up", rarity: RARITY.rare,
+    tr: "Arşivci", en: "Archivist", es: "Archivero",
+    descTr: "Perde 11'e ulaş", descEn: "Reach Act 11", descEs: "Llega al acto 11",
+    target: 11, getProgress: (s) => say(s, "perde"),
+  }),
   defineWatchBadge({
     id: "perde_4", section: BOLUM.PERDE, icon: "trending-up-outline", iconSolid: "trending-up", rarity: RARITY.common,
     family: "perde", tier: 1, tr: "Perde 4", en: "Act 4", es: "Acto 4",
@@ -886,6 +1357,174 @@ export const WATCH_BADGES = [
     target: 1,
     getProgress: (s) => (say(s, "hesapYili") >= 2 && say(s, "gunSayisi") >= 200 ? 1 : 0),
   }),
+
+  // ── Gizli (v2): "tarzını" keşfeden rozetler ─────────────────────────────────
+  // Altısı da mevcut ya da v2'de eklenen `stats` alanlarından okur. Ortak noktaları
+  // ilk beşinkiyle aynı: hiçbiri tek bir sayaçla DEĞİL, bir izleme KİŞİLİĞİYLE
+  // açılır (tek filmi beş kez, iki ekranı birden, tek türe adanmışlık…).
+  defineWatchBadge({
+    id: "gizli_basucu", since: S2, section: BOLUM.GIZLI, hidden: true,
+    icon: "bookmark-outline", iconSolid: "bookmark", rarity: RARITY.uncommon,
+    tr: "Başucu Filmi", en: "Bedside Film", es: "Peli de cabecera",
+    descTr: "Aynı filmi 5 kez izle", descEn: "Watch the same film 5 times", descEs: "Ve la misma película 5 veces",
+    target: 5, getProgress: (s) => say(s, "enCokTekrar"),
+  }),
+  defineWatchBadge({
+    id: "gizli_iki_ekran", since: S2, section: BOLUM.GIZLI, hidden: true,
+    icon: "contrast-outline", iconSolid: "contrast", rarity: RARITY.uncommon,
+    tr: "İki Ekran", en: "Two Screens", es: "Dos pantallas",
+    // "Çift Dünya"nın (250 film + 1.000 bölüm) erişilebilir ilk yarısı: iki izleme
+    // biçimini birden yapan kullanıcı, ağır eşiğe varmadan da bir şey kazanır.
+    descTr: "25 film ve 100 bölümü birlikte tamamla",
+    descEn: "Reach 25 films and 100 episodes together", descEs: "Alcanza 25 películas y 100 episodios a la vez",
+    target: 1,
+    getProgress: (s) => (say(s, "filmSayisi") >= 25 && say(s, "bolumSayisi") >= 100 ? 1 : 0),
+  }),
+  defineWatchBadge({
+    id: "gizli_cok_yonlu", since: S2, section: BOLUM.GIZLI, hidden: true,
+    icon: "shapes-outline", iconSolid: "shapes", rarity: RARITY.rare,
+    tr: "Çok Yönlü", en: "All-Rounder", es: "Todoterreno",
+    // `tur_*` ailesi KAÇ farklı türe uğradığını sayar (1 içerik yeter); bu rozet
+    // tersine derinliği ister: altı türde de en az 10'ar içerik.
+    descTr: "6 farklı türde en az 10'ar içerik izle",
+    descEn: "Watch at least 10 titles in each of 6 genres", descEs: "Ve al menos 10 títulos en cada uno de 6 géneros",
+    target: 6, getProgress: (s) => say(s, "tur10"),
+  }),
+  defineWatchBadge({
+    id: "gizli_tur_bagimlisi", since: S2, section: BOLUM.GIZLI, hidden: true,
+    icon: "pricetag-outline", iconSolid: "pricetag", rarity: RARITY.rare,
+    tr: "Tür Bağımlısı", en: "Genre Devotee", es: "Devoto del género",
+    descTr: "Tek bir türde 100 içerik izle", descEn: "Watch 100 titles in a single genre", descEs: "Ve 100 títulos de un solo género",
+    target: 100, getProgress: (s) => say(s, "enCokTur"),
+  }),
+  defineWatchBadge({
+    id: "gizli_kis_uykusu", since: S2, section: BOLUM.GIZLI, hidden: true,
+    icon: "bed-outline", iconSolid: "bed", rarity: RARITY.rare,
+    tr: "Kış Uykusu", en: "Hibernation", es: "Hibernación",
+    // `gizli_geri_donus`un (60 gün) büyük kardeşi. Tarih türevi → rare tavanı.
+    descTr: "180 gün ara verdikten sonra geri dön", descEn: "Come back after a 180-day break", descEs: "Vuelve tras una pausa de 180 días",
+    target: 180, getProgress: (s) => say(s, "enUzunAra"),
+  }),
+  defineWatchBadge({
+    id: "gizli_altin_koleksiyon", since: S2, section: BOLUM.GIZLI, hidden: true,
+    icon: "star-half-outline", iconSolid: "star-half", rarity: RARITY.epic,
+    tr: "Altın Koleksiyon", en: "Gold Collection", es: "Colección dorada",
+    // `gizli_vitrin`in (25 bölüm) dört katı. TMDB puanı içerikten gelir, izleme
+    // tarihinden değil → epic olabilir; 100 bölüm 9 üstü puanlı yapım izlemek
+    // gerçekten az bulunan bir zevk.
+    descTr: "TMDB puanı 9 üstü 100 bölüm izle", descEn: "Watch 100 episodes rated above 9 on TMDB", descEs: "Ve 100 episodios con una puntuación superior a 9 en TMDB",
+    target: 100, getProgress: (s) => say(s, "yuksekPuanliBolum"),
+  }),
+
+  // ── Keşif ─────────────────────────────────────────────────────────────────
+  // İZLEME DIŞI ÖZELLİKLERİ ilk kez kullanınca açılır. Amaç ödül değil KEŞİF: hiç
+  // hatırlatıcı kurmamış kullanıcı, kilitli "Aklında Olsun"u görür ve o özelliğin var
+  // olduğunu öğrenir. Hepsi common/uncommon, hepsi hedef 1 (dört favori hariç: 4 yuva),
+  // hepsi Free planda kazanılabilir ve Free sınırının altında (4. kural).
+  //
+  // KATALOG DİZİSİNDE SONDA: "Sıradaki hedefler" rafı eşit orandaki hedeflerde giriş
+  // sırasına bakıyor — izleme rozetleri öne geçsin. Ekrandaki yeri BOLUM_SIRA belirler.
+  //
+  // Her rozetin `kaynak`ı, ilerlemesini okuduğu veri kaynağıdır. Kaynak yüklenmeden
+  // id deftere "bilinen" yazılmaz (bilinenRozetIdleri), yoksa kaynak geldiğinde
+  // yıllardır not tutan kullanıcıya "İlk Not" konfetisi yağardı.
+  defineWatchBadge({
+    id: "kesif_ilk_not", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.NOTLAR,
+    icon: "create-outline", iconSolid: "create", rarity: RARITY.common,
+    tr: "Kenar Notu", en: "Margin Note", es: "Nota al margen",
+    descTr: "İlk notunu yaz", descEn: "Write your first note", descEs: "Escribe tu primera nota",
+    target: 1, getProgress: (s) => kesifSay(s, "not"),
+  }),
+  defineWatchBadge({
+    id: "kesif_yapilacaklar", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.NOTLAR,
+    icon: "checkbox-outline", iconSolid: "checkbox", rarity: RARITY.common,
+    tr: "Madde Madde", en: "Item by Item", es: "Punto por punto",
+    descTr: "İlk yapılacaklar listeni oluştur", descEn: "Create your first to-do list", descEs: "Crea tu primera lista de tareas",
+    target: 1, getProgress: (s) => kesifSay(s, "yapilacak"),
+  }),
+  defineWatchBadge({
+    id: "kesif_medya_notu", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.MEDYA_NOTLARI,
+    icon: "chatbox-ellipses-outline", iconSolid: "chatbox-ellipses", rarity: RARITY.common,
+    tr: "Eleştirmen Adayı", en: "Budding Critic", es: "Crítico en ciernes",
+    descTr: "Bir film ya da dizi için not yaz", descEn: "Write a note about a film or show", descEs: "Escribe una nota sobre una película o serie",
+    target: 1, getProgress: (s) => kesifSay(s, "medyaNotu"),
+  }),
+  defineWatchBadge({
+    id: "kesif_ozel_liste", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.LISTELER,
+    icon: "albums-outline", iconSolid: "albums", rarity: RARITY.common,
+    tr: "Kendi Rafın", en: "Your Own Shelf", es: "Tu propio estante",
+    descTr: "İlk özel listeni oluştur", descEn: "Create your first custom list", descEs: "Crea tu primera lista personalizada",
+    target: 1, getProgress: (s) => kesifSay(s, "ozelListe"),
+  }),
+  defineWatchBadge({
+    id: "kesif_favori", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.LISTELER,
+    icon: "heart-outline", iconSolid: "heart", rarity: RARITY.common,
+    tr: "İlk Göz Ağrısı", en: "First Crush", es: "Primer flechazo",
+    descTr: "Bir yapımı favorilerine ekle", descEn: "Add a title to your favorites", descEs: "Añade un título a tus favoritos",
+    target: 1, getProgress: (s) => kesifSay(s, "favori"),
+  }),
+  defineWatchBadge({
+    id: "kesif_izleme_listesi", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.LISTELER,
+    icon: "list-outline", iconSolid: "list", rarity: RARITY.common,
+    tr: "Kuyruğa Giren", en: "In the Queue", es: "En la cola",
+    descTr: "Bir yapımı izleme listene ekle", descEn: "Add a title to your watchlist", descEs: "Añade un título a tu lista de seguimiento",
+    target: 1, getProgress: (s) => kesifSay(s, "izlemeListesi"),
+  }),
+  defineWatchBadge({
+    id: "kesif_hatirlatici", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.HATIRLATICILAR,
+    icon: "notifications-outline", iconSolid: "notifications", rarity: RARITY.common,
+    tr: "Aklında Olsun", en: "Remind Me", es: "Avísame",
+    descTr: "İlk hatırlatıcını kur", descEn: "Set your first reminder", descEs: "Crea tu primer recordatorio",
+    target: 1, getProgress: (s) => kesifSay(s, "hatirlatici"),
+  }),
+  defineWatchBadge({
+    id: "kesif_ortak_liste", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.ORTAK_LISTELER,
+    icon: "people-outline", iconSolid: "people", rarity: RARITY.uncommon,
+    tr: "Birlikte Seçtik", en: "Picked Together", es: "Elegido juntos",
+    // Kurmak ya da katılmak: katılmak Free'de de serbest, davet eden birinin olması gerekir.
+    descTr: "Bir ortak liste kur ya da bir listeye katıl", descEn: "Create or join a shared list", descEs: "Crea una lista compartida o únete a una",
+    target: 1, getProgress: (s) => kesifSay(s, "ortakListe"),
+  }),
+  defineWatchBadge({
+    id: "kesif_arkadas", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.ARKADASLAR,
+    icon: "person-add-outline", iconSolid: "person-add", rarity: RARITY.uncommon,
+    tr: "İlk Dost", en: "First Friend", es: "Primer amigo",
+    descTr: "İlk arkadaşını ekle", descEn: "Add your first friend", descEs: "Añade a tu primer amigo",
+    target: 1, getProgress: (s) => kesifSay(s, "arkadas"),
+  }),
+  defineWatchBadge({
+    id: "kesif_paylasim", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.PROFIL,
+    icon: "megaphone-outline", iconSolid: "megaphone", rarity: RARITY.uncommon,
+    tr: "Sesini Duyur", en: "Speak Up", es: "Alza la voz",
+    descTr: "İlk gönderini paylaş", descEn: "Share your first post", descEs: "Comparte tu primera publicación",
+    target: 1, getProgress: (s) => kesifSay(s, "gonderi"),
+  }),
+  defineWatchBadge({
+    id: "kesif_dort_favori", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.PROFIL,
+    icon: "star-outline", iconSolid: "star", rarity: RARITY.common,
+    tr: "Dörtlü Vitrin", en: "Fab Four", es: "Los cuatro fantásticos",
+    // "Favoriler" listesi (kalp) ile KARIŞMASIN: bu, profilde sergilenen küratörlü
+    // vitrin (utils/fourFavorites.js). Film + dizi + oyuncu toplamı sayılır.
+    descTr: "Profiline dört favori ekle", descEn: "Add four favorites to your profile", descEs: "Añade cuatro favoritos a tu perfil",
+    target: 4, getProgress: (s) => kesifSay(s, "dortFavori"),
+  }),
+  defineWatchBadge({
+    id: "kesif_biyografi", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.PROFIL,
+    icon: "id-card-outline", iconSolid: "id-card", rarity: RARITY.common,
+    tr: "Kendini Tanıt", en: "Introduce Yourself", es: "Preséntate",
+    // Profil FOTOĞRAFI yerine: Google/Apple girişte fotoğraf kullanıcı bir şey yapmadan
+    // dolar, kayıtta avatar rastgele atanır — "kullanıcı yaptı" sinyali güvenilmez.
+    // Biyografi varsayılan boştur ve yalnız elle yazılır.
+    descTr: "Profiline kısa bir tanıtım yaz", descEn: "Write a short bio on your profile", descEs: "Escribe una breve biografía en tu perfil",
+    target: 1, getProgress: (s) => kesifSay(s, "biyografi"),
+  }),
+  defineWatchBadge({
+    id: "kesif_cinematch", since: S3, section: BOLUM.KESIF, kaynak: KESIF_KAYNAK.YAPAY_ZEKA,
+    icon: "sparkles-outline", iconSolid: "sparkles", rarity: RARITY.common,
+    tr: "CineMatch ile Tanış", en: "Meet CineMatch", es: "Conoce a CineMatch",
+    descTr: "CineMatch ile ilk sohbetini yap", descEn: "Have your first chat with CineMatch", descEs: "Ten tu primera conversación con CineMatch",
+    target: 1, getProgress: (s) => kesifSay(s, "cineMatch"),
+  }),
 ];
 
 export const WATCH_BADGE_BY_ID = Object.freeze(
@@ -897,6 +1536,26 @@ export const WATCH_BADGE_BY_ID = Object.freeze(
 // kullanıcı onu ilk kez hak ettiğinde kutlaması normal biçimde oynasın. Bu liste
 // olmadan, sonradan eklenen her rozet mevcut kullanıcıda kutlama seli üretir.
 export const WATCH_BADGE_IDS = Object.freeze(WATCH_BADGES.map((b) => b.id));
+
+/**
+ * Defterin `known` listesine YAZILACAK id'ler: katalogun tamamı, AMA kaynağı henüz
+ * yüklenmemiş Keşif rozetleri hariç.
+ *
+ * Neden: defter "ilk kez gördüğü + o an hak ettiği" id'yi sessizce sahiplenir,
+ * "gördüğü + hak etmediği" id'yi `known`a yazıp ileride kazanırsa KUTLAR. Not motoru,
+ * arkadaş dinleyicisi ya da liste haritaları henüz yüklenmemişken Keşif rozeti
+ * "hak edilmedi" görünür; id `known`a girerse kaynak yüklendiğinde 3 yıldır not tutan
+ * kullanıcıya "İlk Not" konfetisi yağar. Hazır olmayan kaynağın id'leri hiç
+ * bildirilmez; kaynak hazır olunca id ilk kez görülür ve hak ediliyorsa sessiz emilir.
+ *
+ * @param {Record<string, boolean>} [kesifHazir] stats.kesifHazir
+ */
+export function bilinenRozetIdleri(kesifHazir) {
+  const hazir = kesifHazir || {};
+  return WATCH_BADGES
+    .filter((b) => !b.kaynak || hazir[b.kaynak] === true)
+    .map((b) => b.id);
+}
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı). Alanlar: tr/en/es, descTr/descEn/descEs, ekTr/ekEn/ekEs.
 const cap = (code) => code.charAt(0).toUpperCase() + code.slice(1);
@@ -979,7 +1638,7 @@ export function prestijIdleri(kartlar, { sonraki = 0 } = {}) {
 
 /**
  * Kademeli aileleri TEK karta indirir: açık en yüksek kademe gösterilir,
- * ilerleme bir sonraki kademeye göre çizilir. 81 rozet 35 aile/tekil karta iner
+ * ilerleme bir sonraki kademeye göre çizilir. 154 rozet 85 aile/tekil karta iner
  * (ekrana ayrıca mühür ve koleksiyon kartları eklenir — bkz. useWatchProgress).
  * Tamamlanmış ailelerde `prestij` sayacı da burada hesaplanır.
  */

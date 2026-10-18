@@ -80,6 +80,7 @@ import {
   summarizeTitle,
 } from "@services/aiConversationsStore";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const { height: SCREEN_H } = Dimensions.get("window");
 
 // ─── Tema renk örnekleri (ayarlar kartındaki seçici) ─────────────────────────
@@ -1246,6 +1247,7 @@ export const ChatModal = () => {
             <View style={{ height: keyboardHeight, width: "100%" }} />
           )}
         </KeyboardAvoidingView>
+        <ModalToastHost visible={modalVisible} />
       </Modal>
     </View>
   );

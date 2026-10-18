@@ -1,14 +1,16 @@
 // screens/tabs/profile/WatchBadgesScreen.js
 //
-// İzleme rozetleri ekranı — 81 rozet, kademeli aileler tek karoya indirilmiş.
+// İzleme rozetleri ekranı — 140+ rozet, kademeli aileler tek karoya indirilmiş.
 // Ayrıca çalışma anında üretilen iki bölüm: dönem mühürleri ve koleksiyonlar.
 //
 // EKRANIN YAPISI (yukarıdan aşağı), her katman bir soruyu cevaplar:
 //   1. Perde kartı           — "Ne seviyedeyim?"            (puan)
 //   2. Özet kartı            — "Kaç rozetim açık?"          (koleksiyon, nadirlik dağılımı)
+//   2b. Yeni rozet duyurusu  — "Ne değişti?" (katalog genişleyince, bir kez, kapatılabilir)
 //   3. Sıradaki hedefler     — "Şimdi neyin peşinde koşmalıyım?"
+//   3b. Takvimde yakında     — "Kaçırmak üzere olduğum bir şey var mı?"
 //   4. Son kazanılanlar      — "En son ne kazandım?"
-//   5. Süzgeçler             — durum (Tümü/Açık/Kilitli) + bölüm
+//   5. Süzgeçler             — durum (Tümü/Açık/Kilitli[/Yeni]) + bölüm
 //   6. Izgara                — arşiv: bölüm bölüm tüm rozetler
 // Eskiden yalnızca 1 ve 6 vardı; kullanıcının iki acil sorusu (3 ve 4) ızgaranın
 // dibinde, "tamamlanmaya en yakın önce" sıralamasının içinde kayboluyordu.
@@ -26,7 +28,7 @@
 // DERİN BAĞLANTI: kutlama bildirimine dokunmak `openId` ile gelir ve o rozetin
 // detay sayfasını doğrudan açar.
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
@@ -34,31 +36,42 @@ import BackButton from "@components/BackButton";
 import ScreenDecor from "@components/ScreenDecor";
 import StaggerItem from "@components/StaggerItem";
 import BadgeControls from "@components/badges/BadgeControls";
-import { BadgeRail, HedefKarti, SonKarti } from "@components/badges/BadgeRail";
+import { BadgeRail, FirsatKarti, HedefKarti, SonKarti } from "@components/badges/BadgeRail";
 import BadgeSummaryCard from "@components/badges/BadgeSummaryCard";
+import NewBadgesBanner from "@components/badges/NewBadgesBanner";
 import WatchBadgeCard from "@components/badges/WatchBadgeCard";
 import WatchBadgeDetailModal from "@components/badges/WatchBadgeDetailModal";
 import WatchLevelCard from "@components/profile/WatchLevelCard";
-import { BOLUM_BASLIK } from "@components/badges/watchBadgeCatalog";
+import { BOLUM_BASLIK, KATALOG_SURUMU } from "@components/badges/watchBadgeCatalog";
 import {
   bolumOzetleri,
   izgaraSatirlari,
   kartBul,
   nadirlikDagilimi,
   sonKazanilanlar,
+  takvimFirsatlari,
   yaklasanlar,
+  yeniRozetOzeti,
 } from "@components/badges/badgeInsights";
 import { useTheme } from "@context/ThemeContext";
 import { useWatchProgressContext } from "@context/WatchProgressContext";
 import useEntranceGate from "@hooks/useEntranceGate";
+import { Keys, set as setStored, useStored } from "@services/storage";
 import { withAlpha } from "@components/profile/StatsComponents";
 import { i18nText } from "@utils/i18nText";
 
 const SUTUN = 3;   // ızgara sütunu (satır kurma: badgeInsights.izgaraSatirlari)
 
+// "Yenileri göster"e basınca ızgaranın ilk satırı, süzgeç çubuğunun hemen altında
+// kalacak kadar aşağıdan hizalanır (segment + çip satırı + boşluklar ≈ bu kadar).
+const SUZGEC_PAYI = 150;
+
 // Katalogdaki bölüm id'si → i18n anahtarı. Bölüm başlıkları ekran dizesidir
 // (rozet adları katalogda inline durur), bu yüzden buradan çözülür.
 const BOLUM_KEY = {
+  baslangic: "autoI18n.rozet_bolum_baslangic",
+  kesif: "autoI18n.rozet_bolum_kesif",
+  baglilik: "autoI18n.rozet_bolum_baglilik",
   kilometre: "autoI18n.rozet_bolum_kilometre",
   ritim: "autoI18n.rozet_bolum_ritim",
   tur: "autoI18n.rozet_bolum_tur",
@@ -87,6 +100,12 @@ export default function WatchBadgesScreen({ navigation, route }) {
 
   const acDetay = useCallback((b) => setSecili(b), []);
   const kapatDetay = useCallback(() => setSecili(null), []);
+  const listeRef = useRef(null);
+
+  // Yeni-rozet duyurusu: kullanıcı bu katalog sürümünü görüp kapattıysa bir daha
+  // çıkmaz. İlk kez tohumlanan (yeni) kullanıcı için sürüm zaten "görüldü"
+  // yazılır (hooks/useWatchProgress.js) — onun için her rozet yeni sayılmaz.
+  const gorulenSurum = useStored(Keys.watchCatalogSeen);
 
   // Kutlama bildirimine dokunulduğunda ilgili rozetin sayfasını aç.
   const openId = route?.params?.openId;
@@ -100,11 +119,33 @@ export default function WatchBadgesScreen({ navigation, route }) {
 
   const simdi = useMemo(() => Date.now(), [kartlar]); // eslint-disable-line react-hooks/exhaustive-deps
   const yaklasan = useMemo(() => yaklasanlar(kartlar, { limit: 6 }), [kartlar]);
+  const firsatlar = useMemo(() => takvimFirsatlari(kartlar, { simdi, limit: 6 }), [kartlar, simdi]);
   const son = useMemo(() => sonKazanilanlar(kartlar, { limit: 8, gun: 30, simdi }), [kartlar, simdi]);
   const ozetler = useMemo(() => bolumOzetleri(kartlar), [kartlar]);
   const ozetMap = useMemo(() => Object.fromEntries(ozetler.map((o) => [o.bolum, o])), [ozetler]);
   const dagilim = useMemo(() => nadirlikDagilimi(rozetler), [rozetler]);
   const veri = useMemo(() => izgaraSatirlari(kartlar, filtre, bolum), [kartlar, filtre, bolum]);
+  const yeniOzet = useMemo(() => yeniRozetOzeti(rozetler), [rozetler]);
+  const duyuruGorunur = !loading && yeniOzet.toplam > 0 && (Number(gorulenSurum) || 0) < KATALOG_SURUMU;
+
+  const duyuruKapat = useCallback(() => {
+    setStored(Keys.watchCatalogSeen, KATALOG_SURUMU);
+    // "Yeni" süzgeci duyuruyla birlikte kalkar; seçili kalırsa kullanıcı, çubukta
+    // görünmeyen bir süzgeçle sıkışıp kalırdı.
+    setFiltre((f) => (f === "yeni" ? "tumu" : f));
+  }, []);
+
+  const yenileriGoster = useCallback(() => {
+    setBolum(null);
+    setFiltre("yeni");
+    // Süzgeç değişince veri yeniden kurulur; kaydırmayı sonraki karede yap ki
+    // 0. satır yeni listenin satırı olsun.
+    requestAnimationFrame(() => {
+      try {
+        listeRef.current?.scrollToIndex({ index: 0, animated: true, viewOffset: SUZGEC_PAYI });
+      } catch (e) { /* liste henüz hazır değil — kullanıcı elle kaydırır */ }
+    });
+  }, []);
 
   // Izgara satırları ilk yüklenirken kademeli girer; sonra (süzgeç değişimi,
   // kaydırma) animasyon yok — bkz. hooks/useEntranceGate.js.
@@ -124,6 +165,15 @@ export default function WatchBadgesScreen({ navigation, route }) {
       {!loading && toplamRozet > 0 ? (
         <BadgeSummaryCard acik={acikSayisi} toplam={toplamRozet} dagilim={dagilim} style={styles.ozet} />
       ) : null}
+      {duyuruGorunur ? (
+        <NewBadgesBanner
+          toplam={yeniOzet.toplam}
+          acik={yeniOzet.acik}
+          onGoster={yenileriGoster}
+          onKapat={duyuruKapat}
+          style={styles.ozet}
+        />
+      ) : null}
     </View>
   );
 
@@ -137,6 +187,16 @@ export default function WatchBadgesScreen({ navigation, route }) {
           >
             {yaklasan.map(({ kart }) => (
               <HedefKarti key={kart.id} kart={kart} onPress={() => acDetay(kart)} />
+            ))}
+          </BadgeRail>
+        ) : null}
+        {firsatlar.length ? (
+          <BadgeRail
+            baslik={i18nText("autoI18n.rozet_takvim_baslik", "Takvimde yakında")}
+            altBaslik={i18nText("autoI18n.rozet_takvim_alt", "Yılda bir gelen fırsatlar")}
+          >
+            {firsatlar.map((f) => (
+              <FirsatKarti key={f.kart.id} firsat={f} onPress={() => acDetay(f.kart)} />
             ))}
           </BadgeRail>
         ) : null}
@@ -157,6 +217,7 @@ export default function WatchBadgesScreen({ navigation, route }) {
           onBolum={setBolum}
           ozetler={ozetler}
           bolumAd={bolumAdi}
+          yeniVar={duyuruGorunur}
         />
       </View>
     ) : null;
@@ -214,8 +275,10 @@ export default function WatchBadgesScreen({ navigation, route }) {
       </View>
 
       <FlatList
+        ref={listeRef}
         data={veri}
         keyExtractor={(item) => item.id}
+        onScrollToIndexFailed={() => {}}
         // ELEMENT veriyoruz, fonksiyon DEĞİL: fonksiyon bileşen TİPİ olur ve üst bloğun
         // kendi state'i değişince söküp yeniden kurulur (bkz. reanimated-initial-value-vanish).
         ListHeaderComponent={

@@ -2,7 +2,7 @@ import { TouchableOpacity, View } from "react-native";
 import React from "react";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useTheme } from "../context/ThemeContext";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useAuth } from "../context/AuthContext";
 import useUserDataDomain from "../hooks/useUserDataDomain";
 import { remindersActions, remindersDomain } from "../services/userData";

@@ -64,6 +64,7 @@ import ScreenDecor from "@components/ScreenDecor";
 import { alpha } from "../../../theme/colors";
 import BackButton from "@components/BackButton";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 // ─── Tarih yardımcıları ──────────────────────────────────────────────────────
 const toMs = (v) => {
   if (!v) return 0;
@@ -740,6 +741,7 @@ export default function MyActivityScreen({ navigation, route }) {
             </View>
           </View>
         </Animated.View>
+        <ModalToastHost visible={!!editing} />
       </Modal>
     </SafeAreaView>
   );

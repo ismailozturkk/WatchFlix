@@ -16,7 +16,7 @@ import {
 import { Keys, remove } from "../../services/storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { deleteUser, signOut, updateProfile } from "firebase/auth";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { auth } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";

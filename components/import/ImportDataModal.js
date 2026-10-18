@@ -37,8 +37,9 @@ import { resolveBatchMedia } from "../../services/import/tmdbResolver";
 import { writeImportedCustomLists, writeImportedItems } from "../../services/import/importWriter";
 import { triggerHaptic } from "../../services/hapticsService";
 import ImportHelpModal from "./ImportHelpModal";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const { height: SCREEN_H } = Dimensions.get("window");
 const SHEET_MAX_H = SCREEN_H * 0.88;
 
@@ -874,6 +875,7 @@ export default function ImportDataModal({ visible, onClose }) {
       </View>
 
       <ImportHelpModal visible={showHelpModal} onClose={() => setShowHelpModal(false)} />
+      <ModalToastHost visible={visible} />
     </Modal>
   );
 }

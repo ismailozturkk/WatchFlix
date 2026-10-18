@@ -109,6 +109,7 @@ import { ONBOARDING_GENRES } from "@utils/onboardingPreferences";
 import { AI_PLAN_LIMITS } from "@utils/premium";
 
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 // FAB merkezi (ChatModal styles.fab: bottom 85, right 25, lottie 48x48)
 const FAB_ORIGIN = [SCREEN_W - 49, SCREEN_H - 109, 0];
@@ -1161,6 +1162,7 @@ export default function AIChatScreen({
         onClose={() => setShareDraft(null)}
         onSent={handleClose}
       />
+      <ModalToastHost visible={visible} />
     </Modal>
   );
 }

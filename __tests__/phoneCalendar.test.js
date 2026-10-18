@@ -24,10 +24,14 @@ jest.mock("react-native", () => ({
     return mockPlatform;
   },
 }));
-jest.mock("react-native-toast-message", () => ({
-  __esModule: true,
-  default: { show: jest.fn() },
-}));
+jest.mock("../components/AppToast", () => {
+  const mockApi = {
+    show: jest.fn(), hide: jest.fn(), success: jest.fn(), error: jest.fn(), warning: jest.fn(),
+    info: jest.fn(), loading: jest.fn(), badge: jest.fn(), premium: jest.fn(), undo: jest.fn(),
+    update: jest.fn(), promise: jest.fn(), clear: jest.fn(),
+  };
+  return { __esModule: true, default: mockApi, toast: mockApi, showToast: mockApi.show };
+});
 jest.mock("../utils/i18nText", () => ({
   i18nText: (_key, fallback, options) =>
     options?.count != null ? fallback.replace("{{count}}", options.count) : fallback,
@@ -103,7 +107,7 @@ jest.mock("expo-calendar", () => {
   };
 });
 
-import Toast from "react-native-toast-message";
+import Toast from "../components/AppToast";
 import { __resetAllMMKV } from "react-native-mmkv";
 import { __resetStores } from "../services/storage/instances";
 import { __resetStoreCaches } from "../services/storage/store";

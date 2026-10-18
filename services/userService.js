@@ -3,11 +3,8 @@
 // User profil CRUD + Usernames reservation (atomic).
 //
 // ── Şema ─────────────────────────────────────────────────────────────────────
-// Users/{uid}
-//   uid, username, usernameLower, email, displayName, bio?,
-//   avatarIndex, birthDate?      ← "YYYY-MM-DD"; yetişkin içerik kapısı
-//                                  (utils/ageGate.js) yaşı buradan türetir.
-//                                  Bu alan eklenmeden önceki hesaplarda YOK.
+// Users/{uid}                    ← TÜM oturumlulara okunur; gizli veri BURADA DURMAZ
+//   uid, username, usernameLower, displayName, bio?, avatarIndex,
 //   friendsCount, postsCount, followersCount, followingCount,
 //   pendingRequestsInCount, pendingRequestsOutCount, unreadNotifsCount,
 //   isOnline, lastActiveAt, lastSeen,
@@ -15,6 +12,12 @@
 //   listVisible: { ...map },
 //   createdAt, updatedAt,
 //   _schemaVersion           ← migration tracking için
+//
+// Users/{uid}/private/account    ← YALNIZ sahibi okur (services/accountPrivateService.js)
+//   email, birthDate?            ← "YYYY-MM-DD"; yetişkin içerik kapısı
+//                                  (utils/ageGate.js) yaşı buradan türetir.
+//                                  Bu alan eklenmeden önceki hesaplarda YOK.
+//                                  Eskiden kök belgedeydi; sahibi açınca taşınır.
 //
 // Usernames/{usernameLower}
 //   uid, reservedAt
@@ -41,6 +44,12 @@ import { clampAvatarIndex, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
 import { parseBirthDate } from "../utils/ageGate";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { propagateProfileChange } from "./profilePropagation";
+import {
+  accountDocRef,
+  pickAccountFields,
+  splitAccountFields,
+  writeAccountFields,
+} from "./accountPrivateService";
 
 export const SCHEMA_VERSION = 2;
 
@@ -244,15 +253,24 @@ export async function createUserProfile({
       tx.set(usernameRef, { uid, reservedAt: serverTimestamp() });
     }
 
+    // E-posta + doğum tarihi KÖK belgeye yazılmaz: kök herkese okunur. Gizli
+    // belge aynı transaction'da yazılır, yani ikisi birlikte var olur ya da
+    // hiçbiri. `merge`: var olan hesapta bu çağrıda gelmeyen alan (örn. tarih)
+    // SİLİNMEZ — merge yolundan geçen eski hesabın yaş kaydı düşerse kapı açılır.
+    const accountFields = pickAccountFields({ email, birthDate: dogumTarihi });
+    if (Object.keys(accountFields).length > 0) {
+      tx.set(
+        accountDocRef(uid),
+        { ...accountFields, updatedAt: serverTimestamp() },
+        { merge: true },
+      );
+    }
+
     const identity = {
       uid,
       username: usernameLower,
       usernameLower,
-      email,
       displayName: displayName || usernameLower,
-      // Var olan profilde bu alan varsa ve bu çağrıda gelmediyse SİLİNMEMELİ —
-      // merge yolundan geçen eski hesabın yaş kaydı düşerse kapı açılır.
-      ...(dogumTarihi ? { birthDate: dogumTarihi } : {}),
       updatedAt: serverTimestamp(),
     };
 
@@ -308,10 +326,19 @@ export async function getUserProfile(uid) {
  * Tek alan güncelleme — updatedAt otomatik.
  */
 export async function updateUserProfile(uid, partial) {
-  await updateDoc(doc(db, "Users", uid), {
-    ...partial,
-    updatedAt: serverTimestamp(),
-  });
+  // Gizli alanlar (e-posta, doğum tarihi) kök belgeye değil private/account'a
+  // gider. ÖNCE o yazılır: düşerse kök yazımı hiç başlamaz, hata kullanıcıya
+  // döner ve tekrar denenebilir.
+  const { account, rest } = splitAccountFields(partial);
+  await writeAccountFields(uid, account);
+  // Yalnız gizli alan değiştiyse kök belgeye dokunma (updatedAt bile): boş
+  // yere onUserProfileUpdated tetiklenmesin.
+  if (Object.keys(rest).length > 0) {
+    await updateDoc(doc(db, "Users", uid), {
+      ...rest,
+      updatedAt: serverTimestamp(),
+    });
+  }
   // İsim değiştiyse Firebase Auth displayName'i de güncelle → yeni paylaşılan
   // postlar/yorumlar güncel ismi alır (createPost user.displayName okuyor).
   if (

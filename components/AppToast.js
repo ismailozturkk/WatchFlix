@@ -1,337 +1,149 @@
 // components/AppToast.js
 //
-// Uygulama genelinde tek, tutarlı ve performanslı toast yapısı.
-// react-native-toast-message üzerine ince, temalı bir katman.
+// Uygulama genelinde TEK toast API'si. Eskiden react-native-toast-message üzerine ince
+// bir katmandı; şimdi kendi motorumuz var (utils/toastStore.js: kuyruk, öncelik, yineleme
+// sayacı, yerinde güncelleme) ve çizim components/toast/* içinde (Reanimated, UI iş
+// parçacığı). Bu dosya yalnız API + yan etkiler (titreşim, ekran okuyucu); hafif tutuldu —
+// çizim bileşenleri burada İÇE AKTARILMAZ, yoksa toast gösteren her saf modül Reanimated'i
+// ve SVG'yi de yüklerdi.
 //
-// KURULUM (App.js — bir kez):
-//   import { toastConfig } from "@components/AppToast";
-//   <Toast config={toastConfig} position="top" visibilityTime={3000} />
+// KURULUM (bir kez):
+//   App.js        <ToastHost />                      (kök)
+//   Modal içleri  <ToastHost scoped enabled={visible} />
+//                 BottomSheetModal bunu KENDİSİ yapar; çıplak <Modal> kullanan ekran
+//                 <ModalToastHost visible={...} /> eklemeli (components/toast/ModalToastHost.js).
 //
-// KULLANIM (her yerde):
+// KULLANIM:
 //   import { toast } from "@components/AppToast";
 //   toast.success("Kaydedildi", "Değişiklikler uygulandı");
-//   toast.error("Hata", "İşlem başarısız");
-//   toast.warning("Dikkat");
+//   toast.error("Hata", error);                      // Error nesnesi de olur
+//   toast.warning("Depolama dolmak üzere");
 //   toast.info("Bilgi");
-//   toast.hide();
+//   toast.undo("Hatırlatma kaldırıldı", () => geriYaz());   // "Geri Al" düğmeli, 6 sn
+//   toast.premium("Premium aktif", "Tüm ayrıcalıklar açıldı");
+//   toast.badge("Yeni rozet", "Kâşif", { gorunum, ek, ipucu }, { onPress });
 //
-// Eski `Toast.show({ type, text1, text2 })` çağrıları da aynen çalışmaya devam eder
-// (config bu alanları okur), yani mevcut sayfalar bozulmaz.
+//   // Uzun iş: tek kartta yükleniyor → sonuç
+//   const id = toast.loading("Yedek alınıyor");
+//   toast.update(id, { kind: "success", title: "Yedek alındı" });
+//   await toast.promise(yukle(), { loading: "Yükleniyor", success: "Bitti", error: "Olmadı" });
 //
-// Performans/stabilite:
-//   - toastConfig MODÜL düzeyinde (her render'da yeniden oluşmaz → <Toast> stabil).
-//   - Kart React.memo + tema hook'u içeride (config referansı sabit kalır).
-//   - Native sürücülü giriş/çıkış animasyonu kütüphane tarafından yönetilir.
+// ESKİ İMZA da çalışır (react-native-toast-message ile aynı):
+//   import Toast from "@components/AppToast";
+//   Toast.show({ type: "error", text1: "Başlık", text2: "Mesaj", visibilityTime, onPress, props: { action } });
+//   Toast.hide();
 
-import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { LinearGradient } from "expo-linear-gradient";
-import Toast from "react-native-toast-message";
-import { useTheme } from "@context/ThemeContext";
-import AppBadge from "@components/badges/AppBadge";
-import { kademeRengi, kademeSekli, rarityStyle } from "@theme/badgeTokens";
+import { AccessibilityInfo, Platform } from "react-native";
+import { toastStore } from "../utils/toastStore";
+import { triggerHaptic } from "../services/hapticsService";
+import { i18nText } from "../utils/i18nText";
 
-const TYPE_META = {
-  success: { icon: "checkmark", color: "#22C55E", softColor: "#86EFAC" },
-  error: { icon: "close", color: "#EF4444", softColor: "#FDA4AF" },
-  warning: { icon: "alert", color: "#F59E0B", softColor: "#FCD34D" },
-  info: { icon: "information", color: "#3B82F6", softColor: "#7DD3FC" },
-};
+// ── Yan etkiler ──────────────────────────────────────────────────────────────
+// Bir toast SIRA ALDIĞINDA tam bir kez: titreşim (hata/uyarı/kutlama; başarı yalnız
+// `haptic: true` ile — çağıranların çoğu zaten kendi başarı titreşimini verir ve
+// titreşim kısması (hapticsService) çift vuruşu tek vuruşa indirir) ve iOS ekran
+// okuyucu duyurusu (Android'de kartın `accessibilityLiveRegion`ı yeter).
+let installed = false;
+function installEffects() {
+  if (installed) return;
+  installed = true;
+  toastStore.setEffects({
+    onPresent(item) {
+      if (item.haptic) triggerHaptic(item.haptic);
+      if (Platform.OS === "ios") {
+        AccessibilityInfo.announceForAccessibility?.([item.title, item.message].filter(Boolean).join(". "));
+      }
+    },
+  });
+  // Ekran okuyucu açıkken süreler iki katına çıkar (okuma + sesli duyuru + hedefe ulaşma).
+  try {
+    AccessibilityInfo.isScreenReaderEnabled?.()
+      .then((on) => toastStore.setDurationScale(on ? 2 : 1))
+      .catch(() => {});
+    AccessibilityInfo.addEventListener?.("screenReaderChanged", (on) =>
+      toastStore.setDurationScale(on ? 2 : 1),
+    );
+  } catch {
+    // Erişilebilirlik modülü yoksa (test ortamı) sessizce varsayılan süre.
+  }
+}
+installEffects();
 
-// `action` (Toast.show'un `props.action`'ı): { label, onPress } → kartın sağında
-// "Geri Al" gibi tek bir eylem düğmesi; varken kapat çarpısının yerini alır (kart
-// yine dokununca kapanır). Eylemli toast'ın süresini çağıran uzatır
-// (`visibilityTime`): varsayılan 3 sn dokunmaya yetmez.
-const ToastCard = React.memo(function ToastCard({ type, text1, text2, onPress, action }) {
-  const { theme } = useTheme();
-  const meta = TYPE_META[type] || TYPE_META.info;
+// ── API ──────────────────────────────────────────────────────────────────────
+/** Tek giriş noktası: yeni (`kind/title/message`) ya da eski (`type/text1/text2`) imza. @returns {string|null} toast kimliği */
+export const showToast = (options) => toastStore.show(options);
 
-  return (
-    <Pressable
-      // `onPress` (Toast.show seçeneği) varsa kapanmadan ÖNCE çalışır; yoksa eski
-      // davranış: dokununca kapanır.
-      onPress={() => {
-        Toast.hide();
-        onPress?.();
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={[text1, text2].filter(Boolean).join(". ")}
-      style={[
-        styles.card,
-        {
-          backgroundColor: theme.secondary,
-          borderColor: `${meta.color}38`,
-          shadowColor: "#000",
-        },
-      ]}
-    >
-      <View style={styles.cardClip}>
-        <LinearGradient
-          pointerEvents="none"
-          colors={[`${meta.color}1F`, `${meta.color}08`, "transparent"]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <LinearGradient
-          pointerEvents="none"
-          colors={[meta.softColor, meta.color, `${meta.color}00`]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.accentLine}
-        />
+const byKind = (kind) => (title, message, opts) => toastStore.show({ ...opts, kind, title, message });
 
-        <LinearGradient
-          colors={[meta.softColor, meta.color]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.iconWrap, { shadowColor: meta.color }]}
-        >
-          <Ionicons name={meta.icon} size={19} color="#FFFFFF" />
-        </LinearGradient>
-
-        <View style={styles.textWrap}>
-          {text1 ? (
-            <Text
-              allowFontScaling={false}
-              numberOfLines={2}
-              style={[styles.title, { color: theme.text.primary }]}
-            >
-              {text1}
-            </Text>
-          ) : null}
-          {text2 ? (
-            <Text
-              allowFontScaling={false}
-              numberOfLines={3}
-              style={[styles.message, { color: theme.text.secondary }]}
-            >
-              {text2}
-            </Text>
-          ) : null}
-        </View>
-
-        {action ? (
-          <Pressable
-            onPress={() => {
-              Toast.hide();
-              action.onPress?.();
-            }}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={action.label}
-            style={[
-              styles.actionButton,
-              { backgroundColor: `${meta.color}1F`, borderColor: `${meta.color}55` },
-            ]}
-          >
-            <Ionicons name="arrow-undo" size={14} color={meta.color} />
-            <Text
-              allowFontScaling={false}
-              numberOfLines={1}
-              style={[styles.actionText, { color: theme.text.primary }]}
-            >
-              {action.label}
-            </Text>
-          </Pressable>
-        ) : (
-          <View style={[styles.closeButton, { backgroundColor: `${meta.color}12` }]}>
-            <Ionicons name="close" size={16} color={theme.text.secondary} />
-          </View>
-        )}
-      </View>
-    </Pressable>
-  );
-});
-
-// ── ROZET kartı ──────────────────────────────────────────────────────────────
-// Kazanılan ödülün KENDİ rozetini çizer (şekil = aile kademesi, renk = kademe/
-// nadirlik): düz "tik" ikonlu başarı toast'ı rozet kazanmayı sıradan bir kayıt
-// işlemiyle aynı seviyeye indiriyordu. Dokununca Toast.show'un `onPress` seçeneği
-// çalışır (rozet sayfasını o rozet açık olarak açar).
-//
-// props: { gorunum: odulGorunumu(), ek?: number, ipucu?: string }
-const BadgeToastCard = React.memo(function BadgeToastCard({ text1, text2, props, onPress }) {
-  const { theme } = useTheme();
-  const g = props?.gorunum;
-  if (!g) return null;
-  const nadirlik = rarityStyle(g.rarity, theme);
-  const sekil = kademeSekli(g.tier, g.aileToplam);
-  const kadRenk = kademeRengi(sekil.kademe, theme);
-  const vurgu = kadRenk || nadirlik.color;
-
-  return (
-    <Pressable
-      onPress={() => {
-        Toast.hide();
-        onPress?.();
-      }}
-      accessibilityRole="button"
-      accessibilityLabel={[text1, text2].filter(Boolean).join(". ")}
-      style={[
-        styles.card,
-        { backgroundColor: theme.secondary, borderColor: `${vurgu}55`, shadowColor: vurgu },
-      ]}
-    >
-      <View style={[styles.cardClip, styles.badgeClip]}>
-        <LinearGradient
-          pointerEvents="none"
-          colors={[`${vurgu}30`, `${vurgu}0D`, "transparent"]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <LinearGradient
-          pointerEvents="none"
-          colors={["transparent", vurgu, "transparent"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.accentLine}
-        />
-
-        <AppBadge
-          glyph={g.icon}
-          glyphSolid={g.iconSolid}
-          rarity={g.rarity}
-          unlocked
-          size={56}
-          sides={sekil.kenar}
-          color={kadRenk}
-          ornate={sekil.ornate}
-        />
-
-        <View style={styles.textWrap}>
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            style={[styles.eyebrow, { color: vurgu }]}
-          >
-            {text1}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            numberOfLines={2}
-            style={[styles.badgeTitle, { color: theme.text.primary }]}
-          >
-            {text2}
-          </Text>
-          {props?.ipucu ? (
-            <Text
-              allowFontScaling={false}
-              numberOfLines={1}
-              style={[styles.message, { color: theme.text.secondary }]}
-            >
-              {props.ipucu}
-            </Text>
-          ) : null}
-        </View>
-
-        {props?.ek > 0 ? (
-          <View style={[styles.ekPill, { backgroundColor: `${vurgu}22`, borderColor: `${vurgu}55` }]}>
-            <Text allowFontScaling={false} style={[styles.ekText, { color: vurgu }]}>
-              +{props.ek}
-            </Text>
-          </View>
-        ) : null}
-        <Ionicons name="chevron-forward" size={16} color={theme.text.secondary} />
-      </View>
-    </Pressable>
-  );
-});
-
-// ── react-native-toast-message config (MODÜL düzeyinde — stabil referans) ──
-export const toastConfig = {
-  success: (p) => <ToastCard type="success" text1={p.text1} text2={p.text2} onPress={p.onPress} action={p.props?.action} />,
-  error: (p) => <ToastCard type="error" text1={p.text1} text2={p.text2} onPress={p.onPress} action={p.props?.action} />,
-  warning: (p) => <ToastCard type="warning" text1={p.text1} text2={p.text2} onPress={p.onPress} action={p.props?.action} />,
-  info: (p) => <ToastCard type="info" text1={p.text1} text2={p.text2} onPress={p.onPress} action={p.props?.action} />,
-  badge: (p) => <BadgeToastCard text1={p.text1} text2={p.text2} props={p.props} onPress={p.onPress} />,
-};
-
-// ── Programatik API ──
-export const showToast = ({ type = "info", title, message, ...rest } = {}) =>
-  Toast.show({ type, text1: title, text2: message, ...rest });
+function toSpec(value) {
+  if (value == null) return null;
+  if (typeof value === "string") return { title: value };
+  return value;
+}
 
 export const toast = {
-  success: (title, message, opts) => showToast({ type: "success", title, message, ...opts }),
-  error: (title, message, opts) => showToast({ type: "error", title, message, ...opts }),
-  warning: (title, message, opts) => showToast({ type: "warning", title, message, ...opts }),
-  info: (title, message, opts) => showToast({ type: "info", title, message, ...opts }),
-  // Rozet/ödül kutlaması: ödülün kendi rozetini çizer. `props` için badge kartının
-  // başındaki sözleşmeye bak. Normal toast'tan uzun kalır (okumak + dokunmak için).
+  show: showToast,
+  success: byKind("success"),
+  error: byKind("error"),
+  warning: byKind("warning"),
+  info: byKind("info"),
+  premium: byKind("premium"),
+  /** Kalıcı "yükleniyor" kartı; kimliğiyle `update` edilir ya da `hide` edilir. */
+  loading: byKind("loading"),
+  /**
+   * Rozet / ödül kutlaması: ödülün kendi rozetini çizer. `props`: { gorunum, ek?, ipucu? }
+   * (components/toast/ToastCards.js BadgeCard). Normal toast'tan uzun kalır.
+   */
   badge: (title, message, props, opts) =>
-    showToast({ type: "badge", title, message, props, visibilityTime: 5200, ...opts }),
-  hide: () => Toast.hide(),
+    toastStore.show({ ...opts, kind: "badge", title, message, props }),
+  /** "Geri Al" düğmeli bilgi/başarı toast'ı (en az 6 sn). */
+  undo: (title, onUndo, opts) =>
+    toastStore.show({
+      kind: "info",
+      ...opts,
+      title,
+      action: {
+        label: i18nText("autoI18n.geri_al", "Geri Al"),
+        icon: "arrow-undo",
+        onPress: onUndo,
+      },
+    }),
+  /** Görünen ya da sırada bekleyen toast'ı yerinde değiştirir (yoksa yeni açar). */
+  update: (id, patch) => toastStore.update(id, patch),
+  /**
+   * Bir işi izler: `loading` kartı gösterir, bitince AYNI kartı başarıya/hataya çevirir.
+   * Her alan dizge ya da `(değer|hata) => dizge | { title, message }` olabilir; verilmeyen
+   * sonuç için kart sessizce kapanır. Promise sonucu/hatası aynen geçer.
+   */
+  promise: (work, texts = {}, opts) => {
+    const resolve = (spec, arg) => toSpec(typeof spec === "function" ? spec(arg) : spec);
+    const loadingSpec = resolve(texts.loading);
+    const id = loadingSpec ? toastStore.show({ ...opts, ...loadingSpec, kind: "loading" }) : null;
+    const settle = (kind, spec) => {
+      if (spec && (spec.title || spec.message)) {
+        const next = { ...opts, ...spec, kind };
+        if (id != null) toastStore.update(id, next);
+        else toastStore.show(next);
+      } else if (id != null) {
+        toastStore.dismiss(id, "api");
+      }
+    };
+    return Promise.resolve(work).then(
+      (value) => {
+        settle("success", resolve(texts.success, value));
+        return value;
+      },
+      (error) => {
+        settle("error", resolve(texts.error, error));
+        throw error;
+      },
+    );
+  },
+  /** Görünen toast'ı (ya da `id`liyi) kapatır. */
+  // `onPress={toast.hide}` gibi olay nesnesi geçen çağrılar tüm toast'ı kapatır, kimlik sanılmaz.
+  hide: (id) => toastStore.dismiss(typeof id === "string" ? id : undefined, "api"),
+  /** Görünen ve bekleyen her şeyi kaldırır. */
+  clear: () => toastStore.clear(),
 };
-
-const styles = StyleSheet.create({
-  card: {
-    width: "92%",
-    maxWidth: 520,
-    alignSelf: "center",
-    borderRadius: 20,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 18,
-    elevation: 10,
-  },
-  cardClip: {
-    minHeight: 68,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    paddingLeft: 13,
-    paddingRight: 11,
-    borderRadius: 19,
-    overflow: "hidden",
-  },
-  accentLine: {
-    position: "absolute",
-    top: 0,
-    left: 20,
-    right: 20,
-    height: 2,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 7,
-    elevation: 4,
-  },
-  badgeClip: { minHeight: 82, paddingVertical: 13, paddingLeft: 14, gap: 13 },
-  eyebrow: { fontSize: 10.5, fontWeight: "900", letterSpacing: 0.9, textTransform: "uppercase" },
-  badgeTitle: { fontSize: 16.5, fontWeight: "900", letterSpacing: -0.2, lineHeight: 21 },
-  ekPill: { borderRadius: 9, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 3 },
-  ekText: { fontSize: 11, fontWeight: "900" },
-  textWrap: { flex: 1, gap: 3, paddingVertical: 1 },
-  title: { fontSize: 14.5, fontWeight: "800", letterSpacing: -0.15, lineHeight: 19 },
-  message: { fontSize: 12.5, fontWeight: "500", lineHeight: 17.5 },
-  closeButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    minHeight: 34,
-    paddingHorizontal: 11,
-    borderRadius: 12,
-    borderWidth: 1,
-    flexShrink: 0,
-  },
-  actionText: { fontSize: 13, fontWeight: "800" },
-});
 
 export default toast;

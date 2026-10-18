@@ -6,7 +6,7 @@ import { markEpisodeWatched, removeTvWatch } from "../../services/libraryActions
 import { showLibraryError } from "../../utils/libraryErrorText";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useTheme } from "../../context/ThemeContext";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import LottieView from "lottie-react-native";

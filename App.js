@@ -56,9 +56,10 @@ import { MediaActivityProvider } from "./context/MediaActivityContext";
 import { SharedListsProvider } from "./context/SharedListsContext";
 import { MediaQuickActionsProvider } from "./context/MediaQuickActionsContext";
 import { auth } from "./firebase";
-import Toast from "react-native-toast-message";
 import { i18nText } from "./utils/i18nText";
-import { toastConfig } from "@components/AppToast";
+import { toast } from "@components/AppToast";
+import ToastHost from "@components/toast/ToastHost";
+import ConnectivityToast from "@components/toast/ConnectivityToast";
 import { AppAlertHost } from "@components/AppAlert";
 import { PremiumUpsellHost } from "@components/premium/PremiumUpsellSheet";
 import { ensureListsRoot } from "./services/listItemsService";
@@ -272,10 +273,7 @@ function AppContent() {
           // Ham hata metni kullanıcıya değil Sentry'ye: ekranda yerelleştirilmiş
           // genel mesaj kalır, teşhis için gereken ayrıntı raporlamaya gider.
           captureError(e, { tags: { source: "app_create_user_lists" } });
-          Toast.show({
-            type: "error",
-            text1: i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"),
-          });
+          toast.error(i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"));
         }
       };
       createList();
@@ -432,6 +430,14 @@ function AppContent() {
         <Stack.Screen
           name="SeeAllScreen"
           getComponent={() => require("./screens/shared/SeeAllScreen").default}
+          options={{
+            headerShown: false,
+            animation: "slide_from_right",
+          }}
+        />
+        <Stack.Screen
+          name="DiscoverFilters"
+          getComponent={() => require("./screens/shared/DiscoverFiltersScreen").default}
           options={{
             headerShown: false,
             animation: "slide_from_right",
@@ -682,6 +688,11 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="SectionVisibilityScreen"
+          getComponent={() => require("./screens/tabs/settings/SectionVisibilityScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="PremiumUsageScreen"
           getComponent={() => require("./screens/tabs/settings/PremiumUsageScreen").default}
           options={{ headerShown: false }}
@@ -844,12 +855,8 @@ function AppContent() {
       </Stack.Navigator>
 
       {showChatModal && swipeViewReady && <SwipeViewHost />}
-      <Toast
-        config={toastConfig}
-        position="top"
-        topOffset={54}
-        visibilityTime={3000}
-      />
+      <ToastHost />
+      <ConnectivityToast />
       <AppAlertHost />
       {/* Premium yükseltme sayfası: kapılar (hooks/usePremiumGate.js) bunu açar.
           PremiumProvider içinde olmak zorunda (mağaza fiyatını okur). */}

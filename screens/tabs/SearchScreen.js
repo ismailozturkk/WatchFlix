@@ -29,6 +29,7 @@ import { isLightSurface } from "../../utils/colorUtils";
 import { useFocusEffect } from "@react-navigation/native";
 import { i18nText } from "../../utils/i18nText";
 import { Keys, get, set } from "../../services/storage";
+import ScreenToastHost from "@components/toast/ScreenToastHost";
 
 
 const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
@@ -391,6 +392,8 @@ export default function SearchScreen({ navigation, route }) {
           </View>
         </View>
       </Animated.View>
+      {/* `transparentModal` iOS'ta kökün üstüne bir pencere açar: toast için kendi host'u. */}
+      <ScreenToastHost />
     </View>
   );
 }

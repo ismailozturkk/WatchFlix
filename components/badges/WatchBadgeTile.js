@@ -14,7 +14,8 @@
 //   4. Durum — kilitliyse ilerleme ("60/150"), açık tekilse nadirlik adı, bitmiş
 //      ailede "Tamamlandı".
 //   5. İlerleme çubuğu — yalnız peşinde koşulan bir hedef varken.
-// Köşelerde: sol üstte prestij (★n), sağ üstte "YENİ" (son 7 gün).
+// Köşelerde: sol üstte prestij (★n) ya da çerçeveli "YENİ" (kataloğa yeni eklendi),
+// sağ üstte dolgulu "YENİ" (son 7 günde kazanıldı).
 //
 // GİZLİ ROZET: kilitliyken ne adı ne hedefi görünür ("???" + "Gizli"). İlerleme
 // çubuğu da çizilmez — oran, rozetin ne ölçtüğünü ele verirdi.
@@ -112,6 +113,18 @@ function WatchBadgeTile({ badge, onPress }) {
         <View style={[styles.kose, styles.koseSol, { backgroundColor: withAlpha(GOLD, 0.18), borderColor: withAlpha(GOLD, 0.5) }]}>
           <Text allowFontScaling={false} style={[styles.koseText, { color: GOLD }]}>
             ★{badge.prestij}
+          </Text>
+        </View>
+      ) : null}
+      {/* KATALOGA YENİ EKLENEN rozet (sol üst, ÇERÇEVELİ): "burada yeni bir hedef var".
+          Sağ üstteki dolgulu YENİ ise KAZANILDI (son 7 gün). İkisi de aynı anda
+          sağda/solda durabilir; kazanılmış ve yeni etiketli kartta tek YENİ yeter,
+          bu yüzden son 7 günde kazanılmışsa çerçeveli olan çizilmez. Prestij
+          rozeti solda öncelikli (tamamlanmış ailede yeni kademe yoktur zaten). */}
+      {!(badge.prestij > 0) && badge.yeniKatalog && !badge.yeni ? (
+        <View style={[styles.kose, styles.koseSol, { backgroundColor: withAlpha(theme.accent, 0.12), borderColor: withAlpha(theme.accent, 0.7) }]}>
+          <Text allowFontScaling={false} style={[styles.koseText, { color: theme.accent }]}>
+            {i18nText("autoI18n.rozet_yeni", "YENİ")}
           </Text>
         </View>
       ) : null}

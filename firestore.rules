@@ -197,9 +197,78 @@ service cloud.firestore {
     // Her iki taraf da .get() ile okunuyor: alan yokken `resource.data.birthDate`
     // değerlendirme HATASI fırlatıyor ve hata, kuralın geri kalanını da
     // düşürebiliyor (hata = red). Varsayılanlı okuma temiz `false` üretir.
-    function birthDateKept() {
-      return !('birthDate' in resource.data)
-          || request.resource.data.get('birthDate', '') == resource.data.get('birthDate', '');
+    //
+    // GÖÇ (2026-10): doğum tarihi ve e-posta artık kök belgede DEĞİL,
+    // Users/{uid}/private/account'ta (yalnız sahibi okur — kök belge herkese
+    // açık olduğu için başkasının tarihini API ile okumak mümkündü). Kuralın
+    // üç hâli:
+    //   • değişmedi → serbest (private'a bakılmaz, ek okuma maliyeti yok);
+    //   • kökten SİLİNDİ → yalnız gizli kopya AYNI tarihi taşıyorsa (istemcinin
+    //     kendi kendini göç ettirmesi; kopya yokken silmek yaş kaydını yok eder);
+    //   • kökte ilk kez YAZILDI → yalnız eski istemciler için
+    //     (legacyRootAccountWrites) ve gizli kopyayla çelişmiyorsa.
+    function birthDateKept(uid) {
+      let before = resource.data.get('birthDate', null);
+      let after = request.resource.data.get('birthDate', null);
+      return before == after
+          || (before != null && after == null
+              && accountBirthDate(uid) == before)
+          || (before == null && after != null
+              && legacyRootAccountWrites()
+              && (accountBirthDate(uid) == null || accountBirthDate(uid) == after));
+    }
+    // AŞAMA 3 ANAHTARI. true: sahadaki eski istemciler (kayıt ekranı e-posta +
+    // doğum tarihini, B3 öncesi sürümler push jetonunu KÖK belgeye yazar) hâlâ
+    // çalışır. Tüm istemciler yeni yola geçip betik (functions/scripts/
+    // migrateAccountPrivate.js) çalıştıktan sonra false yap + rules deploy:
+    // kök belgeye bu alanlar EKLENEMEZ/DEĞİŞTİRİLEMEZ (silmek hep serbest).
+    // Testler anahtarın iki konumunu da dener (firestore.rules.test.js).
+    function legacyRootAccountWrites() { return true; }
+    // Kökte artık durmaması gereken alanlar.
+    function rootCreateWithoutPrivateFields() {
+      return legacyRootAccountWrites()
+          || !request.resource.data.keys().hasAny(
+               ['email', 'birthDate', 'expoPushToken', 'expoPushTokens', 'pushTokenUpdatedAt']);
+    }
+    function rootUpdateWithoutPrivateFields() {
+      let diff = request.resource.data.diff(resource.data);
+      return legacyRootAccountWrites()
+          || !(diff.addedKeys().hasAny(
+                 ['email', 'expoPushToken', 'expoPushTokens', 'pushTokenUpdatedAt'])
+               || diff.changedKeys().hasAny(
+                 ['email', 'expoPushToken', 'expoPushTokens', 'pushTokenUpdatedAt']));
+    }
+    // Gizli hesap belgesi (Users/{uid}/private/account): e-posta + doğum tarihi.
+    // exists() önce: belge yokken get() değerlendirme HATASI fırlatır.
+    function accountBirthDate(uid) {
+      let p = /databases/$(database)/documents/Users/$(uid)/private/account;
+      return exists(p) ? get(p).data.get('birthDate', null) : null;
+    }
+    function rootBirthDate(uid) {
+      let p = /databases/$(database)/documents/Users/$(uid);
+      return exists(p) ? get(p).data.get('birthDate', null) : null;
+    }
+    function accountShapeOk() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['email', 'birthDate', 'updatedAt'])
+          && d.get('email', '') is string && d.get('email', '').size() <= 320
+          && d.get('birthDate', '') is string
+          && (!('birthDate' in d) || d.birthDate.size() == 10);
+    }
+    // Tarih BİR KEZ yazılır (kökteki kuralın aynısı) ve kökte zaten bir tarih
+    // varsa onunla çelişemez — iki kopya arasında "küçük olan" seçilemesin.
+    function accountCreateOk(uid) {
+      let after = request.resource.data.get('birthDate', null);
+      return accountShapeOk()
+          && (after == null || rootBirthDate(uid) == null || rootBirthDate(uid) == after);
+    }
+    function accountUpdateOk(uid) {
+      let before = resource.data.get('birthDate', null);
+      let after = request.resource.data.get('birthDate', null);
+      return accountShapeOk()
+          && (before == after
+              || (before == null && after != null
+                  && (rootBirthDate(uid) == null || rootBirthDate(uid) == after)));
     }
     // "Dört favori" (utils/fourFavorites.js): her kategori en fazla 4 giriş.
     // İstemci alanı zaten normalize edip yazıyor; kural, profil belgesini
@@ -226,6 +295,7 @@ service cloud.firestore {
       //     herkes kendine "Kurucu" yazabiliyordu.
       allow create: if isOwner(uid)
                     && !request.resource.data.keys().hasAny(['entitlements', 'badges'])
+                    && rootCreateWithoutPrivateFields()
                     && fourFavoritesOk();
       // Sahibi her şeyi yazar; diğer signed-in kullanıcılar SADECE
       // counter/timestamp alanlarını günceller (friend req / like / comment
@@ -235,7 +305,8 @@ service cloud.firestore {
       allow update: if (isOwner(uid)
                         && !request.resource.data.diff(resource.data)
                           .affectedKeys().hasAny(['entitlements', 'badges'])
-                        && birthDateKept()
+                        && birthDateKept(uid)
+                        && rootUpdateWithoutPrivateFields()
                         && fourFavoritesOk())
                     || (isSignedIn()
                         && onlyUpdating([
@@ -325,9 +396,16 @@ service cloud.firestore {
     // sunucu yazar; sahibi okur ve hesap silmede siler (accountService tüm
     // private alt koleksiyonunu temizler). Hiçbir yetki kararı bu belgeden
     // okunmaz — plan, Users/{uid}.entitlements'tadır.
+    //
+    // private/account: e-posta + doğum tarihi (şema/doğrulama: accountShapeOk,
+    // tarih kuralı: accountCreateOk/accountUpdateOk). Kökteki eski kopyadan
+    // göç planı: docs/mimari/KULLANICI_OZEL_ALAN_GOCU.md.
     match /Users/{uid}/private/{docId} {
       allow read, delete: if isOwner(uid);
-      allow create, update: if isOwner(uid) && docId != 'entitlements';
+      allow create: if isOwner(uid) && docId != 'entitlements'
+                    && (docId != 'account' || accountCreateOk(uid));
+      allow update: if isOwner(uid) && docId != 'entitlements'
+                    && (docId != 'account' || accountUpdateOk(uid));
     }
 
     // ─── Following / Followers / Liked / Bookmarks (Posts için) ─────────

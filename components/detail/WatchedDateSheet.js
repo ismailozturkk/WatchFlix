@@ -12,7 +12,7 @@ import {
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DatePickerModal, { normalizeDate } from "../modals/DatePickerModal";
 import BottomSheetModal from "../common/BottomSheetModal";

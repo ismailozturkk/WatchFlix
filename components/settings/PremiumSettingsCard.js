@@ -1,24 +1,33 @@
 // components/settings/PremiumSettingsCard.js
 //
-// Ayarlar ana ekranının en üstündeki Seelogd Premium vitrini. Tüm kart tek bir
-// düğme: dokununca PremiumScreen açılır (abone için "aboneliği yönet" girişi de
-// aynı ekrandan).
+// Ayarlar ana ekranının en üstündeki Seelogd Premium alanı. İki hâli var:
+//   • Free kullanıcı → bu dosyadaki VİTRİN (aşağıda): dokununca PremiumScreen açılır.
+//   • Premium / Premium Max abonesi → küçük "Aboneliği yönet" çubuğu (PremiumMemberBar):
+//     satın almış birine karşılaştırma + satış düğmesi göstermek yer kaplar ve anlamsızdır;
+//     çubuk Kullanım ve haklar ekranını açar. Hangisinin çizileceği `PremiumSettingsCard`ın
+//     (en altta, varsayılan dışa aktarım) tek işi.
+//
+// VİTRİNİN AMACI: Free kullanıcıya "ne kazanırım" sorusunu SOMUT sayılarla tek bakışta
+// cevaplamak. Karolar "Free'de 3 → Premium'da 20" biçiminde; rakamlar utils/premiumFeatures.js
+// kaydından okunur (utils/premiumShowcase.js), yani ödeme ekranındaki tabloyla çelişemez ve
+// limit değişince kart kendiliğinden güncellenir. Düğmenin altında mağazanın GERÇEK fiyatı ve
+// varsa kullanıcının yararlanabileceği giriş teklifi görünür; mağaza cevap vermediyse genel
+// metin kalır, uydurma tutar yazılmaz.
 //
 // Tasarım dili:
 //   • Gradyan çerçeve + yüzeyde yavaş kayan iki "aurora" ışığı; kartın arkasında
 //     tema renginin yumuşak bir parıltısı.
-//   • Üç cam karo (AI hakkı / rozet / sosyal limit) — eski üç satırlık çip
-//     yığınının yerine tek bakışta okunan sayılar.
-//   • Free kullanıcıda CTA dolu gradyan ve periyodik parlama süpürmesi taşır
-//     (dönüşüm eylemi); abonede CTA sönük ikincil düğme — "yönet" bir satış
-//     eylemi değil, bağırmamalı.
+//   • Üç karşılaştırma karosu (AI / arkadaş / özel liste): Free değeri sönük ve üstü çizili,
+//     Premium değeri büyük ve renkli. Altında Free'de kapalı olan avantajların çipleri.
+//   • CTA dolu gradyan ve periyodik parlama süpürmesi taşır (dönüşüm eylemi); teklif varsa
+//     yanında küçük bir indirim rozeti durur.
 //   • Basınca yaylı küçülme + dokunsal geri bildirim.
 //
 // Sürekli dönen animasyonlar yalnız ekran odaktayken ve sistem "Hareketi Azalt"
 // kapalıyken çalışır (bkz. hooks/useReduceMotion.js); hepsi native sürücüde.
 
 import { normalizeAppLanguage } from "../../utils/appLanguages";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -34,15 +43,22 @@ import AppIcon from "@components/AppIcon";
 import * as Haptics from "@services/hapticsService";
 import useReduceMotion from "@hooks/useReduceMotion";
 import { alpha } from "@theme/colors";
-import { i18nText } from "@utils/i18nText";
 import {
-  AI_PLAN_LIMITS,
   getPremiumPlanDisplayName,
   PREMIUM_PLAN,
 } from "@utils/premium";
+import { shouldShowMemberBar } from "@utils/premiumMemberBar";
+import {
+  buildShowcaseHighlights,
+  buildShowcasePerks,
+  buildShowcasePricing,
+  showcaseCtaSubtitle,
+  showcaseOfferBadge,
+} from "@utils/premiumShowcase";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { usePremium } from "../../context/PremiumContext";
+import PremiumMemberBar from "./PremiumMemberBar";
 
 // Yumuşak parıltı: React Native'de radyal gradyan yok; azalan opaklıkta iç içe
 // üç daire kenarı sert olmayan bir ışık verir.
@@ -76,9 +92,15 @@ function GlowOrb({ size, color, style }) {
   );
 }
 
-function BenefitTile({ icon, tint, value, label, theme }) {
+/** Düğme bu genişlikten darsa indirim rozeti çizilmez (başlık + fiyat satırı yer kalsın). */
+const BADGE_MIN_CTA_WIDTH = 300;
+
+// Karşılaştırma karosu: "3 → 20" + etiket. Free değeri sönük/çizili, Premium değeri tek vurgu.
+function CompareTile({ item, tint, theme, freeName, premiumName }) {
   return (
     <View
+      accessible
+      accessibilityLabel={`${item.label}: ${freeName} ${item.from}, ${premiumName} ${item.to}`}
       style={[
         styles.tile,
         {
@@ -88,54 +110,74 @@ function BenefitTile({ icon, tint, value, label, theme }) {
       ]}
     >
       <View style={[styles.tileIcon, { backgroundColor: alpha(tint, 0.18) }]}>
-        <AppIcon name={icon} size={13} color={tint} />
+        <AppIcon name={item.icon} size={13} color={tint} />
+      </View>
+      <View style={styles.tileValues}>
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[styles.tileFrom, { color: theme.text.muted }]}
+        >
+          {item.from}
+        </Text>
+        <AppIcon name="arrow-forward" size={11} color={theme.text.muted} />
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+          style={[styles.tileTo, { color: tint }]}
+        >
+          {item.to}
+        </Text>
       </View>
       <Text
         allowFontScaling={false}
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.8}
-        style={[styles.tileValue, { color: theme.text.primary }]}
-      >
-        {value}
-      </Text>
-      <Text
-        allowFontScaling={false}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.85}
         style={[styles.tileLabel, { color: theme.text.muted }]}
       >
-        {label}
+        {item.label}
       </Text>
     </View>
   );
 }
 
-export default function PremiumSettingsCard() {
+// Free kullanıcının vitrini (abone bu kartı görmez, bkz. dosya sonu).
+function PremiumShowcase() {
   const navigation = useNavigation();
   const focused = useIsFocused();
   const reduceMotion = useReduceMotion();
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const { isPremium, isUnlimited, loading } = usePremium();
-  const tr = language === "tr";
-  const es = normalizeAppLanguage(language) === "es";
+  const { loading, packages, introEligibleIds, usingTestStore } = usePremium();
+  const lang = normalizeAppLanguage(language);
+  const tr = lang === "tr";
+  const es = lang === "es";
 
   const accent = theme.accent;
   const purple = theme.colors.purple || "#8B5CF6";
-  const green = theme.colors.green;
-  const gold = theme.colors.orange || "#F59E0B";
+  const tints = {
+    accent,
+    green: theme.colors.green,
+    orange: theme.colors.orange || "#F59E0B",
+  };
 
-  // Kartın tanıttığı plan: abone kendi planını, Free kullanıcı Premium'u görür
-  // (Free'nin kendi 3 mesajı bir "ayrıcalık" değil).
-  const showcasePlan = isUnlimited ? PREMIUM_PLAN.UNLIMITED : PREMIUM_PLAN.PREMIUM;
-  const limits = AI_PLAN_LIMITS[showcasePlan];
-
+  const highlights = useMemo(() => buildShowcaseHighlights(lang), [lang]);
+  const perks = useMemo(() => buildShowcasePerks(lang), [lang]);
+  const pricing = useMemo(
+    () => buildShowcasePricing({ packages, introEligibleIds, usingTestStore, language: lang }),
+    [packages, introEligibleIds, usingTestStore, lang],
+  );
   const press = useRef(new Animated.Value(1)).current;
   const drift = useRef(new Animated.Value(0)).current;
   const sweep = useRef(new Animated.Value(0)).current;
-  const [ctaWidth, setCtaWidth] = useState(320);
+  const [ctaWidth, setCtaWidth] = useState(340);
+  // Rozet yalnız düğme yeterince genişse (≥ BADGE_MIN_CTA_WIDTH) yanına sığar; dar ekranda
+  // teklif ikinci satırın içine yazılır, başlık kırpılmaz.
+  const showBadge = Boolean(pricing?.offer) && ctaWidth >= BADGE_MIN_CTA_WIDTH;
+  const offerBadge = showBadge ? showcaseOfferBadge(pricing.offer, lang) : null;
 
   const animate = focused && !reduceMotion;
   useEffect(() => {
@@ -191,19 +233,18 @@ export default function PremiumSettingsCard() {
 
   const handlePress = () => {
     Haptics.selectionAsync().catch(() => {});
-    navigation.navigate("PremiumScreen");
+    // `source`: ödeme ekranının "bu ekrana nereden geldim" ölçümü (analytics PAYWALL_VIEW).
+    navigation.navigate("PremiumScreen", { source: "settings" });
   };
 
-  const title = isPremium
-    ? tr ? "Ayrıcalıkların Aktif" : es ? "Tus ventajas están activas" : "Your Benefits Are Active"
-    : tr ? "Sinemanın Sınırlarını Kaldır" : es ? "Desbloquea el cine sin límites" : "Unlock Boundless Cinema";
-
-  const ctaTitle = isPremium
-    ? i18nText("autoI18n.yonet", "Aboneliğimi Yönet")
-    : tr ? "Ayrıcalıkları ve Fiyatları Gör" : es ? "Ver planes y precios" : "View Plans & Pricing";
-  const ctaSubtitle = isPremium
-    ? tr ? "Plan detaylarını ve faturalandırmayı yönet" : es ? "Gestionar el plan y la facturación" : "Manage plan and billing"
-    : tr ? "Doğrudan fiyatlandırma · Dilediğin an iptal" : es ? "Precios claros · Cancela cuando quieras" : "Direct pricing · Cancel anytime";
+  const premiumName = getPremiumPlanDisplayName(PREMIUM_PLAN.PREMIUM);
+  const freeName = getPremiumPlanDisplayName(PREMIUM_PLAN.FREE);
+  const title = tr ? "Sinemanın Sınırlarını Kaldır" : es ? "Desbloquea el cine sin límites" : "Unlock Boundless Cinema";
+  // Kısa tutulur: fiyat zaten ikinci satırda, yanındaki indirim rozeti de yer ister.
+  const ctaTitle = tr ? "Planları Gör" : es ? "Ver planes" : "View Plans";
+  const ctaSubtitle = showcaseCtaSubtitle(pricing, lang, {
+    inlineOffer: Boolean(pricing?.offer) && !showBadge,
+  });
 
   const orbAShift = {
     transform: [
@@ -232,11 +273,12 @@ export default function PremiumSettingsCard() {
   return (
     <Animated.View style={{ transform: [{ scale: press }] }}>
       <Pressable
+        testID="premium-showcase"
         onPress={handlePress}
         onPressIn={() => springTo(0.975, 0)}
         onPressOut={() => springTo(1, 6)}
         accessibilityRole="button"
-        accessibilityLabel={`Seelogd Premium, ${title}`}
+        accessibilityLabel={`Seelogd Premium, ${title}. ${ctaTitle}, ${ctaSubtitle}`}
         accessibilityState={{ busy: loading }}
       >
         {/* Gradyan çerçeve: 1px'lik dış gradyan, içte opak yüzey */}
@@ -284,11 +326,7 @@ export default function PremiumSettingsCard() {
                 >
                   {/* Cam parlaması: karonun üst yarısında soluk beyaz bant */}
                   <View style={styles.iconGloss} />
-                  <AppIcon
-                    name={isUnlimited ? "infinite" : "diamond"}
-                    size={22}
-                    color="#FFFFFF"
-                  />
+                  <AppIcon name="diamond" size={22} color="#FFFFFF" />
                 </LinearGradient>
               </View>
 
@@ -298,7 +336,7 @@ export default function PremiumSettingsCard() {
                     allowFontScaling={false}
                     style={[styles.eyebrow, { color: accent }]}
                   >
-                    {getPremiumPlanDisplayName(showcasePlan).toUpperCase()}
+                    {premiumName.toUpperCase()}
                   </Text>
                   {loading ? (
                     <ActivityIndicator size="small" color={accent} />
@@ -307,31 +345,17 @@ export default function PremiumSettingsCard() {
                       style={[
                         styles.pill,
                         {
-                          backgroundColor: isPremium
-                            ? alpha(green, 0.16)
-                            : alpha(theme.text.primary, 0.07),
-                          borderColor: isPremium
-                            ? alpha(green, 0.34)
-                            : alpha(theme.text.primary, 0.12),
+                          backgroundColor: alpha(theme.text.primary, 0.07),
+                          borderColor: alpha(theme.text.primary, 0.12),
                         },
                       ]}
                     >
-                      <View
-                        style={[
-                          styles.pillDot,
-                          { backgroundColor: isPremium ? green : theme.text.muted },
-                        ]}
-                      />
+                      <View style={[styles.pillDot, { backgroundColor: theme.text.muted }]} />
                       <Text
                         allowFontScaling={false}
-                        style={[
-                          styles.pillText,
-                          { color: isPremium ? green : theme.text.muted },
-                        ]}
+                        style={[styles.pillText, { color: theme.text.muted }]}
                       >
-                        {isPremium
-                          ? i18nText("autoI18n.aktif_upper", "AKTİF")
-                          : getPremiumPlanDisplayName(PREMIUM_PLAN.FREE).toUpperCase()}
+                        {freeName.toUpperCase()}
                       </Text>
                     </View>
                   )}
@@ -346,110 +370,110 @@ export default function PremiumSettingsCard() {
               </View>
             </View>
 
-            {/* Ayrıcalık karoları */}
+            {/* Karşılaştırma: Free'de şu → Premium'da şu (rakamlar kayıttan) */}
             <View style={styles.tiles}>
-              <BenefitTile
-                theme={theme}
-                icon="sparkles"
-                tint={accent}
-                value={String(limits.daily)}
-                label={tr ? "AI mesajı / gün" : es ? "Chats de IA / día" : "AI chats / day"}
-              />
-              <BenefitTile
-                theme={theme}
-                icon="diamond"
-                tint={gold}
-                value={
-                  isUnlimited
-                    ? tr ? "Efsanevi" : es ? "Legendaria" : "Legend"
-                    : tr ? "Epik" : es ? "Épica" : "Epic"
-                }
-                label={tr ? "Profil rozeti" : es ? "Insignia de perfil" : "Profile badge"}
-              />
-              <BenefitTile
-                theme={theme}
-                icon="people"
-                tint={green}
-                value={
-                  isUnlimited
-                    ? tr ? "Sınırsız" : es ? "Ilimitado" : "Unlimited"
-                    : tr ? "Daha fazla" : es ? "Más" : "More"
-                }
-                label={tr ? "Sosyal limitler" : es ? "Límites sociales" : "Social limits"}
-              />
+              {highlights.map((item) => (
+                <CompareTile
+                  key={item.id}
+                  item={item}
+                  tint={tints[item.tint] || accent}
+                  theme={theme}
+                  freeName={freeName}
+                  premiumName={premiumName}
+                />
+              ))}
             </View>
 
-            {/* CTA: Free'de dolu gradyan + parlama, abonede sönük ikincil düğme */}
-            <View
-              onLayout={(e) => setCtaWidth(e.nativeEvent.layout.width)}
-              style={[
-                styles.cta,
-                isPremium && {
-                  backgroundColor: alpha(accent, 0.12),
-                  borderWidth: 1,
-                  borderColor: alpha(accent, 0.3),
-                },
-              ]}
-            >
-              {isPremium ? null : (
-                <>
-                  <LinearGradient
-                    colors={[accent, purple]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <Animated.View
-                    pointerEvents="none"
+            {/* Ayrıca: Free'de kapalı olan avantajlar (kayıt öyle diyorsa) */}
+            {perks.length > 0 ? (
+              <View style={styles.perks}>
+                {perks.map((perk) => (
+                  <View
+                    key={perk.id}
                     style={[
-                      styles.shine,
-                      { transform: [{ translateX: shineX }, { rotate: "18deg" }] },
+                      styles.perk,
+                      {
+                        backgroundColor: alpha(accent, 0.1),
+                        borderColor: alpha(accent, 0.22),
+                      },
                     ]}
                   >
-                    <LinearGradient
-                      colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.34)", "rgba(255,255,255,0)"]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={StyleSheet.absoluteFill}
-                    />
-                  </Animated.View>
-                </>
-              )}
+                    <AppIcon name={perk.icon} size={11} color={accent} />
+                    <Text
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                      style={[styles.perkText, { color: theme.text.primary }]}
+                    >
+                      {perk.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {/* CTA: dolu gradyan + periyodik parlama; fiyat satırı gerçek mağaza fiyatı */}
+            <View
+              onLayout={(e) => setCtaWidth(e.nativeEvent.layout.width)}
+              style={styles.cta}
+            >
+              <LinearGradient
+                colors={[accent, purple]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.shine,
+                  { transform: [{ translateX: shineX }, { rotate: "18deg" }] },
+                ]}
+              >
+                <LinearGradient
+                  colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.34)", "rgba(255,255,255,0)"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Animated.View>
               <View style={styles.ctaCopy}>
                 <Text
                   allowFontScaling={false}
                   numberOfLines={1}
-                  style={[styles.ctaTitle, { color: isPremium ? accent : "#FFFFFF" }]}
+                  style={[styles.ctaTitle, { color: "#FFFFFF" }]}
                 >
                   {ctaTitle}
                 </Text>
                 <Text
                   allowFontScaling={false}
                   numberOfLines={1}
-                  style={[
-                    styles.ctaSubtitle,
-                    { color: isPremium ? theme.text.muted : "rgba(255,255,255,0.82)" },
-                  ]}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                  style={[styles.ctaSubtitle, { color: "rgba(255,255,255,0.82)" }]}
                 >
                   {ctaSubtitle}
                 </Text>
               </View>
+              {offerBadge ? (
+                <View testID="premium-showcase-offer" style={styles.offer}>
+                  <Text allowFontScaling={false} numberOfLines={1} style={styles.offerBig}>
+                    {offerBadge.big}
+                  </Text>
+                  <Text allowFontScaling={false} numberOfLines={1} style={styles.offerSmall}>
+                    {offerBadge.small}
+                  </Text>
+                </View>
+              ) : null}
               <Animated.View
                 style={[
                   styles.ctaArrow,
                   {
-                    backgroundColor: isPremium
-                      ? alpha(accent, 0.16)
-                      : "rgba(255,255,255,0.22)",
-                    transform: [{ translateX: isPremium ? 0 : arrowX }],
+                    backgroundColor: "rgba(255,255,255,0.22)",
+                    transform: [{ translateX: arrowX }],
                   },
                 ]}
               >
-                <AppIcon
-                  name="arrow-forward"
-                  size={15}
-                  color={isPremium ? accent : "#FFFFFF"}
-                />
+                <AppIcon name="arrow-forward" size={15} color="#FFFFFF" />
               </Animated.View>
             </View>
           </View>
@@ -457,6 +481,16 @@ export default function PremiumSettingsCard() {
       </Pressable>
     </Animated.View>
   );
+}
+
+/**
+ * Ayarlar > Seelogd Premium alanı: ücretli planda küçük "Aboneliği yönet" çubuğu, Free'de
+ * vitrin. Plan RevenueCat cevabı beklenirken son bilinen plandır (PremiumContext),
+ * yani abone açılışta bir an vitrin görüp çubuğa atlamaz.
+ */
+export default function PremiumSettingsCard() {
+  const { plan } = usePremium();
+  return shouldShowMemberBar(plan) ? <PremiumMemberBar /> : <PremiumShowcase />;
 }
 
 const styles = StyleSheet.create({
@@ -543,7 +577,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 14,
     borderWidth: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 9,
     gap: 2,
   },
@@ -555,8 +589,35 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 5,
   },
-  tileValue: { fontSize: 15, fontWeight: "900", letterSpacing: -0.2 },
+  tileValues: { flexDirection: "row", alignItems: "center", gap: 4 },
+  // Free değeri sönük ve üstü çizili: "bu sende var, şuna çıkıyor" okunur.
+  tileFrom: {
+    fontSize: 13,
+    fontWeight: "700",
+    textDecorationLine: "line-through",
+    fontVariant: ["tabular-nums"],
+  },
+  tileTo: {
+    flexShrink: 1,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+    fontVariant: ["tabular-nums"],
+  },
   tileLabel: { fontSize: 10.5, fontWeight: "600" },
+
+  perks: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
+  perk: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  perkText: { fontSize: 10.5, fontWeight: "700" },
 
   cta: {
     minHeight: 54,
@@ -572,6 +633,18 @@ const styles = StyleSheet.create({
   ctaCopy: { flex: 1 },
   ctaTitle: { fontSize: 14.5, fontWeight: "900", letterSpacing: -0.15 },
   ctaSubtitle: { fontSize: 10.5, fontWeight: "600", marginTop: 1 },
+  // Giriş teklifi rozeti (yalnız mağaza gerçekten teklif veriyorsa).
+  offer: {
+    alignItems: "center",
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+  offerBig: { fontSize: 12.5, lineHeight: 15, fontWeight: "900", color: "#FFFFFF" },
+  offerSmall: { fontSize: 8.5, lineHeight: 10, fontWeight: "800", letterSpacing: 0.3, color: "rgba(255,255,255,0.88)" },
   ctaArrow: {
     width: 30,
     height: 30,

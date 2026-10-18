@@ -23,7 +23,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import useUserDataDomain from "../../hooks/useUserDataDomain";
 import { remindersActions, remindersDomain } from "../../services/userData";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
@@ -60,6 +60,7 @@ import useReminderGate from "../../hooks/useReminderGate";
 import CommentSheetModal from "@components/modals/CommentSheetModal";
 import RatingSheetModal from "@components/modals/RatingSheetModal";
 import RatingSummary from "@components/RatingSummary";
+import CertificationBadge from "../../components/detail/CertificationBadge";
 import ImageGalleryModal from "@components/modals/ImageGalleryModal";
 import TrailerSection from "@components/video/TrailerSection";
 import PaginatedRail from "../../components/PaginatedRail";
@@ -73,6 +74,7 @@ import NewConversationSheet from "@components/chat/NewConversationSheet";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const { width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
 // Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
@@ -979,6 +981,7 @@ export default function MovieDetails({ navigation, route }) {
 
             {/* Genres */}
             <View style={styles.genreRow}>
+              <CertificationBadge mediaType="movie" details={details} region={providerRegion} />
               {details.genres.slice(0, 3).map((g) => (
                 <View
                   key={g.id}
@@ -1675,6 +1678,7 @@ export default function MovieDetails({ navigation, route }) {
           movieId={id}
           details={details}
         />
+        <ModalToastHost visible={commandModalVisible} />
       </Modal>
 
       {/* Derecelendirme */}
@@ -1695,6 +1699,7 @@ export default function MovieDetails({ navigation, route }) {
           details={details}
           releaseDate={details.release_date}
         />
+        <ModalToastHost visible={ratingModalVisible} />
       </Modal>
 
       {/* Notum */}

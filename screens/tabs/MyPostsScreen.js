@@ -35,6 +35,7 @@ import { alpha } from "../../theme/colors";
 import ScreenDecor from "@components/ScreenDecor";
 import BackButton from "@components/BackButton";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
 const LIKE_RED = "#FF5A5F";
 const SPOILER_RED = "#f04f4f";
 
@@ -721,6 +722,7 @@ export default function MyPostsScreen({ navigation }) {
             )}
           </View>
         </Pressable>
+        <ModalToastHost visible={!!menuPost} />
       </Modal>
 
       {/* Silme onayı */}
@@ -759,6 +761,7 @@ export default function MyPostsScreen({ navigation }) {
             </View>
           </View>
         </View>
+        <ModalToastHost visible={!!confirmPost} />
       </Modal>
 
       {/* Düzenleme modalı */}

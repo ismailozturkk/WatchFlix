@@ -1,9 +1,10 @@
 import {
+  DeviceEventEmitter,
   RefreshControl,
   StyleSheet,
   View,
 } from "react-native";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Animated from "react-native-reanimated";
 import MovieOscar from "../movie/MovieOscar";
 import MovieProviders from "../movie/MovieProvders";
@@ -15,11 +16,12 @@ import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import MovieBests from "../movie/MovieBests";
 import MovieTrends from "../movie/MovieTrends";
 import MovieCollection from "../movie/MovieCollection";
-import { useLanguage } from "../../context/LanguageContext";
 import { useMovie } from "../../context/MovieContex";
 import ScreenDecor from "../../components/ScreenDecor";
-import DiscoverSearchHeader from "../../components/home/DiscoverSearchHeader";
+import DiscoverHeaderSpacer from "../../components/home/DiscoverHeaderSpacer";
+import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import usePullToRefresh from "../../hooks/usePullToRefresh";
+import useScreenSections from "../../hooks/useSectionVisibility";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
 import {
@@ -29,6 +31,8 @@ import {
 import { useProfileStats } from "../../context/ProfileStatsContext";
 import { resolveOnboardingGenreIds } from "../../utils/onboardingPreferences";
 import FavoritesRecommendationRail from "../../components/favorites/FavoritesRecommendationRail";
+import FollowedUpcomingRail from "../../components/person/FollowedUpcomingRail";
+import useFollowedPeople from "../../hooks/useFollowedPeople";
 import { useUserProfile } from "../../context/UserProfileContext";
 import { hasRecommendationSignal, readProfileFavorites } from "../../utils/fourFavorites";
 
@@ -39,11 +43,21 @@ const INITIAL_SECTION_COUNT = 2;
 // kapsamında: render içinde kurulursa liste her render'da sökülür.
 const MarkedFlatList = markTabScroll(Animated.FlatList);
 
-export default function MovieScreen({ navigation }) {
+// `headerTopOffset`: ekranın tepesinde yüzen satırın (Film/Dizi anahtarı + arama düğmesi)
+// yüksekliği (screens/tabs/DiscoverScreen.js); ilk raf onun altından başlar.
+export default function MovieScreen({ navigation, headerTopOffset = 0 }) {
   const { contentBottom } = useTabBarLayout();
   const { theme } = useTheme();
-  const { t } = useLanguage();
-  const { refreshAllMovies } = useMovie();
+  const { refreshAllMovies, loadingTrends } = useMovie();
+
+  // Açılış ekranı (splash) APP_READY'yi bekler. Film/Dizi artık tek sekme ve açılışta
+  // son seçilen bölüm (Film olabilir) çizilir; Dizi ekranı hiç kurulmayabileceği için
+  // aynı işareti burası da verir (bkz. screens/tabs/TvShowScreen.js).
+  useEffect(() => {
+    if (!loadingTrends) {
+      DeviceEventEmitter.emit("APP_READY");
+    }
+  }, [loadingTrends]);
 
   const { streamingProviderIds } = useStreamingProviderSettings();
   const { onboardingGenreKeys } = useDiscoveryPreferenceSettings();
@@ -59,13 +73,21 @@ export default function MovieScreen({ navigation }) {
     () => hasRecommendationSignal(readProfileFavorites(profile), "movie"),
     [profile],
   );
-  const { refreshing, animatedSearchStyle, onScroll, handleRefresh } =
+  // Takip edilen kişi var mı? Yoksa raf bölüm listesine hiç girmez (boş bölüm sayacı şişirmesin).
+  const { count: followedCount } = useFollowedPeople();
+  const { refreshing, onScroll, handleRefresh } =
     usePullToRefresh(refreshAllMovies);
+  // Ayarlar > Kişiselleştirme > Ekran bölümleri'nde gizlenen raflar (utils/sectionVisibility.js).
+  const { filter: filterHiddenSections } = useScreenSections("movie");
 
+  // Raf kimlikleri (`key`) utils/sectionVisibility.js'teki "movie" bölümleriyle aynı.
   const sections = useMemo(
-    () => [
+    () => filterHiddenSections([
       { key: "trends", Component: MovieTrends },
       { key: "bests", Component: MovieBests },
+      ...(followedCount > 0
+        ? [{ key: "followedPeople", Component: FollowedUpcomingRail }]
+        : []),
       // Kaydırınca yüklenen ilk bölümlerden biri: açılışta ağ isteği yaratmaz.
       ...(hasFavoriteSignal
         ? [{ key: "fromFavorites", Component: FavoritesRecommendationRail }]
@@ -86,8 +108,8 @@ export default function MovieScreen({ navigation }) {
       { key: "providers", Component: MovieProviders },
       { key: "genres", Component: MovieGenres },
       { key: "upcoming", Component: MovieUpcoming },
-    ],
-    [hasFavoriteSignal, onboardingGenreIds, streamingProviderIds, topMovieGenres],
+    ]),
+    [filterHiddenSections, followedCount, hasFavoriteSignal, onboardingGenreIds, streamingProviderIds, topMovieGenres],
   );
 
   const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
@@ -113,18 +135,12 @@ export default function MovieScreen({ navigation }) {
     [navigation],
   );
 
-  // ELEMENT olarak verilir (geri çağrı değil): FlatList fonksiyonu bileşen tipi
-  // sayar, kimliği değişince başlık sökülüp yeniden kurulur ve düğme sıfırlanır.
-  const searchHeader = useMemo(
-    () => (
-      <DiscoverSearchHeader
-        navigation={navigation}
-        mediaType="movie"
-        placeholder={t.SearchScreen.searchMovies}
-        animatedStyle={animatedSearchStyle}
-      />
-    ),
-    [animatedSearchStyle, navigation, t.SearchScreen.searchMovies],
+  // Liste başlığı: yüzen Film/Dizi satırının (anahtar + arama düğmesi) altında kalan boşluk.
+  // ELEMENT olarak verilir (geri çağrı değil): FlatList fonksiyonu bileşen tipi sayar,
+  // kimliği değişince başlık sökülüp yeniden kurulur.
+  const listHeader = useMemo(
+    () => <DiscoverHeaderSpacer topOffset={headerTopOffset} />,
+    [headerTopOffset],
   );
 
   const revealNextSection = useCallback(() => {
@@ -133,6 +149,13 @@ export default function MovieScreen({ navigation }) {
     );
   }, [sections.length]);
 
+  // Tüm raflar gizliyse (ya da kalanlar veri/ayar yüzünden çizilmiyorsa) boş ekran yerine
+  // nedenini söyleyen kart. ELEMENT olarak verilir (geri çağrı değil), başlıktaki gibi.
+  const emptyNotice = useMemo(
+    () => <SectionsHiddenNotice navigation={navigation} screen="movie" />,
+    [navigation],
+  );
+
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
       <ScreenDecor scope="home" iconOpacity={0.3} />
@@ -140,7 +163,8 @@ export default function MovieScreen({ navigation }) {
         data={visibleSections}
         keyExtractor={(item) => item.key}
         renderItem={renderSection}
-        ListHeaderComponent={searchHeader}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={emptyNotice}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.container, { paddingBottom: contentBottom }]}
         initialNumToRender={INITIAL_SECTION_COUNT}

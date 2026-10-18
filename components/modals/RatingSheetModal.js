@@ -35,7 +35,7 @@ import {
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import { useTheme } from "@context/ThemeContext";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useAuth } from "@context/AuthContext";
