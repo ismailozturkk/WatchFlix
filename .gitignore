@@ -86,3 +86,7 @@ firestore-debug.log
 firebase-debug.log
 database-debug.log
 ui-debug.log
+
+# AI model değerlendirme çıktıları (API yanıtları, raporlar)
+scripts/ai-eval/out/
+scripts/ai-eval/extraCases.json

@@ -1,0 +1,8 @@
+{
+  "name": "seelogd-ai-eval",
+  "private": true,
+  "description": "AI model karşılaştırma betiğinin kendi bağımlılıkları (uygulamanın package.json'una karışmaz).",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0"
+  }
+}

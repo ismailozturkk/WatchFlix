@@ -10,6 +10,7 @@
     "test": "jest",
     "postinstall": "patch-package",
     "licenses": "node scripts/generate-oss-licenses.js",
+    "ai:eval": "jest -c scripts/ai-eval/jest.config.js --runInBand",
     "test:rules": "firebase emulators:exec --only firestore \"jest -c jest.rules.config.js\""
   },
   "dependencies": {
