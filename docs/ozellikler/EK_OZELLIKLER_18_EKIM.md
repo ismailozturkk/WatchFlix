@@ -15,7 +15,10 @@
 | `services/externalRatings.js` | Callable istemcisi; **asla fırlatmaz** (null); kesin sonuç oturumda önbelleklenir, geçici hata değil. |
 | `utils/externalRatings.js` | Saf: `pickMainRating` (IMDb yoksa TMDB'ye düş), `mergeEpisodeRatings`, `formatImdbVotes`. |
 | `screens/tv/TvGraphDetailScreen.js` | OMDb axios çağrıları kalktı; servis kullanılır. |
-| `components/detail/ExternalRatingsRow.js` | **Yeni:** film/dizi detayında IMDb · Rotten Tomatoes · Metascore çipleri. Yalnız veri GELİNCE görünür (iskelet yok, "N/A" yok). `MovieDetail` / `TvShowsDetails` rating satırının altında. |
+| `components/detail/ExternalRatingsRow.js` | **Yeni:** film/dizi detayında IMDb · Rotten Tomatoes · Metascore **tek satır, tek dokunma hedefi** (simgeli çipler, oy sayısı çipte yok). Yalnız veri GELİNCE görünür (iskelet yok, "N/A" yok). `MovieDetail` / `TvShowsDetails` rating satırının altında. |
+| `components/detail/ExternalRatingsSheet.js` | Basınca açılan ayrıntı sayfası (`BottomSheetModal`): kaynak adı + açıklama + büyük değer + ölçek çubuğu; IMDb oy sayısı TAM, Rotten Tomatoes Taze/Çürük (%60 eşik), Metascore Metacritic aralıklarıyla sözel değerlendirme. |
+| `components/detail/RatingLogos.js` | Kendi çizdiğimiz simgeler (resmî logo dosyası yok): sarı IMDb rozeti, SVG domates / çürük leke, renk eşikli Metascore karesi. |
+| `utils/externalRatingsCopy.js` | Ayrıntı sayfası metinleri (tr/en/es). |
 
 > ⚠️ **Eski anahtar sızmış sayılmalı.** Kod geçmişinde ve yayınlanmış sürümlerde duruyor. OMDb panelinden **yenisini üretip** `firebase functions:secrets:set OMDB_API_KEY` ile yükleyin; eskiyi iptal edin. Bunu yapmadan eski anahtar çalışmaya devam eder.
 > Deploy edilmeden önceki sürümler (paketlenmiş eski istemci) eski gömülü anahtarı kullanmaya devam eder; yeni istemci function yokken TMDB puanına düşer (ekran bozulmaz, IMDb puanı görünmez).
@@ -47,8 +50,18 @@ Arama ekranında alana **IMDb / TMDB bağlantısı yapıştırınca** (ya da ala
 | `screens/tabs/SearchScreen.js` | Yapıştırma yakalama + bağlantı simgesi. Pano **yalnız kullanıcı simgeye basınca** okunur (arka planda okuma yok — iOS'ta yapıştırma uyarısı çıkarırdı). |
 | `utils/mediaLinkCopy.js` | tr/en/es. |
 
-**Yapılmayan (native build ister):** başka uygulamanın **Paylaş menüsünden** Seelogd'a bağlantı göndermek (share-intent) ve **simge uzun basma kısayolları** (quick actions).
-İkisi de yeni native modül + `app.json` eklentisi gerektirir; build alınamadığı/test edilemediği için körlemesine eklenmedi. Letterboxd / Netflix bağlantıları TMDB'ye çevrilemediği için tanınmaz.
+**19 Ekim eki — paylaş menüsü + simge kısayolları (YENİ NATIVE BUILD ŞART):**
+
+| Parça | Ne yapar |
+|---|---|
+| `expo-share-intent` (app.json eklentisi) | iOS: "Seelogd Share" paylaşım uzantısı (hedef `SeelogdShare`, paket `com.smlztrk.seelogd.share-extension`, App Group `group.com.smlztrk.seelogd` mevcutla ORTAK). Android: `ACTION_SEND text/*` süzgeci. Yalnız web adresi/sayfa/metin kabul eder (resim/dosya yok). |
+| `expo-quick-actions` | Simgeye uzun basınca: Ara / Sıradaki / Hatırlatıcılar / Listelerim (kimlikler `utils/externalEntry.QUICK_ACTIONS`; başlıklar uygulama dilinde, dil değişince yeniden kurulur, çıkışta temizlenir). |
+| `components/ExternalEntryHost.js` | NavigationContainer içinde; oturum + profil tamamlanma + gezinme hazır olana dek paylaşım/kısayolu BEKLETİR (soğuk açılış dahil). Paylaşılan IMDb/TMDB bağlantısı → `resolveMediaLink` → detay sayfası; tanınmazsa toast. |
+| `utils/externalEntry.js` (+ test), `utils/externalEntryCopy.js` | Saf kararlar; kısayol ekran adlarını App.js'e karşı denetleyen bekçi test. `linking.getStateFromPath` sarmalayıcısı iOS'un `seelogd://dataUrl=…` adresini ekran yolu saymaz. |
+
+**EAS / iOS dikkat:** yeni uzantı = yeni bundle id. `--non-interactive` build KREDİ BİLGİSİ oluşturamaz; ilk iOS build **etkileşimli** alınmalı (`npx eas build --profile development --platform ios`, Apple girişi + 2FA; `com.smlztrk.seelogd.share-extension` kimliği + App Group yetkisi + profil otomatik oluşur). Widget uzantısıyla birlikte iki uzantı olur; paketin README'si "EAS'te tek uzantı" uyarısı veriyor — çakışma çıkarsa ilk bakılacak yer bu.
+**Doğrulanan:** `expo config --type introspect` Android SEND süzgecini üretiyor, `appExtensions` içinde ReminderWidget + SeelogdShare var, jest temiz. **Doğrulanamayan (Windows'ta iOS prebuild yok):** Xcode hedefinin apple-targets ile birlikte doğru kurulması, uzantı arayüzünün görünümü, kısayol simgeleri, Android'de kısayol dokunuşu.
+**Bilinen sınırlar:** Letterboxd/Netflix bağlantıları yine tanınmaz; Android kısayol simgesi yok (sistem uygulama simgesi); "Seelogd Share" adı paylaşım sayfasında böyle görünür (hedef adıyla aynı olamaz).
 
 ## 4. Oyuncu takibi: yaklaşanı telefon takvimine ekle
 
@@ -62,7 +75,7 @@ Dosyalar: `utils/followedPeople.js` (`upcomingToCalendarItem`), `components/pers
 `website/privacy.html` (tr+en) ve `website/delete-account.html` (tr+en) kütüphane dışa aktarmasına göre güncellendi: "dışa aktaran ekran yok" cümlesi yerine ekranın kapsamı ve **kapsam dışı** veriler
 (yorum, gönderi, not, hatırlatıcı, sohbet, hesap bilgisi) yazıldı; sürüm **1.2 — 18 Ekim 2026**. **Hosting deploy edilmedikçe yayında görünmez.**
 Not: bu oturumdaki yeni özellikler (OMDb proxy'si, haftalık özet) veri akışını değiştiriyor: OMDb'ye IMDb kimliği sunucudan gider (eskiden istemciden), haftalık özet mevcut izleme listesi verisini kullanır.
-Gizlilik metninde OMDb ayrıca anılmıyor (eskiden de anılmıyordu); hukuki beyanı değiştirmeden bırakıldı — **gözden geçirilmeli**.
+Güncellendi: OMDb işleyici tablosuna (tr+en) eklendi (yalnız IMDb kimliği + sezon, istek sunucudan), haftalık özet veri satırına ve bildirim hukuki dayanağına işlendi (varsayılan KAPALI = isteğe bağlı); sürüm geçmişi 1.2 girdisine eklendi. **Hosting yeniden deploy edilmedikçe yayında görünmez.**
 
 ## Deploy (yapılmadı — onay gerekir)
 

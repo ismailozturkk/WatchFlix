@@ -19,6 +19,8 @@ import {
 } from "react-native";
 import { flushSnapshotWrites } from "./services/snapshotCache";
 import UserDataSyncHost from "./components/UserDataSyncHost";
+import ExternalEntryHost from "./components/ExternalEntryHost";
+import { wrapGetStateFromPath } from "./utils/externalEntry";
 import {
   BLUR_SCOPES,
   BlurTargetProvider,
@@ -29,6 +31,7 @@ import {
   NavigationContainer,
   DefaultTheme,
   DarkTheme,
+  getStateFromPath,
 } from "@react-navigation/native";
 import { rootNavigationRef } from "./services/rootNavigation";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -151,8 +154,12 @@ const Stack = createNativeStackNavigator();
 // ReminderWidgetProvider (reminders), ListsWidgetProvider (lists/…),
 // StatsWidgetProvider (stats/…). Yol adları değişirse widget'lar sessizce
 // açılış ekranına düşer — iki tarafı birlikte güncelle.
+//
+// Paylaş menüsü (expo-share-intent) iOS'ta uygulamayı `seelogd://dataUrl=…` ile açar; bu bir ekran yolu değil,
+// paylaşım kancasının okuduğu adres. Ekran eşlemesine sokulmaz (bkz. utils/externalEntry.wrapGetStateFromPath).
 const linking = {
   prefixes: ["seelogd://"],
+  getStateFromPath: wrapGetStateFromPath(getStateFromPath),
   config: {
     screens: {
       RemindersScreen: "reminders",
@@ -866,6 +873,8 @@ function AppContent() {
       {/* Premium yükseltme sayfası: kapılar (hooks/usePremiumGate.js) bunu açar.
           PremiumProvider içinde olmak zorunda (mağaza fiyatını okur). */}
       <PremiumUpsellHost />
+      {/* Paylaş menüsünden gelen bağlantı + simge uzun basma kısayolları. */}
+      <ExternalEntryHost />
       <StatusBar style={isLightSurface(theme.primary) ? "dark" : "light"} />
     </NavigationContainer>
   );

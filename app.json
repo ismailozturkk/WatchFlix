@@ -133,7 +133,20 @@
       ],
       "expo-secure-store",
       "expo-localization",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-quick-actions",
+      [
+        "expo-share-intent",
+        {
+          "iosShareExtensionName": "Seelogd Share",
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsWebPageWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
+          "androidIntentFilters": ["text/*"]
+        }
+      ]
     ],
     "owner": "smlztrk",
     "updates": {
