@@ -132,20 +132,26 @@ export default function OnboardingScreen({ navigation }) {
   }, [step, index, language, phase, count, copy, lang]);
 
   // ── Tercihler ───────────────────────────────────────────────────────────────
+  // Ayar yazımı (changeXxx) AppSettingsProvider'ı günceller. setState GÜNCELLEYİCİSİNİN içinde çağrılırsa React onu
+  // render sırasında çalıştırabilir ve "Cannot update a component while rendering a different component" uyarısı
+  // verir; bu yüzden güncel değer ref'te tutulur, yan etki güncelleyicinin DIŞINDA yapılır.
+  const genreKeysRef = useRef(selectedGenreKeys);
+  const providerIdsRef = useRef(selectedProviderIds);
+
   const toggleGenre = useCallback(
     (mediaType, key) => {
       buzz();
-      setSelectedGenreKeys((current) => {
-        const active = current?.[mediaType] || [];
-        const nextActive = active.includes(key)
-          ? active.filter((item) => item !== key)
-          : active.length >= 3
-            ? active
-            : [...active, key];
-        const next = { movie: current?.movie || [], tv: current?.tv || [], [mediaType]: nextActive };
-        changeOnboardingGenreKeys(next);
-        return next;
-      });
+      const current = genreKeysRef.current;
+      const active = current?.[mediaType] || [];
+      const nextActive = active.includes(key)
+        ? active.filter((item) => item !== key)
+        : active.length >= 3
+          ? active
+          : [...active, key];
+      const next = { movie: current?.movie || [], tv: current?.tv || [], [mediaType]: nextActive };
+      genreKeysRef.current = next;
+      setSelectedGenreKeys(next);
+      changeOnboardingGenreKeys(next);
     },
     [changeOnboardingGenreKeys],
   );
@@ -153,11 +159,11 @@ export default function OnboardingScreen({ navigation }) {
   const toggleProvider = useCallback(
     (id) => {
       buzz();
-      setSelectedProviderIds((current) => {
-        const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
-        changeStreamingProviderIds(next);
-        return next;
-      });
+      const current = providerIdsRef.current;
+      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+      providerIdsRef.current = next;
+      setSelectedProviderIds(next);
+      changeStreamingProviderIds(next);
     },
     [changeStreamingProviderIds],
   );
