@@ -268,7 +268,6 @@ function YearlyGoalTrackCard({
                 testID={`yearly-goal-target-${track}`}
                 allowFontScaling={false}
                 numberOfLines={1}
-                adjustsFontSizeToFit
                 style={[styles.targetValue, { color: theme.text.primary }]}
               >
                 {target}
@@ -398,7 +397,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   targetBox: { flex: 1, minWidth: 0, alignItems: "center" },
-  targetValue: { fontSize: 40, lineHeight: 46, fontWeight: "900", letterSpacing: -1, fontVariant: ["tabular-nums"] },
+  // adjustsFontSizeToFit BİLEREK YOK: alignItems:"center" içindeki otomatik genişlikli metinde iOS, sığdırmayı
+  // genişlik ölçülmeden yapıp sayıyı minimuma (çok küçük) indiriyordu. En geniş hedef 4 hane (9999) ≈ 100 pt;
+  // kutu 320 pt ekranda bile ~130 pt, yani sığdırmaya gerek yok.
+  targetValue: {
+    textAlign: "center", fontSize: 40, lineHeight: 46, fontWeight: "900", letterSpacing: -1, fontVariant: ["tabular-nums"] },
   targetUnit: { fontSize: 11.5, fontWeight: "700", marginTop: -2 },
 
   presetRow: { flexDirection: "row", gap: 8 },
