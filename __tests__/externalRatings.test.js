@@ -2,7 +2,15 @@
 //
 // Harici puanlar: saf biçim yardımcıları (utils/externalRatings.js) + callable istemcisi
 // (services/externalRatings.js; firebase taklit edilir).
-const { formatImdbVotes, mergeEpisodeRatings, pickMainRating } = require("../utils/externalRatings");
+const {
+  formatCompactVotes,
+  formatImdbVotes,
+  mergeEpisodeRatings,
+  metascoreTone,
+  metascoreVerdict,
+  pickMainRating,
+  tomatoState,
+} = require("../utils/externalRatings");
 
 const mockCall = jest.fn();
 jest.mock("../firebase", () => ({ fns: { name: "fns" } }), { virtual: true });
@@ -24,6 +32,58 @@ describe("formatImdbVotes", () => {
     expect(formatImdbVotes(0)).toBeNull();
     expect(formatImdbVotes(null)).toBeNull();
     expect(formatImdbVotes("x")).toBeNull();
+  });
+});
+
+describe("formatCompactVotes", () => {
+  it("kısa oy sayısı: binlik K, milyonluk M; sondaki .0 atılır", () => {
+    expect(formatCompactVotes(845)).toBe("845");
+    expect(formatCompactVotes(1000)).toBe("1K");
+    expect(formatCompactVotes(12300)).toBe("12.3K");
+    expect(formatCompactVotes(12000)).toBe("12K");
+    expect(formatCompactVotes(999499)).toBe("999.5K");
+    expect(formatCompactVotes(999500)).toBe("1M");
+    expect(formatCompactVotes(2345678)).toBe("2.3M");
+    expect(formatCompactVotes(1500000)).toBe("1.5M");
+  });
+  it("geçersizde null", () => {
+    for (const bad of [0, -5, null, undefined, "x", NaN]) expect(formatCompactVotes(bad)).toBeNull();
+  });
+});
+
+describe("metascoreTone / tomatoState", () => {
+  it("Metacritic eşikleri: 61+ yeşil, 40–60 sarı, altı kırmızı", () => {
+    expect(metascoreTone(100)).toBe("green");
+    expect(metascoreTone(61)).toBe("green");
+    expect(metascoreTone(60)).toBe("yellow");
+    expect(metascoreTone(40)).toBe("yellow");
+    expect(metascoreTone(39)).toBe("red");
+    expect(metascoreTone(0)).toBe("red");
+  });
+  it("Metascore sözel değerlendirmesi (Metacritic aralıkları)", () => {
+    expect(metascoreVerdict(100)).toBe("universalAcclaim");
+    expect(metascoreVerdict(81)).toBe("universalAcclaim");
+    expect(metascoreVerdict(80)).toBe("favorable");
+    expect(metascoreVerdict(61)).toBe("favorable");
+    expect(metascoreVerdict(60)).toBe("mixed");
+    expect(metascoreVerdict(40)).toBe("mixed");
+    expect(metascoreVerdict(39)).toBe("unfavorable");
+    expect(metascoreVerdict(20)).toBe("unfavorable");
+    expect(metascoreVerdict(19)).toBe("overwhelmingDislike");
+    expect(metascoreVerdict(0)).toBe("overwhelmingDislike");
+    for (const bad of [null, undefined, "x", -1, 101]) expect(metascoreVerdict(bad)).toBeNull();
+  });
+  it("Rotten Tomatoes: %60 ve üstü taze, altı çürük", () => {
+    expect(tomatoState(100)).toBe("fresh");
+    expect(tomatoState(60)).toBe("fresh");
+    expect(tomatoState(59)).toBe("rotten");
+    expect(tomatoState(0)).toBe("rotten");
+  });
+  it("geçersiz değerde null", () => {
+    for (const bad of [null, undefined, "x", -1, 101, NaN]) {
+      expect(metascoreTone(bad)).toBeNull();
+      expect(tomatoState(bad)).toBeNull();
+    }
   });
 });
 

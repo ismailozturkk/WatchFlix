@@ -1,7 +1,12 @@
 // components/RatingSummary.js
 //
-// Detay ekranlarında derecelendirme özeti: HYBRID skoru (TMDB + uygulama oyları)
-// canlı dinler, yıldız + puan gösterir, dokununca puan verme sheet'ini açar.
+// Detay ekranlarında puan özeti — IMDb'deki gibi SADE: tek altın yıldız + "7.8/10" + altında kısa oy sayısı,
+// sağda "Puan ver" düğmesi (puan verdiysen kendi puanın). Eskiden beş yıldız şeridi, TMDB kişi sayacı, Seelogd
+// rozeti ve ikinci bir yıldızlı kullanıcı puanı yan yana duruyordu; satır çok yer kaplıyor ve karışık görünüyordu.
+//
+// PUAN: HYBRID skoru (TMDB + Seelogd oyları, canlı dinlenir — services/ratingsService.computeHybrid). Oy sayısı
+// iki kaynağın TOPLAMIDIR ve kısa biçimdedir (12.3K). IMDb puanı ayrıca altındaki çipte (components/detail/
+// ExternalRatingsRow). Biçim yardımcıları saf: utils/ratingSummaryModel.js.
 //
 //   <RatingSummary
 //     mediaType="movie"          // 'movie' | 'tv'
@@ -10,16 +15,20 @@
 //     tmdbCount={details.vote_count}
 //     onPressRate={() => setRatingVisible(true)}
 //   />
+//
+// Düğmenin üç hâli: Yayınlanmadı (kilitli) · Puan ver · Senin puanın (accent yıldız + sayı).
 
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { Ionicons, FontAwesome } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "@components/AppToast";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
+import { useLanguage } from "@context/LanguageContext";
 import { i18nText } from "@utils/i18nText";
 import { isUnreleased } from "@utils/watchState";
-import RatingStars from "@components/RatingStars";
+import { formatMyRating, formatScore, summarizeVotes } from "@utils/ratingSummaryModel";
+import { getRatingSummaryCopy } from "@utils/ratingSummaryCopy";
 import {
   mediaKey,
   subscribeToAggregate,
@@ -49,11 +58,12 @@ export default function RatingSummary({
   tmdbAvg = 0,
   tmdbCount = 0,
   onPressRate,
-  starSize = 16,
   releaseDate,
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const { language } = useLanguage();
+  const copy = getRatingSummaryCopy(language);
   const uid = user?.uid;
   const [agg, setAgg] = useState({ count: 0, sum: 0 });
   const [myRating, setMyRating] = useState(null); // kullanıcının kendi oyu (0-10) | null
@@ -74,7 +84,10 @@ export default function RatingSummary({
   }, [mediaType, mediaId, uid]);
 
   const hybrid = computeHybrid({ tmdbAvg, tmdbCount, count: agg.count, sum: agg.sum });
-  const hasMine = myRating != null && myRating > 0;
+  const score = formatScore(hybrid);
+  const votes = summarizeVotes(tmdbCount, agg.count);
+  const mine = formatMyRating(myRating);
+  const hasMine = mine !== null;
   // İçerik henüz yayınlanmadıysa puanlama kilitli. (Kendi oyu olan kullanıcıyı
   // kilitlemeyiz; tarihler geriye gitmese de mevcut oyunu yönetebilsin.)
   const locked = isUnreleased(releaseDate) && !hasMine;
@@ -101,56 +114,52 @@ export default function RatingSummary({
     onPressRate?.();
   };
 
+  const action = locked ? copy.locked : hasMine ? copy.rated(mine) : copy.rate;
+  const summary = score ? copy.score(score, votes) : copy.noScore;
+
   return (
     <TouchableOpacity
       style={styles.row}
       activeOpacity={0.7}
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={`${summary}. ${action}`}
     >
-      <RatingStars rating={hybrid} max={10} size={starSize} color={theme.colors.orange} />
-      <Text allowFontScaling={false} style={[styles.score, { color: theme.colors.orange }]}>
-        {hybrid.toFixed(1)}
-      </Text>
-
-      {/* TMDB oy sayısı */}
-      <View style={styles.voteRow}>
-        <FontAwesome name="user" size={11} color={theme.colors.blue} />
-        <Text allowFontScaling={false} style={[styles.voteCount, { color: theme.colors.blue }]}>
-          {Number(tmdbCount || 0).toLocaleString()}
-        </Text>
+      {/* Puan bloğu: altın yıldız + 7.8/10, altında kısa oy sayısı */}
+      <View style={styles.scoreBlock}>
+        <Ionicons name="star" size={26} color={score ? theme.colors.yellow : theme.text.muted} />
+        <View>
+          <Text allowFontScaling={false} style={styles.scoreLine}>
+            <Text style={[styles.score, { color: theme.text.primary }]}>{score ?? "–"}</Text>
+            {score ? <Text style={[styles.outOf, { color: theme.text.muted }]}>/10</Text> : null}
+          </Text>
+          {votes ? (
+            <Text allowFontScaling={false} style={[styles.votes, { color: theme.text.muted }]}>
+              {votes}
+            </Text>
+          ) : null}
+        </View>
       </View>
 
-      {/* Uygulama oyu varsa rozet */}
-      {agg.count > 0 && (
-        <View style={[styles.appBadge, { backgroundColor: theme.colors.green + "22" }]}>
-          <Ionicons name="people" size={10} color={theme.colors.green} />
-          <Text allowFontScaling={false} style={[styles.appBadgeText, { color: theme.colors.green }]}>
-            {agg.count}
-          </Text>
-        </View>
-      )}
-
-      {/* Yayın tarihi gelecekteyse puanlama kilitli */}
       {locked ? (
-        <View style={[styles.rateBtn, { borderColor: theme.text.muted + "55", backgroundColor: theme.text.muted + "1A" }]}>
-          <Ionicons name="lock-closed" size={12} color={theme.text.muted} />
-          <Text allowFontScaling={false} style={[styles.rateBtnText, { color: theme.text.muted }]}>
+        <View style={[styles.pill, { borderColor: theme.text.muted + "55", backgroundColor: theme.text.muted + "1A" }]}>
+          <Ionicons name="lock-closed" size={13} color={theme.text.muted} />
+          <Text allowFontScaling={false} style={[styles.pillText, { color: theme.text.muted }]}>
             {i18nText("autoI18n.yayinlanmadi", "Yayınlanmadı")}
           </Text>
         </View>
-      ) : /* Kullanıcının kendi oyu: VERDİYSE belli et (dolu yıldız + puan), aksi halde "Puan ver" */
-      hasMine ? (
-        <View style={[styles.rateBtn, { borderColor: theme.accent, backgroundColor: theme.accent }]}>
-          <Ionicons name="checkmark-circle" size={13} color="#fff" />
-          <RatingStars rating={myRating} max={10} count={5} size={11} color="#fff" spacing={0.5} />
-          <Text allowFontScaling={false} style={[styles.rateBtnText, { color: "#fff" }]}>
-            {myRating.toFixed(1)}
+      ) : hasMine ? (
+        // Kendi puanın: tek dolu accent yıldız + sayı (IMDb'deki mavi yıldız gibi)
+        <View style={[styles.pill, { borderColor: theme.accent, backgroundColor: theme.accent + "1A" }]}>
+          <Ionicons name="star" size={14} color={theme.accent} />
+          <Text allowFontScaling={false} style={[styles.pillText, { color: theme.accent }]}>
+            {mine}
           </Text>
         </View>
       ) : (
-        <View style={[styles.rateBtn, { borderColor: theme.accent + "55", backgroundColor: theme.accent + "1A" }]}>
-          <Ionicons name="star" size={12} color={theme.accent} />
-          <Text allowFontScaling={false} style={[styles.rateBtnText, { color: theme.accent }]}>
+        <View style={[styles.pill, { borderColor: theme.accent + "66", backgroundColor: "transparent" }]}>
+          <Ionicons name="star-outline" size={14} color={theme.accent} />
+          <Text allowFontScaling={false} style={[styles.pillText, { color: theme.accent }]}>
             {i18nText("autoI18n.puan_ver", "Puan ver")}
           </Text>
         </View>
@@ -160,27 +169,20 @@ export default function RatingSummary({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  score: { fontSize: 16, fontWeight: "700" },
-  voteRow: { flexDirection: "row", alignItems: "center", gap: 3 },
-  voteCount: { fontSize: 12, fontWeight: "600" },
-  appBadge: {
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  scoreBlock: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 },
+  scoreLine: { includeFontPadding: false },
+  score: { fontSize: 20, fontWeight: "800", letterSpacing: -0.3 },
+  outOf: { fontSize: 13, fontWeight: "600" },
+  votes: { fontSize: 11, fontWeight: "600", marginTop: -1 },
+  pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  appBadgeText: { fontSize: 11, fontWeight: "700" },
-  rateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    gap: 5,
+    minHeight: 34,
+    paddingHorizontal: 12,
+    borderRadius: 17,
     borderWidth: 1,
   },
-  rateBtnText: { fontSize: 12, fontWeight: "700" },
+  pillText: { fontSize: 13, fontWeight: "700" },
 });
