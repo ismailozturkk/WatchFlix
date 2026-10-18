@@ -37,7 +37,8 @@ import { gridEntranceIndex } from "@utils/entranceGate";
 import ListItemActionsSheet from "@components/lists/ListItemActionsSheet";
 import ListSearchBar from "@components/lists/ListSearchBar";
 import GlobalSearchResults from "@components/lists/GlobalSearchResults";
-import ListPosterInfoControls from "@components/lists/ListPosterInfoControls";
+import ListSortFilterSheet from "@components/lists/ListSortFilterSheet";
+import { getListSortFilterCopy } from "@utils/listSortFilterCopy";
 import ListPosterCard from "@components/lists/ListPosterCard";
 import {
   GRID_COLUMN_GAP,
@@ -92,25 +93,6 @@ const chunk = (arr, size) => {
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
 };
-
-const FilterChip = ({ label, selected, onPress, theme }) => (
-  <TouchableOpacity
-    activeOpacity={0.82}
-    onPress={onPress}
-    style={[
-      styles.filterChip,
-      {
-        backgroundColor: selected ? ACCENT + "22" : theme.primary,
-        borderColor: selected ? ACCENT : theme.border,
-      },
-    ]}
-  >
-    {selected ? <Ionicons name="checkmark" size={13} color={ACCENT} /> : null}
-    <Text style={[styles.filterChipText, { color: selected ? ACCENT : theme.text.secondary }]}>
-      {label}
-    </Text>
-  </TouchableOpacity>
-);
 
 export default function SharedListScreen({ route, navigation }) {
   const { width, height: windowHeight } = useWindowDimensions();
@@ -594,6 +576,148 @@ export default function SharedListScreen({ route, navigation }) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  // ── Sırala ve filtrele sayfasının içeriği ────────────────────────────────────
+  const sortFilterCopy = getListSortFilterCopy(language);
+  const sortOptions = [
+    { key: "default", label: i18nText("autoI18n.liste_sirasi", "Liste sırası"), icon: "list" },
+    { key: "newest", label: i18nText("autoI18n.en_yeni", "En yeni"), icon: "calendar" },
+    { key: "name", label: i18nText("autoI18n.ada_gore", "Ada göre"), icon: "type" },
+  ];
+  const resetSharedFilters = () => {
+    setTypeFilter("all");
+    setMemberFilter("all");
+    setGenreFilter([]);
+    setSortBy("default");
+  };
+  const memberFilterNode = (
+    <View style={styles.memberFilterList}>
+      <TouchableOpacity
+        activeOpacity={0.82}
+        onPress={() => setMemberFilter("all")}
+        style={[
+          styles.memberFilterRow,
+          {
+            backgroundColor:
+              memberFilter === "all" ? ACCENT + "18" : theme.primary,
+            borderColor: memberFilter === "all" ? ACCENT : theme.border,
+          },
+        ]}
+      >
+        <View style={[styles.memberFilterAllIcon, { backgroundColor: ACCENT + "22" }]}>
+          <Ionicons name="people" size={16} color={ACCENT} />
+        </View>
+        <Text style={[styles.memberFilterName, { color: theme.text.primary, flex: 1 }]}>
+          {i18nText("autoI18n.tum_uyeler", "Tüm üyeler")}
+        </Text>
+        <Text style={[styles.memberFilterTotal, { color: theme.text.muted }]}>
+          {items.length}
+        </Text>
+        {memberFilter === "all" ? (
+          <Ionicons name="checkmark-circle" size={20} color={ACCENT} />
+        ) : null}
+      </TouchableOpacity>
+      <View style={styles.memberFilterGrid}>
+      {visibleMemberFilters.map((member) => {
+        const selected = memberFilter === member.uid;
+        const sharedCount = memberContentCounts[member.uid] || 0;
+        return (
+          <TouchableOpacity
+            key={member.uid}
+            activeOpacity={0.82}
+            onPress={() => setMemberFilter(member.uid)}
+            style={[
+              styles.memberFilterCard,
+              {
+                backgroundColor: selected ? ACCENT + "18" : theme.primary,
+                borderColor: selected ? ACCENT : theme.border,
+              },
+            ]}
+          >
+            <UserAvatar source={member.avatarSource} isCustomPhoto size={30} style={{ marginBottom: 4 }} />
+            <Text
+              numberOfLines={1}
+              style={[styles.memberFilterCardName, { color: theme.text.primary }]}
+            >
+              {member.uid === uid
+                ? i18nText("autoI18n.sen", "Sen")
+                : member.name || member.username ||
+                  i18nText("autoI18n.uye", "Üye")}
+            </Text>
+            <Text style={[styles.memberFilterCardTotal, { color: theme.text.muted }]}>
+              {sharedCount}
+            </Text>
+            {selected ? (
+              <View style={[styles.memberFilterCheck, { backgroundColor: ACCENT }]}>
+                <Ionicons name="checkmark" size={11} color="#001018" />
+              </View>
+            ) : null}
+          </TouchableOpacity>
+        );
+      })}
+      </View>
+      {memberRows.length > 6 ? (
+        <TouchableOpacity
+          activeOpacity={0.82}
+          onPress={() => setMemberFiltersExpanded((current) => !current)}
+          style={[styles.memberFilterToggle, { backgroundColor: theme.primary, borderColor: theme.border }]}
+        >
+          <Ionicons
+            name={memberFiltersExpanded ? "chevron-up" : "chevron-down"}
+            size={15}
+            color={ACCENT}
+          />
+          <Text style={[styles.memberFilterToggleText, { color: ACCENT }]}>
+            {memberFiltersExpanded
+              ? i18nText("autoI18n.daralt", "Daralt")
+              : i18nText("autoI18n.tum_uyeleri_goster", "Tüm üyeleri göster")}
+          </Text>
+          {!memberFiltersExpanded ? (
+            <View style={[styles.memberFilterMoreCount, { backgroundColor: ACCENT + "20" }]}>
+              <Text style={[styles.memberFilterMoreCountText, { color: ACCENT }]}>
+                +{memberRows.length - 6}
+              </Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+  const filterSections = [
+    {
+      id: "type",
+      kind: "segment",
+      title: i18nText("autoI18n.tur", "TÜR"),
+      value: typeFilter,
+      onChange: setTypeFilter,
+      options: [
+        { key: "all", label: i18nText("autoI18n.hepsi", "Hepsi") },
+        { key: "movie", label: i18nText("autoI18n.film", "Film") },
+        { key: "tv", label: i18nText("autoI18n.dizi", "Dizi") },
+      ],
+    },
+    {
+      id: "member",
+      kind: "node",
+      title: i18nText("autoI18n.paylasan_uye", "PAYLAŞAN ÜYE"),
+      node: memberFilterNode,
+    },
+  ];
+  if (availableGenres.length) {
+    filterSections.push({
+      id: "genre",
+      kind: "multi",
+      title: i18nText("autoI18n.turler", "TÜRLER"),
+      options: availableGenres,
+      value: genreFilter,
+      onToggle: (genre) =>
+        setGenreFilter((current) =>
+          current.includes(genre) ? current.filter((value) => value !== genre) : [...current, genre],
+        ),
+      moreLabel: sortFilterCopy.moreChips,
+      lessLabel: sortFilterCopy.lessChips,
+    });
+  }
+
   // "Ekleyen" çipi posterin dibine yaslanır; kişisel puan rozeti onun üstüne kalkar (bottomSlotHeight).
   const ADDED_BY_SLOT = 26;
   const renderPoster = (item) => {
@@ -828,298 +952,33 @@ export default function SharedListScreen({ route, navigation }) {
         onDelete={removeSharedItem}
       />
 
-      <BottomSheetModal
+      <ListSortFilterSheet
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
-        sheetStyle={[
-          styles.filterSheet,
-          { backgroundColor: theme.secondary, borderColor: theme.border },
-        ]}
-      >
-        <View style={[styles.handle, { backgroundColor: theme.border }]} />
-        <View style={styles.filterHeader}>
-          <View style={[styles.sheetHeaderIcon, { backgroundColor: ACCENT + "20" }]}>
-            <Feather name="sliders" size={18} color={ACCENT} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.sheetTitle, { color: theme.text.primary }]}>
-              {i18nText("autoI18n.sirala_ve_filtrele", "Sırala ve filtrele")}
-            </Text>
-            <Text style={[styles.sheetSub, { color: theme.text.muted }]}>
-              {i18nText("autoI18n.n_sonuc", "{{n}} sonuç", { n: filteredItems.length })}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => {
-              setTypeFilter("all");
-              setMemberFilter("all");
-              setGenreFilter([]);
-              setSortBy("default");
-            }}
-          >
-            <Text style={{ color: ACCENT, fontSize: 12, fontWeight: "800" }}>
-              {i18nText("autoI18n.temizle", "Temizle")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <Text style={[styles.filterSection, { color: theme.text.muted }]}>
-            {i18nText("autoI18n.siralama", "SIRALAMA")}
-          </Text>
-          <View style={styles.chipRow}>
-            {[
-              ["default", i18nText("autoI18n.liste_sirasi", "Liste sırası")],
-              ["newest", i18nText("autoI18n.en_yeni", "En yeni")],
-              ["name", i18nText("autoI18n.ada_gore", "Ada göre")],
-            ].map(([key, label]) => (
-              <FilterChip
-                key={key}
-                label={label}
-                selected={sortBy === key}
-                onPress={() => setSortBy(key)}
-                theme={theme}
-              />
-            ))}
-          </View>
-          <Text style={[styles.filterSection, { color: theme.text.muted }]}>
-            {i18nText("autoI18n.gorunum", "GÖRÜNÜM")}
-          </Text>
-          <View style={styles.appearanceRow}>
-            {[
-              { key: 3, label: i18nText("autoI18n.uclu_dizilim", "3'lü") },
-              { key: 4, label: i18nText("autoI18n.dortlu_dizilim", "4'lü") },
-            ].map((option) => {
-              const selected = gridColumns === option.key;
-              return (
-                <TouchableOpacity
-                  key={option.key}
-                  activeOpacity={0.82}
-                  onPress={() => changeGridColumns(option.key)}
-                  style={[
-                    styles.appearanceButton,
-                    {
-                      backgroundColor: selected ? ACCENT : theme.primary,
-                      borderColor: selected ? ACCENT : theme.border,
-                    },
-                  ]}
-                >
-                  <Feather
-                    name="grid"
-                    size={15}
-                    color={selected ? "#001018" : theme.text.secondary}
-                  />
-                  <Text
-                    style={[
-                      styles.appearanceText,
-                      { color: selected ? "#001018" : theme.text.secondary },
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          <View style={[styles.appearanceRow, { marginTop: 8 }]}>
-            {[
-              { key: 2, label: i18nText("autoI18n.kose_koseli", "Köşeli"), preview: 3 },
-              { key: 10, label: i18nText("autoI18n.kose_normal", "Normal"), preview: 8 },
-              { key: 20, label: i18nText("autoI18n.kose_yuvarlak", "Yuvarlak"), preview: 14 },
-            ].map((option) => {
-              const selected = posterRadius === option.key;
-              return (
-                <TouchableOpacity
-                  key={option.key}
-                  activeOpacity={0.82}
-                  onPress={() => changePosterRadius(option.key)}
-                  style={[
-                    styles.appearanceButton,
-                    {
-                      backgroundColor: selected ? ACCENT : theme.primary,
-                      borderColor: selected ? ACCENT : theme.border,
-                    },
-                  ]}
-                >
-                  <View
-                    style={{
-                      width: 15,
-                      height: 19,
-                      borderRadius: option.preview,
-                      borderWidth: 1.6,
-                      borderColor: selected ? "#001018" : theme.text.secondary,
-                    }}
-                  />
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.appearanceText,
-                      { color: selected ? "#001018" : theme.text.secondary },
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          <Text style={[styles.filterSection, { color: theme.text.muted }]}>
-            {i18nText("autoI18n.poster_bilgileri", "POSTER BİLGİLERİ")}
-          </Text>
-          <ListPosterInfoControls
-            theme={theme}
-            accent={ACCENT}
-            value={listPosterInfo}
-            onValueChange={changeListPosterInfo}
-            showAddedBy
-          />
-          <Text style={[styles.filterSection, { color: theme.text.muted }]}>
-            {i18nText("autoI18n.tur", "TÜR")}
-          </Text>
-          <View style={styles.chipRow}>
-            {[
-              ["all", i18nText("autoI18n.hepsi", "Hepsi")],
-              ["movie", i18nText("autoI18n.film", "Film")],
-              ["tv", i18nText("autoI18n.dizi", "Dizi")],
-            ].map(([key, label]) => (
-              <FilterChip
-                key={key}
-                label={label}
-                selected={typeFilter === key}
-                onPress={() => setTypeFilter(key)}
-                theme={theme}
-              />
-            ))}
-          </View>
-          <Text style={[styles.filterSection, { color: theme.text.muted }]}>
-            {i18nText("autoI18n.paylasan_uye", "PAYLAŞAN ÜYE")}
-          </Text>
-          <View style={styles.memberFilterList}>
-            <TouchableOpacity
-              activeOpacity={0.82}
-              onPress={() => setMemberFilter("all")}
-              style={[
-                styles.memberFilterRow,
-                {
-                  backgroundColor:
-                    memberFilter === "all" ? ACCENT + "18" : theme.primary,
-                  borderColor: memberFilter === "all" ? ACCENT : theme.border,
-                },
-              ]}
-            >
-              <View style={[styles.memberFilterAllIcon, { backgroundColor: ACCENT + "22" }]}>
-                <Ionicons name="people" size={16} color={ACCENT} />
-              </View>
-              <Text style={[styles.memberFilterName, { color: theme.text.primary, flex: 1 }]}>
-                {i18nText("autoI18n.tum_uyeler", "Tüm üyeler")}
-              </Text>
-              <Text style={[styles.memberFilterTotal, { color: theme.text.muted }]}>
-                {items.length}
-              </Text>
-              {memberFilter === "all" ? (
-                <Ionicons name="checkmark-circle" size={20} color={ACCENT} />
-              ) : null}
-            </TouchableOpacity>
-            <View style={styles.memberFilterGrid}>
-            {visibleMemberFilters.map((member) => {
-              const selected = memberFilter === member.uid;
-              const sharedCount = memberContentCounts[member.uid] || 0;
-              return (
-                <TouchableOpacity
-                  key={member.uid}
-                  activeOpacity={0.82}
-                  onPress={() => setMemberFilter(member.uid)}
-                  style={[
-                    styles.memberFilterCard,
-                    {
-                      backgroundColor: selected ? ACCENT + "18" : theme.primary,
-                      borderColor: selected ? ACCENT : theme.border,
-                    },
-                  ]}
-                >
-                  <UserAvatar source={member.avatarSource} isCustomPhoto size={30} style={{ marginBottom: 4 }} />
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.memberFilterCardName, { color: theme.text.primary }]}
-                  >
-                    {member.uid === uid
-                      ? i18nText("autoI18n.sen", "Sen")
-                      : member.name || member.username ||
-                        i18nText("autoI18n.uye", "Üye")}
-                  </Text>
-                  <Text style={[styles.memberFilterCardTotal, { color: theme.text.muted }]}>
-                    {sharedCount}
-                  </Text>
-                  {selected ? (
-                    <View style={[styles.memberFilterCheck, { backgroundColor: ACCENT }]}>
-                      <Ionicons name="checkmark" size={11} color="#001018" />
-                    </View>
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
-            </View>
-            {memberRows.length > 6 ? (
-              <TouchableOpacity
-                activeOpacity={0.82}
-                onPress={() => setMemberFiltersExpanded((current) => !current)}
-                style={[styles.memberFilterToggle, { backgroundColor: theme.primary, borderColor: theme.border }]}
-              >
-                <Ionicons
-                  name={memberFiltersExpanded ? "chevron-up" : "chevron-down"}
-                  size={15}
-                  color={ACCENT}
-                />
-                <Text style={[styles.memberFilterToggleText, { color: ACCENT }]}>
-                  {memberFiltersExpanded
-                    ? i18nText("autoI18n.daralt", "Daralt")
-                    : i18nText("autoI18n.tum_uyeleri_goster", "Tüm üyeleri göster")}
-                </Text>
-                {!memberFiltersExpanded ? (
-                  <View style={[styles.memberFilterMoreCount, { backgroundColor: ACCENT + "20" }]}>
-                    <Text style={[styles.memberFilterMoreCountText, { color: ACCENT }]}>
-                      +{memberRows.length - 6}
-                    </Text>
-                  </View>
-                ) : null}
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          {availableGenres.length ? (
-            <>
-              <Text style={[styles.filterSection, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.turler", "TÜRLER")}
-              </Text>
-              <View style={styles.chipRow}>
-                {availableGenres.map((genre) => (
-                  <FilterChip
-                    key={genre}
-                    label={genre}
-                    selected={genreFilter.includes(genre)}
-                    onPress={() =>
-                      setGenreFilter((current) =>
-                        current.includes(genre)
-                          ? current.filter((value) => value !== genre)
-                          : [...current, genre],
-                      )
-                    }
-                    theme={theme}
-                  />
-                ))}
-              </View>
-            </>
-          ) : null}
-        </ScrollView>
-        <TouchableOpacity
-          onPress={() => setFilterVisible(false)}
-          style={[styles.applyButton, { backgroundColor: ACCENT }]}
-        >
-          <Text style={styles.applyText}>
-            {i18nText("autoI18n.n_sonuc_goster", "{{n}} sonuç göster", {
-              n: filteredItems.length,
-            })}
-          </Text>
-        </TouchableOpacity>
-      </BottomSheetModal>
+        theme={theme}
+        accent={ACCENT}
+        copy={sortFilterCopy}
+        resultCount={filteredItems.length}
+        activeCount={activeFilterCount}
+        onReset={resetSharedFilters}
+        sort={{
+          options: sortOptions,
+          value: sortBy,
+          dir: "desc",
+          supportsDir: false,
+          onChange: ({ key }) => setSortBy(key),
+        }}
+        sections={filterSections}
+        view={{
+          columns: gridColumns,
+          onColumns: changeGridColumns,
+          radius: posterRadius,
+          onRadius: changePosterRadius,
+          posterInfo: listPosterInfo,
+          onPosterInfo: changeListPosterInfo,
+          showAddedBy: true,
+        }}
+      />
 
       {/* ── Üyeler modalı ── */}
       <BottomSheetModal
@@ -1547,35 +1406,6 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   sheetActionText: { fontSize: 13, fontWeight: "800" },
-  filterSheet: {
-    maxHeight: "78%",
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 24,
-  },
-  filterHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
-  filterSection: { fontSize: 10.5, fontWeight: "800", letterSpacing: 1, marginTop: 16, marginBottom: 9 },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  appearanceRow: { flexDirection: "row", gap: 8 },
-  appearanceButton: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-  },
-  appearanceText: { flexShrink: 1, fontSize: 11.5, fontWeight: "800" },
-  filterChip: { minHeight: 36, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
-  filterChipText: { fontSize: 12.5, fontWeight: "700" },
   memberFilterList: { gap: 8 },
   memberFilterGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   memberFilterRow: {
@@ -1631,6 +1461,4 @@ const styles = StyleSheet.create({
   memberFilterToggleText: { fontSize: 11.5, fontWeight: "800" },
   memberFilterMoreCount: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   memberFilterMoreCountText: { fontSize: 9.5, fontWeight: "900" },
-  applyButton: { height: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", marginTop: 18 },
-  applyText: { color: "#001018", fontSize: 14, fontWeight: "900" },
 });

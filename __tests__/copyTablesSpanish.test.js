@@ -23,6 +23,7 @@ const { TASTE_MATCH_COPY } = require("../utils/tasteMatchCopy");
 const { MEDIA_LINK_COPY } = require("../utils/mediaLinkCopy");
 const { EXTERNAL_ENTRY_COPY } = require("../utils/externalEntryCopy");
 const { WATCH_PICKER_COPY } = require("../utils/watchPickerCopy");
+const { LIST_SORT_FILTER_COPY } = require("../utils/listSortFilterCopy");
 const { RATING_SUMMARY_COPY } = require("../utils/ratingSummaryCopy");
 const { EXTERNAL_RATINGS_COPY } = require("../utils/externalRatingsCopy");
 
@@ -91,6 +92,7 @@ const TABLOLAR = {
   "Bağlantıdan aç (mediaLinkCopy)": () => MEDIA_LINK_COPY,
   "Dış giriş: paylaşım + kısayollar (externalEntryCopy)": () => EXTERNAL_ENTRY_COPY,
   "Ne izlesem? (watchPickerCopy)": () => WATCH_PICKER_COPY,
+  "Sırala ve filtrele (listSortFilterCopy)": () => LIST_SORT_FILTER_COPY,
   "Puan özeti (ratingSummaryCopy)": () => RATING_SUMMARY_COPY,
   "Harici puanlar (externalRatingsCopy)": () => EXTERNAL_RATINGS_COPY,
   "Wrapped (wrappedStrings)": () => ({

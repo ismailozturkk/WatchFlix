@@ -51,7 +51,8 @@ import ListItemActionsSheet from "@components/lists/ListItemActionsSheet";
 import GlassIconButton from "@components/common/GlassIconButton";
 import ShareToChatSheet from "@components/chat/ShareToChatSheet";
 import { buildListShare } from "@utils/chatShare";
-import ListPosterInfoControls from "@components/lists/ListPosterInfoControls";
+import ListSortFilterSheet from "@components/lists/ListSortFilterSheet";
+import { getListSortFilterCopy } from "@utils/listSortFilterCopy";
 import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -127,7 +128,6 @@ export default function ListsScreen({ route, navigation }) {
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   // ── Sıralama & filtreleme ───────────────────────────────────────────────
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const filterSheet = useSheetTransition(filterModalVisible);
   const [sortBy, setSortBy] = useState("default"); // default | dateAdded | name | minutes
   const [sortDir, setSortDir] = useState("desc"); // asc | desc
   const [typeFilter, setTypeFilter] = useState("all"); // all | movie | tv
@@ -907,6 +907,75 @@ export default function ListsScreen({ route, navigation }) {
       </View>
     </SkeletonPlaceholder>
   );
+  // ── Sırala ve filtrele sayfasının içeriği ────────────────────────────────────
+  const sortFilterCopy = getListSortFilterCopy(language);
+  const sortOptions = [
+    { key: "default", label: i18nText("autoI18n.liste_sirasi", "Liste sırası"), icon: "list" },
+    { key: "dateAdded", label: i18nText("autoI18n.eklenme_tarihi", "Eklenme tarihi"), icon: "calendar" },
+    { key: "name", label: i18nText("autoI18n.isim", "İsim"), icon: "type" },
+    { key: "minutes", label: i18nText("autoI18n.sure", "Süre"), icon: "clock" },
+  ];
+  const filterSections = [];
+  // Tür süzgeci karışık listelerde anlamlı (izlenen filmler / diziler tek türdür).
+  if (listName !== "watchedMovies" && listName !== "watchedTv") {
+    filterSections.push({
+      id: "type",
+      kind: "segment",
+      title: i18nText("autoI18n.tur", "TÜR"),
+      value: typeFilter,
+      onChange: setTypeFilter,
+      options: [
+        { key: "all", label: i18nText("autoI18n.hepsi", "Hepsi") },
+        { key: "movie", label: t.typeMovies || i18nText("autoI18n.film", "Film") },
+        { key: "tv", label: t.typeTvSeries || i18nText("autoI18n.dizi", "Dizi") },
+      ],
+    });
+  }
+  // Platformlarım (yalnız izleme listesi; sunucu snapshot'ı) — kendi başlığını ve durum notlarını çizer.
+  if (isWatchList && platformPlan) {
+    filterSections.push({
+      id: "platform",
+      kind: "node",
+      node: (
+        <PlatformFilterSection
+          plan={platformPlan}
+          selected={platformOnly}
+          onToggle={togglePlatformOnly}
+          copy={providerCopy}
+          theme={theme}
+          accent={accent}
+        />
+      ),
+    });
+  }
+  if (hasDates) {
+    filterSections.push({
+      id: "date",
+      kind: "chips",
+      title: i18nText("autoI18n.eklenme_tarihi", "EKLENME TARİHİ"),
+      value: dateRange,
+      onChange: setDateRange,
+      options: [
+        { key: "all", label: i18nText("autoI18n.tumu", "Tümü") },
+        { key: "7", label: i18nText("autoI18n.son_7_gun", "Son 7 gün") },
+        { key: "30", label: i18nText("autoI18n.son_30_gun", "Son 30 gün") },
+        { key: "365", label: i18nText("autoI18n.son_1_yil", "Son 1 yıl") },
+      ],
+    });
+  }
+  if (availableGenres.length > 0) {
+    filterSections.push({
+      id: "genre",
+      kind: "multi",
+      title: i18nText("autoI18n.turler", "TÜRLER"),
+      options: availableGenres,
+      value: genreFilter,
+      onToggle: toggleGenre,
+      moreLabel: sortFilterCopy.moreChips,
+      lessLabel: sortFilterCopy.lessChips,
+    });
+  }
+
   // "Ne izlesem?": havuz, o an görünen (arama / süzgeç uygulanmış) liste. Tür seçimi sayfanın içinde.
   const pickerCopy = useMemo(() => getWatchPickerCopy(language), [language]);
   const pickerFiltered =
@@ -1962,359 +2031,38 @@ export default function ListsScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      {/* ── Sıralama & Filtreleme modalı ── */}
-      <Modal
-        animationType="none"
-        transparent
-        visible={filterSheet.mounted}
-        onRequestClose={() => setFilterModalVisible(false)}
-      >
-        <View
-          style={{ flex: 1, justifyContent: "flex-end" }}
-          onLayout={filterSheet.onOverlayLayout}
-        >
-          {/* Blur YERİNDE solar — sayfayla birlikte kaymaz. */}
-          <Animated.View
-            style={[
-              StyleSheet.absoluteFill,
-              { opacity: filterSheet.backdropOpacity },
-            ]}
-          >
-            <ModalBlurBackdrop intensity={30} />
-          </Animated.View>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setFilterModalVisible(false)}
-          />
-          <Animated.View
-            onLayout={filterSheet.onSheetLayout}
-            style={[
-              fStyles.sheet,
-              { backgroundColor: theme.primary, borderColor: theme.border },
-              filterSheet.sheetStyle,
-            ]}
-          >
-            <View style={[fStyles.handle, { backgroundColor: theme.border }]} />
-
-            <View style={fStyles.headerRow}>
-              <Text style={[fStyles.title, { color: theme.text.primary }]}>{i18nText("autoI18n.sirala_filtrele", "Sırala & Filtrele")}</Text>
-              <TouchableOpacity onPress={resetFilters} hitSlop={8}>
-                <Text style={[fStyles.reset, { color: theme.between }]}>{i18nText("autoI18n.sifirla", "Sıfırla")}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 10 }}
-            >
-              {/* Sıralama */}
-              <Text style={[fStyles.section, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.siralama_upper", "SIRALAMA")}
-              </Text>
-              {[
-                { key: "default", label: i18nText("autoI18n.varsayilan_liste_sirasi", "Varsayılan (liste sırası)"), icon: "list" },
-                { key: "dateAdded", label: i18nText("autoI18n.eklenme_tarihi", "Eklenme tarihi"), icon: "calendar" },
-                { key: "name", label: i18nText("autoI18n.isim", "İsim"), icon: "type" },
-                { key: "minutes", label: i18nText("autoI18n.sure", "Süre"), icon: "clock" },
-              ].map((opt) => {
-                const selected = sortBy === opt.key;
-                return (
-                  <TouchableOpacity
-                    key={opt.key}
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      if (opt.key === "default") setSortBy("default");
-                      else if (selected)
-                        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-                      else setSortBy(opt.key);
-                    }}
-                    style={[
-                      fStyles.sortRow,
-                      {
-                        backgroundColor: selected
-                          ? theme.between + "18"
-                          : theme.secondary,
-                        borderColor: selected ? theme.between : theme.border,
-                      },
-                    ]}
-                  >
-                    <Feather
-                      name={opt.icon}
-                      size={16}
-                      color={selected ? theme.between : theme.text.secondary}
-                    />
-                    <Text
-                      style={[
-                        fStyles.sortLabel,
-                        { color: selected ? theme.text.primary : theme.text.secondary },
-                      ]}
-                    >
-                      {opt.label}
-                    </Text>
-                    {selected && opt.key !== "default" ? (
-                      <View style={fStyles.dirWrap}>
-                        <Feather
-                          name={sortDir === "asc" ? "arrow-up" : "arrow-down"}
-                          size={15}
-                          color={theme.between}
-                        />
-                        <Text style={[fStyles.dirText, { color: theme.between }]}>
-                          {sortDir === "asc" ? "Artan" : "Azalan"}
-                        </Text>
-                      </View>
-                    ) : selected ? (
-                      <Feather name="check" size={16} color={theme.between} />
-                    ) : null}
-                  </TouchableOpacity>
-                );
-              })}
-
-              {/* Görünüm — sütun sayısı & köşe yuvarlaklığı */}
-              <Text style={[fStyles.section, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.gorunum", "GÖRÜNÜM")}
-              </Text>
-              <View style={fStyles.segRow}>
-                {[
-                  { key: 3, label: i18nText("autoI18n.uclu_dizilim", "3'lü") },
-                  { key: 4, label: i18nText("autoI18n.dortlu_dizilim", "4'lü") },
-                ].map((opt) => {
-                  const sel = gridColumns === opt.key;
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      activeOpacity={0.8}
-                      onPress={() => changeGridColumns(opt.key)}
-                      style={[
-                        fStyles.segBtn,
-                        {
-                          flexDirection: "row",
-                          justifyContent: "center",
-                          gap: 7,
-                          backgroundColor: sel ? theme.between : theme.secondary,
-                          borderColor: sel ? theme.between : theme.border,
-                        },
-                      ]}
-                    >
-                      <Feather
-                        name="grid"
-                        size={15}
-                        color={sel ? "#fff" : theme.text.secondary}
-                      />
-                      <Text
-                        style={[
-                          fStyles.segText,
-                          { color: sel ? "#fff" : theme.text.secondary },
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <View style={[fStyles.segRow, { marginTop: 8 }]}>
-                {[
-                  { key: 2, label: i18nText("autoI18n.kose_koseli", "Köşeli"), r: 3 },
-                  { key: 10, label: i18nText("autoI18n.kose_normal", "Normal"), r: 8 },
-                  { key: 20, label: i18nText("autoI18n.kose_yuvarlak", "Yuvarlak"), r: 14 },
-                ].map((opt) => {
-                  const sel = posterRadius === opt.key;
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      activeOpacity={0.8}
-                      onPress={() => changePosterRadius(opt.key)}
-                      style={[
-                        fStyles.segBtn,
-                        {
-                          flexDirection: "row",
-                          justifyContent: "center",
-                          gap: 7,
-                          backgroundColor: sel ? theme.between : theme.secondary,
-                          borderColor: sel ? theme.between : theme.border,
-                        },
-                      ]}
-                    >
-                      <View
-                        style={{
-                          width: 15,
-                          height: 19,
-                          borderRadius: opt.r,
-                          borderWidth: 1.6,
-                          borderColor: sel ? "#fff" : theme.text.secondary,
-                        }}
-                      />
-                      <Text
-                        style={[
-                          fStyles.segText,
-                          { color: sel ? "#fff" : theme.text.secondary },
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={[fStyles.section, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.poster_bilgileri", "POSTER BİLGİLERİ")}
-              </Text>
-              <ListPosterInfoControls
-                theme={theme}
-                accent={accent}
-                value={listPosterInfo}
-                onValueChange={changeListPosterInfo}
-              />
-
-              {/* Tür (yalnız karışık listelerde) */}
-              {listName !== "watchedMovies" && listName !== "watchedTv" ? (
-                <>
-                  <Text style={[fStyles.section, { color: theme.text.muted }]}>{i18nText("autoI18n.tur", "TÜR")}</Text>
-                  <View style={fStyles.segRow}>
-                    {[
-                      { key: "all", label: i18nText("autoI18n.hepsi", "Hepsi") },
-                      { key: "movie", label: t.typeMovies || i18nText("autoI18n.film", "Film") },
-                      { key: "tv", label: t.typeTvSeries || i18nText("autoI18n.dizi", "Dizi") },
-                    ].map((opt) => {
-                      const sel = typeFilter === opt.key;
-                      return (
-                        <TouchableOpacity
-                          key={opt.key}
-                          activeOpacity={0.8}
-                          onPress={() => setTypeFilter(opt.key)}
-                          style={[
-                            fStyles.segBtn,
-                            {
-                              backgroundColor: sel ? theme.between : theme.secondary,
-                              borderColor: sel ? theme.between : theme.border,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              fStyles.segText,
-                              { color: sel ? "#fff" : theme.text.secondary },
-                            ]}
-                          >
-                            {opt.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </>
-              ) : null}
-
-              {/* Platformlarım (yalnız izleme listesi; sunucu snapshot'ı) */}
-              {isWatchList && platformPlan ? (
-                <PlatformFilterSection
-                  plan={platformPlan}
-                  selected={platformOnly}
-                  onToggle={togglePlatformOnly}
-                  copy={providerCopy}
-                  theme={theme}
-                  accent={accent}
-                />
-              ) : null}
-
-              {/* Eklenme tarihi aralığı */}
-              {hasDates ? (
-                <>
-                  <Text style={[fStyles.section, { color: theme.text.muted }]}>{i18nText("autoI18n.eklenme_tarihi", "EKLENME TARİHİ")}</Text>
-                  <View style={fStyles.chipsWrap}>
-                    {[
-                      { key: "all", label: i18nText("autoI18n.tumu", "Tümü") },
-                      { key: "7", label: i18nText("autoI18n.son_7_gun", "Son 7 gün") },
-                      { key: "30", label: i18nText("autoI18n.son_30_gun", "Son 30 gün") },
-                      { key: "365", label: i18nText("autoI18n.son_1_yil", "Son 1 yıl") },
-                    ].map((opt) => {
-                      const sel = dateRange === opt.key;
-                      return (
-                        <TouchableOpacity
-                          key={opt.key}
-                          activeOpacity={0.8}
-                          onPress={() => setDateRange(opt.key)}
-                          style={[
-                            fStyles.chip,
-                            {
-                              backgroundColor: sel
-                                ? theme.between + "22"
-                                : theme.secondary,
-                              borderColor: sel ? theme.between : theme.border,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              fStyles.chipText,
-                              { color: sel ? theme.between : theme.text.secondary },
-                            ]}
-                          >
-                            {opt.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </>
-              ) : null}
-
-              {/* Türler (genre) */}
-              {availableGenres.length > 0 ? (
-                <>
-                  <Text style={[fStyles.section, { color: theme.text.muted }]}>{i18nText("autoI18n.turler", "TÜRLER")}</Text>
-                  <View style={fStyles.chipsWrap}>
-                    {availableGenres.map((g) => {
-                      const sel = genreFilter.includes(g);
-                      return (
-                        <TouchableOpacity
-                          key={g}
-                          activeOpacity={0.8}
-                          onPress={() => toggleGenre(g)}
-                          style={[
-                            fStyles.chip,
-                            {
-                              backgroundColor: sel
-                                ? theme.between + "22"
-                                : theme.secondary,
-                              borderColor: sel ? theme.between : theme.border,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              fStyles.chipText,
-                              { color: sel ? theme.between : theme.text.secondary },
-                            ]}
-                          >
-                            {g}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </>
-              ) : null}
-            </ScrollView>
-
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => setFilterModalVisible(false)}
-              style={[fStyles.applyBtn, { backgroundColor: accent }]}
-            >
-              {filtering ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={fStyles.applyText}>
-                  {filteredItems.length}{i18nText("autoI18n.sonuc_goster", "sonuç göster")}</Text>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-        <ModalToastHost visible={filterModalVisible} />
-      </Modal>
+      {/* ── Sırala ve filtrele (ortak kompakt sayfa; bkz. components/lists/ListSortFilterSheet) ── */}
+      <ListSortFilterSheet
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        theme={theme}
+        accent={accent}
+        copy={sortFilterCopy}
+        resultCount={filteredItems.length}
+        filtering={filtering}
+        activeCount={activeFilterCount + (sortActive ? 1 : 0)}
+        onReset={resetFilters}
+        sort={{
+          options: sortOptions,
+          value: sortBy,
+          dir: sortDir,
+          supportsDir: true,
+          onChange: ({ key, dir }) => {
+            setSortBy(key);
+            setSortDir(dir);
+          },
+        }}
+        sections={filterSections}
+        view={{
+          columns: gridColumns,
+          onColumns: changeGridColumns,
+          radius: posterRadius,
+          onRadius: changePosterRadius,
+          posterInfo: listPosterInfo,
+          onPosterInfo: changeListPosterInfo,
+          showAddedBy: false,
+        }}
+      />
 
       {/* ── İzleme tarihi — global aramadan izlenenler listesine ekleme ── */}
       <DatePickerModal
@@ -2726,74 +2474,3 @@ const styles = StyleSheet.create({
 });
 
 // ── Sıralama & filtreleme modalı stilleri ──────────────────────────────────
-const fStyles = StyleSheet.create({
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 16,
-    maxHeight: height * 0.82,
-  },
-  handle: {
-    alignSelf: "center",
-    width: 42,
-    height: 5,
-    borderRadius: 3,
-    marginBottom: 14,
-    opacity: 0.6,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  title: { fontSize: 18, fontWeight: "800", letterSpacing: -0.3 },
-  reset: { fontSize: 14, fontWeight: "700" },
-  section: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
-    marginTop: 16,
-    marginBottom: 9,
-  },
-  sortRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  sortLabel: { flex: 1, fontSize: 14.5, fontWeight: "600" },
-  dirWrap: { flexDirection: "row", alignItems: "center", gap: 4 },
-  dirText: { fontSize: 12, fontWeight: "700" },
-  segRow: { flexDirection: "row", gap: 8 },
-  segBtn: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  segText: { fontSize: 13.5, fontWeight: "700" },
-  chipsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  chipText: { fontSize: 13, fontWeight: "600" },
-  applyBtn: {
-    marginTop: 14,
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  applyText: { color: "#fff", fontSize: 15, fontWeight: "800" },
-});

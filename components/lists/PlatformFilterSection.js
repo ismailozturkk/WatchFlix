@@ -67,17 +67,18 @@ export default function PlatformFilterSection({ plan, selected, onToggle, copy, 
 }
 
 const styles = StyleSheet.create({
-  section: { fontSize: 11, fontWeight: "800", letterSpacing: 1, marginTop: 16, marginBottom: 9 },
+  // Üst boşluğu sayfanın bölüm kabuğu verir (ListSortFilterSheet); başlık diğer bölümlerle aynı biçimde.
+  section: { fontSize: 10.5, fontWeight: "800", letterSpacing: 0.9, marginBottom: 7 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 20,
+    minHeight: 34,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     borderWidth: 1,
   },
-  chipText: { fontSize: 13, fontWeight: "600" },
-  note: { fontSize: 12, lineHeight: 17, marginTop: 8 },
+  chipText: { fontSize: 12.5, fontWeight: "700" },
+  note: { fontSize: 11.5, lineHeight: 16, marginTop: 6 },
 });
