@@ -5,7 +5,7 @@ import {
   View,
   Image,
   TouchableOpacity,
-  ScrollView,
+  Pressable,
   Animated,
   InteractionManager,
 } from "react-native";
@@ -13,13 +13,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
 
 import React, {
+  memo,
   useEffect,
   useState,
   useCallback,
   useMemo,
   useRef,
 } from "react";
-import Skeleton from "../../components/SkeletonGraph";
 import axios from "axios";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLanguage } from "../../context/LanguageContext";
@@ -29,6 +29,7 @@ import { fetchSeasonRatings, fetchTitleRatings } from "../../services/externalRa
 import { mergeEpisodeRatings, pickMainRating } from "../../utils/externalRatings";
 import { getRatingColors } from "../../utils/ratingColors";
 import { TV_GRAPH_GRID_SIZES } from "../../utils/tvGraphGrid";
+import TvGraphGrid from "../../components/tv/TvGraphGrid";
 
 import {
   useApiSettings,
@@ -47,147 +48,137 @@ import ScreenDecor from "../../components/ScreenDecor";
 // kareler %28 küçülürken aralarındaki boşluk aynı kalıyor ve ızgara
 // seyrekleşmiş görünüyordu. Artık boşluk da hücreyle aynı oranda küçülür —
 // görünüm yalnızca ÖLÇEKLENİR.
+//
+// Izgaranın kendisi (sanallaştırılmış liste, satır/hücre) components/tv/TvGraphGrid.js'te.
 const GRID_SIZES = TV_GRAPH_GRID_SIZES;
 
-// ─── Bölüm Hücresi (Memoize) ──────────────────────────────────────────────────
-const EpisodeCell = React.memo(
-  ({
-    episode,
-    seasonNumber,
-    episodeIndex,
-    isSelected,
-    onPress,
-    borderColor,
-    grid,
-  }) => {
-    const { bg, text } = getRatingColors(episode.vote_average);
-    const rating = episode.vote_average
-      ? episode.vote_average.toFixed(1)
-      : "N/A";
+const GRID_MODE_ICONS = [
+  { key: "default", icon: "expand-outline" },
+  { key: "compact", icon: "contract-outline" },
+  { key: "heatmap", icon: "grid-outline" },
+];
 
-    // Koordinatlar hücrenin kendi içinde bağlanır — böylece ızgara `onPress`e
-    // her render'da yeni bir arrow geçirmek zorunda kalmaz ve memo tutar.
-    const handlePress = useCallback(
-      () => onPress(seasonNumber, episodeIndex),
-      [onPress, seasonNumber, episodeIndex],
-    );
-
-    return (
-      <TouchableOpacity
-        onPress={handlePress}
-        accessibilityRole="button"
-        accessibilityLabel={`${i18nText("season", "Sezon")} ${seasonNumber}, ${i18nText("episode", "Bölüm")} ${episodeIndex + 1}, ${i18nText("rating", "Puan")} ${rating}`}
-        accessibilityState={{ selected: isSelected }}
-        activeOpacity={0.75}
-        style={[
-          styles.cell,
-          {
-            width: grid.cell,
-            height: grid.cell,
-            marginVertical: grid.margin,
-            marginHorizontal: grid.margin,
-            borderRadius: grid.radius,
-            backgroundColor: bg,
-            borderWidth: 1.5,
-            borderColor: isSelected ? "#fff" : borderColor,
-            transform: [{ scale: isSelected ? 1.08 : 1 }],
-          },
-        ]}
-      >
-        {!grid.colorOnly && <>
-        <Text
-          style={[
-            styles.cellSeasonLabel,
-            {
-              color: text,
-              opacity: 0.55,
-              fontSize: grid.label,
-              top: grid.labelOffset,
-              left: grid.labelOffset + 1,
-            },
-          ]}
-        >
-          S{seasonNumber}
-        </Text>
-        <Text style={[styles.cellRating, { color: text, fontSize: grid.rating }]}>
-          {rating}
-        </Text>
-        <Text
-          style={[
-            styles.cellEpisodeLabel,
-            {
-              color: text,
-              opacity: 0.55,
-              fontSize: grid.label,
-              bottom: grid.labelOffset,
-              right: grid.labelOffset + 1,
-            },
-          ]}
-        >
-          E{episodeIndex + 1}
-        </Text>
-        </>}
-      </TouchableOpacity>
-    );
-  },
+// ─── Üst Çubuk ────────────────────────────────────────────────────────────────
+// Geri düğmesi eskiden `top={8}` ile mutlak konumlanıyordu. Mutlak öğe, üst kabın
+// (SafeAreaView) iç boşluğunu yok sayar; yani düğme güvenli alanın İÇİNE, durum
+// çubuğu / bildirim alanına düşüyordu. Artık akışın içinde bir satır: güvenli alan
+// boşluğunu SafeAreaView veriyor, düğme onun altında kalıyor.
+const TopBar = ({ children }) => (
+  <View style={styles.topBar}>
+    <BackButton absolute={false} />
+    {children}
+  </View>
 );
+
+// Izgara boyutu seçici: panelin içinden çıkıp üst çubuğa taşındı (panelin sağ
+// kenarındaki dikey yığın, seçili bölümde kapat düğmesiyle çakışmasın diye
+// `top: 44` kaydırması gerektiriyordu).
+const GridModeSwitch = memo(function GridModeSwitch({ options, value, onChange, theme }) {
+  return (
+    <View
+      style={[
+        styles.modeSwitch,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
+    >
+      {options.map((option) => {
+        const active = value === option.key;
+        return (
+          <Pressable
+            key={option.key}
+            onPress={() => onChange(option.key)}
+            accessibilityRole="button"
+            accessibilityLabel={option.label}
+            accessibilityState={{ selected: active }}
+            hitSlop={3}
+            style={({ pressed }) => [
+              styles.modeBtn,
+              active && { backgroundColor: theme.accent },
+              pressed && !active && styles.modeBtnPressed,
+            ]}
+          >
+            <Ionicons
+              name={option.icon}
+              size={16}
+              color={active ? "#fff" : theme.text.primary}
+            />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+});
 
 // ─── Skeleton Loading ─────────────────────────────────────────────────────────
-const SkeletonLoading = ({ theme }) => (
-  <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-    <View
-      style={[styles.infoPanelContainer, { backgroundColor: theme.secondary }]}
-    >
-      <Skeleton
-        width={90}
-        height={130}
-        style={{ borderRadius: 10, backgroundColor: theme.between }}
-      />
-      <View style={{ flex: 1, marginLeft: 14, gap: 10 }}>
-        <Skeleton
-          width={180}
-          height={22}
-          style={{ backgroundColor: theme.between, borderRadius: 6 }}
-        />
-        <Skeleton
-          width={120}
-          height={14}
-          style={{ backgroundColor: theme.between, borderRadius: 6 }}
-        />
-        <Skeleton
-          width={80}
-          height={18}
-          style={{ backgroundColor: theme.between, borderRadius: 6 }}
-        />
-        <Skeleton
-          width={140}
-          height={12}
-          style={{ backgroundColor: theme.between, borderRadius: 6 }}
-        />
-      </View>
-    </View>
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={{ margin: 10 }}>
-        {[...Array(12)].map((_, rowIndex) => (
-          <View key={rowIndex} style={[styles.row, { gap: 0 }]}>
-            {[...Array(7)].map((_, colIndex) => (
-              <View
-                key={colIndex}
-                style={[styles.cell, { backgroundColor: theme.secondary }]}
-              >
-                <Skeleton
-                  width={50}
-                  height={50}
-                  style={{ backgroundColor: theme.between, borderRadius: 8 }}
-                />
-              </View>
-            ))}
+// Eskiden 84+ ayrı <Skeleton> vardı ve her biri kendi sonsuz Animated.loop'unu
+// çalıştırıyordu. Şimdi TEK bir nabız değeri, yalnız kapsayıcının saydamlığını
+// sürer; içerik düz View'lardan oluşur.
+const SKELETON_COLUMNS = 7;
+const SKELETON_ROWS = 12;
+
+const SkeletonLoading = ({ theme }) => {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1000, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.8] });
+
+  const block = (width, height, radius = 6) => ({
+    width,
+    height,
+    borderRadius: radius,
+    backgroundColor: theme.between,
+  });
+  const grid = GRID_SIZES.default;
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
+      <TopBar />
+      <Animated.View style={[styles.skeletonBody, { opacity }]}>
+        <View
+          style={[
+            styles.infoPanelWrapper,
+            styles.skeletonPanel,
+            { backgroundColor: theme.secondary },
+          ]}
+        >
+          <View style={block(90, 130, 10)} />
+          <View style={{ flex: 1, marginLeft: 14, gap: 10 }}>
+            <View style={block(180, 22)} />
+            <View style={block(120, 14)} />
+            <View style={block(80, 18)} />
+            <View style={block(140, 12)} />
           </View>
-        ))}
-      </View>
-    </ScrollView>
-  </SafeAreaView>
-);
+        </View>
+        <View style={styles.skeletonGrid}>
+          {Array.from({ length: SKELETON_ROWS }, (_, rowIndex) => (
+            <View key={rowIndex} style={styles.row}>
+              {Array.from({ length: SKELETON_COLUMNS }, (_, colIndex) => (
+                <View
+                  key={colIndex}
+                  style={{
+                    width: grid.cell,
+                    height: grid.cell,
+                    margin: grid.margin,
+                    borderRadius: grid.radius,
+                    backgroundColor: theme.secondary,
+                  }}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+      </Animated.View>
+    </SafeAreaView>
+  );
+};
 
 // ─── Ana Bileşen ──────────────────────────────────────────────────────────────
 const TvGraphDetailScreen = ({ route, navigation }) => {
@@ -201,7 +192,6 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   const [gridMode, setGridMode] = useState("default");
   const [renderGridMode, setRenderGridMode] = useState("default");
   const grid = GRID_SIZES[renderGridMode];
-  const colWidth = grid.cell + grid.margin * 2; // hücre + iki yandaki boşluk
   const autoGridRef = useRef(false);
   const gridChangeHandleRef = useRef(null);
 
@@ -218,43 +208,73 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   // effect'ten hem "tekrar dene" düğmesinden çağrıldığı için düz bir `cancelled`
   // bayrağı yetmiyor; çalışma jetonu ile eski zincirler bayatlatılıyor. Aksi
   // hâlde dil değişince geciken eski yanıt yeni veriyi eziyor ve unmount
-  // sonrası setState yapılıyordu.
+  // sonrası setState yapılıyordu. Ayrıca süren TMDB istekleri AbortController
+  // ile iptal edilir: ekrandan çıkan kullanıcı için 30+ sezon isteği boşuna
+  // bitmesin.
   const runIdRef = useRef(0);
+  const abortRef = useRef(null);
 
   const fetchAllSeasons = useCallback(async () => {
     const runId = ++runIdRef.current;
     const isStale = () => runId !== runIdRef.current;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const request = (url, params) =>
+      axios.get(url, {
+        params,
+        signal: controller.signal,
+        headers: { accept: "application/json", Authorization: API_KEY },
+      });
+    const tmdbLanguage = tmdbLanguageOf(language);
+
     setLoading(true);
     setError(null);
     try {
-      const tvShowResponse = await axios.get(
+      const { data: show } = await request(
         `https://api.themoviedb.org/3/tv/${id}`,
-        {
-          params: {
-            language: tmdbLanguageOf(language),
-            append_to_response: "external_ids",
-          },
-          headers: { accept: "application/json", Authorization: API_KEY },
-        },
+        { language: tmdbLanguage, append_to_response: "external_ids" },
       );
 
       // IMDb puanları OMDb'den, Cloud Function proxy'si üzerinden (anahtar sunucuda; services/externalRatings.js).
       // Ulaşılamazsa null döner ve TMDB puanı kullanılır.
-      const imdbId = tvShowResponse.data.external_ids?.imdb_id;
-      const imdbMainInfo = pickMainRating(await fetchTitleRatings(imdbId), tvShowResponse.data);
+      const imdbId = show.external_ids?.imdb_id;
+      const validSeasons = (show.seasons ?? []).filter(
+        (s) => s.season_number !== 0,
+      );
 
+      // Dizi puanı ile sezonlar birbirinden bağımsız: art arda değil birlikte
+      // beklenir. Her sezonun TMDB isteği ile IMDb bölüm puanı da paralel
+      // (eskiden önce TMDB, SONRA OMDb bekleniyordu — sezon başına iki kat gecikme).
+      const titleRatingsPromise = fetchTitleRatings(imdbId);
+      const seasonPromises = validSeasons.map(async (season) => {
+        const [tmdbRes, seasonRatings] = await Promise.all([
+          request(
+            `https://api.themoviedb.org/3/tv/${id}/season/${season.season_number}`,
+            { language: tmdbLanguage },
+          ),
+          fetchSeasonRatings(imdbId, season.season_number),
+        ]);
+        return {
+          ...tmdbRes.data,
+          episodes: mergeEpisodeRatings(tmdbRes.data.episodes, seasonRatings?.episodes),
+        };
+      });
+
+      const [titleRatings, seasonsData] = await Promise.all([
+        titleRatingsPromise,
+        Promise.all(seasonPromises),
+      ]);
       if (isStale()) return;
+
+      const imdbMainInfo = pickMainRating(titleRatings, show);
       setShowDetail({
-        ...tvShowResponse.data,
+        ...show,
         vote_average: imdbMainInfo.rating,
         imdb_votes: imdbMainInfo.votes,
       });
 
-      const validSeasons = tvShowResponse.data.seasons.filter(
-        (s) => s.season_number !== 0,
-      );
-
-      // ── Otomatik ızgara boyutu (ilk yükleme) ──
+      // ── Otomatik ızgara boyutu (ilk başarılı yükleme) ──
       // ≤7 sezon → default, 8–11 → compact, >11 → heatmap
       if (!autoGridRef.current) {
         autoGridRef.current = true;
@@ -265,26 +285,11 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         setRenderGridMode(autoMode);
       }
 
-      const seasonPromises = validSeasons.map(async (season) => {
-        const tmdbRes = await axios.get(
-          `https://api.themoviedb.org/3/tv/${id}/season/${season.season_number}`,
-          {
-            params: { language: tmdbLanguageOf(language) },
-            headers: { accept: "application/json", Authorization: API_KEY },
-          },
-        );
-
-        const seasonRatings = await fetchSeasonRatings(imdbId, season.season_number);
-        const enrichedEpisodes = mergeEpisodeRatings(tmdbRes.data.episodes, seasonRatings?.episodes);
-
-        return { ...tmdbRes.data, episodes: enrichedEpisodes };
-      });
-
-      const seasonsData = await Promise.all(seasonPromises);
-      if (isStale()) return;
       setTVShows(seasonsData);
     } catch (err) {
-      if (!isStale()) setError(err.message);
+      // İptal edilen istek hata değil (ekran kapandı / yeni çalışma başladı).
+      if (axios.isCancel?.(err) || isStale()) return;
+      setError(err.message);
       console.error(i18nText("autoI18n.genel_hata", "Genel Hata:"), err);
     } finally {
       if (!isStale()) setLoading(false);
@@ -296,6 +301,8 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
     // Dil/id değişince ya da ekran kapanınca süren zinciri bayatlat.
     return () => {
       runIdRef.current++;
+      abortRef.current?.abort();
+      abortRef.current = null;
       // Bekleyen boyut değişimini iptal et
       if (gridChangeHandleRef.current) {
         gridChangeHandleRef.current.cancel();
@@ -340,37 +347,53 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
     return season?.episodes[selectedEpisode.index] ?? null;
   }, [selectedEpisode, tvShows]);
 
-  const maxEpisodes = useMemo(
-    () => Math.max(...tvShows.map((s) => s.episodes.length), 0),
-    [tvShows],
+  // Izgara boyutu: düğme vurgusu ANINDA, ağır yeniden çizim etkileşimden sonra.
+  const handleGridModeChange = useCallback((mode) => {
+    if (gridChangeHandleRef.current) {
+      gridChangeHandleRef.current.cancel();
+    }
+    setGridMode(mode);
+    gridChangeHandleRef.current = InteractionManager.runAfterInteractions(() => {
+      setRenderGridMode(mode);
+      gridChangeHandleRef.current = null;
+    });
+  }, []);
+
+  const gridOptions = useMemo(
+    () =>
+      GRID_MODE_ICONS.map((option) => ({
+        ...option,
+        label: t.tvGraphGrid[option.key === "default" ? "standard" : option.key],
+      })),
+    [t],
   );
-  const rowLabelWidth = grid.showAxes ? Math.max(30, 12 + String(maxEpisodes).length * 6) : 0;
-  const gridOptions = [
-    { key: "default", icon: "expand-outline", label: t.tvGraphGrid.standard },
-    { key: "compact", icon: "contract-outline", label: t.tvGraphGrid.compact },
-    { key: "heatmap", icon: "grid-outline", label: t.tvGraphGrid.heatmap },
-  ];
+
+  // Hücre başına değil, dil başına bir kez çözülen etiketler (erişilebilirlik + eksenler).
+  const gridLabels = useMemo(
+    () => ({
+      season: i18nText("season", "Sezon"),
+      episode: i18nText("episode", "Bölüm"),
+      rating: i18nText("rating", "Puan"),
+      seasonLetter: t.season[0],
+      episodeLetter: t.episode[0],
+    }),
+    [t],
+  );
 
   // ── Render Koşulları ──────────────────────────────────────────────────────
   if (loading) return <SkeletonLoading theme={theme} />;
 
   if (error) {
     return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          {
-            backgroundColor: theme.primary,
-            justifyContent: "center",
-            alignItems: "center",
-          },
-        ]}
-      >
-        <Text style={styles.errorTitle}>{t.mistake}</Text>
-        <Text style={styles.errorMessage}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchAllSeasons}>
-          <Text style={styles.retryButtonText}>{t.tryAgain}</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
+        <TopBar />
+        <View style={styles.errorBody}>
+          <Text style={styles.errorTitle}>{t.mistake}</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchAllSeasons}>
+            <Text style={styles.retryButtonText}>{t.tryAgain}</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -381,6 +404,15 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
       <ScreenDecor scope="details" iconOpacity={0.25} />
+
+      <TopBar>
+        <GridModeSwitch
+          options={gridOptions}
+          value={gridMode}
+          onChange={handleGridModeChange}
+          theme={theme}
+        />
+      </TopBar>
 
       {/* ── Üst Bilgi Paneli ─────────────────────────────────────────────── */}
       <View style={styles.infoPanelWrapper}>
@@ -397,7 +429,11 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         <View style={styles.panelOverlay} />
 
         <Animated.View
-          style={[styles.infoPanelContainer, { opacity: fadeAnim }]}
+          style={[
+            styles.infoPanelContainer,
+            // Sağ kenar yalnız seçili bölümde kapat düğmesi için ayrılır.
+            { opacity: fadeAnim, paddingRight: selectedEpisode ? 52 : 14 },
+          ]}
         >
           {/* Sol: Poster veya Bölüm Görseli */}
           <Image
@@ -535,38 +571,6 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
             )}
           </View>
 
-          <View style={[styles.gridSizeControls, selectedEpisode && { top: 44 }]}>
-            {gridOptions.map((option) => (
-              <TouchableOpacity
-                key={option.key}
-                style={[
-                  styles.gridSizeBtn,
-                  gridMode === option.key && {
-                    backgroundColor: theme.accent,
-                    borderColor: "rgba(255,255,255,0.8)",
-                  },
-                ]}
-                onPress={() => {
-                  if (gridChangeHandleRef.current) {
-                    gridChangeHandleRef.current.cancel();
-                  }
-                  setGridMode(option.key);
-                  gridChangeHandleRef.current =
-                    InteractionManager.runAfterInteractions(() => {
-                      setRenderGridMode(option.key);
-                      gridChangeHandleRef.current = null;
-                    });
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={option.label}
-                accessibilityState={{ selected: gridMode === option.key }}
-                hitSlop={3}
-              >
-                <Ionicons name={option.icon} size={16} color="#fff" />
-              </TouchableOpacity>
-            ))}
-          </View>
-
           {/* Seçili bölümü kapat */}
           {selectedEpisode && (
             <TouchableOpacity
@@ -593,94 +597,16 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       </View>
 
       {/* ── Değerlendirme Izgarası ────────────────────────────────────────── */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 40, paddingVertical: 10 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <ScrollView
-          horizontal
-          contentContainerStyle={{ paddingHorizontal: 12 }}
-          showsHorizontalScrollIndicator={false}
-        >
-          <View style={{ minWidth: rowLabelWidth + tvShows.length * colWidth }}>
-            {/* Sezon Başlık Satırı */}
-            {grid.showAxes && (
-            <View style={[styles.row, { marginBottom: grid.margin * 2 }]}>
-              <View style={{ width: rowLabelWidth }} />
-              {tvShows.map((season) => (
-                <View
-                  key={season.season_number}
-                  style={[styles.seasonHeader, { width: colWidth }]}
-                >
-                  <Text
-                    style={[
-                      styles.seasonHeaderText,
-                      { fontSize: grid.headerFont, color: theme.text.secondary },
-                    ]}
-                  >
-                    {t.season[0]}{season.season_number}
-                  </Text>
-                </View>
-              ))}
-            </View>
-            )}
-
-            {/* Bölüm Hücreleri */}
-            {[...Array(maxEpisodes)].map((_, epIndex) => (
-              <View key={epIndex} style={styles.row}>
-                {grid.showAxes && (
-                  <View style={[styles.episodeHeader, { width: rowLabelWidth, height: colWidth }]}>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.seasonHeaderText, { fontSize: grid.headerFont, color: theme.text.secondary }]}
-                    >
-                      {t.episode[0]}{epIndex + 1}
-                    </Text>
-                  </View>
-                )}
-                {tvShows.map((season) =>
-                  season.episodes[epIndex] ? (
-                    <EpisodeCell
-                      key={season.season_number}
-                      episode={season.episodes[epIndex]}
-                      seasonNumber={season.season_number}
-                      episodeIndex={epIndex}
-                      grid={grid}
-                      isSelected={
-                        selectedEpisode?.season === season.season_number &&
-                        selectedEpisode?.index === epIndex
-                      }
-                      onPress={handleEpisodePress}
-                      borderColor={theme.primary}
-                    />
-                  ) : (
-                    <View
-                      key={season.season_number}
-                      style={[
-                        styles.emptyCell,
-                        {
-                          width: grid.cell,
-                          height: grid.cell,
-                          marginVertical: grid.margin,
-                          marginHorizontal: grid.margin,
-                        },
-                      ]}
-                    >
-                      {!grid.colorOnly && <Text
-                        style={[styles.emptyCellDot, { fontSize: grid.dot }]}
-                      >
-                        ·
-                      </Text>}
-                    </View>
-                  ),
-                )}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      </ScrollView>
-      <BackButton variant="blur" top={8} />
+      <TvGraphGrid
+        seasons={tvShows}
+        grid={grid}
+        gridKey={renderGridMode}
+        selected={selectedEpisode}
+        onPress={handleEpisodePress}
+        borderColor={theme.primary}
+        headerColor={theme.text.secondary}
+        labels={gridLabels}
+      />
     </SafeAreaView>
   );
 };
@@ -689,11 +615,36 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
+  // ── Üst Çubuk ───────────────────────────────────────────────────────────
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 52,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
+  modeSwitch: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    padding: 3,
+    borderRadius: 13,
+    borderWidth: 1,
+  },
+  modeBtn: {
+    width: 34,
+    height: 30,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modeBtnPressed: { backgroundColor: "rgba(127,127,127,0.18)" },
 
   // ── Bilgi Paneli ────────────────────────────────────────────────────────
   infoPanelWrapper: {
     marginHorizontal: 12,
-    marginTop: 10,
     borderRadius: 18,
     overflow: "hidden",
     elevation: 6,
@@ -720,7 +671,6 @@ const styles = StyleSheet.create({
   infoPanelContainer: {
     flexDirection: "row",
     padding: 14,
-    paddingRight: 52,
     alignItems: "center",
     minHeight: 154,
   },
@@ -821,93 +771,40 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  gridSizeControls: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    gap: 6,
-  },
-  gridSizeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   closeBtnText: {
     color: "#fff",
     fontSize: 12,
     fontWeight: "700",
   },
 
-  // ── Izgara ──────────────────────────────────────────────────────────────
+  // ── Izgara (yalnız satır düzeni; hücre stilleri TvGraphGrid.js'te) ────────
   row: {
     flexDirection: "row",
     alignItems: "center",
   },
-  seasonHeader: {
-    width: 54,
-    paddingVertical: 2,
+
+  // ── Yükleniyor ──────────────────────────────────────────────────────────
+  skeletonBody: { flex: 1 },
+  skeletonPanel: {
+    flexDirection: "row",
+    padding: 14,
     alignItems: "center",
+    minHeight: 154,
   },
-  episodeHeader: {
-    justifyContent: "center",
-    alignItems: "flex-end",
-    paddingRight: 5,
-  },
-  seasonHeaderText: {
-    color: "rgba(255,255,255,0.35)",
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  // Buradaki ölçüler YALNIZ SkeletonLoading için geçerli (default boyutlar);
-  // gerçek ızgarada hepsi `grid`ten gelen satır içi stille eziliyor.
-  cell: {
-    width: 50,
-    height: 50,
-    marginVertical: 2,
-    marginHorizontal: 2,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 8,
+  skeletonGrid: {
+    flex: 1,
     overflow: "hidden",
-  },
-  cellSeasonLabel: {
-    position: "absolute",
-    top: 3,
-    left: 4,
-    fontSize: 8,
-    fontWeight: "700",
-  },
-  cellRating: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  cellEpisodeLabel: {
-    position: "absolute",
-    bottom: 3,
-    right: 4,
-    fontSize: 8,
-    fontWeight: "700",
-  },
-  emptyCell: {
-    width: 50,
-    height: 50,
-    marginVertical: 2,
-    marginHorizontal: 2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyCellDot: {
-    color: "rgba(255,255,255,0.15)",
-    fontSize: 24,
+    paddingTop: 10,
+    paddingHorizontal: 12,
   },
 
   // ── Hata ────────────────────────────────────────────────────────────────
+  errorBody: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
   errorTitle: {
     fontSize: 20,
     fontWeight: "700",
