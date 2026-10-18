@@ -2,8 +2,8 @@ import { readableTextOn } from "@utils/colorUtils";
 import { alpha } from "@theme/colors";
 // components/lists/ListSearchBar.js
 //
-// Liste ekranının arama başlığı: arama kutusu + KİP SEÇİCİ + sırala/filtrele
-// düğmesi.
+// Liste ekranının arama başlığı: TEK satırda arama kutusu + KİP SEÇİCİ (iki simge) + sırala/filtrele
+// düğmesi. Kip düğmeleri eskiden kutunun altında etiketli iki geniş düğmeydi; artık yalnız simge.
 //
 // Eskiden bu satır yalnız "öğe sayısı > 12" ise çiziliyordu; 12'nin altındaki
 // listelerde arama da sıralama/filtre de yoktu ve boş listeye içerik eklemenin
@@ -46,52 +46,21 @@ const placeholderFor = (mode, listName) => {
   return i18nText("autoI18n.film_dizi_ara_ekle", "Eklemek için film veya dizi ara...");
 };
 
+// Yalnız simge: ad ve (varsa) sayı erişilebilirlik etiketine gider, ekranda yer kaplamaz.
 function ModeButton({ active, accent, theme, icon, label, count, onPress }) {
   const foreground = readableTextOn(accent);
+  const spoken = count != null ? `${label}, ${count > 999 ? "999+" : count}` : label;
   return (
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      style={[
-        styles.modeBtn,
-        active && { backgroundColor: accent },
-      ]}
+      hitSlop={{ top: 4, bottom: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel={spoken}
+      accessibilityState={{ selected: active }}
+      style={[styles.modeBtn, active && { backgroundColor: accent }]}
     >
-      <Ionicons
-        name={icon}
-        size={14}
-        color={active ? foreground : theme.text.muted}
-      />
-      <Text
-        numberOfLines={1}
-        allowFontScaling={false}
-        style={[
-          styles.modeText,
-          { color: active ? foreground : theme.text.muted },
-        ]}
-      >
-        {label}
-      </Text>
-      {count != null ? (
-        <View
-          style={[
-            styles.modeCount,
-            {
-              backgroundColor: active ? alpha(foreground, 0.12) : theme.primary,
-            },
-          ]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[
-              styles.modeCountText,
-              { color: active ? foreground : theme.text.muted },
-            ]}
-          >
-            {count > 999 ? "999+" : count}
-          </Text>
-        </View>
-      ) : null}
+      <Ionicons name={icon} size={18} color={active ? foreground : theme.text.muted} />
     </TouchableOpacity>
   );
 }
@@ -171,6 +140,28 @@ function ListSearchBar({
           ) : null}
         </GlassField>
 
+        {/* Kip seçici: yalnız simge, arama kutusu ile filtre düğmesi ARASINDA. */}
+        <View style={[styles.modeRow, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+          <ModeButton
+            active={!isGlobal}
+            accent={accent}
+            theme={theme}
+            icon="albums-outline"
+            label={i18nText("autoI18n.bu_listede", "Bu listede")}
+            count={inListCount}
+            onPress={() => selectMode(LIST_SEARCH_MODE.IN_LIST)}
+          />
+          <ModeButton
+            active={isGlobal}
+            accent={accent}
+            theme={theme}
+            icon="planet-outline"
+            label={i18nText("autoI18n.tum_icerikler", "Tüm içerikler")}
+            count={isGlobal ? globalCount : null}
+            onPress={() => selectMode(LIST_SEARCH_MODE.GLOBAL)}
+          />
+        </View>
+
         {/* Filtre düğmesi: iOS 26+'da cam daire (etkin filtre sayısı camın DIŞINDA
             rozet olarak durur); diğer yerlerde eski kutu. */}
         <GlassIconButton
@@ -200,32 +191,6 @@ function ListSearchBar({
             <Feather name="sliders" size={18} color={theme.text.primary} />
           )}
         </GlassIconButton>
-      </View>
-
-      <View
-        style={[
-          styles.modeRow,
-          { backgroundColor: theme.secondary, borderColor: theme.border },
-        ]}
-      >
-        <ModeButton
-          active={!isGlobal}
-          accent={accent}
-          theme={theme}
-          icon="albums-outline"
-          label={i18nText("autoI18n.bu_listede", "Bu listede")}
-          count={inListCount}
-          onPress={() => selectMode(LIST_SEARCH_MODE.IN_LIST)}
-        />
-        <ModeButton
-          active={isGlobal}
-          accent={accent}
-          theme={theme}
-          icon="planet-outline"
-          label={i18nText("autoI18n.tum_icerikler", "Tüm içerikler")}
-          count={isGlobal ? globalCount : null}
-          onPress={() => selectMode(LIST_SEARCH_MODE.GLOBAL)}
-        />
       </View>
     </View>
   );
@@ -257,34 +222,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   filterDotText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  // Arama kutusu (42 pt) ile aynı yükseklikte iki simgelik kapsül.
   modeRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 8,
+    height: 42,
     padding: 3,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    gap: 3,
+    gap: 2,
   },
   modeBtn: {
-    flex: 1,
-    height: 30,
-    borderRadius: 9,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-  },
-  modeText: { fontSize: 12, fontWeight: "700" },
-  modeCount: {
-    minWidth: 18,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 4,
+    width: 34,
+    height: "100%",
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
-  modeCountText: { fontSize: 10, fontWeight: "800" },
 });
 
 export default memo(ListSearchBar);
