@@ -27,16 +27,18 @@ describe("onboarding metinleri", () => {
     expect(getOnboardingCopy("en")).toBe(ONBOARDING_COPY.en);
     expect(getOnboardingCopy("tr")).toBe(ONBOARDING_COPY.tr);
     expect(getOnboardingCopy("es")).toBe(ONBOARDING_COPY.es);
+    expect(getOnboardingCopy("pt")).toBe(ONBOARDING_COPY.pt);
   });
 
-  it("dil düğmesi etiketi döngüde SIRADAKİ dili adlandırır (tr → en → es → tr)", () => {
+  it("dil düğmesi etiketi döngüde SIRADAKİ dili adlandırır (tr → en → es → pt → tr)", () => {
     expect(ONBOARDING_COPY.tr.language).toBe("English");
     expect(ONBOARDING_COPY.en.language).toBe("Español");
-    expect(ONBOARDING_COPY.es.language).toBe("Türkçe");
+    expect(ONBOARDING_COPY.es.language).toBe("Português");
+    expect(ONBOARDING_COPY.pt.language).toBe("Türkçe");
   });
 
   it("vurgulanan kelime başlığın içinde geçiyor (yoksa vurgu sessizce kaybolur)", () => {
-    for (const lang of ["tr", "en", "es"]) {
+    for (const lang of ["tr", "en", "es", "pt"]) {
       const copy = ONBOARDING_COPY[lang];
       const titled = [
         ...copy.features,

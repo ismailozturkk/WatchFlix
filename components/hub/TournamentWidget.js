@@ -72,9 +72,9 @@ const upperLocale = (s, lang) => (lang === "tr" ? String(s).replace(/i/g, "İ") 
 const shortRound = (key, lang) =>
   key === "r32" ? "32"
   : key === "r16" ? "16"
-  : key === "qf" ? (lang === "tr" ? "ÇF" : lang === "es" ? "CF" : "QF")
-  : key === "sf" ? (lang === "tr" ? "YF" : lang === "es" ? "SF" : "SF")
-  : (lang === "tr" ? "FİNAL" : lang === "es" ? "FINAL" : "FINAL");
+  : key === "qf" ? (lang === "tr" ? "ÇF" : lang === "es" ? "CF" : lang === "pt" ? "QF" : "QF")
+  : key === "sf" ? (lang === "tr" ? "YF" : lang === "es" ? "SF" : lang === "pt" ? "SF" : "SF")
+  : (lang === "tr" ? "FİNAL" : lang === "es" ? "FINAL" : lang === "pt" ? "FINAL" : "FINAL");
 
 // Aktif turun nabzı — StageTimeline'daki onaylı desenin aynısı.
 const Pulse = memo(({ style }) => {
@@ -224,12 +224,12 @@ function TournamentTreePreview({ bracket, getTmdbUrl, accent, lang, phase, activ
 
   // Başlık rozeti — her fazda DOĞRUYU söyler (sabit "SON 32" yok).
   const chip = !rounds
-    ? { text: lang === "tr" ? "HAZIRLANIYOR" : lang === "es" ? "PREPARANDO" : "PREPARING", dot: "rgba(255,255,255,0.55)", gold: false }
+    ? { text: lang === "tr" ? "HAZIRLANIYOR" : lang === "es" ? "PREPARANDO" : lang === "pt" ? "PREPARANDO" : "PREPARING", dot: "rgba(255,255,255,0.55)", gold: false }
     : champion
-      ? { text: lang === "tr" ? "ŞAMPİYON" : lang === "es" ? "CAMPEÓN" : "CHAMPION", dot: GOLD, gold: true }
+      ? { text: lang === "tr" ? "ŞAMPİYON" : lang === "es" ? "CAMPEÓN" : lang === "pt" ? "CAMPEÃO" : "CHAMPION", dot: GOLD, gold: true }
       : phase === "voting" && ROUNDS[activeRound]
         ? { text: upperLocale(roundLabel(ROUNDS[activeRound], lang), lang), dot: "#EF4444", gold: false, live: true }
-        : { text: lang === "tr" ? "PROJEKSİYON" : lang === "es" ? "PROYECCIÓN" : "PROJECTED", dot: "rgba(255,255,255,0.55)", gold: false };
+        : { text: lang === "tr" ? "PROJEKSİYON" : lang === "es" ? "PROYECCIÓN" : lang === "pt" ? "PROJEÇÃO" : "PROJECTED", dot: "rgba(255,255,255,0.55)", gold: false };
 
   return (
     // İlerleme bilgisi kartın KENDİ accessibilityLabel'ında duyurulur; burada
@@ -238,7 +238,7 @@ function TournamentTreePreview({ bracket, getTmdbUrl, accent, lang, phase, activ
       <View style={styles.treeHeader}>
         <AppIcon family="Ionicons" name="git-network-outline" size={11} color="rgba(255,255,255,0.80)" />
         <Text allowFontScaling={false} style={styles.treeHeaderText}>
-          {lang === "tr" ? "ELEME AĞACI" : lang === "es" ? "CUADRO" : "BRACKET"}
+          {lang === "tr" ? "ELEME AĞACI" : lang === "es" ? "CUADRO" : lang === "pt" ? "CHAVE" : "BRACKET"}
         </Text>
         <View style={styles.treeHeaderSpacer} />
         {!!rounds && (
@@ -374,7 +374,7 @@ function TournamentTreePreview({ bracket, getTmdbUrl, accent, lang, phase, activ
               ]}
             >
               {champion
-                ? (lang === "tr" ? "ŞAMPİYON" : lang === "es" ? "CAMPEÓN" : "CHAMPION")
+                ? (lang === "tr" ? "ŞAMPİYON" : lang === "es" ? "CAMPEÓN" : lang === "pt" ? "CAMPEÃO" : "CHAMPION")
                 : shortRound("final", lang)}
             </Text>
           </>
@@ -492,7 +492,7 @@ export default function TournamentWidget({ navigation }) {
     const done = bracketPreview.rounds.reduce(
       (n, r) => n + r.matches.filter((m) => m.decided && m.winnerSide).length, 0,
     );
-    return lang === "tr" ? `${TOTAL_MATCHES} maçın ${done} tanesi tamamlandı` : lang === "es" ? `${done} de ${TOTAL_MATCHES} partidos completados` : `${done} of ${TOTAL_MATCHES} matches complete`;
+    return lang === "tr" ? `${TOTAL_MATCHES} maçın ${done} tanesi tamamlandı` : lang === "es" ? `${done} de ${TOTAL_MATCHES} partidos completados` : lang === "pt" ? `${done} de ${TOTAL_MATCHES} partidas concluídas` : `${done} of ${TOTAL_MATCHES} matches complete`;
   }, [bracketPreview, lang]);
 
   // Katılımcı sayısı (agg varsa). Kartta yalnız sayı + ikon görünür (dar

@@ -49,6 +49,20 @@ export const PROVIDER_WATCH_COPY = {
       "Activa “Avisar cuando esté disponible” en Ajustes > Notificaciones para usar este filtro. Los primeros resultados llegan a las 18:00 de la noche siguiente",
     region: "Los datos de plataformas se prepararon para otra región; se actualizan en la próxima comprobación",
   },
+  pt: {
+    section: "SERVIÇO",
+    chip: "Nos meus serviços",
+    chipCount: (count) => `Nos meus serviços · ${count}`,
+    chipLabel: (count) => `Apenas títulos disponíveis nos meus serviços, ${count} títulos`,
+    ready: (yes, total) => `${yes} de ${total} títulos estão disponíveis nos serviços que você escolheu`,
+    none: "Nada daqui está disponível nos serviços que você escolheu",
+    unknown: (count) => `${count} títulos ainda não foram verificados; não aparecerão com este filtro`,
+    age: (days) => `Última verificação há ${days} dias`,
+    off: "Primeiro escolha seus serviços em Configurações > Minhas assinaturas",
+    noData:
+      "Ative “Avisar quando estiver disponível” em Configurações > Notificações para usar este filtro. Os primeiros resultados chegam às 18h da noite seguinte",
+    region: "Os dados de serviços foram preparados para outra região; são atualizados na próxima verificação",
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

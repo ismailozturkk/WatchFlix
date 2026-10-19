@@ -62,7 +62,7 @@ export const PERK_CANDIDATES = Object.freeze([
 export const MAX_PERKS = 2;
 
 const pick = (copy, language) =>
-  copy?.[copyLanguage(language, ["tr", "en", "es"])] ?? copy?.en ?? copy?.tr ?? "";
+  copy?.[copyLanguage(language, ["tr", "en", "es", "pt"])] ?? copy?.en ?? copy?.tr ?? "";
 
 const categoryOf = (definition) =>
   FEATURE_CATEGORIES.find((category) => category.id === definition?.category) || null;
@@ -87,9 +87,10 @@ function ctaLabel(targetPlan, language) {
 function eyebrowFor(kind, language) {
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
-  if (kind === ACCESS) return tr ? "PREMİUM ÖZELLİK" : es ? "FUNCIÓN PREMIUM" : "PREMIUM FEATURE";
-  if (kind === COUNT) return tr ? "LİMİT DOLDU" : es ? "LÍMITE ALCANZADO" : "LIMIT REACHED";
-  return tr ? "GÜNLÜK HAK BİTTİ" : es ? "LÍMITE DIARIO ALCANZADO" : "DAILY LIMIT REACHED";
+  const pt = normalizeAppLanguage(language) === "pt";
+  if (kind === ACCESS) return tr ? "PREMİUM ÖZELLİK" : es ? "FUNCIÓN PREMIUM" : pt ? "RECURSO PREMIUM" : "PREMIUM FEATURE";
+  if (kind === COUNT) return tr ? "LİMİT DOLDU" : es ? "LÍMITE ALCANZADO" : pt ? "LIMITE ATINGIDO" : "LIMIT REACHED";
+  return tr ? "GÜNLÜK HAK BİTTİ" : es ? "LÍMITE DIARIO ALCANZADO" : pt ? "LIMITE DIÁRIO ATINGIDO" : "DAILY LIMIT REACHED";
 }
 
 /**
@@ -147,7 +148,7 @@ export function splitTierValue(featureId, plan, language = "en") {
   const countable = definition && (definition.kind === COUNT || definition.kind === DAILY);
   if (countable && !definition.planValue?.[plan] && !Number.isFinite(getFeatureLimit(featureId, plan))) {
     const unit = unitLabel(definition, Infinity, language);
-    const sub = definition.kind === DAILY ? `${unit}/${pickByLanguage(language, { tr: "gün", en: "day", es: "día" })}` : unit;
+    const sub = definition.kind === DAILY ? `${unit}/${pickByLanguage(language, { tr: "gün", en: "day", es: "día", pt: "dia" })}` : unit;
     return { main: value, sub: sub || null, figure: true };
   }
 
@@ -272,6 +273,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
   const lang = normalizeAppLanguage(language);
   const tr = lang === "tr";
   const es = normalizeAppLanguage(lang) === "es";
+  const pt = normalizeAppLanguage(lang) === "pt";
   const current = normalizePlan(plan);
   const definition = getFeature(featureId);
 
@@ -283,7 +285,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
       icon: "diamond",
       eyebrow: eyebrowFor(ACCESS, lang),
       featureTitle: "",
-      title: tr ? "Premium özelliği" : es ? "Función Premium" : "Premium feature",
+      title: tr ? "Premium özelliği" : es ? "Función Premium" : pt ? "Recurso Premium" : "Premium feature",
       message: "",
       meter: null,
       note: null,
@@ -294,7 +296,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
       targetPlan: null,
       targetName: null,
       canUpgrade: false,
-      cta: { primary: tr ? "Tamam" : es ? "Entendido" : "Got it", secondary: null },
+      cta: { primary: tr ? "Tamam" : es ? "Entendido" : pt ? "Entendi" : "Got it", secondary: null },
     };
   }
 
@@ -336,7 +338,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
     renew:
       definition.kind === COUNT || isAccess
         ? null
-        : tr ? "Hakların yarın yenilenir" : es ? "Tu límite se restablece mañana" : "Your limit resets tomorrow",
+        : tr ? "Hakların yarın yenilenir" : es ? "Tu límite se restablece mañana" : pt ? "Seu limite é redefinido amanhã" : "Your limit resets tomorrow",
     // Üst plan yoksa karşılaştırma ve fayda satırı anlamsız: yalnız bilgi.
     tiers,
     tierMode: pickTierMode(tiers),
@@ -347,9 +349,9 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
     cta: canUpgrade
       ? {
           primary: ctaLabel(targetPlan, lang),
-          secondary: tr ? "Şimdi değil" : es ? "Ahora no" : "Not now",
+          secondary: tr ? "Şimdi değil" : es ? "Ahora no" : pt ? "Agora não" : "Not now",
         }
-      : { primary: tr ? "Tamam" : es ? "Entendido" : "Got it", secondary: null },
+      : { primary: tr ? "Tamam" : es ? "Entendido" : pt ? "Entendi" : "Got it", secondary: null },
   };
 }
 
@@ -361,16 +363,18 @@ function offerDuration(offer, language) {
   const one = count === 1;
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
+  const pt = normalizeAppLanguage(language) === "pt";
   const units = {
-    day: tr ? "gün" : es ? (one ? "día" : "días") : one ? "day" : "days",
-    week: tr ? "hafta" : es ? (one ? "semana" : "semanas") : one ? "week" : "weeks",
-    month: tr ? "ay" : es ? (one ? "mes" : "meses") : one ? "month" : "months",
-    year: tr ? "yıl" : es ? (one ? "año" : "años") : one ? "year" : "years",
+    day: tr ? "gün" : es ? (one ? "día" : "días") : pt ? one ? "dia" : "dias" : one ? "day" : "days",
+    week: tr ? "hafta" : es ? (one ? "semana" : "semanas") : pt ? one ? "semana" : "semanas" : one ? "week" : "weeks",
+    month: tr ? "ay" : es ? (one ? "mes" : "meses") : pt ? one ? "mês" : "meses" : one ? "month" : "months",
+    year: tr ? "yıl" : es ? (one ? "año" : "años") : pt ? one ? "ano" : "anos" : one ? "year" : "years",
   };
   const unit = units[offer.unit];
   if (!unit) return null;
   if (tr) return one ? `İlk ${unit}` : `İlk ${count} ${unit}`;
   if (es) return one ? `${unit} inicial` : `${count} ${unit} iniciales`;
+  if (pt) return one ? `${unit} inicial` : `${count} ${unit} iniciais`;
   return one ? `First ${unit}` : `First ${count} ${unit}`;
 }
 
@@ -380,18 +384,20 @@ function offerLabel(offer, language) {
   if (!duration) return null;
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
-  if (offer.free) return tr ? `${duration} ücretsiz` : es ? `${duration} gratis` : `${duration} free`;
+  const pt = normalizeAppLanguage(language) === "pt";
+  if (offer.free) return tr ? `${duration} ücretsiz` : es ? `${duration} gratis` : pt ? `${duration} grátis` : `${duration} free`;
   if (!Number.isFinite(offer.percent) || offer.percent <= 0) return null;
-  return tr ? `${duration} %${offer.percent} indirim` : es ? `${duration} ${offer.percent}% de descuento` : `${duration} ${offer.percent}% off`;
+  return tr ? `${duration} %${offer.percent} indirim` : es ? `${duration} ${offer.percent}% de descuento` : pt ? `${duration} com ${offer.percent}% de desconto` : `${duration} ${offer.percent}% off`;
 }
 
 function periodLabel(aPackage, language) {
   const key = getPackagePeriodKey(aPackage);
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
-  if (key === "annual") return tr ? "/ yıl" : es ? "/ año" : "/ year";
-  if (key === "monthly") return tr ? "/ ay" : es ? "/ mes" : "/ month";
-  if (key === "weekly") return tr ? "/ hafta" : es ? "/ semana" : "/ week";
+  const pt = normalizeAppLanguage(language) === "pt";
+  if (key === "annual") return tr ? "/ yıl" : es ? "/ año" : pt ? "/ ano" : "/ year";
+  if (key === "monthly") return tr ? "/ ay" : es ? "/ mes" : pt ? "/ mês" : "/ month";
+  if (key === "weekly") return tr ? "/ hafta" : es ? "/ semana" : pt ? "/ semana" : "/ week";
   return "";
 }
 

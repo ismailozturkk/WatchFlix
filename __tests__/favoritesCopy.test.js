@@ -26,7 +26,7 @@ describe("dört favori metinleri", () => {
   });
 
   it("her kategori için tüm etiketler dolu", () => {
-    for (const lang of ["tr", "en", "es"]) {
+    for (const lang of ["tr", "en", "es", "pt"]) {
       for (const kind of FAVORITE_KINDS) {
         const k = FAVORITES_COPY[lang].kinds[kind];
         for (const key of ["label", "add", "pickTitle", "search", "icon"]) {
@@ -38,7 +38,7 @@ describe("dört favori metinleri", () => {
   });
 
   it("işlev metinleri başlığı içeriyor ve sayaç doğru biçimde", () => {
-    for (const lang of ["tr", "en", "es"]) {
+    for (const lang of ["tr", "en", "es", "pt"]) {
       const copy = FAVORITES_COPY[lang];
       expect(copy.counter(2, MAX_FAVORITES)).toBe("2/4");
       expect(copy.picker.add("Heat")).toContain("Heat");

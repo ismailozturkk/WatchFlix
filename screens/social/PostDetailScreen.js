@@ -20,6 +20,7 @@ import {
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@context/ThemeContext";
+import { useLanguage } from "@context/LanguageContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
@@ -39,25 +40,15 @@ import BackButton from "@components/BackButton";
 import GlassIconButton from "@components/common/GlassIconButton";
 import ShareToChatSheet from "@components/chat/ShareToChatSheet";
 import { buildPostShare } from "@utils/chatShare";
+import { formatTimeAgo } from "@utils/postTime";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
-// Basit göreli zaman (MyPostsScreen ile aynı kısaltmalar).
-const timeAgo = (ms) => {
-  if (!ms) return "";
-  const sec = Math.floor((Date.now() - ms) / 1000);
-  if (sec < 60) return i18nText("autoI18n.simdi", "şimdi");
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} dk`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} sa`;
-  const d = Math.floor(hr / 24);
-  if (d < 7) return `${d} g`;
-  return `${Math.floor(d / 7)} hf`;
-};
+// Göreli zaman: etiketler uygulama dilinden gelir (Hub akışı ve Postlarım ile aynı kaynak).
 
 export default function PostDetailScreen({ route, navigation }) {
   const { postId, openComments = false } = route.params || {};
   const { theme } = useTheme();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const { selectAvatarIndex, avatar } = useProfileUi();
   const { getTmdbUrl } = useImageQualitySettings();
@@ -248,7 +239,7 @@ export default function PostDetailScreen({ route, navigation }) {
                 {post.authorName || i18nText("autoI18n.kullanici", "Kullanıcı")}
               </Text>
               <Text style={[styles.time, { color: theme.text.muted }]}>
-                {timeAgo(post._createdAtMs)}
+                {formatTimeAgo(post._createdAtMs, t.shareScreen?.timeAgo)}
               </Text>
             </View>
             <View style={[styles.badge, { backgroundColor: accent + "22", borderColor: accent + "55" }]}>

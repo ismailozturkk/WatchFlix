@@ -41,17 +41,17 @@ export const GENRE_IDS = Object.freeze([
   "thriller", "war", "western", "reality", "tvmovie",
 ]);
 
-// id → katlanmış ad varyantları (TR + EN + ES). Aynı id'ye birden çok ad düşebilir.
+// id → katlanmış ad varyantları (TR + EN + ES + PT). Aynı id'ye birden çok ad düşebilir.
 // YENİ DİL: o dilin TMDB tür adlarını (film + dizi, bölgesel varyantlar dahil) buraya
 // ekle — yoksa tür "other" kovasına düşer ve tür puanı/rozetleri sessizce bozulur.
 const ALIASES = {
-  action: ["action", "aksiyon", "action adventure", "aksiyon macera", "accion", "accion y aventura"],
+  action: ["action", "aksiyon", "action adventure", "aksiyon macera", "accion", "accion y aventura", "acao", "acao e aventura"],
   adventure: ["adventure", "macera", "aventura"],
-  animation: ["animation", "animasyon", "animacion"],
+  animation: ["animation", "animasyon", "animacion", "animacao"],
   comedy: ["comedy", "komedi", "comedia"],
   crime: ["crime", "suc", "crimen"],
-  documentary: ["documentary", "belgesel", "news", "haber", "documental", "noticias"],
-  drama: ["drama", "dram", "soap", "pembe dizi", "telenovela"],
+  documentary: ["documentary", "belgesel", "news", "haber", "documental", "noticias", "documentario"],
+  drama: ["drama", "dram", "soap", "pembe dizi", "telenovela", "novela"],
   family: ["family", "aile", "kids", "cocuk", "familia", "infantil"],
   fantasy: ["fantasy", "fantastik", "fantezi", "fantasia"],
   history: ["history", "tarih", "historia"],
@@ -61,13 +61,13 @@ const ALIASES = {
   romance: ["romance", "romantik", "romantizm"],
   scifi: [
     "science fiction", "bilim kurgu", "sci fi fantasy", "bilim kurgu fantazi", "bilim kurgu fantezi", "scifi", "sci fi",
-    "ciencia ficcion", "ciencia ficcion y fantasia",
+    "ciencia ficcion", "ciencia ficcion y fantasia", "ficcao cientifica", "ficcao cientifica e fantasia",
   ],
   thriller: ["thriller", "gerilim", "suspense", "suspenso"],
-  war: ["war", "savas", "war politics", "savas politika", "belica", "belica y politica", "guerra"],
-  western: ["western", "vahsi bati", "kovboy"],
+  war: ["war", "savas", "war politics", "savas politika", "belica", "belica y politica", "guerra", "guerra e politica"],
+  western: ["western", "vahsi bati", "kovboy", "faroeste"],
   reality: ["reality", "realite", "talk", "program", "talk show", "programa de entrevistas"],
-  tvmovie: ["tv movie", "tv film", "tv filmi", "pelicula de tv", "cine tv"],
+  tvmovie: ["tv movie", "tv film", "tv filmi", "pelicula de tv", "cine tv", "cinema tv", "filme para tv", "telefilme"],
 };
 
 const LOOKUP = new Map();

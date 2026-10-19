@@ -15,7 +15,7 @@ const ROOT = path.join(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
 const IONICONS = require("../node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json");
 
-const LANGUAGES = ["tr", "en", "es"];
+const LANGUAGES = ["tr", "en", "es", "pt"];
 
 // Başlık bileşenini kullanan tüm raf dosyaları (`section="…"` ya da DiscoveryMediaRail ön ayarı).
 const SECTION_FILES = [

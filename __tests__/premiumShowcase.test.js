@@ -238,6 +238,7 @@ describe("metinler", () => {
     expect(showcaseCtaSubtitle(pricing, "en")).toBe("₺59,99 / ay · Cancel anytime");
     expect(showcaseCtaSubtitle(null, "tr")).toBe("Doğrudan fiyatlandırma · Dilediğin an iptal");
     expect(showcaseCtaSubtitle(null, "es")).toBe("Precios claros · Cancela cuando quieras");
+    expect(showcaseCtaSubtitle(null, "pt")).toBe("Preços claros · Cancele quando quiser");
   });
 
   it("dar ekranda teklif ikinci satırın içine yazılır ve 'iptal' cümlesi düşer", () => {
@@ -251,6 +252,7 @@ describe("metinler", () => {
   it("teklif metni ve rozeti: indirimli / ücretsiz, üç dil", () => {
     expect(showcaseOfferText(offer, "en")).toBe("İlk 3 ay 50% off");
     expect(showcaseOfferText(offer, "es")).toBe("İlk 3 ay -50 %");
+    expect(showcaseOfferText(offer, "pt")).toBe("İlk 3 ay -50%");
     expect(showcaseOfferText({ free: true, duration: "First month" }, "en")).toBe("First month free");
     expect(showcaseOfferText(null, "tr")).toBe("");
     expect(showcaseOfferBadge(offer, "tr")).toEqual({ big: "%50", small: "İlk 3 ay" });

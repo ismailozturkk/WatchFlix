@@ -240,11 +240,87 @@ const es = {
   },
 };
 
-export const YEARLY_GOAL_COPY = { tr, en, es };
+const pt = {
+  editLabel: "Editar a meta de visualização {year}",
+  emptyTitle: "Defina sua meta {year}",
+  ringLabel: "Meta {year}: {summary}",
+  summaryPart: "{name} {count} de {target}",
+  tracks: {
+    movies: {
+      name: "Filmes",
+      unit: "filmes",
+      hint: "Os filmes diferentes que você assistiu este ano. Rever o mesmo conta uma vez.",
+    },
+    shows: { name: "Séries" },
+  },
+  measures: {
+    shows: {
+      name: "Nº de séries",
+      unit: "séries",
+      hint: "As séries diferentes das quais você assistiu a pelo menos um episódio este ano.",
+    },
+    episodes: {
+      name: "Nº de episódios",
+      unit: "episódios",
+      hint: "Os episódios diferentes que você assistiu este ano. Rever o mesmo conta uma vez.",
+    },
+  },
+  overall: {
+    ahead: "Você está adiantado no ritmo",
+    onTrack: "Bem no ritmo",
+    behind: "Você está atrasado no ritmo",
+    done: "Meta cumprida",
+  },
+  pace: {
+    ahead: "{n} à frente",
+    behind: "{n} atrás",
+    onTrack: "No ritmo",
+    done: "Cumprida",
+  },
+  clock: {
+    line: "Ano concluído em {pct} · {days}",
+    daysLeft: "faltam {n} dias",
+    dayLeft: "falta 1 dia",
+    lastDay: "Último dia",
+  },
+  stats: {
+    soFar: "Até agora {n}",
+    planToday: "Plano: {n} para hoje",
+    remaining: "Faltam",
+    over: "A mais",
+    perWeek: "Por semana",
+    perMonth: "Por mês",
+    projected: "Fim do ano",
+    none: "—",
+  },
+  chart: {
+    title: "Plano mensal",
+    plan: "Cerca de {n} por mês para chegar lá",
+    empty: "Você ainda não assistiu a nada este ano; as barras se enchem conforme você assiste.",
+  },
+  sheet: {
+    title: "Meta de visualização {year}",
+    subtitle: "Você pode definir metas diferentes para filmes e séries.",
+    previewTag: "Pré-visualização",
+    toggleMovies: "Meta de filmes",
+    toggleShows: "Meta de séries",
+    measureLabel: "O que contamos?",
+    decrease: "Diminuir a meta",
+    increase: "Aumentar a meta",
+    needTrack: "Ative uma meta de filmes ou séries para salvar.",
+    noSummary: "Ative uma meta; aqui você verá o progresso e o plano.",
+    save: "Salvar",
+    remove: "Remover a meta",
+    close: "Fechar",
+    saveFailed: "Não foi possível salvar a meta",
+  },
+};
+
+export const YEARLY_GOAL_COPY = { tr, en, es, pt };
 
 /** Uygulama diline uygun tablo (tabloda olmayan dil → İngilizce). */
 export const getYearlyGoalCopy = (language) =>
-  YEARLY_GOAL_COPY[copyLanguage(language, ["tr", "en", "es"])];
+  YEARLY_GOAL_COPY[copyLanguage(language, ["tr", "en", "es", "pt"])];
 
 /** `{ad}` yer tutucularını doldurur; verilmeyen yer tutucu olduğu gibi kalır. */
 export const fillCopy = (text, values = {}) =>
@@ -254,12 +330,12 @@ export const fillCopy = (text, values = {}) =>
 export function formatGoalNumber(value, language) {
   const rounded = Math.round(Number(value) * 10) / 10;
   const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-  return copyLanguage(language, ["tr", "en", "es"]) === "en" ? text : text.replace(".", ",");
+  return copyLanguage(language, ["tr", "en", "es", "pt"]) === "en" ? text : text.replace(".", ",");
 }
 
 /** Yüzde gösterimi: tr "%62", diğer diller "62%". */
 export const formatPercent = (percent, language) =>
-  copyLanguage(language, ["tr", "en", "es"]) === "tr" ? `%${percent}` : `${percent}%`;
+  copyLanguage(language, ["tr", "en", "es", "pt"]) === "tr" ? `%${percent}` : `${percent}%`;
 
 /** Yılın saati satırı: "Yıl %50 tamamlandı · 183 gün kaldı". */
 export function describeYearClock(clock, copy, language) {

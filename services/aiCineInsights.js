@@ -189,11 +189,17 @@ const GENRE_ALIASES = {
   guerra: "war",
   historia: "history",
   musica: "music",
+  // Portekizce (katlanmış, aksansız)
+  acao: "action",
+  animacao: "animation",
+  documentario: "documentary",
+  "ficcao cientifica": "sci-fi",
+  faroeste: "western",
 };
 
 function genreTokens(value) {
   return foldForSearch(toStr(value))
-    .split(/[&/,]|\s+ve\s+|\s+and\s+|\s+y\s+/)
+    .split(/[&/,]|\s+ve\s+|\s+and\s+|\s+y\s+|\s+e\s+/)
     .map((part) => part.trim())
     .filter(Boolean)
     .map((part) => GENRE_ALIASES[part] || part);
@@ -404,6 +410,7 @@ export function formatDuration(minutes, language = "en") {
     tr: { hour: "sa", minute: "dk" },
     en: { hour: "h", minute: "m" },
     es: { hour: "h", minute: "min" },
+    pt: { hour: "h", minute: "min" },
   });
   if (h === 0) return `${m} ${minUnit}`;
   return m === 0 ? `${h} ${hourUnit}` : `${h} ${hourUnit} ${m} ${minUnit}`;
@@ -496,6 +503,26 @@ const FOLLOW_UP_COPY = {
     versus: "Comparar con {a}",
     movies: "Sugerir películas",
     series: "Sugerir series",
+  },
+  pt: {
+    different: "Mostre outros",
+    pickOne: "Qual eu assisto?",
+    shorter: "Opções mais curtas",
+    similarTo: "Mais como {title}",
+    watchFirst: "Qual primeiro?",
+    third: "Uma terceira opção",
+    makePlan: "Criar um plano para assistir",
+    shortenPlan: "Encurtar o plano",
+    weekend: "Que caiba num fim de semana",
+    swapOne: "Trocar um",
+    moreLikeThis: "Mais como este",
+    hiddenGems: "Só joias escondidas",
+    toPlan: "Transformar em plano",
+    similar: "Sugerir semelhantes",
+    pitch: "Apresentação sem spoilers",
+    versus: "Comparar com {a}",
+    movies: "Sugerir filmes",
+    series: "Sugerir séries",
   },
 };
 
@@ -628,6 +655,7 @@ export function buildShareText(response, posterMap, { language = "en", appName =
     tr: `${appName} · CineMatch önerileri`,
     en: `${appName} · CineMatch picks`,
     es: `${appName} · recomendaciones de CineMatch`,
+    pt: `${appName} · recomendações do CineMatch`,
   });
   return [head, "", ...lines].join("\n");
 }
@@ -774,6 +802,7 @@ export function formatRelativeTime(timestamp, language = "en", now = Date.now())
     tr: { minute: "dk", hour: "sa", yesterday: "dün", day: "g" },
     en: { minute: "m", hour: "h", yesterday: "1d", day: "d" },
     es: { minute: "min", hour: "h", yesterday: "ayer", day: "d" },
+    pt: { minute: "min", hour: "h", yesterday: "ontem", day: "d" },
   });
   const minutes = Math.floor((now - timestamp) / 60000);
   if (minutes < 1) return "•";

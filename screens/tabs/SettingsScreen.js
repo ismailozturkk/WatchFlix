@@ -496,11 +496,13 @@ export default function SettingsScreen() {
           tr: `${streamingProviderIds.length} platform seçili`,
           en: `${streamingProviderIds.length} services selected`,
           es: `${streamingProviderIds.length} servicios seleccionados`,
+          pt: `${streamingProviderIds.length} serviços selecionados`,
         })
     : pickByLanguage(language, {
         tr: "Henüz platform seçilmedi",
         en: "No services selected yet",
         es: "Aún no has elegido servicios",
+        pt: "Você ainda não escolheu serviços",
       });
 
   const filteredProviders = useMemo(() => {

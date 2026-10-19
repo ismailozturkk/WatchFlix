@@ -13,7 +13,7 @@ const {
 } = require("../screens/tabs/settings/sectionVisibilityCopy");
 const { SECTION_SCREENS } = require("../utils/sectionVisibility");
 
-const DILLER = ["tr", "en", "es"];
+const DILLER = ["tr", "en", "es", "pt"];
 const doluMetin = (m) => typeof m === "string" && m.trim().length > 0;
 
 describe("kayıt ↔ metin bağı", () => {

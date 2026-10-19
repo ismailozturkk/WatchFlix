@@ -75,6 +75,9 @@ describe("normalizeAppLanguage", () => {
     expect(normalizeAppLanguage("es")).toBe("es");
     expect(normalizeAppLanguage("es-MX")).toBe("es");
     expect(normalizeAppLanguage("ES_ar")).toBe("es");
+    expect(normalizeAppLanguage("pt")).toBe("pt");
+    expect(normalizeAppLanguage("pt-BR")).toBe("pt");
+    expect(normalizeAppLanguage("PT_pt")).toBe("pt");
     expect(normalizeAppLanguage("en-GB")).toBe("en");
   });
 
@@ -88,11 +91,13 @@ describe("normalizeAppLanguage", () => {
 describe("copyLanguage / pickByLanguage", () => {
   it("tabloda olan dili seçer", () => {
     expect(copyLanguage("es", ["tr", "en", "es"])).toBe("es");
+    expect(copyLanguage("pt", ["tr", "en", "es", "pt"])).toBe("pt");
     expect(copyLanguage("tr", ["tr", "en"])).toBe("tr");
   });
 
   it("tabloda olmayan dil İngilizceye düşer (Türkçe'ye değil)", () => {
     expect(copyLanguage("es", ["tr", "en"])).toBe("en");
+    expect(copyLanguage("pt", ["tr", "en", "es"])).toBe("en");
     expect(copyLanguage("de", ["tr", "en", "es"])).toBe("en");
     expect(copyLanguage(undefined, ["tr", "en", "es"])).toBe("en");
   });
@@ -108,6 +113,8 @@ describe("copyLanguage / pickByLanguage", () => {
     expect(pickByLanguage("tr", tablo)).toBe("Merhaba");
     expect(pickByLanguage("fr", tablo)).toBe("Hello");
     expect(pickByLanguage("es", { tr: "Merhaba", en: "Hello" })).toBe("Hello");
+    expect(pickByLanguage("pt", { tr: "Merhaba", en: "Hello", es: "Hola", pt: "Olá" })).toBe("Olá");
+    expect(pickByLanguage("pt", { tr: "Merhaba", en: "Hello", es: "Hola" })).toBe("Hello");
   });
 });
 
@@ -119,6 +126,15 @@ describe("dil bağlı sabitler", () => {
     expect(aiPromptLanguageOf("es")).toBe("Spanish (es)");
     expect(legalLanguageOf("es")).toBe("en");
     expect(tmdbImageLanguageOrderOf("es")).toBe("es,en,null");
+  });
+
+  it("Portekizce (Brezilya): TMDB, Intl ve yapay zeka bağları", () => {
+    expect(tmdbLanguageOf("pt")).toBe("pt-BR");
+    expect(tmdbRegionOf("pt")).toBe("BR");
+    expect(intlLocaleOf("pt")).toBe("pt-BR");
+    expect(aiPromptLanguageOf("pt")).toBe("Portuguese (pt-BR)");
+    expect(legalLanguageOf("pt")).toBe("en");
+    expect(tmdbImageLanguageOrderOf("pt")).toBe("pt,en,null");
   });
 
   it("Türkçe ve İngilizce bağları değişmedi", () => {
@@ -151,11 +167,13 @@ describe("dil döngüsü ve eski bayrak göçü", () => {
     expect(legacyFlagToLanguage(true)).toBe("tr");
     expect(legacyFlagToLanguage(false)).toBe("en");
     expect(legacyFlagToLanguage("es")).toBe("es");
+    expect(legacyFlagToLanguage("pt")).toBe("pt");
     expect(legacyFlagToLanguage("xx")).toBe("en");
   });
 
   it("isSupportedAppLanguage yalnız kayıtlı kodlara true", () => {
     expect(isSupportedAppLanguage("es")).toBe(true);
+    expect(isSupportedAppLanguage("pt")).toBe(true);
     expect(isSupportedAppLanguage("de")).toBe(false);
   });
 });

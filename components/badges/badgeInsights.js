@@ -298,13 +298,13 @@ export function prestijBilgisi(kart) {
 // Prestij adımının BİRİM adı. Süre ailesi (`sure`) burada yok: onun birimi çeviriciden
 // (dk/sa/gün) geliyor ve formatBadgeDeger zaten ekliyor.
 const PRESTIJ_EK = Object.freeze({
-  film: { tr: "film", en: "films", es: "películas" },
-  bolum: { tr: "bölüm", en: "episodes", es: "episodios" },
-  final: { tr: "dizi", en: "series", es: "series" },
-  gun: { tr: "gün", en: "days", es: "días" },
-  uzunMetraj: { tr: "uzun film", en: "long films", es: "películas largas" },
+  film: { tr: "film", en: "films", es: "películas", pt: "filmes" },
+  bolum: { tr: "bölüm", en: "episodes", es: "episodios", pt: "episódios" },
+  final: { tr: "dizi", en: "series", es: "series", pt: "séries" },
+  gun: { tr: "gün", en: "days", es: "días", pt: "dias" },
+  uzunMetraj: { tr: "uzun film", en: "long films", es: "películas largas", pt: "filmes longos" },
 });
-export const prestijEk = (family, lang = "tr") => PRESTIJ_EK[family]?.[copyLanguage(lang, ["tr", "en", "es"])] || "";
+export const prestijEk = (family, lang = "tr") => PRESTIJ_EK[family]?.[copyLanguage(lang, ["tr", "en", "es", "pt"])] || "";
 
 /**
  * Rozeti bir kart listesinde bulur: kartın kendi id'si ya da kademeli ailenin

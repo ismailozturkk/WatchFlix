@@ -105,6 +105,39 @@ export const TASTE_MATCH_COPY = {
       needFriend: "Tenéis que ser amigos para enviar una invitación",
     },
   },
+  pt: {
+    title: "Afinidade de gostos",
+    tiers: {
+      veryHigh: "Seus gostos são muito parecidos",
+      high: "Vocês têm gostos bem parecidos",
+      medium: "Vocês coincidem em parte",
+      low: "Seus gostos são diferentes",
+    },
+    limited: "Resultado aproximado porque faltam alguns dados",
+    noData: {
+      hidden: (name) => `${name} não compartilha as listas, então não há o que comparar`,
+      notEnough: "Os dois precisam de mais alguns títulos assistidos para comparar",
+    },
+    rows: {
+      overlap: (n) => (n === 1 ? "1 título assistido pelos dois" : `${n} títulos assistidos pelos dois`),
+      favorites: (n) => (n === 1 ? "1 favorito em comum" : `${n} favoritos em comum`),
+      genres: (list) => `Gêneros em comum: ${list}`,
+      ratings: (percent, pairs) => `${percent}% de concordância nas notas · ${pairs} avaliados pelos dois`,
+    },
+    together: {
+      title: "Vamos assistir juntos",
+      both: (n) => `Há ${n} títulos nas listas dos dois`,
+      mixed: (n) => `${n} candidatos que nenhum dos dois assistiu`,
+      none: "Nenhum candidato em comum foi encontrado",
+      noneHint: "Adicione alguns títulos às listas para assistir de vocês e eles aparecerão aqui",
+      hiddenList: (name) => `${name} não compartilha a lista para assistir; os candidatos vêm só da sua`,
+      sources: { both: "Nas duas listas", mine: "Da sua lista", theirs: "Da lista dele(a)" },
+      action: (name) => `Criar uma sala e convidar ${name}`,
+      actionHint: "Deslizem o mesmo baralho no CineSwipe; os títulos que os dois curtirem dão match",
+      limit: (n) => `Os primeiros ${n} candidatos entram na sala`,
+      needFriend: "Vocês precisam ser amigos para enviar um convite",
+    },
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

@@ -32,7 +32,7 @@ export default function useBadgeCelebration({ kutlama, kutlamayiKapat }) {
 
   useEffect(() => {
     if (!kutlama) return;
-    const lang = copyLanguage(language, ["tr", "en", "es"]);
+    const lang = copyLanguage(language, ["tr", "en", "es", "pt"]);
     const baslik = baslikOdulu(kutlama.rozetler, lang);
 
     if (baslik) {

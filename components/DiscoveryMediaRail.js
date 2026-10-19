@@ -201,7 +201,7 @@ export default function DiscoveryMediaRail({
   const [genreResolutionComplete, setGenreResolutionComplete] = useState(preset !== "topGenres");
 
   // Metinler tr/en/es; bilinmeyen dil İngilizce (utils/appLanguages.pickByLanguage).
-  const L = (tr, en, es) => pickByLanguage(language, { tr, en, es });
+  const L = (tr, en, es, pt) => pickByLanguage(language, { tr, en, es, pt: pt ?? en });
   const genreNamesKey = JSON.stringify(
     [...new Set((genreNames || []).filter((name) => name && name !== "-"))].slice(0, 3),
   );
@@ -213,18 +213,18 @@ export default function DiscoveryMediaRail({
   // Tek istisna "Favori Türlerin": alt başlık kullanıcının üç türünün adı (yoksa tablodaki cümle).
   const section = useMemo(() => {
     if (preset === "subscriptions") {
-      return { title: L("Platform Favorileri", "Service Favorites", "Favoritos de tus plataformas") };
+      return { title: L("Platform Favorileri", "Service Favorites", "Favoritos de tus plataformas", "Favoritos dos seus serviços") };
     }
     if (preset === "hiddenGems") {
-      return { title: L("Gizli cevherler", "Hidden gems", "Joyas ocultas") };
+      return { title: L("Gizli cevherler", "Hidden gems", "Joyas ocultas", "Joias escondidas") };
     }
     if (preset === "topGenres") {
       return {
-        title: L("Favori Türlerin", "Favorite Genres", "Tus géneros favoritos"),
+        title: L("Favori Türlerin", "Favorite Genres", "Tus géneros favoritos", "Seus gêneros favoritos"),
         subtitle: normalizedGenreNames.join("  •  ") || undefined,
       };
     }
-    return { title: L("Yeni Beğenilenler", "Recent Favorites", "Favoritos recientes") };
+    return { title: L("Yeni Beğenilenler", "Recent Favorites", "Favoritos recientes", "Favoritos recentes") };
   }, [language, normalizedGenreNames, preset]);
 
   useEffect(() => {

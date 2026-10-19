@@ -2,7 +2,7 @@
 
 > Amaç: "X dilini ekleyelim" dendiğinde **önce bu dosya okunur**. Dilin nerede seçildiği, hangi
 > yüzeylerde kullanıldığı, bir dil eksik bırakılırsa nereye düşeceği ve yeni dil için adım adım
-> liste burada. İlk yazım ve İspanyolca (`es`) ekleme: 2026-10-15/16. Sayılar o günün kodundan;
+> liste burada. İlk yazım ve İspanyolca (`es`) ekleme: 2026-10-15/16; Portekizce (`pt`, Brezilya) ekleme: 2026-10-19 (bölüm 11). Sayılar o günün kodundan;
 > kod büyüdükçe kayar — kesin sayı için en alttaki "Yeniden sayma komutları"na bak.
 >
 > **Kısa yol:** yeni dil = `utils/appLanguages.js`'e bir satır + `translations/xx.json` + bu dosyadaki
@@ -25,11 +25,11 @@ JSON paketi + o kayıt + yan mekanizmaların her birine bir giriş.
 | Kayıt (saklama) | `services/storage/registry.js` → `Keys.language` (`"selectedLanguage"`, string, varsayılan `"tr"`) | MMKV, senkron okunur |
 | İlk açılış | `translations/index.js` → `cozumlenmisDil()` | Kayıt **yoksa** cihaz dili (`utils/deviceLanguage.js`). Kayıt varsa o. `has()` ile `get()` ayrımı bilerek: `get()` kayıt yokken `"tr"` döndürür |
 | Cihaz dili | `utils/deviceLanguage.js` | `DESTEKLENEN_DILLER` kayıttan; desteklenmeyen cihaz dili `YEDEK_DIL = "en"`e düşer. **İspanyolca cihaz artık ilk açılışta İspanyolca açılır** |
-| i18next | `translations/index.js` | `resources` (tr/en/es), `fallbackLng: { es: ["en","tr"], default: ["tr"] }`, `compatibilityJSON: "v3"`, `languageDetector.async = false`. Detector'ın `cacheUserLanguage` **no-op**: yazan tek taraf `AppSettingsContext` |
+| i18next | `translations/index.js` | `resources` (tr/en/es/pt), `fallbackLng: { es: ["en","tr"], pt: ["en","tr"], default: ["tr"] }`, `compatibilityJSON: "v3"`, `languageDetector.async = false`. Detector'ın `cacheUserLanguage` **no-op**: yazan tek taraf `AppSettingsContext` |
 | Yazma | `context/AppSettingsContext.js` → `changeLanguage` | `setSelectedLanguage` + `persist(Keys.language, …)` |
 | Yayın | `context/LanguageContext.js` | `useLanguage()` → `{ language, toggleLanguage, t }`. `t` = `i18n.getResourceBundle(dil, "translation")` **düz nesne**. `selectedLanguage` değişince `i18n.changeLanguage` + `setTmdbTitleLanguage` |
 | Seçici UI | `screens/tabs/SettingsScreen.js` → `LANGUAGES = APP_LANGUAGES` + dil alt sayfası (arama kutulu, `CountryFlag`) | Bayrak: `react-native-country-flag` ISO kodu (`es` → İspanya bayrağı; dil≠ülke, bilinçli) |
-| Onboarding dil düğmesi | `OnboardingScreen` → `nextAppLanguage(language)` | Kayıt sırasında döner: tr → en → es → tr |
+| Onboarding dil düğmesi | `OnboardingScreen` → `nextAppLanguage(language)` | Kayıt sırasında döner: tr → en → es → pt → tr. Düğme etiketi SIRADAKİ dilin adıdır (`onboardingCopy.*.language`): yeni dil eklenince önceki son dilin etiketi de değişir |
 | Yedek/geri yükleme | `utils/settingsBackup.js` → `language: { check: isSupportedAppLanguage }` | Kayıttan; eski yedeklerdeki boolean/`"en"` değerleri `legacyFlagToLanguage` ile köprülenir |
 
 Döngü uyarısı: `AppSettingsContext` açılış state'ini `cozumlenmisDil`den alır; ayrışsalardı
@@ -38,7 +38,7 @@ beslenmeli.
 
 ## 3. Metin mekanizmaları (hangisi nerede, yeni dilde ne yapılır)
 
-### 3.1 `translations/{tr,en,es}.json` — `t.xxx` (namespace) — 71 dosya, ~440 erişim
+### 3.1 `translations/{tr,en,es,pt}.json` — `t.xxx` (namespace) — 71 dosya, ~440 erişim
 `const { t } = useLanguage(); t.profileScreen.title`. İç içe nesneler (`cineSwipe`, `AICineChat`,
 `shareScreen`, `profileScreen`, `ChatModal`, `tvShowsDetails`, `cineRoomResults`, `movieScreens`…) +
 ~240 düz anahtar (`notifBody*`, `notifChannel*`, `language`, `searchLanguage`…).
@@ -53,8 +53,8 @@ bu yüzden `i18nKeys.test.js` var (bölüm 8). Dinamik anahtar kuran 3 dosya tes
 `ReportReasonSheet` (`REASON_UI`), `NotificationPrimingSheet` (`BENEFITS`), `CacheManagerModal`
 (`cache_${id}`). Yeni dinamik anahtar → o testin `DINAMIK_YERLER`ine ekle.
 
-### 3.3 Yerel `{tr, en, es}` kopya tabloları (JSON dışı) — ~25 modül
-Her biri kendi seçicisini taşır. **Seçici `copyLanguage(language, ["tr","en","es"])` /
+### 3.3 Yerel `{tr, en, es, pt}` kopya tabloları (JSON dışı) — ~25 modül
+Her biri kendi seçicisini taşır. **Seçici `copyLanguage(language, ["tr","en","es","pt"])` /
 `pickByLanguage(language, tablo)`** olmalı (bilinmeyen → İngilizce). Üç dili de `__tests__/copyTablesSpanish.test.js`
 karşılaştırır (anahtar kümesi, yer tutucu, işlev parametre sayısı) — **yeni tablo yazarsan o testin
 `TABLOLAR` listesine ekle.**
@@ -97,11 +97,11 @@ Bölüm 5, 6. JS paketlerinden bağımsız; ayrı deploy/derleme ister.
 
 | Yüzey | Nerede | Dile nasıl bağlı (güncel) |
 |---|---|---|
-| **TMDB `language`** | ~35 dosya (`MovieContex`, `TvShowContex`, aramalar, `SeeAllScreen`, `onboarding/useOnboardingData`, `dataDownloader`, `sceneGameService`, `cineswipe/*`, `tmdbLookup` …) | `tmdbLanguageOf(language)` (`tr-TR` / `en-US` / `es-ES`). `utils/tmdbTitleFallback.js::tmdbLanguageForApp` kayıtlı dilleri kayıttan, tanınmayan kodu (içeriğin özgün dili: `"ja"`) olduğu gibi döndürür. Servis varsayılan parametreleri (`language = "tr-TR"`) çağıranın verdiği değere ezilir |
-| **TMDB `watch_region`** | `MovieContex`, `TvShowContex`, `SeeAllScreen`, `MovieDetail`, `TvShowsDetails`, `Settings`, `useOnboardingData`, `DiscoveryMediaRail`, `dataDownloader`, `tmdbLookup`, `DeviceNotificationsContext` | `tmdbRegionOf(language)` (`TR`/`US`/`ES`). **Dil ≠ ülke**: İspanyolca için tek bölge seçilemez; `ES` bilinçli varsayılan (Latin Amerika için ileride bölge seçici gerekir) |
+| **TMDB `language`** | ~35 dosya (`MovieContex`, `TvShowContex`, aramalar, `SeeAllScreen`, `onboarding/useOnboardingData`, `dataDownloader`, `sceneGameService`, `cineswipe/*`, `tmdbLookup` …) | `tmdbLanguageOf(language)` (`tr-TR` / `en-US` / `es-ES` / `pt-BR`). `utils/tmdbTitleFallback.js::tmdbLanguageForApp` kayıtlı dilleri kayıttan, tanınmayan kodu (içeriğin özgün dili: `"ja"`) olduğu gibi döndürür. Servis varsayılan parametreleri (`language = "tr-TR"`) çağıranın verdiği değere ezilir |
+| **TMDB `watch_region`** | `MovieContex`, `TvShowContex`, `SeeAllScreen`, `MovieDetail`, `TvShowsDetails`, `Settings`, `useOnboardingData`, `DiscoveryMediaRail`, `dataDownloader`, `tmdbLookup`, `DeviceNotificationsContext` | `tmdbRegionOf(language)` (`TR`/`US`/`ES`/`BR`). **Dil ≠ ülke**: İspanyolca için tek bölge seçilemez; `ES` bilinçli varsayılan (Latin Amerika için ileride bölge seçici gerekir) |
 | **Önbellek anahtarları** | `movie_trends_${tmdbLanguage}_…`, `scene:pool:…:${language}`, `settings_provider_catalog_${lang}_${region}` | Dil anahtara girer → yeni dil ayrı önbellek (ilk açılışta soğuk, sorun değil) |
 | **Başlık yedekleme** | `utils/tmdbTitleFallback.js` | Sıra: uygulama dili → İngilizce → özgün başlık; `/translations` ile tamamlar |
-| **Tür adı kanonikleştirme** | `utils/genreCanon.js` `ALIASES`, `services/aiCineInsights.js::GENRE_ALIASES` | Tür **ad** olarak saklanır; TMDB türleri istemci diline göre çevirip döndürür → **yeni dilin tür adları aliasa girmezse `other` kovasına düşer** (tür puanı/rozetleri sessizce bozulur). `fold` sonrası: küçük harf, aksansız (`ciencia ficcion`). İspanyolca eklendi |
+| **Tür adı kanonikleştirme** | `utils/genreCanon.js` `ALIASES`, `services/aiCineInsights.js::GENRE_ALIASES` | Tür **ad** olarak saklanır; TMDB türleri istemci diline göre çevirip döndürür → **yeni dilin tür adları aliasa girmezse `other` kovasına düşer** (tür puanı/rozetleri sessizce bozulur). `fold` sonrası: küçük harf, aksansız (`ciencia ficcion`). İspanyolca ve Portekizce eklendi (Portekizce: `faroeste`, `ficcao cientifica`, `acao`, `cinema tv`, `novela`… + `aiCineInsights.GENRE_ALIASES`) |
 | **Tür adları (id→ad)** | `utils/genreLabels.js` | `autoI18n.*` anahtarlı; JSON'a çeviri yeter |
 | **Fragman** | `utils/trailerLanguages.js`, `components/video/TrailerSection.js` | 13 dil listeli (`en tr de fr es it pt ru ja ko zh hi ar`). `appLangCode = normalizeAppLanguage(language)` → sıra: uygulama dili → `en` → özgün dil → seçilen. Yeni dil kayıtlıysa fragman otomatik o dille başlar |
 | **Görsel (poster/arka plan) dili** | `ImageGalleryModal`, `StoryShareScreen` | `tmdbImageLanguageOrderOf(language)` → `"es,en,null"` |
@@ -126,8 +126,8 @@ Bölüm 5, 6. JS paketlerinden bağımsız; ayrı deploy/derleme ister.
 3. **Android bildirim kanal adları** — `setChannelNames({ default: t.notifChannelGeneral, … })`; dil
    değişince yeniden uygulanır (Android var olan kanalın adını günceller).
 4. **Push (arka plan) — SUNUCU** — `functions/index.js`:
-   - `STRINGS = { tr, en, es }` + `buildContent(n, lang)`: sosyal push gövdeleri.
-   - `STREAM_STRINGS = { tr, en, es }`: "şu platformda izlenebilir" günlük bildirimi.
+   - `STRINGS = { tr, en, es, pt }` + `buildContent(n, lang)`: sosyal push gövdeleri.
+   - `STREAM_STRINGS = { tr, en, es, pt }`: "şu platformda izlenebilir" günlük bildirimi. Haftalık özet: `functions/weeklyDigest.js` `DIGEST_STRINGS`.
    - `NOTIFICATION_LANGUAGES` + `pickNotificationLang(raw)`: **kayıt yoksa `"tr"` (eski kullanıcılar),
      tanınmayan dil `"en"`**. Üç çağrı yeri (buildContent, push dağıtımı, `processUserStreaming`) bunu kullanır.
    - Dil kaynağı `Users/{uid}.notificationLanguage`; istemci `DeviceNotificationsContext` içinde
@@ -181,10 +181,10 @@ Android `WidgetLanguage.of`), `Keys.language` varsayılanı `"tr"`.
 
 | Test | Ne korur |
 |---|---|
-| `__tests__/i18nKeys.test.js` | Koddaki her statik `autoI18n.*` / `t.xxx` anahtarı **tr, en ve es** paketinde var; üç paket aynı anahtar kümesine, aynı `{{yer tutucu}}` kümesine, aynı dizi uzunluklarına sahip; EN/ES'te boş değer yok; **ES'te Türkçeye özgü harf (ğ ş ı İ) sızmaz** (tek istisna: kişi adı "İsmail Öztürk") |
+| `__tests__/i18nKeys.test.js` | Koddaki her statik `autoI18n.*` / `t.xxx` anahtarı **tr, en, es ve pt** paketinde var; paketler aynı anahtar kümesine, aynı `{{yer tutucu}}` kümesine, aynı dizi uzunluklarına sahip; EN/ES'te boş değer yok; **es/pt'de Türkçeye özgü harf (ğ ş ı İ) sızmaz** (pt'de ayrıca ñ ¿ ¡ sızmaz; tek `{count}` yer tutucuları da denetlenir; yeni dil için `EK_DILLER` listesine ekle) (tek istisna: kişi adı "İsmail Öztürk") |
 | `__tests__/appLanguages.test.js` | Kayıt yapısı (alanlar, benzersiz kod), her dilin JSON'u var ve `index.js`'te, `normalizeAppLanguage`/`copyLanguage`/`pickByLanguage` düşüş yönü, ES TMDB/Intl/AI bağları, `nextAppLanguage` döngüsü, eski boolean bayrak göçü |
 | `__tests__/deviceLanguage.test.js` | Cihaz dili → uygulama dili (tr/en/es/yedek) |
-| `__tests__/copyTablesSpanish.test.js` | `BACKUP_COPY`, `STUDIO_COPY`, `AI_COPY`, `ONBOARDING_COPY`, `FAVORITES_COPY`, `getWrappedStrings` — üç dilde aynı anahtar/yer tutucu/işlev parametre sayısı; pozitif kontrol; bilinmeyen dil İngilizce |
+| `__tests__/copyTablesSpanish.test.js` | 20 yerel tablo (`BACKUP_COPY`, `STUDIO_COPY`, `AI_COPY`, `ONBOARDING_COPY`, `FAVORITES_COPY`, `getWrappedStrings` …) — dört dilde aynı anahtar/yer tutucu/işlev parametre sayısı (`KARSILASTIRILAN`, `pt` ayrıca Türkçe/İspanyolca harf denetimi); pozitif kontrol; bilinmeyen dil İngilizce |
 | `__tests__/{aiCopy,favoritesCopy,onboardingCopy}.test.js` | Tek tek tablo davranışları (ES kolları dahil) |
 | `__tests__/widgetNativeLanguage.test.js` | Native widget dil listeleri kayıtla aynı (bölüm 6); widget **adları**: her kayıtlı dilin Android `values-xx/` ve iOS `xx.lproj/Localizable.strings` dosyası var, anahtar kümeleri eşit, çevrilmemiş kopya/kaçışsız `'`/Swift'te sabit ad geri girmesi yok |
 | `__tests__/nativePermissionLocales.test.js` | Sistem izin metinleri: `expo.locales` her kayıtlı dili kapsar, `native/locales/*.json` anahtar kümeleri eşit ve Expo yazıcısını bozacak karakter yok, her `…Permission` seçeneği eşlenmiş (yeni izin = çeviri kararı), Info.plist yedeği İngilizce, `CFBundleLocalizations` = kayıtlı diller |
@@ -192,6 +192,7 @@ Android `WidgetLanguage.of`), `Keys.language` varsayılanı `"tr"`.
 | `__tests__/premiumFeatures.test.js` | İspanyolca hücre/uyarı metinleri, bilinmeyen dil İngilizce, karşılaştırma tablosu üç dilde aynı satırlar |
 | `__tests__/trailerLanguages.test.js`, `tmdbTitleFallback.test.js` | Fragman sırası, TMDB başlık düşüşü |
 | `__tests__/{premium*,wrapped*,badgeMeta,hubWrappedModule}.test.js` | İlgili kopyaların dil çiftleri |
+| `__tests__/portugueseSupport.test.js` | pt birleşim noktaları: cihaz dili, TMDB `pt-BR`, tarih seçici ay/gün adları, takvim `LocaleConfig.locales.pt` + Pazar başlangıcı, Portekizce tür adlarının kanonik id'ye inmesi, sunucu `NOTIFICATION_LANGUAGES`, i18next fallback, keşif süzgeci içerik dili |
 
 Bekçi kör noktası (bellek: `i18n-duplicate-key-blindspot`): test `JSON.parse` okuduğu için **yinelenen
 anahtarı** görmez; `arkadas_ara` casing bölmesi bilinçle ertelendi. Satır içi ternary'lerde (3.4) **hiç
@@ -253,6 +254,58 @@ Kod ADI = ISO 639-1 (`"xx"`). Aşağıda `xx` yerine onu koy. İspanyolca bu lis
 - Biçim: ondalık virgül, kompakt sayıda " mil" son eki, haftanın ilk günü Pazartesi, ay/gün adları küçük harf.
 - Çoğul/eril-dişil: cinsiyetsiz ifadeler tercih edilir; "arkadaş" → `amistades`/`amigos`.
 - Yasal sayfalar çevrilmedi → `legalLang: "en"` (kullanıcı İngilizce sayfayı açar; onay metni İspanyolca).
+
+## 11. Portekizce (pt, Brezilya) — kararlar ve nasıl eklendi
+
+**Karar:** Brezilya Portekizcesi (`você`; Portekiz'in `tu`/`o senhor` kalıpları ve `ficheiro`, `telemóvel` gibi sözcükler yok).
+Dünyadaki Portekizce konuşurların çoğu Brezilya'da; Portekiz'deki cihazlar da `pt` olarak tanınır ve Brezilya Portekizcesi görür
+(anlaşılır, bilinçli). Portekiz'e özgü paket istenirse kayıt kodu 2 harf ve benzersiz olmak zorunda olduğundan ayrı kod yerine bölge/lehçe seçici
+düşünülmeli (İspanyolca için de aynı durum: tek bölge `es-ES`).
+
+- Kayıt: `code: "pt"`, bayrak `br`, `intlLocale: "pt-BR"`, TMDB `pt-BR` / bölge `BR`, görsel dilleri `["pt","en"]`, yasal sayfa `en`, AI `Portuguese (pt-BR)`.
+- Sabit sözlük: rozet = **emblema**, watchlist = **lista para assistir**, Ayarlar = **Configurações**, Free plan adı = **Grátis**
+  (cümle içinde de; `premiumFeatures.planNameFor`), widget = widget, Perde = **Ato** / makara = **Rolo** / kare = **Quadro**,
+  CineSwipe "pass" = **Passar**, sonuçlarda **Descartes**.
+- Biçim: ondalık virgül, kompakt binlik son eki `" mil"`, haftanın ilk günü **Pazar** (`CalendarScreen.firstDay`: en + pt = 0),
+  göreli zaman `min / h / d / sem` (Hub akışı `shareScreen.timeAgo`), uzun tarih `5 de março de 1998`.
+- Tür adları: TMDB pt-BR adları `genreCanon.ALIASES` ve `aiCineInsights.GENRE_ALIASES`'a eklendi (`Ficção científica`, `Faroeste`,
+  `Cinema TV`, `Ação e Aventura` …); `genreTokens` artık " e " ile de böler.
+- İçerik dili süzgeci (Ne izlesem?): `utils/discoverFilters.js` `LANGUAGES`'e `pt` eklendi, dört kopyada `languages.pt` etiketi var.
+
+**Nasıl eklendi (yeniden kullanılabilir yöntem — tek seferlik betikler `scratchpad`te kaldı, repoya girmedi):**
+1. `translations/pt.json`: `en.json` düz listeye dökülüp 14 parçada çevrildi, şablon (`en.json` yapısı) üzerinden yeniden kuruldu;
+   birleştirici yer tutucu eşitliğini, Türkçe harfi ve İspanyolca izini (ñ ¿ ¡) denetledi.
+2. Koddaki **İspanyolca kolları** @babel/parser AST'siyle bulundu (`es:` özelliği, `es ? a : b` üçlüsü, `const es = …`,
+   `["tr","en","es"]` listeleri, `{ tr, en, es }` kısaltması, konumsal `L(tr,en,es)` çağrıları) ve her birinin yanına `pt` kolu eklendi
+   (≈1.600 yer, 95 dosya). Prop ile geçen `es` bayrakları (`TierCard`, `Podium`, `ValueChip`, `ReminderRow` …) elle `pt`ye taşındı;
+   bir kapsam denetimi (Babel `scope.hasBinding`) tanımsız `pt` kullanımını yakaladı.
+3. **Gerçek eksikler** (İspanyolca için de kapatıldı): `UpNextScreen` (es → Türkçe!), `ProfileStoryCard.percentText` (es → `%42`),
+   `MediaNotesContext`/`ProfileNotesContext` limit toast'ları, `SettingsTheme` kilitli not, `ReminderNotificationsScreen` kapsam
+   cümlesi, `PostDetailScreen.timeAgo` (her dilde Türkçe dk/sa/g/hf).
+
+**Yeni dil eklerken tekrar edilecek tuzaklar (pt'de yaşandı):**
+- Konumsal çağrı yardımcıları (`L(tr,en,es)`, `tri(...)`, `t(trText,enText,esText)`) ve `pickByLanguage(lang, { tr, en, es })` ile kurulan
+  `{ tr, en, es }` kısaltmaları yeni parametre/anahtar ister; yalnız tablo satırı eklemek yetmez. `pt ?? en` güvenli düşüş verir.
+- Onboarding dil düğmesi **sıradaki** dilin adını taşır; son dil değişince eski son dilin etiketi de güncellenmeli (`es.language` artık "Português").
+- Bazı arayüz sınırları testle korunur (`watchPickerCopy`: `entry.title` ≤ 14 karakter → pt "O que ver?"); uzun çeviri testi kırar.
+- İçerik dili (TMDB özgün dil kodu) ile uygulama dili ayrı kavramdır: `discoverFiltersCopy.languages.es` "Espanhol" içeriktir.
+
+### Durum (2026-10-19, Portekizce çalışmasının sonu)
+
+| Alan | Durum |
+|---|---|
+| `translations/pt.json` | 3.066 yaprak anahtar, en.json ile birebir (yer tutucu, dizi uzunluğu, boş değer) |
+| Kayıt, i18next, cihaz dili, yedek doğrulayıcı, onboarding düğmesi | Tamam (kayıttan) |
+| `{tr,en,es,pt}` tabloları, satır içi dallanmalar, rozet/Premium/oyun/auth/widget önizleme/turnuva/Wrapped | Tamam; `copyTablesSpanish` + `portugueseSupport` + `i18nKeys` korur |
+| Tür takma adları, takvim yereli, tarih seçici | Tamam |
+| Cloud Functions (`STRINGS`/`STREAM_STRINGS`/`DIGEST_STRINGS`/`NOTIFICATION_LANGUAGES`) | Kodda tamam, **deploy EDİLMEDİ** (eski sunucuda `pt` → İngilizce push) |
+| Android/iOS widget (Kotlin `WidgetLanguage`, Swift `widgetPick`, `values-pt/`, `pt.lproj`) | Kodda tamam, **derlenmedi / yeni native build şart** |
+| iOS izin metinleri (`native/locales/pt.json`, `expo.locales.pt`, `CFBundleLocalizations`) | Kodda tamam, prebuild ile doğrulanmadı |
+| Tam jest | 283 paket yeşil |
+
+**Açık / yapılmayan:** cihazda hiçbir yüzey görülmedi (Portekizce metin İspanyolcadan da uzun olabilir: rozet adları, sekme etiketleri, düğmeler);
+ana dili Portekizce olan biri tarafından gözden geçirme; `store/play/pt-BR/` ve App Store metinleri; web yasal sayfaları yalnız tr/en
+(`legalLang: "en"`); `localeCompare(…, "tr")` sabit yerleri; `autoI18n.bolum` tr/en'deki eski hata (pt düz etiket "Episódio").
 
 ## Yeniden sayma komutları
 

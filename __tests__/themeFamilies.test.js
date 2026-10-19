@@ -206,7 +206,7 @@ describe("hazır temalar (deste)", () => {
   });
 
   test("hazır temaların etiketi her dilde var (ham kimlik görünmez)", () => {
-    for (const lang of ["tr", "en", "es"]) {
+    for (const lang of ["tr", "en", "es", "pt"]) {
       const copy = getStudioCopy(lang);
       for (const id of PRESET_IDS) expect(presetLabel(copy, id)).not.toBe(id);
       for (const tone of TONES) expect(toneLabel(copy, tone)).not.toBe(tone);

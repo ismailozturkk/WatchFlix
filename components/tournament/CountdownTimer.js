@@ -103,6 +103,7 @@ export default function CountdownTimer({
     tr: ["GÜN", "SAAT", "DK", "SN"],
     en: ["DAY", "HR", "MIN", "SEC"],
     es: ["DÍAS", "H", "MIN", "S"],
+    pt: ["DIAS", "H", "MIN", "S"],
   });
   const values = [d, h, m, s];
 

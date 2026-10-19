@@ -61,46 +61,55 @@ const ERROR_TEXT = {
     tr: "Oturum bulunamadı. Lütfen tekrar giriş yap.",
     en: "No active session. Please sign in again.",
     es: "No hay ninguna sesión activa. Inicia sesión de nuevo.",
+    pt: "Não há nenhuma sessão ativa. Entre novamente.",
   },
   [AccountConnectionCode.NO_EMAIL]: {
     tr: "Bu hesapta parola bağlanabilecek bir e-posta adresi yok.",
     en: "This account has no email address that can be linked to a password.",
     es: "Esta cuenta no tiene ningún correo electrónico al que se pueda vincular una contraseña.",
+    pt: "Esta conta não tem nenhum e-mail ao qual uma senha possa ser vinculada.",
   },
   [AccountConnectionCode.PASSWORD_MISMATCH]: {
     tr: "Girdiğin parolalar eşleşmiyor.",
     en: "The passwords do not match.",
     es: "Las contraseñas no coinciden.",
+    pt: "As senhas não coincidem.",
   },
   [AccountConnectionCode.WEAK_PASSWORD]: {
     tr: "Parolan en az 6 karakter olmalı.",
     en: "Your password must be at least 6 characters.",
     es: "Tu contraseña debe tener al menos 6 caracteres.",
+    pt: "Sua senha deve ter pelo menos 6 caracteres.",
   },
   [AccountConnectionCode.ALREADY_LINKED]: {
     tr: "E-posta ve parola girişi bu hesapta zaten etkin.",
     en: "Email and password sign-in is already active on this account.",
     es: "El inicio de sesión con correo y contraseña ya está activo en esta cuenta.",
+    pt: "O login com e-mail e senha já está ativo nesta conta.",
   },
   [AccountConnectionCode.EMAIL_IN_USE]: {
     tr: "Bu e-posta başka bir giriş kaydı tarafından kullanılıyor.",
     en: "This email is already used by another sign-in record.",
     es: "Este correo ya lo usa otro registro de inicio de sesión.",
+    pt: "Este e-mail já é usado por outro registro de login.",
   },
   [AccountConnectionCode.REQUIRES_RECENT_LOGIN]: {
     tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra yeniden dene.",
     en: "For security, sign out and sign in again before retrying.",
     es: "Por seguridad, cierra sesión y vuelve a iniciarla antes de reintentarlo.",
+    pt: "Por segurança, saia e entre de novo antes de tentar novamente.",
   },
   [AccountConnectionCode.LAST_PROVIDER]: {
     tr: "Hesabındaki tek giriş yöntemi kaldırılamaz.",
     en: "The only sign-in method on your account cannot be removed.",
     es: "El único método de inicio de sesión de tu cuenta no se puede quitar.",
+    pt: "O único método de login da sua conta não pode ser removido.",
   },
   [AccountConnectionCode.NETWORK]: {
     tr: "İnternet bağlantısı kurulamadı. Bağlantını kontrol et.",
     en: "Could not reach the network. Check your connection.",
     es: "No se pudo conectar a la red. Revisa tu conexión.",
+    pt: "Não foi possível conectar à rede. Verifique sua conexão.",
   },
 };
 
@@ -116,6 +125,7 @@ export function describeAccountConnectionError(error, language = "tr") {
     tr: "İşlem tamamlanamadı. Lütfen tekrar dene.",
     en: "The action could not be completed. Please try again.",
     es: "No se pudo completar la acción. Inténtalo de nuevo.",
+    pt: "Não foi possível concluir a ação. Tente novamente.",
   });
 }
 

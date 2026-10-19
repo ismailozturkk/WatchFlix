@@ -149,7 +149,7 @@ describe("ilk görünüm", () => {
   });
 
   test("her dilde ekran adı ve bölüm başlığı gösterilir", () => {
-    for (const dil of ["tr", "en", "es"]) {
+    for (const dil of ["tr", "en", "es", "pt"]) {
       mockLang = dil;
       render();
       const metinler = texts();

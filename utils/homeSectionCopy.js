@@ -18,7 +18,7 @@
 import { pickByLanguage } from "./appLanguages";
 
 /** @param {string} tr @param {string} en @param {string} es */
-const tri = (tr, en, es) => ({ tr, en, es });
+const tri = (tr, en, es, pt) => ({ tr, en, es, pt: pt ?? en });
 
 /** "accent" = temanın vurgusu; "gold" = ödül rafları (Oscar / Emmy). */
 export const SECTION_TONES = Object.freeze(["accent", "gold"]);
@@ -34,12 +34,12 @@ export const HOME_SECTIONS = Object.freeze({
       movie: tri(
         "Şu an en çok konuşulan filmler",
         "Most talked-about movies right now",
-        "Las películas más comentadas ahora",
+        "Las películas más comentadas ahora", "Os filmes mais comentados agora",
       ),
       tv: tri(
         "Şu an en çok konuşulan diziler",
         "Most talked-about shows right now",
-        "Las series más comentadas ahora",
+        "Las series más comentadas ahora", "As séries mais comentadas agora",
       ),
     },
   },
@@ -48,28 +48,28 @@ export const HOME_SECTIONS = Object.freeze({
     subtitle: tri(
       "Puan ve popülerliğe göre sıralı",
       "Ranked by rating and popularity",
-      "Por valoración y popularidad",
+      "Por valoración y popularidad", "Por nota e popularidade",
     ),
   },
   ongoing: {
     icon: "play-circle",
-    subtitle: tri("Kaldığın yerden devam et", "Pick up where you left off", "Sigue donde lo dejaste"),
+    subtitle: tri("Kaldığın yerden devam et", "Pick up where you left off", "Sigue donde lo dejaste", "Continue de onde parou"),
   },
   followedPeople: {
     icon: "sparkles",
     // Alt başlığı bileşen kendisi üretir (takip edilen kişi adları); bu yalnız yedek.
-    subtitle: tri("Takip ettiklerinin yeni işleri", "New work from people you follow", "Lo nuevo de a quienes sigues"),
+    subtitle: tri("Takip ettiklerinin yeni işleri", "New work from people you follow", "Lo nuevo de a quienes sigues", "As novidades de quem você segue"),
   },
   fromFavorites: {
     icon: "heart",
-    subtitle: tri("Favorilerine göre öneriler", "Picked from your favorites", "Según tus favoritos"),
+    subtitle: tri("Favorilerine göre öneriler", "Picked from your favorites", "Según tus favoritos", "Com base nos seus favoritos"),
   },
   subscriptions: {
     icon: "tv",
     subtitle: tri(
       "Platformlarında izleyebileceklerin",
       "Available on your services",
-      "Disponible en tus plataformas",
+      "Disponible en tus plataformas", "Disponível nos seus serviços",
     ),
   },
   topGenres: {
@@ -78,7 +78,7 @@ export const HOME_SECTIONS = Object.freeze({
     subtitle: tri(
       "Başlangıçta seçtiğin türlere göre",
       "Based on your onboarding picks",
-      "Según los géneros que elegiste",
+      "Según los géneros que elegiste", "Com base nos gêneros que você escolheu",
     ),
   },
   recentFavorites: {
@@ -86,7 +86,7 @@ export const HOME_SECTIONS = Object.freeze({
     subtitle: tri(
       "Yeni ve güçlü izleyici puanlı",
       "New and highly rated by viewers",
-      "Recientes y bien valorados",
+      "Recientes y bien valorados", "Recentes e bem avaliados",
     ),
   },
   hiddenGems: {
@@ -94,33 +94,33 @@ export const HOME_SECTIONS = Object.freeze({
     subtitle: tri(
       "Az bilinen, yüksek puanlı seçimler",
       "Lesser-known, highly rated picks",
-      "Poco conocidas y muy bien valoradas",
+      "Poco conocidas y muy bien valoradas", "Pouco conhecidos e muito bem avaliados",
     ),
   },
   providers: {
     icon: "apps",
-    subtitle: tri("Platforma göre göz at", "Browse by streaming service", "Explora por plataforma"),
+    subtitle: tri("Platforma göre göz at", "Browse by streaming service", "Explora por plataforma", "Explore por serviço"),
   },
   genres: {
     icon: "grid",
-    title: tri("Türler", "Genres", "Géneros"),
+    title: tri("Türler", "Genres", "Géneros", "Gêneros"),
     subtitle: tri(
       "Bir ya da birden fazla tür seç",
       "Pick one or more genres",
-      "Elige uno o varios géneros",
+      "Elige uno o varios géneros", "Escolha um ou mais gêneros",
     ),
   },
   nowPlaying: {
     icon: "ticket",
-    subtitle: tri("Şu an sinemalarda", "In cinemas right now", "En cines ahora mismo"),
+    subtitle: tri("Şu an sinemalarda", "In cinemas right now", "En cines ahora mismo", "Em cartaz agora"),
   },
   upcoming: {
     icon: "calendar",
-    subtitle: tri("Yakında vizyona girecekler", "Coming soon to cinemas", "Próximamente en cines"),
+    subtitle: tri("Yakında vizyona girecekler", "Coming soon to cinemas", "Próximamente en cines", "Em breve nos cinemas"),
   },
   collection: {
     icon: "albums",
-    subtitle: tri("Film serileri ve devam filmleri", "Film series and sequels", "Sagas y secuelas"),
+    subtitle: tri("Film serileri ve devam filmleri", "Film series and sequels", "Sagas y secuelas", "Sagas e continuações"),
   },
   oscar: {
     icon: "trophy",
@@ -128,7 +128,7 @@ export const HOME_SECTIONS = Object.freeze({
     subtitle: tri(
       "Kategori ve yıla göre kazananlar",
       "Winners by category or year",
-      "Ganadores por categoría o año",
+      "Ganadores por categoría o año", "Vencedores por categoria ou ano",
     ),
   },
   emmy: {
@@ -137,7 +137,7 @@ export const HOME_SECTIONS = Object.freeze({
     subtitle: tri(
       "Kategori ve yıla göre kazananlar",
       "Winners by category or year",
-      "Ganadores por categoría o año",
+      "Ganadores por categoría o año", "Vencedores por categoria ou ano",
     ),
   },
   onTheAir: {
@@ -145,12 +145,12 @@ export const HOME_SECTIONS = Object.freeze({
     subtitle: tri(
       "Bu hafta yeni bölümü yayınlananlar",
       "Shows with new episodes this week",
-      "Episodios nuevos esta semana",
+      "Episodios nuevos esta semana", "Episódios novos esta semana",
     ),
   },
   airingToday: {
     icon: "today",
-    subtitle: tri("Bugün yeni bölümü çıkanlar", "New episodes airing today", "Episodios nuevos hoy"),
+    subtitle: tri("Bugün yeni bölümü çıkanlar", "New episodes airing today", "Episodios nuevos hoy", "Episódios novos hoje"),
   },
 });
 
@@ -158,7 +158,7 @@ export const HOME_SECTIONS = Object.freeze({
  * Başlıktaki "Tümü" düğmesinin kısa etiketi. Çeviri anahtarı (`autoI18n.tumu`) İngilizce'de yalnız "All"
  * ve İspanyolca'da "Todo" — yanında bir ok olan düğmede doğal değil; burada her dilin kendi kalıbı var.
  */
-const SEE_ALL = tri("Tümü", "See all", "Ver todo");
+const SEE_ALL = tri("Tümü", "See all", "Ver todo", "Ver tudo");
 export const getSeeAllLabel = (language) => pickByLanguage(language, SEE_ALL);
 
 /** Tabloda olan bölüm kimlikleri (testler ve ekranlar için). */

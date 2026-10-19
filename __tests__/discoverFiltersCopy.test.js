@@ -21,7 +21,7 @@ const {
   normalizeFilters,
 } = require("../utils/discoverFilters");
 
-const DILLER = ["tr", "en", "es"];
+const DILLER = ["tr", "en", "es", "pt"];
 const doluMetin = (v) => typeof v === "string" && v.trim().length > 0;
 
 describe.each(DILLER)("%s", (dil) => {

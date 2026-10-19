@@ -10,7 +10,8 @@
     "locales": {
       "en": "./native/locales/en.json",
       "tr": "./native/locales/tr.json",
-      "es": "./native/locales/es.json"
+      "es": "./native/locales/es.json",
+      "pt": "./native/locales/pt.json"
     },
     "ios": {
       "bundleIdentifier": "com.smlztrk.seelogd",
@@ -23,7 +24,8 @@
         "CFBundleLocalizations": [
           "en",
           "tr",
-          "es"
+          "es",
+          "pt"
         ]
       },
       "entitlements": {

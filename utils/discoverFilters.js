@@ -34,7 +34,7 @@ export const ERAS = Object.freeze(["any", "last1", "last5", "d2020", "d2010", "d
 /** 0 = süzgeç yok. */
 export const RATINGS = Object.freeze([0, 6, 7, 8]);
 export const RUNTIMES = Object.freeze(["any", "short", "medium", "long"]);
-export const LANGUAGES = Object.freeze(["any", "tr", "en", "es", "fr", "de", "it", "ko", "ja", "hi"]);
+export const LANGUAGES = Object.freeze(["any", "tr", "en", "es", "pt", "fr", "de", "it", "ko", "ja", "hi"]);
 export const SORTS = Object.freeze(["popular", "rating", "newest"]);
 
 /** Tür seçimi sınırı (VE mantığı: çok tür seçmek sonucu hızla daraltır). */

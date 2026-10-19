@@ -23,6 +23,7 @@ const DIGEST_STRINGS = {
   tr: { title: (n) => `Bu hafta çıkacaklar (${n})`, more: (n) => `+${n}`, locale: "tr-TR" },
   en: { title: (n) => `Coming up this week (${n})`, more: (n) => `+${n}`, locale: "en-US" },
   es: { title: (n) => `Esta semana llega (${n})`, more: (n) => `+${n}`, locale: "es-ES" },
+  pt: { title: (n) => `Estreias da semana (${n})`, more: (n) => `+${n}`, locale: "pt-BR" },
 };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;

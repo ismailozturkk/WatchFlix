@@ -85,6 +85,32 @@ export const EXTERNAL_RATINGS_COPY = {
     },
     source: "Las puntuaciones vienen de OMDb. No todos los títulos tienen las tres; las series suelen carecer de Rotten Tomatoes y Metascore.",
   },
+  pt: {
+    title: "Notas",
+    close: "Fechar",
+    open: (summary) => `Notas externas: ${summary}. Toque para ver os detalhes`,
+    imdb: {
+      sub: (votes) => (votes ? `${votes} votos` : "Nota dos usuários"),
+      scale: "de 10",
+    },
+    rt: {
+      sub: "Aprovação da crítica",
+      fresh: "Fresco",
+      rotten: "Podre",
+    },
+    meta: {
+      sub: "Média da crítica",
+      scale: "de 100",
+      verdicts: {
+        universalAcclaim: "Aclamação universal",
+        favorable: "Geralmente favorável",
+        mixed: "Mista ou mediana",
+        unfavorable: "Geralmente desfavorável",
+        overwhelmingDislike: "Rejeição esmagadora",
+      },
+    },
+    source: "As notas vêm do OMDb. Nem todos os títulos têm as três; as séries costumam não ter Rotten Tomatoes nem Metascore.",
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

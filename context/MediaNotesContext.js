@@ -4,6 +4,7 @@ import React, {
 import { useAuth } from "./AuthContext";
 import Toast from "@components/AppToast";
 import { i18nText } from "../utils/i18nText";
+import { pickByLanguage } from "../utils/appLanguages";
 import { usePremiumGate } from "../hooks/usePremiumGate";
 import useUserDataDomain from "../hooks/useUserDataDomain";
 import { mediaNotesDomain } from "../services/userData";
@@ -73,10 +74,22 @@ export const MediaNotesProvider = ({ children }) => {
     if (!existing && !canCreateMediaNote(type === "tv" ? "tv" : "movie", mediaId)) {
       Toast.show({
         type: "warning",
-        text1:
-          language === "tr"
-            ? type === "tv" ? "Dizi notu limitin doldu" : "Film notu limitin doldu"
-            : type === "tv" ? "You've reached your show notes limit" : "You've reached your movie notes limit",
+        text1: pickByLanguage(
+          language,
+          type === "tv"
+            ? {
+                tr: "Dizi notu limitin doldu",
+                en: "You've reached your show notes limit",
+                es: "Has alcanzado tu límite de notas de series",
+                pt: "Você atingiu seu limite de notas de séries",
+              }
+            : {
+                tr: "Film notu limitin doldu",
+                en: "You've reached your movie notes limit",
+                es: "Has alcanzado tu límite de notas de películas",
+                pt: "Você atingiu seu limite de notas de filmes",
+              },
+        ),
       });
       return false;
     }

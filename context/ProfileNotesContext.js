@@ -6,6 +6,7 @@ import { useTheme } from "./ThemeContext";
 import { useLanguage } from "./LanguageContext";
 import Toast from "@components/AppToast";
 import { i18nText } from "../utils/i18nText";
+import { pickByLanguage } from "../utils/appLanguages";
 import { addTodoOnTop, toggleTodoItem } from "../utils/todoOrder";
 import { usePremiumGate } from "../hooks/usePremiumGate";
 import useUserDataDomain from "../hooks/useUserDataDomain";
@@ -240,14 +241,22 @@ export const ProfileNotesProvider = ({ children }) => {
     if (!exists && !canCreateNote(requestedType)) {
       Toast.show({
         type: "warning",
-        text1:
-          language === "tr"
-            ? requestedType === "todo"
-              ? "Yapılacaklar limitin doldu"
-              : "Not limitin doldu"
-            : requestedType === "todo"
-              ? "You've reached your to-do limit"
-              : "You've reached your notes limit",
+        text1: pickByLanguage(
+          language,
+          requestedType === "todo"
+            ? {
+                tr: "Yapılacaklar limitin doldu",
+                en: "You've reached your to-do limit",
+                es: "Has alcanzado tu límite de tareas",
+                pt: "Você atingiu seu limite de tarefas",
+              }
+            : {
+                tr: "Not limitin doldu",
+                en: "You've reached your notes limit",
+                es: "Has alcanzado tu límite de notas",
+                pt: "Você atingiu seu limite de notas",
+              },
+        ),
       });
       return false;
     }

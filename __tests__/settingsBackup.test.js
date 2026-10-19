@@ -170,7 +170,7 @@ describe("planImport — değerler", () => {
   });
 
   test("kayıtlı her dil kodu yedekten geri yüklenebilir (İspanyolca dahil)", () => {
-    for (const language of ["tr", "en", "es"]) {
+    for (const language of ["tr", "en", "es", "pt"]) {
       const plan = planImport(yedekOlustur({ language }));
       expect(yaz(plan)).toEqual({ language });
       expect(plan.skipped).toEqual([]);

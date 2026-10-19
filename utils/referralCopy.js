@@ -263,6 +263,90 @@ export const REFERRAL_COPY = {
     loadFailed: "No se pudo cargar la información de invitaciones",
     retry: "Reintentar",
   },
+  pt: {
+    rowTitle: "Convide um amigo",
+    rowSubtitle: "Compartilhe seu código e ganhe 1 mês grátis por cada amigo que assinar",
+    screenTitle: "Convide um amigo",
+    hero: {
+      title: "Traga um amigo, ganhe 1 mês de Premium",
+      body: (percent) =>
+        `Quando um amigo digita seu código e assina, você ganha 1 mês de Premium grátis e ele ganha ${percent}% de desconto na primeira assinatura.`,
+    },
+    yourCode: "Seu código de convite",
+    copy: "Copiar",
+    copied: "Código copiado",
+    share: "Enviar convite",
+    shareMessage: (code, percent, links) =>
+      `Experimente o Seelogd! Depois de se cadastrar, digite meu código ${code} em "Tem um código?" na página Premium e ganhe ${percent}% de desconto na sua primeira assinatura.\n\n${links}`,
+    steps: {
+      title: "Como funciona",
+      one: "Envie seu código para um amigo",
+      two: (days) => `Seu amigo digita o código em até ${days} dias`,
+      three: "Quando ele assinar, você ganha 1 mês de Premium grátis",
+    },
+    reward: {
+      title: "Seus meses grátis",
+      none: "Você ainda não ganhou nenhum mês grátis",
+      available: (n) => (n === 1 ? "1 mês grátis espera por você" : `${n} meses grátis esperam por você`),
+      start: "Começar mês grátis",
+      starting: "Iniciando…",
+      active: (date) => `Premium grátis ativo até ${date}`,
+      started: (date) => `Premium grátis ativo até ${date}`,
+      storeActive: "Os meses grátis aguardam enquanto sua assinatura da loja estiver ativa; comece um quando ela terminar",
+      earned: (n, max) => `${n} de ${max} meses ganhos`,
+      capped: (max) => `Você pode ganhar até ${max} meses`,
+    },
+    list: {
+      title: "Amigos que você convidou",
+      empty: "Ninguém digitou seu código ainda. Seus amigos aparecerão aqui quando você compartilhar.",
+      counts: (registered, subscribed) =>
+        `${registered} digitaram seu código · ${subscribed} assinaram`,
+      status: {
+        registered: "Cadastrado",
+        subscribed: "Assinante",
+        rewarded: "Assinante · você ganhou um mês grátis",
+      },
+      statusHint: "Se um amigo só digitou seu código, ele aparece como \"Cadastrado\"",
+    },
+    invitedBy: {
+      title: (name) => (name ? `${name} convidou você` : "Você chegou com um convite"),
+      discount: (percent) =>
+        `${percent}% de desconto na primeira assinatura espera por você. É aplicado no pagamento.`,
+      used: "Você usou seu desconto de convite",
+    },
+    redeem: {
+      entryTitle: "Tem um código?",
+      entryHint: "Digite um código de convite ou promocional",
+      sheetTitle: "Digite um código",
+      sheetBody: "Digite o código de convite de um amigo (desconto na primeira assinatura) ou um código promocional (1 mês de Premium grátis).",
+      placeholder: "ABCD-EFGH",
+      apply: "Usar código",
+      applying: "Verificando…",
+      promoSuccess: (days, date) => `${days} dias de Premium grátis ativados · até ${date}`,
+      referralSuccess: (percent, name) =>
+        name
+          ? `Você aceitou o convite de ${name}. Um desconto de ${percent}% será aplicado na sua primeira assinatura.`
+          : `Convite aceito. Um desconto de ${percent}% será aplicado na sua primeira assinatura.`,
+      discountPending: (percent) =>
+        `O desconto de convite (${percent}%) aparecerá no pagamento quando a oferta da loja estiver disponível.`,
+    },
+    errors: {
+      "code-not-found": "Este código não é válido. Confira como você o digitou.",
+      "code-exhausted": "Este código já esgotou.",
+      "code-expired": "Este código expirou.",
+      "code-inactive": "Este código não pode mais ser usado.",
+      "already-redeemed": "Você já usou um código; cada conta pode usar um.",
+      "own-code": "Você não pode usar seu próprio código de convite.",
+      "window-closed": (days) => `O código de convite pode ser digitado durante os primeiros ${days} dias após o cadastro.`,
+      "already-purchased": "O desconto de convite vale só para a primeira assinatura; você já tinha assinado.",
+      "store-subscription-active": "Este código não pode ser usado enquanto você tiver uma assinatura.",
+      "rate-limited": "Muitas tentativas sem sucesso. Tente novamente amanhã.",
+      "no-credit": "Você não tem nenhum mês grátis para começar.",
+      generic: "Não foi possível concluir. Verifique sua conexão e tente novamente.",
+    },
+    loadFailed: "Não foi possível carregar as informações de convites",
+    retry: "Tentar novamente",
+  },
 };
 
 /** Uygulama diline göre metin tablosu (tabloda olmayan dil → İngilizce). */

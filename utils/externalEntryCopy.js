@@ -34,6 +34,15 @@ export const EXTERNAL_ENTRY_COPY = {
     shareUnrecognized: "No encontré ninguna película o serie en este enlace. Comparte un enlace de IMDb o TMDB.",
     shareNotFound: "No se encontró el título de este enlace",
   },
+  pt: {
+    search: "Buscar",
+    upnext: "A seguir",
+    reminders: "Lembretes",
+    lists: "Minhas listas",
+    shareOpening: "Abrindo link…",
+    shareUnrecognized: "Não encontrei nenhum filme ou série neste link. Compartilhe um link do IMDb ou do TMDB.",
+    shareNotFound: "Não foi possível encontrar o título deste link",
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

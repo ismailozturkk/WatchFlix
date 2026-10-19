@@ -41,7 +41,8 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
   const { language } = useLanguage();
   const tr = copyLanguage(language, ["tr", "en"]) === "tr";
   const es = normalizeAppLanguage(language) === "es";
-  const lang = copyLanguage(language, ["tr", "en", "es"]);
+  const pt = normalizeAppLanguage(language) === "pt";
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt"]);
   const {
     loading,
     kare,
@@ -122,7 +123,7 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
   const kalan = perde.kalanKare;
   const filmKarsiligi = Math.max(1, Math.round(kalan / ORT_FILM));
   const bolumKarsiligi = Math.max(1, Math.round(kalan / ORT_BOLUM));
-  const perdeAdi = tr ? perde.ad : es ? perde.adEs : perde.adEn;
+  const perdeAdi = tr ? perde.ad : es ? perde.adEs : pt ? perde.adPt : perde.adEn;
 
   const hedefParam = { film: filmKarsiligi, bolum: bolumKarsiligi };
   const kalanMetni = perde.tabanDevrede

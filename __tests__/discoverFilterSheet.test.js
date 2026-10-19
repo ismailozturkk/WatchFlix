@@ -117,7 +117,7 @@ describe("seçenekler", () => {
     expect(texts).toContain(DISCOVER_FILTERS_COPY.tr.ui.runtimeTvHint);
   });
 
-  test.each(["tr", "en", "es"])("%s: başlık ve düğme metinleri kendi dilinde", (dil) => {
+  test.each(["tr", "en", "es", "pt"])("%s: başlık ve düğme metinleri kendi dilinde", (dil) => {
     mockLang = dil;
     render(baseProps());
     const texts = textsOf();
@@ -285,7 +285,7 @@ describe("kayıtlı süzgeçler", () => {
 
 describe("hazır filtreler", () => {
   test("her hazır süzgeç için çip var; başlık üç dilde", () => {
-    for (const dil of ["tr", "en", "es"]) {
+    for (const dil of ["tr", "en", "es", "pt"]) {
       mockLang = dil;
       render(baseProps());
       QUICK_PRESETS.forEach((preset) => expect(maybe(`filter-quick-${preset.id}`)).toBe(true));

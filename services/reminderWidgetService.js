@@ -23,10 +23,10 @@ export const buildReminderWidgetItems = (reminders, language = "tr") => {
   const movieItems = (reminders?.movieReminders || []).map((movie) => ({
     id: `movie-${movie.movieId}`,
     type: "movie",
-    title: movie.movieName || pickByLanguage(language, { tr: "Film", en: "Movie", es: "Película" }),
+    title: movie.movieName || pickByLanguage(language, { tr: "Film", en: "Movie", es: "Película", pt: "Filme" }),
     subtitle:
       Number(movie.movieMinutes) > 0
-        ? `${movie.movieMinutes} ${pickByLanguage(language, { tr: "dk", en: "min", es: "min" })}`
+        ? `${movie.movieMinutes} ${pickByLanguage(language, { tr: "dk", en: "min", es: "min", pt: "min" })}`
         : "",
     poster: posterUrl(movie.posterPath),
     dateEpoch: toEpoch(movie.releaseDate),
@@ -37,11 +37,12 @@ export const buildReminderWidgetItems = (reminders, language = "tr") => {
       (season.episodes || []).map((episode) => ({
         id: `tv-${episode.episodeId || `${show.showId}-${season.seasonNumber}-${episode.episodeNumber}`}`,
         type: "tv",
-        title: show.showName || pickByLanguage(language, { tr: "Dizi", en: "TV Show", es: "Serie" }),
+        title: show.showName || pickByLanguage(language, { tr: "Dizi", en: "TV Show", es: "Serie", pt: "Série" }),
         subtitle: pickByLanguage(language, {
           tr: `S${season.seasonNumber} · ${episode.episodeNumber}. Bölüm`,
           en: `S${season.seasonNumber} · Episode ${episode.episodeNumber}`,
           es: `T${season.seasonNumber} · Episodio ${episode.episodeNumber}`,
+          pt: `T${season.seasonNumber} · Episódio ${episode.episodeNumber}`,
         }),
         // Sezon posteri varsa onu, yoksa dizi posterini kullan.
         poster: posterUrl(season.seasonPosterPath || show.showPosterPath),

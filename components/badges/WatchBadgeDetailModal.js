@@ -58,7 +58,7 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const insets = useSafeAreaInsets();
-  const lang = copyLanguage(language, ["tr", "en", "es"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt"]);
 
   // Koleksiyon üyelerini çözmek ve üyeye dokununca onun kartını bulmak için
   // bağlamdan okunur. Çağıranlara ek prop taşımak (ekran + profil rafı) iki yerde
@@ -341,7 +341,7 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
                         {/* Büyük harfe JS'te çevriliyor: style textTransform Android'de
                             cihaz yereline göre çalışıyor ve Türkçe yerelli telefonda
                             İngilizce arayüzde "min" → "MİN" oluyordu. */}
-                        {(lang === "tr" ? b.ekTr : lang === "es" ? b.ekEs : b.ekEn).toUpperCase()}
+                        {(lang === "tr" ? b.ekTr : lang === "es" ? b.ekEs : lang === "pt" ? b.ekPt : b.ekEn).toUpperCase()}
                       </Text>
                     </TouchableOpacity>
                   );

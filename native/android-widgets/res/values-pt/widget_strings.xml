@@ -1,0 +1,34 @@
+<!-- Textos dos widgets da tela inicial do Seelogd — PORTUGUÊS (values-pt/).
+     O Android escolhe esta pasta pelo idioma do SISTEMA (não pelo do app), então ela afeta só
+     o nome/descrição no seletor de widgets, o rótulo do manifesto e o texto provisório dos
+     layouts antes da primeira atualização. O conteúdo real do widget segue o idioma do app
+     por meio de WidgetLanguage.kt. A pasta values/ padrão continua em turco.
+     O conjunto de chaves DEVE coincidir com values/widget_strings.xml (vigiado por
+     __tests__/widgetNativeLanguage.test.js). Evite apóstrofos (exigem escape). -->
+<resources>
+  <string name="reminder_widget_name">Seelogd Próximos</string>
+  <string name="reminder_widget_description">Mostra os próximos filmes e episódios de séries</string>
+  <string name="reminder_widget_preview_title">Próximos</string>
+  <string name="reminder_widget_preview_count">0 lembretes</string>
+  <string name="reminder_widget_empty">Nenhum filme ou episódio próximo</string>
+  <string name="reminder_widget_more">+0 mais</string>
+  <string name="lists_widget_name">Seelogd Minhas listas</string>
+  <string name="lists_widget_description">Mostra os pôsteres das suas listas em uma grade</string>
+  <string name="lists_widget_preview_title">Favoritos</string>
+  <string name="lists_widget_preview_position">1/4</string>
+  <string name="lists_widget_empty">Esta lista ainda está vazia</string>
+  <string name="lists_widget_prev">Lista anterior</string>
+  <string name="lists_widget_next">Próxima lista</string>
+  <string name="stats_widget_name">Seelogd Estatísticas</string>
+  <string name="stats_widget_description">Mostra suas estatísticas de visualização na tela inicial</string>
+  <string name="stats_widget_preview_title">Estatísticas</string>
+  <string name="stats_widget_preview_total">Duração total</string>
+  <string name="stats_widget_preview_movies">Filmes</string>
+  <string name="stats_widget_preview_shows">Séries</string>
+  <string name="stats_widget_preview_episodes">Episódios</string>
+  <string name="stats_widget_preview_years">Anos</string>
+  <string name="stats_widget_preview_months">Meses</string>
+  <string name="stats_widget_preview_days">Dias</string>
+  <string name="stats_widget_preview_hours">Horas</string>
+  <string name="stats_widget_preview_minutes">Minutos</string>
+</resources>

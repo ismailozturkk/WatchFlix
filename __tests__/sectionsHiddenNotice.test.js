@@ -46,7 +46,7 @@ const render = (props) => {
 };
 const texts = () => renderer.root.findAllByType("Text").map((n) => [].concat(n.props.children).join(""));
 
-test.each(["tr", "en", "es"])("%s: başlık, açıklama ve düğme metni gösterilir", (dil) => {
+test.each(["tr", "en", "es", "pt"])("%s: başlık, açıklama ve düğme metni gösterilir", (dil) => {
   mockLang = dil;
   render({ navigation: { navigate: jest.fn() }, screen: "hub" });
   const ui = SECTION_VISIBILITY_COPY[dil].ui;

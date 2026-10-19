@@ -203,30 +203,31 @@ export const longestStreakOf = (dayKeys = []) => {
 
 const PERSONALITIES = [
   { key: "comedy",      emoji: "😂", tr: "Kahkaha Avcısı",       en: "Laugh Hunter",      match: ["komedi", "comedy", "comedia"],
-    trDesc: "Kötü bir günün ilacı hep bir komedi.", enDesc: "A good comedy fixes any bad day.", es: "Cazarrisas", esDesc: "Una buena comedia arregla cualquier mal día." },
+    trDesc: "Kötü bir günün ilacı hep bir komedi.", enDesc: "A good comedy fixes any bad day.", es: "Cazarrisas", pt: "Caçador de risadas", esDesc: "Una buena comedia arregla cualquier mal día.", ptDesc: "Uma boa comédia conserta qualquer dia ruim." },
   { key: "horror",      emoji: "😱", tr: "Cesur Yürek",          en: "Brave Heart",       match: ["korku", "horror", "terror"],
-    trDesc: "Işıklar kapalı, ses sonuna kadar açık.", enDesc: "Lights off, volume all the way up.", es: "Corazón valiente", esDesc: "Luces apagadas y volumen al máximo." },
+    trDesc: "Işıklar kapalı, ses sonuna kadar açık.", enDesc: "Lights off, volume all the way up.", es: "Corazón valiente", pt: "Coração valente", esDesc: "Luces apagadas y volumen al máximo.", ptDesc: "Luzes apagadas e volume no máximo." },
   { key: "thriller",    emoji: "🔪", tr: "Gerilim Ustası",       en: "Thrill Seeker",     match: ["gerilim", "thriller", "suspense", "suspenso"],
-    trDesc: "Bir sonraki sürprizi hep sen tahmin edersin.", enDesc: "You always call the next twist.", es: "Instinto de suspense", esDesc: "Siempre adivinas el siguiente giro." },
+    trDesc: "Bir sonraki sürprizi hep sen tahmin edersin.", enDesc: "You always call the next twist.", es: "Instinto de suspense", pt: "Instinto de suspense", esDesc: "Siempre adivinas el siguiente giro.", ptDesc: "Você sempre adivinha a próxima reviravolta." },
   { key: "action",      emoji: "💥", tr: "Adrenalin Bağımlısı",  en: "Adrenaline Junkie", match: ["aksiyon", "action", "macera", "adventure", "acción", "aventura"],
-    trDesc: "Tempo düşmesin, patlama eksik olmasın.", enDesc: "Keep the pace up and the explosions coming.", es: "Adicción a la adrenalina", esDesc: "Que no baje el ritmo y que no falten las explosiones." },
+    trDesc: "Tempo düşmesin, patlama eksik olmasın.", enDesc: "Keep the pace up and the explosions coming.", es: "Adicción a la adrenalina", pt: "Viciado em adrenalina", esDesc: "Que no baje el ritmo y que no falten las explosiones.", ptDesc: "Que o ritmo não caia e que não faltem explosões." },
   { key: "scifi",       emoji: "🚀", tr: "Zaman Yolcusu",        en: "Time Traveler",     match: ["bilim kurgu", "science fiction", "sci-fi", "fantastik", "fantasy", "ciencia ficción", "fantasía"],
-    trDesc: "Gerçeklik sana dar gelir, yeni evrenler ararsın.", enDesc: "Reality feels small — you want new worlds.", es: "Viajero en el tiempo", esDesc: "La realidad se te queda pequeña: buscas mundos nuevos." },
+    trDesc: "Gerçeklik sana dar gelir, yeni evrenler ararsın.", enDesc: "Reality feels small — you want new worlds.", es: "Viajero en el tiempo", pt: "Viajante do tempo", esDesc: "La realidad se te queda pequeña: buscas mundos nuevos.", ptDesc: "A realidade fica pequena para você: você busca mundos novos." },
   { key: "drama",       emoji: "🎭", tr: "Duygu Yolcusu",        en: "Soul Wanderer",     match: ["dram", "drama"],
-    trDesc: "Karakterlerle yaşar, finalde derin bir nefes alırsın.", enDesc: "You live with the characters, then exhale at the finale.", es: "Alma errante", esDesc: "Vives con los personajes y respiras hondo en el final." },
+    trDesc: "Karakterlerle yaşar, finalde derin bir nefes alırsın.", enDesc: "You live with the characters, then exhale at the finale.", es: "Alma errante", pt: "Alma errante", esDesc: "Vives con los personajes y respiras hondo en el final.", ptDesc: "Você vive com os personagens e respira fundo no final." },
   { key: "romance",     emoji: "💘", tr: "Romantik Ruh",         en: "Hopeless Romantic", match: ["romantik", "romance"],
-    trDesc: "Bir aşk hikâyesine hep yer vardır.", enDesc: "There's always room for a love story.", es: "Alma romántica", esDesc: "Siempre hay sitio para una historia de amor." },
+    trDesc: "Bir aşk hikâyesine hep yer vardır.", enDesc: "There's always room for a love story.", es: "Alma romántica", pt: "Alma romântica", esDesc: "Siempre hay sitio para una historia de amor.", ptDesc: "Sempre há espaço para uma história de amor." },
   { key: "animation",   emoji: "🎨", tr: "Çizgi Düşler",         en: "Animated Dreamer",  match: ["animasyon", "animation", "animación"],
-    trDesc: "Çizilmiş dünyalar sana hiç çocukça gelmez.", enDesc: "Drawn worlds never feel childish to you.", es: "Sueños dibujados", esDesc: "Los mundos dibujados nunca te parecen infantiles." },
+    trDesc: "Çizilmiş dünyalar sana hiç çocukça gelmez.", enDesc: "Drawn worlds never feel childish to you.", es: "Sueños dibujados", pt: "Sonhos desenhados", esDesc: "Los mundos dibujados nunca te parecen infantiles.", ptDesc: "Mundos desenhados nunca parecem infantis para você." },
   { key: "documentary", emoji: "🔭", tr: "Bilge Gözlemci",       en: "Wise Observer",     match: ["belgesel", "documentary", "documental"],
-    trDesc: "Gerçek hikâyeler her kurgudan çok sarar.", enDesc: "Real stories beat fiction every time.", es: "Mirada sabia", esDesc: "Las historias reales ganan a la ficción siempre." },
+    trDesc: "Gerçek hikâyeler her kurgudan çok sarar.", enDesc: "Real stories beat fiction every time.", es: "Mirada sabia", pt: "Olhar sábio", esDesc: "Las historias reales ganan a la ficción siempre.", ptDesc: "Histórias reais sempre ganham da ficção." },
   { key: "crime",       emoji: "🕵️", tr: "Dosya Avcısı",         en: "Case Cracker",      match: ["suç", "crime", "gizem", "mystery", "crimen", "misterio"],
-    trDesc: "Her ipucunu izler, dosyayı sen kapatırsın.", enDesc: "You follow every clue and close the case.", es: "Olfato de detective", esDesc: "Sigues cada pista y cierras el caso." },
+    trDesc: "Her ipucunu izler, dosyayı sen kapatırsın.", enDesc: "You follow every clue and close the case.", es: "Olfato de detective", pt: "Faro de detetive", esDesc: "Sigues cada pista y cierras el caso.", ptDesc: "Você segue cada pista e fecha o caso." },
 ];
 const DEFAULT_PERSONALITY = {
-  key: "default", emoji: "🍿", tr: "Sinefil", en: "Cinephile", es: "Cinéfilo",
+  key: "default", emoji: "🍿", tr: "Sinefil", en: "Cinephile", es: "Cinéfilo", pt: "Cinéfilo",
   trDesc: "Her türden izlersin; sinema sana geniş bir alan.", enDesc: "You watch everything — cinema is wide open to you.",
   esDesc: "Ves de todo: el cine es un territorio amplio para ti.",
+  ptDesc: "Você assiste a tudo: o cinema é um território amplo para você.",
 };
 
 export const getPersonality = (genre, language = "tr") => {
@@ -234,12 +235,12 @@ export const getPersonality = (genre, language = "tr") => {
   const found =
     (g && PERSONALITIES.find((p) => p.match.some((m) => g.includes(m)))) ||
     DEFAULT_PERSONALITY;
-  const lang = copyLanguage(language, ["tr", "en", "es"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt"]);
   return {
     key: found.key,
     emoji: found.emoji,
-    title: lang === "tr" ? found.tr : lang === "es" ? found.es : found.en,
-    desc: lang === "tr" ? found.trDesc : lang === "es" ? found.esDesc : found.enDesc,
+    title: lang === "tr" ? found.tr : lang === "es" ? found.es : lang === "pt" ? found.pt : found.en,
+    desc: lang === "tr" ? found.trDesc : lang === "es" ? found.esDesc : lang === "pt" ? found.ptDesc : found.enDesc,
   };
 };
 

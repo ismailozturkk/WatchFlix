@@ -7,6 +7,7 @@ import {
 } from "../utils/deviceLanguage";
 import en from "./en.json";
 import es from "./es.json";
+import pt from "./pt.json";
 import tr from "./tr.json";
 
 // Kayıtlı dil YOKSA cihaz dili. `get()` kayıt yokken registry varsayılanını
@@ -41,6 +42,7 @@ const languageDetector = {
 const resources = {
   en: { translation: en },
   es: { translation: es },
+  pt: { translation: pt },
   tr: { translation: tr },
 };
 
@@ -49,9 +51,9 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    // Eksik anahtar önce İngilizce'ye, sonra Türkçe'ye düşer (es için). tr/en eskisi
+    // Eksik anahtar önce İngilizce'ye, sonra Türkçe'ye düşer (es/pt için). tr/en eskisi
     // gibi Türkçe'ye düşer — paketleri tam eşit olduğundan bu yalnız güvenlik ağı.
-    fallbackLng: { es: ["en", "tr"], default: ["tr"] },
+    fallbackLng: { es: ["en", "tr"], pt: ["en", "tr"], default: ["tr"] },
     compatibilityJSON: "v3", // React Native Android için gereklidir
     interpolation: {
       escapeValue: false, // React XSS'e karşı kendi korumasına sahip

@@ -76,6 +76,20 @@ LocaleConfig.locales.es = {
   today: "Hoy",
 };
 
+LocaleConfig.locales.pt = {
+  monthNames: [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+  ],
+  monthNamesShort: [
+    "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+    "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+  ],
+  dayNames: ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"],
+  dayNamesShort: ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"],
+  today: "Hoje",
+};
+
 // "" = kütüphanenin varsayılanı (İngilizce). YENİ DİL: yukarıya LocaleConfig.locales.<kod> ekle.
 const applyCalendarLocale = (language) => {
   const code = normalizeAppLanguage(language);
@@ -658,7 +672,8 @@ export default function CalendarScreen({ navigation }) {
           markingType="multi-dot"
           markedDates={combinedMarked}
           theme={calendarTheme}
-          firstDay={normalizeAppLanguage(language) === "en" ? 0 : 1}
+          // Pazar başlangıcı: İngilizce ve Brezilya Portekizcesi; diğerleri Pazartesi.
+          firstDay={["en", "pt"].includes(normalizeAppLanguage(language)) ? 0 : 1}
           enableSwipeMonths
           hideExtraDays
           renderArrow={(direction) => (
@@ -779,7 +794,7 @@ export default function CalendarScreen({ navigation }) {
           fallbackRadius={12}
           onPress={refreshEvents}
           disabled={isLoadingEvents}
-          accessibilityLabel={pickByLanguage(language, { tr: "Takvimi yenile", en: "Refresh calendar", es: "Actualizar calendario" })}
+          accessibilityLabel={pickByLanguage(language, { tr: "Takvimi yenile", en: "Refresh calendar", es: "Actualizar calendario", pt: "Atualizar calendário" })}
         >
           {isLoadingEvents ? <ActivityIndicator size="small" color={theme.accent} /> : null}
         </GlassIconButton>

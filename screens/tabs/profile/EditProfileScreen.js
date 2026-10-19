@@ -94,6 +94,7 @@ export default function EditProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
+  const pt = normalizeAppLanguage(language) === "pt";
   const { user } = useAuth();
   const { profile, loading, updateField, changeUsername } = useUserProfile();
   const { selectAvatarIndex, selectAvatar } = useProfileUi();
@@ -245,7 +246,7 @@ export default function EditProfileScreen({ navigation }) {
       Toast.show({
         type: "error",
         text1: isAllDigits
-          ? (tr ? "Kullanıcı adı sadece rakamlardan oluşamaz (en az bir harf içermelidir)." : es ? "El nombre de usuario no puede ser solo números (debe contener al menos una letra)." : "Username cannot consist only of numbers (must contain at least one letter).")
+          ? (tr ? "Kullanıcı adı sadece rakamlardan oluşamaz (en az bir harf içermelidir)." : es ? "El nombre de usuario no puede ser solo números (debe contener al menos una letra)." : pt ? "O nome de usuário não pode ser só números (deve conter pelo menos uma letra)." : "Username cannot consist only of numbers (must contain at least one letter).")
           : i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "Geçersiz kullanıcı adı (3-20 karakter, en az bir harf, a-z 0-9 _)"),
       });
       return;
@@ -254,7 +255,7 @@ export default function EditProfileScreen({ navigation }) {
       if (usernameStatus === "checking") {
         Toast.show({
           type: "info",
-          text1: tr ? "Kullanıcı adı kontrol ediliyor, lütfen bekleyin…" : es ? "Comprobando la disponibilidad del nombre de usuario, espera un momento…" : "Checking username availability, please wait…",
+          text1: tr ? "Kullanıcı adı kontrol ediliyor, lütfen bekleyin…" : es ? "Comprobando la disponibilidad del nombre de usuario, espera un momento…" : pt ? "Verificando a disponibilidade do nome de usuário, aguarde um instante…" : "Checking username availability, please wait…",
         });
         return;
       }
@@ -383,7 +384,7 @@ export default function EditProfileScreen({ navigation }) {
         type: "error",
         text1:
           verificationProvider === "apple"
-            ? (tr ? "Önce Apple ile doğrula" : es ? "Verifica primero con Apple" : "Verify with Apple first")
+            ? (tr ? "Önce Apple ile doğrula" : es ? "Verifica primero con Apple" : pt ? "Verifique primeiro com a Apple" : "Verify with Apple first")
             : i18nText("autoI18n.once_google_ile_dogrula", "Önce Google ile doğrula"),
       });
       return;
@@ -455,7 +456,7 @@ export default function EditProfileScreen({ navigation }) {
         }
         if (un.length >= 3 && /^[0-9_]+$/.test(un)) {
           return {
-            text: tr ? "Kullanıcı adı sadece rakamlardan veya alt çizgiden oluşamaz (en az bir harf içermelidir)." : es ? "El nombre de usuario no puede ser solo números o guiones bajos (debe contener al menos una letra)." : "Username cannot be only numbers or underscores (must contain at least one letter).",
+            text: tr ? "Kullanıcı adı sadece rakamlardan veya alt çizgiden oluşamaz (en az bir harf içermelidir)." : es ? "El nombre de usuario no puede ser solo números o guiones bajos (debe contener al menos una letra)." : pt ? "O nome de usuário não pode ser só números ou sublinhados (deve conter pelo menos uma letra)." : "Username cannot be only numbers or underscores (must contain at least one letter).",
             color: theme.colors.red,
           };
         }
@@ -553,7 +554,7 @@ export default function EditProfileScreen({ navigation }) {
   // Hesap silme sayfasının metinleri (dil dallanması burada kalır).
   const deleteDescription = verificationProvider
     ? verificationProvider === "apple"
-      ? (tr ? "Bu işlem geri alınamaz. Devam etmek ve Apple yetkisini iptal etmek için Apple hesabınla doğrula." : es ? "No se puede deshacer. Verifica con Apple para que también se pueda revocar su autorización." : "This cannot be undone. Verify with Apple so its authorization can also be revoked.")
+      ? (tr ? "Bu işlem geri alınamaz. Devam etmek ve Apple yetkisini iptal etmek için Apple hesabınla doğrula." : es ? "No se puede deshacer. Verifica con Apple para que también se pueda revocar su autorización." : pt ? "Isso não pode ser desfeito. Verifique com a Apple para que a autorização dela também possa ser revogada." : "This cannot be undone. Verify with Apple so its authorization can also be revoked.")
       : i18nText(
           "autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_google_ile_dogrula",
           "Bu işlem geri alınamaz. Devam etmek için Google hesabınla doğrula.",
@@ -561,7 +562,7 @@ export default function EditProfileScreen({ navigation }) {
     : i18nText("autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_sifreni_gi", "Bu işlem geri alınamaz. Devam etmek için şifreni gir.");
   const verifyLabel =
     verificationProvider === "apple"
-      ? (tr ? "Apple ile doğrula" : es ? "Verificar con Apple" : "Verify with Apple")
+      ? (tr ? "Apple ile doğrula" : es ? "Verificar con Apple" : pt ? "Verificar com a Apple" : "Verify with Apple")
       : i18nText("autoI18n.google_ile_dogrula", "Google ile doğrula");
 
   return (

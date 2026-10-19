@@ -138,6 +138,49 @@ export const FOLLOWED_PEOPLE_COPY = {
       close: "Cerrar",
     },
   },
+  pt: {
+    button: {
+      follow: "Seguir",
+      following: "Seguindo",
+      followHint: "Você verá os próximos projetos dessa pessoa na aba de Filmes e Séries",
+      unfollowHint: "Toque para deixar de seguir",
+      followLabel: (name) => `Seguir ${name}`,
+      unfollowLabel: (name) => `Deixar de seguir ${name}`,
+    },
+    toast: {
+      followed: (name) => `Agora você segue ${name}`,
+      followedHint: "Os próximos trabalhos aparecerão em Filmes e Séries",
+      unfollowed: (name) => `Você deixou de seguir ${name}`,
+      limit: (max) => `Você pode seguir até ${max} pessoas`,
+      limitHint: "Deixe de seguir alguém para abrir espaço",
+    },
+    rail: {
+      title: "Próximos de quem você segue",
+      more: (count) => `+${count}`,
+      manage: "Pessoas que sigo",
+      addToCalendar: (title) => `Adicionar o dia de estreia de ${title} ao calendário do celular`,
+      removeFromCalendar: (title) => `Remover o dia de estreia de ${title} do calendário do celular`,
+      addAll: "Adicionar todos os próximos ao calendário do celular",
+      quietTitle: "Nada próximo de quem você segue",
+      quietBody: (count) => (count === 1 ? "Você segue 1 pessoa" : `Você segue ${count} pessoas`),
+    },
+    sheet: {
+      title: "Pessoas que sigo",
+      count: (count, max) => `${count}/${max}`,
+      empty: "Você ainda não segue ninguém",
+      emptyHint: "Toque em “Seguir” na página de um ator ou diretor e os novos projetos dessa pessoa se reúnem aqui.",
+      unfollowLabel: (name) => `Deixar de seguir ${name}`,
+      open: (name) => `Abrir a página de ${name}`,
+      departments: {
+        Acting: "Ator",
+        Directing: "Diretor",
+        Writing: "Roteirista",
+        Production: "Produtor",
+        other: "Pessoa",
+      },
+      close: "Fechar",
+    },
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

@@ -28,6 +28,13 @@ export const RATING_SUMMARY_COPY = {
     rated: (mine) => `Tu puntuación ${mine}. Toca para cambiarla`,
     locked: "Aún no estrenada",
   },
+  pt: {
+    score: (score, votes) => `Nota ${score} de 10${votes ? `, ${votes} votos` : ""}`,
+    noScore: "Ainda sem nota",
+    rate: "Toque para avaliar",
+    rated: (mine) => `Sua nota ${mine}. Toque para alterar`,
+    locked: "Ainda não lançado",
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

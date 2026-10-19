@@ -104,7 +104,7 @@ describe("resolveMediaLink", () => {
 describe("metin tablosu", () => {
   it("üç dilde aynı anahtarlar dolu", () => {
     const keys = Object.keys(MEDIA_LINK_COPY.tr).sort();
-    for (const lang of ["en", "es"]) {
+    for (const lang of ["en", "es", "pt"]) {
       expect(Object.keys(MEDIA_LINK_COPY[lang]).sort()).toEqual(keys);
       keys.forEach((key) => expect(MEDIA_LINK_COPY[lang][key].trim().length).toBeGreaterThan(0));
     }

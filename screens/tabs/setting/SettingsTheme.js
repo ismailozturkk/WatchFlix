@@ -34,6 +34,7 @@ import {
   themes,
 } from "../../../theme/colors";
 import { i18nText } from "../../../utils/i18nText";
+import { pickByLanguage } from "../../../utils/appLanguages";
 import { usePremiumGate } from "../../../hooks/usePremiumGate";
 
 // Ton sırası: soldan sağa açık → orta → koyu.
@@ -490,9 +491,12 @@ export default function SettingsTheme() {
 
       {lockedCustomSelected ? (
         <Text allowFontScaling={false} style={[styles.lockedNote, { color: theme.text.muted }]}>
-          {language === "tr"
-            ? "Özel temaların saklı; Premium ile geri gelir. Şimdilik varsayılan tema kullanılıyor."
-            : "Your custom themes are saved and return with Premium. The default theme is in use for now."}
+          {pickByLanguage(language, {
+            tr: "Özel temaların saklı; Premium ile geri gelir. Şimdilik varsayılan tema kullanılıyor.",
+            en: "Your custom themes are saved and return with Premium. The default theme is in use for now.",
+            es: "Tus temas personalizados están guardados y vuelven con Premium. Por ahora se usa el tema predeterminado.",
+            pt: "Seus temas personalizados estão salvos e voltam com o Premium. Por enquanto, o tema padrão está em uso.",
+          })}
         </Text>
       ) : null}
     </View>

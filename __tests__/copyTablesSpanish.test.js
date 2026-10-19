@@ -1,12 +1,12 @@
 // __tests__/copyTablesSpanish.test.js
 //
-// Yerel `{ tr, en, es }` metin tablolarının DENGESİ.
+// Yerel `{ tr, en, es, pt }` metin tablolarının DENGESİ.
 //
 // NEDEN: bu modüller i18n paketlerine bağlı değil (i18nKeys.test.js onları görmez).
 // Bir dile anahtar eklemeyi unutan geliştirici, `copyLanguage` yedeği sayesinde
 // ekranın patlamadığını, yalnız o dilde İngilizce metin göründüğünü fark etmez.
-// Burada her tablonun üç dili aynı anahtar kümesine, aynı yer tutucu kümesine ve
-// (işlevlerde) aynı parametre sayısına sahip olması zorlanır; ES değerleri boş olamaz.
+// Burada her tablonun dilleri aynı anahtar kümesine, aynı yer tutucu kümesine ve
+// (işlevlerde) aynı parametre sayısına sahip olması zorlanır; ES/PT değerleri boş olamaz.
 const { BACKUP_COPY } = require("../screens/tabs/settings/backupCopy");
 const { STUDIO_COPY } = require("../components/theme/themeStudioCopy");
 const { AI_COPY } = require("../utils/aiCopy");
@@ -43,12 +43,18 @@ function yapraklar(nesne, onek = "", toplam = {}) {
   return toplam;
 }
 
+// tr dışındaki her dil (en, es, pt …) tr ile karşılaştırılır. Yeni dil: buraya ekle.
+const KARSILASTIRILAN = ["en", "es", "pt"];
+
 function karsilastir(tablolar) {
-  const { tr, en, es } = Object.fromEntries(
+  const yap = Object.fromEntries(
     Object.entries(tablolar).map(([dil, tablo]) => [dil, yapraklar(tablo)]),
   );
+  const tr = yap.tr;
   const sorunlar = [];
-  for (const [dil, tablo] of [["en", en], ["es", es]]) {
+  for (const dil of KARSILASTIRILAN) {
+    const tablo = yap[dil];
+    if (!tablo) continue;
     for (const anahtar of Object.keys(tr)) {
       if (!(anahtar in tablo)) sorunlar.push(`${dil}: eksik ${anahtar}`);
     }
@@ -56,21 +62,26 @@ function karsilastir(tablolar) {
       if (!(anahtar in tr)) sorunlar.push(`${dil}: fazla ${anahtar}`);
     }
   }
-  for (const anahtar of Object.keys(es)) {
-    const trDeger = tr[anahtar];
-    const esDeger = es[anahtar];
-    if (typeof trDeger === "function") {
-      if (typeof esDeger !== "function") sorunlar.push(`es: ${anahtar} işlev olmalı`);
-      else if (esDeger.length !== trDeger.length) sorunlar.push(`es: ${anahtar} parametre sayısı`);
-    } else if (typeof trDeger === "string") {
-      if (typeof esDeger !== "string") sorunlar.push(`es: ${anahtar} metin olmalı`);
-      else {
-        if (!esDeger.trim() && trDeger.trim()) sorunlar.push(`es: ${anahtar} boş`);
-        if (yerTutucular(trDeger) !== yerTutucular(esDeger)) sorunlar.push(`es: ${anahtar} yer tutucu`);
-      }
-    } else if (Array.isArray(trDeger)) {
-      if (!Array.isArray(esDeger) || esDeger.length !== trDeger.length) {
-        sorunlar.push(`es: ${anahtar} dizi uzunluğu`);
+  // En dışındaki yabancı dillerde değer kontrolü (en eski davranışı korur: yalnız anahtar kümesi).
+  for (const dil of ["es", "pt"]) {
+    const tablo = yap[dil];
+    if (!tablo) continue;
+    for (const anahtar of Object.keys(tablo)) {
+      const trDeger = tr[anahtar];
+      const deger = tablo[anahtar];
+      if (typeof trDeger === "function") {
+        if (typeof deger !== "function") sorunlar.push(`${dil}: ${anahtar} işlev olmalı`);
+        else if (deger.length !== trDeger.length) sorunlar.push(`${dil}: ${anahtar} parametre sayısı`);
+      } else if (typeof trDeger === "string") {
+        if (typeof deger !== "string") sorunlar.push(`${dil}: ${anahtar} metin olmalı`);
+        else {
+          if (!deger.trim() && trDeger.trim()) sorunlar.push(`${dil}: ${anahtar} boş`);
+          if (yerTutucular(trDeger) !== yerTutucular(deger)) sorunlar.push(`${dil}: ${anahtar} yer tutucu`);
+        }
+      } else if (Array.isArray(trDeger)) {
+        if (!Array.isArray(deger) || deger.length !== trDeger.length) {
+          sorunlar.push(`${dil}: ${anahtar} dizi uzunluğu`);
+        }
       }
     }
   }
@@ -101,14 +112,15 @@ const TABLOLAR = {
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),
     es: getWrappedStrings("es"),
+    pt: getWrappedStrings("pt"),
   }),
 };
 
-describe("yerel metin tablolarında tr / en / es dengesi", () => {
+describe("yerel metin tablolarında tr / en / es / pt dengesi", () => {
   for (const [ad, al] of Object.entries(TABLOLAR)) {
-    it(`${ad}: üç dilde aynı anahtar, yer tutucu ve parametre sayısı`, () => {
+    it(`${ad}: dört dilde aynı anahtar, yer tutucu ve parametre sayısı`, () => {
       const tablo = al();
-      expect(Object.keys(tablo)).toEqual(expect.arrayContaining(["tr", "en", "es"]));
+      expect(Object.keys(tablo)).toEqual(expect.arrayContaining(["tr", "en", "es", "pt"]));
       expect(karsilastir(tablo)).toEqual([]);
     });
   }
@@ -117,6 +129,7 @@ describe("yerel metin tablolarında tr / en / es dengesi", () => {
     expect(Object.keys(yapraklar(BACKUP_COPY.es)).length).toBeGreaterThan(30);
     expect(Object.keys(yapraklar(STUDIO_COPY.es)).length).toBeGreaterThan(50);
     expect(Object.keys(yapraklar(AI_COPY.es)).length).toBeGreaterThan(100);
+    expect(Object.keys(yapraklar(AI_COPY.pt)).length).toBeGreaterThan(100);
   });
 
   it("karşılaştırıcı gerçek bir eksiği yakalıyor (pozitif kontrol)", () => {
@@ -124,10 +137,36 @@ describe("yerel metin tablolarında tr / en / es dengesi", () => {
       tr: { a: "x", b: "{n} adet", c: (n) => n },
       en: { a: "x", b: "{n} items", c: (n) => n },
       es: { a: "", b: "elementos", d: "fazla" },
+      pt: { a: "x", b: "{n} itens", c: "metin" },
     });
     expect(sorunlar).toEqual(
-      expect.arrayContaining(["es: eksik c", "es: fazla d", "es: a boş", "es: b yer tutucu"]),
+      expect.arrayContaining(["es: eksik c", "es: fazla d", "es: a boş", "es: b yer tutucu", "pt: c işlev olmalı"]),
     );
+  });
+});
+
+describe("Portekizce kopya gerçekten Portekizce", () => {
+  it("hiçbir tabloda Türkçeye özgü harf (ğ ş ı İ) ya da İspanyolca işareti (ñ ¿ ¡) yok", () => {
+    const sorunlu = [];
+    for (const [ad, al] of Object.entries(TABLOLAR)) {
+      const pt = al().pt;
+      if (!pt) continue;
+      for (const [yol, deger] of Object.entries(yapraklar(pt))) {
+        const metinler = Array.isArray(deger) ? deger : [deger];
+        for (const m of metinler) {
+          if (typeof m !== "string") continue;
+          // Dil adları ("Türkçe") ve kişi adı ("İsmail Öztürk") yabancı harf taşıyabilir.
+          const temiz = m.replace(/Türkçe|İsmail Öztürk/g, "");
+          if (/[ğşıİñ¿¡]/.test(temiz)) sorunlu.push(`${ad}: ${yol}`);
+        }
+      }
+    }
+    expect(sorunlu).toEqual([]);
+  });
+
+  it("Wrapped metinleri ne Türkçe ne İspanyolca", () => {
+    expect(JSON.stringify(getWrappedStrings("pt"))).not.toBe(JSON.stringify(getWrappedStrings("tr")));
+    expect(JSON.stringify(getWrappedStrings("pt"))).not.toBe(JSON.stringify(getWrappedStrings("es")));
   });
 });
 

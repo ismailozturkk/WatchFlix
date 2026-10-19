@@ -96,6 +96,11 @@ export const MONTHS_ES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
+export const MONTHS_PT = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
 const WEEKDAYS_TR = [
   "Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi",
 ];
@@ -108,19 +113,23 @@ const WEEKDAYS_ES = [
   "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado",
 ];
 
-const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES };
-const WEEKDAY_NAMES = { tr: WEEKDAYS_TR, en: WEEKDAYS_EN, es: WEEKDAYS_ES };
+const WEEKDAYS_PT = [
+  "Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado",
+];
+
+const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT };
+const WEEKDAY_NAMES = { tr: WEEKDAYS_TR, en: WEEKDAYS_EN, es: WEEKDAYS_ES, pt: WEEKDAYS_PT };
 
 /** Dile uygun ay adları (0-11); bilinmeyen dil İngilizce. YENİ DİL: tabloya ekle. */
 export const monthNamesOf = (language) =>
   MONTH_NAMES[copyLanguage(language, Object.keys(MONTH_NAMES))];
 
-/** "1998-03-05" parçaları → dile uygun uzun tarih: "5 Mart 1998" / "March 5, 1998" / "5 de marzo de 1998". */
+/** "1998-03-05" parçaları → dile uygun uzun tarih: "5 Mart 1998" / "March 5, 1998" / "5 de marzo de 1998" / "5 de março de 1998". */
 export function formatLongDateParts(language, { day, monthIndex, year }) {
   const lang = copyLanguage(language, Object.keys(MONTH_NAMES));
   const month = MONTH_NAMES[lang][monthIndex];
   if (lang === "en") return `${month} ${day}, ${year}`;
-  if (lang === "es") return `${day} de ${month.toLowerCase()} de ${year}`;
+  if (lang === "es" || lang === "pt") return `${day} de ${month.toLowerCase()} de ${year}`;
   return `${day} ${month} ${year}`;
 }
 

@@ -20,6 +20,7 @@ import {
 } from "@context/AppSettingsContext";
 import { useDeviceNotifications } from "@context/DeviceNotificationsContext";
 import { i18nText } from "@utils/i18nText";
+import { pickByLanguage } from "@utils/appLanguages";
 import { getFeatureLimit } from "@utils/premiumFeatures";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import { SettingsSubScreen, SettingRow, buildUiColors } from "./settingsUi";
@@ -40,18 +41,21 @@ export default function ReminderNotificationsScreen() {
   // edildiğini burada görür.
   const streamingGate = usePremiumGate("streaming_alerts");
   const premiumStreamingLimit = getFeatureLimit("streaming_alerts", "premium");
-  const streamingScope =
-    language === "tr"
-      ? `Son eklediğin ${streamingGate.limit} başlık takip edilir${
-          streamingGate.limit < premiumStreamingLimit
-            ? ` · Premium'da ${premiumStreamingLimit}`
-            : ""
-        }`
-      : `Your ${streamingGate.limit} latest titles are tracked${
-          streamingGate.limit < premiumStreamingLimit
-            ? ` · ${premiumStreamingLimit} with Premium`
-            : ""
-        }`;
+  const streamingBelowPremium = streamingGate.limit < premiumStreamingLimit;
+  const streamingScope = pickByLanguage(language, {
+    tr: `Son eklediğin ${streamingGate.limit} başlık takip edilir${
+      streamingBelowPremium ? ` · Premium'da ${premiumStreamingLimit}` : ""
+    }`,
+    en: `Your ${streamingGate.limit} latest titles are tracked${
+      streamingBelowPremium ? ` · ${premiumStreamingLimit} with Premium` : ""
+    }`,
+    es: `Se siguen tus ${streamingGate.limit} títulos más recientes${
+      streamingBelowPremium ? ` · ${premiumStreamingLimit} con Premium` : ""
+    }`,
+    pt: `Seus ${streamingGate.limit} títulos mais recentes são acompanhados${
+      streamingBelowPremium ? ` · ${premiumStreamingLimit} com o Premium` : ""
+    }`,
+  });
   const { notificationSettings, changeNotificationSettings } =
     useNotificationSettings();
   const { reminderPreviewLimit, changeReminderPreviewLimit } =

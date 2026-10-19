@@ -457,12 +457,12 @@ describe("v2 bolumleri", () => {
   test("Baslangic ekranin en ustunde, Baglilik ritimden hemen sonra", () => {
     expect(BOLUM_SIRA[0]).toBe(BOLUM.BASLANGIC);
     expect(BOLUM_SIRA.indexOf(BOLUM.BAGLILIK)).toBe(BOLUM_SIRA.indexOf(BOLUM.RITIM) + 1);
-    expect(BOLUM_BASLIK.baslangic).toEqual({ tr: "Başlangıç", en: "Getting Started", es: "Primeros pasos" });
-    expect(BOLUM_BASLIK.baglilik).toEqual({ tr: "Bağlılık", en: "Devotion", es: "Fidelidad" });
+    expect(BOLUM_BASLIK.baslangic).toEqual({ tr: "Başlangıç", en: "Getting Started", es: "Primeros pasos", pt: "Primeiros passos" });
+    expect(BOLUM_BASLIK.baglilik).toEqual({ tr: "Bağlılık", en: "Devotion", es: "Fidelidad", pt: "Dedicação" });
   });
 
   test("bolum basliklari ekranin i18n anahtarlariyla ayni (tr/en/es JSON'da var)", () => {
-    for (const dil of ["tr", "en", "es"]) {
+    for (const dil of ["tr", "en", "es", "pt"]) {
       const json = require(`../translations/${dil}.json`);
       const oto = json.autoI18n || json;
       for (const b of Object.values(BOLUM)) {

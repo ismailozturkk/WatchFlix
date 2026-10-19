@@ -61,6 +61,24 @@ export const LIST_SORT_FILTER_COPY = {
     radius: { 2: "Rectas", 10: "Normales", 20: "Redondas" },
     columnsOption: { 3: "De 3", 4: "De 4" },
   },
+  pt: {
+    title: "Ordenar e filtrar",
+    results: "{n} resultados",
+    showResults: "Mostrar {n} resultados",
+    reset: "Redefinir",
+    close: "Fechar",
+    sort: "ORDENAR POR",
+    asc: "Crescente",
+    desc: "Decrescente",
+    view: "Visualização",
+    columns: "COLUNAS",
+    corners: "CANTOS",
+    posterInfo: "MOSTRAR NO PÔSTER",
+    moreChips: "+{n} mais",
+    lessChips: "Mostrar menos",
+    radius: { 2: "Retos", 10: "Normais", 20: "Redondos" },
+    columnsOption: { 3: "De 3", 4: "De 4" },
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

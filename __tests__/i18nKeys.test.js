@@ -107,11 +107,12 @@ const paket = (ad) => JSON.parse(fs.readFileSync(path.join(KOK, "translations", 
 const tr = paket("tr.json");
 const en = paket("en.json");
 const es = paket("es.json");
+const pt = paket("pt.json");
 
 // `useLanguage()` içindeki `t.movieScreens.title` gibi nesne erişimleri.
 // Yerel döngü değişkeni olarak kullanılan `t.id` benzeri eşleşmeleri elemek
 // için yalnız sözlükte gerçekten bulunan kök namespace'leri denetlenir.
-const tKokleri = new Set([...Object.keys(tr), ...Object.keys(en), ...Object.keys(es)]);
+const tKokleri = new Set([...Object.keys(tr), ...Object.keys(en), ...Object.keys(es), ...Object.keys(pt)]);
 const T_NESNE_DESEN = /(?<![\w.])t(?:\?\.)?\.([A-Za-z_][A-Za-z0-9_]*(?:(?:\?\.)?\.[A-Za-z_][A-Za-z0-9_]*)*)/g;
 for (const tamYol of kaynakDosyalari) {
   const kaynak = fs.readFileSync(tamYol, "utf8");
@@ -163,60 +164,80 @@ describe("i18n anahtar bekçisi", () => {
     expect(eksik).toEqual([]);
   });
 
-  it("koddan çağrılan her statik çeviri anahtarı es.json'da var", () => {
-    const eksik = [...kullanilanAnahtarlar.entries()]
-      .filter(([anahtar]) => !anahtarVar(es, anahtar))
-      .map(([anahtar, dosyalar]) => `${anahtar}  (${[...dosyalar].join(", ")})`);
-    expect(eksik).toEqual([]);
-  });
+  // tr/en dışındaki her dil paketi (es, pt…) aynı sözleşmeye bağlı. Yeni dil: buraya ekle.
+  const EK_DILLER = [
+    ["es", es],
+    ["pt", pt],
+  ];
 
-  it("tr.json ve en.json aynı anahtar kümesine sahip", () => {
-    const trKumesi = new Set(duzAnahtarlar(tr));
-    const enKumesi = new Set(duzAnahtarlar(en));
-    expect([...trKumesi].filter((k) => !enKumesi.has(k))).toEqual([]); // EN'de eksik
-    expect([...enKumesi].filter((k) => !trKumesi.has(k))).toEqual([]); // TR'de eksik
-  });
-
-  it("es.json, en.json ile aynı anahtar kümesine sahip (her iki yönde)", () => {
-    const enKumesi = new Set(duzAnahtarlar(en));
-    const esKumesi = new Set(duzAnahtarlar(es));
-    expect([...enKumesi].filter((k) => !esKumesi.has(k))).toEqual([]); // ES'te eksik
-    expect([...esKumesi].filter((k) => !enKumesi.has(k))).toEqual([]); // ES'te fazla
-  });
-
-  it("es.json'da {{yer tutucu}} kümesi en.json ile birebir aynı", () => {
-    const yerTutucular = (metin) =>
-      (String(metin).match(/\{\{[^}]+\}\}/g) || []).sort().join("|");
-    const sorunlu = duzAnahtarlar(en).filter((anahtar) => {
-      const enDeger = anahtar.split(".").reduce((o, p) => o?.[p], en);
-      const esDeger = anahtar.split(".").reduce((o, p) => o?.[p], es);
-      return yerTutucular(enDeger) !== yerTutucular(esDeger);
+  describe.each(EK_DILLER)("%s.json", (kod, paketi) => {
+    it("koddan çağrılan her statik çeviri anahtarı pakette var", () => {
+      const eksik = [...kullanilanAnahtarlar.entries()]
+        .filter(([anahtar]) => !anahtarVar(paketi, anahtar))
+        .map(([anahtar, dosyalar]) => `${anahtar}  (${[...dosyalar].join(", ")})`);
+      expect(eksik).toEqual([]);
     });
-    expect(sorunlu).toEqual([]);
-  });
 
-  it("es.json'da dizi değerlerinin uzunluğu en.json ile aynı", () => {
-    const sorunlu = duzAnahtarlar(en).filter((anahtar) => {
-      const enDeger = anahtar.split(".").reduce((o, p) => o?.[p], en);
-      const esDeger = anahtar.split(".").reduce((o, p) => o?.[p], es);
-      return Array.isArray(enDeger) && (!Array.isArray(esDeger) || esDeger.length !== enDeger.length);
+    it("en.json ile aynı anahtar kümesine sahip (her iki yönde)", () => {
+      const enKumesi = new Set(duzAnahtarlar(en));
+      const kumesi = new Set(duzAnahtarlar(paketi));
+      expect([...enKumesi].filter((k) => !kumesi.has(k))).toEqual([]); // pakette eksik
+      expect([...kumesi].filter((k) => !enKumesi.has(k))).toEqual([]); // pakette fazla
     });
-    expect(sorunlu).toEqual([]);
-  });
 
-  it("ES paketinde hiçbir metin boş bırakılmamış", () => {
-    const bos = duzAnahtarlar(es).filter((anahtar) => {
-      const deger = anahtar.split(".").reduce((o, p) => o?.[p], es);
-      return typeof deger === "string" && deger.trim() === "";
+    it("{{yer tutucu}} kümesi en.json ile birebir aynı", () => {
+      const yerTutucular = (metin) =>
+        (String(metin).match(/{{[^}]+}}/g) || []).sort().join("|");
+      const sorunlu = duzAnahtarlar(en).filter((anahtar) => {
+        const enDeger = anahtar.split(".").reduce((o, p) => o?.[p], en);
+        const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+        return yerTutucular(enDeger) !== yerTutucular(deger);
+      });
+      expect(sorunlu).toEqual([]);
     });
-    expect(bos).toEqual([]);
+
+    it("tek süslü yer tutucu ({count}) kümesi en.json ile birebir aynı", () => {
+      const tekler = (metin) =>
+        (String(metin).replace(/{{[^}]+}}/g, "").match(/{[^{}]+}/g) || []).sort().join("|");
+      const sorunlu = duzAnahtarlar(en).filter((anahtar) => {
+        const enDeger = anahtar.split(".").reduce((o, p) => o?.[p], en);
+        const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+        return tekler(enDeger) !== tekler(deger);
+      });
+      expect(sorunlu).toEqual([]);
+    });
+
+    it("dizi değerlerinin uzunluğu en.json ile aynı", () => {
+      const sorunlu = duzAnahtarlar(en).filter((anahtar) => {
+        const enDeger = anahtar.split(".").reduce((o, p) => o?.[p], en);
+        const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+        return Array.isArray(enDeger) && (!Array.isArray(deger) || deger.length !== enDeger.length);
+      });
+      expect(sorunlu).toEqual([]);
+    });
+
+    it("hiçbir metin boş bırakılmamış", () => {
+      const bos = duzAnahtarlar(paketi).filter((anahtar) => {
+        const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+        return typeof deger === "string" && deger.trim() === "";
+      });
+      expect(bos).toEqual([]);
+    });
+
+    it("Türkçeye özgü harfler sızmamış (yalnız kişi adı istisnası)", () => {
+      // ğ ş ı İ İspanyolca/Portekizcede yoktur; çıkıyorsa metin çevrilmeden TR'den kopyalanmıştır.
+      const sizan = duzAnahtarlar(paketi).filter((anahtar) => {
+        const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+        return typeof deger === "string" && /[ğşıİ]/.test(deger.replace(/İsmail Öztürk/g, ""));
+      });
+      expect(sizan).toEqual([]);
+    });
   });
 
-  it("ES paketine Türkçeye özgü harfler sızmamış (yalnız kişi adı istisnası)", () => {
-    // ğ ş ı İ İspanyolcada yoktur; çıkıyorsa metin çevrilmeden TR'den kopyalanmıştır.
-    const sizan = duzAnahtarlar(es).filter((anahtar) => {
-      const deger = anahtar.split(".").reduce((o, p) => o?.[p], es);
-      return typeof deger === "string" && /[ğşıİ]/.test(deger.replace(/İsmail Öztürk/g, ""));
+  it("pt.json'a İspanyolca'ya özgü işaretler (ñ ¿ ¡) sızmamış", () => {
+    const sizan = duzAnahtarlar(pt).filter((anahtar) => {
+      const deger = anahtar.split(".").reduce((o, p) => o?.[p], pt);
+      return typeof deger === "string" && /[ñ¿¡]/.test(deger);
     });
     expect(sizan).toEqual([]);
   });

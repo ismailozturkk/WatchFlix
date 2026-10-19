@@ -180,7 +180,7 @@ describe("dolu liste", () => {
 });
 
 describe("kopya metinleri", () => {
-  test.each(["tr", "en", "es"])("%s: bulut ve silme metinleri dolu", (lang) => {
+  test.each(["tr", "en", "es", "pt"])("%s: bulut ve silme metinleri dolu", (lang) => {
     const c = getAiCopy(lang);
     expect(c.history.cloudNote.length).toBeGreaterThan(10);
     expect(c.history.loading.length).toBeGreaterThan(5);

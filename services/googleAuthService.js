@@ -160,61 +160,73 @@ const ERROR_TEXT = {
     tr: "Bu Google hesabı başka bir Seelogd hesabına bağlı. Önce o hesaptan bağlantıyı kaldır.",
     en: "This Google account is linked to another Seelogd account. Disconnect it there first.",
     es: "Esta cuenta de Google está vinculada a otra cuenta de Seelogd. Desvincúlala primero allí.",
+    pt: "Esta conta do Google está vinculada a outra conta do Seelogd. Desvincule-a primeiro lá.",
   },
   [GoogleAuthCode.ALREADY_LINKED_HERE]: {
     tr: "Google hesabın zaten bağlı.",
     en: "Your Google account is already connected.",
     es: "Tu cuenta de Google ya está vinculada.",
+    pt: "Sua conta do Google já está vinculada.",
   },
   [GoogleAuthCode.WRONG_ACCOUNT]: {
     tr: "Farklı bir Google hesabı seçtin. Oturumu açtığın hesabı seç.",
     en: "You picked a different Google account. Choose the one you signed in with.",
     es: "Has elegido una cuenta de Google distinta. Elige aquella con la que iniciaste sesión.",
+    pt: "Você escolheu uma conta do Google diferente. Escolha aquela com a qual você entrou.",
   },
   [GoogleAuthCode.REQUIRES_RECENT_LOGIN]: {
     tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra dene.",
     en: "For security, sign out and sign in again, then retry.",
     es: "Por seguridad, cierra sesión, vuelve a iniciarla e inténtalo de nuevo.",
+    pt: "Por segurança, saia, entre de novo e tente novamente.",
   },
   [GoogleAuthCode.NETWORK]: {
     tr: "İnternet bağlantısı kurulamadı. Bağlantını kontrol et.",
     en: "Could not reach the network. Check your connection.",
     es: "No se pudo conectar a la red. Revisa tu conexión.",
+    pt: "Não foi possível conectar à rede. Verifique sua conexão.",
   },
   [GoogleAuthCode.ACCOUNT_REQUIRES_LINK]: {
     tr: "Bu e-posta ile zaten bir Seelogd hesabı var. Önce e-posta ve şifrenle giriş yap, ardından Ayarlar > Hesap bağlantıları bölümünden Google'ı bağla.",
     en: "A Seelogd account already uses this email. Sign in with email and password first, then connect Google from Settings > Account connections.",
     es: "Ya existe una cuenta de Seelogd con este correo. Inicia sesión primero con tu correo y contraseña y después vincula Google desde Ajustes > Cuentas vinculadas.",
+    pt: "Já existe uma conta do Seelogd com este e-mail. Entre primeiro com seu e-mail e senha e depois vincule o Google em Configurações > Contas vinculadas.",
   },
   [GoogleAuthCode.PLAY_SERVICES]: {
     tr: "Google Play Hizmetleri bu cihazda kullanılamıyor.",
     en: "Google Play Services is unavailable on this device.",
     es: "Google Play Services no está disponible en este dispositivo.",
+    pt: "O Google Play Services não está disponível neste dispositivo.",
   },
   [GoogleAuthCode.MISCONFIGURED]: {
     tr: "Google girişi bu uygulama sürümünde kullanılamıyor.",
     en: "Google sign-in is unavailable in this build.",
     es: "El inicio de sesión con Google no está disponible en esta versión de la app.",
+    pt: "O login com o Google não está disponível nesta versão do app.",
   },
   [GoogleAuthCode.LAST_PROVIDER]: {
     tr: "Google şu anda tek giriş yöntemin, kaldırılamaz.",
     en: "Google is your only sign-in method and cannot be removed.",
     es: "Google es ahora tu único método de inicio de sesión y no se puede quitar.",
+    pt: "O Google agora é seu único método de login e não pode ser removido.",
   },
   [GoogleAuthCode.IN_PROGRESS]: {
     tr: "Google girişi zaten sürüyor.",
     en: "Google sign-in is already in progress.",
     es: "Ya hay un inicio de sesión con Google en curso.",
+    pt: "Já há um login com o Google em andamento.",
   },
   [GoogleAuthCode.NO_ID_TOKEN]: {
     tr: "Google kimlik doğrulaması tamamlanamadı. Tekrar dene.",
     en: "Google could not verify your identity. Please try again.",
     es: "Google no pudo verificar tu identidad. Inténtalo de nuevo.",
+    pt: "O Google não conseguiu verificar sua identidade. Tente novamente.",
   },
   [GoogleAuthCode.NO_SESSION]: {
     tr: "Oturum bulunamadı. Tekrar giriş yap.",
     en: "No active session. Please sign in again.",
     es: "No hay ninguna sesión activa. Inicia sesión de nuevo.",
+    pt: "Não há nenhuma sessão ativa. Entre novamente.",
   },
 };
 
@@ -234,6 +246,7 @@ export function describeGoogleAuthError(error, language = "tr") {
     tr: "Beklenmeyen bir hata oluştu. Lütfen tekrar dene.",
     en: "Something went wrong. Please try again.",
     es: "Ha ocurrido un error. Inténtalo de nuevo.",
+    pt: "Ocorreu um erro. Tente novamente.",
   });
 }
 

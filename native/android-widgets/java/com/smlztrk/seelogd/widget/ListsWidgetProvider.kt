@@ -142,7 +142,7 @@ class ListsWidgetProvider : AppWidgetProvider() {
       views.setTextViewText(
         R.id.lists_widget_title,
         selected?.optString("name")?.takeIf { it.isNotBlank() }
-          ?: WidgetLanguage.pick(lang, "Listelerim", "My Lists", "Mis listas"),
+          ?: WidgetLanguage.pick(lang, "Listelerim", "My Lists", "Mis listas", "Minhas listas"),
       )
       views.setTextColor(R.id.lists_widget_title, appearance.text)
       views.setTextViewText(
@@ -187,7 +187,7 @@ class ListsWidgetProvider : AppWidgetProvider() {
 
       views.setTextViewText(
         R.id.lists_widget_empty_text,
-        WidgetLanguage.pick(lang, "Bu listede henüz içerik yok", "Nothing in this list yet", "Esta lista aún está vacía"),
+        WidgetLanguage.pick(lang, "Bu listede henüz içerik yok", "Nothing in this list yet", "Esta lista aún está vacía", "Esta lista ainda está vazia"),
       )
 
       // Izgara adaptörü — servise widgetId'yi veri olarak koy ki her örnek

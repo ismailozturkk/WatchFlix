@@ -293,7 +293,102 @@ const es = {
   platformAndroid: "Android",
 };
 
-export const BACKUP_COPY = { tr, en, es };
+const pt = {
+  title: "Backup das configurações",
+
+  heroTitle: "Suas configurações em um só arquivo",
+  heroText:
+    "Seu tema, seus temas personalizados, a fonte, os efeitos, o layout e suas preferências de notificações e widgets são salvos juntos. Restaure-os em um dispositivo novo ou após uma instalação limpa.",
+
+  sectionIncluded: "O que está incluído",
+  groupAppearance: "Aparência",
+  groupAppearanceSub: "Tema, temas personalizados, fonte, efeitos, fundos",
+  groupLayout: "Layout de pôsteres e listas",
+  groupLayoutSub: "Colunas, cantos, emblemas, preferências de visualização",
+  groupContent: "Idioma e conteúdo",
+  groupContentSub: "Idioma, serviços, gêneros, qualidade da imagem",
+  groupNotifications: "Notificações e vibração",
+  groupNotificationsSub: "Tipos de notificações e vibração tátil",
+  groupData: "Download de dados",
+  groupDataSub: "Preferências de dados offline",
+  groupWidgets: "Widgets",
+  groupWidgetsSub: "Aparência e conteúdo dos widgets",
+  groupSharing: "Cards para compartilhar",
+  groupSharingSub: "Últimas escolhas dos cards de story e do Wrapped",
+  groupPet: "Pet",
+  groupPetSub: "Ativado ou não, tamanho e posição",
+  customized: "{n} personalizados",
+  allDefault: "Padrão",
+  themeCount: "{n} temas personalizados",
+  themeCountOne: "1 tema personalizado",
+  notIncluded:
+    "Não inclui: dados da conta, senhas, ícone do app, cache, permissões de notificação nem o status da assinatura.",
+
+  sectionExport: "Exportar",
+  exportFile: "Salvar como arquivo",
+  exportFileSub: "Salvar em Arquivos ou compartilhar · {name}",
+  exportClipboard: "Copiar para a área de transferência",
+  exportClipboardSub: "Como texto, para enviar em uma mensagem",
+  exported: "Backup pronto",
+  copied: "Backup copiado para a área de transferência",
+
+  sectionImport: "Importar",
+  importFile: "Importar de um arquivo",
+  importFileSub: "Escolha um backup de configurações do Seelogd",
+  importClipboard: "Importar da área de transferência",
+  importClipboardSub: "Usa o texto de um backup que você copiou",
+  nothingToImport: "Este backup não tem configurações para aplicar",
+
+  sectionRestore: "Desfazer",
+  restoreTitle: "Desfazer a última importação",
+  restoreSub: "Voltar às suas configurações de antes de {date}",
+  restoreConfirmTitle: "Voltar às configurações anteriores?",
+  restoreConfirmBody:
+    "As configurações e os temas personalizados trazidos pela última importação serão removidos. O app será reiniciado.",
+  restoreAction: "Desfazer",
+  restored: "Configurações anteriores restauradas",
+
+  sheetTitle: "Backup encontrado",
+  sheetFile: "Arquivo",
+  sheetWillApply: "{n} configurações serão aplicadas",
+  sheetWillApplyOne: "1 configuração será aplicada",
+  sheetGroupLine: "{n} configurações",
+  sheetGroupLineOne: "1 configuração",
+  sheetThemes: "Temas personalizados",
+  sheetThemesNew: "{n} novos",
+  sheetThemesUpdated: "{n} atualizados",
+  sheetThemesKept: "{n} dos seus temas atuais não serão alterados",
+  sheetThemesKeptOne: "1 dos seus temas atuais não será alterado",
+  warnInvalid: "{n} configurações não são válidas e serão ignoradas",
+  warnInvalidOne: "1 configuração não é válida e será ignorada",
+  warnThemeMissing: "O tema selecionado não foi encontrado no backup, então o tema padrão será usado",
+  warnThemesDropped: "{n} temas personalizados não são válidos ou passam do limite e não serão adicionados",
+  warnThemesDroppedOne: "1 tema personalizado não é válido ou passa do limite e não será adicionado",
+  restartNote: "O app será reiniciado. Suas configurações atuais são mantidas caso você queira desfazer.",
+  confirm: "Importar",
+  cancel: "Cancelar",
+  applying: "Aplicando…",
+
+  imported: "Configurações importadas",
+  importedPartial: "Não foi possível aplicar {n} configurações",
+  importedPartialOne: "Não foi possível aplicar 1 configuração",
+  manualRestartTitle: "Reiniciar",
+  manualRestartBody: "As configurações foram salvas. Feche e abra o app de novo para que todas tenham efeito.",
+
+  errEmpty: "Nenhum backup foi encontrado aqui dentro",
+  errNotBackup: "Isto não é um backup de configurações do Seelogd",
+  errTooNew: "Este backup foi feito com uma versão mais recente do app. Atualize o app primeiro.",
+  errTooLarge: "O arquivo é grande demais",
+  errReadFailed: "Não foi possível ler o arquivo",
+  errWriteFailed: "Não foi possível criar o arquivo de backup",
+  errSharing: "O compartilhamento não está disponível neste dispositivo. Tente copiar para a área de transferência.",
+  errClipboard: "Não foi possível acessar a área de transferência",
+
+  platformIos: "iOS",
+  platformAndroid: "Android",
+};
+
+export const BACKUP_COPY = { tr, en, es, pt };
 
 /**
  * Dile uygun metin paketi. Eski çağrılar `isEn` boolean'ı geçiyordu (true → İngilizce);

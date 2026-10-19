@@ -14,6 +14,7 @@ const MONTHS = {
   tr: ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"],
   en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
   es: ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"],
+  pt: ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"],
 };
 
 const REMINDER_TEMPLATES = [
@@ -33,9 +34,9 @@ const langOf = legacyFlagToLanguage;
 /** ReminderWidgetRemoteViewsService.kt `countdown` ile aynı metinler. */
 export const countdownLabel = (days, isTr) => {
   const lang = langOf(isTr);
-  if (days <= 0) return pickByLanguage(lang, { tr: "Bugün", en: "Today", es: "Hoy" });
-  if (days === 1) return pickByLanguage(lang, { tr: "Yarın", en: "Tomorrow", es: "Mañana" });
-  return pickByLanguage(lang, { tr: `${days} gün`, en: `${days} days`, es: `${days} días` });
+  if (days <= 0) return pickByLanguage(lang, { tr: "Bugün", en: "Today", es: "Hoy", pt: "Hoje" });
+  if (days === 1) return pickByLanguage(lang, { tr: "Yarın", en: "Tomorrow", es: "Mañana", pt: "Amanhã" });
+  return pickByLanguage(lang, { tr: `${days} gün`, en: `${days} days`, es: `${days} días`, pt: `${days} dias` });
 };
 
 /** `SimpleDateFormat("d MMM")` karşılığı. */
@@ -57,6 +58,7 @@ export function buildReminderSamples({ now = new Date(), isTr }) {
             tr: `S${template.season} · ${template.episode}. Bölüm`,
             en: `S${template.season} · Episode ${template.episode}`,
             es: `T${template.season} · Episodio ${template.episode}`,
+            pt: `T${template.season} · Episódio ${template.episode}`,
           })
         : "";
     return {
@@ -74,15 +76,15 @@ export function buildReminderSamples({ now = new Date(), isTr }) {
 /** Listelerim örnekleri (iOS satırları ve Android liste adı). Sayılar listsWidgetService şekliyle aynı. */
 export function buildListSamples({ isTr }) {
   const lang = langOf(isTr);
-  const L = (tr, en, es) => pickByLanguage(lang, { tr, en, es });
+  const L = (tr, en, es, pt) => pickByLanguage(lang, { tr, en, es, pt: pt ?? en });
   return [
-    { id: "watchedTv", name: L("İzlenen Diziler", "Watched Series", "Series vistas"), icon: "tv", count: 37 },
-    { id: "watchedMovies", name: L("İzlenen Filmler", "Watched Movies", "Películas vistas"), icon: "film", count: 184 },
-    { id: "watchList", name: L("İzlenecekler", "Watchlist", "Lista de seguimiento"), icon: "bookmark", count: 52 },
-    { id: "favorites", name: L("Favoriler", "Favorites", "Favoritos"), icon: "heart", count: 24 },
-    { id: "custom1", name: L("Hafta Sonu Filmleri", "Weekend Movies", "Películas de fin de semana"), icon: "list", count: 12 },
-    { id: "custom2", name: L("Korku Gecesi", "Horror Night", "Noche de terror"), icon: "list", count: 9 },
-    { id: "custom3", name: L("Animeler", "Anime", "Anime"), icon: "list", count: 15 },
-    { id: "custom4", name: L("Kısa Filmler", "Short Films", "Cortometrajes"), icon: "list", count: 6 },
+    { id: "watchedTv", name: L("İzlenen Diziler", "Watched Series", "Series vistas", "Séries assistidas"), icon: "tv", count: 37 },
+    { id: "watchedMovies", name: L("İzlenen Filmler", "Watched Movies", "Películas vistas", "Filmes assistidos"), icon: "film", count: 184 },
+    { id: "watchList", name: L("İzlenecekler", "Watchlist", "Lista de seguimiento", "Lista para assistir"), icon: "bookmark", count: 52 },
+    { id: "favorites", name: L("Favoriler", "Favorites", "Favoritos", "Favoritos"), icon: "heart", count: 24 },
+    { id: "custom1", name: L("Hafta Sonu Filmleri", "Weekend Movies", "Películas de fin de semana", "Filmes de fim de semana"), icon: "list", count: 12 },
+    { id: "custom2", name: L("Korku Gecesi", "Horror Night", "Noche de terror", "Noite de terror"), icon: "list", count: 9 },
+    { id: "custom3", name: L("Animeler", "Anime", "Anime", "Anime"), icon: "list", count: 15 },
+    { id: "custom4", name: L("Kısa Filmler", "Short Films", "Cortometrajes", "Curtas-metragens"), icon: "list", count: 6 },
   ];
 }

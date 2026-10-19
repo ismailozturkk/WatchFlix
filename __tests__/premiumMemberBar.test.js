@@ -142,6 +142,7 @@ describe("metinler", () => {
     expect(memberBarTitle("tr")).toBe("Aboneliği yönet");
     expect(memberBarTitle("en")).toBe("Manage subscription");
     expect(memberBarTitle("es")).toBe("Gestionar suscripción");
+    expect(memberBarTitle("pt")).toBe("Gerenciar assinatura");
     expect(memberBarTitle("xx")).toBe("Manage subscription");
   });
 

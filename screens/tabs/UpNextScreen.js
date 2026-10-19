@@ -8,7 +8,7 @@
 // tercihleri ve işaretleme hooks/useUpNextQueue'da — ray ile paylaşılır. Bu
 // ekranda kalan tek fazlalık dizi YÖNETİMİ (gizle/göster) ve geniş kart.
 
-import { intlLocaleOf } from "../../utils/appLanguages";
+import { intlLocaleOf, pickByLanguage } from "../../utils/appLanguages";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -33,61 +33,116 @@ import { useLanguage } from "@context/LanguageContext";
 import useUpNextQueue, { localWatchDate } from "@hooks/useUpNextQueue";
 import { alpha } from "@theme/colors";
 
-const copyFor = (language) =>
-  language === "en"
-    ? {
-        title: "Up Next",
-        subtitle: "Continue every show from the right episode.",
-        recentOrder: "Ordered by your most recently watched shows",
-        minuteShort: "min",
-        episodesWatched: "episodes watched",
-        upcoming: "Coming soon",
-        watchedNow: "Watched now",
-        chooseDate: "Choose date",
-        dateSubtitle: "When did you watch this episode?",
-        manage: "Manage",
-        manageTitle: "Choose ongoing shows",
-        manageSubtitle: "Hidden shows stay in your history and statistics.",
-        showAll: "Show all",
-        visible: "Shown",
-        hidden: "Hidden",
-        done: "Done",
-        emptyTitle: "Nothing is waiting yet",
-        emptyText:
-          "Mark an episode as watched and its next episode will appear here.",
-        emptyHiddenTitle: "No ongoing show is selected",
-        emptyHiddenText: "Choose which shows should appear in Up Next.",
-        discover: "Discover shows",
-        loadError: "Some shows could not be refreshed.",
-        retry: "Try again",
-      }
-    : {
-        title: "Sıradaki",
-        subtitle: "Tüm dizilerine doğru bölümden devam et.",
-        recentOrder: "En son izlediğin dizilere göre sıralandı",
-        minuteShort: "dk",
-        episodesWatched: "bölüm izlendi",
-        upcoming: "Yakında",
-        watchedNow: "Şimdi izledim",
-        chooseDate: "Tarih seç",
-        dateSubtitle: "Bu bölümü ne zaman izledin?",
-        manage: "Dizileri yönet",
-        manageTitle: "Devam eden dizilerini seç",
-        manageSubtitle:
-          "Gizlenen diziler geçmişinden ve istatistiklerinden silinmez.",
-        showAll: "Tümünü göster",
-        visible: "Gösteriliyor",
-        hidden: "Gizli",
-        done: "Bitti",
-        emptyTitle: "Şimdilik bekleyen bölüm yok",
-        emptyText:
-          "Bir bölümü izledim olarak işaretlediğinde sıradaki bölüm burada görünür.",
-        emptyHiddenTitle: "Devam eden dizi seçmedin",
-        emptyHiddenText: "Sıradaki bölümünde görmek istediğin dizileri seç.",
-        discover: "Dizi keşfet",
-        loadError: "Bazı diziler yenilenemedi.",
-        retry: "Tekrar dene",
-      };
+const UP_NEXT_COPY = {
+  tr: {
+    title: "Sıradaki",
+    subtitle: "Tüm dizilerine doğru bölümden devam et.",
+    recentOrder: "En son izlediğin dizilere göre sıralandı",
+    minuteShort: "dk",
+    episodesWatched: "bölüm izlendi",
+    upcoming: "Yakında",
+    watchedNow: "Şimdi izledim",
+    chooseDate: "Tarih seç",
+    dateSubtitle: "Bu bölümü ne zaman izledin?",
+    manage: "Dizileri yönet",
+    manageTitle: "Devam eden dizilerini seç",
+    manageSubtitle:
+      "Gizlenen diziler geçmişinden ve istatistiklerinden silinmez.",
+    showAll: "Tümünü göster",
+    visible: "Gösteriliyor",
+    hidden: "Gizli",
+    done: "Bitti",
+    emptyTitle: "Şimdilik bekleyen bölüm yok",
+    emptyText:
+      "Bir bölümü izledim olarak işaretlediğinde sıradaki bölüm burada görünür.",
+    emptyHiddenTitle: "Devam eden dizi seçmedin",
+    emptyHiddenText: "Sıradaki bölümünde görmek istediğin dizileri seç.",
+    discover: "Dizi keşfet",
+    loadError: "Bazı diziler yenilenemedi.",
+    retry: "Tekrar dene",
+  },
+  en: {
+    title: "Up Next",
+    subtitle: "Continue every show from the right episode.",
+    recentOrder: "Ordered by your most recently watched shows",
+    minuteShort: "min",
+    episodesWatched: "episodes watched",
+    upcoming: "Coming soon",
+    watchedNow: "Watched now",
+    chooseDate: "Choose date",
+    dateSubtitle: "When did you watch this episode?",
+    manage: "Manage",
+    manageTitle: "Choose ongoing shows",
+    manageSubtitle: "Hidden shows stay in your history and statistics.",
+    showAll: "Show all",
+    visible: "Shown",
+    hidden: "Hidden",
+    done: "Done",
+    emptyTitle: "Nothing is waiting yet",
+    emptyText:
+      "Mark an episode as watched and its next episode will appear here.",
+    emptyHiddenTitle: "No ongoing show is selected",
+    emptyHiddenText: "Choose which shows should appear in Up Next.",
+    discover: "Discover shows",
+    loadError: "Some shows could not be refreshed.",
+    retry: "Try again",
+  },
+  es: {
+    title: "Siguiente",
+    subtitle: "Sigue cada serie desde el episodio que toca.",
+    recentOrder: "Ordenadas por las series que viste más recientemente",
+    minuteShort: "min",
+    episodesWatched: "episodios vistos",
+    upcoming: "Próximamente",
+    watchedNow: "Lo vi ahora",
+    chooseDate: "Elegir fecha",
+    dateSubtitle: "¿Cuándo viste este episodio?",
+    manage: "Gestionar",
+    manageTitle: "Elige las series en curso",
+    manageSubtitle: "Las series ocultas siguen en tu historial y tus estadísticas.",
+    showAll: "Mostrar todas",
+    visible: "Visible",
+    hidden: "Oculta",
+    done: "Listo",
+    emptyTitle: "Todavía no hay nada pendiente",
+    emptyText:
+      "Marca un episodio como visto y el siguiente aparecerá aquí.",
+    emptyHiddenTitle: "No has elegido ninguna serie en curso",
+    emptyHiddenText: "Elige qué series quieres ver en Siguiente.",
+    discover: "Descubrir series",
+    loadError: "No se pudieron actualizar algunas series.",
+    retry: "Reintentar",
+  },
+  pt: {
+    title: "A seguir",
+    subtitle: "Continue cada série a partir do episódio certo.",
+    recentOrder: "Ordenadas pelas séries que você assistiu mais recentemente",
+    minuteShort: "min",
+    episodesWatched: "episódios assistidos",
+    upcoming: "Em breve",
+    watchedNow: "Assisti agora",
+    chooseDate: "Escolher data",
+    dateSubtitle: "Quando você assistiu a este episódio?",
+    manage: "Gerenciar",
+    manageTitle: "Escolha as séries em andamento",
+    manageSubtitle: "As séries ocultas continuam no seu histórico e nas suas estatísticas.",
+    showAll: "Mostrar todas",
+    visible: "Visível",
+    hidden: "Oculta",
+    done: "Pronto",
+    emptyTitle: "Ainda não há nada esperando",
+    emptyText:
+      "Marque um episódio como assistido e o próximo aparecerá aqui.",
+    emptyHiddenTitle: "Você não escolheu nenhuma série em andamento",
+    emptyHiddenText: "Escolha quais séries você quer ver em A seguir.",
+    discover: "Descobrir séries",
+    loadError: "Não foi possível atualizar algumas séries.",
+    retry: "Tentar novamente",
+  },
+};
+
+// Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
+const copyFor = (language) => pickByLanguage(language, UP_NEXT_COPY);
 // NOT: kaydetme/hata bildirimleri artık hooks/useUpNextQueue'da (i18nText ile),
 // çünkü aynı toast'ları TV ana ekranındaki ray da gösteriyor.
 

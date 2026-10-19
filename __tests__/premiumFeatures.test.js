@@ -304,6 +304,18 @@ describe("metinler", () => {
     expect(formatFeatureValue("font_catalog", PREMIUM, "en")).toBe("56 fonts");
   });
 
+  test("Portekizce karşılaştırma hücreleri ve uyarılar", () => {
+    expect(formatFeatureValue("custom_lists", FREE, "pt")).toBe("1 lista");
+    expect(formatFeatureValue("custom_lists", MAX, "pt")).toBe("Ilimitado");
+    expect(formatFeatureValue("ai_messages", FREE, "pt")).toBe("3/dia · 30/mês");
+    expect(formatFeatureValue("identity_badge", FREE, "pt")).toBe("—");
+    const copy = buildLimitCopy("custom_lists", FREE, "pt");
+    expect(copy.canUpgrade).toBe(true);
+    expect(copy.message).toMatch(/Grátis/);
+    expect(copy.message).toMatch(/Premium Max/);
+    expect(copy.message).not.toMatch(/Gratis|Free/);
+  });
+
   test("İspanyolca karşılaştırma hücreleri ve uyarılar", () => {
     expect(formatFeatureValue("custom_lists", FREE, "es")).toBe("1 lista");
     expect(formatFeatureValue("custom_lists", MAX, "es")).toBe("Ilimitado");

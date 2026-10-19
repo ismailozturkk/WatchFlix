@@ -24,7 +24,7 @@ describe("themeStudioCopy", () => {
   });
 
   test("hiçbir değer boş değil", () => {
-    for (const lang of ["tr", "en", "es"]) {
+    for (const lang of ["tr", "en", "es", "pt"]) {
       const bos = Object.entries(STUDIO_COPY[lang]).filter(([, v]) => typeof v !== "string" || !v.trim());
       expect(bos).toEqual([]);
     }

@@ -114,7 +114,7 @@ describe("küçük yardımcılar", () => {
   });
 
   it("paylaşım mesajı kodu, oranı ve bağlantıyı taşır (üç dilde)", () => {
-    for (const language of ["tr", "en", "es"]) {
+    for (const language of ["tr", "en", "es", "pt"]) {
       const message = buildReferralShareMessage(getReferralCopy(language), {
         displayCode: "ABCD-EFGH",
         percent: 30,
@@ -143,7 +143,7 @@ describe("küçük yardımcılar", () => {
       "rate-limited",
       "no-credit",
     ];
-    for (const language of ["tr", "en", "es"]) {
+    for (const language of ["tr", "en", "es", "pt"]) {
       for (const reason of reasons) {
         expect(REFERRAL_COPY[language].errors[reason]).toBeTruthy();
       }

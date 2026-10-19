@@ -267,7 +267,92 @@ const es = {
   },
 };
 
-export const SECTION_VISIBILITY_COPY = Object.freeze({ tr, en, es });
+const pt = {
+  ui: {
+    title: "Seções da tela",
+    rowSub: "Escolha quais seções aparecem em filmes, séries, Hub e perfil",
+    badgeAll: "Todas ativas",
+    badgeHidden: "{n} ocultas",
+    intro:
+      "Escolha quais seções aparecem nas telas de Filmes, Séries, Hub e Perfil. As que você ocultar somem da tela; você pode reativá-las aqui quando quiser.",
+    visibleCount: "{shown} de {total} seções visíveis",
+    showAll: "Mostrar tudo",
+    hideAll: "Ocultar tudo",
+    linkedTag: "Configuração compartilhada",
+    conditionalNote:
+      "Algumas filas, como «Pelos seus favoritos» e «Favoritos dos seus serviços», só aparecem se houver dados ou uma configuração relacionada; deixá-las ativadas aqui não garante que sempre apareçam.",
+    reset: "Redefinir",
+    resetSub: "Mostrar todas as seções em todas as telas",
+    saveFailed: "Não foi possível salvar a configuração",
+    confirmTitle: "Ocultar a barra de amigos?",
+    confirmMessage:
+      "Buscar amigos, sua lista de amigos, as mensagens e os pedidos só abrem por esta barra. Se você a ocultar, não conseguirá acessá-los por aqui; você pode reativá-la nesta página quando quiser.",
+    confirmHide: "Ocultar",
+    confirmCancel: "Cancelar",
+    emptyTitle: "Não há seções para mostrar",
+    emptyText: "Você ocultou todas as seções desta tela. Pode reativar as que quiser em Configurações.",
+    emptyAction: "Editar seções",
+  },
+  screens: {
+    tv: { name: "Séries", hint: "Filas da tela de séries" },
+    movie: { name: "Filmes", hint: "Filas da tela de filmes" },
+    hub: { name: "Hub", hint: "Cards da aba Hub" },
+    profile: { name: "Perfil", hint: "Seções da aba Perfil" },
+  },
+  sections: {
+    tv: {
+      trends: ["Séries em alta", "O que está em alta, com categorias semanais e diárias"],
+      ongoing: ["Séries em andamento", "Séries que você já começou. É a mesma configuração de «Séries em andamento» em Configurações"],
+      best: ["Séries mais bem avaliadas", "As séries mais votadas e mais populares"],
+      followedPeople: ["Próximos de quem você segue", "Novos trabalhos dos atores e diretores que você segue; aparece ao seguir alguém"],
+      fromFavorites: ["Pelos seus favoritos", "Recomendações com base nos seus quatro favoritos; aparece ao adicionar algum"],
+      subscriptions: ["Favoritos dos seus serviços", "O que você pode assistir nos serviços que escolheu; aparece ao escolher serviços"],
+      topGenres: ["Seus gêneros favoritos", "Com base no que você mais assiste ou no que escolheu no início"],
+      recentFavorites: ["Favoritos recentes", "Séries recentes com boa nota do público"],
+      hiddenGems: ["Joias escondidas", "Opções pouco conhecidas e muito bem avaliadas"],
+      emmy: ["Séries vencedoras do Emmy", "Vencedoras do Emmy por ano"],
+      providers: ["Serviços", "Descubra séries por serviço"],
+      genres: ["Gêneros", "Descubra séries por gênero"],
+      onTheAir: ["No ar esta semana", "Séries com um episódio novo esta semana"],
+      airingToday: ["No ar hoje", "Séries com um episódio novo hoje"],
+    },
+    movie: {
+      trends: ["Filmes em alta", "O que está em alta, com categorias semanais e diárias"],
+      bests: ["Filmes mais bem avaliados", "Os filmes mais votados e mais populares"],
+      followedPeople: ["Próximos de quem você segue", "Novos trabalhos dos atores e diretores que você segue; aparece ao seguir alguém"],
+      fromFavorites: ["Pelos seus favoritos", "Recomendações com base nos seus quatro favoritos; aparece ao adicionar algum"],
+      subscriptions: ["Favoritos dos seus serviços", "O que você pode assistir nos serviços que escolheu; aparece ao escolher serviços"],
+      topGenres: ["Seus gêneros favoritos", "Com base no que você mais assiste ou no que escolheu no início"],
+      recentFavorites: ["Favoritos recentes", "Filmes recentes com boa nota do público"],
+      hiddenGems: ["Joias escondidas", "Opções pouco conhecidas e muito bem avaliadas"],
+      nowPlaying: ["Filmes em cartaz", "O que está em exibição agora nos cinemas"],
+      oscar: ["Filmes vencedores do Oscar", "Vencedores do Oscar por ano"],
+      collection: ["Sagas de filmes", "Sagas e coleções de filmes"],
+      providers: ["Serviços", "Descubra filmes por serviço"],
+      genres: ["Gêneros", "Descubra filmes por gênero"],
+      upcoming: ["Próximas estreias", "Filmes que chegam em breve aos cinemas"],
+    },
+    hub: {
+      feed: ["Social", "O card de publicações: abre o feed e publica rápido"],
+      cineswipe: ["O que vamos assistir?", "Decida com o CineSwipe, sozinho ou com um amigo"],
+      tournament: ["Torneio", "O torneio mensal de filmes e seus resultados"],
+      wrapped: ["O ano em números", "Seu resumo anual de visualização (Wrapped) e o arquivo"],
+      games: ["Jogos", "O jogo em destaque e suas estatísticas"],
+    },
+    profile: {
+      goal: ["Meta anual de visualização", "O botão do anel de meta no cabeçalho do perfil (ao lado de Editar e Compartilhar)"],
+      badges: ["Emblemas", "Sua pontuação de visualização, seu nível Perde e seus emblemas"],
+      friends: ["Amigos", "Buscar, amigos, mensagens e pedidos. Se você ocultar, não conseguirá acessá-los por aqui"],
+      stats: ["Estatísticas", "Quantos filmes e séries você assistiu e o tempo total"],
+      lists: ["Listas", "Favoritos, para assistir, assistidos e suas próprias listas"],
+      activity: ["Minhas atividades", "Suas notas, comentários, publicações e rascunhos"],
+      reminders: ["Lembretes", "Seus próximos lembretes de filmes e episódios"],
+      notes: ["Notas", "Suas notas de filmes e séries"],
+    },
+  },
+};
+
+export const SECTION_VISIBILITY_COPY = Object.freeze({ tr, en, es, pt });
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getSectionVisibilityCopy = (language) =>

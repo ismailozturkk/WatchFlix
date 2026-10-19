@@ -133,7 +133,7 @@ export const ANALYTICS_EVENTS = {
 export const USER_PROPERTIES = {
   PREMIUM_TIER: "premium_tier", // "free" | "pro" | "unlimited"
   DEVICE_TIER: "device_tier",   // utils/deviceTier.js sınıfı
-  APP_LANGUAGE: "app_language", // uygulama dil kodu: "tr" | "en" | "es" …
+  APP_LANGUAGE: "app_language", // uygulama dil kodu: "tr" | "en" | "es" | "pt" …
 };
 
 export function isValidEventName(name) {

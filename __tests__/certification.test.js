@@ -164,6 +164,7 @@ describe("CertificationBadge bileşeni", () => {
     ["tr", "Yaş sınırı: PG"],
     ["en", "Age rating: PG"],
     ["es", "Clasificación por edades: PG"],
+    ["pt", "Classificação indicativa: PG"],
   ])("%s: erişilebilir etiket kendi dilinde", (dil, beklenen) => {
     mockLang = dil;
     render({ mediaType: "movie", details: movie([entry("US", ["PG", 3])]), region: "US" });

@@ -114,7 +114,7 @@ const CardText = ({ style, ...rest }) => (
   <Text allowFontScaling={false} {...rest} style={style} />
 );
 
-const percentText = (value, language) => (language === "en" ? `${value}%` : `%${value}`);
+const percentText = (value, language) => (language === "tr" ? `%${value}` : `${value}%`);
 
 // ── Zemin ────────────────────────────────────────────────────────────────────
 

@@ -31,7 +31,7 @@ describe("aiCopy tr/en/es paritesi", () => {
   });
 
   test("hiçbir metin boş değil ve hepsi metin", () => {
-    ["tr", "en", "es"].forEach((lang) => {
+    ["tr", "en", "es", "pt"].forEach((lang) => {
       leaves(AI_COPY[lang]).forEach(([path, value]) => {
         expect(typeof value).toBe("string");
         expect(`${lang}:${path}:${value.trim().length > 0}`).toBe(`${lang}:${path}:true`);

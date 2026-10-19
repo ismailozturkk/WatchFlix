@@ -309,7 +309,107 @@ const es = {
   },
 };
 
-export const FEEDBACK_COPY = Object.freeze({ tr, en, es });
+const pt = {
+  group: {
+    label: "Suporte e feedback",
+    bugTitle: "Relatar um erro",
+    bugSub: "Envie o problema com os dados do dispositivo",
+    featureTitle: "Pedir um recurso",
+    featureSub: "Conte a ideia que você gostaria de ver",
+  },
+  common: {
+    deviceTitle: "Incluir dados do dispositivo",
+    deviceHint: "São usados apenas para reproduzir o problema.",
+    privacyNote: "O que você envia fica vinculado à sua conta e pode ser mantido como histórico de suporte mesmo que você a exclua.",
+    titleLabel: "Título curto",
+    counter: "{n}/{max}",
+    messageNeed: "Escreva pelo menos {n} caracteres",
+    submit: "Enviar",
+    submitting: "Enviando…",
+    submitNeed: "Preencha o título e a descrição",
+    sentAgain: "Enviar outro",
+    historyTitle: "Meus envios",
+    historyEmptyTitle: "Você ainda não enviou nada",
+    historyLoadFailed: "Não foi possível carregar a lista",
+    retry: "Tentar novamente",
+    reply: "Resposta da nossa equipe",
+    justNow: "Agora mesmo",
+    errOffline: "Sem conexão com a internet. Seu texto continua aqui; tente de novo quando voltar a ficar online.",
+    errDenied: "Seu plano pode não incluir isto. Confira o status da sua assinatura.",
+    errFailed: "Não foi possível enviar. Tente novamente em instantes.",
+    infoSlow: "A conexão está lenta; o envio está em andamento.",
+    planChip: "Somente para membros {plan}",
+  },
+  bug: {
+    title: "Relatar um erro",
+    heroTitle: "Algo deu errado?",
+    heroText: "Conte para nós e vamos corrigir. A versão do app e os dados do dispositivo são adicionados automaticamente.",
+    heroBenefit: "Com dados do dispositivo",
+    categoryLabel: "Onde está o problema?",
+    severityLabel: "Qual a gravidade?",
+    titlePlaceholder: "Ex.: A tela de Listas fecha sozinha",
+    messageLabel: "O que aconteceu?",
+    messagePlaceholder: "Em qual tela e o que você estava fazendo? Se contar passo a passo, encontramos mais rápido.",
+    sentTitle: "Seu relato chegou até nós",
+    sentText: "Obrigado! Você pode acompanhar o status na lista abaixo.",
+    historyEmptyText: "Se você encontrar um problema, envie aqui e acompanhe o status nesta lista.",
+    categories: {
+      crash: "Fecha / trava",
+      display: "Aparência",
+      data: "Dados errados",
+      notifications: "Notificações",
+      performance: "Lentidão",
+      other: "Outro",
+    },
+    severities: {
+      minor: "Leve",
+      annoying: "Incômodo",
+      blocking: "Bloqueante",
+    },
+    severityHints: {
+      minor: "Quase não atrapalha",
+      annoying: "Atrapalha no uso",
+      blocking: "Não consigo continuar",
+    },
+    statuses: {
+      open: "Recebido",
+      reviewing: "Em análise",
+      planned: "Na fila",
+      done: "Corrigido",
+      declined: "Sem solução",
+    },
+  },
+  feature: {
+    title: "Pedir um recurso",
+    heroTitle: "Tem uma ideia?",
+    heroText: "Descreva o recurso que você gostaria de ver no Seelogd. Aqui mesmo você acompanha o status do que envia.",
+    heroBenefit: "Com acompanhamento",
+    categoryLabel: "Em qual área?",
+    titlePlaceholder: "Ex.: Reordenar listas arrastando",
+    messageLabel: "Como deveria funcionar?",
+    messagePlaceholder: "O que você quer e como isso ajudaria? Um exemplo de uso ajuda muito.",
+    sentTitle: "Sua ideia chegou até nós",
+    sentText: "Obrigado! Você pode acompanhar o status na lista abaixo.",
+    historyEmptyText: "Se você tiver uma ideia, envie aqui e veja o que acontece com ela nesta lista.",
+    categories: {
+      discover: "Descobrir",
+      lists: "Listas",
+      social: "Social",
+      ai: "IA",
+      design: "Design",
+      other: "Outro",
+    },
+    statuses: {
+      open: "Recebido",
+      reviewing: "Em análise",
+      planned: "Planejado",
+      done: "Adicionado",
+      declined: "Por enquanto não",
+    },
+  },
+};
+
+export const FEEDBACK_COPY = Object.freeze({ tr, en, es, pt });
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getFeedbackCopy = (language) =>

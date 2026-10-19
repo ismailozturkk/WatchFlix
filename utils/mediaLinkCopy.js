@@ -27,6 +27,13 @@ export const MEDIA_LINK_COPY = {
     notFound: "No se encontró el título de este enlace",
     clipboardFailed: "No se pudo leer el portapapeles",
   },
+  pt: {
+    pasteLabel: "Abrir o link de filme ou série da área de transferência",
+    opening: "Abrindo link…",
+    emptyClipboard: "Não há nenhum link do IMDb ou do TMDB na área de transferência",
+    notFound: "Não foi possível encontrar o título deste link",
+    clipboardFailed: "Não foi possível ler a área de transferência",
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

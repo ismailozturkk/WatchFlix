@@ -50,6 +50,7 @@ export default function OpenSourceLicensesScreen() {
   const insets = useSafeAreaInsets();
   const isTr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
+  const pt = normalizeAppLanguage(language) === "pt";
 
   // 850 KB'lık lisans verisi uygulama açılışında ayrıştırılmasın diye geçiş
   // animasyonu bittikten sonra tembel yüklenir.
@@ -111,14 +112,14 @@ export default function OpenSourceLicensesScreen() {
             <AppIcon family="Ionicons" name="heart-outline" size={16} color={C.accent} />
           </View>
           <Text allowFontScaling={false} style={[s.introTitle, { color: C.text }]}>
-            {isTr ? "Bu uygulama açık kaynakla çalışıyor" : es ? "Construido sobre código abierto" : "Built on open source"}
+            {isTr ? "Bu uygulama açık kaynakla çalışıyor" : es ? "Construido sobre código abierto" : pt ? "Feito sobre código aberto" : "Built on open source"}
           </Text>
         </View>
         <Text allowFontScaling={false} style={[s.introBody, { color: C.muted }]}>
-          {isTr ? "Seelogd, aşağıdaki açık kaynak kütüphaneleri kullanır. Her birinin lisans metni ve telif bildirimi lisans koşulları gereği burada yer alır. Bir paketin tam metnini görmek için üzerine dokunun." : es ? "Seelogd utiliza las bibliotecas de código abierto que figuran abajo. El texto de cada licencia y su aviso de copyright se reproducen aquí tal como exigen sus términos. Toca un paquete para leer su licencia completa." : "Seelogd uses the open source libraries listed below. Each license text and copyright notice is reproduced here as required by their terms. Tap a package to read its full license."}
+          {isTr ? "Seelogd, aşağıdaki açık kaynak kütüphaneleri kullanır. Her birinin lisans metni ve telif bildirimi lisans koşulları gereği burada yer alır. Bir paketin tam metnini görmek için üzerine dokunun." : es ? "Seelogd utiliza las bibliotecas de código abierto que figuran abajo. El texto de cada licencia y su aviso de copyright se reproducen aquí tal como exigen sus términos. Toca un paquete para leer su licencia completa." : pt ? "O Seelogd usa as bibliotecas de código aberto listadas abaixo. O texto de cada licença e seu aviso de direitos autorais são reproduzidos aqui conforme exigem seus termos. Toque em um pacote para ler a licença completa." : "Seelogd uses the open source libraries listed below. Each license text and copyright notice is reproduced here as required by their terms. Tap a package to read its full license."}
         </Text>
         <Text allowFontScaling={false} style={[s.introMeta, { color: C.muted }]}>
-          {isTr ? `${db.packageCount} paket · ${db.generatedAt} tarihinde oluşturuldu` : es ? `${db.packageCount} paquetes · generado el ${db.generatedAt}` : `${db.packageCount} packages · generated ${db.generatedAt}`}
+          {isTr ? `${db.packageCount} paket · ${db.generatedAt} tarihinde oluşturuldu` : es ? `${db.packageCount} paquetes · generado el ${db.generatedAt}` : pt ? `${db.packageCount} pacotes · gerado em ${db.generatedAt}` : `${db.packageCount} packages · generated ${db.generatedAt}`}
         </Text>
       </View>
 
@@ -131,7 +132,7 @@ export default function OpenSourceLicensesScreen() {
             setQuery(v);
             scrollTop();
           }}
-          placeholder={isTr ? "Paket ara" : es ? "Buscar paquetes" : "Search packages"}
+          placeholder={isTr ? "Paket ara" : es ? "Buscar paquetes" : pt ? "Buscar pacotes" : "Search packages"}
           placeholderTextColor={C.muted}
           allowFontScaling={false}
           autoCapitalize="none"
@@ -159,7 +160,7 @@ export default function OpenSourceLicensesScreen() {
       >
         <Chip
           C={C}
-          label={isTr ? "Tümü" : es ? "Todos" : "All"}
+          label={isTr ? "Tümü" : es ? "Todos" : pt ? "Todos" : "All"}
           count={db.packageCount}
           active={!licenseFilter}
           onPress={() => {
@@ -193,7 +194,7 @@ export default function OpenSourceLicensesScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={
           <Text allowFontScaling={false} style={[s.empty, { color: C.muted }]}>
-            {isTr ? "Eşleşen paket yok." : es ? "No hay paquetes que coincidan." : "No matching packages."}
+            {isTr ? "Eşleşen paket yok." : es ? "No hay paquetes que coincidan." : pt ? "Nenhum pacote correspondente." : "No matching packages."}
           </Text>
         }
         contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
@@ -211,6 +212,7 @@ export default function OpenSourceLicensesScreen() {
         C={C}
         isTr={isTr}
         es={es}
+        pt={pt}
         db={db}
         item={selected}
         onClose={() => setSelected(null)}
@@ -276,7 +278,7 @@ const PackageRow = React.memo(function PackageRow({ C, item, onPress }) {
   );
 });
 
-function LicenseDetailModal({ C, isTr, es, db, item, onClose }) {
+function LicenseDetailModal({ C, isTr, es, pt, db, item, onClose }) {
   const insets = useSafeAreaInsets();
   if (!item) return null;
 
@@ -351,7 +353,7 @@ function LicenseDetailModal({ C, isTr, es, db, item, onClose }) {
                   {noticeText}
                 </Text>
                 <Text allowFontScaling={false} style={[s.blockLabel, { color: C.muted }]}>
-                  {isTr ? "LİSANS" : es ? "LICENCIA" : "LICENSE"}
+                  {isTr ? "LİSANS" : es ? "LICENCIA" : pt ? "LICENÇA" : "LICENSE"}
                 </Text>
               </>
             ) : null}
@@ -361,7 +363,7 @@ function LicenseDetailModal({ C, isTr, es, db, item, onClose }) {
               </Text>
             ) : (
               <Text allowFontScaling={false} style={[s.licenseText, { color: C.muted }]}>
-                {isTr ? `Bu paket lisans metnini kendi dağıtımına eklememiş. Beyan edilen lisans: ${item.license}. Tam metin için paketin kaynak deposuna bakın.` : es ? `Este paquete no incluye archivo de licencia. Licencia declarada: ${item.license}. Consulta el repositorio del paquete para ver el texto completo.` : `This package ships no license file. Declared license: ${item.license}. See the package repository for the full text.`}
+                {isTr ? `Bu paket lisans metnini kendi dağıtımına eklememiş. Beyan edilen lisans: ${item.license}. Tam metin için paketin kaynak deposuna bakın.` : es ? `Este paquete no incluye archivo de licencia. Licencia declarada: ${item.license}. Consulta el repositorio del paquete para ver el texto completo.` : pt ? `Este pacote não inclui arquivo de licença. Licença declarada: ${item.license}. Consulte o repositório do pacote para ver o texto completo.` : `This package ships no license file. Declared license: ${item.license}. See the package repository for the full text.`}
               </Text>
             )}
           </ScrollView>

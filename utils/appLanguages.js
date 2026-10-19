@@ -68,6 +68,22 @@ export const APP_LANGUAGES = Object.freeze([
     legalLang: "en",
     aiPromptName: "Spanish (es)",
   },
+  {
+    // Brezilya Portekizcesi (você). Dünyadaki Portekizce konuşurların büyük çoğunluğu
+    // Brezilya'da; TMDB için tek bölge gerekiyor: BR. Portekiz (pt-PT) için ayrı
+    // paket/bölge istenirse burası bölünür (bkz. rehber, bölüm 11).
+    code: "pt",
+    name: "Portuguese",
+    nativeName: "Português",
+    flag: "br",
+    intlLocale: "pt-BR",
+    tmdbLanguage: "pt-BR",
+    tmdbRegion: "BR",
+    tmdbImageLanguages: ["pt", "en"],
+    // website/legal.js henüz yalnız tr/en biliyor → İngilizce sayfa.
+    legalLang: "en",
+    aiPromptName: "Portuguese (pt-BR)",
+  },
 ]);
 
 export const SUPPORTED_LANGUAGE_CODES = Object.freeze(APP_LANGUAGES.map((l) => l.code));

@@ -78,6 +78,7 @@ test("weekdayLabel dile göre kısa gün adı (tarih-yalnız, kayma yok)", () =>
   assert.match(weekdayLabel("2026-10-18", "tr"), /^Paz/);
   assert.match(weekdayLabel("2026-10-18", "en"), /^Sun/);
   assert.match(weekdayLabel("2026-10-18", "es"), /^dom/i);
+  assert.match(weekdayLabel("2026-10-18", "pt"), /^dom/i);
   assert.match(weekdayLabel("2026-10-19", "tr"), /^Pzt/);
   assert.match(weekdayLabel("2026-10-18", "xx"), /^Sun/); // bilinmeyen dil İngilizce
 });
@@ -89,6 +90,7 @@ test("buildDigestMessage: ilk 3 yapım + kalan sayısı; boşsa null", () => {
   assert.match(msg.body, /^Pzt: A · Sal: B · Çar: C \+2$/);
   assert.equal(buildDigestMessage("en", items.slice(0, 2)).body, "Mon: A · Tue: B");
   assert.equal(buildDigestMessage("es", items.slice(0, 1)).title, "Esta semana llega (1)");
+  assert.equal(buildDigestMessage("pt", items.slice(0, 1)).title, "Estreias da semana (1)");
   assert.equal(buildDigestMessage("tr", []), null);
   assert.equal(buildDigestMessage("tr", undefined), null);
 });

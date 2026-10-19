@@ -216,14 +216,14 @@ export function buildStoryStats({
  */
 export function formatStoryNumber(value, language = "tr", { compact = false } = {}) {
   const n = Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : 0;
-  const lang = copyLanguage(language, ["tr", "en", "es"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt"]);
   const short = (divisor, unit) => {
     const text = (n / divisor).toFixed(1).replace(/\.0$/, "");
     // Ondalık virgül: Türkçe ve İspanyolca; ayraç İngilizcede nokta.
     return `${lang === "en" ? text : text.replace(".", ",")}${unit}`;
   };
   if (compact && n >= 1_000_000) return short(1_000_000, "M");
-  if (compact && n >= 10_000) return short(1_000, lang === "en" ? "K" : lang === "es" ? " mil" : "B");
+  if (compact && n >= 10_000) return short(1_000, lang === "en" ? "K" : lang === "es" ? " mil" : lang === "pt" ? " mil" : "B");
   try {
     return n.toLocaleString(intlLocaleOf(language));
   } catch {
@@ -244,26 +244,26 @@ export function cleanStoryUsername(raw) {
 // saklar (utils/genreCanon.js başlığı); aynı türün "Bilim Kurgu"/"Science
 // Fiction" yazımları tek kimliğe iner ve kart adı BURADAN, kartın diliyle çıkar.
 export const STORY_GENRE_LABELS = Object.freeze({
-  action: { tr: "Aksiyon", en: "Action", es: "Acción" },
-  adventure: { tr: "Macera", en: "Adventure", es: "Aventura" },
-  animation: { tr: "Animasyon", en: "Animation", es: "Animación" },
-  comedy: { tr: "Komedi", en: "Comedy", es: "Comedia" },
-  crime: { tr: "Suç", en: "Crime", es: "Crimen" },
-  documentary: { tr: "Belgesel", en: "Documentary", es: "Documental" },
-  drama: { tr: "Dram", en: "Drama", es: "Drama" },
-  family: { tr: "Aile", en: "Family", es: "Familia" },
-  fantasy: { tr: "Fantastik", en: "Fantasy", es: "Fantasía" },
-  history: { tr: "Tarih", en: "History", es: "Historia" },
-  horror: { tr: "Korku", en: "Horror", es: "Terror" },
-  music: { tr: "Müzik", en: "Music", es: "Música" },
-  mystery: { tr: "Gizem", en: "Mystery", es: "Misterio" },
-  romance: { tr: "Romantik", en: "Romance", es: "Romance" },
-  scifi: { tr: "Bilim Kurgu", en: "Sci-Fi", es: "Ciencia ficción" },
-  thriller: { tr: "Gerilim", en: "Thriller", es: "Suspense" },
-  war: { tr: "Savaş", en: "War", es: "Bélica" },
-  western: { tr: "Vahşi Batı", en: "Western", es: "Western" },
-  reality: { tr: "Realite", en: "Reality", es: "Reality" },
-  tvmovie: { tr: "TV Filmi", en: "TV Movie", es: "Película de TV" },
+  action: { tr: "Aksiyon", en: "Action", es: "Acción", pt: "Ação" },
+  adventure: { tr: "Macera", en: "Adventure", es: "Aventura", pt: "Aventura" },
+  animation: { tr: "Animasyon", en: "Animation", es: "Animación", pt: "Animação" },
+  comedy: { tr: "Komedi", en: "Comedy", es: "Comedia", pt: "Comédia" },
+  crime: { tr: "Suç", en: "Crime", es: "Crimen", pt: "Crime" },
+  documentary: { tr: "Belgesel", en: "Documentary", es: "Documental", pt: "Documentário" },
+  drama: { tr: "Dram", en: "Drama", es: "Drama", pt: "Drama" },
+  family: { tr: "Aile", en: "Family", es: "Familia", pt: "Família" },
+  fantasy: { tr: "Fantastik", en: "Fantasy", es: "Fantasía", pt: "Fantasia" },
+  history: { tr: "Tarih", en: "History", es: "Historia", pt: "História" },
+  horror: { tr: "Korku", en: "Horror", es: "Terror", pt: "Terror" },
+  music: { tr: "Müzik", en: "Music", es: "Música", pt: "Música" },
+  mystery: { tr: "Gizem", en: "Mystery", es: "Misterio", pt: "Mistério" },
+  romance: { tr: "Romantik", en: "Romance", es: "Romance", pt: "Romance" },
+  scifi: { tr: "Bilim Kurgu", en: "Sci-Fi", es: "Ciencia ficción", pt: "Ficção científica" },
+  thriller: { tr: "Gerilim", en: "Thriller", es: "Suspense", pt: "Thriller" },
+  war: { tr: "Savaş", en: "War", es: "Bélica", pt: "Guerra" },
+  western: { tr: "Vahşi Batı", en: "Western", es: "Western", pt: "Faroeste" },
+  reality: { tr: "Realite", en: "Reality", es: "Reality", pt: "Reality" },
+  tvmovie: { tr: "TV Filmi", en: "TV Movie", es: "Película de TV", pt: "Filme para TV" },
 });
 
 const GENRE_ORDER = Object.keys(STORY_GENRE_LABELS);
@@ -280,7 +280,7 @@ const GENRE_ORDER = Object.keys(STORY_GENRE_LABELS);
  * @returns {{ titles: number, top: Array<{id, label, count, pct}> }}
  */
 export function buildStoryGenres(items, language = "tr", limit = 3) {
-  const lang = copyLanguage(language, ["tr", "en", "es"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt"]);
   const counts = new Map();
   const seen = new Set();
   let titles = 0;
@@ -354,7 +354,7 @@ export function buildStoryPerde(info, language = "tr") {
   return {
     number,
     makara: Math.max(0, Math.floor(Number(info.makara)) || 0),
-    name: (language === "tr" ? info.ad : language === "es" ? info.adEs : info.adEn) || "",
+    name: (language === "tr" ? info.ad : language === "es" ? info.adEs : language === "pt" ? info.adPt : info.adEn) || "",
     progress: Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0,
     maxed: Boolean(info.zirve),
   };
@@ -375,7 +375,7 @@ export function formatMemberSince(raw, language = "tr") {
   const locale = intlLocaleOf(language);
   try {
     return date
-      .toLocaleDateString(locale, { month: copyLanguage(language, ["tr", "en", "es"]) === "en" ? "short" : "long", year: "numeric" })
+      .toLocaleDateString(locale, { month: copyLanguage(language, ["tr", "en", "es", "pt"]) === "en" ? "short" : "long", year: "numeric" })
       .toLocaleUpperCase(locale);
   } catch {
     return String(date.getFullYear());

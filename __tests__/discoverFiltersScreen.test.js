@@ -366,7 +366,7 @@ describe("boş ve hata durumları", () => {
     expect(maybe("discover-error")).toBe(false);
   });
 
-  test.each(["tr", "en", "es"])("%s: durum kartı kendi dilinde", (dil) => {
+  test.each(["tr", "en", "es", "pt"])("%s: durum kartı kendi dilinde", (dil) => {
     mockLang = dil;
     mockFeed = makeFeed({ items: [] });
     render({ mediaType: "movie" });
