@@ -78,6 +78,9 @@ const BUILTIN_THEMES = [
   { id: "sky", labelKey: "skyTheme", fallback: "Açık Mavi" },
   { id: "blue", labelKey: "blueTheme", fallback: "Lacivert" },
   { id: "green", labelKey: "greenTheme", fallback: "Yeşil" },
+  { id: "blueDeep", labelKey: "blueDeepTheme", fallback: "Koyu Mavi" },
+  { id: "greenMid", labelKey: "greenMidTheme", fallback: "Orta Yeşil" },
+  { id: "greenDeep", labelKey: "greenDeepTheme", fallback: "Koyu Yeşil" },
   { id: "purple", labelKey: "purpleTheme", fallback: "Gece Moru" },
   { id: "amber", labelKey: "amberTheme", fallback: "Kızıl Sinema" },
 ];

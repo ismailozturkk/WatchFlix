@@ -233,7 +233,7 @@ Ayarlar kartı ve limit uyarıları bu kayıttan üretilir — kaydı olmayan bi
 | CineSwipe oda kurma | — | 10/gün | Sınırsız | `CineSwipeWidget`, `CineSwipeScreen` |
 | CineSwipe tek başına | — | 300/gün | Sınırsız | `CineSwipeWidget`, `CineSwipeScreen` |
 | Turnuvada oy kullanma | Yalnız izleyici | ✓ | ✓ | `TournamentScreen`, `MatchCard` |
-| Özel tema oluşturma | 8 hazır tema | ✓ | ✓ | `SettingsTheme`, `ThemeContext` |
+| Özel tema oluşturma | 9 hazır tema (3 aile × açık·orta·koyu) | ✓ | ✓ | `SettingsTheme`, `ThemeContext` |
 | Yazı tipi kataloğu | 7 font | 56 font | 56 font | `FontSettingsSection`, `typographySettings` |
 | Uygulama simgesi | Varsayılan | ✓ | ✓ | `AppIconSection` |
 | Kar animasyonu | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen`, `DecorScopesScreen` |

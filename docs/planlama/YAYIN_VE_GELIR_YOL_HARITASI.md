@@ -214,7 +214,7 @@ ve kapı yerleri: `docs/kurulum/REVENUECAT_KURULUM.md` §6.1):
 | Liste / ortak liste | 5 / 2 | 25 / 10 | Sınırsız |
 | Arkadaş / sohbet grubu kurma | 30 / 2 | 150 / 10 | Sınırsız |
 | Oyun / CineSwipe oda / CineSwipe kart (günlük) | 5 / 2 / 60 | 20 / 10 / 300 | Sınırsız |
-| Özel tema oluşturma, yazı tipi kataloğu | 8 hazır tema, 7 font | ✓, 56 font | ✓, 56 font |
+| Özel tema oluşturma, yazı tipi kataloğu | 9 hazır tema, 7 font | ✓, 56 font | ✓, 56 font |
 | Platform bildirimi, Wrapped arşivi | 10 başlık, bu yıl + geçen yıl | 100 başlık, tüm yıllar | 100 başlık, tüm yıllar |
 
 Pet'ler ücretsiz kalır: telifli karakterleri (Goku, Naruto, Grogu…) ücrete

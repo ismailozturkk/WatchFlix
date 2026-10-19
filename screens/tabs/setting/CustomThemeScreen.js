@@ -1,16 +1,20 @@
-// Özel tema stüdyosu.
+// Özel tema stüdyosu — ÜÇ TONLU temalar.
 //
-// Tek ekranda üç sekme; üstte HER ZAMAN canlı önizleme:
-//   • Kur       — zemin + vurgu (iki büyük kutu, hazır renkler, zeminden hesaplanan
-//                 uyumlu vurgu önerileri, kontrast/yüzey stili). Zemin değişince
-//                 tüm palet o zeminden yeniden türetilir.
-//   • Keşfet    — ruh haline göre ALTI rastgele aday; zemin/vurgu kilitlenebilir;
-//                 beğenilen adaya dokunulur (tek adım geri alınabilir).
-//   • İnce ayar — 11 token'ı tek tek ayarla; metin kademelerinin zemine kontrastı
-//                 satır başında görünür.
+// Bir özel tema artık tek renk ailesinin üç tonudur: açık · orta · koyu. Hepsi
+// aynı "ana renkten" ve aynı vurgudan türetilir; her ton ayrıca tek başına
+// ayarlanabilir. Ayar ekranında temanın altında üç ton düğmesi çıkar.
+//
+// Tek ekranda dört sekme; üstte HER ZAMAN canlı önizleme (+ ton anahtarı):
+//   • Kur       — ana renk + vurgu, üç tonun zemini ayrı ayrı, hazır renkler,
+//                 uyumlu vurgu önerileri, kontrast/yüzey stili.
+//   • Keşfet    — ruh haline göre ALTI rastgele ÜÇ TONLU aday; ana renk/vurgu
+//                 kilitlenebilir; beğenilen adaya dokunulur (geri alınabilir).
+//   • Hazır     — Varsayılan/Mavi/Yeşil + Gece Moru, Kızıl Sinema ve yeni setler;
+//                 üç tonuyla yüklenir, sonra istenen ayarlanır.
+//   • İnce ayar — önizlenen tonun 11 token'ını tek tek ayarla.
 // Her değişiklik bir geçmiş adımıdır (geri al / yinele). Okunabilirlik özeti
-// önizlemenin altında; sorun varsa tek dokunuşla düzeltilir. Kaydedilmemiş
-// değişiklikle çıkarken onay istenir.
+// önizlemenin altında (önizlenen ton için); sorun varsa tek dokunuşla düzeltilir.
+// Kaydedilmemiş değişiklikle çıkarken onay istenir.
 import { intlLocaleOf } from "../../../utils/appLanguages";
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
@@ -33,6 +37,7 @@ import { appAlert } from "@components/AppAlert";
 import ColorPickerSheet from "@components/theme/ColorPickerSheet";
 import ThemePreviewCard from "@components/theme/ThemePreviewCard";
 import ThemeShuffleDeck from "@components/theme/ThemeShuffleDeck";
+import { PresetGrid, ToneTile } from "@components/theme/ThemeToneKit";
 import {
   ColorTile,
   GhostButton,
@@ -52,7 +57,9 @@ import {
   harmonyLabel,
   hueLabel,
   moodLabel,
-  suggestedThemeName,
+  presetLabel,
+  suggestedBundleName,
+  toneLabel,
 } from "@components/theme/themeStudioCopy";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
@@ -61,18 +68,26 @@ import { i18nText } from "@utils/i18nText";
 import { isLightSurface, shiftLightness, toHex } from "@utils/colorUtils";
 import {
   ACCENT_PRESETS,
-  BACKGROUND_PRESETS,
+  BASE_PRESETS,
   CONTRAST_LEVELS,
   SURFACE_MODES,
+  TONES,
   analyzeContrast,
   describeTheme,
-  fitAccent,
   fixReadability,
   generateCandidates,
-  generateTokensFromSeeds,
+  generateToneFromBackground,
+  generateToneSet,
   suggestAccents,
+  toneAccent,
   uniqueName,
 } from "@utils/themeStudio";
+import {
+  THEME_PRESETS,
+  entryFromBundle,
+  getPresetBundle,
+  initialBundle,
+} from "@utils/themePresets";
 import { canRedo, canUndo, createHistory, historyReducer } from "@utils/draftHistory";
 import ScreenDecor from "@components/ScreenDecor";
 import { usePremiumGate } from "@hooks/usePremiumGate";
@@ -81,23 +96,11 @@ import {
   CUSTOM_THEME_GROUPS,
   CUSTOM_THEME_TOKENS,
   buildCustomTheme,
-  getThemeColors,
+  customSelectionKey,
   isRelativeToken,
+  parseCustomSelection,
   resolveThemeTokens,
-  THEME_NAMES,
-  themeToTokens,
 } from "../../../theme/colors";
-
-const BASE_THEMES = [
-  { key: "gray", labelKey: "grayTheme", fallback: "Gri" },
-  { key: "dark", labelKey: "darkTheme", fallback: "Karanlık" },
-  { key: "light", labelKey: "lightTheme", fallback: "Açık" },
-  { key: "sky", labelKey: "skyTheme", fallback: "Açık Mavi" },
-  { key: "blue", labelKey: "blueTheme", fallback: "Lacivert" },
-  { key: "green", labelKey: "greenTheme", fallback: "Yeşil" },
-  { key: "purple", labelKey: "purpleTheme", fallback: "Gece Moru" },
-  { key: "amber", labelKey: "amberTheme", fallback: "Kızıl Sinema" },
-];
 
 // ColorPickerSheet, `sources` kimliği değişince durumunu sıfırlar; her render'da
 // yeni `[]` vermek sürükleme sırasında seçiciyi sıfırlardı.
@@ -136,15 +139,19 @@ const haptic = (fn) => {
 const tick = () => haptic(() => Haptics.selectionAsync());
 const bump = () => haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
 
+const fillTone = (text, tone) => String(text).replace("{tone}", tone);
+
 export default function CustomThemeScreen({ navigation, route }) {
   const { theme, selectedTheme, customThemes = [], changeTheme, saveCustomTheme, deleteCustomTheme } = useTheme();
   const { language } = useLanguage();
   const copy = useMemo(() => getStudioCopy(language), [language]);
   const locale = intlLocaleOf(language);
   const reduceMotion = useReduceMotion();
-  // Kısa ekranda (iPhone SE gibi) sabit önizleme mini kipe geçer; kaydırılan alana yer kalır.
+  // Kısa ekranda (iPhone SE, ~700-760 dp Android'ler) sabit önizleme mini kipe
+  // geçer; ton anahtarı satırı eklendiği için eşik 700'den 760'a çıktı: kaydırılan
+  // alana yer kalsın.
   const { height: windowHeight } = useWindowDimensions();
-  const miniPreview = windowHeight < 700;
+  const miniPreview = windowHeight < 760;
 
   const editingId = route?.params?.themeId || null;
   const existing = editingId ? customThemes.find((tm) => tm.id === editingId) : null;
@@ -152,34 +159,51 @@ export default function CustomThemeScreen({ navigation, route }) {
   // Açılış anındaki değerler: "başlangıca dön" ve kirli-durum karşılaştırması için.
   const initialRef = useRef(null);
   if (initialRef.current === null) {
+    const start = initialBundle({ existing, selectedTheme, customThemes });
     initialRef.current = {
-      tokens:
-        existing?.tokens || themeToTokens(THEME_NAMES.includes(selectedTheme) ? selectedTheme : "dark"),
+      bundle: start.bundle,
+      json: JSON.stringify(start.bundle),
+      tone: start.tone,
       name: existing?.name || "",
     };
   }
 
-  const [history, dispatch] = useReducer(historyReducer, initialRef.current.tokens, createHistory);
-  const draft = history.present;
+  const [history, dispatch] = useReducer(historyReducer, initialRef.current.bundle, createHistory);
+  const bundle = history.present;
   const commit = useCallback((next) => dispatch({ type: "commit", value: next }), []);
+
+  // Önizlenen / düzenlenen ton.
+  const [tone, setTone] = useState(initialRef.current.tone);
+  const draft = bundle.tones[tone];
 
   const [name, setName] = useState(initialRef.current.name);
   // Yeni temada Keşfet (hazır adaylar), mevcut temada İnce ayar açılır.
   const [tab, setTab] = useState(editingId ? "fine" : "discover");
   const [scene, setScene] = useState("home");
   const [style, setStyle] = useState({ contrast: "balanced", surfaces: "tinted" });
+  // Stil seçilmediyse Keşfet kontrast/yüzey kipini kendisi çeşitlendirir.
+  const [styleTouched, setStyleTouched] = useState(false);
   const [moodId, setMoodId] = useState(null);
   const [locks, setLocks] = useState({ bg: false, accent: false });
   const [readabilityOpen, setReadabilityOpen] = useState(false);
-  const [picker, setPicker] = useState(null); // { kind: "bg" | "accent" | "token", token? }
+  const [picker, setPicker] = useState(null); // { kind: "base" | "accent" | "toneBg" | "token", tone?, token? }
   const [origin, setOrigin] = useState(null); // en son uygulanan adayın ruh hali
+  const [presetOrigin, setPresetOrigin] = useState(null); // en son yüklenen hazır tema
   const [shuffleKey, setShuffleKey] = useState(0);
   const [candidates, setCandidates] = useState(() => generateCandidates(CANDIDATE_COUNT));
 
-  const resolved = useMemo(() => resolveThemeTokens(draft), [draft]);
+  const resolvedTones = useMemo(
+    () => ({
+      light: resolveThemeTokens(bundle.tones.light),
+      mid: resolveThemeTokens(bundle.tones.mid),
+      dark: resolveThemeTokens(bundle.tones.dark),
+    }),
+    [bundle.tones],
+  );
+  const resolved = resolvedTones[tone];
   const previewTheme = useMemo(() => buildCustomTheme(draft), [draft]);
   const analysis = useMemo(() => analyzeContrast(resolved), [resolved]);
-  const draftJson = useMemo(() => JSON.stringify(draft), [draft]);
+  const bundleJson = useMemo(() => JSON.stringify(bundle), [bundle]);
 
   /* ── Önizleme "nabzı": toplu bir değişiklikte hafifçe yaylanır ── */
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -200,16 +224,16 @@ export default function CustomThemeScreen({ navigation, route }) {
   }, [tab, tabFade, reduceMotion]);
 
   /* ── İsim ── */
-  const described = useMemo(() => describeTheme(resolved), [resolved]);
+  const described = useMemo(() => describeTheme(resolvedTones.mid), [resolvedTones.mid]);
   const suggestion = useMemo(() => {
-    const mood = origin && origin.json === draftJson ? origin.moodId : null;
-    const base = suggestedThemeName(copy, { moodId: mood, ...described });
+    const mood = origin && origin.json === bundleJson ? origin.moodId : null;
+    const base = suggestedBundleName(copy, { moodId: mood, family: described.family });
     const others = customThemes.filter((c) => c.id !== editingId).map((c) => c.name);
     return uniqueName(base, others);
-  }, [origin, draftJson, copy, described, customThemes, editingId]);
+  }, [origin, bundleJson, copy, described, customThemes, editingId]);
 
   /* ── Kaydedilmemiş değişiklikle çıkış koruması ── */
-  const dirty = draftJson !== JSON.stringify(initialRef.current.tokens) || name.trim() !== initialRef.current.name.trim();
+  const dirty = bundleJson !== initialRef.current.json || name.trim() !== initialRef.current.name.trim();
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
   const leavingRef = useRef(false);
@@ -247,35 +271,66 @@ export default function CustomThemeScreen({ navigation, route }) {
   };
   const resetToStart = () => {
     bump();
-    commit(initialRef.current.tokens);
+    commit(initialRef.current.bundle);
     setOrigin(null);
     pulse();
   };
 
-  /* ── Renk uygulayıcılar ── */
-  const accentPatch = useCallback(
-    (hex) => ({ accent: hex, bold: shiftLightness(hex, isLightSurface(resolved.primary) ? -9 : -10) }),
-    [resolved.primary],
-  );
+  /* ── Düzenleyiciler ── */
+  const styleOpts = useMemo(() => ({ contrast: style.contrast, surfaces: style.surfaces }), [style]);
 
+  // Yalnız önizlenen tonun token'larını değiştirir.
+  const commitTone = (next) => commit({ ...bundle, tones: { ...bundle.tones, [tone]: next } });
+
+  const changeTone = (next) => {
+    if (next === tone) return;
+    tick();
+    setTone(next);
+  };
+
+  // Vurgu: üç tona birden. Önizlenen tonda seçilen renk AYNEN (yetmiyorsa
+  // okunabilirlik uyarısı verir, "Düzelt" ile oturtulur); diğer tonlar kendi
+  // zeminine oturtulur.
   const applyAccent = (hex) => {
     tick();
-    commit({ ...draft, ...accentPatch(toHex(hex)) });
+    const accent = toHex(hex);
+    const tones = {};
+    for (const t of TONES) {
+      const primary = resolvedTones[t].primary;
+      const fitted = t === tone ? accent : toneAccent(accent, t, primary);
+      tones[t] = {
+        ...bundle.tones[t],
+        accent: fitted,
+        bold: shiftLightness(fitted, isLightSurface(primary) ? -9 : -10),
+      };
+    }
+    commit({ ...bundle, accent, tones });
     setOrigin(null);
   };
 
-  const applyBackground = (hex, { announce = true } = {}) => {
+  // Ana renk: üç ton da bu tondan/doygunluktan yeniden kurulur.
+  const applyBase = (hex, { announce = true } = {}) => {
     tick();
-    const bg = toHex(hex);
-    commit(generateTokensFromSeeds(bg, fitAccent(resolved.accent, bg), style));
+    const base = toHex(hex);
+    commit({ base, accent: bundle.accent, tones: generateToneSet(base, bundle.accent, styleOpts) });
     setOrigin(null);
     pulse();
     if (announce) toast.info(copy.bgMatched);
   };
 
+  // Tek tonun zemini: yalnız o ton yeniden kurulur, diğerleri dokunulmaz.
+  const applyToneBackground = (target, hex) => {
+    tick();
+    const next = generateToneFromBackground(hex, bundle.accent, target, styleOpts);
+    commit({ ...bundle, tones: { ...bundle.tones, [target]: next } });
+    setTone(target);
+    setOrigin(null);
+    pulse();
+  };
+
   const rebuildPalette = () => {
     bump();
-    commit(generateTokensFromSeeds(resolved.primary, resolved.accent, style));
+    commit({ ...bundle, tones: generateToneSet(bundle.base, bundle.accent, styleOpts) });
     setOrigin(null);
     pulse();
     toast.success(i18nText("autoI18n.ct_palet_uretildi", "Palet iki renkten üretildi"));
@@ -285,7 +340,8 @@ export default function CustomThemeScreen({ navigation, route }) {
     tick();
     const next = { ...style, ...patch };
     setStyle(next);
-    commit(generateTokensFromSeeds(resolved.primary, resolved.accent, next));
+    setStyleTouched(true);
+    commit({ ...bundle, tones: generateToneSet(bundle.base, bundle.accent, next) });
     setOrigin(null);
     pulse();
   };
@@ -294,7 +350,7 @@ export default function CustomThemeScreen({ navigation, route }) {
     const patch = fixReadability(resolved);
     if (!Object.keys(patch).length) return;
     bump();
-    commit({ ...draft, ...patch });
+    commitTone({ ...draft, ...patch });
     setOrigin(null);
     pulse();
     toast.success(copy.fixed);
@@ -305,16 +361,16 @@ export default function CustomThemeScreen({ navigation, route }) {
     const nextMood = "moodId" in over ? over.moodId : moodId;
     const nextLocks = over.locks || locks;
     const lock = {
-      bg: nextLocks.bg ? resolved.primary : null,
-      accent: nextLocks.accent ? resolved.accent : null,
+      base: nextLocks.bg ? bundle.base : null,
+      accent: nextLocks.accent ? bundle.accent : null,
     };
     setCandidates((prev) =>
       generateCandidates(CANDIDATE_COUNT, {
         moodId: nextMood,
         lock,
         avoid: over.fresh ? [] : prev,
-        contrast: style.contrast,
-        surfaces: style.surfaces,
+        // Kullanıcı stil seçmediyse kontrast/yüzey her adayda ayrı çeşitlenir.
+        ...(styleTouched ? { contrast: style.contrast, surfaces: style.surfaces } : {}),
       }),
     );
     setShuffleKey((k) => k + 1);
@@ -340,37 +396,42 @@ export default function CustomThemeScreen({ navigation, route }) {
 
   const pickCandidate = (item) => {
     tick();
-    commit(item.tokens);
-    setOrigin({ json: JSON.stringify(item.tokens), moodId: item.moodId });
+    const next = { base: item.base, accent: item.accent, tones: item.tones };
+    commit(next);
+    setOrigin({ json: JSON.stringify(next), moodId: item.moodId });
     pulse();
   };
 
-  const pickBase = (key) => {
+  /* ── Hazır temalar ── */
+  const pickPreset = (id) => {
+    const next = getPresetBundle(id);
+    if (!next) return;
     tick();
-    commit(themeToTokens(key));
+    commit(next);
+    setPresetOrigin({ id, json: JSON.stringify(next) });
     setOrigin(null);
     pulse();
-    toast.info(i18nText("autoI18n.ct_taban_uygulandi", "Taban tema yüklendi"));
+    toast.info(copy.presetLoaded);
   };
 
+  const presetItems = useMemo(
+    () =>
+      THEME_PRESETS.map((preset) => ({
+        id: preset.id,
+        label: presetLabel(copy, preset.id),
+        bundle: getPresetBundle(preset.id),
+      })),
+    [copy],
+  );
+  const activePresetId = presetOrigin && presetOrigin.json === bundleJson ? presetOrigin.id : null;
+
   const appliedKey = useMemo(
-    () => candidates.find((c) => JSON.stringify(c.tokens) === draftJson)?.key || null,
-    [candidates, draftJson],
+    () => candidates.find((c) => JSON.stringify({ base: c.base, accent: c.accent, tones: c.tones }) === bundleJson)?.key || null,
+    [candidates, bundleJson],
   );
   const candidateLabel = useCallback(
     (item) => `${moodLabel(copy, item.moodId)} · ${hueLabel(copy, item.family)}`,
     [copy],
-  );
-  const bases = useMemo(
-    () =>
-      BASE_THEMES.map((b) => ({
-        key: b.key,
-        label: i18nText(b.labelKey, b.fallback),
-        colors: getThemeColors(b.key),
-      })),
-    // i18nText aktif dile bakar; dil değişince etiketler yenilenmeli.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [language],
   );
 
   /* ── Kaydet / sil ── */
@@ -387,15 +448,18 @@ export default function CustomThemeScreen({ navigation, route }) {
     savingRef.current = true;
     leavingRef.current = true;
     const finalName = name.trim() || suggestion;
-    // Aktif temanın kendisi düzenleniyorsa token yazımı geçişin apply adımına
-    // bırakılır: erken yazılırsa ekran görüntü alınmadan yeni renklere boyanır
-    // ve solma "yeniden yeniye" olduğu için görünmez olur.
-    const isActiveEdit = editingId && selectedTheme === `custom:${editingId}`;
+    // Önizlenen ton uygulanır: kullanıcı hangi tonu gördüyse o seçili olur.
+    // Aktif temanın kendisi düzenleniyorsa kayıt geçişin apply adımına bırakılır:
+    // erken yazılırsa ekran görüntü alınmadan yeni renklere boyanır ve solma
+    // "yeniden yeniye" olduğu için görünmez olur.
+    const activeSelection = parseCustomSelection(selectedTheme);
+    const isActiveEdit = Boolean(editingId) && activeSelection?.id === editingId;
+    const build = (id) => entryFromBundle(bundle, { id, name: finalName });
     const done = isActiveEdit
-      ? changeTheme(`custom:${editingId}`, {
-          onApply: () => saveCustomTheme({ id: editingId, name: finalName, tokens: draft }),
+      ? changeTheme(customSelectionKey(editingId, tone), {
+          onApply: () => saveCustomTheme(build(editingId)),
         })
-      : changeTheme(`custom:${saveCustomTheme({ id: editingId, name: finalName, tokens: draft })}`);
+      : changeTheme(customSelectionKey(saveCustomTheme(build(editingId)), tone));
     // Toast ve geri dönüş cross-fade bitince: erken çağrılırlarsa toast
     // ekran görüntüsünün altında gizli kalıyor, pop animasyonu da görüntünün
     // alınmasıyla yarışıp yarım kalmış kare donduruyor.
@@ -417,7 +481,7 @@ export default function CustomThemeScreen({ navigation, route }) {
           style: "destructive",
           onPress: () => {
             leavingRef.current = true;
-            const wasActive = selectedTheme === `custom:${editingId}`;
+            const wasActive = parseCustomSelection(selectedTheme)?.id === editingId;
             deleteCustomTheme(editingId);
             // animated:false — onay alert'i (RN Modal) daha kapanırken görüntü
             // alınırsa iOS'ta alert'in hayaleti solmaya karışıyor; silme
@@ -434,7 +498,7 @@ export default function CustomThemeScreen({ navigation, route }) {
 
   /* ── Renk seçici ── */
   // Kaynak token listesi (kendisi hariç) — bağıl mod kaynakları. Yalnız ince
-  // ayardaki token'lar bağlanabilir; zemin/vurgu kutuları mutlak renk ister.
+  // ayardaki token'lar bağlanabilir; ana renk/vurgu/zemin kutuları mutlak renk ister.
   const tokenSources = useMemo(() => {
     if (picker?.kind !== "token") return NO_SOURCES;
     return CUSTOM_THEME_TOKENS.filter((tok) => tok.key !== picker.token.key).map((tok) => ({
@@ -446,12 +510,22 @@ export default function CustomThemeScreen({ navigation, route }) {
 
   const pickerView = useMemo(() => {
     if (!picker) return { title: "", initialValue: "#000000", sources: NO_SOURCES, original: null, against: null };
-    if (picker.kind === "bg") {
+    if (picker.kind === "base") {
       return {
-        title: tokenLabel("primary"),
-        initialValue: resolved.primary,
+        title: copy.baseTitle,
+        initialValue: bundle.base,
         sources: NO_SOURCES,
-        original: resolved.primary,
+        original: bundle.base,
+        against: null,
+      };
+    }
+    if (picker.kind === "toneBg") {
+      const current = resolvedTones[picker.tone].primary;
+      return {
+        title: fillTone(copy.toneBgTitle, toneLabel(copy, picker.tone)),
+        initialValue: current,
+        sources: NO_SOURCES,
+        original: current,
         against: null,
       };
     }
@@ -474,14 +548,15 @@ export default function CustomThemeScreen({ navigation, route }) {
       original: resolved[key],
       against: againstKey ? { color: resolved[againstKey], label: tokenLabel(againstKey) } : null,
     };
-  }, [picker, resolved, draft, tokenSources]);
+  }, [picker, resolved, resolvedTones, draft, tokenSources, bundle.base, copy]);
 
   const confirmPicker = (value) => {
     if (!picker) return;
-    if (picker.kind === "bg") applyBackground(value);
+    if (picker.kind === "base") applyBase(value);
     else if (picker.kind === "accent") applyAccent(value);
+    else if (picker.kind === "toneBg") applyToneBackground(picker.tone, value);
     else {
-      commit({ ...draft, [picker.token.key]: value });
+      commitTone({ ...draft, [picker.token.key]: value });
       setOrigin(null);
     }
     setPicker(null);
@@ -501,6 +576,7 @@ export default function CustomThemeScreen({ navigation, route }) {
     () => [
       { key: "setup", label: copy.tabSetup, icon: "color-palette-outline" },
       { key: "discover", label: copy.tabDiscover, icon: "dice-outline" },
+      { key: "presets", label: copy.tabPresets, icon: "albums-outline" },
       { key: "fine", label: copy.tabFine, icon: "options-outline" },
     ],
     [copy],
@@ -510,6 +586,10 @@ export default function CustomThemeScreen({ navigation, route }) {
       { key: "home", label: copy.sceneHome },
       { key: "detail", label: copy.sceneDetail },
     ],
+    [copy],
+  );
+  const toneOptions = useMemo(
+    () => TONES.map((key) => ({ key, label: toneLabel(copy, key) })),
     [copy],
   );
   const contrastOptions = useMemo(
@@ -536,11 +616,11 @@ export default function CustomThemeScreen({ navigation, route }) {
       <SectionHeader icon="color-palette-outline" title={copy.sectionColors} sub={copy.sectionColorsSub} theme={theme} />
       <View style={styles.tileRow}>
         <ColorTile
-          label={tokenLabel("primary")}
-          sub={copy.bgSub}
-          color={resolved.primary}
+          label={copy.baseTitle}
+          sub={copy.baseSub}
+          color={bundle.base}
           icon="layers-outline"
-          onPress={() => setPicker({ kind: "bg" })}
+          onPress={() => setPicker({ kind: "base" })}
           theme={theme}
         />
         <ColorTile
@@ -554,8 +634,28 @@ export default function CustomThemeScreen({ navigation, route }) {
       </View>
 
       <View style={styles.block}>
-        <MiniLabel theme={theme}>{copy.readyBackgrounds.toLocaleUpperCase(locale)}</MiniLabel>
-        <SwatchRow colors={BACKGROUND_PRESETS} selected={resolved.primary} onPick={applyBackground} theme={theme} shape="square" />
+        <SectionHeader icon="contrast-outline" title={copy.toneSectionTitle} sub={copy.toneSectionSub} theme={theme} />
+        <View style={styles.tileRow}>
+          {TONES.map((key) => (
+            <ToneTile
+              key={key}
+              label={toneLabel(copy, key)}
+              tokens={resolvedTones[key]}
+              active={tone === key}
+              onPress={() => {
+                setTone(key);
+                setPicker({ kind: "toneBg", tone: key });
+              }}
+              theme={theme}
+            />
+          ))}
+        </View>
+        <Text style={[styles.hint, { color: theme.text.muted }]}>{copy.toneBgSub}</Text>
+      </View>
+
+      <View style={styles.block}>
+        <MiniLabel theme={theme}>{copy.readyBases.toLocaleUpperCase(locale)}</MiniLabel>
+        <SwatchRow colors={BASE_PRESETS} selected={bundle.base} onPick={applyBase} theme={theme} shape="square" />
       </View>
 
       <View style={styles.block}>
@@ -599,20 +699,27 @@ export default function CustomThemeScreen({ navigation, route }) {
       onMood={pickMood}
       lockBg={locks.bg}
       lockAccent={locks.accent}
-      lockColors={{ bg: resolved.primary, accent: resolved.accent }}
+      lockColors={{ bg: bundle.base, accent: bundle.accent }}
       onToggleLock={toggleLock}
       onShuffle={shuffle}
       onPick={pickCandidate}
       shuffleKey={shuffleKey}
-      bases={bases}
-      onBase={pickBase}
+      tone={tone}
       reduceMotion={reduceMotion}
     />
+  );
+
+  const presetsContent = (
+    <View style={styles.stack}>
+      <SectionHeader icon="albums-outline" title={copy.presetsTitle} sub={copy.presetsSub} theme={theme} />
+      <PresetGrid items={presetItems} activeId={activePresetId} onPick={pickPreset} appliedText={copy.applied} theme={theme} />
+    </View>
   );
 
   const fineContent = (
     <View style={styles.stack}>
       <View style={styles.block}>
+        <MiniLabel theme={theme}>{`${toneLabel(copy, tone)} · ${copy.tabFine}`.toLocaleUpperCase(locale)}</MiniLabel>
         <PaletteStrip resolved={resolved} height={14} theme={theme} />
         <Text style={[styles.hint, { color: theme.text.muted }]}>{copy.fineHint}</Text>
       </View>
@@ -659,7 +766,7 @@ export default function CustomThemeScreen({ navigation, route }) {
             {editingId ? i18nText("autoI18n.ct_temayi_duzenle", "Temayı Düzenle") : i18nText("autoI18n.ozel_tema", "Özel Tema")}
           </Text>
           <Text style={[styles.subtitle, { color: theme.text.muted }]} numberOfLines={1}>
-            {i18nText("autoI18n.ct_alt_baslik_v2", "İki renk seç, gerisini biz kuralım")}
+            {copy.headerSub}
           </Text>
         </View>
         {/* Devre dışı: eski kutuda opaklık 0.4; cam yolunda opaklık YOK, ikon soluk. */}
@@ -703,6 +810,10 @@ export default function CustomThemeScreen({ navigation, route }) {
         <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
           <ThemePreviewCard theme={previewTheme} language={language} scene={scene} compact mini={miniPreview} />
         </Animated.View>
+        {/* Ton anahtarı: önizlenen ve düzenlenen ton (açık · orta · koyu) */}
+        <View accessibilityLabel={copy.previewTone}>
+          <Segmented options={toneOptions} value={tone} onChange={changeTone} theme={theme} dense />
+        </View>
         <View style={styles.previewBar}>
           <View style={styles.sceneToggle}>
             <Segmented options={sceneOptions} value={scene} onChange={setScene} theme={theme} dense />
@@ -747,7 +858,7 @@ export default function CustomThemeScreen({ navigation, route }) {
             transform: [{ translateY: tabFade.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
           }}
         >
-          {tab === "setup" ? setupContent : tab === "discover" ? discoverContent : fineContent}
+          {tab === "setup" ? setupContent : tab === "discover" ? discoverContent : tab === "presets" ? presetsContent : fineContent}
         </Animated.View>
 
         <View style={{ height: 8 }} />

@@ -170,7 +170,7 @@ function jsonSafe(value, depth = 0) {
 }
 
 const isThemeId = (v) =>
-  typeof v === "string" && (THEME_NAMES.includes(v) || /^custom:[A-Za-z0-9_-]{1,64}$/.test(v));
+  typeof v === "string" && (THEME_NAMES.includes(v) || /^custom:[A-Za-z0-9_-]{1,64}(:(light|mid|dark))?$/.test(v));
 
 const isPositiveIntList = (v) =>
   Array.isArray(v) && v.length <= 60 && v.every((n) => Number.isInteger(n) && n > 0);
@@ -247,19 +247,38 @@ function sanitizeTokenValue(key, value) {
   return null;
 }
 
+function sanitizeTokens(rawTokens) {
+  if (!isPlain(rawTokens)) return null;
+  const tokens = {};
+  for (const key of TOKEN_KEYS) {
+    if (!(key in rawTokens)) continue;
+    const value = sanitizeTokenValue(key, rawTokens[key]);
+    if (value !== null) tokens[key] = value;
+  }
+  return Object.keys(tokens).length ? tokens : null;
+}
+
 function sanitizeTheme(raw) {
   if (!isPlain(raw)) return null;
   const id = typeof raw.id === "string" ? raw.id.trim() : "";
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id) || !isPlain(raw.tokens)) return null;
-  const tokens = {};
-  for (const key of TOKEN_KEYS) {
-    if (!(key in raw.tokens)) continue;
-    const value = sanitizeTokenValue(key, raw.tokens[key]);
-    if (value !== null) tokens[key] = value;
-  }
-  if (!Object.keys(tokens).length) return null;
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) return null;
+  const tokens = sanitizeTokens(raw.tokens);
+  if (!tokens) return null;
   const name = typeof raw.name === "string" ? raw.name.trim().slice(0, MAX_THEME_NAME) : "";
-  return { id, name, tokens };
+  const out = { id, name, tokens };
+  // Üç tonlu temalar: açık/orta/koyu setleri ve "ana renk" tohumu korunur.
+  // Geçersiz bir ton atılır (o ton, orta tondan yeniden türetilir).
+  if (isPlain(raw.tones)) {
+    const tones = {};
+    for (const tone of ["light", "mid", "dark"]) {
+      const clean = sanitizeTokens(raw.tones[tone]);
+      if (clean) tones[tone] = clean;
+    }
+    if (Object.keys(tones).length) out.tones = tones;
+  }
+  const base = normalizeHex(raw.base);
+  if (base) out.base = base;
+  return out;
 }
 
 /**

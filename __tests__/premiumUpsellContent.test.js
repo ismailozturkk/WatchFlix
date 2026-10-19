@@ -290,8 +290,8 @@ describe("plan sütunu değeri: figür + birim (splitTierValue)", () => {
       sub: "cards/day",
       figure: true,
     });
-    // ACCESS değeri de "N birim" biçimindeyse aynı ayrım (8 hazır tema).
-    expect(split("custom_themes", FREE)).toEqual({ main: "8", sub: "hazır tema", figure: true });
+    // ACCESS değeri de "N birim" biçimindeyse aynı ayrım (9 hazır tema).
+    expect(split("custom_themes", FREE)).toEqual({ main: "9", sub: "hazır tema", figure: true });
   });
 
   test("AI kotası günlük/aylık diye ayrılır (nokta satır sonunda kalmaz)", () => {
@@ -354,7 +354,7 @@ describe("plan satırı kipi (pickTierMode / tierMode)", () => {
     expect(buildUpsellContent("ai_messages", FREE, "en").tierMode).toBe("figure");
     // Free "—" + Premium/Max sayı: hepsi figür.
     expect(buildUpsellContent("games", FREE, "tr").tierMode).toBe("figure");
-    // Free "8 hazır tema" figür, Premium "Sınırsız özel tema" cümle → karışık → cümle.
+    // Free "9 hazır tema" figür, Premium "Sınırsız özel tema" cümle → karışık → cümle.
     expect(buildUpsellContent("custom_themes", FREE, "tr").tierMode).toBe("phrase");
     // "—" figür, "Epik rozet" cümle → karışık.
     expect(buildUpsellContent("identity_badge", FREE, "tr").tierMode).toBe("phrase");

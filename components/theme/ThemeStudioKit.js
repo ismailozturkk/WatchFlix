@@ -33,6 +33,9 @@ export const StudioTabs = memo(function StudioTabs({ tabs, value, onChange, them
   const x = useRef(new Animated.Value(0)).current;
   const index = Math.max(0, tabs.findIndex((tab) => tab.key === value));
   const segW = width > 0 ? (width - TAB_PAD * 2) / tabs.length : 0;
+  // 4+ sekmede (Kur · Keşfet · Hazır · İnce ayar) simge/yazı küçülür; "Fine-tune"
+  // ve "Ajuste fino" 390 dp'de bile kırpılmasın.
+  const crowded = tabs.length > 3;
 
   useEffect(() => {
     if (!segW) return;
@@ -78,12 +81,14 @@ export const StudioTabs = memo(function StudioTabs({ tabs, value, onChange, them
               accessibilityState={{ selected: active }}
               accessibilityLabel={tab.label}
               onPress={() => onChange(tab.key)}
-              style={styles.tabBtn}
+              style={[styles.tabBtn, crowded && styles.tabBtnCrowded]}
             >
-              <AppIcon family="Ionicons" name={tab.icon} size={16} color={active ? theme.accent : theme.text.muted} />
+              <AppIcon family="Ionicons" name={tab.icon} size={crowded ? 15 : 16} color={active ? theme.accent : theme.text.muted} />
               <Text
                 numberOfLines={1}
-                style={[styles.tabLabel, { color: active ? theme.text.primary : theme.text.muted }]}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                style={[styles.tabLabel, crowded && styles.tabLabelCrowded, { color: active ? theme.text.primary : theme.text.muted }]}
               >
                 {tab.label}
               </Text>
@@ -438,6 +443,8 @@ const styles = StyleSheet.create({
   tabsRow: { flexDirection: "row" },
   tabBtn: { flex: 1, minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 4 },
   tabLabel: { fontSize: 12.5, fontWeight: "800", flexShrink: 1 },
+  tabBtnCrowded: { gap: 4, paddingHorizontal: 2 },
+  tabLabelCrowded: { fontSize: 11.5 },
 
   /* bölüm başlığı */
   sectionHead: { flexDirection: "row", alignItems: "center", gap: 11 },

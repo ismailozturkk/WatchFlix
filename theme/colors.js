@@ -15,6 +15,7 @@
  * ────────────────────────────────────────────────────────────────────────────*/
 
 import { clamp, hexToHsl, hslToHex, toHex } from "../utils/colorUtils";
+import { DEFAULT_TONE, deriveToneTokens, isTone } from "../utils/themeStudio";
 
 // ─── Temel renk sabitleri (raw) ───────────────────────────────────────────────
 
@@ -339,10 +340,17 @@ export function getSemanticColorsForTheme(themeKey, surfaceHex) {
   if (themeKey === "sky") {
     return { colors: SKY_THEME_COLORS, notesColor: SKY_THEME_NOTES_COLORS };
   }
-  if (themeKey === "blue") {
+  if (themeKey === "blue" || themeKey === "blueDeep") {
     return { colors: BLUE_THEME_COLORS, notesColor: BLUE_THEME_NOTES_COLORS };
   }
-  if (themeKey === "gray" || themeKey === "dark" || themeKey === "purple" || themeKey === "amber") {
+  if (
+    themeKey === "gray" ||
+    themeKey === "dark" ||
+    themeKey === "purple" ||
+    themeKey === "amber" ||
+    themeKey === "greenMid" ||
+    themeKey === "greenDeep"
+  ) {
     return { colors: DARK_THEME_COLORS, notesColor: DARK_THEME_NOTES_COLORS };
   }
   if (surfaceHex) {
@@ -497,6 +505,74 @@ export const themes = {
     notesColor: GREEN_THEME_NOTES_COLORS,
   },
 
+  /* ── Koyu Lacivert (mavi ailesinin koyu tonu) ──────────────────────
+     Lacivert temanın bir kademe derini: neredeyse siyah gece mavisi. */
+  blueDeep: {
+    primary: "#050A13",
+    secondary: "#0B1425",
+    secondaryt: alpha("#0B1425", 0.5),
+    between: "#08101E",
+    border: "#1B2D4D",
+    tab: "#0A1424",
+    ai: alpha("#0A1424", 0.4),
+    text: {
+      primary: "#EFF5FA",
+      secondary: "#9DBBDA",
+      between: "#7C95B6",
+      muted: "#6580A2",
+    },
+    accent: "#4C8DFF",
+    bold: "#2D6BDF",
+    shadow: alpha(PALETTE.black, 0.65),
+    colors: BLUE_THEME_COLORS,
+    notesColor: BLUE_THEME_NOTES_COLORS,
+  },
+
+  /* ── Orta Yeşil (yeşil ailesinin orta tonu) ───────────────────────
+     Gri temanın yeşil karşılığı: koyu ama siyah olmayan çam yeşili yüzey. */
+  greenMid: {
+    primary: "#13211F",
+    secondary: "#1C2F2C",
+    secondaryt: alpha("#1C2F2C", 0.5),
+    between: "#172725",
+    border: "#2D4A45",
+    tab: "#1B2D2A",
+    ai: alpha("#1B2D2A", 0.4),
+    text: {
+      primary: "#EBF6F3",
+      secondary: "#BFD8D2",
+      between: "#92B3AC",
+      muted: "#729790",
+    },
+    accent: "#1F9E88",
+    bold: "#177A69",
+    shadow: alpha(PALETTE.black, 0.6),
+    colors: DARK_THEME_COLORS,
+    notesColor: DARK_THEME_NOTES_COLORS,
+  },
+
+  /* ── Koyu Yeşil (yeşil ailesinin koyu tonu) ───────────────────────── */
+  greenDeep: {
+    primary: "#040A09",
+    secondary: "#0B1614",
+    secondaryt: alpha("#0B1614", 0.5),
+    between: "#08110F",
+    border: "#17302C",
+    tab: "#0A1513",
+    ai: alpha("#0A1513", 0.4),
+    text: {
+      primary: "#E9F5F2",
+      secondary: "#B5D1CB",
+      between: "#88AAA3",
+      muted: "#69908A",
+    },
+    accent: "#1F9E88",
+    bold: "#177A69",
+    shadow: alpha(PALETTE.black, 0.65),
+    colors: DARK_THEME_COLORS,
+    notesColor: DARK_THEME_NOTES_COLORS,
+  },
+
   /* ── Gece Moru ──────────────────────────────────────────────────── */
   purple: {
     primary: "#16131E",
@@ -565,6 +641,60 @@ export const getThemeColors = (themeName) => themes[themeName] ?? themes.gray;
  */
 
 export const THEME_NAMES = Object.keys(themes);
+
+// ─── Tema aileleri (açık · orta · koyu) ───────────────────────────────────────
+
+/**
+ * Ayarlar > Tema ekranındaki ana seçenekler. Her aile TEK renk karakterinin üç
+ * tonudur; kullanıcı aileyi seçer, altındaki üç küçük düğmeyle tonu belirler.
+ *   light → açık zemin, mid → koyu ama siyah olmayan zemin, dark → en koyu zemin.
+ * `tones` değerleri `themes` anahtarlarıdır (eski kayıtlı seçimler değişmeden çalışır).
+ */
+export const THEME_FAMILIES = Object.freeze([
+  {
+    id: "default",
+    icon: "contrast",
+    labelKey: "themeFamilyDefault",
+    fallback: "Varsayılan",
+    tones: Object.freeze({ light: "light", mid: "gray", dark: "dark" }),
+  },
+  {
+    id: "blue",
+    icon: "water",
+    labelKey: "themeFamilyBlue",
+    fallback: "Mavi",
+    tones: Object.freeze({ light: "sky", mid: "blue", dark: "blueDeep" }),
+  },
+  {
+    id: "green",
+    icon: "leaf",
+    labelKey: "themeFamilyGreen",
+    fallback: "Yeşil",
+    tones: Object.freeze({ light: "green", mid: "greenMid", dark: "greenDeep" }),
+  },
+]);
+
+/** Ailelerde yer alan (Free dahil herkesin seçebildiği) hazır tema anahtarları. */
+export const FAMILY_THEME_KEYS = Object.freeze(
+  THEME_FAMILIES.flatMap((family) => Object.values(family.tones)),
+);
+
+/**
+ * Ayar ekranında artık listelenmeyen eski hazır temalar (Gece Moru, Kızıl Sinema).
+ * Tema Stüdyosu'nda "Hazır temalar" altına taşındılar; bunları daha önce seçmiş
+ * kullanıcıların seçimi bozulmasın diye `themes` içinde duruyorlar.
+ */
+export const LEGACY_PRESET_THEME_KEYS = Object.freeze(["purple", "amber"]);
+
+/** Hazır tema anahtarından { family, tone } (ailesi yoksa null). */
+export function familyOfTheme(themeKey) {
+  for (const family of THEME_FAMILIES) {
+    for (const tone of ["light", "mid", "dark"]) {
+      if (family.tones[tone] === themeKey) return { family, tone };
+    }
+  }
+  return null;
+}
 
 // ─── Özel Tema (kullanıcı tarafından oluşturulan) ─────────────────────────────
 
@@ -674,6 +804,50 @@ export function resolveThemeTokens(tokens) {
   }
   return resolved;
 }
+
+// ─── Özel tema: üç ton ────────────────────────────────────────────────────────
+
+/**
+ * Seçili tema anahtarı: "custom:<id>" (orta ton, eski kayıtlarla aynı) veya
+ * "custom:<id>:light|mid|dark". Özel tema değilse null.
+ * @returns {{id: string|null, tone: "light"|"mid"|"dark"}|null}
+ */
+export function parseCustomSelection(selection) {
+  if (typeof selection !== "string" || !selection.startsWith("custom")) return null;
+  const parts = selection.split(":");
+  const id = parts[1] || null;
+  const tone = isTone(parts[2]) ? parts[2] : DEFAULT_TONE;
+  return { id, tone };
+}
+
+/** Özel tema + ton → seçim anahtarı (orta ton eski biçimle yazılır). */
+export const customSelectionKey = (id, tone = DEFAULT_TONE) =>
+  tone && tone !== DEFAULT_TONE && isTone(tone) ? `custom:${id}:${tone}` : `custom:${id}`;
+
+const toneCache = new WeakMap();
+
+/**
+ * Kayıtlı bir özel temanın bir tonu için token seti. Üç ton kayıtlıysa (yeni
+ * temalar) olduğu gibi; eski tek tonlu temalarda orta ton `tokens`, açık/koyu ton
+ * ondan türetilir (orta ton DEĞİŞMEZ → seçili tema aynı görünür).
+ */
+export function customToneTokens(entry, tone = DEFAULT_TONE) {
+  const t = isTone(tone) ? tone : DEFAULT_TONE;
+  const stored = entry?.tones?.[t];
+  if (stored && typeof stored === "object") return stored;
+  if (t === DEFAULT_TONE || !entry) return entry?.tokens || {};
+  let perEntry = toneCache.get(entry);
+  if (!perEntry) {
+    perEntry = {};
+    toneCache.set(entry, perEntry);
+  }
+  if (!perEntry[t]) perEntry[t] = deriveToneTokens(resolveThemeTokens(entry.tokens), t);
+  return perEntry[t];
+}
+
+/** Kayıtlı özel tema girdisi + ton → tam tema nesnesi. */
+export const buildCustomThemeFromEntry = (entry, tone = DEFAULT_TONE) =>
+  buildCustomTheme(customToneTokens(entry, tone));
 
 /**
  * Düz token setinden tam tema nesnesi üretir. Bağıl token'lar önce çözülür;

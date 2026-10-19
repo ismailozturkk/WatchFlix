@@ -367,6 +367,10 @@ export const AppSettingsProvider = ({ children }) => {
       id,
       name: (themeInput?.name || "").trim() || i18nText("autoI18n.ozel_tema", "Özel Tema"),
       tokens: themeInput?.tokens || {},
+      // Üç tonlu temalar: açık/orta/koyu setleri + "ana renk" tohumu. Eski, tek
+      // tonlu kayıtlarda bu alanlar yoktur (açık/koyu ton orta tondan türetilir).
+      ...(themeInput?.tones ? { tones: themeInput.tones } : {}),
+      ...(themeInput?.base ? { base: themeInput.base } : {}),
     };
     setCustomThemes((prev) => {
       const idx = prev.findIndex((x) => x.id === id);

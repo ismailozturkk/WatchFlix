@@ -12,7 +12,7 @@ import AppIcon from "@components/AppIcon";
 import { MOODS } from "@utils/themeStudio";
 import { alpha } from "../../theme/colors";
 import { moodLabel } from "./themeStudioCopy";
-import { MiniLabel, SectionHeader, inkOn } from "./ThemeStudioKit";
+import { SectionHeader, inkOn } from "./ThemeStudioKit";
 
 /* ───────────────────────── Aday kartı ───────────────────────── */
 
@@ -27,8 +27,9 @@ const CandidateCard = memo(function CandidateCard({
   reduceMotion,
   onPress,
   theme,
+  tone,
 }) {
-  const t = item.tokens;
+  const t = item.tones?.[tone] || item.tokens;
   const anim = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
 
   useEffect(() => {
@@ -107,7 +108,22 @@ const CandidateCard = memo(function CandidateCard({
           >
             {label}
           </Text>
-          {applied ? <Text style={[styles.candidateApplied, { color: theme.accent }]}>{appliedText}</Text> : null}
+          {applied ? (
+            <Text style={[styles.candidateApplied, { color: theme.accent }]}>{appliedText}</Text>
+          ) : (
+            // Üç tonun zeminleri: aday tek renk değil, açık · orta · koyu bir set.
+            <View style={styles.toneDots}>
+              {["light", "mid", "dark"].map((key) => (
+                <View
+                  key={key}
+                  style={[
+                    styles.toneDot,
+                    { backgroundColor: item.tones?.[key]?.primary || t.primary, borderColor: alpha(theme.text.primary, 0.22) },
+                  ]}
+                />
+              ))}
+            </View>
+          )}
         </View>
       </Pressable>
     </Animated.View>
@@ -188,10 +204,8 @@ function ThemeShuffleDeck({
   onShuffle,
   onPick,
   shuffleKey,
-  bases,
-  onBase,
+  tone,
   reduceMotion,
-  locale = "tr-TR",
 }) {
   const spin = useRef(new Animated.Value(0)).current;
 
@@ -281,39 +295,10 @@ function ThemeShuffleDeck({
             appliedText={copy.applied}
             onPress={() => onPick(item)}
             theme={theme}
+            tone={tone}
           />
         ))}
       </View>
-
-      {bases && bases.length ? (
-        <View style={styles.bases}>
-          <MiniLabel theme={theme}>{copy.startFrom.toLocaleUpperCase(locale)}</MiniLabel>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.baseRow}
-            keyboardShouldPersistTaps="handled"
-          >
-            {bases.map((base) => (
-              <TouchableOpacity
-                key={base.key}
-                accessibilityRole="button"
-                accessibilityLabel={base.label}
-                activeOpacity={0.8}
-                onPress={() => onBase(base.key)}
-                style={[styles.baseChip, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-              >
-                <View style={styles.baseSwatches}>
-                  <View style={[styles.baseSwatch, { backgroundColor: base.colors.primary, borderColor: alpha(theme.text.primary, 0.14) }]} />
-                  <View style={[styles.baseSwatch, { backgroundColor: base.colors.secondary, borderColor: alpha(theme.text.primary, 0.14) }]} />
-                  <View style={[styles.baseSwatch, { backgroundColor: base.colors.accent, borderColor: alpha(theme.text.primary, 0.14) }]} />
-                </View>
-                <Text style={[styles.baseLabel, { color: theme.text.secondary }]} numberOfLines={1}>{base.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -357,10 +342,6 @@ const styles = StyleSheet.create({
   candidateLabel: { flexShrink: 1, fontSize: 12, fontWeight: "800" },
   candidateApplied: { fontSize: 10, fontWeight: "900", marginLeft: "auto" },
 
-  bases: { gap: 9 },
-  baseRow: { gap: 9, paddingVertical: 2, paddingRight: 8 },
-  baseChip: { minWidth: 96, borderRadius: 14, borderWidth: 1, padding: 10, gap: 8, alignItems: "center" },
-  baseSwatches: { flexDirection: "row", gap: 4 },
-  baseSwatch: { width: 18, height: 18, borderRadius: 6, borderWidth: 1 },
-  baseLabel: { fontSize: 11, fontWeight: "800" },
+  toneDots: { flexDirection: "row", gap: 4, marginLeft: "auto" },
+  toneDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1 },
 });

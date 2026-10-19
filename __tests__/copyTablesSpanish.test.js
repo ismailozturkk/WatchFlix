@@ -26,6 +26,7 @@ const { WATCH_PICKER_COPY } = require("../utils/watchPickerCopy");
 const { LIST_SORT_FILTER_COPY } = require("../utils/listSortFilterCopy");
 const { RATING_SUMMARY_COPY } = require("../utils/ratingSummaryCopy");
 const { EXTERNAL_RATINGS_COPY } = require("../utils/externalRatingsCopy");
+const { REFERRAL_COPY } = require("../utils/referralCopy");
 
 // `{ad}`, `{{ad}}`, `%d` biçimli yer tutucuları çıkarır.
 const yerTutucular = (metin) =>
@@ -95,6 +96,7 @@ const TABLOLAR = {
   "Sırala ve filtrele (listSortFilterCopy)": () => LIST_SORT_FILTER_COPY,
   "Puan özeti (ratingSummaryCopy)": () => RATING_SUMMARY_COPY,
   "Harici puanlar (externalRatingsCopy)": () => EXTERNAL_RATINGS_COPY,
+  "Arkadaş daveti (referralCopy)": () => REFERRAL_COPY,
   "Wrapped (wrappedStrings)": () => ({
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),

@@ -41,8 +41,8 @@ const tr = {
 
   // Kur
   sectionColors: "Renkler",
-  sectionColorsSub: "İki renk seç, geri kalanı uyumlansın",
-  bgSub: "Seçince tüm palet uyumlanır",
+  sectionColorsSub: "Ana renk ve vurgu seç, üç ton uyumlansın",
+  bgSub: "Seçince üç ton da uyumlanır",
   accentSub: "Düğmeler ve vurgular",
   readyBackgrounds: "Hazır zeminler",
   readyAccents: "Hazır vurgular",
@@ -62,7 +62,7 @@ const tr = {
   contrastHigh: "Yüksek",
   surfacesNeutral: "Nötr",
   surfacesTinted: "Renkli",
-  styleHint: "Stili değiştirmek paleti zemin + vurgudan yeniden türetir; geri alabilirsin.",
+  styleHint: "Stili değiştirmek üç tonu da ana renk + vurgudan yeniden türetir; geri alabilirsin.",
   rebuild: "Paleti yeniden üret",
   bgMatched: "Palet yeni zeminle uyumlandı",
 
@@ -81,12 +81,48 @@ const tr = {
   moodNeon: "Neon",
   moodPastel: "Pastel",
   moodPaper: "Kâğıt",
-  lockBg: "Zemini kilitle",
+  lockBg: "Ana rengi kilitle",
   lockAccent: "Vurguyu kilitle",
   lockHint: "Kilitli renk karıştırırken sabit kalır",
   lockedBoth: "İkisi de kilitli — yalnız stil değişir",
   applied: "Uygulandı",
   startFrom: "Hazır temalardan başla",
+
+  // üç ton + hazır temalar
+  headerSub: "Bir renk seç, üç tonu biz kuralım",
+  tabPresets: "Hazır",
+  toneLight: "Açık",
+  toneMid: "Orta",
+  toneDark: "Koyu",
+  toneSectionTitle: "Üç ton",
+  toneSectionSub: "Açık, orta ve koyu zemin — her birini ayrı ayarla",
+  toneBgTitle: "Zemin · {tone}",
+  toneBgSub: "Yalnız bu tonun zemini",
+  previewTone: "Önizlenen ton",
+  baseTitle: "Ana renk",
+  baseSub: "Üç tonun hepsi buna uyumlanır",
+  readyBases: "Hazır ana renkler",
+  presetsTitle: "Hazır temalar",
+  presetsSub: "Birini seç, üç tonuyla yüklensin; sonra istediğini ayarla",
+  presetLoaded: "Hazır tema üç tonuyla yüklendi",
+  nameSet: "Üç ton",
+  presetDefault: "Varsayılan",
+  presetBlue: "Mavi",
+  presetGreen: "Yeşil",
+  presetPurple: "Gece Moru",
+  presetCrimson: "Kızıl Sinema",
+  presetOcean: "Okyanus",
+  presetForest: "Orman",
+  presetMocha: "Kahve",
+  presetSunset: "Gün Batımı",
+  moodSlate: "Arduvaz",
+  moodSand: "Kum",
+  moodLavender: "Lavanta",
+  moodMint: "Nane",
+  moodRose: "Gül",
+  moodCobalt: "Kobalt",
+  moodEmber: "Köz",
+  moodAurora: "Aurora",
 
   // İnce ayar
   fineHint: "Bir renge dokun, ayarla. Bağlı renkler kaynağını izler.",
@@ -142,8 +178,8 @@ const en = {
   suggestName: "Suggest a name",
 
   sectionColors: "Colors",
-  sectionColorsSub: "Pick two colors and the rest follows",
-  bgSub: "Re-tunes the whole palette",
+  sectionColorsSub: "Pick a main color and an accent; all three tones follow",
+  bgSub: "Re-tunes all three tones",
   accentSub: "Buttons and highlights",
   readyBackgrounds: "Ready backgrounds",
   readyAccents: "Ready accents",
@@ -181,12 +217,48 @@ const en = {
   moodNeon: "Neon",
   moodPastel: "Pastel",
   moodPaper: "Paper",
-  lockBg: "Lock background",
+  lockBg: "Lock main color",
   lockAccent: "Lock accent",
   lockHint: "A locked color stays put while shuffling",
   lockedBoth: "Both locked — only the style varies",
   applied: "Applied",
   startFrom: "Start from a built-in theme",
+
+  // üç ton + hazır temalar
+  headerSub: "Pick a color, we build the three tones",
+  tabPresets: "Presets",
+  toneLight: "Light",
+  toneMid: "Mid",
+  toneDark: "Dark",
+  toneSectionTitle: "Three tones",
+  toneSectionSub: "Light, mid and dark backgrounds — tune each one",
+  toneBgTitle: "Background · {tone}",
+  toneBgSub: "Only this tone's background",
+  previewTone: "Previewed tone",
+  baseTitle: "Main color",
+  baseSub: "All three tones follow it",
+  readyBases: "Ready main colors",
+  presetsTitle: "Preset themes",
+  presetsSub: "Pick one to load it with all three tones, then tweak anything",
+  presetLoaded: "Preset loaded with all three tones",
+  nameSet: "Tri-tone",
+  presetDefault: "Default",
+  presetBlue: "Blue",
+  presetGreen: "Green",
+  presetPurple: "Midnight Purple",
+  presetCrimson: "Crimson Cinema",
+  presetOcean: "Ocean",
+  presetForest: "Forest",
+  presetMocha: "Mocha",
+  presetSunset: "Sunset",
+  moodSlate: "Slate",
+  moodSand: "Sand",
+  moodLavender: "Lavender",
+  moodMint: "Mint",
+  moodRose: "Rose",
+  moodCobalt: "Cobalt",
+  moodEmber: "Ember",
+  moodAurora: "Aurora",
 
   fineHint: "Tap a color to adjust it. Linked colors follow their source.",
   fineLinked: "Linked",
@@ -239,8 +311,8 @@ const es = {
   suggestName: "Sugerir un nombre",
 
   sectionColors: "Colores",
-  sectionColorsSub: "Elige dos colores y el resto se adapta",
-  bgSub: "Reajusta toda la paleta",
+  sectionColorsSub: "Elige un color principal y un acento; los tres tonos se adaptan",
+  bgSub: "Reajusta los tres tonos",
   accentSub: "Botones y elementos destacados",
   readyBackgrounds: "Fondos predefinidos",
   readyAccents: "Acentos predefinidos",
@@ -278,12 +350,48 @@ const es = {
   moodNeon: "Neón",
   moodPastel: "Pastel",
   moodPaper: "Papel",
-  lockBg: "Fijar el fondo",
+  lockBg: "Fijar el color principal",
   lockAccent: "Fijar el acento",
   lockHint: "Un color fijado no cambia al mezclar",
   lockedBoth: "Ambos fijados: solo varía el estilo",
   applied: "Aplicado",
   startFrom: "Empezar desde un tema predefinido",
+
+  // üç ton + hazır temalar
+  headerSub: "Elige un color y creamos los tres tonos",
+  tabPresets: "Listos",
+  toneLight: "Claro",
+  toneMid: "Medio",
+  toneDark: "Oscuro",
+  toneSectionTitle: "Tres tonos",
+  toneSectionSub: "Fondos claro, medio y oscuro — ajusta cada uno",
+  toneBgTitle: "Fondo · {tone}",
+  toneBgSub: "Solo el fondo de este tono",
+  previewTone: "Tono en la vista previa",
+  baseTitle: "Color principal",
+  baseSub: "Los tres tonos se adaptan a él",
+  readyBases: "Colores principales listos",
+  presetsTitle: "Temas predefinidos",
+  presetsSub: "Elige uno para cargarlo con sus tres tonos y luego ajusta lo que quieras",
+  presetLoaded: "Tema cargado con sus tres tonos",
+  nameSet: "Tres tonos",
+  presetDefault: "Predeterminado",
+  presetBlue: "Azul",
+  presetGreen: "Verde",
+  presetPurple: "Púrpura medianoche",
+  presetCrimson: "Cine carmesí",
+  presetOcean: "Océano",
+  presetForest: "Bosque",
+  presetMocha: "Moca",
+  presetSunset: "Atardecer",
+  moodSlate: "Pizarra",
+  moodSand: "Arena",
+  moodLavender: "Lavanda",
+  moodMint: "Menta",
+  moodRose: "Rosa",
+  moodCobalt: "Cobalto",
+  moodEmber: "Brasa",
+  moodAurora: "Aurora",
 
   fineHint: "Toca un color para ajustarlo. Los colores vinculados siguen a su origen.",
   fineLinked: "Vinculado",
@@ -326,6 +434,8 @@ export const fillCopy = (text, values = {}) =>
 export const moodLabel = (copy, moodId) => copy[`mood${cap(moodId)}`] || moodId;
 export const harmonyLabel = (copy, harmonyId) => copy[`harmony${cap(harmonyId)}`] || harmonyId;
 export const hueLabel = (copy, family) => copy[`hue${cap(family)}`] || family;
+export const toneLabel = (copy, tone) => copy[`tone${cap(tone)}`] || tone;
+export const presetLabel = (copy, presetId) => copy[`preset${cap(presetId)}`] || presetId;
 
 /**
  * Tema için isim önerisi: ruh hali biliniyorsa "Okyanus · Turuncu", yoksa
@@ -333,5 +443,15 @@ export const hueLabel = (copy, family) => copy[`hue${cap(family)}`] || family;
  */
 export function suggestedThemeName(copy, { moodId, polarity, family }) {
   const head = moodId ? moodLabel(copy, moodId) : polarity === "light" ? copy.polarityLight : copy.polarityDark;
+  return `${head} · ${hueLabel(copy, family)}`;
+}
+
+/**
+ * Üç tonlu tema için isim önerisi: ruh hali biliniyorsa "Okyanus · Turuncu",
+ * yoksa "Üç ton · Turuncu". (Tek tonlu `suggestedThemeName` kutupluluk söylerdi;
+ * üç tonda kutupluluk anlamsız.)
+ */
+export function suggestedBundleName(copy, { moodId, family }) {
+  const head = moodId ? moodLabel(copy, moodId) : copy.nameSet;
   return `${head} · ${hueLabel(copy, family)}`;
 }

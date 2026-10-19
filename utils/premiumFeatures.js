@@ -143,8 +143,12 @@ export const FREE_FONT_PRESET_IDS = Object.freeze([
 /** Katalogdaki toplam yazı tipi sayısı (utils/typographyRoles.js FONT_PRESETS). */
 export const FONT_CATALOG_SIZE = 56;
 
-/** Hazır tema sayısı (theme/colors.js `themes`). */
-export const PRESET_THEME_COUNT = 8;
+/**
+ * Free'nin seçebildiği hazır tema sayısı: 3 aile (Varsayılan, Mavi, Yeşil) x 3 ton
+ * (açık · orta · koyu) — theme/colors.js `FAMILY_THEME_KEYS`. Gece Moru / Kızıl
+ * Sinema artık Tema Stüdyosu'nun (Premium) "Hazır temalar" bölümünde.
+ */
+export const PRESET_THEME_COUNT = 9;
 
 /**
  * Wrapped arşivinde GÖRÜLEBİLEN yıl sayısı, bu yıl DAHİL: Free yalnız bu yılı,

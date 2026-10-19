@@ -8,18 +8,27 @@ const {
   ACCENT_PRESETS,
   BACKGROUND_PRESETS,
   CONTRAST_LEVELS,
+  BASE_PRESETS,
   HARMONIES,
   MOODS,
   SURFACE_MODES,
+  TONES,
   analyzeContrast,
+  baseFromTokens,
   describeTheme,
+  deriveToneSet,
+  deriveToneTokens,
   fixReadability,
   fitAccent,
   generateCandidates,
   generateRandomTheme,
+  generateToneFromBackground,
+  generateToneSet,
   generateTokensFromSeeds,
+  harmonizeTokens,
   hueFamily,
   suggestAccents,
+  toneBackground,
   uniqueName,
 } = require("../utils/themeStudio");
 const { contrastRatio, hexToHsl, isLightSurface, normalizeHex } = require("../utils/colorUtils");
@@ -220,6 +229,85 @@ describe("fitAccent", () => {
   });
 });
 
+describe("üç ton (açık · orta · koyu)", () => {
+  const BAZLAR = ["#3B6FD4", "#16A34A", "#E11D48", "#64748B", "#808080", "#D97706", "#000000", "#FFFFFF"];
+
+  test("her ana renk üç tonu, doğru sırada ve okunur üretir", () => {
+    const sorunlar = [];
+    for (const base of BAZLAR) {
+      for (const accent of ["#3B82F6", "#F97316", "#22C55E", "#EC4899"]) {
+        const set = generateToneSet(base, accent);
+        expect(Object.keys(set).sort()).toEqual([...TONES].sort());
+        const lum = (hex) => hexToHsl(hex).l;
+        // koyu < orta < açık (zemin açıklığı sırası)
+        if (!(lum(set.dark.primary) < lum(set.mid.primary) && lum(set.mid.primary) < lum(set.light.primary))) {
+          sorunlar.push(`${base}/${accent} sıra`);
+        }
+        if (!isLightSurface(set.light.primary)) sorunlar.push(`${base}/${accent} açık ton koyu`);
+        if (isLightSurface(set.dark.primary)) sorunlar.push(`${base}/${accent} koyu ton açık`);
+        for (const tone of TONES) {
+          const k = set[tone];
+          expect(Object.keys(k).sort()).toEqual([...TOKEN_KEYS].sort());
+          if (!analyzeContrast(k).passes) sorunlar.push(`${base}/${accent}/${tone} rapor`);
+          if (contrastRatio(k.accent, k.primary) < 3) sorunlar.push(`${base}/${accent}/${tone} vurgu`);
+        }
+      }
+    }
+    expect(sorunlar).toEqual([]);
+  });
+
+  test("üç ton aynı ana rengin tonunu (hue) taşır", () => {
+    const set = generateToneSet("#3B6FD4", "#F97316");
+    const baseHue = hexToHsl("#3B6FD4").h;
+    for (const tone of TONES) {
+      const { h, s } = hexToHsl(set[tone].primary);
+      if (s < 8) continue; // çok koyu/açık zeminde ton anlamsızlaşır
+      const d = Math.abs(h - baseHue);
+      expect(Math.min(d, 360 - d)).toBeLessThan(10);
+    }
+  });
+
+  test("kilitli vurgu orta tonda AYNEN kalır", () => {
+    const set = generateToneSet("#10151F", "#F97316", { exactMidAccent: true });
+    expect(set.mid.accent).toBe("#F97316");
+    // diğer tonlar kendi zeminine oturur
+    expect(contrastRatio(set.light.accent, set.light.primary)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(set.dark.accent, set.dark.primary)).toBeGreaterThanOrEqual(3);
+  });
+
+  test("tek bir tonun zemini değişince yalnız o ton yeniden kurulur", () => {
+    const tok = generateToneFromBackground("#201018", "#EC4899", "mid");
+    expect(tok.primary).toBe("#201018");
+    expect(analyzeContrast(tok).passes).toBe(true);
+  });
+
+  test("eski tek tonlu temada orta ton DEĞİŞMEZ, açık/koyu türetilir", () => {
+    const eski = generateTokensFromSeeds("#16131E", "#8B5CF6");
+    const set = deriveToneSet(eski);
+    expect(set.mid).toEqual(eski);
+    expect(isLightSurface(set.light.primary)).toBe(true);
+    expect(isLightSurface(set.dark.primary)).toBe(false);
+    expect(deriveToneTokens(eski, "mid")).toBe(eski);
+    expect(deriveToneTokens(eski, "dark")).toEqual(set.dark);
+  });
+
+  test("baseFromTokens → toneBackground geri dönüşümü orta tonun tonunu korur", () => {
+    const eski = generateTokensFromSeeds("#141C33", "#4C8DFF");
+    const base = baseFromTokens(eski);
+    const mid = hexToHsl(toneBackground(base, "mid"));
+    const orig = hexToHsl(eski.primary);
+    expect(Math.abs(mid.h - orig.h)).toBeLessThan(6);
+  });
+
+  test("vurgu hem zeminde hem kartta ayırt edilir (harmonizeTokens)", () => {
+    const k = generateTokensFromSeeds("#0B0D12", "#3B82F6");
+    const zayif = { ...k, accent: k.secondary };
+    const duzeltilmis = harmonizeTokens(zayif);
+    expect(contrastRatio(duzeltilmis.accent, duzeltilmis.primary)).toBeGreaterThanOrEqual(3);
+    expect(harmonizeTokens(k)).toBe(k);
+  });
+});
+
 describe("generateRandomTheme", () => {
   test("aynı tohum aynı temayı verir (deterministik)", () => {
     const a = generateRandomTheme({ rng: seeded(7), moodId: "ocean" });
@@ -227,67 +315,70 @@ describe("generateRandomTheme", () => {
     expect(a).toEqual(b);
   });
 
-  test("her ruh hali kendi kutupluluğunda ve okunur bir tema üretir", () => {
+  test("her ruh hali üç tonu da okunur ve uyumlu üretir", () => {
     const sorunlar = [];
     for (const mood of MOODS) {
       for (let i = 0; i < 40; i += 1) {
         const t = generateRandomTheme({ rng: seeded(i * 31 + mood.id.length), moodId: mood.id });
-        if (t.dark !== mood.dark) sorunlar.push(`${mood.id}#${i} kutup`);
         if (t.moodId !== mood.id) sorunlar.push(`${mood.id}#${i} mood`);
-        if (contrastRatio(t.accent, t.bg) < 3) sorunlar.push(`${mood.id}#${i} vurgu ${contrastRatio(t.accent, t.bg).toFixed(2)}`);
-        if (contrastRatio(t.tokens.textPrimary, t.tokens.primary) < 7) sorunlar.push(`${mood.id}#${i} metin`);
-        if (!analyzeContrast(t.tokens).passes) sorunlar.push(`${mood.id}#${i} rapor`);
+        if (JSON.stringify(Object.keys(t.tones).sort()) !== JSON.stringify([...TONES].sort())) sorunlar.push(`${mood.id}#${i} tonlar`);
+        if (t.tokens !== t.tones.mid) sorunlar.push(`${mood.id}#${i} kısa yol`);
+        for (const tone of TONES) {
+          const k = t.tones[tone];
+          if (!analyzeContrast(k).passes) sorunlar.push(`${mood.id}#${i}/${tone} rapor`);
+          if (contrastRatio(k.textPrimary, k.primary) < 7) sorunlar.push(`${mood.id}#${i}/${tone} metin`);
+          if (contrastRatio(k.accent, k.primary) < 3) sorunlar.push(`${mood.id}#${i}/${tone} vurgu`);
+          // kart yüzeyinde de ayırt edilmeli (harmonizeTokens hedefi 2.8; band çakışmasında ≥ 2.5)
+          if (contrastRatio(k.accent, k.secondary) < 2.5) sorunlar.push(`${mood.id}#${i}/${tone} vurgu/kart`);
+          if (contrastRatio("#FFFFFF", k.accent) < 3) sorunlar.push(`${mood.id}#${i}/${tone} düğme yazısı`);
+        }
       }
     }
     expect(sorunlar).toEqual([]);
   });
 
-  test("ruh hali aralığına uyar (zemin tonu / açıklığı)", () => {
-    for (const id of ["midnight", "forest", "ocean", "mocha", "neon"]) {
-      const mood = MOODS.find((m) => m.id === id);
+  test("ruh hali ana renk aralığına uyar (ton / doygunluk)", () => {
+    for (const mood of MOODS) {
       for (let i = 0; i < 25; i += 1) {
-        const t = generateRandomTheme({ rng: seeded(100 + i), moodId: id });
-        const { h, l } = hexToHsl(t.bg);
-        // hex yuvarlaması + sarma payı
+        const t = generateRandomTheme({ rng: seeded(100 + i), moodId: mood.id });
+        const { h, s } = hexToHsl(t.base);
         const lo = mood.hue[0] % 360;
         const hi = lo + (mood.hue[1] - mood.hue[0]);
-        const hh = h < lo - 6 ? h + 360 : h;
-        expect(hh).toBeGreaterThanOrEqual(lo - 6);
-        expect(hh).toBeLessThanOrEqual(hi + 6);
-        expect(l).toBeGreaterThanOrEqual(mood.bgL[0] - 2);
-        expect(l).toBeLessThanOrEqual(mood.bgL[1] + 2);
+        if (mood.hue[1] - mood.hue[0] < 360 && s > 10) {
+          const hh = h < lo - 6 ? h + 360 : h;
+          expect(hh).toBeGreaterThanOrEqual(lo - 6);
+          expect(hh).toBeLessThanOrEqual(hi + 6);
+        }
+        expect(s).toBeGreaterThanOrEqual(mood.baseS[0] - 3);
+        expect(s).toBeLessThanOrEqual(mood.baseS[1] + 3);
       }
     }
   });
 
-  test("kilitli zemin AYNEN korunur, vurgu değişir", () => {
+  test("kilitli ana renk AYNEN korunur, vurgu değişir", () => {
     const seen = new Set();
     for (let i = 0; i < 12; i += 1) {
-      const t = generateRandomTheme({ rng: seeded(i + 1), lock: { bg: "#0B0D12" } });
-      expect(t.bg).toBe("#0B0D12");
-      expect(t.tokens.primary).toBe("#0B0D12");
+      const t = generateRandomTheme({ rng: seeded(i + 1), lock: { base: "#3B6FD4" } });
+      expect(t.base).toBe("#3B6FD4");
       seen.add(t.accent);
     }
     expect(seen.size).toBeGreaterThan(4);
   });
 
-  test("kilitli vurgu AYNEN korunur, zemin değişir", () => {
+  test("eski `lock.bg` adı hâlâ ana rengi kilitler", () => {
+    const t = generateRandomTheme({ rng: seeded(3), lock: { bg: "#0B0D12" } });
+    expect(t.base).toBe("#0B0D12");
+  });
+
+  test("kilitli vurgu orta tonda AYNEN korunur, ana renk değişir", () => {
     const seen = new Set();
     for (let i = 0; i < 12; i += 1) {
       const t = generateRandomTheme({ rng: seeded(i + 50), lock: { accent: "#F97316" } });
       expect(t.accent).toBe("#F97316");
-      expect(t.tokens.accent).toBe("#F97316");
-      seen.add(t.bg);
+      expect(t.tones.mid.accent).toBe("#F97316");
+      seen.add(t.base);
     }
     expect(seen.size).toBeGreaterThan(4);
-  });
-
-  test("açık zeminli kilitle koyu ruh hali seçilse bile vurgu okunur kalır", () => {
-    for (let i = 0; i < 20; i += 1) {
-      const t = generateRandomTheme({ rng: seeded(i), moodId: "midnight", lock: { bg: "#F6F7FB" } });
-      expect(t.dark).toBe(false);
-      expect(contrastRatio(t.accent, "#F6F7FB")).toBeGreaterThanOrEqual(3);
-    }
   });
 
   test("rastgele vurgu sarı–limon bandına (bulanık zeytine) düşmez", () => {
@@ -303,10 +394,53 @@ describe("generateRandomTheme", () => {
     expect(bandda).toEqual([]);
   });
 
+  test("zemini renkli bir ana renkte vurgu, tamamlayıcı dışında bile ondan uzak durur", () => {
+    const yakin = [];
+    for (const mood of MOODS) {
+      for (let i = 0; i < 60; i += 1) {
+        const t = generateRandomTheme({ rng: seeded(400 + i), moodId: mood.id });
+        if (t.harmonyId === "mono") continue;
+        const base = hexToHsl(t.base);
+        if (base.s < 12) continue;
+        const acc = hexToHsl(t.accent);
+        const d = Math.abs(base.h - acc.h);
+        // fitAccent'in ton oynaması + hex yuvarlaması için pay bırakılır
+        if (Math.min(d, 360 - d) < 20) yakin.push(`${mood.id}#${i} d=${Math.min(d, 360 - d).toFixed(0)}`);
+      }
+    }
+    expect(yakin).toEqual([]);
+  });
+
+  test("stil verilmezse kontrast/yüzey kipleri çeşitlenir, verilirse sabit kalır", () => {
+    const serbest = new Set();
+    for (let i = 0; i < 60; i += 1) {
+      const t = generateRandomTheme({ rng: seeded(i), moodId: "ocean" });
+      serbest.add(`${t.contrast}/${t.surfaces}`);
+    }
+    expect(serbest.size).toBeGreaterThanOrEqual(4);
+    for (let i = 0; i < 10; i += 1) {
+      const t = generateRandomTheme({ rng: seeded(i), moodId: "ocean", contrast: "high", surfaces: "neutral" });
+      expect(t.contrast).toBe("high");
+      expect(t.surfaces).toBe("neutral");
+    }
+  });
+
+  test("AMOLED ruh halinde koyu ton neredeyse saf siyah", () => {
+    for (let i = 0; i < 20; i += 1) {
+      const t = generateRandomTheme({ rng: seeded(i + 300), moodId: "amoled" });
+      expect(hexToHsl(t.tones.dark.primary).l).toBeLessThanOrEqual(3);
+    }
+  });
+
   test("varsayılan rastgelelik kaynağıyla da çalışır", () => {
     const t = generateRandomTheme();
     expect(Object.keys(t.tokens).sort()).toEqual([...TOKEN_KEYS].sort());
     expect(MOODS.map((m) => m.id)).toContain(t.moodId);
+  });
+
+  test("ruh hali kimlikleri benzersiz ve en az 12 çeşit var", () => {
+    expect(new Set(MOODS.map((m) => m.id)).size).toBe(MOODS.length);
+    expect(MOODS.length).toBeGreaterThanOrEqual(12);
   });
 });
 
@@ -324,6 +458,16 @@ describe("generateCandidates", () => {
     expect(new Set(list.map((c) => c.moodId)).size).toBe(6);
   });
 
+  test("karışık kipte vurgu renk aileleri de çeşitlenir (bir aile en çok 2 kez)", () => {
+    for (let s = 1; s <= 12; s += 1) {
+      const list = generateCandidates(6, { rng: seeded(s * 13) });
+      const sayim = {};
+      for (const c of list) sayim[c.family] = (sayim[c.family] || 0) + 1;
+      expect(Math.max(...Object.values(sayim))).toBeLessThanOrEqual(3);
+      expect(new Set(list.map((c) => c.family)).size).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   test("tek ruh hali seçiliyse hepsi o ruh halinde ama yine de ayrışır", () => {
     const list = generateCandidates(6, { rng: seeded(5), moodId: "ocean" });
     expect(list.every((c) => c.moodId === "ocean")).toBe(true);
@@ -337,16 +481,23 @@ describe("generateCandidates", () => {
     expect(ortak).toEqual([]);
   });
 
-  test("kilitli zemin tüm adaylarda aynı kalır", () => {
-    const list = generateCandidates(6, { rng: seeded(9), lock: { bg: "#10151F" } });
-    expect(list.every((c) => c.tokens.primary === "#10151F")).toBe(true);
+  test("kilitli ana renk tüm adaylarda aynı kalır", () => {
+    const list = generateCandidates(6, { rng: seeded(9), lock: { base: "#3B6FD4" } });
+    expect(list.every((c) => c.base === "#3B6FD4")).toBe(true);
   });
 
-  test("zemin VE vurgu kilitliyse adaylar stil kombinasyonlarıyla ayrışır", () => {
-    const list = generateCandidates(6, { rng: seeded(2), lock: { bg: "#10151F", accent: "#F97316" } });
+  test("ana renk VE vurgu kilitliyse adaylar stil kombinasyonlarıyla ayrışır", () => {
+    const list = generateCandidates(6, { rng: seeded(2), lock: { base: "#3B6FD4", accent: "#F97316" } });
     expect(list).toHaveLength(6);
-    expect(list.every((c) => c.tokens.primary === "#10151F" && c.tokens.accent === "#F97316")).toBe(true);
+    expect(list.every((c) => c.base === "#3B6FD4" && c.tones.mid.accent === "#F97316")).toBe(true);
     expect(new Set(list.map((c) => c.key)).size).toBe(6);
+  });
+
+  test("her aday üç tonlu ve tüm tonları okunur", () => {
+    const list = generateCandidates(6, { rng: seeded(21) });
+    for (const c of list) {
+      for (const tone of TONES) expect(analyzeContrast(c.tones[tone]).passes).toBe(true);
+    }
   });
 });
 

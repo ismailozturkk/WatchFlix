@@ -42,7 +42,7 @@ import {
   isPresetRecommendedFor,
   isValidPresetId,
 } from "../utils/typographyRoles";
-import { THEME_NAMES } from "../theme/colors";
+import { FAMILY_THEME_KEYS } from "../theme/colors";
 
 const { AI_PLAN_LIMITS: SERVER_AI_PLAN_LIMITS } = require("../functions/aiQuota");
 const {
@@ -105,7 +105,7 @@ describe("kayıt bütünlüğü", () => {
   });
 
   test("ödeme ekranındaki hazır tema sayısı gerçek tema sayısıyla aynı", () => {
-    expect(PRESET_THEME_COUNT).toBe(THEME_NAMES.length);
+    expect(PRESET_THEME_COUNT).toBe(FAMILY_THEME_KEYS.length);
   });
 });
 
@@ -300,7 +300,7 @@ describe("metinler", () => {
     expect(formatFeatureValue("ai_messages", FREE, "tr")).toBe("3/gün · 30/ay");
     expect(formatFeatureValue("identity_badge", FREE, "tr")).toBe("—");
     expect(formatFeatureValue("identity_badge", MAX, "tr")).toBe("Efsanevi rozet");
-    expect(formatFeatureValue("custom_themes", FREE, "tr")).toBe("8 hazır tema");
+    expect(formatFeatureValue("custom_themes", FREE, "tr")).toBe("9 hazır tema");
     expect(formatFeatureValue("font_catalog", PREMIUM, "en")).toBe("56 fonts");
   });
 

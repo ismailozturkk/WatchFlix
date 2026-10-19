@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { Animated, Easing, Image, StyleSheet } from "react-native";
 import { captureScreen, releaseCapture } from "react-native-view-shot";
-import { buildCustomTheme, getThemeColors } from "../theme/colors";
+import { buildCustomThemeFromEntry, getThemeColors, parseCustomSelection } from "../theme/colors";
 import { useThemeSettings } from "./AppSettingsContext";
 import { Keys } from "../services/storage";
 import { usePremiumPlanSnapshot } from "../services/premiumState";
@@ -19,11 +19,11 @@ const ThemeContext = createContext();
 // Eski ekran görüntüsünün yeni renklerin üzerinden solma süresi.
 const THEME_FADE_MS = 450;
 
-// "custom:<id>" veya eski "custom" seçimine karşılık gelen özel temayı bulur.
+// "custom:<id>[:ton]" veya eski "custom" seçimine karşılık gelen özel temayı ve tonunu bulur.
 const findCustomTheme = (selectedTheme, customThemes) => {
-  if (!selectedTheme || !selectedTheme.startsWith("custom")) return null;
-  const id = selectedTheme.includes(":") ? selectedTheme.split(":")[1] : null;
-  if (id) return customThemes.find((t) => t.id === id) || null;
+  const selection = parseCustomSelection(selectedTheme);
+  if (!selection) return null;
+  if (selection.id) return customThemes.find((t) => t.id === selection.id) || null;
   return customThemes[0] || null; // legacy "custom" -> ilk özel tema
 };
 
@@ -160,7 +160,7 @@ export const ThemeProvider = ({ children }) => {
     const theme = customLocked
       ? getThemeColors(Keys.theme.default)
       : custom
-        ? buildCustomTheme(custom.tokens)
+        ? buildCustomThemeFromEntry(custom, parseCustomSelection(selectedTheme).tone)
         : isCustomSelection && lastThemeRef.current
           ? lastThemeRef.current
           : getThemeColors(selectedTheme);
