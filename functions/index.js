@@ -17,6 +17,7 @@
 
 const {
   onDocumentCreated,
+  onDocumentDeleted,
   onDocumentUpdated,
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
@@ -34,10 +35,10 @@ const { defineSecret } = require("firebase-functions/params");
 // modüler girişler kullanılır (firebase-admin/app + firebase-admin/firestore).
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { getDatabase } = require("firebase-admin/database");
 const { Expo } = require("expo-server-sdk");
-const { createHash, timingSafeEqual } = require("node:crypto");
+const { createHash, randomInt, timingSafeEqual } = require("node:crypto");
 const { extractRegionProviders, computeNewlyAvailable } = require("./streamingDiff");
 const externalRatings = require("./externalRatings");
 const weeklyDigest = require("./weeklyDigest");
@@ -70,6 +71,7 @@ const {
   sumUnreadMessages,
 } = require("./appBadge");
 const { isRecipientViewingChat } = require("./chatPresence");
+const referral = require("./referral");
 
 initializeApp();
 const db = getFirestore();
@@ -132,20 +134,43 @@ async function fetchRevenueCatPremiumState(uid) {
  * herkese açık profil belgesinde yalnız plan, ayrıntılar sahibine özel
  * Users/{uid}/private/entitlements'ta. `writer` bir transaction veya batch.
  */
-function writeEntitlements(writer, uid, state, { store, source, extraPrivate } = {}) {
+// ETKİN PLAN = max(RevenueCat durumu, süren ücretsiz-ay promosyonu). Promosyon
+// (`promoUntil`) mağaza aboneliği değildir ama webhook bu belgeyi her olayda
+// yeniden yazar; promosyonu burada birleştirmezsek ilk olayda silinirdi.
+//   • `currentEntitlements`: kullanıcı belgesindeki mevcut alan (promoUntil buradan).
+//   • `promoUntilMs`: verilirse promosyon bitişi bu değerle DEĞİŞTİRİLİR (kod/ödül).
+function writeEntitlements(
+  writer,
+  uid,
+  state,
+  { store, source, extraPrivate, currentEntitlements, promoUntilMs } = {},
+) {
+  const nowMs = Date.now();
+  const promo = Number.isFinite(promoUntilMs)
+    ? { untilMs: promoUntilMs, plan: referral.PROMO_PLAN }
+    : referral.readPromo(currentEntitlements, nowMs);
+  const applied = referral.applyPromoToState(state, promo, nowMs);
+  const effectiveSource = applied.source || source || "revenuecat";
   const { publicEntitlements, privateEntitlements } = buildEntitlementDocuments(
-    state,
-    { store, source },
+    applied.state,
+    { store: applied.source ? null : store, source: effectiveSource },
   );
   const legacyCleanup = Object.fromEntries(
     LEGACY_PUBLIC_ENTITLEMENT_FIELDS.map((field) => [field, FieldValue.delete()]),
   );
+  // Süren promosyon korunur; dolmuş olan temizlenir (saatlik süpürme de aynısını yapar).
+  const promoField = !promo
+    ? {}
+    : promo.untilMs > nowMs
+      ? { promoUntil: Timestamp.fromMillis(promo.untilMs) }
+      : { promoUntil: FieldValue.delete() };
   writer.set(
     db.doc(`Users/${uid}`),
     {
       entitlements: {
         ...publicEntitlements,
         ...legacyCleanup,
+        ...promoField,
         premiumSyncedAt: FieldValue.serverTimestamp(),
       },
     },
@@ -160,6 +185,56 @@ function writeEntitlements(writer, uid, state, { store, source, extraPrivate } =
     },
     { merge: true },
   );
+}
+
+/**
+ * Webhook transaction'ının OKUMA aşaması: her değişen kullanıcı için davet
+ * kaydını (ve gerekirse davet edenin hesabını) okuyup ne yazılacağını hesaplar.
+ * Yazmalar `applyReferralUpdate` ile, tüm okumalar bittikten sonra yapılır.
+ */
+async function planReferralUpdates(tx, changes, userSnaps, event) {
+  if (!referral.isSubscriptionStartEvent(event)) return [];
+  const plans = [];
+  for (let index = 0; index < changes.length; index += 1) {
+    const { uid, state } = changes[index];
+    if (!userSnaps[index].exists || !state.premium) continue;
+    const referralRef = db.doc(`Referrals/${uid}`);
+    const referralSnap = await tx.get(referralRef);
+    if (!referralSnap.exists) continue;
+    const record = referralSnap.data();
+    const inviterRef = db.doc(`ReferralAccounts/${record.inviterUid}`);
+    const inviterSnap = await tx.get(inviterRef);
+    const update = referral.planReferralUpdate({
+      referral: {
+        inviterUid: record.inviterUid,
+        subscribedAt: record.subscribedAt?.toMillis?.() || null,
+        rewardedAt: record.rewardedAt?.toMillis?.() || null,
+      },
+      event,
+      inviterEarnedMonths: inviterSnap.get("earnedMonths") || 0,
+      nowMs: Date.now(),
+    });
+    if (update) plans.push({ ...update, referralRef, inviterRef });
+  }
+  return plans;
+}
+
+function applyReferralUpdate(tx, { patch, reward, capped, referralRef, inviterRef }) {
+  const fields = {};
+  if (patch.subscribedAt) fields.subscribedAt = Timestamp.fromMillis(patch.subscribedAt);
+  if (patch.rewardedAt) fields.rewardedAt = Timestamp.fromMillis(patch.rewardedAt);
+  if (capped) fields.rewardCapped = true;
+  tx.set(referralRef, fields, { merge: true });
+  if (reward) {
+    tx.set(
+      inviterRef,
+      {
+        creditMonths: FieldValue.increment(1),
+        earnedMonths: FieldValue.increment(1),
+      },
+      { merge: true },
+    );
+  }
 }
 
 exports.revenueCatWebhook = onRequest(
@@ -243,13 +318,22 @@ exports.revenueCatWebhook = onRequest(
         changes.map((change) => tx.get(db.doc(`Users/${change.uid}`))),
       );
 
+      // Arkadaş daveti: satın alan davetliyse "abone oldu" işaretlenir ve ilk
+      // ücretli dönemde davet edene ücretsiz ay yazılır. Transaction içinde:
+      // webhook yeniden denenirse ödül ikinci kez verilmez (rewardedAt).
+      const referralPlans = transferChanges.length
+        ? []
+        : await planReferralUpdates(tx, changes, userSnaps, event);
+
       changes.forEach((change, index) => {
         if (!userSnaps[index].exists) return;
         writeEntitlements(tx, change.uid, change.state, {
           store: event.store || null,
           source: "revenuecat",
+          currentEntitlements: userSnaps[index].get("entitlements"),
         });
       });
+      referralPlans.forEach((plan) => applyReferralUpdate(tx, plan));
       tx.create(eventRef, {
         eventId: String(event.id),
         type: event.type,
@@ -312,9 +396,389 @@ exports.syncPremiumStatus = onCall(
     writeEntitlements(batch, uid, state, {
       source: "revenuecat_sync",
       extraPrivate: { manualSyncAt: FieldValue.serverTimestamp() },
+      currentEntitlements: userSnap.get("entitlements"),
     });
     await batch.commit();
     return { plan: state.premiumPlan, throttled: false };
+  },
+);
+
+// ─── Arkadaş daveti + promosyon kodu ─────────────────────────────────────────
+// Kurallar functions/referral.js'te; burada yalnız Firestore bağlantısı var.
+// Tüm belgeler (ReferralCodes, ReferralAccounts, Referrals, PromoCodes) yalnız
+// Admin SDK'ya açıktır (firestore.rules): kod uydurma ve ödül yazma istemciden
+// mümkün değil.
+
+const FREE_PLAN_STATE = Object.freeze({
+  premium: false,
+  premiumUnlimited: false,
+  premiumPlan: "free",
+  productId: null,
+  expiresAt: null,
+});
+
+function referralFailure(reason) {
+  const code =
+    reason === referral.REASONS.NOT_FOUND
+      ? "not-found"
+      : reason === referral.REASONS.RATE_LIMITED
+        ? "resource-exhausted"
+        : "failed-precondition";
+  return new HttpsError(code, reason, { reason });
+}
+
+function dayKeyUtc(ms) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** Kullanıcının davet kodu; yoksa çakışmasız üretip kaydeder. */
+async function ensureReferralCode(uid) {
+  const accountRef = db.doc(`ReferralAccounts/${uid}`);
+  const existing = (await accountRef.get()).get("code");
+  if (existing) return existing;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const code = referral.generateReferralCode(randomInt);
+    const codeRef = db.doc(`ReferralCodes/${code}`);
+    const result = await db.runTransaction(async (tx) => {
+      const [accountSnap, codeSnap] = await Promise.all([
+        tx.get(accountRef),
+        tx.get(codeRef),
+      ]);
+      if (accountSnap.get("code")) return accountSnap.get("code");
+      if (codeSnap.exists) return null; // çakışma: yeni kod dene
+      tx.create(codeRef, { ownerUid: uid, createdAt: FieldValue.serverTimestamp() });
+      tx.set(
+        accountRef,
+        { code, createdAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      return code;
+    });
+    if (result) return result;
+  }
+  throw new HttpsError("internal", "Could not allocate a referral code");
+}
+
+function profileSummary(snap) {
+  if (!snap?.exists) return null;
+  const data = snap.data();
+  return {
+    uid: snap.id,
+    name: data.displayName || data.username || "",
+    username: data.username || "",
+    avatarIndex: typeof data.avatarIndex === "number" ? data.avatarIndex : 0,
+    photoURL: typeof data.photoURL === "string" ? data.photoURL : null,
+  };
+}
+
+/**
+ * Davet ekranının tüm verisi: kodum, davet ettiklerim (kayıtlı / abone / ödül),
+ * kazandığım ücretsiz aylar ve BEN davetle geldiysem ilk ay indirimim.
+ */
+exports.getReferralOverview = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  const uid = request.auth.uid;
+  const userSnap = await db.doc(`Users/${uid}`).get();
+  if (!userSnap.exists) throw new HttpsError("failed-precondition", "Profile required");
+
+  const code = await ensureReferralCode(uid);
+  const nowMs = Date.now();
+  const [accountSnap, inviteesSnap, ownReferralSnap] = await Promise.all([
+    db.doc(`ReferralAccounts/${uid}`).get(),
+    db.collection("Referrals").where("inviterUid", "==", uid).limit(200).get(),
+    db.doc(`Referrals/${uid}`).get(),
+  ]);
+
+  const inviteeRefs = inviteesSnap.docs.map((doc) => db.doc(`Users/${doc.id}`));
+  const ownInviterRef = ownReferralSnap.exists
+    ? db.doc(`Users/${ownReferralSnap.get("inviterUid")}`)
+    : null;
+  const profileSnaps = inviteeRefs.length || ownInviterRef
+    ? await db.getAll(...inviteeRefs, ...(ownInviterRef ? [ownInviterRef] : []))
+    : [];
+
+  const invitees = inviteesSnap.docs
+    .map((doc, index) => {
+      const profile = profileSummary(profileSnaps[index]);
+      if (!profile) return null; // hesabı silinmiş davetli listede görünmez
+      const data = doc.data();
+      return {
+        ...profile,
+        status: referral.inviteeStatus({
+          subscribedAt: data.subscribedAt,
+          rewardedAt: data.rewardedAt,
+        }),
+        joinedAtMs: data.createdAt?.toMillis?.() || null,
+        subscribedAtMs: data.subscribedAt?.toMillis?.() || null,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b.joinedAtMs || 0) - (a.joinedAtMs || 0));
+
+  const counts = { registered: 0, subscribed: 0, rewarded: 0 };
+  invitees.forEach((item) => {
+    counts.registered += 1;
+    if (item.status !== "registered") counts.subscribed += 1;
+    if (item.status === "rewarded") counts.rewarded += 1;
+  });
+
+  const entitlements = userSnap.get("entitlements");
+  const promo = referral.readPromo(entitlements, nowMs);
+  const inviterProfile = ownInviterRef
+    ? profileSummary(profileSnaps[profileSnaps.length - 1])
+    : null;
+
+  return {
+    code,
+    displayCode: referral.formatCodeForDisplay(code),
+    creditMonths: accountSnap.get("creditMonths") || 0,
+    earnedMonths: accountSnap.get("earnedMonths") || 0,
+    maxMonths: referral.REFERRAL.MAX_REWARD_MONTHS,
+    rewardDays: referral.REFERRAL.REWARD_DAYS,
+    promoUntilMs: promo?.active ? promo.untilMs : null,
+    storeSubscribed: referral.hasActiveStoreSubscription(entitlements),
+    invitees,
+    counts,
+    // Ben davetle geldiysem: kimin kodu + ilk ay indirimim hâlâ geçerli mi.
+    invitedBy: ownReferralSnap.exists
+      ? {
+          name: inviterProfile?.name || "",
+          discount: referral.inviteeDiscountFor({
+            subscribedAt: ownReferralSnap.get("subscribedAt"),
+          }),
+        }
+      : null,
+    limits: {
+      discountPercent: referral.REFERRAL.INVITEE_DISCOUNT_PERCENT,
+      offerId: referral.REFERRAL.INVITEE_OFFER_ID,
+      windowDays: referral.REFERRAL.REDEEM_WINDOW_DAYS,
+    },
+  };
+});
+
+/**
+ * Tek kod alanı: promosyon kodu (yönetici üretir, N kişiyle sınırlı, 1 ay ücretsiz)
+ * ya da bir arkadaşın davet kodu (ilk ay indirimi) kabul edilir.
+ * Hepsi tek transaction'da: sayaç, kullanım kaydı ve plan birlikte yazılır.
+ */
+exports.redeemCode = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  const uid = request.auth.uid;
+  const code = referral.normalizeCode(request.data?.code);
+  if (!code) throw referralFailure(referral.REASONS.NOT_FOUND);
+
+  let accountCreatedMs = null;
+  try {
+    const record = await getAuth().getUser(uid);
+    const created = Date.parse(record.metadata?.creationTime || "");
+    if (Number.isFinite(created)) accountCreatedMs = created;
+  } catch (error) {
+    console.warn(`[redeemCode] auth lookup failed uid=${uid}:`, error?.message);
+  }
+
+  const nowMs = Date.now();
+  const userRef = db.doc(`Users/${uid}`);
+  const accountRef = db.doc(`ReferralAccounts/${uid}`);
+  const privateEntRef = db.doc(`Users/${uid}/private/entitlements`);
+  const promoRef = db.doc(`PromoCodes/${code}`);
+  const redemptionRef = db.doc(`PromoCodes/${code}/redemptions/${uid}`);
+  const referralCodeRef = db.doc(`ReferralCodes/${code}`);
+  const ownReferralRef = db.doc(`Referrals/${uid}`);
+
+  const outcome = await db.runTransaction(async (tx) => {
+    const [
+      userSnap,
+      accountSnap,
+      privateEntSnap,
+      promoSnap,
+      redemptionSnap,
+      referralCodeSnap,
+      ownReferralSnap,
+    ] = await Promise.all([
+      tx.get(userRef),
+      tx.get(accountRef),
+      tx.get(privateEntRef),
+      tx.get(promoRef),
+      tx.get(redemptionRef),
+      tx.get(referralCodeRef),
+      tx.get(ownReferralRef),
+    ]);
+    if (!userSnap.exists) return { fail: "profile-required" };
+
+    const budget = referral.checkAttemptBudget(
+      accountSnap.get("attempts"),
+      dayKeyUtc(nowMs),
+    );
+    if (!budget.allowed) return { fail: referral.REASONS.RATE_LIMITED };
+    // Başarısızlıkta sayaç işlenir; başarıda dokunulmaz.
+    const failWith = (reason) => {
+      tx.set(accountRef, { attempts: budget.next }, { merge: true });
+      return { fail: reason };
+    };
+
+    const entitlements = userSnap.get("entitlements");
+
+    if (promoSnap.exists) {
+      const verdict = referral.evaluatePromoCode(promoSnap.data(), nowMs);
+      if (!verdict.ok) return failWith(verdict.reason);
+      // Hesap başına TEK promosyon kodu: kodlar tek tek harcanıp yığılmasın.
+      if (redemptionSnap.exists || accountSnap.get("promoRedeemedCode")) {
+        return failWith(referral.REASONS.ALREADY_REDEEMED);
+      }
+      if (referral.hasActiveStoreSubscription(entitlements)) {
+        return failWith(referral.REASONS.STORE_SUBSCRIBED);
+      }
+      const days = Number.isFinite(promoSnap.get("days"))
+        ? promoSnap.get("days")
+        : referral.PROMO_DEFAULT_DAYS;
+      const currentUntil = referral.readPromo(entitlements, nowMs);
+      const untilMs = referral.extendPromoUntil(currentUntil?.untilMs, nowMs, days);
+
+      tx.update(promoRef, { redeemedCount: FieldValue.increment(1) });
+      tx.create(redemptionRef, { redeemedAt: FieldValue.serverTimestamp() });
+      tx.set(accountRef, { promoRedeemedCode: code }, { merge: true });
+      writeEntitlements(tx, uid, FREE_PLAN_STATE, {
+        source: "promo",
+        currentEntitlements: entitlements,
+        promoUntilMs: untilMs,
+      });
+      return { kind: "promo", days, untilMs };
+    }
+
+    if (referralCodeSnap.exists) {
+      const ownerUid = referralCodeSnap.get("ownerUid");
+      const verdict = referral.evaluateReferralRedemption({
+        ownerUid,
+        redeemerUid: uid,
+        existingReferral: ownReferralSnap.exists ? ownReferralSnap.data() : null,
+        accountCreatedMs,
+        nowMs,
+        purchased: Boolean(privateEntSnap.get("productId")),
+        storeSubscribed: referral.hasActiveStoreSubscription(entitlements),
+      });
+      if (!verdict.ok) return failWith(verdict.reason);
+      tx.create(ownReferralRef, {
+        inviterUid: ownerUid,
+        code,
+        createdAt: FieldValue.serverTimestamp(),
+        subscribedAt: null,
+        rewardedAt: null,
+      });
+      return { kind: "referral", ownerUid };
+    }
+
+    return failWith(referral.REASONS.NOT_FOUND);
+  });
+
+  if (outcome.fail === "profile-required") {
+    throw new HttpsError("failed-precondition", "Profile required");
+  }
+  if (outcome.fail) throw referralFailure(outcome.fail);
+
+  if (outcome.kind === "promo") {
+    return { kind: "promo", days: outcome.days, untilMs: outcome.untilMs };
+  }
+  const ownerSnap = await db.doc(`Users/${outcome.ownerUid}`).get();
+  return {
+    kind: "referral",
+    inviterName: profileSummary(ownerSnap)?.name || "",
+    discount: referral.inviteeDiscountFor({}),
+  };
+});
+
+/** Birikmiş davet ödülünü (1 ay) başlatır. Mağaza aboneliği sürerken başlatılamaz. */
+exports.claimReferralReward = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  const uid = request.auth.uid;
+  const userRef = db.doc(`Users/${uid}`);
+  const accountRef = db.doc(`ReferralAccounts/${uid}`);
+
+  const untilMs = await db.runTransaction(async (tx) => {
+    const [userSnap, accountSnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(accountRef),
+    ]);
+    if (!userSnap.exists) throw new HttpsError("failed-precondition", "Profile required");
+    if ((accountSnap.get("creditMonths") || 0) < 1) {
+      throw referralFailure(referral.REASONS.NO_CREDIT);
+    }
+    const entitlements = userSnap.get("entitlements");
+    if (referral.hasActiveStoreSubscription(entitlements)) {
+      throw referralFailure(referral.REASONS.STORE_SUBSCRIBED);
+    }
+    const nowMs = Date.now();
+    const current = referral.readPromo(entitlements, nowMs);
+    const next = referral.extendPromoUntil(
+      current?.untilMs,
+      nowMs,
+      referral.REFERRAL.REWARD_DAYS,
+    );
+    tx.set(accountRef, { creditMonths: FieldValue.increment(-1) }, { merge: true });
+    writeEntitlements(tx, uid, FREE_PLAN_STATE, {
+      source: "promo",
+      currentEntitlements: entitlements,
+      promoUntilMs: next,
+    });
+    return next;
+  });
+  return { untilMs };
+});
+
+/**
+ * Süresi dolan ücretsiz ayları temizler: etkin plan RevenueCat'in gerçek
+ * durumuna döner (arada abone olduysa abone kalır). İstemci süreyi kendisi de
+ * kontrol eder; bu süpürme sunucu kapılarını (kurallar, AI kotası) düzeltir.
+ */
+exports.expirePromoGrants = onSchedule(
+  {
+    schedule: "every 60 minutes",
+    timeZone: "Etc/UTC",
+    secrets: [REVENUECAT_SECRET_API_KEY],
+  },
+  async () => {
+    const expired = await db
+      .collection("Users")
+      .where("entitlements.promoUntil", "<=", Timestamp.now())
+      .limit(200)
+      .get();
+    let cleared = 0;
+    for (const doc of expired.docs) {
+      try {
+        const state = await fetchRevenueCatPremiumState(doc.id);
+        const batch = db.batch();
+        writeEntitlements(batch, doc.id, state, {
+          source: "revenuecat_sync",
+          currentEntitlements: doc.get("entitlements"),
+        });
+        await batch.commit();
+        cleared += 1;
+      } catch (error) {
+        console.warn(`[expirePromoGrants] uid=${doc.id}:`, error?.message);
+      }
+    }
+    console.log(`[expirePromoGrants] ${cleared}/${expired.size} cleared`);
+  },
+);
+
+/** Hesap silinince davet verisi de silinir (kod, davet hesabı, davet kayıtları). */
+exports.cleanupReferralOnUserDeleted = onDocumentDeleted(
+  "Users/{uid}",
+  async (event) => {
+    const uid = event.params.uid;
+    const accountRef = db.doc(`ReferralAccounts/${uid}`);
+    const accountSnap = await accountRef.get();
+    const batch = db.batch();
+    const code = accountSnap.get("code");
+    if (code) batch.delete(db.doc(`ReferralCodes/${code}`));
+    if (accountSnap.exists) batch.delete(accountRef);
+    batch.delete(db.doc(`Referrals/${uid}`));
+    const invited = await db
+      .collection("Referrals")
+      .where("inviterUid", "==", uid)
+      .limit(400)
+      .get();
+    invited.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
   },
 );
 

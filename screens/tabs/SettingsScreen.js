@@ -57,6 +57,7 @@ import { usePremium } from "@context/PremiumContext";
 import { shouldShowMemberBar } from "@utils/premiumMemberBar";
 import useAiPrefs from "@hooks/useAiPrefs";
 import { getAiCopy } from "@utils/aiCopy";
+import { getReferralCopy } from "@utils/referralCopy";
 import { countCustomizedPrefs } from "@utils/aiPrefs";
 import DevPlanSimulatorCard from "@components/settings/DevPlanSimulatorCard";
 import FeedbackSettingsGroup from "@components/settings/FeedbackSettingsGroup";
@@ -378,6 +379,7 @@ export default function SettingsScreen() {
   const { t, language, toggleLanguage } = useLanguage();
   const copyExport = getLibraryExportCopy(language);
   const aiCopy = useMemo(() => getAiCopy(language), [language]);
+  const referralCopy = useMemo(() => getReferralCopy(language), [language]);
   const { prefs: aiPrefs } = useAiPrefs();
   const aiCustomCount = countCustomizedPrefs(aiPrefs);
   const { theme } = useTheme();
@@ -575,6 +577,26 @@ export default function SettingsScreen() {
             />
           </View>
         )}
+        {/* Arkadaş daveti: abone olsun olmasın herkes için (kod paylaşımı + kod girişi) */}
+        <View
+          style={[
+            s.card,
+            s.cardStacked,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName="gift-outline"
+            title={referralCopy.rowTitle}
+            subtitle={referralCopy.rowSubtitle}
+            onPress={() => navigation.navigate("ReferralScreen")}
+            right={<Chevron color={C.muted} />}
+            last
+          />
+        </View>
         {/* Yalnız geliştirme build'inde: premium kapılarını mağazasız dene */}
         {__DEV__ ? <DevPlanSimulatorCard /> : null}
 
@@ -615,8 +637,7 @@ export default function SettingsScreen() {
         {/* ── Görünüm: tema, kişiselleştirme, poster düzeni, widget'lar, dokunsal geri bildirim ── */}
         <SectionLabel color={C.muted}>{t.appearance.toUpperCase()}</SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          {/* Ayrı "Görünüm" başlık satırı kaldırıldı — SettingsTheme'in kendi
-              "Aktif tema" özet satırı bu görevi üstleniyor. */}
+          {/* Ayrı "Görünüm" başlık satırı yok — tema satırları (seçili olan vurgulu) bu görevi görüyor. */}
           <SettingsTheme />
         </View>
         <View

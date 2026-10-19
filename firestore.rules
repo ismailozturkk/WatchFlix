@@ -328,6 +328,27 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Arkadaş daveti + promosyon kodları: ücretsiz ay ödülü ve kod sayaçları
+    // yalnız Cloud Functions'a (Admin SDK) aittir. İstemci hiçbirini okuyamaz ya
+    // da yazamaz; ekran verisi `getReferralOverview` callable'ından gelir.
+    // (Varsayılan ret zaten bunu sağlar; açık yazılı olması kuralı yanlışlıkla
+    // genişletecek bir değişikliği testte yakalar: __tests__/rules.)
+    match /ReferralCodes/{code} {
+      allow read, write: if false;
+    }
+    match /ReferralAccounts/{uid} {
+      allow read, write: if false;
+    }
+    match /Referrals/{inviteeUid} {
+      allow read, write: if false;
+    }
+    match /PromoCodes/{code} {
+      allow read, write: if false;
+      match /redemptions/{uid} {
+        allow read, write: if false;
+      }
+    }
+
     // friends subcollection — sahibi okur; sahibi VEYA arkadaşın kendisi
     // (cross-write için) yazabilir / silebilir.
     match /Users/{uid}/friends/{friendUid} {

@@ -118,9 +118,16 @@ export async function loadIntroEligibleProductIds(productIdentifiers = []) {
 // `customerInfo` verilirse ve kullanıcının aktif bir Play aboneliği varsa
 // satın alma bir ÜRÜN DEĞİŞİMİ olarak gönderilir (bkz. getStoreProductChange);
 // aksi halde Google Play ikinci bir abonelik açar ve iki kez ücret keser.
+//
+// `referralHandle` (utils/premium getPackageReferralOffer().handle): arkadaş davetinin
+// ilk dönem indirimi. Varsayılan teklif yerine mağazadaki özel teklifle satın alınır.
 export async function purchaseRevenueCatPackage(
   aPackage,
-  { customerInfo = null, entitlementId = PREMIUM_ENTITLEMENT_ID } = {},
+  {
+    customerInfo = null,
+    entitlementId = PREMIUM_ENTITLEMENT_ID,
+    referralHandle = null,
+  } = {},
 ) {
   const change = getStoreProductChange({
     customerInfo,
@@ -137,9 +144,26 @@ export async function purchaseRevenueCatPackage(
       }
     : null;
 
-  const result = aPackage?.isStandaloneProduct
-    ? await Purchases.purchaseStoreProduct(aPackage.product, productChangeInfo)
-    : await Purchases.purchasePackage(aPackage, null, productChangeInfo);
+  let result;
+  if (referralHandle?.kind === "play" && referralHandle.option) {
+    result = await Purchases.purchaseSubscriptionOption(
+      referralHandle.option,
+      productChangeInfo,
+    );
+  } else if (referralHandle?.kind === "apple" && referralHandle.discount) {
+    // İmza RevenueCat'ten gelir (App Store Connect abonelik anahtarı panelde yüklü olmalı).
+    const promotionalOffer = await Purchases.getPromotionalOffer(
+      aPackage.product,
+      referralHandle.discount,
+    );
+    result = promotionalOffer
+      ? await Purchases.purchaseDiscountedPackage(aPackage, promotionalOffer)
+      : await Purchases.purchasePackage(aPackage, null, productChangeInfo);
+  } else {
+    result = aPackage?.isStandaloneProduct
+      ? await Purchases.purchaseStoreProduct(aPackage.product, productChangeInfo)
+      : await Purchases.purchasePackage(aPackage, null, productChangeInfo);
+  }
 
   const product = aPackage?.product || {};
   const params = {

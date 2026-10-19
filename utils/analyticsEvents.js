@@ -121,6 +121,12 @@ export const ANALYTICS_EVENTS = {
   // Film/Dizi sekmesindeki "Takip ettiklerinin yaklaşanları" rafından bir yapımın açılması.
   // Rafın işe yarayıp yaramadığını söyleyen tek sinyal. `media_type` = "movie" | "tv".
   FOLLOWED_UPCOMING_OPENED: "followed_upcoming_opened",
+  // Arkadaş daveti (screens/tabs/settings/ReferralScreen). `action` = "share" | "copy" (kod paylaşıldı /
+  // kopyalandı) | "claim" (kazanılan ücretsiz ay başlatıldı). Kod/isim GÖNDERİLMEZ.
+  REFERRAL_ACTION: "referral_action",
+  // "Kodun var mı?" sayfasında kod denendi. `outcome` = "promo" | "referral" | red gerekçesi
+  // (örn. "code-exhausted"). Davet hunisinin (paylaş → kod girildi → abone oldu) ortasını ölçer.
+  CODE_REDEEM: "code_redeem",
 };
 
 /** Ölçüm hunisinde kullanılan kullanıcı özellikleri. */

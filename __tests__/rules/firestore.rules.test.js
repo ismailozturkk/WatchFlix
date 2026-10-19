@@ -1347,3 +1347,49 @@ describe("Feedback (geri bildirim kutusu)", () => {
     await assertFails(deleteDoc(doc(alice, "Feedback", id)));
   });
 });
+
+// Arkadaş daveti + promosyon kodu: tüm koleksiyonlar yalnız Cloud Functions'a ait
+// (functions/index.js → getReferralOverview / redeemCode / claimReferralReward).
+// İstemci ne okuyabilir ne yazabilir: yoksa herkes kendine ücretsiz ay yazar, kod
+// sayaçlarını sıfırlar ya da başkasının davet kodunu/davetlilerini listeler.
+describe("davet ve promosyon kodlari yalniz sunucuya acik", () => {
+  const KAPALI = [
+    ["ReferralCodes", "ABCDEFGH", { ownerUid: ALICE }],
+    ["ReferralAccounts", ALICE, { code: "ABCDEFGH", creditMonths: 1 }],
+    ["Referrals", BOB, { inviterUid: ALICE, subscribedAt: null, rewardedAt: null }],
+    ["PromoCodes", "PROMO123", { days: 30, maxRedemptions: 5, redeemedCount: 0 }],
+  ];
+
+  test.each(KAPALI)("%s: sahibi bile okuyamaz ve yazamaz", async (koleksiyon, id, veri) => {
+    await seed((db) => setDoc(doc(db, koleksiyon, id), veri));
+    await assertFails(getDoc(doc(alice, koleksiyon, id)));
+    await assertFails(setDoc(doc(alice, koleksiyon, `${id}X`), veri));
+    await assertFails(updateDoc(doc(alice, koleksiyon, id), { creditMonths: 99 }));
+    await assertFails(deleteDoc(doc(alice, koleksiyon, id)));
+  });
+
+  test("davet edenin listesi sorgulanamaz", async () => {
+    await assertFails(
+      getDocs(query(collection(alice, "Referrals"), where("inviterUid", "==", ALICE))),
+    );
+  });
+
+  test("promosyon kullanim kaydi alt koleksiyonu kapali", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "PromoCodes", "PROMO123", "redemptions", ALICE), { redeemedAt: new Date() }),
+    );
+    await assertFails(getDoc(doc(alice, "PromoCodes", "PROMO123", "redemptions", ALICE)));
+    await assertFails(
+      setDoc(doc(alice, "PromoCodes", "PROMO123", "redemptions", BOB), { redeemedAt: new Date() }),
+    );
+  });
+
+  test("kullanici kendine promoUntil yazamaz (entitlements sunucuya ait)", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), { displayName: "A" }));
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), {
+        "entitlements.promoUntil": new Date(Date.now() + 86400000 * 365),
+      }),
+    );
+  });
+});

@@ -6,6 +6,7 @@ import {
   Easing,
   InteractionManager,
   LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,10 +31,12 @@ import {
   getPackageIntroOffer,
   getPackageMonthlyEquivalent,
   getPackagePeriodKey,
+  getPackageReferralOffer,
   getPackageRegularPrice,
   getPackageSavings,
   getPackageTierKey,
   getPremiumPlanDisplayName,
+  pickBetterOffer,
   AI_PLAN_LIMITS,
   PREMIUM_PLAN,
   selectPreferredPackage,
@@ -50,6 +53,9 @@ import {
   getFeature,
 } from "../../utils/premiumFeatures";
 import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
+import RedeemCodeSheet, { formatRedeemDate } from "../../components/premium/RedeemCodeSheet";
+import useReferralOverview from "../../hooks/useReferralOverview";
+import { getReferralCopy } from "../../utils/referralCopy";
 
 // ÖNE ÇIKAN FAYDALAR — seçili plana göre, utils/premiumFeatures.js
 // değerlerinden üretilir. Buradaki her cümlenin arkasında bir kapı var; yeni
@@ -223,6 +229,11 @@ export default function PremiumScreen() {
     });
   }, [source]);
 
+  // Arkadaş daveti: "Kodun var mı?" sayfası + davetle geldiysem ilk dönem indirimi.
+  const referralCopy = getReferralCopy(language);
+  const { data: referralData, reload: reloadReferral } = useReferralOverview();
+  const [redeemOpen, setRedeemOpen] = useState(false);
+
   const [selectedTier, setSelectedTier] = useState(PREMIUM_PLAN.PREMIUM);
   const [selectedId, setSelectedId] = useState(null);
   const [showDetailedSection, setShowDetailedSection] = useState(Boolean(sourceFeature));
@@ -317,10 +328,21 @@ export default function PremiumScreen() {
   const selectedDisplayPackage =
     pricedPackages.find((item) => item.identifier === selectedId) || null;
   const selectedTierPackages = getPackagesForTier(pricedPackages, selectedTier);
-  const introOfferFor = (aPackage) =>
-    getPackageIntroOffer(aPackage, {
+  // Paketin ilk dönem teklifi: lansman indirimi, davetle geldiysem davet indirimi — hangisi
+  // daha çok kazandırıyorsa (mağaza tek teklif uygular). Davet teklifi mağazada tanımlı değilse
+  // hiç gösterilmez; `handle` satın almanın o teklifle yapılmasını sağlar.
+  const referralDiscount = referralData?.invitedBy?.discount || null;
+  const offerChoiceFor = (aPackage) => {
+    const intro = getPackageIntroOffer(aPackage, {
       iosIntroEligible: (introEligibleIds || []).includes(aPackage?.product?.identifier),
     });
+    const referral = referralDiscount
+      ? getPackageReferralOffer(aPackage, referralData.limits.offerId, { platform: Platform.OS })
+      : null;
+    const pick = pickBetterOffer(intro, referral?.offer || null);
+    return { offer: pick.offer, handle: pick.useReferral ? referral.handle : null };
+  };
+  const introOfferFor = (aPackage) => offerChoiceFor(aPackage).offer;
   const selectedOffer = selectedDisplayPackage ? introOfferFor(selectedDisplayPackage) : null;
   const busy = Boolean(busyAction);
   const selectedPlanName = getPremiumPlanDisplayName(selectedTier);
@@ -351,7 +373,9 @@ export default function PremiumScreen() {
   const buy = async () => {
     if (!selectedPackage || busy) return;
     try {
-      await purchasePackage(selectedPackage);
+      await purchasePackage(selectedPackage, {
+        referralHandle: offerChoiceFor(selectedPackage).handle,
+      });
       // Premium kutlaması: altın kart + kıvılcım (components/toast).
       Toast.show({
         type: "premium",
@@ -1303,6 +1327,16 @@ export default function PremiumScreen() {
 
       {/* SECONDARY ACTIONS */}
       <View style={styles.secondaryActions}>
+        <Pressable
+          disabled={busy}
+          onPress={() => setRedeemOpen(true)}
+          accessibilityRole="button"
+          style={styles.restoreBtn}
+        >
+          <Text style={[styles.restoreBtnText, { color: C.accent }]}>
+            {referralCopy.redeem.entryTitle}
+          </Text>
+        </Pressable>
         <Pressable disabled={busy} onPress={restore} style={styles.restoreBtn}>
           {busyAction === "restore" ? (
             <ActivityIndicator size="small" color={C.accent} />
@@ -1334,6 +1368,30 @@ export default function PremiumScreen() {
           </Pressable>
         </View>
       </View>
+      <RedeemCodeSheet
+        visible={redeemOpen}
+        onClose={() => setRedeemOpen(false)}
+        onRedeemed={(result) => {
+          if (result?.kind === "promo") {
+            Toast.show({
+              type: "premium",
+              text1: referralCopy.redeem.promoSuccess(
+                result.days,
+                formatRedeemDate(result.untilMs, language),
+              ),
+            });
+          } else {
+            Toast.show({
+              type: "success",
+              text1: referralCopy.redeem.referralSuccess(
+                result?.discount?.percent ?? 30,
+                result?.inviterName,
+              ),
+            });
+          }
+          reloadReferral();
+        }}
+      />
     </SettingsSubScreen>
   );
 }

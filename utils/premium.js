@@ -108,7 +108,16 @@ export function isUnlimitedProductIdentifier(identifier) {
  * Sunucunun yazdığı Users/{uid}.entitlements alanından plan
  * (functions/aiQuota.js resolveAiPlan ile aynı kural).
  */
-export function resolveServerPlan(entitlements) {
+export function resolveServerPlan(entitlements, nowMs = Date.now()) {
+  // Ücretsiz ay (davet ödülü / promosyon kodu) sunucuda etkin plana yazılır ve süpürme
+  // dolduktan en geç ~1 saat sonra temizler. İstemci bu aralığı beklemez: kaynağı
+  // promosyon olan plan, bitişi geçince Free sayılır (functions/referral.js).
+  if (entitlements?.premiumSource === "promo") {
+    const raw = entitlements.promoUntil;
+    const untilMs =
+      typeof raw?.toMillis === "function" ? raw.toMillis() : Number.isFinite(raw) ? raw : null;
+    if (untilMs !== null && untilMs <= nowMs) return PREMIUM_PLAN.FREE;
+  }
   if (
     entitlements?.premiumUnlimited === true ||
     entitlements?.premiumPlan === PREMIUM_PLAN.UNLIMITED
@@ -316,6 +325,11 @@ export function getPackageIntroOffer(aPackage, { iosIntroEligible = false } = {}
       unitCount: intro.periodNumberOfUnits || 1,
     };
   }
+  return finishOffer(aPackage, offer);
+}
+
+/** Ham teklifi normal fiyatla karşılaştırıp {percent, regularPrice…} ekler; sahte indirimde null. */
+function finishOffer(aPackage, offer) {
   if (!offer) return null;
 
   const regular = getPackageRegularPrice(aPackage);
@@ -336,6 +350,71 @@ export function getPackageIntroOffer(aPackage, { iosIntroEligible = false } = {}
     regularPrice: regular.price,
     regularPriceString: regular.priceString,
   };
+}
+
+/**
+ * Arkadaş davetiyle gelen kullanıcının ilk dönem indirimi (mağazadaki ÖZEL teklif).
+ *
+ * Varsayılan teklif (lansman indirimi) kendiliğinden uygulanır; davet teklifi ise
+ * kimliğiyle ARANIR ve satın alma o teklifle yapılır:
+ *   • Play: `subscriptionOptions` içinde "tabanPlan:teklifKimliği" biçimli seçenek.
+ *   • App Store: `discounts` içinde aynı kimlikli promosyon teklifi (imzayı
+ *     satın alma anında RevenueCat üretir: `Purchases.getPromotionalOffer`).
+ * Mağaza panelinde AYNI kimlikle teklif açılmadıysa null döner ve indirim hiç
+ * gösterilmez (vaat edip tahsil etmemek için).
+ *
+ * @returns {{ offer: object, handle: {kind: "play", option: object}|{kind: "apple", discount: object} }|null}
+ */
+export function getPackageReferralOffer(aPackage, offerId, { platform = "android" } = {}) {
+  const product = aPackage?.product;
+  if (!product || !offerId) return null;
+
+  if (platform === "android") {
+    const option = (product.subscriptionOptions || []).find(
+      (item) => item && !item.isBasePlan && String(item.id || "").split(":")[1] === offerId,
+    );
+    const phase = option?.freePhase || option?.introPhase;
+    const phasePrice = pricingPhasePrice(phase);
+    if (!option || !phasePrice) return null;
+    const offer = finishOffer(aPackage, {
+      ...phasePrice,
+      cycles: phase.billingCycleCount || 1,
+      unit: PERIOD_UNIT_KEYS[phase.billingPeriod?.unit] || null,
+      unitCount: phase.billingPeriod?.value || 1,
+    });
+    return offer ? { offer, handle: { kind: "play", option } } : null;
+  }
+
+  const discount = (product.discounts || []).find((item) => item?.identifier === offerId);
+  if (!discount) return null;
+  const offer = finishOffer(aPackage, {
+    price: Number(discount.price),
+    priceString: discount.priceString,
+    currencyCode: product.currencyCode,
+    cycles: discount.cycles || 1,
+    unit: PERIOD_UNIT_KEYS[discount.periodUnit] || null,
+    unitCount: discount.periodNumberOfUnits || 1,
+  });
+  return offer ? { offer, handle: { kind: "apple", discount } } : null;
+}
+
+/** Bir teklifin toplam tasarrufu (dönem başına indirim x dönem sayısı). */
+function offerSaving(offer) {
+  return offer ? (offer.regularPrice - offer.price) * (offer.cycles || 1) : 0;
+}
+
+/**
+ * Lansman (varsayılan) teklifi ile davet teklifinden kullanıcıya DAHA ÇOK kazandıranı seçer.
+ * Mağaza aynı satın almada tek teklif uygular; davet teklifini körü körüne öne almak,
+ * lansman indirimi daha iyiyken kullanıcıyı daha pahalıya iterdi. Eşitlikte davet teklifi.
+ *
+ * @returns {{ offer: object|null, useReferral: boolean }}
+ */
+export function pickBetterOffer(introOffer, referralOffer) {
+  if (referralOffer && offerSaving(referralOffer) >= offerSaving(introOffer)) {
+    return { offer: referralOffer, useReferral: true };
+  }
+  return { offer: introOffer || null, useReferral: false };
 }
 
 export function getPackageMonthlyEquivalent(aPackage, language = "en") {

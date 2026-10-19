@@ -209,6 +209,9 @@ export function PremiumProvider({ children }) {
   useEffect(() => {
     if (!signedIn || awaitingStore || !storePlan || profileLoading || !profile) return;
     if (storePlan === serverPlan) return;
+    // Sunucu planı ücretsiz ay (davet ödülü/promosyon kodu) ise mağazadan yüksek olması
+    // beklenen bir durumdur; RevenueCat'e yeniden sorulacak bir ayrışma değil.
+    if (profile.entitlements?.premiumSource === "promo") return;
     const key = `${user.uid}:${storePlan}:${serverPlan}`;
     if (reconciledRef.current === key) return;
     reconciledRef.current = key;
@@ -218,13 +221,14 @@ export function PremiumProvider({ children }) {
   }, [awaitingStore, profile, profileLoading, serverPlan, signedIn, storePlan, user?.uid]);
 
   const purchasePackage = useCallback(
-    async (aPackage) => {
+    async (aPackage, { referralHandle = null } = {}) => {
       if (!aPackage) throw new Error("purchase-package-required");
       setBusyAction("purchase");
       try {
         const result = await purchaseRevenueCatPackage(aPackage, {
           customerInfo,
           entitlementId: config.entitlementId,
+          referralHandle,
         });
         setCustomerInfo(result.customerInfo);
         return result;

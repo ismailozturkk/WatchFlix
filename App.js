@@ -705,6 +705,11 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="ReferralScreen"
+          getComponent={() => require("./screens/tabs/settings/ReferralScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="PosterSettingsScreen"
           getComponent={() => require("./screens/tabs/settings/PosterSettingsScreen").default}
           options={{ headerShown: false }}
