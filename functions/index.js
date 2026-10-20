@@ -139,15 +139,18 @@ async function fetchRevenueCatPremiumState(uid) {
 // yeniden yazar; promosyonu burada birleştirmezsek ilk olayda silinirdi.
 //   • `currentEntitlements`: kullanıcı belgesindeki mevcut alan (promoUntil buradan).
 //   • `promoUntilMs`: verilirse promosyon bitişi bu değerle DEĞİŞTİRİLİR (kod/ödül).
+//   • `promoPlan`: o promosyonun verdiği plan ("premium" | "unlimited" = Max); yoksa "premium".
+//     Plan, bitişle birlikte `entitlements.promoPlan` olarak saklanır; webhook'un her yeniden
+//     yazışında `currentEntitlements`tan okunur (saklanmazsa Max kod ilk olayda Premium'a düşerdi).
 function writeEntitlements(
   writer,
   uid,
   state,
-  { store, source, extraPrivate, currentEntitlements, promoUntilMs } = {},
+  { store, source, extraPrivate, currentEntitlements, promoUntilMs, promoPlan } = {},
 ) {
   const nowMs = Date.now();
   const promo = Number.isFinite(promoUntilMs)
-    ? { untilMs: promoUntilMs, plan: referral.PROMO_PLAN }
+    ? { untilMs: promoUntilMs, plan: referral.normalizePromoPlan(promoPlan) }
     : referral.readPromo(currentEntitlements, nowMs);
   const applied = referral.applyPromoToState(state, promo, nowMs);
   const effectiveSource = applied.source || source || "revenuecat";
@@ -162,8 +165,8 @@ function writeEntitlements(
   const promoField = !promo
     ? {}
     : promo.untilMs > nowMs
-      ? { promoUntil: Timestamp.fromMillis(promo.untilMs) }
-      : { promoUntil: FieldValue.delete() };
+      ? { promoUntil: Timestamp.fromMillis(promo.untilMs), promoPlan: promo.plan }
+      : { promoUntil: FieldValue.delete(), promoPlan: FieldValue.delete() };
   writer.set(
     db.doc(`Users/${uid}`),
     {
@@ -633,6 +636,12 @@ exports.redeemCode = onCall(async (request) => {
         : referral.PROMO_DEFAULT_DAYS;
       const currentUntil = referral.readPromo(entitlements, nowMs);
       const untilMs = referral.extendPromoUntil(currentUntil?.untilMs, nowMs, days);
+      // Kodun planı (Premium ya da Max). Hesapta zaten süren daha yüksek bir promosyon varsa
+      // o korunur (ör. Max kodu olan biri davet ödülünü başlatınca Premium'a düşmez).
+      const plan = referral.higherPromoPlan(
+        promoSnap.get("plan"),
+        currentUntil?.active ? currentUntil.plan : null,
+      );
 
       tx.update(promoRef, { redeemedCount: FieldValue.increment(1) });
       tx.create(redemptionRef, { redeemedAt: FieldValue.serverTimestamp() });
@@ -641,6 +650,7 @@ exports.redeemCode = onCall(async (request) => {
         source: "promo",
         currentEntitlements: entitlements,
         promoUntilMs: untilMs,
+        promoPlan: plan,
       });
       return { kind: "promo", days, untilMs };
     }
@@ -718,6 +728,8 @@ exports.claimReferralReward = onCall(async (request) => {
       source: "promo",
       currentEntitlements: entitlements,
       promoUntilMs: next,
+      // Davet ödülü Premium verir; hesapta süren Max promosyonu varsa o korunur.
+      promoPlan: current?.active ? current.plan : referral.PROMO_PLAN,
     });
     return next;
   });

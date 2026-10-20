@@ -9,6 +9,8 @@
 //   • --count M    kaç kod üretileceği
 //   Toplam açılacak ücretsiz ay en fazla  M x N.  Ayrıca:
 //   • --days D     her kullanımın verdiği gün (varsayılan 30)
+//   • --plan P     verilen plan: premium (varsayılan) | max (uygulamadaki adıyla Premium Max;
+//                  veritabanında "unlimited" saklanır)
 //   • --expires YYYY-MM-DD   kodun son kullanma günü (UTC gün sonu), isteğe bağlı
 //   • --note "..." kodun nereye/kime verildiği (yalnız yönetici görür)
 //
@@ -27,6 +29,18 @@
 
 const { randomInt } = require("node:crypto");
 const { generateReferralCode, formatCodeForDisplay, normalizeCode, PROMO_DEFAULT_DAYS } = require("../referral");
+
+// Komut satırı adı → veritabanında saklanan plan. "max" kullanıcıya görünen ad; sunucu içinde Max
+// planı "unlimited" diye geçer (functions/referral.js PLAN_RANK).
+const PLAN_FLAGS = Object.freeze({ premium: "premium", max: "unlimited", unlimited: "unlimited" });
+const PLAN_LABELS = Object.freeze({ premium: "Premium", unlimited: "Premium Max" });
+
+function parsePlan(value) {
+  if (value === undefined) return "premium";
+  const plan = PLAN_FLAGS[String(value).toLowerCase()];
+  if (!plan) throw new Error("--plan premium ya da max olmalı");
+  return plan;
+}
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
@@ -71,10 +85,11 @@ async function main() {
     process.exit(1);
   }
 
-  const admin = require("firebase-admin");
-  admin.initializeApp();
-  const db = admin.firestore();
-  const { FieldValue, Timestamp } = require("firebase-admin/firestore");
+  // firebase-admin 14: ad alanlı `admin.firestore()` kalktı; modüler giriş noktaları kullanılır.
+  const { initializeApp } = require("firebase-admin/app");
+  const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
+  initializeApp();
+  const db = getFirestore();
   const apply = flags.apply === true;
 
   if (command === "list") {
@@ -84,7 +99,8 @@ async function main() {
       const d = doc.data();
       const exp = d.expiresAt?.toDate?.().toISOString().slice(0, 10) || "-";
       console.log(
-        `${formatCodeForDisplay(doc.id)}  kullanım ${d.redeemedCount || 0}/${d.maxRedemptions}  ` +
+        `${formatCodeForDisplay(doc.id)}  ${PLAN_LABELS[d.plan] || PLAN_LABELS.premium}  ` +
+          `kullanım ${d.redeemedCount || 0}/${d.maxRedemptions}  ` +
           `${d.days} gün  son: ${exp}  ${d.active === false ? "[PASİF]" : "aktif"}  ${d.note || ""}`,
       );
     });
@@ -104,6 +120,7 @@ async function main() {
   const count = positiveInt(flags.count, 1, "count");
   const uses = positiveInt(flags.uses, 1, "uses");
   const days = positiveInt(flags.days, PROMO_DEFAULT_DAYS, "days");
+  const plan = parsePlan(flags.plan);
   const expiresMs = parseExpires(flags.expires);
   const note = typeof flags.note === "string" ? flags.note.slice(0, 120) : "";
   if (count > 500) throw new Error("Tek seferde en fazla 500 kod");
@@ -121,7 +138,7 @@ async function main() {
   }
 
   console.log(
-    `${count} kod x ${uses} kullanım = en fazla ${count * uses} kişi, her biri ${days} gün` +
+    `${count} ${PLAN_LABELS[plan]} kodu x ${uses} kullanım = en fazla ${count * uses} kişi, her biri ${days} gün` +
       (expiresMs ? `, son gün ${flags.expires}` : ", süresiz") +
       (note ? `, not: ${note}` : ""),
   );
@@ -135,7 +152,7 @@ async function main() {
   codes.forEach((code) => {
     batch.create(db.doc(`PromoCodes/${code}`), {
       days,
-      plan: "premium",
+      plan,
       maxRedemptions: uses,
       redeemedCount: 0,
       active: true,

@@ -45,6 +45,14 @@ node scripts/promoCodes.js list
 node scripts/promoCodes.js disable ABCDEFGH --apply
 ```
 
+**Premium Max kodu:** `--plan max` (varsayılan `premium`). Veritabanında plan `unlimited` saklanır; `list` çıktısı
+"Premium Max" yazar. Plan, `Users/{uid}.entitlements.promoPlan` alanında bitişle (`promoUntil`) birlikte tutulur, webhook
+yeniden yazdığında korunur; alan olmayan eski kayıtlar Premium sayılır. Hesapta süren daha yüksek bir promosyon varsa
+(ör. Max kodu olan biri davet ödülünü başlatırsa) plan düşmez, yalnız süre uzar. **Max kodunu üretmeden önce**
+`redeemCode`, `claimReferralReward`, `expirePromoGrants`, `revenueCatWebhook` ve `syncPremiumStatus` deploy edilmiş olmalı:
+eski `redeemCode` planı okumaz, Max kodunu Premium olarak harcar. İstemci değişikliği gerekmez (plan `premiumPlan`dan okunur);
+tek eksik, kod girme sayfasının başarı metninin her zaman "Premium" demesidir.
+
 Toplam açılabilecek ücretsiz ay en fazla `count × uses`. Sınırı sonradan değiştirmek için konsolda
 `PromoCodes/{KOD}.maxRedemptions` alanını düzenle; `active: false` kodu hemen kapatır.
 

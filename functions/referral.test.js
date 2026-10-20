@@ -9,6 +9,8 @@ const {
   formatCodeForDisplay,
   generateReferralCode,
   readPromo,
+  normalizePromoPlan,
+  higherPromoPlan,
   applyPromoToState,
   extendPromoUntil,
   hasActiveStoreSubscription,
@@ -77,6 +79,46 @@ test("applyPromoToState: mağaza planı eşit/yüksekse mağaza kazanır, dolmu�
   const expired = readPromo({ promoUntil: NOW - 1 }, NOW);
   assert.equal(applyPromoToState(FREE, expired, NOW).source, null);
   assert.equal(applyPromoToState(FREE, null, NOW).state, FREE);
+});
+
+test("normalizePromoPlan: yalnız premium/unlimited; eksik ve bozuk değer premium sayılır", () => {
+  assert.equal(normalizePromoPlan("premium"), "premium");
+  assert.equal(normalizePromoPlan("unlimited"), "unlimited");
+  for (const bad of [undefined, null, "", "max", "free", "UNLIMITED", 5, {}]) {
+    assert.equal(normalizePromoPlan(bad), "premium");
+  }
+});
+
+test("higherPromoPlan: yüksek olanı seçer, ikinci değer yoksa birincisini döner", () => {
+  assert.equal(higherPromoPlan("premium", "unlimited"), "unlimited");
+  assert.equal(higherPromoPlan("unlimited", "premium"), "unlimited");
+  assert.equal(higherPromoPlan("premium", "premium"), "premium");
+  assert.equal(higherPromoPlan("unlimited"), "unlimited");
+  assert.equal(higherPromoPlan("unlimited", null), "unlimited");
+  assert.equal(higherPromoPlan(undefined, undefined), "premium");
+});
+
+test("readPromo: promoPlan okunur; alan yoksa (eski kayıt) premium", () => {
+  assert.equal(readPromo({ promoUntil: NOW + 1000 }, NOW).plan, "premium");
+  assert.equal(readPromo({ promoUntil: NOW + 1000, promoPlan: "unlimited" }, NOW).plan, "unlimited");
+  assert.equal(readPromo({ promoUntil: NOW + 1000, promoPlan: "bozuk" }, NOW).plan, "premium");
+});
+
+test("applyPromoToState: Max promosyonu Free'ye Max, Premium aboneliğe karşı Max verir", () => {
+  const promo = readPromo({ promoUntil: NOW + DAY_MS, promoPlan: "unlimited" }, NOW);
+  const free = applyPromoToState(FREE, promo, NOW);
+  assert.equal(free.source, "promo");
+  assert.equal(free.state.premiumPlan, "unlimited");
+  assert.equal(free.state.premiumUnlimited, true);
+  assert.equal(free.state.premium, true);
+  // Mağazada Premium varken daha yüksek olan Max promosyonu kazanır.
+  const paid = { ...FREE, premium: true, premiumPlan: "premium", productId: "premium_monthly" };
+  const upgraded = applyPromoToState(paid, promo, NOW);
+  assert.equal(upgraded.source, "promo");
+  assert.equal(upgraded.state.premiumPlan, "unlimited");
+  // Mağazada Max varsa mağaza kazanır.
+  const paidMax = { ...paid, premiumPlan: "unlimited", premiumUnlimited: true };
+  assert.equal(applyPromoToState(paidMax, promo, NOW).source, null);
 });
 
 test("extendPromoUntil: süren promosyonun üstüne ekler, dolmuşsa şimdiden başlar", () => {

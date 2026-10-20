@@ -181,6 +181,80 @@ test("promosyon kodu: kişi sınırı, hesap başına tek kullanım, plan ve say
   assert.equal((await db.doc("Users/u3").get()).get("entitlements"), undefined);
 });
 
+test("Max promosyon kodu: plan Premium Max olur, webhook/süpürme/ödül onu Premium'a DÜŞÜRMEZ", { skip }, async () => {
+  await resetData();
+  await db.doc("PromoCodes/MAXKOD01").set({
+    days: 360,
+    plan: "unlimited",
+    maxRedemptions: 1,
+    redeemedCount: 0,
+    active: true,
+  });
+  // Plan alanı olmayan eski kod hâlâ Premium verir.
+  await db.doc("PromoCodes/ESKIPREM").set({ days: 30, maxRedemptions: 1, redeemedCount: 0, active: true });
+  await mkUser("tester");
+  await mkUser("old");
+
+  const result = await call(fns.redeemCode, "tester", { code: "max-kod01" });
+  assert.equal(result.kind, "promo");
+  let ent = (await db.doc("Users/tester").get()).get("entitlements");
+  assert.equal(ent.premium, true);
+  assert.equal(ent.premiumPlan, "unlimited");
+  assert.equal(ent.premiumUnlimited, true);
+  assert.equal(ent.premiumSource, "promo");
+  assert.equal(ent.promoPlan, "unlimited");
+  assert.ok(result.untilMs >= Date.now() + 360 * DAY - 5000);
+
+  await call(fns.redeemCode, "old", { code: "ESKIPREM" });
+  const old = (await db.doc("Users/old").get()).get("entitlements");
+  assert.equal(old.premiumPlan, "premium");
+  assert.equal(old.promoPlan, "premium");
+
+  // KRİTİK: mağazada abonelik yok. Webhook entitlements'ı yeniden yazar; Max düşmemeli.
+  setRevenueCat(null);
+  await webhook({ id: "evt-max-exp", type: "EXPIRATION", app_user_id: "tester", entitlement_ids: [ENTITLEMENT] });
+  ent = (await db.doc("Users/tester").get()).get("entitlements");
+  assert.equal(ent.premiumPlan, "unlimited");
+  assert.equal(ent.premiumUnlimited, true);
+  assert.equal(ent.promoPlan, "unlimited");
+
+  // Davet ödülü başlatmak da Max'i Premium'a düşürmez ama süreyi uzatır.
+  await db.doc("ReferralAccounts/tester").set({ creditMonths: 1 }, { merge: true });
+  const claimed = await call(fns.claimReferralReward, "tester");
+  assert.equal(claimed.untilMs, result.untilMs + 30 * DAY);
+  ent = (await db.doc("Users/tester").get()).get("entitlements");
+  assert.equal(ent.premiumPlan, "unlimited");
+  assert.equal(ent.promoPlan, "unlimited");
+
+  // Aynı hesap ikinci promosyon kodu giremez (Max koduyla Premium koduna geçiş yok); kod
+  // kullanılmamış olsa bile reddedilir ve sayaç artmaz.
+  await db.doc("PromoCodes/YEDEKPRM").set({ days: 30, maxRedemptions: 1, redeemedCount: 0, active: true });
+  assert.equal(await reasonOf(call(fns.redeemCode, "tester", { code: "YEDEKPRM" })), "already-redeemed");
+  assert.equal((await db.doc("PromoCodes/YEDEKPRM").get()).get("redeemedCount"), 0);
+});
+
+test("Max promosyonu dolunca süpürme planı VE promoPlan alanını temizler", { skip }, async () => {
+  await resetData();
+  await mkUser("maxexp", {
+    entitlements: {
+      premium: true,
+      premiumUnlimited: true,
+      premiumPlan: "unlimited",
+      premiumSource: "promo",
+      promoUntil: new Date(Date.now() - 60 * 1000),
+      promoPlan: "unlimited",
+    },
+  });
+  setRevenueCat(null);
+  await fns.expirePromoGrants.run();
+  const ent = (await db.doc("Users/maxexp").get()).get("entitlements");
+  assert.equal(ent.premium, false);
+  assert.equal(ent.premiumPlan, "free");
+  assert.equal(ent.premiumUnlimited, false);
+  assert.equal(ent.promoUntil, undefined);
+  assert.equal(ent.promoPlan, undefined);
+});
+
 test("promosyon kodu: yok, pasif, süresi dolmuş, mağaza aboneliği varken", { skip }, async () => {
   await resetData();
   await db.doc("PromoCodes/PASIFKOD").set({ days: 30, maxRedemptions: 5, redeemedCount: 0, active: false });

@@ -89,6 +89,22 @@ function planRank(plan) {
   return PLAN_RANK[plan] ?? 0;
 }
 
+// Promosyonun verebildiği planlar. "unlimited" = Premium Max (uygulamadaki adı). Bilinmeyen/eksik
+// değer "premium" sayılır: `promoPlan` alanı bu özellikten ÖNCE yazılan kayıtlarda yoktur.
+const PROMO_PLANS = Object.freeze(["premium", "unlimited"]);
+
+function normalizePromoPlan(plan) {
+  return PROMO_PLANS.includes(plan) ? plan : PROMO_PLAN;
+}
+
+/** İki promosyon planından yüksek olanı (biri yoksa öteki). */
+function higherPromoPlan(a, b) {
+  const first = normalizePromoPlan(a);
+  if (b === undefined || b === null) return first;
+  const second = normalizePromoPlan(b);
+  return planRank(second) > planRank(first) ? second : first;
+}
+
 /** Süren promosyon varsa {untilMs, plan}, yoksa null. `promoUntil` Timestamp ya da ms. */
 function readPromo(entitlements, nowMs) {
   const raw = entitlements?.promoUntil;
@@ -101,7 +117,7 @@ function readPromo(entitlements, nowMs) {
   if (!Number.isFinite(untilMs)) return null;
   return {
     untilMs,
-    plan: PROMO_PLAN,
+    plan: normalizePromoPlan(entitlements?.promoPlan),
     active: untilMs > nowMs,
   };
 }
@@ -278,8 +294,11 @@ module.exports = {
   REASONS,
   PROMO_DEFAULT_DAYS,
   PROMO_PLAN,
+  PROMO_PLANS,
   CODE_ALPHABET,
   REFERRAL_CODE_LENGTH,
+  normalizePromoPlan,
+  higherPromoPlan,
   normalizeCode,
   formatCodeForDisplay,
   generateReferralCode,
