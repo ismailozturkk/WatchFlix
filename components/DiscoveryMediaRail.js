@@ -13,6 +13,8 @@ import ListBadges from "./ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "./PosterInfoBadges";
 import PaginatedRail from "./PaginatedRail";
 import SectionHeader from "./home/SectionHeader";
+import { SectionChipRail } from "./home/SectionChips";
+import DiscoverFilterChip from "./home/DiscoverFilterChip";
 import { RailSkeleton } from "./Skeleton";
 import { useTheme } from "../context/ThemeContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -32,6 +34,15 @@ import {
 import { sameListIdentity } from "../utils/sameData";
 import { adultScoped, dropAdult } from "../utils/homeContentSettings";
 import { useHomeDataSettings } from "../hooks/useHomeContentSettings";
+import {
+  WORLD_TOUR_DEFAULT,
+  WORLD_TOUR_LANGUAGES,
+  worldTourChipLabel,
+  worldTourDiscoverParams,
+  worldTourEmptyText,
+  worldTourSeeAllTitle,
+  worldTourTitle,
+} from "../utils/worldTour";
 
 const EMPTY_GENRES = Object.freeze([]);
 
@@ -169,6 +180,7 @@ export default function DiscoveryMediaRail({
   genreNames = EMPTY_GENRES,
   genreIds: preferredGenreIds = EMPTY_GENRES,
 }) {
+  const { theme } = useTheme();
   const { language } = useLanguage();
   const { API_KEY } = useApiSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
@@ -199,6 +211,8 @@ export default function DiscoveryMediaRail({
   );
   const [resolvedGenreIds, setResolvedGenreIds] = useState(normalizedPreferredGenreIds);
   const [genreResolutionComplete, setGenreResolutionComplete] = useState(preset !== "topGenres");
+  // Dünya Turu: seçili özgün dil (çip satırı). Diğer preset'lerde kullanılmaz.
+  const [worldLanguage, setWorldLanguage] = useState(WORLD_TOUR_DEFAULT);
 
   // Metinler tr/en/es; bilinmeyen dil İngilizce (utils/appLanguages.pickByLanguage).
   const L = (tr, en, es, pt, de) => pickByLanguage(language, { tr, en, es, pt: pt ?? en, de: de ?? en });
@@ -215,8 +229,8 @@ export default function DiscoveryMediaRail({
     if (preset === "subscriptions") {
       return { title: L("Platform Favorileri", "Service Favorites", "Favoritos de tus plataformas", "Favoritos dos seus serviços", "Favoriten der Dienste") };
     }
-    if (preset === "hiddenGems") {
-      return { title: L("Gizli cevherler", "Hidden gems", "Joyas ocultas", "Joias escondidas", "Geheimtipps") };
+    if (preset === "worldTour") {
+      return { title: worldTourTitle(language) };
     }
     if (preset === "topGenres") {
       return {
@@ -304,9 +318,12 @@ export default function DiscoveryMediaRail({
       const params = {
         language: tmdbLanguageOf(language),
         page: requestedPage,
-        sort_by: preset === "hiddenGems" ? "vote_average.desc" : "popularity.desc",
-        "vote_count.gte": preset === "hiddenGems" ? 120 : 300,
+        sort_by: "popularity.desc",
+        "vote_count.gte": 300,
       };
+
+      // Dünya Turu: sıralama ve eşikler utils/worldTour'dan (Tümü ekranıyla aynı kural).
+      if (preset === "worldTour") Object.assign(params, worldTourDiscoverParams(worldLanguage));
 
       if (preset === "subscriptions") {
         params.watch_region = tmdbRegionOf(language);
@@ -328,7 +345,7 @@ export default function DiscoveryMediaRail({
 
       return params;
     },
-    [resolvedGenreIds, language, mediaType, preset, streamingProviderIds],
+    [resolvedGenreIds, language, mediaType, preset, streamingProviderIds, worldLanguage],
   );
 
   const load = useCallback(
@@ -359,7 +376,9 @@ export default function DiscoveryMediaRail({
         ? streamingProviderIds.join("-")
         : preset === "topGenres"
           ? resolvedGenreIds.join("-")
-          : "all";
+          : preset === "worldTour"
+            ? worldLanguage
+            : "all";
       const cacheKey = adultScoped(
         `discovery_v2_${mediaType}_${preset}_${language}_${filterKey}_${requestedPage}`,
         adultContent,
@@ -433,7 +452,21 @@ export default function DiscoveryMediaRail({
       mediaType,
       preset,
       streamingProviderIds,
+      worldLanguage,
     ],
+  );
+
+  // Çip değişince eski dilin posterleri yeni dilin yüklenmesi sürerken görünmesin: liste boşaltılıp
+  // iskelet gösterilir (yükleme jenerasyonu `load` içinde artar, eski dilin geç yanıtı ekrana yazmaz).
+  const pickWorldLanguage = useCallback(
+    (code) => {
+      if (code === worldLanguage) return;
+      itemsRef.current = [];
+      setItems([]);
+      setLoading(true);
+      setWorldLanguage(code);
+    },
+    [worldLanguage],
   );
 
   useEffect(() => {
@@ -461,7 +494,10 @@ export default function DiscoveryMediaRail({
     (normalizedGenreNames.length !== 3 ||
       (genreResolutionComplete && resolvedGenreIds.length !== 3))
   ) return null;
-  if (!loading && items.length === 0) return null;
+  // Dünya Turu boş kalsa bile çipler görünür kalır: seçilen dilde sonuç yoksa kullanıcı başka dile
+  // geçebilmeli (rafı tümden gizlemek onu çıkışsız bırakırdı).
+  const isWorldTour = preset === "worldTour";
+  if (!loading && items.length === 0 && !isWorldTour) return null;
 
   return (
     <View style={styles.section}>
@@ -474,13 +510,36 @@ export default function DiscoveryMediaRail({
           navigation.navigate("SeeAllScreen", {
             mediaType,
             section: preset,
-            title: section.title,
+            title: isWorldTour ? worldTourSeeAllTitle(worldLanguage, language) : section.title,
             genreIds: preset === "topGenres" ? resolvedGenreIds : undefined,
+            originalLanguage: isWorldTour ? worldLanguage : undefined,
           })
         }
-      />
+      >
+        {isWorldTour ? (
+          <SectionChipRail
+            data={WORLD_TOUR_LANGUAGES}
+            keyExtractor={(entry) => entry.code}
+            extraData={worldLanguage}
+            renderChip={(entry) => (
+              <DiscoverFilterChip
+                label={worldTourChipLabel(entry.code, language)}
+                selected={worldLanguage === entry.code}
+                onPress={() => pickWorldLanguage(entry.code)}
+              />
+            )}
+          />
+        ) : null}
+      </SectionHeader>
       {loading ? (
         <RailSkeleton />
+      ) : isWorldTour && items.length === 0 ? (
+        <Text
+          allowFontScaling={false}
+          style={[styles.empty, { color: theme.text.muted }]}
+        >
+          {worldTourEmptyText(language)}
+        </Text>
       ) : (
         <PaginatedRail
           data={items}
@@ -502,6 +561,7 @@ export default function DiscoveryMediaRail({
 const styles = StyleSheet.create({
   section: { paddingVertical: 10 },
   rail: { paddingHorizontal: 15 },
+  empty: { paddingHorizontal: 15, paddingVertical: 24, fontSize: 13 },
   item: { marginRight: 10, marginBottom: 5 },
   badges: { position: "absolute", left: 2, bottom: 8 },
   providerBadges: {

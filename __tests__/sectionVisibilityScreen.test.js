@@ -154,7 +154,7 @@ describe("ilk görünüm", () => {
       render();
       const metinler = texts();
       expect(metinler).toContain(copy().screens.tv.name);
-      expect(metinler).toContain(copy().sections.tv.hiddenGems[0]);
+      expect(metinler).toContain(copy().sections.tv.worldTour[0]);
       act(() => renderer.unmount());
       renderer = null;
     }
@@ -164,9 +164,9 @@ describe("ilk görünüm", () => {
 describe("bölüm satırı anahtarı", () => {
   test("satıra basmak bölümü gizler ve DEPOYA yazar; ekran güncellenir", () => {
     render();
-    pressRow("hiddenGems");
-    expect(stored().tv).toEqual(["hiddenGems"]);
-    expect(row("hiddenGems").props.accessibilityState).toEqual({ checked: false });
+    pressRow("worldTour");
+    expect(stored().tv).toEqual(["worldTour"]);
+    expect(row("worldTour").props.accessibilityState).toEqual({ checked: false });
     expect(row("genres").props.accessibilityState).toEqual({ checked: true });
     const total = sectionsOf("tv").length;
     expect(texts()).toContain(`${total - 1} of ${total} sections visible`);
@@ -202,7 +202,7 @@ describe("bölüm satırı anahtarı", () => {
 
   test("gizlenen sayısı karoda rozet olarak görünür", () => {
     render();
-    pressRow("hiddenGems");
+    pressRow("worldTour");
     pressRow("genres");
     const rozet = tile("tv").findAllByType("Text").map((n) => [].concat(n.props.children).join(""));
     expect(rozet).toContain("2");
@@ -212,7 +212,7 @@ describe("bölüm satırı anahtarı", () => {
   test("kayıt başarısız olursa kullanıcıya uyarı çıkar", () => {
     render();
     mockFailWrites = true;
-    pressRow("hiddenGems");
+    pressRow("worldTour");
     expect(mockToastError).toHaveBeenCalledWith(SECTION_VISIBILITY_COPY.en.ui.saveFailed);
     expect(stored().tv).toEqual([]);
   });
@@ -350,7 +350,7 @@ describe("eski tek anahtarlı bölüm: Devam Edenler (showOngoingTvShows)", () =
 describe("sıfırlama", () => {
   test("özelleştirme varken görünür; basınca her ekran geri açılır", () => {
     render();
-    pressRow("hiddenGems");
+    pressRow("worldTour");
     pressTile("hub");
     pressRow("games");
     expect(renderer.root.findAllByProps({ testID: "section-reset" })).toHaveLength(1);

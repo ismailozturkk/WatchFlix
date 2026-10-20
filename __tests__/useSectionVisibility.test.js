@@ -101,9 +101,9 @@ describe("useScreenSections", () => {
 
   test("filter: gizli rafları eler, hiçbiri gizli değilse aynı diziyi döner", () => {
     mount("movie");
-    const raflar = [{ key: "trends" }, { key: "hiddenGems" }];
+    const raflar = [{ key: "trends" }, { key: "worldTour" }];
     expect(seen.movie.filter(raflar)).toBe(raflar);
-    act(() => { setSectionShown("movie", "hiddenGems", false); });
+    act(() => { setSectionShown("movie", "worldTour", false); });
     expect(seen.movie.filter(raflar)).toEqual([{ key: "trends" }]);
   });
 
@@ -137,7 +137,7 @@ describe("useScreenSections", () => {
     mount("profile", "movie");
     act(() => {
       setSectionShown("profile", "notes", false);
-      setSectionShown("movie", "hiddenGems", false);
+      setSectionShown("movie", "worldTour", false);
     });
     act(() => { expect(resetSectionVisibility()).toBe(true); });
     expect(seen.profile.hiddenCount).toBe(0);

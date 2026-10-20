@@ -45,11 +45,11 @@ describe("normalizeSectionVisibility", () => {
 
   test("bilinmeyen ekran ve bölüm kimlikleri atılır", () => {
     const n = normalizeSectionVisibility({
-      tv: ["hiddenGems", "yok-bolum"],
-      sinema: ["hiddenGems"],
+      tv: ["worldTour", "yok-bolum"],
+      sinema: ["worldTour"],
       profile: ["notes", 5, null, { notes: 1 }],
     });
-    expect(n).toEqual({ ...bos(), tv: ["hiddenGems"], profile: ["notes"] });
+    expect(n).toEqual({ ...bos(), tv: ["worldTour"], profile: ["notes"] });
     expect("sinema" in n).toBe(false);
   });
 
@@ -62,7 +62,7 @@ describe("normalizeSectionVisibility", () => {
   });
 
   test("eski tek anahtarlı bölüm (ongoing) burada SAKLANMAZ", () => {
-    expect(normalizeSectionVisibility({ tv: ["ongoing", "hiddenGems"] }).tv).toEqual(["hiddenGems"]);
+    expect(normalizeSectionVisibility({ tv: ["ongoing", "worldTour"] }).tv).toEqual(["worldTour"]);
   });
 
   test("tekrarlar silinir, sıra kanonik; aynı küme = aynı JSON", () => {
@@ -73,11 +73,11 @@ describe("normalizeSectionVisibility", () => {
   });
 
   test("dizi olmayan ekran değeri yok sayılır", () => {
-    expect(normalizeSectionVisibility({ tv: "hiddenGems", movie: { hiddenGems: true } })).toEqual(bos());
+    expect(normalizeSectionVisibility({ tv: "worldTour", movie: { worldTour: true } })).toEqual(bos());
   });
 
   test("girdiyi değiştirmez", () => {
-    const girdi = { tv: ["hiddenGems", "hiddenGems"] };
+    const girdi = { tv: ["worldTour", "worldTour"] };
     const kopya = JSON.parse(JSON.stringify(girdi));
     normalizeSectionVisibility(girdi);
     expect(girdi).toEqual(kopya);
@@ -99,23 +99,23 @@ describe("isSectionVisible", () => {
   });
 
   test("bilinmeyen ekran/bölüm görünür sayılır (kayıtta olmayanı gizleme yetkisi yok)", () => {
-    const hidden = { ...bos(), tv: ["hiddenGems"] };
-    expect(isSectionVisible(hidden, "yok", "hiddenGems")).toBe(true);
+    const hidden = { ...bos(), tv: ["worldTour"] };
+    expect(isSectionVisible(hidden, "yok", "worldTour")).toBe(true);
     expect(isSectionVisible(hidden, "tv", "yok")).toBe(true);
   });
 });
 
 describe("filterVisibleSections", () => {
-  const raflar = [{ key: "trends" }, { key: "hiddenGems" }, { key: "genres" }];
+  const raflar = [{ key: "trends" }, { key: "worldTour" }, { key: "genres" }];
 
   test("hiçbir şey gizli değilse AYNI diziyi döner (gereksiz yeniden çizim yok)", () => {
     expect(filterVisibleSections(bos(), "tv", raflar)).toBe(raflar);
     expect(filterVisibleSections(null, "tv", raflar)).toBe(raflar);
-    expect(filterVisibleSections({ ...bos(), movie: ["hiddenGems"] }, "tv", raflar)).toBe(raflar);
+    expect(filterVisibleSections({ ...bos(), movie: ["worldTour"] }, "tv", raflar)).toBe(raflar);
   });
 
   test("gizli rafı eler, sırayı korur", () => {
-    const sonuc = filterVisibleSections({ ...bos(), tv: ["hiddenGems"] }, "tv", raflar);
+    const sonuc = filterVisibleSections({ ...bos(), tv: ["worldTour"] }, "tv", raflar);
     expect(sonuc.map((r) => r.key)).toEqual(["trends", "genres"]);
     expect(raflar).toHaveLength(3);
   });
@@ -126,7 +126,7 @@ describe("filterVisibleSections", () => {
   });
 
   test("hepsi gizliyse boş dizi", () => {
-    expect(filterVisibleSections({ ...bos(), tv: ["trends", "hiddenGems", "genres"] }, "tv", raflar)).toEqual([]);
+    expect(filterVisibleSections({ ...bos(), tv: ["trends", "worldTour", "genres"] }, "tv", raflar)).toEqual([]);
   });
 
   test("özel kimlik çıkarıcı", () => {
@@ -143,18 +143,18 @@ describe("setSectionVisible / setScreenSectionsVisible", () => {
   });
 
   test("aynı işlemi tekrarlamak değeri değiştirmez (idempotent)", () => {
-    const bir = setSectionVisible(null, "tv", "hiddenGems", false);
-    const iki = setSectionVisible(bir, "tv", "hiddenGems", false);
+    const bir = setSectionVisible(null, "tv", "worldTour", false);
+    const iki = setSectionVisible(bir, "tv", "worldTour", false);
     expect(iki).toEqual(bir);
-    expect(setSectionVisible(bos(), "tv", "hiddenGems", true)).toEqual(bos());
+    expect(setSectionVisible(bos(), "tv", "worldTour", true)).toEqual(bos());
   });
 
   test("diğer ekranlar ve bölümler etkilenmez", () => {
-    let h = setSectionVisible(null, "tv", "hiddenGems", false);
-    h = setSectionVisible(h, "movie", "hiddenGems", false);
+    let h = setSectionVisible(null, "tv", "worldTour", false);
+    h = setSectionVisible(h, "movie", "worldTour", false);
     h = setSectionVisible(h, "tv", "genres", false);
-    h = setSectionVisible(h, "tv", "hiddenGems", true);
-    expect(h).toEqual({ ...bos(), tv: ["genres"], movie: ["hiddenGems"] });
+    h = setSectionVisible(h, "tv", "worldTour", true);
+    expect(h).toEqual({ ...bos(), tv: ["genres"], movie: ["worldTour"] });
   });
 
   test("girdiyi değiştirmez", () => {
@@ -183,7 +183,7 @@ describe("setSectionVisible / setScreenSectionsVisible", () => {
 
 describe("sayım ve özelleştirme", () => {
   test("countHiddenSections ekran bazında ve toplamda", () => {
-    const h = { ...bos(), tv: ["hiddenGems", "genres"], profile: ["notes"] };
+    const h = { ...bos(), tv: ["worldTour", "genres"], profile: ["notes"] };
     expect(countHiddenSections(h, "tv")).toBe(2);
     expect(countHiddenSections(h, "movie")).toBe(0);
     expect(countHiddenSections(h)).toBe(3);
@@ -269,9 +269,9 @@ describe("kayıt bütünlüğü", () => {
   });
 
   test("getSection bilinen bölümü döner, bilinmeyene null", () => {
-    expect(getSection("movie", "hiddenGems").icon).toBe("diamond-outline");
+    expect(getSection("movie", "worldTour").icon).toBe("earth-outline");
     expect(getSection("movie", "yok")).toBeNull();
-    expect(getSection("yok", "hiddenGems")).toBeNull();
+    expect(getSection("yok", "worldTour")).toBeNull();
   });
 });
 
@@ -295,7 +295,7 @@ describe("kalıcı kayıt (Keys.sectionVisibility)", () => {
 
   test("yazılan tercih gidiş-dönüşte aynen gelir", () => {
     let h = setSectionVisible(null, "profile", "notes", false);
-    h = setSectionVisible(h, "movie", "hiddenGems", false);
+    h = setSectionVisible(h, "movie", "worldTour", false);
     expect(set(Keys.sectionVisibility, h)).toBe(true);
     expect(normalizeSectionVisibility(get(Keys.sectionVisibility))).toEqual(h);
   });
@@ -338,11 +338,11 @@ describe("yedek (settingsBackup)", () => {
 
   test("içe aktarılan değer kanonik hale gelir; bilinmeyenler elenir", () => {
     const plan = planImport(
-      yedek({ sectionVisibility: { tv: ["hiddenGems", "ongoing", "yok"], sinema: ["x"], profile: ["notes", "notes"] } }),
+      yedek({ sectionVisibility: { tv: ["worldTour", "ongoing", "yok"], sinema: ["x"], profile: ["notes", "notes"] } }),
     );
     expect(plan.skipped).toEqual([]);
     const yazilan = plan.writes.find((w) => w.id === "sectionVisibility").value;
-    expect(yazilan).toEqual({ ...bos(), tv: ["hiddenGems"], profile: ["notes"] });
+    expect(yazilan).toEqual({ ...bos(), tv: ["worldTour"], profile: ["notes"] });
   });
 
   test.each([["x"], [5], [["notes"]]])("geçersiz değer %j atlanır", (deger) => {

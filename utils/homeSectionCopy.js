@@ -89,13 +89,21 @@ export const HOME_SECTIONS = Object.freeze({
       "Recientes y bien valorados", "Recentes e bem avaliados", "Neu und von Zuschauern hoch bewertet",
     ),
   },
-  hiddenGems: {
-    icon: "diamond",
-    subtitle: tri(
-      "Az bilinen, yüksek puanlı seçimler",
-      "Lesser-known, highly rated picks",
-      "Poco conocidas y muy bien valoradas", "Pouco conhecidos e muito bem avaliados", "Weniger bekannte, hoch bewertete Titel",
-    ),
+  worldTour: {
+    icon: "earth",
+    // Alt başlık türe göre; çip satırı (utils/worldTour) dili seçtirir.
+    subtitle: {
+      movie: tri(
+        "Dünyanın dört bir yanından filmler",
+        "Films from around the world",
+        "Películas de todo el mundo", "Filmes do mundo todo", "Filme aus aller Welt",
+      ),
+      tv: tri(
+        "Dünyanın dört bir yanından diziler",
+        "Shows from around the world",
+        "Series de todo el mundo", "Séries do mundo todo", "Serien aus aller Welt",
+      ),
+    },
   },
   providers: {
     icon: "apps",

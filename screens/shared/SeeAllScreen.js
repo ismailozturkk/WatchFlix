@@ -11,7 +11,7 @@
 //   movie section: "trends" | "bests" | "nowPlaying" | "upcoming"
 //   tv    section: "trends" | "best"  | "airingToday" | "onTheAir"
 //   ortak: "genres" (genreIds ile) | "providers" (providerId ile) |
-//          "subscriptions" | "recentFavorites" | "hiddenGems" — bunlar
+//          "subscriptions" | "recentFavorites" | "worldTour" (originalLanguage ile) — bunlar
 //          context yerine bağımsız discover isteğiyle yüklenir (bkz. DiscoverSeeAll).
 //          "fromFavorites" — dört favoriden türeyen öneriler (bkz. FavoritesSeeAll).
 //
@@ -58,6 +58,7 @@ import { fetchFavoriteRecommendations } from "../../services/favoriteRecommendat
 import { getFavoritesCopy } from "../../utils/favoritesCopy";
 import { readProfileFavorites, recommendationSources } from "../../utils/fourFavorites";
 import GlassTouchable from "../../components/common/GlassTouchable";
+import { worldTourDiscoverParams } from "../../utils/worldTour";
 
 const { width } = Dimensions.get("window");
 const SIDE = 12;
@@ -689,7 +690,7 @@ function TvSeeAll({ section, title, navigation }) {
 // filtreyi (genreIds / providerId) doğrudan TMDB discover'a vererek bağımsız
 // yükler. Böylece taze MovieProvider'ın ilk sağlayıcıyı otomatik seçmesi gibi
 // yan etkiler tamamen atlanır.
-function useDiscoverPagination({ mediaType, genreIds, providerId, preset }) {
+function useDiscoverPagination({ mediaType, genreIds, providerId, preset, originalLanguage }) {
   const { API_KEY } = useApiSettings();
   const { language } = useLanguage();
   const { streamingProviderIds } = useStreamingProviderSettings();
@@ -718,9 +719,16 @@ function useDiscoverPagination({ mediaType, genreIds, providerId, preset }) {
         const params = new URLSearchParams({
           language: tmdbLanguage,
           page: String(pageNum),
-          sort_by: preset === "hiddenGems" ? "vote_average.desc" : "popularity.desc",
-          "vote_count.gte": preset === "hiddenGems" ? "120" : "300",
+          sort_by: "popularity.desc",
+          "vote_count.gte": "300",
         });
+
+        // Dünya Turu: ray (components/DiscoveryMediaRail) ile AYNI sıralama ve eşikler.
+        if (preset === "worldTour") {
+          for (const [key, value] of Object.entries(worldTourDiscoverParams(originalLanguage))) {
+            params.set(key, String(value));
+          }
+        }
 
         if (preset === "subscriptions") {
           params.set("watch_region", tmdbRegion);
@@ -757,6 +765,7 @@ function useDiscoverPagination({ mediaType, genreIds, providerId, preset }) {
       isProviders,
       providerId,
       genresKey,
+      originalLanguage,
       tmdbLanguage,
       tmdbRegion,
       streamingProviderIds,
@@ -904,9 +913,10 @@ function DiscoverSeeAll({
   genreIds,
   providerId,
   preset,
+  originalLanguage,
   navigation,
 }) {
-  const feed = useDiscoverPagination({ mediaType, genreIds, providerId, preset });
+  const feed = useDiscoverPagination({ mediaType, genreIds, providerId, preset, originalLanguage });
   return (
     <SeeAllGrid
       title={title}
@@ -921,7 +931,7 @@ function DiscoverSeeAll({
 }
 
 export default function SeeAllScreen({ route, navigation }) {
-  const { mediaType, section, title, genreIds, providerId } = route.params || {};
+  const { mediaType, section, title, genreIds, providerId, originalLanguage } = route.params || {};
 
   // Favorilerine Göre: öneriler favorilerden istemcide türetilir, discover/context akışı yok.
   if (section === "fromFavorites") {
@@ -935,7 +945,7 @@ export default function SeeAllScreen({ route, navigation }) {
     section === "subscriptions" ||
     section === "topGenres" ||
     section === "recentFavorites" ||
-    section === "hiddenGems"
+    section === "worldTour"
   ) {
     return (
       <DiscoverSeeAll
@@ -943,11 +953,12 @@ export default function SeeAllScreen({ route, navigation }) {
         title={title}
         genreIds={genreIds}
         providerId={providerId}
+        originalLanguage={originalLanguage}
         preset={
           section === "subscriptions" ||
           section === "topGenres" ||
           section === "recentFavorites" ||
-          section === "hiddenGems"
+          section === "worldTour"
             ? section
             : undefined
         }

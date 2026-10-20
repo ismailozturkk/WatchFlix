@@ -2,7 +2,7 @@
 //
 // Ayarlar > Kişiselleştirme > Ekran bölümleri. Diziler, Filmler, Hub ve Profil
 // ekranlarındaki bölümlerin (raflar, kartlar, şeritler) hangilerinin görüneceğini
-// seçtirir; ör. profilde "Notlar"ı ya da film ekranında "Gizli Cevherler"i kapatınca
+// seçtirir; ör. profilde "Notlar"ı ya da film ekranında "Dünya Turu"nu kapatınca
 // o bölümler ilgili ekrandan kalkar.
 //
 // BİÇİM: üstte dört ekran karosu (her birinde kaç bölümün göründüğü), seçili ekranın

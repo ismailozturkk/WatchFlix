@@ -101,7 +101,7 @@ export default function MovieScreen({ navigation, headerTopOffset = 0 }) {
           ? [{ key: "topGenres", Component: DiscoveryMediaRail, preset: "topGenres", genreIds: onboardingGenreIds }]
           : []),
       { key: "recentFavorites", Component: DiscoveryMediaRail, preset: "recentFavorites" },
-      { key: "hiddenGems", Component: DiscoveryMediaRail, preset: "hiddenGems" },
+      { key: "worldTour", Component: DiscoveryMediaRail, preset: "worldTour" },
       { key: "nowPlaying", Component: MovieNowPlaying },
       { key: "oscar", Component: MovieOscar },
       { key: "collection", Component: MovieCollection },

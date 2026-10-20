@@ -1,7 +1,7 @@
 // __tests__/discoveryRailSettings.test.js
 //
 // Keşif rayı (components/DiscoveryMediaRail — "Platform Favorileri", "Yeni
-// Beğenilenler", "Gizli Cevherler", "Favori Türlerin") ayar değişince:
+// Beğenilenler", "Dünya Turu", "Favori Türlerin") ayar değişince:
 //   • yetişkin içerik: yeni kovadan yeniden yüklenir, kapatınca kayıtlar kalkar
 //   • platform üyeliği: yeni platform kümesiyle yeniden yüklenir
 //   • İSTEK SIRASI: art arda değişimde yavaş gelen ESKİ sonuç yenisini ezmez
@@ -38,6 +38,8 @@ jest.mock("../components/PosterInfoBadges", () => ({
   POSTER_BADGE_POS: { bottomRight: {} },
 }));
 jest.mock("../components/home/SectionHeader", () => "SectionHeader");
+jest.mock("../components/home/SectionChips", () => ({ SectionChipRail: "SectionChipRail" }));
+jest.mock("../components/home/DiscoverFilterChip", () => "DiscoverFilterChip");
 jest.mock("../components/Skeleton", () => ({ RailSkeleton: "RailSkeleton" }));
 jest.mock("../components/PaginatedRail", () => (props) => {
   mockRail = props;
@@ -202,10 +204,102 @@ describe("DiscoveryMediaRail — ayar değişimi", () => {
   });
 
   test("ayar değişmeden yeniden çizim ağ isteği üretmez", async () => {
-    await kur("hiddenGems");
+    await kur("worldTour");
     const once = mockCalls.length;
-    await yenidenCiz("hiddenGems");
-    await yenidenCiz("hiddenGems");
+    await yenidenCiz("worldTour");
+    await yenidenCiz("worldTour");
     expect(mockCalls.length).toBe(once);
+  });
+
+  // ── Dünya Turu: çip satırı özgün dili seçer ──
+  // Çip, SectionHeader'ın çocuğu olarak çizilir; burada SectionChipRail taklidinin `renderChip`i çağrılıp
+  // dönen çipin `onPress`i tetiklenir (gerçek dokunuşun yaptığı iş).
+  const cipeBas = async (kod) => {
+    const sira = kok.root.findByType("SectionChipRail");
+    const cip = sira.props.renderChip({ code: kod }, 0);
+    await act(async () => { cip.props.onPress(); });
+    await VAKIT();
+    await VAKIT();
+  };
+  const dilSonucu = (kodlar) => (_url, params) => yanit(kodlar[params.with_original_language] ?? 0);
+
+  test("Dünya Turu: varsayılan Korece, /discover özgün dil + puan eşikleriyle çağrılır", async () => {
+    mockResolver = dilSonucu({ ko: 1 });
+    await kur("worldTour");
+    const params = mockCalls[mockCalls.length - 1].params;
+    expect(params.with_original_language).toBe("ko");
+    expect(params.sort_by).toBe("popularity.desc");
+    expect(params["vote_average.gte"]).toBe(6.5);
+    expect(params["vote_count.gte"]).toBe(150);
+    expect(gosterilen()).toEqual([1]);
+  });
+
+  test("Dünya Turu: çip değişince yeni dille yüklenir, eski dilin posterleri kalmaz", async () => {
+    mockResolver = dilSonucu({ ko: 1, ja: 2 });
+    await kur("worldTour");
+    expect(gosterilen()).toEqual([1]);
+
+    await cipeBas("ja");
+
+    expect(gosterilen()).toEqual([2]);
+    // Her dil kendi önbellek anahtarına yazar (Korece'ye dönünce ağa gidilmez).
+    expect(rawCachedEntry("discovery_v2_movie_worldTour_tr_ko_1")).not.toBeNull();
+    expect(rawCachedEntry("discovery_v2_movie_worldTour_tr_ja_1")).not.toBeNull();
+    const once = mockCalls.length;
+    await cipeBas("ko");
+    expect(gosterilen()).toEqual([1]);
+    expect(mockCalls.length).toBe(once);
+  });
+
+  test("Dünya Turu: yavaş gelen ESKİ dil sonucu, yeni seçilen dilin sonucunu ezmez", async () => {
+    let yavasiBirak;
+    const yavas = new Promise((coz) => { yavasiBirak = coz; });
+    mockResolver = (_url, params) =>
+      params.with_original_language === "ko"
+        ? yavas.then(() => ({ data: { results: ogeler(1), total_pages: 1 } }))
+        : yanit(2);
+    await kur("worldTour"); // Korece isteği uçuşta
+
+    await cipeBas("ja");
+    expect(gosterilen()).toEqual([2]);
+
+    await act(async () => { yavasiBirak(); });
+    await VAKIT();
+    await VAKIT();
+
+    expect(gosterilen()).toEqual([2]);
+    expect(rawCachedEntry("discovery_v2_movie_worldTour_tr_ko_1")).not.toBeNull();
+  });
+
+  test("Dünya Turu: seçilen dilde sonuç yoksa ray gizlenmez, çipler kalır", async () => {
+    mockResolver = () => Promise.resolve({ data: { results: [], total_pages: 1 } });
+    await kur("worldTour");
+    expect(kok.root.findAllByType("SectionChipRail")).toHaveLength(1);
+    // Diğer raflar boşken gizlenir; Dünya Turu'nda kullanıcı başka dile geçebilmeli.
+    await yenidenCiz("recentFavorites");
+    expect(kok.root.findAllByType("SectionChipRail")).toHaveLength(0);
+  });
+
+  test("Dünya Turu: 'Tümü' seçili dili ve başlığı SeeAll ekranına taşır", async () => {
+    mockResolver = dilSonucu({ ko: 1, fr: 3 });
+    const navigate = jest.fn();
+    await act(async () => {
+      kok = create(<DiscoveryMediaRail mediaType="tv" preset="worldTour" navigation={{ navigate }} />);
+    });
+    await VAKIT();
+    await VAKIT();
+    await cipeBas("fr");
+
+    kok.root.findByType("SectionHeader").props.onPressAction();
+
+    expect(navigate).toHaveBeenCalledWith(
+      "SeeAllScreen",
+      expect.objectContaining({
+        mediaType: "tv",
+        section: "worldTour",
+        originalLanguage: "fr",
+        title: "Dünya Turu · Fransızca",
+      }),
+    );
   });
 });

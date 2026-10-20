@@ -100,7 +100,7 @@ export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
           ? [{ key: "topGenres", Component: DiscoveryMediaRail, preset: "topGenres", genreIds: onboardingGenreIds }]
           : []),
       { key: "recentFavorites", Component: DiscoveryMediaRail, preset: "recentFavorites" },
-      { key: "hiddenGems", Component: DiscoveryMediaRail, preset: "hiddenGems" },
+      { key: "worldTour", Component: DiscoveryMediaRail, preset: "worldTour" },
       { key: "emmy", Component: TvShowsEmmy },
       { key: "providers", Component: TvShowsProvders },
       { key: "genres", Component: TvShowsGenres },

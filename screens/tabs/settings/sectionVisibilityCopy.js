@@ -6,7 +6,7 @@
 // (ham kimlik ekranda görünmesin).
 //
 // Bölüm adları ekrandaki rafların/kartların GERÇEK başlıklarıyla aynıdır (kullanıcı
-// "Gizli cevherler"i listede de ekrandaki adıyla görsün). Her bölüm [ad, açıklama].
+// "Dünya Turu"nu listede de ekrandaki adıyla görsün). Her bölüm [ad, açıklama].
 //
 // YENİ BÖLÜM: utils/sectionVisibility.js'e ekle + üç dile [ad, açıklama] yaz.
 
@@ -54,7 +54,7 @@ const tr = {
       subscriptions: ["Platform Favorileri", "Seçtiğin platformlarda izleyebileceklerin; platform seçince görünür"],
       topGenres: ["Favori Türlerin", "En çok izlediğin ya da başlangıçta seçtiğin türlere göre"],
       recentFavorites: ["Yeni Beğenilenler", "Yeni ve izleyici puanı güçlü diziler"],
-      hiddenGems: ["Gizli Cevherler", "Az bilinen, yüksek puanlı seçimler"],
+      worldTour: ["Dünya Turu", "Başka dillerden diziler; Korece, Japonca, Türkçe… çipleriyle ülkeye göre keşif"],
       emmy: ["Emmy Ödüllü Diziler", "Yıllara göre Emmy kazananları"],
       providers: ["Sağlayıcılar", "Platformlara göre dizi keşfi"],
       genres: ["Türler", "Türe göre dizi keşfi"],
@@ -69,7 +69,7 @@ const tr = {
       subscriptions: ["Platform Favorileri", "Seçtiğin platformlarda izleyebileceklerin; platform seçince görünür"],
       topGenres: ["Favori Türlerin", "En çok izlediğin ya da başlangıçta seçtiğin türlere göre"],
       recentFavorites: ["Yeni Beğenilenler", "Yeni ve izleyici puanı güçlü filmler"],
-      hiddenGems: ["Gizli Cevherler", "Az bilinen, yüksek puanlı seçimler"],
+      worldTour: ["Dünya Turu", "Başka dillerden filmler; Korece, Japonca, Türkçe… çipleriyle ülkeye göre keşif"],
       nowPlaying: ["Vizyondaki Filmler", "Şu an sinemalarda gösterilenler"],
       oscar: ["Oscar Ödüllü Filmler", "Yıllara göre Oscar kazananları"],
       collection: ["Seri Filmler", "Film serileri ve koleksiyonlar"],
@@ -139,7 +139,7 @@ const en = {
       subscriptions: ["Service Favorites", "Titles on the services you picked; shows once you pick services"],
       topGenres: ["Favorite Genres", "Based on what you watch or picked at the start"],
       recentFavorites: ["Recent Favorites", "Recent shows with strong audience scores"],
-      hiddenGems: ["Hidden Gems", "Lesser-known, highly rated picks"],
+      worldTour: ["World Tour", "Shows from other languages; discover by country with Korean, Japanese, Turkish… chips"],
       emmy: ["Emmy-Winning TV Shows", "Emmy winners by year"],
       providers: ["Providers", "Browse shows by streaming service"],
       genres: ["Genres", "Browse shows by genre"],
@@ -154,7 +154,7 @@ const en = {
       subscriptions: ["Service Favorites", "Titles on the services you picked; shows once you pick services"],
       topGenres: ["Favorite Genres", "Based on what you watch or picked at the start"],
       recentFavorites: ["Recent Favorites", "Recent movies with strong audience scores"],
-      hiddenGems: ["Hidden Gems", "Lesser-known, highly rated picks"],
+      worldTour: ["World Tour", "Movies from other languages; discover by country with Korean, Japanese, Turkish… chips"],
       nowPlaying: ["Movies In Theaters", "What's showing in cinemas right now"],
       oscar: ["Oscar-Winning Movies", "Oscar winners by year"],
       collection: ["Movie Collections", "Film series and collections"],
@@ -224,7 +224,7 @@ const es = {
       subscriptions: ["Favoritos de tus plataformas", "Lo que puedes ver en las plataformas que elegiste; aparece al elegir plataformas"],
       topGenres: ["Tus géneros favoritos", "Según lo que más ves o lo que elegiste al empezar"],
       recentFavorites: ["Favoritos recientes", "Series recientes con buena puntuación del público"],
-      hiddenGems: ["Joyas ocultas", "Opciones poco conocidas y muy bien valoradas"],
+      worldTour: ["Vuelta al mundo", "Series de otros idiomas; descubre por país con chips de coreano, japonés, turco…"],
       emmy: ["Series ganadoras del Emmy", "Ganadoras del Emmy por año"],
       providers: ["Plataformas", "Descubre series por plataforma"],
       genres: ["Géneros", "Descubre series por género"],
@@ -239,7 +239,7 @@ const es = {
       subscriptions: ["Favoritos de tus plataformas", "Lo que puedes ver en las plataformas que elegiste; aparece al elegir plataformas"],
       topGenres: ["Tus géneros favoritos", "Según lo que más ves o lo que elegiste al empezar"],
       recentFavorites: ["Favoritos recientes", "Películas recientes con buena puntuación del público"],
-      hiddenGems: ["Joyas ocultas", "Opciones poco conocidas y muy bien valoradas"],
+      worldTour: ["Vuelta al mundo", "Películas de otros idiomas; descubre por país con chips de coreano, japonés, turco…"],
       nowPlaying: ["Películas en cines", "Lo que se proyecta ahora en los cines"],
       oscar: ["Películas ganadoras del Óscar", "Ganadoras del Óscar por año"],
       collection: ["Sagas de películas", "Sagas y colecciones de películas"],
@@ -309,7 +309,7 @@ const pt = {
       subscriptions: ["Favoritos dos seus serviços", "O que você pode assistir nos serviços que escolheu; aparece ao escolher serviços"],
       topGenres: ["Seus gêneros favoritos", "Com base no que você mais assiste ou no que escolheu no início"],
       recentFavorites: ["Favoritos recentes", "Séries recentes com boa nota do público"],
-      hiddenGems: ["Joias escondidas", "Opções pouco conhecidas e muito bem avaliadas"],
+      worldTour: ["Volta ao mundo", "Séries de outros idiomas; descubra por país com chips de coreano, japonês, turco…"],
       emmy: ["Séries vencedoras do Emmy", "Vencedoras do Emmy por ano"],
       providers: ["Serviços", "Descubra séries por serviço"],
       genres: ["Gêneros", "Descubra séries por gênero"],
@@ -324,7 +324,7 @@ const pt = {
       subscriptions: ["Favoritos dos seus serviços", "O que você pode assistir nos serviços que escolheu; aparece ao escolher serviços"],
       topGenres: ["Seus gêneros favoritos", "Com base no que você mais assiste ou no que escolheu no início"],
       recentFavorites: ["Favoritos recentes", "Filmes recentes com boa nota do público"],
-      hiddenGems: ["Joias escondidas", "Opções pouco conhecidas e muito bem avaliadas"],
+      worldTour: ["Volta ao mundo", "Filmes de outros idiomas; descubra por país com chips de coreano, japonês, turco…"],
       nowPlaying: ["Filmes em cartaz", "O que está em exibição agora nos cinemas"],
       oscar: ["Filmes vencedores do Oscar", "Vencedores do Oscar por ano"],
       collection: ["Sagas de filmes", "Sagas e coleções de filmes"],
@@ -394,7 +394,7 @@ const de = {
       subscriptions: ["Favoriten der Dienste", "Titel bei den Diensten, die du gewählt hast; erscheint, sobald du Dienste wählst"],
       topGenres: ["Lieblingsgenres", "Nach dem, was du schaust oder zu Beginn gewählt hast"],
       recentFavorites: ["Aktuelle Favoriten", "Neuere Serien mit starken Publikumsbewertungen"],
-      hiddenGems: ["Geheimtipps", "Weniger bekannte, hoch bewertete Titel"],
+      worldTour: ["Weltreise", "Serien aus anderen Sprachen; nach Land entdecken mit Koreanisch, Japanisch, Türkisch…"],
       emmy: ["Emmy-prämierte Serien", "Emmy-Gewinner nach Jahr"],
       providers: ["Anbieter", "Serien nach Streaming-Dienst durchstöbern"],
       genres: ["Genres", "Serien nach Genre durchstöbern"],
@@ -409,7 +409,7 @@ const de = {
       subscriptions: ["Favoriten der Dienste", "Titel bei den Diensten, die du gewählt hast; erscheint, sobald du Dienste wählst"],
       topGenres: ["Lieblingsgenres", "Nach dem, was du schaust oder zu Beginn gewählt hast"],
       recentFavorites: ["Aktuelle Favoriten", "Neuere Filme mit starken Publikumsbewertungen"],
-      hiddenGems: ["Geheimtipps", "Weniger bekannte, hoch bewertete Titel"],
+      worldTour: ["Weltreise", "Filme aus anderen Sprachen; nach Land entdecken mit Koreanisch, Japanisch, Türkisch…"],
       nowPlaying: ["Filme im Kino", "Was gerade in den Kinos läuft"],
       oscar: ["Oscar-prämierte Filme", "Oscar-Gewinner nach Jahr"],
       collection: ["Filmreihen", "Filmreihen und Sammlungen"],
