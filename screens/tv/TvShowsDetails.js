@@ -1,4 +1,13 @@
-import React, { useState, useEffect, useRef } from "react";
+import { tmdbLanguageOf, tmdbRegionOf } from "../../utils/appLanguages";
+import { alpha } from "@theme/colors";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  memo,
+} from "react";
 import {
   StyleSheet,
   View,
@@ -8,44 +17,79 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
-  FlatList,
   Modal,
   Animated,
-  Platform,
-  Pressable,
+    Linking,
+  FlatList,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { DetailsSkeleton } from "../../components/Skeleton";
-import RatingStars from "../../components/RatingStars";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import TVShowItem from "../../components/TVShowItem";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { LinearGradient } from "expo-linear-gradient";
-import LottieView from "lottie-react-native";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useSnow } from "../../context/SnowContext";
-import { getDoc, doc, updateDoc, setDoc } from "firebase/firestore";
-import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
-import Toast from "react-native-toast-message";
+import Toast from "@components/AppToast";
 import SeasonItem from "./SeasonItem";
-import * as Progress from "react-native-progress";
-import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
+import SeasonDeck from "./SeasonDeck";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import Entypo from "@expo/vector-icons/Entypo";
-import { useAppSettings } from "../../context/AppSettingsContext";
-import DateTimePickerModal from "react-native-modal-datetime-picker";
+import {
+  useAppSettings,
+  useImageQualitySettings,
+  useListLayoutSettings,
+} from "../../context/AppSettingsContext";
+import WatchedDateSheet from "@components/detail/WatchedDateSheet";
+import WatchHistorySheet from "@components/modals/WatchHistorySheet";
+import MediaNoteSheet from "@components/detail/MediaNoteSheet";
+import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext";
 import ListViewTv from "../../components/ListViewTv";
-import { BlurView } from "expo-blur";
-import { useListStatus } from "../../modules/UseListStatus";
-import YoutubePlayer from "react-native-youtube-iframe";
+import PosterImage from "../../components/PosterImage";
+import GlassIconButton from "../../components/common/GlassIconButton";
+import ListBadges from "../../components/ListBadges";
 import { useListStatusContext } from "../../context/ListStatusContext";
-import IconBacground from "../../components/IconBacground";
+import { PREDEFINED_MOVIE_LISTS } from "../../services/listItemsService";
+import {
+  markShowWatched,
+  removeTvWatch,
+  setListMembership,
+} from "../../services/libraryActions";
+import { customListHas, listItemFromDetails } from "../../utils/libraryCore";
+import { showLibraryError } from "../../utils/libraryErrorText";
+import { todayListDate } from "../../utils/mediaFacts";
+import ScreenDecor from "../../components/ScreenDecor";
+import ImageGalleryModal from "@components/modals/ImageGalleryModal";
+import TrailerSection from "@components/video/TrailerSection";
+import PaginatedRail from "../../components/PaginatedRail";
+import CommentSheetModal from "@components/modals/CommentSheetModal";
+import RatingSheetModal from "@components/modals/RatingSheetModal";
+import RatingSummary from "@components/RatingSummary";
+import ExternalRatingsRow from "@components/detail/ExternalRatingsRow";
+import CertificationBadge from "../../components/detail/CertificationBadge";
+import { i18nText } from "../../utils/i18nText";
+import { useWatchedShow } from "../../hooks/useWatchedShow";
+import { refreshShowMeta } from "../../services/refreshShowMeta";
+import AIChatScreen from "@screens/chat/AIChatScreen";
+import NewConversationSheet from "@components/chat/NewConversationSheet";
+import {
+  getWatchState,
+  isAired,
+  WATCH_STATE,
+  watchStateColor,
+} from "../../utils/watchState";
+import Reminder from "../../components/Reminder";
+import WatchProgressBar from "../../components/tv/WatchProgressBar";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
-const { height, width } = Dimensions.get("window");
+import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../../components/common/GlassTouchable";
+const { width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
+
+// Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
+const CAST_PLACEHOLDER_ICON = Math.round(width * 0.09);
 
 /* ─── Section header (aynı MovieDetails stili) ── */
 const SectionHeader = ({ title, right, theme }) => (
@@ -58,143 +102,120 @@ const SectionHeader = ({ title, right, theme }) => (
   </View>
 );
 
-/* ─── Benzer dizi kartı ── */
-const SimilarTvShow = ({
+/* ─── Önerilen dizi kartı ── */
+// Kart kendi press animasyonunu yönetir; memo sayesinde ekran re-render
+// olduğunda 40 kart yeniden çizilmez.
+const RecommendedTvShow = memo(function RecommendedTvShow({
   item,
   navigation,
-  scaleValues,
-  onPressIn,
-  onPressOut,
-  imageQuality,
   theme,
-}) => {
-  const { inWatchList, inFavorites, isWatched, isInOtherLists } = useListStatus(
-    item.id,
-    "tv",
-  );
-  const isInAnyList = inWatchList || isWatched || inFavorites || isInOtherLists;
+}) {
+  const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () =>
+    Animated.timing(scale, {
+      toValue: 0.93,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  const onPressOut = () =>
+    Animated.timing(scale, {
+      toValue: 1,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
 
   return (
-    <Animated.View
-      style={{ transform: [{ scale: scaleValues[item.id] || 1 }] }}
-    >
+    <Animated.View style={{ transform: [{ scale }] }}>
       <TouchableOpacity
-        onPressIn={() => onPressIn(item.id)}
-        onPressOut={() => onPressOut(item.id)}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
         activeOpacity={0.9}
-        style={styles.similarItem}
+        style={styles.railItem}
         onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+        onLongPress={() =>
+          openQuickActions({ item, mediaType: "tv", navigation })
+        }
+        delayLongPress={350}
       >
-        <Image
-          source={
-            item.poster_path
-              ? {
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
-                }
-              : require("../../assets/image/no_image.png")
-          }
-          style={[styles.similarPoster, { borderColor: theme.border + "55" }]}
+        <PosterImage
+          path={item.poster_path}
+          type="tv"
+          size={200}
+          iconSize={46}
+          style={[styles.railPoster, { borderColor: alpha(theme.border, 0.3333333333333333) }]}
         />
-        <View
-          style={[styles.ratingPill, { backgroundColor: "rgba(0,0,0,0.72)" }]}
-        >
-          <Ionicons name="star" size={9} color="#FFD700" />
-          <Text allowFontScaling={false} style={styles.ratingPillText}>
-            {item.vote_average.toFixed(1)}
-          </Text>
-        </View>
-        {isInAnyList && (
-          <View style={[styles.stats]}>
-            <View
-              style={{
-                gap: 3,
-                backgroundColor: "rgba(0,0,0,0.72)",
-                paddingVertical: 4,
-                paddingHorizontal: 2,
-                borderRadius: 10,
-              }}
-            >
-              {inWatchList && (
-                <View>
-                  <Ionicons
-                    name="bookmark"
-                    size={12}
-                    color={theme.colors.blue}
-                  />
-                </View>
-              )}
-              {isWatched && (
-                <View>
-                  <Ionicons name="eye" size={12} color={theme.colors.green} />
-                </View>
-              )}
-              {inFavorites && (
-                <View>
-                  <Ionicons name="heart" size={12} color={theme.colors.red} />
-                </View>
-              )}
-              {isInOtherLists && (
-                <View>
-                  <Ionicons name="grid" size={12} color={theme.colors.orange} />
-                </View>
-              )}
-            </View>
+        {posterBadges?.tmdbRating !== false && (
+          <View
+            style={[styles.ratingPill, { backgroundColor: "rgba(0,0,0,0.72)" }]}
+          >
+            <Ionicons name="star" size={9} color="#FFD700" />
+            <Text allowFontScaling={false} style={styles.ratingPillText}>
+              {item.vote_average.toFixed(1)}
+            </Text>
           </View>
         )}
+        <View style={styles.stats}>
+          <ListBadges
+            mediaId={item.id}
+            mediaType="tv"
+            theme={theme}
+            style={{
+              gap: 3,
+              paddingVertical: 4,
+              paddingHorizontal: 2,
+              borderRadius: 10,
+              backgroundColor: "rgba(0,0,0,0.72)",
+            }}
+          />
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
-};
+});
 
 /* ─── Ana bileşen ── */
 export default function TvShowsDetails({ route, navigation }) {
-  const { id } = route.params;
+  const insets = useSafeAreaInsets();
+  // openComments / commentScope: "Etkinliklerim → Yorumlarım" satırından
+  // gelindiğinde yorum sayfası doğrudan o yorumun kapsamında (dizi/sezon/bölüm)
+  // açılır — kullanıcı kendi yorumunu aramak zorunda kalmasın.
+  const { id, openComments = false, commentScope = null } = route.params;
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [commentModalVisible, setCommentModalVisible] = useState(
+    !!openComments || !!commentScope,
+  );
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [noteSheetVisible, setNoteSheetVisible] = useState(false);
+  const { mediaNotes, checkCanCreateMediaNote } = useMediaNotes();
+  const myMediaNote = mediaNotes.find((n) => n.id === mediaNoteItemKey("tv", id)) || null;
+  // Sezon carousel'i: 5+ sezonda tek tek sayfalı görünüm; "Tümünü Gör" düz listeye açar.
+  const [showAllSeasons, setShowAllSeasons] = useState(false);
+  // Ana kadro (credits.cast) — MovieDetail ile aynı bölüm/kart yapısı.
+  const [showFullCast, setShowFullCast] = useState(false);
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { API_KEY, showSnow, imageQuality } = useAppSettings();
-  const { allLists } = useListStatusContext();
+  const { API_KEY } = useAppSettings();
+  const { getTmdbUrl } = useImageQualitySettings();
+  const { allLists, statusIndex } = useListStatusContext();
+  // İzleme sağlayıcıları bölgesi — MovieDetail ile aynı seçim.
+  const providerRegion = tmdbRegionOf(language);
 
-  const [overviewExpanded, setOverviewExpanded] = useState(false);
-  const overviewHeightAnim = useRef(new Animated.Value(80)).current;
-  const overviewOpacity = useRef(new Animated.Value(1)).current;
-  const HALF_W = (width - 30 - 10) / 2;
-  const FULL_W = width - 30;
-  const overviewWidthAnim = useRef(new Animated.Value(HALF_W)).current;
+  // Tek abonelik: bu dizinin tüm izlenme durumu (kök-dizi yerine subcollection).
+  const watched = useWatchedShow(id);
 
-  const toggleOverview = () => {
-    const opening = !overviewExpanded;
-    setOverviewExpanded(opening);
-    Animated.parallel([
-      Animated.timing(overviewHeightAnim, {
-        toValue: opening ? 500 : 80,
-        duration: 280,
-        useNativeDriver: false,
-      }),
-      Animated.timing(overviewWidthAnim, {
-        toValue: opening ? FULL_W : HALF_W,
-        duration: 280,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  };
-  const [listStates, setListStates] = useState({});
-  const [scaleValues, setScaleValues] = useState({});
-  const [isSeasonWatched, setIsSeasonWatched] = useState(0);
-  const [showEpisodeCount, setShowEpisodeCount] = useState();
-  const [showEpisodes, setShowEpisodes] = useState();
   const [isLoading, setIsLoading] = useState(false);
-  const [reviewLength, setReviewLength] = useState(5);
-  const [reviewTextLength, setReviewTextLength] = useState(null);
-  const [selectedVideo, setSelectedVideo] = useState(null);
 
   const [PosterModalVisible, setPosterModalVisible] = useState(false);
   const [backdropModalVisible, setBacdropModalVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
+  const [aiVisible, setAiVisible] = useState(false);
+  const [sendVisible, setSendVisible] = useState(false);
 
   /* ── Format helpers ── */
   const formatDate = (ts) => {
@@ -206,59 +227,43 @@ export default function TvShowsDetails({ route, navigation }) {
     }).format(new Date(ts));
   };
   const formatDateSave = (ts) => {
+    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}/.test(ts)) {
+      return ts.slice(0, 10);
+    }
     const d = new Date(ts);
     if (isNaN(d.getTime())) return "";
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(d.getDate()).padStart(2, "0")}`;
   };
 
-  /* ── Press animasyonları ── */
-  const onPressIn = (id) => {
-    if (!scaleValues[id]) return;
-    Animated.timing(scaleValues[id], {
-      toValue: 0.93,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
-  };
-  const onPressOut = (id) => {
-    if (!scaleValues[id]) return;
-    Animated.timing(scaleValues[id], {
-      toValue: 1,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  /* ── listStates ── */
-  useEffect(() => {
-    if (!allLists) {
-      setListStates({});
-      return;
-    }
+  /* ── listStates — useMemo: snapshot başına bir kez, ekstra render yok ── */
+  const listStates = useMemo(() => {
     const s = {};
-    Object.entries(allLists).forEach(([k, v]) => {
-      s[k] = Array.isArray(v)
-        ? v.some((i) => i.id === id && i.type === "tv")
-        : false;
-    });
-    setListStates(s);
-  }, [allLists, id]);
-
-  /* ── scaleValues ── */
-  useEffect(() => {
-    if (!details) return;
-    const vals = {};
-    [
-      ...(details.recommendations?.results || []).slice(0, 20),
-      ...(details.similar?.results || []).slice(0, 20),
-    ].forEach((item) => {
-      if (item?.id) vals[item.id] = new Animated.Value(1);
-    });
-    setScaleValues(vals);
-  }, [details]);
+    const m = statusIndex?.tv?.[id] || {};
+    s.favorites = !!m.inFavorites;
+    s.watchList = !!m.inWatchList;
+    s.watchedMovies = !!m.isWatched;
+    if (allLists) {
+      Object.entries(allLists).forEach(([k, v]) => {
+        if (
+          PREDEFINED_MOVIE_LISTS.includes(k) ||
+          k === "watchedTv" ||
+          k === "customLists"
+        )
+          return;
+        if (Array.isArray(v)) s[k] = customListHas(allLists, k, id, "tv");
+      });
+    }
+    return s;
+  }, [allLists, statusIndex, id]);
 
   /* ── Fetch details ── */
   useEffect(() => {
+    // Aynı ekran örneği yeni id ile yeniden kullanılabildiği için geç gelen
+    // eski yanıtın yeni diziyi ezmemesi adına cancelled bayrağı gerekli.
+    let cancelled = false;
     const fetch = async () => {
       setLoading(true);
       try {
@@ -266,108 +271,149 @@ export default function TvShowsDetails({ route, navigation }) {
           method: "GET",
           url: `https://api.themoviedb.org/3/tv/${id}`,
           params: {
-            language: language === "tr" ? "tr-TR" : "en-US",
+            language: tmdbLanguageOf(language),
             append_to_response:
-              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,release_dates,reviews,similar,translations,videos,watch/providers",
+              "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,content_ratings,translations,videos,watch/providers",
           },
           headers: { accept: "application/json", Authorization: API_KEY },
         });
-        setDetails(res.data);
+        if (!cancelled) setDetails(res.data);
       } catch (e) {
         console.error(e);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetch();
+    return () => {
+      cancelled = true;
+    };
   }, [id, language]);
 
-  /* ── İzlenme kontrolü ── */
-  const checkIfWatched = () => {
-    if (!allLists) {
-      setShowEpisodeCount();
-      setShowEpisodes();
-      setIsSeasonWatched(0);
-      return;
-    }
-    const tvShow = (allLists.watchedTv || []).find((s) => s.id === id);
-    if (tvShow) {
-      const total = tvShow.showEpisodeCount;
-      const watched = Array.isArray(tvShow.seasons)
-        ? tvShow.seasons.reduce((a, s) => a + (s.episodes?.length || 0), 0)
-        : 0;
-      setShowEpisodeCount(total);
-      setShowEpisodes(watched);
-      setIsSeasonWatched(total && watched ? watched / total : 0);
-    } else {
-      setShowEpisodeCount();
-      setShowEpisodes();
-      setIsSeasonWatched(0);
-    }
-  };
+  // Önerilen diziler rayı: append_to_response yalnız ilk sayfayı getirir.
+  // Ana ekran raylarındaki gibi (PaginatedRail) sona yaklaşınca sonraki TMDB
+  // sayfası çekilip mevcut listenin sonuna eklenir.
+  const [railState, setRailState] = useState({
+    items: [],
+    page: 1,
+    totalPages: 1,
+    loading: false,
+  });
+  const railBusyRef = useRef(false);
+
   useEffect(() => {
-    checkIfWatched();
-  }, [allLists, id]);
+    const block = details?.recommendations;
+    railBusyRef.current = false;
+    setRailState({
+      items: block?.results || [],
+      page: block?.page || 1,
+      totalPages: block?.total_pages || 1,
+      loading: false,
+    });
+  }, [details]);
+
+  // Dizi TMDB'den çekildiğinde ve kullanıcı bu diziyi izlemişse (Firestore'da kaydı varsa),
+  // yeni sezon/bölümler eklenmişse showEpisodeCount ve showSeasonCount'u sessizce güncelle.
+  useEffect(() => {
+    if (!user?.uid || !id || !details || !watched?.showDoc) return;
+    refreshShowMeta(user.uid, id, details, watched.showDoc);
+  }, [user?.uid, id, details, watched?.showDoc]);
+
+  const loadMoreRail = useCallback(async () => {
+    if (railBusyRef.current || railState.page >= railState.totalPages) return;
+    railBusyRef.current = true;
+    setRailState((cur) => ({ ...cur, loading: true }));
+    try {
+      const res = await axios.request({
+        method: "GET",
+        url: `https://api.themoviedb.org/3/tv/${id}/recommendations`,
+        params: {
+          language: tmdbLanguageOf(language),
+          page: railState.page + 1,
+        },
+        headers: { accept: "application/json", Authorization: API_KEY },
+      });
+      const fresh = res.data?.results || [];
+      setRailState((cur) => {
+        const seen = new Set(cur.items.map((it) => it.id));
+        return {
+          items: [...cur.items, ...fresh.filter((it) => !seen.has(it.id))],
+          page: res.data?.page || cur.page + 1,
+          totalPages: res.data?.total_pages || cur.totalPages,
+          loading: false,
+        };
+      });
+    } catch {
+      setRailState((cur) => ({ ...cur, loading: false }));
+    } finally {
+      railBusyRef.current = false;
+    }
+  }, [railState, id, language, API_KEY]);
+
+  /* ── İzlenme durumu — useWatchedShow'dan TÜRETİLİR (subcollection) ── */
+  const watchedEpisodeCount = watched.aggregates.watchedEpisodeCount;
+  const showTotalEpisodes = details?.number_of_episodes || 0;
+  const showAired = isAired(details?.first_air_date);
+  const showWatchState = getWatchState({
+    aired: showAired,
+    watched: watchedEpisodeCount,
+    total: showTotalEpisodes,
+  });
+  const isSeasonWatched =
+    showTotalEpisodes > 0
+      ? Math.min(1, watchedEpisodeCount / showTotalEpisodes)
+      : 0;
 
   /* ── updateTvSeriesList ── */
   const updateTvSeriesList = async (listType, type) => {
-    if (!user.uid || !details) return;
-    const ref = doc(db, "Lists", user.uid);
+    if (!user?.uid || !details) return;
+    const getName = (l) =>
+      ({
+        favorites: t.tvShowsDetails?.favorites,
+        watchList: t.tvShowsDetails?.watchList,
+        watchedMovies: t.tvShowsDetails?.watchedMovies,
+        watchedTv: t.tvShowsDetails?.watchedTv,
+      }[l] || l);
+    const toastRemove = () =>
+      Toast.show({
+        type: "warning",
+        text1: i18nText(
+          "autoI18n.tv_removed_from_list",
+          "Dizi {{list}} listesinden kaldırıldı!",
+          { list: getName(listType) }
+        ),
+      });
+    const toastAdd = () =>
+      Toast.show({
+        type: "success",
+        text1: i18nText(
+          "autoI18n.tv_added_to_list",
+          "Dizi {{list}} listesine eklendi!",
+          { list: getName(listType) }
+        ),
+      });
+
     try {
-      const snap = await getDoc(ref);
-      let data = snap.exists()
-        ? snap.data()
-        : { watchedTv: [], favorites: [], watchList: [], watchedMovies: [] };
-      if (!snap.exists()) await setDoc(ref, data);
-      let list = data[listType] || [];
-      const idx = list.findIndex((i) => i.id === details.id && i.type === type);
-      const getName = (l) =>
-        ({
-          favorites: t.tvShowsDetails?.favorites,
-          watchList: t.tvShowsDetails?.watchList,
-          watchedMovies: t.tvShowsDetails?.watched,
-          watchedTv: t.tvShowsDetails?.watchedTv,
-        })[l] || l;
-      if (idx !== -1) {
-        list.splice(idx, 1);
-        Toast.show({
-          type: "warning",
-          text1: `Dizi ${getName(listType)} listesinden kaldırıldı!`,
-        });
-      } else {
-        list.push({
-          id: details.id,
-          dateAdded: formatDateSave(new Date()),
-          imagePath: details.poster_path,
-          name: details.name,
-          type,
-          genres: details.genres?.map((g) => g.name) || [],
-        });
-        Toast.show({
-          type: "success",
-          text1: `Dizi ${getName(listType)} listesine eklendi!`,
-        });
-      }
-      await updateDoc(ref, { [listType]: list });
+      // Favoriler / izlenecekler / özel listeler: tek kapı (sıralı, iyimser,
+      // hatada geri alınır). Hedef durum GÖRÜNEN durumdan türer.
+      const desired = !listStates[listType];
+      await setListMembership({
+        uid: user.uid,
+        listKey: listType,
+        item: listItemFromDetails(details, type, { dateAdded: todayListDate() }),
+        desired,
+      });
+      if (desired) toastAdd();
+      else toastRemove();
     } catch (e) {
-      Toast.show({ type: "error", text1: "Hata: " + e.message });
+      showLibraryError(e, { source: "tv_detail_list" });
     }
   };
 
   /* ── Modal helpers ── */
   const openModal = () => setModalVisible(true);
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedDate(null);
-  };
-  const showDatePicker = () => setDatePickerVisibility(true);
-  const hideDatePicker = () => setDatePickerVisibility(false);
-  const handleConfirm = (date) => {
-    setSelectedDate(date);
-    addShowToFirestore(date);
-    hideDatePicker();
-  };
-  const showReleaseDateTime = new Date(details?.first_air_date);
+  const closeModal = () => setModalVisible(false);
+  const handleConfirm = (date) => addShowToFirestore(date);
   // Overview accordion (sadece özet, tam genişlik)
   const [expandedCard, setExpandedCard] = useState(null);
   const overviewAnim = React.useRef(new Animated.Value(0)).current;
@@ -390,122 +436,237 @@ export default function TvShowsDetails({ route, navigation }) {
       setExpandedCard(null);
     }
   };
-  /* ── addShowToFirestore ── */
+  /* ── Diziyi komple işaretle (sezonları çek → tek olay olarak yaz) ── */
   const addShowToFirestore = async (selDate = null) => {
-    if (!user || !details || !details.seasons || !selDate) return;
+    if (!user?.uid || !details?.seasons || !selDate) return;
     try {
       setIsLoading(true);
       closeModal();
-      const ref = doc(db, "Lists", user.uid);
-      const snap = await getDoc(ref);
-      let data = snap.exists() ? snap.data() : { watchedTv: [] };
-      let wTv = data.watchedTv || [];
-      const idx = wTv.findIndex((s) => s.id === details.id);
-      const eDate = formatDateSave(selDate);
-      if (idx !== -1) {
-        wTv.splice(idx, 1);
-        await updateDoc(ref, { watchedTv: wTv });
+      // Sezonların çekilmesi, "biri düşerse hiçbiri yazılmaz" kuralı ve yazma
+      // services/libraryActions.markShowWatched'ta — hata kodu yerelleştirilir.
+      const { status } = await markShowWatched({
+        uid: user.uid,
+        details,
+        watchDate: formatDateSave(selDate),
+        apiKey: API_KEY,
+        language,
+      });
+      if (status === "empty-show") {
         Toast.show({
           type: "warning",
-          text1: "Dizi izleme listesinden silindi",
+          text1: i18nText(
+            "autoI18n.bolum_bilgisi_bulunamadi",
+            "Bu dizinin bölüm bilgisi bulunamadı."
+          ),
         });
-        checkIfWatched();
         return;
       }
-      const newShow = {
-        id: details.id,
-        name: details.name,
-        showEpisodeCount: details.number_of_episodes,
-        showSeasonCount: details.number_of_seasons,
-        imagePath: details.poster_path,
-        type: "tv",
-        addedShowDate: eDate,
-        genres: details.genres?.map((g) => g.name) || [],
-        seasons: [],
-      };
-      for (const seasonObj of details.seasons) {
-        if (!seasonObj.season_number || seasonObj.episode_count === 0) continue;
-        const res = await axios.get(
-          `https://api.themoviedb.org/3/tv/${details.id}/season/${seasonObj.season_number}`,
-          {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
-            headers: { accept: "application/json", Authorization: API_KEY },
-          },
-        );
-        const sd = {
-          seasonNumber: seasonObj.season_number,
-          seasonPosterPath: seasonObj.poster_path || null,
-          seasonEpisodes: seasonObj.episode_count,
-          addedSeasonDate: eDate,
-          episodes: [],
-        };
-        for (const ep of res.data.episodes) {
-          sd.episodes.push({
-            episodeNumber: ep.episode_number,
-            episodePosterPath: ep.still_path || null,
-            episodeName: ep.name || "Unknown",
-            episodeRatings: ep.vote_average?.toFixed(1) ?? 0,
-            episodeMinutes: ep.runtime || 0,
-            episodeWatchTime: eDate,
-          });
-        }
-        newShow.seasons.push(sd);
-      }
-      wTv.push(newShow);
-      await updateDoc(ref, { watchedTv: wTv });
       Toast.show({
         type: "success",
-        text1: "Dizi bölümleri izlendi olarak işaretlendi",
+        text1: i18nText(
+          "autoI18n.dizi_bolumleri_izlendi_olarak_isaretlendi",
+          "Dizi bölümleri izlendi olarak işaretlendi"
+        ),
       });
-      checkIfWatched();
     } catch (e) {
-      console.error(e);
+      showLibraryError(e, { source: "tv_detail_mark_show" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removeShowWatchEvent = async (event) => {
+    if (!user?.uid || !details || !event?.id) return;
+    try {
+      setIsLoading(true);
+      await removeTvWatch({ uid: user.uid, showId: details.id, eventId: event.id });
+      Toast.show({
+        type: "success",
+        text1: i18nText(
+          "autoI18n.izleme_kaydi_silindi",
+          "Seçilen izleme kaydı silindi."
+        ),
+      });
+      if (watched.watchEvents.length <= 1) setWatchHistoryVisible(false);
+    } catch (e) {
+      // Eskiden yalnız console.error: kullanıcı silmenin başarısız olduğunu görmüyordu.
+      showLibraryError(e, { source: "tv_detail_remove_watch" });
     } finally {
       setIsLoading(false);
     }
   };
 
   /* ── renderVideo ── */
-  const renderVideo = ({ item }) => (
-    <TouchableOpacity
-      style={styles.videoItem}
-      onPress={() => setSelectedVideo(item.key)}
-      activeOpacity={0.88}
-    >
-      <View style={styles.videoThumbnail}>
-        <Image
-          source={{
-            uri: `https://img.youtube.com/vi/${item.key}/hqdefault.jpg`,
-          }}
-          style={styles.videoImage}
-        />
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.6)"]}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.playIconContainer}>
-          <LottieView
-            style={{ width: 56, height: 56 }}
-            source={require("../../LottieJson/play")}
-            opacity={0.9}
-            autoPlay
-            loop
-          />
-        </View>
-        <View style={styles.videoTypeBadge}>
-          <Text allowFontScaling={false} style={styles.videoTypeBadgeText}>
-            {item.type}
+
+  const renderRecommendedTvShow = useCallback(
+    ({ item }) => (
+      <RecommendedTvShow item={item} navigation={navigation} theme={theme} />
+    ),
+    [navigation, theme]
+  );
+
+  const openReviewComposer = useCallback(() => {
+    if (!details) return;
+    const title = details.name || "";
+    navigation.navigate("ShareContentScreen", {
+      composePost: {
+        composeKey: `tv-${id}-${Date.now()}`,
+        postType: "review",
+        title: title
+          ? `${title} incelemesi`
+          : i18nText("autoI18n.yeni_inceleme", "Yeni inceleme"),
+        content: "",
+        selectedMedia: [
+          {
+            id: details.id,
+            media_type: "tv",
+            type: "tv",
+            title,
+            name: title,
+            poster_path: details.poster_path,
+            poster: details.poster_path
+              ? getTmdbUrl(details.poster_path, "poster", 500)
+              : null,
+            first_air_date: details.first_air_date,
+            year: details.first_air_date
+              ? String(details.first_air_date).slice(0, 4)
+              : "",
+            genre_ids: details.genres?.map((g) => g.id).filter(Boolean) || [],
+          },
+        ],
+      },
+    });
+  }, [details, getTmdbUrl, id, navigation]);
+
+  const chatMedia = useMemo(() => {
+    if (!details?.id) return null;
+    return {
+      id: details.id,
+      media_type: "tv",
+      title: details.name || "",
+      poster_path: details.poster_path || null,
+      vote_average: details.vote_average ?? null,
+      vote_count: details.vote_count ?? null,
+      overview: details.overview || null,
+      release_date: details.first_air_date || null,
+    };
+  }, [details]);
+
+  const sendToRecipient = useCallback((recipient) => {
+    if (!chatMedia || !recipient) return;
+    const sharedParams = {
+      initialMedia: chatMedia,
+      initialMediaKey: `tv-${chatMedia.id}-${Date.now()}`,
+    };
+    if (recipient.recipientType === "group") {
+      navigation.navigate("ChatScreen", {
+        groupId: recipient.id,
+        groupName: recipient.name,
+        groupAvatarIndex: recipient.avatarIndex,
+        ...sharedParams,
+      });
+      return;
+    }
+    navigation.navigate("ChatScreen", {
+      friendUid: recipient.uid,
+      friendName: recipient.name,
+      friendAvatarIndex: recipient.avatarIndex,
+      ...sharedParams,
+    });
+  }, [chatMedia, navigation]);
+
+  const aiPrompt = useMemo(() => {
+    if (!details?.name) return "";
+    const year = details.first_air_date
+      ? ` (${String(details.first_air_date).slice(0, 4)})`
+      : "";
+    return i18nText(
+      "autoI18n.dizi_ai_prompt",
+      "{{title}} dizisi hakkında spoiler vermeden bilgi ver. Konusu, türü, sezon yapısı, öne çıkan oyuncuları, atmosferi, kimlere uygun olduğu ve neden izlenebileceğini kısa başlıklarla anlat.",
+      { title: `${details.name}${year}` },
+    );
+  }, [details]);
+
+  // Sohbet baloncuğunda uzun prompt yerine kısa istek + poster kartı görünür.
+  const aiDisplay = i18nText(
+    "autoI18n.dizi_ai_display",
+    "Bu dizi hakkında bilgi verir misin?",
+  );
+  const aiAttachment = useMemo(() => {
+    if (!details?.name) return null;
+    return {
+      mediaType: "tv",
+      id,
+      title: details.name,
+      year: details.first_air_date ? String(details.first_air_date).slice(0, 4) : "",
+      posterPath: details.poster_path || "",
+      backdropPath: details.backdrop_path || "",
+      runtimeMinutes: Number(details.episode_run_time?.find((value) => Number(value) > 0)) || 0,
+      tagline: details.tagline || "",
+      rating: details.vote_average || 0,
+      originalTitle: details.original_name || details.name,
+      overview: details.overview || "",
+      genres: details.genres?.map((genre) => genre.name).filter(Boolean) || [],
+      cast: details.credits?.cast?.slice(0, 8).map((person) => person.name).filter(Boolean) || [],
+      director:
+        details.created_by?.[0]?.name ||
+        details.credits?.crew?.find((person) => person.job === "Director")?.name ||
+        "",
+      providers:
+        details["watch/providers"]?.results?.[providerRegion]?.flatrate
+          ?.map((provider) => provider.provider_name)
+          .filter(Boolean) || [],
+    };
+  }, [details, id, providerRegion]);
+
+  // Oyuncu kartı — MovieDetail.renderCastMember ile birebir aynı yapı.
+  const renderCastMember = useCallback(
+    ({ item }) => (
+      <TouchableOpacity
+        onPress={() =>
+          navigation.navigate("ActorViewScreen", { personId: item.id })
+        }
+        activeOpacity={0.8}
+      >
+        <View style={styles.castItem}>
+          {item.profile_path ? (
+            <Image
+              source={{ uri: getTmdbUrl(item.profile_path, "poster", 200) }}
+              style={[styles.castImage, { borderColor: theme.border }]}
+            />
+          ) : (
+            <View
+              style={[
+                styles.castImage,
+                styles.castImagePlaceholder,
+                { borderColor: theme.border, backgroundColor: theme.secondary },
+              ]}
+            >
+              <FontAwesome
+                name="user"
+                size={CAST_PLACEHOLDER_ICON}
+                color={theme.text.muted}
+              />
+            </View>
+          )}
+          <Text
+            allowFontScaling={false}
+            style={[styles.castName, { color: theme.text.primary }]}
+            numberOfLines={2}
+          >
+            {item.name}
+          </Text>
+          <Text
+            allowFontScaling={false}
+            style={[styles.castCharacter, { color: theme.text.muted }]}
+            numberOfLines={1}
+          >
+            {item.character}
           </Text>
         </View>
-      </View>
-      <Text
-        allowFontScaling={false}
-        style={[styles.videoTitle, { color: theme.text.primary }]}
-        numberOfLines={2}
-      >
-        {item.name}
-      </Text>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    ),
+    [navigation, theme, getTmdbUrl]
   );
 
   if (loading) return <DetailsSkeleton />;
@@ -523,16 +684,27 @@ export default function TvShowsDetails({ route, navigation }) {
       </View>
     );
 
-  const watchedColor =
-    isSeasonWatched === 1
-      ? theme.colors.green
-      : showEpisodes
-        ? theme.colors.orange
-        : theme.colors.blue;
+  const watchedColor = watchStateColor(showWatchState, theme);
+
+  // Gerçek sezonlar (season_number 0 = özel bölümler hariç).
+  const seasonList = details.seasons.filter((s) => s.season_number > 0);
+  const useSeasonDeck = seasonList.length > 5 && !showAllSeasons;
+
+  // İzleme seçenekleri satırı: bölge sağlayıcıları + sonuna yayıncılar.
+  // Aynı isimli platform (ör. Netflix hem sağlayıcı hem yayıncı) iki kez
+  // görünmesin diye sağlayıcı listesinde olan yayıncılar elenir.
+  const regionProviders = details["watch/providers"]?.results?.[providerRegion];
+  const flatrateProviders = regionProviders?.flatrate ?? [];
+  const providerNames = new Set(
+    flatrateProviders.map((p) => (p.provider_name || "").toLowerCase())
+  );
+  const rowNetworks = (details.networks || []).filter(
+    (nw) => !providerNames.has((nw.name || "").toLowerCase())
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
-      <IconBacground opacity={0.25} />
+      <ScreenDecor scope="details" iconOpacity={0.25} />
       <StatusBar
         barStyle="light-content"
         translucent
@@ -553,7 +725,7 @@ export default function TvShowsDetails({ route, navigation }) {
             >
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
+                  uri: getTmdbUrl(details.backdrop_path, "backdrop", 1000),
                 }}
                 style={styles.backdrop}
               />
@@ -569,35 +741,8 @@ export default function TvShowsDetails({ route, navigation }) {
             colors={["transparent", "rgba(0,0,0,0.15)", theme.primary]}
             locations={[0.3, 0.65, 1]}
             style={styles.heroGradient}
+            pointerEvents="none"
           />
-
-          {/* Geri butonu */}
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.8}
-          >
-            <BlurView tint="dark" intensity={60} style={styles.backBtnBlur}>
-              <Ionicons name="chevron-back" size={22} color="#fff" />
-            </BlurView>
-          </TouchableOpacity>
-
-          {showSnow &&
-            details.seasons.map(
-              (se, i) =>
-                ((i + 4) % 4 === 0 || i < 4) && (
-                  <LottieView
-                    key={se.season_number}
-                    style={[
-                      styles.lottie,
-                      { top: 1000 * Math.floor(i < 4 ? i : i / 4) },
-                    ]}
-                    source={require("../../LottieJson/snow.json")}
-                    autoPlay
-                    loop
-                  />
-                ),
-            )}
         </View>
 
         {/* ── POSTER + INFO HEADER ── */}
@@ -610,9 +755,9 @@ export default function TvShowsDetails({ route, navigation }) {
             {details.poster_path ? (
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                  uri: getTmdbUrl(details.poster_path, "poster", 200),
                 }}
-                style={[styles.poster, { borderColor: theme.border + "80" }]}
+                style={[styles.poster, { borderColor: alpha(theme.border, 0.5019607843137255) }]}
               />
             ) : (
               <View
@@ -644,6 +789,7 @@ export default function TvShowsDetails({ route, navigation }) {
               </Text>
             ) : null}
             <View style={styles.genreRow}>
+              <CertificationBadge mediaType="tv" details={details} region={providerRegion} />
               {details.genres.slice(0, 3).map((g) => (
                 <View
                   key={g.id}
@@ -664,31 +810,45 @@ export default function TvShowsDetails({ route, navigation }) {
                 </View>
               ))}
             </View>
+            {/* Rating row — hybrid (TMDB + uygulama oyları), dokununca puan ver */}
             <View style={styles.ratingRow}>
-              {details.vote_average > 0 && (
-                <RatingStars rating={details.vote_average} />
-              )}
-              <Text style={[styles.ratingNum, { color: theme.colors.orange }]}>
-                {details.vote_average > 0
-                  ? details.vote_average.toFixed(1)
-                  : t.tvShowsDetails?.notYetRated}
-              </Text>
-              <View style={styles.voteRow}>
-                <FontAwesome name="user" size={11} color={theme.colors.blue} />
-                <Text style={[styles.voteCount, { color: theme.colors.blue }]}>
-                  {details.vote_count?.toLocaleString() || 0}
-                </Text>
-              </View>
+              <RatingSummary
+                mediaType="tv"
+                mediaId={id}
+                tmdbAvg={details.vote_average}
+                tmdbCount={details.vote_count}
+                releaseDate={details.first_air_date}
+                onPressRate={() => setRatingModalVisible(true)}
+              />
             </View>
+            <ExternalRatingsRow imdbId={details.external_ids?.imdb_id} />
           </View>
         </View>
 
         {/* ── BODY ── */}
         <View style={styles.body}>
-          {/* ListViewTv + progress bar */}
-          <View style={{ marginBottom: 8 }}>
+          {/* Liste işlemleri + genel dizi ilerlemesi */}
+          <View style={styles.listActionsBlock}>
             <ListViewTv
               isSeasonWatched={isSeasonWatched}
+              showWatchState={showWatchState}
+              onMarkWatched={openModal}
+              onUnmarkWatched={() => setWatchHistoryVisible(true)}
+              watchedOverride={
+                showWatchState === WATCH_STATE.UNAIRED ? (
+                  <Reminder
+                    showId={details.id}
+                    showName={details.name}
+                    showPosterPath={details.poster_path}
+                    seasonNumber={1}
+                    episodeNumber={1}
+                    episodeName={details.name}
+                    airDate={details.first_air_date}
+                    seasonPosterPath={details.poster_path}
+                    type="tv"
+                  />
+                ) : null
+              }
               navigation={navigation}
               updateList={updateTvSeriesList}
               openModal={openModal}
@@ -696,21 +856,136 @@ export default function TvShowsDetails({ route, navigation }) {
               isLoading={isLoading}
               listStates={listStates}
               type="tv"
+              sharedItem={{
+                id: details.id,
+                type: "tv",
+                name: details.name,
+                imagePath: details.poster_path,
+                genres: details.genres?.map((g) => g.name) || [],
+              }}
             />
-            <View
-              style={{ marginTop: -12, marginHorizontal: 4, marginBottom: 8 }}
+            <WatchProgressBar
+              watched={watchedEpisodeCount}
+              total={showTotalEpisodes}
+              startColor={watchedColor}
+              endColor={theme.accent}
+              trackColor={theme.border}
+              style={styles.showProgressTrack}
+            />
+          </View>
+
+          <View style={styles.detailActionRow}>
+            <GlassTouchable
+              activeOpacity={0.88}
+              onPress={openReviewComposer}
+              style={[
+                styles.detailActionBtn,
+                { backgroundColor: theme.secondary, borderColor: theme.border },
+              ]}
             >
-              <Progress.Bar
-                progress={isSeasonWatched || 0}
-                width={width - 30}
-                height={3}
-                borderWidth={0}
-                borderRadius={2}
-                animationConfig={{ bounciness: 10 }}
-                color={watchedColor}
-                unfilledColor={theme.border}
-              />
-            </View>
+              <View
+                style={[
+                  styles.detailActionIcon,
+                  {
+                    backgroundColor:
+                      (theme.colors?.blue || theme.accent) + "20",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={18}
+                  color={theme.colors?.blue || theme.accent}
+                />
+              </View>
+              <View style={styles.detailActionCopy}>
+                <Text
+                  allowFontScaling={false}
+                  style={[
+                    styles.detailActionTitle,
+                    { color: theme.text.primary },
+                  ]}
+                >
+                  {i18nText("autoI18n.inceleme", "İnceleme")}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.detailActionSub, { color: theme.text.muted }]}
+                  numberOfLines={1}
+                >
+                  {i18nText("autoI18n.hubda_paylas", "Hub'da paylaş")}
+                </Text>
+              </View>
+            </GlassTouchable>
+
+            <GlassTouchable
+              activeOpacity={0.88}
+              onPress={() => setAiVisible(true)}
+              style={[
+                styles.detailActionBtn,
+                { backgroundColor: theme.secondary, borderColor: theme.border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.detailActionIcon,
+                  {
+                    backgroundColor:
+                      (theme.colors?.purple || theme.accent) + "20",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name="sparkles-outline"
+                  size={18}
+                  color={theme.colors?.purple || theme.accent}
+                />
+              </View>
+              <View style={styles.detailActionCopy}>
+                <Text
+                  allowFontScaling={false}
+                  style={[
+                    styles.detailActionTitle,
+                    { color: theme.text.primary },
+                  ]}
+                >
+                  {i18nText("autoI18n.yapay_zeka", "Yapay Zeka")}
+                </Text>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.detailActionSub, { color: theme.text.muted }]}
+                  numberOfLines={1}
+                >
+                  {i18nText("autoI18n.bilgi_al", "Bilgi al")}
+                </Text>
+              </View>
+            </GlassTouchable>
+
+            <GlassTouchable
+              activeOpacity={0.88}
+              onPress={() => setSendVisible(true)}
+              style={[
+                styles.detailActionBtn,
+                { backgroundColor: theme.secondary, borderColor: theme.border },
+              ]}
+            >
+              <View
+                style={[
+                  styles.detailActionIcon,
+                  { backgroundColor: (theme.colors?.green || "#3CCB9A") + "20" },
+                ]}
+              >
+                <Ionicons name="paper-plane-outline" size={17} color={theme.colors?.green || "#3CCB9A"} />
+              </View>
+              <View style={styles.detailActionCopy}>
+                <Text allowFontScaling={false} style={[styles.detailActionTitle, { color: theme.text.primary }]}>
+                  {i18nText("autoI18n.gonder", "Gönder")}
+                </Text>
+                <Text allowFontScaling={false} style={[styles.detailActionSub, { color: theme.text.muted }]} numberOfLines={1}>
+                  {i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+                </Text>
+              </View>
+            </GlassTouchable>
           </View>
 
           {/* ── STAT KARTLARI ── */}
@@ -774,12 +1049,12 @@ export default function TvShowsDetails({ route, navigation }) {
                 >
                   {details.number_of_episodes || 0}
                 </Text>
-                {showEpisodes !== undefined && (
+                {watchedEpisodeCount > 0 && (
                   <Text
                     allowFontScaling={false}
                     style={[styles.statValSub, { color: theme.text.muted }]}
                   >
-                    /{showEpisodes}
+                    /{watchedEpisodeCount}
                   </Text>
                 )}
               </View>
@@ -829,6 +1104,87 @@ export default function TvShowsDetails({ route, navigation }) {
             </View>
           </View>
 
+          {/* ── YORUMLAR BUTONU ── */}
+          <GlassTouchable
+            activeOpacity={0.85}
+            onPress={() => setCommentModalVisible(true)}
+            style={[
+              styles.commentsBtn,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <View
+              style={[
+                styles.commentsIconWrap,
+                { backgroundColor: theme.accent + "20" },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="comment-text-multiple-outline"
+                size={18}
+                color={theme.accent}
+              />
+            </View>
+            <Text
+              allowFontScaling={false}
+              style={[styles.commentsBtnText, { color: theme.text.primary }]}
+            >
+              {t.comments || i18nText("autoI18n.yorumlar", "Yorumlar")}
+            </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={theme.text.muted}
+            />
+          </GlassTouchable>
+
+          {/* ── NOTUM KARTI ── */}
+          <GlassTouchable
+            activeOpacity={0.85}
+            onPress={() => {
+              // Ücretsiz planda 20 dizi notu: dolduysa not sayfası hiç açılmaz.
+              if (checkCanCreateMediaNote("tv", id)) setNoteSheetVisible(true);
+            }}
+            style={[
+              styles.commentsBtn,
+              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ]}
+          >
+            <View
+              style={[
+                styles.commentsIconWrap,
+                { backgroundColor: theme.accent + "20" },
+              ]}
+            >
+              <Ionicons
+                name={myMediaNote ? "document-text" : "document-text-outline"}
+                size={18}
+                color={theme.accent}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                allowFontScaling={false}
+                style={{ fontSize: 15, fontWeight: "700", color: theme.text.primary }}
+              >
+                {i18nText("autoI18n.notum", "Notum")}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                style={{ fontSize: 12, marginTop: 2, color: theme.text.muted }}
+              >
+                {myMediaNote?.text ||
+                  i18nText("autoI18n.bu_dizi_hakkinda_bir_not_ekle", "Bu dizi hakkında bir not ekle")}
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={theme.text.muted}
+            />
+          </GlassTouchable>
+
           {/* ── TV SHOW ITEM ── */}
           <View style={styles.section}>
             <TVShowItem item={details} navigation={navigation} />
@@ -848,7 +1204,7 @@ export default function TvShowsDetails({ route, navigation }) {
                 {details.backdrop_path && (
                   <Image
                     source={{
-                      uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
+                      uri: getTmdbUrl(details.backdrop_path, "backdrop", 1000),
                     }}
                     style={styles.graphBackdrop}
                     blurRadius={2}
@@ -862,7 +1218,7 @@ export default function TvShowsDetails({ route, navigation }) {
                   {details.poster_path && (
                     <Image
                       source={{
-                        uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
+                        uri: getTmdbUrl(details.poster_path, "poster", 200),
                       }}
                       style={styles.graphPoster}
                     />
@@ -923,7 +1279,10 @@ export default function TvShowsDetails({ route, navigation }) {
                         allowFontScaling={false}
                         style={styles.graphChevronText}
                       >
-                        Detaylı İstatistikler
+                        {i18nText(
+                          "autoI18n.detayli_istatistikler",
+                          "Detaylı İstatistikler"
+                        )}
                       </Text>
                       <Ionicons
                         name="chevron-forward"
@@ -939,7 +1298,7 @@ export default function TvShowsDetails({ route, navigation }) {
 
           {/* ── ÖZET ACCORDION ── */}
           <View style={{ marginBottom: 24 }}>
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.85}
               onPress={() => toggleCard("overview")}
               style={[
@@ -964,7 +1323,7 @@ export default function TvShowsDetails({ route, navigation }) {
                   allowFontScaling={false}
                   style={[styles.accordionTitle, { color: theme.text.primary }]}
                 >
-                  {t.overview || "Özet"}
+                  {t.overview || i18nText("autoI18n.ozet", "Özet")}
                 </Text>
                 <Ionicons
                   name={
@@ -995,7 +1354,8 @@ export default function TvShowsDetails({ route, navigation }) {
                   ]}
                   numberOfLines={expandedCard === "overview" ? null : 2}
                 >
-                  {details.overview || "Özet bulunmuyor."}
+                  {details.overview ||
+                    i18nText("autoI18n.ozet_bulunmuyor", "Özet bulunmuyor.")}
                 </Text>
               </Animated.View>
               {expandedCard !== "overview" && (
@@ -1003,43 +1363,236 @@ export default function TvShowsDetails({ route, navigation }) {
                   allowFontScaling={false}
                   style={[styles.accordionMore, { color: theme.accent }]}
                 >
-                  devamı...
+                  {i18nText("autoI18n.devami", "devamı...")}
                 </Text>
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
 
-          {/* ── VİDEOLAR ── */}
-          {details.videos?.results.length > 0 && (
+          {/* ── İZLEME PLATFORMLARI + YAYINCI ── */}
+          {/* Tek yatay satır: önce bölge sağlayıcıları (linkli), sonda yayıncılar. */}
+          {(flatrateProviders.length > 0 || rowNetworks.length > 0) && (
             <View style={styles.section}>
-              <SectionHeader title={t.videos} theme={theme} />
+              <SectionHeader title={t.watchProviders} theme={theme} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.providersRow}>
+                  {flatrateProviders.map((p) => (
+                    <TouchableOpacity
+                      key={`p-${p.provider_id}`}
+                      activeOpacity={0.8}
+                      disabled={!regionProviders?.link}
+                      onPress={() => {
+                        if (regionProviders?.link)
+                          Linking.openURL(regionProviders.link).catch(() => {});
+                      }}
+                      style={[
+                        styles.providerCard,
+                        {
+                          backgroundColor: theme.secondary,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <Image
+                        source={{
+                          uri: getTmdbUrl(p.logo_path, "poster", 200),
+                        }}
+                        style={styles.providerLogo}
+                      />
+                      <Text
+                        allowFontScaling={false}
+                        style={[
+                          styles.providerName,
+                          { color: theme.text.secondary },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {p.provider_name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+
+                  {/* Yayıncılar — satırın sonunda. Logoları çoğunlukla
+                      koyu/tek renk olduğundan beyaz zeminli kutuda gösterilir. */}
+                  {rowNetworks.map((n) => (
+                    <View
+                      key={`n-${n.id}`}
+                      style={[
+                        styles.providerCard,
+                        {
+                          backgroundColor: theme.secondary,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.networkLogoWrap}>
+                        {n.logo_path ? (
+                          <Image
+                            source={{
+                              uri: getTmdbUrl(n.logo_path, "poster", 200),
+                            }}
+                            style={styles.networkLogo}
+                            resizeMode="contain"
+                          />
+                        ) : (
+                          <Ionicons name="tv-outline" size={20} color="#666" />
+                        )}
+                      </View>
+                      <Text
+                        allowFontScaling={false}
+                        style={[
+                          styles.providerName,
+                          { color: theme.text.secondary },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {n.name}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
+
+          {/* ── VİDEOLAR ── */}
+          <TrailerSection
+            mediaType="tv"
+            id={id}
+            apiKey={API_KEY}
+            originalLanguage={details.original_language}
+          />
+
+          {/* ── OYUNCULAR (ana kadro) ── */}
+          {details.credits?.cast?.length > 0 && (
+            <View style={styles.section}>
+              <SectionHeader
+                title={t.cast}
+                theme={theme}
+                right={
+                  details.credits.cast.length > 6 && (
+                    <TouchableOpacity
+                      onPress={() => setShowFullCast(!showFullCast)}
+                      style={styles.seeAllBtn}
+                    >
+                      <Text
+                        style={[styles.seeAllText, { color: theme.accent }]}
+                      >
+                        {showFullCast ? t.collapse : t.showAll}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                }
+              />
               <FlatList
-                data={details.videos.results.filter(
-                  (v) => v.site === "YouTube",
-                )}
-                renderItem={renderVideo}
-                keyExtractor={(item) => item.id}
+                data={
+                  showFullCast
+                    ? details.credits.cast
+                    : details.credits.cast.slice(0, 10)
+                }
+                renderItem={renderCastMember}
+                keyExtractor={(item) => item.id.toString()}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingVertical: 4, gap: 14 }}
+                contentContainerStyle={{ paddingVertical: 4, gap: 12 }}
+                initialNumToRender={6}
+                maxToRenderPerBatch={6}
+                windowSize={5}
+                removeClippedSubviews
               />
             </View>
           )}
 
           {/* ── SEZONLAR LİSTESİ ── */}
+          {/* 5'ten fazla sezon: deste görünümü (dikey kaydırmalı yığın) +
+              "Tümünü Gör"; aksi halde klasik düz liste. */}
           <View style={styles.section}>
             <SectionHeader title={t.seasons} theme={theme} />
-            {details.seasons.filter((s) => s.season_number > 0).length > 0 ? (
-              details.seasons
-                .filter((s) => s.season_number > 0)
-                .map((season) => (
-                  <SeasonItem
-                    key={season.id}
-                    season={season}
+            {seasonList.length > 0 ? (
+              useSeasonDeck ? (
+                <>
+                  <SeasonDeck
+                    seasons={seasonList}
                     details={details}
                     navigation={navigation}
+                    getWatchedCount={(sn) => watched.seasonWatchedCount(sn)}
+                    getWatchEvents={(sn) => watched.seasonWatchEvents(sn)}
+                    theme={theme}
                   />
-                ))
+                  <GlassTouchable
+                    activeOpacity={0.8}
+                    onPress={() => setShowAllSeasons(true)}
+                    style={[
+                      styles.seeAllSeasonsBtn,
+                      {
+                        backgroundColor: theme.secondary,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      allowFontScaling={false}
+                      style={[
+                        styles.seeAllSeasonsText,
+                        { color: theme.text.primary },
+                      ]}
+                    >
+                      {i18nText("autoI18n.tumunu_gor", "Tümünü Gör")} (
+                      {seasonList.length})
+                    </Text>
+                    <Ionicons
+                      name="chevron-down"
+                      size={15}
+                      color={theme.text.muted}
+                    />
+                  </GlassTouchable>
+                </>
+              ) : (
+                <>
+                  {seasonList.map((season) => (
+                    <SeasonItem
+                      key={season.id}
+                      season={season}
+                      details={details}
+                      navigation={navigation}
+                      watchedCount={watched.seasonWatchedCount(
+                        season.season_number
+                      )}
+                      watchEvents={watched.seasonWatchEvents(
+                        season.season_number
+                      )}
+                    />
+                  ))}
+                  {seasonList.length > 5 && (
+                    <GlassTouchable
+                      activeOpacity={0.8}
+                      onPress={() => setShowAllSeasons(false)}
+                      style={[
+                        styles.seeAllSeasonsBtn,
+                        {
+                          backgroundColor: theme.secondary,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        allowFontScaling={false}
+                        style={[
+                          styles.seeAllSeasonsText,
+                          { color: theme.text.primary },
+                        ]}
+                      >
+                        {i18nText("autoI18n.daha_az_goster", "Daha az göster")}
+                      </Text>
+                      <Ionicons
+                        name="chevron-up"
+                        size={15}
+                        color={theme.text.muted}
+                      />
+                    </GlassTouchable>
+                  )}
+                </>
+              )
             ) : (
               <View
                 style={[
@@ -1066,408 +1619,213 @@ export default function TvShowsDetails({ route, navigation }) {
           </View>
 
           {/* ── ÖNERİLEN DİZİLER ── */}
-          {details.recommendations?.results.length > 0 && (
+          {railState.items.length > 0 && (
             <View style={styles.section}>
               <SectionHeader title={t.recommendedTvShows} theme={theme} />
-              <FlatList
-                data={details.recommendations.results.slice(0, 20)}
-                renderItem={({ item }) => (
-                  <SimilarTvShow
-                    item={item}
-                    navigation={navigation}
-                    scaleValues={scaleValues}
-                    onPressIn={onPressIn}
-                    onPressOut={onPressOut}
-                    imageQuality={imageQuality}
-                    theme={theme}
-                  />
-                )}
+              <PaginatedRail
+                data={railState.items}
+                renderItem={renderRecommendedTvShow}
                 keyExtractor={(item) => item.id.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
+                onLoadMore={loadMoreRail}
+                loadingMore={railState.loading}
+                hasMore={railState.page < railState.totalPages}
                 contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
+                initialNumToRender={5}
+                maxToRenderPerBatch={5}
+                windowSize={5}
               />
             </View>
           )}
 
-          {/* ── BENZER DİZİLER ── */}
-          {details.similar?.results.length > 0 && (
-            <View style={styles.section}>
-              <SectionHeader title={t.similarTvShows} theme={theme} />
-              <FlatList
-                data={details.similar.results.slice(0, 20)}
-                renderItem={({ item }) => (
-                  <SimilarTvShow
-                    item={item}
-                    navigation={navigation}
-                    scaleValues={scaleValues}
-                    onPressIn={onPressIn}
-                    onPressOut={onPressOut}
-                    imageQuality={imageQuality}
-                    theme={theme}
-                  />
-                )}
-                keyExtractor={(item) => item.id.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingVertical: 4, gap: 10 }}
-              />
-            </View>
-          )}
-
-          {/* ── KRİTİKLER ── */}
-          {details.reviews?.results.length > 0 && (
-            <View style={[styles.section, { marginBottom: 40 }]}>
-              <SectionHeader title={t.reviews} theme={theme} />
-              {details.reviews.results.slice(0, reviewLength).map((review) => (
-                <TouchableOpacity
-                  key={review.id}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    setReviewTextLength(
-                      review.id === reviewTextLength ? null : review.id,
-                    )
-                  }
-                  style={[
-                    styles.reviewCard,
-                    {
-                      backgroundColor: theme.secondary,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.reviewTop}>
-                    <View
-                      style={[
-                        styles.reviewAvatar,
-                        { backgroundColor: theme.accent + "28" },
-                      ]}
-                    >
-                      <Ionicons name="person" size={13} color={theme.accent} />
-                    </View>
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.reviewAuthor,
-                        { color: theme.text.primary },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {review.author}
-                    </Text>
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.reviewDate, { color: theme.text.muted }]}
-                    >
-                      {new Date(review.created_at).toLocaleDateString()}
-                    </Text>
-                  </View>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.reviewBody, { color: theme.text.secondary }]}
-                    numberOfLines={review.id === reviewTextLength ? null : 3}
-                  >
-                    {review.content}
-                  </Text>
-                  {review.id !== reviewTextLength && (
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.readMore, { color: theme.accent }]}
-                    >
-                      Devamını oku
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-              {details.reviews.results.length > 5 && (
-                <TouchableOpacity
-                  onPress={() =>
-                    setReviewLength(
-                      details.reviews.results.length === reviewLength
-                        ? 5
-                        : details.reviews.results.length,
-                    )
-                  }
-                  style={styles.expandBtn}
-                  activeOpacity={0.8}
-                >
-                  <MaterialIcons
-                    name={
-                      reviewLength > 5
-                        ? "keyboard-arrow-up"
-                        : "keyboard-arrow-down"
-                    }
-                    size={20}
-                    color={theme.accent}
-                  />
-                  <Text style={[styles.expandBtnText, { color: theme.accent }]}>
-                    {reviewLength > 5 ? "Daha az" : "Tüm yorumlar"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+          {/* TMDB kritikleri kaldırıldı — yorumlar uygulamanın kendi yorum
+              modalında gösteriliyor. */}
         </View>
       </ScrollView>
 
+
+      {/* ─── ÜST OVERLAY BUTONLARI (her zaman tıklanabilir) ─── */}
+      {/* iOS 26+: Liquid Glass; diğer yerlerde eski koyu blur kutusu. */}
+      <GlassIconButton
+        variant="blur"
+        size={38}
+        icon="chevron-back"
+        accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
+        onPress={() => navigation.goBack()}
+        style={[styles.backBtn, { top: insets.top + 8 }]}
+      />
+
+      <GlassIconButton
+        variant="blur"
+        size={38}
+        icon="share-social-outline"
+        iconSize={20}
+        accessibilityLabel={i18nText("autoI18n.paylas", "Paylaş")}
+        style={[styles.storyBtn, { top: insets.top + 8 }]}
+        onPress={() =>
+          navigation.navigate("StoryShareScreen", {
+            id,
+            type: "tv",
+            title: details.name,
+            year: details.first_air_date
+              ? String(details.first_air_date).slice(0, 4)
+              : "",
+            rating: details.vote_average,
+            genres: details.genres?.map((g) => g.name) || [],
+            backdrop_path: details.backdrop_path,
+            poster_path: details.poster_path,
+            tagline: details.tagline || "",
+          })
+        }
+      />
+
       {/* ═══ MODALS ═══ */}
 
-      {/* Video */}
-      <Modal
-        visible={selectedVideo !== null}
-        onRequestClose={() => setSelectedVideo(null)}
-        animationType="fade"
-        transparent
-      >
-        <View style={styles.videoModal}>
-          <BlurView
-            tint="dark"
-            intensity={60}
-            experimentalBlurMethod="dimezisBlurView"
-            style={StyleSheet.absoluteFill}
-          />
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            onPress={() => setSelectedVideo(null)}
-          />
-          <View style={styles.videoModalContent}>
-            <TouchableOpacity
-              style={styles.videoCloseBtn}
-              onPress={() => setSelectedVideo(null)}
-            >
-              <BlurView
-                tint="dark"
-                intensity={50}
-                style={styles.videoCloseBtnBlur}
-              >
-                <Ionicons name="close" size={20} color="#fff" />
-              </BlurView>
-            </TouchableOpacity>
-            {selectedVideo && (
-              <YoutubePlayer height={220} videoId={selectedVideo} play />
-            )}
-          </View>
-        </View>
-      </Modal>
+      {/* Notum */}
+      <MediaNoteSheet
+        visible={noteSheetVisible}
+        onClose={() => setNoteSheetVisible(false)}
+        type="tv"
+        mediaId={id}
+        title={details?.name}
+        posterPath={details?.poster_path}
+      />
 
       {/* İzleme tarihi */}
-      <Modal
-        visible={modalVisible}
-        onRequestClose={closeModal}
-        animationType="slide"
-        transparent
-      >
-        <View style={styles.dateModalWrap}>
-          <LinearGradient
-            colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.85)"]}
-            style={StyleSheet.absoluteFill}
-          />
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            onPress={closeModal}
-          />
-          <View
-            style={[
-              styles.dateSheet,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <View
-              style={[styles.sheetHandle, { backgroundColor: theme.border }]}
-            />
-            <Text
-              allowFontScaling={false}
-              style={[styles.sheetTitle, { color: theme.text.primary }]}
-            >
-              İzleme Tarihi
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.sheetSubtitle, { color: theme.text.muted }]}
-            >
-              Bu diziyi ne zaman izlediniz?
-            </Text>
-            <View style={styles.dateOptions}>
-              <TouchableOpacity
-                style={[
-                  styles.dateOption,
-                  {
-                    backgroundColor: theme.primary,
-                    borderColor: selectedDate ? theme.accent : theme.border,
-                  },
-                ]}
-                onPress={showDatePicker}
-                activeOpacity={0.85}
-              >
-                <View
-                  style={[
-                    styles.dateOptionIcon,
-                    { backgroundColor: theme.accent + "20" },
-                  ]}
-                >
-                  <Ionicons
-                    name="calendar-outline"
-                    size={24}
-                    color={theme.accent}
-                  />
-                </View>
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.dateOptionLabel,
-                    { color: selectedDate ? theme.accent : theme.text.primary },
-                  ]}
-                >
-                  {selectedDate ? formatDateSave(selectedDate) : "Tarih Seç"}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.dateOption,
-                  { backgroundColor: theme.primary, borderColor: theme.border },
-                ]}
-                onPress={() => {
-                  setSelectedDate(new Date());
-                  addShowToFirestore(new Date());
-                }}
-                activeOpacity={0.85}
-              >
-                <View
-                  style={[
-                    styles.dateOptionIcon,
-                    {
-                      backgroundColor:
-                        (theme.colors?.blue || theme.accent) + "20",
-                    },
-                  ]}
-                >
-                  <Entypo
-                    name="stopwatch"
-                    size={24}
-                    color={theme.colors?.blue || theme.accent}
-                  />
-                </View>
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.dateOptionLabel,
-                    { color: theme.text.primary },
-                  ]}
-                >
-                  Şimdi
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.dateOptionSub, { color: theme.text.muted }]}
-                >
-                  {formatDate(new Date())}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.dateOption,
-                  { backgroundColor: theme.primary, borderColor: theme.border },
-                ]}
-                onPress={() => {
-                  setSelectedDate(showReleaseDateTime);
-                  addShowToFirestore(showReleaseDateTime);
-                }}
-                activeOpacity={0.85}
-              >
-                <View
-                  style={[
-                    styles.dateOptionIcon,
-                    {
-                      backgroundColor:
-                        (theme.colors?.orange || theme.accent) + "20",
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name="movie-play-outline"
-                    size={24}
-                    color={theme.colors?.orange || theme.accent}
-                  />
-                </View>
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.dateOptionLabel,
-                    { color: theme.text.primary },
-                  ]}
-                >
-                  Yayın Tarihi
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.dateOptionSub, { color: theme.text.muted }]}
-                >
-                  {formatDate(showReleaseDateTime)}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <DateTimePickerModal
-              isVisible={isDatePickerVisible}
-              mode="date"
-              onConfirm={handleConfirm}
-              onCancel={hideDatePicker}
-              minimumDate={showReleaseDateTime}
-              maximumDate={new Date()}
-            />
-          </View>
-        </View>
-      </Modal>
+      <WatchHistorySheet
+        visible={watchHistoryVisible}
+        onClose={() => setWatchHistoryVisible(false)}
+        title={details?.name}
+        events={watched.watchEvents}
+        busy={isLoading}
+        onAddAgain={() => {
+          setWatchHistoryVisible(false);
+          setTimeout(openModal, 300);
+        }}
+        onDeleteEvent={removeShowWatchEvent}
+      />
 
-      {/* Poster / Backdrop */}
-      <Modal
+      <WatchedDateSheet
+        visible={modalVisible}
+        onClose={closeModal}
+        subtitle={i18nText(
+          "autoI18n.bu_diziyi_ne_zaman_izlediniz",
+          "Bu diziyi ne zaman izlediniz?"
+        )}
+        pickerSubtitle={i18nText(
+          "autoI18n.bu_diziyi_ne_zaman_izlemeye_basladiniz",
+          "Bu diziyi ne zaman izlemeye başladınız?"
+        )}
+        releaseDate={details?.first_air_date}
+        minDate={details?.first_air_date}
+        mediaType="tv"
+        scope="show"
+        mediaId={id}
+        mediaTitle={details?.name}
+        posterPath={details?.poster_path}
+        busy={isLoading}
+        onConfirm={handleConfirm}
+      />
+
+      {/* Poster / Backdrop galerisi (tüm görseller + indir) */}
+      <ImageGalleryModal
         visible={PosterModalVisible || backdropModalVisible}
-        onRequestClose={() => {
+        onClose={() => {
           setPosterModalVisible(false);
           setBacdropModalVisible(false);
         }}
-        animationType="fade"
+        mediaId={id}
+        mediaType="tv"
+        imageType={PosterModalVisible ? "poster" : "backdrop"}
+        initialImage={
+          PosterModalVisible ? details.poster_path : details.backdrop_path
+        }
+      />
+
+      {/* Yorumlar (film ile aynı yapı, TvComment koleksiyonu) */}
+      <Modal
+        animationType="none"
         transparent
+        visible={commentModalVisible}
+        onRequestClose={() => setCommentModalVisible(false)}
+        statusBarTranslucent
       >
-        <BlurView
-          tint="dark"
-          intensity={60}
-          experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFill}
+        <CommentSheetModal
+          visible={commentModalVisible}
+          onClose={() => setCommentModalVisible(false)}
+          movieId={id}
+          details={details}
+          collectionName="TvComment"
+          // Sezon listesi kapsam seçiciyi besler: kullanıcı bölüm sayfasına
+          // girmeden buradan sezon/bölüm hedefleyip yorum yazabilir.
+          seasons={details?.seasons}
+          initialScope={commentScope}
         />
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          onPress={() => {
-            setPosterModalVisible(false);
-            setBacdropModalVisible(false);
-          }}
-        />
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          <Image
-            source={
-              PosterModalVisible
-                ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${details.poster_path}`,
-                  }
-                : {
-                    uri: `https://image.tmdb.org/t/p/original${details.backdrop_path}`,
-                  }
-            }
-            style={{
-              width: PosterModalVisible ? 300 : 380,
-              height: PosterModalVisible ? 450 : 380 * (9 / 16),
-              borderRadius: 20,
-            }}
-          />
-        </View>
+        <ModalToastHost visible={commentModalVisible} />
       </Modal>
+
+      {/* Derecelendirme */}
+      <Modal
+        animationType="none"
+        transparent
+        visible={ratingModalVisible}
+        onRequestClose={() => setRatingModalVisible(false)}
+        statusBarTranslucent
+      >
+        <RatingSheetModal
+          visible={ratingModalVisible}
+          onClose={() => setRatingModalVisible(false)}
+          mediaType="tv"
+          mediaId={id}
+          tmdbAvg={details.vote_average}
+          tmdbCount={details.vote_count}
+          details={details}
+          releaseDate={details.first_air_date}
+        />
+        <ModalToastHost visible={ratingModalVisible} />
+      </Modal>
+
+      <AIChatScreen
+        visible={aiVisible}
+        onClose={() => setAiVisible(false)}
+        initialPrompt={aiPrompt}
+        initialDisplay={aiDisplay}
+        initialAttachment={aiAttachment}
+      />
+      <NewConversationSheet
+        visible={sendVisible}
+        onClose={() => setSendVisible(false)}
+        onSelect={sendToRecipient}
+        includeGroups
+        title={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+        subtitle={i18nText("autoI18n.gonderilecek_kisiyi_veya_grubu_sec", "Göndermek istediğin arkadaşını veya grubu seç")}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  /* Yorumlar butonu */
+  commentsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginHorizontal: 4,
+    marginBottom: 16,
+  },
+  commentsIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  commentsBtnText: { flex: 1, fontSize: 15, fontWeight: "700" },
 
   /* Hero */
   heroContainer: { height: BACKDROP_HEIGHT, position: "relative" },
@@ -1487,24 +1845,15 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 52 : 36,
     left: 16,
-    zIndex: 10,
+    zIndex: 50,
+    elevation: 50,
   },
-  backBtnBlur: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  lottie: {
+  storyBtn: {
     position: "absolute",
-    height: 1000,
-    left: -120,
-    right: -120,
-    zIndex: 0,
+    right: 16,
+    zIndex: 50,
+    elevation: 50,
   },
 
   /* Info header */
@@ -1553,12 +1902,14 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 4,
   },
-  ratingNum: { fontSize: 16, fontWeight: "700" },
-  voteRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  voteCount: { fontSize: 12, fontWeight: "500" },
 
   /* Body */
   body: { paddingHorizontal: 15 },
+
+  listActionsBlock: { marginBottom: 10 },
+  showProgressTrack: {
+    marginTop: -4,
+  },
 
   /* Stat row */
   statRow: {
@@ -1583,8 +1934,92 @@ const styles = StyleSheet.create({
   statLbl: { fontSize: 11 },
   statDivider: { width: 1, height: 44, opacity: 0.4 },
 
+  detailActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  detailActionBtn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 70,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 5,
+    paddingVertical: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  detailActionIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailActionCopy: { minWidth: 0, alignItems: "center" },
+  detailActionTitle: { fontSize: 11.5, fontWeight: "800", textAlign: "center" },
+  detailActionSub: { fontSize: 9.5, fontWeight: "700", marginTop: 1, textAlign: "center" },
+
   /* Sections */
   section: { marginBottom: 28 },
+
+  /* Yayıncı + izleme sağlayıcıları — MovieDetail provider kartlarıyla aynı */
+  providersRow: { flexDirection: "row", gap: 12, paddingVertical: 4 },
+  providerCard: {
+    alignItems: "center",
+    width: 72,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 7,
+  },
+  providerLogo: { width: 44, height: 44, borderRadius: 10 },
+  providerName: { fontSize: 10, textAlign: "center", fontWeight: "500" },
+  networkLogoWrap: {
+    width: 52,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+  },
+  networkLogo: { width: 42, height: 26 },
+
+  /* Cast — MovieDetail kart boyutlarıyla aynı */
+  castItem: { width: width * 0.2, alignItems: "center" },
+  castImage: {
+    width: width * 0.2,
+    height: width * 0.2 * 1.5,
+    borderRadius: 16,
+    marginBottom: 7,
+    borderWidth: 1.5,
+  },
+  castImagePlaceholder: { justifyContent: "center", alignItems: "center" },
+  castName: {
+    fontSize: 11.5,
+    textAlign: "center",
+    fontWeight: "700",
+    lineHeight: 15,
+  },
+  castCharacter: { fontSize: 10.5, textAlign: "center", lineHeight: 14 },
+  seeAllBtn: { paddingHorizontal: 4 },
+  seeAllText: { fontSize: 13, fontWeight: "600" },
+
+  /* Sezon yığını altındaki Tümünü Gör / Daha az göster butonu */
+  seeAllSeasonsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  seeAllSeasonsText: { fontSize: 13, fontWeight: "700" },
   sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1606,7 +2041,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 160,
   },
-  graphBackdrop: { ...StyleSheet.absoluteFillObject, resizeMode: "cover" },
+  graphBackdrop: { ...StyleSheet.absoluteFill, resizeMode: "cover" },
   graphContent: {
     flex: 1,
     flexDirection: "row",
@@ -1651,9 +2086,9 @@ const styles = StyleSheet.create({
   },
   emptyText: { fontSize: 14 },
 
-  /* Similar */
-  similarItem: { width: width * 0.38 },
-  similarPoster: {
+  /* Yatay ray kartı */
+  railItem: { width: width * 0.38 },
+  railPoster: {
     width: "100%",
     aspectRatio: 2 / 3,
     borderRadius: 14,
@@ -1671,13 +2106,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   ratingPillText: { color: "#FFD700", fontSize: 11, fontWeight: "700" },
-  listDots: {
-    position: "absolute",
-    top: 7,
-    left: 7,
-    flexDirection: "row",
-    gap: 4,
-  },
   stats: {
     position: "absolute",
     bottom: 8,
@@ -1686,121 +2114,6 @@ const styles = StyleSheet.create({
   },
 
   /* Videos */
-  videoItem: { width: width * 0.62 },
-  videoThumbnail: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-  videoImage: { width: "100%", height: "100%" },
-  playIconContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  videoTypeBadge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  videoTypeBadgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  videoTitle: { fontSize: 13, marginTop: 9, fontWeight: "600", lineHeight: 18 },
-
-  /* Reviews */
-  reviewCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  reviewTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    marginBottom: 10,
-  },
-  reviewAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  reviewAuthor: { fontSize: 13, fontWeight: "700", flex: 1 },
-  reviewDate: { fontSize: 11 },
-  reviewBody: { fontSize: 13, lineHeight: 20 },
-  readMore: { fontSize: 12, fontWeight: "600", marginTop: 8 },
 
   /* Video modal */
-  videoModal: { flex: 1, justifyContent: "center" },
-  videoModalContent: { backgroundColor: "#000", position: "relative" },
-  videoCloseBtn: { position: "absolute", top: -52, right: 12, zIndex: 10 },
-  videoCloseBtnBlur: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-
-  /* Date modal */
-  dateModalWrap: { flex: 1, justifyContent: "flex-end" },
-  dateSheet: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    padding: 20,
-    paddingBottom: 40,
-  },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  sheetTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    textAlign: "center",
-    letterSpacing: -0.3,
-    marginBottom: 4,
-  },
-  sheetSubtitle: { fontSize: 13, textAlign: "center", marginBottom: 20 },
-  dateOptions: { flexDirection: "row", gap: 10 },
-  dateOption: {
-    flex: 1,
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    gap: 8,
-    alignItems: "center",
-    borderWidth: 1,
-  },
-  dateOptionIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dateOptionLabel: { fontSize: 12, fontWeight: "700", textAlign: "center" },
-  dateOptionSub: { fontSize: 10.5, textAlign: "center" },
 });

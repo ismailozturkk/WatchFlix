@@ -1,0 +1,513 @@
+# YAYIN ÖNCESİ GÖREV PLANI — AI UYGULAYICI İÇİN
+
+> Kaynak: 2026-08-08 tam yayın denetimi (güvenlik + mağaza uyumu + kod sağlığı + i18n taramaları, `npm test`, `expo-doctor`).
+> Hedef: Google Play kapalı testine (24 Ağustos 2026) kod tarafında hazır olmak; Play TR yayını 21–25 Eylül 2026 (`docs/YAYIN_VE_GELIR_YOL_HARITASI.md`).
+> Durum işaretleri: `[ ]` yapılmadı · `[~]` devam ediyor · `[x]` bitti — görev bitince işaretle ve yanına tarih düş.
+
+---
+
+## 0. UYGULAYICI TALİMATLARI (her oturumda önce bunu oku)
+
+1. **Görevler bağımsız oturumlarda yapılabilir.** Önerilen sıra: A1 → B2 → B3 → B1 → B6 → B4 → B5 → B7 → B8 → B9 → B10. (B2/B3 kural işleri birlikte tek deploy'a girer.)
+2. **Satır numaraları 2026-08-08 anlık görüntüsüne aittir.** Koda başlamadan önce satıra güvenme; verilen çapa (anchor) metnini Grep ile ara.
+3. **Her görevin sonunda `npm test` çalıştır.** Beklenen taban: 59 suite / 908 test yeşil. Yeni davranış eklediysen test de ekle (saf mantık `utils/` içinde, testi `__tests__/` içinde — mevcut desen: `__tests__/ageGate.test.js`).
+4. **Commit stili:** mevcut geçmişe uy — küçük harf, Türkçe, ASCII (ör. `fix: yorum create kurallarina userId baglama`). Tema başına ayrı commit; dev-gürültüsünü commit'e karıştırma.
+5. **Kod yorumları Türkçe** yazılır (mevcut gelenek). Yorum yalnız koddan okunamayan kısıtı anlatır.
+6. **i18n kuralı:** her yeni kullanıcı metni `i18nText("autoI18n.anahtar", "Türkçe fallback")` ile yazılır ve anahtar **hem** `translations/tr.json` **hem** `translations/en.json`'a eklenir. Sadece birine ekleme; B6'daki bekçi testi bunu yakalayacak.
+7. **Alt sayfa/sheet eklerken** projenin `BottomSheetModal` geleneğini kullan (blur yerinde solar, sayfa kayar); RN `Modal` ile yeni tam ekran katman açma. Blur kullanacaksan blur bileşeni `BlurTargetView`'ın **kardeşi** olmalı, içinde değil.
+8. **Native değişiklik disiplini (OTA):** `runtimeVersion.policy = appVersion`. Paket ekleme/çıkarma, config plugin veya manifest değişikliği yaptıysan `app.json` içindeki `version`'ı **artır** — yoksa yeni JS, eski native'e OTA ile düşüp çökertir. Yalnız JS değiştiyse `version` sabit kalır.
+9. **Deploy'lar kullanıcı onayı ister.** `firebase deploy`, `eas build`, `eas update`, Play/RevenueCat panel işlemleri: değişikliği hazırla, komutu öner, kullanıcı "evet" demeden çalıştırma.
+10. **DOKUNMA listesi (bilerek böyle, "düzeltme"):**
+    - `functions/index.js` içindeki `enforceAppCheck: false` — yayın sonrası aşamalı açılacak (bkz. D1). Erken açılırsa sahadaki eski build'ler kırılır.
+    - `purgeMigratedAsyncStorage()` çağrılmıyor — bilerek bir sürüm bekliyor; `@react-native-async-storage` bağımlılığı da bu yüzden duruyor.
+    - Çift Firebase SDK (web `firebase` + `@react-native-firebase/{app,analytics,app-check}`) bilinçli bir ayrım; birleştirme deneme.
+    - Kökteki `.npmrc` (`legacy-peer-deps`) EAS build'i ayakta tutuyor; silme.
+    - `include_adult` parametresini hiçbir çağrı yerine elle yazma; izin kararı `utils/ageGate.js → adultContentAllowed()` + `utils/tmdbAdultGuard.js` interceptor'ında.
+    - Firestore verisi için yeni önbellek deposu açma; `cacheStore` + `cacheKeys` kullan ("Verileri indir" bağı kopmasın).
+
+---
+
+## FAZ A — DAL TOPARLAMA
+
+### [x] GÖREV A1 — Bekleyen işi commit'le, master ile birleşmeyi öner (2026-08-08)
+
+> **Sonuç:** ağaç temiz, 59 suite / 908 test yeşil, altı tema ayrı commit'te:
+> `d166ed2` yaş kapısı + yetişkin süzgeci · `1573468` yorum alt sayfası ·
+> `96b0e39` "benzerler" rayı · `d3f3adc` sohbet giriş çubuğu ·
+> `8e1d4bd` TV grafik ızgara boşluğu · `1320ecb` bu doküman.
+> Plandaki "MMKV kayıt eklemesi" teması ayrı çıkmadı: `registry.js`'teki tek
+> değişiklik `ageRestricted` anahtarıydı, yaş kapısı commit'ine girdi. Buna
+> karşılık planda olmayan iki tema çıktı (sohbet composer'ı — ChatScreen'in
+> yanında iki `AIChatScreen` kopyası da; TV grafik ızgarası).
+> **Bekleyen:** master'a birleştirme + push — kullanıcı onayı bekliyor.
+
+**Bağlam:** `checkpoint/oyun-ve-bekleyen-isler-2026-06-26` dalı master'dan 60 commit ileride ve 29 dosya + 5 yeni dosya commit'lenmemiş. İçerik denetlendi: yarım iş değil, biten işlerin commit'i atılmamış.
+
+**Adımlar:**
+1. `git status` ile listeyi doğrula; beş temaya ayır ve **ayrı commit'ler** at:
+   - Yaş kapısı + TMDB yetişkin süzgeci: `utils/ageGate.js`, `utils/tmdbAdultGuard.js`, `components/auth/BirthDateField.js`, iki test dosyası, `RegisterScreen`/`GoogleProfileCompletionScreen`/`EditProfileScreen`, `AppSettingsContext`, `UserProfileContext`, `translations/*`, `App.js`, servis dosyalarındaki `include_adult` temizlikleri.
+   - Yorum sheet z-katman düzeltmesi: `components/Comment.js`, `components/comments/CommentScopeSheet.js`, `components/modals/CommentSheetModal.js`, `components/modals/PostCommentSheetModal.js`.
+   - "Benzerler" rayının kaldırılması: `screens/movie/MovieDetail.js`, `screens/tv/TvShowsDetails.js` (yalnız bu temaya ait hunk'lar).
+   - Chat input ortalama: `screens/chat/ChatScreen.js`.
+   - MMKV kayıt eklemesi: `services/storage/registry.js` ve kalan dosyalar.
+   Dosyalar temalar arasında çakışıyorsa `git add -p` ile hunk seçerek ayır; ayrışmıyorsa iki temayı tek commit'te birleştirip mesajda belirt.
+2. `npm test` → yeşilse commit'leri at.
+3. Kullanıcıya master'a birleştirme + push önerisi sun (**onaysız push yapma**). Sürüm build'i bu daldan değil, birleştirilmiş master'dan kesilmeli.
+
+**Kabul:** `git status` temiz; testler yeşil; her commit tek temayı anlatıyor.
+
+---
+
+## FAZ B — KOD BLOKERLERİ
+
+### [x] GÖREV B1 — Çift `AIChatScreen`'i tek bileşende birleştir (2026-08-08)
+
+> **Sonuç:** `672bcf1`. Tek dosya kaldı (`screens/chat/AIChatScreen.js`, +83 satır);
+> `screens/AIChatScreen.js` silindi (-942). Üç giriş noktası da aynı bileşeni kullanıyor
+> (`ChatModal`, `MovieDetail`, `TvShowsDetails`). Prop imzası aynı kaldığı için JSX'e
+> dokunulmadı. `npm test` 59/908 yeşil.
+>
+> **i18n adımı gerekmedi:** taşınan blokta (startPromptChat + iki efekt) kullanıcıya
+> görünen metin yok; ham Türkçe fallback'ler zaten silinen kopyadaydı. `AICineChat`
+> anahtarlarının tamamının iki pakette de bulunduğu ayrıca doğrulandı — koddaki
+> `t?.AICineChat?.X || "..."` fallback'leri erişilemez durumda.
+>
+> **⚠ MANUEL DOĞRULAMA (dev build'de yapılmalı, kod tarafı bitti):**
+> 1. Film detayı → "AI'ya sor" → panel açılır, başlık satırında **kota göstergesi** yazar
+>    (eskiden bu akışta "Film & dizi asistanı" yazıyordu).
+> 2. `initialPrompt` ilk mesaj olarak kendiliğinden gider; baloncukta yapım kartı iliştirilmiş
+>    görünür ve balonda ham yönerge değil kısa metin yazar.
+> 3. Panel kapatılıp **aynı yapım için** tekrar "AI'ya sor" → sohbet yeniden başlar
+>    (initialPromptRef sıfırlaması bunun içindi).
+> 4. Dizi detayında aynısı; FAB/pet akışı bozulmamış olmalı.
+
+**Bağlam:** İki canlı kopya var ve ayrışmış durumda:
+- `screens/chat/AIChatScreen.js` → giriş noktası `components/modals/ChatModal.js` ("`ChatModal.js:66`", pet/FAB akışı). Kota UI'sı var (`AI_PLAN_LIMITS`, `usePremium`, `quotaText`), tamamı `i18nText` sarılı. Prop'ları `{ visible, onClose, fabOrigin }`.
+- `screens/AIChatScreen.js` → giriş noktaları `screens/movie/MovieDetail.js` ve `screens/tv/TvShowsDetails.js` (`../AIChatScreen` import'u, "bu yapım hakkında sor" akışı). `initialPrompt` / `initialDisplay` / `initialAttachment` / `startPromptChat` var; **kota UI'sı yok**, ham Türkçe fallback'ler var (ör. `"Ne izleyeceğine birlikte karar verelim"`).
+
+**Adımlar:**
+1. `screens/chat/AIChatScreen.js`'i temel al. `screens/AIChatScreen.js`'ten SADECE `initialPrompt`/`initialDisplay`/`initialAttachment` prop'larını ve `startPromptChat` akışını taşı (iki dosya arasında `git diff --no-index` ile farkı çıkar; ~217 satır).
+2. Taşınan akıştaki Türkçe metinleri `i18nText` + çift pakete anahtar ile yerelleştir.
+3. `MovieDetail.js` ve `TvShowsDetails.js` import'larını `screens/chat/AIChatScreen`'e çevir; prop geçişlerini yeni imzaya uyarla.
+4. `screens/AIChatScreen.js`'i **sil**. `Grep "screens/AIChatScreen"` ve `Grep "\.\./AIChatScreen"` → 0 sonuç olmalı.
+5. Manuel doğrulama notu bırak: film detayından "AI'ya sor" → sohbet açılır, başlık kota göstergesini basar, `initialPrompt` ilk mesaj olarak gider.
+
+**Kabul:** tek dosya kaldı; iki giriş noktası da çalışıyor; kota göstergesi her iki akışta görünür; EN'de Türkçe metin kalmadı; testler yeşil.
+
+### [x] GÖREV B2 — Firestore kural düzeltmeleri (4 açık + birthDate kilidi) (2026-08-08, DEPLOY EDİLDİ)
+
+> **Sonuç:** dört açık da kapandı — `226db20` (kurallar + istemci), `ee1980b` (28 emülatör testi).
+> `npm run test:rules` ile koşuyor (Firestore emülatörü + **JDK 21+** ister; JAVA_HOME 17'yi
+> gösteriyorsa firebase-tools 15 başlamaz). `npm test` tabanı değişmedi: 59/908.
+>
+> **Plandan iki sapma:**
+> 1. **DM `delete` gönderene bağlanmadı, üye bazında kaldı.** Planın 3. adımı update+delete'i
+>    `senderId`e bağlıyordu; hesap silme purge'u (`services/accountService.js`) sohbeti
+>    boşaltırken karşı tarafın mesajlarını da siliyor — bağlansaydı silinen hesabın sohbetleri
+>    asla temizlenemez, kişisel veri artığı kalırdı. Gerekçe kurala yazıldı; D7 (sunucu
+>    süpürücüsü) gelince gönderen şartına inecek.
+> 2. **DM `update` "yalnız gönderen" olamazdı.** Üç meşru güncellemenin ikisi karşı tarafın
+>    dokümanına dokunuyor (alıcı "seen" makbuzu yazıyor, anket oyu karşı tarafın mesajına
+>    gidiyor). Alan bazlı ayrım yapıldı — planın naif hâli DM'leri kırardı.
+>
+> **Ratings** planın önerdiği "±1 / 0-10 aralığı" yerine daha sıkı kuruldu: yazım kullanıcının
+> kendi oy dokümanının aynı commit'teki değişimiyle `getAfter` üzerinden birebir doğrulanıyor.
+> Karşılığı: agregatı bozuk kalmış bir doküman olursa o içerik puanlanamaz (konsoldan onarılır).
+>
+> **Deploy:** B3 ile birlikte yapıldı (2026-08-08) — önce functions, sonra `firestore:rules`.
+> Kurallar hatasız derlendi ve yayına alındı.
+
+**Bağlam:** Kurallar genelde sağlam (varsayılan-red, sayaç ±1 kısıtları, chat üyeliği düzeltilmiş) ama dört yazma açığı var. Hepsi `firestore.rules` içinde; mevcut yardımcılar `counterOk()` (~satır 18) ve `isChatMember()` (~satır 25) desen olarak kullanılabilir.
+
+**Adımlar:**
+1. **Yorum create'lerine kimlik bağla.** ~375, 383, 393, 401 satırlarındaki dört `allow create: if isSignedIn();` kuralına (film/dizi yorum koleksiyonları) şunu ekle: `&& request.resource.data.userId == request.auth.uid`. Referans doğru örnek: Posts create kuralı (`authorId == request.auth.uid`, ~satır 428).
+2. **`/Ratings/{mediaKey}` agregatını kısıtla.** ~satır 415 `allow create, update: if isSignedIn();` → alan listesi + delta kısıtı: `count` ve `sum` yalnız kullanıcının kendi `userRatings/{uid}` yazımıyla tutarlı artabilsin (Posts'taki `counterOk()` yaklaşımı; pratik çözüm: create'te `count == 1`, update'te `count == resource.data.count + 1 || count == resource.data.count - 1 || count == resource.data.count` ve `sum` değişimini 0–10 aralığıyla sınırla).
+3. **DM mesajlarına gönderen bağla.** ~satır 532 `allow read, write: if isChatMember(chatId);` → parçala: `read` aynı; `create`'e `request.resource.data.senderId == request.auth.uid`; `update`/`delete`'e `resource.data.senderId == request.auth.uid`. Pins bloğu (~536-550) desen olarak zaten doğru.
+4. **`birthDate` kilidi.** `Users/{uid}` update kuralına (~satır 174 bloğu): `birthDate` bir kez yazıldıktan sonra değiştirilemesin — `!("birthDate" in resource.data) || request.resource.data.birthDate == resource.data.birthDate`. (Boş/eski hesaplar ilk kez yazabilir; sonrası kilit. `EditProfileScreen`'deki doğum tarihi alanını da "doluysa salt-okunur" yap ve kullanıcıya destek e-postası yolunu göster.)
+5. Mümkünse `@firebase/rules-unit-testing` ile 4 vakayı kapsayan emülatör testi yaz (opsiyonel ama önerilir; yoksa değişimin manuel matrisini PR açıklamasına yaz).
+6. **Deploy'u kullanıcı onayıyla yap:** `firebase deploy --only firestore:rules`.
+
+**Kabul:** dört açık kapandı; mevcut meşru akışlar (yorum yazma, puanlama, DM) bozulmadı; kurallar deploy edildi (onay sonrası).
+
+### [x] GÖREV B3 — Expo push token'larını gizli alt koleksiyona taşı (2026-08-08, DEPLOY EDİLDİ)
+
+> **Sonuç:** `48c281a`. Token'lar `Users/{uid}/private/push`'ta; kural + istemci göçü +
+> iki sunucu tüketicisi fallback'li. 5 kural testi daha eklendi (toplam 33 yeşil).
+>
+> **Planın üstüne çıkan üç şey:**
+> 1. **Hesap silme purge'una `private` alt koleksiyonu eklendi** (`services/accountService.js`).
+>    Planda yoktu; olmasa hesap silindikten sonra token artığı kalır ve o cihaza bildirim
+>    gitmeye devam ederdi — hesap silme uyumluluğunu deler.
+> 2. **`dailyStreamingAvailability`'de sıra değişti:** sağlayıcı kontrolü token okumasının
+>    önüne alındı. Token artık ayrı doküman = her kullanıcı için ekstra okuma, bu fonksiyon
+>    da her gün tüm kullanıcıları geziyor.
+> 3. `pushNotificationsService` başlığındaki bayat "backend yok" yorumu düzeltildi —
+>    **B9 adım 3 bu yüzden zaten yapılmış durumda.**
+>
+> **Fallback'in kaldırılacağı sürüm:** `app.json version` 1.5.0 (yani 1.4.x sahadan düşünce).
+> `functions/index.js` içinde "GEÇİŞ" olarak işaretli bloklar + kök dokümana yazan ölü token
+> temizliği silinecek.
+>
+> **Deploy (2026-08-08, sırasıyla yapıldı):**
+> 1. ✅ `firebase deploy --only functions` — 8 fonksiyon güncellendi (fallback'li sunucu önce
+>    gitti, sahadaki eski istemciler bozulmadı).
+> 2. ✅ `firebase deploy --only firestore:rules` — B2 + B3 kuralları birlikte.
+> 3. ⏳ İstemci sürümü / OTA — sürüm build'i kesildiğinde.
+>
+> **Kalan uyarı:** deploy çıktısı `firebase-functions` sürümünün eskidiğini bildirdi
+> (`npm install --save firebase-functions@latest`). Bu görevin kapsamında değil, B10'un
+> bağımlılık eşitleme adımına bakılabilir.
+
+**Bağlam:** `services/pushNotificationsService.js` (~193-202) token'ı `Users/{uid}.expoPushToken` + `expoPushTokens`'a yazıyor; `Users` ise tüm oturumlulara okunur → herhangi bir kullanıcı tüm token'ları dökebilir ve Expo push ucu üzerinden herkese sahte bildirim atabilir.
+
+**Adımlar:**
+1. Yeni yol: `Users/{uid}/private/push` dokümanı (`expoPushToken`, `expoPushTokens`, `updatedAt`). `firestore.rules`'a ekle: `match /Users/{uid}/private/{docId} { allow read, write: if request.auth != null && request.auth.uid == uid; }`.
+2. İstemci: `pushNotificationsService` yazımını yeni yola çevir; başarılı yazım sonrası eski alanları `deleteField()` ile `Users/{uid}`'den temizle (kendi kendini göç ettirme).
+3. Sunucu: `functions/index.js` içindeki iki tüketiciyi güncelle — `onSocialNotificationCreated` (~616) ve `dailyStreamingAvailability` (~1180). **Geçiş sırası:** functions önce YENİ yolu okusun, boşsa ESKİ alana düşsün (fallback); tüm istemciler güncellenene dek fallback kalsın (Admin SDK kural tanımaz, sorun çıkmaz). Fallback'in kaldırılacağı sürümü yorumla işaretle.
+4. Deploy sırası (kullanıcı onayıyla): önce functions (fallback'li), sonra rules, sonra istemci sürümü/OTA.
+
+**Kabul:** yeni token'lar `private/push`'a yazılıyor; `Users` dokümanında token kalmıyor (aktif kullanıcılarda kendiliğinden temizleniyor); push bildirimleri iki fonksiyondan da gitmeye devam ediyor.
+
+### [x] GÖREV B4 — Şikâyet Et + Engelle: UI ve filtreleme (Apple 1.2 / Play UGC) (2026-08-08)
+
+> **Sekiz adımın hepsi bitti.** `npm test` 60 suite / 917 test, `npm run test:rules` 41 test.
+> Son commit `82d0193` (profil + süzgeçler + engellenenler ekranı).
+>
+> **Bitenler (adım 1-4 + kısmi 6/8):**
+> - `ace6dcc` — veri + servis: `ContentReports` kuralı (create-only, alan/tip doğrulamalı,
+>   kendini şikâyet yasağı), `utils/reportValidation.js` (saf, 9 test),
+>   `services/reportService.js`, `friendsService.subscribeToBlocked`, FriendsContext'te
+>   `blockedUsers` / `blockedUidSet` / `isBlocked`. 8 kural testi (toplam 41).
+> - `d5fd18a` — yorum yüzeyi: "..." menüsü artık her yorumda; başkasınınkinde şikâyet +
+>   engelle. `ReportReasonSheet` ortak bileşen. Engel süzgeci yorumlarda VE yanıtlarda.
+>   24 i18n anahtarı çift pakete.
+> - `535dfc9` — mesaj yüzeyi: uzun-basma sayfasına şikâyet + engelle (yalnız karşı tarafın
+>   mesajında).
+>
+> **Planın üstüne çıkanlar:** `subscribeToBlocked` planda yoktu — engelin etkisi anında
+> görünmeli, tek seferlik `getBlockedUsers` yetmiyordu. Listener `loading` sayacına
+> KATILMIYOR (eşik 3'te sabit, yoksa loading hiç kapanmazdı).
+>
+> - `82d0193` — adım 5-7: profil menüsü (şikâyet + engelle/kaldır), engellenenler ekranı
+>   (Ayarlar → Gizlilik), engel süzgeçleri dört yüzeyde (feed, sohbet listesi, sohbet
+>   composer'ı, arama).
+>
+> **Süzme kararı:** feed'de ham `posts` state'i değiştirilmedi, dışarı süzülmüş liste
+> veriliyor. Sayfalama ve iyimser güncellemeler (beğeni/düzenle/sil) öğeleri kimliğe göre
+> buluyor; ham listeden çıkarmak o akışları bozardı.
+>
+> **⚠ MANUEL DOĞRULAMA (dev build):** `ReportReasonSheet` bir `BottomSheetModal` (RN Modal)
+> ve yorum yüzeyinde **zaten açık olan** `CommentSheetModal`'ın içinden açılıyor. Projede
+> iç içe modal örneği yok (`CommentScopeSheet` bilerek Modal DEĞİL). Sebep sayfasının yorum
+> alt sayfasının üstünde düzgün açılıp kapandığı cihazda görülmeli; sorun çıkarsa çözüm
+> `CommentScopeSheet` gibi ekran içi katmana çevirmek.
+
+**Bağlam:** Şikâyet yalnız gönderilerde var (`services/postsService.js → reportPost`, `PostReports` koleksiyonu). Yorum ve DM/grup mesajı için şikâyet yolu YOK (`components/Comment.js` ~359: menü yalnız `isOwn`'da). Engelleme servis+context'te hazır (`services/friendsService.js → blockUser/unblockUser/getBlockedUsers`, `context/FriendsContext.js` ~186-209 `block/unblock`) ama **hiçbir ekran kullanmıyor ve hiçbir akış filtrelemiyor**.
+
+**Adımlar:**
+1. **Veri:** genel `ContentReports` koleksiyonu: `{ type: 'comment'|'message'|'user', targetPath, targetPreview (ilk ~200 krk), targetUserId, reporterId, reason, createdAt }`. Kural, `PostReports` deseninin aynısı (~495): `create` yalnız `reporterId == request.auth.uid`; `read/update/delete: if false`. `PostReports`'a dokunma.
+2. **Servis:** `services/reportService.js` → `reportComment(...)`, `reportMessage(...)`, `reportUser(...)`; hepsi `ContentReports`'a yazar. Saf doğrulama (tip/uzunluk) ayrı fonksiyonda, testli.
+3. **Yorum UI:** `Comment.js`'te `...` menüsünü `isOwn` DEĞİLKEN de göster; seçenekler: "Şikâyet et" (sebep seçimli `BottomSheetModal`) + "Kullanıcıyı engelle". Şikâyet sonrası toast.
+4. **Mesaj UI:** `screens/chat/ChatScreen.js` uzun-basma eylem sayfasına (~2690-2745, mevcut Edit/Delete/Pin/Copy) karşı tarafın mesajları için "Şikâyet et" ve "Kullanıcıyı engelle" ekle.
+5. **Profil UI:** `screens/tabs/profile/FriendProfileScreen.js`'e "Engelle/Engeli kaldır" (onay diyaloglu) + "Şikâyet et" ekle; context'ten `block/unblock`'u destructure et (~310-318'deki listeye).
+6. **Filtreleme (engelin etkisi):** `FriendsContext`'ten engellenen uid set'ini al ve şu yüzeylerde süz: feed gönderileri (`context/PostsContext.js`), yorum listeleri (`Comment.js` render), sohbet listesi + yeni DM başlatma engeli, arama sonuçları (`SearchFriendsScreen`). Süzme istemci tarafında yeterli (mağaza şartı "kullanıcı görmesin"; sunucu kuralı şart değil).
+7. **Engellenenler listesi:** Ayarlar → Gizlilik altına basit "Engellenen kullanıcılar" ekranı (`getBlockedUsers` + engel kaldır) — App Review'da gösterilebilir olması için.
+8. i18n: tüm yeni metinler çift pakete.
+
+**Kabul:** başka kullanıcının yorumunda/mesajında/profilinde şikâyet + engelle erişilebilir; engellenen kullanıcının gönderi/yorum/mesajı görünmez ve yenisi başlatılamaz; engel listesi ekrandan yönetilebilir; `ContentReports` create-only; testler yeşil.
+
+### [x] GÖREV B5 — Yasal bağlantılar: paywall + kayıt ekranları (2026-08-08)
+
+> **Sonuç:** `bdc8922`. `utils/legalLinks.js` tek kaynak; paywall'da ve iki kayıt ekranında
+> çalışan linkler; `AboutAppScreen` de URL'yi oradan okuyor (panoya kopyalayan yedeği kaldı).
+> `delete-account.html` sabiti de eklendi ama henüz bir ekrandan açılmıyor.
+>
+> **i18n notu:** onay metni üç parçaya bölündü (`kayit_onay_bas/orta/son`) ve **boşluklar
+> çeviri metninin İÇİNDE**. Türkçede bağlantı adına ek geliyor ("Koşulları'nı"), yani araya
+> boşluk konmamalı; İngilizcede gerekiyor (" and "). Çeviri düzenlerken baştaki/sondaki
+> boşlukları silme — bileşende de not var.
+>
+> **Adım 4 (RevenueCat paneli) FAZ C'de:** paneldeki hazır paywall'un footer linkleri C2'de
+> ayrıca doğrulanacak; buradaki kod ayağı o panelin yerine geçmez.
+
+**Bağlam:** Yasal URL'ler uygulamada tek yerde: `screens/tabs/settings/AboutAppScreen.js` (~42). Apple 3.1.2: abonelik satın alma noktasında Kullanım Koşulları (EULA) + Gizlilik linki zorunlu. Kayıtta ne link ne onay ifadesi var; gizlilik politikası KVKK/GDPR metni olarak yazılmış ama kayıtta hiç görünmüyor.
+
+**Adımlar:**
+1. URL'leri `utils/legalLinks.js`'e çıkar (`https://seelogd.com/privacy.html`, `terms.html`, `delete-account.html`); `AboutAppScreen` buradan okusun.
+2. `screens/premium/PremiumScreen.js`: yenileme açıklamasının (~1597-1601) altına iki dokunulabilir link ("Kullanım Koşulları" · "Gizlilik Politikası") — `expo-web-browser` ile aç (paket kurulu).
+3. `RegisterScreen.js` ve `GoogleProfileCompletionScreen.js`: kayıt butonunun üstüne "Kayıt olarak Kullanım Koşulları'nı ve Gizlilik Politikası'nı kabul etmiş olursun" satırı, iki kelime link. (Onay kutusu şart değil; metin + link yeterli. KVKK açık rıza gerektiren opsiyonel işlemler — ör. pazarlama — eklenirse o zaman ayrı kutu.)
+4. RevenueCat panelindeki hazır paywall'un footer linkleri panelden ayrıca doğrulanacak → FAZ C'ye not düşüldü (C2).
+5. i18n: yeni metinler çift pakete.
+
+**Kabul:** paywall'da ve iki kayıt ekranında çalışan linkler; EN+TR; testler yeşil.
+
+### [x] GÖREV B6 — EN yerelleştirme onarımı: 87 yetim anahtar + cihaz dili + ham metinler (2026-08-08)
+
+> **Sonuç:** `npm test` 64 suite / 953 test yeşil (önce 62/938), `expo-doctor` 20/20.
+> Bekçi testi (`__tests__/i18nKeys.test.js`) 7 iddiayla yeşil; 0 yetim anahtar.
+> `app.json version` 1.4.2 → **1.4.3** (expo-localization config plugin = native değişiklik).
+>
+> **Yetim anahtar sayısı 87 değil 101 çıktı.** Plandaki 87, statik `"autoI18n.x"`
+> dizgelerini sayıyordu; bekçi testi anahtarı ÇALIŞMA ANINDA kuran çağrı yerlerini de
+> çözünce 14 anahtar daha göründü:
+> - **`cache_*` (11)** — `CacheManagerModal` `` `autoI18n.cache_${cat.id}` `` diyor ve bu
+>   ailenin **hiçbir üyesi iki pakette de yoktu**: önbellek yöneticisinin tüm kategori
+>   adları (Posterler, Pet'ler, Gönderiler…) EN'de Türkçe basıyordu. Planın taramasında
+>   görünmemesinin sebebi tam olarak dinamik olmaları.
+> - **`widget_upcoming` / `widget_lists` / `widget_stats` (3)** — `WIDGETS` tablosundaki
+>   `titleKey`'ler. Fallback'leri ham id ("reminders"/"lists"/"stats") olduğu için EN'de
+>   değil, **iki dilde birden** bozuktu.
+>
+> **Bekçi testi dinamik çağrıları da koruyor.** Naif regex bu sınıfı hiç görmediği için
+> `DINAMIK_YERLER` kaydı eklendi: dört dosya (WidgetSettings `copy()`, ReportReasonSheet,
+> NotificationPrimingSheet, CacheManagerModal) anahtar tablosuyla kayıtlı ve **kayıtsız yeni
+> bir `autoI18n.${...}` çağrısı testi kırıyor**. Ayrıca TR↔EN anahtar kümesi eşitliği, boş EN
+> değeri ve "tarama gerçekten çalışıyor mu" (desen bozulunca test sessizce yeşile dönmesin)
+> iddiaları da var.
+>
+> **Bulunan ek hata — tek anahtar iki iş yapıyordu:** `widget_custom_theme` hem rozet metni
+> ("ÖZEL") hem tema adı ("Özel Tema") için çağrılıyordu; tek değer verilince biri kaçınılmaz
+> olarak yanlış görünecekti. `widget_custom_theme_name` ayrıldı.
+>
+> **Planın "taslak_sil_onay fallback'i bozuk (`\\`)" tespiti yanlıştı** — kaçış dizisi
+> geçerli, metin doğru üretiliyordu. Gerçek sorun yalnız anahtarın eksikliğiydi; eklendi.
+>
+> **Cihaz dili — ilk seçim BİLEREK depoya yazılmıyor** (plan adım 4 "MMKV'ye yazılsın"
+> diyordu). Sebep: `AppSettingsContext` dosyasında hiç `useEffect` yok (başlıktaki not bunu
+> açıkça bir tasarım kararı olarak anlatıyor) ve ilk açılışta yazmak oraya mount effect'i
+> eklemeyi gerektiriyordu. Yazmayınca davranış daha da iyi: kullanıcı dili ELLE seçene dek
+> uygulama cihaz dilini izler, seçtiği an `changeLanguage` kaydı oluşur ve cihaz dili artık
+> onu ezemez. Yazan taraf hâlâ tek (`AppSettingsContext`), detector yalnız okuyor.
+>
+> **Kritik ayrıntı:** `get(Keys.language)` kayıt yokken registry varsayılanı "tr" döndürüyor,
+> yani "hiç seçilmemiş" ile "Türkçe seçilmiş" ayrılamıyordu — ayrım `has()` ile yapıldı.
+> `AppSettingsContext` ile detector **aynı** `cozumlenmisDil()` fonksiyonunu kullanıyor;
+> ayrışsalardı `LanguageContext` depodaki "tr"yi i18n'e geri yazıp cihaz dilini anında ezerdi.
+> Bilinmeyen dilde yedek **"en"** (Türkçe cihazlar dilini zaten bildiriyor; yanlış tahminin
+> bedeli asimetrik — İngilizce açılan Türk kullanıcı ayarı bulur, Türkçe açılan yabancı bulamaz).
+>
+> **`npm run licenses` çalıştırıldı:** yeni bağımlılık `ossLicenses.test.js`'i kırdı
+> (mevcut bekçi doğru çalıştı), liste yeniden üretildi.
+>
+> **⚠ MANUEL DOĞRULAMA (dev build):** ① cihaz dili İngilizce olan TEMİZ kurulumda uygulama
+> İngilizce açılıyor mu, ② Ayarlar'dan Türkçe seçilince kalıcı mı, ③ Ayarlar → önbellek
+> yöneticisinde kategori adları EN'de İngilizce mi, ④ Widget ayarlarında üç widget başlığı
+> ("Yaklaşanlar/Listeler/İstatistikler") doğru mu.
+
+**Bağlam:** Çeviri dosyaları eşit (2102/2102) ama koddan çağrılan **87 anahtar iki pakette de yok**; `fallbackLng: "tr"` + `i18nText(key, türkçeFallback)` deseni yüzünden bunlar EN kullanıcıya sessizce Türkçe basıyor. En kötüler: `WidgetSettingsScreen` (36 — `copy()` sarmalayıcısı `` `autoI18n.${key}` `` şablonuyla çağırıyor), `PosterSettingsScreen` (14), `PersonalizationScreen` (8). Ayrıca cihaz dili hiç algılanmıyor (varsayılan `tr`, `services/storage/registry.js` ~59) — her yabancı kullanıcı uygulamayı Türkçe açıyor.
+
+**Adımlar:**
+1. **Bekçi testi yaz (kalıcı çözüm):** `__tests__/i18nKeys.test.js` — kaynak ağacını (`screens/ components/ context/ services/ utils/ App.js`) tarar, şu desenlerden anahtar çıkarır: `i18nText("autoI18n.X"`, `t("autoI18n.X"` ve `WidgetSettingsScreen`'deki `copy("X"` (şablon `autoI18n.${key}` sarmalayıcısı — dosyaya özel kural). Çıkan her anahtar `tr.json` VE `en.json`'da yoksa test kırmızı; eksik listesi mesajda. (İskele: `fs.readdirSync` + regex; Jest node ortamında çalışır.)
+2. Testin ilk çıktısındaki eksik listesini (≈87) iki pakete ekle — TR değeri koddaki fallback'ten, EN değeri çevirisinden. Çeviriler mevcut `en.json` üslubuyla (kısa, düz) yazılır.
+3. **Ham metin düzeltmeleri:**
+   - `components/modals/MediaQuickActionsSheet.js` ~549: `` `${kindLabel} ${listLabel(listType)} listesine eklendi!` `` → 8 satır üstteki `media_removed_from_list` deseninin aynısı (`autoI18n.media_added_to_list`, `{{media}} {{list}}` interpolasyonlu, çift pakete).
+   - `screens/story/StoryDraftsScreen.js` ~62: `autoI18n.taslak_sil_onay` fallback'i bozuk (`"\\"`) — gerçek onay metni + çift paket anahtarı.
+   - Kullanıcıya ham hata basan 4 toast: `App.js` ~261, `screens/movie/MovieDetail.js` ~373, `screens/lists/ListsScreen.js` ~420, `context/PostsContext.js` ~401 → genel "İşlem tamamlanamadı" anahtarı + `captureError(e)` ile Sentry'ye ham hata.
+   - `services/dataDownloader.js` ~561: `onProgress?.(1, "Tamam")` → mevcut `autoI18n.tamam` anahtarını kullan.
+4. **Cihaz dili algılama:** `npx expo install expo-localization` → `translations/index.js`'teki detector'da MMKV'de kayıtlı dil YOKSA `getLocales()[0].languageCode === "tr" ? "tr" : "en"` kullan; ilk seçim MMKV'ye yazılsın (tek-sahip yazım kuralına uy: yazan `AppSettingsContext` kalsın, detector yalnız okusun + ilk açılış değerini üretsin). **Native paket eklendi → `app.json version`'ı artır (talimat 8).** `fallbackLng: "tr"` kalabilir — bekçi testi varken eksik anahtar sınıfı zaten build'de yakalanıyor.
+5. `npm test` — bekçi testi dahil yeşil olana kadar eksikleri kapat.
+
+**Kabul:** bekçi testi var ve yeşil (0 yetim anahtar); EN'de bilinen Türkçe sızıntı ekranları (WidgetSettings/PosterSettings/Personalization/Settings) İngilizce; yeni cihazda ilk açılış dili cihaz dilinden; `version` artırıldı.
+
+### [x] GÖREV B7 — Asgari kayıt yaşı (2026-08-08) — **KARAR: 13**
+
+> **Sonuç:** `0618587`. `MIN_REGISTER_AGE = 13`, `canRegister()` (saf, 12 sınır testi),
+> iki kayıt yolu da bağlı. `npm test` 61 suite / 928 test.
+>
+> **⚠ BU DEĞER MAĞAZA FORMLARINA DA GİRİYOR** — C5 (IARC + Play hedef kitle beyanı)
+> doldurulurken "13+" olarak beyan edilmeli. Değer değişirse iki yer birden güncellenmeli;
+> not `utils/ageGate.js` içinde de duruyor.
+>
+> **Tasarım kararı:** `canRegister`'da "bilinmiyor" GEÇERSİZ sayılıyor — yetişkin içerik
+> kapısının tersi. Orada bilinmezlik kısıtı açık bırakıyor (kullanıcıyı korumak için),
+> burada kaydı engelliyor (geçersiz tarihle hesap açılmamalı).
+>
+> **Google yolu:** giriş Auth hesabını zaten açmış oluyor; 13 altı reddinde yetim Auth
+> kaydı siliniyor (silinemezse çıkış) — yoksa kullanıcı bu ekrana sürekli düşüp kilitli
+> kalırdı.
+
+**Bağlam:** Doğum tarihi zorunlu ama yaş sınırı yok — `RegisterScreen.js` ~95'te "18 altı kaydı engellemez" bilinçli notu var. DM'li/UGC'li uygulamada asgari yaş olmadan IARC ve Play hedef-kitle beyanı tutarsız kalır (COPPA riski).
+
+**Adımlar:**
+1. **Kullanıcıya sor: asgari yaş kaç? (öneri: 13).** Karar gelmeden kod yazma; karar mağaza formlarına da girecek.
+2. `utils/ageGate.js`'e `MIN_REGISTER_AGE` + `canRegister(birthDate, now)` (saf) ekle; `__tests__/ageGate.test.js`'e sınır vakaları (tam bugün 13, bir gün eksik, artık yıl).
+3. `RegisterScreen.js` `canSubmit` (~92-101) ve `GoogleProfileCompletionScreen.js`'e bağla; reddedilen kullanıcıya nazik, suçlamayan metin (çift paket). Google-tamamlama reddinde oluşan yarım hesabı temizle (mevcut yetim-hesap temizliği desenini kullan, `RegisterScreen.js` ~254-256).
+4. `birthDate` değiştirilemezliği B2 adım 4'te kurala bağlandı — bu görevle birlikte doğrulanmış olur.
+
+**Kabul:** sınır altı doğum tarihi iki kayıt yolunda da kaydı tamamlayamıyor; testler yeşil; karar değeri bu dosyaya not edildi.
+
+### [x] GÖREV B8 — Android izin bloğu temizliği (2026-08-08)
+
+> **Sonuç:** `9e76871`. `permissions` iki medya iznine indi, `blockedPermissions` aynen kaldı.
+> `app.json version` 1.4.1 → **1.4.2**.
+>
+> **Prebuild doğrulaması yapıldı** (`npx expo prebuild -p android --clean`). Üretilen
+> `AndroidManifest.xml`:
+> - `READ_MEDIA_IMAGES`, `READ_MEDIA_VISUAL_USER_SELECTED` → isteniyor ✅
+> - `WRITE_EXTERNAL_STORAGE`, `READ_MEDIA_AUDIO`, `READ_MEDIA_VIDEO`, `RECORD_AUDIO` →
+>   hepsinde `tools:node="remove"` var; kütüphane manifestlerinden geliyorlar ve
+>   `blockedPermissions` sayesinde birleştirmede düşüyorlar ✅
+> - `READ_EXTERNAL_STORAGE` **duruyor ama `android:maxSdkVersion="32"` ile** — bunu
+>   expo-image-picker/media-library kendi manifestinde tanımlıyor. **Doğru davranış:**
+>   Android 12 ve altında `READ_MEDIA_IMAGES` yok, görsel seçmek için bu izin şart; SDK 33+
+>   için kapalı. Yani app.json'dan çıkarmak Android ≤12'yi bozmadı.
+>
+> Prebuild'in ürettiği `android/` klasörü **silindi**: varlığı EAS'i bare workflow'a
+> çevirir ve sürüm build'i prebuild'i yeniden çalıştırmaz, bayat manifest gömülürdü.
+>
+> **Kalan:** story kaydetme akışı (görseli galeriye kaydet) manuel test listesinde.
+
+**Bağlam:** `app.json` ~29-40 çelişkili: `permissions` içinde `READ_EXTERNAL_STORAGE` + `WRITE_EXTERNAL_STORAGE` istenmiş, `blockedPermissions` içinde `WRITE_EXTERNAL_STORAGE` yeniden engellenmiş. Story kaydetme için gerçek ihtiyaç: `READ_MEDIA_IMAGES` + `READ_MEDIA_VISUAL_USER_SELECTED`.
+
+**Adımlar:**
+1. `permissions` dizisini `["android.permission.READ_MEDIA_IMAGES", "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"]`'e indir; `blockedPermissions` aynen kalsın (RECORD_AUDIO/AUDIO/VIDEO engelleri doğru).
+2. Manifest değişti → `version` artır (talimat 8; B6 ile aynı sürüme binebilir).
+3. Doğrulama: `npx expo prebuild -p android --clean` sonrası üretilen `android/app/src/main/AndroidManifest.xml`'de eski izinlerin olmadığını Grep'le kontrol et; sonuçları raporla (prebuild çıktısı gitignore'da, commit'e girmez).
+4. Story kaydetme akışını (görsel galeriye kaydet) manuel test listesine ekle.
+
+**Kabul:** manifest'te yalnız gerekli medya izinleri; story kaydetme çalışıyor.
+
+### [x] GÖREV B9 — Bildirim izni ön-açıklama ekranı (priming) (2026-08-08)
+
+> **Sonuç:** `npm test` 62 suite / 938 test yeşil. Açılıştaki habersiz izin isteği kaldırıldı;
+> sistem diyaloğu artık yalnız kullanıcı ön-açıklama sayfasında "İzin ver" dedikten sonra açılıyor.
+>
+> **Karar — tetik yeri:** plan "ilk hatırlatıcı kurma denemesi VEYA onboarding'in bildirim adımı"
+> diyordu. Onboarding'de bildirim adımı YOK (2343 satır, hiç bildirim geçmiyor) ve oraya bir adım
+> eklemek izni yine bağlamsız sorardı. Tetik dört hatırlatma kurma noktasına bağlandı:
+> `components/Reminder.js`, `screens/movie/MovieDetail.js`, `components/modals/MediaQuickActionsSheet.js`,
+> `screens/tabs/profile/NotesScreen.js` (tarihli not = `reminder_note_`).
+>
+> **Karar — sayfa nerede çiziliyor:** tek örnek `DeviceNotificationsProvider` içinde; çağrı yerleri
+> yalnız `primeNotificationPermission()` diyor. B4'teki `ReportReasonSheet` riskinin tekrarı
+> OLMAMASI için iç içe modal kurulmadı: alt sayfadan tetiklenen iki yerde önce KENDİ sayfası
+> kapanıyor (`closeThen` / `PRIME_HANDOFF_MS`), sonra izin sayfası açılıyor — projenin
+> `WatchedDateSheet`/`WatchHistorySheet` geçişlerindeki deseninin aynısı.
+>
+> **Karar — bayrak iki düğmede de yanıyor.** Plan yalnız "Şimdi değil" için bayrak diyordu. Ama
+> Android'de ilk ret KALICI DEĞİL (`canAskAgain` true kalıyor); yalnız "Şimdi değil"e bayrak
+> koysaydık "İzin ver" deyip sistem diyaloğunda reddeden kullanıcıya sayfa her hatırlatmada geri
+> gelirdi. Sayfa tek seferlik; geri dönüş yolu Ayarlar › Hatırlatıcılar'daki mevcut uyarı satırı.
+>
+> **Planın üstüne çıkan:** `registerForPushNotificationsAsync` içindeki
+> `requestNotificationPermission()` çağrısı `getPermissionsAsync()` kontrolüne çevrildi. Tek çağrı
+> yeri zaten izni kontrol ettiği için diyalog açılmıyordu, ama kapı açıktı — kabul ölçütü artık
+> yapısal olarak sağlanıyor, tesadüfen değil.
+>
+> **Adım 3 (bayat yorum) zaten B3'te yapılmıştı** — `pushNotificationsService.js` başlığı
+> "Uzak push CANLI" diyor.
+>
+> **Sürüm artışı gerekmedi:** yalnız JS değişti (paket/config plugin/manifest yok), `app.json`
+> 1.4.2'de kaldı.
+>
+> **Manuel test listesine eklendi:** ① ilk hatırlatma kurulunca sayfa açılıyor mu, ② "İzin ver"
+> sonrası sistem diyaloğu geliyor mu (iOS'ta sayfa kapanışıyla çakışmıyor mu), ③ "Şimdi değil"
+> dedikten sonra sayfa bir daha gelmiyor mu, ④ hızlı eylem sayfasından hatırlatma kurunca sayfa
+> ÖNCE kapanıp izin sayfası sonra mı açılıyor.
+
+**Bağlam:** `context/DeviceNotificationsContext.js` ~198-218: açılıştan ~4.2 sn sonra sistem izni habersiz isteniyor — iOS'ta tek seferlik hakkı yakar, App Review'da yorum konusu. `components/NotificationPermissionNotice.js` yalnız RET SONRASI bilgilendirme; ön-açıklama değil.
+
+**Adımlar:**
+1. Auto-ask effect'ini kaldır; yerine tek seferlik ön-açıklama sheet'i: küçük `BottomSheetModal` (talimat 7) — "Hatırlatıcıların ve arkadaş etkinliği bildirimlerin için izin gerekiyor" + "İzin ver" / "Şimdi değil". "İzin ver" → `requestPermission()`; "Şimdi değil" → `settings` deposunda bayrak, bir daha otomatik sorma (Ayarlar'dan hep açılabilir).
+2. Gösterim zamanı: açılışta değil, ilk anlamlı bağlamda (ör. ilk hatırlatıcı kurma denemesi VEYA onboarding'in bildirim adımı — `OnboardingScreen` zaten varsa oraya bağla; yoksa startup gecikmeli gösterimi bağlamlı tetiğe çevir).
+3. Bayat yorumu düzelt: `services/pushNotificationsService.js` ~12-13 "backend yok → push gelmez" → uzak push CANLI (`functions/index.js`: `onSocialNotificationCreated`, `dailyStreamingAvailability`). Data Safety formu bu yoruma göre DOLDURULMASIN notu zaten FAZ C'de.
+4. i18n çift paket; `npm test`.
+
+**Kabul:** sistem izni yalnız kullanıcı "İzin ver" dedikten sonra isteniyor; ret sonrası akış (mevcut notice) bozulmadı.
+
+### [x] GÖREV B10 — Küçük temizlikler (2026-08-08)
+
+> **Sonuç:** `3fa783b`. **expo-doctor 20/20**, `npm test` 60 suite / 917 test yeşil.
+> Sürüm tek kaynak (app.json 1.4.2; package.json 1.1.0'dan esitlendi), ölü blok ve artık
+> stiller silindi, `.env` temizlendi, 5 yama uyuşmazlığı kapandı.
+>
+> **Planın üstüne çıkan:** `.env.example` yalnız "eşleşiyor mu" diye bakılacaktı — eşleşmiyordu
+> ve eksikler kodun gerçekten okuduğu değişkenlerdi (TMDB, Firebase, Google client id'leri).
+> Dosya kodun okuduğu tüm değişkenleri listeleyecek şekilde tamamlandı. `.env` değerlerine
+> bakılmadı, yalnız satır yapısı düzeltildi.
+>
+> **Not:** `npx expo install --fix` ilk çalıştırmada son adımda hata verdi ama sürümleri
+> uygulamıştı; `node_modules`'daki kurulu sürümler tek tek doğrulandı, ikinci çalıştırma
+> "Dependencies are up to date" dedi.
+
+1. **Sürüm dizeleri teke insin:** kaynak `app.json` (`1.4.1`). `package.json` `version`'ı `1.4.1` yap. `screens/tabs/settings/AboutAppScreen.js` ~38'deki sabit `"v1.21.1"` → `expo-constants` ile `Constants.expoConfig?.version` okumasına çevir (destek e-postası konusu da düzelecek).
+2. **Ölü blok:** `screens/navigation/TabScreenNavigator.js` ~322 `{false && activeTab !== "settings" && (...)}` bloğunu tamamen sil.
+3. **`.env` temizliği:** dosya sonundaki bozuk artık satırları (`1`…`16` gibi) sil. **Değerleri asla ekrana/loga basma**; yalnız satır yapısını düzelt. `.env.example` ile değişken adlarının eşleştiğini doğrula.
+4. **Bağımlılık eşitleme:** sürüm build'i kesilmeden önce `npx expo install --check` ile 5 yama uyuşmazlığını kapat (expo, expo-file-system, expo-image-picker, expo-notifications, expo-sharing) → `npm test`.
+
+**Kabul:** üç sürüm kaynağı tek; ölü blok yok; expo-doctor 20/20 (sürüm kontrolü dahil).
+
+---
+
+## FAZ C — İNSAN GEREKTİREN İŞLER (AI çalıştıramaz; taslak/hazırlık yapabilir)
+
+> Bu kalemler panel/hesap işlemi ister. AI'nın rolü: taslak metin, kontrol listesi, hatırlatma.
+
+- **[ ] C1 — Marka kararı:** "Seelogd" için TÜRKPATENT + EUIPO + USPTO + iki mağazada ad taraması → AD KARARI. Mağaza metinleri (`store/play/`) bu karara kilitli. *(AI: tarama sonuç özetini derleyebilir, alternatif ad listesi çıkarabilir.)*
+- **[ ] C2 — Play ürünleri + RevenueCat panel:** Play Console'da abonelik IAP'leri (Premium/Premium Max, TR+global fiyat) → RevenueCat panelinde Play service credentials → Integrations→Webhooks'a fonksiyon URL'si + `Authorization` değeri → paneldeki hazır paywall'un footer'ında Koşullar/Gizlilik linklerinin açık olduğunun teyidi (B5'in panel ayağı).
+  > **2026-09-18:** Webhook bağlı, test olayı 200 döndü (`revenuecatwebhook-nvr53u7q5q-uc.a.run.app`). Panel paywall'u kaldırıldı — tek ödeme ekranı `PremiumScreen` (bkz. `docs/kurulum/REVENUECAT_KURULUM.md` §2); footer linki maddesi bu yüzden düştü.
+  >
+  > **2026-09-19 — kaldığımız yer (sıra önemli):** Ürün kimlikleri `premium_monthly` / `premium_yearly` / `max_monthly` / `max_yearly`, fiyatlar ₺59,99 / $1.99 tabanlı (tablo: `REVENUECAT_KURULUM.md` §2–3; commit `7701517`). Play'e o güne kadar hiç AAB yüklenmemişti; Play abonelik açmak için içinde faturalama izni olan bir paket istiyor.
+  > - [x] Android geliştirici doğrulaması: `com.smlztrk.seelogd` 29 Tem'de kayıtlı (4 anahtar) — iş yok.
+  > - [x] Ödeme profili: "Individual profile for Play" 1136-0306-6469 seçildi; yeni adres Google incelemesinde. Banka hesabı henüz girilmedi (önce bankadan GVK 20/B geliştirici istisna hesabı açtır, mali müşavire teyit ettir).
+  > - [x] **1.** (19 Eyl 14:42 Internal testing'de yayında; tester listesi "Seelogd iç test".) İlk Android production AAB: EAS build `0e4f3772-a7d8-4320-acc8-7fe38d1598c5` (versionCode 2) → Play Console › Test and release › Testing › Internal testing › Create new release › AAB'yi yükle › Save (yayına almak şart değil). Testers'a e-posta listesi + kendi Gmail'in.
+  > - [x] **2.** (19 Eyl: dördü de 1 aktif base plan. Yıllık ikisinin `p1y`'si yanlışlıkla AYLIK kurulmuştu → deaktif, yerine 1 yıllık `p1y-v2`.) Play Console › Monetize with Play › Products › Subscriptions: 4 abonelik, her birinde tek base plan (`p1m` / `p1y`), fiyat USD taban + Türkiye elle → Activate. Teklif EKLEME (kurucu teklifi 7. adımda).
+  > - [ ] **3.** App Store Connect: Small Business Program başvurusu (%15); tek abonelik grubu, aynı 4 kimlik; Level 1 = `max_yearly` + `max_monthly`, Level 2 = `premium_yearly` + `premium_monthly`.
+  > - [~] **4.** (19 Eyl, Play tarafı bitti: servis hesabı `revenuecat@movieandtv-2832a.iam.gserviceaccount.com` — roller Pub/Sub Admin + Monitoring Viewer, Play'de finansal + sipariş yetkisi; 4 Play ürünü içe alındı; RTDN topic `Play-Store-Notifications` bağlı, test bildirimi 12:29 UTC geldi. **Paneldeki entitlement `com.smlztrk.Watchify Pro` idi, kod/EAS `com.smlztrk.seelogd Pro` bekliyordu → satın alma hiç açılmazdı; doğru kimlikle yeni entitlement açıldı, eskisi sonra silinecek.** Kalan: App Store ürünleri + Test Store.) RevenueCat: Play + App Store ürünlerini içe aktar, `com.smlztrk.seelogd Pro` entitlement'ına bağla; Test Store'da aynı 4 kimlikle ürün aç.
+  > - [x] **5.** (19 Eyl: `revenueCatWebhook` + `syncPremiumStatus` deploy edildi; 405/401 duman testi geçti.) `firebase deploy --only functions:revenueCatWebhook` (webhook kimlik listesi değişti) — kullanıcı onayı ister. Offering'den ÖNCE.
+  > - [x] **6.** (19 Eyl: paket kimlikleri eski düzende kaldı, içlerine Play ürünleri bağlandı — eşleşme `REVENUECAT_KURULUM.md` §2.) `default` offering: paketleri yeni ürünlere çevir.
+  > - [~] **7.** (19 Eyl: Play'de HERKESE açık lansman teklifi kuruldu — aylık `launch-50-3m` ilk 3 ay %50, yıllık `launch-20-1y` ilk yıl %20 (Single payment), uygunluk "Never had any subscription"; PremiumScreen teklifi gösteriyor, OTA `17b6d8c2` ile gönderildi, commit `1543313`. Sahte indirim reddedildi, yerine bu kuruldu. Cihazda teklif GÖRÜLEMEDİ: Play satın alma/uygunluk hesabı = uygulamayı YÜKLEYEN Google hesabı, o da abone olmuştu → kapalı testte hiç abone olmamış testçiyle doğrulanacak. Kalan: iOS intro teklifleri, `badges.founder` dağıtımı, `website/terms.html` hosting deploy'u.) Kurucu ayrıcalıkları (3.3): `badges.founder` dağıtımı + "%50 indirim ilk 3 ay" (Play offer + iOS intro/promosyon; PremiumScreen intro fiyatı göstermeli — Apple şartı); `website/terms.html` hosting deploy'u.
+  > - [ ] **8.** Kapalı test — **24 Eyl: hesap türü `Personal` olarak doğrulandı, yani 12 kişi / 14 gün şartı GEÇERLİ** (Organization olsaydı düşecekti). Sayaç, katılan testçi sayısı 12'ye ulaştığı gün başlar ve 14 gün kesintisiz ≥12 kalmalı; bu sürede testçi çıkarma, kanalı durdurma, uygulamayı yayından kaldırma YOK. Sonra Test and release › Production › "Apply for production access".
+  >   **Takvim:** testçiler 25–26 Eyl'de tamamlanırsa 14 gün ~9–10 Ekim'de dolar, ilk kez production incelemesi birkaç gün–1 hafta sürebilir → **Play TR gerçekçi hedef: Ekim ortası**. Eski 21–25 Eylül hedefi geçersiz.
+  >   **Pratik not:** 12 değil 14–15 kişi davet et; listede olmak SAYILMAZ, her testçinin opt-in linkine tıklayıp uygulamayı kurması gerekir. Kendi geliştirici hesabını 12'nin içine sayma.
+  > - [~] **9.** (19 Eyl Android'de GEÇTİ: satın alma → webhook → AI kotası premium 20/300 → Max'e yükseltme tek abonelik, kota unlimited 50/900; iptal → varsayılan tema/font, yeniden alınca eski seçim geri geldi. Hesap A'da alıp B'ye geçince A'nın Free olması TRANSFER ayarından — beklenen, bkz. `REVENUECAT_KURULUM.md` §6.) Cihazda uçtan uca: satın alma, Premium→Max'te tek abonelik, AI kotası anında güncelleniyor, limit uyarıları. Sonra eski Test Store ürünlerini arşivle; test abonelikleri bitince eski kimlikleri koddan sil.
+  > - [x] **10.** (24 Eyl: cihazda DOĞRULANDI, Google girişi çalışıyor — yeni build/`google-services.json` gerekmedi, SHA kaydı sunucu tarafında yeterliydi.) Google girişi Play sürümünde "bu sürümde kullanılamıyor" (DEVELOPER_ERROR) veriyordu: Play APP SIGNING anahtarının SHA-1/SHA-256'sı Firebase'e eklendi (19 Eyl, `GOOGLE_AUTH_KURULUM.txt`).
+  > - [ ] **11.** App Check: Play sürümünden gelen çağrılarda token `MISSING`. **24 Eyl: kod tarafı zaten tam** — `services/appCheck.js:90` `playIntegrity` provider'ıyla başlatıyor, web SDK köprüsü de kurulu. Yani bu bir PANEL işi, yeni build gerektirmiyor: Firebase Console › App Check › Android uygulamasını Play Integrity ile kaydet (Firebase projesi ile Play hesabının bağlı olması gerekir). `enforceAppCheck` bundan sonra, D1 sırasına göre.
+  > - [ ] **12.** Temizlik: RevenueCat'teki eski `com.smlztrk.Watchify Pro` entitlement'ı ve eski Test Store ürünleri; Test Store'da yeni 4 kimlikle ürün; Play'de deaktif `p1y` base plan'ları kalır (silinemez). (24 Eyl: `GOOGLE_AUTH_KURULUM.txt` + bu liste `46d7661` ile commit'lendi.)
+  > - [ ] **13.** (24 Eyl) **Mağaza varlıkları hazır çıktı** — C4 sanıldığı gibi eksik değil: feature graphic 1024×500 TR+EN, 8 adet 1080×1920 TR ekran görüntüsü, TR/EN metinler sınırlar içinde. 512×512 ikon da zaten mevcut: `store/assets/play-icon-512.png`. Kalan iş yalnızca Play Console'a yükleme.
+  > - [ ] **14.** (24 Eyl) **Data Safety formu koddan çıkarıldı** → `docs/kurulum/PLAY_DATA_SAFETY.md` (toplanan/toplanmayan kalemler, paylaşım=Hayır gerekçesi, güvenlik cevapları, doldurma sırası). Karar bekleyen tek konu: Advertising ID'yi beyan mı edelim (Analytics amacıyla, kod değişmez) yoksa manifest meta-data ile kapatalım mı.
+  > - [x] **15.** (24 Eyl) **Kullanılmayan medya izni düzeltildi** (Play "Photo & Video Permissions" beyanını hiç açtırmamak için): 4 kaydetme noktası + `PermissionsSection` write-only'ye geçti, `READ_MEDIA_IMAGES`/`READ_MEDIA_VISUAL_USER_SELECTED` `app.json` `blockedPermissions`'a taşındı (`android/` gitignore'da, manifest'i EAS prebuild üretiyor — tek kaynak app.json), version 1.4.6. 1.4.6 AAB'de manifest denetlendi (izinler yok) ve **cihazda doğrulandı: hikâye kartı + Wrapped görseli galeriye sorunsuz kaydediliyor.** Ayrıntı: `PLAY_DATA_SAFETY.md` §1.2.
+  > - [ ] **16.** (24 Eyl, build 1.4.6 AAB denetiminden) **`expo-image-picker` artık ölü bağımlılık** — son importu madde 15'te kaldırıldı, kodda hiçbir çağrısı yok. Ama AAB manifestine hâlâ `android.permission.CAMERA` koyuyor (bu izni isteyen TEK paket o). Mağaza sayfasındaki izin listesinde gereksiz "Kamera" satırı çıkıyor. Kapalı testi engellemez; **sonraki build'de** `npm uninstall expo-image-picker` + AAB'de CAMERA'nın düştüğünü doğrula. Not: kilit dosyası değişeceği için [[eas-npm-lockfile-mismatch]] kuralına dikkat.
+  > - [x] **17.** (24 Eyl) **Build 1.4.6 / versionCode 4 hazır** — `8a6df143-486f-46f3-8f46-c0858b7c5ffa`, commit `391014b`, kanal production, STORE dağıtımı. AAB manifesti denetlendi: `READ_MEDIA_IMAGES` ve `READ_MEDIA_VISUAL_USER_SELECTED` **yok** (madde 15 doğrulandı), `AD_ID` **var** (Data Safety'de beyan edilecek). İlk deneme yüklemede TLS hatasıyla düştü ve versionCode 3'ü yaktı; sebebi tarball'a giren 45 MB'lık `.theme-audit-export/` kalıntısıydı, silindi.
+- **[ ] C3 — Kapalı test kullanıcıları:** 12+ kişi kesinleşsin; 14 gün sayacı 24 Ağustos'ta başlamalı.
+- **[ ] C4 — Mağaza görselleri:** feature graphic 1024×500, telefon ekran görüntüleri (TR ve EN ayrı setler, ilk 3 kritik), 512×512 ikon. *(AI: ekran görüntüsü çerçeve/başlık metinlerini `store/play/` altına taslaklayabilir; ham görüntüler `store/raw-screenshots/`'ta.)*
+- **[ ] C5 — Data Safety + IARC formları:** **asgari yaş 13** (B7 kararı, kodda uygulandı), beyanlar — Firebase (Auth/Firestore/Analytics), Sentry (crash), RevenueCat (satın alma), Advertising ID, **uzak push CANLI**, UGC (sohbet/yorum/gönderi) VAR + şikâyet/engelleme mekanizmaları (B4 tamamlanmış olmalı). *(AI: soru-cevap taslağı çıkarabilir.)*
+- **[ ] C6 — Eski Gemini anahtarının iptal teyidi:** AI Studio'da eski anahtar + komut satırına yanlışlıkla yazılan ara anahtarın silindiğinin teyidi (yol haritası Faz 0 kalıntısı).
+- **[ ] C7 — Website `mark.todo` alanları:** `website/privacy.html` ve `terms.html` içindeki veri sorumlusu kimliği/ülkesi ve yetkili mahkeme alanları — kullanıcıdan bilgi alınıp doldurulacak, sonra `firebase deploy --only hosting` (onaylı).
+- **[ ] C8 — TMDB ticari kullanım yazışması:** *(AI: e-posta taslağı yazabilir; gönderim kullanıcıda.)*
+
+---
+
+## FAZ D — YAYIN SONRASI / SÜRÜM N+1 (şimdi YAPMA, sırası gelince)
+
+- **[ ] D1 — App Check zorlaması (sıra kritik):** ① yeni build tüm kullanıcılara dağılsın → ② Firebase Console → App Check metriklerinde "verified" istek oranı ~%100 olsun → ③ `functions/index.js` `enforceAppCheck: true` (+ `checkGoogleSignInEligibility`'ye de App Check opsiyonu) + deploy → ④ Console'dan Firestore/RTDB enforcement. Erken açılırsa eski build'ler kırılır.
+- **[ ] D2 — MMKV `auth` deposuna `encryptionKey`:** anahtarı `expo-secure-store`'dan tohumla (`services/storage/instances.js` ~97-106); mevcut düz veriyi tek seferlik yeniden şifreleme göçüyle taşı.
+- **[ ] D3 — Çevrimdışı banner:** `ConnectivityContext` hazır ve mount'lu, tek tüketicisi var — köke bir banner bileşeni bağla.
+- **[ ] D4 — Sessiz catch'lere `captureError`:** `services/tmdbLookup.js` (2), `services/dataDownloader.js` (4), `services/postsService.js` (9), `services/userService.js` (1).
+- **[ ] D5 — Küfür/kelime filtresi** (Apple 1.2 "filtreleme" ayağını güçlendirir) + `ContentReports` için basit iç moderasyon görünümü.
+- **[ ] D6 — `Usernames` koleksiyonunun `read: if true` kuralını kıs** (varlık kontrolü oturum şartına inebilir).
+- **[ ] D7 — Hesap silme sunucu süpürücüsü:** `auth.onDelete` tetikli fonksiyon — istemci `safe()` sarmalayıcısının yuttuğu artıkları temizler (purge zaten idempotent).
+- **[ ] D8 — Paylaşımlı cihaz penceresi:** `uid` değişince profil çözülene dek `ageRestricted = true` iyimser başlangıcı (`context/UserProfileContext.js` ~147-160 notu).
+- **[ ] D9 — `purgeMigratedAsyncStorage()` aç + `@react-native-async-storage`'ı kaldır** (MMKV göçünden bir sürüm sonra; native değişiklik → `version` artır).
+- **[ ] D10 — README güncelle** (hâlâ SDK 54 / Expo Go diyor; doğrulama development build ile).
+- **[ ] D11 — Gemini güvenlik eşiği kararı:** `functions/index.js` ~500-505 dört kategori `BLOCK_ONLY_HIGH` — reşit olmayan kullanıcılar varken en azından `SEXUALLY_EXPLICIT` için `BLOCK_MEDIUM_AND_ABOVE` değerlendir (kullanıcı kararı).
+
+---
+
+## EK — HIZLI DOĞRULAMA KOMUTLARI
+
+```bash
+npm test
+```
+
+```bash
+npx expo-doctor
+```
+
+```bash
+git status
+```
+
+- Yetim i18n anahtarı kontrolü: B6'daki bekçi testi (`npm test` içinde).
+- Kural değişikliği sonrası: yorum yaz/puan ver/DM at akışlarını dev build'de elle doğrula.
+- Sürüm kesmeden önce: FAZ B'nin tamamı `[x]`, `expo-doctor` 20/20, master'da temiz ağaç.

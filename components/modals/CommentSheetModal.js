@@ -1,0 +1,505 @@
+import { Image } from "expo-image";
+/**
+ * CommentSheetModal.jsx
+ *
+ * MovieDetails içindeki yorum modalinin tüm UI katmanı.
+ * Kullanım:
+ *
+ *   import CommentSheetModal from "@components/modals/CommentSheetModal";
+ *
+ *   <CommentSheetModal
+ *     visible={commandModalVisible}
+ *     onClose={() => setCommentModalVisible(false)}
+ *     movieId={id}
+ *     details={details}        // film adı + poster için (opsiyonel)
+ *   />
+ *
+ * MovieDetails içindeki eski Modal bloğunu tamamen bu bileşenle değiştir:
+ *
+ *   <Modal
+ *     animationType="none"
+ *     transparent
+ *     visible={commandModalVisible}
+ *     onRequestClose={() => setCommentModalVisible(false)}
+ *     statusBarTranslucent
+ *   >
+ *     <CommentSheetModal
+ *       visible={commandModalVisible}
+ *       onClose={() => setCommentModalVisible(false)}
+ *       movieId={id}
+ *       details={details}
+ *     />
+ *   </Modal>
+ */
+
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  Dimensions,
+  Platform,
+  KeyboardAvoidingView
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
+import { LinearGradient } from "expo-linear-gradient";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import Comment from "@components/Comment"; // kendi Comment bileşenin
+import { useTheme } from "@context/ThemeContext";
+import GlassCloseButton from "@components/common/GlassCloseButton";
+import { useImageQualitySettings } from "@context/AppSettingsContext";
+import { i18nText } from "@utils/i18nText";
+import useAdaptiveSheetHeight from "@hooks/useAdaptiveSheetHeight";
+
+
+const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
+
+// Sheet artık İÇERİĞE göre canlı büyüyüp küçülüyor (bkz. useAdaptiveSheetHeight):
+// hiç yorum yoksa SHEET_MIN_H, yorum sayısı arttıkça SHEET_MAX_H'a doğru büyür.
+// Üst sınır neredeyse tam ekran — çok yorumlu içerikte sheet ekranı kaplar.
+// Alt sınırın boş listede gerekenden yüksek durmasının bir nedeni daha var:
+// dizi kapsamındaki sezon/bölüm seçici (components/comments/CommentScopeSheet.js)
+// bu sheet'in İÇİNDE açılıyor ve overflow:hidden ile kırpılıyor — sheet kısalırsa
+// seçici de kısalır.
+const SHEET_MAX_H = SCREEN_H * 0.94;
+const SHEET_MIN_H = SCREEN_H * 0.5;
+
+// ── Renk sabitleri ───────────────────────────────────────
+
+export default function CommentSheetModal({
+  visible,
+  onClose,
+  movieId,
+  details,
+  collectionName = "MovieComment", // "MovieComment" (film) | "TvComment" (dizi)
+  // ── Dizi kapsamı (yalnız collectionName="TvComment") ─────────────────────
+  // seasons      → TMDB sezon listesi; verilirse sezon/bölüm seçici açılır
+  // initialScope → sayfa açılırken hedeflenen kapsam; sezon/bölüm ekranından
+  //                gelen "Yorumlar" butonu doğrudan o kısmı süzer
+  seasons = null,
+  initialScope = null,
+  // Başlıkta film/dizi adı yerine gösterilecek metin (ör. "S2 · B5 — Ozymandias")
+  subtitle = null,
+}) {
+  const { getTmdbUrl } = useImageQualitySettings();
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  // Sheet slide-up animasyonu.
+  // Yükseklik artık sabit değil, içerikten geliyor (bkz. useAdaptiveSheetHeight
+  // + styles.sheet). Bu yüzden kapanışta ne kadar aşağı kaydırılacağı ölçümden
+  // okunuyor; ilk açılışta ölçüm yokken üst sınır kullanılıyor (sheet'i
+  // ekranın altında tutar, tek etkisi biraz uzun yol).
+  const slideAnim = useRef(new Animated.Value(SHEET_MAX_H)).current;
+  const sheetHRef = useRef(SHEET_MAX_H);
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  // Görünen yorum sayısı Comment.js'den yükselir; sheet yüksekliği buna göre
+  // canlı büyüyüp küçülür, klavye açıkken de ekrana sığacak şekilde küçülür.
+  const [commentCount, setCommentCount] = useState(0);
+  const { heightAnim } = useAdaptiveSheetHeight({
+    visible,
+    count: commentCount,
+    minHeight: SHEET_MIN_H,
+    maxHeight: SHEET_MAX_H,
+    topInset: insets.top + 12,
+  });
+
+  // Gerçek blur hedefi sheet açılış kayması + yükseklik animasyonu OTURANA
+  // kadar devreye girmiyor (AIChatScreen'deki blurReady ile aynı önlem):
+  // Android'de RenderNode yakalaması hâlâ boyut değiştiren bir görünüme
+  // bağlanırsa kalıcı olarak düz katmana düşebiliyor. Sabit bir süre yerine
+  // animasyonun gerçek bitişini beklemek gerekir; yavaş cihazda 500ms yetmez.
+  const [blurReady, setBlurReady] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setBlurReady(false);
+      Animated.parallel([
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          damping: 22,
+          stiffness: 180,
+          mass: 0.9,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 280,
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (finished) setBlurReady(true);
+      });
+    } else {
+      setBlurReady(false);
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: sheetHRef.current,
+          duration: 260,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const handleClose = useCallback(() => {
+    setBlurReady(false);
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: sheetHRef.current,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onClose());
+  }, [onClose]);
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      {/* ── Karartma overlay ── */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.backdrop, { opacity: backdropOpacity }]}
+      >
+        <ModalBlurBackdrop intensity={28} />
+        {/* Alt gradient — sheet'e doğru koyulaşır */}
+        <LinearGradient
+          colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.82)"]}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+
+      {/* Backdrop'a dokununca kapat */}
+      <TouchableOpacity
+        style={styles.backdropTouchable}
+        activeOpacity={1}
+        onPress={handleClose}
+      />
+
+      {/* ── Bottom Sheet ──
+          İKİ AYRI Animated.View ŞART: transform (native driver) ve height
+          (native driver DESTEKLEMİYOR — JS driver) aynı düğümde birleşirse
+          RN "Style property 'height' is not supported by native animated
+          module" hatası atıyor. Dış katman yalnız kaymayı (native) taşır,
+          iç katman yalnız yüksekliği (JS) — birbirlerinden bağımsız düğümler. */}
+      <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
+      <Animated.View
+        onLayout={(e) => {
+          sheetHRef.current = e.nativeEvent.layout.height;
+        }}
+        style={[
+          styles.sheet,
+          {
+            height: heightAnim,
+            backgroundColor: theme.secondary,
+          },
+        ]}
+      >
+        {/* Üst kenar glow şeridi */}
+        <View
+          style={[styles.sheetTopGlow, { backgroundColor: theme.accent }]}
+        />
+
+        {/* Tutamaç */}
+        <View style={styles.handleWrapper}>
+          <View style={[styles.handle, { backgroundColor: theme.border }]} />
+        </View>
+
+        {/* ── Header ── */}
+        <View style={styles.header}>
+          {/* Film küçük kartı */}
+          <View
+            style={[
+              styles.moviePill,
+              {
+                backgroundColor: theme.between,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            {details?.poster_path ? (
+              <Image
+                source={{
+                  uri: getTmdbUrl(details.poster_path, 'poster', 200),
+                }}
+                style={styles.moviePillPoster}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.moviePillPosterPlaceholder,
+                  { backgroundColor: theme.secondary },
+                ]}
+              >
+                <Ionicons
+                  name="film-outline"
+                  size={14}
+                  color={theme.text.muted}
+                />
+              </View>
+            )}
+            <View style={styles.moviePillTextGroup}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.moviePillTitle, { color: theme.text.primary }]}
+                numberOfLines={1}
+              >
+                {details?.title ||
+                  details?.name ||
+                  (collectionName === "TvComment"
+                    ? i18nText("autoI18n.dizi", "Dizi")
+                    : i18nText("autoI18n.film", "Film"))}
+              </Text>
+              {subtitle ? (
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.moviePillSubtitle, { color: theme.accent }]}
+                  numberOfLines={1}
+                >
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
+            {details?.vote_average > 0 && (
+              <View style={styles.moviePillRating}>
+                <Ionicons name="star" size={9} color="#FFD54F" />
+                <Text
+                  allowFontScaling={false}
+                  style={styles.moviePillRatingText}
+                >
+                  {details.vote_average.toFixed(1)}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Sağ: Başlık + kapat */}
+          <View style={styles.headerRight}>
+            <View style={styles.headerTitleGroup}>
+              <MaterialCommunityIcons
+                name="comment-text-multiple-outline"
+                size={18}
+                color={theme.text.secondary}
+              />
+              <Text
+                allowFontScaling={false}
+                style={[styles.headerTitle, { color: theme.text.primary }]}
+              >
+                {i18nText("comments", "Yorumlar")}
+              </Text>
+            </View>
+            <GlassCloseButton
+              size={32}
+              fallbackRadius={16}
+              color={theme.text.primary}
+              backgroundColor={theme.between}
+              borderColor={theme.border}
+              hitSlop={10}
+              onPress={handleClose}
+            />
+          </View>
+        </View>
+
+        {/* İnce ayırıcı */}
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+        {/* ── Comment bileşeni ── */}
+        <View style={styles.commentArea}>
+          <Comment
+            contextId={movieId}
+            collectionName={collectionName}
+            tmdbReviews={details?.reviews?.results || []}
+            mediaTitle={details?.title || details?.name || ""}
+            mediaPoster={
+              details?.poster_path
+                ? getTmdbUrl(details.poster_path, "poster", 300)
+                : null
+            }
+            seasons={seasons ?? details?.seasons ?? null}
+            initialScope={initialScope}
+            onCommentCountChange={setCommentCount}
+            blurReady={blurReady}
+          />
+        </View>
+      </Animated.View>
+      </Animated.View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+
+  // Backdrop
+  backdrop: {
+    ...StyleSheet.absoluteFill,
+  },
+  // Sheet yüksekliği değişken olduğu için kapatma alanı tüm ekranı kaplıyor;
+  // sheet SONRA render edildiğinden (ve elevation'ı olduğundan) dokunuşları
+  // kendisi yakalar, buraya yalnız dışındaki boşluk kalır.
+  backdropTouchable: {
+    ...StyleSheet.absoluteFill,
+  },
+
+  // ── Sheet ──────────────────────────────────────────────
+  // height artık sabit değil: useAdaptiveSheetHeight'ın Animated değeri
+  // (bkz. JSX'teki inline `height: heightAnim`) burada SHEET_MIN_H/MAX_H
+  // arasında canlı olarak veriliyor.
+  sheet: {
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    overflow: "hidden",
+    // iOS gölge
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.55,
+    shadowRadius: 24,
+    elevation: 28,
+  },
+
+  // Üst kenar mor ışıltı
+  sheetTopGlow: {
+    position: "absolute",
+    top: 0,
+    left: "15%",
+    right: "15%",
+    height: 1.5,
+    opacity: 0.7,
+    borderRadius: 1,
+  },
+
+  // Tutamaç
+  handleWrapper: {
+    alignItems: "center",
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+
+  // ── Header ──────────────────────────────────────────────
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+    gap: 10,
+  },
+
+  // Film bilgi pill (sol)
+  moviePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    gap: 6,
+    flex: 1,
+    maxWidth: SCREEN_W * 0.5,
+  },
+  moviePillPoster: {
+    width: 26,
+    height: 39,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
+  moviePillPosterPlaceholder: {
+    width: 26,
+    height: 39,
+    borderRadius: 5,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  moviePillTextGroup: { flex: 1, minWidth: 0 },
+  moviePillTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 0.1,
+  },
+  // Sezon/bölüm ekranından açıldığında hangi kısımda olunduğunu gösterir.
+  moviePillSubtitle: {
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  moviePillRating: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  moviePillRatingText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#ffad4fff",
+  },
+
+  // Sağ grup
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  headerTitleGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+
+  // Ayırıcı
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    marginHorizontal: 0,
+  },
+
+  // Comment alanı — flex:1 DEĞİL: sheet'in yüksekliği içerikten geldiği için
+  // flex-basis 0 alanı sıfıra çökertirdi. Bunun yerine flexBasis "auto"
+  // kalıyor: içerik kadar yer kaplıyor, üst sınıra dayanınca kısalıp içeride
+  // kaydırılıyor (shrink), alt sınır bağladığında da boşluğu doldurup girdi
+  // kutusunu sheet'in dibinde tutuyor (grow).
+  commentArea: {
+    flexGrow: 1,
+    flexShrink: 1,
+  },
+});

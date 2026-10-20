@@ -1,0 +1,206 @@
+// utils/analyticsEvents.js
+//
+// Analytics olay sözlüğü ve GA4/Firebase kısıtlarının SAF doğrulaması.
+// RN/Firebase importu YOK — jest yalnız saf modülleri çalıştırabiliyor.
+//
+// NEDEN DOĞRULAMA KATMANI: Firebase Analytics geçersiz olay/parametre adını
+// SESSİZCE atar. Konsolda 3 gün veri beklerken olayın hiç gitmediğini fark
+// etmek, yayın sonrası en pahalı zaman kaybı. Ad ve parametreler gönderilmeden
+// önce burada normalize edilir; düzeltilemeyecek kadar bozuksa __DEV__'de
+// gürültü çıkarıp olay düşürülür.
+//
+// Kaynak kısıtlar (Firebase Analytics):
+//   olay adı        : 1-40 karakter, harfle başlar, [A-Za-z0-9_]
+//   parametre adı   : aynı kural
+//   metin değer     : en fazla 100 karakter
+//   parametre sayısı: olay başına en fazla 25
+//   kullanıcı özelliği: ad ≤ 24, değer ≤ 36 karakter
+
+export const EVENT_NAME_MAX = 40;
+export const PARAM_NAME_MAX = 40;
+export const PARAM_VALUE_MAX = 100;
+export const PARAM_COUNT_MAX = 25;
+export const USER_PROPERTY_NAME_MAX = 24;
+export const USER_PROPERTY_VALUE_MAX = 36;
+
+// Firebase'in kendi kullanımına ayırdığı önekler.
+const RESERVED_PREFIXES = ["firebase_", "google_", "ga_"];
+
+// Firebase'in otomatik topladığı, uygulamanın gönderemeyeceği olay adları.
+const RESERVED_EVENT_NAMES = new Set([
+  "ad_activeview", "ad_click", "ad_exposure", "ad_impression", "ad_query",
+  "ad_reward", "adunit_exposure", "app_background", "app_clear_data",
+  "app_exception", "app_remove", "app_store_refund",
+  "app_store_subscription_cancel", "app_store_subscription_convert",
+  "app_store_subscription_renew", "app_update", "app_upgrade",
+  "dynamic_link_app_open", "dynamic_link_app_update",
+  "dynamic_link_first_open", "error", "first_open", "first_visit",
+  "in_app_purchase", "notification_dismiss", "notification_foreground",
+  "notification_open", "notification_receive", "os_update", "session_start",
+  "session_start_with_rollout", "user_engagement",
+]);
+
+const NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
+
+/**
+ * Yol haritası (Faz 1 Hafta 4) temel olay seti.
+ *
+ * İki isim GA4'ün ÖNERİLEN adıyla gönderiliyor (`sign_up`, `purchase`):
+ * bu adlar konsolda hazır huni/gelir raporlarına düşer, kendi adımızı
+ * uydurursak o raporlar boş kalır.
+ */
+export const ANALYTICS_EVENTS = {
+  SIGNUP: "sign_up",
+  ONBOARDING_STARTED: "onboarding_started",
+  ONBOARDING_STEP_VIEWED: "onboarding_step_viewed",
+  ONBOARDING_LANGUAGE_SELECTED: "onboarding_language_selected",
+  ONBOARDING_SKIPPED: "onboarding_skipped",
+  ONBOARDING_COMPLETED: "onboarding_completed",
+  FIRST_CONTENT_TRACKED: "first_content_tracked",
+  CONTENT_TRACKED: "content_tracked",
+  UP_NEXT_VIEWED: "up_next_viewed",
+  UP_NEXT_COMPLETED: "up_next_completed",
+  POST_CREATED: "post_created",
+  // Liste paylaşımı iki yönlü ölçülür: kaç paylaşım profildeki bir listeden
+  // doğdu ve paylaşılan listeler kaç kez kopyalandı.
+  LIST_SHARED_FROM_PROFILE: "list_shared_from_profile",
+  SHARED_LIST_SAVED: "shared_list_saved",
+  GAME_PLAYED: "game_played",
+  AI_MESSAGE: "ai_message",
+  PAYWALL_VIEW: "paywall_view",
+  TRIAL_START: "trial_start",
+  PURCHASE: "purchase",
+  // Premium kapısına takılma (limit dolu / Premium'a özel). `feature` hangi
+  // kapı olduğunu söyler; paywall_view.source ile birlikte kapı başına
+  // dönüşüm oranı çıkar (utils/premiumFeatures.js).
+  PREMIUM_GATE_HIT: "premium_gate_hit",
+  // Yükseltme sayfasında verilen karar: `action` = "upgrade" (ödeme ekranına
+  // geçti) | "dismiss" (vazgeçti). premium_gate_hit ile birlikte kapı başına
+  // sayfa dönüşümü, paywall_view.source ile birlikte nihai dönüşüm çıkar.
+  PREMIUM_UPSELL_ACTION: "premium_upsell_action",
+  // "Dört favori" (profilde film/dizi/oyuncu vitrini): Profili Düzenle'den
+  // kaydedilen seçim sayıları. Tanıtımdaki benimsenme ayrıca
+  // onboarding_completed.favorites_count'ta.
+  FOUR_FAVORITES_SAVED: "four_favorites_saved",
+  // Film/Dizi sekmesindeki "Favorilerine Göre" rayından bir içeriğin açılması.
+  // Önerilerin işe yarayıp yaramadığını söyleyen tek sinyal.
+  FAVORITES_REC_OPENED: "favorites_rec_opened",
+  // Uygulama içi geri bildirim gönderildi (Ayarlar > Destek ve geri bildirim).
+  // `kind` = "bug" | "feature", `category` listeden. Metin ASLA gönderilmez.
+  FEEDBACK_SUBMITTED: "feedback_submitted",
+  // "Ne izlesem?" (Filtreli Keşif, screens/shared/DiscoverFiltersScreen.js): bir süzgeç UYGULANDI.
+  // `source` = "preset" (ekrandaki hazır çip) | "saved" (kayıtlı süzgeç) | "manual" (filtre sayfası);
+  // `filter_count` etkin süzgeç sayısı. Özelliğin benimsenmesini ve hangi kapıdan girildiğini söyler.
+  DISCOVER_FILTER_APPLIED: "discover_filter_applied",
+  // "Şaşırt beni" sonucu: `outcome` = "opened" | "none" | "error".
+  DISCOVER_SURPRISE: "discover_surprise",
+  // İzleme listesindeki "Ne izlesem?" seçici (components/lists/WatchPickerSheet.js): bir seçim YAPILDI.
+  // `media_type` = "mixed" | "movie" | "tv", `pool_size` havuzdaki yapım sayısı, `reroll` ilk seçimden sonraki
+  // her yeni seçimde true. Özelliğin kullanımını ve "başka biri" oranını (seçimin işe yarayıp yaramadığını) söyler.
+  WATCH_PICK_ROLLED: "watch_pick_rolled",
+  // Seçilen yapımın detayına GİDİLDİ: `media_type`, `rerolls` (kaç kez "başka biri" denendi). rolled'a oranı
+  // seçicinin dönüşüm oranıdır.
+  WATCH_PICK_OPENED: "watch_pick_opened",
+  // Yıllık izleme hedefi (profildeki halka, utils/yearlyGoal.js): hedef KONDU / DEĞİŞTİ /
+  // KALDIRILDI. `action` = "set" | "changed" | "cleared", `unit` = "all" | "movie" | "tv",
+  // `target` hedef sayısı. Özelliğin benimsenmesini ve hangi birimin seçildiğini söyler.
+  YEARLY_GOAL: "yearly_goal",
+  // Oyuncu / yönetmen takibi (utils/followedPeople.js): kişi TAKİBE ALINDI / BIRAKILDI.
+  // `action` = "follow" | "unfollow", `source` = "profile" (kişi sayfası) | "sheet" (takip
+  // listesi), `department` TMDB bölümü ("Acting" | "Directing" | …). İsim/kimlik GÖNDERİLMEZ.
+  PERSON_FOLLOW: "person_follow",
+  // İzleme listesinde "Platformlarımda" süzgeci AÇILDI (utils/providerWatch.js). `yes` platformlarında
+  // izlenebilen, `unknown` sunucunun henüz taramadığı, `total` listedeki başlık sayısı. Süzgecin
+  // benimsenmesini ve kapsamın (unknown oranı) yeterli olup olmadığını söyler.
+  WATCHLIST_PLATFORM_FILTER: "watchlist_platform_filter",
+  // Arkadaş profilinden "Birlikte izleyelim" odası BAŞLATILDI (components/friends/TasteMatchCard). `candidates`
+  // odaya giren aday sayısı, `both` iki listede de olanlar, `score` zevk uyumu (-1: hesaplanamadı). İsim/kimlik YOK.
+  TOGETHER_ROOM_STARTED: "together_room_started",
+  // Oda gerçekten kuruldu ve davet sohbete gönderildi (CineSwipeScreen). Başlatılanla farkı = kota / hata kaybı.
+  TOGETHER_ROOM_INVITED: "together_room_invited",
+  // Film/Dizi sekmesindeki "Takip ettiklerinin yaklaşanları" rafından bir yapımın açılması.
+  // Rafın işe yarayıp yaramadığını söyleyen tek sinyal. `media_type` = "movie" | "tv".
+  FOLLOWED_UPCOMING_OPENED: "followed_upcoming_opened",
+  // Arkadaş daveti (screens/tabs/settings/ReferralScreen). `action` = "share" | "copy" (kod paylaşıldı /
+  // kopyalandı) | "claim" (kazanılan ücretsiz ay başlatıldı). Kod/isim GÖNDERİLMEZ.
+  REFERRAL_ACTION: "referral_action",
+  // "Kodun var mı?" sayfasında kod denendi. `outcome` = "promo" | "referral" | red gerekçesi
+  // (örn. "code-exhausted"). Davet hunisinin (paylaş → kod girildi → abone oldu) ortasını ölçer.
+  CODE_REDEEM: "code_redeem",
+};
+
+/** Ölçüm hunisinde kullanılan kullanıcı özellikleri. */
+export const USER_PROPERTIES = {
+  PREMIUM_TIER: "premium_tier", // "free" | "pro" | "unlimited"
+  DEVICE_TIER: "device_tier",   // utils/deviceTier.js sınıfı
+  APP_LANGUAGE: "app_language", // uygulama dil kodu: "tr" | "en" | "es" | "pt" …
+};
+
+export function isValidEventName(name) {
+  if (typeof name !== "string") return false;
+  if (name.length === 0 || name.length > EVENT_NAME_MAX) return false;
+  if (!NAME_PATTERN.test(name)) return false;
+  if (RESERVED_EVENT_NAMES.has(name)) return false;
+  return !RESERVED_PREFIXES.some((prefix) => name.startsWith(prefix));
+}
+
+export function isValidParamName(name) {
+  if (typeof name !== "string") return false;
+  if (name.length === 0 || name.length > PARAM_NAME_MAX) return false;
+  if (!NAME_PATTERN.test(name)) return false;
+  return !RESERVED_PREFIXES.some((prefix) => name.startsWith(prefix));
+}
+
+/**
+ * Parametreleri Firebase'in kabul ettiği biçime indirger:
+ *  - null/undefined ve geçersiz adlar düşer
+ *  - boolean → 1/0 (Firebase boolean kabul etmez)
+ *  - metin → 100 karaktere kırpılır
+ *  - sonlu olmayan sayı (NaN/Infinity) düşer
+ *  - 25 parametreden sonrası düşer
+ */
+export function sanitizeParams(params) {
+  if (!params || typeof params !== "object") return {};
+  const clean = {};
+  let count = 0;
+
+  for (const [key, raw] of Object.entries(params)) {
+    if (count >= PARAM_COUNT_MAX) break;
+    if (!isValidParamName(key)) continue;
+    if (raw === null || raw === undefined) continue;
+
+    let value;
+    if (typeof raw === "boolean") value = raw ? 1 : 0;
+    else if (typeof raw === "number") {
+      if (!Number.isFinite(raw)) continue;
+      value = raw;
+    } else if (typeof raw === "string") {
+      if (raw.length === 0) continue;
+      value = raw.slice(0, PARAM_VALUE_MAX);
+    } else continue; // dizi/nesne desteklenmiyor
+
+    clean[key] = value;
+    count += 1;
+  }
+
+  return clean;
+}
+
+/**
+ * Gönderilmeye hazır olayı üretir. Ad geçersizse `null` döner — çağıran
+ * taraf olayı düşürür (bkz. services/analytics.js).
+ */
+export function buildEvent(name, params) {
+  if (!isValidEventName(name)) return null;
+  return { name, params: sanitizeParams(params) };
+}
+
+/** Kullanıcı özelliği değerini sınırlara indirger; geçersizse null. */
+export function sanitizeUserProperty(name, value) {
+  if (typeof name !== "string" || name.length === 0) return null;
+  if (name.length > USER_PROPERTY_NAME_MAX || !NAME_PATTERN.test(name)) return null;
+  if (value === null || value === undefined) return { name, value: null }; // temizleme
+  const text = String(value);
+  if (text.length === 0) return { name, value: null };
+  return { name, value: text.slice(0, USER_PROPERTY_VALUE_MAX) };
+}

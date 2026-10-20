@@ -1,380 +1,329 @@
-import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  Image,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-} from "react-native";
+// screens/tabs/profile/FriendsListScreen.js
+//
+// Arkadaş listesi: A–Z sıralı, harf bölümlü grup kartları; uzun listede süzme
+// kutusu. Satır → profil; satırdaki "mesaj" hızlı eylemi + "⋯" menüsü (mesaj /
+// profil / arkadaşlıktan çıkar). Silme onayı alttan açılan ortak ConfirmSheet.
+//
+// Görünüm components/friends/* ortak bileşenlerinden gelir; burada Firestore
+// aboneliği, silme ve gezinme davranışı var.
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { SectionList, StyleSheet } from "react-native";
 import {
   doc,
   getDoc,
+  collection,
   onSnapshot,
   updateDoc,
+  deleteDoc,
   arrayRemove,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { db } from "../../../firebase";
-import { useProfileScreen } from "../../../context/ProfileScreenContext";
-import { useTheme } from "../../../context/ThemeContext";
-import SwipeCard from "../../../modules/SwipeCard";
-import Toast from "react-native-toast-message";
-import { useLanguage } from "../../../context/LanguageContext";
-import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import IconBacground from "../../../components/IconBacground";
+import Toast from "@components/AppToast";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAppSettings } from "../../../context/AppSettingsContext";
+import { db } from "../../../firebase";
+import { useTheme } from "../../../context/ThemeContext";
+import { useLanguage } from "../../../context/LanguageContext";
+import ScreenDecor from "../../../components/ScreenDecor";
+import ConfirmSheet from "../../../components/common/ConfirmSheet";
+import FriendsScreenHeader from "../../../components/friends/FriendsScreenHeader";
+import FriendsSearchField from "../../../components/friends/FriendsSearchField";
+import FriendsEmptyState from "../../../components/friends/FriendsEmptyState";
+import FriendActionSheet from "../../../components/friends/FriendActionSheet";
+import PersonRow, { FriendsSectionLabel } from "../../../components/friends/PersonRow";
+import RoundIconButton from "../../../components/friends/RoundIconButton";
+import {
+  FILTER_MIN_ITEMS,
+  groupPeopleByInitial,
+  personMatchesQuery,
+  shouldShowFilter,
+  sortPeopleByName,
+} from "../../../utils/friendsListModel";
+import { i18nText } from "../../../utils/i18nText";
 
-const LIST_META = {
-  watchedMovies: { icon: "movie-outline", iconLib: "mci", color: "#29b864", label: "İzlenen Filmler" },
-  watchedTv:     { icon: "tv",           iconLib: "feather", color: "#29b864", label: "İzlenen Diziler" },
-  favorites:     { icon: "heart",        iconLib: "ion",  color: "#e33",     label: "Favoriler" },
-  watchList:     { icon: "bookmark",     iconLib: "ion",  color: "#64b4ff",  label: "İzlenecekler" },
-};
-
-const ListIcon = ({ name, iconLib, color, size = 14 }) => {
-  if (iconLib === "mci") return <MaterialCommunityIcons name={name} size={size} color={color} />;
-  if (iconLib === "feather") return <Feather name={name} size={size} color={color} />;
-  return <Ionicons name={name} size={size} color={color} />;
-};
-
-const protectedLists = ["watchedTv", "watchedMovies", "watchList", "favorites"];
+// ConfirmSheet'i, menü sayfasının kapanış animasyonu (≈260 ms) BİTTİKTEN sonra
+// aç: iki Modal üst üste açılıp kapanırsa iOS ikincisini hiç göstermeyebilir.
+const MENU_EXIT_MS = 320;
 
 export default function FriendsListScreen({ navigation }) {
   const [friends, setFriends] = useState([]);
-  const [selectedFriend, setSelectedFriend] = useState(null);
-  const [friendLists, setFriendLists] = useState([]);
+  const [query, setQuery] = useState("");
+  // Menüde SON seçilen arkadaş kapanışta sıfırlanmaz (bkz. FriendActionSheet):
+  // sayfa ≈260 ms daha çizilir, içerik boşalıp zıplamasın.
+  const [menuFriend, setMenuFriend] = useState(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const confirmTimerRef = useRef(null);
 
   const auth = getAuth();
   const user = auth.currentUser;
-  const { avatars, gridStyle } = useProfileScreen();
-  const { imageQuality } = useAppSettings();
   const { theme } = useTheme();
-  useLanguage();
+  const { language } = useLanguage();
 
-  const titleAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(titleAnim, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+  useEffect(() => () => clearTimeout(confirmTimerRef.current), []);
 
   useEffect(() => {
     if (!user) return;
-    const userRef = doc(db, "Users", user.uid);
-    const unsubscribe = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) setFriends(docSnap.data().friends || []);
-    });
-    return () => unsubscribe();
-  }, [user]);
+    let legacyUnsub = null;
 
-  useEffect(() => {
-    if (!selectedFriend) { setFriendLists([]); return; }
-    const userRef = doc(db, "Users", selectedFriend.uid);
-    const unsubscribeUser = onSnapshot(userRef, (userSnap) => {
-      if (!userSnap.exists()) return;
-      const listVisible = userSnap.data().listVisible || [];
-      const visibleListNames = listVisible
-        .filter((m) => Object.values(m)[0] === true)
-        .map((m) => Object.keys(m)[0]);
-      const listsRef = doc(db, "Lists", selectedFriend.uid);
-      const unsubscribeLists = onSnapshot(listsRef, (listsSnap) => {
-        if (!listsSnap.exists()) { setFriendLists([]); return; }
-        const all = Object.entries(listsSnap.data() || {});
-        setFriendLists(all.filter(([name]) => visibleListNames.includes(name)));
-      });
-      return () => unsubscribeLists();
-    });
-    return () => unsubscribeUser();
-  }, [selectedFriend]);
+    const unsubSub = onSnapshot(
+      collection(db, "Users", user.uid, "friends"),
+      (snap) => {
+        if (!snap.empty) {
+          if (legacyUnsub) { legacyUnsub(); legacyUnsub = null; }
+          setFriends(
+            snap.docs.map((d) => {
+              const data = d.data();
+              return {
+                uid: data.friendUid || d.id,
+                displayName: data.friendName || "",
+                username: data.friendUsername || "",
+                avatarIndex: data.friendAvatarIndex ?? 0,
+                photoURL: data.friendPhotoURL || data.photoURL || null,
+              };
+            }),
+          );
+        } else if (!legacyUnsub) {
+          legacyUnsub = onSnapshot(doc(db, "Users", user.uid), (docSnap) => {
+            if (docSnap.exists()) setFriends(docSnap.data().friends || []);
+          });
+        }
+      }
+    );
+
+    return () => {
+      unsubSub();
+      if (legacyUnsub) legacyUnsub();
+    };
+  }, [user]);
 
   const handleDelete = async (friend) => {
     try {
-      const userRef = doc(db, "Users", user.uid);
-      const friendRef = doc(db, "Users", friend.uid);
-      const [userSnap, friendSnap] = await Promise.all([getDoc(userRef), getDoc(friendRef)]);
-      if (!userSnap.exists() || !friendSnap.exists()) return;
-      Toast.show({ type: "success", text1: `${friend.displayName} arkadaş listenizden silindi` });
-      await updateDoc(userRef, { friends: arrayRemove(friend) });
-      const currentUserInFriend = friendSnap.data().friends?.find((f) => f.uid === user.uid);
-      if (currentUserInFriend) await updateDoc(friendRef, { friends: arrayRemove(currentUserInFriend) });
+      // Subcollection sil
+      await Promise.all([
+        deleteDoc(doc(db, "Users", user.uid,   "friends", friend.uid)),
+        deleteDoc(doc(db, "Users", friend.uid, "friends", user.uid)),
+      ]);
+      // Eski format root-doc array'i de temizle (varsa)
+      const [userSnap, friendSnap] = await Promise.all([
+        getDoc(doc(db, "Users", user.uid)),
+        getDoc(doc(db, "Users", friend.uid)),
+      ]);
+      const legacyUserFriends   = userSnap.data()?.friends || [];
+      const legacyFriendFriends = friendSnap.data()?.friends || [];
+      const userEntry   = legacyUserFriends.find((f) => f.uid === friend.uid);
+      const friendEntry = legacyFriendFriends.find((f) => f.uid === user.uid);
+      const updates = [];
+      if (userEntry)   updates.push(updateDoc(doc(db, "Users", user.uid),   { friends: arrayRemove(userEntry) }));
+      if (friendEntry) updates.push(updateDoc(doc(db, "Users", friend.uid), { friends: arrayRemove(friendEntry) }));
+      if (updates.length) await Promise.all(updates);
+      // Başarı toast'ı silme GERÇEKTEN bittikten sonra. Eskiden en başta
+      // gösteriliyordu; izin/ağ hatasında kullanıcı hem "silindi" hem
+      // "başarısız" bildirimini arka arkaya görüyordu.
+      Toast.show({
+        type: "success",
+        text1: i18nText("autoI18n.friend_removed_named", "{{name}} arkadaş listenizden silindi", { name: friend.displayName }),
+      });
     } catch (error) {
-      console.error("Arkadaş silme hatası:", error);
-      Toast.show({ type: "error", text1: "Silme işlemi başarısız", text2: error.message });
+      console.error(i18nText("autoI18n.arkadas_silme_hatasi", "Arkadaş silme hatası:"), error);
+      Toast.show({ type: "error", text1: i18nText("autoI18n.silme_islemi_basarisiz", "Silme işlemi başarısız"), text2: error.message });
     }
   };
 
-  const handleSendMessage = (friend) => {
-    navigation.navigate("ChatScreen", { friendUid: friend.uid, friendName: friend.displayName });
+  const openMenu = (friend) => {
+    setMenuFriend(friend);
+    setMenuVisible(true);
   };
 
-  const sortedLists = (lists) => [
-    ...protectedLists.map((n) => lists.find(([ln]) => ln === n)).filter(Boolean),
-    ...lists.filter(([ln]) => !protectedLists.includes(ln)).sort((a, b) => a[0].localeCompare(b[0])),
-  ];
+  const openChat = (friend) =>
+    navigation.navigate("ChatScreen", {
+      friendUid: friend.uid,
+      friendName: friend.displayName,
+      friendAvatarIndex: friend.avatarIndex,
+    });
 
-  const renderFriend = ({ item }) => {
-    const isExpanded = selectedFriend?.uid === item.uid;
-    return (
-      <SwipeCard
-        leftButton={{ label: "Sil", color: "#e53935", onPress: () => handleDelete(item) }}
-        rightButton={{ label: "Mesaj", color: "#5aacf0", onPress: () => handleSendMessage(item) }}
-      >
-        {/* Arkadaş satırı */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setSelectedFriend(isExpanded ? null : item)}
-          style={[styles.friendCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-        >
-          <View style={[styles.avatarWrapper, { borderColor: theme.accent + "66" }]}>
-            {avatars?.[item.avatarIndex] ? (
-              <Image source={avatars[item.avatarIndex]} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary }]}>
-                <Ionicons name="person" size={22} color={theme.text?.muted ?? "#555"} />
-              </View>
-            )}
-          </View>
-          <View style={styles.friendInfo}>
-            <Text style={[styles.friendName, { color: theme.text?.primary ?? "#fff" }]} numberOfLines={1}>
-              {item.displayName}
-            </Text>
-            <Text style={[styles.friendUsername, { color: theme.text?.secondary ?? "#aaa" }]} numberOfLines={1}>
-              @{item.username}
-            </Text>
-          </View>
-          <Ionicons
-            name={isExpanded ? "chevron-up" : "chevron-down"}
-            size={18}
-            color={theme.text?.muted ?? "#555"}
+  const openProfile = (friend) =>
+    navigation.navigate("FriendProfileScreen", {
+      friendUid: friend.uid,
+      friendName: friend.displayName,
+    });
+
+  const handleMenuMessage = () => {
+    setMenuVisible(false);
+    if (menuFriend) openChat(menuFriend);
+  };
+  const handleMenuProfile = () => {
+    setMenuVisible(false);
+    if (menuFriend) openProfile(menuFriend);
+  };
+  const handleMenuRemove = () => {
+    setMenuVisible(false);
+    clearTimeout(confirmTimerRef.current);
+    confirmTimerRef.current = setTimeout(() => setConfirmVisible(true), MENU_EXIT_MS);
+  };
+
+  const confirmRemove = async () => {
+    if (!menuFriend || removing) return;
+    setRemoving(true);
+    try {
+      await handleDelete(menuFriend);
+    } finally {
+      setRemoving(false);
+      setConfirmVisible(false);
+    }
+  };
+
+  const showFilter = shouldShowFilter(friends.length);
+  // Harf başlıkları yalnız uzun listede: 3 arkadaşa "A, B, C" başlığı gürültü.
+  const showLetters = friends.length >= FILTER_MIN_ITEMS;
+
+  const sections = useMemo(() => {
+    const matching = friends.filter((f) => personMatchesQuery(f, query));
+    return showLetters
+      ? groupPeopleByInitial(matching, language)
+      : matching.length
+        ? [{ key: "", data: sortPeopleByName(matching, language) }]
+        : [];
+  }, [friends, query, language, showLetters]);
+
+  const matchCount = sections.reduce((sum, s) => sum + s.data.length, 0);
+
+  const renderFriend = ({ item, index, section }) => (
+    <PersonRow
+      avatar={{ avatarIndex: item.avatarIndex, photoURL: item.photoURL, isCustomPhoto: true }}
+      title={item.displayName}
+      subtitle={item.username ? `@${item.username}` : undefined}
+      onPress={() => openProfile(item)}
+      first={index === 0}
+      last={index === section.data.length - 1}
+      trailing={
+        <>
+          <RoundIconButton
+            icon="chatbubble-ellipses"
+            accessibilityLabel={i18nText("autoI18n.friends_ui_send_message", "Mesaj gönder")}
+            onPress={() => openChat(item)}
           />
-        </TouchableOpacity>
+          <RoundIconButton
+            icon="ellipsis-horizontal"
+            variant="ghost"
+            accessibilityLabel={i18nText("autoI18n.friends_ui_more_options", "Diğer seçenekler")}
+            onPress={() => openMenu(item)}
+          />
+        </>
+      }
+    />
+  );
 
-        {/* Açılır liste kartları */}
-        {isExpanded && (
-          <View style={styles.listsSection}>
-            {friendLists.length === 0 ? (
-              <Text style={[styles.noListsText, { color: theme.text?.muted ?? "#666" }]}>
-                Paylaşılan liste yok
-              </Text>
-            ) : (
-              <FlatList
-                horizontal
-                data={sortedLists(friendLists)}
-                keyExtractor={([listName]) => listName}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.listCardsRow}
-                renderItem={({ item: listItem }) => {
-                  const [listName, items] = listItem;
-                  const meta = LIST_META[listName];
-                  const cols = gridStyle ? 2 : 4;
-                  const imgW = gridStyle ? 52 : 36;
-                  const imgH = gridStyle ? 78 : 54;
+  const goSearch = () => navigation.navigate("SearchFriendsScreen");
 
-                  return (
-                    <TouchableOpacity
-                      activeOpacity={0.85}
-                      style={[styles.listCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
-                    >
-                      {/* Poster grid */}
-                      <View style={styles.posterGrid}>
-                        {Array.from({ length: cols }).map((_, idx) => {
-                          const ci = items?.[idx];
-                          return ci?.imagePath ? (
-                            <Image
-                              key={idx}
-                              source={{ uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${ci.imagePath}` }}
-                              style={[
-                                styles.posterImg,
-                                { width: imgW, height: imgH },
-                                idx === 0 && styles.roundLeft,
-                                idx === cols - 1 && styles.roundRight,
-                              ]}
-                            />
-                          ) : (
-                            <View
-                              key={idx}
-                              style={[
-                                styles.posterPlaceholder,
-                                { width: imgW, height: imgH, backgroundColor: theme.primary },
-                                idx === 0 && styles.roundLeft,
-                                idx === cols - 1 && styles.roundRight,
-                              ]}
-                            />
-                          );
-                        })}
-                      </View>
-
-                      {/* Liste etiketi */}
-                      <View style={styles.listLabel}>
-                        {meta ? (
-                          <ListIcon name={meta.icon} iconLib={meta.iconLib} color={meta.color} />
-                        ) : (
-                          <Ionicons name="grid" size={13} color={theme.colors?.orange ?? "#ff6400"} />
-                        )}
-                        <Text
-                          style={[styles.listLabelText, { color: theme.text?.primary ?? "#fff" }]}
-                          numberOfLines={1}
-                        >
-                          {meta?.label ?? listName}
-                        </Text>
-                        <Text style={[styles.listCount, { color: theme.text?.muted ?? "#666" }]}>
-                          {items?.length ?? 0}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                }}
-              />
-            )}
-          </View>
+  let empty = null;
+  if (friends.length === 0) {
+    empty = (
+      <FriendsEmptyState
+        icon="people"
+        title={i18nText("autoI18n.henuz_hic_arkadasin_yok", "Henüz hiç arkadaşın yok")}
+        description={i18nText(
+          "autoI18n.friends_ui_no_friends_desc",
+          "Kullanıcı adıyla arayıp istek gönder; kabul edilince burada görünür.",
         )}
-      </SwipeCard>
+        actionLabel={i18nText("autoI18n.arkadas_ara", "Arkadaş Ara")}
+        actionIcon="search"
+        onAction={goSearch}
+      />
     );
-  };
+  } else if (matchCount === 0) {
+    empty = (
+      <FriendsEmptyState
+        icon="search"
+        title={i18nText("autoI18n.friends_ui_no_match_title", "Eşleşen kimse yok")}
+        description={i18nText(
+          "autoI18n.friends_ui_no_match_desc",
+          "“{{q}}” ile eşleşen biri bulunamadı.",
+          { q: query.trim() },
+        )}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-      <IconBacground opacity={0.3} />
+      <ScreenDecor scope="profile" iconOpacity={0.3} />
 
-      {/* Başlık + arkadaş sayısı */}
-      <Animated.View
-        style={[
-          styles.headerRow,
-          {
-            opacity: titleAnim,
-            transform: [{
-              translateY: titleAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }),
-            }],
-          },
-        ]}
-      >
-        <Text style={[styles.pageTitle, { color: theme.text?.primary ?? "#fff" }]}>
-          Arkadaşlar
-        </Text>
-        {friends.length > 0 && (
-          <View style={[styles.countBadge, { backgroundColor: theme.secondary }]}>
-            <Text style={[styles.countBadgeText, { color: theme.text?.secondary ?? "#aaa" }]}>
-              {friends.length}
-            </Text>
-          </View>
-        )}
-      </Animated.View>
+      <FriendsScreenHeader
+        title={i18nText("autoI18n.arkadaslar", "Arkadaşlar")}
+        subtitle={
+          friends.length
+            ? i18nText("autoI18n.friends_ui_friends_count", "{{n}} arkadaş", { n: friends.length })
+            : undefined
+        }
+        right={
+          <RoundIconButton
+            icon="person-add"
+            size={42}
+            accessibilityLabel={i18nText("autoI18n.arkadas_ara", "Arkadaş Ara")}
+            onPress={goSearch}
+          />
+        }
+      />
 
-      {/* Liste */}
-      {friends.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="people-outline" size={56} color={theme.text?.muted ?? "#444"} />
-          <Text style={[styles.emptyText, { color: theme.text?.secondary ?? "#aaa" }]}>
-            Henüz hiç arkadaşın yok
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={friends}
+      {showFilter ? (
+        <FriendsSearchField
+          value={query}
+          onChangeText={setQuery}
+          placeholder={i18nText("autoI18n.friends_ui_filter_friends", "Arkadaşlarında ara")}
+          returnKeyType="done"
+        />
+      ) : null}
+
+      {empty || (
+        <SectionList
+          sections={sections}
           keyExtractor={(item) => item.uid}
           renderItem={renderFriend}
+          renderSectionHeader={({ section }) =>
+            section.key ? (
+              <FriendsSectionLabel label={section.key} first={sections[0]?.key === section.key} />
+            ) : null
+          }
+          stickySectionHeadersEnabled={false}
           contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      <FriendActionSheet
+        visible={menuVisible}
+        friend={menuFriend}
+        onClose={() => setMenuVisible(false)}
+        onMessage={handleMenuMessage}
+        onProfile={handleMenuProfile}
+        onRemove={handleMenuRemove}
+      />
+
+      <ConfirmSheet
+        visible={confirmVisible}
+        onClose={() => !removing && setConfirmVisible(false)}
+        onConfirm={confirmRemove}
+        busy={removing}
+        icon="person-remove-outline"
+        tone="danger"
+        title={i18nText("autoI18n.arkadasi_sil", "Arkadaşı Sil")}
+        message={i18nText(
+          "autoI18n.arkadas_silme_onay",
+          "{{name}} arkadaş listenden silinsin mi?",
+          { name: menuFriend?.displayName || "" },
+        )}
+        confirmLabel={i18nText("autoI18n.friends_ui_remove_friend", "Arkadaşlıktan çıkar")}
+        cancelLabel={i18nText("autoI18n.vazgec", "Vazgeç")}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 10 },
-
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    marginBottom: 14,
-    marginTop: 4,
-  },
-  pageTitle: {
-    fontSize: 26,
-    fontWeight: "800",
-    textAlign: "center",
-    letterSpacing: -0.5,
-  },
-  countBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  countBadgeText: { fontSize: 14, fontWeight: "700" },
-
-  listContent: { paddingHorizontal: 16, paddingBottom: 30 },
-
-  // ── Friend card ───────────────────────────────────────────────────────────
-  friendCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 2,
-    borderWidth: 1,
-    gap: 12,
-  },
-  avatarWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
-    overflow: "hidden",
-  },
-  avatar: { width: "100%", height: "100%", borderRadius: 26 },
-  avatarPlaceholder: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  friendInfo: { flex: 1, gap: 3 },
-  friendName: { fontSize: 15, fontWeight: "700" },
-  friendUsername: { fontSize: 13 },
-
-  // ── Expanded lists ────────────────────────────────────────────────────────
-  listsSection: { marginBottom: 10 },
-  noListsText: { fontSize: 13, textAlign: "center", paddingVertical: 14 },
-  listCardsRow: { paddingHorizontal: 4, paddingVertical: 10, gap: 8 },
-
-  listCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: "hidden",
-    alignItems: "center",
-  },
-  posterGrid: { flexDirection: "row" },
-  posterImg: { resizeMode: "cover" },
-  posterPlaceholder: {},
-  roundLeft: { borderTopLeftRadius: 14, borderBottomLeftRadius: 14 },
-  roundRight: { borderTopRightRadius: 14, borderBottomRightRadius: 14 },
-
-  listLabel: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  listLabelText: { fontSize: 11, fontWeight: "600", flex: 1 },
-  listCount: { fontSize: 10 },
-
-  // ── Empty state ───────────────────────────────────────────────────────────
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 14,
-    paddingHorizontal: 32,
-  },
-  emptyText: { fontSize: 14, textAlign: "center", lineHeight: 20 },
+  listContent: { paddingBottom: 30 },
 });

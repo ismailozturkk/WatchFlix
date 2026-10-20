@@ -10,12 +10,27 @@ web-build/
 expo-env.d.ts
 
 # Native
+# Basta / ZORUNLU: ankrajsiz "android/" ve "ios/" her seviyede eslesiyordu ve
+# yerel Expo modulunun kaynagini da (modules/reminder-widget/ios/) yok sayiyordu
+# — oradaki yeni dosyalar sessizce commit disi kalirdi (expo-doctor bunu
+# "local Expo modules are gitignored" olarak raporluyor). Yalniz kok dizindeki
+# prebuild ciktisi haric tutulmali.
+/android/
+/ios/
+# Yerel Expo modullerinin Gradle derleme ciktisi (modules/<ad>/android/build/):
+# kaynak degil; EAS'a yuklenip eski ara ciktiyla karismasin.
+modules/*/android/build/
 *.orig.*
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
+credentials.json
+
+# NOT: android/ artık TAMAMEN üretilen bir dizin (CNG). Widget native kaynağı
+# native/android-widgets/ altında yaşar ve plugins/withAndroidWidgets.js her
+# prebuild'de enjekte eder. Eski seçici izleme kuralları (ve tuzakları) kalktı.
 
 # Metro
 .metro-health-check*
@@ -35,3 +50,46 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 .env
+
+# debug/build artifacts
+crash.txt
+.expo-check-export/
+
+# Claude Code worktree'leri (~50 MB). .claude/launch.json ve settings.local.json
+# bilerek izleniyor, yalnız worktrees haric tutuluyor.
+.claude/worktrees/
+
+# FCM / service account (gizli — asla commit etme)
+*-firebase-adminsdk-*.json
+
+# Firebase hosting deploy onbellegi
+.firebase/
+
+# Windows'ta "> nul" ile bastirilan cikti, bash altinda gercek bir DOSYA olur
+# (null aygiti degil). Arada bir kokte 20-30 KB'lik cop dosya birakiyor.
+nul
+
+# Rebrand oncesi ikon yedekleri — yerelde kalsin, 4,5 MB olu varlik olarak
+# gecmise girmesin. Gerceklestirilen ikonlar assets/ kokunde.
+assets/oldicon/
+assets/oldicon1/
+assets/unused-lottie/
+
+# AI Agent ve çalışma alanları
+.agent/
+.agents/
+.codex/
+
+# Firebase emulator ve genel loglar
+*.log
+firestore-debug.log
+firebase-debug.log
+database-debug.log
+ui-debug.log
+
+# AI model değerlendirme çıktıları (API yanıtları, raporlar)
+scripts/ai-eval/out/
+scripts/ai-eval/extraCases.json
+
+# Yerel Expo modullerinin Gradle onbellegi (modules/<ad>/android/.gradle/): uretilen cikti.
+modules/*/android/.gradle/

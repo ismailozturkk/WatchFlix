@@ -1,0 +1,448 @@
+// screens/tabs/settings/sectionVisibilityCopy.js
+//
+// Ayarlar > Kişiselleştirme > Ekran bölümleri'nin metinleri: yerel tr/en/es üçlüsü.
+// Anahtar eşitliği, boş değer, yer tutucu eşitliği ve "kayıttaki her bölümün üç dilde
+// adı + açıklaması var" kuralı __tests__/sectionVisibilityCopy.test.js'te bekçilenir
+// (ham kimlik ekranda görünmesin).
+//
+// Bölüm adları ekrandaki rafların/kartların GERÇEK başlıklarıyla aynıdır (kullanıcı
+// "Dünya Turu"nu listede de ekrandaki adıyla görsün). Her bölüm [ad, açıklama].
+//
+// YENİ BÖLÜM: utils/sectionVisibility.js'e ekle + üç dile [ad, açıklama] yaz.
+
+import { copyLanguage } from "../../../utils/appLanguages";
+
+const tr = {
+  ui: {
+    title: "Ekran bölümleri",
+    rowSub: "Film, dizi, Hub ve profilde hangi bölümler görünsün",
+    badgeAll: "Hepsi açık",
+    badgeHidden: "{n} gizli",
+    intro:
+      "Film, dizi, Hub ve profil ekranlarında hangi bölümlerin görüneceğini seç. Gizlediğin bölüm ekrandan kalkar; istediğin zaman buradan geri açabilirsin.",
+    visibleCount: "{shown} / {total} bölüm görünür",
+    showAll: "Tümünü göster",
+    hideAll: "Tümünü gizle",
+    linkedTag: "Ortak ayar",
+    conditionalNote:
+      "“Favorilerine göre” ve “Platform favorileri” gibi bazı raflar yalnızca ilgili veri ya da ayar varsa görünür; burada açık olmaları her zaman göründükleri anlamına gelmez.",
+    reset: "Varsayılana dön",
+    resetSub: "Tüm ekranlarda her bölüm görünsün",
+    saveFailed: "Ayar kaydedilemedi",
+    confirmTitle: "Arkadaş çubuğu gizlensin mi?",
+    confirmMessage:
+      "Arkadaş arama, arkadaş listesi, mesajlar ve istekler uygulamada yalnızca bu çubuktan açılıyor. Gizlersen bunlara buradan ulaşamazsın; istediğin zaman bu sayfadan tekrar açabilirsin.",
+    confirmHide: "Gizle",
+    confirmCancel: "Vazgeç",
+    emptyTitle: "Burada gösterilecek bölüm yok",
+    emptyText: "Bu ekrandaki tüm bölümleri gizledin. İstediklerini ayarlardan geri açabilirsin.",
+    emptyAction: "Bölümleri düzenle",
+  },
+  screens: {
+    tv: { name: "Diziler", hint: "Dizi ana ekranındaki raflar" },
+    movie: { name: "Filmler", hint: "Film ana ekranındaki raflar" },
+    hub: { name: "Hub", hint: "Hub sekmesindeki kartlar" },
+    profile: { name: "Profil", hint: "Profil sekmesindeki bölümler" },
+  },
+  sections: {
+    tv: {
+      trends: ["Trend Diziler", "Gündemdeki diziler; haftalık ve günlük kategoriler"],
+      ongoing: ["Devam Edenler", "İzlemeye başladığın diziler. Ayarlar'daki “Devam eden diziler” anahtarıyla aynı ayar"],
+      best: ["En İyi Diziler", "En çok oylanan ve en popüler diziler"],
+      followedPeople: ["Takip Ettiklerinin Yaklaşanları", "Takip ettiğin oyuncu ve yönetmenlerin yeni işleri; birini takip edince görünür"],
+      fromFavorites: ["Favorilerine Göre", "Dört favorine bakarak yapılan öneriler; favori ekleyince görünür"],
+      subscriptions: ["Platform Favorileri", "Seçtiğin platformlarda izleyebileceklerin; platform seçince görünür"],
+      topGenres: ["Favori Türlerin", "En çok izlediğin ya da başlangıçta seçtiğin türlere göre"],
+      recentFavorites: ["Yeni Beğenilenler", "Yeni ve izleyici puanı güçlü diziler"],
+      worldTour: ["Dünya Turu", "Başka dillerden diziler; Korece, Japonca, Türkçe… çipleriyle ülkeye göre keşif"],
+      emmy: ["Emmy Ödüllü Diziler", "Yıllara göre Emmy kazananları"],
+      providers: ["Sağlayıcılar", "Platformlara göre dizi keşfi"],
+      genres: ["Türler", "Türe göre dizi keşfi"],
+      onTheAir: ["Bu Hafta Yayında", "Bu hafta yeni bölümü çıkan diziler"],
+      airingToday: ["Bugün Yayında", "Bugün yeni bölümü çıkan diziler"],
+    },
+    movie: {
+      trends: ["Trend Filmler", "Gündemdeki filmler; haftalık ve günlük kategoriler"],
+      bests: ["En İyi Filmler", "En çok oylanan ve en popüler filmler"],
+      followedPeople: ["Takip Ettiklerinin Yaklaşanları", "Takip ettiğin oyuncu ve yönetmenlerin yeni işleri; birini takip edince görünür"],
+      fromFavorites: ["Favorilerine Göre", "Dört favorine bakarak yapılan öneriler; favori ekleyince görünür"],
+      subscriptions: ["Platform Favorileri", "Seçtiğin platformlarda izleyebileceklerin; platform seçince görünür"],
+      topGenres: ["Favori Türlerin", "En çok izlediğin ya da başlangıçta seçtiğin türlere göre"],
+      recentFavorites: ["Yeni Beğenilenler", "Yeni ve izleyici puanı güçlü filmler"],
+      worldTour: ["Dünya Turu", "Başka dillerden filmler; Korece, Japonca, Türkçe… çipleriyle ülkeye göre keşif"],
+      nowPlaying: ["Vizyondaki Filmler", "Şu an sinemalarda gösterilenler"],
+      oscar: ["Oscar Ödüllü Filmler", "Yıllara göre Oscar kazananları"],
+      collection: ["Seri Filmler", "Film serileri ve koleksiyonlar"],
+      providers: ["Sağlayıcılar", "Platformlara göre film keşfi"],
+      genres: ["Türler", "Türe göre film keşfi"],
+      upcoming: ["Yaklaşan Filmler", "Yakında vizyona girecek filmler"],
+    },
+    hub: {
+      feed: ["Sosyal", "Paylaşımlar kartı: akışa git, hızlı paylaşım yap"],
+      cineswipe: ["Birlikte Ne İzlesek?", "CineSwipe ile tek başına ya da arkadaşınla karar ver"],
+      tournament: ["Turnuva", "Aylık film turnuvası ve sonuçları"],
+      wrapped: ["Yılın Rakamları", "Yıllık izleme özetin (Wrapped) ve arşiv"],
+      games: ["Oyunlar", "Öne çıkan oyun ve istatistiklerin"],
+    },
+    profile: {
+      goal: ["Yıllık izleme hedefi", "Profil başlığındaki hedef halkası düğmesi (Düzenle ve Paylaş'ın yanında)"],
+      badges: ["Rozetler", "İzleme puanın, Perde seviyen ve rozet şeridin"],
+      friends: ["Arkadaşlar", "Ara, arkadaşlar, mesajlar ve istekler. Gizlersen bunlara buradan ulaşamazsın"],
+      stats: ["İstatistikler", "İzlediğin film ve dizi sayıları, toplam süreler"],
+      lists: ["Listeler", "Favoriler, izleme listesi, izlenenler ve kendi listelerin"],
+      activity: ["Aktivitelerim", "Puanlamaların, yorumların, postların ve taslakların"],
+      reminders: ["Hatırlatmalar", "Yaklaşan film ve bölüm hatırlatıcıların"],
+      notes: ["Notlar", "Film ve dizi notların"],
+    },
+  },
+};
+
+const en = {
+  ui: {
+    title: "Screen sections",
+    rowSub: "Choose which sections show on movies, TV, Hub and profile",
+    badgeAll: "All on",
+    badgeHidden: "{n} hidden",
+    intro:
+      "Choose which sections appear on the Movies, TV Shows, Hub and Profile screens. A section you hide disappears from the screen; you can turn it back on here any time.",
+    visibleCount: "{shown} of {total} sections visible",
+    showAll: "Show all",
+    hideAll: "Hide all",
+    linkedTag: "Shared setting",
+    conditionalNote:
+      "Some shelves, like “Because of Your Favorites” and “Service Favorites”, only appear when there is related data or a setting; having them on here does not mean they always show.",
+    reset: "Reset to default",
+    resetSub: "Show every section on every screen",
+    saveFailed: "Couldn't save the setting",
+    confirmTitle: "Hide the friends bar?",
+    confirmMessage:
+      "Friend search, your friends list, messages and requests open only from this bar. If you hide it you won't be able to reach them from here; you can turn it back on from this page any time.",
+    confirmHide: "Hide",
+    confirmCancel: "Cancel",
+    emptyTitle: "No sections to show here",
+    emptyText: "You've hidden every section on this screen. You can turn any of them back on in Settings.",
+    emptyAction: "Edit sections",
+  },
+  screens: {
+    tv: { name: "TV Shows", hint: "Shelves on the TV shows home" },
+    movie: { name: "Movies", hint: "Shelves on the movies home" },
+    hub: { name: "Hub", hint: "Cards on the Hub tab" },
+    profile: { name: "Profile", hint: "Sections on the Profile tab" },
+  },
+  sections: {
+    tv: {
+      trends: ["Trend Series", "What's trending, with weekly and daily categories"],
+      ongoing: ["Ongoing Shows", "Shows you've started. The same setting as “Show ongoing shows” in Settings"],
+      best: ["Top Rated Shows", "Most voted and most popular shows"],
+      followedPeople: ["Upcoming From People You Follow", "New work from the actors and directors you follow; shows once you follow someone"],
+      fromFavorites: ["Because of Your Favorites", "Picks based on your four favorites; shows once you add some"],
+      subscriptions: ["Service Favorites", "Titles on the services you picked; shows once you pick services"],
+      topGenres: ["Favorite Genres", "Based on what you watch or picked at the start"],
+      recentFavorites: ["Recent Favorites", "Recent shows with strong audience scores"],
+      worldTour: ["World Tour", "Shows from other languages; discover by country with Korean, Japanese, Turkish… chips"],
+      emmy: ["Emmy-Winning TV Shows", "Emmy winners by year"],
+      providers: ["Providers", "Browse shows by streaming service"],
+      genres: ["Genres", "Browse shows by genre"],
+      onTheAir: ["Airing This Week", "Shows with a new episode this week"],
+      airingToday: ["Airing Today", "Shows with a new episode today"],
+    },
+    movie: {
+      trends: ["Trend Movies", "What's trending, with weekly and daily categories"],
+      bests: ["Top Rated Movies", "Most voted and most popular movies"],
+      followedPeople: ["Upcoming From People You Follow", "New work from the actors and directors you follow; shows once you follow someone"],
+      fromFavorites: ["Because of Your Favorites", "Picks based on your four favorites; shows once you add some"],
+      subscriptions: ["Service Favorites", "Titles on the services you picked; shows once you pick services"],
+      topGenres: ["Favorite Genres", "Based on what you watch or picked at the start"],
+      recentFavorites: ["Recent Favorites", "Recent movies with strong audience scores"],
+      worldTour: ["World Tour", "Movies from other languages; discover by country with Korean, Japanese, Turkish… chips"],
+      nowPlaying: ["Movies In Theaters", "What's showing in cinemas right now"],
+      oscar: ["Oscar-Winning Movies", "Oscar winners by year"],
+      collection: ["Movie Collections", "Film series and collections"],
+      providers: ["Providers", "Browse movies by streaming service"],
+      genres: ["Genres", "Browse movies by genre"],
+      upcoming: ["Upcoming Movies", "Movies coming to theaters soon"],
+    },
+    hub: {
+      feed: ["Social", "The Posts card: open the feed and post quickly"],
+      cineswipe: ["What Should We Watch?", "Decide with CineSwipe, solo or with a friend"],
+      tournament: ["Tournament", "The monthly movie tournament and its results"],
+      wrapped: ["Year in Numbers", "Your yearly watching recap (Wrapped) and the archive"],
+      games: ["Games", "The featured game and your stats"],
+    },
+    profile: {
+      goal: ["Yearly watch goal", "The goal ring button in the profile header (next to Edit and Share)"],
+      badges: ["Badges", "Your watch score, Perde level and badge strip"],
+      friends: ["Friends", "Search, friends, messages and requests. If you hide it you can't reach them from here"],
+      stats: ["Statistics", "How many movies and shows you've watched, and total time"],
+      lists: ["Lists", "Favorites, watchlist, watched and your own lists"],
+      activity: ["My Activity", "Your ratings, comments, posts and drafts"],
+      reminders: ["Reminders", "Your upcoming movie and episode reminders"],
+      notes: ["Notes", "Your movie and show notes"],
+    },
+  },
+};
+
+const es = {
+  ui: {
+    title: "Secciones de pantalla",
+    rowSub: "Elige qué secciones se muestran en películas, series, Hub y perfil",
+    badgeAll: "Todas activas",
+    badgeHidden: "{n} ocultas",
+    intro:
+      "Elige qué secciones aparecen en las pantallas de Películas, Series, Hub y Perfil. Las que ocultes desaparecen de la pantalla; puedes volver a activarlas aquí cuando quieras.",
+    visibleCount: "{shown} de {total} secciones visibles",
+    showAll: "Mostrar todo",
+    hideAll: "Ocultar todo",
+    linkedTag: "Ajuste compartido",
+    conditionalNote:
+      "Algunos carriles, como «Por tus favoritos» y «Favoritos de tus plataformas», solo aparecen si hay datos o un ajuste relacionado; tenerlos activados aquí no garantiza que se vean siempre.",
+    reset: "Restablecer",
+    resetSub: "Mostrar todas las secciones en todas las pantallas",
+    saveFailed: "No se pudo guardar el ajuste",
+    confirmTitle: "¿Ocultar la barra de amigos?",
+    confirmMessage:
+      "Buscar amigos, tu lista de amigos, los mensajes y las solicitudes solo se abren desde esta barra. Si la ocultas no podrás acceder a ellos desde aquí; puedes volver a activarla desde esta página cuando quieras.",
+    confirmHide: "Ocultar",
+    confirmCancel: "Cancelar",
+    emptyTitle: "No hay secciones que mostrar",
+    emptyText: "Has ocultado todas las secciones de esta pantalla. Puedes volver a activar las que quieras en Ajustes.",
+    emptyAction: "Editar secciones",
+  },
+  screens: {
+    tv: { name: "Series", hint: "Carriles de la pantalla de series" },
+    movie: { name: "Películas", hint: "Carriles de la pantalla de películas" },
+    hub: { name: "Hub", hint: "Tarjetas de la pestaña Hub" },
+    profile: { name: "Perfil", hint: "Secciones de la pestaña Perfil" },
+  },
+  sections: {
+    tv: {
+      trends: ["Series en tendencia", "Lo que está de moda, con categorías semanales y diarias"],
+      ongoing: ["Series en curso", "Series que ya empezaste. Es el mismo ajuste que «Series en curso» en Ajustes"],
+      best: ["Series mejor valoradas", "Las series más votadas y más populares"],
+      followedPeople: ["Próximos de quienes sigues", "Nuevos trabajos de los actores y directores que sigues; aparece al seguir a alguien"],
+      fromFavorites: ["Por tus favoritos", "Recomendaciones según tus cuatro favoritos; aparece al añadir alguno"],
+      subscriptions: ["Favoritos de tus plataformas", "Lo que puedes ver en las plataformas que elegiste; aparece al elegir plataformas"],
+      topGenres: ["Tus géneros favoritos", "Según lo que más ves o lo que elegiste al empezar"],
+      recentFavorites: ["Favoritos recientes", "Series recientes con buena puntuación del público"],
+      worldTour: ["Vuelta al mundo", "Series de otros idiomas; descubre por país con chips de coreano, japonés, turco…"],
+      emmy: ["Series ganadoras del Emmy", "Ganadoras del Emmy por año"],
+      providers: ["Plataformas", "Descubre series por plataforma"],
+      genres: ["Géneros", "Descubre series por género"],
+      onTheAir: ["Se emiten esta semana", "Series con un episodio nuevo esta semana"],
+      airingToday: ["Se emiten hoy", "Series con un episodio nuevo hoy"],
+    },
+    movie: {
+      trends: ["Películas en tendencia", "Lo que está de moda, con categorías semanales y diarias"],
+      bests: ["Películas mejor valoradas", "Las películas más votadas y más populares"],
+      followedPeople: ["Próximos de quienes sigues", "Nuevos trabajos de los actores y directores que sigues; aparece al seguir a alguien"],
+      fromFavorites: ["Por tus favoritos", "Recomendaciones según tus cuatro favoritos; aparece al añadir alguno"],
+      subscriptions: ["Favoritos de tus plataformas", "Lo que puedes ver en las plataformas que elegiste; aparece al elegir plataformas"],
+      topGenres: ["Tus géneros favoritos", "Según lo que más ves o lo que elegiste al empezar"],
+      recentFavorites: ["Favoritos recientes", "Películas recientes con buena puntuación del público"],
+      worldTour: ["Vuelta al mundo", "Películas de otros idiomas; descubre por país con chips de coreano, japonés, turco…"],
+      nowPlaying: ["Películas en cines", "Lo que se proyecta ahora en los cines"],
+      oscar: ["Películas ganadoras del Óscar", "Ganadoras del Óscar por año"],
+      collection: ["Sagas de películas", "Sagas y colecciones de películas"],
+      providers: ["Plataformas", "Descubre películas por plataforma"],
+      genres: ["Géneros", "Descubre películas por género"],
+      upcoming: ["Próximos estrenos", "Películas que llegan pronto a los cines"],
+    },
+    hub: {
+      feed: ["Social", "La tarjeta de publicaciones: abre el feed y publica rápido"],
+      cineswipe: ["¿Qué vemos?", "Decide con CineSwipe, solo o con un amigo"],
+      tournament: ["Torneo", "El torneo mensual de películas y sus resultados"],
+      wrapped: ["El año en cifras", "Tu resumen anual de visionado (Wrapped) y el archivo"],
+      games: ["Juegos", "El juego destacado y tus estadísticas"],
+    },
+    profile: {
+      goal: ["Meta anual de visionado", "El botón del anillo de meta en la cabecera del perfil (junto a Editar y Compartir)"],
+      badges: ["Insignias", "Tu puntuación de visionado, tu nivel Perde y tus insignias"],
+      friends: ["Amigos", "Buscar, amigos, mensajes y solicitudes. Si la ocultas no podrás acceder a ellos desde aquí"],
+      stats: ["Estadísticas", "Cuántas películas y series has visto y el tiempo total"],
+      lists: ["Listas", "Favoritos, pendientes, vistas y tus propias listas"],
+      activity: ["Mi actividad", "Tus valoraciones, comentarios, publicaciones y borradores"],
+      reminders: ["Recordatorios", "Tus próximos recordatorios de películas y episodios"],
+      notes: ["Notas", "Tus notas de películas y series"],
+    },
+  },
+};
+
+const pt = {
+  ui: {
+    title: "Seções da tela",
+    rowSub: "Escolha quais seções aparecem em filmes, séries, Hub e perfil",
+    badgeAll: "Todas ativas",
+    badgeHidden: "{n} ocultas",
+    intro:
+      "Escolha quais seções aparecem nas telas de Filmes, Séries, Hub e Perfil. As que você ocultar somem da tela; você pode reativá-las aqui quando quiser.",
+    visibleCount: "{shown} de {total} seções visíveis",
+    showAll: "Mostrar tudo",
+    hideAll: "Ocultar tudo",
+    linkedTag: "Configuração compartilhada",
+    conditionalNote:
+      "Algumas filas, como «Pelos seus favoritos» e «Favoritos dos seus serviços», só aparecem se houver dados ou uma configuração relacionada; deixá-las ativadas aqui não garante que sempre apareçam.",
+    reset: "Redefinir",
+    resetSub: "Mostrar todas as seções em todas as telas",
+    saveFailed: "Não foi possível salvar a configuração",
+    confirmTitle: "Ocultar a barra de amigos?",
+    confirmMessage:
+      "Buscar amigos, sua lista de amigos, as mensagens e os pedidos só abrem por esta barra. Se você a ocultar, não conseguirá acessá-los por aqui; você pode reativá-la nesta página quando quiser.",
+    confirmHide: "Ocultar",
+    confirmCancel: "Cancelar",
+    emptyTitle: "Não há seções para mostrar",
+    emptyText: "Você ocultou todas as seções desta tela. Pode reativar as que quiser em Configurações.",
+    emptyAction: "Editar seções",
+  },
+  screens: {
+    tv: { name: "Séries", hint: "Filas da tela de séries" },
+    movie: { name: "Filmes", hint: "Filas da tela de filmes" },
+    hub: { name: "Hub", hint: "Cards da aba Hub" },
+    profile: { name: "Perfil", hint: "Seções da aba Perfil" },
+  },
+  sections: {
+    tv: {
+      trends: ["Séries em alta", "O que está em alta, com categorias semanais e diárias"],
+      ongoing: ["Séries em andamento", "Séries que você já começou. É a mesma configuração de «Séries em andamento» em Configurações"],
+      best: ["Séries mais bem avaliadas", "As séries mais votadas e mais populares"],
+      followedPeople: ["Próximos de quem você segue", "Novos trabalhos dos atores e diretores que você segue; aparece ao seguir alguém"],
+      fromFavorites: ["Pelos seus favoritos", "Recomendações com base nos seus quatro favoritos; aparece ao adicionar algum"],
+      subscriptions: ["Favoritos dos seus serviços", "O que você pode assistir nos serviços que escolheu; aparece ao escolher serviços"],
+      topGenres: ["Seus gêneros favoritos", "Com base no que você mais assiste ou no que escolheu no início"],
+      recentFavorites: ["Favoritos recentes", "Séries recentes com boa nota do público"],
+      worldTour: ["Volta ao mundo", "Séries de outros idiomas; descubra por país com chips de coreano, japonês, turco…"],
+      emmy: ["Séries vencedoras do Emmy", "Vencedoras do Emmy por ano"],
+      providers: ["Serviços", "Descubra séries por serviço"],
+      genres: ["Gêneros", "Descubra séries por gênero"],
+      onTheAir: ["No ar esta semana", "Séries com um episódio novo esta semana"],
+      airingToday: ["No ar hoje", "Séries com um episódio novo hoje"],
+    },
+    movie: {
+      trends: ["Filmes em alta", "O que está em alta, com categorias semanais e diárias"],
+      bests: ["Filmes mais bem avaliados", "Os filmes mais votados e mais populares"],
+      followedPeople: ["Próximos de quem você segue", "Novos trabalhos dos atores e diretores que você segue; aparece ao seguir alguém"],
+      fromFavorites: ["Pelos seus favoritos", "Recomendações com base nos seus quatro favoritos; aparece ao adicionar algum"],
+      subscriptions: ["Favoritos dos seus serviços", "O que você pode assistir nos serviços que escolheu; aparece ao escolher serviços"],
+      topGenres: ["Seus gêneros favoritos", "Com base no que você mais assiste ou no que escolheu no início"],
+      recentFavorites: ["Favoritos recentes", "Filmes recentes com boa nota do público"],
+      worldTour: ["Volta ao mundo", "Filmes de outros idiomas; descubra por país com chips de coreano, japonês, turco…"],
+      nowPlaying: ["Filmes em cartaz", "O que está em exibição agora nos cinemas"],
+      oscar: ["Filmes vencedores do Oscar", "Vencedores do Oscar por ano"],
+      collection: ["Sagas de filmes", "Sagas e coleções de filmes"],
+      providers: ["Serviços", "Descubra filmes por serviço"],
+      genres: ["Gêneros", "Descubra filmes por gênero"],
+      upcoming: ["Próximas estreias", "Filmes que chegam em breve aos cinemas"],
+    },
+    hub: {
+      feed: ["Social", "O card de publicações: abre o feed e publica rápido"],
+      cineswipe: ["O que vamos assistir?", "Decida com o CineSwipe, sozinho ou com um amigo"],
+      tournament: ["Torneio", "O torneio mensal de filmes e seus resultados"],
+      wrapped: ["O ano em números", "Seu resumo anual de visualização (Wrapped) e o arquivo"],
+      games: ["Jogos", "O jogo em destaque e suas estatísticas"],
+    },
+    profile: {
+      goal: ["Meta anual de visualização", "O botão do anel de meta no cabeçalho do perfil (ao lado de Editar e Compartilhar)"],
+      badges: ["Emblemas", "Sua pontuação de visualização, seu nível Perde e seus emblemas"],
+      friends: ["Amigos", "Buscar, amigos, mensagens e pedidos. Se você ocultar, não conseguirá acessá-los por aqui"],
+      stats: ["Estatísticas", "Quantos filmes e séries você assistiu e o tempo total"],
+      lists: ["Listas", "Favoritos, para assistir, assistidos e suas próprias listas"],
+      activity: ["Minhas atividades", "Suas notas, comentários, publicações e rascunhos"],
+      reminders: ["Lembretes", "Seus próximos lembretes de filmes e episódios"],
+      notes: ["Notas", "Suas notas de filmes e séries"],
+    },
+  },
+};
+
+const de = {
+  ui: {
+    title: "Bildschirmbereiche",
+    rowSub: "Wähle, welche Bereiche bei Filmen, Serien, Hub und Profil angezeigt werden",
+    badgeAll: "Alle an",
+    badgeHidden: "{n} ausgeblendet",
+    intro:
+      "Wähle, welche Bereiche auf den Bildschirmen Filme, Serien, Hub und Profil erscheinen. Ein ausgeblendeter Bereich verschwindet vom Bildschirm; du kannst ihn hier jederzeit wieder einschalten.",
+    visibleCount: "{shown} von {total} Bereichen sichtbar",
+    showAll: "Alle anzeigen",
+    hideAll: "Alle ausblenden",
+    linkedTag: "Gemeinsame Einstellung",
+    conditionalNote:
+      "Manche Leisten, wie „Wegen deiner Favoriten“ und „Favoriten der Dienste“, erscheinen nur, wenn es passende Daten oder eine Einstellung dafür gibt; dass sie hier an sind, heißt nicht, dass sie immer angezeigt werden.",
+    reset: "Auf Standard zurücksetzen",
+    resetSub: "Jeden Bereich auf jedem Bildschirm anzeigen",
+    saveFailed: "Die Einstellung konnte nicht gespeichert werden",
+    confirmTitle: "Freundeleiste ausblenden?",
+    confirmMessage:
+      "Freundessuche, deine Freundesliste, Nachrichten und Anfragen lassen sich nur über diese Leiste öffnen. Wenn du sie ausblendest, erreichst du sie von hier aus nicht mehr; du kannst sie auf dieser Seite jederzeit wieder einschalten.",
+    confirmHide: "Ausblenden",
+    confirmCancel: "Abbrechen",
+    emptyTitle: "Hier gibt es keine Bereiche zum Anzeigen",
+    emptyText: "Du hast alle Bereiche dieses Bildschirms ausgeblendet. Du kannst sie in den Einstellungen wieder einschalten.",
+    emptyAction: "Bereiche bearbeiten",
+  },
+  screens: {
+    tv: { name: "Serien", hint: "Leisten auf dem Serien-Start" },
+    movie: { name: "Filme", hint: "Leisten auf dem Film-Start" },
+    hub: { name: "Hub", hint: "Karten im Tab „Hub“" },
+    profile: { name: "Profil", hint: "Bereiche im Tab „Profil“" },
+  },
+  sections: {
+    tv: {
+      trends: ["Trendserien", "Was gerade im Trend ist, mit Wochen- und Tageskategorien"],
+      ongoing: ["Laufende Serien", "Serien, die du begonnen hast. Dieselbe Einstellung wie „Laufende Serien anzeigen“ in den Einstellungen"],
+      best: ["Bestbewertete Serien", "Meistbewertete und beliebteste Serien"],
+      followedPeople: ["Anstehendes von Personen, denen du folgst", "Neue Arbeiten der Schauspieler und Regisseure, denen du folgst; erscheint, sobald du jemandem folgst"],
+      fromFavorites: ["Wegen deiner Favoriten", "Tipps nach deinen vier Favoriten; erscheint, sobald du welche hinzufügst"],
+      subscriptions: ["Favoriten der Dienste", "Titel bei den Diensten, die du gewählt hast; erscheint, sobald du Dienste wählst"],
+      topGenres: ["Lieblingsgenres", "Nach dem, was du schaust oder zu Beginn gewählt hast"],
+      recentFavorites: ["Aktuelle Favoriten", "Neuere Serien mit starken Publikumsbewertungen"],
+      worldTour: ["Weltreise", "Serien aus anderen Sprachen; nach Land entdecken mit Koreanisch, Japanisch, Türkisch…"],
+      emmy: ["Emmy-prämierte Serien", "Emmy-Gewinner nach Jahr"],
+      providers: ["Anbieter", "Serien nach Streaming-Dienst durchstöbern"],
+      genres: ["Genres", "Serien nach Genre durchstöbern"],
+      onTheAir: ["Diese Woche im Programm", "Serien mit einer neuen Folge in dieser Woche"],
+      airingToday: ["Heute im Programm", "Serien mit einer neuen Folge heute"],
+    },
+    movie: {
+      trends: ["Trendfilme", "Was gerade im Trend ist, mit Wochen- und Tageskategorien"],
+      bests: ["Bestbewertete Filme", "Meistbewertete und beliebteste Filme"],
+      followedPeople: ["Anstehendes von Personen, denen du folgst", "Neue Arbeiten der Schauspieler und Regisseure, denen du folgst; erscheint, sobald du jemandem folgst"],
+      fromFavorites: ["Wegen deiner Favoriten", "Tipps nach deinen vier Favoriten; erscheint, sobald du welche hinzufügst"],
+      subscriptions: ["Favoriten der Dienste", "Titel bei den Diensten, die du gewählt hast; erscheint, sobald du Dienste wählst"],
+      topGenres: ["Lieblingsgenres", "Nach dem, was du schaust oder zu Beginn gewählt hast"],
+      recentFavorites: ["Aktuelle Favoriten", "Neuere Filme mit starken Publikumsbewertungen"],
+      worldTour: ["Weltreise", "Filme aus anderen Sprachen; nach Land entdecken mit Koreanisch, Japanisch, Türkisch…"],
+      nowPlaying: ["Filme im Kino", "Was gerade in den Kinos läuft"],
+      oscar: ["Oscar-prämierte Filme", "Oscar-Gewinner nach Jahr"],
+      collection: ["Filmreihen", "Filmreihen und Sammlungen"],
+      providers: ["Anbieter", "Filme nach Streaming-Dienst durchstöbern"],
+      genres: ["Genres", "Filme nach Genre durchstöbern"],
+      upcoming: ["Kommende Filme", "Filme, die bald in die Kinos kommen"],
+    },
+    hub: {
+      feed: ["Soziales", "Die Karte „Beiträge“: Feed öffnen und schnell posten"],
+      cineswipe: ["Was schauen wir?", "Entscheide mit CineSwipe, solo oder mit einem Freund"],
+      tournament: ["Turnier", "Das monatliche Filmturnier und seine Ergebnisse"],
+      wrapped: ["Das Jahr in Zahlen", "Dein jährlicher Seh-Rückblick (Wrapped) und das Archiv"],
+      games: ["Spiele", "Das empfohlene Spiel und deine Statistik"],
+    },
+    profile: {
+      goal: ["Jährliches Seh-Ziel", "Die Zielring-Schaltfläche im Profilkopf (neben Bearbeiten und Teilen)"],
+      badges: ["Abzeichen", "Dein Seh-Score, dein Akt-Level und die Abzeichenleiste"],
+      friends: ["Freunde", "Suche, Freunde, Nachrichten und Anfragen. Wenn du sie ausblendest, erreichst du sie von hier aus nicht mehr"],
+      stats: ["Statistik", "Wie viele Filme und Serien du gesehen hast, und die Gesamtzeit"],
+      lists: ["Listen", "Favoriten, Merkliste, Gesehenes und deine eigenen Listen"],
+      activity: ["Meine Aktivität", "Deine Bewertungen, Kommentare, Beiträge und Entwürfe"],
+      reminders: ["Erinnerungen", "Deine bevorstehenden Film- und Folgenerinnerungen"],
+      notes: ["Notizen", "Deine Film- und Serien-Notizen"],
+    },
+  },
+};
+
+export const SECTION_VISIBILITY_COPY = Object.freeze({ tr, en, es, pt, de });
+
+/** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
+export const getSectionVisibilityCopy = (language) =>
+  SECTION_VISIBILITY_COPY[copyLanguage(language, Object.keys(SECTION_VISIBILITY_COPY))];
+
+/** "{n}" gibi yer tutucuları doldurur. */
+export const fillCopy = (text, values = {}) =>
+  String(text).replace(/\{(\w+)\}/g, (_, key) => (key in values ? String(values[key]) : `{${key}}`));

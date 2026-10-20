@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "Permite que o app salve na sua galeria a imagem de story que você criar.",
+    "NSPhotoLibraryAddUsageDescription": "Permite que o app salve na sua galeria a imagem de story que você criar.",
+    "NSCalendarsUsageDescription": "Permite acessar seu calendário para adicionar os lembretes de filmes, séries e notas ao calendário do celular e removê-los dele.",
+    "NSCalendarsFullAccessUsageDescription": "Permite acessar seu calendário para adicionar os lembretes de filmes, séries e notas ao calendário do celular e removê-los dele.",
+    "NSFaceIDUsageDescription": "Permite que o Seelogd acesse os dados biométricos do Face ID."
+  }
+}

@@ -1,43 +1,102 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useTabBarLayout } from "../../context/TabBarLayoutContext";
+import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
+import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
   ScrollView,
-  Alert,
   Modal,
   TextInput,
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Animated,
+  InteractionManager,
 } from "react-native";
+import axios from "axios";
+import { useNavigation } from "@react-navigation/native";
+import { flushUserData } from "../../services/userData";
 import { useLanguage } from "../../context/LanguageContext";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import AppIcon from "../../components/AppIcon";
+import GlassCloseButton from "../../components/common/GlassCloseButton";
 import { useTheme } from "../../context/ThemeContext";
-import LottieView from "lottie-react-native";
 import SettingsTheme from "./setting/SettingsTheme";
-import { useAppSettings } from "../../context/AppSettingsContext";
-import SwitchToggle from "../../modules/SwitchToggle";
-import SwipeCard from "../../modules/SwipeCard";
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
+import {
+  useContentSettings,
+  useImageQualitySettings,
+  useOngoingTvShowsSettings,
+  useHapticsSettings,
+  useAutoDataCacheSettings,
+  useStreamingProviderSettings,
+  STREAMING_PROVIDERS,
+  useApiSettings,
+} from "../../context/AppSettingsContext";
+import SwitchToggle from "@components/SwitchToggle";
+import SwipeCard from "@components/SwipeCard";
+import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
+import BottomSheetModal from "@components/common/BottomSheetModal";
+import ConfirmSheet from "@components/common/ConfirmSheet";
+import useSheetTransition from "@hooks/useSheetTransition";
+import Constants from "expo-constants";
 import CountryFlag from "react-native-country-flag";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import { alpha } from "../../theme/colors";
+import { i18nText } from "../../utils/i18nText";
+import { appAlert } from "@components/AppAlert";
+import { getAuth } from "firebase/auth";
+import { Image } from "expo-image";
+import TmdbLogo from "../../components/TmdbLogo";
+import JustWatchLogo from "../../components/JustWatchLogo";
+import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
+import PremiumSettingsCard from "@components/settings/PremiumSettingsCard";
+import { usePremium } from "@context/PremiumContext";
+import { shouldShowMemberBar } from "@utils/premiumMemberBar";
+import useAiPrefs from "@hooks/useAiPrefs";
+import { getAiCopy } from "@utils/aiCopy";
+import { getReferralCopy } from "@utils/referralCopy";
+import { countCustomizedPrefs } from "@utils/aiPrefs";
+import DevPlanSimulatorCard from "@components/settings/DevPlanSimulatorCard";
+import FeedbackSettingsGroup from "@components/settings/FeedbackSettingsGroup";
+import {
+  DATA_TYPE_COUNT,
+  buildAllTypes,
+  countEnabledTypes,
+  getDataTypeOptions,
+} from "./settings/dataTypes";
+import ImportDataModal from "../../components/import/ImportDataModal";
+import { getLibraryExportCopy } from "./settings/libraryExportCopy";
+import { getImportCopy } from "../../components/import/importCopy";
+import useAppLogo from "@hooks/useAppLogo";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { tabTitleTopSpacing } from "../../utils/screenTopSpacing";
+import {
+  APP_LANGUAGES,
+  COMING_SOON_LANGUAGES,
+  intlLocaleOf,
+  pickByLanguage,
+  tmdbLanguageOf,
+  tmdbRegionOf,
+} from "../../utils/appLanguages";
 
-const LANGUAGES = [
-  { code: "tr", name: "Türkçe", nativeName: "Türkçe", flag: "tr" },
-  { code: "en", name: "English", nativeName: "English", flag: "us" },
-];
+import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../../components/common/GlassTouchable";
+import GlassBox from "../../components/common/GlassBox";
+const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
+
+// Seçilebilir diller utils/appLanguages.js'ten gelir (yeni dil = oraya kayıt +
+// translations/<kod>.json). Rehber: docs/mimari/DIL_DESTEGI_REHBERI.md
+const LANGUAGES = APP_LANGUAGES;
 
 const IMAGE_QUALITIES = [
-  { label: "Düşük", value: "low" },
-  { label: "Orta", value: "medium" },
-  { label: "İyi", value: "good" },
-  { label: "Yüksek", value: "high" },
-  { label: "Orijinal", value: "original" },
+  { labelKey: "imageQualityLow", value: "low" },
+  { labelKey: "imageQualityMedium", value: "medium" },
+  { labelKey: "imageQualityGood", value: "good" },
+  { labelKey: "imageQualityHigh", value: "high" },
+  { labelKey: "imageQualityOriginal", value: "original" },
 ];
 
 function buildUiColors(theme) {
@@ -70,16 +129,24 @@ function buildUiColors(theme) {
   };
 }
 
-function SectionLabel({ children, color }) {
+function SectionLabel({ children, color, first, style }) {
   return (
-    <Text allowFontScaling={false} style={[s.sectionLabel, { color }]}>
+    <Text
+      allowFontScaling={false}
+      style={[
+        s.sectionLabel,
+        { color },
+        first && s.firstSectionLabel,
+        style,
+      ]}
+    >
       {children}
     </Text>
   );
 }
 
 function Chevron({ color }) {
-  return <Ionicons name="chevron-forward" size={14} color={color} />;
+  return <AppIcon family="Ionicons" name="chevron-forward" size={14} color={color} />;
 }
 
 function SettingRow({
@@ -87,7 +154,7 @@ function SettingRow({
   iconBg,
   iconColor,
   iconName,
-  iconLib = "ion",
+  iconFamily = "Ionicons",
   title,
   subtitle,
   right,
@@ -95,13 +162,6 @@ function SettingRow({
   danger,
   last,
 }) {
-  const Icon =
-    iconLib === "mc"
-      ? MaterialCommunityIcons
-      : iconLib === "mi"
-        ? MaterialIcons
-        : Ionicons;
-
   return (
     <TouchableOpacity
       style={[
@@ -114,7 +174,7 @@ function SettingRow({
     >
       <View style={s.rowLeft}>
         <View style={[s.iconWrap, { backgroundColor: iconBg }]}>
-          <Icon name={iconName} size={15} color={iconColor} />
+          <AppIcon family={iconFamily} name={iconName} size={15} color={iconColor} />
         </View>
         <View style={s.rowTexts}>
           <Text
@@ -135,23 +195,283 @@ function SettingRow({
   );
 }
 
+/**
+ * "Verileri indir" açıkken indirilecek veri türlerinin seçimi.
+ * Ana anahtar kapalıyken hiç render edilmez — kapalıyken zaten hiçbir şey
+ * indirilmediği için seçim de anlamsız olur.
+ */
+function DataTypePicker({ types, colors, onChange, onToggleAll }) {
+  const options = getDataTypeOptions();
+  const enabledCount = countEnabledTypes(types);
+  const allEnabled = enabledCount === DATA_TYPE_COUNT;
+
+  return (
+    <View style={s.dataTypes}>
+      <View style={s.dataTypesHeader}>
+        <View style={{ flex: 1 }}>
+          <Text allowFontScaling={false} style={[s.dataTypesTitle, { color: colors.text }]}>
+            {i18nText("autoI18n.indirilecek_veri_turleri", "İndirilecek veri türleri")}
+            {"  "}
+            <Text style={{ color: colors.accent }}>
+              {enabledCount}/{DATA_TYPE_COUNT}
+            </Text>
+          </Text>
+          <Text allowFontScaling={false} style={[s.dataTypesSub, { color: colors.muted }]}>
+            {i18nText(
+              "autoI18n.indirilecek_veri_turleri_alt",
+              "Kapalı tür ne otomatik indirilir ne de çevrimdışı saklanır",
+            )}
+          </Text>
+        </View>
+        <GlassTouchable
+          onPress={() => onToggleAll(!allEnabled)}
+          activeOpacity={0.7}
+          style={[s.dataTypesAction, { backgroundColor: colors.accentDim }]}
+        >
+          <Text allowFontScaling={false} style={[s.dataTypesActionText, { color: colors.accent }]}>
+            {allEnabled
+              ? i18nText("autoI18n.tumunu_kapat", "Tümünü kapat")
+              : i18nText("autoI18n.tumunu_ac", "Tümünü aç")}
+          </Text>
+        </GlassTouchable>
+      </View>
+
+      {enabledCount === 0 && (
+        <Text allowFontScaling={false} style={[s.dataTypesWarn, { color: colors.danger }]}>
+          {i18nText(
+            "autoI18n.hicbir_veri_turu_secili_degil",
+            "Hiçbir tür seçili değil — hiçbir veri çevrimdışı saklanmaz.",
+          )}
+        </Text>
+      )}
+
+      <View style={s.dataTypeGrid}>
+        {options.map((opt) => {
+          const enabled = types?.[opt.id] !== false;
+          const tint = colors[opt.colorKey] || colors.accent;
+          return (
+            <GlassTouchable
+              key={opt.id}
+              style={[
+                s.dataTypeButton,
+                {
+                  backgroundColor: enabled ? alpha(tint, 0.14) : colors.cardAlt,
+                  borderColor: enabled ? alpha(tint, 0.55) : colors.borderMuted,
+                },
+              ]}
+              activeOpacity={0.72}
+              onPress={() => onChange(opt.id, !enabled)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: enabled }}
+              accessibilityLabel={opt.label}
+            >
+              <View
+                style={[
+                  s.dataTypeIcon,
+                  { backgroundColor: enabled ? tint : colors.closeBg },
+                ]}
+              >
+                <AppIcon
+                  family="Ionicons"
+                  name={opt.icon}
+                  size={15}
+                  color={enabled ? colors.white : colors.muted}
+                />
+              </View>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={2}
+                style={[
+                  s.dataTypeLabel,
+                  { color: enabled ? colors.text : colors.muted },
+                ]}
+              >
+                {opt.label}
+              </Text>
+              <View
+                style={[
+                  s.dataTypeCheck,
+                  {
+                    backgroundColor: enabled ? tint : "transparent",
+                    borderColor: enabled ? tint : colors.border,
+                  },
+                ]}
+              >
+                {enabled ? (
+                  <AppIcon family="Ionicons" name="checkmark" size={9} color="#fff" />
+                ) : null}
+              </View>
+            </GlassTouchable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için kaydırma
+// görünümünü sekme ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js).
+// Modül kapsamında: render içinde kurulursa içerik her render'da sökülür.
+const MarkedScrollView = markTabScroll(ScrollView);
+
 export default function SettingsScreen() {
-  const [notifications, setNotifications] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
+  // Marka logosu seçili uygulama simgesini izler (hooks/useAppLogo.js).
+  const { logo: appLogo } = useAppLogo();
+  const { contentBottom } = useTabBarLayout();
+  const onTabBarScroll = useTabBarScrollSync();
+  const navigation = useNavigation();
+  // İçerik ekranın tepesinden başlıyor (durum çubuğu / Dynamic Island altında
+  // değil): başlığın üst boşluğu güvenli alana bağlı, sabit değer değil.
+  const insets = useSafeAreaInsets();
+  const titleTop = tabTitleTopSpacing(insets.top);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
+  const [modalVisibleLogout, setModalVisibleLogout] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  // Arka planda Settings etkileşimleri bittiğinde PremiumScreen modülünü önceden yükle (preload)
+  // Böylece butona dokunulduğunda JS thread takılmadan 60 FPS anında açılır.
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      try {
+        require("../premium/PremiumScreen");
+      } catch {}
+    });
+    return () => task?.cancel?.();
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      const auth = getAuth();
+      // Çıkıştan ÖNCE buluta gitmemiş notları/hatırlatıcıları göndermeyi dene:
+      // çıkıştan sonra yetkisiz kalınır. En çok 4 sn bekler; çevrimdışıysa
+      // vazgeçer — değişiklikler yazma günlüğünde durur ve aynı hesapla tekrar
+      // girişte gider (çıkışı asla kilitlemez).
+      if (auth.currentUser?.uid) {
+        await flushUserData(auth.currentUser.uid, { timeoutMs: 4000 }).catch(() => {});
+      }
+      await auth.signOut();
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "LoginScreen" }],
+      });
+    } catch (error) {
+      appAlert(
+        i18nText("autoI18n.hata", "Hata"),
+        error?.message || i18nText("autoI18n.hata_olustu", "Hata oluştu"),
+        undefined,
+        { type: "error" },
+      );
+    }
+  };
+
+  // Dil sayfası: blur yerinde solar, sayfa kayar
+  // (bkz. hooks/useSheetTransition.js).
+  const langSheet = useSheetTransition(langModalVisible);
+  const [providerModalVisible, setProviderModalVisible] = useState(false);
+  const [providerSearch, setProviderSearch] = useState("");
+  const [providerCatalog, setProviderCatalog] = useState(
+    STREAMING_PROVIDERS.map((provider, index) => ({
+      id: provider.id,
+      name: provider.name,
+      logoPath: null,
+      priority: index,
+    })),
+  );
+  const [providerCatalogLoading, setProviderCatalogLoading] = useState(true);
 
   const { t, language, toggleLanguage } = useLanguage();
+  const copyExport = getLibraryExportCopy(language);
+  const copyImport = getImportCopy(language);
+  const aiCopy = useMemo(() => getAiCopy(language), [language]);
+  const referralCopy = useMemo(() => getReferralCopy(language), [language]);
+  const { prefs: aiPrefs } = useAiPrefs();
+  const aiCustomCount = countCustomizedPrefs(aiPrefs);
   const { theme } = useTheme();
+  // Abone küçük "Aboneliği yönet" çubuğunu görür; o çubuk zaten Kullanım ve haklar'ı açtığı için
+  // alttaki ayrı satır yalnız vitrin gören Free kullanıcıda kalır.
+  const { plan: premiumPlan } = usePremium();
+  const hasMemberBar = shouldShowMemberBar(premiumPlan);
+  const { adultContent, chaneAdultContent, ageRestricted } = useContentSettings();
+  const { showOngoingTvShows, changeShowOngoingTvShows } =
+    useOngoingTvShowsSettings();
+  const { imageQuality, imageQualityLevel, changeImageQuality, getTmdbUrl } =
+    useImageQualitySettings();
+  const { API_KEY } = useApiSettings();
+  const { hapticsEnabled, changeHapticsEnabled } = useHapticsSettings();
   const {
-    chaneAdultContent,
-    adultContent,
-    showSnow,
-    changeShowSnow,
-    imageQuality,
-    imageQualityLevel,
-    changeImageQuality,
-  } = useAppSettings();
+    autoDataCacheEnabled,
+    changeAutoDataCacheEnabled,
+    dataCacheTypes,
+    changeDataCacheType,
+    changeDataCacheTypes,
+  } = useAutoDataCacheSettings();
+  const { streamingProviderIds, changeStreamingProviderIds } =
+    useStreamingProviderSettings();
+
+  useEffect(() => {
+    let active = true;
+    const tmdbLanguage = tmdbLanguageOf(language);
+    const tmdbRegion = tmdbRegionOf(language);
+    const cacheKey = `settings_provider_catalog_${tmdbLanguage}_${tmdbRegion}`;
+
+    const applyCatalog = (rawProviders) => {
+      const merged = new Map();
+      for (const provider of rawProviders || []) {
+        if (!provider?.provider_id) continue;
+        const current = merged.get(provider.provider_id);
+        merged.set(provider.provider_id, {
+          id: provider.provider_id,
+          name: provider.provider_name,
+          logoPath: provider.logo_path || current?.logoPath || null,
+          priority: Math.min(
+            Number(provider.display_priority ?? 9999),
+            Number(current?.priority ?? 9999),
+          ),
+        });
+      }
+      return [...merged.values()].sort(
+        (a, b) => a.priority - b.priority || a.name.localeCompare(b.name),
+      );
+    };
+
+    const loadProviderCatalog = async () => {
+      setProviderCatalogLoading(true);
+      try {
+        const cached = await getCachedValue(cacheKey, TTL.PROVIDERS);
+        if (cached?.length) {
+          if (active) setProviderCatalog(cached);
+          return;
+        }
+        const headers = { accept: "application/json", Authorization: API_KEY };
+        const [movieResponse, tvResponse] = await Promise.all([
+          axios.get("https://api.themoviedb.org/3/watch/providers/movie", {
+            params: { language: tmdbLanguage, watch_region: tmdbRegion },
+            headers,
+          }),
+          axios.get("https://api.themoviedb.org/3/watch/providers/tv", {
+            params: { language: tmdbLanguage, watch_region: tmdbRegion },
+            headers,
+          }),
+        ]);
+        const next = applyCatalog([
+          ...(movieResponse.data.results || []),
+          ...(tvResponse.data.results || []),
+        ]);
+        if (next.length && active) setProviderCatalog(next);
+        if (next.length) setCachedValue(cacheKey, next);
+      } catch (error) {
+        if (__DEV__) console.error("Settings provider catalog:", error?.message || error);
+      } finally {
+        if (active) setProviderCatalogLoading(false);
+      }
+    };
+
+    loadProviderCatalog();
+    return () => {
+      active = false;
+    };
+  }, [API_KEY, language]);
 
   const C = buildUiColors(theme);
 
@@ -162,15 +482,17 @@ export default function SettingsScreen() {
   );
   const currentLang =
     LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
-
-  const handleClearCache = async () => {
-    try {
-      await AsyncStorage.clear();
-      Alert.alert(t.success, t.cacheCleared);
-    } catch {
-      Alert.alert(t.error, t.errorClearingCache);
-    }
-  };
+  // "Yakında" bölümü: henüz desteklenmeyen, SEÇİLEMEYEN diller (utils/appLanguages.COMING_SOON_LANGUAGES).
+  const langQuery = langSearch.toLowerCase();
+  const filteredSoonLanguages = COMING_SOON_LANGUAGES.filter(
+    (l) => l.name.toLowerCase().includes(langQuery) || l.nativeName.toLowerCase().includes(langQuery),
+  );
+  const languageRows = [
+    ...filteredLanguages,
+    ...(filteredSoonLanguages.length
+      ? [{ code: "__soon__", header: true }, ...filteredSoonLanguages.map((l) => ({ ...l, soon: true }))]
+      : []),
+  ];
 
   const handleSelectLanguage = (code) => {
     toggleLanguage(code);
@@ -179,41 +501,229 @@ export default function SettingsScreen() {
   };
 
   const currentQualityLabel =
-    IMAGE_QUALITIES.find((q) => q.value === imageQualityLevel)?.label ?? "—";
+    t[IMAGE_QUALITIES.find((q) => q.value === imageQualityLevel)?.labelKey] ?? "—";
+  const selectedProviderNames = providerCatalog
+    .filter((provider) => streamingProviderIds.includes(provider.id))
+    .map((provider) => provider.name);
+  const providerSummary = streamingProviderIds.length
+    ? selectedProviderNames.length
+      ? selectedProviderNames.join(", ")
+      : pickByLanguage(language, {
+          tr: `${streamingProviderIds.length} platform seçili`,
+          en: `${streamingProviderIds.length} services selected`,
+          es: `${streamingProviderIds.length} servicios seleccionados`,
+          pt: `${streamingProviderIds.length} serviços selecionados`,
+          de: `${streamingProviderIds.length} Dienste ausgewählt`,
+        })
+    : pickByLanguage(language, {
+        tr: "Henüz platform seçilmedi",
+        en: "No services selected yet",
+        es: "Aún no has elegido servicios",
+        pt: "Você ainda não escolheu serviços",
+        de: "Noch keine Dienste ausgewählt",
+      });
+
+  const filteredProviders = useMemo(() => {
+    const locale = intlLocaleOf(language);
+    const query = providerSearch.trim().toLocaleLowerCase(locale);
+    return providerCatalog
+      .filter((provider) =>
+        query
+          ? provider.name.toLocaleLowerCase(locale).includes(query)
+          : true,
+      )
+      .sort((a, b) => {
+        const aSelected = streamingProviderIds.includes(a.id) ? 1 : 0;
+        const bSelected = streamingProviderIds.includes(b.id) ? 1 : 0;
+        return bSelected - aSelected || a.priority - b.priority;
+      });
+  }, [language, providerCatalog, providerSearch, streamingProviderIds]);
+
+  const toggleStreamingProvider = (providerId) => {
+    changeStreamingProviderIds(
+      streamingProviderIds.includes(providerId)
+        ? streamingProviderIds.filter((id) => id !== providerId)
+        : [...streamingProviderIds, providerId],
+    );
+  };
+
+
+
 
   return (
     <View style={[s.root, { backgroundColor: C.bg }]}>
-      <IconBacground opacity={0.15} />
+      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
+      <ScreenDecor scope="settings" iconOpacity={0.15} />
 
-      <ScrollView
+      <MarkedScrollView
         style={s.scroll}
-        contentContainerStyle={s.scrollContent}
+        contentContainerStyle={[s.scrollContent, { paddingBottom: contentBottom }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        onScroll={onTabBarScroll}
+        scrollEventThrottle={16}
       >
-        {showSnow && (
-          <>
-            <LottieView
-              style={s.lottie}
-              source={require("../../LottieJson/snow.json")}
-              autoPlay
-              loop
-            />
-            <LottieView
-              style={s.lottie1}
-              source={require("../../LottieJson/snow.json")}
-              autoPlay
-              loop
-            />
-          </>
-        )}
-
-        <Text allowFontScaling={false} style={[s.pageTitle, { color: C.text }]}>
+        <Text
+          allowFontScaling={false}
+          style={[s.pageTitle, { color: C.text, marginTop: titleTop }]}
+        >
           {t.settings}
         </Text>
 
-        <SectionLabel color={C.muted}>{t.language.toUpperCase()}</SectionLabel>
-        <TouchableOpacity
+        {/* ── Premium: abonelik vitrini en üstte ── */}
+        <SectionLabel color={C.muted} first>SEELOGD PREMIUM</SectionLabel>
+        <PremiumSettingsCard />
+        {hasMemberBar ? null : (
+          <GlassBox role="card"
+            style={[
+              s.card,
+              s.cardStacked,
+              { backgroundColor: C.card, borderColor: C.border },
+            ]}
+          >
+            <SettingRow
+              colors={C}
+              iconBg={C.iconPurple}
+              iconColor={C.purple}
+              iconName="speedometer-outline"
+              title={i18nText("autoI18n.kullanim_haklar_baslik", "Kullanım ve haklar")}
+              subtitle={i18nText(
+                "autoI18n.kullanim_haklar_aciklama",
+                "Planının limitleri ve kalan hakların",
+              )}
+              onPress={() => navigation.navigate("PremiumUsageScreen")}
+              right={<Chevron color={C.muted} />}
+              last
+            />
+          </GlassBox>
+        )}
+        {/* Arkadaş daveti: abone olsun olmasın herkes için (kod paylaşımı + kod girişi) */}
+        <GlassBox role="card"
+          style={[
+            s.card,
+            s.cardStacked,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName="gift-outline"
+            title={referralCopy.rowTitle}
+            subtitle={referralCopy.rowSubtitle}
+            onPress={() => navigation.navigate("ReferralScreen")}
+            right={<Chevron color={C.muted} />}
+            last
+          />
+        </GlassBox>
+        {/* Yalnız geliştirme build'inde: premium kapılarını mağazasız dene */}
+        {__DEV__ ? <DevPlanSimulatorCard /> : null}
+
+        {/* ── Hesap: kimlik doğrulama yöntemleri ve gizlilik ── */}
+        <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_hesap", "Hesap").toUpperCase()}</SectionLabel>
+        <GlassBox role="card"
+          style={[
+            s.card,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="person-circle-outline"
+            title={i18nText("autoI18n.hesap_baglantilari", "Hesap bağlantıları")}
+            subtitle={i18nText("autoI18n.hesap_baglantilari_aciklama", "Google, Apple ve parola yöntemleri")}
+            onPress={() => navigation.navigate("AccountConnectionsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="lock-closed-outline"
+            title={i18nText("autoI18n.gizlilik", "Gizlilik")}
+            subtitle={i18nText(
+              "autoI18n.gizlilik_aciklama",
+              "Profil, listeler, gönderiler ve çevrimiçi durumu kimler görsün",
+            )}
+            onPress={() => navigation.navigate("PrivacySettingsScreen")}
+            right={<Chevron color={C.muted} />}
+            last
+          />
+        </GlassBox>
+
+        {/* ── Görünüm: tema, kişiselleştirme, poster düzeni, widget'lar, dokunsal geri bildirim ── */}
+        <SectionLabel color={C.muted}>{t.appearance.toUpperCase()}</SectionLabel>
+        <GlassBox role="card" style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          {/* Ayrı "Görünüm" başlık satırı yok — tema satırları (seçili olan vurgulu) bu görevi görüyor. */}
+          <SettingsTheme />
+        </GlassBox>
+        <GlassBox role="card"
+          style={[
+            s.card,
+            s.cardStacked,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="color-palette-outline"
+            title={t.personalization}
+            subtitle={i18nText(
+              "autoI18n.kisisellestirme_aciklama",
+              "Kar efekti, ikon arka planı ve pet",
+            )}
+            onPress={() => navigation.navigate("PersonalizationScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconPurple}
+            iconColor={C.purple}
+            iconName="images-outline"
+            title={i18nText("autoI18n.poster_gorunumu", "Poster görünümü")}
+            subtitle={i18nText("autoI18n.poster_gorunumu_aciklama", "Afiş boyutu, köşeler ve düzen")}
+            onPress={() => navigation.navigate("PosterSettingsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="grid-outline"
+            title={i18nText("autoI18n.widget_settings_title", "Widget’lar")}
+            subtitle={i18nText(
+              "autoI18n.widget_settings_description",
+              "Ana ekran widget’larının görünümünü özelleştir",
+            )}
+            onPress={() => navigation.navigate("WidgetSettingsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconAmber}
+            iconColor={C.amber}
+            iconName={hapticsEnabled ? "phone-portrait-outline" : "phone-portrait"}
+            title={t.haptics}
+            subtitle={t.hapticsSubtitle}
+            right={
+              <SwitchToggle
+                value={hapticsEnabled}
+                onValueChange={changeHapticsEnabled}
+                size={36}
+              />
+            }
+            last
+          />
+        </GlassBox>
+
+        {/* ── Dil ve içerik: uygulama dili, izleme platformları, içerik tercihleri ── */}
+        <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_dil_icerik", "Dil ve içerik").toUpperCase()}</SectionLabel>
+        <GlassTouchable
           style={[s.langCard, { backgroundColor: C.card, borderColor: C.border }]}
           onPress={() => {
             setLangSearch("");
@@ -223,7 +733,7 @@ export default function SettingsScreen() {
         >
           <View style={s.langLeft}>
             <View style={[s.iconWrap, { backgroundColor: C.iconBlue }]}>
-              <Ionicons name="language-outline" size={16} color={C.blue} />
+              <AppIcon name="language-outline" size={16} color={C.blue} />
             </View>
             <View>
               <Text allowFontScaling={false} style={[s.langSubLabel, { color: C.muted }]}>
@@ -244,30 +754,145 @@ export default function SettingsScreen() {
             </View>
             <Chevron color={C.muted} />
           </View>
-        </TouchableOpacity>
+        </GlassTouchable>
+        <GlassBox role="card"
+          style={[
+            s.card,
+            s.cardStacked,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="play-circle-outline"
+            title={i18nText("autoI18n.platform_uyeliklerim", "Platform üyeliklerim")}
+            subtitle={providerSummary}
+            onPress={() => {
+              setProviderSearch("");
+              setProviderModalVisible(true);
+            }}
+            right={
+              <View style={s.providerCountWrap}>
+                {streamingProviderIds.length > 0 && (
+                  <View style={[s.providerCount, { backgroundColor: C.accentDim }]}>
+                    <Text style={[s.providerCountText, { color: C.accent }]}>
+                      {streamingProviderIds.length}
+                    </Text>
+                  </View>
+                )}
+                <Chevron color={C.muted} />
+              </View>
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconPurple}
+            iconColor={C.purple}
+            iconName="sparkles-outline"
+            title={aiCopy.settings.rowTitle}
+            subtitle={aiCopy.settings.rowSubtitle}
+            onPress={() => navigation.navigate("AISettingsScreen")}
+            right={
+              <View style={s.providerCountWrap}>
+                {aiCustomCount > 0 && (
+                  <View style={[s.providerCount, { backgroundColor: C.accentDim }]}>
+                    <Text style={[s.providerCountText, { color: C.accent }]}>
+                      {aiCustomCount}
+                    </Text>
+                  </View>
+                )}
+                <Chevron color={C.muted} />
+              </View>
+            }
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName={showOngoingTvShows ? "play-circle-outline" : "pause-circle-outline"}
+            title={t.showOngoingTvShows}
+            subtitle={t.showOngoingTvShowsSubtitle}
+            last={ageRestricted}
+            right={
+              <SwitchToggle
+                value={showOngoingTvShows}
+                onValueChange={changeShowOngoingTvShows}
+                size={36}
+              />
+            }
+          />
+          {/* Yetişkin içerik — 18 altı hesapta satır HİÇ ÇİZİLMEZ. Kapalı bir
+              anahtar göstermek "neden açamıyorum" sorusunu doğuruyor; içerik
+              süzgeci zaten ayrıca kilitli (bkz. utils/tmdbAdultGuard.js). */}
+          {!ageRestricted && (
+            <SettingRow
+              colors={C}
+              iconBg={C.iconPurple}
+              iconColor={C.purple}
+              iconName={adultContent ? "eye-outline" : "eye-off-outline"}
+              title={t.adultContent}
+              subtitle={t.adultContentSubtitle}
+              last
+              right={
+                <SwitchToggle
+                  value={adultContent}
+                  onValueChange={() => chaneAdultContent(!adultContent)}
+                  size={36}
+                />
+              }
+            />
+          )}
+        </GlassBox>
 
-        <SectionLabel color={C.muted}>{t.theme.toUpperCase()}</SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <View style={[s.themeHeader, { borderBottomColor: C.borderMuted }]}>
-            <View style={[s.iconWrap, { backgroundColor: C.iconAmber }]}>
-              <Ionicons name="sunny-outline" size={15} color={C.amber} />
-            </View>
-            <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
-              Görünüm
-            </Text>
-          </View>
-          <SettingsTheme />
-        </View>
+        {/* ── Bildirimler ── */}
+        <SectionLabel color={C.muted}>{t.notifications.toUpperCase()}</SectionLabel>
+        <GlassBox role="card"
+          style={[
+            s.card,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName="alarm-outline"
+            title={t.reminderNotificationGroup}
+            subtitle={i18nText(
+              "autoI18n.hatirlaticilar_aciklama",
+              "Film ve dizi hatırlatmaları, bildirim zamanı",
+            )}
+            onPress={() => navigation.navigate("ReminderNotificationsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconAmber}
+            iconColor={C.amber}
+            iconName="chatbubbles-outline"
+            title={t.socialNotificationGroup}
+            subtitle={i18nText(
+              "autoI18n.sosyal_mesajlar_aciklama",
+              "Arkadaşlık, beğeni, yorum ve mesaj bildirimleri",
+            )}
+            onPress={() => navigation.navigate("SocialNotificationsScreen")}
+            right={<Chevron color={C.muted} />}
+            last
+          />
+        </GlassBox>
 
-        <SectionLabel color={C.muted}>KALITE</SectionLabel>
+        {/* ── Veri ve depolama: görsel kalitesi, çevrimdışı veri, izinler, içe aktarma ── */}
+        <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_veri_depolama", "Veri ve depolama").toUpperCase()}</SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <View style={s.qualityHeader}>
             <View style={[s.iconWrap, { backgroundColor: C.iconPurple }]}>
-              <MaterialIcons name="high-quality" size={16} color={C.purple} />
+              <AppIcon family="MaterialIcons" name="high-quality" size={16} color={C.purple} />
             </View>
             <View style={{ flex: 1 }}>
               <Text allowFontScaling={false} style={[s.rowTitle, { color: C.text }]}>
-                Poster Kalitesi
+                {t.posterQuality}
               </Text>
               <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
                 {currentQualityLabel} · poster:{imageQuality.poster} · backdrop:
@@ -292,7 +917,7 @@ export default function SettingsScreen() {
             {IMAGE_QUALITIES.map((q) => {
               const active = imageQualityLevel === q.value;
               return (
-                <TouchableOpacity
+                <GlassTouchable
                   key={q.value}
                   style={[s.segOpt, active && { backgroundColor: C.accent }]}
                   onPress={() => changeImageQuality(q.value)}
@@ -305,98 +930,109 @@ export default function SettingsScreen() {
                       { color: active ? C.white : C.muted, fontWeight: active ? "700" : "500" },
                     ]}
                   >
-                    {q.label}
+                    {t[q.labelKey]}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               );
             })}
           </View>
         </View>
-
-        <SectionLabel color={C.muted}>{t.content.toUpperCase()}</SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <SettingRow
-            colors={C}
-            iconBg={C.iconTeal}
-            iconColor={C.teal}
-            iconName={showSnow ? "snow-sharp" : "snow-outline"}
-            title={t.snow}
-            subtitle="Animasyonlu kar taneleri"
-            right={
-              <SwitchToggle
-                value={showSnow}
-                onValueChange={changeShowSnow}
-                size={36}
-              />
-            }
-          />
+        <GlassBox role="card"
+          style={[
+            s.card,
+            s.cardStacked,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
+        >
           <SettingRow
             colors={C}
             iconBg={C.iconAmber}
             iconColor={C.amber}
             iconName="cloud-download-outline"
-            title="Verileri İndir"
-            subtitle="Çevrimdışı kullanım için"
-            right={
-              <SwitchToggle value={false} onValueChange={() => {}} size={36} />
+            title={t.downloadData}
+            subtitle={
+              autoDataCacheEnabled
+                ? `${t.downloadDataSubtitle} · ${countEnabledTypes(dataCacheTypes)}/${DATA_TYPE_COUNT} ${i18nText("autoI18n.tur_kucuk", "tür")}`
+                : i18nText(
+                    "autoI18n.veri_indirme_kapali_alt",
+                    "Kapalı — hiçbir veri veya poster indirilmez",
+                  )
             }
+            right={
+              <SwitchToggle
+                value={autoDataCacheEnabled}
+                onValueChange={changeAutoDataCacheEnabled}
+                size={36}
+              />
+            }
+          />
+          {autoDataCacheEnabled && (
+            <DataTypePicker
+              types={dataCacheTypes}
+              colors={C}
+              onChange={changeDataCacheType}
+              onToggleAll={(enabled) => changeDataCacheTypes(buildAllTypes(enabled))}
+            />
+          )}
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="shield-checkmark-outline"
+            title={i18nText("autoI18n.izinlerVeVeriler", "İzinler & Veriler")}
+            subtitle={i18nText(
+              "autoI18n.izinler_veriler_aciklama",
+              "Cihaz izinleri, çevrimdışı veri ve önbellek",
+            )}
+            onPress={() => navigation.navigate("PermissionsDataScreen")}
+            right={<Chevron color={C.muted} />}
           />
           <SettingRow
             colors={C}
             iconBg={C.iconPurple}
             iconColor={C.purple}
-            iconName={adultContent ? "eye-outline" : "eye-off-outline"}
-            title={t.adultContent}
-            subtitle="18+ içerikleri göster"
-            right={
-              <SwitchToggle
-                value={adultContent}
-                onValueChange={() => chaneAdultContent(!adultContent)}
-                size={36}
-              />
-            }
+            iconName="archive-outline"
+            title={i18nText("autoI18n.ayar_yedek_baslik", "Ayarları Yedekle ve Geri Yükle")}
+            subtitle={i18nText(
+              "autoI18n.ayar_yedek_alt",
+              "Tema, özel temalar ve tüm tercihlerini dosyaya aktar",
+            )}
+            onPress={() => navigation.navigate("BackupSettingsScreen")}
+            right={<Chevron color={C.muted} />}
           />
           <SettingRow
             colors={C}
-            iconBg={C.iconBlue}
-            iconColor={C.blue}
-            iconName={
-              notifications
-                ? "notifications-outline"
-                : "notifications-off-outline"
-            }
-            title={t.notifications}
-            subtitle="Yeni içerik bildirimleri"
-            last
-            right={
-              <SwitchToggle
-                value={notifications}
-                onValueChange={setNotifications}
-                size={36}
-              />
-            }
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName="share-outline"
+            title={copyExport.rowTitle}
+            subtitle={copyExport.rowSub}
+            onPress={() => navigation.navigate("LibraryExportScreen")}
+            right={<Chevron color={C.muted} />}
           />
-        </View>
-
-        <SectionLabel color={C.muted}>{t.data.toUpperCase()}</SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <SettingRow
             colors={C}
-            iconBg={C.dangerDim}
-            iconColor={C.danger}
-            iconName="trash-outline"
-            title={t.clearCache}
-            subtitle="Tüm geçici veriler silinir"
-            danger
+            iconBg={C.iconAmber}
+            iconColor={C.amber}
+            iconName="file-tray-full-outline"
+            title={copyImport.rowTitle}
+            subtitle={copyImport.rowSub}
+            onPress={() => setShowImportModal(true)}
+            right={<Chevron color={C.muted} />}
             last
-            onPress={() => setModalVisible(true)}
-            right={<Chevron color={C.danger} />}
           />
-        </View>
+        </GlassBox>
 
+        {/* ── Destek ve geri bildirim: hata bildirimi (Premium+), özellik isteği (Max) ── */}
+        <FeedbackSettingsGroup C={C} />
+
+        {/* ── Hakkında + hata ayıklama ── */}
         <SwipeCard>
           <SectionLabel color={C.muted}>{t.about.toUpperCase()}</SectionLabel>
-          <View
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate("AboutAppScreen")}
             style={[
               s.aboutCard,
               { backgroundColor: C.card, borderColor: C.border },
@@ -406,115 +1042,233 @@ export default function SettingsScreen() {
               style={[
                 s.appIcon,
                 {
-                  backgroundColor: C.iconGreen,
-                  borderColor: alpha(C.green, 0.24),
+                  borderColor: C.border,
                 },
               ]}
             >
-              <MaterialCommunityIcons
-                name="movie-open"
-                size={24}
-                color={C.teal}
+              <Image
+                source={appLogo}
+                style={{ width: 50, height: 50 }}
+                contentFit="contain"
               />
             </View>
             <View style={{ flex: 1 }}>
               <Text allowFontScaling={false} style={[s.aboutName, { color: C.text }]}>
-                Watch Flix
+                Seelogd
               </Text>
               <Text allowFontScaling={false} style={[s.aboutMeta, { color: C.muted }]}>
-                created by ismail ozturk · © 2025
+                {i18nText("autoI18n.created_by", "Oluşturan: İsmail Öztürk · © 2025")}
               </Text>
-              <Text
-                allowFontScaling={false}
-                style={[s.aboutMeta, { marginTop: 2, fontSize: 10, color: C.muted }]}
-              >
-                Veriler TMDB API'sinden alınmıştır.
-              </Text>
+              {/* Veri kaynaklarının resmî logoları: içerik TMDB'den, izleme
+                  sağlayıcısı (watch provider) verisi JustWatch'tan geliyor;
+                  ikisinin de koşulları kaynağın görünür olmasını istiyor.
+                  Dar ekranda ikinci logo alt satıra iner (flexWrap). */}
+              <View style={s.attributionRow}>
+                <TmdbLogo width={72} />
+                <JustWatchLogo width={64} />
+              </View>
             </View>
-            <View style={[s.versionBadge, { backgroundColor: C.accentDim }]}>
-              <Text
-                allowFontScaling={false}
-                style={[s.versionText, { color: C.accentStrong }]}
-              >
-                v1.1.0
-              </Text>
+            <View style={{ alignItems: "flex-end", gap: 6 }}>
+              <View style={[s.versionBadge, { backgroundColor: C.borderMuted }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[s.versionText, { color: C.text }]}
+                >
+                  {APP_VERSION}
+                </Text>
+              </View>
+              <Chevron color={C.muted} />
             </View>
-          </View>
+          </TouchableOpacity>
         </SwipeCard>
 
-        <Modal
-          animationType="fade"
-          transparent
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
+        <GlassBox role="card" style={[s.card, s.debugCard, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow colors={C} iconBg={C.iconBlue} iconColor={C.blue}
+            iconName="analytics-outline" title="Debug"
+            onPress={() => navigation.navigate("UsageDebugScreen")}
+            right={<Chevron color={C.muted} />} last />
+        </GlassBox>
+
+        {/* ── Çıkış: tehlikeli işlem en altta ── */}
+        <SectionLabel color={C.danger}>
+          {(t.logout || "Çıkış Yap").toUpperCase()}
+        </SectionLabel>
+        <GlassBox role="card" style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <SettingRow
+            colors={C}
+            iconBg={C.dangerDim}
+            iconColor={C.danger}
+            iconName="log-out-outline"
+            title={t.logout || "Çıkış Yap"}
+            subtitle={i18nText("autoI18n.cikis_yap_aciklama", "Hesabından güvenli bir şekilde çıkış yap")}
+            danger
+            last
+            onPress={() => setModalVisibleLogout(true)}
+            right={<Chevron color={C.danger} />}
+          />
+        </GlassBox>
+
+        <BottomSheetModal
+          visible={providerModalVisible}
+          onClose={() => {
+            setProviderModalVisible(false);
+            setProviderSearch("");
+          }}
+          sheetStyle={[
+            s.sheet,
+            s.providerSheet,
+            { backgroundColor: C.card, borderColor: C.border },
+          ]}
         >
-          <View style={s.modalOverlay}>
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              onPress={() => setModalVisible(false)}
-            />
-            <BlurView
-              tint="dark"
-              intensity={50}
-              experimentalBlurMethod="dimezisBlurView"
-              style={StyleSheet.absoluteFill}
-            />
-            <View
-              style={[
-                s.modalBox,
-                { backgroundColor: C.card, borderColor: C.border },
-              ]}
-            >
-              <View
+              <View style={[s.sheetHandle, { backgroundColor: C.handle }]} />
+              <View style={s.sheetHeader}>
+                <View style={s.sheetTitleRow}>
+                  <AppIcon name="play-circle-outline" size={20} color={C.text} />
+                  <Text allowFontScaling={false} style={[s.sheetTitle, { color: C.text }]}>
+                    {i18nText("autoI18n.platform_uyeliklerim", "Platform üyeliklerim")}
+                  </Text>
+                </View>
+                <GlassCloseButton
+                  size={30}
+                  fallbackRadius={15}
+                  iconSize={16}
+                  color={C.muted}
+                  backgroundColor={C.closeBg}
+                  onPress={() => {
+                    setProviderModalVisible(false);
+                    setProviderSearch("");
+                  }}
+                />
+              </View>
+              <Text allowFontScaling={false} style={[s.providerHelp, { color: C.muted }]}>
+                {i18nText("autoI18n.platform_uyelikleri_aciklama", "Üyesi olduğun servisleri seç. Film ve dizi ana ekranlarında sana özel bir alan oluşturulur.")}
+              </Text>
+              <GlassBox role="field"
                 style={[
-                  s.iconWrap,
-                  {
-                    backgroundColor: C.dangerDim,
-                    alignSelf: "center",
-                    width: 52,
-                    height: 52,
-                    borderRadius: 16,
-                    marginBottom: 14,
-                  },
+                  s.providerSearchBox,
+                  { backgroundColor: C.cardAlt, borderColor: C.border },
                 ]}
               >
-                <Ionicons name="trash-outline" size={24} color={C.danger} />
+                <AppIcon name="search-outline" size={17} color={C.muted} />
+                <TextInput
+                  allowFontScaling={false}
+                  style={[s.providerSearchInput, { color: C.text }]}
+                  placeholder={i18nText("autoI18n.platform_ara", "Platform ara...")}
+                  placeholderTextColor={C.muted}
+                  value={providerSearch}
+                  onChangeText={setProviderSearch}
+                  maxLength={80}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+                {providerSearch.length > 0 && (
+                  <TouchableOpacity onPress={() => setProviderSearch("")}>
+                    <AppIcon name="close-circle" size={17} color={C.muted} />
+                  </TouchableOpacity>
+                )}
+              </GlassBox>
+              <View style={s.providerListMeta}>
+                <Text style={[s.providerListMetaText, { color: C.muted }]}>
+                  {i18nText("autoI18n.n_platform", "{{count}} platform", {
+                    count: filteredProviders.length,
+                  })}
+                </Text>
+                {streamingProviderIds.length > 0 && (
+                  <TouchableOpacity onPress={() => changeStreamingProviderIds([])}>
+                    <Text style={[s.providerClearText, { color: C.accent }]}>
+                      {i18nText("autoI18n.secimi_temizle", "Seçimi temizle")}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <Text allowFontScaling={false} style={[s.modalTitle, { color: C.text }]}>
-                {t.clearCacheMessage}
-              </Text>
-              <View style={s.modalButtons}>
-                <TouchableOpacity
-                  style={[
-                    s.btnCancel,
-                    { backgroundColor: C.cardAlt, borderColor: C.border },
-                  ]}
-                  onPress={() => setModalVisible(false)}
-                >
-                  <Text allowFontScaling={false} style={[s.btnText, { color: C.text }]}>
-                    {t.cancel}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.btnConfirm, { backgroundColor: C.danger }]}
-                  onPress={() => {
-                    handleClearCache();
-                    setModalVisible(false);
+              {providerCatalogLoading ? (
+                <View style={s.providerLoading}>
+                  <ActivityIndicator size="small" color={C.accent} />
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredProviders}
+                  keyExtractor={(provider) => String(provider.id)}
+                  numColumns={3}
+                  style={s.providerList}
+                  contentContainerStyle={s.providerListContent}
+                  columnWrapperStyle={s.providerColumn}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    <View style={s.providerEmpty}>
+                      <AppIcon name="search-outline" size={26} color={C.muted} />
+                      <Text style={[s.providerEmptyText, { color: C.muted }]}>
+                        {i18nText("autoI18n.platform_bulunamadi", "Platform bulunamadı")}
+                      </Text>
+                    </View>
+                  }
+                  renderItem={({ item: provider }) => {
+                    const selected = streamingProviderIds.includes(provider.id);
+                    return (
+                      <TouchableOpacity
+                        activeOpacity={0.75}
+                        onPress={() => toggleStreamingProvider(provider.id)}
+                        style={[
+                          s.providerTile,
+                          {
+                            backgroundColor: selected ? C.accentDim : C.cardAlt,
+                            borderColor: selected ? C.accent : C.border,
+                          },
+                        ]}
+                      >
+                        {provider.logoPath ? (
+                          <Image
+                            source={{ uri: getTmdbUrl(provider.logoPath, "logo", 92) }}
+                            style={s.providerLogoImage}
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                          />
+                        ) : (
+                          <View style={[s.providerLogo, { backgroundColor: C.accent }]}>
+                            <Text style={s.providerLogoText}>{provider.name.slice(0, 1)}</Text>
+                          </View>
+                        )}
+                        <Text
+                          allowFontScaling={false}
+                          numberOfLines={2}
+                          style={[s.providerName, { color: selected ? C.accent : C.text }]}
+                        >
+                          {provider.name}
+                        </Text>
+                        <View style={[s.providerSelectionIcon, { backgroundColor: C.card }]}>
+                          <AppIcon
+                            name={selected ? "checkmark-circle" : "ellipse-outline"}
+                            size={18}
+                            color={selected ? C.accent : C.muted}
+                          />
+                        </View>
+                      </TouchableOpacity>
+                    );
                   }}
-                >
-                  <Text allowFontScaling={false} style={[s.btnText, { color: C.white }]}>
-                    {t.confirm}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
+                />
+              )}
+              <GlassTouchable
+                activeOpacity={0.8}
+                onPress={() => {
+                  setProviderModalVisible(false);
+                  setProviderSearch("");
+                }}
+                style={[s.providerDone, { backgroundColor: C.accent }]}
+              >
+                <Text style={s.providerDoneText}>
+                  {i18nText("autoI18n.tamam", "Tamam")}
+                </Text>
+              </GlassTouchable>
+              <Text allowFontScaling={false} style={[s.providerAttribution, { color: C.muted }]}>
+                {t.justwatchAttribution}
+              </Text>
+        </BottomSheetModal>
 
         <Modal
-          animationType="slide"
+          animationType="none"
           transparent
-          visible={langModalVisible}
+          visible={langSheet.mounted}
           onRequestClose={() => {
             setLangModalVisible(false);
             setLangSearch("");
@@ -524,7 +1278,9 @@ export default function SettingsScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
           >
-            <View style={s.sheetOverlay}>
+            {/* onLayout: KeyboardAvoidingView pencereyi daralttığında sayfa
+                zaten yükselmiş olur; ölçüm çift kaymayı engeller. */}
+            <View style={s.sheetOverlay} onLayout={langSheet.onOverlayLayout}>
               <TouchableOpacity
                 style={StyleSheet.absoluteFill}
                 activeOpacity={1}
@@ -533,22 +1289,31 @@ export default function SettingsScreen() {
                   setLangSearch("");
                 }}
               />
-              <BlurView
-                tint="dark"
-                intensity={40}
-                experimentalBlurMethod="dimezisBlurView"
-                style={StyleSheet.absoluteFill}
-              />
-              <View
+              {/* Blur YERİNDE solar — sayfayla birlikte kaymaz. */}
+              <Animated.View
                 style={[
-                  s.sheet,
-                  { backgroundColor: C.card, borderColor: C.border },
+                  StyleSheet.absoluteFill,
+                  { opacity: langSheet.backdropOpacity },
+                ]}
+              >
+                <ModalBlurBackdrop intensity={40} />
+              </Animated.View>
+              {/* fit: arama kutusu klavyeyi açınca sayfa, klavyenin üstünde kalan
+                  alana sığacak şekilde kısalır (liste kendi içinde kayar). */}
+              <Animated.View
+                onLayout={langSheet.onSheetLayout}
+                style={[
+                  langSheet.fit([
+                    s.sheet,
+                    { backgroundColor: C.card, borderColor: C.border },
+                  ]),
+                  langSheet.sheetStyle,
                 ]}
               >
                 <View style={[s.sheetHandle, { backgroundColor: C.handle }]} />
                 <View style={s.sheetHeader}>
                   <View style={s.sheetTitleRow}>
-                    <Ionicons
+                    <AppIcon
                       name="language-outline"
                       size={20}
                       color={C.text}
@@ -557,59 +1322,101 @@ export default function SettingsScreen() {
                       {t.language}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    style={[s.closeBtn, { backgroundColor: C.closeBg }]}
+                  <GlassCloseButton
+                    size={30}
+                    fallbackRadius={15}
+                    iconSize={16}
+                    color={C.muted}
+                    backgroundColor={C.closeBg}
                     onPress={() => {
                       setLangModalVisible(false);
                       setLangSearch("");
                     }}
-                  >
-                    <Ionicons name="close" size={16} color={C.muted} />
-                  </TouchableOpacity>
+                  />
                 </View>
 
-                <View
+                <GlassBox role="field"
                   style={[
                     s.searchBox,
                     { borderColor: C.border, backgroundColor: C.cardAlt },
                   ]}
                 >
-                  <Ionicons name="search-outline" size={16} color={C.muted} />
+                  <AppIcon name="search-outline" size={16} color={C.muted} />
                   <TextInput
                     allowFontScaling={false}
                     style={[s.searchInput, { color: C.text }]}
-                    placeholder="Dil ara..."
+                    placeholder={t.searchLanguage}
                     placeholderTextColor={C.muted}
                     value={langSearch}
                     onChangeText={setLangSearch}
+                    maxLength={80}
                     autoCorrect={false}
                     autoCapitalize="none"
                   />
                   {langSearch.length > 0 && (
                     <TouchableOpacity onPress={() => setLangSearch("")}>
-                      <Ionicons name="close-circle" size={16} color={C.muted} />
+                      <AppIcon name="close-circle" size={16} color={C.muted} />
                     </TouchableOpacity>
                   )}
-                </View>
+                </GlassBox>
 
                 <FlatList
-                  data={filteredLanguages}
+                  data={languageRows}
                   keyExtractor={(i) => i.code}
                   style={{ maxHeight: 320 }}
                   showsVerticalScrollIndicator={false}
                   ListEmptyComponent={
                     <View style={s.emptyContainer}>
-                      <Ionicons
+                      <AppIcon
                         name="search-outline"
                         size={28}
                         color={C.muted}
                       />
                       <Text allowFontScaling={false} style={[s.emptyText, { color: C.muted }]}>
-                        Dil bulunamadı
+                        {t.languageNotFound}
                       </Text>
                     </View>
                   }
                   renderItem={({ item }) => {
+                    if (item.header) {
+                      return (
+                        <View style={s.langSoonHeader}>
+                          <Text allowFontScaling={false} style={[s.langSoonHeaderText, { color: C.muted }]}>
+                            {i18nText("autoI18n.language_coming_soon", "Yakında").toLocaleUpperCase(intlLocaleOf(language))}
+                          </Text>
+                          <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
+                            {i18nText("autoI18n.language_more_soon_hint", "Daha fazla dil üzerinde çalışıyoruz")}
+                          </Text>
+                        </View>
+                      );
+                    }
+                    if (item.soon) {
+                      return (
+                        <View
+                          style={[s.langItem, s.langItemSoon]}
+                          accessible
+                          accessibilityState={{ disabled: true }}
+                          accessibilityLabel={`${item.nativeName}, ${i18nText("autoI18n.language_coming_soon", "Yakında")}`}
+                        >
+                          <View style={s.langItemLeft}>
+                            <CountryFlag isoCode={item.flag} size={28} style={{ borderRadius: 6 }} />
+                            <View>
+                              <Text allowFontScaling={false} style={[s.langItemName, { color: C.text, fontWeight: "500" }]}>
+                                {item.nativeName}
+                              </Text>
+                              <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
+                                {item.name}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={[s.langSoonPill, { backgroundColor: C.accentDim }]}>
+                            <Text allowFontScaling={false} style={[s.langSoonPillText, { color: C.accent }]}>
+                              {i18nText("autoI18n.language_coming_soon", "Yakında")}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    }
                     const sel = item.code === language;
                     return (
                       <TouchableOpacity
@@ -645,7 +1452,7 @@ export default function SettingsScreen() {
                           </View>
                         </View>
                         {sel && (
-                          <Ionicons
+                          <AppIcon
                             name="checkmark-circle"
                             size={20}
                             color={C.accent}
@@ -655,16 +1462,96 @@ export default function SettingsScreen() {
                     );
                   }}
                 />
-              </View>
+              </Animated.View>
             </View>
           </KeyboardAvoidingView>
+          <ModalToastHost visible={langModalVisible} />
         </Modal>
-      </ScrollView>
+
+        {/* Çıkış onayı alt sayfası */}
+        <ConfirmSheet
+          visible={modalVisibleLogout}
+          onClose={() => setModalVisibleLogout(false)}
+          onConfirm={() => {
+            setModalVisibleLogout(false);
+            handleSignOut();
+          }}
+          icon="log-out-outline"
+          tone="danger"
+          title={t.logout || "Çıkış Yap"}
+          message={
+            t.profileScreen?.logoutMessage ||
+            i18nText(
+              "autoI18n.cikis_onay_mesaj",
+              "Hesabından çıkış yapmak istediğine emin misin?",
+            )
+          }
+          confirmLabel={t.logout || "Çıkış Yap"}
+          cancelLabel={t.cancel || "İptal"}
+        />
+
+        <ImportDataModal
+          visible={showImportModal}
+          onClose={() => setShowImportModal(false)}
+        />
+      </MarkedScrollView>
     </View>
   );
 }
 
 const s = StyleSheet.create({
+  // ── "Verileri indir" tür seçici ───────────────────────────────────────────
+  // Üstteki SettingRow'un alt çizgisi ayırıcı görevi görür; burada tekrar
+  // kenarlık verilmez (yoksa 2px'lik çift çizgi oluşur).
+  dataTypes: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  dataTypesHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 9,
+  },
+  dataTypesTitle: { fontSize: 11.5, fontWeight: "800" },
+  dataTypesSub: { fontSize: 9, marginTop: 2, lineHeight: 12 },
+  dataTypesAction: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
+  dataTypesActionText: { fontSize: 8.5, fontWeight: "800" },
+  dataTypesWarn: { fontSize: 9.5, fontWeight: "700", marginBottom: 8 },
+  dataTypeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  dataTypeButton: {
+    width: "31.8%",
+    minHeight: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingLeft: 6,
+    paddingRight: 13,
+    paddingVertical: 6,
+  },
+  dataTypeIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  dataTypeLabel: { flex: 1, fontSize: 8.8, fontWeight: "700", lineHeight: 11 },
+  dataTypeCheck: {
+    position: "absolute",
+    top: 3,
+    right: 3,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   root: {
     flex: 1,
   },
@@ -675,29 +1562,20 @@ const s = StyleSheet.create({
   scrollContent: {
     paddingBottom: 110,
   },
-  lottie: {
-    position: "absolute",
-    top: 0,
-    height: 1000,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  lottie1: {
-    position: "absolute",
-    top: 1000,
-    height: 1000,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
+  // Üst boşluk (marginTop) çalışma zamanında güvenli alandan gelir: bkz.
+  // utils/screenTopSpacing.js. Sabit satır yüksekliği iOS/Android'de başlık
+  // kutusunu eşitler (Android'in font dolgusu yüzünden farklı yükseklik çıkmasın).
   pageTitle: {
     fontSize: 26,
+    lineHeight: 32,
     fontWeight: "700",
     textAlign: "center",
-    marginTop: 40,
-    marginBottom: 20,
+    marginBottom: 8,
     letterSpacing: -0.5,
+    includeFontPadding: false,
+  },
+  firstSectionLabel: {
+    marginTop: 8,
   },
   sectionLabel: {
     fontSize: 10.5,
@@ -711,6 +1589,14 @@ const s = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     overflow: "hidden",
+  },
+  // Aynı grup etiketinin altında alt alta duran kartlar arası boşluk (dil kartı +
+  // satır kartı, tema kartı + satır kartı, kalite kartı + satır kartı).
+  cardStacked: {
+    marginTop: 10,
+  },
+  debugCard: {
+    marginTop: 12,
   },
   row: {
     flexDirection: "row",
@@ -749,6 +1635,31 @@ const s = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
+  providerCountWrap: { flexDirection: "row", alignItems: "center", gap: 8 },
+  providerCount: { minWidth: 24, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  providerCountText: { fontSize: 11, fontWeight: "800" },
+  providerSheet: { maxHeight: "88%" },
+  providerHelp: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
+  providerSearchBox: { height: 44, borderRadius: 13, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 9 },
+  providerSearchInput: { flex: 1, fontSize: 13, paddingVertical: 0 },
+  providerListMeta: { minHeight: 36, paddingHorizontal: 2, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  providerListMetaText: { fontSize: 10.5, fontWeight: "600" },
+  providerClearText: { fontSize: 11, fontWeight: "700" },
+  providerList: { flexGrow: 0, maxHeight: 410 },
+  providerListContent: { gap: 8, paddingBottom: 4 },
+  providerColumn: { gap: 8 },
+  providerLoading: { height: 180, alignItems: "center", justifyContent: "center" },
+  providerEmpty: { height: 150, alignItems: "center", justifyContent: "center", gap: 8 },
+  providerEmptyText: { fontSize: 12 },
+  providerTile: { width: "31.7%", minHeight: 108, borderWidth: 1, borderRadius: 14, paddingHorizontal: 7, paddingVertical: 10, alignItems: "center", justifyContent: "center", gap: 7 },
+  providerLogo: { width: 46, height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  providerLogoImage: { width: 46, height: 46, borderRadius: 12, backgroundColor: "#FFFFFF" },
+  providerLogoText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
+  providerName: { minHeight: 26, fontSize: 10.5, lineHeight: 13, fontWeight: "700", textAlign: "center" },
+  providerSelectionIcon: { position: "absolute", top: 5, right: 5, width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  providerDone: { height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center", marginTop: 20 },
+  providerDoneText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
+  providerAttribution: { textAlign: "center", fontSize: 9, marginTop: 10 },
   langCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -783,14 +1694,6 @@ const s = StyleSheet.create({
     borderRadius: 6,
     overflow: "hidden",
     borderWidth: 1,
-  },
-  themeHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
   },
   qualityHeader: {
     flexDirection: "row",
@@ -852,6 +1755,15 @@ const s = StyleSheet.create({
     fontSize: 11.5,
     marginTop: 3,
   },
+  // TMDB + JustWatch logoları yan yana; sığmazsa alt satıra sarar.
+  attributionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    columnGap: 10,
+    rowGap: 6,
+    marginTop: 8,
+  },
   versionBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -860,48 +1772,6 @@ const s = StyleSheet.create({
   versionText: {
     fontSize: 11,
     fontWeight: "700",
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalBox: {
-    borderRadius: 22,
-    padding: 28,
-    marginHorizontal: 32,
-    width: "85%",
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: 16,
-    textAlign: "center",
-    fontWeight: "500",
-    marginBottom: 22,
-    lineHeight: 22,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    gap: 10,
-    width: "100%",
-  },
-  btnCancel: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
-    alignItems: "center",
-    borderWidth: 1,
-  },
-  btnConfirm: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-  btnText: {
-    fontWeight: "700",
-    fontSize: 14,
   },
   sheetOverlay: {
     flex: 1,
@@ -938,13 +1808,6 @@ const s = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
   },
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -978,6 +1841,30 @@ const s = StyleSheet.create({
   },
   langItemName: {
     fontSize: 15,
+  },
+  // Henüz desteklenmeyen dil: soluk, dokunulamaz satır + "Yakında" hapı.
+  langItemSoon: {
+    opacity: 0.62,
+  },
+  langSoonPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  langSoonPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  langSoonHeader: {
+    paddingTop: 10,
+    paddingBottom: 8,
+    paddingHorizontal: 4,
+    gap: 2,
+  },
+  langSoonHeaderText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
   },
   emptyContainer: {
     alignItems: "center",

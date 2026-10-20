@@ -1,0 +1,109 @@
+diff --git a/node_modules/liquid-glass-kit/android/src/main/java/expo/modules/liquidglass/ExpoLiquidGlassModule.kt b/node_modules/liquid-glass-kit/android/src/main/java/expo/modules/liquidglass/ExpoLiquidGlassModule.kt
+index fdbc794..ef191de 100644
+--- a/node_modules/liquid-glass-kit/android/src/main/java/expo/modules/liquidglass/ExpoLiquidGlassModule.kt
++++ b/node_modules/liquid-glass-kit/android/src/main/java/expo/modules/liquidglass/ExpoLiquidGlassModule.kt
+@@ -2,6 +2,9 @@ package expo.modules.liquidglass
+ 
+ import android.content.Context
+ import android.graphics.Canvas
++import android.graphics.RuntimeShader
++import android.os.Build
++import dev.liquidglass.core.LiquidGlassShaders
+ import android.view.MotionEvent
+ import dev.liquidglass.view.CORNER_RADIUS_CAPSULE
+ import dev.liquidglass.view.GlassViewController
+@@ -9,6 +12,7 @@ import expo.modules.kotlin.AppContext
+ import expo.modules.kotlin.modules.Module
+ import expo.modules.kotlin.modules.ModuleDefinition
+ import expo.modules.kotlin.views.ExpoView
++import expo.modules.kotlin.viewevent.EventDispatcher
+ 
+ /**
+  * Native side of `<LiquidGlassView>`: the glass engine drawn directly on the
+@@ -20,7 +24,17 @@ class ExpoLiquidGlassModule : Module() {
+     override fun definition() = ModuleDefinition {
+         Name("ExpoLiquidGlass")
+ 
++        Function("isShaderAvailable") {
++            if (Build.VERSION.SDK_INT < 33) false else try {
++                RuntimeShader(LiquidGlassShaders.LIQUID_GLASS)
++                true
++            } catch (_: RuntimeException) {
++                false
++            }
++        }
++
+         View(LiquidGlassExpoView::class) {
++            Events("onRenderStatus")
+             Prop("providerId") { view: LiquidGlassExpoView, id: String ->
+                 view.providerId = id
+             }
+@@ -71,6 +85,14 @@ class LiquidGlassExpoView(
+ 
+     /** The embedded glass engine; props from JS are applied to it directly. */
+     val glass = GlassViewController(this)
++    private val onRenderStatus by EventDispatcher()
++    private var renderStatus: String? = null
++
++    private fun reportStatus(status: String) {
++        if (renderStatus == status) return
++        renderStatus = status
++        onRenderStatus(mapOf("status" to status))
++    }
+ 
+     var providerId: String = "default"
+         set(value) {
+@@ -102,6 +124,18 @@ class LiquidGlassExpoView(
+ 
+     override fun onDraw(canvas: Canvas) {
+         super.onDraw(canvas)
+-        glass.draw(canvas)
++        if (renderStatus == "failed") return
++        if (!canvas.isHardwareAccelerated) {
++            reportStatus("failed")
++            return
++        }
++        if (glass.provider?.hasRecording != true) return
++        try {
++            glass.draw(canvas)
++            reportStatus("ready")
++        } catch (_: RuntimeException) {
++            glass.onHostDetached()
++            reportStatus("failed")
++        }
+     }
+ }
+diff --git a/node_modules/liquid-glass-kit/android/src/main/java/expo/modules/liquidglass/ExpoLiquidGlassProviderModule.kt b/node_modules/liquid-glass-kit/android/src/main/java/expo/modules/liquidglass/ExpoLiquidGlassProviderModule.kt
+index f1f9584..49e97c0 100644
+--- a/node_modules/liquid-glass-kit/android/src/main/java/expo/modules/liquidglass/ExpoLiquidGlassProviderModule.kt
++++ b/node_modules/liquid-glass-kit/android/src/main/java/expo/modules/liquidglass/ExpoLiquidGlassProviderModule.kt
+@@ -21,6 +21,10 @@ class ExpoLiquidGlassProviderModule : Module() {
+         Name("ExpoLiquidGlassProvider")
+ 
+         View(LiquidGlassProviderExpoView::class) {
++            Prop("recordingEnabled") { view: LiquidGlassProviderExpoView, enabled: Boolean ->
++                view.recordingEnabled = enabled
++                view.invalidate()
++            }
+             Prop("providerId") { view: LiquidGlassProviderExpoView, id: String ->
+                 view.providerId = id
+             }
+@@ -34,6 +38,7 @@ class LiquidGlassProviderExpoView(
+ ) : ExpoView(context, appContext), LiquidGlassBackdropSource {
+ 
+     private val recorder = BackdropRecorder()
++    var recordingEnabled: Boolean = true
+ 
+     var providerId: String = "default"
+         set(value) {
+@@ -59,6 +64,10 @@ class LiquidGlassProviderExpoView(
+     override fun unregisterConsumer(consumer: View) = recorder.unregister(consumer)
+ 
+     override fun dispatchDraw(canvas: Canvas) {
++        if (!recordingEnabled) {
++            super.dispatchDraw(canvas)
++            return
++        }
+         recorder.drawRecorded(canvas, width, height) { target ->
+             super.dispatchDraw(target)
+         }

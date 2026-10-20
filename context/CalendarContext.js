@@ -2,294 +2,146 @@ import React, {
   createContext,
   useContext,
   useState,
-  useEffect,
   useCallback,
   useMemo,
 } from "react";
-import { useAppSettings } from "./AppSettingsContext";
-import { useAuth } from "./AuthContext";
-import { db } from "../firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import {
+  useImageQualitySettings,
+} from "./AppSettingsContext";
+import useUserDataDomain from "../hooks/useUserDataDomain";
+import { notesDomain, remindersDomain } from "../services/userData";
 
 const CalendarContext = createContext();
 
-const TMDB_BASE = "https://api.themoviedb.org/3";
-
-// TMDB için izin verilen maksimum gün aralığı: isteğe bağlı
-export const RANGE_OPTIONS = [
-  { label: "1 Ay", days: 30 },
-  { label: "2 Ay", days: 60 },
-  { label: "3 Ay", days: 90 },
-];
+// Tür renkleri — takvimdeki noktalar, açıklama çipleri ve ajanda satırları aynı
+// değerleri okur. Daha önce nokta (128,0,128) ile çipler (#AF00AF) farklıydı.
+export const EVENT_COLORS = {
+  note: "#138DF0",
+  movie: "#FF7C25",
+  tv: "#AF00AF",
+};
 
 function toDateStr(date) {
-  return date.toISOString().split("T")[0];
-}
-
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
+  // Yerel tarih bileşenleri: toISOString UTC gösterdiği için UTC+3'te
+  // 00:00-03:00 arasında "bugün" bir gün geride kalıyordu (etkinlik
+  // anahtarları yerel YYYY-MM-DD formatında tutuluyor).
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 export const CalendarProvider = ({ children }) => {
-  const { API_KEY, selectedLanguage, imageQuality } = useAppSettings();
-  const POSTER_BASE = `https://image.tmdb.org/t/p/${imageQuality.poster || "w185"}`;
-  const { user } = useAuth();
+  const { getTmdbUrl } = useImageQualitySettings();
 
-  // Kullanıcı seçtiği tarih aralığı (gün)
-  const [rangeDays, setRangeDays] = useState(60);
+  // Takvim ayrı Firestore dinleyicisi AÇMAZ: notlar ve hatırlatıcılar profil
+  // ekranlarıyla AYNI yerel kopyadan (services/userData) türetilir. Eskiden
+  // burası Notes + Reminders'ı (2 + N dinleyici) ikinci kez, tüm belgeleriyle
+  // okuyordu; bir not eklenince iki ekran iki ayrı yoldan güncelleniyordu.
+  const notesView = useUserDataDomain(notesDomain);
+  const remindersView = useUserDataDomain(remindersDomain);
+  const tvReminderEpisodes = remindersView.lists.episodes; // flat list of episode docs
 
-  // TMDB etkinlikleri (tüm takvim için gösterim)
-  const [movieEvents, setMovieEvents] = useState({});
-  const [tvEvents, setTvEvents] = useState({});
-
-  // Kullanıcı verileri (widget için)
-  const [noteEvents, setNoteEvents] = useState({}); // from Notes/{uid}
-  const [reminderEvents, setReminderEvents] = useState({}); // from Reminders/{uid}
-
-  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
-  const [lastFetch, setLastFetch] = useState(null);
-  const [lastRangeDays, setLastRangeDays] = useState(null);
-
-  /* ── Firebase: Notes dinleyici ── */
-  useEffect(() => {
-    if (!user) return;
-    const docRef = doc(db, "Notes", user.uid);
-    const unsub = onSnapshot(docRef, (snap) => {
-      if (!snap.exists()) return;
-      const allNotes = snap.data().notes || [];
-      const nMap = {};
-      allNotes.forEach((n) => {
-        if (!n.scheduledDate) return;
-        const d = n.scheduledDate;
-        if (!nMap[d]) nMap[d] = [];
-        nMap[d].push({ ...n, eventType: "note" });
-      });
-      setNoteEvents(nMap);
+  // Zamanlanmış notlar → tarih bazlı harita
+  const noteEvents = useMemo(() => {
+    const nMap = {};
+    notesView.lists.items.forEach((n) => {
+      if (!n.scheduledDate) return;
+      if (!nMap[n.scheduledDate]) nMap[n.scheduledDate] = [];
+      nMap[n.scheduledDate].push({ ...n, eventType: "note", date: n.scheduledDate });
     });
-    return unsub;
-  }, [user]);
+    return nMap;
+  }, [notesView]);
 
-  /* ── Firebase: Reminders dinleyici ── */
-  useEffect(() => {
-    if (!user) return;
-    const docRef = doc(db, "Reminders", user.uid);
-    const unsub = onSnapshot(docRef, (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-
-      const rMap = {};
-
-      // Film hatırlatıcıları
-      (data.movieReminders || []).forEach((m) => {
-        const d = m.releaseDate;
-        if (!d) return;
-        if (!rMap[d]) rMap[d] = [];
-        rMap[d].push({
-          id: m.movieId,
-          title: m.movieName,
-          poster: m.posterPath ? POSTER_BASE + m.posterPath : null,
-          type: "movie",
-          eventType: "reminder_movie",
-          date: d,
-        });
+  // Film hatırlatıcıları → tarih bazlı harita
+  const movieReminderEvents = useMemo(() => {
+    const mMap = {};
+    remindersView.lists.movies.forEach((m) => {
+      const date = m.releaseDate;
+      if (!date) return;
+      if (!mMap[date]) mMap[date] = [];
+      mMap[date].push({
+        id:        m.movieId,
+        title:     m.movieName,
+        poster:    m.posterPath ? getTmdbUrl(m.posterPath, "poster", 200) : null,
+        type:      "movie",
+        eventType: "reminder_movie",
+        date,
       });
-
-      // Dizi hatırlatıcıları (tüm bölümler düzleştirilerek)
-      (data.tvReminders || []).forEach((show) => {
-        (show.seasons || []).forEach((season) => {
-          (season.episodes || []).forEach((ep) => {
-            const d = ep.airDate;
-            if (!d) return;
-            if (!rMap[d]) rMap[d] = [];
-            rMap[d].push({
-              id: show.showId,
-              title: `${show.showName} - Bölüm ${ep.episodeNumber}`,
-              poster: season.seasonPosterPath
-                ? `https://image.tmdb.org/t/p/w185${season.seasonPosterPath}`
-                : null,
-              type: "tv",
-              eventType: "reminder_tv",
-              date: d,
-            });
-          });
-        });
-      });
-
-      setReminderEvents(rMap);
     });
-    return unsub;
-  }, [user]);
+    return mMap;
+  }, [remindersView, getTmdbUrl]);
 
-  /* ── TMDB fetch ── */
-  const fetchTmdbEvents = useCallback(
-    async (forceDays) => {
-      if (!API_KEY) return;
-      const days = forceDays ?? rangeDays;
+  // Tüm hatırlatıcıları tek bir tarih-bazlı map olarak birleştir
+  const reminderEvents = useMemo(() => {
+    const rMap = {};
+    Object.entries(movieReminderEvents).forEach(([d, arr]) => {
+      rMap[d] = [...(rMap[d] || []), ...arr];
+    });
+    tvReminderEpisodes.forEach((ep) => {
+      const d = ep.airDate;
+      if (!d) return;
+      if (!rMap[d]) rMap[d] = [];
+      rMap[d].push({
+        id:            ep.showId,
+        episodeId:     ep.episodeId,
+        seasonNumber:  ep.seasonNumber,
+        episodeNumber: ep.episodeNumber,
+        showName:      ep.showName,
+        title:         `${ep.showName} - S${ep.seasonNumber}B${ep.episodeNumber}`,
+        poster:        ep.seasonPosterPath
+                         ? getTmdbUrl(ep.seasonPosterPath, "poster", 200)
+                         : (ep.showPosterPath
+                             ? getTmdbUrl(ep.showPosterPath, "poster", 200)
+                             : null),
+        type:          "tv",
+        eventType:     "reminder_tv",
+        date:          d,
+      });
+    });
+    return rMap;
+  }, [movieReminderEvents, tvReminderEpisodes]);
 
-      // Cache: aynı rangeDays ve 1 saat içindeyse tekrar çekme
-      if (
-        lastFetch &&
-        Date.now() - lastFetch < 60 * 60 * 1000 &&
-        lastRangeDays === days
-      )
-        return;
+  // Yerel kopya hazır değilken (yalnız yeni cihazda tek seferlik indirme sırasında)
+  // yükleniyor görünür; normal açılışta hep false.
+  const isLoadingEventsBase =
+    (!notesView.ready && notesView.hydrating) ||
+    (!remindersView.ready && remindersView.hydrating);
+  const [flash, setFlash] = useState(false);
+  const isLoadingEvents = isLoadingEventsBase || flash;
 
-      setIsLoadingEvents(true);
-      const now = new Date();
-      const gte = toDateStr(now);
-      const lte = toDateStr(addDays(now, days));
-      const lang = selectedLanguage === "tr" ? "tr-TR" : "en-US";
-
-      try {
-        const headers = {
-          Authorization: API_KEY,
-          "Content-Type": "application/json",
-        };
-
-        // TMDB Discover: max 2 sayfa (~40 sonuç)
-        const [movRes1, movRes2, tvRes1, tvRes2] = await Promise.all([
-          fetch(
-            `${TMDB_BASE}/discover/movie?language=${lang}&sort_by=primary_release_date.asc&primary_release_date.gte=${gte}&primary_release_date.lte=${lte}&page=1`,
-            { headers },
-          ),
-          fetch(
-            `${TMDB_BASE}/discover/movie?language=${lang}&sort_by=primary_release_date.asc&primary_release_date.gte=${gte}&primary_release_date.lte=${lte}&page=2`,
-            { headers },
-          ),
-          fetch(
-            `${TMDB_BASE}/discover/tv?language=${lang}&sort_by=first_air_date.asc&first_air_date.gte=${gte}&first_air_date.lte=${lte}&page=1`,
-            { headers },
-          ),
-          fetch(
-            `${TMDB_BASE}/discover/tv?language=${lang}&sort_by=first_air_date.asc&first_air_date.lte=${lte}&first_air_date.gte=${gte}&page=2`,
-            { headers },
-          ),
-        ]);
-
-        const [md1, md2, td1, td2] = await Promise.all([
-          movRes1.json(),
-          movRes2.json(),
-          tvRes1.json(),
-          tvRes2.json(),
-        ]);
-
-        // Duplicate ID temizle
-        const seenMovieIds = new Set();
-        const movies = [...(md1.results || []), ...(md2.results || [])].filter(
-          (m) => {
-            if (seenMovieIds.has(m.id)) return false;
-            seenMovieIds.add(m.id);
-            return true;
-          },
-        );
-
-        const seenTvIds = new Set();
-        const tvShows = [...(td1.results || []), ...(td2.results || [])].filter(
-          (t) => {
-            if (seenTvIds.has(t.id)) return false;
-            seenTvIds.add(t.id);
-            return true;
-          },
-        );
-
-        // Tarihe göre gruplandır
-        const mMap = {};
-        movies.forEach((m) => {
-          const d = m.primary_release_date;
-          if (!d) return;
-          if (!mMap[d]) mMap[d] = [];
-          mMap[d].push({
-            id: m.id,
-            title: m.title,
-            poster: m.poster_path ? POSTER_BASE + m.poster_path : null,
-            type: "movie",
-            eventType: "movie",
-            date: d,
-            rating: m.vote_average,
-          });
-        });
-
-        const tMap = {};
-        tvShows.forEach((t) => {
-          const d = t.first_air_date;
-          if (!d) return;
-          if (!tMap[d]) tMap[d] = [];
-          tMap[d].push({
-            id: t.id,
-            title: t.name,
-            poster: t.poster_path ? POSTER_BASE + t.poster_path : null,
-            type: "tv",
-            eventType: "tv",
-            date: d,
-            rating: t.vote_average,
-          });
-        });
-
-        setMovieEvents(mMap);
-        setTvEvents(tMap);
-        setLastFetch(Date.now());
-        setLastRangeDays(days);
-      } catch (e) {
-        console.warn("TMDB fetch error:", e);
-      } finally {
-        setIsLoadingEvents(false);
-      }
-    },
-    [API_KEY, selectedLanguage, lastFetch, lastRangeDays, rangeDays],
-  );
-
-  useEffect(() => {
-    fetchTmdbEvents();
-  }, [fetchTmdbEvents]);
-
-  /* ── Takvim için markedDates (tüm kaynaklar) ── */
+  /* ── Takvim için markedDates (sadece kullanıcı verileri) ── */
   const markedDates = useMemo(() => {
     const allDates = new Set([
-      ...Object.keys(movieEvents),
-      ...Object.keys(tvEvents),
       ...Object.keys(noteEvents),
       ...Object.keys(reminderEvents),
     ]);
     const result = {};
     allDates.forEach((d) => {
       const dots = [];
-      if (
-        noteEvents[d]?.length ||
-        reminderEvents[d]?.some((i) => i.eventType === "reminder_note")
-      )
-        dots.push({ key: "note", color: "rgb(19, 141, 240)" });
-      if (
-        movieEvents[d]?.length ||
-        reminderEvents[d]?.some((i) => i.eventType === "reminder_movie")
-      )
-        dots.push({ key: "movie", color: "rgb(255, 124, 37)" });
-      if (
-        tvEvents[d]?.length ||
-        reminderEvents[d]?.some((i) => i.eventType === "reminder_tv")
-      )
-        dots.push({ key: "tv", color: "rgb(128, 0, 128)" });
-      result[d] = { dots, marked: true };
+      if (noteEvents[d]?.length) {
+        dots.push({ key: "note", color: EVENT_COLORS.note });
+      }
+      if (reminderEvents[d]?.some((i) => i.eventType === "reminder_movie")) {
+        dots.push({ key: "movie", color: EVENT_COLORS.movie });
+      }
+      if (reminderEvents[d]?.some((i) => i.eventType === "reminder_tv")) {
+        dots.push({ key: "tv", color: EVENT_COLORS.tv });
+      }
+      if (dots.length) result[d] = { dots, marked: true };
     });
     return result;
-  }, [movieEvents, tvEvents, noteEvents, reminderEvents]);
+  }, [noteEvents, reminderEvents]);
 
-  /* ── Seçili günün etkinlikleri ── */
+  /* ── Seçili günün etkinlikleri (sadece kullanıcı verileri) ── */
   const getEventsForDate = useCallback(
     (dateStr) => {
-      const notes = [...(noteEvents[dateStr] || [])];
-      const movies = [
-        ...(movieEvents[dateStr] || []),
-        ...(reminderEvents[dateStr] || []).filter((i) => i.type === "movie"),
-      ];
-      const tvs = [
-        ...(tvEvents[dateStr] || []),
-        ...(reminderEvents[dateStr] || []).filter((i) => i.type === "tv"),
-      ];
+      const notes  = [...(noteEvents[dateStr] || [])];
+      const movies = (reminderEvents[dateStr] || []).filter((i) => i.type === "movie");
+      const tvs    = (reminderEvents[dateStr] || []).filter((i) => i.type === "tv");
       return { notes, movies, tvs };
     },
-    [noteEvents, movieEvents, tvEvents, reminderEvents],
+    [noteEvents, reminderEvents],
   );
 
   /* ── Widget: Sadece kullanıcının eklediği verilerden en yakın 3 etkinlik ── */
@@ -297,12 +149,9 @@ export const CalendarProvider = ({ children }) => {
     const today = toDateStr(new Date());
     const items = [];
 
-    // Notlar (scheduledDate olan)
     Object.entries(noteEvents).forEach(([d, arr]) => {
       if (d >= today) arr.forEach((n) => items.push({ ...n, date: d }));
     });
-
-    // Kullanıcının hatırlatıcıları (film + dizi)
     Object.entries(reminderEvents).forEach(([d, arr]) => {
       if (d >= today) arr.forEach((r) => items.push({ ...r, date: d }));
     });
@@ -310,33 +159,23 @@ export const CalendarProvider = ({ children }) => {
     return items.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3);
   }, [noteEvents, reminderEvents]);
 
-  /* ── Aralık değiştirme ── */
-  const changeRange = useCallback(
-    (days) => {
-      setRangeDays(days);
-      setLastFetch(null); // cache'i sıfırla, yeniden çeksin
-      fetchTmdbEvents(days);
-    },
-    [fetchTmdbEvents],
-  );
+  const refreshEvents = useCallback(() => {
+    // Veri yerel kopyadan geliyor ve her yazmada anında güncelleniyor; yenileme
+    // buluta gitmez. Yalnız UI geri bildirimi için kısa flash.
+    setFlash(true);
+    setTimeout(() => setFlash(false), 300);
+  }, []);
 
   return (
     <CalendarContext.Provider
       value={{
-        movieEvents,
-        tvEvents,
         noteEvents,
         reminderEvents,
         markedDates,
         isLoadingEvents,
         getEventsForDate,
         upcomingItems,
-        rangeDays,
-        changeRange,
-        refreshEvents: () => {
-          setLastFetch(null);
-          fetchTmdbEvents();
-        },
+        refreshEvents,
       }}
     >
       {children}

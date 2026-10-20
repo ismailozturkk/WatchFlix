@@ -1,0 +1,386 @@
+// services/listQuickAdd.js
+//
+// Liste ekranındaki GLOBAL ARAMA'nın taşıma katmanı: TMDB'de ara, seçilen eseri
+// AÇIK OLAN listeye yaz. Karar mantığı yok — hangi tipin kabul edildiği ve
+// sonucun nasıl normalleştiği utils/listSearch.js'te (saf, test edilebilir).
+//
+// NEDEN AYRI DOSYA: "listeye ekle" tek bir işlem değil, listenin modeline göre
+// DÖRT ayrı yazma yolu:
+//
+//   favorites / watchList   → Lists/{uid}/{liste}/{type_id}        (setListMembership)
+//   watchedMovies           → izleme OLAYI ekler                   (markMovieWatched)
+//   watchedTv               → tüm sezon/bölümleri işaretler        (markShowWatched)
+//   özel (kullanıcı listesi) → kök dokümandaki dizi                (setListMembership)
+//
+// Yazmanın kendisi services/libraryActions'ta (sıra, iyimser durum, hata
+// sınıflaması); bu dosya yalnız "arama sonucu → doğru listeye doğru çağrı"yı
+// bilir. Ekran yalnız "ekle" diyor.
+//
+// SÜRE/BÖLÜM OLGULARI: TMDB arama sonucu hafiftir (süre YOK). Liste öğesi ise
+// `minutes` / `totalMinutes` okuyor (ListsScreen süre rozeti + süreye göre
+// sıralama, profil toplam dakika). Bu yüzden yazmadan ÖNCE detay çekilir
+// (tmdbFacts, cache'li). Detay gelmezse ekleme yine yapılır — süresiz bir öğe,
+// hiç eklenmemiş bir öğeden iyidir.
+
+import axios from "axios";
+
+import { searchMediaWithFuzzyFallback } from "./fuzzyMediaSearch";
+import { fetchMediaFacts } from "./tmdbFacts";
+import {
+  markMovieWatched,
+  markShowWatched,
+  setListMembership,
+} from "./libraryActions";
+import { LIBRARY_ERROR, LibraryError, isMembershipList, toLibraryError } from "../utils/libraryCore";
+import { cachedTmdb } from "../utils/cachedRead";
+import { resolveGenreIds } from "../utils/discoveryPersonalization";
+import { applyFacts, langOf, todayListDate } from "../utils/mediaFacts";
+import { getReleaseState, RELEASE_STATE } from "../utils/watchState";
+import { mediaToListItem } from "../utils/listShare";
+import { APP_LANGUAGES } from "../utils/appLanguages";
+import { addItemToSharedList } from "./sharedListsService";
+import {
+  listAcceptedTypes,
+  mergeRankedGroups,
+  toCandidates,
+} from "../utils/listSearch";
+
+const TMDB = "https://api.themoviedb.org/3";
+const SUGGESTION_TTL = 6 * 60 * 60 * 1000; // popüler listesi gün içinde oynamaz
+const GENRE_CATALOG_TTL = 30 * 24 * 60 * 60 * 1000; // TMDB tür tablosu neredeyse hiç değişmez
+
+const categoryOf = (type) => (type === "tv" ? "tvContent" : "movieContent");
+
+/**
+ * İzlenenler listesi kapısı: engel varsa `addMediaToList` durum değeri, yoksa
+ * null. Ekrandaki buton kilidi yalnız DETAY sayfasında; buraya arama sonucundan
+ * gelinir ve tarih hiç sorgulanmadan izlendi yazılabiliyordu.
+ * (Karar mantığı: utils/watchState.js)
+ */
+function blockedStatus(date, status) {
+  const state = getReleaseState(date, status);
+  if (state === RELEASE_STATE.RELEASED) return null;
+  return state === RELEASE_STATE.SCHEDULED ? "unreleased" : "unknown-release";
+}
+
+/**
+ * Açık listeye eklenebilecek eserleri TMDB'de arar.
+ *
+ * Karışık listelerde film ve dizi araması PARALEL gider ve tek sıralamada
+ * birleşir (mergeRankedGroups). `search/multi` yerine iki ayrı uç nokta
+ * kullanılıyor çünkü fuzzy düzeltme (MovieSearch/TvShowSearch ile aynı servis)
+ * yalnız tek tipli aramada çalışıyor — "intersteller" yazan kullanıcı sonuç
+ * görmeli.
+ *
+ * @returns {Promise<Array>} utils/listSearch aday nesneleri
+ */
+export async function searchForList({
+  listName,
+  query,
+  apiKey,
+  language,
+  adultContent = false,
+  limit = 40,
+}) {
+  const text = String(query || "").trim();
+  if (!text || !apiKey) return [];
+  const types = listAcceptedTypes(listName);
+
+  const settled = await Promise.all(
+    types.map(async (type) => {
+      try {
+        const { results } = await searchMediaWithFuzzyFallback({
+          mediaType: type,
+          query: text,
+          language: langOf(language),
+          adultContent,
+          API_KEY: apiKey,
+        });
+        return {
+          ok: true,
+          items: toCandidates(results, {
+            fallbackType: type,
+            acceptedTypes: [type],
+            limit,
+          }),
+        };
+      } catch (error) {
+        return { ok: false, error };
+      }
+    }),
+  );
+
+  // Bir tip düşerse diğerinin sonuçları yine gösterilir; HEPSİ düşerse hata
+  // yukarı çıkar — ekran "sonuç yok" değil "bağlantını kontrol et" demeli.
+  const failed = settled.filter((entry) => !entry.ok);
+  if (failed.length === settled.length) throw failed[0].error;
+
+  return mergeRankedGroups(
+    settled.filter((entry) => entry.ok).map((entry) => entry.items),
+    { limit },
+  );
+}
+
+/**
+ * Liste öğelerindeki tür ADLARINI bu medya tipinin TMDB tür ID'lerine çevirir.
+ *
+ * NEDEN AD→ID: liste öğeleri türü yerelleştirilmiş ad olarak saklıyor
+ * (utils/listShare.mediaToListItem), discover ise id istiyor. Tablo DESTEKLENEN HER
+ * dilde (tr-TR, en-US, es-ES …) çekilir çünkü öğeler, o an hangi dil açıksa o dilde kaydedilmiş
+ * olabilir — Türkçe kaydedilmiş "Aksiyon", arayüz İngilizceyken de çözülmeli.
+ *
+ * Film ve dizi tür ID'leri AYRI evrenlerdir (film 28 "Aksiyon", dizi 10759
+ * "Aksiyon & Macera"). Tablo tipe göre çekildiği için karışık listelerde o tipte
+ * karşılığı olmayan adlar sessizce elenir — resolveGenreIds zaten filtreliyor.
+ */
+async function resolveListGenreIds({ type, genreNames, apiKey }) {
+  if (!genreNames?.length) return [];
+  const catalogs = await Promise.all(
+    APP_LANGUAGES.map((entry) => entry.tmdbLanguage).map(async (locale) => {
+      try {
+        const { data } = await cachedTmdb(
+          `${TMDB}/genre/${type}/list?language=${locale}`,
+          { headers: { accept: "application/json", Authorization: apiKey } },
+          { maxAge: GENRE_CATALOG_TTL, category: categoryOf(type) },
+        );
+        return data?.genres || [];
+      } catch {
+        return [];
+      }
+    }),
+  );
+  return resolveGenreIds(genreNames, ...catalogs);
+}
+
+/**
+ * Sorgu yokken gösterilen öneriler. Cache'li: aynı gün içinde ekrana her
+ * girişte ağa çıkılmaz, çevrimdışıyken de dolu gelir.
+ *
+ * ÖNCELİK SIRASI:
+ *   1. `genreNames` verilmişse (listede en çok geçen 3 tür, bkz.
+ *      utils/listSearch.topListGenres) discover ile O TÜRLERDEN öner.
+ *   2. Tür çözülemez, discover patlar ya da BOŞ dönerse popülere düş.
+ *
+ * Boş sonuçta da düşülmesi bilinçli: nadir bir tür üçlüsü + yüksek oy eşiği
+ * hiç sonuç vermeyebilir ve kullanıcıya boş öneri paneli göstermektense genel
+ * popülerler daha iyidir.
+ */
+export async function fetchSuggestionsForList({
+  listName,
+  apiKey,
+  language,
+  genreNames = [],
+  limit = 20,
+}) {
+  if (!apiKey) return [];
+  const types = listAcceptedTypes(listName);
+  const wantedGenres = [
+    ...new Set(
+      (Array.isArray(genreNames) ? genreNames : [])
+        .map((name) => String(name ?? "").trim())
+        .filter((name) => name && name !== "-"),
+    ),
+  ].slice(0, 3);
+
+  const groups = await Promise.all(
+    types.map(async (type) => {
+      const headers = { accept: "application/json", Authorization: apiKey };
+      const readList = async (url) => {
+        const { data } = await cachedTmdb(url, { headers }, {
+          maxAge: SUGGESTION_TTL,
+          category: categoryOf(type),
+        });
+        return toCandidates(data?.results, {
+          fallbackType: type,
+          acceptedTypes: [type],
+          limit,
+        });
+      };
+
+      if (wantedGenres.length) {
+        try {
+          const ids = await resolveListGenreIds({
+            type,
+            genreNames: wantedGenres,
+            apiKey,
+          });
+          if (ids.length) {
+            // vote_count eşiği DiscoveryMediaRail ile aynı (300): tür başına
+            // çöp sonuç yerine gerçekten bilinen yapımlar gelsin.
+            const byGenre = await readList(
+              `${TMDB}/discover/${type}?language=${langOf(language)}&page=1` +
+                `&sort_by=popularity.desc&vote_count.gte=300` +
+                `&with_genres=${ids.join("|")}`,
+            );
+            if (byGenre.length) return byGenre;
+          }
+        } catch {
+          // Popülere düşülecek.
+        }
+      }
+
+      try {
+        return await readList(
+          `${TMDB}/${type}/popular?language=${langOf(language)}&page=1`,
+        );
+      } catch {
+        return [];
+      }
+    }),
+  );
+
+  return mergeRankedGroups(groups, { limit });
+}
+
+/**
+ * Aday eseri (arama sonucu) profil listesi öğesine çevirir; süre/tür olgularını
+ * yazmadan önce tamamlar.
+ */
+async function buildListItem({ media, apiKey, language, genreMap, dateAdded }) {
+  let enriched = media;
+  try {
+    const facts = await fetchMediaFacts({
+      apiKey,
+      id: media.id,
+      mediaType: media.type,
+      language,
+    });
+    if (facts) enriched = applyFacts(media, facts);
+  } catch {
+    // Olgu çekilemedi — öğe süresiz eklenir (bkz. dosya başlığı).
+  }
+  return mediaToListItem(enriched, { dateAdded, genreMap });
+}
+
+/**
+ * Seçilen eseri açık olan listeye ekler.
+ *
+ * @param {object}   p
+ * @param {string}   p.uid
+ * @param {string}   p.listName   route param (öntanımlı anahtar ya da özel liste adı)
+ * @param {object}   p.media      utils/listSearch aday nesnesi
+ * @param {string}   p.apiKey     TMDB Authorization başlığı
+ * @param {string}   p.language
+ * @param {object}   [p.genreMap] tür id → ad (utils/genreLabels.buildGenreMap)
+ * @param {string}   [p.watchDate] "YYYY-MM-DD" — izlenenler listelerinde ZORUNLU
+ * @returns {Promise<{status:"added"|"duplicate"|"empty-show"|"unreleased"|"unknown-release", item:object|null}>}
+ * @throws Firestore/ağ hatasında (çağıran ekran toast gösterir)
+ */
+export async function addMediaToList({
+  uid,
+  listName,
+  media,
+  apiKey,
+  language,
+  genreMap = null,
+  watchDate = null,
+}) {
+  if (!uid || !listName || media?.id == null) {
+    throw new Error("addMediaToList: eksik parametre");
+  }
+
+  const type = media.type === "tv" ? "tv" : "movie";
+  const dateAdded = watchDate || todayListDate();
+
+  // ── İzlenen diziler: liste üyeliği değil, tüm bölümlerin izleme kaydı ──────
+  if (listName === "watchedTv") {
+    let details;
+    try {
+      ({ data: details } = await axios.get(`${TMDB}/tv/${media.id}`, {
+        params: { language: langOf(language) },
+        headers: { accept: "application/json", Authorization: apiKey },
+      }));
+    } catch (error) {
+      throw toLibraryError(error);
+    }
+    // Yayın kapısı: arama sonucundan değil TMDB detayından karar verilir.
+    const blocked = blockedStatus(details?.first_air_date, details?.status);
+    if (blocked) return { status: blocked, item: null };
+
+    // Sezonları çekme, "biri düşerse hiçbiri yazılmaz" kuralı ve yazma sırası
+    // libraryActions/showSeasons'ta.
+    const { status } = await markShowWatched({
+      uid,
+      details: { ...details, name: details.name || media.title },
+      watchDate: dateAdded,
+      apiKey,
+      language,
+    });
+    return { status: status === "added" ? "added" : "empty-show", item: null };
+  }
+
+  // ── İzlenen filmler: yayın kapısı, öğe kurulmadan ÖNCE ────────────────────
+  // Olgular zaten çekiliyor (buildListItem); burada tekrar çağırmak yeni istek
+  // doğurmuyor — tmdbFacts oturum içi memo + 7 günlük önbellek tutuyor.
+  let movieRelease = null;
+  if (listName === "watchedMovies") {
+    const facts = await fetchMediaFacts({
+      apiKey,
+      id: media.id,
+      mediaType: "movie",
+      language,
+    });
+    // Olgu çözülemedi: "tarihi yok" demek DEĞİL. Sessizce engellemek yerine
+    // hata verilir, çağıran ekran "Eklenemedi" gösterir.
+    if (!facts) {
+      throw new LibraryError(LIBRARY_ERROR.UNKNOWN, "addMediaToList: yayın bilgisi alınamadı");
+    }
+    const blocked = blockedStatus(facts.releaseDate, facts.status);
+    if (blocked) return { status: blocked, item: null };
+    movieRelease = { releaseDate: facts.releaseDate, status: facts.status };
+  }
+
+  const item = await buildListItem({
+    media: { ...media, type, media_type: type },
+    apiKey,
+    language,
+    genreMap,
+    dateAdded,
+  });
+  if (!item) throw new LibraryError(LIBRARY_ERROR.INVALID, "addMediaToList: öğe oluşturulamadı");
+
+  // ── İzlenen filmler: her ekleme bir izleme olayı (tekrar izleme desteklenir) ─
+  if (listName === "watchedMovies") {
+    await markMovieWatched({
+      uid,
+      movie: { ...item, type: "movie", ...movieRelease },
+      watchDate: dateAdded,
+    });
+    return { status: "added", item };
+  }
+
+  // ── Favoriler / İzlenecekler / özel liste ──────────────────────────────────
+  // Özel listede aynı öğe zaten varsa "unchanged" döner → "duplicate".
+  const { status } = await setListMembership({ uid, listKey: listName, item, desired: true });
+  if (!isMembershipList(listName) && status === "unchanged") {
+    return { status: "duplicate", item };
+  }
+  return { status: "added", item };
+}
+
+/** Global arama adayını ortak liste öğesine dönüştürüp kaydeder. */
+export async function addMediaToSharedList({
+  listId,
+  user,
+  media,
+  apiKey,
+  language,
+  genreMap = null,
+}) {
+  if (!listId || !user?.uid || media?.id == null)
+    throw new Error("addMediaToSharedList: eksik parametre");
+  const item = await buildListItem({
+    media: {
+      ...media,
+      type: media.type === "tv" ? "tv" : "movie",
+      media_type: media.type === "tv" ? "tv" : "movie",
+    },
+    apiKey,
+    language,
+    genreMap,
+    dateAdded: todayListDate(),
+  });
+  if (!item) throw new Error("addMediaToSharedList: öğe oluşturulamadı");
+  await addItemToSharedList({ listId, user, item });
+  return item;
+}

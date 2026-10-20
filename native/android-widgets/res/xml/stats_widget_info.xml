@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Kompakt istatistik yüzeyi: varsayılan 4×2, dar launcher'larda 3×2'ye
+     küçülebilir. Kartlar weight'li olduğu için yükseklik dengeli paylaşılır. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/stats_widget_description"
+    android:initialLayout="@layout/stats_widget"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:previewImage="@drawable/stats_widget_preview"
+    android:previewLayout="@layout/stats_widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

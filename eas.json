@@ -6,33 +6,60 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "development",
+      "environment": "development"
+    },
+    "development:smlztrkk": {
+      "extends": "development",
+      "env": {
+        "EXPO_ACCOUNT": "smlztrkk"
+      }
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
+      "channel": "preview",
       "android": {
         "buildType": "apk"
       }
     },
+    "preview:smlztrkk": {
+      "extends": "preview",
+      "env": {
+        "EXPO_ACCOUNT": "smlztrkk"
+      }
+    },
+    "appetize": {
+      "extends": "preview",
+      "env": {
+        "FIREBASE_SDK_VERSION": "12.14.0"
+      },
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
       "autoIncrement": true,
-      "android": {
-        "credentialsSource": "local"
+      "channel": "production",
+      "environment": "production",
+      "env": {
+        "FIREBASE_SDK_VERSION": "12.14.0"
       }
     },
-    "preview2": {
-      "android": {
-        "gradleCommand": ":app:assembleRelease"
+    "production:smlztrkk": {
+      "extends": "production",
+      "env": {
+        "FIREBASE_SDK_VERSION": "12.14.0",
+        "EXPO_ACCOUNT": "smlztrkk"
       }
-    },
-    "preview3": {
-      "developmentClient": true
-    },
-    "preview4": {
-      "distribution": "internal"
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6801549169"
+      }
+    }
   }
 }

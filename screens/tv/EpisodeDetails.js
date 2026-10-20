@@ -1,3 +1,4 @@
+import { tmdbLanguageOf } from "../../utils/appLanguages";
 import React, { useState, useEffect, useCallback, memo } from "react";
 import {
   StyleSheet,
@@ -14,17 +15,24 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { EpisodeSkeleton } from "../../components/Skeleton";
 import RatingStars from "../../components/RatingStars";
+import BackButton from "../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import LottieView from "lottie-react-native";
-import { useSnow } from "../../context/SnowContext";
 import WatchedAdd from "./WatchedAdd";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useWatchedShow } from "../../hooks/useWatchedShow";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+} from "../../context/AppSettingsContext";
+import ScreenDecor from "../../components/ScreenDecor";
+import ScopedCommentButton from "../../components/comments/ScopedCommentButton";
+import { COMMENT_SCOPE } from "../../utils/commentScope";
 
 const { width } = Dimensions.get("window");
 
 // ─── Oyuncu / Ekip Kartı (Memoize) ───────────────────────────────────────────
-const PersonCard = memo(({ person, role, imageQuality, theme, onPress }) => (
+const PersonCard = memo(({ person, role, imageQuality, getTmdbUrl, theme, onPress }) => (
   <TouchableOpacity
     onPress={onPress}
     activeOpacity={0.75}
@@ -34,7 +42,7 @@ const PersonCard = memo(({ person, role, imageQuality, theme, onPress }) => (
       {person.profile_path ? (
         <Image
           source={{
-            uri: `https://image.tmdb.org/t/p/${imageQuality}${person.profile_path}`,
+            uri: getTmdbUrl(person.profile_path, 'profile', 200),
           }}
           style={styles.personImage}
         />
@@ -133,14 +141,16 @@ export default function EpisodeDetails({ route, navigation }) {
     seasonPosterPath,
     genres,
   } = route.params;
+  const watched = useWatchedShow(showId);
 
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [check, setChecked] = useState(false);
+  const [check] = useState(false);
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { API_KEY, showSnow, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
   const formatDate = useCallback(
     (timestamp) =>
@@ -160,7 +170,12 @@ export default function EpisodeDetails({ route, navigation }) {
         const response = await axios.get(
           `https://api.themoviedb.org/3/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
           {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
+            params: {
+              language: tmdbLanguageOf(language),
+              // credits.cast = bölümdeki ana kadro (dizinin düzenli oyuncuları);
+              // guest_stars/crew zaten kök yanıtta gelir.
+              append_to_response: "credits",
+            },
             headers: { accept: "application/json", Authorization: API_KEY },
           },
         );
@@ -193,6 +208,7 @@ export default function EpisodeDetails({ route, navigation }) {
     navigation.navigate("ActorViewScreen", { personId });
 
   return (
+    <>
     <ScrollView
       style={[styles.container, { backgroundColor: theme.primary }]}
       showsVerticalScrollIndicator={false}
@@ -208,7 +224,7 @@ export default function EpisodeDetails({ route, navigation }) {
       {check && (
         <LottieView
           style={styles.confetti}
-          source={require("../../LottieJson/confetti_2.json")}
+          source={require("@lottie/confetti_2.json")}
           autoPlay={check}
           loop={false}
         />
@@ -219,7 +235,7 @@ export default function EpisodeDetails({ route, navigation }) {
         {details.still_path ? (
           <Image
             source={{
-              uri: `https://image.tmdb.org/t/p/original${details.still_path}`,
+              uri: getTmdbUrl(details.still_path, 'backdrop', 1000),
             }}
             style={styles.heroImage}
           />
@@ -253,14 +269,7 @@ export default function EpisodeDetails({ route, navigation }) {
 
       {/* ── İçerik ───────────────────────────────────────────────────────── */}
       <View style={[styles.content, { backgroundColor: theme.primary }]}>
-        {showSnow && (
-          <LottieView
-            style={styles.lottie}
-            source={require("../../LottieJson/snow.json")}
-            autoPlay
-            loop
-          />
-        )}
+        <ScreenDecor scope="details" iconOpacity={0.25} />
 
         {/* ── Başlık Bloğu ─────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>
@@ -310,6 +319,8 @@ export default function EpisodeDetails({ route, navigation }) {
             seasonPosterPath={seasonPosterPath}
             episodePosterPath={details.still_path}
             genres={genres}
+            isWatched={watched.isEpisodeWatched(seasonNumber, episodeNumber)}
+            watchEvents={watched.episodeWatchEvents(seasonNumber, episodeNumber)}
           />
         </View>
 
@@ -320,6 +331,23 @@ export default function EpisodeDetails({ route, navigation }) {
             <RatingStars rating={details.vote_average} />
           </View>
         )}
+
+        {/* ── Bölüm yorumları ──────────────────────────────────────────── */}
+        {/* Dizinin ortak yorum sayfası, bu bölüme süzülmüş olarak açılır. */}
+        <ScopedCommentButton
+          theme={theme}
+          showId={showId}
+          showName={showName}
+          showPosterPath={showPosterPath}
+          seasonCount={showSeasonCount}
+          scope={{
+            scope: COMMENT_SCOPE.EPISODE,
+            seasonNumber,
+            episodeNumber,
+            scopeTitle: details.name || "",
+          }}
+          style={styles.commentButton}
+        />
 
         <View
           style={[
@@ -341,6 +369,34 @@ export default function EpisodeDetails({ route, navigation }) {
           </Text>
         </View>
 
+        {/* ── Oyuncular (ana kadro) ─────────────────────────────────────── */}
+        {details.credits?.cast?.length > 0 && (
+          <View style={styles.section}>
+            <SectionTitle
+              label={t.cast}
+              theme={theme}
+              count={details.credits.cast.length}
+            />
+            <ScrollView
+              horizontal
+              contentContainerStyle={styles.personList}
+              showsHorizontalScrollIndicator={false}
+            >
+              {details.credits.cast.map((actor) => (
+                <PersonCard
+                  key={`cast-${actor.id}`}
+                  person={actor}
+                  role={actor.character}
+                  imageQuality={imageQuality}
+                  getTmdbUrl={getTmdbUrl}
+                  theme={theme}
+                  onPress={() => navigateToPerson(actor.id)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* ── Konuk Oyuncular ───────────────────────────────────────────── */}
         {details.guest_stars?.length > 0 && (
           <View style={styles.section}>
@@ -360,6 +416,7 @@ export default function EpisodeDetails({ route, navigation }) {
                   person={actor}
                   role={actor.character}
                   imageQuality={imageQuality}
+                  getTmdbUrl={getTmdbUrl}
                   theme={theme}
                   onPress={() => navigateToPerson(actor.id)}
                 />
@@ -387,6 +444,7 @@ export default function EpisodeDetails({ route, navigation }) {
                   person={member}
                   role={member.job}
                   imageQuality={imageQuality}
+                  getTmdbUrl={getTmdbUrl}
                   theme={theme}
                   onPress={() => navigateToPerson(member.id)}
                 />
@@ -396,6 +454,8 @@ export default function EpisodeDetails({ route, navigation }) {
         )}
       </View>
     </ScrollView>
+    <BackButton variant="blur" />
+    </>
   );
 }
 
@@ -417,7 +477,8 @@ const SectionTitle = memo(({ label, theme, count }) => (
 ));
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const AVATAR = width * 0.18;
+// Kişi kartları MovieDetail oyuncu kartlarıyla aynı oranda (dikdörtgen portre).
+const PERSON_W = width * 0.2;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -476,14 +537,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 18,
     paddingTop: 4,
-  },
-  lottie: {
-    position: "absolute",
-    height: 1000,
-    top: 0,
-    left: -120,
-    right: -120,
-    zIndex: 0,
   },
 
   // ── Başlık Bloğu ──────────────────────────────────────────────────────────
@@ -552,6 +605,10 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
+  commentButton: {
+    marginBottom: 18,
+  },
+
   divider: {
     height: 1,
     marginBottom: 20,
@@ -603,13 +660,13 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   personCard: {
-    width: 90,
+    width: PERSON_W,
     alignItems: "center",
   },
   personImageWrapper: {
-    width: AVATAR,
-    height: AVATAR,
-    borderRadius: AVATAR / 2,
+    width: PERSON_W,
+    height: PERSON_W * 1.5,
+    borderRadius: 16,
     marginBottom: 8,
     overflow: "hidden",
     // subtle ring
@@ -619,6 +676,7 @@ const styles = StyleSheet.create({
   personImage: {
     width: "100%",
     height: "100%",
+    resizeMode: "cover",
   },
   personImagePlaceholder: {
     width: "100%",

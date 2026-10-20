@@ -1,0 +1,127 @@
+GOOGLE ILE GIRIS — KURULUM (Firebase Console tarafi)
+=====================================================
+
+Bu dosya KOD ile cozulemeyen adimlari anlatir. Kod tarafi hazir; asagidaki
+adimlar yapilmadan Google girisi HICBIR sekilde calismaz.
+
+Firebase projesi : movieandtv-2832a
+Android paketi   : com.smlztrk.seelogd
+Web client ID    : 427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com
+                   (google-services.json'daki client_type:3 ile ayni olmali)
+
+
+1) ANDROID — SHA-1 PARMAK IZI EKSIK  [girisi su anda engelleyen sey bu]
+-----------------------------------------------------------------------
+BELIRTI: Google butonuna basinca hesap secici acilir/kapanir, giris olmaz.
+         Native SDK DEVELOPER_ERROR (statusCode 10) doner. Uygulama artik
+         bunu "Google girisi bu uygulama surumunde kullanilamiyor" diye
+         gosterir (GoogleAuthCode.MISCONFIGURED).
+
+MEVCUT DURUM (19.07.2026): Yerel debug SHA-1 Firebase'e eklendi ve hem
+         ./google-services.json hem ./android/app/google-services.json icinde
+         client_type:1 Android istemcisi mevcut. Yerel development build yolu
+         hazir. EAS/Play imzalari kullanilacaksa onlar ayrica eklenmelidir.
+
+GUNCEL (19.09.2026): Firebase Android uygulamasinda (…eaf678e1…) kayitli:
+         5E:8F:16…F6:25  yerel debug keystore
+         8A:76:F7…58:2E  EAS keystore = Play UPLOAD key (preview APK'lar)
+         45:EF:BF:04:75:3A:9B:0F:46:F7:AB:30:E7:FE:B0:7E:39:5E:45:A9
+                         Play APP SIGNING key (klasik) — Play'den kurulan
+                         surum bununla imzali. Eksikken internal testing
+                         surumunde Google girisi "bu surumde kullanilamiyor"
+                         verdi; SHA-256'siyla birlikte eklendi.
+         Play Console'da yeri degisti: Protected with Play > Play Store
+         protection > Play app signing (ya da .../app/<id>/keymanagement).
+         Play imzalama anahtarini degistirirse ("Change key") YENI anahtarin
+         parmak izleri de eklenmeli.
+
+COZUM:
+  a) Gereken SHA-1'leri topla. Uygulamayi imzalayan HER keystore icin ayri:
+
+     - Yerel debug (expo run:android / dev client):
+         keytool -list -v -keystore android/app/debug.keystore \
+                 -alias androiddebugkey -storepass android -keypass android
+       Bu repodaki debug.keystore'un SHA-1'i (Firebase'e eklendi):
+         5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25
+
+     - EAS build (development / preview / production):
+         eas credentials -p android
+       -> Keystore > SHA-1 Fingerprint degerini kopyala.
+
+     - Google Play'e yuklediyseniz (Play App Signing):
+         Play Console > Test and release > Setup > App signing
+       -> "App signing key certificate" SHA-1'i de EKLENMELI. Bu atlanirsa
+          uygulama Store'dan indirildiginde calismaz, dahili build'de calisir.
+
+  b) Firebase Console > Project settings > Your apps > Android
+     (com.smlztrk.seelogd) > "Add fingerprint" ile her SHA-1'i ekle.
+
+  c) Guncellenmis google-services.json'u repo KOKUNE koy:
+         ./google-services.json
+     DUZELTME (24.09.2026): `android/` dizini .gitignore'da (satir 18) ve
+     git'te TAKIPLI TEK BIR DOSYASI YOK. Yani EAS build bu dizini hic
+     almaz, `expo prebuild` ile bastan uretir ve app.json'daki
+     `googleServicesFile` alanindaki koktenki dosyayi kullanir. Yerel
+     ./android/app/google-services.json yalnizca yerel `expo run:android`
+     icin anlamli ve prebuild'de zaten uzerine yazilir.
+     (Bu maddenin eski hali "android/ commit'li, build oradakini kullanir"
+      diyordu — YANLISTI.)
+
+  d) Dogrula — yeni dosyada su blok GORUNMELI:
+         { "client_type": 1,
+           "android_info": { "package_name": "com.smlztrk.seelogd",
+                             "certificate_hash": "..." } }
+     Gorunmuyorsa SHA-1 kaydedilmemistir, tekrar deneyin.
+
+  e) Native yapilandirma degistigi icin YENIDEN BUILD gerekir. Metro'yu
+     yeniden baslatmak yetmez (JS degil, native kaynak degisiyor).
+
+
+2) IOS — YAPILANDIRILDI, GERCEK CIHAZ TESTI BEKLIYOR
+----------------------------------------------------
+- Firebase iOS uygulamasinin bundle ID'si `com.smlztrk.seelogd`.
+- `GoogleService-Info.plist` repo kokunde ve `app.json` icindeki
+  `ios.googleServicesFile` alanina bagli.
+- Google Sign-In config plugin'i plist'teki `REVERSED_CLIENT_ID` degerini iOS
+  URL scheme olarak native projeye aktarir.
+- Servis varsayilan plist'i kullanir; `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` yalniz
+  acik override'dir ve plist varken zorunlu degildir.
+- 14 Agustos 2026'da iOS ve Web Client ID'leri EAS production ortaminda
+  `sensitive` gorunurlukle tanimlandi.
+
+KALAN:
+  a) Yeni production/development iOS build al.
+  b) Gercek cihazda hesap secici, Firebase oturumu, ilk profil tamamlama,
+     ayni e-posta baglama ve cikis akislarini test et.
+
+
+3) NOTLAR
+---------
+- webClientId (type 3) servis fallback'iyle eslesir ve EAS production ortaminda
+  da acik olarak tanimlidir.
+- Expo Go ile Google girisi CALISMAZ (native modul gerekir). expo-dev-client
+  build'i sart.
+- eas.json > build.production > android.credentialsSource: "local" ayarli ama
+  repoda credentials.json YOK. Production build'i bu haliyle calismaz;
+  ya credentials.json ekleyin ya da bu satiri kaldirip EAS'in yonettigi
+  keystore'a donun (o durumda EAS keystore SHA-1'ini eklemeyi unutmayin).
+
+
+4) AYNI E-POSTA KORUMASI — CALLABLE YAYIN DURUMU
+------------------------------------------------
+Kodda checkGoogleSignInEligibility callable'i hazir. Bu islev gecerli Google
+idToken'ini sunucuda dogrular ve ayni e-posta yalniz email/sifre hesabina aitse
+Google girisini Firebase credential uygulanmadan once reddeder. Kullanici once
+email/sifreyle girip Ayarlar > Hesap baglantilari uzerinden Google'i baglar.
+
+19.07.2026 deploy denemesi proje billing'i kapali oldugu icin mevcut
+GEMINI_API_KEY Secret Manager taniminda HTTP 403 ile durdu. Billing acilip secret
+erisimi duzeldiginde su komut calistirilmali:
+
+  firebase deploy --only functions:checkGoogleSignInEligibility \
+           --project movieandtv-2832a
+
+Callable yayinlanana kadar istemci functions/not-found durumunda
+fetchSignInMethodsForEmail kontrolune geri duser. Eski projede email enumeration
+protection kapaliysa bu yol cakismayi engeller. Protection aciksa Firebase bu
+listeyi bos dondurebildigi icin mutlak garanti callable yayinlandiginda saglanir.

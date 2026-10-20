@@ -1,0 +1,10 @@
+/* Seelogd widget galerisi adları ve açıklamaları (TÜRKÇE).
+   Bunlar SİSTEM dilini izler (uygulama içi dili değil). Anahtar İngilizce metnin kendisidir;
+   desteklenmeyen sistem dili İngilizceye düşer. Anahtar kümesi en.lproj ve es.lproj ile aynı
+   olmalı (__tests__/widgetNativeLanguage.test.js denetler). */
+"Seelogd Coming Up" = "Seelogd Yaklaşanlar";
+"Shows upcoming movies and TV episodes." = "Yaklaşan film ve dizi bölümlerini gösterir.";
+"Seelogd My Lists" = "Seelogd Listelerim";
+"Shows your lists and how many items they hold on the home screen." = "Listelerini ve içerik sayılarını ana ekranda gösterir.";
+"Seelogd Statistics" = "Seelogd İstatistikler";
+"Shows your watching statistics on the home screen." = "İzleme istatistiklerini ana ekranda gösterir.";

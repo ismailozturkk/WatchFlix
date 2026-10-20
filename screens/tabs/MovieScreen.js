@@ -1,140 +1,187 @@
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+  DeviceEventEmitter,
   RefreshControl,
-  Animated,
-  Pressable,
-  TextInput,
+  StyleSheet,
+  View,
 } from "react-native";
-import React, { useEffect, useRef } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-//import {  } from "react-native-safe-area-context";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Animated from "react-native-reanimated";
 import MovieOscar from "../movie/MovieOscar";
 import MovieProviders from "../movie/MovieProvders";
 import MovieNowPlaying from "../movie/MovieNowPlaying";
 import MovieGenres from "../movie/MovieGenres";
 import MovieUpcoming from "../movie/MovieUpcoming";
 import { useTheme } from "../../context/ThemeContext";
-import { useSnow } from "../../context/SnowContext";
-import LottieView from "lottie-react-native";
+import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import MovieBests from "../movie/MovieBests";
 import MovieTrends from "../movie/MovieTrends";
 import MovieCollection from "../movie/MovieCollection";
 import { useMovie } from "../../context/MovieContex";
-import { useState } from "react";
-import { useAppSettings } from "../../context/AppSettingsContext";
-import { useLanguage } from "../../context/LanguageContext";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
+import DiscoverHeaderSpacer from "../../components/home/DiscoverHeaderSpacer";
+import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
+import usePullToRefresh from "../../hooks/usePullToRefresh";
+import useScreenSections from "../../hooks/useSectionVisibility";
+import { markTabScroll } from "../../components/navigation/TabScrollMarker";
+import DiscoveryMediaRail from "../../components/DiscoveryMediaRail";
+import {
+  useDiscoveryPreferenceSettings,
+  useStreamingProviderSettings,
+} from "../../context/AppSettingsContext";
+import { useProfileStats } from "../../context/ProfileStatsContext";
+import { resolveOnboardingGenreIds } from "../../utils/onboardingPreferences";
+import FavoritesRecommendationRail from "../../components/favorites/FavoritesRecommendationRail";
+import FollowedUpcomingRail from "../../components/person/FollowedUpcomingRail";
+import useFollowedPeople from "../../hooks/useFollowedPeople";
+import { useUserProfile } from "../../context/UserProfileContext";
+import { hasRecommendationSignal, readProfileFavorites } from "../../utils/fourFavorites";
 
-export default function MovieScreen({ navigation }) {
+const INITIAL_SECTION_COUNT = 2;
+
+// iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için listeyi sekme
+// ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js). Modül
+// kapsamında: render içinde kurulursa liste her render'da sökülür.
+const MarkedFlatList = markTabScroll(Animated.FlatList);
+
+// `headerTopOffset`: ekranın tepesinde yüzen satırın (Film/Dizi anahtarı + arama düğmesi)
+// yüksekliği (screens/tabs/DiscoverScreen.js); ilk raf onun altından başlar.
+export default function MovieScreen({ navigation, headerTopOffset = 0 }) {
+  const { contentBottom } = useTabBarLayout();
   const { theme } = useTheme();
-  const { language, t } = useLanguage();
+  const { refreshAllMovies, loadingTrends } = useMovie();
 
-  const { showSnow } = useAppSettings();
-  const [refreshing, setRefreshing] = useState(false);
-
-  const {
-    fetchSeriesTrends,
-    fetchMoviesBests,
-    fetchMoviesOscar,
-    fetchMoviesCollection,
-    fetchMoviesByGenres,
-    fetchMovieUpcoming,
-    fetchMoviNowPlaying,
-  } = useMovie();
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    (await fetchSeriesTrends(),
-      await fetchMoviesBests(),
-      await fetchMoviesOscar(),
-      await fetchMoviesCollection(),
-      await fetchMoviesByGenres(),
-      await fetchMovieUpcoming(),
-      await fetchMoviNowPlaying(),
-      setRefreshing(false));
-  };
-  const translateY = useRef(new Animated.Value(-100)).current;
-
+  // Açılış ekranı (splash) APP_READY'yi bekler. Film/Dizi artık tek sekme ve açılışta
+  // son seçilen bölüm (Film olabilir) çizilir; Dizi ekranı hiç kurulmayabileceği için
+  // aynı işareti burası da verir (bkz. screens/tabs/TvShowScreen.js).
   useEffect(() => {
-    Animated.spring(translateY, {
-      toValue: 0,
-      useNativeDriver: true,
-      bounciness: 5,
-    }).start();
-  }, []);
+    if (!loadingTrends) {
+      DeviceEventEmitter.emit("APP_READY");
+    }
+  }, [loadingTrends]);
 
-  const closeSearch = () => {
-    Animated.timing(translateY, {
-      toValue: 10,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {});
-  };
+  const { streamingProviderIds } = useStreamingProviderSettings();
+  const { onboardingGenreKeys } = useDiscoveryPreferenceSettings();
+  const onboardingGenreIds = useMemo(
+    () => resolveOnboardingGenreIds(onboardingGenreKeys, "movie"),
+    [onboardingGenreKeys],
+  );
+  const { topMovieGenres } = useProfileStats();
+  // Dört favoriden (film + oyuncu) öneri kaynağı var mı? Boolean olduğu için
+  // profildeki ilgisiz değişiklikler bölüm listesini yeniden kurmaz.
+  const { profile } = useUserProfile();
+  const hasFavoriteSignal = useMemo(
+    () => hasRecommendationSignal(readProfileFavorites(profile), "movie"),
+    [profile],
+  );
+  // Takip edilen kişi var mı? Yoksa raf bölüm listesine hiç girmez (boş bölüm sayacı şişirmesin).
+  const { count: followedCount } = useFollowedPeople();
+  const { refreshing, onScroll, handleRefresh } =
+    usePullToRefresh(refreshAllMovies);
+  // Ayarlar > Kişiselleştirme > Ekran bölümleri'nde gizlenen raflar (utils/sectionVisibility.js).
+  const { filter: filterHiddenSections } = useScreenSections("movie");
+
+  // Raf kimlikleri (`key`) utils/sectionVisibility.js'teki "movie" bölümleriyle aynı.
+  const sections = useMemo(
+    () => filterHiddenSections([
+      { key: "trends", Component: MovieTrends },
+      { key: "bests", Component: MovieBests },
+      ...(followedCount > 0
+        ? [{ key: "followedPeople", Component: FollowedUpcomingRail }]
+        : []),
+      // Kaydırınca yüklenen ilk bölümlerden biri: açılışta ağ isteği yaratmaz.
+      ...(hasFavoriteSignal
+        ? [{ key: "fromFavorites", Component: FavoritesRecommendationRail }]
+        : []),
+      ...(streamingProviderIds.length > 0
+        ? [{ key: "subscriptions", Component: DiscoveryMediaRail, preset: "subscriptions" }]
+        : []),
+      ...(topMovieGenres?.length === 3
+        ? [{ key: "topGenres", Component: DiscoveryMediaRail, preset: "topGenres", genreNames: topMovieGenres }]
+        : onboardingGenreIds.length > 0
+          ? [{ key: "topGenres", Component: DiscoveryMediaRail, preset: "topGenres", genreIds: onboardingGenreIds }]
+          : []),
+      { key: "recentFavorites", Component: DiscoveryMediaRail, preset: "recentFavorites" },
+      { key: "worldTour", Component: DiscoveryMediaRail, preset: "worldTour" },
+      { key: "nowPlaying", Component: MovieNowPlaying },
+      { key: "oscar", Component: MovieOscar },
+      { key: "collection", Component: MovieCollection },
+      { key: "providers", Component: MovieProviders },
+      { key: "genres", Component: MovieGenres },
+      { key: "upcoming", Component: MovieUpcoming },
+    ]),
+    [filterHiddenSections, followedCount, hasFavoriteSignal, onboardingGenreIds, streamingProviderIds, topMovieGenres],
+  );
+
+  const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
+
+  const visibleSections = useMemo(
+    () => sections.slice(0, visibleSectionCount),
+    [sections, visibleSectionCount],
+  );
+
+  const renderSection = useCallback(
+    ({ item }) => {
+      const SectionComponent = item.Component;
+      return (
+        <SectionComponent
+          navigation={navigation}
+          mediaType="movie"
+          preset={item.preset}
+          genreNames={item.genreNames}
+          genreIds={item.genreIds}
+        />
+      );
+    },
+    [navigation],
+  );
+
+  // Liste başlığı: yüzen Film/Dizi satırının (anahtar + arama düğmesi) altında kalan boşluk.
+  // ELEMENT olarak verilir (geri çağrı değil): FlatList fonksiyonu bileşen tipi sayar,
+  // kimliği değişince başlık sökülüp yeniden kurulur.
+  const listHeader = useMemo(
+    () => <DiscoverHeaderSpacer topOffset={headerTopOffset} />,
+    [headerTopOffset],
+  );
+
+  const revealNextSection = useCallback(() => {
+    setVisibleSectionCount((current) =>
+      Math.min(current + 1, sections.length),
+    );
+  }, [sections.length]);
+
+  // Tüm raflar gizliyse (ya da kalanlar veri/ayar yüzünden çizilmiyorsa) boş ekran yerine
+  // nedenini söyleyen kart. ELEMENT olarak verilir (geri çağrı değil), başlıktaki gibi.
+  const emptyNotice = useMemo(
+    () => <SectionsHiddenNotice navigation={navigation} screen="movie" />,
+    [navigation],
+  );
+
   return (
     <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
-      <IconBacground opacity={0.3} />
-      <ScrollView
+      <ScreenDecor scope="home" iconOpacity={0.3} />
+      <MarkedFlatList
+        data={visibleSections}
+        keyExtractor={(item) => item.key}
+        renderItem={renderSection}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={emptyNotice}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.container,
-          {
-            //backgroundColor: theme.primary
-          },
-        ]}
+        contentContainerStyle={[styles.container, { paddingBottom: contentBottom }]}
+        initialNumToRender={INITIAL_SECTION_COUNT}
+        onEndReached={revealNextSection}
+        onEndReachedThreshold={0.6}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.accent || "#E50914"]}
+            tintColor={theme.accent || "#E50914"}
+          />
         }
-      >
-        {showSnow &&
-          [0, 1, 2, 3].map((item, index) => (
-            <LottieView
-              key={index}
-              style={[
-                index === 0
-                  ? styles.lottie
-                  : index === 1
-                    ? styles.lottie0
-                    : index === 2
-                      ? styles.lottie1
-                      : styles.lottie2,
-              ]}
-              source={require("../../LottieJson/snow.json")}
-              autoPlay={true}
-              loop
-            />
-          ))}
+      />
 
-        <Pressable
-          onPress={() =>
-            navigation.navigate("MovieSearch", { autoFocus: true })
-          }
-          style={styles.fakeSearchContainer}
-        >
-          <View
-            style={[styles.searchInput, { backgroundColor: theme.secondary }]}
-            placeholderTextColor={theme.text.muted}
-            placeholder={t.SearchScreen.searchMovies}
-          >
-            <Ionicons name="search" size={20} color={theme.text.muted} />
-            <Text allowFontScaling={false} style={{ color: theme.text.muted }}>
-              {t.searchMovies}
-            </Text>
-          </View>
-        </Pressable>
-        <MovieTrends navigation={navigation} />
-        <MovieBests navigation={navigation} />
-        <MovieOscar navigation={navigation} />
-        <MovieCollection navigation={navigation} />
-        <MovieProviders navigation={navigation} />
-        <MovieNowPlaying navigation={navigation} />
-        <MovieGenres navigation={navigation} />
-        <MovieUpcoming navigation={navigation} />
-      </ScrollView>
     </View>
   );
 }
@@ -142,43 +189,5 @@ export default function MovieScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     paddingBottom: 75,
-  },
-  lottie: {
-    position: "absolute",
-    height: 1000,
-    top: 0,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  lottie0: {
-    position: "absolute",
-    height: 1000,
-    top: 1000,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  lottie1: {
-    position: "absolute",
-    height: 1000,
-    top: 2000,
-    left: -60,
-    right: -60,
-    zIndex: 0,
-  },
-  fakeSearchContainer: {
-    paddingTop: 50,
-    paddingHorizontal: 15,
-    zIndex: 10, // Listenin üstünde kalması için
-  },
-  searchInput: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    gap: 10,
-    paddingVertical: 7,
-    borderRadius: 10,
   },
 });

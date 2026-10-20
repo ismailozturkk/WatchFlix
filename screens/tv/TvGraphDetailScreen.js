@@ -1,143 +1,185 @@
+import { tmdbLanguageOf } from "../../utils/appLanguages";
 import {
   StyleSheet,
   Text,
   View,
   Image,
   TouchableOpacity,
-  ScrollView,
   Animated,
+  InteractionManager,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import BackButton from "../../components/BackButton";
 
 import React, {
+  memo,
   useEffect,
   useState,
   useCallback,
   useMemo,
   useRef,
 } from "react";
-import Skeleton from "../../components/SkeletonGraph";
 import axios from "axios";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLanguage } from "../../context/LanguageContext";
-import LottieView from "lottie-react-native";
 import { useTheme } from "../../context/ThemeContext";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { i18nText } from "../../utils/i18nText";
+import { fetchSeasonRatings, fetchTitleRatings } from "../../services/externalRatings";
+import { mergeEpisodeRatings, pickMainRating } from "../../utils/externalRatings";
+import { getRatingColors } from "../../utils/ratingColors";
+import { TV_GRAPH_GRID_SIZES } from "../../utils/tvGraphGrid";
+import TvGraphGrid from "../../components/tv/TvGraphGrid";
+
+import {
+  useApiSettings,
+  useImageQualitySettings,
+} from "../../context/AppSettingsContext";
+import ScreenDecor from "../../components/ScreenDecor";
+import GlassPressable from "../../components/common/GlassPressable";
+import GlassTouchable from "../../components/common/GlassTouchable";
 
 // ─── Rating Renk Sistemi ──────────────────────────────────────────────────────
-const RATING_TIERS = [
-  { min: 9, bg: "rgb(0, 88, 74)", text: "#fff" },
-  { min: 8, bg: "rgb(41, 184, 100)", text: "#000" },
-  { min: 7, bg: "rgba(119, 255, 171, 1)", text: "#000" },
-  { min: 6, bg: "rgb(255, 255, 0)", text: "#000" },
-  { min: 5, bg: "rgb(255, 100, 0)", text: "#000" },
-  { min: 4, bg: "rgb(255, 0, 0)", text: "#fff" },
-  { min: -Infinity, bg: "rgb(99, 0, 204)", text: "#fff" },
+// Ortak katmanlar utils/ratingColors.js'te — story "Bölüm Graph" bloğu da kullanır.
+
+// ─── Izgara Boyutları ─────────────────────────────────────────────────────────
+// default/compact: bilgileri hücre içinde gösterir. heatmap: yalnız renk;
+// sezonlar üstte, bölümler solda. Sütun genişliği = cell + 2×margin.
+//
+// BOŞLUK ORANA BAĞLI: `margin` sabit 2 dp yazılıydı, yani kompakt görünümde
+// kareler %28 küçülürken aralarındaki boşluk aynı kalıyor ve ızgara
+// seyrekleşmiş görünüyordu. Artık boşluk da hücreyle aynı oranda küçülür —
+// görünüm yalnızca ÖLÇEKLENİR.
+//
+// Izgaranın kendisi (sanallaştırılmış liste, satır/hücre) components/tv/TvGraphGrid.js'te.
+const GRID_SIZES = TV_GRAPH_GRID_SIZES;
+
+const GRID_MODE_ICONS = [
+  { key: "default", icon: "expand-outline" },
+  { key: "compact", icon: "contract-outline" },
+  { key: "heatmap", icon: "grid-outline" },
 ];
 
-const getRatingColors = (rating) => {
-  const tier =
-    RATING_TIERS.find((t) => rating >= t.min) ??
-    RATING_TIERS[RATING_TIERS.length - 1];
-  return { bg: tier.bg, text: tier.text };
-};
-
-// ─── Bölüm Hücresi (Memoize) ──────────────────────────────────────────────────
-const EpisodeCell = React.memo(
-  ({
-    episode,
-    seasonNumber,
-    episodeIndex,
-    isSelected,
-    onPress,
-    borderColor,
-  }) => {
-    const { bg, text } = getRatingColors(episode.vote_average);
-    const rating = episode.vote_average
-      ? episode.vote_average.toFixed(1)
-      : "N/A";
-
-    return (
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.75}
-        style={[
-          styles.cell,
-          {
-            backgroundColor: bg,
-            borderWidth: 1.5,
-            borderColor: isSelected ? "#fff" : borderColor,
-            transform: [{ scale: isSelected ? 1.08 : 1 }],
-          },
-        ]}
-      >
-        <Text style={[styles.cellSeasonLabel, { color: text, opacity: 0.55 }]}>
-          S{seasonNumber}
-        </Text>
-        <Text style={[styles.cellRating, { color: text }]}>{rating}</Text>
-        <Text style={[styles.cellEpisodeLabel, { color: text, opacity: 0.55 }]}>
-          E{episodeIndex + 1}
-        </Text>
-      </TouchableOpacity>
-    );
-  },
+// ─── Üst Çubuk ────────────────────────────────────────────────────────────────
+// Geri düğmesi eskiden `top={8}` ile mutlak konumlanıyordu. Mutlak öğe, üst kabın
+// (SafeAreaView) iç boşluğunu yok sayar; yani düğme güvenli alanın İÇİNE, durum
+// çubuğu / bildirim alanına düşüyordu. Artık akışın içinde bir satır: güvenli alan
+// boşluğunu SafeAreaView veriyor, düğme onun altında kalıyor.
+const TopBar = ({ children }) => (
+  <View style={styles.topBar}>
+    <BackButton absolute={false} />
+    {children}
+  </View>
 );
+
+// Izgara boyutu seçici: panelin içinden çıkıp üst çubuğa taşındı (panelin sağ
+// kenarındaki dikey yığın, seçili bölümde kapat düğmesiyle çakışmasın diye
+// `top: 44` kaydırması gerektiriyordu).
+const GridModeSwitch = memo(function GridModeSwitch({ options, value, onChange, theme }) {
+  return (
+    <View
+      style={[
+        styles.modeSwitch,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
+    >
+      {options.map((option) => {
+        const active = value === option.key;
+        return (
+          <GlassPressable
+            key={option.key}
+            onPress={() => onChange(option.key)}
+            accessibilityRole="button"
+            accessibilityLabel={option.label}
+            accessibilityState={{ selected: active }}
+            hitSlop={3}
+            style={({ pressed }) => [
+              styles.modeBtn,
+              active && { backgroundColor: theme.accent },
+              pressed && !active && styles.modeBtnPressed,
+            ]}
+          >
+            <Ionicons
+              name={option.icon}
+              size={16}
+              color={active ? "#fff" : theme.text.primary}
+            />
+          </GlassPressable>
+        );
+      })}
+    </View>
+  );
+});
 
 // ─── Skeleton Loading ─────────────────────────────────────────────────────────
-const SkeletonLoading = ({ theme }) => (
-  <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
-    <View
-      style={[styles.infoPanelContainer, { backgroundColor: theme.secondary }]}
-    >
-      <Skeleton
-        width={90}
-        height={130}
-        style={{ borderRadius: 10, backgroundColor: theme.between }}
-      />
-      <View style={{ flex: 1, marginLeft: 14, gap: 10 }}>
-        <Skeleton
-          width={180}
-          height={22}
-          style={{ backgroundColor: theme.between, borderRadius: 6 }}
-        />
-        <Skeleton
-          width={120}
-          height={14}
-          style={{ backgroundColor: theme.between, borderRadius: 6 }}
-        />
-        <Skeleton
-          width={80}
-          height={18}
-          style={{ backgroundColor: theme.between, borderRadius: 6 }}
-        />
-        <Skeleton
-          width={140}
-          height={12}
-          style={{ backgroundColor: theme.between, borderRadius: 6 }}
-        />
-      </View>
-    </View>
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={{ margin: 10 }}>
-        {[...Array(12)].map((_, rowIndex) => (
-          <View key={rowIndex} style={[styles.row, { gap: 0 }]}>
-            {[...Array(7)].map((_, colIndex) => (
-              <View
-                key={colIndex}
-                style={[styles.cell, { backgroundColor: theme.secondary }]}
-              >
-                <Skeleton
-                  width={50}
-                  height={50}
-                  style={{ backgroundColor: theme.between, borderRadius: 8 }}
-                />
-              </View>
-            ))}
+// Eskiden 84+ ayrı <Skeleton> vardı ve her biri kendi sonsuz Animated.loop'unu
+// çalıştırıyordu. Şimdi TEK bir nabız değeri, yalnız kapsayıcının saydamlığını
+// sürer; içerik düz View'lardan oluşur.
+const SKELETON_COLUMNS = 7;
+const SKELETON_ROWS = 12;
+
+const SkeletonLoading = ({ theme }) => {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1000, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.8] });
+
+  const block = (width, height, radius = 6) => ({
+    width,
+    height,
+    borderRadius: radius,
+    backgroundColor: theme.between,
+  });
+  const grid = GRID_SIZES.default;
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
+      <TopBar />
+      <Animated.View style={[styles.skeletonBody, { opacity }]}>
+        <View
+          style={[
+            styles.infoPanelWrapper,
+            styles.skeletonPanel,
+            { backgroundColor: theme.secondary },
+          ]}
+        >
+          <View style={block(90, 130, 10)} />
+          <View style={{ flex: 1, marginLeft: 14, gap: 10 }}>
+            <View style={block(180, 22)} />
+            <View style={block(120, 14)} />
+            <View style={block(80, 18)} />
+            <View style={block(140, 12)} />
           </View>
-        ))}
-      </View>
-    </ScrollView>
-  </SafeAreaView>
-);
+        </View>
+        <View style={styles.skeletonGrid}>
+          {Array.from({ length: SKELETON_ROWS }, (_, rowIndex) => (
+            <View key={rowIndex} style={styles.row}>
+              {Array.from({ length: SKELETON_COLUMNS }, (_, colIndex) => (
+                <View
+                  key={colIndex}
+                  style={{
+                    width: grid.cell,
+                    height: grid.cell,
+                    margin: grid.margin,
+                    borderRadius: grid.radius,
+                    backgroundColor: theme.secondary,
+                  }}
+                />
+              ))}
+            </View>
+          ))}
+        </View>
+      </Animated.View>
+    </SafeAreaView>
+  );
+};
 
 // ─── Ana Bileşen ──────────────────────────────────────────────────────────────
 const TvGraphDetailScreen = ({ route, navigation }) => {
@@ -148,125 +190,133 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   const [error, setError] = useState(null);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
   // { season: number, index: number } | null
+  const [gridMode, setGridMode] = useState("default");
+  const [renderGridMode, setRenderGridMode] = useState("default");
+  const grid = GRID_SIZES[renderGridMode];
+  const autoGridRef = useRef(false);
+  const gridChangeHandleRef = useRef(null);
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { showSnow, imageQuality, API_KEY } = useAppSettings();
+  const { getTmdbUrl } = useImageQualitySettings();
+  const { API_KEY } = useApiSettings();
 
   // Animasyon ref'i – panel geçişi için
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   // ── Veri Çekme ────────────────────────────────────────────────────────────
+  // Bu ekran N+1 istek yapıyor (dizi + her sezon + OMDb). fetchAllSeasons hem
+  // effect'ten hem "tekrar dene" düğmesinden çağrıldığı için düz bir `cancelled`
+  // bayrağı yetmiyor; çalışma jetonu ile eski zincirler bayatlatılıyor. Aksi
+  // hâlde dil değişince geciken eski yanıt yeni veriyi eziyor ve unmount
+  // sonrası setState yapılıyordu. Ayrıca süren TMDB istekleri AbortController
+  // ile iptal edilir: ekrandan çıkan kullanıcı için 30+ sezon isteği boşuna
+  // bitmesin.
+  const runIdRef = useRef(0);
+  const abortRef = useRef(null);
+
   const fetchAllSeasons = useCallback(async () => {
+    const runId = ++runIdRef.current;
+    const isStale = () => runId !== runIdRef.current;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const request = (url, params) =>
+      axios.get(url, {
+        params,
+        signal: controller.signal,
+        headers: { accept: "application/json", Authorization: API_KEY },
+      });
+    const tmdbLanguage = tmdbLanguageOf(language);
+
     setLoading(true);
     setError(null);
     try {
-      const tvShowResponse = await axios.get(
+      const { data: show } = await request(
         `https://api.themoviedb.org/3/tv/${id}`,
-        {
-          params: {
-            language: language === "tr" ? "tr-TR" : "en-US",
-            append_to_response: "external_ids",
-          },
-          headers: { accept: "application/json", Authorization: API_KEY },
-        },
+        { language: tmdbLanguage, append_to_response: "external_ids" },
       );
 
-      const imdbId = tvShowResponse.data.external_ids?.imdb_id;
-      let imdbMainInfo = {
-        rating: tvShowResponse.data.vote_average,
-        votes: tvShowResponse.data.vote_count,
-      };
+      // IMDb puanları OMDb'den, Cloud Function proxy'si üzerinden (anahtar sunucuda; services/externalRatings.js).
+      // Ulaşılamazsa null döner ve TMDB puanı kullanılır.
+      const imdbId = show.external_ids?.imdb_id;
+      const validSeasons = (show.seasons ?? []).filter(
+        (s) => s.season_number !== 0,
+      );
 
-      if (imdbId) {
-        try {
-          const omdbMainRes = await axios.get(
-            `https://www.omdbapi.com/?i=${imdbId}&apikey=38aaeabe`,
-          );
-          if (omdbMainRes.data.Response === "True") {
-            imdbMainInfo = {
-              rating:
-                omdbMainRes.data.imdbRating !== "N/A"
-                  ? parseFloat(omdbMainRes.data.imdbRating)
-                  : tvShowResponse.data.vote_average,
-              votes:
-                omdbMainRes.data.imdbVotes || tvShowResponse.data.vote_count,
-            };
-          }
-        } catch (e) {
-          console.log("OMDb Ana Hata:", e);
-        }
-      }
+      // Dizi puanı ile sezonlar birbirinden bağımsız: art arda değil birlikte
+      // beklenir. Her sezonun TMDB isteği ile IMDb bölüm puanı da paralel
+      // (eskiden önce TMDB, SONRA OMDb bekleniyordu — sezon başına iki kat gecikme).
+      const titleRatingsPromise = fetchTitleRatings(imdbId);
+      const seasonPromises = validSeasons.map(async (season) => {
+        const [tmdbRes, seasonRatings] = await Promise.all([
+          request(
+            `https://api.themoviedb.org/3/tv/${id}/season/${season.season_number}`,
+            { language: tmdbLanguage },
+          ),
+          fetchSeasonRatings(imdbId, season.season_number),
+        ]);
+        return {
+          ...tmdbRes.data,
+          episodes: mergeEpisodeRatings(tmdbRes.data.episodes, seasonRatings?.episodes),
+        };
+      });
 
+      const [titleRatings, seasonsData] = await Promise.all([
+        titleRatingsPromise,
+        Promise.all(seasonPromises),
+      ]);
+      if (isStale()) return;
+
+      const imdbMainInfo = pickMainRating(titleRatings, show);
       setShowDetail({
-        ...tvShowResponse.data,
+        ...show,
         vote_average: imdbMainInfo.rating,
         imdb_votes: imdbMainInfo.votes,
       });
 
-      const validSeasons = tvShowResponse.data.seasons.filter(
-        (s) => s.season_number !== 0,
-      );
+      // ── Otomatik ızgara boyutu (ilk başarılı yükleme) ──
+      // ≤7 sezon → default, 8–11 → compact, >11 → heatmap
+      if (!autoGridRef.current) {
+        autoGridRef.current = true;
+        const count = validSeasons.length;
+        const autoMode =
+          count <= 7 ? "default" : count <= 11 ? "compact" : "heatmap";
+        setGridMode(autoMode);
+        setRenderGridMode(autoMode);
+      }
 
-      const seasonPromises = validSeasons.map(async (season) => {
-        const tmdbRes = await axios.get(
-          `https://api.themoviedb.org/3/tv/${id}/season/${season.season_number}`,
-          {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
-            headers: { accept: "application/json", Authorization: API_KEY },
-          },
-        );
-
-        let omdbEpisodes = [];
-        if (imdbId) {
-          try {
-            const omdbRes = await axios.get(
-              `https://www.omdbapi.com/?i=${imdbId}&Season=${season.season_number}&apikey=38aaeabe`,
-            );
-            omdbEpisodes = omdbRes.data.Episodes || [];
-          } catch (e) {
-            console.log("OMDb Sezon Hata:", e);
-          }
-        }
-
-        const enrichedEpisodes = tmdbRes.data.episodes.map((ep) => {
-          const omdbEp = omdbEpisodes.find(
-            (o) => parseInt(o.Episode) === ep.episode_number,
-          );
-          return {
-            ...ep,
-            vote_average:
-              omdbEp && omdbEp.imdbRating !== "N/A"
-                ? parseFloat(omdbEp.imdbRating)
-                : ep.vote_average,
-          };
-        });
-
-        return { ...tmdbRes.data, episodes: enrichedEpisodes };
-      });
-
-      const seasonsData = await Promise.all(seasonPromises);
       setTVShows(seasonsData);
     } catch (err) {
+      // İptal edilen istek hata değil (ekran kapandı / yeni çalışma başladı).
+      if (axios.isCancel?.(err) || isStale()) return;
       setError(err.message);
-      console.error("Genel Hata:", err);
+      console.error(i18nText("autoI18n.genel_hata", "Genel Hata:"), err);
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   }, [id, language, API_KEY]);
 
   useEffect(() => {
     fetchAllSeasons();
+    // Dil/id değişince ya da ekran kapanınca süren zinciri bayatlat.
+    return () => {
+      runIdRef.current++;
+      abortRef.current?.abort();
+      abortRef.current = null;
+      // Bekleyen boyut değişimini iptal et
+      if (gridChangeHandleRef.current) {
+        gridChangeHandleRef.current.cancel();
+        gridChangeHandleRef.current = null;
+      }
+    };
   }, [fetchAllSeasons]);
 
   // ── Bölüm Seçimi ─────────────────────────────────────────────────────────
+  // selectedEpisode'a bağımlı kalırsa her seçimde kimlik değişir ve ızgaradaki
+  // yüzlerce EpisodeCell yeniden render edilir; functional updater ile sabit.
   const handleEpisodePress = useCallback(
     (seasonNum, epIndex) => {
-      const key = `${seasonNum}-${epIndex}`;
-      const currentKey = selectedEpisode
-        ? `${selectedEpisode.season}-${selectedEpisode.index}`
-        : null;
-
       Animated.sequence([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -280,13 +330,13 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         }),
       ]).start();
 
-      if (currentKey === key) {
-        setSelectedEpisode(null);
-      } else {
-        setSelectedEpisode({ season: seasonNum, index: epIndex });
-      }
+      setSelectedEpisode((prev) =>
+        prev && prev.season === seasonNum && prev.index === epIndex
+          ? null
+          : { season: seasonNum, index: epIndex },
+      );
     },
-    [selectedEpisode, fadeAnim],
+    [fadeAnim],
   );
 
   // ── Seçili Bölüm Verisi ───────────────────────────────────────────────────
@@ -298,9 +348,37 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
     return season?.episodes[selectedEpisode.index] ?? null;
   }, [selectedEpisode, tvShows]);
 
-  const maxEpisodes = useMemo(
-    () => Math.max(...tvShows.map((s) => s.episodes.length), 0),
-    [tvShows],
+  // Izgara boyutu: düğme vurgusu ANINDA, ağır yeniden çizim etkileşimden sonra.
+  const handleGridModeChange = useCallback((mode) => {
+    if (gridChangeHandleRef.current) {
+      gridChangeHandleRef.current.cancel();
+    }
+    setGridMode(mode);
+    gridChangeHandleRef.current = InteractionManager.runAfterInteractions(() => {
+      setRenderGridMode(mode);
+      gridChangeHandleRef.current = null;
+    });
+  }, []);
+
+  const gridOptions = useMemo(
+    () =>
+      GRID_MODE_ICONS.map((option) => ({
+        ...option,
+        label: t.tvGraphGrid[option.key === "default" ? "standard" : option.key],
+      })),
+    [t],
+  );
+
+  // Hücre başına değil, dil başına bir kez çözülen etiketler (erişilebilirlik + eksenler).
+  const gridLabels = useMemo(
+    () => ({
+      season: i18nText("season", "Sezon"),
+      episode: i18nText("episode", "Bölüm"),
+      rating: i18nText("rating", "Puan"),
+      seasonLetter: t.season[0],
+      episodeLetter: t.episode[0],
+    }),
+    [t],
   );
 
   // ── Render Koşulları ──────────────────────────────────────────────────────
@@ -308,21 +386,15 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 
   if (error) {
     return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          {
-            backgroundColor: theme.primary,
-            justifyContent: "center",
-            alignItems: "center",
-          },
-        ]}
-      >
-        <Text style={styles.errorTitle}>{t.mistake}</Text>
-        <Text style={styles.errorMessage}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchAllSeasons}>
-          <Text style={styles.retryButtonText}>{t.tryAgain}</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
+        <TopBar />
+        <View style={styles.errorBody}>
+          <Text style={styles.errorTitle}>{t.mistake}</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <GlassTouchable style={styles.retryButton} onPress={fetchAllSeasons}>
+            <Text style={styles.retryButtonText}>{t.tryAgain}</Text>
+          </GlassTouchable>
+        </View>
       </SafeAreaView>
     );
   }
@@ -332,15 +404,16 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.primary }]}
     >
-      {/* Kar Efekti */}
-      {showSnow && (
-        <LottieView
-          style={styles.lottie}
-          source={require("../../LottieJson/snow.json")}
-          autoPlay
-          loop
+      <ScreenDecor scope="details" iconOpacity={0.25} />
+
+      <TopBar>
+        <GridModeSwitch
+          options={gridOptions}
+          value={gridMode}
+          onChange={handleGridModeChange}
+          theme={theme}
         />
-      )}
+      </TopBar>
 
       {/* ── Üst Bilgi Paneli ─────────────────────────────────────────────── */}
       <View style={styles.infoPanelWrapper}>
@@ -348,8 +421,8 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         <Image
           source={{
             uri: selectedEpisodeData?.still_path
-              ? `https://image.tmdb.org/t/p/${imageQuality.backdrop}${selectedEpisodeData.still_path}`
-              : `https://image.tmdb.org/t/p/${imageQuality.backdrop}${showDetail.backdrop_path}`,
+              ? getTmdbUrl(selectedEpisodeData.still_path, 'backdrop', 1000)
+              : getTmdbUrl(showDetail.backdrop_path, 'backdrop', 1000),
           }}
           style={styles.panelBackdrop}
           blurRadius={1}
@@ -357,14 +430,18 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         <View style={styles.panelOverlay} />
 
         <Animated.View
-          style={[styles.infoPanelContainer, { opacity: fadeAnim }]}
+          style={[
+            styles.infoPanelContainer,
+            // Sağ kenar yalnız seçili bölümde kapat düğmesi için ayrılır.
+            { opacity: fadeAnim, paddingRight: selectedEpisode ? 52 : 14 },
+          ]}
         >
           {/* Sol: Poster veya Bölüm Görseli */}
           <Image
             source={{
               uri: selectedEpisodeData?.still_path
-                ? `https://image.tmdb.org/t/p/${imageQuality.poster}${selectedEpisodeData.still_path}`
-                : `https://image.tmdb.org/t/p/${imageQuality.poster}${showDetail.poster_path}`,
+                ? getTmdbUrl(selectedEpisodeData.still_path, 'poster', 200)
+                : getTmdbUrl(showDetail.poster_path, 'poster', 200),
             }}
             style={selectedEpisodeData ? styles.panelStill : styles.panelPoster}
           />
@@ -441,13 +518,27 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                   )}
                   <TouchableOpacity
                     style={styles.detailBtn}
-                    onPress={() =>
+                    onPress={() => {
+                      // EpisodeDetails bu meta'yı WatchedAdd → markEpisodes'a
+                      // iletir; eksik gönderilirse ilk işaretlemede watchedTv
+                      // dokümanı boş adla/0 bölüm sayısıyla oluşur ve sonraki
+                      // işaretlemeler bu meta'yı bir daha onarmaz.
+                      const seasonMeta = showDetail?.seasons?.find(
+                        (s) => s.season_number === selectedEpisode.season,
+                      );
                       navigation.navigate("EpisodeDetails", {
                         showId: id,
                         seasonNumber: selectedEpisode.season,
                         episodeNumber: selectedEpisodeData.episode_number,
-                      })
-                    }
+                        showName: showDetail?.name || "",
+                        showEpisodeCount: showDetail?.number_of_episodes || 0,
+                        showSeasonCount: showDetail?.number_of_seasons || 0,
+                        seasonEpisodes: seasonMeta?.episode_count || 0,
+                        showPosterPath: showDetail?.poster_path || null,
+                        seasonPosterPath: seasonMeta?.poster_path || null,
+                        genres: showDetail?.genres?.map((g) => g.name) || [],
+                      });
+                    }}
                   >
                     <Text style={styles.detailBtnText}>{t.detail} →</Text>
                   </TouchableOpacity>
@@ -464,7 +555,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                   {" · "}
                   {showDetail.status === "Ended"
                     ? showDetail.last_air_date
-                    : "Devam ediyor"}
+                    : i18nText("autoI18n.devam_ediyor", "Devam ediyor")}
                 </Text>
                 <View style={styles.panelBottomRow}>
                   <View style={styles.ratingBadge}>
@@ -473,12 +564,10 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
                     </Text>
                   </View>
                   <Text style={styles.voteCount}>
-                    {showDetail.imdb_votes} oy
+                    {showDetail.imdb_votes} {i18nText("votes", "oy")}
                   </Text>
                 </View>
-                <Text style={styles.hintText}>
-                  Bölüme dokun → bölüm bilgisi
-                </Text>
+                <Text style={styles.hintText}>{i18nText("autoI18n.bolume_dokun_bolum_bilgisi", "Bölüme dokun → bölüm bilgisi")}</Text>
               </>
             )}
           </View>
@@ -509,58 +598,16 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       </View>
 
       {/* ── Değerlendirme Izgarası ────────────────────────────────────────── */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 40, paddingVertical: 10 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <ScrollView
-          horizontal
-          contentContainerStyle={{ paddingHorizontal: 12 }}
-          showsHorizontalScrollIndicator={false}
-        >
-          <View style={{ minWidth: tvShows.length * 54 }}>
-            {/* Sezon Başlık Satırı */}
-            <View style={[styles.row, { marginBottom: 4 }]}>
-              {tvShows.map((season) => (
-                <View key={season.season_number} style={styles.seasonHeader}>
-                  <Text style={styles.seasonHeaderText}>
-                    S{season.season_number}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Bölüm Hücreleri */}
-            {[...Array(maxEpisodes)].map((_, epIndex) => (
-              <View key={epIndex} style={styles.row}>
-                {tvShows.map((season) =>
-                  season.episodes[epIndex] ? (
-                    <EpisodeCell
-                      key={season.season_number}
-                      episode={season.episodes[epIndex]}
-                      seasonNumber={season.season_number}
-                      episodeIndex={epIndex}
-                      isSelected={
-                        selectedEpisode?.season === season.season_number &&
-                        selectedEpisode?.index === epIndex
-                      }
-                      onPress={() =>
-                        handleEpisodePress(season.season_number, epIndex)
-                      }
-                      borderColor={theme.primary}
-                    />
-                  ) : (
-                    <View key={season.season_number} style={styles.emptyCell}>
-                      <Text style={styles.emptyCellDot}>·</Text>
-                    </View>
-                  ),
-                )}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      </ScrollView>
+      <TvGraphGrid
+        seasons={tvShows}
+        grid={grid}
+        gridKey={renderGridMode}
+        selected={selectedEpisode}
+        onPress={handleEpisodePress}
+        borderColor={theme.primary}
+        headerColor={theme.text.secondary}
+        labels={gridLabels}
+      />
     </SafeAreaView>
   );
 };
@@ -569,19 +616,36 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  lottie: {
-    position: "absolute",
-    top: 0,
-    left: -60,
-    right: -60,
-    bottom: -200,
-    zIndex: 0,
+  // ── Üst Çubuk ───────────────────────────────────────────────────────────
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 52,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 6,
   },
+  modeSwitch: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    padding: 3,
+    borderRadius: 13,
+    borderWidth: 1,
+  },
+  modeBtn: {
+    width: 34,
+    height: 30,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modeBtnPressed: { backgroundColor: "rgba(127,127,127,0.18)" },
 
   // ── Bilgi Paneli ────────────────────────────────────────────────────────
   infoPanelWrapper: {
     marginHorizontal: 12,
-    marginTop: 10,
     borderRadius: 18,
     overflow: "hidden",
     elevation: 6,
@@ -609,7 +673,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: 14,
     alignItems: "center",
-    minHeight: 140,
+    minHeight: 154,
   },
   panelPoster: {
     width: 82,
@@ -714,64 +778,34 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // ── Izgara ──────────────────────────────────────────────────────────────
+  // ── Izgara (yalnız satır düzeni; hücre stilleri TvGraphGrid.js'te) ────────
   row: {
     flexDirection: "row",
     alignItems: "center",
   },
-  seasonHeader: {
-    width: 54,
-    paddingVertical: 2,
+
+  // ── Yükleniyor ──────────────────────────────────────────────────────────
+  skeletonBody: { flex: 1 },
+  skeletonPanel: {
+    flexDirection: "row",
+    padding: 14,
     alignItems: "center",
+    minHeight: 154,
   },
-  seasonHeaderText: {
-    color: "rgba(255,255,255,0.35)",
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  cell: {
-    width: 50,
-    height: 50,
-    marginVertical: 2,
-    marginHorizontal: 2,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 8,
+  skeletonGrid: {
+    flex: 1,
     overflow: "hidden",
-  },
-  cellSeasonLabel: {
-    position: "absolute",
-    top: 3,
-    left: 4,
-    fontSize: 8,
-    fontWeight: "700",
-  },
-  cellRating: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  cellEpisodeLabel: {
-    position: "absolute",
-    bottom: 3,
-    right: 4,
-    fontSize: 8,
-    fontWeight: "700",
-  },
-  emptyCell: {
-    width: 50,
-    height: 50,
-    marginVertical: 2,
-    marginHorizontal: 2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyCellDot: {
-    color: "rgba(255,255,255,0.15)",
-    fontSize: 24,
+    paddingTop: 10,
+    paddingHorizontal: 12,
   },
 
   // ── Hata ────────────────────────────────────────────────────────────────
+  errorBody: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
   errorTitle: {
     fontSize: 20,
     fontWeight: "700",

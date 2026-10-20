@@ -1,51 +1,188 @@
 {
   "expo": {
-    "name": "Watch Flix",
-    "slug": "WatchFlix",
-    "version": "1.1.0",
+    "name": "Seelogd",
+    "slug": "seelogd",
+    "version": "1.4.9",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon_default/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#00000000"
+    "scheme": "seelogd",
+    "locales": {
+      "en": "./native/locales/en.json",
+      "tr": "./native/locales/tr.json",
+      "es": "./native/locales/es.json",
+      "pt": "./native/locales/pt.json",
+      "de": "./native/locales/de.json"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.smlztrk.seelogd",
+      "appleTeamId": "KN77DDXC9U",
+      "usesAppleSignIn": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleLocalizations": [
+          "en",
+          "tr",
+          "es",
+          "pt",
+          "de"
+        ]
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.smlztrk.seelogd"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#00000000",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/icon_default/android-icon-foreground.png",
+        "backgroundImage": "./assets/icon_default/android-icon-background.png",
+        "monochromeImage": "./assets/icon_default/android-icon-monochrome.png"
       },
-      "splash": {
-        "image": "./assets/splash-icon.png",
-        "resizeMode": "cover",
-        "backgroundColor": "#00000000"
-      },
-      "package": "com.smlztrk.WatchFlix",
-      "softwareKeyboardLayoutMode": "pan"
+      "package": "com.smlztrk.seelogd",
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [],
+      "blockedPermissions": [
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "3bbd3b81-8382-4788-bfc9-dbde13043eaf"
-      }
+      "favicon": "./assets/icon_default/favicon.png"
     },
     "plugins": [
+      "expo-image",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon_default/android-icon-foreground.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#1E1E1E",
+          "ios": {
+            "imageWidth": 288
+          }
+        }
+      ],
+      "@bacons/apple-targets",
+      "expo-apple-authentication",
+      "@react-native-google-signin/google-signin",
       [
         "expo-video",
         {
           "supportsBackgroundPlayback": true,
           "supportsPictureInPicture": true
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon_default/notification-icon.png",
+          "color": "#1E1E1E",
+          "defaultChannel": "default"
+        }
+      ],
+      "expo-web-browser",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow the app to save the story image you create to your photo library.",
+          "savePhotosPermission": "Allow the app to save the story image you create to your photo library.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/analytics",
+      "./plugins/withRNFirebaseCocoaPods.js",
+      "./plugins/withRNScreensGamma.js",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://de.sentry.io/",
+          "project": "react-native",
+          "organization": "seelogd"
+        }
+      ],
+      "./plugins/withAndroidWidgets.js",
+      [
+        "./plugins/withAlternateAppIcons.js",
+        {
+          "icons": [
+            {
+              "name": "Glass",
+              "ios": "./assets/icon_glass/icon.png",
+              "android": {
+                "foregroundImage": "./assets/icon_glass/android-icon-foreground.png",
+                "backgroundImage": "./assets/icon_glass/android-icon-background.png",
+                "monochromeImage": "./assets/icon_glass/android-icon-monochrome.png"
+              }
+            }
+          ]
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow access to your calendar so movie, series and note reminders can be added to your phone's calendar and removed from it.",
+          "remindersPermission": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-localization",
+      "expo-sharing",
+      "expo-quick-actions",
+      [
+        "expo-share-intent",
+        {
+          "iosShareExtensionName": "Seelogd Share",
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsWebPageWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
+          "androidIntentFilters": ["text/*"]
+        }
       ]
-    ]
+    ],
+    "owner": "smlztrk",
+    "updates": {
+      "url": "https://u.expo.dev/9c17fe1c-ca63-4de3-af7a-76d131e3db7a"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.smlztrk.seelogd.widget",
+                  "targetName": "ReminderWidget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.smlztrk.seelogd"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "9c17fe1c-ca63-4de3-af7a-76d131e3db7a"
+      }
+    }
   }
 }

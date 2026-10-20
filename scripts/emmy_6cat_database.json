@@ -1,0 +1,695 @@
+{
+  "updatedAt": 1786987527426,
+  "totalYears": 58,
+  "items": [
+    {
+      "year": 2027,
+      "isConfirmed": false,
+      "categories": {}
+    },
+    {
+      "year": 2026,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 126308,
+        "comedy_series": 136315,
+        "limited_series": 241259,
+        "animated_program": 94605,
+        "documentary_series": 235345,
+        "international_emmy": 133490
+      }
+    },
+    {
+      "year": 2025,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 126308,
+        "comedy_series": 124101,
+        "limited_series": 241259,
+        "animated_program": 225180,
+        "documentary_series": 235345,
+        "international_emmy": 133490
+      }
+    },
+    {
+      "year": 2024,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 126308,
+        "comedy_series": 124101,
+        "limited_series": 241259,
+        "animated_program": 225180,
+        "documentary_series": 235345,
+        "international_emmy": 133490
+      }
+    },
+    {
+      "year": 2023,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 76331,
+        "comedy_series": 136315,
+        "limited_series": 154385,
+        "animated_program": 456,
+        "documentary_series": 128876,
+        "international_emmy": 133490
+      }
+    },
+    {
+      "year": 2022,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 76331,
+        "comedy_series": 97546,
+        "limited_series": 111803,
+        "animated_program": 94605,
+        "documentary_series": 128876,
+        "international_emmy": 103913
+      }
+    },
+    {
+      "year": 2021,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 65494,
+        "comedy_series": 97546,
+        "limited_series": 87739,
+        "animated_program": 86831,
+        "documentary_series": 79525,
+        "international_emmy": 103913
+      }
+    },
+    {
+      "year": 2020,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 76331,
+        "comedy_series": 61662,
+        "limited_series": 79788,
+        "animated_program": 60625,
+        "documentary_series": 79525,
+        "international_emmy": 87508
+      }
+    },
+    {
+      "year": 2019,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1399,
+        "comedy_series": 67070,
+        "limited_series": 87108,
+        "animated_program": 456,
+        "documentary_series": 83880,
+        "international_emmy": 77994
+      }
+    },
+    {
+      "year": 2018,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1399,
+        "comedy_series": 70796,
+        "limited_series": 70813,
+        "animated_program": 60625,
+        "documentary_series": 77601,
+        "international_emmy": 71446
+      }
+    },
+    {
+      "year": 2017,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 69478,
+        "comedy_series": 2947,
+        "limited_series": 68665,
+        "animated_program": 32726,
+        "documentary_series": 68595,
+        "international_emmy": 70523
+      }
+    },
+    {
+      "year": 2016,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1399,
+        "comedy_series": 2947,
+        "limited_series": 65057,
+        "animated_program": 10283,
+        "documentary_series": 64439,
+        "international_emmy": 62681
+      }
+    },
+    {
+      "year": 2015,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1399,
+        "comedy_series": 2947,
+        "limited_series": 62417,
+        "animated_program": 456,
+        "documentary_series": 61929,
+        "international_emmy": 62681
+      }
+    },
+    {
+      "year": 2014,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1396,
+        "comedy_series": 1421,
+        "limited_series": 60622,
+        "animated_program": 32726,
+        "documentary_series": 58474,
+        "international_emmy": 46616
+      }
+    },
+    {
+      "year": 2013,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1396,
+        "comedy_series": 1421,
+        "limited_series": 55431,
+        "animated_program": 2190,
+        "documentary_series": 15069,
+        "international_emmy": 46616
+      }
+    },
+    {
+      "year": 2012,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1407,
+        "comedy_series": 1421,
+        "limited_series": 43348,
+        "animated_program": 456,
+        "documentary_series": 8724,
+        "international_emmy": 37363
+      }
+    },
+    {
+      "year": 2011,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1104,
+        "comedy_series": 1421,
+        "limited_series": 39591,
+        "animated_program": 615,
+        "documentary_series": 15069,
+        "international_emmy": 37680
+      }
+    },
+    {
+      "year": 2010,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1104,
+        "comedy_series": 1421,
+        "limited_series": 19163,
+        "animated_program": 456,
+        "documentary_series": 31708,
+        "international_emmy": 17340
+      }
+    },
+    {
+      "year": 2009,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1104,
+        "comedy_series": 4608,
+        "limited_series": 13561,
+        "animated_program": 2190,
+        "documentary_series": 15069,
+        "international_emmy": 17340
+      }
+    },
+    {
+      "year": 2008,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1104,
+        "comedy_series": 4608,
+        "limited_series": 15114,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 2973
+      }
+    },
+    {
+      "year": 2007,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1398,
+        "comedy_series": 4608,
+        "limited_series": 4586,
+        "animated_program": 2190,
+        "documentary_series": 1044,
+        "international_emmy": 17340
+      }
+    },
+    {
+      "year": 2006,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1973,
+        "comedy_series": 2316,
+        "limited_series": 1253,
+        "animated_program": 456,
+        "documentary_series": 1044,
+        "international_emmy": 2973
+      }
+    },
+    {
+      "year": 2005,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 4607,
+        "comedy_series": 2140,
+        "limited_series": 6266,
+        "animated_program": 2190,
+        "documentary_series": 15069,
+        "international_emmy": 2973
+      }
+    },
+    {
+      "year": 2004,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1398,
+        "comedy_series": 4589,
+        "limited_series": 1991,
+        "animated_program": 2723,
+        "documentary_series": 15069,
+        "international_emmy": 2973
+      }
+    },
+    {
+      "year": 2003,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 688,
+        "comedy_series": 2140,
+        "limited_series": 4426,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 2973
+      }
+    },
+    {
+      "year": 2002,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 688,
+        "comedy_series": 1668,
+        "limited_series": 4613,
+        "animated_program": 615,
+        "documentary_series": 13579,
+        "international_emmy": 2973
+      }
+    },
+    {
+      "year": 2001,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 688,
+        "comedy_series": 105,
+        "limited_series": 2710,
+        "animated_program": 456,
+        "documentary_series": 13579,
+        "international_emmy": 2973
+      }
+    },
+    {
+      "year": 2000,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 688,
+        "comedy_series": 4454,
+        "limited_series": 2810,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 2973
+      }
+    },
+    {
+      "year": 1999,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 4619,
+        "comedy_series": 1480,
+        "limited_series": 2910,
+        "animated_program": 2122,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1998,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 4619,
+        "comedy_series": 3452,
+        "limited_series": 3010,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1997,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 549,
+        "comedy_series": 3452,
+        "limited_series": 2583,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1996,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 4588,
+        "comedy_series": 3452,
+        "limited_series": 13675,
+        "animated_program": 2228,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1995,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 194,
+        "comedy_series": 3452,
+        "limited_series": 3310,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1994,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 206,
+        "comedy_series": 3452,
+        "limited_series": 2583,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1993,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 206,
+        "comedy_series": 1400,
+        "limited_series": 2583,
+        "animated_program": 2098,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1992,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 4396,
+        "comedy_series": 3219,
+        "limited_series": 3610,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1991,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 732,
+        "comedy_series": 141,
+        "limited_series": 3710,
+        "animated_program": 456,
+        "documentary_series": 9693,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1990,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 732,
+        "comedy_series": 3219,
+        "limited_series": 3810,
+        "animated_program": 456,
+        "documentary_series": 9693,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1989,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 732,
+        "comedy_series": 141,
+        "limited_series": 32675,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1988,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1448,
+        "comedy_series": 4500,
+        "limited_series": 4010,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1987,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 732,
+        "comedy_series": 1678,
+        "limited_series": 4110,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1986,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 4223,
+        "comedy_series": 1678,
+        "limited_series": 20753,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1985,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 4223,
+        "comedy_series": 1759,
+        "limited_series": 3591,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1984,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 3828,
+        "comedy_series": 141,
+        "limited_series": 4410,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1983,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 3828,
+        "comedy_series": 141,
+        "limited_series": 13780,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1982,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 3828,
+        "comedy_series": 3253,
+        "limited_series": 6479,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1981,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 3828,
+        "comedy_series": 2251,
+        "limited_series": 6480,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1980,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 480,
+        "comedy_series": 2251,
+        "limited_series": 12209,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1979,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 480,
+        "comedy_series": 2251,
+        "limited_series": 13555,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1978,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 954,
+        "comedy_series": 1922,
+        "limited_series": 15571,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1977,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 492,
+        "comedy_series": 2962,
+        "limited_series": 13555,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1976,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 9855,
+        "comedy_series": 2962,
+        "limited_series": 492,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1975,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 492,
+        "comedy_series": 2962,
+        "limited_series": 156138,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1974,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 492,
+        "comedy_series": 918,
+        "limited_series": 873,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1973,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 5021,
+        "comedy_series": 1922,
+        "limited_series": 15985,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1972,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 1103,
+        "comedy_series": 1922,
+        "limited_series": 13833,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1971,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 7123,
+        "comedy_series": 1922,
+        "limited_series": 5710,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    },
+    {
+      "year": 1970,
+      "isConfirmed": true,
+      "categories": {
+        "drama_series": 3602,
+        "comedy_series": 582,
+        "limited_series": 19077,
+        "animated_program": 456,
+        "documentary_series": 15069,
+        "international_emmy": 492
+      }
+    }
+  ]
+}

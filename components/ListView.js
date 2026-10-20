@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   TouchableOpacity,
@@ -7,18 +7,27 @@ import {
   StyleSheet,
   FlatList,
   Animated,
+  Easing,
   Pressable,
-  Dimensions,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../context/ThemeContext";
+import GlassCloseButton from "./common/GlassCloseButton";
 import { useLanguage } from "../context/LanguageContext";
 import LottieView from "lottie-react-native";
 import { useListStatusContext } from "../context/ListStatusContext";
-import { BlurView } from "expo-blur";
+import { useSharedLists } from "../context/SharedListsContext";
+import SharedListsSection from "./SharedListsSection";
+import { useHapticsSettings } from "../context/AppSettingsContext";
+import ModalBlurBackdrop from "./common/ModalBlurBackdrop";
+import ListActionIcon from "./common/ListActionIcon";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+import * as Haptics from "@services/hapticsService";
+import Toast from "@components/AppToast";
+import { i18nText } from "../utils/i18nText";
 
+import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "./common/GlassTouchable";
 /* ─── Küçük yardımcı ─────────────────────────────────── */
 const formatDateSave = (timestamp) => {
   const date = new Date(timestamp);
@@ -31,24 +40,33 @@ const formatDateSave = (timestamp) => {
 /* ─── Ana buton bileşeni ──────────────────────────────── */
 const ActionButton = ({
   onPress,
-  onPressIn,
-  onPressOut,
   scale,
+  opacity,
   children,
   badge,
+  compact = false,
 }) => (
   <TouchableOpacity
     onPress={onPress}
-    onPressIn={onPressIn}
-    onPressOut={onPressOut}
-    activeOpacity={0.85}
-    style={styles.actionButtonWrapper}
+    activeOpacity={1}
+    style={[
+      styles.actionButtonWrapper,
+      compact && styles.actionButtonWrapperCompact,
+    ]}
   >
-    <Animated.View style={{ transform: [{ scale: scale || 1 }] }}>
+    <Animated.View
+      style={{
+        transform: [{ scale: scale || 1 }],
+        opacity: opacity !== undefined ? opacity : 1,
+      }}
+    >
       {children}
       {badge != null && badge > 0 && (
-        <View style={styles.badgeWrap}>
-          <Text allowFontScaling={false} style={styles.badgeText}>
+        <View style={[styles.badgeWrap, compact && styles.badgeWrapCompact]}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.badgeText, compact && styles.badgeTextCompact]}
+          >
             {badge}
           </Text>
         </View>
@@ -62,12 +80,11 @@ const GridCard = ({
   item,
   isIn,
   scale,
+  opacity,
   theme,
   onPress,
-  onPressIn,
-  onPressOut,
 }) => (
-  <TouchableOpacity
+  <GlassTouchable
     style={[
       styles.gridCard,
       {
@@ -76,13 +93,12 @@ const GridCard = ({
       },
     ]}
     onPress={onPress}
-    onPressIn={onPressIn}
-    onPressOut={onPressOut}
-    activeOpacity={0.75}
+    activeOpacity={1}
   >
     <Animated.View
       style={{
         transform: [{ scale: scale || 1 }],
+        opacity: opacity !== undefined ? opacity : 1,
         alignItems: "center",
         gap: 8,
       }}
@@ -95,10 +111,13 @@ const GridCard = ({
           },
         ]}
       >
-        <Ionicons
-          name={isIn ? "checkmark-circle" : "folder-outline"}
+        <ListActionIcon
+          active={isIn}
+          activeName="checkmark-circle"
+          inactiveName="folder-outline"
+          activeColor={theme.colors.green}
+          inactiveColor={theme.text.muted}
           size={26}
-          color={isIn ? theme.colors.green : theme.text.muted}
         />
       </View>
       <Text
@@ -112,7 +131,7 @@ const GridCard = ({
         {item}
       </Text>
     </Animated.View>
-  </TouchableOpacity>
+  </GlassTouchable>
 );
 
 /* ─── Ana bileşen ─────────────────────────────────────── */
@@ -124,65 +143,99 @@ const ListView = ({
   type,
   navigation,
   updateWatchedList,
+  openWatchedHistory,
   isRemaining,
+  // Yayın tarihi BİLİNMİYOR (TMDB'de boş/geçersiz ve `status` da yayınlandı
+  // demiyor). İleri tarihli içerikte hatırlatmaya dönen göz butonu burada
+  // dönemez — hatırlatılacak bir tarih yok — bu yüzden kilitlenir.
+  // Bkz. utils/watchState.js → getReleaseState.
+  watchLocked = false,
+  // Hatırlatma kurulu mu. Kurulu kaldığı sürece göz butonu zil olarak kalır —
+  // içerik yayına girse bile. O durumda zil "Yayınlandı" görünümüne geçer
+  // (aşağıda `isReleasedReminder`); dokunuş yine hatırlatmayı kaldırır ve
+  // buton normal "İzle" göz butonuna döner.
   isReminderSet,
   addReminder,
   listStates,
   isLoading,
+  sharedItem, // ortak listeler için medya payload'ı ({id,type,name,imagePath,...})
+  compact = false,
 }) => {
   const { t } = useLanguage();
   const { theme } = useTheme();
-  const { allLists } = useListStatusContext();
+  const { otherListKeys, allListKeys } = useListStatusContext();
+  const { sharedLists } = useSharedLists();
+  const { hapticsEnabled } = useHapticsSettings();
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [otherLists, setOtherLists] = useState([]);
-  const [fullLists, setFullLists] = useState([]);
-  const [scaleValues, setScaleValues] = useState({});
+  const [optimisticStates, setOptimisticStates] = useState({});
+
+  React.useEffect(() => {
+    setOptimisticStates({});
+  }, [listStates, isReminderSet, isRemaining, watchLocked]);
+
+  const getIsActive = (key) => {
+    if (optimisticStates[key] !== undefined) return optimisticStates[key];
+    if (key === "reminder") return isReminderSet;
+    return listStates[key];
+  };
 
   const slideAnim = useRef(new Animated.Value(300)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const scaleValuesRef   = useRef({});
+  const opacityValuesRef = useRef({});
 
-  const trueCount = otherLists?.filter((list) => listStates[list]).length;
+  // Sabit + dinamik key'ler için Animated.Value'ları başlat
+  const initKey = (k) => {
+    if (!scaleValuesRef.current[k])   scaleValuesRef.current[k]   = new Animated.Value(1);
+    if (!opacityValuesRef.current[k]) opacityValuesRef.current[k] = new Animated.Value(1);
+  };
+  ["watchList", "watchedMovies", "favorites", "apps"].forEach(initKey);
+  allListKeys.forEach(initKey);
 
-  /* ── liste verisi ── */
-  useEffect(() => {
-    if (!allLists) {
-      setFullLists([]);
-      setOtherLists([]);
-      return;
+  const trueCount = otherListKeys.filter((list) => getIsActive(list)).length;
+
+  /* ── Animasyonlar ── */
+  // `mode`: "add" (listeye giriyor) | "remove" (çıkıyor) | "neutral" (modal açma
+  // gibi durum değiştirmeyen dokunuşlar). Ekleme ile çıkarma AYNI hissi
+  // vermemeli: ekleme daha derin bir squash + belirgin zıplama, çıkarma sığ ve
+  // yaysız. Dokunsal geri bildirim de yönle birlikte değişir, böylece kullanıcı
+  // ekrana bakmadan hangi yöne gittiğini ayırt edebilir.
+  const animateBounce = (name, mode = "neutral") => {
+    if (hapticsEnabled) {
+      Haptics.impactAsync(
+        mode === "add"
+          ? Haptics.ImpactFeedbackStyle.Medium
+          : Haptics.ImpactFeedbackStyle.Light,
+      );
     }
-    const predefined = ["watchedTv", "favorites", "watchList", "watchedMovies"];
-    const keys = Object.keys(allLists);
-    setFullLists(keys);
-    setOtherLists(keys.filter((l) => !predefined.includes(l)));
-  }, [allLists]);
+    const sc = scaleValuesRef.current[name];
+    if (!sc) return;
 
-  /* ── animasyon değerleri ── */
-  useEffect(() => {
-    const vals = {};
-    (fullLists || []).forEach((name) => {
-      vals[name] = new Animated.Value(1);
-    });
-    setScaleValues(vals);
-  }, [fullLists]);
+    // Animasyonu anında resetle ve küçült
+    sc.stopAnimation();
+    sc.setValue(mode === "add" ? 0.72 : 0.86);
 
-  const onPressIn = (name) => {
-    if (!scaleValues[name]) return;
-    Animated.spring(scaleValues[name], {
-      toValue: 0.65,
-      friction: 4,
-      tension: 220,
+    Animated.spring(sc, {
+      toValue: 1,
+      mass: 1,
+      stiffness: mode === "add" ? 260 : 300,
+      damping: mode === "add" ? 10 : 19, // düşük damping = daha fazla zıplama
       useNativeDriver: true,
     }).start();
   };
-  const onPressOut = (name) => {
-    if (!scaleValues[name]) return;
-    Animated.spring(scaleValues[name], {
-      toValue: 1,
-      friction: 4,
-      tension: 220,
-      useNativeDriver: true,
-    }).start();
+
+  const handleOptimisticPress = (key, action, toggle = true) => {
+    const currentState = getIsActive(key);
+    animateBounce(key, toggle ? (currentState ? "remove" : "add") : "neutral");
+
+    if (toggle) {
+      setOptimisticStates((prev) => ({ ...prev, [key]: !currentState }));
+    }
+    // Animasyonun donmaması için ana işlemi bir sonraki event loop'a bırak
+    setTimeout(() => {
+      action();
+    }, 15);
   };
 
   /* ── modal aç/kapat ── */
@@ -191,13 +244,15 @@ const ListView = ({
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 220,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
-        friction: 7,
-        tension: 60,
+        mass: 1,
+        stiffness: 250,
+        damping: 22,
         useNativeDriver: true,
       }),
     ]).start();
@@ -206,12 +261,14 @@ const ListView = ({
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
-        duration: 180,
+        duration: 200,
+        easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 300,
         duration: 200,
+        easing: Easing.in(Easing.ease),
         useNativeDriver: true,
       }),
     ]).start(() => setModalVisible(false));
@@ -221,10 +278,14 @@ const ListView = ({
   const ICONS = [
     {
       key: "watchList",
-      icon: listStates["watchList"] ? "bookmark" : "bookmark-outline",
-      color: listStates["watchList"] ? theme.colors.blue : theme.text.secondary,
-      label: t.watchlist || "Liste",
-      onPress: () => updateList("watchList", type, formatDateSave(new Date())),
+      activeName: "bookmark",
+      inactiveName: "bookmark-outline",
+      activeColor: theme.colors.blue,
+      inactiveColor: theme.text.secondary,
+      label: getIsActive("watchList")
+        ? i18nText("autoI18n.listede", "Listede")
+        : i18nText("autoI18n.izleme_listesi", "İzleme Listesi"),
+      onPress: () => handleOptimisticPress("watchList", () => updateList("watchList", type, formatDateSave(new Date()))),
     },
     {
       key: "watchedMovies",
@@ -232,10 +293,14 @@ const ListView = ({
     },
     {
       key: "favorites",
-      icon: listStates["favorites"] ? "heart" : "heart-outline",
-      color: listStates["favorites"] ? theme.colors.red : theme.text.secondary,
-      label: t.favorites || "Favori",
-      onPress: () => updateList("favorites", type, formatDateSave(new Date())),
+      activeName: "heart",
+      inactiveName: "heart-outline",
+      activeColor: theme.colors.red,
+      inactiveColor: theme.text.secondary,
+      label: getIsActive("favorites")
+        ? i18nText("autoI18n.favorim", "Favorim")
+        : i18nText("autoI18n.favori", "Favori"),
+      onPress: () => handleOptimisticPress("favorites", () => updateList("favorites", type, formatDateSave(new Date()))),
     },
   ];
 
@@ -243,79 +308,150 @@ const ListView = ({
     <View
       style={[
         styles.container,
+        compact && styles.containerCompact,
         { backgroundColor: theme.secondary, shadowColor: theme.shadow },
       ]}
     >
       {/* ── Standart butonlar ── */}
-      {ICONS.map(({ key, icon, color, label, onPress, isEye }) => {
+      {ICONS.map(({ key, activeName, inactiveName, activeColor, inactiveColor, label, onPress, isEye }) => {
         if (isEye) {
           const isReminderMode = isRemaining || isReminderSet;
+          const reminderOn = !!getIsActive("reminder");
+          // Hatırlatma KALICIDIR: içerik yayına girse de kullanıcı silene kadar
+          // durur (hatırlatıcılar ekranı böylece "yokluğumda neler çıkmış"
+          // listesi olarak da işe yarar). Ama bu buton o ayrımı yapmıyordu:
+          // çoktan vizyona girmiş bir filmde bile turuncu zil + "Hatırlat"
+          // yazıyor, içerik hâlâ bekleniyormuş gibi görünüyordu. Yayın tarihi
+          // GEÇMİŞSE buton bunu söylesin — yeşil `bell-check` + "Yayınlandı".
+          // `watchLocked` dışarıda: tarih de TMDB durumu da bilinmiyorsa
+          // "yayınlandı" diyemeyiz (bkz. utils/watchState.js → getReleaseState).
+          // Koşul BİLEREK `reminderOn` yerine `isReminderMode` üzerinden: iyimser
+          // (optimistic) kaldırma anında zil sönerken ikon takımı da turuncuya
+          // atlasın istemiyoruz — çıkış animasyonu aynı ikonla tamamlanmalı.
+          const isReleasedReminder = isReminderMode && !isRemaining && !watchLocked;
+          // Kilit YALNIZ henüz işaretlenmemişken uygulanır: eski kayıtları
+          // (veya tarihi sonradan silinen içeriği) kullanıcı geçmişten
+          // kaldırabilmeli, aksi hâlde kayıt ekranda kilitli kalırdı.
+          const isWatchBlocked =
+            !isReminderMode && watchLocked && !getIsActive("watchedMovies");
           return (
-            <View key={key} style={styles.iconCol}>
+            <View key={key} style={[styles.iconCol, compact && styles.iconColCompact]}>
               <ActionButton
-                scale={scaleValues[key]}
-                onPressIn={() => onPressIn(key)}
-                onPressOut={() => onPressOut(key)}
+                scale={scaleValuesRef.current[key]}
+                opacity={opacityValuesRef.current[key]}
+                compact={compact}
                 onPress={
-                  isReminderMode
-                    ? addReminder
-                    : () =>
-                        listStates["watchedMovies"]
-                          ? updateList(
-                              "watchedMovies",
-                              type,
-                              formatDateSave(new Date()),
-                            )
-                          : updateWatchedList()
+                  isWatchBlocked
+                    ? () =>
+                        Toast.show({
+                          type: "warning",
+                          text1: i18nText(
+                            "autoI18n.yayin_tarihi_bilinmiyor",
+                            "Yayın tarihi bilinmiyor",
+                          ),
+                          text2: i18nText(
+                            "autoI18n.yayin_tarihi_bilinmiyor_izlendi",
+                            "Tarihi belli olmayan içerik izlendi olarak eklenemez.",
+                          ),
+                        })
+                    : isReminderMode
+                      ? () => handleOptimisticPress("reminder", addReminder)
+                      : () =>
+                          getIsActive("watchedMovies")
+                            ? handleOptimisticPress("watchedMovies", openWatchedHistory, false)
+                            : handleOptimisticPress("watchedMovies", updateWatchedList, false)
                 }
               >
-                {isReminderMode ? (
-                  <MaterialCommunityIcons
-                    name={isReminderSet ? "bell-ring" : "bell-ring-outline"}
-                    size={30}
-                    color={
-                      isReminderSet ? theme.colors.orange : theme.text.secondary
-                    }
+                {isWatchBlocked ? (
+                  <ListActionIcon
+                    active={false}
+                    activeName="lock-closed"
+                    inactiveName="lock-closed-outline"
+                    activeColor={theme.text.muted}
+                    inactiveColor={theme.text.muted}
+                    size={compact ? 24 : 30}
                   />
-                ) : listStates["watchedMovies"] ? (
-                  <Ionicons name="eye" size={30} color={theme.colors.green} />
-                ) : isLoading ? (
+                ) : isReminderMode ? (
+                  <ListActionIcon
+                    active={reminderOn}
+                    IconSet={MaterialCommunityIcons}
+                    activeName={isReleasedReminder ? "bell-check" : "bell-ring"}
+                    inactiveName={
+                      isReleasedReminder ? "bell-check-outline" : "bell-ring-outline"
+                    }
+                    activeColor={
+                      isReleasedReminder ? theme.colors.green : theme.colors.orange
+                    }
+                    inactiveColor={theme.text.secondary}
+                    size={compact ? 24 : 30}
+                  />
+                ) : /* Yükleme göstergesi YALNIZ henüz işaretlenmemişken çıkar.
+                       Eskiden `isLoading` tek başına kontrol ediyordu: kullanıcı
+                       "izledim" der demez ikonun yerini dönen Lottie alıyor,
+                       geçiş animasyonu daha başlamadan ekrandan siliniyordu.
+                       İyimser (optimistic) durum zaten sonucu gösterdiği için
+                       işaretliyken dönen göstermeye gerek yok. */
+                isLoading && !getIsActive("watchedMovies") ? (
                   <LottieView
-                    source={require("../LottieJson/loading15.json")}
-                    style={{ width: 30, height: 30 }}
+                    source={require("@lottie/loading15.json")}
+                    style={{ width: compact ? 24 : 30, height: compact ? 24 : 30 }}
                     autoPlay
                     loop
                   />
                 ) : (
-                  <Ionicons
-                    name="eye-outline"
-                    size={30}
-                    color={theme.text.secondary}
+                  <ListActionIcon
+                    active={!!getIsActive("watchedMovies")}
+                    activeName="eye"
+                    inactiveName="eye-outline"
+                    activeColor={theme.colors.green}
+                    inactiveColor={theme.text.secondary}
+                    size={compact ? 24 : 30}
                   />
                 )}
               </ActionButton>
               <Text
                 allowFontScaling={false}
-                style={[styles.iconLabel, { color: theme.text.muted }]}
+                style={[
+                  styles.iconLabel,
+                  compact && styles.iconLabelCompact,
+                  { color: theme.text.muted },
+                ]}
               >
-                {t.watched || "İzledim"}
+                {isReminderMode
+                  ? isReleasedReminder
+                    ? i18nText("autoI18n.yayinlandi", "Yayınlandı")
+                    : (t.remind || i18nText("autoI18n.hatirlat", "Hatırlat"))
+                  : getIsActive("watchedMovies")
+                    ? (t.watched || i18nText("autoI18n.izlendi", "İzlendi"))
+                    : (t.watch || i18nText("autoI18n.izle", "İzle"))}
               </Text>
             </View>
           );
         }
         return (
-          <View key={key} style={styles.iconCol}>
+          <View key={key} style={[styles.iconCol, compact && styles.iconColCompact]}>
             <ActionButton
-              scale={scaleValues[key]}
-              onPressIn={() => onPressIn(key)}
-              onPressOut={() => onPressOut(key)}
+              scale={scaleValuesRef.current[key]}
+              opacity={opacityValuesRef.current[key]}
+              compact={compact}
               onPress={onPress}
             >
-              <Ionicons name={icon} size={30} color={color} />
+              <ListActionIcon
+                active={!!getIsActive(key)}
+                activeName={activeName}
+                inactiveName={inactiveName}
+                activeColor={activeColor}
+                inactiveColor={inactiveColor}
+                size={compact ? 24 : 30}
+              />
             </ActionButton>
             <Text
               allowFontScaling={false}
-              style={[styles.iconLabel, { color: theme.text.muted }]}
+              style={[
+                styles.iconLabel,
+                compact && styles.iconLabelCompact,
+                { color: theme.text.muted },
+              ]}
             >
               {label}
             </Text>
@@ -324,31 +460,29 @@ const ListView = ({
       })}
 
       {/* ── Diğer listeler butonu ── */}
-      <View style={styles.iconCol}>
+      <View style={[styles.iconCol, compact && styles.iconColCompact]}>
         <ActionButton
-          onPress={openModal}
-          badge={
-            trueCount > 0
-              ? trueCount
-              : otherLists?.length > 0
-                ? trueCount
-                : null
-          }
+          onPress={() => { animateBounce("apps"); openModal(); }}
+          scale={scaleValuesRef.current["apps"]}
+          opacity={opacityValuesRef.current["apps"]}
+          badge={trueCount > 0 ? trueCount : null}
+          compact={compact}
         >
           <View
             style={[
               styles.appsIconWrap,
+              compact && styles.appsIconWrapCompact,
               {
                 backgroundColor:
                   trueCount > 0
                     ? theme.colors.orange + "18"
-                    : otherLists?.length > 0
+                    : otherListKeys?.length > 0
                       ? theme.accent + "15"
                       : theme.primary,
                 borderColor:
                   trueCount > 0
                     ? theme.colors.orange + "55"
-                    : otherLists?.length > 0
+                    : otherListKeys?.length > 0
                       ? theme.accent + "40"
                       : theme.border,
               },
@@ -356,11 +490,11 @@ const ListView = ({
           >
             <Ionicons
               name={trueCount > 0 ? "grid" : "grid-outline"}
-              size={22}
+              size={compact ? 18 : 22}
               color={
                 trueCount > 0
                   ? theme.colors.orange
-                  : otherLists?.length > 0
+                  : otherListKeys?.length > 0
                     ? theme.accent
                     : theme.text.secondary
               }
@@ -369,9 +503,13 @@ const ListView = ({
         </ActionButton>
         <Text
           allowFontScaling={false}
-          style={[styles.iconLabel, { color: theme.text.muted }]}
+          style={[
+            styles.iconLabel,
+            compact && styles.iconLabelCompact,
+            { color: theme.text.muted },
+          ]}
         >
-          {t.otherLists || "Diğerleri"}
+          {i18nText("autoI18n.digerleri", "Diğerleri")}
         </Text>
       </View>
 
@@ -384,12 +522,7 @@ const ListView = ({
       >
         <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeModal} />
-          <BlurView
-            tint="dark"
-            intensity={50}
-            experimentalBlurMethod="dimezisBlurView"
-            style={StyleSheet.absoluteFill}
-          />
+          <ModalBlurBackdrop intensity={50} />
 
           <Animated.View
             style={[
@@ -404,212 +537,109 @@ const ListView = ({
             {/* Header */}
             <View style={styles.sheetHeader}>
               <View style={styles.sheetTitleRow}>
-                <View
-                  style={[
-                    styles.headerIconBg,
-                    { backgroundColor: theme.accent + "20" },
-                  ]}
-                >
+                <View style={[styles.headerIconBg, { backgroundColor: theme.accent + "20" }]}>
                   <Ionicons name="grid" size={16} color={theme.accent} />
                 </View>
                 <View>
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.sheetTitle, { color: theme.text.primary }]}
-                  >
-                    {t.otherLists || "Diğer Listeler"}
+                  <Text allowFontScaling={false} style={[styles.sheetTitle, { color: theme.text.primary }]}>
+                    {i18nText("autoI18n.diger_listeler", "Diğer Listeler")}
                   </Text>
-                  {otherLists?.length > 0 && (
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.sheetSubtitle,
-                        { color: theme.text.muted },
-                      ]}
-                    >
-                      {otherLists.length} liste · {trueCount} seçili
-                    </Text>
+                  {otherListKeys?.length > 0 && (
+                    <Text allowFontScaling={false} style={[styles.sheetSubtitle, { color: theme.text.muted }]}>
+                      {otherListKeys.length}{i18nText("autoI18n.liste_3", "liste ·")}{trueCount}{i18nText("autoI18n.secili", "seçili")}</Text>
                   )}
                 </View>
               </View>
-              <TouchableOpacity
-                onPress={closeModal}
-                style={[styles.closeBtn, { backgroundColor: theme.primary }]}
-              >
-                <Ionicons name="close" size={15} color={theme.text.muted} />
-              </TouchableOpacity>
+              <GlassCloseButton size={28} fallbackRadius={14} iconSize={15} onPress={closeModal} />
             </View>
 
             {/* Separator */}
-            <View
-              style={[styles.separator, { backgroundColor: theme.border }]}
-            />
+            <View style={[styles.separator, { backgroundColor: theme.border }]} />
 
-            {otherLists?.length > 0 ? (
+            {otherListKeys?.length > 0 ||
+            (sharedLists.length > 0 && sharedItem) ? (
               <>
-                <FlatList
-                  data={otherLists}
-                  keyExtractor={(item) => item}
-                  numColumns={3}
-                  contentContainerStyle={styles.gridContainer}
-                  showsVerticalScrollIndicator={false}
-                  style={{ maxHeight: 300 }}
-                  columnWrapperStyle={{ gap: 10 }}
-                  renderItem={({ item }) => (
-                    <GridCard
-                      item={item}
-                      isIn={!!listStates[item]}
-                      scale={scaleValues[item]}
-                      theme={theme}
-                      onPress={() =>
-                        updateList(item, type, formatDateSave(new Date()))
-                      }
-                      onPressIn={() => onPressIn(item)}
-                      onPressOut={() => onPressOut(item)}
-                    />
-                  )}
+                {otherListKeys?.length > 0 && (
+                  <FlatList
+                    data={otherListKeys}
+                    keyExtractor={(item) => item}
+                    numColumns={3}
+                    contentContainerStyle={styles.gridContainer}
+                    showsVerticalScrollIndicator={false}
+                    style={{ maxHeight: 300 }}
+                    columnWrapperStyle={{ gap: 10 }}
+                    renderItem={({ item }) => (
+                      <GridCard
+                        item={item}
+                        isIn={!!getIsActive(item)}
+                        scale={scaleValuesRef.current[item]}
+                        opacity={opacityValuesRef.current[item]}
+                        theme={theme}
+                        onPress={() => handleOptimisticPress(item, () => updateList(item, type, formatDateSave(new Date())))}
+                      />
+                    )}
+                  />
+                )}
+
+                {/* Ortak listeler */}
+                <SharedListsSection
+                  sharedItem={sharedItem}
+                  visible={modalVisible}
                 />
 
                 {/* Eylemler */}
-                <View
-                  style={[
-                    styles.separator,
-                    { backgroundColor: theme.border, marginBottom: 12 },
-                  ]}
-                />
+                <View style={[styles.separator, { backgroundColor: theme.border, marginBottom: 12 }]} />
                 <View style={styles.sheetActions}>
                   <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      {
-                        backgroundColor: theme.primary,
-                        borderColor: theme.border,
-                      },
-                    ]}
+                    style={[styles.actionBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
                     onPress={closeModal}
                   >
-                    <Ionicons
-                      name="close-circle-outline"
-                      size={15}
-                      color={theme.text.muted}
-                    />
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.actionBtnText,
-                        { color: theme.text.muted },
-                      ]}
-                    >
-                      Kapat
+                    <Ionicons name="close-circle-outline" size={15} color={theme.text.muted} />
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: theme.text.muted }]}>
+                      {i18nText("autoI18n.kapat", "Kapat")}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      { backgroundColor: theme.accent },
-                    ]}
-                    onPress={() => {
-                      closeModal();
-                      navigation.navigate("ListsViewScreen");
-                    }}
+                    style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+                    onPress={() => { closeModal(); navigation.navigate("ListsViewScreen"); }}
                   >
                     <Ionicons name="list" size={15} color="#fff" />
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.actionBtnText, { color: "#fff" }]}
-                    >
-                      Tüm Listeler
-                    </Text>
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: "#fff" }]}>{i18nText("autoI18n.tum_listeler", "Tüm Listeler")}</Text>
                   </TouchableOpacity>
                 </View>
               </>
             ) : (
               /* Boş durum */
               <View style={styles.emptyContainer}>
-                <View
-                  style={[
-                    styles.emptyIconBg,
-                    { backgroundColor: theme.primary },
-                  ]}
-                >
-                  <Ionicons
-                    name="folder-open-outline"
-                    size={36}
-                    color={theme.text.muted}
-                  />
+                <View style={[styles.emptyIconBg, { backgroundColor: theme.primary }]}>
+                  <Ionicons name="folder-open-outline" size={36} color={theme.text.muted} />
                 </View>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.emptyTitle, { color: theme.text.primary }]}
-                >
-                  Liste Bulunamadı
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.emptySubtitle, { color: theme.text.muted }]}
-                >
-                  Henüz özel liste oluşturmadın. Listeler ekranından yeni liste
-                  ekleyebilirsin.
-                </Text>
-                <View
-                  style={[
-                    styles.separator,
-                    { backgroundColor: theme.border, marginBottom: 4 },
-                  ]}
-                />
+                <Text allowFontScaling={false} style={[styles.emptyTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.liste_bulunamadi", "Liste Bulunamadı")}</Text>
+                <Text allowFontScaling={false} style={[styles.emptySubtitle, { color: theme.text.muted }]}>{i18nText("autoI18n.henuz_ozel_liste_olusturmadin_listeler_ekranindan_", "Henüz özel liste oluşturmadın. Listeler ekranından yeni liste ekleyebilirsin.")}</Text>
+                <View style={[styles.separator, { backgroundColor: theme.border, marginBottom: 4 }]} />
                 <View style={styles.sheetActions}>
                   <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      {
-                        backgroundColor: theme.primary,
-                        borderColor: theme.border,
-                      },
-                    ]}
+                    style={[styles.actionBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
                     onPress={closeModal}
                   >
-                    <Ionicons
-                      name="close-circle-outline"
-                      size={15}
-                      color={theme.text.muted}
-                    />
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.actionBtnText,
-                        { color: theme.text.muted },
-                      ]}
-                    >
-                      {t.cancel || "İptal"}
+                    <Ionicons name="close-circle-outline" size={15} color={theme.text.muted} />
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: theme.text.muted }]}>
+                      {t.cancel || i18nText("autoI18n.iptal", "İptal")}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      { backgroundColor: theme.accent },
-                    ]}
-                    onPress={() => {
-                      closeModal();
-                      navigation.navigate("ListsViewScreen");
-                    }}
+                    style={[styles.actionBtn, { backgroundColor: theme.accent }]}
+                    onPress={() => { closeModal(); navigation.navigate("ListsViewScreen"); }}
                   >
-                    <Ionicons
-                      name="add-circle-outline"
-                      size={15}
-                      color="#fff"
-                    />
-                    <Text
-                      allowFontScaling={false}
-                      style={[styles.actionBtnText, { color: "#fff" }]}
-                    >
-                      Liste Oluştur
-                    </Text>
+                    <Ionicons name="add-circle-outline" size={15} color="#fff" />
+                    <Text allowFontScaling={false} style={[styles.actionBtnText, { color: "#fff" }]}>{i18nText("autoI18n.liste_olustur", "Liste Oluştur")}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
           </Animated.View>
         </Animated.View>
+        <ModalToastHost visible={modalVisible} />
       </Modal>
     </View>
   );
@@ -631,6 +661,15 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 6,
   },
+  containerCompact: {
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    marginBottom: 0,
+    elevation: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+  },
 
   /* İkon kolonları */
   iconCol: {
@@ -638,10 +677,17 @@ const styles = StyleSheet.create({
     gap: 5,
     flex: 1,
   },
+  iconColCompact: {
+    gap: 2,
+  },
   iconLabel: {
     fontSize: 10,
     fontWeight: "600",
     letterSpacing: 0.2,
+  },
+  iconLabelCompact: {
+    fontSize: 9,
+    letterSpacing: 0.1,
   },
   actionButtonWrapper: {
     position: "relative",
@@ -649,6 +695,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 44,
     height: 44,
+  },
+  actionButtonWrapperCompact: {
+    width: 36,
+    height: 36,
   },
 
   /* Badge */
@@ -664,10 +714,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 3,
   },
+  badgeWrapCompact: {
+    top: -2,
+    right: -3,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+  },
   badgeText: {
     color: "#fff",
     fontSize: 9,
     fontWeight: "800",
+  },
+  badgeTextCompact: {
+    fontSize: 8,
   },
 
   /* Diğer listeler butonu */
@@ -678,6 +738,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
+  },
+  appsIconWrapCompact: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
   },
 
   /* ── MODAL ── */
@@ -734,13 +799,6 @@ const styles = StyleSheet.create({
   sheetSubtitle: {
     fontSize: 11,
     marginTop: 1,
-  },
-  closeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
   },
 
   /* Grid */

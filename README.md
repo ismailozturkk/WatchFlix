@@ -1,6 +1,6 @@
-# 🎬 Watch Flix
+# 🎬 Seelogd
 
-**Watch Flix**, kullanıcıların film ve dizi izleme alışkanlıklarını takip etmelerini, yeni içerikler keşfetmelerini ve kişiselleştirilmiş bir deneyim yaşamalarını sağleyen kapsamlı bir React Native (Expo) uygulamasıdır.
+**Seelogd**, kullanıcıların film ve dizi izleme alışkanlıklarını takip etmelerini, yeni içerikler keşfetmelerini ve kişiselleştirilmiş bir deneyim yaşamalarını sağleyen kapsamlı bir React Native (Expo) uygulamasıdır.
 
 ---
 
@@ -59,14 +59,14 @@ Bu proje modern mobil geliştirme standartlarına uygun olarak inşa edilmiştir
 - **Dil**: `JavaScript (ES6+)`
 - **Backend**: `Firebase (Firestore, Auth)`
 - **Veri Kaynağı**: `The Movie Database (TMDB) API`
-- **Depolama**: `AsyncStorage` (Yerel ayarlar için)
+- **Depolama**: `react-native-mmkv` — tüm kalıcı veri `services/storage` katmanından geçer (senkron okuma, merkezî anahtar kaydı, kullanıcı kapsamı)
 - **Animasyon**: `Lottie`, `React Native Reanimated`
 - **Navigasyon**: `React Navigation 7`
 
 ### 📂 Klasör Yapısı
 
 ```
-WhatchFlix/
+Seelogd/
 ├── screens/          # 54+ uygulama ekranı (Movie, TV, Auth, Tabs...)
 ├── components/       # Tekrar kullanılabilir UI bileşenleri
 ├── context/          # 9 adet Context API modülü (State Management)

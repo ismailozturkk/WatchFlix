@@ -1,0 +1,274 @@
+// __tests__/i18nKeys.test.js
+//
+// Kayıp çeviri anahtarı bekçisi.
+//
+// NEDEN: `i18nText(key, türkçeFallback)` + i18next `fallbackLng: "tr"` ikilisi
+// eksik anahtarı SESSİZCE yutar — ekran patlamaz, yalnızca İngilizce kullanan
+// kullanıcıya Türkçe basar. Denetimde koddan çağrılan 87 anahtarın iki pakette
+// de bulunmadığı böyle ortaya çıktı. Bu test o sınıfı build zamanına çeker:
+// anahtar eklemeyi unutan geliştirici kırmızı test görür, EN kullanıcı değil.
+//
+// KAPSAM: statik `"autoI18n.x"` dizgeleri regex'le çıkarılır. Anahtarı çalışma
+// anında kuran çağrı yerleri (`autoI18n.${...}`) regex'le çözülemez; her biri
+// DINAMIK_YERLER'de elle kayıtlı ve KAYITSIZ yeni bir dinamik çağrı çıkarsa
+// test kırılır (yoksa bu sınıf sessizce geri gelirdi).
+
+const fs = require("fs");
+const path = require("path");
+
+const KOK = path.join(__dirname, "..");
+
+// Taranan kaynak ağacı. Yeni bir üst klasör açılırsa buraya eklenmeli.
+const TARANAN_KLASORLER = ["screens", "components", "context", "services", "utils"];
+const TARANAN_DOSYALAR = ["App.js"];
+
+// `i18nText("autoI18n.x"` ve `t("autoI18n.x"` — tek/çift tırnak.
+// `t` öncesindeki [\w.] engeli `format(`/`.at(` gibi çağrıları eler; zaten
+// "autoI18n." öneki şartı olduğu için yanlış eşleşme pratikte imkânsız.
+const STATIK_DESEN = /i18nText\(\s*(["'])([A-Za-z0-9_.-]+)\1/g;
+const T_FONKSIYON_DESEN = /(?<![\w.])t\(\s*(["'])(autoI18n\.[A-Za-z0-9_.-]+)\1/g;
+// Çağrının DIŞINDA tanımlanan anahtarlar: `{ labelKey: "autoI18n.x" }` gibi tablo
+// satırları, sonra `i18nText(o.labelKey, ...)` ile okunur. Yukarıdaki iki desen bunları
+// göremiyordu (ListPosterInfoControls'taki iki anahtar EN'de böyle sessizce eksik
+// kaldı). `${` ile kurulan dinamik anahtarlar karakter sınıfına uymadığı için
+// buraya girmez; onlar DINAMIK_YERLER'in işi.
+const LITERAL_DESEN = /(["'`])(autoI18n\.[A-Za-z0-9_.-]+)\1/g;
+
+// Anahtarı şablonla kuran dosyalar. Her kayıt, o dosyadaki anahtar TABLOSUNU
+// okuyan desenleri verir — böylece tabloya satır eklenince test onu da korur.
+const DINAMIK_YERLER = [
+  {
+    dosya: "components/moderation/ReportReasonSheet.js",
+    desenler: [/\bkey:\s*"([A-Za-z0-9_]+)"/g], // REASON_UI tablosu
+  },
+  {
+    dosya: "components/notifications/NotificationPrimingSheet.js",
+    // BENEFITS tablosu: metin anahtarı `key`, başlık anahtarı `titleKey`.
+    desenler: [/\bkey:\s*"([A-Za-z0-9_]+)"/g, /\btitleKey:\s*"([A-Za-z0-9_]+)"/g],
+  },
+  {
+    dosya: "components/CacheManagerModal.js",
+    // META tablosunun ALAN ADI anahtarın gövdesi: `autoI18n.cache_${cat.id}`.
+    desenler: [/^ {2}([A-Za-z0-9_]+):\s*\{\s*tr:/gm],
+    onek: "cache_",
+  },
+];
+
+function jsDosyalari(klasor, toplam = []) {
+  for (const girdi of fs.readdirSync(klasor, { withFileTypes: true })) {
+    const tamYol = path.join(klasor, girdi.name);
+    if (girdi.isDirectory()) {
+      if (girdi.name === "node_modules" || girdi.name === "__tests__") continue;
+      jsDosyalari(tamYol, toplam);
+    } else if (girdi.name.endsWith(".js")) {
+      toplam.push(tamYol);
+    }
+  }
+  return toplam;
+}
+
+const kaynakDosyalari = [
+  ...TARANAN_KLASORLER.flatMap((k) => jsDosyalari(path.join(KOK, k))),
+  ...TARANAN_DOSYALAR.map((d) => path.join(KOK, d)),
+];
+
+const goreliYol = (tamYol) => path.relative(KOK, tamYol).split(path.sep).join("/");
+
+// anahtar -> onu çağıran dosyalar (hata mesajında "nerede" yazabilmek için).
+const kullanilanAnahtarlar = new Map();
+const ekle = (anahtar, dosya) => {
+  if (!kullanilanAnahtarlar.has(anahtar)) kullanilanAnahtarlar.set(anahtar, new Set());
+  kullanilanAnahtarlar.get(anahtar).add(dosya);
+};
+
+const dinamikSablonluDosyalar = new Set();
+
+for (const tamYol of kaynakDosyalari) {
+  const kaynak = fs.readFileSync(tamYol, "utf8");
+  const rel = goreliYol(tamYol);
+
+  for (const eslesme of kaynak.matchAll(STATIK_DESEN)) ekle(eslesme[2], rel);
+  for (const eslesme of kaynak.matchAll(T_FONKSIYON_DESEN)) ekle(eslesme[2], rel);
+  for (const eslesme of kaynak.matchAll(LITERAL_DESEN)) ekle(eslesme[2], rel);
+
+  if (/autoI18n\.\$\{/.test(kaynak)) dinamikSablonluDosyalar.add(rel);
+
+  const kayit = DINAMIK_YERLER.find((y) => y.dosya === rel);
+  if (kayit) {
+    for (const desen of kayit.desenler) {
+      for (const eslesme of kaynak.matchAll(desen)) {
+        ekle(`autoI18n.${kayit.onek || ""}${eslesme[1]}`, rel);
+      }
+    }
+  }
+}
+
+const paket = (ad) => JSON.parse(fs.readFileSync(path.join(KOK, "translations", ad), "utf8"));
+const tr = paket("tr.json");
+const en = paket("en.json");
+const es = paket("es.json");
+const pt = paket("pt.json");
+const de = paket("de.json");
+
+// `useLanguage()` içindeki `t.movieScreens.title` gibi nesne erişimleri.
+// Yerel döngü değişkeni olarak kullanılan `t.id` benzeri eşleşmeleri elemek
+// için yalnız sözlükte gerçekten bulunan kök namespace'leri denetlenir.
+const tKokleri = new Set([...Object.keys(tr), ...Object.keys(en), ...Object.keys(es), ...Object.keys(pt), ...Object.keys(de)]);
+const T_NESNE_DESEN = /(?<![\w.])t(?:\?\.)?\.([A-Za-z_][A-Za-z0-9_]*(?:(?:\?\.)?\.[A-Za-z_][A-Za-z0-9_]*)*)/g;
+for (const tamYol of kaynakDosyalari) {
+  const kaynak = fs.readFileSync(tamYol, "utf8");
+  const rel = goreliYol(tamYol);
+  for (const eslesme of kaynak.matchAll(T_NESNE_DESEN)) {
+    const yol = eslesme[1]
+      .replace(/\?\./g, ".")
+      .replace(/\.(?:toUpperCase|toLowerCase|trim|replace|map|filter|slice).*$/, "");
+    if (tKokleri.has(yol.split(".")[0])) ekle(yol, rel);
+  }
+}
+
+// Sözlüğü "a.b.c" düz anahtar listesine indirger (paketler iç içe).
+function duzAnahtarlar(nesne, onek = "", toplam = []) {
+  for (const ad of Object.keys(nesne)) {
+    const deger = nesne[ad];
+    const yol = onek ? `${onek}.${ad}` : ad;
+    if (deger && typeof deger === "object" && !Array.isArray(deger)) duzAnahtarlar(deger, yol, toplam);
+    else toplam.push(yol);
+  }
+  return toplam;
+}
+
+function anahtarVar(nesne, yol) {
+  return yol.split(".").every((parca) => {
+    if (!nesne || typeof nesne !== "object" || !(parca in nesne)) return false;
+    nesne = nesne[parca];
+    return true;
+  });
+}
+
+describe("i18n anahtar bekçisi", () => {
+  it("tarama gerçekten çalışıyor (desen bozulursa test sessizce yeşile dönmesin)", () => {
+    expect(kaynakDosyalari.length).toBeGreaterThan(200);
+    expect(kullanilanAnahtarlar.size).toBeGreaterThan(1000);
+  });
+
+  it("koddan çağrılan her statik çeviri anahtarı tr.json'da var", () => {
+    const eksik = [...kullanilanAnahtarlar.entries()]
+      .filter(([anahtar]) => !anahtarVar(tr, anahtar))
+      .map(([anahtar, dosyalar]) => `${anahtar}  (${[...dosyalar].join(", ")})`);
+    expect(eksik).toEqual([]);
+  });
+
+  it("koddan çağrılan her statik çeviri anahtarı en.json'da var", () => {
+    const eksik = [...kullanilanAnahtarlar.entries()]
+      .filter(([anahtar]) => !anahtarVar(en, anahtar))
+      .map(([anahtar, dosyalar]) => `${anahtar}  (${[...dosyalar].join(", ")})`);
+    expect(eksik).toEqual([]);
+  });
+
+  // tr/en dışındaki her dil paketi (es, pt…) aynı sözleşmeye bağlı. Yeni dil: buraya ekle.
+  const EK_DILLER = [
+    ["es", es],
+    ["pt", pt],
+    ["de", de],
+  ];
+
+  describe.each(EK_DILLER)("%s.json", (kod, paketi) => {
+    it("koddan çağrılan her statik çeviri anahtarı pakette var", () => {
+      const eksik = [...kullanilanAnahtarlar.entries()]
+        .filter(([anahtar]) => !anahtarVar(paketi, anahtar))
+        .map(([anahtar, dosyalar]) => `${anahtar}  (${[...dosyalar].join(", ")})`);
+      expect(eksik).toEqual([]);
+    });
+
+    it("en.json ile aynı anahtar kümesine sahip (her iki yönde)", () => {
+      const enKumesi = new Set(duzAnahtarlar(en));
+      const kumesi = new Set(duzAnahtarlar(paketi));
+      expect([...enKumesi].filter((k) => !kumesi.has(k))).toEqual([]); // pakette eksik
+      expect([...kumesi].filter((k) => !enKumesi.has(k))).toEqual([]); // pakette fazla
+    });
+
+    it("{{yer tutucu}} kümesi en.json ile birebir aynı", () => {
+      const yerTutucular = (metin) =>
+        (String(metin).match(/{{[^}]+}}/g) || []).sort().join("|");
+      const sorunlu = duzAnahtarlar(en).filter((anahtar) => {
+        const enDeger = anahtar.split(".").reduce((o, p) => o?.[p], en);
+        const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+        return yerTutucular(enDeger) !== yerTutucular(deger);
+      });
+      expect(sorunlu).toEqual([]);
+    });
+
+    it("tek süslü yer tutucu ({count}) kümesi en.json ile birebir aynı", () => {
+      const tekler = (metin) =>
+        (String(metin).replace(/{{[^}]+}}/g, "").match(/{[^{}]+}/g) || []).sort().join("|");
+      const sorunlu = duzAnahtarlar(en).filter((anahtar) => {
+        const enDeger = anahtar.split(".").reduce((o, p) => o?.[p], en);
+        const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+        return tekler(enDeger) !== tekler(deger);
+      });
+      expect(sorunlu).toEqual([]);
+    });
+
+    it("dizi değerlerinin uzunluğu en.json ile aynı", () => {
+      const sorunlu = duzAnahtarlar(en).filter((anahtar) => {
+        const enDeger = anahtar.split(".").reduce((o, p) => o?.[p], en);
+        const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+        return Array.isArray(enDeger) && (!Array.isArray(deger) || deger.length !== enDeger.length);
+      });
+      expect(sorunlu).toEqual([]);
+    });
+
+    it("hiçbir metin boş bırakılmamış", () => {
+      const bos = duzAnahtarlar(paketi).filter((anahtar) => {
+        const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+        return typeof deger === "string" && deger.trim() === "";
+      });
+      expect(bos).toEqual([]);
+    });
+
+    it("Türkçeye özgü harfler sızmamış (yalnız kişi adı istisnası)", () => {
+      // ğ ş ı İ İspanyolca/Portekizcede yoktur; çıkıyorsa metin çevrilmeden TR'den kopyalanmıştır.
+      const sizan = duzAnahtarlar(paketi).filter((anahtar) => {
+        const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+        return typeof deger === "string" && /[ğşıİ]/.test(deger.replace(/İsmail Öztürk/g, ""));
+      });
+      expect(sizan).toEqual([]);
+    });
+  });
+
+  it.each([["pt", pt], ["de", de]])("%s.json'a İspanyolca'ya özgü işaretler (ñ ¿ ¡) sızmamış", (_kod, paketi) => {
+    const sizan = duzAnahtarlar(paketi).filter((anahtar) => {
+      const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
+      return typeof deger === "string" && /[ñ¿¡]/.test(deger);
+    });
+    expect(sizan).toEqual([]);
+  });
+
+  it("EN paketinde hiçbir değer boş bırakılmamış", () => {
+    const bos = Object.entries(en.autoI18n || {})
+      .filter(([, deger]) => typeof deger === "string" && deger.trim() === "")
+      .map(([anahtar]) => anahtar);
+    expect(bos).toEqual([]);
+  });
+
+  it("anahtarı şablonla kuran her dosya DINAMIK_YERLER'de kayıtlı", () => {
+    // Kayıtsız dinamik çağrı = regex'in göremediği, bu yüzden hiç korunmayan
+    // anahtar ailesi. `cache_*` ailesi tam olarak böyle gözden kaçmıştı.
+    const kayitli = new Set(DINAMIK_YERLER.map((y) => y.dosya));
+    expect([...dinamikSablonluDosyalar].filter((d) => !kayitli.has(d))).toEqual([]);
+  });
+
+  it("DINAMIK_YERLER kaydı bayatlamadı (her kayıt hâlâ anahtar üretiyor)", () => {
+    const bos = DINAMIK_YERLER.filter((yer) => {
+      const tamYol = path.join(KOK, yer.dosya);
+      if (!fs.existsSync(tamYol)) return true;
+      const kaynak = fs.readFileSync(tamYol, "utf8");
+      // `/g` desenlerde test() lastIndex'i ilerletir — her denemede sıfırla.
+      return !yer.desenler.some((desen) => {
+        desen.lastIndex = 0;
+        return desen.test(kaynak);
+      });
+    }).map((yer) => yer.dosya);
+    expect(bos).toEqual([]);
+  });
+});

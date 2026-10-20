@@ -1,0 +1,99 @@
+// services/aiConversationsStore.js
+//
+// Seelogd AI asistanı sohbet geçmişi — kullanıcı kapsamlı MMKV kalıcılığı.
+//
+// Veri modeli (tek JSON blob altında saklanır):
+//   Conversation = {
+//     id: string,
+//     title: string,                 // ilk kullanıcı mesajından türetilir
+//     messages: Message[],
+//     createdAt: number,             // epoch ms
+//     updatedAt: number,             // epoch ms
+//   }
+//   Message = {
+//     id: string,
+//     role: "user" | "assistant",
+//     text: string,
+//     cards?: Card[],                // yalnızca assistant mesajlarında (poster kartları)
+//     status?: "error",
+//   }
+//   Card = { key, mediaType: "movie"|"tv", query, found, id?, title?, posterPath?, year?, rating? }
+//
+// Saklama: tüm sohbetler tek anahtarda. Veri küçük olduğundan basit ve hızlı.
+
+import { Keys, get, set } from "./storage";
+
+// GİZLİLİK: sohbet geçmişi geçiş öncesinde uid'siz global bir anahtardaydı —
+// aynı cihazda hesap değiştiren kullanıcı öncekinin AI sohbetlerini okuyordu.
+// Artık kullanıcı kapsamlı; aktif uid'i depolama katmanı çözüyor.
+const MAX_CONVERSATIONS = 50; // sınırsız büyümesini engelle
+let mutationQueue = Promise.resolve();
+
+/** Basit, çakışması düşük id üretici. */
+export function makeId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** İlk kullanıcı mesajından kısa bir başlık türetir. */
+export function summarizeTitle(text = "") {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return "…";
+  return clean.length > 42 ? clean.slice(0, 42).trim() + "…" : clean;
+}
+
+/** Tüm sohbetleri yükler (en yeni en üstte). */
+export async function loadConversations() {
+  const parsed = get(Keys.aiConversations);
+  if (!Array.isArray(parsed)) return [];
+  return [...parsed].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+
+/** Tüm listeyi diske yazar (en yeni en üstte, MAX ile sınırlı). */
+export async function persistConversations(list) {
+  const trimmed = [...list]
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    .slice(0, MAX_CONVERSATIONS);
+  return set(Keys.aiConversations, trimmed) ? trimmed : list;
+}
+
+/**
+ * Bir sohbeti listeye ekler/günceller ve döndürür (state + disk için).
+ * Var olan id güncellenir, yoksa eklenir.
+ */
+export function upsertConversation(list, conversation) {
+  return [conversation, ...list.filter((c) => c.id !== conversation.id)].sort(
+    (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0),
+  );
+}
+
+/**
+ * Tek bir sohbeti depodaki en güncel listeye göre ekler veya günceller.
+ * Farklı modal örneklerinin bellekte tuttuğu eski listelerin birbirini
+ * ezmemesi için her yazımdan önce depoyu yeniden okur; kuyruk da aynı anda
+ * tamamlanan iki cevabın son yazan-kazanır yarışına girmesini engeller.
+ */
+export function saveConversation(conversation) {
+  const operation = mutationQueue.then(async () => {
+    if (!conversation?.id) return loadConversations();
+
+    const current = await loadConversations();
+    const existing = current.find((item) => item.id === conversation.id);
+    const now = Date.now();
+    const merged = {
+      ...existing,
+      ...conversation,
+      createdAt: existing?.createdAt || conversation.createdAt || now,
+      updatedAt: conversation.updatedAt || now,
+    };
+
+    return persistConversations(upsertConversation(current, merged));
+  });
+
+  mutationQueue = operation.catch(() => []);
+  return operation;
+}
+
+/** Bir sohbeti listeden çıkarır. */
+export function removeConversation(list, id) {
+  return list.filter((c) => c.id !== id);
+}

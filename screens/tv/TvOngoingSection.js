@@ -1,300 +1,211 @@
-import React, { useEffect, useState } from "react";
+// screens/tv/TvOngoingSection.js
+//
+// "Devam Eden Dizilerim" rayı. Eskiden yalnız poster + ilerleme çubuğu
+// gösteriyordu; artık SIRADAKİ BÖLÜM yapısını da taşıyor: her kart hangi
+// bölümün beklediğini söyler ve tek dokunuşla izlendi işaretlenir.
+//
+// Sıradaki ekranı (screens/tabs/UpNextScreen) silinmedi — "Tümü" ondan açılıyor
+// ve dizi gizleme/yönetim orada duruyor. Ortak mantık hooks/useUpNextQueue'da:
+// iki yüzey aynı kuyruğu, aynı iyimser ilerletmeyi ve aynı çözümleme
+// önbelleğini paylaşır.
+//
+// Bölüm çözümlemesi ETKİLEŞİMLER BİTTİKTEN sonra başlar: ray posterleri yerel
+// veriyle anında çizilir, bölüm bilgisi sonradan dolar. Ana ekranın ilk karesi
+// TMDB isteklerini beklemez.
+
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  Image,
-  StyleSheet,
-  Dimensions,
   Animated,
+  View,
+  FlatList,
+  StyleSheet,
+  InteractionManager,
 } from "react-native";
+
+import SectionHeader, { SectionBadge } from "../../components/home/SectionHeader";
+import UpNextRailCard from "../../components/tv/UpNextRailCard";
+import WatchedDateSheet from "../../components/detail/WatchedDateSheet";
 import { useTheme } from "../../context/ThemeContext";
-import { useTvShow } from "../../context/TvShowContex";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { LinearGradient } from "expo-linear-gradient";
-import * as Progress from "react-native-progress";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useLanguage } from "../../context/LanguageContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
+import { useHomeRenderKey } from "../../hooks/useHomeContentSettings";
+import useUpNextQueue from "../../hooks/useUpNextQueue";
+import { i18nText } from "../../utils/i18nText";
+import { getSeeAllLabel } from "../../utils/homeSectionCopy";
 
-const { width } = Dimensions.get("window");
-const CARD_W = width * 0.4;
-const CARD_H = width * 0.6;
+// Rayda çözülecek dizi sayısı. Her dizi en az bir dizi + bir sezon isteği
+// demek; ana ekran açılışında bunun sınırsız olması pahalı olurdu. Kalanı
+// "Tümü" ile açılan Sıradaki ekranı çözer.
+const RAIL_LIMIT = 10;
 
-// ─── Tek kart (aynı pattern: TvShowBests.MovieItem) ─────────────────────────
-const OngoingCard = ({
-  item,
-  navigation,
-  theme,
-  scaleValues,
-  onPressIn,
-  onPressOut,
-}) => {
-  const watchedEps = (item.seasons || []).reduce(
-    (acc, s) => acc + (s.episodes ? s.episodes.length : 0),
-    0,
-  );
-  const { imageQuality } = useAppSettings();
-  const totalEps = item.showEpisodeCount || 1;
-  const progress = Math.min(watchedEps / totalEps, 1);
-  const isCompleted = progress >= 1;
-
-  const progressColor = isCompleted
-    ? "#4CAF50"
-    : progress > 0
-      ? "#FF9500"
-      : theme.accent;
-
-  // Son izlenen sezon/bölüm
-  const lastSeason = [...(item.seasons || [])]
-    .filter((s) => s.episodes && s.episodes.length > 0)
-    .sort((a, b) => b.seasonNumber - a.seasonNumber)[0];
-  const lastEp = lastSeason
-    ? [...lastSeason.episodes].sort(
-        (a, b) => b.episodeNumber - a.episodeNumber,
-      )[0]
-    : null;
-
-  return (
-    <TouchableOpacity
-      style={styles.similarItem}
-      activeOpacity={0.85}
-      onPressIn={() => onPressIn(item.id)}
-      onPressOut={() => onPressOut(item.id)}
-      onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
-    >
-      <Animated.View
-        style={{
-          transform: [{ scale: scaleValues[item.id] || 1 }],
-        }}
-      >
-        {/* Poster */}
-        <Image
-          source={
-            item.imagePath
-              ? {
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.imagePath}`,
-                }
-              : require("../../assets/image/no_image.png")
-          }
-          style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-          resizeMode="cover"
-        />
-
-        {/* Gradient alt karartma */}
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.80)"]}
-          style={styles.gradient}
-        />
-
-        {/* İlerleme çubuğu — poster altında */}
-        <View style={styles.progressBar}>
-          <Progress.Bar
-            progress={progress}
-            width={CARD_W - 16}
-            height={3}
-            borderWidth={0}
-            borderRadius={2}
-            color={progressColor}
-            unfilledColor="rgba(255,255,255,0.2)"
-          />
-        </View>
-
-        {/* Tamamlandı rozeti — sol üst */}
-        {isCompleted && (
-          <View style={styles.completedBadge}>
-            <Ionicons name="checkmark-circle" size={10} color="#fff" />
-            <Text allowFontScaling={false} style={styles.completedText}>
-              Bitti
-            </Text>
-          </View>
-        )}
-
-        {/* Bölüm sayacı — sağ üst (aynı pozisyon: TvShowBests.relaseDate) */}
-        <View
-          style={[styles.relaseDate, { backgroundColor: theme.secondaryt }]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.badgeText, { color: progressColor }]}
-          >
-            {watchedEps}/{totalEps}
-          </Text>
-        </View>
-
-        {/* Son izlenen bölüm — sol alt (aynı pozisyon: TvShowBests.relaseDateCount) */}
-        {lastEp && lastSeason && (
-          <View
-            style={[
-              styles.relaseDateCount,
-              { backgroundColor: theme.secondaryt },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.badgeText, { color: theme.text.secondary }]}
-            >
-              S{lastSeason.seasonNumber}·B{lastEp.episodeNumber}
-            </Text>
-          </View>
-        )}
-      </Animated.View>
-    </TouchableOpacity>
-  );
-};
-
-// ─── Section bileşeni (TvShowBests/TvShowsGenres ile aynı şablon) ─────────────
 export default function TvOngoingSection({ navigation }) {
   const { theme } = useTheme();
-  const { watchedTvShows: shows } = useTvShow();
+  const { language } = useLanguage();
+  const poster = useRailPosterStyle();
+  // renderItem useCallback ile sabit; poster kalitesi/rozet ayarı değişince
+  // hücreleri yeniden çizdirmek için (bkz. utils/homeContentSettings.js).
+  const renderKey = useHomeRenderKey();
+  const { openQuickActions } = useMediaQuickActions();
+  const [dateItem, setDateItem] = useState(null);
+  const [resolveReady, setResolveReady] = useState(false);
 
-  const [activeFilter, setActiveFilter] = useState("ongoing"); // all | ongoing | completed
-  const [scaleValues, setScaleValues] = useState({});
-
-  // ── Scale animasyonları ────────────────────────────────────────────────────
   useEffect(() => {
-    const vals = {};
-    shows.forEach((s) => {
-      vals[s.id] = new Animated.Value(1);
-    });
-    setScaleValues(vals);
-  }, [shows]);
+    const task = InteractionManager.runAfterInteractions(() =>
+      setResolveReady(true)
+    );
+    // Emniyet supabı: ekranda sürekli dönen bir Animated animasyonu varsa
+    // runAfterInteractions hiç tetiklenmeyebilir; kartlar iskelette kalmasın.
+    const timer = setTimeout(() => setResolveReady(true), 1500);
+    return () => {
+      task.cancel?.();
+      clearTimeout(timer);
+    };
+  }, []);
 
-  const onPressIn = (id) => {
-    if (!scaleValues[id]) return;
-    Animated.timing(scaleValues[id], {
+  const { shows, totalCount, itemsByShow, readyCount, markWatched } =
+    useUpNextQueue({
+      limit: RAIL_LIMIT,
+      concurrency: 3,
+      enabled: resolveReady,
+      surface: "rail",
+    });
+
+  // Basma animasyonu kart başına tek Animated.Value kullanır.
+  const scaleValuesRef = useRef({});
+  const getScaleValue = (id) => {
+    if (!scaleValuesRef.current[id]) {
+      scaleValuesRef.current[id] = new Animated.Value(1);
+    }
+    return scaleValuesRef.current[id];
+  };
+
+  const onPressIn = useCallback((id) => {
+    Animated.timing(getScaleValue(id), {
       toValue: 0.9,
       duration: 150,
       useNativeDriver: true,
     }).start();
-  };
-  const onPressOut = (id) => {
-    if (!scaleValues[id]) return;
-    Animated.timing(scaleValues[id], {
+  }, []);
+  const onPressOut = useCallback((id) => {
+    Animated.timing(getScaleValue(id), {
       toValue: 1,
       duration: 150,
       useNativeDriver: true,
     }).start();
-  };
+  }, []);
 
-  // ── Filtre ────────────────────────────────────────────────────────────────
-  const filtered = shows.filter((s) => {
-    const watched = (s.seasons || []).reduce(
-      (acc, ss) => acc + (ss.episodes ? ss.episodes.length : 0),
-      0,
-    );
-    const total = s.showEpisodeCount || 1;
-    const pct = watched / total;
-    if (activeFilter === "ongoing" && pct >= 1) return false;
-    if (activeFilter === "completed" && pct < 1) return false;
-    return true;
-  });
+  const handleOpen = useCallback(
+    (show) => navigation.push("TvShowsDetails", { id: show.id }),
+    [navigation]
+  );
 
-  // Hiç dizi yoksa section'ı gösterme
+  const handleWatched = useCallback(
+    (item) => markWatched(item),
+    [markWatched]
+  );
+
+  // Basılı tutma: diğer raylardaki gibi hızlı eylem sayfası. Buradaki `show`
+  // izlenen-dizi kaydı (name/imagePath); sayfa kalan alanları TMDB'den çeker.
+  const handleQuickActions = useCallback(
+    (show) => openQuickActions({ item: show, mediaType: "tv", navigation }),
+    [openQuickActions, navigation]
+  );
+
+  const renderItem = useCallback(
+    ({ item: show }) => {
+      const key = String(show.id);
+      return (
+        <UpNextRailCard
+          show={show}
+          item={itemsByShow[key]}
+          resolved={key in itemsByShow}
+          poster={poster}
+          theme={theme}
+          language={language}
+          scaleValue={getScaleValue(show.id)}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          onOpen={handleOpen}
+          onWatched={handleWatched}
+          onChooseDate={setDateItem}
+          onQuickActions={handleQuickActions}
+        />
+      );
+    },
+    [
+      handleOpen,
+      handleQuickActions,
+      handleWatched,
+      itemsByShow,
+      language,
+      onPressIn,
+      onPressOut,
+      poster,
+      theme,
+    ]
+  );
+
+  // Devam eden dizi yoksa bölüm hiç çizilmez.
   if (shows.length === 0) return null;
-
-  const FILTERS = [
-    { key: "all", label: "Tümü" },
-    { key: "ongoing", label: "Devam" },
-    { key: "completed", label: "Bitti" },
-  ];
 
   return (
     <View style={styles.container}>
-      {/* ── Başlık + "Tümünü gör" butonu ── */}
-      <View style={styles.header}>
-        <Text
-          allowFontScaling={false}
-          style={[styles.title, { color: theme.text.secondary }]}
-        >
-          Devam Eden Dizilerim
-        </Text>
-        <TouchableOpacity
-          style={[styles.seeAll, { backgroundColor: theme.secondary }]}
-          onPress={() => navigation.navigate("OnGoingSeries")}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.seeAllText, { color: theme.text.muted }]}
-          >
-            Tümü
-          </Text>
-          <Ionicons name="chevron-forward" size={13} color={theme.text.muted} />
-        </TouchableOpacity>
-      </View>
+      <SectionHeader
+        section="ongoing"
+        mediaType="tv"
+        title={i18nText("autoI18n.devam_eden_dizilerim", "Devam Edenler")}
+        // Sırası gelmiş (bir sonraki bölümü hazır) dizi sayısı.
+        badge={
+          readyCount > 0 ? <SectionBadge icon="play-skip-forward" text={readyCount} /> : null
+        }
+        // Ray ilk RAIL_LIMIT diziyi gösterir; kesildiğini sayı söylesin.
+        actionLabel={
+          totalCount > shows.length
+            ? `${getSeeAllLabel(language)} (${totalCount})`
+            : undefined
+        }
+        onPressAction={() => navigation.navigate("UpNextScreen")}
+      />
 
-      {/* ── Filtre çipleri (TvShowBests'deki kategori çipleri gibi) ── */}
-      <View style={{ paddingLeft: 15, marginBottom: 8 }}>
-        <FlatList
-          data={FILTERS}
-          keyExtractor={(f) => f.key}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.categoriesList,
-            { backgroundColor: theme.secondary },
-          ]}
-          renderItem={({ item: f }) => (
-            <TouchableOpacity
-              onPress={() => setActiveFilter(f.key)}
-              style={[
-                styles.categoryItem,
-                {
-                  borderColor:
-                    activeFilter === f.key
-                      ? theme.text.primary
-                      : theme.text.muted,
-                  paddingVertical: 7,
-                  borderRadius: 13,
-                  paddingHorizontal: 12,
-                  backgroundColor: theme.primary,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.categoryText,
-                  {
-                    color:
-                      activeFilter === f.key
-                        ? theme.text.primary
-                        : theme.text.muted,
-                  },
-                ]}
-              >
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-      </View>
-
-      {/* ── Yatay dizi listesi ── */}
       <FlatList
-        data={filtered}
+        data={shows}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 15 }}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <OngoingCard
-            item={item}
-            navigation={navigation}
-            theme={theme}
-            scaleValues={scaleValues}
-            onPressIn={onPressIn}
-            onPressOut={onPressOut}
-          />
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.emptyText, { color: theme.text.muted }]}
-            >
-              Bu filtre için dizi yok
-            </Text>
-          </View>
+        contentContainerStyle={styles.list}
+        keyExtractor={(item) => String(item.id)}
+        extraData={renderKey}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
+        removeClippedSubviews
+        renderItem={renderItem}
+      />
+
+      <WatchedDateSheet
+        visible={!!dateItem}
+        onClose={() => setDateItem(null)}
+        subtitle={
+          dateItem
+            ? `${dateItem.showName} · S${dateItem.seasonNumber} B${dateItem.episodeNumber}`
+            : undefined
         }
+        pickerSubtitle={i18nText(
+          "autoI18n.up_next_tarih_alt_baslik",
+          "Bu bölümü ne zaman izledin?"
+        )}
+        releaseDate={dateItem?.airDate || undefined}
+        minDate={dateItem?.airDate || undefined}
+        mediaType="tv"
+        scope="episode"
+        onConfirm={(date) => {
+          const selected = dateItem;
+          if (!selected) return;
+          // Kart arkada zaten anında ilerliyor; sayfa kaydı beklemeden kapanır.
+          setDateItem(null);
+          markWatched(selected, date);
+        }}
       />
     </View>
   );
@@ -305,126 +216,5 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
   },
-
-  // ── Başlık satırı ──
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingLeft: 15,
-    paddingRight: 12,
-    marginBottom: 6,
-  },
-  title: {
-    fontSize: 18,
-    marginBottom: 0,
-    fontWeight: "700",
-  },
-  seeAll: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 2,
-  },
-  seeAllText: { fontSize: 12 },
-
-  // ── Filtre çipleri (TvShowBests pattern) ──
-  categoriesList: {
-    borderRadius: 15,
-    paddingVertical: 3,
-    paddingHorizontal: 3,
-    marginBottom: 10,
-    gap: 3,
-  },
-  categoryItem: {},
-  categoryText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-
-  // ── Kart (birebir TvShowBests.similarItem) ──
-  similarItem: {
-    width: CARD_W,
-    height: CARD_H, // kart yükseklik
-    marginRight: 10,
-    marginBottom: 5,
-  },
-  similarPoster: {
-    width: CARD_W,
-    height: CARD_H,
-    borderRadius: 15,
-    marginBottom: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  gradient: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 5,
-    height: CARD_H * 0.4,
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
-  },
-  progressBar: {
-    position: "absolute",
-    bottom: 8,
-    left: 8,
-    right: 8,
-  },
-
-  // ── Rozetler (birebir TvShowBests konumları) ──
-  relaseDate: {
-    // sağ üst — TvShowBests.relaseDate
-    position: "absolute",
-    top: 5,
-    right: 5,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  relaseDateCount: {
-    // sol üst — TvShowBests.relaseDateCount
-    position: "absolute",
-    top: 5,
-    left: 5,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  completedBadge: {
-    position: "absolute",
-    bottom: 16,
-    left: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: "rgba(76,175,80,0.85)",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  completedText: { color: "#fff", fontSize: 9, fontWeight: "700" },
-
-  // ── Boş durum ──
-  emptyContainer: {
-    width: width * 0.6,
-    height: CARD_H,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyText: { fontSize: 13 },
+  list: { paddingHorizontal: 15 },
 });

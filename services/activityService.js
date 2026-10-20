@@ -1,0 +1,55 @@
+// services/activityService.js
+//
+// "Etkinliklerim" hub'ı için OKUMA katmanı. Yazma (denormalizasyon) ilgili
+// kaynaklarda yapılır:
+//   - Yorumlar  → components/Comment.js (film/dizi) + services/postsService.js (post)
+//                 → Users/{uid}/myComments/{commentId}
+//   - Beğeni    → postsService.toggleLike    → Users/{uid}/likedPosts/{postId} (+display)
+//   - Kaydetme  → postsService.toggleBookmark → Users/{uid}/bookmarks/{postId} (+display)
+//   - Puanlar   → ratingsService (Users/{uid}/myRatings) — orada
+//
+// myComments/{commentId} → { kind:'movie'|'tv'|'post', targetId, text, title, createdAt }
+//   Dizi yorumlarında ayrıca KAPSAM alanları taşınır (utils/commentScope.js):
+//   scope ('show'|'season'|'episode'), seasonNumber, episodeNumber, scopeKey,
+//   scopeTitle. "Etkinliklerim → Yorumlarım" satırındaki S2·B5 rozeti ve
+//   satıra dokununca yorum sayfasının o kapsamda açılması bunlara dayanır.
+//   Alanları taşımayan ESKİ kayıtlar 'show' sayılır.
+
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
+import { db } from "../firebase";
+import { trackFirestoreRead } from "./usageTrackerService";
+
+const subColumn = (uid, sub, orderField, cb) => {
+  if (!uid) return () => {};
+  const q = query(
+    collection(db, "Users", uid, sub),
+    orderBy(orderField, "desc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      trackFirestoreRead(`Users/${sub}`, snap.docs.length);
+      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    },
+    (err) => {
+      if (__DEV__) console.warn(`subscribe ${sub} error:`, err.message);
+    },
+  );
+};
+
+/** Kullanıcının yazdığı tüm yorumlar (film/dizi + post), en yeni üstte. */
+export const subscribeToMyComments = (uid, cb) =>
+  subColumn(uid, "myComments", "createdAt", cb);
+
+/** Kullanıcının beğendiği postlar, en yeni üstte. */
+export const subscribeToMyLikes = (uid, cb) =>
+  subColumn(uid, "likedPosts", "likedAt", cb);
+
+/** Kullanıcının kaydettiği postlar, en yeni üstte. */
+export const subscribeToMyBookmarks = (uid, cb) =>
+  subColumn(uid, "bookmarks", "bookmarkedAt", cb);

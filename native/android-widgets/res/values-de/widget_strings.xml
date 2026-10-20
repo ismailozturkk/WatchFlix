@@ -1,0 +1,34 @@
+<!-- Seelogd-Widget-Texte für den Startbildschirm — DEUTSCH (values-de/).
+     Android wählt diesen Ordner anhand der SYSTEMsprache (nicht der App-Sprache); er bestimmt
+     daher nur Name/Beschreibung in der Widget-Auswahl, das Manifest-Label und den Platzhaltertext
+     der Layouts vor dem ersten Update. Der eigentliche Widget-Inhalt folgt der App-Sprache über
+     WidgetLanguage.kt. Der Standardordner values/ bleibt Türkisch.
+     Der Schlüsselsatz MUSS mit values/widget_strings.xml übereinstimmen (geprüft von
+     __tests__/widgetNativeLanguage.test.js). Apostrophe vermeiden (sie müssen maskiert werden). -->
+<resources>
+  <string name="reminder_widget_name">Seelogd Demnächst</string>
+  <string name="reminder_widget_description">Zeigt bevorstehende Filme und Serienfolgen</string>
+  <string name="reminder_widget_preview_title">Demnächst</string>
+  <string name="reminder_widget_preview_count">0 Erinnerungen</string>
+  <string name="reminder_widget_empty">Keine bevorstehenden Filme oder Folgen</string>
+  <string name="reminder_widget_more">+0 weitere</string>
+  <string name="lists_widget_name">Seelogd Meine Listen</string>
+  <string name="lists_widget_description">Zeigt die Poster deiner Listen als Raster</string>
+  <string name="lists_widget_preview_title">Favoriten</string>
+  <string name="lists_widget_preview_position">1/4</string>
+  <string name="lists_widget_empty">In dieser Liste ist noch nichts</string>
+  <string name="lists_widget_prev">Vorherige Liste</string>
+  <string name="lists_widget_next">Nächste Liste</string>
+  <string name="stats_widget_name">Seelogd Statistik</string>
+  <string name="stats_widget_description">Zeigt deine Sehstatistik auf dem Startbildschirm</string>
+  <string name="stats_widget_preview_title">Statistik</string>
+  <string name="stats_widget_preview_total">Gesamtdauer</string>
+  <string name="stats_widget_preview_movies">Filme</string>
+  <string name="stats_widget_preview_shows">Serien</string>
+  <string name="stats_widget_preview_episodes">Folgen</string>
+  <string name="stats_widget_preview_years">Jahre</string>
+  <string name="stats_widget_preview_months">Monate</string>
+  <string name="stats_widget_preview_days">Tage</string>
+  <string name="stats_widget_preview_hours">Stunden</string>
+  <string name="stats_widget_preview_minutes">Minuten</string>
+</resources>

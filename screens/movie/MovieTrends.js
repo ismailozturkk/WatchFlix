@@ -1,36 +1,197 @@
-import React, { useEffect, useState } from "react";
+import { isLightSurface } from "@utils/colorUtils";
+import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   StyleSheet,
   View,
-  Text,
-  FlatList,
-  Image,
   Dimensions,
   Animated,
   TouchableOpacity,
   StatusBar,
 } from "react-native";
-import { MovieCardSkeleton } from "../../components/Skeleton";
+import { Image } from "expo-image";
+import { TrendRailSkeleton } from "../../components/Skeleton";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useMovie } from "../../context/MovieContex";
-import RatingStars from "../../components/RatingStars";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { useListStatus } from "../../modules/UseListStatus";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useAppSettings } from "../../context/AppSettingsContext";
-const { width, height } = Dimensions.get("window");
+import ListBadges from "../../components/ListBadges";
+import { RatingBadge } from "../../components/PosterInfoBadges";
+import SectionHeader from "../../components/home/SectionHeader";
+import { SectionChipRail } from "../../components/home/SectionChips";
+import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
+import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
+const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
-const CARD_HEIHGT = height * 0.45;
+// Sarmalayıcı yüksekliği poster yüksekliğinden türetilir (ekran yüksekliğinden
+// değil); böylece farklı en/boy oranlı cihazlarda posterin altı kesilmez.
+// +50: derece/liste rozetlerinin sığması için pay.
+const CARD_HEIHGT = CARD_WIDTH * 1.5 + 50;
 const SPACING = width * 0.02;
 const ITEM_SIZE = CARD_WIDTH;
 const EMPTY_ITEM_SIZE = (width - CARD_WIDTH) / 2;
+const INITIAL_CARD_RENDER_COUNT = 4;
+// Kaydırırken odağa gelen posterin ulaştığı boyut; settle olunca 1.0'a iner.
+const FOCUS_PEAK = 1.15;
+const FOCUS_EXTRA = FOCUS_PEAK - 1;
+// Büyüyen posterin üstten taşan payı; dikey kırpılmayı önlemek için FlatList
+// içeriğine bu kadar üst boşluk verilir.
+const FOCUS_HEADROOM = Math.ceil((CARD_WIDTH * 1.5 * FOCUS_EXTRA) / 2) + 4;
+// Yükleme iskeleti gerçek kartın ölçülerini birebir kullanır (bkz. TvShowsTrends).
+const TREND_SKELETON_METRICS = {
+  itemSize: ITEM_SIZE,
+  cardWidth: CARD_WIDTH,
+  cardHeight: CARD_HEIHGT,
+  spacing: SPACING,
+  edge: EMPTY_ITEM_SIZE,
+  headroom: FOCUS_HEADROOM,
+};
+
+// Spacer'lar poster verisinin parçası değildir. Fabric'in farklı genişlikteki
+// sahte liste hücrelerini yeniden sıralamasını önlemek için header/footer kullan.
+const TrendEdgeSpacer = memo(function TrendEdgeSpacer() {
+  return <View style={{ width: EMPTY_ITEM_SIZE }} />;
+});
+
+// Stable, module-scope item component → no remount → no flicker.
+const MovieTrendCard = memo(function MovieTrendCard({
+  item,
+  index,
+  navigation,
+  theme,
+  getTmdbUrl,
+  scrollX,
+  shrink,
+  focusedPos,
+}) {
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
+  const onPressIn = () =>
+    Animated.timing(pressScale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.timing(pressScale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+  const inputRange = [
+    (index - 1) * ITEM_SIZE,
+    index * ITEM_SIZE,
+    (index + 1) * ITEM_SIZE,
+  ];
+
+  // Kaydırırken poster odağa yaklaştıkça FOCUS_PEAK'e (1.15) kadar büyür.
+  const scale = scrollX.interpolate({
+    inputRange,
+    outputRange: [0.7, FOCUS_PEAK, 0.7],
+    extrapolate: "clamp",
+  });
+
+  const opacity = scrollX.interpolate({
+    inputRange,
+    outputRange: [0.5, 1, 0.5],
+    extrapolate: "clamp",
+  });
+
+  // Merkeze yakınlık (0 → kenar, 1 → tam ortada).
+  const centerness = scrollX.interpolate({
+    inputRange,
+    outputRange: [0, 1, 0],
+    extrapolate: "clamp",
+  });
+  // Bu kart o an odaktaki (settle olmuş) kart mı? `focusedPos` bu kartın merkez
+  // scroll konumuna eşitse 1 olur. React state yerine Animated ile yürütülür →
+  // yeniden render yok, "addViewAt" çökmesi olmaz.
+  const center = index * ITEM_SIZE;
+  const focusMatch = focusedPos
+    ? focusedPos.interpolate({
+        inputRange: [center - ITEM_SIZE / 2, center, center + ITEM_SIZE / 2],
+        outputRange: [0, 1, 0],
+        extrapolate: "clamp",
+      })
+    : 0;
+  // Büyüme kaydırma sırasında (scroll'a bağlı) olur. Yalnızca odak kartı `shrink`
+  // 0→1 animasyonuyla 1.15'ten normale iner (küçük bounce'lu). Diğer kartlar salt
+  // scroll ölçeğini izler → kalkan poster sıçramaz.
+  const finalScale =
+    shrink && focusedPos
+      ? Animated.subtract(
+          scale,
+          Animated.multiply(
+            Animated.multiply(centerness, focusMatch),
+            Animated.multiply(shrink, FOCUS_EXTRA),
+          ),
+        )
+      : scale;
+
+  const source = useMemo(
+    () => ({ uri: getTmdbUrl(item.poster_path, "poster", 200) }),
+    [item.poster_path, getTmdbUrl]
+  );
+
+  return (
+    <Animated.View
+      style={{
+        width: ITEM_SIZE,
+        height: CARD_HEIHGT,
+        transform: [{ scale: pressScale }],
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={() => navigation.navigate("MovieDetails", { id: item.id })}
+        onLongPress={() =>
+          openQuickActions({ item, mediaType: "movie", navigation })
+        }
+        delayLongPress={350}
+      >
+        <Animated.View
+          style={[
+            styles.cardContainer,
+            {
+              shadowColor: theme.shadow,
+              transform: [{ scale: finalScale }],
+              opacity,
+            },
+          ]}
+        >
+          <Image
+            style={styles.poster}
+            source={source}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={`movietrend-${item.id}`}
+            transition={120}
+          />
+          {posterBadges?.tmdbRating !== false && (
+            <RatingBadge
+              value={item.vote_average}
+              votes={item.vote_count}
+              scale={1}
+              style={styles.trendRating}
+            />
+          )}
+          <ListBadges
+            mediaId={item.id}
+            mediaType="movie"
+            theme={theme}
+            style={styles.trendListBadges}
+          />
+        </Animated.View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
 
 export default function MovieTrends({ navigation }) {
   const { theme } = useTheme();
   const scrollX = React.useRef(new Animated.Value(0)).current;
+  // Odak posteri: kaydırırken FOCUS_PEAK'e büyür, settle olunca `shrink` 0→1 ile
+  // normale iner. `focusedPos` odaktaki kartın merkez scroll konumu (Animated →
+  // React state yok, yeniden render yok).
+  const shrink = React.useRef(new Animated.Value(1)).current;
+  const focusedPos = React.useRef(new Animated.Value(0)).current;
   const { t } = useLanguage();
-  const { imageQuality } = useAppSettings();
+  const { getTmdbUrl } = useImageQualitySettings();
   const {
     loadingTrends,
     movieTrends,
@@ -38,304 +199,107 @@ export default function MovieTrends({ navigation }) {
     setSelectedCategoryTrends,
     getCategoryTitleTrends,
     categoriesTrends,
+    activateMovieSection,
+    loadMoreTrends,
+    loadingMoreTrends,
+    pageTrends,
+    totalPagesTrends,
   } = useMovie();
 
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
+  // onEndReached'in mount'ta gereksiz tetiklenmesini engeller (PaginatedRail ile aynı mantık).
+  const canTrigger = useRef(false);
+  const handleTrendsEndReached = () => {
+    if (!canTrigger.current) return;
+    canTrigger.current = false;
+    if (pageTrends < totalPagesTrends && !loadingMoreTrends) loadMoreTrends();
+  };
+
+  // Poster odağa oturunca (settle): odak kartını `focusedPos` ile işaretle ve o
+  // kartı büyümüş hâlden (1.15) yumuşak bir spring ile normale indir. Spring'in
+  // hafif overshoot'u küçük bir bounce verir. Tümü Animated → React re-render yok.
+  const handleMomentumEnd = (e) => {
+    const snapped = Math.round(e.nativeEvent.contentOffset.x / ITEM_SIZE) * ITEM_SIZE;
+    focusedPos.setValue(snapped);
+    shrink.setValue(0); // büyümüş (1.15) hâlden başla
+    Animated.spring(shrink, {
+      toValue: 1,
+      friction: 7,
+      tension: 60,
+      useNativeDriver: true,
+    }).start();
+  };
 
   useEffect(() => {
-    const newScaleValues = {};
-    if (movieTrends && movieTrends.length > 0) {
-      movieTrends.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
-    }
-  }, [movieTrends]);
+    activateMovieSection("trends");
+  }, [activateMovieSection]);
 
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const renderCategory = ({ item }) => (
-    <TouchableOpacity
-      onPress={() => setSelectedCategoryTrends(item)}
-      style={[
-        styles.categoryItem,
-        {
-          justifyContent: "flex-end",
-        },
-      ]}
-    >
-      <Text
-        style={[
-          selectedCategoryTrends === item
-            ? styles.selectedCategoryText
-            : styles.categoryText,
-          {
-            color:
-              selectedCategoryTrends === item
-                ? theme.text.primary
-                : theme.text.secondary,
-          },
-        ]}
-      >
-        {getCategoryTitleTrends(item)}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  const TrendCard = ({ item, index }) => {
-    if (item.id === "left-spacer" || item.id === "right-spacer") {
-      return <View style={{ width: EMPTY_ITEM_SIZE }} />;
-    }
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "movie");
-
-    const rating = item.vote_average;
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating - fullStars >= 0.5;
-
-    const inputRange = [
-      (index - 2) * ITEM_SIZE,
-      (index - 1) * ITEM_SIZE,
-      index * ITEM_SIZE,
-    ];
-
-    const scale = scrollX.interpolate({
-      inputRange,
-      outputRange: [0.7, 1, 0.7],
-      extrapolate: "clamp",
-    });
-
-    const opacity = scrollX.interpolate({
-      inputRange,
-      outputRange: [0.5, 1, 0.5],
-      extrapolate: "clamp",
-    });
-
+  const renderItem = ({ item, index }) => {
     return (
-      <Animated.View
-        style={{
-          width: ITEM_SIZE,
-          height: CARD_HEIHGT,
-          transform: [{ scale: scaleValues[item.id] || 1 }],
-        }}
-      >
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPressIn={() => onPressIn(item.id)}
-          onPressOut={() => onPressOut(item.id)}
-          onPress={() =>
-            navigation.navigate("MovieDetails", {
-              id: item.id,
-            })
-          }
-        >
-          <Animated.View
-            style={[
-              styles.cardContainer,
-              {
-                shadowColor: theme.shadow,
-                transform: [{ scale }],
-                opacity,
-              },
-            ]}
-          >
-            <Image
-              style={styles.poster}
-              source={{
-                uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
-              }}
-            />
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.infoContainer,
-              {
-                shadowColor: theme.shadow,
-                transform: [
-                  { scale },
-                  {
-                    translateY: scale.interpolate({
-                      inputRange: [0.9, 1],
-                      outputRange: [1, 20],
-                    }),
-                  },
-                ],
-                opacity,
-              },
-            ]}
-          >
-            <View
-              style={{
-                position: "absolute",
-                top: -45,
-                right: 0,
-                borderRadius: 25,
-                paddingHorizontal: 5,
-                paddingVertical: 2,
-                backgroundColor: "rgba(0,0,0,0.6)",
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 5,
-              }}
-            >
-              <RatingStars rating={item.vote_average} />
-              <Text
-                allowFontScaling={false}
-                style={{ fontSize: 14, color: theme.colors.orange }}
-              >
-                {rating.toFixed(1)}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={{ fontSize: 14, color: theme.text.secondary }}
-              >
-                •
-              </Text>
-              <FontAwesome name="user" size={14} color={theme.colors.blue} />
-              <Text
-                allowFontScaling={false}
-                style={{ fontSize: 14, color: theme.colors.blue }}
-              >
-                {item.vote_count}
-              </Text>
-            </View>
-            <View
-              style={{
-                justifyContent: "center",
-                alignItems: "center",
-                position: "absolute",
-                left: 10,
-                bottom: 30,
-              }}
-            >
-              <View
-                style={{
-                  gap: 3,
-                  backgroundColor: theme.secondaryt,
-                  paddingVertical: 3,
-                  paddingHorizontal: 1,
-                  borderRadius: 7,
-                }}
-              >
-                {inWatchList && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("watchList", "tv");
-                    }}
-                  >
-                    <Ionicons
-                      name="bookmark"
-                      size={12}
-                      color={theme.colors.blue}
-                    />
-                  </TouchableOpacity>
-                )}
-                {isWatched && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("watchedTv", "tv");
-                    }}
-                  >
-                    <Ionicons name="eye" size={12} color={theme.colors.green} />
-                  </TouchableOpacity>
-                )}
-                {inFavorites && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateTvSeriesList("favorites", "tv");
-                    }}
-                  >
-                    <Ionicons name="heart" size={12} color={theme.colors.red} />
-                  </TouchableOpacity>
-                )}
-                {isInOtherLists && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      //updateMovieList("favorites", "movie");
-                    }}
-                  >
-                    <Ionicons
-                      name="grid"
-                      size={12}
-                      color={theme.colors.orange}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </Animated.View>
-        </TouchableOpacity>
-      </Animated.View>
+      <MovieTrendCard
+        item={item}
+        index={index}
+        navigation={navigation}
+        theme={theme}
+        getTmdbUrl={getTmdbUrl}
+        scrollX={scrollX}
+        shrink={shrink}
+        focusedPos={focusedPos}
+      />
     );
   };
-  const renderItem = ({ item, index }) => {
-    if (item.id === "left-spacer" || item.id === "right-spacer") {
-      return <View style={{ width: EMPTY_ITEM_SIZE }} />;
-    }
 
-    return <TrendCard item={item} index={index} />;
-  };
+  // Başlık yükleme sırasında da AYNI öğedir (ray başlığın altında; yükseklik değişirse zıplar).
+  // Eskiden bu raf başlıksızdı: yalnız kategori sekmeleri vardı, bölümün adı hiç yazmıyordu.
+  const trendHeader = (
+    <SectionHeader
+      section="trends"
+      mediaType="movie"
+      title={t.movieScreens.title}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "movie",
+          section: "trends",
+          title: t.movieScreens.title,
+        })
+      }
+    >
+      <SectionChipRail
+        data={categoriesTrends}
+        keyExtractor={(item) => item}
+        extraData={selectedCategoryTrends}
+        renderChip={(item) => (
+          <DiscoverFilterChip
+            label={getCategoryTitleTrends(item)}
+            selected={selectedCategoryTrends === item}
+            onPress={() => setSelectedCategoryTrends(item)}
+          />
+        )}
+      />
+    </SectionHeader>
+  );
+
   if (loadingTrends) {
     return (
       <View style={{ flex: 1, marginTop: 10 }}>
-        <StatusBar barStyle="light-content" />
-        <View style={styles.header}>
-          <FlatList
-            data={categoriesTrends}
-            renderItem={renderCategory}
-            keyExtractor={(item) => item}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          />
-        </View>
-        <Animated.FlatList
-          data={[1, 2, 3, 4, 5]}
-          renderItem={(index) => <MovieCardSkeleton index={index} />}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: EMPTY_ITEM_SIZE }}
-        />
+        <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
+        {trendHeader}
+        <TrendRailSkeleton metrics={TREND_SKELETON_METRICS} />
       </View>
     );
   }
   return (
     <View style={{ flex: 1, marginTop: 10 }}>
-      <StatusBar barStyle="light-content" />
-      <View style={styles.header}>
-        <FlatList
-          data={categoriesTrends}
-          renderItem={renderCategory}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-        />
-      </View>
+      <StatusBar barStyle={isLightSurface(theme.primary) ? "dark-content" : "light-content"} />
+      {trendHeader}
       <Animated.FlatList
         data={movieTrends}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
+        ListHeaderComponent={TrendEdgeSpacer}
+        ListFooterComponent={TrendEdgeSpacer}
         horizontal
         showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: FOCUS_HEADROOM }}
         snapToInterval={ITEM_SIZE}
         snapToAlignment="start"
         decelerationRate="fast"
@@ -345,6 +309,21 @@ export default function MovieTrends({ navigation }) {
           { useNativeDriver: true },
         )}
         scrollEventThrottle={16}
+        onMomentumScrollBegin={() => {
+          canTrigger.current = true;
+        }}
+        onMomentumScrollEnd={handleMomentumEnd}
+        onEndReached={handleTrendsEndReached}
+        onEndReachedThreshold={0.5}
+        removeClippedSubviews={false}
+        maxToRenderPerBatch={INITIAL_CARD_RENDER_COUNT}
+        windowSize={5}
+        initialNumToRender={INITIAL_CARD_RENDER_COUNT}
+        getItemLayout={(_, index) => ({
+          length: ITEM_SIZE,
+          offset: EMPTY_ITEM_SIZE + ITEM_SIZE * index,
+          index,
+        })}
       />
     </View>
   );
@@ -368,63 +347,14 @@ const styles = StyleSheet.create({
     shadowRadius: 10.32,
     elevation: 16,
   },
-  header: {
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginLeft: 15,
-    marginBottom: 15,
-  },
-  categoriesList: {
-    paddingHorizontal: 15,
-  },
-  categoryItem: {
-    marginRight: 5,
-    paddingVertical: 5,
-  },
-
-  categoryText: {
-    color: "#666",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  selectedCategoryText: {
-    color: "#666",
-    fontSize: 20,
-    fontWeight: "600",
-  },
   poster: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
-  infoContainer: {
-    justifyContent: "center",
-    alignItems: "center",
+  trendRating: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
   },
-  title: {
-    textAlign: "center",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  genre: {
-    color: "#fff",
-    fontSize: 14,
-  },
-  genreCount: {
-    color: "#666",
-    fontSize: 14,
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 5,
-  },
-  starImage: {
-    width: 12,
-    height: 12,
-    marginRight: 1,
-  },
+  trendListBadges: { position: "absolute", left: 8, bottom: 8 },
 });

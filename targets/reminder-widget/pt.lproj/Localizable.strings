@@ -1,0 +1,10 @@
+/* Nomes e descrições dos widgets do Seelogd na galeria (PORTUGUÊS).
+   Seguem o idioma do SISTEMA (não o do app). A chave é o próprio texto em inglês, então um
+   idioma de sistema sem suporte volta ao inglês. O conjunto de chaves deve coincidir
+   com en.lproj e tr.lproj (vigiado por __tests__/widgetNativeLanguage.test.js). */
+"Seelogd Coming Up" = "Seelogd Próximos";
+"Shows upcoming movies and TV episodes." = "Mostra os próximos filmes e episódios de séries.";
+"Seelogd My Lists" = "Seelogd Minhas listas";
+"Shows your lists and how many items they hold on the home screen." = "Mostra suas listas e quantos itens cada uma tem na tela inicial.";
+"Seelogd Statistics" = "Seelogd Estatísticas";
+"Shows your watching statistics on the home screen." = "Mostra suas estatísticas de visualização na tela inicial.";

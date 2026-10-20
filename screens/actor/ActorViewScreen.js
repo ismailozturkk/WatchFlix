@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import { intlLocaleOf, tmdbLanguageOf } from "../../utils/appLanguages";
+import { Image } from "expo-image";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -6,39 +8,47 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
-  Image,
   StyleSheet,
-  ActivityIndicator,
-  Dimensions,
+    Dimensions,
   StatusBar,
-  Platform,
+  Platform
 } from "react-native";
 import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+} from "../../context/AppSettingsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
+import GlassIconButton from "../../components/common/GlassIconButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ActorSkeleton } from "../../components/Skeleton";
+import { i18nText } from "../../utils/i18nText";
+import ScreenDecor from "../../components/ScreenDecor";
+import FollowPersonButton from "../../components/person/FollowPersonButton";
+import GlassTouchable from "../../components/common/GlassTouchable";
+
 
 const { width } = Dimensions.get("window");
 const HERO_HEIGHT = width * 1.1;
 
-const FILTERS = [
-  { key: "popular", label: "Popüler", icon: "flame-outline" },
-  { key: "voted", label: "En Çok Oy", icon: "people-outline" },
-  { key: "rated", label: "En İyi Puan", icon: "star-outline" },
-  { key: "upcoming", label: "Yakında", icon: "time-outline" },
-  { key: "latest", label: "En Yeni", icon: "calendar-outline" },
+// Etiketler çizim anında çözülür: modül yüklenirken dondurulursa dil değişince eski dilde kalır.
+const buildFilters = () => [
+  { key: "popular", label: i18nText("autoI18n.populer", "Popüler"), icon: "flame-outline" },
+  { key: "voted", label: i18nText("autoI18n.en_cok_oy", "En Çok Oy"), icon: "people-outline" },
+  { key: "rated", label: i18nText("autoI18n.en_iyi_puan", "En İyi Puan"), icon: "star-outline" },
+  { key: "upcoming", label: i18nText("autoI18n.yakinda", "Yakında"), icon: "time-outline" },
+  { key: "latest", label: i18nText("autoI18n.en_yeni", "En Yeni"), icon: "calendar-outline" },
 ];
 
-const TV_FILTERS = [
-  { key: "popular", label: "Popüler", icon: "flame-outline" },
-  { key: "voted", label: "En Çok Oy", icon: "people-outline" },
-  { key: "rated", label: "En İyi Puan", icon: "star-outline" },
-  { key: "latest", label: "En Yeni", icon: "calendar-outline" },
+const buildTvFilters = () => [
+  { key: "popular", label: i18nText("autoI18n.populer", "Popüler"), icon: "flame-outline" },
+  { key: "voted", label: i18nText("autoI18n.en_cok_oy", "En Çok Oy"), icon: "people-outline" },
+  { key: "rated", label: i18nText("autoI18n.en_iyi_puan", "En İyi Puan"), icon: "star-outline" },
+  { key: "latest", label: i18nText("autoI18n.en_yeni", "En Yeni"), icon: "calendar-outline" },
 ];
 
 const getRatingColor = (r) => {
@@ -75,7 +85,7 @@ const FilterChips = ({ filters, active, onSelect, theme }) => (
     {filters.map((f) => {
       const isActive = f.key === active;
       return (
-        <TouchableOpacity
+        <GlassTouchable
           key={f.key}
           onPress={() => onSelect(f.key)}
           activeOpacity={0.75}
@@ -106,14 +116,14 @@ const FilterChips = ({ filters, active, onSelect, theme }) => (
           >
             {f.label}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       );
     })}
   </ScrollView>
 );
 
 // ─── Media Card ───────────────────────────────────────────────────────────────
-const MediaCard = ({ item, onPress, theme, imageQuality }) => {
+const MediaCard = ({ item, onPress, theme, imageQuality, getTmdbUrl }) => {
   const scale = useRef(new Animated.Value(1)).current;
   const rating = item.vote_average ?? 0;
   const ratingColor = getRatingColor(rating);
@@ -143,7 +153,7 @@ const MediaCard = ({ item, onPress, theme, imageQuality }) => {
         {item.poster_path ? (
           <Image
             source={{
-              uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
+              uri: getTmdbUrl(item.poster_path, 'poster', 200),
             }}
             style={styles.mediaPoster}
           />
@@ -245,8 +255,11 @@ const applyFilter = (list, filter, type) => {
 const ActorViewScreen = ({ route, navigation }) => {
   const { personId } = route.params;
   const { theme } = useTheme();
-  const { API_KEY, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { language } = useLanguage();
+  const FILTERS = useMemo(buildFilters, [language]);
+  const TV_FILTERS = useMemo(buildTvFilters, [language]);
   const [actor, setActor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bioExpanded, setBioExpanded] = useState(false);
@@ -256,27 +269,36 @@ const ActorViewScreen = ({ route, navigation }) => {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Aynı ekran örneği yeni personId ile yeniden kullanılabilir (oyuncu →
+    // film → başka oyuncu). loading'i resetlemezsek eski oyuncunun profili
+    // yeni id altında görünür; cancelled bayrağı da geç gelen eski yanıtın
+    // yenisini ezmesini önler.
+    let cancelled = false;
+    setLoading(true);
     const fetchActor = async () => {
       try {
         const { data } = await axios.get(
           `https://api.themoviedb.org/3/person/${personId}`,
           {
             params: {
-              language: language === "tr" ? "tr-TR" : "en-US",
+              language: tmdbLanguageOf(language),
               append_to_response: "movie_credits,tv_credits",
             },
             headers: { Authorization: API_KEY },
           },
         );
-        setActor(data);
+        if (!cancelled) setActor(data);
       } catch (err) {
         console.error("Actor fetch error:", err.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchActor();
-  }, [personId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [personId, language]);
 
   const headerOpacity = scrollY.interpolate({
     inputRange: [HERO_HEIGHT - 100, HERO_HEIGHT - 40],
@@ -285,11 +307,7 @@ const ActorViewScreen = ({ route, navigation }) => {
   });
 
   if (loading) {
-    return (
-      <View style={[styles.center, { backgroundColor: theme.primary }]}>
-        <ActivityIndicator size="large" color={theme.accent} />
-      </View>
-    );
+    return <ActorSkeleton />;
   }
 
   if (!actor) {
@@ -300,9 +318,7 @@ const ActorViewScreen = ({ route, navigation }) => {
           size={48}
           color={theme.text?.muted ?? "#555"}
         />
-        <Text style={[styles.errorText, { color: theme.text?.secondary }]}>
-          Oyuncu bilgisi yüklenemedi
-        </Text>
+        <Text style={[styles.errorText, { color: theme.text?.secondary }]}>{i18nText("autoI18n.oyuncu_bilgisi_yuklenemedi", "Oyuncu bilgisi yüklenemedi")}</Text>
       </View>
     );
   }
@@ -314,12 +330,10 @@ const ActorViewScreen = ({ route, navigation }) => {
     ).values(),
   );
 
-  const IMAGE_URL = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
-
   const formatDate = (d) => {
     if (!d) return null;
     try {
-      return new Date(d).toLocaleDateString("tr-TR", {
+      return new Date(d).toLocaleDateString(intlLocaleOf(language), {
         day: "numeric",
         month: "long",
         year: "numeric",
@@ -331,6 +345,7 @@ const ActorViewScreen = ({ route, navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
+      <ScreenDecor scope="details" iconOpacity={0.25} />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* ── Floating header (scroll sonrası görünür) ── */}
@@ -351,14 +366,12 @@ const ActorViewScreen = ({ route, navigation }) => {
 
       {/* ── Back button (daima görünür) ── */}
       <SafeAreaView style={styles.backBtnWrapper} edges={["top"]}>
-        <TouchableOpacity
+        <GlassIconButton
+          variant="blur"
+          icon="chevron-back"
+          accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
           onPress={() => navigation.goBack()}
-          activeOpacity={0.85}
-        >
-          <BlurView tint="dark" intensity={55} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={22} color="#fff" />
-          </BlurView>
-        </TouchableOpacity>
+        />
       </SafeAreaView>
 
       <Animated.ScrollView
@@ -374,9 +387,9 @@ const ActorViewScreen = ({ route, navigation }) => {
         <View style={{ height: HERO_HEIGHT }}>
           {actor.profile_path ? (
             <Image
-              source={{ uri: `${IMAGE_URL}${actor.profile_path}` }}
+              source={{ uri: getTmdbUrl(actor.profile_path, 'profile', 200) }}
               style={StyleSheet.absoluteFill}
-              resizeMode="cover"
+              contentFit="cover"
             />
           ) : (
             <View
@@ -425,6 +438,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                 </View>
               )}
             </View>
+            <FollowPersonButton person={actor} style={styles.followBtn} />
           </View>
         </View>
 
@@ -455,7 +469,7 @@ const ActorViewScreen = ({ route, navigation }) => {
             icon="film-outline"
             label={
               actor.movie_credits?.cast?.length
-                ? `${actor.movie_credits.cast.length} film`
+                ? i18nText("autoI18n.movie_count", "{{count}} film", { count: actor.movie_credits.cast.length })
                 : null
             }
             theme={theme}
@@ -464,7 +478,7 @@ const ActorViewScreen = ({ route, navigation }) => {
             icon="tv-outline"
             label={
               actor.tv_credits?.cast?.length
-                ? `${actor.tv_credits.cast.length} dizi`
+                ? i18nText("autoI18n.tv_show_count", "{{count}} dizi", { count: actor.tv_credits.cast.length })
                 : null
             }
             theme={theme}
@@ -474,7 +488,7 @@ const ActorViewScreen = ({ route, navigation }) => {
         {/* ── Biyografi ── */}
         {actor.biography ? (
           <View style={styles.section}>
-            <SectionHeader title="Biyografi" theme={theme} />
+            <SectionHeader title={i18nText("autoI18n.biyografi", "Biyografi")} theme={theme} />
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() => setBioExpanded((e) => !e)}
@@ -487,7 +501,7 @@ const ActorViewScreen = ({ route, navigation }) => {
               </Text>
               <View style={styles.bioToggle}>
                 <Text style={[styles.bioToggleText, { color: theme.accent }]}>
-                  {bioExpanded ? "Daha az göster" : "Devamını oku"}
+                  {bioExpanded ? i18nText("autoI18n.daha_az_goster", "Daha az göster") : i18nText("autoI18n.devamini_oku", "Devamını oku")}
                 </Text>
                 <Ionicons
                   name={bioExpanded ? "chevron-up" : "chevron-down"}
@@ -503,7 +517,7 @@ const ActorViewScreen = ({ route, navigation }) => {
         {actor.movie_credits?.cast?.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="Filmler"
+              title={i18nText("autoI18n.filmler", "Filmler")}
               count={actor.movie_credits.cast.length}
               theme={theme}
             />
@@ -523,6 +537,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                     item={item}
                     theme={theme}
                     imageQuality={imageQuality}
+                    getTmdbUrl={getTmdbUrl}
                     onPress={() =>
                       navigation.navigate("MovieDetails", { id: item.id })
                     }
@@ -538,9 +553,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                   size={32}
                   color={theme.text?.muted ?? "#555"}
                 />
-                <Text style={[styles.emptyFilterText, { color: theme.text?.secondary ?? "#aaa" }]}>
-                  Bu filtre için sonuç bulunamadı
-                </Text>
+                <Text style={[styles.emptyFilterText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.bu_filtre_icin_sonuc_bulunamadi", "Bu filtre için sonuç bulunamadı")}</Text>
               </View>
             )}
           </View>
@@ -550,7 +563,7 @@ const ActorViewScreen = ({ route, navigation }) => {
         {actor.tv_credits?.cast?.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="Diziler"
+              title={i18nText("autoI18n.diziler", "Diziler")}
               count={
                 Array.from(
                   new Map(
@@ -576,6 +589,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                     item={item}
                     theme={theme}
                     imageQuality={imageQuality}
+                    getTmdbUrl={getTmdbUrl}
                     onPress={() =>
                       navigation.navigate("TvShowsDetails", { id: item.id })
                     }
@@ -591,9 +605,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                   size={32}
                   color={theme.text?.muted ?? "#555"}
                 />
-                <Text style={[styles.emptyFilterText, { color: theme.text?.secondary ?? "#aaa" }]}>
-                  Bu filtre için sonuç bulunamadı
-                </Text>
+                <Text style={[styles.emptyFilterText, { color: theme.text?.secondary ?? "#aaa" }]}>{i18nText("autoI18n.bu_filtre_icin_sonuc_bulunamadi", "Bu filtre için sonuç bulunamadı")}</Text>
               </View>
             )}
           </View>
@@ -615,14 +627,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 16,
     zIndex: 20,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
   },
 
   // ── Floating header ──────────────────────────────────────────────────────
@@ -683,6 +687,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   popText: { color: "#f5c518", fontSize: 12, fontWeight: "700" },
+  followBtn: { marginTop: 12 },
 
   // ── Info pills ────────────────────────────────────────────────────────────
   pillsRow: {
@@ -761,7 +766,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    resizeMode: "cover",
+    contentFit: "cover",
   },
   mediaNoImage: {
     position: "absolute",

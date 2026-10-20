@@ -1,198 +1,394 @@
-import React, { useEffect, useRef, useState } from "react";
-import {
-  Animated,
-  AppState,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  LogBox,
-} from "react-native";
+import { isLightSurface } from "./utils/colorUtils";
+import React, { useEffect, useMemo, useState } from "react";
+import ErrorBoundary from "./components/ErrorBoundary";
 
-import { NavigationContainer } from "@react-navigation/native";
+// Production'da gereksiz console çıktılarını kapat
+// console.error korunuyor → Sentry/Crashlytics için kullanılabilir
+if (!__DEV__) {
+  console.log  = () => {};
+  console.info = () => {};
+  console.warn = () => {};
+}
+import {
+    AppState,
+    StyleSheet,
+      View,
+    InteractionManager,
+  DeviceEventEmitter,
+} from "react-native";
+import { flushSnapshotWrites } from "./services/snapshotCache";
+import UserDataSyncHost from "./components/UserDataSyncHost";
+import ExternalEntryHost from "./components/ExternalEntryHost";
+import { wrapGetStateFromPath } from "./utils/externalEntry";
+import {
+  BLUR_SCOPES,
+  BlurTargetProvider,
+  BlurTargetSurface,
+} from "./components/common/BlurTarget";
+
+import {
+  NavigationContainer,
+  DefaultTheme,
+  DarkTheme,
+  getStateFromPath,
+} from "@react-navigation/native";
+import { rootNavigationRef } from "./services/rootNavigation";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
-import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { LanguageProvider } from "./context/LanguageContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import TabScreen from "./screens/TabScreen";
-import TvShowsDetails from "./screens/tv/TvShowsDetails";
-import SeasonDetails from "./screens/tv/SeasonDetails";
-import EpisodeDetails from "./screens/tv/EpisodeDetails";
-import MovieDetails from "./screens/movie/MovieDetail";
-import TvGraphDetailScreen from "./screens/tv/TvGraphDetailScreen";
-import MovieSearch from "./screens/search/MovieSearch";
-import TvShowSearch from "./screens/search/TvShowSearch";
+// EKRAN İMPORTLARI BİLEREK YOK: ekranlar Stack.Screen üzerinde
+// getComponent={() => require("...").default} ile İLK NAVİGASYONDA yüklenir.
+// Üstten import edilen bir ekran, tüm bağımlılık ağacıyla birlikte daha splash
+// ekranındayken çalıştırılır — ~60 ekranda bu, açılışı saniyeler mertebesinde
+// uzatıyordu. Yeni ekran eklerken aynı deseni kullan. Aşağıdaki dördü açık
+// kalıyor çünkü olası İLK rotalar (auth kapısı initialRoute'u bunlardan seçer).
 import LoginScreen from "./screens/auth/LoginScreen";
-import RegisterScreen from "./screens/auth/RegisterScreen";
-import ForgotPasswordScreen from "./screens/auth/ForgotPasswordScreen";
+import GoogleProfileCompletionScreen from "./screens/auth/GoogleProfileCompletionScreen";
+import OnboardingScreen from "./screens/onboarding/OnboardingScreen";
 import LottieView from "lottie-react-native";
 import { useTheme } from "./context/ThemeContext";
 import { SnowProvider, useSnow } from "./context/SnowContext";
 import { AppSettingsProvider } from "./context/AppSettingsContext";
+import { TypographyProvider } from "./context/TypographyContext";
+import { ConnectivityProvider } from "./context/ConnectivityContext";
+import { PetProvider } from "./context/PetContext";
 import { ListStatusProvider } from "./context/ListStatusContext";
-import { auth, db } from "./firebase";
-import ProfileScreen from "./screens/tabs/ProfileScreen";
-import Toast from "react-native-toast-message";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import ListsScreen from "./screens/ListsScreen";
+import { MediaActivityProvider } from "./context/MediaActivityContext";
+import { SharedListsProvider } from "./context/SharedListsContext";
+import { MediaQuickActionsProvider } from "./context/MediaQuickActionsContext";
+import { auth } from "./firebase";
+import { i18nText } from "./utils/i18nText";
+import { toast } from "@components/AppToast";
+import ToastHost from "@components/toast/ToastHost";
+import ConnectivityToast from "@components/toast/ConnectivityToast";
+import { AppAlertHost } from "@components/AppAlert";
+import { PremiumUpsellHost } from "@components/premium/PremiumUpsellSheet";
+import { ensureListsRoot } from "./services/listItemsService";
+import { LIBRARY_ERROR, classifyLibraryError } from "./utils/libraryCore";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import ListsViewScreen from "./screens/ListsViewScreen";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import SwipeView from "./screens/SwipeView";
-import { ProfileScreenProvider } from "./context/ProfileScreenContext";
+import { ProfileStatsProvider }     from "./context/ProfileStatsContext";
+import { WatchProgressProvider }    from "./context/WatchProgressContext";
+import { ProfileNotesProvider }     from "./context/ProfileNotesContext";
+import { MediaNotesProvider }       from "./context/MediaNotesContext";
+import { ProfileRemindersProvider } from "./context/ProfileRemindersContext";
+import { ProfileUiProvider }        from "./context/ProfileUiContext";
+import { UserProfileProvider }      from "./context/UserProfileContext";
+import { FriendsProvider }          from "./context/FriendsContext";
+import { NotificationsProvider }    from "./context/NotificationsContext";
+import { UnreadMessagesProvider }   from "./context/UnreadMessagesContext";
+import { reconcileAppIconWithSystem } from "./services/appIconService";
+import { DeviceNotificationsProvider } from "./context/DeviceNotificationsContext";
+import { PostsProvider }            from "./context/PostsContext";
 import { TvShowProvider } from "./context/TvShowContex";
-import { MovieProvider } from "./context/MovieContex";
-import ActorSearch from "./screens/search/ActorSearch";
-import ActorViewScreen from "./screens/actor/ActorViewScreen";
-import MovieStatisticsScreen from "./screens/tabs/profile/MovieStatisticsScreen";
-import TvStatisticsScreen from "./screens/tabs/profile/TvStatisticsScreen";
-import TabScreenNavigator from "./screens/TabScreenNavigator";
-import SearchAll from "./screens/search/SearchAll";
-import FriendsListScreen from "./screens/tabs/profile/FriendsListScreen";
-import SearchFriendsScreen from "./screens/search/SearchFriendsScreen";
-import FriendRequestsScreen from "./screens/tabs/profile/FriendRequestsScreen";
-import ChatScreen from "./screens/ChatScreen";
+import TabScreenNavigator from "@screens/navigation/TabScreenNavigator";
+import { PremiumProvider } from "./context/PremiumContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import Comment from "./components/Comment";
-import MovieSearchScreen from "./screens/search/MovieSearchScreen";
-import IconBacground from "./components/IconBacground";
-import CalendarScreen from "./screens/CalendarScreen";
+import { enableFreeze } from "react-native-screens";
+import SplashPosterWave from "./components/SplashPosterWave";
+import { FALLBACK_EXIT_MS, MIN_VISIBLE_MS } from "./utils/splashMotion";
 import { CalendarProvider } from "./context/CalendarContext";
-import OnGoingSeries from "./screens/tv/OnGoingSeries";
+import { installAxiosDataCache } from "./utils/axiosDataCache";
+import { installTmdbAdultGuard } from "./utils/tmdbAdultGuard";
+import { installTmdbTitleFallback } from "./utils/tmdbTitleFallback";
+import { isMigrated, runStorageMigration } from "./services/storage";
+import { startPresence, stopPresence } from "./services/presenceService";
+import {
+  initCrashReporting,
+  captureError,
+  registerNavigationContainer,
+  setCrashUser,
+  wrapRoot,
+} from "./services/crashReporting";
+import {
+  USER_PROPERTIES,
+  setAnalyticsUser,
+  setAnalyticsUserProperty,
+  trackScreen,
+} from "./services/analytics";
+import { setSnapshotErrorReporter } from "./utils/firestoreError";
+import { deviceTier } from "./services/deviceTier";
+import * as ExpoSplashScreen from "expo-splash-screen";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import Feather from "@expo/vector-icons/Feather";
+import Octicons from "@expo/vector-icons/Octicons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+// Sentry kurulumu bilerek burada DEĞİL: tek kaynak services/crashReporting.js
+// (aşağıdaki initCrashReporting). Sihirbazın buraya eklediği ikinci Sentry.init
+// PII'yi ve %10 oturumda ekran kaydını açıyordu; sarmalayıcıdaki KVKK/GDPR
+// kararını eziyordu.
+
+enableFreeze(true);
+installAxiosDataCache();
+// SIRA: önbellekten SONRA kurulmalı — önbelleğe ham cevap yazılsın, yetişkin
+// süzmesi hem taze hem önbellekten gelen cevaba uygulansın.
+installTmdbAdultGuard();
+// Baslik secimi filtre uygulamaz: uygulama dili -> Ingilizce -> ozgun ad.
+// Ham cevap once cache'e yazilir, yetiskin filtresi uygulanir, en son yalniz
+// gosterilecek title/name alani ortak kuralla cozulur.
+installTmdbTitleFallback();
+ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
+// Yerel splash anında değil kısa bir çapraz solmayla çekilir (Android varsayılanı
+// zaten solar, iOS'ta `fade` açılmalı). Yerel ve JS splash'in logosu aynı boyutta
+// ve aynı yerde (utils/splashMotion LOGO_SIZE ↔ app.json ios.imageWidth), bu
+// yüzden çapraz solma "iki logo üst üste" değil, tek logonun etrafında halkaların
+// belirmesi gibi görünür. `setOptions`ı bilmeyen eski bir yerel derlemede
+// fırlayabilir; sessizce yutulur.
+try {
+  ExpoSplashScreen.setOptions({ fade: true, duration: 320 });
+} catch {
+  // eski native binary — varsayılan davranış
+}
+
+// Hata raporlama İLK iş: bundan sonra çalışan her şeyin (cache preload, font
+// yükleme, provider'lar) hatası yakalanabilsin. DSN yoksa sessiz no-op.
+initCrashReporting();
+// Sessizce yutulan Firestore snapshot hatalarını raporlayıcıya bağla
+// (utils/firestoreError.js saf kalsın diye enjeksiyonla).
+setSnapshotErrorReporter((error, label) =>
+  captureError(error, { tags: { source: "firestore_snapshot", label } }),
+);
+// Cihaz sınıfı kullanıcı özelliği: crash ve performans verisini düşük/orta/üst
+// katmana göre ayırabilmek için (utils/deviceTier.js).
+setAnalyticsUserProperty(USER_PROPERTIES.DEVICE_TIER, deviceTier);
+
+// Bildirime dokunulduğunda yönlendirme için global navigation ref.
+// Kök ref services/rootNavigation'da: ekran olmayan yerler de yönlendirebilsin.
+const navigationRef = rootNavigationRef;
+// Modül seviyesinde: AppContent her render'da yeni bir navigator bileşeni
+// üretirse React ağacı ekran kimliklerini kaybedip stack'i remount edebilir.
+const Stack = createNativeStackNavigator();
+// Ana ekran widget'larının dokunma hedefleri. Android tarafındaki karşılıkları:
+// ReminderWidgetProvider (reminders), ListsWidgetProvider (lists/…),
+// StatsWidgetProvider (stats/…). Yol adları değişirse widget'lar sessizce
+// açılış ekranına düşer — iki tarafı birlikte güncelle.
+//
+// Paylaş menüsü (expo-share-intent) iOS'ta uygulamayı `seelogd://dataUrl=…` ile açar; bu bir ekran yolu değil,
+// paylaşım kancasının okuduğu adres. Ekran eşlemesine sokulmaz (bkz. utils/externalEntry.wrapGetStateFromPath).
+const linking = {
+  prefixes: ["seelogd://"],
+  getStateFromPath: wrapGetStateFromPath(getStateFromPath),
+  config: {
+    screens: {
+      RemindersScreen: "reminders",
+      ListsViewScreen: "lists",
+      ListsScreen: "lists/:listName",
+      UpNextScreen: "upnext",
+      MovieStatisticsScreen: "stats/movies",
+      TvStatisticsScreen: "stats/tv",
+    },
+  },
+};
+
+const preloadIconFont = (IconSet) => {
+  if (typeof IconSet?.loadFont === "function") {
+    return IconSet.loadFont();
+  }
+  return Promise.resolve();
+};
+
+// Uygulama modülü yüklendiği anda ikon font preload'u başlat.
+//
+// Splash yalnız AÇILIŞ YOLUNUN kullandığı iki seti bekler: sekme çubuğu ve ana
+// ekran rayları sadece Ionicons (AppIcon varsayılanı) + MaterialCommunityIcons
+// çiziyor. Kalan dört set daha derin ekranlarda gerekiyor; preload'ları kısa
+// bir gecikmeyle arka plana atıldı — çok erken bir navigasyonda en kötü
+// ihtimal ikon bir karelik gecikmeyle gelir (loadFont zaten idempotent).
+//
+// MMKV GEÇİŞİ: buradaki iki depolama adımı (`hydrateAutoDataCacheSetting` ve
+// `preloadAllCache`) kalktı. İkisi de "AsyncStorage async olduğu için açılışta
+// belleğe al" işiydi; MMKV senkron okuduğundan ikisinin de karşılığı yok.
+const startupPreloadPromise = Promise.allSettled([
+  preloadIconFont(Ionicons),
+  preloadIconFont(MaterialCommunityIcons),
+]);
+
+setTimeout(() => {
+  Promise.allSettled([
+    preloadIconFont(FontAwesome),
+    preloadIconFont(Feather),
+    preloadIconFont(Octicons),
+    preloadIconFont(MaterialIcons),
+  ]);
+}, 1200);
 
 // Daha sonra stack/tab navigator'larında otomatik etkili olur
 
-const SplashScreen = () => {
+// Splash arka planı (theme.primary) koyuysa status bar ikonları açık renk
+// basılmalı. expo-status-bar "barStyle" değil "style" prop'u tanır; cihaz
+// temasına düşen "auto" yerine gerçek arka plan parlaklığından türetiyoruz.
+
+
+// Açılış ekranı: tüm hareket (giriş, döngü, çıkış) SplashPosterWave'de. Burası
+// yalnız tema/kar bağlamlarını ona taşır. `exiting` true olunca çıkış başlar,
+// bitince `onExited` çağrılır (overlay o zaman sökülür).
+const SplashScreen = ({ exiting, onExited }) => {
   const { theme } = useTheme();
   const { showSnow } = useSnow();
+  const light = isLightSurface(theme.primary);
 
   return (
-    <View style={[styles.splashContainer, { backgroundColor: theme.primary }]}>
-      <IconBacground opacity={0.5} />
-
+    <SplashPosterWave
+      backgroundColor={theme.primary}
+      light={light}
+      exiting={exiting}
+      onExited={onExited}
+    >
       {showSnow && (
         <LottieView
           style={styles.lottie}
-          source={require("./LottieJson/snow.json")}
+          source={require("@lottie/snow.json")}
           autoPlay={true}
           loop
         />
       )}
-      <LottieView
-        style={{ width: 350, height: 350 }}
-        source={require("./LottieJson/splash.json")} // Lottie dosyanızın yolu
-        autoPlay
-        loop
-      />
-      <StatusBar
-        //backgroundColor={theme.primary} // Arka plan rengini RGB olarak ayarlayın
-        barStyle="dark-content" // Metin ve simgelerin rengini ayarlayın (light-content veya dark-content)
-      />
-    </View>
+      <StatusBar style={light ? "dark" : "light"} />
+    </SplashPosterWave>
   );
 };
 
+// ChatModal host'u (SwipeView) ancak swipeViewReady=true olunca (açılıştan
+// ~3,8 sn sonra) çizilir; require'ı da o ana erteliyoruz ki ChatModal'ın
+// ~1400 satırlık modül ağacı açılış yürütmesinden tamamen çıksın.
+const SwipeViewHost = () => {
+  const SwipeView = require("@screens/chat/SwipeView").default;
+  return <SwipeView />;
+};
+
 function AppContent() {
-  const Stack = createNativeStackNavigator();
+  const { theme } = useTheme();
+  const navigationTheme = useMemo(() => {
+    const base = isLightSurface(theme.primary) ? DefaultTheme : DarkTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        primary: theme.accent,
+        background: theme.primary,
+        card: theme.secondary,
+        text: theme.text.primary,
+        border: theme.border,
+        notification: theme.colors.red,
+      },
+    };
+  }, [theme]);
   const [showChatModal, setShowChatModal] = useState(false); // State for modal visibility
-  const [showBackButton, setShowBackButton] = useState(false);
-  const { user, initialRoute, loading } = useAuth();
+  const [swipeViewReady, setSwipeViewReady] = useState(false);
+  const { user, initialRoute, loading, needsProfileCompletion } = useAuth();
 
   useEffect(() => {
-    if (user) {
+    // Profil tamamlanmadan Lists/{uid} YAZMA. Google kullanıcısı tamamlama
+    // ekranındayken oturumu açıktır; burada yazarsak ve kullanıcı "Başka hesap
+    // kullan" derse hesap silinir, doküman sahipsiz kalır — kural isOwner(uid)
+    // bir daha doğru olamayacağı için kalıcı olarak erişilemez çöp olur.
+    if (user && !needsProfileCompletion) {
       const createList = async () => {
-        const docRef = doc(db, "Lists", user.uid);
         try {
-          const docSnap = await getDoc(docRef);
-          if (!docSnap.exists()) {
-            await setDoc(docRef, {
-              watchedTv: [],
-              favorites: [],
-              watchList: [],
-              watchedMovies: [],
-            });
-          }
+          // Transaction: eski "getDoc → yoksa merge'siz setDoc" kalıbı, arada başka
+          // bir yazım (ilk ekleme, başka cihaz) kök dokümanı yarattıysa onu SIFIRLARDI.
+          await ensureListsRoot(user.uid);
         } catch (e) {
-          Toast.show({
-            type: "success",
-            text1: `Error fetching or creating document:, ${e}`,
-          });
+          // Çevrimdışı açılış olağan: kök doküman bir sonraki yazımda zaten
+          // oluşturuluyor (tüm servisler merge ile yazar). Her çevrimdışı açılışta
+          // hata toast'ı + rapor basmak gürültüydü.
+          if (classifyLibraryError(e).code === LIBRARY_ERROR.OFFLINE) return;
+          // Ham hata metni kullanıcıya değil Sentry'ye: ekranda yerelleştirilmiş
+          // genel mesaj kalır, teşhis için gereken ayrıntı raporlamaya gider.
+          captureError(e, { tags: { source: "app_create_user_lists" } });
+          toast.error(i18nText("autoI18n.islem_tamamlanamadi", "İşlem tamamlanamadı"));
         }
       };
       createList();
     }
-  }, [user]);
-  const toastConfig = {
-    error: ({ text1, props }) => (
-      <View style={styles.toastError}>
-        <Text allowFontScaling={false} style={styles.toastText}>
-          {text1}
-        </Text>
-      </View>
-    ),
-    warning: ({ text1, props }) => (
-      <View style={styles.toastWarning}>
-        <Text allowFontScaling={false} style={styles.toastText}>
-          {text1}
-        </Text>
-      </View>
-    ),
-    success: ({ text1, props }) => (
-      <View style={styles.toastSuccess}>
-        <Text allowFontScaling={false} style={styles.toastText}>
-          {text1}
-        </Text>
-      </View>
-    ),
-  };
+    // needsProfileCompletion bağımlılıkta: profil tamamlanınca kapı açılır ve
+    // liste o an oluşturulur (yeni bir açılış beklemeden).
+  }, [user, needsProfileCompletion]);
   useEffect(() => {
     if (user) {
       setShowChatModal(true);
-    } else {
+    } else if (!loading && !user) {
       setShowChatModal(false);
+      // Emit APP_READY if user is not logged in, as TvShowScreen won't load
+      DeviceEventEmitter.emit("APP_READY");
     }
-  }, [user]);
+  }, [user, loading]);
+
+  useEffect(() => {
+    if (!showChatModal) {
+      setSwipeViewReady(false);
+      return undefined;
+    }
+
+    let timer = null;
+    const task = InteractionManager.runAfterInteractions(() => {
+      // ChatModal (AI sohbet host'u) ~1400 satırlık ağır bir ağaç; 1,2 sn'de
+      // mount edilince splash sonrası donma penceresine denk geliyordu.
+      // Kullanıcının ilk saniyelerde ihtiyaç duymadığı bu katmanı daha geç kur.
+      timer = setTimeout(() => setSwipeViewReady(true), 3800);
+    });
+
+    return () => {
+      task.cancel?.();
+      if (timer) clearTimeout(timer);
+    };
+  }, [showChatModal]);
 
   if (loading) return null;
 
   return (
     <NavigationContainer
+      theme={navigationTheme}
+      ref={navigationRef}
+      linking={linking}
+      // Sentry ekran geçiş/TTID izlemesi container kaydıyla başlar (no-op
+      // eğer Sentry kapalıysa) — bkz. services/crashReporting.js.
+      onReady={() => registerNavigationContainer(navigationRef)}
       onStateChange={(state) => {
-        // Get the current route name
-        const routeName = state.routes[state.index].name;
+        // state resmi tipte undefined olabilir — guard olmadan crash riski.
+        const routeName = state?.routes?.[state.index]?.name;
+        if (!routeName) return;
+        // Ekran görüntüleme: huni analizinin (onboarding → paywall → satın alma)
+        // temeli. Firebase otomatik screen_view'ı React Navigation'ı görmez.
+        trackScreen(routeName);
         // Control modal visibility based on the current screen
         if (
+          routeName === "OnboardingScreen" ||
           routeName === "ForgotPasswordScreen" || // Examples - Add other screens where you want to show the chat modal
           routeName === "RegisterScreen" ||
-          routeName === "LoginScreen"
+          routeName === "LoginScreen" ||
+          routeName === "GoogleProfileCompletionScreen"
         ) {
           setShowChatModal(false);
         } else {
           setShowChatModal(true);
         }
-        if (
-          routeName === "ForgotPasswordScreen" || // Examples - Add other screens where you want to show the chat modal
-          routeName === "RegisterScreen" ||
-          routeName === "LoginScreen" ||
-          routeName === "TabScreenNavigator"
-        ) {
-          setShowBackButton(false);
-        } else {
-          setShowBackButton(true);
-        }
+        // Not: showBackButton state'i kaldırıldı — hiçbir yerde tüketilmiyordu
+        // ve karşılaştırdığı "TabScreenNavigator" adı kayıtlı rota adı
+        // ("TabScreen") ile hiç eşleşmiyordu; her rota değişiminde gereksiz
+        // render tetikliyordu.
       }}
     >
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={({ navigation }) => ({
-          contentStyle: { backgroundColor: "#1a1a1a" },
+          contentStyle: { backgroundColor: theme.primary },
           //animation: "fade", // iOS benzeri geçiş
           animation: "slide_from_right", // iOS benzeri geçiş
           gestureEnabled: true, // swipe-back gibi hareketleri açar
           gestureDirection: "horizontal", // yatay hareket yönü
         })}
       >
+        <Stack.Screen
+          name="OnboardingScreen"
+          component={OnboardingScreen}
+          options={{
+            headerShown: false,
+            animation: "fade",
+          }}
+        />
         <Stack.Screen
           name="LoginScreen"
           component={LoginScreen}
@@ -204,6 +400,11 @@ function AppContent() {
           }}
         />
         <Stack.Screen
+          name="GoogleProfileCompletionScreen"
+          component={GoogleProfileCompletionScreen}
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
           name="TabScreen"
           component={TabScreenNavigator} // The component is correct
           options={{
@@ -211,375 +412,724 @@ function AppContent() {
           }}
         />
         <Stack.Screen
-          name="TvShowsDetails"
-          component={TvShowsDetails}
+          name="TournamentScreen"
+          getComponent={() => require("./screens/tournament/TournamentScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
-            presentation: "transparentModal",
+            headerShown: false,
+            animation: "slide_from_right",
+          }}
+        />
+        <Stack.Screen
+          name="TvShowsDetails"
+          getComponent={() => require("./screens/tv/TvShowsDetails").default}
+          options={{
+            headerShown: false,
+            // `transparentModal` iOS'ta UIModalPresentationOverFullScreen olur:
+            // bu bir modal sunumdur, push değil; kenardan kaydırarak geri
+            // gitme hareketi (interactivePopGestureRecognizer) çalışmaz.
+            // Ekran zaten opak (theme.primary) olduğundan şeffaflığa ihtiyacı
+            // yok; MovieDetails ile aynı şekilde normal push olarak açılır.
           }}
         />
         <Stack.Screen
           name="SeasonDetails"
-          component={SeasonDetails}
+          getComponent={() => require("./screens/tv/SeasonDetails").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="EpisodeDetails"
-          component={EpisodeDetails}
+          getComponent={() => require("./screens/tv/EpisodeDetails").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="MovieDetails"
-          component={MovieDetails}
+          getComponent={() => require("./screens/movie/MovieDetail").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="SeeAllScreen"
+          getComponent={() => require("./screens/shared/SeeAllScreen").default}
+          options={{
+            headerShown: false,
+            animation: "slide_from_right",
+          }}
+        />
+        <Stack.Screen
+          name="DiscoverFilters"
+          getComponent={() => require("./screens/shared/DiscoverFiltersScreen").default}
+          options={{
+            headerShown: false,
+            animation: "slide_from_right",
           }}
         />
         <Stack.Screen
           name="TvGraphDetailScreen"
-          component={TvGraphDetailScreen}
+          getComponent={() => require("./screens/tv/TvGraphDetailScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
-          name="MovieSearch"
-          component={MovieSearch}
+          name="StoryShareScreen"
+          getComponent={() => require("@screens/story/StoryShareScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
-            animation: "slide_from_bottom",
+            headerShown: false,
+            // Tam ekran SAYFA (push): `presentation: "modal"` iOS'ta sayfa
+            // sheet'i açıp ekranı kısaltıyor, güvenli alanı değiştiriyor ve
+            // aşağı çekerek kapatma jestini tuvaldeki blok sürüklemeyle ve ayar
+            // sayfasındaki kaydırmalarla çakıştırıyordu.
+            animation: "slide_from_right",
+            // Tuval sürüklemesi ekran kenarına kadar gider; kenardan geri
+            // kaydırma jesti bloğu tutarken ekranı kapatırdı. Geri: başlıktaki
+            // ok / Android geri tuşu (açık ayar sayfasını önce kapatır).
+            gestureEnabled: false,
+            fullScreenGestureEnabled: false,
           }}
         />
         <Stack.Screen
-          name="TvShowSearch"
-          component={TvShowSearch}
+          name="StoryDraftsScreen"
+          getComponent={() => require("@screens/story/StoryDraftsScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
-            animation: "slide_from_bottom",
+            headerShown: false,
+            animation: "slide_from_right",
           }}
         />
         <Stack.Screen
-          name="ActorSearch"
-          component={ActorSearch}
+          name="UnifiedSearch"
+          getComponent={() => require("./screens/tabs/SearchScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
-          }}
-        />
-        <Stack.Screen
-          name="SearchAll"
-          component={SearchAll}
-          options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
+            presentation: "transparentModal",
+            animation: "none",
+            contentStyle: { backgroundColor: "transparent" },
           }}
         />
         <Stack.Screen
           name="ActorViewScreen"
-          component={ActorViewScreen}
+          getComponent={() => require("./screens/actor/ActorViewScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
 
         <Stack.Screen
           name="RegisterScreen"
-          component={RegisterScreen}
+          getComponent={() => require("./screens/auth/RegisterScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="ForgotPasswordScreen"
-          component={ForgotPasswordScreen}
+          getComponent={() => require("./screens/auth/ForgotPasswordScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="ProfileScreen"
-          component={ProfileScreen}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
-        />
+        >
+          {(props) => {
+            // Render anında require: modül sekme navigatörü (TabScreen'in
+            // Profil sekmesi) yüzünden bu noktada zaten yüklüdür.
+            const ProfileScreen = require("./screens/tabs/ProfileScreen").default;
+            return (
+              <CalendarProvider>
+                <ProfileScreen {...props} />
+              </CalendarProvider>
+            );
+          }}
+        </Stack.Screen>
         <Stack.Screen
           name="ListsScreen"
-          component={ListsScreen}
+          getComponent={() => require("@screens/lists/ListsScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="ListsViewScreen"
-          component={ListsViewScreen}
+          getComponent={() => require("@screens/lists/ListsViewScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
+          }}
+        />
+        {/* Sıradaki: sekme çubuğundan çıkarıldı, TV ana ekranındaki
+            "Devam Eden Dizilerim" rayının "Tümü" düğmesinden açılıyor. */}
+        <Stack.Screen
+          name="UpNextScreen"
+          getComponent={() => require("@screens/tabs/UpNextScreen").default}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="SharedListScreen"
+          getComponent={() => require("@screens/lists/SharedListScreen").default}
+          options={{
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="MovieStatisticsScreen"
-          component={MovieStatisticsScreen}
+          getComponent={() => require("./screens/tabs/profile/MovieStatisticsScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="TvStatisticsScreen"
-          component={TvStatisticsScreen}
+          getComponent={() => require("./screens/tabs/profile/TvStatisticsScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
-          name="FriendsListScreen"
-          component={FriendsListScreen}
+          name="WrappedScreen"
+          getComponent={() => require("@screens/wrapped/WrappedScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
+            // Tam ekran: `presentation: "modal"` iOS'ta sayfa sheet'i açıp
+            // üstte ~60pt boşluk bırakıyordu; ekran ayrıca kök güvenli alan
+            // (`insets.top`) değerini yine ekleyip içeriği sheet'in kendi
+            // üst kenarından ~70pt aşağı itiyordu. Bu hikâye ekranı bütün
+            // pencereyi kaplar; kapatma sağ üstteki çarpıdan.
+            presentation: "fullScreenModal",
+            animation: "slide_from_bottom",
+          }}
+        />
+        <Stack.Screen
+          name="RemindersScreen"
+          getComponent={() => require("./screens/tabs/profile/RemindersScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="NotesScreen"
+          getComponent={() => require("./screens/tabs/profile/NotesScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="EditProfileScreen"
+          getComponent={() => require("./screens/tabs/profile/EditProfileScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="MyPostsScreen"
+          getComponent={() => require("./screens/tabs/MyPostsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="MyActivityScreen"
+          getComponent={() => require("./screens/tabs/profile/MyActivityScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="FriendsListScreen"
+          getComponent={() => require("./screens/tabs/profile/FriendsListScreen").default}
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="FriendProfileScreen"
+          getComponent={() => require("./screens/tabs/profile/FriendProfileScreen").default}
+          options={{
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="ChatScreen"
-          component={ChatScreen}
+          getComponent={() => require("@screens/chat/ChatScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
+          name="MessagesScreen"
+          getComponent={() => require("@screens/chat/MessagesScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="GroupsListScreen"
+          getComponent={() => require("@screens/chat/GroupsListScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="CreateGroupScreen"
+          getComponent={() => require("@screens/chat/CreateGroupScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="SearchFriendsScreen"
-          component={SearchFriendsScreen}
+          getComponent={() => require("./screens/search/SearchFriendsScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
           name="FriendRequestsScreen"
-          component={FriendRequestsScreen}
+          getComponent={() => require("./screens/tabs/profile/FriendRequestsScreen").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
+        />
+        <Stack.Screen
+          name="PrivacySettingsScreen"
+          getComponent={() => require("./screens/tabs/profile/PrivacySettingsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="BlockedUsersScreen"
+          getComponent={() => require("./screens/tabs/profile/BlockedUsersScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ReminderNotificationsScreen"
+          getComponent={() => require("./screens/tabs/settings/ReminderNotificationsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="SocialNotificationsScreen"
+          getComponent={() => require("./screens/tabs/settings/SocialNotificationsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PersonalizationScreen"
+          getComponent={() => require("./screens/tabs/settings/PersonalizationScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="DecorScopesScreen"
+          getComponent={() => require("./screens/tabs/settings/DecorScopesScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="SectionVisibilityScreen"
+          getComponent={() => require("./screens/tabs/settings/SectionVisibilityScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PremiumUsageScreen"
+          getComponent={() => require("./screens/tabs/settings/PremiumUsageScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ReferralScreen"
+          getComponent={() => require("./screens/tabs/settings/ReferralScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PosterSettingsScreen"
+          getComponent={() => require("./screens/tabs/settings/PosterSettingsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PermissionsDataScreen"
+          getComponent={() => require("./screens/tabs/settings/PermissionsDataScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="FeedbackScreen"
+          getComponent={() => require("./screens/tabs/settings/FeedbackScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="BackupSettingsScreen"
+          getComponent={() => require("./screens/tabs/settings/BackupSettingsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="LibraryExportScreen"
+          getComponent={() => require("./screens/tabs/settings/LibraryExportScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AISettingsScreen"
+          getComponent={() => require("./screens/tabs/settings/AISettingsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AccountConnectionsScreen"
+          getComponent={() => require("./screens/tabs/settings/AccountConnectionsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="OpenSourceLicensesScreen"
+          getComponent={() => require("./screens/tabs/settings/OpenSourceLicensesScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="AboutAppScreen"
+          getComponent={() => require("./screens/tabs/settings/AboutAppScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="WidgetSettingsScreen"
+          getComponent={() => require("./screens/tabs/settings/WidgetSettingsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PremiumScreen"
+          getComponent={() => require("./screens/premium/PremiumScreen").default}
+          options={{ headerShown: false, animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen
+          name="CineSwipeScreen"
+          getComponent={() => require("./screens/cineswipe/CineSwipeScreen").default}
+          options={{ headerShown: false, animation: "slide_from_bottom" }}
         />
         <Stack.Screen
           name="Comment"
-          component={Comment}
+          getComponent={() => require("./components/Comment").default}
           options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
+            headerShown: false,
           }}
         />
         <Stack.Screen
-          name="MovieSearchScreen"
-          component={MovieSearchScreen}
+          name="PostDetailScreen"
+          getComponent={() => require("@screens/social/PostDetailScreen").default}
           options={{
             headerShown: false,
-            presentation: "transparentModal",
-            animation: "fade",
           }}
         />
         <Stack.Screen
           name="CalendarScreen"
-          component={CalendarScreen}
+          options={{
+            headerShown: false,
+            animation: "slide_from_bottom",
+          }}
+        >
+          {(props) => {
+            // İlk navigasyonda require edilir (getComponent ile aynı desen;
+            // CalendarProvider sarmalayıcısı yüzünden children biçiminde).
+            const CalendarScreen = require("@screens/calendar/CalendarScreen").default;
+            return (
+              <CalendarProvider>
+                <CalendarScreen {...props} />
+              </CalendarProvider>
+            );
+          }}
+        </Stack.Screen>
+        <Stack.Screen
+          name="SceneGuessGameScreen"
+          getComponent={() => require("./screens/game/SceneGuessGameScreen").default}
           options={{
             headerShown: false,
             animation: "slide_from_bottom",
           }}
         />
         <Stack.Screen
-          name="OnGoingSeries"
-          component={OnGoingSeries}
-          options={{
-            headerTransparent: true,
-            headerTintColor: "#fff",
-            headerTitle: "",
-            headerShadowVisible: false,
-            animation: "slide_from_right",
-          }}
+          name="ShareContentScreen"
+          getComponent={() => require("./screens/tabs/ShareContentScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="GameHubScreen"
+          getComponent={() => require("./screens/game/GameHubScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="SceneGameDetailScreen"
+          getComponent={() => require("./screens/game/SceneGameDetailScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="SceneGameSetupScreen"
+          getComponent={() => require("./screens/game/SceneGameSetupScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="SceneGamePlayScreen"
+          getComponent={() => require("./screens/game/SceneGamePlayScreen").default}
+          options={{ headerShown: false, animation: "slide_from_bottom", gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="SceneGameResultScreen"
+          getComponent={() => require("./screens/game/SceneGameResultScreen").default}
+          options={{ headerShown: false, animation: "fade" }}
+        />
+        <Stack.Screen
+          name="GameLeaderboardScreen"
+          getComponent={() => require("./screens/game/GameLeaderboardScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="GameStatsScreen"
+          getComponent={() => require("./screens/game/GameStatsScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="GameAchievementsScreen"
+          getComponent={() => require("./screens/game/GameAchievementsScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="WatchBadgesScreen"
+          getComponent={() => require("./screens/tabs/profile/WatchBadgesScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="CustomThemeScreen"
+          getComponent={() => require("./screens/tabs/setting/CustomThemeScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="UsageDebugScreen"
+          getComponent={() => require("./screens/tabs/UsageDebugScreen").default}
+          options={{ headerShown: true, title: "Debug", animation: "slide_from_right" }}
         />
       </Stack.Navigator>
 
-      {showChatModal && <SwipeView />}
-      <Toast visibilityTime={5000} config={toastConfig} position="top" />
-      <StatusBar style="dark" />
+      {showChatModal && swipeViewReady && <SwipeViewHost />}
+      <ToastHost />
+      <ConnectivityToast />
+      <AppAlertHost />
+      {/* Premium yükseltme sayfası: kapılar (hooks/usePremiumGate.js) bunu açar.
+          PremiumProvider içinde olmak zorunda (mağaza fiyatını okur). */}
+      <PremiumUpsellHost />
+      {/* Paylaş menüsünden gelen bağlantı + simge uzun basma kısayolları. */}
+      <ExternalEntryHost />
+      <StatusBar style={isLightSurface(theme.primary) ? "dark" : "light"} />
     </NavigationContainer>
   );
 }
 
-export default function App() {
+export default wrapRoot(function App() {
   const [splashVisible, setSplashVisible] = useState(true);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  // Çıkış animasyonu SplashPosterWave'in içinde; burada yalnız tetikleyici durur.
+  const [splashExiting, setSplashExiting] = useState(false);
+
+  // AsyncStorage → MMKV göç kapısı.
+  //
+  // Provider'lar ayarları SENKRON okuyor; göç bitmeden mount olurlarsa boş
+  // depodan varsayılanları alır ve kullanıcının teması/dili bir kez sıfırlanmış
+  // görünürdü. `isMigrated()` senkron olduğu için bu kapı ilk güncelleme
+  // açılışı DIŞINDA hiçbir maliyet getirmez: sonraki her açılışta başlangıç
+  // değeri zaten `true`, ekstra render bile olmaz.
+  const [storageReady, setStorageReady] = useState(() => isMigrated());
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }).start(() => setSplashVisible(false));
-    }, 2000);
+    if (storageReady) return undefined;
+    let alive = true;
+    runStorageMigration().finally(() => {
+      if (alive) setStorageReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [storageReady]);
 
-    return () => clearTimeout(timer);
+  // Uygulama içi logoların kaynağı (appIconStore, MMKV önbelleği) sistemin GERÇEK
+  // simgesiyle eşitlenir: yeniden kurulum ya da sistem tarafı değişiklik sonrası
+  // giriş/splash/paylaşım logoları launcher'daki simgeyle aynı kalsın. Göçten
+  // sonra çalışır — önbellek göçle gelen değeri okumuş olmalı.
+  useEffect(() => {
+    if (!storageReady) return;
+    reconcileAppIconWithSystem();
+  }, [storageReady]);
+
+  useEffect(() => {
+    // Göç sürerken yerel splash açık kalsın — arkasında boş bir ekran görünmesin.
+    if (!storageReady) return;
+    // Özel splash'imiz render edildiğinde yerel splash'i kapat (çapraz solma için
+    // bkz. dosya başındaki setOptions).
+    ExpoSplashScreen.hideAsync().catch(() => {});
+
+    // Preload zaten modül yüklenirken başladı (yukarıda).
+    // Splash en az MIN_VISIBLE_MS görünür: giriş animasyonu (halkaların
+    // çiçeklenmesi) bitmeden çıkışa geçmek onu yarıda keserdi. Veri geç geliyorsa
+    // splash zaten APP_READY'ye kadar kalır — bu sabit yalnız "her şey hazırken"
+    // ödenen tabandır (utils/splashMotion.js).
+    const MIN_MS = MIN_VISIBLE_MS;
+    const startedAt = Date.now();
+    let preloadDone = false;
+    let dataReady = false;
+    let timeoutFinished = false;
+
+    const checkReady = () => {
+      if (preloadDone && dataReady && !timeoutFinished) {
+        timeoutFinished = true;
+        hideSplash();
+      }
+    };
+
+    const hideSplash = () => setSplashExiting(true);
+
+    startupPreloadPromise.then(() => {
+      const elapsed = Date.now() - startedAt;
+      const wait = Math.max(0, MIN_MS - elapsed);
+      setTimeout(() => {
+        preloadDone = true;
+        checkReady();
+      }, wait);
+    });
+
+    const sub = DeviceEventEmitter.addListener("APP_READY", () => {
+      dataReady = true;
+      checkReady();
+    });
+
+    // Fallback: APP_READY gelmezse zorla çıkış
+    const fallbackTimer = setTimeout(() => {
+      if (!timeoutFinished) {
+        timeoutFinished = true;
+        hideSplash();
+      }
+    }, FALLBACK_EXIT_MS);
+
+    return () => {
+      sub.remove();
+      clearTimeout(fallbackTimer);
+    };
+  }, [storageReady]);
+
+  // Anlık görüntü yazımları erteleniyor (art arda gelen snapshot'lar tek yazıma
+  // birleşsin diye). Uygulama arka plana geçerken süreç dondurulabilir; bekleyen
+  // yazım o pencerede kaybolursa kullanıcı bir sonraki açılışta bir ÖNCEKİ hâli
+  // görür. Burada zorla diske indiriyoruz.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (durum) => {
+      if (durum === "background" || durum === "inactive") flushSnapshotWrites();
+    });
+    return () => sub.remove();
   }, []);
 
-  // // Çevrimiçi/Çevrimdışı durumu yönetimi
-  // useEffect(() => {
-  //   let currentUserUID = null;
+  // Presence (RTDB onDisconnect + AppState) — presenceService halleder.
+  useEffect(() => {
+    const authUnsubscribe = auth.onAuthStateChanged((u) => {
+      if (u?.uid) {
+        startPresence(u.uid);
+      } else {
+        stopPresence();
+      }
+      // Ölçüm kimliği: crash raporunda hangi kullanıcı, analytics'te hangi
+      // huni. Çıkışta null ile temizlenir — sonraki hesabın verisine sızmasın.
+      setAnalyticsUser(u?.uid || null);
+      setCrashUser(u?.uid || null);
+    });
+    return () => {
+      authUnsubscribe();
+      stopPresence();
+    };
+  }, []);
 
-  //   const updateStatus = async (isOnline) => {
-  //     if (currentUserUID) {
-  //       const userRef = doc(db, "Users", currentUserUID);
-  //       try {
-  //         await updateDoc(userRef, { isOnline });
-  //       } catch (error) {
-  //         console.error("Kullanıcı durumu güncellenirken hata:", error);
-  //       }
-  //     }
-  //   };
+  // Göç bitene kadar provider ağacı hiç mount edilmez. Yerel splash hâlâ açık
+  // (hideAsync yukarıda `storageReady` kapısının arkasında), bu yüzden kullanıcı
+  // yalnızca splash görür. Sadece güncelleme sonrası İLK açılışta yaşanır.
+  if (!storageReady) return null;
 
-  //   // Kullanıcı giriş/çıkış yaptığında dinle
-  //   const authUnsubscribe = auth.onAuthStateChanged((user) => {
-  //     if (user) {
-  //       currentUserUID = user.uid;
-  //       updateStatus(true);
-  //     } else if (currentUserUID) {
-  //       // Kullanıcı çıkış yaptıysa
-  //       updateStatus(false);
-  //       currentUserUID = null;
-  //     }
-  //   });
-
-  //   // Uygulama durumunu dinle (aktif, arka plan, vb.)
-  //   const appStateSubscription = AppState.addEventListener(
-  //     "change",
-  //     (nextAppState) => {
-  //       if (nextAppState === "active") {
-  //         updateStatus(true);
-  //       } else {
-  //         updateStatus(false);
-  //       }
-  //     }
-  //   );
-
-  //   // Component kaldırıldığında (unmount) tüm listener'ları temizle
-  //   return () => {
-  //     authUnsubscribe();
-  //     appStateSubscription.remove();
-  //     // Son bir kez offline olarak işaretle
-  //     updateStatus(false);
-  //   };
-  // }, []);
   return (
-    <GestureHandlerRootView>
-      <SafeAreaProvider>
-        <LanguageProvider>
-          <ThemeProvider>
-            <SnowProvider>
-              <AppSettingsProvider>
+    <ErrorBoundary>
+      <GestureHandlerRootView>
+        <SafeAreaProvider>
+          {/* Modal arka planlarının bulanıklaştırdığı yüzey: sekme çubuğu ve
+              üstteki her şey dahil TÜM uygulama. Android'de RN Modal ayrı bir
+              pencereye çizildiği için modal içeriği bu yüzeyin native çocuğu
+              olmaz — hedefleyebilmesinin sebebi bu (bkz. BlurTarget.js).
+              Android 12 altında ve iOS'ta düz bir View'dır, maliyeti yok. */}
+          <BlurTargetProvider>
+          <BlurTargetSurface name={BLUR_SCOPES.root} style={styles.blurRoot}>
+          <ConnectivityProvider>
+          <TypographyProvider>
+            <AppSettingsProvider>
+            <LanguageProvider>
+              <ThemeProvider>
+              <SnowProvider>
                 <AuthProvider>
+                  {/* Yerel-öncelikli veri katmanı (notlar, medya notları,
+                      hatırlatıcılar): giriş/öne gelme/ağ dönüşünde bekleyen
+                      yazımları buluta boşaltır, kopyası olmayan alanları TEK
+                      SEFER indirir. Görsel çıktısı yok; context'lerden ÖNCE
+                      mount olur ki ilk indirme onları beklemesin. */}
+                  <UserDataSyncHost />
+                  {/* UserProfile DIŞTA: PremiumProvider sunucu planını
+                      (Users/{uid}.entitlements) profilden okur. */}
+                  <UserProfileProvider>
+                  <PremiumProvider>
+                  <FriendsProvider>
+                  <NotificationsProvider>
+                  <UnreadMessagesProvider>
                   <ListStatusProvider>
-                    <ProfileScreenProvider>
-                      <CalendarProvider>
+                  <MediaActivityProvider>
+                  <SharedListsProvider>
+                    <ProfileStatsProvider>
+                      {/* ProfileStatsProvider'ın İÇİNDE olmalı: izleme puanı
+                          onun verisinden türüyor ve yeni listener açmıyor.
+                          Sağlayıcı, hook'un iki ekranda birden çalışıp defter
+                          mutabakatını ikiye katlamasını engelliyor. */}
+                      <WatchProgressProvider>
+                      <ProfileNotesProvider>
+                      <MediaNotesProvider>
+                        <ProfileRemindersProvider>
+                          <ProfileUiProvider>
+                            <PostsProvider>
                         <TvShowProvider>
-                          <MovieProvider>
-                            <AppContent />
+                          <PetProvider>
+                            <DeviceNotificationsProvider navigationRef={navigationRef}>
+                              {/* Postere basılı tutunca açılan hızlı eylem
+                                  sayfası. Listeler + puan + izlenme durumunu
+                                  okuduğu için ListStatus/SharedLists/Auth
+                                  sağlayıcılarının İÇİNDE olmak zorunda. */}
+                              <MediaQuickActionsProvider>
+                                <AppContent />
+                              </MediaQuickActionsProvider>
+                            </DeviceNotificationsProvider>
+                          </PetProvider>
                             {splashVisible && (
-                              <Animated.View
-                                style={[
-                                  StyleSheet.absoluteFill,
-                                  { opacity: fadeAnim, zIndex: 9999 },
-                                ]}
+                              <View
+                                style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}
                                 pointerEvents="none"
                               >
-                                <SplashScreen />
-                              </Animated.View>
+                                <SplashScreen
+                                  exiting={splashExiting}
+                                  onExited={() => setSplashVisible(false)}
+                                />
+                              </View>
                             )}
-                          </MovieProvider>
                         </TvShowProvider>
-                      </CalendarProvider>
-                    </ProfileScreenProvider>
+                            </PostsProvider>
+                          </ProfileUiProvider>
+                        </ProfileRemindersProvider>
+                      </MediaNotesProvider>
+                      </ProfileNotesProvider>
+                      </WatchProgressProvider>
+                    </ProfileStatsProvider>
+                  </SharedListsProvider>
+                  </MediaActivityProvider>
                   </ListStatusProvider>
+                  </UnreadMessagesProvider>
+                  </NotificationsProvider>
+                  </FriendsProvider>
+                  </PremiumProvider>
+                  </UserProfileProvider>
                 </AuthProvider>
-              </AppSettingsProvider>
-            </SnowProvider>
-          </ThemeProvider>
-        </LanguageProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+              </SnowProvider>
+              </ThemeProvider>
+            </LanguageProvider>
+          </AppSettingsProvider>
+          </TypographyProvider>
+          </ConnectivityProvider>
+          </BlurTargetSurface>
+          </BlurTargetProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  splashContainer: {
+  // Modal arka planlarının hedefi; sağlayıcı ağacının kapladığı alanın aynısı.
+  blurRoot: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#000",
   },
   lottie: {
     position: "absolute",

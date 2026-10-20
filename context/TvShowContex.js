@@ -1,85 +1,206 @@
-import { createContext, useContext, useEffect, useState, useRef, useMemo } from "react";
-import { useAppSettings } from "./AppSettingsContext";
-import Toast from "react-native-toast-message";
+import { tmdbLanguageOf, tmdbRegionOf } from "../utils/appLanguages";
+import { createContext, useContext, useCallback, useEffect, useState, useMemo, useRef } from "react";
+import {
+  useApiSettings,
+  useStreamingProviderSettings,
+} from "./AppSettingsContext";
 import { useLanguage } from "./LanguageContext";
-import { useAuth } from "./AuthContext";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "../firebase";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useListStatusContext } from "./ListStatusContext";
 import axios from "axios";
+// `getCachedValue` hâlâ kullanılıyor: sağlayıcı/tür listelerinin TTL'i zaten
+// 24 saat ve 7 gün, yani her açılışta ağ beklemeye yol açmıyorlar. Ayrıca
+// sağlayıcı okumasının önbellek isabetinde YAN ETKİSİ var (bir sağlayıcı seçip
+// içeriğini çekiyor); SWR'a çevirmek o isteği ikiye katlardı.
+import { getCachedValue, getSwr, seedList, setCachedValue, TTL } from "../utils/apiCache";
+import { setIfChanged, setListIfChanged } from "../utils/sameData";
+import { adultScoped, dropAdult } from "../utils/homeContentSettings";
+import { useHomeDataSettings } from "../hooks/useHomeContentSettings";
+import { i18nText } from "../utils/i18nText";
+import { getWatchedShowActivityTime } from "../utils/watchState";
+import {
+  getEmmyConfig,
+  fetchEmmyByCategory,
+  fetchEmmyByYear,
+  EMMY_CATEGORIES,
+  DEFAULT_EMMY_CATEGORY,
+} from "../services/emmyService";
+
 
 const TvShowContext = createContext();
 export const useTvShow = () => useContext(TvShowContext);
 
+// `sameJson`/`setIfChanged` buradan utils/sameData.js'e taşındı: aynı iki satır
+// bu dosyada, MovieContex'te, ListStatusContext'te ve MediaActivityContext'te
+// ayrı ayrı yazılıydı.
+
+// id'ye göre tekilleştirerek append eder (sayfalar arası tekrarları eler).
+const mergeUniqueById = (prev, next) => {
+  if (!Array.isArray(next)) return prev;
+  const seen = new Set(prev.map((x) => x && x.id));
+  return [...prev, ...next.filter((x) => x && !seen.has(x.id))];
+};
+
+// Trend state'i yalnızca gerçek TMDB kayıtlarını tutar. Eski cache sürümleri
+// spacer kayıtları içerebildiği için hem mevcut hem de yeni veriyi normalize et.
+const mergeTrendItems = (prev, next) => {
+  const realItems = (items) =>
+    (Array.isArray(items) ? items : []).filter(
+      (x) => x && x.id !== "left-spacer" && x.id !== "right-spacer",
+    );
+  return mergeUniqueById(realItems(prev), realItems(next));
+};
+
+// Sayfalı bölümlerin ortak yükleyicisi: cache okuma, loading bayrakları,
+// append/replace + dedup mantığını tek yerde toplar.
+// `isStale`: kategori/dil değişince eski (in-flight) isteğin sonucu yeni
+// listeye karışmasın diye sonuç uygulanmadan önce kontrol edilir.
+const loadPage = async ({
+  cacheKey,
+  ttl,
+  append,
+  request,
+  setData,
+  setTotal,
+  setLoading,
+  setLoadingMore,
+  isStale,
+  startupSnapshot = false,
+  forceRefresh = false,
+}) => {
+  // `arkaPlan`: ekranda zaten (bayat) veri var, tazeleme sessizce yapılıyor.
+  // Böyle durumda listeyi KİMLİK bazında karşılaştırıyoruz — TMDB aynı listeyi
+  // her istekte biraz farklı `popularity` ondalığıyla döndürdüğü için tam
+  // karşılaştırma, kullanıcı için hiçbir fark olmadığı hâlde tüm rayı yeniden
+  // çizdirirdi.
+  const apply = (results, totalPages, { arkaPlan = false } = {}) => {
+    if (isStale?.()) return;
+    if (setTotal) setTotal(totalPages || 1);
+    if (append) setData((prev) => mergeUniqueById(prev, results));
+    else if (arkaPlan) setListIfChanged(setData, results);
+    else setIfChanged(setData, results);
+  };
+
+  // BAYAT GÖSTER, ARKA PLANDA TAZELE. TTL 24 saat olduğu için gün içinde
+  // cache hep taze sayılır ve ağ isteği yapılmaz. forceRefresh (pull-to-refresh)
+  // bu kontrolü bypass eder ve ağdan yeniden çeker.
+  const cached = getSwr(cacheKey, { maxAge: ttl });
+  const cachedData = cached.data;
+  if (cachedData) {
+    apply(cachedData.results ?? cachedData, cachedData.total_pages ?? 1);
+    (append ? setLoadingMore : setLoading)(false);
+    if (cached.fresh && !forceRefresh) return;
+  } else {
+    (append ? setLoadingMore : setLoading)(true);
+  }
+
+  try {
+    const { results, total_pages } = await request();
+    apply(results, total_pages, { arkaPlan: Boolean(cachedData) });
+    setCachedValue(
+      cacheKey,
+      { results, total_pages },
+      { startupSnapshot: startupSnapshot && !append },
+    );
+  } catch (error) {
+    if (__DEV__) console.error("loadPage:", error?.message || error);
+  } finally {
+    // Bayat veriyle tazeleme yapıldıysa loading zaten false; tekrar false
+    // yazmak zararsız ama gereksiz render üretmesin diye yalnız gerekince.
+    if (!cachedData) (append ? setLoadingMore : setLoading)(false);
+  }
+};
+
 export const TvShowProvider = ({ children }) => {
-  const [seriesTrend, setSeriesTrend] = useState([]);
-  const [loadingTrend, setLoadingTren] = useState(true);
+  const [activeSections, setActiveSections] = useState({});
+  const activateTvSection = useCallback((section) => {
+    setActiveSections((current) => {
+      if (current[section]) return current;
+      return { ...current, [section]: true };
+    });
+  }, []);
+
+  // Bölüm başına istek jenerasyonu: fresh (sayfa 1) fetch jenerasyonu artırır,
+  // append aynı jenerasyonda kalır. Kategori/dil değişince eski in-flight
+  // isteklerin sonuçları stale sayılır ve state'e uygulanmaz.
+  const requestGenRef = useRef({});
+  const beginFreshRequest = (key) => {
+    requestGenRef.current[key] = (requestGenRef.current[key] || 0) + 1;
+    return requestGenRef.current[key];
+  };
+  const currentGen = (key) => requestGenRef.current[key] || 0;
+
+  const { API_KEY } = useApiSettings();
+  const { streamingProviderIds } = useStreamingProviderSettings();
+  // Veriyi değiştiren ayarlar (yetişkin içerik, platform üyelikleri) — ana ekran
+  // listeleri bunlara göre yeniden çekilir (bkz. utils/homeContentSettings.js).
+  const { adultContent, providersKey } = useHomeDataSettings();
+  // `/discover` tabanlı listelerin önbellek anahtarı yetişkin izniyle kapsamlanır.
+  // trending/airing_today/on_the_air ayardan bağımsız; onlar `dropAdult` ile süzülür.
+  const adultKey = (key) => adultScoped(key, adultContent);
+  const { language } = useLanguage();
+
+  // ── AÇILIŞ TOHUMLARI ──────────────────────────────────────────────────────
+  //
+  // Son oturumda görülen listeler MMKV'den SENKRON okunuyor, yani İLK KAREDE
+  // çiziliyor. Eskiden state `[]` + `loading:true` ile başlıyordu; önbellek
+  // DOLU olsa bile veri ancak efekt çalıştıktan sonra geldiği için kullanıcı
+  // her açılışta bir kare iskelet görüyordu.
+  //
+  // `useMemo(..., [])`: tohum yalnız ilk render için. Kategori/dil değişimini
+  // ilgili efekt zaten yeniden çekiyor.
+  const seedLang = tmdbLanguageOf(language);
+  const trendSeed = useMemo(
+    () => seedList(`tv_trends_${seedLang}_week_trending`, { maxAge: TTL.TREND }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const bestSeed = useMemo(
+    () =>
+      seedList(adultKey(`tv_bests_${seedLang}_discover_vote_count_page_1`), {
+        maxAge: TTL.TREND,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // Eski cache sürümleri spacer kaydı içerebiliyor; tohumu da normalize et.
+  const [seriesTrend, setSeriesTrend] = useState(() =>
+    mergeTrendItems([], trendSeed.list),
+  );
+  const [loadingTrend, setLoadingTren] = useState(!trendSeed.hasCache);
+  const [loadingMoreTrend, setLoadingMoreTrend] = useState(false);
+  const [pageTrend, setPageTrend] = useState(1);
+  // Tohumla açıldığında "daha fazla yükle" hemen çalışabilsin; gerçek değeri
+  // ilk istek yazacak.
+  const [totalPagesTrend, setTotalPagesTrend] = useState(
+    trendSeed.hasCache ? 1000 : 1,
+  );
   const [selectedCategoryTrend, setSelectedCategoryTrend] = useState("week");
   const [selectedCategoryTrendShow, setSelectedCategoryTrendShow] =
     useState("trending");
-  const { API_KEY } = useAppSettings();
-  const { language } = useLanguage();
+  const tmdbLanguage = tmdbLanguageOf(language);
+  const tmdbRegion = tmdbRegionOf(language);
   const { t } = useLanguage();
-  const { user } = useAuth();
-
-  // ── İzlenen diziler (Firebase + AsyncStorage cache) ────────────────────────
-  const WATCHED_TV_CACHE = "cache_watchedTvShows";
-  const [watchedTvShows, setWatchedTvShows] = useState([]);
-  const [loadingWatchedTv, setLoadingWatchedTv] = useState(true);
-  const unsubRef = useRef(null);
-
-  const processShows = (raw) => {
-    const filtered = raw.filter((s) => s.type === "tv" || s.seasons !== undefined);
-    filtered.sort((a, b) => new Date(b.addedShowDate) - new Date(a.addedShowDate));
-    return filtered;
-  };
-
-  const startListener = (uid) => {
-    if (unsubRef.current) {
-      unsubRef.current();
-      unsubRef.current = null;
-    }
-    if (!uid) {
-      setWatchedTvShows([]);
-      setLoadingWatchedTv(false);
-      AsyncStorage.removeItem(WATCHED_TV_CACHE).catch(() => {});
-      return;
-    }
-    const docRef = doc(db, "Lists", uid);
-    unsubRef.current = onSnapshot(docRef, (snap) => {
-      const raw = processShows(snap.exists() ? snap.data().watchedTv || [] : []);
-      setWatchedTvShows(raw);
-      setLoadingWatchedTv(false);
-      AsyncStorage.setItem(WATCHED_TV_CACHE, JSON.stringify(raw)).catch(() => {});
-    });
-  };
-
-  // Uygulama açılır açılmaz: önce cache'den yükle, sonra listener başlat
-  useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(WATCHED_TV_CACHE),
-      AsyncStorage.getItem("cachedUserId"),
-    ]).then(([cached, cachedUid]) => {
-      if (cached) {
-        setWatchedTvShows(JSON.parse(cached));
-        setLoadingWatchedTv(false);
-      }
-      if (cachedUid) startListener(cachedUid);
-      else if (!cached) setLoadingWatchedTv(false);
-    });
-    return () => {
-      if (unsubRef.current) unsubRef.current();
-    };
-  }, []);
-
-  // Auth değişince listener'ı güncelle
-  useEffect(() => {
-    if (user?.uid) {
-      startListener(user.uid);
-    } else if (user === null) {
-      startListener(null);
-    }
-  }, [user?.uid]);
+  // İzlenen dizilerin tek kaynağı yeni watchedTv subcollection listener'ıdır.
+  // Kök dokümandaki legacy watchedTv[] migration sonrasında boşaltıldığı için onu
+  // ayrıca dinlemek ana ekranda eksik/eski veri gösteriyordu.
+  const { watchedTvMap, watchedTvLoaded } = useListStatusContext();
+  const watchedTvShows = useMemo(
+    () =>
+      Object.entries(watchedTvMap || {})
+        .map(([docId, show]) => ({
+          ...show,
+          id: show?.id ?? docId,
+          type: show?.type || "tv",
+        }))
+        .filter((show) => show.id != null)
+        .sort(
+          (a, b) =>
+            getWatchedShowActivityTime(b) - getWatchedShowActivityTime(a),
+        ),
+    [watchedTvMap],
+  );
+  const loadingWatchedTv = !watchedTvLoaded;
   const [refreshing, setRefreshing] = useState(false);
 
   const categoriesTrends = ["week", "day"];
@@ -94,51 +215,87 @@ export const TvShowProvider = ({ children }) => {
     }
   };
 
-  const fetchSeriesTrends = async () => {
-    setLoadingTren(true);
-    const options = {
-      method: "GET",
-      url: `https://api.themoviedb.org/3/${selectedCategoryTrendShow}/tv/${selectedCategoryTrend}`,
-      params: {
-        include_adult: "false",
-        include_null_first_air_dates: "false",
-        language: language === "tr" ? "tr-TR" : "en-US",
-        page: "1",
-      },
-      headers: {
-        accept: "application/json",
-        Authorization: API_KEY,
-      },
-    };
+  const fetchSeriesTrends = async (page = 1, append = false, forceRefresh = false) => {
+    const lang = tmdbLanguageOf(language);
+    const gen = append ? currentGen("trends") : beginFreshRequest("trends");
+    const isStale = () => currentGen("trends") !== gen;
+    const baseKey = `tv_trends_${lang}_${selectedCategoryTrend}_${selectedCategoryTrendShow}`;
+    const cacheKey = page === 1 ? baseKey : `${baseKey}_p${page}`;
+
+    // Bayat göster, arka planda tazele — bkz. loadPage'deki aynı desen.
+    const swr = getSwr(cacheKey, { maxAge: TTL.TREND });
+    const cached = swr.data;
+    if (cached) {
+      if (isStale()) return;
+      if (append) {
+        setSeriesTrend((prev) => mergeTrendItems(prev, cached.results ?? cached));
+        setLoadingMoreTrend(false);
+      } else {
+        // Eski spacer'lı cache kayıtlarını da okurken temizle.
+        setIfChanged(setSeriesTrend, mergeTrendItems([], cached.results ?? cached));
+        setLoadingTren(false);
+        setTotalPagesTrend((p) => (p > 1 ? p : 1000));
+      }
+      if (swr.fresh && !forceRefresh) return;
+    } else {
+      (append ? setLoadingMoreTrend : setLoadingTren)(true);
+    }
 
     try {
-      const response = await axios.request(options);
-      setSeriesTrend([
-        { id: "left-spacer" },
-        ...response.data.results,
-        { id: "right-spacer" },
-      ]);
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "error:" + error,
+      const response = await axios.request({
+        method: "GET",
+        url: `https://api.themoviedb.org/3/${selectedCategoryTrendShow}/tv/${selectedCategoryTrend}`,
+        params: {
+          include_null_first_air_dates: "false",
+          language: lang,
+          page,
+        },
+        headers: { accept: "application/json", Authorization: API_KEY },
       });
+      const results = response.data.results || [];
+      // Cache doğru anahtara yazılabilir; yalnızca state güncellemesi stale'de atlanır.
+      setCachedValue(append ? cacheKey : baseKey, results, {
+        startupSnapshot: !append,
+      });
+      if (isStale()) return;
+      setTotalPagesTrend(response.data.total_pages || 1);
+      if (append) {
+        setSeriesTrend((prev) => mergeTrendItems(prev, results));
+      } else if (cached) {
+        // Arka plan tazelemesi: yalnız içerik gerçekten değiştiyse rayı
+        // yeniden çiz (bkz. loadPage'deki `arkaPlan` açıklaması).
+        setListIfChanged(setSeriesTrend, mergeTrendItems([], results));
+      } else {
+        setIfChanged(setSeriesTrend, mergeTrendItems([], results));
+      }
+    } catch (error) {
+      if (__DEV__) console.error("fetchSeriesTrends:", error?.message || error);
     } finally {
-      setLoadingTren(false);
+      if (!cached) (append ? setLoadingMoreTrend : setLoadingTren)(false);
     }
   };
   useEffect(() => {
-    fetchSeriesTrends();
-  }, [selectedCategoryTrend, selectedCategoryTrendShow, language]);
+    if (!activeSections.trends) return;
+    setPageTrend(1);
+    fetchSeriesTrends(1, false);
+  }, [activeSections.trends, selectedCategoryTrend, selectedCategoryTrendShow, language]);
 
-  const [seriesBest, setSeriesBest] = useState([]);
-  const [loadingBest, setLoadingBest] = useState(true);
+  const loadMoreTrend = () => {
+    if (loadingTrend || loadingMoreTrend || pageTrend >= totalPagesTrend) return;
+    const next = pageTrend + 1;
+    setPageTrend(next);
+    fetchSeriesTrends(next, true);
+  };
+
+  const [seriesBest, setSeriesBest] = useState(bestSeed.list);
+  const [loadingBest, setLoadingBest] = useState(!bestSeed.hasCache);
   const [selectedCategoryBestShow, setSelectedCategoryBestShow] =
     useState("discover");
   const [selectedCategoryBest, setSelectedCategoryBest] =
     useState("vote_count");
-  const [pageBest, setPageBest] = useState(1); // loading durumu ekleyin
-  const [totalPagesBest, setTotalPagesBest] = useState([]); // Filmler için yeni durum ekleyin
+  const [pageBest, setPageBest] = useState(1);
+  const [totalPagesBest, setTotalPagesBest] = useState(bestSeed.totalPages);
+  const [loadingMoreBest, setLoadingMoreBest] = useState(false);
   const categoriesBest = ["vote_count", "popularity"];
   const getCategoryTitleBest = (category) => {
     switch (category) {
@@ -151,141 +308,227 @@ export const TvShowProvider = ({ children }) => {
     }
   };
 
-  const fetchSeriesBest = async () => {
-    setLoadingBest(true);
-    const options = {
-      method: "GET",
-      url: `https://api.themoviedb.org/3/${selectedCategoryBestShow}/tv`,
-      params: {
-        include_adult: "false",
-        include_null_first_air_dates: "false",
-        language: language === "tr" ? "tr-TR" : "en-US",
-        page: pageBest,
-        sort_by: `${selectedCategoryBest}.desc`,
-        "vote_count.gte": "500",
+  const fetchSeriesBest = (page = 1, append = false, forceRefresh = false) => {
+    const lang = tmdbLanguageOf(language);
+    const gen = append ? currentGen("best") : beginFreshRequest("best");
+    return loadPage({
+      cacheKey: adultKey(`tv_bests_${lang}_${selectedCategoryBestShow}_${selectedCategoryBest}_page_${page}`),
+      ttl: TTL.TREND,
+      append,
+      forceRefresh,
+      isStale: () => currentGen("best") !== gen,
+      setData: setSeriesBest,
+      setTotal: setTotalPagesBest,
+      setLoading: setLoadingBest,
+      setLoadingMore: setLoadingMoreBest,
+      startupSnapshot: true,
+      request: async () => {
+        const response = await axios.request({
+          method: "GET",
+          url: `https://api.themoviedb.org/3/${selectedCategoryBestShow}/tv`,
+          params: {
+            include_null_first_air_dates: "false",
+            language: lang,
+            page,
+            sort_by: `${selectedCategoryBest}.desc`,
+            "vote_count.gte": "500",
+          },
+          headers: { accept: "application/json", Authorization: API_KEY },
+        });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
       },
-      headers: {
-        accept: "application/json",
-        Authorization: API_KEY,
-      },
-    };
-
-    try {
-      const response = await axios.request(options);
-      setSeriesBest(response.data.results);
-      setTotalPagesBest(response.data.total_pages); // Filmleri ekrana yazdır
-    } catch (error) {
-      Toast.show({
-        type: "error",
-        text1: "error:" + error,
-      });
-    } finally {
-      setLoadingBest(false);
-    }
+    });
   };
   useEffect(() => {
-    fetchSeriesBest();
-  }, [selectedCategoryBest, selectedCategoryBestShow, language, pageBest]);
+    if (!activeSections.best) return;
+    setPageBest(1);
+    fetchSeriesBest(1, false);
+  }, [activeSections.best, selectedCategoryBest, selectedCategoryBestShow, language, adultContent]);
 
-  const [moviesAiringToday, setMoviesAiringToday] = useState([]); // Filmler için yeni durum ekleyin
-  const [totalPagesAiringToday, setTotalPagesAiringToday] = useState([]); // Filmler için yeni durum ekleyin
-  const [loadingAiringToday, setLoadingAiringToday] = useState(true); // loading durumu ekleyin
-  const [pageAiringToday, setPageAiringToday] = useState(1); // loading durumu ekleyin
+  const loadMoreBest = () => {
+    if (loadingBest || loadingMoreBest || pageBest >= totalPagesBest) return;
+    const next = pageBest + 1;
+    setPageBest(next);
+    fetchSeriesBest(next, true);
+  };
 
-  const fetchAiringToday = async () => {
-    setLoadingAiringToday(true);
-    try {
-      const url = `https://api.themoviedb.org/3/tv/airing_today?include_adult=false&include_video=false&language=${language}&region=${language == "tr-TR" ? "tr" : "us"}&page=${pageAiringToday}&sort_by=popularity.desc`; // API'den filmleri çekmek için URL
-      const headers = {
-        Authorization: API_KEY,
-      };
+  const [moviesAiringToday, setMoviesAiringToday] = useState([]);
+  const [totalPagesAiringToday, setTotalPagesAiringToday] = useState(1);
+  const [loadingAiringToday, setLoadingAiringToday] = useState(true);
+  const [loadingMoreAiringToday, setLoadingMoreAiringToday] = useState(false);
+  const [pageAiringToday, setPageAiringToday] = useState(1);
 
-      const response = await axios.get(url, { headers });
-      setMoviesAiringToday(response.data.results); // Filmleri ekrana yazdır
-      setTotalPagesAiringToday(response.data.total_pages); // Filmleri ekrana yazdır
-    } catch (err) {
-      console.error("Yakında çıkacak filmleri çekerken hata:", err.message);
-    } finally {
-      setLoadingAiringToday(false);
-    }
+  const fetchAiringToday = (page = 1, append = false, forceRefresh = false) => {
+    const gen = append ? currentGen("airingToday") : beginFreshRequest("airingToday");
+    return loadPage({
+      cacheKey: `tv_airing_today_${tmdbLanguage}_${tmdbRegion}_page_${page}`,
+      ttl: TTL.NOW_PLAYING,
+      append,
+      forceRefresh,
+      isStale: () => currentGen("airingToday") !== gen,
+      setData: setMoviesAiringToday,
+      setTotal: setTotalPagesAiringToday,
+      setLoading: setLoadingAiringToday,
+      setLoadingMore: setLoadingMoreAiringToday,
+      request: async () => {
+        const url = `https://api.themoviedb.org/3/tv/airing_today?include_video=false&language=${tmdbLanguage}&region=${tmdbRegion}&page=${page}&sort_by=popularity.desc`;
+        const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
+      },
+    });
   };
   useEffect(() => {
-    fetchAiringToday();
-  }, [language, pageAiringToday]);
+    if (!activeSections.airingToday) return;
+    setPageAiringToday(1);
+    fetchAiringToday(1, false);
+  }, [activeSections.airingToday, language]);
+
+  const loadMoreAiringToday = () => {
+    if (loadingAiringToday || loadingMoreAiringToday || pageAiringToday >= totalPagesAiringToday) return;
+    const next = pageAiringToday + 1;
+    setPageAiringToday(next);
+    fetchAiringToday(next, true);
+  };
 
   const [providers, setProviders] = useState([]);
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [moviesProviders, setMoviesProviders] = useState([]);
   const [loadingMoviesByProvider, setLoadingMoviesByProvider] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState(false);
+  const [loadingMoreProvider, setLoadingMoreProvider] = useState(false);
+  const [pageProvider, setPageProvider] = useState(1);
+  const [totalPagesProvider, setTotalPagesProvider] = useState(1);
   //const [fetchMoviesByProvider, setFetchMoviesByProvider] = useState(false);
 
   // Sağlayıcıları çek
+  // `providersKey`: dizi kimliği değil İÇERİK — aynı küme yeniden yazılınca
+  // kullanıcının elle seçtiği sağlayıcı sıfırlanmasın.
   useEffect(() => {
+    if (!activeSections.providers) return;
     fetchProviders();
-  }, [language]);
+  }, [activeSections.providers, language, providersKey]);
+
+  // Yetişkin izni değişince sağlayıcı listesi aynı kalır ama seçili sağlayıcının
+  // dizileri (`/discover`) değişir. fetchProviders'ı çağırmak kullanıcının seçimini
+  // "ilk abone olunan sağlayıcı"ya sıfırlardı; yalnız seçili olanı yeniden çekiyoruz.
+  const lastAdultRef = useRef(adultContent);
+  useEffect(() => {
+    if (lastAdultRef.current === adultContent) return;
+    lastAdultRef.current = adultContent;
+    if (activeSections.providers && selectedProvider != null) {
+      fetchMoviesByProvider(selectedProvider);
+    }
+  }, [adultContent]);
 
   const fetchProviders = async () => {
+    const cacheKey = `tv_providers_${tmdbLanguage}_${tmdbRegion}`;
+    const cached = await getCachedValue(cacheKey, TTL.PROVIDERS);
+    if (cached) {
+      setIfChanged(setProviders, cached);
+      if (cached.length > 0) {
+        const preferred =
+          cached.find((provider) =>
+            streamingProviderIds.includes(provider.provider_id),
+          ) || cached[0];
+        setSelectedProvider(preferred.provider_id);
+        fetchMoviesByProvider(preferred.provider_id);
+      }
+      setLoadingProvider(false);
+      return;
+    }
+
     setLoadingProvider(true);
     try {
-      const url = `https://api.themoviedb.org/3/watch/providers/tv?language=${language}&watch_region=${language == "tr-TR" ? "tr" : "us"}`;
-      const headers = {
-        Authorization: API_KEY,
-      };
-      const response = await axios.get(url, { headers });
-      setProviders(response.data.results);
-      if (response.data.results.length > 0) {
-        const firstProvider = response.data.results[0];
-        setSelectedProvider(firstProvider.provider_id);
-        fetchMoviesByProvider(firstProvider.provider_id);
+      const url = `https://api.themoviedb.org/3/watch/providers/tv?language=${tmdbLanguage}&watch_region=${tmdbRegion}`;
+      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+      const results = response.data.results;
+      setIfChanged(setProviders, results);
+      setCachedValue(cacheKey, results);
+      if (results.length > 0) {
+        const preferred =
+          results.find((provider) =>
+            streamingProviderIds.includes(provider.provider_id),
+          ) || results[0];
+        setSelectedProvider(preferred.provider_id);
+        fetchMoviesByProvider(preferred.provider_id);
       }
     } catch (err) {
-      console.error("Sağlayıcıları çekerken hata:", err.message);
+      if (__DEV__) console.error(i18nText("autoI18n.saglayicilari_cekerken_hata", "Sağlayıcıları çekerken hata:"), err.message);
     } finally {
       setLoadingProvider(false);
     }
   };
 
-  // Seçilen sağlayıcıya göre filmleri çek
-  const fetchMoviesByProvider = async (providerId) => {
-    setLoadingMoviesByProvider(true);
-    setSelectedProvider(providerId);
-
-    try {
-      let url = `https://api.themoviedb.org/3/discover/tv?watch_region=${language == "tr-TR" ? "TR" : "US"}&with_watch_providers=${providerId}&sort_by=vote_count.desc`;
-
-      const headers = {
-        Authorization: API_KEY, // Buraya kendi API keyini koy
-      };
-
-      const response = await axios.get(url, { headers });
-      setMoviesProviders(response.data.results);
-    } catch (err) {
-      console.error("Filmleri çekerken hata:", err.message);
-    } finally {
-      setLoadingMoviesByProvider(false);
+  // Seçilen sağlayıcıya göre dizileri çek (sayfalı)
+  const fetchMoviesByProvider = (providerId, page = 1, append = false) => {
+    if (!append) {
+      setSelectedProvider(providerId);
+      setPageProvider(1);
     }
+    const gen = append ? currentGen("provider") : beginFreshRequest("provider");
+    return loadPage({
+      cacheKey: adultKey(`tv_provider_${tmdbLanguage}_${tmdbRegion}_${providerId}_p${page}`),
+      ttl: TTL.PROVIDERS,
+      append,
+      isStale: () => currentGen("provider") !== gen,
+      setData: setMoviesProviders,
+      setTotal: setTotalPagesProvider,
+      setLoading: setLoadingMoviesByProvider,
+      setLoadingMore: setLoadingMoreProvider,
+      request: async () => {
+        const url = `https://api.themoviedb.org/3/discover/tv?language=${tmdbLanguage}&watch_region=${tmdbRegion}&with_watch_providers=${providerId}&sort_by=vote_count.desc&page=${page}`;
+        const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
+      },
+    });
+  };
+
+  const loadMoreProvider = () => {
+    if (
+      loadingMoviesByProvider ||
+      loadingMoreProvider ||
+      !selectedProvider ||
+      pageProvider >= totalPagesProvider
+    )
+      return;
+    const next = pageProvider + 1;
+    setPageProvider(next);
+    fetchMoviesByProvider(selectedProvider, next, true);
   };
 
   const [genres, setGenres] = useState([]); // Başlangıç değeri boş dizi
   const [selectedGenres, setSelectedGenres] = useState([]);
-  const [moviesGenres, setMoviesGenres] = useState([]); // Filmler için yeni durum ekleyin
-  const [loadingGenres, setLoadingGenres] = useState(true); // loading durumu ekleyin
-  const [pageGenres, setPageGenres] = useState(1); // loading durumu ekleyin
+  const [moviesGenres, setMoviesGenres] = useState([]);
+  const [loadingGenres, setLoadingGenres] = useState(true);
+  const [loadingMoreGenres, setLoadingMoreGenres] = useState(false);
+  const [pageGenres, setPageGenres] = useState(1);
+  const [totalPagesGenres, setTotalPagesGenres] = useState(1);
 
-  // Film türlerini API'den almak
   const tvGenres = async () => {
-    setLoadingGenres(true);
+    const cacheKey = `tv_genres_${tmdbLanguage}`;
+    const cached = await getCachedValue(cacheKey, TTL.GENRES);
+    if (cached) {
+      setIfChanged(setGenres, cached);
+      setLoadingGenres(false);
+      return;
+    }
+
     try {
-      const url = `https://api.themoviedb.org/3/genre/tv/list?language=${language}`;
-      const headers = {
-        Authorization: API_KEY,
-      };
-      const response = await axios.get(url, { headers });
-      const genres = response.data.genres;
-      setGenres(genres);
+      const url = `https://api.themoviedb.org/3/genre/tv/list?language=${tmdbLanguage}`;
+      const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+      setIfChanged(setGenres, response.data.genres);
+      setCachedValue(cacheKey, response.data.genres);
     } catch (err) {
-      console.error(err.message);
+      if (__DEV__) console.error(err.message);
     } finally {
       setLoadingGenres(false);
     }
@@ -293,86 +536,294 @@ export const TvShowProvider = ({ children }) => {
 
   // Seçilen türlere göre filmleri almak
 
-  const fetchTvByGenres = async () => {
-    setLoadingGenres(true);
-    try {
-      let url = `https://api.themoviedb.org/3/discover/tv?language=${language}&page=${pageGenres}`;
-
-      if (selectedGenres.length > 0) {
-        const genreIds = selectedGenres.join(",");
-        url += `&with_genres=${genreIds}`;
-      }
-
-      const headers = {
-        Authorization: API_KEY,
-      };
-
-      const response = await axios.get(url, { headers });
-      setMoviesGenres(response.data.results);
-    } catch (err) {
-      console.error(err.message);
-    } finally {
-      setLoadingGenres(false);
-    }
+  const fetchTvByGenres = (page = 1, append = false, forceRefresh = false) => {
+    const genresKey = [...selectedGenres].sort().join(",");
+    const gen = append ? currentGen("genres") : beginFreshRequest("genres");
+    return loadPage({
+      cacheKey: adultKey(`tv_genres_content_${tmdbLanguage}_p${page}_g${genresKey}`),
+      ttl: TTL.TREND,
+      append,
+      forceRefresh,
+      isStale: () => currentGen("genres") !== gen,
+      setData: setMoviesGenres,
+      setTotal: setTotalPagesGenres,
+      setLoading: setLoadingGenres,
+      setLoadingMore: setLoadingMoreGenres,
+      request: async () => {
+        let url = `https://api.themoviedb.org/3/discover/tv?language=${tmdbLanguage}&page=${page}`;
+        if (selectedGenres.length > 0) url += `&with_genres=${genresKey}`;
+        const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
+      },
+    });
   };
   useEffect(() => {
+    if (!activeSections.genres) return;
     tvGenres();
-    fetchTvByGenres();
-  }, [language, pageGenres, selectedGenres]);
+    setPageGenres(1);
+    fetchTvByGenres(1, false);
+  }, [activeSections.genres, language, selectedGenres, adultContent]);
 
-  const [moviesOnTheAir, setMoviesOnTheAir] = useState([]); // Filmler için yeni durum ekleyin
-  const [totalPagesOnTheAir, setTotalPagesOnTheAir] = useState([]); // Filmler için yeni durum ekleyin
-  const [loadingOnTheAir, setLoadingOnTheAir] = useState(true); // loading durumu ekleyin
-  const [pageOnTheAir, setPageOnTheAir] = useState(1); // loading durumu ekleyin
+  const loadMoreGenres = () => {
+    if (loadingGenres || loadingMoreGenres || pageGenres >= totalPagesGenres) return;
+    const next = pageGenres + 1;
+    setPageGenres(next);
+    fetchTvByGenres(next, true);
+  };
 
-  // Film türlerini API'den almak
+  const [moviesOnTheAir, setMoviesOnTheAir] = useState([]);
+  const [totalPagesOnTheAir, setTotalPagesOnTheAir] = useState(1);
+  const [loadingOnTheAir, setLoadingOnTheAir] = useState(true);
+  const [loadingMoreOnTheAir, setLoadingMoreOnTheAir] = useState(false);
+  const [pageOnTheAir, setPageOnTheAir] = useState(1);
 
-  const fetchOnTheAir = async () => {
-    setLoadingOnTheAir(true);
-    try {
-      const url = `https://api.themoviedb.org/3/tv/on_the_air?include_adult=false&include_video=false&language=${language}&region=${language == "tr-TR" ? "tr" : "us"}&page=${pageOnTheAir}&sort_by=popularity.desc`; // API'den filmleri çekmek için URL
-      const headers = {
-        Authorization: API_KEY,
-      };
-
-      const response = await axios.get(url, { headers });
-      setMoviesOnTheAir(response.data.results); // Filmleri ekrana yazdır
-      setTotalPagesOnTheAir(response.data.total_pages); // Filmleri ekrana yazdır
-    } catch (err) {
-      console.error("Yakında çıkacak filmleri çekerken hata:", err.message);
-    } finally {
-      setLoadingOnTheAir(false);
-    }
+  const fetchOnTheAir = (page = 1, append = false, forceRefresh = false) => {
+    const gen = append ? currentGen("onTheAir") : beginFreshRequest("onTheAir");
+    return loadPage({
+      cacheKey: `tv_on_the_air_${tmdbLanguage}_${tmdbRegion}_page_${page}`,
+      ttl: TTL.NOW_PLAYING,
+      append,
+      forceRefresh,
+      isStale: () => currentGen("onTheAir") !== gen,
+      setData: setMoviesOnTheAir,
+      setTotal: setTotalPagesOnTheAir,
+      setLoading: setLoadingOnTheAir,
+      setLoadingMore: setLoadingMoreOnTheAir,
+      request: async () => {
+        const url = `https://api.themoviedb.org/3/tv/on_the_air?include_video=false&language=${tmdbLanguage}&region=${tmdbRegion}&page=${page}&sort_by=popularity.desc`;
+        const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
+      },
+    });
   };
   useEffect(() => {
-    fetchOnTheAir();
-  }, [language, pageOnTheAir]);
+    if (!activeSections.onTheAir) return;
+    setPageOnTheAir(1);
+    fetchOnTheAir(1, false);
+  }, [activeSections.onTheAir, language]);
+
+  const loadMoreOnTheAir = () => {
+    if (loadingOnTheAir || loadingMoreOnTheAir || pageOnTheAir >= totalPagesOnTheAir) return;
+    const next = pageOnTheAir + 1;
+    setPageOnTheAir(next);
+    fetchOnTheAir(next, true);
+  };
+
+  // ── DİZİ EMMY ÖDÜLLERİ ───────────────────────────────────────────────
+  const [emmyMode, setEmmyMode] = useState("category"); // "category" | "year"
+  const [selectedEmmyCategory, setSelectedEmmyCategory] = useState(DEFAULT_EMMY_CATEGORY);
+  const [selectedEmmyYear, setSelectedEmmyYear] = useState(2026);
+  const [tvShowsEmmy, setTvShowsEmmy] = useState([]);
+  const [tvShowsEmmyYear, setTvShowsEmmyYear] = useState([]);
+  const [loadingEmmy, setLoadingEmmy] = useState(true);
+  const [loadingEmmyYear, setLoadingEmmyYear] = useState(false);
+  const [loadingMoreEmmy, setLoadingMoreEmmy] = useState(false);
+  const [hasMoreEmmy, setHasMoreEmmy] = useState(true);
+  const [errorEmmy, setErrorEmmy] = useState(null);
+  const emmyConfigRef = useRef(null);
+  const emmyPageRef = useRef(0);
+  const loadingMoreEmmyRef = useRef(false);
+
+  const mergeEmmyItems = (prev, next) => {
+    if (!Array.isArray(next)) return prev;
+    const seen = new Set(
+      (Array.isArray(prev) ? prev : [])
+        .map((x) => (x ? `${x.year}-${x.categoryKey || "drama_series"}` : null))
+        .filter(Boolean),
+    );
+    return [
+      ...(Array.isArray(prev) ? prev : []),
+      ...next.filter((x) => {
+        if (!x) return false;
+        const key = `${x.year}-${x.categoryKey || "drama_series"}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }),
+    ];
+  };
+
+  const fetchTvShowsEmmy = useCallback(async (catKey = selectedEmmyCategory, forceRefresh = false) => {
+    setLoadingEmmy(true);
+    setErrorEmmy(null);
+    emmyPageRef.current = 0;
+    try {
+      const config = await getEmmyConfig({ forceRefresh });
+      emmyConfigRef.current = config?.items || [];
+
+      const res = await fetchEmmyByCategory({
+        configItems: emmyConfigRef.current,
+        categoryKey: catKey,
+        page: 0,
+        pageSize: 10,
+        language,
+        apiKey: API_KEY,
+      });
+
+      setIfChanged(setTvShowsEmmy, res.items);
+      setHasMoreEmmy(res.hasMore);
+      emmyPageRef.current = res.nextPage;
+    } catch (err) {
+      setErrorEmmy(err.message);
+    } finally {
+      setLoadingEmmy(false);
+    }
+  }, [selectedEmmyCategory, language, API_KEY]);
+
+  const loadMoreEmmy = useCallback(async () => {
+    if (
+      loadingMoreEmmyRef.current ||
+      !hasMoreEmmy ||
+      !emmyConfigRef.current
+    ) {
+      return;
+    }
+    loadingMoreEmmyRef.current = true;
+    setLoadingMoreEmmy(true);
+    const nextPage = emmyPageRef.current;
+    try {
+      const res = await fetchEmmyByCategory({
+        configItems: emmyConfigRef.current,
+        categoryKey: selectedEmmyCategory,
+        page: nextPage,
+        pageSize: 10,
+        language,
+        apiKey: API_KEY,
+      });
+
+      if (res.items?.length) {
+        setTvShowsEmmy((prev) => mergeEmmyItems(prev, res.items));
+        setHasMoreEmmy(res.hasMore);
+        emmyPageRef.current = res.nextPage;
+      } else {
+        setHasMoreEmmy(false);
+      }
+    } catch (err) {
+      if (__DEV__) console.warn("loadMoreEmmy error:", err?.message);
+    } finally {
+      loadingMoreEmmyRef.current = false;
+      setLoadingMoreEmmy(false);
+    }
+  }, [hasMoreEmmy, selectedEmmyCategory, language, API_KEY]);
+
+  const fetchTvShowsEmmyByYear = useCallback(async (year = selectedEmmyYear, forceRefresh = false) => {
+    setLoadingEmmyYear(true);
+    try {
+      const config = await getEmmyConfig({ forceRefresh });
+      emmyConfigRef.current = config?.items || [];
+
+      const results = await fetchEmmyByYear({
+        configItems: emmyConfigRef.current,
+        year,
+        language,
+        apiKey: API_KEY,
+      });
+
+      setIfChanged(setTvShowsEmmyYear, results);
+    } catch (err) {
+      if (__DEV__) console.warn("fetchTvShowsEmmyByYear error:", err?.message);
+    } finally {
+      setLoadingEmmyYear(false);
+    }
+  }, [selectedEmmyYear, language, API_KEY]);
+
+  const changeEmmyCategory = useCallback((catKey) => {
+    if (catKey === selectedEmmyCategory) return;
+    setSelectedEmmyCategory(catKey);
+  }, [selectedEmmyCategory]);
+
+  const changeEmmyYear = useCallback((year) => {
+    const numYear = Number(year);
+    if (numYear === selectedEmmyYear) return;
+    setSelectedEmmyYear(numYear);
+  }, [selectedEmmyYear]);
+
+  const changeEmmyMode = useCallback((mode) => {
+    setEmmyMode(mode);
+    if (mode === "year" && (!tvShowsEmmyYear || tvShowsEmmyYear.length === 0)) {
+      fetchTvShowsEmmyByYear(selectedEmmyYear);
+    }
+  }, [tvShowsEmmyYear, selectedEmmyYear, fetchTvShowsEmmyByYear]);
+
+  useEffect(() => {
+    if (!activeSections.emmy) return;
+    if (emmyMode === "category") {
+      fetchTvShowsEmmy(selectedEmmyCategory);
+    } else {
+      fetchTvShowsEmmyByYear(selectedEmmyYear);
+    }
+  }, [activeSections.emmy, language, emmyMode, selectedEmmyCategory, selectedEmmyYear, fetchTvShowsEmmy, fetchTvShowsEmmyByYear]);
+
+  // ── PULL-TO-REFRESH: Tüm aktif bölümleri zorla yenile ──────────────────
+  const refreshAllTvShows = useCallback(async () => {
+    const jobs = [];
+    if (activeSections.trends)     jobs.push(fetchSeriesTrends(1, false, true));
+    if (activeSections.best)       jobs.push(fetchSeriesBest(1, false, true));
+    if (activeSections.airingToday)jobs.push(fetchAiringToday(1, false, true));
+    if (activeSections.onTheAir)   jobs.push(fetchOnTheAir(1, false, true));
+    if (activeSections.genres)     jobs.push(fetchTvByGenres(1, false, true));
+    if (activeSections.emmy) {
+      if (emmyMode === "category") jobs.push(fetchTvShowsEmmy(selectedEmmyCategory, true));
+      else jobs.push(fetchTvShowsEmmyByYear(selectedEmmyYear, true));
+    }
+    await Promise.allSettled(jobs);
+  }, [
+    activeSections,
+    fetchSeriesTrends,
+    fetchSeriesBest,
+    fetchAiringToday,
+    fetchOnTheAir,
+    fetchTvByGenres,
+    emmyMode,
+    selectedEmmyCategory,
+    selectedEmmyYear,
+    fetchTvShowsEmmy,
+    fetchTvShowsEmmyByYear,
+  ]);
+
+  // Yetişkin izni yokken ekrandaki listelerden `adult:true` kayıtlar ANINDA elenir:
+  // ayarı kapatınca ağ isteği ya da yeniden yükleme beklenmez. Süzülecek bir şey
+  // yoksa aynı dizi döner, yani kartlar boşuna yeniden çizilmez. `/discover`
+  // dışındaki uçlar (trending vb.) bu sayede ayarı önbellek kapsamı olmadan da
+  // izliyor.
+  const visibleTrend = useMemo(() => dropAdult(seriesTrend, adultContent), [seriesTrend, adultContent]);
+  const visibleBest = useMemo(() => dropAdult(seriesBest, adultContent), [seriesBest, adultContent]);
+  const visibleAiringToday = useMemo(() => dropAdult(moviesAiringToday, adultContent), [moviesAiringToday, adultContent]);
+  const visibleProviders = useMemo(() => dropAdult(moviesProviders, adultContent), [moviesProviders, adultContent]);
+  const visibleGenres = useMemo(() => dropAdult(moviesGenres, adultContent), [moviesGenres, adultContent]);
+  const visibleOnTheAir = useMemo(() => dropAdult(moviesOnTheAir, adultContent), [moviesOnTheAir, adultContent]);
 
   const contextValue = useMemo(() => ({
-    seriesTrend,
-    seriesBest,
+    seriesTrend: visibleTrend,
+    seriesBest: visibleBest,
     loadingTrend,
     loadingBest,
     selectedCategoryTrend,
     selectedCategoryBest,
     totalPagesBest,
     pageBest,
-    moviesAiringToday,
+    moviesAiringToday: visibleAiringToday,
     totalPagesAiringToday,
     loadingAiringToday,
     pageAiringToday,
     providers,
     selectedProvider,
-    moviesProviders,
+    moviesProviders: visibleProviders,
     loadingMoviesByProvider,
     loadingProvider,
     genres,
     selectedGenres,
     pageGenres,
-    moviesGenres,
+    moviesGenres: visibleGenres,
     loadingGenres,
     pageOnTheAir,
-    moviesOnTheAir,
+    moviesOnTheAir: visibleOnTheAir,
     totalPagesOnTheAir,
     loadingOnTheAir,
     categoriesBest,
@@ -381,7 +832,24 @@ export const TvShowProvider = ({ children }) => {
     setRefreshing,
 
     setPageBest,
+    loadMoreBest,
+    loadingMoreBest,
+    loadMoreAiringToday,
+    loadingMoreAiringToday,
+    loadMoreGenres,
+    loadingMoreGenres,
+    totalPagesGenres,
+    loadMoreOnTheAir,
+    loadingMoreOnTheAir,
     fetchMoviesByProvider,
+    loadMoreProvider,
+    loadingMoreProvider,
+    pageProvider,
+    totalPagesProvider,
+    loadMoreTrend,
+    loadingMoreTrend,
+    pageTrend,
+    totalPagesTrend,
     setSelectedCategoryTrend,
     setSelectedCategoryTrendShow,
     setSelectedCategoryBestShow,
@@ -390,10 +858,34 @@ export const TvShowProvider = ({ children }) => {
     setSelectedGenres,
     setPageGenres,
     setPageOnTheAir,
+    activateTvSection,
     getCategoryTitleBest,
     getCategoryTitleTrends,
     watchedTvShows,
     loadingWatchedTv,
+
+    // Emmy
+    emmyMode,
+    setEmmyMode,
+    changeEmmyMode,
+    selectedEmmyCategory,
+    setSelectedEmmyCategory,
+    changeEmmyCategory,
+    EMMY_CATEGORIES,
+    selectedEmmyYear,
+    setSelectedEmmyYear,
+    changeEmmyYear,
+    tvShowsEmmy,
+    tvShowsEmmyYear,
+    loadingEmmy,
+    loadingEmmyYear,
+    loadingMoreEmmy,
+    hasMoreEmmy,
+    errorEmmy,
+    fetchTvShowsEmmy,
+    loadMoreEmmy,
+    fetchTvShowsEmmyByYear,
+
     //!
     fetchSeriesTrends,
     fetchSeriesBest,
@@ -401,14 +893,26 @@ export const TvShowProvider = ({ children }) => {
     fetchProviders,
     fetchTvByGenres,
     fetchOnTheAir,
+    refreshAllTvShows,
   }), [
-    seriesTrend, seriesBest, loadingTrend, loadingBest, selectedCategoryTrend,
-    selectedCategoryBest, totalPagesBest, pageBest, moviesAiringToday,
+    visibleTrend, visibleBest, loadingTrend, loadingBest, selectedCategoryTrend,
+    selectedCategoryBest, totalPagesBest, pageBest, visibleAiringToday,
     totalPagesAiringToday, loadingAiringToday, pageAiringToday, providers,
-    selectedProvider, moviesProviders, loadingMoviesByProvider, loadingProvider,
-    genres, selectedGenres, pageGenres, moviesGenres, loadingGenres, pageOnTheAir,
-    moviesOnTheAir, totalPagesOnTheAir, loadingOnTheAir, categoriesBest,
-    categoriesTrends, refreshing, watchedTvShows, loadingWatchedTv
+    selectedProvider, visibleProviders, loadingMoviesByProvider, loadingProvider,
+    genres, selectedGenres, pageGenres, visibleGenres, loadingGenres, pageOnTheAir,
+    visibleOnTheAir, totalPagesOnTheAir, loadingOnTheAir, categoriesBest,
+    categoriesTrends, refreshing, watchedTvShows, loadingWatchedTv, activateTvSection,
+    loadingMoreBest, loadingMoreAiringToday, loadingMoreGenres, totalPagesGenres,
+    loadingMoreOnTheAir,
+    loadingMoreProvider, pageProvider, totalPagesProvider,
+    loadingMoreTrend, pageTrend, totalPagesTrend,
+    emmyMode, selectedEmmyCategory, selectedEmmyYear, tvShowsEmmy, tvShowsEmmyYear,
+    loadingEmmy, loadingEmmyYear, loadingMoreEmmy, hasMoreEmmy, errorEmmy,
+    changeEmmyMode, changeEmmyCategory, changeEmmyYear, fetchTvShowsEmmy, loadMoreEmmy, fetchTvShowsEmmyByYear,
+    refreshAllTvShows,
+    // Değerdeki yükleyiciler (loadMore*, fetch*) `adultKey`i kapanışla yakalar;
+    // ayar değişince bayat kapanış kalmasın diye açıkça bağımlılık.
+    adultContent,
   ]);
 
   return (

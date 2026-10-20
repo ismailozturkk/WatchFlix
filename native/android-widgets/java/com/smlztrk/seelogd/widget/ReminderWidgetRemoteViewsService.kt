@@ -1,0 +1,280 @@
+package com.smlztrk.seelogd.widget
+
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
+import android.graphics.RectF
+import android.util.LruCache
+import android.view.View
+import android.widget.RemoteViews
+import android.widget.RemoteViewsService
+import com.smlztrk.seelogd.R
+import org.json.JSONArray
+import java.net.HttpURLConnection
+import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.concurrent.TimeUnit
+
+/**
+ * Kaydırılabilir hatırlatma listesini besleyen koleksiyon servisi. Her satırı
+ * getViewAt() üretir; poster bitmap'i arka planda (bu iş parçacığı zaten
+ * arka planda çalışır) indirilir ve LruCache'lenir. RemoteViews URL yükleyemez,
+ * bu yüzden posteri elle çekip yuvarlatıp setImageViewBitmap ile veririz.
+ */
+class ReminderWidgetRemoteViewsService : RemoteViewsService() {
+  override fun onGetViewFactory(intent: Intent): RemoteViewsFactory =
+    ReminderRemoteViewsFactory(applicationContext)
+}
+
+private data class WidgetItem(
+  val id: String,
+  val type: String,
+  val title: String,
+  val subtitle: String,
+  val poster: String,
+  val dateEpoch: Long,
+)
+
+private class ReminderRemoteViewsFactory(
+  private val context: Context,
+) : RemoteViewsService.RemoteViewsFactory {
+
+  private var items: List<WidgetItem> = emptyList()
+  private var lang: String = "tr"
+  private var preferences: WidgetPreferences = WidgetPreferences()
+
+  override fun onCreate() { /* veri onDataSetChanged'de yüklenir */ }
+
+  override fun onDataSetChanged() {
+    val prefs = context.getSharedPreferences(
+      ReminderWidgetProvider.PREFS_NAME,
+      Context.MODE_PRIVATE,
+    )
+    lang = WidgetLanguage.of(prefs.getString(ReminderWidgetProvider.KEY_LANGUAGE, "tr"))
+    preferences = WidgetPreferences.load(context)
+    items = parseItems(prefs.getString(ReminderWidgetProvider.KEY_ITEMS, "[]") ?: "[]")
+      .filter { it.dateEpoch >= startOfToday() }
+      .filter {
+        preferences.reminderContent == "all" ||
+          preferences.reminderContent == it.type
+      }
+      .sortedBy { it.dateEpoch }
+      .take(preferences.reminderMaxItems)
+  }
+
+  override fun onDestroy() { items = emptyList() }
+
+  override fun getCount(): Int = items.size
+
+  override fun getViewAt(position: Int): RemoteViews {
+    val rv = RemoteViews(context.packageName, R.layout.reminder_widget_item)
+    val item = items.getOrNull(position) ?: return rv
+
+    val isMovie = item.type == "movie"
+
+    // Poster: indir + yuvarlat. Başarısızsa tip ikonlu gradyan rozet göster.
+    val bitmap = if (preferences.reminderShowPosters) loadPoster(item.poster) else null
+    if (preferences.reminderShowPosters && bitmap != null) {
+      rv.setViewVisibility(R.id.reminder_widget_item_poster, View.VISIBLE)
+      rv.setViewVisibility(R.id.reminder_widget_item_badge, View.GONE)
+      rv.setImageViewBitmap(R.id.reminder_widget_item_poster, bitmap)
+    } else if (preferences.reminderShowPosters) {
+      rv.setViewVisibility(R.id.reminder_widget_item_poster, View.GONE)
+      rv.setViewVisibility(R.id.reminder_widget_item_badge, View.VISIBLE)
+      rv.setImageViewResource(
+        R.id.reminder_widget_item_badge,
+        if (isMovie) R.drawable.reminder_widget_ic_movie else R.drawable.reminder_widget_ic_tv,
+      )
+      rv.setInt(
+        R.id.reminder_widget_item_badge,
+        "setBackgroundResource",
+        if (isMovie) R.drawable.reminder_widget_movie_badge
+        else R.drawable.reminder_widget_tv_badge,
+      )
+    } else {
+      rv.setViewVisibility(R.id.reminder_widget_item_poster, View.GONE)
+      rv.setViewVisibility(R.id.reminder_widget_item_badge, View.GONE)
+    }
+
+    rv.setTextViewText(R.id.reminder_widget_item_title, item.title)
+    val appearance = preferences.reminderAppearance
+    rv.setTextColor(R.id.reminder_widget_item_title, appearance.text)
+
+    val typeLabel = if (isMovie) {
+      WidgetLanguage.pick(lang, "Film", "Movie", "Película", "Filme", "Film")
+    } else {
+      WidgetLanguage.pick(lang, "Dizi", "TV", "Serie", "Série", "Serie")
+    }
+    val meta = listOf(typeLabel, item.subtitle).filter { it.isNotBlank() }.joinToString("  •  ")
+    rv.setTextViewText(R.id.reminder_widget_item_meta, meta)
+    rv.setTextColor(R.id.reminder_widget_item_meta, appearance.secondaryText)
+
+    val daysUntil = daysUntil(item.dateEpoch)
+    val isToday = daysUntil == 0L
+    rv.setTextViewText(R.id.reminder_widget_item_when, countdown(item.dateEpoch))
+    rv.setTextColor(
+      R.id.reminder_widget_item_when,
+      countdownColor(daysUntil, appearance),
+    )
+    rv.setTextViewText(R.id.reminder_widget_item_date, shortDate(item.dateEpoch))
+    rv.setViewVisibility(
+      R.id.reminder_widget_item_date,
+      if (preferences.reminderShowDates) View.VISIBLE else View.GONE,
+    )
+    rv.setTextColor(R.id.reminder_widget_item_date, appearance.muted)
+    if (preferences.reminderCompact) {
+      val density = context.resources.displayMetrics.density
+      rv.setViewPadding(
+        R.id.reminder_widget_item_root,
+        (6 * density).toInt(),
+        (4 * density).toInt(),
+        (6 * density).toInt(),
+        (4 * density).toInt(),
+      )
+      rv.setTextViewTextSize(
+        R.id.reminder_widget_item_title,
+        android.util.TypedValue.COMPLEX_UNIT_SP,
+        11f,
+      )
+    }
+    WidgetThemeViews.tintBackground(
+      rv,
+      R.id.reminder_widget_item_root,
+      if (isToday) appearance.surface else appearance.surfaceAlt,
+    )
+
+    // Tıklama: template provider'da; buradan sadece doldurma intent'i verilir.
+    val fillIn = Intent().apply { putExtra("reminderId", item.id) }
+    rv.setOnClickFillInIntent(R.id.reminder_widget_item_root, fillIn)
+
+    return rv
+  }
+
+  override fun getLoadingView(): RemoteViews? = null
+  override fun getViewTypeCount(): Int = 1
+  override fun getItemId(position: Int): Long = items.getOrNull(position)?.id?.hashCode()?.toLong() ?: position.toLong()
+  override fun hasStableIds(): Boolean = true
+
+  // ── Poster indirme + yuvarlatma (LruCache'li) ──────────────────────────────
+  private fun loadPoster(url: String): Bitmap? {
+    if (url.isBlank()) return null
+    cache.get(url)?.let { return it }
+    return try {
+      val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        connectTimeout = 6000
+        readTimeout = 6000
+        instanceFollowRedirects = true
+      }
+      conn.inputStream.use { stream ->
+        val raw = BitmapFactory.decodeStream(stream) ?: return null
+        val rounded = roundedCrop(raw, POSTER_W_PX, POSTER_H_PX, CORNER_PX)
+        if (rounded !== raw) raw.recycle()
+        cache.put(url, rounded)
+        rounded
+      }
+    } catch (_: Exception) {
+      null
+    }
+  }
+
+  // 2:3 hedefe center-crop + köşe yuvarlatma.
+  private fun roundedCrop(src: Bitmap, targetW: Int, targetH: Int, radius: Float): Bitmap {
+    val srcRatio = src.width.toFloat() / src.height
+    val dstRatio = targetW.toFloat() / targetH
+    val crop = if (srcRatio > dstRatio) {
+      val w = (src.height * dstRatio).toInt()
+      Rect((src.width - w) / 2, 0, (src.width - w) / 2 + w, src.height)
+    } else {
+      val h = (src.width / dstRatio).toInt()
+      Rect(0, (src.height - h) / 2, src.width, (src.height - h) / 2 + h)
+    }
+    val out = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(out)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val dst = RectF(0f, 0f, targetW.toFloat(), targetH.toFloat())
+    paint.color = Color.parseColor("#1F2233")
+    canvas.drawRoundRect(dst, radius, radius, paint)
+    paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+    canvas.drawBitmap(src, crop, dst, paint)
+    return out
+  }
+
+  private fun countdown(epoch: Long): String {
+    val diff = daysUntil(epoch)
+    return when (diff) {
+      0L -> WidgetLanguage.pick(lang, "Bugün", "Today", "Hoy", "Hoje", "Heute")
+      1L -> WidgetLanguage.pick(lang, "Yarın", "Tomorrow", "Mañana", "Amanhã", "Morgen")
+      else -> WidgetLanguage.pick(lang, "$diff gün", "$diff days", "$diff días", "$diff dias", "$diff Tage")
+    }
+  }
+
+  private fun shortDate(epoch: Long): String {
+    return SimpleDateFormat("d MMM", WidgetLanguage.locale(lang)).format(Date(epoch))
+  }
+
+  private fun startOfToday(): Long = startOfDay(System.currentTimeMillis())
+
+  private fun daysUntil(epoch: Long): Long =
+    TimeUnit.MILLISECONDS.toDays(startOfDay(epoch) - startOfToday())
+
+  // Aciliyet arttıkça süre etiketi ısınır: bugün kırmızı, yarın amber,
+  // ilk birkaç gün aksan; uzak tarihler nötr kalır.
+  private fun countdownColor(days: Long, appearance: WidgetAppearance): Int = when {
+    days <= 0L -> Color.parseColor("#FF6B6B")
+    days == 1L -> Color.parseColor("#FFB547")
+    days <= 3L -> appearance.accent
+    days <= 7L -> appearance.secondaryText
+    else -> appearance.muted
+  }
+
+  private fun startOfDay(epoch: Long): Long = Calendar.getInstance().run {
+    timeInMillis = epoch
+    set(Calendar.HOUR_OF_DAY, 0)
+    set(Calendar.MINUTE, 0)
+    set(Calendar.SECOND, 0)
+    set(Calendar.MILLISECOND, 0)
+    timeInMillis
+  }
+
+  private fun parseItems(raw: String): List<WidgetItem> = try {
+    val array = JSONArray(raw)
+    buildList {
+      for (index in 0 until array.length()) {
+        val obj = array.optJSONObject(index) ?: continue
+        val epoch = obj.optLong("dateEpoch", -1L)
+        if (epoch <= 0L) continue
+        add(
+          WidgetItem(
+            id = obj.optString("id"),
+            type = obj.optString("type"),
+            title = obj.optString("title"),
+            subtitle = obj.optString("subtitle"),
+            poster = obj.optString("poster"),
+            dateEpoch = epoch,
+          ),
+        )
+      }
+    }
+  } catch (_: Exception) {
+    emptyList()
+  }
+
+  companion object {
+    // 34x50dp @ ~3x → poster hedef pikselleri (net görünüm için sabit).
+    private const val POSTER_W_PX = 108
+    private const val POSTER_H_PX = 156
+    private const val CORNER_PX = 20f
+    // Liste 100 öğeye çıkabilir; cache görünür alan + kaydırma tamponunu tutar.
+    // Böylece 100 poster aynı anda belleğe alınmaz.
+    private val cache = LruCache<String, Bitmap>(30)
+  }
+}

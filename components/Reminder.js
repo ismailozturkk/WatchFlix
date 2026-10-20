@@ -1,11 +1,16 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React, { useEffect, useState } from "react";
+import { TouchableOpacity, View } from "react-native";
+import React from "react";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useTheme } from "../context/ThemeContext";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import Toast from "react-native-toast-message";
-import { db } from "../firebase";
+import Toast from "@components/AppToast";
 import { useAuth } from "../context/AuthContext";
+import useUserDataDomain from "../hooks/useUserDataDomain";
+import { remindersActions, remindersDomain } from "../services/userData";
+import { episodeKey } from "../services/userData/domains";
+import { useDeviceNotifications } from "../context/DeviceNotificationsContext";
+import { i18nText } from "../utils/i18nText";
+import useReminderGate from "../hooks/useReminderGate";
+
 
 export default function Reminder({
   showId,
@@ -25,210 +30,95 @@ export default function Reminder({
   movieName,
   posterPath,
   movieId,
+  onLimitReached,
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const [isReminderSet, setIsReminderSet] = useState(false);
+  const { primeNotificationPermission } = useDeviceNotifications();
+  const reminderGate = useReminderGate();
   const uid = user?.uid;
+
   const formatDateSave = (timestamp) => {
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return "";
-    const day = String(date.getDate()).padStart(2, "0");
+    const day   = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
+    const year  = date.getFullYear();
     return `${year}-${month}-${day}`;
   };
-  useEffect(() => {
-    checkExistingReminder();
-  }, []);
 
-  // Bölüm için episodeId ile kontrol
-  const checkExistingReminder = async () => {
-    try {
-      if (!user) return;
+  const epId = String(episodeId || `${showId}-${seasonNumber}-${episodeNumber}`);
 
-      const reminderDoc = await getDoc(doc(db, "Reminders", uid));
-      if (reminderDoc.exists()) {
-        const data = reminderDoc.data();
-        if (type === "tv") {
-          const tvReminders = data.tvReminders || [];
-          const show = tvReminders.find((s) => s.showId === showId);
-          let exists = false;
-          if (show) {
-            const season = show.seasons.find(
-              (sn) => sn.seasonNumber === seasonNumber
-            );
-            if (season) {
-              exists = season.episodes.some(
-                (ep) =>
-                  (episodeId && ep.episodeId === episodeId) ||
-                  (!episodeId && ep.episodeNumber === episodeNumber)
-              );
-            }
-          }
-          setIsReminderSet(exists);
-        } else {
-          const movieReminders = data.movieReminders || [];
-          const exists = movieReminders.some(
-            (item) => item.movieId === movieId
-          );
-          setIsReminderSet(exists);
-        }
-      }
-    } catch (error) {
-      console.error("Error checking reminder:", error);
-    }
-  };
+  // ── Durum ──────────────────────────────────────────────────────────────────
+  // YEREL KOPYADAN, senkron. Eskiden her çan simgesi mount'ta buluttan 1-2
+  // `getDoc` yapıyordu (bölüm listesinde N satır = N okuma, her açılışta).
+  // Görünüm yalnız hatırlatıcılar değiştiğinde yeniden çizilir.
+  const remindersView = useUserDataDomain(remindersDomain);
+  const isReminderSet =
+    type === "tv"
+      ? remindersView.has("episodes", episodeKey(showId, epId))
+      : remindersView.has("movies", movieId);
 
+  // ── Add / Remove ──────────────────────────────────────────────────────────
   const addReminder = async () => {
     try {
-      if (!user) return;
+      if (!uid) return;
 
-      const reminderRef = doc(db, "Reminders", uid);
-      const reminderDoc = await getDoc(reminderRef);
-
-      if (type === "tv") {
-        const episodeData = {
-          episodeId: episodeId || `${showId}-${seasonNumber}-${episodeNumber}`,
-          episodeNumber: episodeNumber || 0,
-          episodeName: episodeName || "",
-          airDate: airDate || "",
-          stillPath: stillPath || null,
-          episodeMinutes: episodeMinutes || 0,
-          createdAt: formatDateSave(new Date()),
-        };
-
-        let tvReminders = [];
-        if (reminderDoc.exists()) {
-          tvReminders = reminderDoc.data().tvReminders || [];
-        }
-
-        // Show bul
-        let showIndex = tvReminders.findIndex((show) => show.showId === showId);
-
-        if (showIndex === -1) {
-          // Dizi yok, ekle
-          tvReminders.push({
-            showId: showId || "",
-            showName: showName || "",
-            showPosterPath: showPosterPath || "",
-            seasons: [
-              {
-                seasonNumber: seasonNumber || 0,
-                seasonPosterPath: seasonPosterPath || null,
-                episodes: [episodeData],
-              },
-            ],
-          });
-        } else {
-          // Dizi var
-          let show = tvReminders[showIndex];
-          let seasonIndex = show.seasons.findIndex(
-            (season) => season.seasonNumber === seasonNumber
-          );
-
-          if (seasonIndex === -1) {
-            // Sezon yok, ekle
-            show.seasons.push({
-              seasonNumber: seasonNumber || 0,
-              seasonPosterPath: seasonPosterPath || null,
-              episodes: [episodeData],
-            });
-          } else {
-            // Sezon var
-            let episodes = show.seasons[seasonIndex].episodes;
-            let episodeIndex = episodes.findIndex(
-              (ep) =>
-                (episodeId && ep.episodeId === episodeId) ||
-                (!episodeId && ep.episodeNumber === episodeNumber)
-            );
-
-            if (episodeIndex === -1 && !isReminderSet) {
-              // Bölüm yok, ekle
-              episodes.push(episodeData);
-            } else if (episodeIndex !== -1 && isReminderSet) {
-              // Bölüm var, sil
-              episodes.splice(episodeIndex, 1);
-
-              // Eğer sezon boşsa sil
-              if (episodes.length === 0) {
-                show.seasons.splice(seasonIndex, 1);
-              }
-              // Eğer dizi tamamen boşsa sil
-              if (show.seasons.length === 0) {
-                tvReminders.splice(showIndex, 1);
-              }
-            }
-          }
-        }
-
-        // Firestore'a kaydet/güncelle
-        if (!reminderDoc.exists()) {
-          await setDoc(reminderRef, {
-            tvReminders,
-            movieReminders: [],
-            updatedAt: formatDateSave(new Date()),
-          });
-        } else {
-          await updateDoc(reminderRef, {
-            tvReminders,
-            updatedAt: formatDateSave(new Date()),
-          });
-        }
-      } else {
-        // Movie için
-        const movieData = {
-          movieId: movieId || "",
-          movieName: movieName || "",
-          releaseDate: releaseDate || "",
-          movieMinutes: movieMinutes || 0,
-          posterPath: posterPath || null,
-          type: "movie",
-          createdAt: formatDateSave(new Date()),
-        };
-
-        let movieReminders = [];
-        if (reminderDoc.exists()) {
-          movieReminders = reminderDoc.data().movieReminders || [];
-        }
-
-        const movieIndex = movieReminders.findIndex(
-          (item) => item.movieId === movieId
-        );
-
-        if (movieIndex === -1 && !isReminderSet) {
-          movieReminders.push(movieData);
-        } else if (movieIndex !== -1 && isReminderSet) {
-          movieReminders.splice(movieIndex, 1);
-        }
-
-        if (!reminderDoc.exists()) {
-          await setDoc(reminderRef, {
-            tvReminders: [],
-            movieReminders,
-            updatedAt: formatDateSave(new Date()),
-          });
-        } else {
-          await updateDoc(reminderRef, {
-            movieReminders,
-            updatedAt: formatDateSave(new Date()),
-          });
+      // Kaldırmak her zaman serbest; yalnız YENİ film/dizi hak harcar.
+      if (!isReminderSet) {
+        const target = { type: type === "tv" ? "tv" : "movie", showId };
+        if (!reminderGate.canAdd(target)) {
+          // Açık bir Modal'ın içindeysek (hızlı işlemler sayfası) yükseltme
+          // sayfasını üst katman açar: iki Modal aynı anda sunulamaz.
+          if (onLimitReached) onLimitReached(target);
+          else reminderGate.checkAdd(target);
+          return;
         }
       }
 
-      setIsReminderSet(!isReminderSet);
+      // Yerel kopyaya + kalıcı günlüğe ANINDA yazılır; buluta arka planda gider
+      // (çevrimdışıyken de çalışır). Dizi belgesi (tvShows/{id}) ilk bölümde
+      // eklenir, son bölümde silinir — okuma gerekmeden yerel sayımdan türetilir.
+      if (type === "tv") {
+        if (!showId) return;
+        remindersActions.toggleEpisode(uid, {
+          episodeId:      epId,
+          episodeNumber:  episodeNumber  || 0,
+          episodeName:    episodeName    || "",
+          airDate:        airDate        || "",
+          stillPath:      stillPath      || null,
+          episodeMinutes: episodeMinutes || 0,
+          showId,
+          showName:       showName       || "",
+          showPosterPath: showPosterPath  || "",
+          seasonNumber:   seasonNumber   || 0,
+          seasonPosterPath: seasonPosterPath || null,
+          createdAt: formatDateSave(new Date()),
+        });
+      } else {
+        if (movieId == null || movieId === "") return;
+        remindersActions.toggleMovie(uid, {
+          movieId,
+          movieName:    movieName    || "",
+          releaseDate:  releaseDate  || "",
+          movieMinutes: movieMinutes || 0,
+          posterPath:   posterPath   || null,
+          type:         "movie",
+          createdAt:    formatDateSave(new Date()),
+        });
+      }
+
+      const eklendi = !isReminderSet;
       Toast.show({
-        type: isReminderSet ? "error" : "success",
-        text1: isReminderSet
-          ? "Hatırlatma kaldırıldı"
-          : "Hatırlatma başarıyla eklendi",
+        type:  isReminderSet ? "error" : "success",
+        text1: isReminderSet ? i18nText("autoI18n.hatirlatma_kaldirildi", "Hatırlatma kaldırıldı") : i18nText("autoI18n.hatirlatma_basariyla_eklendi", "Hatırlatma başarıyla eklendi"),
       });
+      // Hatırlatma kuruldu ama OS izni yoksa bildirim ASLA düşmez. İzin
+      // sayfasını tam da burada açıyoruz: kullanıcı ne istediğini yeni söyledi.
+      if (eklendi) primeNotificationPermission();
     } catch (error) {
       console.error("Error adding reminder:", error);
-      Toast.show({
-        type: "error",
-        text1: "Hatırlatma eklenirken bir hata oluştu",
-      });
+      Toast.show({ type: "error", text1: i18nText("autoI18n.hatirlatma_eklenirken_bir_hata_olustu", "Hatırlatma eklenirken bir hata oluştu") });
     }
   };
 
@@ -244,5 +134,3 @@ export default function Reminder({
     </View>
   );
 }
-
-const styles = StyleSheet.create({});

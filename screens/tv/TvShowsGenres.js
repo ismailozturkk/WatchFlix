@@ -1,65 +1,104 @@
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import {
-  Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   View,
-  Image,
   Dimensions,
   Animated,
 } from "react-native";
+import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useTvShow } from "../../context/TvShowContex";
-import { MovieSkeleton } from "../../components/Skeleton";
-import { useListStatus } from "../../modules/UseListStatus";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useAppSettings } from "../../context/AppSettingsContext";
-const { width, height } = Dimensions.get("window");
+import { ChipRowSkeleton, RailSkeleton } from "../../components/Skeleton";
+import PaginatedRail from "../../components/PaginatedRail";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
+import ListBadges from "../../components/ListBadges";
+import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
+import SectionHeader from "../../components/home/SectionHeader";
+import {
+  SectionChipRail,
+  SECTION_CHIP_GAP,
+  SECTION_CHIP_HEIGHT,
+  SECTION_RAIL_PADDING,
+} from "../../components/home/SectionChips";
+import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
+import { i18nText } from "../../utils/i18nText";
+import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+const { width } = Dimensions.get("window");
+
+// Stable, module-scope item component → no remount → no flicker.
+const TvGenresCard = memo(function TvGenresCard({ item, navigation, theme, getTmdbUrl }) {
+  const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () =>
+    Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+  return (
+    <TouchableOpacity
+      style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
+      activeOpacity={0.8}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "tv", navigation })
+      }
+      delayLongPress={350}
+    >
+      <Animated.View style={[{ transform: [{ scale }] }]}>
+        <PosterImage
+          path={item.poster_path}
+          type="tv"
+          size={200}
+          style={[
+            styles.similarPoster,
+            { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+          ]}
+          cachePolicy="memory-disk"
+          recyclingKey={`tvgenres-${item.id}`}
+          transition={120}
+        />
+
+        {posterBadges?.tmdbRating !== false && (
+          <RatingBadge value={item.vote_average} votes={item.vote_count} style={POSTER_BADGE_POS.bottomRight} />
+        )}
+
+        <ListBadges
+          mediaId={item.id}
+          mediaType="tv"
+          theme={theme}
+          style={{ position: "absolute", left: 2, bottom: 8 }}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
+
 export default function TvShowsGenres({ navigation }) {
   const { theme } = useTheme();
-  const { imageQuality } = useAppSettings();
+  const { getTmdbUrl } = useImageQualitySettings();
 
   const {
     selectedGenres,
     pageGenres,
+    totalPagesGenres,
     moviesGenres,
     genres,
     loadingGenres,
+    loadMoreGenres,
+    loadingMoreGenres,
     setSelectedGenres,
-    setPageGenres,
+    activateTvSection,
   } = useTvShow();
 
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
   useEffect(() => {
-    const newScaleValues = {};
-    if (moviesGenres && moviesGenres.length > 0) {
-      moviesGenres.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
-    }
-  }, [moviesGenres]);
-
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
+    activateTvSection("genres");
+  }, [activateTvSection]);
 
   const toggleGenre = (genreId) => {
     setSelectedGenres(
@@ -69,494 +108,93 @@ export default function TvShowsGenres({ navigation }) {
           : [...prev, genreId], // Seçili değilse ekle
     );
   };
+
+  const genreTitle = selectedGenres.length
+    ? genres
+        .filter((g) => selectedGenres.includes(g.id))
+        .map((g) => g.name)
+        .join(", ")
+    : i18nText("autoI18n.turler", "Türler");
+
+  // Başlık yükleme sırasında da AYNI kurguda: "Türler" + çipler + "Tümü". Türler henüz gelmediyse
+  // yerlerini aynı yükseklikte iskelet çipler tutar — yoksa satır 0'dan gerçek yüksekliğe sıçrıyor,
+  // ray zıplıyordu. Alt başlık: seçim yokken ipucu ("bir ya da birden fazla tür seç"), seçim varsa
+  // seçilen türlerin adları.
+  const genreHeader = (
+    <SectionHeader
+      section="genres"
+      mediaType="tv"
+      subtitle={selectedGenres.length ? genreTitle : undefined}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "tv",
+          section: "genres",
+          title: genreTitle,
+          genreIds: selectedGenres,
+        })
+      }
+    >
+      {genres.length > 0 ? (
+        <SectionChipRail
+          data={genres}
+          keyExtractor={(item) => item.id.toString()}
+          extraData={selectedGenres}
+          renderChip={(item) => (
+            <DiscoverFilterChip
+              label={item.name}
+              selected={selectedGenres.includes(item.id)}
+              onPress={() => toggleGenre(item.id)}
+            />
+          )}
+        />
+      ) : (
+        <ChipRowSkeleton
+          chipHeight={SECTION_CHIP_HEIGHT}
+          radius={SECTION_CHIP_HEIGHT / 2}
+          gap={SECTION_CHIP_GAP}
+          style={styles.chipSkeleton}
+        />
+      )}
+    </SectionHeader>
+  );
+
   if (loadingGenres || moviesGenres.length < 1) {
     return (
       <View style={styles.container}>
-        <FlatList
-          data={genres}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15 }}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.genreButton,
-                {
-                  backgroundColor: selectedGenres.includes(item.id)
-                    ? theme.accent
-                    : theme.secondary,
-                },
-              ]}
-              onPress={() => toggleGenre(item.id)}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {item.name}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-        <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
-          renderItem={() => <MovieSkeleton />}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 15 }}
-        />
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 5,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●●●
-          </Text>
-          {pageGenres > 5 && (
-            <>
-              <TouchableOpacity
-                onPress={() => setPageGenres(pageGenres - 5)}
-                style={[
-                  styles.pageButton,
-                  {
-                    backgroundColor: theme.secondary,
-                  },
-                ]}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.genreText, { color: theme.text.primary }]}
-                >
-                  {pageGenres - 5}
-                </Text>
-              </TouchableOpacity>
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.muted }]}
-              >
-                ●
-              </Text>
-            </>
-          )}
-
-          {pageGenres > 2 && (
-            <TouchableOpacity
-              onPress={() => setPageGenres(pageGenres - 2)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageGenres - 2}
-              </Text>
-            </TouchableOpacity>
-          )}
-          {pageGenres > 1 && (
-            <TouchableOpacity
-              onPress={() => setPageGenres(pageGenres - 1)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageGenres - 1}
-              </Text>
-            </TouchableOpacity>
-          )}
-          <Text
-            style={[
-              styles.genreText,
-              {
-                color: theme.text.secondary,
-                width: 25,
-                height: 20,
-                textAlign: "center",
-              },
-            ]}
-          >
-            {pageGenres}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPageGenres(pageGenres + 1)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageGenres + 1}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setPageGenres(pageGenres + 2)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageGenres + 2}
-            </Text>
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●
-          </Text>
-          <TouchableOpacity
-            onPress={() => setPageGenres(pageGenres + 5)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageGenres + 5}
-            </Text>
-          </TouchableOpacity>
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.muted }]}
-          >
-            ●●●
-          </Text>
-        </View>
+        {genreHeader}
+        {/* Bu bölümün kartında alt boşluk yok (similarItem) */}
+        <RailSkeleton cellMarginBottom={0} />
       </View>
     );
   }
 
-  const MovieItem = ({ item, index }) => {
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "tv");
-    return (
-      <TouchableOpacity
-        style={styles.similarItem}
-        activeOpacity={0.8}
-        onPressIn={() => onPressIn(item.id)}
-        onPressOut={() => onPressOut(item.id)}
-        onPress={() => navigation.push("TvShowsDetails", { id: item.id })}
-      >
-        <Animated.View
-          style={[
-            {
-              transform: [{ scale: scaleValues[item.id] || 1 }],
-            },
-          ]}
-        >
-          <Image
-            source={
-              item.poster_path
-                ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
-                  }
-                : require("../../assets/image/no_image.png")
-            }
-            style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-          />
-
-          <View
-            style={[
-              styles.similarRating,
-              { backgroundColor: theme.secondaryt },
-            ]}
-          >
-            <Text allowFontScaling={false} style={styles.similarRatingText}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
-
-          <View
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-              position: "absolute",
-              left: 2,
-              bottom: 8,
-            }}
-          >
-            <View
-              style={{
-                gap: 3,
-                backgroundColor: theme.secondaryt,
-                paddingVertical: 3,
-                paddingHorizontal: 1,
-                borderRadius: 7,
-              }}
-            >
-              {inWatchList && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchList", "tv");
-                  }}
-                >
-                  <Ionicons
-                    name="bookmark"
-                    size={12}
-                    color={theme.colors.blue}
-                  />
-                </TouchableOpacity>
-              )}
-              {isWatched && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchedTv", "tv");
-                  }}
-                >
-                  <Ionicons name="eye" size={12} color={theme.colors.green} />
-                </TouchableOpacity>
-              )}
-              {inFavorites && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("favorites", "tv");
-                  }}
-                >
-                  <Ionicons name="heart" size={12} color={theme.colors.red} />
-                </TouchableOpacity>
-              )}
-              {isInOtherLists && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("favorites", "movie");
-                  }}
-                >
-                  <Ionicons name="grid" size={12} color={theme.colors.orange} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </Animated.View>
-      </TouchableOpacity>
-    );
-  };
   const renderMovieItem = ({ item }) => {
     if (!item.poster_path) return null;
-    return <MovieItem item={item} navigation={navigation} />;
+    return (
+      <TvGenresCard
+        item={item}
+        navigation={navigation}
+        theme={theme}
+        getTmdbUrl={getTmdbUrl}
+      />
+    );
   };
   return (
     <View style={styles.container}>
-      <FlatList
-        data={genres}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 15 }}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.genreButton,
-              {
-                backgroundColor: selectedGenres.includes(item.id)
-                  ? theme.accent
-                  : theme.secondary,
-              },
-            ]}
-            onPress={() => toggleGenre(item.id)}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
-      <FlatList
+      {genreHeader}
+      <PaginatedRail
         data={moviesGenres}
-        horizontal
         contentContainerStyle={{ paddingHorizontal: 15 }}
-        showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMovieItem}
+        onLoadMore={loadMoreGenres}
+        loadingMore={loadingMoreGenres}
+        hasMore={pageGenres < totalPagesGenres}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
       />
-      <View
-        style={{
-          flexDirection: "row",
-          gap: 5,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●●●
-        </Text>
-        {pageGenres > 5 && (
-          <>
-            <TouchableOpacity
-              onPress={() => setPageGenres(pageGenres - 5)}
-              style={[
-                styles.pageButton,
-                {
-                  backgroundColor: theme.secondary,
-                },
-              ]}
-            >
-              <Text
-                allowFontScaling={false}
-                style={[styles.genreText, { color: theme.text.primary }]}
-              >
-                {pageGenres - 5}
-              </Text>
-            </TouchableOpacity>
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.muted }]}
-            >
-              ●
-            </Text>
-          </>
-        )}
-
-        {pageGenres > 2 && (
-          <TouchableOpacity
-            onPress={() => setPageGenres(pageGenres - 2)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageGenres - 2}
-            </Text>
-          </TouchableOpacity>
-        )}
-        {pageGenres > 1 && (
-          <TouchableOpacity
-            onPress={() => setPageGenres(pageGenres - 1)}
-            style={[
-              styles.pageButton,
-              {
-                backgroundColor: theme.secondary,
-              },
-            ]}
-          >
-            <Text
-              allowFontScaling={false}
-              style={[styles.genreText, { color: theme.text.primary }]}
-            >
-              {pageGenres - 1}
-            </Text>
-          </TouchableOpacity>
-        )}
-        <Text
-          style={[
-            styles.genreText,
-            {
-              color: theme.text.secondary,
-              width: 25,
-              height: 20,
-              textAlign: "center",
-            },
-          ]}
-        >
-          {pageGenres}
-        </Text>
-        <TouchableOpacity
-          onPress={() => setPageGenres(pageGenres + 1)}
-          style={[
-            styles.pageButton,
-            {
-              backgroundColor: theme.secondary,
-            },
-          ]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {pageGenres + 1}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setPageGenres(pageGenres + 2)}
-          style={[
-            styles.pageButton,
-            {
-              backgroundColor: theme.secondary,
-            },
-          ]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {pageGenres + 2}
-          </Text>
-        </TouchableOpacity>
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●
-        </Text>
-        <TouchableOpacity
-          onPress={() => setPageGenres(pageGenres + 5)}
-          style={[
-            styles.pageButton,
-            {
-              backgroundColor: theme.secondary,
-            },
-          ]}
-        >
-          <Text
-            allowFontScaling={false}
-            style={[styles.genreText, { color: theme.text.primary }]}
-          >
-            {pageGenres + 5}
-          </Text>
-        </TouchableOpacity>
-        <Text
-          allowFontScaling={false}
-          style={[styles.genreText, { color: theme.text.muted }]}
-        >
-          ●●●
-        </Text>
-      </View>
     </View>
   );
 }
@@ -566,31 +204,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
   },
-  pageButton: {
-    width: 25,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  genreButton: {
-    marginBottom: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginRight: 5,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  genreText: {
-    color: "white",
-    fontWeight: "bold",
+  chipSkeleton: {
+    paddingHorizontal: SECTION_RAIL_PADDING,
   },
   similarItem: {
     width: width * 0.4,
@@ -610,29 +225,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
-  },
-  similarTitle: {
-    color: "#fff",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  similarRating: {
-    position: "absolute",
-    bottom: 10,
-    right: 5,
-    width: 30,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  similarRatingText: {
-    color: "#ffd700",
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  errorText: {
-    color: "red",
-    fontSize: 16,
-    fontWeight: "bold",
   },
 });

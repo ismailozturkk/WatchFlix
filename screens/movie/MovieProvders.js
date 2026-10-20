@@ -1,27 +1,96 @@
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   FlatList,
-  Image,
   Dimensions,
   StyleSheet,
   Animated,
 } from "react-native";
+import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
-import { useLanguage } from "../../context/LanguageContext";
-import { MovieSkeleton } from "../../components/Skeleton";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
+import { ChipRowSkeleton, MovieSkeleton } from "../../components/Skeleton";
+import {
+  useImageQualitySettings,
+  useListLayoutSettings,
+  useStreamingProviderSettings,
+} from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
-import { useListStatus } from "../../modules/UseListStatus";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import ListBadges from "../../components/ListBadges";
+import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
+import PaginatedRail from "../../components/PaginatedRail";
+import useRailPosterStyle from "../../hooks/useRailPosterStyle";
+import SectionHeader from "../../components/home/SectionHeader";
+import {
+  SectionChipRail,
+  SECTION_CHIP_GAP,
+  SECTION_CHIP_HEIGHT_LOGO,
+  SECTION_RAIL_PADDING,
+} from "../../components/home/SectionChips";
+import ProviderChip from "../../components/home/ProviderChip";
+import { i18nText } from "../../utils/i18nText";
 const { width } = Dimensions.get("window");
+
+// Stable, module-scope item component → no remount → no flicker.
+const MovieProvidersCard = memo(function MovieProvidersCard({ item, navigation, theme, getTmdbUrl }) {
+  const rp = useRailPosterStyle();
+  const { posterBadges } = useListLayoutSettings();
+  const { openQuickActions } = useMediaQuickActions();
+  const scale = useRef(new Animated.Value(1)).current;
+  const onPressIn = () =>
+    Animated.timing(scale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  const onPressOut = () =>
+    Animated.timing(scale, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+
+  return (
+    <TouchableOpacity
+      style={[styles.similarItem, { width: rp.itemWidth, height: rp.itemHeight }]}
+      activeOpacity={0.8}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={() => navigation.push("MovieDetails", { id: item.id })}
+      onLongPress={() =>
+        openQuickActions({ item, mediaType: "movie", navigation })
+      }
+      delayLongPress={350}
+    >
+      <Animated.View style={[{ transform: [{ scale }] }]}>
+        <PosterImage
+          path={item.poster_path}
+          type="movie"
+          size={200}
+          style={[
+            styles.similarPoster,
+            { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
+          ]}
+          cachePolicy="memory-disk"
+          recyclingKey={`movieprovider-${item.id}`}
+          transition={120}
+        />
+
+        {posterBadges?.tmdbRating !== false && (
+          <RatingBadge
+            value={item.vote_average}
+            votes={item.vote_count}
+            style={POSTER_BADGE_POS.bottomRight}
+          />
+        )}
+        <ListBadges
+          mediaId={item.id}
+          mediaType="movie"
+          theme={theme}
+          style={{ position: "absolute", left: 2, bottom: 8 }}
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
 
 export default function MovieProviders({ navigation }) {
   const { theme } = useTheme();
-  const { t } = useLanguage();
-  const { imageQuality } = useAppSettings();
+  const { getTmdbUrl } = useImageQualitySettings();
+  const { streamingProviderIds } = useStreamingProviderSettings();
   // Sağlayıcıları çek
   const {
     selectedProvider,
@@ -30,210 +99,100 @@ export default function MovieProviders({ navigation }) {
     loadingMovieProvider,
     moviesProvider,
     fetchMoviesByProvider,
+    activateMovieSection,
+    loadMoreProvider,
+    loadingMoreProvider,
+    pageProvider,
+    totalPagesProvider,
   } = useMovie();
 
-  // Animated import'unun eklendiğinden emin olun
-  const [scaleValues, setScaleValues] = useState({});
-
-  useEffect(() => {
-    const newScaleValues = {};
-    if (moviesProvider && moviesProvider.length > 0) {
-      moviesProvider.forEach((item) => {
-        newScaleValues[item.id] = new Animated.Value(1);
-      });
-      setScaleValues(newScaleValues);
-    }
-  }, [moviesProvider]);
-
-  const onPressIn = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 0.9,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const onPressOut = (itemId) => {
-    if (!scaleValues[itemId]) return;
-    Animated.timing(scaleValues[itemId], {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const renderProvider = ({ item }) => (
-    <TouchableOpacity
-      style={{
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 5,
-        marginRight: 5,
-        gap: 5,
-        backgroundColor:
-          selectedProvider === item.provider_id
-            ? theme.accent
-            : theme.secondary,
-        borderRadius: 15,
-      }}
-      onPress={() => fetchMoviesByProvider(item.provider_id)}
-    >
-      <Image
-        source={{
-          uri: `https://image.tmdb.org/t/p/${imageQuality.logo}${item.logo_path}`,
-        }}
-        style={{ width: 30, height: 30, borderRadius: 10 }}
-      />
-      <View
-        style={{
-          justifyContent: "center",
-          alignItems: "center",
-          height: 40,
-        }}
-      >
-        <Text
-          style={{
-            color: theme.text.primary,
-            fontSize: 12,
-            textAlign: "center",
-          }}
-        >
-          {item.provider_name}
-        </Text>
-      </View>
-    </TouchableOpacity>
+  const displayedProviders = useMemo(
+    () =>
+      [...providers].sort((a, b) => {
+        const aSubscribed = streamingProviderIds.includes(a.provider_id) ? 1 : 0;
+        const bSubscribed = streamingProviderIds.includes(b.provider_id) ? 1 : 0;
+        return (
+          bSubscribed - aSubscribed ||
+          Number(a.display_priority ?? 9999) - Number(b.display_priority ?? 9999)
+        );
+      }),
+    [providers, streamingProviderIds],
   );
 
-  const MovieItem = ({ item }) => {
-    const { inWatchList, inFavorites, isWatched, isInOtherLists } =
-      useListStatus(item.id, "movie");
-    return (
-      <TouchableOpacity
-        style={styles.similarItem}
-        activeOpacity={0.8}
-        onPressIn={() => onPressIn(item.id)}
-        onPressOut={() => onPressOut(item.id)}
-        onPress={() => navigation.push("MovieDetails", { id: item.id })}
-      >
-        <Animated.View
-          style={[
-            {
-              transform: [{ scale: scaleValues[item.id] || 1 }],
-            },
-          ]}
-        >
-          <Image
-            source={
-              item.poster_path
-                ? {
-                    uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${item.poster_path}`,
-                  }
-                : require("../../assets/image/no_image.png")
-            }
-            style={[styles.similarPoster, { shadowColor: theme.shadow }]}
-          />
+  useEffect(() => {
+    activateMovieSection("providers");
+  }, [activateMovieSection]);
 
-          <View
-            style={[
-              styles.similarRating,
-              { backgroundColor: theme.secondaryt },
-            ]}
-          >
-            <Text allowFontScaling={false} style={styles.similarRatingText}>
-              {item.vote_average.toFixed(1)}
-            </Text>
-          </View>
-          <View
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-              position: "absolute",
-              left: 2,
-              bottom: 8,
-            }}
-          >
-            <View
-              style={{
-                gap: 3,
-                backgroundColor: theme.secondaryt,
-                paddingVertical: 3,
-                paddingHorizontal: 1,
-                borderRadius: 7,
-              }}
-            >
-              {inWatchList && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchList", "tv");
-                  }}
-                >
-                  <Ionicons
-                    name="bookmark"
-                    size={12}
-                    color={theme.colors.blue}
-                  />
-                </TouchableOpacity>
-              )}
-              {isWatched && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("watchedTv", "tv");
-                  }}
-                >
-                  <Ionicons name="eye" size={12} color={theme.colors.green} />
-                </TouchableOpacity>
-              )}
-              {inFavorites && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateTvSeriesList("favorites", "tv");
-                  }}
-                >
-                  <Ionicons name="heart" size={12} color={theme.colors.red} />
-                </TouchableOpacity>
-              )}
-              {isInOtherLists && (
-                <TouchableOpacity
-                  onPress={() => {
-                    //updateMovieList("favorites", "movie");
-                  }}
-                >
-                  <Ionicons name="grid" size={12} color={theme.colors.orange} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </Animated.View>
-      </TouchableOpacity>
+  const renderMovieItem = ({ item }) => {
+    if (!item.poster_path) return null;
+    return (
+      <MovieProvidersCard
+        item={item}
+        navigation={navigation}
+        theme={theme}
+        getTmdbUrl={getTmdbUrl}
+      />
     );
   };
-  const renderMovieItem = ({ item, index, navigation }) => {
-    if (!item.poster_path) return null;
-    return <MovieItem item={item} index={index} navigation={navigation} />;
-  };
+  const providerName =
+    providers.find((p) => p.provider_id === selectedProvider)?.provider_name ||
+    i18nText("autoI18n.saglayicilar", "Sağlayıcılar");
+
+  // Başlık yükleme sırasında da AYNI öğedir (bkz. TvShowsProvders): "Platformlar" + çipler + "Tümü".
+  // Sağlayıcılar henüz gelmediyse yerlerini aynı yükseklikte iskelet çipler tutar.
+  const providerHeader = (
+    <SectionHeader
+      section="providers"
+      mediaType="movie"
+      title={i18nText("autoI18n.saglayicilar", "Sağlayıcılar")}
+      onPressAction={() =>
+        navigation.navigate("SeeAllScreen", {
+          mediaType: "movie",
+          section: "providers",
+          title: providerName,
+          providerId: selectedProvider,
+        })
+      }
+    >
+      {displayedProviders.length > 0 ? (
+        <SectionChipRail
+          data={displayedProviders}
+          keyExtractor={(item) => item.provider_id.toString()}
+          extraData={selectedProvider}
+          renderChip={(item) => (
+            <ProviderChip
+              provider={item}
+              selected={selectedProvider === item.provider_id}
+              subscribed={streamingProviderIds.includes(item.provider_id)}
+              onPress={() => fetchMoviesByProvider(item.provider_id)}
+            />
+          )}
+        />
+      ) : (
+        <ChipRowSkeleton
+          chipHeight={SECTION_CHIP_HEIGHT_LOGO}
+          radius={SECTION_CHIP_HEIGHT_LOGO / 2}
+          gap={SECTION_CHIP_GAP}
+          style={styles.chipSkeleton}
+        />
+      )}
+    </SectionHeader>
+  );
+
   if (loadingMovieProvider || loadingProvider) {
     return (
       <View style={{ flex: 1, paddingVertical: 10 }}>
+        {providerHeader}
         <FlatList
-          data={providers}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.provider_id.toString()}
-          renderItem={renderProvider}
-          contentContainerStyle={{
-            paddingHorizontal: 15,
-            marginRight: 10,
-            marginBottom: 20,
-          }}
-        />
-        <FlatList
-          data={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+          data={[1, 2, 3]}
           renderItem={() => <MovieSkeleton />}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
+          initialNumToRender={3}
+          maxToRenderPerBatch={3}
+          windowSize={3}
+          removeClippedSubviews
         />
       </View>
     );
@@ -241,52 +200,28 @@ export default function MovieProviders({ navigation }) {
 
   return (
     <View style={{ flex: 1, paddingVertical: 10 }}>
-      {/* İzleme sağlayıcıları */}
+      {providerHeader}
 
-      <FlatList
-        data={providers}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.provider_id.toString()}
-        renderItem={renderProvider}
-        contentContainerStyle={{ paddingHorizontal: 15 }}
-      />
-
-      <FlatList
+      <PaginatedRail
         data={moviesProvider}
-        horizontal
-        showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMovieItem}
-        contentContainerStyle={{ paddingHorizontal: 15, marginTop: 20 }}
+        contentContainerStyle={{ paddingHorizontal: 15 }}
+        onLoadMore={loadMoreProvider}
+        loadingMore={loadingMoreProvider}
+        hasMore={pageProvider < totalPagesProvider}
+        initialNumToRender={3}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={80}
+        windowSize={5}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingVertical: 10,
-  },
-  genreButton: {
-    marginVertical: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginRight: 10,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-  genreText: {
-    color: "white",
-    fontWeight: "bold",
+  chipSkeleton: {
+    paddingHorizontal: SECTION_RAIL_PADDING,
   },
   similarItem: {
     width: width * 0.4,
@@ -307,29 +242,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.94,
     shadowRadius: 10.32,
     elevation: 5,
-  },
-  similarTitle: {
-    color: "#fff",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  similarRating: {
-    position: "absolute",
-    bottom: 10,
-    right: 5,
-    width: 30,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  similarRatingText: {
-    color: "#ffd700",
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  errorText: {
-    color: "red",
-    fontSize: 16,
-    fontWeight: "bold",
   },
 });

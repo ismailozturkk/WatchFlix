@@ -1,0 +1,10 @@
+/* Seelogd widget gallery names and descriptions (ENGLISH).
+   These follow the SYSTEM language (not the in-app language). The key is the English text
+   itself, so an unsupported system language falls back to English. The key set must match
+   tr.lproj and es.lproj (enforced by __tests__/widgetNativeLanguage.test.js). */
+"Seelogd Coming Up" = "Seelogd Coming Up";
+"Shows upcoming movies and TV episodes." = "Shows upcoming movies and TV episodes.";
+"Seelogd My Lists" = "Seelogd My Lists";
+"Shows your lists and how many items they hold on the home screen." = "Shows your lists and how many items they hold on the home screen.";
+"Seelogd Statistics" = "Seelogd Statistics";
+"Shows your watching statistics on the home screen." = "Shows your watching statistics on the home screen.";

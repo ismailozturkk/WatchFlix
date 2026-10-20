@@ -1,164 +1,541 @@
-import React from "react";
-import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  StyleSheet,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Text,
+  Animated,
+  Easing,
+  Keyboard,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useLanguage } from "../../context/LanguageContext";
+import { useApiSettings } from "../../context/AppSettingsContext";
+import { toast } from "../../components/AppToast";
+import { looksLikeMediaLink, parseMediaLink } from "../../utils/mediaLinks";
+import { resolveMediaLink } from "../../services/mediaLinkResolver";
+import { getMediaLinkCopy } from "../../utils/mediaLinkCopy";
 import { useTheme } from "../../context/ThemeContext";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import Feather from "@expo/vector-icons/Feather";
-import LottieView from "lottie-react-native";
-import { useAppSettings } from "../../context/AppSettingsContext";
-import IconBacground from "../../components/IconBacground";
-export default function SearchScreen({ navigation }) {
-  const { showSnow } = useAppSettings();
-  const { t } = useLanguage();
-  const { theme } = useTheme();
+import AppIcon from "../../components/AppIcon";
+import ScreenDecor from "../../components/ScreenDecor";
+import MovieSearch from "../search/MovieSearch";
+import TvShowSearch from "../search/TvShowSearch";
+import ActorSearch from "../search/ActorSearch";
+import {
+  initialWindowMetrics,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import BackButton from "../../components/BackButton";
+import GlassField from "../../components/common/GlassField";
+import { liquidGlassSupported } from "../../services/liquidGlass";
+import { isLightSurface } from "../../utils/colorUtils";
+import { useFocusEffect } from "@react-navigation/native";
+import { i18nText } from "../../utils/i18nText";
+import { Keys, get, set } from "../../services/storage";
+import ScreenToastHost from "@components/toast/ScreenToastHost";
+import GlassTouchable from "../../components/common/GlassTouchable";
+
+
+const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
+  const anim = useRef(new Animated.Value(viewMode === "grid" ? 1 : 0)).current;
+
+  const toggle = useCallback(() => {
+    const next = viewMode === "row" ? "grid" : "row";
+    Animated.spring(anim, {
+      toValue: next === "grid" ? 1 : 0,
+      speed: 18,
+      bounciness: 8,
+      useNativeDriver: true,
+    }).start();
+    onToggle(next);
+  }, [viewMode, onToggle]);
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.primary }]}>
-      {showSnow && (
-        <LottieView
-          style={styles.lottie}
-          source={require("../../LottieJson/snow.json")}
-          autoPlay={true}
-          loop
-        />
-      )}
-      <IconBacground opacity={0.3} />
-      <Text
-        allowFontScaling={false}
-        style={[styles.title, { color: theme.text.primary }]}
-      >
-        {t.SearchScreen.search}
-      </Text>
-      <View
+    <GlassTouchable
+      onPress={toggle}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={i18nText("autoI18n.gorunumu_degistir", "Görünümü değiştir")}
+      style={[
+        styles.layoutToggleBtn,
+        { backgroundColor: theme.secondary, borderColor: theme.border },
+      ]}
+    >
+      <Animated.View
         style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
+          transform: [
+            {
+              rotate: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ["0deg", "180deg"],
+              }),
+            },
+          ],
         }}
       >
-        <LottieView
-          style={{ width: "90%", height: "90%" }}
-          source={require("../../LottieJson/SearchScreen.json")}
-          autoPlay
-          loop
+        <AppIcon
+          family="Ionicons"
+          name={viewMode === "row" ? "grid-outline" : "list-outline"}
+          size={20}
+          color={theme.accent ?? theme.text?.primary ?? "#fff"}
         />
-      </View>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: theme.secondary, shadowColor: theme.shadow },
-          ]}
-          onPress={() =>
-            navigation.navigate("MovieSearch", { autoFocus: true })
-          }
-        >
-          <MaterialCommunityIcons
-            name="movie-outline"
-            size={24}
-            color={theme.text.primary}
-          />
-          <Text
-            allowFontScaling={false}
-            style={[styles.buttonText, { color: theme.text.primary }]}
-          >
-            {t.SearchScreen.searchMovies}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: theme.secondary, shadowColor: theme.shadow },
-          ]}
-          onPress={() =>
-            navigation.navigate("TvShowSearch", { autoFocus: true })
-          }
-        >
-          <Feather name="tv" size={24} color={theme.text.primary} />
-          <Text
-            allowFontScaling={false}
-            style={[styles.buttonText, { color: theme.text.primary }]}
-          >
-            {t.SearchScreen.searchTvShows}
-          </Text>
-        </TouchableOpacity>
+      </Animated.View>
+    </GlassTouchable>
+  );
+});
 
-        <TouchableOpacity
+export default function SearchScreen({ navigation, route }) {
+  const { t, language } = useLanguage();
+  const { API_KEY } = useApiSettings();
+  const linkCopy = getMediaLinkCopy(language);
+  const linkBusy = useRef(false);
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  // Bu ekran native-stack'te `transparentModal` olarak açılıyor. iOS'ta bu
+  // sunum tipindeki SafeAreaView bazen üst inset'i 0 uygulayıp arama çubuğunu
+  // status barın altına taşıyor. Canlı inset'i, ilk pencere metriğini güvenli
+  // yedek olarak kullanarak doğrudan köke uygula.
+  const topInset = Math.max(
+    insets.top,
+    initialWindowMetrics?.insets?.top || 0,
+  );
+  const searchOrigin = route?.params?.searchOrigin;
+  const hasSearchOrigin =
+    searchOrigin &&
+    [searchOrigin.x, searchOrigin.y, searchOrigin.width, searchOrigin.height].every(
+      Number.isFinite,
+    ) &&
+    searchOrigin.width > 0 &&
+    searchOrigin.height > 0;
+
+  // Route'dan gelen initialType varsa al (örn: ana ekrandan "movie" veya "tv" tıklandıysa)
+  const initialType = route?.params?.initialType || "movie";
+
+  const [activeTab, setActiveTab] = useState(initialType);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewModeState] = useState(() => get(Keys.searchResultsViewMode));
+  const inputRef = useRef(null);
+
+  // ── Bağlantıdan aç (TMDB / IMDb) ───────────────────────────────────────────
+  // Alana yapıştırılan ya da panodaki film/dizi bağlantısı doğrudan o yapımın detayını açar (ekle / izledim
+  // düğmeleri orada). IMDb kimliği TMDB'ye /find ile çevrilir; bulunamazsa toast. Aynı anda tek çözümleme.
+  const openMediaLink = useCallback(
+    async (text) => {
+      const link = parseMediaLink(text);
+      if (!link) return false;
+      if (linkBusy.current) return true;
+      linkBusy.current = true;
+      try {
+        const target = await resolveMediaLink(link, { apiKey: API_KEY, language });
+        if (!target) {
+          toast.info(linkCopy.notFound);
+          return true;
+        }
+        Keyboard.dismiss();
+        navigation.navigate(target.type === "movie" ? "MovieDetails" : "TvShowsDetails", { id: target.id });
+        return true;
+      } finally {
+        linkBusy.current = false;
+      }
+    },
+    [API_KEY, language, linkCopy, navigation],
+  );
+  const handleChangeText = useCallback(
+    (text) => {
+      // Yapıştırılan bağlantı arama sorgusu OLMAZ; alana yazılmadan açılır.
+      if (looksLikeMediaLink(text)) {
+        openMediaLink(text);
+        return;
+      }
+      setSearchQuery(text);
+    },
+    [openMediaLink],
+  );
+  const pasteLink = useCallback(async () => {
+    let text = "";
+    try {
+      text = await Clipboard.getStringAsync();
+    } catch {
+      toast.info(linkCopy.clipboardFailed);
+      return;
+    }
+    if (!(await openMediaLink(text))) toast.info(linkCopy.emptyClipboard);
+  }, [linkCopy, openMediaLink]);
+
+  const setViewMode = useCallback((nextMode) => {
+    if (nextMode !== "row" && nextMode !== "grid") return;
+    setViewModeState(nextMode);
+    set(Keys.searchResultsViewMode, nextMode);
+  }, []);
+
+  // Genişleme animasyonu bitti mi? Bittiğinde kabuk sabit ölçü yerine
+  // absoluteFill'e geçer; edge-to-edge'de kökün gerçek yüksekliği pencere
+  // yüksekliğinden büyük olduğu için (navigasyon çubuğu şeridi) aksi halde
+  // altta boyanmamış bir bant kalır ve transparentModal'ın altındaki ekran görünür.
+  const [expandDone, setExpandDone] = useState(!hasSearchOrigin);
+
+  // Kabuğun hedef ölçüsü kökün ölçülen layout'undan gelir; useWindowDimensions
+  // Android'de navigasyon çubuğunu hariç tutar.
+  const [rootSize, setRootSize] = useState(null);
+  const onRootLayout = useCallback((event) => {
+    const { width, height } = event.nativeEvent.layout;
+    setRootSize((prev) =>
+      prev && prev.width === width && prev.height === height
+        ? prev
+        : { width, height },
+    );
+  }, []);
+  const targetWidth = rootSize?.width ?? screenWidth;
+  const targetHeight = rootSize?.height ?? screenHeight;
+
+  const searchBarAnim = useRef(new Animated.Value(0)).current;
+  const expandAnim = useRef(new Animated.Value(hasSearchOrigin ? 0 : 1)).current;
+  const contentRevealAnim = useRef(
+    new Animated.Value(hasSearchOrigin ? 0 : 1),
+  ).current;
+
+  const hasAutoFocusedRef = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (route?.params?.autoFocus && !hasAutoFocusedRef.current) {
+        hasAutoFocusedRef.current = true;
+        setTimeout(() => inputRef.current?.focus(), hasSearchOrigin ? 320 : 100);
+      }
+      if (route?.params?.initialType) {
+        setActiveTab(route.params.initialType);
+      }
+    }, [hasSearchOrigin, route?.params])
+  );
+
+  useEffect(() => {
+    const animations = [
+      Animated.timing(searchBarAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ];
+
+    if (hasSearchOrigin) {
+      animations.push(
+        Animated.timing(expandAnim, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(contentRevealAnim, {
+          toValue: 1,
+          delay: 100,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      );
+    }
+
+    let cancelled = false;
+    Animated.parallel(animations).start(() => {
+      if (!cancelled) setExpandDone(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contentRevealAnim, expandAnim, hasSearchOrigin, searchBarAnim]);
+
+  // iOS 26+: Liquid Glass bir atası animasyonlu `opacity` taşıyorsa bozulur
+  // (bkz. components/common/GlassSurface.js) — bu yüzden cam açıkken giriş
+  // yalnız kaymayla yapılır, solma yok. Geri düğmesi ve arama alanı bu satırda.
+  const searchBarStyle = {
+    ...(liquidGlassSupported ? null : { opacity: searchBarAnim }),
+    transform: [
+      {
+        translateY: searchBarAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [12, 0],
+        }),
+      },
+    ],
+  };
+
+  const tabs = [
+    {
+      id: "movie",
+      label: t.SearchScreen?.searchMovies ?? i18nText("autoI18n.film", "Film"),
+      icon: (color) => <AppIcon family="MaterialCommunityIcons" name="movie-outline" size={20} color={color} />,
+    },
+    {
+      id: "tv",
+      label: t.SearchScreen?.searchTvShows ?? i18nText("autoI18n.dizi", "Dizi"),
+      icon: (color) => <AppIcon family="Feather" name="tv" size={18} color={color} />,
+    },
+    {
+      id: "actor",
+      label: t.SearchScreen?.searchActrist ?? "Oyuncu",
+      icon: (color) => <AppIcon family="Feather" name="user" size={18} color={color} />,
+    },
+  ];
+
+  const expandingShellStyle =
+    hasSearchOrigin && !expandDone
+      ? {
+          top: expandAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [searchOrigin.y, 0],
+          }),
+          left: expandAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [searchOrigin.x, 0],
+          }),
+          width: expandAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [searchOrigin.width, targetWidth],
+          }),
+          height: expandAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [searchOrigin.height, targetHeight],
+          }),
+          borderRadius: expandAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [searchOrigin.radius ?? 18, 0],
+          }),
+        }
+      : StyleSheet.absoluteFill;
+
+  return (
+    <View style={styles.transitionRoot} onLayout={onRootLayout}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.expandingShell,
+          { backgroundColor: theme.primary },
+          expandingShellStyle,
+        ]}
+      />
+      <Animated.View
+        style={[styles.animatedContent, { opacity: contentRevealAnim }]}
+      >
+        <View
           style={[
-            styles.button,
-            { backgroundColor: theme.secondary, shadowColor: theme.shadow },
+            styles.container,
+            { paddingTop: topInset + (Platform.OS === "android" ? 10 : 0) },
           ]}
-          onPress={() =>
-            navigation.navigate("ActorSearch", { autoFocus: true })
-          }
         >
-          <Feather name="user" size={24} color={theme.text.primary} />
-          <Text
-            allowFontScaling={false}
-            style={[styles.buttonText, { color: theme.text.primary }]}
-          >
-            {t.SearchScreen.searchActrist}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: theme.secondary, shadowColor: theme.shadow },
+          <ScreenDecor scope="search" iconOpacity={0.3} />
+
+      {/* ── Arama Kutusu ──────────────────────────────────────── */}
+      <Animated.View style={[styles.searchContainer, searchBarStyle]}>
+        <BackButton absolute={false} style={{ alignSelf: "center" }} />
+        {/* iOS 26+: hap biçimli Liquid Glass arama alanı; diğer yerlerde eski kutu. */}
+        <GlassField
+          height={40}
+          fallbackStyle={[
+            styles.searchBarBox,
+            { backgroundColor: theme.secondary, borderColor: theme.border },
           ]}
-          onPress={() => navigation.navigate("SearchAll", { autoFocus: true })}
+          style={styles.searchBar}
         >
-          <Feather name="search" size={24} color={theme.text.primary} />
-          <Text
-            allowFontScaling={false}
-            style={[styles.buttonText, { color: theme.text.primary }]}
-          >
-            {t.SearchScreen.searchActrist}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <AppIcon
+            family="Ionicons"
+            name="search"
+            size={20}
+            color={theme.text?.muted ?? "#666"}
+            style={{ marginRight: 8 }}
+          />
+          <TextInput
+            ref={inputRef}
+            style={[styles.searchInput, { color: theme.text?.primary ?? "#fff" }]}
+            placeholder={
+              activeTab === "movie"
+                ? (t.SearchScreen?.searchMovies ?? "Film ara...")
+                : activeTab === "tv"
+                ? (t.SearchScreen?.searchTvShows ?? "Dizi ara...")
+                : (t.SearchScreen?.searchActrist ?? "Oyuncu ara...")
+            }
+            placeholderTextColor={theme.text?.muted ?? "#666"}
+            value={searchQuery}
+            onChangeText={handleChangeText}
+            maxLength={80}
+            returnKeyType="search"
+            keyboardAppearance={isLightSurface(theme.primary) ? "light" : "dark"}
+            onSubmitEditing={() => Keyboard.dismiss()}
+          />
+          {searchQuery.length === 0 && (
+            <TouchableOpacity
+              onPress={pasteLink}
+              accessibilityRole="button"
+              accessibilityLabel={linkCopy.pasteLabel}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <AppIcon
+                family="Ionicons"
+                name="link-outline"
+                size={21}
+                color={theme.text?.muted ?? "#666"}
+              />
+            </TouchableOpacity>
+          )}
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery("")}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <AppIcon
+                family="Ionicons"
+                name="close-circle"
+                size={22}
+                color={theme.text?.muted ?? "#666"}
+              />
+            </TouchableOpacity>
+          )}
+        </GlassField>
+        <LayoutToggle
+          viewMode={viewMode}
+          onToggle={setViewMode}
+          theme={theme}
+        />
+      </Animated.View>
+
+      {/* ── Kategori Seçici (Tab Bar) ──────────────────────────────────────── */}
+      <Animated.View style={[styles.tabsContainer, searchBarStyle]}>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              activeOpacity={0.7}
+              onPress={() => setActiveTab(tab.id)}
+              style={[
+                styles.tabButton,
+                isActive && { backgroundColor: theme.text?.primary ?? "#fff" },
+                !isActive && { backgroundColor: theme.secondary },
+              ]}
+            >
+              {tab.icon(isActive ? theme.primary : (theme.text?.primary ?? "#fff"))}
+              <Text
+                style={[
+                  styles.tabLabel,
+                  isActive && { color: theme.primary, fontWeight: "700" },
+                  !isActive && { color: theme.text?.primary ?? "#fff" },
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </Animated.View>
+
+      {/* ── İçerik ──────────────────────────────────────── */}
+          <View style={styles.contentContainer}>
+        {activeTab === "movie" && (
+          <MovieSearch
+            navigation={navigation}
+            route={route}
+            isUnified={true}
+            unifiedQuery={searchQuery}
+            unifiedViewMode={viewMode}
+          />
+        )}
+        {activeTab === "tv" && (
+          <TvShowSearch
+            navigation={navigation}
+            route={route}
+            isUnified={true}
+            unifiedQuery={searchQuery}
+            unifiedViewMode={viewMode}
+          />
+        )}
+        {activeTab === "actor" && (
+          <ActorSearch
+            navigation={navigation}
+            route={route}
+            isUnified={true}
+            unifiedQuery={searchQuery}
+            unifiedViewMode={viewMode}
+          />
+        )}
+          </View>
+        </View>
+      </Animated.View>
+      {/* `transparentModal` iOS'ta kökün üstüne bir pencere açar: toast için kendi host'u. */}
+      <ScreenToastHost />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  transitionRoot: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+  expandingShell: {
+    position: "absolute",
+    overflow: "hidden",
+  },
+  animatedContent: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    paddingTop: 40,
-    paddingHorizontal: 20,
   },
-  lottie: {
-    position: "absolute",
-    top: 0,
-    left: -60,
-    right: -60,
-    bottom: -200,
-    zIndex: 0,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  buttonContainer: {
-    flex: 1,
-    gap: 20,
-  },
-  button: {
+  searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 20,
-    borderRadius: 15,
-    gap: 15,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.44,
-    shadowRadius: 10.32,
-    elevation: 16,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    marginTop: 10,
+    gap: 10,
   },
-  buttonText: {
+  // Yerleşim iki yolda da geçerli; köşe/çerçeve yalnız eski kutuda (cam kendi
+  // şeklini çizer).
+  searchBar: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 0,
+  },
+  searchBarBox: { borderRadius: 12, borderWidth: 1 },
+  layoutToggleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  searchInput: {
+    flex: 1,
     fontSize: 16,
+    height: 40,
+    paddingVertical: 0,
+  },
+  tabsContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 6,
+  },
+  tabLabel: {
+    fontSize: 14,
     fontWeight: "600",
+  },
+  contentContainer: {
+    flex: 1,
   },
 });

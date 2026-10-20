@@ -1,0 +1,595 @@
+// services/googleAuthService.js
+//
+// Google ile giriş + hesap bağlama + yeniden doğrulama.
+//
+// Akış: native hesap seçici → idToken → Firebase credential →
+// signInWithCredential (giriş), linkWithCredential (bağlama) veya
+// reauthenticateWithCredential (hesap silme gibi hassas işlemler).
+//
+// Hata sözleşmesi: bu modülün fırlattığı her hata `code` taşır (GoogleAuthCode).
+// UI koda göre yerelleştirir; ham Firebase metni ("Firebase: Error
+// (auth/requires-recent-login)") hiçbir zaman kullanıcıya gösterilmez.
+//
+// NOT (yapılandırma): webClientId, google-services.json içindeki client_type:3
+// ile birebir aynı olmalıdır. Android'de ayrıca uygulamayı imzalayan her
+// keystore'un SHA-1'i Firebase Console'a eklenmiş olmalıdır — aksi halde native
+// SDK DEVELOPER_ERROR döner ve buradaki hiçbir kod bunu kurtaramaz.
+
+import { Keys, get, set, remove } from "./storage";
+import { Platform } from "react-native";
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  isSuccessResponse,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
+import {
+  GoogleAuthProvider,
+  fetchSignInMethodsForEmail,
+  linkWithCredential,
+  reauthenticateWithCredential,
+  signInWithCredential,
+  signOut as firebaseSignOut,
+  unlink,
+} from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db, fns } from "../firebase";
+import { legacyFlagToLanguage, pickByLanguage } from "../utils/appLanguages";
+
+export const GOOGLE_PROFILE_PENDING_KEY = Keys.googleProfilePendingUid.key;
+
+// ── Hata kodları ────────────────────────────────────────────────────────────
+
+export const GoogleAuthCode = {
+  CANCELLED: "google/cancelled",
+  IN_PROGRESS: "google/in-progress",
+  PLAY_SERVICES: "google/play-services",
+  MISCONFIGURED: "google/misconfigured",
+  NO_ID_TOKEN: "google/no-id-token",
+  NO_SESSION: "google/no-session",
+  NETWORK: "google/network",
+  ACCOUNT_REQUIRES_LINK: "google/account-requires-link",
+  ALREADY_LINKED_ELSEWHERE: "google/already-linked-elsewhere",
+  ALREADY_LINKED_HERE: "google/already-linked-here",
+  WRONG_ACCOUNT: "google/wrong-account",
+  REQUIRES_RECENT_LOGIN: "google/requires-recent-login",
+  LAST_PROVIDER: "google/last-provider",
+  UNKNOWN: "google/unknown",
+};
+
+export class GoogleAuthError extends Error {
+  constructor(code, message, cause) {
+    super(message || code);
+    this.name = "GoogleAuthError";
+    this.code = code;
+    this.cause = cause;
+  }
+}
+
+/**
+ * Native SDK ve Firebase hatalarını tek bir kod uzayına indirger.
+ * Android'de DEVELOPER_ERROR statusCodes'ta yok; ham "10" olarak gelir.
+ */
+function toGoogleAuthError(error) {
+  if (error instanceof GoogleAuthError) return error;
+
+  const code = error?.code;
+
+  if (isErrorWithCode(error)) {
+    if (code === statusCodes.SIGN_IN_CANCELLED)
+      return new GoogleAuthError(GoogleAuthCode.CANCELLED, "İptal edildi", error);
+    if (code === statusCodes.IN_PROGRESS)
+      return new GoogleAuthError(
+        GoogleAuthCode.IN_PROGRESS,
+        "Google girişi zaten sürüyor.",
+        error,
+      );
+    if (code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE)
+      return new GoogleAuthError(
+        GoogleAuthCode.PLAY_SERVICES,
+        "Google Play Hizmetleri bu cihazda kullanılamıyor.",
+        error,
+      );
+    // "10" = DEVELOPER_ERROR: imza/SHA-1 veya client id uyuşmazlığı.
+    if (String(code) === "10" || code === "DEVELOPER_ERROR")
+      return new GoogleAuthError(
+        GoogleAuthCode.MISCONFIGURED,
+        "Google girişi bu sürüm için yapılandırılmamış.",
+        error,
+      );
+  }
+
+  switch (code) {
+    case "auth/credential-already-in-use":
+      return new GoogleAuthError(
+        GoogleAuthCode.ALREADY_LINKED_ELSEWHERE,
+        "Bu Google hesabı başka bir Seelogd hesabına bağlı.",
+        error,
+      );
+    case "auth/email-already-in-use":
+    case "auth/account-exists-with-different-credential":
+    case "functions/already-exists":
+      return new GoogleAuthError(
+        GoogleAuthCode.ACCOUNT_REQUIRES_LINK,
+        "Bu e-posta ile zaten bir hesap var. Önce e-posta ve şifrenle giriş yapıp Google hesabını Ayarlar'dan bağla.",
+        error,
+      );
+    case "auth/provider-already-linked":
+      return new GoogleAuthError(
+        GoogleAuthCode.ALREADY_LINKED_HERE,
+        "Google hesabın zaten bağlı.",
+        error,
+      );
+    // Yeniden doğrularken oturumdakinden başka bir Google hesabı seçildi.
+    // Hesap seçici her seferinde açıldığı için (bkz. getGoogleCredential)
+    // bu, sıradan bir kullanıcı hatası — ayrı bir kod hak ediyor.
+    case "auth/user-mismatch":
+      return new GoogleAuthError(
+        GoogleAuthCode.WRONG_ACCOUNT,
+        "Seçilen Google hesabı oturumdaki hesap değil.",
+        error,
+      );
+    case "auth/requires-recent-login":
+      return new GoogleAuthError(
+        GoogleAuthCode.REQUIRES_RECENT_LOGIN,
+        "Güvenlik için tekrar giriş yapman gerekiyor.",
+        error,
+      );
+    case "auth/network-request-failed":
+    case "functions/unavailable":
+    case "functions/deadline-exceeded":
+      return new GoogleAuthError(
+        GoogleAuthCode.NETWORK,
+        "İnternet bağlantısı kurulamadı.",
+        error,
+      );
+    default:
+      return new GoogleAuthError(
+        GoogleAuthCode.UNKNOWN,
+        error?.message || "Beklenmeyen bir hata oluştu.",
+        error,
+      );
+  }
+}
+
+// ── Kullanıcıya gösterilecek metin ──────────────────────────────────────────
+
+const ERROR_TEXT = {
+  [GoogleAuthCode.ALREADY_LINKED_ELSEWHERE]: {
+    tr: "Bu Google hesabı başka bir Seelogd hesabına bağlı. Önce o hesaptan bağlantıyı kaldır.",
+    en: "This Google account is linked to another Seelogd account. Disconnect it there first.",
+    es: "Esta cuenta de Google está vinculada a otra cuenta de Seelogd. Desvincúlala primero allí.",
+    pt: "Esta conta do Google está vinculada a outra conta do Seelogd. Desvincule-a primeiro lá.",
+    de: "Dieses Google-Konto ist mit einem anderen Seelogd-Konto verknüpft. Trenne es dort zuerst.",
+  },
+  [GoogleAuthCode.ALREADY_LINKED_HERE]: {
+    tr: "Google hesabın zaten bağlı.",
+    en: "Your Google account is already connected.",
+    es: "Tu cuenta de Google ya está vinculada.",
+    pt: "Sua conta do Google já está vinculada.",
+    de: "Dein Google-Konto ist bereits verknüpft.",
+  },
+  [GoogleAuthCode.WRONG_ACCOUNT]: {
+    tr: "Farklı bir Google hesabı seçtin. Oturumu açtığın hesabı seç.",
+    en: "You picked a different Google account. Choose the one you signed in with.",
+    es: "Has elegido una cuenta de Google distinta. Elige aquella con la que iniciaste sesión.",
+    pt: "Você escolheu uma conta do Google diferente. Escolha aquela com a qual você entrou.",
+    de: "Du hast ein anderes Google-Konto gewählt. Wähle das, mit dem du dich angemeldet hast.",
+  },
+  [GoogleAuthCode.REQUIRES_RECENT_LOGIN]: {
+    tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra dene.",
+    en: "For security, sign out and sign in again, then retry.",
+    es: "Por seguridad, cierra sesión, vuelve a iniciarla e inténtalo de nuevo.",
+    pt: "Por segurança, saia, entre de novo e tente novamente.",
+    de: "Melde dich aus Sicherheitsgründen ab und wieder an und versuche es dann erneut.",
+  },
+  [GoogleAuthCode.NETWORK]: {
+    tr: "İnternet bağlantısı kurulamadı. Bağlantını kontrol et.",
+    en: "Could not reach the network. Check your connection.",
+    es: "No se pudo conectar a la red. Revisa tu conexión.",
+    pt: "Não foi possível conectar à rede. Verifique sua conexão.",
+    de: "Das Netzwerk war nicht erreichbar. Prüfe deine Verbindung.",
+  },
+  [GoogleAuthCode.ACCOUNT_REQUIRES_LINK]: {
+    tr: "Bu e-posta ile zaten bir Seelogd hesabı var. Önce e-posta ve şifrenle giriş yap, ardından Ayarlar > Hesap bağlantıları bölümünden Google'ı bağla.",
+    en: "A Seelogd account already uses this email. Sign in with email and password first, then connect Google from Settings > Account connections.",
+    es: "Ya existe una cuenta de Seelogd con este correo. Inicia sesión primero con tu correo y contraseña y después vincula Google desde Ajustes > Cuentas vinculadas.",
+    pt: "Já existe uma conta do Seelogd com este e-mail. Entre primeiro com seu e-mail e senha e depois vincule o Google em Configurações > Contas vinculadas.",
+    de: "Ein Seelogd-Konto verwendet diese E-Mail-Adresse bereits. Melde dich zuerst mit E-Mail und Passwort an und verknüpfe Google dann unter Einstellungen > Kontoverknüpfungen.",
+  },
+  [GoogleAuthCode.PLAY_SERVICES]: {
+    tr: "Google Play Hizmetleri bu cihazda kullanılamıyor.",
+    en: "Google Play Services is unavailable on this device.",
+    es: "Google Play Services no está disponible en este dispositivo.",
+    pt: "O Google Play Services não está disponível neste dispositivo.",
+    de: "Die Google Play-Dienste sind auf diesem Gerät nicht verfügbar.",
+  },
+  [GoogleAuthCode.MISCONFIGURED]: {
+    tr: "Google girişi bu uygulama sürümünde kullanılamıyor.",
+    en: "Google sign-in is unavailable in this build.",
+    es: "El inicio de sesión con Google no está disponible en esta versión de la app.",
+    pt: "O login com o Google não está disponível nesta versão do app.",
+    de: "Die Anmeldung mit Google ist in diesem Build nicht verfügbar.",
+  },
+  [GoogleAuthCode.LAST_PROVIDER]: {
+    tr: "Google şu anda tek giriş yöntemin, kaldırılamaz.",
+    en: "Google is your only sign-in method and cannot be removed.",
+    es: "Google es ahora tu único método de inicio de sesión y no se puede quitar.",
+    pt: "O Google agora é seu único método de login e não pode ser removido.",
+    de: "Google ist deine einzige Anmeldemethode und kann nicht entfernt werden.",
+  },
+  [GoogleAuthCode.IN_PROGRESS]: {
+    tr: "Google girişi zaten sürüyor.",
+    en: "Google sign-in is already in progress.",
+    es: "Ya hay un inicio de sesión con Google en curso.",
+    pt: "Já há um login com o Google em andamento.",
+    de: "Die Anmeldung mit Google läuft bereits.",
+  },
+  [GoogleAuthCode.NO_ID_TOKEN]: {
+    tr: "Google kimlik doğrulaması tamamlanamadı. Tekrar dene.",
+    en: "Google could not verify your identity. Please try again.",
+    es: "Google no pudo verificar tu identidad. Inténtalo de nuevo.",
+    pt: "O Google não conseguiu verificar sua identidade. Tente novamente.",
+    de: "Google konnte deine Identität nicht bestätigen. Bitte versuche es erneut.",
+  },
+  [GoogleAuthCode.NO_SESSION]: {
+    tr: "Oturum bulunamadı. Tekrar giriş yap.",
+    en: "No active session. Please sign in again.",
+    es: "No hay ninguna sesión activa. Inicia sesión de nuevo.",
+    pt: "Não há nenhuma sessão ativa. Entre novamente.",
+    de: "Keine aktive Sitzung. Bitte melde dich erneut an.",
+  },
+};
+
+/**
+ * Hata → kullanıcıya gösterilebilir metin. Ham Firebase/native mesajları
+ * ("Firebase: Error (auth/...)") hiçbir zaman kullanıcıya sızmaz.
+ */
+/**
+ * @param {boolean|string} language  Eski çağrılar `true` (Türkçe) / `false` (İngilizce)
+ *   geçiyordu; artık uygulama dili ("tr" | "en" | "es") da verilebilir.
+ */
+export function describeGoogleAuthError(error, language = "tr") {
+  const code = legacyFlagToLanguage(language);
+  const entry = ERROR_TEXT[error?.code];
+  if (entry) return entry[code] ?? entry.en;
+  return pickByLanguage(code, {
+    tr: "Beklenmeyen bir hata oluştu. Lütfen tekrar dene.",
+    en: "Something went wrong. Please try again.",
+    es: "Ha ocurrido un error. Inténtalo de nuevo.",
+    pt: "Ocorreu um erro. Tente novamente.",
+    de: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+  });
+}
+
+// ── Yapılandırma ────────────────────────────────────────────────────────────
+
+const WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  "427087836931-in7lreg3vjgnvudn5h8gauradaeo58kc.apps.googleusercontent.com";
+
+// iOS'ta native SDK varsayılan GoogleService-Info.plist içindeki CLIENT_ID'yi
+// okur. Ortama iosClientId verilirse yalnız açık override olarak kullanılır.
+const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || "";
+
+let configured = false;
+
+export function getGoogleSignInConfiguration({
+  webClientId = WEB_CLIENT_ID,
+  iosClientId = IOS_CLIENT_ID,
+} = {}) {
+  return {
+    webClientId,
+    offlineAccess: false,
+    ...(iosClientId ? { iosClientId } : {}),
+  };
+}
+
+function configureGoogleSignIn() {
+  if (configured) return;
+  GoogleSignin.configure(getGoogleSignInConfiguration());
+  configured = true;
+}
+
+// ── Eşzamanlılık kilidi ─────────────────────────────────────────────────────
+// İki hızlı dokunuş native tarafta IN_PROGRESS'e düşer; JS tarafında keselim.
+
+let busy = false;
+
+async function withLock(fn) {
+  if (busy) {
+    throw new GoogleAuthError(
+      GoogleAuthCode.IN_PROGRESS,
+      "Google girişi zaten sürüyor.",
+    );
+  }
+  busy = true;
+  try {
+    return await fn();
+  } finally {
+    busy = false;
+  }
+}
+
+// ── Credential alma ─────────────────────────────────────────────────────────
+
+/**
+ * Hesap seçiciyi açar ve Firebase credential döner.
+ * İptal edilirse null döner (hata değil — iptal normal bir sonuç).
+ */
+async function getGoogleCredential() {
+  configureGoogleSignIn();
+
+  if (Platform.OS === "android") {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+  }
+
+  // Native oturum açık kalırsa SDK son hesabı sessizce yeniden kullanır:
+  // kullanıcı hesap değiştiremez ve başarısız bir denemeden sonra hep aynı
+  // hesapla tekrar dener. Seçicinin her seferinde çıkması için önce çıkış yap.
+  await GoogleSignin.signOut().catch(() => {});
+
+  const response = await GoogleSignin.signIn();
+  if (!isSuccessResponse(response)) return null; // { type: "cancelled" }
+
+  const idToken = response.data?.idToken;
+  if (!idToken) {
+    throw new GoogleAuthError(
+      GoogleAuthCode.NO_ID_TOKEN,
+      "Google kimlik belirteci alınamadı.",
+    );
+  }
+  return {
+    credential: GoogleAuthProvider.credential(idToken),
+    idToken,
+    email: response.data?.user?.email || null,
+  };
+}
+
+/**
+ * Firebase'e Google credential gondermeden once sunucu tarafinda ayni e-posta
+ * icin baska bir giris yontemi olup olmadigini denetler. Kontrol basarisizsa
+ * guvenli tarafta kalip girisi durdurur; aksi halde Google, dogrulanmamis bir
+ * email/sifre hesabini otomatik olarak ezebilir.
+ */
+async function assertGoogleSignInEligible(idToken, email) {
+  try {
+    const check = httpsCallable(fns, "checkGoogleSignInEligibility");
+    await check({ idToken });
+  } catch (error) {
+    // Callable henuz yayinlanmadiysa (ornegin Firebase billing/Secret Manager
+    // engeli) mevcut uygulamayi tamamen kilitleme. Eski projelerde email
+    // enumeration protection kapaliysa bu Firebase kontrolu parola hesabini
+    // yine yakalar. Protection aciksa bos liste donebilir; tam garanti icin
+    // callable'in yayinlanmasi gerekir.
+    if (error?.code === "functions/not-found" && email) {
+      let methods;
+      try {
+        methods = await fetchSignInMethodsForEmail(auth, email);
+      } catch (fallbackError) {
+        throw toGoogleAuthError(fallbackError);
+      }
+      if (
+        methods.length > 0 &&
+        !methods.includes(GoogleAuthProvider.PROVIDER_ID)
+      ) {
+        throw new GoogleAuthError(
+          GoogleAuthCode.ACCOUNT_REQUIRES_LINK,
+          "Mevcut hesaba Google, Ayarlar'dan bağlanmalı.",
+        );
+      }
+      return;
+    }
+    throw toGoogleAuthError(error);
+  }
+}
+
+// ── Profil durumu ───────────────────────────────────────────────────────────
+
+/**
+ * Profil "tamam" mı?
+ *
+ * Kasıtlı olarak isValidUsername (regex) KULLANMAZ. Eski hesaplarda nokta veya
+ * Türkçe karakter içeren, yahut 20 karakterden uzun username'ler var; regex ile
+ * ölçseydik bu kullanıcılar Google'ı bağladıkları anda "profilin eksik" deyip
+ * tamamlama ekranına düşer ve profilleri sıfırlanırdı. Burada sorulan tek soru:
+ * bu hesabın bir username'i var mı?
+ */
+export function isGoogleProfileComplete(profile) {
+  return typeof profile?.username === "string" && profile.username.trim().length > 0;
+}
+
+async function readProfile(uid) {
+  const snap = await getDoc(doc(db, "Users", uid));
+  return snap.exists() ? snap.data() : null;
+}
+
+// ── Public API ──────────────────────────────────────────────────────────────
+
+export async function signInWithGoogle() {
+  return withLock(async () => {
+    let credential;
+    try {
+      const selected = await getGoogleCredential();
+      if (!selected) return { cancelled: true };
+      await assertGoogleSignInEligible(selected.idToken, selected.email);
+      credential = selected.credential;
+    } catch (error) {
+      throw toGoogleAuthError(error);
+    }
+
+    let user;
+    try {
+      const result = await signInWithCredential(auth, credential);
+      user = result.user;
+    } catch (error) {
+      // Firebase reddettiyse native oturumu da bırakma; yoksa sonraki deneme
+      // aynı hesapla sessizce tekrar başarısız olur.
+      await GoogleSignin.signOut().catch(() => {});
+      throw toGoogleAuthError(error);
+    }
+
+    // Buradan sonrası KRİTİK: Firebase oturumu artık açık. Profil okuması
+    // başarısız olsa bile FIRLATMIYORUZ — yoksa kullanıcı "giriş başarısız"
+    // toast'ı görürken aslında giriş yapmış olurdu (onAuthStateChanged zaten
+    // tetiklendi).
+    //
+    // Okuma ile işaret yazımı ayrı ele alınır. Tek bir try içinde olsalardı,
+    // başarılı bir okumadan sonra gelen AsyncStorage yazım hatası (Android'de
+    // SQLite tabanlı: disk doluyken okumalar çalışır, yazımlar düşer) aynı
+    // catch'e düşer ve doğru hesapladığımız cevabı, yazamadığı işaretten
+    // türetilen YANLIŞ cevapla değiştirirdi — profilsiz kullanıcı TabScreen'e
+    // girerdi.
+    let profile = null;
+    let readOk = true;
+    try {
+      profile = await readProfile(user.uid);
+    } catch {
+      readOk = false;
+    }
+
+    let needsProfileCompletion;
+    if (readOk) {
+      needsProfileCompletion = !isGoogleProfileComplete(profile);
+      // İşaret yazımı best-effort: kararı değiştirmez, yalnızca kalıcılaştırır.
+      if (needsProfileCompletion) set(Keys.googleProfilePendingUid, user.uid);
+      else remove(Keys.googleProfilePendingUid);
+    } else {
+      // Profil doğrulanamadı (çevrimdışı / kural). Kararı işarete bırak: onu
+      // yazarken profilin eksik olduğunu BİLİYORDUK. AuthContext bir sonraki
+      // açılışta Firestore'dan yeniden uzlaştırır.
+      needsProfileCompletion = get(Keys.googleProfilePendingUid) === user.uid;
+    }
+
+    return { user, needsProfileCompletion, cancelled: false };
+  });
+}
+
+export async function linkGoogleAccount() {
+  return withLock(async () => {
+    const current = auth.currentUser;
+    if (!current) {
+      throw new GoogleAuthError(GoogleAuthCode.NO_SESSION, "Oturum bulunamadı.");
+    }
+
+    let credential;
+    try {
+      const selected = await getGoogleCredential();
+      if (!selected) return { cancelled: true };
+      credential = selected.credential;
+    } catch (error) {
+      throw toGoogleAuthError(error);
+    }
+
+    try {
+      await linkWithCredential(current, credential);
+    } catch (error) {
+      // Bağlama reddedildi: native oturumu bırakma ki kullanıcı bir dahaki
+      // denemede başka bir Google hesabı seçebilsin.
+      await GoogleSignin.signOut().catch(() => {});
+      throw toGoogleAuthError(error);
+    }
+
+    // linkWithCredential providerData'yı zaten günceller; reload() yalnızca
+    // sunucuyla tazeleme. Başarısız olması bağlamayı geçersiz kılmaz, bu
+    // yüzden fatal değil — aksi halde "bağlandı ama UI bağlanmadı" derdi.
+    await current.reload().catch(() => {});
+
+    return { cancelled: false };
+  });
+}
+
+/**
+ * Google hesabıyla yeniden doğrulama — hesap silme gibi "yakın zamanda giriş"
+ * isteyen işlemler için. Şifresi olmayan (yalnızca Google ile açılmış)
+ * hesapların tek reauth yolu budur.
+ *
+ * Taze bir idToken alıp reauthenticateWithCredential çağırır; oturumu
+ * değiştirmez, yalnızca mevcut kullanıcının kimliğini tazeler.
+ *
+ * @returns {Promise<{cancelled: boolean}>} Kullanıcı seçiciyi kapatırsa
+ *   { cancelled: true } — iptal bir hata değildir.
+ */
+export async function reauthenticateWithGoogle() {
+  return withLock(async () => {
+    const current = auth.currentUser;
+    if (!current) {
+      throw new GoogleAuthError(GoogleAuthCode.NO_SESSION, "Oturum bulunamadı.");
+    }
+
+    let credential;
+    try {
+      const selected = await getGoogleCredential();
+      if (!selected) return { cancelled: true };
+      credential = selected.credential;
+    } catch (error) {
+      throw toGoogleAuthError(error);
+    }
+
+    try {
+      await reauthenticateWithCredential(current, credential);
+    } catch (error) {
+      // Doğrulama reddedildi (çoğunlukla auth/user-mismatch: yanlış hesap).
+      // Native oturumu bırakma ki kullanıcı tekrar denerken doğru hesabı
+      // seçebilsin — yoksa SDK aynı yanlış hesapla sessizce devam eder.
+      await GoogleSignin.signOut().catch(() => {});
+      throw toGoogleAuthError(error);
+    }
+
+    return { cancelled: false };
+  });
+}
+
+export async function unlinkGoogleAccount() {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new GoogleAuthError(GoogleAuthCode.NO_SESSION, "Oturum bulunamadı.");
+  }
+  if (user.providerData.length <= 1) {
+    throw new GoogleAuthError(
+      GoogleAuthCode.LAST_PROVIDER,
+      "Hesaba erişimi kaybetmemek için tek giriş yöntemi kaldırılamaz.",
+    );
+  }
+  try {
+    await unlink(user, GoogleAuthProvider.PROVIDER_ID);
+  } catch (error) {
+    throw toGoogleAuthError(error);
+  }
+  await Promise.allSettled([GoogleSignin.signOut(), user.reload()]);
+}
+
+/**
+ * Tamamlama ekranındaki "Başka hesap kullan".
+ *
+ * Profili hiç oluşmamış hesabı Auth'tan da siler. Aksi halde e-posta kalıcı
+ * olarak "kullanımda" görünür ve kullanıcı sonradan aynı adresle e-posta/şifre
+ * kaydı yapamaz (auth/email-already-in-use) — hiç açmadığı bir hesap yüzünden.
+ */
+export async function cancelGoogleRegistration() {
+  const current = auth.currentUser;
+  remove(Keys.googleProfilePendingUid);
+  await GoogleSignin.signOut().catch(() => {});
+
+  if (current) {
+    // Silmeden önce profilin GERÇEKTEN yok olduğunu doğrula. Bayat bir pending
+    // işareti profili tam olan bir kullanıcıyı da bu ekrana düşürebilir; onun
+    // hesabını silmek felaket olur. Okuyamazsak silme.
+    let profileExists = true;
+    try {
+      profileExists = !!(await readProfile(current.uid));
+    } catch {
+      profileExists = true;
+    }
+    if (!profileExists) {
+      try {
+        await current.delete();
+        return;
+      } catch {
+        // requires-recent-login vb. → en azından oturumu kapat.
+      }
+    }
+  }
+  await firebaseSignOut(auth);
+}

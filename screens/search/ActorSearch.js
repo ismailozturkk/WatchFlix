@@ -1,3 +1,5 @@
+import { tmdbLanguageOf } from "../../utils/appLanguages";
+import { Image } from "expo-image";
 import React, { useCallback, useState, useRef, useEffect, memo } from "react";
 import {
   StyleSheet,
@@ -5,26 +7,36 @@ import {
   Text,
   TextInput,
   FlatList,
-  Image,
   Dimensions,
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
   Animated,
-  Keyboard,
+  Keyboard
 } from "react-native";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
+import GlassIconButton from "../../components/common/GlassIconButton";
 import { SearchSkeleton } from "../../components/Skeleton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import LottieView from "lottie-react-native";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useContentSettings,
+  useImageQualitySettings,
+} from "../../context/AppSettingsContext";
 import { useFocusEffect } from "@react-navigation/native";
-import IconBacground from "../../components/IconBacground";
+import ScreenDecor from "../../components/ScreenDecor";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { i18nText } from "../../utils/i18nText";
+import { searchMediaWithFuzzyFallback } from "../../services/fuzzyMediaSearch";
+import GlassField from "@components/common/GlassField";
+import { liquidGlassSupported } from "@services/liquidGlass";
+import { isLightSurface } from "@utils/colorUtils";
+
 
 const { width } = Dimensions.get("window");
 
@@ -106,7 +118,7 @@ const ActorRowItem = memo(
     const { opacity, translateY } = useEnterAnim(index);
     const popularity = item.popularity ?? 0;
     const popColor = getPopularityColor(popularity);
-    const IMAGE_URL = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
+    const { getTmdbUrl } = useImageQualitySettings();
 
     const knownForMovies = (item.known_for || [])
       .filter((k) => k.poster_path)
@@ -139,7 +151,7 @@ const ActorRowItem = memo(
             {item.profile_path ? (
               <View style={styles.rowPhotoWrapper}>
                 <Image
-                  source={{ uri: `${IMAGE_URL}${item.profile_path}` }}
+                  source={{ uri: getTmdbUrl(item.profile_path, 'profile', 200) }}
                   style={styles.rowPhoto}
                 />
               </View>
@@ -201,7 +213,7 @@ const ActorRowItem = memo(
                 {knownForMovies.map((k, i) => (
                   <Image
                     key={i}
-                    source={{ uri: `${IMAGE_URL}${k.poster_path}` }}
+                    source={{ uri: getTmdbUrl(k.poster_path, 'poster', 200) }}
                     style={styles.knownPoster}
                   />
                 ))}
@@ -219,7 +231,7 @@ const ActorGridItem = memo(
   ({ item, navigation, imageQuality, theme, index }) => {
     const { scale, onIn, onOut } = usePressAnim();
     const { opacity, translateY } = useEnterAnim(index);
-    const IMAGE_URL = `https://image.tmdb.org/t/p/${imageQuality.poster}`;
+    const { getTmdbUrl } = useImageQualitySettings();
 
     return (
       <Animated.View
@@ -234,10 +246,10 @@ const ActorGridItem = memo(
             navigation.navigate("ActorViewScreen", { personId: item.id });
           }}
         >
-          <View style={styles.gridCard}>
+          <View style={[styles.gridCard, { backgroundColor: theme.between }]}>
             {item.profile_path ? (
               <Image
-                source={{ uri: `${IMAGE_URL}${item.profile_path}` }}
+                source={{ uri: getTmdbUrl(item.profile_path, 'profile', 200) }}
                 style={styles.gridPhoto}
               />
             ) : (
@@ -282,13 +294,13 @@ const DiscoverSection = memo(
     const [trending, setTrending] = useState([]);
     const [loadingDiscover, setLoading] = useState(true);
     const tabAnim = useRef(new Animated.Value(0)).current;
-    const TABS = ["Popüler", "Trend"];
+    const TABS = [i18nText("autoI18n.populer", "Popüler"), "Trend"];
     const TAB_W = (width - 32) / 2;
 
     useEffect(() => {
       const fetchAll = async () => {
         try {
-          const lang = language === "tr" ? "tr-TR" : "en-US";
+          const lang = tmdbLanguageOf(language);
           const headers = { Authorization: API_KEY };
           const [pop, trend] = await Promise.all([
             axios.get("https://api.themoviedb.org/3/person/popular", {
@@ -411,6 +423,7 @@ const DiscoverSection = memo(
             columnWrapperStyle={styles.gridRow}
             contentContainerStyle={styles.gridList}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           />
         ) : (
           <FlatList
@@ -418,6 +431,7 @@ const DiscoverSection = memo(
             data={activeData}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.discoverRowList}
             renderItem={({ item, index }) => (
               <View style={styles.discoverRowItem}>
@@ -461,33 +475,43 @@ const LayoutToggle = memo(({ viewMode, onToggle, theme }) => {
   }, [viewMode, onToggle]);
 
   return (
-    <TouchableOpacity
+    <GlassIconButton
+      icon={viewMode === "row" ? "grid-outline" : "list-outline"}
+      iconSize={18}
+      size={44}
+      fallbackRadius={14}
+      color={theme.text?.primary ?? "#fff"}
+      fallbackStyle={{ backgroundColor: theme.secondary }}
+      style={styles.layoutToggleBtn}
+      accessibilityLabel={i18nText("autoI18n.gorunumu_degistir", "Görünümü değiştir")}
       onPress={toggle}
-      activeOpacity={0.7}
-      style={[styles.layoutToggleBtn, { backgroundColor: theme.secondary }]}
-    >
-      <Ionicons
-        name={viewMode === "row" ? "grid-outline" : "list-outline"}
-        size={18}
-        color={theme.text?.primary ?? "#fff"}
-      />
-    </TouchableOpacity>
+    />
   );
 });
 
 // ─── Ana Bileşen ──────────────────────────────────────────────────────────────
-export default function ActorSearch({ navigation, route }) {
+export default function ActorSearch({ navigation, route, isUnified, unifiedQuery, unifiedViewMode }) {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastSearch, setLastSearch] = useState([]);
-  const [viewMode, setViewMode] = useState("row");
+  const [internalViewMode, setInternalViewMode] = useState("row");
+  const viewMode = isUnified && unifiedViewMode ? unifiedViewMode : internalViewMode;
+  
+  const Container = isUnified ? View : SafeAreaView;
+
+  const handleToggleView = useCallback(() => {
+    setInternalViewMode((prev) => (prev === "row" ? "grid" : "row"));
+  }, []);
 
   const { language, t } = useLanguage();
   const { theme } = useTheme();
-  const { API_KEY, adultContent, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { adultContent } = useContentSettings();
+  const { imageQuality } = useImageQualitySettings();
   const searchTimeout = useRef(null);
+  const searchRequestRef = useRef(0);
   const inputRef = useRef(null);
 
   const searchBarAnim = useRef(new Animated.Value(0)).current;
@@ -510,22 +534,16 @@ export default function ActorSearch({ navigation, route }) {
 
   useFocusEffect(
     useCallback(() => {
-      if (route.params?.autoFocus)
+      if (route?.params?.autoFocus)
         setTimeout(() => inputRef.current?.focus(), 100);
-    }, [route.params]),
+    }, [route?.params]),
   );
 
-  const handleSearch = useCallback((text) => {
-    setSearch(text);
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    if (text.trim() === "") {
-      setResults([]);
-      setLoading(false);
-    } else if (text.trim().length >= 2) {
-      setLoading(true);
-      searchTimeout.current = setTimeout(() => fetchResults(text), 500);
+  useEffect(() => {
+    if (isUnified && unifiedQuery !== undefined) {
+      handleSearch(unifiedQuery);
     }
-  }, []);
+  }, [unifiedQuery, isUnified]);
 
   const fetchResults = useCallback(
     async (searchText) => {
@@ -533,22 +551,23 @@ export default function ActorSearch({ navigation, route }) {
         setLoading(false);
         return;
       }
+      const requestId = ++searchRequestRef.current;
       try {
-        const response = await axios.get(
-          "https://api.themoviedb.org/3/search/person",
-          {
-            params: {
-              query: searchText,
-              include_adult: adultContent,
-              language: language === "tr" ? "tr-TR" : "en-US",
-              page: "1",
-            },
-            headers: { Authorization: API_KEY },
-          },
+        const { results: foundResults, usedFuzzyFallback } =
+          await searchMediaWithFuzzyFallback({
+            mediaType: "person",
+            query: searchText,
+            adultContent,
+            language: tmdbLanguageOf(language),
+            API_KEY,
+          });
+        if (requestId !== searchRequestRef.current) return;
+        const actors = foundResults.filter(
+          (person) => person.known_for_department === "Acting",
         );
-        const sorted = response.data.results
-          .filter((p) => p.known_for_department === "Acting")
-          .sort((a, b) => b.popularity - a.popularity);
+        const sorted = usedFuzzyFallback
+          ? actors
+          : actors.sort((a, b) => b.popularity - a.popularity);
         setResults(sorted);
         setError(null);
         setLastSearch((prev) => {
@@ -564,15 +583,40 @@ export default function ActorSearch({ navigation, route }) {
           return filtered.slice(0, 5);
         });
       } catch (err) {
+        if (requestId !== searchRequestRef.current) return;
         setError(err.message);
       } finally {
-        setLoading(false);
+        if (requestId === searchRequestRef.current) setLoading(false);
       }
     },
     [language, adultContent, API_KEY],
   );
 
-  const handleToggleView = useCallback((next) => setViewMode(next), []);
+  // NOT: handleSearch, fetchResults'tan SONRA tanımlı olmalı — bağımlılık dizisi
+  // render sırasında değerlendiği için yukarıda tanımlanırsa fetchResults
+  // okunamaz ve boş deps ilk render'ın closure'ını kalıcı hapsediyordu (dil /
+  // yetişkin içerik değişimi debounce'lu aramaya yansımıyordu).
+  const handleSearch = useCallback(
+    (text) => {
+      searchRequestRef.current += 1;
+      setSearch(text);
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+      if (text.trim().length >= 2) {
+        setError(null);
+        setLoading(true);
+        searchTimeout.current = setTimeout(() => fetchResults(text), 500);
+      } else {
+        // Boş veya 1 karakter: bekleyen istek iptal edildi. loading/error'ı
+        // burada sıfırlamazsak ekran skeleton'da ya da eski hatada takılı kalır
+        // (2+ karakterden geri silme senaryosu).
+        setResults([]);
+        setLoading(false);
+        setError(null);
+      }
+    },
+    [fetchResults],
+  );
+
 
   const renderRowResult = useCallback(
     ({ item, index }) => (
@@ -611,8 +655,11 @@ export default function ActorSearch({ navigation, route }) {
       },
     ],
   };
+  // iOS 26+: Liquid Glass bir atası animasyonlu `opacity` taşıyorsa bozulur
+  // (bkz. components/common/GlassSurface.js) — bu yüzden cam açıkken giriş
+  // yalnız kaymayla yapılır, solma yok.
   const searchBarStyle = {
-    opacity: searchBarAnim,
+    ...(liquidGlassSupported ? null : { opacity: searchBarAnim }),
     transform: [
       {
         translateY: searchBarAnim.interpolate({
@@ -628,44 +675,43 @@ export default function ActorSearch({ navigation, route }) {
       <View style={styles.centerBox}>
         <LottieView
           style={{ width: 280, height: 280 }}
-          source={require("../../LottieJson/search_notfound.json")}
+          source={require("@lottie/search_notfound.json")}
           autoPlay
           loop
         />
         <Text
           style={[styles.emptyHint, { color: theme.text?.secondary ?? "#aaa" }]}
         >
-          "{search}" için sonuç bulunamadı
-        </Text>
+          "{search}{i18nText("autoI18n.icin_sonuc_bulunamadi", "\" için sonuç bulunamadı")}</Text>
       </View>
     ),
     [search, theme],
   );
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.primary }]}
+    <Container
+      style={[styles.container, !isUnified && { backgroundColor: theme.primary }]}
     >
-      <IconBacground opacity={0.3} />
+      {!isUnified && <ScreenDecor scope="search" iconOpacity={0.3} />}
 
       {/* ── Başlık ─────────────────────────────────────────────────────── */}
-      <Animated.Text
+      {!isUnified && <Animated.Text
         style={[
           styles.pageTitle,
           { color: theme.text?.primary ?? "#fff" },
           titleStyle,
         ]}
       >
-        {t.SearchScreen?.searchActrist ?? "Oyuncu Ara"}
-      </Animated.Text>
+        {t.SearchScreen?.searchActrist ?? i18nText("autoI18n.oyuncu_ara", "Oyuncu Ara")}
+      </Animated.Text>}
 
       {/* ── Arama Kutusu + Toggle ──────────────────────────────────────── */}
-      <Animated.View style={[styles.searchRow, searchBarStyle]}>
-        <View
-          style={[
-            styles.searchBar,
-            { backgroundColor: theme.secondary, flex: 1 },
-          ]}
+      {!isUnified && <Animated.View style={[styles.searchRow, searchBarStyle]}>
+        {/* iOS 26+: hap biçimli Liquid Glass arama alanı; diğer yerlerde eski kutu. */}
+        <GlassField
+          height={48}
+          fallbackStyle={[styles.searchBarBox, { backgroundColor: theme.secondary }]}
+          style={[styles.searchBar, { flex: 1 }]}
         >
           <Ionicons
             name="search"
@@ -679,11 +725,13 @@ export default function ActorSearch({ navigation, route }) {
               styles.searchInput,
               { color: theme.text?.primary ?? "#fff" },
             ]}
-            placeholder={t.SearchScreen?.searchActrist ?? "Oyuncu ara..."}
+            placeholder={t.SearchScreen?.searchActrist ?? i18nText("autoI18n.oyuncu_ara_2", "Oyuncu ara...")}
             placeholderTextColor={theme.text?.muted ?? "#666"}
             value={search}
             onChangeText={handleSearch}
+            maxLength={80}
             returnKeyType="search"
+            keyboardAppearance={isLightSurface(theme.primary) ? "light" : "dark"}
             onSubmitEditing={() =>
               search.trim().length >= 2 && fetchResults(search)
             }
@@ -705,13 +753,13 @@ export default function ActorSearch({ navigation, route }) {
               />
             </TouchableOpacity>
           ) : null}
-        </View>
+        </GlassField>
         <LayoutToggle
           viewMode={viewMode}
           onToggle={handleToggleView}
           theme={theme}
         />
-      </Animated.View>
+      </Animated.View>}
 
       {/* ── Son Aramalar ───────────────────────────────────────────────── */}
       {lastSearch.length > 0 && (
@@ -786,13 +834,13 @@ export default function ActorSearch({ navigation, route }) {
           ListEmptyComponent={search.length > 1 ? <EmptySearch /> : null}
         />
       )}
-    </SafeAreaView>
+    </Container>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 10 },
+  container: { flex: 1 ,paddingTop:10},
 
   pageTitle: {
     fontSize: 26,
@@ -811,27 +859,22 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     gap: 10,
   },
+  // Yerleşim iki yolda da geçerli; köşe yalnız eski kutuda (cam kendi şeklini çizer).
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 2,
-    borderRadius: 16,
-    minHeight: 48,
   },
+  searchBarBox: { borderRadius: 16 },
   searchInput: { flex: 1, fontSize: 15, paddingVertical: 10 },
 
   layoutToggleBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
     flexShrink: 0,
   },
 
   // ── Son aramalar ──────────────────────────────────────────────────────────
-  chipsWrapper: { marginBottom: 4 },
+  chipsWrapper: { marginBottom: 10 },
   chipsList: { paddingHorizontal: 16, alignItems: "center", gap: 8 },
   chip: {
     flexDirection: "row",
@@ -845,7 +888,7 @@ const styles = StyleSheet.create({
   // ── ROW KART ──────────────────────────────────────────────────────────────
   rowList: {
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 10,
     paddingBottom: 30,
   },
   rowCard: {
@@ -949,7 +992,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    resizeMode: "cover",
+    contentFit: "cover",
   },
   gridNoPhoto: {
     position: "absolute",
@@ -1030,12 +1073,4 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 14, textAlign: "center", marginTop: 12 },
 
   // Rating/puan pill (rowCard'da kullanılır)
-  ratingPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  ratingText: { fontSize: 12, fontWeight: "600" },
-  voteCount: { fontSize: 11 },
 });

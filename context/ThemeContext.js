@@ -1,44 +1,217 @@
-import React, { createContext, useState, useContext, useEffect } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getThemeColors } from "../theme/colors";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Animated, Easing, Image, StyleSheet } from "react-native";
+import { captureScreen, releaseCapture } from "react-native-view-shot";
+import { buildCustomThemeFromEntry, getThemeColors, parseCustomSelection } from "../theme/colors";
+import { useThemeSettings } from "./AppSettingsContext";
+import { Keys } from "../services/storage";
+import { usePremiumPlanSnapshot } from "../services/premiumState";
+import { getFeatureLimit } from "../utils/premiumFeatures";
 
 const ThemeContext = createContext();
 
-export const ThemeProvider = ({ children }) => {
-  const [selectedTheme, setSelectedTheme] = useState("gray");
-  const currentTheme = getThemeColors(selectedTheme);
+// Eski ekran görüntüsünün yeni renklerin üzerinden solma süresi.
+const THEME_FADE_MS = 450;
 
-  useEffect(() => {
-    const loadTheme = async () => {
-      try {
-        const savedTheme = await AsyncStorage.getItem("selectedTheme");
-        if (savedTheme) {
-          setSelectedTheme(savedTheme);
-        }
-      } catch (error) {
-        console.error("Tema yüklenemedi:", error);
-      }
-    };
-    loadTheme();
+// "custom:<id>[:ton]" veya eski "custom" seçimine karşılık gelen özel temayı ve tonunu bulur.
+const findCustomTheme = (selectedTheme, customThemes) => {
+  const selection = parseCustomSelection(selectedTheme);
+  if (!selection) return null;
+  if (selection.id) return customThemes.find((t) => t.id === selection.id) || null;
+  return customThemes[0] || null; // legacy "custom" -> ilk özel tema
+};
+
+export const ThemeProvider = ({ children }) => {
+  const {
+    selectedTheme,
+    changeTheme: applyTheme,
+    customThemes = [],
+    saveCustomTheme,
+    deleteCustomTheme,
+  } = useThemeSettings();
+
+  // Animasyonlu tema geçişi: renkler stillere düz değer olarak dağıldığından
+  // (yüzlerce bileşen) renkleri tek tek anime etmek mümkün değil. Onun yerine
+  // değişimden hemen önce ekranın anlık görüntüsü en üste konur, tema altında
+  // değişir ve görüntü solarak yeni renkleri açığa çıkarır (cross-fade).
+  const [snapshotUri, setSnapshotUri] = useState(null);
+  const fade = useRef(new Animated.Value(1)).current;
+  const transitionRef = useRef(null); // { apply, applied, uri, timer, done }
+
+  const finishTransition = useCallback((tr) => {
+    transitionRef.current = null;
+    setSnapshotUri(null);
+    if (tr.uri) releaseCapture(tr.uri);
+    tr.done();
   }, []);
 
-  const changeTheme = (newTheme) => {
-    setSelectedTheme(newTheme);
-    AsyncStorage.setItem("selectedTheme", newTheme).catch((error) => {
-      console.error("Tema kaydedilemedi:", error);
-    });
-  };
+  // Anlık görüntü ekrana geldiğinde tema uygulanır; ağaç yeni renklerle
+  // çizilene kadar iki kare beklenip solma başlatılır.
+  const revealNewTheme = useCallback(() => {
+    const tr = transitionRef.current;
+    if (!tr || tr.applied) return;
+    tr.applied = true;
+    if (tr.timer) clearTimeout(tr.timer);
+    tr.apply();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        Animated.timing(fade, {
+          toValue: 0,
+          duration: THEME_FADE_MS,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }).start(() => finishTransition(tr));
+      }),
+    );
+  }, [fade, finishTransition]);
 
-  const value = {
-    theme: currentTheme,
+  // Görüntü zamanında ekrana gelmedi (onLoadEnd düşmedi): animasyondan
+  // vazgeçip anında değiştir. Görüntü ekranda bırakılırsa geç decode olan
+  // eski ekran, solma ortasında yarı saydam belirip flash yapabiliyor.
+  const skipTransition = useCallback(() => {
+    const tr = transitionRef.current;
+    if (!tr || tr.applied) return;
+    tr.applied = true;
+    tr.apply();
+    finishTransition(tr);
+  }, [finishTransition]);
+
+  const changeTheme = useCallback(
+    (newTheme, { animated = true, onApply } = {}) => {
+      // onApply: temayla AYNI commit'te çalışması gereken yan state yazımı
+      // (ör. aktif özel temanın token'ları). Erken yazılırsa ekran görüntü
+      // alınmadan yeni renklere boyanır ve solma görünmez olur.
+      const apply = () => {
+        if (onApply) onApply();
+        applyTheme(newTheme);
+      };
+      // animated:false — RN Modal içinden yapılan seçimler için (modal ayrı
+      // native pencerede çizilir; overlay onu örtemez, iOS'ta görüntüde
+      // modalın "hayaleti" kalır). Doğrudan, animasyonsuz uygulanır.
+      if (!animated) {
+        apply();
+        return Promise.resolve();
+      }
+      const active = transitionRef.current;
+      if (active) {
+        // Geçiş sürerken gelen yeni seçim: son seçim kazanır. Tema zaten
+        // uygulandıysa anında değiştir (süren solma yeni renkleri açığa
+        // çıkarmaya devam eder), değilse bekleyen uygulamayı değiştir.
+        if (active.applied) apply();
+        else active.apply = apply;
+        return Promise.resolve();
+      }
+      // Dönen promise, tema uygulanıp solma bittiğinde (veya animasyonsuz
+      // düşüşte hemen) çözülür — çağıran taraf navigasyon/toast'ı geciktirebilir.
+      return new Promise((done) => {
+        const tr = {
+          apply,
+          applied: false,
+          uri: null,
+          timer: null,
+          done,
+        };
+        transitionRef.current = tr;
+        captureScreen({ format: "jpg", quality: 0.9 })
+          .then((uri) => {
+            tr.uri = uri;
+            fade.setValue(1);
+            setSnapshotUri(uri);
+            tr.timer = setTimeout(skipTransition, 350);
+          })
+          .catch(() => {
+            // Görüntü alınamadı -> animasyonsuz, anında değiştir. tr.apply
+            // çağrılır (closure'daki newTheme değil): geçiş beklerken seçim
+            // değiştiyse son seçim uygulanmalı.
+            transitionRef.current = null;
+            tr.apply();
+            done();
+          });
+      });
+    },
+    [applyTheme, fade, skipTransition],
+  );
+
+  // Son üretilen tema: seçili özel tema silindiğinde (geçişin apply adımı
+  // gelene kadar selectedTheme hâlâ "custom:<id>" kalır) gri fallback'e
+  // düşüp tüm uygulamanın bir anlığına gri "flash" yapmasını önler.
+  const lastThemeRef = useRef(null);
+
+  // Özel temalar Premium'da. Plan Free'ye düşünce seçim ve kayıtlı temalar
+  // SİLİNMEZ; yalnız varsayılan hazır tema çizilir. Abonelik yenilenince
+  // seçili özel tema kendiliğinden geri gelir. (ThemeProvider PremiumProvider'ın
+  // üstünde olduğu için plan React dışı store'dan okunur.)
+  const premiumPlan = usePremiumPlanSnapshot();
+  const customThemesAllowed = Boolean(getFeatureLimit("custom_themes", premiumPlan));
+
+  const value = useMemo(() => {
+    const isCustomSelection =
+      typeof selectedTheme === "string" && selectedTheme.startsWith("custom");
+    const customLocked = isCustomSelection && !customThemesAllowed;
+    // Bir özel tema seçiliyse token setinden tam tema üretilir; bulunamazsa
+    // önce son bilinen temaya, o da yoksa yerleşik temaya geri düşülür.
+    const custom = customLocked ? null : findCustomTheme(selectedTheme, customThemes);
+    const theme = customLocked
+      ? getThemeColors(Keys.theme.default)
+      : custom
+        ? buildCustomThemeFromEntry(custom, parseCustomSelection(selectedTheme).tone)
+        : isCustomSelection && lastThemeRef.current
+          ? lastThemeRef.current
+          : getThemeColors(selectedTheme);
+    lastThemeRef.current = theme;
+    return {
+      theme,
+      selectedTheme,
+      // Çizilen temanın anahtarı: kilitli özel tema seçiliyken varsayılan tema.
+      appliedTheme: customLocked ? Keys.theme.default : selectedTheme,
+      customThemesAllowed,
+      changeTheme,
+      customThemes,
+      saveCustomTheme,
+      deleteCustomTheme,
+    };
+  }, [
     selectedTheme,
     changeTheme,
-  };
+    customThemes,
+    customThemesAllowed,
+    saveCustomTheme,
+    deleteCustomTheme,
+  ]);
 
   return (
-    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+    <ThemeContext.Provider value={value}>
+      {children}
+      {snapshotUri ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.snapshotOverlay, { opacity: fade }]}
+        >
+          <Image
+            source={{ uri: snapshotUri }}
+            style={StyleSheet.absoluteFill}
+            fadeDuration={0}
+            onLoadEnd={revealNewTheme}
+          />
+        </Animated.View>
+      ) : null}
+    </ThemeContext.Provider>
   );
 };
+
+const styles = StyleSheet.create({
+  // Splash katmanı 9999'da; tema geçişi onun hemen altında kalmalı.
+  snapshotOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 9998,
+  },
+});
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);

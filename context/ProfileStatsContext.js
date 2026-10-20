@@ -1,0 +1,680 @@
+import { intlLocaleOf } from "../utils/appLanguages";
+import React, {
+  createContext, useContext, useEffect, useState, useMemo, useRef, useCallback,
+} from "react";
+import { Animated } from "react-native";
+import { Keys, get, set, getActiveUser } from "../services/storage";
+import { useAuth } from "./AuthContext";
+import { useLanguage } from "./LanguageContext";
+import { useListStatusContext } from "./ListStatusContext";
+import {
+  clearListsWidget,
+  syncListsWidget,
+} from "../services/listsWidgetService";
+import {
+  clearStatsWidget,
+  syncStatsWidget,
+} from "../services/statsWidgetService";
+import { i18nText } from "../utils/i18nText";
+import { cacheKeys } from "../utils/cacheKeys";
+import { publish, seed } from "../services/snapshotCache";
+import {
+  countMovieWatchStats,
+  countTvWatchStats,
+  flattenMovieWatchEntries,
+  flattenTvEpisodeWatchEntries,
+  materializeTvWatchState,
+  mostRewatched,
+} from "../utils/watchHistory";
+
+
+const ProfileStatsContext = createContext();
+export const useProfileStats = () => useContext(ProfileStatsContext);
+
+// ─── Pure helpers (stable — defined outside component) ───────────────────────
+
+const formatTime = (minutes) => {
+  const years  = Math.floor(minutes / (365 * 24 * 60));
+  const months = Math.floor((minutes % (365 * 24 * 60)) / (30 * 24 * 60));
+  const days   = Math.floor((minutes % (30 * 24 * 60)) / (24 * 60));
+  const hours  = Math.floor((minutes % (24 * 60)) / 60);
+  const mins   = minutes % 60;
+  return { years, months, days, hours, minutes: mins };
+};
+
+const parseDate = (date) => {
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date))
+    return new Date(date);
+  if (date?.seconds) return new Date(date.seconds * 1000);
+  return new Date(date);
+};
+
+const groupByDate = (items) => {
+  const groups = {};
+  items.forEach((item) => {
+    const dateStr =
+      typeof item.dateAdded === "string"
+        ? item.dateAdded
+        : item.dateAdded?.seconds
+        ? new Date(item.dateAdded.seconds * 1000).toISOString().slice(0, 10)
+        : "";
+    if (!groups[dateStr]) groups[dateStr] = [];
+    groups[dateStr].push(item);
+  });
+  return Object.entries(groups)
+    .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+    .map(([date, data]) => ({ title: date, data }));
+};
+
+const groupByDateFlatTv = (items) => {
+  const groups = {};
+  items.forEach((item) => {
+    let dateStr = null;
+    if (item.episodeWatchTime?.seconds)
+      dateStr = new Date(item.episodeWatchTime.seconds * 1000)
+        .toISOString()
+        .slice(0, 10);
+    else if (typeof item.episodeWatchTime === "string")
+      dateStr = item.episodeWatchTime.slice(0, 10);
+    if (!dateStr) return;
+    if (!groups[dateStr]) groups[dateStr] = [];
+    groups[dateStr].push(item);
+  });
+  return Object.entries(groups)
+    .sort((a, b) => new Date(b[0]) - new Date(a[0]))
+    .map(([date, data]) => ({ title: date, data }));
+};
+
+// Avatar halkasını, hero gradyanını ve istatistik ekranlarının accent'ini
+// besleyen türetilmiş renk. `step` = 10.080 dakikalık (1 hafta) izleme adımı.
+//
+// ETİKET DEĞİŞTİ: eskiden "Rank 7" yazıyordu ve bu, profildeki asıl ilerleme
+// göstergesi olan **Perde** ile (components/profile/WatchLevelCard.js) aynı
+// anlama gelen ikinci bir "seviye" gibi okunuyordu — uygulamada üç ayrı
+// ilerleme sayısı görünüyordu (Rank, Perde, oyun Seviyesi). Artık ölçtüğü şeyi
+// söylüyor: "7 hafta" (docs §10.3).
+//
+// RENK ÜRETİMİ: eskiden `hue = step*35` ile sabit %80/%90 doygunlukta 360°'yi
+// dönen ham bir HSL rotasyonuydu — bazı adımlarda neon/göz yoran tonlar
+// çıkıyordu ve "seviyeye göre değer artıyor" hissi vermiyordu (her adım aynı
+// doygunluk/parlaklıkta, sadece rastgele farklı bir renkti). Yerine elle
+// seçilmiş, birbiriyle çakışmayan RANK_COLOR_PALETTE (aşağıda) geldi: ilk tur
+// bu paleti sırayla kullanır, palet bitince bir SONRAKİ tur aynı tonları hafif
+// kaydırıp koyulaştırıp/doygunlaştırarak tekrar kullanır — böylece üst
+// seviyeler tükenmeden yeni, "değerli" hissettiren tonlar almaya devam eder.
+const RANK_COLOR_PALETTE = [
+  { hue: 210, sat: 68, light: 56 }, // Gök mavisi
+  { hue: 152, sat: 55, light: 45 }, // Zümrüt
+  { hue: 265, sat: 60, light: 60 }, // Ametist
+  { hue: 188, sat: 62, light: 45 }, // Turkuaz
+  { hue: 340, sat: 65, light: 58 }, // Yakut
+  { hue: 32, sat: 82, light: 55 }, // Amber
+  { hue: 48, sat: 86, light: 52 }, // Altın
+  { hue: 285, sat: 52, light: 55 }, // Orkide
+  { hue: 168, sat: 58, light: 40 }, // Yeşim
+  { hue: 8, sat: 68, light: 55 }, // Mercan
+  { hue: 225, sat: 58, light: 52 }, // Safir
+  { hue: 130, sat: 42, light: 42 }, // Koyu yeşil
+];
+
+const getRankTierForMinutes = (totalMinutes) => {
+  const step = Math.floor(totalMinutes / 10080);
+  const paletteLength = RANK_COLOR_PALETTE.length;
+  const cycle = Math.floor(step / paletteLength);
+  const base = RANK_COLOR_PALETTE[((step % paletteLength) + paletteLength) % paletteLength];
+  const hue = (base.hue + cycle * 11 + 360) % 360;
+  const sat = Math.min(92, base.sat + cycle * 3);
+  const light = Math.max(30, base.light - cycle * 4);
+  const borderColor = `hsl(${hue}, ${sat}%, ${light}%)`;
+  const borderColor2 = `hsl(${hue}, ${Math.min(96, sat + 14)}%, ${Math.min(72, light + 16)}%)`;
+  const shadowColor = `hsla(${hue}, ${Math.max(35, sat - 10)}%, ${Math.max(22, light - 18)}%, 0.9)`;
+  const rankName = i18nText("autoI18n.hafta_sayisi", `${step} hafta`, { count: step });
+  return { borderColor, borderColor2, shadowColor, rankLevel: step, rankName };
+};
+
+// Film/dizi ayrımına göre `Movie`/`Tv` son ekli alan adları üretir — mevcut
+// istatistik ekranları (Movie/TvStatisticsScreen, StatisticsSection, widget
+// senkronu) hâlâ kategori bazlı rengi/seviyeyi ayrı ayrı okuyor.
+const suffixRankTier = (tier, suffix) => ({
+  [`borderColor${suffix}`]: tier.borderColor,
+  [`borderColor2${suffix}`]: tier.borderColor2,
+  [`shadowColor${suffix}`]: tier.shadowColor,
+  [`rankLevel${suffix}`]: tier.rankLevel,
+  [`rankName${suffix}`]: tier.rankName,
+});
+
+const getTopGenreNames = (items, limit = 3) => {
+  const counts = {};
+  (items || []).forEach((item) =>
+    (item.genres || []).forEach((genre) => {
+      if (genre) counts[genre] = (counts[genre] || 0) + 1;
+    }),
+  );
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([genre]) => genre);
+};
+
+// ─── Talebe bağlı (lazy) türetme ─────────────────────────────────────────────
+// Bu context uygulamanın KÖKÜNDE mount. Sıralama / tarihe göre gruplama /
+// en çok tekrar izlenenler gibi ağır türetmeler ise YALNIZ istatistik ve
+// Wrapped ekranlarında okunuyor. Eskiden hepsi useMemo ile her snapshot'ta
+// koşulsuz hesaplanıyordu: kullanıcı o ekranlara hiç girmese de her izleme
+// kaydı değişiminde tüm geçmiş sıralanıp gruplanıyordu.
+//
+// Çözüm: bu alanları context değerinde GETTER olarak yayınla. Hesap ancak bir
+// ekran o alanı gerçekten okuduğunda çalışır; sonuç girdi kimliğine göre
+// cache'lenir, yani aynı veriyle tekrar tekrar okumak bedava ve dönen referans
+// stabil (tüketicilerin useMemo bağımlılıkları bozulmaz).
+const sameDeps = (a, b) =>
+  a.length === b.length && a.every((dep, i) => Object.is(dep, b[i]));
+
+// ─── Provider ────────────────────────────────────────────────────────────────
+
+export const ProfileStatsProvider = ({ children }) => {
+  const { user } = useAuth();
+  const uid = user?.uid;
+
+  const { t, language } = useLanguage();
+  // Öntanımlı listeler (favorites/watchList/watchedMovies) artık subcollection'da;
+  // kök doc'tan kalkacakları için profil liste kartları combinedLists'ten beslenir.
+  const { combinedLists, stats: precomputedStats } = useListStatusContext();
+
+  const [lists,              setLists]             = useState([]);
+
+  // ── AÇILIŞ TOHUMU ────────────────────────────────────────────────────────
+  const statsSeed = useMemo(
+    () => {
+      const tohumUid = uid ?? getActiveUser();
+      return tohumUid ? seed(cacheKeys.stats(tohumUid)).data || {} : {};
+    },
+    [],
+  );
+
+  const [watchedMovieCount,   setWatchedMovieCount]   = useState(statsSeed.watchedMovieCount ?? 0);
+  const [totalWatchedTime,    setTotalWatchedTime]     = useState(statsSeed.totalWatchedTime ?? {});
+  const [totalMinutesTime,    setTotalMinutesTime]     = useState(statsSeed.totalMinutesTime ?? 0);
+  const [watchedTvCount,      setWatchedTvCount]       = useState(statsSeed.watchedTvCount ?? 0);
+  const [totalSeasonsCount,   setTotalSeasonsCount]    = useState(statsSeed.totalSeasonsCount ?? 0);
+  const [totalEpisodesCount,  setTotalEpisodesCount]   = useState(statsSeed.totalEpisodesCount ?? 0);
+  const [totalWatchedTimeTv,  setTotalWatchedTimeTv]   = useState(statsSeed.totalWatchedTimeTv ?? {});
+  const [totalMinutesTimeTv,  setTotalMinutesTimeTv]   = useState(statsSeed.totalMinutesTimeTv ?? 0);
+
+  const [uniqueMovieCount,    setUniqueMovieCount]    = useState(statsSeed.uniqueMovieCount ?? 0);
+  const [uniqueTvCount,       setUniqueTvCount]       = useState(statsSeed.uniqueTvCount ?? 0);
+  const [uniqueSeasonsCount,  setUniqueSeasonsCount]  = useState(statsSeed.uniqueSeasonsCount ?? 0);
+  const [uniqueEpisodesCount, setUniqueEpisodesCount] = useState(statsSeed.uniqueEpisodesCount ?? 0);
+
+  const [isLoading]          = useState(false);
+  const [loadingTv,          setLoadingTv]          = useState(false);
+  const [loadingMovies,      setLoadingMovies]      = useState(false);
+  const [isloadingShowInfo]  = useState(false);
+  const [isloadingMovieInfo] = useState(false);
+
+  const [listItems,   setListItems]   = useState([]);
+  const [listItemsTv, setListItemsTv] = useState([]);
+  const [selectedDate,   setSelectedDate]   = useState(null);
+  const [selectedDateTv, setSelectedDateTv] = useState(null);
+  const [timeDisplayMode, setTimeDisplayMode] = useState("minutes");
+  const [scaleValues,     setScaleValues]     = useState({});
+  const [statsCountMode,  setStatsCountMode]  = useState(() => get(Keys.statsCountMode));
+
+  // ── Sync listItems and precomputed stats from ListStatusContext ────────────
+  useEffect(() => {
+    if (!uid) {
+      setListItems([]);
+      setListItemsTv([]);
+      setLists([]);
+      return;
+    }
+
+    if (combinedLists) {
+      setListItems(combinedLists.watchedMovies || []);
+      setListItemsTv(combinedLists.watchedTv || []);
+      setLists(Object.entries(combinedLists));
+    }
+
+    if (precomputedStats) {
+      if (precomputedStats.movies) {
+        setWatchedMovieCount(precomputedStats.movies.totalRewatchCount || 0);
+        setUniqueMovieCount(precomputedStats.movies.uniqueCount || 0);
+        setTotalMinutesTime(precomputedStats.movies.totalMinutes || 0);
+        setTotalWatchedTime(formatTime(precomputedStats.movies.totalMinutes || 0));
+      }
+      if (precomputedStats.tv) {
+        setWatchedTvCount(precomputedStats.tv.shows?.total || 0);
+        setUniqueTvCount(precomputedStats.tv.shows?.unique || 0);
+        setTotalSeasonsCount(precomputedStats.tv.seasons?.total || 0);
+        setUniqueSeasonsCount(precomputedStats.tv.seasons?.unique || 0);
+        setTotalEpisodesCount(precomputedStats.tv.episodes?.total || 0);
+        setUniqueEpisodesCount(precomputedStats.tv.episodes?.unique || 0);
+        setTotalMinutesTimeTv(precomputedStats.tv.totalMinutes || 0);
+        setTotalWatchedTimeTv(formatTime(precomputedStats.tv.totalMinutes || 0));
+      }
+      setLoadingMovies(false);
+      setLoadingTv(false);
+    }
+  }, [uid, combinedLists, precomputedStats]);
+
+  // Talebe bağlı türetme cache'i: { key: { deps, value } }
+  const lazyCacheRef = useRef({});
+  const lazy = useCallback((key, deps, compute) => {
+    const hit = lazyCacheRef.current[key];
+    if (hit && sameDeps(hit.deps, deps)) return hit.value;
+    const value = compute();
+    lazyCacheRef.current[key] = { deps, value };
+    return value;
+  }, []);
+
+  // ── Eager türetmeler ─────────────────────────────────────────────────────
+  // Bunlar sayaçları (film/dizi/bölüm sayısı, toplam süre) besliyor; sayaçlar
+  // da profil başlığı, ana ekran widget'ları ve rozet defteri tarafından her
+  // durumda okunuyor. Ertelemenin anlamı yok.
+  const movieHistoryItems = useMemo(
+    () => flattenMovieWatchEntries(listItems.filter((item) => item.type === "movie")),
+    [listItems],
+  );
+
+  const tvHistoryStates = useMemo(
+    () => (listItemsTv || []).map((show) => ({
+      show,
+      ...materializeTvWatchState(show),
+    })),
+    [listItemsTv],
+  );
+
+  // Bölüm listesi hem dizi sayaçlarının hem StatisticsSection/Wrapped'in girdisi.
+  // (Eskiden dizi istatistik effect'i içinde İKİNCİ kez flatten ediliyordu.)
+  const flatEpisodesTv = useMemo(
+    () => flattenTvEpisodeWatchEntries(listItemsTv),
+    [listItemsTv],
+  );
+
+  // ── Film istatistikleri ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (
+      movieHistoryItems.length === 0 &&
+      (precomputedStats?.movies?.uniqueCount || statsSeed.uniqueMovieCount)
+    ) {
+      return;
+    }
+    const totalMin = movieHistoryItems.reduce((acc, movie) => acc + (movie.minutes || 0), 0);
+    const counts = countMovieWatchStats(movieHistoryItems);
+    setWatchedMovieCount(counts.total);
+    setUniqueMovieCount(counts.unique);
+    setTotalMinutesTime(totalMin);
+    setTotalWatchedTime(formatTime(totalMin));
+  }, [movieHistoryItems, precomputedStats, statsSeed]);
+
+  // ── Dizi istatistikleri ─────────────────────────────────────────────────
+  // Süre `flatEpisodesTv`ten, sayaçlar aynı kaynaktan türeyen izleme
+  // durumlarından gelir; ikisi de tekrarları içerir, `unique` alanları içermez.
+  useEffect(() => {
+    if (
+      flatEpisodesTv.length === 0 &&
+      (precomputedStats?.tv?.shows?.unique || statsSeed.uniqueTvCount)
+    ) {
+      return;
+    }
+    const totalMinTv = flatEpisodesTv.reduce(
+      (sum, episode) => sum + (Number(episode.episodeMinutes) || 0),
+      0,
+    );
+    const counts = countTvWatchStats(tvHistoryStates);
+    setWatchedTvCount(counts.shows.total);
+    setUniqueTvCount(counts.shows.unique);
+    setTotalSeasonsCount(counts.seasons.total);
+    setUniqueSeasonsCount(counts.seasons.unique);
+    setTotalEpisodesCount(counts.episodes.total);
+    setUniqueEpisodesCount(counts.episodes.unique);
+    setTotalMinutesTimeTv(totalMinTv);
+    setTotalWatchedTimeTv(formatTime(totalMinTv));
+  }, [flatEpisodesTv, tvHistoryStates, precomputedStats, statsSeed]);
+
+  // ── Sayaçları sonraki açılış için sakla ─────────────────────────────────
+  //
+  // KAPI `!loadingMovies && !loadingTv`: iki listener de GERÇEK veriyle
+  // dönmeden yazarsak, tohumla açılıp yarım veri üzerinden hesaplanmış
+  // sayaçları kalıcılaştırır ve hatayı her açılışta pekiştiririz.
+  useEffect(() => {
+    if (!uid || loadingMovies || loadingTv) return;
+    publish(cacheKeys.stats(uid), {
+      watchedMovieCount,
+      totalWatchedTime,
+      totalMinutesTime,
+      watchedTvCount,
+      totalSeasonsCount,
+      totalEpisodesCount,
+      totalWatchedTimeTv,
+      totalMinutesTimeTv,
+      uniqueMovieCount,
+      uniqueTvCount,
+      uniqueSeasonsCount,
+      uniqueEpisodesCount,
+    });
+  }, [
+    uid,
+    loadingMovies,
+    loadingTv,
+    watchedMovieCount,
+    totalWatchedTime,
+    totalMinutesTime,
+    watchedTvCount,
+    totalSeasonsCount,
+    totalEpisodesCount,
+    totalWatchedTimeTv,
+    totalMinutesTimeTv,
+    uniqueMovieCount,
+    uniqueTvCount,
+    uniqueSeasonsCount,
+    uniqueEpisodesCount,
+  ]);
+
+  // ── Tekrarlı/tekrarsız kipi — cihazda kalıcı ────────────────────────────
+  // Senkron okunduğu için başlangıç değerinde (yukarıda) hazır; ayrı bir
+  // hidrasyon effect'ine gerek yok.
+  const toggleStatsCountMode = useCallback(() => {
+    setStatsCountMode((previous) => {
+      const next = previous === "unique" ? "total" : "unique";
+      set(Keys.statsCountMode, next);
+      return next;
+    });
+  }, []);
+
+  // Kartların, ana ekran widget'ının ve istatistik ekranlarının seçili kipte
+  // okuduğu sayılar. Tek yerde seçilir ki hiçbir yüzey diğeriyle çelişmesin.
+  const uniqueMode = statsCountMode === "unique";
+  const displayMovieCount    = uniqueMode ? uniqueMovieCount    : watchedMovieCount;
+  const displayTvCount       = uniqueMode ? uniqueTvCount       : watchedTvCount;
+  const displayEpisodesCount = uniqueMode ? uniqueEpisodesCount : totalEpisodesCount;
+
+  // ── Animation values for movie stats list ────────────────────────────────
+  // Only create new Animated.Values for new items — existing ones are preserved
+  useEffect(() => {
+    if (!movieHistoryItems?.length) return;
+    setScaleValues((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      movieHistoryItems.forEach((item) => {
+        const key = item.historyId || item.id;
+        if (!next[key]) {
+          next[key] = new Animated.Value(1);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [movieHistoryItems]);
+
+  const onPressIn = (id) => {
+    if (!scaleValues[id]) return;
+    Animated.timing(scaleValues[id], { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
+  };
+  const onPressOut = (id) => {
+    if (!scaleValues[id]) return;
+    Animated.timing(scaleValues[id], { toValue: 1, duration: 200, useNativeDriver: true }).start();
+  };
+
+  const handleTimeClick = () =>
+    setTimeDisplayMode((p) => p === "minutes" ? "hours" : p === "hours" ? "days" : "minutes");
+
+  // `short`: dar alanlarda (profildeki süre şeridi) birim kısaltılır —
+  // "1.234 Dakika" yerine "1.234 dk". Uzun etiketler baştaki boşluğu taşıdığı
+  // için trim'lenir, kısa etiketler zaten temiz gelir.
+  const formatTotalDurationTime = (totalMinutes, mode, { short = false } = {}) => {
+    const locale = intlLocaleOf(language);
+    const label = (key) =>
+      short
+        ? (t.profileScreen[`${key}Short`] || t.profileScreen[key] || "").trim()
+        : (t.profileScreen[key] || "").trim();
+    const hours = Math.floor(totalMinutes / 60);
+    const days  = Math.floor(hours / 24);
+    if (mode === "hours") return `${hours.toLocaleString(locale)} ${label("hours")}`;
+    if (mode === "days")  return `${days.toLocaleString(locale)} ${label("days")}`;
+    return `${totalMinutes.toLocaleString(locale)} ${label("minutes")}`;
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return typeof timestamp === "string" ? timestamp : "Bilinmeyen Tarih";
+    return new Intl.DateTimeFormat(language, { day: "numeric", month: "long", year: "numeric" }).format(date);
+  };
+
+  // ── Talebe bağlı türetmeler (yalnız okununca hesaplanır) ─────────────────
+  // Aşağıdaki getXxx fonksiyonları context değerinde getter olarak yayınlanır;
+  // sonuçlar `lazy` ile girdi kimliğine göre cache'lenir. Birbirini çağıranlar
+  // (groupedData → sortedListItems) aynı cache'i paylaşır, iş tekrarlanmaz.
+
+  // Film
+  const getSortedListItems = () =>
+    lazy("sortedListItems", [movieHistoryItems], () =>
+      [...movieHistoryItems].sort((a, b) => parseDate(b.dateAdded) - parseDate(a.dateAdded)),
+    );
+  const getGroupedData = () =>
+    lazy("groupedData", [movieHistoryItems], () => groupByDate(getSortedListItems()));
+  const getUniqueDates = () =>
+    lazy("uniqueDates", [movieHistoryItems], () =>
+      [...new Set(getSortedListItems().map((item) => {
+        if (typeof item.dateAdded === "string") return item.dateAdded;
+        if (item.dateAdded?.seconds) return new Date(item.dateAdded.seconds * 1000).toISOString().slice(0, 10);
+        return "";
+      }))].filter(Boolean),
+    );
+  const getTopMovieGenres = () =>
+    lazy("topMovieGenres", [movieHistoryItems], () => getTopGenreNames(movieHistoryItems));
+  const getMostRewatchedMovies = () =>
+    lazy("mostRewatchedMovies", [movieHistoryItems], () =>
+      mostRewatched(movieHistoryItems, (item) => item.id),
+    );
+
+  // Dizi
+  const getSortedFlatEpisodesTv = () =>
+    lazy("sortedFlatEpisodesTv", [flatEpisodesTv], () =>
+      [...flatEpisodesTv].sort((a, b) => {
+        const ts = (t) => t?.seconds ? new Date(t.seconds * 1000) : typeof t === "string" ? new Date(t) : 0;
+        return ts(b.episodeWatchTime) - ts(a.episodeWatchTime);
+      }),
+    );
+  const getGroupedDataTv = () =>
+    lazy("groupedDataTv", [flatEpisodesTv], () => groupByDateFlatTv(getSortedFlatEpisodesTv()));
+  const getUniqueDatesTv = () =>
+    lazy("uniqueDatesTv", [flatEpisodesTv], () =>
+      [...new Set(getSortedFlatEpisodesTv().map((item) => {
+        if (item.episodeWatchTime?.seconds) return new Date(item.episodeWatchTime.seconds * 1000).toISOString().slice(0, 10);
+        if (typeof item.episodeWatchTime === "string") return item.episodeWatchTime.slice(0, 10);
+        return null;
+      }).filter(Boolean))].sort((a, b) => new Date(b) - new Date(a)),
+    );
+  const getTopTvGenres = () =>
+    lazy("topTvGenres", [flatEpisodesTv], () => getTopGenreNames(flatEpisodesTv));
+  const getTvFullWatchEntries = () =>
+    lazy("tvFullWatchEntries", [tvHistoryStates], () =>
+      tvHistoryStates.flatMap(({ show, watchEvents }) =>
+        watchEvents
+          .filter((event) => event.scope === "show")
+          .map((event) => ({ ...show, watchEvent: event })),
+      ),
+    );
+  const getMostRewatchedTv = () =>
+    lazy("mostRewatchedTv", [tvHistoryStates], () =>
+      mostRewatched(getTvFullWatchEntries(), (item) => item.id),
+    );
+
+  // ── Rank colors ──────────────────────────────────────────────────────────
+  // Kategori bazlı (`Movie`/`Tv` son ekli) alanlar istatistik ekranları için
+  // korunuyor; son eksiz `borderColor`/`rankLevel`/`rankName` ise film+dizi
+  // dakikalarının TOPLAMINDAN türeyen tek, birleşik seviye — avatardaki tek
+  // halkayı besler (bkz. screens/tabs/ProfileScreen.js).
+  const rankInfo = useMemo(() => ({
+    ...suffixRankTier(getRankTierForMinutes(totalMinutesTime), "Movie"),
+    ...suffixRankTier(getRankTierForMinutes(totalMinutesTimeTv), "Tv"),
+    ...getRankTierForMinutes((totalMinutesTime || 0) + (totalMinutesTimeTv || 0)),
+  }), [totalMinutesTime, totalMinutesTimeTv]);
+
+  // İzlenen diziler artık subcollection'da (Lists/{uid}/watchedTv/{showId}); kök
+  // doc'taki watchedTv[] dizisi migration ile boşaltılıyor. Liste ekranlarının (Profile
+  // Lists / ListsViewScreen / ListsScreen) gördüğü `lists`'te watchedTv girdisini
+  // subcollection show'larıyla (gömülü seasons) override ediyoruz; sıralama için
+  // dateAdded ekliyoruz.
+  const displayLists = useMemo(() => {
+    const tvItems = (listItemsTv || []).map((s) => ({
+      ...s,
+      dateAdded: s.dateAdded ?? s.addedShowDate ?? null,
+    }));
+    // Öntanımlı listeler subcollection'dan (combinedLists), watchedTv gömülü
+    // seasons'lı listItemsTv'den; özel listeler kök doc entry'lerinden (`lists`).
+    const result = [
+      ["favorites", combinedLists?.favorites || []],
+      ["watchList", combinedLists?.watchList || []],
+      ["watchedMovies", combinedLists?.watchedMovies || []],
+      ["watchedTv", tvItems],
+    ];
+    (lists || []).forEach(([k, v]) => {
+      if (
+        k === "favorites" ||
+        k === "watchList" ||
+        k === "watchedMovies" ||
+        k === "watchedTv" ||
+        k === "customLists" ||
+        !Array.isArray(v)
+      )
+        return;
+      result.push([k, v]);
+    });
+    return result;
+  }, [lists, listItemsTv, combinedLists]);
+
+  // ── Ana ekran widget'ları ("Listelerim" + "İstatistikler") ────────────────
+  // Widget'lar Firestore'a İKİNCİ bir bağlantı açmaz: bu context'in canonical
+  // verisinin küçük bir özetini native depoya aktarırız; widget oradan çizilir
+  // ve uygulama kapalıyken de son senkronize hali gösterir.
+  //
+  // Debounce NEDEN VAR: açılışta 3 listener'ın snapshot'ları art arda gelir ve
+  // her birinde 12 liste × 36 poster URL'lik payload'u serialize edip köprüden
+  // geçirmek boşuna iş. Yazma yalnız veri duraklayınca bir kez yapılır.
+  useEffect(() => {
+    if (!uid) {
+      clearListsWidget();
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      syncListsWidget(displayLists, t?.profileScreen?.ProfileLists, language);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [uid, displayLists, t, language]);
+
+  useEffect(() => {
+    if (!uid) {
+      clearStatsWidget();
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      syncStatsWidget(
+        {
+          // Widget profil kartlarının aynası: seçili kipi o da izler, aksi
+          // halde ana ekranda 500, profilde 100 yazardı.
+          movieCount: displayMovieCount,
+          movieMinutes: totalMinutesTime,
+          movieTime: totalWatchedTime,
+          movieAccent: rankInfo.borderColorMovie,
+          movieRankName: rankInfo.rankNameMovie,
+          tvShowCount: displayTvCount,
+          episodeCount: displayEpisodesCount,
+          tvMinutes: totalMinutesTimeTv,
+          tvTime: totalWatchedTimeTv,
+          tvAccent: rankInfo.borderColorTv,
+          tvRankName: rankInfo.rankNameTv,
+          labels: {
+            movies: t?.movies,
+            tvShows: t?.tvShows,
+            movieWatched: t?.profileScreen?.movieWatched,
+            tvShowCount: t?.profileScreen?.tvShowCount,
+            tvShowEpisodeCount: t?.profileScreen?.tvShowEpisodetotalCount,
+            totalDuration: t?.profileScreen?.totalDuration,
+            years: t?.profileScreen?.years,
+            months: t?.profileScreen?.months,
+            days: t?.profileScreen?.days,
+            hours: t?.profileScreen?.hours,
+            minutes: t?.profileScreen?.minutes,
+          },
+        },
+        language,
+      );
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [
+    uid, language, t, rankInfo,
+    displayMovieCount, totalMinutesTime, totalWatchedTime,
+    displayTvCount, displayEpisodesCount, totalMinutesTimeTv, totalWatchedTimeTv,
+  ]);
+
+  const value = useMemo(() => {
+    const base = {
+      // Lists
+      lists: displayLists, isLoading,
+      // Movie stats
+      watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems, setListItems,
+      movieHistoryItems,
+      isloadingMovieInfo, loadingMovies, selectedDate, setSelectedDate,
+      scaleValues,
+      // TV stats
+      watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
+      listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv,
+      selectedDateTv, setSelectedDateTv,
+      // Tekrarsız sayaçlar + kip. `display*` seçili kipi uygular; ham sayaçlar
+      // istatistik ekranlarının ikisini birden göstermesi için açık durur.
+      uniqueMovieCount, uniqueTvCount, uniqueSeasonsCount, uniqueEpisodesCount,
+      statsCountMode, toggleStatsCountMode,
+      displayMovieCount, displayTvCount, displayEpisodesCount,
+      // Shared helpers
+      timeDisplayMode, handleTimeClick, formatTotalDurationTime, formatDate, onPressIn, onPressOut,
+      t,
+      // Rank
+      ...rankInfo,
+    };
+
+    // Ağır alanlar getter olarak: hesap ancak bir ekran gerçekten okuyunca
+    // çalışır (bkz. yukarıdaki "Talebe bağlı türetme" notu).
+    const defineLazy = (key, get) =>
+      Object.defineProperty(base, key, { enumerable: true, configurable: true, get });
+
+    defineLazy("groupedData", getGroupedData);
+    defineLazy("uniqueDates", getUniqueDates);
+    defineLazy("topMovieGenres", getTopMovieGenres);
+    defineLazy("mostWatchedGenre", () => getTopMovieGenres()[0] || null);
+    defineLazy("secondWatchedGenre", () => getTopMovieGenres()[1] || "-");
+    defineLazy("threeWatchedGenre", () => getTopMovieGenres()[2] || "-");
+    defineLazy("mostRewatchedMovies", getMostRewatchedMovies);
+
+    defineLazy("groupedDataTv", getGroupedDataTv);
+    defineLazy("uniqueDatesTv", getUniqueDatesTv);
+    defineLazy("topTvGenres", getTopTvGenres);
+    defineLazy("mostWatchedGenreTv", () => getTopTvGenres()[0] || "-");
+    defineLazy("secondWatchedGenreTv", () => getTopTvGenres()[1] || "-");
+    defineLazy("thirdWatchedGenreTv", () => getTopTvGenres()[2] || "-");
+    defineLazy("mostRewatchedTv", getMostRewatchedTv);
+
+    return base;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    displayLists, isLoading,
+    watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems,
+    movieHistoryItems,
+    isloadingMovieInfo, loadingMovies, selectedDate, scaleValues,
+    watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
+    listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv, tvHistoryStates,
+    selectedDateTv,
+    uniqueMovieCount, uniqueTvCount, uniqueSeasonsCount, uniqueEpisodesCount,
+    statsCountMode, toggleStatsCountMode,
+    displayMovieCount, displayTvCount, displayEpisodesCount,
+    timeDisplayMode, rankInfo, t,
+  ]);
+
+  return (
+    <ProfileStatsContext.Provider value={value}>
+      {children}
+    </ProfileStatsContext.Provider>
+  );
+};

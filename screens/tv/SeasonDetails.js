@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, memo, useMemo } from "react";
+import { tmdbLanguageOf } from "../../utils/appLanguages";
+import React, { useState, useEffect, useCallback, memo } from "react";
 import {
   StyleSheet,
   View,
@@ -12,20 +13,25 @@ import {
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
-import { SearchSkeleton } from "../../components/Skeleton";
-import RatingStars from "../../components/RatingStars";
+import { SeasonSkeleton } from "../../components/Skeleton";
+import BackButton from "../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
+import WatchProgressBar from "../../components/tv/WatchProgressBar";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
-import { useSnow } from "../../context/SnowContext";
 import WatchedAdd from "./WatchedAdd";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "../../firebase";
-import { useAuth } from "../../context/AuthContext";
-import AntDesign from "@expo/vector-icons/AntDesign";
-import { useAppSettings } from "../../context/AppSettingsContext";
+import { useWatchedShow } from "../../hooks/useWatchedShow";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+} from "../../context/AppSettingsContext";
 import Reminder from "../../components/Reminder";
+import ScreenDecor from "../../components/ScreenDecor";
+import { daysUntil, parseAirDate } from "../../utils/airDate";
+import ScopedCommentButton from "../../components/comments/ScopedCommentButton";
+import { COMMENT_SCOPE } from "../../utils/commentScope";
+import { alpha } from "../../theme/colors";
 
 const { width } = Dimensions.get("window");
 
@@ -52,11 +58,13 @@ const EpisodeCard = memo(
     genres,
     theme,
     imageQuality,
+    getTmdbUrl,
     t,
     isPlaying,
     dateDiff,
     onPress,
-    adjustOpacity,
+    isWatched,
+    watchEvents,
   }) => {
     const ratingColor = getRatingColor(episode.vote_average);
     const isUpcoming = dateDiff?.isRemaining;
@@ -79,13 +87,13 @@ const EpisodeCard = memo(
           <>
             <LottieView
               style={styles.fireworksLeft}
-              source={require("../../LottieJson/6_fireworks.json")}
+              source={require("@lottie/6_fireworks.json")}
               autoPlay
               loop={false}
             />
             <LottieView
               style={styles.fireworksRight}
-              source={require("../../LottieJson/6_fireworks.json")}
+              source={require("@lottie/6_fireworks.json")}
               autoPlay
               loop={false}
             />
@@ -98,7 +106,7 @@ const EpisodeCard = memo(
             <>
               <Image
                 source={{
-                  uri: `https://image.tmdb.org/t/p/${imageQuality.poster}${episode.still_path}`,
+                  uri: getTmdbUrl(episode.still_path, 'poster', 200),
                 }}
                 style={styles.episodeThumbnail}
               />
@@ -128,7 +136,7 @@ const EpisodeCard = memo(
             <View
               style={[
                 styles.runtimeBadge,
-                { backgroundColor: adjustOpacity(theme.secondary, 0.82) },
+                { backgroundColor: alpha(theme.secondary, 0.82) },
               ]}
             >
               <Ionicons
@@ -138,6 +146,7 @@ const EpisodeCard = memo(
                 style={{ marginRight: 3 }}
               />
               <Text
+                allowFontScaling={false}
                 style={[
                   styles.runtimeText,
                   { color: theme.text?.primary ?? "#fff" },
@@ -156,7 +165,10 @@ const EpisodeCard = memo(
                 { backgroundColor: ratingColor + "dd" },
               ]}
             >
-              <Text style={styles.ratingBadgeOnThumbText}>
+              <Text
+                allowFontScaling={false}
+                style={styles.ratingBadgeOnThumbText}
+              >
                 ★ {episode.vote_average.toFixed(1)}
               </Text>
             </View>
@@ -165,10 +177,12 @@ const EpisodeCard = memo(
 
         {/* ── Sağ: Bilgiler ─────────────────────────────────────────────── */}
         <View style={styles.episodeBody}>
-          {/* Üst satır: bölüm no + tarih + hatırlatıcı + izlendi */}
+          {/* Üst satır: bölüm no + tarih yan yana (tek satır) + hatırlatıcı + izlendi */}
           <View style={styles.episodeTopRow}>
             <View style={styles.episodeMetaLeft}>
               <Text
+                allowFontScaling={false}
+                numberOfLines={1}
                 style={[
                   styles.episodeNumText,
                   { color: theme.text?.secondary ?? "#aaa" },
@@ -188,6 +202,8 @@ const EpisodeCard = memo(
                   ]}
                 >
                   <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
                     style={[
                       styles.datePillText,
                       {
@@ -237,12 +253,15 @@ const EpisodeCard = memo(
                 episodePosterPath={episode.still_path}
                 genres={genres}
                 size={32}
+                isWatched={isWatched}
+                watchEvents={watchEvents}
               />
             )}
           </View>
 
           {/* Bölüm adı */}
           <Text
+            allowFontScaling={false}
             style={[
               styles.episodeName,
               { color: theme.text?.primary ?? "#fff" },
@@ -255,6 +274,7 @@ const EpisodeCard = memo(
           {/* Özet */}
           {episode.overview ? (
             <Text
+              allowFontScaling={false}
               style={[
                 styles.episodeOverview,
                 { color: theme.text?.secondary ?? "#aaa" },
@@ -303,37 +323,59 @@ export default function SeasonDetails({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [lineCount, setLineCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
-  const [play, setPlay] = useState("");
-  const [isSeasonWatched, setIsSeasonWatched] = useState(0);
+  const [play] = useState("");
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
-  const { user } = useAuth();
-  const { API_KEY, showSnow, imageQuality } = useAppSettings();
+  const { API_KEY } = useApiSettings();
+  const { imageQuality, getTmdbUrl } = useImageQualitySettings();
+
+  // Tek abonelik: bu dizinin tüm izlenme durumu (bölüm bazında getDoc yok).
+  const watched = useWatchedShow(showId);
+  const watchedSeasonCount = watched.seasonWatchedCount(seasonNumber);
+  const isSeasonWatched =
+    details?.episodes?.length > 0
+      ? Math.min(1, watchedSeasonCount / details.episodes.length)
+      : 0;
 
   // ── Yardımcılar ───────────────────────────────────────────────────────────
   const formatDate = useCallback(
-    (ts) =>
-      new Intl.DateTimeFormat(language, {
+    (ts) => {
+      const date = parseAirDate(ts);
+      if (!date) return "";
+      return new Intl.DateTimeFormat(language, {
         day: "numeric",
         month: "long",
         year: "numeric",
-      }).format(new Date(ts)),
+      }).format(date);
+    },
     [language],
   );
 
-  const adjustOpacity = useCallback((rgbColor, opacity) => {
-    const rgb = rgbColor.match(/\d+/g);
-    if (!rgb) return rgbColor;
-    return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${opacity})`;
-  }, []);
+  // Bölüm kartındaki tarih rozeti için kısa biçim ("5 Oca 2020"). Uzun ay
+  // adları bölüm no + tarih satırını alt satıra kaydırıyordu.
+  const formatDateCompact = useCallback(
+    (ts) => {
+      const date = parseAirDate(ts);
+      if (!date) return "";
+      return new Intl.DateTimeFormat(language, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }).format(date);
+    },
+    [language],
+  );
 
+  // Takvim günü farkı (bkz. utils/airDate.js) — "geçen süre" ile hesaplanırsa
+  // yarın yayınlanacak bölüm için "Bugün" yazıyordu.
   const calculateDateDifference = useCallback(
     (airDate) => {
       if (!airDate) return null;
-      const diff = new Date(airDate).getTime() - Date.now();
-      if (diff < 0) return { text: formatDate(airDate), isRemaining: false };
-      const days = Math.floor(diff / 86400000);
+      const days = daysUntil(airDate);
+      if (days === null) return null;
+      if (days < 0)
+        return { text: formatDateCompact(airDate), isRemaining: false };
       const months = Math.floor(days / 30);
       const remDays = days % 30;
       let text;
@@ -349,7 +391,7 @@ export default function SeasonDetails({ route, navigation }) {
       }
       return { text, isRemaining: true };
     },
-    [formatDate, t],
+    [formatDateCompact, t],
   );
 
   // ── Veri Çekme ────────────────────────────────────────────────────────────
@@ -361,7 +403,7 @@ export default function SeasonDetails({ route, navigation }) {
         const res = await axios.get(
           `https://api.themoviedb.org/3/tv/${showId}/season/${seasonNumber}`,
           {
-            params: { language: language === "tr" ? "tr-TR" : "en-US" },
+            params: { language: tmdbLanguageOf(language) },
             headers: { accept: "application/json", Authorization: API_KEY },
           },
         );
@@ -378,34 +420,8 @@ export default function SeasonDetails({ route, navigation }) {
     };
   }, [showId, seasonNumber, language, API_KEY]);
 
-  // ── Firestore İzleme ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!user || !showId || !seasonNumber) return;
-    const unsubscribe = onSnapshot(doc(db, "Lists", user.uid), (snap) => {
-      if (!snap.exists()) return;
-      const watchedTv = snap.data().watchedTv || [];
-      const tvShow = watchedTv.find((s) => s.id === showId);
-      if (tvShow?.seasons?.[seasonNumber - 1]) {
-        const season = tvShow.seasons[seasonNumber - 1];
-        if (season.episodes?.length && season.seasonEpisodes) {
-          setIsSeasonWatched(season.episodes.length / season.seasonEpisodes);
-        }
-      } else {
-        setIsSeasonWatched(0);
-      }
-    });
-    return unsubscribe;
-  }, [user, showId, seasonNumber]);
-
   // ── Kar efekti lottie sayısını sınırla ───────────────────────────────────
-  const snowIndices = useMemo(() => {
-    if (!details || !showSnow) return [];
-    return details.episodes
-      .map((ep, i) => i)
-      .filter((i) => (i + 7) % 7 === 0 || i < 4);
-  }, [details, showSnow]);
-
-  if (loading) return <SearchSkeleton />;
+  if (loading) return <SeasonSkeleton />;
 
   if (!details) {
     return (
@@ -421,8 +437,11 @@ export default function SeasonDetails({ route, navigation }) {
     isSeasonWatched === 1 ? theme.colors?.green : theme.colors?.orange;
 
   return (
+    <View style={[styles.container, { backgroundColor: theme.primary }]}>
+    {/* Dekor İÇERİĞİN ARKASINDA: eskiden kar ScrollView'ın ÜSTÜNDE çiziliyordu. */}
+    <ScreenDecor scope="details" iconOpacity={0.25} />
     <ScrollView
-      style={[styles.container, { backgroundColor: theme.primary }]}
+      style={styles.container}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
@@ -436,7 +455,7 @@ export default function SeasonDetails({ route, navigation }) {
       {isSeasonWatched === 1 && (
         <LottieView
           style={styles.confetti}
-          source={require("../../LottieJson/confetti_2.json")}
+          source={require("@lottie/confetti_2.json")}
           autoPlay
           loop={false}
         />
@@ -447,7 +466,7 @@ export default function SeasonDetails({ route, navigation }) {
         {details.poster_path ? (
           <Image
             source={{
-              uri: `https://image.tmdb.org/t/p/original${details.poster_path}`,
+              uri: getTmdbUrl(details.poster_path, 'poster', 200),
             }}
             style={styles.heroPoster}
           />
@@ -485,20 +504,6 @@ export default function SeasonDetails({ route, navigation }) {
 
       {/* ── İçerik ───────────────────────────────────────────────────────── */}
       <View style={[styles.content, { backgroundColor: theme.primary }]}>
-        {/* Kar efekti */}
-        {snowIndices.map((i) => (
-          <LottieView
-            key={details.episodes[i].episode_number}
-            style={[
-              styles.lottie,
-              { top: 1000 * Math.floor(i < 7 ? i : i / 7) },
-            ]}
-            source={require("../../LottieJson/snow.json")}
-            autoPlay
-            loop
-          />
-        ))}
-
         {/* ── Başlık Bloğu ─────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>
           <Text
@@ -598,24 +603,30 @@ export default function SeasonDetails({ route, navigation }) {
         )}
 
         {/* ── İzlenme Çubuğu ───────────────────────────────────────────── */}
-        <View style={styles.progressWrapper}>
-          <View style={styles.progressBarTrack}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  width: `${Math.round(isSeasonWatched * 100)}%`,
-                  backgroundColor: progressColor,
-                },
-              ]}
-            />
-          </View>
-          {isSeasonWatched > 0 && (
-            <Text style={[styles.progressLabel, { color: progressColor }]}>
-              %{Math.round(isSeasonWatched * 100)}
-            </Text>
-          )}
-        </View>
+        <WatchProgressBar
+          watched={watchedSeasonCount}
+          total={details.episodes?.length || 0}
+          startColor={progressColor}
+          endColor={theme.accent}
+          trackColor={theme.border}
+          style={styles.progressWrapper}
+        />
+
+        {/* ── Sezon yorumları ──────────────────────────────────────────── */}
+        {/* Dizinin ortak yorum sayfasını bu sezona süzülmüş açar. */}
+        <ScopedCommentButton
+          theme={theme}
+          showId={showId}
+          showName={showName}
+          showPosterPath={showPosterPath}
+          seasonCount={showSeasonCount}
+          scope={{
+            scope: COMMENT_SCOPE.SEASON,
+            seasonNumber,
+            scopeTitle: details.name || "",
+          }}
+          style={styles.commentButton}
+        />
 
         <View
           style={[
@@ -684,10 +695,15 @@ export default function SeasonDetails({ route, navigation }) {
                 genres={genres}
                 theme={theme}
                 imageQuality={imageQuality}
+                getTmdbUrl={getTmdbUrl}
                 t={t}
                 isPlaying={episode.id === play}
                 dateDiff={dateDiff}
-                adjustOpacity={adjustOpacity}
+                isWatched={watched.isEpisodeWatched(seasonNumber, episode.episode_number)}
+                watchEvents={watched.episodeWatchEvents(
+                  seasonNumber,
+                  episode.episode_number,
+                )}
                 onPress={() =>
                   navigation.navigate("EpisodeDetails", {
                     showId,
@@ -708,6 +724,9 @@ export default function SeasonDetails({ route, navigation }) {
         </View>
       </View>
     </ScrollView>
+
+    <BackButton variant="blur" />
+    </View>
   );
 }
 
@@ -769,14 +788,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 16,
   },
-  lottie: {
-    position: "absolute",
-    height: 1000,
-    top: 0,
-    left: -120,
-    right: -120,
-    zIndex: 0,
-  },
 
   // ── Başlık ────────────────────────────────────────────────────────────────
   titleBlock: {
@@ -824,28 +835,10 @@ const styles = StyleSheet.create({
 
   // ── İlerleme ──────────────────────────────────────────────────────────────
   progressWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
     marginBottom: 18,
   },
-  progressBarTrack: {
-    flex: 1,
-    height: 4,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    overflow: "hidden",
-  },
-  progressBarFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  progressLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    minWidth: 32,
-    textAlign: "right",
-  },
+
+  commentButton: { marginBottom: 18 },
 
   divider: { height: 1, marginBottom: 20 },
 
@@ -906,8 +899,11 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   episodeThumbnailWrapper: {
+    // Kart yüksekliği bu görselden geliyor. En yoğun içerik (bölüm no 32 +
+    // 2 satır ad 34 + 2 satır özet 28 + boşluklar ≈ 110px) tam sığar; daha
+    // fazlası kartı gereksiz uzatıyor.
     width: 155,
-    height: 110,
+    height: 112,
     position: "relative",
     borderRadius: 20,
     overflow: "hidden",
@@ -964,42 +960,45 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
 
-  // Kart sağ tarafı
+  // Kart sağ tarafı — "space-between" boşluğu satır aralarına dağıtıp kısa
+  // bölüm adlarında kartı seyrek gösteriyordu; blok artık dikeyde ortalanıyor.
   episodeBody: {
     flex: 1,
     padding: 5,
-    justifyContent: "space-between",
+    justifyContent: "center",
   },
   episodeTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 5,
+    marginBottom: 4,
   },
+  // Bölüm no + tarih hep yan yana: sarma kapalı, dar ekranda tarih kırpılır.
   episodeMetaLeft: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 5,
+    flexWrap: "nowrap",
+    gap: 4,
     flex: 1,
     marginRight: 6,
   },
-  episodeNumText: { fontSize: 12, fontWeight: "600" },
+  episodeNumText: { fontSize: 12, fontWeight: "600", flexShrink: 0 },
   datePill: {
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
+    flexShrink: 1,
   },
   datePillText: { fontSize: 11, fontWeight: "500" },
   episodeName: {
     fontSize: 13,
     fontWeight: "700",
-    lineHeight: 18,
-    marginBottom: 4,
+    lineHeight: 17,
+    marginBottom: 2,
   },
   episodeOverview: {
     fontSize: 11,
-    lineHeight: 15,
+    lineHeight: 14,
     fontWeight: "300",
   },
 });

@@ -1,0 +1,245 @@
+// components/badges/seasonSeals.js
+//
+// DÖNEM MÜHÜRLERİ — zamanın kendisi bir eksen.
+//
+// Katalogdaki her rozet ÖMÜR BOYU birikimlidir: bugün de, üç yıl sonra da aynı
+// hedefi kovalarsın. Mühür bunun tam tersidir — zor olduğu için değil, GERİ
+// ALINAMAZ olduğu için özeldir: o mevsimde buradaydın ya da değildin. Kaçırılan
+// bir mühür bir daha asla kazanılamaz, bu yüzden sahip olmak bir şey anlatır.
+//
+// ÖLÇÜT SAHTELENEMEZ. Katalogun 2. kuralı ("tarih türevi rozet tavanı = rare")
+// kullanıcının SEÇTİĞİ izleme tarihinin uydurulabilir olmasından doğar
+// (DatePickerModal geçmişe onlarca yıl açık). Mühürler o tarihi HİÇ okumaz;
+// kaynakları defterdeki `aktiflik.gunler` — cihaz saatiyle gerçek işaretleme
+// anından türeyen, geriye dönük düzeltilemeyen gün listesi (utils/watchActivity.js).
+// Yine de cihaz saati sunucu doğrulamalı olmadığı için tavan rare'dir; eşik
+// zaten düşük tutuldu, amaç zorluk değil VARLIK.
+//
+// GERİYE DÖNÜK MÜHÜR YOKTUR. `ILK_DONEM`den önceki dönemler hiç üretilmez:
+// yayın anında "2024 Kışı"nı kilitli göstermek, kullanıcıya asla kapatamayacağı
+// bir boşluk göstermek olurdu. Ayrıca `gunler` 400 günlük kayan pencere; daha
+// eskisi zaten ölçülemez. Kazanılan mühür deftere (earned) yazıldığı için
+// pencereden düşse bile KALICIDIR.
+//
+// SAF MODÜL: React/AsyncStorage/Firestore importu yok.
+
+import { RARITY } from "@theme/badgeTokens";
+import { BOLUM } from "./watchBadgeCatalog";
+import { SUPPORTED_LANGUAGE_CODES } from "../../utils/appLanguages";
+
+/** Dönemde kaç FARKLI günde işaretleme yapılmalı. */
+export const MUHUR_ESIK = 8;
+
+/**
+ * Mühür sisteminin başladığı dönem. Bundan öncesi için mühür üretilmez.
+ * Yeni dönemler kendiliğinden gelir; bu sabit yalnızca ALT sınırdır.
+ */
+export const ILK_DONEM = "2026-yaz";
+
+// Kuzey yarımküre mevsimleri. Aralık, TAKİP EDEN yılın kışına sayılır — yoksa
+// tek bir kış iki ayrı mühre bölünür ve ikisi de eşiğe ulaşamaz.
+const DONEM_TANIM = [
+  { id: "kis", aylar: [12, 1, 2], icon: "snow-outline", iconSolid: "snow", tr: "Kışı", en: "Winter", es: "Invierno", pt: "Inverno", de: "Winter" },
+  { id: "ilkbahar", aylar: [3, 4, 5], icon: "flower-outline", iconSolid: "flower", tr: "İlkbaharı", en: "Spring", es: "Primavera", pt: "Primavera", de: "Frühling" },
+  { id: "yaz", aylar: [6, 7, 8], icon: "sunny-outline", iconSolid: "sunny", tr: "Yazı", en: "Summer", es: "Verano", pt: "Verão", de: "Sommer" },
+  { id: "sonbahar", aylar: [9, 10, 11], icon: "leaf-outline", iconSolid: "leaf", tr: "Sonbaharı", en: "Autumn", es: "Otoño", pt: "Outono", de: "Herbst" },
+];
+
+const DONEM_BY_AY = (() => {
+  const m = {};
+  for (const d of DONEM_TANIM) for (const ay of d.aylar) m[ay] = d;
+  return m;
+})();
+
+export const DONEM_BY_ID = Object.freeze(
+  DONEM_TANIM.reduce((acc, d) => { acc[d.id] = d; return acc; }, {}),
+);
+
+/** "YYYY-MM-DD" → { yil, donem } · geçersizse null. */
+export function donemBilgisi(gunKey) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(gunKey || ""));
+  if (!m) return null;
+  const yil = Number(m[1]);
+  const ay = Number(m[2]);
+  const d = DONEM_BY_AY[ay];
+  if (!d) return null;
+  // Aralık → gelecek yılın kışı (kış Ara-Oca-Şub olarak tek parça kalsın).
+  return { yil: ay === 12 ? yil + 1 : yil, donem: d.id };
+}
+
+export const donemAnahtari = (gunKey) => {
+  const b = donemBilgisi(gunKey);
+  return b ? `${b.yil}-${b.donem}` : null;
+};
+
+export const muhurId = (anahtar) => `muhur_${String(anahtar).replace("-", "_")}`;
+
+/** `muhur_2026_yaz` → { yil, donem, anahtar } · tanınmazsa null. */
+export function muhurCoz(id) {
+  const m = /^muhur_(\d{4})_([a-z]+)$/.exec(String(id || ""));
+  if (!m || !DONEM_BY_ID[m[2]]) return null;
+  return { yil: Number(m[1]), donem: m[2], anahtar: `${m[1]}-${m[2]}` };
+}
+
+// Dönem sıralaması: kış(1) → ilkbahar(2) → yaz(3) → sonbahar(4)
+const SIRA = { kis: 1, ilkbahar: 2, yaz: 3, sonbahar: 4 };
+const donemSayi = (anahtar) => {
+  const [y, d] = String(anahtar).split("-");
+  return Number(y) * 10 + (SIRA[d] || 0);
+};
+const ILK_DONEM_SAYI = donemSayi(ILK_DONEM);
+
+/**
+ * Dönemin SON GÜNÜ ("YYYY-MM-DD"). Kış yıl anahtarının Şubat'ında biter
+ * (Aralık takip eden yılın kışına sayıldığı için 2027 Kışı = Ara 2026 → Şub 2027).
+ */
+export function donemSonGunu(anahtar) {
+  const [yilStr, donem] = String(anahtar || "").split("-");
+  const yil = Number(yilStr);
+  if (!Number.isInteger(yil) || !DONEM_BY_ID[donem]) return null;
+  // Ayın son günü: bir sonraki ayın 0. günü. Şubat için artık yıl otomatik çözülür.
+  const sonAy = { kis: 2, ilkbahar: 5, yaz: 8, sonbahar: 11 }[donem];
+  const son = new Date(Date.UTC(yil, sonAy, 0)).getUTCDate();
+  return `${yil}-${String(sonAy).padStart(2, "0")}-${String(son).padStart(2, "0")}`;
+}
+
+/**
+ * Dönemin bitmesine kaç gün var? BUGÜN DAHİL DEĞİL: son günün kendisi 0'dır
+ * ("bugün son gün"), dönem bittiyse negatif döner. Cihaz saatiyle LOKAL gün.
+ */
+export function donemKalanGun(anahtar, simdi = Date.now()) {
+  const son = donemSonGunu(anahtar);
+  if (!son) return null;
+  const d = new Date(simdi);
+  const bugunNo = Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+  const [y, m, g] = son.split("-").map(Number);
+  return Math.round(Date.UTC(y, m - 1, g) / 86400000) - bugunNo;
+}
+
+/** Verilen an hangi döneme düşüyor? */
+export function bugunkuDonem(simdi = Date.now()) {
+  const d = new Date(simdi);
+  const gun = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  return donemAnahtari(gun);
+}
+
+const cap = (code) => code.charAt(0).toUpperCase() + code.slice(1);
+
+/**
+ * Mühür başlığı: tr "2026 Yazı" · diğer diller "Summer 2026" / "Verano 2026" / "Sommer 2026".
+ * Hem kart (muhurleriHesapla) hem kutlama (badgeMeta.odulAdi) buradan çözer — ikisi ayrışmasın.
+ */
+export function muhurBasligi(code, yil, donem) {
+  const d = DONEM_BY_ID[donem];
+  const ad = d?.[code] || d?.en || "";
+  return code === "tr" ? `${yil} ${ad}`.trim() : `${ad} ${yil}`.trim();
+}
+
+// Açıklama cümlesi dil başına ayrı kurulur (sıra/ek farklı): `adi` mevsim adı, `baslik` yılla birlikte.
+const ACIKLAMA = {
+  tr: ({ baslik, n }) => `${baslik} döneminde ${n} farklı günde işaretle`,
+  en: ({ baslik, n }) => `Log on ${n} separate days during ${baslik}`,
+  es: ({ baslik, n }) => `Registra visionados en ${n} días distintos durante ${baslik}`,
+  pt: ({ baslik, n }) => `Registre sessões em ${n} dias diferentes durante ${baslik}`,
+  de: ({ adi, yil, n }) => `Markiere an ${n} verschiedenen Tagen etwas als gesehen – im ${adi} ${yil}`,
+};
+
+/**
+ * Kartın TÜM dil alanları (tr/en/es/pt/de … + descTr/descEn/…). Yalnız tr/en yazılırsa ES/PT/DE kullanıcısı
+ * kartta İngilizce başlık görür (kutlama ise çevrilmiş çıkar → ikisi çelişir).
+ */
+function muhurDilAlanlari(yil, donem) {
+  const out = {};
+  for (const code of SUPPORTED_LANGUAGE_CODES) {
+    const baslik = muhurBasligi(code, yil, donem);
+    const d = DONEM_BY_ID[donem];
+    const adi = d?.[code] || d?.en || "";
+    out[code] = baslik;
+    out[`desc${cap(code)}`] = (ACIKLAMA[code] || ACIKLAMA.en)({ baslik, adi, yil, n: MUHUR_ESIK });
+  }
+  return out;
+}
+
+/**
+ * Mühür kartlarını üretir — ROZET ŞEKLİNDE, WatchBadgeCard değişmeden çizer.
+ *
+ * Gösterilenler: (a) İÇİNDE BULUNULAN dönem — kilitliyken ilerleme çubuğuyla,
+ * (b) defterde kazanılmış geçmiş mühürler. Gelecek dönemler ve kaçırılmış
+ * dönemler HİÇ üretilmez: ilki anlamsız, ikincisi kapatılamayan bir boşluk.
+ *
+ * @param {string[]} aktifGunler defterdeki gerçek işaretleme günleri
+ * @param {object} opts { simdi, kazanilmis }
+ */
+export function muhurleriHesapla(aktifGunler, { simdi = Date.now(), kazanilmis = [] } = {}) {
+  const defter = kazanilmis instanceof Set ? kazanilmis : new Set(kazanilmis || []);
+
+  // Dönem → farklı gün adedi
+  const sayac = new Map();
+  for (const g of Array.isArray(aktifGunler) ? aktifGunler : []) {
+    const anahtar = donemAnahtari(g);
+    if (!anahtar || donemSayi(anahtar) < ILK_DONEM_SAYI) continue;
+    sayac.set(anahtar, (sayac.get(anahtar) || 0) + 1);
+  }
+
+  const suan = bugunkuDonem(simdi);
+  const anahtarlar = new Set();
+  if (suan && donemSayi(suan) >= ILK_DONEM_SAYI) anahtarlar.add(suan);
+  for (const id of defter) {
+    const c = muhurCoz(id);
+    if (c) anahtarlar.add(c.anahtar);
+  }
+
+  return [...anahtarlar]
+    .sort((a, b) => donemSayi(b) - donemSayi(a))     // en yeni dönem üstte
+    .map((anahtar) => {
+      const [yilStr, donem] = anahtar.split("-");
+      const yil = Number(yilStr);
+      const tanim = DONEM_BY_ID[donem];
+      const id = muhurId(anahtar);
+      const gun = sayac.get(anahtar) || 0;
+      const ilerleme = Math.min(gun, MUHUR_ESIK);
+      return {
+        id,
+        section: BOLUM.MUHUR,
+        family: null,
+        tier: 0,
+        hidden: false,
+        birim: null,
+        icon: tanim.icon,
+        iconSolid: tanim.iconSolid,
+        rarity: RARITY.uncommon,
+        ...muhurDilAlanlari(yil, donem),
+        donem,
+        yil,
+        guncelDonem: anahtar === suan,
+        // Mühür KAÇIRILABİLİR tek ödüldür: kalan gün ve eksik gün kartın üstünde
+        // taşınır ki arayüz "yetişir mi?" sorusunu cevaplayabilsin. `yetisir` bugünü
+        // de sayar (son günde 1 gün eksikse hâlâ yetişir).
+        kalanGun: donemKalanGun(anahtar, simdi),
+        eksikGun: Math.max(0, MUHUR_ESIK - gun),
+        yetisir: gun >= MUHUR_ESIK || (donemKalanGun(anahtar, simdi) ?? -1) + 1 >= MUHUR_ESIK - gun,
+        ham: gun,
+        target: MUHUR_ESIK,
+        ilerleme,
+        oran: ilerleme / MUHUR_ESIK,
+        // Defter üyeliği kalıcıdır: 400 günlük pencereden düşen eski dönem
+        // yeniden hesaplanamaz, `earned` onu ayakta tutar.
+        acik: defter.has(id) || gun >= MUHUR_ESIK,
+      };
+    });
+}
+
+/**
+ * Deftere bildirilecek mühür id'leri. Güncel dönem HER ZAMAN listede olmalı:
+ * defter bir id'yi ancak ÖNCEDEN "biliyorsa" kazanıldığında kutlar; ilk kez
+ * kazanıldığı anda görülen id sessizce emilir ve kutlama hiç oynamaz.
+ */
+export function muhurIdleri({ simdi = Date.now(), kazanilmis = [] } = {}) {
+  const out = new Set();
+  const suan = bugunkuDonem(simdi);
+  if (suan && donemSayi(suan) >= ILK_DONEM_SAYI) out.add(muhurId(suan));
+  for (const id of kazanilmis instanceof Set ? kazanilmis : kazanilmis || []) {
+    if (muhurCoz(id)) out.add(id);
+  }
+  return [...out];
+}
