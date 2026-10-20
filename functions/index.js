@@ -1337,6 +1337,20 @@ const STRINGS = {
     mention: "💬 mencionou você",
     mention_text: "💬 mencionou você: {text}",
   },
+  de: {
+    someone: "Jemand",
+    notification: "Benachrichtigung",
+    messageFallback: "hat dir eine Nachricht gesendet",
+    friend_request: "👤 hat dir eine Freundschaftsanfrage gesendet",
+    friend_accepted: "🤝 hat deine Freundschaftsanfrage angenommen",
+    post_like: "❤️ gefällt dein Beitrag",
+    post_comment: "💬 hat deinen Beitrag kommentiert",
+    post_comment_text: "💬 hat kommentiert: {text}",
+    comment_reply: "💬 hat auf deinen Kommentar geantwortet",
+    comment_reply_text: "💬 hat geantwortet: {text}",
+    mention: "💬 hat dich erwähnt",
+    mention_text: "💬 hat dich erwähnt: {text}",
+  },
 };
 
 // Push dili: istemci Users/{uid}.notificationLanguage'a uygulama dilini yazar
@@ -1344,13 +1358,13 @@ const STRINGS = {
 // (alan yokken varsayılan her zaman Türkçeydi). Alan var ama bu listede yoksa
 // (ileride eklenecek bir dil, bu deploy'dan önce) → İNGİLİZCE: yabancı kullanıcıya
 // Türkçe push gitmesin. YENİ DİL: STRINGS + STREAM_STRINGS'e giriş + bu liste.
-const NOTIFICATION_LANGUAGES = ["tr", "en", "es", "pt"];
+const NOTIFICATION_LANGUAGES = ["tr", "en", "es", "pt", "de"];
 function pickNotificationLang(value) {
   if (!value) return "tr";
   return NOTIFICATION_LANGUAGES.includes(value) ? value : "en";
 }
 
-// notification.type → {title, body}. lang: "tr" | "en" | "es" | "pt".
+// notification.type → {title, body}. lang: "tr" | "en" | "es" | "pt" | "de".
 function buildContent(n, lang) {
   const S = STRINGS[pickNotificationLang(lang)];
   const name = n.fromName || S.someone;
@@ -2120,6 +2134,11 @@ const STREAM_STRINGS = {
     single: (p) => `📺 Já disponível em ${p}`,
     multi: (ps) => `📺 Já disponível em: ${ps}`,
     fallbackTitle: "Sua lista para assistir",
+  },
+  de: {
+    single: (p) => `📺 Jetzt verfügbar bei ${p}`,
+    multi: (ps) => `📺 Jetzt verfügbar bei: ${ps}`,
+    fallbackTitle: "Deine Merkliste",
   },
 };
 

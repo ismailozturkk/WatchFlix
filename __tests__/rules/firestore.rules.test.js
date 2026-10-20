@@ -1245,7 +1245,7 @@ describe("Feedback (geri bildirim kutusu)", () => {
     message: "Listelerim ekranina girince uygulama kendiliginden kapaniyor.",
     status: "open",
     language: "tr",
-    appVersion: "1.4.8",
+    appVersion: "1.4.9",
     platform: "ios",
     osVersion: "26.0",
     deviceModel: "iPhone 16",
@@ -1307,7 +1307,7 @@ describe("Feedback (geri bildirim kutusu)", () => {
   });
 
   test("ozellik isteginde cihaz bilgisi serbest", async () => {
-    await assertSucceeds(yaz(bob, istek(BOB, { appVersion: "1.4.8" })));
+    await assertSucceeds(yaz(bob, istek(BOB, { appVersion: "1.4.9" })));
   });
 
   test("uzunluk sinirlari: kisa baslik/mesaj ve asiri uzun metin reddedilir", async () => {

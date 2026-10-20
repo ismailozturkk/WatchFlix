@@ -24,6 +24,7 @@ const DIGEST_STRINGS = {
   en: { title: (n) => `Coming up this week (${n})`, more: (n) => `+${n}`, locale: "en-US" },
   es: { title: (n) => `Esta semana llega (${n})`, more: (n) => `+${n}`, locale: "es-ES" },
   pt: { title: (n) => `Estreias da semana (${n})`, more: (n) => `+${n}`, locale: "pt-BR" },
+  de: { title: (n) => `Neu diese Woche (${n})`, more: (n) => `+${n}`, locale: "de-DE" },
 };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
