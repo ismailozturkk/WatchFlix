@@ -8,14 +8,11 @@ import {
   TouchableOpacity,
   Animated,
   ActivityIndicator,
-  Modal,
-  SafeAreaView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
 import PosterImage from "../../components/PosterImage";
 import AppIcon from "../../components/AppIcon";
-import GlassIconButton from "../../components/common/GlassIconButton";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -27,12 +24,14 @@ import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges
 import SectionHeader, { SECTION_GOLD } from "../../components/home/SectionHeader";
 import { SectionChipRail, SectionSegmented } from "../../components/home/SectionChips";
 import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
+import AwardYearSheet from "../../components/home/AwardYearSheet";
+import useAwardYears from "../../hooks/useAwardYears";
+import { FALLBACK_EMMY_CONFIG, getEmmyConfig } from "../../services/emmyService";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { toast } from "../../components/AppToast";
 import { triggerHaptic } from "../../services/hapticsService";
 
-import ModalToastHost from "@components/toast/ModalToastHost";
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 // Dikey yıl metni
 const DikeyMetin = memo(function DikeyMetin({ metin }) {
@@ -68,7 +67,9 @@ const TvShowsEmmyCard = memo(function TvShowsEmmyCard({
   const isPending = !item.isConfirmed || !item.poster_path;
 
   // Kategori adı belirleme
-  const catLabel = item.categoryLabelTr || (item.categoryLabelKey ? i18nText(item.categoryLabelKey, "") : "");
+  const catLabel = item.categoryLabelKey
+    ? i18nText(item.categoryLabelKey, item.categoryLabelTr || "")
+    : item.categoryLabelTr || "";
 
   if (isPending) {
     const handlePendingPress = () => {
@@ -230,12 +231,12 @@ export default function TvShowsEmmy({ navigation }) {
     activateTvSection("emmy");
   }, [activateTvSection]);
 
-  // 1970 - 2027 Yıllar listesi
-  const availableYears = React.useMemo(() => {
-    const arr = [];
-    for (let y = 2027; y >= 1970; y--) arr.push(y);
-    return arr;
-  }, []);
+  // Yıl listesi ödül yapılandırmasından gelir (gömülü liste → uzak yapılandırma); açıklanmamış yıllar işaretlenir.
+  const { years: availableYears, pending: pendingYears } = useAwardYears({
+    active: emmyMode === "year",
+    getConfig: getEmmyConfig,
+    fallbackItems: FALLBACK_EMMY_CONFIG.items,
+  });
 
   const handleModeChange = (mode) => {
     try { triggerHaptic("selection"); } catch (e) {}
@@ -404,75 +405,16 @@ export default function TvShowsEmmy({ navigation }) {
         removeClippedSubviews
       />
 
-      {/* Yıl Seçim Modalı */}
-      <Modal
+      <AwardYearSheet
         visible={yearModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setYearModalVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setYearModalVisible(false)}
-        >
-          <SafeAreaView style={styles.modalSafeArea}>
-            <View style={[styles.modalContent, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-              <View style={styles.modalHeader}>
-                <Text allowFontScaling={false} style={[styles.modalTitle, { color: theme.text.primary }]}>
-                  {i18nText("autoI18n.emmy_select_year", "Emmy Yılı Seçin")}
-                </Text>
-                <GlassIconButton
-                  variant="plain"
-                  icon="close"
-                  iconSize={22}
-                  size={34}
-                  color={theme.text.secondary}
-                  accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
-                  onPress={() => setYearModalVisible(false)}
-                />
-              </View>
-
-              <FlatList
-                data={availableYears}
-                keyExtractor={(item) => String(item)}
-                numColumns={4}
-                contentContainerStyle={styles.yearGrid}
-                renderItem={({ item: yr }) => {
-                  const isSelected = selectedEmmyYear === yr;
-                  return (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => handleYearSelect(yr)}
-                      style={[
-                        styles.yearGridItem,
-                        {
-                          backgroundColor: isSelected ? theme.accent : theme.secondary,
-                          borderColor: isSelected ? theme.accent : theme.border,
-                        },
-                      ]}
-                    >
-                      <Text
-                        allowFontScaling={false}
-                        style={[
-                          styles.yearGridText,
-                          {
-                            color: isSelected ? "#ffffff" : theme.text.primary,
-                            fontWeight: isSelected ? "800" : "600",
-                          },
-                        ]}
-                      >
-                        {yr}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                }}
-              />
-            </View>
-          </SafeAreaView>
-        </TouchableOpacity>
-        <ModalToastHost visible={yearModalVisible} />
-      </Modal>
+        onClose={() => setYearModalVisible(false)}
+        title={i18nText("autoI18n.emmy_select_year", "Emmy Yılı Seçin")}
+        years={availableYears}
+        pendingYears={pendingYears}
+        pendingLabel={i18nText("autoI18n.emmy_pending_subtitle", "Çok Yakında")}
+        selectedYear={selectedEmmyYear}
+        onSelect={handleYearSelect}
+      />
     </View>
   );
 }
@@ -575,47 +517,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "flex-end",
-  },
-  modalSafeArea: {
-    maxHeight: height * 0.65,
-  },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    padding: 16,
-    maxHeight: "100%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-  },
-  yearGrid: {
-    paddingBottom: 24,
-    gap: 8,
-  },
-  yearGridItem: {
-    flex: 1,
-    margin: 4,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  yearGridText: {
-    fontSize: 14,
   },
 });
