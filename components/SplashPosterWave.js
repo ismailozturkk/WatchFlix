@@ -1,85 +1,91 @@
 // components/SplashPosterWave.js
 //
-// Splash ekranı: ortada uygulama logosu (adaptive icon foreground), etrafında
-// posterlerden oluşan neredeyse bitişik eş merkezli DAİRESEL halkalar. TEK bir
-// native döngülü sürücü değer 0→1 dönerken her halka bu değerden faz kaydırmalı
-// interpolate ile kendi büyüyüp-küçülme (scale) salınımını türetir → dalga
-// merkezden dışarıya doğru halka halka yayılır ve splash kapanana kadar döngüde
-// kalır. Fazlar sürücüden MATEMATİKSEL olarak türediği için açılış sırasındaki
-// JS thread blokları (navigator mount, cache parse...) halkaların senkronunu
-// bozamaz; setTimeout/sequence tabanlı kurgu bu pencerede dalgayı düzleştirdiği
-// için bilinçli olarak kullanılmadı.
+// Açılış ekranı (JS splash). Yerel splash'in (koyu zemin + ortada logo) BİREBİR
+// devamı olarak başlar; sonra:
+//
+//   1. zemin yerel splash grisinden tema rengine yumuşakça geçer,
+//   2. logonun renklerinde (mor/mavi/turkuaz) bir ışıma belirir,
+//   3. logo bir kez nabız atar ve posterlerden oluşan eş merkezli halkalar
+//      merkezden dışa doğru çiçeklenir (halka halka, hafif aşımlı),
+//   4. halkalar yavaşça süzülüp durur (posterler dik kalır) ve üzerlerinden
+//      merkezden dışa süzülen bir "Meksika dalgası" geçer,
+//   5. veri hazır olunca (`exiting`) logo/ışıma/halkalar dışa süzülüp solar, zemin
+//      en son açılır ve altındaki uygulama belirir (`onExited` ile haber verir).
+//
+// Hareketin tamamı TEK bir [0,1] sürücüden (giriş, çıkış, her döngü için birer
+// tane) native tarafta interpolate ile türer — süreler, eğriler ve geometri
+// utils/splashMotion.js'te, ne kadar iş yapılacağı (kalite kademesi) utils/
+// splashPlan.js'te (saf, test edilir). Açılışta JS thread'i bloklansa da hareket
+// kesilmez; ilk kare de (sürücüler 0'da) yerel splash'le aynı görünür.
+//
+// "KASMA" BÜTÇESİ — splash, uygulama ağacının mount olduğu en yoğun anda çalışır:
+//   • Poster başına TEK native view: `Animated.Image` doğrudan opaklık + dönüşü
+//     taşır, köşe yuvarlama resmin kendisinde. (Eskiden sarmalayıcı View + expo-image
+//     idi: poster başına iki view ve ayrı bir köşe-maskesi katmanı.)
+//   • Konumlar `left/top: 50%` + kenar boşluğuyla, ekran MERKEZİNE göre: onLayout,
+//     state ve ölçü gelince yeniden render yok (Android'de "window" ile gerçek
+//     overlay ölçüsü farkı yüzünden poster kaymaları da yok).
+//   • Opaklık yalnız POSTER seviyesinde, halka kabına değil: yarı saydam bir kap
+//     60+ posteri ekran dışı katmana çizdirirdi. Kaplar yalnız dönüş + ölçek taşır.
+//   • Işıma SVG değil hazır bitmap (assets/splash-glow.png).
+//   • Efektler ayarı (Tam/Orta/Kapalı) + Hareketi Azalt kaliteyi kısar; "Kapalı"da
+//     (zayıf cihaz varsayılanı) süreklilik arz eden HİÇBİR animasyon çalışmaz.
+//   • Yörünge sonsuz değil: ~7 sn'de süzülüp durur. Tüm zamanlayıcılar
+//     isInteraction:false (aksi halde InteractionManager'ı tutar ve
+//     runAfterInteractions'a bağlı açılış işleri başlamaz).
+//
+// SAĞLAMLIK: splash çökerse uygulama açılmaz → bileşen kendi hata sınırına sahip,
+// düşerse statik (zemin + logo) bir yedeğe geçer. Çıkışın "bitti" haberi kaybolsa
+// bile overlay bir süre sonra zorla sökülür.
 //
 // Poster kaynağı: oy sayısı en yüksek film/dizilerden hazırlanmış yerel katalog.
-// Görseller JS bundle ile birlikte gelir; splash ağ veya disk cache beklemez.
-import { Image } from "expo-image";
+// Görseller JS bundle ile gelir; splash ağ veya disk cache beklemez.
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Dimensions, Easing, StyleSheet, View } from "react-native";
+import { Animated, Dimensions, Easing, Image, StyleSheet, View } from "react-native";
 import { SPLASH_POSTER_CATALOG } from "../data/splashPosterCatalog";
 import useAppLogo from "../hooks/useAppLogo";
+import useReduceMotion from "../hooks/useReduceMotion";
+import { captureError } from "../services/crashReporting";
+import { getEffectMode } from "../services/effectSettings";
+import {
+  BREATH_MS,
+  EXIT_GUARD_MS,
+  EXIT_MS,
+  GLOW_SIZE,
+  GLOW_SPIN_MS,
+  INTRO_MS,
+  LOGO_SIZE,
+  NATIVE_SPLASH_BG,
+  ORBIT_MS,
+  STATIC_LEVEL,
+  TILE_H,
+  TILE_W,
+  WAVE_PERIOD_MS,
+  bloomOpacityTable,
+  bloomScaleTable,
+  breathTable,
+  exitBackdropTable,
+  exitGlowOpacityTable,
+  exitGlowScaleTable,
+  exitLogoOpacityTable,
+  exitLogoScaleTable,
+  exitRingOpacityTable,
+  exitRingScaleTable,
+  glowOpacityTable,
+  glowPeakAlpha,
+  glowScaleTable,
+  logoPulseTable,
+  orbitDirection,
+  orbitTable,
+  veilTable,
+  waveOpacityTable,
+  waveScaleTable,
+} from "../utils/splashMotion";
+import { planSplash, splashQualityFor } from "../utils/splashPlan";
 
-// İlk render için tahmin; gerçek ölçü onLayout ile gelir. Android'de "window"
-// ölçüsü sistem çubuklarını dışlayabilirken splash overlay'i gerçek tam ekranı
-// kaplar — merkez bu yüzden onLayout ölçüsünden hesaplanır, yoksa logo ile
-// halkaların merkezi birbirinden kayar.
-const WINDOW = Dimensions.get("window");
+const GLOW_SOURCE = require("../assets/splash-glow.png");
 
-// ── Dairesel yerleşim geometrisi ─────────────────────────────────────────────
-const TILE_W = 78;
-const TILE_H = 117;
-const FIRST_RING_RADIUS = 150; // logo boşluğu → ilk halkanın merkezi
-const RING_STEP = TILE_H + 6; // halkalar radyal olarak neredeyse bitişik
-const MAX_RING_COUNT = 3; // tam görünmeyen en dıştaki dördüncü halka üretilmez
-const TANGENTIAL_GAP = 4; // aynı halkadaki posterler neredeyse bitişik
-const ICON_SIZE = 230;
-
-// ── Dalga zamanlaması ────────────────────────────────────────────────────────
-const WAVE_SCALE_AMP = 0.14; // tepe noktasında poster 1.14x büyür
-const WAVE_PERIOD_MS = 2800; // dalganın tam tur süresi (sakin tempo)
-// Meksika dalgası karakteri: her halka döngünün yalnızca bu kesrinde hareket
-// eder (kalk-otur), kalanında bekler → tepe dar bir bant halinde merkezden
-// dışarıya süzülür.
-const WAVE_CREST = 0.4;
-const WAVE_SAMPLES = 32; // faz kaydırmalı dalganın interpolate örnek sayısı
-
-// Halkanın scale'i: sürücünün [0,1] turu üzerinde faza kaydırılmış dar
-// yükseltilmiş-kosinüs tepeciği (1 → 1+WAVE_SCALE_AMP → 1, sonra bekleme).
-// f(0) = f(1) olduğundan döngü sarımında sıçrama olmaz; komşu halkalar arası
-// faz farkı sabittir.
-function buildRingScale(driver, phase) {
-  const inputRange = [];
-  const outputRange = [];
-  for (let s = 0; s <= WAVE_SAMPLES; s++) {
-    const t = s / WAVE_SAMPLES;
-    const local = (t - phase + 1) % 1;
-    const bump =
-      local < WAVE_CREST
-        ? 0.5 * (1 - Math.cos((2 * Math.PI * local) / WAVE_CREST))
-        : 0;
-    inputRange.push(t);
-    outputRange.push(1 + WAVE_SCALE_AMP * bump);
-  }
-  return driver.interpolate({ inputRange, outputRange });
-}
-
-// Opaklık aynı tepeciği izler: halka büyürken görünür, kendi normal boyutuna
-// dönerken yeniden solar. Ölçek ve görünürlük arasında gecikme olmadığı için
-// poster, animasyonun tepesinden ayrı bir anda yanıp sönmez.
-function buildRingOpacity(driver, phase) {
-  const inputRange = [];
-  const outputRange = [];
-  for (let s = 0; s <= WAVE_SAMPLES; s++) {
-    const t = s / WAVE_SAMPLES;
-    const local = (t - phase + 1) % 1;
-    const bump =
-      local < WAVE_CREST
-        ? 0.5 * (1 - Math.cos((2 * Math.PI * local) / WAVE_CREST))
-        : 0;
-    inputRange.push(t);
-    outputRange.push(0.12 + 0.88 * bump);
-  }
-  return driver.interpolate({ inputRange, outputRange });
-}
+const CLAMP = { extrapolate: "clamp" };
 
 function shuffle(list) {
   const arr = list.slice();
@@ -90,187 +96,375 @@ function shuffle(list) {
   return arr;
 }
 
-// İkonun etrafında eş merkezli daireler: her halkada posterler çember üzerine
-// eşit açıyla dizilir, komşu halkalar yarım adım kaydırılır. En fazla üç halka
-// üretilir; tamamen ekran dışında kalan posterler hiç üretilmez. Üretim sırası
-// zaten merkezden dışa doğru → en popüler posterler iç halkalara düşer.
-function buildTiles(screenW, screenH) {
-  const cx = screenW / 2;
-  const cy = screenH / 2;
-  const maxRadius = Math.hypot(cx, cy) + TILE_H / 2;
-  const tiles = [];
-  for (
-    let ring = 0;
-    ring < MAX_RING_COUNT && FIRST_RING_RADIUS + ring * RING_STEP <= maxRadius;
-    ring++
-  ) {
-    const radius = FIRST_RING_RADIUS + ring * RING_STEP;
-    const count = Math.max(
-      6,
-      Math.round((2 * Math.PI * radius) / (TILE_W + TANGENTIAL_GAP)),
-    );
-    const angleOffset = ring % 2 ? Math.PI / count : 0;
-    for (let s = 0; s < count; s++) {
-      const angle = angleOffset + (s / count) * 2 * Math.PI;
-      const x = cx + radius * Math.cos(angle);
-      const y = cy + radius * Math.sin(angle);
-      if (
-        x + TILE_W / 2 < 0 ||
-        x - TILE_W / 2 > screenW ||
-        y + TILE_H / 2 < 0 ||
-        y - TILE_H / 2 > screenH
-      ) {
-        continue;
-      }
-      tiles.push({ left: x - TILE_W / 2, top: y - TILE_H / 2, ring });
-    }
-  }
-  return tiles;
-}
+const lerp = (driver, table, options) => driver.interpolate({ ...table, ...options });
 
-const SplashPosterWave = () => {
+// Çarpım zinciri (native'de desteklenir); boş/tek elemanlı zincir de güvenli.
+const product = (nodes) => nodes.reduce((acc, node) => Animated.multiply(acc, node));
+
+// Yalnız tanımlı dönüşleri taşıyan transform dizisi; hiçbiri yoksa `undefined`
+// (boş transform dizisi bile her karede gereksiz iş demek).
+const transformOf = (parts) => {
+  const list = parts.filter(Boolean);
+  return list.length ? list : undefined;
+};
+
+// Ekran merkezine göre konum (ölçüsüz): `left/top: 50%` ebeveyn ölçüsüne çözülür.
+const centered = (dx, dy, width, height) => ({
+  left: "50%",
+  top: "50%",
+  marginLeft: dx - width / 2,
+  marginTop: dy - height / 2,
+});
+
+const LOGO_PLACE = centered(0, 0, LOGO_SIZE, LOGO_SIZE);
+const GLOW_PLACE = centered(0, 0, GLOW_SIZE, GLOW_SIZE);
+
+function SplashStage({ backgroundColor, light = false, exiting = false, onExited, children }) {
   // Marka logosu seçili uygulama simgesini izler (hooks/useAppLogo.js).
   const { logo: appLogo } = useAppLogo();
+  const reduced = useReduceMotion();
+  // Efekt modu splash ömrü boyunca değişmez (ayar ekranına erişilemez); abonelik yok.
+  const [mode] = useState(getEffectMode);
+  const quality = useMemo(() => splashQualityFor(mode, reduced), [mode, reduced]);
+
+  // Poster kümesi yalnız mod + ekran boyutuna bağlı; `reduced` onu değiştirmez.
+  const [screen] = useState(() => Dimensions.get("screen"));
+  const plan = useMemo(
+    () => planSplash({ width: screen.width, height: screen.height, quality: splashQualityFor(mode) }),
+    [mode, screen.width, screen.height],
+  );
   // Sıra yalnız bu mount için karıştırılır. Kaynakların tamamı statik require
   // olduğu için ilk karede hazırdır ve çevrimdışı açılışta da aynı davranır.
   const posterSources = useMemo(
-    () => shuffle(SPLASH_POSTER_CATALOG.map((item) => item.source)),
-    [],
-  );
-
-  // Overlay'in GERÇEK ölçüsü: hem halkalar hem logo bu ölçünün merkezinden
-  // konumlanır — iki merkez asla ayrışamaz, her ekran boyutuna uyum sağlar.
-  const [layout, setLayout] = useState({
-    width: WINDOW.width,
-    height: WINDOW.height,
-  });
-  const handleLayout = (e) => {
-    const { width, height } = e.nativeEvent.layout;
-    setLayout((prev) =>
-      Math.abs(prev.width - width) < 1 && Math.abs(prev.height - height) < 1
-        ? prev
-        : { width, height },
-    );
-  };
-
-  const tiles = useMemo(
-    () => buildTiles(layout.width, layout.height),
-    [layout.width, layout.height],
-  );
-  const ringCount = useMemo(
-    () => tiles.reduce((max, t) => Math.max(max, t.ring), 0) + 1,
-    [tiles],
-  );
-
-  const waveDriver = useRef(new Animated.Value(0)).current;
-  // Faz farkı 1/ringCount: tam turda dalga kesintisiz biçimde merkezden en dış
-  // halkaya akar (en dış halkanın fazı sarımla merkezinkine bağlanır).
-  const ringScales = useMemo(
     () =>
-      Array.from({ length: ringCount }, (_, ring) =>
-        buildRingScale(waveDriver, ring / ringCount),
+      shuffle(SPLASH_POSTER_CATALOG.map((item) => item.source)).slice(
+        0,
+        splashQualityFor(mode).posterPool,
       ),
-    [waveDriver, ringCount],
+    [mode],
   );
-  const ringOpacities = useMemo(
-    () =>
-      Array.from({ length: ringCount }, (_, ring) =>
-        buildRingOpacity(waveDriver, ring / ringCount),
-      ),
-    [waveDriver, ringCount],
-  );
+  // Her halkanın poster dizisindeki başlangıç sırası: sıra halkalar boyunca
+  // sürekli artar, komşu halkalar aynı afişi yan yana göstermez.
+  const tileBases = useMemo(() => {
+    let n = 0;
+    return plan.rings.map(({ tiles }) => {
+      const base = n;
+      n += tiles.length;
+      return base;
+    });
+  }, [plan]);
 
+  // Sürücüler (hepsi [0,1], hepsi native).
+  const intro = useRef(new Animated.Value(0)).current;
+  const exit = useRef(new Animated.Value(0)).current;
+  const wave = useRef(new Animated.Value(0)).current;
+  const breath = useRef(new Animated.Value(0)).current;
+  const glowSpin = useRef(new Animated.Value(0)).current;
+  const orbit = useRef(new Animated.Value(0)).current;
+
+  // Tüm interpolate düğümleri bir kez kurulur; yalnız plan ya da kalite değişince
+  // yeniden hesaplanır. Kapalı özelliğin düğümü HİÇ kurulmaz.
+  const nodes = useMemo(() => {
+    const flat = !quality.bloomScale;
+    const ringCount = plan.ringCount;
+    const rings = plan.rings.map(({ ring }) => {
+      const dir = orbitDirection(ring);
+      const phase = ring / ringCount;
+      return {
+        containerTransform: transformOf([
+          quality.bloomScale && {
+            scale: Animated.multiply(
+              lerp(intro, bloomScaleTable(ring), CLAMP),
+              lerp(exit, exitRingScaleTable(ring), CLAMP),
+            ),
+          },
+          quality.orbit && { rotate: lerp(orbit, orbitTable(dir)) },
+        ]),
+        tileOpacity: product([
+          ...(quality.waveLoop ? [lerp(wave, waveOpacityTable(phase))] : []),
+          lerp(intro, bloomOpacityTable(ring, quality.waveLoop ? 1 : STATIC_LEVEL), CLAMP),
+          lerp(exit, exitRingOpacityTable(ring), CLAMP),
+        ]),
+        tileTransform: transformOf([
+          quality.orbit && { rotate: lerp(orbit, orbitTable(dir, true)) },
+          quality.waveScale && { scale: lerp(wave, waveScaleTable(phase)) },
+        ]),
+      };
+    });
+
+    // Ölçek çarpanları: yalnız açık özelliklerin düğümü kurulur (boşsa dönüşte ölçek yok).
+    const glowScaleParts = [
+      ...(flat ? [] : [lerp(intro, glowScaleTable(), CLAMP)]),
+      ...(quality.glowMotion ? [lerp(breath, breathTable(0.1))] : []),
+      ...(flat ? [] : [lerp(exit, exitGlowScaleTable(), CLAMP)]),
+    ];
+    const logoScaleParts = [
+      ...(quality.pulse ? [lerp(intro, logoPulseTable(), CLAMP)] : []),
+      ...(quality.breath ? [lerp(breath, breathTable(0.035))] : []),
+      ...(flat ? [] : [lerp(exit, exitLogoScaleTable(), CLAMP)]),
+    ];
+
+    return {
+      rings,
+      backdropOpacity: lerp(exit, exitBackdropTable(), CLAMP),
+      veilOpacity: lerp(intro, veilTable(), CLAMP),
+      glowOpacity: Animated.multiply(
+        lerp(intro, glowOpacityTable(glowPeakAlpha(light)), CLAMP),
+        lerp(exit, exitGlowOpacityTable(), CLAMP),
+      ),
+      glowTransform: transformOf([
+        glowScaleParts.length && { scale: product(glowScaleParts) },
+        quality.glowMotion && {
+          rotate: glowSpin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] }),
+        },
+      ]),
+      logoTransform: transformOf([logoScaleParts.length && { scale: product(logoScaleParts) }]),
+      logoOpacity: lerp(exit, exitLogoOpacityTable(), CLAMP),
+      // Kar/ek içerik logoyla birlikte çözülür.
+      childOpacity: lerp(exit, exitLogoOpacityTable(), CLAMP),
+    };
+  }, [plan, quality, light, intro, exit, wave, breath, glowSpin, orbit]);
+
+  // Giriş: mount'ta bir kez.
   useEffect(() => {
-    // Tek timing'li Animated.loop yinelemeyi tamamen native tarafta yürütür
-    // (sequence'li kurgunun aksine yarım döngüde bir JS'e uğramaz) → açılış
-    // jankları dalgayı donduramaz. isInteraction: false şart — sonsuz döngü
-    // aksi halde InteractionManager'ı meşgul tutar ve runAfterInteractions'a
-    // bağlı açılış işleri hiç başlamaz.
-    const anim = Animated.loop(
-      Animated.timing(waveDriver, {
-        toValue: 1,
-        duration: WAVE_PERIOD_MS,
-        easing: Easing.linear,
-        useNativeDriver: true,
-        isInteraction: false,
-      }),
-    );
+    const anim = Animated.timing(intro, {
+      toValue: 1,
+      duration: INTRO_MS,
+      easing: Easing.linear,
+      useNativeDriver: true,
+      isInteraction: false,
+    });
     anim.start();
     return () => anim.stop();
-  }, [waveDriver]);
+  }, [intro]);
+
+  // Döngüler: tek timing'li Animated.loop yinelemeyi tamamen native tarafta
+  // yürütür (sequence'li kurgunun aksine yarım döngüde JS'e uğramaz) → açılış
+  // jankları dalgayı donduramaz. Yalnız kalitenin istediği döngüler başlar.
+  useEffect(() => {
+    const loops = [
+      quality.waveLoop && [wave, WAVE_PERIOD_MS],
+      quality.breath || quality.glowMotion ? [breath, BREATH_MS] : null,
+      quality.glowMotion && [glowSpin, GLOW_SPIN_MS],
+    ]
+      .filter(Boolean)
+      .map(([value, duration]) =>
+        Animated.loop(
+          Animated.timing(value, {
+            toValue: 1,
+            duration,
+            easing: Easing.linear,
+            useNativeDriver: true,
+            isInteraction: false,
+          }),
+        ),
+      );
+    // Yörünge döngü değil: süzülüp durur (bkz. ORBIT_MS).
+    if (quality.orbit) {
+      loops.push(
+        Animated.timing(orbit, {
+          toValue: 1,
+          duration: ORBIT_MS,
+          easing: Easing.linear,
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+      );
+    }
+    loops.forEach((anim) => anim.start());
+    return () => loops.forEach((anim) => anim.stop());
+  }, [quality, wave, breath, glowSpin, orbit]);
+
+  // Çıkış. Giriş sürücüsüne DOKUNMAZ: her katmanın değeri giriş × çıkış çarpımı
+  // olduğundan, giriş bitmeden çıkış başlasa bile geçiş kesintisiz olur.
+  const onExitedRef = useRef(onExited);
+  onExitedRef.current = onExited;
+  useEffect(() => {
+    if (!exiting) return undefined;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      onExitedRef.current?.();
+    };
+    const anim = Animated.timing(exit, {
+      toValue: 1,
+      duration: EXIT_MS,
+      easing: Easing.linear,
+      useNativeDriver: true,
+      isInteraction: false,
+    });
+    anim.start(({ finished }) => {
+      if (finished) finish();
+    });
+    // Native "bitti" geri çağrısı kaybolursa (ör. sürücü arka planda iptal oldu)
+    // overlay sonsuza dek ekranda kalmasın.
+    const guard = setTimeout(finish, EXIT_MS + EXIT_GUARD_MS);
+    return () => {
+      clearTimeout(guard);
+      anim.stop();
+    };
+  }, [exiting, exit]);
+
+  // Poster elemanları yalnız plan/düğüm değişince yeniden kurulur: üst bileşen
+  // (tema/kar bağlamı) yeniden çizilince 60+ posterin hepsi yeniden çizilmez.
+  const ringViews = useMemo(
+    () =>
+      plan.rings.map(({ ring, tiles }, ringIndex) => {
+        const node = nodes.rings[ringIndex];
+        const tileStyle = [
+          styles.tile,
+          { opacity: node.tileOpacity },
+          node.tileTransform && { transform: node.tileTransform },
+        ];
+        return (
+          <Animated.View
+            key={ring}
+            collapsable={false}
+            style={[StyleSheet.absoluteFill, node.containerTransform && { transform: node.containerTransform }]}
+          >
+            {tiles.map((tile, s) => (
+              <Animated.Image
+                key={s}
+                source={posterSources[(tileBases[ringIndex] + s) % posterSources.length]}
+                style={[...tileStyle, centered(tile.dx, tile.dy, TILE_W, TILE_H)]}
+                resizeMode="cover"
+                // Android (Fresco): bitmap'i görünüm boyutuna indirger ve yüklenirken
+                // 300 ms'lik solma uygulamaz (aksi halde posterler iki kez solardı).
+                resizeMethod="resize"
+                fadeDuration={0}
+              />
+            ))}
+          </Animated.View>
+        );
+      }),
+    [plan, nodes, posterSources, tileBases],
+  );
 
   return (
-    <View
-      style={StyleSheet.absoluteFill}
-      pointerEvents="none"
-      onLayout={handleLayout}
-    >
-      <View style={styles.posterField}>
-        {tiles.map((tile, index) => (
-          <Animated.View
-            key={`${tile.left.toFixed(1)}-${tile.top.toFixed(1)}`}
-            style={[
-              styles.tile,
-              {
-                left: tile.left,
-                top: tile.top,
-                opacity: ringOpacities[tile.ring],
-                transform: [{ scale: ringScales[tile.ring] }],
-              },
-            ]}
-          >
-            <Image
-              source={posterSources[index % posterSources.length]}
-              style={styles.tileImage}
-              contentFit="cover"
-              transition={0}
-            />
-          </Animated.View>
-        ))}
-      </View>
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* Zemin: opak yerel-splash grisi + üstüne tema rengi. İkisi birlikte çıkışta
+          solar (altındaki uygulama o zaman görünür). */}
+      <Animated.View
+        collapsable={false}
+        style={[StyleSheet.absoluteFill, { opacity: nodes.backdropOpacity }]}
+      >
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: NATIVE_SPLASH_BG }]} />
+        <Animated.View
+          collapsable={false}
+          style={[StyleSheet.absoluteFill, { backgroundColor, opacity: nodes.veilOpacity }]}
+        />
+      </Animated.View>
 
-      {/* Adaptive icon foreground'u şeffaf zeminli — halkaların ortası zaten
-          boş olduğundan arkasına ayrıca zemin konmaz. Halkalarla AYNI merkezden
-          absolute konumlanır (flex-center değil). */}
-      <Image
-        source={appLogo}
+      <Animated.Image
+        source={GLOW_SOURCE}
+        resizeMode="stretch"
+        fadeDuration={0}
         style={[
-          styles.icon,
-          {
-            left: layout.width / 2 - ICON_SIZE / 2,
-            top: layout.height / 2 - ICON_SIZE / 2,
-          },
+          styles.glow,
+          GLOW_PLACE,
+          { opacity: nodes.glowOpacity },
+          nodes.glowTransform && { transform: nodes.glowTransform },
         ]}
-        contentFit="contain"
       />
+
+      {ringViews}
+
+      {/* Adaptive icon foreground'u şeffaf zeminli — halkaların ortası zaten boş
+          olduğundan arkasına ayrıca zemin konmaz. Halkalarla AYNI merkezden
+          konumlanır (yüzde + kenar boşluğu, flex-center değil). */}
+      <Animated.Image
+        source={appLogo}
+        resizeMode="contain"
+        fadeDuration={0}
+        style={[
+          styles.logo,
+          LOGO_PLACE,
+          { opacity: nodes.logoOpacity },
+          nodes.logoTransform && { transform: nodes.logoTransform },
+        ]}
+      />
+
+      {children ? (
+        <Animated.View
+          collapsable={false}
+          style={[StyleSheet.absoluteFill, { opacity: nodes.childOpacity }]}
+        >
+          {children}
+        </Animated.View>
+      ) : null}
     </View>
   );
-};
+}
 
-export default React.memo(SplashPosterWave);
+// Animasyonlu sahne düşerse: statik zemin + logo. Çıkış isteğine kısa bir bekleyişle
+// yanıt verir ki overlay yine sökülsün.
+function StaticSplash({ backgroundColor, exiting, onExited, children }) {
+  const { logo } = useAppLogo();
+  useEffect(() => {
+    if (!exiting) return undefined;
+    const timer = setTimeout(() => onExited?.(), 160);
+    return () => clearTimeout(timer);
+  }, [exiting, onExited]);
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor }]} pointerEvents="none">
+      <Image source={logo} resizeMode="contain" style={[styles.logo, LOGO_PLACE]} />
+      {children}
+    </View>
+  );
+}
+
+class SplashBoundary extends React.Component {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error, info) {
+    captureError(error, {
+      tags: { boundary: "splash" },
+      extra: { componentStack: info?.componentStack },
+    });
+  }
+
+  render() {
+    // Yedek AYRI prop: `children` çöken sahnenin kendisi, onu tekrar çizmek hatayı tekrarlar.
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+/**
+ * @param {string}   backgroundColor  tema zemin rengi (yerel splash grisinden buna geçilir)
+ * @param {boolean}  light            zemin açık mı (ışıma açık zeminde daha silik)
+ * @param {boolean}  exiting          true olunca çıkış animasyonu başlar
+ * @param {function} onExited         çıkış bitince çağrılır (overlay'i söküp atmak için)
+ * @param {node}     children         halka/logonun üstünde çizilir, çıkışla birlikte solar
+ */
+export default function SplashPosterWave(props) {
+  return (
+    <SplashBoundary fallback={<StaticSplash {...props} />}>
+      <SplashStage {...props} />
+    </SplashBoundary>
+  );
+}
 
 const styles = StyleSheet.create({
-  posterField: {
-    ...StyleSheet.absoluteFill,
+  glow: {
+    position: "absolute",
+    width: GLOW_SIZE,
+    height: GLOW_SIZE,
   },
   tile: {
     position: "absolute",
     width: TILE_W,
     height: TILE_H,
     borderRadius: 10,
-    overflow: "hidden",
     backgroundColor: "rgba(127, 127, 127, 0.14)",
   },
-  tileImage: {
-    width: "100%",
-    height: "100%",
-  },
-  // Adaptive foreground PNG'nin kendi güvenli-alan dolgusu var; görünür logo
-  // kutunun ~%60'ı olduğundan kutu, halkaların ortasındaki boşluğa göre büyük
-  // tutulur.
-  icon: {
+  logo: {
     position: "absolute",
-    width: ICON_SIZE,
-    height: ICON_SIZE,
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
   },
 });

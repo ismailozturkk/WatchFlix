@@ -31,7 +31,10 @@ module.exports = {
   // "SyntaxError: Unexpected token 'export'" ile patliyordu.
   // Yalniz expo paketi istisna tutuldu; kalan node_modules donusturulmuyor
   // (bkz. yukaridaki not: burada RN/Firebase bagimli kod test edilmiyor).
-  transformIgnorePatterns: ["node_modules/(?!(expo)/)"],
+  // `react-native` de dönüştürülür: __tests__/splashPosterWave.render.test.js GERÇEK
+  // Animated düğüm sınıflarını (Flow tipli kaynak) yükler. Yalnız gerçekten require
+  // edilen dosyalar dönüştürülür; react-native'i tümden taklit eden testler etkilenmez.
+  transformIgnorePatterns: ["node_modules/(?!(expo|react-native|@react-native)/)"],
   // `__DEV__` normalde Metro tarafından tanımlanır; jest'te yok. Test edilen
   // saf modüller bile artık (analytics/crash raporlama sarmalayıcıları
   // üzerinden) bu bayrağı okuyabiliyor — tanımsız kalırsa ReferenceError.
