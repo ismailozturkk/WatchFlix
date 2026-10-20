@@ -1,0 +1,9 @@
+{
+  "ios": {
+    "NSPhotoLibraryUsageDescription": "Erlaubt der App, das von dir erstellte Story-Bild in deiner Fotomediathek zu speichern.",
+    "NSPhotoLibraryAddUsageDescription": "Erlaubt der App, das von dir erstellte Story-Bild in deiner Fotomediathek zu speichern.",
+    "NSCalendarsUsageDescription": "Erlaubt den Zugriff auf deinen Kalender, damit Film-, Serien- und Notizerinnerungen zum Kalender deines Telefons hinzugefügt und wieder daraus entfernt werden können.",
+    "NSCalendarsFullAccessUsageDescription": "Erlaubt den Zugriff auf deinen Kalender, damit Film-, Serien- und Notizerinnerungen zum Kalender deines Telefons hinzugefügt und wieder daraus entfernt werden können.",
+    "NSFaceIDUsageDescription": "Erlaubt Seelogd, auf deine biometrischen Face-ID-Daten zuzugreifen."
+  }
+}

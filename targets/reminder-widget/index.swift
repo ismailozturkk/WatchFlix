@@ -54,9 +54,9 @@ private func countdownText(_ date: Date, lang: String) -> String {
     to: cal.startOfDay(for: date)
   ).day ?? 0
 
-  if days <= 0 { return widgetPick(lang, tr: "Bugün", en: "Today", es: "Hoy", pt: "Hoje") }
-  if days == 1 { return widgetPick(lang, tr: "Yarın", en: "Tomorrow", es: "Mañana", pt: "Amanhã") }
-  return widgetPick(lang, tr: "\(days) gün", en: "\(days) days", es: "\(days) días", pt: "\(days) dias")
+  if days <= 0 { return widgetPick(lang, tr: "Bugün", en: "Today", es: "Hoy", pt: "Hoje", de: "Heute") }
+  if days == 1 { return widgetPick(lang, tr: "Yarın", en: "Tomorrow", es: "Mañana", pt: "Amanhã", de: "Morgen") }
+  return widgetPick(lang, tr: "\(days) gün", en: "\(days) days", es: "\(days) días", pt: "\(days) dias", de: "\(days) Tage")
 }
 
 private let sampleItems: [ReminderItem] = [
@@ -181,8 +181,8 @@ private struct ReminderRow: View {
 
   private var isMovie: Bool { item.type == "movie" }
   private var typeLabel: String {
-    if isMovie { return widgetPick(lang, tr: "Film", en: "Movie", es: "Película", pt: "Filme") }
-    return widgetPick(lang, tr: "Dizi", en: "TV", es: "Serie", pt: "Série")
+    if isMovie { return widgetPick(lang, tr: "Film", en: "Movie", es: "Película", pt: "Filme", de: "Film") }
+    return widgetPick(lang, tr: "Dizi", en: "TV", es: "Serie", pt: "Série", de: "Serie")
   }
 
   var body: some View {
@@ -271,14 +271,14 @@ private struct ReminderWidgetEntryView: View {
             .background(appearance.accentColor)
             .clipShape(RoundedRectangle(cornerRadius: metrics.badge * 0.3, style: .continuous))
 
-          Text(widgetPick(entry.lang, tr: "Yaklaşanlar", en: "Coming Up", es: "Próximos", pt: "Próximos"))
+          Text(widgetPick(entry.lang, tr: "Yaklaşanlar", en: "Coming Up", es: "Próximos", pt: "Próximos", de: "Demnächst"))
             .font(.system(size: metrics.badge >= 24 ? 15 : 13, weight: .bold))
             .foregroundColor(appearance.textColor)
             .lineLimit(1)
 
           Spacer(minLength: 0)
 
-          Text(widgetPick(entry.lang, tr: "\(filtered.count) hatırlatma", en: "\(filtered.count) reminders", es: "\(filtered.count) recordatorios", pt: "\(filtered.count) lembretes"))
+          Text(widgetPick(entry.lang, tr: "\(filtered.count) hatırlatma", en: "\(filtered.count) reminders", es: "\(filtered.count) recordatorios", pt: "\(filtered.count) lembretes", de: "\(filtered.count) Erinnerungen"))
             .font(.system(size: 10, weight: .bold))
             .foregroundColor(appearance.accentColor)
             .lineLimit(1)
@@ -291,7 +291,7 @@ private struct ReminderWidgetEntryView: View {
 
       if shown.isEmpty {
         Spacer()
-        Text(widgetPick(entry.lang, tr: "Yaklaşan film veya bölüm yok", en: "No upcoming movies or episodes", es: "No hay películas ni episodios próximos", pt: "Nenhum filme ou episódio próximo"))
+        Text(widgetPick(entry.lang, tr: "Yaklaşan film veya bölüm yok", en: "No upcoming movies or episodes", es: "No hay películas ni episodios próximos", pt: "Nenhum filme ou episódio próximo", de: "Keine bevorstehenden Filme oder Folgen"))
           .font(.system(size: 12))
           .foregroundColor(appearance.mutedColor)
           .frame(maxWidth: .infinity, alignment: .center)
@@ -308,7 +308,7 @@ private struct ReminderWidgetEntryView: View {
           )
         }
         if fit.showsOverflow {
-          Text(widgetPick(entry.lang, tr: "+\(overflow) daha", en: "+\(overflow) more", es: "+\(overflow) más", pt: "+\(overflow) mais"))
+          Text(widgetPick(entry.lang, tr: "+\(overflow) daha", en: "+\(overflow) more", es: "+\(overflow) más", pt: "+\(overflow) mais", de: "+\(overflow) weitere"))
             .font(.system(size: 10, weight: .bold))
             .foregroundColor(appearance.accentColor)
             .frame(maxWidth: .infinity, alignment: .center)

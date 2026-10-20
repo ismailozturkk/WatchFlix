@@ -220,7 +220,7 @@ private struct ListsWidgetEntryView: View {
             .background(appearance.accentColor)
             .clipShape(RoundedRectangle(cornerRadius: metrics.badge * 0.33, style: .continuous))
 
-          Text(widgetPick(entry.lang, tr: "Listelerim", en: "My Lists", es: "Mis listas", pt: "Minhas listas"))
+          Text(widgetPick(entry.lang, tr: "Listelerim", en: "My Lists", es: "Mis listas", pt: "Minhas listas", de: "Meine Listen"))
             .font(.system(size: metrics.badge >= 22 ? 14 : 12, weight: .bold))
             .foregroundColor(appearance.textColor)
             .lineLimit(1)
@@ -231,7 +231,7 @@ private struct ListsWidgetEntryView: View {
 
       if shown.isEmpty {
         Spacer()
-        Text(widgetPick(entry.lang, tr: "Henüz liste yok", en: "No lists yet", es: "Aún no hay listas", pt: "Ainda não há listas"))
+        Text(widgetPick(entry.lang, tr: "Henüz liste yok", en: "No lists yet", es: "Aún no hay listas", pt: "Ainda não há listas", de: "Noch keine Listen"))
           .font(.system(size: 12))
           .foregroundColor(appearance.mutedColor)
           .frame(maxWidth: .infinity, alignment: .center)

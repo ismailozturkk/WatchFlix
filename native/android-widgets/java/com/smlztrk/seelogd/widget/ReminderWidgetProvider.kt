@@ -77,12 +77,12 @@ class ReminderWidgetProvider : AppWidgetProvider() {
       )
       views.setTextViewText(
         R.id.reminder_widget_title,
-        WidgetLanguage.pick(lang, "Yaklaşanlar", "Coming Up", "Próximos", "Próximos"),
+        WidgetLanguage.pick(lang, "Yaklaşanlar", "Coming Up", "Próximos", "Próximos", "Demnächst"),
       )
       views.setTextColor(R.id.reminder_widget_title, appearance.text)
       views.setTextViewText(
         R.id.reminder_widget_count,
-        WidgetLanguage.pick(lang, "$count hatırlatma", "$count reminders", "$count recordatorios", "$count lembretes"),
+        WidgetLanguage.pick(lang, "$count hatırlatma", "$count reminders", "$count recordatorios", "$count lembretes", "$count Erinnerungen"),
       )
       views.setTextColor(R.id.reminder_widget_count, appearance.accent)
       views.setTextViewText(
@@ -93,6 +93,7 @@ class ReminderWidgetProvider : AppWidgetProvider() {
           "No upcoming movies or episodes",
           "No hay películas ni episodios próximos",
           "Nenhum filme ou episódio próximo",
+          "Keine bevorstehenden Filme oder Folgen",
         ),
       )
       views.setTextColor(R.id.reminder_widget_empty_text, appearance.muted)

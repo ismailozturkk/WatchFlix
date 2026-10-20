@@ -2,7 +2,7 @@
   "expo": {
     "name": "Seelogd",
     "slug": "seelogd",
-    "version": "1.4.8",
+    "version": "1.4.9",
     "orientation": "portrait",
     "icon": "./assets/icon_default/icon.png",
     "userInterfaceStyle": "automatic",
@@ -11,7 +11,8 @@
       "en": "./native/locales/en.json",
       "tr": "./native/locales/tr.json",
       "es": "./native/locales/es.json",
-      "pt": "./native/locales/pt.json"
+      "pt": "./native/locales/pt.json",
+      "de": "./native/locales/de.json"
     },
     "ios": {
       "bundleIdentifier": "com.smlztrk.seelogd",
@@ -25,7 +26,8 @@
           "en",
           "tr",
           "es",
-          "pt"
+          "pt",
+          "de"
         ]
       },
       "entitlements": {
@@ -64,7 +66,10 @@
         {
           "image": "./assets/icon_default/android-icon-foreground.png",
           "resizeMode": "contain",
-          "backgroundColor": "#1E1E1E"
+          "backgroundColor": "#1E1E1E",
+          "ios": {
+            "imageWidth": 288
+          }
         }
       ],
       "@bacons/apple-targets",
