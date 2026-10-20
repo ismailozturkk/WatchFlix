@@ -90,3 +90,6 @@ ui-debug.log
 # AI model değerlendirme çıktıları (API yanıtları, raporlar)
 scripts/ai-eval/out/
 scripts/ai-eval/extraCases.json
+
+# Yerel Expo modullerinin Gradle onbellegi (modules/<ad>/android/.gradle/): uretilen cikti.
+modules/*/android/.gradle/

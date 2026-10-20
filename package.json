@@ -1,6 +1,6 @@
 {
   "name": "seelogd",
-  "version": "1.4.5",
+  "version": "1.4.9",
   "main": "index.js",
   "scripts": {
     "start": "npx expo start",
@@ -167,6 +167,7 @@
     "@babel/core": "^7.25.2",
     "@babel/plugin-transform-private-methods": "^7.25.9",
     "@bacons/apple-targets": "^5.0.0",
+    "@expo/ngrok": "^4.1.3",
     "@firebase/rules-unit-testing": "^5.0.1",
     "babel-jest": "^29.7.0",
     "babel-plugin-module-resolver": "^5.0.3",
