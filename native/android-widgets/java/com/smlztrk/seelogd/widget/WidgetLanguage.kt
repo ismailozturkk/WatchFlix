@@ -4,7 +4,7 @@ import java.util.Locale
 
 /**
  * Widget'ların dil kararı. JS tarafı uygulama dil kodunu ("tr" | "en" | "es" | "pt" | "de" …)
- * SharedPreferences'a yazar (services/*WidgetService.js → updateX(payload, language)).
+ * SharedPreferences'a yazar (services/{reminder,lists,stats}WidgetService.js → updateX(payload, language)).
  *
  * KURAL (utils/appLanguages.js ile AYNI): bilinmeyen dil → İNGİLİZCE. Kayıt yoksa
  * eski davranış korunur ("tr"). YENİ DİL: [SUPPORTED]'a kodu ekle ve her pick(...)
