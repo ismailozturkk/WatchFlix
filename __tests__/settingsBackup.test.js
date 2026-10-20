@@ -37,7 +37,7 @@ const yedekOlustur = (settings) => ({
   format: BACKUP_FORMAT,
   version: BACKUP_VERSION,
   createdAt: "2026-10-15T10:00:00.000Z",
-  app: { version: "1.4.8", platform: "ios" },
+  app: { version: "1.4.9", platform: "ios" },
   settings,
 });
 
@@ -89,11 +89,11 @@ describe("kapsam bekçisi", () => {
 
 describe("buildBackup / serialize", () => {
   test("zarf alanları + her kimlik için bir giriş; kayıtsız olan null", () => {
-    const yedek = buildBackup(() => undefined, { now: new Date("2026-10-15T10:00:00Z"), appVersion: "1.4.8", platform: "ios" });
+    const yedek = buildBackup(() => undefined, { now: new Date("2026-10-15T10:00:00Z"), appVersion: "1.4.9", platform: "ios" });
     expect(yedek.format).toBe(BACKUP_FORMAT);
     expect(yedek.version).toBe(BACKUP_VERSION);
     expect(yedek.createdAt).toBe("2026-10-15T10:00:00.000Z");
-    expect(yedek.app).toEqual({ version: "1.4.8", platform: "ios" });
+    expect(yedek.app).toEqual({ version: "1.4.9", platform: "ios" });
     expect(Object.keys(yedek.settings).sort()).toEqual(BACKUP_ENTRIES.map((e) => e.id).sort());
     expect(Object.values(yedek.settings).every((v) => v === null)).toBe(true);
   });
@@ -166,7 +166,7 @@ describe("planImport — değerler", () => {
     expect(plan.skipped).toEqual([]);
     expect(plan.groups.find((g) => g.id === "appearance").applied).toBe(1);
     expect(plan.groups.find((g) => g.id === "layout").applied).toBe(2);
-    expect(plan.meta).toEqual({ createdAt: "2026-10-15T10:00:00.000Z", appVersion: "1.4.8", platform: "ios" });
+    expect(plan.meta).toEqual({ createdAt: "2026-10-15T10:00:00.000Z", appVersion: "1.4.9", platform: "ios" });
   });
 
   test("kayıtlı her dil kodu yedekten geri yüklenebilir (İspanyolca dahil)", () => {

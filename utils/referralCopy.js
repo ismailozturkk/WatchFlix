@@ -347,6 +347,90 @@ export const REFERRAL_COPY = {
     loadFailed: "Não foi possível carregar as informações de convites",
     retry: "Tentar novamente",
   },
+  de: {
+    rowTitle: "Freund einladen",
+    rowSubtitle: "Teile deinen Code und erhalte für jeden Freund, der abonniert, 1 Gratismonat",
+    screenTitle: "Freund einladen",
+    hero: {
+      title: "Bring einen Freund mit, erhalte 1 Monat Premium",
+      body: (percent) =>
+        `Wenn ein Freund deinen Code eingibt und abonniert, erhältst du 1 Monat Premium gratis und er bekommt ${percent} % Rabatt auf sein erstes Abo.`,
+    },
+    yourCode: "Dein Einladungscode",
+    copy: "Kopieren",
+    copied: "Code kopiert",
+    share: "Einladung senden",
+    shareMessage: (code, percent, links) =>
+      `Probiere Seelogd aus! Gib nach der Registrierung meinen Code ${code} auf der Premium-Seite unter „Hast du einen Code?“ ein und erhalte ${percent} % Rabatt auf dein erstes Abo.\n\n${links}`,
+    steps: {
+      title: "So funktioniert es",
+      one: "Sende deinen Code an einen Freund",
+      two: (days) => `Dein Freund gibt ihn innerhalb von ${days} Tagen ein`,
+      three: "Wenn er abonniert, erhältst du 1 Monat Premium gratis",
+    },
+    reward: {
+      title: "Deine Gratismonate",
+      none: "Du hast noch keinen Gratismonat verdient",
+      available: (n) => (n === 1 ? "1 Gratismonat wartet auf dich" : `${n} Gratismonate warten auf dich`),
+      start: "Gratismonat starten",
+      starting: "Wird gestartet…",
+      active: (date) => `Gratis-Premium ist aktiv bis ${date}`,
+      started: (date) => `Gratis-Premium ist aktiv bis ${date}`,
+      storeActive: "Gratismonate warten, solange dein Store-Abo aktiv ist; starte einen, wenn es endet",
+      earned: (n, max) => `${n} von ${max} Monaten verdient`,
+      capped: (max) => `Du kannst bis zu ${max} Monate verdienen`,
+    },
+    list: {
+      title: "Von dir eingeladene Freunde",
+      empty: "Noch niemand hat deinen Code eingegeben. Freunde erscheinen hier, sobald du ihn teilst.",
+      counts: (registered, subscribed) =>
+        `${registered} haben deinen Code eingegeben · ${subscribed} haben abonniert`,
+      status: {
+        registered: "Registriert",
+        subscribed: "Abonniert",
+        rewarded: "Abonniert · du hast einen Gratismonat verdient",
+      },
+      statusHint: "Wenn ein Freund nur deinen Code eingegeben hat, erscheint er als „Registriert“",
+    },
+    invitedBy: {
+      title: (name) => (name ? `${name} hat dich eingeladen` : "Du bist per Einladung beigetreten"),
+      discount: (percent) =>
+        `${percent} % Rabatt auf dein erstes Abo warten auf dich. Der Rabatt wird beim Bezahlen angewendet.`,
+      used: "Du hast deinen Einladungsrabatt genutzt",
+    },
+    redeem: {
+      entryTitle: "Hast du einen Code?",
+      entryHint: "Gib einen Einladungs- oder Aktionscode ein",
+      sheetTitle: "Code eingeben",
+      sheetBody: "Gib den Einladungscode eines Freundes (Rabatt auf dein erstes Abo) oder einen Aktionscode (1 Monat Premium gratis) ein.",
+      placeholder: "ABCD-EFGH",
+      apply: "Code einlösen",
+      applying: "Wird geprüft…",
+      promoSuccess: (days, date) => `${days} Tage Gratis-Premium freigeschaltet · bis ${date}`,
+      referralSuccess: (percent, name) =>
+        name
+          ? `Du hast die Einladung von ${name} angenommen. ${percent} % Rabatt auf dein erstes Abo werden angewendet.`
+          : `Einladung angenommen. ${percent} % Rabatt auf dein erstes Abo werden angewendet.`,
+      discountPending: (percent) =>
+        `Der Einladungsrabatt (${percent} %) erscheint beim Bezahlen, sobald das Store-Angebot live ist.`,
+    },
+    errors: {
+      "code-not-found": "Dieser Code ist ungültig. Prüfe die Schreibweise.",
+      "code-exhausted": "Dieser Code wurde aufgebraucht.",
+      "code-expired": "Dieser Code ist abgelaufen.",
+      "code-inactive": "Dieser Code kann nicht mehr verwendet werden.",
+      "already-redeemed": "Du hast bereits einen Code verwendet; jedes Konto kann einen verwenden.",
+      "own-code": "Du kannst deinen eigenen Einladungscode nicht verwenden.",
+      "window-closed": (days) => `Ein Einladungscode kann in den ersten ${days} Tagen nach der Registrierung eingegeben werden.`,
+      "already-purchased": "Der Einladungsrabatt gilt nur für ein erstes Abo; du hast schon einmal abonniert.",
+      "store-subscription-active": "Dieser Code kann nicht verwendet werden, solange du ein Abo hast.",
+      "rate-limited": "Zu viele Fehlversuche. Versuche es morgen erneut.",
+      "no-credit": "Du hast keinen Gratismonat zum Starten.",
+      generic: "Das hat nicht geklappt. Prüfe deine Verbindung und versuche es erneut.",
+    },
+    loadFailed: "Einladungsdetails konnten nicht geladen werden",
+    retry: "Erneut versuchen",
+  },
 };
 
 /** Uygulama diline göre metin tablosu (tabloda olmayan dil → İngilizce). */

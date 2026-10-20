@@ -66,6 +66,7 @@ import {
 import { resolveCards } from "@services/tmdbLookup";
 import AIChatScreen from "@screens/chat/AIChatScreen";
 import { i18nText } from "@utils/i18nText";
+import { daysText, hoursText, minutesText } from "@utils/durationText";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { appAlert } from "@components/AppAlert";
 import { usePet } from "@context/PetContext";
@@ -87,11 +88,11 @@ const { height: SCREEN_H } = Dimensions.get("window");
 // ─── Tema renk örnekleri (ayarlar kartındaki seçici) ─────────────────────────
 // key → colors.js'deki tema anahtarı; bg/bc/tc → daire dolgu/kenar/✓ rengi.
 const THEME_SWATCHES = [
-  { key: "dark", bg: "#000000", bc: "#3A3A3A", tc: "#FFFFFF", label: "siyah" },
-  { key: "light", bg: "#E8E8E8", bc: "#B0B0B0", tc: "#222222", label: "beyaz" },
-  { key: "gray", bg: "#2C2C2C", bc: "#555555", tc: "#FFFFFF", label: "gri" },
-  { key: "blue", bg: "#141C33", bc: "#5374AC", tc: "#8BAFD0", label: "mavi" },
-  { key: "green", bg: "#A9BDBB", bc: "#1C4F4E", tc: "#143636", label: i18nText("autoI18n.yesil", "yeşil") },
+  { key: "dark", bg: "#000000", bc: "#3A3A3A", tc: "#FFFFFF" },
+  { key: "light", bg: "#E8E8E8", bc: "#B0B0B0", tc: "#222222" },
+  { key: "gray", bg: "#2C2C2C", bc: "#555555", tc: "#FFFFFF" },
+  { key: "blue", bg: "#141C33", bc: "#5374AC", tc: "#8BAFD0" },
+  { key: "green", bg: "#A9BDBB", bc: "#1C4F4E", tc: "#143636" },
 ];
 
 // ─── Yardımcılar ──────────────────────────────────────────────────────────────
@@ -108,12 +109,12 @@ const formatRelative = (ts) => {
   const diff = Date.now() - ts;
   const m = Math.floor(diff / 60000);
   if (m < 1) return "•";
-  if (m < 60) return `${m} dk`;
+  if (m < 60) return minutesText(m);
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} sa`;
+  if (h < 24) return hoursText(h);
   const d = Math.floor(h / 24);
   if (d === 1) return i18nText("autoI18n.dun_lower", "dün");
-  if (d < 7) return `${d} g`;
+  if (d < 7) return daysText(d);
   const date = new Date(ts);
   return `${String(date.getDate()).padStart(2, "0")}.${String(
     date.getMonth() + 1,

@@ -29,6 +29,7 @@ const LABELS = Object.freeze({
   en: { rating: "Age rating", outside: "{region} rating" },
   es: { rating: "Clasificación por edades", outside: "Clasificación de {region}" },
   pt: { rating: "Classificação indicativa", outside: "Classificação de {region}" },
+  de: { rating: "Altersfreigabe", outside: "Freigabe {region}" },
 });
 
 /**

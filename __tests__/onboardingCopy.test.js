@@ -22,19 +22,21 @@ describe("onboarding metinleri", () => {
   });
 
   it("bilinmeyen dil İngilizceye düşer (Türkçeye DEĞİL)", () => {
-    expect(getOnboardingCopy("de")).toBe(ONBOARDING_COPY.en);
+    expect(getOnboardingCopy("fr")).toBe(ONBOARDING_COPY.en);
     expect(getOnboardingCopy(undefined)).toBe(ONBOARDING_COPY.en);
     expect(getOnboardingCopy("en")).toBe(ONBOARDING_COPY.en);
     expect(getOnboardingCopy("tr")).toBe(ONBOARDING_COPY.tr);
     expect(getOnboardingCopy("es")).toBe(ONBOARDING_COPY.es);
     expect(getOnboardingCopy("pt")).toBe(ONBOARDING_COPY.pt);
+    expect(getOnboardingCopy("de")).toBe(ONBOARDING_COPY.de);
   });
 
-  it("dil düğmesi etiketi döngüde SIRADAKİ dili adlandırır (tr → en → es → pt → tr)", () => {
+  it("dil düğmesi etiketi döngüde SIRADAKİ dili adlandırır (tr → en → es → pt → de → tr)", () => {
     expect(ONBOARDING_COPY.tr.language).toBe("English");
     expect(ONBOARDING_COPY.en.language).toBe("Español");
     expect(ONBOARDING_COPY.es.language).toBe("Português");
-    expect(ONBOARDING_COPY.pt.language).toBe("Türkçe");
+    expect(ONBOARDING_COPY.pt.language).toBe("Deutsch");
+    expect(ONBOARDING_COPY.de.language).toBe("Türkçe");
   });
 
   it("vurgulanan kelime başlığın içinde geçiyor (yoksa vurgu sessizce kaybolur)", () => {

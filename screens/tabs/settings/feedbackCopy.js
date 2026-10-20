@@ -409,7 +409,107 @@ const pt = {
   },
 };
 
-export const FEEDBACK_COPY = Object.freeze({ tr, en, es, pt });
+const de = {
+  group: {
+    label: "Support & Feedback",
+    bugTitle: "Fehler melden",
+    bugSub: "Sende das aufgetretene Problem mit Geräteinfos",
+    featureTitle: "Funktion vorschlagen",
+    featureSub: "Erzähl uns die Idee, die du gern sehen würdest",
+  },
+  common: {
+    deviceTitle: "Geräteinfos anhängen",
+    deviceHint: "Wird nur verwendet, um das Problem nachzustellen.",
+    privacyNote: "Was du sendest, ist mit deinem Konto verknüpft und kann für den Support-Verlauf auch nach dem Löschen des Kontos aufbewahrt werden.",
+    titleLabel: "Kurzer Titel",
+    counter: "{n}/{max}",
+    messageNeed: "Schreibe mindestens {n} Zeichen",
+    submit: "Senden",
+    submitting: "Wird gesendet…",
+    submitNeed: "Titel und Beschreibung ausfüllen",
+    sentAgain: "Weitere senden",
+    historyTitle: "Meine Einsendungen",
+    historyEmptyTitle: "Du hast noch nichts gesendet",
+    historyLoadFailed: "Die Liste konnte nicht geladen werden",
+    retry: "Erneut versuchen",
+    reply: "Antwort unseres Teams",
+    justNow: "Gerade eben",
+    errOffline: "Keine Internetverbindung. Dein Text ist noch da; versuche es erneut, sobald du online bist.",
+    errDenied: "Dein Plan enthält das möglicherweise nicht. Prüfe deinen Abostatus.",
+    errFailed: "Senden nicht möglich. Bitte versuche es gleich noch einmal.",
+    infoSlow: "Die Verbindung ist langsam; das Senden läuft.",
+    planChip: "Nur für {plan}-Mitglieder",
+  },
+  bug: {
+    title: "Fehler melden",
+    heroTitle: "Ist etwas schiefgelaufen?",
+    heroText: "Sag es uns, wir kümmern uns darum. App-Version und Geräteinfos werden für dich ergänzt.",
+    heroBenefit: "Mit Geräteinfos",
+    categoryLabel: "Wo liegt das Problem?",
+    severityLabel: "Wie schwerwiegend ist es?",
+    titlePlaceholder: "z. B. Der Bildschirm „Listen“ schließt sich ständig",
+    messageLabel: "Was ist passiert?",
+    messagePlaceholder: "Welcher Bildschirm, und was hast du gerade getan? Schritt für Schritt hilft uns, es zu finden.",
+    sentTitle: "Deine Meldung ist bei uns angekommen",
+    sentText: "Danke! Den Status kannst du in der Liste unten verfolgen.",
+    historyEmptyText: "Wenn du auf ein Problem stößt, sende es hier und verfolge seinen Status in dieser Liste.",
+    categories: {
+      crash: "Absturz / Einfrieren",
+      display: "Anzeige",
+      data: "Falsche Daten",
+      notifications: "Benachrichtigungen",
+      performance: "Langsamkeit",
+      other: "Sonstiges",
+    },
+    severities: {
+      minor: "Geringfügig",
+      annoying: "Störend",
+      blocking: "Blockierend",
+    },
+    severityHints: {
+      minor: "Stört mich kaum",
+      annoying: "Stört bei der Nutzung",
+      blocking: "Ich komme nicht weiter",
+    },
+    statuses: {
+      open: "Eingegangen",
+      reviewing: "In Prüfung",
+      planned: "Eingeplant",
+      done: "Behoben",
+      declined: "Nicht behebbar",
+    },
+  },
+  feature: {
+    title: "Funktion vorschlagen",
+    heroTitle: "Eine Idee?",
+    heroText: "Beschreibe die Funktion, die du dir in Seelogd wünschst. Den Status dessen, was du sendest, kannst du gleich hier verfolgen.",
+    heroBenefit: "Mit Statusverfolgung",
+    categoryLabel: "Welcher Bereich?",
+    titlePlaceholder: "z. B. Listen per Ziehen umsortieren",
+    messageLabel: "Wie soll es funktionieren?",
+    messagePlaceholder: "Was möchtest du und wie würde es helfen? Ein Beispiel, wie du es nutzen würdest, hilft sehr.",
+    sentTitle: "Deine Idee ist bei uns angekommen",
+    sentText: "Danke! Den Status kannst du in der Liste unten verfolgen.",
+    historyEmptyText: "Wenn du eine Idee hast, sende sie hier und sieh in dieser Liste, was daraus wird.",
+    categories: {
+      discover: "Entdecken",
+      lists: "Listen",
+      social: "Soziales",
+      ai: "KI",
+      design: "Design",
+      other: "Sonstiges",
+    },
+    statuses: {
+      open: "Eingegangen",
+      reviewing: "In Prüfung",
+      planned: "Geplant",
+      done: "Hinzugefügt",
+      declined: "Vorerst nicht",
+    },
+  },
+};
+
+export const FEEDBACK_COPY = Object.freeze({ tr, en, es, pt, de });
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getFeedbackCopy = (language) =>

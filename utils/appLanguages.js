@@ -84,7 +84,42 @@ export const APP_LANGUAGES = Object.freeze([
     legalLang: "en",
     aiPromptName: "Portuguese (pt-BR)",
   },
+  {
+    // Almanca (du). Almanya, Avusturya ve İsviçre aynı paketi görür; TMDB için tek bölge
+    // gerekiyor: DE. Bölgeye özgü sürüm (de-AT / de-CH) istenirse burası bölünür (rehber, bölüm 12).
+    code: "de",
+    name: "German",
+    nativeName: "Deutsch",
+    flag: "de",
+    intlLocale: "de-DE",
+    tmdbLanguage: "de-DE",
+    tmdbRegion: "DE",
+    tmdbImageLanguages: ["de", "en"],
+    // website/legal.js henüz yalnız tr/en biliyor → İngilizce sayfa.
+    legalLang: "en",
+    aiPromptName: "German (de)",
+  },
 ]);
+
+/**
+ * Ayarlar > Dil listesinde "Yakında" diye gösterilen, HENÜZ DESTEKLENMEYEN diller. Bu liste
+ * `APP_LANGUAGES`'in parçası DEĞİLDİR: seçilemez, kayıt/yedek/cihaz dili/onboarding döngüsüne girmez.
+ * Bir dil gerçekten eklenince buradan SİLİNİR ve `APP_LANGUAGES`'e tam kayıtla taşınır
+ * (bkz. docs/mimari/DIL_DESTEGI_REHBERI.md, bölüm 9). Kodlar `normalizeAppLanguage`ta tanınmaz →
+ * bu dillerdeki cihaz İngilizce açılır.
+ *
+ * @type {ReadonlyArray<{code: string, name: string, nativeName: string, flag: string}>}
+ */
+export const COMING_SOON_LANGUAGES = Object.freeze([
+  { code: "fr", name: "French", nativeName: "Français", flag: "fr" },
+  { code: "ja", name: "Japanese", nativeName: "日本語", flag: "jp" },
+  { code: "ko", name: "Korean", nativeName: "한국어", flag: "kr" },
+  { code: "it", name: "Italian", nativeName: "Italiano", flag: "it" },
+  { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia", flag: "id" },
+  { code: "hi", name: "Hindi", nativeName: "हिन्दी", flag: "in" },
+  { code: "ar", name: "Arabic", nativeName: "العربية", flag: "sa" },
+  { code: "zh", name: "Chinese", nativeName: "中文", flag: "cn" },
+].map((l) => Object.freeze(l)));
 
 export const SUPPORTED_LANGUAGE_CODES = Object.freeze(APP_LANGUAGES.map((l) => l.code));
 

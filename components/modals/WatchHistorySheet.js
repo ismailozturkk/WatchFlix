@@ -20,6 +20,7 @@ import GlassCloseButton from "../common/GlassCloseButton";
 import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
+import { hoursMinutesText } from "../../utils/durationText";
 import { selectionAsync } from "../../services/hapticsService";
 
 const scopeMeta = (scope) => {
@@ -41,10 +42,7 @@ const scopeMeta = (scope) => {
 const formatDuration = (minutes) => {
   const total = Math.max(0, Number(minutes) || 0);
   if (!total) return null;
-  const hours = Math.floor(total / 60);
-  const remainder = total % 60;
-  if (!hours) return `${remainder} dk`;
-  return remainder ? `${hours} sa ${remainder} dk` : `${hours} sa`;
+  return hoursMinutesText(total);
 };
 
 function HistoryEventCard({

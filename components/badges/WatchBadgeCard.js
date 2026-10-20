@@ -30,7 +30,7 @@ import { badgeAciklama, badgeAd, formatBadgeAralik } from "./watchBadgeCatalog";
 function WatchBadgeRow({ badge, onPress }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
 
   const acik = badge.acik;
   const nadirlik = rarityStyle(badge.rarity, theme);

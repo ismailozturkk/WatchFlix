@@ -45,11 +45,12 @@ export function memberBarLook(plan, theme) {
   };
 }
 
-/** Çubuğun başlığı ("Aboneliği yönet"). `language`: tr | en | es | pt (bilinmeyen → en). */
+/** Çubuğun başlığı ("Aboneliği yönet"). `language`: tr | en | es | pt | de (bilinmeyen → en). */
 export function memberBarTitle(language) {
   if (language === "tr") return "Aboneliği yönet";
   if (language === "es") return "Gestionar suscripción";
   if (language === "pt") return "Gerenciar assinatura";
+  if (language === "de") return "Abo verwalten";
   return "Manage subscription";
 }
 
@@ -63,6 +64,6 @@ export function memberBarAccessibilityLabel(plan, language) {
       ? "plan, kullanım ve limitler"
       : language === "es"
         ? "plan, uso y límites"
-        : language === "pt" ? "plano, uso e limites" : "plan, usage and limits";
+        : language === "pt" ? "plano, uso e limites" : language === "de" ? "Plan, Nutzung und Limits" : "plan, usage and limits";
   return `${name}, ${memberBarTitle(language)}, ${tail}`;
 }

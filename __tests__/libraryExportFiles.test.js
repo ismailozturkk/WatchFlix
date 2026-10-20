@@ -30,7 +30,7 @@ jest.mock("expo-sharing", () => ({
   isAvailableAsync: async () => mockSharingAvailable,
   shareAsync: (...args) => mockShare(...args),
 }));
-jest.mock("expo-constants", () => ({ __esModule: true, default: { expoConfig: { version: "1.4.8" } } }));
+jest.mock("expo-constants", () => ({ __esModule: true, default: { expoConfig: { version: "1.4.9" } } }));
 jest.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 
 const JSZip = require("jszip");
@@ -51,7 +51,7 @@ beforeEach(() => {
 });
 
 it("anlık görüntü uygulama sürümünü ve platformu taşır", () => {
-  expect(snapshot()).toMatchObject({ appVersion: "1.4.8", platform: "ios" });
+  expect(snapshot()).toMatchObject({ appVersion: "1.4.9", platform: "ios" });
 });
 
 describe("JSON", () => {

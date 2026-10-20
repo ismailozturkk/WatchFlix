@@ -156,6 +156,7 @@ function PremiumShowcase() {
   const tr = lang === "tr";
   const es = lang === "es";
   const pt = lang === "pt";
+  const de = lang === "de";
 
   const accent = theme.accent;
   const purple = theme.colors.purple || "#8B5CF6";
@@ -240,9 +241,9 @@ function PremiumShowcase() {
 
   const premiumName = getPremiumPlanDisplayName(PREMIUM_PLAN.PREMIUM);
   const freeName = getPremiumPlanDisplayName(PREMIUM_PLAN.FREE);
-  const title = tr ? "Sinemanın Sınırlarını Kaldır" : es ? "Desbloquea el cine sin límites" : pt ? "Desbloqueie o cinema sem limites" : "Unlock Boundless Cinema";
+  const title = tr ? "Sinemanın Sınırlarını Kaldır" : es ? "Desbloquea el cine sin límites" : pt ? "Desbloqueie o cinema sem limites" : de ? "Schalte grenzenloses Kino frei" : "Unlock Boundless Cinema";
   // Kısa tutulur: fiyat zaten ikinci satırda, yanındaki indirim rozeti de yer ister.
-  const ctaTitle = tr ? "Planları Gör" : es ? "Ver planes" : pt ? "Ver planos" : "View Plans";
+  const ctaTitle = tr ? "Planları Gör" : es ? "Ver planes" : pt ? "Ver planos" : de ? "Pläne ansehen" : "View Plans";
   const ctaSubtitle = showcaseCtaSubtitle(pricing, lang, {
     inlineOffer: Boolean(pricing?.offer) && !showBadge,
   });

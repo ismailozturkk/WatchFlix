@@ -62,7 +62,7 @@ export const PERK_CANDIDATES = Object.freeze([
 export const MAX_PERKS = 2;
 
 const pick = (copy, language) =>
-  copy?.[copyLanguage(language, ["tr", "en", "es", "pt"])] ?? copy?.en ?? copy?.tr ?? "";
+  copy?.[copyLanguage(language, ["tr", "en", "es", "pt", "de"])] ?? copy?.en ?? copy?.tr ?? "";
 
 const categoryOf = (definition) =>
   FEATURE_CATEGORIES.find((category) => category.id === definition?.category) || null;
@@ -88,9 +88,10 @@ function eyebrowFor(kind, language) {
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
-  if (kind === ACCESS) return tr ? "PREMİUM ÖZELLİK" : es ? "FUNCIÓN PREMIUM" : pt ? "RECURSO PREMIUM" : "PREMIUM FEATURE";
-  if (kind === COUNT) return tr ? "LİMİT DOLDU" : es ? "LÍMITE ALCANZADO" : pt ? "LIMITE ATINGIDO" : "LIMIT REACHED";
-  return tr ? "GÜNLÜK HAK BİTTİ" : es ? "LÍMITE DIARIO ALCANZADO" : pt ? "LIMITE DIÁRIO ATINGIDO" : "DAILY LIMIT REACHED";
+  const de = normalizeAppLanguage(language) === "de";
+  if (kind === ACCESS) return tr ? "PREMİUM ÖZELLİK" : es ? "FUNCIÓN PREMIUM" : pt ? "RECURSO PREMIUM" : de ? "PREMIUM-FUNKTION" : "PREMIUM FEATURE";
+  if (kind === COUNT) return tr ? "LİMİT DOLDU" : es ? "LÍMITE ALCANZADO" : pt ? "LIMITE ATINGIDO" : de ? "LIMIT ERREICHT" : "LIMIT REACHED";
+  return tr ? "GÜNLÜK HAK BİTTİ" : es ? "LÍMITE DIARIO ALCANZADO" : pt ? "LIMITE DIÁRIO ATINGIDO" : de ? "TAGESLIMIT ERREICHT" : "DAILY LIMIT REACHED";
 }
 
 /**
@@ -148,7 +149,7 @@ export function splitTierValue(featureId, plan, language = "en") {
   const countable = definition && (definition.kind === COUNT || definition.kind === DAILY);
   if (countable && !definition.planValue?.[plan] && !Number.isFinite(getFeatureLimit(featureId, plan))) {
     const unit = unitLabel(definition, Infinity, language);
-    const sub = definition.kind === DAILY ? `${unit}/${pickByLanguage(language, { tr: "gün", en: "day", es: "día", pt: "dia" })}` : unit;
+    const sub = definition.kind === DAILY ? `${unit}/${pickByLanguage(language, { tr: "gün", en: "day", es: "día", pt: "dia", de: "Tag" })}` : unit;
     return { main: value, sub: sub || null, figure: true };
   }
 
@@ -274,6 +275,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
   const tr = lang === "tr";
   const es = normalizeAppLanguage(lang) === "es";
   const pt = normalizeAppLanguage(lang) === "pt";
+  const de = normalizeAppLanguage(lang) === "de";
   const current = normalizePlan(plan);
   const definition = getFeature(featureId);
 
@@ -285,7 +287,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
       icon: "diamond",
       eyebrow: eyebrowFor(ACCESS, lang),
       featureTitle: "",
-      title: tr ? "Premium özelliği" : es ? "Función Premium" : pt ? "Recurso Premium" : "Premium feature",
+      title: tr ? "Premium özelliği" : es ? "Función Premium" : pt ? "Recurso Premium" : de ? "Premium-Funktion" : "Premium feature",
       message: "",
       meter: null,
       note: null,
@@ -296,7 +298,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
       targetPlan: null,
       targetName: null,
       canUpgrade: false,
-      cta: { primary: tr ? "Tamam" : es ? "Entendido" : pt ? "Entendi" : "Got it", secondary: null },
+      cta: { primary: tr ? "Tamam" : es ? "Entendido" : pt ? "Entendi" : de ? "Verstanden" : "Got it", secondary: null },
     };
   }
 
@@ -338,7 +340,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
     renew:
       definition.kind === COUNT || isAccess
         ? null
-        : tr ? "Hakların yarın yenilenir" : es ? "Tu límite se restablece mañana" : pt ? "Seu limite é redefinido amanhã" : "Your limit resets tomorrow",
+        : tr ? "Hakların yarın yenilenir" : es ? "Tu límite se restablece mañana" : pt ? "Seu limite é redefinido amanhã" : de ? "Dein Limit wird morgen zurückgesetzt" : "Your limit resets tomorrow",
     // Üst plan yoksa karşılaştırma ve fayda satırı anlamsız: yalnız bilgi.
     tiers,
     tierMode: pickTierMode(tiers),
@@ -349,32 +351,35 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
     cta: canUpgrade
       ? {
           primary: ctaLabel(targetPlan, lang),
-          secondary: tr ? "Şimdi değil" : es ? "Ahora no" : pt ? "Agora não" : "Not now",
+          secondary: tr ? "Şimdi değil" : es ? "Ahora no" : pt ? "Agora não" : de ? "Nicht jetzt" : "Not now",
         }
-      : { primary: tr ? "Tamam" : es ? "Entendido" : pt ? "Entendi" : "Got it", secondary: null },
+      : { primary: tr ? "Tamam" : es ? "Entendido" : pt ? "Entendi" : de ? "Verstanden" : "Got it", secondary: null },
   };
 }
 
 // ── Fiyat ────────────────────────────────────────────────────────────────────
 
 /** Giriş teklifinin süresi: "İlk 3 ay", "İlk yıl", "First 3 months". */
+const DE_FIRST = { day: "Erster", week: "Erste", month: "Erster", year: "Erstes" };
 function offerDuration(offer, language) {
   const count = (offer.cycles || 1) * (offer.unitCount || 1);
   const one = count === 1;
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
+  const de = normalizeAppLanguage(language) === "de";
   const units = {
-    day: tr ? "gün" : es ? (one ? "día" : "días") : pt ? one ? "dia" : "dias" : one ? "day" : "days",
-    week: tr ? "hafta" : es ? (one ? "semana" : "semanas") : pt ? one ? "semana" : "semanas" : one ? "week" : "weeks",
-    month: tr ? "ay" : es ? (one ? "mes" : "meses") : pt ? one ? "mês" : "meses" : one ? "month" : "months",
-    year: tr ? "yıl" : es ? (one ? "año" : "años") : pt ? one ? "ano" : "anos" : one ? "year" : "years",
+    day: tr ? "gün" : es ? (one ? "día" : "días") : pt ? one ? "dia" : "dias" : de ? (one ? "Tag" : "Tage") : one ? "day" : "days",
+    week: tr ? "hafta" : es ? (one ? "semana" : "semanas") : pt ? one ? "semana" : "semanas" : de ? (one ? "Woche" : "Wochen") : one ? "week" : "weeks",
+    month: tr ? "ay" : es ? (one ? "mes" : "meses") : pt ? one ? "mês" : "meses" : de ? (one ? "Monat" : "Monate") : one ? "month" : "months",
+    year: tr ? "yıl" : es ? (one ? "año" : "años") : pt ? one ? "ano" : "anos" : de ? (one ? "Jahr" : "Jahre") : one ? "year" : "years",
   };
   const unit = units[offer.unit];
   if (!unit) return null;
   if (tr) return one ? `İlk ${unit}` : `İlk ${count} ${unit}`;
   if (es) return one ? `${unit} inicial` : `${count} ${unit} iniciales`;
   if (pt) return one ? `${unit} inicial` : `${count} ${unit} iniciais`;
+  if (de) return one ? `${DE_FIRST[offer.unit]} ${unit}` : `Erste ${count} ${unit}`;
   return one ? `First ${unit}` : `First ${count} ${unit}`;
 }
 
@@ -385,9 +390,10 @@ function offerLabel(offer, language) {
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
-  if (offer.free) return tr ? `${duration} ücretsiz` : es ? `${duration} gratis` : pt ? `${duration} grátis` : `${duration} free`;
+  const de = normalizeAppLanguage(language) === "de";
+  if (offer.free) return tr ? `${duration} ücretsiz` : es ? `${duration} gratis` : pt ? `${duration} grátis` : de ? `${duration} kostenlos` : `${duration} free`;
   if (!Number.isFinite(offer.percent) || offer.percent <= 0) return null;
-  return tr ? `${duration} %${offer.percent} indirim` : es ? `${duration} ${offer.percent}% de descuento` : pt ? `${duration} com ${offer.percent}% de desconto` : `${duration} ${offer.percent}% off`;
+  return tr ? `${duration} %${offer.percent} indirim` : es ? `${duration} ${offer.percent}% de descuento` : pt ? `${duration} com ${offer.percent}% de desconto` : de ? `${duration} ${offer.percent} % Rabatt` : `${duration} ${offer.percent}% off`;
 }
 
 function periodLabel(aPackage, language) {
@@ -395,9 +401,10 @@ function periodLabel(aPackage, language) {
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
-  if (key === "annual") return tr ? "/ yıl" : es ? "/ año" : pt ? "/ ano" : "/ year";
-  if (key === "monthly") return tr ? "/ ay" : es ? "/ mes" : pt ? "/ mês" : "/ month";
-  if (key === "weekly") return tr ? "/ hafta" : es ? "/ semana" : pt ? "/ semana" : "/ week";
+  const de = normalizeAppLanguage(language) === "de";
+  if (key === "annual") return tr ? "/ yıl" : es ? "/ año" : pt ? "/ ano" : de ? "/ year" : "/ year";
+  if (key === "monthly") return tr ? "/ ay" : es ? "/ mes" : pt ? "/ mês" : de ? "/ month" : "/ month";
+  if (key === "weekly") return tr ? "/ hafta" : es ? "/ semana" : pt ? "/ semana" : de ? "/ week" : "/ week";
   return "";
 }
 

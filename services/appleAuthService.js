@@ -114,72 +114,84 @@ const ERROR_TEXT = {
     en: "Sign in with Apple is unavailable on this device.",
     es: "Iniciar sesión con Apple no está disponible en este dispositivo.",
     pt: "Entrar com a Apple não está disponível neste dispositivo.",
+    de: "Die Anmeldung mit Apple ist auf diesem Gerät nicht verfügbar.",
   },
   [AppleAuthCode.ACCOUNT_REQUIRES_LINK]: {
     tr: "Bu e-posta ile zaten bir Seelogd hesabı var. Önce mevcut yönteminle giriş yap, ardından Ayarlar > Hesap bağlantıları bölümünden Apple'ı bağla.",
     en: "A Seelogd account already uses this email. Sign in with the existing method, then connect Apple from Settings > Account connections.",
     es: "Ya existe una cuenta de Seelogd con este correo. Inicia sesión con tu método actual y después vincula Apple desde Ajustes > Cuentas vinculadas.",
     pt: "Já existe uma conta do Seelogd com este e-mail. Entre com seu método atual e depois vincule a Apple em Configurações > Contas vinculadas.",
+    de: "Ein Seelogd-Konto verwendet diese E-Mail-Adresse bereits. Melde dich mit der bisherigen Methode an und verknüpfe Apple dann unter Einstellungen > Kontoverknüpfungen.",
   },
   [AppleAuthCode.ALREADY_LINKED_ELSEWHERE]: {
     tr: "Bu Apple hesabı başka bir Seelogd hesabına bağlı.",
     en: "This Apple account is linked to another Seelogd account.",
     es: "Esta cuenta de Apple está vinculada a otra cuenta de Seelogd.",
     pt: "Esta conta da Apple está vinculada a outra conta do Seelogd.",
+    de: "Dieses Apple-Konto ist mit einem anderen Seelogd-Konto verknüpft.",
   },
   [AppleAuthCode.ALREADY_LINKED_HERE]: {
     tr: "Apple hesabın zaten bağlı.",
     en: "Your Apple account is already connected.",
     es: "Tu cuenta de Apple ya está vinculada.",
     pt: "Sua conta da Apple já está vinculada.",
+    de: "Dein Apple-Konto ist bereits verknüpft.",
   },
   [AppleAuthCode.WRONG_ACCOUNT]: {
     tr: "Oturumu açtığın Apple hesabını seç.",
     en: "Choose the Apple account used for this session.",
     es: "Elige la cuenta de Apple que usaste para esta sesión.",
     pt: "Escolha a conta da Apple que você usou nesta sessão.",
+    de: "Wähle das Apple-Konto, das für diese Sitzung verwendet wurde.",
   },
   [AppleAuthCode.REQUIRES_RECENT_LOGIN]: {
     tr: "Güvenlik için çıkış yapıp tekrar giriş yaptıktan sonra dene.",
     en: "For security, sign out and sign in again, then retry.",
     es: "Por seguridad, cierra sesión, vuelve a iniciarla e inténtalo de nuevo.",
     pt: "Por segurança, saia, entre de novo e tente novamente.",
+    de: "Melde dich aus Sicherheitsgründen ab und wieder an und versuche es dann erneut.",
   },
   [AppleAuthCode.LAST_PROVIDER]: {
     tr: "Apple şu anda tek giriş yöntemin, kaldırılamaz.",
     en: "Apple is your only sign-in method and cannot be removed.",
     es: "Apple es ahora tu único método de inicio de sesión y no se puede quitar.",
     pt: "A Apple agora é seu único método de login e não pode ser removida.",
+    de: "Apple ist deine einzige Anmeldemethode und kann nicht entfernt werden.",
   },
   [AppleAuthCode.NETWORK]: {
     tr: "İnternet bağlantısı kurulamadı. Bağlantını kontrol et.",
     en: "Could not reach the network. Check your connection.",
     es: "No se pudo conectar a la red. Revisa tu conexión.",
     pt: "Não foi possível conectar à rede. Verifique sua conexão.",
+    de: "Das Netzwerk war nicht erreichbar. Prüfe deine Verbindung.",
   },
   [AppleAuthCode.NO_ID_TOKEN]: {
     tr: "Apple kimliğini doğrulayamadı. Lütfen tekrar dene.",
     en: "Apple could not verify your identity. Please try again.",
     es: "Apple no pudo verificar tu identidad. Inténtalo de nuevo.",
     pt: "A Apple não conseguiu verificar sua identidade. Tente novamente.",
+    de: "Apple konnte deine Identität nicht bestätigen. Bitte versuche es erneut.",
   },
   [AppleAuthCode.NO_SESSION]: {
     tr: "Oturum bulunamadı. Tekrar giriş yap.",
     en: "No active session. Please sign in again.",
     es: "No hay ninguna sesión activa. Inicia sesión de nuevo.",
     pt: "Não há nenhuma sessão ativa. Entre novamente.",
+    de: "Keine aktive Sitzung. Bitte melde dich erneut an.",
   },
   [AppleAuthCode.IN_PROGRESS]: {
     tr: "Apple ile giriş zaten sürüyor.",
     en: "Sign in with Apple is already in progress.",
     es: "Ya hay un inicio de sesión con Apple en curso.",
     pt: "Já há um login com a Apple em andamento.",
+    de: "Die Anmeldung mit Apple läuft bereits.",
   },
   [AppleAuthCode.REVOCATION_FAILED]: {
     tr: "Apple yetkilendirmesi kaldırılamadı. Lütfen tekrar dene.",
     en: "Apple authorization could not be revoked. Please try again.",
     es: "No se pudo revocar la autorización de Apple. Inténtalo de nuevo.",
     pt: "Não foi possível revogar a autorização da Apple. Tente novamente.",
+    de: "Die Apple-Autorisierung konnte nicht widerrufen werden. Bitte versuche es erneut.",
   },
 };
 
@@ -196,6 +208,7 @@ export function describeAppleAuthError(error, language = "tr") {
     en: "The action could not be completed. Please try again.",
     es: "No se pudo completar la acción. Inténtalo de nuevo.",
     pt: "Não foi possível concluir a ação. Tente novamente.",
+    de: "Die Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
   });
 }
 

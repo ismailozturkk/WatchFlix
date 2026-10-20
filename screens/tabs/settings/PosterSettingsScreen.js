@@ -5,11 +5,12 @@
 // Kafa karıştırıcı tekrarları önleyen Canlı Önizleme Stüdyosu ve sekmeli kontrol
 // yapısı ile modernize edilmiştir.
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import AppIcon from "@components/AppIcon";
 import { useTheme } from "@context/ThemeContext";
 import { useListLayoutSettings } from "@context/AppSettingsContext";
+import { useLanguage } from "@context/LanguageContext";
 import { i18nText } from "../../../utils/i18nText";
 import { REMINDER_BADGE } from "../../../utils/reminderBadge";
 import { SettingsSubScreen, SectionLabel, buildUiColors } from "./settingsUi";
@@ -100,7 +101,7 @@ function PostListLayoutPreview({ layout, colors }) {
 
 // Rozet önizlemesi: poster karesi + canlı aktif rozetlerin simülasyonu.
 function BadgePreviewTile({ width, radius, colors, badges }) {
-  const statusBadges = POSTER_BADGE_OPTIONS.filter(
+  const statusBadges = buildPosterBadgeOptions().filter(
     (b) => b.group === "status" && badges?.[b.key] !== false
   );
   const denseCount = statusBadges.length;
@@ -368,34 +369,35 @@ function ControlRow({ icon, iconFamily = "Ionicons", title, options, value, onCh
   );
 }
 
-const COLUMN_OPTIONS = [
+// Etiketler çizim anında çözülür: modül yüklenirken dondurulursa dil değişince eski dilde kalır.
+const buildColumnOptions = () => [
   { value: 3, label: i18nText("autoI18n.uclu_dizilim", "3'lü") },
   { value: 4, label: i18nText("autoI18n.dortlu_dizilim", "4'lü") },
 ];
 
-const GRID_RADIUS_OPTIONS = [
+const buildGridRadiusOptions = () => [
   { value: 2, label: i18nText("autoI18n.kose_koseli", "Köşeli"), r: 3 },
   { value: 10, label: i18nText("autoI18n.kose_normal", "Normal"), r: 7 },
   { value: 20, label: i18nText("autoI18n.kose_yuvarlak", "Yuvarlak"), r: 12 },
 ];
 
-const RAIL_RADIUS_OPTIONS = [
+const buildRailRadiusOptions = () => [
   { value: 4, label: i18nText("autoI18n.kose_koseli", "Köşeli"), r: 3 },
   { value: 15, label: i18nText("autoI18n.kose_normal", "Normal"), r: 8 },
   { value: 24, label: i18nText("autoI18n.kose_yuvarlak", "Yuvarlak"), r: 12 },
 ];
 
-const RAIL_SIZE_OPTIONS = [
+const buildRailSizeOptions = () => [
   { value: "normal", label: i18nText("autoI18n.varsayilan", "Varsayılan") },
   { value: "small", label: i18nText("autoI18n.kucuk", "Küçük") },
 ];
 
-const POST_LIST_LAYOUT_OPTIONS = [
+const buildPostListLayoutOptions = () => [
   { value: "spaced", label: i18nText("autoI18n.aralikli", "Aralıklı") },
   { value: "joined", label: i18nText("autoI18n.bitisik", "Bitişik") },
 ];
 
-const POSTER_BADGE_OPTIONS = [
+const buildPosterBadgeOptions = () => [
   {
     key: "watchlist",
     group: "status",
@@ -495,7 +497,7 @@ const POSTER_BADGE_OPTIONS = [
   },
 ];
 
-const PREVIEW_MODES = [
+const buildPreviewModes = () => [
   { id: "lists", label: i18nText("autoI18n.listeler", "Listeler"), icon: "grid-outline" },
   { id: "seeAll", label: i18nText("autoI18n.tumunu_gor", "Tümünü Gör"), icon: "apps-outline" },
   { id: "rails", label: i18nText("autoI18n.ana_ekran", "Ana Ekran"), icon: "film-outline" },
@@ -505,7 +507,15 @@ const PREVIEW_MODES = [
 
 export default function PosterSettingsScreen() {
   const { theme } = useTheme();
+  const { language } = useLanguage();
   const C = buildUiColors(theme);
+  const COLUMN_OPTIONS = useMemo(buildColumnOptions, [language]);
+  const GRID_RADIUS_OPTIONS = useMemo(buildGridRadiusOptions, [language]);
+  const RAIL_RADIUS_OPTIONS = useMemo(buildRailRadiusOptions, [language]);
+  const RAIL_SIZE_OPTIONS = useMemo(buildRailSizeOptions, [language]);
+  const POST_LIST_LAYOUT_OPTIONS = useMemo(buildPostListLayoutOptions, [language]);
+  const POSTER_BADGE_OPTIONS = useMemo(buildPosterBadgeOptions, [language]);
+  const PREVIEW_MODES = useMemo(buildPreviewModes, [language]);
   const {
     listsGridColumns,
     changeListsGridColumns,

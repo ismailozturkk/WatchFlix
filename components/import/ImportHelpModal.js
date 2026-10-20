@@ -23,12 +23,17 @@ import GlassCloseButton from "../common/GlassCloseButton";
 import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
 import GlassTouchable from "../common/GlassTouchable";
+import { useLanguage } from "../../context/LanguageContext";
+import { getImportCopy, withPickLabel } from "./importCopy";
+import { renderRich } from "./richText";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 const SHEET_MAX_H = SCREEN_H * 0.85;
 
 export default function ImportHelpModal({ visible, onClose }) {
   const { theme } = useTheme();
+  const { language } = useLanguage();
+  const copy = getImportCopy(language);
   const sheet = useSheetTransition(visible);
   const [activeTab, setActiveTab] = useState("letterboxd"); // "letterboxd" | "imdb"
 
@@ -82,7 +87,7 @@ export default function ImportHelpModal({ visible, onClose }) {
                 />
               </View>
               <Text style={[styles.headerTitle, { color: theme.text.primary }]}>
-                Dışa Aktarma Rehberi
+                {copy.help.title}
               </Text>
             </View>
             <GlassCloseButton
@@ -163,108 +168,28 @@ export default function ImportHelpModal({ visible, onClose }) {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {activeTab === "letterboxd" ? (
-              <View style={styles.stepsContainer}>
-                {/* Step 1 */}
-                <View style={styles.stepCard}>
+            <View style={styles.stepsContainer}>
+              {(copy.help[activeTab] || []).map((step, index) => (
+                <View key={`${activeTab}-${index}`} style={styles.stepCard}>
                   <View style={[styles.stepNumber, { backgroundColor: alpha(theme.accent, 0.18) }]}>
-                    <Text style={[styles.stepNumberText, { color: theme.accent }]}>1</Text>
+                    <Text style={[styles.stepNumberText, { color: theme.accent }]}>{index + 1}</Text>
                   </View>
                   <View style={styles.stepTextContent}>
-                    <Text style={[styles.stepTitle, { color: theme.text.primary }]}>
-                      Ayarlar Menüsüne Gidin
-                    </Text>
+                    <Text style={[styles.stepTitle, { color: theme.text.primary }]}>{step.title}</Text>
                     <Text style={[styles.stepBody, { color: theme.text.secondary }]}>
-                      Letterboxd web sitesinde profil simgenize tıklayın ve <Text style={{ fontWeight: "700" }}>Settings (Ayarlar)</Text> sayfasına girin.
+                      {renderRich(withPickLabel(step.body, copy), { fontWeight: "700" })}
                     </Text>
                   </View>
                 </View>
-
-                {/* Step 2 */}
-                <View style={styles.stepCard}>
-                  <View style={[styles.stepNumber, { backgroundColor: alpha(theme.accent, 0.18) }]}>
-                    <Text style={[styles.stepNumberText, { color: theme.accent }]}>2</Text>
-                  </View>
-                  <View style={styles.stepTextContent}>
-                    <Text style={[styles.stepTitle, { color: theme.text.primary }]}>
-                      Export Your Data (Verilerinizi Dışa Aktarın)
-                    </Text>
-                    <Text style={[styles.stepBody, { color: theme.text.secondary }]}>
-                      <Text style={{ fontWeight: "700" }}>Import & Export</Text> sekmesine tıklayın ve <Text style={{ fontWeight: "700" }}>Export Your Data</Text> butonuna basın.
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Step 3 */}
-                <View style={styles.stepCard}>
-                  <View style={[styles.stepNumber, { backgroundColor: alpha(theme.accent, 0.18) }]}>
-                    <Text style={[styles.stepNumberText, { color: theme.accent }]}>3</Text>
-                  </View>
-                  <View style={styles.stepTextContent}>
-                    <Text style={[styles.stepTitle, { color: theme.text.primary }]}>
-                      ZIP veya CSV Dosyasını Seçin
-                    </Text>
-                    <Text style={[styles.stepBody, { color: theme.text.secondary }]}>
-                      İndirilen <Text style={{ fontWeight: "700" }}>.zip</Text> dosyasını doğrudan seçebilirsiniz. Uygulama <Text style={{ fontWeight: "700" }}>watched.csv</Text>, <Text style={{ fontWeight: "700" }}>diary.csv</Text>, <Text style={{ fontWeight: "700" }}>ratings.csv</Text> ve <Text style={{ fontWeight: "700" }}>watchlist.csv</Text> dosyalarını otomatik tarar.
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.stepsContainer}>
-                {/* Step 1 */}
-                <View style={styles.stepCard}>
-                  <View style={[styles.stepNumber, { backgroundColor: alpha(theme.accent, 0.18) }]}>
-                    <Text style={[styles.stepNumberText, { color: theme.accent }]}>1</Text>
-                  </View>
-                  <View style={styles.stepTextContent}>
-                    <Text style={[styles.stepTitle, { color: theme.text.primary }]}>
-                      IMDb Listenize Gidin
-                    </Text>
-                    <Text style={[styles.stepBody, { color: theme.text.secondary }]}>
-                      IMDb web sitesinde <Text style={{ fontWeight: "700" }}>Your Ratings (Puanlarınız)</Text> veya <Text style={{ fontWeight: "700" }}>Your Watchlist</Text> sayfasına gidin.
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Step 2 */}
-                <View style={styles.stepCard}>
-                  <View style={[styles.stepNumber, { backgroundColor: alpha(theme.accent, 0.18) }]}>
-                    <Text style={[styles.stepNumberText, { color: theme.accent }]}>2</Text>
-                  </View>
-                  <View style={styles.stepTextContent}>
-                    <Text style={[styles.stepTitle, { color: theme.text.primary }]}>
-                      Dışa Aktar (Export) Butonuna Tıklayın
-                    </Text>
-                    <Text style={[styles.stepBody, { color: theme.text.secondary }]}>
-                      Listenin sağ üst köşesindeki üç nokta menüsünden veya sayfa sonundaki <Text style={{ fontWeight: "700" }}>Export</Text> seçeneğine tıklayın.
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Step 3 */}
-                <View style={styles.stepCard}>
-                  <View style={[styles.stepNumber, { backgroundColor: alpha(theme.accent, 0.18) }]}>
-                    <Text style={[styles.stepNumberText, { color: theme.accent }]}>3</Text>
-                  </View>
-                  <View style={styles.stepTextContent}>
-                    <Text style={[styles.stepTitle, { color: theme.text.primary }]}>
-                      Seelogd'a Yükleyin
-                    </Text>
-                    <Text style={[styles.stepBody, { color: theme.text.secondary }]}>
-                      İnen <Text style={{ fontWeight: "700" }}>ratings.csv</Text> dosyasını "Dosyalardan Seç" butonuna dokunarak doğrudan seçin.
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
+              ))}
+            </View>
 
             {/* Quick Tip Box */}
             <View style={[styles.tipBox, { backgroundColor: alpha(theme.accent, 0.1), borderColor: alpha(theme.accent, 0.3) }]}>
               <AppIcon family="Ionicons" name="bulb-outline" size={20} color={theme.accent} />
               <Text style={[styles.tipText, { color: theme.text.secondary }]}>
-                <Text style={{ fontWeight: "800", color: theme.accent }}>İpucu: </Text>
-                CSV dosyanızı doğrudan telefonunuza indirip "Dosyalardan Seç" butonuna tıklayarak saniyeler içinde içe aktarabilirsiniz.
+                <Text style={{ fontWeight: "800", color: theme.accent }}>{copy.help.tipLead}</Text>
+                {renderRich(withPickLabel(copy.help.tipBody, copy), { fontWeight: "700" })}
               </Text>
             </View>
           </ScrollView>

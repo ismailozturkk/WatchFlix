@@ -1,6 +1,6 @@
 import { intlLocaleOf, tmdbLanguageOf } from "../../utils/appLanguages";
 import { Image } from "expo-image";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -35,7 +35,8 @@ import GlassTouchable from "../../components/common/GlassTouchable";
 const { width } = Dimensions.get("window");
 const HERO_HEIGHT = width * 1.1;
 
-const FILTERS = [
+// Etiketler çizim anında çözülür: modül yüklenirken dondurulursa dil değişince eski dilde kalır.
+const buildFilters = () => [
   { key: "popular", label: i18nText("autoI18n.populer", "Popüler"), icon: "flame-outline" },
   { key: "voted", label: i18nText("autoI18n.en_cok_oy", "En Çok Oy"), icon: "people-outline" },
   { key: "rated", label: i18nText("autoI18n.en_iyi_puan", "En İyi Puan"), icon: "star-outline" },
@@ -43,7 +44,7 @@ const FILTERS = [
   { key: "latest", label: i18nText("autoI18n.en_yeni", "En Yeni"), icon: "calendar-outline" },
 ];
 
-const TV_FILTERS = [
+const buildTvFilters = () => [
   { key: "popular", label: i18nText("autoI18n.populer", "Popüler"), icon: "flame-outline" },
   { key: "voted", label: i18nText("autoI18n.en_cok_oy", "En Çok Oy"), icon: "people-outline" },
   { key: "rated", label: i18nText("autoI18n.en_iyi_puan", "En İyi Puan"), icon: "star-outline" },
@@ -257,6 +258,8 @@ const ActorViewScreen = ({ route, navigation }) => {
   const { API_KEY } = useApiSettings();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { language } = useLanguage();
+  const FILTERS = useMemo(buildFilters, [language]);
+  const TV_FILTERS = useMemo(buildTvFilters, [language]);
   const [actor, setActor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bioExpanded, setBioExpanded] = useState(false);

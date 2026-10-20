@@ -102,6 +102,11 @@ export const MONTHS_PT = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
+export const MONTHS_DE = [
+  "Januar", "Februar", "März", "April", "Mai", "Juni",
+  "Juli", "August", "September", "Oktober", "November", "Dezember",
+];
+
 const WEEKDAYS_TR = [
   "Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi",
 ];
@@ -118,8 +123,12 @@ const WEEKDAYS_PT = [
   "Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado",
 ];
 
-const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT };
-const WEEKDAY_NAMES = { tr: WEEKDAYS_TR, en: WEEKDAYS_EN, es: WEEKDAYS_ES, pt: WEEKDAYS_PT };
+const WEEKDAYS_DE = [
+  "Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag",
+];
+
+const MONTH_NAMES = { tr: MONTHS_TR, en: MONTHS_EN, es: MONTHS_ES, pt: MONTHS_PT, de: MONTHS_DE };
+const WEEKDAY_NAMES = { tr: WEEKDAYS_TR, en: WEEKDAYS_EN, es: WEEKDAYS_ES, pt: WEEKDAYS_PT, de: WEEKDAYS_DE };
 
 /** Dile uygun ay adları (0-11); bilinmeyen dil İngilizce. YENİ DİL: tabloya ekle. */
 export const monthNamesOf = (language) =>
@@ -131,6 +140,7 @@ export function formatLongDateParts(language, { day, monthIndex, year }) {
   const month = MONTH_NAMES[lang][monthIndex];
   if (lang === "en") return `${month} ${day}, ${year}`;
   if (lang === "es" || lang === "pt") return `${day} de ${month.toLowerCase()} de ${year}`;
+  if (lang === "de") return `${day}. ${month} ${year}`;
   return `${day} ${month} ${year}`;
 }
 

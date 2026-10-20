@@ -1,5 +1,5 @@
 import { isLightSurface } from "./utils/colorUtils";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 // Production'da gereksiz console çıktılarını kapat
@@ -10,7 +10,6 @@ if (!__DEV__) {
   console.warn = () => {};
 }
 import {
-  Animated,
     AppState,
     StyleSheet,
       View,
@@ -88,6 +87,7 @@ import { PremiumProvider } from "./context/PremiumContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
 import SplashPosterWave from "./components/SplashPosterWave";
+import { FALLBACK_EXIT_MS, MIN_VISIBLE_MS } from "./utils/splashMotion";
 import { CalendarProvider } from "./context/CalendarContext";
 import { installAxiosDataCache } from "./utils/axiosDataCache";
 import { installTmdbAdultGuard } from "./utils/tmdbAdultGuard";
@@ -131,6 +131,17 @@ installTmdbAdultGuard();
 // gosterilecek title/name alani ortak kuralla cozulur.
 installTmdbTitleFallback();
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {});
+// Yerel splash anında değil kısa bir çapraz solmayla çekilir (Android varsayılanı
+// zaten solar, iOS'ta `fade` açılmalı). Yerel ve JS splash'in logosu aynı boyutta
+// ve aynı yerde (utils/splashMotion LOGO_SIZE ↔ app.json ios.imageWidth), bu
+// yüzden çapraz solma "iki logo üst üste" değil, tek logonun etrafında halkaların
+// belirmesi gibi görünür. `setOptions`ı bilmeyen eski bir yerel derlemede
+// fırlayabilir; sessizce yutulur.
+try {
+  ExpoSplashScreen.setOptions({ fade: true, duration: 320 });
+} catch {
+  // eski native binary — varsayılan davranış
+}
 
 // Hata raporlama İLK iş: bundan sonra çalışan her şeyin (cache preload, font
 // yükleme, provider'lar) hatası yakalanabilsin. DSN yoksa sessiz no-op.
@@ -211,14 +222,21 @@ setTimeout(() => {
 // temasına düşen "auto" yerine gerçek arka plan parlaklığından türetiyoruz.
 
 
-const SplashScreen = () => {
+// Açılış ekranı: tüm hareket (giriş, döngü, çıkış) SplashPosterWave'de. Burası
+// yalnız tema/kar bağlamlarını ona taşır. `exiting` true olunca çıkış başlar,
+// bitince `onExited` çağrılır (overlay o zaman sökülür).
+const SplashScreen = ({ exiting, onExited }) => {
   const { theme } = useTheme();
   const { showSnow } = useSnow();
+  const light = isLightSurface(theme.primary);
 
   return (
-    <View style={[styles.splashContainer, { backgroundColor: theme.primary }]}>
-      <SplashPosterWave />
-
+    <SplashPosterWave
+      backgroundColor={theme.primary}
+      light={light}
+      exiting={exiting}
+      onExited={onExited}
+    >
       {showSnow && (
         <LottieView
           style={styles.lottie}
@@ -227,8 +245,8 @@ const SplashScreen = () => {
           loop
         />
       )}
-      <StatusBar style={isLightSurface(theme.primary) ? "dark" : "light"} />
-    </View>
+      <StatusBar style={light ? "dark" : "light"} />
+    </SplashPosterWave>
   );
 };
 
@@ -887,7 +905,8 @@ function AppContent() {
 
 export default wrapRoot(function App() {
   const [splashVisible, setSplashVisible] = useState(true);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  // Çıkış animasyonu SplashPosterWave'in içinde; burada yalnız tetikleyici durur.
+  const [splashExiting, setSplashExiting] = useState(false);
 
   // AsyncStorage → MMKV göç kapısı.
   //
@@ -921,15 +940,16 @@ export default wrapRoot(function App() {
   useEffect(() => {
     // Göç sürerken yerel splash açık kalsın — arkasında boş bir ekran görünmesin.
     if (!storageReady) return;
-    // Özel Lottie splash screen'imiz render edildiğinde yerel (beyaz) splash'i kapat.
+    // Özel splash'imiz render edildiğinde yerel splash'i kapat (çapraz solma için
+    // bkz. dosya başındaki setOptions).
     ExpoSplashScreen.hideAsync().catch(() => {});
 
     // Preload zaten modül yüklenirken başladı (yukarıda).
-    // Minimum 250 ms göster; preload bitince (genellikle < 50 ms) kapat.
-    // (600 ms'ti; 350 ms'lik fade ile birlikte her açılışa ~1 sn yapay bekleme
-    // ekliyordu. Veri geç geliyorsa splash zaten APP_READY'ye kadar kalır —
-    // bu sabit yalnız "her şey hazırken" ödenen tabandır.)
-    const MIN_MS = 250;
+    // Splash en az MIN_VISIBLE_MS görünür: giriş animasyonu (halkaların
+    // çiçeklenmesi) bitmeden çıkışa geçmek onu yarıda keserdi. Veri geç geliyorsa
+    // splash zaten APP_READY'ye kadar kalır — bu sabit yalnız "her şey hazırken"
+    // ödenen tabandır (utils/splashMotion.js).
+    const MIN_MS = MIN_VISIBLE_MS;
     const startedAt = Date.now();
     let preloadDone = false;
     let dataReady = false;
@@ -942,13 +962,7 @@ export default wrapRoot(function App() {
       }
     };
 
-    const hideSplash = () => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => setSplashVisible(false));
-    };
+    const hideSplash = () => setSplashExiting(true);
 
     startupPreloadPromise.then(() => {
       const elapsed = Date.now() - startedAt;
@@ -964,13 +978,13 @@ export default wrapRoot(function App() {
       checkReady();
     });
 
-    // Fallback: forcefully hide after 10 seconds just in case
+    // Fallback: APP_READY gelmezse zorla çıkış
     const fallbackTimer = setTimeout(() => {
       if (!timeoutFinished) {
         timeoutFinished = true;
         hideSplash();
       }
-    }, 10000);
+    }, FALLBACK_EXIT_MS);
 
     return () => {
       sub.remove();
@@ -1071,15 +1085,15 @@ export default wrapRoot(function App() {
                             </DeviceNotificationsProvider>
                           </PetProvider>
                             {splashVisible && (
-                              <Animated.View
-                                style={[
-                                  StyleSheet.absoluteFill,
-                                  { opacity: fadeAnim, zIndex: 9999 },
-                                ]}
+                              <View
+                                style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}
                                 pointerEvents="none"
                               >
-                                <SplashScreen />
-                              </Animated.View>
+                                <SplashScreen
+                                  exiting={splashExiting}
+                                  onExited={() => setSplashVisible(false)}
+                                />
+                              </View>
                             )}
                         </TvShowProvider>
                             </PostsProvider>
@@ -1116,12 +1130,6 @@ const styles = StyleSheet.create({
   // Modal arka planlarının hedefi; sağlayıcı ağacının kapladığı alanın aynısı.
   blurRoot: {
     flex: 1,
-  },
-  splashContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#000",
   },
   lottie: {
     position: "absolute",

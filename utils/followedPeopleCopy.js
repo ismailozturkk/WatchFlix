@@ -181,6 +181,49 @@ export const FOLLOWED_PEOPLE_COPY = {
       close: "Fechar",
     },
   },
+  de: {
+    button: {
+      follow: "Folgen",
+      following: "Folge ich",
+      followHint: "Du siehst ihre kommenden Projekte im Tab „Filme & Serien“",
+      unfollowHint: "Tippen zum Entfolgen",
+      followLabel: (name) => `${name} folgen`,
+      unfollowLabel: (name) => `${name} entfolgen`,
+    },
+    toast: {
+      followed: (name) => `Du folgst ${name}`,
+      followedHint: "Ihre kommenden Arbeiten erscheinen im Tab „Filme & Serien“",
+      unfollowed: (name) => `${name} entfolgt`,
+      limit: (max) => `Du kannst bis zu ${max} Personen folgen`,
+      limitHint: "Entfolge jemandem, um Platz zu schaffen",
+    },
+    rail: {
+      title: "Anstehendes von Personen, denen du folgst",
+      more: (count) => `+${count}`,
+      manage: "Personen, denen ich folge",
+      addToCalendar: (title) => `Erscheinungstag von ${title} zum Telefonkalender hinzufügen`,
+      removeFromCalendar: (title) => `Erscheinungstag von ${title} aus dem Telefonkalender entfernen`,
+      addAll: "Alle anstehenden Termine zum Telefonkalender hinzufügen",
+      quietTitle: "Nichts Anstehendes von Personen, denen du folgst",
+      quietBody: (count) => (count === 1 ? "Du folgst 1 Person" : `Du folgst ${count} Personen`),
+    },
+    sheet: {
+      title: "Personen, denen ich folge",
+      count: (count, max) => `${count}/${max}`,
+      empty: "Du folgst noch niemandem",
+      emptyHint: "Tippe auf der Seite eines Schauspielers oder Regisseurs auf „Folgen“, dann sammeln sich seine neuen Projekte hier.",
+      unfollowLabel: (name) => `${name} entfolgen`,
+      open: (name) => `Seite von ${name} öffnen`,
+      departments: {
+        Acting: "Schauspieler",
+        Directing: "Regie",
+        Writing: "Drehbuch",
+        Production: "Produktion",
+        other: "Person",
+      },
+      close: "Schließen",
+    },
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

@@ -4,6 +4,7 @@
 // watched.csv, diary.csv, ratings.csv, watchlist.csv ve reviews.csv formatlarını destekler.
 
 import { parseCsv } from "./csvParser";
+import { ImportError } from "./importErrors";
 
 /**
  * Verilen CSV'nin Letterboxd formatında olup olmadığını belirler.
@@ -43,7 +44,7 @@ export function parseLetterboxdCsv(csvText, fileNameHint = null) {
   const { headers, data } = parseCsv(csvText);
 
   if (!isLetterboxdCsv(headers)) {
-    throw new Error("Geçerli bir Letterboxd CSV formatı bulunamadı.");
+    throw new ImportError("notLetterboxdCsv", "No valid Letterboxd CSV format was found.");
   }
 
   const hSet = new Set(headers);

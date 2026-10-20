@@ -140,6 +140,32 @@ const UP_NEXT_COPY = {
     loadError: "Não foi possível atualizar algumas séries.",
     retry: "Tentar novamente",
   },
+  de: {
+    title: "Als Nächstes",
+    subtitle: "Schau jede Serie bei der richtigen Folge weiter.",
+    recentOrder: "Sortiert nach deinen zuletzt gesehenen Serien",
+    minuteShort: "Min.",
+    episodesWatched: "Folgen gesehen",
+    upcoming: "Bald",
+    watchedNow: "Gerade gesehen",
+    chooseDate: "Datum wählen",
+    dateSubtitle: "Wann hast du diese Folge gesehen?",
+    manage: "Verwalten",
+    manageTitle: "Laufende Serien wählen",
+    manageSubtitle: "Ausgeblendete Serien bleiben in deinem Verlauf und deiner Statistik.",
+    showAll: "Alle anzeigen",
+    visible: "Angezeigt",
+    hidden: "Ausgeblendet",
+    done: "Fertig",
+    emptyTitle: "Noch wartet nichts",
+    emptyText:
+      "Markiere eine Folge als gesehen, dann erscheint hier die nächste Folge.",
+    emptyHiddenTitle: "Keine laufende Serie ausgewählt",
+    emptyHiddenText: "Wähle, welche Serien unter „Als Nächstes“ erscheinen sollen.",
+    discover: "Serien entdecken",
+    loadError: "Einige Serien konnten nicht aktualisiert werden.",
+    retry: "Erneut versuchen",
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

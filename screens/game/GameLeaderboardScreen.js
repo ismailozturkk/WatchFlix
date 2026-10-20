@@ -24,11 +24,11 @@ const PODIUM_COLORS = ["#E8B931", "#C7CDD6", "#CD7F32"];
 // okunur. Haftalik/Sezonluk dereceli tablo backend uretimi gerektirdiginden
 // (Part 14.4 / 17 — Faz E) bu surumde kilitli "Yakinda" durumundadir.
 const SCOPES = [
-  { id: "friends", icon: "people-outline", tr: "Arkadaşlar", en: "Friends", es: "Amigos", pt: "Amigos", available: true },
-  { id: "global", icon: "earth-outline", tr: "Global", en: "Global", es: "Global", pt: "Global", available: true },
-  { id: "daily", icon: "sunny-outline", tr: "Günlük", en: "Daily", es: "Diario", pt: "Diário", available: true },
-  { id: "weekly", icon: "calendar-outline", tr: "Haftalık", en: "Weekly", es: "Semanal", pt: "Semanal", available: false },
-  { id: "season", icon: "ribbon-outline", tr: "Sezonluk", en: "Seasonal", es: "De temporada", pt: "Sazonais", available: false },
+  { id: "friends", icon: "people-outline", tr: "Arkadaşlar", en: "Friends", es: "Amigos", pt: "Amigos", de: "Freunde", available: true },
+  { id: "global", icon: "earth-outline", tr: "Global", en: "Global", es: "Global", pt: "Global", de: "Global", available: true },
+  { id: "daily", icon: "sunny-outline", tr: "Günlük", en: "Daily", es: "Diario", pt: "Diário", de: "Täglich", available: true },
+  { id: "weekly", icon: "calendar-outline", tr: "Haftalık", en: "Weekly", es: "Semanal", pt: "Semanal", de: "Wöchentlich", available: false },
+  { id: "season", icon: "ribbon-outline", tr: "Sezonluk", en: "Seasonal", es: "De temporada", pt: "Sazonais", de: "Saison", available: false },
 ];
 
 const accuracyOf = (entry) => {
@@ -55,6 +55,7 @@ export default function GameLeaderboardScreen({ navigation, route }) {
   const tr = copyLanguage(language, ["tr", "en"]) === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
+  const de = normalizeAppLanguage(language) === "de";
   // Genel ve gunluk tablo ayri kaynaklardir; gunluk ilk acildiginda yuklenir.
   const [boards, setBoards] = useState({ global: { status: "loading", data: [] }, daily: { status: "idle", data: [] } });
   const [scope, setScope] = useState(() => initialScopeOf(route?.params?.scope));
@@ -106,8 +107,8 @@ export default function GameLeaderboardScreen({ navigation, route }) {
         <Text style={[styles.rank, { color: theme.text.muted }]}>#{rank}</Text>
         <UserAvatar avatarIndex={item.avatarIndex} photoURL={item.photoURL} isCustomPhoto size={36} />
         <View style={styles.player}>
-          <Text style={[styles.name, { color: theme.text.primary }]} numberOfLines={1}>{isSelf ? (tr ? "Sen" : es ? "Tú" : pt ? "Você" : "You") : item.displayName || (tr ? "Anonim" : es ? "Anónimo" : pt ? "Anônimo" : "Anonymous")}</Text>
-          <Text style={[styles.meta, { color: theme.text.muted }]}>{item.isDaily ? `${Number(item.totalCorrect) || 0}/${DAILY_QUESTION_COUNT} ${tr ? "doğru" : es ? "aciertos" : pt ? "acertos" : "correct"}` : `${accuracyOf(item)}% ${tr ? "doğruluk" : es ? "precisión" : pt ? "precisão" : "accuracy"}`} · 🔥 {Number(item.bestStreak) || 0}</Text>
+          <Text style={[styles.name, { color: theme.text.primary }]} numberOfLines={1}>{isSelf ? (tr ? "Sen" : es ? "Tú" : pt ? "Você" : de ? "Du" : "You") : item.displayName || (tr ? "Anonim" : es ? "Anónimo" : pt ? "Anônimo" : de ? "Anonym" : "Anonymous")}</Text>
+          <Text style={[styles.meta, { color: theme.text.muted }]}>{item.isDaily ? `${Number(item.totalCorrect) || 0}/${DAILY_QUESTION_COUNT} ${tr ? "doğru" : es ? "aciertos" : pt ? "acertos" : de ? "richtig" : "correct"}` : `${accuracyOf(item)}% ${tr ? "doğruluk" : es ? "precisión" : pt ? "precisão" : de ? "Genauigkeit" : "accuracy"}`} · 🔥 {Number(item.bestStreak) || 0}</Text>
         </View>
         <Text style={[styles.points, { color: theme.accent }]}>{Number(item.bestScore) || 0}</Text>
       </View>
@@ -121,33 +122,33 @@ export default function GameLeaderboardScreen({ navigation, route }) {
       size={38}
       fallbackRadius={12}
       color={theme.text.primary}
-      accessibilityLabel={tr ? "Sıralama kuralları" : es ? "Reglas de la clasificación" : pt ? "Regras do ranking" : "Ranking rules"}
+      accessibilityLabel={tr ? "Sıralama kuralları" : es ? "Reglas de la clasificación" : pt ? "Regras do ranking" : de ? "Ranglistenregeln" : "Ranking rules"}
       onPress={() => setRulesVisible(true)}
     />
   );
 
   const listHeader = (
     <View style={styles.listHeader}>
-      {podium.length > 0 ? <Podium entries={podium} currentUid={user?.uid} theme={theme} tr={tr} es={es} pt={pt} /> : null}
-      {rest.length > 0 ? <Text style={[styles.restLabel, { color: theme.text.muted }]}>{tr ? "DİĞER OYUNCULAR" : es ? "OTROS JUGADORES" : pt ? "OUTROS JOGADORES" : "OTHER PLAYERS"}</Text> : null}
+      {podium.length > 0 ? <Podium entries={podium} currentUid={user?.uid} theme={theme} tr={tr} es={es} pt={pt} de={de} /> : null}
+      {rest.length > 0 ? <Text style={[styles.restLabel, { color: theme.text.muted }]}>{tr ? "DİĞER OYUNCULAR" : es ? "OTROS JUGADORES" : pt ? "OUTROS JOGADORES" : de ? "ANDERE SPIELER" : "OTHER PLAYERS"}</Text> : null}
     </View>
   );
 
   return (
-    <GameScreenShell navigation={navigation} scroll={false} title={tr ? "Liderlik" : es ? "Clasificación" : pt ? "Ranking" : "Leaderboard"} subtitle={tr ? "Sahne Tahmin sıralaması" : es ? "Clasificación de Adivina la escena" : pt ? "Ranking do Adivinhe a cena" : "Scene Guess ranking"} headerRight={headerRight}>
-      <ScopeBar scope={scope} onChange={setScope} theme={theme} tr={tr} es={es} pt={pt} />
+    <GameScreenShell navigation={navigation} scroll={false} title={tr ? "Liderlik" : es ? "Clasificación" : pt ? "Ranking" : de ? "Bestenliste" : "Leaderboard"} subtitle={tr ? "Sahne Tahmin sıralaması" : es ? "Clasificación de Adivina la escena" : pt ? "Ranking do Adivinhe a cena" : de ? "Szenenraten-Rangliste" : "Scene Guess ranking"} headerRight={headerRight}>
+      <ScopeBar scope={scope} onChange={setScope} theme={theme} tr={tr} es={es} pt={pt} de={de} />
 
       {state.status === "loading" || state.status === "idle" ? (
-        <State icon="trophy-outline" text={tr ? "Sıralamalar yükleniyor..." : es ? "Cargando clasificaciones..." : pt ? "Carregando rankings..." : "Loading rankings..."} theme={theme} loading />
+        <State icon="trophy-outline" text={tr ? "Sıralamalar yükleniyor..." : es ? "Cargando clasificaciones..." : pt ? "Carregando rankings..." : de ? "Ranglisten werden geladen..." : "Loading rankings..."} theme={theme} loading />
       ) : state.status === "error" ? (
-        <State icon="cloud-offline-outline" text={tr ? "Liderlik tablosu yüklenemedi" : es ? "No se pudo cargar la clasificación" : pt ? "Não foi possível carregar o ranking" : "Could not load the leaderboard"} theme={theme} action={reload} actionText={tr ? "Tekrar Dene" : es ? "Reintentar" : pt ? "Tentar novamente" : "Try Again"} />
+        <State icon="cloud-offline-outline" text={tr ? "Liderlik tablosu yüklenemedi" : es ? "No se pudo cargar la clasificación" : pt ? "Não foi possível carregar o ranking" : de ? "Die Bestenliste konnte nicht geladen werden" : "Could not load the leaderboard"} theme={theme} action={reload} actionText={tr ? "Tekrar Dene" : es ? "Reintentar" : pt ? "Tentar novamente" : de ? "Erneut versuchen" : "Try Again"} />
       ) : entries.length === 0 ? (
         <State
           icon={scope === "friends" ? "people-outline" : scope === "daily" ? "sunny-outline" : "trophy-outline"}
-          text={scope === "friends" ? (tr ? "Arkadaşların henüz sıralamada değil" : es ? "Tus amigos aún no están en la clasificación" : pt ? "Seus amigos ainda não estão no ranking" : "Your friends aren't ranked yet") : scope === "daily" ? (tr ? "Bugün henüz kimse Günlük Meydan Okuma'yı oynamadı" : es ? "Nadie ha jugado todavía el reto diario de hoy" : pt ? "Ninguém jogou o desafio diário de hoje ainda" : "Nobody has played today's Daily Challenge yet") : (tr ? "Henüz sıralamaya giren oyuncu yok" : es ? "Aún no hay jugadores clasificados" : pt ? "Ainda não há jogadores classificados" : "No ranked players yet")}
+          text={scope === "friends" ? (tr ? "Arkadaşların henüz sıralamada değil" : es ? "Tus amigos aún no están en la clasificación" : pt ? "Seus amigos ainda não estão no ranking" : de ? "Deine Freunde sind noch nicht platziert" : "Your friends aren't ranked yet") : scope === "daily" ? (tr ? "Bugün henüz kimse Günlük Meydan Okuma'yı oynamadı" : es ? "Nadie ha jugado todavía el reto diario de hoy" : pt ? "Ninguém jogou o desafio diário de hoje ainda" : de ? "Niemand hat die heutige tägliche Challenge bisher gespielt" : "Nobody has played today's Daily Challenge yet") : (tr ? "Henüz sıralamaya giren oyuncu yok" : es ? "Aún no hay jugadores clasificados" : pt ? "Ainda não há jogadores classificados" : de ? "Noch keine platzierten Spieler" : "No ranked players yet")}
           theme={theme}
           action={scope === "daily" ? playDaily : undefined}
-          actionText={tr ? "Günlüğü Oyna" : es ? "Jugar el reto diario" : pt ? "Jogar o desafio diário" : "Play Daily"}
+          actionText={tr ? "Günlüğü Oyna" : es ? "Jugar el reto diario" : pt ? "Jogar o desafio diário" : de ? "Tägliche Challenge spielen" : "Play Daily"}
         />
       ) : (
         <FlatList
@@ -164,12 +165,12 @@ export default function GameLeaderboardScreen({ navigation, route }) {
         />
       )}
 
-      <RulesModal visible={rulesVisible} onClose={() => setRulesVisible(false)} theme={theme} tr={tr} es={es} pt={pt} />
+      <RulesModal visible={rulesVisible} onClose={() => setRulesVisible(false)} theme={theme} tr={tr} es={es} pt={pt} de={de} />
     </GameScreenShell>
   );
 }
 
-function ScopeBar({ scope, onChange, theme, tr, es, pt }) {
+function ScopeBar({ scope, onChange, theme, tr, es, pt, de }) {
   return (
     <FlatList
       horizontal
@@ -191,7 +192,7 @@ function ScopeBar({ scope, onChange, theme, tr, es, pt }) {
             style={[styles.scopeChip, { backgroundColor: active ? theme.accent : theme.secondary, borderColor: active ? theme.accent : theme.border, opacity: locked ? 0.5 : 1 }]}
           >
             <AppIcon family="Ionicons" name={item.icon} size={14} color={active ? "#fff" : theme.text.secondary} />
-            <Text style={[styles.scopeText, { color: active ? "#fff" : theme.text.secondary }]}>{tr ? item.tr : es ? item.es : pt ? item.pt : item.en}</Text>
+            <Text style={[styles.scopeText, { color: active ? "#fff" : theme.text.secondary }]}>{tr ? item.tr : es ? item.es : pt ? item.pt : de ? item.de : item.en}</Text>
             {locked ? <View style={[styles.soonDot, { backgroundColor: theme.text.muted }]} /> : null}
           </TouchableOpacity>
         );
@@ -200,7 +201,7 @@ function ScopeBar({ scope, onChange, theme, tr, es, pt }) {
   );
 }
 
-function Podium({ entries, currentUid, theme, tr, es, pt }) {
+function Podium({ entries, currentUid, theme, tr, es, pt, de }) {
   // Gorsel sira: 2 - 1 - 3 (ortada birinci).
   const order = [entries[1], entries[0], entries[2]].filter(Boolean);
   return (
@@ -220,7 +221,7 @@ function Podium({ entries, currentUid, theme, tr, es, pt }) {
               />
               <View style={[styles.podiumRank, { backgroundColor: PODIUM_COLORS[realRank] }]}><Text style={styles.podiumRankText}>{realRank + 1}</Text></View>
             </View>
-            <Text style={[styles.podiumName, { color: theme.text.primary }]} numberOfLines={1}>{isSelf ? (tr ? "Sen" : es ? "Tú" : pt ? "Você" : "You") : entry.displayName || (tr ? "Anonim" : es ? "Anónimo" : pt ? "Anônimo" : "Anonymous")}</Text>
+            <Text style={[styles.podiumName, { color: theme.text.primary }]} numberOfLines={1}>{isSelf ? (tr ? "Sen" : es ? "Tú" : pt ? "Você" : de ? "Du" : "You") : entry.displayName || (tr ? "Anonim" : es ? "Anónimo" : pt ? "Anônimo" : de ? "Anonym" : "Anonymous")}</Text>
             <View style={[styles.podiumBar, { backgroundColor: theme.secondary, borderColor: PODIUM_COLORS[realRank], height: isWinner ? 64 : realRank === 1 ? 50 : 40 }]}>
               <Text style={[styles.podiumScore, { color: PODIUM_COLORS[realRank] }]}>{Number(entry.bestScore) || 0}</Text>
             </View>
@@ -241,12 +242,12 @@ function State({ icon, text, theme, loading, action, actionText }) {
   );
 }
 
-function RulesModal({ visible, onClose, theme, tr, es, pt }) {
+function RulesModal({ visible, onClose, theme, tr, es, pt, de }) {
   const rules = tr
     ? ["Önce daha yüksek skor sıralanır.", "Skor eşitse daha çok doğru cevap öne geçer.", "Sonra daha uzun en iyi seri.", "Kalan eşitlikler daha az joker ve skora daha erken ulaşma ile çözülür."]
     : es
       ? ["Primero va quien tiene la puntuación más alta.", "Si hay empate, gana quien tenga más aciertos.", "Después, quien tenga la mejor racha más larga.", "Los empates restantes se deshacen por menos comodines usados y por haber llegado antes a la puntuación."]
-      : pt ? ["Quem tem a maior pontuação vem primeiro.", "Em caso de empate, vence quem tiver mais acertos.", "Depois, quem tiver a maior melhor sequência.", "Os empates restantes são desfeitos por menos coringas usados e por ter chegado antes à pontuação."] : ["Higher score ranks first.", "If scores tie, more correct answers win.", "Then the longer best streak.", "Remaining ties break on fewer jokers and reaching the score earlier."];
+      : pt ? ["Quem tem a maior pontuação vem primeiro.", "Em caso de empate, vence quem tiver mais acertos.", "Depois, quem tiver a maior melhor sequência.", "Os empates restantes são desfeitos por menos coringas usados e por ter chegado antes à pontuação."] : de ? ["Die höhere Punktzahl steht vorn.", "Bei Punktgleichheit gewinnen mehr richtige Antworten.", "Danach die längere beste Serie.", "Verbleibende Gleichstände entscheiden weniger Joker und das frühere Erreichen der Punktzahl."] : ["Higher score ranks first.", "If scores tie, more correct answers win.", "Then the longer best streak.", "Remaining ties break on fewer jokers and reaching the score earlier."];
   return (
     <BottomSheetModal
       visible={visible}
@@ -256,8 +257,8 @@ function RulesModal({ visible, onClose, theme, tr, es, pt }) {
     >
       <SafeAreaView edges={["bottom"]} style={[styles.sheet, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
-          <Text style={[styles.sheetTitle, { color: theme.text.primary }]}>{tr ? "Sıralama Nasıl Belirlenir?" : es ? "Cómo funciona la clasificación" : pt ? "Como funciona o ranking" : "How Ranking Works"}</Text>
-          <Text style={[styles.sheetSubtitle, { color: theme.text.muted }]}>{tr ? "Eşit skorlarda kullanılan sıra (tie-break) kuralları" : es ? "Reglas de desempate para puntuaciones iguales" : pt ? "Regras de desempate para pontuações iguais" : "Tie-break rules used for equal scores"}</Text>
+          <Text style={[styles.sheetTitle, { color: theme.text.primary }]}>{tr ? "Sıralama Nasıl Belirlenir?" : es ? "Cómo funciona la clasificación" : pt ? "Como funciona o ranking" : de ? "So wird der Rang bestimmt" : "How Ranking Works"}</Text>
+          <Text style={[styles.sheetSubtitle, { color: theme.text.muted }]}>{tr ? "Eşit skorlarda kullanılan sıra (tie-break) kuralları" : es ? "Reglas de desempate para puntuaciones iguales" : pt ? "Regras de desempate para pontuações iguais" : de ? "Regeln zur Auflösung von Gleichständen bei gleichen Punktzahlen" : "Tie-break rules used for equal scores"}</Text>
           <View style={styles.rulesList}>
             {rules.map((rule, index) => (
               <View key={rule} style={styles.ruleRow}>
@@ -266,8 +267,8 @@ function RulesModal({ visible, onClose, theme, tr, es, pt }) {
               </View>
             ))}
           </View>
-          <Text style={[styles.sheetNote, { color: theme.text.muted }]}>{tr ? "Global tablo Klasik + Normal sonuçlarından beslenir; kişisel liste oyunları tabloyu etkilemez. Günlük sekme yalnızca bugünün Günlük Meydan Okuma sonuçlarını gösterir." : es ? "La clasificación global usa los resultados del modo Clásico con dificultad Normal; las partidas con listas personales no la afectan. La pestaña Diario solo muestra los resultados del reto diario de hoy." : pt ? "O ranking global usa os resultados do modo Clássico com dificuldade Normal; partidas com listas pessoais não o afetam. A aba Diário mostra apenas os resultados do desafio diário de hoje." : "The global board uses Classic + Normal results; personal-list games don't affect it. The Daily tab only shows today's Daily Challenge results."}</Text>
-          <GlassTouchable onPress={onClose} style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent }]}><Text style={gameSharedStyles.primaryButtonText}>{tr ? "Anladım" : es ? "Entendido" : pt ? "Entendi" : "Got it"}</Text></GlassTouchable>
+          <Text style={[styles.sheetNote, { color: theme.text.muted }]}>{tr ? "Global tablo Klasik + Normal sonuçlarından beslenir; kişisel liste oyunları tabloyu etkilemez. Günlük sekme yalnızca bugünün Günlük Meydan Okuma sonuçlarını gösterir." : es ? "La clasificación global usa los resultados del modo Clásico con dificultad Normal; las partidas con listas personales no la afectan. La pestaña Diario solo muestra los resultados del reto diario de hoy." : pt ? "O ranking global usa os resultados do modo Clássico com dificuldade Normal; partidas com listas pessoais não o afetam. A aba Diário mostra apenas os resultados do desafio diário de hoje." : de ? "Die globale Tabelle nutzt Ergebnisse aus Klassik + Normal; Spiele mit eigenen Listen haben darauf keinen Einfluss. Der Tab „Täglich“ zeigt nur die Ergebnisse der heutigen täglichen Challenge." : "The global board uses Classic + Normal results; personal-list games don't affect it. The Daily tab only shows today's Daily Challenge results."}</Text>
+          <GlassTouchable onPress={onClose} style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent }]}><Text style={gameSharedStyles.primaryButtonText}>{tr ? "Anladım" : es ? "Entendido" : pt ? "Entendi" : de ? "Verstanden" : "Got it"}</Text></GlassTouchable>
       </SafeAreaView>
     </BottomSheetModal>
   );

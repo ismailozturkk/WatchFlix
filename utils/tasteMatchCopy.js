@@ -138,6 +138,39 @@ export const TASTE_MATCH_COPY = {
       needFriend: "Vocês precisam ser amigos para enviar um convite",
     },
   },
+  de: {
+    title: "Geschmacks-Match",
+    tiers: {
+      veryHigh: "Euer Geschmack liegt sehr nah beieinander",
+      high: "Ihr habt einen recht ähnlichen Geschmack",
+      medium: "Ihr überschneidet euch teilweise",
+      low: "Euer Geschmack unterscheidet sich",
+    },
+    limited: "Ein ungefähres Ergebnis, weil einige Daten fehlen",
+    noData: {
+      hidden: (name) => `${name} teilt keine Merklisten, daher gibt es nichts zu vergleichen`,
+      notEnough: "Ihr braucht beide noch ein paar gesehene Titel für einen Vergleich",
+    },
+    rows: {
+      overlap: (n) => (n === 1 ? "1 Titel, den ihr beide gesehen habt" : `${n} Titel, die ihr beide gesehen habt`),
+      favorites: (n) => (n === 1 ? "1 gemeinsamer Favorit" : `${n} gemeinsame Favoriten`),
+      genres: (list) => `Gemeinsame Genres: ${list}`,
+      ratings: (percent, pairs) => `${percent} % Übereinstimmung bei Bewertungen · ${pairs} von beiden bewertet`,
+    },
+    together: {
+      title: "Lasst uns gemeinsam schauen",
+      both: (n) => `${n} Titel stehen auf euren beiden Listen`,
+      mixed: (n) => `${n} Kandidaten, die keiner von euch gesehen hat`,
+      none: "Keine gemeinsamen Kandidaten gefunden",
+      noneHint: "Füge deinen Merklisten ein paar Titel hinzu, dann erscheinen sie hier",
+      hiddenList: (name) => `${name} teilt die Merkliste nicht; die Kandidaten stammen nur aus deiner Liste`,
+      sources: { both: "Auf beiden Listen", mine: "Aus deiner Liste", theirs: "Aus ihrer Liste" },
+      action: (name) => `Raum erstellen und ${name} einladen`,
+      actionHint: "Wischt in CineSwipe dasselbe Deck; Titel, die euch beiden gefallen, werden zu Matches",
+      limit: (n) => `Die ersten ${n} Kandidaten kommen in den Raum`,
+      needFriend: "Ihr müsst befreundet sein, um eine Einladung zu senden",
+    },
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

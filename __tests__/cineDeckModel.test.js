@@ -84,7 +84,7 @@ describe("dil", () => {
     expect(tmdbLanguage("en")).toBe("en-US");
     expect(tmdbLanguage("tr-TR")).toBe("tr-TR");
     expect(tmdbLanguage(undefined)).toBe("en-US");
-    expect(tmdbLanguage("de")).toBe("en-US");
+    expect(tmdbLanguage("fr")).toBe("en-US");
   });
 });
 

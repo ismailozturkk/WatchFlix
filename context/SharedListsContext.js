@@ -4,8 +4,11 @@ import React, {
   useState,
   useEffect,
   useMemo,
+  useRef,
 } from "react";
 import { useAuth } from "./AuthContext";
+import { useLanguage } from "./LanguageContext";
+import { intlLocaleOf } from "../utils/appLanguages";
 import useStartupGate from "../hooks/useStartupGate";
 import {
   subscribeToMySharedLists,
@@ -44,6 +47,11 @@ export const useSharedLists = () => useContext(SharedListsContext);
 
 export const SharedListsProvider = ({ children }) => {
   const { user } = useAuth();
+  const { language } = useLanguage();
+  // Liste adı sıralaması uygulama dilinin kurallarıyla (ö/ü/ñ/ç harfleri dile göre yerleşir).
+  const sortLocale = intlLocaleOf(language);
+  const sortLocaleRef = useRef(sortLocale);
+  sortLocaleRef.current = sortLocale;
   const [sharedLists, setSharedLists] = useState([]);
   const [sharedItemsByList, setSharedItemsByList] = useState({});
   const [loading, setLoading] = useState(true);
@@ -65,12 +73,21 @@ export const SharedListsProvider = ({ children }) => {
     const unsub = subscribeToMySharedLists(user.uid, (lists) => {
       // İsim sırasına göre sabit sıralama — kart dizilimi snapshot'tan
       // snapshot'a zıplamasın.
-      lists.sort((a, b) => (a.name || "").localeCompare(b.name || "", "tr"));
+      lists.sort((a, b) => (a.name || "").localeCompare(b.name || "", sortLocaleRef.current));
       setSharedLists(lists);
       setLoading(false);
     });
     return () => unsub();
   }, [user?.uid, startupReady]);
+
+  // Dil değişince mevcut dizi yeni dilin sırasına girsin (sonraki snapshot'ı beklemeden).
+  useEffect(() => {
+    setSharedLists((prev) =>
+      prev.length > 1
+        ? [...prev].sort((a, b) => (a.name || "").localeCompare(b.name || "", sortLocale))
+        : prev,
+    );
+  }, [sortLocale]);
 
   const sharedListIds = useMemo(
     () => sharedLists.map((list) => list.id).filter(Boolean),

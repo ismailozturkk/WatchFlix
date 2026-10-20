@@ -19,6 +19,7 @@ export default function GameAchievementsScreen({ navigation }) {
   const tr = copyLanguage(language, ["tr", "en"]) === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
+  const de = normalizeAppLanguage(language) === "de";
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export default function GameAchievementsScreen({ navigation }) {
   const unlockedCount = achievements.filter((item) => item.unlocked).length;
 
   return (
-    <GameScreenShell navigation={navigation} title={tr ? "Başarımlar" : es ? "Logros" : pt ? "Conquistas" : "Achievements"} subtitle={`${unlockedCount}/${achievements.length} ${tr ? "açıldı" : es ? "desbloqueados" : pt ? "desbloqueadas" : "unlocked"}`}>
+    <GameScreenShell navigation={navigation} title={tr ? "Başarımlar" : es ? "Logros" : pt ? "Conquistas" : de ? "Erfolge" : "Achievements"} subtitle={`${unlockedCount}/${achievements.length} ${tr ? "açıldı" : es ? "desbloqueados" : pt ? "desbloqueadas" : de ? "freigeschaltet" : "unlocked"}`}>
       {achievements.map((item) => {
         const ratio = item.target ? item.progress / item.target : 0;
         return (

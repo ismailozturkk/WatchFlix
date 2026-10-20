@@ -69,11 +69,13 @@ import {
 } from "./settings/dataTypes";
 import ImportDataModal from "../../components/import/ImportDataModal";
 import { getLibraryExportCopy } from "./settings/libraryExportCopy";
+import { getImportCopy } from "../../components/import/importCopy";
 import useAppLogo from "@hooks/useAppLogo";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { tabTitleTopSpacing } from "../../utils/screenTopSpacing";
 import {
   APP_LANGUAGES,
+  COMING_SOON_LANGUAGES,
   intlLocaleOf,
   pickByLanguage,
   tmdbLanguageOf,
@@ -380,6 +382,7 @@ export default function SettingsScreen() {
 
   const { t, language, toggleLanguage } = useLanguage();
   const copyExport = getLibraryExportCopy(language);
+  const copyImport = getImportCopy(language);
   const aiCopy = useMemo(() => getAiCopy(language), [language]);
   const referralCopy = useMemo(() => getReferralCopy(language), [language]);
   const { prefs: aiPrefs } = useAiPrefs();
@@ -479,6 +482,17 @@ export default function SettingsScreen() {
   );
   const currentLang =
     LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0];
+  // "Yakında" bölümü: henüz desteklenmeyen, SEÇİLEMEYEN diller (utils/appLanguages.COMING_SOON_LANGUAGES).
+  const langQuery = langSearch.toLowerCase();
+  const filteredSoonLanguages = COMING_SOON_LANGUAGES.filter(
+    (l) => l.name.toLowerCase().includes(langQuery) || l.nativeName.toLowerCase().includes(langQuery),
+  );
+  const languageRows = [
+    ...filteredLanguages,
+    ...(filteredSoonLanguages.length
+      ? [{ code: "__soon__", header: true }, ...filteredSoonLanguages.map((l) => ({ ...l, soon: true }))]
+      : []),
+  ];
 
   const handleSelectLanguage = (code) => {
     toggleLanguage(code);
@@ -499,12 +513,14 @@ export default function SettingsScreen() {
           en: `${streamingProviderIds.length} services selected`,
           es: `${streamingProviderIds.length} servicios seleccionados`,
           pt: `${streamingProviderIds.length} serviços selecionados`,
+          de: `${streamingProviderIds.length} Dienste ausgewählt`,
         })
     : pickByLanguage(language, {
         tr: "Henüz platform seçilmedi",
         en: "No services selected yet",
         es: "Aún no has elegido servicios",
         pt: "Você ainda não escolheu serviços",
+        de: "Noch keine Dienste ausgewählt",
       });
 
   const filteredProviders = useMemo(() => {
@@ -999,8 +1015,8 @@ export default function SettingsScreen() {
             iconBg={C.iconAmber}
             iconColor={C.amber}
             iconName="file-tray-full-outline"
-            title="Letterboxd & IMDb'den Aktar"
-            subtitle="İzleme geçmişinizi ve puanlarınızı Seelogd'a taşıyın"
+            title={copyImport.rowTitle}
+            subtitle={copyImport.rowSub}
             onPress={() => setShowImportModal(true)}
             right={<Chevron color={C.muted} />}
             last
@@ -1345,7 +1361,7 @@ export default function SettingsScreen() {
                 </GlassBox>
 
                 <FlatList
-                  data={filteredLanguages}
+                  data={languageRows}
                   keyExtractor={(i) => i.code}
                   style={{ maxHeight: 320 }}
                   showsVerticalScrollIndicator={false}
@@ -1362,6 +1378,45 @@ export default function SettingsScreen() {
                     </View>
                   }
                   renderItem={({ item }) => {
+                    if (item.header) {
+                      return (
+                        <View style={s.langSoonHeader}>
+                          <Text allowFontScaling={false} style={[s.langSoonHeaderText, { color: C.muted }]}>
+                            {i18nText("autoI18n.language_coming_soon", "Yakında").toLocaleUpperCase(intlLocaleOf(language))}
+                          </Text>
+                          <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
+                            {i18nText("autoI18n.language_more_soon_hint", "Daha fazla dil üzerinde çalışıyoruz")}
+                          </Text>
+                        </View>
+                      );
+                    }
+                    if (item.soon) {
+                      return (
+                        <View
+                          style={[s.langItem, s.langItemSoon]}
+                          accessible
+                          accessibilityState={{ disabled: true }}
+                          accessibilityLabel={`${item.nativeName}, ${i18nText("autoI18n.language_coming_soon", "Yakında")}`}
+                        >
+                          <View style={s.langItemLeft}>
+                            <CountryFlag isoCode={item.flag} size={28} style={{ borderRadius: 6 }} />
+                            <View>
+                              <Text allowFontScaling={false} style={[s.langItemName, { color: C.text, fontWeight: "500" }]}>
+                                {item.nativeName}
+                              </Text>
+                              <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
+                                {item.name}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={[s.langSoonPill, { backgroundColor: C.accentDim }]}>
+                            <Text allowFontScaling={false} style={[s.langSoonPillText, { color: C.accent }]}>
+                              {i18nText("autoI18n.language_coming_soon", "Yakında")}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    }
                     const sel = item.code === language;
                     return (
                       <TouchableOpacity
@@ -1786,6 +1841,30 @@ const s = StyleSheet.create({
   },
   langItemName: {
     fontSize: 15,
+  },
+  // Henüz desteklenmeyen dil: soluk, dokunulamaz satır + "Yakında" hapı.
+  langItemSoon: {
+    opacity: 0.62,
+  },
+  langSoonPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  langSoonPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  langSoonHeader: {
+    paddingTop: 10,
+    paddingBottom: 8,
+    paddingHorizontal: 4,
+    gap: 2,
+  },
+  langSoonHeaderText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
   },
   emptyContainer: {
     alignItems: "center",

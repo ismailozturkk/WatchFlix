@@ -97,7 +97,7 @@ export default function FontSettingsSection({ colors, language }) {
   const saklananSecimVar = TEXT_ROLES.some(
     (rol) => durum.selected && durum.selected[rol] !== durum[rol],
   );
-  const locale = copyLanguage(language, ["tr", "en", "es", "pt"]);
+  const locale = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
   const [aktifRol, setAktifRol] = useState("heading");
   const [aktifSayfa, setAktifSayfa] = useState(0);
   const [galleryWidth, setGalleryWidth] = useState(0);
@@ -584,7 +584,7 @@ export default function FontSettingsSection({ colors, language }) {
             ? "Seçtiğin premium yazı tipleri saklı; Premium ile geri gelir."
             : locale === "es"
               ? "Las fuentes Premium que elegiste están guardadas y vuelven con Premium."
-              : locale === "pt" ? "As fontes Premium que você escolheu estão salvas e voltam com o Premium." : "Your premium font picks are saved and return with Premium."}
+              : locale === "pt" ? "As fontes Premium que você escolheu estão salvas e voltam com o Premium." : locale === "de" ? "Deine Premium-Schriftauswahl ist gespeichert und kehrt mit Premium zurück." : "Your premium font picks are saved and return with Premium."}
         </Text>
       ) : null}
 

@@ -352,7 +352,92 @@ const pt = {
   },
 };
 
-export const SECTION_VISIBILITY_COPY = Object.freeze({ tr, en, es, pt });
+const de = {
+  ui: {
+    title: "Bildschirmbereiche",
+    rowSub: "Wähle, welche Bereiche bei Filmen, Serien, Hub und Profil angezeigt werden",
+    badgeAll: "Alle an",
+    badgeHidden: "{n} ausgeblendet",
+    intro:
+      "Wähle, welche Bereiche auf den Bildschirmen Filme, Serien, Hub und Profil erscheinen. Ein ausgeblendeter Bereich verschwindet vom Bildschirm; du kannst ihn hier jederzeit wieder einschalten.",
+    visibleCount: "{shown} von {total} Bereichen sichtbar",
+    showAll: "Alle anzeigen",
+    hideAll: "Alle ausblenden",
+    linkedTag: "Gemeinsame Einstellung",
+    conditionalNote:
+      "Manche Leisten, wie „Wegen deiner Favoriten“ und „Favoriten der Dienste“, erscheinen nur, wenn es passende Daten oder eine Einstellung dafür gibt; dass sie hier an sind, heißt nicht, dass sie immer angezeigt werden.",
+    reset: "Auf Standard zurücksetzen",
+    resetSub: "Jeden Bereich auf jedem Bildschirm anzeigen",
+    saveFailed: "Die Einstellung konnte nicht gespeichert werden",
+    confirmTitle: "Freundeleiste ausblenden?",
+    confirmMessage:
+      "Freundessuche, deine Freundesliste, Nachrichten und Anfragen lassen sich nur über diese Leiste öffnen. Wenn du sie ausblendest, erreichst du sie von hier aus nicht mehr; du kannst sie auf dieser Seite jederzeit wieder einschalten.",
+    confirmHide: "Ausblenden",
+    confirmCancel: "Abbrechen",
+    emptyTitle: "Hier gibt es keine Bereiche zum Anzeigen",
+    emptyText: "Du hast alle Bereiche dieses Bildschirms ausgeblendet. Du kannst sie in den Einstellungen wieder einschalten.",
+    emptyAction: "Bereiche bearbeiten",
+  },
+  screens: {
+    tv: { name: "Serien", hint: "Leisten auf dem Serien-Start" },
+    movie: { name: "Filme", hint: "Leisten auf dem Film-Start" },
+    hub: { name: "Hub", hint: "Karten im Tab „Hub“" },
+    profile: { name: "Profil", hint: "Bereiche im Tab „Profil“" },
+  },
+  sections: {
+    tv: {
+      trends: ["Trendserien", "Was gerade im Trend ist, mit Wochen- und Tageskategorien"],
+      ongoing: ["Laufende Serien", "Serien, die du begonnen hast. Dieselbe Einstellung wie „Laufende Serien anzeigen“ in den Einstellungen"],
+      best: ["Bestbewertete Serien", "Meistbewertete und beliebteste Serien"],
+      followedPeople: ["Anstehendes von Personen, denen du folgst", "Neue Arbeiten der Schauspieler und Regisseure, denen du folgst; erscheint, sobald du jemandem folgst"],
+      fromFavorites: ["Wegen deiner Favoriten", "Tipps nach deinen vier Favoriten; erscheint, sobald du welche hinzufügst"],
+      subscriptions: ["Favoriten der Dienste", "Titel bei den Diensten, die du gewählt hast; erscheint, sobald du Dienste wählst"],
+      topGenres: ["Lieblingsgenres", "Nach dem, was du schaust oder zu Beginn gewählt hast"],
+      recentFavorites: ["Aktuelle Favoriten", "Neuere Serien mit starken Publikumsbewertungen"],
+      hiddenGems: ["Geheimtipps", "Weniger bekannte, hoch bewertete Titel"],
+      emmy: ["Emmy-prämierte Serien", "Emmy-Gewinner nach Jahr"],
+      providers: ["Anbieter", "Serien nach Streaming-Dienst durchstöbern"],
+      genres: ["Genres", "Serien nach Genre durchstöbern"],
+      onTheAir: ["Diese Woche im Programm", "Serien mit einer neuen Folge in dieser Woche"],
+      airingToday: ["Heute im Programm", "Serien mit einer neuen Folge heute"],
+    },
+    movie: {
+      trends: ["Trendfilme", "Was gerade im Trend ist, mit Wochen- und Tageskategorien"],
+      bests: ["Bestbewertete Filme", "Meistbewertete und beliebteste Filme"],
+      followedPeople: ["Anstehendes von Personen, denen du folgst", "Neue Arbeiten der Schauspieler und Regisseure, denen du folgst; erscheint, sobald du jemandem folgst"],
+      fromFavorites: ["Wegen deiner Favoriten", "Tipps nach deinen vier Favoriten; erscheint, sobald du welche hinzufügst"],
+      subscriptions: ["Favoriten der Dienste", "Titel bei den Diensten, die du gewählt hast; erscheint, sobald du Dienste wählst"],
+      topGenres: ["Lieblingsgenres", "Nach dem, was du schaust oder zu Beginn gewählt hast"],
+      recentFavorites: ["Aktuelle Favoriten", "Neuere Filme mit starken Publikumsbewertungen"],
+      hiddenGems: ["Geheimtipps", "Weniger bekannte, hoch bewertete Titel"],
+      nowPlaying: ["Filme im Kino", "Was gerade in den Kinos läuft"],
+      oscar: ["Oscar-prämierte Filme", "Oscar-Gewinner nach Jahr"],
+      collection: ["Filmreihen", "Filmreihen und Sammlungen"],
+      providers: ["Anbieter", "Filme nach Streaming-Dienst durchstöbern"],
+      genres: ["Genres", "Filme nach Genre durchstöbern"],
+      upcoming: ["Kommende Filme", "Filme, die bald in die Kinos kommen"],
+    },
+    hub: {
+      feed: ["Soziales", "Die Karte „Beiträge“: Feed öffnen und schnell posten"],
+      cineswipe: ["Was schauen wir?", "Entscheide mit CineSwipe, solo oder mit einem Freund"],
+      tournament: ["Turnier", "Das monatliche Filmturnier und seine Ergebnisse"],
+      wrapped: ["Das Jahr in Zahlen", "Dein jährlicher Seh-Rückblick (Wrapped) und das Archiv"],
+      games: ["Spiele", "Das empfohlene Spiel und deine Statistik"],
+    },
+    profile: {
+      goal: ["Jährliches Seh-Ziel", "Die Zielring-Schaltfläche im Profilkopf (neben Bearbeiten und Teilen)"],
+      badges: ["Abzeichen", "Dein Seh-Score, dein Akt-Level und die Abzeichenleiste"],
+      friends: ["Freunde", "Suche, Freunde, Nachrichten und Anfragen. Wenn du sie ausblendest, erreichst du sie von hier aus nicht mehr"],
+      stats: ["Statistik", "Wie viele Filme und Serien du gesehen hast, und die Gesamtzeit"],
+      lists: ["Listen", "Favoriten, Merkliste, Gesehenes und deine eigenen Listen"],
+      activity: ["Meine Aktivität", "Deine Bewertungen, Kommentare, Beiträge und Entwürfe"],
+      reminders: ["Erinnerungen", "Deine bevorstehenden Film- und Folgenerinnerungen"],
+      notes: ["Notizen", "Deine Film- und Serien-Notizen"],
+    },
+  },
+};
+
+export const SECTION_VISIBILITY_COPY = Object.freeze({ tr, en, es, pt, de });
 
 /** Uygulama diline göre metin tablosu (bilinmeyen dil → İngilizce). */
 export const getSectionVisibilityCopy = (language) =>

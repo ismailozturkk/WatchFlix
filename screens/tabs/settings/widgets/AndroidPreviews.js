@@ -109,6 +109,7 @@ function ReminderPreview({ settings }) {
   const isTr = copyLanguage(language, ["tr", "en"]) === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
+  const de = normalizeAppLanguage(language) === "de";
   const compact = settings.density === "compact";
   // Geri sayım ve tarih bugünden türetilir (saf, dile göre): bkz. widgetSamples.js.
   const samples = useMemo(() => buildReminderSamples({ isTr: language }), [language]);
@@ -122,7 +123,7 @@ function ReminderPreview({ settings }) {
   // render etmek de Ayarlar ekranını gereksiz yorardı.
   const display = filtered.slice(0, Math.min(settings.maxItems, 8));
   const typeLabel = (type) =>
-    type === "movie" ? (isTr ? "Film" : es ? "Película" : pt ? "Filme" : "Movie") : isTr ? "Dizi" : es ? "Serie" : pt ? "Série" : "TV";
+    type === "movie" ? (isTr ? "Film" : es ? "Película" : pt ? "Filme" : de ? "Film" : "Movie") : isTr ? "Dizi" : es ? "Serie" : pt ? "Série" : de ? "TV" : "TV";
 
   return (
     <View
@@ -144,7 +145,7 @@ function ReminderPreview({ settings }) {
               numberOfLines={1}
               style={[styles.remTitle, { color: p.text }]}
             >
-              {isTr ? "Yaklaşanlar" : es ? "Próximos" : pt ? "Próximos" : "Coming Up"}
+              {isTr ? "Yaklaşanlar" : es ? "Próximos" : pt ? "Próximos" : de ? "Demnächst" : "Coming Up"}
             </Text>
           </>
         )}
@@ -157,7 +158,7 @@ function ReminderPreview({ settings }) {
             allowFontScaling={false}
             style={[styles.remCountText, { color: p.accent }]}
           >
-            {display.length} {isTr ? "hatırlatma" : es ? "recordatorios" : pt ? "lembretes" : "reminders"}
+            {display.length} {isTr ? "hatırlatma" : es ? "recordatorios" : pt ? "lembretes" : de ? "Erinnerungen" : "reminders"}
           </Text>
         </View>
       </View>
@@ -174,7 +175,7 @@ function ReminderPreview({ settings }) {
           {/* İkon sabit gri (reminder_widget_ic_empty), yalnız metin temaya uyar. */}
           <AppIcon name="calendar-outline" size={30} color="#9AA3B8" />
           <Text style={[styles.remEmptyText, { color: p.muted }]}>
-            {isTr ? "Yaklaşan film veya bölüm yok" : es ? "No hay películas ni episodios próximos" : pt ? "Nenhum filme ou episódio próximo" : "No upcoming movies or episodes"}
+            {isTr ? "Yaklaşan film veya bölüm yok" : es ? "No hay películas ni episodios próximos" : pt ? "Nenhum filme ou episódio próximo" : de ? "Keine bevorstehenden Filme oder Folgen" : "No upcoming movies or episodes"}
           </Text>
         </View>
       ) : (
@@ -264,6 +265,7 @@ function ListsPreview({ settings }) {
   const isTr = copyLanguage(language, ["tr", "en"]) === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
+  const de = normalizeAppLanguage(language) === "de";
   const compact = settings.density === "compact";
   // Gerçek widget hücreleri 3 sütunda 6dp aralıkla dizilir. Eskiden hücre
   // yüksekliği SABİT 112dp'ydi ve poster "fitCenter" ile sığdırılıyordu; 2:3
@@ -306,7 +308,7 @@ function ListsPreview({ settings }) {
               allowFontScaling={false}
               style={[styles.listsTitle, { color: p.text }]}
             >
-              {isTr ? "Listelerim" : es ? "Mis listas" : pt ? "Minhas listas" : "My Lists"}
+              {isTr ? "Listelerim" : es ? "Mis listas" : pt ? "Minhas listas" : de ? "Meine Listen" : "My Lists"}
             </Text>
           </>
         )}
@@ -417,20 +419,21 @@ function StatsPreview({ settings }) {
   const isTr = copyLanguage(language, ["tr", "en"]) === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
+  const de = normalizeAppLanguage(language) === "de";
   const compact = settings.density === "compact";
   // Etiketler widget'a hangi anahtarlardan gidiyorsa buraya da oradan gelir
   // (ProfileStatsContext.labels → statsWidgetService payload).
   const ps = t?.profileScreen || {};
-  const saatEtiketi = etiket(ps.hours, isTr ? "Saat" : es ? "Horas" : pt ? "Horas" : "Hours");
+  const saatEtiketi = etiket(ps.hours, isTr ? "Saat" : es ? "Horas" : pt ? "Horas" : de ? "Stunden" : "Hours");
   // Yoğunluk bu widget'ta YALNIZCA kök dolguyu değiştirir (StatsWidgetProvider
   // setViewPadding); bölüm araları ve punto sabittir.
   const birimler = (values) =>
     [
-      [values[0], etiket(ps.years, isTr ? "Yıl" : es ? "Años" : pt ? "Anos" : "Years")],
-      [values[1], etiket(ps.months, isTr ? "Ay" : es ? "Meses" : pt ? "Meses" : "Months")],
-      [values[2], etiket(ps.days, isTr ? "Gün" : es ? "Días" : pt ? "Dias" : "Days")],
+      [values[0], etiket(ps.years, isTr ? "Yıl" : es ? "Años" : pt ? "Anos" : de ? "Jahre" : "Years")],
+      [values[1], etiket(ps.months, isTr ? "Ay" : es ? "Meses" : pt ? "Meses" : de ? "Monate" : "Months")],
+      [values[2], etiket(ps.days, isTr ? "Gün" : es ? "Días" : pt ? "Dias" : de ? "Tage" : "Days")],
       [values[3], saatEtiketi],
-      [values[4], etiket(ps.minutes, isTr ? "Dakika" : es ? "Minutos" : pt ? "Minutos" : "Minutes")],
+      [values[4], etiket(ps.minutes, isTr ? "Dakika" : es ? "Minutos" : pt ? "Minutos" : de ? "Minuten" : "Minutes")],
     ].map(([value, label]) => (
       <TimeUnit key={label} value={value} label={label} palette={p} />
     ));
@@ -455,7 +458,7 @@ function StatsPreview({ settings }) {
             allowFontScaling={false}
             style={[styles.statsHeaderTitle, { color: p.text }]}
           >
-            {isTr ? "İstatistikler" : es ? "Estadísticas" : pt ? "Estatísticas" : "Statistics"}
+            {isTr ? "İstatistikler" : es ? "Estadísticas" : pt ? "Estatísticas" : de ? "Statistik" : "Statistics"}
           </Text>
         </View>
       )}
@@ -465,7 +468,7 @@ function StatsPreview({ settings }) {
           <View style={[styles.statsPanel, styles.statsCountPanel, { backgroundColor: alpha(p.surfaceAlt, 0.85) }]}>
             <CountBlock
               value="184"
-              label={etiket(ps.movieWatched, isTr ? "İzlenen Filmler" : es ? "Películas vistas" : pt ? "Filmes assistidos" : "Movies Watched")}
+              label={etiket(ps.movieWatched, isTr ? "İzlenen Filmler" : es ? "Películas vistas" : pt ? "Filmes assistidos" : de ? "Gesehene Filme" : "Movies Watched")}
               palette={p}
             />
           </View>
@@ -486,9 +489,9 @@ function StatsPreview({ settings }) {
           ]}
         >
           {[
-            ["time-outline", "1.284", etiket(ps.totalDuration, isTr ? "Toplam Süre" : es ? "Duración total" : pt ? "Duração total" : "Total Duration"), p.accent],
-            ["film-outline", "356", etiket(t?.movies, isTr ? "Filmler" : es ? "Películas" : pt ? "Filmes" : "Movies"), p.accent],
-            ["tv-outline", "928", etiket(t?.tvShows, isTr ? "Diziler" : es ? "Series" : pt ? "Séries" : "TV Shows"), p.bold],
+            ["time-outline", "1.284", etiket(ps.totalDuration, isTr ? "Toplam Süre" : es ? "Duración total" : pt ? "Duração total" : de ? "Gesamtdauer" : "Total Duration"), p.accent],
+            ["film-outline", "356", etiket(t?.movies, isTr ? "Filmler" : es ? "Películas" : pt ? "Filmes" : de ? "Filme" : "Movies"), p.accent],
+            ["tv-outline", "928", etiket(t?.tvShows, isTr ? "Diziler" : es ? "Series" : pt ? "Séries" : de ? "Serien" : "TV Shows"), p.bold],
           ].map(([icon, value, label, tint]) => (
             <View key={icon} style={styles.durationGroup}>
               {/* Üç ikon da sabit gri: provider bunları yeniden boyamaz. */}
@@ -531,7 +534,7 @@ function StatsPreview({ settings }) {
               value="912"
               label={etiket(
                 ps.tvShowEpisodetotalCount,
-                isTr ? "Bölüm Sayısı" : es ? "Nº de episodios" : pt ? "Nº de episódios" : "Episode Count",
+                isTr ? "Bölüm Sayısı" : es ? "Nº de episodios" : pt ? "Nº de episódios" : de ? "Anzahl der Folgen" : "Episode Count",
               )}
               palette={p}
             />

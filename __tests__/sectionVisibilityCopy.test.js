@@ -71,7 +71,7 @@ describe("dil seçimi", () => {
   });
 
   test("bilinmeyen/boş dil İNGİLİZCEye düşer (Türkçeye değil)", () => {
-    for (const dil of ["de", "fr", "", undefined, null, "zz"]) {
+    for (const dil of ["fr", "it", "", undefined, null, "zz"]) {
       expect(getSectionVisibilityCopy(dil)).toBe(SECTION_VISIBILITY_COPY.en);
     }
   });

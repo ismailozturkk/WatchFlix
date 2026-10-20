@@ -20,7 +20,7 @@ describe("Portekizce: cihaz dili ve TMDB bağları", () => {
   it("Portekizce cihaz ilk açılışta Portekizce açılır (pt, pt-BR, pt-PT)", () => {
     expect(cihazDilindenSec([{ languageCode: "pt" }])).toBe("pt");
     expect(cihazDilindenSec([{ languageCode: "PT" }])).toBe("pt");
-    expect(cihazDilindenSec([{ languageCode: "de" }])).toBe("en");
+    expect(cihazDilindenSec([{ languageCode: "fr" }])).toBe("en");
   });
 
   it("TMDB dili pt-BR; Intl pt-BR; yasal sayfa İngilizce (sayfa yazılana dek)", () => {
@@ -86,7 +86,7 @@ describe("Portekizce kopya gerçekten Portekizce", () => {
 describe("Portekizce: dil listeleri olan kaynak dosyaları", () => {
   it("sunucu bildirim dili listesi pt'yi içeriyor ve metinleri var", () => {
     const sunucu = oku("functions/index.js");
-    expect(sunucu).toMatch(/NOTIFICATION_LANGUAGES = \["tr", "en", "es", "pt"\]/);
+    expect(sunucu).toMatch(/NOTIFICATION_LANGUAGES = \["tr", "en", "es", "pt", "de"\]/);
     expect(sunucu).toMatch(/\n  pt: \{\n    someone: "Alguém"/);
     expect(sunucu).toMatch(/\n  pt: \{\n    single: \(p\) =>/);
   });

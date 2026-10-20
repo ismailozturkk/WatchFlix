@@ -61,7 +61,7 @@ function Halka({ oran, renk, iz, metin, metinRenk }) {
 function BadgeSummaryCard({ acik, toplam, dagilim, style }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
   const oran = toplam > 0 ? acik / toplam : 0;
 
   return (

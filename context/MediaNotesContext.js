@@ -82,12 +82,14 @@ export const MediaNotesProvider = ({ children }) => {
                 en: "You've reached your show notes limit",
                 es: "Has alcanzado tu límite de notas de series",
                 pt: "Você atingiu seu limite de notas de séries",
+                de: "Du hast dein Limit für Serien-Notizen erreicht",
               }
             : {
                 tr: "Film notu limitin doldu",
                 en: "You've reached your movie notes limit",
                 es: "Has alcanzado tu límite de notas de películas",
                 pt: "Você atingiu seu limite de notas de filmes",
+                de: "Du hast dein Limit für Film-Notizen erreicht",
               },
         ),
       });

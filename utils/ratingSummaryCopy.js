@@ -35,6 +35,13 @@ export const RATING_SUMMARY_COPY = {
     rated: (mine) => `Sua nota ${mine}. Toque para alterar`,
     locked: "Ainda não lançado",
   },
+  de: {
+    score: (score, votes) => `Bewertung ${score} von 10${votes ? `, ${votes} Stimmen` : ""}`,
+    noScore: "Noch keine Bewertung",
+    rate: "Zum Bewerten tippen",
+    rated: (mine) => `Deine Bewertung ${mine}. Zum Ändern tippen`,
+    locked: "Noch nicht erschienen",
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

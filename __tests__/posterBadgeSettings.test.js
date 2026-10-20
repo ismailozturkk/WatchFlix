@@ -2,7 +2,8 @@
 //
 // Poster rozetlerinin ÜÇ yerde yaşayan sözleşmesinin eşleşme bekçisi:
 //   1) context/AppSettingsContext.js  → DEFAULT_POSTER_BADGES (kaydedilen anahtarlar)
-//   2) screens/tabs/settings/PosterSettingsScreen.js → POSTER_BADGE_OPTIONS (ayar satırları)
+//   2) screens/tabs/settings/PosterSettingsScreen.js → buildPosterBadgeOptions() (ayar satırları;
+//      etiketler dil değişince yeniden çözülsün diye işlev)
 //   3) components/ListBadges.js → poster üstündeki rozet yığını
 //
 // NEDEN: yeni rozet eklerken üçünden biri unutulursa hata sessizdir — ayarda
@@ -31,7 +32,7 @@ function defaultKeys() {
 }
 
 function settingOptions() {
-  const block = settingsSource.match(/const POSTER_BADGE_OPTIONS = \[([\s\S]*?)\n\];/);
+  const block = settingsSource.match(/const buildPosterBadgeOptions = \(\) => \[([\s\S]*?)\n\];/);
   expect(block).not.toBeNull();
   const entry = new RegExp(`\\{\\s*(?:\\/\\/[^\\n]*\\n\\s*)*key:\\s*${KEY_PATTERN},\\s*group:\\s*"(\\w+)"`, "g");
   return [...block[1].matchAll(entry)].map((m) => ({ key: resolveKey(m[1]), group: m[2] }));

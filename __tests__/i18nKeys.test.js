@@ -108,11 +108,12 @@ const tr = paket("tr.json");
 const en = paket("en.json");
 const es = paket("es.json");
 const pt = paket("pt.json");
+const de = paket("de.json");
 
 // `useLanguage()` içindeki `t.movieScreens.title` gibi nesne erişimleri.
 // Yerel döngü değişkeni olarak kullanılan `t.id` benzeri eşleşmeleri elemek
 // için yalnız sözlükte gerçekten bulunan kök namespace'leri denetlenir.
-const tKokleri = new Set([...Object.keys(tr), ...Object.keys(en), ...Object.keys(es), ...Object.keys(pt)]);
+const tKokleri = new Set([...Object.keys(tr), ...Object.keys(en), ...Object.keys(es), ...Object.keys(pt), ...Object.keys(de)]);
 const T_NESNE_DESEN = /(?<![\w.])t(?:\?\.)?\.([A-Za-z_][A-Za-z0-9_]*(?:(?:\?\.)?\.[A-Za-z_][A-Za-z0-9_]*)*)/g;
 for (const tamYol of kaynakDosyalari) {
   const kaynak = fs.readFileSync(tamYol, "utf8");
@@ -168,6 +169,7 @@ describe("i18n anahtar bekçisi", () => {
   const EK_DILLER = [
     ["es", es],
     ["pt", pt],
+    ["de", de],
   ];
 
   describe.each(EK_DILLER)("%s.json", (kod, paketi) => {
@@ -234,9 +236,9 @@ describe("i18n anahtar bekçisi", () => {
     });
   });
 
-  it("pt.json'a İspanyolca'ya özgü işaretler (ñ ¿ ¡) sızmamış", () => {
-    const sizan = duzAnahtarlar(pt).filter((anahtar) => {
-      const deger = anahtar.split(".").reduce((o, p) => o?.[p], pt);
+  it.each([["pt", pt], ["de", de]])("%s.json'a İspanyolca'ya özgü işaretler (ñ ¿ ¡) sızmamış", (_kod, paketi) => {
+    const sizan = duzAnahtarlar(paketi).filter((anahtar) => {
+      const deger = anahtar.split(".").reduce((o, p) => o?.[p], paketi);
       return typeof deger === "string" && /[ñ¿¡]/.test(deger);
     });
     expect(sizan).toEqual([]);

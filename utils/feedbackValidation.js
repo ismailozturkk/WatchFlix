@@ -156,7 +156,7 @@ const PLATFORM_NAME = Object.freeze({ ios: "iOS", android: "Android" });
 
 /**
  * Kullanıcıya "şunu göndereceğiz" diye gösterilen tek satır:
- * "Seelogd v1.4.8 · iOS 26.0 · iPhone 16". Eksik parça atlanır; hiçbiri yoksa "".
+ * "Seelogd v1.4.9 · iOS 26.0 · iPhone 16". Eksik parça atlanır; hiçbiri yoksa "".
  */
 export function formatDeviceLine(device) {
   if (!device || typeof device !== "object") return "";

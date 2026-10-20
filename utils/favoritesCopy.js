@@ -239,6 +239,63 @@ export const FAVORITES_COPY = {
       more: (count) => `+${count}`,
     },
   },
+  de: {
+    kinds: {
+      movies: {
+        label: "Filme",
+        add: "Film hinzufügen",
+        pickTitle: "Wähle deine Lieblingsfilme",
+        search: "Filme suchen…",
+        icon: "film-outline",
+      },
+      shows: {
+        label: "Serien",
+        add: "Serie hinzufügen",
+        pickTitle: "Wähle deine Lieblingsserien",
+        search: "Serien suchen…",
+        icon: "tv-outline",
+      },
+      people: {
+        label: "Schauspieler",
+        add: "Schauspieler hinzufügen",
+        pickTitle: "Wähle deine Lieblingsschauspieler",
+        search: "Schauspieler suchen…",
+        icon: "person-outline",
+      },
+    },
+    counter: (count, max) => `${count}/${max}`,
+    section: {
+      title: "Your four favorites",
+      hint: "Anyone who can see your profile sees these. Pick up to 4 per category — or leave it empty.",
+    },
+    picker: {
+      done: "Fertig",
+      full: "Voll · entferne einen, um zu tauschen",
+      suggestions: "Vorschläge",
+      popular: "Beliebt",
+      basedOnPicks: "Nach deiner Auswahl",
+      castOfPicks: "Aus der Besetzung deiner Auswahl",
+      results: "Ergebnisse",
+      noResults: "Keine Ergebnisse gefunden",
+      searchError: "Suche nicht möglich. Prüfe deine Verbindung.",
+      loadError: "Die Liste konnte nicht geladen werden.",
+      retry: "Erneut versuchen",
+      typeMore: "Gib mindestens 2 Buchstaben zum Suchen ein",
+      remove: "Entfernen",
+      selected: "Ausgewählt",
+      add: (title) => `${title} hinzufügen`,
+      removeLabel: (title) => `${title} aus den Favoriten entfernen`,
+    },
+    profile: {
+      title: "Lieblingstipps",
+      open: "Öffnen",
+    },
+    rail: {
+      title: "Wegen deiner Favoriten",
+      subtitle: (names) => `Weil du ${names} gewählt hast`,
+      more: (count) => `+${count}`,
+    },
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

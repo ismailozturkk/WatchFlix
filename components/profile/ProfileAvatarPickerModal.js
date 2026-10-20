@@ -45,7 +45,7 @@ const AvatarCell = memo(function AvatarCell({
       accessibilityState={{ selected }}
       accessibilityLabel={
         isSocial
-          ? "Sosyal Profil Fotoğrafı"
+          ? i18nText("autoI18n.sosyal_profil_fotografi", "Sosyal Profil Fotoğrafı")
           : i18nText("autoI18n.avatar_n", "Avatar {{n}}", { n: index + 1 })
       }
     >
@@ -149,10 +149,13 @@ export default function ProfileAvatarPickerModal({
             {i18nText("autoI18n.avatar_sec", "Avatar seç")}
           </Text>
           <Text style={[styles.subtitle, { color: theme.text.muted }]}>
-            {socialPhotoURL ? "Profil fotoğrafın ve " : ""}
-            {i18nText("autoI18n.n_avatar", "{{n}} avatar", {
-              n: RAW_AVATAR_INDEXES.length,
-            })}
+            {socialPhotoURL
+              ? i18nText("autoI18n.profil_fotografi_ve_n_avatar", "Profil fotoğrafın ve {{n}} avatar", {
+                  n: RAW_AVATAR_INDEXES.length,
+                })
+              : i18nText("autoI18n.n_avatar", "{{n}} avatar", {
+                  n: RAW_AVATAR_INDEXES.length,
+                })}
           </Text>
         </View>
         <GlassCloseButton

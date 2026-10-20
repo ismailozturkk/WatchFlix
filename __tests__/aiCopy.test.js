@@ -52,7 +52,7 @@ describe("aiCopy tr/en/es paritesi", () => {
     expect(getAiCopy("tr")).toBe(AI_COPY.tr);
     expect(getAiCopy("en")).toBe(AI_COPY.en);
     expect(getAiCopy("es")).toBe(AI_COPY.es);
-    expect(getAiCopy("de")).toBe(AI_COPY.en);
+    expect(getAiCopy("fr")).toBe(AI_COPY.en);
     expect(getAiCopy(undefined)).toBe(AI_COPY.en);
   });
 });

@@ -21,7 +21,7 @@ const yedek = (settings) => ({
   format: BACKUP_FORMAT,
   version: BACKUP_VERSION,
   createdAt: "2026-10-17T10:00:00.000Z",
-  app: { version: "1.4.8", platform: "ios" },
+  app: { version: "1.4.9", platform: "ios" },
   settings,
 });
 

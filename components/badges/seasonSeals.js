@@ -25,6 +25,7 @@
 
 import { RARITY } from "@theme/badgeTokens";
 import { BOLUM } from "./watchBadgeCatalog";
+import { SUPPORTED_LANGUAGE_CODES } from "../../utils/appLanguages";
 
 /** Dönemde kaç FARKLI günde işaretleme yapılmalı. */
 export const MUHUR_ESIK = 8;
@@ -38,10 +39,10 @@ export const ILK_DONEM = "2026-yaz";
 // Kuzey yarımküre mevsimleri. Aralık, TAKİP EDEN yılın kışına sayılır — yoksa
 // tek bir kış iki ayrı mühre bölünür ve ikisi de eşiğe ulaşamaz.
 const DONEM_TANIM = [
-  { id: "kis", aylar: [12, 1, 2], icon: "snow-outline", iconSolid: "snow", tr: "Kışı", en: "Winter", es: "Invierno", pt: "Inverno" },
-  { id: "ilkbahar", aylar: [3, 4, 5], icon: "flower-outline", iconSolid: "flower", tr: "İlkbaharı", en: "Spring", es: "Primavera", pt: "Primavera" },
-  { id: "yaz", aylar: [6, 7, 8], icon: "sunny-outline", iconSolid: "sunny", tr: "Yazı", en: "Summer", es: "Verano", pt: "Verão" },
-  { id: "sonbahar", aylar: [9, 10, 11], icon: "leaf-outline", iconSolid: "leaf", tr: "Sonbaharı", en: "Autumn", es: "Otoño", pt: "Outono" },
+  { id: "kis", aylar: [12, 1, 2], icon: "snow-outline", iconSolid: "snow", tr: "Kışı", en: "Winter", es: "Invierno", pt: "Inverno", de: "Winter" },
+  { id: "ilkbahar", aylar: [3, 4, 5], icon: "flower-outline", iconSolid: "flower", tr: "İlkbaharı", en: "Spring", es: "Primavera", pt: "Primavera", de: "Frühling" },
+  { id: "yaz", aylar: [6, 7, 8], icon: "sunny-outline", iconSolid: "sunny", tr: "Yazı", en: "Summer", es: "Verano", pt: "Verão", de: "Sommer" },
+  { id: "sonbahar", aylar: [9, 10, 11], icon: "leaf-outline", iconSolid: "leaf", tr: "Sonbaharı", en: "Autumn", es: "Otoño", pt: "Outono", de: "Herbst" },
 ];
 
 const DONEM_BY_AY = (() => {
@@ -122,8 +123,42 @@ export function bugunkuDonem(simdi = Date.now()) {
   return donemAnahtari(gun);
 }
 
-const baslikTr = (yil, donem) => `${yil} ${DONEM_BY_ID[donem]?.tr || ""}`.trim();
-const baslikEn = (yil, donem) => `${DONEM_BY_ID[donem]?.en || ""} ${yil}`.trim();
+const cap = (code) => code.charAt(0).toUpperCase() + code.slice(1);
+
+/**
+ * Mühür başlığı: tr "2026 Yazı" · diğer diller "Summer 2026" / "Verano 2026" / "Sommer 2026".
+ * Hem kart (muhurleriHesapla) hem kutlama (badgeMeta.odulAdi) buradan çözer — ikisi ayrışmasın.
+ */
+export function muhurBasligi(code, yil, donem) {
+  const d = DONEM_BY_ID[donem];
+  const ad = d?.[code] || d?.en || "";
+  return code === "tr" ? `${yil} ${ad}`.trim() : `${ad} ${yil}`.trim();
+}
+
+// Açıklama cümlesi dil başına ayrı kurulur (sıra/ek farklı): `adi` mevsim adı, `baslik` yılla birlikte.
+const ACIKLAMA = {
+  tr: ({ baslik, n }) => `${baslik} döneminde ${n} farklı günde işaretle`,
+  en: ({ baslik, n }) => `Log on ${n} separate days during ${baslik}`,
+  es: ({ baslik, n }) => `Registra visionados en ${n} días distintos durante ${baslik}`,
+  pt: ({ baslik, n }) => `Registre sessões em ${n} dias diferentes durante ${baslik}`,
+  de: ({ adi, yil, n }) => `Markiere an ${n} verschiedenen Tagen etwas als gesehen – im ${adi} ${yil}`,
+};
+
+/**
+ * Kartın TÜM dil alanları (tr/en/es/pt/de … + descTr/descEn/…). Yalnız tr/en yazılırsa ES/PT/DE kullanıcısı
+ * kartta İngilizce başlık görür (kutlama ise çevrilmiş çıkar → ikisi çelişir).
+ */
+function muhurDilAlanlari(yil, donem) {
+  const out = {};
+  for (const code of SUPPORTED_LANGUAGE_CODES) {
+    const baslik = muhurBasligi(code, yil, donem);
+    const d = DONEM_BY_ID[donem];
+    const adi = d?.[code] || d?.en || "";
+    out[code] = baslik;
+    out[`desc${cap(code)}`] = (ACIKLAMA[code] || ACIKLAMA.en)({ baslik, adi, yil, n: MUHUR_ESIK });
+  }
+  return out;
+}
 
 /**
  * Mühür kartlarını üretir — ROZET ŞEKLİNDE, WatchBadgeCard değişmeden çizer.
@@ -173,10 +208,7 @@ export function muhurleriHesapla(aktifGunler, { simdi = Date.now(), kazanilmis =
         icon: tanim.icon,
         iconSolid: tanim.iconSolid,
         rarity: RARITY.uncommon,
-        tr: baslikTr(yil, donem),
-        en: baslikEn(yil, donem),
-        descTr: `${baslikTr(yil, donem)} döneminde ${MUHUR_ESIK} farklı günde işaretle`,
-        descEn: `Log on ${MUHUR_ESIK} separate days during ${baslikEn(yil, donem)}`,
+        ...muhurDilAlanlari(yil, donem),
         donem,
         yil,
         guncelDonem: anahtar === suan,

@@ -50,8 +50,8 @@ describe("collectCurrentBackup", () => {
   });
 
   test("meta bilgisi zarfa yazılır", () => {
-    const yedek = collectCurrentBackup({ appVersion: "1.4.8", platform: "android" });
-    expect(yedek.app).toEqual({ version: "1.4.8", platform: "android" });
+    const yedek = collectCurrentBackup({ appVersion: "1.4.9", platform: "android" });
+    expect(yedek.app).toEqual({ version: "1.4.9", platform: "android" });
   });
 });
 

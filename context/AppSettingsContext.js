@@ -189,15 +189,18 @@ const normalizeListPosterInfo = (settings) => {
 // Tek yazma yolu. MMKV senkron ve throw etmiyor; `set` yalnız tip/doğrulama
 // reddinde ya da disk hatasında false döner — kullanıcıya ancak o zaman haber verilir.
 const persist = (key, value, errorText) => {
-  if (!set(key, value)) Toast.show({ type: "error", text1: errorText });
+  if (!set(key, value)) {
+    Toast.show({ type: "error", text1: typeof errorText === "function" ? errorText() : errorText });
+  }
 };
 
-const TEMA_HATASI = i18nText("autoI18n.tema_kaydedilemedi", "Tema kaydedilemedi: ");
-const IKON_HATASI = i18nText(
+// Hata metinleri kaydetme ANINDA çözülür (modül yüklenirken dondurulursa dil değişince eski dilde kalır).
+const TEMA_HATASI = () => i18nText("autoI18n.tema_kaydedilemedi", "Tema kaydedilemedi: ");
+const IKON_HATASI = () => i18nText(
   "autoI18n.ikon_arka_plan_ayari_kaydedilemedi",
   "İkon arka plan ayarı kaydedilemedi: ",
 );
-const GORUNUM_HATASI = i18nText(
+const GORUNUM_HATASI = () => i18nText(
   "autoI18n.gorunum_ayari_kaydedilemedi",
   "Görünüm ayarı kaydedilemedi",
 );

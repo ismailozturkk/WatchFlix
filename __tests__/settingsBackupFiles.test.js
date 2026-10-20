@@ -6,7 +6,7 @@
 // bir kod olarak döner, ekran onu kullanıcıya çevirir.
 
 jest.mock("react-native", () => ({ Platform: { OS: "ios" } }));
-jest.mock("expo-constants", () => ({ __esModule: true, default: { expoConfig: { version: "1.4.8" } } }));
+jest.mock("expo-constants", () => ({ __esModule: true, default: { expoConfig: { version: "1.4.9" } } }));
 jest.mock("expo-clipboard", () => ({
   setStringAsync: jest.fn(() => Promise.resolve(true)),
   getStringAsync: jest.fn(),
@@ -66,7 +66,7 @@ describe("exportToFile", () => {
     expect(icerik.format).toBe(BACKUP_FORMAT);
     expect(icerik.settings.theme).toBe("dark");
     expect(icerik.settings.customThemes).toHaveLength(1);
-    expect(icerik.app).toEqual({ version: "1.4.8", platform: "ios" });
+    expect(icerik.app).toEqual({ version: "1.4.9", platform: "ios" });
   });
 
   test("aynı gün ikinci dışa aktarma eski dosyanın ÜZERİNE yazar", async () => {

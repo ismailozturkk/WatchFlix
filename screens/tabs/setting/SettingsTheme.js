@@ -496,6 +496,7 @@ export default function SettingsTheme() {
             en: "Your custom themes are saved and return with Premium. The default theme is in use for now.",
             es: "Tus temas personalizados están guardados y vuelven con Premium. Por ahora se usa el tema predeterminado.",
             pt: "Seus temas personalizados estão salvos e voltam com o Premium. Por enquanto, o tema padrão está em uso.",
+            de: "Deine eigenen Designs sind gespeichert und kehren mit Premium zurück. Vorerst wird das Standarddesign verwendet.",
           })}
         </Text>
       ) : null}

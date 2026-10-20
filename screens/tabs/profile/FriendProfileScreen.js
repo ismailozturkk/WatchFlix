@@ -106,16 +106,17 @@ const mergeById = (subItems, legacyItems) => {
   return [...(subItems || []), ...(legacyItems || []).filter((i) => !subIds.has(i.id))];
 };
 
-const LIST_META = {
+// Etiketler çizim anında çözülür: modül yüklenirken dondurulursa dil değişince eski dilde kalır.
+const buildListMeta = () => ({
   watchedMovies: { icon: "movie-outline", iconLib: "mci", color: "#29b864", label: i18nText("autoI18n.izlenen_filmler", "İzlenen Filmler") },
   watchedTv:     { icon: "tv",            iconLib: "feather", color: "#29b864", label: i18nText("autoI18n.izlenen_diziler", "İzlenen Diziler") },
   favorites:     { icon: "heart",         iconLib: "ion", color: "#e33",     label: i18nText("autoI18n.favoriler", "Favoriler") },
   watchList:     { icon: "bookmark",      iconLib: "ion", color: "#64b4ff",  label: i18nText("autoI18n.izlenecekler", "İzlenecekler") },
-};
+});
 
 // ── Süre formatı: 12345dk → "8 gün 13 sa" / "3 sa 25 dk" / "45 dk" ──────────
 const formatDuration = (totalMinutes) => {
-  if (!totalMinutes) return "0 dk";
+  if (!totalMinutes) return i18nText("autoI18n.duration_minutes", "{{minutes}} dk", { minutes: 0 });
   const days = Math.floor(totalMinutes / 1440);
   const hours = Math.floor((totalMinutes % 1440) / 60);
   const mins = totalMinutes % 60;
@@ -149,7 +150,7 @@ const SharedListGridCard = memo(function SharedListGridCard({
   onPress,
   style,
 }) {
-  const meta = LIST_META[listName];
+  const meta = buildListMeta()[listName];
   const accent = getListAccent(listName, theme.secondary);
   const icon = getListIcon(listName);
   const displayName = meta?.label ?? listName;
@@ -706,7 +707,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   const memberSince = formatMemberSince(profile?.createdAt, language);
   const selectedListName = selectedSharedList?.[0] ?? "";
   const selectedListItems = selectedSharedList?.[1] ?? [];
-  const selectedListMeta = LIST_META[selectedListName];
+  const selectedListMeta = buildListMeta()[selectedListName];
   const selectedListTitle = selectedListMeta?.label ?? selectedListName;
   const isFullScreenList = selectedListItems.length >= FULLSCREEN_LIST_THRESHOLD;
 

@@ -29,6 +29,7 @@ export default function GameStatsScreen({ navigation }) {
   const tr = copyLanguage(language, ["tr", "en"]) === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
+  const de = normalizeAppLanguage(language) === "de";
   const [state, setState] = useState({ loading: true, data: null });
 
   useEffect(() => {
@@ -44,12 +45,12 @@ export default function GameStatsScreen({ navigation }) {
   const values = useMemo(() => {
     const questions = (data.totalCorrect || 0) + (data.totalWrong || 0);
     return [
-      { icon: "trophy-outline", label: tr ? "En iyi skor" : es ? "Mejor puntuación" : pt ? "Melhor pontuação" : "Best score", value: data.bestScore || 0, color: "#E8B931" },
-      { icon: "flame-outline", label: tr ? "En iyi seri" : es ? "Mejor racha" : pt ? "Melhor sequência" : "Best streak", value: data.bestStreak || 0, color: "#FF6B6B" },
-      { icon: "game-controller-outline", label: tr ? "Toplam oyun" : es ? "Partidas totales" : pt ? "Total de partidas" : "Total games", value: data.totalPlayed || 0, color: theme.accent },
-      { icon: "checkmark-circle-outline", label: tr ? "Toplam doğru" : es ? "Total de aciertos" : pt ? "Total de acertos" : "Total correct", value: data.totalCorrect || 0, color: "#2ECC71" },
-      { icon: "close-circle-outline", label: tr ? "Toplam yanlış" : es ? "Total de fallos" : pt ? "Total de erros" : "Total wrong", value: data.totalWrong || 0, color: "#E74C3C" },
-      { icon: "analytics-outline", label: tr ? "Doğruluk" : es ? "Precisión" : pt ? "Precisão" : "Accuracy", value: questions ? `${Math.round(((data.totalCorrect || 0) / questions) * 100)}%` : "0%", color: "#56CCF2" },
+      { icon: "trophy-outline", label: tr ? "En iyi skor" : es ? "Mejor puntuación" : pt ? "Melhor pontuação" : de ? "Bestwert" : "Best score", value: data.bestScore || 0, color: "#E8B931" },
+      { icon: "flame-outline", label: tr ? "En iyi seri" : es ? "Mejor racha" : pt ? "Melhor sequência" : de ? "Beste Serie" : "Best streak", value: data.bestStreak || 0, color: "#FF6B6B" },
+      { icon: "game-controller-outline", label: tr ? "Toplam oyun" : es ? "Partidas totales" : pt ? "Total de partidas" : de ? "Spiele insgesamt" : "Total games", value: data.totalPlayed || 0, color: theme.accent },
+      { icon: "checkmark-circle-outline", label: tr ? "Toplam doğru" : es ? "Total de aciertos" : pt ? "Total de acertos" : de ? "Richtig insgesamt" : "Total correct", value: data.totalCorrect || 0, color: "#2ECC71" },
+      { icon: "close-circle-outline", label: tr ? "Toplam yanlış" : es ? "Total de fallos" : pt ? "Total de erros" : de ? "Falsch insgesamt" : "Total wrong", value: data.totalWrong || 0, color: "#E74C3C" },
+      { icon: "analytics-outline", label: tr ? "Doğruluk" : es ? "Precisión" : pt ? "Precisão" : de ? "Genauigkeit" : "Accuracy", value: questions ? `${Math.round(((data.totalCorrect || 0) / questions) * 100)}%` : "0%", color: "#56CCF2" },
     ];
   }, [data, theme.accent, tr]);
 
@@ -71,7 +72,7 @@ export default function GameStatsScreen({ navigation }) {
   }, [data.bestScoresByMode, language]);
 
   return (
-    <GameScreenShell navigation={navigation} title={tr ? "Oyuncu Profili" : es ? "Perfil de jugador" : pt ? "Perfil do jogador" : "Player Profile"} subtitle={tr ? "Sahne Tahmin ilerlemen" : es ? "Tu progreso en Adivina la escena" : pt ? "Seu progresso no Adivinhe a cena" : "Your Scene Guess progress"}>
+    <GameScreenShell navigation={navigation} title={tr ? "Oyuncu Profili" : es ? "Perfil de jugador" : pt ? "Perfil do jogador" : de ? "Spielerprofil" : "Player Profile"} subtitle={tr ? "Sahne Tahmin ilerlemen" : es ? "Tu progreso en Adivina la escena" : pt ? "Seu progresso no Adivinhe a cena" : de ? "Dein Szenenraten-Fortschritt" : "Your Scene Guess progress"}>
       {state.loading ? (
         <StatsSkeleton theme={theme} />
       ) : (
@@ -84,19 +85,19 @@ export default function GameStatsScreen({ navigation }) {
                 <Text style={[styles.levelNumber, { color: theme.accent }]}>{level.level}</Text>
               </View>
               <View style={styles.levelCopy}>
-                <Text style={[styles.levelTitle, { color: theme.text.primary }]}>{tr ? `Seviye ${level.level}` : es ? `Nivel ${level.level}` : pt ? `Nível ${level.level}` : `Level ${level.level}`}</Text>
-                <Text style={[styles.levelXp, { color: theme.text.muted }]}>{tr ? `${level.totalXp} XP toplam` : es ? `${level.totalXp} XP en total` : pt ? `${level.totalXp} XP no total` : `${level.totalXp} XP total`}</Text>
+                <Text style={[styles.levelTitle, { color: theme.text.primary }]}>{tr ? `Seviye ${level.level}` : es ? `Nivel ${level.level}` : pt ? `Nível ${level.level}` : de ? `Level ${level.level}` : `Level ${level.level}`}</Text>
+                <Text style={[styles.levelXp, { color: theme.text.muted }]}>{tr ? `${level.totalXp} XP toplam` : es ? `${level.totalXp} XP en total` : pt ? `${level.totalXp} XP no total` : de ? `${level.totalXp} XP insgesamt` : `${level.totalXp} XP total`}</Text>
               </View>
               <View style={styles.streakWrap}>
                 <Text style={styles.streakValue}>🔥 {dayStreak}</Text>
-                <Text style={[styles.streakLabel, { color: theme.text.muted }]}>{tr ? "Gün serisi" : es ? "Racha de días" : pt ? "Sequência de dias" : "Day streak"}</Text>
+                <Text style={[styles.streakLabel, { color: theme.text.muted }]}>{tr ? "Gün serisi" : es ? "Racha de días" : pt ? "Sequência de dias" : de ? "Tagesserie" : "Day streak"}</Text>
               </View>
             </View>
             <View style={[styles.progressTrack, { backgroundColor: theme.primary }]}>
               <View style={[styles.progressFill, { backgroundColor: theme.accent, width: `${Math.round(level.progress * 100)}%` }]} />
             </View>
             <View style={styles.progressFooter}>
-              <Text style={[styles.progressText, { color: theme.text.muted }]}>{tr ? `Sonraki seviyeye ${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP` : es ? `${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP para el siguiente nivel` : pt ? `${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP para o próximo nível` : `${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP to next level`}</Text>
+              <Text style={[styles.progressText, { color: theme.text.muted }]}>{tr ? `Sonraki seviyeye ${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP` : es ? `${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP para el siguiente nivel` : pt ? `${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP para o próximo nível` : de ? `${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP bis zum nächsten Level` : `${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP to next level`}</Text>
               <Text style={[styles.progressText, { color: theme.text.muted }]}>{formatLastPlayed(data.lastPlayedAt, language)}</Text>
             </View>
           </GlassBox>
@@ -115,7 +116,7 @@ export default function GameStatsScreen({ navigation }) {
           {/* Mod bazlı rekorlar */}
           {modeBests.length > 0 ? (
             <>
-              <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{tr ? "MOD REKORLARI" : es ? "RÉCORDS POR MODO" : pt ? "RECORDES POR MODO" : "MODE RECORDS"}</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{tr ? "MOD REKORLARI" : es ? "RÉCORDS POR MODO" : pt ? "RECORDES POR MODO" : de ? "MODUS-REKORDE" : "MODE RECORDS"}</Text>
               <GlassBox role="card" style={[styles.panel, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                 {modeBests.map((mode, index) => (
                   <View key={mode.key} style={[styles.modeRow, index !== modeBests.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
@@ -131,8 +132,8 @@ export default function GameStatsScreen({ navigation }) {
           <GameNavCard
             icon="ribbon-outline"
             accent="#C084FC"
-            title={tr ? "Başarımlar" : es ? "Logros" : pt ? "Conquistas" : "Achievements"}
-            description={tr ? "Açtığın ve bekleyen başarımları gör" : es ? "Consulta los logros desbloqueados y los pendientes" : pt ? "Veja as conquistas desbloqueadas e as pendentes" : "See unlocked and pending achievements"}
+            title={tr ? "Başarımlar" : es ? "Logros" : pt ? "Conquistas" : de ? "Erfolge" : "Achievements"}
+            description={tr ? "Açtığın ve bekleyen başarımları gör" : es ? "Consulta los logros desbloqueados y los pendientes" : pt ? "Veja as conquistas desbloqueadas e as pendentes" : de ? "Freigeschaltete und ausstehende Erfolge ansehen" : "See unlocked and pending achievements"}
             onPress={() => navigation.navigate("GameAchievementsScreen")}
           />
         </>
@@ -142,9 +143,9 @@ export default function GameStatsScreen({ navigation }) {
 }
 
 function formatLastPlayed(value, language) {
-  if (!value) return pickByLanguage(language, { tr: "Henüz oynanmadı", en: "Not played yet", es: "Aún sin jugar", pt: "Ainda não jogado" });
+  if (!value) return pickByLanguage(language, { tr: "Henüz oynanmadı", en: "Not played yet", es: "Aún sin jugar", pt: "Ainda não jogado", de: "Noch nicht gespielt" });
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return pickByLanguage(language, { tr: "Son oynama", en: "Last played", es: "Última partida", pt: "Última partida" });
+  if (Number.isNaN(date.getTime())) return pickByLanguage(language, { tr: "Son oynama", en: "Last played", es: "Última partida", pt: "Última partida", de: "Zuletzt gespielt" });
   return new Intl.DateTimeFormat(intlLocaleOf(language), { day: "numeric", month: "short" }).format(date);
 }
 

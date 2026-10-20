@@ -11,7 +11,7 @@
 import { copyLanguage, pickByLanguage } from "../../utils/appLanguages";
 import { AILE_PRESTIJ, WATCH_BADGES, WATCH_BADGE_BY_ID, badgeAd } from "./watchBadgeCatalog";
 import { BADGE_SET_BY_ID } from "./badgeSets";
-import { DONEM_BY_ID, muhurCoz } from "./seasonSeals";
+import { DONEM_BY_ID, muhurBasligi, muhurCoz } from "./seasonSeals";
 import { RARITY, RARITY_ORDER } from "@theme/badgeTokens";
 
 // Prestij id'si → aile + basamak. `prestij_film_3` → { family: "film", n: 3 }
@@ -22,12 +22,12 @@ export function prestijCoz(id) {
 }
 
 const AILE_ADI = {
-  film: { tr: "Film", en: "Film", es: "Película", pt: "Filme" },
-  bolum: { tr: "Bölüm", en: "Episode", es: "Episodio", pt: "Episódio" },
-  final: { tr: "Final", en: "Finale", es: "Final", pt: "Final" },
-  sure: { tr: "Süre", en: "Screen time", es: "Tiempo de pantalla", pt: "Tempo de tela" },
-  gun: { tr: "Gün", en: "Day", es: "Día", pt: "Dia" },
-  uzunMetraj: { tr: "Uzun metraj", en: "Feature", es: "Largometraje", pt: "Longa-metragem" },
+  film: { tr: "Film", en: "Film", es: "Película", pt: "Filme", de: "Film" },
+  bolum: { tr: "Bölüm", en: "Episode", es: "Episodio", pt: "Episódio", de: "Folge" },
+  final: { tr: "Final", en: "Finale", es: "Final", pt: "Final", de: "Finale" },
+  sure: { tr: "Süre", en: "Screen time", es: "Tiempo de pantalla", pt: "Tempo de tela", de: "Bildschirmzeit" },
+  gun: { tr: "Gün", en: "Day", es: "Día", pt: "Dia", de: "Tag" },
+  uzunMetraj: { tr: "Uzun metraj", en: "Feature", es: "Largometraje", pt: "Longa-metragem", de: "Spielfilm" },
 };
 
 /**
@@ -35,7 +35,7 @@ const AILE_ADI = {
  * @returns {string|null} tanınmayan id'de null (çağıran kutlamayı atlar)
  */
 export function odulAdi(id, lang = "tr") {
-  const code = copyLanguage(lang, ["tr", "en", "es", "pt"]);
+  const code = copyLanguage(lang, ["tr", "en", "es", "pt", "de"]);
 
   const rozet = WATCH_BADGE_BY_ID[id];
   if (rozet) return badgeAd(rozet, code);
@@ -45,21 +45,19 @@ export function odulAdi(id, lang = "tr") {
 
   const muhur = muhurCoz(id);
   if (muhur) {
-    const d = DONEM_BY_ID[muhur.donem];
-    const donem = d?.[code] || d?.en || "";
-    // tr: "2025 Kış", en/es: "Winter 2025" / "Invierno 2025"
-    return code === "tr" ? `${muhur.yil} ${donem}`.trim() : `${donem} ${muhur.yil}`.trim();
+    return muhurBasligi(code, muhur.yil, muhur.donem);
   }
 
   const prestij = prestijCoz(id);
   if (prestij) {
-    const ad = AILE_ADI[prestij.family] || { tr: prestij.family, en: prestij.family, es: prestij.family, pt: prestij.family };
+    const ad = AILE_ADI[prestij.family] || { tr: prestij.family, en: prestij.family, es: prestij.family, pt: prestij.family, de: prestij.family };
     const aile = ad[code] || ad.en;
     return pickByLanguage(code, {
       tr: `${aile} · ${prestij.n}. prestij`,
       en: `${aile} · prestige ${prestij.n}`,
       es: `${aile} · prestigio ${prestij.n}`,
       pt: `${aile} · prestígio ${prestij.n}`,
+      de: `${aile} · Prestige ${prestij.n}`,
     });
   }
 
@@ -68,11 +66,11 @@ export function odulAdi(id, lang = "tr") {
 
 /** Kutlama başlığı: ödül türüne göre değişir ("Rozet kazandın" her şeye uymaz). */
 export function odulBasligi(id, lang = "tr") {
-  const L = (tr, en, es, pt) => pickByLanguage(lang, { tr, en, es, pt: pt ?? en });
-  if (BADGE_SET_BY_ID[id]) return L("Koleksiyon tamamlandı", "Collection complete", "Colección completada", "Coleção concluída");
-  if (muhurCoz(id)) return L("Dönem mührü kazandın", "Season seal earned", "Has conseguido un sello de temporada", "Você conquistou um selo de temporada");
-  if (prestijCoz(id)) return L("Prestij yükseldi", "Prestige up", "Subes de prestigio", "Você subiu de prestígio");
-  return L("Rozet kazandın", "Badge earned", "Has conseguido una insignia", "Você conquistou um emblema");
+  const L = (tr, en, es, pt, de) => pickByLanguage(lang, { tr, en, es, pt: pt ?? en, de: de ?? en });
+  if (BADGE_SET_BY_ID[id]) return L("Koleksiyon tamamlandı", "Collection complete", "Colección completada", "Coleção concluída", "Sammlung abgeschlossen");
+  if (muhurCoz(id)) return L("Dönem mührü kazandın", "Season seal earned", "Has conseguido un sello de temporada", "Você conquistou um selo de temporada", "Saison-Siegel erhalten");
+  if (prestijCoz(id)) return L("Prestij yükseldi", "Prestige up", "Subes de prestigio", "Você subiu de prestígio", "Prestige gestiegen");
+  return L("Rozet kazandın", "Badge earned", "Has conseguido una insignia", "Você conquistou um emblema", "Abzeichen erhalten");
 }
 
 // Ailenin kademe sayısı ve ZİRVE rozeti. Kutlama bildirimi rozetin şeklini

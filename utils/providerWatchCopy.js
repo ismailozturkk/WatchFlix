@@ -63,6 +63,20 @@ export const PROVIDER_WATCH_COPY = {
       "Ative “Avisar quando estiver disponível” em Configurações > Notificações para usar este filtro. Os primeiros resultados chegam às 18h da noite seguinte",
     region: "Os dados de serviços foram preparados para outra região; são atualizados na próxima verificação",
   },
+  de: {
+    section: "PLATFORM",
+    chip: "Bei meinen Plattformen",
+    chipCount: (count) => `Bei meinen Plattformen · ${count}`,
+    chipLabel: (count) => `Nur Titel, die bei meinen Plattformen verfügbar sind, ${count} Titel`,
+    ready: (yes, total) => `${yes} von ${total} Titeln sind bei den von dir gewählten Plattformen verfügbar`,
+    none: "Hier ist nichts bei den von dir gewählten Plattformen verfügbar",
+    unknown: (count) => `${count} Titel wurden noch nicht geprüft; sie erscheinen mit diesem Filter nicht`,
+    age: (days) => `Zuletzt vor ${days} Tagen geprüft`,
+    off: "Wähle zuerst deine Plattformen unter Einstellungen > Meine Abos",
+    noData:
+      "Aktiviere „Bei Verfügbarkeit benachrichtigen“ unter Einstellungen > Benachrichtigungen, um diesen Filter zu nutzen. Die ersten Ergebnisse kommen am nächsten Abend um 18 Uhr",
+    region: "Die Plattformdaten wurden für eine andere Region vorbereitet; sie werden bei der nächsten Prüfung aktualisiert",
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

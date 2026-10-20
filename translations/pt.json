@@ -1514,6 +1514,7 @@
     "filtrele": "Filtrar",
     "filtre_tarih": "Data",
     "filtre_tur": "Gênero",
+    "filtre_tur_tumunu_goster": "Mostrar todos ({{n}})",
     "eski_kayitlar": "Registros antigos",
     "herkese_acik": "Público",
     "tum_kullanicilar_profilini_gorur": "Todos os usuários podem ver seu perfil",
@@ -2966,7 +2967,16 @@
     "izin_takvim_reddedildi_ipucu": "A permissão foi negada antes; agora só pode ser ativada nas configurações do sistema.",
     "izin_takvim_artik_etkinlik": "Os eventos que você adicionou antes ({{count}} no total) continuam no seu calendário. Com a permissão desativada, o Seelogd não consegue removê-los; ative-a de novo se quiser que eles sejam removidos.",
     "izin_takvim_izin_ver": "Permitir acesso ao calendário",
-    "izin_takvim_ayarlari_ac": "Abrir configurações do sistema"
+    "izin_takvim_ayarlari_ac": "Abrir configurações do sistema",
+    "duration_hours": "{{hours}}h",
+    "duration_days": "{{days}}d",
+    "oturum_bulunamadi_tekrar_giris": "Sessão não encontrada. Entre novamente",
+    "devam_icin_sifre_gir": "Digite sua senha para continuar",
+    "profil_fotografi_ve_n_avatar": "Sua foto de perfil e {{n}} avatares",
+    "sinema_karti_paylas_baslik": "Compartilhe seu cartão de cinema",
+    "paylasim_desteklenmiyor": "Este dispositivo não oferece suporte a compartilhamento.",
+    "language_coming_soon": "Em breve",
+    "language_more_soon_hint": "Estamos trabalhando em mais idiomas"
   },
   "comments": "Comentários",
   "cineRoomJoin": {

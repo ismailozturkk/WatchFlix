@@ -4,6 +4,7 @@
 // ratings.csv ve watchlist.csv formatlarını, dizi/film ayrımını ve süre/tür alanlarını destekler.
 
 import { parseCsv } from "./csvParser";
+import { ImportError } from "./importErrors";
 
 /**
  * Verilen CSV'nin IMDb formatında olup olmadığını belirler.
@@ -44,7 +45,7 @@ export function parseImdbCsv(csvText) {
   const { headers, data } = parseCsv(csvText);
 
   if (!isImdbCsv(headers)) {
-    throw new Error("Geçerli bir IMDb CSV formatı bulunamadı.");
+    throw new ImportError("notImdbCsv", "No valid IMDb CSV format was found.");
   }
 
   const hSet = new Set(headers);

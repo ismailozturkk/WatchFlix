@@ -18,7 +18,7 @@ describe("dört favori metinleri", () => {
   });
 
   it("bilinmeyen dil İngilizceye düşer (Türkçeye DEĞİL)", () => {
-    expect(getFavoritesCopy("de")).toBe(FAVORITES_COPY.en);
+    expect(getFavoritesCopy("fr")).toBe(FAVORITES_COPY.en);
     expect(getFavoritesCopy(undefined)).toBe(FAVORITES_COPY.en);
     expect(getFavoritesCopy("tr")).toBe(FAVORITES_COPY.tr);
     expect(getFavoritesCopy("en")).toBe(FAVORITES_COPY.en);

@@ -201,7 +201,7 @@ export default function DiscoveryMediaRail({
   const [genreResolutionComplete, setGenreResolutionComplete] = useState(preset !== "topGenres");
 
   // Metinler tr/en/es; bilinmeyen dil İngilizce (utils/appLanguages.pickByLanguage).
-  const L = (tr, en, es, pt) => pickByLanguage(language, { tr, en, es, pt: pt ?? en });
+  const L = (tr, en, es, pt, de) => pickByLanguage(language, { tr, en, es, pt: pt ?? en, de: de ?? en });
   const genreNamesKey = JSON.stringify(
     [...new Set((genreNames || []).filter((name) => name && name !== "-"))].slice(0, 3),
   );
@@ -213,18 +213,18 @@ export default function DiscoveryMediaRail({
   // Tek istisna "Favori Türlerin": alt başlık kullanıcının üç türünün adı (yoksa tablodaki cümle).
   const section = useMemo(() => {
     if (preset === "subscriptions") {
-      return { title: L("Platform Favorileri", "Service Favorites", "Favoritos de tus plataformas", "Favoritos dos seus serviços") };
+      return { title: L("Platform Favorileri", "Service Favorites", "Favoritos de tus plataformas", "Favoritos dos seus serviços", "Favoriten der Dienste") };
     }
     if (preset === "hiddenGems") {
-      return { title: L("Gizli cevherler", "Hidden gems", "Joyas ocultas", "Joias escondidas") };
+      return { title: L("Gizli cevherler", "Hidden gems", "Joyas ocultas", "Joias escondidas", "Geheimtipps") };
     }
     if (preset === "topGenres") {
       return {
-        title: L("Favori Türlerin", "Favorite Genres", "Tus géneros favoritos", "Seus gêneros favoritos"),
+        title: L("Favori Türlerin", "Favorite Genres", "Tus géneros favoritos", "Seus gêneros favoritos", "Lieblingsgenres"),
         subtitle: normalizedGenreNames.join("  •  ") || undefined,
       };
     }
-    return { title: L("Yeni Beğenilenler", "Recent Favorites", "Favoritos recientes", "Favoritos recentes") };
+    return { title: L("Yeni Beğenilenler", "Recent Favorites", "Favoritos recientes", "Favoritos recentes", "Aktuelle Favoriten") };
   }, [language, normalizedGenreNames, preset]);
 
   useEffect(() => {

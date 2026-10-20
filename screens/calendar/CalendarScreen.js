@@ -91,6 +91,20 @@ LocaleConfig.locales.pt = {
   today: "Hoje",
 };
 
+LocaleConfig.locales.de = {
+  monthNames: [
+    "Januar", "Februar", "März", "April", "Mai", "Juni",
+    "Juli", "August", "September", "Oktober", "November", "Dezember",
+  ],
+  monthNamesShort: [
+    "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
+    "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
+  ],
+  dayNames: ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"],
+  dayNamesShort: ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"],
+  today: "Heute",
+};
+
 // "" = kütüphanenin varsayılanı (İngilizce). YENİ DİL: yukarıya LocaleConfig.locales.<kod> ekle.
 const applyCalendarLocale = (language) => {
   const code = normalizeAppLanguage(language);
@@ -766,7 +780,7 @@ export default function CalendarScreen({ navigation }) {
             {monthLabel}
             {" · "}
             {monthCounts.total
-              ? i18nText("autoI18n.n_etkinlik", "{{count}} etkinlik", { count: monthCounts.total })
+              ? i18nText("autoI18n.n_etkinlik", "{{n}} etkinlik", { n: monthCounts.total })
               : i18nText("autoI18n.takvim_ay_bos", "Etkinlik yok")}
           </Text>
         </View>
@@ -795,7 +809,7 @@ export default function CalendarScreen({ navigation }) {
           fallbackRadius={12}
           onPress={refreshEvents}
           disabled={isLoadingEvents}
-          accessibilityLabel={pickByLanguage(language, { tr: "Takvimi yenile", en: "Refresh calendar", es: "Actualizar calendario", pt: "Atualizar calendário" })}
+          accessibilityLabel={pickByLanguage(language, { tr: "Takvimi yenile", en: "Refresh calendar", es: "Actualizar calendario", pt: "Atualizar calendário", de: "Kalender aktualisieren" })}
         >
           {isLoadingEvents ? <ActivityIndicator size="small" color={theme.accent} /> : null}
         </GlassIconButton>

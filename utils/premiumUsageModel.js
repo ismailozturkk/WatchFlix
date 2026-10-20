@@ -38,7 +38,7 @@ export const LOW_RATIO = 0.8;
 const INFORMATIONAL = Object.freeze(new Set(["streaming_alerts"]));
 
 const pick = (copy, language) =>
-  copy?.[copyLanguage(language, ["tr", "en", "es", "pt"])] ?? copy?.en ?? copy?.tr ?? "";
+  copy?.[copyLanguage(language, ["tr", "en", "es", "pt", "de"])] ?? copy?.en ?? copy?.tr ?? "";
 
 const toCount = (value) => {
   if (value === null || value === undefined || value === "") return null;
@@ -103,15 +103,16 @@ export function formatCountdown(ms, language = "en") {
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
+  const de = normalizeAppLanguage(language) === "de";
   const totalMinutes = Math.max(1, Math.ceil((Number(ms) || 0) / 60000));
   const days = Math.floor(totalMinutes / 1440);
   const hours = Math.floor((totalMinutes % 1440) / 60);
   const minutes = totalMinutes % 60;
   const parts = [];
-  if (days > 0) parts.push(tr ? `${days} gün` : es ? `${days} d` : pt ? `${days} d` : `${days}d`);
-  if (hours > 0) parts.push(tr ? `${hours} sa` : es ? `${hours} h` : pt ? `${hours} h` : `${hours}h`);
+  if (days > 0) parts.push(tr ? `${days} gün` : es ? `${days} d` : pt ? `${days} d` : de ? `${days}d` : `${days}d`);
+  if (hours > 0) parts.push(tr ? `${hours} sa` : es ? `${hours} h` : pt ? `${hours} h` : de ? `${hours}h` : `${hours}h`);
   // Gün gösteriliyorsa dakika gürültü olur.
-  if (minutes > 0 && days === 0) parts.push(tr ? `${minutes} dk` : es ? `${minutes} min` : pt ? `${minutes} min` : `${minutes}m`);
+  if (minutes > 0 && days === 0) parts.push(tr ? `${minutes} dk` : es ? `${minutes} min` : pt ? `${minutes} min` : de ? `${minutes}m` : `${minutes}m`);
   return parts.join(" ");
 }
 
@@ -120,6 +121,7 @@ export function formatResetLabel(resetAt, now = new Date(), language = "en") {
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
+  const de = normalizeAppLanguage(language) === "de";
   const ms = resetAt.getTime() - now.getTime();
   if (ms > 2 * 86400000) {
     let date;
@@ -131,10 +133,10 @@ export function formatResetLabel(resetAt, now = new Date(), language = "en") {
     } catch {
       date = resetAt.toISOString().slice(0, 10);
     }
-    return tr ? `${date} tarihinde yenilenir` : es ? `Se restablece el ${date}` : pt ? `Redefine em ${date}` : `Resets on ${date}`;
+    return tr ? `${date} tarihinde yenilenir` : es ? `Se restablece el ${date}` : pt ? `Redefine em ${date}` : de ? `Wird am ${date} zurückgesetzt` : `Resets on ${date}`;
   }
   const left = formatCountdown(ms, language);
-  return tr ? `${left} sonra yenilenir` : es ? `Se restablece en ${left}` : pt ? `Redefine em ${left}` : `Resets in ${left}`;
+  return tr ? `${left} sonra yenilenir` : es ? `Se restablece en ${left}` : pt ? `Redefine em ${left}` : de ? `Wird in ${left} zurückgesetzt` : `Resets in ${left}`;
 }
 
 // ── Satır üretimi ────────────────────────────────────────────────────────────
@@ -167,6 +169,7 @@ export function buildUsageRow(featureId, plan, usage = {}, now = new Date(), lan
   const tr = lang === "tr";
   const es = normalizeAppLanguage(lang) === "es";
   const pt = normalizeAppLanguage(lang) === "pt";
+  const de = normalizeAppLanguage(lang) === "de";
   const current = normalizePlan(plan);
   const category = FEATURE_CATEGORIES.find((c) => c.id === definition.category) || null;
 
@@ -196,12 +199,12 @@ export function buildUsageRow(featureId, plan, usage = {}, now = new Date(), lan
     const limits = getFeatureLimit(featureId, current);
     const ai = usage.ai || null;
     const daily = meterFor({
-      label: tr ? "Bugün" : es ? "Hoy" : pt ? "Hoje" : "Today",
+      label: tr ? "Bugün" : es ? "Hoy" : pt ? "Hoje" : de ? "Heute" : "Today",
       used: ai ? ai.dailyUsed : null,
       limit: limits.daily,
     });
     const monthly = meterFor({
-      label: tr ? "Bu ay" : es ? "Este mes" : pt ? "Este mês" : "This month",
+      label: tr ? "Bu ay" : es ? "Este mes" : pt ? "Este mês" : de ? "Diesen Monat" : "This month",
       used: ai ? ai.monthlyUsed : null,
       limit: limits.monthly,
     });

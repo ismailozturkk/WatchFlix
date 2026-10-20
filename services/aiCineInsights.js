@@ -195,11 +195,24 @@ const GENRE_ALIASES = {
   documentario: "documentary",
   "ficcao cientifica": "sci-fi",
   faroeste: "western",
+  // Almanca (katlanmış, aksansız)
+  abenteuer: "adventure",
+  komodie: "comedy",
+  krimi: "crime",
+  dokumentarfilm: "documentary",
+  familie: "family",
+  historie: "history",
+  geschichte: "history",
+  musik: "music",
+  liebesfilm: "romance",
+  romanze: "romance",
+  kriegsfilm: "war",
+  krieg: "war",
 };
 
 function genreTokens(value) {
   return foldForSearch(toStr(value))
-    .split(/[&/,]|\s+ve\s+|\s+and\s+|\s+y\s+|\s+e\s+/)
+    .split(/[&/,]|\s+ve\s+|\s+and\s+|\s+y\s+|\s+e\s+|\s+und\s+/)
     .map((part) => part.trim())
     .filter(Boolean)
     .map((part) => GENRE_ALIASES[part] || part);
@@ -411,6 +424,7 @@ export function formatDuration(minutes, language = "en") {
     en: { hour: "h", minute: "m" },
     es: { hour: "h", minute: "min" },
     pt: { hour: "h", minute: "min" },
+    de: { hour: "h", minute: "m" },
   });
   if (h === 0) return `${m} ${minUnit}`;
   return m === 0 ? `${h} ${hourUnit}` : `${h} ${hourUnit} ${m} ${minUnit}`;
@@ -523,6 +537,26 @@ const FOLLOW_UP_COPY = {
     versus: "Comparar com {a}",
     movies: "Sugerir filmes",
     series: "Sugerir séries",
+  },
+  de: {
+    different: "Zeig mir andere",
+    pickOne: "Welchen soll ich schauen?",
+    shorter: "Kürzere Optionen",
+    similarTo: "Mehr wie {title}",
+    watchFirst: "Welchen zuerst?",
+    third: "Eine dritte Option",
+    makePlan: "Schauplan erstellen",
+    shortenPlan: "Plan kürzen",
+    weekend: "In ein Wochenende packen",
+    swapOne: "Einen austauschen",
+    moreLikeThis: "Mehr davon",
+    hiddenGems: "Nur Geheimtipps",
+    toPlan: "In einen Plan umwandeln",
+    similar: "Ähnliches vorschlagen",
+    pitch: "Spoilerfreier Pitch",
+    versus: "Mit {a} vergleichen",
+    movies: "Filme vorschlagen",
+    series: "Serien vorschlagen",
   },
 };
 
@@ -656,6 +690,7 @@ export function buildShareText(response, posterMap, { language = "en", appName =
     en: `${appName} · CineMatch picks`,
     es: `${appName} · recomendaciones de CineMatch`,
     pt: `${appName} · recomendações do CineMatch`,
+    de: `${appName} · CineMatch-Tipps`,
   });
   return [head, "", ...lines].join("\n");
 }
@@ -803,6 +838,7 @@ export function formatRelativeTime(timestamp, language = "en", now = Date.now())
     en: { minute: "m", hour: "h", yesterday: "1d", day: "d" },
     es: { minute: "min", hour: "h", yesterday: "ayer", day: "d" },
     pt: { minute: "min", hour: "h", yesterday: "ontem", day: "d" },
+    de: { minute: "m", hour: "h", yesterday: "1d", day: "d" },
   });
   const minutes = Math.floor((now - timestamp) / 60000);
   if (minutes < 1) return "•";

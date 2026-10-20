@@ -3,7 +3,7 @@
 // Profile / Lists / Posts / Online Status için privacy seçenekleri.
 // Tüm değerler Users/{uid}.privacy map'inde saklanır.
 
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "../../../context/ThemeContext";
 import { useUserProfile } from "../../../context/UserProfileContext";
+import { useLanguage } from "../../../context/LanguageContext";
 import Toast from "@components/AppToast";
 import { i18nText } from "../../../utils/i18nText";
 import ScreenDecor from "../../../components/ScreenDecor";
@@ -21,7 +22,8 @@ import BackButton from "@components/BackButton";
 import GlassTouchable from "../../../components/common/GlassTouchable";
 
 
-const OPTIONS = {
+// Etiketler çizim anında çözülür: modül yüklenirken dondurulursa dil değişince eski dilde kalır.
+const buildOptions = () => ({
   profile: [
     { value: "public",  label: i18nText("autoI18n.herkese_acik", "Herkese Açık"), icon: "earth", desc: i18nText("autoI18n.tum_kullanicilar_profilini_gorur", "Tüm kullanıcılar profilini görür") },
     { value: "friends", label: i18nText("autoI18n.arkadaslar", "Arkadaşlar"),   icon: "people", desc: i18nText("autoI18n.sadece_arkadaslarin_gorur", "Sadece arkadaşların görür") },
@@ -40,9 +42,9 @@ const OPTIONS = {
     { value: "friends",  label: i18nText("autoI18n.arkadaslar", "Arkadaşlar"), icon: "people", desc: i18nText("autoI18n.sadece_arkadaslarin_gorur", "Sadece arkadaşların görür") },
     { value: "none",     label: i18nText("autoI18n.hic_kimse", "Hiç Kimse"),  icon: "eye-off", desc: i18nText("autoI18n.hic_kimse_online_oldugunu_gormez", "Hiç kimse online olduğunu görmez") },
   ],
-};
+});
 
-const SECTIONS = [
+const buildSections = () => [
   { key: "profile",      title: i18nText("autoI18n.profil_gorunurlugu", "Profil Görünürlüğü"),     icon: "person-circle" },
   { key: "lists",        title: i18nText("autoI18n.liste_gorunurlugu", "Liste Görünürlüğü"),      icon: "list" },
   { key: "onlineStatus", title: i18nText("autoI18n.cevrimici_durumu", "Çevrimiçi Durumu"),        icon: "ellipse" },
@@ -94,6 +96,9 @@ const PrivacyOption = memo(function PrivacyOption({
 export default function PrivacySettingsScreen({ navigation }) {
   const { theme } = useTheme();
   const { privacy, updatePrivacy } = useUserProfile();
+  const { language } = useLanguage();
+  const OPTIONS = useMemo(buildOptions, [language]);
+  const SECTIONS = useMemo(buildSections, [language]);
 
   const handleChange = useCallback(
     async (key, value) => {

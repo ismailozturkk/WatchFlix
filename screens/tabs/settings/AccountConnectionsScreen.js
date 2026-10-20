@@ -51,6 +51,7 @@ export default function AccountConnectionsScreen() {
   const tr = language === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
+  const de = normalizeAppLanguage(language) === "de";
   const [busyAction, setBusyAction] = useState(null);
   const [revision, setRevision] = useState(0);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -91,13 +92,13 @@ export default function AccountConnectionsScreen() {
       if (!result.cancelled) {
         Toast.show({
           type: "success",
-          text1: tr ? "Google hesabı bağlandı" : es ? "Cuenta de Google vinculada" : pt ? "Conta do Google vinculada" : "Google account connected",
+          text1: tr ? "Google hesabı bağlandı" : es ? "Cuenta de Google vinculada" : pt ? "Conta do Google vinculada" : de ? "Google-Konto verknüpft" : "Google account connected",
         });
       }
     } catch (error) {
       if (error?.code === GoogleAuthCode.CANCELLED) return;
       appAlert(
-        tr ? "Google hesabı bağlanamadı" : es ? "No se pudo vincular Google" : pt ? "Não foi possível vincular o Google" : "Could not connect Google",
+        tr ? "Google hesabı bağlanamadı" : es ? "No se pudo vincular Google" : pt ? "Não foi possível vincular o Google" : de ? "Google konnte nicht verknüpft werden" : "Could not connect Google",
         describeGoogleAuthError(error, language),
         undefined,
         { type: "error" }
@@ -119,20 +120,20 @@ export default function AccountConnectionsScreen() {
       // NOT: Burada "önce e-posta ve şifre ekle" DEMİYORUZ — uygulamada şifre
       // ekleme akışı yok, o metin kullanıcıyı çıkmaz sokağa gönderiyordu.
       appAlert(
-        tr ? "Bağlantı kaldırılamaz" : es ? "No se puede desvincular" : pt ? "Não é possível desvincular" : "Cannot disconnect",
-        tr ? "Google şu anda hesabındaki tek giriş yöntemi. Kaldırılırsa hesabına bir daha giriş yapamazsın." : es ? "Google es el único método de inicio de sesión de tu cuenta. Si lo quitas, te quedarás sin acceso." : pt ? "O Google é o único método de login da sua conta. Se você removê-lo, ficará sem acesso." : "Google is the only sign-in method on your account. Removing it would lock you out.",
+        tr ? "Bağlantı kaldırılamaz" : es ? "No se puede desvincular" : pt ? "Não é possível desvincular" : de ? "Trennen nicht möglich" : "Cannot disconnect",
+        tr ? "Google şu anda hesabındaki tek giriş yöntemi. Kaldırılırsa hesabına bir daha giriş yapamazsın." : es ? "Google es el único método de inicio de sesión de tu cuenta. Si lo quitas, te quedarás sin acceso." : pt ? "O Google é o único método de login da sua conta. Se você removê-lo, ficará sem acesso." : de ? "Google ist die einzige Anmeldemethode deines Kontos. Wenn du es entfernst, sperrst du dich aus." : "Google is the only sign-in method on your account. Removing it would lock you out.",
         undefined,
         { type: "warning" }
       );
       return;
     }
     appAlert(
-      tr ? "Google bağlantısı kaldırılsın mı?" : es ? "¿Desvincular Google?" : pt ? "Desvincular o Google?" : "Disconnect Google?",
-      tr ? "Google ile giriş artık kullanılamayacak." : es ? "Ya no podrás iniciar sesión con Google." : pt ? "Você não poderá mais entrar com o Google." : "You will no longer be able to sign in with Google.",
+      tr ? "Google bağlantısı kaldırılsın mı?" : es ? "¿Desvincular Google?" : pt ? "Desvincular o Google?" : de ? "Google trennen?" : "Disconnect Google?",
+      tr ? "Google ile giriş artık kullanılamayacak." : es ? "Ya no podrás iniciar sesión con Google." : pt ? "Você não poderá mais entrar com o Google." : de ? "Du kannst dich nicht mehr mit Google anmelden." : "You will no longer be able to sign in with Google.",
       [
-        { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : "Cancel", style: "cancel" },
+        { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : de ? "Abbrechen" : "Cancel", style: "cancel" },
         {
-          text: tr ? "Bağlantıyı kaldır" : es ? "Desvincular" : pt ? "Desvincular" : "Disconnect",
+          text: tr ? "Bağlantıyı kaldır" : es ? "Desvincular" : pt ? "Desvincular" : de ? "Trennen" : "Disconnect",
           style: "destructive",
           onPress: async () => {
             setBusyAction("google");
@@ -140,11 +141,11 @@ export default function AccountConnectionsScreen() {
               await unlinkGoogleAccount();
               Toast.show({
                 type: "success",
-                text1: tr ? "Google bağlantısı kaldırıldı" : es ? "Google desvinculado" : pt ? "Google desvinculado" : "Google disconnected",
+                text1: tr ? "Google bağlantısı kaldırıldı" : es ? "Google desvinculado" : pt ? "Google desvinculado" : de ? "Google getrennt" : "Google disconnected",
               });
             } catch (error) {
               appAlert(
-                tr ? "İşlem başarısız" : es ? "La acción ha fallado" : pt ? "A ação falhou" : "Action failed",
+                tr ? "İşlem başarısız" : es ? "La acción ha fallado" : pt ? "A ação falhou" : de ? "Aktion fehlgeschlagen" : "Action failed",
                 describeGoogleAuthError(error, language),
                 undefined,
                 { type: "error" }
@@ -163,20 +164,20 @@ export default function AccountConnectionsScreen() {
     if (busy || !appleLinked) return;
     if (providers.length <= 1) {
       appAlert(
-        tr ? "Bağlantı kaldırılamaz" : es ? "No se puede desvincular" : pt ? "Não é possível desvincular" : "Cannot disconnect",
-        tr ? "Apple şu anda hesabındaki tek giriş yöntemi. Kaldırılırsa hesabına bir daha giriş yapamazsın." : es ? "Apple es el único método de inicio de sesión de tu cuenta. Si lo quitas, te quedarás sin acceso." : pt ? "A Apple é o único método de login da sua conta. Se você removê-la, ficará sem acesso." : "Apple is the only sign-in method on your account. Removing it would lock you out.",
+        tr ? "Bağlantı kaldırılamaz" : es ? "No se puede desvincular" : pt ? "Não é possível desvincular" : de ? "Trennen nicht möglich" : "Cannot disconnect",
+        tr ? "Apple şu anda hesabındaki tek giriş yöntemi. Kaldırılırsa hesabına bir daha giriş yapamazsın." : es ? "Apple es el único método de inicio de sesión de tu cuenta. Si lo quitas, te quedarás sin acceso." : pt ? "A Apple é o único método de login da sua conta. Se você removê-la, ficará sem acesso." : de ? "Apple ist die einzige Anmeldemethode deines Kontos. Wenn du es entfernst, sperrst du dich aus." : "Apple is the only sign-in method on your account. Removing it would lock you out.",
         undefined,
         { type: "warning" },
       );
       return;
     }
     appAlert(
-      tr ? "Apple bağlantısı kaldırılsın mı?" : es ? "¿Desvincular Apple?" : pt ? "Desvincular a Apple?" : "Disconnect Apple?",
-      tr ? "Apple ile giriş artık bu Seelogd hesabında kullanılamayacak." : es ? "Iniciar sesión con Apple dejará de funcionar para esta cuenta de Seelogd." : pt ? "Entrar com a Apple deixará de funcionar para esta conta do Seelogd." : "Sign in with Apple will no longer work for this Seelogd account.",
+      tr ? "Apple bağlantısı kaldırılsın mı?" : es ? "¿Desvincular Apple?" : pt ? "Desvincular a Apple?" : de ? "Apple trennen?" : "Disconnect Apple?",
+      tr ? "Apple ile giriş artık bu Seelogd hesabında kullanılamayacak." : es ? "Iniciar sesión con Apple dejará de funcionar para esta cuenta de Seelogd." : pt ? "Entrar com a Apple deixará de funcionar para esta conta do Seelogd." : de ? "Die Anmeldung mit Apple funktioniert für dieses Seelogd-Konto nicht mehr." : "Sign in with Apple will no longer work for this Seelogd account.",
       [
-        { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : "Cancel", style: "cancel" },
+        { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : de ? "Abbrechen" : "Cancel", style: "cancel" },
         {
-          text: tr ? "Bağlantıyı kaldır" : es ? "Desvincular" : pt ? "Desvincular" : "Disconnect",
+          text: tr ? "Bağlantıyı kaldır" : es ? "Desvincular" : pt ? "Desvincular" : de ? "Trennen" : "Disconnect",
           style: "destructive",
           onPress: async () => {
             setBusyAction("apple");
@@ -184,11 +185,11 @@ export default function AccountConnectionsScreen() {
               await unlinkAppleAccount();
               Toast.show({
                 type: "success",
-                text1: tr ? "Apple bağlantısı kaldırıldı" : es ? "Apple desvinculado" : pt ? "Apple desvinculada" : "Apple disconnected",
+                text1: tr ? "Apple bağlantısı kaldırıldı" : es ? "Apple desvinculado" : pt ? "Apple desvinculada" : de ? "Apple getrennt" : "Apple disconnected",
               });
             } catch (error) {
               appAlert(
-                tr ? "İşlem başarısız" : es ? "La acción ha fallado" : pt ? "A ação falhou" : "Action failed",
+                tr ? "İşlem başarısız" : es ? "La acción ha fallado" : pt ? "A ação falhou" : de ? "Aktion fehlgeschlagen" : "Action failed",
                 describeAppleAuthError(error, language),
                 undefined,
                 { type: "error" },
@@ -206,24 +207,24 @@ export default function AccountConnectionsScreen() {
   const connectApple = () => {
     if (busy || appleLinked || !appleAvailable) return;
     appAlert(
-      tr ? "Apple hesabını bağla" : es ? "Vincular cuenta de Apple" : pt ? "Vincular conta da Apple" : "Connect Apple account",
-      tr ? "Devam edersen Apple hesabındaki kimlik bilgilerini mevcut Seelogd profilinle ilişkilendirmeyi onaylarsın. Profilin ve mevcut verilerin korunur." : es ? "Al continuar, aceptas asociar tu identidad de Apple a tu perfil de Seelogd actual. Tu perfil y tus datos no cambian." : pt ? "Ao continuar, você aceita associar sua identidade da Apple ao seu perfil atual do Seelogd. Seu perfil e seus dados não mudam." : "By continuing, you consent to associating your Apple identity with your existing Seelogd profile. Your profile and existing data stay intact.",
+      tr ? "Apple hesabını bağla" : es ? "Vincular cuenta de Apple" : pt ? "Vincular conta da Apple" : de ? "Apple-Konto verknüpfen" : "Connect Apple account",
+      tr ? "Devam edersen Apple hesabındaki kimlik bilgilerini mevcut Seelogd profilinle ilişkilendirmeyi onaylarsın. Profilin ve mevcut verilerin korunur." : es ? "Al continuar, aceptas asociar tu identidad de Apple a tu perfil de Seelogd actual. Tu perfil y tus datos no cambian." : pt ? "Ao continuar, você aceita associar sua identidade da Apple ao seu perfil atual do Seelogd. Seu perfil e seus dados não mudam." : de ? "Wenn du fortfährst, stimmst du zu, deine Apple-Identität mit deinem bestehenden Seelogd-Profil zu verknüpfen. Dein Profil und deine vorhandenen Daten bleiben unverändert." : "By continuing, you consent to associating your Apple identity with your existing Seelogd profile. Your profile and existing data stay intact.",
       [
-        { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : "Cancel", style: "cancel" },
+        { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : de ? "Abbrechen" : "Cancel", style: "cancel" },
         {
-          text: tr ? "Devam et" : es ? "Continuar" : pt ? "Continuar" : "Continue",
+          text: tr ? "Devam et" : es ? "Continuar" : pt ? "Continuar" : de ? "Weiter" : "Continue",
           onPress: async () => {
             setBusyAction("apple");
             try {
               await linkAppleAccount();
               Toast.show({
                 type: "success",
-                text1: tr ? "Apple hesabı bağlandı" : es ? "Cuenta de Apple vinculada" : pt ? "Conta da Apple vinculada" : "Apple account connected",
+                text1: tr ? "Apple hesabı bağlandı" : es ? "Cuenta de Apple vinculada" : pt ? "Conta da Apple vinculada" : de ? "Apple-Konto verknüpft" : "Apple account connected",
               });
             } catch (error) {
               if (error?.code === AppleAuthCode.CANCELLED) return;
               appAlert(
-                tr ? "Apple hesabı bağlanamadı" : es ? "No se pudo vincular Apple" : pt ? "Não foi possível vincular a Apple" : "Could not connect Apple",
+                tr ? "Apple hesabı bağlanamadı" : es ? "No se pudo vincular Apple" : pt ? "Não foi possível vincular a Apple" : de ? "Apple konnte nicht verknüpft werden" : "Could not connect Apple",
                 describeAppleAuthError(error, language),
                 undefined,
                 { type: "error" },
@@ -249,12 +250,12 @@ export default function AccountConnectionsScreen() {
       refresh();
       Toast.show({
         type: "success",
-        text1: tr ? "Parola ile giriş etkinleştirildi" : es ? "Inicio de sesión con contraseña activado" : pt ? "Login com senha ativado" : "Password sign-in enabled",
-        text2: tr ? "Artık e-posta adresin ve parolanla da giriş yapabilirsin." : es ? "Ahora también puedes iniciar sesión con tu correo y tu contraseña." : pt ? "Agora você também pode entrar com seu e-mail e sua senha." : "You can now also sign in with your email and password.",
+        text1: tr ? "Parola ile giriş etkinleştirildi" : es ? "Inicio de sesión con contraseña activado" : pt ? "Login com senha ativado" : de ? "Passwort-Anmeldung aktiviert" : "Password sign-in enabled",
+        text2: tr ? "Artık e-posta adresin ve parolanla da giriş yapabilirsin." : es ? "Ahora también puedes iniciar sesión con tu correo y tu contraseña." : pt ? "Agora você também pode entrar com seu e-mail e sua senha." : de ? "Du kannst dich jetzt auch mit deiner E-Mail-Adresse und deinem Passwort anmelden." : "You can now also sign in with your email and password.",
       });
     } catch (error) {
       appAlert(
-        tr ? "Parola eklenemedi" : es ? "No se pudo añadir la contraseña" : pt ? "Não foi possível adicionar a senha" : "Could not add password",
+        tr ? "Parola eklenemedi" : es ? "No se pudo añadir la contraseña" : pt ? "Não foi possível adicionar a senha" : de ? "Passwort konnte nicht hinzugefügt werden" : "Could not add password",
         describeAccountConnectionError(error, language),
         undefined,
         { type: "error" },
@@ -267,23 +268,23 @@ export default function AccountConnectionsScreen() {
   const offerPasswordReset = () => {
     if (busy || !passwordLinked) return;
     appAlert(
-      tr ? "Parolanı değiştir" : es ? "Cambia tu contraseña" : pt ? "Altere sua senha" : "Change your password",
-      tr ? `${user?.email || ""} adresine güvenli parola yenileme bağlantısı gönderilecek.` : es ? `Se enviará un enlace seguro para restablecer la contraseña a ${user?.email || "tu correo"}.` : pt ? `Um link seguro para redefinir a senha será enviado para ${user?.email || "seu e-mail"}.` : `A secure password reset link will be sent to ${user?.email || "your email"}.`,
+      tr ? "Parolanı değiştir" : es ? "Cambia tu contraseña" : pt ? "Altere sua senha" : de ? "Passwort ändern" : "Change your password",
+      tr ? `${user?.email || ""} adresine güvenli parola yenileme bağlantısı gönderilecek.` : es ? `Se enviará un enlace seguro para restablecer la contraseña a ${user?.email || "tu correo"}.` : pt ? `Um link seguro para redefinir a senha será enviado para ${user?.email || "seu e-mail"}.` : de ? `Ein sicherer Link zum Zurücksetzen des Passworts wird an ${user?.email || "deine E-Mail-Adresse"} gesendet.` : `A secure password reset link will be sent to ${user?.email || "your email"}.`,
       [
-        { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : "Cancel", style: "cancel" },
+        { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : de ? "Abbrechen" : "Cancel", style: "cancel" },
         {
-          text: tr ? "Bağlantıyı gönder" : es ? "Enviar enlace" : pt ? "Enviar link" : "Send link",
+          text: tr ? "Bağlantıyı gönder" : es ? "Enviar enlace" : pt ? "Enviar link" : de ? "Link senden" : "Send link",
           onPress: async () => {
             setBusyAction("reset");
             try {
               await sendCurrentUserPasswordReset();
               Toast.show({
                 type: "success",
-                text1: tr ? "Parola yenileme e-postası gönderildi" : es ? "Correo de restablecimiento enviado" : pt ? "E-mail de redefinição enviado" : "Password reset email sent",
+                text1: tr ? "Parola yenileme e-postası gönderildi" : es ? "Correo de restablecimiento enviado" : pt ? "E-mail de redefinição enviado" : de ? "E-Mail zum Zurücksetzen des Passworts gesendet" : "Password reset email sent",
               });
             } catch (error) {
               appAlert(
-                tr ? "E-posta gönderilemedi" : es ? "No se pudo enviar el correo" : pt ? "Não foi possível enviar o e-mail" : "Could not send email",
+                tr ? "E-posta gönderilemedi" : es ? "No se pudo enviar el correo" : pt ? "Não foi possível enviar o e-mail" : de ? "E-Mail konnte nicht gesendet werden" : "Could not send email",
                 describeAccountConnectionError(error, language),
                 undefined,
                 { type: "error" },
@@ -324,10 +325,10 @@ export default function AccountConnectionsScreen() {
 
   return (
     <SettingsSubScreen
-      title={tr ? "Hesap bağlantıları" : es ? "Cuentas vinculadas" : pt ? "Contas vinculadas" : "Account connections"}
+      title={tr ? "Hesap bağlantıları" : es ? "Cuentas vinculadas" : pt ? "Contas vinculadas" : de ? "Kontoverknüpfungen" : "Account connections"}
     >
       <SectionLabel color={C.muted}>
-        {tr ? "HESABIN" : es ? "TU CUENTA" : pt ? "SUA CONTA" : "YOUR ACCOUNT"}
+        {tr ? "HESABIN" : es ? "TU CUENTA" : pt ? "SUA CONTA" : de ? "DEIN KONTO" : "YOUR ACCOUNT"}
       </SectionLabel>
       <GlassBox role="card"
         style={[
@@ -340,29 +341,29 @@ export default function AccountConnectionsScreen() {
         </View>
         <View style={styles.identityText}>
           <Text style={[styles.identityName, { color: C.text }]} numberOfLines={1}>
-            {user?.displayName || (tr ? "Seelogd hesabı" : es ? "Cuenta de Seelogd" : pt ? "Conta do Seelogd" : "Seelogd account")}
+            {user?.displayName || (tr ? "Seelogd hesabı" : es ? "Cuenta de Seelogd" : pt ? "Conta do Seelogd" : de ? "Seelogd-Konto" : "Seelogd account")}
           </Text>
           <Text style={[styles.identityEmail, { color: C.muted }]} numberOfLines={1}>
-            {user?.email || (tr ? "E-posta bilgisi yok" : es ? "Sin correo electrónico" : pt ? "Sem e-mail" : "No email available")}
+            {user?.email || (tr ? "E-posta bilgisi yok" : es ? "Sin correo electrónico" : pt ? "Sem e-mail" : de ? "Keine E-Mail-Adresse verfügbar" : "No email available")}
           </Text>
           <View style={styles.identityMeta}>
             <View style={[styles.miniBadge, { backgroundColor: C.iconGreen }]}>
               <AppIcon family="Ionicons" name="shield-checkmark" size={10} color={C.green} />
               <Text style={[styles.miniBadgeText, { color: C.green }]}>
                 {user?.emailVerified
-                  ? tr ? "Doğrulandı" : es ? "Verificado" : pt ? "Verificado" : "Verified"
-                  : tr ? "Oturum açık" : es ? "Sesión iniciada" : pt ? "Sessão iniciada" : "Signed in"}
+                  ? tr ? "Doğrulandı" : es ? "Verificado" : pt ? "Verificado" : de ? "Bestätigt" : "Verified"
+                  : tr ? "Oturum açık" : es ? "Sesión iniciada" : pt ? "Sessão iniciada" : de ? "Angemeldet" : "Signed in"}
               </Text>
             </View>
             <Text style={[styles.methodCount, { color: C.muted }]}>
-              {tr ? `${providerCount} giriş yöntemi` : es ? `${providerCount} ${providerCount === 1 ? "método" : "métodos"} de inicio de sesión` : pt ? `${providerCount} ${providerCount === 1 ? "método" : "métodos"} de login` : `${providerCount} sign-in ${providerCount === 1 ? "method" : "methods"}`}
+              {tr ? `${providerCount} giriş yöntemi` : es ? `${providerCount} ${providerCount === 1 ? "método" : "métodos"} de inicio de sesión` : pt ? `${providerCount} ${providerCount === 1 ? "método" : "métodos"} de login` : de ? `${providerCount} ${providerCount === 1 ? "Anmeldemethode" : "Anmeldemethoden"}` : `${providerCount} sign-in ${providerCount === 1 ? "method" : "methods"}`}
             </Text>
           </View>
         </View>
       </GlassBox>
 
       <SectionLabel color={C.muted}>
-        {tr ? "GİRİŞ YÖNTEMLERİ" : es ? "MÉTODOS DE INICIO DE SESIÓN" : pt ? "MÉTODOS DE LOGIN" : "SIGN-IN METHODS"}
+        {tr ? "GİRİŞ YÖNTEMLERİ" : es ? "MÉTODOS DE INICIO DE SESIÓN" : pt ? "MÉTODOS DE LOGIN" : de ? "ANMELDEMETHODEN" : "SIGN-IN METHODS"}
       </SectionLabel>
       <View
         style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}
@@ -375,14 +376,14 @@ export default function AccountConnectionsScreen() {
           title="Google"
           subtitle={
             googleLinked
-              ? tr ? `${providerDetails["google.com"]?.email || user?.email || "Google hesabı"} · bağlı` : es ? `${providerDetails["google.com"]?.email || user?.email || "Cuenta de Google"} · vinculada` : pt ? `${providerDetails["google.com"]?.email || user?.email || "Conta do Google"} · vinculada` : `${providerDetails["google.com"]?.email || user?.email || "Google account"} · connected`
-              : tr ? "Daha hızlı ve güvenli giriş yap" : es ? "Inicia sesión más rápido y de forma segura" : pt ? "Entre mais rápido e com segurança" : "Sign in faster and securely"
+              ? tr ? `${providerDetails["google.com"]?.email || user?.email || "Google hesabı"} · bağlı` : es ? `${providerDetails["google.com"]?.email || user?.email || "Cuenta de Google"} · vinculada` : pt ? `${providerDetails["google.com"]?.email || user?.email || "Conta do Google"} · vinculada` : de ? `${providerDetails["google.com"]?.email || user?.email || "Google-Konto"} · verknüpft` : `${providerDetails["google.com"]?.email || user?.email || "Google account"} · connected`
+              : tr ? "Daha hızlı ve güvenli giriş yap" : es ? "Inicia sesión más rápido y de forma segura" : pt ? "Entre mais rápido e com segurança" : de ? "Melde dich schneller und sicher an" : "Sign in faster and securely"
           }
           onPress={googleLinked ? disconnectGoogle : connectGoogle}
           right={
             statusPill(googleLinked, "google", {
-              linked: tr ? "Bağlı" : es ? "Vinculado" : pt ? "Vinculado" : "Connected",
-              unlinked: tr ? "Bağla" : es ? "Vincular" : pt ? "Vincular" : "Connect",
+              linked: tr ? "Bağlı" : es ? "Vinculado" : pt ? "Vinculado" : de ? "Verknüpft" : "Connected",
+              unlinked: tr ? "Bağla" : es ? "Vincular" : pt ? "Vincular" : de ? "Verknüpfen" : "Connect",
             })
           }
         />
@@ -394,21 +395,17 @@ export default function AccountConnectionsScreen() {
           title="Apple"
           subtitle={
             appleLinked
-              ? tr ? `${providerDetails["apple.com"]?.email || user?.email || "Apple hesabı"} · bağlı` : es ? `${providerDetails["apple.com"]?.email || user?.email || "Cuenta de Apple"} · vinculada` : pt ? `${providerDetails["apple.com"]?.email || user?.email || "Conta da Apple"} · vinculada` : `${providerDetails["apple.com"]?.email || user?.email || "Apple account"} · connected`
-              : tr
-              ? appleAvailable
-                ? "Apple hesabını bağla"
-                : "Apple bağlantısı iPhone veya iPad üzerinden yapılabilir"
+              ? tr ? `${providerDetails["apple.com"]?.email || user?.email || "Apple hesabı"} · bağlı` : es ? `${providerDetails["apple.com"]?.email || user?.email || "Cuenta de Apple"} · vinculada` : pt ? `${providerDetails["apple.com"]?.email || user?.email || "Conta da Apple"} · vinculada` : de ? `${providerDetails["apple.com"]?.email || user?.email || "Apple-Konto"} · verknüpft` : `${providerDetails["apple.com"]?.email || user?.email || "Apple account"} · connected`
               : appleAvailable
-                ? "Connect your Apple account"
-                : "Apple can be connected from an iPhone or iPad"
+                ? tr ? "Apple hesabını bağla" : es ? "Conecta tu cuenta de Apple" : pt ? "Conecte sua conta da Apple" : de ? "Verknüpfe dein Apple-Konto" : "Connect your Apple account"
+                : tr ? "Apple bağlantısı iPhone veya iPad üzerinden yapılabilir" : es ? "Apple se puede conectar desde un iPhone o un iPad" : pt ? "A Apple pode ser conectada em um iPhone ou iPad" : de ? "Apple lässt sich von einem iPhone oder iPad aus verknüpfen" : "Apple can be connected from an iPhone or iPad"
           }
           onPress={appleLinked ? disconnectApple : appleAvailable ? connectApple : undefined}
           right={statusPill(appleLinked, "apple", {
-            linked: tr ? "Bağlı" : es ? "Vinculado" : pt ? "Vinculado" : "Connected",
+            linked: tr ? "Bağlı" : es ? "Vinculado" : pt ? "Vinculado" : de ? "Verknüpft" : "Connected",
             unlinked: appleAvailable
-              ? tr ? "Bağla" : es ? "Vincular" : pt ? "Vincular" : "Connect"
-              : Platform.OS === "ios" ? tr ? "Kullanılamıyor" : es ? "No disponible" : pt ? "Indisponível" : "Unavailable" : tr ? "iOS gerekli" : es ? "Requiere iOS" : pt ? "Requer iOS" : "iOS required",
+              ? tr ? "Bağla" : es ? "Vincular" : pt ? "Vincular" : de ? "Verknüpfen" : "Connect"
+              : Platform.OS === "ios" ? tr ? "Kullanılamıyor" : es ? "No disponible" : pt ? "Indisponível" : de ? "Nicht verfügbar" : "Unavailable" : tr ? "iOS gerekli" : es ? "Requiere iOS" : pt ? "Requer iOS" : de ? "iOS erforderlich" : "iOS required",
           })}
         />
         <SettingRow
@@ -416,18 +413,18 @@ export default function AccountConnectionsScreen() {
           iconBg={C.iconBlue}
           iconColor={C.blue}
           iconName="mail-outline"
-          title={tr ? "E-posta ve şifre" : es ? "Correo y contraseña" : pt ? "E-mail e senha" : "Email and password"}
+          title={tr ? "E-posta ve şifre" : es ? "Correo y contraseña" : pt ? "E-mail e senha" : de ? "E-Mail und Passwort" : "Email and password"}
           subtitle={
             passwordLinked
-              ? tr ? "Etkin" : es ? "Activo" : pt ? "Ativo" : "Active"
-              : tr ? "Ayarlı değil" : es ? "Sin configurar" : pt ? "Não configurado" : "Not configured"
+              ? tr ? "Etkin" : es ? "Activo" : pt ? "Ativo" : de ? "Aktiv" : "Active"
+              : tr ? "Ayarlı değil" : es ? "Sin configurar" : pt ? "Não configurado" : de ? "Nicht eingerichtet" : "Not configured"
           }
           onPress={togglePasswordPanel}
           last={!passwordOpen}
           right={
             statusPill(passwordLinked, passwordLinked ? "reset" : "password", {
-              linked: tr ? "Değiştir" : es ? "Cambiar" : pt ? "Alterar" : "Change",
-              unlinked: tr ? "Parola ekle" : es ? "Añadir contraseña" : pt ? "Adicionar senha" : "Add password",
+              linked: tr ? "Değiştir" : es ? "Cambiar" : pt ? "Alterar" : de ? "Ändern" : "Change",
+              unlinked: tr ? "Parola ekle" : es ? "Añadir contraseña" : pt ? "Adicionar senha" : de ? "Passwort hinzufügen" : "Add password",
             })
           }
         />
@@ -439,10 +436,10 @@ export default function AccountConnectionsScreen() {
             ]}
           >
             <Text style={[styles.passwordTitle, { color: C.text }]}>
-              {tr ? "E-posta ile girişi etkinleştir" : es ? "Activar el inicio de sesión con correo" : pt ? "Ativar o login com e-mail" : "Enable email sign-in"}
+              {tr ? "E-posta ile girişi etkinleştir" : es ? "Activar el inicio de sesión con correo" : pt ? "Ativar o login com e-mail" : de ? "E-Mail-Anmeldung aktivieren" : "Enable email sign-in"}
             </Text>
             <Text style={[styles.passwordDescription, { color: C.muted }]}>
-              {tr ? `${user?.email || "Hesabın"} için bir parola oluştur. Google bağlantın korunur; iki yöntem de aynı profile açılır.` : es ? `Crea una contraseña para ${user?.email || "tu cuenta"}. Google sigue vinculado y ambos métodos abren el mismo perfil.` : pt ? `Crie uma senha para ${user?.email || "sua conta"}. O Google continua vinculado e os dois métodos abrem o mesmo perfil.` : `Create a password for ${user?.email || "your account"}. Google stays connected and both methods open the same profile.`}
+              {tr ? `${user?.email || "Hesabın"} için bir parola oluştur. Google bağlantın korunur; iki yöntem de aynı profile açılır.` : es ? `Crea una contraseña para ${user?.email || "tu cuenta"}. Google sigue vinculado y ambos métodos abren el mismo perfil.` : pt ? `Crie uma senha para ${user?.email || "sua conta"}. O Google continua vinculado e os dois métodos abrem o mesmo perfil.` : de ? `Erstelle ein Passwort für ${user?.email || "dein Konto"}. Google bleibt verknüpft und beide Methoden öffnen dasselbe Profil.` : `Create a password for ${user?.email || "your account"}. Google stays connected and both methods open the same profile.`}
             </Text>
 
             <GlassBox role="field" style={[styles.inputShell, { borderColor: C.border, backgroundColor: C.card }]}>
@@ -451,7 +448,7 @@ export default function AccountConnectionsScreen() {
                 value={password}
                 onChangeText={setPassword}
                 maxLength={128}
-                placeholder={tr ? "Yeni parola" : es ? "Contraseña nueva" : pt ? "Nova senha" : "New password"}
+                placeholder={tr ? "Yeni parola" : es ? "Contraseña nueva" : pt ? "Nova senha" : de ? "Neues Passwort" : "New password"}
                 placeholderTextColor={C.muted}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
@@ -475,7 +472,7 @@ export default function AccountConnectionsScreen() {
                 value={passwordAgain}
                 onChangeText={setPasswordAgain}
                 maxLength={128}
-                placeholder={tr ? "Parolayı tekrar yaz" : es ? "Repite la contraseña" : pt ? "Repita a senha" : "Repeat password"}
+                placeholder={tr ? "Parolayı tekrar yaz" : es ? "Repite la contraseña" : pt ? "Repita a senha" : de ? "Passwort wiederholen" : "Repeat password"}
                 placeholderTextColor={C.muted}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
@@ -490,12 +487,12 @@ export default function AccountConnectionsScreen() {
             <View style={styles.passwordRules}>
               <Rule
                 ok={password.length >= 6}
-                text={tr ? "En az 6 karakter" : es ? "Mínimo 6 caracteres" : pt ? "Mínimo de 6 caracteres" : "At least 6 characters"}
+                text={tr ? "En az 6 karakter" : es ? "Mínimo 6 caracteres" : pt ? "Mínimo de 6 caracteres" : de ? "Mindestens 6 Zeichen" : "At least 6 characters"}
                 colors={C}
               />
               <Rule
                 ok={password.length > 0 && password === passwordAgain}
-                text={tr ? "Parolalar eşleşiyor" : es ? "Las contraseñas coinciden" : pt ? "As senhas coincidem" : "Passwords match"}
+                text={tr ? "Parolalar eşleşiyor" : es ? "Las contraseñas coinciden" : pt ? "As senhas coincidem" : de ? "Passwörter stimmen überein" : "Passwords match"}
                 colors={C}
               />
             </View>
@@ -518,7 +515,7 @@ export default function AccountConnectionsScreen() {
                 <>
                   <AppIcon family="Ionicons" name="key-outline" size={16} color="#fff" />
                   <Text style={styles.primaryButtonText}>
-                    {tr ? "Parolayı ekle" : es ? "Añadir contraseña" : pt ? "Adicionar senha" : "Add password"}
+                    {tr ? "Parolayı ekle" : es ? "Añadir contraseña" : pt ? "Adicionar senha" : de ? "Passwort hinzufügen" : "Add password"}
                   </Text>
                 </>
               )}
@@ -528,7 +525,7 @@ export default function AccountConnectionsScreen() {
       </View>
 
       <Text style={[styles.note, { color: C.muted }]}>
-        {tr ? "Bağlı giriş yöntemlerinden herhangi biriyle aynı Seelogd profiline erişebilirsin. Tek giriş yöntemi, hesaba erişimini kaybetmemen için kaldırılamaz." : es ? "Cualquier método vinculado abre el mismo perfil de Seelogd. Tu único método de inicio de sesión no se puede quitar, para proteger el acceso a tu cuenta." : pt ? "Qualquer método vinculado abre o mesmo perfil do Seelogd. Seu único método de login não pode ser removido, para proteger o acesso à sua conta." : "Any connected method opens the same Seelogd profile. Your only sign-in method cannot be removed to protect account access."}
+        {tr ? "Bağlı giriş yöntemlerinden herhangi biriyle aynı Seelogd profiline erişebilirsin. Tek giriş yöntemi, hesaba erişimini kaybetmemen için kaldırılamaz." : es ? "Cualquier método vinculado abre el mismo perfil de Seelogd. Tu único método de inicio de sesión no se puede quitar, para proteger el acceso a tu cuenta." : pt ? "Qualquer método vinculado abre o mesmo perfil do Seelogd. Seu único método de login não pode ser removido, para proteger o acesso à sua conta." : de ? "Jede verknüpfte Methode öffnet dasselbe Seelogd-Profil. Deine einzige Anmeldemethode kann nicht entfernt werden, um den Kontozugriff zu schützen." : "Any connected method opens the same Seelogd profile. Your only sign-in method cannot be removed to protect account access."}
       </Text>
     </SettingsSubScreen>
   );

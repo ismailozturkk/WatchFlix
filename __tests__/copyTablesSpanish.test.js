@@ -1,6 +1,6 @@
 // __tests__/copyTablesSpanish.test.js
 //
-// Yerel `{ tr, en, es, pt }` metin tablolarının DENGESİ.
+// Yerel `{ tr, en, es, pt, de }` metin tablolarının DENGESİ.
 //
 // NEDEN: bu modüller i18n paketlerine bağlı değil (i18nKeys.test.js onları görmez).
 // Bir dile anahtar eklemeyi unutan geliştirici, `copyLanguage` yedeği sayesinde
@@ -27,6 +27,7 @@ const { LIST_SORT_FILTER_COPY } = require("../utils/listSortFilterCopy");
 const { RATING_SUMMARY_COPY } = require("../utils/ratingSummaryCopy");
 const { EXTERNAL_RATINGS_COPY } = require("../utils/externalRatingsCopy");
 const { REFERRAL_COPY } = require("../utils/referralCopy");
+const { IMPORT_COPY } = require("../components/import/importCopy");
 
 // `{ad}`, `{{ad}}`, `%d` biçimli yer tutucuları çıkarır.
 const yerTutucular = (metin) =>
@@ -44,7 +45,7 @@ function yapraklar(nesne, onek = "", toplam = {}) {
 }
 
 // tr dışındaki her dil (en, es, pt …) tr ile karşılaştırılır. Yeni dil: buraya ekle.
-const KARSILASTIRILAN = ["en", "es", "pt"];
+const KARSILASTIRILAN = ["en", "es", "pt", "de"];
 
 function karsilastir(tablolar) {
   const yap = Object.fromEntries(
@@ -63,7 +64,7 @@ function karsilastir(tablolar) {
     }
   }
   // En dışındaki yabancı dillerde değer kontrolü (en eski davranışı korur: yalnız anahtar kümesi).
-  for (const dil of ["es", "pt"]) {
+  for (const dil of ["es", "pt", "de"]) {
     const tablo = yap[dil];
     if (!tablo) continue;
     for (const anahtar of Object.keys(tablo)) {
@@ -108,19 +109,21 @@ const TABLOLAR = {
   "Puan özeti (ratingSummaryCopy)": () => RATING_SUMMARY_COPY,
   "Harici puanlar (externalRatingsCopy)": () => EXTERNAL_RATINGS_COPY,
   "Arkadaş daveti (referralCopy)": () => REFERRAL_COPY,
+  "Letterboxd / IMDb içe aktarma (importCopy)": () => IMPORT_COPY,
   "Wrapped (wrappedStrings)": () => ({
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),
     es: getWrappedStrings("es"),
     pt: getWrappedStrings("pt"),
+    de: getWrappedStrings("de"),
   }),
 };
 
-describe("yerel metin tablolarında tr / en / es / pt dengesi", () => {
+describe("yerel metin tablolarında tr / en / es / pt / de dengesi", () => {
   for (const [ad, al] of Object.entries(TABLOLAR)) {
-    it(`${ad}: dört dilde aynı anahtar, yer tutucu ve parametre sayısı`, () => {
+    it(`${ad}: beş dilde aynı anahtar, yer tutucu ve parametre sayısı`, () => {
       const tablo = al();
-      expect(Object.keys(tablo)).toEqual(expect.arrayContaining(["tr", "en", "es", "pt"]));
+      expect(Object.keys(tablo)).toEqual(expect.arrayContaining(["tr", "en", "es", "pt", "de"]));
       expect(karsilastir(tablo)).toEqual([]);
     });
   }
@@ -130,6 +133,7 @@ describe("yerel metin tablolarında tr / en / es / pt dengesi", () => {
     expect(Object.keys(yapraklar(STUDIO_COPY.es)).length).toBeGreaterThan(50);
     expect(Object.keys(yapraklar(AI_COPY.es)).length).toBeGreaterThan(100);
     expect(Object.keys(yapraklar(AI_COPY.pt)).length).toBeGreaterThan(100);
+    expect(Object.keys(yapraklar(AI_COPY.de)).length).toBeGreaterThan(100);
   });
 
   it("karşılaştırıcı gerçek bir eksiği yakalıyor (pozitif kontrol)", () => {
@@ -145,11 +149,11 @@ describe("yerel metin tablolarında tr / en / es / pt dengesi", () => {
   });
 });
 
-describe("Portekizce kopya gerçekten Portekizce", () => {
+describe.each(["pt", "de"])("%s kopyası gerçekten o dilde (Türkçe/İspanyolca sızıntısı yok)", (dilKodu) => {
   it("hiçbir tabloda Türkçeye özgü harf (ğ ş ı İ) ya da İspanyolca işareti (ñ ¿ ¡) yok", () => {
     const sorunlu = [];
     for (const [ad, al] of Object.entries(TABLOLAR)) {
-      const pt = al().pt;
+      const pt = al()[dilKodu];
       if (!pt) continue;
       for (const [yol, deger] of Object.entries(yapraklar(pt))) {
         const metinler = Array.isArray(deger) ? deger : [deger];
@@ -165,8 +169,8 @@ describe("Portekizce kopya gerçekten Portekizce", () => {
   });
 
   it("Wrapped metinleri ne Türkçe ne İspanyolca", () => {
-    expect(JSON.stringify(getWrappedStrings("pt"))).not.toBe(JSON.stringify(getWrappedStrings("tr")));
-    expect(JSON.stringify(getWrappedStrings("pt"))).not.toBe(JSON.stringify(getWrappedStrings("es")));
+    expect(JSON.stringify(getWrappedStrings(dilKodu))).not.toBe(JSON.stringify(getWrappedStrings("tr")));
+    expect(JSON.stringify(getWrappedStrings(dilKodu))).not.toBe(JSON.stringify(getWrappedStrings("es")));
   });
 });
 
@@ -181,6 +185,6 @@ describe("İspanyolca kopya gerçekten İspanyolca", () => {
   });
 
   it("bilinmeyen dil İngilizce kopyayı alır, Türkçeyi değil", () => {
-    expect(getWrappedStrings("de")).toEqual(getWrappedStrings("en"));
+    expect(getWrappedStrings("fr")).toEqual(getWrappedStrings("en"));
   });
 });

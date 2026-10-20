@@ -9,7 +9,7 @@
 // SOMUT EYLEME çevrilir: "≈ 14 film ya da 63 bölüm". Ölçek olarak
 // __tests__/watchScoring.test.js'te sabitlenen ortalama değerler kullanılır.
 
-import { copyLanguage, intlLocaleOf, normalizeAppLanguage } from "../../utils/appLanguages";
+import { copyLanguage, intlLocaleOf, normalizeAppLanguage, pickByLanguage } from "../../utils/appLanguages";
 import React, { memo, useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -43,7 +43,8 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
   const tr = copyLanguage(language, ["tr", "en"]) === "tr";
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt"]);
+  const de = normalizeAppLanguage(language) === "de";
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
   const {
     loading,
     kare,
@@ -124,7 +125,7 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
   const kalan = perde.kalanKare;
   const filmKarsiligi = Math.max(1, Math.round(kalan / ORT_FILM));
   const bolumKarsiligi = Math.max(1, Math.round(kalan / ORT_BOLUM));
-  const perdeAdi = tr ? perde.ad : es ? perde.adEs : pt ? perde.adPt : perde.adEn;
+  const perdeAdi = tr ? perde.ad : es ? perde.adEs : pt ? perde.adPt : de ? perde.adDe : perde.adEn;
 
   const hedefParam = { film: filmKarsiligi, bolum: bolumKarsiligi };
   const kalanMetni = perde.tabanDevrede
@@ -148,9 +149,13 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
       {...(onPress
         ? {
             accessibilityRole: "button",
-            accessibilityLabel: tr
-              ? `Perde ${perde.perde}, ${perdeAdi}. Rozetler`
-              : `Act ${perde.perde}, ${perdeAdi}. Badges`,
+            accessibilityLabel: pickByLanguage(language, {
+              tr: `Perde ${perde.perde}, ${perdeAdi}. Rozetler`,
+              en: `Act ${perde.perde}, ${perdeAdi}. Badges`,
+              es: `Acto ${perde.perde}, ${perdeAdi}. Insignias`,
+              pt: `Ato ${perde.perde}, ${perdeAdi}. Emblemas`,
+              de: `Akt ${perde.perde}, ${perdeAdi}. Abzeichen`,
+            }),
             activeOpacity: 0.85,
             onPress,
           }

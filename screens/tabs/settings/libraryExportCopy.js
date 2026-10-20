@@ -198,7 +198,55 @@ const pt = {
   ].join("\n"),
 };
 
-export const LIBRARY_EXPORT_COPY = { tr, en, es, pt };
+const de = {
+  title: "Deine Bibliothek exportieren",
+  rowTitle: "Deine Bibliothek exportieren",
+  rowSub: "Hol dir deine Listen, deinen Sehverlauf und deine Bewertungen als JSON oder CSV",
+  heroTitle: "Deine Daten gehören dir",
+  heroText:
+    "Deine gesehenen Titel, Listen, Sehdaten und Bewertungen werden als Dateien auf deinem Gerät ausgegeben. Nimm sie in eine andere App mit oder bewahre sie als Sicherung auf.",
+
+  sectionIncluded: "Was enthalten ist",
+  films: (n) => (n === 1 ? "1 gesehener Film" : `${n} gesehene Filme`),
+  shows: (n, episodes) => `${n} Serien · ${episodes} Folgen`,
+  watchList: (n) => (n === 1 ? "1 auf deiner Merkliste" : `${n} auf deiner Merkliste`),
+  favorites: (n) => (n === 1 ? "1 Favorit" : `${n} Favoriten`),
+  customLists: (lists, items) => `${lists} eigene Listen · ${items} Titel`,
+  ratings: (n) => (n === 1 ? "1 Bewertung" : `${n} Bewertungen`),
+  loading: "Deine Bibliothek wird geladen…",
+  empty: "Noch nichts zu exportieren. Füge einen Film oder eine Serie hinzu, dann erscheint er hier.",
+  notIncluded: "Nicht enthalten: Kommentare, Beiträge, Notizen, Erinnerungen, Chats und Kontodaten.",
+
+  sectionExport: "Exportieren",
+  jsonTitle: "Vollständige Sicherung (JSON)",
+  jsonSub: "Alles: Listen, Sehdaten, Folgenverlauf bei Serien, Bewertungen",
+  zipTitle: "Tabelle und Letterboxd (ZIP)",
+  zipSub: "library.csv (Excel / Sheets) + CSVs, die du in Letterboxd importieren kannst",
+  ready: "Export bereit",
+
+  noteLetterboxd:
+    "Letterboxd kennt nur Filme: Serien stehen in der JSON und der library.csv, aber nicht in den Letterboxd-Dateien. Zum Hochladen nutze Settings > Import & Export auf letterboxd.com; importiere die gesehenen Filme und die Merkliste getrennt.",
+  notePrivacy: "Die Datei wird nur auf deinem Gerät erstellt. Wohin du sie sendest, wählst du im Teilen-Menü.",
+
+  errWrite: "Die Datei konnte nicht erstellt werden",
+  errSharing: "Teilen ist auf diesem Gerät nicht verfügbar",
+  errZip: "Die ZIP-Datei konnte nicht erstellt werden",
+  errEmpty: "Es gibt keine Daten zum Exportieren",
+
+  readme: [
+    "Seelogd library export",
+    "",
+    "library.csv                  Alle Listen in einer Tabelle (Excel / Google Sheets).",
+    "letterboxd-watched*.csv      Von dir gesehene Filme (Datum, Bewertung, erneutes Ansehen). In Letterboxd importierbar.",
+    "letterboxd-watchlist*.csv    Filme auf deiner Merkliste. In Letterboxd importierbar.",
+    "",
+    "Letterboxd: letterboxd.com > Settings > Import & Export. Die Dateien ordnen Filme über die tmdbID zu.",
+    "Letterboxd kennt nur Filme; Serien stehen in der library.csv und in der JSON-Sicherung.",
+    "Große Bibliotheken werden als -1, -2 ... aufgeteilt, um unter dem 1-MB-Limit zu bleiben; lade sie der Reihe nach hoch.",
+  ].join("\n"),
+};
+
+export const LIBRARY_EXPORT_COPY = { tr, en, es, pt, de };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getLibraryExportCopy = (language) =>

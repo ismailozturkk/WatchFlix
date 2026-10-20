@@ -32,6 +32,7 @@ jest.mock("../components/AppIcon", () => {
   return { __esModule: true, default: (props) => React.createElement("Icon", props) };
 });
 jest.mock("../context/ThemeContext", () => ({ useTheme: () => ({ theme: {} }) }));
+jest.mock("../context/LanguageContext", () => ({ useLanguage: () => ({ language: "tr" }) }));
 jest.mock("../context/AppSettingsContext", () => ({ useListLayoutSettings: () => mockSettings }));
 jest.mock("../utils/i18nText", () => ({ i18nText: (_key, fallback) => fallback }));
 jest.mock("../screens/tabs/settings/settingsUi", () => {

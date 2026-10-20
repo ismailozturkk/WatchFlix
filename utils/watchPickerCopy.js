@@ -155,6 +155,43 @@ export const WATCH_PICKER_COPY = {
       longRun: "Uma série longa: {n} temporadas",
     },
   },
+  de: {
+    entry: {
+      title: "Was schauen?",
+      movie: "Film",
+      tv: "Serie",
+      empty: "Füge zuerst etwas zu deiner Liste hinzu",
+      filteredNote: "Tipps aus deiner gefilterten Liste",
+      a11yRandom: "Was schauen? Wähle zufällig einen Titel aus deiner Merkliste",
+      a11yMovie: "Wähle zufällig einen Film aus deiner Merkliste",
+      a11yTv: "Wähle zufällig eine Serie aus deiner Merkliste",
+    },
+    sheet: {
+      title: "Was soll ich schauen?",
+      pool: "Aus {n} Titeln",
+      poolFiltered: "Aus deiner gefilterten Liste · {n} Titel",
+      shuffling: "Wird gemischt…",
+      reroll: "Noch einer",
+      open: "Zu den Details",
+      history: "Gerade gewürfelt",
+      cycled: "Du hast alle gesehen, deshalb haben wir neu gemischt",
+      emptyType: "Keine Titel dieser Art in deiner Liste",
+      unreleased: "Noch nicht erschienen. Möchtest du einen anderen wählen?",
+      close: "Schließen",
+      types: { mixed: "Gemischt", movie: "Filme", tv: "Serien" },
+      kind: { movie: "Movie", tv: "Show" },
+      units: { hour: "h", minute: "Min.", season: "Staffeln", episode: "Folgen" },
+    },
+    reasons: {
+      waitingMonths: "Wartet seit {n} Monaten in deiner Liste",
+      waitingDays: "Wartet seit {n} Tagen in deiner Liste",
+      fresh: "Gerade hinzugefügt",
+      shortFilm: "Kurz: in {n} Minuten geschafft",
+      longFilm: "Ein Film für einen langen Abend",
+      oneSeason: "Eine Staffel, schnell geschafft",
+      longRun: "Eine langlaufende Serie: {n} Staffeln",
+    },
+  },
 };
 
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).

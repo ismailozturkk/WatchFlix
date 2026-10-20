@@ -23,7 +23,7 @@ const GAME_TOKENS = { correct: "#00E676", incorrect: "#FF1744" };
 const GOLD = "#F5C518";
 
 // Üç dilli metin seçici: es verilmezse İngilizce (utils/appLanguages kuralı: bilinmeyen → en).
-const L = (lang, tr, en, es, pt) => (lang === "tr" ? tr : lang === "es" && es != null ? es : lang === "pt" && pt != null ? pt : en);
+const L = (lang, tr, en, es, pt, de) => (lang === "tr" ? tr : lang === "es" && es != null ? es : lang === "pt" && pt != null ? pt : lang === "de" && de != null ? de : en);
 const pathAt = (paths, i) => (paths.length ? paths[i % paths.length] : null);
 
 // Uzun metni kısa "hook"a indirger (gerçek özet cümlesinden).
@@ -63,7 +63,7 @@ function LoadingCard({ theme, lang }) {
   return (
     <Panel theme={theme}>
       <Text style={[styles.aiSub, { color: theme.text.muted, textAlign: "center", paddingVertical: 26 }]}>
-        {L(lang, "İçerik yükleniyor…", "Loading…", "Cargando…", "Carregando…")}
+        {L(lang, "İçerik yükleniyor…", "Loading…", "Cargando…", "Carregando…", "Wird geladen…")}
       </Text>
     </Panel>
   );
@@ -73,11 +73,11 @@ function LoadingCard({ theme, lang }) {
 
 // Seelogd AI'ın beş cevap stili (ilki örnekte açık, diğerleri çip olarak listelenir).
 const AI_STYLES = [
-  { icon: "sparkles", tr: "Öneri", en: "Picks", es: "Sugerencias", pt: "Sugestões" },
-  { icon: "git-compare", tr: "Karşılaştırma", en: "Compare", es: "Comparación", pt: "Comparação" },
-  { icon: "calendar", tr: "İzleme planı", en: "Watch plan", es: "Plan de visionado", pt: "Plano para assistir" },
-  { icon: "list", tr: "Liste", en: "List", es: "Lista", pt: "Lista" },
-  { icon: "information-circle", tr: "Künye", en: "Spotlight", es: "Ficha", pt: "Destaque" },
+  { icon: "sparkles", tr: "Öneri", en: "Picks", es: "Sugerencias", pt: "Sugestões", de: "Tipps" },
+  { icon: "git-compare", tr: "Karşılaştırma", en: "Compare", es: "Comparación", pt: "Comparação", de: "Vergleichen" },
+  { icon: "calendar", tr: "İzleme planı", en: "Watch plan", es: "Plan de visionado", pt: "Plano para assistir", de: "Schauplan" },
+  { icon: "list", tr: "Liste", en: "List", es: "Lista", pt: "Lista", de: "Liste" },
+  { icon: "information-circle", tr: "Künye", en: "Spotlight", es: "Ficha", pt: "Destaque", de: "Steckbrief" },
 ];
 
 // Poster + puan rozeti + başlık/yıl. Veri henüz yoksa nötr iskelet çizer.
@@ -123,7 +123,7 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
       {/* Kullanıcının sorusu */}
       <View style={[aiMock.question, { backgroundColor: accent }]}>
         <Text style={[aiMock.questionText, { color: onAccent }]}>
-          {L(lang, "Bu akşam ne izlesem? 🍿", "What should I watch tonight? 🍿", "¿Qué veo esta noche? 🍿", "O que assistir hoje à noite? 🍿")}
+          {L(lang, "Bu akşam ne izlesem? 🍿", "What should I watch tonight? 🍿", "¿Qué veo esta noche? 🍿", "O que assistir hoje à noite? 🍿", "Was soll ich heute Abend schauen? 🍿")}
         </Text>
       </View>
 
@@ -144,11 +144,11 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
             <Text style={[aiMock.aiName, { color: theme.text.primary }]}>Seelogd AI</Text>
             <View style={[aiMock.styleTag, { backgroundColor: alpha(accent, 0.14) }]}>
               <Ionicons name={AI_STYLES[0].icon} size={10} color={accent} />
-              <Text style={[aiMock.styleTagText, { color: accent }]}>{L(lang, AI_STYLES[0].tr, AI_STYLES[0].en, AI_STYLES[0].es, AI_STYLES[0].pt)}</Text>
+              <Text style={[aiMock.styleTagText, { color: accent }]}>{L(lang, AI_STYLES[0].tr, AI_STYLES[0].en, AI_STYLES[0].es, AI_STYLES[0].pt, AI_STYLES[0].de)}</Text>
             </View>
           </View>
           <Text style={[aiMock.answerText, { color: theme.text.secondary }]}>
-            {L(lang, "Ruh haline göre üç yapım seçtim:", "Three picks matched to your mood:", "Tres opciones según tu estado de ánimo:", "Três opções de acordo com o seu humor:")}
+            {L(lang, "Ruh haline göre üç yapım seçtim:", "Three picks matched to your mood:", "Tres opciones según tu estado de ánimo:", "Três opções de acordo com o seu humor:", "Drei Tipps passend zu deiner Stimmung:")}
           </Text>
 
           <View style={aiMock.picks}>
@@ -160,7 +160,7 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
           <View style={[aiMock.addRow, { borderTopColor: theme.border }]}>
             <Ionicons name="bookmark-outline" size={13} color={accent} />
             <Text style={[aiMock.addText, { color: theme.text.muted }]}>
-              {L(lang, "Tek dokunuşla listene ekle", "Add to your list in one tap", "Añádelo a tu lista con un toque", "Adicione à sua lista com um toque")}
+              {L(lang, "Tek dokunuşla listene ekle", "Add to your list in one tap", "Añádelo a tu lista con un toque", "Adicione à sua lista com um toque", "Mit einem Tippen zu deiner Liste hinzufügen")}
             </Text>
           </View>
         </View>
@@ -168,7 +168,7 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
 
       {/* Beş cevap stili */}
       <Text style={[aiMock.label, { color: theme.text.muted }]}>
-        {L(lang, "5 FARKLI CEVAP STİLİ", "5 ANSWER STYLES", "5 ESTILOS DE RESPUESTA", "5 ESTILOS DE RESPOSTA")}
+        {L(lang, "5 FARKLI CEVAP STİLİ", "5 ANSWER STYLES", "5 ESTILOS DE RESPUESTA", "5 ESTILOS DE RESPOSTA", "5 ANTWORTSTILE")}
       </Text>
       <View style={aiMock.chips}>
         {AI_STYLES.map((style, i) => (
@@ -183,7 +183,7 @@ export function AiShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang = 
           >
             <Ionicons name={style.icon} size={12} color={i === 0 ? accent : theme.text.secondary} />
             <Text style={[aiMock.chipText, { color: i === 0 ? accent : theme.text.secondary }]}>
-              {L(lang, style.tr, style.en, style.es, style.pt)}
+              {L(lang, style.tr, style.en, style.es, style.pt, style.de)}
             </Text>
           </View>
         ))}
@@ -300,7 +300,7 @@ export function MiniBracket({ theme, accent, posterPaths = [], getTmdbUrl, lang 
           <BracketThumb uri={uri(6)} w={fW} h={fH} theme={theme} accent={accent} champion />
           <View style={[mb.champPill, { backgroundColor: alpha(accent, 0.15) }]}>
             <Text style={[mb.champPillText, { color: accent }]}>
-              {L(lang, "ŞAMPİYON", "CHAMPION", "CAMPEÓN", "CAMPEÃO")}
+              {L(lang, "ŞAMPİYON", "CHAMPION", "CAMPEÓN", "CAMPEÃO", "CHAMPION")}
             </Text>
           </View>
         </View>
@@ -325,14 +325,14 @@ export function TournamentShowcase({ theme, accent, posterPaths = [], getTmdbUrl
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.aiName, { color: theme.text.primary }]}>
-            {L(lang, "Aylık Turnuva", "Monthly Tournament", "Torneo mensual", "Torneio mensal")}
+            {L(lang, "Aylık Turnuva", "Monthly Tournament", "Torneo mensual", "Torneio mensal", "Monatsturnier")}
           </Text>
           <Text style={[styles.aiSub, { color: theme.text.muted }]}>{prevMonth}</Text>
         </View>
         <View style={[styles.pastPill, { backgroundColor: alpha(theme.text.muted, 0.14) }]}>
           <Ionicons name="time-outline" size={11} color={theme.text.muted} />
           <Text style={[styles.pastPillText, { color: theme.text.muted }]}>
-            {L(lang, "Geçen ay", "Last month", "El mes pasado", "No mês passado")}
+            {L(lang, "Geçen ay", "Last month", "El mes pasado", "No mês passado", "Letzter Monat")}
           </Text>
         </View>
       </View>
@@ -341,12 +341,12 @@ export function TournamentShowcase({ theme, accent, posterPaths = [], getTmdbUrl
         <>
           <MiniBracket theme={theme} accent={accent} posterPaths={posterPaths} getTmdbUrl={getTmdbUrl} lang={lang} />
           <Text style={[mb.caption, { color: theme.text.muted }]}>
-            {L(lang, "32 yapım · 1.2k oy · her ay yenilenir", "32 titles · 1.2k votes · renews monthly", "32 títulos · 1,2 mil votos · se renueva cada mes", "32 títulos · 1,2 mil votos · renova todo mês")}
+            {L(lang, "32 yapım · 1.2k oy · her ay yenilenir", "32 titles · 1.2k votes · renews monthly", "32 títulos · 1,2 mil votos · se renueva cada mes", "32 títulos · 1,2 mil votos · renova todo mês", "32 Titel · 1,2k Stimmen · erneuert sich monatlich")}
           </Text>
         </>
       ) : (
         <Text style={[styles.aiSub, { color: theme.text.muted, paddingVertical: 20, textAlign: "center" }]}>
-          {L(lang, "Ağaç yükleniyor…", "Loading bracket…", "Cargando el cuadro…", "Carregando o chaveamento…")}
+          {L(lang, "Ağaç yükleniyor…", "Loading bracket…", "Cargando el cuadro…", "Carregando o chaveamento…", "Turnierbaum wird geladen…")}
         </Text>
       )}
     </Panel>
@@ -394,10 +394,10 @@ export function ShareShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang
             <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
               <Text style={[ps.userName, { color: theme.text.primary }]} numberOfLines={1}>emir</Text>
               <View style={[ps.badge, { backgroundColor: blue + "22", borderColor: blue + "55" }]}>
-                <Text style={[ps.badgeText, { color: blue }]}>{L(lang, "İNCELEME", "REVIEW", "RESEÑA", "AVALIAÇÃO")}</Text>
+                <Text style={[ps.badgeText, { color: blue }]}>{L(lang, "İNCELEME", "REVIEW", "RESEÑA", "AVALIAÇÃO", "REZENSION")}</Text>
               </View>
             </View>
-            <Text style={[ps.time, { color: theme.text.muted }]}>{L(lang, "2 saat önce", "2h ago", "hace 2 h", "há 2 h")}</Text>
+            <Text style={[ps.time, { color: theme.text.muted }]}>{L(lang, "2 saat önce", "2h ago", "hace 2 h", "há 2 h", "vor 2 Std.")}</Text>
           </View>
           <MaterialCommunityIcons name="dots-vertical" size={18} color={theme.text.muted} />
         </View>
@@ -416,7 +416,7 @@ export function ShareShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang
           <View style={{ flex: 1 }}>
             <Text style={[ps.title, { color: theme.text.primary }]} numberOfLines={2}>{post.title}</Text>
             <Text style={[ps.content, { color: theme.text.secondary }]} numberOfLines={4}>
-              {clip(post.overview, 150) || L(lang, "Kesinlikle önerdiğim bir yapım!", "A title I highly recommend!", "¡Un título que recomiendo muchísimo!", "Um título que eu recomendo muito!")}
+              {clip(post.overview, 150) || L(lang, "Kesinlikle önerdiğim bir yapım!", "A title I highly recommend!", "¡Un título que recomiendo muchísimo!", "Um título que eu recomendo muito!", "Ein Titel, den ich sehr empfehle!")}
             </Text>
           </View>
         </View>
@@ -444,7 +444,7 @@ export function ShareShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang
       {/* Story paylaşım kartı (StoryShareScreen çıktısı) */}
       <Panel theme={theme}>
         <Text style={[styles.blockLabel, { color: theme.text.muted }]}>
-          {L(lang, "HİKÂYE PAYLAŞIMI", "STORY SHARE", "COMPARTIR EN HISTORIA", "COMPARTILHAR NO STORY")}
+          {L(lang, "HİKÂYE PAYLAŞIMI", "STORY SHARE", "COMPARTIR EN HISTORIA", "COMPARTILHAR NO STORY", "STORY TEILEN")}
         </Text>
         <View style={{ flexDirection: "row", gap: 14, marginTop: 10, alignItems: "center" }}>
           <View style={ps.storyCard}>
@@ -469,11 +469,11 @@ export function ShareShowcase({ theme, accent, mediaItems = [], getTmdbUrl, lang
           </View>
           <View style={{ flex: 1, gap: 10 }}>
             <Text style={[styles.mediaMeta, { color: theme.text.secondary, fontSize: 12.5, lineHeight: 17 }]}>
-              {L(lang, "İzlediğin içeriği şık bir kartla hikâyende paylaş.", "Share what you watched as a sleek story card.", "Comparte lo que has visto en una tarjeta de historia con estilo.", "Compartilhe o que você assistiu em um card de story estiloso.")}
+              {L(lang, "İzlediğin içeriği şık bir kartla hikâyende paylaş.", "Share what you watched as a sleek story card.", "Comparte lo que has visto en una tarjeta de historia con estilo.", "Compartilhe o que você assistiu em um card de story estiloso.", "Teile, was du gesehen hast, als schicke Story-Karte.")}
             </Text>
             <View style={[ps.shareBtn, { backgroundColor: accent }]}>
               <Ionicons name="share-social" size={14} color="#fff" />
-              <Text style={ps.shareBtnText}>{L(lang, "Hikâyeye Ekle", "Add to Story", "Añadir a la historia", "Adicionar ao story")}</Text>
+              <Text style={ps.shareBtnText}>{L(lang, "Hikâyeye Ekle", "Add to Story", "Añadir a la historia", "Adicionar ao story", "Zur Story hinzufügen")}</Text>
             </View>
           </View>
         </View>
@@ -512,10 +512,10 @@ export function PlayShowcase({ theme, accent, mediaItems = [], posterPaths = [],
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[duo.headName, { color: theme.text.primary }]} numberOfLines={1}>
-                {L(lang, "Sahne Tahmin", "Guess the Scene", "Adivina la escena", "Adivinhe a cena")}
+                {L(lang, "Sahne Tahmin", "Guess the Scene", "Adivina la escena", "Adivinhe a cena", "Szenenraten")}
               </Text>
               <Text style={[duo.headSub, { color: theme.text.muted }]}>
-                {L(lang, "Soru 3/10", "Q 3/10", "P 3/10", "P 3/10")}
+                {L(lang, "Soru 3/10", "Q 3/10", "P 3/10", "P 3/10", "Q 3/10")}
               </Text>
             </View>
             <View style={[mini.pill, { backgroundColor: alpha(orange, 0.15) }]}>
@@ -557,11 +557,11 @@ export function PlayShowcase({ theme, accent, mediaItems = [], posterPaths = [],
         <InfoCol
           theme={theme}
           accent={accent}
-          eyebrow={L(lang, "SAHNE TAHMİN", "GUESS THE SCENE", "ADIVINA LA ESCENA", "ADIVINHE A CENA")}
+          eyebrow={L(lang, "SAHNE TAHMİN", "GUESS THE SCENE", "ADIVINA LA ESCENA", "ADIVINHE A CENA", "SZENENRATEN")}
           bullets={[
-            { icon: "film-outline", text: L(lang, "Sahneden yapımı bil", "Guess the title from a scene", "Adivina el título a partir de una escena", "Adivinhe o título a partir de uma cena") },
-            { icon: "flash-outline", text: L(lang, "Klasik · Zamana Karşı · Günlük", "Classic · Time Attack · Daily", "Clásico · Contrarreloj · Diario", "Clássico · Contra o relógio · Diário") },
-            { icon: "flame-outline", text: L(lang, "Seri yap, puanını katla", "Build streaks, boost your score", "Encadena rachas y sube tu puntuación", "Encadeie sequências e aumente sua pontuação") },
+            { icon: "film-outline", text: L(lang, "Sahneden yapımı bil", "Guess the title from a scene", "Adivina el título a partir de una escena", "Adivinhe o título a partir de uma cena", "Errate den Titel anhand einer Szene") },
+            { icon: "flash-outline", text: L(lang, "Klasik · Zamana Karşı · Günlük", "Classic · Time Attack · Daily", "Clásico · Contrarreloj · Diario", "Clássico · Contra o relógio · Diário", "Klassik · Gegen die Zeit · Täglich") },
+            { icon: "flame-outline", text: L(lang, "Seri yap, puanını katla", "Build streaks, boost your score", "Encadena rachas y sube tu puntuación", "Encadeie sequências e aumente sua pontuação", "Baue Serien auf, steigere deine Punktzahl") },
           ]}
         />
       </View>
@@ -572,11 +572,11 @@ export function PlayShowcase({ theme, accent, mediaItems = [], posterPaths = [],
           theme={theme}
           accent={accent}
           align="right"
-          eyebrow={L(lang, "AYLIK TURNUVA", "MONTHLY TOURNAMENT", "TORNEO MENSUAL", "TORNEIO MENSAL")}
+          eyebrow={L(lang, "AYLIK TURNUVA", "MONTHLY TOURNAMENT", "TORNEO MENSUAL", "TORNEIO MENSAL", "MONATSTURNIER")}
           bullets={[
-            { icon: "trophy-outline", text: L(lang, "32 yapım kapışır", "32 titles face off", "32 títulos se enfrentan", "32 títulos se enfrentam") },
-            { icon: "people-outline", text: L(lang, "Şampiyonu topluluk seçer", "The community picks the champion", "La comunidad elige al campeón", "A comunidade escolhe o campeão") },
-            { icon: "refresh-outline", text: L(lang, "Her ay yeni turnuva", "A fresh bracket every month", "Un cuadro nuevo cada mes", "Uma chave nova a cada mês") },
+            { icon: "trophy-outline", text: L(lang, "32 yapım kapışır", "32 titles face off", "32 títulos se enfrentan", "32 títulos se enfrentam", "32 Titel treten gegeneinander an") },
+            { icon: "people-outline", text: L(lang, "Şampiyonu topluluk seçer", "The community picks the champion", "La comunidad elige al campeón", "A comunidade escolhe o campeão", "Die Community wählt den Champion") },
+            { icon: "refresh-outline", text: L(lang, "Her ay yeni turnuva", "A fresh bracket every month", "Un cuadro nuevo cada mes", "Uma chave nova a cada mês", "Jeden Monat ein neuer Turnierbaum") },
           ]}
         />
 
@@ -587,10 +587,10 @@ export function PlayShowcase({ theme, accent, mediaItems = [], posterPaths = [],
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[duo.headName, { color: theme.text.primary }]} numberOfLines={1}>
-                {L(lang, "Aylık Turnuva", "Monthly Tournament", "Torneo mensual", "Torneio mensal")}
+                {L(lang, "Aylık Turnuva", "Monthly Tournament", "Torneo mensual", "Torneio mensal", "Monatsturnier")}
               </Text>
               <Text style={[duo.headSub, { color: theme.text.muted }]}>
-                {L(lang, "1.2k oy", "1.2k votes", "1,2 mil votos", "1,2 mil votos")}
+                {L(lang, "1.2k oy", "1.2k votes", "1,2 mil votos", "1,2 mil votos", "1,2k Stimmen")}
               </Text>
             </View>
           </View>
@@ -608,11 +608,11 @@ export function PlayShowcase({ theme, accent, mediaItems = [], posterPaths = [],
             <View style={{ flex: 1 }}>
               <Text style={[duo.headName, { color: theme.text.primary }]} numberOfLines={1}>emir</Text>
               <Text style={[duo.headSub, { color: theme.text.muted }]}>
-                {L(lang, "2 sa önce", "2h ago", "hace 2 h", "há 2 h")}
+                {L(lang, "2 sa önce", "2h ago", "hace 2 h", "há 2 h", "vor 2 Std.")}
               </Text>
             </View>
             <View style={[mini.badge, { backgroundColor: alpha(blue, 0.13), borderColor: alpha(blue, 0.33) }]}>
-              <Text style={[mini.badgeText, { color: blue }]}>{L(lang, "İNCELEME", "REVIEW", "RESEÑA", "AVALIAÇÃO")}</Text>
+              <Text style={[mini.badgeText, { color: blue }]}>{L(lang, "İNCELEME", "REVIEW", "RESEÑA", "AVALIAÇÃO", "REZENSION")}</Text>
             </View>
           </View>
 
@@ -629,7 +629,7 @@ export function PlayShowcase({ theme, accent, mediaItems = [], posterPaths = [],
               </Text>
               <Stars5 rating={4} color={orange} size={8} />
               <Text style={[mini.postText, { color: theme.text.secondary }]} numberOfLines={2}>
-                {clip(post.overview, 70) || L(lang, "Kesinlikle önerdiğim bir yapım!", "A title I highly recommend!", "¡Un título que recomiendo muchísimo!", "Um título que eu recomendo muito!")}
+                {clip(post.overview, 70) || L(lang, "Kesinlikle önerdiğim bir yapım!", "A title I highly recommend!", "¡Un título que recomiendo muchísimo!", "Um título que eu recomendo muito!", "Ein Titel, den ich sehr empfehle!")}
               </Text>
             </View>
           </View>
@@ -647,11 +647,11 @@ export function PlayShowcase({ theme, accent, mediaItems = [], posterPaths = [],
         <InfoCol
           theme={theme}
           accent={accent}
-          eyebrow={L(lang, "PAYLAŞ", "SHARE", "COMPARTE", "COMPARTILHE")}
+          eyebrow={L(lang, "PAYLAŞ", "SHARE", "COMPARTE", "COMPARTILHE", "TEILEN")}
           bullets={[
-            { icon: "create-outline", text: L(lang, "Puanla ve incele", "Rate and review", "Puntúa y reseña", "Avalie e escreva uma resenha") },
-            { icon: "heart-outline", text: L(lang, "Beğeni ve yorum al", "Get likes and comments", "Consigue me gusta y comentarios", "Ganhe curtidas e comentários") },
-            { icon: "share-social-outline", text: L(lang, "Skorunu kartla paylaş", "Share your score as a card", "Comparte tu puntuación en una tarjeta", "Compartilhe sua nota em um card") },
+            { icon: "create-outline", text: L(lang, "Puanla ve incele", "Rate and review", "Puntúa y reseña", "Avalie e escreva uma resenha", "Bewerten und rezensieren") },
+            { icon: "heart-outline", text: L(lang, "Beğeni ve yorum al", "Get likes and comments", "Consigue me gusta y comentarios", "Ganhe curtidas e comentários", "Erhalte Likes und Kommentare") },
+            { icon: "share-social-outline", text: L(lang, "Skorunu kartla paylaş", "Share your score as a card", "Comparte tu puntuación en una tarjeta", "Compartilhe sua nota em um card", "Teile deine Punktzahl als Karte") },
           ]}
         />
       </View>
@@ -704,14 +704,14 @@ export function ChatDuoShowcase({ theme, accent, mediaItems = [], getTmdbUrl, la
             <View style={{ flex: 1 }}>
               <Text style={[duo.headName, { color: theme.text.primary }]}>ayşe</Text>
               <Text style={[duo.headSub, { color: theme.colors.green }]}>
-                {L(lang, "çevrimiçi", "online", "en línea", "online")}
+                {L(lang, "çevrimiçi", "online", "en línea", "online", "online")}
               </Text>
             </View>
             <Ionicons name="videocam-outline" size={13} color={theme.text.muted} />
           </View>
 
           <MiniBubble>
-            <Text style={duo.bubbleText}>{L(lang, "Bu akşam ne izlesek? 🍿", "What should we watch? 🍿", "¿Qué vemos? 🍿", "O que vamos assistir? 🍿")}</Text>
+            <Text style={duo.bubbleText}>{L(lang, "Bu akşam ne izlesek? 🍿", "What should we watch? 🍿", "¿Qué vemos? 🍿", "O que vamos assistir? 🍿", "Was schauen wir? 🍿")}</Text>
           </MiniBubble>
 
           {/* Paylaşılan film kartı (kendi mesajım) */}
@@ -734,12 +734,12 @@ export function ChatDuoShowcase({ theme, accent, mediaItems = [], getTmdbUrl, la
           </MiniBubble>
 
           <MiniBubble>
-            <Text style={duo.bubbleText}>{L(lang, "Bu olur! 🔥", "That works! 🔥", "¡Me apunto! 🔥", "Bora! 🔥")}</Text>
+            <Text style={duo.bubbleText}>{L(lang, "Bu olur! 🔥", "That works! 🔥", "¡Me apunto! 🔥", "Bora! 🔥", "Passt! 🔥")}</Text>
           </MiniBubble>
 
           <View style={[duo.inputBar, { backgroundColor: theme.between, borderColor: theme.border }]}>
             <Ionicons name="add-circle-outline" size={13} color={accent} />
-            <Text style={[duo.inputHint, { color: theme.text.muted }]}>{L(lang, "Mesaj yaz…", "Type…", "Escribe…", "Escreva…")}</Text>
+            <Text style={[duo.inputHint, { color: theme.text.muted }]}>{L(lang, "Mesaj yaz…", "Type…", "Escribe…", "Escreva…", "Schreib…")}</Text>
             <Ionicons name="send" size={11} color={accent} />
           </View>
         </View>
@@ -747,11 +747,11 @@ export function ChatDuoShowcase({ theme, accent, mediaItems = [], getTmdbUrl, la
         <InfoCol
           theme={theme}
           accent={accent}
-          eyebrow={L(lang, "BİREBİR SOHBET", "DIRECT CHAT", "CHAT INDIVIDUAL", "CONVERSA INDIVIDUAL")}
+          eyebrow={L(lang, "BİREBİR SOHBET", "DIRECT CHAT", "CHAT INDIVIDUAL", "CONVERSA INDIVIDUAL", "DIREKTCHAT")}
           bullets={[
-            { icon: "film-outline", text: L(lang, "Film kartı & fragman paylaş", "Share title cards & trailers", "Comparte fichas de títulos y tráileres", "Compartilhe fichas de títulos e trailers") },
-            { icon: "list-outline", text: L(lang, "Listeni tek dokunuşla gönder", "Send lists in one tap", "Envía listas con un toque", "Envie listas com um toque") },
-            { icon: "flash-outline", text: L(lang, "Anında öneri alışverişi", "Swap picks instantly", "Intercambia recomendaciones al instante", "Troque recomendações na hora") },
+            { icon: "film-outline", text: L(lang, "Film kartı & fragman paylaş", "Share title cards & trailers", "Comparte fichas de títulos y tráileres", "Compartilhe fichas de títulos e trailers", "Titelkarten & Trailer teilen") },
+            { icon: "list-outline", text: L(lang, "Listeni tek dokunuşla gönder", "Send lists in one tap", "Envía listas con un toque", "Envie listas com um toque", "Listen mit einem Tippen senden") },
+            { icon: "flash-outline", text: L(lang, "Anında öneri alışverişi", "Swap picks instantly", "Intercambia recomendaciones al instante", "Troque recomendações na hora", "Tipps sofort austauschen") },
           ]}
         />
       </View>
@@ -762,11 +762,11 @@ export function ChatDuoShowcase({ theme, accent, mediaItems = [], getTmdbUrl, la
           theme={theme}
           accent={accent}
           align="right"
-          eyebrow={L(lang, "GRUP SOHBETİ", "GROUP CHAT", "CHAT DE GRUPO", "CONVERSA EM GRUPO")}
+          eyebrow={L(lang, "GRUP SOHBETİ", "GROUP CHAT", "CHAT DE GRUPO", "CONVERSA EM GRUPO", "GRUPPENCHAT")}
           bullets={[
-            { icon: "bar-chart-outline", text: L(lang, "Posterli anketlerle oylayın", "Vote with poster polls", "Vota con encuestas con pósteres", "Vote com enquetes de pôsteres") },
-            { icon: "calendar-outline", text: L(lang, "Film gecesini planlayın", "Plan movie night", "Planifica la noche de cine", "Planeje a noite de cinema") },
-            { icon: "people-outline", text: L(lang, "Karar saniyeler içinde", "Decide in seconds", "Decidid en segundos", "Decidam em segundos") },
+            { icon: "bar-chart-outline", text: L(lang, "Posterli anketlerle oylayın", "Vote with poster polls", "Vota con encuestas con pósteres", "Vote com enquetes de pôsteres", "Mit Poster-Umfragen abstimmen") },
+            { icon: "calendar-outline", text: L(lang, "Film gecesini planlayın", "Plan movie night", "Planifica la noche de cine", "Planeje a noite de cinema", "Filmabend planen") },
+            { icon: "people-outline", text: L(lang, "Karar saniyeler içinde", "Decide in seconds", "Decidid en segundos", "Decidam em segundos", "In Sekunden entschieden") },
           ]}
         />
 
@@ -791,21 +791,21 @@ export function ChatDuoShowcase({ theme, accent, mediaItems = [], getTmdbUrl, la
             </View>
             <View style={{ flex: 1, marginLeft: 6 }}>
               <Text style={[duo.headName, { color: theme.text.primary }]} numberOfLines={1}>
-                {L(lang, "Film Gecesi 🎬", "Movie Night 🎬", "Noche de cine 🎬", "Noite de cinema 🎬")}
+                {L(lang, "Film Gecesi 🎬", "Movie Night 🎬", "Noche de cine 🎬", "Noite de cinema 🎬", "Filmabend 🎬")}
               </Text>
-              <Text style={[duo.headSub, { color: theme.text.muted }]}>{L(lang, "4 üye", "4 members", "4 miembros", "4 membros")}</Text>
+              <Text style={[duo.headSub, { color: theme.text.muted }]}>{L(lang, "4 üye", "4 members", "4 miembros", "4 membros", "4 Mitglieder")}</Text>
             </View>
           </View>
 
           <Text style={[duo.senderName, { color: theme.colors.blue }]}>can</Text>
           <MiniBubble>
-            <Text style={duo.bubbleText}>{L(lang, "Herkes hazır mı? 🙌", "Everyone ready? 🙌", "¿Todos listos? 🙌", "Todo mundo pronto? 🙌")}</Text>
+            <Text style={duo.bubbleText}>{L(lang, "Herkes hazır mı? 🙌", "Everyone ready? 🙌", "¿Todos listos? 🙌", "Todo mundo pronto? 🙌", "Alle bereit? 🙌")}</Text>
           </MiniBubble>
 
           {/* Mini anket (gerçek yapımlarla) */}
           <Text style={[duo.senderName, { color: theme.colors.orange }]}>mert</Text>
           <MiniBubble style={{ maxWidth: "96%" }}>
-            <Text style={duo.pollQuestion}>{L(lang, "Bu akşam hangisi?", "Which one tonight?", "¿Cuál esta noche?", "Qual hoje à noite?")}</Text>
+            <Text style={duo.pollQuestion}>{L(lang, "Bu akşam hangisi?", "Which one tonight?", "¿Cuál esta noche?", "Qual hoje à noite?", "Welcher heute Abend?")}</Text>
             {[
               { m: pollA, pct: 67 },
               { m: pollB, pct: 33 },
@@ -827,7 +827,7 @@ export function ChatDuoShowcase({ theme, accent, mediaItems = [], getTmdbUrl, la
                 </View>
               </View>
             ))}
-            <Text style={duo.pollVotes}>{L(lang, "6 oy", "6 votes", "6 votos", "6 votos")}</Text>
+            <Text style={duo.pollVotes}>{L(lang, "6 oy", "6 votes", "6 votos", "6 votos", "6 Stimmen")}</Text>
           </MiniBubble>
         </View>
       </View>
@@ -925,14 +925,14 @@ export function ProfileShowcase({ theme, accent, posters = [], mediaItems = [], 
         </View>
 
         <View style={pf.stats}>
-          <ProfileStat theme={theme} accent={accent} icon="film-outline" value="312" label={L(lang, "Film", "Movies", "Películas", "Filmes")} />
-          <ProfileStat theme={theme} accent={accent} icon="tv-outline" value="48" label={L(lang, "Dizi", "Shows", "Series", "Séries")} />
+          <ProfileStat theme={theme} accent={accent} icon="film-outline" value="312" label={L(lang, "Film", "Movies", "Películas", "Filmes", "Filme")} />
+          <ProfileStat theme={theme} accent={accent} icon="tv-outline" value="48" label={L(lang, "Dizi", "Shows", "Series", "Séries", "Serien")} />
           <ProfileStat
             theme={theme}
             accent={accent}
             icon="time-outline"
-            value={L(lang, "18 gün", "18 days", "18 días", "18 dias")}
-            label={L(lang, "İzleme süresi", "Watch time", "Tiempo de visionado", "Tempo assistido")}
+            value={L(lang, "18 gün", "18 days", "18 días", "18 dias", "18 Tage")}
+            label={L(lang, "İzleme süresi", "Watch time", "Tiempo de visionado", "Tempo assistido", "Sehzeit")}
           />
         </View>
 
@@ -947,12 +947,12 @@ export function ProfileShowcase({ theme, accent, posters = [], mediaItems = [], 
           <MaterialCommunityIcons name="star-four-points" size={14} color="#fff" />
           <View style={{ flex: 1 }}>
             <Text style={pf.wrappedTitle}>Wrapped {year}</Text>
-            <Text style={pf.wrappedSub}>{L(lang, "Yılın izleme özetin hazır", "Your year in watching", "Tu año viendo cine y series", "Seu ano assistindo filmes e séries")}</Text>
+            <Text style={pf.wrappedSub}>{L(lang, "Yılın izleme özetin hazır", "Your year in watching", "Tu año viendo cine y series", "Seu ano assistindo filmes e séries", "Dein Seh-Jahr")}</Text>
           </View>
           <Ionicons name="arrow-forward" size={16} color="#fff" />
         </View>
 
-        <Text style={[pf.label, { color: theme.text.muted }]}>{L(lang, "FAVORİLERİN", "YOUR FAVORITES", "TUS FAVORITOS", "SEUS FAVORITOS")}</Text>
+        <Text style={[pf.label, { color: theme.text.muted }]}>{L(lang, "FAVORİLERİN", "YOUR FAVORITES", "TUS FAVORITOS", "SEUS FAVORITOS", "DEINE FAVORITEN")}</Text>
         <View style={pf.favs}>
           {[0, 1, 2, 3].map((k) => (
             <View key={k} style={[pf.fav, { backgroundColor: alpha(theme.text.muted, 0.14) }]}>
@@ -972,14 +972,14 @@ export function ProfileShowcase({ theme, accent, posters = [], mediaItems = [], 
       {/* Arkadaş hareketi */}
       <View style={[pf.activity, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
         <Text style={[pf.label, { color: theme.text.muted, marginTop: 0 }]}>
-          {L(lang, "ARKADAŞLARIN NE İZLİYOR", "WHAT FRIENDS ARE WATCHING", "LO QUE VEN TUS AMIGOS", "O QUE SEUS AMIGOS ESTÃO ASSISTINDO")}
+          {L(lang, "ARKADAŞLARIN NE İZLİYOR", "WHAT FRIENDS ARE WATCHING", "LO QUE VEN TUS AMIGOS", "O QUE SEUS AMIGOS ESTÃO ASSISTINDO", "WAS FREUNDE SCHAUEN")}
         </Text>
         <FriendActivity
           first
           theme={theme}
           name="zeynep"
           color={green}
-          verb={L(lang, "izledi", "watched", "vio", "assistiu")}
+          verb={L(lang, "izledi", "watched", "vio", "assistiu", "gesehen")}
           item={friendA}
           getTmdbUrl={getTmdbUrl}
         />
@@ -987,7 +987,7 @@ export function ProfileShowcase({ theme, accent, posters = [], mediaItems = [], 
           theme={theme}
           name="can"
           color={blue}
-          verb={L(lang, "puanladı", "rated", "puntuó", "avaliou")}
+          verb={L(lang, "puanladı", "rated", "puntuó", "avaliou", "bewertet")}
           item={friendB}
           rating={4.5}
           getTmdbUrl={getTmdbUrl}

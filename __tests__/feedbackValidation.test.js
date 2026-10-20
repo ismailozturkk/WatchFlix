@@ -24,7 +24,7 @@ const bug = (extra = {}) => ({
   title: "Listeler ekranı kapanıyor",
   message: "Listelerim ekranına girince uygulama kendiliğinden kapanıyor.",
   language: "tr",
-  device: { appVersion: "v1.4.8", platform: "ios", osVersion: "26.0", deviceModel: "iPhone 16" },
+  device: { appVersion: "v1.4.9", platform: "ios", osVersion: "26.0", deviceModel: "iPhone 16" },
   ...extra,
 });
 
@@ -51,7 +51,7 @@ describe("buildFeedback", () => {
       message: "Listelerim ekranına girince uygulama kendiliğinden kapanıyor.",
       status: "open",
       language: "tr",
-      appVersion: "v1.4.8",
+      appVersion: "v1.4.9",
       platform: "ios",
       osVersion: "26.0",
       deviceModel: "iPhone 16",
@@ -158,8 +158,8 @@ describe("sabitler", () => {
 
 describe("formatDeviceLine", () => {
   test("tam satır ve eksik parça atlama", () => {
-    expect(formatDeviceLine({ appVersion: "v1.4.8", platform: "ios", osVersion: "26.0", deviceModel: "iPhone 16" })).toBe(
-      "Seelogd v1.4.8 · iOS 26.0 · iPhone 16",
+    expect(formatDeviceLine({ appVersion: "v1.4.9", platform: "ios", osVersion: "26.0", deviceModel: "iPhone 16" })).toBe(
+      "Seelogd v1.4.9 · iOS 26.0 · iPhone 16",
     );
     expect(formatDeviceLine({ platform: "android", osVersion: "15" })).toBe("Android 15");
     expect(formatDeviceLine({ deviceModel: "Pixel 9" })).toBe("Pixel 9");

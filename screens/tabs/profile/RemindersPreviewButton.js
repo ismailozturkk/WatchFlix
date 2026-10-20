@@ -23,6 +23,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileReminders } from "../../../context/ProfileRemindersContext";
 import { useImageQualitySettings, useListLayoutSettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
+import { minutesText } from "../../../utils/durationText";
 import GlassIconButton from "../../../components/common/GlassIconButton";
 import { parseAirDate, startOfDay } from "../../../utils/airDate";
 import GlassTouchable from "../../../components/common/GlassTouchable";
@@ -65,7 +66,7 @@ function buildItems(reminders, limit = 5) {
     type: "movie",
     poster: m.posterPath,
     title: m.movieName,
-    subtitle: m.movieMinutes > 0 ? `${m.movieMinutes} dk` : null,
+    subtitle: m.movieMinutes > 0 ? minutesText(m.movieMinutes) : null,
     date: m.releaseDate,
   }));
   const eps = (reminders.tvReminders || []).flatMap((show) =>

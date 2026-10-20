@@ -10,6 +10,7 @@ const fs = require("fs");
 const path = require("path");
 const {
   APP_LANGUAGES,
+  COMING_SOON_LANGUAGES,
   SUPPORTED_LANGUAGE_CODES,
   FALLBACK_LANGUAGE,
   normalizeAppLanguage,
@@ -82,7 +83,7 @@ describe("normalizeAppLanguage", () => {
   });
 
   it("bilinmeyen / bozuk değer İngilizceye düşer, Türkçeye DEĞİL", () => {
-    for (const girdi of ["de", "fr", "zz", "", null, undefined, 42, {}]) {
+    for (const girdi of ["fr", "it", "zz", "", null, undefined, 42, {}]) {
       expect(normalizeAppLanguage(girdi)).toBe("en");
     }
   });
@@ -98,13 +99,13 @@ describe("copyLanguage / pickByLanguage", () => {
   it("tabloda olmayan dil İngilizceye düşer (Türkçe'ye değil)", () => {
     expect(copyLanguage("es", ["tr", "en"])).toBe("en");
     expect(copyLanguage("pt", ["tr", "en", "es"])).toBe("en");
-    expect(copyLanguage("de", ["tr", "en", "es"])).toBe("en");
+    expect(copyLanguage("fr", ["tr", "en", "es"])).toBe("en");
     expect(copyLanguage(undefined, ["tr", "en", "es"])).toBe("en");
   });
 
   it("İngilizce de yoksa tablonun ilk dili", () => {
     expect(copyLanguage("es", ["tr", "es"])).toBe("es");
-    expect(copyLanguage("de", ["tr", "es"])).toBe("tr");
+    expect(copyLanguage("fr", ["tr", "es"])).toBe("tr");
   });
 
   it("pickByLanguage metni döndürür", () => {
@@ -137,6 +138,15 @@ describe("dil bağlı sabitler", () => {
     expect(tmdbImageLanguageOrderOf("pt")).toBe("pt,en,null");
   });
 
+  it("Almanca: TMDB, Intl ve yapay zeka bağları", () => {
+    expect(tmdbLanguageOf("de")).toBe("de-DE");
+    expect(tmdbRegionOf("de")).toBe("DE");
+    expect(intlLocaleOf("de")).toBe("de-DE");
+    expect(aiPromptLanguageOf("de")).toBe("German (de)");
+    expect(legalLanguageOf("de")).toBe("en");
+    expect(tmdbImageLanguageOrderOf("de")).toBe("de,en,null");
+  });
+
   it("Türkçe ve İngilizce bağları değişmedi", () => {
     expect(tmdbLanguageOf("tr")).toBe("tr-TR");
     expect(tmdbRegionOf("tr")).toBe("TR");
@@ -146,7 +156,7 @@ describe("dil bağlı sabitler", () => {
   });
 
   it("bilinmeyen dilde İngilizce bağları döner", () => {
-    expect(tmdbLanguageOf("de")).toBe("en-US");
+    expect(tmdbLanguageOf("fr")).toBe("en-US");
     expect(intlLocaleOf("zz")).toBe("en-US");
   });
 });
@@ -168,12 +178,59 @@ describe("dil döngüsü ve eski bayrak göçü", () => {
     expect(legacyFlagToLanguage(false)).toBe("en");
     expect(legacyFlagToLanguage("es")).toBe("es");
     expect(legacyFlagToLanguage("pt")).toBe("pt");
+    expect(legacyFlagToLanguage("de")).toBe("de");
     expect(legacyFlagToLanguage("xx")).toBe("en");
   });
 
   it("isSupportedAppLanguage yalnız kayıtlı kodlara true", () => {
     expect(isSupportedAppLanguage("es")).toBe(true);
     expect(isSupportedAppLanguage("pt")).toBe(true);
-    expect(isSupportedAppLanguage("de")).toBe(false);
+    expect(isSupportedAppLanguage("de")).toBe(true);
+    expect(isSupportedAppLanguage("fr")).toBe(false);
+  });
+});
+
+describe("\"Yakında\" diller (henüz desteklenmeyen)", () => {
+  const BEKLENEN = ["fr", "ja", "ko", "it", "id", "hi", "ar", "zh"];
+
+  it("istenen sekiz dil listede, başka dil yok", () => {
+    expect(COMING_SOON_LANGUAGES.map((l) => l.code)).toEqual(BEKLENEN);
+  });
+
+  it("her kayıt ad, kendi adı ve bayrak taşır; kodlar benzersiz", () => {
+    const kodlar = new Set();
+    for (const dil of COMING_SOON_LANGUAGES) {
+      expect(dil.code).toMatch(/^[a-z]{2}$/);
+      expect(kodlar.has(dil.code)).toBe(false);
+      kodlar.add(dil.code);
+      for (const alan of ["name", "nativeName", "flag"]) {
+        expect(typeof dil[alan]).toBe("string");
+        expect(dil[alan].length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("desteklenen dillerle karışmaz: seçilemez, cihaz dilinde İngilizceye düşer", () => {
+    for (const dil of COMING_SOON_LANGUAGES) {
+      expect(SUPPORTED_LANGUAGE_CODES).not.toContain(dil.code);
+      expect(isSupportedAppLanguage(dil.code)).toBe(false);
+      expect(normalizeAppLanguage(dil.code)).toBe(FALLBACK_LANGUAGE);
+      expect(DESTEKLENEN_DILLER).not.toContain(dil.code);
+    }
+  });
+
+  it("liste dondurulmuş (çalışma anında değiştirilemez)", () => {
+    expect(Object.isFrozen(COMING_SOON_LANGUAGES)).toBe(true);
+    expect(COMING_SOON_LANGUAGES.every((l) => Object.isFrozen(l))).toBe(true);
+  });
+
+  it("Ayarlar > Dil sayfası listeyi gösterir ve satırlara dokunulamaz", () => {
+    const kaynak = fs.readFileSync(path.join(KOK, "screens/tabs/SettingsScreen.js"), "utf8");
+    expect(kaynak).toMatch(/COMING_SOON_LANGUAGES/);
+    expect(kaynak).toMatch(/autoI18n\.language_coming_soon/);
+    // "Yakında" satırı TouchableOpacity değil düz View: handleSelectLanguage'a bağlanamaz.
+    const soonBlok = kaynak.slice(kaynak.indexOf("if (item.soon) {"), kaynak.indexOf("const sel = item.code === language;"));
+    expect(soonBlok.length).toBeGreaterThan(100);
+    expect(soonBlok).not.toMatch(/onPress|handleSelectLanguage|TouchableOpacity/);
   });
 });

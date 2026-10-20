@@ -6,6 +6,7 @@
 
 import JSZip from "jszip";
 import { parseCsv } from "./csvParser";
+import { ImportError } from "./importErrors";
 
 /**
  * Letterboxd 0.5-5.0 yıldız puanını 1-10 skalasına çevirir.
@@ -40,7 +41,7 @@ export function normalizeLetterboxdRating(rawRating) {
  */
 export function parseLetterboxdBundle(filesMap) {
   if (!filesMap || typeof filesMap !== "object") {
-    throw new Error("Geçerli bir Letterboxd dosya paketi bulunamadı.");
+    throw new ImportError("noBundle", "No valid Letterboxd file bundle was found.");
   }
 
   // Dosya adlarını küçük harfe göre normalize et
@@ -278,7 +279,7 @@ export function parseLetterboxdBundle(filesMap) {
   const allItems = [...watchedItems, ...watchlistItems];
 
   if (allItems.length === 0) {
-    throw new Error("Paket içinde aktarılabilecek geçerli bir film verisi bulunamadı.");
+    throw new ImportError("noBundleItems", "The bundle has no valid movie data to import.");
   }
 
   return {
@@ -323,7 +324,7 @@ export async function parseLetterboxdZip(zipData, { isBase64 = true } = {}) {
   }
 
   if (Object.keys(filesMap).length === 0) {
-    throw new Error("ZIP arşivi içinde CSV formatında dosya bulunamadı.");
+    throw new ImportError("zipNoCsv", "No CSV files were found inside the ZIP archive.");
   }
 
   return parseLetterboxdBundle(filesMap);

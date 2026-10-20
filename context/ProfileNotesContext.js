@@ -249,12 +249,14 @@ export const ProfileNotesProvider = ({ children }) => {
                 en: "You've reached your to-do limit",
                 es: "Has alcanzado tu límite de tareas",
                 pt: "Você atingiu seu limite de tarefas",
+                de: "Du hast dein Aufgaben-Limit erreicht",
               }
             : {
                 tr: "Not limitin doldu",
                 en: "You've reached your notes limit",
                 es: "Has alcanzado tu límite de notas",
                 pt: "Você atingiu seu limite de notas",
+                de: "Du hast dein Notizen-Limit erreicht",
               },
         ),
       });

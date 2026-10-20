@@ -30,7 +30,7 @@ describe("cihazDilindenSec", () => {
   });
 
   it("desteklenmeyen dil yedek dile düşer (Türkçe'ye DEĞİL)", () => {
-    expect(cihazDilindenSec([locale("de")])).toBe("en");
+    expect(cihazDilindenSec([locale("fr")])).toBe("en");
     expect(cihazDilindenSec([locale("ar")])).toBe("en");
     expect(cihazDilindenSec([locale("ja")])).toBe("en");
   });

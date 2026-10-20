@@ -388,7 +388,102 @@ const pt = {
   platformAndroid: "Android",
 };
 
-export const BACKUP_COPY = { tr, en, es, pt };
+const de = {
+  title: "Einstellungen sichern",
+
+  heroTitle: "Deine Einstellungen in einer Datei",
+  heroText:
+    "Dein Design, eigene Designs, Schriftart, Effekte, Anordnung sowie Benachrichtigungs- und Widget-Einstellungen werden zusammen gespeichert. Stelle sie auf einem neuen Gerät oder nach einer Neuinstallation wieder her.",
+
+  sectionIncluded: "Was enthalten ist",
+  groupAppearance: "Darstellung",
+  groupAppearanceSub: "Design, eigene Designs, Schriftart, Effekte, Hintergründe",
+  groupLayout: "Poster- und Listenanordnung",
+  groupLayoutSub: "Spalten, Ecken, Markierungen, Ansichtspräferenzen",
+  groupContent: "Sprache und Inhalte",
+  groupContentSub: "Sprache, Plattformen, Genres, Bildqualität",
+  groupNotifications: "Benachrichtigungen und Haptik",
+  groupNotificationsSub: "Benachrichtigungstypen und Haptik",
+  groupData: "Datendownload",
+  groupDataSub: "Offline-Dateneinstellungen",
+  groupWidgets: "Widgets",
+  groupWidgetsSub: "Widget-Aussehen und Inhaltsauswahl",
+  groupSharing: "Teilen-Karten",
+  groupSharingSub: "Letzte Story- und Wrapped-Kartenauswahl",
+  groupPet: "Begleiter",
+  groupPetSub: "An/Aus, Größe und Position",
+  customized: "{n} angepasst",
+  allDefault: "Standard",
+  themeCount: "{n} eigene Designs",
+  themeCountOne: "1 eigenes Design",
+  notIncluded:
+    "Nicht enthalten: Kontodaten, Passwörter, App-Symbol, Cache, Benachrichtigungsberechtigungen und Abostatus.",
+
+  sectionExport: "Exportieren",
+  exportFile: "Als Datei speichern",
+  exportFileSub: "In „Dateien“ speichern oder teilen · {name}",
+  exportClipboard: "In die Zwischenablage kopieren",
+  exportClipboardSub: "Als Text, zum Senden in einer Nachricht",
+  exported: "Sicherung bereit",
+  copied: "Sicherung in die Zwischenablage kopiert",
+
+  sectionImport: "Importieren",
+  importFile: "Aus einer Datei importieren",
+  importFileSub: "Wähle eine Seelogd-Einstellungssicherung",
+  importClipboard: "Aus der Zwischenablage importieren",
+  importClipboardSub: "Kopierten Sicherungstext verwenden",
+  nothingToImport: "Diese Sicherung enthält keine anzuwendenden Einstellungen",
+
+  sectionRestore: "Rückgängig",
+  restoreTitle: "Letzten Import rückgängig machen",
+  restoreSub: "Zu deinen Einstellungen von vor dem {date} zurückkehren",
+  restoreConfirmTitle: "Zu deinen vorherigen Einstellungen zurückkehren?",
+  restoreConfirmBody:
+    "Einstellungen und eigene Designs, die der letzte Import gebracht hat, werden entfernt. Die App startet neu.",
+  restoreAction: "Rückgängig",
+  restored: "Vorherige Einstellungen wiederhergestellt",
+
+  sheetTitle: "Sicherung gefunden",
+  sheetFile: "Datei",
+  sheetWillApply: "{n} Einstellungen werden angewendet",
+  sheetWillApplyOne: "1 Einstellung wird angewendet",
+  sheetGroupLine: "{n} Einstellungen",
+  sheetGroupLineOne: "1 Einstellung",
+  sheetThemes: "Eigene Designs",
+  sheetThemesNew: "{n} neu",
+  sheetThemesUpdated: "{n} aktualisiert",
+  sheetThemesKept: "{n} deiner aktuellen Designs bleiben unberührt",
+  sheetThemesKeptOne: "1 deiner aktuellen Designs bleibt unberührt",
+  warnInvalid: "{n} Einstellungen sind ungültig und werden übersprungen",
+  warnInvalidOne: "1 Einstellung ist ungültig und wird übersprungen",
+  warnThemeMissing: "Das in der Sicherung gewählte Design wurde nicht gefunden, daher wird das Standarddesign verwendet",
+  warnThemesDropped: "{n} eigene Designs sind ungültig oder über dem Limit und werden nicht hinzugefügt",
+  warnThemesDroppedOne: "1 eigenes Design ist ungültig oder über dem Limit und wird nicht hinzugefügt",
+  restartNote: "Die App startet neu. Deine aktuellen Einstellungen bleiben erhalten, falls du es rückgängig machen möchtest.",
+  confirm: "Importieren",
+  cancel: "Abbrechen",
+  applying: "Wird angewendet…",
+
+  imported: "Einstellungen importiert",
+  importedPartial: "{n} Einstellungen konnten nicht angewendet werden",
+  importedPartialOne: "1 Einstellung konnte nicht angewendet werden",
+  manualRestartTitle: "Neu starten",
+  manualRestartBody: "Die Einstellungen sind gespeichert. Schließe die App und öffne sie erneut, damit alle wirksam werden.",
+
+  errEmpty: "Darin wurde keine Sicherung gefunden",
+  errNotBackup: "Das ist keine Seelogd-Einstellungssicherung",
+  errTooNew: "Diese Sicherung wurde mit einer neueren Version der App erstellt. Aktualisiere zuerst die App.",
+  errTooLarge: "Die Datei ist zu groß",
+  errReadFailed: "Die Datei konnte nicht gelesen werden",
+  errWriteFailed: "Die Sicherungsdatei konnte nicht erstellt werden",
+  errSharing: "Teilen ist auf diesem Gerät nicht verfügbar. Versuche, in die Zwischenablage zu kopieren.",
+  errClipboard: "Auf die Zwischenablage konnte nicht zugegriffen werden",
+
+  platformIos: "iOS",
+  platformAndroid: "Android",
+};
+
+export const BACKUP_COPY = { tr, en, es, pt, de };
 
 /**
  * Dile uygun metin paketi. Eski çağrılar `isEn` boolean'ı geçiyordu (true → İngilizce);

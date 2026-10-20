@@ -66,6 +66,7 @@ import ImageGalleryModal from "@components/modals/ImageGalleryModal";
 import TrailerSection from "@components/video/TrailerSection";
 import PaginatedRail from "../../components/PaginatedRail";
 import { i18nText } from "../../utils/i18nText";
+import { minutesText } from "../../utils/durationText";
 import { captureError } from "../../services/crashReporting";
 import { daysUntil, parseAirDate } from "../../utils/airDate";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
@@ -1207,7 +1208,7 @@ export default function MovieDetails({ navigation, route }) {
                 allowFontScaling={false}
                 style={[styles.statVal, { color: theme.text.primary }]}
               >
-                {details.runtime ? `${details.runtime} dk` : "?"}
+                {details.runtime ? minutesText(details.runtime) : "?"}
               </Text>
               <Text
                 allowFontScaling={false}

@@ -37,6 +37,10 @@ import { resolveBatchMedia } from "../../services/import/tmdbResolver";
 import { writeImportedCustomLists, writeImportedItems } from "../../services/import/importWriter";
 import { triggerHaptic } from "../../services/hapticsService";
 import ImportHelpModal from "./ImportHelpModal";
+import { useLanguage } from "../../context/LanguageContext";
+import { getImportCopy, importErrorText } from "./importCopy";
+import { renderRich } from "./richText";
+import { ImportError } from "../../services/import/importErrors";
 import Toast from "@components/AppToast";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
@@ -47,6 +51,8 @@ const SHEET_MAX_H = SCREEN_H * 0.88;
 
 export default function ImportDataModal({ visible, onClose }) {
   const { theme } = useTheme();
+  const { language } = useLanguage();
+  const copy = getImportCopy(language);
   const { user } = useAuth();
   const { displayName, username, avatarIndex, photoURL } = useUserProfile();
   const { refreshList } = useListStatusContext();
@@ -100,7 +106,7 @@ export default function ImportDataModal({ visible, onClose }) {
   // Tekil CSV Metnini Ayrıştır
   const handleParseText = (text, sourceFileName = null) => {
     if (!text || !text.trim()) {
-      Toast.show({ type: "error", text1: "Lütfen geçerli bir CSV verisi girin." });
+      Toast.show({ type: "error", text1: copy.pasteEmpty });
       return;
     }
 
@@ -108,8 +114,8 @@ export default function ImportDataModal({ visible, onClose }) {
       triggerHaptic("error");
       Toast.show({
         type: "error",
-        text1: "Geçersiz Dosya Formatı",
-        text2: "Seçilen dosya metin tabanlı bir CSV dosyası değil.",
+        text1: copy.invalidFileTitle,
+        text2: copy.invalidFileBody,
       });
       return;
     }
@@ -118,7 +124,7 @@ export default function ImportDataModal({ visible, onClose }) {
       const { headers } = parseCsv(text);
 
       if (!headers || headers.length === 0) {
-        throw new Error("Dosya boş veya sütun başlıkları okunamadı.");
+        throw new ImportError("emptyHeaders");
       }
 
       let parsed = null;
@@ -128,13 +134,11 @@ export default function ImportDataModal({ visible, onClose }) {
       } else if (isImdbCsv(headers)) {
         parsed = parseImdbCsv(text);
       } else {
-        throw new Error(
-          "Uyumsuz CSV formatı! Bu dosya Letterboxd veya IMDb dışa aktarımına ait görünmüyor. Lütfen Letterboxd ZIP dosyasını veya doğru CSV'yi seçin."
-        );
+        throw new ImportError("unrecognizedCsv");
       }
 
       if (!parsed.items || parsed.items.length === 0) {
-        throw new Error("Dosya içinde aktarılabilecek film veya dizi kaydı bulunamadı.");
+        throw new ImportError("noItemsInFile");
       }
 
       setParsedData(parsed);
@@ -145,16 +149,16 @@ export default function ImportDataModal({ visible, onClose }) {
       if (sourceFileName) {
         Toast.show({
           type: "success",
-          text1: `${sourceFileName} Yüklendi`,
-          text2: `${parsed.items.length} içerik başarıyla ayrıştırıldı.`,
+          text1: copy.loadedTitle(sourceFileName),
+          text2: copy.loadedBody(parsed.items.length),
         });
       }
     } catch (e) {
       triggerHaptic("error");
       Toast.show({
         type: "error",
-        text1: "CSV Doğrulama Hatası",
-        text2: e.message || "Lütfen dosya formatını kontrol edin.",
+        text1: copy.csvErrorTitle,
+        text2: importErrorText(e, copy, copy.csvErrorFallback),
       });
     }
   };
@@ -165,9 +169,9 @@ export default function ImportDataModal({ visible, onClose }) {
     const text = await Clipboard.getStringAsync();
     if (text && text.trim()) {
       setCsvText(text);
-      handleParseText(text, "Pano İçeriği");
+      handleParseText(text, copy.clipboardName);
     } else {
-      Toast.show({ type: "info", text1: "Panoda yapıştırılacak metin bulunamadı." });
+      Toast.show({ type: "info", text1: copy.clipboardEmpty });
     }
   };
 
@@ -230,11 +234,11 @@ export default function ImportDataModal({ visible, onClose }) {
           triggerHaptic("selection");
           Toast.show({
             type: "success",
-            text1: "Letterboxd Paketi Yüklendi",
-            text2: `${bundle.stats.totalUniqueItems} içerik ve ${bundle.stats.ratingsCount} puan tespit edildi.`,
+            text1: copy.bundleLoadedTitle,
+            text2: copy.bundleLoadedBody(bundle.stats.totalUniqueItems, bundle.stats.ratingsCount),
           });
         } catch (zipErr) {
-          throw new Error(`ZIP açılırken hata: ${zipErr.message}`);
+          throw zipErr instanceof ImportError ? zipErr : new ImportError("zipOpen", zipErr?.message);
         } finally {
           setIsProcessingFile(false);
         }
@@ -267,8 +271,8 @@ export default function ImportDataModal({ visible, onClose }) {
         setIsProcessingFile(false);
         Toast.show({
           type: "success",
-          text1: "Letterboxd Dosyaları Birleştirildi",
-          text2: `${bundle.stats.totalUniqueItems} içerik hazırlandı.`,
+          text1: copy.filesMergedTitle,
+          text2: copy.filesMergedBody(bundle.stats.totalUniqueItems),
         });
         return;
       }
@@ -292,12 +296,12 @@ export default function ImportDataModal({ visible, onClose }) {
 
       if (content && content.trim()) {
         setCsvText(content);
-        handleParseText(content, file.name || "CSV Dosyası");
+        handleParseText(content, file.name || copy.csvFileName);
       } else {
         Toast.show({
           type: "error",
-          text1: "Dosya Boş",
-          text2: "Seçilen dosyanın içi boş görünüyor.",
+          text1: copy.emptyFileTitle,
+          text2: copy.emptyFileBody,
         });
       }
     } catch (err) {
@@ -305,8 +309,8 @@ export default function ImportDataModal({ visible, onClose }) {
       triggerHaptic("error");
       Toast.show({
         type: "error",
-        text1: "İçerik Yüklenemedi",
-        text2: err.message || "Lütfen geçerli bir ZIP veya CSV dosyası seçin.",
+        text1: copy.loadFailedTitle,
+        text2: importErrorText(err, copy, copy.loadFailedFallback),
       });
     }
   };
@@ -347,13 +351,13 @@ export default function ImportDataModal({ visible, onClose }) {
     const customItemsToImport = getCustomItemsToImport();
     const allItemsToResolve = [...itemsToImport, ...customItemsToImport];
     if (!allItemsToResolve.length || !user?.uid) {
-      Toast.show({ type: "info", text1: "Aktarılacak içerik bulunamadı." });
+      Toast.show({ type: "info", text1: copy.nothingToImport });
       return;
     }
 
     setStep("importing");
     setProgress(0);
-    setProgressText("İçerikler TMDB ile eşleştiriliyor...");
+    setProgressText(copy.matching);
 
     try {
       // 1. TMDB Eşleme (Concurrency 5 ile paralel çözümleme)
@@ -361,16 +365,16 @@ export default function ImportDataModal({ visible, onClose }) {
         onProgress: (current, total, currentItem) => {
           const ratio = (current / total) * 0.65;
           setProgress(ratio);
-          setProgressText(`Eşleştiriliyor: ${current} / ${total}\n${currentItem}`);
+          setProgressText(copy.matchingProgress(current, total, currentItem));
         },
       });
 
       if (resolvedItems.length === 0) {
-        throw new Error("TMDB veritabanında eşleşen film bulunamadı.");
+        throw new ImportError("noTmdbMatch");
       }
 
       // 2. Firestore'a Güvenli Batch Yazma (Lists + myRatings + myComments / MovieComment)
-      setProgressText("Seelogd listelerinize, puanlarınıza ve incelemelerinize kaydediliyor...");
+      setProgressText(copy.saving);
       const standardResolvedItems = resolvedItems.filter((item) => !item.customListName);
       const customResolvedItems = resolvedItems.filter((item) => item.customListName);
       const stats = await writeImportedItems(user.uid, standardResolvedItems, {
@@ -383,7 +387,7 @@ export default function ImportDataModal({ visible, onClose }) {
         onProgress: (savedCount, total) => {
           const ratio = 0.65 + (savedCount / total) * 0.25;
           setProgress(ratio);
-          setProgressText(`Kaydediliyor: ${savedCount} / ${total}`);
+          setProgressText(copy.savingProgress(savedCount, total));
         },
       });
 
@@ -394,7 +398,7 @@ export default function ImportDataModal({ visible, onClose }) {
         return groups;
       }, new Map()).entries()].map(([name, items]) => ({ name, items }));
       setProgress(0.94);
-      setProgressText("Özel Letterboxd listeleri birleştiriliyor...");
+      setProgressText(copy.mergingLists);
       const customStats = await writeImportedCustomLists(user.uid, customGroups);
       const finalStats = {
         ...stats,
@@ -413,8 +417,8 @@ export default function ImportDataModal({ visible, onClose }) {
     } catch (e) {
       Toast.show({
         type: "error",
-        text1: "İçe aktarma sırasında hata oluştu",
-        text2: `${e.message || "Beklenmeyen bir hata oluştu."} Tamamlanan kayıtlar korunur; güvenle yeniden deneyebilirsiniz.`,
+        text1: copy.importFailedTitle,
+        text2: copy.importFailedBody(e instanceof ImportError ? importErrorText(e, copy) : copy.unexpected),
       });
       setStep("preview");
     }
@@ -470,7 +474,7 @@ export default function ImportDataModal({ visible, onClose }) {
                 <AppIcon family="Ionicons" name="cloud-upload" size={20} color={theme.accent || "#138DF0"} />
               </View>
               <Text style={[styles.headerTitle, { color: theme.text.primary }]}>
-                Letterboxd / IMDb Aktar
+                {copy.title}
               </Text>
             </View>
 
@@ -495,14 +499,14 @@ export default function ImportDataModal({ visible, onClose }) {
               <View style={styles.stepContainer}>
                 <View style={styles.helpRow}>
                   <Text style={[styles.stepDesc, { color: theme.text.secondary }]}>
-                    İndirilen ZIP dosyasını veya CSV'leri seçin. İzlenenler, puanlar, incelemeler ve izleme listesi mevcut kayıtlar korunarak birleştirilir.
+                    {copy.inputDesc}
                   </Text>
                   <GlassTouchable
                     onPress={() => setShowHelpModal(true)}
                     style={[styles.helpTrigger, { backgroundColor: alpha(theme.accent, 0.12), borderColor: alpha(theme.accent, 0.28) }]}
                   >
                     <AppIcon family="Ionicons" name="help-circle-outline" size={14} color={theme.accent} />
-                    <Text style={[styles.helpTriggerText, { color: theme.accent }]}>Nasıl Alınır?</Text>
+                    <Text style={[styles.helpTriggerText, { color: theme.accent }]}>{copy.howTo}</Text>
                   </GlassTouchable>
                 </View>
 
@@ -518,7 +522,7 @@ export default function ImportDataModal({ visible, onClose }) {
                   ) : (
                     <>
                       <AppIcon family="Ionicons" name="archive-outline" size={22} color="#FFF" />
-                      <Text style={styles.filePickBtnText}>Letterboxd ZIP veya CSV Seç</Text>
+                      <Text style={styles.filePickBtnText}>{copy.pickBtn}</Text>
                     </>
                   )}
                 </GlassTouchable>
@@ -527,20 +531,20 @@ export default function ImportDataModal({ visible, onClose }) {
                 <View style={[styles.infoBanner, { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.5), borderColor: alpha(theme.border || "#444", 0.3) }]}>
                   <AppIcon family="Ionicons" name="sparkles-outline" size={16} color={theme.accent} />
                   <Text style={[styles.infoBannerText, { color: theme.text.secondary }]}>
-                    <Text style={{ fontWeight: "700", color: theme.text.primary }}>Otomatik Paket Çözücü:</Text> Zip arşivi içindeki <Text style={{ color: theme.accent }}>watched.csv</Text>, <Text style={{ color: theme.accent }}>diary.csv</Text>, <Text style={{ color: theme.accent }}>ratings.csv</Text> ve <Text style={{ color: theme.accent }}>watchlist.csv</Text> otomatik taranır.
+                    <Text style={{ fontWeight: "700", color: theme.text.primary }}>{copy.autoPackLead}</Text> {renderRich(copy.autoPackBody, { color: theme.accent })}
                   </Text>
                 </View>
 
                 <View style={styles.orRow}>
                   <View style={[styles.orLine, { backgroundColor: theme.border || "#333" }]} />
-                  <Text style={[styles.orText, { color: theme.text.muted }]}>VEYA METİN OLARAK YAPIŞTIR</Text>
+                  <Text style={[styles.orText, { color: theme.text.muted }]}>{copy.orPaste}</Text>
                   <View style={[styles.orLine, { backgroundColor: theme.border || "#333" }]} />
                 </View>
 
                 <GlassBox role="field" style={[styles.inputBox, { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.4), borderColor: alpha(theme.border || "#444", 0.4) }]}>
                   <TextInput
                     style={[styles.textInput, { color: theme.text.primary }]}
-                    placeholder="CSV metnini buraya yapıştırın..."
+                    placeholder={copy.pastePlaceholder}
                     placeholderTextColor={theme.text.muted}
                     multiline
                     numberOfLines={3}
@@ -554,7 +558,7 @@ export default function ImportDataModal({ visible, onClose }) {
                   >
                     <AppIcon family="Ionicons" name="clipboard-outline" size={15} color={theme.accent || "#138DF0"} />
                     <Text style={[styles.pasteBtnText, { color: theme.accent || "#138DF0" }]}>
-                      Panodan Yapıştır
+                      {copy.pasteBtn}
                     </Text>
                   </GlassTouchable>
                 </GlassBox>
@@ -562,9 +566,9 @@ export default function ImportDataModal({ visible, onClose }) {
                 {csvText.trim().length > 0 && (
                   <GlassTouchable
                     style={[styles.parseBtn, { backgroundColor: alpha(theme.accent, 0.2), borderColor: theme.accent }]}
-                    onPress={() => handleParseText(csvText, "Yapıştırılan Metin")}
+                    onPress={() => handleParseText(csvText, copy.pastedTextName)}
                   >
-                    <Text style={[styles.parseBtnText, { color: theme.accent }]}>Verileri Ayrıştır & Önizle</Text>
+                    <Text style={[styles.parseBtnText, { color: theme.accent }]}>{copy.parseBtn}</Text>
                   </GlassTouchable>
                 )}
               </View>
@@ -579,7 +583,7 @@ export default function ImportDataModal({ visible, onClose }) {
                     <View style={styles.previewHeader}>
                       <AppIcon family="Ionicons" name="file-tray-stacked" size={22} color={theme.accent} />
                       <Text style={[styles.previewSource, { color: theme.text.primary }]}>
-                        Letterboxd Paketi Tespit Edildi
+                        {copy.bundleDetected}
                       </Text>
                     </View>
 
@@ -598,9 +602,9 @@ export default function ImportDataModal({ visible, onClose }) {
                         <View style={styles.customListsToggleInfo}>
                           <AppIcon family="Ionicons" name="albums-outline" size={18} color={includeCustomLists ? theme.accent : theme.text.muted} />
                           <View>
-                            <Text style={[styles.customListsToggleTitle, { color: theme.text.primary }]}>Özel Letterboxd Listeleri</Text>
+                            <Text style={[styles.customListsToggleTitle, { color: theme.text.primary }]}>{copy.customLists}</Text>
                             <Text style={[styles.customListsToggleDesc, { color: theme.text.secondary }]}>
-                              {parsedData.stats.listsCount} liste · {customItemsToImport.length} içerik
+                              {copy.customListsMeta(parsedData.stats.listsCount, customItemsToImport.length)}
                             </Text>
                           </View>
                         </View>
@@ -635,7 +639,7 @@ export default function ImportDataModal({ visible, onClose }) {
                           {parsedData.stats.watchedCount}
                         </Text>
                         <Text style={[styles.bundleStatLabel, { color: theme.text.secondary }]}>
-                          İzlenen Filmler
+                          {copy.watchedMovies}
                         </Text>
                       </GlassTouchable>
 
@@ -664,7 +668,7 @@ export default function ImportDataModal({ visible, onClose }) {
                           {parsedData.stats.watchlistCount}
                         </Text>
                         <Text style={[styles.bundleStatLabel, { color: theme.text.secondary }]}>
-                          İzleme Listesi
+                          {copy.watchlist}
                         </Text>
                       </GlassTouchable>
                     </View>
@@ -673,20 +677,20 @@ export default function ImportDataModal({ visible, onClose }) {
                     <View style={styles.extraStatsRow}>
                       <View style={[styles.miniBadge, { backgroundColor: alpha("#FFD700", 0.15) }]}>
                         <Text style={[styles.miniBadgeText, { color: "#FFD700" }]}>
-                          ⭐ {parsedData.stats.ratingsCount} Film Puanı
+                          {copy.ratingsBadge(parsedData.stats.ratingsCount)}
                         </Text>
                       </View>
                       {parsedData.stats.reviewsCount > 0 && (
                         <View style={[styles.miniBadge, { backgroundColor: alpha(theme.accent, 0.15) }]}>
                           <Text style={[styles.miniBadgeText, { color: theme.accent }]}>
-                            ✍️ {parsedData.stats.reviewsCount} İnceleme
+                            {copy.reviewsBadge(parsedData.stats.reviewsCount)}
                           </Text>
                         </View>
                       )}
                     </View>
 
                     <Text style={[styles.sampleTitle, { color: theme.text.secondary, marginTop: 14 }]}>
-                      Örnek İçerikler:
+                      {copy.sampleTitle}
                     </Text>
                     {parsedData.watchedItems.slice(0, 3).map((item, idx) => (
                       <View key={idx} style={styles.sampleItem}>
@@ -710,7 +714,7 @@ export default function ImportDataModal({ visible, onClose }) {
                         color={theme.accent}
                       />
                       <Text style={[styles.previewSource, { color: theme.text.primary }]}>
-                        {parsedData.source === "letterboxd" ? "Letterboxd" : "IMDb"} Dosyası Tespit Edildi
+                        {copy.fileDetected(parsedData.source === "letterboxd" ? "Letterboxd" : "IMDb")}
                       </Text>
                     </View>
 
@@ -719,7 +723,7 @@ export default function ImportDataModal({ visible, onClose }) {
                         <Text style={[styles.statNum, { color: theme.text.primary }]}>
                           {parsedData.items?.length || 0}
                         </Text>
-                        <Text style={[styles.statLabel, { color: theme.text.secondary }]}>Toplam İçerik</Text>
+                        <Text style={[styles.statLabel, { color: theme.text.secondary }]}>{copy.totalItems}</Text>
                       </View>
                     </View>
 
@@ -727,24 +731,24 @@ export default function ImportDataModal({ visible, onClose }) {
                       <View style={styles.extraStatsRow}>
                         {parsedData.items?.some((item) => item.rating) && (
                           <View style={[styles.miniBadge, { backgroundColor: alpha("#FFD700", 0.15) }]}>
-                            <Text style={[styles.miniBadgeText, { color: "#FFD700" }]}>⭐ {parsedData.items.filter((item) => item.rating).length} Puan</Text>
+                            <Text style={[styles.miniBadgeText, { color: "#FFD700" }]}>{copy.singleRatings(parsedData.items.filter((item) => item.rating).length)}</Text>
                           </View>
                         )}
                         {parsedData.items?.some((item) => item.review) && (
                           <View style={[styles.miniBadge, { backgroundColor: alpha(theme.accent, 0.15) }]}>
-                            <Text style={[styles.miniBadgeText, { color: theme.accent }]}>✍️ {parsedData.items.filter((item) => item.review).length} İnceleme</Text>
+                            <Text style={[styles.miniBadgeText, { color: theme.accent }]}>{copy.reviewsBadge(parsedData.items.filter((item) => item.review).length)}</Text>
                           </View>
                         )}
                       </View>
                     )}
 
                     {/* Target List Selector */}
-                    <Text style={[styles.selectorTitle, { color: theme.text.secondary }]}>Hedef Liste Seçin:</Text>
+                    <Text style={[styles.selectorTitle, { color: theme.text.secondary }]}>{copy.targetTitle}</Text>
                     <View style={styles.targetListSelector}>
                       {[
-                        { key: "watchedMovies", label: "İzlenenler", icon: "film-outline" },
-                        { key: "watchList", label: "İzleme Listesi", icon: "bookmark-outline" },
-                        { key: "favorites", label: "Favoriler", icon: "heart-outline" },
+                        { key: "watchedMovies", label: copy.targetWatched, icon: "film-outline" },
+                        { key: "watchList", label: copy.targetWatchlist, icon: "bookmark-outline" },
+                        { key: "favorites", label: copy.targetFavorites, icon: "heart-outline" },
                       ].map((tgt) => (
                         <GlassTouchable
                           key={tgt.key}
@@ -779,7 +783,7 @@ export default function ImportDataModal({ visible, onClose }) {
                     </View>
 
                     <Text style={[styles.sampleTitle, { color: theme.text.secondary, marginTop: 14 }]}>
-                      Örnek İçerikler:
+                      {copy.sampleTitle}
                     </Text>
                     {parsedData.items?.slice(0, 3).map((item, idx) => (
                       <View key={idx} style={styles.sampleItem}>
@@ -799,7 +803,7 @@ export default function ImportDataModal({ visible, onClose }) {
                     style={[styles.backStepBtn, { backgroundColor: alpha(theme.secondary || "#333", 0.8) }]}
                     onPress={() => setStep("input")}
                   >
-                    <Text style={[styles.backStepText, { color: theme.text.primary }]}>Geri Dön</Text>
+                    <Text style={[styles.backStepText, { color: theme.text.primary }]}>{copy.back}</Text>
                   </GlassTouchable>
 
                   <GlassTouchable
@@ -812,7 +816,7 @@ export default function ImportDataModal({ visible, onClose }) {
                     disabled={totalItemsToImport === 0}
                   >
                     <Text style={styles.importBtnText}>
-                      Aktarımı Başlat ({totalItemsToImport})
+                      {copy.start(totalItemsToImport)}
                     </Text>
                   </GlassTouchable>
                 </View>
@@ -837,7 +841,7 @@ export default function ImportDataModal({ visible, onClose }) {
                   />
                 </View>
                 <Text style={[styles.progressPercent, { color: theme.text.secondary }]}>
-                  %{Math.min(100, Math.round(progress * 100))}
+                  {copy.percent(Math.min(100, Math.round(progress * 100)))}
                 </Text>
               </View>
             )}
@@ -849,26 +853,26 @@ export default function ImportDataModal({ visible, onClose }) {
                   <AppIcon family="Ionicons" name="checkmark-circle" size={48} color="#64FF64" />
                 </View>
                 <Text style={[styles.successTitle, { color: theme.text.primary }]}>
-                  Aktarım Başarıyla Tamamlandı!
+                  {copy.successTitle}
                 </Text>
                 <Text style={[styles.successDesc, { color: theme.text.secondary }]}>
-                  Toplam <Text style={{ fontWeight: "800", color: theme.text.primary }}>{importStats.count}</Text> içerik güvenle işlendi.
-                  {importStats.addedWatchEventsCount > 0 && `\n🎬 ${importStats.addedWatchEventsCount} eksik izleme kaydı eklendi.`}
-                  {importStats.ratingsCount > 0 && `\n⭐ ${importStats.ratingsCount} eksik puan profilinize işlendi.`}
-                  {importStats.reviewsCount > 0 && `\n✍️ ${importStats.reviewsCount} eksik inceleme yorumlarınıza aktarıldı.`}
-                  {(importStats.preservedRatingsCount > 0 || importStats.preservedReviewsCount > 0) && `\n🛡️ Mevcut puan ve yorumlarınız değiştirilmedi.`}
-                  {importStats.unchangedCount > 0 && `\n✓ ${importStats.unchangedCount} içerik zaten günceldi.`}
-                  {importStats.watchlistCount > 0 && `\n📌 ${importStats.watchlistCount} izleme listesi kaydı kontrol edildi.`}
-                  {importStats.favoritesCount > 0 && `\n❤️ ${importStats.favoritesCount} favori kaydı kontrol edildi.`}
-                  {importStats.customListsCount > 0 && `\n📚 ${importStats.customListsCount} özel liste, ${importStats.customListItemsCount} yeni içerikle birleştirildi.`}
-                  {importStats.unmatchedCount > 0 && `\n⚠️ ${importStats.unmatchedCount} içerik TMDB ile eşleşmediği için atlandı.`}
+                  {renderRich(copy.successTotal(importStats.count), { fontWeight: "800", color: theme.text.primary })}
+                  {importStats.addedWatchEventsCount > 0 && `\n${copy.addedWatchEvents(importStats.addedWatchEventsCount)}`}
+                  {importStats.ratingsCount > 0 && `\n${copy.addedRatings(importStats.ratingsCount)}`}
+                  {importStats.reviewsCount > 0 && `\n${copy.addedReviews(importStats.reviewsCount)}`}
+                  {(importStats.preservedRatingsCount > 0 || importStats.preservedReviewsCount > 0) && `\n${copy.preserved}`}
+                  {importStats.unchangedCount > 0 && `\n${copy.unchanged(importStats.unchangedCount)}`}
+                  {importStats.watchlistCount > 0 && `\n${copy.checkedWatchlist(importStats.watchlistCount)}`}
+                  {importStats.favoritesCount > 0 && `\n${copy.checkedFavorites(importStats.favoritesCount)}`}
+                  {importStats.customListsCount > 0 && `\n${copy.mergedCustomLists(importStats.customListsCount, importStats.customListItemsCount)}`}
+                  {importStats.unmatchedCount > 0 && `\n${copy.skippedUnmatched(importStats.unmatchedCount)}`}
                 </Text>
 
                 <GlassTouchable
                   style={[styles.doneBtn, { backgroundColor: theme.accent || "#138DF0" }]}
                   onPress={onClose}
                 >
-                  <Text style={styles.doneBtnText}>Tamam</Text>
+                  <Text style={styles.doneBtnText}>{copy.done}</Text>
                 </GlassTouchable>
               </View>
             )}

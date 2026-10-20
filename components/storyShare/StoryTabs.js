@@ -1,11 +1,13 @@
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
+import { useLanguage } from "../../context/LanguageContext";
 import { i18nText } from "../../utils/i18nText";
 
 
-const TABS = [
+// Etiketler çizim anında çözülür: modül yüklenirken dondurulursa dil değişince eski dilde kalır.
+const buildTabs = () => [
   { id: "background", icon: "image-outline", label: i18nText("autoI18n.arka_plan", "Arka Plan") },
   { id: "poster", icon: "film-outline", label: "Poster" },
   { id: "content", icon: "layers-outline", label: i18nText("autoI18n.icerik", "İçerik") },
@@ -17,6 +19,8 @@ const TABS = [
 // etiket sığmazsa tek satırda küçülür.
 function StoryTabsComponent({ activeTab, onChangeTab }) {
   const { theme } = useTheme();
+  const { language } = useLanguage();
+  const TABS = useMemo(buildTabs, [language]);
   return (
     <View style={[styles.row, { borderBottomColor: theme.border }]}>
       {TABS.map((tab) => {

@@ -316,11 +316,87 @@ const pt = {
   },
 };
 
-export const YEARLY_GOAL_COPY = { tr, en, es, pt };
+const de = {
+  editLabel: "Seh-Ziel {year} bearbeiten",
+  emptyTitle: "Setze dein Ziel für {year}",
+  ringLabel: "Ziel {year}: {summary}",
+  summaryPart: "{name} {count} von {target}",
+  tracks: {
+    movies: {
+      name: "Filme",
+      unit: "Filme",
+      hint: "Die verschiedenen Filme, die du dieses Jahr gesehen hast. Erneutes Ansehen desselben Films zählt einmal.",
+    },
+    shows: { name: "Serien" },
+  },
+  measures: {
+    shows: {
+      name: "Anzahl der Serien",
+      unit: "Serien",
+      hint: "Die verschiedenen Serien, von denen du dieses Jahr mindestens eine Folge gesehen hast.",
+    },
+    episodes: {
+      name: "Anzahl der Folgen",
+      unit: "Folgen",
+      hint: "Die verschiedenen Folgen, die du dieses Jahr gesehen hast. Erneutes Ansehen derselben Folge zählt einmal.",
+    },
+  },
+  overall: {
+    ahead: "Du liegst vor dem Plan",
+    onTrack: "Genau im Plan",
+    behind: "Du liegst hinter dem Plan",
+    done: "Ziel erreicht",
+  },
+  pace: {
+    ahead: "{n} voraus",
+    behind: "{n} im Rückstand",
+    onTrack: "Im Plan",
+    done: "Fertig",
+  },
+  clock: {
+    line: "Jahr zu {pct} geschafft · {days}",
+    daysLeft: "Noch {n} Tage",
+    dayLeft: "Noch 1 Tag",
+    lastDay: "Letzter Tag",
+  },
+  stats: {
+    soFar: "Bisher {n}",
+    planToday: "Plan: {n} bis heute",
+    remaining: "Noch offen",
+    over: "Extra",
+    perWeek: "Pro Woche",
+    perMonth: "Pro Monat",
+    projected: "Jahresende",
+    none: "—",
+  },
+  chart: {
+    title: "Monatsplan",
+    plan: "Etwa {n} pro Monat, um es zu schaffen",
+    empty: "Dieses Jahr noch nichts gesehen; die Balken füllen sich, während du schaust.",
+  },
+  sheet: {
+    title: "Seh-Ziel {year}",
+    subtitle: "Du kannst getrennte Ziele für Filme und Serien festlegen.",
+    previewTag: "Vorschau",
+    toggleMovies: "Filmziel",
+    toggleShows: "Serienziel",
+    measureLabel: "Was zählen wir?",
+    decrease: "Ziel senken",
+    increase: "Ziel erhöhen",
+    needTrack: "Aktiviere ein Film- oder Serienziel, um zu speichern.",
+    noSummary: "Aktiviere ein Ziel; Fortschritt und Plan erscheinen hier.",
+    save: "Speichern",
+    remove: "Ziel entfernen",
+    close: "Schließen",
+    saveFailed: "Das Ziel konnte nicht gespeichert werden",
+  },
+};
+
+export const YEARLY_GOAL_COPY = { tr, en, es, pt, de };
 
 /** Uygulama diline uygun tablo (tabloda olmayan dil → İngilizce). */
 export const getYearlyGoalCopy = (language) =>
-  YEARLY_GOAL_COPY[copyLanguage(language, ["tr", "en", "es", "pt"])];
+  YEARLY_GOAL_COPY[copyLanguage(language, ["tr", "en", "es", "pt", "de"])];
 
 /** `{ad}` yer tutucularını doldurur; verilmeyen yer tutucu olduğu gibi kalır. */
 export const fillCopy = (text, values = {}) =>
@@ -330,12 +406,12 @@ export const fillCopy = (text, values = {}) =>
 export function formatGoalNumber(value, language) {
   const rounded = Math.round(Number(value) * 10) / 10;
   const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-  return copyLanguage(language, ["tr", "en", "es", "pt"]) === "en" ? text : text.replace(".", ",");
+  return copyLanguage(language, ["tr", "en", "es", "pt", "de"]) === "en" ? text : text.replace(".", ",");
 }
 
 /** Yüzde gösterimi: tr "%62", diğer diller "62%". */
 export const formatPercent = (percent, language) =>
-  copyLanguage(language, ["tr", "en", "es", "pt"]) === "tr" ? `%${percent}` : `${percent}%`;
+  copyLanguage(language, ["tr", "en", "es", "pt", "de"]) === "tr" ? `%${percent}` : `${percent}%`;
 
 /** Yılın saati satırı: "Yıl %50 tamamlandı · 183 gün kaldı". */
 export function describeYearClock(clock, copy, language) {

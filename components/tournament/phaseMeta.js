@@ -9,26 +9,26 @@ import { copyLanguage } from "../../utils/appLanguages";
 
 export const PHASE_META = {
   selection: {
-    tr: "Aday Belirleme", en: "Selection", es: "Selección de candidatos", pt: "Seleção de candidatos", icon: "list",
+    tr: "Aday Belirleme", en: "Selection", es: "Selección de candidatos", pt: "Seleção de candidatos", de: "Auswahl", icon: "list",
     color: "#3B82F6",
     gradient: ["#2563EB", "#7C3AED"],
   },
   voting: {
-    tr: "Oylama", en: "Voting", es: "Votación", pt: "Votação", icon: "flame",
+    tr: "Oylama", en: "Voting", es: "Votación", pt: "Votação", de: "Abstimmung", icon: "flame",
     color: "#F59E0B",
     gradient: ["#EA580C", "#DC2626"],
   },
   results: {
-    tr: "Sonuçlar", en: "Results", es: "Resultados", pt: "Resultados", icon: "trophy",
+    tr: "Sonuçlar", en: "Results", es: "Resultados", pt: "Resultados", de: "Ergebnisse", icon: "trophy",
     color: "#F5C518",
     gradient: ["#D97706", "#F5C518"],
   },
   upcoming: {
-    tr: "Yakında", en: "Upcoming", es: "Próximamente", pt: "Em breve", icon: "time",
+    tr: "Yakında", en: "Upcoming", es: "Próximamente", pt: "Em breve", de: "Demnächst", icon: "time",
     color: "#6B7280",
     gradient: ["#4B5563", "#1F2937"],
   },
 };
 
 /** Faz adı: dile uygun, yoksa İngilizce (utils/appLanguages kuralı). */
-export const phaseLabel = (meta, lang) => meta?.[copyLanguage(lang, ["tr", "en", "es", "pt"])] || meta?.en || "";
+export const phaseLabel = (meta, lang) => meta?.[copyLanguage(lang, ["tr", "en", "es", "pt", "de"])] || meta?.en || "";

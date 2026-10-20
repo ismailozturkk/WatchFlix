@@ -13,6 +13,7 @@ import GlassCloseButton from "@components/common/GlassCloseButton";
 import PosterImage from "@components/PosterImage";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
+import { hoursMinutesText } from "@utils/durationText";
 import * as Haptics from "@services/hapticsService";
 import { buildGenreMap } from "@utils/genreLabels";
 import GlassTouchable from "../common/GlassTouchable";
@@ -23,11 +24,7 @@ const DANGER = "#ef4444";
 function formatItemDuration(item) {
   if (!item) return null;
   const mins = Number(item.minutes);
-  if (mins > 0) {
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return h > 0 ? `${h} sa ${m > 0 ? `${m} dk` : ""}` : `${mins} dk`;
-  }
+  if (mins > 0) return hoursMinutesText(mins);
   let totalMins = Number(item.totalMinutes) || 0;
   if (!totalMins && Array.isArray(item.seasons)) {
     item.seasons.forEach((s) => {
@@ -38,13 +35,9 @@ function formatItemDuration(item) {
       });
     });
   }
-  if (totalMins > 0) {
-    const h = Math.floor(totalMins / 60);
-    const m = totalMins % 60;
-    return h > 0 ? `${h} sa ${m > 0 ? `${m} dk` : ""}` : `${totalMins} dk`;
-  }
+  if (totalMins > 0) return hoursMinutesText(totalMins);
   if (item.showEpisodeCount) {
-    return `${item.showEpisodeCount} ${i18nText("autoI18n.bolum", "bölüm")}`;
+    return i18nText("autoI18n.n_bolum", "{{count}} bölüm", { count: item.showEpisodeCount });
   }
   return null;
 }

@@ -82,5 +82,5 @@ export function countEventsInMonth(noteEvents, reminderEvents, monthKey) {
 /** "S1B3" (TR) / "S1E3" (EN). Sezon ya da bölüm yoksa boş dizgi. */
 export function formatEpisodeCode(seasonNumber, episodeNumber, language) {
   if (seasonNumber == null || episodeNumber == null) return "";
-  return `${pickByLanguage(language, { tr: "S", en: "S", es: "T", pt: "T" })}${seasonNumber}${pickByLanguage(language, { tr: "B", en: "E", es: "E", pt: "E" })}${episodeNumber}`;
+  return `${pickByLanguage(language, { tr: "S", en: "S", es: "T", pt: "T", de: "S" })}${seasonNumber}${pickByLanguage(language, { tr: "B", en: "E", es: "E", pt: "E", de: "E" })}${episodeNumber}`;
 }

@@ -298,7 +298,7 @@ export default function LoginScreen({ navigation }) {
           type: "success",
           text1:
             i18nText("autoI18n.hos_geldin", "Hoş geldin, ") +
-            (user.displayName || user.email || (language === "tr" ? "Apple kullanıcısı" : language === "es" ? "Usuario de Apple" : language === "pt" ? "Usuário da Apple" : "Apple user")),
+            (user.displayName || user.email || (language === "tr" ? "Apple kullanıcısı" : language === "es" ? "Usuario de Apple" : language === "pt" ? "Usuário da Apple" : language === "de" ? "Apple-Nutzer" : "Apple user")),
         });
         navigation.reset({ index: 0, routes: [{ name: "TabScreen" }] });
       }
@@ -306,7 +306,7 @@ export default function LoginScreen({ navigation }) {
       if (error?.code === AppleAuthCode.CANCELLED) return;
       Toast.show({
         type: "error",
-        text1: language === "tr" ? "Apple ile giriş başarısız" : language === "es" ? "No se pudo iniciar sesión con Apple" : language === "pt" ? "Não foi possível entrar com a Apple" : "Sign in with Apple failed",
+        text1: language === "tr" ? "Apple ile giriş başarısız" : language === "es" ? "No se pudo iniciar sesión con Apple" : language === "pt" ? "Não foi possível entrar com a Apple" : language === "de" ? "Anmeldung mit Apple fehlgeschlagen" : "Sign in with Apple failed",
         text2: describeAppleAuthError(error, language),
       });
     } finally {

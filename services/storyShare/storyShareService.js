@@ -5,6 +5,7 @@
 
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
+import { i18nText } from "../../utils/i18nText";
 import * as MediaLibrary from "expo-media-library";
 // SDK 57: `saveToLibraryAsync` ana giriste calisma aninda hata firlatiyor;
 // legacy girisinden alinmali (izin fonksiyonlari ana giriste gecerli).
@@ -58,12 +59,12 @@ export function toShareableUri(fileUri) {
 export async function shareStoryImage(fileUri) {
   const isAvailable = await Sharing.isAvailableAsync();
   if (!isAvailable) {
-    throw new Error("Bu cihazda paylaşım özelliği desteklenmiyor.");
+    throw new Error(i18nText("autoI18n.paylasim_desteklenmiyor", "Bu cihazda paylaşım özelliği desteklenmiyor."));
   }
 
   await Sharing.shareAsync(toShareableUri(fileUri), {
     mimeType: "image/png",
-    dialogTitle: "Sinema Kartını Paylaş",
+    dialogTitle: i18nText("autoI18n.sinema_karti_paylas_baslik", "Sinema kartını paylaş"),
     UTI: "public.png",
   });
 }

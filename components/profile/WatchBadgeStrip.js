@@ -37,7 +37,7 @@ const KOMPAKT_ROZET_BOYUT = 30;
 function WatchBadgeStrip({ progress, onPress, compact = false }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const lang = copyLanguage(language, ["tr", "en", "es", "pt"]);
+  const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
   const { loading, kartlar, acikSayisi, toplamRozet } = progress || {};
   // Simgeye dokunmak DETAY MODALINI açar, Rozetler ekranına GİTMEZ. Gezinme
   // sonundaki sayaç çipinde kalır: raf bir vitrin, her simge kendi hikâyesini
@@ -75,7 +75,7 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
         <GlassTouchable
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={pickByLanguage(lang, { tr: "Tüm rozetler", en: "All badges", es: "Todas las insignias", pt: "Todos os emblemas" })}
+          accessibilityLabel={pickByLanguage(lang, { tr: "Tüm rozetler", en: "All badges", es: "Todas las insignias", pt: "Todos os emblemas", de: "Alle Abzeichen" })}
           onPress={onPress}
           style={[
             styles.hepsi,

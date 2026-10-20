@@ -47,13 +47,13 @@ const library = () =>
       },
       ratings: { movie_1: 8, movie_2: 7.5, tv_10: 9, movie_999: 6, bozuk: 5, movie_3: 0 },
     },
-    { now: NOW, appVersion: "1.4.8", platform: "ios" },
+    { now: NOW, appVersion: "1.4.9", platform: "ios" },
   );
 
 describe("buildLibrarySnapshot", () => {
   it("üst bilgi ve sayaçlar", () => {
     const snap = library();
-    expect(snap).toMatchObject({ app: "seelogd", kind: "library-export", version: 1, appVersion: "1.4.8", platform: "ios" });
+    expect(snap).toMatchObject({ app: "seelogd", kind: "library-export", version: 1, appVersion: "1.4.9", platform: "ios" });
     expect(snap.exportedAt).toBe(NOW.toISOString());
     expect(snap.counts).toEqual({
       watchedMovies: 3,
