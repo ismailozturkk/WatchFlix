@@ -16,17 +16,14 @@ import {
   ScrollView,
   FlatList,
   SectionList,
-  Dimensions,
 } from "react-native";
 
-const { height: SCREEN_H } = Dimensions.get("window");
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AdaptiveBlurView from "../common/AdaptiveBlurView";
-import BottomSheetModal from "@components/common/BottomSheetModal";
-import GlassCloseButton from "@components/common/GlassCloseButton";
 import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
 import { i18nText } from "../../utils/i18nText";
+import { describeDateFilter } from "../../utils/statsFilters";
 
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import GlassTouchable from "../common/GlassTouchable";
@@ -1002,11 +999,14 @@ export const StatsFilterBar = memo(function StatsFilterBar({
   selectedDate,
   selectedGenre,
   formatDate,
+  locale,
   onOpenFilters,
   allDatesLabel = i18nText("autoI18n.tum_tarihler", "Tüm Tarihler"),
   allGenresLabel = i18nText("autoI18n.tum_turler", "Tüm Türler"),
 }) {
-  const dateText = selectedDate ? formatDate?.(selectedDate) || selectedDate : allDatesLabel;
+  // selectedDate yıl ("2025"), ay ("2025-03") ya da gün olabilir.
+  const dateText =
+    describeDateFilter(selectedDate, { locale, formatDay: formatDate }) || allDatesLabel;
   const genreText = selectedGenre || allGenresLabel;
 
   return (
@@ -1129,185 +1129,6 @@ const FilterSearchInput = memo(function FilterSearchInput({
   );
 });
 
-// ─── FILTER MODAL ────────────────────────────────────────────────────────────
-//
-// Tarih + tür filtrelerini tek bottom-sheet'te toplar. Seçimler anında uygulanır
-// (parent state'i günceller); "Temizle" ikisini de sıfırlar. Tekil seçim: null = tümü.
-
-export const StatsFilterModal = memo(function StatsFilterModal({
-  visible,
-  onClose,
-  theme,
-  dates = [],
-  selectedDate,
-  onSelectDate,
-  genres = [],
-  selectedGenre,
-  onSelectGenre,
-  formatDate,
-  title = i18nText("autoI18n.filtrele", "Filtrele"),
-  dateLabel = i18nText("autoI18n.filtre_tarih", "Tarih"),
-  genreLabel = i18nText("autoI18n.filtre_tur", "Tür"),
-  allDatesLabel = i18nText("autoI18n.tum_tarihler", "Tüm Tarihler"),
-  allGenresLabel = i18nText("autoI18n.tum_turler", "Tüm Türler"),
-  clearLabel = i18nText("autoI18n.temizle", "Temizle"),
-  doneLabel = i18nText("autoI18n.tamam", "Tamam"),
-}) {
-  const hasFilters = selectedDate != null || selectedGenre != null;
-
-  const dateOptions = [
-    { key: "__all__", label: allDatesLabel, value: null },
-    ...dates.map((d) => ({ key: d, label: formatDate?.(d) || d, value: d })),
-  ];
-  const genreOptions = [
-    { key: "__all__", label: allGenresLabel, value: null },
-    ...genres.map((g) => ({ key: g, label: g, value: g })),
-  ];
-
-  return (
-    <BottomSheetModal
-      visible={visible}
-      onClose={onClose}
-      intensity={35}
-      dimColor="rgba(0,0,0,0.35)"
-      sheetStyle={[
-        modalStyles.sheet,
-        { backgroundColor: theme.secondary, borderColor: theme.border },
-      ]}
-    >
-          <View style={[modalStyles.handle, { backgroundColor: theme.border }]} />
-
-          <View style={modalStyles.header}>
-            <Text style={[modalStyles.title, { color: theme.text.primary }]}>{title}</Text>
-            <GlassCloseButton
-              size={32}
-              fallbackRadius={16}
-              color={theme.text.secondary}
-              backgroundColor="transparent"
-              borderColor={theme.border}
-              hitSlop={10}
-              onPress={onClose}
-            />
-          </View>
-
-          <ScrollView
-            style={modalStyles.body}
-            contentContainerStyle={modalStyles.bodyContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            <FilterGroup theme={theme} icon="calendar-outline" label={dateLabel}>
-              <FilterChipCloud
-                theme={theme}
-                options={dateOptions}
-                selectedValue={selectedDate}
-                onSelect={onSelectDate}
-              />
-            </FilterGroup>
-
-            {genres.length > 0 && (
-              <FilterGroup theme={theme} icon="pricetags-outline" label={genreLabel}>
-                <FilterChipCloud
-                  theme={theme}
-                  options={genreOptions}
-                  selectedValue={selectedGenre}
-                  onSelect={onSelectGenre}
-                />
-              </FilterGroup>
-            )}
-          </ScrollView>
-
-          <View style={[modalStyles.footer, { borderTopColor: theme.border }]}>
-            <GlassPressable
-              onPress={() => {
-                onSelectDate(null);
-                onSelectGenre(null);
-              }}
-              disabled={!hasFilters}
-              style={[
-                modalStyles.clearBtn,
-                { borderColor: theme.border, opacity: hasFilters ? 1 : 0.45 },
-              ]}
-            >
-              <Ionicons name="refresh-outline" size={15} color={theme.text.secondary} />
-              <Text style={[modalStyles.clearText, { color: theme.text.secondary }]}>
-                {clearLabel}
-              </Text>
-            </GlassPressable>
-            <GlassPressable
-              onPress={onClose}
-              style={[modalStyles.doneBtn, { backgroundColor: theme.accent }]}
-            >
-              <Text style={modalStyles.doneText}>{doneLabel}</Text>
-            </GlassPressable>
-          </View>
-    </BottomSheetModal>
-  );
-});
-
-const FilterGroup = memo(function FilterGroup({ theme, icon, label, children }) {
-  return (
-    <View style={modalStyles.group}>
-      <View style={modalStyles.groupHeader}>
-        <Ionicons name={icon} size={15} color={theme.text.muted} />
-        <Text style={[modalStyles.groupLabel, { color: theme.text.muted }]}>{label}</Text>
-      </View>
-      {children}
-    </View>
-  );
-});
-
-const FilterChipCloud = memo(function FilterChipCloud({
-  theme,
-  options,
-  selectedValue,
-  onSelect,
-}) {
-  return (
-    <View style={modalStyles.cloud}>
-      {options.map((opt) => {
-        const isActive =
-          (opt.value == null && selectedValue == null) ||
-          (opt.value != null && selectedValue === opt.value);
-        return (
-          <GlassPressable
-            key={opt.key}
-            onPress={() => onSelect(opt.value)}
-            style={[
-              modalStyles.cloudChip,
-              {
-                backgroundColor: isActive ? theme.accent : theme.primary,
-                borderColor: isActive ? theme.accent : theme.border,
-              },
-            ]}
-          >
-            {isActive && (
-              <Ionicons
-                name="checkmark"
-                size={13}
-                color="#fff"
-                style={{ marginRight: 3 }}
-              />
-            )}
-            <Text
-              style={[
-                modalStyles.cloudChipText,
-                {
-                  color: isActive ? "#fff" : theme.text.secondary,
-                  fontWeight: isActive ? "700" : "600",
-                },
-              ]}
-              numberOfLines={1}
-            >
-              {opt.label}
-            </Text>
-          </GlassPressable>
-        );
-      })}
-    </View>
-  );
-});
-
 const filterStyles = StyleSheet.create({
   wrap: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6 },
   searchRow: {
@@ -1354,82 +1175,6 @@ const filterStyles = StyleSheet.create({
     maxWidth: 200,
   },
   pillText: { fontSize: 12, flexShrink: 1 },
-});
-
-const modalStyles = StyleSheet.create({
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    paddingBottom: 10,
-  },
-  handle: {
-    alignSelf: "center",
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    marginTop: 10,
-    marginBottom: 6,
-    opacity: 0.7,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 18,
-    paddingTop: 4,
-    paddingBottom: 12,
-  },
-  title: { fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
-  body: { paddingHorizontal: 16, maxHeight: Math.round(SCREEN_H * 0.48) },
-  bodyContent: { paddingBottom: 12, gap: 20 },
-  group: { gap: 10 },
-  groupHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
-  groupLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-  },
-  cloud: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  cloudChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderRadius: 999,
-    borderWidth: 1,
-    maxWidth: "100%",
-  },
-  cloudChipText: { fontSize: 13 },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    marginTop: 2,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  clearBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  clearText: { fontSize: 13, fontWeight: "700" },
-  doneBtn: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 13,
-    borderRadius: 14,
-  },
-  doneText: { color: "#fff", fontSize: 14, fontWeight: "800" },
 });
 
 // ─── SECTION HEADER (her tarih grubunun başlığı) ─────────────────────────────

@@ -8,17 +8,18 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
 import { buildWatchChartData, countGenres } from "../../../utils/watchHistory";
+import { countByDate, matchesDateFilter } from "../../../utils/statsFilters";
 import BackButton from "../../../components/BackButton";
 import ScreenDecor from "../../../components/ScreenDecor";
 import {
   StatsHeroCard,
   StatsScreenHeader,
   StatsFilterBar,
-  StatsFilterModal,
   StatsDateSection,
   StatsEmptyState,
   StatsCollapsingList,
 } from "../../../components/profile/StatsComponents";
+import StatsFilterModal from "../../../components/profile/StatsFilterModal";
 
 const sectionKeyExtractor = (_item, index) => `tv-${index}`;
 
@@ -74,7 +75,8 @@ const TvStatisticsScreen = ({ navigation }) => {
   // Hero'daki tür çubukları ve filtre modalındaki tür listesi aynı sayımdan
   // beslenir (izlenme sıklığına göre azalan). Sayım bölüm bazlıdır.
   const genreStats = useMemo(() => countGenres(groupedDataTv), [groupedDataTv]);
-  const allGenres = useMemo(() => genreStats.map((g) => g.name), [genreStats]);
+  // Filtre penceresinin yıl/ay çiplerindeki sayaçlar (gün → izlenen bölüm sayısı).
+  const dateCounts = useMemo(() => countByDate(groupedDataTv), [groupedDataTv]);
 
   const sections = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -95,7 +97,7 @@ const TvStatisticsScreen = ({ navigation }) => {
           ),
       }))
       .filter((s) => s.items.length > 0)
-      .filter((s) => selectedDateTv == null || s.title === selectedDateTv)
+      .filter((s) => matchesDateFilter(s.title, selectedDateTv))
       .map((s) => ({
         title: s.title,
         data: [],
@@ -209,6 +211,7 @@ const TvStatisticsScreen = ({ navigation }) => {
       selectedDate={selectedDateTv}
       selectedGenre={selectedGenre}
       formatDate={formatDate}
+      locale={locale}
       onOpenFilters={onOpenFilters}
     />
   );
@@ -237,12 +240,14 @@ const TvStatisticsScreen = ({ navigation }) => {
         onClose={onCloseFilters}
         theme={theme}
         dates={uniqueDatesTv}
+        dateCounts={dateCounts}
         selectedDate={selectedDateTv}
         onSelectDate={onSelectDate}
-        genres={allGenres}
+        genres={genreStats}
         selectedGenre={selectedGenre}
         onSelectGenre={onSelectGenre}
         formatDate={formatDate}
+        locale={locale}
       />
       <BackButton />
     </View>

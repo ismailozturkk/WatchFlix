@@ -8,17 +8,18 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
 import { buildWatchChartData, countGenres } from "../../../utils/watchHistory";
+import { countByDate, matchesDateFilter } from "../../../utils/statsFilters";
 import BackButton from "../../../components/BackButton";
 import ScreenDecor from "../../../components/ScreenDecor";
 import {
   StatsHeroCard,
   StatsScreenHeader,
   StatsFilterBar,
-  StatsFilterModal,
   StatsDateSection,
   StatsEmptyState,
   StatsCollapsingList,
 } from "../../../components/profile/StatsComponents";
+import StatsFilterModal from "../../../components/profile/StatsFilterModal";
 
 const sectionKeyExtractor = (_item, index) => `m-${index}`;
 
@@ -66,7 +67,8 @@ const MovieStatisticsScreen = ({ navigation }) => {
   // Hero'daki tür çubukları ve filtre modalındaki tür listesi aynı sayımdan
   // beslenir (izlenme sıklığına göre azalan).
   const genreStats = useMemo(() => countGenres(groupedData), [groupedData]);
-  const allGenres = useMemo(() => genreStats.map((g) => g.name), [genreStats]);
+  // Filtre penceresinin yıl/ay çiplerindeki sayaçlar (gün → izlenen film sayısı).
+  const dateCounts = useMemo(() => countByDate(groupedData), [groupedData]);
 
   // Tek geçişte filtrele (arama + tür) + bölüm meta'sını (tür/dk) ve normalize
   // poster'ları önceden hesapla. Dış liste yalnızca başlık render eder (data: []).
@@ -83,7 +85,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
           ),
       }))
       .filter((s) => s.items.length > 0)
-      .filter((s) => selectedDate == null || s.title === selectedDate)
+      .filter((s) => matchesDateFilter(s.title, selectedDate))
       .map((s) => ({
         title: s.title,
         data: [],
@@ -187,6 +189,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
       selectedDate={selectedDate}
       selectedGenre={selectedGenre}
       formatDate={formatDate}
+      locale={locale}
       onOpenFilters={onOpenFilters}
     />
   );
@@ -215,12 +218,14 @@ const MovieStatisticsScreen = ({ navigation }) => {
         onClose={onCloseFilters}
         theme={theme}
         dates={uniqueDates}
+        dateCounts={dateCounts}
         selectedDate={selectedDate}
         onSelectDate={onSelectDate}
-        genres={allGenres}
+        genres={genreStats}
         selectedGenre={selectedGenre}
         onSelectGenre={onSelectGenre}
         formatDate={formatDate}
+        locale={locale}
       />
       <BackButton />
     </View>
