@@ -21,6 +21,7 @@ import { rarityStyle } from "@theme/badgeTokens";
 import { i18nText } from "@utils/i18nText";
 import { withAlpha } from "@components/profile/StatsComponents";
 import { nadirlikAdi, yuzdeMetni } from "./badgeFormat";
+import GlassBox from "../common/GlassBox";
 
 const HALKA = 72;
 const KALINLIK = 8;
@@ -64,7 +65,7 @@ function BadgeSummaryCard({ acik, toplam, dagilim, style }) {
   const oran = toplam > 0 ? acik / toplam : 0;
 
   return (
-    <View
+    <GlassBox role="card"
       style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }, style]}
       accessible
       accessibilityLabel={`${acik}/${toplam} ${i18nText("autoI18n.rozet_ozet_acildi", "rozet açıldı")}`}
@@ -116,7 +117,7 @@ function BadgeSummaryCard({ acik, toplam, dagilim, style }) {
           );
         })}
       </View>
-    </View>
+    </GlassBox>
   );
 }
 

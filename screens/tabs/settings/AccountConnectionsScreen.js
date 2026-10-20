@@ -41,6 +41,8 @@ import {
   buildUiColors,
   ui,
 } from "./settingsUi";
+import GlassTouchable from "../../../components/common/GlassTouchable";
+import GlassBox from "../../../components/common/GlassBox";
 
 export default function AccountConnectionsScreen() {
   const { language } = useLanguage();
@@ -327,7 +329,7 @@ export default function AccountConnectionsScreen() {
       <SectionLabel color={C.muted}>
         {tr ? "HESABIN" : es ? "TU CUENTA" : pt ? "SUA CONTA" : "YOUR ACCOUNT"}
       </SectionLabel>
-      <View
+      <GlassBox role="card"
         style={[
           styles.identityCard,
           { backgroundColor: C.card, borderColor: C.border },
@@ -357,7 +359,7 @@ export default function AccountConnectionsScreen() {
             </Text>
           </View>
         </View>
-      </View>
+      </GlassBox>
 
       <SectionLabel color={C.muted}>
         {tr ? "GİRİŞ YÖNTEMLERİ" : es ? "MÉTODOS DE INICIO DE SESIÓN" : pt ? "MÉTODOS DE LOGIN" : "SIGN-IN METHODS"}
@@ -443,7 +445,7 @@ export default function AccountConnectionsScreen() {
               {tr ? `${user?.email || "Hesabın"} için bir parola oluştur. Google bağlantın korunur; iki yöntem de aynı profile açılır.` : es ? `Crea una contraseña para ${user?.email || "tu cuenta"}. Google sigue vinculado y ambos métodos abren el mismo perfil.` : pt ? `Crie uma senha para ${user?.email || "sua conta"}. O Google continua vinculado e os dois métodos abrem o mesmo perfil.` : `Create a password for ${user?.email || "your account"}. Google stays connected and both methods open the same profile.`}
             </Text>
 
-            <View style={[styles.inputShell, { borderColor: C.border, backgroundColor: C.card }]}>
+            <GlassBox role="field" style={[styles.inputShell, { borderColor: C.border, backgroundColor: C.card }]}>
               <AppIcon family="Ionicons" name="lock-closed-outline" size={15} color={C.muted} />
               <TextInput
                 value={password}
@@ -466,8 +468,8 @@ export default function AccountConnectionsScreen() {
                   color={C.muted}
                 />
               </TouchableOpacity>
-            </View>
-            <View style={[styles.inputShell, { borderColor: C.border, backgroundColor: C.card }]}>
+            </GlassBox>
+            <GlassBox role="field" style={[styles.inputShell, { borderColor: C.border, backgroundColor: C.card }]}>
               <AppIcon family="Ionicons" name="checkmark-circle-outline" size={15} color={C.muted} />
               <TextInput
                 value={passwordAgain}
@@ -483,7 +485,7 @@ export default function AccountConnectionsScreen() {
                 onSubmitEditing={submitPassword}
                 style={[styles.input, { color: C.text }]}
               />
-            </View>
+            </GlassBox>
 
             <View style={styles.passwordRules}>
               <Rule
@@ -498,7 +500,7 @@ export default function AccountConnectionsScreen() {
               />
             </View>
 
-            <TouchableOpacity
+            <GlassTouchable
               disabled={!passwordReady || busy}
               activeOpacity={0.75}
               onPress={submitPassword}
@@ -520,7 +522,7 @@ export default function AccountConnectionsScreen() {
                   </Text>
                 </>
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
         ) : null}
       </View>

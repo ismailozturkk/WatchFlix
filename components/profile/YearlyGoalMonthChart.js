@@ -11,12 +11,13 @@
 // bir kez sayılır, toplam hedef halkasındaki sayıyla aynıdır.
 
 import React, { memo, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useProfileStats } from "@context/ProfileStatsContext";
 import { alpha } from "../../theme/colors";
 import { intlLocaleOf } from "../../utils/appLanguages";
 import { monthlyYearTitles } from "../../utils/yearlyGoal";
 import { fillCopy, formatGoalNumber } from "./yearlyGoalCopy";
+import GlassPressable from "../common/GlassPressable";
 
 const BAR_AREA = 92;
 const MIN_BAR = 3;
@@ -74,7 +75,7 @@ function YearlyGoalMonthChart({ theme, language, copy, year, now, series }) {
             {series.map((item) => {
               const selected = item.track === active.track;
               return (
-                <Pressable
+                <GlassPressable
                   key={item.track}
                   testID={`yearly-goal-chart-tab-${item.track}`}
                   accessibilityRole="button"
@@ -91,7 +92,7 @@ function YearlyGoalMonthChart({ theme, language, copy, year, now, series }) {
                   <Text style={[styles.tabText, { color: selected ? theme.text.primary : theme.text.secondary }]}>
                     {item.name}
                   </Text>
-                </Pressable>
+                </GlassPressable>
               );
             })}
           </View>

@@ -22,6 +22,7 @@ import { useTheme } from "../../context/ThemeContext";
 import GlassCloseButton from "../common/GlassCloseButton";
 import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
+import GlassTouchable from "../common/GlassTouchable";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 const SHEET_MAX_H = SCREEN_H * 0.85;
@@ -97,7 +98,7 @@ export default function ImportHelpModal({ visible, onClose }) {
 
           {/* Segmented Tab */}
           <View style={[styles.tabBar, { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.5) }]}>
-            <TouchableOpacity
+            <GlassTouchable
               style={[
                 styles.tabBtn,
                 activeTab === "letterboxd" && [
@@ -124,9 +125,9 @@ export default function ImportHelpModal({ visible, onClose }) {
               >
                 Letterboxd
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
 
-            <TouchableOpacity
+            <GlassTouchable
               style={[
                 styles.tabBtn,
                 activeTab === "imdb" && [
@@ -153,7 +154,7 @@ export default function ImportHelpModal({ visible, onClose }) {
               >
                 IMDb
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
 
           {/* Guide Steps */}

@@ -20,6 +20,7 @@ import {
   countDiscoveryFilters,
 } from "../../utils/aiPrefs";
 import { ChoiceChip, ChoiceWrap, SegmentedChoice } from "./AIChips";
+import GlassTouchable from "../common/GlassTouchable";
 
 const LIST_TOGGLES = [
   ["watchList", "listWatchList"],
@@ -258,14 +259,14 @@ function AIPrefsPanel({ theme, t, copy, language, prefs, updatePrefs, onOpenAllS
         ) : null}
 
         {onOpenAllSettings ? (
-          <TouchableOpacity
+          <GlassTouchable
             onPress={onOpenAllSettings}
             style={[s.allBtn, { borderColor: alpha(theme.accent, 0.45), backgroundColor: alpha(theme.accent, 0.1) }]}
           >
             <Ionicons name="settings-outline" size={16} color={theme.bold} />
             <Text style={[s.linkText, { color: theme.bold, flex: 1 }]}>{copy.panel.allSettings}</Text>
             <Ionicons name="chevron-forward" size={15} color={theme.bold} />
-          </TouchableOpacity>
+          </GlassTouchable>
         ) : null}
       </ScrollView>
     </View>

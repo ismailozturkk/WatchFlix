@@ -29,6 +29,7 @@ import { ActorSkeleton } from "../../components/Skeleton";
 import { i18nText } from "../../utils/i18nText";
 import ScreenDecor from "../../components/ScreenDecor";
 import FollowPersonButton from "../../components/person/FollowPersonButton";
+import GlassTouchable from "../../components/common/GlassTouchable";
 
 
 const { width } = Dimensions.get("window");
@@ -83,7 +84,7 @@ const FilterChips = ({ filters, active, onSelect, theme }) => (
     {filters.map((f) => {
       const isActive = f.key === active;
       return (
-        <TouchableOpacity
+        <GlassTouchable
           key={f.key}
           onPress={() => onSelect(f.key)}
           activeOpacity={0.75}
@@ -114,7 +115,7 @@ const FilterChips = ({ filters, active, onSelect, theme }) => (
           >
             {f.label}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       );
     })}
   </ScrollView>

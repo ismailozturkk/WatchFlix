@@ -4,7 +4,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
@@ -16,6 +15,8 @@ import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import * as Haptics from "@services/hapticsService";
 import { buildGenreMap } from "@utils/genreLabels";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 
 const DANGER = "#ef4444";
 
@@ -200,7 +201,7 @@ export default function ListItemActionsSheet({
             </View>
           </View>
 
-          <TouchableOpacity
+          <GlassTouchable
             activeOpacity={0.85}
             disabled={!canMove || itemCount < 2}
             onPress={() => setStep("move")}
@@ -226,9 +227,9 @@ export default function ListItemActionsSheet({
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={17} color={theme.text.muted} />
-          </TouchableOpacity>
+          </GlassTouchable>
 
-          <TouchableOpacity
+          <GlassTouchable
             activeOpacity={0.85}
             disabled={!canDelete}
             onPress={() => setStep("delete")}
@@ -252,7 +253,7 @@ export default function ListItemActionsSheet({
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={17} color={theme.text.muted} />
-          </TouchableOpacity>
+          </GlassTouchable>
         </>
       ) : step === "move" ? (
         <>
@@ -265,14 +266,14 @@ export default function ListItemActionsSheet({
             {i18nText("autoI18n.hedef_sira", "Hedef sıra")}
           </Text>
           <View style={styles.positionRow}>
-            <TouchableOpacity
+            <GlassTouchable
               onPress={() => stepPosition(-1)}
               disabled={busy || target <= 1}
               style={[styles.stepButton, { backgroundColor: theme.primary, borderColor: theme.border }]}
             >
               <Feather name="minus" size={20} color={theme.text.primary} />
-            </TouchableOpacity>
-            <View style={[styles.inputWrap, { backgroundColor: theme.primary, borderColor: accent }]}>
+            </GlassTouchable>
+            <GlassBox role="field" style={[styles.inputWrap, { backgroundColor: theme.primary, borderColor: accent }]}>
               <TextInput
                 value={position}
                 onChangeText={(text) => setPosition(text.replace(/[^0-9]/g, ""))}
@@ -283,17 +284,17 @@ export default function ListItemActionsSheet({
                 style={[styles.input, { color: theme.text.primary }]}
               />
               <Text style={[styles.total, { color: theme.text.muted }]}>/ {itemCount}</Text>
-            </View>
-            <TouchableOpacity
+            </GlassBox>
+            <GlassTouchable
               onPress={() => stepPosition(1)}
               disabled={busy || target >= itemCount}
               style={[styles.stepButton, { backgroundColor: theme.primary, borderColor: theme.border }]}
             >
               <Feather name="plus" size={20} color={theme.text.primary} />
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
           <View style={styles.quickRow}>
-            <TouchableOpacity
+            <GlassTouchable
               onPress={() => setPosition("1")}
               disabled={busy}
               style={[styles.quickButton, { backgroundColor: theme.primary, borderColor: theme.border }]}
@@ -302,8 +303,8 @@ export default function ListItemActionsSheet({
               <Text style={[styles.quickText, { color: theme.text.muted }]}>
                 {i18nText("autoI18n.ilk_sira", "İlk sıra")}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </GlassTouchable>
+            <GlassTouchable
               onPress={() => setPosition(String(itemCount))}
               disabled={busy}
               style={[styles.quickButton, { backgroundColor: theme.primary, borderColor: theme.border }]}
@@ -312,9 +313,9 @@ export default function ListItemActionsSheet({
               <Text style={[styles.quickText, { color: theme.text.muted }]}>
                 {i18nText("autoI18n.son_sira", "Son sıra")}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
-          <TouchableOpacity
+          <GlassTouchable
             onPress={() => onMove?.(target - 1)}
             disabled={moveDisabled}
             style={[styles.primaryButton, { backgroundColor: accent }, moveDisabled && styles.disabled]}
@@ -323,7 +324,7 @@ export default function ListItemActionsSheet({
             <Text style={styles.primaryText}>
               {busy ? i18nText("autoI18n.tasiniyor", "Taşınıyor...") : i18nText("autoI18n.tasi", "Taşı")}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </>
       ) : (
         <>
@@ -341,7 +342,7 @@ export default function ListItemActionsSheet({
               {i18nText("autoI18n.diger_listeler_etkilenmez", "Diğer listelerdeki kayıtların etkilenmez.")}
             </Text>
           </View>
-          <TouchableOpacity
+          <GlassTouchable
             onPress={onDelete}
             disabled={busy}
             style={[styles.primaryButton, { backgroundColor: DANGER }, busy && styles.disabled]}
@@ -350,7 +351,7 @@ export default function ListItemActionsSheet({
             <Text style={styles.primaryText}>
               {busy ? i18nText("autoI18n.siliniyor", "Siliniyor...") : i18nText("autoI18n.kaldir", "Kaldır")}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </>
       )}
     </BottomSheetModal>

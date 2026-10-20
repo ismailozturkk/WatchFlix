@@ -32,6 +32,7 @@ import { LIST_SEARCH_MODE, listAcceptedTypes } from "@utils/listSearch";
 import GlassField from "@components/common/GlassField";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { useGlassScheme } from "@components/common/GlassSurface";
+import GlassTouchable from "../common/GlassTouchable";
 
 const placeholderFor = (mode, listName) => {
   if (mode === LIST_SEARCH_MODE.IN_LIST) {
@@ -51,7 +52,7 @@ function ModeButton({ active, accent, theme, icon, label, count, onPress }) {
   const foreground = readableTextOn(accent);
   const spoken = count != null ? `${label}, ${count > 999 ? "999+" : count}` : label;
   return (
-    <TouchableOpacity
+    <GlassTouchable
       activeOpacity={0.85}
       onPress={onPress}
       hitSlop={{ top: 4, bottom: 4 }}
@@ -61,7 +62,7 @@ function ModeButton({ active, accent, theme, icon, label, count, onPress }) {
       style={[styles.modeBtn, active && { backgroundColor: accent }]}
     >
       <Ionicons name={icon} size={18} color={active ? foreground : theme.text.muted} />
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 

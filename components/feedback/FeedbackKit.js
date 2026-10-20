@@ -26,6 +26,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import SwitchToggle from "@components/SwitchToggle";
 import { alpha } from "../../theme/colors";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 
 const WHITE = "#FFFFFF";
 
@@ -118,7 +120,7 @@ function Pill({ icon, label, color, textColor, soft }) {
 /** Üstteki tanıtım kartı: büyük ikon, başlık, açıklama ve iki küçük hap. */
 export function FeedbackHero({ C, tint, icon, title, text, planLabel, benefit, benefitIcon }) {
   return (
-    <View style={[k.hero, { borderColor: alpha(tint, 0.4) }]}>
+    <GlassBox role="card" style={[k.hero, { borderColor: alpha(tint, 0.4) }]}>
       <LinearGradient
         colors={[alpha(tint, 0.26), alpha(tint, 0.04)]}
         start={{ x: 0, y: 0 }}
@@ -147,7 +149,7 @@ export function FeedbackHero({ C, tint, icon, title, text, planLabel, benefit, b
           <Pill icon={benefitIcon} label={benefit} color={C.muted} textColor={soft(C)} soft />
         </View>
       </LinearGradient>
-    </View>
+    </GlassBox>
   );
 }
 
@@ -174,7 +176,7 @@ export function ChipGroup({ C, tint, options, value, onChange }) {
       {options.map((option) => {
         const active = option.id === value;
         return (
-          <TouchableOpacity
+          <GlassTouchable
             key={option.id}
             activeOpacity={0.75}
             onPress={() => onChange(option.id)}
@@ -204,7 +206,7 @@ export function ChipGroup({ C, tint, options, value, onChange }) {
             >
               {option.label}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         );
       })}
     </View>
@@ -219,7 +221,7 @@ export function SeverityRail({ C, options, value, onChange }) {
         const active = option.id === value;
         const color = tone(C, SEVERITY_TONE[option.id]);
         return (
-          <TouchableOpacity
+          <GlassTouchable
             key={option.id}
             activeOpacity={0.75}
             onPress={() => onChange(option.id)}
@@ -253,7 +255,7 @@ export function SeverityRail({ C, options, value, onChange }) {
             >
               {option.hint}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         );
       })}
     </View>
@@ -273,7 +275,7 @@ export function TextField({
 }) {
   const [focused, setFocused] = useState(false);
   return (
-    <View
+    <GlassBox role="field"
       style={[
         k.field,
         {
@@ -300,7 +302,7 @@ export function TextField({
           multiline && { minHeight, paddingTop: 12 },
         ]}
       />
-    </View>
+    </GlassBox>
   );
 }
 
@@ -495,7 +497,7 @@ export function HistoryNotice({ C, icon, title, text, actionLabel, onAction }) {
         </Text>
       ) : null}
       {actionLabel ? (
-        <TouchableOpacity
+        <GlassTouchable
           activeOpacity={0.75}
           onPress={onAction}
           accessibilityRole="button"
@@ -504,7 +506,7 @@ export function HistoryNotice({ C, icon, title, text, actionLabel, onAction }) {
           <Text allowFontScaling={false} style={[k.noticeActionText, { color: C.accent }]}>
             {actionLabel}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       ) : null}
     </View>
   );

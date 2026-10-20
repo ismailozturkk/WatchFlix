@@ -3,11 +3,12 @@
 // Kayan göstergeli segment kontrolü (Solo/Duo geçişi ve içerik türü seçimi).
 // Gösterge seçili parçaya yaylanarak kayar; eski sürüm rengi anında değiştiriyordu.
 import React, { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import AppIcon from "../AppIcon";
 import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
+import GlassPressable from "../common/GlassPressable";
 
 const PAD = 4;
 const SPRING = { damping: 18, stiffness: 230, mass: 0.8 };
@@ -54,7 +55,7 @@ export default function CineSegmented({ options, value, onChange, disabled = fal
         const selected = option.id === value;
         const tint = selected ? colors.onAccent : colors.textSecondary;
         return (
-          <Pressable
+          <GlassPressable
             key={option.id}
             disabled={disabled}
             accessibilityRole="button"
@@ -71,7 +72,7 @@ export default function CineSegmented({ options, value, onChange, disabled = fal
             <Text numberOfLines={1} style={[styles.label, large ? styles.labelLarge : null, { color: tint }]}>
               {option.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>

@@ -9,15 +9,16 @@
 //   SegmentedChoice  eşit genişlikli bölmeli kontrol (2–4 seçenek: stil, sayı…)
 
 import React, { memo } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { alpha } from "../../theme/colors";
+import GlassTouchable from "../common/GlassTouchable";
 
 export const ChoiceChip = memo(({ label, icon, dotColor, selected, onPress, theme, disabled }) => {
   const tint = selected ? theme.bold : theme.text.secondary;
   return (
-    <TouchableOpacity
+    <GlassTouchable
       activeOpacity={0.8}
       disabled={disabled}
       onPress={onPress}
@@ -37,7 +38,7 @@ export const ChoiceChip = memo(({ label, icon, dotColor, selected, onPress, them
       <Text style={[s.chipText, { color: tint }]} numberOfLines={1}>
         {label}
       </Text>
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 });
 
@@ -67,7 +68,7 @@ export const SegmentedChoice = memo(({ options, value, onChange, theme, style })
     {options.map((option) => {
       const active = option.value === value;
       return (
-        <TouchableOpacity
+        <GlassTouchable
           key={String(option.value)}
           activeOpacity={0.8}
           onPress={() => onChange(option.value)}
@@ -81,7 +82,7 @@ export const SegmentedChoice = memo(({ options, value, onChange, theme, style })
           >
             {option.label}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       );
     })}
   </View>

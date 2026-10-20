@@ -22,6 +22,8 @@ import { GOAL_LIMITS, GOAL_PRESETS, GOAL_STEPS } from "../../utils/yearlyGoal";
 import YearlyGoalBar from "./YearlyGoalBar";
 import { paceVisualOf, SHOW_MEASURE_ORDER } from "./yearlyGoalTheme";
 import { fillCopy, formatGoalNumber, formatPercent, unitLabel } from "./yearlyGoalCopy";
+import GlassPressable from "../common/GlassPressable";
+import GlassBox from "../common/GlassBox";
 
 const HOLD_DELAY_MS = 380;
 const HOLD_SLOW_MS = 110;
@@ -62,7 +64,7 @@ function useHoldStep(apply) {
 
 const StepButton = memo(function StepButton({ testID, icon, label, disabled, onHoldStart, onHoldEnd, theme }) {
   return (
-    <Pressable
+    <GlassPressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -80,7 +82,7 @@ const StepButton = memo(function StepButton({ testID, icon, label, disabled, onH
       ]}
     >
       <Ionicons name={icon} size={22} color={theme.text.primary} />
-    </Pressable>
+    </GlassPressable>
   );
 });
 
@@ -173,7 +175,7 @@ function YearlyGoalTrackCard({
   }
 
   return (
-    <View
+    <GlassBox role="card"
       testID={`yearly-goal-track-${track}`}
       style={[
         styles.card,
@@ -358,7 +360,7 @@ function YearlyGoalTrackCard({
           ) : null}
         </View>
       ) : null}
-    </View>
+    </GlassBox>
   );
 }
 

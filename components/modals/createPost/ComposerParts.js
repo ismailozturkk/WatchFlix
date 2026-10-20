@@ -25,6 +25,8 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, Octicons } from "@expo/vector-icons";
 import { alpha } from "../../../theme/colors";
+import GlassPressable from "../../common/GlassPressable";
+import GlassBox from "../../common/GlassBox";
 
 export const DANGER = "#f04f4f";
 const STAR = "#FFD54F";
@@ -58,7 +60,7 @@ export const FieldCard = memo(function FieldCard({
   const atMax = value.length >= maxLength;
 
   return (
-    <View
+    <GlassBox role="field"
       style={[
         st.field,
         {
@@ -99,7 +101,7 @@ export const FieldCard = memo(function FieldCard({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
       />
-    </View>
+    </GlassBox>
   );
 });
 
@@ -187,7 +189,7 @@ const QuickButton = memo(function QuickButton({
   onPress,
 }) {
   return (
-    <Pressable
+    <GlassPressable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected: done, busy: loading }}
@@ -213,7 +215,7 @@ const QuickButton = memo(function QuickButton({
       ) : done ? (
         <Ionicons name="checkmark-circle" size={17} color={accent} />
       ) : null}
-    </Pressable>
+    </GlassPressable>
   );
 });
 
@@ -363,7 +365,7 @@ export const RatingRow = memo(function RatingRow({
           {label}
         </Text>
         {rating > 0 && (
-          <Pressable
+          <GlassPressable
             accessibilityRole="button"
             accessibilityLabel={clearLabel}
             onPress={onClear}
@@ -372,7 +374,7 @@ export const RatingRow = memo(function RatingRow({
           >
             <Text style={[st.ratingValue, { color: theme.text.primary }]}>{rating}/5</Text>
             <Ionicons name="close" size={12} color={theme.text.muted} />
-          </Pressable>
+          </GlassPressable>
         )}
       </View>
       <View style={st.starsRow}>
@@ -463,7 +465,7 @@ export const PillToggle = memo(function PillToggle({ theme, accent, items, activ
       {items.map((item) => {
         const isActive = active === item.key;
         return (
-          <Pressable
+          <GlassPressable
             key={item.key}
             accessibilityRole="button"
             accessibilityState={{ selected: isActive }}
@@ -488,7 +490,7 @@ export const PillToggle = memo(function PillToggle({ theme, accent, items, activ
             >
               {item.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>

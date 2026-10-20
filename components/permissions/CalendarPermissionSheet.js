@@ -26,7 +26,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -40,6 +39,8 @@ import {
   removeAllEventsFromPhoneCalendar,
 } from "@utils/phoneCalendar";
 import StatusPill from "./StatusPill";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 
 function InfoRow({ C, icon, tone, bg, title, body, last }) {
   return (
@@ -70,7 +71,7 @@ function SheetButton({ C, label, icon, tone = "neutral", onPress, disabled, load
         ? { bg: C.dangerDim, fg: C.danger, border: "transparent" }
         : { bg: C.cardAlt, fg: C.text, border: C.border };
   return (
-    <TouchableOpacity
+    <GlassTouchable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled, busy: !!loading }}
@@ -94,7 +95,7 @@ function SheetButton({ C, label, icon, tone = "neutral", onPress, disabled, load
           </Text>
         </>
       )}
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 
@@ -276,7 +277,7 @@ export default function CalendarPermissionSheet({
           )}
         </Text>
 
-        <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
+        <GlassBox role="card" style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <InfoRow
             C={C}
             icon="hand-left-outline"
@@ -311,7 +312,7 @@ export default function CalendarPermissionSheet({
             )}
             last
           />
-        </View>
+        </GlassBox>
 
         {/* ── İzin YOK ── */}
         {!plan.granted ? (
@@ -351,7 +352,7 @@ export default function CalendarPermissionSheet({
         {/* ── İzin VAR ── */}
         {plan.granted ? (
           <View style={styles.actions}>
-            <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
+            <GlassBox role="card" style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
               <View style={styles.countRow}>
                 <View style={[styles.countIcon, { backgroundColor: C.iconPurple }]}>
                   <AppIcon name="calendar-number-outline" size={16} color={C.purple} />
@@ -365,7 +366,7 @@ export default function CalendarPermissionSheet({
                   <Text style={[styles.countValue, { color: C.text }]}>{plan.count}</Text>
                 ) : null}
               </View>
-            </View>
+            </GlassBox>
 
             {resultView ? (
               <Note C={C} icon={resultView.icon} tone={resultView.tone} bg={resultView.bg}>

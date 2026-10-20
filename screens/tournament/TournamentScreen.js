@@ -10,8 +10,13 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, ActivityIndicator,
-  TouchableOpacity, Pressable, Modal,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Pressable,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -59,6 +64,8 @@ import ScreenDecor from "@components/ScreenDecor";
 import { PHASE_META, phaseLabel } from "@components/tournament/phaseMeta";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../../components/common/GlassTouchable";
+import GlassPressable from "../../components/common/GlassPressable";
 // Onay katmanında artık okunacak iki seçenek var; eski 2.6 sn karar vermeye
 // yetmiyordu (MatchCard'daki PENDING_TIMEOUT ile aynı).
 const NOM_PENDING_TIMEOUT = 6000;
@@ -569,7 +576,7 @@ export default function TournamentScreen() {
   // modalını açar. Başlık/alt yazı kaldırıldı; tüm bilgi accessibilityLabel'da.
   // Header'ın en sağında yer alır.
   const PodiumButton = (
-    <TouchableOpacity
+    <GlassTouchable
       onPress={() => setPodiumVisible(true)}
       activeOpacity={0.85}
       accessibilityRole="button"
@@ -577,7 +584,7 @@ export default function TournamentScreen() {
       style={[styles.podiumBtn, { backgroundColor: "#F5C51822", borderColor: "#F5C51866" }]}
     >
       <AppIcon family="Ionicons" name="trophy" size={17} color="#F5C518" />
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 
   // ── Header ──────────────────────────────────────────────────────────────────
@@ -655,7 +662,7 @@ export default function TournamentScreen() {
   const ViewToggle = (
     <View style={[styles.toggle, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       {["list", "tree"].map((m) => (
-        <Pressable
+        <GlassPressable
           key={m}
           onPress={() => setViewMode(m)}
           accessibilityRole="button"
@@ -673,7 +680,7 @@ export default function TournamentScreen() {
               ? i18nText("autoI18n.tournament_list", "Liste")
               : i18nText("autoI18n.tournament_tree", "Ağaç")}
           </Text>
-        </Pressable>
+        </GlassPressable>
       ))}
     </View>
   );
@@ -733,14 +740,14 @@ export default function TournamentScreen() {
           </Text>
         </View>
         <View style={styles.browserHeaderRight}>
-          <TouchableOpacity
+          <GlassTouchable
             onPress={() => setInfoVisible(true)}
             accessibilityRole="button"
             accessibilityLabel={i18nText("autoI18n.tournament_info", "Bilgi")}
             style={[styles.infoBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
           >
             <AppIcon family="Ionicons" name="information" size={13} color={theme.text.secondary} />
-          </TouchableOpacity>
+          </GlassTouchable>
           {ViewToggle}
         </View>
       </View>
@@ -769,7 +776,7 @@ export default function TournamentScreen() {
       onRequestClose={() => setInfoVisible(false)}
     >
       <Pressable style={styles.matchModalOverlay} onPress={() => setInfoVisible(false)}>
-        <Pressable onPress={() => {}} style={[styles.matchModalCard, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+        <GlassPressable onPress={() => {}} style={[styles.matchModalCard, { backgroundColor: theme.primary, borderColor: theme.border }]}>
           <View style={styles.matchModalHeader}>
             <Text style={[styles.matchModalTitle, { color: theme.text.primary }]}>
               {i18nText("autoI18n.tournament_info", "Bilgi")}
@@ -803,7 +810,7 @@ export default function TournamentScreen() {
               )}
             </Text>
           </View>
-        </Pressable>
+        </GlassPressable>
       </Pressable>
       <ModalToastHost visible={infoVisible} />
     </Modal>
@@ -836,7 +843,7 @@ export default function TournamentScreen() {
     >
       <Pressable style={styles.matchModalOverlay} onPress={() => setTreeMatchId(null)}>
         {/* Kartın kendisine basınca kapanmasın */}
-        <Pressable onPress={() => {}} style={[styles.matchModalCard, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+        <GlassPressable onPress={() => {}} style={[styles.matchModalCard, { backgroundColor: theme.primary, borderColor: theme.border }]}>
           {treeMatch && (
             <>
               <View style={styles.matchModalHeader}>
@@ -879,7 +886,7 @@ export default function TournamentScreen() {
               </Text>
             </>
           )}
-        </Pressable>
+        </GlassPressable>
       </Pressable>
       <ModalToastHost visible={!!treeMatch} />
     </Modal>
@@ -1070,7 +1077,7 @@ export default function TournamentScreen() {
   // halde postere basınca "bir şey olmuyor" hissi verirdi.
   const spectatorNotice =
     !canVoteHere && !!uid && (nominationOpen || phaseInfo.phase === "voting") ? (
-      <Pressable
+      <GlassPressable
         onPress={() => voteGate.showUpsell()}
         accessibilityRole="button"
         style={[styles.notice, { backgroundColor: theme.accent + "1A", borderColor: theme.accent + "44" }]}
@@ -1080,7 +1087,7 @@ export default function TournamentScreen() {
           {lang === "tr" ? "Turnuvayı seyirci olarak izliyorsun. Oy kullanmak Premium'a özel." : lang === "es" ? "Estás viendo el torneo como espectador. Votar es una ventaja Premium." : lang === "pt" ? "Você está vendo o torneio como espectador. Votar é um benefício Premium." : "You're watching as a spectator. Voting is a Premium perk."}
         </Text>
         <AppIcon family="Ionicons" name="chevron-forward" size={14} color={theme.text.muted} />
-      </Pressable>
+      </GlassPressable>
     ) : null;
 
   // ── Body ──────────────────────────────────────────────────────────────────────
@@ -1171,7 +1178,7 @@ export default function TournamentScreen() {
           )}
 
           {/* Arama çubuğu görünümlü buton → aday arama ekranı (oradan hype verilir) */}
-          <Pressable
+          <GlassPressable
             onPress={() => setSearchVisible(true)}
             style={[styles.searchBar, { backgroundColor: theme.between, borderColor: theme.border }]}
             accessibilityRole="button"
@@ -1184,13 +1191,13 @@ export default function TournamentScreen() {
             <View style={[styles.searchBarBadge, { backgroundColor: theme.accent + "1A" }]}>
               <AppIcon family="Ionicons" name="flame" size={11} color={theme.accent} />
             </View>
-          </Pressable>
+          </GlassPressable>
         </View>
 
         {NomineeGrid()}
 
         {/* Eşleşme projeksiyonu — şu anki oylara göre; istenirse açılır */}
-        <TouchableOpacity
+        <GlassTouchable
           onPress={() => setShowProjection((s) => !s)}
           activeOpacity={0.8}
           style={[styles.projToggle, { backgroundColor: theme.secondary, borderColor: theme.border }]}
@@ -1207,7 +1214,7 @@ export default function TournamentScreen() {
             size={16}
             color={theme.text.muted}
           />
-        </TouchableOpacity>
+        </GlassTouchable>
         {showProjection && (
           <View>
             {nominationOpen && (
@@ -1264,7 +1271,7 @@ export default function TournamentScreen() {
       {__DEV__ && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.devStrip}>
           {DEV_PRESETS.map((p) => (
-            <TouchableOpacity
+            <GlassTouchable
               key={p.key}
               onPress={() => {
                 const ms = p.offset == null ? null : getPeriodStartMs(periodId) + p.offset * DAY;
@@ -1275,7 +1282,7 @@ export default function TournamentScreen() {
               style={[styles.devChip, { backgroundColor: theme.secondary, borderColor: theme.border }]}
             >
               <Text style={{ color: theme.text.secondary, fontSize: 11, fontWeight: "700" }}>{p.label}</Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           ))}
         </ScrollView>
       )}

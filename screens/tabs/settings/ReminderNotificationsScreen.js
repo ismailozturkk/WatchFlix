@@ -5,7 +5,7 @@
 // Ana anahtar (tüm bildirimler) burada da var — hem hatırlatma hem sosyal onu paylaşır.
 
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import SwitchToggle from "@components/SwitchToggle";
 import AppIcon from "@components/AppIcon";
 import BatteryOptimizationNotice from "@components/BatteryOptimizationNotice";
@@ -24,6 +24,7 @@ import { pickByLanguage } from "@utils/appLanguages";
 import { getFeatureLimit } from "@utils/premiumFeatures";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import { SettingsSubScreen, SettingRow, buildUiColors } from "./settingsUi";
+import GlassTouchable from "../../../components/common/GlassTouchable";
 
 const REMINDER_NOTIFICATION_TIMINGS = [
   { labelKey: "onReleaseDay", value: 0 },
@@ -239,7 +240,7 @@ export default function ReminderNotificationsScreen() {
             {REMINDER_NOTIFICATION_TIMINGS.map((item) => {
               const active = notificationSettings.leadTimeDays === item.value;
               return (
-                <TouchableOpacity
+                <GlassTouchable
                   key={item.value}
                   style={[
                     ns.segOpt,
@@ -262,7 +263,7 @@ export default function ReminderNotificationsScreen() {
                   >
                     {t[item.labelKey]}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               );
             })}
           </View>
@@ -292,7 +293,7 @@ export default function ReminderNotificationsScreen() {
             {REMINDER_PREVIEW_LIMITS.map((limit) => {
               const active = reminderPreviewLimit === limit;
               return (
-                <TouchableOpacity
+                <GlassTouchable
                   key={limit}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
@@ -312,7 +313,7 @@ export default function ReminderNotificationsScreen() {
                   >
                     {limit}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               );
             })}
           </View>

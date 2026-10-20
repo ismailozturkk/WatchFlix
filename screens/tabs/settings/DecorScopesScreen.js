@@ -13,7 +13,7 @@
 // Mantık utils/decorScopes.js'te (saf, testli); burada yalnız çizim.
 
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import AppIcon from "@components/AppIcon";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import { useLanguage } from "@context/LanguageContext";
@@ -37,6 +37,8 @@ import {
 } from "@utils/decorScopes";
 import { alpha } from "@theme/colors";
 import { SettingsSubScreen, buildUiColors } from "./settingsUi";
+import GlassTouchable from "../../../components/common/GlassTouchable";
+import GlassBox from "../../../components/common/GlassBox";
 
 // Etiketler render içinde çözülür (dil değişince yeniden çizilsin); anahtarlar
 // STATİK yazılı çünkü i18nKeys bekçisi yalnız düz dizgeleri tarar.
@@ -131,7 +133,7 @@ function EffectChip({ effect, label, state, color, dimmed, locked, onPress, a11y
   const mixed = state === "mixed";
   const lit = on || mixed;
   return (
-    <TouchableOpacity
+    <GlassTouchable
       accessibilityRole="switch"
       accessibilityLabel={a11yLabel}
       accessibilityState={{ checked: mixed ? "mixed" : on }}
@@ -168,7 +170,7 @@ function EffectChip({ effect, label, state, color, dimmed, locked, onPress, a11y
       ) : on ? (
         <AppIcon name="checkmark" size={12} color={color} />
       ) : null}
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 
@@ -248,7 +250,7 @@ export default function DecorScopesScreen() {
         )}
       </Text>
 
-      <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
         {/* Tüm ekranlar: sütun toplu anahtarı */}
         <View style={[s.block, { borderBottomColor: C.borderMuted }]}>
           <View style={s.head}>
@@ -348,7 +350,7 @@ export default function DecorScopesScreen() {
             </View>
           );
         })}
-      </View>
+      </GlassBox>
 
       {anyGloballyOff ? (
         <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
@@ -360,7 +362,7 @@ export default function DecorScopesScreen() {
       ) : null}
 
       {isDecorCustomized(decorHidden) ? (
-        <TouchableOpacity
+        <GlassTouchable
           accessibilityRole="button"
           activeOpacity={0.7}
           onPress={() => {
@@ -383,7 +385,7 @@ export default function DecorScopesScreen() {
               )}
             </Text>
           </View>
-        </TouchableOpacity>
+        </GlassTouchable>
       ) : null}
     </SettingsSubScreen>
   );

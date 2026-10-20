@@ -10,7 +10,7 @@
 // kalarak arkadan tazelenir.
 
 import React, { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Skeleton from "@components/Skeleton";
 import PremiumPill from "@components/premium/PremiumPill";
 import { usePremiumGate } from "@hooks/usePremiumGate";
@@ -31,6 +31,7 @@ import {
   buildSceneGameProgress,
   GAME_REGISTRY,
 } from "@screens/game/gameRegistry";
+import GlassPressable from "../common/GlassPressable";
 
 export default function ProfileGamesModule({ navigation }) {
   const { theme } = useTheme();
@@ -79,7 +80,7 @@ export default function ProfileGamesModule({ navigation }) {
       />
 
       {locked ? (
-        <Pressable
+        <GlassPressable
           onPress={() => gamesGate.showUpsell()}
           accessibilityRole="button"
           style={[styles.lockBanner, { backgroundColor: theme.secondary, borderColor: theme.border }]}
@@ -95,7 +96,7 @@ export default function ProfileGamesModule({ navigation }) {
               "Sahne tahmin oyunları Premium'da. Günlük meydan okuma, liderlik tablosu ve istatistikler dahil.",
             )}
           </Text>
-        </Pressable>
+        </GlassPressable>
       ) : null}
 
       {!ready ? (

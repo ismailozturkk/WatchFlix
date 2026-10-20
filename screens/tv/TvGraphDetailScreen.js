@@ -5,7 +5,6 @@ import {
   View,
   Image,
   TouchableOpacity,
-  Pressable,
   Animated,
   InteractionManager,
 } from "react-native";
@@ -36,6 +35,8 @@ import {
   useImageQualitySettings,
 } from "../../context/AppSettingsContext";
 import ScreenDecor from "../../components/ScreenDecor";
+import GlassPressable from "../../components/common/GlassPressable";
+import GlassTouchable from "../../components/common/GlassTouchable";
 
 // ─── Rating Renk Sistemi ──────────────────────────────────────────────────────
 // Ortak katmanlar utils/ratingColors.js'te — story "Bölüm Graph" bloğu da kullanır.
@@ -84,7 +85,7 @@ const GridModeSwitch = memo(function GridModeSwitch({ options, value, onChange, 
       {options.map((option) => {
         const active = value === option.key;
         return (
-          <Pressable
+          <GlassPressable
             key={option.key}
             onPress={() => onChange(option.key)}
             accessibilityRole="button"
@@ -102,7 +103,7 @@ const GridModeSwitch = memo(function GridModeSwitch({ options, value, onChange, 
               size={16}
               color={active ? "#fff" : theme.text.primary}
             />
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>
@@ -390,9 +391,9 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         <View style={styles.errorBody}>
           <Text style={styles.errorTitle}>{t.mistake}</Text>
           <Text style={styles.errorMessage}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchAllSeasons}>
+          <GlassTouchable style={styles.retryButton} onPress={fetchAllSeasons}>
             <Text style={styles.retryButtonText}>{t.tryAgain}</Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       </SafeAreaView>
     );

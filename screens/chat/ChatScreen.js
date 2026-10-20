@@ -157,6 +157,8 @@ import Reanimated, {
   withTiming,
 } from "react-native-reanimated";
 import TrailerModal from "@components/video/TrailerModal";
+import GlassTouchable from "../../components/common/GlassTouchable";
+import GlassBox from "../../components/common/GlassBox";
 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -2348,7 +2350,7 @@ export default function ChatScreen({ route, navigation }) {
       >
           {/* ── MESAJ LİSTESİ ── */}
           {pinnedMessages.length > 0 && (
-            <TouchableOpacity
+            <GlassTouchable
               onPress={() => setPinnedModalVisible(true)}
               activeOpacity={0.82}
               style={[
@@ -2405,7 +2407,7 @@ export default function ChatScreen({ route, navigation }) {
                 size={16}
                 color={theme.text.muted}
               />
-            </TouchableOpacity>
+            </GlassTouchable>
           )}
           <View
             ref={messageViewportRef}
@@ -2569,7 +2571,7 @@ export default function ChatScreen({ route, navigation }) {
               {/* FAB menüsü — anket & arama kısayolları */}
               {attachMenuVisible && (
                 <View style={styles.attachMenuRow}>
-                  <TouchableOpacity
+                  <GlassTouchable
                     style={[
                       styles.attachAction,
                       {
@@ -2598,9 +2600,9 @@ export default function ChatScreen({ route, navigation }) {
                     >
                       {i18nText("autoI18n.metin_anketi", "Metin Anketi")}
                     </Text>
-                  </TouchableOpacity>
+                  </GlassTouchable>
 
-                  <TouchableOpacity
+                  <GlassTouchable
                     style={[
                       styles.attachAction,
                       {
@@ -2629,7 +2631,7 @@ export default function ChatScreen({ route, navigation }) {
                     >
                       {i18nText("autoI18n.film_dizi_ara", "Film & Dizi Ara")}
                     </Text>
-                  </TouchableOpacity>
+                  </GlassTouchable>
                 </View>
               )}
 
@@ -2810,7 +2812,7 @@ export default function ChatScreen({ route, navigation }) {
                   </View>
 
                   {/* Arama girişi (modaldaki) */}
-                  <View
+                  <GlassBox role="field"
                     style={[
                       styles.searchInputWrapper,
                       {
@@ -2846,11 +2848,11 @@ export default function ChatScreen({ route, navigation }) {
                         style={{ width: 40, height: 24, marginRight: 8 }}
                       />
                     )}
-                  </View>
+                  </GlassBox>
 
                   {/* Kategori filtreleri */}
                   <View style={styles.categoryRow}>
-                    <TouchableOpacity
+                    <GlassTouchable
                       style={[
                         styles.catBtn,
                         {
@@ -2871,9 +2873,9 @@ export default function ChatScreen({ route, navigation }) {
                           searchChoise === null && { color: theme.accent, fontWeight: "700" },
                         ]}
                       >{i18nText("autoI18n.tumu", "Tümü")}</Text>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                     {CATEGORIES.map((cat) => (
-                      <TouchableOpacity
+                      <GlassTouchable
                         key={cat.key}
                         style={[
                           styles.catBtn,
@@ -2906,7 +2908,7 @@ export default function ChatScreen({ route, navigation }) {
                         >
                           {cat.label}
                         </Text>
-                      </TouchableOpacity>
+                      </GlassTouchable>
                     ))}
                   </View>
 
@@ -3006,13 +3008,13 @@ export default function ChatScreen({ route, navigation }) {
                                 <FontAwesome name="image" size={16} color={theme.text.muted} />
                               </View>
                             )}
-                            <TouchableOpacity
+                            <GlassTouchable
                               style={[styles.composeThumbRemove, { borderColor: theme.secondary }]}
                               onPress={() => toggleSelectItem(it)}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
                               <Ionicons name="close" size={11} color="#fff" />
-                            </TouchableOpacity>
+                            </GlassTouchable>
                           </View>
                         ))}
                       </ScrollView>
@@ -3021,7 +3023,7 @@ export default function ChatScreen({ route, navigation }) {
                       {selectedItems.length >= 2 &&
                         categoryOf(selectedItems[0].media_type) === "media" && (
                           <View style={[styles.modeRow, { backgroundColor: theme.between }]}>
-                            <TouchableOpacity
+                            <GlassTouchable
                               style={[
                                 styles.modeBtn,
                                 !pollMode && [
@@ -3038,8 +3040,8 @@ export default function ChatScreen({ route, navigation }) {
                               <Text style={[styles.modeBtnText, { color: !pollMode ? theme.accent : theme.text.muted }]}>
                                 {i18nText("autoI18n.liste", "Liste")}
                               </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
+                            </GlassTouchable>
+                            <GlassTouchable
                               style={[
                                 styles.modeBtn,
                                 pollMode && [
@@ -3056,14 +3058,14 @@ export default function ChatScreen({ route, navigation }) {
                               <Text style={[styles.modeBtnText, { color: pollMode ? theme.accent : theme.text.muted }]}>
                                 {i18nText("autoI18n.anket", "Anket")}
                               </Text>
-                            </TouchableOpacity>
+                            </GlassTouchable>
                           </View>
                         )}
 
                       {/* Başlık (liste) veya soru (anket) */}
                       {selectedItems.length >= 2 &&
                         (pollMode ? (
-                          <View
+                          <GlassBox role="field"
                             style={[
                               styles.composeTitleWrap,
                               {
@@ -3082,9 +3084,9 @@ export default function ChatScreen({ route, navigation }) {
                               selectionColor={theme.accent}
                               maxLength={80}
                             />
-                          </View>
+                          </GlassBox>
                         ) : showTitleInput ? (
-                          <View
+                          <GlassBox role="field"
                             style={[
                               styles.composeTitleWrap,
                               {
@@ -3103,7 +3105,7 @@ export default function ChatScreen({ route, navigation }) {
                               selectionColor={theme.accent}
                               maxLength={60}
                             />
-                          </View>
+                          </GlassBox>
                         ) : (
                           <TouchableOpacity
                             style={styles.composeAddTitle}
@@ -3126,7 +3128,7 @@ export default function ChatScreen({ route, navigation }) {
                             {i18nText("autoI18n.temizle", "Temizle")}
                           </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
+                        <GlassTouchable
                           onPress={sendComposed}
                           style={[
                             styles.composeSendBtn,
@@ -3143,7 +3145,7 @@ export default function ChatScreen({ route, navigation }) {
                               ? i18nText("autoI18n.anket_olustur", "Anket Oluştur")
                               : i18nText("autoI18n.gonder", "Gönder") + " (" + selectedItems.length + ")"}
                           </Text>
-                        </TouchableOpacity>
+                        </GlassTouchable>
                       </View>
                     </View>
                   )}
@@ -3246,7 +3248,7 @@ export default function ChatScreen({ route, navigation }) {
                     },
                   ]}
                 >
-                  <TouchableOpacity
+                  <GlassTouchable
                     style={[styles.actionRowL, { backgroundColor: theme.secondary }]}
                     onPress={() => beginReply(selectedMessage)}
                     activeOpacity={0.7}
@@ -3262,10 +3264,10 @@ export default function ChatScreen({ route, navigation }) {
                         {i18nText("autoI18n.mesaji_alintila", "Mesajı alıntılayarak yanıtla")}
                       </Text>
                     </View>
-                  </TouchableOpacity>
+                  </GlassTouchable>
 
                   {(canPinSelected || canUnpinSelected) && (
-                    <TouchableOpacity
+                    <GlassTouchable
                       style={[styles.actionRowL, { backgroundColor: theme.secondary }]}
                       onPress={() =>
                         canUnpinSelected
@@ -3294,14 +3296,14 @@ export default function ChatScreen({ route, navigation }) {
                             : i18nText("autoI18n.sohbetin_ustunde_goster", "Sohbetin üstünde göster")}
                         </Text>
                       </View>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   )}
 
                   {/* Düzenleme yalnızca düz metin mesajlarda gösterilir;
                       paylaşılan media/koleksiyon mesajının metni başlıktır,
                       düzenlenmesi anlamsızdır. */}
                   {canEditSelected && (
-                    <TouchableOpacity
+                    <GlassTouchable
                       style={[styles.actionRowL, { backgroundColor: theme.secondary }]}
                       onPress={() => {
                         setReplyingTo(null);
@@ -3331,11 +3333,11 @@ export default function ChatScreen({ route, navigation }) {
                           {i18nText("autoI18n.mesaji_degistir", "Mesajı değiştir")}
                         </Text>
                       </View>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   )}
 
                   {canDeleteSelected && (
-                    <TouchableOpacity
+                    <GlassTouchable
                       style={[styles.actionRowR, { backgroundColor: theme.secondary }]}
                       onPress={() => deleteMessage(selectedMessage)}
                       activeOpacity={0.7}
@@ -3352,13 +3354,13 @@ export default function ChatScreen({ route, navigation }) {
                         <Text style={[styles.actionRowTitle, { color: DANGER }]}>{i18nText("autoI18n.sil", "Sil")}</Text>
                         <Text style={[styles.actionRowSub, { color: theme.text.muted }]}>{i18nText("autoI18n.bu_mesaji_kaldir", "Bu mesajı kaldır")}</Text>
                       </View>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   )}
 
                   {/* Şikâyet + engelle (yalnız karşı tarafın mesajında).
                       Mağaza şartı: her UGC yüzeyinde bildirme yolu olmalı. */}
                   {canModerateSelected && (
-                    <TouchableOpacity
+                    <GlassTouchable
                       style={[styles.actionRowL, { backgroundColor: theme.secondary }]}
                       onPress={() => {
                         setOptionsVisible(false);
@@ -3382,11 +3384,11 @@ export default function ChatScreen({ route, navigation }) {
                           {i18nText("autoI18n.mesaji_sikayet_et", "Mesajı şikâyet et")}
                         </Text>
                       </View>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   )}
 
                   {canModerateSelected && (
-                    <TouchableOpacity
+                    <GlassTouchable
                       style={[styles.actionRowR, { backgroundColor: theme.secondary }]}
                       onPress={() => {
                         setOptionsVisible(false);
@@ -3414,12 +3416,12 @@ export default function ChatScreen({ route, navigation }) {
                           {i18nText("autoI18n.engelle", "Engelle")}
                         </Text>
                       </View>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   )}
                 </View>
 
                 {/* İptal butonu */}
-                <TouchableOpacity
+                <GlassTouchable
                   style={[
                     styles.cancelBtn,
                     {
@@ -3433,7 +3435,7 @@ export default function ChatScreen({ route, navigation }) {
                   <Text style={[styles.cancelBtnText, { color: theme.text.primary }]}>
                     {i18nText("autoI18n.iptal", "İptal")}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
           </BottomSheetModal>
         )}
 

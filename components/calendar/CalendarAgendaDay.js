@@ -20,6 +20,8 @@ import {
 } from "@utils/phoneCalendar";
 import { dayDiff, formatEpisodeCode, urgencyTone } from "@utils/calendarAgenda";
 import { i18nText } from "@utils/i18nText";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 
 const THUMB_W = 46;
 const THUMB_H = 68;
@@ -108,7 +110,7 @@ const SaveButton = ({ item, savedSet, onSavedChange, viewMode, theme }) => {
         };
 
   return (
-    <TouchableOpacity
+    <GlassTouchable
       onPress={toggle}
       activeOpacity={0.7}
       disabled={busy}
@@ -127,7 +129,7 @@ const SaveButton = ({ item, savedSet, onSavedChange, viewMode, theme }) => {
       ]}
     >
       <Ionicons name={look.icon} size={look.size} color={look.color} />
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 };
 
@@ -304,7 +306,7 @@ export const AgendaDay = memo(function AgendaDay({
         </View>
       </TouchableOpacity>
 
-      <View
+      <GlassBox role="card"
         style={[
           styles.card,
           { backgroundColor: theme.secondary, borderColor: theme.border },
@@ -323,7 +325,7 @@ export const AgendaDay = memo(function AgendaDay({
             isLast={index === entries.length - 1}
           />
         ))}
-      </View>
+      </GlassBox>
     </View>
   );
 });

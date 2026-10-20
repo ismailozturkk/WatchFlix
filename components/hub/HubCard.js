@@ -14,10 +14,11 @@
 //                 basmasını taşır (kartın geri kalanı hâlâ kartı açar).
 
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import { PressableScale } from "@components/game/ui";
+import GlassPressable from "../common/GlassPressable";
 
 export default function HubCard({
   colors,
@@ -84,7 +85,7 @@ export function HubArrow({ color, size = 36 }) {
 /** Cam yuvarlak "sohbete gönder" düğmesi; basış kartın kendi basışına geçmez. */
 export function HubSendButton({ onPress, size = 36, label }) {
   return (
-    <Pressable
+    <GlassPressable
       onPress={onPress}
       hitSlop={6}
       accessibilityRole="button"
@@ -96,7 +97,7 @@ export function HubSendButton({ onPress, size = 36, label }) {
       ]}
     >
       <AppIcon family="Ionicons" name="paper-plane-outline" size={Math.round(size * 0.5)} color="#FFFFFF" />
-    </Pressable>
+    </GlassPressable>
   );
 }
 

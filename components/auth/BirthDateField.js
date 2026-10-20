@@ -17,13 +17,14 @@
 // (bkz. utils/ageGate.js).
 
 import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import DatePickerModal, { formatLongDateParts } from "../modals/DatePickerModal";
 import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { calculateAge, MAX_AGE, MIN_ADULT_AGE, parseBirthDate } from "../../utils/ageGate";
+import GlassPressable from "../common/GlassPressable";
 
 // Çark boş değerle bugüne açılıyor; doğum tarihi için bu, çoğu kullanıcıya
 // yirmi-otuz yıl kaydırmak demek. Kullanıcı listesinin ortasına yakın bir
@@ -87,7 +88,7 @@ export default function BirthDateField({
 
   return (
     <View style={styles.wrap}>
-      <Pressable
+      <GlassPressable
         accessibilityRole="button"
         accessibilityState={{ disabled }}
         accessibilityLabel={
@@ -146,7 +147,7 @@ export default function BirthDateField({
         {!disabled && (
           <Ionicons name="chevron-down" size={16} color={theme.text.muted} />
         )}
-      </Pressable>
+      </GlassPressable>
 
       {showHint && (
         <Text style={[styles.hint, { color: theme.text.muted }]}>

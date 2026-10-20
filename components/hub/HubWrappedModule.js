@@ -64,6 +64,7 @@ import { PREMIUM_PLAN, getPremiumPlanDisplayName } from "@utils/premium";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import useReduceMotion from "@hooks/useReduceMotion";
 import { triggerHaptic } from "@services/hapticsService";
+import GlassPressable from "../common/GlassPressable";
 
 const RM = ReduceMotion.System;
 const PRESS_SPRING = { mass: 0.4, damping: 12, stiffness: 180 };
@@ -470,7 +471,7 @@ const YearRow = memo(function YearRow({
         .reduceMotion(RM)}
     >
       <Animated.View style={press.style}>
-        <Pressable
+        <GlassPressable
           onPressIn={press.onPressIn}
           onPressOut={press.onPressOut}
           onPress={onPress}
@@ -522,7 +523,7 @@ const YearRow = memo(function YearRow({
             <Text style={styles.launchBtnText}>{locked ? lockedPlanName : str.hubWatch}</Text>
             <Ionicons name={locked ? "diamond" : "play"} size={12} color="#FFFFFF" />
           </View>
-        </Pressable>
+        </GlassPressable>
       </Animated.View>
     </Animated.View>
   );
@@ -892,7 +893,7 @@ export default function HubWrappedModule({ navigation, revealed = true }) {
       {/* ── YILLIK ARŞİV ── */}
       <Reveal active={active} delay={1250} dy={14} style={styles.archiveReveal}>
         <Animated.View style={archive.style}>
-          <Pressable
+          <GlassPressable
             onPressIn={archive.onPressIn}
             onPressOut={archive.onPressOut}
             onPress={openArchive}
@@ -942,7 +943,7 @@ export default function HubWrappedModule({ navigation, revealed = true }) {
               ))}
               <Ionicons name="chevron-forward" size={15} color={theme.text.muted} />
             </View>
-          </Pressable>
+          </GlassPressable>
         </Animated.View>
       </Reveal>
 

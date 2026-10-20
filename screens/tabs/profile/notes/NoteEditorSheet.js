@@ -51,6 +51,8 @@ import {
   isNoteEmpty,
   todoStats,
 } from "../../../../utils/notesView";
+import GlassTouchable from "../../../../components/common/GlassTouchable";
+import GlassBox from "../../../../components/common/GlassBox";
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
@@ -527,7 +529,7 @@ export default function NoteEditorSheet({
                 const active = activeType === tp;
                 const full = fullTypes.includes(tp);
                 return (
-                  <TouchableOpacity
+                  <GlassTouchable
                     key={tp}
                     style={[
                       st.typeBtn,
@@ -554,7 +556,7 @@ export default function NoteEditorSheet({
                         ? i18nText("autoI18n.not", "Not")
                         : i18nText("autoI18n.yapilacak", "Yapılacak")}
                     </Text>
-                  </TouchableOpacity>
+                  </GlassTouchable>
                 );
               })}
             </View>
@@ -569,7 +571,7 @@ export default function NoteEditorSheet({
             </View>
           )}
 
-          <TouchableOpacity
+          <GlassTouchable
             onPress={() => setPinned((v) => !v)}
             activeOpacity={0.8}
             accessibilityRole="button"
@@ -588,7 +590,7 @@ export default function NoteEditorSheet({
             ]}
           >
             <Ionicons name={pinned ? "pin" : "pin-outline"} size={19} color={pinned ? color : theme.text.secondary} />
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
 
         {/* Renk seçici: seçili renkte onay işareti */}
@@ -697,7 +699,7 @@ export default function NoteEditorSheet({
                       <Text allowFontScaling={false} style={[st.sectionLabel, { color, marginBottom: 0 }]}>
                         {i18nText("autoI18n.yapilanlar_upper", "YAPILANLAR")}
                       </Text>
-                      <TouchableOpacity
+                      <GlassTouchable
                         onPress={clearCompleted}
                         hitSlop={ICON_HIT_SLOP}
                         style={[st.clearBtn, { backgroundColor: alpha(color, 0.14) }]}
@@ -707,7 +709,7 @@ export default function NoteEditorSheet({
                         <Text allowFontScaling={false} style={[st.clearBtnText, { color }]}>
                           {i18nText("autoI18n.notes_tamamlananlari_temizle", "Tamamlananları temizle")}
                         </Text>
-                      </TouchableOpacity>
+                      </GlassTouchable>
                     </View>
                     {doneTodos.map(renderTodoRow)}
                   </>
@@ -760,7 +762,7 @@ export default function NoteEditorSheet({
             {presets.map((p) => {
               const selected = scheduledDate === p.value;
               return (
-                <TouchableOpacity
+                <GlassTouchable
                   key={p.key}
                   onPress={() => setScheduledDate(selected ? null : p.value)}
                   activeOpacity={0.85}
@@ -778,7 +780,7 @@ export default function NoteEditorSheet({
                   >
                     {p.label}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               );
             })}
           </ScrollView>
@@ -788,7 +790,7 @@ export default function NoteEditorSheet({
       {/* Madde ekleme: kaydırma alanının DIŞINDA — liste uzayınca da erişilebilir kalsın */}
       {activeType === "todo" && (
         <View style={st.addTodoRow}>
-          <View style={[st.addTodoInputShell, { borderColor: alpha(color, 0.5), backgroundColor: theme.primary }]}>
+          <GlassBox role="field" style={[st.addTodoInputShell, { borderColor: alpha(color, 0.5), backgroundColor: theme.primary }]}>
             <TextInput
               ref={todoInputRef}
               allowFontScaling={false}
@@ -803,8 +805,8 @@ export default function NoteEditorSheet({
               blurOnSubmit={false}
             />
             <LimitCounter value={newTodoText} limit={TODO_ITEM_LIMIT} theme={theme} style={st.todoInputCounter} />
-          </View>
-          <TouchableOpacity
+          </GlassBox>
+          <GlassTouchable
             onPress={addTodo}
             activeOpacity={0.85}
             hitSlop={ICON_HIT_SLOP}
@@ -812,7 +814,7 @@ export default function NoteEditorSheet({
             accessibilityRole="button"
           >
             <Ionicons name="add" size={26} color={newTodoText.trim() ? "#fff" : color} />
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       )}
 

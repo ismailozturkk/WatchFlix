@@ -31,6 +31,8 @@ import { searchCandidates } from "@services/tournamentService";
 import useKeyboardInset from "@hooks/useKeyboardInset";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassPressable from "../common/GlassPressable";
+import GlassBox from "../common/GlassBox";
 const PENDING_TIMEOUT = 2600;
 const SEARCH_DEBOUNCE = 380;
 const MIN_QUERY = 2;
@@ -64,7 +66,7 @@ const Row = memo(function Row({
     );
   } else if (canVote) {
     action = (
-      <Pressable
+      <GlassPressable
         onPress={() => onPress(item)}
         style={[
           styles.actionChip,
@@ -79,7 +81,7 @@ const Row = memo(function Row({
             ? i18nText("autoI18n.tournament_confirm_final", "Onayla — kesin")
             : i18nText("autoI18n.tournament_hype", "Hype")}
         </Text>
-      </Pressable>
+      </GlassPressable>
     );
   }
 
@@ -257,7 +259,7 @@ export default function NomineeSearchModal({
       >
         {/* Başlık + arama kutusu */}
         <View style={styles.header}>
-          <View style={[styles.searchBox, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+          <GlassBox role="field" style={[styles.searchBox, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
             <AppIcon family="Ionicons" name="search" size={16} color={theme.text.muted} />
             <TextInput
               autoFocus
@@ -278,7 +280,7 @@ export default function NomineeSearchModal({
                 <AppIcon family="Ionicons" name="close-circle" size={16} color={theme.text.muted} />
               </Pressable>
             ) : null}
-          </View>
+          </GlassBox>
           <GlassCloseButton
             size={38}
             fallbackRadius={13}

@@ -36,6 +36,7 @@ import ScreenDecor from "@components/ScreenDecor";
 import BackButton from "@components/BackButton";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassPressable from "../../components/common/GlassPressable";
 const LIKE_RED = "#FF5A5F";
 const SPOILER_RED = "#f04f4f";
 
@@ -673,7 +674,7 @@ export default function MyPostsScreen({ navigation }) {
 
                 {/* Yan yana aksiyonlar */}
                 <View style={menu.actionRow}>
-                  <Pressable
+                  <GlassPressable
                     style={[
                       menu.actionHalf,
                       { backgroundColor: theme.primary, borderColor: theme.border },
@@ -694,8 +695,8 @@ export default function MyPostsScreen({ navigation }) {
                       />
                     </View>
                     <Text style={[menu.actionText, { color: theme.text.primary }]}>{i18nText("autoI18n.duzenle", "Düzenle")}</Text>
-                  </Pressable>
-                  <Pressable
+                  </GlassPressable>
+                  <GlassPressable
                     style={[
                       menu.actionHalf,
                       { backgroundColor: theme.primary, borderColor: theme.border },
@@ -712,7 +713,7 @@ export default function MyPostsScreen({ navigation }) {
                       <AppIcon family="Ionicons" name="trash-outline" size={20} color="#f04f4f" />
                     </View>
                     <Text style={[menu.actionText, { color: "#f04f4f" }]}>{i18nText("autoI18n.sil", "Sil")}</Text>
-                  </Pressable>
+                  </GlassPressable>
                 </View>
 
                 <Pressable style={menu.cancelRow} onPress={() => setMenuPost(null)}>
@@ -743,7 +744,7 @@ export default function MyPostsScreen({ navigation }) {
             <Text style={[menu.dialogTitle, { color: theme.text.primary }]}>{i18nText("autoI18n.paylasimi_sil", "Paylaşımı sil")}</Text>
             <Text style={[menu.dialogMsg, { color: theme.text.secondary }]}>{i18nText("autoI18n.bu_paylasim_kalici_olarak_silinecek_bu_islem_geri_", "Bu paylaşım kalıcı olarak silinecek. Bu işlem geri alınamaz.")}</Text>
             <View style={menu.dialogActions}>
-              <Pressable
+              <GlassPressable
                 style={[
                   menu.dialogBtn,
                   { backgroundColor: theme.primary, borderColor: theme.border },
@@ -751,13 +752,13 @@ export default function MyPostsScreen({ navigation }) {
                 onPress={() => setConfirmPost(null)}
               >
                 <Text style={[menu.dialogBtnText, { color: theme.text.primary }]}>{i18nText("autoI18n.vazgec", "Vazgeç")}</Text>
-              </Pressable>
-              <Pressable
+              </GlassPressable>
+              <GlassPressable
                 style={[menu.dialogBtn, { backgroundColor: "#f04f4f", borderColor: "#f04f4f" }]}
                 onPress={handleConfirmDelete}
               >
                 <Text style={[menu.dialogBtnText, { color: "#fff" }]}>{i18nText("autoI18n.sil", "Sil")}</Text>
-              </Pressable>
+              </GlassPressable>
             </View>
           </View>
         </View>

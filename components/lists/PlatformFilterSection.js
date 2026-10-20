@@ -9,9 +9,10 @@
 // "N başlıktan K tanesi…", kapsam dışı başlık sayısı, denetimin yaşı. Veri yokken çip ÇİZİLMEZ,
 // yerine nedeni ve ne yapılacağı yazılır.
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { isStale } from "../../utils/providerWatch";
+import GlassTouchable from "../common/GlassTouchable";
 
 export default function PlatformFilterSection({ plan, selected, onToggle, copy, theme, accent }) {
   const { state, counts, ageDays } = plan;
@@ -30,7 +31,7 @@ export default function PlatformFilterSection({ plan, selected, onToggle, copy, 
       <Text style={[styles.section, { color: theme.text.muted }]}>{copy.section}</Text>
       {showChip ? (
         <View style={styles.chipRow}>
-          <TouchableOpacity
+          <GlassTouchable
             activeOpacity={0.8}
             onPress={onToggle}
             accessibilityRole="switch"
@@ -52,7 +53,7 @@ export default function PlatformFilterSection({ plan, selected, onToggle, copy, 
             <Text style={[styles.chipText, { color: selected ? theme.text.primary : theme.text.secondary }]}>
               {copy.chipCount(counts.yes)}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       ) : null}
       <Text style={[styles.note, { color: theme.text.muted }]}>{status}</Text>

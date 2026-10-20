@@ -81,6 +81,7 @@ import {
 } from "@services/aiConversationsStore";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../common/GlassTouchable";
 const { height: SCREEN_H } = Dimensions.get("window");
 
 // ─── Tema renk örnekleri (ayarlar kartındaki seçici) ─────────────────────────
@@ -290,7 +291,7 @@ const PosterCard = memo(({ card, theme, t, getTmdbUrl, onPress }) => {
   // Bulunamayan başlık → "Ara" çipi
   if (!card.found) {
     return (
-      <TouchableOpacity
+      <GlassTouchable
         activeOpacity={0.8}
         onPress={() => onPress(card)}
         style={[
@@ -310,7 +311,7 @@ const PosterCard = memo(({ card, theme, t, getTmdbUrl, onPress }) => {
           {card.query}
         </Text>
         <Ionicons name="search" size={12} color={theme.text.muted} />
-      </TouchableOpacity>
+      </GlassTouchable>
     );
   }
 
@@ -409,7 +410,7 @@ const MessageBubble = memo(
               </Text>
             </View>
             {!!msg.retry && (
-              <TouchableOpacity
+              <GlassTouchable
                 onPress={() => onRetry(msg.id, msg.retry)}
                 style={[styles.retryBtn, { borderColor: theme.colors.red + "66" }]}
               >
@@ -417,7 +418,7 @@ const MessageBubble = memo(
                 <Text style={{ color: theme.colors.red, fontSize: 12, fontWeight: "600" }}>
                   {t?.ChatModal?.retry}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
             )}
           </View>
         </Reanimated.View>
@@ -1045,7 +1046,7 @@ export const ChatModal = () => {
 
                     {/* Tür filtreleri */}
                     <View style={styles.minChipRow}>
-                      <TouchableOpacity
+                      <GlassTouchable
                         onPress={chooseGenres}
                         activeOpacity={0.7}
                         style={[
@@ -1070,9 +1071,9 @@ export const ChatModal = () => {
                         >
                           {t?.ChatModal?.watchedMovieGenres}
                         </Text>
-                      </TouchableOpacity>
+                      </GlassTouchable>
 
-                      <TouchableOpacity
+                      <GlassTouchable
                         onPress={chooseGenresTv}
                         activeOpacity={0.7}
                         style={[
@@ -1097,7 +1098,7 @@ export const ChatModal = () => {
                         >
                           {t?.ChatModal?.watchedTvGenres}
                         </Text>
-                      </TouchableOpacity>
+                      </GlassTouchable>
                     </View>
                   </Reanimated.View>
                 )}

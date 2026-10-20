@@ -22,6 +22,7 @@ import {
   subscribeToMyBookmarks,
 } from "@services/activityService";
 import { StoryDraftService } from "@services/StoryDraftService";
+import GlassBox from "../../../components/common/GlassBox";
 
 function formatCount(n) {
   if (n >= 1000) {
@@ -181,7 +182,7 @@ export default function MyActivityButton({ navigation }) {
         {i18nText("autoI18n.etkinliklerim", "Etkinliklerim")}
       </Text>
 
-      <View
+      <GlassBox role="card"
         style={[
           styles.card,
           {
@@ -255,7 +256,7 @@ export default function MyActivityButton({ navigation }) {
             />
           ))}
         </View>
-      </View>
+      </GlassBox>
     </View>
   );
 }

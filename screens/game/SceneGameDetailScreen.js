@@ -6,7 +6,7 @@
 
 import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { useCallback, useMemo, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -37,6 +37,8 @@ import {
 import usePremiumScreenGuard from "@hooks/usePremiumScreenGuard";
 import { getGameTitle, getModeMetaLine } from "./gameLabels";
 import { bestScoreForGame, getGameEntry, resolveGameAccentColors } from "./gameRegistry";
+import GlassTouchable from "../../components/common/GlassTouchable";
+import GlassBox from "../../components/common/GlassBox";
 
 // Kurallar oyuna göre: [ikon, çeviri anahtarı].
 const SCENE_RULES = [
@@ -198,7 +200,7 @@ export default function SceneGameDetailScreen({ navigation, route }) {
             : i18nText("autoI18n.sahne_tahmin_detay_aciklama", "Doğru yapımı seçenekler arasından bul, hızlı cevaplarla skorunu ve serini geliştir.")}
         </Text>
 
-        <TouchableOpacity
+        <GlassTouchable
           accessibilityRole="button"
           accessibilityLabel={i18nText("autoI18n.kurallari_gor", "Kuralları gör")}
           onPress={() => setRulesVisible(true)}
@@ -208,7 +210,7 @@ export default function SceneGameDetailScreen({ navigation, route }) {
           <Text style={styles.rulesButtonText} allowFontScaling={false}>
             {i18nText("autoI18n.nasil_oynanir", "Nasıl Oynanır?")}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       </LinearGradient>
 
       {state.loading ? (
@@ -279,14 +281,14 @@ export default function SceneGameDetailScreen({ navigation, route }) {
 
 function Metric({ label, value, color, theme }) {
   return (
-    <View style={[gameSharedStyles.metric, styles.metricCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <GlassBox role="card" style={[gameSharedStyles.metric, styles.metricCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       <Text style={[styles.metricValue, { color }]} allowFontScaling={false}>
         {value}
       </Text>
       <Text style={[styles.metricLabel, { color: theme.text.muted }]} numberOfLines={1} allowFontScaling={false}>
         {label}
       </Text>
-    </View>
+    </GlassBox>
   );
 }
 
@@ -323,7 +325,7 @@ function LastGameCard({ stats, language, theme }) {
   const difficulty = getDifficultyConfig(stats?.lastDifficultyId);
   const source = SCENE_GAME_SOURCES.find((item) => item.id === stats?.lastSourceId);
   return (
-    <View style={[styles.lastGameCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <GlassBox role="card" style={[styles.lastGameCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       <View style={styles.lastGameTop}>
         <View>
           <Text style={[styles.lastGameDate, { color: theme.text.muted }]} allowFontScaling={false}>
@@ -357,7 +359,7 @@ function LastGameCard({ stats, language, theme }) {
           </Text>
         </View>
       </View>
-    </View>
+    </GlassBox>
   );
 }
 
@@ -398,11 +400,11 @@ function RulesSheet({ visible, onClose, theme, rules, title, accent }) {
             </View>
           ))}
         </View>
-        <TouchableOpacity onPress={onClose} style={[gameSharedStyles.primaryButton, { backgroundColor: accent }]}>
+        <GlassTouchable onPress={onClose} style={[gameSharedStyles.primaryButton, { backgroundColor: accent }]}>
           <Text style={gameSharedStyles.primaryButtonText} allowFontScaling={false}>
             {i18nText("autoI18n.anladim", "Anladım")}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       </SafeAreaView>
     </BottomSheetModal>
   );

@@ -5,6 +5,8 @@
 // Firestore'a bagli kod bu config ile test edilmez (bkz. Part 23 not).
 module.exports = {
   testEnvironment: "node",
+  // Cam sarmalayıcılarının import zincirini hafifleten ortak taklitler (jest.setup.js).
+  setupFiles: ["<rootDir>/jest.setup.js"],
   testMatch: ["**/__tests__/**/*.test.js"],
   // __tests__/helpers/* test degil, yardimci modul.
   // __tests__/rules/* calisan bir Firestore emulatoru ister; `npm test`

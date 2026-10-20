@@ -22,6 +22,7 @@ import { useTheme } from "@context/ThemeContext";
 import { alpha } from "@theme/colors";
 import { i18nText } from "@utils/i18nText";
 import { DANGER, FRIEND_GREEN, PENDING_AMBER } from "./friendsTokens";
+import GlassPressable from "../common/GlassPressable";
 
 function OptionRow({ icon, label, description, tone, onPress, chevron, last }) {
   const { theme } = useTheme();
@@ -187,7 +188,7 @@ export default function ProfileOptionsSheet({
         )}
       </View>
 
-      <Pressable
+      <GlassPressable
         onPress={onClose}
         accessibilityRole="button"
         style={({ pressed }) => [
@@ -202,7 +203,7 @@ export default function ProfileOptionsSheet({
         >
           {i18nText("autoI18n.vazgec", "Vazgeç")}
         </Text>
-      </Pressable>
+      </GlassPressable>
     </BottomSheetModal>
   );
 }

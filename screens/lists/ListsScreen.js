@@ -98,6 +98,8 @@ import {
   posterWidthFor,
   rowHeightFor,
 } from "@utils/listPosterLayout";
+import GlassTouchable from "../../components/common/GlassTouchable";
+import GlassBox from "../../components/common/GlassBox";
 const { width, height } = Dimensions.get("window");
 // Diziyi `size`'lık satırlara böler (elle grid için — Android'de dinamik
 // numColumns'lu FlatList "addViewAt: failed to insert view" çökmesine yol açıyor).
@@ -1159,7 +1161,7 @@ export default function ListsScreen({ route, navigation }) {
               >
                 {i18nText("autoI18n.bu_liste_bos", "Bu liste boş.")}
               </Text>
-              <TouchableOpacity
+              <GlassTouchable
                 activeOpacity={0.85}
                 onPress={() => setSearchMode(LIST_SEARCH_MODE.GLOBAL)}
                 style={[styles.emptyCta, { backgroundColor: accent }]}
@@ -1168,7 +1170,7 @@ export default function ListsScreen({ route, navigation }) {
                 <Text style={styles.emptyCtaText}>
                   {i18nText("autoI18n.icerik_ekle", "İçerik ekle")}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
             </View>
           ) : (
         <>
@@ -1355,7 +1357,7 @@ export default function ListsScreen({ route, navigation }) {
                     "Bu listede eşleşen içerik yok.",
                   )}
                 </Text>
-                <TouchableOpacity
+                <GlassTouchable
                   activeOpacity={0.85}
                   onPress={() => setSearchMode(LIST_SEARCH_MODE.GLOBAL)}
                   style={[styles.emptyCta, { backgroundColor: accent }]}
@@ -1367,7 +1369,7 @@ export default function ListsScreen({ route, navigation }) {
                       "Tüm içeriklerde ara",
                     )}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               </View>
             }
           />
@@ -1875,7 +1877,7 @@ export default function ListsScreen({ route, navigation }) {
             </Text>
 
             <View style={styles.positionRow}>
-              <TouchableOpacity
+              <GlassTouchable
                 onPress={() => stepTargetPosition(-1)}
                 disabled={isReordering || Number(value) <= 1}
                 style={[
@@ -1888,9 +1890,9 @@ export default function ListsScreen({ route, navigation }) {
                 ]}
               >
                 <Feather name="minus" size={20} color={theme.text.primary} />
-              </TouchableOpacity>
+              </GlassTouchable>
 
-              <View
+              <GlassBox role="field"
                 style={[
                   styles.positionInputWrap,
                   { backgroundColor: theme.primary, borderColor: accent },
@@ -1910,9 +1912,9 @@ export default function ListsScreen({ route, navigation }) {
                 >
                   / {listItems.length}
                 </Text>
-              </View>
+              </GlassBox>
 
-              <TouchableOpacity
+              <GlassTouchable
                 onPress={() => stepTargetPosition(1)}
                 disabled={
                   isReordering || Number(value) >= listItems.length
@@ -1927,11 +1929,11 @@ export default function ListsScreen({ route, navigation }) {
                 ]}
               >
                 <Feather name="plus" size={20} color={theme.text.primary} />
-              </TouchableOpacity>
+              </GlassTouchable>
             </View>
 
             <View style={styles.quickPositionRow}>
-              <TouchableOpacity
+              <GlassTouchable
                 onPress={() => {
                   setValue("1");
                   Haptics.selectionAsync().catch(() => {});
@@ -1948,8 +1950,8 @@ export default function ListsScreen({ route, navigation }) {
                 >
                   {i18nText("autoI18n.ilk_sira", "İlk sıra")}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </GlassTouchable>
+              <GlassTouchable
                 onPress={() => {
                   setValue(String(listItems.length));
                   Haptics.selectionAsync().catch(() => {});
@@ -1970,11 +1972,11 @@ export default function ListsScreen({ route, navigation }) {
                 >
                   {i18nText("autoI18n.son_sira", "Son sıra")}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
             </View>
 
             <View style={styles.reorderActions}>
-              <TouchableOpacity
+              <GlassTouchable
                 onPress={closeReorderModal}
                 disabled={isReordering}
                 style={[
@@ -1987,9 +1989,9 @@ export default function ListsScreen({ route, navigation }) {
                 >
                   {i18nText("autoI18n.iptal", "İptal")}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
 
-              <TouchableOpacity
+              <GlassTouchable
                 onPress={() => reorderWatchedTv(index, value, listName)}
                 disabled={
                   isReordering ||
@@ -2025,7 +2027,7 @@ export default function ListsScreen({ route, navigation }) {
                     ? i18nText("autoI18n.tasiniyor", "Taşınıyor...")
                     : i18nText("autoI18n.tasi", "Taşı")}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
             </View>
           </View>
         </View>

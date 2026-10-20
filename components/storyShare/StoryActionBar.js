@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   StyleSheet,
   Text,
-  TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -11,6 +10,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { planStoryActionBar } from "../../utils/storyCanvasLayout";
+import GlassTouchable from "../common/GlassTouchable";
 
 // Ölçüler pencere genişliğinden HESAPLANIR (utils/storyCanvasLayout.js →
 // planStoryActionBar): eskiden `genişlik < 400` eşiğiyle iki sabit düzen vardı
@@ -48,7 +48,7 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
 
   return (
     <View style={[styles.row, { gap: plan.gap }]}>
-      <TouchableOpacity
+      <GlassTouchable
         activeOpacity={0.9}
         onPress={onShare}
         disabled={busy}
@@ -95,11 +95,11 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
             </Text>
           )}
         </View>
-      </TouchableOpacity>
+      </GlassTouchable>
 
       {/* İçerikleri saydam zeminli PNG (çıkartma) olarak paylaş */}
       {onShareSticker && (
-        <TouchableOpacity
+        <GlassTouchable
           activeOpacity={0.85}
           onPress={onShareSticker}
           disabled={busy}
@@ -109,10 +109,10 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
           <Text allowFontScaling={false} numberOfLines={1} style={[styles.iconLabel, { color: theme.text.muted }]}>
             {i18nText("autoI18n.sticker", "Sticker")}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       )}
 
-      <TouchableOpacity
+      <GlassTouchable
         activeOpacity={0.85}
         onPress={onSaveImage}
         disabled={busy}
@@ -122,9 +122,9 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
         <Text allowFontScaling={false} numberOfLines={1} style={[styles.iconLabel, { color: theme.text.muted }]}>
           {i18nText("autoI18n.galeri", "Galeri")}
         </Text>
-      </TouchableOpacity>
+      </GlassTouchable>
 
-      <TouchableOpacity
+      <GlassTouchable
         activeOpacity={0.85}
         onPress={onOpenSettings}
         disabled={busy}
@@ -134,7 +134,7 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
         <Text allowFontScaling={false} numberOfLines={1} style={[styles.iconLabel, { color: theme.text.muted }]}>
           {i18nText("autoI18n.duzenle", "Düzenle")}
         </Text>
-      </TouchableOpacity>
+      </GlassTouchable>
     </View>
   );
 }

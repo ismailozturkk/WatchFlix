@@ -7,12 +7,13 @@
 //
 // `screen` ayar sayfasının hangi ekran sekmesinde açılacağını belirler.
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import AppIcon from "../AppIcon";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
 import { getSectionVisibilityCopy } from "../../screens/tabs/settings/sectionVisibilityCopy";
+import GlassTouchable from "../common/GlassTouchable";
 
 function SectionsHiddenNotice({ navigation, screen }) {
   const { language } = useLanguage();
@@ -31,7 +32,7 @@ function SectionsHiddenNotice({ navigation, screen }) {
       <Text allowFontScaling={false} style={[styles.text, { color: theme.text.muted }]}>
         {copy.emptyText}
       </Text>
-      <TouchableOpacity
+      <GlassTouchable
         testID="sections-hidden-action"
         accessibilityRole="button"
         activeOpacity={0.75}
@@ -42,7 +43,7 @@ function SectionsHiddenNotice({ navigation, screen }) {
         <Text allowFontScaling={false} style={styles.actionText}>
           {copy.emptyAction}
         </Text>
-      </TouchableOpacity>
+      </GlassTouchable>
     </View>
   );
 }

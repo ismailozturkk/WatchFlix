@@ -40,6 +40,7 @@ import {
 } from "./ai/aiCardKit";
 import AITitleActions from "./ai/AITitleActions";
 import AIResponseFooter from "./ai/AIResponseFooter";
+import GlassTouchable from "./common/GlassTouchable";
 
 // ── Yardımcılar ───────────────────────────────────────────────────────────────
 
@@ -548,14 +549,14 @@ const TitleSpotlightCard = ({ data, ctx }) => {
         {found && (
           <View style={s.spotActions}>
             <AITitleActions card={pcard} theme={theme} copy={copy} />
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.8}
               onPress={() => onTitlePress(pcard)}
               style={[s.detailBtn, { borderColor: alpha(theme.accent, 0.5), backgroundColor: alpha(theme.accent, 0.12) }]}
             >
               <Text style={[s.detailBtnText, { color: theme.bold }]}>{copy.actions.detail}</Text>
               <Ionicons name="chevron-forward" size={14} color={theme.bold} />
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
         )}
 
@@ -718,21 +719,21 @@ const ErrorBubble = memo(({ text, retry, upsell, onRetry, onUpgrade, theme, t })
         <Text style={{ color: theme.text.secondary, fontSize: 12, marginTop: 6 }}>{upsell.message}</Text>
       )}
       {upsell && onUpgrade ? (
-        <TouchableOpacity
+        <GlassTouchable
           onPress={onUpgrade}
           style={[s.retryBtn, { borderColor: alpha(theme.accent, 0.5), backgroundColor: alpha(theme.accent, 0.12) }]}
         >
           <Ionicons name="diamond" size={13} color={theme.accent} />
           <Text style={{ color: theme.accent, fontSize: 12, fontWeight: "800" }}>{upsell.cta}</Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       ) : (
         !!retry && (
-          <TouchableOpacity onPress={() => onRetry(retry)} style={[s.retryBtn, { borderColor: alpha(theme.colors.red, 0.4) }]}>
+          <GlassTouchable onPress={() => onRetry(retry)} style={[s.retryBtn, { borderColor: alpha(theme.colors.red, 0.4) }]}>
             <Ionicons name="refresh" size={13} color={theme.colors.red} />
             <Text style={{ color: theme.colors.red, fontSize: 12, fontWeight: "700" }}>
               {t?.AICineChat?.retry || "Tekrar dene"}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         )
       )}
     </View>

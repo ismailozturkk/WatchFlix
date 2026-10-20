@@ -5,7 +5,7 @@
 // yorumlar hâlâ tek yerde toplanır, kullanıcı yalnız o kısmı görür.
 
 import React, { useMemo, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Modal } from "react-native";
+import { View, Text, StyleSheet, Modal } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import CommentSheetModal from "../modals/CommentSheetModal";
 import { alpha } from "../../theme/colors";
@@ -14,6 +14,7 @@ import { normalizeScope } from "../../utils/commentScope";
 import { scopeLong } from "./scopeTexts";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../common/GlassTouchable";
 export default function ScopedCommentButton({
   theme,
   showId,
@@ -50,7 +51,7 @@ export default function ScopedCommentButton({
 
   return (
     <>
-      <TouchableOpacity
+      <GlassTouchable
         activeOpacity={0.85}
         onPress={() => setVisible(true)}
         style={[
@@ -83,7 +84,7 @@ export default function ScopedCommentButton({
           size={15}
           color={theme.text?.muted ?? "#888"}
         />
-      </TouchableOpacity>
+      </GlassTouchable>
 
       <Modal
         animationType="none"

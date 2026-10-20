@@ -15,10 +15,11 @@
 //   leading  : simge yerine herhangi bir düğüm (ör. platform logosu)
 //   marked   : seçili OLMADAN öne çıkar — vurgu çerçevesi + sağda onay simgesi (ör. üyeliğin olan platform)
 import React, { memo } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
+import GlassPressable from "../common/GlassPressable";
 
 export const DISCOVER_CHIP_HEIGHT = 36;
 
@@ -48,7 +49,7 @@ function DiscoverFilterChip({
   const endIcon = trailingIcon ?? (marked ? "checkmark-circle" : null);
 
   return (
-    <Pressable
+    <GlassPressable
       testID={testID}
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel ?? label}
@@ -72,7 +73,7 @@ function DiscoverFilterChip({
         {label}
       </Text>
       {endIcon ? <Ionicons name={endIcon} size={14} color={marked && !trailingIcon ? accent : iconColor} /> : null}
-    </Pressable>
+    </GlassPressable>
   );
 }
 

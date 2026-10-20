@@ -21,6 +21,7 @@ import { trackEvent, ANALYTICS_EVENTS } from "../../services/analytics";
 import { triggerHaptic } from "../../services/hapticsService";
 import { MAX_FOLLOWED } from "../../utils/followedPeople";
 import { departmentLabel, getFollowedPeopleCopy } from "../../utils/followedPeopleCopy";
+import GlassPressable from "../common/GlassPressable";
 
 const Row = memo(function Row({ person, copy, theme, getTmdbUrl, onOpen, onUnfollow }) {
   return (
@@ -51,7 +52,7 @@ const Row = memo(function Row({ person, copy, theme, getTmdbUrl, onOpen, onUnfol
           </Text>
         </View>
       </Pressable>
-      <Pressable
+      <GlassPressable
         onPress={() => onUnfollow(person)}
         hitSlop={8}
         accessibilityRole="button"
@@ -63,7 +64,7 @@ const Row = memo(function Row({ person, copy, theme, getTmdbUrl, onOpen, onUnfol
         ]}
       >
         <Ionicons name="notifications-off-outline" size={16} color={theme.text.secondary} />
-      </Pressable>
+      </GlassPressable>
     </View>
   );
 });

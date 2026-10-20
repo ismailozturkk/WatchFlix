@@ -84,6 +84,7 @@ import WatchProgressBar from "../../components/tv/WatchProgressBar";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../../components/common/GlassTouchable";
 const { width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
 
@@ -874,7 +875,7 @@ export default function TvShowsDetails({ route, navigation }) {
           </View>
 
           <View style={styles.detailActionRow}>
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.88}
               onPress={openReviewComposer}
               style={[
@@ -915,9 +916,9 @@ export default function TvShowsDetails({ route, navigation }) {
                   {i18nText("autoI18n.hubda_paylas", "Hub'da paylaş")}
                 </Text>
               </View>
-            </TouchableOpacity>
+            </GlassTouchable>
 
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.88}
               onPress={() => setAiVisible(true)}
               style={[
@@ -958,9 +959,9 @@ export default function TvShowsDetails({ route, navigation }) {
                   {i18nText("autoI18n.bilgi_al", "Bilgi al")}
                 </Text>
               </View>
-            </TouchableOpacity>
+            </GlassTouchable>
 
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.88}
               onPress={() => setSendVisible(true)}
               style={[
@@ -984,7 +985,7 @@ export default function TvShowsDetails({ route, navigation }) {
                   {i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
                 </Text>
               </View>
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
 
           {/* ── STAT KARTLARI ── */}
@@ -1104,7 +1105,7 @@ export default function TvShowsDetails({ route, navigation }) {
           </View>
 
           {/* ── YORUMLAR BUTONU ── */}
-          <TouchableOpacity
+          <GlassTouchable
             activeOpacity={0.85}
             onPress={() => setCommentModalVisible(true)}
             style={[
@@ -1135,10 +1136,10 @@ export default function TvShowsDetails({ route, navigation }) {
               size={16}
               color={theme.text.muted}
             />
-          </TouchableOpacity>
+          </GlassTouchable>
 
           {/* ── NOTUM KARTI ── */}
-          <TouchableOpacity
+          <GlassTouchable
             activeOpacity={0.85}
             onPress={() => {
               // Ücretsiz planda 20 dizi notu: dolduysa not sayfası hiç açılmaz.
@@ -1182,7 +1183,7 @@ export default function TvShowsDetails({ route, navigation }) {
               size={16}
               color={theme.text.muted}
             />
-          </TouchableOpacity>
+          </GlassTouchable>
 
           {/* ── TV SHOW ITEM ── */}
           <View style={styles.section}>
@@ -1297,7 +1298,7 @@ export default function TvShowsDetails({ route, navigation }) {
 
           {/* ── ÖZET ACCORDION ── */}
           <View style={{ marginBottom: 24 }}>
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.85}
               onPress={() => toggleCard("overview")}
               style={[
@@ -1365,7 +1366,7 @@ export default function TvShowsDetails({ route, navigation }) {
                   {i18nText("autoI18n.devami", "devamı...")}
                 </Text>
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
 
           {/* ── İZLEME PLATFORMLARI + YAYINCI ── */}
@@ -1518,7 +1519,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     getWatchEvents={(sn) => watched.seasonWatchEvents(sn)}
                     theme={theme}
                   />
-                  <TouchableOpacity
+                  <GlassTouchable
                     activeOpacity={0.8}
                     onPress={() => setShowAllSeasons(true)}
                     style={[
@@ -1544,7 +1545,7 @@ export default function TvShowsDetails({ route, navigation }) {
                       size={15}
                       color={theme.text.muted}
                     />
-                  </TouchableOpacity>
+                  </GlassTouchable>
                 </>
               ) : (
                 <>
@@ -1563,7 +1564,7 @@ export default function TvShowsDetails({ route, navigation }) {
                     />
                   ))}
                   {seasonList.length > 5 && (
-                    <TouchableOpacity
+                    <GlassTouchable
                       activeOpacity={0.8}
                       onPress={() => setShowAllSeasons(false)}
                       style={[
@@ -1588,7 +1589,7 @@ export default function TvShowsDetails({ route, navigation }) {
                         size={15}
                         color={theme.text.muted}
                       />
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   )}
                 </>
               )

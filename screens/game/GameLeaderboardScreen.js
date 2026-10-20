@@ -15,6 +15,7 @@ import UserAvatar from "@components/common/UserAvatar";
 import { GameScreenShell, gameSharedStyles } from "./GameScreenShell";
 import usePremiumScreenGuard from "@hooks/usePremiumScreenGuard";
 import { SCENE_GAME_ID } from "./gameConfig";
+import GlassTouchable from "../../components/common/GlassTouchable";
 
 const PODIUM_COLORS = ["#E8B931", "#C7CDD6", "#CD7F32"];
 
@@ -235,7 +236,7 @@ function State({ icon, text, theme, loading, action, actionText }) {
     <View style={[styles.state, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       {loading ? <ActivityIndicator color={theme.accent} /> : <AppIcon family="Ionicons" name={icon} size={35} color={theme.text.muted} />}
       <Text style={[styles.stateText, { color: theme.text.secondary }]}>{text}</Text>
-      {action ? <TouchableOpacity onPress={action} style={[styles.stateAction, { backgroundColor: theme.accent }]}><Text style={styles.stateActionText}>{actionText}</Text></TouchableOpacity> : null}
+      {action ? <GlassTouchable onPress={action} style={[styles.stateAction, { backgroundColor: theme.accent }]}><Text style={styles.stateActionText}>{actionText}</Text></GlassTouchable> : null}
     </View>
   );
 }
@@ -266,7 +267,7 @@ function RulesModal({ visible, onClose, theme, tr, es, pt }) {
             ))}
           </View>
           <Text style={[styles.sheetNote, { color: theme.text.muted }]}>{tr ? "Global tablo Klasik + Normal sonuçlarından beslenir; kişisel liste oyunları tabloyu etkilemez. Günlük sekme yalnızca bugünün Günlük Meydan Okuma sonuçlarını gösterir." : es ? "La clasificación global usa los resultados del modo Clásico con dificultad Normal; las partidas con listas personales no la afectan. La pestaña Diario solo muestra los resultados del reto diario de hoy." : pt ? "O ranking global usa os resultados do modo Clássico com dificuldade Normal; partidas com listas pessoais não o afetam. A aba Diário mostra apenas os resultados do desafio diário de hoje." : "The global board uses Classic + Normal results; personal-list games don't affect it. The Daily tab only shows today's Daily Challenge results."}</Text>
-          <TouchableOpacity onPress={onClose} style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent }]}><Text style={gameSharedStyles.primaryButtonText}>{tr ? "Anladım" : es ? "Entendido" : pt ? "Entendi" : "Got it"}</Text></TouchableOpacity>
+          <GlassTouchable onPress={onClose} style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent }]}><Text style={gameSharedStyles.primaryButtonText}>{tr ? "Anladım" : es ? "Entendido" : pt ? "Entendi" : "Got it"}</Text></GlassTouchable>
       </SafeAreaView>
     </BottomSheetModal>
   );

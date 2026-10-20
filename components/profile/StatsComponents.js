@@ -29,6 +29,9 @@ import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
 import { i18nText } from "../../utils/i18nText";
 
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassPressable from "../common/GlassPressable";
+import GlassBox from "../common/GlassBox";
 
 /**
  * Renge alpha ekle — hem hex (#aabbcc) hem hsl(...) destekler.
@@ -173,7 +176,7 @@ const SegmentedControl = memo(function SegmentedControl({
       {options.map((option) => {
         const active = value === option.key;
         return (
-          <TouchableOpacity
+          <GlassTouchable
             key={option.key}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
@@ -193,7 +196,7 @@ const SegmentedControl = memo(function SegmentedControl({
             >
               {option.label}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         );
       })}
     </View>
@@ -355,7 +358,7 @@ const WatchRhythmChart = memo(function WatchRhythmChart({
   };
 
   return (
-    <View
+    <GlassBox role="card"
       style={[
         heroStyles.chartCard,
         {
@@ -488,7 +491,7 @@ const WatchRhythmChart = memo(function WatchRhythmChart({
           );
         })}
       </View>
-    </View>
+    </GlassBox>
   );
 });
 
@@ -675,7 +678,7 @@ export const StatsHeroCard = memo(function StatsHeroCard({
         </View>
 
         {/* Toplam süre — dokununca dk → sa → gün */}
-        <Pressable
+        <GlassPressable
           onPress={onTimePress}
           accessibilityRole="button"
           style={[
@@ -707,10 +710,10 @@ export const StatsHeroCard = memo(function StatsHeroCard({
             </Text>
           </View>
           <Ionicons name="swap-horizontal" size={17} color={theme.text.muted} />
-        </Pressable>
+        </GlassPressable>
 
         {/* Expand toggle */}
-        <TouchableOpacity
+        <GlassTouchable
           style={[heroStyles.expandBtn, { borderColor: theme.border }]}
           onPress={onToggleExpand}
           activeOpacity={0.7}
@@ -727,7 +730,7 @@ export const StatsHeroCard = memo(function StatsHeroCard({
               ? i18nText("autoI18n.daha_az", "Daha az")
               : i18nText("autoI18n.istatistik_daha_fazla", "Daha fazla")}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
 
         {/* Expanded content */}
         {expanded && (
@@ -1010,7 +1013,7 @@ export const StatsFilterBar = memo(function StatsFilterBar({
     <View style={filterStyles.wrap}>
       {/* Search row */}
       <View style={[filterStyles.searchRow]}>
-        <Pressable
+        <GlassPressable
           onPress={onToggleSearch}
           style={[
             filterStyles.searchIconBtn,
@@ -1025,10 +1028,10 @@ export const StatsFilterBar = memo(function StatsFilterBar({
             size={16}
             color={searchVisible ? "#fff" : theme.text.primary}
           />
-        </Pressable>
+        </GlassPressable>
 
         {searchVisible ? (
-          <View
+          <GlassBox role="field"
             style={[
               filterStyles.searchInputWrap,
               { backgroundColor: theme.secondary, borderColor: theme.border },
@@ -1045,7 +1048,7 @@ export const StatsFilterBar = memo(function StatsFilterBar({
                 <Ionicons name="close-circle" size={16} color={theme.text.muted} />
               </Pressable>
             ) : null}
-          </View>
+          </GlassBox>
         ) : (
           // Tarih + tür filtre pill'leri (search kapalıyken). Dokununca modal açılır.
           <ScrollView
@@ -1079,7 +1082,7 @@ export const StatsFilterBar = memo(function StatsFilterBar({
 // Filtre tetikleyici pill (tarih / tür). Seçim varsa vurgulanır.
 const FilterPill = memo(function FilterPill({ theme, icon, text, active, onPress }) {
   return (
-    <Pressable
+    <GlassPressable
       onPress={onPress}
       style={[
         filterStyles.pill,
@@ -1103,7 +1106,7 @@ const FilterPill = memo(function FilterPill({ theme, icon, text, active, onPress
         {text}
       </Text>
       <Ionicons name="chevron-down" size={13} color={active ? "#fff" : theme.text.muted} />
-    </Pressable>
+    </GlassPressable>
   );
 });
 
@@ -1215,7 +1218,7 @@ export const StatsFilterModal = memo(function StatsFilterModal({
           </ScrollView>
 
           <View style={[modalStyles.footer, { borderTopColor: theme.border }]}>
-            <Pressable
+            <GlassPressable
               onPress={() => {
                 onSelectDate(null);
                 onSelectGenre(null);
@@ -1230,13 +1233,13 @@ export const StatsFilterModal = memo(function StatsFilterModal({
               <Text style={[modalStyles.clearText, { color: theme.text.secondary }]}>
                 {clearLabel}
               </Text>
-            </Pressable>
-            <Pressable
+            </GlassPressable>
+            <GlassPressable
               onPress={onClose}
               style={[modalStyles.doneBtn, { backgroundColor: theme.accent }]}
             >
               <Text style={modalStyles.doneText}>{doneLabel}</Text>
-            </Pressable>
+            </GlassPressable>
           </View>
     </BottomSheetModal>
   );
@@ -1267,7 +1270,7 @@ const FilterChipCloud = memo(function FilterChipCloud({
           (opt.value == null && selectedValue == null) ||
           (opt.value != null && selectedValue === opt.value);
         return (
-          <Pressable
+          <GlassPressable
             key={opt.key}
             onPress={() => onSelect(opt.value)}
             style={[
@@ -1298,7 +1301,7 @@ const FilterChipCloud = memo(function FilterChipCloud({
             >
               {opt.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>
@@ -1733,7 +1736,7 @@ export const StatsDateSection = memo(function StatsDateSection({
   );
 
   return (
-    <View
+    <GlassBox role="card"
       style={[
         dateSectionStyles.card,
         { backgroundColor: withAlpha(theme.secondary, 0.62), borderColor: theme.border },
@@ -1764,7 +1767,7 @@ export const StatsDateSection = memo(function StatsDateSection({
         windowSize={5}
         removeClippedSubviews={false}
       />
-    </View>
+    </GlassBox>
   );
 });
 
@@ -1884,7 +1887,7 @@ export const RewatchHighlights = memo(function RewatchHighlights({
 }) {
   if (!items.length) return null;
   return (
-    <View style={[
+    <GlassBox role="card" style={[
       rewatchStyles.card,
       embedded && rewatchStyles.embeddedCard,
       {
@@ -1918,7 +1921,7 @@ export const RewatchHighlights = memo(function RewatchHighlights({
           </View>
         ))}
       </View>
-    </View>
+    </GlassBox>
   );
 });
 

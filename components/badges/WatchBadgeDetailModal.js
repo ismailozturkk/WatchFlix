@@ -50,6 +50,7 @@ import {
 } from "./watchBadgeCatalog";
 import { kalanMiktar, kartBul, prestijBilgisi, prestijEk, setUyeleri } from "./badgeInsights";
 import { formatTarih, nadirlikAdi, yuzdeMetni } from "./badgeFormat";
+import GlassTouchable from "../common/GlassTouchable";
 
 const DUGUM_ROZET = 40;      // yol düğümündeki rozet boyu (hücre genişliği esnek)
 const BOS = [];
@@ -323,7 +324,7 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
                 {SURE_BIRIMLERI.map((b) => {
                   const secili = b.id === birimId;
                   return (
-                    <TouchableOpacity
+                    <GlassTouchable
                       key={b.id}
                       accessibilityRole="button"
                       accessibilityState={{ selected: secili }}
@@ -343,7 +344,7 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
                             İngilizce arayüzde "min" → "MİN" oluyordu. */}
                         {(lang === "tr" ? b.ekTr : lang === "es" ? b.ekEs : lang === "pt" ? b.ekPt : b.ekEn).toUpperCase()}
                       </Text>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   );
                 })}
               </View>

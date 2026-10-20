@@ -42,6 +42,9 @@ import Svg, { Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import LottieView from "lottie-react-native";
 import GlassIconButton from "../common/GlassIconButton";
+import GlassSurface from "../common/GlassSurface";
+import useGlassChrome from "../common/useGlassChrome";
+import { useLiquidGlass } from "../../services/liquidGlass";
 import { alpha } from "../../theme/colors";
 import { isLightSurface, luminance, shiftLightness, toHex } from "../../utils/colorUtils";
 import { i18nText } from "../../utils/i18nText";
@@ -99,12 +102,21 @@ function PressScale({
   onLongPress,
   disabled,
   pressedScale = 0.97,
+  glass = true,
   ...rest
 }) {
   const scale = useSharedValue(1);
   const animated = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
+  // iOS 26+: düğmenin dolgu/çerçeve/köşe stili Liquid Glass'a devredilir.
+  // Marka düğmeleri (Apple / Google) `glass={false}` ile bunun dışında kalır.
+  const chrome = useGlassChrome(style, {
+    role: "button",
+    enabled: glass,
+    interactive: true,
+    catchTouches: true,
+  });
   return (
     <Pressable
       {...rest}
@@ -119,7 +131,9 @@ function PressScale({
         scale.value = withSpring(1, { damping: 14, stiffness: 260 });
       }}
     >
-      <Animated.View style={[style, animated]}>{children}</Animated.View>
+      <Animated.View style={[chrome ? chrome.style : style, animated]} onLayout={chrome?.onLayout}>
+        {chrome ? chrome.wrap(children) : children}
+      </Animated.View>
     </Pressable>
   );
 }
@@ -357,13 +371,24 @@ export const AuthField = forwardRef(function AuthField(
   const surfaceTarget = focused ? alpha(tone ?? accent, 0.08) : fieldSurface;
   const iconColor = tone ?? theme.text.muted;
 
+  // iOS 26+: alan Liquid Glass'tır. Odak / geçerli / geçersiz durumu çerçeve
+  // rengiyle (cam üstünde de) ve camın tonuyla anlatılır; dinlenmede çerçeve yok.
+  const glass = useLiquidGlass();
   const shellAnim = useAnimatedStyle(() => ({
-    borderColor: withTiming(borderTarget, { duration: 180 }),
-    backgroundColor: withTiming(surfaceTarget, { duration: 180 }),
+    borderColor: withTiming(glass && !tone ? "transparent" : borderTarget, { duration: 180 }),
+    backgroundColor: glass ? "transparent" : withTiming(surfaceTarget, { duration: 180 }),
   }));
 
   return (
     <Animated.View style={[styles.field, shellAnim, containerStyle]}>
+      {glass ? (
+        <GlassSurface
+          radius={FIELD_RADIUS}
+          tint={focused || tone ? alpha(tone ?? accent, 0.22) : alpha(fieldSurface ?? theme.secondary, 0.55)}
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
       {icon ? (
         <View
           style={[
@@ -437,6 +462,8 @@ export function AuthPrimaryButton({
 }) {
   const fg = onAccentColor(accent);
   const gradient = [shiftLightness(accent, 6), accent, shiftLightness(accent, -14)];
+  // iOS 26+: degrade yerine accent tonlu Liquid Glass (PressScale cama çevirir).
+  const glass = useLiquidGlass();
   return (
     <PressScale
       accessibilityRole="button"
@@ -452,20 +479,24 @@ export function AuthPrimaryButton({
         style,
       ]}
     >
-      <LinearGradient
-        colors={gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[StyleSheet.absoluteFill, { borderRadius: FIELD_RADIUS }]}
-      />
-      {/* Üstten inen ince parlama: düz degradeye hafif bir "cam" derinliği verir */}
-      <LinearGradient
-        pointerEvents="none"
-        colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0)"]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 0.65 }}
-        style={[StyleSheet.absoluteFill, { borderRadius: FIELD_RADIUS }]}
-      />
+      {glass ? null : (
+        <>
+          <LinearGradient
+            colors={gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[StyleSheet.absoluteFill, { borderRadius: FIELD_RADIUS }]}
+          />
+          {/* Üstten inen ince parlama: düz degradeye hafif bir "cam" derinliği verir */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0)"]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 0.65 }}
+            style={[StyleSheet.absoluteFill, { borderRadius: FIELD_RADIUS }]}
+          />
+        </>
+      )}
       {loading ? (
         <LottieView
           source={require("@lottie/loading15.json")}
@@ -559,6 +590,7 @@ function SocialButton({ label, onPress, disabled, loading, palette, textStyle, c
       onPress={onPress}
       disabled={disabled}
       pressedScale={0.98}
+      glass={false}
       style={[
         styles.social,
         { backgroundColor: palette.bg, borderColor: palette.border },

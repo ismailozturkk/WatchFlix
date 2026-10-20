@@ -14,7 +14,7 @@
 //     kendi rengiyle). Arkadaş yoksa rakam yerine ikon durur. Rozet gibi durmaz.
 
 import React, { memo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import AppIcon from "../AppIcon";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
@@ -23,6 +23,7 @@ import {
   formatBadge,
   formatFriendCount,
 } from "../../utils/friendsBarModel";
+import GlassPressable from "../common/GlassPressable";
 
 // Gerçek bildirim rozeti rengi: temadan bağımsız, her zemin üstünde okunur.
 const BADGE_COLOR = "#FF3B30";
@@ -50,7 +51,7 @@ const Item = memo(function Item({
   const accessibilityLabel = [label, countText, badgeText].filter(Boolean).join(", ");
 
   return (
-    <Pressable
+    <GlassPressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -97,7 +98,7 @@ const Item = memo(function Item({
       >
         {label}
       </Text>
-    </Pressable>
+    </GlassPressable>
   );
 });
 

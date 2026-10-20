@@ -24,6 +24,7 @@ import Skeleton from "../../../components/Skeleton";
 import StaggerItem from "../../../components/StaggerItem";
 import GlassIconButton from "../../../components/common/GlassIconButton";
 import useReduceMotion from "../../../hooks/useReduceMotion";
+import GlassTouchable from "../../../components/common/GlassTouchable";
 
 
 const { width } = Dimensions.get("window");
@@ -132,7 +133,7 @@ function CountdownBadge({ countdown, colors, onDelete, deleteLabel }) {
           {countdown.label}
         </Text>
       </View>
-      <TouchableOpacity
+      <GlassTouchable
         onPress={onDelete}
         activeOpacity={0.6}
         // Dilim küçük (≈21×17): dokunma alanı kartın içinde kalacak kadar genişletildi
@@ -146,7 +147,7 @@ function CountdownBadge({ countdown, colors, onDelete, deleteLabel }) {
         ]}
       >
         <Ionicons name="trash-outline" size={11} color={colors.red} />
-      </TouchableOpacity>
+      </GlassTouchable>
     </View>
   );
 }

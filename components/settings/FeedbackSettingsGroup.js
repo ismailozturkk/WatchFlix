@@ -8,7 +8,6 @@
 // Hakkında ekranında açık kalır.
 
 import React, { useMemo } from "react";
-import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import PremiumPill from "@components/premium/PremiumPill";
 import { useLanguage } from "@context/LanguageContext";
@@ -18,6 +17,7 @@ import { getPremiumPlanDisplayName } from "@utils/premium";
 import { getFeature } from "@utils/premiumFeatures";
 import { Chevron, SectionLabel, SettingRow, ui } from "../../screens/tabs/settings/settingsUi";
 import { getFeedbackCopy } from "../../screens/tabs/settings/feedbackCopy";
+import GlassBox from "../common/GlassBox";
 
 export default function FeedbackSettingsGroup({ C }) {
   const navigation = useNavigation();
@@ -45,7 +45,7 @@ export default function FeedbackSettingsGroup({ C }) {
   return (
     <>
       <SectionLabel color={C.muted}>{copy.group.label.toLocaleUpperCase(intlLocaleOf(language))}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         <SettingRow
           colors={C}
           iconBg={C.iconAmber}
@@ -67,7 +67,7 @@ export default function FeedbackSettingsGroup({ C }) {
           right={right(featureGate, C.purple)}
           last
         />
-      </View>
+      </GlassBox>
     </>
   );
 }

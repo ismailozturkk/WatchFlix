@@ -18,6 +18,8 @@ import SheetScroll from "@components/common/SheetScroll";
 import { useTheme } from "@context/ThemeContext";
 import * as Haptics from "@services/hapticsService";
 import { clamp, contrastRatio, hexToHsl, hslToHex, normalizeHex, readableTextOn } from "@utils/colorUtils";
+import GlassPressable from "../common/GlassPressable";
+import GlassBox from "../common/GlassBox";
 
 const HUE_GRADIENT = ["#FF0000", "#FFFF00", "#00FF00", "#00FFFF", "#0000FF", "#FF00FF", "#FF0000"];
 const OFFSET_GRADIENT = ["#000000", "#808080", "#FFFFFF"];
@@ -314,7 +316,7 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
 
           {mode === "absolute" ? (
             <>
-              <View style={[styles.hexRow, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+              <GlassBox role="field" style={[styles.hexRow, { backgroundColor: theme.primary, borderColor: theme.border }]}>
                 <AppIcon family="Ionicons" name="color-fill-outline" size={17} color={theme.text.muted} />
                 <TextInput
                   value={hexInput}
@@ -328,7 +330,7 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
                   placeholderTextColor={theme.text.muted}
                   style={[styles.hexInput, { color: theme.text.primary }]}
                 />
-              </View>
+              </GlassBox>
 
               <Channel label={t("Ton", "Hue", "Tono", "Matiz")} theme={theme}>
                 <ColorSlider value={hsl.h} max={360} onChange={(v) => setChannel("h", v)} gradient={HUE_GRADIENT} thumbColor={hslToHex(hsl.h, 100, 50)} theme={theme} />
@@ -360,7 +362,7 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
                 {sources.map((src) => {
                   const active = rel.from === src.key;
                   return (
-                    <Pressable
+                    <GlassPressable
                       key={src.key}
                       accessibilityRole="button"
                       accessibilityLabel={src.label}
@@ -369,7 +371,7 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
                     >
                       <View style={[styles.sourceSwatch, { backgroundColor: src.color, borderColor: theme.border }]} />
                       <Text style={[styles.sourceLabel, { color: active ? theme.accent : theme.text.secondary }]} numberOfLines={1}>{src.label}</Text>
-                    </Pressable>
+                    </GlassPressable>
                   );
                 })}
               </ScrollView>
@@ -394,13 +396,13 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
           </SheetScroll>
 
           <View style={styles.actions}>
-            <Pressable onPress={onClose} style={[styles.cancelBtn, { borderColor: theme.border }]}>
+            <GlassPressable onPress={onClose} style={[styles.cancelBtn, { borderColor: theme.border }]}>
               <Text style={[styles.cancelText, { color: theme.text.secondary }]}>{t("Vazgeç", "Cancel", "Cancelar", "Cancelar")}</Text>
-            </Pressable>
-            <Pressable onPress={confirm} style={[styles.confirmBtn, { backgroundColor: theme.accent }]}>
+            </GlassPressable>
+            <GlassPressable onPress={confirm} style={[styles.confirmBtn, { backgroundColor: theme.accent }]}>
               <AppIcon family="Ionicons" name="checkmark" size={19} color="#fff" />
               <Text style={styles.confirmText}>{t("Seç", "Apply", "Aplicar", "Aplicar")}</Text>
-            </Pressable>
+            </GlassPressable>
           </View>
       </SafeAreaView>
     </BottomSheetModal>
@@ -409,10 +411,10 @@ export default function ColorPickerSheet({ visible, initialValue, title, languag
 
 function SegBtn({ active, icon, label, onPress, theme }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.segBtn, active && { backgroundColor: theme.accent }]}>
+    <GlassPressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.segBtn, active && { backgroundColor: theme.accent }]}>
       <AppIcon family="Ionicons" name={icon} size={15} color={active ? "#fff" : theme.text.secondary} />
       <Text style={[styles.segText, { color: active ? "#fff" : theme.text.secondary }]}>{label}</Text>
-    </Pressable>
+    </GlassPressable>
   );
 }
 

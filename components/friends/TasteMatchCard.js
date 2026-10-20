@@ -16,6 +16,7 @@ import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { alpha } from "../../theme/colors";
 import { getTasteMatchCopy } from "../../utils/tasteMatchCopy";
 import { MAX_CANDIDATES } from "../../utils/tasteMatch";
+import GlassBox from "../common/GlassBox";
 
 const THUMBS_SHOWN = 8;
 
@@ -64,7 +65,7 @@ function TasteMatchCard({
   const introText = candidates.length === 0 ? copy.together.none : both > 0 ? copy.together.both(both) : copy.together.mixed(mine + theirs);
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <GlassBox role="card" style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       {/* ── Zevk uyumu ── */}
       <View style={styles.head}>
         {match.score !== null ? (
@@ -162,7 +163,7 @@ function TasteMatchCard({
           )}
         </>
       ) : null}
-    </View>
+    </GlassBox>
   );
 }
 

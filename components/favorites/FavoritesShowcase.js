@@ -19,6 +19,7 @@ import { alpha } from "../../theme/colors";
 import { getFavoritesCopy } from "../../utils/favoritesCopy";
 import { FAVORITE_KINDS, normalizeFavorites } from "../../utils/fourFavorites";
 import FavoriteSlots from "./FavoriteSlots";
+import GlassBox from "../common/GlassBox";
 
 const ROUTE = { movies: "MovieDetails", shows: "TvShowsDetails", people: "ActorViewScreen" };
 
@@ -50,7 +51,7 @@ function FavoritesShowcase({ favorites, navigation }) {
   if (!kinds.length) return null;
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <GlassBox role="card" style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       {kinds.map((kind, index) => {
         const kindCopy = copy.kinds[kind];
         return (
@@ -95,7 +96,7 @@ function FavoritesShowcase({ favorites, navigation }) {
           </View>
         );
       })}
-    </View>
+    </GlassBox>
   );
 }
 

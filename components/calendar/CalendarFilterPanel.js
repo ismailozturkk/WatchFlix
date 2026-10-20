@@ -5,12 +5,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import { i18nText } from "@utils/i18nText";
+import GlassTouchable from "../common/GlassTouchable";
 
 export const CALENDAR_RANGE_PRESETS = [
   { value: 1, label: () => i18nText("autoI18n.1_ay", "1 Ay") },
@@ -91,7 +91,7 @@ export function CalendarControls({
           ].map((option) => {
             const active = viewMode === option.key;
             return (
-              <TouchableOpacity
+              <GlassTouchable
                 key={option.key}
                 onPress={() => onViewModeChange(option.key)}
                 style={[styles.modeTab, active && { backgroundColor: theme.accent }]}
@@ -110,12 +110,12 @@ export function CalendarControls({
                 >
                   {option.label}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
             );
           })}
         </View>
 
-        <TouchableOpacity
+        <GlassTouchable
           onPress={onRangePress}
           style={[
             styles.rangeButton,
@@ -130,7 +130,7 @@ export function CalendarControls({
             {rangeLabel}
           </Text>
           <Ionicons name="chevron-down" size={13} color={theme.accent} />
-        </TouchableOpacity>
+        </GlassTouchable>
       </View>
 
       {showBulk ? (
@@ -165,7 +165,7 @@ export function CalendarControls({
               })}
             </Text>
           </View>
-          <TouchableOpacity
+          <GlassTouchable
             onPress={onBulkAction}
             disabled={isBulkLoading}
             style={[styles.bulkButton, { backgroundColor: bulkColor }]}
@@ -180,7 +180,7 @@ export function CalendarControls({
                 {isFuture ? i18nText("autoI18n.aktar", "Aktar") : i18nText("autoI18n.sil", "Sil")}
               </Text>
             )}
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       ) : null}
     </View>
@@ -199,7 +199,7 @@ export function CalendarTypeChips({ theme, activeFilter, onFilterChange, filterC
         const active = activeFilter === option.key;
         const count = filterCounts?.[option.key] || 0;
         return (
-          <TouchableOpacity
+          <GlassTouchable
             key={option.key}
             onPress={() => onFilterChange(option.key)}
             style={[
@@ -236,7 +236,7 @@ export function CalendarTypeChips({ theme, activeFilter, onFilterChange, filterC
                 {count}
               </Text>
             </View>
-          </TouchableOpacity>
+          </GlassTouchable>
         );
       })}
     </ScrollView>
@@ -296,7 +296,7 @@ export function CalendarRangePicker({
             {CALENDAR_RANGE_PRESETS.map((preset) => {
               const active = selectedValue === preset.value;
               return (
-                <TouchableOpacity
+                <GlassTouchable
                   key={String(preset.value)}
                   onPress={() => onSelect(preset.value)}
                   style={[
@@ -329,7 +329,7 @@ export function CalendarRangePicker({
                     size={17}
                     color={active ? theme.accent : theme.text.muted}
                   />
-                </TouchableOpacity>
+                </GlassTouchable>
               );
             })}
           </View>

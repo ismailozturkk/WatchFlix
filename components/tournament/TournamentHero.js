@@ -19,6 +19,7 @@ import CountdownTimer from "@components/tournament/CountdownTimer";
 import StageTimeline from "@components/tournament/StageTimeline";
 import { monthLabel, mediaLabel } from "@services/tournamentEngine";
 import { i18nText } from "@utils/i18nText";
+import GlassBox from "../common/GlassBox";
 
 // Türkçe-güvenli BÜYÜK harf: JS'in toUpperCase'i 'i' → 'I' yapar, doğrusu 'İ'dir.
 const upper = (s, lang) =>
@@ -70,7 +71,7 @@ function TournamentHero({
         {theTheme}
       </Text>
 
-      <View style={styles.panel}>
+      <GlassBox role="card" style={styles.panel}>
         <View style={styles.panelHead}>
           <View style={styles.panelLabelWrap}>
             <AppIcon family="Ionicons" name="time-outline" size={14} color="rgba(255,255,255,0.88)" />
@@ -89,7 +90,7 @@ function TournamentHero({
           fill
           boxColor="rgba(0,0,0,0.22)"
         />
-      </View>
+      </GlassBox>
 
       <View style={styles.timelineWrap}>
         <StageTimeline periodId={periodId} nowMs={nowMs} lang={lang} onStagePress={onStagePress} />

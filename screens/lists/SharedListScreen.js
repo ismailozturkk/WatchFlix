@@ -83,6 +83,7 @@ import {
   canReorderSharedList,
   reorderSharedListItems,
 } from "@services/sharedListsService";
+import GlassTouchable from "../../components/common/GlassTouchable";
 
 const ACCENT = "#38bdf8"; // ListsViewScreen'deki ortak liste vurgusuyla aynı
 const SHARED_SEARCH_LIST = "__shared__";
@@ -591,7 +592,7 @@ export default function SharedListScreen({ route, navigation }) {
   };
   const memberFilterNode = (
     <View style={styles.memberFilterList}>
-      <TouchableOpacity
+      <GlassTouchable
         activeOpacity={0.82}
         onPress={() => setMemberFilter("all")}
         style={[
@@ -615,7 +616,7 @@ export default function SharedListScreen({ route, navigation }) {
         {memberFilter === "all" ? (
           <Ionicons name="checkmark-circle" size={20} color={ACCENT} />
         ) : null}
-      </TouchableOpacity>
+      </GlassTouchable>
       <View style={styles.memberFilterGrid}>
       {visibleMemberFilters.map((member) => {
         const selected = memberFilter === member.uid;
@@ -656,7 +657,7 @@ export default function SharedListScreen({ route, navigation }) {
       })}
       </View>
       {memberRows.length > 6 ? (
-        <TouchableOpacity
+        <GlassTouchable
           activeOpacity={0.82}
           onPress={() => setMemberFiltersExpanded((current) => !current)}
           style={[styles.memberFilterToggle, { backgroundColor: theme.primary, borderColor: theme.border }]}
@@ -678,7 +679,7 @@ export default function SharedListScreen({ route, navigation }) {
               </Text>
             </View>
           ) : null}
-        </TouchableOpacity>
+        </GlassTouchable>
       ) : null}
     </View>
   );
@@ -1183,7 +1184,7 @@ export default function SharedListScreen({ route, navigation }) {
             <View style={styles.sheetActions}>
               {isOwner ? (
                 <>
-                  <TouchableOpacity
+                  <GlassTouchable
                     style={[styles.sheetActionBtn, { backgroundColor: "#f8717115", borderColor: "#f8717144" }]}
                     onPress={() => {
                       setMembersVisible(false);
@@ -1194,8 +1195,8 @@ export default function SharedListScreen({ route, navigation }) {
                     <Text style={[styles.sheetActionText, { color: "#f87171" }]}>
                       {i18nText("autoI18n.listeyi_sil", "Listeyi Sil")}
                     </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </GlassTouchable>
+                  <GlassTouchable
                     style={[styles.sheetActionBtn, { backgroundColor: ACCENT }]}
                     onPress={() => {
                       setMembersVisible(false);
@@ -1206,10 +1207,10 @@ export default function SharedListScreen({ route, navigation }) {
                     <Text style={[styles.sheetActionText, { color: "#000" }]}>
                       {i18nText("autoI18n.uye_ekle", "Üye Ekle")}
                     </Text>
-                  </TouchableOpacity>
+                  </GlassTouchable>
                 </>
               ) : (
-                <TouchableOpacity
+                <GlassTouchable
                   style={[styles.sheetActionBtn, { backgroundColor: "#f8717115", borderColor: "#f8717144" }]}
                   onPress={() => {
                     setMembersVisible(false);
@@ -1220,7 +1221,7 @@ export default function SharedListScreen({ route, navigation }) {
                   <Text style={[styles.sheetActionText, { color: "#f87171" }]}>
                     {i18nText("autoI18n.listeden_ayril", "Listeden Ayrıl")}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               )}
             </View>
       </BottomSheetModal>

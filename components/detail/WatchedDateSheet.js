@@ -33,6 +33,8 @@ import {
   subscribeToMyRating,
 } from "../../services/ratingsService";
 import { addMediaComment } from "../../services/mediaCommentsService";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 
 const todayIso = () => normalizeDate(new Date());
 const COMMENT_TEXT_LIMIT = 500;
@@ -348,7 +350,7 @@ export default function WatchedDateSheet({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-      <TouchableOpacity
+      <GlassTouchable
         accessibilityRole="button"
         accessibilityState={{
           selected: !!selectedDate,
@@ -401,7 +403,7 @@ export default function WatchedDateSheet({
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={19} color={theme.text.muted} />
-      </TouchableOpacity>
+      </GlassTouchable>
 
       <View style={styles.quickRow}>
         <QuickDateOption
@@ -518,7 +520,7 @@ export default function WatchedDateSheet({
               {i18nText("autoI18n.yorum_yap_opsiyonel", "Yorum yap (opsiyonel)")}
             </Text>
           </View>
-          <View
+          <GlassBox role="field"
             style={[
               styles.commentField,
               {
@@ -545,7 +547,7 @@ export default function WatchedDateSheet({
             <Text allowFontScaling={false} style={[styles.commentCounter, { color: theme.text.muted }]}>
               {Math.max(0, COMMENT_TEXT_LIMIT - commentText.length)}
             </Text>
-          </View>
+          </GlassBox>
           <Text allowFontScaling={false} style={[styles.commentHint, { color: theme.text.muted }]}>
             {i18nText(
               "autoI18n.yorumun_herkese_acik_paylasilir",
@@ -615,7 +617,7 @@ function QuickDateOption({
 }) {
   const { theme } = useTheme();
   return (
-    <TouchableOpacity
+    <GlassTouchable
       accessibilityRole="button"
       accessibilityState={{ selected, disabled }}
       activeOpacity={0.82}
@@ -655,7 +657,7 @@ function QuickDateOption({
           style={styles.selectedMark}
         />
       )}
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 

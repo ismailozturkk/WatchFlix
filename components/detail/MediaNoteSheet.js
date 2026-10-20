@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -19,6 +18,8 @@ import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { toast } from "../AppToast";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 
 const NOTE_TEXT_LIMIT = 2000;
 
@@ -135,7 +136,7 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
         />
       </View>
 
-      <View style={[styles.textField, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+      <GlassBox role="field" style={[styles.textField, { backgroundColor: theme.primary, borderColor: theme.border }]}>
         <TextInput
           allowFontScaling={false}
           style={[styles.textInput, { color: theme.text.primary }]}
@@ -154,12 +155,12 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
         <Text allowFontScaling={false} style={[styles.counter, { color: theme.text.muted }]}>
           {Math.max(0, NOTE_TEXT_LIMIT - text.length)}
         </Text>
-      </View>
+      </GlassBox>
       </SheetScroll>
 
       <View style={styles.actionsRow}>
         {!!existing && (
-          <TouchableOpacity
+          <GlassTouchable
             accessibilityRole="button"
             accessibilityLabel={i18nText("autoI18n.notu_sil", "Notu Sil")}
             style={[styles.deleteButton, { backgroundColor: "#ef444422", borderColor: "#ef444455" }]}
@@ -171,9 +172,9 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
             ) : (
               <Ionicons name="trash-outline" size={18} color="#ef4444" />
             )}
-          </TouchableOpacity>
+          </GlassTouchable>
         )}
-        <TouchableOpacity
+        <GlassTouchable
           accessibilityRole="button"
           accessibilityState={{ disabled: !text.trim() || isBusy }}
           activeOpacity={0.85}
@@ -192,7 +193,7 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
           <Text allowFontScaling={false} style={styles.saveButtonText}>
             {i18nText("autoI18n.kaydet", "Kaydet")}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       </View>
     </BottomSheetModal>
   );

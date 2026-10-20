@@ -5,10 +5,11 @@
 // kronolojik sıra, satırlar arasında kopmadan devam eden bir "yılan" yolu olur.
 
 import React, { memo, useMemo } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { i18nText } from "../../utils/i18nText";
 import Svg, { Path, Defs, LinearGradient, Stop } from "react-native-svg";
 import AppIcon from "../AppIcon";
+import GlassPressable from "../common/GlassPressable";
 
 const MAX_COLUMNS = 4;
 const MAX_VISIBLE_ROWS = 7;
@@ -126,7 +127,7 @@ const WrappedYearPath = memo(function WrappedYearPath({
           {positions.map((point, index) => {
             const active = point.year === selectedYear;
             return (
-              <Pressable
+              <GlassPressable
                 key={point.year}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
@@ -167,7 +168,7 @@ const WrappedYearPath = memo(function WrappedYearPath({
                 >
                   WRAPPED
                 </Text>
-              </Pressable>
+              </GlassPressable>
             );
           })}
         </ScrollView>

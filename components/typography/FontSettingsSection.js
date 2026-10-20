@@ -13,7 +13,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import AppIcon from "../AppIcon";
@@ -34,6 +33,7 @@ import { i18nText } from "../../utils/i18nText";
 import { alpha } from "../../theme/colors";
 import { isFontPresetFree } from "../../utils/premiumFeatures";
 import { usePremiumGate } from "../../hooks/usePremiumGate";
+import GlassTouchable from "../common/GlassTouchable";
 
 const SISTEM_FONTU = Platform.select({
   ios: "System",
@@ -233,7 +233,7 @@ export default function FontSettingsSection({ colors, language }) {
           const aktif = aktifRol === rol.id;
           const preset = FONT_PRESET_BY_ID[durum[rol.id]] || FONT_PRESETS[0];
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={rol.id}
               activeOpacity={0.75}
               onPress={() => rolDegistir(rol.id)}
@@ -268,7 +268,7 @@ export default function FontSettingsSection({ colors, language }) {
               >
                 {preset.names[locale]}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
       </View>
@@ -361,7 +361,7 @@ export default function FontSettingsSection({ colors, language }) {
 
         {toplamSayfa > 1 ? (
           <View style={styles.paginationNav}>
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.7}
               onPress={() => gitSayfa(aktifSayfa - 1)}
               disabled={aktifSayfa === 0}
@@ -376,14 +376,14 @@ export default function FontSettingsSection({ colors, language }) {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <AppIcon name="chevron-back" size={13} color={colors.text} />
-            </TouchableOpacity>
+            </GlassTouchable>
             <Text
               allowFontScaling={false}
               style={[styles.pageCounterText, { color: colors.muted }]}
             >
               {aktifSayfa + 1} / {toplamSayfa}
             </Text>
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.7}
               onPress={() => gitSayfa(aktifSayfa + 1)}
               disabled={aktifSayfa === toplamSayfa - 1}
@@ -398,7 +398,7 @@ export default function FontSettingsSection({ colors, language }) {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <AppIcon name="chevron-forward" size={13} color={colors.text} />
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
         ) : null}
       </View>
@@ -453,7 +453,7 @@ export default function FontSettingsSection({ colors, language }) {
                       const aktif = durum[aktifRol] === preset.id;
                       const premiumKilidi = kilitli(preset.id);
                       return (
-                        <TouchableOpacity
+                        <GlassTouchable
                           key={preset.id}
                           activeOpacity={0.75}
                           onPress={() =>
@@ -543,7 +543,7 @@ export default function FontSettingsSection({ colors, language }) {
                               />
                             </View>
                           ) : null}
-                        </TouchableOpacity>
+                        </GlassTouchable>
                       );
                     })}
                   </View>
@@ -559,7 +559,7 @@ export default function FontSettingsSection({ colors, language }) {
           {Array.from({ length: toplamSayfa }, (_, idx) => {
             const aktif = idx === aktifSayfa;
             return (
-              <TouchableOpacity
+              <GlassTouchable
                 key={idx}
                 onPress={() => gitSayfa(idx)}
                 hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
@@ -589,7 +589,7 @@ export default function FontSettingsSection({ colors, language }) {
       ) : null}
 
       {tumRollereUygun ? (
-        <TouchableOpacity
+        <GlassTouchable
           activeOpacity={0.75}
           onPress={() => setAllFontRoles(durum[aktifRol])}
           accessibilityRole="button"
@@ -613,7 +613,7 @@ export default function FontSettingsSection({ colors, language }) {
               { font: secili.names[locale] },
             )}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       ) : null}
     </View>
   );

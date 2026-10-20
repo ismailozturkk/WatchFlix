@@ -92,6 +92,8 @@ import { getTasteMatchCopy } from "../../../utils/tasteMatchCopy";
 
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassPressable from "../../../components/common/GlassPressable";
+import GlassTouchable from "../../../components/common/GlassTouchable";
 const PROTECTED_LISTS = ["watchedMovies", "watchedTv", "watchList", "favorites"];
 // Bu sayı ve üzeri içerikte liste modalı sabit yükseklik yerine ekranı
 // kaplayacak şekilde büyür (bkz. FriendProfileScreen liste modalı).
@@ -1129,7 +1131,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                   {[3, 4].map((columns) => {
                     const active = sharedListColumns === columns;
                     return (
-                      <Pressable
+                      <GlassPressable
                         key={columns}
                         onPress={() => setSharedListColumns(columns)}
                         accessibilityRole="button"
@@ -1152,7 +1154,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                         >
                           {columns}
                         </Text>
-                      </Pressable>
+                      </GlassPressable>
                     );
                   })}
                 </View>
@@ -1311,7 +1313,7 @@ export default function FriendProfileScreen({ route, navigation }) {
             </Text>
 
             <View style={styles.confirmActions}>
-              <TouchableOpacity
+              <GlassTouchable
                 activeOpacity={0.85}
                 onPress={() => setUnfriendModalVisible(false)}
                 style={[styles.confirmBtn, { backgroundColor: theme.primary ?? "#111", borderColor: theme.border ?? "rgba(255,255,255,0.08)" }]}
@@ -1319,8 +1321,8 @@ export default function FriendProfileScreen({ route, navigation }) {
                 <Text allowFontScaling={false} numberOfLines={1} style={[styles.confirmBtnText, { color: theme.text?.primary ?? "#fff" }]}>
                   {i18nText("autoI18n.iptal", "İptal")}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </GlassTouchable>
+              <GlassTouchable
                 activeOpacity={0.85}
                 onPress={handleRemoveFriend}
                 style={[styles.confirmBtn, styles.confirmDangerBtn]}
@@ -1329,7 +1331,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                 <Text allowFontScaling={false} numberOfLines={1} style={[styles.confirmBtnText, { color: "#fff" }]}>
                   {i18nText("autoI18n.cikar", "Çıkar")}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
             </View>
           </View>
         </View>

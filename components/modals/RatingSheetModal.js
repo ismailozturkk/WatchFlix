@@ -54,6 +54,7 @@ import {
   computeHybrid,
   userAverage,
 } from "@services/ratingsService";
+import GlassTouchable from "../common/GlassTouchable";
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
 const SHEET_RATIO = 0.7;
@@ -354,7 +355,7 @@ export default function RatingSheetModal({
             {/* Aksiyonlar */}
             <View style={styles.actions}>
               {myRating != null && (
-                <TouchableOpacity
+                <GlassTouchable
                   style={[styles.removeBtn, { borderColor: theme.border }]}
                   onPress={handleRemove}
                   disabled={saving}
@@ -363,9 +364,9 @@ export default function RatingSheetModal({
                   <Text allowFontScaling={false} style={[styles.removeBtnText, { color: theme.colors.red }]}>
                     {i18nText("autoI18n.kaldir", "Kaldır")}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               )}
-              <TouchableOpacity
+              <GlassTouchable
                 style={[
                   styles.saveBtn,
                   { backgroundColor: theme.accent },
@@ -383,7 +384,7 @@ export default function RatingSheetModal({
                       : i18nText("autoI18n.kaydet", "Kaydet")}
                   </Text>
                 )}
-              </TouchableOpacity>
+              </GlassTouchable>
             </View>
           </View>
         )}

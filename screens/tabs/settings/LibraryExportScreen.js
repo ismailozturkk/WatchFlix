@@ -20,6 +20,7 @@ import { exportLibraryJson, exportLibraryZip, snapshotFromLibrary } from "@servi
 import { isSnapshotEmpty } from "@utils/libraryExport";
 import { SettingsSubScreen, SectionLabel, SettingRow, Chevron, buildUiColors, ui } from "./settingsUi";
 import { exportErrorMessage, getLibraryExportCopy } from "./libraryExportCopy";
+import GlassBox from "../../../components/common/GlassBox";
 
 const tick = () => {
   try {
@@ -94,7 +95,7 @@ export default function LibraryExportScreen() {
   return (
     <SettingsSubScreen title={copy.title}>
       {/* ── Tanıtım ── */}
-      <View style={[s.hero, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[s.hero, { backgroundColor: C.card, borderColor: C.border }]}>
         <View style={[s.heroIcon, { backgroundColor: C.accentDim }]}>
           <AppIcon family="Ionicons" name="share-outline" size={26} color={C.accent} />
         </View>
@@ -106,11 +107,11 @@ export default function LibraryExportScreen() {
             {copy.heroText}
           </Text>
         </View>
-      </View>
+      </GlassBox>
 
       {/* ── Neler dahil ── */}
       <SectionLabel color={C.muted}>{copy.sectionIncluded.toLocaleUpperCase(locale)}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         {!ready ? (
           <View style={s.stateRow}>
             {spinner}
@@ -143,14 +144,14 @@ export default function LibraryExportScreen() {
             </View>
           ))
         )}
-      </View>
+      </GlassBox>
       <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
         {copy.notIncluded}
       </Text>
 
       {/* ── Dışa aktar ── */}
       <SectionLabel color={C.muted}>{copy.sectionExport.toLocaleUpperCase(locale)}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border, opacity: disabled ? 0.55 : 1 }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border, opacity: disabled ? 0.55 : 1 }]}>
         <SettingRow
           colors={C}
           iconBg={C.iconBlue}
@@ -172,7 +173,7 @@ export default function LibraryExportScreen() {
           right={busy === "zip" ? spinner : <Chevron color={C.muted} />}
           last
         />
-      </View>
+      </GlassBox>
       <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
         {copy.noteLetterboxd}
       </Text>

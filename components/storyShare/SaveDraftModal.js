@@ -5,13 +5,14 @@ import {
   Modal,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import useKeyboardInset from "../../hooks/useKeyboardInset";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassTextInput from "../common/GlassTextInput";
 
 
 function SaveDraftModalComponent({
@@ -45,7 +46,7 @@ function SaveDraftModalComponent({
           <Text allowFontScaling={false} style={[styles.title, { color: theme.text.primary }]}>
             {isUpdate ? i18nText("autoI18n.taslagi_guncelle", "Taslağı Güncelle") : i18nText("autoI18n.taslak_kaydet", "Taslak Kaydet")}
           </Text>
-          <TextInput
+          <GlassTextInput
             value={draftName}
             onChangeText={onChangeName}
             maxLength={40}
@@ -66,7 +67,7 @@ function SaveDraftModalComponent({
             >
               <Text allowFontScaling={false} style={[styles.btnText, { color: theme.text.muted }]}>{i18nText("autoI18n.iptal", "İptal")}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
+            <GlassTouchable
               onPress={onSave}
               disabled={saving}
               style={[styles.btn, styles.saveBtn, { backgroundColor: theme.accent, opacity: saving ? 0.7 : 1 }]}
@@ -78,7 +79,7 @@ function SaveDraftModalComponent({
                   {isUpdate ? i18nText("autoI18n.guncelle", "Güncelle") : "Kaydet"}
                 </Text>
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
         </View>
       </Animated.View>

@@ -62,6 +62,7 @@ import useReduceMotion from "../../../hooks/useReduceMotion";
 import { useLiquidGlass } from "../../../services/liquidGlass";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../../../components/common/GlassTouchable";
 const GRID_PAD = 16;
 const GRID_GAP = 10;
 // Izgarada kartlar arası dikey boşluk; liste kipindeki `styles.list.gap` ile aynı.
@@ -85,7 +86,7 @@ const DeleteModal = ({ visible, onConfirm, onClose, theme }) => (
           {i18nText("autoI18n.notu_sil_onay", "Bu notu silmek istediğine emin misin? Bu işlem geri alınamaz.")}
         </Text>
         <View style={styles.deleteBtns}>
-          <TouchableOpacity
+          <GlassTouchable
             style={[styles.deleteBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
             onPress={onClose}
             activeOpacity={0.85}
@@ -93,8 +94,8 @@ const DeleteModal = ({ visible, onConfirm, onClose, theme }) => (
             <Text allowFontScaling={false} style={[styles.deleteBtnText, { color: theme.text.primary }]}>
               {i18nText("autoI18n.iptal", "İptal")}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          </GlassTouchable>
+          <GlassTouchable
             style={[styles.deleteBtn, { backgroundColor: "#ef4444", borderColor: "#ef4444" }]}
             onPress={onConfirm}
             activeOpacity={0.85}
@@ -102,7 +103,7 @@ const DeleteModal = ({ visible, onConfirm, onClose, theme }) => (
             <Text allowFontScaling={false} style={[styles.deleteBtnText, { color: "#fff" }]}>
               {i18nText("autoI18n.sil", "Sil")}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       </View>
     </View>

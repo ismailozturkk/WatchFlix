@@ -13,7 +13,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   Share,
   StyleSheet,
   Text,
@@ -42,6 +41,7 @@ import {
 import { REFERRAL_COPY } from "@utils/referralCopy";
 import { alpha } from "@theme/colors";
 import { SettingsSubScreen, buildUiColors } from "./settingsUi";
+import GlassPressable from "../../../components/common/GlassPressable";
 
 const COPY_LANGUAGES = Object.keys(REFERRAL_COPY);
 
@@ -168,11 +168,11 @@ export default function ReferralScreen() {
       {error && !data ? (
         <Card C={C} style={st.errorCard}>
           <Text style={[st.errorText, { color: C.muted }]}>{copy.loadFailed}</Text>
-          <Pressable onPress={reload} accessibilityRole="button" style={[st.retry, { borderColor: C.border }]}>
+          <GlassPressable onPress={reload} accessibilityRole="button" style={[st.retry, { borderColor: C.border }]}>
             <Text allowFontScaling={false} style={[st.retryText, { color: C.accent }]}>
               {copy.retry}
             </Text>
-          </Pressable>
+          </GlassPressable>
         </Card>
       ) : null}
 
@@ -207,7 +207,7 @@ export default function ReferralScreen() {
               {data.displayCode}
             </Text>
             <View style={st.codeActions}>
-              <Pressable
+              <GlassPressable
                 onPress={copyCode}
                 accessibilityRole="button"
                 style={[st.secondaryButton, { borderColor: C.border, backgroundColor: alpha(C.text, 0.05) }]}
@@ -216,8 +216,8 @@ export default function ReferralScreen() {
                 <Text allowFontScaling={false} style={[st.secondaryText, { color: C.text }]}>
                   {copy.copy}
                 </Text>
-              </Pressable>
-              <Pressable
+              </GlassPressable>
+              <GlassPressable
                 onPress={shareCode}
                 accessibilityRole="button"
                 style={[st.primaryButton, { backgroundColor: C.accent }]}
@@ -226,7 +226,7 @@ export default function ReferralScreen() {
                 <Text allowFontScaling={false} style={st.primaryText}>
                   {copy.share}
                 </Text>
-              </Pressable>
+              </GlassPressable>
             </View>
           </Card>
 
@@ -245,7 +245,7 @@ export default function ReferralScreen() {
               <Text style={[st.rewardHint, { color: C.muted }]}>{copy.reward.storeActive}</Text>
             ) : null}
             {reward?.canStart ? (
-              <Pressable
+              <GlassPressable
                 onPress={startReward}
                 disabled={claiming}
                 accessibilityRole="button"
@@ -255,7 +255,7 @@ export default function ReferralScreen() {
                 <Text allowFontScaling={false} style={st.primaryText}>
                   {claiming ? copy.reward.starting : copy.reward.start}
                 </Text>
-              </Pressable>
+              </GlassPressable>
             ) : null}
             <Text style={[st.rewardHint, { color: C.muted }]}>
               {data.earnedMonths >= data.maxMonths
@@ -322,7 +322,7 @@ export default function ReferralScreen() {
       ) : null}
 
       {/* Kod gir: davet ya da promosyon kodu (Premium sayfasında da var) */}
-      <Pressable
+      <GlassPressable
         onPress={() => setRedeemOpen(true)}
         accessibilityRole="button"
         style={[st.redeemRow, { backgroundColor: C.card, borderColor: C.border }]}
@@ -337,7 +337,7 @@ export default function ReferralScreen() {
           <Text style={[st.bannerBody, { color: C.muted }]}>{copy.redeem.entryHint}</Text>
         </View>
         <AppIcon family="Ionicons" name="chevron-forward" size={14} color={C.muted} />
-      </Pressable>
+      </GlassPressable>
 
       <RedeemCodeSheet
         visible={redeemOpen}

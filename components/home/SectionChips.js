@@ -17,10 +17,11 @@
 // GÖLGE YOK: yatay liste gölgeyi çip yüksekliğinde keser, alt kenar sert kalır (eski tür çiplerinde
 // yaşandı). Seçim çerçeveyle anlatılır.
 import React, { memo } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
 import { DISCOVER_CHIP_HEIGHT } from "./DiscoverFilterChip";
+import GlassPressable from "../common/GlassPressable";
 
 export const SECTION_CHIP_HEIGHT = DISCOVER_CHIP_HEIGHT;
 export const SECTION_CHIP_HEIGHT_LOGO = 42;
@@ -78,7 +79,7 @@ function SectionSegmented({ options, value, onChange, style }) {
       {options.map((option) => {
         const selected = option.key === value;
         return (
-          <Pressable
+          <GlassPressable
             key={option.key}
             onPress={() => onChange(option.key)}
             hitSlop={4}
@@ -104,7 +105,7 @@ function SectionSegmented({ options, value, onChange, style }) {
             >
               {option.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>

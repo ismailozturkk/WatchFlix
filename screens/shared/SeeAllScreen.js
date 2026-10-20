@@ -57,6 +57,7 @@ import { useListStatusContext } from "../../context/ListStatusContext";
 import { fetchFavoriteRecommendations } from "../../services/favoriteRecommendations";
 import { getFavoritesCopy } from "../../utils/favoritesCopy";
 import { readProfileFavorites, recommendationSources } from "../../utils/fourFavorites";
+import GlassTouchable from "../../components/common/GlassTouchable";
 
 const { width } = Dimensions.get("window");
 const SIDE = 12;
@@ -239,7 +240,7 @@ const LayoutControls = React.memo(function LayoutControls({
         {[3, 4].map((c) => {
           const active = columns === c;
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={c}
               activeOpacity={0.7}
               onPress={() => onColumns(c)}
@@ -254,7 +255,7 @@ const LayoutControls = React.memo(function LayoutControls({
               >
                 {c}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
       </View>
@@ -262,7 +263,7 @@ const LayoutControls = React.memo(function LayoutControls({
         {RADIUS_OPTS.map((opt) => {
           const active = radius === opt.value;
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={opt.value}
               activeOpacity={0.7}
               onPress={() => onRadius(opt.value)}
@@ -277,7 +278,7 @@ const LayoutControls = React.memo(function LayoutControls({
                   borderColor: active ? "#fff" : theme.text.secondary,
                 }}
               />
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
       </View>

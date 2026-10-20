@@ -64,6 +64,7 @@ import { openPremiumScreen } from "@services/premiumUpsell";
 import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
 import { buildPriceHint, buildUpsellContent, planTierTypography } from "@utils/premiumUpsellContent";
 import BottomSheetModal from "../common/BottomSheetModal";
+import GlassPressable from "../common/GlassPressable";
 
 const RM = ReduceMotion.System;
 const PRESS_SPRING = { mass: 0.4, damping: 12, stiffness: 180 };
@@ -1012,7 +1013,7 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
               onPress={onPrimary}
             />
           ) : (
-            <Pressable
+            <GlassPressable
               accessibilityRole="button"
               onPress={onPrimary}
               style={({ pressed }) => [
@@ -1028,7 +1029,7 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
               <Text allowFontScaling={false} style={[styles.ctaText, { color: theme.text.primary }]}>
                 {content.cta.primary}
               </Text>
-            </Pressable>
+            </GlassPressable>
           )}
         </Rise>
 

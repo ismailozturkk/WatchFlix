@@ -24,13 +24,14 @@
 
 import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { memo, useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import AppIcon from "../AppIcon";
 import GlassIconButton from "../common/GlassIconButton";
 import IdentityBadgesRow from "../badges/IdentityBadgesRow";
 import YearlyGoalButton from "./YearlyGoalButton";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
+import GlassPressable from "../common/GlassPressable";
 
 // "Düzenle" hapının asgari genişliği (yalnız etiket) ve simgenin de sığdığı genişlik.
 const EDIT_MIN = 62;
@@ -181,7 +182,7 @@ function ProfileIdentityBlock({
       </View>
 
       <View style={styles.actions}>
-        <Pressable
+        <GlassPressable
           onPress={onEdit}
           onLayout={onEditLayout}
           hitSlop={4}
@@ -212,7 +213,7 @@ function ProfileIdentityBlock({
           >
             {i18nText("autoI18n.duzenle", "Düzenle")}
           </Text>
-        </Pressable>
+        </GlassPressable>
 
         <GlassIconButton
           icon="share-social-outline"

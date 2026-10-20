@@ -13,7 +13,7 @@
 // <ModalToastHost>unu taşır) ama appAlert hâlâ modalın arkasında kalır.
 
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { alpha } from "../../theme/colors";
@@ -25,6 +25,7 @@ import { setListMembership } from "../../services/libraryActions";
 import { libraryErrorMessage } from "../../utils/libraryErrorText";
 import { todayListDate } from "../../utils/mediaFacts";
 import { normMediaType, toStr } from "../../services/aiCineService";
+import GlassTouchable from "../common/GlassTouchable";
 
 const ERROR_VISIBLE_MS = 3200;
 
@@ -89,7 +90,7 @@ function AITitleActions({ card, theme, copy, style, compact = false, vertical = 
   return (
     <View style={style}>
       <View style={[s.row, vertical && s.column]}>
-        <TouchableOpacity
+        <GlassTouchable
           activeOpacity={0.8}
           onPress={() => toggle("watchList")}
           accessibilityRole="button"
@@ -114,8 +115,8 @@ function AITitleActions({ card, theme, copy, style, compact = false, vertical = 
               {inWatchList ? copy.actions.inWatchlist : copy.actions.watchlist}
             </Text>
           )}
-        </TouchableOpacity>
-        <TouchableOpacity
+        </GlassTouchable>
+        <GlassTouchable
           activeOpacity={0.8}
           onPress={() => toggle("favorites")}
           hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
@@ -138,7 +139,7 @@ function AITitleActions({ card, theme, copy, style, compact = false, vertical = 
             size={compact ? 14 : 15}
             color={inFavorites ? red : theme.text.secondary}
           />
-        </TouchableOpacity>
+        </GlassTouchable>
       </View>
       {!!message && (
         <Text style={[s.error, { color: red }]} numberOfLines={2}>

@@ -13,6 +13,7 @@ import { useListLayoutSettings } from "@context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
 import { REMINDER_BADGE } from "../../../utils/reminderBadge";
 import { SettingsSubScreen, SectionLabel, buildUiColors } from "./settingsUi";
+import GlassTouchable from "../../../components/common/GlassTouchable";
 
 // Canlı önizleme için tek bir sahte poster karesi.
 function PreviewTile({ width, radius, colors, title }) {
@@ -217,7 +218,7 @@ function BadgePreviewTile({ width, radius, colors, badges }) {
 
 function BadgeToggleButton({ item, enabled, colors, onChange }) {
   return (
-    <TouchableOpacity
+    <GlassTouchable
       style={[
         ps.badgeButton,
         {
@@ -263,7 +264,7 @@ function BadgeToggleButton({ item, enabled, colors, onChange }) {
           <AppIcon family="Ionicons" name="checkmark" size={10} color="#fff" />
         ) : null}
       </View>
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 
@@ -277,7 +278,7 @@ function BadgeGroup({ title, subtitle, items, badges, colors, onChange, onToggle
           <Text style={[ps.badgeGroupTitle, { color: colors.text }]}>{title}</Text>
           <Text style={[ps.badgeGroupSub, { color: colors.muted }]}>{subtitle}</Text>
         </View>
-        <TouchableOpacity
+        <GlassTouchable
           onPress={() => onToggleAll(items, !allEnabled)}
           activeOpacity={0.7}
           style={[ps.groupAction, { backgroundColor: colors.accentDim }]}
@@ -287,7 +288,7 @@ function BadgeGroup({ title, subtitle, items, badges, colors, onChange, onToggle
               ? i18nText("autoI18n.tumunu_kapat", "Tümünü kapat")
               : i18nText("autoI18n.tumunu_ac", "Tümünü aç")}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       </View>
       <View style={ps.badgeButtonGrid}>
         {items.map((item) => (
@@ -580,7 +581,7 @@ export default function PosterSettingsScreen() {
           {PREVIEW_MODES.map((m) => {
             const active = previewMode === m.id;
             return (
-              <TouchableOpacity
+              <GlassTouchable
                 key={m.id}
                 style={[
                   ps.modeChip,
@@ -601,7 +602,7 @@ export default function PosterSettingsScreen() {
                 >
                   {m.label}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
             );
           })}
         </View>
@@ -689,7 +690,7 @@ export default function PosterSettingsScreen() {
 
       {/* ── ANA KATEGORİ SEKMELERİ (TABS) ── */}
       <View style={[ps.tabBar, { backgroundColor: C.cardAlt, borderColor: C.border }]}>
-        <TouchableOpacity
+        <GlassTouchable
           style={[ps.tabButton, activeTab === "layout" && { backgroundColor: C.card }]}
           onPress={() => handleTabChange("layout")}
           activeOpacity={0.8}
@@ -710,9 +711,9 @@ export default function PosterSettingsScreen() {
           >
             {i18nText("autoI18n.duzen_ve_boyutlar", "Düzen ve Boyutlar")}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
 
-        <TouchableOpacity
+        <GlassTouchable
           style={[ps.tabButton, activeTab === "badges" && { backgroundColor: C.card }]}
           onPress={() => handleTabChange("badges")}
           activeOpacity={0.8}
@@ -733,7 +734,7 @@ export default function PosterSettingsScreen() {
           >
             {i18nText("autoI18n.poster_rozetleri", "Poster Rozetleri")}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       </View>
 
       {/* ── TAB 1: DÜZEN VE BOYUTLAR ── */}

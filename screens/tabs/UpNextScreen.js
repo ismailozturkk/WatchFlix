@@ -32,6 +32,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import useUpNextQueue, { localWatchDate } from "@hooks/useUpNextQueue";
 import { alpha } from "@theme/colors";
+import GlassPressable from "../../components/common/GlassPressable";
 
 const UP_NEXT_COPY = {
   tr: {
@@ -380,7 +381,7 @@ function ManageShowsModal({
           </View>
 
           {hiddenShowIds.size > 0 && (
-            <Pressable
+            <GlassPressable
               onPress={onShowAll}
               style={[
                 styles.showAllButton,
@@ -391,7 +392,7 @@ function ManageShowsModal({
               <Text style={[styles.showAllText, { color: theme.accent }]}>
                 {labels.showAll}
               </Text>
-            </Pressable>
+            </GlassPressable>
           )}
 
           <ScrollView
@@ -464,12 +465,12 @@ function ManageShowsModal({
             })}
           </ScrollView>
 
-          <Pressable
+          <GlassPressable
             onPress={onClose}
             style={[styles.doneButton, { backgroundColor: theme.accent }]}
           >
             <Text style={styles.doneText}>{labels.done}</Text>
-          </Pressable>
+          </GlassPressable>
     </BottomSheetModal>
   );
 }
@@ -515,7 +516,7 @@ export default function UpNextScreen({ navigation }) {
               {labels.subtitle}
             </Text>
           </View>
-          <Pressable
+          <GlassPressable
             accessibilityRole="button"
             accessibilityLabel={labels.manage}
             onPress={() => setManageVisible(true)}
@@ -537,7 +538,7 @@ export default function UpNextScreen({ navigation }) {
                 <Text style={styles.manageCountText}>{readyCount}</Text>
               </View>
             )}
-          </Pressable>
+          </GlassPressable>
         </View>
 
         {loading ? (
@@ -566,7 +567,7 @@ export default function UpNextScreen({ navigation }) {
             <Text style={[styles.emptyText, { color: theme.text.secondary }]}>
               {allHidden ? labels.emptyHiddenText : labels.emptyText}
             </Text>
-            <Pressable
+            <GlassPressable
               onPress={() => {
                 if (allHidden) setManageVisible(true);
                 else {
@@ -586,7 +587,7 @@ export default function UpNextScreen({ navigation }) {
               <Text style={styles.discoverText}>
                 {allHidden ? labels.manage : labels.discover}
               </Text>
-            </Pressable>
+            </GlassPressable>
             {failedCount > 0 && (
               <Pressable onPress={handleRefresh} style={styles.retryButton}>
                 <Text style={[styles.retryText, { color: theme.text.muted }]}>

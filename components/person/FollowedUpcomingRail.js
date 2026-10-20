@@ -15,7 +15,7 @@
 // bugün olan ve zaten izlenmiş bir yapım olabilir.
 // YÜKLEME HATASI sessiz: raf çizilmez (FavoritesRecommendationRail ile aynı karar).
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import PosterImage from "../PosterImage";
 import ListBadges from "../ListBadges";
@@ -43,6 +43,7 @@ import {
 } from "../../utils/phoneCalendar";
 import { getFollowedPeopleCopy } from "../../utils/followedPeopleCopy";
 import { alpha } from "../../theme/colors";
+import GlassPressable from "../common/GlassPressable";
 
 const VISIBLE_LIMIT = 24;
 
@@ -96,7 +97,7 @@ const UpcomingCard = memo(function UpcomingCard({ item, mediaType, navigation, o
           style={styles.badges}
         />
         {onToggleSave ? (
-          <Pressable
+          <GlassPressable
             onPress={() => onToggleSave(item)}
             hitSlop={6}
             accessibilityRole="button"
@@ -109,7 +110,7 @@ const UpcomingCard = memo(function UpcomingCard({ item, mediaType, navigation, o
             style={styles.calendarBtn}
           >
             <Ionicons name={saved ? "calendar" : "calendar-outline"} size={15} color="#FFFFFF" />
-          </Pressable>
+          </GlassPressable>
         ) : null}
       </Animated.View>
     </TouchableOpacity>
@@ -247,7 +248,7 @@ export default function FollowedUpcomingRail({ mediaType, navigation }) {
   if (state.status === "ready" && visible.length === 0) {
     return (
       <View style={styles.section}>
-        <Pressable
+        <GlassPressable
           onPress={openSheet}
           accessibilityRole="button"
           accessibilityLabel={copy.rail.manage}
@@ -274,7 +275,7 @@ export default function FollowedUpcomingRail({ mediaType, navigation }) {
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
-        </Pressable>
+        </GlassPressable>
         {sheet}
       </View>
     );

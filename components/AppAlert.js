@@ -20,7 +20,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Pressable,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -28,6 +27,7 @@ import * as Haptics from "@services/hapticsService";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import BottomSheetModal from "./common/BottomSheetModal";
+import GlassPressable from "./common/GlassPressable";
 
 // Tür → ikon + vurgu geçişi. 'confirm' rengi render'da theme.accent olur.
 const ALERT_TYPES = {
@@ -224,7 +224,7 @@ export function AppAlertHost() {
               : theme.accent;
           const fg = cancel ? theme.text.secondary : "#FFFFFF";
           return (
-            <Pressable
+            <GlassPressable
               key={`${b.text}-${i}`}
               accessibilityRole="button"
               onPress={() => pressButton(b)}
@@ -244,7 +244,7 @@ export function AppAlertHost() {
               >
                 {b.text}
               </Text>
-            </Pressable>
+            </GlassPressable>
           );
         })}
       </View>

@@ -15,7 +15,7 @@
 // Mantık utils/sectionVisibility.js'te (saf, testli); burada yalnız çizim.
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import AppIcon from "@components/AppIcon";
 import SwitchToggle from "@components/SwitchToggle";
@@ -43,6 +43,8 @@ import {
 import { alpha } from "@theme/colors";
 import { SettingsSubScreen, buildUiColors, ui } from "./settingsUi";
 import { fillCopy, getSectionVisibilityCopy } from "./sectionVisibilityCopy";
+import GlassTouchable from "../../../components/common/GlassTouchable";
+import GlassBox from "../../../components/common/GlassBox";
 
 // Simge karosu renkleri: [zemin, simge].
 const tintOf = (C, tint) =>
@@ -57,7 +59,7 @@ const tintOf = (C, tint) =>
 // ─── Ekran karosu ─────────────────────────────────────────────────────────────
 const ScreenTile = memo(function ScreenTile({ id, icon, name, shown, total, hiddenCount, selected, onPress, C }) {
   return (
-    <TouchableOpacity
+    <GlassTouchable
       testID={`section-screen-${id}`}
       accessibilityRole="tab"
       accessibilityState={{ selected }}
@@ -92,7 +94,7 @@ const ScreenTile = memo(function ScreenTile({ id, icon, name, shown, total, hidd
           </Text>
         </View>
       ) : null}
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 });
 
@@ -110,7 +112,7 @@ const SectionRow = memo(function SectionRow({
 }) {
   const [tintBg, tintFg] = tintOf(C, item.tint);
   return (
-    <TouchableOpacity
+    <GlassTouchable
       testID={`section-row-${item.id}`}
       accessibilityRole="switch"
       accessibilityState={{ checked: visible }}
@@ -145,7 +147,7 @@ const SectionRow = memo(function SectionRow({
       <View style={s.switchBox}>
         <SwitchToggle value={visible} onValueChange={(next) => onToggle(item, next)} size={36} />
       </View>
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 });
 
@@ -314,7 +316,7 @@ export default function SectionVisibilityScreen() {
               {screenCopy.hint}
             </Text>
           </View>
-          <TouchableOpacity
+          <GlassTouchable
             testID="section-toggle-all"
             accessibilityRole="button"
             activeOpacity={0.7}
@@ -328,7 +330,7 @@ export default function SectionVisibilityScreen() {
             <Text allowFontScaling={false} numberOfLines={1} style={[s.allBtnText, { color: allShown ? C.muted : C.accent }]}>
               {allShown ? copy.ui.hideAll : copy.ui.showAll}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
         <View style={[s.track, { backgroundColor: C.borderMuted }]}>
           <Animated.View style={[s.fill, { width: fillWidth, backgroundColor: C.accent }]} />
@@ -339,7 +341,7 @@ export default function SectionVisibilityScreen() {
       </View>
 
       {/* Bölüm satırları */}
-      <View style={[ui.card, s.list, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, s.list, { backgroundColor: C.card, borderColor: C.border }]}>
         {items.map((item, index) => {
           const [title, hint] = copy.sections[current.id][item.id];
           const visible = item.legacy
@@ -360,7 +362,7 @@ export default function SectionVisibilityScreen() {
             />
           );
         })}
-      </View>
+      </GlassBox>
 
       {showConditionalNote ? (
         <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
@@ -369,7 +371,7 @@ export default function SectionVisibilityScreen() {
       ) : null}
 
       {customized ? (
-        <TouchableOpacity
+        <GlassTouchable
           testID="section-reset"
           accessibilityRole="button"
           activeOpacity={0.7}
@@ -387,7 +389,7 @@ export default function SectionVisibilityScreen() {
               {copy.ui.resetSub}
             </Text>
           </View>
-        </TouchableOpacity>
+        </GlassTouchable>
       ) : null}
 
       <ConfirmSheet

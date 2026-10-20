@@ -9,6 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import { i18nText } from "@utils/i18nText";
+import GlassTouchable from "../common/GlassTouchable";
 
 export default function ExitGameSheet({
   theme,
@@ -35,7 +36,7 @@ export default function ExitGameSheet({
               "Devam edebilir, oturumu bitirip sonucu görebilir veya ana ekrana dönebilirsin.",
             )}
           </Text>
-          <TouchableOpacity
+          <GlassTouchable
             style={[styles.exitPrimaryBtn, { backgroundColor: theme.accent }]}
             onPress={onResume}
             activeOpacity={0.85}
@@ -43,8 +44,8 @@ export default function ExitGameSheet({
           >
             <AppIcon family="Ionicons" name="play" size={18} color="#fff" />
             <Text style={styles.exitPrimaryText}>{i18nText("autoI18n.oyuna_devam_et", "Oyuna Devam Et")}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          </GlassTouchable>
+          <GlassTouchable
             style={[styles.exitSecondaryBtn, { borderColor: theme.border }]}
             onPress={onEndSession}
             activeOpacity={0.8}
@@ -54,7 +55,7 @@ export default function ExitGameSheet({
             <Text style={[styles.exitSecondaryText, { color: theme.text.primary }]}>
               {i18nText("autoI18n.oturumu_bitir", "Oturumu Bitir")}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
           <TouchableOpacity style={styles.exitTextBtn} onPress={onQuitToHome} activeOpacity={0.7} accessibilityRole="button">
             <Text style={[styles.exitTextBtnText, { color: theme.text.muted }]}>
               {i18nText("autoI18n.ana_ekrana_don", "Ana Ekrana Dön")}

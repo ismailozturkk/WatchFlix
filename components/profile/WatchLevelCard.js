@@ -25,6 +25,7 @@ import {
 } from "@components/badges/watchBadgeCatalog";
 import { i18nText } from "@utils/i18nText";
 import { yaklasanlar } from "@components/badges/badgeInsights";
+import GlassBox from "../common/GlassBox";
 
 // Ortalama eser değerleri — Perde tablosunun dayandığı sayılar.
 const ORT_FILM = 165;
@@ -78,7 +79,7 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
   // iskelet gösterip susmak doğrusu.
   if (loading || !perde) {
     return (
-      <View
+      <GlassBox role="card"
         style={[
           styles.card,
           styles.skeleton,
@@ -116,7 +117,7 @@ function WatchLevelCard({ progress, onPress, showNearest = true, style }) {
             },
           ]}
         />
-      </View>
+      </GlassBox>
     );
   }
 

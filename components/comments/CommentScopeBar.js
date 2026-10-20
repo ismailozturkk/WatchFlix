@@ -27,9 +27,10 @@ import {
 } from "../../utils/commentScope";
 import { i18nText } from "../../utils/i18nText";
 import { scopeShortLabels, scopeFilterLabel } from "./scopeTexts";
+import GlassTouchable from "../common/GlassTouchable";
 
 const Chip = ({ theme, label, count, active, dimmed, icon, onPress }) => (
-  <TouchableOpacity
+  <GlassTouchable
     activeOpacity={0.8}
     onPress={onPress}
     style={[
@@ -78,7 +79,7 @@ const Chip = ({ theme, label, count, active, dimmed, icon, onPress }) => (
         </Text>
       </View>
     )}
-  </TouchableOpacity>
+  </GlassTouchable>
 );
 
 export default function CommentScopeBar({
@@ -156,7 +157,7 @@ export default function CommentScopeBar({
           })}
         </ScrollView>
 
-        <TouchableOpacity
+        <GlassTouchable
           activeOpacity={0.8}
           onPress={onOpenPicker}
           style={[
@@ -166,7 +167,7 @@ export default function CommentScopeBar({
           hitSlop={6}
         >
           <Ionicons name="options-outline" size={16} color={theme.text.secondary} />
-        </TouchableOpacity>
+        </GlassTouchable>
       </View>
 
       {activeSeason != null && (

@@ -41,6 +41,8 @@ import { i18nText } from "../../utils/i18nText";
 import ScreenDecor from "../../components/ScreenDecor";
 import BirthDateField from "../../components/auth/BirthDateField";
 import LegalConsentNotice from "../../components/auth/LegalConsentNotice";
+import GlassTouchable from "../../components/common/GlassTouchable";
+import GlassBox from "../../components/common/GlassBox";
 
 export default function GoogleProfileCompletionScreen({ navigation }) {
   const { theme } = useTheme();
@@ -282,7 +284,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
             <Text style={[styles.label, { color: theme.text.muted }]}>
               {tr ? "GÖRÜNEN AD" : es ? "NOMBRE VISIBLE" : pt ? "NOME EXIBIDO" : "DISPLAY NAME"}
             </Text>
-            <View
+            <GlassBox role="field"
               style={[
                 styles.inputShell,
                 { backgroundColor: theme.between, borderColor: theme.border },
@@ -302,7 +304,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                 placeholderTextColor={theme.text.muted}
                 returnKeyType="next"
               />
-            </View>
+            </GlassBox>
 
             <Text style={[styles.label, { color: theme.text.muted }]}>
               {tr ? "DOĞUM TARİHİ" : es ? "FECHA DE NACIMIENTO" : pt ? "DATA DE NASCIMENTO" : "DATE OF BIRTH"}
@@ -318,7 +320,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
             <Text style={[styles.label, { color: theme.text.muted }]}>
               {tr ? "KULLANICI ADI" : es ? "NOMBRE DE USUARIO" : pt ? "NOME DE USUÁRIO" : "USERNAME"}
             </Text>
-            <View
+            <GlassBox role="field"
               style={[
                 styles.inputShell,
                 {
@@ -354,7 +356,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                   color={available ? "#34A853" : theme.colors.red}
                 />
               ) : null}
-            </View>
+            </GlassBox>
             <Text
               style={[
                 styles.hint,
@@ -386,7 +388,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                 kayıt tamamlama noktası, bağlantılar burada da görünmeli. */}
             <LegalConsentNotice theme={theme} accent={theme.accent} />
 
-            <TouchableOpacity
+            <GlassTouchable
               disabled={!canSave}
               onPress={completeProfile}
               style={[
@@ -405,7 +407,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                   <Ionicons name="arrow-forward" size={17} color="#fff" />
                 </>
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
             <TouchableOpacity
               disabled={saving}
               onPress={cancel}

@@ -23,6 +23,7 @@ import { AuthEyeToggle, AuthField, AuthPressable } from "../auth/AuthKit";
 import { alpha } from "../../theme/colors";
 import { isLightSurface, shiftLightness } from "../../utils/colorUtils";
 import { i18nText } from "../../utils/i18nText";
+import GlassBox from "../common/GlassBox";
 
 const noop = () => {};
 
@@ -254,7 +255,7 @@ export function ProfileHero({
 /** İkon madalyonlu başlığı olan yuvarlak köşeli kart. */
 export function FormSection({ theme, icon, title, children }) {
   return (
-    <View style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <GlassBox role="card" style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       <View style={styles.cardHead}>
         <View style={[styles.cardIcon, { backgroundColor: alpha(theme.accent, 0.13) }]}>
           <Ionicons name={icon} size={16} color={theme.accent} />
@@ -268,7 +269,7 @@ export function FormSection({ theme, icon, title, children }) {
         </Text>
       </View>
       {children}
-    </View>
+    </GlassBox>
   );
 }
 

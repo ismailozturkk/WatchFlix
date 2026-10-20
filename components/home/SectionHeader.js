@@ -25,13 +25,14 @@
 // TON: "accent" temanın vurgusu; "gold" ödül rafları. Kutunun içindeki simge VURGU renginde, zemin
 // vurgunun %14'ü — vurgu üstü METİN koymuyoruz, bu yüzden tüm temalarda (açık sarı dahil) okunur.
 import React, { memo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { getSectionMeta, getSeeAllLabel } from "../../utils/homeSectionCopy";
+import GlassPressable from "../common/GlassPressable";
 
 export const SECTION_GOLD = "#F2B705";
 /** İkon kutusu ve başlık/alt başlık bloğunun yüksekliği (24 + 16). */
@@ -57,7 +58,7 @@ export function SectionIconAction({ icon, onPress, accessibilityLabel, tone = "a
   const { theme } = useTheme();
   const tint = tone === "gold" ? SECTION_GOLD : theme.accent;
   return (
-    <Pressable
+    <GlassPressable
       onPress={onPress}
       hitSlop={8}
       accessibilityRole="button"
@@ -69,7 +70,7 @@ export function SectionIconAction({ icon, onPress, accessibilityLabel, tone = "a
       ]}
     >
       <Ionicons name={icon} size={16} color={tint} />
-    </Pressable>
+    </GlassPressable>
   );
 }
 
@@ -153,7 +154,7 @@ function SectionHeader({
         {trailing}
 
         {hasAction ? (
-          <Pressable
+          <GlassPressable
             onPress={onPressAction}
             hitSlop={8}
             accessibilityRole="button"
@@ -168,7 +169,7 @@ function SectionHeader({
               {label}
             </Text>
             <Ionicons name="chevron-forward" size={14} color={theme.accent} />
-          </Pressable>
+          </GlassPressable>
         ) : null}
       </View>
 

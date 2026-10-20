@@ -201,13 +201,13 @@ describe("ekranlar arası bağlar (kaynak bekçisi)", () => {
   it("Ayarlar: çubuk varken aynı ekrana giden ikinci 'Kullanım ve haklar' satırı çizilmez", () => {
     const src = read("screens", "tabs", "SettingsScreen.js");
     expect(src).toContain("const hasMemberBar = shouldShowMemberBar(premiumPlan);");
-    expect(src).toMatch(/\{hasMemberBar \? null : \(\s*<View[\s\S]*?navigate\("PremiumUsageScreen"\)/);
+    expect(src).toMatch(/\{hasMemberBar \? null : \(\s*<(?:GlassBox|View)[\s\S]*?navigate\("PremiumUsageScreen"\)/);
   });
 
   it("Kullanım ve haklar: yönetme düğmesi yalnız MAĞAZA aboneliği olan planda", () => {
     const src = read("screens", "tabs", "settings", "PremiumUsageScreen.js");
     expect(src).toContain("const canManage = storePlan !== PREMIUM_PLAN.FREE;");
-    expect(src).toMatch(/\{canManage \? \(\s*(\/\/[^\n]*\n\s*)*<Pressable\s+testID="premium-usage-manage"/);
+    expect(src).toMatch(/\{canManage \? \(\s*(\/\/[^\n]*\n\s*)*<(?:Glass)?Pressable\s+testID="premium-usage-manage"/);
     expect(src).toContain("openCustomerCenter()");
   });
 });

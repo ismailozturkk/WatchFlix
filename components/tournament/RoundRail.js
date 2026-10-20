@@ -12,13 +12,14 @@
 // Seçim değişince (ör. aşama çizelgesinden atlayınca) ray seçili karta kayar.
 
 import React, { memo, useCallback, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import Animated, {
   useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming, ReduceMotion,
 } from "react-native-reanimated";
 import AppIcon from "@components/AppIcon";
 import { roundLabel } from "@services/tournamentEngine";
 import { i18nText } from "@utils/i18nText";
+import GlassPressable from "../common/GlassPressable";
 
 // Uygulamanın onay/başarı yeşili (TournamentScreen / MatchCard ile aynı değer).
 const DONE_GREEN = "#22C55E";
@@ -61,7 +62,7 @@ const RoundItem = memo(function RoundItem({
   const fill = total > 0 ? Math.min(100, Math.round((myCount / total) * 100)) : 0;
 
   return (
-    <Pressable
+    <GlassPressable
       onPress={() => onSelect(index)}
       onLayout={(e) => onLayoutItem(index, e.nativeEvent.layout.x)}
       accessibilityRole="button"
@@ -102,7 +103,7 @@ const RoundItem = memo(function RoundItem({
           ]}
         />
       </View>
-    </Pressable>
+    </GlassPressable>
   );
 });
 

@@ -7,7 +7,7 @@
 
 import UserAvatar from "@components/common/UserAvatar";
 import React, { useCallback, useMemo, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
@@ -36,6 +36,7 @@ import {
   SCENE_ACHIEVEMENTS,
 } from "./gameRegistry";
 import { getLocalizedGameLabel, SCENE_GAME_ID, SELECTABLE_GAME_MODES } from "./gameConfig";
+import GlassTouchable from "../../components/common/GlassTouchable";
 
 const RANK_COLORS = ["#FFC83D", "#C4CAD4", "#D98C4A"];
 
@@ -343,7 +344,7 @@ function AchievementsPreview({ achievements, theme, onOpen }) {
 
 function EmptyPanel({ icon, text, theme, onPress }) {
   return (
-    <TouchableOpacity
+    <GlassTouchable
       activeOpacity={0.8}
       onPress={onPress}
       style={[styles.emptyPanel, { backgroundColor: theme.secondary, borderColor: theme.border }]}
@@ -353,7 +354,7 @@ function EmptyPanel({ icon, text, theme, onPress }) {
         {text}
       </Text>
       <AppIcon family="Ionicons" name="chevron-forward" size={16} color={theme.text.muted} />
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 

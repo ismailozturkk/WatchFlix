@@ -12,10 +12,11 @@
 // Çiplerdeki sayı KADEME düzeyinde (badgeInsights.bolumOzetleri): "Türler 4/9".
 
 import React, { memo } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import { withAlpha } from "@components/profile/StatsComponents";
+import GlassTouchable from "../common/GlassTouchable";
 
 export const DURUM_FILTRELERI = [
   { id: "tumu", key: "autoI18n.rozet_filtre_tumu", fallback: "Tümü" },
@@ -38,7 +39,7 @@ function BadgeControls({ filtre, onFiltre, bolum, onBolum, ozetler, bolumAd, yen
         {filtreler.map((f) => {
           const secili = filtre === f.id;
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={f.id}
               activeOpacity={0.8}
               accessibilityRole="button"
@@ -61,7 +62,7 @@ function BadgeControls({ filtre, onFiltre, bolum, onBolum, ozetler, bolumAd, yen
               >
                 {i18nText(f.key, f.fallback)}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
       </View>
@@ -75,7 +76,7 @@ function BadgeControls({ filtre, onFiltre, bolum, onBolum, ozetler, bolumAd, yen
           const secili = (bolum || null) === o.bolum;
           const ad = o.bolum === null ? i18nText("autoI18n.rozet_filtre_tumu", "Tümü") : bolumAd(o.bolum);
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={o.bolum || "tumu"}
               activeOpacity={0.8}
               accessibilityRole="button"
@@ -97,7 +98,7 @@ function BadgeControls({ filtre, onFiltre, bolum, onBolum, ozetler, bolumAd, yen
                   {o.acik}/{o.toplam}
                 </Text>
               ) : null}
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
       </ScrollView>

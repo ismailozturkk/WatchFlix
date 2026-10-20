@@ -34,6 +34,8 @@ import {
   formatRelativeTime,
   groupConversationsByRecency,
 } from "../../services/aiCineInsights";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 
 const SEARCH_MIN_CONVERSATIONS = 5;
 
@@ -177,7 +179,7 @@ function AIHistory({
   return (
     <View style={{ flex: 1 }}>
       {conversations.length >= SEARCH_MIN_CONVERSATIONS && (
-        <View style={[s.search, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+        <GlassBox role="field" style={[s.search, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <Ionicons name="search" size={16} color={theme.text.muted} />
           <TextInput
             style={[s.searchInput, { color: theme.text.primary }]}
@@ -194,7 +196,7 @@ function AIHistory({
               <Ionicons name="close-circle" size={17} color={theme.text.muted} />
             </TouchableOpacity>
           )}
-        </View>
+        </GlassBox>
       )}
 
       {sections.length === 0 ? (
@@ -237,18 +239,18 @@ function AIHistory({
                   <Text style={[s.confirmTitle, { color: theme.text.primary }]}>{copy.history.clearAllTitle}</Text>
                   <Text style={[s.confirmText, { color: theme.text.secondary }]}>{copy.history.clearAllMessage}</Text>
                   <View style={s.confirmRow}>
-                    <TouchableOpacity
+                    <GlassTouchable
                       onPress={() => setConfirming(false)}
                       style={[s.confirmBtn, { borderColor: theme.border }]}
                     >
                       <Text style={[s.confirmBtnText, { color: theme.text.secondary }]}>{copy.history.cancel}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
+                    </GlassTouchable>
+                    <GlassTouchable
                       onPress={confirmClear}
                       style={[s.confirmBtn, { borderColor: theme.colors.red, backgroundColor: alpha(theme.colors.red, 0.14) }]}
                     >
                       <Text style={[s.confirmBtnText, { color: theme.colors.red }]}>{copy.history.delete}</Text>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   </View>
                 </View>
               ) : (

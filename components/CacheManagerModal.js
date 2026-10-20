@@ -26,6 +26,7 @@ import {
 } from "../services/cacheInspector";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "./common/GlassTouchable";
 const META = {
   images: { tr: "Posterler ve görseller", family: "Ionicons", icon: "images-outline", color: "#3B82F6" },
   pets: { tr: "Pet'ler", family: "MaterialCommunityIcons", icon: "paw", color: "#F59E0B" },
@@ -230,7 +231,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
           )}
 
           {/* Tümünü temizle */}
-          <TouchableOpacity
+          <GlassTouchable
             onPress={onClearAll}
             disabled={clearingAll || loading || data.total === 0}
             activeOpacity={0.85}
@@ -253,7 +254,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
                 </Text>
               </>
             )}
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       </View>
       <ModalToastHost visible={visible} />

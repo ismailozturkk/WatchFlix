@@ -9,6 +9,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import { i18nText } from "@utils/i18nText";
+import GlassTouchable from "../common/GlassTouchable";
 
 // `content.upgrade`: günlük oyun hakkı bitti ve üst plan var → birincil buton
 // ödeme ekranına götürür (onUpgrade). Tekrar denemek o gün işe yaramaz.
@@ -22,24 +23,24 @@ export default function GameErrorState({ theme, content, onRetry, onDismiss, onU
         <Text style={[styles.errorStateTitle, { color: theme.text.primary }]}>{content.title}</Text>
         <Text style={[styles.errorStateMessage, { color: theme.text.secondary }]}>{content.message}</Text>
         {content.upgrade && onUpgrade && (
-          <TouchableOpacity
+          <GlassTouchable
             style={[styles.errorPrimaryBtn, { backgroundColor: theme.accent }]}
             onPress={onUpgrade}
             activeOpacity={0.8}
           >
             <AppIcon family="Ionicons" name="diamond" size={18} color="#fff" />
             <Text style={styles.errorPrimaryText}>{content.upgradeLabel}</Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         )}
         {content.retryable && (
-          <TouchableOpacity
+          <GlassTouchable
             style={[styles.errorPrimaryBtn, { backgroundColor: theme.accent }]}
             onPress={onRetry}
             activeOpacity={0.8}
           >
             <AppIcon family="Ionicons" name="refresh" size={18} color="#fff" />
             <Text style={styles.errorPrimaryText}>{i18nText("autoI18n.tekrar_dene", "Tekrar Dene")}</Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         )}
         <TouchableOpacity style={styles.errorSecondaryBtn} onPress={onDismiss} activeOpacity={0.7}>
           <Text style={[styles.errorSecondaryText, { color: theme.text.muted }]}>

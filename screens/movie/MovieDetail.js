@@ -76,6 +76,7 @@ import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../../components/common/GlassTouchable";
 const { width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
 // Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
@@ -1045,7 +1046,7 @@ export default function MovieDetails({ navigation, route }) {
           />
 
           <View style={styles.detailActionRow}>
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.88}
               onPress={openReviewComposer}
               style={[
@@ -1080,9 +1081,9 @@ export default function MovieDetails({ navigation, route }) {
                   {i18nText("autoI18n.hubda_paylas", "Hub'da paylaş")}
                 </Text>
               </View>
-            </TouchableOpacity>
+            </GlassTouchable>
 
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.88}
               onPress={() => setAiVisible(true)}
               style={[
@@ -1117,9 +1118,9 @@ export default function MovieDetails({ navigation, route }) {
                   {i18nText("autoI18n.bilgi_al", "Bilgi al")}
                 </Text>
               </View>
-            </TouchableOpacity>
+            </GlassTouchable>
 
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.88}
               onPress={() => setSendVisible(true)}
               style={[
@@ -1143,7 +1144,7 @@ export default function MovieDetails({ navigation, route }) {
                   {i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
                 </Text>
               </View>
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
 
           {/* ── STAT PILLS ── */}
@@ -1258,7 +1259,7 @@ export default function MovieDetails({ navigation, route }) {
             leftButton={{ label: i18nText("autoI18n.sil", "Sil"), color: "#e53935" }}
             rightButton={{ label: i18nText("autoI18n.yanitla", "Yanıtla"), color: "#5aacf0" }}
           >
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.85}
               onPress={() => setCommentModalVisible(!commandModalVisible)}
               style={[
@@ -1287,11 +1288,11 @@ export default function MovieDetails({ navigation, route }) {
                   color={theme.text.muted}
                 />
               </View>
-            </TouchableOpacity>
+            </GlassTouchable>
           </SwipeCard>
 
           {/* ── NOTUM KARTI ── */}
-          <TouchableOpacity
+          <GlassTouchable
             activeOpacity={0.85}
             onPress={() => {
               // Ücretsiz planda 20 film notu: dolduysa not sayfası hiç açılmaz.
@@ -1333,7 +1334,7 @@ export default function MovieDetails({ navigation, route }) {
             <View style={styles.commentsRight}>
               <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
             </View>
-          </TouchableOpacity>
+          </GlassTouchable>
 
           {/* ── EKSTERNAl LİNKLER ── */}
           {details.external_ids && (
@@ -1370,7 +1371,7 @@ export default function MovieDetails({ navigation, route }) {
                   },
                 ].map(({ key, url, icon, label }) =>
                   details.external_ids[key] ? (
-                    <TouchableOpacity
+                    <GlassTouchable
                       key={key}
                       style={[
                         styles.extLink,
@@ -1398,7 +1399,7 @@ export default function MovieDetails({ navigation, route }) {
                       >
                         {label}
                       </Text>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   ) : null,
                 )}
               </View>
@@ -1407,7 +1408,7 @@ export default function MovieDetails({ navigation, route }) {
 
           {/* ── ÖZET ACCORDION ── */}
           <View style={{ marginBottom: 24 }}>
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.85}
               onPress={() => toggleCard("overview")}
               style={[
@@ -1472,7 +1473,7 @@ export default function MovieDetails({ navigation, route }) {
                   style={[styles.accordionMore, { color: theme.accent }]}
                 >{i18nText("autoI18n.devami", "devamı...")}</Text>
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
 
           {/* ── İZLEME PLATFORMLARI ── */}

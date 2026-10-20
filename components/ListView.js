@@ -27,6 +27,7 @@ import Toast from "@components/AppToast";
 import { i18nText } from "../utils/i18nText";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "./common/GlassTouchable";
 /* ─── Küçük yardımcı ─────────────────────────────────── */
 const formatDateSave = (timestamp) => {
   const date = new Date(timestamp);
@@ -83,7 +84,7 @@ const GridCard = ({
   theme,
   onPress,
 }) => (
-  <TouchableOpacity
+  <GlassTouchable
     style={[
       styles.gridCard,
       {
@@ -130,7 +131,7 @@ const GridCard = ({
         {item}
       </Text>
     </Animated.View>
-  </TouchableOpacity>
+  </GlassTouchable>
 );
 
 /* ─── Ana bileşen ─────────────────────────────────────── */

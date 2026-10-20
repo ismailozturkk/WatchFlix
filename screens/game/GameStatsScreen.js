@@ -19,6 +19,7 @@ import {
 } from "./gameConfig";
 import usePremiumScreenGuard from "@hooks/usePremiumScreenGuard";
 import { getGameTitle } from "./gameLabels";
+import GlassBox from "../../components/common/GlassBox";
 
 export default function GameStatsScreen({ navigation }) {
   usePremiumScreenGuard("games", navigation);
@@ -76,7 +77,7 @@ export default function GameStatsScreen({ navigation }) {
       ) : (
         <>
           {/* Seviye / XP kartı (Part 15.1) */}
-          <View style={[styles.levelCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+          <GlassBox role="card" style={[styles.levelCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
             <View style={styles.levelTop}>
               <View style={[styles.levelBadge, { backgroundColor: `${theme.accent}1A`, borderColor: `${theme.accent}55` }]}>
                 <AppIcon family="Ionicons" name="sparkles" size={18} color={theme.accent} />
@@ -98,7 +99,7 @@ export default function GameStatsScreen({ navigation }) {
               <Text style={[styles.progressText, { color: theme.text.muted }]}>{tr ? `Sonraki seviyeye ${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP` : es ? `${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP para el siguiente nivel` : pt ? `${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP para o próximo nível` : `${Math.max(0, level.nextLevelXp - level.currentLevelXp)} XP to next level`}</Text>
               <Text style={[styles.progressText, { color: theme.text.muted }]}>{formatLastPlayed(data.lastPlayedAt, language)}</Text>
             </View>
-          </View>
+          </GlassBox>
 
           {/* İstatistik grid */}
           <View style={styles.grid}>
@@ -115,7 +116,7 @@ export default function GameStatsScreen({ navigation }) {
           {modeBests.length > 0 ? (
             <>
               <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{tr ? "MOD REKORLARI" : es ? "RÉCORDS POR MODO" : pt ? "RECORDES POR MODO" : "MODE RECORDS"}</Text>
-              <View style={[styles.panel, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+              <GlassBox role="card" style={[styles.panel, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                 {modeBests.map((mode, index) => (
                   <View key={mode.key} style={[styles.modeRow, index !== modeBests.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
                     <AppIcon family="Ionicons" name="medal-outline" size={17} color={theme.accent} />
@@ -123,7 +124,7 @@ export default function GameStatsScreen({ navigation }) {
                     <Text style={[styles.modeScore, { color: theme.accent }]}>{mode.score}</Text>
                   </View>
                 ))}
-              </View>
+              </GlassBox>
             </>
           ) : null}
 

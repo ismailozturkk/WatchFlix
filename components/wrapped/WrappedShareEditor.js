@@ -54,6 +54,8 @@ import {
   sanitizeWrappedCardOptions,
   wrappedModuleAvailability,
 } from "../../utils/wrappedCard";
+import GlassPressable from "../common/GlassPressable";
+import GlassBox from "../common/GlassBox";
 
 const PANEL_H = 118;
 const TABS = [
@@ -95,7 +97,7 @@ const Segmented = memo(function Segmented({ items, value, onChange, accent, onAc
       {items.map((item) => {
         const active = item.id === value;
         return (
-          <Pressable
+          <GlassPressable
             key={item.id}
             onPress={() => onChange(item.id)}
             disabled={disabled}
@@ -113,7 +115,7 @@ const Segmented = memo(function Segmented({ items, value, onChange, accent, onAc
             >
               {item.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>
@@ -210,7 +212,7 @@ function LayoutThumb({ id, color }) {
 const LayoutCard = memo(function LayoutCard({ id, label, active, accent, onPress }) {
   const color = active ? accent : "#FFFFFF";
   return (
-    <Pressable
+    <GlassPressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
@@ -227,7 +229,7 @@ const LayoutCard = memo(function LayoutCard({ id, label, active, accent, onPress
       >
         {label}
       </Text>
-    </Pressable>
+    </GlassPressable>
   );
 });
 
@@ -264,7 +266,7 @@ const Swatch = memo(function Swatch({ palette, label, active, accent, onAccent, 
 
 const ToggleChip = memo(function ToggleChip({ item, label, on, disabled, accent, onPress }) {
   return (
-    <Pressable
+    <GlassPressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="switch"
@@ -287,7 +289,7 @@ const ToggleChip = memo(function ToggleChip({ item, label, on, disabled, accent,
       >
         {label}
       </Text>
-    </Pressable>
+    </GlassPressable>
   );
 });
 
@@ -656,7 +658,7 @@ export default function WrappedShareEditor({
 
             {tab === "note" && (
               <View style={styles.notePanel}>
-                <View style={styles.noteBox}>
+                <GlassBox role="field" style={styles.noteBox}>
                   <Ionicons name="chatbox-ellipses-outline" size={17} color={MUTED} />
                   <TextInput
                     ref={inputRef}
@@ -676,7 +678,7 @@ export default function WrappedShareEditor({
                       <Ionicons name="close-circle" size={18} color={MUTED} />
                     </Pressable>
                   ) : null}
-                </View>
+                </GlassBox>
                 <View style={styles.noteMeta}>
                   <Text style={styles.noteHint} allowFontScaling={false} numberOfLines={2}>
                     {str.captionHint}

@@ -37,6 +37,7 @@ import {
   setFilter,
   toggleGenre,
 } from "../../utils/discoverFilters";
+import GlassPressable from "../common/GlassPressable";
 
 const Section = ({ title, hint, theme, children }) => (
   <View style={styles.section}>
@@ -165,7 +166,7 @@ export default function DiscoverFilterSheet({
                   style={styles.savedChip}
                   onPress={() => setDraft(normalizeFilters(preset.filters, mediaType))}
                 />
-                <Pressable
+                <GlassPressable
                   testID={`filter-saved-remove-${preset.id}`}
                   accessibilityRole="button"
                   accessibilityLabel={copy.ui.savedRemove}
@@ -174,7 +175,7 @@ export default function DiscoverFilterSheet({
                   style={[styles.removeSaved, { backgroundColor: alpha(theme.text.muted, 0.14) }]}
                 >
                   <Ionicons name="trash-outline" size={14} color={theme.text.muted} />
-                </Pressable>
+                </GlassPressable>
               </View>
             ))}
           </Section>
@@ -285,7 +286,7 @@ export default function DiscoverFilterSheet({
         </View>
 
         {canSave ? (
-          <Pressable
+          <GlassPressable
             testID="filter-sheet-save"
             accessibilityRole="button"
             onPress={() => onSavePreset?.(draft)}
@@ -298,11 +299,11 @@ export default function DiscoverFilterSheet({
             <Text allowFontScaling={false} style={[styles.saveText, { color: accent }]}>
               {copy.ui.saveCurrent}
             </Text>
-          </Pressable>
+          </GlassPressable>
         ) : null}
       </SheetScroll>
 
-      <Pressable
+      <GlassPressable
         testID="filter-sheet-apply"
         accessibilityRole="button"
         onPress={() => onApply?.(draft)}
@@ -311,7 +312,7 @@ export default function DiscoverFilterSheet({
         <Text allowFontScaling={false} style={styles.applyText}>
           {activeCount > 0 ? `${copy.ui.apply} (${activeCount})` : copy.ui.apply}
         </Text>
-      </Pressable>
+      </GlassPressable>
     </BottomSheetModal>
   );
 }

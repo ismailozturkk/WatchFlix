@@ -17,6 +17,8 @@ import { useTheme } from "@context/ThemeContext";
 import { subscribeUserGroups } from "@services/groupsService";
 import { i18nText } from "@utils/i18nText";
 import UserAvatar from "../common/UserAvatar";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 
 const normalizeFriend = (friend) => ({
   uid: friend?.friendUid || friend?.uid || friend?.id,
@@ -120,7 +122,7 @@ export default function NewConversationSheet({
           ].map((tab) => {
             const selected = recipientType === tab.key;
             return (
-              <TouchableOpacity
+              <GlassTouchable
                 key={tab.key}
                 onPress={() => {
                   setRecipientType(tab.key);
@@ -132,13 +134,13 @@ export default function NewConversationSheet({
                 <Text style={[styles.tabText, { color: selected ? "#fff" : theme.text.muted }]}>
                   {tab.label}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
             );
           })}
         </View>
       )}
 
-      <View
+      <GlassBox role="field"
         style={[
           styles.search,
           { backgroundColor: theme.secondary, borderColor: theme.border },
@@ -162,7 +164,7 @@ export default function NewConversationSheet({
             <Ionicons name="close-circle" size={18} color={theme.text.muted} />
           </TouchableOpacity>
         )}
-      </View>
+      </GlassBox>
 
       <FlatList
         data={data}

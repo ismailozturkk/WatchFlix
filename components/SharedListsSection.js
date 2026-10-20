@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "@components/AppToast";
 import { useTheme } from "../context/ThemeContext";
@@ -18,6 +18,7 @@ import {
 import { i18nText } from "../utils/i18nText";
 
 import { getSharedListAccent } from "../utils/listAppearance";
+import GlassTouchable from "./common/GlassTouchable";
 
 /**
  * Detay ekranı "Diğer Listeler" modalındaki ORTAK LİSTELER bölümü.
@@ -192,7 +193,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
           // Ekli DEĞİLKEN "Diğer Listeler" kartlarıyla aynı nötr görünüm;
           // ekliyken ortak listenin kendi rengi (ACCENT).
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={list.id}
               activeOpacity={0.85}
               onPress={() => toggle(list)}
@@ -243,7 +244,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
                     : states[list.id]?.addedByName || ""}
                 </Text>
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
       </View>

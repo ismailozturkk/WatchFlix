@@ -24,7 +24,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -101,6 +100,8 @@ import {
   parseCustomSelection,
   resolveThemeTokens,
 } from "../../../theme/colors";
+import GlassTouchable from "../../../components/common/GlassTouchable";
+import GlassBox from "../../../components/common/GlassBox";
 
 // ColorPickerSheet, `sources` kimliği değişince durumunu sıfırlar; her render'da
 // yeni `[]` vermek sürükleme sırasında seçiciyi sıfırlardı.
@@ -826,7 +827,7 @@ export default function CustomThemeScreen({ navigation, route }) {
         {readabilityOpen ? <ReadabilityPanel analysis={analysis} copy={copy} onFix={fixReadable} theme={theme} /> : null}
 
         {/* Tema adı (+ öneri) */}
-        <View style={[styles.nameRow, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+        <GlassBox role="field" style={[styles.nameRow, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
           <AppIcon family="Ionicons" name="pricetag-outline" size={17} color={theme.text.muted} />
           <TextInput
             value={name}
@@ -836,7 +837,7 @@ export default function CustomThemeScreen({ navigation, route }) {
             placeholderTextColor={theme.text.muted}
             style={[styles.nameInput, { color: theme.text.primary }]}
           />
-          <TouchableOpacity
+          <GlassTouchable
             accessibilityRole="button"
             accessibilityLabel={copy.suggestName}
             activeOpacity={0.75}
@@ -847,8 +848,8 @@ export default function CustomThemeScreen({ navigation, route }) {
             style={[styles.nameMagic, { backgroundColor: `${theme.accent}22` }]}
           >
             <AppIcon family="Ionicons" name="sparkles" size={15} color={theme.accent} />
-          </TouchableOpacity>
-        </View>
+          </GlassTouchable>
+        </GlassBox>
 
         <StudioTabs tabs={tabs} value={tab} onChange={(key) => { tick(); setTab(key); }} theme={theme} reduceMotion={reduceMotion} />
 
@@ -868,14 +869,14 @@ export default function CustomThemeScreen({ navigation, route }) {
       <View style={[styles.footer, { backgroundColor: theme.primary, borderTopColor: theme.border }]}>
         <View style={styles.footerRow}>
           {editingId ? (
-            <TouchableOpacity accessibilityRole="button" accessibilityLabel={i18nText("autoI18n.sil", "Sil")} activeOpacity={0.85} onPress={remove} style={[styles.deleteBtn, { borderColor: `${theme.colors.red}88` }]}>
+            <GlassTouchable accessibilityRole="button" accessibilityLabel={i18nText("autoI18n.sil", "Sil")} activeOpacity={0.85} onPress={remove} style={[styles.deleteBtn, { borderColor: `${theme.colors.red}88` }]}>
               <AppIcon family="Ionicons" name="trash-outline" size={20} color={theme.colors.red} />
-            </TouchableOpacity>
+            </GlassTouchable>
           ) : null}
-          <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={save} style={[styles.saveBtn, { backgroundColor: theme.accent }]}>
+          <GlassTouchable accessibilityRole="button" activeOpacity={0.85} onPress={save} style={[styles.saveBtn, { backgroundColor: theme.accent }]}>
             <AppIcon family="Ionicons" name="checkmark-circle" size={20} color="#fff" />
             <Text style={styles.saveText}>{i18nText("autoI18n.ct_kaydet_uygula", "Kaydet ve Uygula")}</Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       </View>
 

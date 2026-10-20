@@ -28,6 +28,7 @@ import {
 import { getGameTitle } from "./gameLabels";
 import { getGameEntry, resolveGameAccentColors } from "./gameRegistry";
 import { deleteGameSessionResult, getGameSessionResult } from "./gameSessionStore";
+import GlassTouchable from "../../components/common/GlassTouchable";
 
 const SHARE_CARD_W = 320;
 const SHARE_CARD_H = 569; // ~9:16
@@ -171,9 +172,9 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <View style={styles.missing}>
           <AppIcon family="Ionicons" name="alert-circle-outline" size={42} color={theme.text.muted} />
           <Text style={[styles.missingText, { color: theme.text.secondary }]}>{tr ? "Bu oturumun sonucu artık kullanılamıyor." : es ? "El resultado de esta sesión ya no está disponible." : pt ? "O resultado desta sessão não está mais disponível." : "This session result is no longer available."}</Text>
-          <TouchableOpacity style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent, alignSelf: "stretch", marginHorizontal: 24 }]} onPress={() => navigation.navigate("GameHubScreen")}>
+          <GlassTouchable style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent, alignSelf: "stretch", marginHorizontal: 24 }]} onPress={() => navigation.navigate("GameHubScreen")}>
             <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Oyun Merkezine Dön" : es ? "Volver al centro de juegos" : pt ? "Voltar à central de jogos" : "Back to Game Hub"}</Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       </GameScreenShell>
     );
@@ -392,9 +393,9 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <SecondaryAction icon={sharing ? null : "share-social-outline"} label={tr ? "Paylaş" : es ? "Compartir" : pt ? "Compartilhar" : "Share"} theme={theme} loading={sharing} onPress={handleShare} />
       </View>
 
-      <TouchableOpacity style={[styles.ghostButton, { borderColor: theme.border }]} onPress={() => leaveResult("GameHubScreen")}>
+      <GlassTouchable style={[styles.ghostButton, { borderColor: theme.border }]} onPress={() => leaveResult("GameHubScreen")}>
         <Text style={[styles.ghostText, { color: theme.text.secondary }]}>{tr ? "Oyun Merkezine Dön" : es ? "Volver al centro de juegos" : pt ? "Voltar à central de jogos" : "Back to Game Hub"}</Text>
-      </TouchableOpacity>
+      </GlassTouchable>
 
       {/* Gizli paylasim karti (captureRef hedefi) — spoiler gorsel icermez */}
       <View style={styles.captureHost} pointerEvents="none">
@@ -443,10 +444,10 @@ function DetailItem({ icon, label, value, theme }) {
 
 function SecondaryAction({ icon, label, theme, onPress, loading }) {
   return (
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} activeOpacity={0.8} disabled={loading} onPress={onPress} style={[styles.secondaryAction, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+    <GlassTouchable accessibilityRole="button" accessibilityLabel={label} activeOpacity={0.8} disabled={loading} onPress={onPress} style={[styles.secondaryAction, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       {loading ? <ActivityIndicator size="small" color={theme.accent} /> : <AppIcon family="Ionicons" name={icon} size={20} color={theme.accent} />}
       <Text style={[styles.secondaryActionText, { color: theme.text.secondary }]} numberOfLines={1}>{label}</Text>
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 

@@ -35,6 +35,8 @@ import {
 } from "@utils/listShare";
 import { getListAccent, getListIcon } from "@utils/listAppearance";
 import { usePremiumGate } from "@hooks/usePremiumGate";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 
 /**
  * @param {object} props
@@ -155,7 +157,7 @@ export default function CreateListModal({
         <GlassCloseButton size={30} fallbackRadius={15} iconSize={16} onPress={close} />
       </View>
 
-      <View
+      <GlassBox role="field"
         style={[
           styles.inputWrap,
           {
@@ -185,13 +187,13 @@ export default function CreateListModal({
             <Ionicons name="close-circle" size={16} color={theme.text.muted} />
           </TouchableOpacity>
         ) : null}
-      </View>
+      </GlassBox>
 
       {hint ? (
         <Text style={[styles.hint, { color: "#ef4444" }]}>{hint}</Text>
       ) : null}
 
-      <TouchableOpacity
+      <GlassTouchable
         activeOpacity={0.85}
         onPress={handleSubmit}
         disabled={!target.canSave || saving}
@@ -208,7 +210,7 @@ export default function CreateListModal({
         <Text style={styles.submitText}>
           {i18nText("autoI18n.listeyi_olustur", "Listeyi Oluştur")}
         </Text>
-      </TouchableOpacity>
+      </GlassTouchable>
     </BottomSheetModal>
   );
 }

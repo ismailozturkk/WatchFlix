@@ -47,6 +47,7 @@ import {
   shuffleFrames,
 } from "@utils/watchPicker";
 import { fillPickerCopy, getWatchPickerCopy, reasonText } from "@utils/watchPickerCopy";
+import GlassPressable from "../common/GlassPressable";
 
 const HISTORY_MAX = 6;
 const OPEN_SETTLE_MS = 260; // sayfa kayarken başlamasın
@@ -306,7 +307,7 @@ export default function WatchPickerSheet({ visible, onClose, items, filtered = f
           const selected = id === type;
           const empty = counts[id] === 0;
           return (
-            <Pressable
+            <GlassPressable
               key={id}
               testID={`watch-picker-type-${id}`}
               accessibilityRole="button"
@@ -335,7 +336,7 @@ export default function WatchPickerSheet({ visible, onClose, items, filtered = f
                   {counts[id] > 999 ? "999+" : counts[id]}
                 </Text>
               </View>
-            </Pressable>
+            </GlassPressable>
           );
         })}
       </View>
@@ -511,7 +512,7 @@ export default function WatchPickerSheet({ visible, onClose, items, filtered = f
       </SheetScroll>
 
       <View style={styles.actions}>
-        <Pressable
+        <GlassPressable
           testID="watch-picker-reroll"
           accessibilityRole="button"
           disabled={shuffling || pool.length === 0}
@@ -526,8 +527,8 @@ export default function WatchPickerSheet({ visible, onClose, items, filtered = f
           <Text allowFontScaling={false} style={[styles.secondaryText, { color: theme.text.primary }]}>
             {copy.sheet.reroll}
           </Text>
-        </Pressable>
-        <Pressable
+        </GlassPressable>
+        <GlassPressable
           testID="watch-picker-open"
           accessibilityRole="button"
           disabled={!shown || shuffling}
@@ -538,7 +539,7 @@ export default function WatchPickerSheet({ visible, onClose, items, filtered = f
             {copy.sheet.open}
           </Text>
           <Ionicons name="arrow-forward" size={18} color={onAccent} />
-        </Pressable>
+        </GlassPressable>
       </View>
     </BottomSheetModal>
   );

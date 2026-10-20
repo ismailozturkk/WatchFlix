@@ -21,6 +21,7 @@ import AppIcon from "@components/AppIcon";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import { withAlpha } from "@components/profile/StatsComponents";
+import GlassTouchable from "../common/GlassTouchable";
 
 function NewBadgesBanner({ toplam, acik, onGoster, onKapat, style }) {
   const { theme } = useTheme();
@@ -75,7 +76,7 @@ function NewBadgesBanner({ toplam, acik, onGoster, onKapat, style }) {
           <AppIcon family="Ionicons" name="close" size={18} color={theme.text.muted} />
         </TouchableOpacity>
       </View>
-      <TouchableOpacity
+      <GlassTouchable
         activeOpacity={0.85}
         onPress={onGoster}
         accessibilityRole="button"
@@ -85,7 +86,7 @@ function NewBadgesBanner({ toplam, acik, onGoster, onKapat, style }) {
           {i18nText("autoI18n.rozet_yeni_duyuru_goster", "Yenileri göster")}
         </Text>
         <AppIcon family="Ionicons" name="arrow-forward" size={15} color="#FFFFFF" />
-      </TouchableOpacity>
+      </GlassTouchable>
     </View>
   );
 }

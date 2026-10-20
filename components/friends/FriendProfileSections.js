@@ -25,6 +25,7 @@ import IdentityBadgesRow from "@components/badges/IdentityBadgesRow";
 import { useTheme } from "@context/ThemeContext";
 import { alpha } from "@theme/colors";
 import { FRIEND_GREEN } from "./friendsTokens";
+import GlassBox from "../common/GlassBox";
 
 const AVATAR_SIZE = 100;
 // UserAvatar squircle yarıçapı `round(size * 0.33)`; halka onun etrafında
@@ -271,7 +272,7 @@ export const ProfileHero = memo(function ProfileHero({
 export const ProfileStatStrip = memo(function ProfileStatStrip({ items }) {
   const { theme } = useTheme();
   return (
-    <View
+    <GlassBox role="card"
       style={[
         styles.statStrip,
         { backgroundColor: theme.secondary, borderColor: theme.border },
@@ -308,7 +309,7 @@ export const ProfileStatStrip = memo(function ProfileStatStrip({ items }) {
           </View>
         </React.Fragment>
       ))}
-    </View>
+    </GlassBox>
   );
 });
 
@@ -372,7 +373,7 @@ export const WatchStatsCard = memo(function WatchStatsCard({
   const divider = { backgroundColor: alpha(theme.border, 0.9) };
 
   return (
-    <View
+    <GlassBox role="card"
       style={[
         styles.statsCard,
         { backgroundColor: theme.secondary, borderColor: theme.border },
@@ -539,7 +540,7 @@ export const WatchStatsCard = memo(function WatchStatsCard({
           </View>
         </>
       ) : null}
-    </View>
+    </GlassBox>
   );
 });
 
@@ -547,7 +548,7 @@ export const WatchStatsCard = memo(function WatchStatsCard({
 export const ProfileNoticeCard = memo(function ProfileNoticeCard({ icon, title }) {
   const { theme } = useTheme();
   return (
-    <View
+    <GlassBox role="card"
       style={[
         styles.notice,
         { backgroundColor: theme.secondary, borderColor: theme.border },
@@ -562,7 +563,7 @@ export const ProfileNoticeCard = memo(function ProfileNoticeCard({ icon, title }
       >
         {title}
       </Text>
-    </View>
+    </GlassBox>
   );
 });
 

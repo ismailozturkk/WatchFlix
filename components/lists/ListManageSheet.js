@@ -45,6 +45,8 @@ import { renameCustomRootList } from "@services/listItemsService";
 import { moveListVisibility } from "@services/userService";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 const DANGER = "#ef4444";
 
 /**
@@ -260,7 +262,7 @@ export default function ListManageSheet({
                 </View>
               </View>
 
-              <TouchableOpacity
+              <GlassTouchable
                 activeOpacity={0.85}
                 onPress={() => setStep("rename")}
                 style={[
@@ -283,9 +285,9 @@ export default function ListManageSheet({
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
-              </TouchableOpacity>
+              </GlassTouchable>
 
-              <TouchableOpacity
+              <GlassTouchable
                 activeOpacity={0.85}
                 onPress={() => setStep("delete")}
                 style={[
@@ -305,9 +307,9 @@ export default function ListManageSheet({
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
-              </TouchableOpacity>
+              </GlassTouchable>
 
-              <TouchableOpacity
+              <GlassTouchable
                 activeOpacity={0.85}
                 onPress={close}
                 style={[styles.ghostBtn, { backgroundColor: theme.secondary }]}
@@ -315,14 +317,14 @@ export default function ListManageSheet({
                 <Text style={[styles.btnText, { color: theme.text.secondary }]}>
                   {t.cancel}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
             </>
           ) : step === "rename" ? (
             <>
               <StepHeader
                 title={i18nText("autoI18n.yeniden_adlandir", "Yeniden adlandır")}
               />
-              <View
+              <GlassBox role="field"
                 style={[
                   styles.inputWrap,
                   {
@@ -353,7 +355,7 @@ export default function ListManageSheet({
                     <Ionicons name="close-circle" size={17} color={theme.text.muted} />
                   </TouchableOpacity>
                 ) : null}
-              </View>
+              </GlassBox>
 
               <View style={styles.hintRow}>
                 <Text
@@ -375,7 +377,7 @@ export default function ListManageSheet({
               </View>
 
               <View style={styles.actions}>
-                <TouchableOpacity
+                <GlassTouchable
                   style={[styles.btn, { backgroundColor: theme.secondary }]}
                   onPress={close}
                   disabled={busy}
@@ -383,8 +385,8 @@ export default function ListManageSheet({
                   <Text style={[styles.btnText, { color: theme.text.secondary }]}>
                     {t.cancel}
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </GlassTouchable>
+                <GlassTouchable
                   style={[
                     styles.btn,
                     {
@@ -405,7 +407,7 @@ export default function ListManageSheet({
                       </Text>
                     </>
                   )}
-                </TouchableOpacity>
+                </GlassTouchable>
               </View>
             </>
           ) : (
@@ -433,7 +435,7 @@ export default function ListManageSheet({
                 )}
               </Text>
               <View style={styles.actions}>
-                <TouchableOpacity
+                <GlassTouchable
                   style={[styles.btn, { backgroundColor: theme.secondary }]}
                   onPress={close}
                   disabled={busy}
@@ -441,8 +443,8 @@ export default function ListManageSheet({
                   <Text style={[styles.btnText, { color: theme.text.secondary }]}>
                     {t.cancel}
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </GlassTouchable>
+                <GlassTouchable
                   style={[
                     styles.btn,
                     { backgroundColor: DANGER, opacity: busy ? 0.6 : 1 },
@@ -460,7 +462,7 @@ export default function ListManageSheet({
                       </Text>
                     </>
                   )}
-                </TouchableOpacity>
+                </GlassTouchable>
               </View>
             </>
           )}

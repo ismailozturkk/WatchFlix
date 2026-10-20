@@ -31,6 +31,7 @@ import { isLightSurface } from "../../../../utils/colorUtils";
 // orta tonlarda yanlış seçer — eşik 0.5 yerine 0.179 olmalı).
 const markOn = (hex) => (isLightSurface(hex) ? "#111111" : "#FFFFFF");
 import { selectionAsync } from "../../../../services/hapticsService";
+import GlassPressable from "../../../../components/common/GlassPressable";
 
 const tap = () => {
   selectionAsync().catch(() => {});
@@ -127,7 +128,7 @@ function MaterialSegmented({ options, value, onChange, colors }) {
       {options.map((option, i) => {
         const active = option.value === value;
         return (
-          <Pressable
+          <GlassPressable
             key={String(option.value)}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
@@ -155,7 +156,7 @@ function MaterialSegmented({ options, value, onChange, colors }) {
             >
               {option.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>
@@ -285,7 +286,7 @@ export function WidgetPicker({ widgets, active, onChange, colors, platform, comp
       {widgets.map((widget) => {
         const selected = widget.id === active;
         return (
-          <Pressable
+          <GlassPressable
             key={widget.id}
             accessibilityRole="button"
             accessibilityState={{ selected }}
@@ -333,7 +334,7 @@ export function WidgetPicker({ widgets, active, onChange, colors, platform, comp
             >
               {widget.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>
@@ -448,7 +449,7 @@ export function AccentGrid({ options, selected, onPick }) {
       {options.map((accent) => {
         const active = selected === accent;
         return (
-          <Pressable
+          <GlassPressable
             key={accent}
             accessibilityRole="button"
             accessibilityLabel={accent}
@@ -469,7 +470,7 @@ export function AccentGrid({ options, selected, onPick }) {
                 <AppIcon name="checkmark" size={15} color={markOn(accent)} />
               )}
             </View>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>

@@ -39,6 +39,7 @@ import {
   seasonBucket,
 } from "../../utils/commentScope";
 import { episodeRowLabel, seasonRowLabel } from "./scopeTexts";
+import GlassTouchable from "../common/GlassTouchable";
 
 // Bölüm listeleri oturum boyunca bellekte tutulur — aynı sezonu tekrar açmak
 // yeni bir TMDB isteği doğurmaz. (axios cevap önbelleği ayrıca diske yazar.)
@@ -75,7 +76,7 @@ const Row = ({
   onPress,
   right,
 }) => (
-  <TouchableOpacity
+  <GlassTouchable
     activeOpacity={0.8}
     onPress={onPress}
     style={[
@@ -127,7 +128,7 @@ const Row = ({
 
     {selected && <Ionicons name="checkmark-circle" size={18} color={theme.accent} />}
     {right}
-  </TouchableOpacity>
+  </GlassTouchable>
 );
 
 export default function CommentScopeSheet({

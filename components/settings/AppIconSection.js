@@ -32,6 +32,7 @@ import { i18nText } from "@utils/i18nText";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import PremiumPill from "@components/premium/PremiumPill";
 import { alpha } from "@theme/colors";
+import GlassBox from "../common/GlassBox";
 
 export default function AppIconSection({ colors: C }) {
   // null = henüz sorgulanmadı; sonra getAppIconSupportStatus() değerlerinden biri.
@@ -105,7 +106,7 @@ export default function AppIconSection({ colors: C }) {
   if (status !== "supported") {
     if (!__DEV__ || !status) return null;
     return (
-      <View style={[styles.card, styles.devNote, { borderColor: C.borderMuted }]}>
+      <GlassBox role="card" style={[styles.card, styles.devNote, { borderColor: C.borderMuted }]}>
         <Text allowFontScaling={false} style={[styles.devTitle, { color: C.muted }]}>
           Uygulama simgesi seçici gizli (yalnız geliştirme build'inde görünür)
         </Text>
@@ -114,12 +115,12 @@ export default function AppIconSection({ colors: C }) {
             ? "Bu yapıda SeelogdAppIcon native modülü yok (Expo Go ya da modülden önce alınmış build). Yeni bir development build gerekir."
             : "Modül var ama alternatif simge desteği yok. Android'de AndroidManifest'te MainActivityDefault/Glass alias'ları eksik: eski bir android/ klasörü kullanılıyor olabilir, `npx expo prebuild --platform android` ile yeniden üret."}
         </Text>
-      </View>
+      </GlassBox>
     );
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
+    <GlassBox role="card" style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
       <View style={styles.header}>
         <View style={[styles.headerIcon, { backgroundColor: C.iconBlue }]}>
           <AppIcon name="apps-outline" size={16} color={C.blue} />
@@ -194,7 +195,7 @@ export default function AppIconSection({ colors: C }) {
           );
         })}
       </View>
-    </View>
+    </GlassBox>
   );
 }
 

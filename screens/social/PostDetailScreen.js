@@ -43,6 +43,7 @@ import { buildPostShare } from "@utils/chatShare";
 import { formatTimeAgo } from "@utils/postTime";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../../components/common/GlassTouchable";
 // Göreli zaman: etiketler uygulama dilinden gelir (Hub akışı ve Postlarım ile aynı kaynak).
 
 export default function PostDetailScreen({ route, navigation }) {
@@ -358,7 +359,7 @@ export default function PostDetailScreen({ route, navigation }) {
 
             {/* Liste paylaşımını kendi profiline kopyala (feed'deki ile aynı akış) */}
             {post.type === "list" && post.mediaList?.length > 0 && (
-              <TouchableOpacity
+              <GlassTouchable
                 style={[styles.saveListBtn, { borderColor: `${accent}55` }]}
                 onPress={() => setSaveListVisible(true)}
                 activeOpacity={0.8}
@@ -367,7 +368,7 @@ export default function PostDetailScreen({ route, navigation }) {
                 <Text style={[styles.saveListText, { color: accent }]} numberOfLines={1}>
                   {i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
             )}
           </View>
         </ScrollView>

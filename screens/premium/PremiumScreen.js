@@ -56,6 +56,8 @@ import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
 import RedeemCodeSheet, { formatRedeemDate } from "../../components/premium/RedeemCodeSheet";
 import useReferralOverview from "../../hooks/useReferralOverview";
 import { getReferralCopy } from "../../utils/referralCopy";
+import GlassPressable from "../../components/common/GlassPressable";
+import GlassBox from "../../components/common/GlassBox";
 
 // ÖNE ÇIKAN FAYDALAR — seçili plana göre, utils/premiumFeatures.js
 // değerlerinden üretilir. Buradaki her cümlenin arkasında bir kapı var; yeni
@@ -464,7 +466,7 @@ export default function PremiumScreen() {
 
       {/* Kaynak özellik bandı: kullanıcı bir limitten/kilitten geldiyse */}
       {sourceFeature ? (
-        <View
+        <GlassBox role="card"
           style={[
             styles.sourceBanner,
             { backgroundColor: C.card, borderColor: alpha(C.accent, 0.35) },
@@ -488,7 +490,7 @@ export default function PremiumScreen() {
               ).join("  ·  ")}
             </Text>
           </View>
-        </View>
+        </GlassBox>
       ) : null}
 
       {/* Hero Card */}
@@ -908,14 +910,14 @@ export default function PremiumScreen() {
             })}
           </View>
         ) : (
-          <View style={[styles.noticeBox, { backgroundColor: C.card, borderColor: C.border }]}>
+          <GlassBox role="card" style={[styles.noticeBox, { backgroundColor: C.card, borderColor: C.border }]}>
             <AppIcon family="Ionicons" name="construct-outline" size={20} color={C.amber} />
             <Text style={[styles.noticeText, { color: C.muted }]}>
               {configurationError === "missing-api-key"
                 ? tr ? "RevenueCat API anahtarı bekleniyor." : es ? "Falta la clave de la API de RevenueCat." : pt ? "A chave da API do RevenueCat não foi encontrada." : "RevenueCat API key is missing."
                 : tr ? `${selectedPlanName} mağaza paketleri henüz hazır değil.` : es ? `Los paquetes de ${selectedPlanName} aún no se han cargado.` : pt ? `Os pacotes de ${selectedPlanName} ainda não foram carregados.` : `${selectedPlanName} packages not loaded yet.`}
             </Text>
-          </View>
+          </GlassBox>
         )}
 
         {/* PRIMARY CTA BUTTON */}
@@ -1178,7 +1180,7 @@ export default function PremiumScreen() {
                 const isCatActive = categoryFilter === cat.id;
                 const activeColor = cat.color || C.accent;
                 return (
-                  <Pressable
+                  <GlassPressable
                     key={cat.id}
                     onPress={() => {
                       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -1205,7 +1207,7 @@ export default function PremiumScreen() {
                     >
                       {cat.title}
                     </Text>
-                  </Pressable>
+                  </GlassPressable>
                 );
               })}
             </ScrollView>

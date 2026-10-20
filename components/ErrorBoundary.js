@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { i18nText } from "../utils/i18nText";
 import { captureError } from "../services/crashReporting";
+import GlassTouchable from "./common/GlassTouchable";
 
 
 export default class ErrorBoundary extends React.Component {
@@ -34,12 +35,12 @@ export default class ErrorBoundary extends React.Component {
           <Text style={styles.emoji}>⚠️</Text>
           <Text style={styles.title}>{i18nText("autoI18n.bir_seyler_ters_gitti", "Bir şeyler ters gitti")}</Text>
           <Text style={styles.message}>{i18nText("autoI18n.uygulama_beklenmedik_bir_hatayla_karsilasti", "Uygulama beklenmedik bir hatayla karşılaştı.")}</Text>
-          <TouchableOpacity
+          <GlassTouchable
             style={styles.button}
             onPress={() => this.setState({ hasError: false, error: null })}
           >
             <Text style={styles.buttonText}>{i18nText("autoI18n.tekrar_dene", "Tekrar Dene")}</Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       );
     }

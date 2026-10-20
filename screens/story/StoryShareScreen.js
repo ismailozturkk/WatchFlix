@@ -56,6 +56,9 @@ import {
   storyTitleSize,
   planStoryActionBar,
 } from "@utils/storyCanvasLayout";
+import GlassTouchable from "../../components/common/GlassTouchable";
+import GlassBox from "../../components/common/GlassBox";
+import GlassTextInput from "../../components/common/GlassTextInput";
 
 /* ── Tuval ölçüleri EKRANDAN ölçülür (utils/storyCanvasLayout.js) ──
    Eskiden modül yüklenirken Dimensions + sabit header/alt çubuk yüksekliğiyle
@@ -195,7 +198,7 @@ function HexColorInput({ theme, color, onChange }) {
     else setText((color || "").replace(/^#/, ""));
   };
   return (
-    <View
+    <GlassBox role="field"
       style={[
         styles.hexBox,
         { borderColor: theme.border, backgroundColor: theme.secondary },
@@ -227,7 +230,7 @@ function HexColorInput({ theme, color, onChange }) {
         autoCorrect={false}
         style={[styles.hexInput, { color: theme.text.primary }]}
       />
-    </View>
+    </GlassBox>
   );
 }
 
@@ -1688,13 +1691,13 @@ export default function StoryShareScreen({ route, navigation }) {
                 }}
               />
               {!blocks.some((b) => b.id === "poster") && poster_path && (
-                <TouchableOpacity
+                <GlassTouchable
                   style={[styles.addBtn, { backgroundColor: theme.secondary, borderColor: theme.border, borderWidth: 1, marginTop: 14 }]}
                   onPress={() => setPosterImage(poster_path)}
                 >
                   <Ionicons name="image" size={18} color={theme.accent} />
                   <Text style={[styles.addBtnText, { color: theme.text.primary }]}>{i18nText("autoI18n.posteri_geri_ekle", "Posteri Geri Ekle")}</Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               )}
 
               {/* Poster özelleştirme (eskiden Stil sekmesindeydi) */}
@@ -1747,27 +1750,27 @@ export default function StoryShareScreen({ route, navigation }) {
           {activeTab === "content" && (
             <View>
               <View style={styles.addRow}>
-                <TouchableOpacity
+                <GlassTouchable
                   style={[styles.addBtn, { backgroundColor: theme.accent }]}
                   onPress={addText}
                 >
                   <Ionicons name="add" size={18} color="#fff" />
                   <Text style={styles.addBtnText}>{i18nText("autoI18n.yazi_ekle", "Yazı Ekle")}</Text>
-                </TouchableOpacity>
+                </GlassTouchable>
                 {!blocks.some((b) => b.id === "poster") && poster_path && (
-                  <TouchableOpacity
+                  <GlassTouchable
                     style={[styles.addBtn, { backgroundColor: theme.secondary, borderColor: theme.border, borderWidth: 1 }]}
                     onPress={() => setPosterImage(poster_path)}
                   >
                     <Ionicons name="image" size={18} color={theme.accent} />
                     <Text style={[styles.addBtnText, { color: theme.text.primary }]}>{i18nText("autoI18n.poster_ekle", "Poster Ekle")}</Text>
-                  </TouchableOpacity>
+                  </GlassTouchable>
                 )}
               </View>
 
               {/* Bölüm Graph — yalnızca dizilerde, tek örnek */}
               {type === "tv" && !graphBlock && (
-                <TouchableOpacity
+                <GlassTouchable
                   style={[
                     styles.addBtn,
                     {
@@ -1788,7 +1791,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   <Text style={[styles.addBtnText, { color: theme.text.primary }]}>
                     {i18nText("autoI18n.bolum_graph_ekle", "Bölüm Graph Ekle")}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               )}
 
               {blocks.map((b) => (
@@ -1882,7 +1885,7 @@ export default function StoryShareScreen({ route, navigation }) {
             <View>
               {selected && selected.type === "text" ? (
                 <>
-                  <TextInput
+                  <GlassTextInput
                     ref={editRef}
                     value={selected.text}
                     onChangeText={(txt) => updateSelected({ text: txt })}
@@ -1934,7 +1937,7 @@ export default function StoryShareScreen({ route, navigation }) {
                     {FONTS.map((f) => {
                       const active = (selected.font || "system") === f.id;
                       return (
-                        <TouchableOpacity
+                        <GlassTouchable
                           key={f.id}
                           activeOpacity={0.8}
                           onPress={() => updateSelected({ font: f.id })}
@@ -1964,7 +1967,7 @@ export default function StoryShareScreen({ route, navigation }) {
                           >
                             {f.name}
                           </Text>
-                        </TouchableOpacity>
+                        </GlassTouchable>
                       );
                     })}
                   </ScrollView>
@@ -2091,7 +2094,7 @@ export default function StoryShareScreen({ route, navigation }) {
               <Label theme={theme}>{i18nText("autoI18n.filigran_konumu_zorunlu", "Filigran Konumu (zorunlu)")}</Label>
               <View style={styles.toolRow}>
                 {WM_POSITIONS.map((p) => (
-                  <TouchableOpacity
+                  <GlassTouchable
                     key={p.id}
                     onPress={() => setWatermarkPos(p.id)}
                     style={[
@@ -2116,7 +2119,7 @@ export default function StoryShareScreen({ route, navigation }) {
                     >
                       {p.id === "bottom-right" ? i18nText("autoI18n.sag_alt", "Sağ Alt") : p.id === "bottom-left" ? i18nText("autoI18n.sol_alt", "Sol Alt") : p.id === "top-right" ? i18nText("autoI18n.sag_ust", "Sağ Üst") : i18nText("autoI18n.sol_ust", "Sol Üst")}
                     </Text>
-                  </TouchableOpacity>
+                  </GlassTouchable>
                 ))}
               </View>
             </View>
@@ -2145,7 +2148,7 @@ function Label({ theme, children }) {
 
 function Tool({ theme, icon, label, onPress, active, danger, italic, underline, flip }) {
   return (
-    <TouchableOpacity
+    <GlassTouchable
       onPress={onPress}
       style={[
         styles.toolBtn,
@@ -2192,20 +2195,20 @@ function Tool({ theme, icon, label, onPress, active, danger, italic, underline, 
           style={flip ? { transform: [{ scaleX: -1 }] } : undefined}
         />
       )}
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 
 function ResetBtn({ theme, onPress }) {
   return (
-    <TouchableOpacity
+    <GlassTouchable
       onPress={onPress}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       style={[styles.resetBtn, { borderColor: theme.border }]}
     >
       <Ionicons name="refresh" size={11} color={theme.text.muted} />
       <Text allowFontScaling={false} style={[styles.resetTxt, { color: theme.text.muted }]}>{i18nText("autoI18n.sifirla", "Sıfırla")}</Text>
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 

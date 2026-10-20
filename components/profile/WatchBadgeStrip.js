@@ -29,6 +29,7 @@ import { useTheme } from "@context/ThemeContext";
 import { kademeRengi, kademeSekli, RARITY_ORDER } from "@theme/badgeTokens";
 import { badgeAd } from "@components/badges/watchBadgeCatalog";
 import { withAlpha } from "./StatsComponents";
+import GlassTouchable from "../common/GlassTouchable";
 
 const ROZET_BOYUT = 44;
 const KOMPAKT_ROZET_BOYUT = 30;
@@ -71,7 +72,7 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
       >
         {/* Sayaç + giriş oku vitrinin başında kalır; rozetler sayfasına geçiş
             yatay listenin sonuna kadar kaydırmayı gerektirmemeli. */}
-        <TouchableOpacity
+        <GlassTouchable
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel={pickByLanguage(lang, { tr: "Tüm rozetler", en: "All badges", es: "Todas las insignias", pt: "Todos os emblemas" })}
@@ -123,7 +124,7 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
             size={compact ? 12 : 14}
             color={theme.accent}
           />
-        </TouchableOpacity>
+        </GlassTouchable>
 
         {acikRozetler.map((b) => {
           const sekil = kademeSekli(b.tier, b.aileToplam);

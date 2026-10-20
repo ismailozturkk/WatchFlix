@@ -10,7 +10,6 @@ import {
   Animated,
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   PanResponder,
 } from "react-native";
@@ -54,6 +53,7 @@ import {
   buildUiColors,
 } from "./settingsUi";
 import { fillCopy, getSectionVisibilityCopy } from "./sectionVisibilityCopy";
+import GlassTouchable from "../../../components/common/GlassTouchable";
 
 // İkon arka planı saydamlık kaydırıcısı (0.1–1). Delta-based native 120 FPS PanResponder.
 function OpacitySlider({ value, onChange, colors }) {
@@ -345,7 +345,7 @@ export default function PersonalizationScreen() {
                     : C.iconAmber;
 
               return (
-                <TouchableOpacity
+                <GlassTouchable
                   key={o.value}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: active }}
@@ -421,7 +421,7 @@ export default function PersonalizationScreen() {
                       <AppIcon name="checkmark" size={10} color={C.white} />
                     ) : null}
                   </View>
-                </TouchableOpacity>
+                </GlassTouchable>
               );
             })}
           </View>
@@ -586,7 +586,7 @@ export default function PersonalizationScreen() {
                 ].map((o) => {
                   const active = iconBackgroundMode === o.value;
                   return (
-                    <TouchableOpacity
+                    <GlassTouchable
                       key={o.value}
                       style={[ps.segOpt, active && { backgroundColor: C.accent }]}
                       onPress={() => changeIconBackgroundMode(o.value)}
@@ -601,7 +601,7 @@ export default function PersonalizationScreen() {
                       >
                         {o.label}
                       </Text>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   );
                 })}
               </View>

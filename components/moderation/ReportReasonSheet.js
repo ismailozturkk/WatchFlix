@@ -11,12 +11,13 @@
 // gördüğü içerikle daha uzun süre baş başa bırakmaktan başka işe yaramıyor.
 
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheetModal from "../common/BottomSheetModal";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { REPORT_REASONS } from "../../utils/reportValidation";
+import GlassPressable from "../common/GlassPressable";
 
 // Sebep kodu → (etiket, ikon). Sıra reportValidation'daki listeden geliyor;
 // buradaki tablo yalnız görünümü tarif ediyor.
@@ -63,7 +64,7 @@ export default function ReportReasonSheet({ visible, onClose, onSelect, subtitle
       {REPORT_REASONS.map((reason) => {
         const ui = REASON_UI[reason] || REASON_UI.other;
         return (
-          <Pressable
+          <GlassPressable
             key={reason}
             accessibilityRole="button"
             onPress={() => onSelect?.(reason)}
@@ -78,7 +79,7 @@ export default function ReportReasonSheet({ visible, onClose, onSelect, subtitle
               {i18nText(`autoI18n.${ui.key}`, ui.tr)}
             </Text>
             <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </BottomSheetModal>

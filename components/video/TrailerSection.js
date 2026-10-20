@@ -51,6 +51,7 @@ import {
   normalizeTrailerLanguageCode,
   trailerLanguageOf,
 } from "../../utils/trailerLanguages";
+import GlassTouchable from "../common/GlassTouchable";
 
 // Fragmanları öne al (Trailer > Teaser > Clip ...), resmi olanları üste.
 const TYPE_ORDER = { Trailer: 0, Teaser: 1, Clip: 2, Featurette: 3, Behind: 4 };
@@ -289,7 +290,7 @@ function LanguageSheet({ visible, selected, originalLanguage, onSelect, onClose,
         {languages.map((l) => {
           const active = l.code === selected;
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={l.code}
               activeOpacity={0.8}
               style={[
@@ -309,7 +310,7 @@ function LanguageSheet({ visible, selected, originalLanguage, onSelect, onClose,
               ) : (
                 <View style={[styles.sheetRowDot, { borderColor: theme.border }]} />
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
       </SheetScroll>
@@ -458,7 +459,7 @@ export default function TrailerSection({
         {chipCodes.map((code) => {
           const active = code === selectedLang;
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={code}
               onPress={() => handleSelectLang(code)}
               style={[
@@ -479,10 +480,10 @@ export default function TrailerSection({
               >
                 {trailerLanguageOf(code).label}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
-        <TouchableOpacity
+        <GlassTouchable
           onPress={() => setSheetVisible(true)}
           style={[
             styles.chip,
@@ -501,7 +502,7 @@ export default function TrailerSection({
           {isSheet ? (
             <Ionicons name="chevron-down" size={13} color={theme.text.muted} />
           ) : null}
-        </TouchableOpacity>
+        </GlassTouchable>
       </ScrollView>
 
       {/* İçerik */}

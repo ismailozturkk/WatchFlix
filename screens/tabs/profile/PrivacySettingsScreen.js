@@ -8,7 +8,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,6 +18,7 @@ import Toast from "@components/AppToast";
 import { i18nText } from "../../../utils/i18nText";
 import ScreenDecor from "../../../components/ScreenDecor";
 import BackButton from "@components/BackButton";
+import GlassTouchable from "../../../components/common/GlassTouchable";
 
 
 const OPTIONS = {
@@ -52,7 +52,7 @@ const PrivacyOption = memo(function PrivacyOption({
   option, isActive, onPress, theme,
 }) {
   return (
-    <TouchableOpacity
+    <GlassTouchable
       onPress={onPress}
       activeOpacity={0.7}
       style={[
@@ -87,7 +87,7 @@ const PrivacyOption = memo(function PrivacyOption({
       {isActive && (
         <Ionicons name="checkmark-circle" size={22} color={theme.accent} />
       )}
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 });
 
@@ -159,7 +159,7 @@ export default function PrivacySettingsScreen({ navigation }) {
               {i18nText("autoI18n.engellenen_kullanicilar", "Engellenen kullanıcılar")}
             </Text>
           </View>
-          <TouchableOpacity
+          <GlassTouchable
             onPress={() => navigation?.navigate?.("BlockedUsersScreen")}
             activeOpacity={0.85}
             style={[styles.blockedRow, { borderColor: theme.border }]}
@@ -171,7 +171,7 @@ export default function PrivacySettingsScreen({ navigation }) {
               )}
             </Text>
             <Ionicons name="chevron-forward" size={18} color={theme.text.muted} />
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       </ScrollView>
     </SafeAreaView>

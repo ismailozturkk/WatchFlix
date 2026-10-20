@@ -10,7 +10,7 @@
 
 import { intlLocaleOf } from "../../../utils/appLanguages";
 import React, { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View, TouchableOpacity } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -46,6 +46,8 @@ import {
   groupTitle,
   platformName,
 } from "./backupCopy";
+import GlassTouchable from "../../../components/common/GlassTouchable";
+import GlassBox from "../../../components/common/GlassBox";
 
 const tick = () => {
   try {
@@ -206,7 +208,7 @@ export default function BackupSettingsScreen() {
   return (
     <SettingsSubScreen title={copy.title}>
       {/* ── Tanıtım ── */}
-      <View style={[s.hero, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[s.hero, { backgroundColor: C.card, borderColor: C.border }]}>
         <View style={[s.heroIcon, { backgroundColor: C.accentDim }]}>
           <AppIcon family="Ionicons" name="archive-outline" size={26} color={C.accent} />
         </View>
@@ -218,11 +220,11 @@ export default function BackupSettingsScreen() {
             {copy.heroText}
           </Text>
         </View>
-      </View>
+      </GlassBox>
 
       {/* ── Neler dahil ── */}
       <SectionLabel color={C.muted}>{copy.sectionIncluded.toLocaleUpperCase(locale)}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         {contents.groups.map((group, index) => {
           const [bg, fg] = GROUP_TONES[index % GROUP_TONES.length];
           const last = index === contents.groups.length - 1;
@@ -261,14 +263,14 @@ export default function BackupSettingsScreen() {
             </View>
           );
         })}
-      </View>
+      </GlassBox>
       <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
         {copy.notIncluded}
       </Text>
 
       {/* ── Dışa aktar ── */}
       <SectionLabel color={C.muted}>{copy.sectionExport.toLocaleUpperCase(locale)}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         <SettingRow
           colors={C}
           iconBg={C.iconBlue}
@@ -290,11 +292,11 @@ export default function BackupSettingsScreen() {
           right={busy === "export-clipboard" ? spinner : <Chevron color={C.muted} />}
           last
         />
-      </View>
+      </GlassBox>
 
       {/* ── İçe aktar ── */}
       <SectionLabel color={C.muted}>{copy.sectionImport.toLocaleUpperCase(locale)}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         <SettingRow
           colors={C}
           iconBg={C.iconGreen}
@@ -316,13 +318,13 @@ export default function BackupSettingsScreen() {
           right={busy === "import-clipboard" ? spinner : <Chevron color={C.muted} />}
           last
         />
-      </View>
+      </GlassBox>
 
       {/* ── Geri al (yalnız bir içe aktarma yapıldıysa) ── */}
       {restorePoint ? (
         <>
           <SectionLabel color={C.muted}>{copy.sectionRestore.toLocaleUpperCase(locale)}</SectionLabel>
-          <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
             <SettingRow
               colors={C}
               iconBg={C.dangerDim}
@@ -337,7 +339,7 @@ export default function BackupSettingsScreen() {
               right={<Chevron color={C.muted} />}
               last
             />
-          </View>
+          </GlassBox>
         </>
       ) : null}
 
@@ -450,7 +452,7 @@ export default function BackupSettingsScreen() {
           </SheetScroll>
 
           <View style={s.actions}>
-            <TouchableOpacity
+            <GlassTouchable
               accessibilityRole="button"
               activeOpacity={0.8}
               disabled={applying}
@@ -460,8 +462,8 @@ export default function BackupSettingsScreen() {
               <Text allowFontScaling={false} style={[s.cancelText, { color: C.muted }]}>
                 {copy.cancel}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </GlassTouchable>
+            <GlassTouchable
               accessibilityRole="button"
               activeOpacity={0.85}
               disabled={applying}
@@ -476,7 +478,7 @@ export default function BackupSettingsScreen() {
               <Text allowFontScaling={false} numberOfLines={1} style={s.confirmText}>
                 {applying ? copy.applying : copy.confirm}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
         </SafeAreaView>
       </BottomSheetModal>

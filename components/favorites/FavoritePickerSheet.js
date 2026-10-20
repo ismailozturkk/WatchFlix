@@ -17,7 +17,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -39,6 +38,8 @@ import {
   searchFavorites,
 } from "../../services/fourFavoritesService";
 import FavoriteArt from "./FavoriteArt";
+import GlassPressable from "../common/GlassPressable";
+import GlassBox from "../common/GlassBox";
 
 const SEARCH_DEBOUNCE_MS = 350;
 const ART_W = 46;
@@ -272,17 +273,17 @@ export default function FavoritePickerSheet({ visible, kind, favorites, onToggle
             {full ? copy.picker.full : copy.counter(count, MAX_FAVORITES)}
           </Text>
         </View>
-        <Pressable
+        <GlassPressable
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel={copy.picker.done}
           style={[styles.done, { backgroundColor: accent }]}
         >
           <Text style={[styles.doneText, { color: onAccent }]}>{copy.picker.done}</Text>
-        </Pressable>
+        </GlassPressable>
       </View>
 
-      <View style={[styles.search, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      <GlassBox role="field" style={[styles.search, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
         <Ionicons name="search" size={18} color={theme.text.muted} />
         <TextInput
           value={query}
@@ -299,7 +300,7 @@ export default function FavoritePickerSheet({ visible, kind, favorites, onToggle
             <Ionicons name="close-circle" size={18} color={theme.text.muted} />
           </TouchableOpacity>
         )}
-      </View>
+      </GlassBox>
       {text.length > 0 && text.length < MIN_SEARCH_CHARS ? (
         <Text style={[styles.hint, { color: theme.text.muted }]}>{copy.picker.typeMore}</Text>
       ) : null}

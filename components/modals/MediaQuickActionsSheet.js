@@ -92,6 +92,7 @@ import {
 } from "../../utils/watchState";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../common/GlassTouchable";
 const { width, height } = Dimensions.get("window");
 const BACKDROP_H = Math.round(width * (9 / 16) * 0.72);
 const POSTER_W = Math.round(width * 0.25);
@@ -112,7 +113,7 @@ const formatDateSave = (value) => {
 
 /* ── Alt yönlendirme satırı ──────────────────────────────────────────────── */
 const ActionRow = ({ icon, tint, title, subtitle, onPress, theme }) => (
-  <TouchableOpacity
+  <GlassTouchable
     activeOpacity={0.85}
     onPress={onPress}
     style={[
@@ -140,7 +141,7 @@ const ActionRow = ({ icon, tint, title, subtitle, onPress, theme }) => (
       </Text>
     </View>
     <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
-  </TouchableOpacity>
+  </GlassTouchable>
 );
 
 // `onClose`  → sayfayı kapatır; devir akışları (detay, puan, tarih…) bunu kullanır.

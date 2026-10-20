@@ -14,6 +14,7 @@ import PremiumPill from "@components/premium/PremiumPill";
 import { usePet, PET_SIZES } from "@context/PetContext";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import { i18nText } from "@utils/i18nText";
+import GlassTouchable from "../common/GlassTouchable";
 
 // Kart ölçüleri (windowing / getItemLayout için sabit).
 const PREVIEW_SIZE = 72; // sprite kare yüksekliği — küçük = daha hafif decode
@@ -71,13 +72,13 @@ const PetCard = memo(function PetCard({
 
       {/* İndirilmiş petlerde önbellekten silme butonu (sol üst). */}
       {cached && !downloading && (
-        <TouchableOpacity
+        <GlassTouchable
           hitSlop={8}
           onPress={() => onDelete(pet.id)}
           style={[ps.trashBadge, { backgroundColor: C.card, borderColor: C.border }]}
         >
           <AppIcon name="trash-outline" size={12} color={C.muted} />
-        </TouchableOpacity>
+        </GlassTouchable>
       )}
 
       <View style={[ps.previewBox, { backgroundColor: C.card }]}>
@@ -313,7 +314,7 @@ function PetSettingsSection({ colors: C, showLabel = true }) {
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity
+                <GlassTouchable
                   activeOpacity={0.8}
                   onPress={clearAllPets}
                   style={[ps.clearBtn, { borderColor: C.border }]}
@@ -324,7 +325,7 @@ function PetSettingsSection({ colors: C, showLabel = true }) {
                   >
                     {i18nText("autoI18n.petTumunuTemizle", "Tümünü temizle")}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               </View>
             )}
 
@@ -352,7 +353,7 @@ function PetSettingsSection({ colors: C, showLabel = true }) {
                 {PET_SIZES.map((sz) => {
                   const active = petSize === sz.value;
                   return (
-                    <TouchableOpacity
+                    <GlassTouchable
                       key={sz.key}
                       style={[ps.segOpt, active && { backgroundColor: C.accent }]}
                       onPress={() => changePetSize(sz.value)}
@@ -370,7 +371,7 @@ function PetSettingsSection({ colors: C, showLabel = true }) {
                       >
                         {i18nText(sz.labelKey, sz.label)}
                       </Text>
-                    </TouchableOpacity>
+                    </GlassTouchable>
                   );
                 })}
               </View>

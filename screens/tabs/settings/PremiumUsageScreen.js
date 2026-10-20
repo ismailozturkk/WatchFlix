@@ -26,6 +26,7 @@ import { PREMIUM_PLAN } from "@utils/premium";
 import { buildUsageModel, nextUtcMidnight } from "@utils/premiumUsageModel";
 import { alpha } from "@theme/colors";
 import { SectionLabel, SettingsSubScreen, buildUiColors } from "./settingsUi";
+import GlassPressable from "../../../components/common/GlassPressable";
 
 const CLOCK_TICK_MS = 30000;
 
@@ -266,7 +267,7 @@ export default function PremiumUsageScreen({ navigation }) {
             : tr ? "Tüm haklarının durumu aşağıda." : es ? "Así van todos tus límites." : pt ? "É assim que estão todos os seus limites." : "Here's where all your limits stand."}
         </Text>
         {model.canUpgrade ? (
-          <Pressable
+          <GlassPressable
             onPress={openPlans}
             accessibilityRole="button"
             style={[st.summaryCta, { backgroundColor: C.accent }]}
@@ -275,11 +276,11 @@ export default function PremiumUsageScreen({ navigation }) {
               {tr ? "Planları ve fiyatları gör" : es ? "Ver planes y precios" : pt ? "Ver planos e preços" : "View plans & pricing"}
             </Text>
             <AppIcon family="Ionicons" name="arrow-forward" size={14} color="#FFFFFF" />
-          </Pressable>
+          </GlassPressable>
         ) : null}
         {canManage ? (
           // Yükseltme düğmesi varken ikincil (çerçeveli); tek eylemse birincil (dolu).
-          <Pressable
+          <GlassPressable
             testID="premium-usage-manage"
             onPress={manage}
             disabled={managing}
@@ -310,7 +311,7 @@ export default function PremiumUsageScreen({ navigation }) {
                 </Text>
               </>
             )}
-          </Pressable>
+          </GlassPressable>
         ) : null}
       </View>
 

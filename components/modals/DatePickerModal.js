@@ -59,6 +59,7 @@ import { i18nText } from "@utils/i18nText";
 import { buildEnabledOptions } from "@utils/datePickerWheel";
 import { selectionAsync } from "@services/hapticsService";
 import { deviceTier } from "@services/deviceTier";
+import GlassPressable from "../common/GlassPressable";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -1054,7 +1055,7 @@ export default function DatePickerModal({
             },
           ]}
         >
-          <Pressable
+          <GlassPressable
             accessibilityRole="button"
             accessibilityLabel={i18nText("autoI18n.onceki_gun", "Önceki gün")}
             accessibilityState={{ disabled: !canPickPrevious }}
@@ -1070,7 +1071,7 @@ export default function DatePickerModal({
             ]}
           >
             <Ionicons name="chevron-back" size={17} color={theme.accent} />
-          </Pressable>
+          </GlassPressable>
           <View
             style={styles.previewCopy}
             accessibilityLabel={`${previewText}, ${previewWeekday}`}
@@ -1092,7 +1093,7 @@ export default function DatePickerModal({
               {previewWeekday}
             </Text>
           </View>
-          <Pressable
+          <GlassPressable
             accessibilityRole="button"
             accessibilityLabel={i18nText("autoI18n.sonraki_gun", "Sonraki gün")}
             accessibilityState={{ disabled: !canPickNext }}
@@ -1108,7 +1109,7 @@ export default function DatePickerModal({
             ]}
           >
             <Ionicons name="chevron-forward" size={17} color={theme.accent} />
-          </Pressable>
+          </GlassPressable>
         </Animated.View>
 
         {/* Hızlı seçimler */}
@@ -1117,7 +1118,7 @@ export default function DatePickerModal({
             {quickItems.map((item) => {
               const active = item.iso === selectedIso;
               return (
-                <Pressable
+                <GlassPressable
                   key={item.key}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
@@ -1142,7 +1143,7 @@ export default function DatePickerModal({
                   >
                     {item.label}
                   </Text>
-                </Pressable>
+                </GlassPressable>
               );
             })}
           </View>
@@ -1249,7 +1250,7 @@ export default function DatePickerModal({
         </View>
 
         {/* Onay */}
-        <Pressable
+        <GlassPressable
           onPress={handleConfirm}
           accessibilityRole="button"
           accessibilityLabel={`${confirmLabel}: ${previewText}`}
@@ -1265,7 +1266,7 @@ export default function DatePickerModal({
           <Text allowFontScaling={false} style={styles.confirmBtnText}>
             {confirmLabel}
           </Text>
-        </Pressable>
+        </GlassPressable>
       </Animated.View>
     </Modal>
   );

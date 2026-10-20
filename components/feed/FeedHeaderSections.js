@@ -22,6 +22,7 @@ import UserAvatar from "../common/UserAvatar";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { postTypeMeta } from "./postTypeMeta";
+import GlassPressable from "../common/GlassPressable";
 
 export const FEED_FILTERS = {
   ALL: "all",
@@ -122,7 +123,7 @@ export const FeedComposerCard = memo(function FeedComposerCard({
           {COMPOSE_TYPES.map((item) => {
             const meta = postTypeMeta(item.key, theme.colors);
             return (
-              <Pressable
+              <GlassPressable
                 key={item.key}
                 accessibilityRole="button"
                 onPress={() => onCompose(item.key)}
@@ -154,7 +155,7 @@ export const FeedComposerCard = memo(function FeedComposerCard({
                 >
                   {i18nText(item.labelKey, item.fallback)}
                 </Text>
-              </Pressable>
+              </GlassPressable>
             );
           })}
         </View>
@@ -354,7 +355,7 @@ export const FeedFilterBar = memo(function FeedFilterBar({
       {items.map((item) => {
         const isActive = active === item.key;
         return (
-          <Pressable
+          <GlassPressable
             key={item.key}
             accessibilityRole="button"
             accessibilityState={{ selected: isActive }}
@@ -393,7 +394,7 @@ export const FeedFilterBar = memo(function FeedFilterBar({
             >
               {item.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </ScrollView>
@@ -436,7 +437,7 @@ export const FeedSortBar = memo(function FeedSortBar({
         {items.map((item) => {
           const isActive = active === item.key;
           return (
-            <Pressable
+            <GlassPressable
               key={item.key}
               accessibilityRole="button"
               accessibilityState={{ selected: isActive }}
@@ -467,7 +468,7 @@ export const FeedSortBar = memo(function FeedSortBar({
               >
                 {item.label}
               </Text>
-            </Pressable>
+            </GlassPressable>
           );
         })}
       </View>

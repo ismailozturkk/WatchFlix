@@ -31,6 +31,7 @@ import {
   widgetAspect,
   widgetNaturalWidth,
 } from "./widgetPlatform";
+import GlassPressable from "../../../../components/common/GlassPressable";
 
 const STAGE_PAD = 14;
 const SCREEN_GUTTER = 16; // settingsUi `ui.scroll` yatay dolgusu
@@ -125,7 +126,7 @@ function FamilyToggle({ active, family, onChange, chip, accent }) {
       {families.map((id) => {
         const selected = id === family;
         return (
-          <Pressable
+          <GlassPressable
             key={id}
             accessibilityRole="button"
             accessibilityState={{ selected }}
@@ -146,7 +147,7 @@ function FamilyToggle({ active, family, onChange, chip, accent }) {
             >
               {label(id)}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>

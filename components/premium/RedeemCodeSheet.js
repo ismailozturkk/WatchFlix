@@ -12,10 +12,8 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,6 +26,8 @@ import { redeemCode, referralErrorReason } from "@services/referralService";
 import { copyLanguage, intlLocaleOf } from "@utils/appLanguages";
 import { REFERRAL_COPY } from "@utils/referralCopy";
 import { alpha } from "@theme/colors";
+import GlassPressable from "../common/GlassPressable";
+import GlassTextInput from "../common/GlassTextInput";
 
 const COPY_LANGUAGES = Object.keys(REFERRAL_COPY);
 
@@ -117,7 +117,7 @@ export default function RedeemCodeSheet({ visible, onClose, onRedeemed }) {
       </View>
       <Text style={[styles.body, { color: theme.text.muted }]}>{copy.redeem.sheetBody}</Text>
 
-      <TextInput
+      <GlassTextInput
         value={code}
         onChangeText={(text) => {
           setCode(text.toUpperCase());
@@ -148,7 +148,7 @@ export default function RedeemCodeSheet({ visible, onClose, onRedeemed }) {
         </Text>
       ) : null}
 
-      <Pressable
+      <GlassPressable
         onPress={submit}
         disabled={!canSubmit}
         accessibilityRole="button"
@@ -165,7 +165,7 @@ export default function RedeemCodeSheet({ visible, onClose, onRedeemed }) {
             {copy.redeem.apply}
           </Text>
         )}
-      </Pressable>
+      </GlassPressable>
     </BottomSheetModal>
   );
 }

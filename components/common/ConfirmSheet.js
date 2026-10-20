@@ -23,6 +23,7 @@ import ModalBlurBackdrop from "./ModalBlurBackdrop";
 import useSheetTransition from "@hooks/useSheetTransition";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
+import GlassTouchable from "./GlassTouchable";
 
 // Yıkıcı eylem paleti — ListManageSheet'in silme adımıyla aynı.
 const TONES = {
@@ -111,7 +112,7 @@ export default function ConfirmSheet({
           ) : null}
 
           <View style={styles.actions}>
-            <TouchableOpacity
+            <GlassTouchable
               style={[styles.btn, { backgroundColor: theme.secondary }]}
               onPress={onClose}
               disabled={busy}
@@ -119,8 +120,8 @@ export default function ConfirmSheet({
               <Text style={[styles.btnText, { color: theme.text.secondary }]}>
                 {cancelLabel ?? t.cancel}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </GlassTouchable>
+            <GlassTouchable
               style={[
                 styles.btn,
                 { backgroundColor: palette.solid, opacity: busy ? 0.6 : 1 },
@@ -138,7 +139,7 @@ export default function ConfirmSheet({
                   </Text>
                 </>
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
         </Animated.View>
       </View>

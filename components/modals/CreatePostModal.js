@@ -81,6 +81,9 @@ import { DraftCard, DraftsEmpty } from "./createPost/DraftCard";
 import LeaveSheet from "./createPost/LeaveSheet";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassTextInput from "../common/GlassTextInput";
+import GlassBox from "../common/GlassBox";
 // Karakter sınırları — büyük Firestore dökümanlarını ve aşırı uzun
 // içerikleri önler. Sayaçlar bu sabitlere göre gösterilir.
 const MAX_TITLE = 100;
@@ -1315,19 +1318,19 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                               <LinearGradient colors={["transparent", "rgba(0,0,0,0.75)"]} style={s.listPosterOverlay}>
                                 <Text style={s.listPosterTitle} numberOfLines={2}>{opt.label}</Text>
                               </LinearGradient>
-                              <TouchableOpacity style={s.removeBadge} onPress={() => setPollOptions((prev) => prev.filter((o) => o.id !== opt.id))}>
+                              <GlassTouchable style={s.removeBadge} onPress={() => setPollOptions((prev) => prev.filter((o) => o.id !== opt.id))}>
                                 <Ionicons name="close-circle" size={22} color={DANGER} />
-                              </TouchableOpacity>
+                              </GlassTouchable>
                             </View>
                           ))}
                           {pollOptions.length < MAX_POLL && (
-                            <TouchableOpacity
+                            <GlassTouchable
                               style={[s.addMoreBtn, { backgroundColor: theme.secondary, borderColor: alpha(currentAccent, 0.4) }]}
                               onPress={() => openSearch("movie")}
                             >
                               <Ionicons name="add" size={30} color={currentAccent} />
                               <Text style={[s.addMoreText, { color: theme.text.muted }]}>{i18nText("autoI18n.ekle", "Ekle")}</Text>
-                            </TouchableOpacity>
+                            </GlassTouchable>
                           )}
                         </ScrollView>
                       ) : (
@@ -1337,7 +1340,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                               <View style={[s.pollNum, { backgroundColor: alpha(currentAccent, 0.16) }]}>
                                 <Text style={[s.pollNumText, { color: currentAccent }]}>{idx + 1}</Text>
                               </View>
-                              <TextInput
+                              <GlassTextInput
                                 style={[s.pollTextInput, { color: theme.text.primary, backgroundColor: theme.secondary, borderColor: theme.border }]}
                                 placeholder={`${i18nText("autoI18n.secenek", "Seçenek")} ${idx + 1}`}
                                 placeholderTextColor={theme.text.muted}
@@ -1351,14 +1354,14 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                             </View>
                           ))}
                           {pollOptions.length < MAX_POLL && (
-                            <TouchableOpacity
+                            <GlassTouchable
                               style={[s.pollAddText, { borderColor: alpha(currentAccent, 0.4), backgroundColor: alpha(currentAccent, 0.06) }]}
                               onPress={() => setPollOptions((prev) => [...prev, { id: `opt_t_${prev.length}_${Date.now()}`, label: "", media: null }])}
                               activeOpacity={0.85}
                             >
                               <Ionicons name="add" size={18} color={currentAccent} />
                               <Text style={[s.pollAddTextLabel, { color: currentAccent }]}>{i18nText("autoI18n.secenek_ekle", "Seçenek ekle")}</Text>
-                            </TouchableOpacity>
+                            </GlassTouchable>
                           )}
                         </View>
                       )}
@@ -1406,7 +1409,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
 
                       {/* Profildeki listeyi olduğu gibi aktar — tek tek
                           aramak yerine hazır listeyi paylaşmanın kısa yolu. */}
-                      <TouchableOpacity
+                      <GlassTouchable
                         style={[s.importListBtn, { borderColor: `${currentAccent}55`, backgroundColor: `${currentAccent}12` }]}
                         onPress={() => setListPickerVisible(true)}
                         activeOpacity={0.85}
@@ -1423,7 +1426,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                           </Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={theme.text.muted} />
-                      </TouchableOpacity>
+                      </GlassTouchable>
 
                       {/* Toplam süre + tür çipleri. Süre çipi mavi: tür
                           çiplerinden (yeşil) farklı bir bilgi türü. */}
@@ -1494,26 +1497,26 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                               </LinearGradient>
                               {ranked && (
                                 <View style={s.reorderRow}>
-                                  <TouchableOpacity disabled={idx === 0} onPress={() => moveMedia(idx, -1)} style={[s.reorderBtn, idx === 0 && { opacity: 0.3 }]}>
+                                  <GlassTouchable disabled={idx === 0} onPress={() => moveMedia(idx, -1)} style={[s.reorderBtn, idx === 0 && { opacity: 0.3 }]}>
                                     <Ionicons name="chevron-back" size={15} color="#fff" />
-                                  </TouchableOpacity>
-                                  <TouchableOpacity disabled={idx === selectedMedia.length - 1} onPress={() => moveMedia(idx, 1)} style={[s.reorderBtn, idx === selectedMedia.length - 1 && { opacity: 0.3 }]}>
+                                  </GlassTouchable>
+                                  <GlassTouchable disabled={idx === selectedMedia.length - 1} onPress={() => moveMedia(idx, 1)} style={[s.reorderBtn, idx === selectedMedia.length - 1 && { opacity: 0.3 }]}>
                                     <Ionicons name="chevron-forward" size={15} color="#fff" />
-                                  </TouchableOpacity>
+                                  </GlassTouchable>
                                 </View>
                               )}
-                              <TouchableOpacity style={s.removeBadge} onPress={() => handleRemoveMedia(item.id)}>
+                              <GlassTouchable style={s.removeBadge} onPress={() => handleRemoveMedia(item.id)}>
                                 <Ionicons name="close-circle" size={22} color={DANGER} />
-                              </TouchableOpacity>
+                              </GlassTouchable>
                             </View>
                           ))}
-                          <TouchableOpacity
+                          <GlassTouchable
                             style={[s.addMoreBtn, { backgroundColor: theme.secondary, borderColor: alpha(currentAccent, 0.4) }]}
                             onPress={() => openSearch("movie")}
                           >
                             <Ionicons name="add" size={30} color={currentAccent} />
                             <Text style={[s.addMoreText, { color: theme.text.muted }]}>{i18nText("autoI18n.ekle", "Ekle")}</Text>
-                          </TouchableOpacity>
+                          </GlassTouchable>
                         </ScrollView>
                       )}
                     </>
@@ -1561,7 +1564,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                 </View>
 
                 {/* Search bar */}
-                <View style={[s.searchBar, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+                <GlassBox role="field" style={[s.searchBar, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
                   <Ionicons name="search" size={18} color={theme.text.muted} />
                   <TextInput
                     style={[s.searchInput, { color: theme.text.primary }]}
@@ -1579,7 +1582,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                       <Ionicons name="close-circle" size={20} color={theme.text.muted} />
                     </TouchableOpacity>
                   )}
-                </View>
+                </GlassBox>
 
                 {loadingSearch ? (
                   <View style={s.loadingWrap}>

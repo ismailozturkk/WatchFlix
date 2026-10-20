@@ -8,7 +8,7 @@
 //                     mesajıdır; yalnız son cevapta çizilir)
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Share } from "react-native";
+import { View, Text, StyleSheet, Share } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 import { alpha } from "../../theme/colors";
@@ -24,6 +24,7 @@ import {
 import { libraryErrorMessage } from "../../utils/libraryErrorText";
 import { todayListDate } from "../../utils/mediaFacts";
 import { fillCopy } from "../../utils/aiCopy";
+import GlassTouchable from "../common/GlassTouchable";
 
 const FEEDBACK_MS = 3200;
 
@@ -111,7 +112,7 @@ function BulkActions({ response, ctx, showAdd, onShare }) {
   return (
     <View style={s.bulkWrap}>
       {canAdd && (
-        <TouchableOpacity
+        <GlassTouchable
           activeOpacity={0.8}
           disabled={busy || allIn}
           onPress={addAll}
@@ -125,12 +126,12 @@ function BulkActions({ response, ctx, showAdd, onShare }) {
                 ? copy.actions.allAlreadyIn
                 : fillCopy(copy.actions.addAll, { n: pending.length })}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       )}
       {(canShare || canSend) && (
         <View style={[s.bulkRow, canAdd && s.bulkRowGap]}>
           {canShare && (
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.8}
               onPress={share}
               accessibilityLabel={copy.actions.share}
@@ -140,10 +141,10 @@ function BulkActions({ response, ctx, showAdd, onShare }) {
               <Text style={[s.bulkText, { color: theme.text.secondary }]} numberOfLines={1}>
                 {copy.actions.share}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           )}
           {canSend && (
-            <TouchableOpacity
+            <GlassTouchable
               activeOpacity={0.8}
               onPress={onShare}
               accessibilityLabel={copy.actions.sendToChat}
@@ -157,7 +158,7 @@ function BulkActions({ response, ctx, showAdd, onShare }) {
               <Text style={[s.bulkText, { color: theme.accent }]} numberOfLines={1}>
                 {copy.actions.sendToChat}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           )}
         </View>
       )}
@@ -201,7 +202,7 @@ function FollowUps({ response, ctx, disabled, onFollowUp, onRegenerate }) {
       <Text style={[s.followTitle, { color: theme.text.muted }]}>{copy.actions.followUps}</Text>
       <View style={s.followRow}>
         {chips.map((chip) => (
-          <TouchableOpacity
+          <GlassTouchable
             key={chip.id}
             disabled={disabled}
             activeOpacity={0.8}
@@ -215,10 +216,10 @@ function FollowUps({ response, ctx, disabled, onFollowUp, onRegenerate }) {
             <Text style={[s.followText, { color: theme.text.primary }]} numberOfLines={1}>
               {chip.label}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         ))}
         {!!onRegenerate && (
-          <TouchableOpacity
+          <GlassTouchable
             disabled={disabled}
             activeOpacity={0.8}
             onPress={onRegenerate}
@@ -231,7 +232,7 @@ function FollowUps({ response, ctx, disabled, onFollowUp, onRegenerate }) {
             <Text style={[s.followText, { color: theme.text.secondary }]} numberOfLines={1}>
               {copy.actions.regenerate}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         )}
       </View>
       <Text style={[s.costHint, { color: theme.text.muted }]}>{copy.actions.costHint}</Text>

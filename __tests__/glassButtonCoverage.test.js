@@ -12,7 +12,8 @@
 //     ListsViewScreen yeni-liste satırı (headerAnim) — cam solarken bozulur (kural 1)
 //   • Liste satırı içi eylemler (not kartı kopyala/sil, geçmiş sil, üye çıkar, adım
 //     düğmeleri, kaldır/ekle) — içerik katmanı; her satırda cam pahalı ve HIG'e aykırı
-//   • Seçim kutuları/çipler/sekmeler, "x" temizle (alan içi), yer tutucu daireler
+//   • "x" temizle (alan içi), yer tutucu daireler. (Çipler / sekmeler / seçim
+//     kutuları ARTIK cam: GlassTouchable/GlassPressable, bkz. glassCoverageGuard.test.js)
 //   • Story/Wrapped'ın görüntüye YAKALANAN tuvali (yalnız çevresindeki düğmeler cam)
 const fs = require("fs");
 const path = require("path");

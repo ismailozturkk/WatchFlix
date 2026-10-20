@@ -43,6 +43,7 @@ import {
   saveManyEventsToPhoneCalendar,
   removeManyEventsFromPhoneCalendar,
 } from "@utils/phoneCalendar";
+import GlassTouchable from "../../components/common/GlassTouchable";
 
 /* ── Takvim yerelleştirmesi ──
    react-native-calendars ay/gün adlarını xdate'ten okur ve varsayılan yerel
@@ -770,7 +771,7 @@ export default function CalendarScreen({ navigation }) {
           </Text>
         </View>
         {showTodayButton ? (
-          <TouchableOpacity
+          <GlassTouchable
             onPress={goToToday}
             style={[
               styles.todayBtn,
@@ -784,7 +785,7 @@ export default function CalendarScreen({ navigation }) {
             <Text allowFontScaling={false} style={[styles.todayBtnText, { color: theme.accent }]}>
               {i18nText("autoI18n.bugun", "Bugün")}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         ) : null}
         <GlassIconButton
           icon="refresh"

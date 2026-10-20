@@ -30,6 +30,8 @@ import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import { SettingsSubScreen, buildUiColors } from "./settingsUi";
+import GlassTouchable from "../../../components/common/GlassTouchable";
+import GlassBox from "../../../components/common/GlassBox";
 
 const ROW_HEIGHT = 60;
 
@@ -123,7 +125,7 @@ export default function OpenSourceLicensesScreen() {
         </Text>
       </View>
 
-      <View style={[s.search, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="field" style={[s.search, { backgroundColor: C.card, borderColor: C.border }]}>
         <AppIcon family="Ionicons" name="search" size={15} color={C.muted} />
         <TextInput
           value={query}
@@ -150,7 +152,7 @@ export default function OpenSourceLicensesScreen() {
             <AppIcon family="Ionicons" name="close-circle" size={16} color={C.muted} />
           </TouchableOpacity>
         ) : null}
-      </View>
+      </GlassBox>
 
       <ScrollView
         horizontal
@@ -223,7 +225,7 @@ export default function OpenSourceLicensesScreen() {
 
 function Chip({ C, label, count, active, onPress }) {
   return (
-    <TouchableOpacity
+    <GlassTouchable
       onPress={onPress}
       activeOpacity={0.7}
       style={[
@@ -240,14 +242,14 @@ function Chip({ C, label, count, active, onPress }) {
       >
         {label} · {count}
       </Text>
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 
 const PackageRow = React.memo(function PackageRow({ C, item, onPress }) {
   const tone = licenseTone(item.license, C);
   return (
-    <TouchableOpacity
+    <GlassTouchable
       activeOpacity={0.65}
       onPress={onPress}
       style={[s.row, { backgroundColor: C.card, borderColor: C.border }]}
@@ -274,7 +276,7 @@ const PackageRow = React.memo(function PackageRow({ C, item, onPress }) {
           {item.license}
         </Text>
       </View>
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 });
 

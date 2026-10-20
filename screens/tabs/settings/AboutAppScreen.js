@@ -30,6 +30,8 @@ import { i18nText } from "@utils/i18nText";
 import { legalUrl, SUPPORT_EMAIL } from "@utils/legalLinks";
 import { SettingsSubScreen, buildUiColors } from "./settingsUi";
 import useAppLogo from "@hooks/useAppLogo";
+import GlassTouchable from "../../../components/common/GlassTouchable";
+import GlassBox from "../../../components/common/GlassBox";
 
 if (
   Platform.OS === "android" &&
@@ -190,7 +192,7 @@ export default function AboutAppScreen() {
       title={isTr ? "Uygulama Bilgisi & SSS" : es ? "Información de la app y preguntas frecuentes" : pt ? "Informações do app e perguntas frequentes" : "App Info & FAQ"}
     >
       {/* 🚀 Hero Banner */}
-      <View style={[styles.heroCard, { borderColor: C.border }]}>
+      <GlassBox role="card" style={[styles.heroCard, { borderColor: C.border }]}>
         <LinearGradient
           colors={[C.cardAlt, C.card]}
           start={{ x: 0, y: 0 }}
@@ -225,7 +227,7 @@ export default function AboutAppScreen() {
             </View>
           </View>
         </LinearGradient>
-      </View>
+      </GlassBox>
 
       {/* ✉️ Destek ve İletişim */}
       <Text allowFontScaling={false} style={[styles.sectionHeader, { color: C.muted }]}>
@@ -258,7 +260,7 @@ export default function AboutAppScreen() {
         </View>
 
         <View style={styles.supportActions}>
-          <TouchableOpacity
+          <GlassTouchable
             activeOpacity={0.8}
             onPress={handleSendEmail}
             style={[styles.btnSupportPrimary, { backgroundColor: C.accent }]}
@@ -267,9 +269,9 @@ export default function AboutAppScreen() {
             <Text allowFontScaling={false} style={styles.btnSupportPrimaryText}>
               {isTr ? "Destek Ekibine E-Posta At" : es ? "Escribir al equipo de soporte" : pt ? "Escrever para a equipe de suporte" : "Email Support Team"}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
 
-          <TouchableOpacity
+          <GlassTouchable
             activeOpacity={0.7}
             onPress={copyEmailToClipboard}
             style={[
@@ -284,7 +286,7 @@ export default function AboutAppScreen() {
             >
               {SUPPORT_EMAIL}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       </View>
 
@@ -292,7 +294,7 @@ export default function AboutAppScreen() {
       <Text allowFontScaling={false} style={[styles.sectionHeader, { color: C.muted }]}>
         {isTr ? "YASAL VE LİSANSLAR" : es ? "LEGAL Y LICENCIAS" : pt ? "JURÍDICO E LICENÇAS" : "LEGAL & LICENSES"}
       </Text>
-      <View
+      <GlassBox role="card"
         style={[
           styles.legalCard,
           { backgroundColor: C.card, borderColor: C.border },
@@ -340,7 +342,7 @@ export default function AboutAppScreen() {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </GlassBox>
 
       {/* ❓ Sıkça Sorulan Sorular (SSS) */}
       <Text allowFontScaling={false} style={[styles.sectionHeader, { color: C.muted }]}>

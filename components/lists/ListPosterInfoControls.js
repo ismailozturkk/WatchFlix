@@ -1,9 +1,10 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import SwitchToggle from "@components/SwitchToggle";
 import { i18nText } from "@utils/i18nText";
 import { readableTextOn } from "@utils/colorUtils";
+import GlassPressable from "../common/GlassPressable";
 
 const OPTIONS = [
   {
@@ -72,7 +73,7 @@ export default function ListPosterInfoControls({
         {visibleOptions.map((option) => {
           const on = value?.[option.key] ?? option.defaultValue;
           return (
-            <Pressable
+            <GlassPressable
               key={option.key}
               testID={`poster-info-${option.key}`}
               accessibilityRole="switch"
@@ -94,7 +95,7 @@ export default function ListPosterInfoControls({
               >
                 {i18nText(option.labelKey, option.fallback)}
               </Text>
-            </Pressable>
+            </GlassPressable>
           );
         })}
       </View>

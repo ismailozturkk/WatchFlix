@@ -8,14 +8,15 @@
 // satırlık not durur (kullanıcı "neden hep aynı birkaç şey çıkıyor?" demesin).
 
 import React, { memo, useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { readableTextOn } from "@utils/colorUtils";
 import { countsOf } from "@utils/watchPicker";
+import GlassPressable from "../common/GlassPressable";
 
 function TypeButton({ testID, icon, label, count, theme, disabled, accessibilityLabel, onPress }) {
   return (
-    <Pressable
+    <GlassPressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={`${accessibilityLabel}. ${count}`}
@@ -37,7 +38,7 @@ function TypeButton({ testID, icon, label, count, theme, disabled, accessibility
       <Text allowFontScaling={false} numberOfLines={1} style={[styles.typeLabel, { color: theme.text.primary }]}>
         {label}
       </Text>
-    </Pressable>
+    </GlassPressable>
   );
 }
 
@@ -49,7 +50,7 @@ function WatchPickerEntry({ theme, copy, items, filtered = false, onPick }) {
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
-        <Pressable
+        <GlassPressable
           testID="watch-picker-entry"
           accessibilityRole="button"
           accessibilityLabel={copy.entry.a11yRandom}
@@ -64,7 +65,7 @@ function WatchPickerEntry({ theme, copy, items, filtered = false, onPick }) {
           <Text allowFontScaling={false} numberOfLines={1} style={[styles.randomLabel, { color: onAccent }]}>
             {copy.entry.title}
           </Text>
-        </Pressable>
+        </GlassPressable>
 
         <TypeButton
           testID="watch-picker-entry-movie"

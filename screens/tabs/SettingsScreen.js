@@ -81,6 +81,8 @@ import {
 } from "../../utils/appLanguages";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../../components/common/GlassTouchable";
+import GlassBox from "../../components/common/GlassBox";
 const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
 
 // Seçilebilir diller utils/appLanguages.js'ten gelir (yeni dil = oraya kayıt +
@@ -219,7 +221,7 @@ function DataTypePicker({ types, colors, onChange, onToggleAll }) {
             )}
           </Text>
         </View>
-        <TouchableOpacity
+        <GlassTouchable
           onPress={() => onToggleAll(!allEnabled)}
           activeOpacity={0.7}
           style={[s.dataTypesAction, { backgroundColor: colors.accentDim }]}
@@ -229,7 +231,7 @@ function DataTypePicker({ types, colors, onChange, onToggleAll }) {
               ? i18nText("autoI18n.tumunu_kapat", "Tümünü kapat")
               : i18nText("autoI18n.tumunu_ac", "Tümünü aç")}
           </Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       </View>
 
       {enabledCount === 0 && (
@@ -246,7 +248,7 @@ function DataTypePicker({ types, colors, onChange, onToggleAll }) {
           const enabled = types?.[opt.id] !== false;
           const tint = colors[opt.colorKey] || colors.accent;
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={opt.id}
               style={[
                 s.dataTypeButton,
@@ -297,7 +299,7 @@ function DataTypePicker({ types, colors, onChange, onToggleAll }) {
                   <AppIcon family="Ionicons" name="checkmark" size={9} color="#fff" />
                 ) : null}
               </View>
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
       </View>
@@ -556,7 +558,7 @@ export default function SettingsScreen() {
         <SectionLabel color={C.muted} first>SEELOGD PREMIUM</SectionLabel>
         <PremiumSettingsCard />
         {hasMemberBar ? null : (
-          <View
+          <GlassBox role="card"
             style={[
               s.card,
               s.cardStacked,
@@ -577,10 +579,10 @@ export default function SettingsScreen() {
               right={<Chevron color={C.muted} />}
               last
             />
-          </View>
+          </GlassBox>
         )}
         {/* Arkadaş daveti: abone olsun olmasın herkes için (kod paylaşımı + kod girişi) */}
-        <View
+        <GlassBox role="card"
           style={[
             s.card,
             s.cardStacked,
@@ -598,13 +600,13 @@ export default function SettingsScreen() {
             right={<Chevron color={C.muted} />}
             last
           />
-        </View>
+        </GlassBox>
         {/* Yalnız geliştirme build'inde: premium kapılarını mağazasız dene */}
         {__DEV__ ? <DevPlanSimulatorCard /> : null}
 
         {/* ── Hesap: kimlik doğrulama yöntemleri ve gizlilik ── */}
         <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_hesap", "Hesap").toUpperCase()}</SectionLabel>
-        <View
+        <GlassBox role="card"
           style={[
             s.card,
             { backgroundColor: C.card, borderColor: C.border },
@@ -634,15 +636,15 @@ export default function SettingsScreen() {
             right={<Chevron color={C.muted} />}
             last
           />
-        </View>
+        </GlassBox>
 
         {/* ── Görünüm: tema, kişiselleştirme, poster düzeni, widget'lar, dokunsal geri bildirim ── */}
         <SectionLabel color={C.muted}>{t.appearance.toUpperCase()}</SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+        <GlassBox role="card" style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           {/* Ayrı "Görünüm" başlık satırı yok — tema satırları (seçili olan vurgulu) bu görevi görüyor. */}
           <SettingsTheme />
-        </View>
-        <View
+        </GlassBox>
+        <GlassBox role="card"
           style={[
             s.card,
             s.cardStacked,
@@ -701,11 +703,11 @@ export default function SettingsScreen() {
             }
             last
           />
-        </View>
+        </GlassBox>
 
         {/* ── Dil ve içerik: uygulama dili, izleme platformları, içerik tercihleri ── */}
         <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_dil_icerik", "Dil ve içerik").toUpperCase()}</SectionLabel>
-        <TouchableOpacity
+        <GlassTouchable
           style={[s.langCard, { backgroundColor: C.card, borderColor: C.border }]}
           onPress={() => {
             setLangSearch("");
@@ -736,8 +738,8 @@ export default function SettingsScreen() {
             </View>
             <Chevron color={C.muted} />
           </View>
-        </TouchableOpacity>
-        <View
+        </GlassTouchable>
+        <GlassBox role="card"
           style={[
             s.card,
             s.cardStacked,
@@ -826,11 +828,11 @@ export default function SettingsScreen() {
               }
             />
           )}
-        </View>
+        </GlassBox>
 
         {/* ── Bildirimler ── */}
         <SectionLabel color={C.muted}>{t.notifications.toUpperCase()}</SectionLabel>
-        <View
+        <GlassBox role="card"
           style={[
             s.card,
             { backgroundColor: C.card, borderColor: C.border },
@@ -863,7 +865,7 @@ export default function SettingsScreen() {
             right={<Chevron color={C.muted} />}
             last
           />
-        </View>
+        </GlassBox>
 
         {/* ── Veri ve depolama: görsel kalitesi, çevrimdışı veri, izinler, içe aktarma ── */}
         <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_veri_depolama", "Veri ve depolama").toUpperCase()}</SectionLabel>
@@ -899,7 +901,7 @@ export default function SettingsScreen() {
             {IMAGE_QUALITIES.map((q) => {
               const active = imageQualityLevel === q.value;
               return (
-                <TouchableOpacity
+                <GlassTouchable
                   key={q.value}
                   style={[s.segOpt, active && { backgroundColor: C.accent }]}
                   onPress={() => changeImageQuality(q.value)}
@@ -914,12 +916,12 @@ export default function SettingsScreen() {
                   >
                     {t[q.labelKey]}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               );
             })}
           </View>
         </View>
-        <View
+        <GlassBox role="card"
           style={[
             s.card,
             s.cardStacked,
@@ -1003,7 +1005,7 @@ export default function SettingsScreen() {
             right={<Chevron color={C.muted} />}
             last
           />
-        </View>
+        </GlassBox>
 
         {/* ── Destek ve geri bildirim: hata bildirimi (Premium+), özellik isteği (Max) ── */}
         <FeedbackSettingsGroup C={C} />
@@ -1064,18 +1066,18 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </SwipeCard>
 
-        <View style={[s.card, s.debugCard, { backgroundColor: C.card, borderColor: C.border }]}>
+        <GlassBox role="card" style={[s.card, s.debugCard, { backgroundColor: C.card, borderColor: C.border }]}>
           <SettingRow colors={C} iconBg={C.iconBlue} iconColor={C.blue}
             iconName="analytics-outline" title="Debug"
             onPress={() => navigation.navigate("UsageDebugScreen")}
             right={<Chevron color={C.muted} />} last />
-        </View>
+        </GlassBox>
 
         {/* ── Çıkış: tehlikeli işlem en altta ── */}
         <SectionLabel color={C.danger}>
           {(t.logout || "Çıkış Yap").toUpperCase()}
         </SectionLabel>
-        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+        <GlassBox role="card" style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <SettingRow
             colors={C}
             iconBg={C.dangerDim}
@@ -1088,7 +1090,7 @@ export default function SettingsScreen() {
             onPress={() => setModalVisibleLogout(true)}
             right={<Chevron color={C.danger} />}
           />
-        </View>
+        </GlassBox>
 
         <BottomSheetModal
           visible={providerModalVisible}
@@ -1125,7 +1127,7 @@ export default function SettingsScreen() {
               <Text allowFontScaling={false} style={[s.providerHelp, { color: C.muted }]}>
                 {i18nText("autoI18n.platform_uyelikleri_aciklama", "Üyesi olduğun servisleri seç. Film ve dizi ana ekranlarında sana özel bir alan oluşturulur.")}
               </Text>
-              <View
+              <GlassBox role="field"
                 style={[
                   s.providerSearchBox,
                   { backgroundColor: C.cardAlt, borderColor: C.border },
@@ -1148,7 +1150,7 @@ export default function SettingsScreen() {
                     <AppIcon name="close-circle" size={17} color={C.muted} />
                   </TouchableOpacity>
                 )}
-              </View>
+              </GlassBox>
               <View style={s.providerListMeta}>
                 <Text style={[s.providerListMetaText, { color: C.muted }]}>
                   {i18nText("autoI18n.n_platform", "{{count}} platform", {
@@ -1230,7 +1232,7 @@ export default function SettingsScreen() {
                   }}
                 />
               )}
-              <TouchableOpacity
+              <GlassTouchable
                 activeOpacity={0.8}
                 onPress={() => {
                   setProviderModalVisible(false);
@@ -1241,7 +1243,7 @@ export default function SettingsScreen() {
                 <Text style={s.providerDoneText}>
                   {i18nText("autoI18n.tamam", "Tamam")}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
               <Text allowFontScaling={false} style={[s.providerAttribution, { color: C.muted }]}>
                 {t.justwatchAttribution}
               </Text>
@@ -1317,7 +1319,7 @@ export default function SettingsScreen() {
                   />
                 </View>
 
-                <View
+                <GlassBox role="field"
                   style={[
                     s.searchBox,
                     { borderColor: C.border, backgroundColor: C.cardAlt },
@@ -1340,7 +1342,7 @@ export default function SettingsScreen() {
                       <AppIcon name="close-circle" size={16} color={C.muted} />
                     </TouchableOpacity>
                   )}
-                </View>
+                </GlassBox>
 
                 <FlatList
                   data={filteredLanguages}

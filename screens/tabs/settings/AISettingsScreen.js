@@ -32,6 +32,7 @@ import {
 } from "@utils/aiPrefs";
 import { ONBOARDING_GENRES } from "@utils/onboardingPreferences";
 import { SettingsSubScreen, SectionLabel, SettingRow, Chevron, buildUiColors, ui } from "./settingsUi";
+import GlassBox from "../../../components/common/GlassBox";
 
 const LIST_KEYS = ["watchList", "favorites", "custom", "watched"];
 
@@ -184,7 +185,7 @@ export default function AISettingsScreen() {
   return (
     <SettingsSubScreen title={text.title}>
       {/* ── Tanıtım ── */}
-      <View style={[s.hero, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[s.hero, { backgroundColor: C.card, borderColor: C.border }]}>
         <View style={[s.heroIcon, { backgroundColor: C.accentDim }]}>
           <AppIcon family="Ionicons" name="sparkles-outline" size={26} color={C.accent} />
         </View>
@@ -196,8 +197,8 @@ export default function AISettingsScreen() {
             {text.heroText}
           </Text>
         </View>
-      </View>
-      <View style={[ui.card, s.usageCard, { backgroundColor: C.card, borderColor: C.border }]}>
+      </GlassBox>
+      <GlassBox role="card" style={[ui.card, s.usageCard, { backgroundColor: C.card, borderColor: C.border }]}>
         <SettingRow
           colors={C}
           iconBg={C.iconPurple}
@@ -208,11 +209,11 @@ export default function AISettingsScreen() {
           right={<Chevron color={C.muted} />}
           last
         />
-      </View>
+      </GlassBox>
 
       {/* ── Kişiselleştirme ── */}
       <SectionLabel color={C.muted}>{upper(text.sectionPersonal)}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         {switchRow({
           key: "enabled",
           icon: "library-outline",
@@ -263,11 +264,11 @@ export default function AISettingsScreen() {
           hint: text.followUpsHint,
           last: true,
         })}
-      </View>
+      </GlassBox>
 
       {/* ── Keşif filtreleri ── */}
       <SectionLabel color={C.muted}>{upper(text.sectionFilters)}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         <Block C={C} title={text.mediaType}>
           <ChoiceWrap
             options={mediaOptions}
@@ -318,11 +319,11 @@ export default function AISettingsScreen() {
             last
           />
         ) : null}
-      </View>
+      </GlassBox>
 
       {/* ── Cevap stili ── */}
       <SectionLabel color={C.muted}>{upper(text.sectionStyle)}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         <Block C={C} title={text.styleLength} hint={text.styleLengthHint}>
           <SegmentedChoice
             options={styleOptions}
@@ -347,11 +348,11 @@ export default function AISettingsScreen() {
             theme={theme}
           />
         </Block>
-      </View>
+      </GlassBox>
 
       {/* ── Sohbet geçmişi ── */}
       <SectionLabel color={C.muted}>{upper(text.sectionHistory)}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         <Block
           C={C}
           title={text.historyLimit}
@@ -379,11 +380,11 @@ export default function AISettingsScreen() {
           right={<Chevron color={C.muted} />}
           last
         />
-      </View>
+      </GlassBox>
 
       {/* ── Sıfırla ── */}
       <SectionLabel color={C.muted}>{upper(text.sectionReset)}</SectionLabel>
-      <View style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         <SettingRow
           colors={C}
           iconBg={C.iconAmber}
@@ -395,7 +396,7 @@ export default function AISettingsScreen() {
           right={<Chevron color={C.muted} />}
           last
         />
-      </View>
+      </GlassBox>
 
       <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
         {text.footnote}

@@ -20,6 +20,8 @@ import { usePremiumGate } from "@hooks/usePremiumGate";
 import { createSharedList, addSharedListMembers } from "@services/sharedListsService";
 import UserAvatar from "../common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 
 // Ortak liste oluşturma / mevcut ortak listeye üye ekleme sayfası (bottom sheet).
 //
@@ -178,7 +180,7 @@ export default function CreateSharedListModal({
         </View>
 
         {sel ? (
-          <TouchableOpacity
+          <GlassTouchable
             activeOpacity={0.8}
             onPress={() => toggleCanAdd(item.uid)}
             style={[
@@ -212,7 +214,7 @@ export default function CreateSharedListModal({
                 ? i18nText("autoI18n.ekleyebilir", "Ekleyebilir")
                 : i18nText("autoI18n.sadece_gorur", "Sadece görür")}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         ) : null}
 
         <Ionicons
@@ -258,7 +260,7 @@ export default function CreateSharedListModal({
 
           {/* Liste adı (yalnız oluşturma modu) */}
           {!isAddMode && (
-            <View
+            <GlassBox role="field"
               style={[
                 styles.inputWrap,
                 { backgroundColor: theme.primary, borderColor: theme.border },
@@ -273,7 +275,7 @@ export default function CreateSharedListModal({
                 onChangeText={setName}
                 maxLength={40}
               />
-            </View>
+            </GlassBox>
           )}
 
           {/* Arkadaş seçimi */}
@@ -313,7 +315,7 @@ export default function CreateSharedListModal({
           )}
 
           {/* Onay */}
-          <TouchableOpacity
+          <GlassTouchable
             activeOpacity={0.85}
             onPress={handleSubmit}
             disabled={saving}
@@ -332,7 +334,7 @@ export default function CreateSharedListModal({
                 ? i18nText("autoI18n.uyeleri_ekle", "Üyeleri Ekle")
                 : i18nText("autoI18n.listeyi_olustur", "Listeyi Oluştur")}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
     </BottomSheetModal>
   );
 }

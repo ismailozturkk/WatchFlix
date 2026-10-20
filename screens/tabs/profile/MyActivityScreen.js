@@ -22,7 +22,6 @@ import {
   ScrollView,
   Dimensions,
   Modal,
-  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -65,6 +64,8 @@ import { alpha } from "../../../theme/colors";
 import BackButton from "@components/BackButton";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../../../components/common/GlassTouchable";
+import GlassTextInput from "../../../components/common/GlassTextInput";
 // ─── Tarih yardımcıları ──────────────────────────────────────────────────────
 const toMs = (v) => {
   if (!v) return 0;
@@ -575,7 +576,7 @@ export default function MyActivityScreen({ navigation, route }) {
           const active = tab === tb.key;
           const color = tabColor(tb.key, theme);
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={tb.key}
               onPress={() => setTab(tb.key)}
               activeOpacity={0.85}
@@ -614,7 +615,7 @@ export default function MyActivityScreen({ navigation, route }) {
                   </Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
       </ScrollView>
@@ -693,7 +694,7 @@ export default function MyActivityScreen({ navigation, route }) {
                 {editText.length}/500
               </Text>
             </View>
-            <TextInput
+            <GlassTextInput
               value={editText}
               onChangeText={setEditText}
               maxLength={500}
@@ -707,7 +708,7 @@ export default function MyActivityScreen({ navigation, route }) {
               ]}
             />
             <View style={st.editActions}>
-              <TouchableOpacity
+              <GlassTouchable
                 onPress={() => setEditing(null)}
                 disabled={saving}
                 activeOpacity={0.85}
@@ -716,7 +717,7 @@ export default function MyActivityScreen({ navigation, route }) {
                 <Text style={[st.editBtnText, { color: theme.text.secondary }]}>
                   {i18nText("autoI18n.vazgec", "Vazgeç")}
                 </Text>
-              </TouchableOpacity>
+              </GlassTouchable>
               <TouchableOpacity
                 onPress={saveEdit}
                 disabled={saving}
@@ -976,7 +977,7 @@ function PostMini({ theme, type, poll, posters = [], title, content, userRating,
             </Text>
           </View>
           {onRemove ? (
-            <TouchableOpacity
+            <GlassTouchable
               onPress={onRemove}
               activeOpacity={0.8}
               hitSlop={8}
@@ -986,7 +987,7 @@ function PostMini({ theme, type, poll, posters = [], title, content, userRating,
               <Text style={[st.removePillText, { color: theme.text.secondary }]}>
                 {i18nText("autoI18n.kaldir", "Kaldır")}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           ) : null}
         </View>
       ) : likes != null || comments != null ? (

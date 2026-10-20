@@ -95,6 +95,8 @@ import {
   toStoryBadge,
   toggleStoryKind,
 } from "../../utils/profileStoryCard";
+import GlassPressable from "../common/GlassPressable";
+import GlassBox from "../common/GlassBox";
 
 const TABS = [
   { id: "layout", icon: "grid-outline", label: () => i18nText("autoI18n.profil_story_sekme_duzen", "Düzen") },
@@ -172,7 +174,7 @@ const Segmented = memo(function Segmented({ theme, items, value, onChange }) {
       {items.map((item) => {
         const active = item.id === value;
         return (
-          <Pressable
+          <GlassPressable
             key={item.id}
             onPress={() => onChange(item.id)}
             accessibilityRole="button"
@@ -186,7 +188,7 @@ const Segmented = memo(function Segmented({ theme, items, value, onChange }) {
             >
               {item.label()}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>
@@ -201,7 +203,7 @@ const MultiSegmented = memo(function MultiSegmented({ theme, items, selected, on
       {items.map((item) => {
         const active = selected.includes(item.id);
         return (
-          <Pressable
+          <GlassPressable
             key={item.id}
             onPress={() => onToggle(item.id)}
             accessibilityRole="button"
@@ -219,7 +221,7 @@ const MultiSegmented = memo(function MultiSegmented({ theme, items, selected, on
             >
               {item.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>
@@ -337,7 +339,7 @@ function LayoutThumb({ id, color }) {
 const LayoutCard = memo(function LayoutCard({ theme, item, active, disabled, onPress }) {
   const color = active ? theme.accent : theme.text.muted;
   return (
-    <Pressable
+    <GlassPressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active, disabled: !!disabled }}
@@ -358,7 +360,7 @@ const LayoutCard = memo(function LayoutCard({ theme, item, active, disabled, onP
       >
         {item.label()}
       </Text>
-    </Pressable>
+    </GlassPressable>
   );
 });
 
@@ -403,7 +405,7 @@ const Swatch = memo(function Swatch({ theme, item, accent, ringColors, active, o
 // ("Henüz dört favorin yok"). Pasifken DEĞER değiştirmek çağıranın sorumluluğu.
 const ToggleChip = memo(function ToggleChip({ theme, item, on, disabled, onPress }) {
   return (
-    <Pressable
+    <GlassPressable
       onPress={onPress}
       accessibilityRole="switch"
       accessibilityState={{ checked: on, disabled }}
@@ -429,7 +431,7 @@ const ToggleChip = memo(function ToggleChip({ theme, item, on, disabled, onPress
       >
         {item.label()}
       </Text>
-    </Pressable>
+    </GlassPressable>
   );
 });
 
@@ -917,7 +919,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
       </Pressable>
 
       {/* Not: sekmelerin dışında; yazarken önizleme küçülür, bu alan görünür kalır. */}
-      <View style={[styles.noteBox, { backgroundColor: theme.secondary, borderColor: alpha(theme.border, 0.8) }]}>
+      <GlassBox role="field" style={[styles.noteBox, { backgroundColor: theme.secondary, borderColor: alpha(theme.border, 0.8) }]}>
         <AppIcon family="Ionicons" name="chatbox-ellipses-outline" size={17} color={theme.text.muted} />
         <TextInput
           value={noteDraft}
@@ -934,14 +936,14 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
             <AppIcon family="Ionicons" name="close-circle" size={18} color={theme.text.muted} />
           </Pressable>
         ) : null}
-      </View>
+      </GlassBox>
 
       {/* Sekmeler */}
       <View style={[styles.tabs, hide]}>
         {TABS.map((item) => {
           const active = tab === item.id;
           return (
-            <Pressable
+            <GlassPressable
               key={item.id}
               onPress={() => {
                 triggerHaptic("selection");
@@ -965,7 +967,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
               >
                 {item.label()}
               </Text>
-            </Pressable>
+            </GlassPressable>
           );
         })}
       </View>
@@ -1064,7 +1066,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
 
       {/* Eylemler */}
       <View style={[styles.actions, hide]}>
-        <Pressable
+        <GlassPressable
           onPress={() => run("save")}
           disabled={!!busy || !ready}
           accessibilityRole="button"
@@ -1079,9 +1081,9 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
           ) : (
             <AppIcon family="Ionicons" name="download-outline" size={22} color={theme.text.primary} />
           )}
-        </Pressable>
+        </GlassPressable>
 
-        <Pressable
+        <GlassPressable
           onPress={() => run("share")}
           disabled={!!busy || !ready}
           accessibilityRole="button"
@@ -1101,7 +1103,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
               </Text>
             </>
           )}
-        </Pressable>
+        </GlassPressable>
       </View>
     </View>
   );

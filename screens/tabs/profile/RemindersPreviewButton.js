@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   useWindowDimensions,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -26,6 +25,7 @@ import { useImageQualitySettings, useListLayoutSettings } from "../../../context
 import { i18nText } from "../../../utils/i18nText";
 import GlassIconButton from "../../../components/common/GlassIconButton";
 import { parseAirDate, startOfDay } from "../../../utils/airDate";
+import GlassTouchable from "../../../components/common/GlassTouchable";
 
 
 const H_MARGIN = 16;
@@ -317,7 +317,7 @@ export default function RemindersPreviewButton({ navigation }) {
         >
           {label}
         </Text>
-        <TouchableOpacity
+        <GlassTouchable
           activeOpacity={0.85}
           onPress={() => navigation.navigate("RemindersScreen")}
           style={[
@@ -346,7 +346,7 @@ export default function RemindersPreviewButton({ navigation }) {
             style={[styles.emptySub, { color: theme.text.muted }]}
           >{i18nText("autoI18n.henuz_hatirlatma_yok", "Henüz hatırlatma yok")}</Text>
           <Ionicons name="chevron-forward" size={20} color={theme.text.muted} />
-        </TouchableOpacity>
+        </GlassTouchable>
       </View>
     );
   }
@@ -603,7 +603,7 @@ export default function RemindersPreviewButton({ navigation }) {
           </View>
           <View style={styles.paginationSide}>
             {start !== 0 && (
-              <TouchableOpacity
+              <GlassTouchable
                 accessibilityRole="button"
                 accessibilityLabel={i18nText("autoI18n.basa_don", "Başa dön")}
                 activeOpacity={0.72}
@@ -617,7 +617,7 @@ export default function RemindersPreviewButton({ navigation }) {
                 ]}
               >
                 <Ionicons name="return-up-back" size={14} color={theme.accent} />
-              </TouchableOpacity>
+              </GlassTouchable>
             )}
           </View>
         </View>

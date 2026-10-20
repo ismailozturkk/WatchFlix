@@ -7,12 +7,13 @@
 //   • Hata kartı sorunu ve çıkış yollarını (yeniden kod gir / Hub) birlikte verir.
 //   • Son oyun sonucu aynı kartın içinde, formun altında durur.
 import React, { useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import AppIcon from "../AppIcon";
 import CineEmptyState from "./CineEmptyState";
 import PressableScale from "./PressableScale";
 import { alpha } from "../../theme/colors";
 import { sanitizeRoomCode } from "../../services/cineswipe/deckModel";
+import GlassTextInput from "../common/GlassTextInput";
 
 export default function CineDuoLobby({
   copy,
@@ -92,7 +93,7 @@ export default function CineDuoLobby({
       </View>
 
       <View style={styles.joinRow}>
-        <TextInput
+        <GlassTextInput
           ref={inputRef}
           style={[
             styles.input,

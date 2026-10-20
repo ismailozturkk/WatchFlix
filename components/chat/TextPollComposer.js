@@ -15,6 +15,9 @@ import SheetScroll from "@components/common/SheetScroll";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { alpha } from "../../theme/colors";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassTextInput from "../common/GlassTextInput";
+import GlassBox from "../common/GlassBox";
 
 const MAX_OPTS = 6;
 
@@ -119,7 +122,7 @@ export default function TextPollComposer({
 
           <SheetScroll>
           {/* Soru */}
-          <TextInput
+          <GlassTextInput
             ref={questionInputRef}
             value={question}
             onChangeText={setQuestion}
@@ -143,7 +146,7 @@ export default function TextPollComposer({
             {i18nText("autoI18n.secenekler", "Seçenekler")}
           </Text>
           {options.map((opt, i) => (
-            <View
+            <GlassBox role="field"
               key={i}
               style={[
                 styles.optRow,
@@ -170,7 +173,7 @@ export default function TextPollComposer({
                   <Ionicons name="close-circle" size={18} color={theme.text.muted} />
                 </TouchableOpacity>
               )}
-            </View>
+            </GlassBox>
           ))}
 
           {options.length < MAX_OPTS && (
@@ -183,7 +186,7 @@ export default function TextPollComposer({
           )}
           </SheetScroll>
 
-          <TouchableOpacity
+          <GlassTouchable
             onPress={create}
             disabled={!canCreate}
             activeOpacity={0.85}
@@ -196,7 +199,7 @@ export default function TextPollComposer({
             <Text style={styles.createBtnText}>
               {i18nText("autoI18n.anketi_olustur", "Anketi Oluştur")}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         </View>
       </Reanimated.View>
     </BottomSheetModal>

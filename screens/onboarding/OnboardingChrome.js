@@ -7,7 +7,7 @@
 // Üst gradyan kaydırılan içeriğin başlığın altından geçerken karışmasını önler.
 
 import React, { useEffect, useMemo, useRef } from "react";
-import { Animated, Dimensions, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Dimensions, Easing, Image, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import GlassIconButton from "../../components/common/GlassIconButton";
@@ -16,6 +16,7 @@ import {
   AuthPrimaryButton,
 } from "../../components/auth/AuthKit";
 import { alpha } from "../../theme/colors";
+import GlassPressable from "../../components/common/GlassPressable";
 
 const { width } = Dimensions.get("window");
 const SIDE = 20;
@@ -95,7 +96,7 @@ export function OnboardingHeader({
 
         <View style={styles.headerActions} pointerEvents="box-none">
           {showSkip && (
-            <Pressable
+            <GlassPressable
               accessibilityRole="button"
               onPress={onSkip}
               hitSlop={8}
@@ -105,9 +106,9 @@ export function OnboardingHeader({
                 {copy.skip}
               </Text>
               <Ionicons name="play-forward" size={11} color={theme.text.muted} />
-            </Pressable>
+            </GlassPressable>
           )}
-          <Pressable
+          <GlassPressable
             accessibilityRole="button"
             accessibilityLabel={copy.language}
             onPress={onToggleLanguage}
@@ -118,7 +119,7 @@ export function OnboardingHeader({
             <Text maxFontSizeMultiplier={1.15} style={[styles.chipText, { color: theme.text.primary }]}>
               {(language || "tr").toUpperCase()}
             </Text>
-          </Pressable>
+          </GlassPressable>
         </View>
       </View>
 

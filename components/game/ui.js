@@ -14,6 +14,7 @@ import Animated, {
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import { alpha } from "../../theme/colors";
+import useGlassChrome from "../common/useGlassChrome";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const SPRING = { mass: 0.4, damping: 14, stiffness: 220 };
@@ -22,12 +23,21 @@ const SPRING = { mass: 0.4, damping: 14, stiffness: 220 };
  * Basınca yayla küçülen Pressable. `style` dizi/nesne olabilir (fonksiyon
  * DEĞİL). Dokunma geri bildirimi tüm oyun yüzeylerinde aynı olsun diye tek yer.
  */
-export function PressableScale({ children, style, scaleTo = 0.97, onPressIn, onPressOut, ...rest }) {
+export function PressableScale({ children, style, scaleTo = 0.97, glass = true, onLayout, onPressIn, onPressOut, ...rest }) {
   const scale = useSharedValue(1);
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  // iOS 26+: kendi dolgu/çerçeve/köşe stili Liquid Glass'a devredilir (cam yoksa eski görünüm).
+  const chrome = useGlassChrome(style, {
+    role: "button",
+    enabled: glass,
+    interactive: true,
+    catchTouches: true,
+    onLayout,
+  });
   return (
     <AnimatedPressable
       {...rest}
+      onLayout={chrome ? chrome.onLayout : onLayout}
       onPressIn={(event) => {
         scale.value = withSpring(scaleTo, SPRING);
         onPressIn?.(event);
@@ -36,9 +46,9 @@ export function PressableScale({ children, style, scaleTo = 0.97, onPressIn, onP
         scale.value = withSpring(1, SPRING);
         onPressOut?.(event);
       }}
-      style={[style, animated]}
+      style={[chrome ? chrome.style : style, animated]}
     >
-      {children}
+      {chrome ? chrome.wrap(children) : children}
     </AnimatedPressable>
   );
 }

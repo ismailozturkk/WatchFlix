@@ -46,6 +46,7 @@ import YearlyGoalRing from "./YearlyGoalRing";
 import YearlyGoalTrackCard from "./YearlyGoalTrackCard";
 import { paceVisualOf, TRACK_VISUAL } from "./yearlyGoalTheme";
 import { describeYearClock, fillCopy, formatPercent, getYearlyGoalCopy } from "./yearlyGoalCopy";
+import GlassPressable from "../common/GlassPressable";
 
 const GOLD = "#FBBF24";
 
@@ -271,7 +272,7 @@ function YearlyGoalSheet({ visible, onClose, year, now, goal, counts, suggestion
             {copy.sheet.saveFailed}
           </Text>
         ) : null}
-        <Pressable
+        <GlassPressable
           testID="yearly-goal-save"
           accessibilityRole="button"
           accessibilityState={{ disabled: !canSave }}
@@ -284,7 +285,7 @@ function YearlyGoalSheet({ visible, onClose, year, now, goal, counts, suggestion
         >
           {/* Vurgu rengi üstündeki yazı BEYAZ (tema stüdyosu kuralı). */}
           <Text style={styles.saveText}>{copy.sheet.save}</Text>
-        </Pressable>
+        </GlassPressable>
         {goal ? (
           <Pressable
             testID="yearly-goal-remove"

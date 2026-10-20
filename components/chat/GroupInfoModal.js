@@ -35,6 +35,7 @@ import GroupAvatar from "@components/chat/GroupAvatar";
 import GroupAvatarGrid from "@components/chat/GroupAvatarGrid";
 import { appAlert } from "@components/AppAlert";
 import UserAvatar from "@components/common/UserAvatar";
+import GlassTouchable from "../common/GlassTouchable";
 
 const ACCENT = "#6C63FF";
 const DANGER = "#FF6B6B";
@@ -521,7 +522,7 @@ export default function GroupInfoModal({
               { backgroundColor: theme.primary || "rgba(0,0,0,0.18)" },
             ]}
           >
-            <TouchableOpacity
+            <GlassTouchable
               onPress={() => setTab("members")}
               style={[
                 styles.tab,
@@ -546,10 +547,10 @@ export default function GroupInfoModal({
               >
                 {i18nText("autoI18n.uyeler", "Üyeler")}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
             {canManage && (
               <>
-                <TouchableOpacity
+                <GlassTouchable
                   onPress={() => setTab("add")}
                   style={[
                     styles.tab,
@@ -574,8 +575,8 @@ export default function GroupInfoModal({
                   >
                     {i18nText("autoI18n.kisi_ekle", "Kişi ekle")}
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </GlassTouchable>
+                <GlassTouchable
                   onPress={() => setTab("avatar")}
                   style={[
                     styles.tab,
@@ -604,7 +605,7 @@ export default function GroupInfoModal({
                   >
                     {i18nText("autoI18n.avatar", "Avatar")}
                   </Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               </>
             )}
           </View>

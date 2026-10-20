@@ -13,8 +13,6 @@ import {
   ActivityIndicator,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { Image } from "expo-image";
@@ -45,6 +43,8 @@ import {
 import { buildGenreMap } from "@utils/genreLabels";
 import { fetchMediaFactsBatch } from "@services/tmdbFacts";
 import { saveSharedListToProfile } from "@services/listItemsService";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassTextInput from "../common/GlassTextInput";
 
 const PREVIEW_COUNT = 5;
 
@@ -240,7 +240,7 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
           <Text style={[styles.label, { color: theme.text.muted }]}>
             {i18nText("autoI18n.liste_adi_baslik", "LİSTE ADI")}
           </Text>
-          <TextInput
+          <GlassTextInput
             value={name}
             onChangeText={setName}
             maxLength={MAX_LIST_NAME_LENGTH}
@@ -302,7 +302,7 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
           )}
           </SheetScroll>
 
-          <TouchableOpacity
+          <GlassTouchable
             disabled={!canSave || saving}
             onPress={handleSave}
             activeOpacity={0.85}
@@ -322,7 +322,7 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
             <Text style={styles.saveText}>
               {i18nText("autoI18n.profilime_ekle", "Profilime ekle")}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
     </BottomSheetModal>
   );
 }

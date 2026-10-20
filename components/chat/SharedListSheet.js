@@ -16,7 +16,6 @@
 import React, { memo, useState } from "react";
 import {
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -33,6 +32,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { shareListTitle } from "./SharedListMessage";
 import { PosterEdge } from "./shareKit";
+import GlassPressable from "../common/GlassPressable";
 
 // Bu sayı ve üzeri içerikte sayfa sabit yükseklik yerine ekranı kaplar
 // (FriendProfileScreen ile aynı eşik).
@@ -169,7 +169,7 @@ export default function SharedListSheet({
             {[3, 4].map((count) => {
               const active = columns === count;
               return (
-                <Pressable
+                <GlassPressable
                   key={count}
                   onPress={() => setColumns(count)}
                   accessibilityRole="button"
@@ -190,7 +190,7 @@ export default function SharedListSheet({
                   >
                     {count}
                   </Text>
-                </Pressable>
+                </GlassPressable>
               );
             })}
           </View>

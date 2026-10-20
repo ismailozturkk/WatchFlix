@@ -62,6 +62,7 @@ import {
   iosFamilyFor,
   widgetCapabilities,
 } from "./widgets/widgetPlatform";
+import GlassPressable from "../../../components/common/GlassPressable";
 
 const PLATFORM = Platform.OS === "ios" ? "ios" : "android";
 
@@ -653,7 +654,7 @@ export default function WidgetSettingsScreen() {
             <HowToCard colors={C} platform={PLATFORM} />
 
             <View style={styles.resetRow}>
-              <Pressable
+              <GlassPressable
                 accessibilityRole="button"
                 android_ripple={{ color: alpha(C.accent, 0.15) }}
                 onPress={resetActive}
@@ -670,7 +671,7 @@ export default function WidgetSettingsScreen() {
                 >
                   {i18nText("autoI18n.widget_reset_one", "Bu widget’ı sıfırla")}
                 </Text>
-              </Pressable>
+              </GlassPressable>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setConfirmReset(true)}

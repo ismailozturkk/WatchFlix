@@ -40,6 +40,8 @@ import ImportHelpModal from "./ImportHelpModal";
 import Toast from "@components/AppToast";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 const { height: SCREEN_H } = Dimensions.get("window");
 const SHEET_MAX_H = SCREEN_H * 0.88;
 
@@ -495,17 +497,17 @@ export default function ImportDataModal({ visible, onClose }) {
                   <Text style={[styles.stepDesc, { color: theme.text.secondary }]}>
                     İndirilen ZIP dosyasını veya CSV'leri seçin. İzlenenler, puanlar, incelemeler ve izleme listesi mevcut kayıtlar korunarak birleştirilir.
                   </Text>
-                  <TouchableOpacity
+                  <GlassTouchable
                     onPress={() => setShowHelpModal(true)}
                     style={[styles.helpTrigger, { backgroundColor: alpha(theme.accent, 0.12), borderColor: alpha(theme.accent, 0.28) }]}
                   >
                     <AppIcon family="Ionicons" name="help-circle-outline" size={14} color={theme.accent} />
                     <Text style={[styles.helpTriggerText, { color: theme.accent }]}>Nasıl Alınır?</Text>
-                  </TouchableOpacity>
+                  </GlassTouchable>
                 </View>
 
                 {/* Primary Action: Pick ZIP or CSV */}
-                <TouchableOpacity
+                <GlassTouchable
                   style={[styles.filePickBtn, { backgroundColor: theme.accent || "#138DF0" }]}
                   onPress={handlePickDocument}
                   activeOpacity={0.85}
@@ -519,7 +521,7 @@ export default function ImportDataModal({ visible, onClose }) {
                       <Text style={styles.filePickBtnText}>Letterboxd ZIP veya CSV Seç</Text>
                     </>
                   )}
-                </TouchableOpacity>
+                </GlassTouchable>
 
                 {/* Folder Info Hint */}
                 <View style={[styles.infoBanner, { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.5), borderColor: alpha(theme.border || "#444", 0.3) }]}>
@@ -535,7 +537,7 @@ export default function ImportDataModal({ visible, onClose }) {
                   <View style={[styles.orLine, { backgroundColor: theme.border || "#333" }]} />
                 </View>
 
-                <View style={[styles.inputBox, { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.4), borderColor: alpha(theme.border || "#444", 0.4) }]}>
+                <GlassBox role="field" style={[styles.inputBox, { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.4), borderColor: alpha(theme.border || "#444", 0.4) }]}>
                   <TextInput
                     style={[styles.textInput, { color: theme.text.primary }]}
                     placeholder="CSV metnini buraya yapıştırın..."
@@ -546,7 +548,7 @@ export default function ImportDataModal({ visible, onClose }) {
                     onChangeText={setCsvText}
                   />
 
-                  <TouchableOpacity
+                  <GlassTouchable
                     onPress={handlePasteFromClipboard}
                     style={[styles.pasteBtn, { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.8) }]}
                   >
@@ -554,16 +556,16 @@ export default function ImportDataModal({ visible, onClose }) {
                     <Text style={[styles.pasteBtnText, { color: theme.accent || "#138DF0" }]}>
                       Panodan Yapıştır
                     </Text>
-                  </TouchableOpacity>
-                </View>
+                  </GlassTouchable>
+                </GlassBox>
 
                 {csvText.trim().length > 0 && (
-                  <TouchableOpacity
+                  <GlassTouchable
                     style={[styles.parseBtn, { backgroundColor: alpha(theme.accent, 0.2), borderColor: theme.accent }]}
                     onPress={() => handleParseText(csvText, "Yapıştırılan Metin")}
                   >
                     <Text style={[styles.parseBtnText, { color: theme.accent }]}>Verileri Ayrıştır & Önizle</Text>
-                  </TouchableOpacity>
+                  </GlassTouchable>
                 )}
               </View>
             )}
@@ -582,7 +584,7 @@ export default function ImportDataModal({ visible, onClose }) {
                     </View>
 
                     {parsedData.stats.listsCount > 0 && (
-                      <TouchableOpacity
+                      <GlassTouchable
                         style={[
                           styles.customListsToggle,
                           includeCustomLists && { borderColor: theme.accent, backgroundColor: alpha(theme.accent, 0.1) },
@@ -603,13 +605,13 @@ export default function ImportDataModal({ visible, onClose }) {
                           </View>
                         </View>
                         <AppIcon family="Ionicons" name={includeCustomLists ? "checkbox" : "square-outline"} size={20} color={includeCustomLists ? theme.accent : theme.text.muted} />
-                      </TouchableOpacity>
+                      </GlassTouchable>
                     )}
 
                     {/* Stats Grid */}
                     <View style={styles.bundleStatsGrid}>
                       {/* Watched Toggle Card */}
-                      <TouchableOpacity
+                      <GlassTouchable
                         style={[
                           styles.bundleStatCard,
                           includeWatched && { borderColor: theme.accent, backgroundColor: alpha(theme.accent, 0.1) },
@@ -635,10 +637,10 @@ export default function ImportDataModal({ visible, onClose }) {
                         <Text style={[styles.bundleStatLabel, { color: theme.text.secondary }]}>
                           İzlenen Filmler
                         </Text>
-                      </TouchableOpacity>
+                      </GlassTouchable>
 
                       {/* Watchlist Toggle Card */}
-                      <TouchableOpacity
+                      <GlassTouchable
                         style={[
                           styles.bundleStatCard,
                           includeWatchlist && { borderColor: theme.accent, backgroundColor: alpha(theme.accent, 0.1) },
@@ -664,7 +666,7 @@ export default function ImportDataModal({ visible, onClose }) {
                         <Text style={[styles.bundleStatLabel, { color: theme.text.secondary }]}>
                           İzleme Listesi
                         </Text>
-                      </TouchableOpacity>
+                      </GlassTouchable>
                     </View>
 
                     {/* Extra Badges Row */}
@@ -744,7 +746,7 @@ export default function ImportDataModal({ visible, onClose }) {
                         { key: "watchList", label: "İzleme Listesi", icon: "bookmark-outline" },
                         { key: "favorites", label: "Favoriler", icon: "heart-outline" },
                       ].map((tgt) => (
-                        <TouchableOpacity
+                        <GlassTouchable
                           key={tgt.key}
                           style={[
                             styles.targetBtn,
@@ -772,7 +774,7 @@ export default function ImportDataModal({ visible, onClose }) {
                           >
                             {tgt.label}
                           </Text>
-                        </TouchableOpacity>
+                        </GlassTouchable>
                       ))}
                     </View>
 
@@ -793,14 +795,14 @@ export default function ImportDataModal({ visible, onClose }) {
                 )}
 
                 <View style={styles.actionBtnRow}>
-                  <TouchableOpacity
+                  <GlassTouchable
                     style={[styles.backStepBtn, { backgroundColor: alpha(theme.secondary || "#333", 0.8) }]}
                     onPress={() => setStep("input")}
                   >
                     <Text style={[styles.backStepText, { color: theme.text.primary }]}>Geri Dön</Text>
-                  </TouchableOpacity>
+                  </GlassTouchable>
 
-                  <TouchableOpacity
+                  <GlassTouchable
                     style={[
                       styles.importBtn,
                       { backgroundColor: theme.accent || "#138DF0" },
@@ -812,7 +814,7 @@ export default function ImportDataModal({ visible, onClose }) {
                     <Text style={styles.importBtnText}>
                       Aktarımı Başlat ({totalItemsToImport})
                     </Text>
-                  </TouchableOpacity>
+                  </GlassTouchable>
                 </View>
               </View>
             )}
@@ -862,12 +864,12 @@ export default function ImportDataModal({ visible, onClose }) {
                   {importStats.unmatchedCount > 0 && `\n⚠️ ${importStats.unmatchedCount} içerik TMDB ile eşleşmediği için atlandı.`}
                 </Text>
 
-                <TouchableOpacity
+                <GlassTouchable
                   style={[styles.doneBtn, { backgroundColor: theme.accent || "#138DF0" }]}
                   onPress={onClose}
                 >
                   <Text style={styles.doneBtnText}>Tamam</Text>
-                </TouchableOpacity>
+                </GlassTouchable>
               </View>
             )}
           </ScrollView>

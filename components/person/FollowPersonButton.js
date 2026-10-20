@@ -9,7 +9,7 @@
 // SINIR: en fazla MAX_FOLLOWED kişi (utils/followedPeople.js). Dolunca takip EDİLMEZ, toast nedenini
 // söyler. Plan kapısı YOK (açık soru 2: ücretsiz kalsın — docs/planlama/GELISTIRME_ONERI_ADAYLARI).
 import React, { memo, useCallback } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { toast } from "../AppToast";
 import { useTheme } from "../../context/ThemeContext";
@@ -19,6 +19,7 @@ import { trackEvent, ANALYTICS_EVENTS } from "../../services/analytics";
 import { triggerHaptic } from "../../services/hapticsService";
 import { MAX_FOLLOWED } from "../../utils/followedPeople";
 import { getFollowedPeopleCopy } from "../../utils/followedPeopleCopy";
+import GlassPressable from "../common/GlassPressable";
 
 function FollowPersonButton({ person, source = "profile", style }) {
   const { theme } = useTheme();
@@ -58,7 +59,7 @@ function FollowPersonButton({ person, source = "profile", style }) {
   if (!personId || !name) return null;
 
   return (
-    <Pressable
+    <GlassPressable
       onPress={onPress}
       hitSlop={8}
       accessibilityRole="button"
@@ -78,7 +79,7 @@ function FollowPersonButton({ person, source = "profile", style }) {
       <Text style={styles.label} numberOfLines={1}>
         {following ? copy.button.following : copy.button.follow}
       </Text>
-    </Pressable>
+    </GlassPressable>
   );
 }
 

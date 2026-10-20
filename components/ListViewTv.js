@@ -31,6 +31,7 @@ import {
 
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import GlassTouchable from "./common/GlassTouchable";
 /* ─── Küçük buton sarmalayıcı ─────────────────── */
 const ActionButton = ({
   onPress,
@@ -83,7 +84,7 @@ const GridCard = ({
   theme,
   onPress,
 }) => (
-  <TouchableOpacity
+  <GlassTouchable
     style={[
       styles.gridCard,
       {
@@ -130,7 +131,7 @@ const GridCard = ({
         {item}
       </Text>
     </Animated.View>
-  </TouchableOpacity>
+  </GlassTouchable>
 );
 
 /* ─── Ana bileşen ───────────────────────────────── */

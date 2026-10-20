@@ -13,6 +13,8 @@ import AppIcon from "@components/AppIcon";
 import { contrastRatio, isLightSurface, shiftLightness } from "@utils/colorUtils";
 import { alpha } from "../../theme/colors";
 import { fillCopy } from "./themeStudioCopy";
+import GlassTouchable from "../common/GlassTouchable";
+import GlassPressable from "../common/GlassPressable";
 
 /** Verilen zemin üzerinde okunur yazı rengi (WCAG eşiğinde siyah/beyaz). */
 export const inkOn = (color) => (isLightSurface(color) ? "#0B0D12" : "#FFFFFF");
@@ -211,7 +213,7 @@ export const HarmonyRow = memo(function HarmonyRow({ items, selected, onPick, th
       {items.map((item) => {
         const active = sel === item.hex.toUpperCase();
         return (
-          <TouchableOpacity
+          <GlassTouchable
             key={item.id}
             accessibilityRole="button"
             accessibilityLabel={`${item.label} ${item.hex}`}
@@ -230,7 +232,7 @@ export const HarmonyRow = memo(function HarmonyRow({ items, selected, onPick, th
             <Text style={[styles.harmonyLabel, { color: active ? theme.text.primary : theme.text.secondary }]} numberOfLines={1}>
               {item.label}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         );
       })}
     </ScrollView>
@@ -245,7 +247,7 @@ export const Segmented = memo(function Segmented({ options, value, onChange, the
       {options.map((opt) => {
         const active = opt.key === value;
         return (
-          <Pressable
+          <GlassPressable
             key={opt.key}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
@@ -255,7 +257,7 @@ export const Segmented = memo(function Segmented({ options, value, onChange, the
             <Text style={[styles.segText, dense && styles.segTextDense, { color: active ? "#FFFFFF" : theme.text.secondary }]} numberOfLines={1}>
               {opt.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>
@@ -267,7 +269,7 @@ export const Segmented = memo(function Segmented({ options, value, onChange, the
 export const GhostButton = memo(function GhostButton({ icon, label, onPress, theme, disabled, tone }) {
   const color = tone || theme.text.secondary;
   return (
-    <TouchableOpacity
+    <GlassTouchable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
@@ -278,7 +280,7 @@ export const GhostButton = memo(function GhostButton({ icon, label, onPress, the
     >
       <AppIcon family="Ionicons" name={icon} size={16} color={color} />
       <Text style={[styles.ghostText, { color }]} numberOfLines={1}>{label}</Text>
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 });
 
@@ -308,7 +310,7 @@ export const ReadabilityPill = memo(function ReadabilityPill({ analysis, copy, o
   const tone = levelTone(theme, analysis.level);
   const levelText = { great: copy.levelGreat, ok: copy.levelOk, low: copy.levelLow, fail: copy.levelFail }[analysis.level];
   return (
-    <TouchableOpacity
+    <GlassTouchable
       accessibilityRole="button"
       accessibilityState={{ expanded: open }}
       accessibilityLabel={`${copy.readability}: ${levelText}`}
@@ -329,7 +331,7 @@ export const ReadabilityPill = memo(function ReadabilityPill({ analysis, copy, o
         </Text>
       )}
       <AppIcon family="Ionicons" name={open ? "chevron-up" : "chevron-down"} size={14} color={theme.text.muted} />
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 });
 
@@ -367,7 +369,7 @@ export const ReadabilityPanel = memo(function ReadabilityPanel({ analysis, copy,
         );
       })}
       {analysis.issues > 0 ? (
-        <TouchableOpacity
+        <GlassTouchable
           accessibilityRole="button"
           activeOpacity={0.85}
           onPress={onFix}
@@ -375,7 +377,7 @@ export const ReadabilityPanel = memo(function ReadabilityPanel({ analysis, copy,
         >
           <AppIcon family="Ionicons" name="color-wand" size={16} color="#FFFFFF" />
           <Text style={styles.fixText}>{copy.fixReadability}</Text>
-        </TouchableOpacity>
+        </GlassTouchable>
       ) : (
         <View style={styles.okNote}>
           <AppIcon family="Ionicons" name="checkmark-done" size={15} color={theme.colors.green} />

@@ -66,6 +66,7 @@ import {
   deleteComment,
   toggleCommentLike,
 } from "@services/postsService";
+import GlassTouchable from "../common/GlassTouchable";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
@@ -216,7 +217,7 @@ const CommentItem = memo(function CommentItem({
         </View>
 
         <View style={styles.threadActionsRow}>
-          <TouchableOpacity onPress={onLikePress} style={styles.actionButton}>
+          <GlassTouchable onPress={onLikePress} style={styles.actionButton}>
             <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
               <MaterialCommunityIcons
                 name={isLiked ? "heart" : "heart-outline"}
@@ -232,10 +233,10 @@ const CommentItem = memo(function CommentItem({
                 {likeCount}
               </Text>
             )}
-          </TouchableOpacity>
+          </GlassTouchable>
 
           {!isReply && (
-            <TouchableOpacity onPress={() => onReply(item)} style={styles.actionButton}>
+            <GlassTouchable onPress={() => onReply(item)} style={styles.actionButton}>
               <Ionicons
                 name="chatbubble-outline"
                 size={18}
@@ -244,12 +245,12 @@ const CommentItem = memo(function CommentItem({
               {replyCount > 0 && (
                 <Text allowFontScaling={false} style={styles.actionLabel}>{replyCount}</Text>
               )}
-            </TouchableOpacity>
+            </GlassTouchable>
           )}
         </View>
 
         {!isReply && replyCount > 0 && (
-          <TouchableOpacity
+          <GlassTouchable
             onPress={() => onToggleReplies(item.id)}
             style={styles.repliesToggle}
           >
@@ -261,7 +262,7 @@ const CommentItem = memo(function CommentItem({
                     count: replyCount,
                   })}
             </Text>
-          </TouchableOpacity>
+          </GlassTouchable>
         )}
       </View>
     </View>

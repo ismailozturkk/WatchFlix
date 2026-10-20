@@ -36,6 +36,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { i18nText } from "../../utils/i18nText";
 import { Keys, get, set } from "../../services/storage";
 import ScreenToastHost from "@components/toast/ScreenToastHost";
+import GlassTouchable from "../../components/common/GlassTouchable";
 
 
 const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
@@ -53,7 +54,7 @@ const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
   }, [viewMode, onToggle]);
 
   return (
-    <TouchableOpacity
+    <GlassTouchable
       onPress={toggle}
       activeOpacity={0.7}
       accessibilityRole="button"
@@ -82,7 +83,7 @@ const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
           color={theme.accent ?? theme.text?.primary ?? "#fff"}
         />
       </Animated.View>
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 });
 

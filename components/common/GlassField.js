@@ -26,21 +26,23 @@
 // çocuklar `style`ın verdiği düzende normal akışta durur, camın şekline
 // kırpılmaz, dokunuşlar katmana takılmaz.
 //
-// Form alanları (kayıt, profil düzenleme) BİLEREK bu kabuğu kullanmaz: sınır
-// netliği veri girişinde erişilebilirlik için önemlidir ve orada cam yerine
-// çerçeveli düz alan daha okunaklıdır. Cam, içerik üstünde yüzen alanlar
-// (arama, mesaj yazma) içindir.
+// Bu kabuk yüzen arama / mesaj alanları içindir (sabit hap, odakta vurgu tonu).
+// Form ve sayfa içi yazı alanları (sayfalar, ayarlar, listeler…) aynı camı
+// `GlassBox role="field"` / `GlassTextInput` ile alır: onlar alanın ESKİ
+// stilini (köşe, boyut, çok satır) korur, yalnız dolgu/çerçeve camlaşır; durum
+// bildiren renkli çerçeve (odak, hata) cam üstünde de çizilir.
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import GlassSurface from "./GlassSurface";
+import { GlassNestContext } from "./useGlassChrome";
 import { useTheme } from "../../context/ThemeContext";
 import { useLiquidGlass } from "../../services/liquidGlass";
 import { alpha } from "../../theme/colors";
+import { GLASS_FIELD_FOCUS_TINT_ALPHA, GLASS_FIELD_TINT_ALPHA } from "../../utils/glassChrome";
 
-/** Camın dinlenme tonunun opaklığı (tema yüzeyi): alanı düz sayfadan ayırır. */
-export const GLASS_FIELD_TINT_ALPHA = 0.55;
-/** Odaktayken vurgu tonunun opaklığı. */
-export const GLASS_FIELD_FOCUS_TINT_ALPHA = 0.22;
+// Camın dinlenme tonunun opaklığı (tema yüzeyi: alanı düz sayfadan ayırır) ve
+// odaktayken vurgu tonunun opaklığı utils/glassChrome'da durur (GlassBox da kullanır).
+export { GLASS_FIELD_FOCUS_TINT_ALPHA, GLASS_FIELD_TINT_ALPHA };
 
 /**
  * @param {number}  [props.height=46]     Cam yolunda SABİT yükseklik (hap = height/2)
@@ -81,7 +83,8 @@ export default function GlassField({
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <GlassSurface radius={radius} tint={tint} style={StyleSheet.absoluteFill} />
       </View>
-      {children}
+      {/* İçerideki GlassTouchable/GlassBox camlaşmaz: cam camı örnekleyemez. */}
+      <GlassNestContext.Provider value>{children}</GlassNestContext.Provider>
     </View>
   );
 }

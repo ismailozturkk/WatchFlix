@@ -19,7 +19,6 @@ import {
   FlatList,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -36,6 +35,7 @@ import { setListMembership } from "@services/libraryActions";
 import { todayListDate } from "@utils/mediaFacts";
 import { i18nText } from "@utils/i18nText";
 import { showLibraryError } from "@utils/libraryErrorText";
+import GlassTouchable from "../common/GlassTouchable";
 
 const GridCard = memo(function GridCard({ label, active, onPress, theme }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -51,7 +51,7 @@ const GridCard = memo(function GridCard({ label, active, onPress, theme }) {
     onPress();
   };
   return (
-    <TouchableOpacity
+    <GlassTouchable
       activeOpacity={1}
       onPress={handlePress}
       style={[
@@ -86,7 +86,7 @@ const GridCard = memo(function GridCard({ label, active, onPress, theme }) {
           {label}
         </Text>
       </Animated.View>
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 });
 
@@ -253,7 +253,7 @@ export default function OtherListsPickerModal({
           />
           <View style={[styles.separator, { backgroundColor: theme.border, marginTop: 12, marginBottom: 12 }]} />
           <View style={styles.sheetActions}>
-            <TouchableOpacity
+            <GlassTouchable
               style={[styles.actionBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
               onPress={onClose}
             >
@@ -261,8 +261,8 @@ export default function OtherListsPickerModal({
               <Text allowFontScaling={false} style={[styles.actionBtnText, { color: theme.text.muted }]}>
                 {i18nText("autoI18n.kapat", "Kapat")}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </GlassTouchable>
+            <GlassTouchable
               style={[styles.actionBtn, { backgroundColor: theme.accent }]}
               onPress={goToLists}
             >
@@ -270,7 +270,7 @@ export default function OtherListsPickerModal({
               <Text allowFontScaling={false} style={[styles.actionBtnText, { color: "#fff" }]}>
                 {i18nText("autoI18n.tum_listeler", "Tüm Listeler")}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
         </>
       ) : (
@@ -289,7 +289,7 @@ export default function OtherListsPickerModal({
           </Text>
           <View style={[styles.separator, { backgroundColor: theme.border, marginBottom: 4 }]} />
           <View style={styles.sheetActions}>
-            <TouchableOpacity
+            <GlassTouchable
               style={[styles.actionBtn, { backgroundColor: theme.primary, borderColor: theme.border }]}
               onPress={onClose}
             >
@@ -297,8 +297,8 @@ export default function OtherListsPickerModal({
               <Text allowFontScaling={false} style={[styles.actionBtnText, { color: theme.text.muted }]}>
                 {t.cancel || i18nText("autoI18n.iptal", "İptal")}
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </GlassTouchable>
+            <GlassTouchable
               style={[styles.actionBtn, { backgroundColor: theme.accent }]}
               onPress={goToLists}
             >
@@ -306,7 +306,7 @@ export default function OtherListsPickerModal({
               <Text allowFontScaling={false} style={[styles.actionBtnText, { color: "#fff" }]}>
                 {i18nText("autoI18n.liste_olustur", "Liste Oluştur")}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           </View>
         </View>
       )}

@@ -27,6 +27,7 @@ import { alpha } from "@theme/colors";
 import { readableTextOn } from "@utils/colorUtils";
 import { collapseChips, nextSort, radiusKeyOf } from "@utils/listSortFilter";
 import { fillSortFilterCopy } from "@utils/listSortFilterCopy";
+import GlassPressable from "../common/GlassPressable";
 
 const COLUMN_KEYS = [3, 4];
 const RADIUS_KEYS = [2, 10, 20];
@@ -46,7 +47,7 @@ function Segment({ options, value, onChange, theme, accent, testID }) {
       {options.map((option) => {
         const selected = option.key === value;
         return (
-          <Pressable
+          <GlassPressable
             key={String(option.key)}
             testID={testID ? `${testID}-${option.key}` : undefined}
             accessibilityRole="button"
@@ -72,7 +73,7 @@ function Segment({ options, value, onChange, theme, accent, testID }) {
             >
               {option.label}
             </Text>
-          </Pressable>
+          </GlassPressable>
         );
       })}
     </View>
@@ -82,7 +83,7 @@ function Segment({ options, value, onChange, theme, accent, testID }) {
 function Chip({ label, selected, onPress, theme, accent, testID, icon, trailing }) {
   const onAccent = readableTextOn(accent);
   return (
-    <Pressable
+    <GlassPressable
       testID={testID}
       accessibilityRole="button"
       accessibilityState={{ selected }}
@@ -104,7 +105,7 @@ function Chip({ label, selected, onPress, theme, accent, testID, icon, trailing 
         {label}
       </Text>
       {trailing}
-    </Pressable>
+    </GlassPressable>
   );
 }
 
@@ -129,7 +130,7 @@ function MultiChips({ section, theme, accent }) {
         />
       ))}
       {hiddenCount > 0 || (expanded && section.options.length > 8) ? (
-        <Pressable
+        <GlassPressable
           testID={`sort-filter-${section.id}-more`}
           accessibilityRole="button"
           onPress={() => setExpanded((current) => !current)}
@@ -139,7 +140,7 @@ function MultiChips({ section, theme, accent }) {
             {expanded ? section.lessLabel : fillSortFilterCopy(section.moreLabel, hiddenCount)}
           </Text>
           <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={14} color={accent} />
-        </Pressable>
+        </GlassPressable>
       ) : null}
     </View>
   );
@@ -191,7 +192,7 @@ function ListSortFilterSheet({
             {fillSortFilterCopy(copy.results, resultCount)}
           </Text>
         </View>
-        <Pressable
+        <GlassPressable
           testID="sort-filter-reset"
           accessibilityRole="button"
           disabled={activeCount === 0}
@@ -206,7 +207,7 @@ function ListSortFilterSheet({
             {copy.reset}
             {activeCount > 0 ? ` · ${activeCount}` : ""}
           </Text>
-        </Pressable>
+        </GlassPressable>
         <GlassCloseButton size={34} fallbackRadius={11} onPress={onClose} accessibilityLabel={copy.close} />
       </View>
 
@@ -344,7 +345,7 @@ function ListSortFilterSheet({
         </View>
       </SheetScroll>
 
-      <Pressable
+      <GlassPressable
         testID="sort-filter-apply"
         accessibilityRole="button"
         onPress={onClose}
@@ -357,7 +358,7 @@ function ListSortFilterSheet({
             {fillSortFilterCopy(copy.showResults, resultCount)}
           </Text>
         )}
-      </Pressable>
+      </GlassPressable>
     </BottomSheetModal>
   );
 }

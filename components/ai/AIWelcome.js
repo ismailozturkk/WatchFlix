@@ -24,6 +24,7 @@ import {
   normalizeVibe,
 } from "../../services/aiCineInsights";
 import { ChoiceWrap } from "./AIChips";
+import GlassTouchable from "../common/GlassTouchable";
 
 const MOOD_ICONS = {
   cozy: "cafe-outline",
@@ -102,7 +103,7 @@ const VibePicker = memo(({ theme, copy, onSubmit }) => {
         theme={theme}
       />
 
-      <TouchableOpacity
+      <GlassTouchable
         activeOpacity={0.85}
         disabled={!ready}
         onPress={() => onSubmit(normalizeVibe(vibe))}
@@ -110,7 +111,7 @@ const VibePicker = memo(({ theme, copy, onSubmit }) => {
       >
         <Ionicons name="sparkles" size={16} color="#fff" />
         <Text style={s.ctaText}>{ready ? copy.vibe.cta : copy.vibe.pickOne}</Text>
-      </TouchableOpacity>
+      </GlassTouchable>
     </View>
   );
 });
@@ -154,7 +155,7 @@ function AIWelcome({
       </LinearGradient>
 
       {filterSummary ? (
-        <TouchableOpacity
+        <GlassTouchable
           activeOpacity={0.82}
           onPress={onOpenFilters}
           style={[s.activeFilters, { backgroundColor: alpha(theme.accent, 0.12), borderColor: alpha(theme.accent, 0.35) }]}
@@ -164,7 +165,7 @@ function AIWelcome({
             {filterSummary}
           </Text>
           <Ionicons name="chevron-forward" size={15} color={theme.bold} />
-        </TouchableOpacity>
+        </GlassTouchable>
       ) : null}
 
       <VibePicker theme={theme} copy={copy} onSubmit={onVibe} />
@@ -173,7 +174,7 @@ function AIWelcome({
         {tabs.map((tab) => {
           const active = activeTab === tab;
           return (
-            <TouchableOpacity
+            <GlassTouchable
               key={tab}
               onPress={() => onTabChange(tab)}
               style={[
@@ -190,14 +191,14 @@ function AIWelcome({
               <Text numberOfLines={2} style={[s.tabHint, { color: theme.text.muted }]}>
                 {t?.AICineChat?.tabHints?.[tab] || ""}
               </Text>
-            </TouchableOpacity>
+            </GlassTouchable>
           );
         })}
       </View>
 
       <View style={s.chipWrap}>
         {chips.map((chip, i) => (
-          <TouchableOpacity
+          <GlassTouchable
             key={`${chip.label}-${i}`}
             activeOpacity={0.8}
             onPress={() => onSendChip(chip.prompt)}
@@ -208,7 +209,7 @@ function AIWelcome({
             </View>
             <Text style={[s.promptChipText, { color: theme.text.primary }]}>{chip.label}</Text>
             <Ionicons name="arrow-forward" size={16} color={theme.text.muted} />
-          </TouchableOpacity>
+          </GlassTouchable>
         ))}
       </View>
     </View>
