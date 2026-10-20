@@ -861,12 +861,12 @@ export async function saveSharedListToProfile(uid, name, items, meta = {}) {
     // field-path ayracı sayar, "S.W.A.T. Favorilerim" iç içe map'e dönüşür ve
     // liste hiç görünmezdi. tx.set data anahtarlarını literal işler.
     tx.set(ref, { [finalName]: items.map(normalizeItem) }, { merge: true });
-    // Arkadaş profilinde kullanıcı açıkça paylaşmayı seçene kadar
-    // kopyalanan liste kapalı kalır. Nested map, noktalı liste adını da
-    // literal anahtar olarak korur.
+    // Her yeni liste gibi kopyalanan liste de varsayılan olarak AÇIK doğar;
+    // gizlemek kullanıcının seçimi (ListsViewScreen / ListManageSheet).
+    // Nested map, noktalı liste adını da literal anahtar olarak korur.
     tx.set(
       doc(db, "Users", uid),
-      { listVisible: { [finalName]: false } },
+      { listVisible: { [finalName]: true } },
       { merge: true },
     );
   });
