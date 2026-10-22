@@ -1,7 +1,6 @@
 import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AppIcon from "@components/AppIcon";
 import { GlowBackdrop } from "@components/game/ui";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
@@ -64,30 +63,6 @@ export function GameScreenShell({
   );
 }
 
-export function GameNavCard({ icon, title, description, onPress, accent, disabled = false, trailing }) {
-  const { theme } = useTheme();
-  const color = accent || theme.accent;
-  return (
-    <TouchableOpacity
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      activeOpacity={0.8}
-      disabled={disabled}
-      onPress={onPress}
-      style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border, opacity: disabled ? 0.5 : 1 }]}
-    >
-      <View style={[styles.cardIcon, { backgroundColor: `${color}20` }]}>
-        <AppIcon family="Ionicons" name={icon} size={23} color={color} />
-      </View>
-      <View style={styles.cardCopy}>
-        <Text style={[styles.cardTitle, { color: theme.text.primary }]}>{title}</Text>
-        {description ? <Text style={[styles.cardDescription, { color: theme.text.muted }]}>{description}</Text> : null}
-      </View>
-      {trailing || <AppIcon family="Ionicons" name="chevron-forward" size={19} color={theme.text.muted} />}
-    </TouchableOpacity>
-  );
-}
-
 export const gameSharedStyles = StyleSheet.create({
   sectionTitle: { fontSize: 13, fontWeight: "800", letterSpacing: 0.7, marginBottom: 10, marginTop: 10, textTransform: "uppercase" },
   primaryButton: { minHeight: 52, borderRadius: 16, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 9, paddingHorizontal: 20 },
@@ -110,9 +85,4 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, gap: 12 },
   contentFill: { flex: 1 },
   footer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, borderTopWidth: StyleSheet.hairlineWidth },
-  card: { minHeight: 76, borderRadius: 18, borderWidth: 1, padding: 13, flexDirection: "row", alignItems: "center", gap: 12 },
-  cardIcon: { width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  cardCopy: { flex: 1 },
-  cardTitle: { fontSize: 15, fontWeight: "850" },
-  cardDescription: { fontSize: 12, lineHeight: 17, fontWeight: "600", marginTop: 3 },
 });

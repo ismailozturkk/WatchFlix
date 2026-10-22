@@ -3,7 +3,7 @@
 // Hub'daki vitrin kartlarının (Paylaşımlar, CineSwipe, Turnuva) ortak kabuğu ve
 // küçük yapı taşları. Amaç: üç kart farklı renkte olsa da aynı dili konuşsun —
 // aynı köşe yuvarlaklığı, aynı gölge, aynı cam çip, aynı "beyaz eylem" düğmesi
-// (Oyunlar modülündeki GameTile/DailyChallengeCard ile de uyumlu).
+// (Oyunlar modülündeki oyun ızgarası/DailyChallengeCard ile de uyumlu).
 //
 //   • HubCard   — gölge + gradyan + iki ışık küresi. `onPress` verilirse kartın
 //                 tamamı yayla küçülen bir düğme olur; verilmezse düz kabuktur

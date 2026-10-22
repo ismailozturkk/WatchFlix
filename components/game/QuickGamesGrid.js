@@ -6,6 +6,11 @@
 //
 // Premium kapısı YOK ve modülün kilit şeridinden bağımsızdır (Sahne Tahmin kilitliyken de oynanır): oyunlar yerel,
 // sunucu maliyeti yok, deneme kapısı olarak çalışır. Kilitlemek istenirse `onOpen`i modülün `guarded`ına sar.
+//
+// `leadingTiles`: Eğlence modülü Sahne Tahmin + Poster Bulmaca'yı da AYNI ızgaranın başına koyar (tek oyun
+// listesi; eskiden iki büyük kart + ayrı "Hızlı oyunlar" bölümüydü). Her öğe { id, icon, colors, title, best,
+// locked } taşır; kilitliyse rekor yerine "Premium" yazar. Dokunuşta yine `onOpen(id)`.
+// `title={null}`: ızgara kendi başlığını çizmez (modülün "Oyunlar" başlığı yeter).
 
 import React, { memo, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -21,11 +26,12 @@ import { QUICK_GAME_IDS, QUICK_GAME_META, normalizeQuickStats } from "@utils/qui
 import { getQuickCopy } from "@utils/quickGamesCopy";
 
 const GOLD = "#FFD76A";
+const EMPTY = [];
 
 /** "Önce hangisi?" bu ailenin ilk üyesi; kendi rotası ve kayıt anahtarı var. */
 const OLDER_TILE = { id: "older", icon: "swap-horizontal", colors: ["#6366F1", "#4338CA"] };
 
-function QuickGamesGrid({ theme, onOpen }) {
+function QuickGamesGrid({ theme, onOpen, leadingTiles = EMPTY, title }) {
   const { language } = useLanguage();
   const { user } = useAuth() || {};
   const uid = user?.uid || null;
@@ -42,6 +48,7 @@ function QuickGamesGrid({ theme, onOpen }) {
   }, [olderRaw, quickRaw]);
 
   const tiles = [
+    ...leadingTiles,
     { ...OLDER_TILE, title: copy.title },
     ...QUICK_GAME_IDS.map((id) => ({
       id,
@@ -51,12 +58,14 @@ function QuickGamesGrid({ theme, onOpen }) {
     })),
   ];
 
+  const heading = title === undefined ? quick.gridTitle : title;
+
   return (
     <View style={styles.wrap}>
-      <SectionHeader title={quick.gridTitle} theme={theme} style={styles.header} />
+      {heading ? <SectionHeader title={heading} theme={theme} style={styles.header} /> : null}
       <View style={styles.grid}>
         {tiles.map((tile, index) => {
-          const best = bests[tile.id] || 0;
+          const best = tile.best ?? bests[tile.id] ?? 0;
           const last = index === tiles.length - 1 && tiles.length % 2 === 1;
           return (
             <PressableScale
@@ -76,9 +85,14 @@ function QuickGamesGrid({ theme, onOpen }) {
                   {tile.title}
                 </Text>
                 <View style={styles.meta}>
-                  <AppIcon family="Ionicons" name={best > 0 ? "trophy" : "sparkles"} size={12} color={best > 0 ? GOLD : "#FFFFFF"} />
+                  <AppIcon
+                    family="Ionicons"
+                    name={tile.locked ? "diamond" : best > 0 ? "trophy" : "sparkles"}
+                    size={12}
+                    color={!tile.locked && best > 0 ? GOLD : "#FFFFFF"}
+                  />
                   <Text style={styles.metaText} numberOfLines={1} allowFontScaling={false}>
-                    {best > 0 ? copy.cardBest(best) : copy.cardNew}
+                    {tile.locked ? "Premium" : best > 0 ? copy.cardBest(best) : copy.cardNew}
                   </Text>
                 </View>
               </LinearGradient>

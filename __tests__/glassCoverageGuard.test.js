@@ -151,7 +151,7 @@ describe("Liquid Glass kapsamı — örnek yüzeyler (geri alınmasın)", () => 
     ["screens/tabs/settings/AboutAppScreen.js", "card"],
     ["components/friends/TasteMatchCard.js", "card"],
     ["components/profile/WatchLevelCard.js", "card"],
-    ["screens/game/GameStatsScreen.js", "card"],
+    ["screens/game/GameHubScreen.js", "card"],
   ];
   test.each(SAMPLE)("%s → %s", (rel, kind) => {
     expect(read(rel)).toMatch(WRAPPER[kind]);

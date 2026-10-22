@@ -72,7 +72,7 @@ const COVERED = [
   ["components/storyShare/ProfileStoryModal.js", CLOSE],
   ["screens/tabs/SettingsScreen.js", CLOSE],
   ["screens/tabs/settings/OpenSourceLicensesScreen.js", CLOSE],
-  ["screens/game/SceneGameDetailScreen.js", CLOSE],
+  ["components/game/GameSetupSheet.js", CLOSE],
   ["screens/tournament/TournamentScreen.js", CLOSE],
   ["screens/cineswipe/CineSwipeScreen.js", CLOSE],
   // Oscar / Emmy yıl seçici: iki ekranın ham Modal'ı ortak alt sayfaya (AwardYearSheet) taşındı.

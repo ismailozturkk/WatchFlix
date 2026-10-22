@@ -7,6 +7,8 @@ import { POSTER_GAME_ID, SCENE_GAME_ID } from "./gameConfig";
 //   scene_guess   → TMDB sahne kareleri
 //   poster_puzzle → bulanik/ortulu afis, sure ilerledikce acilir
 // `accentColors`: tema anahtari ("accent"/"bold") ya da sabit hex.
+// Iki oyun da ayri ekrana gitmez: Eglence'deki karo kurulum alt sayfasini acar
+// (components/game/GameSetupSheet.js), oradan dogrudan SceneGamePlayScreen.
 export const GAME_REGISTRY = [
   {
     id: SCENE_GAME_ID,
@@ -15,7 +17,6 @@ export const GAME_REGISTRY = [
     icon: { family: "Ionicons", name: "film-outline" },
     artwork: { type: "gradient", icon: "scan-outline" },
     accentColors: ["accent", "bold"],
-    routeName: "SceneGameDetailScreen",
     availability: "available",
   },
   {
@@ -25,7 +26,6 @@ export const GAME_REGISTRY = [
     icon: { family: "Ionicons", name: "grid-outline" },
     artwork: { type: "gradient", icon: "image-outline" },
     accentColors: ["#F59E0B", "#E4572E"],
-    routeName: "SceneGameDetailScreen",
     availability: "available",
   },
 ];

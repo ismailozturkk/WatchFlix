@@ -98,7 +98,10 @@ export default function SceneGuessGameScreen({ navigation, route }) {
   // (yeni model — eski allLists kök-array yerine).
   const { combinedLists: allLists } = useListStatusContext();
 
-  const routeSourceId = route?.params?.sourceId;
+  // Kaynaksız açılış (eski SceneGuessGameScreen rotası) Popüler havuzla başlar;
+  // eskiden ayrı kurulum ekranına devrediliyordu, o ekran artık yok (kurulum
+  // Eğlence'deki alt sayfada: components/game/GameSetupSheet.js).
+  const routeSourceId = route?.params?.sourceId || "popular";
   const routeGameId = route?.params?.gameId || SCENE_GAME_ID;
   const routeModeId = route?.params?.modeId || DEFAULT_MODE_ID;
   const routeDifficultyId = route?.params?.difficultyId || DEFAULT_DIFFICULTY_ID;
@@ -170,8 +173,6 @@ export default function SceneGuessGameScreen({ navigation, route }) {
   const openedResultSessionRef = useRef(null);
   // Bilerek çıkarken (kaydedip geri dön / sonuca geç) beforeRemove engellemesin.
   const allowLeaveRef = useRef(false);
-  // Eski rota davranışı: kaynaksız açılan (SceneGuessGameScreen) giriş kuruluma gider.
-  const legacyEntryRef = useRef(!routeSourceId);
 
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -189,17 +190,6 @@ export default function SceneGuessGameScreen({ navigation, route }) {
     );
     return () => { active = false; sub?.remove?.(); };
   }, []);
-
-  // Kaynak verilmeden açıldıysa (eski rota) kurulum ekranına devret.
-  useEffect(() => {
-    if (!legacyEntryRef.current) return;
-    allowLeaveRef.current = true;
-    navigation.replace("SceneGameSetupScreen", {
-      gameId: routeGameId,
-      modeId: routeModeId,
-      difficultyId: routeDifficultyId,
-    });
-  }, [navigation, routeDifficultyId, routeGameId, routeModeId]);
 
   useEffect(() => {
     if (!routeSourceId || autoStartRef.current) return;

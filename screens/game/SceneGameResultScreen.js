@@ -7,6 +7,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { captureRef } from "react-native-view-shot";
 import AppIcon from "@components/AppIcon";
 import { toast } from "@components/AppToast";
+import GameSetupSheet from "@components/game/GameSetupSheet";
 import SceneResultShareCard from "@components/game/SceneResultShareCard";
 import UserAvatar from "@components/common/UserAvatar";
 import { PressableScale } from "@components/game/ui";
@@ -16,6 +17,7 @@ import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { fetchDailyFriendRows } from "@services/sceneGameService";
 import { buildTmdbUrl } from "@utils/tmdbImageUtils";
+import { i18nText } from "@utils/i18nText";
 import { alpha } from "../../theme/colors";
 import { GameScreenShell, gameSharedStyles } from "./GameScreenShell";
 import {
@@ -72,6 +74,8 @@ export default function SceneGameResultScreen({ navigation, route }) {
   const [reviewExpanded, setReviewExpanded] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [dailyBoard, setDailyBoard] = useState(null);
+  // "Mod Seçimi": kurulum alt sayfası burada açılır (ayrı kurulum ekranı yok).
+  const [setupVisible, setSetupVisible] = useState(false);
   const shareCardRef = useRef(null);
   const tr = copyLanguage(language, ["tr", "en"]) === "tr";
   const es = normalizeAppLanguage(language) === "es";
@@ -129,17 +133,19 @@ export default function SceneGameResultScreen({ navigation, route }) {
     [isDaily, dailyKey, totalQuestions, result?.score, result?.totalCorrect],
   );
 
-  const leaveResult = (routeName, params) => {
+  // Yeni oyun bu ekranın YERİNE açılır; geri dönüş yine oyunun açıldığı yere.
+  const replayWith = (params) => {
     deleteGameSessionResult(sessionId);
-    if (routeName === "SceneGamePlayScreen") {
-      navigation.replace(routeName, params);
-      return;
-    }
-    if (typeof navigation.popTo === "function") {
-      navigation.popTo(routeName, params);
-      return;
-    }
-    navigation.navigate(routeName, params);
+    navigation.replace("SceneGamePlayScreen", params);
+  };
+  // Sonuç, oyunun yerine geçtiği için geri = oyunun açıldığı yer (Eğlence
+  // sekmesi, liderlik tablosu, sohbetteki düello kartı…). Eskiden burası Oyun
+  // Merkezi'ne "popTo" yapıyordu: Eğlence'den gelen oyuncu hiç açmadığı bir
+  // ekrana düşüyordu.
+  const closeResult = () => {
+    deleteGameSessionResult(sessionId);
+    if (navigation.canGoBack?.()) navigation.goBack();
+    else navigation.navigate("TabScreen");
   };
 
   // Cevap incelemesinden bir yapima gidis: oturum sonucu silinmez, kullanici
@@ -186,8 +192,8 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <View style={styles.missing}>
           <AppIcon family="Ionicons" name="alert-circle-outline" size={42} color={theme.text.muted} />
           <Text style={[styles.missingText, { color: theme.text.secondary }]}>{tr ? "Bu oturumun sonucu artık kullanılamıyor." : es ? "El resultado de esta sesión ya no está disponible." : pt ? "O resultado desta sessão não está mais disponível." : de ? "Das Ergebnis dieser Sitzung ist nicht mehr verfügbar." : "This session result is no longer available."}</Text>
-          <GlassTouchable style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent, alignSelf: "stretch", marginHorizontal: 24 }]} onPress={() => navigation.navigate("GameHubScreen")}>
-            <Text style={gameSharedStyles.primaryButtonText}>{tr ? "Oyun Merkezine Dön" : es ? "Volver al centro de juegos" : pt ? "Voltar à central de jogos" : de ? "Zurück zum Spielzentrum" : "Back to Game Hub"}</Text>
+          <GlassTouchable style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent, alignSelf: "stretch", marginHorizontal: 24 }]} onPress={closeResult}>
+            <Text style={gameSharedStyles.primaryButtonText}>{i18nText("autoI18n.kapat", "Kapat")}</Text>
           </GlassTouchable>
         </View>
       </GameScreenShell>
@@ -207,7 +213,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
   const myRank = dailyBoard ? dailyBoard.findIndex((row) => row.uid === user?.uid) + 1 : 0;
 
   return (
-    <GameScreenShell navigation={navigation} onBack={() => leaveResult("GameHubScreen")} title={tr ? "Oyun Sonucu" : es ? "Resultado de la partida" : pt ? "Resultado da partida" : de ? "Spielergebnis" : "Game Result"} subtitle={`${modeLabel} · ${outcomeLabel}`}>
+    <GameScreenShell navigation={navigation} onBack={closeResult} title={tr ? "Oyun Sonucu" : es ? "Resultado de la partida" : pt ? "Resultado da partida" : de ? "Spielergebnis" : "Game Result"} subtitle={`${modeLabel} · ${outcomeLabel}`}>
       {/* Hero skor */}
       <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.scoreHero}>
         <View pointerEvents="none" style={styles.heroGlowOne} />
@@ -389,7 +395,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
       ) : (
         <PressableScale
           accessibilityRole="button"
-          onPress={() => leaveResult("SceneGamePlayScreen", { gameId: result.gameId, modeId: result.modeId, difficultyId: result.difficultyId, sourceId: result.sourceId })}
+          onPress={() => replayWith({ gameId: result.gameId, modeId: result.modeId, difficultyId: result.difficultyId, sourceId: result.sourceId })}
           style={styles.primaryWrap}
         >
           <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryGradient}>
@@ -401,7 +407,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
 
       <View style={styles.actionRow}>
         {!isDaily ? (
-          <SecondaryAction icon="options-outline" label={tr ? "Mod Seçimi" : es ? "Elegir modo" : pt ? "Escolher modo" : de ? "Moduseinrichtung" : "Mode Setup"} theme={theme} onPress={() => leaveResult("SceneGameSetupScreen", { gameId: result.gameId, modeId: result.modeId, difficultyId: result.difficultyId, sourceId: result.sourceId })} />
+          <SecondaryAction icon="options-outline" label={tr ? "Mod Seçimi" : es ? "Elegir modo" : pt ? "Escolher modo" : de ? "Moduseinrichtung" : "Mode Setup"} theme={theme} onPress={() => setSetupVisible(true)} />
         ) : null}
         <SecondaryAction icon="trophy-outline" label={tr ? "Liderlik" : es ? "Clasificación" : pt ? "Ranking" : de ? "Bestenliste" : "Leaderboard"} theme={theme} onPress={() => navigation.navigate("GameLeaderboardScreen", { gameId: result.gameId })} />
         <SecondaryAction icon={sharing ? null : "share-social-outline"} label={tr ? "Paylaş" : es ? "Compartir" : pt ? "Compartilhar" : de ? "Teilen" : "Share"} theme={theme} loading={sharing} onPress={handleShare} />
@@ -410,9 +416,19 @@ export default function SceneGameResultScreen({ navigation, route }) {
       {/* Günlük: sonucu bir arkadaşa düello olarak gönder (aynı 10 sahne, skorlar yan yana). */}
       {isDaily && duelPayload ? <DuelSendButton payload={duelPayload} theme={theme} source="result" /> : null}
 
-      <GlassTouchable style={[styles.ghostButton, { borderColor: theme.border }]} onPress={() => leaveResult("GameHubScreen")}>
-        <Text style={[styles.ghostText, { color: theme.text.secondary }]}>{tr ? "Oyun Merkezine Dön" : es ? "Volver al centro de juegos" : pt ? "Voltar à central de jogos" : de ? "Zurück zum Spielzentrum" : "Back to Game Hub"}</Text>
+      <GlassTouchable style={[styles.ghostButton, { borderColor: theme.border }]} onPress={closeResult}>
+        <Text style={[styles.ghostText, { color: theme.text.secondary }]}>{i18nText("autoI18n.kapat", "Kapat")}</Text>
       </GlassTouchable>
+
+      {!isDaily ? (
+        <GameSetupSheet
+          visible={setupVisible}
+          gameId={result.gameId}
+          initial={{ modeId: result.modeId, difficultyId: result.difficultyId, sourceId: result.sourceId }}
+          onClose={() => setSetupVisible(false)}
+          onStart={replayWith}
+        />
+      ) : null}
 
       {/* Gizli paylasim karti (captureRef hedefi) — spoiler gorsel icermez */}
       <View style={styles.captureHost} pointerEvents="none">

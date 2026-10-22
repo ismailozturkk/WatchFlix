@@ -1,24 +1,30 @@
 // components/profile/ProfileGamesModule.js
 //
-// Hub sekmesindeki "Oyunlar" modülü (dosya adı, profilden taşındığı günden
-// kaldı). Üç katman:
+// Eğlence sekmesindeki "Oyunlar" modülü (dosya adı, profilden taşındığı günden
+// kaldı). Üç katman, yukarıdan aşağıya:
 //   1) Günlük Meydan Okuma — tek dokunuşla oynanır, her gün yeni set
-//   2) Oyun kartları       — Sahne Tahmin + Poster Bulmaca yan yana
-//   3) Oyuncu şeridi       — seviye/XP/seri; dokununca Oyun Merkezi
+//   2) Oyun ızgarası       — TÜM oyunlar tek ızgarada: Sahne Tahmin + Poster
+//                            Bulmaca + hızlı oyunlar (components/game/QuickGamesGrid)
+//   3) Oyuncu şeridi       — seviye/XP/seri; dokununca Oyun Merkezi (ilerleme)
+//
+// SADELEŞTİRME (23 Eki): Sahne Tahmin'e girmek eskiden üç ekran sürüyordu
+// (oyun vitrini → kurulum → oyun) ve modülde iki ayrı oyun bölümü vardı. Şimdi
+// karta dokununca kurulum ALT SAYFASI (GameSetupSheet) burada açılır, son
+// seçimler hazırdır, "Oyunu Başlat" doğrudan oyuna gider.
 //
 // Veri tek okuma (useGameStats); ekran her odaklandığında içerik yerinde
 // kalarak arkadan tazelenir.
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Skeleton from "@components/Skeleton";
 import PremiumPill from "@components/premium/PremiumPill";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import DailyChallengeCard from "@components/game/DailyChallengeCard";
 import DuelSendButton from "@components/game/DuelSendButton";
+import GameSetupSheet from "@components/game/GameSetupSheet";
 import QuickGamesGrid from "@components/game/QuickGamesGrid";
 import { duelPayloadFromResult } from "@utils/dailyDuel";
-import GameTile from "@components/game/GameTile";
 import PlayerStrip from "@components/game/PlayerStrip";
 import { SectionHeader } from "@components/game/ui";
 import { useAuth } from "@context/AuthContext";
@@ -33,8 +39,11 @@ import {
   bestScoreForGame,
   buildSceneGameProgress,
   GAME_REGISTRY,
+  resolveGameAccentColors,
 } from "@screens/game/gameRegistry";
 import GlassPressable from "../common/GlassPressable";
+
+const REGISTRY_IDS = new Set(GAME_REGISTRY.map((game) => game.id));
 
 export default function ProfileGamesModule({ navigation }) {
   const { theme } = useTheme();
@@ -48,6 +57,9 @@ export default function ProfileGamesModule({ navigation }) {
     () => (daily.status === "completed" ? duelPayloadFromResult(daily.result, { dayKey: daily.dayKey }) : null),
     [daily.status, daily.result, daily.dayKey],
   );
+  // Kurulum sayfası: açıkken hangi oyun. Kapanışta oyun kimliği SİLİNMEZ
+  // (sayfa çıkış animasyonu boyunca başlık boşalmasın); yalnız görünürlük düşer.
+  const [setup, setSetup] = useState({ visible: false, gameId: SCENE_GAME_ID });
 
   // Oyunlar Premium'da. Free kullanıcıda modül görünür kalır (neyin kilitli
   // olduğu görülsün) ama her giriş yükseltme sayfasını açar, ekrana gitmez.
@@ -75,22 +87,34 @@ export default function ProfileGamesModule({ navigation }) {
   const openDailyBoard = guarded(() =>
     navigation.navigate("GameLeaderboardScreen", { gameId: SCENE_GAME_ID, scope: "daily" }),
   );
-  const openGame = guarded((game) => navigation.navigate(game.routeName, { gameId: game.id }));
+  const openSetup = guarded((gameId) => setSetup({ visible: true, gameId }));
   // Hızlı oyunlar kilitten bağımsız: "Önce hangisi?" kendi rotasında, diğerleri ortak ekranda.
-  const openQuickGame = (gameId) =>
-    gameId === "older"
-      ? navigation.navigate("OlderGameScreen", { source: "hub" })
-      : navigation.navigate("QuickGameScreen", { gameId, source: "hub" });
+  const openQuickGame = (gameId) => {
+    if (REGISTRY_IDS.has(gameId)) {
+      openSetup(gameId);
+      return;
+    }
+    if (gameId === "older") navigation.navigate("OlderGameScreen", { source: "hub" });
+    else navigation.navigate("QuickGameScreen", { gameId, source: "hub" });
+  };
+
+  // Sahne Tahmin + Poster Bulmaca, hızlı oyunlarla aynı karo dilinde ızgaranın başında.
+  const leadingTiles = useMemo(
+    () =>
+      GAME_REGISTRY.map((game) => ({
+        id: game.id,
+        icon: game.icon.name,
+        colors: resolveGameAccentColors(game, theme),
+        title: i18nText(game.titleKey, game.id),
+        best: bestScoreForGame(stats, game.id),
+        locked,
+      })),
+    [stats, theme, locked],
+  );
 
   return (
     <View style={styles.module}>
-      <SectionHeader
-        title={i18nText("autoI18n.oyunlar", "Oyunlar")}
-        action={i18nText("autoI18n.oyun_merkezi", "Oyun Merkezi")}
-        onAction={openHub}
-        theme={theme}
-        style={styles.header}
-      />
+      <SectionHeader title={i18nText("autoI18n.oyunlar", "Oyunlar")} theme={theme} style={styles.header} />
 
       {locked ? (
         <GlassPressable
@@ -121,24 +145,21 @@ export default function ProfileGamesModule({ navigation }) {
           {/* Bugünkü deneme bittiyse: sonucu bir arkadaşa düello olarak gönder. */}
           {duelPayload ? <DuelSendButton payload={duelPayload} theme={theme} source="hub" /> : null}
 
-          <View style={styles.tiles}>
-            {GAME_REGISTRY.map((game) => (
-              <GameTile
-                key={game.id}
-                game={game}
-                theme={theme}
-                bestScore={bestScoreForGame(stats, game.id)}
-                onPress={() => openGame(game)}
-              />
-            ))}
-          </View>
-
-          {/* Hızlı oyunlar: kilit şeridinden bağımsız, her planda açık (yerel, sunucu maliyeti yok). */}
-          <QuickGamesGrid theme={theme} onOpen={openQuickGame} />
+          {/* Tek oyun ızgarası; hızlı oyunlar kilit şeridinden bağımsız, her planda açık. */}
+          <QuickGamesGrid theme={theme} onOpen={openQuickGame} leadingTiles={leadingTiles} title={null} />
 
           <PlayerStrip progress={progress} theme={theme} user={user} onPress={openHub} compact />
         </View>
       )}
+
+      <GameSetupSheet
+        visible={setup.visible}
+        gameId={setup.gameId}
+        stats={stats}
+        bestScore={bestScoreForGame(stats, setup.gameId)}
+        onClose={() => setSetup((current) => ({ ...current, visible: false }))}
+        onStart={(params) => navigation.navigate("SceneGamePlayScreen", params)}
+      />
     </View>
   );
 }
@@ -152,8 +173,12 @@ function GamesModuleSkeleton({ theme }) {
     >
       <Skeleton height={204} style={[styles.skeletonHero, box]} />
       <View style={[styles.tiles, styles.tilesSkeleton]}>
-        <Skeleton width="48.5%" height={148} style={[styles.skeletonTile, box]} />
-        <Skeleton width="48.5%" height={148} style={[styles.skeletonTile, box]} />
+        <Skeleton width="48.5%" height={104} style={[styles.skeletonTile, box]} />
+        <Skeleton width="48.5%" height={104} style={[styles.skeletonTile, box]} />
+      </View>
+      <View style={[styles.tiles, styles.tilesSkeleton]}>
+        <Skeleton width="48.5%" height={104} style={[styles.skeletonTile, box]} />
+        <Skeleton width="48.5%" height={104} style={[styles.skeletonTile, box]} />
       </View>
       <Skeleton height={76} style={[styles.skeletonStrip, box]} />
     </View>
@@ -177,6 +202,6 @@ const styles = StyleSheet.create({
   tiles: { flexDirection: "row", gap: 12 },
   tilesSkeleton: { justifyContent: "space-between" },
   skeletonHero: { borderRadius: 26 },
-  skeletonTile: { borderRadius: 22 },
+  skeletonTile: { borderRadius: 20 },
   skeletonStrip: { borderRadius: 22 },
 });

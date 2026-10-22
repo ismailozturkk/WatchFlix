@@ -823,7 +823,7 @@ Seelogd/
 │   │   ├── ExitGameSheet.js
 │   │   ├── GameErrorState.js
 │   │   ├── GameLoadingState.js
-│   │   ├── GameTile.js
+│   │   ├── GameSetupSheet.js
 │   │   ├── GameTimerBar.js
 │   │   ├── GameTopBar.js
 │   │   ├── JokerBar.js
@@ -1355,7 +1355,6 @@ Seelogd/
 │   ├── development
 │   │   └── TabBarQaScreen.js
 │   ├── game
-│   │   ├── GameAchievementsScreen.js
 │   │   ├── gameConfig.js
 │   │   ├── GameHubScreen.js
 │   │   ├── gameLabels.js
@@ -1363,13 +1362,10 @@ Seelogd/
 │   │   ├── gameRegistry.js
 │   │   ├── GameScreenShell.js
 │   │   ├── gameSessionStore.js
-│   │   ├── GameStatsScreen.js
 │   │   ├── OlderGameScreen.js
 │   │   ├── QuickGameScreen.js
-│   │   ├── SceneGameDetailScreen.js
 │   │   ├── SceneGamePlayScreen.js
 │   │   ├── SceneGameResultScreen.js
-│   │   ├── SceneGameSetupScreen.js
 │   │   └── SceneGuessGameScreen.js
 │   ├── lists
 │   │   ├── ListsScreen.js

@@ -849,16 +849,6 @@ function AppContent() {
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
-          name="SceneGameDetailScreen"
-          getComponent={() => require("./screens/game/SceneGameDetailScreen").default}
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="SceneGameSetupScreen"
-          getComponent={() => require("./screens/game/SceneGameSetupScreen").default}
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
           name="SceneGamePlayScreen"
           getComponent={() => require("./screens/game/SceneGamePlayScreen").default}
           options={{ headerShown: false, animation: "slide_from_bottom", gestureEnabled: false }}
@@ -886,16 +876,6 @@ function AppContent() {
         <Stack.Screen
           name="GameLeaderboardScreen"
           getComponent={() => require("./screens/game/GameLeaderboardScreen").default}
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="GameStatsScreen"
-          getComponent={() => require("./screens/game/GameStatsScreen").default}
-          options={{ headerShown: false, animation: "slide_from_right" }}
-        />
-        <Stack.Screen
-          name="GameAchievementsScreen"
-          getComponent={() => require("./screens/game/GameAchievementsScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
