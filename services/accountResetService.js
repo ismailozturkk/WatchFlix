@@ -8,16 +8,24 @@
 //   Lists/{uid}  → favoriler, izlenecekler, izlenen filmler/diziler (+ sezon alt
 //                  koleksiyonları), özel listeler, Wrapped özetleri; kök belge
 //                  (sayaçlar, statusIndex, istatistik) yeniden BOŞ kurulur
-//   Users/{uid}/myRatings + Ratings/*/userRatings/{uid}  → agregatlarla tutarlı
-//                  (ratingsService.removeMyRating)
+//   ETKİNLİKLERİM (Profil > Etkinliklerim'in altı sekmesi):
+//                  puanlar (Ratings agregatı düşer, ratingsService.removeMyRating), yorumlar
+//                  (post + film/dizi yorumları ve yanıtları), gönderiler (likes/comments ile),
+//                  beğeniler ve kaydedilenler (+ ayna koleksiyonları myComments|likedPosts|
+//                  bookmarks|myRatings), gönderi sayacı (postsCount → 0); gönderi ve story
+//                  TASLAKLARI (yerel)
+//   ROZETLER      → yalnız bu cihazdadır (defter): utils/watchBadgeLedger.resetWatchLedger
+//                  anahtarları siler VE canlı kancanın bellekteki rozet kümesini boşaltır
+//                  (yoksa bir sonraki mutabakat onu yeniden tohumlardı)
 //   Notes, MediaNotes, Reminders, AiConversations (CineMatch sohbet geçmişi)
 //   SceneGame, SceneGameHistory, GameLeaderboards girdileri, Users/{uid}/gameProfile|
 //                  gameStats|gameSessions, UserStats/{uid}
-//   Yalnız bu cihazda duran ilerleme: rozet defteri, yıllık hedef, bingo, hızlı oyunlar,
-//                  Günün Sorusu, "Önce hangisi?", takip edilen kişiler, son CineSwipe sonucu, CineMatch sohbet kopyası
+//   Yalnız bu cihazda duran ilerleme: yıllık hedef, bingo, hızlı oyunlar, Günün Sorusu,
+//                  "Önce hangisi?", takip edilen kişiler, son CineSwipe sonucu, CineMatch sohbet
+//                  kopyası, içerik-etkinlik (puanladım/yorumladım) önbelleği
 //
 // KALAN: Firebase Auth hesabı, profil kimliği (isim, kullanıcı adı, avatar, bio, doğum
-//   tarihi, dört favori, sosyal hesaplar), arkadaşlar/takip, gönderiler/yorumlar/sohbetler,
+//   tarihi, dört favori, sosyal hesaplar, kimlik rozetleri), arkadaşlar/takip, sohbetler,
 //   gruplar ve ortak listeler, ayarlar, abonelik/yetki. Günlük premium haklar da kalır —
 //   `premiumDailyUsage` bilerek SİLİNMEZ (sıfırlamak günlük hakkı yenilemenin yolu olmasın).
 //
@@ -32,11 +40,20 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  updateDoc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { dailyBoardId, dayKeyOf, previousDayKey } from "../utils/dailyChallenge";
-import { removeMyRating } from "./ratingsService";
-import { deleteCollection, reauthenticateForDeletion } from "./accountService";
+import { resetWatchLedger } from "../utils/watchBadgeLedger";
+import {
+  deleteCollection,
+  purgeMyComments,
+  purgeMyPostLikes,
+  purgeMyPosts,
+  purgeMyRatings,
+  readMyComments,
+  reauthenticateForDeletion,
+} from "./accountService";
 import { ensureListsRoot } from "./listItemsService";
 import { setLocalList } from "./listSyncService";
 import { purgeUserData as purgeLocalUserData, startUserData, stopUserData } from "./userData";
@@ -46,7 +63,7 @@ import { Keys, remove as removeStored } from "./storage";
 export const RESET_STAGES = Object.freeze([
   "verify",
   "library",
-  "ratings",
+  "activity",
   "notes",
   "games",
   "local",
@@ -58,9 +75,8 @@ export const ResetAccountCode = Object.freeze({
 });
 
 /** Bu cihazda duran, buluta yazılmayan ilerleme anahtarları. */
+// (Rozet defteri burada DEĞİL: `resetWatchLedger` ile, canlı kancayı da boşaltarak silinir.)
 const LOCAL_PROGRESS_KEYS = Object.freeze([
-  Keys.watchLedger,
-  Keys.watchCatalogSeen,
   Keys.yearlyGoals,
   Keys.cinemaBingo,
   Keys.cinemaBingoMonthly,
@@ -70,6 +86,13 @@ const LOCAL_PROGRESS_KEYS = Object.freeze([
   Keys.followedPeople,
   Keys.cineLastResult,
   Keys.aiCineConversations,
+  // Etkinliklerim > Taslaklar / Story + not madde taslakları.
+  Keys.postDrafts,
+  Keys.storyDrafts,
+  Keys.noteTodoDrafts,
+  // "Puanladım / yorumladım" işaretleri ve liste durumu önbelleği (canlı kök belge yeniden doldurur).
+  Keys.mediaActivity,
+  Keys.listStatus,
 ]);
 
 const LIST_SLOTS = Object.freeze(["favorites", "watchList", "watchedMovies", "watchedTv"]);
@@ -146,21 +169,20 @@ export async function resetAccount({ password, reauthenticated = false, onProgre
   });
   await step("lists-root", () => ensureListsRoot(uid));
 
-  // 4) Puanlar: her oy agregatı düşürerek kaldırılır.
-  report("ratings");
-  await step("ratings", async () => {
-    const snap = await getDocs(collection(db, "Users", uid, "myRatings"));
-    for (const entry of snap.docs) {
-      const data = entry.data() || {};
-      if (!data.mediaType || data.mediaId == null) {
-        await step(`rating-mirror ${entry.id}`, () => deleteDoc(entry.ref));
-        continue;
-      }
-      await step(`rating ${entry.id}`, () =>
-        removeMyRating({ mediaType: data.mediaType, mediaId: data.mediaId, uid }),
-      );
-    }
-  });
+  // 4) Etkinliklerim: yorumlar → gönderiler → puanlar → beğeniler (hesap silmeyle AYNI
+  // parçalar, aynı sıra: aynalar silinmeden önce okunur, yorumlar gönderilerden önce
+  // işlenir). Sonra ayna koleksiyonları ve gönderi sayacı.
+  report("activity");
+  const myComments = await readMyComments(uid);
+  await step("comments", () => purgeMyComments(uid, myComments));
+  await step("posts", () => purgeMyPosts(uid));
+  await step("ratings", () => purgeMyRatings(uid));
+  await step("post-likes", () => purgeMyPostLikes(uid));
+  for (const sub of ["myComments", "likedPosts", "bookmarks", "myRatings"]) {
+    await step(`users-sub ${sub}`, () => deleteCollection(collection(db, "Users", uid, sub)));
+  }
+  // Etkinliklerim'deki "Postlar" sayısı Users/{uid}.postsCount'tan okunur.
+  await step("posts-count", () => updateDoc(doc(db, "Users", uid), { postsCount: 0 }));
 
   // 5) Notlar, hatırlatıcılar, yapay zeka sohbetleri.
   report("notes");
@@ -219,6 +241,7 @@ export async function resetAccount({ password, reauthenticated = false, onProgre
     purgeLocalUserData(uid);
     LIST_SLOTS.forEach((listKey) => setLocalList(uid, listKey, {}));
     LOCAL_PROGRESS_KEYS.forEach((descriptor) => removeStored(descriptor, { uid }));
+    resetWatchLedger(uid);
   });
   startUserData(uid);
 

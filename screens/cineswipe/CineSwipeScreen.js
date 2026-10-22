@@ -71,7 +71,7 @@ import { triggerHaptic } from "../../services/hapticsService";
 import { addItemsToCustomRootList } from "../../services/listItemsService";
 import { addManyToMembership, setListMembership } from "../../services/libraryActions";
 import { addItemToSharedList, createSharedList } from "../../services/sharedListsService";
-import { Keys, get } from "../../services/storage";
+import { Keys, get, subscribe } from "../../services/storage";
 
 const IDLE_ROOM = { state: "idle", id: null };
 
@@ -130,6 +130,7 @@ export default function CineSwipeScreen({ route, navigation }) {
   const stackRef = useRef(null);
   const joinAttempt = useRef(0);
   const joinBusy = useRef(false);
+  const autoJoinCode = useRef(null);
   const roomSession = useRef(0);
   const swipeBusy = useRef(false);
   const finishedRoom = useRef(null);
@@ -181,9 +182,16 @@ export default function CineSwipeScreen({ route, navigation }) {
   }, []);
 
   // Hesap değişince oda ve son sonuç sıfırlanır (solo deste kendi kancasında yenilenir).
+  // Son sonuç başka yerden silinirse (hesap sıfırlama) ekran eski sonucu göstermesin.
+  useEffect(() => {
+    if (!uid) return undefined;
+    return subscribe(Keys.cineLastResult, () => setLastResult(get(Keys.cineLastResult, { uid })), { uid });
+  }, [uid]);
+
   useEffect(() => {
     joinAttempt.current += 1;
     joinBusy.current = false;
+    autoJoinCode.current = null;
     setJoining(false);
     setLastResult(uid ? get(Keys.cineLastResult, { uid }) : null);
     resetRoom();
@@ -574,20 +582,21 @@ export default function CineSwipeScreen({ route, navigation }) {
     }
   };
 
-  const handleJoinRoom = async () => {
+  const handleJoinRoom = async (candidate) => {
+    const code = typeof candidate === "string" ? candidate : inputCode;
     if (joinBusy.current) return;
     joinBusy.current = true;
     const attempt = ++joinAttempt.current;
     setJoining(true);
     setJoinError(null);
     try {
-      const { roomId: joinedId, roomData } = await joinCineRoom(inputCode, user);
+      const { roomId: joinedId, roomData } = await joinCineRoom(code, user);
       if (attempt !== joinAttempt.current) return;
       resetRoom();
       const cards = roomData.deck || [];
       const nextIndex = cards.findIndex((media) => !cineVotesFor(roomData, media)[uid]);
       setRoomId(joinedId);
-      setRoomCode(roomData.roomCode || inputCode.trim());
+      setRoomCode(roomData.roomCode || code.trim());
       setRoomDeck(cards);
       setRoomIndex(nextIndex < 0 ? cards.length : nextIndex);
       setRoomMeta({
@@ -606,6 +615,15 @@ export default function CineSwipeScreen({ route, navigation }) {
       if (attempt === joinAttempt.current) setJoining(false);
     }
   };
+
+  useEffect(() => {
+    if (!route?.params?.autoJoin || !inviteCode || !uid || autoJoinCode.current === inviteCode) return;
+    autoJoinCode.current = inviteCode;
+    setInputCode(inviteCode);
+    handleJoinRoom(inviteCode);
+    // One join attempt per accepted code; a failed attempt remains retryable in the room UI.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route?.params?.autoJoin, inviteCode, uid]);
 
   const handleDuoSwipe = async (direction, media) => {
     if (swipeBusy.current || !roomId || !uid || roomState !== "playing" || !media) return;

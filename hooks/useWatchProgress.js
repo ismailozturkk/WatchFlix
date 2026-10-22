@@ -36,7 +36,9 @@ import {
 import { Keys, set as setStored } from "@services/storage";
 import { bilinenSetIdleri, evaluateBadgeSets } from "@components/badges/badgeSets";
 import { muhurIdleri, muhurleriHesapla } from "@components/badges/seasonSeals";
-import { kutlanacaklar, loadLedger, markCelebrated, reconcileLedger } from "@utils/watchBadgeLedger";
+import {
+  kutlanacaklar, loadLedger, markCelebrated, reconcileLedger, subscribeLedgerReset,
+} from "@utils/watchBadgeLedger";
 import { serileriHesapla } from "@utils/watchActivity";
 import { kartlariDekorle } from "@components/badges/badgeInsights";
 import useKesifSignals from "@hooks/useKesifSignals";
@@ -94,6 +96,8 @@ export default function useWatchProgress() {
   const [kutlama, setKutlama] = useState(null);   // { rozetler[], perdeAtladi, oncekiPerde, yeniPerde }
   const [ilkTohum, setIlkTohum] = useState(false);
   const [tohumRozetSayisi, setTohumRozetSayisi] = useState(0);
+  // Defter/oyun seviyesi okumalarını yeniden tetikler (hesap sıfırlanınca ++).
+  const [sifirlamaNo, setSifirlamaNo] = useState(0);
 
   // ProfileStatsContext listener'ları useStartupGate(3200) ile erteleniyor; ilk
   // ~3,2 saniye veri YOKTUR. Bu pencerede "0 Kare / Perde 1" göstermek hem
@@ -139,7 +143,7 @@ export default function useWatchProgress() {
       setAktifGunler(l.aktiflik.gunler);
     }).catch(() => {});
     return () => { iptal = true; };
-  }, [uid]);
+  }, [uid, sifirlamaNo]);
 
   // Oyun seviyesi — tek seferlik okuma, listener değil.
   useEffect(() => {
@@ -149,10 +153,11 @@ export default function useWatchProgress() {
       .then((d) => { if (!iptal) setOyunSeviye(Number(d?.level) || 0); })
       .catch(() => { if (!iptal) setOyunSeviye(0); });
     return () => { iptal = true; };
-  }, [uid]);
+  }, [uid, sifirlamaNo]);
 
-  // Hesap değişiminde önceki kullanıcının defteri sızmasın.
-  useEffect(() => {
+  // Bellekteki rozet durumunu boşaltır: hesap değişince önceki kullanıcının defteri
+  // sızmasın, hesap SIFIRLANINCA da eski rozetler bellekten defteri yeniden tohumlamasın.
+  const durumuBosalt = useCallback(() => {
     // İmza da sıfırlanmalı: A hesabından B hesabına geçildiğinde imzalar
     // çakışırsa (ikisi de yeni hesap, aynı boş rozet kümesi) mutabakat "zaten
     // yapıldı" deyip B için HİÇ çalışmaz ve B'nin defteri hiç tohumlanmaz.
@@ -167,7 +172,24 @@ export default function useWatchProgress() {
     setKutlama(null);
     setIlkTohum(false);
     setTohumRozetSayisi(0);
-  }, [uid]);
+  }, []);
+
+  useEffect(() => {
+    durumuBosalt();
+  }, [uid, durumuBosalt]);
+
+  // Hesap SIFIRLANDI (utils/watchBadgeLedger.resetWatchLedger): defter diskten silindi,
+  // şimdi bellekteki kopya da gitmeli — yoksa bir sonraki mutabakat eski rozet kümesini
+  // ("açık" sayılan `kazanilmis`) yeni deftere tohumlar ve hiçbir şey sıfırlanmamış olur.
+  useEffect(() => {
+    if (!uid) return undefined;
+    return subscribeLedgerReset((sifirlananUid) => {
+      if (sifirlananUid && sifirlananUid !== uid) return;
+      durumuBosalt();
+      setOyunSeviye(0);
+      setSifirlamaNo((n) => n + 1);
+    });
+  }, [uid, durumuBosalt]);
 
   // Keşif rozetlerinin girdisi (not, liste, hatırlatıcı, arkadaş, profil, CineMatch).
   // İZLEME VERİSİNDEN DEĞİL ve computeWatchScore'a GİRMEZ: puana girmez, yeni
@@ -307,7 +329,8 @@ export default function useWatchProgress() {
       })
       .then((r) => {
         yerlesti = true;
-        if (iptal) return;
+        // null: araya hesap sıfırlama girdi, bu tur yazılmadı (bkz. watchBadgeLedger `epoch`).
+        if (iptal || !r) return;
         // Defteri BU build'de ilk kez kuran kullanıcı için "yeni rozetler eklendi"
         // duyurusu anlamsız: kataloğun eski halini hiç görmedi, her şey onun için
         // yeni. Sürümü "görüldü" yazarak duyuruyu baştan kapatıyoruz. Defteri

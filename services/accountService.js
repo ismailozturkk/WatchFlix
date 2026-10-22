@@ -126,6 +126,8 @@ import { deleteSharedList, leaveSharedList } from "./sharedListsService";
 // Yerel-öncelikli veri katmanı (notlar, hatırlatıcılar…). Bu dosyadaki
 // `purgeUserData` BULUTU siler; yerel kopya + bekleyen yazımlar için ayrı ad.
 import { purgeUserData as purgeLocalUserData } from "./userData";
+import { purgeUserScope } from "./storage";
+import { resetWatchLedger } from "../utils/watchBadgeLedger";
 
 const CHUNK = 450; // Firestore batch limiti 500 — güvenli pay bıraktık.
 // Sunucu silme aşamaları, ÇALIŞMA SIRASIYLA (functions/accountPurge.js PURGE_PHASES ile
@@ -185,6 +187,217 @@ export async function deleteCollection(colRef) {
 }
 
 const reqId = (fromUid, toUid) => `${fromUid}_${toUid}`;
+
+// ── ETKİNLİKLERİM parçaları ───────────────────────────────────────────────────
+// Hesabı SİLME (purgeUserData) ve hesabı SIFIRLAMA (services/accountResetService.js)
+// aynı gövdeleri kullanır: yorumlarım, gönderilerim, puanlarım, beğenilerim. Eskiden
+// purgeUserData'nın içinde satır içiydi; sıfırlama kopyalamasın diye ayrıldı.
+// Her biri bağımsız ve idempotent; hata yutulur (`safe`), akış durmaz.
+
+// ── YORUMLARIM (başkalarının postları + film/dizi sayfaları) ──────────────
+// myComments mirror'ı asıl yorum dokümanlarına giden TEK indeks: istemcide
+// "bütün Posts/*/comments içinde authorId == uid" araması ancak collection
+// group sorgusuyla olurdu. O yol seçilmedi çünkü (a) collectionGroup("comments")
+// hem Posts hem MovieComment/TvComment alt koleksiyonlarını kapsar, (b)
+// çalışması için collection-group kapsamlı tek alan indeksi + `match
+// /{path=**}/comments/{id}` altında bir `list` izni gerekir; ikincisi bugün
+// yol-bazlı olan kural yüzeyini gereksizce genişletirdi. Mirror zaten her
+// yorumda yazılıyor (postsService#addComment + components/Comment.js) →
+// ucuz ve yeterli olan yol bu.
+//
+// SIRA: mirror "users-sub myComments" adımında siliniyor, o yüzden burada
+// ÖNCE okunur; ayrıca post yorumları kendi postlarım silinmeden işlenmeli
+// (post dokümanı gidince commentsCount batch'i NOT_FOUND ile düşerdi).
+/** Yorum aynasını (Users/{uid}/myComments) okur: silme bu listeyle yürür. */
+export async function readMyComments(uid) {
+  const myComments = [];
+  await safe("read-my-comments", async () => {
+    const snap = await getDocs(collection(db, "Users", uid, "myComments"));
+    snap.docs.forEach((d) => myComments.push({ id: d.id, ...(d.data() || {}) }));
+  });
+  return myComments;
+}
+
+/** Başkalarının postlarına ve film/dizi sayfalarına yazdığım yorumlar (+ yanıtlar). */
+export async function purgeMyComments(uid, myComments) {
+  // Post yorumlarım: deleteComment yanıtları da kaskatlı siler ve commentsCount'u
+  // silinen doküman başına increment(-1) ile düşürür (rules counterOk ±1).
+  await safe("post-comments", async () => {
+    for (const c of myComments) {
+      if (c.kind !== "post" || !c.targetId) continue;
+      await safe(`post-comment ${c.id}`, async () => {
+        try {
+          await deleteComment(c.targetId, c.id, uid);
+        } catch {
+          // Post dokümanı yoksa (yazarı silmiş, alt koleksiyon orphan kalmış)
+          // sayaç batch'i düşer; en azından yorumun kendisini bırakma.
+          await deleteDoc(doc(db, "Posts", c.targetId, "comments", c.id));
+        }
+      });
+    }
+  });
+
+  // Film/dizi yorumlarım. Mirror: kind 'movie' | 'tv', targetId = medya id.
+  // Yanıtlar {coll}/{targetId}/comments/{parentId}/replies/{replyId} altında
+  // durduğu için yol YALNIZ parentId ile kurulabilir; bu alan artık mirror'a
+  // yazılıyor (components/Comment.js). parentId taşımayan ESKİ mirror'larda
+  // üst seviye yol denenir, doküman yoksa hedef derin taramaya alınır.
+  await safe("media-comments", async () => {
+    const targets = new Map(); // "MovieComment/603" → { coll, targetId }
+    const deepScan = new Set(); // parentId'si bilinmeyen yanıtlar için hedefler
+
+    for (const c of myComments) {
+      if (c.kind !== "movie" && c.kind !== "tv") continue;
+      if (c.targetId == null) continue;
+      const coll = c.kind === "tv" ? "TvComment" : "MovieComment";
+      const targetId = String(c.targetId);
+      const key = `${coll}/${targetId}`;
+      targets.set(key, { coll, targetId });
+
+      if (c.parentId) {
+        await safe(`media-reply ${c.id}`, async () => {
+          await deleteDoc(
+            doc(db, coll, targetId, "comments", c.parentId, "replies", c.id),
+          );
+          await updateDoc(doc(db, coll, targetId, "comments", c.parentId), {
+            replyCount: increment(-1),
+          }).catch(() => {});
+        });
+        continue;
+      }
+
+      const exists = await safe(`media-comment-read ${c.id}`, async () => {
+        const snap = await getDoc(doc(db, coll, targetId, "comments", c.id));
+        return snap.exists();
+      });
+      // exists === null → okuma başarısız; hedef zaten aşağıdaki süpürmede.
+      if (exists === false) deepScan.add(key);
+    }
+
+    // Süpürme: her hedefte userId == uid olan ÜST SEVİYE yorumlar (mirror'ı
+    // eksik kalmış eski kayıtlar dahil) + altlarındaki kendi yanıtlarım.
+    // Tek alan eşitlik sorgusu — ek composite index gerektirmez.
+    for (const { coll, targetId } of targets.values()) {
+      await safe(`media-sweep ${coll}/${targetId}`, async () => {
+        const mine = await getDocs(
+          query(
+            collection(db, coll, targetId, "comments"),
+            where("userId", "==", uid),
+          ),
+        );
+        for (const c of mine.docs) {
+          // Kendi yanıtlarım: BAŞKALARININ yanıtlarını kural gereği silemem
+          // (yalnız yazarı silebilir) — onlar orphan kalır; tekil yorum
+          // silmede de durum aynı (components/Comment.js#handleDelete).
+          await safe(`media-own-replies ${c.id}`, async () => {
+            const rs = await getDocs(
+              query(
+                collection(db, coll, targetId, "comments", c.id, "replies"),
+                where("userId", "==", uid),
+              ),
+            );
+            await deleteRefsInChunks(rs.docs.map((r) => r.ref));
+          });
+        }
+        await deleteRefsInChunks(mine.docs.map((c) => c.ref));
+      });
+    }
+
+    // Derin tarama: yalnız yukarıda çözülemeyen hedeflerde çalışır (mirror'da
+    // parentId yok + üst seviyede doküman yok → başkasının yorumuna yazılmış
+    // eski bir yanıt). Hedefin yorumları listelenir, her birinin replies'ı
+    // userId == uid ile sorgulanır.
+    for (const key of deepScan) {
+      const { coll, targetId } = targets.get(key) || {};
+      if (!coll) continue;
+      await safe(`media-deep ${key}`, async () => {
+        const parents = await getDocs(collection(db, coll, targetId, "comments"));
+        for (const p of parents.docs) {
+          await safe(`media-deep-reply ${p.id}`, async () => {
+            const rs = await getDocs(
+              query(
+                collection(db, coll, targetId, "comments", p.id, "replies"),
+                where("userId", "==", uid),
+              ),
+            );
+            for (const r of rs.docs) {
+              await deleteDoc(r.ref);
+              // Sayaç yanıt başına ±1 oynar (rules counterOk) — toplu
+              // increment(-n) reddedilirdi.
+              await updateDoc(p.ref, { replyCount: increment(-1) }).catch(() => {});
+            }
+          });
+        }
+      });
+    }
+  });
+}
+
+/** Kendi gönderilerim (likes + comments alt koleksiyonlarıyla). */
+export async function purgeMyPosts(uid) {
+  // ── KENDİ POSTLARI (likes + comments alt koleksiyonlarıyla) ───────────────
+  await safe("posts", async () => {
+    const snap = await getDocs(
+      query(collection(db, "Posts"), where("authorId", "==", uid)),
+    );
+    for (const d of snap.docs) {
+      await safe(`post ${d.id}`, async () => {
+        await deleteCollection(collection(db, "Posts", d.id, "likes"));
+        await deleteCollection(collection(db, "Posts", d.id, "comments"));
+        await deleteDoc(d.ref);
+      });
+    }
+  });
+}
+
+/** Puanlarım — agregatlarla tutarlı (removeMyRating). */
+export async function purgeMyRatings(uid) {
+  // ── PUANLAR (Ratings agregatlarıyla tutarlı silme) ────────────────────────
+  // myRatings mirror'ı üzerinden her oy removeMyRating transaction'ı ile
+  // kaldırılır: Ratings/{key}/userRatings/{uid} silinir + agregat count/sum
+  // düşer + mirror silinir. Doğrudan koleksiyon silseydik silinen kullanıcının
+  // oyları site geneli ortalamalarda sonsuza dek sayılmaya devam ederdi.
+  await safe("ratings", async () => {
+    const snap = await getDocs(collection(db, "Users", uid, "myRatings"));
+    for (const d of snap.docs) {
+      const data = d.data() || {};
+      const mediaType = data.mediaType;
+      const mediaId = data.mediaId;
+      if (!mediaType || mediaId == null) {
+        // Meta eksikse en azından mirror'ı bırakma.
+        await safe(`rating-mirror ${d.id}`, () => deleteDoc(d.ref));
+        continue;
+      }
+      await safe(`rating ${d.id}`, () =>
+        removeMyRating({ mediaType, mediaId, uid }),
+      );
+    }
+  });
+}
+
+/** Başkalarının gönderilerindeki beğenilerim (likesCount düşümüyle). */
+export async function purgeMyPostLikes(uid) {
+  // ── BAŞKALARININ GÖNDERİLERİNDEKİ BEĞENİLERİM ─────────────────────────────
+  // likedPosts yalnız aynadır; asıl beğeni Posts/{id}/likes/{uid} ve sayaç
+  // likesCount. Aynayı silip bunları bırakmak beğenimi gönderide yaşatıyordu.
+  // Kural: beğeni sahibi kendi beğenisini siler, sayaç ±1 (toggleLike ile aynı).
+  // Ayna burada okunur — "users-sub likedPosts" adımı onu silmeden ÖNCE.
+  await safe("post-likes", async () => {
+    const snap = await getDocs(collection(db, "Users", uid, "likedPosts"));
+    for (const d of snap.docs) {
+      await safe(`post-like ${d.id}`, async () => {
+        const postRef = doc(db, "Posts", d.id);
+        const likeRef = doc(db, "Posts", d.id, "likes", uid);
+        const [likeSnap, postSnap] = await Promise.all([getDoc(likeRef), getDoc(postRef)]);
+        if (!likeSnap.exists()) return;
+        const batch = writeBatch(db);
+        batch.delete(likeRef);
+        if (postSnap.exists()) batch.update(postRef, { likesCount: increment(-1) });
+        await batch.commit();
+      });
+    }
+  });
+}
 
 /**
  * Kullanıcının tüm Firestore izlerini temizler. Her bölüm bağımsız sarmalanır;
@@ -306,180 +519,13 @@ export async function purgeUserData(uid) {
   // SIRA: mirror "users-sub myComments" adımında siliniyor, o yüzden burada
   // ÖNCE okunur; ayrıca post yorumları kendi postlarım silinmeden işlenmeli
   // (post dokümanı gidince commentsCount batch'i NOT_FOUND ile düşerdi).
-  const myComments = [];
-  await safe("read-my-comments", async () => {
-    const snap = await getDocs(collection(db, "Users", uid, "myComments"));
-    snap.docs.forEach((d) => myComments.push({ id: d.id, ...(d.data() || {}) }));
-  });
-
-  // Post yorumlarım: deleteComment yanıtları da kaskatlı siler ve commentsCount'u
-  // silinen doküman başına increment(-1) ile düşürür (rules counterOk ±1).
-  await safe("post-comments", async () => {
-    for (const c of myComments) {
-      if (c.kind !== "post" || !c.targetId) continue;
-      await safe(`post-comment ${c.id}`, async () => {
-        try {
-          await deleteComment(c.targetId, c.id, uid);
-        } catch {
-          // Post dokümanı yoksa (yazarı silmiş, alt koleksiyon orphan kalmış)
-          // sayaç batch'i düşer; en azından yorumun kendisini bırakma.
-          await deleteDoc(doc(db, "Posts", c.targetId, "comments", c.id));
-        }
-      });
-    }
-  });
-
-  // Film/dizi yorumlarım. Mirror: kind 'movie' | 'tv', targetId = medya id.
-  // Yanıtlar {coll}/{targetId}/comments/{parentId}/replies/{replyId} altında
-  // durduğu için yol YALNIZ parentId ile kurulabilir; bu alan artık mirror'a
-  // yazılıyor (components/Comment.js). parentId taşımayan ESKİ mirror'larda
-  // üst seviye yol denenir, doküman yoksa hedef derin taramaya alınır.
-  await safe("media-comments", async () => {
-    const targets = new Map(); // "MovieComment/603" → { coll, targetId }
-    const deepScan = new Set(); // parentId'si bilinmeyen yanıtlar için hedefler
-
-    for (const c of myComments) {
-      if (c.kind !== "movie" && c.kind !== "tv") continue;
-      if (c.targetId == null) continue;
-      const coll = c.kind === "tv" ? "TvComment" : "MovieComment";
-      const targetId = String(c.targetId);
-      const key = `${coll}/${targetId}`;
-      targets.set(key, { coll, targetId });
-
-      if (c.parentId) {
-        await safe(`media-reply ${c.id}`, async () => {
-          await deleteDoc(
-            doc(db, coll, targetId, "comments", c.parentId, "replies", c.id),
-          );
-          await updateDoc(doc(db, coll, targetId, "comments", c.parentId), {
-            replyCount: increment(-1),
-          }).catch(() => {});
-        });
-        continue;
-      }
-
-      const exists = await safe(`media-comment-read ${c.id}`, async () => {
-        const snap = await getDoc(doc(db, coll, targetId, "comments", c.id));
-        return snap.exists();
-      });
-      // exists === null → okuma başarısız; hedef zaten aşağıdaki süpürmede.
-      if (exists === false) deepScan.add(key);
-    }
-
-    // Süpürme: her hedefte userId == uid olan ÜST SEVİYE yorumlar (mirror'ı
-    // eksik kalmış eski kayıtlar dahil) + altlarındaki kendi yanıtlarım.
-    // Tek alan eşitlik sorgusu — ek composite index gerektirmez.
-    for (const { coll, targetId } of targets.values()) {
-      await safe(`media-sweep ${coll}/${targetId}`, async () => {
-        const mine = await getDocs(
-          query(
-            collection(db, coll, targetId, "comments"),
-            where("userId", "==", uid),
-          ),
-        );
-        for (const c of mine.docs) {
-          // Kendi yanıtlarım: BAŞKALARININ yanıtlarını kural gereği silemem
-          // (yalnız yazarı silebilir) — onlar orphan kalır; tekil yorum
-          // silmede de durum aynı (components/Comment.js#handleDelete).
-          await safe(`media-own-replies ${c.id}`, async () => {
-            const rs = await getDocs(
-              query(
-                collection(db, coll, targetId, "comments", c.id, "replies"),
-                where("userId", "==", uid),
-              ),
-            );
-            await deleteRefsInChunks(rs.docs.map((r) => r.ref));
-          });
-        }
-        await deleteRefsInChunks(mine.docs.map((c) => c.ref));
-      });
-    }
-
-    // Derin tarama: yalnız yukarıda çözülemeyen hedeflerde çalışır (mirror'da
-    // parentId yok + üst seviyede doküman yok → başkasının yorumuna yazılmış
-    // eski bir yanıt). Hedefin yorumları listelenir, her birinin replies'ı
-    // userId == uid ile sorgulanır.
-    for (const key of deepScan) {
-      const { coll, targetId } = targets.get(key) || {};
-      if (!coll) continue;
-      await safe(`media-deep ${key}`, async () => {
-        const parents = await getDocs(collection(db, coll, targetId, "comments"));
-        for (const p of parents.docs) {
-          await safe(`media-deep-reply ${p.id}`, async () => {
-            const rs = await getDocs(
-              query(
-                collection(db, coll, targetId, "comments", p.id, "replies"),
-                where("userId", "==", uid),
-              ),
-            );
-            for (const r of rs.docs) {
-              await deleteDoc(r.ref);
-              // Sayaç yanıt başına ±1 oynar (rules counterOk) — toplu
-              // increment(-n) reddedilirdi.
-              await updateDoc(p.ref, { replyCount: increment(-1) }).catch(() => {});
-            }
-          });
-        }
-      });
-    }
-  });
-
-  // ── KENDİ POSTLARI (likes + comments alt koleksiyonlarıyla) ───────────────
-  await safe("posts", async () => {
-    const snap = await getDocs(
-      query(collection(db, "Posts"), where("authorId", "==", uid)),
-    );
-    for (const d of snap.docs) {
-      await safe(`post ${d.id}`, async () => {
-        await deleteCollection(collection(db, "Posts", d.id, "likes"));
-        await deleteCollection(collection(db, "Posts", d.id, "comments"));
-        await deleteDoc(d.ref);
-      });
-    }
-  });
-
-  // ── PUANLAR (Ratings agregatlarıyla tutarlı silme) ────────────────────────
-  // myRatings mirror'ı üzerinden her oy removeMyRating transaction'ı ile
-  // kaldırılır: Ratings/{key}/userRatings/{uid} silinir + agregat count/sum
-  // düşer + mirror silinir. Doğrudan koleksiyon silseydik silinen kullanıcının
-  // oyları site geneli ortalamalarda sonsuza dek sayılmaya devam ederdi.
-  await safe("ratings", async () => {
-    const snap = await getDocs(collection(db, "Users", uid, "myRatings"));
-    for (const d of snap.docs) {
-      const data = d.data() || {};
-      const mediaType = data.mediaType;
-      const mediaId = data.mediaId;
-      if (!mediaType || mediaId == null) {
-        // Meta eksikse en azından mirror'ı bırakma.
-        await safe(`rating-mirror ${d.id}`, () => deleteDoc(d.ref));
-        continue;
-      }
-      await safe(`rating ${d.id}`, () =>
-        removeMyRating({ mediaType, mediaId, uid }),
-      );
-    }
-  });
-
-  // ── BAŞKALARININ GÖNDERİLERİNDEKİ BEĞENİLERİM ─────────────────────────────
-  // likedPosts yalnız aynadır; asıl beğeni Posts/{id}/likes/{uid} ve sayaç
-  // likesCount. Aynayı silip bunları bırakmak beğenimi gönderide yaşatıyordu.
-  // Kural: beğeni sahibi kendi beğenisini siler, sayaç ±1 (toggleLike ile aynı).
-  // Ayna burada okunur — "users-sub likedPosts" adımı onu silmeden ÖNCE.
-  await safe("post-likes", async () => {
-    const snap = await getDocs(collection(db, "Users", uid, "likedPosts"));
-    for (const d of snap.docs) {
-      await safe(`post-like ${d.id}`, async () => {
-        const postRef = doc(db, "Posts", d.id);
-        const likeRef = doc(db, "Posts", d.id, "likes", uid);
-        const [likeSnap, postSnap] = await Promise.all([getDoc(likeRef), getDoc(postRef)]);
-        if (!likeSnap.exists()) return;
-        const batch = writeBatch(db);
-        batch.delete(likeRef);
-        if (postSnap.exists()) batch.update(postRef, { likesCount: increment(-1) });
-        await batch.commit();
-      });
-    }
-  });
+  // ── ETKİNLİKLERİM: yorumlar → gönderiler → puanlar → beğeniler (SIRA ve gerekçeler
+  // ilgili parçanın başlık notunda: aynalar "users-sub" adımında silinmeden ÖNCE okunur).
+  const myComments = await readMyComments(uid);
+  await purgeMyComments(uid, myComments);
+  await purgeMyPosts(uid);
+  await purgeMyRatings(uid);
+  await purgeMyPostLikes(uid);
 
   // ── KONUŞMALAR INDEX'İ (karşılıklı) + chatId türetimi ─────────────────────
   // conversations hem karşı tarafın gelen kutusundaki kaydımı silmek hem de
@@ -889,6 +935,16 @@ export async function reauthenticateForDeletion({ password } = {}) {
   return { cancelled: false };
 }
 
+/** Silinen hesabın cihazdaki tüm yerel izleri (hata yutulur: hesap zaten gitti). */
+function purgeDeviceResidue(uid) {
+  try {
+    resetWatchLedger(uid);
+    purgeUserScope(uid);
+  } catch (error) {
+    if (__DEV__) console.warn("[deleteAccount] cihaz kalıntıları:", error?.message || error);
+  }
+}
+
 /**
  * Hesabı tamamen siler: reauth → Firestore purge → Auth kullanıcısını sil.
  * Başarılı olduğunda Firebase otomatik sign-out yapar (onAuthStateChanged null).
@@ -1004,6 +1060,12 @@ export async function deleteAccount({
     if (!reauthOk) throw error;
     await deleteUser(user);
   }
+
+  // 4) Cihazdaki kalıntılar. Çıkış yolu (AuthContext → clearUserScope) `keepOnLogout`
+  // anahtarlara dokunmaz: rozet defteri, yıllık hedef, bingo, hızlı oyunlar, takip edilen
+  // kişiler… Silinmiş hesabın dönüşü yok, bu yüzden hepsi burada gider. Rozet defteri
+  // canlı kancanın belleğindeki kopyayla birlikte (resetWatchLedger) silinir.
+  purgeDeviceResidue(uid);
 
   return { cancelled: false };
 }

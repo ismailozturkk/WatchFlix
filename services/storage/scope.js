@@ -53,6 +53,38 @@ export function clearUserScope(uid, options = {}) {
 }
 
 /**
+ * Bir kullanıcının cihazdaki TÜM kapsamını siler — `keepOnLogout` anahtarlar DAHİL
+ * (rozet defteri, yıllık hedef, bingo, hızlı oyunlar, takip edilen kişiler, günlük hak
+ * sayaçları…). Yalnız HESAP SİLİNİNCE kullanılır: çıkışta o anahtarlar aynı kullanıcı
+ * geri dönecek diye korunur, ama silinmiş bir hesabın dönüşü yoktur — kalmaları cihazda
+ * sahipsiz kişisel veri bırakırdı.
+ *
+ * Rozet defteri için ayrıca `utils/watchBadgeLedger.resetWatchLedger` çağır: canlı
+ * kancanın bellekteki kopyasını da boşaltır.
+ *
+ * @param {string} uid
+ * @returns {number} silinen anahtar sayısı
+ */
+export function purgeUserScope(uid) {
+  if (!uid) return 0;
+  let removed = 0;
+  for (const descriptor of ALL_KEYS) {
+    if (descriptor.scope !== "user") continue;
+    try {
+      const store = getStore(descriptor.store);
+      const key = physicalKey(descriptor, uid);
+      if (store.contains(key)) {
+        store.remove(key);
+        removed += 1;
+      }
+    } catch (error) {
+      reportStorageError("purgeUserScope", error, { key: descriptor.name, uid });
+    }
+  }
+  return removed;
+}
+
+/**
  * Yeniden üretilebilir HER ŞEYİ siler: `cache` deposunun tamamı.
  *
  * Eski karşılığı, elle bakımı yapılan bir anahtar süzgeciydi; listeye

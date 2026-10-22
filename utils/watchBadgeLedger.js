@@ -21,7 +21,47 @@ import {
   aktifligiGuncelle, rekorYukselt,
 } from "./watchLedgerCore";
 import { bugunAnahtari, GUN_TUT, serileriHesapla } from "./watchActivity";
-import { Keys, get, set } from "../services/storage";
+import { Keys, get, remove, set } from "../services/storage";
+
+// ── SIFIRLAMA ────────────────────────────────────────────────────────────────
+// Defter yalnız diskte DEĞİL: useWatchProgress rozet kümesini, Perde tabanlarını ve
+// serileri React state'inde de tutuyor ve her mutabakatta o state'ten yeni defter
+// kuruyor. Yalnız anahtarları silmek rozetleri sıfırlamaz — bir sonraki mutabakat
+// bellekteki eski kümeyle defteri yeniden tohumlar. Bu yüzden sıfırlama (hesabı
+// sıfırla / hesabı sil) `resetWatchLedger` ile yapılır: anahtarları siler, dönemi
+// (`epoch`) ilerletir ve canlı kancayı haberdar eder.
+//
+// DÖNEM: yolda olan bir mutabakat/kutlama (disk okundu, henüz yazılmadı) sıfırlamadan
+// SONRA eski defteri geri yazamasın diye her yazma, başladığı dönemde olup olmadığını
+// kontrol eder; değişmişse yazmaz.
+let epoch = 0;
+const resetListeners = new Set();
+
+/** Kanca sıfırlamayı dinler: `listener(uid)`. Aboneliği bırakan fonksiyon döner. */
+export function subscribeLedgerReset(listener) {
+  resetListeners.add(listener);
+  return () => resetListeners.delete(listener);
+}
+
+/**
+ * Rozet defterini ve katalog duyurusu işaretini siler; yolda olan yazmaları geçersiz
+ * kılar ve canlı kancaya state'ini boşaltmasını söyler. Tohumlama sonraki mutabakatta
+ * boş veriden yeniden yapılır (kutlama yok).
+ */
+export function resetWatchLedger(uid) {
+  epoch += 1;
+  if (uid) {
+    remove(Keys.watchLedger, { uid });
+    remove(Keys.watchCatalogSeen, { uid });
+  }
+  resetListeners.forEach((listener) => {
+    try {
+      listener(uid);
+    } catch {
+      // bir dinleyicinin hatası sıfırlamayı durdurmasın
+    }
+  });
+}
 
 // Üç ayrı anahtar yerine TEK doküman: baseline/earned/seen aynı anda tutarlı
 // olmalı. Ayrı anahtarlarda kısmi bir yazma (uygulama öldürülmesi, dolu disk)
@@ -49,6 +89,7 @@ export async function saveLedger(uid, ledger) {
 export async function reconcileLedger(uid, {
   badgeIds = [], tumIds = null, perde = 1, makara = 0, kare = 0, icerikSayisi = null,
 } = {}) {
+  const donem = epoch;
   const mevcut = await loadLedger(uid);
   const bugun = bugunAnahtari();
 
@@ -56,6 +97,7 @@ export async function reconcileLedger(uid, {
     const tohumlu = tohumla(mevcut, {
       badgeIds, tumIds, perde, makara, kare, icerikSayisi, seenAt: new Date().toISOString(),
     });
+    if (donem !== epoch) return null; // araya sıfırlama girdi
     await saveLedger(uid, tohumlu);
     return {
       ledger: tohumlu,
@@ -86,6 +128,7 @@ export async function reconcileLedger(uid, {
 
   // `bugun` yeni kazanılan rozetlere KAZANMA GÜNÜ olarak yazılır (defter v3).
   const sonuc = birlestir(r.ledger, { badgeIds, tumIds, perde, makara, bugun });
+  if (donem !== epoch) return null; // araya sıfırlama girdi: eski defteri geri yazma
   if (sonuc.degisti || a.degisti || r.degisti) await saveLedger(uid, sonuc.ledger);
   return {
     ledger: sonuc.ledger,
@@ -114,8 +157,10 @@ export async function reconcileLedger(uid, {
  * "Perde ve rozet düşmez" sözleşmesi kutlamanın kendisi yüzünden bozulurdu.
  */
 export async function markCelebrated(uid, _ledger, ids) {
+  const donem = epoch;
   const guncel = await loadLedger(uid);
   const sonraki = isaretleGorulmus(guncel, ids);
+  if (donem !== epoch) return guncel; // araya sıfırlama girdi
   await saveLedger(uid, sonraki);
   return sonraki;
 }

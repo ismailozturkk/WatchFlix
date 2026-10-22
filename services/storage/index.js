@@ -40,6 +40,7 @@ export {
 export { createNamespace } from "./namespace";
 export {
   clearUserScope,
+  purgeUserScope,
   clearAllCacheStorage,
   cacheByteSize,
   scopedByteSize,

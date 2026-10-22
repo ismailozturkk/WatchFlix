@@ -2,12 +2,10 @@ import { buildActivityFromRoot } from "../utils/mediaActivityIndex";
 import React, {
   createContext,
   useContext,
-  useState,
   useEffect,
   useMemo,
-  useRef,
 } from "react";
-import { Keys, get, set, getActiveUser } from "../services/storage";
+import { Keys, set, getActiveUser, useStored } from "../services/storage";
 import { useAuth } from "./AuthContext";
 import { useListStatusContext } from "./ListStatusContext";
 
@@ -27,27 +25,13 @@ export const MediaActivityProvider = ({ children }) => {
   const { user } = useAuth();
   const { activityIndex: rootActivity } = useListStatusContext() || {};
 
-  // AÇILIŞ TOHUMU — MMKV'den senkron okuma
-  const ilkTohum = useMemo(
-    () => {
-      const uid = user?.uid ?? getActiveUser();
-      return uid ? get(Keys.mediaActivity, { uid })?.activityIndex ?? null : null;
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
-  const [cachedIndex, setCachedIndex] = useState(ilkTohum ?? EMPTY_INDEX);
-  const cacheHydratedForUid = useRef(null);
-
-  useEffect(() => {
-    const uid = user?.uid ?? getActiveUser();
-    if (!uid || cacheHydratedForUid.current === uid) return;
-    cacheHydratedForUid.current = uid;
-
-    const parsed = get(Keys.mediaActivity, { uid });
-    if (parsed?.activityIndex) setCachedIndex(parsed.activityIndex);
-  }, [user?.uid]);
+  // ÖNBELLEK — MMKV'den senkron ve REAKTİF okuma. Eskiden açılışta bir kez state'e
+  // kopyalanıyordu; hesap SIFIRLANINCA anahtar silinse bile ekran eski "puanladım /
+  // yorumladım" işaretlerini göstermeye devam ediyordu (canlı kök belge boşken yedek
+  // olarak bu kopya kullanılır). useStored silinmeyi/yazımı izler.
+  const cacheUid = user?.uid ?? getActiveUser();
+  const stored = useStored(Keys.mediaActivity, cacheUid ? { uid: cacheUid } : undefined);
+  const cachedIndex = stored?.activityIndex ?? EMPTY_INDEX;
 
   const liveIndex = useMemo(
     () => (rootActivity ? buildActivityFromRoot(rootActivity) : null),
