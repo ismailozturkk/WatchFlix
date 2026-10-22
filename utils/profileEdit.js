@@ -5,6 +5,8 @@
 
 import { favoritesEqual } from "./fourFavorites";
 import { socialLinksEqual } from "./socialLinks";
+import { CUSTOM_AVATAR_INDEX } from "./avatars";
+import { samePhoto } from "./avatarPhotos";
 
 /**
  * Formda kaydedilmemiş bir değişiklik var mı? Kaydet düğmesi buna bakar.
@@ -31,6 +33,15 @@ export function isProfileEditDirty({ ready, saved, draft }) {
   if ((draft.username || "") !== (saved.username || "")) return true;
   if ((draft.bio || "").trim() !== (saved.bio || "")) return true;
   if (draft.avatarIndex !== saved.avatarIndex) return true;
+  // İkisi de fotoğraf avatarıysa (ör. eski fotoğraf → Google'ın güncel resmi)
+  // fark resimdedir; yalnız boyut eki farkı değişiklik sayılmaz.
+  if (
+    draft.avatarIndex === CUSTOM_AVATAR_INDEX &&
+    (draft.avatarPhotoURL || saved.avatarPhotoURL) &&
+    !samePhoto(draft.avatarPhotoURL, saved.avatarPhotoURL)
+  ) {
+    return true;
+  }
   if (!favoritesEqual(saved.fourFavorites, draft.fourFavorites)) return true;
   if (!socialLinksEqual(saved.socialLinks, draft.socialLinks)) return true;
   if (draft.socialInvalid?.length) return true;

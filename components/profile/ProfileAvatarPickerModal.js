@@ -13,30 +13,38 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import GlassCloseButton from "@components/common/GlassCloseButton";
+import GlassTouchable from "@components/common/GlassTouchable";
 import { useTheme } from "@context/ThemeContext";
-import { useAuth } from "@context/AuthContext";
-import { useUserProfile } from "@context/UserProfileContext";
-import { AVATARS, CUSTOM_AVATAR_INDEX, getAvatarSource } from "@utils/avatars";
+import { useNavigation } from "@react-navigation/native";
+import { useProfileUi } from "@context/ProfileUiContext";
+import {
+  AVATARS,
+  AVATAR_COUNT,
+  CUSTOM_AVATAR_INDEX,
+  getAvatarSource,
+} from "@utils/avatars";
+import { buildAvatarChoices, sameAvatarChoice } from "@utils/avatarPhotos";
 import { i18nText } from "@utils/i18nText";
 
-const RAW_AVATAR_INDEXES = AVATARS.map((_, index) => index);
+const PROVIDER_ICON = {
+  "google.com": "logo-google",
+  "apple.com": "logo-apple",
+};
 
-const AvatarCell = memo(function AvatarCell({
-  index,
-  selected,
-  accent,
-  photoURL,
-  onSelect,
-}) {
-  const isSocial = index === CUSTOM_AVATAR_INDEX;
-  const avatarSource = isSocial
-    ? getAvatarSource(CUSTOM_AVATAR_INDEX, photoURL)
-    : getAvatarSource(index);
+function photoLabel(photoSource) {
+  return photoSource === "google.com"
+    ? i18nText("autoI18n.google_fotografi", "Google fotoğrafı")
+    : i18nText("autoI18n.hesap_fotografi", "Hesap fotoğrafı");
+}
+
+const AvatarCell = memo(function AvatarCell({ item, selected, accent, onSelect }) {
+  const isPhoto = item.avatarIndex === CUSTOM_AVATAR_INDEX;
+  const avatarSource = getAvatarSource(item.avatarIndex, item.photoURL);
 
   return (
     <TouchableOpacity
       activeOpacity={0.78}
-      onPress={() => onSelect(index)}
+      onPress={() => onSelect(item)}
       style={[
         styles.cell,
         selected && { borderColor: accent, backgroundColor: accent + "18" },
@@ -44,9 +52,9 @@ const AvatarCell = memo(function AvatarCell({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={
-        isSocial
-          ? i18nText("autoI18n.sosyal_profil_fotografi", "Sosyal Profil Fotoğrafı")
-          : i18nText("autoI18n.avatar_n", "Avatar {{n}}", { n: index + 1 })
+        isPhoto
+          ? photoLabel(item.photoSource)
+          : i18nText("autoI18n.avatar_n", "Avatar {{n}}", { n: item.avatarIndex + 1 })
       }
     >
       <Image
@@ -54,12 +62,18 @@ const AvatarCell = memo(function AvatarCell({
         style={styles.avatar}
         contentFit="cover"
         cachePolicy="memory-disk"
-        recyclingKey={String(index)}
+        recyclingKey={item.key}
+        // Süresi dolmuş sağlayıcı adresi boş hücre bırakmasın.
+        placeholder={isPhoto ? AVATARS[0] : undefined}
       />
 
-      {isSocial && (
+      {isPhoto && (
         <View style={[styles.socialBadge, { backgroundColor: accent }]}>
-          <Ionicons name="sparkles" size={8} color="#fff" />
+          <Ionicons
+            name={PROVIDER_ICON[item.photoSource] || "sparkles"}
+            size={8}
+            color="#fff"
+          />
         </View>
       )}
 
@@ -72,45 +86,56 @@ const AvatarCell = memo(function AvatarCell({
   );
 });
 
+/**
+ * Avatar seçici: bağlı hesap fotoğrafları (Google…) + hazır avatarlar.
+ *
+ * @param {object}   props.selected  Seçili avatar: { avatarIndex, photoURL, photoSource }
+ *   (utils/avatarPhotos.js). Verilmezse kendi kayıtlı avatarın kullanılır.
+ * @param {Function} props.onSelect  Seçim NESNESİYLE çağrılır; çağıran
+ *   ProfileUiContext.selectAvatar'a ya da forma iletir.
+ */
 export default function ProfileAvatarPickerModal({
   visible,
-  selectedIndex,
+  selected,
   saving,
   onSelect,
   onClose,
 }) {
   const { theme } = useTheme();
-  const { user } = useAuth();
-  const { profile } = useUserProfile();
+  const { myAvatar, linkedPhotos } = useProfileUi();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
 
-  const socialPhotoURL = profile?.photoURL || user?.photoURL || null;
-
-  const avatarIndexes = useMemo(() => {
-    if (socialPhotoURL) {
-      return [CUSTOM_AVATAR_INDEX, ...RAW_AVATAR_INDEXES];
-    }
-    return RAW_AVATAR_INDEXES;
-  }, [socialPhotoURL]);
+  const current = selected || myAvatar;
+  const choices = useMemo(
+    () => buildAvatarChoices({ linkedPhotos, current }),
+    [linkedPhotos, current]
+  );
+  const photoCount = choices.length - AVATAR_COUNT;
+  const hasGooglePhoto = linkedPhotos.some((p) => p.providerId === "google.com");
 
   const chooseAvatar = useCallback(
-    (index) => {
-      Promise.resolve(onSelect(index)).catch(() => {});
+    (item) => {
+      Promise.resolve(onSelect(item)).catch(() => {});
     },
     [onSelect]
   );
 
+  const openConnections = useCallback(() => {
+    onClose?.();
+    navigation.navigate("AccountConnectionsScreen");
+  }, [navigation, onClose]);
+
   const renderItem = useCallback(
     ({ item }) => (
       <AvatarCell
-        index={item}
-        selected={item === selectedIndex}
+        item={item}
+        selected={sameAvatarChoice(item, current)}
         accent={theme.accent}
-        photoURL={socialPhotoURL}
         onSelect={chooseAvatar}
       />
     ),
-    [selectedIndex, theme.accent, socialPhotoURL, chooseAvatar]
+    [current, theme.accent, chooseAvatar]
   );
 
   return (
@@ -149,12 +174,12 @@ export default function ProfileAvatarPickerModal({
             {i18nText("autoI18n.avatar_sec", "Avatar seç")}
           </Text>
           <Text style={[styles.subtitle, { color: theme.text.muted }]}>
-            {socialPhotoURL
+            {photoCount > 0
               ? i18nText("autoI18n.profil_fotografi_ve_n_avatar", "Profil fotoğrafın ve {{n}} avatar", {
-                  n: RAW_AVATAR_INDEXES.length,
+                  n: AVATAR_COUNT,
                 })
               : i18nText("autoI18n.n_avatar", "{{n}} avatar", {
-                  n: RAW_AVATAR_INDEXES.length,
+                  n: AVATAR_COUNT,
                 })}
           </Text>
         </View>
@@ -168,10 +193,39 @@ export default function ProfileAvatarPickerModal({
         />
       </View>
 
+      {hasGooglePhoto ? (
+        <View style={[styles.hint, { backgroundColor: theme.accent + "12" }]}>
+          <Ionicons name="sync-outline" size={14} color={theme.accent} />
+          <Text style={[styles.hintText, { color: theme.text.secondary }]}>
+            {i18nText(
+              "autoI18n.avatar_foto_guncel_kalir",
+              "Google'da fotoğrafını değiştirirsen burada da güncellenir"
+            )}
+          </Text>
+        </View>
+      ) : linkedPhotos.length === 0 ? (
+        <GlassTouchable
+          activeOpacity={0.75}
+          disabled={saving}
+          onPress={openConnections}
+          accessibilityRole="link"
+          style={[styles.hint, { backgroundColor: theme.accent + "12" }]}
+        >
+          <Ionicons name="logo-google" size={14} color={theme.accent} />
+          <Text style={[styles.hintText, { color: theme.text.secondary }]}>
+            {i18nText(
+              "autoI18n.avatar_foto_ipucu",
+              "Google hesabını bağlarsan fotoğrafını da avatar yapabilirsin"
+            )}
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color={theme.text.muted} />
+        </GlassTouchable>
+      ) : null}
+
       <FlatList
-        data={avatarIndexes}
-        extraData={selectedIndex}
-        keyExtractor={(item) => String(item)}
+        data={choices}
+        extraData={current}
+        keyExtractor={(item) => item.key}
         renderItem={renderItem}
         numColumns={5}
         columnWrapperStyle={styles.row}
@@ -269,6 +323,16 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
     zIndex: 2,
   },
+  hint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  hintText: { flex: 1, fontSize: 12, fontWeight: "600", lineHeight: 16 },
   savingOverlay: {
     ...StyleSheet.absoluteFill,
     alignItems: "center",

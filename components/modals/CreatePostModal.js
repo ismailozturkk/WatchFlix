@@ -35,6 +35,7 @@ import Toast from "@components/AppToast";
 import { Octicons } from "@expo/vector-icons";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { avatarSnapshot } from "@utils/avatarPhotos";
 import UserAvatar from "@components/common/UserAvatar";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { useUserProfile } from "@context/UserProfileContext";
@@ -143,8 +144,8 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   const { adultContent } = useContentSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const { user } = useAuth();
-  const { avatar, selectAvatarIndex } = useProfileUi();
-  const { displayName, username, avatarIndex: profileAvatarIndex } = useUserProfile();
+  const { avatar, myAvatar } = useProfileUi();
+  const { displayName, username } = useUserProfile();
 
   const isEditing = !!editingPost;
 
@@ -648,16 +649,12 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       visibility: "public",
       authorName: displayName || user?.displayName || "",
       authorUsername: username || "",
-      // Avatar tam URL değil sadece index olarak gider.
-      // utils/avatars.js içinde clampAvatarIndex bir güvenlik ağı.
-      authorAvatarIndex:
-        typeof profileAvatarIndex === "number"
-          ? profileAvatarIndex
-          : typeof selectAvatarIndex === "number"
-            ? selectAvatarIndex
-            : 0,
-      authorPhotoURL: user?.photoURL || null,
-      authorAvatar: user?.photoURL || null,
+      // Kendi avatarım tek kaynaktan (ProfileUiContext.myAvatar). Fotoğraf
+      // profildeki GÜNCEL adrestir; eskiden Auth'un hiç tazelenmeyen
+      // user.photoURL'ü yazılıyordu (bağlanan Google hesabında boş).
+      authorAvatarIndex: avatarSnapshot(myAvatar).avatarIndex,
+      authorPhotoURL: avatarSnapshot(myAvatar).photoURL,
+      authorAvatar: avatarSnapshot(myAvatar).photoURL,
     };
     if (postType === "poll") {
       payload.poll = buildPollObject({

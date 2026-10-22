@@ -40,7 +40,8 @@ import {
 } from "firebase/firestore";
 import { updateProfile } from "firebase/auth";
 import { auth, db } from "../firebase";
-import { clampAvatarIndex, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
+import { clampAvatarIndex, CUSTOM_AVATAR_INDEX, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
+import { avatarSnapshot, toAvatarChoice } from "../utils/avatarPhotos";
 import { parseBirthDate } from "../utils/ageGate";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { propagateProfileChange } from "./profilePropagation";
@@ -409,20 +410,42 @@ export async function changeUsername(uid, newUsername) {
 }
 
 /**
- * Avatar değiştir — Users.avatarIndex'i set et (-1 ise photoURL ile birlikte).
- * (Eski post'lardaki authorAvatarIndex değişmez — bilinçli snapshot davranışı.)
+ * Avatar değiştir — TEK kalıcı yazım yolu (seçici, Profili Düzenle, bağlı hesap
+ * senkronu). Fotoğraf avatarında (-1) adres ve kaynak hesap (`photoSource`)
+ * birlikte yazılır; hazır avatarda son fotoğraf belgede kalır ama gösterilmez.
+ *
+ * İstemcinin izinli kopyaları burada hemen tazelenir; geri kalan bütün sosyal
+ * yüzeyleri functions/index.js:onUserProfileUpdated günceller. Çağıranlar
+ * ayrıca propagateProfileChange ÇAĞIRMAZ.
+ *
+ * @param {string} uid
+ * @param {number|{avatarIndex:number, photoURL?:string, photoSource?:string}} avatar
+ *   Hazır avatar indeksi ya da utils/avatarPhotos.js seçim nesnesi.
+ * @param {string|null} [photoURL] Eski imza: avatar sayıyken -1 için fotoğraf.
  */
-export async function setAvatarIndex(uid, avatarIndex, photoURL = null) {
-  const clamped = clampAvatarIndex(avatarIndex);
-  const patch = { avatarIndex: clamped };
-  if (clamped === -1 && photoURL) {
-    patch.photoURL = photoURL;
+export async function setAvatarIndex(uid, avatar, photoURL = null) {
+  const choice = toAvatarChoice(avatar, { photoURL });
+  const patch = { avatarIndex: choice.avatarIndex };
+  if (choice.avatarIndex === CUSTOM_AVATAR_INDEX) {
+    patch.photoURL = choice.photoURL;
+    // Kaynağı bilinmeyen fotoğrafta alan silinir: önceki hesabın adı yanlış
+    // fotoğrafa yapışıp senkronu yanlış yöne çekmesin.
+    patch.photoSource = choice.photoSource || deleteField();
   }
   await updateUserProfile(uid, patch);
-  propagateProfileChange(uid, {
-    avatarIndex: clamped,
-    photoURL: clamped === -1 ? photoURL : null,
-  }).catch(() => {});
+  propagateProfileChange(uid, avatarSnapshot(choice)).catch(() => {});
+}
+
+/**
+ * Bağlı hesaptaki fotoğraf değişti: avatar seçimi aynı (fotoğraf), yalnız adres
+ * ve kaynak tazelenir. Adres aynıysa (eski hesaba `photoSource` geri doldurma)
+ * kopyalara dokunulmaz.
+ */
+export async function refreshAvatarPhoto(uid, { photoURL, photoSource, photoChanged = true }) {
+  await updateUserProfile(uid, { photoURL, photoSource });
+  if (photoChanged) {
+    propagateProfileChange(uid, { avatarIndex: CUSTOM_AVATAR_INDEX, photoURL }).catch(() => {});
+  }
 }
 
 /**

@@ -11,7 +11,7 @@
 // çizileceğiydi: boyut/oran/border/cover-contain/overlay mantığı 23 dosyada
 // ayrı ayrı tekrarlanıyordu. Artık hepsi burada yaşıyor.
 
-import React, { memo } from "react";
+import React, { memo, useCallback, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Image } from "expo-image";
 import { getAvatarSource, CUSTOM_AVATAR_INDEX, DEFAULT_AVATAR_INDEX, AVATARS } from "@utils/avatars";
@@ -56,12 +56,23 @@ const UserAvatar = memo(function UserAvatar({
   priority = "high",
   cachePolicy = "memory-disk",
 }) {
+  // Uzak fotoğraf yüklenemezse (sağlayıcı adresi süresi dolmuş/silinmiş —
+  // anlık kopyalardaki eski Google adresleri gibi) boş daire yerine yedek
+  // avatar. Hangi adresin düştüğü tutulur: kaynak değişince yeniden denenir.
+  const [failedUri, setFailedUri] = useState(null);
+  const candidate = source ?? getAvatarSource(avatarIndex, photoURL) ?? fallbackSource;
+  const candidateUri = typeof candidate === "object" ? candidate?.uri || null : null;
+  const handleError = useCallback(() => {
+    if (candidateUri) setFailedUri(candidateUri);
+  }, [candidateUri]);
+
   if (loading) {
     const radius = shape === "circle" ? size / 2 : Math.round(size * 0.33);
     return <Skeleton width={size} height={size} style={[{ borderRadius: radius }, style]} />;
   }
 
-  const resolvedSource = source ?? getAvatarSource(avatarIndex, photoURL) ?? fallbackSource;
+  const resolvedSource =
+    candidateUri && candidateUri === failedUri ? fallbackSource : candidate;
   const cover =
     isCustomPhoto !== null ? isCustomPhoto : source ? true : avatarIndex === CUSTOM_AVATAR_INDEX;
 
@@ -92,6 +103,7 @@ const UserAvatar = memo(function UserAvatar({
         contentFit={cover ? "cover" : "contain"}
         priority={priority}
         cachePolicy={cachePolicy}
+        onError={candidateUri ? handleError : undefined}
       />
       {online ? (
         <View

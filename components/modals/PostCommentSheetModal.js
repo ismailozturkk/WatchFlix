@@ -53,6 +53,7 @@ import { useTheme } from "@context/ThemeContext";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { avatarSnapshot } from "@utils/avatarPhotos";
 import { useUserProfile } from "@context/UserProfileContext";
 import UserAvatar from "../common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
@@ -272,12 +273,10 @@ const CommentItem = memo(function CommentItem({
 export default function PostCommentSheetModal({ visible, post, onClose }) {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { avatar, selectAvatarIndex } = useProfileUi();
+  const { avatar, myAvatar } = useProfileUi();
   const {
     displayName: profileDisplayName,
     username: profileUsername,
-    avatarIndex: profileAvatarIndex,
-    photoURL: profilePhotoURL,
   } = useUserProfile();
   const styles = getStyles(theme);
   const insets = useSafeAreaInsets();
@@ -433,13 +432,8 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
           {
           parentId: parentId || null,
           authorUsername: profileUsername || "",
-          authorAvatarIndex:
-            typeof profileAvatarIndex === "number"
-              ? profileAvatarIndex
-              : typeof selectAvatarIndex === "number"
-                ? selectAvatarIndex
-                : 0,
-          authorPhotoURL: profilePhotoURL || user?.photoURL || null,
+          authorAvatarIndex: avatarSnapshot(myAvatar).avatarIndex,
+          authorPhotoURL: avatarSnapshot(myAvatar).photoURL,
           postTitle: post?.title || "",
           postPoster: post?.mediaList?.[0]?.poster || null,
           },
@@ -469,12 +463,10 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
     isSending,
     postId,
     user,
-    selectAvatarIndex,
+    myAvatar,
     post,
     profileDisplayName,
     profileUsername,
-    profileAvatarIndex,
-    profilePhotoURL,
   ]);
 
   // ── Sil ──

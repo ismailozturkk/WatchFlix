@@ -30,6 +30,26 @@ describe("isProfileEditDirty", () => {
     expect(isProfileEditDirty({ ready: true, saved, draft: { ...same, ...patch } })).toBe(true);
   });
 
+  describe("photo avatar", () => {
+    const photoSaved = { ...saved, avatarIndex: -1, avatarPhotoURL: "https://lh3.googleusercontent.com/a/OLD=s96-c" };
+    const photoDraft = { ...same, avatarIndex: -1, avatarPhotoURL: photoSaved.avatarPhotoURL };
+
+    it("is dirty when a different photo is picked", () => {
+      const draft = { ...photoDraft, avatarPhotoURL: "https://lh3.googleusercontent.com/a/NEW=s96-c" };
+      expect(isProfileEditDirty({ ready: true, saved: photoSaved, draft })).toBe(true);
+    });
+
+    it("is clean when only the size suffix differs", () => {
+      const draft = { ...photoDraft, avatarPhotoURL: "https://lh3.googleusercontent.com/a/OLD=s500-c" };
+      expect(isProfileEditDirty({ ready: true, saved: photoSaved, draft })).toBe(false);
+    });
+
+    it("ignores the stored photo while a preset avatar is in use", () => {
+      const draft = { ...same, avatarPhotoURL: null };
+      expect(isProfileEditDirty({ ready: true, saved: { ...saved, avatarPhotoURL: "https://x.test/a.png" }, draft })).toBe(false);
+    });
+  });
+
   it("ignores surrounding whitespace the save would trim away", () => {
     expect(isProfileEditDirty({ ready: true, saved, draft: { ...same, displayName: "  Ali Veli  ", bio: "Film delisi \n" } })).toBe(false);
   });

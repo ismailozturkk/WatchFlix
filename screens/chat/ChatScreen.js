@@ -79,6 +79,7 @@ import {
 import * as Haptics from "@services/hapticsService";
 import { useLanguage } from "@context/LanguageContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { avatarSnapshot } from "@utils/avatarPhotos";
 import { useUserProfile } from "@context/UserProfileContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
 import { invitationFieldsFromMessage } from "@utils/importantInvites";
@@ -389,13 +390,13 @@ export default function ChatScreen({ route, navigation }) {
   const [trailerMedia, setTrailerMedia] = useState(null);
   const { adultContent } = useContentSettings();
   const { block, isBlocked } = useFriends();
-  const { selectAvatarIndex, avatars } = useProfileUi();
+  const { myAvatar, avatars } = useProfileUi();
   const {
     displayName: profileDisplayName,
     username: profileUsername,
-    avatarIndex: profileAvatarIndex,
-    photoURL: profilePhotoURL,
   } = useUserProfile();
+  // Gönderen kimliğine yazılan avatar: tek kaynak (ProfileUiContext.myAvatar).
+  const mySnapshot = avatarSnapshot(myAvatar);
   const [groupData, setGroupData] = useState(null); // grup modunda doc
   const [friendIdentity, setFriendIdentity] = useState(() => ({
     displayName: friendName || "",
@@ -1087,16 +1088,11 @@ export default function ChatScreen({ route, navigation }) {
         ? {
             senderName: profileDisplayName || currentUser.displayName || "",
             senderUsername: profileUsername || "",
-            senderAvatarIndex:
-              typeof profileAvatarIndex === "number"
-                ? profileAvatarIndex
-                : typeof selectAvatarIndex === "number"
-                  ? selectAvatarIndex
-                  : 0,
-            senderPhotoURL: profilePhotoURL || currentUser?.photoURL || null,
+            senderAvatarIndex: mySnapshot.avatarIndex,
+            senderPhotoURL: mySnapshot.photoURL,
           }
         : {},
-    [isGroup, currentUser.displayName, currentUser?.photoURL, profileDisplayName, profileUsername, profileAvatarIndex, selectAvatarIndex, profilePhotoURL],
+    [isGroup, currentUser.displayName, profileDisplayName, profileUsername, mySnapshot.avatarIndex, mySnapshot.photoURL],
   );
 
   const resolveSenderName = useCallback(
@@ -1208,12 +1204,7 @@ export default function ChatScreen({ route, navigation }) {
     [busyPinId, canRemovePin, pinsRef],
   );
 
-  const fromAvatarIndex =
-    typeof profileAvatarIndex === "number"
-      ? profileAvatarIndex
-      : typeof selectAvatarIndex === "number"
-        ? selectAvatarIndex
-        : 0;
+  const fromAvatarIndex = mySnapshot.avatarIndex;
 
   // Mesajın kalıcı YAN ETKİLERİ — sohbet özeti, gelen kutusu index'i (iki taraf)
   // ve alıcının okunmamış sayacı — mesajın KENDİSİYLE aynı batch'e eklenir.

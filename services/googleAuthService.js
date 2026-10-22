@@ -561,6 +561,38 @@ export async function unlinkGoogleAccount() {
 }
 
 /**
+ * Cihazdaki Google oturumunun GÜNCEL profili (hesap seçici açmadan).
+ *
+ * Firebase'in `providerData[google].photoURL` kopyası yalnız Google ile yeniden
+ * girişte tazelenir; kullanıcı Google'da fotoğrafını değiştirse uygulama bunu
+ * aylarca görmezdi. Başarılı giriş/bağlamadan sonra yerel oturum açık kaldığı
+ * için (bkz. getGoogleCredential) sessiz giriş güncel fotoğrafı döndürür.
+ *
+ * Hiçbir zaman fırlatmaz; oturum yoksa, başka bir Google akışı sürüyorsa ya da
+ * native modül yoksa null.
+ *
+ * @returns {Promise<{id:string, photo:string|null, email:string|null}|null>}
+ */
+export async function getSilentGoogleProfile() {
+  if (busy) return null;
+  try {
+    configureGoogleSignIn();
+    if (!GoogleSignin.hasPreviousSignIn()) return null;
+    const response = await GoogleSignin.signInSilently();
+    if (!isSuccessResponse(response)) return null;
+    const googleUser = response.data?.user;
+    if (!googleUser?.id) return null;
+    return {
+      id: googleUser.id,
+      photo: googleUser.photo || null,
+      email: googleUser.email || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Tamamlama ekranındaki "Başka hesap kullan".
  *
  * Profili hiç oluşmamış hesabı Auth'tan da siler. Aksi halde e-posta kalıcı

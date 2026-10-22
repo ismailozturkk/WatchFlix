@@ -21,7 +21,6 @@ import ScreenDecor from "../../components/ScreenDecor";
 // dönerken "hayalet" olarak belirip kalıyordu.
 import StatisticsSection from "./profile/StatisticsSection";
 import { useUserProfile } from "../../context/UserProfileContext";
-import { propagateProfileChange } from "../../services/profilePropagation";
 import * as Haptics from "../../services/hapticsService";
 import ProfileAvatarPickerModal from "../../components/profile/ProfileAvatarPickerModal";
 import AvatarPreviewModal from "../../components/profile/AvatarPreviewModal";
@@ -188,21 +187,18 @@ const ProfileScreen = ({ navigation }) => {
     setShowAvatarPreview(true);
   }, []);
 
+  // Kopyaların tazelenmesi selectAvatar → userService.setAvatarIndex içinde;
+  // burada ayrıca yayılım yapılmaz (eskiden fotoğrafsız ikinci bir yayılım
+  // vardı).
   const handleAvatarSelect = useCallback(
-    async (index) => {
-      const changed = index !== selectAvatarIndex;
+    async (choice) => {
       try {
-        const saved = await selectAvatar(index);
-        if (saved && changed && user?.uid) {
-          propagateProfileChange(user.uid, { avatarIndex: index }).catch(
-            () => {}
-          );
-        }
+        await selectAvatar(choice);
       } catch {
         // Context seçimi geri alır ve kullanıcıya kalıcılık hatasını gösterir.
       }
     },
-    [selectAvatarIndex, selectAvatar, user?.uid]
+    [selectAvatar]
   );
 
   return (
@@ -219,7 +215,7 @@ const ProfileScreen = ({ navigation }) => {
         <SafeAreaView
           style={[styles.container, { backgroundColor: "transparent" }]}
         >
-          <ImportantInvitesBar navigation={navigation} />
+          <ImportantInvitesBar key={user?.uid || "guest"} navigation={navigation} />
           <View style={styles.images}>
             <ProfileAvatarHalo
               source={avatar}
@@ -325,7 +321,6 @@ const ProfileScreen = ({ navigation }) => {
           <ProfileLogoutButton navigation={navigation} theme={theme} />
           <ProfileAvatarPickerModal
             visible={modalVisible}
-            selectedIndex={selectAvatarIndex}
             saving={isloadingAvatar}
             onSelect={handleAvatarSelect}
             onClose={() => setModalVisible(false)}

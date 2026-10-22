@@ -216,7 +216,24 @@ describe("EditProfileScreen", () => {
       expect(header().props.canSave).toBe(true);
 
       await act(async () => { await header().props.onSave(); });
-      expect(mockSelectAvatar).toHaveBeenCalledWith(9);
+      expect(mockSelectAvatar).toHaveBeenCalledWith({ avatarIndex: 9, photoURL: null, photoSource: null });
+    });
+
+    it("a linked-account photo is passed through with its source and shown in the hero", async () => {
+      await render();
+      const google = {
+        avatarIndex: -1,
+        photoURL: "https://lh3.googleusercontent.com/a/NEW=s96-c",
+        photoSource: "google.com",
+      };
+      await act(() => renderer.root.findByType("AvatarSheet").props.onSelect(google));
+      const hero = renderer.root.findByType("ProfileHero");
+      expect(hero.props.avatarIndex).toBe(-1);
+      expect(hero.props.photoURL).toBe(google.photoURL);
+      expect(hero.props.social).toBe(true);
+
+      await act(async () => { await header().props.onSave(); });
+      expect(mockSelectAvatar).toHaveBeenCalledWith(google);
     });
 
     it("picking the avatar that is already saved is not a change", async () => {

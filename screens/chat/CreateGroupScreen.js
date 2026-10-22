@@ -19,6 +19,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useTheme } from "@context/ThemeContext";
 import { useProfileUi } from "@context/ProfileUiContext";
+import { avatarSnapshot } from "@utils/avatarPhotos";
 import { useUserProfile } from "@context/UserProfileContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BackButton from "@components/BackButton";
@@ -43,8 +44,8 @@ export default function CreateGroupScreen({ navigation }) {
   const auth = getAuth();
   const user = auth.currentUser;
   const { theme } = useTheme();
-  const { selectAvatarIndex } = useProfileUi();
-  const { displayName, username, avatarIndex: profileAvatarIndex, photoURL: profilePhotoURL } = useUserProfile();
+  const { myAvatar } = useProfileUi();
+  const { displayName, username } = useUserProfile();
 
   const [friends, setFriends] = useState([]);
   const [selected, setSelected] = useState({}); // uid -> friend
@@ -132,13 +133,7 @@ export default function CreateGroupScreen({ navigation }) {
         [user.uid]: {
           name: displayName || user.displayName || "",
           username: username || "",
-          avatarIndex:
-            typeof profileAvatarIndex === "number"
-              ? profileAvatarIndex
-              : typeof selectAvatarIndex === "number"
-                ? selectAvatarIndex
-                : 0,
-          photoURL: profilePhotoURL || user?.photoURL || null,
+          ...avatarSnapshot(myAvatar),
         },
       };
       selectedList.forEach((f) => {
@@ -172,7 +167,7 @@ export default function CreateGroupScreen({ navigation }) {
       );
       setCreating(false);
     }
-  }, [canCreate, creating, user, selectedList, name, color, avatarIndex, selectAvatarIndex, profileAvatarIndex, profilePhotoURL, displayName, username, navigation, groupsGate]);
+  }, [canCreate, creating, user, selectedList, name, color, avatarIndex, myAvatar, displayName, username, navigation, groupsGate]);
 
   const renderFriend = ({ item }) => {
     const isSel = !!selected[item.uid];

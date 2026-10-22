@@ -6,38 +6,54 @@ import React, {
   useState,
   useMemo,
   useRef,
+  useSyncExternalStore,
 } from "react";
+import { AppState, InteractionManager } from "react-native";
 import { Keys, get, set, has } from "../services/storage";
 import Toast from "@components/AppToast";
 import { useAuth } from "./AuthContext";
 import { useUserProfile } from "./UserProfileContext";
 import {
   AVATARS as avatars,
+  CUSTOM_AVATAR_INDEX,
+  DEFAULT_AVATAR_INDEX,
   clampAvatarIndex,
   getAvatarSource,
 } from "../utils/avatars";
+import {
+  profileAvatarChoice,
+  sameAvatarChoice,
+  toAvatarChoice,
+} from "../utils/avatarPhotos";
+import {
+  fetchFreshProviderPhotos,
+  getLinkedPhotosState,
+  reconcileAvatarPhoto,
+  refreshLinkedPhotos,
+  subscribeLinkedPhotos,
+} from "../services/avatarPhotoSync";
 import { i18nText } from "../utils/i18nText";
 
 const ProfileUiContext = createContext();
+const NO_PHOTOS = [];
+
+function readCachedAvatarIndex(uid) {
+  return uid && has(Keys.avatarIndex, { uid })
+    ? clampAvatarIndex(get(Keys.avatarIndex, { uid }))
+    : null;
+}
 export const useProfileUi = () => useContext(ProfileUiContext);
 
 export const ProfileUiProvider = ({ children }) => {
   const { user } = useAuth();
   const { profile, changeAvatarIndex } = useUserProfile();
   const uid = user?.uid;
-  const socialPhotoURL = profile?.photoURL || user?.photoURL || null;
 
-  const [selectAvatarIndex, setSelectAvatarIndex] = useState(0);
-  const [avatarHydrating, setAvatarHydrating] = useState(false);
-  const [avatarSaving, setAvatarSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [gridStyle, setGridStyle] = useState(() => get(Keys.listGridStyle));
   const [allCornersRounded, setAllCornersRounded] = useState(() =>
     get(Keys.allCornersRounded),
   );
-  const firestoreAvatarUidRef = useRef(null);
-  const avatarSavingRef = useRef(false);
-
   // Görünüm tercihleri yukarıdaki useState başlangıç değerlerinde SENKRON
   // okunuyor; eski iki ayrı hidrasyon effect'i kalktı. "true"/"false" biçimli
   // eski kayıtların sayıya çevrilmesi göçün işi (registry: listGridStyle).
@@ -67,59 +83,84 @@ export const ProfileUiProvider = ({ children }) => {
     setAllCornersRounded(isRounded);
   };
 
-  // Yerel kayıt yalnız hızlı başlangıç önbelleğidir; gerçek kaynak Firestore.
+  // ── Avatar ────────────────────────────────────────────────────────────────
+  //
+  // "Kendi avatarım" TEK yerde çözülür: kaydedilmekte olan seçim (iyimser) →
+  // Firestore profili → cihazdaki son seçim (profil henüz gelmediyse). Kendi
+  // kimliğini gönderiye/yoruma/mesaja yazan her yer `myAvatar`ı
+  // (avatarSnapshot ile) kullanır; formülü ayrıca kurmaz.
+
+  const linked = useSyncExternalStore(subscribeLinkedPhotos, getLinkedPhotosState);
+  const linkedPhotos = linked.uid === uid ? linked.linkedPhotos : NO_PHOTOS;
+
+  const [cachedIndex, setCachedIndex] = useState(() => readCachedAvatarIndex(uid));
+  const [pendingChoice, setPendingChoice] = useState(null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const avatarSavingRef = useRef(false);
+
   useEffect(() => {
-    firestoreAvatarUidRef.current = null;
-    if (!uid) {
-      setSelectAvatarIndex(0);
-      return;
-    }
-    if (has(Keys.avatarIndex, { uid })) {
-      setSelectAvatarIndex(clampAvatarIndex(get(Keys.avatarIndex, { uid })));
-    }
-    setAvatarHydrating(false);
+    setPendingChoice(null);
+    setCachedIndex(readCachedAvatarIndex(uid));
   }, [uid]);
 
-  // Firestore gerçek kaynak: profil snapshot'ı geldiğinde hem UI hem local cache
-  // aynı güvenli index'e çekilir. Bu ayrıca başka cihazdaki seçimi de taşır.
-  useEffect(() => {
-    if (
-      !uid ||
-      profile?.uid !== uid ||
-      typeof profile?.avatarIndex !== "number"
-    ) {
-      return;
+  const profileReady = !!uid && profile?.uid === uid;
+  const savedChoice = useMemo(() => {
+    if (profileReady) {
+      return profileAvatarChoice(profile, {
+        fallbackIndex: cachedIndex ?? DEFAULT_AVATAR_INDEX,
+        authPhotoURL: user?.photoURL,
+      });
     }
-    const index = clampAvatarIndex(profile.avatarIndex);
-    firestoreAvatarUidRef.current = uid;
-    setSelectAvatarIndex(index);
-    setAvatarHydrating(false);
-    set(Keys.avatarIndex, index, { uid });
-  }, [uid, profile?.uid, profile?.avatarIndex]);
+    return toAvatarChoice(cachedIndex ?? DEFAULT_AVATAR_INDEX, {
+      photoURL: user?.photoURL || linkedPhotos[0]?.uri,
+    });
+    // profil nesnesinin yalnız avatar alanları önemli
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    profileReady,
+    profile?.avatarIndex,
+    profile?.photoURL,
+    profile?.photoSource,
+    cachedIndex,
+    user?.photoURL,
+    linkedPhotos,
+  ]);
+  const myAvatar = pendingChoice || savedChoice;
 
-  // Tek kalıcı seçim yolu. UI optimistic güncellenir; Firestore yazısı başarısız
-  // olursa hem state hem local cache önceki değere geri alınır.
+  // Firestore'daki seçim cihaz önbelleğine yansır (sonraki soğuk açılışın ilk
+  // karesi için). Başka cihazdaki seçim de bu yoldan gelir.
+  useEffect(() => {
+    if (!profileReady || typeof profile?.avatarIndex !== "number") return;
+    set(Keys.avatarIndex, clampAvatarIndex(profile.avatarIndex), { uid });
+  }, [profileReady, profile?.avatarIndex, uid]);
+
+  // Tek kalıcı seçim yolu. Hazır avatar indeksi ya da seçim nesnesi
+  // ({ avatarIndex, photoURL, photoSource }) alır; fotoğrafsız -1 gelirse ilk
+  // bağlı hesap fotoğrafı kullanılır. UI iyimser güncellenir; yazım düşerse
+  // profildeki değer geri gelir.
   const selectAvatar = useCallback(
-    async (nextIndex) => {
+    async (next) => {
       if (!uid || avatarSavingRef.current) return false;
-      const index = clampAvatarIndex(nextIndex);
-      if (index === selectAvatarIndex) {
+      const fallbackPhoto = linkedPhotos[0]
+        ? { photoURL: linkedPhotos[0].uri, photoSource: linkedPhotos[0].providerId }
+        : myAvatar.avatarIndex === CUSTOM_AVATAR_INDEX
+          ? myAvatar
+          : null;
+      const choice = toAvatarChoice(next, fallbackPhoto);
+      if (sameAvatarChoice(choice, savedChoice)) {
         setModalVisible(false);
         return true;
       }
 
-      const previous = selectAvatarIndex;
       avatarSavingRef.current = true;
       setAvatarSaving(true);
-      setSelectAvatarIndex(index);
+      setPendingChoice(choice);
       try {
-        await changeAvatarIndex(index, socialPhotoURL);
-        set(Keys.avatarIndex, index, { uid });
+        await changeAvatarIndex(choice);
+        set(Keys.avatarIndex, choice.avatarIndex, { uid });
         setModalVisible(false);
         return true;
       } catch (error) {
-        setSelectAvatarIndex(previous);
-        set(Keys.avatarIndex, previous, { uid });
         Toast.show({
           type: "error",
           text1: i18nText(
@@ -130,22 +171,68 @@ export const ProfileUiProvider = ({ children }) => {
         });
         throw error;
       } finally {
+        setPendingChoice(null);
         avatarSavingRef.current = false;
         setAvatarSaving(false);
       }
     },
-    [uid, selectAvatarIndex, changeAvatarIndex, socialPhotoURL]
+    [uid, linkedPhotos, myAvatar, savedChoice, changeAvatarIndex]
   );
 
-  const avatar = getAvatarSource(selectAvatarIndex, socialPhotoURL);
-  const isloadingAvatar = avatarHydrating || avatarSaving;
+  // Bağlı hesap fotoğraflarını tazele: açılışta (etkileşimler bitince, açılış
+  // yolunu yavaşlatmadan), uygulama öne geldikçe (servis kendisi kısar).
+  useEffect(() => {
+    if (!uid) {
+      refreshLinkedPhotos();
+      return undefined;
+    }
+    refreshLinkedPhotos();
+    const task = InteractionManager.runAfterInteractions(() => {
+      fetchFreshProviderPhotos().catch(() => {});
+    });
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") fetchFreshProviderPhotos().catch(() => {});
+    });
+    return () => {
+      task?.cancel?.();
+      sub.remove();
+    };
+  }, [uid]);
+
+  // Fotoğraf avatarı bağlı hesapla uyumlu kalsın: sağlayıcıdaki resim
+  // değiştiyse tazele, hesabı kaldırıldıysa hazır avatara dön.
+  useEffect(() => {
+    if (!profileReady || avatarSavingRef.current) return;
+    reconcileAvatarPhoto(uid, {
+      uid,
+      avatarIndex: profile?.avatarIndex,
+      photoURL: profile?.photoURL,
+      photoSource: profile?.photoSource,
+    }).catch(() => {});
+  }, [
+    profileReady,
+    uid,
+    profile?.avatarIndex,
+    profile?.photoURL,
+    profile?.photoSource,
+    linked,
+  ]);
+
+  // Fotoğrafta getAvatarSource her çağrıda yeni { uri } döner; sabit tutulmazsa
+  // context değeri her render'da değişir ve bütün tüketiciler yeniden çizilir.
+  const avatar = useMemo(
+    () => getAvatarSource(myAvatar.avatarIndex, myAvatar.photoURL),
+    [myAvatar.avatarIndex, myAvatar.photoURL],
+  );
+  const isloadingAvatar = avatarSaving;
+  const selectAvatarIndex = myAvatar.avatarIndex;
 
   const value = useMemo(
     () => ({
       avatar,
       avatars,
+      myAvatar,
       selectAvatarIndex,
-      setSelectAvatarIndex,
       selectAvatar,
       isloadingAvatar,
       modalVisible,
@@ -156,18 +243,18 @@ export const ProfileUiProvider = ({ children }) => {
       allCornersRounded,
       setAllCornersRounded,
       saveAllCornersRounded,
-      socialPhotoURL,
-      hasSocialPhoto: Boolean(socialPhotoURL),
+      linkedPhotos,
     }),
     [
       avatar,
+      myAvatar,
       selectAvatarIndex,
       selectAvatar,
       isloadingAvatar,
       modalVisible,
       gridStyle,
       allCornersRounded,
-      socialPhotoURL,
+      linkedPhotos,
     ]
   );
 

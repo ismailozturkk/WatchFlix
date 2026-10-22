@@ -36,6 +36,9 @@ import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useApiSettings } from "@context/AppSettingsContext";
 import { useAuth } from "@context/AuthContext";
+import { useUserProfile } from "@context/UserProfileContext";
+import { useProfileUi } from "@context/ProfileUiContext";
+import { avatarSnapshot } from "@utils/avatarPhotos";
 import { useListStatusContext } from "@context/ListStatusContext";
 import { i18nText } from "@utils/i18nText";
 import { buildQuestionImageUrl } from "@utils/gameImage";
@@ -78,6 +81,19 @@ export default function SceneGuessGameScreen({ navigation, route }) {
   const { plan: premiumPlan } = usePremium();
   const { API_KEY } = useApiSettings();
   const { user } = useAuth();
+  const { displayName: profileDisplayName } = useUserProfile();
+  const { myAvatar } = useProfileUi();
+  // Liderlik tablosuna yazılan kimlik: profildeki ad + avatar. Eskiden Auth
+  // kullanıcısı geçiliyordu — avatarIndex hiç yoktu, fotoğraf da Auth'un
+  // tazelenmeyen kopyasıydı (tabloda yanlış avatar).
+  const gameIdentity = useMemo(() => {
+    if (!user) return null;
+    return {
+      uid: user.uid,
+      displayName: profileDisplayName || user.displayName || "",
+      ...avatarSnapshot(myAvatar),
+    };
+  }, [user, profileDisplayName, myAvatar]);
   // combinedLists: öntanımlı listeler + watchedTv subcollection'dan türetilir
   // (yeni model — eski allLists kök-array yerine).
   const { combinedLists: allLists } = useListStatusContext();
@@ -136,7 +152,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
     language,
     userUid: user?.uid,
     allLists,
-    currentUser: user,
+    currentUser: gameIdentity,
     modeId: routeModeId,
     difficultyId: routeDifficultyId,
     gameId: routeGameId,

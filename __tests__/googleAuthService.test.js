@@ -13,6 +13,8 @@ jest.mock("react-native", () => ({ Platform: { OS: "android" } }));
 const mockSignIn = jest.fn();
 const mockGoogleSignOut = jest.fn().mockResolvedValue(null);
 const mockHasPlayServices = jest.fn().mockResolvedValue(true);
+const mockHasPreviousSignIn = jest.fn(() => false);
+const mockSignInSilently = jest.fn();
 
 jest.mock("@react-native-google-signin/google-signin", () => ({
   GoogleSignin: {
@@ -20,6 +22,8 @@ jest.mock("@react-native-google-signin/google-signin", () => ({
     hasPlayServices: (...a) => mockHasPlayServices(...a),
     signIn: (...a) => mockSignIn(...a),
     signOut: (...a) => mockGoogleSignOut(...a),
+    hasPreviousSignIn: (...a) => mockHasPreviousSignIn(...a),
+    signInSilently: (...a) => mockSignInSilently(...a),
   },
   isSuccessResponse: (r) => r?.type === "success",
   isErrorWithCode: (e) => typeof e?.code === "string",
@@ -76,6 +80,7 @@ const {
   GoogleAuthCode,
   describeGoogleAuthError,
   getGoogleSignInConfiguration,
+  getSilentGoogleProfile,
 } = require("../services/googleAuthService");
 
 const snapshot = (data) => ({ exists: () => data !== null, data: () => data });
@@ -315,6 +320,39 @@ describe("cancelGoogleRegistration", () => {
     mockAuth.currentUser = null;
     await cancelGoogleRegistration();
     expect(readPending()).toBe(null);
+  });
+});
+
+describe("getSilentGoogleProfile", () => {
+  beforeEach(() => {
+    mockHasPreviousSignIn.mockReset().mockReturnValue(true);
+    mockSignInSilently.mockReset();
+  });
+
+  it("returns the current Google photo without opening the account picker", async () => {
+    mockSignInSilently.mockResolvedValue({
+      type: "success",
+      data: { user: { id: "g-1", photo: "https://lh3.googleusercontent.com/a/NEW=s96-c", email: "a@b.c" } },
+    });
+    await expect(getSilentGoogleProfile()).resolves.toEqual({
+      id: "g-1",
+      photo: "https://lh3.googleusercontent.com/a/NEW=s96-c",
+      email: "a@b.c",
+    });
+    expect(mockSignIn).not.toHaveBeenCalled();
+  });
+
+  it("does not touch the network when there is no native Google session", async () => {
+    mockHasPreviousSignIn.mockReturnValue(false);
+    await expect(getSilentGoogleProfile()).resolves.toBeNull();
+    expect(mockSignInSilently).not.toHaveBeenCalled();
+  });
+
+  it("never throws: no saved credential or a native error is just null", async () => {
+    mockSignInSilently.mockResolvedValueOnce({ type: "noSavedCredentialFound", data: null });
+    await expect(getSilentGoogleProfile()).resolves.toBeNull();
+    mockSignInSilently.mockRejectedValueOnce(Object.assign(new Error("x"), { code: "SIGN_IN_REQUIRED" }));
+    await expect(getSilentGoogleProfile()).resolves.toBeNull();
   });
 });
 

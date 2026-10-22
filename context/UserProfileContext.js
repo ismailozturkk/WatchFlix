@@ -295,10 +295,12 @@ export function UserProfileProvider({ children }) {
     [uid],
   );
 
+  // `avatar`: hazır avatar indeksi ya da seçim nesnesi
+  // ({ avatarIndex, photoURL, photoSource } — utils/avatarPhotos.js).
   const changeAvatarIndex = useCallback(
-    async (index, photoURL = null) => {
+    async (avatar, photoURL = null) => {
       if (!uid) return;
-      await setAvatarIndexService(uid, index, photoURL);
+      await setAvatarIndexService(uid, avatar, photoURL);
     },
     [uid],
   );
@@ -367,6 +369,7 @@ export function UserProfileProvider({ children }) {
       migrating,
       uid,
       avatarIndex,
+      photoURL,
       privacy,
       birthDate,
       age,

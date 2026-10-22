@@ -41,6 +41,7 @@ import {
   buildUiColors,
   ui,
 } from "./settingsUi";
+import { fetchFreshProviderPhotos } from "../../../services/avatarPhotoSync";
 import GlassTouchable from "../../../components/common/GlassTouchable";
 import GlassBox from "../../../components/common/GlassBox";
 
@@ -78,7 +79,14 @@ export default function AccountConnectionsScreen() {
   const passwordReady = password.length >= 6 && password === passwordAgain;
   const providerCount = providers.length;
 
-  const refresh = () => setRevision((value) => value + 1);
+  // Bağlama/kaldırma `user` nesnesini yerinde değiştirir: fotoğraf deposu da
+  // tazelenir ki bağlanan hesabın fotoğrafı avatar seçicide hemen çıksın,
+  // kaldırılan hesabın fotoğrafı avatarsa hazır avatara dönülsün
+  // (services/avatarPhotoSync.js).
+  const refresh = () => {
+    setRevision((value) => value + 1);
+    fetchFreshProviderPhotos({ force: true }).catch(() => {});
+  };
 
   useEffect(() => {
     isAppleAuthenticationAvailable().then(setAppleAvailable);

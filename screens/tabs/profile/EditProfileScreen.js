@@ -1,6 +1,6 @@
 import { normalizeAppLanguage } from "../../../utils/appLanguages";
 import { isLightSurface } from "@utils/colorUtils";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   ScrollView,
@@ -18,10 +18,12 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useAuth } from "../../../context/AuthContext";
 import { useUserProfile } from "../../../context/UserProfileContext";
 import { useProfileUi } from "../../../context/ProfileUiContext";
+import { CUSTOM_AVATAR_INDEX } from "../../../utils/avatars";
 import {
-  clampAvatarIndex,
-  CUSTOM_AVATAR_INDEX,
-} from "../../../utils/avatars";
+  profileAvatarChoice,
+  sameAvatarChoice,
+  toAvatarChoice,
+} from "../../../utils/avatarPhotos";
 import {
   formatUsernameInput,
   isValidUsername,
@@ -115,7 +117,19 @@ export default function EditProfileScreen({ navigation }) {
   const { profile, loading, updateField, changeUsername } = useUserProfile();
   const { selectAvatarIndex, selectAvatar } = useProfileUi();
 
-  const socialPhotoURL = profile?.photoURL || user?.photoURL || null;
+  // Kayıtlı avatar, seçim biçiminde ({ avatarIndex, photoURL, photoSource }).
+  // Formun başlangıcı, "değişti mi" hesabı ve Kaydet AYNI değeri kullanır;
+  // profilde avatarIndex yoksa cihazdaki seçili avatar.
+  const savedAvatar = useMemo(
+    () =>
+      profile
+        ? profileAvatarChoice(profile, {
+            fallbackIndex: selectAvatarIndex,
+            authPhotoURL: user?.photoURL,
+          })
+        : null,
+    [profile, selectAvatarIndex, user?.photoURL],
+  );
 
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
@@ -123,7 +137,7 @@ export default function EditProfileScreen({ navigation }) {
   // Bu alan sonradan eklendi: eski hesaplarda boş gelir ve boş bırakılabilir —
   // kaydetmeyi zorunlu kılmak, yalnızca bio'sunu düzeltmek isteyeni kilitlerdi.
   const [birthDate, setBirthDate] = useState(null);
-  const [avatarIndex, setAvatarIndex] = useState(0);
+  const [avatarChoice, setAvatarChoice] = useState(() => toAvatarChoice(0));
   // Dört favori (film/dizi/oyuncu, her biri 0–4). Taslak burada; Kaydet ile
   // Users/{uid}.fourFavorites'e yazılır (utils/fourFavorites.js).
   const [favorites, setFavorites] = useState(emptyFavorites);
@@ -189,17 +203,11 @@ export default function EditProfileScreen({ navigation }) {
       setBirthDate(profile.birthDate || null);
       setFavorites(readProfileFavorites(profile));
       setSocialDraft(readProfileSocialLinks(profile));
-      setAvatarIndex(
-        clampAvatarIndex(
-          typeof profile.avatarIndex === "number"
-            ? profile.avatarIndex
-            : selectAvatarIndex,
-        ),
-      );
+      if (savedAvatar) setAvatarChoice(savedAvatar);
       initRef.current = true;
       setReady(true);
     }
-  }, [profile, selectAvatarIndex]);
+  }, [profile, savedAvatar]);
 
   // Kullanıcı adı: format + müsaitlik (debounce)
   useEffect(() => {
@@ -241,9 +249,8 @@ export default function EditProfileScreen({ navigation }) {
           displayName: profile.displayName || "",
           username: normalizeUsername(profile.username || ""),
           bio: profile.bio || "",
-          avatarIndex: clampAvatarIndex(
-            typeof profile.avatarIndex === "number" ? profile.avatarIndex : selectAvatarIndex,
-          ),
+          avatarIndex: savedAvatar.avatarIndex,
+          avatarPhotoURL: savedAvatar.photoURL,
           birthDate: profile.birthDate || null,
           fourFavorites: readProfileFavorites(profile),
           socialLinks: readProfileSocialLinks(profile),
@@ -253,7 +260,8 @@ export default function EditProfileScreen({ navigation }) {
       displayName,
       username: normalizeUsername(username),
       bio,
-      avatarIndex,
+      avatarIndex: avatarChoice.avatarIndex,
+      avatarPhotoURL: avatarChoice.photoURL,
       birthDate,
       fourFavorites: favorites,
       socialLinks: socialResolved.links,
@@ -353,19 +361,20 @@ export default function EditProfileScreen({ navigation }) {
       // kaydeder kaydetmez doğru durumda olmalı.
       if (birthChanged) syncAgeRestriction(birthDate);
 
-      const avatarChanged = avatarIndex !== clampAvatarIndex(profile?.avatarIndex);
+      // Avatar kopyalarını selectAvatar → userService.setAvatarIndex tazeler
+      // (fotoğraf adresiyle birlikte); aşağıdaki yayılım yalnız ad içindir.
+      const avatarChanged = !sameAvatarChoice(avatarChoice, savedAvatar);
       if (avatarChanged) {
-        await selectAvatar(avatarIndex);
+        await selectAvatar(avatarChoice);
       }
 
       // İstemcinin izinli oldugu kopyalari hemen tazele. Tum sosyal yuzeylerin
       // yetkili fan-out'u Users/{uid} degisimini dinleyen Cloud Function'dadir.
       const nameChanged = patch.displayName !== undefined;
-      if ((nameChanged || usernameChanged || avatarChanged) && profile?.uid) {
+      if ((nameChanged || usernameChanged) && profile?.uid) {
         propagateProfileChange(profile.uid, {
           displayName: nameChanged ? dn : undefined,
           username: usernameChanged ? un : undefined,
-          avatarIndex: avatarChanged ? avatarIndex : undefined,
         }).catch(() => {});
       }
 
@@ -586,7 +595,7 @@ export default function EditProfileScreen({ navigation }) {
   const accent = theme.accent;
   const lightTheme = isLightSurface(theme.primary);
   const fieldSurface = theme.between;
-  const socialSelected = !!socialPhotoURL && avatarIndex === CUSTOM_AVATAR_INDEX;
+  const socialSelected = avatarChoice.avatarIndex === CUSTOM_AVATAR_INDEX;
 
   // Kullanıcı adı durum satırı: alanın kenar tonuyla (AuthField) aynı renkler.
   const hintColor = hint
@@ -699,8 +708,8 @@ export default function EditProfileScreen({ navigation }) {
             <Reveal>
               <ProfileHero
                 theme={theme}
-                avatarIndex={avatarIndex}
-                photoURL={socialPhotoURL}
+                avatarIndex={avatarChoice.avatarIndex}
+                photoURL={avatarChoice.photoURL}
                 name={displayName}
                 username={username}
                 social={socialSelected}
@@ -891,10 +900,10 @@ export default function EditProfileScreen({ navigation }) {
       {/* Avatar seçici: seçim yalnız forma yazılır, Kaydet ile kalıcı olur. */}
       <ProfileAvatarPickerModal
         visible={avatarSheet}
-        selectedIndex={avatarIndex}
+        selected={avatarChoice}
         saving={false}
-        onSelect={(index) => {
-          setAvatarIndex(index);
+        onSelect={(choice) => {
+          setAvatarChoice(toAvatarChoice(choice));
           setAvatarSheet(false);
         }}
         onClose={() => setAvatarSheet(false)}
