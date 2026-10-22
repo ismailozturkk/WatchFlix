@@ -57,7 +57,7 @@ import {
   setListMembership,
 } from "../../services/libraryActions";
 import { customListHas, listItemFromDetails } from "../../utils/libraryCore";
-import { showLibraryError } from "../../utils/libraryErrorText";
+import { showLibraryError, showWatchSpreadNotice } from "../../utils/libraryErrorText";
 import { todayListDate } from "../../utils/mediaFacts";
 import ScreenDecor from "../../components/ScreenDecor";
 import ImageGalleryModal from "@components/modals/ImageGalleryModal";
@@ -444,13 +444,14 @@ export default function TvShowsDetails({ route, navigation }) {
       closeModal();
       // Sezonların çekilmesi, "biri düşerse hiçbiri yazılmaz" kuralı ve yazma
       // services/libraryActions.markShowWatched'ta — hata kodu yerelleştirilir.
-      const { status } = await markShowWatched({
+      const watchResult = await markShowWatched({
         uid: user.uid,
         details,
         watchDate: formatDateSave(selDate),
         apiKey: API_KEY,
         language,
       });
+      const { status } = watchResult;
       if (status === "empty-show") {
         Toast.show({
           type: "warning",
@@ -461,13 +462,16 @@ export default function TvShowsDetails({ route, navigation }) {
         });
         return;
       }
-      Toast.show({
-        type: "success",
-        text1: i18nText(
-          "autoI18n.dizi_bolumleri_izlendi_olarak_isaretlendi",
-          "Dizi bölümleri izlendi olarak işaretlendi"
-        ),
-      });
+      // Günlük 24 saat sınırı yüzünden günlere yayıldıysa başarı toast'ı yerine bu söylenir.
+      if (!showWatchSpreadNotice(watchResult)) {
+        Toast.show({
+          type: "success",
+          text1: i18nText(
+            "autoI18n.dizi_bolumleri_izlendi_olarak_isaretlendi",
+            "Dizi bölümleri izlendi olarak işaretlendi"
+          ),
+        });
+      }
     } catch (e) {
       showLibraryError(e, { source: "tv_detail_mark_show" });
     } finally {

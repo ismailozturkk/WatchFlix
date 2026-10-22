@@ -32,6 +32,7 @@
 import { i18nText } from "./i18nText";
 import { tmdbPathFromPoster, MAX_SHARED_LIST_ITEMS } from "./listShare";
 import { PREVIEW_MAX } from "./threadPreview";
+import { tierOf } from "./tasteMatch";
 
 export const SHARE_VERSION = 1;
 
@@ -41,6 +42,8 @@ export const SHARE_KIND = Object.freeze({
   POST: "postShare",
   TOURNAMENT: "tournamentShare",
   CINE_ROOM: "cineRoomShare",
+  TASTE_MATCH: "tasteMatchShare",
+  CHALLENGE: "challengeShare",
 });
 
 export const SHARE_TYPE = Object.freeze({
@@ -49,6 +52,8 @@ export const SHARE_TYPE = Object.freeze({
   POST: "post",
   TOURNAMENT: "tournament",
   CINE_ROOM: "cineRoom",
+  TASTE_MATCH: "tasteMatch",
+  CHALLENGE: "challenge",
 });
 
 const KIND_BY_TYPE = {
@@ -57,6 +62,8 @@ const KIND_BY_TYPE = {
   [SHARE_TYPE.POST]: SHARE_KIND.POST,
   [SHARE_TYPE.TOURNAMENT]: SHARE_KIND.TOURNAMENT,
   [SHARE_TYPE.CINE_ROOM]: SHARE_KIND.CINE_ROOM,
+  [SHARE_TYPE.TASTE_MATCH]: SHARE_KIND.TASTE_MATCH,
+  [SHARE_TYPE.CHALLENGE]: SHARE_KIND.CHALLENGE,
 };
 const SHARE_KINDS = Object.values(SHARE_KIND);
 
@@ -493,6 +500,133 @@ export function buildCineRoomShare({ code, host, count } = {}) {
   return sanitizeCineRoomShare({ code, host, count });
 }
 
+// ─── Zevk uyumu ──────────────────────────────────────────────────────────────
+
+export const MAX_TASTE_SHARE_ITEMS = 4;
+const TASTE_PART_IDS = ["genres", "overlap", "ratings", "favorites"];
+const percentInt = (value) => (Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : null);
+const countInt = (value) => (Number.isFinite(value) && value >= 0 ? Math.min(99999, Math.round(value)) : null);
+
+function sanitizeTasteMatchShare(raw) {
+  const score = percentInt(raw.score);
+  // Puansız (veri yetersiz) uyum paylaşılmaz: uydurma yüzde göndermeyiz.
+  if (score === null) return null;
+  const share = { v: SHARE_VERSION, type: SHARE_TYPE.TASTE_MATCH, score, tier: tierOf(score) };
+
+  const host = clip(raw.host, MAX_AUTHOR_NAME);
+  if (host) share.host = host;
+  const friend = clip(raw.friend, MAX_AUTHOR_NAME);
+  if (friend) share.friend = friend;
+
+  const overlap = countInt(raw.overlap);
+  if (overlap !== null) share.overlap = overlap;
+  const favorites = countInt(raw.favorites);
+  if (favorites !== null) share.favorites = favorites;
+  const agreement = percentInt(raw.agreement);
+  const pairs = countInt(raw.pairs);
+  if (agreement !== null && pairs) {
+    share.agreement = agreement;
+    share.pairs = pairs;
+  }
+
+  // Film / dizi ayrı uyum (paylaşılmayan ya da verisi az kategori yoktur: uydurma puan gitmez).
+  const movie = percentInt(raw.movie);
+  if (movie !== null) share.movie = movie;
+  const tv = percentInt(raw.tv);
+  if (tv !== null) share.tv = tv;
+
+  const genres = (Array.isArray(raw.genres) ? raw.genres : []).map((g) => clip(g, 30)).filter(Boolean).slice(0, 3);
+  if (genres.length) share.genres = genres;
+  const loved = (Array.isArray(raw.loved) ? raw.loved : []).map((n) => clip(n, MAX_TITLE)).filter(Boolean).slice(0, 3);
+  if (loved.length) share.loved = loved;
+
+  const seenPart = new Set();
+  const parts = [];
+  (Array.isArray(raw.parts) ? raw.parts : []).forEach((entry) => {
+    const value = percentInt(entry?.value);
+    if (!TASTE_PART_IDS.includes(entry?.id) || value === null || seenPart.has(entry.id)) return;
+    seenPart.add(entry.id);
+    parts.push({ id: entry.id, value });
+  });
+  if (parts.length) share.parts = parts;
+
+  const seen = new Set();
+  const items = [];
+  (Array.isArray(raw.items) ? raw.items : []).forEach((entry) => {
+    const media = toShareMedia(entry);
+    if (!media || !media.title || seen.has(`${media.media_type}_${media.id}`) || items.length >= MAX_TASTE_SHARE_ITEMS) return;
+    seen.add(`${media.media_type}_${media.id}`);
+    items.push({
+      id: media.id,
+      media_type: media.media_type,
+      title: media.title,
+      ...(media.poster_path ? { poster_path: media.poster_path } : {}),
+    });
+  });
+  if (items.length) share.items = items;
+  return share;
+}
+
+/**
+ * `computeTasteMatch` çıktısı → sohbet gövdesi. Puan yoksa (veri yetersiz) null.
+ * Yalnız İKİ tarafın da bildiği veriler gider: ortak izlenen / ortak puanlanan başlıklar,
+ * ortak türler ve sayılar (tür eğilimi ve ayrışılan başlık bilerek GİTMEZ).
+ */
+export function buildTasteMatchShare(match, { host, friend } = {}) {
+  if (!isObject(match) || match.score == null) return null;
+  return sanitizeTasteMatchShare({
+    score: match.score,
+    host,
+    friend,
+    overlap: match.watched?.overlap?.length,
+    favorites: Array.isArray(match.favorites) ? match.favorites.length : undefined,
+    agreement: match.ratings?.agreement == null ? undefined : match.ratings.agreement * 100,
+    pairs: match.ratings?.pairs,
+    movie: match.byType?.movie?.score ?? undefined,
+    tv: match.byType?.tv?.score ?? undefined,
+    genres: match.genres?.shared,
+    loved: (match.loved || []).map((entry) => entry.name),
+    parts: match.breakdown,
+    items: (match.highlights || []).map((h) => ({ id: h.id, type: h.type, name: h.name, imagePath: h.imagePath })),
+  });
+}
+
+// ─── Günlük meydan okuma (düello) ────────────────────────────────────────────
+
+const CHALLENGE_DAY = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+export const MAX_CHALLENGE_SCORE = 100000;
+export const MAX_CHALLENGE_QUESTIONS = 50;
+
+function sanitizeChallengeShare(raw) {
+  const dayKey = typeof raw.dayKey === "string" && CHALLENGE_DAY.test(raw.dayKey) ? raw.dayKey : null;
+  if (!dayKey) return null;
+  const score = Number(raw.score);
+  // Skorsuz ("henüz oynamadım") bir meydan okuma olmaz; uydurma 0 da gönderilmez.
+  if (!Number.isFinite(score) || score < 0) return null;
+  const total = Math.max(1, Math.min(MAX_CHALLENGE_QUESTIONS, Math.round(Number(raw.total)) || 10));
+  const correct = Math.max(0, Math.min(total, Math.round(Number(raw.correct)) || 0));
+  const share = {
+    v: SHARE_VERSION,
+    type: SHARE_TYPE.CHALLENGE,
+    dayKey,
+    score: Math.min(MAX_CHALLENGE_SCORE, Math.round(score)),
+    correct,
+    total,
+  };
+  const host = clip(raw.host, MAX_AUTHOR_NAME);
+  if (host) share.host = host;
+  return share;
+}
+
+/**
+ * Günlük Meydan Okuma sonucu → düello kartı. Alıcı AYNI günün aynı 10 sahnesini oynar
+ * (günlük set herkeste sabit); karttaki skor yalnız ilk görünüm içindir, karşılaştırmada
+ * alıcının cihazı iki tarafın skorunu günlük tablodan DOĞRULAYARAK okur.
+ */
+export function buildChallengeShare({ dayKey, score, correct, total, host } = {}) {
+  return sanitizeChallengeShare({ dayKey, score, correct, total, host });
+}
+
 // ─── Ortak: doğrulama, okuma, önizleme ───────────────────────────────────────
 
 /** Bilinmeyen/bozuk gövde → null; geçerliyse temizlenmiş kopya. */
@@ -509,6 +643,10 @@ export function sanitizeShare(raw) {
       return sanitizeTournamentShare(raw);
     case SHARE_TYPE.CINE_ROOM:
       return sanitizeCineRoomShare(raw);
+    case SHARE_TYPE.TASTE_MATCH:
+      return sanitizeTasteMatchShare(raw);
+    case SHARE_TYPE.CHALLENGE:
+      return sanitizeChallengeShare(raw);
     default:
       return null;
   }
@@ -554,6 +692,10 @@ export function sharePreview(share) {
       return i18nText("autoI18n.paylas_turnuva_baslik", "Aylık turnuva");
     case SHARE_TYPE.CINE_ROOM:
       return i18nText("autoI18n.paylas_cine_daveti", "CineSwipe daveti");
+    case SHARE_TYPE.TASTE_MATCH:
+      return i18nText("autoI18n.paylas_zevk_onizleme", "Zevk uyumu %{{n}}", { n: share.score });
+    case SHARE_TYPE.CHALLENGE:
+      return i18nText("autoI18n.paylas_meydan_onizleme", "Günlük meydan okuma · {{n}} puan", { n: share.score });
     default: {
       const head = titlesOf(share).slice(0, 3).join(", ");
       return head || firstLine(share.summary, 80) || share.question || "CineMatch";
@@ -580,6 +722,12 @@ export function shareMessageText(share) {
       break;
     case SHARE_TYPE.CINE_ROOM:
       line = `🎬 ${sharePreview(share)}`;
+      break;
+    case SHARE_TYPE.TASTE_MATCH:
+      line = `💞 ${sharePreview(share)}`;
+      break;
+    case SHARE_TYPE.CHALLENGE:
+      line = `⚔️ ${sharePreview(share)}`;
       break;
     default:
       line = `✨ CineMatch · ${sharePreview(share)}`;
@@ -611,7 +759,10 @@ export function shareThumb(share) {
     case SHARE_TYPE.TOURNAMENT:
       return share.champion?.poster_path || null;
     case SHARE_TYPE.CINE_ROOM:
+    case SHARE_TYPE.CHALLENGE:
       return null;
+    case SHARE_TYPE.TASTE_MATCH:
+      return (share.items || []).find((item) => item.poster_path)?.poster_path || null;
     default:
       for (const section of share.sections) {
         const hit = section.picks.find((pick) => pick.poster_path);

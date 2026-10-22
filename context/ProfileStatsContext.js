@@ -184,12 +184,17 @@ export const ProfileStatsProvider = ({ children }) => {
   const [lists,              setLists]             = useState([]);
 
   // ── AÇILIŞ TOHUMU ────────────────────────────────────────────────────────
+  //
+  // `uid`e bağlı: hesap değişince (çıkış, silme + yeni kayıt) ESKİ hesabın tohumu
+  // elde kalmasın. Eskiden `[]` bağımlılıkla bir kez hesaplanıyordu; aşağıdaki
+  // "liste boş + tohumda sayı var → sayaçlara dokunma" korumaları bu bayat tohumla
+  // yeni (boş) hesapta da devreye girip eski sayıları sonsuza dek tutuyordu.
   const statsSeed = useMemo(
     () => {
       const tohumUid = uid ?? getActiveUser();
       return tohumUid ? seed(cacheKeys.stats(tohumUid)).data || {} : {};
     },
-    [],
+    [uid],
   );
 
   const [watchedMovieCount,   setWatchedMovieCount]   = useState(statsSeed.watchedMovieCount ?? 0);
@@ -219,6 +224,37 @@ export const ProfileStatsProvider = ({ children }) => {
   const [timeDisplayMode, setTimeDisplayMode] = useState("minutes");
   const [scaleValues,     setScaleValues]     = useState({});
   const [statsCountMode,  setStatsCountMode]  = useState(() => get(Keys.statsCountMode));
+
+  // ── HESAP DEĞİŞİMİNDE SAYAÇLARI SIFIRLA ──────────────────────────────────
+  // Bu context uygulamanın kökünde durur; çıkış / hesap silme sırasında sökülmez.
+  // Aşağıdaki effect'ler yalnız liste durumunu boşaltıyordu, sayaçlar (film/dizi/bölüm
+  // sayısı, toplam süre) önceki hesaptan kalıyordu: hesabı silip aynı e-postayla yeniden
+  // kayıt olan kullanıcı, içi boş listelerin yanında eski sayıları görüyordu.
+  // Yalnız GERÇEK bir hesaptan başkasına/çıkışa geçişte çalışır; ilk yüklemede
+  // (uid undefined → gerçek uid) tohum zaten doğru hesaba ait, dokunulmaz.
+  const previousUidRef = useRef(uid);
+  useEffect(() => {
+    const previous = previousUidRef.current;
+    previousUidRef.current = uid;
+    if (!previous || previous === uid) return;
+    const fresh = (uid ? seed(cacheKeys.stats(uid)).data : null) || {};
+    setWatchedMovieCount(fresh.watchedMovieCount ?? 0);
+    setTotalWatchedTime(fresh.totalWatchedTime ?? {});
+    setTotalMinutesTime(fresh.totalMinutesTime ?? 0);
+    setWatchedTvCount(fresh.watchedTvCount ?? 0);
+    setTotalSeasonsCount(fresh.totalSeasonsCount ?? 0);
+    setTotalEpisodesCount(fresh.totalEpisodesCount ?? 0);
+    setTotalWatchedTimeTv(fresh.totalWatchedTimeTv ?? {});
+    setTotalMinutesTimeTv(fresh.totalMinutesTimeTv ?? 0);
+    setUniqueMovieCount(fresh.uniqueMovieCount ?? 0);
+    setUniqueTvCount(fresh.uniqueTvCount ?? 0);
+    setUniqueSeasonsCount(fresh.uniqueSeasonsCount ?? 0);
+    setUniqueEpisodesCount(fresh.uniqueEpisodesCount ?? 0);
+    setSelectedDate(null);
+    setSelectedDateTv(null);
+    setScaleValues({});
+    lazyCacheRef.current = {};
+  }, [uid]);
 
   // ── Sync listItems and precomputed stats from ListStatusContext ────────────
   useEffect(() => {

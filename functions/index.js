@@ -72,6 +72,8 @@ const {
 } = require("./appBadge");
 const { isRecipientViewingChat } = require("./chatPresence");
 const referral = require("./referral");
+const { purgeAccountData, PURGE_PHASES } = require("./accountPurge");
+const functionsV1 = require("firebase-functions/v1");
 
 initializeApp();
 const db = getFirestore();
@@ -795,6 +797,50 @@ exports.cleanupReferralOnUserDeleted = onDocumentDeleted(
 );
 
 /**
+ * Hesap silme: kullanıcının buluttaki TÜM verisini Admin yetkisiyle siler
+ * (functions/accountPurge.js — istemci kuralları yüzünden silemediği izler dahil).
+ * İstemci bunu Auth kullanıcısını silmeden ÖNCE çağırır; dönen `failed` boş değilse
+ * kendi yedek yoluna da düşer. `data.phase` (PURGE_PHASES) verilirse yalnız o aşama
+ * çalışır — istemci aşamaları sırayla çağırıp ilerleme çubuğunu çizer; verilmezse hepsi.
+ * Kimlik doğrulaması taze olmalı: çalınmış eski bir
+ * oturum belirteciyle veri silinmesin diye (deleteUser'ın "recent login" şartının eşi).
+ */
+// Aşamalı silme (aşağıdaki `phase`) birkaç dakika sürebilir; tek belirteç bütün aşamaları taşır.
+const DELETE_ACCOUNT_MAX_AUTH_AGE_SEC = 15 * 60;
+exports.deleteAccountData = onCall(
+  { timeoutSeconds: 540, memory: "512MiB" },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Authentication required");
+    const authTime = Number(request.auth?.token?.auth_time) || 0;
+    if (Date.now() / 1000 - authTime > DELETE_ACCOUNT_MAX_AUTH_AGE_SEC) {
+      throw new HttpsError("unauthenticated", "Recent sign-in required");
+    }
+    const phase = request.data?.phase;
+    if (phase !== undefined && !PURGE_PHASES.includes(phase)) {
+      throw new HttpsError("invalid-argument", "Unknown phase");
+    }
+    const result = await purgeAccountData({ db, rtdb }, uid, { phase });
+    console.log(
+      `[deleteAccountData] uid=${uid} phase=${phase || "all"} failed=${result.failed.length} skipped=${result.skipped.length}`,
+    );
+    return result;
+  },
+);
+
+/**
+ * Auth kullanıcısı silinince (uygulamadan ya da konsoldan) verisini BİR KEZ DAHA
+ * süpürür: istemci silme sürerken açık kalan dinleyiciler (presence, senkron…)
+ * silinmiş belgeleri geri yazmış olabilir. İşlem idempotent.
+ */
+exports.purgeOnAuthUserDeleted = functionsV1.auth.user().onDelete(async (user) => {
+  const result = await purgeAccountData({ db, rtdb }, user.uid);
+  console.log(
+    `[purgeOnAuthUserDeleted] uid=${user.uid} failed=${result.failed.length} skipped=${result.skipped.length}`,
+  );
+});
+
+/**
  * Google ile giris yapilmadan ONCE hesap cakismasini guvenli bicimde denetler.
  *
  * Neden istemcide fetchSignInMethodsForEmail kullanmiyoruz?
@@ -1297,6 +1343,8 @@ const STRINGS = {
     someone: "Birisi",
     notification: "Bildirim",
     messageFallback: "sana bir mesaj gönderdi",
+    cineswipe_invite: "🎬 seni CineSwipe odasına davet etti",
+    game_challenge: "⚔️ seni günlük düelloya davet etti",
     friend_request: "👤 sana arkadaşlık isteği gönderdi",
     friend_accepted: "🤝 arkadaşlık isteğini kabul etti",
     post_like: "❤️ gönderini beğendi",
@@ -1311,6 +1359,8 @@ const STRINGS = {
     someone: "Someone",
     notification: "Notification",
     messageFallback: "sent you a message",
+    cineswipe_invite: "🎬 invited you to a CineSwipe room",
+    game_challenge: "⚔️ challenged you to a daily duel",
     friend_request: "👤 sent you a friend request",
     friend_accepted: "🤝 accepted your friend request",
     post_like: "❤️ liked your post",
@@ -1325,6 +1375,8 @@ const STRINGS = {
     someone: "Alguien",
     notification: "Notificación",
     messageFallback: "te ha enviado un mensaje",
+    cineswipe_invite: "🎬 te invitó a una sala de CineSwipe",
+    game_challenge: "⚔️ te retó a un duelo diario",
     friend_request: "👤 te ha enviado una solicitud de amistad",
     friend_accepted: "🤝 ha aceptado tu solicitud de amistad",
     post_like: "❤️ le ha dado me gusta a tu publicación",
@@ -1339,6 +1391,8 @@ const STRINGS = {
     someone: "Alguém",
     notification: "Notificação",
     messageFallback: "enviou uma mensagem para você",
+    cineswipe_invite: "🎬 convidou você para uma sala do CineSwipe",
+    game_challenge: "⚔️ desafiou você para um duelo diário",
     friend_request: "👤 enviou um pedido de amizade para você",
     friend_accepted: "🤝 aceitou seu pedido de amizade",
     post_like: "❤️ curtiu sua publicação",
@@ -1353,6 +1407,8 @@ const STRINGS = {
     someone: "Jemand",
     notification: "Benachrichtigung",
     messageFallback: "hat dir eine Nachricht gesendet",
+    cineswipe_invite: "🎬 hat dich in einen CineSwipe Raum eingeladen",
+    game_challenge: "⚔️ hat dich zu einem Tagesduell herausgefordert",
     friend_request: "👤 hat dir eine Freundschaftsanfrage gesendet",
     friend_accepted: "🤝 hat deine Freundschaftsanfrage angenommen",
     post_like: "❤️ gefällt dein Beitrag",
@@ -1400,6 +1456,9 @@ function buildContent(n, lang) {
         return { title: n.groupName || name, body: `${name}: ${text || S.messageFallback}` };
       }
       return { title: name, body: text || `${name} ${S.messageFallback}` };
+    case "cineswipe_invite":
+    case "game_challenge":
+      return { title: name, body: S[n.type] };
     default:
       return { title: S.notification, body: name };
   }
@@ -1513,6 +1572,8 @@ exports.onSocialNotificationCreated = onDocumentCreated(
       comment_reply: "postCommentsEnabled",
       mention: "mentionsEnabled",
       message: "messagesEnabled",
+      cineswipe_invite: "messagesEnabled",
+      game_challenge: "messagesEnabled",
     };
     const settingKey = TYPE_SETTING_KEY[n.type];
     if (settingKey && ns[settingKey] === false) {
@@ -1598,6 +1659,8 @@ exports.onSocialNotificationCreated = onDocumentCreated(
         fromName: n.fromName || null,
         groupId: n.groupId || null,
         groupName: n.groupName || null,
+        inviteCode: n.inviteCode || null,
+        dayKey: n.dayKey || null,
         // İstemci bununla "kullanıcı bu sohbeti izliyor mu" kararını verir ve
         // sohbet açılınca çekmecedeki bildirimleri temizler.
         chatId,

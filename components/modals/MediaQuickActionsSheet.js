@@ -78,7 +78,7 @@ import {
   listItemFromDetails,
   movieWatchItemFromDetails,
 } from "../../utils/libraryCore";
-import { showLibraryError } from "../../utils/libraryErrorText";
+import { showLibraryError, showWatchSpreadNotice } from "../../utils/libraryErrorText";
 import { movieWatchEvents } from "../../utils/watchHistory";
 import { getCachedValue, setCachedValue, TTL } from "../../utils/apiCache";
 import { i18nText } from "../../utils/i18nText";
@@ -638,13 +638,14 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
       if (!user?.uid || !Array.isArray(details?.seasons)) return;
       setBusy(true);
       try {
-        const { status } = await markShowWatched({
+        const watchResult = await markShowWatched({
           uid: user.uid,
           details,
           watchDate: formatDateSave(date),
           apiKey: API_KEY,
           language,
         });
+        const { status } = watchResult;
         if (status === "empty-show") {
           Toast.show({
             type: "warning",
@@ -656,13 +657,15 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
           return;
         }
         setDateSheetVisible(false);
-        Toast.show({
-          type: "success",
-          text1: i18nText(
-            "autoI18n.dizi_bolumleri_izlendi_olarak_isaretlendi",
-            "Dizi bölümleri izlendi olarak işaretlendi",
-          ),
-        });
+        if (!showWatchSpreadNotice(watchResult)) {
+          Toast.show({
+            type: "success",
+            text1: i18nText(
+              "autoI18n.dizi_bolumleri_izlendi_olarak_isaretlendi",
+              "Dizi bölümleri izlendi olarak işaretlendi",
+            ),
+          });
+        }
       } catch (error) {
         showLibraryError(error, { source: "quick_actions_show_watch" });
       } finally {

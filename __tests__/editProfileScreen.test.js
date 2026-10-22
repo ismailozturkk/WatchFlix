@@ -92,8 +92,14 @@ jest.mock("../services/userService", () => ({
 const mockDeleteAccount = jest.fn(() => Promise.resolve({}));
 jest.mock("../services/accountService", () => ({
   deleteAccount: (...args) => mockDeleteAccount(...args),
+  DeleteAccountCode: { NO_SESSION: "delete-account/no-session", NEEDS_PASSWORD: "delete-account/needs-password" },
   getSignInMethods: () => ({ hasPassword: true, hasGoogle: false, hasApple: false }),
   reauthenticateForDeletion: jest.fn(),
+}));
+const mockResetAccount = jest.fn(() => Promise.resolve({ cancelled: false }));
+jest.mock("../services/accountResetService", () => ({
+  resetAccount: (...args) => mockResetAccount(...args),
+  ResetAccountCode: { NO_SESSION: "reset-account/no-session", INCOMPLETE: "reset-account/incomplete" },
 }));
 jest.mock("../services/googleAuthService", () => ({
   describeGoogleAuthError: () => "google error", GoogleAuthCode: { CANCELLED: "google/cancelled" },
@@ -335,19 +341,36 @@ describe("EditProfileScreen", () => {
 
   describe("delete account", () => {
     const sheet = () => renderer.root.findByType("DeleteSheet");
+    // Tehlikeli bölgede iki satır var: önce "Hesabı Sıfırla", sonra "Hesabı Sil".
+    const resetRow = () => renderer.root.findAllByType("DangerRow")[0];
+    const deleteRow = () => renderer.root.findAllByType("DangerRow")[1];
 
     it("opens the confirmation sheet in password mode for a password account", async () => {
       await render();
       expect(sheet().props.visible).toBe(false);
-      await act(() => renderer.root.findByType("DangerRow").props.onPress());
+      await act(() => deleteRow().props.onPress());
       expect(sheet().props.visible).toBe(true);
       expect(sheet().props.provider).toBeNull();
       expect(sheet().props.confirmDisabled).toBe(false);
     });
 
+    it("confirms by HOLDING: the delete sheet carries a hold duration, labels and a pre-check", async () => {
+      await render();
+      await act(() => deleteRow().props.onPress());
+      expect(sheet().props.holdMs).toBe(2500);
+      expect(sheet().props.confirmLabel).toBe("Silmek için basılı tut");
+      expect(sheet().props.holdHint).toContain("2.5");
+      expect(sheet().props.icon).toBe("warning-outline");
+      // Şifre boşken basılı tutma hiç başlamaz (dolum açılmaz) ve nedeni söylenir.
+      expect(sheet().props.canStart()).toBe(false);
+      expect(mockToast.show).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
+      await act(() => sheet().props.onPasswordChange("gizli123"));
+      expect(sheet().props.canStart()).toBe(true);
+    });
+
     it("asks for the password before deleting", async () => {
       await render();
-      await act(() => renderer.root.findByType("DangerRow").props.onPress());
+      await act(() => deleteRow().props.onPress());
       await act(async () => { await sheet().props.onConfirm(); });
       expect(mockDeleteAccount).not.toHaveBeenCalled();
       expect(mockToast.show).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
@@ -355,16 +378,88 @@ describe("EditProfileScreen", () => {
 
     it("deletes with the typed password and returns to the login screen", async () => {
       await render();
-      await act(() => renderer.root.findByType("DangerRow").props.onPress());
+      await act(() => deleteRow().props.onPress());
       await act(() => sheet().props.onPasswordChange("gizli123"));
       await act(async () => { await sheet().props.onConfirm(); });
       expect(mockDeleteAccount).toHaveBeenCalledWith(expect.objectContaining({ password: "gizli123" }));
       expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: "LoginScreen" }] });
     });
 
+    it("feeds the service's progress events to the sheet while deleting, and clears them after", async () => {
+      let finish;
+      mockDeleteAccount.mockImplementationOnce(
+        ({ onProgress }) =>
+          new Promise((resolve) => {
+            finish = () => resolve({ cancelled: true });
+            onProgress({ stage: "social", stages: ["verify", "social", "account"] });
+          }),
+      );
+      await render();
+      await act(() => deleteRow().props.onPress());
+      await act(() => sheet().props.onPasswordChange("gizli123"));
+      expect(sheet().props.progress).toBeNull();
+      let pending;
+      await act(async () => { pending = sheet().props.onConfirm(); });
+      expect(sheet().props.deleting).toBe(true);
+      expect(sheet().props.progress).toEqual({ stage: "social", stages: ["verify", "social", "account"] });
+      expect(sheet().props.progressCopy.stages.social).toEqual(expect.any(String));
+      await act(async () => { finish(); await pending; });
+      expect(sheet().props.deleting).toBe(false);
+      expect(sheet().props.progress).toBeNull();
+    });
+
+    describe("reset account", () => {
+      it("opens the same sheet in reset mode with its own texts and a shorter hold", async () => {
+        await render();
+        await act(() => resetRow().props.onPress());
+        expect(sheet().props.visible).toBe(true);
+        expect(sheet().props.title).toBe("Hesabı sıfırla");
+        expect(sheet().props.confirmLabel).toBe("Sıfırlamak için basılı tut");
+        expect(sheet().props.holdMs).toBe(2000);
+        expect(sheet().props.icon).toBe("refresh-circle-outline");
+        expect(sheet().props.progressCopy.title).toBe("Hesabın sıfırlanıyor");
+        expect(sheet().props.description).toContain("şifreni gir");
+      });
+
+      it("asks for the password before resetting", async () => {
+        await render();
+        await act(() => resetRow().props.onPress());
+        await act(async () => { await sheet().props.onConfirm(); });
+        expect(mockResetAccount).not.toHaveBeenCalled();
+        expect(mockToast.show).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
+      });
+
+      it("resets with the typed password, closes the sheet and goes back (no logout)", async () => {
+        await render();
+        await act(() => resetRow().props.onPress());
+        await act(() => sheet().props.onPasswordChange("gizli123"));
+        await act(async () => { await sheet().props.onConfirm(); });
+        expect(mockResetAccount).toHaveBeenCalledWith(expect.objectContaining({ password: "gizli123" }));
+        expect(mockDeleteAccount).not.toHaveBeenCalled();
+        expect(navigation.reset).not.toHaveBeenCalled();
+        expect(navigation.goBack).toHaveBeenCalled();
+        expect(sheet().props.visible).toBe(false);
+      });
+
+      it("keeps the sheet open and says so when part of the data could not be reset", async () => {
+        const error = Object.assign(new Error("x"), { code: "reset-account/incomplete" });
+        mockResetAccount.mockRejectedValueOnce(error);
+        await render();
+        await act(() => resetRow().props.onPress());
+        await act(() => sheet().props.onPasswordChange("gizli123"));
+        await act(async () => { await sheet().props.onConfirm(); });
+        expect(navigation.goBack).not.toHaveBeenCalled();
+        expect(sheet().props.visible).toBe(true);
+        expect(sheet().props.deleting).toBe(false);
+        expect(mockToast.show).toHaveBeenCalledWith(
+          expect.objectContaining({ type: "error", text1: expect.stringContaining("sıfırlanamadı") }),
+        );
+      });
+    });
+
     it("closes with the cancel handler", async () => {
       await render();
-      await act(() => renderer.root.findByType("DangerRow").props.onPress());
+      await act(() => deleteRow().props.onPress());
       await act(() => sheet().props.onClose());
       expect(sheet().props.visible).toBe(false);
     });

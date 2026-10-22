@@ -56,7 +56,18 @@ jest.mock("firebase/database", () => ({
 }));
 
 const mockAuth = { currentUser: null };
-jest.mock("../firebase", () => ({ auth: mockAuth, db: {}, rtdb: null }));
+jest.mock("../firebase", () => ({ auth: mockAuth, db: {}, rtdb: null, fns: {} }));
+
+// Sunucu silmesi (Cloud Function `deleteAccountData`): varsayilan olarak ULASILAMAZ
+// (deploy edilmemis gibi) — boylece asagidaki eski testler istemci yedeginin
+// calistigini gormeye devam eder. Sunucu yolu en altta ayri sinanir.
+const mockCallable = jest.fn();
+jest.mock("firebase/functions", () => ({
+  httpsCallable: (fns, name, options) => (payload) => {
+    calls.push(`server:${payload?.phase ?? "all"}`);
+    return mockCallable(name, options, payload);
+  },
+}));
 
 jest.mock("../services/ratingsService", () => ({
   removeMyRating: jest.fn(async () => {}),
@@ -82,7 +93,9 @@ jest.mock("../services/appleAuthService", () => ({
 }));
 
 const {
+  DELETE_STAGES,
   DeleteAccountCode,
+  SERVER_PURGE_PHASES,
   deleteAccount,
   getSignInMethods,
   reauthenticateForDeletion,
@@ -91,6 +104,7 @@ const {
 const userWith = (...providers) => ({
   uid: "u1",
   email: "user@example.com",
+  getIdToken: jest.fn(async () => "fresh-token"),
   providerData: providers.map((providerId) => ({ providerId })),
 });
 
@@ -99,6 +113,8 @@ const authError = (code) => Object.assign(new Error(code), { code });
 beforeEach(() => {
   jest.clearAllMocks();
   calls.length = 0;
+  mockCallable.mockReset();
+  mockCallable.mockRejectedValue(new Error("functions/not-found"));
   mockAuth.currentUser = null;
   mockReauthenticateWithCredential.mockResolvedValue({});
   mockReauthenticateWithGoogle.mockResolvedValue({ cancelled: false });
@@ -299,5 +315,143 @@ describe("deleteAccount", () => {
       code: DeleteAccountCode.NO_SESSION,
     });
     expect(calls).toEqual([]);
+  });
+});
+
+describe("deleteAccount: sunucu silmesi (deleteAccountData)", () => {
+  it("sunucu TAM bitirirse istemci yedegi calismaz; deleteUser yine en sonda", async () => {
+    mockAuth.currentUser = userWith("google.com");
+    mockCallable.mockResolvedValue({ data: { failed: [], skipped: [] } });
+
+    await deleteAccount();
+
+    // Aşamalar TEK TEK, sırayla çağrılır (ilerleme çubuğu buna dayanır).
+    expect(calls).toEqual([...SERVER_PURGE_PHASES.map((phase) => `server:${phase}`), "deleteUser"]);
+    expect(mockAuth.currentUser.getIdToken).toHaveBeenCalledWith(true);
+    // Belirteç aşama başına değil, bir kez yenilenir.
+    expect(mockAuth.currentUser.getIdToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("sunucu eksik bildirirse istemci yedegi de calisir", async () => {
+    mockAuth.currentUser = userWith("google.com");
+    mockCallable.mockResolvedValue({ data: { failed: ["chats"], skipped: [] } });
+
+    await deleteAccount();
+
+    expect(calls).toContain("purge");
+    expect(calls.indexOf("server:groups")).toBe(-1);
+    expect(calls.indexOf("server:profile")).toBeLessThan(calls.indexOf("purge"));
+    expect(calls[calls.length - 1]).toBe("deleteUser");
+  });
+
+  it("sunucuya ulasilamazsa (deploy yok / cevrimdisi) yedek calisir ve hesap yine silinir", async () => {
+    mockAuth.currentUser = userWith("google.com");
+
+    await expect(deleteAccount()).resolves.toEqual({ cancelled: false });
+
+    expect(calls).toContain("purge");
+    expect(calls[calls.length - 1]).toBe("deleteUser");
+  });
+
+  it("dogrulama iptalinde sunucu da CAGRILMAZ", async () => {
+    mockAuth.currentUser = userWith("google.com");
+    mockReauthenticateWithGoogle.mockResolvedValue({ cancelled: true });
+
+    await deleteAccount();
+
+    expect(mockCallable).not.toHaveBeenCalled();
+  });
+
+  it("Apple yetkisi iptal edilemezse sunucu silmesi de baslamaz", async () => {
+    mockAuth.currentUser = userWith("apple.com");
+    mockRevokeAppleAuthorization.mockRejectedValue(new Error("revoke failed"));
+
+    await expect(deleteAccount()).rejects.toThrow("revoke failed");
+
+    expect(mockCallable).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteAccount: ilerleme (onProgress)", () => {
+  const collect = () => {
+    const events = [];
+    return { events, onProgress: (event) => events.push(event) };
+  };
+
+  it("aşamaları sırayla bildirir: doğrulama → yerel → sunucu aşamaları → hesap", async () => {
+    mockAuth.currentUser = userWith("google.com");
+    mockCallable.mockResolvedValue({ data: { failed: [], skipped: [] } });
+    const { events, onProgress } = collect();
+
+    await deleteAccount({ onProgress });
+
+    expect(events.map((e) => e.stage)).toEqual(DELETE_STAGES);
+    // Liste hep aynı; yedek yola girilmediği için "fallback" yok.
+    events.forEach((e) => expect(e.stages).toEqual(DELETE_STAGES));
+  });
+
+  it("UI doğruladıysa da 'verify' aşaması bildirilir (liste tutarlı kalsın)", async () => {
+    mockAuth.currentUser = userWith("google.com");
+    mockCallable.mockResolvedValue({ data: { failed: [], skipped: [] } });
+    const { events, onProgress } = collect();
+
+    await deleteAccount({ reauthenticated: true, onProgress });
+
+    expect(events[0].stage).toBe("verify");
+  });
+
+  it("sunucuya ulaşılamazsa koşmamış aşamalar listeden düşer, 'fallback' araya girer", async () => {
+    mockAuth.currentUser = userWith("google.com");
+    const { events, onProgress } = collect();
+
+    await deleteAccount({ onProgress });
+
+    const last = events[events.length - 1];
+    expect(last.stage).toBe("account");
+    // Yalnız denenen ilk aşama kalır; yedek hesap kapanışından hemen önce.
+    expect(last.stages).toEqual(["verify", "local", "social", "fallback", "account"]);
+    expect(events.map((e) => e.stage)).toEqual(["verify", "local", "social", "fallback", "account"]);
+  });
+
+  it("bir aşama eksik dönerse listenin tamamı korunur ve yedek en sonda çalışır", async () => {
+    mockAuth.currentUser = userWith("google.com");
+    mockCallable.mockImplementation(async (name, options, payload) => ({
+      data: { failed: payload?.phase === "chats" ? ["groups"] : [], skipped: [] },
+    }));
+    const { events, onProgress } = collect();
+
+    await deleteAccount({ onProgress });
+
+    expect(events.map((e) => e.stage)).toEqual([
+      "verify",
+      "local",
+      ...SERVER_PURGE_PHASES,
+      "fallback",
+      "account",
+    ]);
+  });
+
+  it("onProgress hata fırlatırsa silme durmaz", async () => {
+    mockAuth.currentUser = userWith("google.com");
+    mockCallable.mockResolvedValue({ data: { failed: [], skipped: [] } });
+
+    await expect(
+      deleteAccount({
+        onProgress: () => {
+          throw new Error("ui crashed");
+        },
+      }),
+    ).resolves.toEqual({ cancelled: false });
+    expect(calls[calls.length - 1]).toBe("deleteUser");
+  });
+
+  it("doğrulama iptalinde yalnız 'verify' bildirilir", async () => {
+    mockAuth.currentUser = userWith("google.com");
+    mockReauthenticateWithGoogle.mockResolvedValue({ cancelled: true });
+    const { events, onProgress } = collect();
+
+    await deleteAccount({ onProgress });
+
+    expect(events.map((e) => e.stage)).toEqual(["verify"]);
   });
 });

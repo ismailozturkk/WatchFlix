@@ -424,6 +424,25 @@ describe("çıkış / hesap değiştirme", () => {
     expect(mods.userData.notesDomain.getSnapshot("u1").lists.items).toHaveLength(2);
   });
 
+  test("hesap silme: istatistik / profil / aktivite okuma önbelleği de diskten düşer", () => {
+    seedCloud();
+    const mods = boot();
+    const snapshot = require("../services/snapshotCache");
+    const { cacheKeys } = require("../utils/cacheKeys");
+    const keys = [cacheKeys.stats("u1"), cacheKeys.profile("u1"), cacheKeys.activity("u1")];
+    const baskasi = cacheKeys.stats("u2");
+    for (const key of [...keys, baskasi]) snapshot.publish(key, { watchedMovieCount: 7 }, { immediate: true });
+    for (const key of [...keys, baskasi]) expect(snapshot.seed(key).data).toEqual({ watchedMovieCount: 7 });
+
+    mods.userData.purgeUserData("u1");
+
+    // Sıfırlanan bellek yerine DİSKTEN okunsun: bayat tohum yeni hesapta sayaç tutmasın.
+    snapshot.resetSnapshotCache();
+    for (const key of keys) expect(snapshot.seed(key).data).toBeNull();
+    // Başka hesabın önbelleğine dokunulmaz.
+    expect(snapshot.seed(baskasi).data).toEqual({ watchedMovieCount: 7 });
+  });
+
   test("hesap silme: bekleyen yazımlar da silinir (bulutta geri oluşmaz)", async () => {
     seedCloud();
     const mods = boot();

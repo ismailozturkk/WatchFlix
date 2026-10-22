@@ -9,6 +9,7 @@ import { tabBarNativeSupport, useTabBarCapabilities } from "../../services/tabBa
 import { AI_ACTION, TAB_NAMES, createTabState, getAiButtonCenter, getTabBarLayout, isTabName, tabStateReducer } from "../../utils/tabBarModel";
 import { isLightSurface } from "../../utils/colorUtils";
 import { selectionAsync } from "../../services/hapticsService";
+import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
 import { TAB_BAR_SCROLL_UNSET, advanceTabBarCollapse } from "../../utils/tabBarCollapse";
 import { nativeTabBarScaleAvailable } from "../../services/tabBarScale";
 import useAppActive from "../../hooks/useAppActive";
@@ -90,6 +91,12 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
     lastScrollY.value = TAB_BAR_SCROLL_UNSET;
     tabBarCollapse.value = reduceMotion ? 0 : withTiming(0, { duration: 200 });
   }, [state.activeTab, reduceMotion]);
+
+  // Sekme kullanımı: açılışta ilk sekme dahil her geçişte bir kez. Sekme düzeni
+  // kararları (hangi sekme ne kadar açılıyor) bununla ölçülür.
+  useEffect(() => {
+    trackEvent(ANALYTICS_EVENTS.TAB_VIEWED, { tab: state.activeTab });
+  }, [state.activeTab]);
 
   useEffect(() => {
     const show = () => setKeyboardVisible(true);

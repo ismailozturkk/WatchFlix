@@ -36,7 +36,7 @@ için **tek kapı** vardır: `services/libraryActions.js`. Ekranlar yazma servis
 ## Hata kodları (`LibraryError.code`)
 
 `offline` · `permission` · `conflict` · `quota` · `unreleased` · `unknown-release` ·
-`seasons-incomplete` · `list-name-reserved` · `list-name-conflict` · `invalid-request` · `unknown`.
+`seasons-incomplete` · `daily-watch-limit` · `list-name-reserved` · `list-name-conflict` · `invalid-request` · `unknown`.
 `retryable` bayrağı kullanıcının tekrar denemesinin işe yarayıp yaramayacağını söyler.
 
 ## Veri sözleşmesi (kök doküman `Lists/{uid}`)
@@ -85,6 +85,34 @@ Hepsi için önce kırmızı emülatör testi yazıldı (`__tests__/rules/librar
     `addItemsToList`: 100'lük parçalar hâlinde tek transaction.
 14. Ölü ve hatalı `unmarkEpisode`/`unmarkSeason` kaldırıldı (hiçbir yerden çağrılmıyordu; istatistik,
     olay geçmişi ve yerel önbelleği güncellemiyordu). Bölüm/sezon geri alma `removeTvWatch`.
+
+## Günlük 1440 dakika sınırı
+
+Bir güne en fazla **24 saat** (1440 dk) izleme yazılır. Kural `utils/dailyWatchLimit.js`'te (saf),
+kapı `services/libraryActions.js`'te, metinler `utils/dailyLimitCopy.js`'te.
+
+- **Ne sayılır:** izleme tarihi (`watchedAt`) o güne denk gelen her olayın süresi — film olayları
+  (belgedeki `minutes`), dizi olayları (olay `minutes`'ı). Tekrar izleme de süre harcar. Süresi
+  bilinmeyen (0 dk) içerik sınırı doldurmaz. Kullanım **yerel listelerden** hesaplanır (ağ yok).
+- **Film / tek bölüm** (`markMovieWatched`, `markEpisodeWatched`): günün kalanına sığmazsa
+  `daily-watch-limit` fırlatılır (`error.details`: `reason, day, used, remaining, requested`); hiçbir şey
+  yazılmaz, bindirme geri alınır. Tam sınır kabul edilir.
+- **Sezon / tüm dizi** (`markSeasonWatched`, `markShowWatched`): sığmıyorsa bölümler **sırayla günlere
+  yayılır**. Seçilen tarih izlemenin **bittiği gün**dür: son bölümler o güne, öncekiler geriye doğru
+  önceki günlere yazılır (gelecek tarih üretilmez); zaten dolu günlerin yalnız boş kısmı kullanılır.
+  Yayılma `MAX_SPREAD_DAYS` (366) günü aşarsa `reason: "span"` ile reddedilir ve **hiçbir şey yazılmaz**.
+  Sonuçta `spread: { days, startDate, endDate }` döner; ekranlar `showWatchSpreadNotice(result)` ile söyler.
+- **Yazım:** yayılan işlem TEK transaction'da birkaç olay yazar (`watchedTvService.commitWatch` →
+  `schedule`). Olaylar aynı `batchId`'yi, `part`/`parts` sırasını taşır; asıl kapsam (`show`/`season`)
+  seçilen günün (son) olayında kalır, öncekiler `episode` olur → `countTvWatchStats` tam izleme sayacı
+  şişmez. `removeTvWatchEvent` aynı `batchId`'li tüm parçaları birlikte siler.
+- **Sıralama:** denetim + yazım kullanıcı başına TEK sırada (`${uid}:watch-days`); eşzamanlı iki ekleme
+  aynı günün son dakikasını paylaşamaz.
+- **Kapsam dışı (bilinçli):** içe aktarma (Letterboxd/IMDb) ve eski kayıtlar sınırdan geçmez; bu yüzden
+  bir günün kullanımı zaten 1440'ı aşmış olabilir (kalan 0 sayılır). Sınır **istemci kuralı**dır —
+  Firestore kuralları dakika toplamını denetleyemez.
+- **Testler:** `__tests__/dailyWatchLimit.test.js` (saf), `__tests__/rules/dailyWatchLimit.test.js`
+  (emülatör: sınır, yayılma, tek hamlede silme, eşzamanlılık), `__tests__/dailyLimitCopy.test.js`.
 
 ## Testler
 

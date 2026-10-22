@@ -24,6 +24,8 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 jest.mock("../components/common/BlurTarget", () => ({ BlurTargetSurface: "BlurTarget", BLUR_SCOPES: { screen: "screen" }, useBlurTargetRef: () => ({ current: {} }) }));
 jest.mock("../services/tabBarCapabilities", () => ({ tabBarNativeSupport: { AndroidBackdrop: "Backdrop", nativeTabsAvailable: true }, useTabBarCapabilities: () => ({ mode: mockMode, reduceMotion: false }) }));
 jest.mock("../services/hapticsService", () => ({ selectionAsync: jest.fn(() => Promise.resolve()) }));
+jest.mock("../services/analytics", () => ({ ANALYTICS_EVENTS: { TAB_VIEWED: "tab_viewed" }, trackEvent: jest.fn() }));
+const { trackEvent: mockTrackEvent } = require("../services/analytics");
 jest.mock("../hooks/useAppActive", () => ({ __esModule: true, default: () => true }));
 jest.mock("../components/navigation/TabBar", () => ({ __esModule: true, default: "OverlayBar" }));
 // iOS 26 yerel ölçekleme: modül varlığı testte elle belirlenir; sürücü bileşen
@@ -47,6 +49,7 @@ beforeEach(() => {
   mockMode = "native-ios";
   mockNativeScale = false;
   Object.keys(mounts).forEach((key) => delete mounts[key]);
+  mockTrackEvent.mockClear();
   const original = console.error;
   warn = jest.spyOn(console, "error").mockImplementation((message, ...args) => {
     if (String(message).includes("react-test-renderer is deprecated")) return;
@@ -88,6 +91,17 @@ it("native selection and legacy bar presses share one state without losing visit
   expect(renderer.root.findByType("NativeTabs").props.navStateRequest.selectedScreenKey).toBe("profile");
   expect(mounts.profile).toBe(1);
   expect(mounts.share).toBe(1);
+});
+
+it("her sekme geçişinde (ilk sekme dahil) tab_viewed bir kez gönderilir; aynı sekmeye yeniden basmak saymaz", async () => {
+  await render();
+  expect(mockTrackEvent.mock.calls).toEqual([["tab_viewed", { tab: "profile" }]]);
+  mockMode = "legacy-blur";
+  await update();
+  await act(() => renderer.root.findByType("OverlayBar").props.onSelect("library"));
+  expect(mockTrackEvent).toHaveBeenLastCalledWith("tab_viewed", { tab: "library" });
+  await act(() => renderer.root.findByType("OverlayBar").props.onSelect("library"));
+  expect(mockTrackEvent).toHaveBeenCalledTimes(2);
 });
 
 it("consumes repeated initialTab navigation and preserves the current destination", async () => {
@@ -177,7 +191,7 @@ describe("iOS 26 native bar scaling", () => {
 it("registers exactly four native scenes and disables native reselect side effects", async () => {
   await render();
   const scenes = renderer.root.findAllByType("NativeScene");
-  expect(scenes.map((scene) => scene.props.screenKey)).toEqual(["discover", "share", "settings", "profile"]);
+  expect(scenes.map((scene) => scene.props.screenKey)).toEqual(["discover", "share", "library", "profile"]);
   scenes.forEach((scene) => {
     expect(scene.props.specialEffects.repeatedTabSelection).toEqual({ popToRoot: false, scrollToTop: false });
     expect(scene.props.ios.overrideScrollViewContentInsetAdjustmentBehavior).toBe(false);

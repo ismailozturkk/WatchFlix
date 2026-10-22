@@ -143,6 +143,13 @@ export function purgeUserData(uid) {
   if (!uid) return;
   clearUserLocal(uid);
   outbox.clear(uid);
+  // Türetilmiş / okuma önbellekleri (profil, aktivite, İSTATİSTİK sayaçları): normal
+  // çıkışta diskte kalır (aynı hesapla dönülürse ilk kare hazır olsun diye), ama
+  // hesap silinince sahibi yok — kalmaları hem gizlilik kalıntısı hem de bayat sayaç
+  // tohumu. Kaynak listeleri `clearUserLocal` zaten düşürdü.
+  for (const key of [cacheKeys.profile(uid), cacheKeys.activity(uid), cacheKeys.stats(uid)]) {
+    snapshot.dropSnapshot(key);
+  }
 }
 
 /**

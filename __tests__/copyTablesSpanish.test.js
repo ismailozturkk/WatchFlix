@@ -28,6 +28,14 @@ const { RATING_SUMMARY_COPY } = require("../utils/ratingSummaryCopy");
 const { EXTERNAL_RATINGS_COPY } = require("../utils/externalRatingsCopy");
 const { REFERRAL_COPY } = require("../utils/referralCopy");
 const { IMPORT_COPY } = require("../components/import/importCopy");
+const { BINGO_COPY } = require("../utils/cinemaBingoCopy");
+const { DUEL_COPY } = require("../utils/dailyDuelCopy");
+const { OLDER_COPY } = require("../utils/olderGameCopy");
+const { POLL_COPY } = require("../utils/dailyPollCopy");
+const { QUICK_COPY } = require("../utils/quickGamesCopy");
+const { DAILY_LIMIT_COPY } = require("../utils/dailyLimitCopy");
+const { RESET_ACCOUNT_COPY } = require("../screens/tabs/profile/resetAccountCopy");
+const { DELETE_ACCOUNT_COPY } = require("../screens/tabs/profile/deleteAccountCopy");
 
 // `{ad}`, `{{ad}}`, `%d` biçimli yer tutucuları çıkarır.
 const yerTutucular = (metin) =>
@@ -110,6 +118,14 @@ const TABLOLAR = {
   "Harici puanlar (externalRatingsCopy)": () => EXTERNAL_RATINGS_COPY,
   "Arkadaş daveti (referralCopy)": () => REFERRAL_COPY,
   "Letterboxd / IMDb içe aktarma (importCopy)": () => IMPORT_COPY,
+  "Sinema Bingosu (cinemaBingoCopy)": () => BINGO_COPY,
+  "Günlük düello (dailyDuelCopy)": () => DUEL_COPY,
+  "Önce hangisi? (olderGameCopy)": () => OLDER_COPY,
+  "Günün sorusu (dailyPollCopy)": () => POLL_COPY,
+  "Hızlı oyunlar (quickGamesCopy)": () => QUICK_COPY,
+  "Günlük izleme sınırı (dailyLimitCopy)": () => DAILY_LIMIT_COPY,
+  "Hesabı sıfırla (resetAccountCopy)": () => RESET_ACCOUNT_COPY,
+  "Hesabı sil (deleteAccountCopy)": () => DELETE_ACCOUNT_COPY,
   "Wrapped (wrappedStrings)": () => ({
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),

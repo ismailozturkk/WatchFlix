@@ -8,6 +8,7 @@ import {
   buildAiShare,
   buildListShare,
   buildShareMessage,
+  buildTasteMatchShare,
   chatParamsForShare,
   readShare,
   sanitizeShare,
@@ -517,6 +518,104 @@ describe("buildCineRoomShare", () => {
 
   it("makul olmayan kart sayısını atar", () => {
     expect(buildCineRoomShare({ code: "123456", count: 100000 }).count).toBeUndefined();
+  });
+});
+
+describe("buildTasteMatchShare", () => {
+  const match = (over = {}) => ({
+    state: "ok",
+    score: 72,
+    watched: { overlap: [{}, {}, {}], mine: 10, theirs: 12 },
+    favorites: [{}, {}],
+    genres: { shared: ["Dram", "Komedi", "Gerilim", "Korku"], lean: { mine: "Korku", theirs: "Komedi" } },
+    ratings: { pairs: 4, agreement: 0.834 },
+    loved: [{ name: "Film 1", mine: 9, theirs: 9 }],
+    split: { name: "Gizli", mine: 1, theirs: 9 },
+    highlights: [1, 2, 3, 4, 5].map((i) => ({ id: i, type: "movie", name: `Film ${i}`, imagePath: `/p${i}.jpg`, mine: 8, theirs: 8 })),
+    breakdown: [{ id: "genres", value: 80, weight: 0.4 }, { id: "overlap", value: 55, weight: 0.3 }],
+    ...over,
+  });
+
+  it("puan, kademe, sayılar, ortak türler ve afişleri taşır; tavanlara uyar", () => {
+    const share = buildTasteMatchShare(match(), { host: "Ali", friend: "Ada" });
+    expect(share).toMatchObject({
+      v: 1,
+      type: "tasteMatch",
+      score: 72,
+      tier: "high",
+      host: "Ali",
+      friend: "Ada",
+      overlap: 3,
+      favorites: 2,
+      agreement: 83,
+      pairs: 4,
+      genres: ["Dram", "Komedi", "Gerilim"],
+      loved: ["Film 1"],
+      parts: [{ id: "genres", value: 80 }, { id: "overlap", value: 55 }],
+    });
+    expect(share.items).toHaveLength(4);
+    expect(share.items[0]).toEqual({ id: 1, media_type: "movie", title: "Film 1", poster_path: "/p1.jpg" });
+  });
+
+  it("film / dizi puanı yalnız hesaplanabilen kategori için gider", () => {
+    const both = buildTasteMatchShare(match({ byType: { movie: { score: 80 }, tv: { score: 61 } } }), {});
+    expect(both).toMatchObject({ movie: 80, tv: 61 });
+    const one = buildTasteMatchShare(match({ byType: { movie: { score: 80 }, tv: { shared: false, score: null } } }), {});
+    expect(one.movie).toBe(80);
+    expect(one.tv).toBeUndefined();
+    expect(buildTasteMatchShare(match(), {}).movie).toBeUndefined(); // eski biçim: kırılım yok
+  });
+
+  it("tür eğilimi ve ayrışılan başlık mesaja GİTMEZ", () => {
+    const json = JSON.stringify(buildTasteMatchShare(match(), {}));
+    expect(json).not.toContain("Gizli");
+    expect(json).not.toContain("lean");
+  });
+
+  it("puan yoksa (veri yetersiz) paylaşım yok; uydurma yüzde gönderilmez", () => {
+    expect(buildTasteMatchShare(match({ score: null }))).toBeNull();
+    expect(buildTasteMatchShare(null)).toBeNull();
+    expect(sanitizeShare({ type: "tasteMatch", score: "x" })).toBeNull();
+  });
+
+  it("kademeyi gövdeden değil puandan türetir (elle bozulmuş kayıt)", () => {
+    const share = sanitizeShare({ type: "tasteMatch", score: 20, tier: "veryHigh" });
+    expect(share.tier).toBe("low");
+    expect(sanitizeShare({ type: "tasteMatch", score: 250 }).score).toBe(100);
+  });
+
+  it("puan uyumu çift sayısı yoksa yazılmaz; bilinmeyen bileşen ve yinelenen öğe atılır", () => {
+    const share = sanitizeShare({
+      type: "tasteMatch",
+      score: 50,
+      agreement: 70,
+      pairs: 0,
+      parts: [{ id: "evil", value: 5 }, { id: "genres", value: 10 }, { id: "genres", value: 20 }],
+      items: [{ id: 1, type: "movie", name: "A" }, { id: 1, type: "movie", name: "A" }],
+    });
+    expect(share.agreement).toBeUndefined();
+    expect(share.parts).toEqual([{ id: "genres", value: 10 }]);
+    expect(share.items).toHaveLength(1);
+  });
+
+  it("mesaj: kind, 💞 önekli metin; readShare okur, kind uyuşmazlığını reddeder; alıntı küçük resmi ilk afiş", () => {
+    const share = buildTasteMatchShare(match(), { host: "Ali" });
+    const fields = buildShareMessage(share);
+    expect(fields).toMatchObject({ kind: "tasteMatchShare", text: expect.stringMatching(/^💞 \S/u) });
+    expect(fields.text).toContain("72");
+    const message = { id: "m", ...fields };
+    expect(readShare(message).score).toBe(72);
+    expect(readShare({ ...message, kind: "cineRoomShare" })).toBeNull();
+    expect(shareThumb(share)).toBe("/p1.jpg");
+    expect(replyKind(message)).toBe("tasteMatch");
+    expect(replyThumb(message)).toBe("/p1.jpg");
+    expect(replyGlyph("tasteMatch")).toBe("heart");
+  });
+
+  it("alıcıya (arkadaşa) giden sohbet parametresi", () => {
+    const share = buildTasteMatchShare(match(), {});
+    const params = chatParamsForShare({ uid: "u2", name: "Ada", avatarIndex: 3 }, share, 1000);
+    expect(params).toMatchObject({ friendUid: "u2", friendName: "Ada", initialShare: share, initialShareKey: "tasteMatch-1000" });
   });
 });
 

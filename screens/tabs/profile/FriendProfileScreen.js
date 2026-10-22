@@ -87,6 +87,7 @@ import { useMediaQuickActions } from "../../../context/MediaQuickActionsContext"
 import { useListStatusContext } from "../../../context/ListStatusContext";
 import TasteMatchCard from "../../../components/friends/TasteMatchCard";
 import { candidatesToDeckSource, computeTasteMatch, findTogetherCandidates } from "../../../utils/tasteMatch";
+import { buildTasteMatchShare, chatParamsForShare } from "../../../utils/chatShare";
 import { trackEvent, ANALYTICS_EVENTS } from "../../../services/analytics";
 import { getTasteMatchCopy } from "../../../utils/tasteMatchCopy";
 
@@ -150,6 +151,8 @@ const SharedListGridCard = memo(function SharedListGridCard({
   onPress,
   style,
 }) {
+  // This memoized card must update even when its list props stay unchanged.
+  useLanguage();
   const meta = buildListMeta()[listName];
   const accent = getListAccent(listName, theme.secondary);
   const icon = getListIcon(listName);
@@ -609,6 +612,17 @@ export default function FriendProfileScreen({ route, navigation }) {
       },
     });
   }, [together, friendUid, tasteMatch, profile?.displayName, profile?.avatarIndex, friendName, navigation]);
+
+  // Uyum kartını arkadaşın sohbetine gönderir: ChatScreen mesajı kendisi yazar (initialShare kalıbı).
+  const shareTasteMatch = useCallback(() => {
+    if (!friendUid) return;
+    const name = profile?.displayName || friendName || "";
+    const share = buildTasteMatchShare(tasteMatch, { host: currentUser?.displayName || "", friend: name });
+    const params = chatParamsForShare({ uid: friendUid, name, avatarIndex: profile?.avatarIndex }, share);
+    if (!params) return;
+    trackEvent(ANALYTICS_EVENTS.TASTE_MATCH_SHARED, { score: tasteMatch.score });
+    navigation.navigate("ChatScreen", params);
+  }, [friendUid, tasteMatch, profile?.displayName, profile?.avatarIndex, friendName, currentUser?.displayName, navigation]);
   // ── Moderasyon: şikâyet + engelle ─────────────────────────────────────────
   const isSelf = !!currentUser?.uid && currentUser.uid === friendUid;
 
@@ -860,6 +874,7 @@ export default function FriendProfileScreen({ route, navigation }) {
           badges={identityBadges}
           language={language}
           bio={canViewProfile ? profile.bio : null}
+          socialLinks={canViewProfile ? profile.socialLinks : null}
           memberSince={
             canViewProfile && memberSince
               ? `${memberSince} ${i18nText("autoI18n.tarihinden_beri_uye", "tarihinden beri üye")}`
@@ -1023,6 +1038,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                   noWatchedVisible={friendSide?.watchedMovies === null && friendSide?.watchedShows === null}
                   canInvite={friend}
                   onInvite={inviteToRoom}
+                  onShareMatch={shareTasteMatch}
                 />
               </>
             ) : null}

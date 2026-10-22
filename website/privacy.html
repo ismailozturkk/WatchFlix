@@ -9,21 +9,19 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230a1626'/%3E%3Ccircle cx='24' cy='33' r='11' fill='%23f4fbff'/%3E%3Ccircle cx='40' cy='33' r='11' fill='%23f4fbff'/%3E%3Ccircle cx='26' cy='35' r='5' fill='%2304121f'/%3E%3Ccircle cx='42' cy='35' r='5' fill='%2304121f'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Schibsted+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="legal.css" />
+<link rel="stylesheet" href="lang-menu.css" />
 </head>
-<body data-title-tr="Gizlilik Politikası — seelogd" data-title-en="Privacy Policy — seelogd">
+<body data-page="privacy">
 <div class="glow" aria-hidden="true"></div>
 
 <header class="bar">
   <a class="bar-brand" href="index.html"><img src="s-mark-tight.png" alt="" />seelogd</a>
   <span class="bar-sep">/</span>
-  <span class="bar-page" data-tr="Gizlilik Politikası" data-en="Privacy Policy">Gizlilik Politikası</span>
+  <span class="bar-page" id="barPage">Gizlilik Politikası</span>
   <span class="bar-spacer"></span>
-  <div class="lang" role="group" aria-label="Dil / Language">
-    <button type="button" data-lang="tr" aria-pressed="true">TR</button>
-    <button type="button" data-lang="en" aria-pressed="false">EN</button>
-  </div>
+  <div id="langMenu"></div>
 </header>
 
 <div class="shell">
@@ -52,8 +50,8 @@
       </p>
       <div class="stamp">
         <span>Yürürlük: <b>16 Ekim 2026</b></span>
-        <span>Son güncelleme: <b>18 Ekim 2026</b></span>
-        <span>Sürüm: <b>1.2</b></span>
+        <span>Son güncelleme: <b>21 Ekim 2026</b></span>
+        <span>Sürüm: <b>1.4</b></span>
       </div>
     </div>
 
@@ -97,7 +95,7 @@
             </tr>
             <tr>
               <td><strong>Profil</strong></td>
-              <td>Biyografi, seçtiğiniz hazır avatarın numarası, <strong>dört favoriniz</strong> (profilinize sabitlediğiniz en fazla 4 film, 4 dizi ve 4 oyuncu: ad, yıl ve görsel yolu), gizlilik tercihleri, tema/dil ayarları, rozetler</td>
+              <td>Biyografi, seçtiğiniz hazır avatarın numarası, <strong>dört favoriniz</strong> (profilinize sabitlediğiniz en fazla 4 film, 4 dizi ve 4 oyuncu: ad, yıl ve görsel yolu), gizlilik tercihleri, tema/dil ayarları, rozetler ve isteğe bağlı <strong>sosyal hesap kullanıcı adlarınız</strong> (Instagram, X, TikTok, YouTube, Twitch, Letterboxd, Snapchat, Threads: yalnızca kullanıcı adı saklanır; adres, platformun sabit alan adından kurulur)</td>
               <td>Sizden</td>
             </tr>
             <tr>
@@ -107,7 +105,7 @@
             </tr>
             <tr>
               <td><strong>Sosyal</strong></td>
-              <td>Gönderiler, yorumlar, beğeniler, kaydettikleriniz, puanlarınız, arkadaşlıklar, takip/takipçi, arkadaşlık istekleri, engellediğiniz hesaplar, bildirimler, içerik şikâyetleri</td>
+              <td>Gönderiler, yorumlar, beğeniler, kaydettikleriniz, puanlarınız, arkadaşlıklar, takip/takipçi, arkadaşlık istekleri, engellediğiniz hesaplar, bildirimler, içerik şikâyetleri. Bir arkadaşınızın profilinde görünen <strong>zevk uyumu</strong>, iki tarafın zaten görebildiği izleme verilerinden cihazınızda hesaplanır ve ayrıca saklanmaz; yalnızca sonucu sohbete gönderirseniz yüzde ve ortak başlıklar mesaj olarak tutulur</td>
               <td>Sizden</td>
             </tr>
             <tr>
@@ -132,8 +130,13 @@
             </tr>
             <tr>
               <td><strong>Abonelik</strong></td>
-              <td>Satın alma durumu ve hak sahipliği (Free / Premium / Premium Max), mağaza işlem kimlikleri. <strong>Kart ve ödeme bilgilerinizi hiçbir zaman görmüyoruz</strong> — ödemeyi Google Play / App Store alır.</td>
+              <td>Satın alma durumu ve hak sahipliği (Free / Premium / Premium Max), mağaza işlem kimlikleri. <strong>Kart ve ödeme bilgilerinizi hiçbir zaman görmüyoruz</strong> — ödemeyi Google Play / App Store alır. Davet ödülü veya promosyon kodundan gelen ücretsiz ay bir mağaza aboneliği değildir; o süre için planınız doğrudan hesabınıza işlenir (plan ve bitiş tarihi).</td>
               <td>Google Play, App Store, RevenueCat</td>
+            </tr>
+            <tr>
+              <td><strong>Davet ve promosyon</strong></td>
+              <td>Size ait davet kodu; bir arkadaşınızın davet kodunu girdiyseniz kimin davetiyle geldiğiniz, kodu girdiğiniz zaman ve ilk ücretli aboneliğinizi başlatıp başlatmadığınız (yalnızca “abone oldu” bilgisi; tutar veya ürün tutulmaz); kazandığınız ve kullandığınız ücretsiz ay sayısı; girdiğiniz promosyon kodu ve kullanım zamanı; günlük yanlış kod denemesi sayacı. Bu kayıtlar yalnızca sunucuda tutulur; veritabanı kuralları gereği uygulama bunları doğrudan okuyamaz, davet ekranınıza sunucu fonksiyonu üzerinden gelir.</td>
+              <td>Sizden; abone olma durumu Google Play / App Store / RevenueCat’ten</td>
             </tr>
             <tr>
               <td><strong>Geri bildirim</strong></td>
@@ -152,7 +155,7 @@
             </tr>
             <tr>
               <td><strong>Cihaz üzerinde kalan</strong></td>
-              <td>Ayarlar ve ayar yedeği dosyası (oluşturursanız), önbellek, çevrimdışı için indirilen içerik ve posterler, ana ekran widget’larında gösterilen özetler (hatırlatıcılar, listeler, istatistikler) ve oluşturduğunuz paylaşım görselleri (kaydetmeyi seçerseniz galeriye yazılır) — bunlar telefonunuzda kalır, bize gönderilmez. Notlarınızın, hatırlatıcılarınızın, listelerinizin ve AI sohbetlerinizin cihazdaki kopyası ise hesabınıza yedeklenir; hesabınızdan çıkış yaptığınızda cihazdaki kopya silinir.</td>
+              <td>Ayarlar ve ayar yedeği dosyası (oluşturursanız), önbellek, takip ettiğiniz oyuncu ve yönetmenler, yıllık izleme hedefleriniz, çevrimdışı için indirilen içerik ve posterler, ana ekran widget’larında gösterilen özetler (hatırlatıcılar, listeler, istatistikler) ve oluşturduğunuz paylaşım görselleri (kaydetmeyi seçerseniz galeriye yazılır) — bunlar telefonunuzda kalır, bize gönderilmez. Notlarınızın, hatırlatıcılarınızın, listelerinizin ve AI sohbetlerinizin cihazdaki kopyası ise hesabınıza yedeklenir; hesabınızdan çıkış yaptığınızda cihazdaki kopya silinir.</td>
               <td>Otomatik</td>
             </tr>
             <tr>
@@ -235,6 +238,10 @@
               <td>Sözleşmenin ifası + hukuki yükümlülük — KVKK m.5/2-c, 5/2-a · GDPR m.6(1)(b)/(c)</td>
             </tr>
             <tr>
+              <td>Arkadaş davetini ve promosyon kodlarını işletmek, ücretsiz ay haklarını vermek; çoklu hesap ve kod tahmini gibi kötüye kullanımı önlemek</td>
+              <td>Sözleşmenin ifası + meşru menfaat — KVKK m.5/2-c, 5/2-f · GDPR m.6(1)(b)/(f)</td>
+            </tr>
+            <tr>
               <td>Hataları ve çökmeleri tespit edip gidermek, hangi özelliklerin kullanıldığını ölçerek uygulamayı geliştirmek</td>
               <td>Meşru menfaat — KVKK m.5/2-f · GDPR m.6(1)(f)</td>
             </tr>
@@ -257,9 +264,10 @@
         kullanıcılara görünür. Neyin kime göründüğünü siz belirlersiniz.
       </p>
       <ul>
-        <li><strong>Herkese açık (giriş yapmış kullanıcılar):</strong> kullanıcı adınız, görünen adınız, avatarınız, biyografiniz, rozetleriniz, dört favoriniz, yorumlarınız, verdiğiniz puanlar ve liderlik tablosu kaydınız.</li>
+        <li><strong>Herkese açık (giriş yapmış kullanıcılar):</strong> kullanıcı adınız, görünen adınız, avatarınız, biyografiniz, rozetleriniz, dört favoriniz, eklediyseniz sosyal hesap kullanıcı adlarınız (dokunulunca ilgili platformun uygulaması veya sitesi açılır; orada o platformun kendi politikası geçerlidir), yorumlarınız, verdiğiniz puanlar ve liderlik tablosu kaydınız.</li>
         <li><strong>Gönderiler:</strong> paylaşırken <em>herkese açık</em> ya da <em>yalnızca takipçiler</em> seçersiniz. Herkese açık gönderiler, uygulamayı kullanmayan kişilerce de görülebilecek şekilde erişilebilir olabilir.</li>
         <li><strong>Ayarla kontrol edilir:</strong> profil, listeler ve çevrimiçi durumu için Ayarlar → Gizlilik’ten ayrı ayrı seçim yaparsınız (profil ve listeler için <em>herkese açık / yalnızca arkadaşlar / gizli</em>; çevrimiçi durumu için <em>herkes / arkadaşlar / hiç kimse</em>). Liste görünürlüğü sunucu güvenlik kurallarında da uygulanır; profil ve çevrimiçi durumu tercihleri uygulama arayüzünde uygulanır.</li>
+        <li><strong>Davet bağı:</strong> bir arkadaşınızın davet kodunu girerseniz o kişi davet ekranında adınızı, kullanıcı adınızı, avatarınızı, katılma zamanınızı ve durumunuzu (“kayıt oldu”, ilk ücretli aboneliğinizi başlattıysanız “abone oldu”, ücretsiz ay kazanıldıysa “ödül kazanıldı”) görür; ne satın aldığınız veya ne kadar ödediğiniz görünmez. Siz de sizi davet edenin adını görürsünüz. Kodu girmediğiniz sürece davet edenle aranızda bir bağ kurulmaz.</li>
         <li><strong>Yalnızca ilgili kişiler:</strong> birebir ve grup mesajları yalnızca o sohbetin katılımcılarına, CineSwipe odası yalnızca odadaki iki kişiye açıktır. Sohbete bir liste, film kartı veya AI cevabı gönderirseniz o içerik sohbetin katılımcılarına görünür.</li>
         <li><strong>Yalnızca siz:</strong> notlar, hatırlatıcılar, takvim, istatistik ayrıntıları, AI sohbet geçmişiniz, geri bildirimleriniz, e-posta adresiniz ve doğum tarihiniz. E-posta adresiniz ve doğum tarihiniz uygulamada diğer kullanıcılara gösterilmez.</li>
       </ul>
@@ -287,6 +295,11 @@
               <td><strong>Google Firebase</strong><br /><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Politika</a></td>
               <td>Kimlik doğrulama, veritabanı (Firestore + Realtime Database), sunucu fonksiyonları, web barındırma</td>
               <td>Yukarıdaki tablodaki tüm hesap ve uygulama verileri</td>
+            </tr>
+            <tr>
+              <td><strong>Firebase App Check</strong><br />(Google Play Integrity / Apple App Attest)</td>
+              <td>Sunucuya gelen isteklerin gerçek seelogd uygulamasından geldiğini doğrulamak; otomatik ve kötüye kullanım amaçlı erişimi azaltmak</td>
+              <td>Cihazın ve uygulama kurulumunun bütünlük sinyali (Android’de Google, iOS’ta Apple’ın ürettiği doğrulama belirteci). Hesap verisi veya içerik taşımaz.</td>
             </tr>
             <tr>
               <td><strong>Google Firebase Analytics</strong><br /><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Politika</a></td>
@@ -331,7 +344,7 @@
             <tr>
               <td><strong>TMDB</strong><br /><a href="https://www.themoviedb.org/privacy-policy" target="_blank" rel="noopener">Politika</a></td>
               <td>Film/dizi bilgileri, posterler, yayın platformu verisi (JustWatch kaynaklı)</td>
-              <td>Yalnızca içerik sorguları (ör. aradığınız film adı); hesap kimliğinizi TMDB’ye göndermiyoruz. İstekler cihazınızdan doğrudan yapıldığı için TMDB IP adresinizi görebilir.</td>
+              <td>Yalnızca içerik sorguları (ör. aradığınız film adı ya da yapıştırdığınız veya başka bir uygulamadan seelogd’a paylaştığınız IMDb/TMDB bağlantısındaki yapım kimliği); hesap kimliğinizi TMDB’ye göndermiyoruz. İstekler cihazınızdan doğrudan yapıldığı için TMDB IP adresinizi görebilir.</td>
             </tr>
             <tr>
               <td><strong>OMDb API</strong><br /><a href="https://www.omdbapi.com/legal.htm" target="_blank" rel="noopener">Şartlar</a></td>
@@ -433,10 +446,12 @@
         <li><strong>Mesajlar:</strong> sohbet içinde silinene ya da hesap kapatılana kadar. Birebir sohbetleri hesabınızı silerken kaldırırız.</li>
         <li><strong>AI sohbet geçmişi:</strong> siz silene, “saklanacak sohbet” sınırını aşana (en eski sohbetler silinir) veya hesabınızı silene kadar. Silinenler hesabınızdan da kaldırılır.</li>
         <li><strong>CineSwipe odaları:</strong> sonuç iki tarafa teslim edilince; teslim edilmezse en geç 24 saat içinde otomatik silinir.</li>
-        <li><strong>Geri bildirimler:</strong> destek geçmişini ve ürün kararlarını izleyebilmek için hesabınız silindikten sonra da saklanabilir; hesap kimliğinize bağlı kaydın silinmesini e-postayla isteyebilirsiniz.</li>
+        <li><strong>Geri bildirimler:</strong> hesabınızı sildiğinizde hata bildirimleriniz ve özellik isteklerinizin tümü de silinir.</li>
+        <li><strong>Turnuva oyları:</strong> hesabınızı sildiğinizde oylarınız kaldırılır ve turnuva sayaçları buna göre düzeltilir.</li>
         <li><strong>Bekleme listesi e-postası:</strong> lansman duyurusu yapılana kadar; talebiniz üzerine hemen sileriz.</li>
         <li><strong>Abonelik/işlem kayıtları:</strong> mali ve hukuki saklama yükümlülükleri gereği hesap silindikten sonra da tutulabilir.</li>
-        <li><strong>İçerik şikâyetleri:</strong> moderasyon kararının dayanağı olarak, şikâyet eden hesap silinse de saklanabilir.</li>
+        <li><strong>Davet ve promosyon kayıtları:</strong> hesabınız açık olduğu sürece. Hesabı sildiğinizde davet kodunuz, davet hesabınız (biriken ücretsiz aylar) ve sizin davet ettiğiniz ya da sizi davet eden kayıtları silinir. Promosyon kodu kullanım kaydınız da silinir.</li>
+        <li><strong>İçerik şikâyetleri:</strong> yaptığınız şikâyetler moderasyon kararının dayanağı olarak saklanabilir, ancak hesabınızı sildiğinizde şikâyeti sizin yaptığınızı gösteren hesap kimliğiniz kayıttan çıkarılır; hakkınızda yapılmış şikâyetler silinir.</li>
         <li><strong>Ölçüm ve hata kayıtları:</strong> Firebase Analytics ve Sentry’nin kendi saklama süreleri geçerlidir; bu kayıtlar içerik taşımaz.</li>
       </ul>
       <p>
@@ -547,13 +562,15 @@
       </p>
       <p><strong>Sürüm geçmişi</strong></p>
       <ul>
+        <li><strong>1.4 — 21 Ekim 2026:</strong> Profilde isteğe bağlı sosyal hesap kullanıcı adları ve arkadaşla zevk uyumu eklendi. Hesap silme artık sunucuda tam kapsamlı çalışıyor: turnuva oyları, geri bildirimler, promosyon kullanım kaydı, başkalarının gönderilerindeki beğenileriniz, başkalarının bildirim kutusuna gönderdiğiniz bildirimler ve günlük liderlik kayıtlarınız da silinir; içerik şikâyetlerinde hesap kimliğiniz kayıttan çıkarılır.</li>
+        <li><strong>1.3 — 21 Ekim 2026:</strong> Arkadaş daveti ve promosyon kodu eklendi (hangi kayıtların tutulduğu, davet edenin neleri gördüğü, saklama ve silme). Firebase App Check (Google Play Integrity / Apple App Attest) üçüncü taraf listesine eklendi. Yapıştırılan veya başka uygulamadan paylaşılan IMDb/TMDB bağlantısının TMDB sorgusu olduğu belirtildi. Cihazda kalan verilere takip edilen kişiler ve yıllık hedef eklendi. Yasal sayfaların Portekizce ve Almanca kullanıcılara İngilizce açıldığı belirtildi.</li>
         <li><strong>1.2 — 18 Ekim 2026:</strong> “Kütüphaneni Dışa Aktar” ekranı eklendi; “Verilerinizin kopyası” bölümü ve hak listesi buna göre güncellendi. Harici puanlar için OMDb işleyici olarak ve (isteğe bağlı) haftalık yayın özeti bildirimi eklendi.</li>
         <li><strong>1.1 — 16 Ekim 2026:</strong> doğum tarihi ve yaş kapısı; Apple ile giriş; dört favori; geri bildirim kutusu; AI sohbet geçmişinin hesaba yedeklenmesi ve AI’ya giden verinin ayrıntılı dökümü; CineSwipe odaları; telefon takvimi, widget ve ayar yedeği; performans ölçümü ile Android reklam kimliğinin kullanım ölçümünde kullanıldığının açıkça belirtilmesi; “Verileri indir” özelliğinin bir veri dışa aktarımı olmadığının netleştirilmesi; görünürlük tercihlerinin nerede uygulandığının düzeltilmesi.</li>
         <li><strong>1.0 — 25 Temmuz 2026:</strong> ilk yayın.</li>
       </ul>
       <p>
         <strong>Dil:</strong> Bu metin Türkçe ve İngilizce yayımlanır. Uygulamayı
-        başka bir dilde (ör. İspanyolca) kullanıyorsanız bağlantı İngilizce
+        başka bir dilde (ör. İspanyolca, Portekizce veya Almanca) kullanıyorsanız bağlantı İngilizce
         sürümü açar. Sürümler arasında bir fark olursa Türkçe metin esas
         alınır.
       </p>
@@ -590,8 +607,8 @@
       </p>
       <div class="stamp">
         <span>Effective: <b>16 October 2026</b></span>
-        <span>Last updated: <b>18 October 2026</b></span>
-        <span>Version: <b>1.2</b></span>
+        <span>Last updated: <b>21 October 2026</b></span>
+        <span>Version: <b>1.4</b></span>
       </div>
     </div>
 
@@ -636,7 +653,7 @@
             </tr>
             <tr>
               <td><strong>Profile</strong></td>
-              <td>Bio, the index of the built-in avatar you picked, your <strong>four favourites</strong> (up to 4 movies, 4 shows and 4 people you pin to your profile: name, year and image path), privacy preferences, theme/language settings, badges</td>
+              <td>Bio, the index of the built-in avatar you picked, your <strong>four favourites</strong> (up to 4 movies, 4 shows and 4 people you pin to your profile: name, year and image path), privacy preferences, theme/language settings, badges and, optionally, your <strong>social account usernames</strong> (Instagram, X, TikTok, YouTube, Twitch, Letterboxd, Snapchat, Threads: only the username is stored; the address is built from the platform’s fixed domain)</td>
               <td>From you</td>
             </tr>
             <tr>
@@ -646,7 +663,7 @@
             </tr>
             <tr>
               <td><strong>Social</strong></td>
-              <td>Posts, comments, likes, bookmarks, your ratings, friendships, following/followers, friend requests, accounts you blocked, notifications, content reports</td>
+              <td>Posts, comments, likes, bookmarks, your ratings, friendships, following/followers, friend requests, accounts you blocked, notifications, content reports. The <strong>taste match</strong> shown on a friend’s profile is calculated on your device from watch data both sides can already see and is not stored separately; only if you send the result to a chat are the percentage and shared titles kept, as a message</td>
               <td>From you</td>
             </tr>
             <tr>
@@ -671,8 +688,13 @@
             </tr>
             <tr>
               <td><strong>Subscription</strong></td>
-              <td>Purchase state and entitlement (Free / Premium / Premium Max), store transaction identifiers. <strong>We never see your card or payment details</strong> — payment is taken by Google Play / the App Store.</td>
+              <td>Purchase state and entitlement (Free / Premium / Premium Max), store transaction identifiers. <strong>We never see your card or payment details</strong> — payment is taken by Google Play / the App Store. A free month from an invite reward or a promo code is not a store subscription; for that period your plan is recorded directly on your account (plan and end date).</td>
               <td>Google Play, App Store, RevenueCat</td>
+            </tr>
+            <tr>
+              <td><strong>Invites and promo codes</strong></td>
+              <td>Your own invite code; if you entered a friend’s invite code, who invited you, when you entered it, and whether you have started your first paid subscription (only a “subscribed” flag — no amount or product is kept); the free months you have earned and used; a promo code you redeemed and when; a daily counter of wrong code attempts. These records are kept on the server only; under the database rules the app cannot read them directly, and your invite screen is fed through a server function.</td>
+              <td>From you; subscribed status from Google Play / App Store / RevenueCat</td>
             </tr>
             <tr>
               <td><strong>Feedback</strong></td>
@@ -691,7 +713,7 @@
             </tr>
             <tr>
               <td><strong>On-device only</strong></td>
-              <td>Settings and the settings backup file (if you create one), cache, content and posters downloaded for offline use, the summaries shown in home-screen widgets (reminders, lists, statistics) and the share images you create (written to your gallery only if you choose to save them) — these stay on your phone and are not sent to us. The on-device copy of your notes, reminders, lists and AI chats, however, is backed up to your account; it is removed from the device when you sign out.</td>
+              <td>Settings and the settings backup file (if you create one), cache, the actors and directors you follow, your yearly watch goals, content and posters downloaded for offline use, the summaries shown in home-screen widgets (reminders, lists, statistics) and the share images you create (written to your gallery only if you choose to save them) — these stay on your phone and are not sent to us. The on-device copy of your notes, reminders, lists and AI chats, however, is backed up to your account; it is removed from the device when you sign out.</td>
               <td>Automatic</td>
             </tr>
             <tr>
@@ -774,6 +796,10 @@
               <td>Contract + legal obligation — GDPR Art. 6(1)(b)/(c) · KVKK Art. 5/2-c, 5/2-a</td>
             </tr>
             <tr>
+              <td>Running friend invites and promo codes, granting free-month entitlements, and preventing abuse such as multiple accounts and code guessing</td>
+              <td>Contract + legitimate interests — GDPR Art. 6(1)(b)/(f) · KVKK Art. 5/2-c, 5/2-f</td>
+            </tr>
+            <tr>
               <td>Detecting and fixing errors and crashes, and measuring which features are used in order to improve the app</td>
               <td>Legitimate interests — GDPR Art. 6(1)(f) · KVKK Art. 5/2-f</td>
             </tr>
@@ -796,9 +822,10 @@
         design. You decide what is visible to whom.
       </p>
       <ul>
-        <li><strong>Visible to signed-in users:</strong> your username, display name, avatar, bio, badges, four favourites, comments, ratings and leaderboard entry.</li>
+        <li><strong>Visible to signed-in users:</strong> your username, display name, avatar, bio, badges, four favourites, social account usernames if you added any (tapping one opens that platform’s app or site, where the platform’s own policy applies), comments, ratings and leaderboard entry.</li>
         <li><strong>Posts:</strong> you choose <em>public</em> or <em>followers only</em> when you post. Public posts may be accessible to people who do not use the app.</li>
         <li><strong>Controlled by settings:</strong> in Settings → Privacy you choose separately for your profile and lists (<em>public / friends only / private</em>) and for your online status (<em>everyone / friends / nobody</em>). List visibility is enforced in the server security rules as well; the profile and online-status preferences are enforced in the app interface.</li>
+        <li><strong>Invite link:</strong> if you enter a friend’s invite code, that person sees your name, username, avatar, the time you joined and your status on their invite screen (“joined”, “subscribed” once you start your first paid subscription, “reward earned” once a free month has been granted); what you bought or how much you paid is not shown. You in turn see the name of the person who invited you. Unless you enter a code, no link to an inviter is created.</li>
         <li><strong>Only the people involved:</strong> direct and group messages are visible only to participants of that conversation, and a CineSwipe room only to the two people in it. If you send a list, a title card or an AI answer into a chat, it is visible to that chat’s participants.</li>
         <li><strong>Only you:</strong> notes, reminders, calendar, detailed statistics, your AI chat history, your feedback, your e-mail address and your date of birth. Your e-mail and date of birth are not shown to other users in the app.</li>
       </ul>
@@ -826,6 +853,11 @@
               <td><strong>Google Firebase</strong><br /><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Policy</a></td>
               <td>Authentication, database (Firestore + Realtime Database), server functions, web hosting</td>
               <td>All account and app data listed above</td>
+            </tr>
+            <tr>
+              <td><strong>Firebase App Check</strong><br />(Google Play Integrity / Apple App Attest)</td>
+              <td>Verifying that requests reaching our servers come from the genuine seelogd app, and reducing automated or abusive access</td>
+              <td>A device and app-install integrity signal (an attestation token produced by Google on Android and Apple on iOS). It carries no account data or content.</td>
             </tr>
             <tr>
               <td><strong>Google Firebase Analytics</strong><br /><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Policy</a></td>
@@ -870,7 +902,7 @@
             <tr>
               <td><strong>TMDB</strong><br /><a href="https://www.themoviedb.org/privacy-policy" target="_blank" rel="noopener">Policy</a></td>
               <td>Movie/TV metadata, posters, streaming availability (sourced from JustWatch)</td>
-              <td>Content queries only (e.g. the title you search for); we do not send your account identity to TMDB. Because requests are made directly from your device, TMDB can see your IP address.</td>
+              <td>Content queries only (e.g. the title you search for, or the title ID in an IMDb/TMDB link you paste or share into seelogd from another app); we do not send your account identity to TMDB. Because requests are made directly from your device, TMDB can see your IP address.</td>
             </tr>
             <tr>
               <td><strong>OMDb API</strong><br /><a href="https://www.omdbapi.com/legal.htm" target="_blank" rel="noopener">Terms</a></td>
@@ -970,10 +1002,12 @@
         <li><strong>Messages:</strong> until deleted in the chat or until the account is closed. Direct chats are removed when you delete your account.</li>
         <li><strong>AI chat history:</strong> until you delete it, until it exceeds your “chats to keep” limit (oldest chats are removed first), or until you delete your account. Anything removed is deleted from your account as well.</li>
         <li><strong>CineSwipe rooms:</strong> deleted automatically once the result has been delivered to both sides, or after 24 hours at most.</li>
-        <li><strong>Feedback:</strong> may be kept after you delete your account so we can follow support history and product decisions; you can ask by e-mail for the record tied to your account id to be deleted.</li>
+        <li><strong>Feedback:</strong> all bug reports and feature requests you sent are deleted together with your account.</li>
+        <li><strong>Tournament votes:</strong> when you delete your account your votes are removed and the tournament tallies are corrected accordingly.</li>
         <li><strong>Waitlist e-mail:</strong> until we announce the launch; removed immediately on request.</li>
         <li><strong>Subscription/transaction records:</strong> may be retained after account deletion where financial and legal retention duties apply.</li>
-        <li><strong>Content reports:</strong> may be retained as the basis of a moderation decision even if the reporting account is deleted.</li>
+        <li><strong>Invite and promo records:</strong> as long as your account exists. When you delete your account, your invite code, your invite account (accrued free months) and the records of people you invited or who invited you are deleted. Your promo code redemption record is deleted as well.</li>
+        <li><strong>Content reports:</strong> reports you filed may be retained as the basis of a moderation decision, but when you delete your account your account id is removed from them; reports filed about you are deleted.</li>
         <li><strong>Analytics and error records:</strong> Firebase Analytics’ and Sentry’s own retention periods apply; these records carry no content.</li>
       </ul>
       <p>
@@ -1079,13 +1113,15 @@
       </p>
       <p><strong>Version history</strong></p>
       <ul>
+        <li><strong>1.4 — 21 October 2026:</strong> Added optional social account usernames on the profile and taste match with a friend. Account deletion now runs in full on the server: tournament votes, feedback, promo redemption record, your likes on other people’s posts, notifications you sent to other users’ inboxes and your daily leaderboard entries are deleted too; your account id is removed from content reports you filed.</li>
+        <li><strong>1.3 — 21 October 2026:</strong> added friend invites and promo codes (which records are kept, what the inviter sees, retention and deletion). Added Firebase App Check (Google Play Integrity / Apple App Attest) to the third-party list. Stated that a pasted or shared IMDb/TMDB link results in a TMDB query. Added followed people and the yearly goal to the on-device data. Stated that Portuguese and German users are shown the English legal pages.</li>
         <li><strong>1.2 — 18 October 2026:</strong> added the “Export Your Library” screen; the “A copy of your data” section and the rights list were updated accordingly. OMDb was added as a processor for external ratings, and the optional weekly release-digest notification was added.</li>
         <li><strong>1.1 — 16 October 2026:</strong> date of birth and the age gate; Sign in with Apple; four favourites; the feedback box; AI chat history backed up to your account and a detailed account of what is sent to the AI; CineSwipe rooms; phone calendar, widgets and settings backup; performance measurement, and a clear statement that the Android advertising id is used within usage analytics; clarification that “Download data” is not a data export; correction of where visibility preferences are enforced.</li>
         <li><strong>1.0 — 25 July 2026:</strong> first release.</li>
       </ul>
       <p>
         <strong>Language:</strong> this text is published in Turkish and English.
-        If you use the app in another language (for example Spanish), the link
+        If you use the app in another language (for example Spanish, Portuguese or German), the link
         opens the English version. If the versions differ, the Turkish text
         prevails.
       </p>
@@ -1104,7 +1140,7 @@
 
   <nav class="toc" aria-label="İçindekiler / Contents">
     <details class="toc-box" open>
-      <summary class="toc-title" data-tr="İçindekiler" data-en="Contents">İçindekiler</summary>
+      <summary class="toc-title" id="tocTitle">İçindekiler</summary>
       <ol></ol>
     </details>
   </nav>
@@ -1112,15 +1148,16 @@
 
 <footer class="foot">
   <div class="foot-nav">
-    <a href="index.html" data-foot-tr="Ana sayfa" data-foot-en="Home">Ana sayfa</a>
-    <a href="privacy.html" aria-current="page" data-foot-tr="Gizlilik Politikası" data-foot-en="Privacy Policy">Gizlilik Politikası</a>
-    <a href="terms.html" data-foot-tr="Kullanım Şartları" data-foot-en="Terms of Use">Kullanım Şartları</a>
-    <a href="delete-account.html" data-foot-tr="Hesap Silme" data-foot-en="Delete Account">Hesap Silme</a>
+    <a href="index.html" data-nav="home">Ana sayfa</a>
+    <a href="privacy.html" aria-current="page" data-nav="privacy">Gizlilik Politikası</a>
+    <a href="terms.html" data-nav="terms">Kullanım Şartları</a>
+    <a href="delete-account.html" data-nav="delete">Hesap Silme</a>
     <a href="mailto:contact@seelogd.com" class="mail">contact@seelogd.com</a>
   </div>
   <p>© 2026 seelogd</p>
 </footer>
 
+<script src="site-lang.js"></script>
 <script src="legal.js"></script>
 </body>
 </html>

@@ -4,10 +4,10 @@
 // (jest yalnız saf modülleri test edebiliyor, bkz. jest.config.js).
 //
 // KAVRAMLAR
-//   ekran  : bölümlerin yaşadığı dört yüzey — Diziler ("tv"), Filmler ("movie"), Hub
-//            ("hub") ve Profil ("profile"). Film ve Dizi tek sekmede ama AYRI ekran:
-//            ikisinin rafları farklı ve kullanıcı birini sadeleştirip ötekini
-//            bırakabilmeli (screens/tabs/DiscoverScreen.js).
+//   ekran  : bölümlerin yaşadığı beş yüzey — Diziler ("tv"), Filmler ("movie"), Eğlence
+//            (eski Hub, kimliği "hub" kaldı), Kütüphane ("library") ve Profil ("profile").
+//            Film ve Dizi tek sekmede ama AYRI ekran: ikisinin rafları farklı ve kullanıcı
+//            birini sadeleştirip ötekini bırakabilmeli (screens/tabs/DiscoverScreen.js).
 //   bölüm  : ekranın bağımsız bir parçası (bir raf, bir kart, bir şerit).
 //   gizli  : kullanıcının kapattığı (ekran, bölüm) çiftleri.
 //
@@ -16,7 +16,7 @@
 // tercihin onu SESSİZCE kapalı bırakmaması. Boş kayıt = hepsi görünür. Aynı karar
 // utils/decorScopes.js'te de verilmişti.
 //
-// ESKİ TEK ANAHTARLI BÖLÜM (`legacy`): "Devam Edenler" rafının kendi ayarı zaten
+// ESKİ TEK ANAHTARLI BÖLÜM (`legacy`): "Sıradaki" (devam eden diziler) rafının kendi ayarı zaten
 // vardı (Ayarlar > Dil ve içerik, `showOngoingTvShows`). İkinci bir kayıt açılsa
 // aynı bölüm için iki gerçek doğruluk kaynağı olurdu ("burada kapalı, orada açık").
 // Bu yüzden böyle bölümler BURADA listelenir (ayar ekranı tek yerden yönetsin) ama
@@ -47,7 +47,6 @@ export const SECTION_SCREENS = Object.freeze(
       icon: "tv-outline",
       sections: [
         section("trends", "flame-outline", "blue"),
-        section("ongoing", "play-circle-outline", "green", { legacy: "showOngoingTvShows" }),
         section("best", "star-outline", "amber"),
         section("followedPeople", "notifications-outline", "blue"),
         section("fromFavorites", "heart-outline", "purple"),
@@ -84,13 +83,30 @@ export const SECTION_SCREENS = Object.freeze(
     },
     {
       id: "hub",
-      icon: "grid-outline",
+      icon: "game-controller-outline",
       sections: [
         section("feed", "chatbubbles-outline", "blue"),
         section("cineswipe", "heart-half-outline", "purple"),
+        section("bingo", "grid-outline", "teal"),
+        section("poll", "help-circle-outline", "purple"),
         section("tournament", "trophy-outline", "amber"),
-        section("wrapped", "bar-chart-outline", "green"),
         section("games", "game-controller-outline", "purple"),
+      ],
+    },
+    {
+      // Günlük işler: Profil'den taşınan Listeler / Hatırlatmalar / Notlar + devam
+      // eden dizilerin rafı (Sıradaki; TV ana ekranından buraya taşındı) + Wrapped
+      // (Eğlence'den taşındı).
+      id: "library",
+      icon: "library-outline",
+      sections: [
+        // Eski "Devam eden diziler" ayarı (Ayarlar > Dil ve içerik): tek doğruluk kaynağı.
+        section("nextUp", "play-skip-forward-outline", "green", { legacy: "showOngoingTvShows" }),
+        section("lists", "albums-outline", "purple"),
+        section("reminders", "notifications-outline", "amber"),
+        section("notes", "document-text-outline", "blue"),
+        // Yıllık izleme özeti + arşiv: Eğlence'den taşındı (kimliği aynı kaldı).
+        section("wrapped", "bar-chart-outline", "green"),
       ],
     },
     {
@@ -103,10 +119,7 @@ export const SECTION_SCREENS = Object.freeze(
         // Mesajlar, arkadaş listesi ve istekler uygulamada YALNIZ buradan açılıyor.
         section("friends", "people-outline", "blue", { confirmHide: true }),
         section("stats", "stats-chart-outline", "green"),
-        section("lists", "albums-outline", "purple"),
         section("activity", "pulse-outline", "teal"),
-        section("reminders", "notifications-outline", "amber"),
-        section("notes", "document-text-outline", "blue"),
       ],
     },
   ].map((screen) =>
@@ -131,6 +144,29 @@ export const getSection = (screen, id) => sectionsOf(screen).find((item) => item
 const emptyHidden = () => Object.fromEntries(SECTION_SCREEN_IDS.map((screen) => [screen, []]));
 
 /**
+ * Kütüphane sekmesine taşınan bölümler (kimlikleri aynı kaldı): Listeler / Hatırlatmalar /
+ * Notlar Profil'den, Wrapped Eğlence'den ("hub"). Eski kayıtta kaynak ekranda gizlenmiş
+ * olanlar, taşınmayla birlikte sessizce geri görünmesin diye "library" ekranına aktarılır.
+ * Yeniden yazım zaten normalize çıktısını (taşınmış hâlini) saklar; yani bu göç yalnız
+ * bir kez iş görür.
+ */
+const MOVED_TO_LIBRARY = Object.freeze([
+  { from: "profile", ids: Object.freeze(["lists", "reminders", "notes"]) },
+  { from: "hub", ids: Object.freeze(["wrapped"]) },
+]);
+function migrateMovedSections(raw) {
+  let next = raw;
+  for (const { from, ids } of MOVED_TO_LIBRARY) {
+    if (!Array.isArray(next[from])) continue;
+    const moved = next[from].filter((id) => ids.includes(id));
+    if (moved.length === 0) continue;
+    const library = Array.isArray(next.library) ? next.library : [];
+    next = { ...next, library: [...new Set([...library, ...moved])] };
+  }
+  return next;
+}
+
+/**
  * Depodan okunan ham değeri güvenli biçime çevirir. Bozuk/eksik/eski kayıt asla
  * hata vermez: bilinmeyen ekran ve bölüm kimlikleri atılır, eski tek anahtarlı
  * bölümler atılır (görünürlükleri başka yerde), tekrarlar silinir, sıra kanonik
@@ -138,9 +174,10 @@ const emptyHidden = () => Object.fromEntries(SECTION_SCREEN_IDS.map((screen) => 
  *
  * @returns {Record<string, string[]>} her ekran için gizli bölüm kimlikleri
  */
-export function normalizeSectionVisibility(raw) {
+export function normalizeSectionVisibility(rawValue) {
   const out = emptyHidden();
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  if (!rawValue || typeof rawValue !== "object" || Array.isArray(rawValue)) return out;
+  const raw = migrateMovedSections(rawValue);
   for (const screen of SECTION_SCREEN_IDS) {
     const list = raw[screen];
     if (!Array.isArray(list)) continue;

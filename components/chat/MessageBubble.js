@@ -25,10 +25,12 @@ import MessageReplyPreview from "./MessageReplyPreview";
 import PollMessage from "./PollMessage";
 import SharedAiMessage from "./SharedAiMessage";
 import SharedCineRoomMessage from "./SharedCineRoomMessage";
+import SharedChallengeMessage from "./SharedChallengeMessage";
 import SharedListMessage from "./SharedListMessage";
 import SharedMediaCollection from "./SharedMediaCollection";
 import SharedMediaMessage from "./SharedMediaMessage";
 import SharedPostMessage from "./SharedPostMessage";
+import SharedTasteMatchMessage from "./SharedTasteMatchMessage";
 import SharedTournamentMessage from "./SharedTournamentMessage";
 import SwipeReplyContainer from "./SwipeReplyContainer";
 
@@ -300,6 +302,10 @@ const MessageBubble = memo(
               isOutgoing={isMe}
               onOpen={() => openShareTarget(navigation, share)}
             />
+          ) : share?.type === "tasteMatch" ? (
+            <SharedTasteMatchMessage share={share} isOutgoing={isMe} getTmdbUrl={getTmdbUrl} />
+          ) : share?.type === "challenge" ? (
+            <SharedChallengeMessage share={share} isOutgoing={isMe} senderUid={item.senderId} />
           ) : hasItems ? (
             <SharedMediaCollection
               items={item.items}

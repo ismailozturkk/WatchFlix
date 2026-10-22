@@ -9,21 +9,19 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230a1626'/%3E%3Ccircle cx='24' cy='33' r='11' fill='%23f4fbff'/%3E%3Ccircle cx='40' cy='33' r='11' fill='%23f4fbff'/%3E%3Ccircle cx='26' cy='35' r='5' fill='%2304121f'/%3E%3Ccircle cx='42' cy='35' r='5' fill='%2304121f'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Schibsted+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="legal.css" />
+<link rel="stylesheet" href="lang-menu.css" />
 </head>
-<body data-title-tr="Kullanım Şartları — seelogd" data-title-en="Terms of Use — seelogd">
+<body data-page="terms">
 <div class="glow" aria-hidden="true"></div>
 
 <header class="bar">
   <a class="bar-brand" href="index.html"><img src="s-mark-tight.png" alt="" />seelogd</a>
   <span class="bar-sep">/</span>
-  <span class="bar-page" data-tr="Kullanım Şartları" data-en="Terms of Use">Kullanım Şartları</span>
+  <span class="bar-page" id="barPage">Kullanım Şartları</span>
   <span class="bar-spacer"></span>
-  <div class="lang" role="group" aria-label="Dil / Language">
-    <button type="button" data-lang="tr" aria-pressed="true">TR</button>
-    <button type="button" data-lang="en" aria-pressed="false">EN</button>
-  </div>
+  <div id="langMenu"></div>
 </header>
 
 <div class="shell">
@@ -41,8 +39,8 @@
       </p>
       <div class="stamp">
         <span>Yürürlük: <b>16 Ekim 2026</b></span>
-        <span>Son güncelleme: <b>16 Ekim 2026</b></span>
-        <span>Sürüm: <b>1.1</b></span>
+        <span>Son güncelleme: <b>21 Ekim 2026</b></span>
+        <span>Sürüm: <b>1.3</b></span>
       </div>
     </div>
 
@@ -120,6 +118,16 @@
         sahip olduğunuzu beyan edersiniz.
       </p>
       <p>
+        <strong>Profil bağlantıları:</strong> Profilinize isteğe bağlı olarak
+        sosyal hesap kullanıcı adları (ör. Instagram, X, TikTok) ekleyebilirsiniz.
+        Yalnızca <em>size ait</em> hesapları ekleyebilirsiniz; başkasını taklit
+        eden veya yanıltıcı bir hesabı bağlamak yasaktır. Bu kullanıcı adları
+        profilinizi görebilen kişilere görünür; dokunulduğunda ilgili platformun
+        uygulaması veya sitesi açılır. O platformun içeriğinden ve politikasından
+        biz sorumlu değiliz. İstediğiniz zaman Profili Düzenle ekranından
+        kaldırabilirsiniz.
+      </p>
+      <p>
         <strong>Moderasyon:</strong> Uygulamada içerik şikâyet etme, kullanıcı
         engelleme ve içeriği gizleme araçları vardır. Bu şartları ihlal eden
         içeriği kaldırabilir, görünürlüğünü kısıtlayabilir; tekrarlayan ihlalde
@@ -141,9 +149,9 @@
         <li><strong>İptal:</strong> Aboneliği dilediğiniz an mağaza hesabınızın abonelik ayarlarından iptal edebilirsiniz. İptal, mevcut dönemin sonunda yürürlüğe girer; kalan dönem kullanılmaya devam eder.</li>
         <li><strong>İade:</strong> İadeler ilgili mağazanın iade politikasına tabidir. Mağaza üzerinden yapılan satın almalar için iade yetkisi mağazadadır; talebinizi doğrudan Google Play veya App Store’a iletmeniz gerekir. Tüketici mevzuatından doğan cayma/iade haklarınız saklıdır.</li>
         <li><strong>Fiyatlar:</strong> Ülkeye göre değişir ve mağazada gösterilen tutar geçerlidir. Fiyat değişikliklerini yürürlükten önce duyururuz; değişiklik yalnızca duyuru sonrası dönemler için geçerlidir.</li>
-        <li><strong>Tanıtım teklifleri:</strong> İlk dönem indirimi gibi teklifler mağaza tarafından uygulanır; koşulları (süre, kimlerin yararlanabileceği, sonraki dönem fiyatı) satın alma ekranında ve mağazada yazılıdır ve yalnızca mağazanın uygun bulduğu hesaplar için geçerlidir.</li>
+        <li><strong>Tanıtım teklifleri:</strong> İlk dönem indirimi gibi teklifler mağaza tarafından uygulanır; koşulları (süre, kimlerin yararlanabileceği, sonraki dönem fiyatı) satın alma ekranında ve mağazada yazılıdır ve yalnızca mağazanın uygun bulduğu hesaplar için geçerlidir. Davet ve promosyon kodlarından gelen ücretsiz aylar mağaza teklifi değildir; <a href="#tr-17">Arkadaş daveti ve promosyon kodları</a> maddesinde düzenlenmiştir.</li>
         <li><strong>Plan sona erdiğinde:</strong> Aboneliğiniz bitince verileriniz silinmez. Ücretsiz planın limitlerini aşan kısım için yeni ekleme yapamayabilir; yalnızca ücretli planlarda açık olan özellikler (ör. oyunlar, CineSwipe, özel temalar) kapanır, tercihleriniz silinmez.</li>
-        <li><strong>Hesap silme aboneliği iptal etmez.</strong> Hesabınızı silmeden önce aboneliği mağazadan iptal edin; aksi hâlde mağaza tahsilata devam eder.</li>
+        <li><strong>Hesap silme aboneliği iptal etmez.</strong> Hesabınızı silmeden önce aboneliği mağazadan iptal edin; aksi hâlde mağaza tahsilata devam eder. Hesabı silmek, kalan ücretsiz ay haklarınızı da sona erdirir.</li>
         <li><strong>Premium içeriği değişebilir:</strong> Pakete dâhil özellikleri geliştirebilir veya değiştirebiliriz. Bir özelliği paketten çıkarmamız hâlinde, satın aldığınız dönem boyunca erişiminizi sürdürürüz.</li>
       </ul>
       <div class="box">
@@ -160,6 +168,22 @@
           içinde gösterilir.
         </p>
       </div>
+
+      <h2 id="tr-17" data-toc="Davet ve promosyon">Arkadaş daveti ve promosyon kodları</h2>
+      <p>
+        Ayarlar → Seelogd Premium altındaki “Arkadaşını davet et” ekranı ve
+        Premium sayfasındaki “Kodun var mı?” alanı için şu koşullar geçerlidir:
+      </p>
+      <ul>
+        <li><strong>Davet ödülü:</strong> arkadaşınız davet kodunuzu girer ve <em>ilk ücretli</em> aboneliğini başlatırsa size 1 ay ücretsiz Premium biriktirilir. Deneme sürümleri, test satın almaları ve ücretsiz (0 fiyatlı) satın almalar sayılmaz; davet başına tek ödül verilir ve biriken toplam ödül en fazla 12 aydır. Biriken ayı uygulamadan siz başlatırsınız; mağaza aboneliğiniz sürerken başlatılamaz, ay birikmiş olarak bekler.</li>
+        <li><strong>Davetli indirimi:</strong> davet kodunu giren kişi, kodu hesabını açtıktan sonra en geç 14 gün içinde ve henüz abone olmadıysa girebilir. İlk ay indirimi (şu an %30) mağazanın teklifi olarak uygulanır; mağaza aynı anda yalnızca bir teklif uyguladığı ve uygunluğu kendisi belirlediği için, daha avantajlı başka bir teklif varsa o uygulanır.</li>
+        <li><strong>Promosyon kodu:</strong> bizim verdiğimiz kodlar (ör. kampanya, basın veya test kodu) belirtilen süre için Premium ya da Premium Max hakkı verir. Hesap başına yalnızca bir promosyon kodu kullanılabilir; kodların kişi sınırı ve son kullanma tarihi olabilir; mağaza aboneliğiniz sürerken kod kullanılamaz.</li>
+        <li><strong>Ücretsiz ay bir mağaza aboneliği değildir:</strong> kendiliğinden yenilenmez ve ücret tahsil edilmez. Süre bitince planınız, varsa mağaza aboneliğinizin planına, yoksa Free plana döner; verileriniz silinmez (bkz. “Plan sona erdiğinde”).</li>
+        <li><strong>Devredilemez:</strong> kod ve ücretsiz aylar satılamaz, devredilemez, paraya veya başka bir ödüle çevrilemez.</li>
+        <li><strong>Kötüye kullanım:</strong> birden fazla hesapla ödül toplamak, kendi kodunuzu kullanmaya çalışmak, kod tahmin etmek veya kodları toplu biçimde paylaşıp satmak yasaktır. Böyle bir durumda kodu ve ücretsiz ayları iptal edebilir, hesabı kısıtlayabiliriz.</li>
+        <li><strong>Değişiklik:</strong> ödül süresini, tavanı ve indirim oranını değiştirebilir veya programı sonlandırabiliriz; önemli değişiklikleri makul biçimde duyururuz.</li>
+        <li>Davet ve promosyon işlenirken hangi verilerin tutulduğu ve davet edenin neleri gördüğü <a href="privacy.html">Gizlilik Politikası</a>’ndadır.</li>
+      </ul>
 
       <h2 id="tr-7" data-toc="AI özelliği">AI önerileri hakkında</h2>
       <p>
@@ -184,7 +208,7 @@
       <ul>
         <li>Oyun skorları şu an istemci tarafında hesaplanır ve sunucuda “doğrulanmamış” olarak işaretlenir. Bu nedenle liderlik tabloları bilgilendirme amaçlıdır.</li>
         <li>Hile, otomasyon, çoklu hesap veya skor manipülasyonu tespit edersek skoru silebilir, tabloyu sıfırlayabilir veya hesabı kısıtlayabiliriz.</li>
-        <li>Turnuva oylamasında her hesap bir oy kullanır. Oy bütünlüğünü korumak için oylar, verildikten sonra silinemez ve hesap silme işleminde de kaldırılmaz (oy kaydı kullanıcı adınızla ilişkilendirilmiş anonim bir kayıttır).</li>
+        <li>Turnuva oylamasında her hesap bir oy kullanır. Oy bütünlüğünü korumak için oylar, verildikten sonra değiştirilemez ve tek tek silinemez; ancak hesabınızı sildiğinizde oylarınız da kaldırılır ve turnuva sayaçları buna göre düzeltilir.</li>
         <li>Liderlik tablosu kaydınız kullanıcı adınız ve skorunuzla diğer kullanıcılara görünür.</li>
         <li>Ödül, para veya şans oyunu unsuru içermez; oyunlar için plan ücreti dışında ayrıca bir katılım ücreti alınmaz. Oyunların, CineSwipe’ın ve turnuvada oy kullanmanın hangi planlarda açık olduğu Premium ekranında gösterilir; Free planda turnuva izlenebilir ancak oy kullanılamaz.</li>
         <li>CineSwipe’ta bir arkadaşınızla ortak oda kurarsanız oylarınız ve eşleşmeleriniz odadaki iki kişiye görünür; oda sonuç teslim edildikten sonra ya da en geç 24 saat içinde otomatik silinir.</li>
@@ -262,7 +286,8 @@
       <p>
         Diğer kullanıcıların paylaştığı içerikten ve kullanıcılar arasındaki
         etkileşimden sorumlu değiliz. Verilerinizin önemli olduğu durumlarda
-        uygulamanın <em>verileri indir</em> özelliğiyle kendi kopyanızı almanızı
+        Ayarlar → Veri ve depolama → <em>Kütüphaneni Dışa Aktar</em> ekranıyla
+        izleme verilerinizin ve listelerinizin kendi kopyasını almanızı
         öneririz.
       </p>
 
@@ -287,11 +312,16 @@
       </p>
       <p>
         <strong>Dil:</strong> Bu şartlar Türkçe ve İngilizce yayımlanır. Uygulamayı
-        başka bir dilde (ör. İspanyolca) kullanıyorsanız bağlantı İngilizce
+        başka bir dilde (ör. İspanyolca, Portekizce veya Almanca) kullanıyorsanız bağlantı İngilizce
         sürümü açar. Sürümler arasında bir fark olursa Türkçe metin esas alınır.
       </p>
       <p>
-        <strong>Sürüm geçmişi:</strong> 1.1 (16 Ekim 2026) — doğum tarihi ve yaş
+        <strong>Sürüm geçmişi:</strong> 1.3 (21 Ekim 2026) — profil bağlantıları (sosyal hesap kullanıcı adları) maddesi eklendi; hesap silinince turnuva oylarının da kaldırıldığı belirtildi.
+        1.2 (21 Ekim 2026) — arkadaş daveti ve
+        promosyon kodları maddesi eklendi; ücretsiz ayların hesap silmeyle sona
+        erdiği belirtildi; veri kopyası önerisi “Kütüphaneni Dışa Aktar” ekranına
+        bağlandı; davetli indirimi maddesinden “lansman teklifi” örneği kaldırıldı.
+        1.1 (16 Ekim 2026) — doğum tarihi ve yaş
         kuralları, Apple ile giriş, geri bildirim kutusu, AI kişiselleştirme ve
         sohbet geçmişi, plan sona ermesi, CineSwipe ve cihaz izinleri
         maddeleri eklendi; oyun katılımı ve AI kota metinleri düzeltildi.
@@ -318,8 +348,8 @@
       </p>
       <div class="stamp">
         <span>Effective: <b>16 October 2026</b></span>
-        <span>Last updated: <b>16 October 2026</b></span>
-        <span>Version: <b>1.1</b></span>
+        <span>Last updated: <b>21 October 2026</b></span>
+        <span>Version: <b>1.3</b></span>
       </div>
     </div>
 
@@ -396,6 +426,15 @@
         hold the necessary rights and permissions.
       </p>
       <p>
+        <strong>Profile links:</strong> You may optionally add social account
+        usernames (e.g. Instagram, X, TikTok) to your profile. You may only add
+        accounts that <em>belong to you</em>; linking an account that impersonates
+        someone else or is misleading is prohibited. These usernames are visible
+        to people who can see your profile; tapping one opens that platform’s app
+        or site, and we are not responsible for that platform’s content or
+        policies. You can remove them at any time from Edit Profile.
+      </p>
+      <p>
         <strong>Moderation:</strong> the app provides tools to report content,
         block users and hide content. We may remove content that breaches these
         terms or limit its visibility, and we may suspend or close accounts for
@@ -417,9 +456,9 @@
         <li><strong>Cancellation:</strong> you can cancel at any time in your store account’s subscription settings. Cancellation takes effect at the end of the current period, which you keep using until then.</li>
         <li><strong>Refunds:</strong> refunds follow the relevant store’s policy. For store purchases the store holds refund authority, so requests must go to Google Play or the App Store. Statutory withdrawal and refund rights under consumer law are unaffected.</li>
         <li><strong>Prices:</strong> vary by country; the amount shown in the store applies. We announce price changes before they take effect, and changes apply only to periods after the announcement.</li>
-        <li><strong>Introductory offers:</strong> offers such as a first-period discount are applied by the store; their terms (duration, who is eligible, the price afterwards) are shown on the purchase screen and in the store, and apply only to accounts the store considers eligible.</li>
+        <li><strong>Introductory offers:</strong> offers such as a first-period discount are applied by the store; their terms (duration, who is eligible, the price afterwards) are shown on the purchase screen and in the store, and apply only to accounts the store considers eligible. Free months from invite and promo codes are not store offers; they are governed by the <a href="#en-17">Friend invites and promo codes</a> clause.</li>
         <li><strong>When a plan ends:</strong> your data is not deleted when a subscription ends. You may be unable to add more beyond the Free plan’s limits, and features available only on paid plans (for example games, CineSwipe, custom themes) close, but your preferences are not erased.</li>
-        <li><strong>Deleting your account does not cancel your subscription.</strong> Cancel it in the store first, otherwise the store keeps billing you.</li>
+        <li><strong>Deleting your account does not cancel your subscription.</strong> Cancel it in the store first, otherwise the store keeps billing you. Deleting your account also ends any remaining free-month entitlement.</li>
         <li><strong>Premium contents may change:</strong> we may improve or change which features are included. If we remove a feature from the plan, you keep access for the period you already paid for.</li>
       </ul>
       <div class="box">
@@ -435,6 +474,22 @@
           current limit is shown in the app.
         </p>
       </div>
+
+      <h2 id="en-17" data-toc="Invites and promo codes">Friend invites and promo codes</h2>
+      <p>
+        These conditions apply to the “Invite a friend” screen under Settings →
+        Seelogd Premium and to the “Have a code?” field on the Premium page:
+      </p>
+      <ul>
+        <li><strong>Invite reward:</strong> if a friend enters your invite code and starts their <em>first paid</em> subscription, 1 month of free Premium is added to your balance. Trials, test purchases and free (zero-price) purchases do not count; one reward is given per invite, and the total you can accrue is capped at 12 months. You start the accrued months yourself in the app; they cannot be started while your store subscription is active, and simply wait in your balance.</li>
+        <li><strong>Invitee discount:</strong> the person entering an invite code may do so within 14 days of opening their account and only if they have not subscribed before. The first-month discount (currently 30%) is applied as a store offer; because the store applies only one offer at a time and decides eligibility itself, a better offer applies instead where there is one.</li>
+        <li><strong>Promo codes:</strong> codes we issue (for example campaign, press or test codes) grant Premium or Premium Max for the stated period. Only one promo code can be used per account; codes may have a user limit and an expiry date; a code cannot be redeemed while your store subscription is active.</li>
+        <li><strong>A free month is not a store subscription:</strong> it does not renew itself and nothing is charged. When it ends, your plan returns to that of your store subscription if you have one, otherwise to Free; your data is not deleted (see “When a plan ends”).</li>
+        <li><strong>Not transferable:</strong> codes and free months cannot be sold, transferred, or exchanged for money or any other reward.</li>
+        <li><strong>Abuse:</strong> collecting rewards with multiple accounts, trying to use your own code, guessing codes, or sharing and selling codes in bulk is prohibited. In that case we may cancel the code and the free months and restrict the account.</li>
+        <li><strong>Changes:</strong> we may change the reward length, the cap and the discount rate, or end the programme; we announce material changes in a reasonable way.</li>
+        <li>What data is kept when processing invites and promo codes, and what the inviter sees, is set out in the <a href="privacy.html">Privacy Policy</a>.</li>
+      </ul>
 
       <h2 id="en-7" data-toc="The AI feature">About AI recommendations</h2>
       <p>
@@ -459,7 +514,7 @@
       <ul>
         <li>Game scores are currently computed on the client and flagged as “unverified” on the server, so leaderboards are informational.</li>
         <li>If we detect cheating, automation, multi-accounting or score manipulation, we may delete scores, reset a leaderboard or restrict the account.</li>
-        <li>Each account casts one vote in tournament voting. To protect vote integrity, votes cannot be deleted once cast and are not removed when an account is deleted (a vote record is an anonymous entry linked to your username).</li>
+        <li>Each account casts one vote in tournament voting. To protect vote integrity, votes cannot be changed or deleted individually once cast; deleting your account does remove your votes and the tournament tallies are corrected accordingly.</li>
         <li>Your leaderboard entry is visible to other users with your username and score.</li>
         <li>There are no prizes, money or games of chance involved; apart from the plan fee, no separate participation fee is charged for games. Which plans include games, CineSwipe and tournament voting is shown on the Premium screen; on the Free plan you can watch the tournament but cannot vote.</li>
         <li>If you set up a CineSwipe room with a friend, your votes and matches are visible to the two people in the room; the room is deleted automatically once the result is delivered, or after 24 hours at most.</li>
@@ -539,7 +594,8 @@
       <p>
         We are not responsible for content shared by other users or for
         interactions between users. Where your data matters to you, we recommend
-        keeping your own copy via the app’s <em>download data</em> feature.
+        keeping your own copy of your watch data and lists via Settings → Data
+        &amp; storage → <em>Export Your Library</em>.
       </p>
 
       <h2 id="en-13" data-toc="Governing law">Governing law and disputes</h2>
@@ -563,12 +619,17 @@
       </p>
       <p>
         <strong>Language:</strong> these terms are published in Turkish and
-        English. If you use the app in another language (for example Spanish),
+        English. If you use the app in another language (for example Spanish, Portuguese or German),
         the link opens the English version. If the versions differ, the Turkish
         text prevails.
       </p>
       <p>
-        <strong>Version history:</strong> 1.1 (16 October 2026) — added clauses
+        <strong>Version history:</strong> 1.3 (21 October 2026) — added the profile links (social account usernames) clause; stated that tournament votes are removed when an account is deleted.
+        1.2 (21 October 2026) — added the
+        friend invites and promo codes clause; stated that free months end when
+        the account is deleted; pointed the data-copy suggestion at the “Export
+        Your Library” screen; removed the “launch offer” example from the invitee-discount clause.
+        1.1 (16 October 2026) — added clauses
         on date of birth and age rules, Sign in with Apple, the feedback box, AI
         personalisation and chat history, what happens when a plan ends, CineSwipe
         and device permissions; corrected the game-participation and AI-quota
@@ -587,7 +648,7 @@
 
   <nav class="toc" aria-label="İçindekiler / Contents">
     <details class="toc-box" open>
-      <summary class="toc-title" data-tr="İçindekiler" data-en="Contents">İçindekiler</summary>
+      <summary class="toc-title" id="tocTitle">İçindekiler</summary>
       <ol></ol>
     </details>
   </nav>
@@ -595,15 +656,16 @@
 
 <footer class="foot">
   <div class="foot-nav">
-    <a href="index.html" data-foot-tr="Ana sayfa" data-foot-en="Home">Ana sayfa</a>
-    <a href="privacy.html" data-foot-tr="Gizlilik Politikası" data-foot-en="Privacy Policy">Gizlilik Politikası</a>
-    <a href="terms.html" aria-current="page" data-foot-tr="Kullanım Şartları" data-foot-en="Terms of Use">Kullanım Şartları</a>
-    <a href="delete-account.html" data-foot-tr="Hesap Silme" data-foot-en="Delete Account">Hesap Silme</a>
+    <a href="index.html" data-nav="home">Ana sayfa</a>
+    <a href="privacy.html" data-nav="privacy">Gizlilik Politikası</a>
+    <a href="terms.html" aria-current="page" data-nav="terms">Kullanım Şartları</a>
+    <a href="delete-account.html" data-nav="delete">Hesap Silme</a>
     <a href="mailto:contact@seelogd.com" class="mail">contact@seelogd.com</a>
   </div>
   <p>© 2026 seelogd</p>
 </footer>
 
+<script src="site-lang.js"></script>
 <script src="legal.js"></script>
 </body>
 </html>

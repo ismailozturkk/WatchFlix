@@ -682,6 +682,17 @@ function AppContent() {
             headerShown: false,
           }}
         />
+        {/* Ayarlar sekme değil: Profil'in dişli düğmesinden açılır (ProfileScreen). */}
+        <Stack.Screen
+          name="NotificationsScreen"
+          getComponent={() => require("./screens/tabs/profile/NotificationsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="SettingsScreen"
+          getComponent={() => require("./screens/tabs/SettingsScreen").default}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen
           name="PrivacySettingsScreen"
           getComponent={() => require("./screens/tabs/profile/PrivacySettingsScreen").default}
@@ -856,6 +867,21 @@ function AppContent() {
           name="SceneGameResultScreen"
           getComponent={() => require("./screens/game/SceneGameResultScreen").default}
           options={{ headerShown: false, animation: "fade" }}
+        />
+        <Stack.Screen
+          name="QuickGameScreen"
+          getComponent={() => require("./screens/game/QuickGameScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="OlderGameScreen"
+          getComponent={() => require("./screens/game/OlderGameScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="CinemaBingoScreen"
+          getComponent={() => require("./screens/bingo/CinemaBingoScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
           name="GameLeaderboardScreen"

@@ -7,42 +7,40 @@
  * görüneceğine karar veriyor. JS çalışmazsa iki blok da görünür kalır —
  * yasal metin her koşulda okunabilir olmalı.
  *
- * Dil seçimi landing (index.html) ile aynı localStorage anahtarını
- * paylaşır: "wf_lang". Uygulama içindeki bağlantılar `?lang=tr|en` ekler:
- * telefonun dili uygulamanın diliyle aynı olmak zorunda değil, yasal metin
- * kullanıcının uygulamada seçtiği dilde açılmalı.
+ * Site 5 dil bilir (site-lang.js: tr · en · es · pt · de) ama HUKUKİ METİN yalnız
+ * Türkçe ve İngilizce. es/pt/de seçiliyse İngilizce blok gösterilir; sayfanın
+ * çerçevesi (başlık, içindekiler, alt bilgi) seçilen dilde, üstte de o dilde bir
+ * not çıkar ("metin tr/en; çelişkide Türkçe esas"). Hukuki metni çevirmek hukuki
+ * inceleme ister; çevrilirse ilgili dil için <section data-lang-block="xx"> ekle,
+ * BLOCK_LANGS'e yaz ve CHROME.<dil>.note'u sil.
+ *
+ * Dil seçimi landing (index.html) ile aynı localStorage anahtarını paylaşır
+ * ("wf_lang"). Uygulama içindeki bağlantılar `?lang=` ekler: telefonun dili
+ * uygulamanın diliyle aynı olmak zorunda değil, yasal metin kullanıcının
+ * uygulamada seçtiği dilde açılmalı.
  */
 (function () {
   "use strict";
 
-  var LANGS = ["tr", "en"];
-  var KEY = "wf_lang";
+  var SL = window.SiteLang;
+  var BLOCK_LANGS = ["tr", "en"]; // metni olan diller; diğerleri İngilizceye düşer
 
-  function readStored() {
-    try {
-      var v = localStorage.getItem(KEY);
-      return LANGS.indexOf(v) !== -1 ? v : null;
-    } catch (e) {
-      return null; // Depolama kapalıysa (gizli sekme/katı ayarlar) sessiz geç.
-    }
-  }
-
-  function store(lang) {
-    try { localStorage.setItem(KEY, lang); } catch (e) { /* yoksay */ }
-  }
-
-  /* ?lang=tr / ?lang=en — uygulamadan gelen bağlantı bunu ekler.
-     "tr-TR" gibi bölgeli değerler de kabul edilir (ilk iki harf). */
-  function readParam() {
-    var m = /[?&]lang=([a-z-]+)/i.exec(location.search || "");
-    var v = m ? m[1].toLowerCase().slice(0, 2) : null;
-    return LANGS.indexOf(v) !== -1 ? v : null;
-  }
-
-  function detect() {
-    var nav = (navigator.language || navigator.userLanguage || "").toLowerCase();
-    return nav.indexOf("tr") === 0 ? "tr" : "en";
-  }
+  var CHROME = {
+    tr: { home: "Ana sayfa", privacy: "Gizlilik Politikası", terms: "Kullanım Şartları", "delete": "Hesap Silme", toc: "İçindekiler", menu: "Dil" },
+    en: { home: "Home", privacy: "Privacy Policy", terms: "Terms of Use", "delete": "Delete Account", toc: "Contents", menu: "Language" },
+    es: {
+      home: "Inicio", privacy: "Política de privacidad", terms: "Términos de uso", "delete": "Eliminar cuenta", toc: "Contenido", menu: "Idioma",
+      note: "Este texto legal solo está disponible en turco e inglés. Te mostramos la versión en inglés; si hay diferencias entre versiones, prevalece el texto en turco.",
+    },
+    pt: {
+      home: "Início", privacy: "Política de Privacidade", terms: "Termos de Uso", "delete": "Excluir conta", toc: "Conteúdo", menu: "Idioma",
+      note: "Este texto legal está disponível apenas em turco e inglês. Mostramos a versão em inglês; se houver diferenças entre as versões, prevalece o texto em turco.",
+    },
+    de: {
+      home: "Startseite", privacy: "Datenschutzerklärung", terms: "Nutzungsbedingungen", "delete": "Konto löschen", toc: "Inhalt", menu: "Sprache",
+      note: "Dieser Rechtstext gibt es nur auf Türkisch und Englisch. Wir zeigen dir die englische Fassung; bei Abweichungen gilt der türkische Text.",
+    },
+  };
 
   /* İçindekiler kutusu: masaüstünde (≥1000px) her zaman açık — kenar
      çubuğunda duruyor. Küçük ekranda tek satıra katlanır; orada sayfanın
@@ -72,10 +70,13 @@
   }
 
   var blocks = Array.prototype.slice.call(document.querySelectorAll("[data-lang-block]"));
-  var buttons = Array.prototype.slice.call(document.querySelectorAll(".lang button[data-lang]"));
   var tocList = document.querySelector(".toc ol");
-  var tocTitle = document.querySelector(".toc-title");
-  var barPage = document.querySelector(".bar-page");
+  var tocTitle = document.getElementById("tocTitle");
+  var barPage = document.getElementById("barPage");
+  var page = document.body.dataset.page || "privacy";
+  var main = document.querySelector("main");
+  var note = null;
+  var menu = null;
   var current = null;
   var spy = null;
 
@@ -125,48 +126,55 @@
     Array.prototype.forEach.call(heads, function (h) { spy.observe(h); });
   }
 
+  function ensureNote() {
+    if (note || !main) return note;
+    note = document.createElement("p");
+    note.className = "lang-note";
+    note.setAttribute("role", "note");
+    note.hidden = true;
+    main.insertBefore(note, main.firstChild);
+    return note;
+  }
+
   function apply(lang) {
-    if (LANGS.indexOf(lang) === -1) lang = "en";
+    if (SL.LANGS.indexOf(lang) === -1) lang = "en";
     current = lang;
-    document.documentElement.lang = lang;
+    var blockLang = BLOCK_LANGS.indexOf(lang) !== -1 ? lang : "en";
+    var chrome = CHROME[lang];
+    document.documentElement.lang = blockLang;
 
     var active = null;
     blocks.forEach(function (b) {
-      var on = b.dataset.langBlock === lang;
+      var on = b.dataset.langBlock === blockLang;
       b.hidden = !on;
       if (on) active = b;
     });
 
-    buttons.forEach(function (btn) {
-      var on = btn.dataset.lang === lang;
-      btn.classList.toggle("active", on);
-      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    // Sekme başlığı, üst bardaki sayfa adı, İçindekiler etiketi ve alt bilgi seçilen dilde.
+    document.title = chrome[page] + " — seelogd";
+    if (barPage) barPage.textContent = chrome[page];
+    if (tocTitle) tocTitle.textContent = chrome.toc;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-nav]"), function (el) {
+      var label = chrome[el.dataset.nav];
+      if (label) el.textContent = label;
     });
+    if (menu) { menu.set(lang); menu.setLabel(chrome.menu); }
 
-    // Sekme başlığı, üst bardaki sayfa adı ve İçindekiler etiketi dile uyar.
-    // dataset anahtarı camelCase'e çevrilir: data-title-tr → titleTr.
-    var titleKey = lang === "tr" ? "titleTr" : "titleEn";
-    if (document.body.dataset[titleKey]) {
-      document.title = document.body.dataset[titleKey];
+    var n = ensureNote();
+    if (n) {
+      n.textContent = chrome.note || "";
+      n.hidden = !chrome.note;
     }
-    if (barPage && barPage.dataset[lang]) barPage.textContent = barPage.dataset[lang];
-    if (tocTitle && tocTitle.dataset[lang]) tocTitle.textContent = tocTitle.dataset[lang];
-
-    document.querySelectorAll("[data-foot-tr][data-foot-en]").forEach(function (el) {
-      el.textContent = el.dataset["foot" + (lang === "tr" ? "Tr" : "En")];
-    });
 
     if (active) buildToc(active);
   }
 
-  buttons.forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var lang = btn.dataset.lang;
-      if (lang === current) return;
-      store(lang);
-      apply(lang);
-    });
-  });
+  function setLang(lang) {
+    if (lang === current) return;
+    SL.store(lang);
+    SL.syncUrl(lang);
+    apply(lang);
+  }
 
   /* Kopyala düğmeleri: data-copy-target ile eşleşen <pre> içeriğini alır. */
   document.querySelectorAll("[data-copy-target]").forEach(function (btn) {
@@ -205,9 +213,9 @@
   }
 
   /* Sıra önemli: adres çubuğundaki istek, daha önce kaydedilmiş tercihten
-     önce gelir. Parametreyle gelen dil ayrıca kaydedilir; kullanıcı yasal
+     önce gelir (SiteLang.resolve) ve ayrıca kaydedilir; kullanıcı yasal
      sayfalar arasında gezinirken (bağlantılarda parametre yok) dil sabit kalsın. */
-  var fromParam = readParam();
-  if (fromParam) store(fromParam);
-  apply(fromParam || readStored() || detect());
+  var initial = SL.resolve();
+  menu = SL.mountMenu(document.getElementById("langMenu"), initial, setLang, CHROME[initial].menu);
+  apply(initial);
 })();

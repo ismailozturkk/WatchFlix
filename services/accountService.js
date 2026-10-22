@@ -2,9 +2,20 @@
 //
 // Hesap silme — Firebase Auth kullanıcısını ve TÜM Firestore izlerini temizler.
 //
-// İki aşama:
-//   1) purgeUserData(uid)  → Firestore'daki bütün veriyi siler (kendi + karşılıklı)
+// Aşamalar:
+//   0) purgeOnServer(user) → `deleteAccountData` Cloud Function'ı (functions/accountPurge.js).
+//                            ASIL silme yolu: Admin yetkisiyle çalışır, güvenlik kurallarının
+//                            istemciye kapattığı izleri (başkasının gönderisindeki beğenim,
+//                            günlük liderlik, turnuva oyu, başkalarının gelen kutusundaki
+//                            bildirimlerim, geri bildirimler, davet kayıtları…) ve adı
+//                            listede olmayan alt koleksiyonları da siler.
+//   1) purgeUserData(uid)  → YEDEK: istemci kuralları içinde yapabildiği kadarını siler
+//                            (kendi + karşılıklı). Sunucu yolu yoksa (fonksiyon deploy
+//                            edilmemiş / çevrimdışı) ya da eksik bıraktıysa çalışır.
 //   2) deleteAccount(...)  → reauth + purge + Firebase Auth kullanıcısını sil
+//
+// Auth kullanıcısı silinince sunucuda `purgeOnAuthUserDeleted` bir kez daha süpürür:
+// silme sürerken açık kalan dinleyicilerin geri yazdığı belgeleri temizler.
 //
 // NEDEN reauth? Firebase, hesap silme gibi hassas işlemler için "yakın zamanda
 // giriş" ister (auth/requires-recent-login). Yeniden doğrulama yolu hesabın
@@ -58,22 +69,24 @@
 //       için yaşamaya devam eder; kurucusuysam sahiplik kalan bir üyeye
 //       devredilir, son üye bensem grup tümüyle silinir.
 //     - Üyesi olduğum SharedLists'teki memberIds/members kaydım (ayrılırım)
-//   BİLİNÇLİ KAPSAM DIŞI:
-//     - tournaments/*/votes/{uid}: kural gereği silinemez (oy değiştirme
-//       exploit'ini önlemek için delete kapalı); temizlik ileride admin/CF ile.
-//     - PostReports/{id} (reporterId == uid): moderasyon kararının dayanağı.
-//     - Feedback/{id} (uid == kullanıcı): kural yalnız create + kendi kaydını
-//       okuma; istemci silemez. Gizlilik politikası ve delete-account.html
-//       "Silinmeyen kayıtlar" bunu açıkça söylüyor; silme e-postayla, konsoldan.
-//     - CineRooms/{roomId}: oda sonucu iki taraf alınca ya da en geç 24 saatte
-//       sunucu (cleanupDeliveredCineRoom / cleanupExpiredCineRooms) siler.
-//     - Başkalarının BENİM medya yorumuma yazdığı yanıtlar: kural yalnız
-//       yanıtın yazarına silme izni verir (Posts'taki "post sahibi de silebilir"
-//       yolunun MovieComment/TvComment karşılığı yok). Tekil yorum silmede de
-//       durum aynı — bkz. components/Comment.js#handleDelete.
+//     - Başkalarının gönderilerindeki beğenilerim (Posts/{id}/likes/{uid}) + likesCount--
+//     - Günlük meydan okuma girdilerim (GameLeaderboards/scene_daily_<gün>/entries/{uid})
+//   SUNUCU YOLUNA (functions/accountPurge.js) ÖZGÜ — kurallar istemciye izin vermez,
+//   bu yüzden bu yedek yolda SİLİNMEZ:
+//     - Başkalarının gelen kutusuna bıraktığım bildirimler (notifications.fromUid)
+//     - tournaments/*/votes/{uid}: kural "oylar kalıcıdır" (delete kapalı)
+//     - Feedback/{id}: kural yalnız create + kendi kaydını okuma
+//     - PostReports/ContentReports: reporterId anonimleştirilir (kayıt kalır)
+//     - ReferralAccounts/Referrals/PromoCodes: yalnız Admin SDK'ya açık
+//     - CineRooms (host/guest benim), `scene_daily_*` tahtalarının 90 günden eskileri
+//     - Başkalarının BENİM medya yorumuma yazdığı yanıtlar (kural yalnız yazarına
+//       silme izni verir; sunucu yorumla birlikte alt ağacı siler)
+//     - Adı bu listede olmayan Users/{uid} alt koleksiyonları (recursiveDelete)
+//   YEDEK YOLDA da kalabilen sınır:
 //     - myComments mirror'ı HİÇ yazılmamış çok eski medya yorumları: tarama
 //       yalnız mirror'da adı geçen medya hedeflerinde yapılır (bkz. aşağıdaki
-//       "media-comments" adımının başındaki not).
+//       "media-comments" adımının başındaki not). Sunucu yolu bunları
+//       koleksiyon-grubu taramasıyla (comments.userId) yakalar.
 
 import {
   EmailAuthProvider,
@@ -97,7 +110,9 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { ref as rtdbRef, remove as rtdbRemove } from "firebase/database";
-import { auth, db, rtdb } from "../firebase";
+import { httpsCallable } from "firebase/functions";
+import { auth, db, rtdb, fns } from "../firebase";
+import { dailyBoardId, dayKeyOf, previousDayKey } from "../utils/dailyChallenge";
 import { removeMyRating } from "./ratingsService";
 import { reauthenticateWithGoogle } from "./googleAuthService";
 import {
@@ -113,6 +128,32 @@ import { deleteSharedList, leaveSharedList } from "./sharedListsService";
 import { purgeUserData as purgeLocalUserData } from "./userData";
 
 const CHUNK = 450; // Firestore batch limiti 500 — güvenli pay bıraktık.
+// Sunucu silme aşamaları, ÇALIŞMA SIRASIYLA (functions/accountPurge.js PURGE_PHASES ile
+// aynı; eşitliği __tests__/deleteAccountProgress.test.js korur). Her aşama ayrı
+// çağrılır, böylece ilerleme gerçek aşama geçişlerinden çizilir.
+export const SERVER_PURGE_PHASES = Object.freeze([
+  "social",
+  "comments",
+  "content",
+  "chats",
+  "games",
+  "records",
+  "profile",
+]);
+
+/**
+ * İlerleme ekranının aşamaları, sırayla. `fallback` (istemci yedeği) yalnız sunucu
+ * ulaşılamaz/eksikse araya girer — `onProgress` o anki gerçek listeyi (`stages`) verir.
+ */
+export const DELETE_STAGES = Object.freeze([
+  "verify",
+  "local",
+  ...SERVER_PURGE_PHASES,
+  "account",
+]);
+
+const SERVER_PURGE_TIMEOUT_MS = 9 * 60 * 1000; // fonksiyonun timeoutSeconds'ı (540) ile eşit
+const DAILY_LOOKBACK_DAYS = 90; // yedek yolun geriye doğru deneyeceği günlük tahta sayısı
 
 // Bir işi sarmalar; hata olursa tüm akışı çökertmek yerine loglar ve devam eder.
 // Hesap silmede "kısmî temizlik > hiç temizlememe" mantığı geçerli.
@@ -126,7 +167,7 @@ async function safe(label, fn) {
 }
 
 // Verilen referansları 450'lik batch'ler hâlinde siler.
-async function deleteRefsInChunks(refs) {
+export async function deleteRefsInChunks(refs) {
   for (let i = 0; i < refs.length; i += CHUNK) {
     const batch = writeBatch(db);
     refs.slice(i, i + CHUNK).forEach((ref) => batch.delete(ref));
@@ -135,8 +176,9 @@ async function deleteRefsInChunks(refs) {
 }
 
 // Bir koleksiyonun tüm (üst seviye) dokümanlarını siler. Alt koleksiyonları
-// otomatik silmez — onları çağıran taraf ayrıca temizlemeli.
-async function deleteCollection(colRef) {
+// otomatik silmez — onları çağıran taraf ayrıca temizlemeli. (Hesap SIFIRLAMA
+// — services/accountResetService.js — da bu iki yardımcıyı kullanır.)
+export async function deleteCollection(colRef) {
   const snap = await getDocs(colRef);
   if (!snap.empty) await deleteRefsInChunks(snap.docs.map((d) => d.ref));
   return snap.docs;
@@ -418,6 +460,27 @@ export async function purgeUserData(uid) {
     }
   });
 
+  // ── BAŞKALARININ GÖNDERİLERİNDEKİ BEĞENİLERİM ─────────────────────────────
+  // likedPosts yalnız aynadır; asıl beğeni Posts/{id}/likes/{uid} ve sayaç
+  // likesCount. Aynayı silip bunları bırakmak beğenimi gönderide yaşatıyordu.
+  // Kural: beğeni sahibi kendi beğenisini siler, sayaç ±1 (toggleLike ile aynı).
+  // Ayna burada okunur — "users-sub likedPosts" adımı onu silmeden ÖNCE.
+  await safe("post-likes", async () => {
+    const snap = await getDocs(collection(db, "Users", uid, "likedPosts"));
+    for (const d of snap.docs) {
+      await safe(`post-like ${d.id}`, async () => {
+        const postRef = doc(db, "Posts", d.id);
+        const likeRef = doc(db, "Posts", d.id, "likes", uid);
+        const [likeSnap, postSnap] = await Promise.all([getDoc(likeRef), getDoc(postRef)]);
+        if (!likeSnap.exists()) return;
+        const batch = writeBatch(db);
+        batch.delete(likeRef);
+        if (postSnap.exists()) batch.update(postRef, { likesCount: increment(-1) });
+        await batch.commit();
+      });
+    }
+  });
+
   // ── KONUŞMALAR INDEX'İ (karşılıklı) + chatId türetimi ─────────────────────
   // conversations hem karşı tarafın gelen kutusundaki kaydımı silmek hem de
   // participants alanı olmayan eski chat dokümanlarını yakalamak için
@@ -455,6 +518,8 @@ export async function purgeUserData(uid) {
     "likedPosts",
     "bookmarks",
     "myComments",
+    // Puan aynası: removeMyRating (yukarıda) başarısız olursa ayna kalmasın.
+    "myRatings",
     "conversations",
     "gameProfile",
     "gameStats",
@@ -483,6 +548,20 @@ export async function purgeUserData(uid) {
           deleteDoc(doc(db, "GameLeaderboards", `scene_${m}_${dLevel}`, "entries", uid)),
         );
       }
+    }
+  });
+
+  // Günlük meydan okuma tahtaları (`scene_daily_<gün>`): her gün ayrı tahta. İstemci
+  // koleksiyon grubunu tarayamaz (kural yok); son DAILY_LOOKBACK_DAYS günü dener.
+  // Daha eskisi ve tüm kalanı sunucu yolunun işi (Admin `entries` taraması).
+  await safe("daily-leaderboards", async () => {
+    let dayKey = dayKeyOf();
+    for (let i = 0; i < DAILY_LOOKBACK_DAYS && dayKey; i += 1) {
+      const key = dayKey;
+      await safe(`daily-leaderboard ${key}`, () =>
+        deleteDoc(doc(db, "GameLeaderboards", dailyBoardId(key), "entries", uid)),
+      );
+      dayKey = previousDayKey(key);
     }
   });
 
@@ -700,6 +779,32 @@ export async function purgeUserData(uid) {
   await safe("provider-watch", () => deleteDoc(doc(db, "ProviderWatch", uid)));
 }
 
+/**
+ * `deleteAccountData` Cloud Function'ını çağırır (functions/accountPurge.js).
+ * Taze kimlik belirteci şart (sunucu `auth_time`ı denetler), bu yüzden belirteç
+ * yenilenir. Hiçbir hata akışı durdurmaz: `complete: false` dönerse çağıran istemci
+ * yedek silmeyi çalıştırır.
+ *
+ * @param {Object} [options]
+ * @param {string} [options.phase] SERVER_PURGE_PHASES'ten biri; verilmezse sunucu hepsini çalıştırır.
+ * @param {boolean} [options.refreshToken=true] Aşamalı çağrılarda belirteç bir kez yenilenir.
+ * @returns {Promise<{complete: boolean, failed: string[]}>}
+ */
+export async function purgeOnServer(user = auth.currentUser, { phase, refreshToken = true } = {}) {
+  try {
+    if (refreshToken) await user.getIdToken(true);
+    const { data } = await httpsCallable(fns, "deleteAccountData", {
+      timeout: SERVER_PURGE_TIMEOUT_MS,
+    })(phase ? { phase } : undefined);
+    const failed = Array.isArray(data?.failed) ? data.failed : [];
+    if (failed.length > 0 && __DEV__) console.warn("[deleteAccount] sunucu eksik:", failed);
+    return { complete: failed.length === 0, failed };
+  } catch (e) {
+    if (__DEV__) console.warn("[deleteAccount] sunucu silmesi çağrılamadı:", e?.message || e);
+    return { complete: false, failed: ["server-unavailable"] };
+  }
+}
+
 // ── Yeniden doğrulama ───────────────────────────────────────────────────────
 
 export const DeleteAccountCode = {
@@ -795,6 +900,9 @@ export async function reauthenticateForDeletion({ password } = {}) {
  *   açılmasını önler.
  * @param {string} [params.appleAuthorizationCode] Apple yetkisini iptal etmek
  *   için ayrı doğrulama adımından alınan tek kullanımlık kod.
+ * @param {(event: {stage: string, stages: string[]}) => void} [params.onProgress]
+ *   Her aşama BAŞLARKEN çağrılır; `stages` o anki gerçek aşama listesidir (sunucu yoksa
+ *   `fallback` eklenir). Hataları yutulur — arayüz akışı bozamaz.
  * @returns {Promise<{cancelled: boolean}>} Doğrulama iptal edilirse
  *   { cancelled: true } döner ve HİÇBİR veri silinmez.
  */
@@ -802,6 +910,7 @@ export async function deleteAccount({
   password,
   reauthenticated = false,
   appleAuthorizationCode,
+  onProgress,
 } = {}) {
   const user = auth.currentUser;
   if (!user) {
@@ -812,7 +921,17 @@ export async function deleteAccount({
   }
   const uid = user.uid;
 
+  let stages = [...DELETE_STAGES];
+  const report = (stage) => {
+    try {
+      onProgress?.({ stage, stages: [...stages] });
+    } catch {
+      // Arayüz hatası silmeyi durdurmasın.
+    }
+  };
+
   // 1) Yeniden doğrulama (requires-recent-login hatasını önler).
+  report("verify");
   let authorizationCode = appleAuthorizationCode;
   if (!reauthenticated) {
     const { cancelled, appleAuthorizationCode: freshAppleCode } =
@@ -830,12 +949,40 @@ export async function deleteAccount({
   // 1.5) Yerel kopya VE bekleyen yazımlar, bulut silinmeden ÖNCE gider: yazma
   // günlüğü açık kalırsa arka plan işçisi silinen hesabın belgelerini bulutta
   // geri oluşturabilirdi (silme ile deleteUser arasındaki pencerede).
+  report("local");
   purgeLocalUserData(uid);
 
-  // 2) Firestore izlerini temizle (hâlâ kimlik doğrulanmışken).
-  await purgeUserData(uid);
+  // 2) Firestore izlerini temizle (hâlâ kimlik doğrulanmışken). Önce sunucu, aşama
+  // aşama (her aşama ilerlemeye yansır); hepsi tam bittiyse istemci yedeği çalıştırılmaz.
+  // Sunucu yoksa ya da eksik bıraktıysa yedek, istemcinin yapabildiğini yapar —
+  // kısmî temizlik > hiç yok.
+  let needFallback = false;
+  try {
+    await user.getIdToken(true); // sunucu auth_time'ı denetler; belirteç bir kez yenilenir
+  } catch {
+    needFallback = true;
+  }
+  const ranPhases = [];
+  if (!needFallback) {
+    for (const phase of SERVER_PURGE_PHASES) {
+      report(phase);
+      const server = await purgeOnServer(user, { phase, refreshToken: false });
+      ranPhases.push(phase);
+      if (!server.complete) needFallback = true;
+      // Sunucuya hiç ulaşılamıyorsa kalan aşamaları boşuna deneme.
+      if (server.failed.includes("server-unavailable")) break;
+    }
+  }
+  if (needFallback) {
+    // Hiç koşmamış sunucu aşamaları listeden düşer, yedek hesap kapanışından önce araya girer.
+    stages = stages.filter((stage) => !SERVER_PURGE_PHASES.includes(stage) || ranPhases.includes(stage));
+    stages.splice(stages.indexOf("account"), 0, "fallback");
+    report("fallback");
+    await purgeUserData(uid);
+  }
 
   // 3) Auth kullanıcısını sil — bu işlem oturumu da kapatır.
+  report("account");
   try {
     await deleteUser(user);
   } catch (error) {

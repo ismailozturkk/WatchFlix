@@ -1,13 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useTabBarLayout } from "../../context/TabBarLayoutContext";
-import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
-import { markTabScroll } from "../../components/navigation/TabScrollMarker";
+import { SettingsSubScreen } from "./settings/settingsUi";
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
   Modal,
   TextInput,
   FlatList,
@@ -19,7 +16,6 @@ import {
 } from "react-native";
 import axios from "axios";
 import { useNavigation } from "@react-navigation/native";
-import { flushUserData } from "../../services/userData";
 import { useLanguage } from "../../context/LanguageContext";
 import AppIcon from "../../components/AppIcon";
 import GlassCloseButton from "../../components/common/GlassCloseButton";
@@ -39,15 +35,11 @@ import SwitchToggle from "@components/SwitchToggle";
 import SwipeCard from "@components/SwipeCard";
 import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
 import BottomSheetModal from "@components/common/BottomSheetModal";
-import ConfirmSheet from "@components/common/ConfirmSheet";
 import useSheetTransition from "@hooks/useSheetTransition";
 import Constants from "expo-constants";
 import CountryFlag from "react-native-country-flag";
-import ScreenDecor from "../../components/ScreenDecor";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
-import { appAlert } from "@components/AppAlert";
-import { getAuth } from "firebase/auth";
 import { Image } from "expo-image";
 import TmdbLogo from "../../components/TmdbLogo";
 import JustWatchLogo from "../../components/JustWatchLogo";
@@ -71,8 +63,6 @@ import ImportDataModal from "../../components/import/ImportDataModal";
 import { getLibraryExportCopy } from "./settings/libraryExportCopy";
 import { getImportCopy } from "../../components/import/importCopy";
 import useAppLogo from "@hooks/useAppLogo";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { tabTitleTopSpacing } from "../../utils/screenTopSpacing";
 import {
   APP_LANGUAGES,
   COMING_SOON_LANGUAGES,
@@ -309,24 +299,15 @@ function DataTypePicker({ types, colors, onChange, onToggleAll }) {
   );
 }
 
-// iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için kaydırma
-// görünümünü sekme ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js).
-// Modül kapsamında: render içinde kurulursa içerik her render'da sökülür.
-const MarkedScrollView = markTabScroll(ScrollView);
-
+// AYARLAR SEKME DEĞİL: Profil'in sağ üstündeki dişli düğmesinden bir stack ekranı
+// ("SettingsScreen", App.js) olarak açılır. Diğer tüm ayar alt ekranlarıyla aynı iskeleti
+// (SettingsSubScreen: geri düğmesi + başlık + kaydırma) kullanır; içerik değişmedi.
 export default function SettingsScreen() {
   // Marka logosu seçili uygulama simgesini izler (hooks/useAppLogo.js).
   const { logo: appLogo } = useAppLogo();
-  const { contentBottom } = useTabBarLayout();
-  const onTabBarScroll = useTabBarScrollSync();
   const navigation = useNavigation();
-  // İçerik ekranın tepesinden başlıyor (durum çubuğu / Dynamic Island altında
-  // değil): başlığın üst boşluğu güvenli alana bağlı, sabit değer değil.
-  const insets = useSafeAreaInsets();
-  const titleTop = tabTitleTopSpacing(insets.top);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [langSearch, setLangSearch] = useState("");
-  const [modalVisibleLogout, setModalVisibleLogout] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
 
   // Arka planda Settings etkileşimleri bittiğinde PremiumScreen modülünü önceden yükle (preload)
@@ -339,31 +320,6 @@ export default function SettingsScreen() {
     });
     return () => task?.cancel?.();
   }, []);
-
-  const handleSignOut = async () => {
-    try {
-      const auth = getAuth();
-      // Çıkıştan ÖNCE buluta gitmemiş notları/hatırlatıcıları göndermeyi dene:
-      // çıkıştan sonra yetkisiz kalınır. En çok 4 sn bekler; çevrimdışıysa
-      // vazgeçer — değişiklikler yazma günlüğünde durur ve aynı hesapla tekrar
-      // girişte gider (çıkışı asla kilitlemez).
-      if (auth.currentUser?.uid) {
-        await flushUserData(auth.currentUser.uid, { timeoutMs: 4000 }).catch(() => {});
-      }
-      await auth.signOut();
-      navigation.reset({
-        index: 0,
-        routes: [{ name: "LoginScreen" }],
-      });
-    } catch (error) {
-      appAlert(
-        i18nText("autoI18n.hata", "Hata"),
-        error?.message || i18nText("autoI18n.hata_olustu", "Hata oluştu"),
-        undefined,
-        { type: "error" },
-      );
-    }
-  };
 
   // Dil sayfası: blur yerinde solar, sayfa kayar
   // (bkz. hooks/useSheetTransition.js).
@@ -551,25 +507,7 @@ export default function SettingsScreen() {
 
 
   return (
-    <View style={[s.root, { backgroundColor: C.bg }]}>
-      {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
-      <ScreenDecor scope="settings" iconOpacity={0.15} />
-
-      <MarkedScrollView
-        style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingBottom: contentBottom }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        onScroll={onTabBarScroll}
-        scrollEventThrottle={16}
-      >
-        <Text
-          allowFontScaling={false}
-          style={[s.pageTitle, { color: C.text, marginTop: titleTop }]}
-        >
-          {t.settings}
-        </Text>
-
+    <SettingsSubScreen title={t.settings}>
         {/* ── Premium: abonelik vitrini en üstte ── */}
         <SectionLabel color={C.muted} first>SEELOGD PREMIUM</SectionLabel>
         <PremiumSettingsCard />
@@ -1089,25 +1027,6 @@ export default function SettingsScreen() {
             right={<Chevron color={C.muted} />} last />
         </GlassBox>
 
-        {/* ── Çıkış: tehlikeli işlem en altta ── */}
-        <SectionLabel color={C.danger}>
-          {(t.logout || "Çıkış Yap").toUpperCase()}
-        </SectionLabel>
-        <GlassBox role="card" style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
-          <SettingRow
-            colors={C}
-            iconBg={C.dangerDim}
-            iconColor={C.danger}
-            iconName="log-out-outline"
-            title={t.logout || "Çıkış Yap"}
-            subtitle={i18nText("autoI18n.cikis_yap_aciklama", "Hesabından güvenli bir şekilde çıkış yap")}
-            danger
-            last
-            onPress={() => setModalVisibleLogout(true)}
-            right={<Chevron color={C.danger} />}
-          />
-        </GlassBox>
-
         <BottomSheetModal
           visible={providerModalVisible}
           onClose={() => {
@@ -1468,34 +1387,11 @@ export default function SettingsScreen() {
           <ModalToastHost visible={langModalVisible} />
         </Modal>
 
-        {/* Çıkış onayı alt sayfası */}
-        <ConfirmSheet
-          visible={modalVisibleLogout}
-          onClose={() => setModalVisibleLogout(false)}
-          onConfirm={() => {
-            setModalVisibleLogout(false);
-            handleSignOut();
-          }}
-          icon="log-out-outline"
-          tone="danger"
-          title={t.logout || "Çıkış Yap"}
-          message={
-            t.profileScreen?.logoutMessage ||
-            i18nText(
-              "autoI18n.cikis_onay_mesaj",
-              "Hesabından çıkış yapmak istediğine emin misin?",
-            )
-          }
-          confirmLabel={t.logout || "Çıkış Yap"}
-          cancelLabel={t.cancel || "İptal"}
-        />
-
         <ImportDataModal
           visible={showImportModal}
           onClose={() => setShowImportModal(false)}
         />
-      </MarkedScrollView>
-    </View>
+    </SettingsSubScreen>
   );
 }
 
@@ -1551,28 +1447,6 @@ const s = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  root: {
-    flex: 1,
-  },
-  scroll: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  scrollContent: {
-    paddingBottom: 110,
-  },
-  // Üst boşluk (marginTop) çalışma zamanında güvenli alandan gelir: bkz.
-  // utils/screenTopSpacing.js. Sabit satır yüksekliği iOS/Android'de başlık
-  // kutusunu eşitler (Android'in font dolgusu yüzünden farklı yükseklik çıkmasın).
-  pageTitle: {
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 8,
-    letterSpacing: -0.5,
-    includeFontPadding: false,
   },
   firstSectionLabel: {
     marginTop: 8,

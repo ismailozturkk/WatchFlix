@@ -8,14 +8,11 @@ import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLanguage } from "../../context/LanguageContext";
-import ProfileLists from "./profile/ProfileLists";
 import { useAuth } from "../../context/AuthContext";
 import { useFriends } from "../../context/FriendsContext";
 import { useUnreadMessages } from "../../context/UnreadMessagesContext";
 import { useProfileStats } from "../../context/ProfileStatsContext";
 import { useProfileUi } from "../../context/ProfileUiContext";
-import NotesCard from "./profile/NotesCard";
-import RemindersPreviewButton from "./profile/RemindersPreviewButton";
 import MyActivityButton from "./profile/MyActivityButton";
 import FriendsActionBar from "../../components/profile/FriendsActionBar";
 import ScreenDecor from "../../components/ScreenDecor";
@@ -36,6 +33,11 @@ import ProfileStoryModal from "../../components/storyShare/ProfileStoryModal";
 import { getIdentityBadges } from "../../components/badges/badgeCatalog";
 import { usePremium } from "../../context/PremiumContext";
 import { readProfileFavorites } from "../../utils/fourFavorites";
+import SocialLinksRow from "../../components/profile/SocialLinksRow";
+import ProfileLogoutButton from "../../components/profile/ProfileLogoutButton";
+import ProfileNotificationsButton from "../../components/profile/ProfileNotificationsButton";
+import ImportantInvitesBar from "../../components/profile/ImportantInvitesBar";
+import { hasAnySocialLinks, readProfileSocialLinks } from "../../utils/socialLinks";
 
 // iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için kaydırma
 // görünümünü sekme ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js).
@@ -67,6 +69,12 @@ const ProfileScreen = ({ navigation }) => {
     // Yalnız favori alanı değişince; profilin diğer alanları kartı yeniden hesaplatmasın.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [profile?.fourFavorites]
+  );
+  // Sosyal hesap şeridi (Users/{uid}.socialLinks; Profili Düzenle'den girilir).
+  const socialLinks = useMemo(
+    () => readProfileSocialLinks(profile),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profile?.socialLinks]
   );
   const {
     avatar,
@@ -143,6 +151,11 @@ const ProfileScreen = ({ navigation }) => {
     () => navigation.navigate("EditProfileScreen"),
     [navigation]
   );
+  // Ayarlar artık sekme değil: bu dişli düğmesinden açılır (App.js "SettingsScreen").
+  const goSettings = useCallback(
+    () => navigation.navigate("SettingsScreen"),
+    [navigation]
+  );
   const openStoryExport = useCallback(() => setShowStoryExport(true), []);
   const closeStoryExport = useCallback(() => setShowStoryExport(false), []);
   // Şerit kartları memo'lu; yönlendirme referanslarını sabit tutarak ilgisiz
@@ -206,6 +219,7 @@ const ProfileScreen = ({ navigation }) => {
         <SafeAreaView
           style={[styles.container, { backgroundColor: "transparent" }]}
         >
+          <ImportantInvitesBar navigation={navigation} />
           <View style={styles.images}>
             <ProfileAvatarHalo
               source={avatar}
@@ -234,11 +248,24 @@ const ProfileScreen = ({ navigation }) => {
               joinedAt={user?.metadata?.createdAt}
               onEdit={goEditProfile}
               onShare={openStoryExport}
+              // Ayarlar girişi: adın sağındaki dişli (App.js "SettingsScreen").
+              onSettings={goSettings}
+              settingsLabel={t.settings}
+              // Bildirim kutusu: Düzenle'nin yanında ikon düğmesi (okunmamış rozetiyle).
+              notificationsAction={<ProfileNotificationsButton navigation={navigation} />}
               // Yıllık hedef halkası düğmesi (Düzenle / Paylaş'ın yanında). Ayarlar > Ekran
               // bölümleri > Profil > "Yıllık izleme hedefi" ile gizlenir.
               showGoal={showSection("goal")}
             />
           </View>
+          {hasAnySocialLinks(socialLinks) && (
+            <SocialLinksRow
+              links={socialLinks}
+              theme={theme}
+              language={language}
+              style={styles.socialLinks}
+            />
+          )}
           {showSection("badges") && (
             <View style={styles.profileBadgeStrip}>
               <WatchBadgeStrip
@@ -288,13 +315,14 @@ const ProfileScreen = ({ navigation }) => {
               t={t}
             />
           )}
-          {showSection("lists") && <ProfileLists navigation={navigation} />}
+          {/* Listeler, Hatırlatmalar ve Notlar Kütüphane sekmesine taşındı
+              (screens/tabs/LibraryScreen.js). */}
           {showSection("activity") && <MyActivityButton navigation={navigation} />}
-          {showSection("reminders") && <RemindersPreviewButton navigation={navigation} />}
-          {showSection("notes") && <NotesCard navigation={navigation} />}
           {allSectionsHidden && (
             <SectionsHiddenNotice navigation={navigation} screen="profile" />
           )}
+          {/* Çıkış: tehlikeli işlem sayfanın en altında (Ayarlar'dan taşındı). */}
+          <ProfileLogoutButton navigation={navigation} theme={theme} />
           <ProfileAvatarPickerModal
             visible={modalVisible}
             selectedIndex={selectAvatarIndex}
@@ -365,6 +393,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
+  },
+  socialLinks: {
+    alignSelf: "stretch",
+    paddingHorizontal: 16,
+    paddingBottom: 6,
   },
   images: {
     width: "100%",

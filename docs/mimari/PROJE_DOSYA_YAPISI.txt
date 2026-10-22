@@ -1274,12 +1274,13 @@ Seelogd/
 │   │   │   ├── settingsUi.js
 │   │   │   ├── SocialNotificationsScreen.js
 │   │   │   └── WidgetSettingsScreen.js
-│   │   ├── HubScreen.js
+│   │   ├── HubScreen.js                  (sekme adı: Eğlence; anahtar "share")
+│   │   ├── LibraryScreen.js              (Kütüphane sekmesi: Sıradaki, Listeler, Hatırlatmalar, Notlar)
 │   │   ├── MovieScreen.js
 │   │   ├── MyPostsScreen.js
 │   │   ├── ProfileScreen.js
 │   │   ├── SearchScreen.js
-│   │   ├── SettingsScreen.js
+│   │   ├── SettingsScreen.js             (sekme değil: Profil'in dişli düğmesinden stack ekranı)
 │   │   ├── ShareContentScreen.js
 │   │   ├── TvShowScreen.js
 │   │   └── UpNextScreen.js

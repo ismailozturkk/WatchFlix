@@ -52,7 +52,7 @@ function buildCopy() {
     groups: {
       home: [
         i18nText("autoI18n.dekor_grup_home", "Ana ekranlar"),
-        i18nText("autoI18n.dekor_grup_home_alt", "Hub, Film, Dizi, Sıradaki, Tümünü gör"),
+        i18nText("autoI18n.dekor_grup_home_alt", "Eğlence, Film, Dizi, Sıradaki, Tümünü gör"),
       ],
       search: [
         i18nText("autoI18n.dekor_grup_search", "Arama"),
@@ -69,7 +69,7 @@ function buildCopy() {
         i18nText("autoI18n.dekor_grup_lists", "Listeler"),
         i18nText(
           "autoI18n.dekor_grup_lists_alt",
-          "Listelerim, liste içi ve paylaşılan listeler",
+          "Kütüphane, listelerim, liste içi ve paylaşılan listeler",
         ),
       ],
       chat: [
@@ -97,7 +97,7 @@ function buildCopy() {
         i18nText("autoI18n.dekor_grup_profile", "Profil ve arkadaşlar"),
         i18nText(
           "autoI18n.dekor_grup_profile_alt",
-          "Profil, arkadaşlar, rozetler, istatistikler, notlar",
+          "Profil, arkadaşlar, rozetler, istatistikler",
         ),
       ],
       settings: [

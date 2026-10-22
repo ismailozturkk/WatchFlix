@@ -67,7 +67,7 @@ function normalizeEpisode(ep, watchDate) {
 const episodeKey = (seasonNumber, episodeNumber) =>
   `${Number(seasonNumber)}:${Number(episodeNumber)}`;
 
-function appendWatchEvent(data, showMeta, seasonTargets, watchDate, scope) {
+function appendWatchEvent(data, showMeta, seasonTargets, watchDate, scope, batch = null) {
   const watchedAt = normalizeWatchDate(watchDate);
   if (!watchedAt) return null;
   const current = materializeTvWatchState({
@@ -81,6 +81,9 @@ function appendWatchEvent(data, showMeta, seasonTargets, watchDate, scope) {
     recordedAt: new Date().toISOString(),
     episodeKeys: [],
     seasonNumbers: [],
+    // Günlük sınır yüzünden günlere bölünen tek işlemin parçaları: aynı batchId.
+    // Silme (removeTvWatchEvent) hepsini birlikte kaldırır.
+    ...(batch ? { batchId: batch.id, part: batch.part, parts: batch.parts } : {}),
   };
   const seasons = current.seasons.map((season) => ({
     ...season,
@@ -264,7 +267,7 @@ function buildShowMeta(showMeta, watchDate) {
  *
  * @returns {Promise<object|null>} oluşturulan izleme olayı
  */
-async function commitWatch(uid, showMeta, targets, watchDate, scope) {
+async function commitWatch(uid, showMeta, targets, watchDate, scope, schedule = null) {
   const ref = showRef(uid, showMeta.id);
   const rootRef = doc(db, "Lists", uid);
   const docKey = `tv_${showMeta.id}`;
@@ -274,9 +277,33 @@ async function commitWatch(uid, showMeta, targets, watchDate, scope) {
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.exists() ? snap.data() : null;
-    const result = appendWatchEvent(data, showMeta, targets, watchDate, scope);
+    // Günlük sınır planı varsa tek işlem birkaç güne bölünür; hepsi AYNI transaction'da
+    // art arda uygulanır (yarım yazım olmaz). Asıl kapsam (show/season) seçilen gün olan
+    // SON parçada kalır, öncekiler 'episode' olur: tam izleme sayaçları şişmez.
+    const parts = schedule?.length ? schedule : [{ watchDate, targets }];
+    const batchId = parts.length > 1 ? createWatchEventId(`batch_tv_${showMeta.id}`) : null;
+    let working = data;
+    let result = null;
+    const partEvents = [];
+    parts.forEach((part, index) => {
+      const last = index === parts.length - 1;
+      const next = appendWatchEvent(
+        working,
+        showMeta,
+        part.targets,
+        part.watchDate,
+        last ? scope : "episode",
+        batchId ? { id: batchId, part: index + 1, parts: parts.length } : null,
+      );
+      if (!next) return;
+      partEvents.push(next.event);
+      result = next;
+      working = { ...(working || {}), id: working?.id ?? showMeta?.id, seasons: next.seasons, watchEvents: next.watchEvents };
+    });
     if (!result) return;
-    createdEvent = result.event;
+    createdEvent = partEvents[partEvents.length - 1];
+    const addedEpisodes = partEvents.reduce((sum, event) => sum + (event.episodeCount || 0), 0);
+    const addedMinutes = partEvents.reduce((sum, event) => sum + (event.minutes || 0), 0);
 
     const isFirstShowWatch = !snap.exists();
     const showData = {
@@ -314,9 +341,9 @@ async function commitWatch(uid, showMeta, targets, watchDate, scope) {
 
     const rootUpdates = {
       [`statusIndex.tv.${showMeta.id}.isWatched`]: true,
-      "stats.tv.episodes.total": increment(result.event.episodeCount),
-      "stats.tv.totalMinutes": increment(result.event.minutes),
-      "stats.totalMinutes": increment(result.event.minutes),
+      "stats.tv.episodes.total": increment(addedEpisodes),
+      "stats.tv.totalMinutes": increment(addedMinutes),
+      "stats.totalMinutes": increment(addedMinutes),
       updatedAt: serverTimestamp(),
       _schemaVersion: 3,
     };
@@ -370,12 +397,17 @@ export async function markEpisodes(
   assertWatchDate(watchDate);
 
   const scope = options.scope || "episode";
+  const schedule = buildSchedule(
+    releasedEpisodes.map((episode) => ({ seasonMeta, episode })),
+    options.planSchedule,
+  );
   const createdEvent = await commitWatch(
     uid,
     showMeta,
     [{ seasonMeta, episodes: releasedEpisodes }],
     watchDate,
     scope,
+    schedule,
   );
 
   // markSeason da buraya delege ediyor; `scope` hangisi olduğunu ayırır.
@@ -398,16 +430,42 @@ export async function markEpisodes(
 }
 
 /** Bir sezonun tüm bölümlerini işaretler (markEpisodes wrapper'ı). */
-export async function markSeason(uid, showMeta, seasonMeta, episodes, watchDate) {
+export async function markSeason(uid, showMeta, seasonMeta, episodes, watchDate, options = {}) {
   return markEpisodes(uid, showMeta, seasonMeta, episodes, watchDate, {
+    ...options,
     scope: "season",
+  });
+}
+
+/**
+ * Günlük sınır planını (utils/dailyWatchLimit) yazılacak parçalara çevirir.
+ * `planSchedule(items)` yayınlanmış bölümleri izleme SIRASIYLA alır
+ * (`[{ minutes }]`) ve `[{ date, from, to }]` döner (kronolojik, `to` dahil); sınır
+ * aşılıyorsa fırlatır — hiçbir şey yazılmaz. Plan verilmezse tek olay, tek gün.
+ * Servis planlamayı yayın kapısından SONRA çağırır: kapıdan geçmeyen bölüm
+ * günlük süreyi harcamaz.
+ *
+ * @returns {Array<{watchDate: string, targets: Array}>|null}
+ */
+function buildSchedule(flat, planSchedule) {
+  if (typeof planSchedule !== "function") return null;
+  const chunks = planSchedule(flat.map(({ episode }) => ({ minutes: episode.episodeMinutes })));
+  if (!Array.isArray(chunks) || chunks.length === 0) return null;
+  return chunks.map((chunk) => {
+    const targets = [];
+    flat.slice(chunk.from, chunk.to + 1).forEach(({ seasonMeta, episode }) => {
+      const last = targets[targets.length - 1];
+      if (last && last.seasonMeta === seasonMeta) last.episodes.push(episode);
+      else targets.push({ seasonMeta, episodes: [episode] });
+    });
+    return { watchDate: chunk.date, targets };
   });
 }
 
 /**
  * Diziyi komple işaretler (tüm sezonların bölümleriyle — üzerine yazar).
  */
-export async function markShow(uid, showMeta, seasonsWithEpisodes, watchDate) {
+export async function markShow(uid, showMeta, seasonsWithEpisodes, watchDate, options = {}) {
   if (!uid || showMeta?.id == null || !Array.isArray(seasonsWithEpisodes)) return;
   assertWatchable(showMeta?.firstAirDate, showMeta?.status);
   const targets = seasonsWithEpisodes
@@ -420,7 +478,18 @@ export async function markShow(uid, showMeta, seasonsWithEpisodes, watchDate) {
   if (!targets.length) return null;
   assertWatchDate(watchDate);
 
-  const createdEvent = await commitWatch(uid, showMeta, targets, watchDate, "show");
+  // Günlük sınır planı bölüm SIRASINA bakar: sezon sezon, bölüm bölüm.
+  const flat = targets
+    .slice()
+    .sort((a, b) => Number(a.seasonMeta.seasonNumber) - Number(b.seasonMeta.seasonNumber))
+    .flatMap(({ seasonMeta, episodes }) =>
+      episodes
+        .slice()
+        .sort((a, b) => Number(a.episodeNumber) - Number(b.episodeNumber))
+        .map((episode) => ({ seasonMeta, episode })),
+    );
+  const schedule = buildSchedule(flat, options.planSchedule);
+  const createdEvent = await commitWatch(uid, showMeta, targets, watchDate, "show", schedule);
 
   if (createdEvent) {
     trackEvent(ANALYTICS_EVENTS.CONTENT_TRACKED, {
@@ -460,6 +529,13 @@ export async function removeTvWatchEvent(uid, showId, eventId) {
     const current = materializeTvWatchState({ ...data, id: data.id ?? showId });
     const removedEvent = current.watchEvents.find((event) => event.id === eventId);
     if (!removedEvent) return;
+    // Günlük sınır yüzünden günlere bölünmüş işlem (aynı batchId) tek parça silinir.
+    const removedEvents = current.watchEvents.filter(
+      (event) =>
+        event.id === eventId ||
+        (removedEvent.batchId && event.batchId === removedEvent.batchId),
+    );
+    const removedIds = new Set(removedEvents.map((event) => event.id));
 
     const seasons = current.seasons
       .map((season) => ({
@@ -467,7 +543,7 @@ export async function removeTvWatchEvent(uid, showId, eventId) {
         episodes: (season.episodes || [])
           .map((episode) => {
             const watchEvents = (episode.watchEvents || []).filter(
-              (event) => event.id !== eventId,
+              (event) => !removedIds.has(event.id),
             );
             if (!watchEvents.length) return null;
             const latest = watchEvents
@@ -481,9 +557,9 @@ export async function removeTvWatchEvent(uid, showId, eventId) {
           .filter(Boolean),
       }))
       .filter((season) => season.episodes.length);
-    const watchEvents = current.watchEvents.filter((event) => event.id !== eventId);
-    const removedMinutes = Number(removedEvent.minutes) || 0;
-    const removedEpisodes = Number(removedEvent.episodeCount) || 0;
+    const watchEvents = current.watchEvents.filter((event) => !removedIds.has(event.id));
+    const removedMinutes = removedEvents.reduce((sum, event) => sum + (Number(event.minutes) || 0), 0);
+    const removedEpisodes = removedEvents.reduce((sum, event) => sum + (Number(event.episodeCount) || 0), 0);
 
     const rootUpdates = {
       "stats.tv.episodes.total": increment(-removedEpisodes),

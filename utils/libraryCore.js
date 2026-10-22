@@ -68,6 +68,8 @@ export const LIBRARY_ERROR = Object.freeze({
   LIST_RESERVED: "list-name-reserved",
   LIST_CONFLICT: "list-name-conflict",
   INVALID: "invalid-request",
+  // Günlük 1440 dk izleme sınırı (utils/dailyWatchLimit). `error.details`: { reason, day, used, remaining, requested }.
+  DAILY_LIMIT: "daily-watch-limit",
   UNKNOWN: "unknown",
 });
 
@@ -128,12 +130,13 @@ export function classifyLibraryError(error) {
 
 /** Katmanın dışına çıkan her hata bu sınıftır; `code` ekranların sözleşmesi. */
 export class LibraryError extends Error {
-  constructor(code, message, { cause, retryable } = {}) {
+  constructor(code, message, { cause, retryable, details } = {}) {
     super(message || code);
     this.name = "LibraryError";
     this.code = code;
     this.retryable = retryable ?? RETRYABLE.has(code);
     if (cause !== undefined) this.cause = cause;
+    if (details !== undefined) this.details = details;
   }
 }
 

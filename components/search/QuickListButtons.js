@@ -39,7 +39,7 @@ import { useListStatus } from "@hooks/useListStatus";
 import * as Haptics from "@services/hapticsService";
 import { setListMembership } from "../../services/libraryActions";
 import { addMediaToList } from "../../services/listQuickAdd";
-import { showLibraryError } from "../../utils/libraryErrorText";
+import { showLibraryError, showWatchSpreadNotice } from "../../utils/libraryErrorText";
 import { toCandidate } from "../../utils/listSearch";
 import { todayListDate } from "../../utils/mediaFacts";
 import { i18nText } from "../../utils/i18nText";
@@ -232,7 +232,7 @@ function QuickListButtons({
   const confirmWatch = async (date) => {
     try {
       const candidate = toCandidate(item, { fallbackType: mediaType });
-      const { status } = await addMediaToList({
+      const addResult = await addMediaToList({
         uid: user.uid,
         listName: mediaType === "tv" ? "watchedTv" : "watchedMovies",
         media: candidate,
@@ -240,6 +240,7 @@ function QuickListButtons({
         language,
         watchDate: date,
       });
+      const { status } = addResult;
 
       if (status === "empty-show") {
         Toast.show({
@@ -264,7 +265,7 @@ function QuickListButtons({
             "İzlendi olarak eklenemez.",
           ),
         });
-      } else {
+      } else if (!showWatchSpreadNotice(addResult)) {
         Toast.show({
           type: "success",
           text1: i18nText(

@@ -97,12 +97,15 @@ Firestore Root
 │   │       └── reason: string = "spam_and_harassment"
 │   │
 │   ├── 📁 notifications/{notifId} (Örn: "notif_998877")
-│   │       ├── type: string = "like" | "comment" | "reply" | "friend_request" | "streaming"
+│   │       ├── type: string = "message" | "friend_request" | "post_like" | "post_comment" | "comment_reply" | "mention" | "cineswipe_invite" | "game_challenge" | ...
 │   │       ├── fromUid: string = "usr_friend456"
 │   │       ├── fromName: string = "Ahmet Yılmaz"
 │   │       ├── fromAvatarIndex: int = 5
 │   │       ├── postId: string = "post_interstellar_review"
 │   │       ├── text: string = "Ahmet Yılmaz gönderini beğendi."
+│   │       ├── inviteCode?: string = "123456" (CineSwipe daveti)
+│   │       ├── dayKey?: string = "2026-10-22" (günlük düello daveti)
+│   │       ├── response?: "accepted" | "declined" (alıcı bir kez yazar; eksikse beklemede)
 │   │       ├── read: boolean = false
 │   │       └── createdAt: timestamp = 2026-08-21T02:15:00Z
 │   │
@@ -322,6 +325,8 @@ Firestore Root
 │   │       ├── watchEvents: array<object> = [
 │   │       │     { id: "we_tv_got_full", watchedAt: "2026-05-01T00:00:00.000Z", scope: "show", episodeCount: 73, seasonCount: 8, minutes: 4380, recordedAt: "2026-05-01T00:00:00.000Z" }
 │   │       │   ]
+│   │       │   // Günlük 1440 dk sınırı yüzünden günlere bölünen toplu işaretlemede (docs/mimari/LISTE_IZLEME_ALTYAPISI.md)
+│   │       │   // her gün ayrı olay: aynı batchId, part (1..parts) ve parts; yalnız SON parça scope "show"/"season" taşır, öncekiler "episode".
 │   │       └── seasons: array<object> = [
 │   │             {
 │   │               seasonNumber: 1,
@@ -736,3 +741,30 @@ Firestore Root
 | `GameLeaderboards`| `scene_${mode}_${difficulty}` | Örn: `scene_classic_normal` | `entries/{uid}` (`Users`) |
 | `ProviderWatch` | `{uid}` | Auth UID | `Lists/{uid}/watchList` |
 | `AiUsage` | `{uid}` | Auth UID | `Users/{uid}.entitlements` |
+
+---
+
+## 3. Ek (21 Ekim 2026): yukarıdaki ağaca SONRADAN eklenen koleksiyonlar + hesap silme eşlemesi
+
+Ağaç (bölüm 1) 15 Ekim öncesini anlatır; sonrasında eklenenler aşağıdadır. Kurallar: `firestore.rules`; hesap silme: `functions/accountPurge.js`.
+
+| Yol | Alanlar (özet) | Kim yazar / okur | Hesap silmede |
+|---|---|---|---|
+| `Users/{uid}.socialLinks` | `{ instagram, x, tiktok, youtube, twitch, letterboxd, snapchat, threads }` — yalnız KULLANICI ADI | sahibi yazar (`socialLinksOk` kuralı), profili görenler okur | `user-tree` (profil aşaması) |
+| `Users/{uid}/private/{account,push,entitlements}` | e-posta + doğum tarihi / push jetonu / plan ayrıntısı | yalnız sahibi (entitlements'ı yalnız sunucu yazar) | `user-tree` |
+| `MediaNotes/{uid}/items/{id}` | film/dizi sayfasına bağlı notlar | sahibi (yerel-öncelikli, `services/userData`) | `root MediaNotes` |
+| `AiConversations/{uid}/items/{id}` | CineMatch sohbet geçmişi | sahibi | `root AiConversations` |
+| `Feedback/{id}` | `uid, kind, category, severity, title, message, status, language, createdAt` (+ isteğe bağlı `appVersion, platform, osVersion, deviceModel`; `reply` konsoldan) | sahibi create + kendi kaydını okur; durum/yanıt konsoldan | `feedback` (chats… `records` aşaması) |
+| `ReferralAccounts/{uid}`, `ReferralCodes/{code}`, `Referrals/{inviteeUid}` | davet kodu, biriken aylar, davet bağı (`inviterUid`) | YALNIZ Cloud Functions (kurallar kapalı) | `referral` (`records`) |
+| `PromoCodes/{code}` + `redemptions/{uid}` | promosyon kodu, plan (Premium / Premium Max), kullanım | YALNIZ Cloud Functions | `promo-redemptions` (`records`) |
+| `GameLeaderboards/scene_daily_{gün}/entries/{uid}` | günlük meydan okuma girdisi (`uid, score, correctCount, …`) | sahibi | `sweep-leaderboard-entries` (`games`) |
+| `tournaments/{dönem}/votes/{uid}` | `noms`, `picks` | sahibi create; silme kural gereği KAPALI | `tournament-votes` (`games`, Admin ile) |
+| `CineRooms/{id}` | `hostUid`, `guestUid`, deste, oylar | taraflar; sonuç teslimi/24 saatte sunucu siler | `cine-rooms` (`games`) |
+| `ContentReports/{id}`, `PostReports/{id}` | `reporterId`, `targetUserId`… | yalnız create | `reporterId → "deleted-user"`; hakkımdaki `ContentReports` silinir |
+
+### Hesap silme akışı (özet)
+
+`deleteAccount()` (istemci) → `deleteAccountData` callable'ı **7 aşamayla**, sırayla: `social → comments → content → chats → games → records → profile`
+(`profile` EN SON: aynaları — `myComments`, `likedPosts`, `myRatings`, `conversations` — taşıyan `Users/{uid}` ağacını siler). Sonra `deleteUser`;
+Auth kullanıcısı silinince `purgeOnAuthUserDeleted` bir kez daha süpürür. Sunucuya ulaşılamazsa `services/accountService.js` istemci yedeği
+(kurallara tabi) çalışır. Yeni koleksiyon eklenince: `accountPurge.js` + `accountPurge.integration.test.js` + `website/delete-account.html` + bu tablo.

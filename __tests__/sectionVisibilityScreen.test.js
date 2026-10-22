@@ -110,9 +110,9 @@ afterEach(() => {
 });
 
 describe("ilk görünüm", () => {
-  test("dört ekran karosu, Diziler seçili; satırlar ekrandaki sırayla", () => {
+  test("beş ekran karosu (sekme sırası), Diziler seçili; satırlar ekrandaki sırayla", () => {
     render();
-    for (const id of ["tv", "movie", "hub", "profile"]) expect(tile(id)).toBeDefined();
+    for (const id of ["tv", "movie", "hub", "library", "profile"]) expect(tile(id)).toBeDefined();
     expect(tile("tv").props.accessibilityState).toEqual({ selected: true });
     expect(tile("movie").props.accessibilityState).toEqual({ selected: false });
     expect(rowIds()).toEqual(sectionsOf("tv").map((s) => s.id));
@@ -142,10 +142,12 @@ describe("ilk görünüm", () => {
   test("ekran karosuna basınca o ekranın satırları gelir", () => {
     render();
     pressTile("profile");
-    expect(rowIds()).toEqual(["goal", "badges", "friends", "stats", "lists", "activity", "reminders", "notes"]);
+    expect(rowIds()).toEqual(["goal", "badges", "friends", "stats", "activity"]);
     expect(tile("profile").props.accessibilityState).toEqual({ selected: true });
+    pressTile("library");
+    expect(rowIds()).toEqual(["nextUp", "lists", "reminders", "notes", "wrapped"]);
     pressTile("hub");
-    expect(rowIds()).toEqual(["feed", "cineswipe", "tournament", "wrapped", "games"]);
+    expect(rowIds()).toEqual(["feed", "cineswipe", "bingo", "poll", "tournament", "games"]);
   });
 
   test("her dilde ekran adı ve bölüm başlığı gösterilir", () => {
@@ -186,7 +188,7 @@ describe("bölüm satırı anahtarı", () => {
     render();
     pressRow("trends");
     pressRow("trends");
-    expect(stored()).toEqual({ tv: [], movie: [], hub: [], profile: [] });
+    expect(stored()).toEqual({ tv: [], movie: [], hub: [], library: [], profile: [] });
     expect(get(Keys.sectionVisibility)).toBeNull();
   });
 
@@ -296,7 +298,7 @@ describe("arkadaş çubuğu onayı (başka giriş yok)", () => {
     pressTile("profile");
     pressRow("friends");
     act(() => confirm().props.onConfirm());
-    pressRow("notes");
+    pressRow("activity");
     pressAll(); // kısmen gizli → 'Show all'
     expect(stored().profile).toEqual([]);
   });
@@ -309,37 +311,46 @@ describe("arkadaş çubuğu onayı (başka giriş yok)", () => {
   });
 });
 
-describe("eski tek anahtarlı bölüm: Devam Edenler (showOngoingTvShows)", () => {
-  test("satır VAR, 'Shared setting' etiketi taşır", () => {
+describe("eski tek anahtarlı bölüm: Kütüphane > Sıradaki (showOngoingTvShows)", () => {
+  test("Diziler ekranında devam eden diziler satırı YOK (raf Kütüphane'ye taşındı)", () => {
     render();
-    expect(rowIds()).toContain("ongoing");
+    expect(rowIds()).not.toContain("ongoing");
+  });
+
+  test("Kütüphane'de satır VAR, 'Shared setting' etiketi taşır", () => {
+    render();
+    pressTile("library");
+    expect(rowIds()).toContain("nextUp");
     expect(texts()).toContain(copy().ui.linkedTag);
   });
 
   test("anahtar mevcut ayarı yazar; bu modülün kaydına DOKUNMAZ", () => {
     render();
-    pressRow("ongoing");
+    pressTile("library");
+    pressRow("nextUp");
     expect(mockChangeOngoing).toHaveBeenCalledWith(false);
     expect(get(Keys.sectionVisibility)).toBeNull();
   });
 
-  test("ayar kapalıysa satır kapalı çizilir ve özet bunu sayar", () => {
+  test("ayar kapalıyken satır kapalı çizilir ve özet bunu sayar", () => {
     mockOngoing = false;
     render();
-    expect(row("ongoing").props.accessibilityState).toEqual({ checked: false });
-    const total = sectionsOf("tv").length;
+    pressTile("library");
+    expect(row("nextUp").props.accessibilityState).toEqual({ checked: false });
+    const total = sectionsOf("library").length;
     expect(texts()).toContain(`${total - 1} of ${total} sections visible`);
     expect(renderer.root.findAllByProps({ testID: "section-reset" })).toHaveLength(1);
   });
 
-  test("'Tümünü gizle' Devam Edenler'in ayarını da kapatır, 'göster' açar", () => {
+  test("'Tümünü gizle' Sıradaki ayarını da kapatır", () => {
     render();
+    pressTile("library");
     pressAll();
     expect(mockChangeOngoing).toHaveBeenCalledWith(false);
-    expect(stored().tv).toHaveLength(storedSectionsOf("tv").length);
+    expect(stored().library).toHaveLength(storedSectionsOf("library").length);
   });
 
-  test("sıfırla: kapalı Devam Edenler ayarını da açar", () => {
+  test("sıfırla: kapalı Sıradaki ayarını da açar", () => {
     mockOngoing = false;
     render();
     act(() => renderer.root.findByProps({ testID: "section-reset" }).props.onPress());
@@ -355,9 +366,9 @@ describe("sıfırlama", () => {
     pressRow("games");
     expect(renderer.root.findAllByProps({ testID: "section-reset" })).toHaveLength(1);
     act(() => renderer.root.findByProps({ testID: "section-reset" }).props.onPress());
-    expect(stored()).toEqual({ tv: [], movie: [], hub: [], profile: [] });
+    expect(stored()).toEqual({ tv: [], movie: [], hub: [], library: [], profile: [] });
     expect(renderer.root.findAllByProps({ testID: "section-reset" })).toHaveLength(0);
-    // Devam Edenler zaten açıktı: ayarına dokunulmaz.
+    // Sıradaki zaten açıktı: ayarına dokunulmaz.
     expect(mockChangeOngoing).not.toHaveBeenCalled();
   });
 });

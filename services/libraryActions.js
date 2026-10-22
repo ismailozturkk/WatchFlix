@@ -18,6 +18,11 @@
 //   4. KAPILAR     Yayınlanmamış içerik, geçersiz tarih gibi kapılar ağa/yazıma
 //                  çıkmadan ÖNCE kontrol edilir; bindirme hiç açılmaz, sezonlar
 //                  boşuna çekilmez.
+//   5. GÜNLÜK SINIR Bir güne en fazla 1440 dk izleme yazılır (utils/dailyWatchLimit).
+//                  Film / tek bölüm sığmazsa DAILY_LIMIT fırlatılır; sezon / dizi
+//                  sığmazsa bölümler sırayla günlere yayılır ve sonuçta `spread`
+//                  döner. Denetim kullanıcı başına TEK sırada, yazımla birlikte
+//                  yapılır: iki eşzamanlı işlem aynı günün son dakikasını paylaşamaz.
 //
 // Bu dosya Firestore'a doğrudan dokunmaz.
 
@@ -34,6 +39,7 @@ import {
   toLibraryError,
 } from "../utils/libraryCore";
 import { normalizeWatchDate } from "../utils/watchHistory";
+import { MAX_SPREAD_DAYS, dayUsage, planDailyWatch } from "../utils/dailyWatchLimit";
 import { assertWatchable } from "../utils/watchState";
 import {
   addItemsToList,
@@ -66,6 +72,61 @@ const itemKey = (uid, type, id) => `${uid}:${mediaKey(type, id)}`;
 const customListsKey = (uid) => `${uid}:custom-lists`;
 
 const invalid = (message) => new LibraryError(LIBRARY_ERROR.INVALID, message);
+
+// ── Günlük izleme sınırı (1440 dk) ───────────────────────────────────────────
+
+/** Tüm izleme yazımları kullanıcı başına tek sırada: denetim ile yazım arası boşluk kalmaz. */
+const watchDaysKey = (uid) => `${uid}:watch-days`;
+
+/** İzlenen film + dizi olaylarından gün → dakika haritası (yerel kopya, ağ yok). */
+const currentUsage = (uid) =>
+  dayUsage({
+    watchedMovies: getLocalList(uid, "watchedMovies"),
+    watchedTv: getLocalList(uid, "watchedTv"),
+  });
+
+function dailyLimitError(plan) {
+  return new LibraryError(LIBRARY_ERROR.DAILY_LIMIT, "Günlük 1440 dakikalık izleme sınırı", {
+    details: {
+      reason: plan.reason,
+      day: plan.day,
+      used: plan.used,
+      remaining: plan.remaining,
+      requested: plan.requested,
+      days: MAX_SPREAD_DAYS,
+    },
+  });
+}
+
+/** Tek bir film / bölüm o güne sığmıyorsa DAILY_LIMIT fırlatır (yayılma yok). */
+function assertFitsDay(uid, watchDate, minutes) {
+  const plan = planDailyWatch({
+    items: [{ minutes }],
+    watchDate,
+    usage: currentUsage(uid),
+    allowSpread: false,
+  });
+  if (!plan.ok) throw dailyLimitError(plan);
+}
+
+/**
+ * Toplu ekleme (sezon / dizi) için servise verilen planlayıcı: sığmazsa günlere
+ * yayar, `MAX_SPREAD_DAYS`ı da aşarsa fırlatır (HİÇBİR ŞEY yazılmaz). Planı `sink`e bırakır.
+ */
+function spreadPlanner(uid, watchDate, sink) {
+  return (items) => {
+    const plan = planDailyWatch({ items, watchDate, usage: currentUsage(uid) });
+    if (!plan.ok) throw dailyLimitError(plan);
+    sink.plan = plan;
+    return plan.chunks;
+  };
+}
+
+/** Sonuçta dönen yayılma özeti (yayılmadıysa null). */
+const spreadOf = (plan) =>
+  plan?.spread
+    ? { days: plan.chunks.length, startDate: plan.startDate, endDate: plan.endDate }
+    : null;
 
 /**
  * İşi sıraya koyar; bitince bindirmeyi bırakır, hatayı sınıflayıp yeniden fırlatır.
@@ -231,10 +292,13 @@ export function markMovieWatched({ uid, movie, watchDate }) {
     assertWatchable(movie.releaseDate, movie.status);
 
     const token = beginOverlay(uid, "movie", movie.id, { isWatched: true });
-    return enqueue(itemKey(uid, "movie", movie.id), token, async () => {
-      const event = await markMovieWatch(uid, { ...movie, type: "movie" }, watchDate);
-      return { event };
-    });
+    return queue.run(watchDaysKey(uid), () =>
+      enqueue(itemKey(uid, "movie", movie.id), token, async () => {
+        assertFitsDay(uid, watchDate, movie.minutes);
+        const event = await markMovieWatch(uid, { ...movie, type: "movie" }, watchDate);
+        return { event };
+      }),
+    );
   });
 }
 
@@ -269,11 +333,18 @@ export function markShowWatched({ uid, details, watchDate, apiKey, language }) {
     return fetchShowSeasons({ details, apiKey, language }).then((seasons) => {
       if (seasons.length === 0) return { status: "empty-show", event: null };
       const token = beginOverlay(uid, "tv", details.id, { isWatched: true });
-      return enqueue(itemKey(uid, "tv", details.id), token, async () => {
-        const event = await markShow(uid, showMeta, seasons, watchDate);
-        // Hiçbir bölüm yayınlanmamışsa servis hiçbir şey yazmaz (null).
-        return event ? { status: "added", event } : { status: "empty-show", event: null };
-      });
+      return queue.run(watchDaysKey(uid), () =>
+        enqueue(itemKey(uid, "tv", details.id), token, async () => {
+          const sink = { plan: null };
+          const event = await markShow(uid, showMeta, seasons, watchDate, {
+            planSchedule: spreadPlanner(uid, watchDate, sink),
+          });
+          // Hiçbir bölüm yayınlanmamışsa servis hiçbir şey yazmaz (null).
+          return event
+            ? { status: "added", event, spread: spreadOf(sink.plan) }
+            : { status: "empty-show", event: null, spread: null };
+        }),
+      );
     });
   });
 }
@@ -298,20 +369,28 @@ export function markSeasonWatched({ uid, details, season, watchDate, apiKey, lan
     }).then((episodes) => {
       if (episodes.length === 0) return { status: "empty-season", event: null };
       const token = beginOverlay(uid, "tv", details.id, { isWatched: true });
-      return enqueue(itemKey(uid, "tv", details.id), token, async () => {
-        const event = await markSeason(
-          uid,
-          showMetaFromDetails(details),
-          {
-            seasonNumber: season.season_number,
-            seasonPosterPath: season.poster_path || null,
-            seasonEpisodes: season.episode_count,
-          },
-          episodes,
-          watchDate,
-        );
-        return { status: event ? "added" : "empty-season", event: event || null };
-      });
+      return queue.run(watchDaysKey(uid), () =>
+        enqueue(itemKey(uid, "tv", details.id), token, async () => {
+          const sink = { plan: null };
+          const event = await markSeason(
+            uid,
+            showMetaFromDetails(details),
+            {
+              seasonNumber: season.season_number,
+              seasonPosterPath: season.poster_path || null,
+              seasonEpisodes: season.episode_count,
+            },
+            episodes,
+            watchDate,
+            { planSchedule: spreadPlanner(uid, watchDate, sink) },
+          );
+          return {
+            status: event ? "added" : "empty-season",
+            event: event || null,
+            spread: spreadOf(sink.plan),
+          };
+        }),
+      );
     });
   });
 }
@@ -333,13 +412,16 @@ export function markEpisodeWatched({ uid, showMeta, seasonMeta, episode, watchDa
     requireWatchDate(watchDate);
 
     const token = beginOverlay(uid, "tv", showMeta.id, { isWatched: true });
-    return enqueue(itemKey(uid, "tv", showMeta.id), token, async () => {
-      const event = await markEpisodes(uid, showMeta, seasonMeta, [episode], watchDate, {
-        scope: "episode",
-        ...(source ? { source } : {}),
-      });
-      return { status: event ? "added" : "empty-episode", event: event || null };
-    });
+    return queue.run(watchDaysKey(uid), () =>
+      enqueue(itemKey(uid, "tv", showMeta.id), token, async () => {
+        assertFitsDay(uid, watchDate, episode.episodeMinutes);
+        const event = await markEpisodes(uid, showMeta, seasonMeta, [episode], watchDate, {
+          scope: "episode",
+          ...(source ? { source } : {}),
+        });
+        return { status: event ? "added" : "empty-episode", event: event || null };
+      }),
+    );
   });
 }
 

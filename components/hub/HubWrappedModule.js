@@ -1,6 +1,6 @@
 // components/hub/HubWrappedModule.js
 //
-// Hub sekmesindeki Seelogd Wrapped & Yıllık Arşiv modülü.
+// Kütüphane sekmesindeki (eskiden Hub/Eğlence) Seelogd Wrapped & Yıllık Arşiv modülü.
 //
 // İki parça:
 //   • Hero kart  — en son yılın toplam izleme süresi (sayaç animasyonu), geçen
@@ -17,7 +17,7 @@
 //     ayarına uyar; sayaç da aynı ayar açıkken doğrudan son değere atlar.
 //   • `revealed` false iken hiçbir şey başlamaz: modül ekranın alt yarısında
 //     olduğundan giriş animasyonu kullanıcı kartı görünce oynamalı, mount
-//     anında (ekran dışındayken) değil. HubScreen kaydırmayı izleyip bayrağı
+//     anında (ekran dışındayken) değil. LibraryScreen kaydırmayı izleyip bayrağı
 //     açar; prop verilmezse modül kendi başına hemen oynar.
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";

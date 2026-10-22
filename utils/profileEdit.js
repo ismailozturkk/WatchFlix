@@ -4,6 +4,7 @@
 // için burada test edilebilir tutuluyor (bkz. jest.config.js).
 
 import { favoritesEqual } from "./fourFavorites";
+import { socialLinksEqual } from "./socialLinks";
 
 /**
  * Formda kaydedilmemiş bir değişiklik var mı? Kaydet düğmesi buna bakar.
@@ -20,6 +21,9 @@ import { favoritesEqual } from "./fourFavorites";
  * @param {object}  p.draft  Formdaki anlık değerler (`username` normalize).
  *   `saved.fourFavorites` / `draft.fourFavorites` (isteğe bağlı): dört favori.
  *   Alan yoksa iki taraf da "boş" sayılır — eski hesaplar kendiliğinden kirlenmez.
+ *   `saved.socialLinks` / `draft.socialLinks` (isteğe bağlı): ÇÖZÜLMÜŞ sosyal hesap
+ *   haritası; `draft.socialInvalid` (anahtar dizisi) doluysa Kaydet açık kalır ki
+ *   hata mesajı gösterilebilsin.
  */
 export function isProfileEditDirty({ ready, saved, draft }) {
   if (!ready || !saved || !draft) return false;
@@ -28,6 +32,8 @@ export function isProfileEditDirty({ ready, saved, draft }) {
   if ((draft.bio || "").trim() !== (saved.bio || "")) return true;
   if (draft.avatarIndex !== saved.avatarIndex) return true;
   if (!favoritesEqual(saved.fourFavorites, draft.fourFavorites)) return true;
+  if (!socialLinksEqual(saved.socialLinks, draft.socialLinks)) return true;
+  if (draft.socialInvalid?.length) return true;
   // Doğum tarihi bir kez yazılır (firestore.rules → birthDateKept): yalnız
   // henüz kayıtlı değilken girilmesi bir değişikliktir.
   if (!saved.birthDate && !!draft.birthDate) return true;

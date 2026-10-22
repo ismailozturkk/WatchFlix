@@ -34,6 +34,7 @@ import {
   getSignInMethods,
   reauthenticateForDeletion,
 } from "../../../services/accountService";
+import { ResetAccountCode, resetAccount } from "../../../services/accountResetService";
 import {
   describeGoogleAuthError,
   GoogleAuthCode,
@@ -82,12 +83,25 @@ import {
   readProfileFavorites,
   toProfilePayload,
 } from "../../../utils/fourFavorites";
+import SocialLinksEditor from "../../../components/profile/SocialLinksEditor";
+import { SOCIAL_NAMES, getSocialCopy } from "../../../utils/socialLinksCopy";
+import { getDeleteAccountCopy } from "./deleteAccountCopy";
+import { getResetAccountCopy } from "./resetAccountCopy";
+import {
+  readProfileSocialLinks,
+  resolveSocialDraft,
+  socialLinksEqual,
+  toSocialPayload,
+} from "../../../utils/socialLinks";
 import { ANALYTICS_EVENTS, trackEvent } from "../../../services/analytics";
 
 
 const BIO_MAX = 160;
 const NAME_MAX = 40;
 const USERNAME_MAX = 20;
+// Geri alınamaz işlemlerin onay düğmesi bu kadar BASILI TUTULUNCA çalışır.
+const DELETE_HOLD_MS = 2500;
+const RESET_HOLD_MS = 2000;
 
 export default function EditProfileScreen({ navigation }) {
   const { theme } = useTheme();
@@ -114,6 +128,11 @@ export default function EditProfileScreen({ navigation }) {
   // Users/{uid}.fourFavorites'e yazılır (utils/fourFavorites.js).
   const [favorites, setFavorites] = useState(emptyFavorites);
   const favCopy = getFavoritesCopy(language);
+  // Sosyal hesaplar: platform → kullanıcının yazdığı ham metin. Kaydet'te
+  // kullanıcı adına çözülür (adres yapıştırmak serbest, utils/socialLinks.js).
+  const [socialDraft, setSocialDraft] = useState({});
+  const [socialInvalid, setSocialInvalid] = useState([]);
+  const socialCopy = getSocialCopy(language);
   const [usernameStatus, setUsernameStatus] = useState("idle"); // idle|same|invalid|checking|available|taken
   const [saving, setSaving] = useState(false);
   // Form profilden doldurulana kadar "değişiklik var mı" hesabı yapılmaz.
@@ -127,9 +146,16 @@ export default function EditProfileScreen({ navigation }) {
   // Hesap silme. Onay sayfası ortak BottomSheetModal: şifre kutusu klavyeyi
   // açınca sayfa klavyenin üstüne çıkar ve içerik küçülüp kayar, Vazgeç / Hesabı
   // sil düğmeleri görünür kalır (eskiden ortalanmış kutu klavyenin altında kalıyordu).
-  const [showDelete, setShowDelete] = useState(false);
+  // Aynı onay sayfası hem silme hem sıfırlama için: hangisinin açık olduğu burada.
+  const [dangerMode, setDangerMode] = useState(null); // null | "delete" | "reset"
+  const showDelete = dangerMode !== null;
+  const isReset = dangerMode === "reset";
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
+  // Silme sürerken aşama listesi: { stage, stages } (services/accountService.js onProgress).
+  const [deleteProgress, setDeleteProgress] = useState(null);
+  const deleteCopy = getDeleteAccountCopy(language);
+  const resetCopy = getResetAccountCopy(language);
   // Yeniden doğrulama, hesabın sağlayıcısına göre değişir: parolası olanlar
   // şifresini yazar, yalnızca Google ile açılmış hesaplar hesap seçiciyi açar.
   // Sağlayıcılar modal her açıldığında okunur — arada Ayarlar'dan Google
@@ -162,6 +188,7 @@ export default function EditProfileScreen({ navigation }) {
       setBio(profile.bio || "");
       setBirthDate(profile.birthDate || null);
       setFavorites(readProfileFavorites(profile));
+      setSocialDraft(readProfileSocialLinks(profile));
       setAvatarIndex(
         clampAvatarIndex(
           typeof profile.avatarIndex === "number"
@@ -206,6 +233,7 @@ export default function EditProfileScreen({ navigation }) {
   // Kaydet yalnız değiştirilecek bir şey varken açılır. Başlangıç avatarı,
   // formun profilden aldığı değerle AYNI formülle hesaplanır (yukarıdaki
   // doldurma efekti) — profilde avatarIndex yoksa seçili avatar kullanılır.
+  const socialResolved = resolveSocialDraft(socialDraft);
   const dirty = isProfileEditDirty({
     ready,
     saved: profile
@@ -218,6 +246,7 @@ export default function EditProfileScreen({ navigation }) {
           ),
           birthDate: profile.birthDate || null,
           fourFavorites: readProfileFavorites(profile),
+          socialLinks: readProfileSocialLinks(profile),
         }
       : null,
     draft: {
@@ -227,6 +256,8 @@ export default function EditProfileScreen({ navigation }) {
       avatarIndex,
       birthDate,
       fourFavorites: favorites,
+      socialLinks: socialResolved.links,
+      socialInvalid: socialResolved.invalid,
     },
   });
   const canSave = dirty && !usernameBlocked;
@@ -272,6 +303,17 @@ export default function EditProfileScreen({ navigation }) {
       return;
     }
 
+    // Geçersiz sosyal kullanıcı adı: kaydı durdur, hatalı alanları işaretle.
+    // (Yarım kayıt olmasın diye username değişiminden ÖNCE kontrol edilir.)
+    if (socialResolved.invalid.length) {
+      setSocialInvalid(socialResolved.invalid);
+      Toast.show({
+        type: "error",
+        text1: socialCopy.invalid(SOCIAL_NAMES[socialResolved.invalid[0]]),
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       if (usernameChanged) {
@@ -291,6 +333,10 @@ export default function EditProfileScreen({ navigation }) {
       // sızmasın diye "alan var" bilgisi korunur, bkz. adoptPendingFavorites).
       if (!favoritesEqual(favorites, readProfileFavorites(profile))) {
         patch.fourFavorites = toProfilePayload(favorites);
+      }
+      // Sosyal hesaplar: hepsini silmek de bir değişikliktir (boş harita yazılır).
+      if (!socialLinksEqual(socialResolved.links, readProfileSocialLinks(profile))) {
+        patch.socialLinks = toSocialPayload(socialResolved.links);
       }
       if (Object.keys(patch).length) await updateField(patch);
       if (patch.fourFavorites) {
@@ -332,12 +378,12 @@ export default function EditProfileScreen({ navigation }) {
     }
   };
 
-  const openDeleteModal = () => {
+  const openDangerSheet = (mode) => {
     setDeletePassword("");
     setProviderVerified(false);
     setAppleAuthorizationCode(null);
     setSignInMethods(getSignInMethods());
-    setShowDelete(true);
+    setDangerMode(mode);
   };
 
   // Sosyal hesaplar için ayrı doğrulama adımı: sağlayıcı seçicisi açılır. Apple
@@ -375,11 +421,13 @@ export default function EditProfileScreen({ navigation }) {
     }
   };
 
-  const onDeleteAccount = async () => {
-    if (deleting || verifying) return;
+  // Basılı tutma BAŞLAMADAN önce (ve onay anında yine) denenen ön koşullar: şifre
+  // girildi mi, sosyal hesapta kimlik doğrulandı mı. Eksikse nedenini söyler.
+  const validateDanger = () => {
+    if (deleting || verifying) return false;
     if (usesPassword && !deletePassword) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.devam_etmek_icin_sifreni_gir", "Devam etmek için şifreni gir") });
-      return;
+      return false;
     }
     if (verificationProvider && !providerVerified) {
       Toast.show({
@@ -389,64 +437,106 @@ export default function EditProfileScreen({ navigation }) {
             ? (tr ? "Önce Apple ile doğrula" : es ? "Verifica primero con Apple" : pt ? "Verifique primeiro com a Apple" : de ? "Bestätige zuerst mit Apple" : "Verify with Apple first")
             : i18nText("autoI18n.once_google_ile_dogrula", "Önce Google ile doğrula"),
       });
-      return;
+      return false;
     }
+    return true;
+  };
+
+  // Silme ve sıfırlamanın ortak hata çevirisi. Kullanıcı sağlayıcı penceresini
+  // kendisi kapattıysa (iptal) hata değildir: toast gösterilmez.
+  const handleDangerFailure = (e) => {
+    const code = e?.code || "";
+    let msg = e?.message || (isReset ? resetCopy.incomplete : i18nText("autoI18n.hesap_silinemedi", "Hesap silinemedi"));
+    let silent = false;
+    if (
+      usesPassword &&
+      (code === "auth/wrong-password" || code === "auth/invalid-credential")
+    ) {
+      msg = i18nText("autoI18n.sifre_yanlis", "Şifre yanlış");
+    } else if (code === DeleteAccountCode.NO_SESSION || code === ResetAccountCode.NO_SESSION) {
+      msg = i18nText("autoI18n.oturum_bulunamadi_tekrar_giris", "Oturum bulunamadı. Lütfen tekrar giriş yap");
+    } else if (code === DeleteAccountCode.NEEDS_PASSWORD) {
+      msg = i18nText("autoI18n.devam_icin_sifre_gir", "Devam etmek için şifreni gir");
+    } else if (code === ResetAccountCode.INCOMPLETE) {
+      msg = resetCopy.incomplete;
+    } else if (code === "auth/too-many-requests") {
+      msg = i18nText("autoI18n.cok_fazla_deneme", "Çok fazla deneme. Biraz sonra tekrar dene");
+    } else if (code === "auth/requires-recent-login") {
+      // Doğrulama bayatladı. Sosyal akışta kullanıcıyı doğrulama adımına
+      // geri gönder; parola akışında şifreyi yeniden göndermesi yeterli.
+      setProviderVerified(false);
+      setAppleAuthorizationCode(null);
+      msg = i18nText(
+        "autoI18n.guvenlik_icin_kimligini_yeniden_dogrula",
+        "Güvenlik için kimliğini yeniden doğrula",
+      );
+    } else if (typeof code === "string" && code.startsWith("google/")) {
+      if (code === GoogleAuthCode.CANCELLED) silent = true;
+      else {
+        setProviderVerified(false);
+        msg = describeGoogleAuthError(e, language);
+      }
+    } else if (typeof code === "string" && code.startsWith("apple/")) {
+      if (code === AppleAuthCode.CANCELLED) silent = true;
+      else {
+        setProviderVerified(false);
+        setAppleAuthorizationCode(null);
+        msg = describeAppleAuthError(e, language);
+      }
+    }
+    if (!silent) Toast.show({ type: "error", text1: msg });
+    setDeleting(false);
+    setDeleteProgress(null);
+  };
+
+  const onDeleteAccount = async () => {
+    if (!validateDanger()) return;
     setDeleting(true);
+    setDeleteProgress(null);
     try {
       const result = await deleteAccount({
         password: usesPassword ? deletePassword : undefined,
         // Sosyal akışta doğrulama az önce yapıldı; seçiciyi tekrar açma.
         reauthenticated: providerVerified,
         appleAuthorizationCode,
+        onProgress: setDeleteProgress,
       });
       if (result?.cancelled) {
         setDeleting(false);
+        setDeleteProgress(null);
         return;
       }
       // Başarılı: Firebase oturumu kapattı. Login'e dön.
       Toast.show({ type: "success", text1: i18nText("autoI18n.hesabin_silindi", "Hesabın silindi") });
       navigation.reset({ index: 0, routes: [{ name: "LoginScreen" }] });
     } catch (e) {
-      const code = e?.code || "";
-      let msg = e?.message || i18nText("autoI18n.hesap_silinemedi", "Hesap silinemedi");
-      if (
-        usesPassword &&
-        (code === "auth/wrong-password" || code === "auth/invalid-credential")
-      ) {
-        msg = i18nText("autoI18n.sifre_yanlis", "Şifre yanlış");
-      } else if (code === DeleteAccountCode.NO_SESSION) {
-        msg = i18nText("autoI18n.oturum_bulunamadi_tekrar_giris", "Oturum bulunamadı. Lütfen tekrar giriş yap");
-      } else if (code === DeleteAccountCode.NEEDS_PASSWORD) {
-        msg = i18nText("autoI18n.devam_icin_sifre_gir", "Devam etmek için şifreni gir");
-      } else if (code === "auth/too-many-requests") {
-        msg = i18nText("autoI18n.cok_fazla_deneme", "Çok fazla deneme. Biraz sonra tekrar dene");
-      } else if (code === "auth/requires-recent-login") {
-        // Doğrulama bayatladı. Sosyal akışta kullanıcıyı doğrulama adımına
-        // geri gönder; parola akışında şifreyi yeniden göndermesi yeterli.
-        setProviderVerified(false);
-        setAppleAuthorizationCode(null);
-        msg = i18nText(
-          "autoI18n.guvenlik_icin_kimligini_yeniden_dogrula",
-          "Güvenlik için kimliğini yeniden doğrula",
-        );
-      } else if (typeof code === "string" && code.startsWith("google/")) {
-        if (code === GoogleAuthCode.CANCELLED) {
-          setDeleting(false);
-          return;
-        }
-        setProviderVerified(false);
-        msg = describeGoogleAuthError(e, language);
-      } else if (typeof code === "string" && code.startsWith("apple/")) {
-        if (code === AppleAuthCode.CANCELLED) {
-          setDeleting(false);
-          return;
-        }
-        setProviderVerified(false);
-        setAppleAuthorizationCode(null);
-        msg = describeAppleAuthError(e, language);
+      handleDangerFailure(e);
+    }
+  };
+
+  // Hesabı sıfırla: oturum açık kalır, kütüphane + ilerleme silinir (services/accountResetService).
+  const onResetAccount = async () => {
+    if (!validateDanger()) return;
+    setDeleting(true);
+    setDeleteProgress(null);
+    try {
+      const result = await resetAccount({
+        password: usesPassword ? deletePassword : undefined,
+        reauthenticated: providerVerified,
+        onProgress: setDeleteProgress,
+      });
+      if (result?.cancelled) {
+        setDeleting(false);
+        setDeleteProgress(null);
+        return;
       }
-      Toast.show({ type: "error", text1: msg });
       setDeleting(false);
+      setDeleteProgress(null);
+      setDangerMode(null);
+      Toast.show({ type: "success", text1: resetCopy.done });
+      navigation.goBack();
+    } catch (e) {
+      handleDangerFailure(e);
     }
   };
 
@@ -566,6 +656,15 @@ export default function EditProfileScreen({ navigation }) {
           "Bu işlem geri alınamaz. Devam etmek için Google hesabınla doğrula.",
         )
     : i18nText("autoI18n.bu_islem_geri_alinamaz_devam_etmek_icin_sifreni_gi", "Bu işlem geri alınamaz. Devam etmek için şifreni gir.");
+  const resetDescription = [
+    resetCopy.sheetDescription,
+    verificationProvider === "apple"
+      ? resetCopy.needApple
+      : verificationProvider === "google"
+        ? resetCopy.needGoogle
+        : resetCopy.needPassword,
+  ].join(" ");
+  const holdMs = isReset ? RESET_HOLD_MS : DELETE_HOLD_MS;
   const verifyLabel =
     verificationProvider === "apple"
       ? (tr ? "Apple ile doğrula" : es ? "Verificar con Apple" : pt ? "Verificar com a Apple" : de ? "Mit Apple bestätigen" : "Verify with Apple")
@@ -707,6 +806,31 @@ export default function EditProfileScreen({ navigation }) {
               </FormSection>
             </Reveal>
 
+            {/* Sosyal hesaplar: profilde (kendi + arkadaşlarınki) ikon düğmesi olarak görünür. */}
+            <Reveal delay={115} style={authColumn}>
+              <FormSection
+                theme={theme}
+                icon="link-outline"
+                title={socialCopy.title}
+              >
+                <SocialLinksEditor
+                  draft={socialDraft}
+                  invalid={socialInvalid}
+                  onChange={(key, value) => {
+                    setSocialDraft((prev) => ({ ...prev, [key]: value }));
+                    setSocialInvalid((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : prev));
+                  }}
+                  theme={theme}
+                  accent={accent}
+                  fieldSurface={fieldSurface}
+                  language={language}
+                />
+                <FieldHint icon="eye-outline" color={theme.text.muted}>
+                  {socialCopy.hint}
+                </FieldHint>
+              </FormSection>
+            </Reveal>
+
             {/* Yalnız kullanıcıya görünen bilgi. Doğum tarihi yetişkin içerik
                 ayarının kapısı; kaydedilmişse salt-okunur (kural da tek yazıma
                 izin veriyor — firestore.rules → birthDateKept). */}
@@ -744,12 +868,19 @@ export default function EditProfileScreen({ navigation }) {
                 </AuthSectionLabel>
                 <DangerRow
                   theme={theme}
+                  icon="refresh-circle-outline"
+                  title={resetCopy.rowTitle}
+                  description={resetCopy.rowDescription}
+                  onPress={() => openDangerSheet("reset")}
+                />
+                <DangerRow
+                  theme={theme}
                   title={i18nText("autoI18n.hesabi_sil", "Hesabı Sil")}
                   description={i18nText(
                     "autoI18n.hesabin_listelerin_hatirlaticilarin_notlarin_gonde",
                     "Hesabın, listelerin, hatırlatıcıların, notların, gönderilerin ve arkadaşlık bağların kalıcı olarak silinir. Bu işlem geri alınamaz.",
                   )}
-                  onPress={openDeleteModal}
+                  onPress={() => openDangerSheet("delete")}
                 />
               </View>
             </Reveal>
@@ -769,15 +900,18 @@ export default function EditProfileScreen({ navigation }) {
         onClose={() => setAvatarSheet(false)}
       />
 
-      {/* Hesap silme onayı */}
+      {/* Hesap silme / sıfırlama onayı: onay düğmesi BASILI TUTARAK çalışır */}
       <DeleteAccountSheet
         visible={showDelete}
-        onClose={() => setShowDelete(false)}
+        onClose={() => setDangerMode(null)}
         theme={theme}
         deleting={deleting}
         verifying={verifying}
-        title={i18nText("autoI18n.hesabi_sil_2", "Hesabı sil")}
-        description={deleteDescription}
+        progress={deleteProgress}
+        progressCopy={isReset ? resetCopy : deleteCopy}
+        icon={isReset ? "refresh-circle-outline" : "warning-outline"}
+        title={isReset ? resetCopy.sheetTitle : i18nText("autoI18n.hesabi_sil_2", "Hesabı sil")}
+        description={isReset ? resetDescription : deleteDescription}
         provider={verificationProvider}
         verified={providerVerified}
         verifyLabel={verifyLabel}
@@ -785,10 +919,17 @@ export default function EditProfileScreen({ navigation }) {
         password={deletePassword}
         onPasswordChange={setDeletePassword}
         onVerify={onVerifyWithProvider}
-        onConfirm={onDeleteAccount}
+        onConfirm={isReset ? onResetAccount : onDeleteAccount}
         confirmDisabled={deleteBlocked}
+        canStart={validateDanger}
+        holdMs={holdMs}
         cancelLabel={i18nText("autoI18n.vazgec", "Vazgeç")}
-        confirmLabel={i18nText("autoI18n.hesabi_sil_2", "Hesabı sil")}
+        confirmLabel={isReset ? resetCopy.hold : deleteCopy.hold}
+        holdLabel={isReset ? resetCopy.holdActive : deleteCopy.holdActive}
+        holdHint={(isReset ? resetCopy.holdHint : deleteCopy.holdHint).replace(
+          "{seconds}",
+          String(holdMs / 1000),
+        )}
         passwordLabel={i18nText("autoI18n.sifre", "Şifre")}
       />
     </View>

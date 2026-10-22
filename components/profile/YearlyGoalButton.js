@@ -33,11 +33,8 @@ import YearlyGoalSheet from "./YearlyGoalSheet";
 import { fillCopy, formatPercent, getYearlyGoalCopy, summarizeTracks } from "./yearlyGoalCopy";
 
 export const GOAL_BUTTON_SIZE = 36;
-const RING = 30;
 const STROKE = 3;
 const GOLD = "#FBBF24";
-// Halkanın iç çapı: yüzde metninin sığacağı en geniş yer.
-const INNER = RING - STROKE * 2;
 
 /** Ölçüm olayı için hedefin biçimi: hangi hatlar + hedef sayıları (kullanıcı verisi içermez). */
 function analyticsShape(goal) {
@@ -50,12 +47,21 @@ function analyticsShape(goal) {
   };
 }
 
-function YearlyGoalButton() {
+function YearlyGoalButton({ size = GOAL_BUTTON_SIZE, hitSlop = 4 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const copy = getYearlyGoalCopy(language);
   const { year, now, goal, counts, tracks, overall, suggestion, loading, saveGoal, removeGoal } = useYearlyGoal();
   const [sheetVisible, setSheetVisible] = useState(false);
+  const resolvedSize = Number(size) > 0 ? Number(size) : GOAL_BUTTON_SIZE;
+  const ringSize = Math.max(18, resolvedSize - (resolvedSize < 32 ? 4 : 6));
+  const stroke = resolvedSize < 32 ? 2.5 : STROKE;
+  // Halkanın iç çapı: yüzde metninin sığacağı en geniş yer.
+  const inner = ringSize - stroke * 2;
+  const fallbackRadius = Math.max(8, Math.round(resolvedSize / 3));
+  const flagSize = Math.max(11, Math.round(resolvedSize * 0.36));
+  const percentFontSize = resolvedSize < 32 ? 8 : 9;
+  const percentLineHeight = resolvedSize < 32 ? 10 : 11;
 
   const open = useCallback(() => {
     triggerHaptic("selection");
@@ -96,9 +102,9 @@ function YearlyGoalButton() {
     <View>
       <GlassIconButton
         testID="yearly-goal-button"
-        size={GOAL_BUTTON_SIZE}
-        fallbackRadius={12}
-        hitSlop={4}
+        size={resolvedSize}
+        fallbackRadius={fallbackRadius}
+        hitSlop={hitSlop}
         fallbackStyle={{
           backgroundColor: theme.secondary,
           borderColor: alpha(theme.border, 0.9),
@@ -109,8 +115,8 @@ function YearlyGoalButton() {
         onPress={open}
       >
         <YearlyGoalRing
-          size={RING}
-          stroke={STROKE}
+          size={ringSize}
+          stroke={stroke}
           ratio={hasGoal ? overall.ratio : 0}
           color={ringColor}
           trackColor={alpha(theme.text.muted, 0.3)}
@@ -122,12 +128,20 @@ function YearlyGoalButton() {
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.7}
-              style={[styles.percent, { color: theme.text.primary }]}
+              style={[
+                styles.percent,
+                {
+                  maxWidth: inner,
+                  fontSize: percentFontSize,
+                  lineHeight: percentLineHeight,
+                  color: theme.text.primary,
+                },
+              ]}
             >
               {formatPercent(overall.percent, language)}
             </Text>
           ) : loading ? null : (
-            <Ionicons name="flag-outline" size={13} color={theme.accent} />
+            <Ionicons name="flag-outline" size={flagSize} color={theme.accent} />
           )}
         </YearlyGoalRing>
       </GlassIconButton>
@@ -149,9 +163,6 @@ function YearlyGoalButton() {
 
 const styles = StyleSheet.create({
   percent: {
-    maxWidth: INNER,
-    fontSize: 9,
-    lineHeight: 11,
     fontWeight: "800",
     textAlign: "center",
     fontVariant: ["tabular-nums"],

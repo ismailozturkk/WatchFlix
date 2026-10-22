@@ -31,6 +31,8 @@ const RAW_TOUCHABLE_ALLOWED = {
   "components/feed/FeedPostCard.js": 11,
   "components/feed/ClampedText.js": 1,
   "components/friends/PillButton.js": 1,
+  // Basılı-tut onay düğmesi: yüzeyi soldan sağa dolan bir ilerleme çubuğu — cam bu dolguyu bozar.
+  "components/profile/HoldToConfirmButton.js": 1,
   "components/friends/RoundIconButton.js": 1,
   "components/lists/GlobalSearchResults.js": 1,
   "components/modals/createPost/DraftCard.js": 2,
@@ -46,6 +48,9 @@ const RAW_TOUCHABLE_ALLOWED = {
   "components/toast/ToastCards.js": 1,
   // Marka renkli giriş düğmeleri (Apple / Google) — AuthKit'te glass={false}.
   "components/auth/AuthKit.js": 1,
+  // Hata sınırı sağlayıcıların DIŞINDA: cam bileşeni tema okuyup "useTheme must be used within a
+  // ThemeProvider" ile asıl hatayı gizlerdi (bkz. __tests__/errorBoundaryStandalone.test.js).
+  "components/ErrorBoundary.js": 1,
   // Yalnız geliştirici ekranları.
   "screens/development/TabBarQaScreen.js": 1,
   "screens/tabs/UsageDebugScreen.js": 36,

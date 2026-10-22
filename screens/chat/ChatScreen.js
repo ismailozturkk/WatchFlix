@@ -81,6 +81,7 @@ import { useLanguage } from "@context/LanguageContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { useUserProfile } from "@context/UserProfileContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
+import { invitationFieldsFromMessage } from "@utils/importantInvites";
 import { isOnlineVisible } from "@services/presenceService";
 import {
   createTypingController,
@@ -1320,7 +1321,8 @@ export default function ChatScreen({ route, navigation }) {
   // artışı batch ile zaten işlenmiş olduğundan toplam yeni mesajı sayar.
   // Bildirim hatası gönderimi geri almaz: mesaj zaten kalıcı.
   const notifyThread = useCallback(
-    (previewText) => {
+    (previewText, messageData) => {
+      const invitation = invitationFieldsFromMessage(messageData);
       if (isGroup) {
         const others = (groupData?.members || []).filter(
           (u) => u !== currentUser.uid,
@@ -1331,7 +1333,8 @@ export default function ChatScreen({ route, navigation }) {
             fromUid: currentUser.uid,
             fromName: profileDisplayName || currentUser.displayName || "",
             fromAvatarIndex,
-            type: "message",
+            type: invitation?.type || "message",
+            ...(invitation || {}),
             text: previewText,
             groupId: chatId,
             groupName: groupData?.name || groupName || "",
@@ -1344,7 +1347,8 @@ export default function ChatScreen({ route, navigation }) {
         fromUid: currentUser.uid,
         fromName: profileDisplayName || currentUser.displayName || "",
         fromAvatarIndex,
-        type: "message",
+        type: invitation?.type || "message",
+        ...(invitation || {}),
         text: previewText,
       }).catch(() => {});
     },
@@ -1369,7 +1373,7 @@ export default function ChatScreen({ route, navigation }) {
       batch.set(doc(messagesRef), messageData);
       queueThreadWrites(batch, previewText);
       await batch.commit();
-      notifyThread(previewText);
+      notifyThread(previewText, messageData);
     },
     [messagesRef, queueThreadWrites, notifyThread],
   );

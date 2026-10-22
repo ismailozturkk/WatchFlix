@@ -39,7 +39,9 @@ import { getSeeAllLabel } from "../../utils/homeSectionCopy";
 // "Tümü" ile açılan Sıradaki ekranı çözer.
 const RAIL_LIMIT = 10;
 
-export default function TvOngoingSection({ navigation }) {
+// `surface` ölçümde hangi yüzeyin kullanıldığını söyler: TV ana ekranı "rail",
+// Kütüphane sekmesi "library" (bkz. hooks/useUpNextQueue).
+export default function TvOngoingSection({ navigation, surface = "rail" }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const poster = useRailPosterStyle();
@@ -68,7 +70,7 @@ export default function TvOngoingSection({ navigation }) {
       limit: RAIL_LIMIT,
       concurrency: 3,
       enabled: resolveReady,
-      surface: "rail",
+      surface,
     });
 
   // Basma animasyonu kart başına tek Animated.Value kullanır.

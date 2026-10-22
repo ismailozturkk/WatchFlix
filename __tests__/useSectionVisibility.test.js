@@ -60,30 +60,30 @@ afterEach(() => {
 
 describe("useScreenSections", () => {
   test("kayıt yokken her bölüm görünür", () => {
-    mount("profile");
-    expect(seen.profile.isVisible("notes")).toBe(true);
-    expect(seen.profile.hiddenCount).toBe(0);
-    expect(seen.profile.allHidden).toBe(false);
+    mount("library");
+    expect(seen.library.isVisible("notes")).toBe(true);
+    expect(seen.library.hiddenCount).toBe(0);
+    expect(seen.library.allHidden).toBe(false);
   });
 
   test("bir bölümü gizlemek AÇIK ekranı anında günceller, öteki ekrana dokunmaz", () => {
-    mount("profile", "hub");
+    mount("library", "hub");
     act(() => {
-      expect(setSectionShown("profile", "notes", false)).toBe(true);
+      expect(setSectionShown("library", "notes", false)).toBe(true);
     });
-    expect(seen.profile.isVisible("notes")).toBe(false);
-    expect(seen.profile.isVisible("stats")).toBe(true);
-    expect(seen.profile.hiddenCount).toBe(1);
+    expect(seen.library.isVisible("notes")).toBe(false);
+    expect(seen.library.isVisible("lists")).toBe(true);
+    expect(seen.library.hiddenCount).toBe(1);
     expect(seen.hub.hiddenCount).toBe(0);
     expect(seen.hub.isVisible("games")).toBe(true);
   });
 
   test("tekrar göstermek geri alır ve anahtar silinir (boş nesne depoda dolaşmaz)", () => {
-    mount("profile");
-    act(() => { setSectionShown("profile", "notes", false); });
+    mount("library");
+    act(() => { setSectionShown("library", "notes", false); });
     expect(has(Keys.sectionVisibility)).toBe(true);
-    act(() => { setSectionShown("profile", "notes", true); });
-    expect(seen.profile.isVisible("notes")).toBe(true);
+    act(() => { setSectionShown("library", "notes", true); });
+    expect(seen.library.isVisible("notes")).toBe(true);
     expect(has(Keys.sectionVisibility)).toBe(false);
     expect(get(Keys.sectionVisibility)).toBeNull();
   });
@@ -91,11 +91,11 @@ describe("useScreenSections", () => {
   test("hızlı art arda iki yazım birbirini ezmez (son kayıttan okur)", () => {
     mount("profile");
     act(() => {
-      setSectionShown("profile", "notes", false);
+      setSectionShown("profile", "activity", false);
       setSectionShown("profile", "stats", false);
       setSectionShown("profile", "badges", false);
     });
-    expect(seen.profile.hidden.profile).toEqual(["badges", "stats", "notes"]);
+    expect(seen.profile.hidden.profile).toEqual(["badges", "stats", "activity"]);
     expect(seen.profile.hiddenCount).toBe(3);
   });
 
@@ -118,11 +118,20 @@ describe("useScreenSections", () => {
     mount("hub");
     act(() => { setScreenSectionsShown("hub", false); });
     expect(seen.hub.allHidden).toBe(true);
-    expect(seen.hub.hiddenCount).toBe(5);
+    expect(seen.hub.hiddenCount).toBe(6);
     act(() => { setSectionShown("hub", "games", true); });
     expect(seen.hub.allHidden).toBe(false);
     act(() => { setScreenSectionsShown("hub", true); });
     expect(seen.hub.hiddenCount).toBe(0);
+  });
+
+  test("Kütüphane'de allHidden eski tek anahtarlı bölümü (Sıradaki) saymaz", () => {
+    mount("library");
+    act(() => { setScreenSectionsShown("library", false); });
+    expect(seen.library.allHidden).toBe(true);
+    // 5 bölümden 4'ü bu kayıtta saklanır; "nextUp" TV rafıyla ortak ayarda (showOngoingTvShows).
+    expect(seen.library.hiddenCount).toBe(4);
+    expect(seen.library.hidden.library).toEqual(["lists", "reminders", "notes", "wrapped"]);
   });
 
   test("Dizi'de allHidden eski tek anahtarlı bölümü (Devam Edenler) saymaz", () => {
@@ -134,13 +143,13 @@ describe("useScreenSections", () => {
   });
 
   test("resetSectionVisibility her şeyi geri açar", () => {
-    mount("profile", "movie");
+    mount("library", "movie");
     act(() => {
-      setSectionShown("profile", "notes", false);
+      setSectionShown("library", "notes", false);
       setSectionShown("movie", "worldTour", false);
     });
     act(() => { expect(resetSectionVisibility()).toBe(true); });
-    expect(seen.profile.hiddenCount).toBe(0);
+    expect(seen.library.hiddenCount).toBe(0);
     expect(seen.movie.hiddenCount).toBe(0);
     expect(has(Keys.sectionVisibility)).toBe(false);
   });
@@ -158,6 +167,9 @@ describe("useScreenSections", () => {
       setSectionShown("yok", "notes", false);
       setSectionShown("profile", "yok", false);
       setSectionShown("tv", "ongoing", false);
+      setSectionShown("library", "nextUp", false);
+      // Profil'den Kütüphane'ye taşınan bölüm artık Profil'in değil.
+      setSectionShown("profile", "notes", false);
     });
     expect(has(Keys.sectionVisibility)).toBe(false);
     expect(seen.profile.hiddenCount).toBe(0);
@@ -167,25 +179,40 @@ describe("useScreenSections", () => {
 describe("bozuk kayıt", () => {
   test("çözülemeyen JSON ekranı bozmaz: hepsi görünür", () => {
     getStore(Keys.sectionVisibility.store).set(physicalKey(Keys.sectionVisibility), "{bozuk json");
-    mount("profile");
-    expect(seen.profile.isVisible("notes")).toBe(true);
-    expect(seen.profile.hiddenCount).toBe(0);
+    mount("library");
+    expect(seen.library.isVisible("notes")).toBe(true);
+    expect(seen.library.hiddenCount).toBe(0);
     expect(get(Keys.sectionVisibility)).toBeNull();
   });
 
   test("dizi olarak yazılmış kayıt (elle bozulmuş) yok sayılır", () => {
     getStore(Keys.sectionVisibility.store).set(physicalKey(Keys.sectionVisibility), JSON.stringify(["notes"]));
-    mount("profile");
-    expect(seen.profile.isVisible("notes")).toBe(true);
+    mount("library");
+    expect(seen.library.isVisible("notes")).toBe(true);
   });
 
   test("içinde bilinmeyen kimlik olan kayıt bilinenleri korur, bilinmeyeni atar", () => {
     getStore(Keys.sectionVisibility.store).set(
       physicalKey(Keys.sectionVisibility),
-      JSON.stringify({ profile: ["notes", "gelecekte-eklenen"], baskaEkran: ["x"] }),
+      JSON.stringify({ library: ["notes", "gelecekte-eklenen"], baskaEkran: ["x"] }),
     );
-    mount("profile");
-    expect(seen.profile.hidden.profile).toEqual(["notes"]);
-    expect(seen.profile.isVisible("notes")).toBe(false);
+    mount("library");
+    expect(seen.library.hidden.library).toEqual(["notes"]);
+    expect(seen.library.isVisible("notes")).toBe(false);
+  });
+
+  test("Kütüphane öncesi kayıt: Profil'de gizli Notlar, Kütüphane'de gizli kalır (geri görünmez)", () => {
+    getStore(Keys.sectionVisibility.store).set(
+      physicalKey(Keys.sectionVisibility),
+      JSON.stringify({ profile: ["notes", "stats"] }),
+    );
+    mount("library", "profile");
+    expect(seen.library.isVisible("notes")).toBe(false);
+    expect(seen.profile.isVisible("stats")).toBe(false);
+    expect(seen.profile.hidden.profile).toEqual(["stats"]);
+    // Kütüphane'de yeniden açınca kayıt, taşınmış (temiz) hâliyle yazılır.
+    act(() => { setSectionShown("library", "notes", true); });
+    expect(seen.library.isVisible("notes")).toBe(true);
+    expect(get(Keys.sectionVisibility)).toEqual({ tv: [], movie: [], hub: [], library: [], profile: ["stats"] });
   });
 });

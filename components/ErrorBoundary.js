@@ -1,10 +1,13 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { i18nText } from "../utils/i18nText";
 import { captureError } from "../services/crashReporting";
-import GlassTouchable from "./common/GlassTouchable";
 
-
+// BU DOSYA HİÇBİR SAĞLAYICIYA (tema, dil…) BAĞLI OLMAMALI. Sınır App.js'te tüm
+// sağlayıcıların DIŞINDA durur; yedek ekranda tema okuyan bir bileşen (GlassTouchable →
+// GlassSurface → useTheme) çizilirse "useTheme must be used within a ThemeProvider"
+// fırlatır ve asıl hatayı gizleyen ikinci bir çökme olur. Bu yüzden düğme düz
+// TouchableOpacity (Liquid Glass bilerek yok). Bekçi: __tests__/errorBoundaryStandalone.test.js.
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -35,12 +38,13 @@ export default class ErrorBoundary extends React.Component {
           <Text style={styles.emoji}>⚠️</Text>
           <Text style={styles.title}>{i18nText("autoI18n.bir_seyler_ters_gitti", "Bir şeyler ters gitti")}</Text>
           <Text style={styles.message}>{i18nText("autoI18n.uygulama_beklenmedik_bir_hatayla_karsilasti", "Uygulama beklenmedik bir hatayla karşılaştı.")}</Text>
-          <GlassTouchable
+          <TouchableOpacity
+            accessibilityRole="button"
             style={styles.button}
             onPress={() => this.setState({ hasError: false, error: null })}
           >
             <Text style={styles.buttonText}>{i18nText("autoI18n.tekrar_dene", "Tekrar Dene")}</Text>
-          </GlassTouchable>
+          </TouchableOpacity>
         </View>
       );
     }

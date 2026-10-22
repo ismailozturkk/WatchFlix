@@ -7,7 +7,7 @@
 // o bileşen hesaba HİÇ girmez; "elinde olmayan bilgiyi sıfır sanma" yoktur. Puanlar da yalnız ikimizin de
 // GÖRÜNÜR izlenenlerinde ortak olan başlıklar için okunur (gizli bir listeden dolaylı bilgi sızmasın).
 //
-// UYUM PUANI üç bileşenin ağırlıklı ortalamasıdır; yeterli verisi olmayan bileşen DÜŞER (ağırlıklar
+// UYUM PUANI dört bileşenin ağırlıklı ortalamasıdır; yeterli verisi olmayan bileşen DÜŞER (ağırlıklar
 // kalanlara yeniden dağıtılır), hiçbiri yoksa puan yoktur (`null`) — uydurma % gösterilmez:
 //   • tür benzerliği  (ağırlık 0.4)  izlenenlerin tür dağılımlarının kosinüs benzerliği, [0.5, 1] → [0, 1].
 //                                    TÜR ADLARI düz metindir ve yazanın TMDB dilindedir ("Dram" / "Drama"):
@@ -15,6 +15,12 @@
 //                                    HESAPTAN DÜŞER — yanlış "tamamen farklı zevk" sonucu üretilmez.
 //   • ortak izlenen   (ağırlık 0.3)  ortak / küçük listenin boyutu, karekök ölçeği (küçük liste şişirmesin)
 //   • puan uyumu      (ağırlık 0.3)  ortak puanlanan başlıklarda 1 − ortalama mutlak fark / 9
+//   • ortak favori    (ağırlık 0.2)  İSTEĞE BAĞLI bonus: iki favori listesi de görünür ve ≥ 3 ise,
+//                                    ortak / küçük listenin boyutu (karekök). Yokluğu puanı cezalandırmaz:
+//                                    bileşen düşer, çekirdek üçlü eski göreli ağırlıklarıyla kalır.
+// Puanın yanında NEDEN o puan olduğunu anlatan içgörüler üretilir (bileşen dökümü, birlikte sevilen / ayrışılan
+// başlıklar, türlerde kimin neye yattığı). Hepsi yalnız ORTAK görünür izlenenlerden ve görünür izlenen
+// türlerinden türetilir; yeni bir gizlilik yüzeyi açmaz.
 // Bu bir HEURİSTİKTİR (bilimsel ölçü değil); eşikler ve ağırlıklar aşağıda sabit, testle kilitli.
 //
 // BİRLİKTE İZLEYELİM: ikisinin de izlemediği başlıklar. Önce her iki izleme listesindeki ortaklar, sonra
@@ -24,9 +30,19 @@
 export const MIN_WATCHED_FOR_GENRES = 5;
 export const MIN_WATCHED_FOR_OVERLAP = 5;
 export const MIN_RATED_PAIRS = 3;
+export const MIN_FAVORITES = 3;
+/** Bir puan çifti iki tarafta da bu eşik ve üstündeyse "ikinizin de sevdiği". */
+export const LOVED_RATING = 8;
+/** Puan farkı bu eşik ve üstündeyse "ayrıştığınız". */
+export const SPLIT_GAP = 3;
+/** Tür payı farkı (0–1) bu eşik ve üstündeyse "daha çok X izliyor" denir. */
+export const GENRE_LEAN_GAP = 0.12;
+export const MAX_HIGHLIGHTS = 8;
 /** İki tarafın tür sözlüğünün (küçük olana göre) en az bu kadarı ortak olmalı; yoksa dil farkı varsayılır. */
 export const MIN_VOCAB_OVERLAP = 0.5;
-export const WEIGHTS = Object.freeze({ genres: 0.4, overlap: 0.3, ratings: 0.3 });
+// Ağırlıklar GÖRECELİDİR: eksik bileşen düşünce kalanlara göre yeniden normalleştirilir (toplamın 1 olması gerekmez).
+export const WEIGHTS = Object.freeze({ genres: 0.4, overlap: 0.3, ratings: 0.3, favorites: 0.2 });
+const CORE_COMPONENTS = ["genres", "overlap", "ratings"];
 export const MAX_CANDIDATES = 20;
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
@@ -128,14 +144,17 @@ export const tierOf = (score) => (score == null ? null : TIERS.find((tier) => sc
  *   score: number | null, tier: string | null,
  *   watched: { overlap: Array, mine: number, theirs: number },
  *   favorites: Array | null,
- *   genres: { similarity: number | null, shared: string[], comparable: boolean },
+ *   genres: { similarity: number | null, shared: string[], comparable: boolean,
+ *     lean: { mine: string | null, theirs: string | null } },
  *   ratings: { pairs: number, agreement: number | null },
+ *   highlights: Array<{ key, id, type, name, imagePath, mine: number | null, theirs: number | null }>,
+ *   loved: Array<{ name, mine: number, theirs: number }>,
+ *   split: { name: string, mine: number, theirs: number } | null,
+ *   breakdown: Array<{ id: string, value: number, weight: number }>,
  *   components: string[]
  * }}
  */
-export function computeTasteMatch(mine, theirs) {
-  const a = prepareSide(mine);
-  const b = prepareSide(theirs);
+function compareSides(a, b) {
 
   // Karşılaştırma yalnız ARKADAŞIN gördüğümüz kategorilerinde yapılır.
   const categories = ["watchedMovies", "watchedShows"].filter((c) => b[c] !== null);
@@ -158,6 +177,7 @@ export function computeTasteMatch(mine, theirs) {
   let genreScore = null;
   let similarity = null;
   const shared = [];
+  const lean = { mine: null, theirs: null };
   const vocabShared = [...ga.counts.keys()].filter((genre) => gb.counts.has(genre)).length;
   const vocabSmaller = Math.min(ga.counts.size, gb.counts.size);
   const sameVocabulary = vocabSmaller > 0 && vocabShared / vocabSmaller >= MIN_VOCAB_OVERLAP;
@@ -172,26 +192,85 @@ export function computeTasteMatch(mine, theirs) {
         .slice(0, 3)
         .map((entry) => entry.genre),
     );
+
+    // Kim hangi türe daha çok yatıyor: pay (türü olan izlenenlerdeki oran) farkı en büyük olanlar.
+    let mineGap = 0;
+    let theirGap = 0;
+    for (const genre of new Set([...ga.counts.keys(), ...gb.counts.keys()])) {
+      const gap = (ga.counts.get(genre) || 0) / ga.withGenres - (gb.counts.get(genre) || 0) / gb.withGenres;
+      if (gap >= GENRE_LEAN_GAP && gap > mineGap) {
+        mineGap = gap;
+        lean.mine = genre;
+      } else if (-gap >= GENRE_LEAN_GAP && -gap > theirGap) {
+        theirGap = -gap;
+        lean.theirs = genre;
+      }
+    }
   }
 
   // ── puan uyumu: yalnız ORTAK izlenen başlıklarda ──
   let diffSum = 0;
   let pairs = 0;
+  const rated = []; // ikimizin de puanladığı ortak başlıklar
+  const highlightsAll = [];
   for (const item of overlap) {
     const ra = ratingOf(a.ratings, item.key);
     const rb = ratingOf(b.ratings, item.key);
+    highlightsAll.push({ item, mine: ra, theirs: rb });
     if (ra !== null && rb !== null) {
       diffSum += Math.abs(ra - rb);
       pairs += 1;
+      rated.push({ item, mine: ra, theirs: rb });
     }
   }
   const agreement = pairs >= MIN_RATED_PAIRS ? clamp01(1 - diffSum / pairs / 9) : null;
+
+  // ── ortak favori (isteğe bağlı bonus bileşen) ──
+  const favorites =
+    a.favorites && b.favorites ? [...a.favorites.values()].filter((item) => b.favorites.has(item.key)) : null;
+  const favoritesScore =
+    favorites && a.favorites.size >= MIN_FAVORITES && b.favorites.size >= MIN_FAVORITES
+      ? clamp01(Math.sqrt(favorites.length / Math.min(a.favorites.size, b.favorites.size)))
+      : null;
+
+  // ── içgörüler (yalnız ortak görünür izlenenlerden) ──
+  const loved = rated
+    .filter((pair) => pair.mine >= LOVED_RATING && pair.theirs >= LOVED_RATING)
+    .sort((x, y) => y.mine + y.theirs - (x.mine + x.theirs) || x.item.name.localeCompare(y.item.name))
+    .slice(0, 3)
+    .map((pair) => ({ name: pair.item.name, mine: pair.mine, theirs: pair.theirs }));
+  const widest = [...rated].sort((x, y) => Math.abs(y.mine - y.theirs) - Math.abs(x.mine - x.theirs))[0];
+  const split =
+    widest && Math.abs(widest.mine - widest.theirs) >= SPLIT_GAP
+      ? { name: widest.item.name, mine: widest.mine, theirs: widest.theirs }
+      : null;
+  // Afiş şeridi: önce ikimizin de puanladığı (toplam puan yüksekten), sonra yalnız birinin, sonra puansızlar.
+  const rank = (entry) => (entry.mine !== null && entry.theirs !== null ? 2 : entry.mine !== null || entry.theirs !== null ? 1 : 0);
+  const highlights = highlightsAll
+    .filter(({ item }) => item.imagePath)
+    .sort(
+      (x, y) =>
+        rank(y) - rank(x) ||
+        (y.mine || 0) + (y.theirs || 0) - ((x.mine || 0) + (x.theirs || 0)) ||
+        x.item.name.localeCompare(y.item.name),
+    )
+    .slice(0, MAX_HIGHLIGHTS)
+    .map(({ item, mine, theirs }) => ({
+      key: item.key,
+      id: item.id,
+      type: item.type,
+      name: item.name,
+      imagePath: item.imagePath,
+      mine,
+      theirs,
+    }));
 
   // ── birleşik puan ──
   const parts = [
     ["genres", genreScore],
     ["overlap", overlapScore],
     ["ratings", agreement],
+    ["favorites", favoritesScore],
   ].filter(([, value]) => value !== null);
   let score = null;
   if (parts.length > 0) {
@@ -199,19 +278,56 @@ export function computeTasteMatch(mine, theirs) {
     score = Math.round((parts.reduce((sum, [name, value]) => sum + WEIGHTS[name] * value, 0) / totalWeight) * 100);
   }
 
-  // ── ortak favoriler (ikisi de görünürse) ──
-  const favorites =
-    a.favorites && b.favorites ? [...a.favorites.values()].filter((item) => b.favorites.has(item.key)) : null;
-
   return {
-    state: parts.length === 0 ? "no-data" : parts.length === 3 ? "ok" : "limited",
+    // "ok": çekirdek üçlünün hepsi var (ortak favori bonus olduğundan beklenmez).
+    state:
+      parts.length === 0
+        ? "no-data"
+        : CORE_COMPONENTS.every((name) => parts.some(([id]) => id === name))
+          ? "ok"
+          : "limited",
     score,
     tier: tierOf(score),
     watched: { overlap, mine: watchedA.size, theirs: watchedB.size },
     favorites,
-    genres: { similarity, shared, comparable: sameVocabulary },
+    genres: { similarity, shared, comparable: sameVocabulary, lean },
     ratings: { pairs, agreement },
+    highlights,
+    loved,
+    split,
+    breakdown: parts.map(([id, value]) => ({ id, value: Math.round(value * 100), weight: WEIGHTS[id] })),
     components: parts.map(([name]) => name),
+  };
+}
+
+/**
+ * Zevk uyumunun film / dizi kırılımı ile sarmalanmış hâli (asıl hesap `compareSides`).
+ *
+ * Ek alanlar:
+ *   scope   "both" | "movies" | "shows" | "none"  arkadaşın bize AÇTIĞI izlenen kategorileri
+ *   byType  { movie, tv }  her biri { shared, score | null, overlap, mine, theirs }
+ *           shared=false: arkadaş o kategoriyi paylaşmıyor (puan YOK, "sıfır" değil);
+ *           shared=true ama score=null: o kategoride karşılaştırmaya yetecek kayıt yok.
+ * Kategori puanı ana puanla AYNI formüldür, yalnız o kategorinin izlenenleriyle (ortak favori hariç).
+ */
+export function computeTasteMatch(mine, theirs) {
+  const a = prepareSide(mine);
+  const b = prepareSide(theirs);
+  const result = compareSides(a, b);
+
+  const only = (category, otherCategory) => {
+    const shared = b[category] !== null;
+    if (!shared) return { shared: false, score: null, overlap: 0, mine: 0, theirs: 0 };
+    const sub = compareSides(a, { ...b, [otherCategory]: null, favorites: null });
+    return { shared: true, score: sub.score, overlap: sub.watched.overlap.length, mine: sub.watched.mine, theirs: sub.watched.theirs };
+  };
+  const movie = only("watchedMovies", "watchedShows");
+  const tv = only("watchedShows", "watchedMovies");
+
+  return {
+    ...result,
+    scope: movie.shared && tv.shared ? "both" : movie.shared ? "movies" : tv.shared ? "shows" : "none",
+    byType: { movie, tv },
   };
 }
 

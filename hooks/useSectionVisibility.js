@@ -1,7 +1,7 @@
 // hooks/useSectionVisibility.js
 //
-// Film / Dizi / Hub / Profil ekranlarının bölüm görünürlüğü (Ayarlar >
-// Kişiselleştirme > Ekran bölümleri). Karar mantığı utils/sectionVisibility.js'te
+// Film / Dizi / Eğlence ("hub") / Kütüphane / Profil ekranlarının bölüm görünürlüğü
+// (Ayarlar > Kişiselleştirme > Ekran bölümleri). Karar mantığı utils/sectionVisibility.js'te
 // (saf, testli); burada yalnız depoya bağlama.
 //
 // NEDEN AppSettingsContext'te DEĞİL: değer yalnız bu ekranlara ve ayar sayfasına
@@ -25,7 +25,7 @@ import {
   toStoredSectionVisibility,
 } from "../utils/sectionVisibility";
 
-/** Normalize edilmiş gizli bölüm haritası ({ tv: [...], movie: [...], hub: [...], profile: [...] }). */
+/** Normalize edilmiş gizli bölüm haritası ({ tv: [...], movie: [...], hub: [...], library: [...], profile: [...] }). */
 export function useSectionVisibilityMap() {
   const raw = useStored(Keys.sectionVisibility);
   return useMemo(() => normalizeSectionVisibility(raw), [raw]);
@@ -35,7 +35,7 @@ export function useSectionVisibilityMap() {
  * Bir ekranın bölüm görünürlüğü. Dönen nesne `hidden` değişmedikçe AYNI kalır —
  * memo'lu çocuklara ve `useMemo` bağımlılıklarına güvenle verilebilir.
  *
- * @param {"tv"|"movie"|"hub"|"profile"} screen
+ * @param {"tv"|"movie"|"hub"|"library"|"profile"} screen
  * @returns {{
  *   hidden: Record<string, string[]>,
  *   isVisible: (section: string) => boolean,

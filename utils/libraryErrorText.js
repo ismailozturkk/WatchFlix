@@ -9,12 +9,17 @@
 import Toast from "@components/AppToast";
 
 import { captureError } from "../services/crashReporting";
+import i18n from "../translations";
+import { dailyLimitMessage, dailySpreadNotice } from "./dailyLimitCopy";
 import { i18nText } from "./i18nText";
 import { LIBRARY_ERROR, toLibraryError } from "./libraryCore";
 
 /** Hata kodunun kullanıcı metni. Bilinmeyen/teknik kodlar genel mesaja düşer. */
 export function libraryErrorMessage(error) {
-  switch (toLibraryError(error).code) {
+  const libraryError = toLibraryError(error);
+  switch (libraryError.code) {
+    case LIBRARY_ERROR.DAILY_LIMIT:
+      return dailyLimitMessage(libraryError.details, i18n.language);
     case LIBRARY_ERROR.OFFLINE:
       return i18nText(
         "autoI18n.kutuphane_cevrimdisi",
@@ -69,6 +74,7 @@ const EXPECTED = new Set([
   LIBRARY_ERROR.PERMISSION,
   LIBRARY_ERROR.UNRELEASED,
   LIBRARY_ERROR.UNKNOWN_RELEASE,
+  LIBRARY_ERROR.DAILY_LIMIT,
   LIBRARY_ERROR.SEASONS_INCOMPLETE,
   LIBRARY_ERROR.LIST_RESERVED,
   LIBRARY_ERROR.LIST_CONFLICT,
@@ -95,4 +101,16 @@ export function showLibraryError(error, { source = "library", title } = {}) {
     ...(title ? { text2: message } : {}),
   });
   return libraryError;
+}
+
+/**
+ * Toplu ekleme (sezon / dizi) günlük sınır yüzünden günlere yayıldıysa kullanıcıya
+ * bunu söyler: `result.spread` = libraryActions'ın döndürdüğü özet.
+ * @returns {boolean} bildirim gösterildiyse true
+ */
+export function showWatchSpreadNotice(result) {
+  const notice = dailySpreadNotice(result?.spread, i18n.language);
+  if (!notice) return false;
+  Toast.show({ type: "info", text1: notice.title, text2: notice.body, visibilityTime: 6500 });
+  return true;
 }

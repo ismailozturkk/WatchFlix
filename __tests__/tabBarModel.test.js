@@ -1,4 +1,4 @@
-import { AI_ACTION, TAB_NAMES, createTabState, getAiButtonCenter, getTabBarLayout, initialTabName, isTabName, tabStateReducer } from "../utils/tabBarModel";
+import { AI_ACTION, TAB_DEFINITIONS, TAB_NAMES, createTabState, getAiButtonCenter, getTabBarLayout, initialTabName, isTabName, tabStateReducer } from "../utils/tabBarModel";
 import { resolveTabBarMode } from "../utils/tabBarCapabilities";
 
 const supported = { platform: "android", apiLevel: 33, accessibilityReady: true, androidGlassAvailable: true, hasBlurTarget: true };
@@ -90,7 +90,7 @@ describe("tab state across native/JS interaction", () => {
     expect(layout.aiGap).toBeGreaterThan(0);
   });
   it("her sekmeye ve yeni genişliğe rağmen çubuk dört yuvaya bölünür", () => {
-    expect(TAB_NAMES).toEqual(["discover", "share", "settings", "profile"]);
+    expect(TAB_NAMES).toEqual(["discover", "share", "library", "profile"]);
     const layout = getTabBarLayout({ width: 390, bottomInset: 34, mode: "legacy-blur" });
     expect(layout.width).toBe(layout.slotWidth * TAB_NAMES.length + layout.padding * 2);
   });
@@ -103,7 +103,18 @@ describe("Film + Dizi tek sekme, yapay zeka sekme değil", () => {
       expect(initialTabName(eski)).toBe("discover");
     }
     expect(initialTabName(undefined)).toBe("discover");
-    expect(initialTabName("debug")).toBe("settings");
+    // Ayarlar artık sekme değil (Profil'in dişli düğmesinden açılır): eski adlar
+    // ona düşmez, kalan sekmelere düşer.
+    expect(isTabName("settings")).toBe(false);
+    expect(initialTabName("settings")).toBe("discover");
+    expect(initialTabName("debug")).toBe("profile");
+  });
+  it("Kütüphane sekme, Ayarlar değil; Hub'ın anahtarı korunur ama etiketi ve simgesi Eğlence", () => {
+    expect(isTabName("library")).toBe(true);
+    const share = TAB_DEFINITIONS.find((tab) => tab.name === "share");
+    expect(share.labelKey).toBe("funTab");
+    expect(share.icon).toBe("game-controller");
+    expect(TAB_DEFINITIONS.find((tab) => tab.name === "library").labelKey).toBe("library");
   });
   it("yapay zeka anahtarı sekme adı değil: durum makinesi ona asla geçmez", () => {
     expect(isTabName(AI_ACTION.key)).toBe(false);

@@ -10,12 +10,15 @@ import SharedCineRoomMessage, { formatRoomCode } from "../components/chat/Shared
 import { setDebugNow } from "../services/tournamentEngine";
 import {
   buildAiShare,
+  buildChallengeShare,
   buildCineRoomShare,
   buildListShare,
   buildPostShare,
   buildShareMessage,
+  buildTasteMatchShare,
   buildTournamentShare,
 } from "../utils/chatShare";
+import SharedTasteMatchMessage from "../components/chat/SharedTasteMatchMessage";
 
 // "Sohbete gönder" balon gövdeleri ve MessageBubble yönlendirmesi: hangi türün
 // hangi gövdeyle çizildiği, aç/kapa ve dokunuş bağlantıları, bozuk kaydın düz
@@ -92,6 +95,8 @@ jest.mock("../components/chat/MessageReplyPreview", () => ({ __esModule: true, d
 jest.mock("../components/chat/PollMessage", () => ({ __esModule: true, default: "PollBody" }));
 jest.mock("../components/chat/SharedMediaCollection", () => ({ __esModule: true, default: "CollectionBody" }));
 jest.mock("../components/chat/SharedMediaMessage", () => ({ __esModule: true, default: "MediaBody" }));
+// Düello kartı gezinme/plan/Firestore kancaları kullanır; gövdesi __tests__/dailyDuel.test.js'te sınanır.
+jest.mock("../components/chat/SharedChallengeMessage", () => ({ __esModule: true, default: "ChallengeBody" }));
 
 const getTmdbUrl = (path, _type, width) => `https://img.test/w${width}${path}`;
 
@@ -670,6 +675,68 @@ describe("SharedCineRoomMessage", () => {
   });
 });
 
+describe("SharedTasteMatchMessage", () => {
+  const taste = (over = {}) =>
+    buildTasteMatchShare(
+      {
+        score: 72,
+        watched: { overlap: [{}, {}, {}] },
+        favorites: [{}],
+        genres: { shared: ["Dram", "Komedi"] },
+        ratings: { pairs: 4, agreement: 0.83 },
+        loved: [{ name: "Film 1" }],
+        highlights: [{ id: 1, type: "movie", name: "Film 1", imagePath: "/p1.jpg" }],
+        breakdown: [],
+        ...over,
+      },
+      { host: "Ali", friend: "Ada" },
+    );
+  const mount = (share, props = {}) => render(<SharedTasteMatchMessage share={share} getTmdbUrl={getTmdbUrl} {...props} />).root;
+
+  test("shows the percent, the tier, both names and the shared facts in the receiver's language", () => {
+    const text = textOf(mount(taste()));
+    ["ZEVK UYUMU", "Ali & Ada", "%72", "Epey benzer zevkleriniz var", "3 ortak izlenen", "1 ortak favori", "Ortak türler: Dram, Komedi", "Puanlarda %83 uyum · 4 ortak puan", "Ortak sevdiğiniz: Film 1"].forEach(
+      (part) => expect(text).toContain(part),
+    );
+  });
+
+  test("shows the movie / show split only for the categories that have a score", () => {
+    const both = textOf(mount(taste({ byType: { movie: { score: 80 }, tv: { score: 61 } } })));
+    expect(both).toContain("Film %80");
+    expect(both).toContain("Dizi %61");
+    const onlyShows = textOf(mount(taste({ byType: { movie: { score: null }, tv: { score: 66 } } })));
+    expect(onlyShows).toContain("Dizi %66");
+    expect(onlyShows).not.toContain("Film %");
+    expect(textOf(mount(taste()))).not.toContain("Dizi %");
+  });
+
+  test("renders the shared posters and omits empty rows", () => {
+    const root = mount(taste({ favorites: [], genres: { shared: [] }, ratings: { pairs: 0, agreement: null }, loved: [], highlights: [] }));
+    const text = textOf(root);
+    expect(text).not.toContain("ortak favori");
+    expect(text).not.toContain("Ortak türler");
+    expect(text).not.toContain("Puanlarda");
+    expect(root.findAllByType("Image")).toHaveLength(0);
+    expect(mount(taste()).findAllByType("Image")).toHaveLength(1);
+  });
+
+  test("MessageBubble draws a taste match share with this body (no tap target)", () => {
+    const base = {
+      currentUser: { uid: "me" },
+      theme: mockTheme,
+      getTmdbUrl,
+      onLongPress: () => {},
+      renderMessageText: (t) => t,
+      onReply: () => {},
+      entrance: null,
+      navigation: { push: jest.fn() },
+    };
+    const item = { id: "m1", senderId: "them", timestamp: null, ...buildShareMessage(taste()) };
+    const root = render(<MessageBubble {...base} item={item} />).root;
+    expect(textOf(root)).toContain("%72");
+  });
+});
+
 describe("MessageBubble: hub paylaşımları", () => {
   const base = {
     currentUser: { uid: "me" },
@@ -681,6 +748,17 @@ describe("MessageBubble: hub paylaşımları", () => {
     entrance: null,
   };
   const incoming = (share) => ({ id: "m1", senderId: "them", timestamp: null, ...buildShareMessage(share) });
+
+  test("a challenge share is drawn with the duel body and told who sent it", () => {
+    const share = buildChallengeShare({ dayKey: "2026-10-21", score: 7450, correct: 8, total: 10, host: "Ali" });
+    const root = render(<MessageBubble {...base} navigation={{ push: jest.fn() }} item={incoming(share)} />).root;
+    const body = root.findByType("ChallengeBody");
+    expect(body.props.share).toMatchObject({ type: "challenge", score: 7450 });
+    expect(body.props.senderUid).toBe("them");
+    expect(body.props.isOutgoing).toBe(false);
+    // Gelen kutusu satırı simgeli önizlemedir.
+    expect(incoming(share).text).toMatch(/^⚔️ /);
+  });
 
   test("a post share opens the post detail", () => {
     const navigation = { push: jest.fn() };

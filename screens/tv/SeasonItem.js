@@ -13,7 +13,7 @@ import { useAuth } from "../../context/AuthContext";
 import Toast from "@components/AppToast";
 import Reminder from "../../components/Reminder";
 import { markSeasonWatched, removeTvWatch } from "../../services/libraryActions";
-import { showLibraryError } from "../../utils/libraryErrorText";
+import { showLibraryError, showWatchSpreadNotice } from "../../utils/libraryErrorText";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import {
@@ -121,7 +121,7 @@ const SeasonItem = ({
       if (!user?.uid || !date) return;
       try {
         setIsLoading(true);
-        const { status } = await markSeasonWatched({
+        const watchResult = await markSeasonWatched({
           uid: user.uid,
           details,
           season,
@@ -129,6 +129,7 @@ const SeasonItem = ({
           apiKey: API_KEY,
           language,
         });
+        const { status } = watchResult;
         if (status === "empty-season") {
           Toast.show({
             type: "warning",
@@ -140,13 +141,15 @@ const SeasonItem = ({
           return;
         }
         setModalVisible(false);
-        Toast.show({
-          type: "success",
-          text1: i18nText(
-            "autoI18n.sezon_izlendi_olarak_isaretlendi",
-            "Sezon izlendi olarak işaretlendi.",
-          ),
-        });
+        if (!showWatchSpreadNotice(watchResult)) {
+          Toast.show({
+            type: "success",
+            text1: i18nText(
+              "autoI18n.sezon_izlendi_olarak_isaretlendi",
+              "Sezon izlendi olarak işaretlendi.",
+            ),
+          });
+        }
       } catch (e) {
         // Sessiz kalınırsa kullanıcı sezonu işaretlediğini sanıp ekrandan
         // çıkıyor; aynı dosyadaki onDeleteEvent ile aynı geri bildirim.

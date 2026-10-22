@@ -10,13 +10,13 @@
 //   • Sosyal: Paylaşımlar kartı (components/hub/FeedWidget) — feed'e gider;
 //     içinde hızlı paylaşım çubuğu + tür karoları (İnceleme/Liste/Sohbet/Anket)
 //   • CineSwipe ve Turnuva vitrin kartları (components/hub/*)
-//   • Wrapped / yıllık arşiv
 //   • Oyunlar: taşınan ProfileGamesModule (öne çıkan oyun + istatistik)
 //
 // Üç vitrin bölümü aynı SectionHeader'ı kullanır (Oyunlar modülüyle aynı başlık
 // dili); kartların ortak kabuğu components/hub/HubCard.js.
+// (Wrapped / yıllık arşiv Kütüphane sekmesine taşındı: screens/tabs/LibraryScreen.js)
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useMemo } from "react";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
 import useScreenSections from "../../hooks/useSectionVisibility";
@@ -35,8 +35,9 @@ import ScreenDecor from "@components/ScreenDecor";
 import ProfileGamesModule from "@components/profile/ProfileGamesModule";
 import FeedWidget from "@components/hub/FeedWidget";
 import TournamentWidget from "@components/hub/TournamentWidget";
-import HubWrappedModule from "@components/hub/HubWrappedModule";
 import CineSwipeWidget from "@components/hub/CineSwipeWidget";
+import BingoWidget from "@components/hub/BingoWidget";
+import DailyPollWidget from "@components/hub/DailyPollWidget";
 import { SectionHeader } from "@components/game/ui";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -70,27 +71,6 @@ export default function HubScreen({ navigation }) {
   // (utils/sectionVisibility.js "hub"). Selamlama başlığı her zaman görünür.
   const { isVisible: show, allHidden } = useScreenSections("hub");
 
-  // Wrapped modülü sayfanın alt yarısında: giriş animasyonu mount anında değil,
-  // kart ekrana girerken oynamalı. Bayrak yalnız bir kez açılır (state tek
-  // sefer değişir), kaydırma başına yeniden çizim yok.
-  const [wrappedSeen, setWrappedSeen] = useState(false);
-  const wrappedTop = useRef(null); // modülün içerik içindeki y'si
-  const viewportH = useRef(0); // ScrollView'ın görünür yüksekliği
-  const scrollTop = useRef(0);
-  const checkWrappedSeen = useCallback(() => {
-    if (wrappedTop.current == null || !viewportH.current) return;
-    // Kartın üstünden ~120px içeri girince başlar.
-    if (scrollTop.current + viewportH.current > wrappedTop.current + 120) setWrappedSeen(true);
-  }, []);
-  const handleScroll = useCallback(
-    (event) => {
-      onTabBarScroll(event);
-      scrollTop.current = event?.nativeEvent?.contentOffset?.y ?? 0;
-      if (!wrappedSeen) checkWrappedSeen();
-    },
-    [onTabBarScroll, wrappedSeen, checkWrappedSeen],
-  );
-
   // language dependency'de olmalı; yoksa dil değişince selamlama eski dilde kalır.
   const greeting = useMemo(() => {
     const name = user?.displayName?.split(" ")[0] || "";
@@ -106,11 +86,7 @@ export default function HubScreen({ navigation }) {
         <MarkedScrollView
           contentContainerStyle={[styles.scroll, { paddingBottom: contentBottom }]}
           showsVerticalScrollIndicator={false}
-          onScroll={handleScroll}
-          onLayout={(e) => {
-            viewportH.current = e.nativeEvent.layout.height;
-            checkWrappedSeen();
-          }}
+          onScroll={onTabBarScroll}
           scrollEventThrottle={16}
         >
         {/* Başlık */}
@@ -155,25 +131,25 @@ export default function HubScreen({ navigation }) {
           </HubSection>
         )}
 
+        {/* Sinema Bingosu (haftalık kart) */}
+        {show("bingo") && (
+          <HubSection title="BINGO" theme={theme}>
+            <BingoWidget navigation={navigation} />
+          </HubSection>
+        )}
+
+        {/* Günün Sorusu (iki seçenekli günlük anket) */}
+        {show("poll") && (
+          <HubSection title={i18nText("autoI18n.gunun_sorusu_bolum", "Günün sorusu")} theme={theme}>
+            <DailyPollWidget />
+          </HubSection>
+        )}
+
         {/* Turnuva */}
         {show("tournament") && (
           <HubSection title={i18nText("autoI18n.tournament_section", "Turnuva")} theme={theme}>
             <TournamentWidget navigation={navigation} />
           </HubSection>
-        )}
-
-        {/* Wrapped ve Yıllık Arşiv (profilden taşındı). Gizliyken hiç çizilmez; yeniden
-            gösterilince `onLayout` konumu tazeler (giriş animasyonu bayrağı tek yönlüdür). */}
-        {show("wrapped") && (
-          <View
-            style={styles.wrappedHost}
-            onLayout={(e) => {
-              wrappedTop.current = e.nativeEvent.layout.y;
-              checkWrappedSeen();
-            }}
-          >
-            <HubWrappedModule navigation={navigation} revealed={wrappedSeen} />
-          </View>
         )}
 
         {/* Oyunlar */}
@@ -189,7 +165,6 @@ export default function HubScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { alignItems: "center", paddingTop: 10, paddingBottom: 110 },
-  wrappedHost: { width: "100%" },
 
   headerRow: {
     width: "90%",

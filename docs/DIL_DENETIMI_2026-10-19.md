@@ -1,5 +1,7 @@
 # Dil ve çeviri denetimi — 19 Ekim 2026
 
+> Bu belge 19 Ekim tarihli bulguların tarihsel kaydıdır. Düzeltmeler ve Almanca dahil beş dilin güncel doğrulaması için [22 Ekim 2026 tamamlama raporuna](DIL_DENETIMI_2026-10-22.md) bakın. Aşağıdaki sekiz bulgu güncel açık hata listesi değildir.
+
 ## Sonuç
 
 Türkçe, İngilizce, İspanyolca ve Brezilya Portekizcesi sözlükleri yapısal olarak eşit. Ancak uygulamanın tamamı çevrilmiş ve dil değişimine doğru tepki veriyor denemez. Aşağıdaki sekiz kullanım hatası doğrulandı. Bu çalışma incelemedir; uygulama kodu değiştirilmedi.

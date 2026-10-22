@@ -29,6 +29,8 @@ import { getGameTitle } from "./gameLabels";
 import { getGameEntry, resolveGameAccentColors } from "./gameRegistry";
 import { deleteGameSessionResult, getGameSessionResult } from "./gameSessionStore";
 import GlassTouchable from "../../components/common/GlassTouchable";
+import DuelSendButton from "../../components/game/DuelSendButton";
+import { duelPayloadFromResult } from "../../utils/dailyDuel";
 
 const SHARE_CARD_W = 320;
 const SHARE_CARD_H = 569; // ~9:16
@@ -115,6 +117,17 @@ export default function SceneGameResultScreen({ navigation, route }) {
 
   const totalQuestions = (result?.totalCorrect || 0) + (result?.totalWrong || 0);
   const shownScore = useCountUp(result?.score || 0);
+  // Düello kartı yalnız gerçekten oynanmış günlük denemeden çıkar (en az bir cevap).
+  const duelPayload = useMemo(
+    () =>
+      isDaily && totalQuestions > 0
+        ? duelPayloadFromResult(
+            { score: result?.score, correct: result?.totalCorrect, total: totalQuestions },
+            { dayKey: dailyKey },
+          )
+        : null,
+    [isDaily, dailyKey, totalQuestions, result?.score, result?.totalCorrect],
+  );
 
   const leaveResult = (routeName, params) => {
     deleteGameSessionResult(sessionId);
@@ -393,6 +406,9 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <SecondaryAction icon="trophy-outline" label={tr ? "Liderlik" : es ? "Clasificación" : pt ? "Ranking" : de ? "Bestenliste" : "Leaderboard"} theme={theme} onPress={() => navigation.navigate("GameLeaderboardScreen", { gameId: result.gameId })} />
         <SecondaryAction icon={sharing ? null : "share-social-outline"} label={tr ? "Paylaş" : es ? "Compartir" : pt ? "Compartilhar" : de ? "Teilen" : "Share"} theme={theme} loading={sharing} onPress={handleShare} />
       </View>
+
+      {/* Günlük: sonucu bir arkadaşa düello olarak gönder (aynı 10 sahne, skorlar yan yana). */}
+      {isDaily && duelPayload ? <DuelSendButton payload={duelPayload} theme={theme} source="result" /> : null}
 
       <GlassTouchable style={[styles.ghostButton, { borderColor: theme.border }]} onPress={() => leaveResult("GameHubScreen")}>
         <Text style={[styles.ghostText, { color: theme.text.secondary }]}>{tr ? "Oyun Merkezine Dön" : es ? "Volver al centro de juegos" : pt ? "Voltar à central de jogos" : de ? "Zurück zum Spielzentrum" : "Back to Game Hub"}</Text>

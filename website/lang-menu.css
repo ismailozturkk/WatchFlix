@@ -1,0 +1,53 @@
+/* lang-menu.css — site-lang.js'in kurduğu dil menüsü (landing + yasal sayfalar).
+   Kendi kendine yeten tokenlar: iki sayfa ailesinin renk değişkenleri farklı. */
+
+.lang-menu {
+  --lm-bg: #10151c;
+  --lm-line: rgba(255, 255, 255, .12);
+  --lm-ink: #eef4fb;
+  --lm-dim: #8fa1b5;
+  --lm-accent: #138df0;
+  position: relative; display: inline-block;
+}
+
+.lm-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 40px; padding: 0 12px 0 11px;
+  font: inherit; font-size: 13px; font-weight: 700; letter-spacing: .06em;
+  color: var(--lm-ink);
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid var(--lm-line); border-radius: 999px;
+  cursor: pointer;
+  transition: background .18s, border-color .18s;
+}
+.lm-btn:hover { background: rgba(255, 255, 255, .09); border-color: rgba(255, 255, 255, .22); }
+.lm-btn:focus-visible { outline: 2px solid var(--lm-accent); outline-offset: 2px; }
+.lm-ico { opacity: .85; flex: none; }
+.lm-chev { opacity: .6; flex: none; transition: transform .2s; }
+.lang-menu.open .lm-chev { transform: rotate(180deg); }
+
+.lm-list {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 80;
+  min-width: 196px; margin: 0; padding: 6px; list-style: none;
+  background: var(--lm-bg);
+  border: 1px solid var(--lm-line); border-radius: 16px;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, .7), 0 0 0 1px rgba(0, 0, 0, .4);
+}
+.lm-list[hidden] { display: none; }
+.lm-list li {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px;
+  font-size: 15px; color: var(--lm-ink); cursor: pointer; outline: none;
+}
+.lm-list li:hover, .lm-list li:focus-visible { background: rgba(255, 255, 255, .07); }
+.lm-list li:focus-visible { box-shadow: inset 0 0 0 2px var(--lm-accent); }
+.lm-name { flex: 1; font-weight: 500; }
+.lm-code { font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--lm-dim); }
+.lm-tick { color: var(--lm-accent); opacity: 0; flex: none; }
+.lm-list li[aria-selected="true"] .lm-tick { opacity: 1; }
+.lm-list li[aria-selected="true"] .lm-name { font-weight: 700; }
+
+@media (hover: none), (max-width: 1024px) {
+  .lm-btn { height: 44px; }
+  .lm-list li { padding: 13px 12px; }
+}

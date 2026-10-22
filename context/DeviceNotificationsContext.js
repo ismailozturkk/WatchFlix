@@ -30,6 +30,7 @@ import {
   useStreamingProviderSettings,
 } from "./AppSettingsContext";
 import { useNotifications } from "./NotificationsContext";
+import { notificationInboxCopy } from "../utils/notificationInboxCopy";
 import { useFriends } from "./FriendsContext";
 import { useUnreadMessages } from "./UnreadMessagesContext";
 import { useProfileReminders } from "./ProfileRemindersContext";
@@ -88,12 +89,14 @@ const SOCIAL_SETTING_KEY = {
   comment_reply: "postCommentsEnabled",
   mention: "mentionsEnabled",
   message: "messagesEnabled",
+  cineswipe_invite: "messagesEnabled",
+  game_challenge: "messagesEnabled",
 };
 
 // WhatsApp/Instagram tarzı: BAŞLIK = kişi/grup adı, GÖVDE = aksiyon (emoji) / mesaj.
 // Backend buildContent (functions/index.js) ile birebir aynı mantık → foreground ve
 // background bildirimleri tutarlı görünür.
-function buildSocialContent(item, t) {
+function buildSocialContent(item, t, language) {
   const name = item.fromName || t.someone || "Birisi";
   const text = item.text ? String(item.text) : "";
   switch (item.type) {
@@ -132,6 +135,10 @@ function buildSocialContent(item, t) {
       }
       return { title: name, body: text || `${name} ${fallback}` };
     }
+    case "cineswipe_invite":
+      return { title: name, body: `🎬 ${notificationInboxCopy(language).cineInvite}` };
+    case "game_challenge":
+      return { title: name, body: `⚔️ ${notificationInboxCopy(language).duelInvite}` };
     default:
       return { title: t.notifications, body: name };
   }
@@ -546,7 +553,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
       // gereksiz — mesajı zaten sohbette canlı görüyor.
       if (chatId && isChatActive(chatId)) return;
 
-      const { title, body } = buildSocialContent(item, t);
+      const { title, body } = buildSocialContent(item, t, language);
       presentNow({
         title,
         body,
@@ -560,11 +567,13 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
           fromName: item.fromName || null,
           groupId: item.groupId || null,
           groupName: item.groupName || null,
+          inviteCode: item.inviteCode || null,
+          dayKey: item.dayKey || null,
           chatId,
         },
       });
     });
-  }, [items, notifLoading, settings, permissionStatus, t, uid]);
+  }, [items, notifLoading, settings, permissionStatus, t, language, uid]);
 
   // ── 5b. Uygulama simgesi rozeti ──────────────────────────────────────────
   //
@@ -650,6 +659,8 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
                 friendName: data.fromName || "",
               });
             }
+          } else if (data.type === "cineswipe_invite" || data.type === "game_challenge") {
+            nav.navigate("ProfileScreen");
           } else if (data.type === "friend_request") {
             nav.navigate("FriendRequestsScreen");
           } else if (

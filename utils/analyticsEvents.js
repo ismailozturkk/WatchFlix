@@ -105,6 +105,33 @@ export const ANALYTICS_EVENTS = {
   // KALDIRILDI. `action` = "set" | "changed" | "cleared", `unit` = "all" | "movie" | "tv",
   // `target` hedef sayısı. Özelliğin benimsenmesini ve hangi birimin seçildiğini söyler.
   YEARLY_GOAL: "yearly_goal",
+  // Sinema Bingosu (utils/cinemaBingo.js): sayfa AÇILDI. `source` = "hub" (kart) | "other", `lines` 0-8,
+  // `squares` 0-9. Kartın açılma oranını ve haftalık ilerlemenin nerede takıldığını söyler. İsim/kimlik YOK.
+  BINGO_VIEWED: "bingo_viewed",
+  // Bingoda YENİ çizgi ya da tam kart tamamlandı (sayfa açıkken görülen kutlama). `lines` yeni toplam,
+  // `full` tam kart mı, `streak` hafta serisi. Haftada en çok 9 kez (çizgi başına) gönderilir.
+  BINGO_LINE: "bingo_line",
+  // Günlük düello (utils/dailyDuel.js): günlük sonuçla bir arkadaşa MEYDAN OKUNDU (alıcı seçildi, kart sohbete
+  // gidiyor). `source` = "result" (sonuç ekranı) | "hub" (Oyunlar modülü), `score` gönderenin skoru. Alıcı ismi YOK.
+  DUEL_SENT: "duel_sent",
+  // Sohbetteki düello kartında "Kabul et"e basıldı. `locked` = oyun planda yok (yükseltme sayfası açıldı).
+  // sent'e oranı kartın dönüşümüdür.
+  DUEL_ACCEPTED: "duel_accepted",
+  // "Önce hangisi?" (utils/olderGame.js): oyun BAŞLADI (havuz hazır, ilk çift gösterildi). `source` = "hub".
+  OLDER_GAME_STARTED: "older_game_started",
+  // Koşu BİTTİ (üç can doldu). `score` doğru sayısı, `answered` sorulan, `new_best` rekor mu, `best` kayıtlı rekor.
+  // Ortalama skor ve rekor kırma oranı, zorluk eğrisinin (utils/olderGame.gapForStreak) dengesini söyler.
+  OLDER_GAME_FINISHED: "older_game_finished",
+  // Hızlı oyun (utils/quickGames.js: popular | decade | kind | genre) BAŞLADI / BİTTİ. `game_id` oyun, `source` = "hub".
+  // Bitişte `score` doğru sayısı, `answered` sorulan, `new_best`, `best`. Oyunlar arası ilgi ve zorluk eğrisinin
+  // dengesi (ortalama skor) buradan okunur.
+  QUICK_GAME_STARTED: "quick_game_started",
+  QUICK_GAME_FINISHED: "quick_game_finished",
+  // Günün Sorusu'nda OY VERİLDİ (utils/dailyPoll.js). `question_id` kalıcı soru kimliği (seçilen taraf GÖNDERİLMEZ),
+  // `synced` oy sunucuya yazıldı mı (false = çevrimdışı / kurallar yayında değil → yerelde bekliyor).
+  DAILY_POLL_VOTED: "daily_poll_voted",
+  // Bingo sonucu PAYLAŞILDI (sistem paylaşım sayfası açıldı). `lines`, `squares`.
+  BINGO_SHARED: "bingo_shared",
   // Oyuncu / yönetmen takibi (utils/followedPeople.js): kişi TAKİBE ALINDI / BIRAKILDI.
   // `action` = "follow" | "unfollow", `source` = "profile" (kişi sayfası) | "sheet" (takip
   // listesi), `department` TMDB bölümü ("Acting" | "Directing" | …). İsim/kimlik GÖNDERİLMEZ.
@@ -118,6 +145,8 @@ export const ANALYTICS_EVENTS = {
   TOGETHER_ROOM_STARTED: "together_room_started",
   // Oda gerçekten kuruldu ve davet sohbete gönderildi (CineSwipeScreen). Başlatılanla farkı = kota / hata kaybı.
   TOGETHER_ROOM_INVITED: "together_room_invited",
+  // Zevk uyumu kartı arkadaşın sohbetine gönderildi (TasteMatchCard "sohbette gönder"). `score` 0–100; kimlik YOK.
+  TASTE_MATCH_SHARED: "taste_match_shared",
   // Film/Dizi sekmesindeki "Takip ettiklerinin yaklaşanları" rafından bir yapımın açılması.
   // Rafın işe yarayıp yaramadığını söyleyen tek sinyal. `media_type` = "movie" | "tv".
   FOLLOWED_UPCOMING_OPENED: "followed_upcoming_opened",
@@ -127,6 +156,10 @@ export const ANALYTICS_EVENTS = {
   // "Kodun var mı?" sayfasında kod denendi. `outcome` = "promo" | "referral" | red gerekçesi
   // (örn. "code-exhausted"). Davet hunisinin (paylaş → kod girildi → abone oldu) ortasını ölçer.
   CODE_REDEEM: "code_redeem",
+  // Alt çubukta bir sekme AÇILDI (components/navigation/AdaptiveTabShell): ilk sekme dahil her
+  // geçişte bir kez. `tab` = "discover" | "share" | "library" | "profile". Sekme düzeni (Ayarlar'ın
+  // Profil'e taşınıp yerine Kütüphane gelmesi) bununla ölçülür; yerel kaydırma/yeniden seçim sayılmaz.
+  TAB_VIEWED: "tab_viewed",
 };
 
 /** Ölçüm hunisinde kullanılan kullanıcı özellikleri. */

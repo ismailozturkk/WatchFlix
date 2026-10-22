@@ -1,153 +1,169 @@
-# seelogd — Bekleme Listesi Sitesi + Yasal Sayfalar
+# seelogd — Tanıtım sitesi + Yasal sayfalar
 
-Statik site, build gerekmez:
+Statik site, build gerekmez (`firebase.json` → `hosting.public = website`).
 
 | Dosya | İçerik |
 | --- | --- |
-| [index.html](index.html) | Bekleme listesi landing (tek dosya, kendi içinde stil + i18n) |
-| [privacy.html](privacy.html) | Gizlilik Politikası — mağaza formlarının istediği URL |
-| [terms.html](terms.html) | Kullanım Şartları |
-| [delete-account.html](delete-account.html) | Hesap silme yolu (Play'in web talep şartı) |
-| [legal.css](legal.css) · [legal.js](legal.js) | Üç yasal sayfanın ortak stili ve dil anahtarı |
+| [index.html](index.html) | Tanıtım sayfası (hero · özellikler · planlar · SSS · son çağrı). Yalnız işaretleme; metinler JS'ten gelir |
+| [site-config.js](site-config.js) | **Elle değiştirilen ayarlar:** mağaza bağlantıları, lansman tarihi, Firebase, sayaç ofseti |
+| [home-i18n.js](home-i18n.js) | Tanıtım sayfasının 5 dillik metin sözlüğü (tr · en · es · pt · de) |
+| [home.js](home.js) | Davranış: dil uygulama, mağaza düğmeleri, bekleme listesi, poster şeridi, animasyonlar |
+| [site.css](site.css) | Tanıtım sayfası stili |
+| [app-mock.js](app-mock.js) · [app-mock.css](app-mock.css) | **Etkileşimli uygulama maketi**: telefon çerçevesi, 4 sekme + CineMatch düğmesi, Film&Dizi/Eğlence/Kütüphane/Profil/Ayarlar ekranları, 9 temalı tema değişkenleri |
+| [app-mock-tour.js](app-mock-tour.js) · [app-mock-tour.css](app-mock-tour.css) | "İçeride neler var" turunun ek ekranları (dizi takibi, Ne izlesem?, istatistik, sohbet, oyun, listeler, hikâye kartı, görünüm) |
+| [mock-i18n.js](mock-i18n.js) | Maket metinlerinin 5 dilli sözlüğü — **uygulamanın kendi çevirilerinden** üretilir (`scripts/site-mock-i18n/gen.mjs`) |
+| [site-lang.js](site-lang.js) · [lang-menu.css](lang-menu.css) | **Ortak** dil mantığı + dil menüsü (tanıtım ve yasal sayfalar kullanır) |
+| [privacy.html](privacy.html) · [terms.html](terms.html) · [delete-account.html](delete-account.html) | Gizlilik / Şartlar / Hesap silme — mağaza formlarının istediği URL'ler |
+| [legal.css](legal.css) · [legal.js](legal.js) | Üç yasal sayfanın ortak stili ve davranışı |
+| `s-mark.png` · `s-mark-tight.png` | Uygulama ikonunun "S" harfi (wordmark ve küçük logo). `logo.png` artık kullanılmıyor |
 
-**Yasal sayfalar hakkında:** İki dil DOM'da ayrı bloklar hâlinde durur
-(`<section data-lang-block="tr|en">`); `legal.js` yalnız hangisinin görüneceğine
-karar verir — uzun hukuki metinde yüzlerce çeviri anahtarı tutmamak için. JS
-çalışmazsa iki blok da görünür kalır. Dil tercihi landing ile aynı
-localStorage anahtarını (`wf_lang`) paylaşır. İçindekiler listesi, aktif dil
-bloğunun `h2[id]` başlıklarından üretilir — başlık eklerken TOC'a dokunmak
-gerekmez, sadece `id` ve (isteğe bağlı) kısa `data-toc` ver.
+## Diller (5)
 
-**`?lang=tr|en`:** Uygulama içi bağlantılar (Ayarlar → Hakkında → Gizlilik
-Politikası / Kullanım Şartları) bu parametreyi ekler ve kaydedilmiş tercihi
-geçersiz kılar. Telefonun dili uygulamanın diliyle aynı olmak zorunda değil;
-metin kullanıcının uygulamada seçtiği dilde açılmalı. Parametre ayrıca
-`wf_lang`'e yazılır, böylece sayfalar arası gezinmede dil sabit kalır.
+Site, uygulamanın dilleriyle aynı beş dili bilir: **tr · en · es · pt (Brasil) · de**
+(kaynak: `utils/appLanguages.js`). Hitap uygulamayla aynı: sen / tú / você / du.
 
-> ✅ `mark.todo` ile işaretli boş alan kalmadı: veri sorumlusu (ISO STUDIOS) ve
-> yetkili mahkeme (Tokat) dolduruldu. Yeni bir boşluk bırakırsan aynı işareti
-> kullan; tarayıcıda amber renkte görünür.
+- **Seçim sırası** (`site-lang.js → resolve()`): adresteki `?lang=xx` → kayıtlı tercih
+  (`localStorage.wf_lang`) → tarayıcı dili → İngilizce. Parametre ayrıca kaydedilir;
+  kullanıcı dili menüden değiştirince adresteki `?lang=` de güncellenir (yenilemede eski dile dönmesin).
+- **Tanıtım sayfası** tam çevrilidir. Eksik anahtar İngilizceye düşer. **Yeni dil eklemek:**
+  `site-lang.js` (LANGS/NAMES/SHORT) → `home-i18n.js` (sözlük) → `legal.js` (CHROME). Metin
+  uzunluğunu 375 px'te ve Almanca'da (en uzun) kontrol et.
+- **Yasal metinler yalnız tr/en.** es/pt/de seçiliyse İngilizce metin gösterilir; sayfanın çerçevesi
+  (başlık, içindekiler, altbilgi) seçilen dildedir ve üstte o dilde bir not çıkar ("metin tr/en;
+  çelişkide Türkçe esas"). **Neden çevrilmedi:** hukuki metin çevirisi hukuki inceleme ister ve her
+  değişiklikte 5 kopya senkron tutulur. Çevrilirse `<section data-lang-block="xx">` ekle,
+  `legal.js → BLOCK_LANGS`'e yaz, `CHROME.<dil>.note`'u sil.
+- Uygulama içi bağlantılar (Ayarlar → Hakkında) `?lang=tr|en` ekler (`utils/appLanguages.legalLanguageOf`);
+  es/pt/de için `en` gider. İstenirse uygulama gerçek kodu (`?lang=es`) da gönderebilir — site kabul eder.
+
+## Mağaza bağlantıları
+
+`site-config.js → stores`. **Şu an ikisi de boş:** düğmeler "Yakında" etiketiyle görünür ve tıklayınca
+bekleme listesi kutusuna götürür. Uygulama yayına girince adresleri yaz:
+
+```js
+stores: {
+  apple:  "https://apps.apple.com/app/id0000000000",
+  google: "https://play.google.com/store/apps/details?id=com.smlztrk.seelogd",
+}
+```
+
+- İkisi de doluysa: hero hapı "Yayında" olur, bekleme listesi kutusu ve sayaç gizlenir, son çağrıdaki
+  "Haber ver" düğmesi kalkar, üst çubuktaki düğme "Uygulamayı al" olup telefona uygun mağazaya gider.
+- Yalnız biri doluysa: o düğme canlı, diğeri "Yakında" kalır; bekleme listesi açık kalır.
+- **Resmî rozetler:** şu an düğmeler özel çizimdir (Apple/Google logoları + metin). Apple ve Google marka
+  kuralları yayın günü resmî "Download on the App Store" / "Get it on Google Play" rozetlerini ister;
+  `index.html`'deki iki `.store` bloğunun (hero + son çağrı) yerine resmî görselleri koy.
+- `launchDate` (isteğe bağlı): ISO biçiminde (`2026-11-20T10:00:00+03:00`) yazılırsa hap "… tarihinde
+  yayında" der; `null` ise "Yakında". **Geri sayım sayacı kaldırıldı:** geçmiş tarihte sıfırlanmış sayaç
+  ve "YAYINDA!" yazısı yanıltıcıydı (uygulama mağazada değilken).
+
+## Bekleme listesi
+
+`index.html` formu Firestore'a yazar (proje `movieandtv-2832a`):
+
+- `waitlist/{emailHash}` — e-posta kayıtları (hash doc-id mükerrer kaydı engeller)
+- `meta/waitlist` — toplam sayaç (`count`)
+
+Yazılan alanlar **yalnızca** `{ email, createdAt, source:"landing", queueNo }`; kural bunun dışındaki
+alanı reddeder (forma alan eklersen `firestore.rules`'u da güncelle). `CONFIG.baseCount` sayacın başlangıç
+ofsetidir (gösterilen = ofset + gerçek kayıt). Firebase yüklenemezse artık **hata gösterilir** (eskiden
+sessizce localStorage'a yazıp başarı gösteriyordu); `firebaseConfig: null` yapılırsa DEMO modu (yalnız
+tarayıcı localStorage'ı) çalışır. Firestore yalnızca sayfa boşa çıkınca / form gönderilince yüklenir.
+
+**Kaldırılanlar (21 Eki 2026):** "Kurucu üye rozeti" ve "ilk 3 ay %50 indirim" vaadi (**olmayacak**),
+açılış (intro) animasyonu, geri sayım, bilet/konfeti. Kurucu rozeti ve lansman indirimi uygulama/mağaza
+tarafında hâlâ iz bırakmış olabilir: `components/badges/badgeCatalog.js` (`founder`, hiçbir yerden
+verilmiyor) ve Play'deki `launch-50-3m` / `launch-20-1y` teklifleri — bakınız `docs/kurulum/REVENUECAT_KURULUM.md`.
+26 Tem 2026'da "SEN İSTE, BİZ YAPALIM" panosu kalktı; `featureRequests` koleksiyonundaki eski kayıtlar
+Firebase Console'dan temizlenmeli (kural kaldırmak veriyi silmez).
+
+## Tasarım notları
+
+- **Yön:** koyu, cam yüzeyli; vurgu logodaki gradyan (turkuaz `#2ee6d6` → uygulama mavisi `#138df0` →
+  mor `#8b7cf6`). Yazı tipi Schibsted Grotesk; Anton yalnızca alt bilgideki wordmark'ta.
+- **Uygulama maketleri HTML/CSS çizimidir, gerçek ekran görüntüsü değil** (alt bilgide "App visuals on
+  this page are illustrations" yazar). Eski mağaza ekran görüntüleri (`store/`) Temmuz tarihli, durum
+  çubuğu içeriyor ve uygulama arayüzü değişti; kullanılmadı. Uygulamanın karikatür avatarları
+  (`assets/avatar`) üçüncü taraf lisanslı olabileceği için kullanılmadı; avatarlar gradyan + harf.
+- **Hero telefonu** (`app-mock.js`) uygulamanın sekme yapısını izler: Film&Dizi · Eğlence · Kütüphane ·
+  Profil + ayrık CineMatch düğmesi; Ayarlar sekme değil, Profil'in dişlisinden açılır. Sekmeler,
+  Film/Dizi anahtarı, Haftanın/Günün trendleri, tema seçici (Ayarlar → Görünüm: aile × ton, 9 tema
+  `theme/colors.js` belirteçleriyle) ve CineMatch ruh hali seçicisi (seçince "Bana öner" → sonuçlar)
+  tıklanır. Telefon 300×630 tasarım boyutunda çizilir, kap genişliğine göre `--k` ile ölçeklenir.
+  **Sekme düzeni uygulamanın o günkü çalışma ağacından alındı** (21 Eki: Hub→Eğlence, Ayarlar→Profil,
+  yeni Kütüphane). Uygulama düzeni değişirse `app-mock.js` içindeki `TABS`, `PARENT_TAB` ve ilgili
+  `screens.*` işlevlerini güncelle; etiketler `mock-i18n.js`'te (`mTab*`).
+- **"İçeride neler var" turu** (`home.js → setupTour`): solda 9 özellik (başlık/açıklama `f<n>t/f<n>d`),
+  sağda o özelliğin uygulama ekranı. Bölüm görünürken ~7 sn'de bir otomatik ilerler; listeye ya da telefona
+  dokunan kullanıcı için durur, `prefers-reduced-motion`'da hiç başlamaz. Yeni özellik = `TOUR` dizisine
+  satır + `app-mock-tour.js`'e `S.<ekran>` + `home-i18n.js`'e `f<n>t/d`. Altındaki "…ve çok daha fazlası"
+  ızgarası `mo<n>t/d` anahtarlarından (12 kutucuk; `MORE_ICONS`) çizilir.
+- **Maket metinleri uygulamanın kendi çevirileridir.** `node --no-warnings scripts/site-mock-i18n/gen.mjs`
+  (proje kökünden) `mock-i18n.js`'i `translations/*.json`, `utils/aiCopy`, `utils/homeSectionCopy` ve
+  `screens/shared/discoverFiltersCopy`'den yeniden üretir; uygulamada olmayan metinler `SPEC`'te `T(...)`
+  ile elle yazılı. Uygulamadan bir anahtar silinirse betik "EKSİK: anahtar (dil)" der.
+- Güncel, başlıksız ekran görüntüleri hazır olunca ilgili maketi `<img>` ile değiştirmek istersen telefonun
+  `.am-screen` içeriğini değiştir ve alt bilgideki "illüstrasyon" cümlesini kaldır.
+- **Planlar bölümü** (AI kotası, arkadaş/grup/liste limitleri, Wrapped arşivi…) `utils/premiumFeatures.js`
+  ve `store/play/*` açıklamasıyla AYNI olmalı; orada değişirse `home-i18n.js`'teki `plan*B` listelerini
+  5 dilde güncelle. **Fiyat yazılmaz** (mağaza belirler, yerel para birimiyle gösterilir).
+- Afişler TMDB'den (`image.tmdb.org`) doğrudan yüklenir; atıf alt bilgide.
+- Gezinme çubuğundaki bağlantılar 940 px altında gizlenir (tek sayfa; bölümlere kaydırılır).
+- Hareket azaltma tercihi (`prefers-reduced-motion`) tüm animasyonları kapatır; JS yoksa metin İngilizce
+  ve statik görünür.
+- **Wordmark:** alt bilgideki büyük `seelogd` inline SVG; "s" uygulama ikonunun ön planıdır
+  (`assets/icon_default/android-icon-foreground.png` → `s-mark.png`), gözler imleci/dokunuşu yumuşakça
+  takip eder (`home.js → setupEyes`), arada kırpar. İkon değişirse `<image>` konumu yeniden
+  hesaplanmalı: PNG'nin opak bloğunu ölç (mevcut "S" bloğu x 337–671, y 280–742, tuval 1024²), S'in
+  görünür dikdörtgeni 760×240 viewBox'ta **x 27,8–165,3 · y 24,0–214,0** olmalı; ölçek
+  `k = 190 / S_yüksekliği`, `width = height = 1024k`, `x = 165,3 − (S_sağ+1)k`, `y = 24 − S_üst·k`
+  (şu an `k ≈ 0,4104` → `x="-110.5" y="-90.9" width="420.2" height="420.2"`). `s-mark-tight.png`
+  (519×519) S bloğunun etrafından kırpılıp ortalanmış sürümdür; ikon değişince onu da yeniden üret.
+
+## Yasal sayfalar
+
+İki dil DOM'da ayrı bloklar hâlinde durur (`<section data-lang-block="tr|en">`); `legal.js` yalnız
+hangisinin görüneceğine karar verir — uzun hukuki metinde yüzlerce çeviri anahtarı tutmamak için. JS
+çalışmazsa iki blok da görünür kalır. İçindekiler listesi aktif dil bloğunun `h2[id]` başlıklarından
+üretilir — başlık eklerken TOC'a dokunmak gerekmez, sadece `id` ve (isteğe bağlı) kısa `data-toc` ver.
+Sayfa çerçevesi için işaretleme: `<body data-page="privacy|terms|delete">`, `#langMenu`, `#barPage`,
+`#tocTitle`, altbilgi bağlantılarında `data-nav`.
+
+> **Metni değiştirdiğinde:** `Yürürlük` / `Son güncelleme` / `Sürüm` damgasını ve gizlilik/şartlar
+> sayfalarının sonundaki "Sürüm geçmişi" satırını güncelle. Üç sayfa uygulamanın gerçek davranışına
+> bağlı — bir özellik veri toplamaya/göndermeye başlıyorsa (yeni koleksiyon, analitik, üçüncü taraf,
+> izin) aynı PR'da `privacy.html`, silme kapsamı değişiyorsa `delete-account.html` (ve
+> `services/accountService.js` başlık listesi), plan/limit değişiyorsa `terms.html` güncellenmeli.
+> Mağaza formu karşılığı: `docs/kurulum/PLAY_DATA_SAFETY.md`. Yeni bir boşluk bırakırsan
+> `<mark class="todo">` kullan; tarayıcıda amber renkte görünür.
 >
-> **Metni değiştirdiğinde:** `Yürürlük` / `Son güncelleme` / `Sürüm` damgasını ve
-> gizlilik/şartlar sayfalarının sonundaki "Sürüm geçmişi" satırını güncelle.
-> Üç sayfa uygulamanın gerçek davranışına bağlı — bir özellik veri
-> toplamaya/göndermeye başlıyorsa (yeni koleksiyon, analitik, üçüncü taraf,
-> izin) aynı PR'da `privacy.html`, silme kapsamı değişiyorsa
-> `delete-account.html` (ve `services/accountService.js` başlık listesi),
-> plan/limit değişiyorsa `terms.html` güncellenmeli. Mağaza formu karşılığı:
-> `docs/kurulum/PLAY_DATA_SAFETY.md`. Site yalnız `tr`/`en` biliyor; uygulama
-> `es` için İngilizce sayfaya düşer (`utils/appLanguages` `legalLanguageOf`).
-
-- **Renkler:** Vurgu rengi uygulamanın mavisi (`theme/colors.js` → `blue #138DF0`,
-  `blueDark #0551A3`); CSS değişkenleri `--blue / --blue-hi / --blue-deep`.
-- **Logo:** Hero'daki marka **inline SVG wordmark** (`.brand-logo`) + `</body>`
-  öncesindeki küçük script. "s" harfi **uygulama ikonunun ön planı**
-  (`assets/android-icon-foreground.png` → `website/s-mark.png` olarak kopyalandı) —
-  cam gibi 3B S (turkuaz→mavi→mor) ve sağ üstünde üç küçük baloncuk; SVG'de
-  `<image href="s-mark.png">` olarak yerleştirilir (konum, ikonun saydam olmayan
-  sınırına göre ölçülüp hesaplandı). Baloncuklar S ile sol göz arasındaki
-  boşluğa denk gelir, göze taşmaz.
-- **İkon güncellenirse `<image>` yeniden hesaplanmalı.** Yerleşim, PNG'nin opak
-  sınırına bağlıdır; yeni ikonun S'i farklı yerde/oranda olabilir. Yöntem:
-  1. PNG'nin opak bloklarını ölç (`pngjs` ile alfa taraması; noktalar S'ten
-     ayrı bloklar olarak çıkar). Mevcut ikonda S bloğu **x 337–671, y 280–742**
-     (tuval 1024×1024).
-  2. Hedef: S'in görünür dikdörtgeni 760×240'lık viewBox'ta
-     **x 27,8–165,3 · y 24,0–214,0** olmalı (sağ kenar sol gözden önce biter,
-     yükseklik "logd" ile aynı ritimde).
-  3. Ölçek `k = 190 / S_yüksekliği`, `width = height = 1024k`,
-     `x = 165,3 − (S_sağ+1)k`, `y = 24 − S_üst·k`. Şu anki değerler:
-     `k ≈ 0,4104` → `x="-110.5" y="-90.9" width="420.2" height="420.2"`.
-  "ee" fareyi/dokunuşu **yumuşak takip eden, ara ara kırpan parlak iki göz**
-  (`.sl-pupil` grubu `style.transform` ile hareket eder; kırpma + geçiş CSS
-  `<style>`'da SVG içinde, `slBlink`). "logd" Anton ile mavi gradyan. Script yalnız
-  göz takibini kurar; yüklenmezse S görseli + gözler + "logd" statik görünür.
-  Favicon inline SVG (iki göz). Eski `logo.png` artık kullanılmıyor.
-- **Açılış (intro):** Sekme başına bir kez gösterilir (`sessionStorage.wf_intro_seen`;
-  `prefers-reduced-motion` açıksa hiç çalışmaz). İçeriği `s-mark-tight.png` + SVG
-  wordmark yazısı. **Yazıyı SVG olarak tutuyoruz**: önceden HTML metin +
-  `background-clip: text` idi ve gradyan bazı motorlarda hiç boyanmadığından
-  ekranda yalnız logo görünüyordu; SVG'de gradyan `fill` ile metnin içine
-  boyanır, her yerde çalışır. Aynı sebeple hero wordmark'ı da SVG.
-- **`s-mark-tight.png`:** Açılış logosu ve yasal sayfaların üst barındaki 24 px logo. `s-mark.png`
-  tuvalinin %67'si saydam olduğu için küçük boyutta S nokta gibi kalıyordu; bu
-  dosya S bloğunun etrafından kırpılıp kareye ortalanmış sürümdür (519×519).
-  İkon değişirse bunu da yeniden üret — kırpma sınırları yukarıdaki opak blok
-  ölçümüyle aynı.
-- **Geri sayım:** `CONFIG.launchDate` hedef lansman tarihidir (şu an
-  `2026-09-25T20:00:00+03:00` — yol haritasındaki Play TR yayını). Tarih değişirse
-  sadece bu satırı güncelle; sayaç AY:GÜN:SAAT:DK:SN olarak kendini hesaplar.
-- **Kampanya metni:** "İlk 3 ay %50 indirim" vaadi hero'daki `.promo` bloğu ve
-  kayıt sonrası bilette geçiyor — fiyatlandırma kararı değişirse ikisini de güncelle.
-- **Ekran görüntüleri:** Şu an özellik kareleri yayın öncesi placeholder gösterir.
-  Gerçek görseller hazır olunca `shots/kare-01.png` … `kare-08.png` dosyalarını koy
-  ve ilgili `<figure class="shot empty">` bloklarına tekrar `<img>` ekle. Detay:
-  [shots/README.md](shots/README.md).
-
-## Responsive davranış
-
-Yerleşim akışkan (`clamp()` + yüzde ölçüler); kırılma noktaları yalnız gerekli
-yerde devreye giriyor. 375 / 768 / 1134 px ve yatay telefon (812×400) ölçülerek
-doğrulandı: hiçbirinde yatay kaydırma yok.
-
-| Kırılma | Ne yapar |
-| --- | --- |
-| `html { overflow-x: clip }` | Dönük ticker bandı bilerek taşar; kilit yalnız `body`'de olsa iOS Safari'de yatay kayma sızıyordu. `clip`, `hidden`'ın aksine sticky'yi bozmaz. |
-| `≤1200px` | Üst gezinme çubuğu gizlenir (tablet ve telefonda yok). |
-| `≤1024px` | Bölüm boşlukları, bilet ölçeği, şerit kare genişliği küçülür. |
-| `hover:none` veya `≤1024px` | Dokunma hedefleri: dil düğmeleri 48×40, alt bilgi bağlantıları min 44px, yasal sayfalarda kopyala/buton ≥40px. |
-| `≤640px` | Hero/form dikey yığılır, geri sayım `9.6vw`, mikro etiketler 10 → 11,5px, e-posta alanı 36 → 46px. |
-| `≤360px` | Geri sayım `10.2vw`, wordmark `78vw`. |
-| yatay + `≤560px yükseklik` | Dikey ölçüler `vh`'ye bağlanır (geri sayım `8vh`), açılış logosu/yazısı küçülür, yasal sayfalarda yapışkan katmanlar statikleşir. |
-
-**Yasal sayfalarda içindekiler:** ≥1000px'te sağ kenarda yapışkan liste;
-altında tek kolona düşüldüğü için liste **sayfanın en üstüne** taşınır ve
-`<details>` ile tek satıra katlanır (kapalı başlar, açılınca 2 kolon — ≤640px'te
-1 kolon). Bir başlığa tıklayınca kapanır ki yapışkan kutu hedefin üstünü
-kapatmasın. `scroll-padding-top` küçük ekranda 118px: bar + içindekiler
-katmanının ikisinin altına da kaçmaz.
-
-## Modlar
-
-- **Canlı mod (varsayılan):** `index.html` içindeki `CONFIG.firebaseConfig` mevcut
-  Firebase projesine (`movieandtv-2832a`) bağlıdır. Site Firestore'a yazar:
-  - `waitlist/{emailHash}` — e-posta kayıtları (hash doc-id sayesinde mükerrer kayıt engellenir)
-  - `meta/waitlist` — toplam sayaç (`count`)
-- **Demo mod:** `CONFIG.firebaseConfig = null` yapılırsa e-postalar tarayıcının
-  localStorage'ında tutulur. Sadece tasarım denemesi için kullan.
-
-`CONFIG.baseCount` sayacın başlangıç ofsetidir; gerçek kayıt sayısının üstüne eklenir.
-
-> **26 Tem 2026 — kaldırıldı:** "SEN İSTE, BİZ YAPALIM" (özellik istekleri / hype
-> panosu) bölümü siteden çıkarıldı; ilgili HTML, CSS, JS, i18n anahtarları ve
-> `featureRequests` Firestore kuralı silindi. Koleksiyondaki eski kayıtlar
-> Firebase Console'dan temizlenmeli — kural kaldırmak veriyi silmez.
+> **Güncel damgalar (21 Eki 2026):** gizlilik **1.3**, şartlar **1.2**, hesap silme 21 Eki. 1.3/1.2
+> şunları ekledi: arkadaş daveti + promosyon kodu (veri modeli ve silme davranışı
+> `functions/referral.js` + `cleanupReferralOnUserDeleted`; davet edenin davetliyi nasıl gördüğü
+> `getReferralOverview`), Firebase App Check, yapıştırılan/paylaşılan IMDb–TMDB bağlantısı, cihazda kalan
+> yeni veriler. **Bilinen sapma:** promosyon kodunun `redemptions/{uid}` kaydı hesap silinince
+> SİLİNMİYOR (sayfalar bunu açıkça yazıyor); silinmesi istenirse `cleanupReferralOnUserDeleted`a
+> collectionGroup sorgusu eklenmeli (functions deploy) ve üç sayfadaki cümle kalkmalı.
 
 ## Firestore kuralları
 
-Kurallar tek kaynakta: kökteki [firestore.rules](../firestore.rules) →
-"Landing sitesi" bölümü (`waitlist`, `meta/waitlist`).
-Buraya kopyalanmış eski bir sürüm vardı ve gerçek kurallarla ayrışmıştı; kopya
-kaldırıldı — kural değişikliğini yalnız `firestore.rules` üzerinde yap.
+Kurallar tek kaynakta: kökteki [firestore.rules](../firestore.rules) → "Landing sitesi" bölümü
+(`waitlist`, `meta/waitlist`). Kural değişikliğini yalnız orada yap.
 
-Bilinmesi gerekenler:
-
-- `waitlist` üzerinde **`get` açık, `list` kapalı.** Doküman kimliği
-  `base64(email)` ve `email` alanı düz metin olduğundan koleksiyon listeleme
-  açık olsa herkes tüm bekleme listesini dökebilirdi. Site yalnızca kendi
-  kaydını tek doküman olarak okur (`store.addEmail` → `getDoc`), o yüzden bu
-  ayrım siteyi bozmaz.
-- Sayaç `meta/waitlist` okumaya açıktır (odometre için) ve yalnız `+1`
-  artırılabilir.
-- Bu uçlar anonim yazıma açıktır (bekleme listesi doğası gereği). Spam'e karşı
-  Firebase **App Check (reCAPTCHA Enterprise/v3)** etkinleştirilmesi şiddetle
-  önerilir.
+- `waitlist` üzerinde **`get` açık, `list` kapalı.** Doküman kimliği `base64(email)` ve `email` alanı düz
+  metin olduğundan koleksiyon listeleme açık olsa herkes tüm bekleme listesini dökebilirdi. Site yalnızca
+  kendi kaydını tek doküman olarak okur, o yüzden bu ayrım siteyi bozmaz.
+- Sayaç `meta/waitlist` okumaya açıktır ve yalnız `+1` artırılabilir.
+- Bu uçlar anonim yazıma açıktır (bekleme listesi doğası gereği). Spam'e karşı Firebase **App Check**
+  etkinleştirilmesi önerilir.
 
 ## Yayınlama (Firebase Hosting)
 
 ```bash
-firebase deploy --only firestore:rules,hosting
+firebase deploy --only hosting            # yalnız site
+firebase deploy --only firestore:rules,hosting   # kural da değiştiyse
 ```
 
-Lansman günü e-posta göndermek için `waitlist` koleksiyonunu CSV dışa aktarıp
-(Console → Export) Mailchimp/Brevo benzeri bir servise yükleyebilirsin.
+HTML/JS/CSS `no-cache`, görseller 7 gün önbellekte (`firebase.json`). Lansman günü e-posta göndermek için
+`waitlist` koleksiyonunu CSV dışa aktarıp (Console → Export) bir e-posta servisine yükleyebilirsin.

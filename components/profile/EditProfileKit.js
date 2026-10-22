@@ -10,8 +10,8 @@
 // aranıyor, alanlar etiket+çerçeve yığınıydı, Kaydet her zaman açıktı ve hesap
 // silme modalı ortada bir kutuydu.
 
-import React, { useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,6 +24,7 @@ import { alpha } from "../../theme/colors";
 import { isLightSurface, shiftLightness } from "../../utils/colorUtils";
 import { i18nText } from "../../utils/i18nText";
 import GlassBox from "../common/GlassBox";
+import HoldToConfirmButton from "./HoldToConfirmButton";
 
 const noop = () => {};
 
@@ -314,8 +315,11 @@ export function FieldBlock({ children }) {
 
 // ── Tehlikeli bölge ───────────────────────────────────────────────────────────
 
-/** Hesap silme girişi: bağıran bir düğme yerine sakin, kırmızı tonlu bir satır. */
-export function DangerRow({ theme, title, description, onPress }) {
+/**
+ * Tehlikeli bölge girişi (hesabı sil / sıfırla): bağıran bir düğme yerine sakin,
+ * kırmızı tonlu bir satır. `icon` ile iki satır birbirinden ayrışır.
+ */
+export function DangerRow({ theme, title, description, onPress, icon = "trash-outline" }) {
   const red = theme.colors.red;
   return (
     <AuthPressable
@@ -329,7 +333,7 @@ export function DangerRow({ theme, title, description, onPress }) {
       ]}
     >
       <View style={[styles.dangerIcon, { backgroundColor: alpha(red, 0.14) }]}>
-        <Ionicons name="trash-outline" size={19} color={red} />
+        <Ionicons name={icon} size={19} color={red} />
       </View>
       <View style={styles.dangerCopy}>
         <Text allowFontScaling={false} style={[styles.dangerTitle, { color: red }]}>
@@ -345,10 +349,92 @@ export function DangerRow({ theme, title, description, onPress }) {
 // ── Hesap silme sayfası ───────────────────────────────────────────────────────
 
 /**
+ * Silme sürerken gösterilen aşama listesi + ilerleme çubuğu. `progress` =
+ * { stage, stages } (services/accountService.js `onProgress`); `copy` =
+ * getDeleteAccountCopy(language). Biten aşama yeşil tik, sürenin dönen halkası,
+ * bekleyen sönük daire. Çubuk biten aşama sayısı + sürenin yarısı kadar dolar.
+ */
+export function DeleteProgress({ theme, progress, copy }) {
+  const red = theme.colors.red;
+  const stages = progress?.stages?.length ? progress.stages : [];
+  const activeIndex = Math.max(0, stages.indexOf(progress?.stage));
+  const fraction = stages.length ? Math.min(1, (activeIndex + 0.5) / stages.length) : 0;
+
+  const fill = useRef(new Animated.Value(fraction)).current;
+  useEffect(() => {
+    Animated.timing(fill, {
+      toValue: fraction,
+      duration: 380,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [fraction, fill]);
+
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: stages.length, now: activeIndex }}
+      style={styles.progress}
+    >
+      <View style={[styles.progressTrack, { backgroundColor: theme.between, borderColor: theme.border }]}>
+        <Animated.View
+          style={[
+            styles.progressFill,
+            {
+              backgroundColor: red,
+              width: fill.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
+            },
+          ]}
+        />
+      </View>
+      <Text allowFontScaling={false} style={[styles.progressStep, { color: theme.text.muted }]}>
+        {copy.step.replace("{n}", String(activeIndex + 1)).replace("{total}", String(stages.length))}
+      </Text>
+      <View style={styles.progressList}>
+        {stages.map((id, index) => {
+          const done = index < activeIndex;
+          const active = index === activeIndex;
+          return (
+            <View key={id} style={styles.progressRow}>
+              <View style={styles.progressIcon}>
+                {done ? (
+                  <Ionicons name="checkmark-circle" size={20} color={theme.colors.green} />
+                ) : active ? (
+                  <ActivityIndicator size="small" color={red} />
+                ) : (
+                  <Ionicons name="ellipse-outline" size={18} color={alpha(theme.text.muted, 0.6)} />
+                )}
+              </View>
+              <Text
+                allowFontScaling={false}
+                style={[
+                  styles.progressLabel,
+                  {
+                    color: active ? theme.text.primary : done ? theme.text.secondary : theme.text.muted,
+                    fontWeight: active ? "800" : "600",
+                  },
+                ]}
+              >
+                {copy.stages[id] ?? id}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/**
  * Alt sayfa (uygulamanın ortak BottomSheetModal'ı). Doğrulama alanı sağlayıcıya
  * göre değişir: `provider` ("apple" | "google") verilirse sağlayıcı düğmesi,
  * verilmezse parola alanı. Metinler çağıran tarafta çözülür (dil dallanması
  * ekranda).
+ *
+ * Onay düğmesi BASILI TUTARAK çalışır (HoldToConfirmButton): `holdMs` boyunca
+ * basılı tutulunca dolar ve `onConfirm` çalışır. `canStart` basışın başında
+ * çağrılır; false dönerse (şifre boş…) dolum başlamaz. Aynı sayfa hem hesap
+ * silme hem sıfırlama için kullanılır — `icon`, başlık ve metinler değişir.
  */
 export function DeleteAccountSheet({
   visible,
@@ -356,6 +442,8 @@ export function DeleteAccountSheet({
   theme,
   deleting,
   verifying,
+  progress,
+  progressCopy,
   title,
   description,
   provider,
@@ -369,12 +457,19 @@ export function DeleteAccountSheet({
   confirmDisabled,
   cancelLabel,
   confirmLabel,
+  holdLabel,
+  holdHint,
+  holdMs,
+  canStart,
+  icon = "warning-outline",
   passwordLabel,
 }) {
   const insets = useSafeAreaInsets();
   const [showPassword, setShowPassword] = useState(false);
   const red = theme.colors.red;
   const busy = deleting || verifying;
+  // Silme başladıysa ve ilerleme geldiyse: doğrulama alanı ve düğmeler yerine aşama listesi.
+  const showProgress = !!deleting && !!progress && !!progressCopy;
   return (
     <BottomSheetModal
       visible={visible}
@@ -399,16 +494,20 @@ export function DeleteAccountSheet({
         <View style={styles.sheetHead}>
           <View style={[styles.medalRing, { backgroundColor: alpha(red, 0.08), borderColor: alpha(red, 0.18) }]}>
             <View style={[styles.medal, { backgroundColor: alpha(red, 0.16), borderColor: alpha(red, 0.4) }]}>
-              <Ionicons name="warning-outline" size={26} color={red} />
+              <Ionicons name={icon} size={26} color={red} />
             </View>
           </View>
           <Text allowFontScaling={false} style={[styles.sheetTitle, { color: theme.text.primary }]}>
-            {title}
+            {showProgress ? progressCopy.title : title}
           </Text>
-          <Text style={[styles.sheetDesc, { color: theme.text.secondary }]}>{description}</Text>
+          <Text style={[styles.sheetDesc, { color: theme.text.secondary }]}>
+            {showProgress ? progressCopy.hint : description}
+          </Text>
         </View>
 
-        {provider ? (
+        {showProgress ? (
+          <DeleteProgress theme={theme} progress={progress} copy={progressCopy} />
+        ) : provider ? (
           <AuthPressable
             accessibilityRole="button"
             accessibilityLabel={verified ? verifiedLabel : verifyLabel}
@@ -467,6 +566,7 @@ export function DeleteAccountSheet({
         )}
       </SheetScroll>
 
+      {showProgress ? null : (
       <View style={styles.sheetActions}>
         <AuthPressable
           accessibilityRole="button"
@@ -481,29 +581,20 @@ export function DeleteAccountSheet({
             {cancelLabel}
           </Text>
         </AuthPressable>
-        <AuthPressable
-          accessibilityRole="button"
-          accessibilityLabel={confirmLabel}
-          accessibilityState={{ disabled: confirmDisabled, busy: !!deleting }}
-          onPress={onConfirm}
+        <HoldToConfirmButton
+          label={confirmLabel}
+          holdLabel={holdLabel}
+          hint={holdHint}
+          holdMs={holdMs}
+          color={red}
           disabled={confirmDisabled}
-          pressedScale={0.97}
-          containerStyle={styles.actionConfirm}
-          style={[
-            styles.action,
-            { backgroundColor: red, shadowColor: red },
-            confirmDisabled ? styles.actionOff : styles.actionLit,
-          ]}
-        >
-          {deleting ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text allowFontScaling={false} style={[styles.actionText, { color: "#fff" }]}>
-              {confirmLabel}
-            </Text>
-          )}
-        </AuthPressable>
+          busy={!!deleting}
+          canStart={canStart}
+          onConfirm={onConfirm}
+          style={styles.actionConfirm}
+        />
       </View>
+      )}
     </BottomSheetModal>
   );
 }
@@ -689,6 +780,14 @@ const styles = StyleSheet.create({
   },
   verifyText: { fontSize: 15, fontWeight: "800" },
   passwordField: { marginTop: 0 },
+  progress: { gap: 10, paddingBottom: 4 },
+  progressTrack: { height: 8, borderRadius: 4, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: 4 },
+  progressStep: { fontSize: 12, fontWeight: "700", textAlign: "center", letterSpacing: 0.2 },
+  progressList: { gap: 9, marginTop: 4 },
+  progressRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  progressIcon: { width: 22, alignItems: "center" },
+  progressLabel: { flex: 1, fontSize: 14, lineHeight: 19 },
   sheetActions: { flexDirection: "row", gap: 10, marginTop: 16 },
   actionCancel: { flex: 1 },
   actionConfirm: { flex: 1.25 },
@@ -698,12 +797,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  actionLit: {
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.32,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  actionOff: { opacity: 0.5 },
   actionText: { fontSize: 15.5, fontWeight: "800" },
 });

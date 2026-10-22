@@ -19,18 +19,54 @@ Arkadaşın bir listesi yalnız **o listeyi bize açmışsa** (`Users/{uid}.list
 
 ## Puan nasıl hesaplanıyor (heuristik — bilimsel ölçü değil)
 
-Üç bileşenin ağırlıklı ortalaması; verisi yetersiz bileşen düşer, ağırlıklar kalanlara dağılır; hiçbiri yoksa puan yoktur.
+Dört bileşenin ağırlıklı ortalaması; verisi yetersiz bileşen düşer, ağırlıklar kalanlara göre yeniden normalleşir; hiçbiri yoksa puan yoktur.
+**Ortak favori isteğe bağlı bonustur** (iki favori listesi de görünür ve ≥ 3 ise girer): yokluğu puanı değiştirmez, `state: "ok"` için çekirdek üçlü (tür·ortak·puan) yeter.
 
 | Bileşen | Ağırlık | Hesap | Gerekli veri |
 |---|---|---|---|
 | Tür benzerliği | 0.40 | izlenenlerin tür dağılımlarının kosinüs benzerliği, [0,5–1] → [0–1] | iki tarafta ≥ 5 türlü izlenen **ve ortak tür sözlüğü** |
 | Ortak izlenen | 0.30 | √(ortak / küçük listenin boyutu) | iki tarafta ≥ 5 izlenen |
 | Puan uyumu | 0.30 | 1 − ortalama mutlak fark / 9 | ≥ 3 ortak puanlanan başlık |
+| Ortak favori (bonus) | 0.20 | √(ortak favori / küçük favori listesi) | iki favori listesi görünür, her ikisinde ≥ 3 |
+
+### Film / Dizi kırılımı ve "!" sayfası (21 Eki)
+
+- `computeTasteMatch` ayrıca `scope` (`both | movies | shows | none` — arkadaşın bize AÇTIĞI izlenen kategorileri) ve `byType.{movie,tv}` döner:
+  `{ shared, score | null, overlap, mine, theirs }`. Kategori puanı ana puanla AYNI formüldür, yalnız o kategorinin izlenenleriyle (ortak favori hariç).
+  `shared:false` = arkadaş o kategoriyi paylaşmıyor (puan YOK, "sıfır" değil); `shared:true, score:null` = kaydı az ("Veri az").
+- Kart: halka + kademe + **"!"** → Film / Dizi kutuları (paylaşılmayan kutu sönük, kilitli) → sayı kutuları (ortak izlenen · favori · puan uyumu, ince çubuk) → ortak tür çipleri → içgörüler → afiş şeridi.
+  Uzun açıklamalar karttan kalktı; **"!"** `TasteMatchInfoSheet` açar (neye bakılır + ağırlıklar, kademeler, hangi veriler, ne zaman yüzde çıkmaz). Ağırlık / kademe / asgari kayıt sayıları
+  `utils/tasteMatch.js` sabitlerinden OKUNUR (metne elle yazılmaz; hesap değişirse sayfa kendiliğinden doğru kalır).
+- Sohbet balonu `movie` / `tv` puanlarını da taşır (yalnız hesaplanabilenler); balonda "Film %80 · Dizi %61" çipleri.
+
+### "Neden bu puan?" içgörüleri (kartta)
+
+`computeTasteMatch` puanın yanında şunları da döner; hepsi yalnız **ortak görünür izlenenlerden** ve görünür izlenen türlerinden türer (yeni gizlilik yüzeyi yok):
+
+- `breakdown` — bileşen başına 0–100 değer + ağırlık → kartta her satırın altında doluluk çubuğu.
+- `loved` — iki tarafın da ≥ 8 verdiği en çok 3 başlık ("İkinizin de çok sevdiği").
+- `split` — puan farkı ≥ 3 olan en ayrışık başlık ("sen 2, o 9 verdi").
+- `genres.lean` — tür payı farkı ≥ %12 olan türler: kim neye daha çok yatıyor. Farklı dil sözlüğünde üretilmez.
+- `highlights` — ortak izlenen afişleri (en çok 8): önce ikisinin de puanladığı, sonra tek taraflı, sonra puansız; çip "sen · o".
+
+Yüzde biçimi dile göre (`copy.percent`: tr `%72`, en/es/pt `72%`, de `72 %`). Halka `react-native-svg` yayıdır (statik, animasyon yok).
 
 Kademeler: ≥ 75 çok yakın · ≥ 55 epey benzer · ≥ 35 kısmen örtüşüyor · altı farklı. Kısmi veride "yaklaşık" notu çıkar.
 
 **Tür adı tuzağı:** tür adları TMDB'den yazanın diliyle gelen düz metin ("Dram" / "Drama"). Farklı dilde iki kullanıcının sözlüğü örtüşmez ve kosinüs sahte biçimde ~0 çıkardı.
 Bu yüzden iki tarafın tür sözlüğü küçük olanın en az %50'si kadar ortak değilse tür bileşeni **hesaptan düşer** (`genres.comparable=false`); ortak izlenen yine hesaplanır.
+
+## Uyumu sohbete gönder
+
+Kartta (yalnız **arkadaşsak** ve **puan varsa**) "Uyumu {ad} adlı kişiye sohbette gönder" düğmesi: `buildTasteMatchShare` → `chatParamsForShare` → `ChatScreen`
+(`initialShare`; mesajı ChatScreen yazar). Yeni paylaşım türü `tasteMatch` / mesaj `kind: "tasteMatchShare"`, balon `components/chat/SharedTasteMatchMessage.js`
+(yüzde, kademe, iki ad, ortak izlenen / favori / tür / puan uyumu, birlikte sevilenler, en çok 4 afiş). Balon metinleri **alıcının dilinde** `tasteMatchCopy`'den çizilir;
+gelen kutusu önizlemesi (`💞 Zevk uyumu %72`) gönderenin dilinde. Rules/functions değişikliği yok.
+
+- **Gitmeyenler (bilerek):** tür eğilimi ("sen daha çok Korku…") ve en çok ayrışılan başlık mesaja girmez; yalnız iki tarafın da bildiği veriler gider.
+- Puansız (veri yetersiz) uyum paylaşılamaz. Kademe gövdeden değil puandan yeniden türetilir.
+- Olay: `taste_match_shared` (`score`; kimlik yok). Kapsam bekçisi: gövde alıntı (`replyKind` → `tasteMatch`, simge `heart`).
+- Balon dokunulmaz (hedef ekran yok); eski sürümlü alıcıda tanımsız `kind` düz `text` önizlemesine düşer.
 
 ## Birlikte izleyelim adayları
 

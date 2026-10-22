@@ -18,6 +18,7 @@ import {
   markNotificationRead as markReadApi,
   markAllNotificationsRead as markAllApi,
   deleteNotification as deleteApi,
+  respondToInvitation as respondApi,
 } from "../services/notificationsService";
 import useStartupGate from "../hooks/useStartupGate";
 
@@ -28,8 +29,11 @@ export function NotificationsProvider({ children }) {
   const { user } = useAuth();
   const uid = user?.uid;
 
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState({ uid: null, items: [], loading: true });
+  const [retryKey, setRetryKey] = useState(0);
+  // Never expose the previous account's inbox during an auth transition.
+  const current = state.uid === uid ? state : { items: [], loading: !!uid };
+  const { items, loading, error = null, cursor = null, hasMore = false } = current;
 
   // Sekme çubuğunda rozet yok; items'ı yalnız bildirim ekranı ve
   // DeviceNotifications'ın uygulama-rozeti/ön-plan gösterimi tüketiyor. O
@@ -42,24 +46,27 @@ export function NotificationsProvider({ children }) {
   useEffect(() => {
     if (!startupReady) return undefined;
     if (!uid) {
-      setItems([]);
-      setLoading(false);
+      setState({ uid, items: [], loading: false });
       return;
     }
-    setLoading(true);
-    const unsub = subscribeToNotifications(uid, (list) => {
-      setItems(list);
-      setLoading(false);
+    let active = true;
+    setState({ uid, items: [], loading: true });
+    const unsub = subscribeToNotifications(uid, (list, page = {}) => {
+      if (active) setState({ uid, items: list, loading: false, ...page });
+    }, (error) => {
+      if (active) setState((previous) => ({ ...previous, loading: false, error }));
     });
-    return () => unsub();
-  }, [uid, startupReady]);
+    return () => { active = false; unsub(); };
+  }, [uid, startupReady, retryKey]);
+
+  const retry = useCallback(() => setRetryKey((value) => value + 1), []);
 
   const markRead = useCallback(
     async (notifId) => {
       if (!uid) return;
       const item = items.find((n) => n.id === notifId);
-      if (!item || item.read) return;
-      await markReadApi(uid, notifId, item.read);
+      if (item?.read) return;
+      await markReadApi(uid, notifId);
     },
     [uid, items],
   );
@@ -78,9 +85,14 @@ export function NotificationsProvider({ children }) {
     [uid, items],
   );
 
+  const respond = useCallback((notifId, decision) => {
+    if (!uid) return Promise.resolve(false);
+    return respondApi(uid, notifId, decision);
+  }, [uid]);
+
   const value = useMemo(
-    () => ({ items, loading, markRead, markAll, remove }),
-    [items, loading, markRead, markAll, remove],
+    () => ({ items, loading, error, cursor, hasMore, retry, markRead, markAll, remove, respond }),
+    [items, loading, error, cursor, hasMore, retry, markRead, markAll, remove, respond],
   );
 
   return (

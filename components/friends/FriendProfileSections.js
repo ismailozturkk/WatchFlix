@@ -12,7 +12,7 @@
 //   • Sayaçlar tek parça şerit, istatistikler kendi renkli ikon karoları ve
 //     çubuklarıyla: her şey aynı yüzey/yarıçap ritminde.
 
-import React, { memo, useEffect, useRef } from "react";
+import React, { memo, useEffect, useMemo, useRef } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -22,6 +22,8 @@ import BackButton from "@components/BackButton";
 import UserAvatar from "@components/common/UserAvatar";
 import GlassIconButton from "@components/common/GlassIconButton";
 import IdentityBadgesRow from "@components/badges/IdentityBadgesRow";
+import SocialLinksRow from "@components/profile/SocialLinksRow";
+import { hasAnySocialLinks, normalizeSocialLinks } from "@utils/socialLinks";
 import { useTheme } from "@context/ThemeContext";
 import { alpha } from "@theme/colors";
 import { FRIEND_GREEN } from "./friendsTokens";
@@ -139,10 +141,13 @@ export const ProfileHero = memo(function ProfileHero({
   badges,
   language,
   bio,
+  socialLinks,
   memberSince,
 }) {
   const { theme } = useTheme();
   const enter = useRef(new Animated.Value(0)).current;
+  // Başkasının yazdığı veri: her seferinde temizlenir (bilinmeyen/geçersiz atılır).
+  const links = useMemo(() => normalizeSocialLinks(socialLinks), [socialLinks]);
 
   useEffect(() => {
     Animated.timing(enter, { toValue: 1, duration: 420, useNativeDriver: true }).start();
@@ -248,6 +253,15 @@ export const ProfileHero = memo(function ProfileHero({
         >
           {bio}
         </Text>
+      ) : null}
+
+      {hasAnySocialLinks(links) ? (
+        <SocialLinksRow
+          links={links}
+          theme={theme}
+          language={language}
+          style={styles.socialRow}
+        />
       ) : null}
 
       {memberSince ? (
@@ -657,6 +671,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: "center",
   },
+  socialRow: { justifyContent: "center", marginTop: 14, paddingHorizontal: 12 },
   memberSince: {
     flexDirection: "row",
     alignItems: "center",

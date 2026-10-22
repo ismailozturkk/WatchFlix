@@ -1,11 +1,11 @@
 // screens/tabs/settings/SectionVisibilityScreen.js
 //
-// Ayarlar > Kişiselleştirme > Ekran bölümleri. Diziler, Filmler, Hub ve Profil
-// ekranlarındaki bölümlerin (raflar, kartlar, şeritler) hangilerinin görüneceğini
-// seçtirir; ör. profilde "Notlar"ı ya da film ekranında "Dünya Turu"nu kapatınca
+// Ayarlar > Kişiselleştirme > Ekran bölümleri. Diziler, Filmler, Eğlence, Kütüphane ve
+// Profil ekranlarındaki bölümlerin (raflar, kartlar, şeritler) hangilerinin görüneceğini
+// seçtirir; ör. Kütüphane'de "Notlar"ı ya da film ekranında "Dünya Turu"nu kapatınca
 // o bölümler ilgili ekrandan kalkar.
 //
-// BİÇİM: üstte dört ekran karosu (her birinde kaç bölümün göründüğü), seçili ekranın
+// BİÇİM: üstte beş ekran karosu (her birinde kaç bölümün göründüğü), seçili ekranın
 // özet kartı (ilerleme çubuğu + tümünü aç/kapa) ve bölüm satırları. Her satırın anahtarı
 // ilgili ekranı ANINDA günceller (ekran aynı depoyu dinler, hooks/useSectionVisibility.js).
 //

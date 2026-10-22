@@ -27,6 +27,8 @@ import {
     increment,
   where,
   getDocs,
+  startAfter,
+  runTransaction,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { snapshotErrorHandler } from "../utils/firestoreError";
@@ -38,7 +40,7 @@ const PAGE = 30;
  * Realtime: kullanıcının en son N bildirimi.
  * @returns {Function} unsubscribe
  */
-export function subscribeToNotifications(uid, callback) {
+export function subscribeToNotifications(uid, callback, onError) {
   if (!uid) return () => {};
   const q = query(
     collection(db, "Users", uid, "notifications"),
@@ -49,28 +51,71 @@ export function subscribeToNotifications(uid, callback) {
     q,
     (snap) => {
       trackFirestoreRead("notifications", snap.docs.length);
-      callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })), {
+        cursor: snap.docs[snap.docs.length - 1] || null,
+        hasMore: snap.size === PAGE,
+      });
     },
-    snapshotErrorHandler("notifications"),
+    (error) => {
+      snapshotErrorHandler("notifications")(error);
+      onError?.(error);
+    },
   );
+}
+
+export async function fetchOlderNotifications(uid, cursor) {
+  if (!uid || !cursor) return { items: [], cursor: null, hasMore: false };
+  const snap = await getDocs(query(
+    collection(db, "Users", uid, "notifications"),
+    orderBy("createdAt", "desc"), startAfter(cursor), limit(PAGE),
+  ));
+  trackFirestoreRead("notifications", snap.docs.length);
+  return {
+    items: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+    cursor: snap.docs[snap.docs.length - 1] || null,
+    hasMore: snap.size === PAGE,
+  };
 }
 
 /**
  * Tek bildirimi okundu işaretle. Eğer halen okunmamışsa
  * `unreadNotifsCount` -= 1.
  */
-export async function markNotificationRead(uid, notifId, wasRead) {
+export async function markNotificationRead(uid, notifId) {
   if (!uid || !notifId) return;
-  const batch = writeBatch(db);
-  batch.update(doc(db, "Users", uid, "notifications", notifId), {
-    read: true,
-  });
-  if (!wasRead) {
-    batch.update(doc(db, "Users", uid), {
-      unreadNotifsCount: increment(-1),
+  // Two taps/devices must never decrement the same notification twice.
+  await runTransaction(db, async (transaction) => {
+    const ref = doc(db, "Users", uid, "notifications", notifId);
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists() || snapshot.data().read) return;
+    const userRef = doc(db, "Users", uid);
+    const userSnapshot = await transaction.get(userRef);
+    transaction.update(ref, { read: true });
+    transaction.update(userRef, {
+      unreadNotifsCount: Math.max(0, (Number(userSnapshot.data()?.unreadNotifsCount) || 0) - 1),
     });
-  }
-  await batch.commit();
+  });
+}
+
+/** Accept or decline an actionable invitation once, across devices. Reading it alone leaves it pending. */
+export async function respondToInvitation(uid, notifId, response) {
+  if (!uid || !notifId || !["accepted", "declined"].includes(response)) return false;
+  return runTransaction(db, async (transaction) => {
+    const ref = doc(db, "Users", uid, "notifications", notifId);
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists()) return false;
+    const item = snapshot.data();
+    if (!["cineswipe_invite", "game_challenge"].includes(item.type) || item.response) return false;
+    const userRef = doc(db, "Users", uid);
+    const userSnapshot = item.read ? null : await transaction.get(userRef);
+    transaction.update(ref, { response, read: true });
+    if (!item.read) {
+      transaction.update(userRef, {
+        unreadNotifsCount: Math.max(0, (Number(userSnapshot.data()?.unreadNotifsCount) || 0) - 1),
+      });
+    }
+    return true;
+  });
 }
 
 /**

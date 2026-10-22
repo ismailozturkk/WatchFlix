@@ -9,21 +9,19 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230a1626'/%3E%3Ccircle cx='24' cy='33' r='11' fill='%23f4fbff'/%3E%3Ccircle cx='40' cy='33' r='11' fill='%23f4fbff'/%3E%3Ccircle cx='26' cy='35' r='5' fill='%2304121f'/%3E%3Ccircle cx='42' cy='35' r='5' fill='%2304121f'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Schibsted+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="legal.css" />
+<link rel="stylesheet" href="lang-menu.css" />
 </head>
-<body data-title-tr="Hesap Silme — seelogd" data-title-en="Delete Account — seelogd">
+<body data-page="delete">
 <div class="glow" aria-hidden="true"></div>
 
 <header class="bar">
   <a class="bar-brand" href="index.html"><img src="s-mark-tight.png" alt="" />seelogd</a>
   <span class="bar-sep">/</span>
-  <span class="bar-page" data-tr="Hesap Silme" data-en="Delete Account">Hesap Silme</span>
+  <span class="bar-page" id="barPage">Hesap Silme</span>
   <span class="bar-spacer"></span>
-  <div class="lang" role="group" aria-label="Dil / Language">
-    <button type="button" data-lang="tr" aria-pressed="true">TR</button>
-    <button type="button" data-lang="en" aria-pressed="false">EN</button>
-  </div>
+  <div id="langMenu"></div>
 </header>
 
 <div class="shell">
@@ -41,7 +39,7 @@
         neyin silindiği ve hangi kayıtların zorunlu olarak saklandığı yazıyor.
       </p>
       <div class="stamp">
-        <span>Son güncelleme: <b>16 Ekim 2026</b></span>
+        <span>Son güncelleme: <b>21 Ekim 2026</b></span>
         <span>İşlem: <b>geri alınamaz</b></span>
       </div>
     </div>
@@ -50,7 +48,7 @@
       <div class="box flame">
         <p class="box-title">Silmeden önce — 3 şey</p>
         <ol>
-          <li><strong>Aboneliğinizi iptal edin.</strong> Hesabı silmek aboneliği iptal <em>etmez</em>. Google Play veya App Store aboneliğinizi mağaza ayarlarından iptal etmezseniz tahsilat devam eder.</li>
+          <li><strong>Aboneliğinizi iptal edin.</strong> Hesabı silmek aboneliği iptal <em>etmez</em>. Google Play veya App Store aboneliğinizi mağaza ayarlarından iptal etmezseniz tahsilat devam eder. Davet ya da promosyon kodundan gelen kalan ücretsiz aylarınız silmeyle sona erer.</li>
           <li><strong>Verilerinizin kopyasını isteyin.</strong> Ayarlar → Veri ve depolama → <em>Kütüphaneni Dışa Aktar</em> izlediklerinizi, listelerinizi, izleme tarihlerinizi ve puanlarınızı JSON ya da CSV olarak cihazınıza çıkarır; yorumlar, gönderiler, notlar, hatırlatıcılar ve sohbetler bu dosyada yoktur. Ayarlar’daki <em>Verileri indir</em> ise içerikleri yalnızca çevrimdışı kullanım için telefona indirir, yedek değildir. Dışa aktarmanın kapsamadığı veriler için silmeden <em>önce</em> hesabın e-postasından <a href="mailto:contact@seelogd.com">contact@seelogd.com</a> adresine yazın. Silme işleminden sonra veriyi geri getirmemizin yolu yok.</li>
           <li><strong>Kullanıcı adınız serbest kalır.</strong> Silme sonrası aynı kullanıcı adını başka biri alabilir; geri dönerseniz aynı adı garanti edemeyiz.</li>
         </ol>
@@ -134,7 +132,7 @@ Bu talebin geri alınamaz olduğunu anlıyorum.</pre>
       </p>
       <ul>
         <li><strong>Giriş bilgileri:</strong> Firebase kimlik kaydınız (e-posta + şifre) ve rezerve edilmiş kullanıcı adınız.</li>
-        <li><strong>Profil:</strong> kullanıcı adı, görünen ad, doğum tarihi, biyografi, avatar, dört favoriniz, gizlilik tercihleri, rozetler, bildirim jetonlarınız.</li>
+        <li><strong>Profil:</strong> kullanıcı adı, görünen ad, doğum tarihi, biyografi, avatar, dört favoriniz, gizlilik tercihleri, rozetler, bildirim jetonlarınız ve eklediyseniz sosyal hesap kullanıcı adlarınız.</li>
         <li><strong>Listeler ve takip:</strong> izlediğiniz filmler, izlediğiniz diziler (sezon ve bölüm kayıtlarıyla), favoriler, izleme listesi, özel listeler, yıl özeti (Wrapped) kayıtları.</li>
         <li><strong>Notlar, hatırlatıcılar ve istatistikler:</strong> tüm notlarınız (genel notlar ve film/dizi sayfasına bağlı notlar), film/dizi hatırlatıcılarınız ve türetilmiş istatistik dokümanınız. Telefon takviminize eklediğiniz etkinlikler cihazınızdadır; onları takvim uygulamanızdan silebilirsiniz.</li>
         <li><strong>Yapay zekâ sohbetleri:</strong> hesabınıza yedeklenen CineMatch sohbet geçmişiniz (yazdığınız mesajlar ve aldığınız cevaplar).</li>
@@ -148,6 +146,9 @@ Bu talebin geri alınamaz olduğunu anlıyorum.</pre>
         <li><strong>Oyun verileri:</strong> oyun profiliniz, skorlarınız, oyun geçmişi, başarımlar ve tüm mod/zorluk kombinasyonlarındaki liderlik tablosu kayıtlarınız.</li>
         <li><strong>Çevrimiçi durumu:</strong> anlık durum kaydınız (Realtime Database dâhil).</li>
         <li><strong>AI kullanım sayacınız</strong> ve <strong>yayın platformu takip kaydınız:</strong> günlük AI kotanızı tutan sayaç ve izleme listeniz için tutulan yayın uygunluğu anlık görüntüsü.</li>
+        <li><strong>Davet ve promosyon kayıtları:</strong> davet kodunuz, davet hesabınız (biriken ücretsiz aylar), sizi davet eden ya da sizin davet ettiğiniz kişilerle ilgili davet kayıtları, promosyon kodu kullanım kaydınız ve hesabınıza işlenmiş ücretsiz ay/promosyon hakkınız. Hesap silinince bunlar otomatik olarak kaldırılır.</li>
+        <li><strong>Turnuva oyları, geri bildirimler ve odalar:</strong> verdiğiniz turnuva oyları (turnuva sayaçları da buna göre düzelir), hata bildirimi ve özellik istekleriniz (Geri bildirim kutusu) ile kurduğunuz ya da katıldığınız açık CineSwipe odaları.</li>
+        <li><strong>Başkalarında bıraktığınız izler:</strong> başkalarının gönderilerine verdiğiniz beğeniler (beğeni sayacı düşer), başka kullanıcıların bildirim kutusuna gönderdiğiniz bildirimler, günlük meydan okuma liderlik kayıtlarınız ve başkalarının ortak listelerine eklediğiniz öğeler. Film/dizi yorumunuza başkalarının yazdığı yanıtlar da yorumunuzla birlikte silinir.</li>
       </ul>
 
       <h2 id="tr-4" data-toc="Silinmeyen kayıtlar">Silinmeyen kayıtlar</h2>
@@ -164,24 +165,8 @@ Bu talebin geri alınamaz olduğunu anlıyorum.</pre>
           </thead>
           <tbody>
             <tr>
-              <td>Turnuva oylarınız</td>
-              <td>Saklanır. Oy bütünlüğünü korumak için oylar verildikten sonra değiştirilemez veya silinemez; kayıt yalnızca oy tercihini içerir.</td>
-            </tr>
-            <tr>
-              <td>Başkalarının, sizin film/dizi yorumunuza yazdığı yanıtlar</td>
-              <td>Yanıtı yalnızca yazarı silebilir; başkasının metnini sizin adınıza kaldıramayız. Sizin yorumunuz silinir, bu yanıtlar yazarlarında kalır.</td>
-            </tr>
-            <tr>
               <td>Gönderdiğiniz içerik şikâyetleri</td>
-              <td>Moderasyon kararının dayanağı olduğu için saklanır.</td>
-            </tr>
-            <tr>
-              <td>Hata bildirimi ve özellik istekleriniz (Geri bildirim kutusu)</td>
-              <td>Saklanır. Destek geçmişi ve ürün kararları için tutulur ve hesap kimliğinize bağlıdır; uygulama bu kaydı sizin adınıza silemez. Silinmesini hesabın e-postasından yazarak isteyebilirsiniz, kayıtları tek tek sileriz.</td>
-            </tr>
-            <tr>
-              <td>Açık bir CineSwipe odası</td>
-              <td>Oda belgesi (deste, oylar, katılımcı kimlikleri) sonuç iki tarafa teslim edilince ya da en geç 24 saat içinde otomatik silinir; hesabı silmeniz bu süreyi etkilemez.</td>
+              <td>Moderasyon kararının dayanağı olduğu için kayıt saklanır; ancak şikâyeti sizin yaptığınızı gösteren hesap kimliğiniz kayıttan çıkarılır. Hakkınızda yapılmış şikâyetler silinir.</td>
             </tr>
             <tr>
               <td>Abonelik ve fatura kayıtları</td>
@@ -232,7 +217,7 @@ Bu talebin geri alınamaz olduğunu anlıyorum.</pre>
         both, what gets deleted, and which records we are required to keep.
       </p>
       <div class="stamp">
-        <span>Last updated: <b>16 October 2026</b></span>
+        <span>Last updated: <b>21 October 2026</b></span>
         <span>Action: <b>irreversible</b></span>
       </div>
     </div>
@@ -241,7 +226,7 @@ Bu talebin geri alınamaz olduğunu anlıyorum.</pre>
       <div class="box flame">
         <p class="box-title">Before you delete — 3 things</p>
         <ol>
-          <li><strong>Cancel your subscription.</strong> Deleting the account does <em>not</em> cancel it. Unless you cancel in your Google Play or App Store subscription settings, billing continues.</li>
+          <li><strong>Cancel your subscription.</strong> Deleting the account does <em>not</em> cancel it. Unless you cancel in your Google Play or App Store subscription settings, billing continues. Any free months left from an invite or promo code end when you delete.</li>
           <li><strong>Ask for a copy of your data.</strong> Settings → Data &amp; storage → <em>Export Your Library</em> writes what you watched, your lists, watch dates and ratings to a JSON or CSV file on your device; comments, posts, notes, reminders and chats are not in that file. <em>Download data</em> in Settings only downloads content to your phone for offline use and is not a backup. For data the export does not cover, write <em>before</em> deleting, from the account’s e-mail address, to <a href="mailto:contact@seelogd.com">contact@seelogd.com</a>. After deletion we have no way to restore it.</li>
           <li><strong>Your username is released.</strong> After deletion someone else may take it; if you come back we cannot guarantee the same name.</li>
         </ol>
@@ -322,7 +307,7 @@ I understand this request is irreversible.</pre>
       <p>Deletion permanently removes your account and all of the following:</p>
       <ul>
         <li><strong>Sign-in credentials:</strong> your Firebase authentication record (e-mail + password) and your reserved username.</li>
-        <li><strong>Profile:</strong> username, display name, date of birth, bio, avatar, your four favourites, privacy preferences, badges and your push notification tokens.</li>
+        <li><strong>Profile:</strong> username, display name, date of birth, bio, avatar, your four favourites, privacy preferences, badges, your push notification tokens and any social account usernames you added.</li>
         <li><strong>Lists and tracking:</strong> movies you watched, shows you watched (with season and episode records), favourites, watchlist, custom lists and Wrapped year-in-review records.</li>
         <li><strong>Notes, reminders and statistics:</strong> all your notes (general notes and notes attached to a movie/show page), movie/TV reminders and your derived statistics document. Events you added to your phone calendar live on your device; you can delete them in your calendar app.</li>
         <li><strong>AI chats:</strong> your CineMatch chat history backed up to your account (the messages you typed and the answers you received).</li>
@@ -336,6 +321,9 @@ I understand this request is irreversible.</pre>
         <li><strong>Game data:</strong> your game profile, scores, game history, achievements and your leaderboard entries across every mode/difficulty.</li>
         <li><strong>Presence:</strong> your live online-status record (including in the Realtime Database).</li>
         <li><strong>Your AI usage counter</strong> and <strong>streaming watch record:</strong> the counter holding your daily AI quota, and the streaming-availability snapshot kept for your watchlist.</li>
+        <li><strong>Invite and promo records:</strong> your invite code, your invite account (accrued free months), the invite records involving people who invited you or whom you invited, your promo code redemption record, and any free-month or promo entitlement recorded on your account. These are removed automatically when the account is deleted.</li>
+        <li><strong>Tournament votes, feedback and rooms:</strong> the tournament votes you cast (tournament tallies are corrected accordingly), the bug reports and feature requests you sent (feedback box), and any open CineSwipe rooms you created or joined.</li>
+        <li><strong>Traces you left on other people’s content:</strong> likes you gave to other people’s posts (the like counter goes down), notifications you sent to other users’ inboxes, your daily-challenge leaderboard entries, and items you added to other people’s shared lists. Replies others wrote to your movie/TV comment are deleted together with your comment.</li>
       </ul>
 
       <h2 id="en-4" data-toc="What is kept">Records that are kept</h2>
@@ -352,24 +340,8 @@ I understand this request is irreversible.</pre>
           </thead>
           <tbody>
             <tr>
-              <td>Your tournament votes</td>
-              <td>Kept. To protect vote integrity, votes cannot be changed or deleted once cast; the record contains only the voting choice.</td>
-            </tr>
-            <tr>
-              <td>Replies other people wrote to your movie/TV comment</td>
-              <td>Only the author of a reply can delete it; we cannot remove someone else’s text on your behalf. Your comment is deleted, those replies stay with their authors.</td>
-            </tr>
-            <tr>
               <td>Content reports you filed</td>
-              <td>Kept, because they are the basis of a moderation decision.</td>
-            </tr>
-            <tr>
-              <td>Bug reports and feature requests you sent (feedback box)</td>
-              <td>Kept. They are held for support history and product decisions and are tied to your account id; the app cannot delete them on your behalf. You can ask for deletion by writing from the account’s e-mail address, and we remove the records one by one.</td>
-            </tr>
-            <tr>
-              <td>An open CineSwipe room</td>
-              <td>The room document (deck, votes, participant ids) is deleted automatically once the result has been delivered to both sides, or after 24 hours at most; deleting your account does not change that.</td>
+              <td>The record is kept because it is the basis of a moderation decision, but your account id is removed from it. Reports filed about you are deleted.</td>
             </tr>
             <tr>
               <td>Subscription and billing records</td>
@@ -413,7 +385,7 @@ I understand this request is irreversible.</pre>
 
   <nav class="toc" aria-label="İçindekiler / Contents">
     <details class="toc-box" open>
-      <summary class="toc-title" data-tr="İçindekiler" data-en="Contents">İçindekiler</summary>
+      <summary class="toc-title" id="tocTitle">İçindekiler</summary>
       <ol></ol>
     </details>
   </nav>
@@ -421,15 +393,16 @@ I understand this request is irreversible.</pre>
 
 <footer class="foot">
   <div class="foot-nav">
-    <a href="index.html" data-foot-tr="Ana sayfa" data-foot-en="Home">Ana sayfa</a>
-    <a href="privacy.html" data-foot-tr="Gizlilik Politikası" data-foot-en="Privacy Policy">Gizlilik Politikası</a>
-    <a href="terms.html" data-foot-tr="Kullanım Şartları" data-foot-en="Terms of Use">Kullanım Şartları</a>
-    <a href="delete-account.html" aria-current="page" data-foot-tr="Hesap Silme" data-foot-en="Delete Account">Hesap Silme</a>
+    <a href="index.html" data-nav="home">Ana sayfa</a>
+    <a href="privacy.html" data-nav="privacy">Gizlilik Politikası</a>
+    <a href="terms.html" data-nav="terms">Kullanım Şartları</a>
+    <a href="delete-account.html" aria-current="page" data-nav="delete">Hesap Silme</a>
     <a href="mailto:contact@seelogd.com" class="mail">contact@seelogd.com</a>
   </div>
   <p>© 2026 seelogd</p>
 </footer>
 
+<script src="site-lang.js"></script>
 <script src="legal.js"></script>
 </body>
 </html>

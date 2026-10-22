@@ -32,24 +32,24 @@ const {
 
 const KOK = path.join(__dirname, "..");
 const oku = (...parcalar) => fs.readFileSync(path.join(KOK, ...parcalar), "utf8");
-const bos = () => ({ tv: [], movie: [], hub: [], profile: [] });
+const bos = () => ({ tv: [], movie: [], hub: [], library: [], profile: [] });
 
 describe("normalizeSectionVisibility", () => {
   test.each([null, undefined, "x", 5, true, [], ["tv"], () => 1])("bozuk girdi %p → boş harita, hata yok", (girdi) => {
     expect(normalizeSectionVisibility(girdi)).toEqual(bos());
   });
 
-  test("dört ekranın hepsi her zaman var", () => {
-    expect(Object.keys(normalizeSectionVisibility({})).sort()).toEqual(["hub", "movie", "profile", "tv"]);
+  test("beş ekranın hepsi her zaman var", () => {
+    expect(Object.keys(normalizeSectionVisibility({})).sort()).toEqual(["hub", "library", "movie", "profile", "tv"]);
   });
 
   test("bilinmeyen ekran ve bölüm kimlikleri atılır", () => {
     const n = normalizeSectionVisibility({
       tv: ["worldTour", "yok-bolum"],
       sinema: ["worldTour"],
-      profile: ["notes", 5, null, { notes: 1 }],
+      profile: ["badges", 5, null, { badges: 1 }],
     });
-    expect(n).toEqual({ ...bos(), tv: ["worldTour"], profile: ["notes"] });
+    expect(n).toEqual({ ...bos(), tv: ["worldTour"], profile: ["badges"] });
     expect("sinema" in n).toBe(false);
   });
 
@@ -61,14 +61,14 @@ describe("normalizeSectionVisibility", () => {
     expect(n.hub).toEqual([]);
   });
 
-  test("eski tek anahtarlı bölüm (ongoing) burada SAKLANMAZ", () => {
-    expect(normalizeSectionVisibility({ tv: ["ongoing", "worldTour"] }).tv).toEqual(["worldTour"]);
+  test("eski tek anahtarlı bölüm (nextUp) burada SAKLANMAZ", () => {
+    expect(normalizeSectionVisibility({ library: ["nextUp", "notes"] }).library).toEqual(["notes"]);
   });
 
   test("tekrarlar silinir, sıra kanonik; aynı küme = aynı JSON", () => {
-    const a = normalizeSectionVisibility({ profile: ["notes", "stats", "notes", "badges"] });
-    const b = normalizeSectionVisibility({ profile: ["badges", "stats", "notes"] });
-    expect(a.profile).toEqual(["badges", "stats", "notes"]);
+    const a = normalizeSectionVisibility({ profile: ["activity", "stats", "activity", "badges"] });
+    const b = normalizeSectionVisibility({ profile: ["badges", "stats", "activity"] });
+    expect(a.profile).toEqual(["badges", "stats", "activity"]);
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 
@@ -82,19 +82,45 @@ describe("normalizeSectionVisibility", () => {
     normalizeSectionVisibility(girdi);
     expect(girdi).toEqual(kopya);
   });
+
+  describe("Profil'den Kütüphane'ye taşınan bölümler (eski kayıt göçü)", () => {
+    test("Profil'de gizlenmiş Listeler/Hatırlatmalar/Notlar Kütüphane'de gizli kalır, geri görünmez", () => {
+      const n = normalizeSectionVisibility({ profile: ["stats", "notes", "reminders", "lists"] });
+      expect(n.profile).toEqual(["stats"]);
+      expect(n.library).toEqual(["lists", "reminders", "notes"]);
+      expect(isSectionVisible(n, "library", "notes")).toBe(false);
+    });
+
+    test("Kütüphane'de zaten gizli olanlarla birleşir, tekrar yok", () => {
+      const n = normalizeSectionVisibility({ library: ["notes"], profile: ["notes", "lists"] });
+      expect(n.library).toEqual(["lists", "notes"]);
+    });
+
+    test("göç yalnız bir kez iş görür: çıktı tekrar normalize edilince aynı kalır", () => {
+      const bir = normalizeSectionVisibility({ profile: ["notes", "badges"] });
+      expect(normalizeSectionVisibility(bir)).toEqual(bir);
+    });
+
+    test("göç yazım yolunda da çalışır: Kütüphane'de göster, eski Profil kaydını geri getirmez", () => {
+      const ham = { profile: ["notes"] };
+      const gizli = setSectionVisible(ham, "library", "notes", true);
+      expect(gizli).toEqual(bos());
+      expect(toStoredSectionVisibility(gizli)).toBeNull();
+    });
+  });
 });
 
 describe("isSectionVisible", () => {
   test("varsayılan: her şey görünür (kayıt boş/null/bozuk)", () => {
     for (const hidden of [null, undefined, {}, bos(), "x"]) {
-      expect(isSectionVisible(hidden, "profile", "notes")).toBe(true);
+      expect(isSectionVisible(hidden, "library", "notes")).toBe(true);
     }
   });
 
   test("gizli listedeki bölüm görünmez, ötekiler görünür", () => {
-    const hidden = { ...bos(), profile: ["notes"] };
-    expect(isSectionVisible(hidden, "profile", "notes")).toBe(false);
-    expect(isSectionVisible(hidden, "profile", "stats")).toBe(true);
+    const hidden = { ...bos(), library: ["notes"] };
+    expect(isSectionVisible(hidden, "library", "notes")).toBe(false);
+    expect(isSectionVisible(hidden, "library", "lists")).toBe(true);
     expect(isSectionVisible(hidden, "hub", "notes")).toBe(true);
   });
 
@@ -137,9 +163,9 @@ describe("filterVisibleSections", () => {
 
 describe("setSectionVisible / setScreenSectionsVisible", () => {
   test("gizle → göster gidiş-dönüşü boş haritaya döner", () => {
-    const gizli = setSectionVisible(null, "profile", "notes", false);
-    expect(gizli.profile).toEqual(["notes"]);
-    expect(setSectionVisible(gizli, "profile", "notes", true)).toEqual(bos());
+    const gizli = setSectionVisible(null, "library", "notes", false);
+    expect(gizli.library).toEqual(["notes"]);
+    expect(setSectionVisible(gizli, "library", "notes", true)).toEqual(bos());
   });
 
   test("aynı işlemi tekrarlamak değeri değiştirmez (idempotent)", () => {
@@ -168,7 +194,10 @@ describe("setSectionVisible / setScreenSectionsVisible", () => {
   test("bilinmeyen ekran/bölüm ve eski tek anahtarlı bölüm yok sayılır", () => {
     expect(setSectionVisible(null, "yok", "notes", false)).toEqual(bos());
     expect(setSectionVisible(null, "profile", "yok", false)).toEqual(bos());
-    expect(setSectionVisible(null, "tv", "ongoing", false)).toEqual(bos());
+    expect(setSectionVisible(null, "tv", "ongoing", false)).toEqual(bos()); // TV rafı kalktı
+    expect(setSectionVisible(null, "library", "nextUp", false)).toEqual(bos());
+    // Profil'den taşınan bölümler artık Profil'de gizlenemez.
+    expect(setSectionVisible(null, "profile", "notes", false)).toEqual(bos());
   });
 
   test("ekranın tüm bölümlerini gizler/gösterir; eski tek anahtarlı bölüm kayda girmez", () => {
@@ -183,7 +212,7 @@ describe("setSectionVisible / setScreenSectionsVisible", () => {
 
 describe("sayım ve özelleştirme", () => {
   test("countHiddenSections ekran bazında ve toplamda", () => {
-    const h = { ...bos(), tv: ["worldTour", "genres"], profile: ["notes"] };
+    const h = { ...bos(), tv: ["worldTour", "genres"], library: ["notes"] };
     expect(countHiddenSections(h, "tv")).toBe(2);
     expect(countHiddenSections(h, "movie")).toBe(0);
     expect(countHiddenSections(h)).toBe(3);
@@ -199,15 +228,15 @@ describe("sayım ve özelleştirme", () => {
   test("toStoredSectionVisibility: hiçbir şey gizli değilse null (anahtar silinir)", () => {
     expect(toStoredSectionVisibility(null)).toBeNull();
     expect(toStoredSectionVisibility(bos())).toBeNull();
-    expect(toStoredSectionVisibility({ tv: ["ongoing"] })).toBeNull();
+    expect(toStoredSectionVisibility({ library: ["nextUp"] })).toBeNull();
     expect(toStoredSectionVisibility({ hub: ["games", "yok"] })).toEqual({ ...bos(), hub: ["games"] });
   });
 
   test("summarizeScreen: toplam eski tek anahtarlıyı da sayar; görünür sayı onun ayarına bakar", () => {
-    const toplam = sectionsOf("tv").length;
-    expect(summarizeScreen(null, "tv")).toEqual({ total: toplam, shown: toplam, hidden: 0 });
-    expect(summarizeScreen(null, "tv", { showOngoingTvShows: false })).toEqual({ total: toplam, shown: toplam - 1, hidden: 1 });
-    expect(summarizeScreen({ ...bos(), tv: ["genres"] }, "tv", { showOngoingTvShows: false }).hidden).toBe(2);
+    const toplam = sectionsOf("library").length;
+    expect(summarizeScreen(null, "library")).toEqual({ total: toplam, shown: toplam, hidden: 0 });
+    expect(summarizeScreen(null, "library", { showOngoingTvShows: false })).toEqual({ total: toplam, shown: toplam - 1, hidden: 1 });
+    expect(summarizeScreen({ ...bos(), library: ["notes"] }, "library", { showOngoingTvShows: false }).hidden).toBe(2);
     expect(summarizeScreen(null, "yok")).toEqual({ total: 0, shown: 0, hidden: 0 });
   });
 });
@@ -221,8 +250,8 @@ describe("kayıt bütünlüğü", () => {
   );
   const TINTS = ["blue", "purple", "green", "amber", "teal"];
 
-  test("dört ekran: tv, movie, hub, profile", () => {
-    expect(SECTION_SCREEN_IDS).toEqual(["tv", "movie", "hub", "profile"]);
+  test("beş ekran: tv, movie, hub, library, profile (sekme sırası)", () => {
+    expect(SECTION_SCREEN_IDS).toEqual(["tv", "movie", "hub", "library", "profile"]);
     expect(isSectionScreen("tv")).toBe(true);
     expect(isSectionScreen("settings")).toBe(false);
   });
@@ -255,7 +284,9 @@ describe("kayıt bütünlüğü", () => {
   test("eski tek anahtarlı bölümün anahtarı registry'de gerçek bir boolean ayar", () => {
     const { Keys } = require("../services/storage/registry");
     const eskiler = SECTION_SCREENS.flatMap((s) => s.sections.filter((x) => x.legacy));
-    expect(eskiler.map((x) => x.id)).toEqual(["ongoing"]);
+    // Kütüphane'nin "Sıradaki"si eski ayara bağlı (TV ana ekranındaki raf kaldırıldı).
+    expect(eskiler.map((x) => x.id)).toEqual(["nextUp"]);
+    expect(new Set(eskiler.map((x) => x.legacy))).toEqual(new Set(["showOngoingTvShows"]));
     for (const item of eskiler) {
       expect(Keys[item.legacy]).toBeDefined();
       expect(Keys[item.legacy].type).toBe("boolean");
@@ -294,7 +325,7 @@ describe("kalıcı kayıt (Keys.sectionVisibility)", () => {
   });
 
   test("yazılan tercih gidiş-dönüşte aynen gelir", () => {
-    let h = setSectionVisible(null, "profile", "notes", false);
+    let h = setSectionVisible(null, "library", "notes", false);
     h = setSectionVisible(h, "movie", "worldTour", false);
     expect(set(Keys.sectionVisibility, h)).toBe(true);
     expect(normalizeSectionVisibility(get(Keys.sectionVisibility))).toEqual(h);
@@ -338,11 +369,23 @@ describe("yedek (settingsBackup)", () => {
 
   test("içe aktarılan değer kanonik hale gelir; bilinmeyenler elenir", () => {
     const plan = planImport(
-      yedek({ sectionVisibility: { tv: ["worldTour", "ongoing", "yok"], sinema: ["x"], profile: ["notes", "notes"] } }),
+      yedek({ sectionVisibility: { tv: ["worldTour", "ongoing", "yok"], sinema: ["x"], library: ["notes", "notes"] } }),
     );
     expect(plan.skipped).toEqual([]);
     const yazilan = plan.writes.find((w) => w.id === "sectionVisibility").value;
-    expect(yazilan).toEqual({ ...bos(), tv: ["worldTour"], profile: ["notes"] });
+    expect(yazilan).toEqual({ ...bos(), tv: ["worldTour"], library: ["notes"] });
+  });
+
+  test("Kütüphane öncesi alınmış yedek: Profil'de gizli Notlar/Listeler/Hatırlatmalar Kütüphane'ye geçer", () => {
+    const plan = planImport(yedek({ sectionVisibility: { profile: ["stats", "notes", "lists"] } }));
+    const yazilan = plan.writes.find((w) => w.id === "sectionVisibility").value;
+    expect(yazilan).toEqual({ ...bos(), profile: ["stats"], library: ["lists", "notes"] });
+  });
+
+  test("Wrapped Eğlence'den Kütüphane'ye taşındı: eski kayıtta Eğlence'de gizli Wrapped Kütüphane'ye geçer", () => {
+    const plan = planImport(yedek({ sectionVisibility: { hub: ["games", "wrapped"], library: ["notes"] } }));
+    const yazilan = plan.writes.find((w) => w.id === "sectionVisibility").value;
+    expect(yazilan).toEqual({ ...bos(), hub: ["games"], library: ["notes", "wrapped"] });
   });
 
   test.each([["x"], [5], [["notes"]]])("geçersiz değer %j atlanır", (deger) => {
@@ -392,8 +435,20 @@ describe("kapsam bekçisi: kayıttaki her bölüm ekranında bağlı, ekrandaki 
     expect(kaynak).toContain('useScreenSections("profile")');
   });
 
-  test("Tüm bölümler gizlenince Hub ve Profil boş kalmaz (bildirim kartı bağlı)", () => {
-    for (const [dosya, ekran] of [["HubScreen.js", "hub"], ["ProfileScreen.js", "profile"]]) {
+  test("Kütüphane: show(\"…\") çağrıları = kayıttaki SAKLANAN bölümler; Sıradaki TV rafıyla aynı ayara bağlı", () => {
+    const kaynak = oku("screens", "tabs", "LibraryScreen.js");
+    esit(kimlikler(kaynak, /\bshow\("(\w+)"\)/g), storedSectionsOf("library").map((s) => s.id));
+    expect(kaynak).toContain('useScreenSections("library")');
+    // "Sıradaki" (eski tek anahtarlı bölüm): TvOngoingSection, showOngoingTvShows ayarına bağlı.
+    expect(kaynak).toContain("showOngoingTvShows");
+    expect(kaynak).toMatch(/showOngoingTvShows && <TvOngoingSection[^>]*surface="library"/);
+    // Wrapped (Eğlence'den taşındı) bu ekranda çizilir, Eğlence'de değil.
+    expect(kaynak).toContain("HubWrappedModule");
+    expect(oku("screens", "tabs", "HubScreen.js")).not.toContain("HubWrappedModule");
+  });
+
+  test("Tüm bölümler gizlenince Hub, Kütüphane ve Profil boş kalmaz (bildirim kartı bağlı)", () => {
+    for (const [dosya, ekran] of [["HubScreen.js", "hub"], ["LibraryScreen.js", "library"], ["ProfileScreen.js", "profile"]]) {
       const kaynak = oku("screens", "tabs", dosya);
       expect(kaynak).toContain("SectionsHiddenNotice");
       expect(kaynak).toContain(`screen="${ekran}"`);
@@ -407,7 +462,9 @@ describe("kapsam bekçisi: kayıttaki her bölüm ekranında bağlı, ekrandaki 
     );
   });
 
-  test("Devam Edenler kendi ayarını (showOngoingTvShows) kullanmaya devam eder", () => {
-    expect(oku("screens", "tabs", "TvShowScreen.js")).toContain("showOngoingTvShows");
+  test("TV ana ekranı devam eden diziler rafını artık çizmez", () => {
+    const tv = oku("screens", "tabs", "TvShowScreen.js");
+    expect(tv).not.toContain("TvOngoingSection");
+    expect(tv).not.toContain("showOngoingTvShows");
   });
 });

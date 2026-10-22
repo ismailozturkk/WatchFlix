@@ -15,6 +15,9 @@ import Skeleton from "@components/Skeleton";
 import PremiumPill from "@components/premium/PremiumPill";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import DailyChallengeCard from "@components/game/DailyChallengeCard";
+import DuelSendButton from "@components/game/DuelSendButton";
+import QuickGamesGrid from "@components/game/QuickGamesGrid";
+import { duelPayloadFromResult } from "@utils/dailyDuel";
 import GameTile from "@components/game/GameTile";
 import PlayerStrip from "@components/game/PlayerStrip";
 import { SectionHeader } from "@components/game/ui";
@@ -40,6 +43,11 @@ export default function ProfileGamesModule({ navigation }) {
   const { ready, stats } = useGameStats();
   const daily = useDailyView(stats);
   const progress = useMemo(() => buildSceneGameProgress(stats, daily.now), [stats, daily.now]);
+  // Kilitli (planda oyun yok) kullanıcıda düello yok: oynamadığı bir günü gönderecek sonucu zaten olmaz.
+  const duelPayload = useMemo(
+    () => (daily.status === "completed" ? duelPayloadFromResult(daily.result, { dayKey: daily.dayKey }) : null),
+    [daily.status, daily.result, daily.dayKey],
+  );
 
   // Oyunlar Premium'da. Free kullanıcıda modül görünür kalır (neyin kilitli
   // olduğu görülsün) ama her giriş yükseltme sayfasını açar, ekrana gitmez.
@@ -68,6 +76,11 @@ export default function ProfileGamesModule({ navigation }) {
     navigation.navigate("GameLeaderboardScreen", { gameId: SCENE_GAME_ID, scope: "daily" }),
   );
   const openGame = guarded((game) => navigation.navigate(game.routeName, { gameId: game.id }));
+  // Hızlı oyunlar kilitten bağımsız: "Önce hangisi?" kendi rotasında, diğerleri ortak ekranda.
+  const openQuickGame = (gameId) =>
+    gameId === "older"
+      ? navigation.navigate("OlderGameScreen", { source: "hub" })
+      : navigation.navigate("QuickGameScreen", { gameId, source: "hub" });
 
   return (
     <View style={styles.module}>
@@ -105,6 +118,9 @@ export default function ProfileGamesModule({ navigation }) {
         <View style={styles.stack}>
           <DailyChallengeCard daily={daily} theme={theme} onPlay={playDaily} onResult={openDailyBoard} />
 
+          {/* Bugünkü deneme bittiyse: sonucu bir arkadaşa düello olarak gönder. */}
+          {duelPayload ? <DuelSendButton payload={duelPayload} theme={theme} source="hub" /> : null}
+
           <View style={styles.tiles}>
             {GAME_REGISTRY.map((game) => (
               <GameTile
@@ -116,6 +132,9 @@ export default function ProfileGamesModule({ navigation }) {
               />
             ))}
           </View>
+
+          {/* Hızlı oyunlar: kilit şeridinden bağımsız, her planda açık (yerel, sunucu maliyeti yok). */}
+          <QuickGamesGrid theme={theme} onOpen={openQuickGame} />
 
           <PlayerStrip progress={progress} theme={theme} user={user} onPress={openHub} compact />
         </View>

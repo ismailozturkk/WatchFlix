@@ -4,7 +4,7 @@
    (beğeni, yorum, mention, arkadaşlık, mesaj) push olarak gönderir.
 2. **`callGemini` (callable):** AI sohbet proxy'si — Gemini API anahtarı YALNIZ
    burada durur (Secret Manager), kullanıcı başına günlük + aylık kota uygular
-   (Free 5/30, Premium 20/300, Premium Max 50/900 — `aiQuota.js`,
+   (Free 3/30, Premium 20/300, Premium Max 50/900 — `aiQuota.js`,
    `AiUsage/{uid}` sayacı). Yayın blokeri çözümü:
    `docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md` §1.2 madde 1.
 3. **`revenueCatWebhook` (HTTP):** RevenueCat olaylarında aboneliği

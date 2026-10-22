@@ -15,11 +15,11 @@ import { copyLanguage } from "../../../utils/appLanguages";
 const tr = {
   ui: {
     title: "Ekran bölümleri",
-    rowSub: "Film, dizi, Hub ve profilde hangi bölümler görünsün",
+    rowSub: "Film, dizi, Eğlence, Kütüphane ve profilde hangi bölümler görünsün",
     badgeAll: "Hepsi açık",
     badgeHidden: "{n} gizli",
     intro:
-      "Film, dizi, Hub ve profil ekranlarında hangi bölümlerin görüneceğini seç. Gizlediğin bölüm ekrandan kalkar; istediğin zaman buradan geri açabilirsin.",
+      "Film, dizi, Eğlence, Kütüphane ve profil ekranlarında hangi bölümlerin görüneceğini seç. Gizlediğin bölüm ekrandan kalkar; istediğin zaman buradan geri açabilirsin.",
     visibleCount: "{shown} / {total} bölüm görünür",
     showAll: "Tümünü göster",
     hideAll: "Tümünü gizle",
@@ -41,13 +41,13 @@ const tr = {
   screens: {
     tv: { name: "Diziler", hint: "Dizi ana ekranındaki raflar" },
     movie: { name: "Filmler", hint: "Film ana ekranındaki raflar" },
-    hub: { name: "Hub", hint: "Hub sekmesindeki kartlar" },
+    hub: { name: "Eğlence", hint: "Eğlence sekmesindeki kartlar" },
+    library: { name: "Kütüphane", hint: "Kütüphane sekmesindeki bölümler" },
     profile: { name: "Profil", hint: "Profil sekmesindeki bölümler" },
   },
   sections: {
     tv: {
       trends: ["Trend Diziler", "Gündemdeki diziler; haftalık ve günlük kategoriler"],
-      ongoing: ["Devam Edenler", "İzlemeye başladığın diziler. Ayarlar'daki “Devam eden diziler” anahtarıyla aynı ayar"],
       best: ["En İyi Diziler", "En çok oylanan ve en popüler diziler"],
       followedPeople: ["Takip Ettiklerinin Yaklaşanları", "Takip ettiğin oyuncu ve yönetmenlerin yeni işleri; birini takip edince görünür"],
       fromFavorites: ["Favorilerine Göre", "Dört favorine bakarak yapılan öneriler; favori ekleyince görünür"],
@@ -80,19 +80,24 @@ const tr = {
     hub: {
       feed: ["Sosyal", "Paylaşımlar kartı: akışa git, hızlı paylaşım yap"],
       cineswipe: ["Birlikte Ne İzlesek?", "CineSwipe ile tek başına ya da arkadaşınla karar ver"],
+      bingo: ["Sinema Bingosu", "Aylık kart ve kolay haftalık hedefler, izledikçe kendiliğinden ilerler"],
+      poll: ["Günün sorusu", "Her gün iki seçenekli bir soru; herkes ne dedi gör"],
       tournament: ["Turnuva", "Aylık film turnuvası ve sonuçları"],
-      wrapped: ["Yılın Rakamları", "Yıllık izleme özetin (Wrapped) ve arşiv"],
       games: ["Oyunlar", "Öne çıkan oyun ve istatistiklerin"],
+    },
+    library: {
+      nextUp: ["Sıradaki", "Devam ettiğin dizilerin sıradaki bölümleri. Ayarlar'daki “Devam eden diziler” anahtarıyla aynı ayar"],
+      lists: ["Listeler", "Favoriler, izleme listesi, izlenenler ve kendi listelerin"],
+      reminders: ["Hatırlatmalar", "Yaklaşan film ve bölüm hatırlatıcıların"],
+      notes: ["Notlar", "Film ve dizi notların"],
+      wrapped: ["Yılın Rakamları", "Yıllık izleme özetin (Wrapped) ve arşiv"],
     },
     profile: {
       goal: ["Yıllık izleme hedefi", "Profil başlığındaki hedef halkası düğmesi (Düzenle ve Paylaş'ın yanında)"],
       badges: ["Rozetler", "İzleme puanın, Perde seviyen ve rozet şeridin"],
       friends: ["Arkadaşlar", "Ara, arkadaşlar, mesajlar ve istekler. Gizlersen bunlara buradan ulaşamazsın"],
       stats: ["İstatistikler", "İzlediğin film ve dizi sayıları, toplam süreler"],
-      lists: ["Listeler", "Favoriler, izleme listesi, izlenenler ve kendi listelerin"],
       activity: ["Aktivitelerim", "Puanlamaların, yorumların, postların ve taslakların"],
-      reminders: ["Hatırlatmalar", "Yaklaşan film ve bölüm hatırlatıcıların"],
-      notes: ["Notlar", "Film ve dizi notların"],
     },
   },
 };
@@ -100,11 +105,11 @@ const tr = {
 const en = {
   ui: {
     title: "Screen sections",
-    rowSub: "Choose which sections show on movies, TV, Hub and profile",
+    rowSub: "Choose which sections show on movies, TV, Fun, Library and profile",
     badgeAll: "All on",
     badgeHidden: "{n} hidden",
     intro:
-      "Choose which sections appear on the Movies, TV Shows, Hub and Profile screens. A section you hide disappears from the screen; you can turn it back on here any time.",
+      "Choose which sections appear on the Movies, TV Shows, Fun, Library and Profile screens. A section you hide disappears from the screen; you can turn it back on here any time.",
     visibleCount: "{shown} of {total} sections visible",
     showAll: "Show all",
     hideAll: "Hide all",
@@ -126,13 +131,13 @@ const en = {
   screens: {
     tv: { name: "TV Shows", hint: "Shelves on the TV shows home" },
     movie: { name: "Movies", hint: "Shelves on the movies home" },
-    hub: { name: "Hub", hint: "Cards on the Hub tab" },
+    hub: { name: "Fun", hint: "Cards on the Fun tab" },
+    library: { name: "Library", hint: "Sections on the Library tab" },
     profile: { name: "Profile", hint: "Sections on the Profile tab" },
   },
   sections: {
     tv: {
       trends: ["Trend Series", "What's trending, with weekly and daily categories"],
-      ongoing: ["Ongoing Shows", "Shows you've started. The same setting as “Show ongoing shows” in Settings"],
       best: ["Top Rated Shows", "Most voted and most popular shows"],
       followedPeople: ["Upcoming From People You Follow", "New work from the actors and directors you follow; shows once you follow someone"],
       fromFavorites: ["Because of Your Favorites", "Picks based on your four favorites; shows once you add some"],
@@ -165,19 +170,24 @@ const en = {
     hub: {
       feed: ["Social", "The Posts card: open the feed and post quickly"],
       cineswipe: ["What Should We Watch?", "Decide with CineSwipe, solo or with a friend"],
+      bingo: ["Cinema Bingo", "A monthly card and small weekly goals that update as you watch"],
+      poll: ["Question of the day", "A two-option question every day; see what everyone said"],
       tournament: ["Tournament", "The monthly movie tournament and its results"],
-      wrapped: ["Year in Numbers", "Your yearly watching recap (Wrapped) and the archive"],
       games: ["Games", "The featured game and your stats"],
+    },
+    library: {
+      nextUp: ["Up Next", "The next episode of the shows you're watching. The same setting as “Show ongoing shows” in Settings"],
+      lists: ["Lists", "Favorites, watchlist, watched and your own lists"],
+      reminders: ["Reminders", "Your upcoming movie and episode reminders"],
+      notes: ["Notes", "Your movie and show notes"],
+      wrapped: ["Year in Numbers", "Your yearly watching recap (Wrapped) and the archive"],
     },
     profile: {
       goal: ["Yearly watch goal", "The goal ring button in the profile header (next to Edit and Share)"],
       badges: ["Badges", "Your watch score, Perde level and badge strip"],
       friends: ["Friends", "Search, friends, messages and requests. If you hide it you can't reach them from here"],
       stats: ["Statistics", "How many movies and shows you've watched, and total time"],
-      lists: ["Lists", "Favorites, watchlist, watched and your own lists"],
       activity: ["My Activity", "Your ratings, comments, posts and drafts"],
-      reminders: ["Reminders", "Your upcoming movie and episode reminders"],
-      notes: ["Notes", "Your movie and show notes"],
     },
   },
 };
@@ -185,11 +195,11 @@ const en = {
 const es = {
   ui: {
     title: "Secciones de pantalla",
-    rowSub: "Elige qué secciones se muestran en películas, series, Hub y perfil",
+    rowSub: "Elige qué secciones se muestran en películas, series, Diversión, Biblioteca y perfil",
     badgeAll: "Todas activas",
     badgeHidden: "{n} ocultas",
     intro:
-      "Elige qué secciones aparecen en las pantallas de Películas, Series, Hub y Perfil. Las que ocultes desaparecen de la pantalla; puedes volver a activarlas aquí cuando quieras.",
+      "Elige qué secciones aparecen en las pantallas de Películas, Series, Diversión, Biblioteca y Perfil. Las que ocultes desaparecen de la pantalla; puedes volver a activarlas aquí cuando quieras.",
     visibleCount: "{shown} de {total} secciones visibles",
     showAll: "Mostrar todo",
     hideAll: "Ocultar todo",
@@ -211,13 +221,13 @@ const es = {
   screens: {
     tv: { name: "Series", hint: "Carriles de la pantalla de series" },
     movie: { name: "Películas", hint: "Carriles de la pantalla de películas" },
-    hub: { name: "Hub", hint: "Tarjetas de la pestaña Hub" },
+    hub: { name: "Diversión", hint: "Tarjetas de la pestaña Diversión" },
+    library: { name: "Biblioteca", hint: "Secciones de la pestaña Biblioteca" },
     profile: { name: "Perfil", hint: "Secciones de la pestaña Perfil" },
   },
   sections: {
     tv: {
       trends: ["Series en tendencia", "Lo que está de moda, con categorías semanales y diarias"],
-      ongoing: ["Series en curso", "Series que ya empezaste. Es el mismo ajuste que «Series en curso» en Ajustes"],
       best: ["Series mejor valoradas", "Las series más votadas y más populares"],
       followedPeople: ["Próximos de quienes sigues", "Nuevos trabajos de los actores y directores que sigues; aparece al seguir a alguien"],
       fromFavorites: ["Por tus favoritos", "Recomendaciones según tus cuatro favoritos; aparece al añadir alguno"],
@@ -250,19 +260,24 @@ const es = {
     hub: {
       feed: ["Social", "La tarjeta de publicaciones: abre el feed y publica rápido"],
       cineswipe: ["¿Qué vemos?", "Decide con CineSwipe, solo o con un amigo"],
+      bingo: ["Bingo de cine", "Cartón mensual y pequeños objetivos semanales que avanzan al mirar"],
+      poll: ["Pregunta del día", "Una pregunta de dos opciones cada día; mira qué dijo todo el mundo"],
       tournament: ["Torneo", "El torneo mensual de películas y sus resultados"],
-      wrapped: ["El año en cifras", "Tu resumen anual de visionado (Wrapped) y el archivo"],
       games: ["Juegos", "El juego destacado y tus estadísticas"],
+    },
+    library: {
+      nextUp: ["Lo siguiente", "El próximo episodio de las series que sigues. Es el mismo ajuste que «Series en curso» en Ajustes"],
+      lists: ["Listas", "Favoritos, pendientes, vistas y tus propias listas"],
+      reminders: ["Recordatorios", "Tus próximos recordatorios de películas y episodios"],
+      notes: ["Notas", "Tus notas de películas y series"],
+      wrapped: ["El año en cifras", "Tu resumen anual de visionado (Wrapped) y el archivo"],
     },
     profile: {
       goal: ["Meta anual de visionado", "El botón del anillo de meta en la cabecera del perfil (junto a Editar y Compartir)"],
       badges: ["Insignias", "Tu puntuación de visionado, tu nivel Perde y tus insignias"],
       friends: ["Amigos", "Buscar, amigos, mensajes y solicitudes. Si la ocultas no podrás acceder a ellos desde aquí"],
       stats: ["Estadísticas", "Cuántas películas y series has visto y el tiempo total"],
-      lists: ["Listas", "Favoritos, pendientes, vistas y tus propias listas"],
       activity: ["Mi actividad", "Tus valoraciones, comentarios, publicaciones y borradores"],
-      reminders: ["Recordatorios", "Tus próximos recordatorios de películas y episodios"],
-      notes: ["Notas", "Tus notas de películas y series"],
     },
   },
 };
@@ -270,11 +285,11 @@ const es = {
 const pt = {
   ui: {
     title: "Seções da tela",
-    rowSub: "Escolha quais seções aparecem em filmes, séries, Hub e perfil",
+    rowSub: "Escolha quais seções aparecem em filmes, séries, Diversão, Biblioteca e perfil",
     badgeAll: "Todas ativas",
     badgeHidden: "{n} ocultas",
     intro:
-      "Escolha quais seções aparecem nas telas de Filmes, Séries, Hub e Perfil. As que você ocultar somem da tela; você pode reativá-las aqui quando quiser.",
+      "Escolha quais seções aparecem nas telas de Filmes, Séries, Diversão, Biblioteca e Perfil. As que você ocultar somem da tela; você pode reativá-las aqui quando quiser.",
     visibleCount: "{shown} de {total} seções visíveis",
     showAll: "Mostrar tudo",
     hideAll: "Ocultar tudo",
@@ -296,13 +311,13 @@ const pt = {
   screens: {
     tv: { name: "Séries", hint: "Filas da tela de séries" },
     movie: { name: "Filmes", hint: "Filas da tela de filmes" },
-    hub: { name: "Hub", hint: "Cards da aba Hub" },
+    hub: { name: "Diversão", hint: "Cards da aba Diversão" },
+    library: { name: "Biblioteca", hint: "Seções da aba Biblioteca" },
     profile: { name: "Perfil", hint: "Seções da aba Perfil" },
   },
   sections: {
     tv: {
       trends: ["Séries em alta", "O que está em alta, com categorias semanais e diárias"],
-      ongoing: ["Séries em andamento", "Séries que você já começou. É a mesma configuração de «Séries em andamento» em Configurações"],
       best: ["Séries mais bem avaliadas", "As séries mais votadas e mais populares"],
       followedPeople: ["Próximos de quem você segue", "Novos trabalhos dos atores e diretores que você segue; aparece ao seguir alguém"],
       fromFavorites: ["Pelos seus favoritos", "Recomendações com base nos seus quatro favoritos; aparece ao adicionar algum"],
@@ -335,19 +350,24 @@ const pt = {
     hub: {
       feed: ["Social", "O card de publicações: abre o feed e publica rápido"],
       cineswipe: ["O que vamos assistir?", "Decida com o CineSwipe, sozinho ou com um amigo"],
+      bingo: ["Bingo de cinema", "Cartela mensal e pequenas metas semanais que avançam ao assistir"],
+      poll: ["Pergunta do dia", "Uma pergunta de duas opções por dia; veja o que todos disseram"],
       tournament: ["Torneio", "O torneio mensal de filmes e seus resultados"],
-      wrapped: ["O ano em números", "Seu resumo anual de visualização (Wrapped) e o arquivo"],
       games: ["Jogos", "O jogo em destaque e suas estatísticas"],
+    },
+    library: {
+      nextUp: ["A seguir", "O próximo episódio das séries que você acompanha. É a mesma configuração de «Séries em andamento» em Configurações"],
+      lists: ["Listas", "Favoritos, para assistir, assistidos e suas próprias listas"],
+      reminders: ["Lembretes", "Seus próximos lembretes de filmes e episódios"],
+      notes: ["Notas", "Suas notas de filmes e séries"],
+      wrapped: ["O ano em números", "Seu resumo anual de visualização (Wrapped) e o arquivo"],
     },
     profile: {
       goal: ["Meta anual de visualização", "O botão do anel de meta no cabeçalho do perfil (ao lado de Editar e Compartilhar)"],
       badges: ["Emblemas", "Sua pontuação de visualização, seu nível Perde e seus emblemas"],
       friends: ["Amigos", "Buscar, amigos, mensagens e pedidos. Se você ocultar, não conseguirá acessá-los por aqui"],
       stats: ["Estatísticas", "Quantos filmes e séries você assistiu e o tempo total"],
-      lists: ["Listas", "Favoritos, para assistir, assistidos e suas próprias listas"],
       activity: ["Minhas atividades", "Suas notas, comentários, publicações e rascunhos"],
-      reminders: ["Lembretes", "Seus próximos lembretes de filmes e episódios"],
-      notes: ["Notas", "Suas notas de filmes e séries"],
     },
   },
 };
@@ -355,11 +375,11 @@ const pt = {
 const de = {
   ui: {
     title: "Bildschirmbereiche",
-    rowSub: "Wähle, welche Bereiche bei Filmen, Serien, Hub und Profil angezeigt werden",
+    rowSub: "Wähle, welche Bereiche bei Filmen, Serien, Spaß, Bibliothek und Profil angezeigt werden",
     badgeAll: "Alle an",
     badgeHidden: "{n} ausgeblendet",
     intro:
-      "Wähle, welche Bereiche auf den Bildschirmen Filme, Serien, Hub und Profil erscheinen. Ein ausgeblendeter Bereich verschwindet vom Bildschirm; du kannst ihn hier jederzeit wieder einschalten.",
+      "Wähle, welche Bereiche auf den Bildschirmen Filme, Serien, Spaß, Bibliothek und Profil erscheinen. Ein ausgeblendeter Bereich verschwindet vom Bildschirm; du kannst ihn hier jederzeit wieder einschalten.",
     visibleCount: "{shown} von {total} Bereichen sichtbar",
     showAll: "Alle anzeigen",
     hideAll: "Alle ausblenden",
@@ -381,13 +401,13 @@ const de = {
   screens: {
     tv: { name: "Serien", hint: "Leisten auf dem Serien-Start" },
     movie: { name: "Filme", hint: "Leisten auf dem Film-Start" },
-    hub: { name: "Hub", hint: "Karten im Tab „Hub“" },
+    hub: { name: "Spaß", hint: "Karten im Tab „Spaß“" },
+    library: { name: "Bibliothek", hint: "Bereiche im Tab „Bibliothek“" },
     profile: { name: "Profil", hint: "Bereiche im Tab „Profil“" },
   },
   sections: {
     tv: {
       trends: ["Trendserien", "Was gerade im Trend ist, mit Wochen- und Tageskategorien"],
-      ongoing: ["Laufende Serien", "Serien, die du begonnen hast. Dieselbe Einstellung wie „Laufende Serien anzeigen“ in den Einstellungen"],
       best: ["Bestbewertete Serien", "Meistbewertete und beliebteste Serien"],
       followedPeople: ["Anstehendes von Personen, denen du folgst", "Neue Arbeiten der Schauspieler und Regisseure, denen du folgst; erscheint, sobald du jemandem folgst"],
       fromFavorites: ["Wegen deiner Favoriten", "Tipps nach deinen vier Favoriten; erscheint, sobald du welche hinzufügst"],
@@ -420,19 +440,24 @@ const de = {
     hub: {
       feed: ["Soziales", "Die Karte „Beiträge“: Feed öffnen und schnell posten"],
       cineswipe: ["Was schauen wir?", "Entscheide mit CineSwipe, solo oder mit einem Freund"],
+      bingo: ["Kino-Bingo", "Monatskarte und kleine Wochenziele, die beim Schauen fortschreiten"],
+      poll: ["Frage des Tages", "Jeden Tag eine Frage mit zwei Antworten; sieh, was alle sagten"],
       tournament: ["Turnier", "Das monatliche Filmturnier und seine Ergebnisse"],
-      wrapped: ["Das Jahr in Zahlen", "Dein jährlicher Seh-Rückblick (Wrapped) und das Archiv"],
       games: ["Spiele", "Das empfohlene Spiel und deine Statistik"],
+    },
+    library: {
+      nextUp: ["Als Nächstes", "Die nächste Folge der Serien, die du schaust. Dieselbe Einstellung wie „Laufende Serien anzeigen“ in den Einstellungen"],
+      lists: ["Listen", "Favoriten, Merkliste, Gesehenes und deine eigenen Listen"],
+      reminders: ["Erinnerungen", "Deine bevorstehenden Film- und Folgenerinnerungen"],
+      notes: ["Notizen", "Deine Film- und Serien-Notizen"],
+      wrapped: ["Das Jahr in Zahlen", "Dein jährlicher Seh-Rückblick (Wrapped) und das Archiv"],
     },
     profile: {
       goal: ["Jährliches Seh-Ziel", "Die Zielring-Schaltfläche im Profilkopf (neben Bearbeiten und Teilen)"],
       badges: ["Abzeichen", "Dein Seh-Score, dein Akt-Level und die Abzeichenleiste"],
       friends: ["Freunde", "Suche, Freunde, Nachrichten und Anfragen. Wenn du sie ausblendest, erreichst du sie von hier aus nicht mehr"],
       stats: ["Statistik", "Wie viele Filme und Serien du gesehen hast, und die Gesamtzeit"],
-      lists: ["Listen", "Favoriten, Merkliste, Gesehenes und deine eigenen Listen"],
       activity: ["Meine Aktivität", "Deine Bewertungen, Kommentare, Beiträge und Entwürfe"],
-      reminders: ["Erinnerungen", "Deine bevorstehenden Film- und Folgenerinnerungen"],
-      notes: ["Notizen", "Deine Film- und Serien-Notizen"],
     },
   },
 };

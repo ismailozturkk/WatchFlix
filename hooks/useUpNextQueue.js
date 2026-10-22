@@ -160,6 +160,10 @@ export default function useUpNextQueue({
     const trackFirstView = (resolvedNow) => {
       if (viewTracked.current) return;
       viewTracked.current = true;
+      // Kütüphane sekmesi diğer sekmeler gibi arka planda önceden kurulur (AdaptiveTabShell
+      // ısıtması); orada "görüntülendi" demek sahte olay olurdu. Kullanım bu yüzeyde
+      // up_next_completed(surface: "library") ve tab_viewed(tab: "library") ile ölçülür.
+      if (surface === "library") return;
       const list = targets
         .map(({ key }) =>
           resolvedNow.has(key)

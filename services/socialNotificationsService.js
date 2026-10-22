@@ -39,6 +39,8 @@ export async function createSocialNotification({
   text,
   groupId,
   groupName,
+  inviteCode,
+  dayKey,
 }) {
   if (!toUid || !fromUid || !type) return;
   if (toUid === fromUid) return; // kendine bildirim yok
@@ -57,6 +59,8 @@ export async function createSocialNotification({
     // ve dokunulunca doğru gruba yönlendirme için groupId/groupName saklanır.
     ...(groupId ? { groupId } : {}),
     ...(groupName ? { groupName: String(groupName).slice(0, 80) } : {}),
+    ...(type === "cineswipe_invite" && /^\d{6}$/.test(String(inviteCode || "")) ? { inviteCode } : {}),
+    ...(type === "game_challenge" && /^\d{4}-\d{2}-\d{2}$/.test(String(dayKey || "")) ? { dayKey } : {}),
     read: false,
     createdAt: serverTimestamp(),
   });

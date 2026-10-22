@@ -18,7 +18,10 @@
   --ink-faint: #4d5a6c;
   --flame: #ff6b35;
   --amber: #ffc247;
-  --font-display: "Anton", "Haettenschweiler", "Impact", "Arial Narrow", sans-serif;
+  --teal: #2ee6d6;
+  --violet: #8b7cf6;
+  /* Başlıklar da gövde yazı tipiyle (landing ile aynı aile); ağırlık/aralık kurallarda. */
+  --font-display: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
   --font-body: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
   --measure: 74ch;
   color-scheme: dark;
@@ -52,7 +55,8 @@ body {
 .glow {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(52% 30% at 50% -8%, rgba(19, 141, 240, .16), transparent 70%),
+    radial-gradient(52% 30% at 30% -8%, rgba(19, 141, 240, .18), transparent 70%),
+    radial-gradient(40% 26% at 90% 0%, rgba(139, 124, 246, .12), transparent 70%),
     radial-gradient(120% 80% at 50% 108%, rgba(0, 0, 0, .5), transparent 55%);
 }
 
@@ -68,29 +72,25 @@ body {
 }
 .bar-brand {
   font-family: var(--font-display);
-  font-size: 21px; letter-spacing: .1em;
+  font-size: 20px; font-weight: 800; letter-spacing: -.02em;
   color: var(--paper); text-decoration: none;
   display: inline-flex; align-items: center; gap: 9px;
 }
-.bar-brand img { width: 24px; height: 24px; border-radius: 6px; }
+.bar-brand img { width: 28px; height: 28px; border-radius: 8px; }
 .bar-brand:hover { color: var(--blue-hi); }
 .bar-sep { color: var(--ink-faint); font-size: 15px; }
 .bar-page { color: var(--ink-muted); font-size: 14px; letter-spacing: .02em; }
 .bar-spacer { flex: 1; }
+/* Dil menüsü: lang-menu.css (site-lang.js üretir). */
 
-.lang {
-  display: inline-flex; gap: 2px; padding: 3px;
-  border: 1px solid var(--line); border-radius: 999px;
-  background: var(--surface);
+/* es/pt/de: yasal metin yalnız tr/en; bu kullanıcılar İngilizce metni görür. */
+.lang-note {
+  margin: 0 0 26px; padding: 14px 18px;
+  border: 1px solid var(--line); border-left: 3px solid var(--amber); border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 194, 71, .08), rgba(255, 194, 71, .02));
+  color: #dbe6f2; font-size: 15px; line-height: 1.6;
 }
-.lang button {
-  font: inherit; font-size: 12px; font-weight: 700; letter-spacing: .08em;
-  padding: 5px 11px; border: 0; border-radius: 999px;
-  background: transparent; color: var(--ink-dim); cursor: pointer;
-  transition: background .18s, color .18s;
-}
-.lang button:hover { color: var(--paper); }
-.lang button.active { background: var(--blue); color: #041220; }
+.lang-note[hidden] { display: none; }
 
 /* ── Yerleşim ─────────────────────────────────────────────────────── */
 .shell {
@@ -106,14 +106,14 @@ body {
 
 .hero { margin-bottom: clamp(24px, 4vw, 40px); }
 .hero-kicker {
-  font-size: 11px; letter-spacing: .38em; text-transform: uppercase;
-  color: var(--blue); font-weight: 700; margin-bottom: 14px;
+  font-size: 12px; letter-spacing: .24em; text-transform: uppercase;
+  color: var(--teal); font-weight: 800; margin-bottom: 14px;
 }
 .hero h1 {
   font-family: var(--font-display);
-  font-size: clamp(34px, 7vw, 62px);
-  line-height: 1.02; letter-spacing: .015em; font-weight: 400;
-  margin-bottom: 16px;
+  font-size: clamp(34px, 6.4vw, 58px);
+  line-height: 1.04; letter-spacing: -.035em; font-weight: 800;
+  margin-bottom: 16px; text-wrap: balance;
 }
 .hero-lead {
   color: var(--ink-muted); font-size: clamp(16px, 2vw, 18px);
@@ -135,9 +135,9 @@ body {
 article { max-width: var(--measure); }
 
 article h2 {
-  font-family: var(--font-display); font-weight: 400;
-  font-size: clamp(21px, 3.2vw, 27px);
-  line-height: 1.2; letter-spacing: .02em;
+  font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(21px, 3vw, 26px);
+  line-height: 1.2; letter-spacing: -.02em;
   margin: 52px 0 16px;
   padding-top: 22px; border-top: 1px solid var(--line-soft);
 }
@@ -227,7 +227,7 @@ ol.steps > li::before {
   position: absolute; left: 0; top: -2px;
   width: 34px; height: 34px; border-radius: 50%;
   display: grid; place-items: center;
-  font-family: var(--font-display); font-size: 17px; line-height: 1;
+  font-family: var(--font-display); font-size: 16px; font-weight: 800; line-height: 1;
   background: var(--surface-2); border: 1px solid var(--line); color: var(--blue-hi);
 }
 ol.steps > li::after {
@@ -351,7 +351,7 @@ pre.copy-body {
   .shell { display: flex; flex-direction: column; }
   .toc {
     order: -1;
-    position: sticky; top: 53px; z-index: 15;
+    position: sticky; top: 68px; z-index: 15; /* üst çubuk ≈68px (dil menüsü düğmesi 44px + dolgu) */
     padding: 12px 14px;
     background: rgba(18, 22, 29, .95);
     -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
@@ -359,15 +359,11 @@ pre.copy-body {
   .toc-box > ol { columns: 2; column-gap: 22px; margin-top: 10px; }
   .toc a { padding: 8px 10px 8px 12px; break-inside: avoid; }
   /* İki yapışkan katman üst üste: bağlantı hedefleri ikisinin de altında kalmasın */
-  html { scroll-padding-top: 118px; }
+  html { scroll-padding-top: 134px; }
 }
 
 /* ── Dokunmatik: hedefler parmakla basılabilir olmalı ─────────────── */
 @media (hover: none), (max-width: 1024px) {
-  .lang button {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-height: 38px; min-width: 48px; padding: 0 14px;
-  }
   .foot-nav { gap: 4px 18px; }
   .foot-nav a { display: inline-block; padding: 8px 4px; }
   .copy-head button { min-height: 40px; }

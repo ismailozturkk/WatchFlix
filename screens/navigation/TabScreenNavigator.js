@@ -3,7 +3,7 @@ import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { usePet } from "@context/PetContext";
 import HubScreen from "@screens/tabs/HubScreen";
-import SettingsScreen from "@screens/tabs/SettingsScreen";
+import LibraryScreen from "@screens/tabs/LibraryScreen";
 import ProfileScreen from "@screens/tabs/ProfileScreen";
 import DiscoverScreen from "@screens/tabs/DiscoverScreen";
 import { CalendarProvider } from "@context/CalendarContext";
@@ -22,7 +22,8 @@ export default function TabScreenNavigator({ navigation, route }) {
   const screens = useMemo(() => ({
     discover: <DiscoverScreen navigation={navigation} />,
     share: <HubScreen navigation={navigation} />,
-    settings: <SettingsScreen navigation={navigation} />,
+    // Ayarlar artık sekme değil: Profil'in dişli düğmesinden "SettingsScreen" olarak açılır.
+    library: <LibraryScreen navigation={navigation} />,
     profile: <CalendarProvider><ProfileScreen navigation={navigation} /></CalendarProvider>,
   }), [navigation]);
   const renderCompanion = useCallback(() => <PetCompanion />, []);

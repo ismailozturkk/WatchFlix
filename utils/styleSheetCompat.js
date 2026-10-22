@@ -1,6 +1,6 @@
 // utils/styleSheetCompat.js
 //
-// React Native 0.85, `StyleSheet.absoluteFillObject`'i KALDIRDI (0.86.2'de
+// React Native 0.85, `StyleSheet.absoluteFill`'i KALDIRDI (0.86.2'de
 // Libraries/StyleSheet/StyleSheetExports.js artık yalnızca `absoluteFill`
 // dışa aktarıyor). Projenin kendi kodundaki 50 kullanım SDK 57 geçişinde
 // `absoluteFill`'e çevrildi, ancak GÜNCELLENMEYEN ÜÇÜNCÜ PARTİ paketler hâlâ
@@ -8,14 +8,14 @@
 //
 //   react-native-circular-progress-indicator@4.4.2  (son yayın: Ara 2022)
 //     circularProgressBase/index.js ve circularProgress/index.js:
-//       style: [StyleSheet.absoluteFillObject, styles(styleProps).valueContainer]
+//       style: [StyleSheet.absoluteFill, styles(styleProps).valueContainer]
 //     Alan `undefined` olunca kapsayıcı `position:absolute` niteliğini
 //     kaybediyor, `flex:1` ile normal akışa düşüyor ve içindeki çocuklar
 //     halkanın üstüne bindirileceğine ALTINA kayıyor. Profil ekranındaki
 //     avatar çevresindeki iç/dış ilerleme halkalarının kayması buydu.
 //
 //   react-native-calendars/src/timeline/TimelineHours.js
-//     <View style={StyleSheet.absoluteFillObject} /> — Timeline bileşeni
+//     <View style={StyleSheet.absoluteFill} /> — Timeline bileşeni
 //     bugün kullanılmıyor ama ileride açılırsa aynı şekilde bozulurdu.
 //
 // Her iki paket de alanı MODÜL YÜKLENİRKEN değil RENDER SIRASINDA okuyor;

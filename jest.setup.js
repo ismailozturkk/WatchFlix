@@ -50,3 +50,6 @@ jest.mock("./components/common/GlassTextInput", () => ({
     return require("react-native").TextInput;
   },
 }));
+
+// Marka ikonları (profil sosyal hesap şeridi): paket ESM; testte düz bileşen yeter.
+jest.mock("@expo/vector-icons/FontAwesome6", () => ({ __esModule: true, default: "FontAwesome6" }));

@@ -1,6 +1,6 @@
 # Ekran bölümleri (gizle / göster)
 
-**Ayarlar > Kişiselleştirme > Ekran bölümleri.** Diziler, Filmler, Hub ve Profil ekranlarındaki
+**Ayarlar > Kişiselleştirme > Ekran bölümleri.** Diziler, Filmler, Eğlence (Hub), Kütüphane ve Profil ekranlarındaki
 bölümlerin (raflar, kartlar, şeritler) tek tek açılıp kapatılması. Örnek: profilde "Notlar"ı ya da
 film ekranında "Gizli Cevherler"i kapatınca o bölümler ilgili ekrandan kalkar.
 
@@ -32,6 +32,10 @@ film ekranında "Gizli Cevherler"i kapatınca o bölümler ilgili ekrandan kalka
 - Film/Dizi ekranının üst satırındaki **keşfet ve arama düğmeleri bölüm DEĞİL** (rafların üstünde yüzer) ve gizlenemez. "Ne izlesem?"
   önce listenin başında gizlenebilir bir kartken (`picker`) çok yer kapladığı için keşfet düğmesine çevrildi; `picker` kaydı silindi.
   Ayrıntı: `docs/ozellikler/FILTRELI_KESIF.md`.
+- **Taşınan bölümler kimliğini korur** (`MOVED_TO_LIBRARY` göçü, `utils/sectionVisibility.js`): Listeler / Hatırlatmalar / Notlar Profil'den,
+  **Wrapped** (`wrapped`, "Yılın Rakamları") Eğlence'den **Kütüphane**'ye taşındı. Eski kayıtta kaynak ekranda gizli olan bölüm,
+  taşınmayla sessizce geri görünmesin diye `library` altına aktarılır (ayar yedeğinden geri yüklemede de). Wrapped'ın giriş animasyonu
+  kart ekrana girince oynar (`LibraryScreen` kaydırmayı izler). Bkz. `screens/tabs/LibraryScreen.js`.
 - **Plan kapısı yok**: ücretsiz özellik.
 - Tüm bölümler gizlenince Hub/Profil/Film/Dizi boş kalmaz: `SectionsHiddenNotice` nedenini söyler ve
   ayar sayfasını doğru sekmede açar (`navigate("SectionVisibilityScreen", { initialScreen })`).

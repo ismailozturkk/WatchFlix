@@ -9,7 +9,7 @@ import { i18nText } from "../../utils/i18nText";
 // Etiketler çizim anında çözülür: modül yüklenirken dondurulursa dil değişince eski dilde kalır.
 const buildTabs = () => [
   { id: "background", icon: "image-outline", label: i18nText("autoI18n.arka_plan", "Arka Plan") },
-  { id: "poster", icon: "film-outline", label: "Poster" },
+  { id: "poster", icon: "film-outline", label: i18nText("autoI18n.profil_story_ogr_poster", "Posterler") },
   { id: "content", icon: "layers-outline", label: i18nText("autoI18n.icerik", "İçerik") },
   { id: "style", icon: "color-palette-outline", label: i18nText("autoI18n.stil", "Stil") },
 ];

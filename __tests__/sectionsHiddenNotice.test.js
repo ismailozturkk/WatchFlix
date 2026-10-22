@@ -53,7 +53,7 @@ test.each(["tr", "en", "es", "pt"])("%s: başlık, açıklama ve düğme metni g
   expect(texts()).toEqual([ui.emptyTitle, ui.emptyText, ui.emptyAction]);
 });
 
-test.each(["tv", "movie", "hub", "profile"])("düğme ayar sayfasını '%s' sekmesinde açar", (screen) => {
+test.each(["tv", "movie", "hub", "library", "profile"])("düğme ayar sayfasını '%s' sekmesinde açar", (screen) => {
   const navigate = jest.fn();
   render({ navigation: { navigate }, screen });
   act(() => renderer.root.findByProps({ testID: "sections-hidden-action" }).props.onPress());

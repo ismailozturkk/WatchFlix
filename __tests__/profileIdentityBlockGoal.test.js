@@ -1,9 +1,9 @@
 // __tests__/profileIdentityBlockGoal.test.js
 //
-// Profil kimlik bloğundaki eylem satırı: [Düzenle] [Paylaş] [Yıllık hedef halkası].
-// Üç düğmeyle sütun daralır (360 pt'te "Düzenle"ye ~70 px kalır); bu yüzden "Düzenle"
-// kendi ölçülen genişliğine göre simgesini bırakır ve satır sarılabilir. Düzenin gerçek
-// ölçüsü (Yoga) burada değil, davranış bağlantısı burada sınanır.
+// Profil kimlik bloğundaki eylem satırı: hepsi İKON düğmesi —
+// [Düzenle] [Bildirimler] [Ayarlar] [Paylaş] [Yıllık hedef halkası].
+// Beş düğme de alt satıra İNMEZ (flexWrap: "nowrap"); sütun genişliğine göre
+// düğme boyu ve aralık duyarlı (responsive) ölçeklenerek yatay alana tam sığar.
 
 import React from "react";
 import { act, create } from "react-test-renderer";
@@ -21,7 +21,10 @@ jest.mock("../components/badges/IdentityBadgesRow", () => ({ __esModule: true, d
 jest.mock("../components/profile/YearlyGoalButton", () => ({ __esModule: true, default: "GoalButton" }));
 jest.mock("../utils/i18nText", () => ({ i18nText: (_key, fallback) => fallback }));
 
-const ProfileIdentityBlock = require("../components/profile/ProfileIdentityBlock").default;
+const {
+  default: ProfileIdentityBlock,
+  resolveActionRowLayout,
+} = require("../components/profile/ProfileIdentityBlock");
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -37,6 +40,7 @@ const baseProps = {
 let renderer;
 let warn;
 beforeEach(() => {
+  jest.clearAllMocks();
   const original = console.error;
   warn = jest.spyOn(console, "error").mockImplementation((message, ...args) => {
     if (String(message).includes("react-test-renderer is deprecated")) return;
@@ -52,85 +56,94 @@ afterEach(() => {
 const render = (props = {}) => {
   act(() => { renderer = create(<ProfileIdentityBlock {...baseProps} {...props} />); });
 };
-const editButton = () => renderer.root.findAll((n) => n.type === "Pressable" && n.props.accessibilityLabel === "Profili Düzenle")[0];
-const layout = (width) => act(() => editButton().props.onLayout({ nativeEvent: { layout: { width, height: 36 } } }));
-const editIcons = () => editButton().findAllByType("Icon");
-const actionsRow = () => {
-  const edit = editButton();
-  return edit.parent;
-};
+const editButton = () => renderer.root.findByProps({ testID: "profile-edit-button" });
+const actionsRow = () => editButton().parent;
+const flatStyle = (style) => Object.assign({}, ...[].concat(style).flat(Infinity).filter(Boolean));
 const childTypes = () => actionsRow().children.map((c) => (typeof c === "string" ? c : c.type));
+const NotifStub = () => <GlassNotif />;
+const GlassNotif = () => null;
 
 describe("eylem satırı", () => {
-  test("showGoal açıkken sıra: Düzenle, Paylaş, hedef halkası", () => {
-    render({ showGoal: true });
-    expect(childTypes()).toEqual(["Pressable", "GlassButton", "GoalButton"]);
+  test("Düzenle bir İKON düğmesidir (etiketli hap değil) ve erişilebilir adı durur", () => {
+    render();
+    expect(editButton().type).toBe("GlassButton");
+    expect(editButton().props.icon).toBe("create-outline");
+    expect(editButton().props.size).toBe(36);
+    expect(editButton().props.accessibilityLabel).toBe("Profili Düzenle");
+    expect(renderer.root.findAllByType("Pressable")).toHaveLength(0);
   });
 
-  test("showGoal kapalıyken (varsayılan) hedef düğmesi YOK", () => {
+  test("sıra: Düzenle, Bildirimler, Ayarlar, Paylaş, hedef halkası", () => {
+    render({ showGoal: true, notificationsAction: <NotifStub />, onSettings: jest.fn(), settingsLabel: "Ayarlar" });
+    expect(childTypes()).toEqual(["GlassButton", NotifStub, "GlassButton", "GlassButton", "GoalButton"]);
+    const labels = actionsRow()
+      .children.filter((c) => c.type === "GlassButton")
+      .map((c) => c.props.testID ?? c.props.accessibilityLabel);
+    expect(labels).toEqual(["profile-edit-button", "profile-settings-button", "Paylaş"]);
+  });
+
+  test("bildirim girişi verilmezse yer tutmaz; hedef kapalıyken halka yok", () => {
     render();
-    expect(childTypes()).toEqual(["Pressable", "GlassButton"]);
-    render({ showGoal: false });
+    expect(childTypes()).toEqual(["GlassButton", "GlassButton"]);
     expect(renderer.root.findAllByType("GoalButton")).toHaveLength(0);
   });
 
-  test("satır sarılabilir; Düzenle esnek taban + asgari genişlikle (flex:1 DEĞİL)", () => {
-    render({ showGoal: true });
-    const row = actionsRow().props.style;
-    expect(row.flexWrap).toBe("wrap");
-    const edit = editButton().props.style({ pressed: false });
-    const style = Object.assign({}, ...[].concat(edit).flat().filter(Boolean));
-    // flexBasis 0 (flex:1) sarmayı tetiklemez; açık taban şart.
-    expect(style.flex).toBeUndefined();
-    expect(style.flexGrow).toBe(1);
-    expect(style.flexBasis).toBe(62);
-    expect(style.minWidth).toBe(62);
-  });
-});
+  test("satır tek yatay satırda kalır (nowrap) ve genişliğe göre tüm düğmeleri ölçekler", () => {
+    render({ showGoal: true, notificationsAction: <NotifStub />, onSettings: jest.fn(), settingsLabel: "Ayarlar" });
+    const row = flatStyle(actionsRow().props.style);
+    expect(row.flexWrap).toBe("nowrap");
+    expect(row.flexDirection).toBe("row");
+    expect(row.width).toBe("100%");
 
-describe("Düzenle simgesi darlıkta bırakılır", () => {
-  test("ilk ölçüme kadar simge yok (dar ekranda önce çizilip kaybolmasın)", () => {
-    render({ showGoal: true });
-    expect(editIcons()).toHaveLength(0);
-  });
-
-  test.each([62, 70, 85, 95])("%i px: yalnız etiket", (width) => {
-    render({ showGoal: true });
-    layout(width);
-    expect(editIcons()).toHaveLength(0);
-    expect(editButton().findAllByType("Text")).toHaveLength(1);
+    // 360 pt ekran (sütun genişliği 158 px): 5 düğme + 4 boşluk tam 158 px'e sığar.
+    act(() => {
+      actionsRow().props.onLayout({ nativeEvent: { layout: { width: 158, height: 36 } } });
+    });
+    const updatedRow = flatStyle(actionsRow().props.style);
+    const size = editButton().props.size;
+    expect(size).toBe(28);
+    expect(updatedRow.gap).toBe(4.5);
+    expect(5 * size + 4 * updatedRow.gap).toBeLessThanOrEqual(158);
+    expect(renderer.root.findByType("GoalButton").props.size).toBe(size);
+    expect(renderer.root.findByType(NotifStub).props.size).toBe(size);
   });
 
-  test.each([96, 100, 144, 210])("%i px: simge + etiket", (width) => {
-    render({ showGoal: true });
-    layout(width);
-    expect(editIcons()).toHaveLength(1);
-  });
+  test.each([135, 158, 173, 188, 191, 210, 228])(
+    "%i px sütunda 5 düğme yatay genişliği aşmadan sığar",
+    (width) => {
+      const layout = resolveActionRowLayout(width, 5);
+      expect(layout.size).toBeGreaterThanOrEqual(22);
+      expect(layout.size).toBeLessThanOrEqual(38);
+      expect(5 * layout.size + 4 * layout.gap).toBeLessThanOrEqual(width);
+    },
+  );
 
-  test("genişlik değişince simge geri gelir / gider", () => {
-    render({ showGoal: true });
-    layout(150);
-    expect(editIcons()).toHaveLength(1);
-    layout(70);
-    expect(editIcons()).toHaveLength(0);
-    layout(150);
-    expect(editIcons()).toHaveLength(1);
-  });
-
-  test("etiket her genişlikte durur (dokunma hedefinin adı kaybolmaz)", () => {
-    render({ showGoal: true });
-    layout(70);
-    expect(editButton().findAllByType("Text")[0].props.children).toBe("Düzenle");
-    expect(editButton().props.accessibilityRole).toBe("button");
-  });
-
-  test("Düzenle ve Paylaş işleyicileri hâlâ bağlı", () => {
+  test("Düzenle ve Paylaş işleyicileri bağlı", () => {
     const onEdit = jest.fn();
     const onShare = jest.fn();
     render({ showGoal: true, onEdit, onShare });
     act(() => editButton().props.onPress());
-    act(() => renderer.root.findByType("GlassButton").props.onPress());
+    const share = renderer.root
+      .findAllByType("GlassButton")
+      .find((n) => n.props.accessibilityLabel === "Paylaş");
+    act(() => share.props.onPress());
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onShare).toHaveBeenCalledTimes(1);
+  });
+
+  test("Ayarlar dişlisi eylem satırında (adın yanında DEĞİL) ve işleyicisi bağlı", () => {
+    const onSettings = jest.fn();
+    render({ onSettings, settingsLabel: "Ayarlar" });
+    const gear = renderer.root.findByProps({ testID: "profile-settings-button" });
+    expect(gear.parent).toBe(actionsRow());
+    expect(gear.props.size).toBe(36);
+    expect(gear.props.accessibilityLabel).toBe("Ayarlar");
+    act(() => gear.props.onPress());
+    expect(onSettings).toHaveBeenCalledTimes(1);
+  });
+
+  test("onSettings yoksa dişli çizilmez", () => {
+    render();
+    expect(renderer.root.findAllByProps({ testID: "profile-settings-button" })).toHaveLength(0);
   });
 });

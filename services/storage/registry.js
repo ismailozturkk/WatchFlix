@@ -519,6 +519,57 @@ const dataKeys = {
     keepOnLogout: true,
     validate: plainObject,
   },
+  // Sinema Bingosu geçmişi (utils/cinemaBingo.js): { "<pazartesi YYYY-AA-GG>": { lines, squares, full } },
+  // son 26 hafta. Yalnız bu cihazda tutulur ve çıkışta SİLİNMEZ (yearlyGoals ile aynı karar):
+  // kartın kendisi her hafta tohumdan yeniden kurulur, kalıcı olan tek şey seri ve tam kart sayısıdır.
+  cinemaBingo: {
+    key: "cinema_bingo:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
+  // Aylık kartın geçmişi; eski haftalık kartın kayıtları ayrı anahtarda korunur.
+  cinemaBingoMonthly: {
+    key: "cinema_bingo_monthly:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
+  // Hızlı oyunların kayıtları (utils/quickGames.js): { popular|decade|kind|genre: { best, plays, correct, answered } }.
+  // "Önce hangisi?" kendi anahtarında (olderGame) kaldı. Yalnız bu cihazda; çıkışta SİLİNMEZ (olderGame ile aynı karar).
+  quickGames: {
+    key: "quick_games:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
+  // Günün Sorusu'nda verdiğin oylar (utils/dailyPoll.js): { "<gün>": { choice: "a"|"b", synced } }, son 14 gün.
+  // Oyun sunucuya yazılana dek (ya da çevrimdışıyken) kartı bu kayıt doğru gösterir. Çıkışta SİLİNMEZ: sunucudaki
+  // oy zaten tek ve kalıcı; yerel kayıt silinirse kart, oyu sunucudan geri okuyana dek "oy ver" gibi görünürdü.
+  dailyPoll: {
+    key: "daily_poll:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
+  // "Önce hangisi?" hızlı oyununun kaydı (utils/olderGame.js): { best, plays, correct, answered }. Yalnız bu
+  // cihazda tutulur (liderlik / XP yok) ve çıkışta SİLİNMEZ: rekor kullanıcıya aittir, bulut kopyası yoktur.
+  olderGame: {
+    key: "older_game:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
   // Takip edilen oyuncu / yönetmenler (utils/followedPeople.js): { "<kişiId>": { id, name, photo,
   // department, at } }. Yalnız bu cihazda tutulur (buluta yazılmaz) ve çıkışta SİLİNMEZ: bulut
   // kopyası olmadığından silinen liste geri getirilemez (yearlyGoals ile aynı karar).

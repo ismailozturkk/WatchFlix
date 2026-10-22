@@ -8,13 +8,22 @@
 // içindeki cam anahtar (components/home/MediaTypeSwitch.js) ikisi arasında geçirir.
 // Eskiden iki ayrı sekme vardı ("tvshows", "movies"); alt çubuk beşten dörde indi.
 //
+// AYARLAR SEKME DEĞİL: "kur ve unut" bir ekran, çubukta en değerli yeri tutuyordu.
+// Profil'in sağ üstündeki dişli düğmesinden bir stack ekranı ("SettingsScreen") olarak
+// açılır; boşalan yere günlük işleri taşıyan "library" (Kütüphane: Sıradaki, Listeler,
+// Hatırlatmalar, Notlar) geldi.
+//
+// "share" anahtarı eski "Hub" sekmesidir (CineSwipe de `initialTab: "share"` ile oraya
+// döner); anahtar bilerek değişmedi, yalnız etiket ("Eğlence") ve simge oyun kolu oldu —
+// sekmenin içeriği paylaşımlar + CineSwipe + turnuva + Wrapped + oyunlar.
+//
 // SOFT CORNERS: every glyph is picked for round silhouettes — no sprocket
 // squares (film), dot grids (apps) or bare heads (person). Each Ionicons pair
 // has an SF Symbol twin with the SAME silhouette, so the native iOS bar and
 // the JS bar (Android glass / blur / solid) read as one icon set:
 //   discover play-circle ↔ play.circle (film + dizi için ortak, yuvarlak "izle")
-//   hub     grid      ↔ square.grid.2x2 (was apps: 3×3 dots, and a mismatch
-//                                      with the 2×2 grid iOS already showed)
+//   share    game-controller ↔ gamecontroller (eğlence / oyunlar)
+//   library  library    ↔ books.vertical (raf = kütüphane)
 //   profile person-circle ↔ person.crop.circle (was a bare person)
 //
 // A wrong SF name renders a BLANK tab icon on iOS with no error, and a wrong
@@ -22,13 +31,14 @@
 // checks every name here against the real glyph maps.
 export const TAB_DEFINITIONS = Object.freeze([
   { name: "discover", labelKey: "moviesAndTv", family: "Ionicons", icon: "play-circle", iconOutline: "play-circle-outline", sf: "play.circle", selectedSf: "play.circle.fill" },
-  { name: "share", labelKey: "hub", family: "Ionicons", icon: "grid", iconOutline: "grid-outline", sf: "square.grid.2x2", selectedSf: "square.grid.2x2.fill" },
-  { name: "settings", labelKey: "settings", family: "Ionicons", icon: "settings", iconOutline: "settings-outline", sf: "gearshape", selectedSf: "gearshape.fill" },
+  { name: "share", labelKey: "funTab", family: "Ionicons", icon: "game-controller", iconOutline: "game-controller-outline", sf: "gamecontroller", selectedSf: "gamecontroller.fill" },
+  { name: "library", labelKey: "library", family: "Ionicons", icon: "library", iconOutline: "library-outline", sf: "books.vertical", selectedSf: "books.vertical.fill" },
   { name: "profile", labelKey: "profile", family: "Ionicons", icon: "person-circle", iconOutline: "person-circle-outline", sf: "person.crop.circle", selectedSf: "person.crop.circle.fill" },
 ]);
 export const TAB_NAMES = Object.freeze(TAB_DEFINITIONS.map(({ name }) => name));
 export const isTabName = (name) => TAB_NAMES.includes(name);
-export const initialTabName = (name) => isTabName(name) ? name : name === "debug" ? "settings" : "discover";
+// Eski "debug" adı Ayarlar sekmesine düşerdi; Ayarlar artık Profil'den açılıyor.
+export const initialTabName = (name) => isTabName(name) ? name : name === "debug" ? "profile" : "discover";
 
 // Yapay zeka (CineMatch) bir SEKME DEĞİL, çubuğun yanındaki ayrık yuvarlak bir
 // eylem düğmesi: dokununca sohbeti açar, hiçbir ekranı seçili yapmaz. Bu yüzden

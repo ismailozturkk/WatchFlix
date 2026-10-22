@@ -77,6 +77,30 @@ beforeEach(async () => {
 /** Kuralları atlayarak başlangıç verisi yaz (test kurulumu). */
 const seed = (fn) => testEnv.withSecurityRulesDisabled((ctx) => fn(ctx.firestore()));
 
+describe("important invitation responses", () => {
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "Users", BOB, "notifications", "invite"), {
+        type: "cineswipe_invite", fromUid: ALICE, read: false, inviteCode: "123456",
+      });
+      await setDoc(doc(db, "Users", BOB, "notifications", "ordinary"), {
+        type: "message", fromUid: ALICE, read: false,
+      });
+    });
+  });
+
+  test("recipient can accept once; sender and later changes cannot alter decision", async () => {
+    const ref = doc(bob, "Users", BOB, "notifications", "invite");
+    await assertSucceeds(updateDoc(ref, { read: true, response: "accepted" }));
+    await assertFails(updateDoc(ref, { response: "declined" }));
+    await assertFails(updateDoc(doc(alice, "Users", BOB, "notifications", "invite"), { response: "declined" }));
+  });
+
+  test("ordinary messages cannot gain a response field", async () => {
+    await assertFails(updateDoc(doc(bob, "Users", BOB, "notifications", "ordinary"), { response: "accepted" }));
+  });
+});
+
 describe("ortak liste siralama yetkisi", () => {
   beforeEach(async () => {
     await seed(async (db) => {
@@ -1391,5 +1415,125 @@ describe("davet ve promosyon kodlari yalniz sunucuya acik", () => {
         "entitlements.promoUntil": new Date(Date.now() + 86400000 * 365),
       }),
     );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Günün Sorusu (DailyPolls): sayaç yalnız oy kaydıyla BİRLİKTE, +1 ve seçilen yana artar.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Günün Sorusu (DailyPolls)", () => {
+  // Gün anahtarı sunucu saatine göre TR günü (UTC+3) olmalı — istemcinin utils/dailyChallenge.dayKeyOf'u gibi.
+  const trDay = (offsetDays = 0) => {
+    const shifted = new Date(Date.now() + 3 * 3600000 + offsetDays * 86400000);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${shifted.getUTCFullYear()}-${p(shifted.getUTCMonth() + 1)}-${p(shifted.getUTCDate())}`;
+  };
+  const TODAY = trDay();
+
+  /** Oyu ve sayacı TEK toplu yazımda yazar (istemcideki işlemle aynı biçim). */
+  const castBatch = (db, uid, choice, day = TODAY, counter) => {
+    const batch = writeBatch(db);
+    batch.set(doc(db, "DailyPolls", day, "votes", uid), { choice });
+    batch.set(doc(db, "DailyPolls", day), counter || { a: choice === "a" ? 1 : 0, b: choice === "b" ? 1 : 0 });
+    return batch.commit();
+  };
+  const bumpBatch = (db, uid, choice, fields, day = TODAY) => {
+    const batch = writeBatch(db);
+    batch.set(doc(db, "DailyPolls", day, "votes", uid), { choice });
+    batch.update(doc(db, "DailyPolls", day), fields);
+    return batch.commit();
+  };
+
+  test("ilk oy sayacı kurar; sonraki oylar +1 artırır; sayaç herkese okunur", async () => {
+    await assertSucceeds(castBatch(alice, ALICE, "a"));
+    await assertSucceeds(bumpBatch(bob, BOB, "b", { b: increment(1) }));
+    await assertSucceeds(bumpBatch(carol, CAROL, "a", { a: increment(1) }));
+    const snap = await assertSucceeds(getDoc(doc(bob, "DailyPolls", TODAY)));
+    expect(snap.data()).toEqual({ a: 2, b: 1 });
+  });
+
+  test("istemcinin kullandığı transaction akışı çalışır (sayaç yoksa kur, varsa artır)", async () => {
+    const vote = (db, uid, choice) =>
+      runTransaction(db, async (tx) => {
+        const counterRef = doc(db, "DailyPolls", TODAY);
+        const snap = await tx.get(counterRef);
+        tx.set(doc(db, "DailyPolls", TODAY, "votes", uid), { choice });
+        if (snap.exists()) tx.update(counterRef, { [choice]: increment(1) });
+        else tx.set(counterRef, { a: choice === "a" ? 1 : 0, b: choice === "b" ? 1 : 0 });
+      });
+    await assertSucceeds(vote(alice, ALICE, "b"));
+    await assertSucceeds(vote(bob, BOB, "b"));
+    await assertSucceeds(vote(carol, CAROL, "a"));
+    expect((await getDoc(doc(alice, "DailyPolls", TODAY))).data()).toEqual({ a: 1, b: 2 });
+  });
+
+  test("seçilmeyen tarafın sayacı artırılamaz; çift artış ve keyfî değer reddedilir", async () => {
+    await seed((db) => setDoc(doc(db, "DailyPolls", TODAY), { a: 5, b: 5 }));
+    await assertFails(bumpBatch(alice, ALICE, "a", { b: increment(1) })); // a seçti, b'yi artırdı
+    await assertFails(bumpBatch(alice, ALICE, "a", { a: increment(2) })); // +2
+    await assertFails(bumpBatch(alice, ALICE, "a", { a: 999 })); // keyfî
+    await assertFails(bumpBatch(alice, ALICE, "b", { a: increment(1), b: increment(1) })); // iki taraf birden
+    await assertFails(bumpBatch(alice, ALICE, "a", { a: increment(-1) })); // azaltma
+    await assertSucceeds(bumpBatch(alice, ALICE, "a", { a: increment(1) }));
+  });
+
+  test("oy kaydı olmadan sayaç oynatılamaz; sayaçsız oy kaydı da olmaz", async () => {
+    await seed((db) => setDoc(doc(db, "DailyPolls", TODAY), { a: 5, b: 5 }));
+    await assertFails(updateDoc(doc(alice, "DailyPolls", TODAY), { a: increment(1) }));
+    await assertFails(setDoc(doc(alice, "DailyPolls", TODAY, "votes", ALICE), { choice: "a" }));
+  });
+
+  test("ikinci oy reddedilir (aynı seçim de, farklı seçim de); oy değiştirilemez ve silinemez", async () => {
+    await assertSucceeds(castBatch(alice, ALICE, "a"));
+    await assertFails(bumpBatch(alice, ALICE, "a", { a: increment(1) }));
+    await assertFails(bumpBatch(alice, ALICE, "b", { b: increment(1) }));
+    await assertFails(updateDoc(doc(alice, "DailyPolls", TODAY, "votes", ALICE), { choice: "b" }));
+    await assertFails(deleteDoc(doc(alice, "DailyPolls", TODAY, "votes", ALICE)));
+    expect((await getDoc(doc(alice, "DailyPolls", TODAY))).data()).toEqual({ a: 1, b: 0 });
+  });
+
+  test("başkası adına oy yazılamaz; oylar yalnız sahibine okunur", async () => {
+    await assertFails(castBatch(alice, BOB, "a"));
+    await assertSucceeds(castBatch(alice, ALICE, "a"));
+    await assertSucceeds(getDoc(doc(alice, "DailyPolls", TODAY, "votes", ALICE)));
+    await assertFails(getDoc(doc(bob, "DailyPolls", TODAY, "votes", ALICE)));
+    await assertFails(getDocs(collection(bob, "DailyPolls", TODAY, "votes")));
+  });
+
+  test("gün anahtarı bugün olmalı: dün, yarın ve bozuk anahtar reddedilir", async () => {
+    await assertFails(castBatch(alice, ALICE, "a", trDay(-1)));
+    await assertFails(castBatch(alice, ALICE, "a", trDay(1)));
+    await assertFails(castBatch(alice, ALICE, "a", "2026-13-45"));
+    await assertFails(castBatch(alice, ALICE, "a", "bugun"));
+    await assertSucceeds(castBatch(alice, ALICE, "a", TODAY));
+  });
+
+  test("geçersiz seçim ve fazladan alan reddedilir", async () => {
+    await assertFails(castBatch(alice, ALICE, "c", TODAY, { a: 1, b: 0 }));
+    const extraVote = writeBatch(alice);
+    extraVote.set(doc(alice, "DailyPolls", TODAY, "votes", ALICE), { choice: "a", weight: 50 });
+    extraVote.set(doc(alice, "DailyPolls", TODAY), { a: 1, b: 0 });
+    await assertFails(extraVote.commit());
+    const extraCounter = writeBatch(alice);
+    extraCounter.set(doc(alice, "DailyPolls", TODAY, "votes", ALICE), { choice: "a" });
+    extraCounter.set(doc(alice, "DailyPolls", TODAY), { a: 1, b: 0, total: 1 });
+    await assertFails(extraCounter.commit());
+  });
+
+  test("ilk oyla sayaç keyfî değerle kurulamaz (2/0, 1/1, negatif, yanlış taraf)", async () => {
+    await assertFails(castBatch(alice, ALICE, "a", TODAY, { a: 2, b: 0 }));
+    await assertFails(castBatch(alice, ALICE, "a", TODAY, { a: 1, b: 1 }));
+    await assertFails(castBatch(alice, ALICE, "a", TODAY, { a: -1, b: 0 }));
+    await assertFails(castBatch(alice, ALICE, "a", TODAY, { a: 0, b: 1 }));
+    await assertFails(castBatch(alice, ALICE, "a", TODAY, { a: "1", b: 0 }));
+    await assertSucceeds(castBatch(alice, ALICE, "a"));
+  });
+
+  test("sayaç silinemez; giriş yapmamış kullanıcı ne okur ne yazar", async () => {
+    await assertSucceeds(castBatch(alice, ALICE, "a"));
+    await assertFails(deleteDoc(doc(alice, "DailyPolls", TODAY)));
+    const anon = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anon, "DailyPolls", TODAY)));
+    await assertFails(castBatch(anon, "anon", "a", TODAY, { a: 1, b: 0 }));
   });
 });

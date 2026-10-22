@@ -75,7 +75,7 @@ import {
 } from "@services/listQuickAdd";
 import { reorderWatchedShows } from "../../services/watchedTvService";
 import { removeFromListAny, reorderCustomList } from "../../services/libraryActions";
-import { showLibraryError } from "../../utils/libraryErrorText";
+import { showLibraryError, showWatchSpreadNotice } from "../../utils/libraryErrorText";
 import { refreshShowMeta } from "../../services/refreshShowMeta";
 import { cachedTmdb } from "../../utils/cachedRead";
 import ScreenDecor from "@components/ScreenDecor";
@@ -782,7 +782,7 @@ export default function ListsScreen({ route, navigation }) {
     async (media, watchDate) => {
       setAddingKey(media.key);
       try {
-        const { status } = await addMediaToList({
+        const addResult = await addMediaToList({
           uid: user.uid,
           listName,
           media,
@@ -791,6 +791,7 @@ export default function ListsScreen({ route, navigation }) {
           genreMap,
           watchDate,
         });
+        const { status } = addResult;
 
         if (status === "empty-show") {
           Toast.show({
@@ -832,11 +833,13 @@ export default function ListsScreen({ route, navigation }) {
         Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success,
         ).catch(() => {});
-        Toast.show({
-          type: "success",
-          text1: i18nText("autoI18n.listeye_eklendi", "Listeye eklendi"),
-          text2: media.title,
-        });
+        if (!showWatchSpreadNotice(addResult)) {
+          Toast.show({
+            type: "success",
+            text1: i18nText("autoI18n.listeye_eklendi", "Listeye eklendi"),
+            text2: media.title,
+          });
+        }
       } catch (error) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(
           () => {},

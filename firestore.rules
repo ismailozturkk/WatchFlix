@@ -284,6 +284,25 @@ service cloud.firestore {
               && f.get('shows', []) is list && f.get('shows', []).size() <= 4
               && f.get('people', []) is list && f.get('people', []).size() <= 4);
     }
+    // "Sosyal hesaplar" (utils/socialLinks.js): { instagram: "ad", x: "ad", … }
+    // Yalnız bilinen platform anahtarları, her değer en fazla 30 karakterlik metin.
+    // Adres DEĞİL kullanıcı adı saklanır; adresi istemci sabit alan adından kurar.
+    // Alan hiç yoksa get() null döner → serbest. Yeni platform = burası + istemci tablosu.
+    function socialLinksOk() {
+      let s = request.resource.data.get('socialLinks', null);
+      return s == null
+          || (s is map
+              && s.keys().hasOnly(['instagram', 'x', 'tiktok', 'youtube',
+                                   'twitch', 'letterboxd', 'snapchat', 'threads'])
+              && s.get('instagram', '') is string && s.get('instagram', '').size() <= 30
+              && s.get('x', '') is string && s.get('x', '').size() <= 30
+              && s.get('tiktok', '') is string && s.get('tiktok', '').size() <= 30
+              && s.get('youtube', '') is string && s.get('youtube', '').size() <= 30
+              && s.get('twitch', '') is string && s.get('twitch', '').size() <= 30
+              && s.get('letterboxd', '') is string && s.get('letterboxd', '').size() <= 30
+              && s.get('snapchat', '') is string && s.get('snapchat', '').size() <= 30
+              && s.get('threads', '') is string && s.get('threads', '').size() <= 30);
+    }
     match /Users/{uid} {
       allow read: if isSignedIn();
       // Sunucuya ait alanlar — istemci ne kendi belgesinde ne başkasınınkinde
@@ -296,7 +315,8 @@ service cloud.firestore {
       allow create: if isOwner(uid)
                     && !request.resource.data.keys().hasAny(['entitlements', 'badges'])
                     && rootCreateWithoutPrivateFields()
-                    && fourFavoritesOk();
+                    && fourFavoritesOk()
+                    && socialLinksOk();
       // Sahibi her şeyi yazar; diğer signed-in kullanıcılar SADECE
       // counter/timestamp alanlarını günceller (friend req / like / comment
       // akışlarında karşı tarafın dokümanı güncellenir).
@@ -307,7 +327,8 @@ service cloud.firestore {
                           .affectedKeys().hasAny(['entitlements', 'badges'])
                         && birthDateKept(uid)
                         && rootUpdateWithoutPrivateFields()
-                        && fourFavoritesOk())
+                        && fourFavoritesOk()
+                        && socialLinksOk())
                     || (isSignedIn()
                         && onlyUpdating([
                              'friendsCount','followersCount','followingCount',
@@ -470,8 +491,13 @@ service cloud.firestore {
       allow create: if isSignedIn()
                     && request.resource.data.fromUid == request.auth.uid
                     && notBlocked(uid);
-      // Sahibi sadece 'read' alanını değiştirebilir veya silebilir.
-      allow update: if isOwner(uid) && onlyUpdating(['read']);
+        // Davete verilen yanıt yalnız alıcı tarafından bir kez yazılır.
+        allow update: if isOwner(uid)
+                      && onlyUpdating(['read', 'response'])
+                      && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['response'])
+                          || (!('response' in resource.data)
+                              && resource.data.type in ['cineswipe_invite', 'game_challenge']
+                              && request.resource.data.response in ['accepted', 'declined']));
       allow delete: if isOwner(uid);
     }
 
@@ -1256,6 +1282,71 @@ service cloud.firestore {
                       || resource.data.guestUid == request.auth.uid
                     );
       allow delete: if isSignedIn() && resource.data.hostUid == request.auth.uid;
+    }
+
+    // ─── Günün Sorusu (iki seçenekli günlük anket) ──────────────────────
+    // DailyPolls/{gün}: { a, b } — iki seçeneğin oy sayacı. Gün anahtarı Türkiye günüdür
+    // (utils/dailyChallenge.dayKeyOf, UTC+3). Soru metni istemcide paketlidir; burada yalnız SAYAÇ vardır.
+    //
+    // GÜVEN MODELİ (sayaç şişirmeyi kural düzeyinde kapatır):
+    //   • Oy, kullanıcı başına TEK doküman (DailyPolls/{gün}/votes/{uid}) ve değiştirilemez/silinemez.
+    //   • Sayaç yalnız kullanıcının O ANKİ toplu yazımda oy dokümanını OLUŞTURMASIYLA artabilir
+    //     (existsAfter/getAfter): oy kaydı olmadan sayaç oynatılamaz, aynı oyla iki kez artırılamaz
+    //     (!exists = oy daha önce yok), artış tam +1 ve YALNIZ seçilen tarafa.
+    //   • Gün anahtarı sunucu saatine göre BUGÜN olmalı: gelecek/geçmiş günlerin sayacı doldurulamaz.
+    //   • Oyların kim olduğu başkasına açık değildir (votes yalnız sahibine okunur).
+    function pollTrNow() { return request.time + duration.value(3, 'h'); }
+    function pollTwo(n) { return (n < 10 ? '0' : '') + string(n); }
+    function pollToday() {
+      return string(pollTrNow().year()) + '-' + pollTwo(pollTrNow().month()) + '-' + pollTwo(pollTrNow().day());
+    }
+    match /DailyPolls/{dayKey} {
+      function pollVotePath() {
+        return /databases/$(database)/documents/DailyPolls/$(dayKey)/votes/$(request.auth.uid);
+      }
+      function pollChoiceAfter() { return getAfter(pollVotePath()).data.choice; }
+      // Seçilen yanın yazım ÖNCESİ sayacı + 1 (sayaç henüz yoksa 0 + 1).
+      function pollCountBefore(choice) {
+        return (exists(/databases/$(database)/documents/DailyPolls/$(dayKey))
+                 ? get(/databases/$(database)/documents/DailyPolls/$(dayKey)).data[choice]
+                 : 0) + 1;
+      }
+      function pollCounterBase() {
+        return isSignedIn()
+            && dayKey == pollToday()
+            && request.resource.data.keys().hasOnly(['a', 'b'])
+            && request.resource.data.a is int
+            && request.resource.data.b is int
+            && !exists(pollVotePath())
+            && existsAfter(pollVotePath());
+      }
+
+      allow read: if isSignedIn();
+      allow create: if pollCounterBase()
+                    && ((pollChoiceAfter() == 'a' && request.resource.data.a == 1 && request.resource.data.b == 0)
+                     || (pollChoiceAfter() == 'b' && request.resource.data.a == 0 && request.resource.data.b == 1));
+      allow update: if pollCounterBase()
+                    && ((pollChoiceAfter() == 'a'
+                         && request.resource.data.a == resource.data.a + 1
+                         && request.resource.data.b == resource.data.b)
+                     || (pollChoiceAfter() == 'b'
+                         && request.resource.data.b == resource.data.b + 1
+                         && request.resource.data.a == resource.data.a));
+      allow delete: if false;
+
+      match /votes/{uid} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && dayKey == pollToday()
+                      && request.resource.data.keys().hasOnly(['choice'])
+                      && request.resource.data.choice in ['a', 'b']
+                      // Sayaç aynı toplu yazımda artmadan oy kaydı olmaz (oy "sayılmadan" kaydedilemez):
+                      // seçilen yanın sayacı yazım SONRASI, yazım ÖNCESİNDEN tam 1 fazla olmalı.
+                      && existsAfter(/databases/$(database)/documents/DailyPolls/$(dayKey))
+                      && getAfter(/databases/$(database)/documents/DailyPolls/$(dayKey)).data[request.resource.data.choice]
+                         == pollCountBefore(request.resource.data.choice);
+        allow update, delete: if false;
+      }
     }
   }
 }

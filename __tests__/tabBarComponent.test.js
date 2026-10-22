@@ -247,12 +247,12 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
       );
     });
 
-    const settingsBtn = renderer.root.find((node) => node.props["data-testid"] === "tab-settings");
+    const libraryBtn = renderer.root.find((node) => node.props["data-testid"] === "tab-library");
     act(() => {
-      settingsBtn.props.onClick();
+      libraryBtn.props.onClick();
     });
 
-    expect(onSelect).toHaveBeenCalledWith("settings");
+    expect(onSelect).toHaveBeenCalledWith("library");
   });
 
   it("renders AdaptiveBlurView in legacy-blur mode", () => {
@@ -506,9 +506,9 @@ describe("TabBar Liquid Glass & Component Interaction", () => {
     });
 
     const callsBeforeRelease = withSpring.mock.calls.length;
-    const settingsButton = renderer.root.find((node) => node.props["data-testid"] === "tab-settings");
+    const libraryButton = renderer.root.find((node) => node.props["data-testid"] === "tab-library");
     expect(() => {
-      act(() => { settingsButton.props.onPressOut(); });
+      act(() => { libraryButton.props.onPressOut(); });
     }).not.toThrow();
 
     // onPressOut must have driven the shrink-back springs itself, without

@@ -1,0 +1,73 @@
+import { copyLanguage } from "./appLanguages";
+
+export const NOTIFICATION_INBOX_COPY = {
+  tr: {
+    importantTitle: "Önemli davetler", cineInvite: "seni CineSwipe odasına davet etti", duelInvite: "seni günlük düelloya davet etti",
+    acceptInvite: "Kabul et", declineInvite: "Reddet", inviteCount: (n) => `${n} davet`, nextInvite: "Sonraki davet", inviteError: "Davet yanıtı kaydedilemedi. Tekrar dene.",
+    expand: "Detayları göster", collapse: "Detayları gizle",
+    title: "Bildirimler", subtitle: "En yeniden eskiye tüm hareketler", today: "Bugün", yesterday: "Dün",
+    unread: "Okunmamış", read: "Okundu", all: "Tümü", empty: "Henüz bildirim yok",
+    emptyBody: "Gelen arkadaşlık istekleri, mesajlar ve gönderi etkileşimleri burada görünecek.",
+    emptyUnread: "Okunmamış bildirim yok", emptyUnreadBody: "Yüklenen bildirimlerin tümü okundu.",
+    error: "Bildirimler yüklenemedi. Lütfen tekrar dene.", readError: "Bildirim okundu olarak kaydedilemedi. Lütfen tekrar dene.",
+    retry: "Tekrar dene", more: "Daha eski bildirimler", unknownDate: "Tarih bilgisi yok", open: "İlgili içeriği aç",
+    summary: (n) => n > 0 ? `${n} okunmamış bildirim` : "Gelen bildirimlerini görüntüle",
+    relativeTime: (n, unit) => n === 0 ? "şimdi" : `${n} ${{ second: "saniye", minute: "dakika", hour: "saat", day: "gün" }[unit]} önce`,
+  },
+  en: {
+    importantTitle: "Important invitations", cineInvite: "invited you to a CineSwipe room", duelInvite: "challenged you to a daily duel",
+    acceptInvite: "Accept", declineInvite: "Decline", inviteCount: (n) => `${n} invitation${n === 1 ? "" : "s"}`, nextInvite: "Next invitation", inviteError: "Couldn't save your response. Try again.",
+    expand: "Show details", collapse: "Hide details",
+    title: "Notifications", subtitle: "All activity, newest first", today: "Today", yesterday: "Yesterday",
+    unread: "Unread", read: "Read", all: "All", empty: "No notifications yet",
+    emptyBody: "Friend requests, messages and post activity will appear here.",
+    emptyUnread: "No unread notifications", emptyUnreadBody: "All loaded notifications have been read.",
+    error: "Couldn't load notifications. Please try again.", readError: "Couldn't mark this notification as read. Please try again.",
+    retry: "Try again", more: "Older notifications", unknownDate: "Date unavailable", open: "Open related content",
+    summary: (n) => n > 0 ? `${n} unread notifications` : "View your notifications",
+    relativeTime: (n, unit) => n === 0 ? "now" : `${n} ${unit}${n === 1 ? "" : "s"} ago`,
+  },
+  es: {
+    importantTitle: "Invitaciones importantes", cineInvite: "te invitó a una sala de CineSwipe", duelInvite: "te retó a un duelo diario",
+    acceptInvite: "Aceptar", declineInvite: "Rechazar", inviteCount: (n) => `${n} invitación${n === 1 ? "" : "es"}`, nextInvite: "Siguiente invitación", inviteError: "No se pudo guardar tu respuesta. Inténtalo de nuevo.",
+    expand: "Mostrar detalles", collapse: "Ocultar detalles",
+    title: "Notificaciones", subtitle: "Toda la actividad, de más reciente a más antigua", today: "Hoy", yesterday: "Ayer",
+    unread: "Sin leer", read: "Leída", all: "Todas", empty: "Aún no hay notificaciones",
+    emptyBody: "Aquí aparecerán las solicitudes de amistad, los mensajes y las interacciones con tus publicaciones.",
+    emptyUnread: "No hay notificaciones sin leer", emptyUnreadBody: "Todas las notificaciones cargadas están leídas.",
+    error: "No se pudieron cargar las notificaciones. Inténtalo de nuevo.", readError: "No se pudo marcar como leída. Inténtalo de nuevo.",
+    retry: "Reintentar", more: "Notificaciones anteriores", unknownDate: "Fecha no disponible", open: "Abrir contenido relacionado",
+    summary: (n) => n > 0 ? `${n} notificaciones sin leer` : "Ver tus notificaciones",
+    relativeTime: (n, unit) => n === 0 ? "ahora" : `hace ${n} ${{ second: "segundo", minute: "minuto", hour: "hora", day: "día" }[unit]}${n === 1 ? "" : "s"}`,
+  },
+  pt: {
+    importantTitle: "Convites importantes", cineInvite: "convidou você para uma sala do CineSwipe", duelInvite: "desafiou você para um duelo diário",
+    acceptInvite: "Aceitar", declineInvite: "Recusar", inviteCount: (n) => `${n} convite${n === 1 ? "" : "s"}`, nextInvite: "Próximo convite", inviteError: "Não foi possível salvar sua resposta. Tente novamente.",
+    expand: "Mostrar detalhes", collapse: "Ocultar detalhes",
+    title: "Notificações", subtitle: "Toda a atividade, da mais recente à mais antiga", today: "Hoje", yesterday: "Ontem",
+    unread: "Não lidas", read: "Lida", all: "Todas", empty: "Ainda não há notificações",
+    emptyBody: "Pedidos de amizade, mensagens e interações com suas publicações aparecerão aqui.",
+    emptyUnread: "Nenhuma notificação não lida", emptyUnreadBody: "Todas as notificações carregadas foram lidas.",
+    error: "Não foi possível carregar as notificações. Tente novamente.", readError: "Não foi possível marcar como lida. Tente novamente.",
+    retry: "Tentar novamente", more: "Notificações anteriores", unknownDate: "Data indisponível", open: "Abrir conteúdo relacionado",
+    summary: (n) => n > 0 ? `${n} notificações não lidas` : "Ver suas notificações",
+    relativeTime: (n, unit) => n === 0 ? "agora" : `há ${n} ${{ second: "segundo", minute: "minuto", hour: "hora", day: "dia" }[unit]}${n === 1 ? "" : "s"}`,
+  },
+  de: {
+    importantTitle: "Wichtige Einladungen", cineInvite: "hat dich in einen CineSwipe Raum eingeladen", duelInvite: "hat dich zu einem Tagesduell herausgefordert",
+    acceptInvite: "Annehmen", declineInvite: "Ablehnen", inviteCount: (n) => `${n} Einladung${n === 1 ? "" : "en"}`, nextInvite: "Nächste Einladung", inviteError: "Antwort konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    expand: "Details anzeigen", collapse: "Details ausblenden",
+    title: "Benachrichtigungen", subtitle: "Alle Aktivitäten, neueste zuerst", today: "Heute", yesterday: "Gestern",
+    unread: "Ungelesen", read: "Gelesen", all: "Alle", empty: "Noch keine Benachrichtigungen",
+    emptyBody: "Freundschaftsanfragen, Nachrichten und Beitragsaktivitäten erscheinen hier.",
+    emptyUnread: "Keine ungelesenen Benachrichtigungen", emptyUnreadBody: "Alle geladenen Benachrichtigungen wurden gelesen.",
+    error: "Benachrichtigungen konnten nicht geladen werden. Bitte versuche es erneut.", readError: "Konnte nicht als gelesen markiert werden. Bitte versuche es erneut.",
+    retry: "Erneut versuchen", more: "Ältere Benachrichtigungen", unknownDate: "Datum nicht verfügbar", open: "Zugehörigen Inhalt öffnen",
+    summary: (n) => n > 0 ? `${n} ungelesene Benachrichtigungen` : "Benachrichtigungen ansehen",
+    relativeTime: (n, unit) => n === 0 ? "jetzt" : `vor ${n} ${(n === 1
+      ? { second: "Sekunde", minute: "Minute", hour: "Stunde", day: "Tag" }
+      : { second: "Sekunden", minute: "Minuten", hour: "Stunden", day: "Tagen" })[unit]}`,
+  },
+};
+
+export const notificationInboxCopy = (language) => NOTIFICATION_INBOX_COPY[copyLanguage(language, Object.keys(NOTIFICATION_INBOX_COPY))];

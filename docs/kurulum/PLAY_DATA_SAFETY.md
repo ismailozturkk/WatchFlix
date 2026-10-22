@@ -147,4 +147,26 @@ tablo 2'ye şunlar eklenir (hepsi **linked**, **Shared: Hayır**, **Required** �
 
 ---
 
+## 8. 21 Ekim 2026 güncellemesi — 16 Ekim'den SONRA eklenenler
+
+Gizlilik politikası 1.4 / Şartlar 1.3 (`website/privacy.html`, `terms.html`) bu listeye göre yazıldı. Hepsi **linked**, **Shared: Hayır**,
+**Required** (kapatma anahtarı yok) — yeni bir Play veri türü AÇILMIYOR, mevcut kalemlerin kapsamı genişliyor:
+
+| Play kategorisi | Ne | Kaynak | Amaç |
+|---|---|---|---|
+| App activity › **Other user-generated content** | Sosyal hesap kullanıcı adları (`Users.socialLinks`: Instagram, X, TikTok, YouTube, Twitch, Letterboxd, Snapchat, Threads — yalnız kullanıcı adı) | `utils/socialLinks.js`, `SocialLinksEditor.js` | App functionality |
+| App activity › **Other user-generated content** | Davet kodu, davet bağı, promosyon kodu kullanımı (yalnız sunucuda; kurallar istemciye kapalı) | `functions/referral.js` | App functionality |
+| Financial info › **Purchase history** | Davetli için yalnız "abone oldu" bilgisi (tutar/ürün tutulmaz) | `functions/referral.js` | App functionality |
+
+- **Zevk uyumu** (arkadaş profilinde): iki tarafın zaten görebildiği veriden CİHAZDA hesaplanır, ayrıca saklanmaz → yeni kalem yok. Sohbete gönderilirse
+  tablo 2'deki "Other in-app messages" kapsamında.
+- **Harici puanlar (OMDb):** sunucu fonksiyonu `getExternalRatings` yalnız film/dizi kimliğini sorgular; kullanıcı verisi OMDb'ye gitmez.
+- **Haftalık özet bildirimi:** mevcut push jetonu; ek veri yok.
+- **Kütüphane dışa aktarma:** kullanıcının cihazında oluşturduğu dosya; bize gitmez.
+- **İzinler:** `expo-image-picker` kaldırıldı (21 Eki) → manifestten `CAMERA` düştü; fotoğraf/kamera hiçbir yerde istenmiyor. Yeni build gerekir.
+- **Hesap silme:** artık sunucuda (`deleteAccountData` + Auth `onDelete` süpürmesi) tam kapsamlı çalışır; "Can users request data deletion? Evet" yanıtı doğru ve
+  kapsamı `website/delete-account.html` ile birebir. Sunucu fonksiyonları ABD bölgesinde (`us-central1`).
+
+---
+
 **İlgili:** `REVENUECAT_KURULUM.md` (abonelik tarafı), `YAYIN_ONCESI_AI_GOREV_PLANI.md` C5.

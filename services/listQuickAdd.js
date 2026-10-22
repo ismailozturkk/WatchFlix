@@ -299,14 +299,19 @@ export async function addMediaToList({
 
     // Sezonları çekme, "biri düşerse hiçbiri yazılmaz" kuralı ve yazma sırası
     // libraryActions/showSeasons'ta.
-    const { status } = await markShowWatched({
+    const { status, spread } = await markShowWatched({
       uid,
       details: { ...details, name: details.name || media.title },
       watchDate: dateAdded,
       apiKey,
       language,
     });
-    return { status: status === "added" ? "added" : "empty-show", item: null };
+    // `spread`: günlük 24 saat sınırı yüzünden bölümler günlere yayıldıysa özeti.
+    return {
+      status: status === "added" ? "added" : "empty-show",
+      item: null,
+      ...(spread ? { spread } : {}),
+    };
   }
 
   // ── İzlenen filmler: yayın kapısı, öğe kurulmadan ÖNCE ────────────────────

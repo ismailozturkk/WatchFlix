@@ -12,14 +12,10 @@ import TvShowsGenres from "../tv/TvShowsGenres";
 import TvShowsProvders from "../tv/TvShowsProvders";
 import TvShowsTrends from "../tv/TvShowsTrends";
 import TvShowBests from "../tv/TvShowBests";
-import TvOngoingSection from "../tv/TvOngoingSection";
 import TvShowsEmmy from "../tv/TvShowsEmmy";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { useTvShow } from "../../context/TvShowContex";
 import { DeviceEventEmitter } from "react-native";
-import {
-  useOngoingTvShowsSettings,
-} from "../../context/AppSettingsContext";
 import ScreenDecor from "../../components/ScreenDecor";
 import DiscoverHeaderSpacer from "../../components/home/DiscoverHeaderSpacer";
 import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
@@ -49,7 +45,6 @@ const MarkedFlatList = markTabScroll(Animated.FlatList);
 export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
   const { contentBottom } = useTabBarLayout();
   const { theme } = useTheme();
-  const { showOngoingTvShows } = useOngoingTvShowsSettings();
   const { streamingProviderIds } = useStreamingProviderSettings();
   const { onboardingGenreKeys } = useDiscoveryPreferenceSettings();
   const onboardingGenreIds = useMemo(
@@ -81,9 +76,6 @@ export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
   const sections = useMemo(() => {
     const items = [
       { key: "trends", Component: TvShowsTrends },
-      showOngoingTvShows
-        ? { key: "ongoing", Component: TvOngoingSection }
-        : null,
       { key: "best", Component: TvShowBests },
       ...(followedCount > 0
         ? [{ key: "followedPeople", Component: FollowedUpcomingRail }]
@@ -108,10 +100,10 @@ export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
       { key: "airingToday", Component: TvShowsAiringToday },
     ];
 
-    // Raf kimlikleri (`key`) utils/sectionVisibility.js'teki "tv" bölümleriyle aynı;
-    // "ongoing" ise kendi ayarıyla (showOngoingTvShows) yukarıda zaten elendi.
+    // Raf kimlikleri (`key`) utils/sectionVisibility.js'teki "tv" bölümleriyle aynı.
+    // Devam eden diziler rafı buradan kalktı: Kütüphane sekmesindeki "Sıradaki" taşıyor.
     return filterHiddenSections(items.filter(Boolean));
-  }, [filterHiddenSections, followedCount, hasFavoriteSignal, onboardingGenreIds, showOngoingTvShows, streamingProviderIds, topTvGenres]);
+  }, [filterHiddenSections, followedCount, hasFavoriteSignal, onboardingGenreIds, streamingProviderIds, topTvGenres]);
 
   const [visibleSectionCount, setVisibleSectionCount] = useState(INITIAL_SECTION_COUNT);
 
