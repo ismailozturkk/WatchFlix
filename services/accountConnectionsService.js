@@ -5,10 +5,10 @@
 import {
   EmailAuthProvider,
   linkWithCredential,
-  sendPasswordResetEmail,
   unlink,
 } from "firebase/auth";
 import { auth } from "../firebase";
+import { AuthEmailCode, sendResetEmail } from "./authEmail";
 import { legacyFlagToLanguage, pickByLanguage } from "../utils/appLanguages";
 
 export const AccountConnectionCode = {
@@ -21,6 +21,7 @@ export const AccountConnectionCode = {
   REQUIRES_RECENT_LOGIN: "account-connection/requires-recent-login",
   LAST_PROVIDER: "account-connection/last-provider",
   NETWORK: "account-connection/network",
+  TOO_MANY: "account-connection/too-many-requests",
   UNKNOWN: "account-connection/unknown",
 };
 
@@ -39,6 +40,16 @@ function providerIds(user) {
 
 function toAccountConnectionError(error) {
   if (error instanceof AccountConnectionError) return error;
+  // services/authEmail.js'in sınıflı hataları (parola sıfırlama e-postası).
+  if (error?.name === "AuthEmailError") {
+    if (error.code === AuthEmailCode.OFFLINE) {
+      return new AccountConnectionError(AccountConnectionCode.NETWORK, null, error);
+    }
+    if (error.code === AuthEmailCode.TOO_MANY) {
+      return new AccountConnectionError(AccountConnectionCode.TOO_MANY, null, error);
+    }
+    return new AccountConnectionError(AccountConnectionCode.UNKNOWN, null, error);
+  }
   switch (error?.code) {
     case "auth/weak-password":
       return new AccountConnectionError(AccountConnectionCode.WEAK_PASSWORD, null, error);
@@ -120,6 +131,13 @@ const ERROR_TEXT = {
     pt: "Não foi possível conectar à rede. Verifique sua conexão.",
     de: "Das Netzwerk war nicht erreichbar. Prüfe deine Verbindung.",
   },
+  [AccountConnectionCode.TOO_MANY]: {
+    tr: "Çok fazla deneme yapıldı. Biraz bekleyip tekrar dene.",
+    en: "Too many attempts. Wait a bit and try again.",
+    es: "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
+    pt: "Muitas tentativas. Aguarde um pouco e tente novamente.",
+    de: "Zu viele Versuche. Warte einen Moment und versuche es erneut.",
+  },
 };
 
 /**
@@ -167,7 +185,8 @@ export async function sendCurrentUserPasswordReset() {
   if (!user) throw new AccountConnectionError(AccountConnectionCode.NO_SESSION);
   if (!user.email) throw new AccountConnectionError(AccountConnectionCode.NO_EMAIL);
   try {
-    await sendPasswordResetEmail(auth, user.email);
+    // Şablon uygulama dilinde gider; adres temizlenir (services/authEmail.js).
+    await sendResetEmail(user.email);
   } catch (error) {
     throw toAccountConnectionError(error);
   }

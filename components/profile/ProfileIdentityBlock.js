@@ -33,7 +33,7 @@ import YearlyGoalButton from "./YearlyGoalButton";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 
-const { StyleSheet, Text, View } = ReactNative;
+const { Pressable, StyleSheet, Text, View } = ReactNative;
 
 // Doğrulama renkleri temadan bağımsız: her zeminde okunur (eski ekranla aynı).
 const VERIFIED_COLOR = "rgb(29, 161, 242)";
@@ -123,6 +123,8 @@ function ProfileIdentityBlock({
   email,
   emailVerified,
   verifyHint,
+  // Doğrulama uyarısının altındaki eylem: { label, onPress, busy?, disabled? } (yoksa yalnız metin).
+  verifyAction = null,
   joinedAt,
   onEdit,
   onShare,
@@ -251,13 +253,37 @@ function ProfileIdentityBlock({
               size={13}
               color={UNVERIFIED_COLOR}
             />
-            <Text
-              allowFontScaling={false}
-              numberOfLines={3}
-              style={[styles.noticeText, { color: UNVERIFIED_COLOR }]}
-            >
-              {verifyHint}
-            </Text>
+            <View style={styles.noticeBody}>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={3}
+                style={[styles.noticeText, { color: UNVERIFIED_COLOR }]}
+              >
+                {verifyHint}
+              </Text>
+              {!!verifyAction && (
+                <Pressable
+                  testID="profile-verify-resend"
+                  accessibilityRole="button"
+                  accessibilityLabel={verifyAction.label}
+                  accessibilityState={{ disabled: !!verifyAction.disabled, busy: !!verifyAction.busy }}
+                  disabled={!!verifyAction.disabled || !!verifyAction.busy}
+                  onPress={verifyAction.onPress}
+                  hitSlop={8}
+                >
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    style={[
+                      styles.noticeAction,
+                      { color: UNVERIFIED_COLOR, opacity: verifyAction.disabled || verifyAction.busy ? 0.55 : 1 },
+                    ]}
+                  >
+                    {verifyAction.label}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
           </View>
         )}
       </View>
@@ -379,11 +405,17 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     borderWidth: 1,
   },
+  noticeBody: { flex: 1, gap: 3 },
   noticeText: {
-    flex: 1,
     fontSize: 10.5,
     fontWeight: "600",
     lineHeight: 14,
+  },
+  noticeAction: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    lineHeight: 14,
+    textDecorationLine: "underline",
   },
   actions: {
     marginTop: 12,

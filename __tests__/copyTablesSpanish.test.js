@@ -34,6 +34,7 @@ const { OLDER_COPY } = require("../utils/olderGameCopy");
 const { POLL_COPY } = require("../utils/dailyPollCopy");
 const { QUICK_COPY } = require("../utils/quickGamesCopy");
 const { DAILY_LIMIT_COPY } = require("../utils/dailyLimitCopy");
+const { AUTH_EMAIL_COPY } = require("../utils/authEmailCopy");
 const { RESET_ACCOUNT_COPY } = require("../screens/tabs/profile/resetAccountCopy");
 const { DELETE_ACCOUNT_COPY } = require("../screens/tabs/profile/deleteAccountCopy");
 
@@ -124,6 +125,7 @@ const TABLOLAR = {
   "Günün sorusu (dailyPollCopy)": () => POLL_COPY,
   "Hızlı oyunlar (quickGamesCopy)": () => QUICK_COPY,
   "Günlük izleme sınırı (dailyLimitCopy)": () => DAILY_LIMIT_COPY,
+  "E-posta doğrulama / sıfırlama (authEmailCopy)": () => AUTH_EMAIL_COPY,
   "Hesabı sıfırla (resetAccountCopy)": () => RESET_ACCOUNT_COPY,
   "Hesabı sil (deleteAccountCopy)": () => DELETE_ACCOUNT_COPY,
   "Wrapped (wrappedStrings)": () => ({

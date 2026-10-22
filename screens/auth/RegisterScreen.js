@@ -21,11 +21,11 @@ import {
   createUserWithEmailAndPassword,
   deleteUser,
   getAuth,
-  sendEmailVerification,
   signOut,
   updateProfile,
 } from "firebase/auth";
 import Toast from "@components/AppToast";
+import { cleanEmail, sendVerificationEmail } from "../../services/authEmail";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
@@ -133,7 +133,10 @@ export default function RegisterScreen({ navigation }) {
   const passwordAgainRef = useRef(null);
 
   // Basit e-posta biçim kontrolü (boşken nötr)
-  const emailValid = email.length === 0 ? null : /^\S+@\S+\.\S+$/.test(email);
+  // Otomatik tamamlama adrese boşluk bırakabiliyor (Login ekranı da kırpıyor): doğrulama ve
+  // gönderim TEMİZLENMİŞ adresle yapılır, yoksa buton sebepsiz kapalı kalırdı.
+  const emailClean = cleanEmail(email);
+  const emailValid = emailClean.length === 0 ? null : /^\S+@\S+\.\S+$/.test(emailClean);
   const usernameValid = isValidUsername(username);
   const usernameChecking =
     username.length >= 3 && usernameValid && usernameAvailable === null;
@@ -270,7 +273,7 @@ export default function RegisterScreen({ navigation }) {
       const auth = getAuth();
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        email,
+        emailClean,
         password,
       );
       const user = userCredential.user;
@@ -285,7 +288,7 @@ export default function RegisterScreen({ navigation }) {
       await createUserProfile({
         uid: user.uid,
         username: cleanUsername,
-        email,
+        email: emailClean,
         displayName,
         birthDate,
         // Yeni hesaba rastgele avatar: herkes 0 numaralı görselle başlamasın.
@@ -301,9 +304,10 @@ export default function RegisterScreen({ navigation }) {
 
       // Profil olusmadan once verification gondermiyoruz. Profil transaction'i
       // duserse Auth kullanicisini silebilir ve e-postayi kilitlemeyiz.
+      // E-posta şablonu uygulama dilinde gider (services/authEmail.js → auth.languageCode).
       let verificationSent = true;
       try {
-        await sendEmailVerification(user);
+        await sendVerificationEmail(user, { language });
       } catch {
         verificationSent = false;
       }
@@ -318,9 +322,9 @@ export default function RegisterScreen({ navigation }) {
         text1: verificationSent
           ? i18nText("autoI18n.registration_success_verify_email", "{{username}} olarak kayıt başarılı! Email doğrulaması gönderildi: {{email}}", {
               username,
-              email,
+              email: emailClean,
             })
-          : language === "tr" ? "Hesabın oluşturuldu. Doğrulama e-postasını giriş ekranından yeniden gönderebilirsin." : language === "es" ? "Tu cuenta se ha creado. Puedes reenviar la verificación desde la pantalla de inicio de sesión." : language === "pt" ? "Sua conta foi criada. Você pode reenviar a verificação pela tela de login." : language === "de" ? "Dein Konto wurde erstellt. Du kannst die Bestätigung auf dem Anmeldebildschirm erneut senden." : "Your account was created. You can resend verification from the sign-in screen.",
+          : language === "tr" ? "Hesabın oluşturuldu. Giriş yaptıktan sonra Profil ekranından doğrulama e-postasını yeniden gönderebilirsin." : language === "es" ? "Tu cuenta se ha creado. Tras iniciar sesión puedes reenviar la verificación desde tu perfil." : language === "pt" ? "Sua conta foi criada. Depois de entrar, você pode reenviar a verificação pelo seu perfil." : language === "de" ? "Dein Konto wurde erstellt. Nach der Anmeldung kannst du die Bestätigung in deinem Profil erneut senden." : "Your account was created. After signing in you can resend the verification email from your profile.",
       });
       navigation.reset({ index: 0, routes: [{ name: "LoginScreen" }] });
     } catch (error) {

@@ -15,7 +15,9 @@
 import {
   doc,
   getDoc,
+  getDocs,
   collection,
+  deleteDoc,
   query,
   where,
   onSnapshot,
@@ -24,6 +26,7 @@ import {
   increment,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { deleteCollection, deleteRefsInChunks } from "./firestoreBulk";
 import { clampAvatarIndex } from "../utils/avatars";
 import { snapshotErrorHandler } from "../utils/firestoreError";
 import { trackFirestoreRead } from "./usageTrackerService";
@@ -321,21 +324,91 @@ export async function cancelFriendRequest(currentUid, toUid) {
   await batch.commit();
 }
 
+/** 1-1 sohbet kimliği: iki uid, büyük olan başta (ChatScreen / functions/appBadge ile aynı formül). */
+export const directChatId = (uidA, uidB) => (uidA > uidB ? `${uidA}_${uidB}` : `${uidB}_${uidA}`);
+
 /**
- * Arkadaşlıktan çıkar.
+ * İki kişi arasındaki 1-1 sohbeti SİLER: mesajlar, sabitlemeler, sohbet belgesi, iki
+ * tarafın "gelen kutusu" kaydı (Mesajlar listesi + okunmamış sayacı) ve BENİM
+ * gelen kutumdaki o kişiden gelmiş mesaj bildirimleri.
+ *
+ * Kurallar buna izin verir: mesaj/sabitleme/sohbet silme sohbet ÜYESİNE bağlı
+ * (firestore.rules → chats), gelen kutusu kaydını iki taraf da yazabilir, bildirimi
+ * yalnız sahibi siler. Karşı tarafın gelen kutusundaki bildirimlere dokunulamaz
+ * (yalnız sahibi siler) — onlar kendi tarafında kalır.
+ *
+ * Her adım bağımsız: biri düşerse kalanlar çalışır, düşenlerin adı döner. İdempotent.
+ *
+ * @returns {Promise<{ failed: string[] }>}
+ */
+export async function deleteDirectChat(currentUid, friendUid) {
+  if (!currentUid || !friendUid) throw new Error("uid eksik");
+  const chatId = directChatId(currentUid, friendUid);
+  const failed = [];
+  const step = async (label, fn) => {
+    try {
+      await fn();
+    } catch (error) {
+      failed.push(label);
+      if (__DEV__) console.warn(`[deleteDirectChat] ${label}:`, error?.message || error);
+    }
+  };
+
+  // Sıra: sabitlemeler → mesajlar → sohbet belgesi. Sabitleme silme kuralı sabitlenen
+  // mesajın senderId'sine bakar (firestore.rules → chats/pins); mesaj önce giderse o
+  // get başarısız olur ve sabitleme silinemezdi.
+  await step("pins", () => deleteCollection(collection(db, "chats", chatId, "pins")));
+  await step("messages", () => deleteCollection(collection(db, "chats", chatId, "messages")));
+  await step("chat", () => deleteDoc(doc(db, "chats", chatId)));
+  await step("my-conversation", () =>
+    deleteDoc(doc(db, "Users", currentUid, "conversations", friendUid)),
+  );
+  await step("their-conversation", () =>
+    deleteDoc(doc(db, "Users", friendUid, "conversations", currentUid)),
+  );
+  await step("message-notifications", async () => {
+    const snap = await getDocs(
+      query(collection(db, "Users", currentUid, "notifications"), where("fromUid", "==", friendUid)),
+    );
+    await deleteRefsInChunks(
+      snap.docs.filter((d) => d.data()?.type === "message" && !d.data()?.groupId).map((d) => d.ref),
+    );
+  });
+  return { failed };
+}
+
+/**
+ * Arkadaşlıktan çıkar ve aralarındaki 1-1 SOHBETİ sil.
+ *
+ * Arkadaşlık atomik batch ile çözülür; sohbet temizliği ondan SONRA ve ayrı çalışır —
+ * sohbet silinemese bile (çevrimdışı, kural) arkadaşlıktan çıkarma geri alınmaz.
+ * Benim tarafımda zaten arkadaş olmayanlar için (bayat arayüz, çift dokunuş) hiçbir şey
+ * yapılmaz: sayaçlar iki kez düşmesin diye.
+ *
+ * @returns {Promise<{ removed: boolean, chatFailed: string[] }>}
  */
 export async function unfriend(currentUid, friendUid) {
   if (!currentUid || !friendUid) throw new Error("uid eksik");
+  // Yalnız KENDİ kaydıma bakılabilir: karşı tarafın friends belgesini kurallar yalnız
+  // sahibine okutur. Benim kaydım yoksa arkadaşlık bende zaten bitmiş demektir.
+  const mine = await getDoc(doc(db, "Users", currentUid, "friends", friendUid));
+  if (!mine.exists()) return { removed: false, chatFailed: [] };
+
   const batch = writeBatch(db);
   batch.delete(doc(db, "Users", currentUid, "friends", friendUid));
   batch.delete(doc(db, "Users", friendUid, "friends", currentUid));
-  batch.update(doc(db, "Users", currentUid), {
-    friendsCount: increment(-1),
-  });
-  batch.update(doc(db, "Users", friendUid), {
-    friendsCount: increment(-1),
-  });
+  batch.update(doc(db, "Users", currentUid), { friendsCount: increment(-1) });
+  batch.update(doc(db, "Users", friendUid), { friendsCount: increment(-1) });
   await batch.commit();
+
+  let chatFailed = [];
+  try {
+    chatFailed = (await deleteDirectChat(currentUid, friendUid)).failed;
+  } catch (error) {
+    chatFailed = ["chat"];
+    if (__DEV__) console.warn("[unfriend] sohbet silinemedi:", error?.message || error);
+  }
+  return { removed: true, chatFailed };
 }
 
 /**

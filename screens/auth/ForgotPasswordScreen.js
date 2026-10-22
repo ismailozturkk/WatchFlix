@@ -15,7 +15,6 @@ import {
 import React, { useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import * as Haptics from "@services/hapticsService";
-import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 import Toast from "@components/AppToast";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -38,6 +37,12 @@ import {
 } from "../../components/auth/AuthKit";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
+import { authEmailErrorMessage, cleanEmail, sendResetEmail } from "../../services/authEmail";
+import { fillAuthEmailText, getAuthEmailCopy } from "../../utils/authEmailCopy";
+import useCooldown from "../../hooks/useCooldown";
+
+// Art arda sıfırlama isteği Firebase'de `too-many-requests` kilidine yol açar.
+const RESEND_COOLDOWN_S = 60;
 
 // Hafif dokunsal geri bildirim — desteklemeyen cihazlarda sessizce geç
 const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -48,7 +53,9 @@ export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState("");
   const [isloading, setIsloading] = useState(false);
   const [sent, setSent] = useState(false);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { remaining, start: startCooldown, active: cooling } = useCooldown();
+  const emailCopy = getAuthEmailCopy(language);
 
   const accent = theme.accent;
   const isLightTheme = isLightSurface(theme.primary);
@@ -58,20 +65,25 @@ export default function ForgotPasswordScreen({ navigation }) {
   const emailValid = /^\S+@\S+\.\S+$/.test(email);
 
   const resetPassword = async () => {
-    if (isloading || !emailValid) return;
+    if (isloading || !emailValid || cooling) return;
     setIsloading(true);
-    const auth = getAuth();
     try {
-      await sendPasswordResetEmail(auth, email);
+      // Adres temizlenir, e-posta şablonu uygulama dilinde gider (services/authEmail.js).
+      const sentTo = await sendResetEmail(email, { language });
+      setEmail(sentTo);
       setSent(true);
+      startCooldown(RESEND_COOLDOWN_S);
       Toast.show({
         type: "success",
-        text1: email + t.ForgotPasswordScreen.forgotPasswordToast,
+        text1: sentTo + t.ForgotPasswordScreen.forgotPasswordToast,
       });
     } catch (error) {
+      // Çok fazla deneme: düğme hemen tekrar basılmasın.
+      if (error?.code === "too-many-requests") startCooldown(RESEND_COOLDOWN_S);
       Toast.show({
         type: "error",
-        text1: t.ForgotPasswordScreen.forgotPasswordToast1,
+        // Hata türüne göre: çevrimdışı / çok fazla deneme / geçersiz adres (eskiden hepsi "Geçersiz e posta").
+        text1: authEmailErrorMessage(error, language),
       });
     } finally {
       setIsloading(false);
@@ -137,7 +149,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                     textContentType="emailAddress"
                     returnKeyType="send"
                     onSubmitEditing={resetPassword}
-                    onChangeText={setEmail}
+                    onChangeText={(value) => setEmail(cleanEmail(value))}
                     value={email}
                     maxLength={254}
                   />
@@ -152,10 +164,14 @@ export default function ForgotPasswordScreen({ navigation }) {
                   />
 
                   <AuthPrimaryButton
-                    label={t.ForgotPasswordScreen.send}
+                    label={
+                      cooling
+                        ? fillAuthEmailText(emailCopy.sendWait, { n: remaining })
+                        : t.ForgotPasswordScreen.send
+                    }
                     icon="send"
                     accent={accent}
-                    enabled={emailValid}
+                    enabled={emailValid && !cooling}
                     loading={isloading}
                     onPress={() => {
                       buzz();

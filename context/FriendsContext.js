@@ -203,8 +203,19 @@ export function FriendsProvider({ children }) {
     async (friendUid) => {
       if (!uid) return;
       try {
-        await unfriendApi(uid, friendUid);
+        // Arkadaşlıktan çıkarmak aralarındaki 1-1 sohbeti de siler (friendsService.unfriend).
+        const { chatFailed } = await unfriendApi(uid, friendUid);
         Toast.show({ type: "success", text1: i18nText("autoI18n.arkadasliktan_cikarildi", "Arkadaşlıktan çıkarıldı") });
+        // Arkadaşlık çözüldü ama sohbetin bir kısmı silinemediyse (çevrimdışı…) söyle.
+        if (chatFailed?.length) {
+          Toast.show({
+            type: "warning",
+            text1: i18nText(
+              "autoI18n.sohbet_tam_silinemedi",
+              "Arkadaşlıktan çıkarıldı ancak sohbet tamamen silinemedi",
+            ),
+          });
+        }
       } catch (e) {
         Toast.show({ type: "error", text1: e.message });
       }

@@ -389,7 +389,7 @@ export default function ChatScreen({ route, navigation }) {
   const { hapticsEnabled } = useHapticsSettings();
   const [trailerMedia, setTrailerMedia] = useState(null);
   const { adultContent } = useContentSettings();
-  const { block, isBlocked } = useFriends();
+  const { block, isBlocked, isFriend, loading: friendsLoading } = useFriends();
   const { myAvatar, avatars } = useProfileUi();
   const {
     displayName: profileDisplayName,
@@ -855,6 +855,26 @@ export default function ChatScreen({ route, navigation }) {
     if (!isGroup || !isViewing || myGroupUnread === 0) return;
     updateDoc(chatRef, { [`unread.${currentUser.uid}`]: 0 }).catch(() => {});
   }, [isGroup, isViewing, myGroupUnread, chatRef, currentUser.uid]);
+
+  // Sohbet açıkken ARKADAŞLIK bitti (karşı taraf seni çıkardı ya da sen başka yerden):
+  // sohbet silinmiştir, ekranda kalıp mesaj yazmak boş bir sohbeti yeniden yaratırdı.
+  // Yalnız "açıldığında arkadaştı → şimdi değil" geçişinde çıkılır; arkadaş olmayan
+  // biriyle bilerek açılmış sohbetler (bildirim/paylaşım girişleri) etkilenmez.
+  const wasFriendRef = useRef(false);
+  const friendNow = !isGroup && !friendsLoading && isFriend(friendUid);
+  useEffect(() => {
+    if (isGroup || friendsLoading) return;
+    if (friendNow) {
+      wasFriendRef.current = true;
+    } else if (wasFriendRef.current) {
+      wasFriendRef.current = false;
+      toast.show({
+        type: "info",
+        text1: i18nText("autoI18n.arkadaslik_sona_erdi_sohbet_kapandi", "Arkadaşlık sona erdi, sohbet kapatıldı"),
+      });
+      navigation.goBack();
+    }
+  }, [isGroup, friendsLoading, friendNow, navigation]);
 
   // Clear processed-message guard when switching chats
   useEffect(() => { processedMsgIds.current.clear(); }, [chatId]);

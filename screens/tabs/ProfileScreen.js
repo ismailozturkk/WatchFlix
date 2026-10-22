@@ -4,6 +4,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import useTabBarScrollSync from "../../hooks/useTabBarScrollSync";
 import useScreenSections from "../../hooks/useSectionVisibility";
+import useEmailVerification from "../../hooks/useEmailVerification";
 import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -52,6 +53,8 @@ const ProfileScreen = ({ navigation }) => {
   // (utils/sectionVisibility.js "profile"). Kimlik bloğu (avatar + ad) her zaman görünür.
   const { isVisible: showSection, allHidden: allSectionsHidden } = useScreenSections("profile");
   const { user } = useAuth();
+  // E-posta doğrulama durumu: odakta/öne dönünce tazelenir, "tekrar gönder" burada.
+  const emailVerification = useEmailVerification(user, language);
   const { profile } = useUserProfile();
   const { isPremium, isUnlimited } = usePremium();
   const isFounder = Boolean(profile?.badges?.founder);
@@ -236,10 +239,21 @@ const ProfileScreen = ({ navigation }) => {
               username={profileUsername}
               badges={identityBadges}
               email={user?.email}
-              emailVerified={Boolean(user?.emailVerified)}
+              emailVerified={emailVerification.verified}
               // user, çıkış anındaki render'da null olabilir — doğrudan erişim çökertir
               verifyHint={
-                user && !user.emailVerified ? t.profileScreen.emailVerified : ""
+                user && !emailVerification.verified ? t.profileScreen.emailVerified : ""
+              }
+              // "Tekrar gönder": doğrulama e-postası kaybolduysa ya da kayıtta gönderilemediyse.
+              verifyAction={
+                user && !emailVerification.verified
+                  ? {
+                      label: emailVerification.resendLabel,
+                      onPress: emailVerification.resend,
+                      busy: emailVerification.sending,
+                      disabled: emailVerification.cooldown > 0,
+                    }
+                  : null
               }
               joinedAt={user?.metadata?.createdAt}
               onEdit={goEditProfile}

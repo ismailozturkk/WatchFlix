@@ -126,10 +126,10 @@ import { deleteSharedList, leaveSharedList } from "./sharedListsService";
 // Yerel-öncelikli veri katmanı (notlar, hatırlatıcılar…). Bu dosyadaki
 // `purgeUserData` BULUTU siler; yerel kopya + bekleyen yazımlar için ayrı ad.
 import { purgeUserData as purgeLocalUserData } from "./userData";
+import { deleteCollection, deleteRefsInChunks } from "./firestoreBulk";
 import { purgeUserScope } from "./storage";
 import { resetWatchLedger } from "../utils/watchBadgeLedger";
 
-const CHUNK = 450; // Firestore batch limiti 500 — güvenli pay bıraktık.
 // Sunucu silme aşamaları, ÇALIŞMA SIRASIYLA (functions/accountPurge.js PURGE_PHASES ile
 // aynı; eşitliği __tests__/deleteAccountProgress.test.js korur). Her aşama ayrı
 // çağrılır, böylece ilerleme gerçek aşama geçişlerinden çizilir.
@@ -168,23 +168,9 @@ async function safe(label, fn) {
   }
 }
 
-// Verilen referansları 450'lik batch'ler hâlinde siler.
-export async function deleteRefsInChunks(refs) {
-  for (let i = 0; i < refs.length; i += CHUNK) {
-    const batch = writeBatch(db);
-    refs.slice(i, i + CHUNK).forEach((ref) => batch.delete(ref));
-    await batch.commit();
-  }
-}
-
-// Bir koleksiyonun tüm (üst seviye) dokümanlarını siler. Alt koleksiyonları
-// otomatik silmez — onları çağıran taraf ayrıca temizlemeli. (Hesap SIFIRLAMA
-// — services/accountResetService.js — da bu iki yardımcıyı kullanır.)
-export async function deleteCollection(colRef) {
-  const snap = await getDocs(colRef);
-  if (!snap.empty) await deleteRefsInChunks(snap.docs.map((d) => d.ref));
-  return snap.docs;
-}
+// Toplu silme yardımcıları services/firestoreBulk.js'te (friendsService de kullanır);
+// hesap sıfırlama bunları buradan alıyor, o yüzden yeniden dışa aktarılır.
+export { deleteCollection, deleteRefsInChunks };
 
 const reqId = (fromUid, toUid) => `${fromUid}_${toUid}`;
 

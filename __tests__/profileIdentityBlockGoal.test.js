@@ -146,4 +146,38 @@ describe("eylem satırı", () => {
     render();
     expect(renderer.root.findAllByProps({ testID: "profile-settings-button" })).toHaveLength(0);
   });
+
+  describe("e-posta doğrulama uyarısı", () => {
+    const resend = () => renderer.root.findByProps({ testID: "profile-verify-resend" });
+
+    test("uyarı metni var ama eylem verilmediyse 'tekrar gönder' çizilmez", () => {
+      render({ email: "a@b.co", emailVerified: false, verifyHint: "E-postanı doğrula" });
+      expect(renderer.root.findAllByProps({ testID: "profile-verify-resend" })).toHaveLength(0);
+    });
+
+    test("eylem etiketiyle çizilir ve dokunuşu bağlıdır", () => {
+      const onPress = jest.fn();
+      render({ email: "a@b.co", emailVerified: false, verifyHint: "E-postanı doğrula", verifyAction: { label: "Tekrar gönder", onPress } });
+      expect(resend().props.accessibilityLabel).toBe("Tekrar gönder");
+      expect(resend().props.accessibilityRole).toBe("button");
+      expect(resend().props.disabled).toBe(false);
+      act(() => resend().props.onPress());
+      expect(onPress).toHaveBeenCalledTimes(1);
+    });
+
+    test("bekleme sürerken (disabled) ve gönderilirken (busy) dokunuş kapalı", () => {
+      render({ email: "a@b.co", emailVerified: false, verifyHint: "x", verifyAction: { label: "30 sn", onPress: jest.fn(), disabled: true } });
+      expect(resend().props.disabled).toBe(true);
+      expect(resend().props.accessibilityState).toEqual({ disabled: true, busy: false });
+      act(() => renderer.unmount());
+      render({ email: "a@b.co", emailVerified: false, verifyHint: "x", verifyAction: { label: "...", onPress: jest.fn(), busy: true } });
+      expect(resend().props.disabled).toBe(true);
+      expect(resend().props.accessibilityState).toEqual({ disabled: false, busy: true });
+    });
+
+    test("uyarı metni yoksa (doğrulanmış) eylem de çizilmez", () => {
+      render({ email: "a@b.co", emailVerified: true, verifyHint: "", verifyAction: { label: "Tekrar gönder", onPress: jest.fn() } });
+      expect(renderer.root.findAllByProps({ testID: "profile-verify-resend" })).toHaveLength(0);
+    });
+  });
 });
