@@ -1,912 +1,883 @@
 ===============================================================================
 SEELOGD — TAM PROJE DOSYA YAPISI VE HIYERARSISI
-Son Guncelleme Tarihi: 08.08.2026
+Son Guncelleme Tarihi: 22.10.2026
+Kapsam: Tum kaynak kod dizinleri ve bilesenleri (.git, node_modules, android haric)
 ===============================================================================
 
 Seelogd/
-├── __mocks__/
-│   ├── @react-native-async-storage/
+├── __mocks__
+│   ├── @react-native-async-storage
 │   │   └── async-storage.js
-│   ├── @react-native-community/
+│   ├── @react-native-community
 │   │   └── netinfo.js
 │   ├── expo-file-system.js
+│   ├── fileMock.js
 │   └── react-native-mmkv.js
-├── __tests__/
-│   ├── helpers/
-│   │   └── storageTestKit.js
-│   ├── rules/
-│   │   └── firestore.rules.test.js
+├── __tests__
+│   ├── helpers
+│   │   ├── fakeRtdb.js
+│   │   ├── glassInventory.js
+│   │   ├── libraryEmulator.js
+│   │   ├── storageTestKit.js
+│   │   ├── storyCardFixtures.js
+│   │   └── userDataHarness.js
+│   ├── rules
+│   │   ├── dailyWatchLimit.test.js
+│   │   ├── firestore.rules.test.js
+│   │   ├── libraryActions.test.js
+│   │   ├── libraryServices.test.js
+│   │   ├── listQuickAdd.test.js
+│   │   └── userData.test.js
 │   ├── accountConnectionsService.test.js
+│   ├── accountMigrationPlan.test.js
+│   ├── accountPrivateService.test.js
+│   ├── accountReset.test.js
 │   ├── accountService.test.js
+│   ├── activeChatTracker.test.js
+│   ├── adaptiveTabShell.test.js
 │   ├── ageGate.test.js
+│   ├── aiCineInsights.test.js
 │   ├── aiCineService.test.js
+│   ├── aiCineServiceStyle.test.js
+│   ├── aiConversationsCloud.test.js
 │   ├── aiConversationStore.test.js
+│   ├── aiConversationsWiring.test.js
+│   ├── aiCopy.test.js
+│   ├── aiEvalLib.test.js
+│   ├── aiHistoryCloudStates.test.js
+│   ├── aiPrefs.test.js
 │   ├── aiQuota.test.js
 │   ├── airDate.test.js
+│   ├── aiResponseFooterShare.test.js
+│   ├── aiUserContextFavorites.test.js
+│   ├── ambientBackground.test.js
 │   ├── analyticsEvents.test.js
 │   ├── apiCacheSwr.test.js
+│   ├── appBadge.test.js
+│   ├── appIcons.test.js
+│   ├── appIconService.test.js
+│   ├── appIconStore.test.js
+│   ├── appLanguages.test.js
+│   ├── appleAuthService.test.js
+│   ├── assetRequires.test.js
+│   ├── authRoute.test.js
+│   ├── avatarHalo.test.js
+│   ├── avatars.test.js
+│   ├── awardYearSheet.test.js
 │   ├── babelTransformAppText.test.js
+│   ├── backupCopy.test.js
+│   ├── badgeInsights.test.js
 │   ├── badgeMeta.test.js
 │   ├── blurSupport.test.js
+│   ├── cacheStoreDurable.test.js
+│   ├── calendarAgenda.test.js
+│   ├── calendarPermissionPlan.test.js
+│   ├── calendarPermissionSheet.test.js
+│   ├── calendarSaveButton.test.js
+│   ├── certification.test.js
+│   ├── chatBubbleStyle.test.js
+│   ├── chatEntrance.test.js
 │   ├── chatOptimistic.test.js
+│   ├── chatReply.test.js
+│   ├── chatReplyCards.test.js
+│   ├── chatShare.test.js
+│   ├── chatShareMessages.test.js
+│   ├── chatSignals.test.js
+│   ├── cineCopy.test.js
+│   ├── cineDeckModel.test.js
+│   ├── cinemaBingo.test.js
+│   ├── cinemaBingoScreen.test.js
+│   ├── cineResultsStore.test.js
+│   ├── cineSoloReducer.test.js
+│   ├── cineswipe.test.js
 │   ├── colorUtils.test.js
 │   ├── commentScope.test.js
 │   ├── connectivityToast.test.js
+│   ├── copyTablesSpanish.test.js
+│   ├── csvParser.test.js
+│   ├── dailyCache.test.js
+│   ├── dailyChallenge.test.js
+│   ├── dailyDuel.test.js
+│   ├── dailyLimitCopy.test.js
+│   ├── dailyPoll.test.js
+│   ├── dailyUsage.test.js
+│   ├── dailyWatchLimit.test.js
+│   ├── databaseRules.test.js
 │   ├── dataCacheSettings.test.js
 │   ├── datePickerWheel.test.js
+│   ├── decorScopes.test.js
+│   ├── deleteAccountProgress.test.js
+│   ├── deleteProgressView.test.js
 │   ├── deviceLanguage.test.js
 │   ├── deviceTier.test.js
+│   ├── devPlanOverride.test.js
+│   ├── devPlanSimulatorCard.test.js
+│   ├── discoverExploreAction.test.js
+│   ├── discoverFilters.test.js
+│   ├── discoverFiltersBackup.test.js
+│   ├── discoverFiltersCopy.test.js
+│   ├── discoverFilterSheet.test.js
+│   ├── discoverFiltersScreen.test.js
+│   ├── discoverHeaderLayout.test.js
+│   ├── discoverScreen.test.js
+│   ├── discoverSearchAction.test.js
 │   ├── discoveryPersonalization.test.js
+│   ├── discoveryRailSettings.test.js
+│   ├── editProfileScreen.test.js
 │   ├── effectSettings.test.js
+│   ├── emmyService.test.js
+│   ├── emojiText.test.js
+│   ├── entranceGate.test.js
+│   ├── errorBoundaryStandalone.test.js
+│   ├── externalEntry.test.js
+│   ├── externalRatings.test.js
+│   ├── externalRatingsRow.test.js
+│   ├── favoritesCopy.test.js
+│   ├── favoritesSeeAll.test.js
+│   ├── feedbackCopy.test.js
+│   ├── feedbackRulesParity.test.js
+│   ├── feedbackValidation.test.js
+│   ├── followedPeople.test.js
+│   ├── followedUpcomingService.test.js
+│   ├── followPersonButton.test.js
+│   ├── fourFavorites.test.js
+│   ├── friendsBarModel.test.js
+│   ├── friendsListModel.test.js
 │   ├── fuzzyMediaSearch.test.js
 │   ├── gameConfig.test.js
 │   ├── gameScoring.test.js
+│   ├── gameSelection.test.js
+│   ├── germanSupport.test.js
+│   ├── glassButtonCoverage.test.js
+│   ├── glassButtons.test.js
+│   ├── glassChrome.test.js
+│   ├── glassCoverageGuard.test.js
+│   ├── glassField.test.js
+│   ├── glassSurface.test.js
+│   ├── glassWrappers.test.js
 │   ├── googleAuthService.test.js
 │   ├── groupRoles.test.js
 │   ├── hapticsService.test.js
+│   ├── holdToConfirmButton.test.js
+│   ├── homeContentSettings.test.js
+│   ├── homeSectionCopy.test.js
+│   ├── homeSectionHeaderCoverage.test.js
+│   ├── homeSettingsCoverage.test.js
+│   ├── homeSettingsSync.test.js
+│   ├── hubWrappedModule.test.js
 │   ├── i18nKeys.test.js
+│   ├── importantInvites.test.js
+│   ├── importantInvitesBar.test.js
+│   ├── importMerge.test.js
+│   ├── importWriter.test.js
+│   ├── kesifBadges.test.js
+│   ├── libraryCore.test.js
+│   ├── libraryExport.test.js
+│   ├── libraryExportFiles.test.js
+│   ├── libraryExportScreen.test.js
+│   ├── libraryOverlay.test.js
+│   ├── libraryScreen.test.js
+│   ├── liquidGlass.test.js
+│   ├── listBadgesReminder.test.js
+│   ├── listPosterCard.test.js
+│   ├── listPosterLayout.test.js
 │   ├── listSearch.test.js
 │   ├── listShare.test.js
+│   ├── listSortFilter.test.js
+│   ├── listSortFilterSheet.test.js
+│   ├── listStatusContext.test.js
+│   ├── listStatusIndex.test.js
 │   ├── listsWidgetService.test.js
+│   ├── listSyncAndStats.test.js
+│   ├── localizationRuntime.test.js
 │   ├── mediaFacts.test.js
+│   ├── mediaLinks.test.js
+│   ├── mediaTypeSwitch.test.js
+│   ├── messagesScreenGroups.test.js
+│   ├── moduleImports.test.js
+│   ├── nativePermissionLocales.test.js
+│   ├── nativeSwitchLayout.test.js
+│   ├── nativeTabBarScale.test.js
+│   ├── notesChrome.test.js
+│   ├── notesView.test.js
+│   ├── noteTodoDraftService.test.js
+│   ├── notificationInbox.test.js
 │   ├── notificationPriming.test.js
+│   ├── notificationsScreen.test.js
+│   ├── notificationsService.test.js
+│   ├── olderGame.test.js
+│   ├── olderGameScreen.test.js
+│   ├── onboardingCopy.test.js
+│   ├── onboardingPreferences.test.js
+│   ├── oscarService.test.js
 │   ├── ossLicenses.test.js
+│   ├── phoneCalendar.test.js
+│   ├── portugueseSupport.test.js
 │   ├── postComposer.test.js
+│   ├── posterBadgeSettings.test.js
+│   ├── posterSettingsReminderBadge.test.js
+│   ├── postTime.test.js
 │   ├── premium.test.js
+│   ├── premiumFeatures.test.js
+│   ├── premiumMemberBar.test.js
+│   ├── premiumShowcase.test.js
+│   ├── premiumUpsellContent.test.js
+│   ├── premiumUpsellHost.test.js
+│   ├── premiumUsageModel.test.js
+│   ├── presenceIntegration.test.js
+│   ├── presenceSession.test.js
+│   ├── profileEdit.test.js
+│   ├── profileIdentity.test.js
+│   ├── profileIdentityBlockGoal.test.js
+│   ├── profileRemindersQuickDelete.test.js
+│   ├── profileStatsReset.test.js
+│   ├── profileStoryCard.test.js
+│   ├── profileStoryCardFavorites.test.js
+│   ├── profileStoryModalFavorites.test.js
+│   ├── providerWatch.test.js
+│   ├── quickGames.test.js
+│   ├── quickGameScreen.test.js
 │   ├── r2.test.js
+│   ├── ratingSummary.test.js
+│   ├── referral.test.js
+│   ├── referralScreen.test.js
+│   ├── reminderBadge.test.js
+│   ├── reminderCounts.test.js
 │   ├── reminderNotificationScheduler.test.js
+│   ├── reminderQuickDelete.test.js
 │   ├── reminderWidgetService.test.js
 │   ├── reportValidation.test.js
 │   ├── revenueCatWebhook.test.js
+│   ├── rnFirebasePodfilePlugin.test.js
+│   ├── rnScreensGammaPlugin.test.js
+│   ├── rootListMerge.test.js
 │   ├── sameData.test.js
+│   ├── sceneGameService.test.js
+│   ├── screenTopSpacing.test.js
+│   ├── sectionHeader.test.js
+│   ├── sectionsHiddenNotice.test.js
+│   ├── sectionVisibility.test.js
+│   ├── sectionVisibilityCopy.test.js
+│   ├── sectionVisibilityScreen.test.js
+│   ├── seededRandom.test.js
+│   ├── settingsBackup.test.js
+│   ├── settingsBackupFiles.test.js
+│   ├── settingsBackupService.test.js
+│   ├── sheetKeyboardFit.test.js
+│   ├── sheetTransitionKeyboard.test.js
 │   ├── snapshotCache.test.js
+│   ├── socialLinks.test.js
+│   ├── socialLinksRow.test.js
+│   ├── splashMotion.test.js
+│   ├── splashPlan.test.js
+│   ├── splashPosterCatalog.test.js
+│   ├── splashPosterWave.render.test.js
+│   ├── staggerItemAnimate.test.js
+│   ├── statsFilterModal.test.js
+│   ├── statsFilters.test.js
 │   ├── statsWidgetService.test.js
 │   ├── storage.test.js
+│   ├── storyCanvasLayout.test.js
+│   ├── storyShare.test.js
+│   ├── storyShareScreen.test.js
 │   ├── streamingDiff.test.js
 │   ├── styleSheetCompat.test.js
+│   ├── surfaceBlur.test.js
+│   ├── switchToggleLabel.test.js
+│   ├── switchToggleLocked.test.js
+│   ├── switchToggleNativeBox.test.js
+│   ├── tabBarCapabilities.test.js
+│   ├── tabBarCollapse.test.js
+│   ├── tabBarComponent.test.js
+│   ├── tabBarIcons.test.js
+│   ├── tabBarModel.test.js
+│   ├── tabBarScale.test.js
+│   ├── tabScrollMarker.test.js
+│   ├── tasteMatch.test.js
+│   ├── tasteMatchCard.test.js
+│   ├── textClamp.test.js
+│   ├── themeAppearance.test.js
+│   ├── themeFamilies.test.js
+│   ├── themeStudio.test.js
+│   ├── themeStudioCopy.test.js
+│   ├── threadPreview.test.js
 │   ├── tmdbAdultGuard.test.js
 │   ├── tmdbLookup.test.js
+│   ├── tmdbTitleFallback.test.js
 │   ├── toastFacade.test.js
 │   ├── toastStore.test.js
 │   ├── toastUi.test.js
+│   ├── todoOrder.test.js
 │   ├── tournamentEngine.test.js
 │   ├── tournamentWinnerArchive.test.js
+│   ├── trailerLanguages.test.js
+│   ├── trailerModalSheet.test.js
+│   ├── tvGraphGrid.test.js
+│   ├── tvGraphGridRender.test.js
 │   ├── typographyRoles.test.js
 │   ├── typographySettings.test.js
 │   ├── upNext.test.js
 │   ├── upNextPreferences.test.js
 │   ├── upNextService.test.js
+│   ├── usageTrackerBackup.test.js
+│   ├── usageTrackerService.test.js
+│   ├── useDiscoverFilterStore.test.js
+│   ├── useFilteredDiscover.test.js
+│   ├── useKesifSignals.test.js
+│   ├── userDataContexts.test.js
+│   ├── userDataDomain.test.js
+│   ├── userDataOutbox.test.js
+│   ├── userDataReminders.test.js
+│   ├── userDataSyncWorker.test.js
 │   ├── userProfileCreate.test.js
+│   ├── useSectionVisibility.test.js
 │   ├── watchActivity.test.js
 │   ├── watchBadgeCatalog.test.js
 │   ├── watchHistory.test.js
 │   ├── watchLedgerCore.test.js
+│   ├── watchPicker.test.js
+│   ├── watchPickerSheet.test.js
 │   ├── watchScoring.test.js
 │   ├── watchState.test.js
-│   └── widgetPreferencesService.test.js
-├── android/
-│   ├── .gradle/
-│   │   ├── 9.3.1/
-│   │   │   ├── checksums/
-│   │   │   │   ├── checksums.lock
-│   │   │   │   ├── md5-checksums.bin
-│   │   │   │   └── sha1-checksums.bin
-│   │   │   ├── executionHistory/
-│   │   │   │   ├── executionHistory.bin
-│   │   │   │   └── executionHistory.lock
-│   │   │   ├── expanded/
-│   │   │   ├── fileChanges/
-│   │   │   │   └── last-build.bin
-│   │   │   ├── fileHashes/
-│   │   │   │   ├── fileHashes.bin
-│   │   │   │   ├── fileHashes.lock
-│   │   │   │   └── resourceHashesCache.bin
-│   │   │   ├── vcsMetadata/
-│   │   │   └── gc.properties
-│   │   ├── buildOutputCleanup/
-│   │   │   ├── buildOutputCleanup.lock
-│   │   │   ├── cache.properties
-│   │   │   └── outputFiles.bin
-│   │   ├── noVersion/
-│   │   │   └── buildLogic.lock
-│   │   ├── vcs-1/
-│   │   │   └── gc.properties
-│   │   └── file-system.probe
-│   ├── .kotlin/
-│   │   └── sessions/
-│   ├── app/
-│   │   ├── .cxx/
-│   │   │   ├── Debug/
-│   │   │   │   └── 7573n1u6/
-│   │   │   │       ├── arm64-v8a/
-│   │   │   │       │   ├── .cmake/
-│   │   │   │       │   │   └── api/
-│   │   │   │       │   │       └── v1/
-│   │   │   │       │   │           ├── query/
-│   │   │   │       │   │           │   └── client-agp/
-│   │   │   │       │   │           │       ├── cache-v2
-│   │   │   │       │   │           │       ├── cmakeFiles-v1
-│   │   │   │       │   │           │       └── codemodel-v2
-│   │   │   │       │   │           └── reply/
-│   │   │   │       │   │               ├── cache-v2-a592755aeb28385c23ed.json
-│   │   │   │       │   │               ├── cmakeFiles-v1-b3fe5f950cfae151aa2d.json
-│   │   │   │       │   │               ├── codemodel-v2-d2f96c4d552918765582.json
-│   │   │   │       │   │               ├── directory-.-Debug-d0094a50bb2071803777.json
-│   │   │   │       │   │               ├── directory-lottiereactnative_autolinked_build-Debug-3f686ba494ef91f8b5f7.json
-│   │   │   │       │   │               ├── directory-NitroModulesSpec_autolinked_build-Debug-8a41c6cc55dd828d3370.json
-│   │   │   │       │   │               ├── directory-pagerview_autolinked_build-Debug-c7a4aeaa213b262a798f.json
-│   │   │   │       │   │               ├── directory-rnasyncstorage_autolinked_build-Debug-1220ac5fe1e3ba87d197.json
-│   │   │   │       │   │               ├── directory-RNCNetInfoSpec_autolinked_build-Debug-7f61d1d30caf77e7832d.json
-│   │   │   │       │   │               ├── directory-RNCWebViewSpec_autolinked_build-Debug-fb9026e491ac7b4e1bd9.json
-│   │   │   │       │   │               ├── directory-RNDateTimePickerCGen_autolinked_build-Debug-d62c304c7e12b4849e0c.json
-│   │   │   │       │   │               ├── directory-RNFBAnalyticsTurboModules_autolinked_build-Debug-9df1d9bddfa99fa604e0.json
-│   │   │   │       │   │               ├── directory-RNFBAppCheckTurboModules_autolinked_build-Debug-e7a2fef55b3cc4fc7405.json
-│   │   │   │       │   │               ├── directory-RNFBAppTurboModules_autolinked_build-Debug-653be1908fd9b3b3cc5f.json
-│   │   │   │       │   │               ├── directory-rngesturehandler_codegen_autolinked_build-Debug-b19c6e158cf737766c68.json
-│   │   │   │       │   │               ├── directory-RNGoogleSignInCGen_autolinked_build-Debug-76e251757aea7dc549db.json
-│   │   │   │       │   │               ├── directory-rnpicker_autolinked_build-Debug-42c1fb797ac77776bbbb.json
-│   │   │   │       │   │               ├── directory-rnreanimated_autolinked_build-Debug-0dc63ca30f1a312086b9.json
-│   │   │   │       │   │               ├── directory-rnscreens_autolinked_build-Debug-6ada5c73987d87bfc76a.json
-│   │   │   │       │   │               ├── directory-RNSentrySpec_autolinked_build-Debug-16b9026e619c04b64e34.json
-│   │   │   │       │   │               ├── directory-rnskia_autolinked_build-Debug-b40d1058003d955dd839.json
-│   │   │   │       │   │               ├── directory-rnsvg_autolinked_build-Debug-5c54e8be43bed3aa768a.json
-│   │   │   │       │   │               ├── directory-rnviewshot_autolinked_build-Debug-fc09e39a2481e46709fe.json
-│   │   │   │       │   │               ├── directory-rnworklets_autolinked_build-Debug-592ebca28617310a93de.json
-│   │   │   │       │   │               ├── directory-safeareacontext_autolinked_build-Debug-6de13ec344cde3e0bff7.json
-│   │   │   │       │   │               ├── index-2026-08-08T17-34-35-0388.json
-│   │   │   │       │   │               ├── target-appmodules-Debug-8780aa7c5e76f15e50e6.json
-│   │   │   │       │   │               ├── target-react_codegen_lottiereactnative-Debug-7208bc3b2ef8c3cd8521.json
-│   │   │   │       │   │               ├── target-react_codegen_NitroModulesSpec-Debug-cc664eed7db84fc562b5.json
-│   │   │   │       │   │               ├── target-react_codegen_pagerview-Debug-4f84ef8eedd744440c4b.json
-│   │   │   │       │   │               ├── target-react_codegen_rnasyncstorage-Debug-3471bf705ef69699660a.json
-│   │   │   │       │   │               ├── target-react_codegen_RNCNetInfoSpec-Debug-96d3b230a5d8c67c7a90.json
-│   │   │   │       │   │               ├── target-react_codegen_RNCWebViewSpec-Debug-8cab12bb8b62abcf4709.json
-│   │   │   │       │   │               ├── target-react_codegen_RNDateTimePickerCGen-Debug-d80f3264f29759da7f24.json
-│   │   │   │       │   │               ├── target-react_codegen_RNFBAnalyticsTurboModules-Debug-55379f98b8fb88a81811.json
-│   │   │   │       │   │               ├── target-react_codegen_RNFBAppCheckTurboModules-Debug-0a6b5c7b8a073f115c4e.json
-│   │   │   │       │   │               ├── target-react_codegen_RNFBAppTurboModules-Debug-1c7f04397c21544cd383.json
-│   │   │   │       │   │               ├── target-react_codegen_rngesturehandler_codegen-Debug-2e4c9caf7f29b3caf9ef.json
-│   │   │   │       │   │               ├── target-react_codegen_RNGoogleSignInCGen-Debug-6522c792c9d632848680.json
-│   │   │   │       │   │               ├── target-react_codegen_rnpicker-Debug-0f0ebdd7ea79ce6a3c59.json
-│   │   │   │       │   │               ├── target-react_codegen_rnreanimated-Debug-f14f26f05165f1e0bd6b.json
-│   │   │   │       │   │               ├── target-react_codegen_rnscreens-Debug-882ca89a3dc96264ae61.json
-│   │   │   │       │   │               ├── target-react_codegen_RNSentrySpec-Debug-bd8a928456931c738903.json
-│   │   │   │       │   │               ├── target-react_codegen_rnskia-Debug-48c79d2086680bc3a46c.json
-│   │   │   │       │   │               ├── target-react_codegen_rnsvg-Debug-5c50a02d5bf244dad6ab.json
-│   │   │   │       │   │               ├── target-react_codegen_rnviewshot-Debug-0384d24a1cd4ff404028.json
-│   │   │   │       │   │               ├── target-react_codegen_rnworklets-Debug-d77ab3827d693c992a5a.json
-│   │   │   │       │   │               └── target-react_codegen_safeareacontext-Debug-ac93b6185d52d5d04a90.json
-│   │   │   │       │   ├── CMakeFiles/
-│   │   │   │       │   │   ├── _CMakeLTOTest-CXX/
-│   │   │   │       │   │   │   ├── bin/
-│   │   │   │       │   │   │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   │   │   ├── boo.dir/
-│   │   │   │       │   │   │   │   │   │   └── main.cpp.o
-│   │   │   │       │   │   │   │   │   ├── foo.dir/
-│   │   │   │       │   │   │   │   │   │   └── foo.cpp.o
-│   │   │   │       │   │   │   │   │   ├── cmake.check_cache
-│   │   │   │       │   │   │   │   │   ├── rules.ninja
-│   │   │   │       │   │   │   │   │   └── TargetDirectories.txt
-│   │   │   │       │   │   │   │   ├── .ninja_deps
-│   │   │   │       │   │   │   │   ├── .ninja_log
-│   │   │   │       │   │   │   │   ├── build.ninja
-│   │   │   │       │   │   │   │   ├── cmake_install.cmake
-│   │   │   │       │   │   │   │   ├── CMakeCache.txt
-│   │   │   │       │   │   │   │   └── libfoo.a
-│   │   │   │       │   │   │   └── src/
-│   │   │   │       │   │   │       ├── CMakeLists.txt
-│   │   │   │       │   │   │       ├── foo.cpp
-│   │   │   │       │   │   │       └── main.cpp
-│   │   │   │       │   │   ├── 3.22.1-g37088a8-dirty/
-│   │   │   │       │   │   │   ├── CompilerIdC/
-│   │   │   │       │   │   │   │   ├── tmp/
-│   │   │   │       │   │   │   │   ├── CMakeCCompilerId.c
-│   │   │   │       │   │   │   │   └── CMakeCCompilerId.o
-│   │   │   │       │   │   │   ├── CompilerIdCXX/
-│   │   │   │       │   │   │   │   ├── tmp/
-│   │   │   │       │   │   │   │   ├── CMakeCXXCompilerId.cpp
-│   │   │   │       │   │   │   │   └── CMakeCXXCompilerId.o
-│   │   │   │       │   │   │   ├── CMakeCCompiler.cmake
-│   │   │   │       │   │   │   ├── CMakeCXXCompiler.cmake
-│   │   │   │       │   │   │   ├── CMakeDetermineCompilerABI_C.bin
-│   │   │   │       │   │   │   ├── CMakeDetermineCompilerABI_CXX.bin
-│   │   │   │       │   │   │   └── CMakeSystem.cmake
-│   │   │   │       │   │   ├── appmodules.dir/
-│   │   │   │       │   │   │   ├── C_/
-│   │   │   │       │   │   │   │   └── Users/
-│   │   │   │       │   │   │   │       └── ismail/
-│   │   │   │       │   │   │   │           └── Desktop/
-│   │   │   │       │   │   │   │               └── projeler/
-│   │   │   │       │   │   │   │                   └── Seelogd/
-│   │   │   │       │   │   │   │                       └── android/
-│   │   │   │       │   │   │   │                           └── app/
-│   │   │   │       │   │   │   └── OnLoad.cpp.o
-│   │   │   │       │   │   ├── CMakeTmp/
-│   │   │   │       │   │   ├── cmake.check_cache
-│   │   │   │       │   │   ├── cmake.verify_globs
-│   │   │   │       │   │   ├── CMakeError.log
-│   │   │   │       │   │   ├── CMakeOutput.log
-│   │   │   │       │   │   ├── rules.ninja
-│   │   │   │       │   │   ├── TargetDirectories.txt
-│   │   │   │       │   │   └── VerifyGlobs.cmake
-│   │   │   │       │   ├── lottiereactnative_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_lottiereactnative.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── lottiereactnative/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── lottiereactnative-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── NitroModulesSpec_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_NitroModulesSpec.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── NitroModulesSpec/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── NitroModulesSpec-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── pagerview_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_pagerview.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── pagerview/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── pagerview-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── rnasyncstorage_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_rnasyncstorage.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── rnasyncstorage/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── rnasyncstorage-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── RNCNetInfoSpec_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_RNCNetInfoSpec.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── RNCNetInfoSpec/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── RNCNetInfoSpec-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── RNCWebViewSpec_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_RNCWebViewSpec.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── RNCWebViewSpec/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── RNCWebViewSpec-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── RNDateTimePickerCGen_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_RNDateTimePickerCGen.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── RNDateTimePickerCGen/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── RNDateTimePickerCGen-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── RNFBAnalyticsTurboModules_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_RNFBAnalyticsTurboModules.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── RNFBAnalyticsTurboModules/
-│   │   │   │       │   │   │       │               ├── RNFBAnalyticsTurboModulesJSI-generated.cpp.o
-│   │   │   │       │   │   │       │               └── RNFBAnalyticsTurboModulesJSI-generated.cpp.o.d
-│   │   │   │       │   │   │       └── RNFBAnalyticsTurboModules-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── RNFBAppCheckTurboModules_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_RNFBAppCheckTurboModules.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── RNFBAppCheckTurboModules/
-│   │   │   │       │   │   │       │               ├── RNFBAppCheckTurboModulesJSI-generated.cpp.o
-│   │   │   │       │   │   │       │               └── RNFBAppCheckTurboModulesJSI-generated.cpp.o.d
-│   │   │   │       │   │   │       └── RNFBAppCheckTurboModules-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── RNFBAppTurboModules_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_RNFBAppTurboModules.dir/
-│   │   │   │       │   │   │       ├── 5ad6a9ed320ef5e3a37b4d59fc1602b0/
-│   │   │   │       │   │   │       │   └── RNFBAppTurboModulesJSI-generated.cpp.o
-│   │   │   │       │   │   │       └── RNFBAppTurboModules-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── rngesturehandler_codegen_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_rngesturehandler_codegen.dir/
-│   │   │   │       │   │   │       ├── bac033cd950586cef66695376748dd33/
-│   │   │   │       │   │   │       │   ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │   └── EventEmitters.cpp.o
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── rngesturehandler_codegen/
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── rngesturehandler_codegen-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── RNGoogleSignInCGen_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_RNGoogleSignInCGen.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── RNGoogleSignInCGen/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── RNGoogleSignInCGen-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── rnpicker_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_rnpicker.dir/
-│   │   │   │       │   │   │       ├── 123de210e34743c3fe6153f8f397ddd9/
-│   │   │   │       │   │   │       │   └── source/
-│   │   │   │       │   │   │       │       └── codegen/
-│   │   │   │       │   │   │       │           └── jni/
-│   │   │   │       │   │   │       │               └── react/
-│   │   │   │       │   │   │       │                   └── renderer/
-│   │   │   │       │   │   │       │                       └── components/
-│   │   │   │       │   │   │       │                           └── rnpicker/
-│   │   │   │       │   │   │       │                               ├── Props.cpp.o
-│   │   │   │       │   │   │       │                               └── States.cpp.o
-│   │   │   │       │   │   │       ├── 3dc6318bcf2b830cf6c3cc3d1ffa3d37/
-│   │   │   │       │   │   │       │   └── jni/
-│   │   │   │       │   │   │       │       └── react/
-│   │   │   │       │   │   │       │           └── renderer/
-│   │   │   │       │   │   │       │               └── components/
-│   │   │   │       │   │   │       │                   └── rnpicker/
-│   │   │   │       │   │   │       │                       └── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       ├── da2f56ef394a4f80c2d3c28b01d0426a/
-│   │   │   │       │   │   │       │   └── codegen/
-│   │   │   │       │   │   │       │       └── jni/
-│   │   │   │       │   │   │       │           └── react/
-│   │   │   │       │   │   │       │               └── renderer/
-│   │   │   │       │   │   │       │                   └── components/
-│   │   │   │       │   │   │       │                       └── rnpicker/
-│   │   │   │       │   │   │       │                           ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │                           └── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       ├── RNCAndroidDialogPickerMeasurementsManager.cpp.o
-│   │   │   │       │   │   │       ├── RNCAndroidDialogPickerShadowNode.cpp.o
-│   │   │   │       │   │   │       ├── RNCAndroidDialogPickerState.cpp.o
-│   │   │   │       │   │   │       ├── RNCAndroidDropdownPickerMeasurementsManager.cpp.o
-│   │   │   │       │   │   │       ├── RNCAndroidDropdownPickerShadowNode.cpp.o
-│   │   │   │       │   │   │       ├── RNCAndroidDropdownPickerState.cpp.o
-│   │   │   │       │   │   │       └── rnpicker.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── rnreanimated_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_rnreanimated.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── rnreanimated/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── rnreanimated-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── rnscreens_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_rnscreens.dir/
-│   │   │   │       │   │   │       ├── 14e34e8dd4ae4c7ec269c0d84fbb176b/
-│   │   │   │       │   │   │       │   └── cpp/
-│   │   │   │       │   │   │       │       └── react/
-│   │   │   │       │   │   │       │           └── renderer/
-│   │   │   │       │   │   │       │               └── components/
-│   │   │   │       │   │   │       │                   └── rnscreens/
-│   │   │   │       │   │   │       │                       ├── RNSSafeAreaViewState.cpp.o
-│   │   │   │       │   │   │       │                       ├── RNSScreenShadowNode.cpp.o
-│   │   │   │       │   │   │       │                       ├── RNSScreenState.cpp.o
-│   │   │   │       │   │   │       │                       ├── RNSStackScreenState.cpp.o
-│   │   │   │       │   │   │       │                       └── RNSTabsHostState.cpp.o
-│   │   │   │       │   │   │       ├── 8693757e3d5a5c9a6db54638aebbeec4/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── rnscreens/
-│   │   │   │       │   │   │       │               ├── RNSFormSheetHostShadowNode.cpp.o
-│   │   │   │       │   │   │       │               ├── RNSFullWindowOverlayShadowNode.cpp.o
-│   │   │   │       │   │   │       │               ├── RNSSafeAreaViewShadowNode.cpp.o
-│   │   │   │       │   │   │       │               ├── RNSScreenShadowNodeCommitHook.cpp.o
-│   │   │   │       │   │   │       │               ├── RNSStackHeaderConfigShadowNode.cpp.o
-│   │   │   │       │   │   │       │               ├── RNSStackHeaderConfigState.cpp.o
-│   │   │   │       │   │   │       │               ├── RNSStackHeaderItemShadowNode.cpp.o
-│   │   │   │       │   │   │       │               └── RNSStackHeaderSubviewState.cpp.o
-│   │   │   │       │   │   │       ├── 902056a31821811ee37a3a6eee24419f/
-│   │   │   │       │   │   │       │   └── codegen/
-│   │   │   │       │   │   │       │       └── jni/
-│   │   │   │       │   │   │       │           └── react/
-│   │   │   │       │   │   │       │               └── renderer/
-│   │   │   │       │   │   │       │                   └── components/
-│   │   │   │       │   │   │       │                       └── rnscreens/
-│   │   │   │       │   │   │       │                           ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │                           └── States.cpp.o
-│   │   │   │       │   │   │       ├── a6a261134b372ba0fdc4a1a79835032a/
-│   │   │   │       │   │   │       │   └── components/
-│   │   │   │       │   │   │       │       └── rnscreens/
-│   │   │   │       │   │   │       │           ├── RNSScreenStackHeaderConfigShadowNode.cpp.o
-│   │   │   │       │   │   │       │           ├── RNSScreenStackHeaderConfigState.cpp.o
-│   │   │   │       │   │   │       │           ├── RNSScreenStackHeaderSubviewShadowNode.cpp.o
-│   │   │   │       │   │   │       │           ├── RNSScreenStackHeaderSubviewState.cpp.o
-│   │   │   │       │   │   │       │           ├── RNSStackHeaderSubviewShadowNode.cpp.o
-│   │   │   │       │   │   │       │           └── RNSTabsBottomAccessoryShadowNode.cpp.o
-│   │   │   │       │   │   │       ├── b1f7c58d622af07164f7758cdaef3796/
-│   │   │   │       │   │   │       │   └── source/
-│   │   │   │       │   │   │       │       └── codegen/
-│   │   │   │       │   │   │       │           └── jni/
-│   │   │   │       │   │   │       │               └── react/
-│   │   │   │       │   │   │       │                   └── renderer/
-│   │   │   │       │   │   │       │                       └── components/
-│   │   │   │       │   │   │       │                           └── rnscreens/
-│   │   │   │       │   │   │       │                               └── Props.cpp.o
-│   │   │   │       │   │   │       ├── b3ed453958a5e2cda0765bb15bb96b76/
-│   │   │   │       │   │   │       │   └── jni/
-│   │   │   │       │   │   │       │       └── react/
-│   │   │   │       │   │   │       │           └── renderer/
-│   │   │   │       │   │   │       │               └── components/
-│   │   │   │       │   │   │       │                   └── rnscreens/
-│   │   │   │       │   │   │       │                       ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │                       └── EventEmitters.cpp.o
-│   │   │   │       │   │   │       ├── e8e5b2c273c2de66d2e822e1693b7c13/
-│   │   │   │       │   │   │       │   └── react/
-│   │   │   │       │   │   │       │       └── renderer/
-│   │   │   │       │   │   │       │           └── components/
-│   │   │   │       │   │   │       │               └── rnscreens/
-│   │   │   │       │   │   │       │                   ├── RNSFormSheetHostState.cpp.o
-│   │   │   │       │   │   │       │                   ├── RNSModalScreenShadowNode.cpp.o
-│   │   │   │       │   │   │       │                   ├── RNSSplitScreenShadowNode.cpp.o
-│   │   │   │       │   │   │       │                   ├── RNSStackHeaderItemState.cpp.o
-│   │   │   │       │   │   │       │                   ├── RNSStackScreenShadowNode.cpp.o
-│   │   │   │       │   │   │       │                   └── RNSTabsHostShadowNode.cpp.o
-│   │   │   │       │   │   │       └── rnscreens.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── RNSentrySpec_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_RNSentrySpec.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── RNSentrySpec/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── RNSentrySpec-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── rnskia_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_rnskia.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── rnskia/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── rnskia-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── rnsvg_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_rnsvg.dir/
-│   │   │   │       │   │   │       ├── 857f5a7e600b92ba4e556ef8d6abc4d4/
-│   │   │   │       │   │   │       │   └── codegen/
-│   │   │   │       │   │   │       │       └── jni/
-│   │   │   │       │   │   │       │           └── react/
-│   │   │   │       │   │   │       │               └── renderer/
-│   │   │   │       │   │   │       │                   └── components/
-│   │   │   │       │   │   │       │                       └── rnsvg/
-│   │   │   │       │   │   │       │                           └── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       ├── a4d0f197042eeedea7a459830f3e24eb/
-│   │   │   │       │   │   │       │   └── source/
-│   │   │   │       │   │   │       │       └── codegen/
-│   │   │   │       │   │   │       │           └── jni/
-│   │   │   │       │   │   │       │               └── react/
-│   │   │   │       │   │   │       │                   └── renderer/
-│   │   │   │       │   │   │       │                       └── components/
-│   │   │   │       │   │   │       │                           └── rnsvg/
-│   │   │   │       │   │   │       │                               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │                               └── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       ├── d454b7ee0ef98798853df2031ab1449e/
-│   │   │   │       │   │   │       │   └── common/
-│   │   │   │       │   │   │       │       └── cpp/
-│   │   │   │       │   │   │       │           └── react/
-│   │   │   │       │   │   │       │               └── renderer/
-│   │   │   │       │   │   │       │                   └── components/
-│   │   │   │       │   │   │       │                       └── rnsvg/
-│   │   │   │       │   │   │       │                           ├── RNSVGImageShadowNode.cpp.o
-│   │   │   │       │   │   │       │                           ├── RNSVGImageState.cpp.o
-│   │   │   │       │   │   │       │                           ├── RNSVGLayoutableShadowNode.cpp.o
-│   │   │   │       │   │   │       │                           └── RNSVGShadowNodes.cpp.o
-│   │   │   │       │   │   │       ├── f75a5d96668e86caa7f76720f052fcdf/
-│   │   │   │       │   │   │       │   └── generated/
-│   │   │   │       │   │   │       │       └── source/
-│   │   │   │       │   │   │       │           └── codegen/
-│   │   │   │       │   │   │       │               └── jni/
-│   │   │   │       │   │   │       │                   └── react/
-│   │   │   │       │   │   │       │                       └── renderer/
-│   │   │   │       │   │   │       │                           └── components/
-│   │   │   │       │   │   │       │                               └── rnsvg/
-│   │   │   │       │   │   │       │                                   ├── Props.cpp.o
-│   │   │   │       │   │   │       │                                   └── States.cpp.o
-│   │   │   │       │   │   │       └── rnsvg.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── rnviewshot_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_rnviewshot.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── rnviewshot/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── rnviewshot-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── rnworklets_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_rnworklets.dir/
-│   │   │   │       │   │   │       ├── react/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── rnworklets/
-│   │   │   │       │   │   │       │               ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │               ├── EventEmitters.cpp.o
-│   │   │   │       │   │   │       │               ├── Props.cpp.o
-│   │   │   │       │   │   │       │               ├── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       │               └── States.cpp.o
-│   │   │   │       │   │   │       └── rnworklets-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── safeareacontext_autolinked_build/
-│   │   │   │       │   │   ├── CMakeFiles/
-│   │   │   │       │   │   │   └── react_codegen_safeareacontext.dir/
-│   │   │   │       │   │   │       ├── 106802300c4987cfcedc77a2be2016a3/
-│   │   │   │       │   │   │       │   └── react/
-│   │   │   │       │   │   │       │       └── renderer/
-│   │   │   │       │   │   │       │           └── components/
-│   │   │   │       │   │   │       │               └── safeareacontext/
-│   │   │   │       │   │   │       │                   ├── Props.cpp.o
-│   │   │   │       │   │   │       │                   └── States.cpp.o
-│   │   │   │       │   │   │       ├── 278176e8c107b4ec7a4b6e362c2bb0fc/
-│   │   │   │       │   │   │       │   └── safeareacontext/
-│   │   │   │       │   │   │       │       └── RNCSafeAreaViewShadowNode.cpp.o
-│   │   │   │       │   │   │       ├── 2a4d83e32fc300b3c5e35cec6aeacccd/
-│   │   │   │       │   │   │       │   └── components/
-│   │   │   │       │   │   │       │       └── safeareacontext/
-│   │   │   │       │   │   │       │           └── RNCSafeAreaViewState.cpp.o
-│   │   │   │       │   │   │       ├── 7398a7f6057ad84183232dfa4a0288e2/
-│   │   │   │       │   │   │       │   └── renderer/
-│   │   │   │       │   │   │       │       └── components/
-│   │   │   │       │   │   │       │           └── safeareacontext/
-│   │   │   │       │   │   │       │               └── ShadowNodes.cpp.o
-│   │   │   │       │   │   │       ├── 988453b8d807a160940aab16d9485fdf/
-│   │   │   │       │   │   │       │   └── components/
-│   │   │   │       │   │   │       │       └── safeareacontext/
-│   │   │   │       │   │   │       │           ├── ComponentDescriptors.cpp.o
-│   │   │   │       │   │   │       │           └── EventEmitters.cpp.o
-│   │   │   │       │   │   │       └── d77d4c5cbd6352ecd18dd148dcb6a84c/
-│   │   │   │       │   │   │           └── source/
-│   │   │   │       │   │   │               └── codegen/
-│   │   │   │       │   │   │                   └── jni/
-│   │   │   │       │   │   │                       └── safeareacontext-generated.cpp.o
-│   │   │   │       │   │   └── cmake_install.cmake
-│   │   │   │       │   ├── .ninja_deps
-│   │   │   │       │   ├── .ninja_log
-│   │   │   │       │   ├── additional_project_files.txt
-│   │   │   │       │   ├── android_gradle_build_mini.json
-│   │   │   │       │   ├── android_gradle_build.json
-│   │   │   │       │   ├── build_file_index.txt
-│   │   │   │       │   ├── build.ninja
-│   │   │   │       │   ├── cmake_install.cmake
-│   │   │   │       │   ├── CMakeCache.txt
-│   │   │   │       │   ├── compile_commands.json
-│   │   │   │       │   ├── compile_commands.json.bin
-│   │   │   │       │   ├── configure_fingerprint.bin
-│   │   │   │       │   ├── metadata_generation_command.txt
-│   │   │   │       │   ├── prefab_config.json
-│   │   │   │       │   └── symbol_folder_index.txt
-│   │   │   │       ├── prefab/
-│   │   │   │       │   └── arm64-v8a/
-│   │   │   │       │       └── prefab/
-│   │   │   │       │           └── lib/
-│   │   │   │       │               └── aarch64-linux-android/
-│   │   │   │       │                   └── cmake/
-│   │   │   │       │                       ├── fbjni/
-│   │   │   │       │                       │   ├── fbjniConfig.cmake
-│   │   │   │       │                       │   └── fbjniConfigVersion.cmake
-│   │   │   │       │                       ├── hermes-engine/
-│   │   │   │       │                       │   ├── hermes-engineConfig.cmake
-│   │   │   │       │                       │   └── hermes-engineConfigVersion.cmake
-│   │   │   │       │                       ├── react-native-nitro-modules/
-│   │   │   │       │                       │   └── react-native-nitro-modulesConfig.cmake
-│   │   │   │       │                       ├── react-native-reanimated/
-│   │   │   │       │                       │   ├── react-native-reanimatedConfig.cmake
-│   │   │   │       │                       │   └── react-native-reanimatedConfigVersion.cmake
-│   │   │   │       │                       ├── react-native-worklets/
-│   │   │   │       │                       │   ├── react-native-workletsConfig.cmake
-│   │   │   │       │                       │   └── react-native-workletsConfigVersion.cmake
-│   │   │   │       │                       ├── ReactAndroid/
-│   │   │   │       │                       │   ├── ReactAndroidConfig.cmake
-│   │   │   │       │                       │   └── ReactAndroidConfigVersion.cmake
-│   │   │   │       │                       └── shopify_react-native-skia/
-│   │   │   │       │                           └── shopify_react-native-skiaConfig.cmake
-│   │   │   │       └── hash_key.txt
-│   │   │   └── tools/
-│   │   │       └── debug/
-│   │   │           └── arm64-v8a/
-│   │   │               └── compile_commands.json
-│   │   ├── src/
-│   │   │   ├── debug/
-│   │   │   │   └── AndroidManifest.xml
-│   │   │   ├── debugOptimized/
-│   │   │   │   └── AndroidManifest.xml
-│   │   │   └── main/
-│   │   │       ├── java/
-│   │   │       │   └── com/
-│   │   │       │       └── smlztrk/
-│   │   │       │           └── seelogd/
-│   │   │       │               ├── widget/
-│   │   │       │               │   ├── ListsWidgetModule.kt
-│   │   │       │               │   ├── ListsWidgetProvider.kt
-│   │   │       │               │   ├── ListsWidgetRemoteViewsService.kt
-│   │   │       │               │   ├── ReminderWidgetModule.kt
-│   │   │       │               │   ├── ReminderWidgetProvider.kt
-│   │   │       │               │   ├── ReminderWidgetRemoteViewsService.kt
-│   │   │       │               │   ├── SeelogdWidgetPackage.kt
-│   │   │       │               │   ├── StatsWidgetModule.kt
-│   │   │       │               │   ├── StatsWidgetProvider.kt
-│   │   │       │               │   └── WidgetPreferences.kt
-│   │   │       │               ├── MainActivity.kt
-│   │   │       │               └── MainApplication.kt
-│   │   │       ├── res/
-│   │   │       │   ├── drawable/
-│   │   │       │   │   ├── ic_launcher_background.xml
-│   │   │       │   │   ├── lists_widget_header_bg.xml
-│   │   │       │   │   ├── lists_widget_ic_bookmark.xml
-│   │   │       │   │   ├── lists_widget_ic_heart.xml
-│   │   │       │   │   ├── lists_widget_ic_list.xml
-│   │   │       │   │   ├── lists_widget_ic_next.xml
-│   │   │       │   │   ├── lists_widget_ic_prev.xml
-│   │   │       │   │   ├── lists_widget_icon_dot.xml
-│   │   │       │   │   ├── lists_widget_nav_btn.xml
-│   │   │       │   │   ├── lists_widget_poster_bg.xml
-│   │   │       │   │   ├── lists_widget_poster_preview_a.xml
-│   │   │       │   │   ├── lists_widget_poster_preview_b.xml
-│   │   │       │   │   ├── lists_widget_poster_preview_c.xml
-│   │   │       │   │   ├── lists_widget_preview.xml
-│   │   │       │   │   ├── reminder_widget_background.xml
-│   │   │       │   │   ├── reminder_widget_count_badge.xml
-│   │   │       │   │   ├── reminder_widget_ic_empty.xml
-│   │   │       │   │   ├── reminder_widget_ic_movie.xml
-│   │   │       │   │   ├── reminder_widget_ic_tv.xml
-│   │   │       │   │   ├── reminder_widget_logo_badge.xml
-│   │   │       │   │   ├── reminder_widget_movie_badge.xml
-│   │   │       │   │   ├── reminder_widget_poster_bg.xml
-│   │   │       │   │   ├── reminder_widget_preview.xml
-│   │   │       │   │   ├── reminder_widget_row_bg_today.xml
-│   │   │       │   │   ├── reminder_widget_row_bg.xml
-│   │   │       │   │   ├── reminder_widget_tv_badge.xml
-│   │   │       │   │   ├── rn_edit_text_material.xml
-│   │   │       │   │   ├── stats_widget_card_bg.xml
-│   │   │       │   │   ├── stats_widget_ic_time.xml
-│   │   │       │   │   ├── stats_widget_panel_bg.xml
-│   │   │       │   │   ├── stats_widget_preview.xml
-│   │   │       │   │   └── stats_widget_strip_bg.xml
-│   │   │       │   ├── drawable-hdpi/
-│   │   │       │   │   ├── notification_icon.png
-│   │   │       │   │   └── splashscreen_logo.png
-│   │   │       │   ├── drawable-mdpi/
-│   │   │       │   │   ├── notification_icon.png
-│   │   │       │   │   └── splashscreen_logo.png
-│   │   │       │   ├── drawable-xhdpi/
-│   │   │       │   │   ├── notification_icon.png
-│   │   │       │   │   └── splashscreen_logo.png
-│   │   │       │   ├── drawable-xxhdpi/
-│   │   │       │   │   ├── notification_icon.png
-│   │   │       │   │   └── splashscreen_logo.png
-│   │   │       │   ├── drawable-xxxhdpi/
-│   │   │       │   │   ├── notification_icon.png
-│   │   │       │   │   └── splashscreen_logo.png
-│   │   │       │   ├── layout/
-│   │   │       │   │   ├── lists_widget_item.xml
-│   │   │       │   │   ├── lists_widget_preview.xml
-│   │   │       │   │   ├── lists_widget.xml
-│   │   │       │   │   ├── reminder_widget_item.xml
-│   │   │       │   │   ├── reminder_widget_preview.xml
-│   │   │       │   │   ├── reminder_widget.xml
-│   │   │       │   │   ├── stats_widget_preview.xml
-│   │   │       │   │   └── stats_widget.xml
-│   │   │       │   ├── mipmap-anydpi-v26/
-│   │   │       │   │   ├── ic_launcher_round.xml
-│   │   │       │   │   └── ic_launcher.xml
-│   │   │       │   ├── mipmap-hdpi/
-│   │   │       │   │   ├── ic_launcher_background.webp
-│   │   │       │   │   ├── ic_launcher_foreground.webp
-│   │   │       │   │   ├── ic_launcher_monochrome.webp
-│   │   │       │   │   ├── ic_launcher_round.webp
-│   │   │       │   │   └── ic_launcher.webp
-│   │   │       │   ├── mipmap-mdpi/
-│   │   │       │   │   ├── ic_launcher_background.webp
-│   │   │       │   │   ├── ic_launcher_foreground.webp
-│   │   │       │   │   ├── ic_launcher_monochrome.webp
-│   │   │       │   │   ├── ic_launcher_round.webp
-│   │   │       │   │   └── ic_launcher.webp
-│   │   │       │   ├── mipmap-xhdpi/
-│   │   │       │   │   ├── ic_launcher_background.webp
-│   │   │       │   │   ├── ic_launcher_foreground.webp
-│   │   │       │   │   ├── ic_launcher_monochrome.webp
-│   │   │       │   │   ├── ic_launcher_round.webp
-│   │   │       │   │   └── ic_launcher.webp
-│   │   │       │   ├── mipmap-xxhdpi/
-│   │   │       │   │   ├── ic_launcher_background.webp
-│   │   │       │   │   ├── ic_launcher_foreground.webp
-│   │   │       │   │   ├── ic_launcher_monochrome.webp
-│   │   │       │   │   ├── ic_launcher_round.webp
-│   │   │       │   │   └── ic_launcher.webp
-│   │   │       │   ├── mipmap-xxxhdpi/
-│   │   │       │   │   ├── ic_launcher_background.webp
-│   │   │       │   │   ├── ic_launcher_foreground.webp
-│   │   │       │   │   ├── ic_launcher_monochrome.webp
-│   │   │       │   │   ├── ic_launcher_round.webp
-│   │   │       │   │   └── ic_launcher.webp
-│   │   │       │   ├── values/
-│   │   │       │   │   ├── colors.xml
-│   │   │       │   │   ├── strings.xml
-│   │   │       │   │   ├── styles.xml
-│   │   │       │   │   └── widget_strings.xml
-│   │   │       │   ├── values-night/
-│   │   │       │   │   └── colors.xml
-│   │   │       │   └── xml/
-│   │   │       │       ├── lists_widget_info.xml
-│   │   │       │       ├── reminder_widget_info.xml
-│   │   │       │       └── stats_widget_info.xml
-│   │   │       └── AndroidManifest.xml
-│   │   ├── build.gradle
-│   │   ├── debug.keystore
-│   │   ├── google-services.json
-│   │   └── proguard-rules.pro
-│   ├── gradle/
-│   │   └── wrapper/
-│   │       ├── gradle-wrapper.jar
-│   │       └── gradle-wrapper.properties
-│   ├── .gitignore
-│   ├── build.gradle
-│   ├── gradle.properties
-│   ├── gradlew
-│   ├── gradlew.bat
-│   ├── sentry.properties
-│   └── settings.gradle
-├── assets/
-│   ├── android-icon-background.png/
-│   ├── android-icon-foreground.png/
-│   ├── android-icon-monochrome.png/
-│   ├── avatar/
-│   ├── favicon.png/
-│   ├── flags/
-│   ├── icon.png/
-│   ├── iconBacground/
-│   ├── image/
-│   ├── lottie/
-│   ├── notification-icon.png/
-│   ├── oldicon/
-│   ├── oldicon1/
-│   └── ossLicenses.json/
-├── components/
-│   ├── animated/
+│   ├── widgetNativeLanguage.test.js
+│   ├── widgetPreferencesService.test.js
+│   ├── widgetSettingsModel.test.js
+│   ├── worldTour.test.js
+│   ├── wrappedCard.test.js
+│   ├── wrappedHub.test.js
+│   ├── yearlyGoal.test.js
+│   └── yearlyGoalButton.test.js
+├── assets
+│   ├── avatar
+│   │   ├── 0.png
+│   │   ├── 1.png
+│   │   ├── 10.png
+│   │   ├── 11.png
+│   │   ├── 12.png
+│   │   ├── 13.png
+│   │   ├── 14.png
+│   │   ├── 15.png
+│   │   ├── 16.png
+│   │   ├── 17.png
+│   │   ├── 18.png
+│   │   ├── 19.png
+│   │   ├── 2.png
+│   │   ├── 20.png
+│   │   ├── 21.png
+│   │   ├── 22.png
+│   │   ├── 23.png
+│   │   ├── 24.png
+│   │   ├── 25.png
+│   │   ├── 26.png
+│   │   ├── 27.png
+│   │   ├── 28.png
+│   │   ├── 29.png
+│   │   ├── 3.png
+│   │   ├── 30.png
+│   │   ├── 31.png
+│   │   ├── 32.png
+│   │   ├── 33.png
+│   │   ├── 34.png
+│   │   ├── 35.png
+│   │   ├── 36.png
+│   │   ├── 37.png
+│   │   ├── 38.png
+│   │   ├── 39.png
+│   │   ├── 4.png
+│   │   ├── 40.png
+│   │   ├── 41.png
+│   │   ├── 42.png
+│   │   ├── 43.png
+│   │   ├── 44.png
+│   │   ├── 45.png
+│   │   ├── 46.png
+│   │   ├── 47.png
+│   │   ├── 48.png
+│   │   ├── 49.png
+│   │   ├── 5.png
+│   │   ├── 50.png
+│   │   ├── 51.png
+│   │   ├── 52.png
+│   │   ├── 53.png
+│   │   ├── 54.png
+│   │   ├── 55.png
+│   │   ├── 6.png
+│   │   ├── 7.png
+│   │   ├── 8.png
+│   │   └── 9.png
+│   ├── icon_default
+│   │   ├── android-icon-background.png
+│   │   ├── android-icon-foreground.png
+│   │   ├── android-icon-monochrome.png
+│   │   ├── favicon.png
+│   │   ├── icon.png
+│   │   └── notification-icon.png
+│   ├── icon_glass
+│   │   ├── android-icon-background.png
+│   │   ├── android-icon-foreground.png
+│   │   ├── android-icon-monochrome.png
+│   │   ├── favicon.png
+│   │   ├── icon.png
+│   │   └── notification-icon.png
+│   ├── iconBacground
+│   │   ├── 0.png
+│   │   ├── 1.png
+│   │   ├── 10.png
+│   │   ├── 100.png
+│   │   ├── 101.png
+│   │   ├── 102.png
+│   │   ├── 103.png
+│   │   ├── 104.png
+│   │   ├── 105.png
+│   │   ├── 106.png
+│   │   ├── 107.png
+│   │   ├── 108.png
+│   │   ├── 109.png
+│   │   ├── 11.png
+│   │   ├── 110.png
+│   │   ├── 111.png
+│   │   ├── 112.png
+│   │   ├── 113.png
+│   │   ├── 114.png
+│   │   ├── 115.png
+│   │   ├── 116.png
+│   │   ├── 117.png
+│   │   ├── 118.png
+│   │   ├── 119.png
+│   │   ├── 12.png
+│   │   ├── 120.png
+│   │   ├── 121.png
+│   │   ├── 122.png
+│   │   ├── 123.png
+│   │   ├── 124.png
+│   │   ├── 125.png
+│   │   ├── 126.png
+│   │   ├── 127.png
+│   │   ├── 128.png
+│   │   ├── 129.png
+│   │   ├── 13.png
+│   │   ├── 130.png
+│   │   ├── 131.png
+│   │   ├── 132.png
+│   │   ├── 133.png
+│   │   ├── 134.png
+│   │   ├── 135.png
+│   │   ├── 136.png
+│   │   ├── 137.png
+│   │   ├── 138.png
+│   │   ├── 139.png
+│   │   ├── 14.png
+│   │   ├── 140.png
+│   │   ├── 141.png
+│   │   ├── 142.png
+│   │   ├── 143.png
+│   │   ├── 144.png
+│   │   ├── 145.png
+│   │   ├── 146.png
+│   │   ├── 147.png
+│   │   ├── 148.png
+│   │   ├── 149.png
+│   │   ├── 15.png
+│   │   ├── 150.png
+│   │   ├── 151.png
+│   │   ├── 152.png
+│   │   ├── 153.png
+│   │   ├── 154.png
+│   │   ├── 155.png
+│   │   ├── 156.png
+│   │   ├── 157.png
+│   │   ├── 158.png
+│   │   ├── 159.png
+│   │   ├── 16.png
+│   │   ├── 160.png
+│   │   ├── 161.png
+│   │   ├── 162.png
+│   │   ├── 163.png
+│   │   ├── 164.png
+│   │   ├── 165.png
+│   │   ├── 166.png
+│   │   ├── 167.png
+│   │   ├── 168.png
+│   │   ├── 169.png
+│   │   ├── 17.png
+│   │   ├── 170.png
+│   │   ├── 171.png
+│   │   ├── 172.png
+│   │   ├── 173.png
+│   │   ├── 174.png
+│   │   ├── 18.png
+│   │   ├── 19.png
+│   │   ├── 2.png
+│   │   ├── 20.png
+│   │   ├── 21.png
+│   │   ├── 22.png
+│   │   ├── 23.png
+│   │   ├── 24.png
+│   │   ├── 25.png
+│   │   ├── 26.png
+│   │   ├── 27.png
+│   │   ├── 28.png
+│   │   ├── 29.png
+│   │   ├── 3.png
+│   │   ├── 30.png
+│   │   ├── 31.png
+│   │   ├── 32.png
+│   │   ├── 33.png
+│   │   ├── 34.png
+│   │   ├── 35.png
+│   │   ├── 36.png
+│   │   ├── 37.png
+│   │   ├── 38.png
+│   │   ├── 39.png
+│   │   ├── 4.png
+│   │   ├── 40.png
+│   │   ├── 41.png
+│   │   ├── 42.png
+│   │   ├── 43.png
+│   │   ├── 44.png
+│   │   ├── 45.png
+│   │   ├── 46.png
+│   │   ├── 47.png
+│   │   ├── 48.png
+│   │   ├── 49.png
+│   │   ├── 5.png
+│   │   ├── 50.png
+│   │   ├── 51.png
+│   │   ├── 52.png
+│   │   ├── 53.png
+│   │   ├── 54.png
+│   │   ├── 55.png
+│   │   ├── 56.png
+│   │   ├── 57.png
+│   │   ├── 58.png
+│   │   ├── 59.png
+│   │   ├── 6.png
+│   │   ├── 60.png
+│   │   ├── 61.png
+│   │   ├── 62.png
+│   │   ├── 63.png
+│   │   ├── 64.png
+│   │   ├── 65.png
+│   │   ├── 66.png
+│   │   ├── 67.png
+│   │   ├── 68.png
+│   │   ├── 69.png
+│   │   ├── 7.png
+│   │   ├── 70.png
+│   │   ├── 71.png
+│   │   ├── 72.png
+│   │   ├── 73.png
+│   │   ├── 74.png
+│   │   ├── 75.png
+│   │   ├── 76.png
+│   │   ├── 77.png
+│   │   ├── 78.png
+│   │   ├── 79.png
+│   │   ├── 8.png
+│   │   ├── 80.png
+│   │   ├── 81.png
+│   │   ├── 82.png
+│   │   ├── 83.png
+│   │   ├── 84.png
+│   │   ├── 85.png
+│   │   ├── 86.png
+│   │   ├── 87.png
+│   │   ├── 88.png
+│   │   ├── 89.png
+│   │   ├── 9.png
+│   │   ├── 90.png
+│   │   ├── 91.png
+│   │   ├── 92.png
+│   │   ├── 93.png
+│   │   ├── 94.png
+│   │   ├── 95.png
+│   │   ├── 96.png
+│   │   ├── 97.png
+│   │   ├── 98.png
+│   │   └── 99.png
+│   ├── lottie
+│   │   ├── 6_fireworks.json
+│   │   ├── confetti_2.json
+│   │   ├── dizi_film_animation.json
+│   │   ├── gemini.json
+│   │   ├── loading15.json
+│   │   ├── play.json
+│   │   ├── search_notfound.json
+│   │   ├── search12.json
+│   │   ├── snow.json
+│   │   └── typingAnimation.json
+│   ├── splash-posters
+│   │   ├── movie-118340.jpg
+│   │   ├── movie-13.jpg
+│   │   ├── movie-155.jpg
+│   │   ├── movie-157336.jpg
+│   │   ├── movie-19995.jpg
+│   │   ├── movie-24428.jpg
+│   │   ├── movie-27205.jpg
+│   │   ├── movie-278.jpg
+│   │   ├── movie-293660.jpg
+│   │   ├── movie-299536.jpg
+│   │   ├── movie-550.jpg
+│   │   ├── movie-680.jpg
+│   │   ├── tv-1396.jpg
+│   │   ├── tv-1399.jpg
+│   │   ├── tv-1402.jpg
+│   │   ├── tv-1418.jpg
+│   │   ├── tv-63174.jpg
+│   │   ├── tv-66732.jpg
+│   │   ├── tv-69050.jpg
+│   │   ├── tv-71446.jpg
+│   │   ├── tv-71712.jpg
+│   │   ├── tv-76479.jpg
+│   │   ├── tv-85271.jpg
+│   │   └── tv-93405.jpg
+│   ├── unused-lottie
+│   │   ├── AI_Bot.json
+│   │   ├── AI.json
+│   │   ├── Animation3.json
+│   │   ├── arrow.json
+│   │   ├── bounce_sercle.json
+│   │   ├── camera_animation.json
+│   │   ├── confetti_1.json
+│   │   ├── confetti_3.json
+│   │   ├── del_animation.json
+│   │   ├── forgot_password.json
+│   │   ├── gradiant.json
+│   │   ├── heart_animation.json
+│   │   ├── loading_pacman.json
+│   │   ├── loading10.json
+│   │   ├── loading11.json
+│   │   ├── loading13.json
+│   │   ├── loading14.json
+│   │   ├── login.json
+│   │   ├── rainbow_fireworks.json
+│   │   ├── register.json
+│   │   ├── Search.json
+│   │   ├── search10.json
+│   │   ├── search11.json
+│   │   ├── search13.json
+│   │   ├── search9.json
+│   │   ├── SearchScreen.json
+│   │   ├── splash.json
+│   │   ├── time_go.json
+│   │   ├── warning.json
+│   │   └── yon.json
+│   ├── ossLicenses.json
+│   └── splash-glow.png
+├── components
+│   ├── ai
+│   │   ├── AIChips.js
+│   │   ├── AIHistory.js
+│   │   ├── AIPrefsPanel.js
+│   │   ├── AIQuotaMeter.js
+│   │   ├── AIResponseFooter.js
+│   │   ├── AIThinking.js
+│   │   ├── AITitleActions.js
+│   │   ├── AIWelcome.js
+│   │   └── aiCardKit.js
+│   ├── animated
 │   │   └── RollingNumber.js
-│   ├── auth/
+│   ├── auth
+│   │   ├── AuthKit.js
 │   │   ├── BirthDateField.js
 │   │   ├── EmailSuffixRow.js
 │   │   └── LegalConsentNotice.js
-│   ├── badges/
+│   ├── badges
 │   │   ├── AppBadge.js
 │   │   ├── badgeCatalog.js
+│   │   ├── BadgeControls.js
+│   │   ├── badgeFormat.js
+│   │   ├── badgeInsights.js
 │   │   ├── badgeMeta.js
+│   │   ├── BadgeRail.js
 │   │   ├── badgeSets.js
+│   │   ├── BadgeSummaryCard.js
+│   │   ├── IdentityBadgesRow.js
+│   │   ├── NewBadgesBanner.js
 │   │   ├── seasonSeals.js
 │   │   ├── WatchBadgeCard.js
 │   │   ├── watchBadgeCatalog.js
-│   │   └── WatchBadgeDetailModal.js
-│   ├── calendar/
+│   │   ├── WatchBadgeDetailModal.js
+│   │   └── WatchBadgeTile.js
+│   ├── calendar
+│   │   ├── CalendarAgendaDay.js
 │   │   └── CalendarFilterPanel.js
-│   ├── chat/
+│   ├── chat
+│   │   ├── BounceIn.js
+│   │   ├── ChatCreateFab.js
+│   │   ├── ChatHeader.js
+│   │   ├── ComposerBlur.js
+│   │   ├── ComposerReplyBar.js
 │   │   ├── GroupAvatar.js
 │   │   ├── GroupAvatarGrid.js
 │   │   ├── GroupAvatarPickerModal.js
 │   │   ├── GroupInfoModal.js
+│   │   ├── MessageBubble.js
 │   │   ├── MessageReplyPreview.js
+│   │   ├── NewConversationSheet.js
 │   │   ├── PinnedMessagesModal.js
 │   │   ├── PollMessage.js
+│   │   ├── PosterStrip.js
+│   │   ├── SharedAiMessage.js
+│   │   ├── SharedChallengeMessage.js
+│   │   ├── SharedCineRoomMessage.js
+│   │   ├── SharedListMessage.js
+│   │   ├── SharedListSheet.js
 │   │   ├── SharedMediaCollection.js
 │   │   ├── SharedMediaMessage.js
+│   │   ├── SharedPostMessage.js
+│   │   ├── SharedTasteMatchMessage.js
+│   │   ├── SharedTournamentMessage.js
+│   │   ├── shareKit.js
+│   │   ├── ShareToChatSheet.js
 │   │   ├── SwipeReplyContainer.js
 │   │   └── TextPollComposer.js
-│   ├── comments/
+│   ├── cineswipe
+│   │   ├── CineActionBar.js
+│   │   ├── CineCardSkeleton.js
+│   │   ├── CineCardStack.js
+│   │   ├── CineDuoLobby.js
+│   │   ├── CineDuoProgress.js
+│   │   ├── CineDuoResultsModal.js
+│   │   ├── CineEmptyState.js
+│   │   ├── CineFilterFields.js
+│   │   ├── CineFilterSheet.js
+│   │   ├── CineLikedBasketModal.js
+│   │   ├── CineMatchModal.js
+│   │   ├── CineRoomConfigModal.js
+│   │   ├── CineSegmented.js
+│   │   ├── CineSheet.js
+│   │   ├── cineTheme.js
+│   │   ├── CineWaitingRoom.js
+│   │   ├── filterLabels.js
+│   │   ├── PressableScale.js
+│   │   ├── SwipeCard.js
+│   │   └── useCineCopy.js
+│   ├── comments
 │   │   ├── CommentScopeBadge.js
 │   │   ├── CommentScopeBar.js
 │   │   ├── CommentScopeSheet.js
 │   │   ├── ScopedCommentButton.js
 │   │   └── scopeTexts.js
-│   ├── common/
+│   ├── common
 │   │   ├── AdaptiveBlurView.js
 │   │   ├── BlurTarget.js
 │   │   ├── BottomSheetModal.js
 │   │   ├── ConfirmSheet.js
+│   │   ├── GlassBox.js
+│   │   ├── GlassCloseButton.js
+│   │   ├── GlassField.js
+│   │   ├── GlassIconButton.js
+│   │   ├── GlassPillButton.js
+│   │   ├── GlassPressable.js
+│   │   ├── GlassSurface.js
+│   │   ├── GlassTextInput.js
+│   │   ├── GlassTouchable.js
 │   │   ├── ListActionIcon.js
-│   │   └── ModalBlurBackdrop.js
-│   ├── detail/
+│   │   ├── ModalBlurBackdrop.js
+│   │   ├── SheetScroll.js
+│   │   ├── useGlassChrome.js
+│   │   └── UserAvatar.js
+│   ├── detail
+│   │   ├── CertificationBadge.js
+│   │   ├── ExternalRatingsRow.js
+│   │   ├── ExternalRatingsSheet.js
+│   │   ├── MediaNoteSheet.js
+│   │   ├── RatingLogos.js
 │   │   └── WatchedDateSheet.js
-│   ├── game/
+│   ├── favorites
+│   │   ├── FavoriteArt.js
+│   │   ├── FavoritePickerSheet.js
+│   │   ├── FavoritesEditor.js
+│   │   ├── FavoriteSlots.js
+│   │   ├── FavoritesRecommendationRail.js
+│   │   └── FavoritesShowcase.js
+│   ├── feed
+│   │   ├── ClampedText.js
+│   │   ├── FeedHeaderSections.js
+│   │   ├── FeedPostCard.js
+│   │   ├── PosterStack.js
+│   │   ├── postTypeMeta.js
+│   │   └── StatPill.js
+│   ├── feedback
+│   │   └── FeedbackKit.js
+│   ├── friends
+│   │   ├── FriendActionSheet.js
+│   │   ├── FriendProfileSections.js
+│   │   ├── FriendsEmptyState.js
+│   │   ├── FriendsScreenHeader.js
+│   │   ├── FriendsSearchField.js
+│   │   ├── FriendsSegmentedTabs.js
+│   │   ├── friendsTokens.js
+│   │   ├── PersonRow.js
+│   │   ├── PillButton.js
+│   │   ├── ProfileOptionsSheet.js
+│   │   ├── RoundIconButton.js
+│   │   ├── TasteMatchCard.js
+│   │   └── TasteMatchInfoSheet.js
+│   ├── game
+│   │   ├── AnswerFeedbackBar.js
 │   │   ├── AnswerOptionCard.js
+│   │   ├── DailyChallengeCard.js
+│   │   ├── DuelSendButton.js
 │   │   ├── ExitGameSheet.js
 │   │   ├── GameErrorState.js
 │   │   ├── GameLoadingState.js
+│   │   ├── GameTile.js
 │   │   ├── GameTimerBar.js
 │   │   ├── GameTopBar.js
 │   │   ├── JokerBar.js
-│   │   └── SceneResultShareCard.js
-│   ├── hub/
+│   │   ├── LevelRing.js
+│   │   ├── PlayerStrip.js
+│   │   ├── PosterReveal.js
+│   │   ├── QuickGameParts.js
+│   │   ├── QuickGamesGrid.js
+│   │   ├── SceneResultShareCard.js
+│   │   └── ui.js
+│   ├── home
+│   │   ├── AwardYearSheet.js
+│   │   ├── DiscoverExploreAction.js
+│   │   ├── DiscoverFilterChip.js
+│   │   ├── DiscoverFilterSheet.js
+│   │   ├── DiscoverHeaderSpacer.js
+│   │   ├── DiscoverSearchAction.js
+│   │   ├── MediaTypeSwitch.js
+│   │   ├── ProviderChip.js
+│   │   ├── SectionChips.js
+│   │   ├── SectionHeader.js
+│   │   └── SectionsHiddenNotice.js
+│   ├── hub
+│   │   ├── BingoWidget.js
+│   │   ├── CineSwipeWidget.js
+│   │   ├── DailyPollWidget.js
+│   │   ├── FeedWidget.js
+│   │   ├── HubCard.js
+│   │   ├── HubWrappedModule.js
 │   │   └── TournamentWidget.js
-│   ├── lists/
+│   ├── import
+│   │   ├── ImportDataModal.js
+│   │   ├── ImportHelpModal.js
+│   │   ├── importCopy.js
+│   │   └── richText.js
+│   ├── lists
+│   │   ├── CreateListModal.js
 │   │   ├── GlobalSearchResults.js
 │   │   ├── ListCovers.js
+│   │   ├── ListItemActionsSheet.js
 │   │   ├── ListManageSheet.js
-│   │   └── ListSearchBar.js
-│   ├── modals/
+│   │   ├── ListPosterCard.js
+│   │   ├── ListPosterInfoControls.js
+│   │   ├── ListSearchBar.js
+│   │   ├── ListSortFilterSheet.js
+│   │   ├── OtherListsPickerModal.js
+│   │   ├── PlatformFilterSection.js
+│   │   ├── WatchPickerEntry.js
+│   │   └── WatchPickerSheet.js
+│   ├── modals
+│   │   ├── createPost
+│   │   │   ├── ComposerParts.js
+│   │   │   ├── DraftCard.js
+│   │   │   └── LeaveSheet.js
 │   │   ├── ChatModal.js
 │   │   ├── CommentSheetModal.js
 │   │   ├── CreatePostModal.js
@@ -919,34 +890,84 @@ Seelogd/
 │   │   ├── RatingSheetModal.js
 │   │   ├── SaveSharedListModal.js
 │   │   └── WatchHistorySheet.js
-│   ├── moderation/
+│   ├── moderation
 │   │   └── ReportReasonSheet.js
-│   ├── notifications/
+│   ├── navigation
+│   │   ├── AdaptiveTabShell.js
+│   │   ├── NativeTabBarScale.js
+│   │   ├── TabBar.js
+│   │   ├── TabBarAiButton.js
+│   │   ├── TabBarGlass.js
+│   │   └── TabScrollMarker.js
+│   ├── notifications
 │   │   ├── NotificationBellHero.js
 │   │   └── NotificationPrimingSheet.js
-│   ├── pet/
+│   ├── permissions
+│   │   ├── CalendarPermissionSheet.js
+│   │   └── StatusPill.js
+│   ├── person
+│   │   ├── FollowedPeopleSheet.js
+│   │   ├── FollowedUpcomingRail.js
+│   │   └── FollowPersonButton.js
+│   ├── pet
 │   │   ├── PetCompanion.js
 │   │   ├── PetSettingsSection.js
 │   │   └── SpritePet.js
-│   ├── profile/
-│   │   ├── CalendarWidget.js
+│   ├── premium
+│   │   ├── PremiumPill.js
+│   │   ├── PremiumUpsellSheet.js
+│   │   └── RedeemCodeSheet.js
+│   ├── profile
+│   │   ├── AvatarPreviewModal.js
+│   │   ├── EditProfileKit.js
+│   │   ├── FriendsActionBar.js
+│   │   ├── HoldToConfirmButton.js
+│   │   ├── ImportantInvitesBar.js
+│   │   ├── ProfileAvatarHalo.js
 │   │   ├── ProfileAvatarPickerModal.js
 │   │   ├── ProfileGamesModule.js
+│   │   ├── ProfileIdentityBlock.js
+│   │   ├── ProfileLogoutButton.js
+│   │   ├── ProfileNotificationsButton.js
+│   │   ├── SocialLinksEditor.js
+│   │   ├── SocialLinksRow.js
 │   │   ├── StatsComponents.js
+│   │   ├── StatsFilterModal.js
 │   │   ├── WatchBadgeStrip.js
-│   │   └── WatchLevelCard.js
-│   ├── settings/
+│   │   ├── WatchLevelCard.js
+│   │   ├── YearlyGoalBar.js
+│   │   ├── YearlyGoalButton.js
+│   │   ├── yearlyGoalCopy.js
+│   │   ├── YearlyGoalMonthChart.js
+│   │   ├── YearlyGoalRing.js
+│   │   ├── YearlyGoalSheet.js
+│   │   ├── yearlyGoalTheme.js
+│   │   └── YearlyGoalTrackCard.js
+│   ├── search
+│   │   └── QuickListButtons.js
+│   ├── settings
+│   │   ├── AppIconSection.js
+│   │   ├── DevPlanSimulatorCard.js
+│   │   ├── FeedbackSettingsGroup.js
+│   │   ├── PremiumMemberBar.js
+│   │   ├── PremiumSettingsCard.js
 │   │   └── SettingPreviews.js
-│   ├── storyShare/
+│   ├── storyShare
+│   │   ├── ProfileStoryCard.js
+│   │   ├── ProfileStoryModal.js
 │   │   ├── SaveDraftModal.js
 │   │   ├── StoryActionBar.js
 │   │   ├── StoryHeader.js
 │   │   ├── StorySlider.js
 │   │   └── StoryTabs.js
-│   ├── theme/
+│   ├── theme
 │   │   ├── ColorPickerSheet.js
-│   │   └── ThemePreviewCard.js
-│   ├── toast/
+│   │   ├── ThemePreviewCard.js
+│   │   ├── ThemeShuffleDeck.js
+│   │   ├── themeStudioCopy.js
+│   │   ├── ThemeStudioKit.js
+│   │   └── ThemeToneKit.js
+│   ├── toast
 │   │   ├── ConnectivityToast.js
 │   │   ├── ModalToastHost.js
 │   │   ├── ScreenToastHost.js
@@ -955,28 +976,38 @@ Seelogd/
 │   │   ├── ToastItem.js
 │   │   ├── ToastOrb.js
 │   │   └── toastPalette.js
-│   ├── tournament/
+│   ├── tournament
 │   │   ├── BracketTree.js
 │   │   ├── CountdownTimer.js
 │   │   ├── MatchCard.js
 │   │   ├── NomineeSearchModal.js
+│   │   ├── phaseMeta.js
 │   │   ├── PodiumModal.js
-│   │   └── StageTimeline.js
-│   ├── tv/
-│   │   └── UpNextRailCard.js
-│   ├── typography/
+│   │   ├── RoundRail.js
+│   │   ├── StageTimeline.js
+│   │   └── TournamentHero.js
+│   ├── tv
+│   │   ├── TvGraphGrid.js
+│   │   ├── UpNextRailCard.js
+│   │   └── WatchProgressBar.js
+│   ├── typography
 │   │   ├── AppText.js
 │   │   └── FontSettingsSection.js
-│   ├── video/
+│   ├── video
 │   │   ├── TrailerModal.js
-│   │   └── TrailerSection.js
-│   ├── wrapped/
+│   │   ├── TrailerSection.js
+│   │   └── TrailerVideoList.js
+│   ├── wrapped
 │   │   ├── WrappedShareCard.js
+│   │   ├── WrappedShareEditor.js
 │   │   ├── WrappedSlides.js
-│   │   └── WrappedYearPath.js
+│   │   ├── WrappedYearPath.js
+│   │   └── YearHeat.js
 │   ├── AICineCards.js
+│   ├── AmbientBackground.js
 │   ├── AppAlert.js
 │   ├── AppIcon.js
+│   ├── appLogoSources.js
 │   ├── AppToast.js
 │   ├── BackButton.js
 │   ├── BatteryOptimizationNotice.js
@@ -984,6 +1015,7 @@ Seelogd/
 │   ├── Comment.js
 │   ├── DiscoveryMediaRail.js
 │   ├── ErrorBoundary.js
+│   ├── ExternalEntryHost.js
 │   ├── IconBacground.js
 │   ├── iconBackgroundSources.js
 │   ├── JustWatchLogo.js
@@ -993,26 +1025,25 @@ Seelogd/
 │   ├── NotificationPermissionNotice.js
 │   ├── PaginatedRail.js
 │   ├── PermissionsSection.js
+│   ├── PosterActivityBadge.js
 │   ├── PosterImage.js
 │   ├── PosterInfoBadges.js
-│   ├── PosterMarqueeBackground.js
 │   ├── RatingInput.js
 │   ├── RatingStars.js
 │   ├── RatingSummary.js
 │   ├── Reminder.js
 │   ├── ScreenDecor.js
 │   ├── ScreenSnow.js
-│   ├── SeeAllHeader.js
 │   ├── SharedListsSection.js
 │   ├── Skeleton.js
-│   ├── SkeletonGraph.js
 │   ├── SplashPosterWave.js
 │   ├── StaggerItem.js
 │   ├── SwipeCard.js
 │   ├── SwitchToggle.js
 │   ├── TmdbLogo.js
-│   └── TVShowItem.js
-├── context/
+│   ├── TVShowItem.js
+│   └── UserDataSyncHost.js
+├── context
 │   ├── AppSettingsContext.js
 │   ├── AuthContext.js
 │   ├── CalendarContext.js
@@ -1022,6 +1053,7 @@ Seelogd/
 │   ├── LanguageContext.js
 │   ├── ListStatusContext.js
 │   ├── MediaActivityContext.js
+│   ├── MediaNotesContext.js
 │   ├── MediaQuickActionsContext.js
 │   ├── MovieContex.js
 │   ├── NotificationsContext.js
@@ -1034,182 +1066,317 @@ Seelogd/
 │   ├── ProfileUiContext.js
 │   ├── SharedListsContext.js
 │   ├── SnowContext.js
+│   ├── TabBarLayoutContext.js
 │   ├── ThemeContext.js
 │   ├── TvShowContex.js
 │   ├── TypographyContext.js
+│   ├── UnreadMessagesContext.js
 │   ├── UserProfileContext.js
 │   └── WatchProgressContext.js
-├── docs/
-│   ├── kurulum/
+├── data
+│   ├── dailyPollQuestions.js
+│   └── splashPosterCatalog.js
+├── docs
+│   ├── kurulum
+│   │   ├── APPLE_AUTH_KURULUM.md
+│   │   ├── ARKADAS_DAVETI_KURULUM.md
 │   │   ├── GOOGLE_AUTH_KURULUM.txt
+│   │   ├── PLAY_DATA_SAFETY.md
 │   │   ├── reminder-widget-ios-kurulum.md
 │   │   ├── REVENUECAT_KURULUM.md
 │   │   └── streaming-bildirimleri-kurulum.md
-│   ├── memory-bank/
+│   ├── memory-bank
 │   │   ├── activeContext.md
 │   │   ├── productContext.md
 │   │   ├── progress.md
 │   │   ├── projectbrief.md
 │   │   ├── systemPatterns.md
 │   │   └── techContext.md
-│   ├── mimari/
+│   ├── mimari
 │   │   ├── ACIK_KAYNAK_LISANSLARI.md
+│   │   ├── DIL_DESTEGI_REHBERI.md
+│   │   ├── FIRESTORE_DATABASE_SCHEMA.md
 │   │   ├── FIRESTORE_SCHEMA.txt
 │   │   ├── GEMINI.md
+│   │   ├── KULLANICI_OZEL_ALAN_GOCU.md
+│   │   ├── LISTE_IZLEME_ALTYAPISI.md
+│   │   ├── PRESENCE.md
 │   │   ├── PROJE_ANALIZ_RAPORU.txt
 │   │   ├── PROJE_DOSYA_YAPISI.txt
 │   │   ├── PROJECT_CONTEXT.md
-│   │   └── UYGULAMA_BILGISI_VE_MIMARISI.md
-│   ├── ozellikler/
+│   │   ├── TOAST_SISTEMI.md
+│   │   ├── UYGULAMA_BILGISI_VE_MIMARISI.md
+│   │   └── YEREL_ONCELIKLI_VERI_KATMANI.md
+│   ├── ozellikler
+│   │   ├── DORT_FAVORI.md
+│   │   ├── EK_OZELLIKLER_18_EKIM.md
+│   │   ├── EKRAN_BOLUMLERI.md
+│   │   ├── FILTRELI_KESIF.md
+│   │   ├── GUNLUK_DUELLO.md
+│   │   ├── GUNUN_SORUSU.md
+│   │   ├── HIZLI_OYUNLAR.md
+│   │   ├── KUTUPHANE_DISA_AKTARMA.md
+│   │   ├── ONCE_HANGISI.md
 │   │   ├── OYUN_KISMI_GELISTIRME.txt
-│   │   └── PUANLAMA_ROZET_SISTEMI.md
-│   ├── performans/
+│   │   ├── OYUNCU_TAKIBI.md
+│   │   ├── PLATFORMLARIMDA_SUZGECI.md
+│   │   ├── PUANLAMA_ROZET_SISTEMI.md
+│   │   ├── SINEMA_BINGOSU.md
+│   │   ├── YILLIK_HEDEF.md
+│   │   └── ZEVK_UYUMU.md
+│   ├── performans
 │   │   ├── performance_optimization.txt
 │   │   ├── PERFORMANS_GUNCELLEME_ADIMLARI.txt
 │   │   ├── PERFORMANS_INCELEME_RAPORU.txt
 │   │   └── PERFORMANS_OPTIMIZASYON_PLANI.txt
-│   └── planlama/
-│       ├── GELISTIRME_PLANI.txt
-│       ├── MASTER_GOREV_LISTESI.txt
-│       ├── ozellik-onerileri-arastirma.md
-│       ├── YAYIN_ONCESI_AI_GOREV_PLANI.md
-│       └── YAYIN_VE_GELIR_YOL_HARITASI.md
-├── functions/
-│   ├── scripts/
+│   ├── planlama
+│   │   ├── GELISTIRME_ONERI_ADAYLARI_2026-10-17.md
+│   │   ├── GELISTIRME_PLANI.txt
+│   │   ├── LIQUID_GLASS_TABS_ARASTIRMA_VE_GECIS_PLANI_2026-09-09.md
+│   │   ├── MASTER_GOREV_LISTESI.txt
+│   │   ├── ozellik-onerileri-arastirma.md
+│   │   ├── RELEASE_CANDIDATE_COMMIT_PLANI_2026-08-12.md
+│   │   ├── YAYIN_HAZIRLIK_DURUM_RAPORU_2026-08-10.md
+│   │   ├── YAYIN_ONCESI_AI_GOREV_PLANI.md
+│   │   └── YAYIN_VE_GELIR_YOL_HARITASI.md
+│   ├── CINESWIPE_LIFECYCLE.md
+│   ├── DIL_DENETIMI_2026-10-19.md
+│   └── DIL_DENETIMI_2026-10-22.md
+├── functions
+│   ├── scripts
+│   │   ├── accountMigrationPlan.js
+│   │   ├── migrateAccountPrivate.js
+│   │   ├── promoCodes.js
 │   │   └── purgeStaleTokens.js
 │   ├── .gitignore
+│   ├── accountPurge.integration.test.js
+│   ├── accountPurge.js
 │   ├── aiQuota.js
+│   ├── appBadge.js
+│   ├── appBadge.test.js
+│   ├── appleAuth.js
+│   ├── appleAuth.test.js
+│   ├── chatPresence.js
+│   ├── chatPresence.test.js
+│   ├── cineRoomCleanup.js
+│   ├── cineRoomCleanup.test.js
+│   ├── externalRatings.js
+│   ├── externalRatings.test.js
 │   ├── index.js
 │   ├── package-lock.json
 │   ├── package.json
+│   ├── planCapabilities.js
+│   ├── profileIdentity.js
 │   ├── README.md
+│   ├── referral.integration.test.js
+│   ├── referral.js
+│   ├── referral.test.js
 │   ├── revenueCatWebhook.js
 │   ├── streamingDiff.js
-│   └── tournamentBracket.js
-├── hooks/
+│   ├── tournamentBracket.js
+│   ├── weeklyDigest.js
+│   └── weeklyDigest.test.js
+├── hooks
+│   ├── useAdaptiveSheetHeight.js
+│   ├── useAiConversations.js
+│   ├── useAiPrefs.js
+│   ├── useAiQuota.js
 │   ├── useAppActive.js
+│   ├── useAppLogo.js
+│   ├── useAwardYears.js
+│   ├── useBadgeCelebration.js
+│   ├── useCinemaBingo.js
+│   ├── useCineSoloDeck.js
+│   ├── useDailyPoll.js
+│   ├── useDailyView.js
+│   ├── useDecorVisibility.js
+│   ├── useDiscoverFilterStore.js
+│   ├── useDuelStatus.js
+│   ├── useEntranceGate.js
+│   ├── useFilteredDiscover.js
+│   ├── useFollowedPeople.js
+│   ├── useGameStats.js
+│   ├── useHomeContentSettings.js
+│   ├── useKesifSignals.js
+│   ├── useKeyboardInset.js
+│   ├── useKeyboardMetrics.js
 │   ├── useListStatus.js
 │   ├── useMediaActivity.js
 │   ├── useModalKeyboardLift.js
-│   ├── usePullToSearch.js
+│   ├── useOlderGame.js
+│   ├── usePremiumGate.js
+│   ├── usePremiumScreenGuard.js
+│   ├── usePremiumUsage.js
+│   ├── useProviderWatch.js
+│   ├── usePullToRefresh.js
+│   ├── useQuickGame.js
 │   ├── useRailPosterStyle.js
 │   ├── useReduceMotion.js
+│   ├── useReferralOverview.js
+│   ├── useReminderGate.js
 │   ├── useSceneGame.js
+│   ├── useScreenFocused.js
+│   ├── useSectionVisibility.js
 │   ├── useSheetTransition.js
 │   ├── useStartupGate.js
+│   ├── useSyncStatus.js
+│   ├── useTabBarScrollSync.js
+│   ├── useUpcomingReminder.js
 │   ├── useUpNextQueue.js
+│   ├── useUserDataDomain.js
 │   ├── useWatchedShow.js
-│   └── useWatchProgress.js
-├── modules/
-│   └── reminder-widget/
-│       ├── ios/
-│       │   ├── ReminderWidget.podspec
-│       │   └── ReminderWidgetModule.swift
+│   ├── useWatchProgress.js
+│   └── useYearlyGoal.js
+├── modules
+│   ├── app-icon
+│   │   ├── ios
+│   │   │   ├── AppIconModule.swift
+│   │   │   └── SeelogdAppIcon.podspec
+│   │   └── expo-module.config.json
+│   ├── reminder-widget
+│   │   ├── ios
+│   │   │   ├── ReminderWidgetModule.swift
+│   │   │   └── SeelogdReminderWidgetBridge.podspec
+│   │   └── expo-module.config.json
+│   └── tab-bar-scale
+│       ├── ios
+│       │   ├── SeelogdTabBarScale.podspec
+│       │   └── TabBarScaleModule.swift
 │       └── expo-module.config.json
-├── native/
-│   └── android-widgets/
-│       ├── java/
-│       │   └── com/
-│       │       └── smlztrk/
-│       │           └── seelogd/
-│       │               └── widget/
-│       │                   ├── ListsWidgetModule.kt
-│       │                   ├── ListsWidgetProvider.kt
-│       │                   ├── ListsWidgetRemoteViewsService.kt
-│       │                   ├── ReminderWidgetModule.kt
-│       │                   ├── ReminderWidgetProvider.kt
-│       │                   ├── ReminderWidgetRemoteViewsService.kt
-│       │                   ├── SeelogdWidgetPackage.kt
-│       │                   ├── StatsWidgetModule.kt
-│       │                   ├── StatsWidgetProvider.kt
-│       │                   └── WidgetPreferences.kt
-│       ├── res/
-│       │   ├── drawable/
-│       │   │   ├── lists_widget_header_bg.xml
-│       │   │   ├── lists_widget_ic_bookmark.xml
-│       │   │   ├── lists_widget_ic_heart.xml
-│       │   │   ├── lists_widget_ic_list.xml
-│       │   │   ├── lists_widget_ic_next.xml
-│       │   │   ├── lists_widget_ic_prev.xml
-│       │   │   ├── lists_widget_icon_dot.xml
-│       │   │   ├── lists_widget_nav_btn.xml
-│       │   │   ├── lists_widget_poster_bg.xml
-│       │   │   ├── lists_widget_poster_preview_a.xml
-│       │   │   ├── lists_widget_poster_preview_b.xml
-│       │   │   ├── lists_widget_poster_preview_c.xml
-│       │   │   ├── lists_widget_preview.xml
-│       │   │   ├── reminder_widget_background.xml
-│       │   │   ├── reminder_widget_count_badge.xml
-│       │   │   ├── reminder_widget_ic_empty.xml
-│       │   │   ├── reminder_widget_ic_movie.xml
-│       │   │   ├── reminder_widget_ic_tv.xml
-│       │   │   ├── reminder_widget_logo_badge.xml
-│       │   │   ├── reminder_widget_movie_badge.xml
-│       │   │   ├── reminder_widget_poster_bg.xml
-│       │   │   ├── reminder_widget_preview.xml
-│       │   │   ├── reminder_widget_row_bg_today.xml
-│       │   │   ├── reminder_widget_row_bg.xml
-│       │   │   ├── reminder_widget_tv_badge.xml
-│       │   │   ├── stats_widget_card_bg.xml
-│       │   │   ├── stats_widget_ic_time.xml
-│       │   │   ├── stats_widget_panel_bg.xml
-│       │   │   ├── stats_widget_preview.xml
-│       │   │   └── stats_widget_strip_bg.xml
-│       │   ├── layout/
-│       │   │   ├── lists_widget_item.xml
-│       │   │   ├── lists_widget_preview.xml
-│       │   │   ├── lists_widget.xml
-│       │   │   ├── reminder_widget_item.xml
-│       │   │   ├── reminder_widget_preview.xml
-│       │   │   ├── reminder_widget.xml
-│       │   │   ├── stats_widget_preview.xml
-│       │   │   └── stats_widget.xml
-│       │   ├── values/
-│       │   │   └── widget_strings.xml
-│       │   └── xml/
-│       │       ├── lists_widget_info.xml
-│       │       ├── reminder_widget_info.xml
-│       │       └── stats_widget_info.xml
-│       └── README.md
-├── plugins/
-│   └── withAndroidWidgets.js
-├── screens/
-│   ├── actor/
+├── native
+│   ├── android-widgets
+│   │   ├── java
+│   │   │   └── com
+│   │   │       └── smlztrk
+│   │   │           └── seelogd
+│   │   │               └── widget
+│   │   │                   ├── AppIconRes.kt
+│   │   │                   ├── ListsWidgetModule.kt
+│   │   │                   ├── ListsWidgetProvider.kt
+│   │   │                   ├── ListsWidgetRemoteViewsService.kt
+│   │   │                   ├── ReminderWidgetModule.kt
+│   │   │                   ├── ReminderWidgetProvider.kt
+│   │   │                   ├── ReminderWidgetRemoteViewsService.kt
+│   │   │                   ├── SeelogdWidgetPackage.kt
+│   │   │                   ├── StatsWidgetModule.kt
+│   │   │                   ├── StatsWidgetProvider.kt
+│   │   │                   ├── WidgetLanguage.kt
+│   │   │                   └── WidgetPreferences.kt
+│   │   ├── res
+│   │   │   ├── drawable
+│   │   │   │   ├── lists_widget_header_bg.xml
+│   │   │   │   ├── lists_widget_ic_bookmark.xml
+│   │   │   │   ├── lists_widget_ic_heart.xml
+│   │   │   │   ├── lists_widget_ic_list.xml
+│   │   │   │   ├── lists_widget_ic_next.xml
+│   │   │   │   ├── lists_widget_ic_prev.xml
+│   │   │   │   ├── lists_widget_icon_dot.xml
+│   │   │   │   ├── lists_widget_nav_btn.xml
+│   │   │   │   ├── lists_widget_poster_bg.xml
+│   │   │   │   ├── lists_widget_poster_preview_a.xml
+│   │   │   │   ├── lists_widget_poster_preview_b.xml
+│   │   │   │   ├── lists_widget_poster_preview_c.xml
+│   │   │   │   ├── lists_widget_preview.xml
+│   │   │   │   ├── reminder_widget_background.xml
+│   │   │   │   ├── reminder_widget_count_badge.xml
+│   │   │   │   ├── reminder_widget_ic_empty.xml
+│   │   │   │   ├── reminder_widget_ic_movie.xml
+│   │   │   │   ├── reminder_widget_ic_tv.xml
+│   │   │   │   ├── reminder_widget_logo_badge.xml
+│   │   │   │   ├── reminder_widget_movie_badge.xml
+│   │   │   │   ├── reminder_widget_poster_bg.xml
+│   │   │   │   ├── reminder_widget_preview.xml
+│   │   │   │   ├── reminder_widget_row_bg_today.xml
+│   │   │   │   ├── reminder_widget_row_bg.xml
+│   │   │   │   ├── reminder_widget_tv_badge.xml
+│   │   │   │   ├── stats_widget_card_bg.xml
+│   │   │   │   ├── stats_widget_ic_time.xml
+│   │   │   │   ├── stats_widget_panel_bg.xml
+│   │   │   │   ├── stats_widget_preview.xml
+│   │   │   │   └── stats_widget_strip_bg.xml
+│   │   │   ├── layout
+│   │   │   │   ├── lists_widget_item.xml
+│   │   │   │   ├── lists_widget_preview.xml
+│   │   │   │   ├── lists_widget.xml
+│   │   │   │   ├── reminder_widget_item.xml
+│   │   │   │   ├── reminder_widget_preview.xml
+│   │   │   │   ├── reminder_widget.xml
+│   │   │   │   ├── stats_widget_preview.xml
+│   │   │   │   └── stats_widget.xml
+│   │   │   ├── values
+│   │   │   │   └── widget_strings.xml
+│   │   │   ├── values-de
+│   │   │   │   └── widget_strings.xml
+│   │   │   ├── values-en
+│   │   │   │   └── widget_strings.xml
+│   │   │   ├── values-es
+│   │   │   │   └── widget_strings.xml
+│   │   │   ├── values-pt
+│   │   │   │   └── widget_strings.xml
+│   │   │   └── xml
+│   │   │       ├── lists_widget_info.xml
+│   │   │       ├── reminder_widget_info.xml
+│   │   │       └── stats_widget_info.xml
+│   │   └── README.md
+│   └── locales
+│       ├── de.json
+│       ├── en.json
+│       ├── es.json
+│       ├── pt.json
+│       └── tr.json
+├── patches
+│   └── liquid-glass-kit+1.0.0.patch
+├── plugins
+│   ├── withAlternateAppIcons.js
+│   ├── withAndroidWidgets.js
+│   ├── withRNFirebaseCocoaPods.js
+│   └── withRNScreensGamma.js
+├── screens
+│   ├── actor
 │   │   └── ActorViewScreen.js
-│   ├── auth/
+│   ├── auth
 │   │   ├── ForgotPasswordScreen.js
 │   │   ├── GoogleProfileCompletionScreen.js
 │   │   ├── LoginScreen.js
 │   │   └── RegisterScreen.js
-│   ├── calendar/
+│   ├── bingo
+│   │   └── CinemaBingoScreen.js
+│   ├── calendar
 │   │   └── CalendarScreen.js
-│   ├── chat/
+│   ├── chat
 │   │   ├── AIChatScreen.js
 │   │   ├── ChatScreen.js
 │   │   ├── CreateGroupScreen.js
 │   │   ├── GroupsListScreen.js
 │   │   ├── MessagesScreen.js
 │   │   └── SwipeView.js
-│   ├── game/
+│   ├── cineswipe
+│   │   └── CineSwipeScreen.js
+│   ├── development
+│   │   └── TabBarQaScreen.js
+│   ├── game
 │   │   ├── GameAchievementsScreen.js
 │   │   ├── gameConfig.js
 │   │   ├── GameHubScreen.js
+│   │   ├── gameLabels.js
 │   │   ├── GameLeaderboardScreen.js
 │   │   ├── gameRegistry.js
 │   │   ├── GameScreenShell.js
 │   │   ├── gameSessionStore.js
 │   │   ├── GameStatsScreen.js
+│   │   ├── OlderGameScreen.js
+│   │   ├── QuickGameScreen.js
 │   │   ├── SceneGameDetailScreen.js
 │   │   ├── SceneGamePlayScreen.js
 │   │   ├── SceneGameResultScreen.js
 │   │   ├── SceneGameSetupScreen.js
 │   │   └── SceneGuessGameScreen.js
-│   ├── lists/
+│   ├── lists
 │   │   ├── ListsScreen.js
 │   │   ├── ListsViewScreen.js
 │   │   └── SharedListScreen.js
-│   ├── movie/
-│   │   ├── components/
+│   ├── movie
+│   │   ├── components
 │   │   │   └── MovieVideoItem.js
 │   │   ├── MovieBests.js
 │   │   ├── MovieCollection.js
@@ -1220,28 +1387,46 @@ Seelogd/
 │   │   ├── MovieProvders.js
 │   │   ├── MovieTrends.js
 │   │   └── MovieUpcoming.js
-│   ├── navigation/
+│   ├── navigation
 │   │   └── TabScreenNavigator.js
-│   ├── onboarding/
+│   ├── onboarding
+│   │   ├── OnboardingBackdrop.js
+│   │   ├── OnboardingChrome.js
+│   │   ├── onboardingCopy.js
+│   │   ├── OnboardingFavorites.js
+│   │   ├── OnboardingIntro.js
+│   │   ├── OnboardingParts.js
+│   │   ├── OnboardingPreferences.js
 │   │   ├── OnboardingScreen.js
-│   │   └── OnboardingShowcases.js
-│   ├── premium/
+│   │   ├── OnboardingShowcases.js
+│   │   ├── OnboardingSlides.js
+│   │   └── useOnboardingData.js
+│   ├── premium
 │   │   └── PremiumScreen.js
-│   ├── search/
+│   ├── search
 │   │   ├── ActorSearch.js
 │   │   ├── MovieSearch.js
 │   │   ├── SearchFriendsScreen.js
 │   │   └── TvShowSearch.js
-│   ├── shared/
+│   ├── shared
+│   │   ├── discoverFiltersCopy.js
+│   │   ├── DiscoverFiltersScreen.js
 │   │   └── SeeAllScreen.js
-│   ├── social/
+│   ├── social
 │   │   └── PostDetailScreen.js
-│   ├── story/
+│   ├── story
 │   │   ├── StoryDraftsScreen.js
 │   │   └── StoryShareScreen.js
-│   ├── tabs/
-│   │   ├── profile/
+│   ├── tabs
+│   │   ├── profile
+│   │   │   ├── notes
+│   │   │   │   ├── NoteCards.js
+│   │   │   │   ├── NoteEditorSheet.js
+│   │   │   │   ├── NotesChrome.js
+│   │   │   │   ├── NotesMasonry.js
+│   │   │   │   └── NotesQuickAddSheet.js
 │   │   │   ├── BlockedUsersScreen.js
+│   │   │   ├── deleteAccountCopy.js
 │   │   │   ├── EditProfileScreen.js
 │   │   │   ├── FriendProfileScreen.js
 │   │   │   ├── FriendRequestsScreen.js
@@ -1251,43 +1436,66 @@ Seelogd/
 │   │   │   ├── MyActivityScreen.js
 │   │   │   ├── NotesCard.js
 │   │   │   ├── NotesScreen.js
+│   │   │   ├── NotificationsScreen.js
 │   │   │   ├── PrivacySettingsScreen.js
 │   │   │   ├── ProfileLists.js
 │   │   │   ├── ProfileReminders.js
 │   │   │   ├── RemindersPreviewButton.js
 │   │   │   ├── RemindersScreen.js
+│   │   │   ├── resetAccountCopy.js
 │   │   │   ├── StatisticsSection.js
 │   │   │   ├── TvStatisticsScreen.js
 │   │   │   └── WatchBadgesScreen.js
-│   │   ├── setting/
+│   │   ├── setting
 │   │   │   ├── CustomThemeScreen.js
 │   │   │   └── SettingsTheme.js
-│   │   ├── settings/
+│   │   ├── settings
+│   │   │   ├── widgets
+│   │   │   │   ├── AndroidPreviews.js
+│   │   │   │   ├── IosPreviews.js
+│   │   │   │   ├── WidgetControls.js
+│   │   │   │   ├── widgetPlatform.js
+│   │   │   │   ├── widgetSamples.js
+│   │   │   │   └── WidgetStage.js
 │   │   │   ├── AboutAppScreen.js
 │   │   │   ├── AccountConnectionsScreen.js
+│   │   │   ├── AISettingsScreen.js
+│   │   │   ├── backupCopy.js
+│   │   │   ├── BackupSettingsScreen.js
 │   │   │   ├── dataTypes.js
+│   │   │   ├── DecorScopesScreen.js
+│   │   │   ├── feedbackCopy.js
+│   │   │   ├── FeedbackScreen.js
+│   │   │   ├── libraryExportCopy.js
+│   │   │   ├── LibraryExportScreen.js
 │   │   │   ├── OpenSourceLicensesScreen.js
 │   │   │   ├── PermissionsDataScreen.js
 │   │   │   ├── PersonalizationScreen.js
 │   │   │   ├── PosterSettingsScreen.js
+│   │   │   ├── PremiumUsageScreen.js
+│   │   │   ├── ReferralScreen.js
 │   │   │   ├── ReminderNotificationsScreen.js
+│   │   │   ├── sectionVisibilityCopy.js
+│   │   │   ├── SectionVisibilityScreen.js
 │   │   │   ├── settingsUi.js
 │   │   │   ├── SocialNotificationsScreen.js
 │   │   │   └── WidgetSettingsScreen.js
-│   │   ├── HubScreen.js                  (sekme adı: Eğlence; anahtar "share")
-│   │   ├── LibraryScreen.js              (Kütüphane sekmesi: Sıradaki, Listeler, Hatırlatmalar, Notlar)
+│   │   ├── DiscoverScreen.js
+│   │   ├── HubScreen.js
+│   │   ├── LibraryScreen.js
 │   │   ├── MovieScreen.js
 │   │   ├── MyPostsScreen.js
 │   │   ├── ProfileScreen.js
 │   │   ├── SearchScreen.js
-│   │   ├── SettingsScreen.js             (sekme değil: Profil'in dişli düğmesinden stack ekranı)
+│   │   ├── SettingsScreen.js
 │   │   ├── ShareContentScreen.js
 │   │   ├── TvShowScreen.js
-│   │   └── UpNextScreen.js
-│   ├── tournament/
+│   │   ├── UpNextScreen.js
+│   │   └── UsageDebugScreen.js
+│   ├── tournament
 │   │   └── TournamentScreen.js
-│   ├── tv/
-│   │   ├── components/
+│   ├── tv
+│   │   ├── components
 │   │   ├── EpisodeDetails.js
 │   │   ├── SeasonDeck.js
 │   │   ├── SeasonDetails.js
@@ -1297,20 +1505,70 @@ Seelogd/
 │   │   ├── TvShowBests.js
 │   │   ├── TvShowsAiringToday.js
 │   │   ├── TvShowsDetails.js
+│   │   ├── TvShowsEmmy.js
 │   │   ├── TvShowsGenres.js
 │   │   ├── TvShowsOnTheAir.js
 │   │   ├── TvShowsProvders.js
 │   │   ├── TvShowsTrends.js
 │   │   └── WatchedAdd.js
-│   └── wrapped/
+│   └── wrapped
 │       └── WrappedScreen.js
-├── scripts/
+├── scripts
+│   ├── ai-eval
+│   │   ├── lib
+│   │   │   ├── models.js
+│   │   │   ├── prompt.js
+│   │   │   ├── providers.js
+│   │   │   ├── report.js
+│   │   │   ├── runner.js
+│   │   │   ├── schema.js
+│   │   │   ├── score.js
+│   │   │   ├── titleMatch.js
+│   │   │   └── tmdb.js
+│   │   ├── out
+│   │   ├── dataset.js
+│   │   ├── jest.config.js
+│   │   ├── package-lock.json
+│   │   ├── package.json
+│   │   ├── README.md
+│   │   └── run.eval.js
+│   ├── site-mock-i18n
+│   │   ├── gen.mjs
+│   │   └── loader.mjs
 │   ├── babel-transform-app-text.js
 │   ├── backfill-comment-scope.cjs
 │   ├── backfill-watched-movie-metadata.cjs
-│   └── generate-oss-licenses.js
-├── services/
-│   ├── storage/
+│   ├── build-emmy-database.cjs
+│   ├── build-oscar-database.cjs
+│   ├── comprehensive-health-check.cjs
+│   ├── create-missing-user.cjs
+│   ├── emmy_6cat_database.json
+│   ├── fix-all-users.cjs
+│   ├── generate-oss-licenses.js
+│   ├── generate-splash-glow.cjs
+│   ├── migrate-single-user.cjs
+│   ├── oscar_6cat_database.json
+│   ├── repair-user-list-summary.cjs
+│   ├── seed-emmy-awards.cjs
+│   ├── seed-oscar-awards.cjs
+│   └── verify-emmy-ids.cjs
+├── services
+│   ├── cineswipe
+│   │   ├── cineResultsStore.js
+│   │   ├── cineswipeService.js
+│   │   ├── deckModel.js
+│   │   └── soloReducer.js
+│   ├── import
+│   │   ├── csvParser.js
+│   │   ├── imdbImporter.js
+│   │   ├── importErrors.js
+│   │   ├── importMerge.js
+│   │   ├── importSummary.js
+│   │   ├── importWriter.js
+│   │   ├── letterboxdBundleImporter.js
+│   │   ├── letterboxdImporter.js
+│   │   └── tmdbResolver.js
+│   ├── storage
 │   │   ├── authPersistence.js
 │   │   ├── codec.js
 │   │   ├── errors.js
@@ -1321,22 +1579,54 @@ Seelogd/
 │   │   ├── registry.js
 │   │   ├── scope.js
 │   │   └── store.js
+│   ├── storyShare
+│   │   └── storyShareService.js
+│   ├── userData
+│   │   ├── aiConversations.js
+│   │   ├── createDomain.js
+│   │   ├── domains.js
+│   │   ├── firestoreRemote.js
+│   │   ├── hydrationMarker.js
+│   │   ├── index.js
+│   │   ├── outbox.js
+│   │   ├── sanitize.js
+│   │   └── syncWorker.js
 │   ├── accountConnectionsService.js
+│   ├── accountPrivateService.js
+│   ├── accountResetService.js
 │   ├── accountService.js
 │   ├── activationAnalytics.js
+│   ├── activeChatTracker.js
 │   ├── activityService.js
+│   ├── aiCineInsights.js
 │   ├── aiCineService.js
 │   ├── aiCineStore.js
 │   ├── aiConversationsStore.js
 │   ├── aiUserContext.js
 │   ├── analytics.js
 │   ├── appCheck.js
+│   ├── appIconService.js
+│   ├── appIconStore.js
+│   ├── appleAuthService.js
+│   ├── appReload.js
+│   ├── avatarPhotoSync.js
 │   ├── cacheInspector.js
 │   ├── chatRtdb.js
+│   ├── chatSignals.js
 │   ├── crashReporting.js
+│   ├── dailyDuelService.js
+│   ├── dailyPollService.js
 │   ├── dataDownloader.js
 │   ├── deviceTier.js
+│   ├── devPlanOverride.js
+│   ├── discoverQuery.js
 │   ├── effectSettings.js
+│   ├── emmyService.js
+│   ├── externalRatings.js
+│   ├── favoriteRecommendations.js
+│   ├── feedbackService.js
+│   ├── followedUpcoming.js
+│   ├── fourFavoritesService.js
 │   ├── friendsService.js
 │   ├── fuzzyMediaSearch.js
 │   ├── geminiService.js
@@ -1344,28 +1634,53 @@ Seelogd/
 │   ├── groupsService.js
 │   ├── hapticsService.js
 │   ├── imagePrefetch.js
+│   ├── libraryActions.js
+│   ├── libraryExportFiles.js
+│   ├── libraryOverlay.js
+│   ├── liquidGlass.js
 │   ├── listItemsService.js
 │   ├── listQuickAdd.js
 │   ├── listsWidgetService.js
+│   ├── listSyncService.js
+│   ├── mediaCommentsService.js
+│   ├── mediaLinkResolver.js
+│   ├── noteTodoDraftService.js
 │   ├── notificationsService.js
+│   ├── oscarService.js
+│   ├── pendingFavorites.js
 │   ├── petCache.js
 │   ├── postDraftService.js
 │   ├── postsService.js
+│   ├── premiumState.js
+│   ├── premiumUpsell.js
+│   ├── premiumUpsellHost.js
+│   ├── premiumUsage.js
+│   ├── presenceModel.js
 │   ├── presenceService.js
+│   ├── presenceSession.js
 │   ├── profilePropagation.js
 │   ├── pushNotificationsService.js
+│   ├── quickGamePool.js
 │   ├── ratingsService.js
+│   ├── referralService.js
+│   ├── refreshShowMeta.js
 │   ├── reminderNotificationScheduler.js
 │   ├── reminderWidgetService.js
 │   ├── reportService.js
 │   ├── revenueCatService.js
+│   ├── rootNavigation.js
 │   ├── sceneGamePreferences.js
 │   ├── sceneGameService.js
+│   ├── settingsBackupFiles.js
+│   ├── settingsBackupService.js
 │   ├── sharedListsService.js
+│   ├── showSeasons.js
 │   ├── snapshotCache.js
 │   ├── socialNotificationsService.js
 │   ├── statsWidgetService.js
 │   ├── StoryDraftService.js
+│   ├── tabBarCapabilities.js
+│   ├── tabBarScale.js
 │   ├── tmdbFacts.js
 │   ├── tmdbLookup.js
 │   ├── tournamentEngine.js
@@ -1373,28 +1688,38 @@ Seelogd/
 │   ├── typographySettings.js
 │   ├── upNextPreferences.js
 │   ├── upNextService.js
+│   ├── usageTrackerService.js
 │   ├── userService.js
 │   ├── watchedTvService.js
 │   ├── widgetBridge.js
 │   ├── widgetPreferencesService.js
 │   └── wrappedService.js
-├── store/
-│   ├── assets/
-│   │   ├── feature-graphic-en.png/
-│   │   ├── feature-graphic-tr.png/
-│   │   ├── play-icon-512.png/
-│   │   └── screenshots/
-│   ├── play/
-│   │   ├── en-US/
+├── store
+│   ├── assets
+│   │   ├── screenshots
+│   │   │   └── tr-TR
+│   │   │       ├── 01-film-kesif.png
+│   │   │       ├── 02-film-detay.png
+│   │   │       ├── 03-izlenen-diziler.png
+│   │   │       ├── 04-istatistik.png
+│   │   │       ├── 05-wrapped.png
+│   │   │       ├── 06-hub.png
+│   │   │       ├── 07-paylasimlar.png
+│   │   │       └── 08-dizi-kesif.png
+│   │   ├── feature-graphic-en.png
+│   │   ├── feature-graphic-tr.png
+│   │   └── play-icon-512.png
+│   ├── play
+│   │   ├── en-US
 │   │   │   ├── full-description.txt
 │   │   │   ├── short-description.txt
 │   │   │   └── title.txt
-│   │   └── tr-TR/
+│   │   └── tr-TR
 │   │       ├── full-description.txt
 │   │       ├── short-description.txt
 │   │       └── title.txt
-│   ├── raw-screenshots/
-│   │   └── tr-TR/
+│   ├── raw-screenshots
+│   │   └── tr-TR
 │   │       ├── dizi-kesif.jpg
 │   │       ├── film-detay.jpg
 │   │       ├── film-kesif.jpg
@@ -1404,88 +1729,232 @@ Seelogd/
 │   │       ├── paylasimlar.jpg
 │   │       └── wrapped.jpg
 │   └── README.md
-├── targets/
-│   └── reminder-widget/
+├── targets
+│   └── reminder-widget
+│       ├── de.lproj
+│       │   └── Localizable.strings
+│       ├── en.lproj
+│       │   └── Localizable.strings
+│       ├── es.lproj
+│       │   └── Localizable.strings
+│       ├── pt.lproj
+│       │   └── Localizable.strings
+│       ├── tr.lproj
+│       │   └── Localizable.strings
 │       ├── expo-target.config.js
 │       ├── index.swift
 │       ├── lists-widget.swift
 │       ├── shared.swift
 │       └── stats-widget.swift
-├── theme/
+├── theme
 │   ├── badgeTokens.js
 │   ├── colors.js
 │   └── gameTokens.js
-├── translations/
+├── translations
+│   ├── de.json
 │   ├── en.json
+│   ├── es.json
 │   ├── index.js
+│   ├── pt.json
 │   └── tr.json
-├── utils/
+├── utils
 │   ├── ageGate.js
+│   ├── aiCopy.js
+│   ├── aiPrefs.js
 │   ├── airDate.js
+│   ├── ambientBackground.js
 │   ├── analyticsEvents.js
 │   ├── apiCache.js
+│   ├── appBadge.js
+│   ├── appIcons.js
+│   ├── appLanguages.js
+│   ├── avatarHalo.js
+│   ├── avatarPhotos.js
 │   ├── avatars.js
+│   ├── awardYears.js
 │   ├── axiosDataCache.js
 │   ├── blurSupport.js
 │   ├── cachedRead.js
 │   ├── cacheKeys.js
 │   ├── cacheStore.js
+│   ├── calendarAgenda.js
+│   ├── calendarPermissionPlan.js
+│   ├── certification.js
+│   ├── chatBubbleStyle.js
+│   ├── chatEntrance.js
 │   ├── chatOptimistic.js
+│   ├── chatReply.js
+│   ├── chatShare.js
+│   ├── cinemaBingo.js
+│   ├── cinemaBingoCopy.js
 │   ├── colorUtils.js
 │   ├── commentScope.js
 │   ├── connectivityToast.js
+│   ├── dailyChallenge.js
+│   ├── dailyDuel.js
+│   ├── dailyDuelCopy.js
+│   ├── dailyLimitCopy.js
+│   ├── dailyPoll.js
+│   ├── dailyPollCopy.js
+│   ├── dailyUsage.js
+│   ├── dailyWatchLimit.js
 │   ├── dataCacheSettings.js
 │   ├── datePickerWheel.js
+│   ├── decorScopes.js
 │   ├── deviceLanguage.js
 │   ├── deviceTier.js
+│   ├── discoverFilters.js
+│   ├── discoverHeaderLayout.js
+│   ├── discoverMedia.js
 │   ├── discoveryPersonalization.js
+│   ├── draftHistory.js
+│   ├── durationText.js
+│   ├── emojiText.js
+│   ├── entranceGate.js
+│   ├── externalEntry.js
+│   ├── externalEntryCopy.js
+│   ├── externalRatings.js
+│   ├── externalRatingsCopy.js
+│   ├── favoritesCopy.js
+│   ├── feedbackValidation.js
 │   ├── firestoreError.js
+│   ├── firestoreNestedFields.js
+│   ├── followedPeople.js
+│   ├── followedPeopleCopy.js
+│   ├── fourFavorites.js
+│   ├── friendsBarModel.js
+│   ├── friendsListModel.js
+│   ├── gameImage.js
 │   ├── gameScoring.js
+│   ├── gameSelection.js
 │   ├── genreCanon.js
 │   ├── genreLabels.js
+│   ├── glassChrome.js
 │   ├── groupRoles.js
+│   ├── homeContentSettings.js
+│   ├── homeSectionCopy.js
 │   ├── i18nText.js
+│   ├── importantInvites.js
+│   ├── kesifSignals.js
 │   ├── legalLinks.js
+│   ├── libraryCore.js
+│   ├── libraryErrorText.js
+│   ├── libraryExport.js
+│   ├── liquidGlass.js
 │   ├── listAppearance.js
 │   ├── listOrder.js
+│   ├── listPosterLayout.js
 │   ├── listSearch.js
 │   ├── listShare.js
+│   ├── listSortFilter.js
+│   ├── listSortFilterCopy.js
+│   ├── listStatusIndex.js
+│   ├── mediaActivityIndex.js
 │   ├── mediaFacts.js
+│   ├── mediaLinkCopy.js
+│   ├── mediaLinks.js
+│   ├── nativeSwitchLayout.js
+│   ├── notesView.js
+│   ├── notificationInbox.js
+│   ├── notificationInboxCopy.js
+│   ├── notificationPresentation.js
 │   ├── notificationPriming.js
+│   ├── olderGame.js
+│   ├── olderGameCopy.js
+│   ├── onboardingPreferences.js
 │   ├── phoneCalendar.js
 │   ├── postComposer.js
+│   ├── postTime.js
 │   ├── premium.js
+│   ├── premiumFeatures.js
+│   ├── premiumMemberBar.js
+│   ├── premiumShowcase.js
+│   ├── premiumUpsellContent.js
+│   ├── premiumUsageModel.js
+│   ├── profileEdit.js
+│   ├── profileStoryCard.js
+│   ├── providerWatch.js
+│   ├── providerWatchCopy.js
+│   ├── quickGames.js
+│   ├── quickGamesCopy.js
 │   ├── r2.js
 │   ├── randomPick.js
 │   ├── ratingColors.js
+│   ├── ratingSummaryCopy.js
+│   ├── ratingSummaryModel.js
+│   ├── referral.js
+│   ├── referralCopy.js
+│   ├── reminderBadge.js
+│   ├── reminderCounts.js
+│   ├── reminderQuickDelete.js
 │   ├── reportValidation.js
+│   ├── rootListMerge.js
 │   ├── sameData.js
+│   ├── screenTopSpacing.js
+│   ├── sectionVisibility.js
+│   ├── seededRandom.js
+│   ├── settingsBackup.js
+│   ├── sheetKeyboardFit.js
+│   ├── socialLinks.js
+│   ├── socialLinksCopy.js
+│   ├── splashMotion.js
+│   ├── splashPlan.js
+│   ├── statsFilters.js
+│   ├── storyCanvasLayout.js
 │   ├── styleSheetCompat.js
+│   ├── surfaceBlur.js
+│   ├── tabBarCapabilities.js
+│   ├── tabBarCollapse.js
+│   ├── tabBarModel.js
+│   ├── tasteMatch.js
+│   ├── tasteMatchCopy.js
+│   ├── textClamp.js
+│   ├── themePresets.js
+│   ├── themeStudio.js
+│   ├── threadPreview.js
 │   ├── tmdbAdultGuard.js
 │   ├── tmdbImageUtils.js
+│   ├── tmdbTitleFallback.js
 │   ├── toastStore.js
+│   ├── todoOrder.js
+│   ├── trailerLanguages.js
+│   ├── tvGraphGrid.js
 │   ├── typographyRoles.js
 │   ├── upNext.js
 │   ├── watchActivity.js
 │   ├── watchBadgeLedger.js
 │   ├── watchHistory.js
 │   ├── watchLedgerCore.js
+│   ├── watchPicker.js
+│   ├── watchPickerCopy.js
 │   ├── watchScoring.js
 │   ├── watchState.js
+│   ├── worldTour.js
 │   ├── wrapped.js
-│   └── wrappedStrings.js
-├── website/
-│   ├── shots/
-│   │   └── README.md
+│   ├── wrappedCard.js
+│   ├── wrappedStrings.js
+│   └── yearlyGoal.js
+├── website
+│   ├── app-mock-tour.css
+│   ├── app-mock-tour.js
+│   ├── app-mock.css
+│   ├── app-mock.js
 │   ├── delete-account.html
+│   ├── home-i18n.js
+│   ├── home.js
 │   ├── index.html
+│   ├── lang-menu.css
 │   ├── legal.css
 │   ├── legal.js
 │   ├── logo.png
+│   ├── mock-i18n.js
 │   ├── privacy.html
 │   ├── README.md
 │   ├── s-mark-tight.png
 │   ├── s-mark.png
+│   ├── site-config.js
+│   ├── site-lang.js
+│   ├── site.css
 │   └── terms.html
 ├── .easignore
 ├── .env
@@ -1494,7 +1963,9 @@ Seelogd/
 ├── .firebaserc
 ├── .gitignore
 ├── .npmrc
+├── .theme-audit-export.log
 ├── @smlztrk__seelogd.jks
+├── app.config.js
 ├── App.js
 ├── app.json
 ├── babel.config.js
@@ -1502,14 +1973,16 @@ Seelogd/
 ├── eas.json
 ├── firebase.js
 ├── firebase.json
+├── firestore-debug.log
 ├── firestore.indexes.json
 ├── firestore.rules
 ├── google-services.json
+├── GoogleService-Info.plist
 ├── index.js
 ├── jest.config.js
 ├── jest.rules.config.js
+├── jest.setup.js
 ├── metro.config.js
-├── nul
 ├── package-lock.json
 ├── package.json
 ├── README.md

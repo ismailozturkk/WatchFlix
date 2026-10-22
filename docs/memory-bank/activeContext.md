@@ -2,83 +2,53 @@
 
 ## 🔥 Şu Anki Odak
 
-_(29 Tem 2026)_ **Yayın hazırlığı** — tek doğruluk kaynağı
-`docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md`. Rebrand tamam (Watchify → seelogd,
-paket `com.smlztrk.seelogd`). Kodda biten büyük parçalar: premium (RevenueCat
-Premium/Premium Max), ölçüm (Firebase Analytics + Sentry), performans (device tier +
-AdaptiveBlurView), Gemini proxy Cloud Function. Bekleyen işler operasyonel:
-Firebase billing → functions/rules/hosting deploy'ları, Play Console hesabı,
-kapalı test kullanıcıları, marka/ad kararı.
+_(22 Eki 2026)_ **Yayın hazırlığı & Stabilizasyon** — Tek doğruluk kaynağı:
+`docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md`. Rebrand tamamlandı (`com.smlztrk.seelogd`). Kodda biten büyük parçalar:
+- Premium (RevenueCat Premium / Premium Max, paywall)
+- Ölçüm & Analitik (Firebase Analytics + Sentry)
+- Performans (Device tier, Liquid Glass / AdaptiveBlurView, MMKV storage registry)
+- Yapay zeka & backend (Gemini proxy Cloud Function, kota kontrolü)
+- Sosyal özellikler (Group Chat, Feed, Medya Paylaşımı, Yorumlar, Hikaye Kartları)
+- Oyun & Rozet (Kutu açma simülasyonu, rozet kataloğu, sinema bingosu, turnuvalar)
 
-> Not: Bu dosyanın aşağıdaki bölümleri eski bir dönemin anlık görüntüsü
-> (Group Chat ve Media Sharing o zamandan beri YAPILDI — `services/groupsService.js`,
-> `services/postsService.js` + `ShareContentScreen`). Güncel plan için yukarıdaki
-> yol haritasına bak.
+## ⚙️ Mevcut Mimari (22.10.2026 İtibarıyla)
 
-## Active Tasks
+### Context Yapısı (29 Context Modülü)
 
-- [x] **Chat Screen Optimization**
-  - Implement `inverted` FlatList for better UX.
-  - Implement `limit(20)` and pagination with `onEndReached`.
-  - Fix scroll jumping issues.
-- [x] **Skeleton Loading Improvements**
-  - Fix dimensions for `MovieOscarSkeleton`, `MovieUpComingSkeleton`, `SearchSkeleton`.
-  - Add `MovieBestsSkeleton`.
-  - Fix `MovieCardSkeleton` (added scale animation placeholders).
-- [x] **API & Performance Optimizations (Phase 1)**
-  - Switched from Axios to Fetch in `ChatModal.js` to fix UI-blocking `Network Error` from Gemini.
-  - Wrapped `MovieContext` and `TvShowContext` values in `useMemo` to prevent unnecessary component re-renders.
-  - Fixed `setLoading` reference bug in `MovieContext` (`fetchMoviesByGenres`).
-- [x] **Memory Bank Updates** _(29 Tem 2026'da güncellendi)_
-
-## Recent Changes
-
-- `screens/ChatScreen.js`: Refactored to usage `inverted` list, removed `RefreshControl`, optimized Firestore query.
-- `components/Skeleton.js`: Updated dimensions to match real cards. Added `MovieBestsSkeleton`.
-- `screens/movie/MovieBests.js`: Integrated `MovieBestsSkeleton`.
-- `screens/movie/MovieTrends.js`: Optimized loading state and animation binding.
-
-## Immediate Next Steps
-
-- Güncel adımlar `docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md`'de (Faz 1 Hafta 4 itibarıyla).
-- Group Chat ve Media Sharing tamamlandı ve uygulamada canlı.
-
-## ⚙️ Mevcut Mimari
-
-### Context Yapısı (9 Context)
-
-- **AuthContext**: Firebase Auth yönetimi
-- **LanguageContext**: Çoklu dil desteği (TR/EN) - JSON tabanlı
-- **ThemeContext**: Tema sistemi
-- **MovieContext**: Film verileri (Trends, Bests, Oscar, Collections, Genres, Providers, Upcoming, NowPlaying)
-- **TvShowContext**: Dizi verileri
-- **ProfileScreenContext**: Profil, istatistikler, avatar, rank, notes, reminders
-- **AppSettingsContext**: Uygulama ayarları + TMDB API_KEY
-- **ListStatusContext**: Liste durumu yönetimi
-- **SnowContext**: Dekoratif kar efekti
+- **AuthContext**: Firebase Auth wrapper
+- **AppSettingsContext**: Uygulama ayarları, font/kalite tercihleri, TMDB konfigürasyonu
+- **UserProfileContext**: Users/{uid} gerçek zamanlı senkronizasyonu
+- **FriendsContext**: Arkadaş listesi ve istek yönetimi
+- **NotificationsContext & DeviceNotificationsContext**: Uygulama içi ve push bildirimleri
+- **PostsContext**: Sosyal feed akışı ve paylaşımlar
+- **ListStatusContext**: O(1) liste durum haritası (watched, watchlist, favorites)
+- **ProfileStatsContext, ProfileNotesContext, ProfileRemindersContext, ProfileUiContext**: Bağımsız profil alt durumları
+- **MovieContex & TvShowContex**: TMDB film ve dizi veri sağlayıcıları
+- **PremiumContext**: RevenueCat abonelik durumu ve paywall
+- **PetContext**: Sanal maskot ve etkileşim sistemi
+- **TypographyContext, ThemeContext, SnowContext**: Tipografi, tema ve görsel efektler
+- **SharedListsContext, ConnectivityContext, MediaNotesContext, WatchProgressContext, vb.**
 
 ### Firestore Collections
 
-- **Lists**: Kullanıcı izleme listeleri (watchedMovies, watchedTv, favorites, watchList)
-- **Notes**: Kullanıcı notları (renkli, editable)
+- **Users**: Kullanıcı profilleri, sayaçlar, tercihler
+- **Lists**: Kullanıcı izleme listeleri subcollection mimarisi (`watchedMovies`, `watchedTv`, `favorites`, `watchList`)
+- **Notes**: Kullanıcı notları (`Notes/{uid}/items/{noteId}`)
 - **Reminders**: Film/dizi hatırlatıcıları
-- **Users**: Kullanıcı profilleri (arkadaş sistemi, isOnline durumu - yorum satırında)
-- **Comments**: Film/dizi yorumları
+- **Posts**: Sosyal feed paylaşımları, beğeniler ve yorumlar
+- **Presence**: Realtime kullanıcı durum ve heartbeat bilgisi
 
 ### Screens & Features
 
-- **54 Screen**: Movie (9), TV (12), Tabs (16), Search (6), Auth (3), Actor (1) + yardımcı ekranlar
-- **10 Component**: ChatModal, Comment, ListView, Skeleton, RatingStars, Reminder, vb.
-- **4 Custom Module**: SwipeCard, SwitchToggle, UseListStatus, UseNetworkStatus
+- **153 Ekran (91.820 LOC)**: Tabs (69), TV (15), Oyun/Rozet (16), Onboarding (11), Film (10), Chat (6), Arama (4), Auth (4), Listeler (3), Paylaşılan (3), Story (2), CineSwipe, Turnuva, Takvim, Premium, Bingo, Aktör, Wrapped vb.
+- **339 Bileşen (103.340 LOC)**: Yeniden kullanılabilir UI, modal, kart, istatistik ve sohbet bileşenleri
+- **136 Servis (31.043 LOC)**: Firestore CRUD, TMDB, RevenueCat, MMKV storage, bildirim ve analitik
+- **331 Test (73.980 LOC)**: Jest ve Firestore rules birim/entegrasyon testleri
+- **5 Dil Desteği**: TR, EN, DE, ES, PT
 
-## 🧠 Öğrenilenler
+## 🧠 Öğrenilenler & Mimari İlkeler
 
-- `onSnapshot` her context'te yaygın kullanılıyor, ancak performans için dikkatli olmak gerekiyor (Optimize edildi: Global tek dinleyici kuralı)
-- `ProfileScreenContext` 28KB (918 satır) → çok büyük, refactor edilmeli
-- `MovieContext` & `TvShowContext` "God Object" anti-deseni → custom hooks'a bölünmeli
-- AsyncStorage avatar yönetimi için kullanılıyor
-- TMDB API anahtarı artık `EXPO_PUBLIC_API_KEY` ortam değişkeninde (hardcoded değil;
-  EAS ortam değişkenlerinde de tanımlı)
-- Axios her context'te ayrı ayrı kullanılıyor → merkezi servis katmanı yok
-- Chat sistemi SwipeView ile modal olarak çalışıyor
-- Rank sistemi HSL renk sistemine dayalı dinamik gradient kullanıyor
+- `onSnapshot` listener'ları merkezî tekil dinleyiciler ve `services/snapshotCache` ile optimize edildi.
+- `services/storage` (MMKV) ile senkron, merkezî anahtar kayıtlı veri erişimi sağlandı.
+- TMDB API anahtarı `EXPO_PUBLIC_API_KEY` ortam değişkeninde ve iki katmanlı (in-memory + disk TTL) cache ile korunuyor.
+- Reanimated 4 ve Skia entegrasyonu tamamlandı.

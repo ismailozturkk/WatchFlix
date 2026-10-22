@@ -5,7 +5,6 @@ import GlassPressable from "../common/GlassPressable";
 import { useLanguage } from "../../context/LanguageContext";
 import { useNotifications } from "../../context/NotificationsContext";
 import { useTheme } from "../../context/ThemeContext";
-import { usePremiumGate } from "../../hooks/usePremiumGate";
 import { alpha } from "../../theme/colors";
 import { INVITE_TYPES, invitationDestination, pendingInvitations } from "../../utils/importantInvites";
 import { notificationDateLabel } from "../../utils/notificationInbox";
@@ -13,9 +12,8 @@ import { notificationInboxCopy } from "../../utils/notificationInboxCopy";
 
 export default function ImportantInvitesBar({ navigation }) {
   const { theme } = useTheme();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const { items, respond } = useNotifications();
-  const gamesGate = usePremiumGate("games");
   const copy = notificationInboxCopy(language);
   const [now, setNow] = useState(Date.now());
   const [selectedId, setSelectedId] = useState(null);
@@ -36,17 +34,13 @@ export default function ImportantInvitesBar({ navigation }) {
   if (!item) return null;
   const accent = item.type === INVITE_TYPES.cine ? "#E11D48" : "#F59E0B";
   const action = item.type === INVITE_TYPES.cine ? copy.cineInvite : copy.duelInvite;
-  const name = item.fromName || copy.title;
+  const name = item.fromName || t?.someone || copy.title;
   const date = notificationDateLabel(item, language, copy, now).split(" · ")[0];
 
   const decide = async (response) => {
     if (busy) return;
     const destination = response === "accepted" ? invitationDestination(item) : null;
     if (response === "accepted" && !destination) return;
-    if (response === "accepted" && item.type === INVITE_TYPES.duel && !gamesGate.allows(0)) {
-      gamesGate.showUpsell();
-      return;
-    }
     setBusy(true);
     setError(false);
     try {

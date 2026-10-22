@@ -64,6 +64,15 @@ test("group message details include sender and the full stored text", () => {
   expect(content.detail).toBe("Ada: İzleyelim mi?");
 });
 
+test("invitation history shows accepted and declined decisions", () => {
+  expect(notificationContent({ type: "cineswipe_invite", response: "accepted" }, {}, copy).responseLabel).toBe(copy.acceptedInvite);
+  expect(notificationContent({ type: "game_challenge", response: "declined" }, {}, copy).responseLabel).toBe(copy.declinedInvite);
+  expect(notificationContent({ type: "game_challenge" }, {}, copy).responseLabel).toBe("");
+  expect(notificationDestination({ type: "cineswipe_invite", inviteCode: "123456", response: "declined" })).toBeNull();
+  expect(notificationDestination({ type: "cineswipe_invite", inviteCode: "123456" })).toBeNull();
+  expect(notificationDestination({ type: "cineswipe_invite", inviteCode: "123456", response: "accepted" })?.name).toBe("CineSwipeScreen");
+});
+
 describe("device runtimes without RelativeTimeFormat", () => {
   const original = Object.getOwnPropertyDescriptor(Intl, "RelativeTimeFormat");
   beforeEach(() => Object.defineProperty(Intl, "RelativeTimeFormat", { configurable: true, value: undefined }));

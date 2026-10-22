@@ -1,36 +1,41 @@
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║              SEELOGD — TAM PROJE ANALİZ RAPORU                           ║
-║              Tarih: 2026-08-08  |  Kapsam: Tüm kaynak dosyalar             ║
+║              Tarih: 2026-10-22  |  Kapsam: Tüm kaynak dosyalar             ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
-Bu rapor projenin tamamı (106 ekran, 26 context, 133 bileşen, 67 servis, 485 JS/TS dosyası)
-taranarak güncellenmiştir. Her bölüm somut dosya yolu ve satır numarasıyla
-desteklenmiştir.
+Bu rapor projenin tamamı (153 ekran, 29 context, 339 bileşen, 136 servis, 50 hook, 176 util,
+331 test, 1.304 JS/TS dosyası, 1.830 toplam dosya) taranarak güncellenmiştir.
+Her bölüm somut dosya yolu ve satır numarasıyla desteklenmiştir.
 
 ─────────────────────────────────────────────────────────────────────────────
-  PROJE İSTATİSTİKLERİ (Son Güncelleme: 08.08.2026)
+  PROJE İSTATİSTİKLERİ (Son Güncelleme: 22.10.2026)
 ─────────────────────────────────────────────────────────────────────────────
 
-  Toplam JS/TS kod satırı  : 172.945 satır (485 dosya)
-  Toplam ekran dosyası      : 106 dosya  (76.512 satır)
-  Toplam bileşen dosyası    : 133 dosya  (45.184 satır)
-  Toplam servis dosyası     : 67 dosya   (15.652 satır)
-  Toplam context dosyası    : 26 dosya   (8.352 satır)
-  Toplam test dosyası       : 64 dosya   (11.477 satır)
-  En büyük dosyalar         :
-    ChatScreen.js           3.858 satır
-    ListsScreen.js          3.105 satır
-    OnboardingScreen.js     2.344 satır
-    PremiumScreen.js        2.233 satır
-    StoryShareScreen.js     2.188 satır
-    TvShowsDetails.js       2.179 satır
-    MovieDetail.js          2.043 satır
-    Comment.js              1.823 satır
-    StatsComponents.js      1.724 satır
-    CreatePostModal.js      1.692 satır
-  Bağımlılık sayısı         : 46 paket
-  Firebase onSnapshot sayısı: 18+ aktif listener (tüm proje)
-  console.log olan dosya    : 29 dosya
+  Toplam kaynak dosya       : 1.830 dosya  (448.768 satır)
+  Toplam JS/TS kod satırı   : 367.273 satır (1.304 dosya)
+  Toplam ekran dosyası      : 153 dosya    (91.820 satır)
+  Toplam bileşen dosyası    : 339 dosya    (103.340 satır)
+  Toplam servis dosyası     : 136 dosya    (31.043 satır)
+  Toplam context dosyası    : 29 dosya     (9.480 satır)
+  Toplam custom hook        : 50 dosya     (5.643 satır)
+  Toplam yardımcı araç (util): 176 dosya    (32.113 satır)
+  Toplam test dosyası       : 331 dosya    (73.980 satır)
+  Toplam cloud function     : 32 dosya     (10.686 satır)
+  En büyük dosyalar (TOP 12):
+    UsageDebugScreen.js     4.769 satır (218 KB)
+    ChatScreen.js           4.307 satır (156 KB)
+    index.js (functions)    2.757 satır (110 KB)
+    StoryShareScreen.js     2.496 satır (91 KB)
+    ListsScreen.js          2.482 satır (94 KB)
+    PremiumScreen.js        2.161 satır (87 KB)
+    TvShowsDetails.js       2.124 satır (74 KB)
+    MovieDetail.js          2.107 satır (74 KB)
+    WrappedSlides.js        2.061 satır (65 KB)
+    Comment.js              1.900 satır (71 KB)
+    CreatePostModal.js      1.800 satır (89 KB)
+    SettingsScreen.js       1.752 satır (65 KB)
+  Bağımlılık sayısı         : 119 paket (105 dependencies + 14 devDependencies)
+  Firebase onSnapshot sayısı: Optimize edilmiş tekil merkezi listener mimarisi
 
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

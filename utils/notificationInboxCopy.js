@@ -3,7 +3,7 @@ import { copyLanguage } from "./appLanguages";
 export const NOTIFICATION_INBOX_COPY = {
   tr: {
     importantTitle: "Önemli davetler", cineInvite: "seni CineSwipe odasına davet etti", duelInvite: "seni günlük düelloya davet etti",
-    acceptInvite: "Kabul et", declineInvite: "Reddet", inviteCount: (n) => `${n} davet`, nextInvite: "Sonraki davet", inviteError: "Davet yanıtı kaydedilemedi. Tekrar dene.",
+    acceptInvite: "Kabul et", declineInvite: "Reddet", acceptedInvite: "Kabul edildi", declinedInvite: "Reddedildi", inviteCount: (n) => `${n} davet`, nextInvite: "Sonraki davet", inviteError: "Davet yanıtı kaydedilemedi. Tekrar dene.",
     expand: "Detayları göster", collapse: "Detayları gizle",
     title: "Bildirimler", subtitle: "En yeniden eskiye tüm hareketler", today: "Bugün", yesterday: "Dün",
     unread: "Okunmamış", read: "Okundu", all: "Tümü", empty: "Henüz bildirim yok",
@@ -16,7 +16,7 @@ export const NOTIFICATION_INBOX_COPY = {
   },
   en: {
     importantTitle: "Important invitations", cineInvite: "invited you to a CineSwipe room", duelInvite: "challenged you to a daily duel",
-    acceptInvite: "Accept", declineInvite: "Decline", inviteCount: (n) => `${n} invitation${n === 1 ? "" : "s"}`, nextInvite: "Next invitation", inviteError: "Couldn't save your response. Try again.",
+    acceptInvite: "Accept", declineInvite: "Decline", acceptedInvite: "Accepted", declinedInvite: "Declined", inviteCount: (n) => `${n} invitation${n === 1 ? "" : "s"}`, nextInvite: "Next invitation", inviteError: "Couldn't save your response. Try again.",
     expand: "Show details", collapse: "Hide details",
     title: "Notifications", subtitle: "All activity, newest first", today: "Today", yesterday: "Yesterday",
     unread: "Unread", read: "Read", all: "All", empty: "No notifications yet",
@@ -29,7 +29,7 @@ export const NOTIFICATION_INBOX_COPY = {
   },
   es: {
     importantTitle: "Invitaciones importantes", cineInvite: "te invitó a una sala de CineSwipe", duelInvite: "te retó a un duelo diario",
-    acceptInvite: "Aceptar", declineInvite: "Rechazar", inviteCount: (n) => `${n} invitación${n === 1 ? "" : "es"}`, nextInvite: "Siguiente invitación", inviteError: "No se pudo guardar tu respuesta. Inténtalo de nuevo.",
+    acceptInvite: "Aceptar", declineInvite: "Rechazar", acceptedInvite: "Aceptada", declinedInvite: "Rechazada", inviteCount: (n) => `${n} invitación${n === 1 ? "" : "es"}`, nextInvite: "Siguiente invitación", inviteError: "No se pudo guardar tu respuesta. Inténtalo de nuevo.",
     expand: "Mostrar detalles", collapse: "Ocultar detalles",
     title: "Notificaciones", subtitle: "Toda la actividad, de más reciente a más antigua", today: "Hoy", yesterday: "Ayer",
     unread: "Sin leer", read: "Leída", all: "Todas", empty: "Aún no hay notificaciones",
@@ -42,7 +42,7 @@ export const NOTIFICATION_INBOX_COPY = {
   },
   pt: {
     importantTitle: "Convites importantes", cineInvite: "convidou você para uma sala do CineSwipe", duelInvite: "desafiou você para um duelo diário",
-    acceptInvite: "Aceitar", declineInvite: "Recusar", inviteCount: (n) => `${n} convite${n === 1 ? "" : "s"}`, nextInvite: "Próximo convite", inviteError: "Não foi possível salvar sua resposta. Tente novamente.",
+    acceptInvite: "Aceitar", declineInvite: "Recusar", acceptedInvite: "Aceito", declinedInvite: "Recusado", inviteCount: (n) => `${n} convite${n === 1 ? "" : "s"}`, nextInvite: "Próximo convite", inviteError: "Não foi possível salvar sua resposta. Tente novamente.",
     expand: "Mostrar detalhes", collapse: "Ocultar detalhes",
     title: "Notificações", subtitle: "Toda a atividade, da mais recente à mais antiga", today: "Hoje", yesterday: "Ontem",
     unread: "Não lidas", read: "Lida", all: "Todas", empty: "Ainda não há notificações",
@@ -55,7 +55,7 @@ export const NOTIFICATION_INBOX_COPY = {
   },
   de: {
     importantTitle: "Wichtige Einladungen", cineInvite: "hat dich in einen CineSwipe Raum eingeladen", duelInvite: "hat dich zu einem Tagesduell herausgefordert",
-    acceptInvite: "Annehmen", declineInvite: "Ablehnen", inviteCount: (n) => `${n} Einladung${n === 1 ? "" : "en"}`, nextInvite: "Nächste Einladung", inviteError: "Antwort konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    acceptInvite: "Annehmen", declineInvite: "Ablehnen", acceptedInvite: "Angenommen", declinedInvite: "Abgelehnt", inviteCount: (n) => `${n} Einladung${n === 1 ? "" : "en"}`, nextInvite: "Nächste Einladung", inviteError: "Antwort konnte nicht gespeichert werden. Bitte erneut versuchen.",
     expand: "Details anzeigen", collapse: "Details ausblenden",
     title: "Benachrichtigungen", subtitle: "Alle Aktivitäten, neueste zuerst", today: "Heute", yesterday: "Gestern",
     unread: "Ungelesen", read: "Gelesen", all: "Alle", empty: "Noch keine Benachrichtigungen",

@@ -1,17 +1,18 @@
 # Seelogd — Project Context
 
-> **Son Güncelleme Tarihi:** 08.08.2026  
-> Yeni bir geliştirici / AI ajanı için tek dosyalık genel bağlam. Hızlı orijinte oluş için.
-> Detaylı şema: [`FIRESTORE_SCHEMA.txt`](./FIRESTORE_SCHEMA.txt).
-> Güvenlik kuralları: [`firestore.rules`](./firestore.rules).
+> **Son Güncelleme Tarihi:** 22.10.2026  
+> Yeni bir geliştirici / AI ajanı için tek dosyalık genel bağlam. Hızlı oryantasyon için.
+> Detaylı mimari rapor: [`UYGULAMA_BILGISI_VE_MIMARISI.md`](./UYGULAMA_BILGISI_VE_MIMARISI.md).
+> Detaylı şema: [`FIRESTORE_DATABASE_SCHEMA.md`](./FIRESTORE_DATABASE_SCHEMA.md).
+> Güvenlik kuralları: [`firestore.rules`](../../firestore.rules).
 
 ---
 
 ## 🎬 Proje nedir?
 
-**Seelogd** — kullanıcıların film/dizi izleme geçmişini takip eden, sosyal özelliklerle (arkadaş, paylaşım, beğeni, bildirim) zenginleştirilmiş bir React Native mobil uygulaması. TMDB API'sinden içerik çeker, Firebase Firestore'da kullanıcı verisini tutar.
+**Seelogd** — kullanıcıların film/dizi izleme geçmişini takip eden, sosyal özelliklerle (arkadaş, sohbet, paylaşım, beğeni, bildirim, turnuvalar, rozetler) zenginleştirilmiş bir React Native mobil uygulaması. TMDB API'sinden içerik çeker, Firebase Firestore ve Realtime Database'de kullanıcı verisini tutar, RevenueCat ile abonelik sunar.
 
-**Hedef kitle:** Türk + İngiliz dilini konuşan film/dizi tutkunları.
+**Hedef kitle:** Çok dilli (Türkçe, İngilizce, Almanca, İspanyolca, Portekizce) film ve dizi tutkunları.
 
 ---
 
@@ -19,81 +20,64 @@
 
 | Katman | Teknoloji |
 |--------|-----------|
-| Runtime | React Native 0.81.5 + Expo SDK ~54 |
-| UI | React 19.1, react-navigation 7, expo-image, expo-blur, expo-linear-gradient, react-native-reanimated |
-| Auth | Firebase Auth + Google Sign-in |
-| DB | Firebase Firestore (Modular SDK v11.7) |
+| Runtime | React Native 0.86.3 + Expo SDK ~57.0.21 |
+| UI | React 19.2.3, react-navigation 7.3.18, expo-image, expo-blur, expo-linear-gradient, react-native-reanimated 4.5.1, @shopify/react-native-skia 2.6.2 |
+| Auth | Firebase Auth + Google Sign-in + Apple Auth |
+| DB & Backend | Firebase Firestore (Modular SDK v11.7.3), RTDB, Cloud Functions (32 dosya) |
 | External API | TMDB (The Movie Database) |
-| Yerel depolama | react-native-mmkv, `services/storage` katmanı üzerinden (registry + senkron erişim + kapsam) |
+| Abonelik / IAP | RevenueCat (react-native-purchases 10.6.0) |
+| Yerel depolama | react-native-mmkv 4.3.2, `services/storage` katmanı üzerinden (registry + senkron erişim + kullanıcı kapsamı) |
 | Local cache | MMKV `cache` deposu (memory+disk TTL cache `utils/apiCache.js`) |
-| i18n | i18next + react-i18next (`translations/tr.json`, `translations/en.json`) |
-| Test | Manuel (otomasyon yok) |
+| i18n | i18next + react-i18next (5 dil: `tr`, `en`, `de`, `es`, `pt`) |
+| Test | Jest 29.7.0, @firebase/rules-unit-testing (331 test dosyası, ~74K LOC) |
 
 ---
 
-## 📂 Klasör Yapısı
+## 📂 Klasör Yapısı ve İstatistikler
+
+- **153 Ekran** (`screens/`, 91.820 LOC)
+- **339 Bileşen** (`components/`, 103.340 LOC)
+- **136 Servis** (`services/`, 31.043 LOC)
+- **29 Context** (`context/`, 9.480 LOC)
+- **50 Custom Hook** (`hooks/`, 5.643 LOC)
+- **176 Utils** (`utils/`, 32.113 LOC)
+- **331 Test** (`__tests__/`, 73.980 LOC)
+- **Toplam:** 1.304 JS/TS dosyası (367.273 LOC), 1.830 toplam kaynak dosya (448.768 LOC)
 
 ```
 Seelogd/
 ├── App.js                       # Root component, Provider hiyerarşisi, Stack navigator
 ├── firebase.js                  # Firebase initApp
-├── firestore.rules              # Security rules (v2 şema)
-├── FIRESTORE_SCHEMA.txt         # Detaylı şema dokümantasyonu
+├── firestore.rules              # Security rules
 ├── PROJECT_CONTEXT.md           # Bu dosya
 │
-├── context/                     # Tüm global state buradan
+├── context/                     # 29 adet global state sağlayıcısı
 │   ├── AuthContext.js
-│   ├── AppSettingsContext.js   # Theme/Lang/Snow/Avatar… 10 ayrı context
-│   ├── UserProfileContext.js   # Users/{uid} realtime + migration
-│   ├── FriendsContext.js       # Arkadaşlar + req/sent listenerlar
+│   ├── AppSettingsContext.js   # Theme/Lang/Snow/Avatar/ImageQuality/TMDB
+│   ├── UserProfileContext.js   # Users/{uid} realtime + profil
+│   ├── FriendsContext.js       # Arkadaşlar + istek listenerları
 │   ├── NotificationsContext.js # Bildirim listesi
 │   ├── PostsContext.js         # Sosyal feed
 │   ├── ProfileStatsContext.js  # İzleme istatistikleri
 │   ├── ProfileUiContext.js     # Avatar + UI ayarları
-│   ├── TvShowContex.js, MovieContex.js, CalendarContext.js …
+│   ├── TvShowContex.js, MovieContex.js, CalendarContext.js, PremiumContext.js …
 │
-├── services/                    # Firestore CRUD katmanı — UI Firestore'a doğrudan değmez
-│   ├── userService.js          # Profil + Usernames reservation + migration
-│   ├── friendsService.js       # request/accept/decline/cancel/unfriend/block — atomic batch
-│   ├── presenceService.js      # Presence/{uid} heartbeat (60sn) + AppState
-│   ├── notificationsService.js # subscribe/markRead/markAll/delete
-│   └── postsService.js         # Posts CRUD + likes + comments + bookmarks + follow
+├── services/                    # 136 servis modülü — UI doğrudan Firestore'a gitmez
+│   ├── userService.js          # Profil + Usernames rezervasyonu
+│   ├── friendsService.js       # Arkadaşlık istekleri ve atomik batch
+│   ├── presenceService.js      # Heartbeat + AppState
+│   ├── notificationsService.js # Bildirim yönetimi
+│   ├── postsService.js         # Sosyal feed CRUD + beğeni/yorum
+│   ├── storage/                # MMKV registry ve depolama motoru
+│   └── purchasesService.js     # RevenueCat abonelik yönetimi
 │
-├── screens/
-│   ├── auth/                   # Login/Register/Forgot
-│   ├── tabs/                   # Tab bar ekranları
-│   │   ├── TvShowScreen.js, MovieScreen.js
-│   │   ├── ShareContentScreen.js
-│   │   ├── SettingsScreen.js, SearchScreen.js, ProfileScreen.js
-│   │   └── profile/            # Profil alt ekranları
-│   │       ├── FriendsListScreen.js
-│   │       ├── FriendRequestsScreen.js
-│   │       ├── PrivacySettingsScreen.js
-│   │       ├── MovieStatisticsScreen.js
-│   │       └── TvStatisticsScreen.js   ← AKTİF
-│   ├── tv/                     # TV alt ekranları (NOT: TvStatisticsScreen burada DEĞİL,
-│   │                             eskiden duplicate vardı, silindi)
-│   ├── movie/, search/, actor/
-│   └── ChatScreen.js, CalendarScreen.js, ListsScreen.js, ListsViewScreen.js
-│
-├── components/
-│   ├── profile/
-│   │   └── StatsComponents.js  # HeroCard, FilterBar, SectionHeader, PosterCard, EmptyState
-│   ├── CreatePostModal.js
-│   ├── Comment.js, CommentSheetModal.js
-│   ├── Skeleton.js, ErrorBoundary.js …
-│
-├── utils/
-│   ├── apiCache.js             # MMKV TTL cache (TMDB için)
-│   ├── avatars.js              # 56 avatar require() + getAvatarSource + clampAvatarIndex
-│   └── tmdbImageUtils.js
-│
-├── translations/
-│   ├── tr.json
-│   └── en.json
-│
-├── assets/avatar/0.png … 55.png
-└── LottieJson/, theme/, modules/
+├── screens/                     # 153 ekran (tabs, tv, movie, chat, game, lists, auth...)
+├── components/                  # 339 UI bileşeni (modallar, feed, profile, chat, badges...)
+├── hooks/                       # 50 özel React hook'u
+├── utils/                       # 176 yardımcı fonksiyon (önbellek, puanlama, hesaplama)
+├── translations/                # tr, en, de, es, pt çevirileri (5 dil)
+├── functions/                   # 32 backend Cloud Functions dosyası
+└── __tests__/                   # 331 Jest birim ve entegrasyon testi
 ```
 
 ---

@@ -4,20 +4,24 @@ Bu doküman, Seelogd uygulamasında kullanılan ve hedeflenen temel yazılım ta
 
 ## ✅ Mevcut Desenler
 
-### 1. Modüler Context API (9 Context Provider)
+### 1. Modüler Context API (29 Context Provider)
 
-- **Açıklama:** Her context tek bir sorumluluğa odaklanır:
-  - `LanguageContext`: Çoklu dil yönetimi (TR/EN)
-  - `ThemeContext`: Tema sistemi
-  - `AuthContext`: Firebase Auth wrapper
-  - `MovieContext`: Film verileri
-  - `TvShowContext`: Dizi verileri
-  - `ProfileScreenContext`: Profil, istatistik, notlar
-  - `AppSettingsContext`: Uygulama ayarları
-  - `ListStatusContext`: Liste durumu
-  - `SnowContext`: Dekoratif efektler
-- **Avantaj:** Her context bağımsız yönetilebilir
-- **⚠️ Sorun:** Bazı context'ler çok büyüdü ve God Object anti-desenine dönüştü
+- **Açıklama:** Sorumlulukların ayrıştırılması ilkesine dayalı 29 modüler durum sağlayıcısı:
+  - `AppSettingsContext`: Global ayarlar, font/kalite tercihleri, TMDB konfigürasyonu
+  - `LanguageContext`: 5 dilde (TR, EN, DE, ES, PT) i18next çeviri köprüsü
+  - `ThemeContext`: Dinamik tema ve stil motoru
+  - `AuthContext`: Firebase Auth wrapper ve oturum durumu
+  - `UserProfileContext`: Users/{uid} gerçek zamanlı profili
+  - `FriendsContext`: Arkadaşlar, engellenenler ve istek dinleyicileri
+  - `NotificationsContext` & `DeviceNotificationsContext`: Bildirim yönetimi
+  - `PostsContext`: Sosyal feed akışı ve paylaşımlar
+  - `ProfileStatsContext`, `ProfileNotesContext`, `ProfileRemindersContext`, `ProfileUiContext`: Parçalanmış bağımsız profil durumları
+  - `ListStatusContext`: O(1) liste durum haritası
+  - `MovieContex` & `TvShowContex`: TMDB film ve dizi veri sağlayıcıları
+  - `PremiumContext`: RevenueCat abonelik durumu ve paywall
+  - `PetContext`: Maskot ve evcil hayvan etkileşimi
+  - `SharedListsContext`, `ConnectivityContext`, `TypographyContext`, `SnowContext` vb.
+- **Avantaj:** Her context bağımsız yönetilebilir, gereksiz yeniden render'lar engellenir.
 
 ### 2. Merkezî Depolama Katmanı (`services/storage`, MMKV)
 

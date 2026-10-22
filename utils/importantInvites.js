@@ -33,8 +33,9 @@ export const pendingInvitations = (items, now = Date.now()) =>
   (Array.isArray(items) ? items : []).filter((item) => isPendingInvitation(item, now));
 
 export function invitationDestination(item) {
+  if (item?.response === "declined") return null;
   if (item?.type === INVITE_TYPES.cine && /^\d{6}$/.test(String(item.inviteCode || ""))) {
-    return { name: "CineSwipeScreen", params: { initialMode: "duo", inviteCode: item.inviteCode } };
+    return { name: "CineSwipeScreen", params: { initialMode: "duo", inviteCode: item.inviteCode, autoJoin: true } };
   }
   if (item?.type === INVITE_TYPES.duel && item.dayKey === dayKeyOf()) {
     return {

@@ -1,80 +1,106 @@
 # 🎬 Seelogd
 
-**Seelogd**, kullanıcıların film ve dizi izleme alışkanlıklarını takip etmelerini, yeni içerikler keşfetmelerini ve kişiselleştirilmiş bir deneyim yaşamalarını sağleyen kapsamlı bir React Native (Expo) uygulamasıdır.
+**Seelogd**, kullanıcıların film ve dizi izleme alışkanlıklarını takip etmelerini, arkadaş edinip sohbet etmelerini, oyunlar ve turnuvalar oynamalarını, yeni içerikler keşfetmelerini ve kişiselleştirilmiş bir sinema deneyimi yaşamalarını sağlayan kapsamlı bir React Native (Expo) mobil uygulamasıdır.
 
 ---
 
 ## 📊 Proje İstatistikleri
 
-Uygulamanın kapsamlı bir analizi sonucunda elde edilen veriler:
+Uygulamanın kapsamlı kaynak kodu analizi sonucunda elde edilen güncel veriler:
 
-| Kategori        | Adet       | Detaylar                                                          |
-| --------------- | ---------- | ----------------------------------------------------------------- |
-| **Ekranlar**    | **54**     | Film, Dizi, Arama, Profil ve Auth ekranları dahil                 |
-| **Bileşenler**  | **15+**    | Yeniden kullanılabilir UI elementleri (Card, Modal, Skeleton vb.) |
-| **Context API** | **9**      | Eyalet (State) yönetimi için modüler yapı                         |
-| **Servisler**   | **3**      | Firebase, TMDB ve Yerel Depolama entegrasyonları                  |
-| **Kod Satırı**  | **~35.5K** | Toplam kaynak kodu satır sayısı (JS & JSON)                       |
-| **Dil Desteği** | **2**      | Türkçe (TR) ve İngilizce (EN)                                     |
+| Kategori | Adet | Detaylar |
+| :--- | :---: | :--- |
+| **Ekranlar (Screens)** | **153** | Film, Dizi, Tabs, Arama, Chat, Oyunlar, Onboarding, Profil ve Auth modülleri |
+| **Bileşenler (Components)** | **339** | Yeniden kullanılabilir UI bileşenleri (Modallar, Kartlar, Skeleton, Sheet, Hub vb.) |
+| **Context API** | **29** | Modüler global durum yönetimi katmanı |
+| **Servisler (Services)** | **136** | Firestore CRUD, TMDB API, RevenueCat, depolama ve iş mantığı servisleri |
+| **Custom Hooks** | **50** | Özelleştirilmiş React hook'ları |
+| **Yardımcı Araçlar (Utils)** | **176** | Veri formatlama, hesaplama, önbellek, yetki ve yardımcı araçlar |
+| **Test Dosyaları** | **331** | Jest birim testleri ve Firestore güvenlik kuralı testleri (~74K satır) |
+| **Cloud Functions** | **32** | Firebase Cloud Functions backend dosyaları (~10.7K satır) |
+| **Kod Satırı (JS/TS)** | **~367K** | 1.304 JavaScript ve TypeScript dosyasında toplam 367.273 satır |
+| **Toplam Kod Satırı (Tüm Proje)** | **~449K** | 1.830 kaynak dosyasında toplam 448.768 satır |
+| **Dil Desteği (i18n)** | **5 Dil** | Türkçe (TR), İngilizce (EN), Almanca (DE), İspanyolca (ES), Portekizce (PT) |
 
 ---
 
 ## 🚀 Öne Çıkan Özellikler
 
-### 🔐 Kullanıcı Yönetimi
+### 🔐 Kullanıcı Yönetimi & Sosyal Ağ
+- **Firebase Auth & Google Sign-In**: Güvenli oturum açma, şifre sıfırlama ve hesap yönetimi.
+- **Kişiselleştirilebilir Profil**: 56 özel avatar seçeneği, biyografi, rütbe, istatistikler ve gizlilik tercihleri.
+- **Sosyal Akış & Arkadaşlık**: Arkadaş ekleme/onaylama, feed paylaşımları, anlık birebir ve grup mesajlaşması, hikaye kartı oluşturma ve paylaşma.
 
-- **Firebase Auth** ile güvenli giriş/kayıt işlemleri.
-- **Kişiselleştirilebilir Profil**: Avatar, kullanıcı adı ve biyografi düzenleme.
+### 🎥 İçerik Keşfi & TMDB Entegrasyonu
+- **TMDB API & İki Katmanlı Önbellek**: Güncel vizyon, popüler, trend, Oscar ve Emmy ödüllü yapımlar.
+- **CineSwipe**: Tinder tarzı kart kaydırma ile hızlı film ve dizi keşfi.
+- **Detaylı Görünüm**: Oyuncu kadrosu, fragmanlar, benzer yapımlar, sağlayıcı platformlar (Netflix, Disney+, Prime vb.).
+- **Gelişmiş Arama**: Fuzzy arama, çoklu filtreleme (tür, yıl, platform, yetişkin filtresi).
 
-### 🎥 İçerik Keşfi
+### 📝 Kişisel Listeler & İzleme Takibi
+- **İzleme Listeleri**: Favoriler, İzlenecekler, İzlenen Filmler ve Sezon/Bölüm bazlı İzlenen Diziler.
+- **Notlar & Hatırlatıcılar**: İçeriklere özel renkli kişisel notlar, vizyon ve yeni bölüm takvim hatırlatıcıları.
+- **Yıllık Hedef & Wrapped**: Kullanıcının izleme hedefleri ve yıl sonu kişisel "Wrapped" özeti.
 
-- **TMDB Entegrasyonu**: Güncel film ve dizi veritabanı.
-- **Kategoriler**: Trendler, Popüler, Yakında Vizyona Girecekler, Şimdi Vizyonda.
-- **Detaylı Görünüm**: Oyuncular, fragmanlar, benzer yapımlar ve platform bilgileri.
+### 🎮 Oyunlar, Rozetler & Turnuvalar
+- **Kutu Açma & Seviye**: Sinema temalı kutu açma simülasyonu, puanlama ve seviye ilerleme.
+- **Rozet Kataloğu**: İzleme alışkanlıklarına göre kazanılan onlarca dinamik rozet.
+- **Film/Dizi Turnuvaları & Sinema Bingosu**: Kendi eşleşmelerinizi oluşturup şampiyonu seçtiğiniz turnuva modu ve bingo oyunu.
 
-### 📝 Kişisel Listeler & Takip
-
-- **İzleme Listeleri**: Favoriler, İzlenecekler, İzlenenler.
-- **Notlar Sistemi**: Filmler ve diziler için kişisel notlar alma.
-- **İstatistikler**: İzleme geçmişine dayalı detaylı kullanıcı istatistikleri ve rütbe sistemi.
-
-### 🤖 Akıllı Özellikler (Geliştirme Aşamasında)
-
-- **Gemini AI**: Kullanıcı zevklerine göre yapay zeka tabanlı film önerileri.
-- **Hatırlatıcılar**: Beklenen yapımlar için bildirim sistemi.
+### 💎 Premium & Gelir Modeli
+- **RevenueCat Entegrasyonu**: Premium ve Premium Max abonelik paketleri, paywall ekranı ve ayrıcalık yönetimi.
 
 ### 🎨 UI/UX Deneyimi
-
-- **Karanlık/Aydınlık Mod**: Tema desteği.
-- **Animasyonlar**: Lottie ve Reanimated ile zenginleştirilmiş akıcı geçişler.
-- **Skeleton Loading**: Yükleme anlarında şık placeholders.
+- **Karanlık/Aydınlık Tema & Liquid Glass**: Dinamik tema motoru, Liquid Glass / Blur efektleri, font ve tipografi seçimleri.
+- **Akıcı Animasyonlar**: Lottie, React Native Reanimated 4 ve Skia destekli 60fps mikro-etkileşimler.
 
 ---
 
 ## 🛠 Teknolojik Altyapı
 
-Bu proje modern mobil geliştirme standartlarına uygun olarak inşa edilmiştir:
+Modern mobil geliştirme ve yüksek performans standartlarına uygun mimari:
 
-- **Framework**: `React Native (Expo SDK ~54)`
-- **Dil**: `JavaScript (ES6+)`
-- **Backend**: `Firebase (Firestore, Auth)`
-- **Veri Kaynağı**: `The Movie Database (TMDB) API`
-- **Depolama**: `react-native-mmkv` — tüm kalıcı veri `services/storage` katmanından geçer (senkron okuma, merkezî anahtar kaydı, kullanıcı kapsamı)
-- **Animasyon**: `Lottie`, `React Native Reanimated`
-- **Navigasyon**: `React Navigation 7`
+- **Çalışma Zamanı**: `React Native 0.86.3` (Expo SDK `~57.0.21`, React `19.2.3`)
+- **Navigasyon**: `React Navigation 7` (`@react-navigation/native 7.3.18`, Native Stack, Stack)
+- **Backend & Veritabanı**: `Firebase Firestore`, `Firebase Realtime Database`, `Cloud Functions`, `Firebase Auth`
+- **Harici Veri Kaynağı**: `The Movie Database (TMDB) API`
+- **Abonelik**: `RevenueCat (react-native-purchases 10.6.0)`
+- **Yerel Depolama**: `react-native-mmkv 4.3.2` — merkezî anahtar kaydı ve kapsamlı depolama (`services/storage`)
+- **Animasyon & Çizim**: `react-native-reanimated 4.5.1`, `lottie-react-native ~7.3.8`, `@shopify/react-native-skia 2.6.2`
+- **Test**: `Jest 29`, `@firebase/rules-unit-testing` (331 test dosyası)
 
 ### 📂 Klasör Yapısı
 
 ```
 Seelogd/
-├── screens/          # 54+ uygulama ekranı (Movie, TV, Auth, Tabs...)
-├── components/       # Tekrar kullanılabilir UI bileşenleri
-├── context/          # 9 adet Context API modülü (State Management)
-├── memory-bank/      # Proje dokümantasyonu ve hafıza bankası
-├── modules/          # Özel modüller ve yardımcı fonksiyonlar
-├── translations/     # Çoklu dil dosyaları (JSON)
-├── theme/            # Tema yapılandırmaları
-└── firebase.js       # Firebase yapılandırması
+├── screens/               # 153 ekran (Movie, TV, Tabs, Chat, Game, Lists, Story, Auth...)
+│   ├── tabs/              # Ana tab ekranları ve alt profil/ayarlar menüleri (69 ekran)
+│   ├── tv/                # Dizi modülü ve bölüm detayları (15 ekran)
+│   ├── game/              # Oyun, rozet ve kutu açma ekranları (16 ekran)
+│   ├── movie/             # Film detay, tür ve kategori ekranları (10 ekran)
+│   ├── chat/              # Birebir ve grup mesajlaşma ekranları (6 ekran)
+│   ├── lists/             # İzleme listeleri ve paylaşılan listeler (3 ekran)
+│   ├── search/            # Medya ve oyuncu arama ekranları (4 ekran)
+│   ├── onboarding/        # Tanıtım ve kurulum vitrinleri (11 ekran)
+│   └── auth/              # Giriş, kayıt ve şifre işlemleri (4 ekran)
+├── components/            # 339 yeniden kullanılabilir UI bileşeni
+│   ├── modals/            # 15 modül (ChatModal, DatePicker, CreatePost, MediaQuickActions...)
+│   ├── profile/           # 25 profil ve istatistik bileşeni
+│   ├── chat/              # 29 sohbet balonu ve mesaj bileşeni
+│   ├── cineswipe/         # 20 kart kaydırma bileşeni
+│   ├── badges/            # 16 rozet ve başarı bileşeni
+│   └── wrapped/           # 5 yıllık özet slayt bileşeni
+├── services/              # 136 servis (Firestore, TMDB, Storage, RevenueCat, Bildirimler)
+├── context/               # 29 Context API sağlayıcısı (Global State)
+├── hooks/                 # 50 özel React hook'u
+├── utils/                 # 176 yardımcı fonksiyon ve matematik/tarih araçları
+├── translations/          # 5 dilde (TR, EN, DE, ES, PT) i18n JSON dosyaları ve yapılandırma
+├── functions/             # 32 dosya Firebase Cloud Functions backend kodu
+├── theme/                 # Tema renkleri, stiller ve tipografi tanımları
+├── native/ & targets/     # iOS WidgetKit hedefleri ve yerel modüller
+├── website/               # Tanıtım web sitesi ve yasal metinler
+├── docs/                  # Kapsamlı mimari, kurulum ve özellik dokümantasyonu
+└── __tests__/             # 331 Jest birim, kural ve entegrasyon testi
 ```
 
 ---
@@ -99,12 +125,21 @@ Projeyi yerel ortamınızda çalıştırmak için aşağıdaki adımları izleyi
    - **Expo Go** uygulaması ile QR kodu taratın (Android/iOS).
    - Veya emülatör seçeneklerini kullanın (`a` for Android, `i` for iOS).
 
+4. **Testleri Çalıştırmak İçin:**
+
+   ```bash
+   npm test
+   ```
+
 ---
 
-## 📚 Dokümantasyon (Memory Bank)
+## 📚 Dokümantasyon
 
-Proje, detaylı bir "Memory Bank" yapısına sahiptir. Geliştirme sürecine katkıda bulunmadan önce `/memory-bank` klasörünü incelemeniz önerilir:
+Projenin kapsamlı mimari ve teknik dokümanları `docs/` klasöründe yer almaktadır:
 
-- `projectbrief.md`: genel vizyon.
-- `activeContext.md`: aktif görevler ve mimari notlar.
-- `techContext.md`: teknoloji yığını detayları.
+- **Genel Mimari**: `docs/mimari/UYGULAMA_BILGISI_VE_MIMARISI.md`
+- **Dosya Hiyerarşisi**: `docs/mimari/PROJE_DOSYA_YAPISI.txt`
+- **Analiz Raporu**: `docs/mimari/PROJE_ANALIZ_RAPORU.txt`
+- **Veritabanı Şeması**: `docs/mimari/FIRESTORE_DATABASE_SCHEMA.md`
+- **Yayın & Gelir Yol Haritası**: `docs/planlama/YAYIN_VE_GELIR_YOL_HARITASI.md`
+- **Memory Bank**: `docs/memory-bank/`

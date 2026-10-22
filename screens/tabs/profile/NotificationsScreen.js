@@ -114,7 +114,7 @@ function Inbox({ uid, navigation }) {
         glass={false}
         testID={`notification-${item.id}`}
         accessibilityRole="button"
-        accessibilityLabel={`${content.title}. ${content.action}. ${relativeTime}. ${unread ? copy.unread : copy.read}`}
+        accessibilityLabel={`${content.title}. ${content.action}. ${content.responseLabel ? `${content.responseLabel}. ` : ""}${relativeTime}. ${unread ? copy.unread : copy.read}`}
         accessibilityHint={expanded ? copy.collapse : copy.expand}
         accessibilityState={{ expanded, disabled: openingId !== null, busy: openingId === item.id }}
         disabled={openingId !== null}
@@ -131,7 +131,7 @@ function Inbox({ uid, navigation }) {
               <Text numberOfLines={1} style={[styles.name, { color: theme.text.primary, fontWeight: unread ? "700" : "600" }]}>{content.title}</Text>
               <Text numberOfLines={1} style={[styles.relativeTime, { color: theme.text.secondary }]}>{relativeTime}</Text>
             </View>
-            <Text numberOfLines={1} style={[styles.preview, { color: theme.text.secondary }]}>{content.detail || content.action}</Text>
+            <Text numberOfLines={1} style={[styles.preview, { color: theme.text.secondary }]}>{content.responseLabel || content.detail || content.action}</Text>
           </View>
           {openingId === item.id ? <ActivityIndicator size="small" color={accent} /> : (
             <AppIcon family="Ionicons" name={expanded ? "chevron-up" : "chevron-down"} size={14} color={theme.text.secondary} />
@@ -141,6 +141,7 @@ function Inbox({ uid, navigation }) {
       {expanded && <View testID={`notification-detail-${item.id}`} style={[styles.expanded, { borderTopColor: alpha(theme.border, 0.45) }]}>
         <Text style={[styles.sender, { color: theme.text.primary }]}>{content.title}</Text>
         <Text style={[styles.action, { color: theme.text.primary }]}>{content.action}</Text>
+        {!!content.responseLabel && <Text style={[styles.response, { color: tone }]}>{content.responseLabel}</Text>}
         {!!content.detail && (
           <View style={[styles.detail, { backgroundColor: alpha(tone, 0.08) }]}>
             <Text style={[styles.body, { color: theme.text.primary }]}>{content.detail}</Text>
@@ -227,6 +228,7 @@ const styles = StyleSheet.create({
   expanded: { marginHorizontal: 12, paddingVertical: 12, borderTopWidth: 1 },
   sender: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
   action: { fontSize: 13, lineHeight: 20 },
+  response: { fontSize: 12, fontWeight: "700", marginTop: 5 },
   detail: { borderRadius: 10, padding: 10, marginTop: 8 }, body: { fontSize: 13, lineHeight: 20 },
   date: { fontSize: 11, lineHeight: 17, marginTop: 10 },
   openButton: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, marginTop: 10 },

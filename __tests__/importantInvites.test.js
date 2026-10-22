@@ -27,7 +27,7 @@ test("pending filter keeps read but unanswered invitations, removes expired and 
 
 test("accept destinations carry the room code and daily mode", () => {
   expect(invitationDestination({ type: "cineswipe_invite", inviteCode: "123456" })).toEqual({
-    name: "CineSwipeScreen", params: { initialMode: "duo", inviteCode: "123456" },
+    name: "CineSwipeScreen", params: { initialMode: "duo", inviteCode: "123456", autoJoin: true },
   });
   jest.useFakeTimers().setSystemTime(now);
   expect(invitationDestination({ type: "game_challenge", dayKey: "2026-10-22" })).toEqual({
@@ -35,5 +35,6 @@ test("accept destinations carry the room code and daily mode", () => {
     params: expect.objectContaining({ modeId: "daily", difficultyId: "normal" }),
   });
   expect(invitationDestination({ type: "game_challenge", dayKey: "2026-10-21" })).toBeNull();
+  expect(invitationDestination({ type: "cineswipe_invite", inviteCode: "123456", response: "declined" })).toBeNull();
   jest.useRealTimers();
 });

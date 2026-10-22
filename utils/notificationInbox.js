@@ -102,6 +102,9 @@ export function notificationTone(type) {
 
 export function notificationContent(item, t, copy) {
   const [icon, key] = TYPES[item.type] || ["notifications-outline", null];
+  const responseLabel = item.type === "cineswipe_invite" || item.type === "game_challenge"
+    ? item.response === "accepted" ? copy.acceptedInvite : item.response === "declined" ? copy.declinedInvite : ""
+    : "";
   return {
     icon,
     tone: notificationTone(item.type),
@@ -110,12 +113,14 @@ export function notificationContent(item, t, copy) {
       : item.type === "game_challenge" ? copy.duelInvite
         : key ? t[key] || copy.title : item.body || copy.title,
     detail: item.text ? `${item.groupId && item.fromName ? `${item.fromName}: ` : ""}${item.text}` : "",
+    responseLabel,
   };
 }
 
 export function notificationDestination(item) {
-  const invite = invitationDestination(item);
-  if (invite) return invite;
+  if (item.type === "cineswipe_invite" || item.type === "game_challenge") {
+    return item.response === "accepted" ? invitationDestination(item) : null;
+  }
   if (item.type === "friend_request") return { name: "FriendRequestsScreen" };
   if (item.type === "friend_accepted" && item.fromUid) return {
     name: "FriendProfileScreen", params: { friendUid: item.fromUid, friendName: item.fromName || "" },
