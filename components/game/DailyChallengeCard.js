@@ -24,6 +24,12 @@ const POSTER_LAYOUT = [
   { right: 36, top: 14, rotate: "-2deg", scale: 1, opacity: 0.95 },
   { right: -6, top: 34, rotate: "10deg", scale: 0.96, opacity: 1 },
 ];
+// İnce (compact) bant: daha küçük afişler, daha sıkı yığın — Eğlence'deki Oyunlar modülü bunu kullanır.
+const POSTER_LAYOUT_COMPACT = [
+  { right: 60, top: 22, rotate: "-11deg", scale: 0.92, opacity: 0.85 },
+  { right: 28, top: 12, rotate: "-2deg", scale: 1, opacity: 0.95 },
+  { right: -6, top: 28, rotate: "10deg", scale: 0.96, opacity: 1 },
+];
 
 function pickPosters(dayKey) {
   const total = SPLASH_POSTER_CATALOG.length;
@@ -66,7 +72,7 @@ export default function DailyChallengeCard({ daily, theme, onPlay, onResult, com
       accessibilityLabel={`${i18nText("autoI18n.gunluk_meydan_okuma", "Günlük Meydan Okuma")}. ${title}. ${cta}`}
       onPress={completed ? onResult : onPlay}
       scaleTo={0.98}
-      style={[styles.shadow, { shadowColor: bold }]}
+      style={[styles.shadow, compact && styles.shadowCompact, { shadowColor: bold }]}
     >
       <LinearGradient colors={[bold, accent]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, compact && styles.cardCompact]}>
         <View pointerEvents="none" style={styles.glowOne} />
@@ -74,12 +80,13 @@ export default function DailyChallengeCard({ daily, theme, onPlay, onResult, com
 
         <View pointerEvents="none" style={styles.posterStack}>
           {posters.map((poster, index) => {
-            const layout = POSTER_LAYOUT[index];
+            const layout = (compact ? POSTER_LAYOUT_COMPACT : POSTER_LAYOUT)[index];
             return (
               <View
                 key={`${poster.mediaType}-${poster.id}`}
                 style={[
                   styles.poster,
+                  compact && styles.posterCompact,
                   {
                     right: layout.right,
                     top: layout.top,
@@ -101,14 +108,14 @@ export default function DailyChallengeCard({ daily, theme, onPlay, onResult, com
           </Text>
         </View>
 
-        <Text style={styles.title} allowFontScaling={false} numberOfLines={2}>
+        <Text style={[styles.title, compact && styles.titleCompact]} allowFontScaling={false} numberOfLines={2}>
           {title}
         </Text>
         <Text style={styles.subtitle} allowFontScaling={false} numberOfLines={2}>
           {subtitle}
         </Text>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, compact && styles.footerCompact]}>
           <View style={styles.chips}>
             <View style={styles.chip}>
               <AppIcon family="Ionicons" name="time-outline" size={13} color="#FFFFFF" />
@@ -130,7 +137,7 @@ export default function DailyChallengeCard({ daily, theme, onPlay, onResult, com
             </View>
           </View>
 
-          <View style={styles.cta}>
+          <View style={[styles.cta, compact && styles.ctaCompact]}>
             <Text style={[styles.ctaText, { color: bold }]} allowFontScaling={false}>
               {cta}
             </Text>
@@ -150,6 +157,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.32,
     shadowRadius: 14,
   },
+  shadowCompact: { borderRadius: 22 },
   card: {
     minHeight: 204,
     borderRadius: 26,
@@ -159,7 +167,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
   },
-  cardCompact: { minHeight: 176 },
+  cardCompact: { minHeight: 0, padding: 14, borderRadius: 22 },
   glowOne: {
     position: "absolute",
     width: 200,
@@ -189,6 +197,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.4)",
     backgroundColor: "rgba(0,0,0,0.25)",
   },
+  posterCompact: { width: 48, height: 72, borderRadius: 8 },
   posterImage: { width: "100%", height: "100%" },
   badge: {
     alignSelf: "flex-start",
@@ -204,6 +213,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: "#FFFFFF", fontSize: 9.5, fontWeight: "900", letterSpacing: 0.9 },
   title: { color: "#FFFFFF", fontSize: 24, lineHeight: 29, fontWeight: "900", maxWidth: "62%", marginTop: 12 },
+  titleCompact: { fontSize: 19, lineHeight: 23, marginTop: 9 },
   subtitle: {
     color: "rgba(255,255,255,0.86)",
     fontSize: 12,
@@ -213,6 +223,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   footer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 14 },
+  footerCompact: { marginTop: 10 },
   chips: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 },
   chip: {
     flexDirection: "row",
@@ -235,5 +246,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#FFFFFF",
   },
+  ctaCompact: { height: 34, paddingHorizontal: 12, borderRadius: 12 },
   ctaText: { fontSize: 12.5, fontWeight: "900" },
 });

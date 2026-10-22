@@ -1,11 +1,17 @@
 // components/profile/ProfileGamesModule.js
 //
 // Eğlence sekmesindeki "Oyunlar" modülü (dosya adı, profilden taşındığı günden
-// kaldı). Üç katman, yukarıdan aşağıya:
-//   1) Günlük Meydan Okuma — tek dokunuşla oynanır, her gün yeni set
-//   2) Oyun ızgarası       — TÜM oyunlar tek ızgarada: Sahne Tahmin + Poster
-//                            Bulmaca + hızlı oyunlar (components/game/QuickGamesGrid)
-//   3) Oyuncu şeridi       — seviye/XP/seri; dokununca Oyun Merkezi (ilerleme)
+// kaldı). Yukarıdan aşağıya:
+//   0) Başlık + oyuncu çipi — seviye halkası/seri; dokununca Oyun Merkezi (ilerleme)
+//   1) Günlük Meydan Okuma  — ince bant, tek dokunuşla oynanır, her gün yeni set
+//   2) Oyunlar              — Sahne Tahmin + Poster Bulmaca yan yana iki büyük kart,
+//                             altında hızlı oyunlar yatay rayda; her kartta oyunun
+//                             küçük önizlemesi (components/game/QuickGamesGrid +
+//                             GamePreviews)
+//
+// KOMPAKT DÜZEN (23 Eki, aynı gün ikinci istek): modül ~800 pt'den ~590 pt'ye indi —
+// tam genişlik oyuncu şeridi başlığa çip oldu, günlük kart ince banda, 4 satırlık
+// simge ızgarası önizlemeli iki kart + tek satırlık raya döndü.
 //
 // SADELEŞTİRME (23 Eki): Sahne Tahmin'e girmek eskiden üç ekran sürüyordu
 // (oyun vitrini → kurulum → oyun) ve modülde iki ayrı oyun bölümü vardı. Şimdi
@@ -16,7 +22,7 @@
 // kalarak arkadan tazelenir.
 
 import React, { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Skeleton from "@components/Skeleton";
 import PremiumPill from "@components/premium/PremiumPill";
 import { usePremiumGate } from "@hooks/usePremiumGate";
@@ -25,9 +31,8 @@ import DuelSendButton from "@components/game/DuelSendButton";
 import GameSetupSheet from "@components/game/GameSetupSheet";
 import QuickGamesGrid from "@components/game/QuickGamesGrid";
 import { duelPayloadFromResult } from "@utils/dailyDuel";
-import PlayerStrip from "@components/game/PlayerStrip";
+import { PlayerChip } from "@components/game/PlayerStrip";
 import { SectionHeader } from "@components/game/ui";
-import { useAuth } from "@context/AuthContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import useDailyView from "@hooks/useDailyView";
@@ -48,8 +53,10 @@ const REGISTRY_IDS = new Set(GAME_REGISTRY.map((game) => game.id));
 export default function ProfileGamesModule({ navigation }) {
   const { theme } = useTheme();
   useLanguage(); // dil değişince i18nText çağrıları yeniden değerlendirilsin
-  const { user } = useAuth();
   const { ready, stats } = useGameStats();
+  // Modül ekranın %90'ı: hızlı oyun rayı iki yandaki %5'e taşar (kenarda kesik görünmesin).
+  const { width } = useWindowDimensions();
+  const bleed = Math.round(width * 0.05);
   const daily = useDailyView(stats);
   const progress = useMemo(() => buildSceneGameProgress(stats, daily.now), [stats, daily.now]);
   // Kilitli (planda oyun yok) kullanıcıda düello yok: oynamadığı bir günü gönderecek sonucu zaten olmaz.
@@ -103,7 +110,6 @@ export default function ProfileGamesModule({ navigation }) {
     () =>
       GAME_REGISTRY.map((game) => ({
         id: game.id,
-        icon: game.icon.name,
         colors: resolveGameAccentColors(game, theme),
         title: i18nText(game.titleKey, game.id),
         best: bestScoreForGame(stats, game.id),
@@ -114,7 +120,10 @@ export default function ProfileGamesModule({ navigation }) {
 
   return (
     <View style={styles.module}>
-      <SectionHeader title={i18nText("autoI18n.oyunlar", "Oyunlar")} theme={theme} style={styles.header} />
+      <View style={styles.headerRow}>
+        <SectionHeader title={i18nText("autoI18n.oyunlar", "Oyunlar")} theme={theme} style={styles.header} />
+        {ready ? <PlayerChip progress={progress} theme={theme} onPress={openHub} /> : null}
+      </View>
 
       {locked ? (
         <GlassPressable
@@ -140,15 +149,13 @@ export default function ProfileGamesModule({ navigation }) {
         <GamesModuleSkeleton theme={theme} />
       ) : (
         <View style={styles.stack}>
-          <DailyChallengeCard daily={daily} theme={theme} onPlay={playDaily} onResult={openDailyBoard} />
+          <DailyChallengeCard daily={daily} theme={theme} onPlay={playDaily} onResult={openDailyBoard} compact />
 
           {/* Bugünkü deneme bittiyse: sonucu bir arkadaşa düello olarak gönder. */}
-          {duelPayload ? <DuelSendButton payload={duelPayload} theme={theme} source="hub" /> : null}
+          {duelPayload ? <DuelSendButton payload={duelPayload} theme={theme} source="hub" dense /> : null}
 
-          {/* Tek oyun ızgarası; hızlı oyunlar kilit şeridinden bağımsız, her planda açık. */}
-          <QuickGamesGrid theme={theme} onOpen={openQuickGame} leadingTiles={leadingTiles} title={null} />
-
-          <PlayerStrip progress={progress} theme={theme} user={user} onPress={openHub} compact />
+          {/* Önizlemeli oyun kartları; hızlı oyunlar kilit şeridinden bağımsız, her planda açık. */}
+          <QuickGamesGrid theme={theme} onOpen={openQuickGame} leadingTiles={leadingTiles} bleed={bleed} />
         </View>
       )}
 
@@ -171,37 +178,37 @@ function GamesModuleSkeleton({ theme }) {
       style={styles.stack}
       accessibilityLabel={i18nText("autoI18n.oyunlar_yukleniyor", "Oyunlar yükleniyor")}
     >
-      <Skeleton height={204} style={[styles.skeletonHero, box]} />
+      <Skeleton height={134} style={[styles.skeletonHero, box]} />
       <View style={[styles.tiles, styles.tilesSkeleton]}>
-        <Skeleton width="48.5%" height={104} style={[styles.skeletonTile, box]} />
-        <Skeleton width="48.5%" height={104} style={[styles.skeletonTile, box]} />
+        <Skeleton width="48.5%" height={170} style={[styles.skeletonTile, box]} />
+        <Skeleton width="48.5%" height={170} style={[styles.skeletonTile, box]} />
       </View>
-      <View style={[styles.tiles, styles.tilesSkeleton]}>
-        <Skeleton width="48.5%" height={104} style={[styles.skeletonTile, box]} />
-        <Skeleton width="48.5%" height={104} style={[styles.skeletonTile, box]} />
+      <View style={styles.tiles}>
+        <Skeleton width={150} height={142} style={[styles.skeletonTile, box]} />
+        <Skeleton width={150} height={142} style={[styles.skeletonTile, box]} />
       </View>
-      <Skeleton height={76} style={[styles.skeletonStrip, box]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   module: { width: "90%", marginTop: 14, marginBottom: 15 },
-  header: { marginTop: 0, paddingHorizontal: 10 },
-  stack: { gap: 12 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
+  header: { flex: 1, marginTop: 0, marginBottom: 0, paddingHorizontal: 10 },
+  stack: { gap: 10 },
   lockBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    padding: 12,
-    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
     borderRadius: 16,
     borderWidth: 1,
   },
   lockText: { flex: 1, fontSize: 12, fontWeight: "600", lineHeight: 16 },
-  tiles: { flexDirection: "row", gap: 12 },
+  tiles: { flexDirection: "row", gap: 10, overflow: "hidden" },
   tilesSkeleton: { justifyContent: "space-between" },
-  skeletonHero: { borderRadius: 26 },
+  skeletonHero: { borderRadius: 22 },
   skeletonTile: { borderRadius: 20 },
-  skeletonStrip: { borderRadius: 22 },
 });

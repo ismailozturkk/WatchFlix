@@ -2,7 +2,7 @@
 //
 // Oyuncu özeti şeridi: seviye halkası + unvan + XP + günlük seri. Hub
 // modülünde kompakt tek satır (compact), Oyun Merkezi'nde büyük kart (compact
-// değil) olarak kullanılır.
+// değil) olarak kullanılır. Eğlence > Oyunlar başlığındaki küçük hâli: PlayerChip.
 
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -107,7 +107,52 @@ export default function PlayerStrip({ progress, theme, user, onPress, compact = 
   );
 }
 
+/**
+ * Başlık satırına sığan oyuncu çipi (Eğlence > Oyunlar): seviye halkası + günlük seri + ok. Eskiden modülün
+ * altında tam genişlik bir şerit (PlayerStrip compact) vardı; kompakt düzende başlığın sağına taşındı.
+ */
+export function PlayerChip({ progress, theme, onPress }) {
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={i18nText("autoI18n.oyun_merkezi", "Oyun Merkezi")}
+      onPress={onPress}
+      scaleTo={0.95}
+      style={[styles.chip, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+    >
+      <LevelRing
+        size={26}
+        stroke={3}
+        progress={progress.levelProgress}
+        color={theme.accent}
+        trackColor={alpha(theme.accent, 0.2)}
+      >
+        <Text style={[styles.chipLevel, { color: theme.text.primary }]} allowFontScaling={false}>
+          {progress.level}
+        </Text>
+      </LevelRing>
+      <AppIcon family="Ionicons" name="flame" size={13} color={progress.dayStreak > 0 ? "#FF8A3D" : theme.text.muted} />
+      <Text style={[styles.chipValue, { color: theme.text.primary }]} allowFontScaling={false}>
+        {progress.dayStreak}
+      </Text>
+      <AppIcon family="Ionicons" name="chevron-forward" size={14} color={theme.text.muted} />
+    </PressableScale>
+  );
+}
+
 const styles = StyleSheet.create({
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingLeft: 4,
+    paddingRight: 8,
+    paddingVertical: 4,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  chipLevel: { fontSize: 11, fontWeight: "900" },
+  chipValue: { fontSize: 12.5, fontWeight: "900", marginRight: 1 },
   card: { borderRadius: 22, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 14 },
   cardCompact: { padding: 12 },
   cardLarge: { padding: 16 },

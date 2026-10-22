@@ -12,6 +12,7 @@ jest.mock("react-native", () => ({
   View: "View",
   Text: "Text",
   Pressable: "Pressable",
+  ScrollView: "ScrollView",
   ActivityIndicator: "Spinner",
   PixelRatio: { get: () => 2 },
   useWindowDimensions: () => ({ width: 390, height: 844 }),
@@ -314,7 +315,7 @@ describe("ortak davranış", () => {
 describe("Eğlence ızgarası", () => {
   const mountGrid = (onOpen = jest.fn()) => { act(() => { renderer = create(<QuickGamesGrid theme={mockTheme} onOpen={onOpen} />); }); return onOpen; };
 
-  test("beş kare (Önce hangisi? + dört oyun), başlık ve 'Yeni'; son kare tam genişlik", () => {
+  test("beş kart (Önce hangisi? + dört oyun) tek yatay rayda, başlık ve 'Yeni'; her kartta önizleme", () => {
     mountGrid();
     expect(has(quick().gridTitle)).toBe(true);
     const tiles = scales();
@@ -323,9 +324,11 @@ describe("Eğlence ızgarası", () => {
       OLDER_COPY.tr.title, ...QUICK_GAME_IDS.map((id) => QUICK_COPY.tr.games[id].title),
     ]);
     expect(texts().filter((t) => t === OLDER_COPY.tr.cardNew)).toHaveLength(5);
-    const flat = (style) => Object.assign({}, ...[].concat(style).flat(Infinity).filter(Boolean));
-    expect(flat(tiles[4].props.style).flexBasis).toBe("100%");
-    expect(flat(tiles[0].props.style).flexBasis).toBe("47%");
+    const [rail] = renderer.root.findAllByType("ScrollView");
+    expect(rail.props.horizontal).toBe(true);
+    expect(rail.findAll((n) => n.type === "Scale")).toHaveLength(5);
+    // Her kart kendi oyununun önizlemesini taşır (afiş görselleri paketten, ağ yok).
+    tiles.forEach((tile) => expect(tile.findAllByType("Image").length).toBeGreaterThan(0));
   });
 
   test("dokununca kare kimliğiyle açılır: older + dört hızlı oyun", () => {

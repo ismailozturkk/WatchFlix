@@ -3,7 +3,7 @@
 // Eğlence > Oyunlar sadeleştirmesi (23 Eki): Sahne Tahmin / Poster Bulmaca'ya girmek artık ayrı vitrin + kurulum
 // ekranı DEĞİL, karoya dokununca açılan kurulum alt sayfası (components/game/GameSetupSheet.js). Oyun Merkezi
 // tek ilerleme ekranı (istatistik + başarımlar içinde). Bu dosya üç şeyi sabitler:
-//   1) modül: tek ızgara (2 sahne oyunu + 5 hızlı oyun), karo → sayfa → "Oyunu Başlat" → SceneGamePlayScreen
+//   1) modül: önizlemeli iki sahne oyunu kartı + 5 hızlı oyunluk ray, karo → sayfa → "Oyunu Başlat" → SceneGamePlayScreen
 //      (sayfa KAPANDIKTAN sonra: iOS iki Modal kuralı), kilitli planda sayfa yerine yükseltme
 //   2) sayfa: kayıtlı tercih / açık seçim / yetersiz kişisel liste düşüşü, günlük hak bitince oyun açılmaz
 //   3) Oyun Merkezi: başarımlar ve mod rekorları aynı ekranda; kaldırılan ekranlara giden rota kalmadı
@@ -42,7 +42,7 @@ jest.mock("../components/badges/AppBadge", () => mockHost("Badge"));
 jest.mock("../components/premium/PremiumPill", () => mockHost("PremiumPill"));
 jest.mock("../components/game/DailyChallengeCard", () => mockHost("DailyCard"));
 jest.mock("../components/game/DuelSendButton", () => mockHost("Duel"));
-jest.mock("../components/game/PlayerStrip", () => mockHost("PlayerStrip"));
+jest.mock("../components/game/PlayerStrip", () => ({ ...mockHost("PlayerStrip"), PlayerChip: mockHost("PlayerChip").default }));
 jest.mock("../components/game/ui", () => {
   const React = require("react");
   return {
@@ -169,13 +169,16 @@ const mountModule = async () => {
 };
 
 describe("Eğlence > Oyunlar modülü", () => {
-  test("tek ızgara: önce iki sahne oyunu, sonra beş hızlı oyun; ayrı oyun bölümü/başlığı yok", async () => {
+  test("önce iki sahne oyunu kartı, sonra beş hızlı oyunluk ray; her kartta önizleme", async () => {
     await mountModule();
     const grid = renderer.root.findAll((n) => n.type === "Scale" && typeof n.props.accessibilityLabel === "string");
     expect(grid.map((n) => n.props.accessibilityLabel).slice(0, 2)).toEqual(GAME_REGISTRY.map((g) => g.id));
     expect(grid).toHaveLength(2 + 1 + QUICK_GAME_IDS.length);
     const titles = renderer.root.findAllByType("Section").map((n) => n.props.title);
-    expect(titles).toEqual(["Oyunlar"]); // "Hızlı oyunlar" ve "Oyun Merkezi" kısayolu kalktı
+    expect(titles).toEqual(["Oyunlar", "Hızlı oyunlar"]); // "Oyun Merkezi" kısayolu yok; giriş oyuncu çipi
+    grid.forEach((tile) => expect(tile.findAllByType("Image").length).toBeGreaterThan(0));
+    // Günlük kart ince bant olarak çizilir.
+    expect(renderer.root.findByType("DailyCard").props.compact).toBe(true);
   });
 
   test("Sahne Tahmin: karo → kurulum sayfası → Başlat → sayfa kapanınca oyun (kayıtlı tercihle)", async () => {
@@ -245,9 +248,10 @@ describe("Eğlence > Oyunlar modülü", () => {
     expect(navigation.navigate).toHaveBeenCalledWith("QuickGameScreen", { gameId: QUICK_GAME_IDS[0], source: "hub" });
   });
 
-  test("oyuncu şeridi Oyun Merkezi'ne gider", async () => {
+  test("başlıktaki oyuncu çipi Oyun Merkezi'ne gider (ayrı şerit yok)", async () => {
     const navigation = await mountModule();
-    const strip = renderer.root.findByType("PlayerStrip");
+    expect(renderer.root.findAllByType("PlayerStrip")).toHaveLength(0);
+    const strip = renderer.root.findByType("PlayerChip");
     act(() => strip.props.onPress());
     expect(navigation.navigate).toHaveBeenCalledWith("GameHubScreen");
   });

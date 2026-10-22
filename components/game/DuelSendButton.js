@@ -6,6 +6,7 @@
 //
 // `payload` yoksa (bugün oynanmadı / skor yok) hiçbir şey çizilmez: skorsuz meydan okuma olmaz.
 // Düğme tek satırlık sakin bir cam şerittir; ana eylemin (sıralama / tekrar oyna) yerini almaz.
+// `dense`: açıklama satırı yok, daha ince (Eğlence modülünün kompakt düzeni).
 
 import React, { memo, useCallback, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -21,7 +22,7 @@ import { getDuelCopy } from "@utils/dailyDuelCopy";
 
 const AMBER = "#F59E0B";
 
-function DuelSendButton({ payload, theme, source = "result", style }) {
+function DuelSendButton({ payload, theme, source = "result", dense = false, style }) {
   const { user } = useAuth() || {};
   const { language } = useLanguage();
   const copy = getDuelCopy(language);
@@ -49,18 +50,20 @@ function DuelSendButton({ payload, theme, source = "result", style }) {
         accessibilityRole="button"
         accessibilityLabel={copy.sendA11y}
         accessibilityHint={copy.sendHint}
-        style={[styles.button, { backgroundColor: theme.secondary, borderColor: theme.border }, style]}
+        style={[styles.button, dense && styles.buttonDense, { backgroundColor: theme.secondary, borderColor: theme.border }, style]}
       >
-        <View style={styles.icon}>
-          <AppIcon family="Ionicons" name="flash" size={16} color="#FFFFFF" />
+        <View style={[styles.icon, dense && styles.iconDense]}>
+          <AppIcon family="Ionicons" name="flash" size={dense ? 14 : 16} color="#FFFFFF" />
         </View>
         <View style={styles.copy}>
           <Text style={[styles.title, { color: theme.text.primary }]} numberOfLines={1}>
             {copy.send}
           </Text>
-          <Text style={[styles.hint, { color: theme.text.muted }]} numberOfLines={2}>
-            {copy.sendHint}
-          </Text>
+          {dense ? null : (
+            <Text style={[styles.hint, { color: theme.text.muted }]} numberOfLines={2}>
+              {copy.sendHint}
+            </Text>
+          )}
         </View>
         <AppIcon family="Ionicons" name="paper-plane-outline" size={18} color={theme.text.muted} />
       </GlassPressable>
@@ -80,7 +83,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
   },
+  buttonDense: { gap: 10, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 16 },
   icon: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: AMBER },
+  iconDense: { width: 28, height: 28, borderRadius: 10 },
   copy: { flex: 1, minWidth: 0 },
   title: { fontSize: 14, fontWeight: "800" },
   hint: { fontSize: 11.5, lineHeight: 15, fontWeight: "500", marginTop: 1 },

@@ -1,6 +1,6 @@
 # Hızlı oyunlar
 
-Eğlence → Oyunlar modülünde iki oyun karosunun altında **"Hızlı oyunlar"** ızgarası. Hepsi aynı iskelet: Sahne Tahmin'in
+Eğlence → Oyunlar modülünde iki büyük oyun kartının altında **"Hızlı oyunlar"** yatay rayı (her kartta oyunun küçük önizlemesi). Hepsi aynı iskelet: Sahne Tahmin'in
 başlık havuzundan kurulan kısa sorular, **üç can**, art arda doğru sayısı skor, cevaptan sonra 1,5 sn bilgi ve sıradaki
 (dokununca hemen ilerler). Rekor ve doğruluk yalnız bu cihazda. Liderlik / XP / günlük hak / premium kapısı **yok**.
 Yeni sunucu, rules, native build gerekmez (OTA).
@@ -25,7 +25,8 @@ Kaynak: 21 Ekim 2026, "Önce hangisi? gibi birkaç tane daha" isteği. İlk üye
 | `hooks/useQuickGame.js` | Durum makinesi (loading → playing → revealed → over \| error), kayıt yazımı, ölçüm. |
 | `screens/game/QuickGameScreen.js` | Dört oyunun ekranı (rota `QuickGameScreen`, parametre `gameId`). Afiş boyutu pencere yüksekliğinden türer. |
 | `components/game/QuickGameParts.js` | Ortak parçalar: canlar, skor/rekor satırı, yükleniyor, hata, oyun sonu kartı, afiş kartı, "Doğru!/Yanlış" şeridi. `OlderGameScreen` de kullanır. |
-| `components/game/QuickGamesGrid.js` | Eğlence ızgarası (beş kare; tek kalan son kare tam genişlik). Eski `OlderGameCard` silindi. |
+| `components/game/QuickGamesGrid.js` | Eğlence oyun listesi: başta iki sahne oyunu kartı, altında beş kartlık yatay ray (23 Eki kompakt düzen; eskiden 2 sütunlu simge ızgarası). Eski `OlderGameCard` silindi. |
+| `components/game/GamePreviews.js` | Kartlardaki "nasıl oynanır" önizlemeleri; paketli splash afişleri, `PREVIEW_FACTS` doğru cevapları (bekçi: `__tests__/gamePreviews.test.js`). |
 | `services/storage/registry.js` | `Keys.quickGames` (`{oyun: {best, plays, correct, answered}}`, `keepOnLogout`). `older` kendi anahtarında (`olderGame`) kaldı. |
 | `utils/analyticsEvents.js` | `QUICK_GAME_STARTED {game_id, source}`, `QUICK_GAME_FINISHED {game_id, score, answered, new_best, best}`. |
 
@@ -49,7 +50,9 @@ Kaynak: 21 Ekim 2026, "Önce hangisi? gibi birkaç tane daha" isteği. İlk üye
 
 1. `utils/quickGames.js`: `BUILDERS`a soru üretici + `QUICK_GAME_IDS` + `QUICK_GAME_META` (düzen, simge, iki renk).
 2. `utils/quickGamesCopy.js`: `games.<id>` (başlık / ipucu / soru) beş dilde; gerekirse şık etiketi (`quickOptionLabel`).
-3. `QuickGameScreen.js`: ek bilgi (cevaptan sonra rozet) varsa oyuna özel dal. Izgara ve kayıt kendiliğinden gelir.
+3. `QuickGameScreen.js`: ek bilgi (cevaptan sonra rozet) varsa oyuna özel dal. Ray kartı ve kayıt kendiliğinden gelir;
+   kart önizlemesi için `components/game/GamePreviews.js`e bir dal + `PREVIEW_FACTS` girdisi (gerçek bilgiyle) ekle —
+   yoksa kart boş önizleme kutusuyla çizilir.
 4. `__tests__/quickGames.test.js` (çekirdek) ve `quickGameScreen.test.js` (`describe.each` oyunu otomatik kapsar; doğru cevabı
    havuz bilgisinden çözen `currentAnswers`a yeni oyunun dalını ekle).
 
