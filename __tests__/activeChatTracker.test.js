@@ -114,6 +114,22 @@ describe("decideForegroundPresentation", () => {
     ).toBe(SUPPRESSED);
   });
 
+  // Sunucu mesaj tetikleyicisinin push'u (functions/socialPush.js): bildirim
+  // belgesi yok → yerel kopya yok. Gizlenirse ön planda mesaj bildirimi hiç çıkmaz.
+  test("yerel kopyası olmayan (remoteOnly) mesaj push'u ön planda gösterilir", () => {
+    const remoteOnly = { kind: "social", type: "message", remoteOnly: true, chatId: "grp-1" };
+    expect(
+      decideForegroundPresentation({ data: remoteOnly, appActive: true, chatIsActive: active }),
+    ).toBe(PRESENTED);
+  });
+
+  test("remoteOnly push'u da izlenen sohbetten geldiyse bastırılır", () => {
+    const remoteOnly = { kind: "social", type: "message", remoteOnly: true, chatId: "me_friend" };
+    expect(
+      decideForegroundPresentation({ data: remoteOnly, appActive: true, chatIsActive: active }),
+    ).toBe(SUPPRESSED);
+  });
+
   test("izlenen sohbetin yerel mesaj bildirimi tamamen bastırılır", () => {
     expect(
       decideForegroundPresentation({ data: local(), appActive: true, chatIsActive: active }),

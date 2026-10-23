@@ -65,12 +65,7 @@ const {
   revokeAppleAuthorizationCode,
   verifyAppleIdentityToken,
 } = require("./appleAuth");
-const {
-  badgeForPush,
-  chatIdForMessage,
-  sumUnreadMessages,
-} = require("./appBadge");
-const { isRecipientViewingChat } = require("./chatPresence");
+const { createSocialPush } = require("./socialPush");
 const referral = require("./referral");
 const { purgeAccountData, PURGE_PHASES } = require("./accountPurge");
 const functionsV1 = require("firebase-functions/v1");
@@ -1535,163 +1530,58 @@ async function clearDeadPushTokens(uid, userData, priv, deadTokens) {
   }
 }
 
+// Sosyal push'un hazırlanması/gönderimi tek yerde (socialPush.js): bildirim
+// belgesi tetikleyicisi ve mesaj tetikleyicileri AYNI ayar/engel/inChat/rozet
+// mantığını kullanır.
+const socialPush = createSocialPush({
+  db,
+  rtdb,
+  expo,
+  buildContent,
+  pickNotificationLang,
+  loadPushTokens,
+  clearDeadPushTokens,
+});
+
 exports.onSocialNotificationCreated = onDocumentCreated(
   "Users/{uid}/notifications/{notifId}",
   async (event) => {
     const snap = event.data;
     if (!snap) return;
+    const prepared = await socialPush.prepare(event.params.uid, snap.data() || {}, {
+      notifId: event.params.notifId,
+    });
+    if (prepared) await socialPush.send([prepared]);
+  },
+);
 
-    const n = snap.data() || {};
-    const recipientUid = event.params.uid;
-    const notifId = event.params.notifId;
+// Mesaj push'u: yeni istemci mesaja `push: "server"` yazar ve bildirim belgesi
+// ÜRETMEZ; dağıtım burada (alıcı başına sıfır Firestore yazımı, tüm alıcılar tek
+// gönderimde). İşaretsiz mesaj (eski istemci) yok sayılır — onun push'u bildirim
+// belgesinden gelir. Ayrıntı: socialPush.js.
+exports.onDirectMessageCreated = onDocumentCreated(
+  "chats/{chatId}/messages/{msgId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    await socialPush.deliverMessagePush({
+      message: snap.data() || {},
+      messageId: event.params.msgId,
+      chatId: event.params.chatId,
+    });
+  },
+);
 
-    // Alıcının token'larını oku.
-    let userData;
-    try {
-      const userSnap = await db.doc(`Users/${recipientUid}`).get();
-      if (!userSnap.exists) return;
-      userData = userSnap.data() || {};
-    } catch (e) {
-      console.error("Kullanıcı dökümanı okunamadı:", e);
-      return;
-    }
-
-    // Tür-bazlı ayar kontrolü. İstemci Users/{uid}.notificationSettings'e yansıtır.
-    // Ayar yoksa/alan tanımsızsa → GÖNDER (eski kullanıcıları susturmamak için);
-    // yalnızca açıkça false ise atla. İstemci foreground filtresiyle tutarlı.
-    const ns = userData.notificationSettings || {};
-    if (ns.enabled === false) {
-      console.log(`Bildirimler kapalı (master): ${recipientUid}`);
-      return;
-    }
-    const TYPE_SETTING_KEY = {
-      friend_request: "friendRequestsEnabled",
-      friend_accepted: "friendAcceptedEnabled",
-      post_like: "postLikesEnabled",
-      post_comment: "postCommentsEnabled",
-      comment_reply: "postCommentsEnabled",
-      mention: "mentionsEnabled",
-      message: "messagesEnabled",
-      cineswipe_invite: "messagesEnabled",
-      game_challenge: "messagesEnabled",
-    };
-    const settingKey = TYPE_SETTING_KEY[n.type];
-    if (settingKey && ns[settingKey] === false) {
-      console.log(`Tür kapalı (${n.type}): ${recipientUid}`);
-      return;
-    }
-
-    // Alıcı, gönderenle olan bu 1-1 sohbeti tam o an ekranda açık tutuyorsa
-    // (chatRtdb.js'nin inChat bayrağı) push gereksiz — mesajı zaten sohbette
-    // canlı görüyor. Yalnızca 1-1 mesajlar için: gruplarda inChat izlenmiyor
-    // (bkz. chatRtdb.js — enterChat/leaveChat yalnızca 1-1 modunda çağrılır).
-    // Bayrak yalnız alıcının bağlantısı hâlâ canlıysa geçerli sayılır (bkz.
-    // chatPresence.js): ani kapanışta takılı kalan bayrak push'u susturamaz.
-    if (rtdb && n.type === "message" && !n.groupId && n.fromUid) {
-      const chatId =
-        n.fromUid > recipientUid
-          ? `${n.fromUid}_${recipientUid}`
-          : `${recipientUid}_${n.fromUid}`;
-      try {
-        if (await isRecipientViewingChat(rtdb, chatId, recipientUid)) {
-          console.log(`Alıcı sohbette, push atlandı: ${recipientUid}`);
-          return;
-        }
-      } catch (e) {
-        console.warn("inChat kontrolü başarısız (push yine de gönderilecek):", e.message);
-      }
-    }
-
-    // Token'lar Users/{uid}/private/push'ta (+ geçiş süresince kök alanlar).
-    const { tokens, priv } = await loadPushTokens(recipientUid, userData);
-    if (tokens.length === 0) {
-      console.log(`Geçerli Expo push token yok: ${recipientUid}`);
-      return;
-    }
-
-    // Dil: istemci Users/{uid}.notificationLanguage'a yansıtır (alan yoksa tr).
-    const lang = pickNotificationLang(userData.notificationLanguage);
-    const { title, body } = buildContent(n, lang);
-
-    // Uygulama simgesi rozeti (iOS): MUTLAK sayı, artış değil. Eskiden push
-    // `badge` taşımıyordu; uygulama kapalıyken sayı hiç düzeltilemiyor, istemci
-    // ise okunmamış bildirim DOKÜMANLARINI sayıp yalnız büyütüyordu. Tanım:
-    // okunmamış 1-1 mesajlar + bekleyen gelen istekler (bkz. appBadge.js).
-    // Sorgu başarısız olursa `badge` hiç yazılmaz — OS mevcut sayıyı korur,
-    // yanlış bir sayı yazmaktan iyidir.
-    let badge = null;
-    try {
-      const [convSnap, requestsAgg] = await Promise.all([
-        db
-          .collection(`Users/${recipientUid}/conversations`)
-          .where("unreadCount", ">", 0)
-          .select("unreadCount")
-          .get(),
-        db
-          .collection(`Users/${recipientUid}/friendRequests`)
-          .where("status", "==", "pending")
-          .count()
-          .get(),
-      ]);
-      badge = badgeForPush(n, {
-        unreadMessages: sumUnreadMessages(convSnap.docs),
-        pendingRequests: requestsAgg.data().count,
-      });
-    } catch (e) {
-      console.warn("Rozet sayısı hesaplanamadı (badge atlanıyor):", e.message);
-    }
-
-    const chatId = chatIdForMessage(n, recipientUid);
-    const messages = tokens.map((to) => ({
-      to,
-      sound: "default",
-      title,
-      body,
-      channelId: "social", // istemcideki Android kanalıyla aynı
-      priority: "high",
-      ...(badge !== null ? { badge } : {}),
-      data: {
-        kind: "social",
-        type: n.type || "",
-        notifId,
-        postId: n.postId || null,
-        fromUid: n.fromUid || null,
-        fromName: n.fromName || null,
-        groupId: n.groupId || null,
-        groupName: n.groupName || null,
-        inviteCode: n.inviteCode || null,
-        dayKey: n.dayKey || null,
-        // İstemci bununla "kullanıcı bu sohbeti izliyor mu" kararını verir ve
-        // sohbet açılınca çekmecedeki bildirimleri temizler.
-        chatId,
-      },
-    }));
-
-    // Gönder (chunk'lı) + ölü token tespiti.
-    const deadTokens = [];
-    const chunks = expo.chunkPushNotifications(messages);
-    for (const chunk of chunks) {
-      try {
-        const tickets = await expo.sendPushNotificationsAsync(chunk);
-        tickets.forEach((ticket, i) => {
-          if (
-            ticket.status === "error" &&
-            ticket.details &&
-            ticket.details.error === "DeviceNotRegistered"
-          ) {
-            deadTokens.push(chunk[i].to);
-          }
-        });
-      } catch (e) {
-        console.error("Expo push gönderim hatası:", e);
-      }
-    }
-
-    await clearDeadPushTokens(recipientUid, userData, priv, deadTokens);
-
-    console.log(
-      `Push gönderildi → ${recipientUid} | tür: ${n.type} | cihaz: ${tokens.length} | ölü: ${deadTokens.length} | rozet: ${badge ?? "-"}`,
-    );
+exports.onGroupMessageCreated = onDocumentCreated(
+  "groups/{groupId}/messages/{msgId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    await socialPush.deliverMessagePush({
+      message: snap.data() || {},
+      messageId: event.params.msgId,
+      groupId: event.params.groupId,
+    });
   },
 );
 

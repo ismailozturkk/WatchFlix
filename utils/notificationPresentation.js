@@ -9,6 +9,10 @@
 //   1. Backend'den gelen UZAK sosyal push → gizle. Aynı olayı Firestore
 //      listener'ından üretilen yerel kopya (data.local === true) zaten, tür
 //      ayarlarına saygı göstererek gösteriyor; ikisi birden çift bildirim olur.
+//      İSTİSNA: `remoteOnly === true` push'un yerel kopyası YOKTUR — sunucu mesaj
+//      tetikleyicisi bildirim belgesi yazmadan gönderir (functions/socialPush.js;
+//      tür ayarına sunucu bakmıştır). Onu gizlemek ön planda mesaj bildirimini
+//      tamamen kaybettirirdi; kural 2'ye tabi olarak gösterilir.
 //   2. Kullanıcı o mesajın sohbetini şu an izliyorsa → yerel kopya dahil
 //      HİÇBİR banner/ses/liste kaydı yok. Mesajı sohbette canlı görüyor.
 //      Karar, bildirim çıkmadan hemen önce handler'da verilir — listener'daki
@@ -43,7 +47,7 @@ export function decideForegroundPresentation({ data, appActive, chatIsActive }) 
   const payload = data || {};
   if (!appActive || payload.kind !== "social") return PRESENTED;
 
-  if (payload.local !== true) return SUPPRESSED;
+  if (payload.local !== true && payload.remoteOnly !== true) return SUPPRESSED;
 
   if (payload.type === "message" && payload.chatId && chatIsActive?.(String(payload.chatId))) {
     return SUPPRESSED;

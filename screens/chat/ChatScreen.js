@@ -82,7 +82,7 @@ import { useProfileUi } from "@context/ProfileUiContext";
 import { avatarSnapshot } from "@utils/avatarPhotos";
 import { useUserProfile } from "@context/UserProfileContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
-import { invitationFieldsFromMessage } from "@utils/importantInvites";
+import { prepareOutgoingMessage } from "@utils/chatPush";
 import { isOnlineVisible } from "@services/presenceService";
 import {
   createTypingController,
@@ -1333,14 +1333,14 @@ export default function ChatScreen({ route, navigation }) {
     ],
   );
 
-  // Bildirim dokümanları mesaj batch'i işlendikten SONRA yazılır (push'u
-  // tetikler). SIRA ÖNEMLİ: sunucu push'u bildirim oluşunca rozete yazacağı
-  // okunmamış toplamını o an Firestore'dan okur (functions/appBadge.js); sayaç
-  // artışı batch ile zaten işlenmiş olduğundan toplam yeni mesajı sayar.
-  // Bildirim hatası gönderimi geri almaz: mesaj zaten kalıcı.
-  const notifyThread = useCallback(
-    (previewText, messageData) => {
-      const invitation = invitationFieldsFromMessage(messageData);
+  // YALNIZ DAVET (CineSwipe odası, günlük düello) bildirim belgesi yazar: kabul/ret
+  // akışı o belgede. Düz mesajın push'unu sunucu mesaj tetikleyicisi dağıtır,
+  // istemci hiçbir alıcıya yazmaz (utils/chatPush.js). Davet belgeleri mesaj
+  // batch'i işlendikten SONRA yazılır: sunucu push'u rozete yazacağı okunmamış
+  // toplamını o an okur (functions/appBadge.js). Hata gönderimi geri almaz.
+  const notifyInvitation = useCallback(
+    (previewText, invitation) => {
+      if (!invitation) return;
       if (isGroup) {
         const others = (groupData?.members || []).filter(
           (u) => u !== currentUser.uid,
@@ -1351,8 +1351,7 @@ export default function ChatScreen({ route, navigation }) {
             fromUid: currentUser.uid,
             fromName: profileDisplayName || currentUser.displayName || "",
             fromAvatarIndex,
-            type: invitation?.type || "message",
-            ...(invitation || {}),
+            ...invitation,
             text: previewText,
             groupId: chatId,
             groupName: groupData?.name || groupName || "",
@@ -1365,8 +1364,7 @@ export default function ChatScreen({ route, navigation }) {
         fromUid: currentUser.uid,
         fromName: profileDisplayName || currentUser.displayName || "",
         fromAvatarIndex,
-        type: invitation?.type || "message",
-        ...(invitation || {}),
+        ...invitation,
         text: previewText,
       }).catch(() => {});
     },
@@ -1384,16 +1382,18 @@ export default function ChatScreen({ route, navigation }) {
   );
 
   // TÜM gönderim yolları (metin, anket, medya, koleksiyon, detaydan paylaşım)
-  // buradan geçer: mesaj + yan etkiler tek atomik batch, ardından bildirim.
+  // buradan geçer: mesaj + yan etkiler tek atomik batch. Düz mesaj sunucu push
+  // işaretini taşır; davet ise ardından bildirim belgesi yazar.
   const postMessage = useCallback(
     async (messageData, previewText) => {
+      const { message, invitation } = prepareOutgoingMessage(messageData);
       const batch = writeBatch(db);
-      batch.set(doc(messagesRef), messageData);
+      batch.set(doc(messagesRef), message);
       queueThreadWrites(batch, previewText);
       await batch.commit();
-      notifyThread(previewText, messageData);
+      notifyInvitation(previewText, invitation);
     },
-    [messagesRef, queueThreadWrites, notifyThread],
+    [messagesRef, queueThreadWrites, notifyInvitation],
   );
 
   // Mesajlar listesindeki önizlemeyi sohbetin GÜNCEL son mesajına eşitler (bkz.
