@@ -59,6 +59,8 @@ import {
   setDoc,
   writeBatch,
   limit,
+  startAfter,
+  endAt,
   deleteField,
   increment,
 } from "firebase/firestore";
@@ -84,6 +86,7 @@ import { useUserProfile } from "@context/UserProfileContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
 import { prepareOutgoingMessage } from "@utils/chatPush";
 import { applyReceipts, newestIncoming, shouldMarkRead } from "@utils/chatReceipts";
+import { createMessagePager } from "@services/chatMessagePager";
 import { isOnlineVisible } from "@services/presenceService";
 import {
   createTypingController,
@@ -266,6 +269,12 @@ const messagePreview = (message) => {
 
 const timestampMs = (value) => value?.toMillis?.() || value?.toDate?.()?.getTime?.() || 0;
 
+// Mesaj sayfaları (services/chatMessagePager.js): açılışta ve her "daha eski"de
+// bu kadar mesaj; alıntıya atlamada daha büyük sayfa, en çok 6 sayfa (≈300 mesaj).
+const MESSAGE_PAGE_SIZE = 30;
+const JUMP_PAGE_SIZE = 50;
+const JUMP_MAX_PAGES = 6;
+
 // ─── Arama Sonuç Kartı ──────────────────────────────────────────────────────
 const SearchResultCard = memo(({ item, onPress, getTmdbUrl, theme, selected }) => {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -415,7 +424,6 @@ export default function ChatScreen({ route, navigation }) {
   // Şikâyet sayfasının hedefi (mesaj nesnesi); null ise sayfa kapalı.
   const [reportTarget, setReportTarget] = useState(null);
   const [textLink, setTextLink] = useState(false);
-  const [messageLimit, setMessageLimit] = useState(20);
 
   const [searchChoise, setSearchChoise] = useState(null); // null | "movie" | "tv" | "person"
   const [searchOption, setSearchOption] = useState(false);
@@ -479,6 +487,8 @@ export default function ChatScreen({ route, navigation }) {
   }, [keyboard, kbGate]);
 
   const flatListRef = useRef();
+  const pagerRef = useRef(null);           // imleçli mesaj sayfaları (chatMessagePager)
+  const scrollRetryRef = useRef(0);        // scrollToIndex yeniden deneme sayacı
   const typingCtrlRef    = useRef(null);   // "yazıyor" bayrağı (ilk tuşta yaz, boşta kapat)
   const messageInputRef  = useRef(null);
   const searchInputRef   = useRef(null);   // arama input — modal açıldıktan SONRA odakla
@@ -886,18 +896,17 @@ export default function ChatScreen({ route, navigation }) {
     }
   }, [isGroup, friendsLoading, friendNow, navigation]);
 
+  // Mesajlar: imleçli sayfalar (services/chatMessagePager.js). Eskiden tek
+  // dinleyicinin limiti büyütülüp yeniden kuruluyordu — her "daha eski" yüklenmiş
+  // tüm mesajları baştan okutuyor, aynı efektteki profil/RTDB dinleyicilerini de
+  // yeniden kuruyordu. Artık sohbet başına bir kez kurulur; eski sayfa eklemek
+  // yalnız o sayfayı okur.
   useEffect(() => {
-    const q = query(
+    const pager = createMessagePager({
       messagesRef,
-      orderBy("timestamp", "desc"),
-      limit(messageLimit),
-    );
-
-    const unsubscribeMessages = onSnapshot(
-      q,
-      (snapshot) => {
-        trackFirestoreRead("messages", snapshot.docs.length);
-        const msgs = snapshot.docs.map((docSnap) => {
+      fs: { query, orderBy, limit, startAfter, endAt, onSnapshot },
+      pageSize: MESSAGE_PAGE_SIZE,
+      mapDoc: (docSnap) => {
         const data = docSnap.data();
         return {
           id: docSnap.id,
@@ -907,23 +916,30 @@ export default function ChatScreen({ route, navigation }) {
             (data.clientCreatedAt ? new Date(data.clientCreatedAt) : null),
           _pendingWrite: docSnap.metadata.hasPendingWrites,
         };
-      });
+      },
       // Tikler bu listeden ve sohbet belgesindeki okundu işaretinden TÜRETİLİR
-      // (utils/chatReceipts.js); eskiden burada her giden mesaja "delivered"
-      // yazılıyordu — yalnız sunucu onayını tekrar eden, mesaj başına bir yazım.
-      setChatData((prev) => ({
-        ...prev,
-        loaded: true,
-        messages: mergeServerMessages(msgs, prev.messages, chatId),
-      }));
+      // (utils/chatReceipts.js); mesajlara durum yazılmaz.
+      onChange: ({ messages, loaded }) => {
+        if (!loaded) return;
+        setChatData((prev) => ({
+          ...prev,
+          loaded: true,
+          messages: mergeServerMessages(messages, prev.messages, chatId),
+        }));
       },
-      (err) => {
-        // Örn. gruptan çıkarılınca permission-denied: listener sessizce ölür,
-        // ekran bayat mesajlarda donardı — en azından logla.
-        if (__DEV__) console.warn("messages listener error:", err?.message);
-      },
-    );
+      // Örn. gruptan çıkarılınca permission-denied: dinleyici sessizce ölür,
+      // ekran bayat mesajlarda donardı — en azından logla.
+      onError: (err) => __DEV__ && console.warn("messages listener error:", err?.message),
+      onReads: (count) => trackFirestoreRead("messages", count),
+    });
+    pagerRef.current = pager;
+    return () => {
+      pager.stop();
+      if (pagerRef.current === pager) pagerRef.current = null;
+    };
+  }, [messagesRef, chatId]);
 
+  useEffect(() => {
     // Grup: doc'u dinle (header + memberInfo). 1-1: typing + presence.
     let unsubMeta = () => {};
     let unsubFriendProfile = () => {};
@@ -991,12 +1007,11 @@ export default function ChatScreen({ route, navigation }) {
     }
 
     return () => {
-      unsubscribeMessages();
       unsubMeta();
       unsubFriendProfile();
       unsubGroup();
     };
-  }, [isGroup, groupId, chatId, friendUid, messageLimit]);
+  }, [isGroup, groupId, chatId, friendUid]);
 
   // Okundu işaretleri (1-1): sohbet belgesindeki readAt.{uid} — iki tarafın da
   // gördüğü en yeni gelen mesajın zamanı (utils/chatReceipts.js). Sohbet belgesi
@@ -1711,6 +1726,7 @@ export default function ChatScreen({ route, navigation }) {
     (messageId) => {
       const index = memoizedMessages.findIndex((message) => message.id === messageId);
       if (index < 0) return false;
+      scrollRetryRef.current = 0;
       flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
       setHighlightedMessageId(messageId);
       if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
@@ -1721,18 +1737,35 @@ export default function ChatScreen({ route, navigation }) {
     [memoizedMessages],
   );
 
+  // Hedef mesaj listede yoksa eski sayfalar, bulunana ya da tavana (6×50)
+  // varılana dek yüklenir. Sayfa yükleniyorsa ("busy") yeni sayfa gelince bu
+  // efekt yeniden çalışır; geçmişin başına varıldıysa ("end") vazgeçilir.
+  // (Önceki tek seferlik deneme, bir sayfadan eski hedeflerde sonsuza dek
+  // "yükleniyor" toast'ında takılı kalıyordu.)
   const pendingJumpTriesRef = useRef(0);
+  const continueJump = useCallback(() => {
+    if (!pendingJumpIdRef.current) return;
+    if (pendingJumpTriesRef.current >= JUMP_MAX_PAGES) {
+      pendingJumpIdRef.current = null;
+      return;
+    }
+    const result = pagerRef.current?.loadOlder(JUMP_PAGE_SIZE) ?? "end";
+    if (result === "started") pendingJumpTriesRef.current += 1;
+    else if (result === "end") pendingJumpIdRef.current = null;
+  }, []);
+
   const jumpToMessage = useCallback(
     (messageId) => {
       if (scrollToMessage(messageId)) return;
       pendingJumpIdRef.current = messageId;
       pendingJumpTriesRef.current = 0;
-      setMessageLimit((current) => current + 50);
+      continueJump();
+      if (!pendingJumpIdRef.current) return; // geçmişte yok (silinmiş olabilir)
       toast.warning(
         i18nText("autoI18n.eski_mesaj_yukleniyor", "Eski mesaj yükleniyor"),
       );
     },
-    [scrollToMessage],
+    [scrollToMessage, continueJump],
   );
 
   useEffect(() => {
@@ -1742,16 +1775,8 @@ export default function ChatScreen({ route, navigation }) {
       pendingJumpIdRef.current = null;
       return;
     }
-    // Hedef bu sayfada da yok: tavana kadar (6×50) sayfa büyütmeye devam et.
-    // Önceki tek seferlik +50, bir sayfadan eski hedeflerde sonsuza dek
-    // "yükleniyor" toast'ında takılı kalıyordu.
-    if (pendingJumpTriesRef.current >= 6) {
-      pendingJumpIdRef.current = null;
-      return;
-    }
-    pendingJumpTriesRef.current += 1;
-    setMessageLimit((current) => current + 50);
-  }, [memoizedMessages, scrollToMessage]);
+    continueJump();
+  }, [memoizedMessages, scrollToMessage, continueJump]);
 
   const deleteMessage = useCallback(
     async (message) => {
@@ -1949,10 +1974,28 @@ export default function ChatScreen({ route, navigation }) {
     ],
   );
 
-  const loadMoreMessages = useCallback(
-    () => setMessageLimit((prev) => prev + 20),
-    [],
-  );
+  const loadMoreMessages = useCallback(() => {
+    pagerRef.current?.loadOlder();
+  }, []);
+
+  // scrollToIndex, sanal listede henüz ölçülmemiş satırda başarısız olur: önce
+  // tahmini konuma kaydırılır, satır çizilince yeniden denenir (en çok iki kez).
+  // Eskiden burada mesaj limiti büyütülüyordu — veriyi yeniden okutup ölçüm
+  // sorununu çözmüyordu.
+  const handleScrollToIndexFailed = useCallback((info) => {
+    if (scrollRetryRef.current >= 2) {
+      scrollRetryRef.current = 0;
+      return;
+    }
+    scrollRetryRef.current += 1;
+    flatListRef.current?.scrollToOffset({
+      offset: Math.max(0, (info.averageItemLength || 0) * info.index),
+      animated: false,
+    });
+    setTimeout(() => {
+      flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+    }, 80);
+  }, []);
 
   // ── Seçim yardımcıları ──────────────────────────────────────────────────────
   const itemKey = (it) => (it?.media_type || "x") + "-" + it?.id;
@@ -2464,9 +2507,7 @@ export default function ChatScreen({ route, navigation }) {
             maxToRenderPerBatch={12}
             initialNumToRender={15}
             updateCellsBatchingPeriod={30}
-            onScrollToIndexFailed={() => {
-              setMessageLimit((current) => current + 50);
-            }}
+            onScrollToIndexFailed={handleScrollToIndexFailed}
             ListHeaderComponent={
               chatData.friendTyping ? (
                 <BounceIn kind={reduceMotion ? null : "receive"}>
