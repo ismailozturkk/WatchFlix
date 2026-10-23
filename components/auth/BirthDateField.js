@@ -8,9 +8,10 @@
 // ayrı yazsaydı biri 18 kontrolünü ya da gelecek tarih sınırını kaçırırdı.
 //
 // Neden elle yazma değil: GG/AA/YYYY kutuları "31 Şubat" gibi olmayan tarihleri
-// yazdırabiliyor ve doğrulama hatası göstermek zorunda kalıyordu. Çark seçici
+// yazdırabiliyor ve doğrulama hatası göstermek zorunda kalıyordu. Takvim seçici
 // yalnız var olan tarihleri üretiyor, sınır dışı gün/ay/yıl zaten kapalı geliyor
-// — geçersiz durum hiç doğmuyor.
+// — geçersiz durum hiç doğmuyor. Tarih henüz yoksa seçici YIL ızgarasıyla açılır:
+// yıl → ay → gün, üç dokunuş.
 //
 // Sözleşme dışarıya sade: `value` ISO ("YYYY-MM-DD") ya da null, `onChange(iso)`.
 // 18 altı olmak kaydı ENGELLEMEZ, yalnız yetişkin içerik kapalı kalır
@@ -26,9 +27,9 @@ import { i18nText } from "../../utils/i18nText";
 import { calculateAge, MAX_AGE, MIN_ADULT_AGE, parseBirthDate } from "../../utils/ageGate";
 import GlassPressable from "../common/GlassPressable";
 
-// Çark boş değerle bugüne açılıyor; doğum tarihi için bu, çoğu kullanıcıya
-// yirmi-otuz yıl kaydırmak demek. Kullanıcı listesinin ortasına yakın bir
-// yerden başlasın.
+// Seçici boş değerle bugüne açılıyor; doğum tarihi için bu, çoğu kullanıcıya
+// yirmi-otuz yıl geri gitmek demek. Yıl ızgarası kullanıcı kitlesinin ortasına
+// yakın bir yılda açılsın.
 const VARSAYILAN_ACILIS_YAS = 20;
 
 /** "1998-03-05" → "5 Mart 1998" / "March 5, 1998" / "5 de marzo de 1998" */
@@ -69,7 +70,7 @@ export default function BirthDateField({
   const etiket = useMemo(() => tarihEtiketi(value, language), [value, language]);
 
   // Sınırlar: gelecekte doğum yok, 120 yaştan eskisi de gerçekçi değil.
-  // Çark bu aralığın dışını zaten kapalı gösteriyor.
+  // Seçici bu aralığın dışını zaten kapalı gösteriyor.
   const { minDate, maxDate } = useMemo(() => {
     const bugun = new Date();
     return {
@@ -173,6 +174,7 @@ export default function BirthDateField({
         maxDate={maxDate}
         // "Dün / Bugün / Yarın" çipleri doğum tarihi için anlamsız.
         quickActions={false}
+        initialView={value ? "days" : "years"}
         title={i18nText("autoI18n.dogum_tarihi", "Doğum tarihi")}
         subtitle={i18nText(
           "autoI18n.dogum_tarihi_alt_baslik",
