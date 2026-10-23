@@ -3,15 +3,14 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
-  MIXED_PROJECTS_ERROR,
   SERVER_PUSH_MARKER,
-  splitByProject,
   buildMessageNotification,
   createSocialPush,
   directRecipient,
   groupRecipients,
   shouldServerPush,
 } = require("./socialPush");
+const { MIXED_PROJECTS_ERROR } = require("./expoSend");
 
 // ─── Sahteler ──────────────────────────────────────────────────────────────
 // Yol → veri haritasından Firestore. Sorgular yalnız rozet hesabının iki
@@ -335,17 +334,7 @@ test("100'den fazla push parçalara bölünür ve ölü token sahibine doğru e�
   assert.equal(cleared.filter((c) => c.dead.length > 0).length, 1);
 });
 
-// ─── Karışık Expo projesi (22 Eki günlüğündeki hata) ───────────────────────
-test("splitByProject: details'e göre gruplar; bilinmeyen token ayrı grupta", () => {
-  const messages = [{ to: "A1" }, { to: "B1" }, { to: "A2" }, { to: "X" }];
-  const groups = splitByProject(messages, { "@a/app": ["A1", "A2"], "@b/eski": ["B1"] });
-  assert.deepEqual(
-    groups.map((g) => g.map((m) => m.to)),
-    [["A1", "A2"], ["B1"], ["X"]],
-  );
-  assert.deepEqual(splitByProject(messages, undefined).length, 1);
-});
-
+// ─── Karışık Expo projesi (22 Eki günlüğündeki hata; bölme: expoSend.js) ───
 test("grupta bir üyenin eski proje token'ı varsa istek bölünür, herkes push alır", async () => {
   const { push, expo, cleared } = setup({
     docs: groupDocs,

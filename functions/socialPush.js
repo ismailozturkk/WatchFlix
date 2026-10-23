@@ -25,6 +25,7 @@
 
 const { badgeForPush, sumUnreadMessages, chatIdForMessage } = require("./appBadge");
 const { isRecipientViewingChat } = require("./chatPresence");
+const { sendExpoPushes } = require("./expoSend");
 
 /** İstemcideki utils/chatPush.js SERVER_PUSH ile AYNI değer. */
 const SERVER_PUSH_MARKER = "server";
@@ -42,30 +43,6 @@ const TYPE_SETTING_KEY = {
   cineswipe_invite: "messagesEnabled",
   game_challenge: "messagesEnabled",
 };
-
-// Expo, bir istekte birden çok projenin (ör. eski geliştirme build'i + yeni build)
-// token'ı varsa İSTEĞİN TAMAMINI bu kodla reddeder; `details` = { proje: [token] }.
-// 22 Eki günlüklerinde görüldü: o kullanıcıya hiçbir cihazından push gitmiyordu.
-// Alıcılar tek istekte toplandığından bölünmezse bir grubun tamamı push'suz kalırdı.
-const MIXED_PROJECTS_ERROR = "PUSH_TOO_MANY_EXPERIENCE_IDS";
-
-/**
- * Karışık proje hatasındaki `details`e göre mesajları proje gruplarına böler.
- * `details`te geçmeyen token'lar kendi grubunda toplanır.
- */
-function splitByProject(messages, details) {
-  const projectOf = new Map();
-  for (const [project, tokens] of Object.entries(details || {})) {
-    for (const token of Array.isArray(tokens) ? tokens : []) projectOf.set(token, project);
-  }
-  const groups = new Map();
-  for (const m of messages) {
-    const key = projectOf.has(m.to) ? `p:${projectOf.get(m.to)}` : "?";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(m);
-  }
-  return [...groups.values()];
-}
 
 /** Bu mesajın push'unu sunucu mu dağıtacak (yeni istemci işareti)? */
 function shouldServerPush(message) {
@@ -288,42 +265,25 @@ function createSocialPush({
       }
     });
 
-    const deadByOwner = list.map(() => []);
-    const sendChunk = async (chunk, allowSplit) => {
-      try {
-        const tickets = await expo.sendPushNotificationsAsync(chunk);
-        tickets.forEach((ticket, i) => {
-          if (ticket?.status === "error" && ticket.details?.error === "DeviceNotRegistered") {
-            const token = chunk[i].to;
-            for (const idx of owners.get(token) || []) deadByOwner[idx].push(token);
-          }
-        });
-      } catch (e) {
-        if (allowSplit && e?.code === MIXED_PROJECTS_ERROR) {
-          const groups = splitByProject(chunk, e.details);
-          if (groups.length > 1) {
-            log.warn(`Karışık Expo projesi: istek ${groups.length} parçaya bölündü`);
-            for (const group of groups) await sendChunk(group, false);
-            return;
-          }
-        }
-        log.error("Expo push gönderim hatası:", e);
-      }
-    };
-    for (const chunk of expo.chunkPushNotifications(all)) await sendChunk(chunk, true);
+    // Karışık Expo projesi isteği bölünerek gönderilir (expoSend.js).
+    const deadTokens = await sendExpoPushes(expo, all, { log, label: "social" });
+    const deadByOwner = list.map(() => new Set());
+    for (const token of deadTokens) {
+      for (const idx of owners.get(token) || []) deadByOwner[idx].add(token);
+    }
 
     await Promise.all(
       list.map((p, idx) =>
-        clearDeadPushTokens(p.recipientUid, p.userData, p.priv, deadByOwner[idx]),
+        clearDeadPushTokens(p.recipientUid, p.userData, p.priv, [...deadByOwner[idx]]),
       ),
     );
 
     list.forEach((p, idx) => {
       log.log(
-        `Push gönderildi → ${p.recipientUid} | tür: ${p.type} | cihaz: ${p.messages.length} | ölü: ${deadByOwner[idx].length} | rozet: ${p.badge ?? "-"}`,
+        `Push gönderildi → ${p.recipientUid} | tür: ${p.type} | cihaz: ${p.messages.length} | ölü: ${deadByOwner[idx].size} | rozet: ${p.badge ?? "-"}`,
       );
     });
-    return { sent: all.length, dead: deadByOwner.reduce((s, d) => s + d.length, 0) };
+    return { sent: all.length, dead: deadByOwner.reduce((s, d) => s + d.size, 0) };
   }
 
   /**
@@ -384,8 +344,6 @@ function createSocialPush({
 module.exports = {
   SERVER_PUSH_MARKER,
   TYPE_SETTING_KEY,
-  MIXED_PROJECTS_ERROR,
-  splitByProject,
   shouldServerPush,
   directRecipient,
   groupRecipients,

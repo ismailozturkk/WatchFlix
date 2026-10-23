@@ -66,6 +66,7 @@ const {
   verifyAppleIdentityToken,
 } = require("./appleAuth");
 const { createSocialPush } = require("./socialPush");
+const { sendExpoPushes } = require("./expoSend");
 const referral = require("./referral");
 const { purgeAccountData, PURGE_PHASES } = require("./accountPurge");
 const functionsV1 = require("firebase-functions/v1");
@@ -2236,25 +2237,9 @@ async function processUserStreaming(userDoc, getProviders) {
 
   if (messages.length === 0) return 0;
 
-  // Gönder + ölü token temizliği (onSocialNotificationCreated ile aynı desen).
-  const deadTokens = [];
-  const chunks = expo.chunkPushNotifications(messages);
-  for (const chunk of chunks) {
-    try {
-      const tickets = await expo.sendPushNotificationsAsync(chunk);
-      tickets.forEach((ticket, i) => {
-        if (
-          ticket.status === "error" &&
-          ticket.details &&
-          ticket.details.error === "DeviceNotRegistered"
-        ) {
-          deadTokens.push(chunk[i].to);
-        }
-      });
-    } catch (e) {
-      console.error("[streaming] push hatası:", e && e.message);
-    }
-  }
+  // Gönder + ölü token temizliği (ortak döngü: karışık Expo projesi isteği
+  // bölünür — bkz. expoSend.js).
+  const deadTokens = await sendExpoPushes(expo, messages, { label: "streaming" });
   await clearDeadPushTokens(uid, u, priv, deadTokens);
 
   return new Set(messages.map((m) => m.title)).size;
@@ -2396,19 +2381,7 @@ async function processUserDigest(userDoc, getDetails, window) {
     data: { kind: "weeklyDigest", count: String(items.length) },
   }));
 
-  const deadTokens = [];
-  for (const chunk of expo.chunkPushNotifications(messages)) {
-    try {
-      const tickets = await expo.sendPushNotificationsAsync(chunk);
-      tickets.forEach((ticket, i) => {
-        if (ticket.status === "error" && ticket.details && ticket.details.error === "DeviceNotRegistered") {
-          deadTokens.push(chunk[i].to);
-        }
-      });
-    } catch (e) {
-      console.error("[weeklyDigest] push hatası:", e && e.message);
-    }
-  }
+  const deadTokens = await sendExpoPushes(expo, messages, { label: "weeklyDigest" });
   await clearDeadPushTokens(uid, u, priv, deadTokens);
   return items.length;
 }
