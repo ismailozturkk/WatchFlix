@@ -4,7 +4,11 @@ import {
   getReactNativePersistence,
   } from "firebase/auth";
 import { mmkvAuthPersistence } from "./services/storage/authPersistence";
-import { getFirestore } from "firebase/firestore";
+import {
+  initializeFirestore,
+  memoryLocalCache,
+  memoryLruGarbageCollector,
+} from "firebase/firestore";
 import { getDatabase } from "firebase/database";
 import { getFunctions } from "firebase/functions";
 const firebaseConfig = {
@@ -35,7 +39,26 @@ const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(mmkvAuthPersistence),
 });
 
-const db = getFirestore(app);
+// Firestore önbelleği: BELLEKTE, LRU. React Native'de disk kalıcılığı yok (JS
+// SDK'sı IndexedDB ister). Varsayılan "eager" bellek önbelleği, dinleyici
+// kapanınca belgeleri ve sorgunun devam token'ını hemen atıyordu: bir sohbete
+// (ya da herhangi bir ekrana) dönünce sorgu sıfırdan, sunucu beklenerek
+// okunuyordu. LRU önbellek bunları oturum boyunca tutar:
+//   • yeniden açılan sorgu önce önbellekten ANINDA çizilir, sonra sunucu
+//     tazeler (emülatörde ölçüldü: 30 mesajlık sayfa 8 ms, sunucu ~30 ms);
+//   • SDK yeniden dinlerken devam token'ını gönderir — Firestore 30 dk içindeki
+//     yeniden bağlanmayı yeni sorgu gibi faturalamaz, yalnız değişenler okunur
+//     (emülatör bunu uygulamadığından gerçek etki kullanım panelinden izlenmeli).
+// Süreç kapanınca önbellek gider; cihaza veri YAZILMAZ. Üst sınır aşılınca en
+// az kullanılan sorgular atılır. Sınırı değiştirirken __tests__/firebaseCache.test.js.
+const FIRESTORE_MEMORY_CACHE_BYTES = 20 * 1024 * 1024;
+const db = initializeFirestore(app, {
+  localCache: memoryLocalCache({
+    garbageCollector: memoryLruGarbageCollector({
+      cacheSizeBytes: FIRESTORE_MEMORY_CACHE_BYTES,
+    }),
+  }),
+});
 
 // Cloud Functions (callable) — Gemini proxy `callGemini` buradan çağrılır.
 // Bölge: functions varsayılanı (us-central1); sunucu tarafı bölge değişirse
