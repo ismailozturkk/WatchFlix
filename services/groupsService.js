@@ -23,7 +23,10 @@ import {
   deleteField,
   runTransaction,
   getDocs,
+  increment,
 } from "firebase/firestore";
+import { groupUnreadRecipients } from "../utils/friendsListModel";
+import { MAX_GROUP_MEMBERS } from "../utils/groupLimits";
 
 // ─── Üye baloncuk rengi (uid'den deterministik) ──────────────────────────────
 // Grup sohbetinde her gönderenin baloncuğu/adı tutarlı bir renk alır.
@@ -68,6 +71,11 @@ export async function createGroup({
   memberInfo,
   createdBy,
 }) {
+  // Asıl kapı firestore.rules (create: members.size() <= tavan); burada erken,
+  // anlaşılır bir hata verilir.
+  if ((members?.length || 0) > MAX_GROUP_MEMBERS) {
+    throw new Error(`Bir grupta en fazla ${MAX_GROUP_MEMBERS} üye olabilir`);
+  }
   const ref = await addDoc(collection(db, "groups"), {
     name: (name || "").trim() || "Grup",
     color: color || memberColor(createdBy),
@@ -126,6 +134,41 @@ export function subscribeGroup(groupId, callback) {
     doc(db, "groups", groupId),
     (snap) => callback(snap.exists() ? { id: snap.id, ...snap.data() } : null),
     (err) => __DEV__ && console.warn("subscribeGroup:", err.message)
+  );
+}
+
+// ─── Okunmamış sayacı: üye başına gelen kutusu ──────────────────────────────
+// Users/{uid}/groupInbox/{groupId} = { unread }. Eskiden sayaç grup belgesinde
+// (`groups/{id}.unread.{uid}`) duruyordu: her mesaj ve sohbete bakan her üyenin
+// sıfırlaması AYNI belgeye yazıyor, belge her yazımda bütün üyelerin
+// dinleyicisine yeniden gidiyordu (mesaj başına ~üye² okuma, tek belgede yazım
+// çekişmesi). Artık her üyenin sayacı kendi alt koleksiyonunda: gönderenin
+// artışı alıcı başına bir yazım, sıfırlama yalnız sahibinin dinleyicisini
+// tetikler. Kural: başka üye yalnız TAM +1 yazabilir (firestore.rules).
+export const groupInboxDoc = (uid, groupId) =>
+  doc(db, "Users", uid, "groupInbox", groupId);
+
+/** Mesaj batch'ine diğer üyelerin okunmamış artışlarını ekler. */
+export function queueGroupUnreadIncrements(batch, groupId, members, senderUid) {
+  if (!groupId) return;
+  for (const uid of groupUnreadRecipients(members, senderUid)) {
+    batch.set(groupInboxDoc(uid, groupId), { unread: increment(1) }, { merge: true });
+  }
+}
+
+/** Kullanıcının grup sayaçlarını { groupId: unread } olarak dinler (Mesajlar ekranı). */
+export function subscribeGroupInbox(uid, callback) {
+  if (!uid) return () => {};
+  return onSnapshot(
+    collection(db, "Users", uid, "groupInbox"),
+    (snap) => {
+      const inbox = {};
+      snap.docs.forEach((d) => {
+        inbox[d.id] = d.data()?.unread;
+      });
+      callback(inbox);
+    },
+    (err) => __DEV__ && console.warn("subscribeGroupInbox:", err.message)
   );
 }
 

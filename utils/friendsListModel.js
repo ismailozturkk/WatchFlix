@@ -117,36 +117,43 @@ export function totalUnread(conversations) {
 }
 
 /**
- * Bir grubun BU üye için okunmamış mesaj sayısı. Sayaç grup belgesinde üye
- * başına tutulur (`groups/{id}.unread.{uid}`): gönderen diğer üyeler için
- * artırır, üye sohbeti görünürken kendininkini sıfırlar — 1-1'deki
- * `conversations.unreadCount`'un grup karşılığı. Bozuk/negatif değer 0 sayılır.
+ * Bir grubun BU kullanıcı için okunmamış mesaj sayısı. Sayaç kullanıcının kendi
+ * gelen kutusunda grup başına tutulur (`Users/{uid}/groupInbox/{groupId}.unread`;
+ * `inbox` = { groupId: unread }, bkz. groupsService.subscribeGroupInbox):
+ * gönderen diğer üyelerinkini artırır, üye sohbeti görünürken kendininkini
+ * sıfırlar — 1-1'deki `conversations.unreadCount`'un grup karşılığı. Bozuk/negatif
+ * değer 0 sayılır.
  */
-export function groupUnreadCount(group, uid) {
-  if (!uid) return 0;
-  const n = Math.floor(Number(group?.unread?.[uid]));
+export function groupUnreadCount(inbox, groupId) {
+  if (!groupId) return 0;
+  const n = Math.floor(Number(inbox?.[groupId]));
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-/** Tüm grupların bu üye için okunmamış toplamı. */
-export function totalGroupUnread(groups, uid) {
+/**
+ * ÜYESİ OLUNAN grupların okunmamış toplamı. Gelen kutusunda çıkarılınan grubun
+ * bayat kaydı kalabilir; yalnız `groups` listesindekiler sayılır.
+ */
+export function totalGroupUnread(groups, inbox) {
   let sum = 0;
-  for (const g of groups || []) sum += groupUnreadCount(g, uid);
+  for (const g of groups || []) sum += groupUnreadCount(inbox, g?.id);
   return sum;
 }
 
 /**
- * Grup mesajı gönderilirken yazılacak `unread` yaması: gönderen DIŞINDAKİ her
- * üye için `bump()` (Firestore `increment(1)`; test edilebilsin diye dışarıdan
- * verilir). Boşsa `null` döner — `set(..., { merge: true })` içinde boş bir
- * `unread: {}` alan maskesine girip mevcut sayaçların hepsini silerdi.
+ * Grup mesajı gönderilirken okunmamış sayacı artırılacak üyeler: gönderen
+ * DIŞINDAKİ benzersiz, boş olmayan uid'ler. (Aynı uid iki kez artırılırsa kural
+ * "tam +1" şartıyla batch'i reddeder.)
  */
-export function groupUnreadIncrements(members, senderUid, bump) {
-  const patch = {};
+export function groupUnreadRecipients(members, senderUid) {
+  const recipients = [];
+  const seen = new Set();
   for (const uid of members || []) {
-    if (uid && uid !== senderUid) patch[uid] = bump();
+    if (!uid || uid === senderUid || seen.has(uid)) continue;
+    seen.add(uid);
+    recipients.push(uid);
   }
-  return Object.keys(patch).length > 0 ? patch : null;
+  return recipients;
 }
 
 /** Sohbet satırlarını kişi adı veya son mesaj metnine göre süzer. */

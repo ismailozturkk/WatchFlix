@@ -16,9 +16,10 @@
 //
 // Beğeni/yorum bildirimleri bilerek DAHİL DEĞİL: onları temizleyecek bir
 // bildirim ekranı yok, rozete eklenirlerse yine sıfırlanamaz olurlardı. Grup
-// mesajlarının okunmamış sayacı (groups/{id}.unread.{uid}) Mesajlar ekranında
-// gösterilir ama sayıma GİRMİYOR: sunucu push'u rozeti hesaplarken üyenin tüm
-// grup belgelerini de okumak zorunda kalırdı (bkz. functions/appBadge.js).
+// mesajlarının okunmamış sayacı (Users/{uid}/groupInbox/{groupId}.unread)
+// Mesajlar ekranında gösterilir ama sayıma GİRMİYOR. Sayaç artık kullanıcının
+// kendi alt koleksiyonunda olduğu için sunucu tek sorguyla okuyabilir; rozete
+// katmak bir ürün kararı ve functions/appBadge.js ile birlikte yapılmalı.
 //
 // AYNI MANTIK functions/appBadge.js içinde (CommonJS, sunucu push'una `badge`
 // yazar). İkisi birlikte güncellenmeli — iki taraf ayrışırsa uygulama açıkken

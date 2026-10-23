@@ -11,7 +11,7 @@ import {
   foldForSearch,
   groupPeopleByInitial,
   groupUnreadCount,
-  groupUnreadIncrements,
+  groupUnreadRecipients,
   initialOf,
   personMatchesQuery,
   shouldShowFilter,
@@ -174,46 +174,45 @@ describe("toEpochMs", () => {
   });
 });
 
-describe("grup okunmamış sayacı", () => {
-  const group = { id: "g1", members: ["me", "ali"], unread: { me: 3, ali: 7 } };
+// Sayaç kullanıcının kendi gelen kutusunda: Users/{uid}/groupInbox/{groupId}
+// → { groupId: unread } haritası (groupsService.subscribeGroupInbox).
+describe("grup okunmamış sayacı (gelen kutusu)", () => {
+  const inbox = { g1: 3, g3: 2, eskiGrup: 9 };
 
-  test("yalnız BU üyenin sayacını okur", () => {
-    expect(groupUnreadCount(group, "me")).toBe(3);
-    expect(groupUnreadCount(group, "ali")).toBe(7);
-    expect(groupUnreadCount(group, "baskasi")).toBe(0);
+  test("grubun gelen kutusundaki sayacı okur", () => {
+    expect(groupUnreadCount(inbox, "g1")).toBe(3);
+    expect(groupUnreadCount(inbox, "g2")).toBe(0);
   });
 
-  test("alan yoksa, uid yoksa ya da değer bozuksa 0 döner", () => {
-    expect(groupUnreadCount({ id: "g2" }, "me")).toBe(0);
-    expect(groupUnreadCount(undefined, "me")).toBe(0);
-    expect(groupUnreadCount(group, undefined)).toBe(0);
-    expect(groupUnreadCount({ unread: { me: -2 } }, "me")).toBe(0);
-    expect(groupUnreadCount({ unread: { me: "x" } }, "me")).toBe(0);
-    expect(groupUnreadCount({ unread: { me: 2.9 } }, "me")).toBe(2);
+  test("kayıt yoksa, grup kimliği yoksa ya da değer bozuksa 0 döner", () => {
+    expect(groupUnreadCount({}, "g1")).toBe(0);
+    expect(groupUnreadCount(undefined, "g1")).toBe(0);
+    expect(groupUnreadCount(inbox, undefined)).toBe(0);
+    expect(groupUnreadCount({ g1: -2 }, "g1")).toBe(0);
+    expect(groupUnreadCount({ g1: "x" }, "g1")).toBe(0);
+    expect(groupUnreadCount({ g1: 2.9 }, "g1")).toBe(2);
   });
 
-  test("gruplar arası toplam yalnız bu üyenin sayaçlarını toplar", () => {
-    const groups = [group, { id: "g3", unread: { me: 2 } }, { id: "g4", unread: { ali: 9 } }, { id: "g5" }];
-    expect(totalGroupUnread(groups, "me")).toBe(5);
-    expect(totalGroupUnread(undefined, "me")).toBe(0);
+  test("toplam yalnız ÜYESİ OLUNAN grupları sayar (çıkarılınan grubun bayat kaydı girmez)", () => {
+    const groups = [{ id: "g1" }, { id: "g3" }, { id: "g5" }];
+    expect(totalGroupUnread(groups, inbox)).toBe(5);
+    expect(totalGroupUnread(undefined, inbox)).toBe(0);
+    expect(totalGroupUnread(groups, undefined)).toBe(0);
   });
 });
 
-describe("groupUnreadIncrements", () => {
-  test("gönderen DIŞINDAKİ her üye için artış üretir", () => {
-    let calls = 0;
-    const patch = groupUnreadIncrements(["me", "ali", "veli"], "me", () => ++calls);
-    expect(Object.keys(patch).sort()).toEqual(["ali", "veli"]);
-    expect(calls).toBe(2);
+describe("groupUnreadRecipients", () => {
+  test("gönderen DIŞINDAKİ üyeleri döndürür", () => {
+    expect(groupUnreadRecipients(["me", "ali", "veli"], "me")).toEqual(["ali", "veli"]);
   });
 
-  test("gönderenden başka üye yoksa null döner (boş map sayaçları silerdi)", () => {
-    expect(groupUnreadIncrements(["me"], "me", () => 1)).toBeNull();
-    expect(groupUnreadIncrements([], "me", () => 1)).toBeNull();
-    expect(groupUnreadIncrements(undefined, "me", () => 1)).toBeNull();
+  test("gönderenden başka üye yoksa boş liste", () => {
+    expect(groupUnreadRecipients(["me"], "me")).toEqual([]);
+    expect(groupUnreadRecipients([], "me")).toEqual([]);
+    expect(groupUnreadRecipients(undefined, "me")).toEqual([]);
   });
 
-  test("boş/bozuk uid atlanır", () => {
-    expect(groupUnreadIncrements(["", null, "ali"], "me", () => 1)).toEqual({ ali: 1 });
+  test("boş/bozuk uid atlanır, tekrar eden uid bir kez artırılır (kural tam +1 ister)", () => {
+    expect(groupUnreadRecipients(["", null, "ali", "ali"], "me")).toEqual(["ali"]);
   });
 });

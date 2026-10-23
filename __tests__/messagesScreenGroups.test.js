@@ -6,7 +6,9 @@ import MessagesScreen from "../screens/chat/MessagesScreen";
 // taşımalı: satır vurgusu, kalın ad/önizleme, vurgulu saat ve sağda okunmamış
 // sayısı rozeti; ayrıca "Gruplar" sekmesinde toplam rozeti ve başlıkta
 // "N okunmamış mesaj". Eskiden grup satırı hiçbir okunmamış durumu göstermiyordu
-// çünkü gruplarda sayaç hiç tutulmuyordu (şimdi groups/{id}.unread.{uid}).
+// çünkü gruplarda sayaç hiç tutulmuyordu. Sayaç artık kullanıcının kendi gelen
+// kutusunda (Users/{uid}/groupInbox/{groupId}); grup belgesindeki eski
+// `unread` haritası OKUNMAZ.
 //
 // Bu test ekranın BAĞLANTISINI kilitler (hangi props nereye gider). Çizimin
 // kendisi (renk, yerleşim) components/friends/PersonRow'dadır ve cihazda görülür.
@@ -66,9 +68,14 @@ jest.mock("../utils/i18nText", () => ({
 jest.mock("../services/usageTrackerService", () => ({ trackFirestoreRead: jest.fn() }));
 
 let mockGroups = [];
+let mockInbox = {};
 jest.mock("../services/groupsService", () => ({
   subscribeUserGroups: (_uid, callback) => {
     callback(mockGroups);
+    return () => {};
+  },
+  subscribeGroupInbox: (_uid, callback) => {
+    callback(mockInbox);
     return () => {};
   },
 }));
@@ -101,8 +108,9 @@ afterEach(async () => {
   consoleError.mockRestore();
 });
 
-async function renderGroupsTab(groups) {
+async function renderGroupsTab(groups, inbox = {}) {
   mockGroups = groups;
+  mockInbox = inbox;
   await act(() => {
     renderer = create(<MessagesScreen navigation={{ navigate: jest.fn() }} />);
   });
@@ -113,13 +121,13 @@ const tabs = () => renderer.root.findByType("Tabs").props.tabs;
 
 describe("MessagesScreen — grup satırı", () => {
   it("okunmamış grup, 1-1 satırıyla aynı vurguyu ve sayaç rozetini alır", async () => {
-    await renderGroupsTab([group("g1", { unread: { me: 3, ali: 9 } })]);
+    // Grup belgesindeki eski harita (me: 9) yok sayılır; kaynak gelen kutusu.
+    await renderGroupsTab([group("g1", { unread: { me: 9 } })], { g1: 3 });
     const row = rows()[0].props;
     expect(row.highlighted).toBe(true);
     expect(row.titleStrong).toBe(true);
     expect(row.subtitleStrong).toBe(true);
     expect(row.metaAccent).toBe(true);
-    // Rozet yalnız BU kullanıcının sayacını gösterir (me: 3, ali'nin 9'u değil).
     expect(row.trailing).toBeTruthy();
     let pill;
     await act(() => {
@@ -130,12 +138,11 @@ describe("MessagesScreen — grup satırı", () => {
     expect(labels).toEqual(["3"]);
   });
 
-  it("sayaç yoksa ya da yalnız başkalarınınsa satır normal kalır", async () => {
-    await renderGroupsTab([
-      group("g1"),
-      group("g2", { unread: { me: 0, ali: 4 } }),
-      group("g3", { unread: { ali: 4 } }),
-    ]);
+  it("gelen kutusunda sayaç yoksa ya da sıfırsa satır normal kalır", async () => {
+    await renderGroupsTab(
+      [group("g1"), group("g2"), group("g3", { unread: { me: 4 } })],
+      { g2: 0, baskaGrup: 7 },
+    );
     for (const row of rows()) {
       expect(row.props.highlighted).toBe(false);
       expect(row.props.titleStrong).toBe(false);
@@ -145,11 +152,12 @@ describe("MessagesScreen — grup satırı", () => {
   });
 
   it("'Gruplar' sekmesi toplam okunmamışı rozet olarak taşır, başlık da söyler", async () => {
-    await renderGroupsTab([
-      group("g1", { unread: { me: 3 } }),
-      group("g2", { unread: { me: 2 } }),
-      group("g3"),
-    ]);
+    // Üyesi olunmayan grubun bayat kaydı (eskiGrup) toplama girmez.
+    await renderGroupsTab([group("g1"), group("g2"), group("g3")], {
+      g1: 3,
+      g2: 2,
+      eskiGrup: 6,
+    });
     const groupsTab = tabs().find((t) => t.key === "group");
     expect(groupsTab.badge).toBe(5);
     expect(groupsTab.badgeColor).toBe("#e11d48");

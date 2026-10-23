@@ -1124,20 +1124,45 @@ describe("premium ve rozet alanlari", () => {
   });
 });
 
-// Grup okunmamış sayacı: groups/{id}.unread.{uid}. Gönderen mesajla birlikte
-// diğer üyelerin sayacını artırır (screens/chat/ChatScreen.js → queueThreadWrites),
-// üye sohbeti görünürken kendininkini sıfırlar. Kural yalnız anahtarların MEVCUT
-// ÜYELERE ait olmasını ve yan alanlara (ad, üyelik…) dokunulmamasını şart koşar.
+// Grup okunmamış sayacı: Users/{uid}/groupInbox/{groupId}.unread. Gönderen
+// mesajla AYNI batch'te diğer üyelerin kaydını increment(1) ile artırır
+// (screens/chat/ChatScreen.js → queueThreadWrites → groupsService
+// .queueGroupUnreadIncrements), üye sohbeti görünürken kendininkini sıfırlar.
+// Başka üye yalnız TAM +1 yazabilir. Eski istemcilerin groups/{id}.unread
+// haritası (alttaki "eski istemci" testleri) geçiş süresince kabul ediliyor.
 describe("grup okunmamis sayaci", () => {
   const GROUP = "grp-1";
   const groupRef = (db) => doc(db, "groups", GROUP);
+  const inboxRef = (db, uid, groupId = GROUP) => doc(db, "Users", uid, "groupInbox", groupId);
   // seed() değer döndürmez; kuralları atlayarak güncel belgeyi okur.
-  const readGroup = async () => {
+  const readAs = async (refOf) => {
     let data;
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      data = (await getDoc(groupRef(ctx.firestore()))).data();
+      data = (await getDoc(refOf(ctx.firestore()))).data();
     });
     return data;
+  };
+  const readGroup = () => readAs(groupRef);
+  // ChatScreen.postMessage'ın grup batch'i: mesaj + özet + alıcı sayaçları.
+  const sendBatch = (db, senderUid, recipients, groupId = GROUP) => {
+    const batch = writeBatch(db);
+    batch.set(doc(collection(db, "groups", groupId, "messages")), {
+      text: "selam",
+      senderId: senderUid,
+      timestamp: serverTimestamp(),
+    });
+    batch.set(
+      doc(db, "groups", groupId),
+      {
+        lastMessage: { text: "selam", senderId: senderUid, time: serverTimestamp() },
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+    for (const uid of recipients) {
+      batch.set(inboxRef(db, uid, groupId), { unread: increment(1) }, { merge: true });
+    }
+    return batch.commit();
   };
 
   beforeEach(async () => {
@@ -1156,7 +1181,74 @@ describe("grup okunmamis sayaci", () => {
     );
   });
 
-  test("uye mesajla birlikte digerlerinin sayacini artirir (ChatScreen batch'i)", async () => {
+  test("gonderen mesajla birlikte alicinin gelen kutusunu artirir (ilk kayit + artis)", async () => {
+    await assertSucceeds(sendBatch(alice, ALICE, [BOB]));
+    expect(await readAs((db) => inboxRef(db, BOB))).toEqual({ unread: 1 });
+    await assertSucceeds(sendBatch(alice, ALICE, [BOB]));
+    expect(await readAs((db) => inboxRef(db, BOB))).toEqual({ unread: 2 });
+    // Grup belgesinin eski haritasına dokunulmaz.
+    expect((await readGroup()).unread).toEqual({ [BOB]: 2 });
+  });
+
+  test("sahibi kendi sayacini okur ve sifirlar; baskasi okuyamaz", async () => {
+    await seed((db) => setDoc(inboxRef(db, BOB), { unread: 4 }));
+    await assertSucceeds(getDoc(inboxRef(bob, BOB)));
+    await assertSucceeds(updateDoc(inboxRef(bob, BOB), { unread: 0 }));
+    expect(await readAs((db) => inboxRef(db, BOB))).toEqual({ unread: 0 });
+    await assertFails(getDoc(inboxRef(alice, BOB)));
+    await assertSucceeds(deleteDoc(inboxRef(bob, BOB)));
+  });
+
+  test("baska uye keyfi deger yazamaz: sifirlama, +2 ya da sabit sayi reddedilir", async () => {
+    await seed((db) => setDoc(inboxRef(db, BOB), { unread: 2 }));
+    await assertFails(updateDoc(inboxRef(alice, BOB), { unread: 0 }));
+    await assertFails(updateDoc(inboxRef(alice, BOB), { unread: increment(2) }));
+    await assertFails(setDoc(inboxRef(alice, BOB), { unread: 10 }));
+    await assertFails(deleteDoc(inboxRef(alice, BOB)));
+    // İlk kayıt da yalnız 1 olabilir.
+    await assertFails(setDoc(inboxRef(alice, BOB, "grp-yeni"), { unread: 5 }));
+  });
+
+  test("uye olmayan yazamaz, uye olmayana da yazilamaz, olmayan gruba sayac acilamaz", async () => {
+    await assertFails(
+      setDoc(inboxRef(carol, BOB), { unread: increment(1) }, { merge: true }),
+    );
+    await assertFails(
+      setDoc(inboxRef(alice, CAROL), { unread: increment(1) }, { merge: true }),
+    );
+    await assertFails(
+      setDoc(inboxRef(alice, BOB, "grp-yok"), { unread: increment(1) }, { merge: true }),
+    );
+    // Uye olmayana yazım tüm mesaj batch'ini düşürür (mesaj yarım kalmaz).
+    await assertFails(sendBatch(alice, ALICE, [BOB, CAROL]));
+  });
+
+  test("sayaca ek alan tasinamaz; sahibi de negatif ya da ek alan yazamaz", async () => {
+    await assertFails(
+      setDoc(inboxRef(alice, BOB), { unread: increment(1), not: "x" }, { merge: true }),
+    );
+    await assertFails(setDoc(inboxRef(bob, BOB), { unread: 0, not: "x" }));
+    await assertFails(setDoc(inboxRef(bob, BOB), { unread: -1 }));
+    await assertFails(setDoc(inboxRef(bob, BOB), { unread: "3" }));
+  });
+
+  test("tavandaki grupta tek mesaj batch'i 49 aliciyi birden artirabilir", async () => {
+    const others = Array.from({ length: 49 }, (_, i) => `uye${i}`);
+    await seed((db) =>
+      setDoc(doc(db, "groups", "grp-kalabalik"), {
+        name: "Kalabalık",
+        members: [ALICE, ...others],
+        memberInfo: {},
+        admins: [],
+        createdBy: ALICE,
+        lastMessage: null,
+      }),
+    );
+    await assertSucceeds(sendBatch(alice, ALICE, others, "grp-kalabalik"));
+    expect(await readAs((db) => inboxRef(db, "uye48", "grp-kalabalik"))).toEqual({ unread: 1 });
+  });
+
+  test("eski istemci: uye mesajla birlikte grup belgesindeki sayaci artirir", async () => {
     const batch = writeBatch(alice);
     batch.set(
       groupRef(alice),
@@ -1171,13 +1263,13 @@ describe("grup okunmamis sayaci", () => {
     expect((await readGroup()).unread).toEqual({ [BOB]: 3 });
   });
 
-  test("uye kendi sayacini sifirlar; baskasinin sayaci ve updatedAt oldugu gibi kalir", async () => {
+  test("eski istemci: uye grup belgesindeki kendi sayacini sifirlar", async () => {
     await seed((db) => updateDoc(groupRef(db), { "unread.alice": 4 }));
     await assertSucceeds(updateDoc(groupRef(alice), { "unread.alice": 0 }));
     expect((await readGroup()).unread).toEqual({ [ALICE]: 0, [BOB]: 2 });
   });
 
-  test("uye olmayan uid icin sayac anahtari reddedilir", async () => {
+  test("eski istemci: uye olmayan uid icin sayac anahtari reddedilir", async () => {
     await assertFails(updateDoc(groupRef(alice), { "unread.mallory": 1 }));
   });
 
@@ -1194,7 +1286,7 @@ describe("grup okunmamis sayaci", () => {
     );
   });
 
-  test("sayaci olmayan eski gruba da ilk artis yazilabilir", async () => {
+  test("eski istemci: sayaci olmayan gruba da ilk artis yazilabilir", async () => {
     await seed((db) =>
       setDoc(doc(db, "groups", "grp-legacy"), {
         name: "Eski",
@@ -1240,6 +1332,75 @@ describe("grup okunmamis sayaci", () => {
 
   test("gerileme: son mesaj silinince ozet alani temizlenebilir (syncThreadPreview)", async () => {
     await assertSucceeds(updateDoc(groupRef(bob), { lastMessage: deleteField() }));
+  });
+});
+
+// Grup üye tavanı: 50 (utils/groupLimits.js; __tests__/groupLimits.test.js sayının
+// kural dosyasıyla aynı olduğunu denetler). Tavanı aşan ESKİ bir grupta üye
+// çıkarmak ve gruptan ayrılmak serbest kalmalı.
+describe("grup uye tavani", () => {
+  const uyeler = (n) => Array.from({ length: n }, (_, i) => `uye${i}`);
+  const grup = (members) => ({
+    name: "Kalabalık",
+    color: "#6C63FF",
+    avatarIndex: 0,
+    members,
+    memberInfo: {},
+    admins: [],
+    createdBy: ALICE,
+    lastMessage: null,
+  });
+
+  test("kurucu dahil 50 uyeyle grup kurulur, 51 ile kurulamaz", async () => {
+    await assertSucceeds(
+      setDoc(doc(alice, "groups", "grp-50"), grup([ALICE, ...uyeler(49)])),
+    );
+    await assertFails(
+      setDoc(doc(alice, "groups", "grp-51"), grup([ALICE, ...uyeler(50)])),
+    );
+  });
+
+  test("dolu gruba uye eklenemez, bir eksigine eklenir", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "groups", "grp-dolu"), grup([ALICE, ...uyeler(49)]));
+      await setDoc(doc(db, "groups", "grp-yer"), grup([ALICE, ...uyeler(48)]));
+    });
+    await assertFails(
+      updateDoc(doc(alice, "groups", "grp-dolu"), {
+        members: arrayUnion(CAROL),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(alice, "groups", "grp-yer"), {
+        members: arrayUnion(CAROL),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  test("tavani asan eski grupta uye cikarilir ve uye kendisi ayrilabilir", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "groups", "grp-eski"), grup([ALICE, BOB, ...uyeler(52)])),
+    );
+    await assertSucceeds(
+      updateDoc(doc(alice, "groups", "grp-eski"), {
+        members: arrayRemove("uye0"),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(bob, "groups", "grp-eski"), {
+        members: arrayRemove(BOB),
+        admins: arrayRemove(BOB),
+        updatedAt: serverTimestamp(),
+      }),
+    );
+    // Küçülmeyen yönetim yazımı (ad değişikliği) da geçer; büyüme geçmez.
+    await assertSucceeds(updateDoc(doc(alice, "groups", "grp-eski"), { name: "Yeni" }));
+    await assertFails(
+      updateDoc(doc(alice, "groups", "grp-eski"), { members: arrayUnion(CAROL) }),
+    );
   });
 });
 

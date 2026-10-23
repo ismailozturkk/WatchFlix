@@ -31,6 +31,7 @@ import { i18nText } from "@utils/i18nText";
 import UserAvatar from "@components/common/UserAvatar";
 import { toast } from "@components/AppToast";
 import { countOwnedGroups, createGroup } from "@services/groupsService";
+import { MAX_GROUP_MEMBERS, groupSlotsLeft } from "@utils/groupLimits";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import { ICON_BACKGROUND_COUNT } from "@components/IconBacground";
 import { randomInt, randomPick } from "@utils/randomPick";
@@ -107,13 +108,23 @@ export default function CreateGroupScreen({ navigation }) {
   }, [user]);
 
   const toggle = useCallback((friend) => {
+    // Üye tavanı (utils/groupLimits.js); kurucu da üye sayılır (+1).
+    if (!selected[friend.uid] && groupSlotsLeft(Object.keys(selected).length + 1) === 0) {
+      toast.warning(
+        i18nText("autoI18n.grup_dolu", "Grup dolu"),
+        i18nText("autoI18n.grup_uye_siniri", "Bir grupta en fazla {{n}} kişi olabilir", {
+          n: MAX_GROUP_MEMBERS,
+        }),
+      );
+      return;
+    }
     setSelected((prev) => {
       const next = { ...prev };
       if (next[friend.uid]) delete next[friend.uid];
       else next[friend.uid] = friend;
       return next;
     });
-  }, []);
+  }, [selected]);
 
   const selectedList = Object.values(selected);
   const canCreate = selectedList.length >= 1 && name.trim().length > 0;

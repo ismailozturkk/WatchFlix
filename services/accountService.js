@@ -553,6 +553,9 @@ export async function purgeUserData(uid) {
     // Puan aynası: removeMyRating (yukarıda) başarısız olursa ayna kalmasın.
     "myRatings",
     "conversations",
+    // Grup okunmamış sayaçları (groupInbox/{groupId}); sunucu süpürmesi Users
+    // ağacını recursiveDelete ile zaten götürür.
+    "groupInbox",
     "gameProfile",
     "gameStats",
     "gameSessions",

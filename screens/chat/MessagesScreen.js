@@ -9,7 +9,7 @@
 // satır vurgu rengiyle aydınlanır, ad kalınlaşır, saat vurgulanır ve sağda
 // okunmamış sayısı rozeti durur (eskiden yalnız çerçeve rengi değişiyordu).
 // Gruplar da AYNI görünümü kullanır; sayaç kaynağı 1-1'de
-// Users/{uid}/conversations/*.unreadCount, grupta groups/{id}.unread.{uid}.
+// Users/{uid}/conversations/*.unreadCount, grupta Users/{uid}/groupInbox/*.unread.
 
 import React, { useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
@@ -40,7 +40,7 @@ import {
   totalUnread,
 } from "@utils/friendsListModel";
 import { i18nText } from "@utils/i18nText";
-import { subscribeUserGroups } from "@services/groupsService";
+import { subscribeGroupInbox, subscribeUserGroups } from "@services/groupsService";
 import { trackFirestoreRead } from "@services/usageTrackerService";
 
 const formatTime = (ts) => {
@@ -79,6 +79,7 @@ export default function MessagesScreen({ navigation }) {
   const [convs, setConvs] = useState([]);
   const { isBlocked } = useFriends();
   const [groups, setGroups] = useState([]);
+  const [groupInbox, setGroupInbox] = useState({}); // groupId -> okunmamış
 
   useEffect(() => {
     if (!user) return;
@@ -101,6 +102,12 @@ export default function MessagesScreen({ navigation }) {
     return () => unsub();
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeGroupInbox(user.uid, setGroupInbox);
+    return () => unsub();
+  }, [user]);
+
   const isDm = tab === "dm";
   // Engellenen kişinin sohbeti listede görünmez. Konuşma kaydı SİLİNMİYOR:
   // engel kaldırıldığında geçmiş geri gelsin (engel geri alınabilir bir
@@ -111,8 +118,8 @@ export default function MessagesScreen({ navigation }) {
   );
   const unreadTotal = useMemo(() => totalUnread(visibleConvs), [visibleConvs]);
   const groupUnreadTotal = useMemo(
-    () => totalGroupUnread(groups, user?.uid),
-    [groups, user?.uid],
+    () => totalGroupUnread(groups, groupInbox),
+    [groups, groupInbox],
   );
 
   const baseData = isDm ? visibleConvs : groups;
@@ -155,12 +162,12 @@ export default function MessagesScreen({ navigation }) {
   };
 
   // ── Grup satırı ── okunmamış görünümü 1-1 satırıyla AYNI (vurgu, kalın ad,
-  // vurgulu saat, sağda sayaç rozeti); sayaç grup belgesinde üye başına durur.
+  // vurgulu saat, sağda sayaç rozeti); sayaç kendi gelen kutumda grup başına durur.
   const renderGroup = ({ item, index }) => {
     const last = item.lastMessage;
     const lastSenderName =
       item.memberInfo?.[last?.senderId]?.name || last?.senderName || "";
-    const unreadCount = groupUnreadCount(item, user?.uid);
+    const unreadCount = groupUnreadCount(groupInbox, item.id);
     const unread = unreadCount > 0;
     return (
       <PersonRow
@@ -292,6 +299,9 @@ export default function MessagesScreen({ navigation }) {
           data={data}
           keyExtractor={(it) => it.id}
           renderItem={isDm ? renderConv : renderGroup}
+          // Grup sayacı satır nesnesinde değil gelen kutusunda: yalnız o
+          // değişince de satırlar yeniden çizilsin.
+          extraData={groupInbox}
           contentContainerStyle={styles.listContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"

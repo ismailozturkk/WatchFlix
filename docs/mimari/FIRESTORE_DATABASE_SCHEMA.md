@@ -146,6 +146,12 @@ Firestore Root
 │   │       ├── unreadCount: int = 0
 │   │       └── timestamp: timestamp = 2026-08-21T02:50:00Z
 │   │
+│   ├── 📁 groupInbox/{groupId} (Örn: "grp_sinema_kulubu_2026") — grup okunmamış sayacı
+│   │       └── unread: int = 2
+│   │             (gönderen, mesajla AYNI batch'te diğer üyeler için increment(1)
+│   │              yazar — kural yalnız TAM +1'e izin verir; üye sohbeti görünürken
+│   │              kendi kaydını 0 yapar. 1-1'deki conversations.unreadCount'un karşılığı)
+│   │
 │   ├── 📁 private/{docId} (Örn: "push" | "account" | "entitlements") — YALNIZ sahibi okur
 │   │       ├── [push]    expoPushTokens: array<string> = [ "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" ]
 │   │       ├── [push]    updatedAt: timestamp = 2026-08-21T01:00:00Z
@@ -237,10 +243,10 @@ Firestore Root
 │   │   ├── admins: array<string> = [ "usr_friend456" ]
 │   │   ├── createdBy: string = "usr_abc123"
 │   │   ├── lastMessage: string = "Bu haftanın filmini seçelim:"
-│   │   ├── unread: map<uid, int> = { usr_friend456: 2, usr_caner789: 0 }
-│   │   │     (üye başına okunmamış mesaj sayısı: gönderen, mesajla AYNI batch'te
-│   │   │      diğer üyeler için increment(1) yazar; üye sohbeti görünürken kendi
-│   │   │      anahtarını 0 yapar. 1-1'deki Users/{uid}/conversations.unreadCount'un karşılığı)
+│   │   ├── unread: map<uid, int> = { usr_friend456: 2 }   ← ESKİ istemciler; yeni
+│   │   │     istemci yazmaz/okumaz. Sayaç artık Users/{uid}/groupInbox/{groupId}'de
+│   │   │     (her sıfırlama grup belgesini tüm üyelere yeniden gönderiyordu).
+│   │   │     Üye tavanı: 50 (utils/groupLimits.js + firestore.rules groupSizeOk).
 │   │   ├── createdAt: timestamp = 2026-03-01T15:30:00Z
 │   │   └── updatedAt: timestamp = 2026-08-21T02:00:00Z
 │   │

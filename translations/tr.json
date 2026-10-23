@@ -830,6 +830,8 @@
     "bu_sensin": "Bu sensin",
     "profili_gor": "Profili gör",
     "eklenebilecek_arkadas_yok": "Eklenebilecek başka arkadaşın yok",
+    "grup_dolu": "Grup dolu",
+    "grup_uye_siniri": "Bir grupta en fazla {{n}} kişi olabilir",
     "uye_bulunamadi": "Üye bulunamadı",
     "grup_avatarini_degistir": "Grup avatarını değiştir",
     "grup": "Grup",

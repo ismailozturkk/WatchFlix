@@ -830,6 +830,8 @@
     "bu_sensin": "Este é você",
     "profili_gor": "Ver perfil",
     "eklenebilecek_arkadas_yok": "Não há mais amigos para adicionar",
+    "grup_dolu": "O grupo está cheio",
+    "grup_uye_siniri": "Um grupo pode ter no máximo {{n}} membros",
     "uye_bulunamadi": "Nenhum membro encontrado",
     "grup_avatarini_degistir": "Alterar avatar do grupo",
     "grup": "Grupo",

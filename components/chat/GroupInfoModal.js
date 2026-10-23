@@ -29,6 +29,7 @@ import {
   isGroupCreator,
   sortMembersByRole,
 } from "@utils/groupRoles";
+import { MAX_GROUP_MEMBERS, groupSlotsLeft } from "@utils/groupLimits";
 import { i18nText } from "@utils/i18nText";
 import { toast } from "@components/AppToast";
 import GroupAvatar from "@components/chat/GroupAvatar";
@@ -153,6 +154,16 @@ export default function GroupInfoModal({
   const addMember = useCallback(
     async (friend) => {
       if (busyUid) return;
+      // Üye tavanı (utils/groupLimits.js); kural da aynı sayıyı uygular.
+      if (groupSlotsLeft(memberIds.length) === 0) {
+        toast.warning(
+          i18nText("autoI18n.grup_dolu", "Grup dolu"),
+          i18nText("autoI18n.grup_uye_siniri", "Bir grupta en fazla {{n}} kişi olabilir", {
+            n: MAX_GROUP_MEMBERS,
+          }),
+        );
+        return;
+      }
       setBusyUid(friend.uid);
       try {
         await addGroupMember(groupId, friend);
@@ -172,7 +183,7 @@ export default function GroupInfoModal({
         setBusyUid(null);
       }
     },
-    [busyUid, groupId]
+    [busyUid, groupId, memberIds.length]
   );
 
   const confirmRemove = useCallback(

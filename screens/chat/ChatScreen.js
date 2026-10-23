@@ -97,6 +97,8 @@ import { useIsFocused } from "@react-navigation/native";
 import {
   subscribeGroup,
   nextVote,
+  groupInboxDoc,
+  queueGroupUnreadIncrements,
 } from "@services/groupsService";
 import axios from "axios";
 import {
@@ -131,7 +133,6 @@ import ComposerReplyBar from "@components/chat/ComposerReplyBar";
 import { buildReplySnapshot } from "@utils/chatReply";
 import { buildShareMessage, readShare, sharePreview } from "@utils/chatShare";
 import SaveSharedListModal from "@components/modals/SaveSharedListModal";
-import { groupUnreadCount, groupUnreadIncrements } from "@utils/friendsListModel";
 import PinnedMessagesModal from "@components/chat/PinnedMessagesModal";
 import ReportReasonSheet from "@components/moderation/ReportReasonSheet";
 import { useFriends } from "@context/FriendsContext";
@@ -844,17 +845,26 @@ export default function ChatScreen({ route, navigation }) {
     return () => unsub();
   }, [isGroup, isViewing, currentUser.uid, friendUid]);
 
-  // Grup karşılığı: sohbet GÖRÜNÜRKEN benim okunmamış sayacım (groups/{id}
-  // .unread.{uid}) sıfırda tutulur. Grup belgesi zaten dinleniyor (groupData);
-  // yeni bir listener açmak yerine ondan okunur. Yalnız kendi anahtarım yazılır
-  // ve updatedAt'e dokunulmaz — liste sıralaması (updatedAt) okumayla
-  // oynamasın. Yazım başarısız olursa bağımlılıklar değişmediği için döngüye
-  // girmez; bir sonraki snapshot'ta yeniden denenir.
-  const myGroupUnread = isGroup ? groupUnreadCount(groupData, currentUser.uid) : 0;
+  // Grup karşılığı: sohbet GÖRÜNÜRKEN kendi gelen kutumdaki sayaç
+  // (Users/{uid}/groupInbox/{groupId}.unread) sıfırda tutulur. Sayaç grup
+  // belgesinde DEĞİL: orada her üyenin sıfırlaması belgeyi bütün üyelere
+  // yeniden gönderiyordu (bkz. services/groupsService.js). Kendi belgemi
+  // dinlerim; sıfırlama yalnız benim dinleyicimi tetikler, grup sıralamasına
+  // (updatedAt) da dokunmaz.
   useEffect(() => {
-    if (!isGroup || !isViewing || myGroupUnread === 0) return;
-    updateDoc(chatRef, { [`unread.${currentUser.uid}`]: 0 }).catch(() => {});
-  }, [isGroup, isViewing, myGroupUnread, chatRef, currentUser.uid]);
+    if (!isGroup || !isViewing) return undefined;
+    const myInboxRef = groupInboxDoc(currentUser.uid, groupId);
+    const unsub = onSnapshot(
+      myInboxRef,
+      (snap) => {
+        if (snap.exists() && (snap.data()?.unread || 0) > 0) {
+          updateDoc(myInboxRef, { unread: 0 }).catch(() => {});
+        }
+      },
+      () => {},
+    );
+    return () => unsub();
+  }, [isGroup, isViewing, currentUser.uid, groupId]);
 
   // Sohbet açıkken ARKADAŞLIK bitti (karşı taraf seni çıkardı ya da sen başka yerden):
   // sohbet silinmiştir, ekranda kalıp mesaj yazmak boş bir sohbeti yeniden yaratırdı.
@@ -1235,14 +1245,6 @@ export default function ChatScreen({ route, navigation }) {
   const queueThreadWrites = useCallback(
     (batch, previewText) => {
       if (isGroup) {
-        // Diğer üyelerin okunmamış sayacı mesajla AYNI batch'te artar (1-1'de
-        // alıcının conversations.unreadCount'u gibi): kopma/süreç ölümü mesajı
-        // yazıp sayacı eksik bırakmaz.
-        const unread = groupUnreadIncrements(
-          groupData?.members,
-          currentUser.uid,
-          () => increment(1),
-        );
         batch.set(
           chatRef,
           {
@@ -1254,10 +1256,14 @@ export default function ChatScreen({ route, navigation }) {
               time: serverTimestamp(),
             },
             updatedAt: serverTimestamp(),
-            ...(unread ? { unread } : {}),
           },
           { merge: true },
         );
+        // Diğer üyelerin okunmamış sayacı mesajla AYNI batch'te artar (1-1'de
+        // alıcının conversations.unreadCount'u gibi): kopma/süreç ölümü mesajı
+        // yazıp sayacı eksik bırakmaz. Sayaç grup belgesinde değil, her üyenin
+        // kendi gelen kutusunda (services/groupsService.js).
+        queueGroupUnreadIncrements(batch, chatId, groupData?.members, currentUser.uid);
         return;
       }
       batch.set(
@@ -1313,6 +1319,7 @@ export default function ChatScreen({ route, navigation }) {
     },
     [
       isGroup,
+      chatId,
       chatRef,
       currentUser.uid,
       currentUser.displayName,
