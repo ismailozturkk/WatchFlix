@@ -371,6 +371,40 @@ describe("DM mesajlari", () => {
     );
   });
 
+  // Okundu işareti (utils/chatReceipts.js): ChatScreen sohbet belgesine
+  // readAt.{uid} + üst düzey participants yazar; karşı taraf belgeyi dinler.
+  // Hesap silme `participants array-contains` sorgusuyla bu belgeyi bulur.
+  test("uye okundu isaretini yazar, karsi taraf okur; participants sorgusu bulur", async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(bob, "chats", CHAT),
+        { readAt: { [BOB]: new Date(1000) }, participants: [BOB, ALICE] },
+        { merge: true },
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(alice, "chats", CHAT),
+        { readAt: { [ALICE]: new Date(2000) }, participants: [ALICE, BOB] },
+        { merge: true },
+      ),
+    );
+    const snap = await getDoc(doc(alice, "chats", CHAT));
+    expect(Object.keys(snap.data().readAt).sort()).toEqual([ALICE, BOB]);
+    const found = await getDocs(
+      query(collection(bob, "chats"), where("participants", "array-contains", BOB)),
+    );
+    expect(found.docs.map((d) => d.id)).toEqual([CHAT]);
+  });
+
+  test("sohbetin disindaki kullanici okundu isaretini okuyamaz ve yazamaz", async () => {
+    await seed((db) => setDoc(doc(db, "chats", CHAT), { readAt: {}, participants: [ALICE, BOB] }));
+    await assertFails(getDoc(doc(carol, "chats", CHAT)));
+    await assertFails(
+      setDoc(doc(carol, "chats", CHAT), { readAt: { [CAROL]: new Date() } }, { merge: true }),
+    );
+  });
+
   test("sohbetin disindaki kullanici okuyamaz ve yazamaz", async () => {
     await seed((db) => setDoc(doc(db, "chats", CHAT, "messages", "m1"), mesaj(ALICE)));
     await assertFails(getDoc(doc(carol, "chats", CHAT, "messages", "m1")));

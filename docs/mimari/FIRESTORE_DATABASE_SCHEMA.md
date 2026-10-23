@@ -204,17 +204,21 @@ Firestore Root
 │
 ├── 📂 chats/{chatId} (Örn: "usr_abc123_usr_friend456")
 │   │   ├── participants: array<string> = [ "usr_abc123", "usr_friend456" ]
-│   │   ├── lastMessage: string = "Dune 2'yi izledin mi? Muazzamdı!"
-│   │   ├── lastMessageSenderId: string = "usr_abc123"
-│   │   ├── updatedAt: timestamp = 2026-08-21T02:50:00Z
-│   │   └── createdAt: timestamp = 2026-02-01T12:00:00Z
+│   │   │     (EN ÜST düzey; okundu işaretiyle birlikte yazılır, hesap silme
+│   │   │      `array-contains` ile bulur. Belge mesaj başına YAZILMAZ.)
+│   │   ├── readAt: map<uid, timestamp> = { usr_abc123: 2026-08-21T02:50:00Z }
+│   │   │     (o kişinin GÖRDÜĞÜ en yeni gelen mesajın zamanı; mavi tik bundan
+│   │   │      türetilir — utils/chatReceipts.js. Sohbeti açmak tek yazım.)
+│   │   └── information: map   ← ESKİ istemciler mesaj başına yazar; okunmaz.
 │   │
 │   ├── 📁 messages/{msgId} (Örn: "msg_chat_101")
 │   │       ├── senderId: string = "usr_abc123"
 │   │       ├── text: string = "Dune 2'yi izledin mi? Muazzamdı!"
 │   │       ├── timestamp: timestamp = 2026-08-21T02:50:00Z
-│   │       ├── status: string = "seen" | "delivered" | "sent"
-│   │       ├── deliveredAt: timestamp = 2026-08-21T02:50:02Z
+│   │       ├── status: string = "sent"   (yeni istemci başka durum YAZMAZ; eski
+│   │       │     istemcilerin "delivered"/"seen" yazımları okunmaya devam eder)
+│   │       ├── push: string = "server"   (sunucu push'u dağıtır — functions/socialPush.js)
+│   │       ├── deliveredAt: timestamp   ← yalnız eski istemciler
 │   │       ├── edited: boolean = false
 │   │       ├── clientId: string = "msg_local_1724208600000_123"
 │   │       ├── kind: string = "text" | "media" | "poll"

@@ -83,6 +83,7 @@ import { avatarSnapshot } from "@utils/avatarPhotos";
 import { useUserProfile } from "@context/UserProfileContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
 import { prepareOutgoingMessage } from "@utils/chatPush";
+import { applyReceipts, newestIncoming, shouldMarkRead } from "@utils/chatReceipts";
 import { isOnlineVisible } from "@services/presenceService";
 import {
   createTypingController,
@@ -479,7 +480,6 @@ export default function ChatScreen({ route, navigation }) {
 
   const flatListRef = useRef();
   const typingCtrlRef    = useRef(null);   // "yazıyor" bayrağı (ilk tuşta yaz, boşta kapat)
-  const processedMsgIds  = useRef(new Set()); // guard against redundant seen/delivered writes
   const messageInputRef  = useRef(null);
   const searchInputRef   = useRef(null);   // arama input — modal açıldıktan SONRA odakla
   const pendingComposerRef = useRef(null); // "search" | "poll"
@@ -886,9 +886,6 @@ export default function ChatScreen({ route, navigation }) {
     }
   }, [isGroup, friendsLoading, friendNow, navigation]);
 
-  // Clear processed-message guard when switching chats
-  useEffect(() => { processedMsgIds.current.clear(); }, [chatId]);
-
   useEffect(() => {
     const q = query(
       messagesRef,
@@ -911,37 +908,14 @@ export default function ChatScreen({ route, navigation }) {
           _pendingWrite: docSnap.metadata.hasPendingWrites,
         };
       });
+      // Tikler bu listeden ve sohbet belgesindeki okundu işaretinden TÜRETİLİR
+      // (utils/chatReceipts.js); eskiden burada her giden mesaja "delivered"
+      // yazılıyordu — yalnız sunucu onayını tekrar eden, mesaj başına bir yazım.
       setChatData((prev) => ({
         ...prev,
         loaded: true,
         messages: mergeServerMessages(msgs, prev.messages, chatId),
       }));
-
-      // delivered yalnızca 1-1'de anlamlı (grupta çok alıcı → tek durum
-      // paylaşılamaz; gereksiz yazma). Grupta atla. "seen" burada DEĞİL: görüldü
-      // işareti yalnız sohbet görünürken yazılır (aşağıdaki isViewing efekti).
-      if (isGroup) return;
-      const batch = writeBatch(db);
-      let hasBatch = false;
-      snapshot.docs.forEach((docSnap) => {
-        // Optimistic yerel echo: mesaj henüz sunucuya yazılmadan snapshot tetiklenir.
-        // Bu durumda batch.update "No document to update" ile patlar ve TÜM batch
-        // fail eder. Sunucu commit'ini bekle — bir sonraki (server-confirmed)
-        // snapshot'ta işlenir (processedMsgIds'e de eklenmez, atlanmış sayılmaz).
-        if (docSnap.metadata.hasPendingWrites) return;
-        const msg = docSnap.data();
-        if (msg.senderId === currentUser.uid && msg.status === "sent") {
-          // Gönderen tarafı one-shot: aynı mesaja tekrar delivered yazma.
-          if (processedMsgIds.current.has(docSnap.id)) return;
-          batch.update(doc(messagesRef, docSnap.id), {
-            status: "delivered",
-            deliveredAt: serverTimestamp(),
-          });
-          hasBatch = true;
-          processedMsgIds.current.add(docSnap.id);
-        }
-      });
-      if (hasBatch) batch.commit().catch(console.error);
       },
       (err) => {
         // Örn. gruptan çıkarılınca permission-denied: listener sessizce ölür,
@@ -1024,30 +998,44 @@ export default function ChatScreen({ route, navigation }) {
     };
   }, [isGroup, groupId, chatId, friendUid, messageLimit]);
 
-  // Gelen mesajları "görüldü" yap — YALNIZ sohbet gerçekten görünürken (odakta
-  // + uygulama ön planda). Eskiden snapshot dinleyicisi, ekran arka planda ya da
-  // üstte başka ekran varken de yazıyordu: kullanıcı görmeden "görüldü" çıkıyordu.
-  // Sohbete dönüldüğünde birikenler de burada işaretlenir. Alıcı tarafı one-shot
-  // DEĞİL: gönderenin gecikmiş "delivered" yazımı "seen"i ezebilir; durum seen
-  // değilse yeniden yazılır (idempotent) ki "seen"de sabitlensin.
+  // Okundu işaretleri (1-1): sohbet belgesindeki readAt.{uid} — iki tarafın da
+  // gördüğü en yeni gelen mesajın zamanı (utils/chatReceipts.js). Sohbet belgesi
+  // artık mesaj başına yazılmadığı için bu dinleyici yalnız okundu değişiminde
+  // tetiklenir. Belge yoksa (henüz kimse okumadı) işaretler boş.
+  const [receipts, setReceipts] = useState({ chatId: null, readAt: {} });
   useEffect(() => {
-    if (isGroup || !isViewing) return;
-    const unseen = chatData.messages.filter(
-      (m) =>
-        m.id &&
-        !m._optimistic &&
-        !m._pendingWrite &&
-        m.senderId &&
-        m.senderId !== currentUser.uid &&
-        m.status !== "seen",
+    if (isGroup) return undefined;
+    return onSnapshot(
+      chatRef,
+      (snap) => setReceipts({ chatId, readAt: snap.data()?.readAt || {} }),
+      (error) => __DEV__ && console.warn("receipts:", error?.message),
     );
-    if (unseen.length === 0) return;
-    const batch = writeBatch(db);
-    unseen.forEach((m) => batch.update(doc(messagesRef, m.id), { status: "seen" }));
-    batch.commit().catch((err) => {
-      if (__DEV__) console.warn("seen:", err?.message);
+  }, [isGroup, chatRef, chatId]);
+  const receiptsReady = receipts.chatId === chatId;
+  const friendReadAt = receiptsReady ? receipts.readAt[friendUid] : null;
+  const myReadAt = receiptsReady ? receipts.readAt[currentUser.uid] : null;
+
+  // Gelen mesajları "görüldü" yap — YALNIZ sohbet gerçekten görünürken (odakta
+  // + uygulama ön planda); arkada kalmış ya da arka plandaki sohbet "görüldü"
+  // demez. Kaç mesaj birikmiş olursa olsun TEK yazım: işaret, görülen en yeni
+  // gelen mesajın zamanına ilerler (eskiden okunmamış her mesaja ayrı "seen"
+  // yazılıyordu). `participants` en üst düzeyde: hesap silme bu alanla sohbeti
+  // bulur (eskiden information.participants içinde kalıp hiç eşleşmiyordu).
+  useEffect(() => {
+    if (isGroup || !isViewing || !receiptsReady) return;
+    const latest = newestIncoming(chatData.messages, currentUser.uid);
+    if (!shouldMarkRead(latest, myReadAt)) return;
+    setDoc(
+      chatRef,
+      {
+        readAt: { [currentUser.uid]: latest.timestamp },
+        participants: [currentUser.uid, friendUid],
+      },
+      { merge: true },
+    ).catch((err) => {
+      if (__DEV__) console.warn("readAt:", err?.message);
     });
-  }, [isGroup, isViewing, chatData.messages, currentUser.uid, messagesRef]);
+  }, [isGroup, isViewing, receiptsReady, chatData.messages, currentUser.uid, myReadAt, chatRef, friendUid]);
 
   useEffect(() => {
     const unsubscribePins = onSnapshot(
@@ -1266,22 +1254,10 @@ export default function ChatScreen({ route, navigation }) {
         queueGroupUnreadIncrements(batch, chatId, groupData?.members, currentUser.uid);
         return;
       }
-      batch.set(
-        chatRef,
-        {
-          information: {
-            lastMessage: {
-              [currentUser.uid]: {
-                lastMessageText: previewText,
-                lastMessageTime: serverTimestamp(),
-              },
-            },
-            updatedAt: serverTimestamp(),
-            participants: [currentUser.uid, friendUid],
-          },
-        },
-        { merge: true },
-      );
+      // 1-1'de sohbet belgesi (chats/{chatId}) mesaj başına YAZILMAZ: eskiden
+      // buraya yazılan `information` özeti hiçbir yerde okunmuyordu, üstelik her
+      // yazım iki tarafın okundu dinleyicisini boşuna tetiklerdi. Belge yalnız
+      // okundu işaretini (+ participants) taşır.
       // Gelen kutusu index'i (iki taraf) — Mesajlar ekranı bunu listeler.
       const convEntry = (withUid, withName, withUsername, withAvatarIndex) => ({
         withUid,
@@ -1726,8 +1702,10 @@ export default function ChatScreen({ route, navigation }) {
       if (fresh.length > 0) recordFresh(entranceRegistryRef.current, fresh);
     }
     prevMessagesRef.current = next;
-    return next;
-  }, [chatData.messages, chatData.loaded, currentUser.uid]);
+    // Tikler (1-1): sunucuya ulaşan = iletildi, karşı tarafın okundu işaretine
+    // kadar olan = görüldü. Değişmeyen balonun nesnesi korunur.
+    return isGroup ? next : applyReceipts(next, { myUid: currentUser.uid, friendReadAt });
+  }, [chatData.messages, chatData.loaded, currentUser.uid, isGroup, friendReadAt]);
 
   const scrollToMessage = useCallback(
     (messageId) => {
