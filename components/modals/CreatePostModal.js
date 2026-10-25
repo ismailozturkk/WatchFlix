@@ -85,6 +85,7 @@ import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../common/GlassTouchable";
 import GlassTextInput from "../common/GlassTextInput";
 import GlassBox from "../common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 // Karakter sınırları — büyük Firestore dökümanlarını ve aşırı uzun
 // içerikleri önler. Sayaçlar bu sabitlere göre gösterilir.
 const MAX_TITLE = 100;
@@ -1302,7 +1303,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                       />
 
                       {pollKind === "media" ? (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.posterScroll}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.posterScrollView} contentContainerStyle={s.posterScroll}>
                           {pollOptions.map((opt) => (
                             <View key={opt.id} style={s.listPosterWrapper}>
                               {opt.media?.poster_path ? (
@@ -1458,7 +1459,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                           </TouchableOpacity>
                         </View>
                       ) : (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.posterScroll}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.posterScrollView} contentContainerStyle={s.posterScroll}>
                           {selectedMedia.map((item, idx) => (
                             <View key={item.id} style={s.listPosterWrapper}>
                               {posterUri(item) ? (
@@ -1742,7 +1743,11 @@ const s = StyleSheet.create({
   stackLabel: { fontSize: 11.5, fontWeight: "700", marginTop: 8, letterSpacing: 0.2 },
 
   // Poster scroll
-  posterScroll: { paddingLeft: 4, paddingVertical: 8, gap: 10 },
+  // Kaldır rozeti afişin 6 pt dışına taşar; basılan cam (rozet, "Ekle") kırpma sınırında
+  // kesilmesin diye üstte/sağda taşma + GLASS_PRESS_ROOM, solda GLASS_PRESS_ROOM. Eski
+  // dolgunun fazlası negatif dış boşlukla düşülür: afişler yerinden oynamaz.
+  posterScrollView: { marginTop: 8 - (6 + GLASS_PRESS_ROOM), marginLeft: 4 - GLASS_PRESS_ROOM, marginRight: -(6 + GLASS_PRESS_ROOM) },
+  posterScroll: { paddingTop: 6 + GLASS_PRESS_ROOM, paddingBottom: 8, paddingLeft: GLASS_PRESS_ROOM, paddingRight: 6 + GLASS_PRESS_ROOM, gap: 10 },
   listPosterWrapper: { width: 100, height: 150, position: "relative" },
   listPosterImg: { width: "100%", height: "100%", borderRadius: 14 },
   listPosterOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, padding: 8, paddingTop: 20, borderBottomLeftRadius: 14, borderBottomRightRadius: 14 },

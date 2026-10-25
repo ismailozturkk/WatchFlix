@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useProfileStats } from "../../../context/ProfileStatsContext";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
-import { useImageQualitySettings } from "../../../context/AppSettingsContext";
+import usePosterUri from "../../../hooks/usePosterUri";
 import { i18nText } from "../../../utils/i18nText";
 import { buildWatchChartData, countGenres } from "../../../utils/watchHistory";
 import { countByDate, matchesDateFilter } from "../../../utils/statsFilters";
@@ -45,7 +45,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
 
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
   const insets = useSafeAreaInsets();
 
   const [searchVisible, setSearchVisible] = useState(false);
@@ -94,14 +94,14 @@ const MovieStatisticsScreen = ({ navigation }) => {
         totalMinutes: s.items.reduce((acc, item) => acc + (item.minutes || 0), 0),
         posters: s.items.map((item) => ({
           key: String(item.historyId || item.watchEventId || item.id),
-          imageUri: item.imagePath ? getTmdbUrl(item.imagePath, "poster", 200) : null,
+          imageUri: posterUri("movie", item.id, item.imagePath),
           mediaId: item.id,
           mediaType: "movie",
           minutes: item.minutes,
           onPress: () => navigation.navigate("MovieDetails", { id: item.id }),
         })),
       }));
-  }, [groupedData, search, selectedDate, selectedGenre, getTmdbUrl, navigation]);
+  }, [groupedData, search, selectedDate, selectedGenre, posterUri, navigation]);
 
   const renderSectionHeader = useCallback(
     ({ section }) => (

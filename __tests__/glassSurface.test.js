@@ -1,6 +1,7 @@
 // components/common/GlassSurface.js — iki çizim yolu:
 //   • cam açık  → NativeGlassView, doğru stil/şema/ton/etkileşim propları ile
 //   • cam kapalı→ çağıranın ESKİ görünümü (düz yüzey ya da blur)
+//   • Android   → buzlu cam (yarı saydam yüzey + kenar ışığı + parlama, blur hedefi)
 // Android / iOS 18–25 / "Efektler: Kapalı" kullanıcısının eski görünümde kalması
 // bu testin asıl konusu. Gerçek UIGlassEffect çizimi cihazda doğrulanır.
 import React from "react";
@@ -29,7 +30,10 @@ jest.mock("../context/ThemeContext", () => ({
 jest.mock("../services/liquidGlass", () => {
   const React = require("react");
   return {
-    useLiquidGlass: () => mockGlass,
+    // mockGlass: true (iOS 26 cam) | "frosted" (Android buzlu cam) | false (eski görünüm)
+    useLiquidGlass: () => mockGlass === true,
+    useGlassMode: () => (mockGlass === true ? "native" : mockGlass === "frosted" ? "frosted" : "off"),
+    useGlassShape: () => mockGlass === true || mockGlass === "frosted",
     NativeGlassView: (props) => React.createElement("GlassView", props),
   };
 });
@@ -135,6 +139,67 @@ describe("GlassSurface — cam kapalı (eski görünüm)", () => {
       </GlassSurface>,
     );
     expect(tree.root.findAllByType(Child)).toHaveLength(1);
+  });
+});
+
+describe("GlassSurface — Android buzlu cam", () => {
+  beforeEach(() => {
+    mockGlass = "frosted";
+  });
+
+  const sheenOf = (tree) => tree.root.findByType("LinearGradient");
+
+  it("cam çizilmez; yüzey eski zeminin buzlu opaklığında, çerçeve RENGİ çizilmez", () => {
+    const tree = render(
+      <GlassSurface
+        radius={20}
+        fallbackStyle={{ backgroundColor: "#222222", borderColor: "#333333", borderWidth: 1 }}
+        style={{ width: 40 }}
+      />,
+    );
+    expect(tree.root.findAllByType("GlassView")).toHaveLength(0);
+    const surface = tree.root.findAllByType("View")[0];
+    expect(flat(surface.props.style)).toMatchObject({
+      width: 40,
+      borderRadius: 20,
+      backgroundColor: "rgba(34, 34, 34, 0.8)",
+      borderWidth: 1,
+      borderColor: "transparent",
+    });
+    // Kenar ışığı + parlama: içeriğin arkasında, dokunuş almaz.
+    expect(sheenOf(tree).props.colors).toHaveLength(2);
+  });
+
+  it("eski kutunun durum çerçevesi (canlı renk) kenar ışığı olur", () => {
+    const tree = render(
+      <GlassSurface radius={21} fallbackStyle={{ backgroundColor: "#222222", borderColor: "#3B82F6", borderWidth: 1 }} />,
+    );
+    const rimLayer = tree.root.findAllByType("View")[1];
+    expect(rimLayer.props.pointerEvents).toBe("none");
+    expect(flat(rimLayer.props.style).borderColor).toBe("rgba(59, 130, 246, 1)");
+  });
+
+  it("açık `rim` her şeyi ezer; zemin yoksa ton, o da yoksa tema yüzeyi", () => {
+    mockTheme = { primary: "#111111", secondary: "#1C1C1E" };
+    const tree = render(<GlassSurface radius={20} rim="#FF0000" />);
+    expect(flat(tree.root.findAllByType("View")[0].props.style).backgroundColor).toBe("rgba(28, 28, 30, 0.8)");
+    expect(flat(tree.root.findAllByType("View")[1].props.style).borderColor).toBe("#FF0000");
+  });
+
+  it("fallbackBlur: blur hedefiyle AdaptiveBlurView (gerçek blur) + parlama, eski çerçeve yok", () => {
+    const target = { current: {} };
+    const tree = render(
+      <GlassSurface
+        radius={19}
+        fallbackBlur={{ tint: "dark", intensity: 60 }}
+        blurTarget={target}
+        fallbackStyle={{ borderWidth: 1, borderColor: "rgba(255,255,255,0.14)" }}
+      />,
+    );
+    const blur = tree.root.findByType("AdaptiveBlurView");
+    expect(blur.props.blurTarget).toBe(target);
+    expect(flat(blur.props.style).borderWidth).toBeUndefined();
+    expect(sheenOf(tree)).toBeTruthy();
   });
 });
 

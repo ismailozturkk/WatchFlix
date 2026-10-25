@@ -2262,6 +2262,7 @@
     "paylas_cine_eslesme_baslik": "CineSwipe-Treffer",
     "paylas_cine_n_eslesme": "{{n}} gemeinsame Treffer",
     "paylas_duello_sonuc_onizleme": "Duell-Ergebnis · {{a}} – {{b}}",
+    "paylas_ayar_onizleme": "Darstellung ({{n}})",
     "gonderilecek_kisiyi_veya_grubu_sec": "Wähle einen Freund oder eine Gruppe, an den bzw. die gesendet werden soll",
     "grup_ara": "Gruppen suchen",
     "izleme_kaydi_silindi": "Ausgewählter Seheintrag entfernt.",

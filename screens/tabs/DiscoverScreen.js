@@ -46,7 +46,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import { useTheme } from "../../context/ThemeContext";
 import useReduceMotion from "../../hooks/useReduceMotion";
-import { useLiquidGlass } from "../../services/liquidGlass";
+import { useGlassShape } from "../../services/liquidGlass";
 import { Keys, get, set } from "../../services/storage";
 import { getDiscoverFiltersCopy } from "../shared/discoverFiltersCopy";
 import { ROW_GAP, discoverRowLayout } from "../../utils/discoverHeaderLayout";
@@ -70,7 +70,8 @@ export default function DiscoverScreen({ navigation }) {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { width } = useWindowDimensions();
-  const glass = useLiquidGlass();
+  // Arama/keşfet dairesinin çapı cam ŞEKLİNE bağlı (gerçek cam + Android buzlu cam).
+  const glassShape = useGlassShape();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
   const { tabBarCollapse, tabBarLastScrollY } = useTabBarLayout();
@@ -99,8 +100,8 @@ export default function DiscoverScreen({ navigation }) {
   const exploreLabel = getDiscoverFiltersCopy(language).ui.title;
   // Dar ekranda üçü birden sığsın diye anahtarın bölme genişliği (ve kompakt kip) ekrana göre.
   const row = useMemo(
-    () => discoverRowLayout({ width, buttonSize: discoverSearchActionSize(glass), switchHeight: MEDIA_SWITCH_HEIGHT }),
-    [width, glass],
+    () => discoverRowLayout({ width, buttonSize: discoverSearchActionSize(glassShape), switchHeight: MEDIA_SWITCH_HEIGHT }),
+    [width, glassShape],
   );
 
   const handleChange = useCallback(

@@ -517,6 +517,27 @@ service cloud.firestore {
     match /AiConversations/{uid}/{document=**} {
       allow read, write: if isOwner(uid);
     }
+    // Özel afiş ve arka plan seçimleri: PosterChoices/{uid} TEK belge
+    // { id: "all", choices: { "movie_603": "/x.jpg" }, backdrops: { "movie_603": "/b.jpg" },
+    //   updatedAt } (utils/posterChoices.js).
+    // Okuma listelerle AYNI görünürlük: arkadaş profili sahibin seçtiği görseli görür.
+    // Yazma yalnız sahibi. Premium kapısı istemcide; izleyen taraf da sahibin
+    // entitlements'ına bakar (Free sahibin seçimi başkasına çizilmez). Kural harita
+    // değerlerini tek tek denetleyemez — istemci okurken süzer (sanitizePosterChoices).
+    function posterChoicesOk() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['id', 'choices', 'backdrops', 'updatedAt'])
+          && d.get('choices', {}) is map
+          && d.get('choices', {}).size() <= 500
+          && d.get('backdrops', {}) is map
+          && d.get('backdrops', {}).size() <= 500
+          && d.get('updatedAt', 0) is number;
+    }
+    match /PosterChoices/{uid} {
+      allow read: if canReadLists(uid);
+      allow create, update: if isOwner(uid) && posterChoicesOk();
+      allow delete: if isOwner(uid);
+    }
     match /Reminders/{uid}/{document=**} {
       allow read, write: if isOwner(uid);
     }

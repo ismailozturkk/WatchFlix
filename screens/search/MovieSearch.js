@@ -23,6 +23,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import LottieView from "lottie-react-native";
 import Toast from "@components/AppToast";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import usePosterUri from "../../hooks/usePosterUri";
+import useBackdropUri from "../../hooks/useBackdropUri";
 import { useFocusEffect } from "@react-navigation/native";
 import ListBadges from "../../components/ListBadges";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -31,12 +33,17 @@ import { i18nText } from "../../utils/i18nText";
 import { searchMediaWithFuzzyFallback } from "../../services/fuzzyMediaSearch";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import QuickListButtons from "../../components/search/QuickListButtons";
+import DiscoverCategoryChips from "../../components/search/DiscoverCategoryChips";
+import { getSearchHeaderCopy } from "../../components/search/searchHeaderCopy";
 import GlassField from "@components/common/GlassField";
 import { liquidGlassSupported } from "@services/liquidGlass";
 import { isLightSurface } from "@utils/colorUtils";
 
 
 const { width } = Dimensions.get("window");
+
+// Keşif çipleri: sıra, aşağıdaki [popular, upcoming, topRated] veri sırasıyla aynı.
+const DISCOVER_CATEGORIES = ["popular", "upcoming", "topRated"];
 
 // Poster grid: 3 sütun, eşit boşluklar
 const GRID_COLS = 3;
@@ -120,6 +127,8 @@ const useEnterAnim = (index) => {
 const MovieRowItem = memo(
   ({ item, navigation, imageQuality, theme, index }) => {
     const { getTmdbUrl } = useImageQualitySettings();
+    const posterUri = usePosterUri();
+    const backdropUri = useBackdropUri();
     const { posterBadges } = useListLayoutSettings();
     const { openQuickActions } = useMediaQuickActions();
     const { scale, onIn, onOut } = usePressAnim();
@@ -155,10 +164,10 @@ const MovieRowItem = memo(
             ]}
           >
             {/* Backdrop */}
-            {item.backdrop_path && (
+            {Boolean(backdropUri("movie", item.id, item.backdrop_path)) && (
               <Image
                 source={{
-                  uri: getTmdbUrl(item.backdrop_path, 'backdrop', 200),
+                  uri: backdropUri("movie", item.id, item.backdrop_path, 200),
                 }}
                 style={styles.rowBackdrop}
                 contentFit="cover"
@@ -170,7 +179,7 @@ const MovieRowItem = memo(
               <View style={styles.rowPosterWrapper}>
                 <Image
                   source={{
-                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
+                    uri: posterUri("movie", item.id, item.poster_path),
                   }}
                   style={styles.rowPoster}
                 />
@@ -271,7 +280,7 @@ const MovieRowItem = memo(
 // ─── GRID POSTER KART ─────────────────────────────────────────────────────────
 const MovieGridItem = memo(
   ({ item, navigation, imageQuality, theme, index }) => {
-  const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
   const { posterBadges } = useListLayoutSettings();
   const { openQuickActions } = useMediaQuickActions();
     const { scale, onIn, onOut } = usePressAnim();
@@ -302,7 +311,7 @@ const MovieGridItem = memo(
               {item.poster_path ? (
                 <Image
                   source={{
-                    uri: getTmdbUrl(item.poster_path, 'poster', 200),
+                    uri: posterUri("movie", item.id, item.poster_path),
                   }}
                   style={styles.gridPoster}
                 />
@@ -374,9 +383,7 @@ const DiscoverSection = memo(
     const [upcoming, setUpcoming] = useState([]);
     const [topRated, setTopRated] = useState([]);
     const [loadingDiscover, setLoading] = useState(true);
-    const tabAnim = useRef(new Animated.Value(0)).current;
-    const TABS = [i18nText("autoI18n.populer", "Popüler"), i18nText("autoI18n.yakinda", "Yakında"), i18nText("autoI18n.en_iyi", "En İyi")];
-    const TAB_W = (width - 32) / 3;
+    const copy = getSearchHeaderCopy(language);
 
     useEffect(() => {
       const fetchAll = async () => {
@@ -409,19 +416,6 @@ const DiscoverSection = memo(
       fetchAll();
     }, [language, API_KEY]);
 
-    const switchTab = useCallback(
-      (i) => {
-        setActiveTab(i);
-        Animated.spring(tabAnim, {
-          toValue: i,
-          speed: 16,
-          bounciness: 5,
-          useNativeDriver: true,
-        }).start();
-      },
-      [tabAnim],
-    );
-
     // ⚠️ Tüm hook'lar erken return'den ÖNCE — Rules of Hooks
     const renderGridItem = useCallback(
       ({ item, index }) => (
@@ -439,59 +433,31 @@ const DiscoverSection = memo(
 
     const activeData = [popular, upcoming, topRated][activeTab];
 
+    // Çipler yüklenirken de çizilir: veri gelince başlık zıplamasın.
+    const chips = (
+      <DiscoverCategoryChips
+        categories={DISCOVER_CATEGORIES}
+        labels={copy.categories}
+        activeIndex={activeTab}
+        onChange={setActiveTab}
+        accessibilityLabel={copy.categoryLabel}
+      />
+    );
+
     if (loadingDiscover) {
       return (
-        <View style={styles.discoverLoadingBox}>
-          <ActivityIndicator size="small" color={theme.text?.muted ?? "#666"} />
+        <View style={styles.discoverWrapper}>
+          {chips}
+          <View style={styles.discoverLoadingBox}>
+            <ActivityIndicator size="small" color={theme.text?.muted ?? "#666"} />
+          </View>
         </View>
       );
     }
 
     return (
       <View style={styles.discoverWrapper}>
-        {/* Sekme çubuğu */}
-        <View style={[styles.tabBar, { backgroundColor: theme.secondary }]}>
-          <Animated.View
-            style={[
-              styles.tabIndicator,
-              {
-                width: TAB_W - 8,
-                backgroundColor: theme.primary,
-                transform: [
-                  {
-                    translateX: tabAnim.interpolate({
-                      inputRange: [0, 1, 2],
-                      outputRange: [4, TAB_W + 4, TAB_W * 2 + 4],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
-          {TABS.map((label, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[styles.tabBtn, { width: TAB_W }]}
-              onPress={() => switchTab(i)}
-              activeOpacity={0.75}
-            >
-              <Text
-                style={[
-                  styles.tabLabel,
-                  {
-                    color:
-                      activeTab === i
-                        ? (theme.text?.primary ?? "#fff")
-                        : (theme.text?.secondary ?? "#aaa"),
-                  },
-                  activeTab === i && { fontWeight: "700" },
-                ]}
-              >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {chips}
 
         {/* Grid modu */}
         {viewMode === "grid" ? (
@@ -1141,31 +1107,6 @@ const styles = StyleSheet.create({
   },
   discoverRowList: { paddingHorizontal: 16, gap: 12, paddingVertical: 20 },
   discoverRowItem: { width: width * 0.92 },
-
-  tabBar: {
-    flexDirection: "row",
-    marginHorizontal: 16,
-    marginBottom: 14,
-    borderRadius: 14,
-    padding: 4,
-    position: "relative",
-    height: 42,
-    alignItems: "center",
-  },
-  tabIndicator: {
-    position: "absolute",
-    height: 34,
-    borderRadius: 10,
-    top: 4,
-    left: 0,
-  },
-  tabBtn: {
-    justifyContent: "center",
-    alignItems: "center",
-    height: 34,
-    zIndex: 1,
-  },
-  tabLabel: { fontSize: 13, fontWeight: "500" },
 
   // ── Boş / Hata ────────────────────────────────────────────────────────────
   centerBox: {

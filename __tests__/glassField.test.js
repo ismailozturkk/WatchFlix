@@ -2,6 +2,7 @@
 //   • cam açık  → çocukların ARKASINDA TEK katman: tema yüzeyiyle tonlanmış Liquid Glass
 //                 (altında ayrı bir dolgulu yüzey YOK; ton camın kendi tintColor'ından)
 //   • cam kapalı→ çağıranın ESKİ kutusu, kendi köşe yarıçapıyla (hap yarıçapı ezmez)
+//   • Android   → cam yerleşimi (sabit yükseklik, hap) + buzlu katman; odak = kenar ışığı
 // Gerçek UIGlassEffect çizimi cihazda doğrulanır; burada kilitlenen şey katman
 // sırası, yarıçap/yükseklik ve Android / iOS 18–25 kullanıcısının eski görünümü.
 import React from "react";
@@ -37,7 +38,10 @@ jest.mock("../context/ThemeContext", () => ({
 jest.mock("../services/liquidGlass", () => {
   const React = require("react");
   return {
-    useLiquidGlass: () => mockGlass,
+    // mockGlass: true (iOS 26 cam) | "frosted" (Android buzlu cam) | false (eski görünüm)
+    useLiquidGlass: () => mockGlass === true,
+    useGlassMode: () => (mockGlass === true ? "native" : mockGlass === "frosted" ? "frosted" : "off"),
+    useGlassShape: () => mockGlass === true || mockGlass === "frosted",
     NativeGlassView: (props) => React.createElement("GlassView", props),
   };
 });
@@ -190,5 +194,31 @@ describe("GlassField — cam kapalı (eski görünüm)", () => {
       </GlassField>,
     );
     expect(tree.root.findAllByType(Child)).toHaveLength(1);
+  });
+});
+
+describe("GlassField — Android buzlu cam", () => {
+  beforeEach(() => {
+    mockGlass = "frosted";
+  });
+
+  it("cam yerleşimi (sabit yükseklik) + hap buzlu katman; zemin eski kutudan", () => {
+    const tree = render(
+      <GlassField height={46} fallbackStyle={{ backgroundColor: "#202020", borderRadius: 16, borderWidth: 1 }}>
+        <Child />
+      </GlassField>,
+    );
+    expect(tree.root.findAllByType("GlassView")).toHaveLength(0);
+    const root = tree.root.findAllByType("View")[0];
+    expect(flat(root.props.style).height).toBe(46);
+    expect(flat(root.props.style).minHeight).toBeUndefined();
+    const surface = tree.root.findAllByType("View").find((v) => flat(v.props.style).borderRadius === 23);
+    expect(flat(surface.props.style).backgroundColor).toBe("rgba(32, 32, 32, 0.8)");
+  });
+
+  it("odakta yüzey değişmez, kenar ışığı vurgu rengine döner", () => {
+    const tree = render(<GlassField height={46} focused accent="#00FF88" fallbackStyle={{ backgroundColor: "#202020" }} />);
+    const views = tree.root.findAllByType("View");
+    expect(views.some((v) => flat(v.props.style).borderColor === "#00FF88")).toBe(true);
   });
 });

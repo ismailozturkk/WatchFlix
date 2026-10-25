@@ -37,6 +37,10 @@ const { DAILY_LIMIT_COPY } = require("../utils/dailyLimitCopy");
 const { AUTH_EMAIL_COPY } = require("../utils/authEmailCopy");
 const { RESET_ACCOUNT_COPY } = require("../screens/tabs/profile/resetAccountCopy");
 const { DELETE_ACCOUNT_COPY } = require("../screens/tabs/profile/deleteAccountCopy");
+const { LIST_VISIBILITY_COPY } = require("../screens/tabs/profile/listVisibilityCopy");
+const { SEARCH_HEADER_COPY } = require("../components/search/searchHeaderCopy");
+const { UPCOMING_FILTERS_COPY } = require("../utils/upcomingFiltersCopy");
+const { POSTER_CHOICES_COPY } = require("../utils/posterChoicesCopy");
 
 // `{ad}`, `{{ad}}`, `%d` biçimli yer tutucuları çıkarır.
 const yerTutucular = (metin) =>
@@ -128,6 +132,10 @@ const TABLOLAR = {
   "E-posta doğrulama / sıfırlama (authEmailCopy)": () => AUTH_EMAIL_COPY,
   "Hesabı sıfırla (resetAccountCopy)": () => RESET_ACCOUNT_COPY,
   "Hesabı sil (deleteAccountCopy)": () => DELETE_ACCOUNT_COPY,
+  "Profilinde görünen listeler (listVisibilityCopy)": () => LIST_VISIBILITY_COPY,
+  "Arama ekranı başlığı (searchHeaderCopy)": () => SEARCH_HEADER_COPY,
+  "Yaklaşan Filmler süzgeci (upcomingFiltersCopy)": () => UPCOMING_FILTERS_COPY,
+  "Özel afişler (posterChoicesCopy)": () => POSTER_CHOICES_COPY,
   "Wrapped (wrappedStrings)": () => ({
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),

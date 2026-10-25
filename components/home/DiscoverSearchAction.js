@@ -22,7 +22,7 @@ import { View } from "react-native";
 import GlassIconButton from "../common/GlassIconButton";
 import { GLASS_FIELD_TINT_ALPHA } from "../common/GlassField";
 import { useTheme } from "../../context/ThemeContext";
-import { useLiquidGlass } from "../../services/liquidGlass";
+import { useGlassShape } from "../../services/liquidGlass";
 import { alpha } from "../../theme/colors";
 import { MEDIA_SWITCH_HEIGHT } from "./MediaTypeSwitch";
 
@@ -49,9 +49,9 @@ export const discoverActionStyle = (theme) => ({
   },
 });
 
-/** Çizim yoluna göre dairenin çapı. */
-export const discoverSearchActionSize = (glass) =>
-  glass ? DISCOVER_SEARCH_ACTION_SIZE : DISCOVER_SEARCH_ACTION_SIZE + FALLBACK_BORDER_EXTRA;
+/** Çizim yoluna göre dairenin çapı (`shaped`: gerçek cam ya da Android buzlu camı — çerçevesiz). */
+export const discoverSearchActionSize = (shaped) =>
+  shaped ? DISCOVER_SEARCH_ACTION_SIZE : DISCOVER_SEARCH_ACTION_SIZE + FALLBACK_BORDER_EXTRA;
 
 /**
  * @param {object} props.navigation
@@ -60,8 +60,7 @@ export const discoverSearchActionSize = (glass) =>
  */
 function DiscoverSearchAction({ navigation, mediaType, label }) {
   const { theme } = useTheme();
-  const glass = useLiquidGlass();
-  const size = discoverSearchActionSize(glass);
+  const size = discoverSearchActionSize(useGlassShape());
   const buttonRef = useRef(null);
 
   const openSearch = useCallback(() => {

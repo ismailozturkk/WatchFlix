@@ -94,6 +94,10 @@ export const ANALYTICS_EVENTS = {
   DISCOVER_FILTER_APPLIED: "discover_filter_applied",
   // "Şaşırt beni" sonucu: `outcome` = "opened" | "none" | "error".
   DISCOVER_SURPRISE: "discover_surprise",
+  // "Yaklaşan Filmler" süzgeci uygulandı (utils/upcomingFilters.js). `source` = "chip" (raftaki hazır
+  // aralık) | "sheet" (filtre sayfası) | "reset" (boş durumdaki sıfırla); `surface` = "rail" | "see_all";
+  // `range` aralık kimliği, `scope`, `sort`, `genre_count`, `filter_count`. Metin ASLA gönderilmez.
+  UPCOMING_FILTER_APPLIED: "upcoming_filter_applied",
   // İzleme listesindeki "Ne izlesem?" seçici (components/lists/WatchPickerSheet.js): bir seçim YAPILDI.
   // `media_type` = "mixed" | "movie" | "tv", `pool_size` havuzdaki yapım sayısı, `reroll` ilk seçimden sonraki
   // her yeni seçimde true. Özelliğin kullanımını ve "başka biri" oranını (seçimin işe yarayıp yaramadığını) söyler.

@@ -1,7 +1,8 @@
 // components/common/GlassField.js
 //
 // Arama / yazı alanı kabuğu: iOS 26+'da hap biçimli Liquid Glass (sistemin arama
-// çubuğuyla aynı dil), diğer yerlerde çağıranın eski kutusu.
+// çubuğuyla aynı dil), Android'de aynı biçimde buzlu cam, iOS 18–25 ve Efektler
+// Kapalı'da çağıranın eski kutusu.
 //
 // Yalnız KABUK: içindeki TextInput, ikonlar ve temizle düğmesi çağırana ait.
 // Alan odaklanınca cam, vurgu renginde hafifçe tonlanır (eski görünümün vurgu
@@ -36,9 +37,10 @@ import { StyleSheet, View } from "react-native";
 import GlassSurface from "./GlassSurface";
 import { GlassNestContext } from "./useGlassChrome";
 import { useTheme } from "../../context/ThemeContext";
-import { useLiquidGlass } from "../../services/liquidGlass";
+import { useGlassMode } from "../../services/liquidGlass";
 import { alpha } from "../../theme/colors";
 import { GLASS_FIELD_FOCUS_TINT_ALPHA, GLASS_FIELD_TINT_ALPHA } from "../../utils/glassChrome";
+import { GLASS_MODES } from "../../utils/liquidGlass";
 
 // Camın dinlenme tonunun opaklığı (tema yüzeyi: alanı düz sayfadan ayırır) ve
 // odaktayken vurgu tonunun opaklığı utils/glassChrome'da durur (GlassBox da kullanır).
@@ -60,12 +62,13 @@ export default function GlassField({
   children,
   ...rest
 }) {
-  const glass = useLiquidGlass();
+  const mode = useGlassMode();
+  const glass = mode === GLASS_MODES.native;
   const { theme } = useTheme();
 
   // Cam yok: çağıranın eski kutusu. Köşe yarıçapı BİLEREK verilmez — hap
   // yarıçapı `fallbackStyle.borderRadius`u ezmesin, eski görünüm aynen kalsın.
-  if (!glass) {
+  if (mode === GLASS_MODES.off) {
     return (
       <View style={[style, { minHeight: height }, fallbackStyle]} {...rest}>
         {children}
@@ -73,15 +76,25 @@ export default function GlassField({
     );
   }
 
+  // Gerçek cam ve Android buzlu camı AYNI yerleşimi kullanır (sabit yükseklik,
+  // hap). Buzlu camda yüzey çağıranın eski zemininden gelir, odak kenar ışığının
+  // vurgu rengine dönmesiyle anlatılır (yarı saydam vurgu zemini düz sayfada
+  // okunaksızlaşırdı).
   const radius = height / 2;
-  const tint =
-    focused && accent
-      ? alpha(accent, GLASS_FIELD_FOCUS_TINT_ALPHA)
-      : alpha(theme.secondary, GLASS_FIELD_TINT_ALPHA);
+  const focusAccent = focused && accent ? accent : undefined;
+  const tint = focusAccent
+    ? alpha(focusAccent, GLASS_FIELD_FOCUS_TINT_ALPHA)
+    : alpha(theme.secondary, GLASS_FIELD_TINT_ALPHA);
   return (
     <View style={[style, { height }]} {...rest}>
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <GlassSurface radius={radius} tint={tint} style={StyleSheet.absoluteFill} />
+        <GlassSurface
+          radius={radius}
+          tint={glass ? tint : undefined}
+          rim={focusAccent}
+          fallbackStyle={glass ? undefined : fallbackStyle}
+          style={StyleSheet.absoluteFill}
+        />
       </View>
       {/* İçerideki GlassTouchable/GlassBox camlaşmaz: cam camı örnekleyemez. */}
       <GlassNestContext.Provider value>{children}</GlassNestContext.Provider>

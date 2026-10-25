@@ -143,7 +143,8 @@
 > - **12 tür uzmanlığı** (aksiyon, macera, bilim kurgu, dram, romantik, gerilim, suç,
 >   fantastik, gizem, aile, tarih, savaş) — `turSayaci`'ndan okur, yeni sayaç yok.
 > - **5 mevsimsel/takvim rozeti:** Bahar Esintisi, Sonbahar Yaprağı (yaz/kış'ın
->   eksik yarısı), Uğursuz Cuma (Cuma 13'ünde korku), Güç Seninle Olsun (4 Mayıs
+>   eksik yarısı), Korkunç 13 (Cuma 13'ünde korku; eski adı "Uğursuz Cuma", 24 Eki 2026'da
+>   değişti), Güç Seninle Olsun (4 Mayıs
 >   bilim kurgu), Bir Nisan Şakası (1 Nisan komedi).
 > - **6 gizli rozet:** Başucu Filmi, İki Ekran, Çok Yönlü, Tür Bağımlısı, Kış Uykusu,
 >   Altın Koleksiyon. **3 Perde ara basamağı:** Perde 3 / 6 / 11 (aileye girmez,

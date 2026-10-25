@@ -20,6 +20,13 @@ import { i18nText } from "../../../utils/i18nText";
 import ScreenDecor from "../../../components/ScreenDecor";
 import BackButton from "@components/BackButton";
 import GlassTouchable from "../../../components/common/GlassTouchable";
+import { useListStatusContext } from "../../../context/ListStatusContext";
+import {
+  buildListVisibilityRows,
+  normalizeListVisible,
+  summarizeListVisibility,
+} from "../../../utils/listVisibility";
+import { getListVisibilityCopy } from "./listVisibilityCopy";
 
 
 // Etiketler çizim anında çözülür: modül yüklenirken dondurulursa dil değişince eski dilde kalır.
@@ -95,10 +102,19 @@ const PrivacyOption = memo(function PrivacyOption({
 
 export default function PrivacySettingsScreen({ navigation }) {
   const { theme } = useTheme();
-  const { privacy, updatePrivacy } = useUserProfile();
+  const { privacy, updatePrivacy, profile } = useUserProfile();
   const { language } = useLanguage();
   const OPTIONS = useMemo(buildOptions, [language]);
   const SECTIONS = useMemo(buildSections, [language]);
+  const listCopy = getListVisibilityCopy(language);
+  const { combinedLists } = useListStatusContext() || {};
+  const listSummary = useMemo(
+    () =>
+      summarizeListVisibility(
+        buildListVisibilityRows(combinedLists, normalizeListVisible(profile?.listVisible)),
+      ),
+    [combinedLists, profile?.listVisible],
+  );
 
   const handleChange = useCallback(
     async (key, value) => {
@@ -147,6 +163,29 @@ export default function PrivacySettingsScreen({ navigation }) {
                 theme={theme}
               />
             ))}
+            {/* "Kim" seçeneklerinin hemen altında "hangi listeler": iki ayar birlikte
+                okunur. Eskiden Listelerim kartlarındaki yazısız göz simgesiydi. */}
+            {section.key === "lists" ? (
+              <GlassTouchable
+                testID="privacy-list-visibility"
+                onPress={() => navigation?.navigate?.("ListVisibilityScreen")}
+                activeOpacity={0.85}
+                style={[styles.linkRow, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: theme.primary }]}>
+                  <Ionicons name="albums-outline" size={18} color={theme.text.secondary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionLabel, { color: theme.text.primary, fontWeight: "600" }]}>
+                    {listCopy.rowTitle}
+                  </Text>
+                  <Text style={[styles.optionDesc, { color: theme.text.secondary }]}>
+                    {listCopy.rowSub(listSummary.shown, listSummary.total)}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.text.muted} />
+              </GlassTouchable>
+            ) : null}
           </View>
         ))}
 
@@ -223,6 +262,15 @@ const styles = StyleSheet.create({
   optionIcon: {
     width: 36, height: 36, borderRadius: 18,
     justifyContent: "center", alignItems: "center",
+  },
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 6,
   },
   optionLabel: { fontSize: 15 },
   optionDesc: { fontSize: 12, marginTop: 2, lineHeight: 16 },

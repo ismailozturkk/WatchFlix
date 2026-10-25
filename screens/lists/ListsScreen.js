@@ -100,6 +100,7 @@ import {
 } from "@utils/listPosterLayout";
 import GlassTouchable from "../../components/common/GlassTouchable";
 import GlassBox from "../../components/common/GlassBox";
+import usePosterUri from "../../hooks/usePosterUri";
 const { width, height } = Dimensions.get("window");
 // Diziyi `size`'lık satırlara böler (elle grid için — Android'de dinamik
 // numColumns'lu FlatList "addViewAt: failed to insert view" çökmesine yol açıyor).
@@ -197,6 +198,7 @@ export default function ListsScreen({ route, navigation }) {
   const [pickerType, setPickerType] = useState("mixed");
   const [value, setValue] = useState("");
   const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
 
   const handleChange = (text) => {
     // Sadece rakamları al
@@ -1438,9 +1440,9 @@ export default function ListsScreen({ route, navigation }) {
                 const seasonRows = Math.max(1, Math.ceil(sortedSeasons.length / 3));
                 const seasonGridH =
                   seasonRows * seasonCardH + (seasonRows - 1) * 10;
-                const posterSource = item.imagePath
+                const posterSource = posterUri("tv", item.id, item.imagePath)
                   ? {
-                      uri: getTmdbUrl(item.imagePath, "poster", 200),
+                      uri: posterUri("tv", item.id, item.imagePath),
                       cache: "force-cache",
                     }
                   : null;
@@ -1494,6 +1496,7 @@ export default function ListsScreen({ route, navigation }) {
                         <PosterImage
                           path={item.imagePath}
                           type="tv"
+                          mediaId={item.id}
                           size={200}
                           style={styles.heroPoster}
                         />
@@ -1845,6 +1848,7 @@ export default function ListsScreen({ route, navigation }) {
               <PosterImage
                 path={reorderItems?.imagePath}
                 type={reorderItems?.type}
+                mediaId={reorderItems?.id}
                 size={200}
                 style={styles.imageReorder}
                 contentFit="cover"

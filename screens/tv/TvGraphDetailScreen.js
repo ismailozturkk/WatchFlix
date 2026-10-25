@@ -37,6 +37,8 @@ import {
 import ScreenDecor from "../../components/ScreenDecor";
 import GlassPressable from "../../components/common/GlassPressable";
 import GlassTouchable from "../../components/common/GlassTouchable";
+import usePosterUri from "../../hooks/usePosterUri";
+import useBackdropUri from "../../hooks/useBackdropUri";
 
 // ─── Rating Renk Sistemi ──────────────────────────────────────────────────────
 // Ortak katmanlar utils/ratingColors.js'te — story "Bölüm Graph" bloğu da kullanır.
@@ -199,6 +201,8 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
+  const backdropUri = useBackdropUri();
   const { API_KEY } = useApiSettings();
 
   // Animasyon ref'i – panel geçişi için
@@ -422,7 +426,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
           source={{
             uri: selectedEpisodeData?.still_path
               ? getTmdbUrl(selectedEpisodeData.still_path, 'backdrop', 1000)
-              : getTmdbUrl(showDetail.backdrop_path, 'backdrop', 1000),
+              : backdropUri("tv", showDetail.id, showDetail.backdrop_path),
           }}
           style={styles.panelBackdrop}
           blurRadius={1}
@@ -441,7 +445,7 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
             source={{
               uri: selectedEpisodeData?.still_path
                 ? getTmdbUrl(selectedEpisodeData.still_path, 'poster', 200)
-                : getTmdbUrl(showDetail.poster_path, 'poster', 200),
+                : posterUri("tv", showDetail.id, showDetail.poster_path),
             }}
             style={selectedEpisodeData ? styles.panelStill : styles.panelPoster}
           />

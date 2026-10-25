@@ -28,6 +28,7 @@ import { getOlderCopy } from "@utils/olderGameCopy";
 import { QUICK_GAME_IDS, QUICK_GAME_META, normalizeQuickStats } from "@utils/quickGames";
 import { getQuickCopy } from "@utils/quickGamesCopy";
 import GamePreview from "./GamePreviews";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const GOLD = "#FFD76A";
 const EMPTY = [];
@@ -131,7 +132,7 @@ function QuickGamesGrid({ theme, onOpen, leadingTiles = EMPTY, title, bleed = 0 
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={bleed ? { marginHorizontal: -bleed } : null}
+        style={[styles.railScroll, bleed ? { marginHorizontal: -bleed } : null]}
         contentContainerStyle={[styles.rail, { paddingHorizontal: bleed }]}
       >
         {railTiles.map((tile) => (
@@ -165,7 +166,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 5,
   },
-  rail: { gap: 10, paddingTop: 6, paddingBottom: 10 },
+  // Üstte GLASS_PRESS_ROOM: basılan cam kart satırın kırpma sınırında kesilmesin; eski 6 pt'nin
+  // fazlası dış boşluktan düşülür (yerleşim aynı).
+  railScroll: { marginTop: 6 - GLASS_PRESS_ROOM },
+  rail: { gap: 10, paddingTop: GLASS_PRESS_ROOM, paddingBottom: 10 },
   card: { overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)" },
   featureCard: { flexGrow: 1, borderRadius: 20, padding: 8 },
   railCard: { borderRadius: 18, padding: 7 },

@@ -11,6 +11,7 @@ import BottomSheetModal from "@components/common/BottomSheetModal";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import { i18nText } from "@utils/i18nText";
 import GlassTouchable from "../common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 export const CALENDAR_RANGE_PRESETS = [
   { value: 1, label: () => i18nText("autoI18n.1_ay", "1 Ay") },
@@ -193,6 +194,7 @@ export function CalendarTypeChips({ theme, activeFilter, onFilterChange, filterC
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.filterScroll}
       contentContainerStyle={styles.filterList}
     >
       {FILTER_OPTIONS.map((option) => {
@@ -390,7 +392,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   bulkButtonText: { color: "#fff", fontSize: 13, fontWeight: "800" },
-  filterList: { gap: 8, paddingHorizontal: 16, paddingVertical: 2 },
+  // Basılan cam çip kesilmesin: dikey pay GLASS_PRESS_ROOM, eski 2 pt'nin fazlası dış boşluktan düşülür.
+  filterScroll: { marginVertical: 2 - GLASS_PRESS_ROOM },
+  filterList: { gap: 8, paddingHorizontal: 16, paddingVertical: GLASS_PRESS_ROOM },
   filterChip: {
     minHeight: 36,
     flexDirection: "row",

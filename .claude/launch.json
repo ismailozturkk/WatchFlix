@@ -24,6 +24,19 @@
         "8081"
       ],
       "port": 8081
+    },
+    {
+      "name": "metro-devclient-8082",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "expo",
+        "start",
+        "--dev-client",
+        "--port",
+        "8082"
+      ],
+      "port": 8082,
+      "autoPort": false
     }
   ]
 }

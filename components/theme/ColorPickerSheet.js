@@ -20,6 +20,7 @@ import * as Haptics from "@services/hapticsService";
 import { clamp, contrastRatio, hexToHsl, hslToHex, normalizeHex, readableTextOn } from "@utils/colorUtils";
 import GlassPressable from "../common/GlassPressable";
 import GlassBox from "../common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const HUE_GRADIENT = ["#FF0000", "#FFFF00", "#00FF00", "#00FFFF", "#0000FF", "#FF00FF", "#FF0000"];
 const OFFSET_GRADIENT = ["#000000", "#808080", "#FFFFFF"];
@@ -467,8 +468,9 @@ const styles = StyleSheet.create({
   presetsWrap: { marginTop: 16, marginHorizontal: -18, flexGrow: 0 },
   presets: { flexDirection: "row", gap: 9, paddingHorizontal: 18 },
   presetSwatch: { width: 34, height: 34, borderRadius: 10 },
-  sourceWrap: { marginHorizontal: -18, flexGrow: 0 },
-  sourceRow: { flexDirection: "row", gap: 8, paddingHorizontal: 18 },
+  // Basılan cam çip satırın kırpma sınırında kesilmesin (utils/liquidGlass GLASS_PRESS_ROOM).
+  sourceWrap: { marginHorizontal: -18, marginVertical: -GLASS_PRESS_ROOM, flexGrow: 0 },
+  sourceRow: { flexDirection: "row", gap: 8, paddingHorizontal: 18, paddingVertical: GLASS_PRESS_ROOM },
   sourceChip: { minHeight: 38, borderRadius: 11, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 7 },
   sourceSwatch: { width: 18, height: 18, borderRadius: 6, borderWidth: 1 },
   sourceLabel: { fontSize: 12, fontWeight: "800", maxWidth: 110 },

@@ -19,16 +19,28 @@
 import React, { forwardRef } from "react";
 import { View } from "react-native";
 import useGlassChrome from "./useGlassChrome";
+import { useGlassMode } from "../../services/liquidGlass";
 import { alpha } from "../../theme/colors";
 import { GLASS_FIELD_FOCUS_TINT_ALPHA } from "../../utils/glassChrome";
+import { GLASS_MODES } from "../../utils/liquidGlass";
 
 const GlassBox = forwardRef(function GlassBox(
   { style, children, role = "card", focused = false, accent, glass = true, glassTint, onLayout, ...rest },
   ref,
 ) {
+  // Odak: camda vurgu tonu; buzlu camda (Android) yüzey aynı kalır, kenar ışığı
+  // vurgu rengine döner (yarı saydam vurgu zemini düz sayfada okunaksızlaşırdı).
+  const frosted = useGlassMode() === GLASS_MODES.frosted;
+  const focusAccent = focused && accent ? accent : undefined;
   const tint =
-    glassTint ?? (focused && accent ? alpha(accent, GLASS_FIELD_FOCUS_TINT_ALPHA) : undefined);
-  const chrome = useGlassChrome(style, { role, tint, enabled: glass, onLayout });
+    glassTint ?? (focusAccent && !frosted ? alpha(focusAccent, GLASS_FIELD_FOCUS_TINT_ALPHA) : undefined);
+  const chrome = useGlassChrome(style, {
+    role,
+    tint,
+    rim: frosted ? focusAccent : undefined,
+    enabled: glass,
+    onLayout,
+  });
 
   if (!chrome) {
     return (

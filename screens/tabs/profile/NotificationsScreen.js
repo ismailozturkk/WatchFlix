@@ -5,10 +5,13 @@ import { useAuth } from "../../../context/AuthContext";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useNotifications } from "../../../context/NotificationsContext";
+import { useUserProfile } from "../../../context/UserProfileContext";
 import ScreenDecor from "../../../components/ScreenDecor";
 import FriendsScreenHeader from "../../../components/friends/FriendsScreenHeader";
 import GlassPressable from "../../../components/common/GlassPressable";
+import GlassIconButton from "../../../components/common/GlassIconButton";
 import AppIcon from "../../../components/AppIcon";
+import { toast } from "../../../components/AppToast";
 import { alpha } from "../../../theme/colors";
 import { fetchOlderNotifications } from "../../../services/notificationsService";
 import { notificationInboxCopy } from "../../../utils/notificationInboxCopy";
@@ -26,21 +29,25 @@ export default function NotificationsScreen({ navigation }) {
 function Inbox({ uid, navigation }) {
   const { theme } = useTheme();
   const { language, t } = useLanguage();
-  const { items, loading, error, cursor, hasMore, retry, markRead } = useNotifications();
+  const { items, loading, error, cursor, hasMore, retry, markRead, markAll } = useNotifications();
+  const { profile } = useUserProfile();
   const copy = notificationInboxCopy(language);
   const accent = theme.accent || "#8B7CF8";
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pageError, setPageError] = useState(false);
-  const [actionError, setActionError] = useState(false);
+  // copy anahtarı: "readError" | "markAllError"
+  const [actionError, setActionError] = useState(null);
   const [readIds, setReadIds] = useState(() => new Set());
   const [openingId, setOpeningId] = useState(null);
+  const [markingAll, setMarkingAll] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [now, setNow] = useState(Date.now());
   const active = useRef(true);
   const fetching = useRef(false);
   const opening = useRef(false);
+  const marking = useRef(false);
   useEffect(() => {
     active.current = true;
     const timer = setInterval(() => setNow(Date.now()), 30000);
@@ -54,6 +61,8 @@ function Inbox({ uid, navigation }) {
     language, copy, new Date(now),
   ), [merged, filter, expandedId, language, copy, now]);
   const moreAvailable = page ? page.hasMore : hasMore;
+  // Sayaç yüklenmemiş eski bildirimleri de sayar; kaymışsa düğmeye basmak onu sıfırlar.
+  const hasUnread = merged.some((item) => !item.read) || Number(profile?.unreadNotifsCount) > 0;
 
   const loadMore = async () => {
     if (fetching.current || !uid || !moreAvailable) return;
@@ -75,7 +84,7 @@ function Inbox({ uid, navigation }) {
     if (opening.current || !uid) return;
     opening.current = true;
     setOpeningId(item.id);
-    setActionError(false);
+    setActionError(null);
     try {
       if (!item.read) await markRead(item.id);
       if (!active.current) return;
@@ -83,10 +92,31 @@ function Inbox({ uid, navigation }) {
       const destination = notificationDestination(item);
       if (navigate && destination) navigation.navigate(destination.name, destination.params);
     } catch {
-      if (active.current) setActionError(true);
+      if (active.current) setActionError("readError");
     } finally {
       opening.current = false;
       if (active.current) setOpeningId(null);
+    }
+  };
+
+  const markAllRead = async () => {
+    if (marking.current || !uid) return;
+    marking.current = true;
+    setMarkingAll(true);
+    setActionError(null);
+    // Yazımdan ÖNCE alınır: işlem sürerken gelen yeni bildirim okunmamış kalmalı.
+    const unreadIds = merged.filter((item) => !item.read).map((item) => item.id);
+    try {
+      await markAll();
+      if (!active.current) return;
+      // Eski sayfalar canlı dinlenmiyor; onlar da yerelde okundu görünsün.
+      setReadIds((previous) => new Set([...previous, ...unreadIds]));
+      toast.success(copy.markAllDone);
+    } catch {
+      if (active.current) setActionError("markAllError");
+    } finally {
+      marking.current = false;
+      if (active.current) setMarkingAll(false);
     }
   };
 
@@ -167,7 +197,19 @@ function Inbox({ uid, navigation }) {
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.primary }]}>
       <ScreenDecor scope="profile" iconOpacity={0.3} />
-      <FriendsScreenHeader title={copy.title} subtitle={copy.subtitle} />
+      <FriendsScreenHeader title={copy.title} subtitle={copy.subtitle} right={hasUnread ? (
+        <GlassIconButton
+          testID="notifications-mark-all"
+          icon="checkmark-done"
+          color={accent}
+          accessibilityLabel={copy.markAllRead}
+          accessibilityState={{ disabled: markingAll, busy: markingAll }}
+          disabled={markingAll}
+          onPress={markAllRead}
+        >
+          {markingAll ? <ActivityIndicator size="small" color={accent} /> : undefined}
+        </GlassIconButton>
+      ) : null} />
       <View style={styles.filters}>
         {["all", "unread"].map((key) => (
           <GlassPressable key={key} accessibilityRole="button" accessibilityState={{ selected: filter === key }}
@@ -177,7 +219,7 @@ function Inbox({ uid, navigation }) {
           </GlassPressable>
         ))}
       </View>
-      {actionError && <Text accessibilityRole="alert" style={[styles.error, { color: theme.text.primary }]}>{copy.readError}</Text>}
+      {actionError && <Text accessibilityRole="alert" style={[styles.error, { color: theme.text.primary }]}>{copy[actionError]}</Text>}
       {error && <View style={styles.errorBox}>
         <Text accessibilityRole="alert" style={[styles.body, { color: theme.text.primary }]}>{copy.error}</Text>
         <GlassPressable accessibilityRole="button" onPress={retry} style={[styles.more, { backgroundColor: theme.secondary }]}>

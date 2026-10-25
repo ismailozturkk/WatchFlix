@@ -11,7 +11,7 @@
 import { Platform } from "react-native";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { useEffectPreset } from "./effectSettings";
-import { resolveGlassPlan } from "../utils/liquidGlass";
+import { GLASS_MODES, resolveGlassMode, resolveGlassPlan } from "../utils/liquidGlass";
 
 function probe() {
   const none = { supported: false, GlassView: null };
@@ -50,4 +50,26 @@ export function useLiquidGlass() {
     supported: liquidGlassSupported,
     effectsEnabled: blurEnabled,
   }).native;
+}
+
+/**
+ * Cam yerlerinin çizim kipi: "native" (iOS 26+ cam), "frosted" (Android buzlu
+ * cam) ya da "off" (çağıranın eski kutusu). Kararı utils/liquidGlass.resolveGlassMode.
+ */
+export function useGlassMode() {
+  const { blurEnabled } = useEffectPreset();
+  return resolveGlassMode({
+    platform: Platform.OS,
+    supported: liquidGlassSupported,
+    effectsEnabled: blurEnabled,
+  });
+}
+
+/**
+ * Cam ŞEKLİ (daire / hap, sabit alan yüksekliği) kullanılacak mı? Gerçek camda da
+ * buzlu camda da evet; yalnız "off" kipinde çağıranın eski köşesi kalır. Opaklık
+ * kuralları için bu DEĞİL `useLiquidGlass()` okunur (buzlu cam opaklıkla solabilir).
+ */
+export function useGlassShape() {
+  return useGlassMode() !== GLASS_MODES.off;
 }

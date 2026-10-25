@@ -5,18 +5,25 @@ const mockTransaction = {
 };
 const mockGetDocs = jest.fn();
 const mockOnSnapshot = jest.fn();
+const mockBatches = [];
 jest.mock("firebase/firestore", () => ({
   doc: (_db, ...parts) => parts.join("/"), collection: (_db, ...parts) => parts.join("/"),
   query: (...args) => args, orderBy: (...args) => ["orderBy", ...args], limit: (n) => ["limit", n],
   startAfter: (cursor) => ["startAfter", cursor],
   getDocs: (...args) => mockGetDocs(...args), onSnapshot: (...args) => mockOnSnapshot(...args),
   runTransaction: (_db, fn) => fn(mockTransaction),
+  where: (...args) => ["where", ...args],
+  writeBatch: () => {
+    const batch = { updates: [], update: (ref, patch) => batch.updates.push([ref, patch]), commit: jest.fn(async () => {}) };
+    mockBatches.push(batch);
+    return batch;
+  },
 }));
 jest.mock("../firebase", () => ({ db: {} }));
 jest.mock("../services/usageTrackerService", () => ({ trackFirestoreRead: jest.fn() }));
-const { markNotificationRead, respondToInvitation, fetchOlderNotifications, subscribeToNotifications } = require("../services/notificationsService");
+const { markNotificationRead, markAllNotificationsRead, respondToInvitation, fetchOlderNotifications, subscribeToNotifications } = require("../services/notificationsService");
 
-beforeEach(() => { jest.clearAllMocks(); mockDocs.clear(); });
+beforeEach(() => { jest.clearAllMocks(); mockDocs.clear(); mockBatches.length = 0; });
 
 test("mark-read uses current server state so repeated reads decrement once and never below zero", async () => {
   mockDocs.set("Users/u", { unreadNotifsCount: 2 });
@@ -74,4 +81,37 @@ test("listener exposes errors and pagination metadata", () => {
   const failure = new Error("offline");
   onError(failure);
   expect(error).toHaveBeenCalledWith(failure);
+});
+
+const unreadDocs = (n, from = 0) => Array.from({ length: n }, (_, i) => ({ ref: `n${from + i}`, id: `n${from + i}` }));
+
+test("mark-all walks every unread chunk and resets the counter only with the final one", async () => {
+  mockGetDocs
+    .mockResolvedValueOnce({ docs: unreadDocs(400) })
+    .mockResolvedValueOnce({ docs: unreadDocs(3, 400) });
+  expect(await markAllNotificationsRead("u")).toBe(403);
+  expect(mockGetDocs.mock.calls[0][0]).toContainEqual(["where", "read", "==", false]);
+  expect(mockBatches).toHaveLength(2);
+  expect(mockBatches[0].updates).toHaveLength(400);
+  expect(mockBatches[0].updates.some(([ref]) => ref === "Users/u")).toBe(false);
+  expect(mockBatches[1].updates).toEqual([
+    ["n400", { read: true }], ["n401", { read: true }], ["n402", { read: true }],
+    ["Users/u", { unreadNotifsCount: 0 }],
+  ]);
+  expect(mockBatches.every((batch) => batch.commit.mock.calls.length === 1)).toBe(true);
+});
+
+test("mark-all with nothing unread still repairs a drifted counter", async () => {
+  mockGetDocs.mockResolvedValueOnce({ docs: [] });
+  expect(await markAllNotificationsRead("u")).toBe(0);
+  expect(mockBatches[0].updates).toEqual([["Users/u", { unreadNotifsCount: 0 }]]);
+});
+
+test("mark-all stops at a failed chunk without resetting the counter", async () => {
+  mockGetDocs
+    .mockResolvedValueOnce({ docs: unreadDocs(400) })
+    .mockRejectedValueOnce(new Error("offline"));
+  await expect(markAllNotificationsRead("u")).rejects.toThrow("offline");
+  expect(mockBatches[0].commit).toHaveBeenCalledTimes(1);
+  expect(mockBatches.flatMap((batch) => batch.updates).some(([ref]) => ref === "Users/u")).toBe(false);
 });

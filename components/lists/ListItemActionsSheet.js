@@ -154,6 +154,7 @@ export default function ListItemActionsSheet({
             <PosterImage
               path={item?.imagePath}
               type={item?.type}
+              mediaId={item?.id}
               size={200}
               style={styles.poster}
             />

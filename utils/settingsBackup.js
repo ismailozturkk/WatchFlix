@@ -144,6 +144,7 @@ export const BACKUP_EXCLUDED = Object.freeze({
   petSelected: "Seçili pet sahip olunan petlere bağlı.",
   homeMediaType: "Film/Dizi sekmesinde son bakılan bölüm; gezinme durumu, ayar değil.",
   discoverFilters: "Ne izlesem? ekranında en son kullanılan süzgeç; gezinme durumu (kayıtlı süzgeçler yedeğe girer).",
+  upcomingFilters: "Yaklaşan Filmler rafının son süzgeci; tarihe bağlı gezinme durumu (seçilen ay/aralık zamanla geçersizleşir).",
   settingsRestorePoint: "Geri alma noktası kendi kendini yedeklememeli.",
 });
 
@@ -226,6 +227,20 @@ export function valueProblem(entry, value) {
   const rule = RULES[entry.id];
   if (rule?.check && !rule.check(value)) return "invalid";
   return null;
+}
+
+/**
+ * Tek bir ayarı yedeğin kurallarıyla doğrular ve kanonik biçime çeker. Sohbette
+ * paylaşılan ayarlar da (utils/settingsShare.js) AYNI kapıdan geçer.
+ * @returns {{ok: true, value: any} | {ok: false, reason: string}}
+ */
+export function sanitizeBackupValue(id, value) {
+  const entry = ENTRY_BY_ID.get(id);
+  if (!entry) return { ok: false, reason: "unknown" };
+  const problem = valueProblem(entry, value);
+  if (problem) return { ok: false, reason: problem };
+  const rule = RULES[id];
+  return { ok: true, value: value !== null && rule?.normalize ? rule.normalize(value) : value };
 }
 
 /* ───────────────────────── Özel temalar ───────────────────────── */

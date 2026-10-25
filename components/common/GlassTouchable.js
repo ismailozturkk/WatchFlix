@@ -1,8 +1,9 @@
 // components/common/GlassTouchable.js
 //
 // TouchableOpacity'nin YERİNE GEÇEN düğme: iOS 26+'da kendi dolgu/çerçeve/köşe
-// stili Liquid Glass'a devredilir, diğer her yerde (Android, iOS 18–25, Efektler
-// Kapalı) birebir TouchableOpacity çizilir. Çağıran yer yalnız etiketi değiştirir:
+// stili Liquid Glass'a, Android'de buzlu cam katmanına devredilir; iOS 18–25 ve
+// Efektler Kapalı'da birebir TouchableOpacity çizilir. Çağıran yer yalnız etiketi
+// değiştirir:
 //
 //   <TouchableOpacity style={[s.btn, { backgroundColor: theme.accent }]} …>
 //   <GlassTouchable   style={[s.btn, { backgroundColor: theme.accent }]} …>
@@ -41,6 +42,22 @@ const GlassTouchable = forwardRef(function GlassTouchable(
         {...rest}
       >
         {children}
+      </TouchableOpacity>
+    );
+  }
+
+  // Android buzlu cam: opaklık kuralı yok; eski dokunma geri bildirimi
+  // (activeOpacity) aynen kalır, yalnız kabuk buzlu katmana devredilir.
+  if (chrome.frosted) {
+    return (
+      <TouchableOpacity
+        ref={ref}
+        style={chrome.style}
+        activeOpacity={activeOpacity}
+        onLayout={chrome.onLayout}
+        {...rest}
+      >
+        {chrome.wrap(children)}
       </TouchableOpacity>
     );
   }

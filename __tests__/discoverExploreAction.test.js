@@ -20,7 +20,11 @@ const mockTheme = {
 
 jest.mock("react-native", () => ({ View: "View", StyleSheet: { create: (s) => s } }));
 jest.mock("../context/ThemeContext", () => ({ useTheme: () => ({ theme: mockTheme }) }));
-jest.mock("../services/liquidGlass", () => ({ useLiquidGlass: () => mockGlass }));
+jest.mock("../services/liquidGlass", () => ({
+  useLiquidGlass: () => mockGlass,
+  useGlassMode: () => (mockGlass ? "native" : "off"),
+  useGlassShape: () => mockGlass,
+}));
 jest.mock("../components/common/GlassIconButton", () => {
   const React = require("react");
   return { __esModule: true, default: (props) => React.createElement("IconButton", props) };

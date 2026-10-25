@@ -3,12 +3,14 @@
 // iOS Liquid Glass karar tablosu (utils/liquidGlass.js). Saf mantık: cam çizilip
 // çizilmeyeceği, camın hangi görünümde çizileceği ve hap köşe yarıçapı.
 // Native yoklama (services/liquidGlass.js) ve çizim (GlassSurface) bu testin
-// kapsamı dışında — burada kilitlenen şey Android / iOS 18–25 kullanıcısının
-// ESKİ görünümde kalması.
+// kapsamı dışında — burada kilitlenen şey iOS 18–25 kullanıcısının ESKİ, Android
+// kullanıcısının buzlu cam (resolveGlassMode) görünümüne geçmesi.
 import {
+  GLASS_MODES,
   LIQUID_GLASS_MIN_IOS,
   capsuleRadius,
   glassSchemeFor,
+  resolveGlassMode,
   resolveGlassPlan,
 } from "../utils/liquidGlass";
 
@@ -83,5 +85,30 @@ describe("capsuleRadius", () => {
 describe("LIQUID_GLASS_MIN_IOS", () => {
   it("Liquid Glass iOS 26 ile başlar", () => {
     expect(LIQUID_GLASS_MIN_IOS).toBe(26);
+  });
+});
+
+describe("resolveGlassMode", () => {
+  it("iOS 26+ cam → native", () => {
+    expect(resolveGlassMode({ platform: "ios", supported: true })).toBe(GLASS_MODES.native);
+  });
+
+  it("Android + efektler açık → buzlu cam", () => {
+    expect(resolveGlassMode({ platform: "android", effectsEnabled: true })).toBe(GLASS_MODES.frosted);
+    expect(resolveGlassMode({ platform: "android" })).toBe(GLASS_MODES.frosted);
+  });
+
+  it("Android + Efektler Kapalı → eski düz görünüm", () => {
+    expect(resolveGlassMode({ platform: "android", effectsEnabled: false })).toBe(GLASS_MODES.off);
+  });
+
+  it("iOS 18–25 ve efektleri kapalı iOS eski görünümde kalır", () => {
+    expect(resolveGlassMode({ platform: "ios", supported: false })).toBe(GLASS_MODES.off);
+    expect(resolveGlassMode({ platform: "ios", supported: true, effectsEnabled: false })).toBe(GLASS_MODES.off);
+  });
+
+  it("web / bilinmeyen / argümansız → off", () => {
+    expect(resolveGlassMode({ platform: "web" })).toBe(GLASS_MODES.off);
+    expect(resolveGlassMode()).toBe(GLASS_MODES.off);
   });
 });

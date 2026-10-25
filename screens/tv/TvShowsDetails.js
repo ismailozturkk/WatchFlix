@@ -60,6 +60,8 @@ import { customListHas, listItemFromDetails } from "../../utils/libraryCore";
 import { showLibraryError, showWatchSpreadNotice } from "../../utils/libraryErrorText";
 import { todayListDate } from "../../utils/mediaFacts";
 import ScreenDecor from "../../components/ScreenDecor";
+import { LocalBlurTarget, useLocalBlurTarget } from "../../components/common/BlurTarget";
+
 import ImageGalleryModal from "@components/modals/ImageGalleryModal";
 import TrailerSection from "@components/video/TrailerSection";
 import PaginatedRail from "../../components/PaginatedRail";
@@ -85,6 +87,8 @@ import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../../components/common/GlassTouchable";
+import usePosterUri from "../../hooks/usePosterUri";
+import useBackdropUri from "../../hooks/useBackdropUri";
 const { width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
 
@@ -143,6 +147,7 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
         <PosterImage
           path={item.poster_path}
           type="tv"
+          mediaId={item.id}
           size={200}
           iconSize={46}
           style={[styles.railPoster, { borderColor: alpha(theme.border, 0.3333333333333333) }]}
@@ -179,6 +184,9 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
 /* ─── Ana bileşen ── */
 export default function TvShowsDetails({ route, navigation }) {
   const insets = useSafeAreaInsets();
+  // Android 12+: üst düğmeler (geri / paylaş) posteri GERÇEKTEN bulanıklaştırsın
+  // diye ekran içeriği yerel bir blur hedefine sarılır; düğmeler onun KARDEŞİ.
+  const posterBlur = useLocalBlurTarget();
   // openComments / commentScope: "Etkinliklerim → Yorumlarım" satırından
   // gelindiğinde yorum sayfası doğrudan o yorumun kapsamında (dizi/sezon/bölüm)
   // açılır — kullanıcı kendi yorumunu aramak zorunda kalmasın.
@@ -201,6 +209,8 @@ export default function TvShowsDetails({ route, navigation }) {
   const { user } = useAuth();
   const { API_KEY } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
+  const backdropUri = useBackdropUri();
   const { allLists, statusIndex } = useListStatusContext();
   // İzleme sağlayıcıları bölgesi — MovieDetail ile aynı seçim.
   const providerRegion = tmdbRegionOf(language);
@@ -708,13 +718,14 @@ export default function TvShowsDetails({ route, navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
-      <ScreenDecor scope="details" iconOpacity={0.25} />
       <StatusBar
         barStyle="light-content"
         translucent
         backgroundColor="transparent"
       />
 
+      <LocalBlurTarget attach={posterBlur.attach} backgroundColor={theme.primary} style={styles.container}>
+      <ScreenDecor scope="details" iconOpacity={0.25} />
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
@@ -722,14 +733,14 @@ export default function TvShowsDetails({ route, navigation }) {
       >
         {/* ── HERO / BACKDROP ── */}
         <View style={styles.heroContainer}>
-          {details.backdrop_path ? (
+          {backdropUri("tv", details.id, details.backdrop_path) ? (
             <TouchableOpacity
               activeOpacity={0.95}
               onPress={() => setBacdropModalVisible(true)}
             >
               <Image
                 source={{
-                  uri: getTmdbUrl(details.backdrop_path, "backdrop", 1000),
+                  uri: backdropUri("tv", details.id, details.backdrop_path),
                 }}
                 style={styles.backdrop}
               />
@@ -756,10 +767,10 @@ export default function TvShowsDetails({ route, navigation }) {
             onPress={() => setPosterModalVisible(true)}
             activeOpacity={0.92}
           >
-            {details.poster_path ? (
+            {posterUri("tv", details.id, details.poster_path) ? (
               <Image
                 source={{
-                  uri: getTmdbUrl(details.poster_path, "poster", 200),
+                  uri: posterUri("tv", details.id, details.poster_path),
                 }}
                 style={[styles.poster, { borderColor: alpha(theme.border, 0.5019607843137255) }]}
               />
@@ -1205,10 +1216,10 @@ export default function TvShowsDetails({ route, navigation }) {
                 activeOpacity={0.88}
                 style={[styles.graphCard, { borderColor: theme.border }]}
               >
-                {details.backdrop_path && (
+                {Boolean(backdropUri("tv", details.id, details.backdrop_path)) && (
                   <Image
                     source={{
-                      uri: getTmdbUrl(details.backdrop_path, "backdrop", 1000),
+                      uri: backdropUri("tv", details.id, details.backdrop_path),
                     }}
                     style={styles.graphBackdrop}
                     blurRadius={2}
@@ -1219,10 +1230,10 @@ export default function TvShowsDetails({ route, navigation }) {
                   style={StyleSheet.absoluteFill}
                 />
                 <View style={styles.graphContent}>
-                  {details.poster_path && (
+                  {Boolean(posterUri("tv", details.id, details.poster_path)) && (
                     <Image
                       source={{
-                        uri: getTmdbUrl(details.poster_path, "poster", 200),
+                        uri: posterUri("tv", details.id, details.poster_path),
                       }}
                       style={styles.graphPoster}
                     />
@@ -1645,12 +1656,14 @@ export default function TvShowsDetails({ route, navigation }) {
               modalında gösteriliyor. */}
         </View>
       </ScrollView>
+      </LocalBlurTarget>
 
 
       {/* ─── ÜST OVERLAY BUTONLARI (her zaman tıklanabilir) ─── */}
-      {/* iOS 26+: Liquid Glass; diğer yerlerde eski koyu blur kutusu. */}
+      {/* iOS 26+: Liquid Glass; Android'de posteri bulanıklaştıran buzlu cam. */}
       <GlassIconButton
         variant="blur"
+        blurTarget={posterBlur.target}
         size={38}
         icon="chevron-back"
         accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
@@ -1660,6 +1673,7 @@ export default function TvShowsDetails({ route, navigation }) {
 
       <GlassIconButton
         variant="blur"
+        blurTarget={posterBlur.target}
         size={38}
         icon="share-social-outline"
         iconSize={20}
@@ -1743,6 +1757,7 @@ export default function TvShowsDetails({ route, navigation }) {
         initialImage={
           PosterModalVisible ? details.poster_path : details.backdrop_path
         }
+        posterPicker
       />
 
       {/* Yorumlar (film ile aynı yapı, TvComment koleksiyonu) */}

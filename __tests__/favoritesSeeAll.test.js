@@ -87,6 +87,14 @@ jest.mock("../context/ListStatusContext", () => ({
 jest.mock("../services/favoriteRecommendations", () => ({
   fetchFavoriteRecommendations: (...args) => mockFetch(...args),
 }));
+// Film dalının "Yaklaşan" süzgeci (bu testin konusu değil): çip/sayfa/kanca kabuk.
+jest.mock("../components/home/UpcomingFilterChips", () => ({ __esModule: true, default: "UpcomingFilterChips" }));
+jest.mock("../components/home/UpcomingFilterSheet", () => ({ __esModule: true, default: "UpcomingFilterSheet" }));
+jest.mock("../components/home/UpcomingEmptyState", () => ({ __esModule: true, default: "UpcomingEmptyState" }));
+jest.mock("../hooks/useUpcomingFilterControls", () => ({
+  __esModule: true,
+  default: () => ({ filters: {}, sheetVisible: false }),
+}));
 
 const SeeAllScreen = require("../screens/shared/SeeAllScreen").default;
 

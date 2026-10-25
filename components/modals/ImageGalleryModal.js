@@ -35,6 +35,13 @@ import Toast from "@components/AppToast";
 import { i18nText } from "@utils/i18nText";
 import { tmdbImageLanguageOrderOf, tmdbImageLanguagesOf } from "@utils/appLanguages";
 import * as Haptics from "@services/hapticsService";
+import GlassPillButton from "../common/GlassPillButton";
+import { POSTER_CHOICE_RESULT, usePosterChoices } from "@context/PosterChoicesContext";
+import { showPremiumLimitAlert } from "@services/premiumUpsell";
+import { createCloseGate } from "@services/premiumUpsellHost";
+import { PREMIUM_PLAN } from "@utils/premium";
+import { CHOICE_KIND, MAX_POSTER_CHOICES, orderGalleryForChoice } from "@utils/posterChoices";
+import { getPosterChoicesCopy } from "@utils/posterChoicesCopy";
 
 
 import ModalToastHost from "@components/toast/ModalToastHost";
@@ -57,6 +64,11 @@ const MAX_DOT_COUNT = 40;
 // payi ve hucreler arasi bosluk hesaptan DUSULUYOR.
 const GRID_EDGE = 16;
 const GRID_GAP = 8;
+
+// Ozel afis secici cubugu (alt kenar): dugme + altinda "Varsayilana don" baglantisi.
+const PICKER_BOTTOM = 16;
+const PICKER_HEIGHT = 48;
+const PICKER_LINK_HEIGHT = 34;
 
 // Buyutulmus gorselin indirme geri bildirimi.
 //
@@ -274,11 +286,30 @@ const ImageGalleryModal = ({
   seasonNumber, // used when mediaType is 'season'
   imageType, // 'poster' or 'backdrop'
   initialImage, // fallback/initial path
+  // Film/dizi detayından açılınca: "Afiş / Arka plan olarak kullan" (özel görsel, Premium).
+  posterPicker = false,
 }) => {
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const { language } = useLanguage();
   const insets = useSafeAreaInsets();
+  const posterChoices = usePosterChoices();
+  const pickerCopy = getPosterChoicesCopy(language);
+  const pickerActive =
+    posterPicker &&
+    (imageType === "poster" || imageType === "backdrop") &&
+    (mediaType === "movie" || mediaType === "tv");
+  const choiceKind = imageType === "poster" ? CHOICE_KIND.POSTER : CHOICE_KIND.BACKDROP;
+  const isPosterChoice = choiceKind === CHOICE_KIND.POSTER;
+  const chosenPath = pickerActive ? posterChoices.chosenFor(mediaType, mediaId, choiceKind) : null;
+  // Galeri açılırken seçili afiş listenin başına alınır; açıkken yapılan seçim
+  // sırayı DEĞİŞTİRMEZ (yoksa kaydırılan liste elin altında kayardı).
+  const chosenRef = useRef(chosenPath);
+  chosenRef.current = chosenPath;
+  // Free kullanıcı "Afiş olarak kullan"a basınca: önce galeri kapanır, yükseltme
+  // sayfası pencere kalktıktan SONRA açılır (iOS iki Modal'ı aynı anda sunamaz).
+  const upsellGateRef = useRef(null);
+  if (!upsellGateRef.current) upsellGateRef.current = createCloseGate(700);
   const imageLanguages = tmdbImageLanguagesOf(language);
   const imageLanguageOrder = tmdbImageLanguageOrderOf(language);
   const [images, setImages] = useState([]);
@@ -351,19 +382,17 @@ const ImageGalleryModal = ({
             grouped[code].sort(sortByVotes),
           );
 
-          setImages(finalImages);
+          setImages(pickerActive ? orderGalleryForChoice(finalImages, chosenRef.current) : finalImages);
         } else {
           // Fallback if API returned nothing
-          if (initialImage) {
-            setImages([{ file_path: initialImage }]);
-          } else {
-            setImages([]);
-          }
+          const fallback = initialImage ? [{ file_path: initialImage }] : [];
+          setImages(pickerActive ? orderGalleryForChoice(fallback, chosenRef.current) : fallback);
         }
       } catch (error) {
         console.error("Error fetching images:", error);
         if (initialImage) {
-          setImages([{ file_path: initialImage }]);
+          const fallback = [{ file_path: initialImage }];
+          setImages(pickerActive ? orderGalleryForChoice(fallback, chosenRef.current) : fallback);
         }
       } finally {
         setLoading(false);
@@ -371,7 +400,7 @@ const ImageGalleryModal = ({
     };
 
     fetchImages();
-  }, [visible, mediaId, mediaType, seasonNumber, imageType, API_KEY, initialImage, imageLanguageOrder, language]);
+  }, [visible, mediaId, mediaType, seasonNumber, imageType, API_KEY, initialImage, imageLanguageOrder, language, pickerActive]);
 
   // Handle reset state when modal closes
   useEffect(() => {
@@ -394,9 +423,61 @@ const ImageGalleryModal = ({
   useEffect(
     () => () => {
       if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+      upsellGateRef.current?.cancel();
     },
     []
   );
+
+  /* Ozel gorsel: ekrandaki gorseli bu yapimin afisi / arka plani yap (Premium). */
+  const chooseCurrentImage = () => {
+    const path = images[currentIndex]?.file_path || (images.length === 0 ? initialImage : null);
+    if (!path) return;
+    if (!posterChoices.allowed && posterChoices.uid) {
+      Haptics.selectionAsync().catch(() => {});
+      // Yükseltme sayfası denenen görseli gösterir: "Şimdi" (çizilen) → "Seçtiğin".
+      const imageKind = isPosterChoice ? "poster" : "backdrop";
+      const width = isPosterChoice ? 120 : 300;
+      const shown = chosenPath || initialImage;
+      const preview = {
+        kind: choiceKind,
+        fromUri: shown ? getTmdbUrl(shown, imageKind, width) : null,
+        toUri: getTmdbUrl(path, imageKind, width),
+      };
+      upsellGateRef.current.begin(() =>
+        showPremiumLimitAlert("custom_posters", PREMIUM_PLAN.FREE, { preview }),
+      );
+      onClose();
+      return;
+    }
+    const result = posterChoices.choose(mediaType, mediaId, path, choiceKind);
+    if (result === POSTER_CHOICE_RESULT.OK) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Toast.show({
+        type: "success",
+        text1: isPosterChoice ? pickerCopy.chosenToast : pickerCopy.backdropChosenToast,
+        text2: isPosterChoice ? pickerCopy.chosenToastSub : pickerCopy.backdropChosenToastSub,
+      });
+    } else if (result === POSTER_CHOICE_RESULT.FULL) {
+      Toast.show({
+        type: "error",
+        text1: isPosterChoice
+          ? pickerCopy.fullToast(MAX_POSTER_CHOICES)
+          : pickerCopy.backdropFullToast(MAX_POSTER_CHOICES),
+        text2: pickerCopy.fullToastSub,
+      });
+    } else if (result === POSTER_CHOICE_RESULT.SIGNED_OUT) {
+      Toast.show({ type: "info", text1: pickerCopy.signInNeeded });
+    }
+  };
+
+  const resetChoice = () => {
+    if (posterChoices.reset(mediaType, mediaId, choiceKind) !== POSTER_CHOICE_RESULT.OK) return;
+    Haptics.selectionAsync().catch(() => {});
+    Toast.show({
+      type: "success",
+      text1: isPosterChoice ? pickerCopy.resetToast : pickerCopy.backdropResetToast,
+    });
+  };
 
   /* Sonucu bir sure ekranda tut, sonra ipucunu normale dondur. */
   const flashFeedback = (path, status) => {
@@ -455,7 +536,10 @@ const ImageGalleryModal = ({
   const handleGridItemPress = (index) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsGrid(false);
-    
+    // Indir / "Afis olarak kullan" ekrandaki gorsele uygulanir: sira burada da
+    // guncellenmeli (kaydirma sonu olayi programatik atlamada gelmez).
+    setCurrentIndex(index);
+
     // Doğrudan noktanın konumunu da güncelleyelim
     scrollX.setValue(index * width);
     
@@ -518,9 +602,29 @@ const ImageGalleryModal = ({
             { width: gridItemWidth, height: gridItemHeight },
           ]}
         />
+        {pickerActive && chosenPath && item.file_path === chosenPath && (
+          <View
+            style={styles.chosenBadge}
+            accessible
+            accessibilityLabel={isPosterChoice ? pickerCopy.chosenBadge : pickerCopy.chosenBackdropBadge}
+          >
+            <Ionicons name="checkmark" size={14} color="#1a1a1a" />
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
+
+  // Ekrandaki gorsel su an cizilen afis/arka plan mi (secim yoksa TMDB varsayilani).
+  const shownImage = chosenPath || initialImage;
+  const currentPath = images[currentIndex]?.file_path || (images.length === 0 ? initialImage : null);
+  const currentIsShown = Boolean(currentPath) && currentPath === shownImage;
+  const useLabel = isPosterChoice ? pickerCopy.useAsPoster : pickerCopy.useAsBackdrop;
+  const currentLabel = isPosterChoice ? pickerCopy.currentPoster : pickerCopy.currentBackdrop;
+  const showPicker = pickerActive && !isGrid && !loading && Boolean(currentPath);
+  // Secici cubugu altta yer kaplar: noktalar/sayac onun ustune cikar.
+  const pickerReserve = insets.bottom + PICKER_BOTTOM + PICKER_HEIGHT + PICKER_LINK_HEIGHT;
+  const indicatorBottom = showPicker ? pickerReserve + 12 : 40;
 
   const showDots = images.length > 1 && images.length <= MAX_DOT_COUNT;
   const showCounter = images.length > MAX_DOT_COUNT;
@@ -560,6 +664,7 @@ const ImageGalleryModal = ({
     <Modal
       visible={visible}
       onRequestClose={onClose}
+      onDismiss={() => upsellGateRef.current?.finish()}
       animationType="fade"
       transparent
     >
@@ -721,7 +826,7 @@ const ImageGalleryModal = ({
 
             {/* Cok fazla gorsel varsa nokta yerine konum sayaci */}
             {!isGrid && showCounter && (
-              <View style={styles.counterPill}>
+              <View style={[styles.counterPill, { bottom: indicatorBottom }]}>
                 <Text allowFontScaling={false} style={styles.counterText}>
                   {currentIndex + 1} / {images.length}
                 </Text>
@@ -730,7 +835,7 @@ const ImageGalleryModal = ({
 
             {/* Pagination Dots (Sliding Window) */}
             {!isGrid && showDots && (
-              <View style={styles.paginationWrapper}>
+              <View style={[styles.paginationWrapper, { bottom: indicatorBottom }]}>
                 <Animated.View
                   style={[
                     styles.paginationContainer,
@@ -772,6 +877,61 @@ const ImageGalleryModal = ({
           </>
         )}
       </View>
+
+      {/* Ozel gorsel secici: ekrandaki gorsel = cizilen afis/arka plansa "... bu",
+          degilse "... olarak kullan" (Free'de kilit + Premium etiketi → yukseltme). */}
+      {showPicker && (
+        <View
+          style={[styles.pickerBar, { bottom: insets.bottom + PICKER_BOTTOM }]}
+          pointerEvents="box-none"
+        >
+          <GlassPillButton
+            height={PICKER_HEIGHT}
+            paddingHorizontal={22}
+            fallbackStyle={styles.pickerFallback}
+            onPress={currentIsShown ? undefined : chooseCurrentImage}
+            accessibilityLabel={currentIsShown ? currentLabel : useLabel}
+          >
+            {currentIsShown ? (
+              <>
+                <Ionicons name="checkmark-circle" size={19} color="#FFD700" />
+                <Text allowFontScaling={false} style={styles.pickerLabel}>
+                  {currentLabel}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Ionicons
+                  name={posterChoices.allowed ? "image-outline" : "lock-closed"}
+                  size={18}
+                  color="#fff"
+                />
+                <Text allowFontScaling={false} style={styles.pickerLabel}>
+                  {useLabel}
+                </Text>
+                {!posterChoices.allowed && posterChoices.uid ? (
+                  <Text allowFontScaling={false} style={styles.premiumTag}>
+                    {pickerCopy.premiumTag}
+                  </Text>
+                ) : null}
+              </>
+            )}
+          </GlassPillButton>
+          <View style={styles.pickerLinkSlot}>
+            {chosenPath ? (
+              <TouchableOpacity
+                onPress={resetChoice}
+                hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+                accessibilityRole="button"
+              >
+                <Text allowFontScaling={false} style={styles.pickerLink}>
+                  {pickerCopy.resetPoster}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      )}
       <ModalToastHost visible={visible} />
     </Modal>
   );
@@ -936,6 +1096,53 @@ const styles = StyleSheet.create({
   gridImage: {
     borderRadius: 8,
     contentFit: "cover",
+  },
+  chosenBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#FFD700",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pickerBar: {
+    position: "absolute",
+    left: GRID_EDGE,
+    right: GRID_EDGE,
+    alignItems: "center",
+  },
+  pickerFallback: {
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+  pickerLabel: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  premiumTag: {
+    color: "#1a1a1a",
+    backgroundColor: "#FFD700",
+    fontSize: 11,
+    fontWeight: "800",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  pickerLinkSlot: {
+    height: PICKER_LINK_HEIGHT,
+    justifyContent: "flex-end",
+  },
+  pickerLink: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 13,
+    fontWeight: "700",
+    textDecorationLine: "underline",
   },
   counterPill: {
     position: "absolute",

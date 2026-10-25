@@ -130,3 +130,48 @@ export function useBlurTargetRef(name) {
   // yeniden bağlanmayı önler.
   return useMemo(() => (node ? { current: node } : null), [node]);
 }
+
+// ── YEREL HEDEF: bir ekranın kendi içeriği ───────────────────────────────────
+//
+// İsimli kapsamlar (root/screen) ekran İÇİNDEKİ bir yüzeye yaramaz: o yüzey
+// kendisi hedefin içindedir (yukarıdaki kural). Poster üstü düğmeler ve sohbet
+// yazı alanı gibi yüzen yüzeyler için çare, altlarından kayan içeriği AYRI bir
+// hedefe sarmak ve yüzeyi o hedefin KARDEŞİ yapmaktır:
+//
+//   const posterBlur = useLocalBlurTarget();
+//   <LocalBlurTarget attach={posterBlur.attach} backgroundColor={theme.primary} style={{ flex: 1 }}>
+//     <ScrollView>…</ScrollView>
+//   </LocalBlurTarget>
+//   <GlassIconButton variant="blur" blurTarget={posterBlur.target} … />
+//
+// Arka plan rengi hedefin İÇİNDE çizilir: Android'de hedef host'un kendi zemini
+// kaydedilen içeriğe dahil değildir (kayıtta saydam kalır). Ekranın dekoru
+// (ScreenDecor) da kayda girsin isteniyorsa hedefin içine konur — dışarıda
+// kalırsa opak zemin onu örter.
+//
+// Her ekran kendi hedefini tutar (state): üst üste açılan iki detay ekranı
+// birbirinin hedefini görmez.
+
+/** `{ attach, target }` — attach hedefe ref, target yüzeyin `blurTarget`ı. */
+export function useLocalBlurTarget() {
+  const [node, attach] = useState(null);
+  const target = useMemo(() => (node ? { current: node } : null), [node]);
+  return { attach, target };
+}
+
+/**
+ * Yerel blur hedefi. Hedefin anlamsız olduğu yerde (iOS, Android < 12) düz View;
+ * ağaç derinliği her platformda aynı.
+ */
+export function LocalBlurTarget({ attach, backgroundColor, children, ...props }) {
+  const content = (
+    <View style={{ flexGrow: 1, flexShrink: 1, backgroundColor }}>{children}</View>
+  );
+  return HEDEF_ANLAMLI ? (
+    <BlurTargetView ref={attach} {...props}>
+      {content}
+    </BlurTargetView>
+  ) : (
+    <View {...props}>{content}</View>
+  );
+}

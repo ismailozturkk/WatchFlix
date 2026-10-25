@@ -73,6 +73,7 @@ function PickerRow({ row, kind, selected, blocked, theme, accent, onPress, copy 
       <FavoriteArt
         path={entry.image}
         kind={kind}
+        mediaId={entry.id}
         width={ART_W}
         height={kind === "people" ? ART_W : Math.round(ART_W * 1.5)}
         radius={10}

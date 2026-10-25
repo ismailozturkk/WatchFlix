@@ -30,6 +30,7 @@ import { kademeRengi, kademeSekli, RARITY_ORDER } from "@theme/badgeTokens";
 import { badgeAd } from "@components/badges/watchBadgeCatalog";
 import { withAlpha } from "./StatsComponents";
 import GlassTouchable from "../common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const ROZET_BOYUT = 44;
 const KOMPAKT_ROZET_BOYUT = 30;
@@ -68,6 +69,7 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.scroll}
         contentContainerStyle={[styles.row, compact && styles.rowCompact]}
       >
         {/* Sayaç + giriş oku vitrinin başında kalır; rozetler sayfasına geçiş
@@ -171,7 +173,17 @@ const styles = StyleSheet.create({
   // kenarıyla hizasız kalırdı.
   wrap: { width: "90%", marginBottom: 14 },
   wrapCompact: { width: "100%", marginTop: 7, marginBottom: 7 },
-  row: { flexDirection: "row", alignItems: "center", gap: 10, paddingRight: 2 },
+  // Baştaki cam "Tüm rozetler" düğmesi basılınca kırpma sınırında kesilmesin: dört yanda
+  // GLASS_PRESS_ROOM (dolgu + eşit negatif dış boşluk; yerleşim aynı).
+  scroll: { margin: -GLASS_PRESS_ROOM },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: GLASS_PRESS_ROOM,
+    paddingLeft: GLASS_PRESS_ROOM,
+    paddingRight: 2 + GLASS_PRESS_ROOM,
+  },
   rowCompact: { gap: 5 },
   hepsi: {
     flexDirection: "row", alignItems: "center", gap: 5,

@@ -72,8 +72,8 @@ export function NotificationsProvider({ children }) {
   );
 
   const markAll = useCallback(async () => {
-    if (!uid) return;
-    await markAllApi(uid);
+    if (!uid) return 0;
+    return markAllApi(uid);
   }, [uid]);
 
   const remove = useCallback(

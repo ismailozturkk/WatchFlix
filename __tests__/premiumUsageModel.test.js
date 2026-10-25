@@ -106,7 +106,7 @@ describe("kilitli ve erişim satırları", () => {
   });
 
   test("erişim özellikleri Free'de kilitli, Premium'da dahil", () => {
-    for (const id of ["tournament_vote", "app_icon", "snow_effect", "ambient_background", "icon_background", "pet_companion"]) {
+    for (const id of ["tournament_vote", "app_icon", "snow_effect", "ambient_background", "custom_posters", "icon_background", "pet_companion"]) {
       expect(row(id, FREE, {}).state).toBe("locked");
       expect(row(id, PREMIUM, {}).state).toBe("included");
       expect(row(id, FREE, {}).nextPlan).toBe(PREMIUM);

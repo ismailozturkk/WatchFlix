@@ -54,6 +54,7 @@ import {
 } from "./settingsUi";
 import { fillCopy, getSectionVisibilityCopy } from "./sectionVisibilityCopy";
 import GlassTouchable from "../../../components/common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../../utils/liquidGlass";
 
 // İkon arka planı saydamlık kaydırıcısı (0.1–1). Delta-based native 120 FPS PanResponder.
 function OpacitySlider({ value, onChange, colors }) {
@@ -816,10 +817,14 @@ const ps = StyleSheet.create({
     shadowRadius: 3,
     elevation: 4,
   },
+  // Kart kırpıyor (overflow): seçili cam seçenek basılınca kartın yan/alt sınırında
+  // kesilmesin diye o kenarlarda GLASS_PRESS_ROOM.
   segment: {
     flexDirection: "row",
     borderTopWidth: 1,
-    padding: 4,
+    paddingTop: 4,
+    paddingHorizontal: GLASS_PRESS_ROOM,
+    paddingBottom: GLASS_PRESS_ROOM,
     gap: 2,
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 18,

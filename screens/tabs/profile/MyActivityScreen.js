@@ -30,6 +30,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
+import usePosterUri from "../../../hooks/usePosterUri";
 import { i18nText } from "@utils/i18nText";
 import { tallyVotes } from "@utils/postComposer";
 import RatingStars from "@components/RatingStars";
@@ -152,6 +153,7 @@ export default function MyActivityScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
   const uid = user?.uid;
 
   const requestedInitialTab = TABS.some((item) => item.key === route?.params?.initialTab)
@@ -417,7 +419,7 @@ export default function MyActivityScreen({ navigation, route }) {
         node = (
           <Row
             theme={theme}
-            poster={item.poster ? getTmdbUrl(item.poster, "poster", 200) : null}
+            poster={posterUri(item.mediaType, item.mediaId, item.poster)}
             kind={item.mediaType}
             title={item.title}
             date={item.updatedAt}

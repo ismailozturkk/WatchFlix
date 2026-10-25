@@ -39,7 +39,7 @@ import Toast from "@components/AppToast";
 import { useTheme } from "@context/ThemeContext";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useAuth } from "@context/AuthContext";
-import { useImageQualitySettings } from "@context/AppSettingsContext";
+import usePosterUri from "../../hooks/usePosterUri";
 import { i18nText } from "@utils/i18nText";
 import { isUnreleased } from "@utils/watchState";
 import { alpha } from "../../theme/colors";
@@ -87,7 +87,7 @@ export default function RatingSheetModal({
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
 
   const key = mediaId != null ? mediaKey(mediaType, mediaId) : null;
 
@@ -255,7 +255,7 @@ export default function RatingSheetModal({
         <View style={styles.header}>
           <View style={styles.mediaPill}>
             {poster ? (
-              <Image source={{ uri: getTmdbUrl(poster, "poster", 200) }} style={styles.poster} />
+              <Image source={{ uri: posterUri(mediaType, mediaId, poster) }} style={styles.poster} />
             ) : (
               <View style={styles.posterPlaceholder}>
                 <Ionicons name="film-outline" size={14} color="rgba(255,255,255,0.4)" />

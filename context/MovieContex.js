@@ -21,6 +21,8 @@ import {
 import { setIfChanged, setListIfChanged } from "../utils/sameData";
 import { adultScoped, dropAdult } from "../utils/homeContentSettings";
 import { useHomeDataSettings } from "../hooks/useHomeContentSettings";
+import { useUpcomingFilters } from "../hooks/useUpcomingFilters";
+import { buildUpcomingUrl, upcomingQuerySignature } from "../utils/upcomingFilters";
 import { i18nText } from "../utils/i18nText";
 import {
   getOscarConfig,
@@ -823,72 +825,20 @@ export const MovieProvider = ({ children }) => {
   const [loadingMoreUpcoming, setLoadingMoreUpcoming] = useState(false);
   const [pageUpcoming, setPageUpcoming] = useState(1); // loading durumu ekleyin
   const [totalPagesUpcoming, setTotalPagesUpcoming] = useState(1);
-  const [valueUpcoming, setValueUpcoming] = useState("0"); // Varsayılan olarak "Bu hafta" seçili
-  const [isFocusUpcoming, setIsFocusUpcoming] = useState(false);
-  const [calculatedDate, setCalculatedDate] = useState("");
 
-  const dateData = useMemo(() => [
-    { label: t.movieScreens.movieUpcaming.label, value: "0" },
-    { label: t.movieScreens.movieUpcaming.label1, value: "1" },
-    { label: t.movieScreens.movieUpcaming.label2, value: "2" },
-    { label: t.movieScreens.movieUpcaming.label3, value: "3" },
-    { label: t.movieScreens.movieUpcaming.label4, value: "12" },
-    { label: t.movieScreens.movieUpcaming.label5, value: "24" },
-    { label: t.movieScreens.movieUpcaming.label6, value: "36" },
-  ], [t]);
+  // Süzgeç (tarih penceresi, gösterim, tür, dil, sıralama) depoda durur: "Tümü" ekranının kendi
+  // MovieProvider örneği de aynı kayda abone (bkz. hooks/useUpcomingFilters.js). Sorgu imzası
+  // dil/bölge/gün dahil her şeyi taşır; değişince akış baştan başlar.
+  const upcomingFilters = useUpcomingFilters();
+  const upcomingQuery = useMemo(
+    () => upcomingQuerySignature({ filters: upcomingFilters, language: tmdbLanguage, region: tmdbRegion }),
+    [upcomingFilters, tmdbLanguage, tmdbRegion],
+  );
 
-  const today = new Date();
-  today.setDate(today.getDate() + 1);
-
-  // Tarihi formatlamak için yardımcı fonksiyon
-  const formatDate = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0"); // Ayı al (0-11 arası olduğu için +1 ekliyoruz)
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  // Seçilen değeri tarihe eklemek için fonksiyon
-  const addTimeToDate = (value) => {
-    let newDate = new Date(today); // Yeni bir tarih nesnesi oluştur
-
-    // Seçilen değere göre işlem yap
-    switch (value) {
-      case "0": // Bu hafta
-        newDate.setDate(newDate.getDate() + 7); // 7 gün ekle
-        break;
-      case "1": // Bu ay
-        newDate.setMonth(newDate.getMonth() + 1); // 1 ay ekle
-        break;
-      case "2": // Sonraki 2 ay
-        newDate.setMonth(newDate.getMonth() + 2); // 2 ay ekle
-        break;
-      case "3": // Sonraki 3 ay
-        newDate.setMonth(newDate.getMonth() + 3); // 3 ay ekle
-        break;
-      case "12": // Sonraki 1 yıl
-        newDate.setFullYear(newDate.getFullYear() + 1); // 1 yıl ekle
-        break;
-      case "24": // Sonraki 2 yıl
-        newDate.setFullYear(newDate.getFullYear() + 2); // 2 yıl ekle
-        break;
-      case "36": // Sonraki 3 yıl
-        newDate.setFullYear(newDate.getFullYear() + 3); // 3 yıl ekle
-        break;
-      default:
-        break;
-    }
-
-    // Hesaplanan tarihi formatla ve set et
-    setCalculatedDate(formatDate(newDate));
-  };
-
-  // Film türlerini API'den almak
   const fetchMovieUpcoming = (page = 1, append = false, forceRefresh = false) => {
-    if (!calculatedDate) return;
     const gen = append ? currentGen("upcoming") : beginFreshRequest("upcoming");
     return loadPage({
-      cacheKey: adultKey(`movie_upcoming_${tmdbLanguage}_${tmdbRegion}_${calculatedDate}_p${page}`),
+      cacheKey: adultKey(`movie_upcoming_v2_${upcomingQuery}_p${page}`),
       ttl: TTL.NOW_PLAYING,
       append,
       forceRefresh,
@@ -898,7 +848,12 @@ export const MovieProvider = ({ children }) => {
       setLoading: setLoadingUpcoming,
       setLoadingMore: setLoadingMoreUpcoming,
       request: async () => {
-        const url = `https://api.themoviedb.org/3/discover/movie?include_video=false&language=${tmdbLanguage}&primary_release_date.gte=${formatDate(today)}&primary_release_date.lte=${calculatedDate}&region=${tmdbRegion}&page=${page}&sort_by=popularity.desc`;
+        const url = buildUpcomingUrl({
+          filters: upcomingFilters,
+          language: tmdbLanguage,
+          region: tmdbRegion,
+          page,
+        });
         const response = await axios.get(url, { headers: { Authorization: API_KEY } });
         return {
           results: response.data.results,
@@ -910,14 +865,12 @@ export const MovieProvider = ({ children }) => {
 
   useEffect(() => {
     if (!activeSections.upcoming) return;
-    addTimeToDate(valueUpcoming);
-  }, [activeSections.upcoming, valueUpcoming]);
-
-  useEffect(() => {
-    if (!activeSections.upcoming || !calculatedDate) return;
+    // Önceki süzgecin sonuçları yeni çiplerin altında kalmasın (çevrimdışıyken istek düşerse de).
+    // Önbellek varsa loadPage aynı turda doldurur; React toplu işlediği için boş kare görünmez.
+    setMoviesUpcoming([]);
     setPageUpcoming(1);
     fetchMovieUpcoming(1, false);
-  }, [activeSections.upcoming, language, calculatedDate, adultContent]);
+  }, [activeSections.upcoming, upcomingQuery, adultContent]);
 
   const loadMoreUpcoming = () => {
     if (loadingUpcoming || loadingMoreUpcoming || pageUpcoming >= totalPagesUpcoming) return;
@@ -1009,12 +962,10 @@ export const MovieProvider = ({ children }) => {
     moviesGenres: visibleGenres,
     pageGenres,
     selectedGenres,
-    dateData,
     moviesUpcoming: visibleUpcoming,
     loadingUpcoming,
     pageUpcoming,
-    valueUpcoming,
-    isFocusUpcoming,
+    upcomingFilters,
     moviesCollection,
     loadingCollection,
     errorCollection,
@@ -1064,10 +1015,7 @@ export const MovieProvider = ({ children }) => {
     activateMovieSection,
     toggleGenre,
     setPageGenres,
-    addTimeToDate,
     setPageUpcoming,
-    setValueUpcoming,
-    setIsFocusUpcoming,
     RelaseCount,
     //!
     fetchSeriesTrends,
@@ -1088,8 +1036,8 @@ export const MovieProvider = ({ children }) => {
     selectedProvider, providers,
     loadingProvider, loadingMovieProvider, visibleProvider, visibleNowPlaying,
     loadingNowPlaying, genres, loadingGenres, visibleGenres, pageGenres,
-    selectedGenres, dateData, visibleUpcoming, loadingUpcoming,
-    pageUpcoming, valueUpcoming, isFocusUpcoming, moviesCollection,
+    selectedGenres, visibleUpcoming, loadingUpcoming,
+    pageUpcoming, upcomingFilters, moviesCollection,
     loadingCollection, errorCollection, activateMovieSection,
     loadingMoreBests, loadingMoreGenres, totalPagesGenres,
     loadingMoreUpcoming, totalPagesUpcoming,

@@ -130,6 +130,29 @@ export const aiConversationsSpec = {
 };
 
 /* ================================================================== */
+/* ÖZEL AFİŞLER — PosterChoices/{uid} (TEK belge)                      */
+/* ================================================================== */
+
+// Seçimler tek belgede: arkadaş profili onu TEK okumayla alır (alt koleksiyonda
+// seçim başına bir okuma olurdu). Motorun "öğe" kavramına tek öğe olarak oturur:
+// anahtar hep "all", her yazım tam belge `set` (idempotent; son yazan kazanır).
+// Şema ve tavan: utils/posterChoices.js. Yalnız bu kullanıcının istemcisi yazar.
+export const posterChoicesSpec = {
+  name: "posterChoices",
+  kinds: {
+    doc: {
+      cacheKey: (uid) => cacheKeys.posterChoices(uid),
+      keyOf: (doc) => doc.id,
+      pathOf: (uid) => `PosterChoices/${uid}`,
+    },
+  },
+  fetchCloud: async (uid, remote) => {
+    const data = await remote.fetchDoc(`PosterChoices/${uid}`);
+    return { doc: data ? [{ ...data, id: "all" }] : [] };
+  },
+};
+
+/* ================================================================== */
 /* HATIRLATICILAR — Reminders/{uid}/movies + tvShows/{id}/episodes     */
 /* ================================================================== */
 

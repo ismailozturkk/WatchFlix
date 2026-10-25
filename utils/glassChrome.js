@@ -11,11 +11,16 @@
 // View / TextInput'un ESKİ stili aynen verilir, cam çizilebiliyorsa stilin
 // "kabuk" kısmı (dolgu rengi, çerçeve rengi, gölge) camın kendisine devredilir,
 // yerleşim kısmı (boyut, dolgu boşluğu, düzen) dokunulmadan kalır. Cam
-// çizilemiyorsa (Android, iOS 18–25, Efektler: Kapalı) hiçbir şey değişmez.
+// çizilemiyorsa iOS 18–25'te ve Efektler: Kapalı'da hiçbir şey değişmez; Android'de
+// aynı plan "buzlu cam" katmanıyla çizilir (aşağıda, frostedFill / frostedAppearance).
 //
 //   dolgu rengi  → camın tonu (tintColor); vurgu rengi canlı, yüzey rengi hafif ton
-//   çerçeve      → "nötr" (tema çerçevesi) ise düşer, cam kendi kenar ışığını çizer;
-//                  "anlamlı" (vurgu rengi, seçili durum) ise ÇİZİLMEYE devam eder
+//   çerçeve      → HER ZAMAN düşer (kalınlığı saydam kalır, boyut değişmesin). Cam
+//                  dokununca esneyip büyür/küçülür, RN çerçevesi ise yerinde SABİT
+//                  kalır: camın çevresinde ondan kopuk ikinci bir halka görünür. Cam
+//                  kendi kenar ışığını çizer. "Anlamlı" çerçevenin (vurgu rengi:
+//                  seçili çip, hata/odak) rengi kaybolmasın diye TONA taşınır; buzlu
+//                  camda (Android) ayrıca kenar ışığının rengi olur (`rim`)
 //   gölge        → düşer (cam kendi derinliğini çizer; GlassSurface kural 4)
 //   opaklık      → cam yolunda stilden düşer (basılı-durum saydamlığı; GlassSurface
 //                  kural 1). STATİK kısık öğe (opaklık < 1: devre dışı / yükleniyor)
@@ -38,6 +43,17 @@ export const GLASS_SURFACE_TINT_ALPHA = 0.55;
 /** Cam arama/yazı alanı: dinlenme tonunun opaklığı (tema yüzeyi) ve odaktaki vurgu tonu. */
 export const GLASS_FIELD_TINT_ALPHA = 0.55;
 export const GLASS_FIELD_FOCUS_TINT_ALPHA = 0.22;
+/**
+ * Durum bildiren (canlı) çerçevenin camdaki ton opaklığı; çerçevenin kendi
+ * alfasıyla orantılı (accent@0.55 "işaretli" çip, tam accent "seçili"den hafif).
+ */
+export const GLASS_STATE_TINT_ALPHA = 0.3;
+const STATE_TINT_MIN_ALPHA = 0.16;
+/**
+ * Android buzlu cam: opak nötr yüzeyin opaklığı. Arkada blur yok; düz sayfa
+ * zemininde yüzey ayırt edilsin, metin okunaklı kalsın diye camdakinden (0.55) yüksek.
+ */
+export const FROSTED_SURFACE_TINT_ALPHA = 0.8;
 /** Çok şeffaf nötr dolgu (cam zaten şeffaf): ton hiç verilmez. */
 const NEUTRAL_MIN_TINT_ALPHA = 0.2;
 /** Yarı saydam vurgu dolgusunun (seçili çip) alt sınırı. */
@@ -130,12 +146,14 @@ const SHADOW_KEYS = [
  * @param {"button"|"field"|"card"} [options.role]
  * @param {object} [options.theme]    { border } — tema çerçeve rengi (hex/rgba)
  * @param {string} [options.tint]     Ton zorla (dolgu rengini ezer)
+ * @param {boolean} [options.frosted] Android buzlu cam: opak nötr yüzey daha opak kalır
  * @returns {null | {radius:number, tint:string|undefined, scheme:"dark"|undefined,
- *   inset:number, dropBorder:boolean}}
+ *   inset:number, dropBorder:boolean, rim:string|undefined}}
+ *   `rim`: durum bildiren çerçevenin rengi (buzlu camın kenar ışığı olur).
  */
 export function planGlassChrome(flat, options = {}) {
   if (!flat || typeof flat !== "object") return null;
-  const { role = "button", theme = {}, tint: tintOverride } = options;
+  const { role = "button", theme = {}, tint: tintOverride, frosted = false } = options;
 
   const radius = flat.borderRadius;
   if (typeof radius !== "number" || !(radius > 0)) return null;
@@ -174,46 +192,114 @@ export function planGlassChrome(flat, options = {}) {
   if (!hasFill && !hasBorder) return null;
 
   const themeBorder = parseColor(theme.border);
-  const dropBorder = hasBorder ? isNeutralBorder(border, themeBorder) : false;
+  const stateBorder = hasBorder && !isNeutralBorder(border, themeBorder) ? border : null;
+  const vividFill = hasFill && isVividColor(bg);
 
   let tintColor;
   let scheme;
   if (typeof tintOverride === "string") {
     tintColor = parseColor(tintOverride);
+  } else if (vividFill) {
+    // Dolgu durumu zaten taşıyor (dolu vurgu düğmesi, seçili çip zemini).
+    tintColor =
+      bg.a >= 0.9
+        ? { ...bg, a: role === "button" ? GLASS_ACCENT_TINT_ALPHA : 0.7 }
+        : { ...bg, a: Math.max(TRANSLUCENT_ACCENT_MIN_ALPHA, bg.a) };
+  } else if (stateBorder) {
+    // Nötr (ya da hiç) dolgu + renkli çerçeve: durumu yalnız çerçeve söylüyordu;
+    // çerçeve camda çizilmediği için renk tona geçer.
+    tintColor = {
+      ...stateBorder,
+      a: Math.max(STATE_TINT_MIN_ALPHA, GLASS_STATE_TINT_ALPHA * stateBorder.a),
+    };
   } else if (hasFill) {
-    const vivid = isVividColor(bg);
-    if (vivid && bg.a >= 0.9) {
-      tintColor = { ...bg, a: role === "button" ? GLASS_ACCENT_TINT_ALPHA : 0.7 };
-    } else if (vivid) {
-      tintColor = { ...bg, a: Math.max(TRANSLUCENT_ACCENT_MIN_ALPHA, bg.a) };
-    } else if (bg.a >= 0.9) {
-      tintColor = { ...bg, a: GLASS_SURFACE_TINT_ALPHA };
+    if (bg.a >= 0.9) {
+      tintColor = { ...bg, a: frosted ? FROSTED_SURFACE_TINT_ALPHA : GLASS_SURFACE_TINT_ALPHA };
     } else if (bg.a >= NEUTRAL_MIN_TINT_ALPHA) {
       tintColor = { ...bg };
     }
-    if (bg.a < 0.95 && isDarkColor(bg)) scheme = "dark";
   }
+  if (hasFill && bg.a < 0.95 && isDarkColor(bg)) scheme = "dark";
   return {
     radius,
     tint: tintColor ? formatColor(tintColor, tintColor.a) : undefined,
     scheme,
-    inset: hasBorder && dropBorder ? borderWidth : 0,
-    dropBorder,
+    inset: hasBorder ? borderWidth : 0,
+    dropBorder: hasBorder,
+    rim: stateBorder ? formatColor(stateBorder, stateBorder.a) : undefined,
   };
 }
 
 /**
  * Cam yolunda öğenin KENDİ stilinden kabuk kısmını çıkarır; yerleşim kalır.
  * Çerçeve genişliği korunur (boyut değişmesin), yalnız rengi saydamlaşır.
+ * `keepOpacity` (buzlu cam): basılı-durum saydamlığı kalır — Android'de opaklık
+ * kuralı yok, dokunma geri bildirimi eski düğmedeki gibi sürer.
  */
-export function stripChrome(flat, plan) {
+export function stripChrome(flat, plan, { keepOpacity = false } = {}) {
   if (!flat || !plan) return flat;
   const next = { ...flat };
   delete next.backgroundColor;
   for (const key of SHADOW_KEYS) delete next[key];
-  if (flat.opacity !== undefined) delete next.opacity;
+  if (flat.opacity !== undefined && !keepOpacity) delete next.opacity;
   if (plan.dropBorder) next.borderColor = "transparent";
   return next;
+}
+
+// ── ANDROID BUZLU CAM GÖRÜNÜMÜ ──────────────────────────────────────────────
+//
+// UIGlassEffect'in Android karşılığı yok; gerçek blur da yalnız arkasında bir
+// BlurTargetView olan (ve onun KARDEŞİ duran) yüzeyde mümkün (bkz.
+// components/common/BlurTarget.js). Ekran içindeki düğme/alan/kartlar için bu
+// yüzden camın görsel DİLİ taklit edilir: yarı saydam yüzey + ince kenar ışığı +
+// üstten inen parlama. Tek View + tek degrade; öğe başına native efekt yok.
+
+/**
+ * Çağıranın eski çerçeve rengi bir DURUM bildiriyorsa (canlı: odak, seçili,
+ * etkin filtre) o renk, nötrse undefined. Buzlu camın kenar ışığı bununla
+ * renklenir; böylece eski görünümdeki vurgu çerçevesi Android'de de kaybolmaz.
+ */
+export function stateBorderColor(color) {
+  const parsed = parseColor(color);
+  if (!parsed || parsed.a <= TRANSPARENT_ALPHA || isNeutralBorder(parsed)) return undefined;
+  return formatColor(parsed, parsed.a);
+}
+
+/** Opak nötr yüzey rengini buzlu cam opaklığına indirir; vurgu ve yarı saydam olduğu gibi. */
+export function frostedFill(color) {
+  const parsed = parseColor(color);
+  if (!parsed) return color;
+  if (parsed.a < 0.9) return formatColor(parsed, parsed.a);
+  if (isVividColor(parsed)) return formatColor(parsed, Math.min(parsed.a, 0.94));
+  return formatColor(parsed, FROSTED_SURFACE_TINT_ALPHA);
+}
+
+/**
+ * Buzlu camın kenar ışığı + parlama renkleri.
+ * @param {object} girdi
+ * @param {string} [girdi.fill]          Yüzeyin dolgusu (canlıysa parlama güçlenir)
+ * @param {"light"|"dark"} [girdi.scheme] Yüzey görünümü (tema / poster üstü koyu)
+ * @param {string} [girdi.rim]           Durum rengi (seçili / hata / odak) — kenar ışığını ezer
+ * @returns {{rim: string, sheen: [string, string]}}
+ */
+export function frostedAppearance({ fill, scheme = "dark", rim } = {}) {
+  const parsed = parseColor(fill);
+  if (parsed && parsed.a >= 0.6 && isVividColor(parsed)) {
+    return {
+      rim: rim ?? "rgba(255, 255, 255, 0.24)",
+      sheen: ["rgba(255, 255, 255, 0.2)", "rgba(255, 255, 255, 0)"],
+    };
+  }
+  if (scheme === "light") {
+    return {
+      rim: rim ?? "rgba(0, 0, 0, 0.08)",
+      sheen: ["rgba(255, 255, 255, 0.6)", "rgba(255, 255, 255, 0)"],
+    };
+  }
+  return {
+    rim: rim ?? "rgba(255, 255, 255, 0.13)",
+    sheen: ["rgba(255, 255, 255, 0.09)", "rgba(255, 255, 255, 0)"],
+  };
 }
 
 /** Cam köşesini ölçülen boyutun yarısıyla sınırlar (hap = 999 gibi değerler). */

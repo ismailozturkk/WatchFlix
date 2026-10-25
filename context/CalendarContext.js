@@ -9,6 +9,7 @@ import {
   useImageQualitySettings,
 } from "./AppSettingsContext";
 import useUserDataDomain from "../hooks/useUserDataDomain";
+import usePosterUri from "../hooks/usePosterUri";
 import { notesDomain, remindersDomain } from "../services/userData";
 
 const CalendarContext = createContext();
@@ -33,6 +34,7 @@ function toDateStr(date) {
 
 export const CalendarProvider = ({ children }) => {
   const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
 
   // Takvim ayrı Firestore dinleyicisi AÇMAZ: notlar ve hatırlatıcılar profil
   // ekranlarıyla AYNI yerel kopyadan (services/userData) türetilir. Eskiden
@@ -63,14 +65,15 @@ export const CalendarProvider = ({ children }) => {
       mMap[date].push({
         id:        m.movieId,
         title:     m.movieName,
-        poster:    m.posterPath ? getTmdbUrl(m.posterPath, "poster", 200) : null,
+        // Özel afiş yalnız filmde; dizi bölümü SEZON afişi taşır (aşağıda).
+        poster:    posterUri("movie", m.movieId, m.posterPath),
         type:      "movie",
         eventType: "reminder_movie",
         date,
       });
     });
     return mMap;
-  }, [remindersView, getTmdbUrl]);
+  }, [remindersView, posterUri]);
 
   // Tüm hatırlatıcıları tek bir tarih-bazlı map olarak birleştir
   const reminderEvents = useMemo(() => {

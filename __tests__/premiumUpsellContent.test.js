@@ -17,6 +17,7 @@ import {
   MAX_PERKS,
   PERK_CANDIDATES,
   TIER_EM,
+  buildChoicePreview,
   buildPriceHint,
   buildUpsellContent,
   fitTierFontSize,
@@ -677,5 +678,62 @@ describe("Wrapped arşivi (yıl penceresi): sayaç değil kilit", () => {
     expect(c.canUpgrade).toBe(false);
     expect(c.tiers).toEqual([]);
     expect(c.cta.primary).toBe("Tamam");
+  });
+});
+
+describe("özel afiş / arka plan önizlemesi", () => {
+  const TMDB = "https://image.tmdb.org/t/p/w185";
+  const posterPreview = { kind: "poster", fromUri: `${TMDB}/now.jpg`, toUri: `${TMDB}/pick.jpg` };
+
+  test("galeriden gelen önizleme sayfaya taşınır; etiketler dile göre", () => {
+    const c = buildUpsellContent("custom_posters", FREE, "tr", { preview: posterPreview });
+    expect(c.preview).toEqual({
+      kind: "poster",
+      fromUri: `${TMDB}/now.jpg`,
+      toUri: `${TMDB}/pick.jpg`,
+      fromLabel: "Şimdi",
+      toLabel: "Seçtiğin",
+    });
+    expect(c.title).toBe("Afişi sen seç");
+    expect(buildUpsellContent("custom_posters", FREE, "en", { preview: posterPreview }).preview.toLabel).toBe(
+      "Your pick",
+    );
+  });
+
+  test("arka plan galerisinden gelince başlık arka planı söyler", () => {
+    const c = buildUpsellContent("custom_posters", FREE, "tr", {
+      preview: { ...posterPreview, kind: "backdrop" },
+    });
+    expect(c.preview.kind).toBe("backdrop");
+    expect(c.title).toBe("Arka planı sen seç");
+  });
+
+  test("önizlemesiz açılış (ör. karşılaştırma) eski başlıkla, kartsız", () => {
+    const c = buildUpsellContent("custom_posters", FREE, "tr");
+    expect(c.preview).toBeNull();
+    expect(c.title).toBe("Afişi sen seç");
+    expect(c.perks.length).toBeGreaterThan(0);
+  });
+
+  test("önizleme varken kazanç satırları çizilmez (sayfa kaydırmasız sığsın)", () => {
+    const c = buildUpsellContent("custom_posters", FREE, "tr", { preview: posterPreview });
+    expect(c.perks).toEqual([]);
+    expect(c.tiers).toHaveLength(3);
+  });
+
+  test("yalnız TMDB adresleri; seçilen görsel yoksa kart yok; aynı görsel 'Şimdi'de tekrarlanmaz", () => {
+    expect(buildChoicePreview({ kind: "poster", toUri: "https://evil.example/x.jpg" }, "tr")).toBeNull();
+    expect(buildChoicePreview({ kind: "poster", fromUri: `${TMDB}/a.jpg` }, "tr")).toBeNull();
+    expect(buildChoicePreview({ kind: "logo", toUri: `${TMDB}/a.jpg` }, "tr")).toBeNull();
+    expect(buildChoicePreview(null, "tr")).toBeNull();
+    const same = buildChoicePreview({ kind: "poster", fromUri: `${TMDB}/a.jpg`, toUri: `${TMDB}/a.jpg` }, "tr");
+    expect(same.fromUri).toBeNull();
+    const foreign = buildChoicePreview({ kind: "poster", fromUri: "http://x/y.jpg", toUri: `${TMDB}/a.jpg` }, "tr");
+    expect(foreign.fromUri).toBeNull();
+  });
+
+  test("başka özellikler önizlemeyi yok saymaz ama başlıkları değişmez", () => {
+    const c = buildUpsellContent("ambient_background", FREE, "tr", { preview: posterPreview });
+    expect(c.title).toBe("Ambiyans Premium'da");
   });
 });

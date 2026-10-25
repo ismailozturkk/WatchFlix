@@ -3,17 +3,24 @@
 // iOS 26+ Liquid Glass yüzeyi — uygulamada `expo-glass-effect`in GlassView'ını
 // doğrudan kullanan TEK yer (AdaptiveBlurView'ın expo-blur için olduğu gibi).
 //
-// Cam çizilemiyorsa (Android, iOS 18–25, eski development build, Efektler:
-// Kapalı) çağıran yerin KENDİ eski görünümü çizilir; bu bileşen o görünümü iki
-// yoldan alır:
-//   • `fallbackBlur` verilirse → AdaptiveBlurView (poster/backdrop üstü yüzeyler)
-//   • yoksa → düz View + `fallbackStyle` (tema zeminli yüzeyler)
+// Üç çizim kipi (services/liquidGlass.useGlassMode):
+//   • native  → GlassView (iOS 26+)
+//   • frosted → Android "buzlu cam": camla aynı şekil, yarı saydam yüzey, ince
+//               kenar ışığı + üstten parlama; `fallbackBlur` verilen yerde gerçek
+//               blur (Android'de `blurTarget` varsa — bkz. BlurTarget.js)
+//   • off     → çağıran yerin KENDİ eski görünümü (iOS 18–25, Efektler: Kapalı):
+//               `fallbackBlur` → AdaptiveBlurView, yoksa düz View + `fallbackStyle`
 //
 // ── CAM İÇİN KURALLAR (cihazda sessizce bozulan şeyler) ──────────────────────
 //
 //  1. Cam yüzeyin KENDİSİNE ya da ATALARINA `opacity` animasyonu verme. Sistem
 //     camı opaklıkla soldurunca efekt kaybolur / düz gri dikdörtgene döner.
 //     Giriş animasyonunu `transform` ile yap, solmayı cam altındaki içerikte.
+//     iOS 26.1+ UIKit, neredeyse saydamken çizilen camı düşürür ve kendiliğinden
+//     geri çizmez ("dokununca görünüyor" hatası: Reveal/FadeIn girişleri, AI
+//     modalı). Native güvenlik ağı patches/expo-glass-effect+*.patch: efekt,
+//     opaklık yükselip oturunca yeniden atanır (yeni native build gerekir). Ağ
+//     solmanın SONUNDA düzeltir; solma sırasında cam yine görünmeyebilir.
 //  2. Köşe yarıçapı `style.borderRadius`tan okunur ve SABİT uygulanır. Hap için
 //     yüksekliğin yarısını ver (utils/liquidGlass.capsuleRadius); `overflow:
 //     "hidden"` EKLEME — cam kendi şeklini keser, kenar ışığını da kırpmayalım.
@@ -21,15 +28,21 @@
 //     düğme birbirine akıp birleşsin isteniyorsa expo-glass-effect'in
 //     `GlassContainer`ı gerekir (şu an hiçbir yerde kullanılmıyor).
 //  4. RN gölgesi (shadow*/elevation) EKLEME: cam kendi derinlik gölgesini çizer.
+//     Buzlu camda da yok: Android `elevation`ı yarı saydam zeminin İÇİNDEN görünür.
 //  5. `colorScheme` açıkça verilir: "auto" sistemi izler, oysa uygulamanın kendi
 //     tema seçimi var (utils/liquidGlass.glassSchemeFor).
+//  6. Cam üstüne RN çerçevesi (borderWidth + renk) KOYMA: cam dokununca esneyip
+//     büyür/küçülür, çerçeve yerinde sabit kalır → camdan kopuk ikinci halka.
+//     Durum rengi (odak, seçili, hata) `tint` ile verilir.
 import React from "react";
 import { StyleSheet, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import AdaptiveBlurView from "./AdaptiveBlurView";
 import { useTheme } from "../../context/ThemeContext";
-import { NativeGlassView, useLiquidGlass } from "../../services/liquidGlass";
+import { NativeGlassView, useGlassMode } from "../../services/liquidGlass";
 import { isLightSurface } from "../../utils/colorUtils";
-import { glassSchemeFor } from "../../utils/liquidGlass";
+import { frostedAppearance, frostedFill, stateBorderColor } from "../../utils/glassChrome";
+import { GLASS_MODES, glassSchemeFor } from "../../utils/liquidGlass";
 
 /**
  * Tema yüzeyine göre cam görünümü ("light" | "dark"). `override` verilirse o
@@ -39,6 +52,31 @@ export function useGlassScheme(override) {
   const { theme } = useTheme();
   if (override === "light" || override === "dark") return override;
   return glassSchemeFor(isLightSurface(theme.primary));
+}
+
+/** Buzlu camın kenar ışığı kalınlığı (mutlak katman: yerleşimi etkilemez). */
+const FROSTED_RIM_WIDTH = 1;
+
+/** Kenar ışığı + üstten inen parlama; yüzeyin İLK çocuğu (içeriğin arkasında). */
+function FrostedSheen({ shape, look, inset = 0 }) {
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        inset ? { position: "absolute", top: -inset, left: -inset, right: -inset, bottom: -inset } : StyleSheet.absoluteFill,
+        shape,
+        styles.clip,
+        { borderWidth: FROSTED_RIM_WIDTH, borderColor: look.rim },
+      ]}
+    >
+      <LinearGradient
+        colors={look.sheen}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 0.7 }}
+        style={StyleSheet.absoluteFill}
+      />
+    </View>
+  );
 }
 
 /**
@@ -52,7 +90,11 @@ export function useGlassScheme(override) {
  * @param {string}  [props.tint]                 Cam tonu (vurgulu eylem için accent)
  * @param {boolean} [props.interactive=false]    Dokununca cam sistem düzeyinde esner/parlar
  * @param {object}  [props.fallbackBlur]         { tint, intensity } — cam yoksa blur çiz
- * @param {object}  [props.fallbackStyle]        Cam yoksa `style`a eklenecek yüzey stili
+ * @param {object}  [props.blurTarget]           `fallbackBlur` için Android blur hedefi
+ *   (useLocalBlurTarget / useBlurTargetRef); yoksa Android'de düz koyu katman
+ * @param {object}  [props.fallbackStyle]        Cam yoksa `style`a eklenecek yüzey stili.
+ *   Buzlu camda yalnız `backgroundColor`u okunur (yüzey rengi); çerçeve/gölge çizilmez.
+ * @param {string}  [props.rim]                  Buzlu camın kenar ışığı rengi (odak / seçili)
  */
 export default function GlassSurface({
   radius,
@@ -61,15 +103,18 @@ export default function GlassSurface({
   tint,
   interactive = false,
   fallbackBlur,
+  blurTarget,
   fallbackStyle,
+  rim,
   style,
   children,
   ...rest
 }) {
-  const glass = useLiquidGlass();
+  const mode = useGlassMode();
+  const { theme } = useTheme();
   const resolvedScheme = useGlassScheme(scheme);
 
-  if (glass && NativeGlassView) {
+  if (mode === GLASS_MODES.native && NativeGlassView) {
     return (
       <NativeGlassView
         glassEffectStyle={variant}
@@ -85,6 +130,7 @@ export default function GlassSurface({
   }
 
   const shape = typeof radius === "number" ? { borderRadius: radius } : null;
+  const frosted = mode === GLASS_MODES.frosted;
 
   if (fallbackBlur) {
     // AdaptiveBlurView'ın kendisi yuvarlak köşeyi kırpmaz; kırpma burada.
@@ -92,11 +138,46 @@ export default function GlassSurface({
       <AdaptiveBlurView
         tint={fallbackBlur.tint ?? "dark"}
         intensity={fallbackBlur.intensity ?? 60}
-        style={[style, fallbackStyle, shape, styles.clip]}
+        blurTarget={blurTarget}
+        style={[style, frosted ? null : fallbackStyle, shape, styles.clip]}
         {...rest}
       >
+        {frosted ? (
+          <FrostedSheen shape={shape} look={frostedAppearance({ scheme: "dark", rim })} />
+        ) : null}
         {children}
       </AdaptiveBlurView>
+    );
+  }
+
+  if (frosted) {
+    // Yüzey rengi: çağıranın eski zemini (opak tema yüzeyi buzlu opaklığa iner),
+    // yoksa camın tonu, o da yoksa tema yüzeyi.
+    // Kenar ışığı: açık `rim`, yoksa eski kutunun DURUM çerçevesi (etkin filtre,
+    // odak), yoksa nötr ışık.
+    const fallbackFlat = StyleSheet.flatten(fallbackStyle) || {};
+    const fill = frostedFill(fallbackFlat.backgroundColor ?? tint ?? theme.secondary);
+    const look = frostedAppearance({
+      fill,
+      scheme: resolvedScheme,
+      rim: rim ?? stateBorderColor(fallbackFlat.borderColor),
+    });
+    // Eski kutunun çerçeve KALINLIĞI saydam olarak korunur (içerik 1 px bile
+    // kaymasın); ışık katmanı o payı da örter.
+    const inset = typeof fallbackFlat.borderWidth === "number" ? fallbackFlat.borderWidth : 0;
+    return (
+      <View
+        style={[
+          style,
+          shape,
+          { backgroundColor: fill },
+          inset ? { borderWidth: inset, borderColor: "transparent" } : null,
+        ]}
+        {...rest}
+      >
+        <FrostedSheen shape={shape} look={look} inset={inset} />
+        {children}
+      </View>
     );
   }
 

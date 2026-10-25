@@ -49,6 +49,7 @@ const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, th
         <PosterImage
           path={item.poster_path}
           type="tv"
+          mediaId={item.id}
           size={200}
           style={[
             styles.similarPoster,

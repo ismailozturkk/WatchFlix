@@ -474,6 +474,19 @@ export async function moveListVisibility(uid, fromName, toName) {
 }
 
 /**
+ * Listelerin profilde görünürlüğünü yazar: `changes` → `{ listeAdı: boolean }`.
+ *
+ * Yalnız verilen anahtarlar yazılır (diğer listelerin bayrağına dokunulmaz).
+ * FieldPath: ad noktalıysa ("S.W.A.T.") string anahtar iç içe map'e çözülürdü.
+ */
+export async function setListVisibility(uid, changes) {
+  const entries = Object.entries(changes || {});
+  if (!uid || entries.length === 0) return;
+  const pairs = entries.flatMap(([name, shown]) => [new FieldPath("listVisible", name), shown === true]);
+  await updateDoc(doc(db, "Users", uid), ...pairs);
+}
+
+/**
  * Privacy ayarlarını güncelle (kısmi merge).
  */
 export async function updatePrivacy(uid, partialPrivacy) {

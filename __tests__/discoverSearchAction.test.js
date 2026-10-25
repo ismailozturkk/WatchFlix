@@ -27,7 +27,11 @@ jest.mock("react-native-safe-area-context", () => ({
 }));
 jest.mock("react-native-reanimated", () => ({ useAnimatedScrollHandler: (handler) => handler }));
 jest.mock("../context/ThemeContext", () => ({ useTheme: () => ({ theme: mockTheme }) }));
-jest.mock("../services/liquidGlass", () => ({ useLiquidGlass: () => mockGlass }));
+jest.mock("../services/liquidGlass", () => ({
+  useLiquidGlass: () => mockGlass,
+  useGlassMode: () => (mockGlass ? "native" : "off"),
+  useGlassShape: () => mockGlass,
+}));
 jest.mock("../components/common/GlassIconButton", () => {
   const React = require("react");
   return { __esModule: true, default: (props) => React.createElement("IconButton", props) };

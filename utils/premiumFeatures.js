@@ -654,6 +654,37 @@ export const PREMIUM_FEATURES = Object.freeze({
     freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" },
     paidValue: { tr: "Süzülen ışıklar", en: "Drifting lights", es: "Luces flotantes", pt: "Luzes flutuantes", de: "Treibende Lichter" },
   }),
+  // Film/dizi başına TMDB'deki alternatif afiş ve arka planlardan biri (utils/posterChoices.js).
+  // Abonelik bitince seçimler SİLİNMEZ, varsayılan görsel çizilir (diğer kozmetiklerle
+  // aynı kural). Arkadaşlar sahibin seçimini, sahibin SUNUCU planı izin verdikçe görür
+  // (Users/{uid}.entitlements — context/PosterChoicesProvider useUserPosterChoices).
+  // Kimlik `custom_posters` olarak kalır (arka plan aynı hakka 25 Eki'de eklendi).
+  custom_posters: feature({
+    id: "custom_posters",
+    kind: ACCESS,
+    category: "personal",
+    icon: "images",
+    minPlan: PREMIUM_PLAN.PREMIUM,
+    title: { tr: "Özel afiş ve arka planlar", en: "Custom posters and backdrops", es: "Pósteres y fondos personalizados", pt: "Pôsteres e fundos personalizados", de: "Eigene Poster und Hintergründe" },
+    // Yükseltme sayfası galeriden açılınca seçmeye çalışılan görseli de gösterir
+    // ("Şimdi" → "Seçtiğin"; utils/premiumUpsellContent buildChoicePreview). Başlık o
+    // an seçilen türe göre: `titleByPreview.backdrop` arka plan galerisinden gelince.
+    upsell: {
+      title: { tr: "Afişi sen seç", en: "You pick the poster", es: "Tú eliges el póster", pt: "Você escolhe o pôster", de: "Du wählst das Poster" },
+      titleByPreview: {
+        backdrop: { tr: "Arka planı sen seç", en: "You pick the backdrop", es: "Tú eliges el fondo", pt: "Você escolhe o fundo", de: "Du wählst den Hintergrund" },
+      },
+      message: {
+        tr: "Seçtiğin afiş ve arka plan her yerde görünür, arkadaşların da görür.",
+        en: "Your poster and backdrop picks show everywhere, and your friends see them too.",
+        es: "Tus pósteres y fondos elegidos se ven en todas partes, y tus amigos también los ven.",
+        pt: "Seus pôsteres e fundos escolhidos aparecem em todo lugar, e seus amigos também veem.",
+        de: "Deine Poster und Hintergründe erscheinen überall, und deine Freunde sehen sie auch.",
+      },
+    },
+    freeValue: { tr: "Varsayılan", en: "Default", es: "Predeterminado", pt: "Padrão", de: "Standard" },
+    paidValue: { tr: "Senin seçimin", en: "Your pick", es: "Tu elección", pt: "Sua escolha", de: "Deine Wahl" },
+  }),
   icon_background: feature({
     id: "icon_background",
     kind: ACCESS,

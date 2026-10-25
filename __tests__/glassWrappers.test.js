@@ -4,6 +4,7 @@
 //     AYNI stil ve prop'larla, araya ek View girmeden
 //   • cam açık   → kabuk (dolgu/gölge/opaklık) stilden çıkar, öğenin ARKASINDA tek
 //     cam katmanı durur; yerleşim stili ve çocuklar yerinde kalır; iç içe cam yok
+//   • Android    → aynı plan buzlu cam katmanıyla; dokunma saydamlığı korunur
 // Gerçek UIGlassEffect çizimi cihazda doğrulanır.
 import React from "react";
 import { act, create } from "react-test-renderer";
@@ -55,7 +56,10 @@ jest.mock("../context/ThemeContext", () => ({
 jest.mock("../services/liquidGlass", () => {
   const React = require("react");
   return {
-    useLiquidGlass: () => mockGlass,
+    // mockGlass: true (iOS 26 cam) | "frosted" (Android buzlu cam) | false (eski görünüm)
+    useLiquidGlass: () => mockGlass === true,
+    useGlassMode: () => (mockGlass === true ? "native" : mockGlass === "frosted" ? "frosted" : "off"),
+    useGlassShape: () => mockGlass === true || mockGlass === "frosted",
     NativeGlassView: (props) => React.createElement("GlassView", props),
   };
 });
@@ -358,5 +362,76 @@ describe("GlassTextInput", () => {
     const tree = render(<GlassTextInput style={{ color: "#fff", fontSize: 15 }} />);
     expect(tree.root.findAllByType("GlassView")).toHaveLength(0);
     expect(tree.root.findAllByType("View")).toHaveLength(0);
+  });
+});
+
+describe("Android buzlu cam", () => {
+  beforeEach(() => {
+    mockGlass = "frosted";
+  });
+
+  it("GlassTouchable: TouchableOpacity KALIR (activeOpacity), kabuk buzlu katmana geçer", () => {
+    const tree = render(
+      <GlassTouchable style={BTN} activeOpacity={0.7}>
+        <Child />
+      </GlassTouchable>,
+    );
+    expect(tree.root.findAllByType("GlassView")).toHaveLength(0);
+    expect(tree.root.findAllByType("Pressable")).toHaveLength(0);
+    const touchable = tree.root.findByType("TouchableOpacity");
+    expect(touchable.props.activeOpacity).toBe(0.7);
+    const style = flat(touchable.props.style);
+    expect(style.backgroundColor).toBeUndefined();
+    expect(style.elevation).toBeUndefined();
+    // Katman: vurgu dolgusu buzlu yüzey olur, dokunuş almaz, çocukların arkasında.
+    const [layerNode, childNode] = touchable.children;
+    const layer = layerNode.findAllByType("View")[0];
+    expect(layer.props.pointerEvents).toBe("none");
+    expect(flat(layer.props.style)).toMatchObject({ position: "absolute", borderRadius: 14 });
+    expect(flat(layer.props.style).backgroundColor).toBe("rgba(229, 9, 20, 0.9)");
+    expect(childNode.findAllByType("Child")).toHaveLength(1);
+  });
+
+  it("GlassPressable: fonksiyon stilindeki basılı-durum saydamlığı korunur", () => {
+    const tree = render(
+      <GlassPressable style={({ pressed }) => [BTN, { opacity: pressed ? 0.6 : 1 }]}>
+        <Child />
+      </GlassPressable>,
+    );
+    const pressable = tree.root.findByType("Pressable");
+    expect(flat(pressable.props.style({ pressed: true })).opacity).toBe(0.6);
+    expect(flat(pressable.props.style({ pressed: false })).backgroundColor).toBeUndefined();
+  });
+
+  it("seçili çipin vurgu çerçevesi kenar ışığı olur, kendi çerçeve rengi saydamlaşır", () => {
+    const tree = render(
+      <GlassBox style={{ borderRadius: 18, backgroundColor: "#202020", borderWidth: 1, borderColor: "#3B82F6" }}>
+        <Child />
+      </GlassBox>,
+    );
+    const outer = tree.root.findAllByType("View")[0];
+    expect(flat(outer.props.style).borderColor).toBe("transparent");
+    const rimLayer = tree.root.findAllByType("View").find(
+      (node) => flat(node.props.style).borderColor === "rgba(59, 130, 246, 1)",
+    );
+    expect(rimLayer).toBeTruthy();
+  });
+
+  it("GlassBox odak: yüzey aynı kalır, kenar ışığı vurgu rengine döner", () => {
+    const tree = render(
+      <GlassBox role="field" focused accent="#00FF88" style={{ borderRadius: 12, backgroundColor: "#202020" }} />,
+    );
+    const views = tree.root.findAllByType("View");
+    expect(views.some((node) => flat(node.props.style).borderColor === "#00FF88")).toBe(true);
+    expect(views.some((node) => flat(node.props.style).backgroundColor === "rgba(32, 32, 32, 0.8)")).toBe(true);
+  });
+
+  it("GlassTextInput: kutu buzlu cama geçer, yazı iç TextInput'ta", () => {
+    const tree = render(
+      <GlassTextInput style={{ borderRadius: 12, backgroundColor: "#202020", height: 44, color: "#fff" }} />,
+    );
+    const input = tree.root.findByType("TextInput");
+    expect(flat(input.props.style).color).toBe("#fff");
+    expect(flat(input.props.style).backgroundColor).toBeUndefined();
   });
 });

@@ -517,6 +517,7 @@ async function purgeAccountData({ db, rtdb = null, warn = console.warn }, uid, {
     "Notes",
     "MediaNotes",
     "AiConversations",
+    "PosterChoices",
     "Reminders",
     "UserStats",
     "SceneGame",

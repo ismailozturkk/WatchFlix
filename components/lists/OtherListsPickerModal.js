@@ -36,6 +36,7 @@ import { todayListDate } from "@utils/mediaFacts";
 import { i18nText } from "@utils/i18nText";
 import { showLibraryError } from "@utils/libraryErrorText";
 import GlassTouchable from "../common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const GridCard = memo(function GridCard({ label, active, onPress, theme }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -240,7 +241,7 @@ export default function OtherListsPickerModal({
             numColumns={3}
             contentContainerStyle={styles.gridContainer}
             showsVerticalScrollIndicator={false}
-            style={{ maxHeight: 300 }}
+            style={styles.gridList}
             columnWrapperStyle={{ gap: 10 }}
             renderItem={({ item: key }) => (
               <GridCard
@@ -332,7 +333,10 @@ const styles = StyleSheet.create({
   sheetTitle: { fontSize: 16, fontWeight: "800" },
   sheetSubtitle: { fontSize: 11, marginTop: 2, fontWeight: "600" },
   separator: { height: StyleSheet.hairlineWidth, marginVertical: 12 },
-  gridContainer: { gap: 10, paddingBottom: 4 },
+  // 3 sütunlu cam kart ızgarası: kenardaki kart basılınca listenin kırpma sınırında kesilmesin
+  // diye dört yanda GLASS_PRESS_ROOM (dolgu + eşit negatif dış boşluk; görünür yükseklik aynı).
+  gridList: { maxHeight: 300 + 2 * GLASS_PRESS_ROOM, margin: -GLASS_PRESS_ROOM },
+  gridContainer: { gap: 10, padding: GLASS_PRESS_ROOM, paddingBottom: 4 + GLASS_PRESS_ROOM },
   gridCard: {
     flex: 1,
     aspectRatio: 1,

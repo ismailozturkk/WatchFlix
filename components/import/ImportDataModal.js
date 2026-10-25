@@ -46,6 +46,7 @@ import Toast from "@components/AppToast";
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../common/GlassTouchable";
 import GlassBox from "../common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 const { height: SCREEN_H } = Dimensions.get("window");
 const SHEET_MAX_H = SCREEN_H * 0.88;
 
@@ -938,11 +939,15 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "800",
   },
+  // Tam genişlikteki cam düğmeler basılınca kaydırma sınırında kesilmesin: yanlarda
+  // GLASS_PRESS_ROOM (dolgu + sayfanın 20 pt yan boşluğuna taşan negatif dış boşluk).
   scrollArea: {
     marginTop: 8,
+    marginHorizontal: -GLASS_PRESS_ROOM,
   },
   scrollContent: {
     paddingVertical: 10,
+    paddingHorizontal: GLASS_PRESS_ROOM,
   },
   stepContainer: {
     paddingBottom: 10,

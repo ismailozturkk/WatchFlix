@@ -135,6 +135,7 @@ function ListPosterCard({
           <PosterImage
             path={item.imagePath}
             type={item.type}
+            mediaId={item.id}
             size={imageWidthFor(posterWidth)}
             style={styles.image}
             contentFit="cover"

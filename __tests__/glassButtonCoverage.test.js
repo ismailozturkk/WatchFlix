@@ -79,6 +79,7 @@ const COVERED = [
   ["components/home/AwardYearSheet.js", CLOSE],
   ["screens/tabs/setting/CustomThemeScreen.js", ICON],
   ["screens/game/GameHubScreen.js", ICON],
+  ["screens/lists/ListsViewScreen.js", ICON], // başlıktaki gizlilik (kilit) düğmesi
   ["screens/game/GameLeaderboardScreen.js", ICON],
   ["components/profile/ProfileIdentityBlock.js", ICON],
   ["components/PermissionsSection.js", ICON],
@@ -91,6 +92,7 @@ const COVERED = [
   ["screens/search/MovieSearch.js", ICON],
   ["screens/search/TvShowSearch.js", ICON],
   ["screens/search/ActorSearch.js", ICON],
+  ["screens/tabs/SearchScreen.js", ICON], // birleşik aramanın görünüm anahtarı (geri düğmesiyle aynı)
   ["screens/chat/AIChatScreen.js", ICON],
   ["components/modals/ChatModal.js", ICON],
   ["components/modals/CreatePostModal.js", ICON],

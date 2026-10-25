@@ -2263,6 +2263,7 @@
     "paylas_cine_eslesme_baslik": "CineSwipe matches",
     "paylas_cine_n_eslesme": "{{n}} shared matches",
     "paylas_duello_sonuc_onizleme": "Duel result · {{a}} – {{b}}",
+    "paylas_ayar_onizleme": "Appearance settings ({{n}})",
     "gonderilecek_kisiyi_veya_grubu_sec": "Choose a friend or group to send this to",
     "grup_ara": "Search groups",
     "izleme_kaydi_silindi": "Selected watch entry removed.",

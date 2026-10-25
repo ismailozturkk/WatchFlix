@@ -58,6 +58,7 @@ import useReferralOverview from "../../hooks/useReferralOverview";
 import { getReferralCopy } from "../../utils/referralCopy";
 import GlassPressable from "../../components/common/GlassPressable";
 import GlassBox from "../../components/common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 // ÖNE ÇIKAN FAYDALAR — seçili plana göre, utils/premiumFeatures.js
 // değerlerinden üretilir. Buradaki her cümlenin arkasında bir kapı var; yeni
@@ -1180,6 +1181,7 @@ export default function PremiumScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={styles.categoryFilterScroll}
               contentContainerStyle={styles.categoryFilterRow}
             >
               {[
@@ -1993,10 +1995,15 @@ const styles = StyleSheet.create({
   categorySectionWrap: {
     marginTop: 12,
   },
+  // Basılan cam hap kesilmesin: pay GLASS_PRESS_ROOM, eski dolgunun fazlası dış boşluktan düşülür.
+  categoryFilterScroll: {
+    marginVertical: 4 - GLASS_PRESS_ROOM,
+    marginHorizontal: 2 - GLASS_PRESS_ROOM,
+  },
   categoryFilterRow: {
     gap: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 2,
+    paddingVertical: GLASS_PRESS_ROOM,
+    paddingHorizontal: GLASS_PRESS_ROOM,
   },
   categoryFilterPill: {
     flexDirection: "row",

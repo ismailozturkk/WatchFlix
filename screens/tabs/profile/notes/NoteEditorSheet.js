@@ -53,6 +53,7 @@ import {
 } from "../../../../utils/notesView";
 import GlassTouchable from "../../../../components/common/GlassTouchable";
 import GlassBox from "../../../../components/common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../../../utils/liquidGlass";
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
@@ -857,8 +858,11 @@ const st = StyleSheet.create({
     gap: 12,
   },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center" },
-  scroll: { flexShrink: 1 },
-  scrollContent: { gap: 12, paddingBottom: 4 },
+  // Üst satırdaki ve yandaki cam düğmeler basılınca kaydırma sınırında kesilmesin: üstte ve
+  // yanlarda GLASS_PRESS_ROOM (dolgu + sayfanın 18 pt yan / 12 pt aralık boşluğuna taşan
+  // negatif dış boşluk; yerleşim aynı).
+  scroll: { flexShrink: 1, marginTop: -GLASS_PRESS_ROOM, marginHorizontal: -GLASS_PRESS_ROOM },
+  scrollContent: { gap: 12, paddingTop: GLASS_PRESS_ROOM, paddingBottom: 4, paddingHorizontal: GLASS_PRESS_ROOM },
 
   topRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   typeSwitch: {
@@ -978,8 +982,10 @@ const st = StyleSheet.create({
   todoHint: { fontSize: 13, paddingVertical: 14, textAlign: "center" },
 
   // Hatırlatıcı
-  dateScroll: { flexGrow: 0 },
-  dateRow: { gap: 8, alignItems: "center", paddingVertical: 2 },
+  // Basılan cam tarih hapı kırpma sınırında kesilmesin: dört yanda GLASS_PRESS_ROOM; eski 2 pt'nin
+  // fazlası negatif dış boşlukla düşülür (yerleşim aynı).
+  dateScroll: { flexGrow: 0, marginVertical: 2 - GLASS_PRESS_ROOM, marginHorizontal: -GLASS_PRESS_ROOM },
+  dateRow: { gap: 8, alignItems: "center", paddingVertical: GLASS_PRESS_ROOM, paddingHorizontal: GLASS_PRESS_ROOM },
   dateChip: {
     flexDirection: "row",
     alignItems: "center",

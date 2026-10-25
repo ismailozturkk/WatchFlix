@@ -95,6 +95,7 @@ function UpNextRailCard({
         <PosterImage
           path={item?.showPosterPath || show.imagePath}
           type="tv"
+          mediaId={show.id}
           size={200}
           style={[
             styles.poster,

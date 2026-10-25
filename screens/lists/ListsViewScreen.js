@@ -13,7 +13,7 @@ import {
   StatusBar,
 } from "react-native";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { doc, getDoc, onSnapshot, setDoc, writeBatch, collection, getDocs, limit, query } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, writeBatch, collection, getDocs, limit, query } from "firebase/firestore";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
@@ -21,6 +21,9 @@ import Toast from "@components/AppToast";
 import { db } from "../../firebase";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
+import GlassIconButton from "@components/common/GlassIconButton";
+import { useLanguage } from "@context/LanguageContext";
+import { getListVisibilityCopy } from "../tabs/profile/listVisibilityCopy";
 import StaggerItem from "../../components/StaggerItem";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
@@ -94,10 +97,8 @@ const CardCovers = ({ gridStyle, ...rest }) => (
 const ListCard = ({
   listName,
   items,
-  isVisible,
   onPress,
   onLongPress,
-  onVisibilityToggle,
   getTmdbUrl,
   index,
   theme,
@@ -202,17 +203,9 @@ const ListCard = ({
                 {displayName}
               </Text>
             </View>
+            {/* Profil görünürlüğü artık burada değil: Ayarlar > Gizlilik >
+                Profilinde görünen listeler (ListVisibilityScreen). */}
             <View style={styles.cardFooterRight}>
-              <TouchableOpacity
-                onPress={onVisibilityToggle}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons
-                  name={isVisible ? "eye" : "eye-off-outline"}
-                  size={16}
-                  color={isVisible ? accent : theme.text.muted}
-                />
-              </TouchableOpacity>
               <Text style={[styles.countBadge, { color: accent }]}>
                 {items?.length ?? 0}
               </Text>
@@ -333,6 +326,7 @@ const SharedListCard = ({
 // ── Ana Bileşen ──────────────────────────────────────────────────────────────
 export default function ListsViewScreen({ navigation }) {
   const { theme } = useTheme();
+  const { language } = useLanguage();
   const SHARED_ACCENT = getSharedListAccent(theme.primary);
   const customAccent = getListAccent(null, theme.secondary);
   const { user } = useAuth();
@@ -385,7 +379,6 @@ export default function ListsViewScreen({ navigation }) {
   );
   // Uzun basılan liste — yönetim sayfası (ad değiştir / sil) buna bakar.
   const [selectedList, setSelectedList] = useState(null);
-  const [listVisible, setListVisible] = useState({});
   const [newListName, setNewListName] = useState("");
   const [inputFocused, setInputFocused] = useState(false);
 
@@ -436,55 +429,22 @@ export default function ListsViewScreen({ navigation }) {
     }).start();
   }, []);
 
-  // Firestore'dan listVisible çek (eski array formatını map'e dönüştürür)
-  useEffect(() => {
-    const fetchListVisible = async () => {
-      if (!user) return;
-      try {
-        const userRef = doc(db, "Users", user.uid);
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) return;
-        const raw = userSnap.data().listVisible;
-        if (Array.isArray(raw)) {
-          // Eski format: [{listName: true}, ...] → map'e çevir ve kaydet
-          const map = {};
-          raw.forEach((item) => Object.assign(map, item));
-          setListVisible(map);
-          setDoc(userRef, { listVisible: map }, { merge: true }).catch(() => {});
-        } else {
-          setListVisible(raw || {});
-        }
-      } catch (e) {
-        // Offline ilk açılış: getDoc cache'siz reddeder — unhandled olmasın.
-        if (__DEV__) console.warn("fetchListVisible:", e?.message);
-      }
-    };
-    fetchListVisible();
-  }, [user]);
-
-  const addToListVisible = async (listName) => {
-    if (!user) return;
-    const userRef = doc(db, "Users", user.uid);
-    const updated = { ...listVisible, [listName]: !listVisible[listName] };
-    try {
-      await setDoc(userRef, { listVisible: updated }, { merge: true });
-      setListVisible(updated);
-    } catch (e) {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.islem_basarisiz", "İşlem başarısız") });
-    }
-  };
-
   // Firestore listeleri dinle
   useEffect(() => {
     if (!user?.uid) return;
     const docRef = doc(db, "Lists", user.uid);
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setRootLists(Object.entries(docSnap.data() || {}));
-      } else {
-        setRootLists([]);
-      }
-    });
+    const unsubscribe = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setRootLists(Object.entries(docSnap.data() || {}));
+        } else {
+          setRootLists([]);
+        }
+      },
+      // Çıkış yapılırken oturum, dinleyici kapanmadan düşebilir.
+      (err) => __DEV__ && console.warn("ListsView Lists:", err.message),
+    );
     return () => unsubscribe();
   }, [user?.uid]);
 
@@ -519,7 +479,6 @@ export default function ListsViewScreen({ navigation }) {
           { merge: true },
         );
         await batch.commit();
-        setListVisible((prev) => ({ ...prev, [name]: true }));
         setNewListName("");
         Keyboard.dismiss();
         Toast.show({ type: "success", text1: i18nText("autoI18n.liste_olusturuldu", "Liste oluşturuldu") });
@@ -558,20 +517,6 @@ export default function ListsViewScreen({ navigation }) {
   const selectedListCount =
     lists.find(([name]) => name === selectedList)?.[1]?.length ?? 0;
 
-  // Ad değişince görünürlük bayrağı da yeni ada taşınır (yazmayı sayfa yapar,
-  // burada yalnız ekrandaki göz ikonlarının haritası güncellenir).
-  const handleRenamed = (from, to) => {
-    setListVisible((prev) => {
-      const next = { ...prev };
-      const wasVisible = prev[from] === true;
-      delete next[from];
-      next[to] = wasVisible;
-      return next;
-    });
-  };
-
-  const isListVisible = (listName) => listVisible[listName] === true;
-
   const renderItem = useCallback(
     ({ item, index }) => {
       const [listName, items] = item;
@@ -580,7 +525,6 @@ export default function ListsViewScreen({ navigation }) {
           <ListCard
             listName={listName}
             items={items}
-            isVisible={isListVisible(listName)}
             index={index}
             getTmdbUrl={getTmdbUrl}
             theme={theme}
@@ -597,12 +541,11 @@ export default function ListsViewScreen({ navigation }) {
                 setSelectedList(listName);
               }
             }}
-            onVisibilityToggle={() => addToListVisible(listName)}
           />
         </StaggerItem>
       );
     },
-    [listVisible, getTmdbUrl, gridStyle, allCornersRounded, theme],
+    [getTmdbUrl, gridStyle, allCornersRounded, theme],
   );
 
   return (
@@ -653,14 +596,29 @@ export default function ListsViewScreen({ navigation }) {
             </Text>
           </View>
         </View>
-        <View style={[styles.countChip, { backgroundColor: theme.secondary }]}>
-          <Text
-            style={[
-              styles.countChipText,
-              { color: theme.text?.secondary ?? "#aaa" },
-            ]}
-          >
-            {lists.length}{i18nText("autoI18n.liste", "liste")}</Text>
+        <View style={styles.headerRight}>
+          <View style={[styles.countChip, { backgroundColor: theme.secondary }]}>
+            <Text
+              style={[
+                styles.countChipText,
+                { color: theme.text?.secondary ?? "#aaa" },
+              ]}
+            >
+              {lists.length}{i18nText("autoI18n.liste", "liste")}</Text>
+          </View>
+          {/* Profilde hangi listeler görünsün: Gizlilik > Profilinde görünen
+              listeler ekranına doğrudan gider (eski kart üstü göz simgesinin yerine). */}
+          <GlassIconButton
+            testID="lists-privacy-button"
+            icon="lock-closed-outline"
+            iconSize={19}
+            size={40}
+            onPress={() => {
+              Keyboard.dismiss();
+              navigation.navigate("ListVisibilityScreen");
+            }}
+            accessibilityLabel={getListVisibilityCopy(language).rowTitle}
+          />
         </View>
       </Animated.View>
 
@@ -836,7 +794,6 @@ export default function ListsViewScreen({ navigation }) {
         existingNames={existingListNames}
         uid={user?.uid}
         onClose={() => setSelectedList(null)}
-        onRenamed={handleRenamed}
       />
 
       {/* ── Ortak liste oluşturma ── */}
@@ -882,11 +839,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: -0.5,
   },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   countChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    marginBottom: 4,
   },
   countChipText: { fontSize: 12, fontWeight: "600" },
 

@@ -73,6 +73,7 @@ const UpcomingCard = memo(function UpcomingCard({ item, mediaType, navigation, o
         <PosterImage
           path={item.poster_path}
           type={mediaType}
+          mediaId={item.id}
           size={200}
           style={{
             width: rail.posterWidth,

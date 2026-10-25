@@ -62,6 +62,7 @@ import {
   useApiSettings,
   useImageQualitySettings,
 } from "../../context/AppSettingsContext";
+import useBackdropUri from "../../hooks/useBackdropUri";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
 import useReminderGate from "../../hooks/useReminderGate";
@@ -158,6 +159,7 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
   const reminderGate = useReminderGate();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
+  const backdropUri = useBackdropUri();
   const { allLists, statusIndex, watchedMoviesItems } = useListStatusContext();
 
   // `target` kapanınca null olur; içerik kapanış animasyonu boyunca çizilmeye
@@ -857,9 +859,9 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
               >
                 {/* ── HERO / BACKDROP ── */}
                 <View style={styles.hero}>
-                  {backdropPath ? (
+                  {backdropUri(mediaType, id, backdropPath) ? (
                     <Image
-                      source={{ uri: getTmdbUrl(backdropPath, "backdrop", 1000) }}
+                      source={{ uri: backdropUri(mediaType, id, backdropPath) }}
                       style={styles.backdrop}
                       contentFit="cover"
                       cachePolicy="memory-disk"
@@ -885,6 +887,7 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
                     <PosterImage
                       path={posterPath}
                       type={mediaType}
+                      mediaId={id}
                       size={200}
                       style={[styles.poster, { borderColor: alpha(theme.border, 0.5019607843137255) }]}
                       cachePolicy="memory-disk"

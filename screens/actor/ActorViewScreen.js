@@ -28,8 +28,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ActorSkeleton } from "../../components/Skeleton";
 import { i18nText } from "../../utils/i18nText";
 import ScreenDecor from "../../components/ScreenDecor";
+import { LocalBlurTarget, useLocalBlurTarget } from "../../components/common/BlurTarget";
+
 import FollowPersonButton from "../../components/person/FollowPersonButton";
 import GlassTouchable from "../../components/common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
+import usePosterUri from "../../hooks/usePosterUri";
 
 
 const { width } = Dimensions.get("window");
@@ -80,6 +84,7 @@ const FilterChips = ({ filters, active, onSelect, theme }) => (
   <ScrollView
     horizontal
     showsHorizontalScrollIndicator={false}
+    style={styles.filterScroll}
     contentContainerStyle={styles.filterList}
   >
     {filters.map((f) => {
@@ -123,7 +128,8 @@ const FilterChips = ({ filters, active, onSelect, theme }) => (
 );
 
 // ─── Media Card ───────────────────────────────────────────────────────────────
-const MediaCard = ({ item, onPress, theme, imageQuality, getTmdbUrl }) => {
+const MediaCard = ({ item, mediaType, onPress, theme, imageQuality }) => {
+  const posterUri = usePosterUri();
   const scale = useRef(new Animated.Value(1)).current;
   const rating = item.vote_average ?? 0;
   const ratingColor = getRatingColor(rating);
@@ -153,7 +159,7 @@ const MediaCard = ({ item, onPress, theme, imageQuality, getTmdbUrl }) => {
         {item.poster_path ? (
           <Image
             source={{
-              uri: getTmdbUrl(item.poster_path, 'poster', 200),
+              uri: posterUri(mediaType, item.id, item.poster_path),
             }}
             style={styles.mediaPoster}
           />
@@ -255,6 +261,9 @@ const applyFilter = (list, filter, type) => {
 const ActorViewScreen = ({ route, navigation }) => {
   const { personId } = route.params;
   const { theme } = useTheme();
+  // Android 12+: geri düğmesi altından kayan fotoğrafı/içeriği GERÇEKTEN
+  // bulanıklaştırsın diye içerik yerel blur hedefine sarılır; düğme onun KARDEŞİ.
+  const contentBlur = useLocalBlurTarget();
   const { API_KEY } = useApiSettings();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
   const { language } = useLanguage();
@@ -345,8 +354,9 @@ const ActorViewScreen = ({ route, navigation }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
-      <ScreenDecor scope="details" iconOpacity={0.25} />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <LocalBlurTarget attach={contentBlur.attach} backgroundColor={theme.primary} style={styles.container}>
+      <ScreenDecor scope="details" iconOpacity={0.25} />
 
       {/* ── Floating header (scroll sonrası görünür) ── */}
       <Animated.View
@@ -363,16 +373,6 @@ const ActorViewScreen = ({ route, navigation }) => {
           {actor.name}
         </Text>
       </Animated.View>
-
-      {/* ── Back button (daima görünür) ── */}
-      <SafeAreaView style={styles.backBtnWrapper} edges={["top"]}>
-        <GlassIconButton
-          variant="blur"
-          icon="chevron-back"
-          accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
-          onPress={() => navigation.goBack()}
-        />
-      </SafeAreaView>
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
@@ -537,7 +537,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                     item={item}
                     theme={theme}
                     imageQuality={imageQuality}
-                    getTmdbUrl={getTmdbUrl}
+                    mediaType="movie"
                     onPress={() =>
                       navigation.navigate("MovieDetails", { id: item.id })
                     }
@@ -589,7 +589,7 @@ const ActorViewScreen = ({ route, navigation }) => {
                     item={item}
                     theme={theme}
                     imageQuality={imageQuality}
-                    getTmdbUrl={getTmdbUrl}
+                    mediaType="tv"
                     onPress={() =>
                       navigation.navigate("TvShowsDetails", { id: item.id })
                     }
@@ -611,6 +611,19 @@ const ActorViewScreen = ({ route, navigation }) => {
           </View>
         )}
       </Animated.ScrollView>
+      </LocalBlurTarget>
+
+      {/* ── Back button (daima görünür) ── */}
+      {/* Hedefin KARDEŞİ ve ondan sonra: blur hedefin içinde olamaz. */}
+      <SafeAreaView style={styles.backBtnWrapper} edges={["top"]}>
+        <GlassIconButton
+          variant="blur"
+          blurTarget={contentBlur.target}
+          icon="chevron-back"
+          accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
+          onPress={() => navigation.goBack()}
+        />
+      </SafeAreaView>
     </View>
   );
 };
@@ -735,8 +748,11 @@ const styles = StyleSheet.create({
   bioToggleText: { fontSize: 13, fontWeight: "600" },
 
   // ── Filter chips ──────────────────────────────────────────────────────────
+  // Basılan cam çip satırın üst kırpma sınırında kesilmesin (utils/liquidGlass GLASS_PRESS_ROOM).
+  filterScroll: { marginTop: -GLASS_PRESS_ROOM },
   filterList: {
     paddingHorizontal: 16,
+    paddingTop: GLASS_PRESS_ROOM,
     paddingBottom: 12,
     gap: 8,
   },

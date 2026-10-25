@@ -68,3 +68,51 @@ export function glassSchemeFor(lightSurface) {
 export function capsuleRadius(height) {
   return typeof height === "number" && height > 0 ? height / 2 : null;
 }
+
+// ── ÇİZİM KİPİ: native / frosted / off ──────────────────────────────────────
+//
+// Cam çizilemeyen yerde iki farklı "eski görünüm" var:
+//
+//   native  → iOS 26+ gerçek Liquid Glass (yukarıdaki plan).
+//   frosted → Android, efektler açık: UIGlassEffect yok, ama cam yerleri
+//             "buzlu cam" diliyle çizilir — camla AYNI şekil (daire/hap), yarı
+//             saydam yüzey, ince kenar ışığı ve üstten inen parlama; arkasında
+//             bulandırılacak bir hedef olan yerlerde (poster üstü düğmeler,
+//             sohbet yazı alanı) gerçek blur. Çizim components/common/GlassSurface.
+//   off      → iOS 18–25 (eski görünüm bilerek korunur) ve Efektler: Kapalı
+//             (kullanıcı düz arayüzü kendisi seçti): çağıranın eski kutusu aynen.
+
+export const GLASS_MODES = Object.freeze({
+  native: "native",
+  frosted: "frosted",
+  off: "off",
+});
+
+/**
+ * @param {object}  girdi   resolveGlassPlan ile aynı alanlar
+ * @returns {"native"|"frosted"|"off"}
+ */
+export function resolveGlassMode({ platform, supported = false, effectsEnabled = true } = {}) {
+  if (resolveGlassPlan({ platform, supported, effectsEnabled }).native) return GLASS_MODES.native;
+  if (platform === "android" && effectsEnabled) return GLASS_MODES.frosted;
+  return GLASS_MODES.off;
+}
+
+// ── BASINCA BÜYÜME PAYI ─────────────────────────────────────────────────────
+//
+// Etkileşimli cam (`isInteractive`: GlassTouchable, GlassPressable, GlassIconButton,
+// GlassPillButton…) dokununca sistem animasyonuyla kendi kutusunun DIŞINA doğru
+// esneyip büyür. Kırpan bir kabın — ScrollView / FlatList (UIScrollView sınırına
+// kırpar), `overflow: "hidden"` kutu — kenarına dayanan cam düğme o an kesik görünür.
+// Böyle kaplarda düğme ile kırpma sınırı arasında en az GLASS_PRESS_ROOM boşluk
+// kalır. Düzen kaymasın diye pay içerik kabına DOLGU, kaydırma görünümüne aynı
+// kadar NEGATİF dış boşluk olarak verilir: yerleşim aynı, yalnız kırpma sınırı
+// dışarı açılır:
+//
+//   chipRow:    { paddingVertical: GLASS_PRESS_ROOM, … }   // contentContainerStyle
+//   chipScroll: { marginVertical: -GLASS_PRESS_ROOM }      // ScrollView style
+//
+// Bekçi: __tests__/glassPressRoom.test.js (cam düğmeli yatay satırlar).
+
+/** Basılan etkileşimli camın kutusunun dışına taşabileceği pay (pt). */
+export const GLASS_PRESS_ROOM = 8;

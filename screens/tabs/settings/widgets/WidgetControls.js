@@ -666,11 +666,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 4,
     borderWidth: 1,
-    overflow: "hidden",
   },
   pickerItemCompact: { paddingVertical: 11 },
   pickerIos: { borderRadius: 16 },
-  pickerAndroid: { borderRadius: 20 },
+  // overflow yalnız Android'de (dalga efektini köşeye kırpar); iOS'ta cam katmanını basılınca
+  // düğmenin sınırında keserdi.
+  pickerAndroid: { borderRadius: 20, overflow: "hidden" },
   pickerIcon: {
     width: 30,
     height: 30,

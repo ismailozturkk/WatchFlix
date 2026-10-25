@@ -18,8 +18,29 @@
 //
 // `keyboardShouldPersistTaps="handled"` şart: aksi halde klavye açıkken ilk
 // dokunuş yalnız klavyeyi kapatır, düğmeler iki dokunuşta çalışır.
+//
+// YATAY BASMA PAYI: sayfadaki cam düğme/çipler bölgenin yan kenarına dayanır;
+// basılınca büyüyen cam ScrollView sınırında kesilirdi. Kaydırıcı iki yana
+// GLASS_PRESS_ROOM kadar taşar, içerik aynı kadar içeri itilir (yerleşim aynı;
+// sayfanın kendi yan boşluğu bu payı karşılar). Tüketicinin yatay dolgusu korunur,
+// pay ona EKLENİR. Dikeyde pay yok: negatif üst boşluk kayan içeriği başlığın
+// altına sokardı.
 import React from "react";
 import { ScrollView, StyleSheet } from "react-native";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
+
+/** Tüketicinin içerik stiline iki yanda GLASS_PRESS_ROOM ekler (mevcut dolguyu koruyarak). */
+function withSideRoom(contentContainerStyle) {
+  const flat = StyleSheet.flatten(contentContainerStyle) || {};
+  const side = (key) => flat[key] ?? flat.paddingHorizontal ?? flat.padding ?? 0;
+  return [
+    contentContainerStyle,
+    {
+      paddingLeft: side("paddingLeft") + GLASS_PRESS_ROOM,
+      paddingRight: side("paddingRight") + GLASS_PRESS_ROOM,
+    },
+  ];
+}
 
 export default function SheetScroll({
   children,
@@ -30,7 +51,7 @@ export default function SheetScroll({
   return (
     <ScrollView
       style={[styles.scroll, style]}
-      contentContainerStyle={contentContainerStyle}
+      contentContainerStyle={withSideRoom(contentContainerStyle)}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
       bounces={false}
@@ -43,5 +64,5 @@ export default function SheetScroll({
 }
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 0, flexShrink: 1 },
+  scroll: { flexGrow: 0, flexShrink: 1, marginHorizontal: -GLASS_PRESS_ROOM },
 });

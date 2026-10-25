@@ -83,6 +83,7 @@ import {
 
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 const { height: SCREEN_H } = Dimensions.get("window");
 
 // ─── Tema renk örnekleri (ayarlar kartındaki seçici) ─────────────────────────
@@ -446,6 +447,8 @@ const MessageBubble = memo(
                 keyExtractor={(c) => c.key}
                 showsHorizontalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                style={styles.cardRail}
+                contentContainerStyle={styles.cardRailContent}
                 ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
                 renderItem={({ item }) => (
                   <PosterCard
@@ -1297,6 +1300,10 @@ const styles = StyleSheet.create({
   },
   bubbleUser: { borderBottomRightRadius: 5 },
   bubbleAi: { borderBottomLeftRadius: 5, borderWidth: StyleSheet.hairlineWidth },
+  // Basılan cam "Ara" çipi rayın kırpma sınırında kesilmesin: dört yanda GLASS_PRESS_ROOM
+  // (dolgu + eşit negatif dış boşluk; balonun 12/9 pt iç boşluğuna taşar, yerleşim aynı).
+  cardRail: { margin: -GLASS_PRESS_ROOM },
+  cardRailContent: { padding: GLASS_PRESS_ROOM },
 
   retryBtn: {
     flexDirection: "row",

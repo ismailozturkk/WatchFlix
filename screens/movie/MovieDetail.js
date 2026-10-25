@@ -32,6 +32,8 @@ import MediaNoteSheet from "@components/detail/MediaNoteSheet";
 import ListView from "../../components/ListView";
 import PosterImage from "../../components/PosterImage";
 import { useAppSettings, useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import usePosterUri from "../../hooks/usePosterUri";
+import useBackdropUri from "../../hooks/useBackdropUri";
 import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
@@ -54,6 +56,8 @@ import { showLibraryError } from "../../utils/libraryErrorText";
 import { todayListDate } from "../../utils/mediaFacts";
 import { movieWatchEvents } from "../../utils/watchHistory";
 import ScreenDecor from "../../components/ScreenDecor";
+import { LocalBlurTarget, useLocalBlurTarget } from "../../components/common/BlurTarget";
+
 import { useAuth } from "../../context/AuthContext";
 import { useDeviceNotifications } from "../../context/DeviceNotificationsContext";
 import useReminderGate from "../../hooks/useReminderGate";
@@ -78,6 +82,7 @@ import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../../components/common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 const { width } = Dimensions.get("window");
 const BACKDROP_HEIGHT = width * (9 / 16);
 // Fotoğrafı olmayan oyuncu kartındaki ikon: kart genişliğinin (width * 0.2) ~%45'i.
@@ -129,6 +134,7 @@ const RecommendedMovieItem = memo(function RecommendedMovieItem({
         <PosterImage
           path={item.poster_path}
           type="movie"
+          mediaId={item.id}
           size={200}
           iconSize={46}
           style={[styles.railPoster, { borderColor: alpha(theme.border, 0.3333333333333333) }]}
@@ -190,6 +196,7 @@ const CollectionMovieItem = memo(function CollectionMovieItem({
         <PosterImage
           path={item.poster_path}
           type="movie"
+          mediaId={item.id}
           size={200}
           iconSize={46}
           style={[
@@ -276,6 +283,9 @@ const SectionHeader = ({ title, right, theme }) => (
 ───────────────────────────────────────── */
 export default function MovieDetails({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  // Android 12+: üst düğmeler (geri / paylaş) posteri GERÇEKTEN bulanıklaştırsın
+  // diye ekran içeriği yerel bir blur hedefine sarılır; düğmeler onun KARDEŞİ.
+  const posterBlur = useLocalBlurTarget();
   // openComments: "Etkinliklerim → Yorumlarım" satırından gelindiğinde yorum
   // sayfası doğrudan açılır (dizi tarafındaki davranışın filmdeki karşılığı).
   const { id, openComments = false } = route.params;
@@ -319,6 +329,8 @@ export default function MovieDetails({ navigation, route }) {
 
   const { API_KEY } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
+  const backdropUri = useBackdropUri();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
@@ -881,13 +893,14 @@ export default function MovieDetails({ navigation, route }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
-      <ScreenDecor scope="details" iconOpacity={0.25} />
       <StatusBar
         barStyle="light-content"
         translucent
         backgroundColor="transparent"
       />
 
+      <LocalBlurTarget attach={posterBlur.attach} backgroundColor={theme.primary} style={styles.container}>
+      <ScreenDecor scope="details" iconOpacity={0.25} />
       <ScrollView
         style={styles.container}
         nestedScrollEnabled
@@ -896,14 +909,14 @@ export default function MovieDetails({ navigation, route }) {
       >
         {/* ─── HERO / BACKDROP ─── */}
         <View style={styles.heroContainer}>
-          {details.backdrop_path ? (
+          {backdropUri("movie", details.id, details.backdrop_path) ? (
             <TouchableOpacity
               activeOpacity={0.95}
               onPress={() => setBacdropModalVisible(true)}
             >
               <Image
                 source={{
-                  uri: getTmdbUrl(details.backdrop_path, 'backdrop', 1000),
+                  uri: backdropUri("movie", details.id, details.backdrop_path),
                 }}
                 style={styles.backdrop}
               />
@@ -936,10 +949,10 @@ export default function MovieDetails({ navigation, route }) {
             onPress={() => setPosterModalVisible(true)}
             activeOpacity={0.92}
           >
-            {details.poster_path ? (
+            {posterUri("movie", details.id, details.poster_path) ? (
               <Image
                 source={{
-                  uri: getTmdbUrl(details.poster_path, 'poster', 200),
+                  uri: posterUri("movie", details.id, details.poster_path),
                 }}
                 style={[styles.poster, { borderColor: alpha(theme.border, 0.5019607843137255) }]}
               />
@@ -1342,7 +1355,7 @@ export default function MovieDetails({ navigation, route }) {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={{ marginBottom: 24 }}
+              style={styles.externalScroll}
             >
               <View style={styles.externalLinks}>
                 {[
@@ -1629,12 +1642,14 @@ export default function MovieDetails({ navigation, route }) {
               modalında gösteriliyor. */}
         </View>
       </ScrollView>
+      </LocalBlurTarget>
 
 
       {/* ─── ÜST OVERLAY BUTONLARI (her zaman tıklanabilir) ─── */}
-      {/* iOS 26+: Liquid Glass; diğer yerlerde eski koyu blur kutusu. */}
+      {/* iOS 26+: Liquid Glass; Android'de posteri bulanıklaştıran buzlu cam. */}
       <GlassIconButton
         variant="blur"
+        blurTarget={posterBlur.target}
         size={38}
         icon="chevron-back"
         accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
@@ -1644,6 +1659,7 @@ export default function MovieDetails({ navigation, route }) {
 
       <GlassIconButton
         variant="blur"
+        blurTarget={posterBlur.target}
         size={38}
         icon="share-social-outline"
         iconSize={20}
@@ -1780,6 +1796,7 @@ export default function MovieDetails({ navigation, route }) {
         initialImage={
           PosterModalVisible ? details.poster_path : details.backdrop_path
         }
+        posterPicker
       />
 
       <AIChatScreen
@@ -1965,7 +1982,14 @@ const styles = StyleSheet.create({
   commentsRight: { marginLeft: "auto" },
 
   /* External links */
-  externalLinks: { flexDirection: "row", gap: 8, paddingVertical: 2 },
+  // Basılan cam bağlantı hapı kırpma sınırında kesilmesin: dört yanda GLASS_PRESS_ROOM; eski
+  // dolgunun ve alt boşluğun fazlası negatif dış boşlukla düşülür (yerleşim aynı).
+  externalScroll: {
+    marginTop: 2 - GLASS_PRESS_ROOM,
+    marginBottom: 24 - (GLASS_PRESS_ROOM - 2),
+    marginHorizontal: -GLASS_PRESS_ROOM,
+  },
+  externalLinks: { flexDirection: "row", gap: 8, padding: GLASS_PRESS_ROOM },
   extLink: {
     flexDirection: "row",
     alignItems: "center",

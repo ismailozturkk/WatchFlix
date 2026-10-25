@@ -24,6 +24,7 @@ import React, { useMemo } from "react";
 import { Image } from "expo-image";
 import { StyleSheet, View } from "react-native";
 import { sortItemsByListOrder } from "@utils/listOrder";
+import usePosterUri from "../../hooks/usePosterUri";
 
 // Afişler arası boşluk ve köşe yarıçapı — iki yüzeyde de aynı.
 const GAP = 2;
@@ -66,11 +67,14 @@ export function getNaturalCoverWidth(gridStyle, height) {
   return null;
 }
 
-const Cover = ({ item, width, height, corners, getTmdbUrl, theme }) => {
+const Cover = ({ item, width, height, corners, theme }) => {
+  // Özel afiş: liste sahibinin (arkadaş profilinde PosterChoicesScope) ya da kendi seçimin.
+  const posterUri = usePosterUri();
   const box = [{ width, height }, corners];
-  if (item?.imagePath) {
+  const uri = posterUri(item?.type, item?.id, item?.imagePath);
+  if (uri) {
     return (
-      <Image source={{ uri: getTmdbUrl(item.imagePath, "poster", 200) }} style={box} />
+      <Image source={{ uri }} style={box} />
     );
   }
   return <View style={[...box, { backgroundColor: theme?.primary || "#1c1c1e" }]} />;

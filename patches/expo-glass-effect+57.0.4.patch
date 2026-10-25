@@ -1,0 +1,183 @@
+diff --git a/node_modules/expo-glass-effect/ios/GlassView.swift b/node_modules/expo-glass-effect/ios/GlassView.swift
+index 1130937..687d3e0 100644
+--- a/node_modules/expo-glass-effect/ios/GlassView.swift
++++ b/node_modules/expo-glass-effect/ios/GlassView.swift
+@@ -11,6 +11,11 @@ public final class GlassView: ExpoView {
+   // https://github.com/expo/expo/issues/41024#issuecomment-3867466289
+   private var isMounted = false
+   private var visibilityLink: CADisplayLink?
++  // Lowest and last sampled opacity since the effect was last applied
++  // (see GlassVisibilityMonitor).
++  private var lowestOpacitySinceApply: CGFloat = 1
++  private var lastSampledOpacity: CGFloat = 1
++  private var needsEffectReapply = false
+ 
+   private var glassStyle: GlassStyle?
+   private var glassTintColor: UIColor?
+@@ -53,7 +58,15 @@ public final class GlassView: ExpoView {
+ 
+   override public func layoutSubviews() {
+     super.layoutSubviews()
+-    guard !isMounted, isGlassEffectAvailable() else {
++    guard isGlassEffectAvailable() else {
++      return
++    }
++    if isMounted {
++      // UIGlassEffect must be (re)applied in layoutSubviews.
++      if needsEffectReapply {
++        needsEffectReapply = false
++        applyEffect(atOpacity: effectiveOpacity)
++      }
+       return
+     }
+     if isEffectRenderable {
+@@ -66,27 +79,45 @@ public final class GlassView: ExpoView {
+   // UIKit silently skips the glass effect when the view's opacity is low,
+   // and never installs it again.
+   private var isEffectRenderable: Bool {
++    // This number was chosen through trial and error.
++    // If adjusting it, be sure to test on various real devices.
++    return effectiveOpacity > 0.02
++  }
++
++  // The opacity the view is drawn with: every ancestor's alpha multiplied, 0 when it is
++  // off-window or hidden. While Core Animation animates a layer, its presentation opacity
++  // is used too: UIKit transitions (native-stack `fade`, RN Modal `fade`) set the model
++  // alpha to 1 up front and only the presentation layer fades in.
++  fileprivate var effectiveOpacity: CGFloat {
+     guard window != nil else {
+-      return false
++      return 0
+     }
+     var opacity: CGFloat = 1
+     var view: UIView? = self
+     while let current = view {
+       if current.isHidden {
+-        return false
++        return 0
++      }
++      var alpha = current.alpha
++      if current.layer.animationKeys() != nil, let presented = current.layer.presentation() {
++        alpha = min(alpha, CGFloat(presented.opacity))
+       }
+-      opacity *= current.alpha
++      opacity *= alpha
+       view = current.superview
+     }
+-
+-    // This number was chosen through trial and error.
+-    // If adjusting it, be sure to test on various real devices.
+-    return opacity > 0.02
++    return opacity
+   }
+ 
+   private func installEffect() {
+     isMounted = true
+     stopWaitingForVisibility()
++    applyEffect(atOpacity: effectiveOpacity)
++    GlassVisibilityMonitor.shared.track(self)
++  }
++
++  private func applyEffect(atOpacity opacity: CGFloat) {
++    lowestOpacitySinceApply = opacity
++    lastSampledOpacity = opacity
+     // Clear the stale effect before re-applying so UIKit fully tears down
+     // the old UIGlassEffect, otherwise re-assigning does not render GlassView correctly.
+     // https://github.com/expo/expo/issues/43732
+@@ -94,6 +125,31 @@ public final class GlassView: ExpoView {
+     updateEffect()
+   }
+ 
++  // Called by GlassVisibilityMonitor a few times per second while the effect is installed.
++  // An effect applied (or drawn) while the view was nearly transparent may have been
++  // skipped by UIKit, which only redraws it when the effect is assigned again; touching an
++  // interactive glass or changing its tint did that, so the view stayed invisible until
++  // then. Once the opacity has risen and settled, the effect is applied again.
++  fileprivate func sampleOpacity() {
++    guard isMounted, !needsEffectReapply else {
++      return
++    }
++    let opacity = effectiveOpacity
++    defer {
++      lastSampledOpacity = opacity
++    }
++    if opacity < lowestOpacitySinceApply {
++      lowestOpacitySinceApply = opacity
++      return
++    }
++    let hasRisen = opacity - lowestOpacitySinceApply > 0.1
++    let hasSettled = opacity >= 0.98 || abs(opacity - lastSampledOpacity) < 0.01
++    if hasRisen && hasSettled {
++      needsEffectReapply = true
++      setNeedsLayout()
++    }
++  }
++
+   private func waitForVisibility() {
+     guard visibilityLink == nil else {
+       return
+@@ -295,7 +351,9 @@ public final class GlassView: ExpoView {
+     super.didMoveToWindow()
+     if (self.window == nil) {
+       isMounted = false
++      needsEffectReapply = false
+       stopWaitingForVisibility()
++      GlassVisibilityMonitor.shared.untrack(self)
+     } else {
+       // https://github.com/expo/expo/issues/43732
+       // UIGlassEffect must be created during layoutSubviews
+@@ -338,6 +396,54 @@ public final class GlassView: ExpoView {
+   }
+ }
+ 
++// Polls the opacity of glass views whose effect is installed. UIKit drops a glass effect
++// that is drawn while (nearly) transparent and does not draw it again by itself
++// (iOS 26.1+, https://developer.apple.com/forums/thread/808410), and an ancestor's opacity
++// change is not observable from here: fade-in entrances, fading modals and hidden tabs
++// left the glass invisible. One shared low-rate timer for all views instead of a display
++// link per view; it stops when no view is tracked.
++@MainActor
++private final class GlassVisibilityMonitor: NSObject {
++  static let shared = GlassVisibilityMonitor()
++
++  private let views = NSHashTable<GlassView>.weakObjects()
++  private var timer: Timer?
++
++  func track(_ view: GlassView) {
++    views.add(view)
++    guard timer == nil else {
++      return
++    }
++    let timer = Timer(timeInterval: 0.12, target: self, selector: #selector(tick), userInfo: nil, repeats: true)
++    timer.tolerance = 0.04
++    RunLoop.main.add(timer, forMode: .common)
++    self.timer = timer
++  }
++
++  func untrack(_ view: GlassView) {
++    views.remove(view)
++    if views.allObjects.isEmpty {
++      stop()
++    }
++  }
++
++  @objc private func tick() {
++    let tracked = views.allObjects
++    if tracked.isEmpty {
++      stop()
++      return
++    }
++    for view in tracked {
++      view.sampleOpacity()
++    }
++  }
++
++  private func stop() {
++    timer?.invalidate()
++    timer = nil
++  }
++}
++
+ // Use a weak proxy so CADisplayLink does not retain the view
+ private final class WeakDisplayLinkProxy: NSObject {
+   private weak var view: GlassView?

@@ -17,6 +17,7 @@ import {
 } from "../../components/auth/AuthKit";
 import { alpha } from "../../theme/colors";
 import GlassPressable from "../../components/common/GlassPressable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const { width } = Dimensions.get("window");
 const SIDE = 20;
@@ -171,9 +172,18 @@ export function OnboardingNavDock({
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.dockRow}>
+        {/* Sarmalayıcı açılışta kırpar; basılan cam düğme kesilmesin diye düğmenin üst/alt/
+            solunda GLASS_PRESS_ROOM pay var. Sol pay negatif dış boşlukla geri alınır (kapalıyken
+            0: "İleri" düğmesi yerinden oynamaz). */}
         <Animated.View
           style={{
-            width: backOpen.interpolate({ inputRange: [0, 1], outputRange: [0, BACK_W + 10] }),
+            width: backOpen.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, BACK_W + 10 + GLASS_PRESS_ROOM],
+            }),
+            marginLeft: backOpen.interpolate({ inputRange: [0, 1], outputRange: [0, -GLASS_PRESS_ROOM] }),
+            marginVertical: -GLASS_PRESS_ROOM,
+            paddingVertical: GLASS_PRESS_ROOM,
             opacity: backOpen,
             overflow: "hidden",
           }}
@@ -186,6 +196,7 @@ export function OnboardingNavDock({
             fallbackRadius={18}
             accessibilityLabel={copy.back}
             onPress={onBack}
+            style={styles.backRoom}
           />
         </Animated.View>
         <View style={styles.nextWrap}>
@@ -279,6 +290,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   dockRow: { flexDirection: "row", alignItems: "center" },
+  backRoom: { marginLeft: GLASS_PRESS_ROOM },
   nextWrap: { flex: 1 },
   trust: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
   trustText: { fontSize: 11, fontWeight: "600", letterSpacing: 0.2 },

@@ -10,6 +10,7 @@ import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import { usePosterResolver } from "../../context/PosterChoicesContext";
 
 const PLACEHOLDER_ICON = {
   movies: "film-outline",
@@ -23,11 +24,16 @@ const PLACEHOLDER_ICON = {
  * @param {number} width
  * @param {number} height
  * @param {number} [radius]    Köşe; oyuncuda yarıçap otomatik yuvarlak
+ * @param {number} [mediaId]   TMDB kimliği: film/dizide özel afiş (oyuncuda yok sayılır)
  */
-export default function FavoriteArt({ path, kind, width, height, radius = 12, style }) {
+export default function FavoriteArt({ path: basePath, kind, mediaId, width, height, radius = 12, style }) {
   const { theme } = useTheme();
   const { getTmdbUrl } = useImageQualitySettings();
+  const resolvePoster = usePosterResolver();
   const round = kind === "people";
+  const path = round || mediaId == null
+    ? basePath
+    : resolvePoster(kind === "shows" ? "tv" : "movie", mediaId, basePath);
   const box = {
     width,
     height,

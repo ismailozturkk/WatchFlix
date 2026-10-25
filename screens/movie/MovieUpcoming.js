@@ -19,9 +19,12 @@ import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { CountdownBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import SectionHeader from "../../components/home/SectionHeader";
-import { SectionChipRail } from "../../components/home/SectionChips";
-import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
-import { triggerHaptic } from "../../services/hapticsService";
+import UpcomingFilterChips from "../../components/home/UpcomingFilterChips";
+import UpcomingFilterSheet from "../../components/home/UpcomingFilterSheet";
+import UpcomingEmptyState from "../../components/home/UpcomingEmptyState";
+import useUpcomingFilterControls from "../../hooks/useUpcomingFilterControls";
+import { isUpcomingCustomized } from "../../utils/upcomingFilters";
+import { upcomingSummary } from "../../utils/upcomingFiltersCopy";
 
 const { width } = Dimensions.get("window");
 
@@ -52,6 +55,7 @@ const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, th
         <PosterImage
           path={item.poster_path}
           type="movie"
+          mediaId={item.id}
           size={200}
           style={[
             styles.similarPoster,
@@ -81,39 +85,44 @@ const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, th
 
 export default function MovieUpcoming({ navigation }) {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const {
-    dateData,
-    addTimeToDate,
     moviesUpcoming,
     loadingUpcoming,
-    setValueUpcoming,
     pageUpcoming,
     totalPagesUpcoming,
     loadMoreUpcoming,
     loadingMoreUpcoming,
-    valueUpcoming,
     RelaseCount,
     activateMovieSection,
   } = useMovie();
   const { getTmdbUrl } = useImageQualitySettings();
+  const rp = useRailPosterStyle();
+  const {
+    filters,
+    region,
+    sheetVisible,
+    openSheet,
+    closeSheet,
+    selectRange,
+    applyFromSheet,
+    reset,
+  } = useUpcomingFilterControls("rail");
 
   useEffect(() => {
     activateMovieSection("upcoming");
   }, [activateMovieSection]);
 
-  const handleSelectDate = (val) => {
-    if (val === valueUpcoming) return;
-    try { triggerHaptic("selection"); } catch (e) {}
-    setValueUpcoming?.(val);
-    addTimeToDate?.(val);
-  };
+  // Etkin süzgeç özeti alt başlığın yerini alır ("Sinemada · Korku · Tarihe göre"); süzgeç yoksa
+  // undefined → SectionHeader kendi alt başlığını (homeSectionCopy) gösterir.
+  const summary = upcomingSummary(filters, language);
 
   const headerComponent = (
     <SectionHeader
       section="upcoming"
       mediaType="movie"
       title={t.movieScreens.movieUpcaming.upcaming}
+      subtitle={summary || undefined}
       onPressAction={() =>
         navigation.navigate("SeeAllScreen", {
           mediaType: "movie",
@@ -122,20 +131,18 @@ export default function MovieUpcoming({ navigation }) {
         })
       }
     >
-      <SectionChipRail
-        data={dateData}
-        keyExtractor={(item) => item.value}
-        extraData={valueUpcoming}
-        renderChip={(item) => (
-          <DiscoverFilterChip
-            icon="calendar-outline"
-            label={item.label}
-            selected={valueUpcoming === item.value}
-            onPress={() => handleSelectDate(item.value)}
-          />
-        )}
-      />
+      <UpcomingFilterChips filters={filters} onOpenFilters={openSheet} onSelectRange={selectRange} />
     </SectionHeader>
+  );
+
+  const filterSheet = (
+    <UpcomingFilterSheet
+      visible={sheetVisible}
+      onClose={closeSheet}
+      filters={filters}
+      onApply={applyFromSheet}
+      region={region}
+    />
   );
 
   if (loadingUpcoming) {
@@ -149,6 +156,20 @@ export default function MovieUpcoming({ navigation }) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 15 }}
         />
+        {filterSheet}
+      </View>
+    );
+  }
+
+  // Süzgeç sonuç vermediyse raf boş kalmaz: neden + sıfırla. (Varsayılan süzgeçte boş liste = ağ
+  // hatası; eski davranış korunur, kart çizilmez.)
+  const hasPosters = moviesUpcoming.some((item) => item?.poster_path);
+  if (!hasPosters && isUpcomingCustomized(filters)) {
+    return (
+      <View style={styles.container}>
+        {headerComponent}
+        <UpcomingEmptyState onReset={reset} minHeight={rp.itemHeight} style={styles.empty} />
+        {filterSheet}
       </View>
     );
   }
@@ -182,6 +203,7 @@ export default function MovieUpcoming({ navigation }) {
         updateCellsBatchingPeriod={80}
         windowSize={5}
       />
+      {filterSheet}
     </View>
   );
 }
@@ -191,6 +213,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
   },
+  empty: { marginHorizontal: 15 },
   similarItem: {
     width: width * 0.4,
     height: width * 0.62,

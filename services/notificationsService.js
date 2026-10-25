@@ -136,29 +136,34 @@ export async function acceptMatchingInvitations(uid, match) {
   return saved.filter(Boolean).length;
 }
 
+// Bir toplu yazım en fazla 500 işlem alır; sayaç güncellemesine yer kalsın.
+const MARK_ALL_CHUNK = 400;
+
 /**
- * Tüm bildirimleri toplu okundu işaretle.
- * Performans için: önce unread olanları sorgula, sayıyı bil, hepsini güncelle.
- * Büyük sayılarda chunk gerekir; şimdilik 30'la sınırlı görünüm yeterli.
+ * Tüm okunmamış bildirimleri parça parça okundu işaretle (yüklenmemiş eskiler dahil).
+ * Sayaç YALNIZ son parçayla sıfırlanır: yarıda kalan bir çalışma okunmamışları gizlemez.
+ * Okunmamış belge kalmasa da sayaç sıfırlanır — kaymış sayaç böyle düzelir.
+ * @returns {Promise<number>} okundu işaretlenen bildirim sayısı
  */
 export async function markAllNotificationsRead(uid) {
-  if (!uid) return;
-  const q = query(
+  if (!uid) return 0;
+  const unread = query(
     collection(db, "Users", uid, "notifications"),
     where("read", "==", false),
-    limit(100),
+    limit(MARK_ALL_CHUNK),
   );
-  const snap = await getDocs(q);
-  if (snap.empty) return;
-
-  const batch = writeBatch(db);
-  snap.docs.forEach((d) => {
-    batch.update(d.ref, { read: true });
-  });
-  batch.update(doc(db, "Users", uid), {
-    unreadNotifsCount: 0,
-  });
-  await batch.commit();
+  let marked = 0;
+  for (;;) {
+    const snap = await getDocs(unread);
+    trackFirestoreRead("notifications", snap.docs.length);
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.update(d.ref, { read: true }));
+    marked += snap.docs.length;
+    const last = snap.docs.length < MARK_ALL_CHUNK;
+    if (last) batch.update(doc(db, "Users", uid), { unreadNotifsCount: 0 });
+    await batch.commit();
+    if (last) return marked;
+  }
 }
 
 /**

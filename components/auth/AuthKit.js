@@ -371,11 +371,13 @@ export const AuthField = forwardRef(function AuthField(
   const surfaceTarget = focused ? alpha(tone ?? accent, 0.08) : fieldSurface;
   const iconColor = tone ?? theme.text.muted;
 
-  // iOS 26+: alan Liquid Glass'tır. Odak / geçerli / geçersiz durumu çerçeve
-  // rengiyle (cam üstünde de) ve camın tonuyla anlatılır; dinlenmede çerçeve yok.
+  // iOS 26+: alan Liquid Glass'tır. Odak / geçerli / geçersiz durumu YALNIZ camın
+  // tonuyla anlatılır: cam üstünde çerçeve hiç çizilmez (sabit RN halkası camın
+  // kenar ışığından kopuk ikinci bir hat gibi duruyordu). Kalınlık saydam kalır,
+  // cam o payı da örter (alan boyutu iki yolda aynı).
   const glass = useLiquidGlass();
   const shellAnim = useAnimatedStyle(() => ({
-    borderColor: withTiming(glass && !tone ? "transparent" : borderTarget, { duration: 180 }),
+    borderColor: glass ? "transparent" : withTiming(borderTarget, { duration: 180 }),
     backgroundColor: glass ? "transparent" : withTiming(surfaceTarget, { duration: 180 }),
   }));
 
@@ -386,7 +388,7 @@ export const AuthField = forwardRef(function AuthField(
           radius={FIELD_RADIUS}
           tint={focused || tone ? alpha(tone ?? accent, 0.22) : alpha(fieldSurface ?? theme.secondary, 0.55)}
           pointerEvents="none"
-          style={StyleSheet.absoluteFill}
+          style={styles.fieldGlass}
         />
       ) : null}
       {icon ? (
@@ -472,6 +474,9 @@ export function AuthPrimaryButton({
       onPress={onPress}
       disabled={!enabled || loading}
       pressedScale={0.975}
+      // Android buzlu camı burada YOK: degrade + accent parıltısı (gölge) markanın
+      // ana eylemi; buzlu katman gölgeyi düşürür, degrade de onu zaten örter.
+      glass={glass}
       style={[
         styles.primary,
         { backgroundColor: accent, shadowColor: accent },
@@ -788,6 +793,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
+  // Cam katmanı saydam çerçeve payını da örter (styles.field borderWidth: 1).
+  fieldGlass: { position: "absolute", top: -1, left: -1, right: -1, bottom: -1 },
   fieldIcon: {
     width: 34,
     height: 34,

@@ -17,6 +17,7 @@ import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import { withAlpha } from "@components/profile/StatsComponents";
 import GlassTouchable from "../common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 export const DURUM_FILTRELERI = [
   { id: "tumu", key: "autoI18n.rozet_filtre_tumu", fallback: "Tümü" },
@@ -70,6 +71,7 @@ function BadgeControls({ filtre, onFiltre, bolum, onBolum, ozetler, bolumAd, yen
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.cipKaydirma}
         contentContainerStyle={styles.cipSatir}
       >
         {[{ bolum: null }, ...(ozetler || [])].map((o) => {
@@ -118,7 +120,9 @@ const styles = StyleSheet.create({
   segmentOge: { flex: 1, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
   segmentYazi: { fontSize: 13, fontWeight: "900" },
   segmentYaziKompakt: { fontSize: 11.5 },
-  cipSatir: { paddingHorizontal: 14, gap: 8 },
+  // Basılan cam çip satırın kırpma sınırında kesilmesin (utils/liquidGlass GLASS_PRESS_ROOM).
+  cipKaydirma: { marginVertical: -GLASS_PRESS_ROOM },
+  cipSatir: { paddingHorizontal: 14, paddingVertical: GLASS_PRESS_ROOM, gap: 8 },
   cip: {
     flexDirection: "row",
     alignItems: "center",

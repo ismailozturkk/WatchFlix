@@ -23,12 +23,17 @@
 //     oynar — bu yüzden cam yolunda ek basma saydamlığı/ölçeği YOK (cam üzerinde
 //     `opacity` değişimi efekti bozar, bkz. GlassSurface kuralları)
 //   • `variant="blur"` camı temadan bağımsız KOYU çizer (poster hep koyu)
+//
+// Android (buzlu cam kipi): şekil camla aynı (tam yuvarlak), yüzey buzlu cam
+// (GlassSurface); `variant="blur"` düğmeye `blurTarget` verilirse (posteri saran
+// useLocalBlurTarget hedefi) arkadaki görsel GERÇEKTEN bulanıklaşır. Basma
+// geri bildirimi eski yoldaki saydamlık.
 import React, { memo } from "react";
 import { Pressable, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import GlassSurface from "./GlassSurface";
 import { useTheme } from "../../context/ThemeContext";
-import { useLiquidGlass } from "../../services/liquidGlass";
+import { useGlassShape, useLiquidGlass } from "../../services/liquidGlass";
 
 const DEFAULT_FALLBACK_RADIUS = 12;
 
@@ -43,6 +48,7 @@ function GlassIconButton({
   overlay,
   fallbackStyle,
   flatFallback = false,
+  blurTarget,
   onPress,
   accessibilityLabel,
   hitSlop = 8,
@@ -53,6 +59,8 @@ function GlassIconButton({
 }) {
   const { theme } = useTheme();
   const glass = useLiquidGlass();
+  // Gerçek camda da Android buzlu camında da düğme tam yuvarlak (cam şekli).
+  const shaped = useGlassShape();
   const onImage = variant === "blur";
   const iconColor = color || (onImage ? "#FFFFFF" : theme.text.primary);
   const glyphSize = iconSize ?? (variant === "plain" ? 24 : 22);
@@ -60,11 +68,12 @@ function GlassIconButton({
   const box = { width: size, height: size };
   const surface = (
     <GlassSurface
-      radius={glass ? size / 2 : fallbackRadius}
+      radius={shaped ? size / 2 : fallbackRadius}
       scheme={onImage ? "dark" : undefined}
       tint={tint}
       interactive
       fallbackBlur={onImage && !flatFallback ? { tint: "dark", intensity: 60 } : undefined}
+      blurTarget={blurTarget}
       fallbackStyle={
         fallbackStyle ??
         (onImage || variant === "plain"

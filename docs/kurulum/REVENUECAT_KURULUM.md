@@ -238,6 +238,7 @@ Ayarlar kartı ve limit uyarıları bu kayıttan üretilir — kaydı olmayan bi
 | Uygulama simgesi | Varsayılan | ✓ | ✓ | `AppIconSection` |
 | Kar animasyonu | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen`, `DecorScopesScreen` |
 | Ambiyans arka planı | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen`, `DecorScopesScreen` |
+| Özel afiş ve arka planlar (25 Eki) | Varsayılan görseller | ✓ | ✓ | `ImageGalleryModal` (seçici), `PosterChoicesProvider` (çizim + arkadaş görünürlüğü sahibin `entitlements` planına bağlı) |
 | İkon arka planı | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen`, `DecorScopesScreen` |
 | Pet / Dost | — | ✓ | ✓ | `PetContext`, `PetSettingsSection` |
 | Platform bildirimi | 10 başlık | 100 | 100 | Sunucu (`dailyStreamingAvailability`) |

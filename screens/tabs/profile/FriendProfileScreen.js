@@ -95,6 +95,9 @@ import { getTasteMatchCopy } from "../../../utils/tasteMatchCopy";
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassPressable from "../../../components/common/GlassPressable";
 import GlassTouchable from "../../../components/common/GlassTouchable";
+import usePosterUri from "../../../hooks/usePosterUri";
+import { PosterChoicesScope } from "../../../context/PosterChoicesContext";
+import { useUserPosterChoices } from "../../../context/PosterChoicesProvider";
 const PROTECTED_LISTS = ["watchedMovies", "watchedTv", "watchList", "favorites"];
 // Bu sayı ve üzeri içerikte liste modalı sabit yükseklik yerine ekranı
 // kaplayacak şekilde büyür (bkz. FriendProfileScreen liste modalı).
@@ -213,6 +216,8 @@ const SharedListMediaCard = memo(function SharedListMediaCard({
   showRating,
   showComment,
 }) {
+  // Profil sahibinin seçtiği afiş (ekran PosterChoicesScope ile sarılı).
+  const posterUri = usePosterUri();
   return (
     <View>
       <TouchableOpacity
@@ -229,9 +234,9 @@ const SharedListMediaCard = memo(function SharedListMediaCard({
           },
         ]}
       >
-        {item?.imagePath ? (
+        {posterUri(item?.type, item?.id, item?.imagePath) ? (
           <Image
-            source={{ uri: getTmdbUrl(item.imagePath, "poster", 200) }}
+            source={{ uri: posterUri(item.type, item.id, item.imagePath) }}
             style={styles.sharedMediaPosterImg}
             contentFit="cover"
             cachePolicy="memory-disk"
@@ -348,9 +353,19 @@ export default function FriendProfileScreen({ route, navigation }) {
   const privacy = profile?.privacy || DEFAULT_PRIVACY;
   const canViewProfile =
     privacy.profile === "public" || (privacy.profile === "friends" && friend);
+  // Profil belgesi gelmeden gizlilik BİLİNMİYOR: varsayılana ("herkese açık") düşüp
+  // Lists/{uid} dinleyicisini açmak, listeleri kısıtlı her profilde kuraldan
+  // permission-denied alırdı (belge gelince dinleyici kapanır ama hata çoktan düşmüştür).
   const canViewLists =
+    profile != null &&
     canViewProfile &&
     (privacy.lists === "public" || (privacy.lists === "friends" && friend));
+  // Profil sahibinin özel afişleri: listeleri görebiliyorsan ve sahibin planı izin
+  // veriyorsa TEK okuma (aynı koşul kuralda: PosterChoices okuması = canReadLists).
+  const friendPosterChoices = useUserPosterChoices(friendUid, {
+    entitlements: profile?.entitlements,
+    canRead: canViewLists,
+  });
   const online = isOnlineVisible(presence, privacy, { viewerIsFriend: friend });
   const showPresenceText =
     privacy.onlineStatus === "everyone" ||
@@ -362,9 +377,18 @@ export default function FriendProfileScreen({ route, navigation }) {
       setAllLists(null);
       return;
     }
-    const unsub = onSnapshot(doc(db, "Lists", friendUid), (snap) => {
-      setAllLists(snap.exists() ? snap.data() : {});
-    });
+    const unsub = onSnapshot(
+      doc(db, "Lists", friendUid),
+      (snap) => {
+        setAllLists(snap.exists() ? snap.data() : {});
+      },
+      // Kural istemciden farklı karar verebilir (arkadaşlık yalnız bir tarafta kalmışsa
+      // kural ARKADAŞIN friends alt koleksiyonuna bakar): listeler boş görünür.
+      (err) => {
+        if (__DEV__) console.warn("FriendProfile Lists:", err.message);
+        setAllLists({});
+      },
+    );
     return () => unsub();
   }, [friendUid, canViewLists]);
 
@@ -842,6 +866,7 @@ export default function FriendProfileScreen({ route, navigation }) {
     : null;
 
   return (
+    <PosterChoicesScope choices={friendPosterChoices}>
     <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
       <ProfileBackdrop scrollY={scrollY} />
       <ScreenDecor scope="profile" iconOpacity={0.3} />
@@ -1364,6 +1389,7 @@ export default function FriendProfileScreen({ route, navigation }) {
         username={profile.username}
       />
     </SafeAreaView>
+    </PosterChoicesScope>
   );
 }
 

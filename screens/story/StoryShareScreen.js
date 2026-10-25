@@ -59,6 +59,7 @@ import {
 import GlassTouchable from "../../components/common/GlassTouchable";
 import GlassBox from "../../components/common/GlassBox";
 import GlassTextInput from "../../components/common/GlassTextInput";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 /* ── Tuval ölçüleri EKRANDAN ölçülür (utils/storyCanvasLayout.js) ──
    Eskiden modül yüklenirken Dimensions + sabit header/alt çubuk yüksekliğiyle
@@ -1452,7 +1453,7 @@ export default function StoryShareScreen({ route, navigation }) {
 
         <ScrollView
           ref={sheetScrollRef}
-          style={{ flex: 1 }}
+          style={styles.sheetScrollView}
           contentContainerStyle={[
             styles.sheetScroll,
             { paddingBottom: 34 + insets.bottom },
@@ -1933,7 +1934,12 @@ export default function StoryShareScreen({ route, navigation }) {
                   </ScrollView>
 
                   <Label theme={theme}>{i18nText("autoI18n.yazi_tipi", "Yazı Tipi")}</Label>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.fontScroll}
+                    contentContainerStyle={styles.fontRow}
+                  >
                     {FONTS.map((f) => {
                       const active = (selected.font || "system") === f.id;
                       return (
@@ -2296,7 +2302,13 @@ const styles = StyleSheet.create({
   },
   sheetTitle: { fontSize: 19, fontWeight: "900" },
   sheetTabs: { marginBottom: 4 },
-  sheetScroll: { paddingBottom: 34, paddingTop: 2 },
+  // Yandaki cam araç/sıfırla düğmeleri basılınca kaydırma sınırında kesilmesin: yanlarda
+  // GLASS_PRESS_ROOM (dolgu + sayfanın 16 pt yan boşluğuna taşan negatif dış boşluk).
+  sheetScrollView: { flex: 1, marginHorizontal: -GLASS_PRESS_ROOM },
+  sheetScroll: { paddingBottom: 34, paddingTop: 2, paddingHorizontal: GLASS_PRESS_ROOM },
+  // Yazı tipi çipleri: dört yanda GLASS_PRESS_ROOM (dolgu + eşit negatif dış boşluk).
+  fontScroll: { margin: -GLASS_PRESS_ROOM },
+  fontRow: { padding: GLASS_PRESS_ROOM },
 
   canvasShadow: {
     marginTop: 6,

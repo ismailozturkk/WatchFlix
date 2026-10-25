@@ -13,7 +13,7 @@ import BottomSheetModal from "../common/BottomSheetModal";
 import SheetScroll from "../common/SheetScroll";
 import { useTheme } from "../../context/ThemeContext";
 import GlassCloseButton from "../common/GlassCloseButton";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import usePosterUri from "../../hooks/usePosterUri";
 import { useMediaNotes, mediaNoteItemKey } from "../../context/MediaNotesContext";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
@@ -31,7 +31,7 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { mediaNotes, saveMediaNote, deleteMediaNote } = useMediaNotes();
-  const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -106,7 +106,7 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
       <SheetScroll>
       <View style={styles.header}>
         {posterPath ? (
-          <Image source={{ uri: getTmdbUrl(posterPath, "poster", 200) }} style={styles.poster} />
+          <Image source={{ uri: posterUri(type, mediaId, posterPath) }} style={styles.poster} />
         ) : (
           <View style={[styles.posterFallback, { backgroundColor: theme.between }]}>
             <Ionicons name={mediaType === "tv" ? "tv-outline" : "film-outline"} size={20} color={theme.text.muted} />

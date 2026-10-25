@@ -28,15 +28,17 @@ export function openPremiumScreen(source = "unknown") {
  *
  * @param {string} featureId
  * @param {string} plan
- * @param {{ used?: number, onUpgrade?: () => void, onDismiss?: () => void }} [options]
+ * @param {{ used?: number, onUpgrade?: () => void, onDismiss?: () => void,
+ *   preview?: { kind: "poster"|"backdrop", fromUri?: string|null, toUri: string } }} [options]
  *   used: sayılı özellikte sahip olunan adet / günlük kullanım (gösterge için)
+ *   preview: özel afiş/arka plan — seçilmeye çalışılan görsel (sayfa "Şimdi → Seçtiğin" çizer)
  */
-export function showPremiumLimitAlert(featureId, plan, { used, onUpgrade, onDismiss } = {}) {
+export function showPremiumLimitAlert(featureId, plan, { used, onUpgrade, onDismiss, preview } = {}) {
   trackEvent(ANALYTICS_EVENTS.PREMIUM_GATE_HIT, {
     feature: featureId,
     plan,
     can_upgrade: Boolean(nextPlanFor(featureId, normalizePlan(plan))),
   });
 
-  presentUpsell({ featureId, plan, used, onUpgrade, onDismiss });
+  presentUpsell({ featureId, plan, used, onUpgrade, onDismiss, preview });
 }

@@ -31,6 +31,7 @@ import SharedListMessage from "./SharedListMessage";
 import SharedMediaCollection from "./SharedMediaCollection";
 import SharedMediaMessage from "./SharedMediaMessage";
 import SharedPostMessage from "./SharedPostMessage";
+import SharedSettingsMessage from "./SharedSettingsMessage";
 import SharedTasteMatchMessage from "./SharedTasteMatchMessage";
 import SharedTournamentMessage from "./SharedTournamentMessage";
 import SwipeReplyContainer from "./SwipeReplyContainer";
@@ -326,6 +327,8 @@ const MessageBubble = memo(
               senderUid={item.senderId}
               senderName={senderName}
             />
+          ) : share?.type === "settings" ? (
+            <SharedSettingsMessage share={share} isOutgoing={isMe} />
           ) : hasItems ? (
             <SharedMediaCollection
               items={item.items}

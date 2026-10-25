@@ -29,7 +29,11 @@ jest.mock("../services/storage", () => ({
   get: () => mockStored,
   set: (...args) => mockSet(...args),
 }));
-jest.mock("../services/liquidGlass", () => ({ useLiquidGlass: () => mockGlass }));
+jest.mock("../services/liquidGlass", () => ({
+  useLiquidGlass: () => mockGlass,
+  useGlassMode: () => (mockGlass ? "native" : "off"),
+  useGlassShape: () => mockGlass,
+}));
 jest.mock("../context/LanguageContext", () => ({
   useLanguage: () => ({
     language: "tr",

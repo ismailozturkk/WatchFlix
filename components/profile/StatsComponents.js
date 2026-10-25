@@ -29,6 +29,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import GlassTouchable from "../common/GlassTouchable";
 import GlassPressable from "../common/GlassPressable";
 import GlassBox from "../common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 /**
  * Renge alpha ekle — hem hex (#aabbcc) hem hsl(...) destekler.
@@ -1155,13 +1156,19 @@ const filterStyles = StyleSheet.create({
     gap: 6,
   },
   searchInput: { flex: 1, fontSize: 13, padding: 0 },
+  // Basılan cam hap kırpma sınırında kesilmesin: üst/alt ve solda (arama düğmesiyle arada 8 pt
+  // boşluk var) GLASS_PRESS_ROOM; dolgu + eşit negatif dış boşluk, yerleşim aynı.
   chipsScroll: {
     flex: 1,
+    marginVertical: -GLASS_PRESS_ROOM,
+    marginLeft: -GLASS_PRESS_ROOM,
   },
   chipsContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    paddingVertical: GLASS_PRESS_ROOM,
+    paddingLeft: GLASS_PRESS_ROOM,
     paddingRight: 8,
   },
   pill: {

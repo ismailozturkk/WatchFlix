@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../context/ThemeContext";
 import { useImageQualitySettings } from "../context/AppSettingsContext";
+import { usePosterResolver } from "../context/PosterChoicesContext";
 
 /**
  * Poster/afiş görseli için tek kaynak.
@@ -12,16 +13,23 @@ import { useImageQualitySettings } from "../context/AppSettingsContext";
  * (eski `assets/image/no_image.png` görselinin yerine). Kutu boyutu her iki
  * durumda da `style` ile aynı kalır; yer tutucu ortalanmış bir ikon içerir.
  *
+ * Özel afiş: `mediaId` verilirse kullanıcının (ya da `PosterChoicesScope` içindeyse
+ * profil sahibinin) o yapım için seçtiği afiş çizilir (context/PosterChoicesContext).
+ * Film/dizi afişi çizen her çağrı `mediaId` geçmeli — bekçi:
+ * __tests__/posterChoicesCoverage.test.js.
+ *
  * @param {string|null} path     TMDB poster yolu (yoksa ikon gösterilir)
- * @param {"movie"|"tv"} type    İkon seçimi (film / dizi)
+ * @param {"movie"|"tv"} type    İkon seçimi (film / dizi) ve özel afiş türü
+ * @param {number|string} mediaId TMDB kimliği (özel afiş için)
  * @param {object|array} style   Kutu stili (görsele ve yer tutucuya uygulanır)
  * @param {number} size          TMDB görsel boyutu (varsayılan 200)
  * @param {number} iconSize      İkon boyutu override (yoksa style.width'ten türetilir)
  * @param {string} iconName      İkon adı override (varsayılan film-outline / tv-outline)
  */
 export default function PosterImage({
-  path,
+  path: basePath,
   type = "movie",
+  mediaId,
   style,
   size = 200,
   iconSize,
@@ -30,6 +38,8 @@ export default function PosterImage({
 }) {
   const { theme } = useTheme();
   const { getTmdbUrl } = useImageQualitySettings();
+  const resolvePoster = usePosterResolver();
+  const path = mediaId != null ? resolvePoster(type, mediaId, basePath) : basePath;
 
   if (path) {
     return (

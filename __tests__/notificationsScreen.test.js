@@ -4,6 +4,8 @@ import { act, create } from "react-test-renderer";
 let mockUid = "user-a";
 let mockLanguage = "tr";
 let mockInbox;
+let mockUnreadCount = 101;
+const mockToastSuccess = jest.fn();
 const mockFetchOlder = jest.fn();
 jest.mock("react-native", () => ({
   View: "View", Text: "Text", ActivityIndicator: "Spinner",
@@ -18,12 +20,13 @@ jest.mock("../context/ThemeContext", () => ({ useTheme: () => ({ theme: {
   colors: { red: "#ff3232", blue: "#3b82f6", green: "#22c55e", purple: "#a855f7", orange: "#ff7c25" },
 } }) }));
 jest.mock("../context/LanguageContext", () => ({ useLanguage: () => ({ language: mockLanguage, t: require(`../translations/${mockLanguage}.json`) }) }));
-jest.mock("../context/UserProfileContext", () => ({ useUserProfile: () => ({ profile: { unreadNotifsCount: 101 } }) }));
+jest.mock("../context/UserProfileContext", () => ({ useUserProfile: () => ({ profile: { unreadNotifsCount: mockUnreadCount } }) }));
 jest.mock("../components/ScreenDecor", () => "Decor");
 jest.mock("../components/friends/FriendsScreenHeader", () => "Header");
 jest.mock("../components/AppIcon", () => "Icon");
 jest.mock("../components/common/GlassPressable", () => "Button");
 jest.mock("../components/common/GlassIconButton", () => ({ __esModule: true, default: "IconButton" }));
+jest.mock("../components/AppToast", () => ({ toast: { success: (...args) => mockToastSuccess(...args) } }));
 jest.mock("../services/notificationsService", () => ({ fetchOlderNotifications: (...args) => mockFetchOlder(...args) }));
 
 const Screen = require("../screens/tabs/profile/NotificationsScreen").default;
@@ -38,7 +41,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockUid = "user-a";
   mockLanguage = "tr";
-  mockInbox = { items: [item], loading: false, error: null, cursor: "first-cursor", hasMore: true, markRead: jest.fn().mockResolvedValue(), retry: jest.fn() };
+  mockUnreadCount = 101;
+  mockInbox = { items: [item], loading: false, error: null, cursor: "first-cursor", hasMore: true, markRead: jest.fn().mockResolvedValue(), markAll: jest.fn().mockResolvedValue(1), retry: jest.fn() };
   const original = console.error;
   warn = jest.spyOn(console, "error").mockImplementation((message, ...args) => {
     if (!String(message).includes("react-test-renderer is deprecated")) original(message, ...args);
@@ -221,4 +225,58 @@ test("expanded notification updates its copy and action when language changes", 
     expect(rowRenderer.root.findAllByType("Text").some((n) => n.props.children === require(`../translations/${language}.json`).notifBodyMessage)).toBe(true);
   }
   expect(mockInbox.markRead).toHaveBeenCalledTimes(1);
+});
+
+const markAllButton = () => renderer.root.findByType("Header").props.right;
+const readStates = () => list().props.sections.flatMap((s) => s.data).map((n) => [n.id, n.read]);
+
+test("mark all read clears loaded and older-page items, then hides the header action", async () => {
+  mockFetchOlder.mockResolvedValue({ items: [{ ...item, id: "older", createdAt: 500 }], cursor: null, hasMore: false });
+  render();
+  await pressFooter();
+  const button = markAllButton();
+  expect(button.props.testID).toBe("notifications-mark-all");
+  expect(button.props.accessibilityLabel).toBe("Tümünü okundu olarak işaretle");
+  await act(async () => { await button.props.onPress(); });
+  expect(mockInbox.markAll).toHaveBeenCalledTimes(1);
+  expect(readStates()).toEqual([["n1", true], ["older", true]]);
+  expect(mockToastSuccess).toHaveBeenCalledWith("Tüm bildirimler okundu olarak işaretlendi");
+  mockUnreadCount = 0;
+  act(() => renderer.update(<Screen navigation={navigation} />));
+  expect(markAllButton()).toBeNull();
+});
+
+test("mark all read ignores a second tap while running and keeps a notification that arrived meanwhile unread", async () => {
+  let finish;
+  mockInbox.markAll.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  render();
+  let pending;
+  act(() => { pending = markAllButton().props.onPress(); });
+  expect(markAllButton().props.disabled).toBe(true);
+  await act(async () => { await markAllButton().props.onPress(); });
+  mockInbox = { ...mockInbox, items: [{ ...item, id: "fresh", createdAt: 3000 }, item] };
+  act(() => renderer.update(<Screen navigation={navigation} />));
+  await act(async () => { finish(1); await pending; });
+  expect(mockInbox.markAll).toHaveBeenCalledTimes(1);
+  expect(readStates()).toEqual([["fresh", false], ["n1", true]]);
+});
+
+test("mark all read failure keeps items unread and shows its own error", async () => {
+  mockInbox.markAll.mockRejectedValue(new Error("offline"));
+  render();
+  await act(async () => { await markAllButton().props.onPress(); });
+  expect(readStates()).toEqual([["n1", false]]);
+  const alert = renderer.root.findAllByType("Text").find((n) => n.props.accessibilityRole === "alert");
+  expect(alert.props.children).toBe("Bildirimler okundu olarak işaretlenemedi. Lütfen tekrar dene.");
+  expect(mockToastSuccess).not.toHaveBeenCalled();
+});
+
+test("header action follows the unread counter even when no loaded item is unread", () => {
+  mockInbox.items = [{ ...item, read: true }];
+  mockUnreadCount = 3;
+  render();
+  expect(markAllButton()).not.toBeNull();
+  mockUnreadCount = 0;
+  act(() => renderer.update(<Screen navigation={navigation} />));
+  expect(markAllButton()).toBeNull();
 });

@@ -45,6 +45,7 @@ import { fetchMediaFactsBatch } from "@services/tmdbFacts";
 import { saveSharedListToProfile } from "@services/listItemsService";
 import GlassTouchable from "../common/GlassTouchable";
 import GlassTextInput from "../common/GlassTextInput";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const PREVIEW_COUNT = 5;
 
@@ -176,7 +177,7 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
 
           {/* Klavye açıkken sayfa küçülür: alanlar kayar, "Profilime ekle"
               düğmesi klavyenin hemen üstünde sabit kalır. */}
-          <SheetScroll>
+          <SheetScroll style={styles.scrollRoom} contentContainerStyle={styles.scrollRoomContent}>
           <View style={styles.header}>
             <View
               style={[styles.iconWrap, { backgroundColor: `${theme.accent}22` }]}
@@ -337,6 +338,10 @@ const styles = StyleSheet.create({
     paddingBottom: 26,
   },
   handle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 14 },
+  // Kapat düğmesi kaydırma bölgesinin en üstünde: basılınca üst kırpma sınırında kesilmesin
+  // diye GLASS_PRESS_ROOM (dolgu + tutamacın 14 pt boşluğuna taşan negatif dış boşluk).
+  scrollRoom: { marginTop: -GLASS_PRESS_ROOM },
+  scrollRoomContent: { paddingTop: GLASS_PRESS_ROOM },
   header: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
   iconWrap: {
     width: 36,

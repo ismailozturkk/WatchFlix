@@ -264,13 +264,48 @@ export function pickPerks(featureId, current, targetPlan, language = "en") {
   return perks;
 }
 
+// ── Seçim önizlemesi (özel afiş / arka plan) ────────────────────────────────
+
+const PREVIEW_LABELS = Object.freeze({
+  from: { tr: "Şimdi", en: "Now", es: "Ahora", pt: "Agora", de: "Jetzt" },
+  to: { tr: "Seçtiğin", en: "Your pick", es: "Tu elección", pt: "Sua escolha", de: "Deine Wahl" },
+});
+const PREVIEW_URI = /^https:\/\/image\.tmdb\.org\//;
+
+/**
+ * Galeriden gelen önizleme: sayfa "Şimdi → Seçtiğin" kartını çizer. Yalnız TMDB
+ * adresleri kabul edilir; seçilen görsel (`toUri`) yoksa kart hiç çizilmez.
+ *
+ * @param {{ kind?: string, fromUri?: string|null, toUri?: string }} [preview]
+ * @returns {{ kind: "poster"|"backdrop", fromUri: string|null, toUri: string,
+ *   fromLabel: string, toLabel: string } | null}
+ */
+export function buildChoicePreview(preview, language = "en") {
+  if (!preview || typeof preview !== "object") return null;
+  const kind = preview.kind === "backdrop" ? "backdrop" : preview.kind === "poster" ? "poster" : null;
+  const toUri = typeof preview.toUri === "string" && PREVIEW_URI.test(preview.toUri) ? preview.toUri : null;
+  if (!kind || !toUri) return null;
+  const fromUri =
+    typeof preview.fromUri === "string" && PREVIEW_URI.test(preview.fromUri) && preview.fromUri !== toUri
+      ? preview.fromUri
+      : null;
+  return {
+    kind,
+    fromUri,
+    toUri,
+    fromLabel: pick(PREVIEW_LABELS.from, language),
+    toLabel: pick(PREVIEW_LABELS.to, language),
+  };
+}
+
 /**
  * @param {string} featureId
  * @param {string} plan             kullanıcının mevcut planı
  * @param {"tr"|"en"} language
- * @param {{ used?: number }} [options]  COUNT: sahip olunan adet; DAILY: bugünkü kullanım
+ * @param {{ used?: number, preview?: object }} [options]  COUNT: sahip olunan adet; DAILY:
+ *   bugünkü kullanım; preview: seçilmeye çalışılan görsel (buildChoicePreview)
  */
-export function buildUpsellContent(featureId, plan, language = "en", { used } = {}) {
+export function buildUpsellContent(featureId, plan, language = "en", { used, preview } = {}) {
   const lang = normalizeAppLanguage(language);
   const tr = lang === "tr";
   const es = normalizeAppLanguage(lang) === "es";
@@ -290,6 +325,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
       title: tr ? "Premium özelliği" : es ? "Función Premium" : pt ? "Recurso Premium" : de ? "Premium-Funktion" : "Premium feature",
       message: "",
       meter: null,
+      preview: null,
       note: null,
       renew: null,
       tiers: [],
@@ -317,8 +353,10 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
   // "bu yıl kilitli" konuşur; mesajı yine planın mevcut penceresini söyler.
   const windowed = definition.window === true;
   const locked = isAccess || windowed;
+  const choicePreview = buildChoicePreview(preview, lang);
   const title =
     (lockedCountable ? pick(definition.upsell?.lockedTitle, lang) : "") ||
+    (choicePreview ? pick(definition.upsell?.titleByPreview?.[choicePreview.kind], lang) : "") ||
     (targetPlan ? pick(definition.upsell?.titleByTarget?.[targetPlan], lang) : "") ||
     pick(definition.upsell?.title, lang) ||
     legacy.title;
@@ -336,6 +374,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
     message,
     featureTitle: pick(definition.title, lang),
     meter: buildMeter(definition, current, used, lang),
+    preview: choicePreview,
     note: definition.note ? pick(definition.note, lang) : null,
     renew:
       definition.kind === COUNT || isAccess
@@ -344,7 +383,9 @@ export function buildUpsellContent(featureId, plan, language = "en", { used } = 
     // Üst plan yoksa karşılaştırma ve fayda satırı anlamsız: yalnız bilgi.
     tiers,
     tierMode: pickTierMode(tiers),
-    perks: canUpgrade ? pickPerks(featureId, current, targetPlan, lang) : [],
+    // Önizleme kartı (≈ iki kazanç satırı yüksekliği) varken kazanç satırları çizilmez:
+    // sayfa yine kaydırmasız sığsın (MAX_PERKS ile aynı gerekçe); yeri "Seçtiğin" görsel alır.
+    perks: canUpgrade && !choicePreview ? pickPerks(featureId, current, targetPlan, lang) : [],
     targetPlan: targetPlan || null,
     targetName: targetPlan ? getPremiumPlanDisplayName(targetPlan) : null,
     canUpgrade,

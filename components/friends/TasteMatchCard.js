@@ -18,7 +18,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import Svg, { Circle } from "react-native-svg";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
-import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import usePosterUri from "../../hooks/usePosterUri";
 import { alpha } from "../../theme/colors";
 import { getTasteMatchCopy } from "../../utils/tasteMatchCopy";
 import GlassBox from "../common/GlassBox";
@@ -174,7 +174,7 @@ function TasteMatchCard({
 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
   const copy = getTasteMatchCopy(language);
   const [infoOpen, setInfoOpen] = useState(false);
   const openInfo = useCallback(() => setInfoOpen(true), []);
@@ -360,7 +360,7 @@ function TasteMatchCard({
                   accessibilityLabel={bothRated ? `${item.name}. ${copy.ratingPair(item.mine, item.theirs)}` : item.name}
                   style={[styles.thumb, { backgroundColor: theme.primary, borderColor: theme.border }]}
                 >
-                  <Image source={{ uri: getTmdbUrl(item.imagePath, "poster", 200) }} style={styles.thumbImage} contentFit="cover" />
+                  <Image source={{ uri: posterUri(item.type, item.id, item.imagePath) }} style={styles.thumbImage} contentFit="cover" />
                   {bothRated ? (
                     <View style={[styles.ratingChip, { backgroundColor: alpha("#000000", 0.72) }]}>
                       <Text allowFontScaling={false} style={styles.ratingChipText}>
@@ -404,7 +404,7 @@ function TasteMatchCard({
                 style={[styles.thumb, { backgroundColor: theme.primary, borderColor: theme.border }]}
               >
                 {item.imagePath ? (
-                  <Image source={{ uri: getTmdbUrl(item.imagePath, "poster", 200) }} style={styles.thumbImage} contentFit="cover" />
+                  <Image source={{ uri: posterUri(item.type, item.id, item.imagePath) }} style={styles.thumbImage} contentFit="cover" />
                 ) : null}
               </View>
             ))}

@@ -85,11 +85,17 @@ export default function FriendsListScreen({ navigation }) {
             }),
           );
         } else if (!legacyUnsub) {
-          legacyUnsub = onSnapshot(doc(db, "Users", user.uid), (docSnap) => {
-            if (docSnap.exists()) setFriends(docSnap.data().friends || []);
-          });
+          legacyUnsub = onSnapshot(
+            doc(db, "Users", user.uid),
+            (docSnap) => {
+              if (docSnap.exists()) setFriends(docSnap.data().friends || []);
+            },
+            (err) => __DEV__ && console.warn("FriendsList legacy:", err.message),
+          );
         }
-      }
+      },
+      // Çıkış yapılırken oturum, dinleyici kapanmadan düşebilir.
+      (err) => __DEV__ && console.warn("FriendsList friends:", err.message),
     );
 
     return () => {

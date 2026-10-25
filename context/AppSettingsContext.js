@@ -460,6 +460,12 @@ export const AppSettingsProvider = ({ children }) => {
     [applyDecorHidden],
   );
 
+  // Tüm kapsam tablosunu tek seferde yazar (sohbette paylaşılan ayarlar, geri al).
+  const replaceDecorScopes = useCallback(
+    (next) => applyDecorHidden(normalizeDecorScopes(next)),
+    [applyDecorHidden],
+  );
+
   const changeIconBackgroundMode = useCallback((mode) => {
     if (mode !== "shared" && mode !== "random") return;
     setIconBackgroundMode(mode);
@@ -781,8 +787,9 @@ export const AppSettingsProvider = ({ children }) => {
       changeDecorVisible,
       changeDecorEffectVisible,
       resetDecorScopes,
+      replaceDecorScopes,
     }),
-    [decorHidden, changeDecorVisible, changeDecorEffectVisible, resetDecorScopes],
+    [decorHidden, changeDecorVisible, changeDecorEffectVisible, resetDecorScopes, replaceDecorScopes],
   );
 
   const getTmdbUrl = useCallback(

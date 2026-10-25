@@ -1,6 +1,7 @@
 // utils/glassChrome.js — "bu düğme/kutu/alan cama çevrilsin mi, nasıl?" kararı.
 // Burada kilitlenen şey: hangi stiller cama DÖNMEZ (eski görünüm kalır), tonun
-// dolgu renginden nasıl türediği, çerçevenin ne zaman düştüğü/korunduğu ve
+// dolgu renginden nasıl türediği, çerçevenin camda hep düşüp renginin tona
+// taşınması, Android buzlu cam renkleri ve
 // TextInput stilinin kutu / yazı olarak bölünmesi.
 import {
   clampRadius,
@@ -11,7 +12,12 @@ import {
   planGlassChrome,
   splitInputStyle,
   stripChrome,
+  frostedAppearance,
+  frostedFill,
+  stateBorderColor,
+  FROSTED_SURFACE_TINT_ALPHA,
   GLASS_ACCENT_TINT_ALPHA,
+  GLASS_STATE_TINT_ALPHA,
   GLASS_SURFACE_TINT_ALPHA,
 } from "../utils/glassChrome";
 
@@ -129,13 +135,44 @@ describe("planGlassChrome — çerçeve", () => {
     expect(plan.inset).toBe(1.5);
   });
 
-  it("vurgu rengi çerçeve (seçili durum) korunur → katman içeride kalır", () => {
+  // Cam basınca esneyip büyür/küçülür; RN çerçevesi yerinde sabit kalır ve camın
+  // çevresinde ondan kopuk ikinci bir halka olarak görünür. Bu yüzden camda HİÇBİR
+  // çerçeve çizilmez; durum rengi tona (ve buzlu camda kenar ışığına) geçer.
+  it("vurgu rengi çerçeve (seçili durum) de düşer; rengi tona ve `rim`e taşınır", () => {
     const plan = planGlassChrome(
       { borderRadius: 14, backgroundColor: "#202020", borderWidth: 1.5, borderColor: "#E50914" },
       { theme: THEME },
     );
-    expect(plan.dropBorder).toBe(false);
-    expect(plan.inset).toBe(0);
+    expect(plan.dropBorder).toBe(true);
+    expect(plan.inset).toBe(1.5);
+    expect(plan.tint).toBe(formatColor(parseColor("#E50914"), GLASS_STATE_TINT_ALPHA));
+    expect(plan.rim).toBe("rgba(229, 9, 20, 1)");
+  });
+
+  it("yarı saydam durum çerçevesinin tonu kendi alfasıyla orantılı (alt sınırlı)", () => {
+    const plan = planGlassChrome(
+      { borderRadius: 18, backgroundColor: "#202020", borderWidth: 1, borderColor: "rgba(229, 9, 20, 0.55)" },
+      { theme: THEME },
+    );
+    expect(plan.tint).toBe(formatColor(parseColor("#E50914"), 0.165));
+  });
+
+  it("dolgu zaten canlıysa ton dolgudan gelir (çerçeve rengi tonu ezmez)", () => {
+    const plan = planGlassChrome(
+      { borderRadius: 18, backgroundColor: "rgba(59, 130, 246, 0.16)", borderWidth: 1, borderColor: "#3B82F6" },
+      { theme: THEME },
+    );
+    expect(plan.tint).toBe("rgba(59, 130, 246, 0.2)");
+    expect(plan.rim).toBe("rgba(59, 130, 246, 1)");
+    expect(plan.dropBorder).toBe(true);
+  });
+
+  it("nötr çerçevede `rim` yok", () => {
+    const plan = planGlassChrome(
+      { borderRadius: 14, backgroundColor: "#202020", borderWidth: 1, borderColor: THEME.border },
+      { theme: THEME },
+    );
+    expect(plan.rim).toBeUndefined();
   });
 
   it("isNeutralBorder", () => {
@@ -166,12 +203,52 @@ describe("stripChrome", () => {
     expect(stripChrome({ backgroundColor: "#E50914", borderRadius: 14, opacity: 0.8 }, plan).opacity).toBeUndefined();
   });
 
-  it("anlamlı çerçeve rengi saydamlaşmaz", () => {
+  it("anlamlı çerçeve rengi de saydamlaşır (kalınlık korunur)", () => {
     const flat = { backgroundColor: "#202020", borderRadius: 14, borderWidth: 2, borderColor: "#E50914" };
     const plan = planGlassChrome(flat, { theme: THEME });
-    expect(stripChrome(flat, plan).borderColor).toBe("#E50914");
+    expect(stripChrome(flat, plan)).toEqual({ borderRadius: 14, borderWidth: 2, borderColor: "transparent" });
+  });
+
+  it("buzlu camda (keepOpacity) basılı-durum saydamlığı korunur", () => {
+    const flat = { backgroundColor: "#202020", borderRadius: 14, opacity: 0.7 };
+    const plan = planGlassChrome({ ...flat, opacity: 1 }, { theme: THEME });
+    expect(stripChrome(flat, plan, { keepOpacity: true }).opacity).toBe(0.7);
+    expect(stripChrome(flat, plan).opacity).toBeUndefined();
   });
 });
+
+describe("Android buzlu cam", () => {
+  it("opak nötr yüzey camdakinden daha opak kalır (arkada blur yok)", () => {
+    const flat = { borderRadius: 14, backgroundColor: "#202020" };
+    expect(planGlassChrome(flat, { frosted: true }).tint).toBe(
+      formatColor(parseColor("#202020"), FROSTED_SURFACE_TINT_ALPHA),
+    );
+    expect(planGlassChrome(flat).tint).toBe(formatColor(parseColor("#202020"), GLASS_SURFACE_TINT_ALPHA));
+  });
+
+  it("frostedFill: opak nötr → buzlu opaklık; vurgu ve yarı saydam aynen", () => {
+    expect(frostedFill("#202020")).toBe(formatColor(parseColor("#202020"), FROSTED_SURFACE_TINT_ALPHA));
+    expect(frostedFill("#E50914")).toBe("rgba(229, 9, 20, 0.94)");
+    expect(frostedFill("rgba(0,0,0,0.45)")).toBe("rgba(0, 0, 0, 0.45)");
+    expect(frostedFill(undefined)).toBeUndefined();
+  });
+
+  it("frostedAppearance: canlı dolguda güçlü parlama; açık/koyu tema kenar ışığı; `rim` ezer", () => {
+    expect(frostedAppearance({ fill: "#E50914" }).rim).toBe("rgba(255, 255, 255, 0.24)");
+    expect(frostedAppearance({ fill: "#202020", scheme: "dark" }).rim).toBe("rgba(255, 255, 255, 0.13)");
+    expect(frostedAppearance({ fill: "#F2F2F2", scheme: "light" }).rim).toBe("rgba(0, 0, 0, 0.08)");
+    expect(frostedAppearance({ fill: "#202020", rim: "#3B82F6" }).rim).toBe("#3B82F6");
+    expect(frostedAppearance({ fill: "#202020" }).sheen).toHaveLength(2);
+  });
+
+  it("stateBorderColor: yalnız canlı çerçeve durum sayılır", () => {
+    expect(stateBorderColor("#3B82F6")).toBe("rgba(59, 130, 246, 1)");
+    expect(stateBorderColor("rgba(255,255,255,0.12)")).toBeUndefined();
+    expect(stateBorderColor("transparent")).toBeUndefined();
+    expect(stateBorderColor(undefined)).toBeUndefined();
+  });
+});
+
 
 describe("clampRadius", () => {
   it("hap (999) ölçülen boyutun yarısına iner; sığan köşe değişmez", () => {

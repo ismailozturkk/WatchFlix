@@ -7,6 +7,7 @@
 //
 //   notesDomain · mediaNotesDomain · remindersDomain   okuma (senkron) + apply
 //   aiConversationsDomain · aiConversations            AI sohbet geçmişi (+ depo API'si)
+//   posterChoicesDomain                                 özel afiş seçimleri (tek belge)
 //   remindersActions                                    hatırlatıcı yazma
 //   startUserData(uid)                                  giriş: işçi + indirme
 //   clearUserLocal(uid)                                 çıkış
@@ -30,6 +31,7 @@ import {
   createRemindersActions,
   mediaNotesSpec,
   notesSpec,
+  posterChoicesSpec,
   remindersSpec,
 } from "./domains";
 
@@ -60,11 +62,13 @@ export const notesDomain = createUserDataDomain(notesSpec, deps);
 export const mediaNotesDomain = createUserDataDomain(mediaNotesSpec, deps);
 export const remindersDomain = createUserDataDomain(remindersSpec, deps);
 export const aiConversationsDomain = createUserDataDomain(aiConversationsSpec, deps);
+export const posterChoicesDomain = createUserDataDomain(posterChoicesSpec, deps);
 export const ALL_DOMAINS = Object.freeze([
   notesDomain,
   mediaNotesDomain,
   remindersDomain,
   aiConversationsDomain,
+  posterChoicesDomain,
 ]);
 
 export const remindersActions = createRemindersActions(remindersDomain);

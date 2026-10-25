@@ -25,8 +25,9 @@ import SheetScroll from "@components/common/SheetScroll";
 import PosterImage from "@components/PosterImage";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
-import { useApiSettings, useImageQualitySettings } from "@context/AppSettingsContext";
+import { useApiSettings } from "@context/AppSettingsContext";
 import useReduceMotion from "@hooks/useReduceMotion";
+import usePosterUri from "@hooks/usePosterUri";
 import * as Haptics from "@services/hapticsService";
 import { readTmdb } from "@services/favoriteRecommendations";
 import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
@@ -71,7 +72,7 @@ export default function WatchPickerSheet({ visible, onClose, items, filtered = f
   const { theme } = useTheme();
   const { language } = useLanguage();
   const { API_KEY } = useApiSettings();
-  const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
   const reduceMotion = useReduceMotion();
   const copy = useMemo(() => getWatchPickerCopy(language), [language]);
   const genreMap = useMemo(() => buildGenreMap(), [language]);
@@ -265,7 +266,9 @@ export default function WatchPickerSheet({ visible, onClose, items, filtered = f
     ...facts,
   ].filter(Boolean);
 
-  const backdrop = shown?.imagePath && !shuffling ? { uri: getTmdbUrl(shown.imagePath, "poster", 500) } : null;
+  // Arka plan bulanığı öndeki afişle aynı görsel (özel afiş dahil).
+  const backdropUri = shuffling ? null : posterUri(shown?.type, shown?.id, shown?.imagePath, 500);
+  const backdrop = backdropUri ? { uri: backdropUri } : null;
   const poolLine = fillPickerCopy(filtered ? copy.sheet.poolFiltered : copy.sheet.pool, pool.length);
 
   return (
@@ -365,6 +368,7 @@ export default function WatchPickerSheet({ visible, onClose, items, filtered = f
                 <PosterImage
                   path={shown.imagePath}
                   type={shown.type}
+                  mediaId={shown.id}
                   size={300}
                   style={styles.poster}
                   contentFit="cover"
@@ -499,6 +503,7 @@ export default function WatchPickerSheet({ visible, onClose, items, filtered = f
                     <PosterImage
                       path={entry.imagePath}
                       type={entry.type}
+                      mediaId={entry.id}
                       size={92}
                       contentFit="cover"
                       style={styles.historyPoster}

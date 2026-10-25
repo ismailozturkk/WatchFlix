@@ -48,6 +48,7 @@ const TvOnTheAirCard = memo(function TvOnTheAirCard({ item, navigation, theme, g
         <PosterImage
           path={item.poster_path}
           type="tv"
+          mediaId={item.id}
           size={200}
           style={[
             styles.similarPoster,

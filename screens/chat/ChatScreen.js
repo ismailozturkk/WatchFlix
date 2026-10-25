@@ -168,6 +168,7 @@ import Reanimated, {
 import TrailerModal from "@components/video/TrailerModal";
 import GlassTouchable from "../../components/common/GlassTouchable";
 import GlassBox from "../../components/common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -3069,6 +3070,7 @@ export default function ChatScreen({ route, navigation }) {
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
+                        style={styles.composeThumbsScroll}
                         contentContainerStyle={styles.composeThumbsRow}
                       >
                         {selectedItems.map((it) => (
@@ -4122,7 +4124,10 @@ const styles = StyleSheet.create({
   modeBtnActive: { backgroundColor: ACCENT_SOFT, borderWidth: 1, borderColor: ACCENT + "55" },
   modeBtnText: { color: "rgba(255,255,255,0.5)", fontSize: 12.5, fontWeight: "800" },
   // Üst/sağ padding: taşan "×" rozetinin ScrollView kenarında kırpılmaması için.
-  composeThumbsRow: { gap: 8, paddingTop: 8, paddingRight: 10, paddingLeft: 2 },
+  // Kaldır rozeti küçük afişin 6 pt dışına taşar; basılan cam rozet kırpma sınırında kesilmesin
+  // diye üstte/sağda taşma + GLASS_PRESS_ROOM. Eski dolgunun fazlası negatif dış boşlukla düşülür.
+  composeThumbsScroll: { marginTop: 8 - (6 + GLASS_PRESS_ROOM), marginRight: 10 - (6 + GLASS_PRESS_ROOM) },
+  composeThumbsRow: { gap: 8, paddingTop: 6 + GLASS_PRESS_ROOM, paddingRight: 6 + GLASS_PRESS_ROOM, paddingLeft: 2 },
   composeThumb: {
     width: 46,
     height: 69,
@@ -4319,7 +4324,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 4,
     borderColor: "rgba(255,255,255,0.08)",
-    overflow: "hidden",
+    // overflow YOK: cam satırlar basılınca kutunun sınırında kesilirdi. Satır köşesi (14) +
+    // dolgu (4) = kutunun köşesi (18); kırpılacak taşma yok.
     marginBottom: 14,
     gap: 4,
   },

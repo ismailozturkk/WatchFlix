@@ -31,6 +31,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
 import { cineMediaKey, fillText, posterUrl } from "../../services/cineswipe/deckModel";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 function BasketPoster({ item, highlighted, dimmed, busy, onOpen, onRemove, copy, colors }) {
   const pulse = useSharedValue(0);
@@ -430,8 +431,9 @@ const styles = StyleSheet.create({
   },
   remove: {
     position: "absolute",
-    top: 6,
-    left: 6,
+    // Afiş kutusu kırpıyor (overflow): basılan cam düğme kenarda kesilmesin.
+    top: GLASS_PRESS_ROOM,
+    left: GLASS_PRESS_ROOM,
     width: 22,
     height: 22,
     borderRadius: 11,

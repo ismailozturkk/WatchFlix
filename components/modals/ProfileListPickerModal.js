@@ -23,7 +23,7 @@ import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useProfileStats } from "@context/ProfileStatsContext";
-import { useImageQualitySettings } from "@context/AppSettingsContext";
+import usePosterUri from "../../hooks/usePosterUri";
 import { i18nText } from "@utils/i18nText";
 import { getListAccent, getListIcon } from "@utils/listAppearance";
 import { sortItemsByListOrder } from "@utils/listOrder";
@@ -43,7 +43,7 @@ export default function ProfileListPickerModal({ visible, onClose, onSelect }) {
   // olarak görünür. Böyle bir durumda çökmek yerine sebebi yazan boş durum
   // gösterilir.
   const { lists: profileLists, isLoading } = useProfileStats() || {};
-  const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
 
   const lists = useMemo(() => {
     const labels = t?.profileScreen?.ProfileLists || {};
@@ -221,7 +221,7 @@ export default function ProfileListPickerModal({ visible, onClose, onSelect }) {
                         >
                           {entry.imagePath ? (
                             <Image
-                              source={{ uri: getTmdbUrl(entry.imagePath, "poster", 200) }}
+                              source={{ uri: posterUri(entry.type, entry.id, entry.imagePath) }}
                               style={StyleSheet.absoluteFill}
                               contentFit="cover"
                             />

@@ -19,6 +19,7 @@ import SectionHeader from "../../components/home/SectionHeader";
 import { SectionChipRail } from "../../components/home/SectionChips";
 import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import usePosterUri from "../../hooks/usePosterUri";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
@@ -121,9 +122,10 @@ const MovieTrendCard = memo(function MovieTrendCard({
         )
       : scale;
 
+  const posterUri = usePosterUri();
   const source = useMemo(
-    () => ({ uri: getTmdbUrl(item.poster_path, "poster", 200) }),
-    [item.poster_path, getTmdbUrl]
+    () => ({ uri: posterUri("movie", item.id, item.poster_path) }),
+    [item.id, item.poster_path, posterUri]
   );
 
   return (

@@ -22,6 +22,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileReminders } from "../../../context/ProfileRemindersContext";
 import { useImageQualitySettings, useListLayoutSettings } from "../../../context/AppSettingsContext";
+import usePosterUri from "../../../hooks/usePosterUri";
 import { i18nText } from "../../../utils/i18nText";
 import { minutesText } from "../../../utils/durationText";
 import GlassIconButton from "../../../components/common/GlassIconButton";
@@ -65,6 +66,7 @@ function buildItems(reminders, limit = 5) {
     key: `m-${m.movieId}`,
     type: "movie",
     poster: m.posterPath,
+    mediaId: m.movieId,
     title: m.movieName,
     subtitle: m.movieMinutes > 0 ? minutesText(m.movieMinutes) : null,
     date: m.releaseDate,
@@ -271,6 +273,7 @@ export default function RemindersPreviewButton({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
   const { posterBadges, reminderPreviewLimit } = useListLayoutSettings();
   const { reminders, calculateDateDifference, formatDate } =
     useProfileReminders();
@@ -367,7 +370,12 @@ export default function RemindersPreviewButton({ navigation }) {
         <View style={[styles.posterBox, { backgroundColor: theme.primary }]}>
           {item.poster ? (
             <Image
-              source={{ uri: getTmdbUrl(item.poster, "poster", 200) }}
+              source={{
+                // Dizi satırı SEZON afişi gösterir: özel afiş yalnız filmde.
+                uri: isMovie
+                  ? posterUri("movie", item.mediaId, item.poster)
+                  : getTmdbUrl(item.poster, "poster", 200),
+              }}
               style={styles.poster}
               contentFit="cover"
               cachePolicy="memory-disk"

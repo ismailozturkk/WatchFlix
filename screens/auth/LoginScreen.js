@@ -65,6 +65,7 @@ import {
   signInWithApple,
 } from "../../services/appleAuthService";
 import useAppLogo from "@hooks/useAppLogo";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 // Hafif dokunsal geri bildirim — desteklemeyen cihazlarda sessizce geç
 const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -654,11 +655,14 @@ const styles = StyleSheet.create({
     // Android'de ebeveyn sınırı dışına taşan dokunma kaybı yaşanmaz.
     marginHorizontal: -22,
   },
+  // Basılan cam çip kesilmesin: dikey pay GLASS_PRESS_ROOM (dolgu + eşit negatif dış boşluk).
   savedList: {
     flexGrow: 0,
+    marginVertical: -GLASS_PRESS_ROOM,
   },
   savedListContent: {
     paddingHorizontal: 22,
+    paddingVertical: GLASS_PRESS_ROOM,
     gap: CHIP_GAP,
   },
   savedChip: {

@@ -7,6 +7,7 @@
 //   │       sallanan madalyon (nabız halkalı), etiket, başlık, tek cümle
 //   ├ gösterge: "5 / 5 liste" — küçük limitlerde parça parça dolan dilimler,
 //   │       büyüklerde parlayan çubuk; sayı 0'dan sayar
+//   │   (ya da) önizleme: özel afiş/arka plan galerisinden gelince "Şimdi → Seçtiğin"
 //   ├ plan kartları: Free · Premium · Max; önerilen kart taç + nefes alan çerçeve
 //   ├ "Premium ile ayrıca": gerçek kapılardan 2 kazanç satırı (sağdan kayarak girer)
 //   ├ güvence notu ("Gelen istekleri kabul etmek her zaman serbest")
@@ -50,6 +51,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
+import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -552,6 +554,122 @@ const MeterCard = memo(function MeterCard({ content, theme, language, reduceMoti
   );
 });
 
+// ── Seçim önizlemesi (özel afiş / arka plan) ────────────────────────────────
+
+// Afiş önizlemesi 2:3; arka plan 16:9 ve iki kutu satıra sığacak kadar geniş
+// (sayfa yan dolgusu 2×20, kart dolgusu 2×14, ortadaki ok alanı PREVIEW_ARROW_SPACE).
+const PREVIEW_POSTER = Object.freeze({ w: 84, h: 126 });
+const PREVIEW_ARROW_SPACE = 44;
+const PREVIEW_FRAME_PAD = 3;
+
+/** Tek görsel: "Şimdi" soluk, "Seçtiğin" özelliğin rengiyle çerçeveli + kilitli + parıltılı. */
+const PreviewTile = memo(function PreviewTile({
+  uri,
+  label,
+  size,
+  theme,
+  icon,
+  chosen = false,
+  color,
+  ambient,
+  delay,
+}) {
+  return (
+    <Rise delay={delay} dy={10} from={chosen ? 0.88 : 1} style={styles.previewTile}>
+      <View
+        style={[
+          styles.previewFrame,
+          chosen
+            ? [styles.previewGlow, { borderColor: color, backgroundColor: alpha(color, 0.12), shadowColor: color }]
+            : { borderColor: "transparent" },
+        ]}
+      >
+        <View
+          style={[
+            styles.previewClip,
+            { width: size.w, height: size.h, backgroundColor: theme.primary },
+            !chosen && styles.previewDim,
+          ]}
+        >
+          {uri ? (
+            <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={160} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.previewEmpty]}>
+              <Ionicons name={icon} size={22} color={theme.text.muted} />
+            </View>
+          )}
+          {chosen && ambient ? <Sheen width={size.w} delay={1500} rest={2800} strength={0.26} /> : null}
+        </View>
+        {chosen ? (
+          <View style={[styles.previewLock, { backgroundColor: theme.secondary }]}>
+            <View style={[styles.previewLockInner, { backgroundColor: color }]}>
+              <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+            </View>
+          </View>
+        ) : null}
+      </View>
+      <Text
+        allowFontScaling={false}
+        numberOfLines={1}
+        style={[styles.previewLabel, { color: chosen ? color : theme.text.muted }]}
+      >
+        {label}
+      </Text>
+    </Rise>
+  );
+});
+
+/**
+ * Galeriden gelen yükseltme: seçilmeye çalışılan görsel ("Şimdi → Seçtiğin").
+ * Erişim özelliklerinde gösterge olmadığından onun yerinde, aynı kart diliyle durur.
+ */
+const ChoicePreviewCard = memo(function ChoicePreviewCard({ content, theme, ambient, delay, windowWidth }) {
+  const { preview, color } = content;
+  const poster = preview.kind === "poster";
+  const backdropW = Math.max(
+    96,
+    // Çerçeve payı (dolgu + 1,5 kenarlık) iki yandan düşülür: satır kartı taşmasın.
+    Math.floor((windowWidth - TIERS_SIDE_PADDING - 28 - PREVIEW_ARROW_SPACE) / 2) - PREVIEW_FRAME_PAD * 2 - 4,
+  );
+  const size = poster ? PREVIEW_POSTER : { w: backdropW, h: Math.round((backdropW * 9) / 16) };
+  const icon = poster ? "film-outline" : "image-outline";
+
+  return (
+    <Rise
+      delay={delay}
+      dy={18}
+      style={[styles.card, styles.previewCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+    >
+      <View style={styles.previewRow}>
+        <PreviewTile
+          uri={preview.fromUri}
+          label={preview.fromLabel}
+          size={size}
+          theme={theme}
+          icon={icon}
+          delay={delay + 80}
+        />
+        <Rise delay={delay + 200} dx={-10} dy={0} style={styles.previewArrowWrap}>
+          <View style={[styles.previewArrow, { backgroundColor: alpha(color, 0.16) }]}>
+            <Ionicons name="arrow-forward" size={15} color={color} />
+          </View>
+        </Rise>
+        <PreviewTile
+          chosen
+          uri={preview.toUri}
+          label={preview.toLabel}
+          size={size}
+          theme={theme}
+          icon={icon}
+          color={color}
+          ambient={ambient}
+          delay={delay + 280}
+        />
+      </View>
+    </Rise>
+  );
+});
+
 // ── Plan kartları ────────────────────────────────────────────────────────────
 
 /**
@@ -856,9 +974,9 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
   const { color } = content;
   const accentEnd = theme.bold || theme.accent;
 
-  // Giriş sahnesinin zamanlaması (ms): hero → gösterge → kartlar → kazançlar → düğme.
+  // Giriş sahnesinin zamanlaması (ms): hero → gösterge/önizleme → kartlar → kazançlar → düğme.
   const meterDelay = 360;
-  const tiersDelay = content.meter ? 520 : 380;
+  const tiersDelay = content.meter || content.preview ? 520 : 380;
   const perksDelay = tiersDelay + 360;
   const noteDelay = perksDelay + 260;
 
@@ -921,6 +1039,16 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
             reduceMotion={reduceMotion}
             ambient={ambient}
             delay={meterDelay}
+          />
+        ) : null}
+
+        {content.preview ? (
+          <ChoicePreviewCard
+            content={content}
+            theme={theme}
+            ambient={ambient}
+            delay={meterDelay}
+            windowWidth={windowWidth}
           />
         ) : null}
 
@@ -1118,7 +1246,12 @@ export function PremiumUpsellHost() {
 
   const content = useMemo(
     () =>
-      request ? buildUpsellContent(request.featureId, request.plan, lang, { used: request.used }) : null,
+      request
+        ? buildUpsellContent(request.featureId, request.plan, lang, {
+            used: request.used,
+            preview: request.preview,
+          })
+        : null,
     [request, lang],
   );
 
@@ -1311,6 +1444,28 @@ const styles = StyleSheet.create({
   bar: { height: 10, borderRadius: 5, overflow: "hidden", marginTop: 11 },
   barFill: { height: "100%", borderRadius: 5, overflow: "hidden" },
   sheen: { position: "absolute", top: -10, bottom: -10, width: 70 },
+  // seçim önizlemesi (özel afiş / arka plan)
+  previewCard: { paddingVertical: 14 },
+  previewRow: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  previewTile: { alignItems: "center", gap: 7 },
+  previewFrame: { padding: PREVIEW_FRAME_PAD, borderRadius: 14, borderWidth: 1.5 },
+  previewGlow: { shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
+  previewClip: { borderRadius: 10, overflow: "hidden" },
+  previewDim: { opacity: 0.62 },
+  previewEmpty: { alignItems: "center", justifyContent: "center" },
+  previewLock: {
+    position: "absolute",
+    top: -7,
+    right: -7,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    padding: 2,
+  },
+  previewLockInner: { flex: 1, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  previewLabel: { fontSize: 12, fontWeight: "800", letterSpacing: 0.2 },
+  previewArrowWrap: { width: PREVIEW_ARROW_SPACE, alignItems: "center", marginBottom: 22 },
+  previewArrow: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
   inlineRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
   inlineText: { fontSize: 12, fontWeight: "600" },
   noteText: { flex: 1, lineHeight: 17, marginTop: 0 },
@@ -1419,7 +1574,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   ctaGloss: { position: "absolute", top: 0, left: 0, right: 0, height: "52%" },
-  ctaPlain: { borderWidth: 1 },
+  // Düz (cam) düğmede kırpılacak parlama yok; overflow cam katmanını basılınca keserdi.
+  ctaPlain: { borderWidth: 1, overflow: "visible" },
   ctaText: { color: "#FFFFFF", fontSize: 15.5, fontWeight: "900", letterSpacing: -0.1 },
   // Düğme yazısı simge ile ok arasında esner; uzun etiket/geniş yazı tipinde
   // okun üstüne binmek yerine küçülür.

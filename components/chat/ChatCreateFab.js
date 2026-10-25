@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "@context/ThemeContext";
 import GlassSurface from "@components/common/GlassSurface";
-import { useLiquidGlass } from "@services/liquidGlass";
+import { useGlassShape, useLiquidGlass } from "@services/liquidGlass";
 
 const HEIGHT = 54;
 
@@ -13,6 +13,7 @@ const HEIGHT = 54;
 export default function ChatCreateFab({ icon, label, onPress }) {
   const { theme } = useTheme();
   const glass = useLiquidGlass();
+  const shaped = useGlassShape();
 
   return (
     <Pressable
@@ -23,7 +24,7 @@ export default function ChatCreateFab({ icon, label, onPress }) {
       style={({ pressed }) => [styles.anchor, !glass && pressed && styles.pressedFallback]}
     >
       <GlassSurface
-        radius={glass ? HEIGHT / 2 : 18}
+        radius={shaped ? HEIGHT / 2 : 18}
         tint={theme.accent}
         interactive
         fallbackStyle={[styles.fallbackBox, { backgroundColor: theme.accent }]}

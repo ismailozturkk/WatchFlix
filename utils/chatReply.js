@@ -11,7 +11,7 @@ import { readShare, shareThumb } from "./chatShare";
 const POLL_EMOJI_PREFIX = /^📊\s*/u;
 
 // Sohbete gönderilen zengin içerik türleri (utils/chatShare.js SHARE_TYPE değerleri).
-const SHARE_REPLY_KINDS = ["list", "ai", "post", "tournament", "cineRoom", "tasteMatch", "challenge", "duelResult"];
+const SHARE_REPLY_KINDS = ["list", "ai", "post", "tournament", "cineRoom", "tasteMatch", "challenge", "duelResult", "settings"];
 
 // "poll" | "list" | "ai" | "post" | "tournament" | "cineRoom" | "collection" | "media" | "text". Eski kayıtlarda kind
 // alanı farklı olabilir (örn. "list"); tanınmayan her şey düz metin sayılır.
@@ -81,6 +81,7 @@ export function replyGlyph(kind, mediaType) {
   if (kind === "cineRoom") return "film";
   if (kind === "tasteMatch") return "heart";
   if (kind === "challenge" || kind === "duelResult") return "flash";
+  if (kind === "settings") return "color-palette";
   if (kind === "collection") return "albums";
   if (kind === "media") {
     if (mediaType === "tv") return "tv";

@@ -4,6 +4,7 @@
 // Asıl sözleşme: cam ÇİZİLEMİYORSA (Android, iOS 18–25, Efektler: Kapalı) çağıranın
 // ESKİ kutusu (boyut, köşe, zemin, çerçeve) aynen çıkar; cam çiziliyorsa
 // yuvarlak/hap cam çıkar ve cam yolunda opaklık/gölge YOKTUR (cam kuralları).
+// Android buzlu camında şekil camla aynı (daire/hap), yüzey buzlu, basma saydamlığı kalır.
 import React from "react";
 import { act, create } from "react-test-renderer";
 import GlassCloseButton from "../components/common/GlassCloseButton";
@@ -52,7 +53,10 @@ jest.mock("../context/ThemeContext", () => ({
 jest.mock("../services/liquidGlass", () => {
   const React = require("react");
   return {
-    useLiquidGlass: () => mockGlass,
+    // mockGlass: true (iOS 26 cam) | "frosted" (Android buzlu cam) | false (eski görünüm)
+    useLiquidGlass: () => mockGlass === true,
+    useGlassMode: () => (mockGlass === true ? "native" : mockGlass === "frosted" ? "frosted" : "off"),
+    useGlassShape: () => mockGlass === true || mockGlass === "frosted",
     NativeGlassView: (props) => React.createElement("GlassView", props),
   };
 });
@@ -213,5 +217,45 @@ describe("GlassPillButton", () => {
     expect(tree.root.findAllByType("Text")).toHaveLength(0);
     expect(tree.root.findByType("Pressable").props.onPress).toBeUndefined();
     expect(tree.root.findByType("Pressable").props.accessibilityState).toMatchObject({ busy: true });
+  });
+});
+
+describe("Android buzlu cam", () => {
+  beforeEach(() => {
+    mockGlass = "frosted";
+  });
+
+  it("GlassCloseButton: cam şekli (size/2), yüzey eski zeminin buzlu hâli, basınca opaklık VAR", () => {
+    const tree = render(
+      <GlassCloseButton size={34} fallbackRadius={11} backgroundColor="#abcdef" onPress={() => {}} />,
+    );
+    expect(tree.root.findAllByType("GlassView")).toHaveLength(0);
+    const box = flat(tree.root.findAllByType("View")[0].props.style);
+    expect(box).toMatchObject({ width: 34, height: 34, borderRadius: 17 });
+    expect(box.backgroundColor).toBe("rgba(171, 205, 239, 0.94)");
+    expect(pressableStyle(tree, true).opacity).toBe(0.8);
+  });
+
+  it("GlassIconButton plain: Android'de de çıplak ikon değil, yuvarlak buzlu düğme", () => {
+    const tree = render(<GlassIconButton variant="plain" icon="add" size={40} onPress={() => {}} />);
+    const box = flat(tree.root.findAllByType("View")[0].props.style);
+    expect(box.borderRadius).toBe(20);
+    expect(box.backgroundColor).toBe("rgba(34, 34, 34, 0.8)");
+  });
+
+  it("GlassIconButton blur: blur hedefi AdaptiveBlurView'a iletilir (gerçek blur)", () => {
+    const target = { current: {} };
+    const tree = render(<GlassIconButton variant="blur" icon="close" size={38} blurTarget={target} onPress={() => {}} />);
+    const blur = tree.root.findByType("AdaptiveBlurView");
+    expect(blur.props.blurTarget).toBe(target);
+    expect(flat(blur.props.style).borderRadius).toBe(19);
+  });
+
+  it("GlassPillButton: hap (yükseklik/2); devre dışı eski yoldaki gibi opaklıkla", () => {
+    const tree = render(
+      <GlassPillButton label="Kaydet" height={48} fallbackRadius={18} disabled fallbackStyle={{ backgroundColor: "#3B82F6" }} />,
+    );
+    expect(flat(tree.root.findAllByType("View")[0].props.style).borderRadius).toBe(24);
+    expect(pressableStyle(tree).opacity).toBe(0.4);
   });
 });

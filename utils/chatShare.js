@@ -33,6 +33,7 @@ import { i18nText } from "./i18nText";
 import { tmdbPathFromPoster, MAX_SHARED_LIST_ITEMS } from "./listShare";
 import { PREVIEW_MAX } from "./threadPreview";
 import { tierOf } from "./tasteMatch";
+import { sanitizeSettingsShare, SETTINGS_SHARE_TYPE, settingsShareSectionIds } from "./settingsShare";
 
 export const SHARE_VERSION = 1;
 
@@ -45,6 +46,7 @@ export const SHARE_KIND = Object.freeze({
   TASTE_MATCH: "tasteMatchShare",
   CHALLENGE: "challengeShare",
   DUEL_RESULT: "duelResultShare",
+  SETTINGS: "settingsShare",
 });
 
 export const SHARE_TYPE = Object.freeze({
@@ -56,6 +58,8 @@ export const SHARE_TYPE = Object.freeze({
   TASTE_MATCH: "tasteMatch",
   CHALLENGE: "challenge",
   DUEL_RESULT: "duelResult",
+  // Gövdenin kendisi utils/settingsShare.js'te (görünüm ayarları; alıcı seçerek uygular).
+  SETTINGS: SETTINGS_SHARE_TYPE,
 });
 
 const KIND_BY_TYPE = {
@@ -67,6 +71,7 @@ const KIND_BY_TYPE = {
   [SHARE_TYPE.TASTE_MATCH]: SHARE_KIND.TASTE_MATCH,
   [SHARE_TYPE.CHALLENGE]: SHARE_KIND.CHALLENGE,
   [SHARE_TYPE.DUEL_RESULT]: SHARE_KIND.DUEL_RESULT,
+  [SHARE_TYPE.SETTINGS]: SHARE_KIND.SETTINGS,
 };
 const SHARE_KINDS = Object.values(SHARE_KIND);
 
@@ -704,6 +709,8 @@ export function sanitizeShare(raw) {
       return sanitizeChallengeShare(raw);
     case SHARE_TYPE.DUEL_RESULT:
       return sanitizeDuelResultShare(raw);
+    case SHARE_TYPE.SETTINGS:
+      return sanitizeSettingsShare(raw);
     default:
       return null;
   }
@@ -764,6 +771,10 @@ export function sharePreview(share) {
         a: share.guestScore,
         b: share.hostScore ?? "?",
       });
+    case SHARE_TYPE.SETTINGS:
+      return i18nText("autoI18n.paylas_ayar_onizleme", "Görünüm ayarları ({{n}})", {
+        n: settingsShareSectionIds(share).length,
+      });
     default: {
       const head = titlesOf(share).slice(0, 3).join(", ");
       return head || firstLine(share.summary, 80) || share.question || "CineMatch";
@@ -798,6 +809,9 @@ export function shareMessageText(share) {
     case SHARE_TYPE.DUEL_RESULT:
       line = `⚔️ ${sharePreview(share)}`;
       break;
+    case SHARE_TYPE.SETTINGS:
+      line = `🎨 ${sharePreview(share)}`;
+      break;
     default:
       line = `✨ CineMatch · ${sharePreview(share)}`;
   }
@@ -830,6 +844,7 @@ export function shareThumb(share) {
     case SHARE_TYPE.CINE_ROOM:
     case SHARE_TYPE.CHALLENGE:
     case SHARE_TYPE.DUEL_RESULT:
+    case SHARE_TYPE.SETTINGS:
       return null;
     case SHARE_TYPE.TASTE_MATCH:
       return (share.items || []).find((item) => item.poster_path)?.poster_path || null;

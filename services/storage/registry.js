@@ -379,6 +379,15 @@ const settingsKeys = {
     default: null,
     validate: arrayOf(),
   },
+  // Film ana ekranı "Yaklaşan Filmler" süzgeci (utils/upcomingFilters.js): tarih penceresi, gösterim,
+  // tür, dil, sıralama. Raf ile "Tümü" ekranı (kendi MovieProvider örneği) bu kayıttan ortak okur.
+  // Varsayılansa null.
+  upcomingFilters: {
+    key: "upcomingFilters",
+    type: TYPES.json,
+    default: null,
+    validate: plainObject,
+  },
 };
 
 /* ================================================================== */

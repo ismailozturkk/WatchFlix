@@ -20,6 +20,7 @@ import AppIcon from "@components/AppIcon";
 import { roundLabel } from "@services/tournamentEngine";
 import { i18nText } from "@utils/i18nText";
 import GlassPressable from "../common/GlassPressable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 // Uygulamanın onay/başarı yeşili (TournamentScreen / MatchCard ile aynı değer).
 const DONE_GREEN = "#22C55E";
@@ -117,7 +118,8 @@ function RoundRail({ rounds = [], phase, activeRound, selected, onSelect, myPick
   const scrollToSelected = useCallback((idx) => {
     const x = offsets.current[idx];
     if (x == null) return;
-    scrollRef.current?.scrollTo({ x: Math.max(0, x - 16), animated: true });
+    // x, içerik kabının sol dolgusunu (GLASS_PRESS_ROOM) içerir; kart eskisi gibi 16 pt içeride dursun.
+    scrollRef.current?.scrollTo({ x: Math.max(0, x - 16 - GLASS_PRESS_ROOM), animated: true });
   }, []);
 
   // Seçim dışarıdan (aşama çizelgesi) değişince seçili kart görünür kalsın.
@@ -134,6 +136,7 @@ function RoundRail({ rounds = [], phase, activeRound, selected, onSelect, myPick
       ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.scroll}
       contentContainerStyle={styles.row}
     >
       {rounds.map((round, i) => {
@@ -165,7 +168,10 @@ function RoundRail({ rounds = [], phase, activeRound, selected, onSelect, myPick
 }
 
 const styles = StyleSheet.create({
-  row: { gap: 10, paddingVertical: 14, paddingRight: 8 },
+  // Soldaki ilk kart basılınca kırpma sınırında kesilmesin: GLASS_PRESS_ROOM dolgu + eşit
+  // negatif dış boşluk (dikeyde 14 pt zaten yeterli).
+  scroll: { marginLeft: -GLASS_PRESS_ROOM },
+  row: { gap: 10, paddingVertical: 14, paddingLeft: GLASS_PRESS_ROOM, paddingRight: 8 },
   item: {
     minWidth: 108, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 11,
     borderRadius: 16, borderWidth: 1,

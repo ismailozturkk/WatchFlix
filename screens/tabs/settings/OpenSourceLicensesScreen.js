@@ -32,6 +32,7 @@ import { i18nText } from "@utils/i18nText";
 import { SettingsSubScreen, buildUiColors } from "./settingsUi";
 import GlassTouchable from "../../../components/common/GlassTouchable";
 import GlassBox from "../../../components/common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../../utils/liquidGlass";
 
 const ROW_HEIGHT = 60;
 
@@ -158,6 +159,7 @@ export default function OpenSourceLicensesScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={s.chipsScroll}
         contentContainerStyle={s.chips}
         keyboardShouldPersistTaps="handled"
       >
@@ -200,7 +202,8 @@ export default function OpenSourceLicensesScreen() {
             {isTr ? "Eşleşen paket yok." : es ? "No hay paquetes que coincidan." : pt ? "Nenhum pacote correspondente." : de ? "Keine passenden Pakete." : "No matching packages."}
           </Text>
         }
-        contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
+        style={s.listRoom}
+        contentContainerStyle={[s.listRoomContent, { paddingBottom: insets.bottom + 110 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         initialNumToRender={14}
@@ -401,7 +404,12 @@ const s = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 13, padding: 0 },
 
-  chips: { gap: 8, paddingVertical: 12, paddingRight: 4 },
+  // Basılan cam satır/çip kırpma sınırında kesilmesin: yanlarda GLASS_PRESS_ROOM (dolgu +
+  // sayfanın 16 pt yan boşluğuna taşan negatif dış boşluk; yerleşim aynı).
+  listRoom: { marginHorizontal: -GLASS_PRESS_ROOM },
+  listRoomContent: { paddingHorizontal: GLASS_PRESS_ROOM },
+  chipsScroll: { marginHorizontal: -GLASS_PRESS_ROOM },
+  chips: { gap: 8, paddingVertical: 12, paddingLeft: GLASS_PRESS_ROOM, paddingRight: 4 + GLASS_PRESS_ROOM },
   chip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
   chipText: { fontSize: 11, fontWeight: "600" },
 

@@ -15,6 +15,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useImageQualitySettings, useListLayoutSettings } from "../../../context/AppSettingsContext";
+import usePosterUri from "../../../hooks/usePosterUri";
 import { i18nText } from "../../../utils/i18nText";
 import {
   removeEpisodeReminderWithUndo,
@@ -134,6 +135,9 @@ function CountdownBadge({ countdown, colors, onDelete, deleteLabel }) {
         </Text>
       </View>
       <GlassTouchable
+        // Cam DEĞİL: dilim, kırpılan iki parçalı hapın parçası; basılınca büyüyen cam
+        // hapın sınırında kesilirdi (≈21×17 pt'lik dilimde yer açacak boşluk yok).
+        glass={false}
         onPress={onDelete}
         activeOpacity={0.6}
         // Dilim küçük (≈21×17): dokunma alanı kartın içinde kalacak kadar genişletildi
@@ -162,6 +166,7 @@ function MovieCard({
   onDelete,
 }) {
   const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
   const { posterBadges } = useListLayoutSettings();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const diff = calculateDateDifference(reminder.releaseDate);
@@ -212,7 +217,7 @@ function MovieCard({
         <View style={styles.posterWrapper}>
           <Image
             source={{
-              uri: getTmdbUrl(reminder.posterPath, 'poster', 200),
+              uri: posterUri("movie", reminder.movieId, reminder.posterPath),
             }}
             style={styles.poster}
             resizeMode="cover"

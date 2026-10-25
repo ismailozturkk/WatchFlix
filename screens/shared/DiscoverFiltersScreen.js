@@ -58,6 +58,7 @@ import {
 } from "../../utils/discoverFilters";
 import { SeeAllGrid } from "./SeeAllScreen";
 import { describeCopyOf, fillCopy, getDiscoverFiltersCopy } from "./discoverFiltersCopy";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 /** Ölçüm: süzgeç uygulandı (kaynak: hazır çip / kayıtlı / filtre sayfası). Metin ASLA gönderilmez. */
 const trackApplied = (source, mediaType, filters, extra) =>
@@ -265,6 +266,7 @@ export default function DiscoverFiltersScreen({ route, navigation }) {
         ref={chipScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.chipScroll}
         contentContainerStyle={styles.chipRow}
         keyboardShouldPersistTaps="handled"
       >
@@ -405,7 +407,9 @@ export default function DiscoverFiltersScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   bar: { gap: 10 },
   switchRow: { alignItems: "center" },
-  chipRow: { paddingHorizontal: 12, gap: 8, alignItems: "center" },
+  // Basılan cam çip satırın kırpma sınırında kesilmesin (utils/liquidGlass GLASS_PRESS_ROOM).
+  chipScroll: { marginVertical: -GLASS_PRESS_ROOM },
+  chipRow: { paddingHorizontal: 12, paddingVertical: GLASS_PRESS_ROOM, gap: 8, alignItems: "center" },
   warning: { flexDirection: "row", alignItems: "flex-start", gap: 6, paddingHorizontal: 14 },
   warningText: { flex: 1, fontSize: 11.5, lineHeight: 15 },
   state: { width: "100%", alignItems: "center", paddingHorizontal: 32, paddingTop: 48, paddingBottom: 24 },

@@ -58,7 +58,13 @@ import { fetchFavoriteRecommendations } from "../../services/favoriteRecommendat
 import { getFavoritesCopy } from "../../utils/favoritesCopy";
 import { readProfileFavorites, recommendationSources } from "../../utils/fourFavorites";
 import GlassTouchable from "../../components/common/GlassTouchable";
+import { useLiquidGlass } from "../../services/liquidGlass";
 import { worldTourDiscoverParams } from "../../utils/worldTour";
+import UpcomingFilterChips from "../../components/home/UpcomingFilterChips";
+import UpcomingFilterSheet from "../../components/home/UpcomingFilterSheet";
+import UpcomingEmptyState from "../../components/home/UpcomingEmptyState";
+import useUpcomingFilterControls from "../../hooks/useUpcomingFilterControls";
+import { isUpcomingCustomized } from "../../utils/upcomingFilters";
 
 const { width } = Dimensions.get("window");
 const SIDE = 12;
@@ -187,6 +193,7 @@ const PosterCard = React.memo(function PosterCard({
         <PosterImage
           path={item.poster_path}
           type={mediaType}
+          mediaId={item.id}
           size={200}
           style={[
             styles.poster,
@@ -235,9 +242,14 @@ const LayoutControls = React.memo(function LayoutControls({
   onColumns,
   onRadius,
 }) {
+  // Camda kap KIRPMAZ: seçili hücrenin camı kabın çocuğu, basılınca kap sınırında kesilirdi.
+  // Köşeler bu yüzden hücrede (kabın iç köşesi = 10 − 1 pt çerçeve).
+  const glass = useLiquidGlass();
+  const segStyle = [styles.seg, !glass && styles.segClip, { backgroundColor: theme.secondary, borderColor: theme.border }];
+  const cellStyle = [styles.segCell, glass && styles.segCellGlass];
   return (
     <View style={styles.controls}>
-      <View style={[styles.seg, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      <View style={segStyle}>
         {[3, 4].map((c) => {
           const active = columns === c;
           return (
@@ -245,7 +257,7 @@ const LayoutControls = React.memo(function LayoutControls({
               key={c}
               activeOpacity={0.7}
               onPress={() => onColumns(c)}
-              style={[styles.segCell, active && { backgroundColor: theme.accent }]}
+              style={[cellStyle, active && { backgroundColor: theme.accent }]}
             >
               <Text
                 allowFontScaling={false}
@@ -260,7 +272,7 @@ const LayoutControls = React.memo(function LayoutControls({
           );
         })}
       </View>
-      <View style={[styles.seg, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+      <View style={segStyle}>
         {RADIUS_OPTS.map((opt) => {
           const active = radius === opt.value;
           return (
@@ -268,7 +280,7 @@ const LayoutControls = React.memo(function LayoutControls({
               key={opt.value}
               activeOpacity={0.7}
               onPress={() => onRadius(opt.value)}
-              style={[styles.segCell, active && { backgroundColor: theme.accent }]}
+              style={[cellStyle, active && { backgroundColor: theme.accent }]}
             >
               <View
                 style={{
@@ -560,18 +572,49 @@ function MovieSeeAll({ section, title, navigation }) {
     );
   }, [section, ctx.OSCAR_CATEGORIES, ctx.selectedOscarCategory, ctx.changeOscarCategory, theme]);
 
+  // Yaklaşan Filmler: raftakiyle AYNI çip satırı + filtre sayfası. Süzgeç depoda (useUpcomingFilters):
+  // burada değişince ana ekrandaki raf da güncellenir.
+  const upcoming = useUpcomingFilterControls("see_all");
+  const isUpcoming = section === "upcoming";
+  const upcomingEmpty =
+    isUpcoming && !ctx.loadingUpcoming && isUpcomingCustomized(upcoming.filters) ? (
+      <UpcomingEmptyState onReset={upcoming.reset} style={styles.upcomingEmpty} />
+    ) : undefined;
+
   return (
-    <SeeAllGrid
-      title={title}
-      mediaType="movie"
-      navigation={navigation}
-      data={cfg?.data}
-      loadMore={cfg?.loadMore}
-      loadingMore={cfg?.loadingMore}
-      hasMore={!!cfg?.hasMore}
-      onActivate={onActivate}
-      headerExtra={headerExtra}
-    />
+    <>
+      <SeeAllGrid
+        title={title}
+        mediaType="movie"
+        navigation={navigation}
+        data={cfg?.data}
+        loadMore={cfg?.loadMore}
+        loadingMore={cfg?.loadingMore}
+        hasMore={!!cfg?.hasMore}
+        onActivate={onActivate}
+        headerExtra={
+          isUpcoming ? (
+            <UpcomingFilterChips
+              filters={upcoming.filters}
+              onOpenFilters={upcoming.openSheet}
+              onSelectRange={upcoming.selectRange}
+            />
+          ) : (
+            headerExtra
+          )
+        }
+        emptyComponent={upcomingEmpty}
+      />
+      {isUpcoming ? (
+        <UpcomingFilterSheet
+          visible={upcoming.sheetVisible}
+          onClose={upcoming.closeSheet}
+          filters={upcoming.filters}
+          onApply={upcoming.applyFromSheet}
+          region={upcoming.region}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -1001,8 +1044,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     borderRadius: 10,
     borderWidth: 1,
-    overflow: "hidden",
   },
+  segClip: { overflow: "hidden" },
+  segCellGlass: { borderRadius: 9 },
   segCell: {
     paddingHorizontal: 8,
     paddingVertical: 6,
@@ -1058,6 +1102,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: "100%",
   },
+  upcomingEmpty: { marginTop: 40 },
   oscarYearBadge: {
     position: "absolute",
     top: 5,

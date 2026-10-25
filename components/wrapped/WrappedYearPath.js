@@ -10,12 +10,15 @@ import { i18nText } from "../../utils/i18nText";
 import Svg, { Path, Defs, LinearGradient, Stop } from "react-native-svg";
 import AppIcon from "../AppIcon";
 import GlassPressable from "../common/GlassPressable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const MAX_COLUMNS = 4;
 const MAX_VISIBLE_ROWS = 7;
 const NODE_W = 68;
 const NODE_H = 48;
-const PAD_X = 38;
+// Kenar düğümü kırpan kutunun (pathShell) kenarından en az GLASS_PRESS_ROOM içeride:
+// basılan cam düğüm kesilmesin.
+const PAD_X = NODE_W / 2 + GLASS_PRESS_ROOM;
 const FIRST_ROW_Y = 40;
 const ROW_STEP = 64;
 const ROW_ZIGZAG = 7;

@@ -49,6 +49,7 @@ const MovieNowPlayingCard = memo(function MovieNowPlayingCard({ item, navigation
         <PosterImage
           path={item.poster_path}
           type="movie"
+          mediaId={item.id}
           size={200}
           style={[
             styles.similarPoster,

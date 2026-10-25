@@ -23,6 +23,7 @@ import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { postTypeMeta } from "./postTypeMeta";
 import GlassPressable from "../common/GlassPressable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 export const FEED_FILTERS = {
   ALL: "all",
@@ -642,8 +643,9 @@ const s = StyleSheet.create({
   },
 
   // Filtre
-  filterScroll: { flexGrow: 0, marginBottom: 12 },
-  filterContent: { paddingHorizontal: 14, gap: 8, paddingVertical: 4 },
+  // Basılan cam hap kesilmesin: dikey pay GLASS_PRESS_ROOM, eski 4 pt'nin fazlası dış boşluktan düşülür.
+  filterScroll: { flexGrow: 0, marginTop: 4 - GLASS_PRESS_ROOM, marginBottom: 16 - GLASS_PRESS_ROOM },
+  filterContent: { paddingHorizontal: 14, gap: 8, paddingVertical: GLASS_PRESS_ROOM },
   filterPill: {
     flexDirection: "row",
     alignItems: "center",

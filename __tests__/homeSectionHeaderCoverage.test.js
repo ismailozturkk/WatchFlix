@@ -61,7 +61,8 @@ const CHIP_FILES = {
   "screens/movie/MovieOscar.js": "DiscoverFilterChip",
   "screens/movie/MovieProvders.js": "ProviderChip",
   "screens/movie/MovieTrends.js": "DiscoverFilterChip",
-  "screens/movie/MovieUpcoming.js": "DiscoverFilterChip",
+  // Yaklaşan: çip satırı raf ile "Tümü" ekranında ortak bileşende (tarih çipleri + Filtreler).
+  "components/home/UpcomingFilterChips.js": "DiscoverFilterChip",
   "screens/tv/TvShowBests.js": "DiscoverFilterChip",
   "screens/tv/TvShowsEmmy.js": "DiscoverFilterChip",
   "screens/tv/TvShowsGenres.js": "DiscoverFilterChip",

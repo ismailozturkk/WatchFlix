@@ -52,6 +52,7 @@ import {
   trailerLanguageOf,
 } from "../../utils/trailerLanguages";
 import GlassTouchable from "../common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 // Fragmanları öne al (Trailer > Teaser > Clip ...), resmi olanları üste.
 const TYPE_ORDER = { Trailer: 0, Teaser: 1, Clip: 2, Featurette: 3, Behind: 4 };
@@ -286,7 +287,7 @@ function LanguageSheet({ visible, selected, originalLanguage, onSelect, onClose,
           onPress={onClose}
         />
       </View>
-      <SheetScroll contentContainerStyle={styles.sheetList}>
+      <SheetScroll style={styles.sheetListScroll} contentContainerStyle={styles.sheetList}>
         {languages.map((l) => {
           const active = l.code === selected;
           return (
@@ -453,7 +454,7 @@ export default function TrailerSection({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={isSheet ? styles.chipScrollSheet : undefined}
+        style={isSheet ? styles.chipScrollSheet : styles.chipScroll}
         contentContainerStyle={isSheet ? styles.chipRowSheet : styles.chipRow}
       >
         {chipCodes.map((code) => {
@@ -567,7 +568,16 @@ const styles = StyleSheet.create({
   accent: { width: 3, height: 18, borderRadius: 2 },
   title: { fontSize: 17, fontWeight: "700", letterSpacing: -0.2, flex: 1 },
 
-  chipRow: { gap: 8, paddingBottom: 12, paddingRight: 4 },
+  // Basılan cam dil çipi kırpma sınırında kesilmesin: üstte ve yanlarda GLASS_PRESS_ROOM
+  // (dolgu + eşit negatif dış boşluk; yerleşim aynı). Altta 12 pt zaten yeterli.
+  chipScroll: { marginTop: -GLASS_PRESS_ROOM, marginHorizontal: -GLASS_PRESS_ROOM },
+  chipRow: {
+    gap: 8,
+    paddingTop: GLASS_PRESS_ROOM,
+    paddingBottom: 12,
+    paddingLeft: GLASS_PRESS_ROOM,
+    paddingRight: 4 + GLASS_PRESS_ROOM,
+  },
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -669,8 +679,8 @@ const styles = StyleSheet.create({
   // Sayfa yerleşimi (TrailerModal içinde). Kök küçülebilir: sayfa maxHeight'a
   // dayanınca çipler yerinde kalır, yalnız video listesi kısalıp kayar.
   sheetSection: { flexShrink: 1 },
-  chipScrollSheet: { flexGrow: 0, flexShrink: 0 },
-  chipRowSheet: { gap: 8, paddingHorizontal: SHEET_GUTTER, paddingBottom: 14 },
+  chipScrollSheet: { flexGrow: 0, flexShrink: 0, marginTop: -GLASS_PRESS_ROOM },
+  chipRowSheet: { gap: 8, paddingHorizontal: SHEET_GUTTER, paddingTop: GLASS_PRESS_ROOM, paddingBottom: 14 },
   chipSheet: { height: 34, paddingHorizontal: 14, borderRadius: 17 },
 
   // Dil sayfası
@@ -698,7 +708,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   sheetTitle: { flex: 1, fontSize: 17, fontWeight: "800" },
-  sheetList: { gap: 8 },
+  // İlk/son cam satır basılınca kaydırma bölgesinin üst/alt sınırında kesilmesin (yanlar
+  // SheetScroll'da): GLASS_PRESS_ROOM dolgu + eşit negatif dış boşluk.
+  sheetListScroll: { marginVertical: -GLASS_PRESS_ROOM },
+  sheetList: { gap: 8, paddingVertical: GLASS_PRESS_ROOM },
   sheetRow: {
     flexDirection: "row",
     alignItems: "center",

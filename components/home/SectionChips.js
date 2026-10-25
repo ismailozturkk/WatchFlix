@@ -15,13 +15,15 @@
 // (bkz. __tests__/glassButtonCoverage.test.js).
 //
 // GÖLGE YOK: yatay liste gölgeyi çip yüksekliğinde keser, alt kenar sert kalır (eski tür çiplerinde
-// yaşandı). Seçim çerçeveyle anlatılır.
+// yaşandı). Seçim çerçeveyle anlatılır. Aynı kırpma basılınca büyüyen cam çipi de keser: satırın
+// üstünde/altında GLASS_PRESS_ROOM payı var (dolgu + eşit negatif dış boşluk, yerleşim değişmez).
 import React, { memo } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
 import { DISCOVER_CHIP_HEIGHT } from "./DiscoverFilterChip";
 import GlassPressable from "../common/GlassPressable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 export const SECTION_CHIP_HEIGHT = DISCOVER_CHIP_HEIGHT;
 export const SECTION_CHIP_HEIGHT_LOGO = 42;
@@ -54,7 +56,7 @@ export function SectionChipRail({
       extraData={extraData}
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
-      style={style}
+      style={[styles.rail, style]}
       contentContainerStyle={[styles.railContent, contentContainerStyle]}
       initialNumToRender={8}
       windowSize={5}
@@ -116,8 +118,10 @@ const MemoSegmented = memo(SectionSegmented);
 export { MemoSegmented as SectionSegmented };
 
 const styles = StyleSheet.create({
+  rail: { marginVertical: -GLASS_PRESS_ROOM },
   railContent: {
     paddingHorizontal: SECTION_RAIL_PADDING,
+    paddingVertical: GLASS_PRESS_ROOM,
     gap: SECTION_CHIP_GAP,
     alignItems: "center",
   },

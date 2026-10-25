@@ -28,6 +28,7 @@ import { i18nText } from "../utils/i18nText";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "./common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../utils/liquidGlass";
 /* ─── Küçük yardımcı ─────────────────────────────────── */
 const formatDateSave = (timestamp) => {
   const date = new Date(timestamp);
@@ -566,7 +567,7 @@ const ListView = ({
                     numColumns={3}
                     contentContainerStyle={styles.gridContainer}
                     showsVerticalScrollIndicator={false}
-                    style={{ maxHeight: 300 }}
+                    style={styles.gridList}
                     columnWrapperStyle={{ gap: 10 }}
                     renderItem={({ item }) => (
                       <GridCard
@@ -802,9 +803,13 @@ const styles = StyleSheet.create({
   },
 
   /* Grid */
+  // 3 sütunlu cam kart ızgarası: kenardaki kart basılınca listenin kırpma sınırında kesilmesin
+  // diye dört yanda GLASS_PRESS_ROOM (dolgu + eşit negatif dış boşluk; görünür yükseklik aynı).
+  gridList: { maxHeight: 300 + 2 * GLASS_PRESS_ROOM, margin: -GLASS_PRESS_ROOM },
   gridContainer: {
     gap: 10,
-    paddingBottom: 4,
+    padding: GLASS_PRESS_ROOM,
+    paddingBottom: 4 + GLASS_PRESS_ROOM,
   },
   gridCard: {
     flex: 1,

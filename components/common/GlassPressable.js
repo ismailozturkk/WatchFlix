@@ -1,11 +1,13 @@
 // components/common/GlassPressable.js
 //
 // Pressable'ın YERİNE GEÇEN düğme: iOS 26+'da kendi dolgu/çerçeve/köşe stili
-// Liquid Glass'a devredilir, diğer her yerde birebir Pressable çizilir.
+// Liquid Glass'a, Android'de buzlu cam katmanına devredilir; iOS 18–25 ve Efektler
+// Kapalı'da birebir Pressable çizilir.
 // `style` ve `children` Pressable gibi FONKSİYON da olabilir ({ pressed }).
 //
 // Cam yolunda basılı-durum saydamlığı kalkar (stildeki `opacity` düşer): cam
-// kendi `isInteractive` animasyonunu oynar. Stil kuralları utils/glassChrome.js'te.
+// kendi `isInteractive` animasyonunu oynar. Buzlu camda saydamlık KALIR (Android'de
+// opaklık kuralı yok). Stil kuralları utils/glassChrome.js'te.
 //
 // Ek prop'lar: glass={false} (cam olmasın), glassTint (ton zorla).
 import React, { forwardRef } from "react";

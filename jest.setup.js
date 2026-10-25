@@ -13,10 +13,15 @@ jest.mock("expo-blur", () => ({
   BlurTargetView: "BlurTargetView",
 }));
 
+// GlassSurface'ın Android buzlu cam parlaması degrade kullanır; paket ESM.
+jest.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
+
 jest.mock("./services/liquidGlass", () => ({
   liquidGlassSupported: false,
   NativeGlassView: null,
   useLiquidGlass: () => false,
+  useGlassMode: () => "off",
+  useGlassShape: () => false,
 }));
 
 // Cam sarmalayıcıları, cam KAPALIYKEN eski bileşenle birebir aynıdır (araya View

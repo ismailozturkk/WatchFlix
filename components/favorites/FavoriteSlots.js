@@ -40,7 +40,7 @@ function FilledSlot({
 }) {
   const height = kind === "people" ? width : Math.round(width * POSTER_RATIO);
   const art = (
-    <FavoriteArt path={entry.image} kind={kind} width={width} height={height} radius={radius} />
+    <FavoriteArt path={entry.image} kind={kind} mediaId={entry.id} width={width} height={height} radius={radius} />
   );
   return (
     <View style={{ width }}>

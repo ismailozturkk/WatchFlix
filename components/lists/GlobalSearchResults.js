@@ -133,6 +133,7 @@ const ResultRow = memo(function ResultRow({
           <PosterImage
             path={item.poster_path}
             type={item.type}
+            mediaId={item.id}
             // Görsel 46px çiziliyor; 200 istemek gereksiz büyük dosya indiriyordu.
             size={POSTER_W}
             style={styles.poster}

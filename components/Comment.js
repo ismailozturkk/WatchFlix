@@ -796,10 +796,14 @@ const Comment = ({
       collection(db, collectionName, cid, "comments"),
       orderBy("timestamp", "desc"),
     );
-    const unsub = onSnapshot(q, (snapshot) => {
-      const loaded = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setComments(loaded);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const loaded = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setComments(loaded);
+      },
+      (err) => __DEV__ && console.warn("Comment comments:", err.message),
+    );
     return () => unsub();
   }, [contextId, collectionName]);
 
@@ -900,16 +904,20 @@ const Comment = ({
             collection(db, collectionName, cid, "comments", id, "replies"),
             orderBy("timestamp", "asc"),
           );
-          replyUnsubsRef.current[id] = onSnapshot(rq, (snap) => {
-            setRepliesMap((rm) => ({
-              ...rm,
-              [id]: snap.docs.map((d) => ({
-                id: d.id,
-                ...d.data(),
-                parentId: id,
-              })),
-            }));
-          });
+          replyUnsubsRef.current[id] = onSnapshot(
+            rq,
+            (snap) => {
+              setRepliesMap((rm) => ({
+                ...rm,
+                [id]: snap.docs.map((d) => ({
+                  id: d.id,
+                  ...d.data(),
+                  parentId: id,
+                })),
+              }));
+            },
+            (err) => __DEV__ && console.warn("Comment replies:", err.message),
+          );
         } else if (!willBeVisible && replyUnsubsRef.current[id]) {
           replyUnsubsRef.current[id]();
           delete replyUnsubsRef.current[id];

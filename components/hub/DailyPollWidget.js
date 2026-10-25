@@ -73,7 +73,7 @@ function DailyPollWidget() {
               accessibilityRole="button"
               accessibilityLabel={voted && shares?.showPercent ? copy.resultA11y(option.text, option.percent) : copy.optionA11y(option.text)}
               accessibilityState={{ selected: chosen, disabled: voted }}
-              style={[styles.option, chosen && styles.optionChosen]}
+              style={[styles.option, showBar && styles.optionClip, chosen && styles.optionChosen]}
             >
               {showBar ? (
                 <View
@@ -121,7 +121,6 @@ const styles = StyleSheet.create({
   option: {
     minHeight: 48,
     borderRadius: 16,
-    overflow: "hidden",
     justifyContent: "center",
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -130,6 +129,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.24)",
   },
   optionChosen: { borderColor: "rgba(255,255,255,0.85)", borderWidth: 1.5 },
+  // Kırpma YALNIZ sonuç çubuğu görünürken (oy verilmiş = düğme kapalı): etkin cam düğmenin
+  // katmanı çocuğudur, overflow onu basılınca düğmenin sınırında keserdi.
+  optionClip: { overflow: "hidden" },
   fill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "rgba(255,255,255,0.16)" },
   fillChosen: { backgroundColor: "rgba(255,255,255,0.34)" },
   optionRow: { flexDirection: "row", alignItems: "center", gap: 8 },

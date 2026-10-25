@@ -43,6 +43,7 @@ import { getModeMetaLine } from "@screens/game/gameLabels";
 import { getGameEntry, resolveGameAccentColors } from "@screens/game/gameRegistry";
 import { alpha } from "../../theme/colors";
 import { PressableScale } from "./ui";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 // Kurulum listesinde yalnız keşif + kişisel kaynaklar (günlük havuz seçilmez).
 const SETUP_SOURCES = SCENE_GAME_SOURCES.filter((s) => s.group === "discover" || s.group === "personal");
@@ -372,8 +373,9 @@ const styles = StyleSheet.create({
   meta: { fontSize: 10.5, fontWeight: "800", marginTop: 4 },
 
   // Çipler sayfa kenarına kadar kaysın: gövdenin yatay dolgusu geri alınır.
-  sourcesScroll: { flexGrow: 0, marginHorizontal: -18 },
-  sources: { gap: 8, paddingHorizontal: 18 },
+  // Basılan cam kart satırın kırpma sınırında kesilmesin (utils/liquidGlass GLASS_PRESS_ROOM).
+  sourcesScroll: { flexGrow: 0, marginHorizontal: -18, marginVertical: -GLASS_PRESS_ROOM },
+  sources: { gap: 8, paddingHorizontal: 18, paddingVertical: GLASS_PRESS_ROOM },
   chip: {
     height: 40,
     borderRadius: 20,

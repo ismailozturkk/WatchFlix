@@ -111,6 +111,7 @@ async function seed() {
   await set(`Notes/${ME}/items/n`, {});
   await set(`MediaNotes/${ME}/items/n`, {});
   await set(`AiConversations/${ME}/items/n`, {});
+  await set(`PosterChoices/${ME}`, { id: "all", choices: { movie_1: "/a.jpg" } });
   await set(`Reminders/${ME}/tvShows/9/episodes/e1`, {});
   await set(`Reminders/${ME}/movies/m1`, {});
   await set(`UserStats/${ME}`, {});
@@ -215,6 +216,7 @@ test("sunucu silmesi tüm izleri götürür, başkalarının verisini ve sayaçl
     `Notes/${ME}/items/n`,
     `MediaNotes/${ME}/items/n`,
     `AiConversations/${ME}/items/n`,
+    `PosterChoices/${ME}`,
     `Reminders/${ME}/tvShows/9/episodes/e1`,
     `Reminders/${ME}/movies/m1`,
     `UserStats/${ME}`,

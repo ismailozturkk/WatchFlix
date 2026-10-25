@@ -28,6 +28,7 @@ import {
   useImageQualitySettings,
 } from "../../context/AppSettingsContext";
 import { useFocusEffect } from "@react-navigation/native";
+import usePosterUri from "../../hooks/usePosterUri";
 import ScreenDecor from "../../components/ScreenDecor";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -36,9 +37,14 @@ import { searchMediaWithFuzzyFallback } from "../../services/fuzzyMediaSearch";
 import GlassField from "@components/common/GlassField";
 import { liquidGlassSupported } from "@services/liquidGlass";
 import { isLightSurface } from "@utils/colorUtils";
+import DiscoverCategoryChips from "../../components/search/DiscoverCategoryChips";
+import { getSearchHeaderCopy } from "../../components/search/searchHeaderCopy";
 
 
 const { width } = Dimensions.get("window");
+
+// Keşif çipleri: sıra, aşağıdaki [popular, trending] veri sırasıyla aynı.
+const DISCOVER_CATEGORIES = ["popular", "trending"];
 
 // Grid: 3 sütun
 const GRID_COLS = 3;
@@ -119,6 +125,7 @@ const ActorRowItem = memo(
     const popularity = item.popularity ?? 0;
     const popColor = getPopularityColor(popularity);
     const { getTmdbUrl } = useImageQualitySettings();
+    const posterUri = usePosterUri();
 
     const knownForMovies = (item.known_for || [])
       .filter((k) => k.poster_path)
@@ -213,7 +220,7 @@ const ActorRowItem = memo(
                 {knownForMovies.map((k, i) => (
                   <Image
                     key={i}
-                    source={{ uri: getTmdbUrl(k.poster_path, 'poster', 200) }}
+                    source={{ uri: posterUri(k.media_type, k.id, k.poster_path) }}
                     style={styles.knownPoster}
                   />
                 ))}
@@ -293,9 +300,7 @@ const DiscoverSection = memo(
     const [popular, setPopular] = useState([]);
     const [trending, setTrending] = useState([]);
     const [loadingDiscover, setLoading] = useState(true);
-    const tabAnim = useRef(new Animated.Value(0)).current;
-    const TABS = [i18nText("autoI18n.populer", "Popüler"), "Trend"];
-    const TAB_W = (width - 32) / 2;
+    const copy = getSearchHeaderCopy(language);
 
     useEffect(() => {
       const fetchAll = async () => {
@@ -331,19 +336,6 @@ const DiscoverSection = memo(
       fetchAll();
     }, [language, API_KEY]);
 
-    const switchTab = useCallback(
-      (i) => {
-        setActiveTab(i);
-        Animated.spring(tabAnim, {
-          toValue: i,
-          speed: 16,
-          bounciness: 5,
-          useNativeDriver: true,
-        }).start();
-      },
-      [tabAnim],
-    );
-
     const renderGridItem = useCallback(
       ({ item, index }) => (
         <ActorGridItem
@@ -359,59 +351,31 @@ const DiscoverSection = memo(
 
     const activeData = [popular, trending][activeTab];
 
+    // Çipler yüklenirken de çizilir: veri gelince başlık zıplamasın.
+    const chips = (
+      <DiscoverCategoryChips
+        categories={DISCOVER_CATEGORIES}
+        labels={copy.categories}
+        activeIndex={activeTab}
+        onChange={setActiveTab}
+        accessibilityLabel={copy.categoryLabel}
+      />
+    );
+
     if (loadingDiscover) {
       return (
-        <View style={styles.discoverLoadingBox}>
-          <ActivityIndicator size="small" color={theme.text?.muted ?? "#666"} />
+        <View style={styles.discoverWrapper}>
+          {chips}
+          <View style={styles.discoverLoadingBox}>
+            <ActivityIndicator size="small" color={theme.text?.muted ?? "#666"} />
+          </View>
         </View>
       );
     }
 
     return (
       <View style={styles.discoverWrapper}>
-        {/* Sekme çubuğu */}
-        <View style={[styles.tabBar, { backgroundColor: theme.secondary }]}>
-          <Animated.View
-            style={[
-              styles.tabIndicator,
-              {
-                width: TAB_W - 8,
-                backgroundColor: theme.primary,
-                transform: [
-                  {
-                    translateX: tabAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [4, TAB_W + 4],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          />
-          {TABS.map((label, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[styles.tabBtn, { width: TAB_W }]}
-              onPress={() => switchTab(i)}
-              activeOpacity={0.75}
-            >
-              <Text
-                style={[
-                  styles.tabLabel,
-                  {
-                    color:
-                      activeTab === i
-                        ? (theme.text?.primary ?? "#fff")
-                        : (theme.text?.secondary ?? "#aaa"),
-                  },
-                  activeTab === i && { fontWeight: "700" },
-                ]}
-              >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {chips}
 
         {viewMode === "grid" ? (
           <FlatList
@@ -1038,29 +1002,6 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   discoverRowItem: { marginBottom: 12 },
-
-  // ── Tab çubuğu ────────────────────────────────────────────────────────────
-  tabBar: {
-    flexDirection: "row",
-    marginHorizontal: 16,
-    marginBottom: 10,
-    borderRadius: 14,
-    height: 44,
-    position: "relative",
-    overflow: "hidden",
-  },
-  tabIndicator: {
-    position: "absolute",
-    top: 4,
-    bottom: 4,
-    borderRadius: 10,
-  },
-  tabBtn: {
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-  },
-  tabLabel: { fontSize: 13, fontWeight: "500" },
 
   // ── Ortak ─────────────────────────────────────────────────────────────────
   centerBox: {

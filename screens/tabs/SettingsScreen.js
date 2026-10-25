@@ -60,6 +60,7 @@ import {
   getDataTypeOptions,
 } from "./settings/dataTypes";
 import ImportDataModal from "../../components/import/ImportDataModal";
+import { getSettingsShareCopy } from "../../utils/settingsShareCopy";
 import { getLibraryExportCopy } from "./settings/libraryExportCopy";
 import { getImportCopy } from "../../components/import/importCopy";
 import useAppLogo from "@hooks/useAppLogo";
@@ -75,6 +76,7 @@ import {
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../../components/common/GlassTouchable";
 import GlassBox from "../../components/common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
 
 // Seçilebilir diller utils/appLanguages.js'ten gelir (yeni dil = oraya kayıt +
@@ -341,6 +343,7 @@ export default function SettingsScreen() {
   const copyImport = getImportCopy(language);
   const aiCopy = useMemo(() => getAiCopy(language), [language]);
   const referralCopy = useMemo(() => getReferralCopy(language), [language]);
+  const shareLookCopy = useMemo(() => getSettingsShareCopy(language), [language]);
   const { prefs: aiPrefs } = useAiPrefs();
   const aiCustomCount = countCustomizedPrefs(aiPrefs);
   const { theme } = useTheme();
@@ -626,6 +629,16 @@ export default function SettingsScreen() {
             title={i18nText("autoI18n.poster_gorunumu", "Poster görünümü")}
             subtitle={i18nText("autoI18n.poster_gorunumu_aciklama", "Afiş boyutu, köşeler ve düzen")}
             onPress={() => navigation.navigate("PosterSettingsScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="share-social-outline"
+            title={shareLookCopy.shareRowTitle}
+            subtitle={shareLookCopy.shareRowSub}
+            onPress={() => navigation.navigate("ShareSettingsScreen")}
             right={<Chevron color={C.muted} />}
           />
           <SettingRow
@@ -1586,10 +1599,14 @@ const s = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
   },
+  // Kart kırpıyor (overflow): seçili cam seçenek basılınca kartın yan/alt sınırında
+  // kesilmesin diye o kenarlarda GLASS_PRESS_ROOM.
   segment: {
     flexDirection: "row",
     borderTopWidth: 1,
-    padding: 4,
+    paddingTop: 4,
+    paddingHorizontal: GLASS_PRESS_ROOM,
+    paddingBottom: GLASS_PRESS_ROOM,
     gap: 2,
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 18,

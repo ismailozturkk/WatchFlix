@@ -17,7 +17,7 @@ import React, { forwardRef } from "react";
 import { StyleSheet, TextInput } from "react-native";
 import GlassBox from "./GlassBox";
 import useGlassChrome from "./useGlassChrome";
-import { useLiquidGlass } from "../../services/liquidGlass";
+import { useGlassShape } from "../../services/liquidGlass";
 import { splitInputStyle } from "../../utils/glassChrome";
 
 const GlassTextInput = forwardRef(function GlassTextInput(
@@ -25,7 +25,7 @@ const GlassTextInput = forwardRef(function GlassTextInput(
   ref,
 ) {
   // Cam yokken stile hiç dokunulmaz (düzleştirme yok): eski TextInput aynen.
-  const glassOn = useLiquidGlass();
+  const glassOn = useGlassShape();
   const { box, text } = splitInputStyle(glassOn ? StyleSheet.flatten(style) || {} : {});
   // Cam yolu mu? Karar kutu stiline bakar (cam yoksa ya da kutu cama uygun
   // değilse eski tek TextInput).

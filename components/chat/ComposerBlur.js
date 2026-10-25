@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
-import { BlurTargetView } from "expo-blur";
 import AdaptiveBlurView from "../common/AdaptiveBlurView";
+import { LocalBlurTarget, useLocalBlurTarget } from "../common/BlurTarget";
 import GlassSurface from "../common/GlassSurface";
 import { useLiquidGlass } from "../../services/liquidGlass";
 import { androidSupportsNativeBlur } from "../../utils/blurSupport";
@@ -16,20 +16,9 @@ export const COMPOSER_TARGET_IS_NATIVE =
   Platform.OS === "android" && androidSupportsNativeBlur(Platform.Version);
 
 // Keep each chat's target local: stacked chats and AI modals can coexist.
-export function useComposerBlurTarget() {
-  const [node, attach] = useState(null);
-  const target = useMemo(() => (node ? { current: node } : null), [node]);
-  return { attach, target };
-}
-
-export function ComposerBlurTarget({ attach, backgroundColor, children, ...props }) {
-  // The background must be INSIDE the native target: the target host's own
-  // background is not part of the recorded message content on Android.
-  const content = <View style={{ flexGrow: 1, flexShrink: 1, backgroundColor }}>{children}</View>;
-  return COMPOSER_TARGET_IS_NATIVE
-    ? <BlurTargetView ref={attach} {...props}>{content}</BlurTargetView>
-    : <View {...props}>{content}</View>;
-}
+// Genel yerel hedef (components/common/BlurTarget.js) ile aynı yapı: arka plan
+// hedefin İÇİNDE, yüzey hedefin KARDEŞİ.
+export { LocalBlurTarget as ComposerBlurTarget, useLocalBlurTarget as useComposerBlurTarget };
 
 // Cam yolunda hapın SARMALAYICISINA eklenecek stil. Cam kendi kenar ışığını ve
 // derinlik gölgesini çizer (GlassSurface kuralı 4); üstüne bir de çerçeve halkası

@@ -84,6 +84,7 @@ import { PostsProvider }            from "./context/PostsContext";
 import { TvShowProvider } from "./context/TvShowContex";
 import TabScreenNavigator from "@screens/navigation/TabScreenNavigator";
 import { PremiumProvider } from "./context/PremiumContext";
+import { PosterChoicesProvider } from "./context/PosterChoicesProvider";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
 import SplashPosterWave from "./components/SplashPosterWave";
@@ -699,6 +700,11 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="ListVisibilityScreen"
+          getComponent={() => require("./screens/tabs/profile/ListVisibilityScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="BlockedUsersScreen"
           getComponent={() => require("./screens/tabs/profile/BlockedUsersScreen").default}
           options={{ headerShown: false }}
@@ -756,6 +762,11 @@ function AppContent() {
         <Stack.Screen
           name="BackupSettingsScreen"
           getComponent={() => require("./screens/tabs/settings/BackupSettingsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ShareSettingsScreen"
+          getComponent={() => require("./screens/tabs/settings/ShareSettingsScreen").default}
           options={{ headerShown: false }}
         />
         <Stack.Screen
@@ -1085,9 +1096,13 @@ export default wrapRoot(function App() {
                                   sayfası. Listeler + puan + izlenme durumunu
                                   okuduğu için ListStatus/SharedLists/Auth
                                   sağlayıcılarının İÇİNDE olmak zorunda. */}
+                              {/* Özel afiş seçimleri: çizim anında uygulanır;
+                                  planı okuduğu için PremiumProvider'ın İÇİNDE. */}
+                              <PosterChoicesProvider>
                               <MediaQuickActionsProvider>
                                 <AppContent />
                               </MediaQuickActionsProvider>
+                              </PosterChoicesProvider>
                             </DeviceNotificationsProvider>
                           </PetProvider>
                             {splashVisible && (

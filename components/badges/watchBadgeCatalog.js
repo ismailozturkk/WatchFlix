@@ -1122,7 +1122,9 @@ export const WATCH_BADGES = [
   }),
   defineWatchBadge({
     id: "cuma_13", since: S2, section: BOLUM.MEVSIM, icon: "warning-outline", iconSolid: "warning", rarity: RARITY.rare,
-    tr: "Uğursuz Cuma", en: "Friday the 13th", es: "Viernes 13", pt: "Sexta-feira 13", de: "Freitag der 13.",
+    // Ad bilerek günü anmıyor: Cuma kutsal bir gün, "uğursuz" diye etiketlenmez (kullanıcı kararı,
+    // 24 Eki 2026). Kimlik (`cuma_13`) kazanılmış rozet defterine bağlı, DEĞİŞMEZ.
+    tr: "Korkunç 13", en: "Spooky 13", es: "Terrorífico 13", pt: "13 Assustador", de: "Gruselige 13",
     descTr: "Cuma 13'ünde bir korku içeriği işaretle", descEn: "Mark a horror title on a Friday the 13th", descEs: "Marca un título de terror un viernes 13", descPt: "Marque um título de terror em uma sexta-feira 13", descDe: "Markiere an einem Freitag, dem 13., einen Horrortitel",
     target: 1, getProgress: (s) => say(s, "cuma13"),
   }),

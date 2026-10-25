@@ -14,6 +14,8 @@
 //
 // Varsayılan olarak SafeArea üst boşluğuna göre absolute konumlanır (sol üst).
 // `absolute={false}` verilirse satır içi (header içinde) kullanılabilir.
+// `size` (varsayılan 40) ve `fallbackRadius` (cam yokken köşe, varsayılan 12):
+// satırdaki komşularla aynı yükseklik/biçim gerektiğinde (ör. hap arama alanı yanında daire).
 
 import React, { useEffect, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
@@ -28,6 +30,8 @@ export default function BackButton({
   color,
   absolute = true,
   top,
+  size,
+  fallbackRadius,
   style,
 }) {
   const navigation = useNavigation();
@@ -66,6 +70,8 @@ export default function BackButton({
       icon={iconName}
       variant={variant === "blur" || variant === "plain" ? variant : "solid"}
       color={color}
+      size={size}
+      fallbackRadius={fallbackRadius}
       onPress={handlePress}
       accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
       style={[positionStyle, style]}

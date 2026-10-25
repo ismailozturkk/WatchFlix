@@ -15,6 +15,7 @@ import { alpha } from "../../theme/colors";
 import { fillCopy } from "./themeStudioCopy";
 import GlassTouchable from "../common/GlassTouchable";
 import GlassPressable from "../common/GlassPressable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 /** Verilen zemin üzerinde okunur yazı rengi (WCAG eşiğinde siyah/beyaz). */
 export const inkOn = (color) => (isLightSurface(color) ? "#0B0D12" : "#FFFFFF");
@@ -207,6 +208,7 @@ export const HarmonyRow = memo(function HarmonyRow({ items, selected, onPick, th
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={styles.harmonyScroll}
       contentContainerStyle={styles.harmonyRow}
       keyboardShouldPersistTaps="handled"
     >
@@ -473,7 +475,10 @@ const styles = StyleSheet.create({
   swatchActive: { borderWidth: 2.5, transform: [{ scale: 1.08 }] },
 
   /* uyum */
-  harmonyRow: { gap: 9, paddingVertical: 2, paddingRight: 8 },
+  // Basılan cam hap kırpma sınırında kesilmesin: üst/alt/solda GLASS_PRESS_ROOM, eski dolgunun
+  // fazlası negatif dış boşlukla düşülür (yerleşim aynı).
+  harmonyScroll: { marginVertical: 2 - GLASS_PRESS_ROOM, marginLeft: -GLASS_PRESS_ROOM },
+  harmonyRow: { gap: 9, paddingVertical: GLASS_PRESS_ROOM, paddingLeft: GLASS_PRESS_ROOM, paddingRight: 8 },
   harmonyItem: { minWidth: 82, borderRadius: 14, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 10, alignItems: "center", gap: 7 },
   harmonyDot: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   harmonyLabel: { fontSize: 10.5, fontWeight: "800" },

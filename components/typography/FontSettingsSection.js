@@ -34,6 +34,7 @@ import { alpha } from "../../theme/colors";
 import { isFontPresetFree } from "../../utils/premiumFeatures";
 import { usePremiumGate } from "../../hooks/usePremiumGate";
 import GlassTouchable from "../common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const SISTEM_FONTU = Platform.select({
   ios: "System",
@@ -101,6 +102,9 @@ export default function FontSettingsSection({ colors, language }) {
   const [aktifRol, setAktifRol] = useState("heading");
   const [aktifSayfa, setAktifSayfa] = useState(0);
   const [galleryWidth, setGalleryWidth] = useState(0);
+  // Sayfa, galeri genişliğinin iki yanına GLASS_PRESS_ROOM ekler: kenardaki cam hücre basılınca
+  // kaydırma görünümünün sınırında kesilmesin (görünüm aynı miktarda dışa taşar, hizalama aynı).
+  const sayfaGenisligi = galleryWidth + 2 * GLASS_PRESS_ROOM;
   const scrollRef = useRef(null);
 
   // Galeri önizlemeleri katalogdaki TÜM dosyaları ister; açılışta yalnız
@@ -173,7 +177,7 @@ export default function FontSettingsSection({ colors, language }) {
     setAktifSayfa(hedefSayfa);
     if (galleryWidth > 0) {
       scrollRef.current?.scrollTo({
-        x: hedefSayfa * galleryWidth,
+        x: hedefSayfa * sayfaGenisligi,
         animated: false,
       });
     }
@@ -183,7 +187,7 @@ export default function FontSettingsSection({ colors, language }) {
     const s = Math.max(0, Math.min(hedef, toplamSayfa - 1));
     setAktifSayfa(s);
     if (galleryWidth > 0) {
-      scrollRef.current?.scrollTo({ x: s * galleryWidth, animated: true });
+      scrollRef.current?.scrollTo({ x: s * sayfaGenisligi, animated: true });
     }
   };
 
@@ -422,21 +426,22 @@ export default function FontSettingsSection({ colors, language }) {
             showsHorizontalScrollIndicator={false}
             scrollEventThrottle={16}
             decelerationRate="fast"
-            snapToInterval={galleryWidth}
+            snapToInterval={sayfaGenisligi}
             snapToAlignment="center"
             disableIntervalMomentum={true}
             onMomentumScrollEnd={(e) => {
               const p = Math.round(
-                e.nativeEvent.contentOffset.x / (galleryWidth || 1),
+                e.nativeEvent.contentOffset.x / (sayfaGenisligi || 1),
               );
               if (p !== aktifSayfa) setAktifSayfa(p);
             }}
+            style={styles.galleryScroll}
             contentContainerStyle={styles.galleryScrollContent}
           >
             {sayfalar.map((rows, pageIndex) => (
               <View
                 key={pageIndex}
-                style={[styles.pageGrid, { width: galleryWidth }]}
+                style={[styles.pageGrid, { width: sayfaGenisligi }]}
               >
                 {rows.map((row, rIdx) => (
                   <View key={rIdx} style={styles.gridRow}>
@@ -750,11 +755,14 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     minHeight: 195,
   },
+  galleryScroll: { margin: -GLASS_PRESS_ROOM },
   galleryScrollContent: {
     alignItems: "flex-start",
+    paddingVertical: GLASS_PRESS_ROOM,
   },
   pageGrid: {
     gap: 6,
+    paddingHorizontal: GLASS_PRESS_ROOM,
   },
   gridRow: {
     flexDirection: "row",
@@ -770,7 +778,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 2,
     paddingVertical: 2,
-    overflow: "hidden",
+    // overflow YOK: cam katmanı hücrenin çocuğu, basılınca hücre sınırında kesilirdi.
+    // Yazılar kendi sarmalayıcılarında (sampleWrap / nameWrap) kırpılıyor.
   },
   emptyCell: {
     flex: 1,

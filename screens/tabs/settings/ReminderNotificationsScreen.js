@@ -25,6 +25,7 @@ import { getFeatureLimit } from "@utils/premiumFeatures";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import { SettingsSubScreen, SettingRow, buildUiColors } from "./settingsUi";
 import GlassTouchable from "../../../components/common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../../utils/liquidGlass";
 
 const REMINDER_NOTIFICATION_TIMINGS = [
   { labelKey: "onReleaseDay", value: 0 },
@@ -353,10 +354,14 @@ const ns = StyleSheet.create({
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
+  // Kart kırpıyor (overflow): seçili cam seçenek basılınca kartın yan/alt sınırında
+  // kesilmesin diye o kenarlarda GLASS_PRESS_ROOM.
   segment: {
     flexDirection: "row",
     borderTopWidth: 1,
-    padding: 4,
+    paddingTop: 4,
+    paddingHorizontal: GLASS_PRESS_ROOM,
+    paddingBottom: GLASS_PRESS_ROOM,
     gap: 2,
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 18,

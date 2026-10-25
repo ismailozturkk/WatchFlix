@@ -23,6 +23,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useUserProfile } from "../../context/UserProfileContext";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
+import usePosterUri from "../../hooks/usePosterUri";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { isUnreleased } from "../../utils/watchState";
@@ -35,6 +36,7 @@ import {
 import { addMediaComment } from "../../services/mediaCommentsService";
 import GlassTouchable from "../common/GlassTouchable";
 import GlassBox from "../common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const todayIso = () => normalizeDate(new Date());
 const COMMENT_TEXT_LIMIT = 500;
@@ -65,6 +67,7 @@ export default function WatchedDateSheet({
   const { language } = useLanguage();
   const { user } = useAuth();
   const { getTmdbUrl } = useImageQualitySettings();
+  const posterUri = usePosterUri();
   const {
     displayName: myDisplayName,
     username: myUsername,
@@ -288,7 +291,13 @@ export default function WatchedDateSheet({
         {posterPath ? (
           <View style={[styles.posterFrame, { borderColor: alpha(theme.accent, 0.3) }]}>
             <Image
-              source={{ uri: getTmdbUrl(posterPath, "poster", 200) }}
+              source={{
+                // Sezon/bölüm kapsamı sezon afişi taşır: özel afiş yalnız film/dizi kapsamında.
+                uri:
+                  scope === "movie" || scope === "show"
+                    ? posterUri(mediaType, mediaId, posterPath)
+                    : getTmdbUrl(posterPath, "poster", 200),
+              }}
               style={styles.poster}
               contentFit="cover"
             />
@@ -703,8 +712,10 @@ const styles = StyleSheet.create({
   selectionSummary: { minHeight: 50, borderRadius: 16, borderWidth: 1, paddingHorizontal: 10, marginTop: 12, flexDirection: "row", alignItems: "center", gap: 10 },
   selectionIcon: { width: 28, height: 28, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   selectionText: { flex: 1, fontSize: 11, lineHeight: 15, fontWeight: "600" },
-  scroll: { flexGrow: 0 },
-  scrollContent: { paddingBottom: 2 },
+  // Tam genişlikteki cam kart/seçenekler basılınca kaydırma sınırında kesilmesin: üstte ve
+  // yanlarda GLASS_PRESS_ROOM (dolgu + sayfanın yan/başlık boşluğuna taşan negatif dış boşluk).
+  scroll: { flexGrow: 0, marginTop: -GLASS_PRESS_ROOM, marginHorizontal: -GLASS_PRESS_ROOM },
+  scrollContent: { paddingTop: GLASS_PRESS_ROOM, paddingBottom: 2, paddingHorizontal: GLASS_PRESS_ROOM },
   sectionDivider: { height: StyleSheet.hairlineWidth, marginTop: 18, marginBottom: 14 },
   sectionPill: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, marginBottom: 9 },
   sectionTitle: { fontSize: 11.5, fontWeight: "800" },

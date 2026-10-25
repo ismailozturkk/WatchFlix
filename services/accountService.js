@@ -44,6 +44,7 @@
 //     Notes/{uid}/items
 //     MediaNotes/{uid}/items (film/dizi sayfasına bağlı notlar)
 //     AiConversations/{uid}/items (CineMatch AI sohbet geçmişi)
+//     PosterChoices/{uid} (özel afiş seçimleri)
 //     Reminders/{uid} (movies, tvShows/{showId}/episodes)
 //     UserStats/{uid}
 //     Presence/{uid} (Firestore kalıntı) + RTDB /presence/{uid}
@@ -643,6 +644,10 @@ export async function purgeUserData(uid) {
   await safe("ai-conversations", () =>
     deleteCollection(collection(db, "AiConversations", uid, "items")),
   );
+
+  // ── PosterChoices/{uid} (özel afiş seçimleri, TEK belge) ───────────────────
+  // Yerel-öncelikli alan; yerel kopyayı `purgeLocalUserData` temizler.
+  await safe("poster-choices", () => deleteDoc(doc(db, "PosterChoices", uid)));
 
   // ── Reminders (movies, tvShows/{showId}/episodes) + Reminders/{uid} ───────
   await safe("reminders", async () => {

@@ -4,7 +4,6 @@ import {
   View,
   TextInput,
   TouchableOpacity,
-  Text,
   Animated,
   Easing,
   Keyboard,
@@ -30,16 +29,24 @@ import {
 } from "react-native-safe-area-context";
 import BackButton from "../../components/BackButton";
 import GlassField from "../../components/common/GlassField";
+import GlassIconButton from "../../components/common/GlassIconButton";
+import GlassSegmentedControl from "../../components/common/GlassSegmentedControl";
+import { getSearchHeaderCopy } from "../../components/search/searchHeaderCopy";
 import { liquidGlassSupported } from "../../services/liquidGlass";
+import { alpha } from "../../theme/colors";
 import { isLightSurface } from "../../utils/colorUtils";
 import { useFocusEffect } from "@react-navigation/native";
-import { i18nText } from "../../utils/i18nText";
 import { Keys, get, set } from "../../services/storage";
 import ScreenToastHost from "@components/toast/ScreenToastHost";
-import GlassTouchable from "../../components/common/GlassTouchable";
 
+// Başlık satırındaki her öğe (geri, alan, görünüm) aynı yükseklikte ve cam olmayan
+// yolda da yuvarlak: hap alanın iki yanında daire düğmeler, tek hizada okunur.
+const BAR_HEIGHT = 44;
 
-const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
+// Tür anahtarının bölmeleri (simgeler Film/Dizi ana ekranındaki MediaTypeSwitch ile aynı).
+const TYPE_ICONS = { movie: "videocam", tv: "tv", actor: "person" };
+
+const LayoutToggle = React.memo(({ viewMode, onToggle, theme, labels }) => {
   const anim = useRef(new Animated.Value(viewMode === "grid" ? 1 : 0)).current;
 
   const toggle = useCallback(() => {
@@ -53,16 +60,16 @@ const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
     onToggle(next);
   }, [viewMode, onToggle]);
 
+  // Geri düğmesiyle aynı yuvarlak cam düğme; simge yalnız `transform` ile döner
+  // (camın içinde opaklık animasyonu yok).
   return (
-    <GlassTouchable
+    <GlassIconButton
+      testID="search-layout-toggle"
+      size={BAR_HEIGHT}
+      fallbackRadius={BAR_HEIGHT / 2}
       onPress={toggle}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={i18nText("autoI18n.gorunumu_degistir", "Görünümü değiştir")}
-      style={[
-        styles.layoutToggleBtn,
-        { backgroundColor: theme.secondary, borderColor: theme.border },
-      ]}
+      accessibilityLabel={viewMode === "row" ? labels.gridView : labels.listView}
+      style={styles.layoutToggleBtn}
     >
       <Animated.View
         style={{
@@ -80,17 +87,18 @@ const LayoutToggle = React.memo(({ viewMode, onToggle, theme }) => {
           family="Ionicons"
           name={viewMode === "row" ? "grid-outline" : "list-outline"}
           size={20}
-          color={theme.accent ?? theme.text?.primary ?? "#fff"}
+          color={theme.text?.primary ?? "#fff"}
         />
       </Animated.View>
-    </GlassTouchable>
+    </GlassIconButton>
   );
 });
 
 export default function SearchScreen({ navigation, route }) {
-  const { t, language } = useLanguage();
+  const { language } = useLanguage();
   const { API_KEY } = useApiSettings();
   const linkCopy = getMediaLinkCopy(language);
+  const copy = getSearchHeaderCopy(language);
   const linkBusy = useRef(false);
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -117,8 +125,11 @@ export default function SearchScreen({ navigation, route }) {
 
   const [activeTab, setActiveTab] = useState(initialType);
   const [searchQuery, setSearchQuery] = useState("");
+  const [focused, setFocused] = useState(false);
   const [viewMode, setViewModeState] = useState(() => get(Keys.searchResultsViewMode));
   const inputRef = useRef(null);
+  const accent = theme.accent ?? "#3B82F6";
+  const muted = theme.text?.muted ?? "#666";
 
   // ── Bağlantıdan aç (TMDB / IMDb) ───────────────────────────────────────────
   // Alana yapıştırılan ya da panodaki film/dizi bağlantısı doğrudan o yapımın detayını açar (ekle / izledim
@@ -263,23 +274,11 @@ export default function SearchScreen({ navigation, route }) {
     ],
   };
 
-  const tabs = [
-    {
-      id: "movie",
-      label: t.SearchScreen?.searchMovies ?? i18nText("autoI18n.film", "Film"),
-      icon: (color) => <AppIcon family="MaterialCommunityIcons" name="movie-outline" size={20} color={color} />,
-    },
-    {
-      id: "tv",
-      label: t.SearchScreen?.searchTvShows ?? i18nText("autoI18n.dizi", "Dizi"),
-      icon: (color) => <AppIcon family="Feather" name="tv" size={18} color={color} />,
-    },
-    {
-      id: "actor",
-      label: t.SearchScreen?.searchActrist ?? "Oyuncu",
-      icon: (color) => <AppIcon family="Feather" name="user" size={18} color={color} />,
-    },
-  ];
+  const typeOptions = ["movie", "tv", "actor"].map((id) => ({
+    value: id,
+    label: copy.tabs[id],
+    icon: TYPE_ICONS[id],
+  }));
 
   const expandingShellStyle =
     hasSearchOrigin && !expandDone
@@ -329,67 +328,81 @@ export default function SearchScreen({ navigation, route }) {
           <ScreenDecor scope="search" iconOpacity={0.3} />
 
       {/* ── Arama Kutusu ──────────────────────────────────────── */}
+      {/* Geri · arama alanı · görünüm: üçü de BAR_HEIGHT, tek hizada. */}
       <Animated.View style={[styles.searchContainer, searchBarStyle]}>
-        <BackButton absolute={false} style={{ alignSelf: "center" }} />
-        {/* iOS 26+: hap biçimli Liquid Glass arama alanı; diğer yerlerde eski kutu. */}
+        <BackButton
+          absolute={false}
+          size={BAR_HEIGHT}
+          fallbackRadius={BAR_HEIGHT / 2}
+          style={{ alignSelf: "center" }}
+        />
+        {/* iOS 26+: hap biçimli Liquid Glass arama alanı (odakta vurgu tonlu); diğer
+            yerlerde aynı hap biçiminde tema kutusu, odakta vurgu çerçeveli. */}
         <GlassField
-          height={40}
+          height={BAR_HEIGHT}
+          focused={focused}
+          accent={accent}
           fallbackStyle={[
             styles.searchBarBox,
-            { backgroundColor: theme.secondary, borderColor: theme.border },
+            {
+              backgroundColor: theme.secondary,
+              borderColor: focused ? alpha(accent, 0.6) : theme.border,
+            },
           ]}
           style={styles.searchBar}
         >
           <AppIcon
             family="Ionicons"
             name="search"
-            size={20}
-            color={theme.text?.muted ?? "#666"}
-            style={{ marginRight: 8 }}
+            size={18}
+            color={focused ? accent : muted}
           />
           <TextInput
             ref={inputRef}
             style={[styles.searchInput, { color: theme.text?.primary ?? "#fff" }]}
-            placeholder={
-              activeTab === "movie"
-                ? (t.SearchScreen?.searchMovies ?? "Film ara...")
-                : activeTab === "tv"
-                ? (t.SearchScreen?.searchTvShows ?? "Dizi ara...")
-                : (t.SearchScreen?.searchActrist ?? "Oyuncu ara...")
-            }
-            placeholderTextColor={theme.text?.muted ?? "#666"}
+            placeholder={copy.placeholder[activeTab] ?? copy.placeholder.movie}
+            placeholderTextColor={muted}
+            selectionColor={accent}
             value={searchQuery}
             onChangeText={handleChangeText}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             maxLength={80}
             returnKeyType="search"
             keyboardAppearance={isLightSurface(theme.primary) ? "light" : "dark"}
             onSubmitEditing={() => Keyboard.dismiss()}
           />
-          {searchQuery.length === 0 && (
+          {/* Alan içi eylem: boşken "bağlantıdan aç", yazarken "temizle". Camın
+              içinde olduğundan düz dokunulabilir (cam içine cam konmaz). */}
+          {searchQuery.length === 0 ? (
             <TouchableOpacity
+              testID="search-paste-link"
               onPress={pasteLink}
               accessibilityRole="button"
               accessibilityLabel={linkCopy.pasteLabel}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.fieldAction, { backgroundColor: alpha(muted, 0.16) }]}
             >
               <AppIcon
                 family="Ionicons"
-                name="link-outline"
-                size={21}
-                color={theme.text?.muted ?? "#666"}
+                name="link"
+                size={15}
+                color={theme.text?.secondary ?? muted}
               />
             </TouchableOpacity>
-          )}
-          {searchQuery.length > 0 && (
+          ) : (
             <TouchableOpacity
+              testID="search-clear"
               onPress={() => setSearchQuery("")}
+              accessibilityRole="button"
+              accessibilityLabel={copy.clear}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <AppIcon
                 family="Ionicons"
                 name="close-circle"
-                size={22}
-                color={theme.text?.muted ?? "#666"}
+                size={20}
+                color={muted}
               />
             </TouchableOpacity>
           )}
@@ -398,37 +411,20 @@ export default function SearchScreen({ navigation, route }) {
           viewMode={viewMode}
           onToggle={setViewMode}
           theme={theme}
+          labels={copy}
         />
       </Animated.View>
 
-      {/* ── Kategori Seçici (Tab Bar) ──────────────────────────────────────── */}
+      {/* ── Tür anahtarı: Film · Dizi · Oyuncu (kayan vurgu hapı) ───────────── */}
       <Animated.View style={[styles.tabsContainer, searchBarStyle]}>
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              activeOpacity={0.7}
-              onPress={() => setActiveTab(tab.id)}
-              style={[
-                styles.tabButton,
-                isActive && { backgroundColor: theme.text?.primary ?? "#fff" },
-                !isActive && { backgroundColor: theme.secondary },
-              ]}
-            >
-              {tab.icon(isActive ? theme.primary : (theme.text?.primary ?? "#fff"))}
-              <Text
-                style={[
-                  styles.tabLabel,
-                  isActive && { color: theme.primary, fontWeight: "700" },
-                  !isActive && { color: theme.text?.primary ?? "#fff" },
-                ]}
-              >
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+        <GlassSegmentedControl
+          options={typeOptions}
+          value={activeTab}
+          onChange={setActiveTab}
+          height={42}
+          accessibilityLabel={copy.typeLabel}
+          testIDPrefix="search-type"
+        />
       </Animated.View>
 
       {/* ── İçerik ──────────────────────────────────────── */}
@@ -488,52 +484,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 10,
     marginTop: 10,
-    gap: 10,
+    gap: 8,
   },
   // Yerleşim iki yolda da geçerli; köşe/çerçeve yalnız eski kutuda (cam kendi
-  // şeklini çizer).
+  // şeklini çizer). Eski kutu da hap: camla aynı biçim.
   searchBar: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
+    gap: 8,
+    paddingLeft: 14,
+    paddingRight: 8,
     paddingVertical: 0,
   },
-  searchBarBox: { borderRadius: 12, borderWidth: 1 },
-  layoutToggleBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
+  searchBarBox: { borderRadius: BAR_HEIGHT / 2, borderWidth: 1 },
+  layoutToggleBtn: { flexShrink: 0 },
   searchInput: {
     flex: 1,
+    minWidth: 0,
     fontSize: 16,
-    height: 40,
+    height: BAR_HEIGHT,
     paddingVertical: 0,
   },
-  tabsContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: "row",
+  fieldAction: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 6,
   },
-  tabLabel: {
-    fontSize: 14,
-    fontWeight: "600",
+  tabsContainer: {
+    paddingHorizontal: 16,
   },
   contentContainer: {
     flex: 1,

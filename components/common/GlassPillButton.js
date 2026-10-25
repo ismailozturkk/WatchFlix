@@ -18,7 +18,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import GlassSurface from "./GlassSurface";
 import { useTheme } from "../../context/ThemeContext";
-import { useLiquidGlass } from "../../services/liquidGlass";
+import { useGlassShape, useLiquidGlass } from "../../services/liquidGlass";
 
 function GlassPillButton({
   label,
@@ -43,6 +43,8 @@ function GlassPillButton({
 }) {
   const { theme } = useTheme();
   const glass = useLiquidGlass();
+  // Android buzlu camında da şekil hap (cam ile aynı dil).
+  const shaped = useGlassShape();
   const inactive = disabled || loading;
   // Cam yolunda opaklık yok: devre dışı = ton kalkar, içerik soluklaşır.
   const contentColor = disabled && glass ? disabledColor ?? theme.text.muted : color;
@@ -80,7 +82,7 @@ function GlassPillButton({
       ]}
     >
       <GlassSurface
-        radius={glass ? height / 2 : fallbackRadius}
+        radius={shaped ? height / 2 : fallbackRadius}
         tint={disabled ? undefined : tint}
         interactive={!inactive}
         fallbackStyle={fallbackStyle}

@@ -215,6 +215,7 @@ function EpisodeRow({
         <PosterImage
           path={item.showPosterPath}
           type="tv"
+          mediaId={item.showId}
           size={342}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
@@ -446,6 +447,7 @@ function ManageShowsModal({
                   <PosterImage
                     path={show.imagePath}
                     type="tv"
+                    mediaId={show.id}
                     size={200}
                     style={styles.managePoster}
                     contentFit="cover"

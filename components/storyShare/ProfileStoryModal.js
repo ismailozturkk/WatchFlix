@@ -97,6 +97,7 @@ import {
 } from "../../utils/profileStoryCard";
 import GlassPressable from "../common/GlassPressable";
 import GlassBox from "../common/GlassBox";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const TABS = [
   { id: "layout", icon: "grid-outline", label: () => i18nText("autoI18n.profil_story_sekme_duzen", "Düzen") },
@@ -1044,7 +1045,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
                 </Text>
               </View>
             )}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.noGrow} contentContainerStyle={styles.chipGrid}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll} contentContainerStyle={styles.chipGrid}>
               {TOGGLE_ROWS.map((row, rowIndex) => (
                 <View key={rowIndex} style={styles.chipRow}>
                   {row.map((item) => (
@@ -1228,7 +1229,16 @@ const styles = StyleSheet.create({
   contentPanel: { gap: 10 },
   // Yatay ScrollView'un içerik kabı varsayılan olarak `row`dur; iki satırın alt
   // alta durması için `column` AÇIKÇA verilmeli.
-  chipGrid: { flexDirection: "column", gap: 8, paddingRight: 4 },
+  // Basılan cam çip kırpma sınırında kesilmesin: dört yanda GLASS_PRESS_ROOM (dolgu + eşit
+  // negatif dış boşluk; yerleşim aynı).
+  chipScroll: { flexGrow: 0, margin: -GLASS_PRESS_ROOM },
+  chipGrid: {
+    flexDirection: "column",
+    gap: 8,
+    paddingVertical: GLASS_PRESS_ROOM,
+    paddingLeft: GLASS_PRESS_ROOM,
+    paddingRight: 4 + GLASS_PRESS_ROOM,
+  },
   chipRow: { flexDirection: "row", gap: 8 },
   toggleChip: {
     flexDirection: "row",

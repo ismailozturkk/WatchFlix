@@ -24,6 +24,7 @@ import Skeleton from "@components/Skeleton";
 import { i18nText } from "../../../../utils/i18nText";
 import { dueStatus, parseISODate, todoStats } from "../../../../utils/notesView";
 import { alpha } from "../../../../theme/colors";
+import usePosterUri from "../../../../hooks/usePosterUri";
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
@@ -288,13 +289,13 @@ export const MediaNoteCard = memo(function MediaNoteCard({
   note,
   theme,
   language,
-  getTmdbUrl,
   onPress,
   onGoTo,
   onDelete,
 }) {
   const isTv = note.type === "tv";
   const accent = theme.accent;
+  const posterUri = usePosterUri();
   return (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -310,7 +311,7 @@ export const MediaNoteCard = memo(function MediaNoteCard({
         pointerEvents="none"
       />
       {note.posterPath ? (
-        <Image source={{ uri: getTmdbUrl(note.posterPath, "poster", 200) }} style={st.mediaPoster} />
+        <Image source={{ uri: posterUri(note.type, note.mediaId, note.posterPath) }} style={st.mediaPoster} />
       ) : (
         <View style={[st.mediaPoster, st.mediaPosterFallback, { backgroundColor: theme.between }]}>
           <Ionicons name={isTv ? "tv-outline" : "film-outline"} size={22} color={theme.text.muted} />

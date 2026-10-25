@@ -14,7 +14,7 @@
 import React, { memo, useCallback } from "react";
 import GlassIconButton from "../common/GlassIconButton";
 import { useTheme } from "../../context/ThemeContext";
-import { useLiquidGlass } from "../../services/liquidGlass";
+import { useGlassShape } from "../../services/liquidGlass";
 import { DISCOVER_FILTERS_ROUTE } from "../../utils/discoverFilters";
 import { discoverActionStyle, discoverSearchActionSize } from "./DiscoverSearchAction";
 
@@ -25,8 +25,7 @@ import { discoverActionStyle, discoverSearchActionSize } from "./DiscoverSearchA
  */
 function DiscoverExploreAction({ navigation, mediaType, label }) {
   const { theme } = useTheme();
-  const glass = useLiquidGlass();
-  const size = discoverSearchActionSize(glass);
+  const size = discoverSearchActionSize(useGlassShape());
 
   const open = useCallback(
     () => navigation?.navigate?.(DISCOVER_FILTERS_ROUTE, { mediaType }),

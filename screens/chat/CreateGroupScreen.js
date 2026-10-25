@@ -103,6 +103,7 @@ export default function CreateGroupScreen({ navigation }) {
           }),
         );
       },
+      (err) => __DEV__ && console.warn("CreateGroup friends:", err.message),
     );
     return () => unsub();
   }, [user]);

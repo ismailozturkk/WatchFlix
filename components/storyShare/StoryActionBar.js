@@ -11,6 +11,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { planStoryActionBar } from "../../utils/storyCanvasLayout";
 import GlassTouchable from "../common/GlassTouchable";
+import { useLiquidGlass } from "../../services/liquidGlass";
 
 // Ölçüler pencere genişliğinden HESAPLANIR (utils/storyCanvasLayout.js →
 // planStoryActionBar): eskiden `genişlik < 400` eşiğiyle iki sabit düzen vardı
@@ -19,6 +20,9 @@ import GlassTouchable from "../common/GlassTouchable";
 function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings, onSaveImage }) {
   const { theme } = useTheme();
   const { width } = useWindowDimensions();
+  // Camda düğme kırpılmaz (cam katmanı çocuğudur, basılınca sınırda kesilirdi); taşan parıltı
+  // dairesi de bu yüzden yalnız eski görünümde çizilir — cam kendi parlamasını taşır.
+  const glass = useLiquidGlass();
 
   const fullTitle = i18nText("autoI18n.tasarimi_paylas", "Tasarımı Paylaş");
   const shortTitle = i18nText("autoI18n.paylas", "Paylaş");
@@ -64,7 +68,7 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
           },
         ]}
       >
-        <View style={styles.glow} />
+        {glass ? null : <View style={styles.glow} />}
         <View
           style={[
             styles.iconWrap,
@@ -150,7 +154,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.24,

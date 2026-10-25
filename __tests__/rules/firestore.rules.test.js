@@ -1732,3 +1732,55 @@ describe("Günün Sorusu (DailyPolls)", () => {
     await assertFails(castBatch(anon, "anon", "a", TODAY, { a: 1, b: 0 }));
   });
 });
+
+describe("Özel afiş seçimleri (PosterChoices)", () => {
+  const belge = (choices = { movie_603: "/abc123.jpg" }) => ({ id: "all", choices, updatedAt: 1 });
+  const profil = (lists) => ({ uid: ALICE, username: "alice", usernameLower: "alice", privacy: { lists } });
+  const cokSecim = (n) =>
+    Object.fromEntries(Array.from({ length: n }, (_, i) => [`movie_${i + 1}`, `/p${i + 1}.jpg`]));
+
+  test("sahibi yazar ve okur; başkası yazamaz", async () => {
+    await assertSucceeds(setDoc(doc(alice, "PosterChoices", ALICE), belge()));
+    await assertSucceeds(getDoc(doc(alice, "PosterChoices", ALICE)));
+    await assertFails(setDoc(doc(bob, "PosterChoices", ALICE), belge()));
+    await assertSucceeds(deleteDoc(doc(alice, "PosterChoices", ALICE)));
+  });
+
+  test("şekil: fazladan alan, harita olmayan seçim ve 500 tavanı", async () => {
+    await assertFails(setDoc(doc(alice, "PosterChoices", ALICE), { ...belge(), extra: true }));
+    await assertFails(setDoc(doc(alice, "PosterChoices", ALICE), { id: "all", choices: ["/a.jpg"] }));
+    await assertFails(setDoc(doc(alice, "PosterChoices", ALICE), { ...belge(), updatedAt: "dün" }));
+    await assertSucceeds(setDoc(doc(alice, "PosterChoices", ALICE), belge(cokSecim(500))));
+    await assertFails(setDoc(doc(alice, "PosterChoices", ALICE), belge(cokSecim(501))));
+  });
+
+  test("arka plan haritası: kendi tavanı (500), harita olmalı; afişle birlikte yazılır", async () => {
+    const ref = doc(alice, "PosterChoices", ALICE);
+    await assertSucceeds(setDoc(ref, { ...belge(), backdrops: { movie_603: "/bd603.jpg" } }));
+    await assertSucceeds(setDoc(ref, { ...belge(cokSecim(500)), backdrops: cokSecim(500) }));
+    await assertFails(setDoc(ref, { ...belge(), backdrops: cokSecim(501) }));
+    await assertFails(setDoc(ref, { ...belge(), backdrops: ["/bd.jpg"] }));
+  });
+
+  test("okuma listelerle aynı: herkese açık → okur, gizli → okuyamaz", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "PosterChoices", ALICE), belge());
+      await setDoc(doc(db, "Users", ALICE), profil("public"));
+    });
+    await assertSucceeds(getDoc(doc(bob, "PosterChoices", ALICE)));
+
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil("private")));
+    await assertFails(getDoc(doc(bob, "PosterChoices", ALICE)));
+    await assertSucceeds(getDoc(doc(alice, "PosterChoices", ALICE)));
+  });
+
+  test("yalnız arkadaşlar: sahibin arkadaş listesindeki okur, diğeri okuyamaz", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "PosterChoices", ALICE), belge());
+      await setDoc(doc(db, "Users", ALICE), profil("friends"));
+      await setDoc(doc(db, "Users", ALICE, "friends", BOB), { friendUid: BOB });
+    });
+    await assertSucceeds(getDoc(doc(bob, "PosterChoices", ALICE)));
+    await assertFails(getDoc(doc(carol, "PosterChoices", ALICE)));
+  });
+});

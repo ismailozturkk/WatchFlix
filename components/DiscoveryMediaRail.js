@@ -109,6 +109,7 @@ export const DiscoveryCard = memo(function DiscoveryCard({
         <PosterImage
           path={item.poster_path}
           type={mediaType}
+          mediaId={item.id}
           size={200}
           style={{
             width: rail.posterWidth,

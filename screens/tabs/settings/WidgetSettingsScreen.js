@@ -63,6 +63,7 @@ import {
   widgetCapabilities,
 } from "./widgets/widgetPlatform";
 import GlassPressable from "../../../components/common/GlassPressable";
+import { GLASS_PRESS_ROOM } from "../../../utils/liquidGlass";
 
 const PLATFORM = Platform.OS === "ios" ? "ios" : "android";
 
@@ -361,7 +362,7 @@ export default function WidgetSettingsScreen() {
 
         <View style={styles.flex}>
           <ScrollView
-            style={styles.flex}
+            style={[styles.flex, styles.scrollRoom]}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -660,6 +661,7 @@ export default function WidgetSettingsScreen() {
                 onPress={resetActive}
                 style={({ pressed }) => [
                   styles.resetButton,
+                  PLATFORM === "android" && styles.rippleClip,
                   { borderColor: C.border, backgroundColor: C.card },
                   PLATFORM === "ios" && pressed && { opacity: 0.6 },
                 ]}
@@ -721,7 +723,10 @@ const styles = StyleSheet.create({
   loading: { paddingTop: 80, alignItems: "center" },
   // Sabit önizleme bölgesi: seçici + sahne.
   pinned: { gap: 10, paddingTop: 4, paddingBottom: 6 },
-  content: { paddingBottom: 110 },
+  // Kart içindeki cam düğmeler/tam genişlik düğme basılınca kaydırma sınırında kesilmesin:
+  // yanlarda GLASS_PRESS_ROOM (dolgu + sayfanın 16 pt yan boşluğuna taşan negatif dış boşluk).
+  scrollRoom: { marginHorizontal: -GLASS_PRESS_ROOM },
+  content: { paddingBottom: 110, paddingHorizontal: GLASS_PRESS_ROOM },
   topFade: { position: "absolute", top: 0, left: 0, right: 0, height: 14 },
   applyAll: {
     flexDirection: "row",
@@ -741,8 +746,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexDirection: "row",
     gap: 8,
-    overflow: "hidden",
   },
+  // Yalnız Android: dalga efektini köşeye kırpar. iOS'ta cam katmanı düğmenin çocuğu;
+  // overflow onu basılınca düğmenin sınırında keserdi.
+  rippleClip: { overflow: "hidden" },
   resetText: { fontSize: 14, fontWeight: "700" },
   resetAll: { minHeight: 44, alignItems: "center", justifyContent: "center" },
   resetAllText: { fontSize: 13, fontWeight: "600" },

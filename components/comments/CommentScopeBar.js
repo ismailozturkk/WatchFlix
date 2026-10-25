@@ -28,6 +28,7 @@ import {
 import { i18nText } from "../../utils/i18nText";
 import { scopeShortLabels, scopeFilterLabel } from "./scopeTexts";
 import GlassTouchable from "../common/GlassTouchable";
+import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 const Chip = ({ theme, label, count, active, dimmed, icon, onPress }) => (
   <GlassTouchable
@@ -122,6 +123,7 @@ export default function CommentScopeBar({
           horizontal
           showsHorizontalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          style={styles.rowScroll}
           contentContainerStyle={styles.rowContent}
         >
           <Chip
@@ -175,6 +177,7 @@ export default function CommentScopeBar({
           horizontal
           showsHorizontalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          style={styles.rowScroll}
           contentContainerStyle={[styles.rowContent, styles.subRowContent]}
         >
           <Chip
@@ -259,7 +262,9 @@ export default function CommentScopeBar({
 const styles = StyleSheet.create({
   wrap: { paddingTop: 10, gap: 8 },
   row: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 15 },
-  rowContent: { gap: 8, paddingHorizontal: 15, alignItems: "center" },
+  // Basılan cam çip satırın kırpma sınırında kesilmesin (utils/liquidGlass GLASS_PRESS_ROOM).
+  rowScroll: { marginVertical: -GLASS_PRESS_ROOM },
+  rowContent: { gap: 8, paddingHorizontal: 15, paddingVertical: GLASS_PRESS_ROOM, alignItems: "center" },
   subRowContent: { paddingRight: 15 },
 
   chip: {
