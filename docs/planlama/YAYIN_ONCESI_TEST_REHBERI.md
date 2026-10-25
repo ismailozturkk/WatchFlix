@@ -103,7 +103,9 @@
 2. `/code-review high` çalıştır. Aralık büyükse alana göre böl: sohbet ve sosyal, kütüphane ve listeler, Premium ve ödeme, Hub ve oyunlar, ayarlar ve hesap.
 3. Her bulguyu kodda doğrula; yanlış alarmları ele. Doğrulananları `docs/test/T1_KOD_INCELEME_<tarih>.md`'ye yaz, Kritik ve Yüksekleri hemen düzelt.
 
-### [ ] T1.2 — Mekanik taramalar
+### [x] T1.2 — Mekanik taramalar (2026-10-25)
+
+> **Sonuç:** `docs/test/T1_MEKANIK_TARAMA_2026-10-25.md`. **Yüksek, düzeltildi:** Ayarlar'daki "Debug" satırı release'de görünüyordu → `__DEV__` kapısı + bekçi test (`devToolsReleaseGate`). Açık: fonksiyon bağımlılıklarında 15 yamalı açık (`npm audit fix` + tüm fonksiyonların deploy'u önerisi), uygulamada `axios` yükseltmesi, 372 sessiz catch'ten kullanıcı akışındakiler T1.1'e. Tip taraması ve sır taraması temiz.
 
 Her biri ayrı madde olarak rapora:
 - **Import ve export:** `__tests__/moduleImports.test.js` `npm test` içinde koşuyor; yeşilse tamam.

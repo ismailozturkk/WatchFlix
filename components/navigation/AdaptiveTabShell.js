@@ -117,7 +117,7 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
     const requested = route?.params?.initialTab;
     if (requested === "debug") {
       navigation.setParams({ initialTab: undefined });
-      navigation.navigate("UsageDebugScreen");
+      if (__DEV__) navigation.navigate("UsageDebugScreen");
     } else if (isTabName(requested)) {
       dispatch({ type: "select", name: requested });
       navigation.setParams({ initialTab: undefined });

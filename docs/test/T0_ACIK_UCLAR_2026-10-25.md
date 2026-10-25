@@ -179,4 +179,4 @@ npx eas build --profile production --platform android
 
 - [x] 2.2: 9 fonksiyonun yeniden yayını — 25 Eki yapıldı (2.3)
 - [ ] 2.4: gizlilik göçünün sırası ve servis hesabı ile kuru çalışma
-- [ ] 3: iOS development build ve Android production AAB zamanlaması
+- [~] 3: build'ler — 25 Eki: Android önizleme APK'sı başlatıldı (`7e918a58`, `e675082`; kullanıcı APK istedi). iOS build alınmayacak: aylık iOS derleme kotası doldu, telefondaki 1.4.8 development build kullanılacak → iOS'a özgü native düzeltmeler (cam yaması, SDK 57 yamaları) kota yenilenene kadar cihazda doğrulanamaz. Play kapalı testi için production AAB hâlâ gerekli (T6 öncesi).

@@ -1033,12 +1033,15 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </SwipeCard>
 
-        <GlassBox role="card" style={[s.card, s.debugCard, { backgroundColor: C.card, borderColor: C.border }]}>
-          <SettingRow colors={C} iconBg={C.iconBlue} iconColor={C.blue}
-            iconName="analytics-outline" title="Debug"
-            onPress={() => navigation.navigate("UsageDebugScreen")}
-            right={<Chevron color={C.muted} />} last />
-        </GlassBox>
+        {/* Geliştirici maliyet/test ekranı: yalnız geliştirme build'inde (plan simülatörü gibi). */}
+        {__DEV__ ? (
+          <GlassBox role="card" style={[s.card, s.debugCard, { backgroundColor: C.card, borderColor: C.border }]}>
+            <SettingRow colors={C} iconBg={C.iconBlue} iconColor={C.blue}
+              iconName="analytics-outline" title="Debug"
+              onPress={() => navigation.navigate("UsageDebugScreen")}
+              right={<Chevron color={C.muted} />} last />
+          </GlassBox>
+        ) : null}
 
         <BottomSheetModal
           visible={providerModalVisible}
