@@ -213,6 +213,35 @@ describe("indirme sırasındaki / öncesindeki yerel değişiklikler kaybolmaz",
     expect(ids(h).sort()).toEqual(["n1", "n2"]);
   });
 
+  test("indirmeden ÖNCE kuyrukta olup indirme SÜRERKEN onaylanan değişiklik kaybolmaz", async () => {
+    // Önceki oturumdan kalan (çevrimdışı) yazım: indirme başladığında günlükte
+    // değil, kuyrukta. Okuma yazımdan önce biterse bulut cevabı onu içermez;
+    // kuyruktan da onayla düştüğü için yalnız indirme başındaki kopya kurtarır.
+    const h = boot({ online: false });
+    seedNotes(h, "u1", [note("n1")]);
+    h.mods.notes.apply("u1", [{ kind: "items", doc: note("n7", { content: "offline" }) }]);
+    h.env.online = true;
+
+    let serbest;
+    const asil = h.remote.fetchCollection.bind(h.remote);
+    h.remote.fetchCollection = async (path) => {
+      await new Promise((r) => (serbest = r));
+      return asil(path);
+    };
+    const indirme = h.mods.notes.ensureHydrated("u1");
+    await Promise.resolve();
+
+    h.mods.worker.start("u1");
+    await jest.advanceTimersByTimeAsync(500);
+    expect(h.mods.outbox.counts("u1").pending).toBe(0);
+
+    h.remote.db.delete("Notes/u1/items/n7"); // okuma commit'ten önceydi
+    serbest();
+    await indirme;
+
+    expect(ids(h).sort()).toEqual(["n1", "n7"]);
+  });
+
   test("zorla yeniden indirme yerelle bulutu eşitler, bekleyenleri korur", async () => {
     const h = boot({ online: false });
     seedNotes(h, "u1", [note("n1")]);

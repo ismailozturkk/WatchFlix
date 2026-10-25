@@ -35,6 +35,7 @@ import {
   getPackageRegularPrice,
   getPackageSavings,
   getPackageTierKey,
+  getPremiumPlan,
   getPremiumPlanDisplayName,
   pickBetterOffer,
   AI_PLAN_LIMITS,
@@ -54,6 +55,8 @@ import {
 } from "../../utils/premiumFeatures";
 import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
 import RedeemCodeSheet, { formatRedeemDate } from "../../components/premium/RedeemCodeSheet";
+import { appAlert } from "../../components/AppAlert";
+import { REFERRAL_OFFER_UNAVAILABLE } from "../../services/revenueCatService";
 import useReferralOverview from "../../hooks/useReferralOverview";
 import { getReferralCopy } from "../../utils/referralCopy";
 import GlassPressable from "../../components/common/GlassPressable";
@@ -231,6 +234,7 @@ export default function PremiumScreen() {
     entitlementId,
     usingTestStore,
     purchasePackage,
+    refresh,
     restorePurchases,
     openCustomerCenter,
   } = usePremium();
@@ -390,26 +394,56 @@ export default function PremiumScreen() {
     setSelectedId(packageId);
   };
 
-  const buy = async () => {
-    if (!selectedPackage || busy) return;
+  const purchase = async (aPackage, referralHandle) => {
     try {
-      await purchasePackage(selectedPackage, {
-        referralHandle: offerChoiceFor(selectedPackage).handle,
-      });
+      const result = await purchasePackage(aPackage, { referralHandle });
+      // Kutlama yalnız hak GERÇEKTEN açıldıysa: ödeme alınıp hak açılmadıysa
+      // (bekleyen ödeme, panelde entitlement eşleşmesi bozuk) "aktif" denmez.
+      const purchasedPlan = getPremiumPlan(result?.customerInfo, entitlementId);
+      if (purchasedPlan === PREMIUM_PLAN.FREE) {
+        refresh?.().catch?.(() => {});
+        Toast.show({
+          type: "info",
+          text1: tr ? "Ödemen alındı" : es ? "Hemos recibido tu pago" : pt ? "Recebemos seu pagamento" : de ? "Deine Zahlung ist eingegangen" : "Your payment was received",
+          text2: tr ? "Ayrıcalıkların açılması birkaç dakika sürebilir." : es ? "Tus ventajas pueden tardar unos minutos en activarse." : pt ? "Seus benefícios podem levar alguns minutos para serem ativados." : de ? "Es kann ein paar Minuten dauern, bis deine Vorteile aktiv sind." : "It may take a few minutes for your benefits to activate.",
+        });
+        return;
+      }
+      const planName = getPremiumPlanDisplayName(purchasedPlan);
       // Premium kutlaması: altın kart + kıvılcım (components/toast).
       Toast.show({
         type: "premium",
-        text1: tr ? "Seelogd Premium aktif edildi!" : es ? "¡Seelogd Premium está activo!" : pt ? "O Seelogd Premium está ativo!" : de ? "Seelogd Premium ist aktiv!" : "Seelogd Premium is active!",
+        text1: tr ? `Seelogd ${planName} aktif edildi!` : es ? `¡Seelogd ${planName} está activo!` : pt ? `O Seelogd ${planName} está ativo!` : de ? `Seelogd ${planName} ist aktiv!` : `Seelogd ${planName} is active!`,
         text2: tr ? "Tüm ayrıcalıkların kullanıma hazır." : es ? "Todas tus ventajas están listas." : pt ? "Todos os seus benefícios estão prontos." : de ? "Alle deine Vorteile sind bereit." : "All your benefits are ready.",
       });
     } catch (error) {
       if (error?.userCancelled) return;
+      // Davet indirimi mağazadan alınamadı: tam fiyata sormadan geçilmez.
+      if (error?.code === REFERRAL_OFFER_UNAVAILABLE) {
+        appAlert(
+          tr ? "İndirim şu an uygulanamıyor" : es ? "El descuento no está disponible ahora" : pt ? "O desconto não está disponível agora" : de ? "Der Rabatt ist gerade nicht verfügbar" : "The discount isn't available right now",
+          tr ? "Davet indirimi mağazadan alınamadı. Tam fiyatla devam edebilir ya da daha sonra tekrar deneyebilirsin." : es ? "No se pudo obtener el descuento de invitación de la tienda. Puedes continuar con el precio completo o intentarlo más tarde." : pt ? "Não foi possível obter o desconto de convite na loja. Você pode continuar com o preço cheio ou tentar mais tarde." : de ? "Der Einladungsrabatt konnte nicht vom Store abgerufen werden. Du kannst zum vollen Preis fortfahren oder es später erneut versuchen." : "The invite discount couldn't be retrieved from the store. You can continue at full price or try again later.",
+          [
+            { text: tr ? "Vazgeç" : es ? "Cancelar" : pt ? "Cancelar" : de ? "Abbrechen" : "Cancel", style: "cancel" },
+            {
+              text: tr ? "Tam fiyatla devam et" : es ? "Continuar con precio completo" : pt ? "Continuar com preço cheio" : de ? "Zum vollen Preis fortfahren" : "Continue at full price",
+              onPress: () => purchase(aPackage, null),
+            },
+          ],
+        );
+        return;
+      }
       Toast.show({
         type: "error",
         text1: tr ? "Satın alma tamamlanamadı" : es ? "No se pudo completar la compra" : pt ? "Não foi possível concluir a compra" : de ? "Der Kauf konnte nicht abgeschlossen werden" : "Purchase could not be completed",
         text2: error?.message,
       });
     }
+  };
+
+  const buy = () => {
+    if (!selectedPackage || busy) return;
+    purchase(selectedPackage, offerChoiceFor(selectedPackage).handle);
   };
 
   const restore = async () => {

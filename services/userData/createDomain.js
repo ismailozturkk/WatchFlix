@@ -283,7 +283,10 @@ export function createUserDataDomain(spec, deps) {
 
     st.hydrating = true;
     st.error = null;
-    st.journal = [];
+    // Günlük, indirme BAŞINDA kuyrukta bekleyenlerle başlar: indirme sürerken
+    // onaylanıp kuyruktan düşen bir yazım, okuması daha önce bitmiş bulut
+    // cevabında da yoksa yalnız bu kopya sayesinde yerelde kalır.
+    st.journal = [...outbox.overlayOps(uid, name)];
     st.view = buildView(st);
     emit();
 

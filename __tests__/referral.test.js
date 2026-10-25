@@ -247,7 +247,10 @@ describe("bağlar (kaynak bekçisi)", () => {
   it("Premium sayfası: kod girişi var ve satın alma davet teklifini taşıyor", () => {
     const src = read("screens", "premium", "PremiumScreen.js");
     expect(src).toContain("<RedeemCodeSheet");
-    expect(src).toMatch(/purchasePackage\(selectedPackage,\s*\{\s*referralHandle:/);
+    // Satın alma tek yardımcıdan (purchase) geçer: seçili paket davet teklifiyle çağrılır,
+    // yardımcı teklifi purchasePackage'a iletir (teklif alınamazsa tam fiyat SORULUR).
+    expect(src).toMatch(/purchase\(selectedPackage,\s*offerChoiceFor\(selectedPackage\)\.handle\)/);
+    expect(src).toMatch(/purchasePackage\(aPackage,\s*\{\s*referralHandle\s*\}\)/);
   });
 
   it("webhook ve plan yazımı promosyonu korur (currentEntitlements geçiyor)", () => {

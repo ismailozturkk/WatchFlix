@@ -121,6 +121,8 @@ export async function loadIntroEligibleProductIds(productIdentifiers = []) {
 //
 // `referralHandle` (utils/premium getPackageReferralOffer().handle): arkadaş davetinin
 // ilk dönem indirimi. Varsayılan teklif yerine mağazadaki özel teklifle satın alınır.
+export const REFERRAL_OFFER_UNAVAILABLE = "referral-offer-unavailable";
+
 export async function purchaseRevenueCatPackage(
   aPackage,
   {
@@ -152,13 +154,23 @@ export async function purchaseRevenueCatPackage(
     );
   } else if (referralHandle?.kind === "apple" && referralHandle.discount) {
     // İmza RevenueCat'ten gelir (App Store Connect abonelik anahtarı panelde yüklü olmalı).
-    const promotionalOffer = await Purchases.getPromotionalOffer(
-      aPackage.product,
-      referralHandle.discount,
-    );
-    result = promotionalOffer
-      ? await Purchases.purchaseDiscountedPackage(aPackage, promotionalOffer)
-      : await Purchases.purchasePackage(aPackage, null, productChangeInfo);
+    // Teklif alınamazsa sessizce tam fiyata GEÇİLMEZ: ekran indirim vaat etti;
+    // kullanıcıya sorulur (REFERRAL_OFFER_UNAVAILABLE, bkz. PremiumScreen).
+    let promotionalOffer = null;
+    try {
+      promotionalOffer = await Purchases.getPromotionalOffer(
+        aPackage.product,
+        referralHandle.discount,
+      );
+    } catch {
+      promotionalOffer = null;
+    }
+    if (!promotionalOffer) {
+      const error = new Error("referral-offer-unavailable");
+      error.code = REFERRAL_OFFER_UNAVAILABLE;
+      throw error;
+    }
+    result = await Purchases.purchaseDiscountedPackage(aPackage, promotionalOffer);
   } else {
     result = aPackage?.isStandaloneProduct
       ? await Purchases.purchaseStoreProduct(aPackage.product, productChangeInfo)

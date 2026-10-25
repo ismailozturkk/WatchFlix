@@ -63,6 +63,7 @@ import {
   endAt,
   deleteField,
   increment,
+  getDoc,
 } from "firebase/firestore";
 import { trackFirestoreRead } from "../../services/usageTrackerService";
 import { useTheme } from "@context/ThemeContext";
@@ -1277,7 +1278,7 @@ export default function ChatScreen({ route, navigation }) {
   // rozetini güncellenmemiş bırakıyordu. Batch atomiktir: ya hepsi ya hiçbiri.
   // Grup ve 1-1 şemaları farklı.
   const queueThreadWrites = useCallback(
-    (batch, previewText) => {
+    (batch, previewText, groupMembers = groupData?.members) => {
       if (isGroup) {
         batch.set(
           chatRef,
@@ -1297,7 +1298,7 @@ export default function ChatScreen({ route, navigation }) {
         // alıcının conversations.unreadCount'u gibi): kopma/süreç ölümü mesajı
         // yazıp sayacı eksik bırakmaz. Sayaç grup belgesinde değil, her üyenin
         // kendi gelen kutusunda (services/groupsService.js).
-        queueGroupUnreadIncrements(batch, chatId, groupData?.members, currentUser.uid);
+        queueGroupUnreadIncrements(batch, chatId, groupMembers, currentUser.uid);
         return;
       }
       // 1-1'de sohbet belgesi (chats/{chatId}) mesaj başına YAZILMAZ: eskiden
@@ -1409,13 +1410,25 @@ export default function ChatScreen({ route, navigation }) {
   const postMessage = useCallback(
     async (messageData, previewText) => {
       const { message, invitation } = prepareOutgoingMessage(messageData);
+      // Grup belgesi dinleyiciden henüz gelmediyse (sohbet yeni açıldı ya da
+      // dinleyici düştü) üyeler gönderim anında okunur; yoksa diğer üyelerin
+      // okunmamış sayacı bu mesajda artmazdı. Okuma düşerse eski davranış.
+      let groupMembers = groupData?.members;
+      if (isGroup && !Array.isArray(groupMembers)) {
+        try {
+          const snap = await getDoc(chatRef);
+          groupMembers = snap.exists() ? snap.data()?.members : undefined;
+        } catch (error) {
+          if (__DEV__) console.warn("grup üyeleri okunamadı:", error?.message);
+        }
+      }
       const batch = writeBatch(db);
       batch.set(doc(messagesRef), message);
-      queueThreadWrites(batch, previewText);
+      queueThreadWrites(batch, previewText, groupMembers);
       await batch.commit();
       notifyInvitation(previewText, invitation);
     },
-    [messagesRef, queueThreadWrites, notifyInvitation],
+    [messagesRef, queueThreadWrites, notifyInvitation, isGroup, groupData, chatRef],
   );
 
   // Mesajlar listesindeki önizlemeyi sohbetin GÜNCEL son mesajına eşitler (bkz.
