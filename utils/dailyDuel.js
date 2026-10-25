@@ -65,3 +65,30 @@ export function duelPayloadFromResult(result, { dayKey, host } = {}) {
     host,
   };
 }
+
+/**
+ * Düello SONUCU kartının izleyiciye göre düzeni (mesaj kind: "duelResultShare"). `guest` = kabul eden
+ * (mesajın göndereni), `host` = meydan okuyan. İzleyici kendi tarafını SOLDA görür; grupta üçüncü kişi
+ * için sol kabul eden, sağ meydan okuyandır.
+ *
+ * @returns {{
+ *   role: "guest"|"host"|"other",
+ *   left: { side: "guest"|"host", score: number|null },
+ *   right: { side: "guest"|"host", score: number|null },
+ *   verdict: "win"|"lose"|"tie"|"decided"|null,   // "decided": üçüncü kişi için kazanan belli
+ *   winner: "guest"|"host"|null,
+ *   diff: number,
+ * }}
+ */
+export function duelResultView({ viewerUid, guestUid, hostUid, guestScore, hostScore }) {
+  const role = viewerUid && viewerUid === guestUid ? "guest" : viewerUid && viewerUid === hostUid ? "host" : "other";
+  const guest = { side: "guest", score: Number.isFinite(guestScore) ? guestScore : null };
+  const host = { side: "host", score: Number.isFinite(hostScore) ? hostScore : null };
+  const [left, right] = role === "host" ? [host, guest] : [guest, host];
+  if (guest.score === null || host.score === null) {
+    return { role, left, right, verdict: null, winner: null, diff: 0 };
+  }
+  const winner = guest.score > host.score ? "guest" : guest.score < host.score ? "host" : null;
+  const verdict = winner === null ? "tie" : role === "other" ? "decided" : winner === role ? "win" : "lose";
+  return { role, left, right, verdict, winner, diff: Math.abs(guest.score - host.score) };
+}

@@ -85,6 +85,8 @@ import { avatarSnapshot } from "@utils/avatarPhotos";
 import { useUserProfile } from "@context/UserProfileContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
 import { prepareOutgoingMessage } from "@utils/chatPush";
+import { invitationFieldsFromShare } from "@utils/importantInvites";
+import { acceptMatchingInvitations } from "@services/notificationsService";
 import { applyReceipts, newestIncoming, shouldMarkRead } from "@utils/chatReceipts";
 import { createMessagePager } from "@services/chatMessagePager";
 import { isOnlineVisible } from "@services/presenceService";
@@ -771,6 +773,34 @@ export default function ChatScreen({ route, navigation }) {
     [rootCol, chatId],
   );
   const chatRef = useMemo(() => doc(db, rootCol, chatId), [rootCol, chatId]);
+
+  // Davet kartları (CineSwipe odası, günlük düello) kabul edilince sonucun yazılacağı sohbet: bu sohbet.
+  // Alan adları ekran parametreleriyle aynı (utils/importantInvites.chatTargetOf).
+  const resolvedChatName = isGroup
+    ? groupData?.name || groupName || ""
+    : friendIdentity.displayName || friendName || "";
+  const chatTarget = useMemo(
+    () =>
+      isGroup
+        ? { groupId, groupName: resolvedChatName }
+        : { friendUid, friendName: resolvedChatName },
+    [isGroup, groupId, friendUid, resolvedChatName],
+  );
+
+  // Davet karttan kabul edildi: aynı davetin bildirim kaydı da "kabul edildi" olsun, Profil'deki önemli
+  // davetler çubuğu aynı şeyi yeniden sormasın. Hata kabulü engellemez (çubuk en kötü daveti gösterir).
+  const acceptInviteFromCard = useCallback(
+    (share, senderUid) => {
+      const invitation = invitationFieldsFromShare(share);
+      if (!invitation || !senderUid || senderUid === currentUser.uid) return;
+      acceptMatchingInvitations(currentUser.uid, {
+        ...invitation,
+        fromUid: senderUid,
+        groupId: isGroup ? groupId : null,
+      }).catch(() => {});
+    },
+    [currentUser.uid, isGroup, groupId],
+  );
 
   const currentUserIsCreator = isGroupCreator(groupData, currentUser.uid);
   const currentUserCanManageGroup = canManageGroup(groupData, currentUser.uid);
@@ -1943,6 +1973,8 @@ export default function ChatScreen({ route, navigation }) {
           onOpenList={openListSheet}
           onReply={beginReply}
           onJumpToMessage={jumpToMessage}
+          chatTarget={chatTarget}
+          onAcceptInvite={acceptInviteFromCard}
           highlighted={highlightedMessageId === item.id}
           entrance={
             reduceMotion
@@ -1970,6 +2002,8 @@ export default function ChatScreen({ route, navigation }) {
       openListSheet,
       beginReply,
       jumpToMessage,
+      chatTarget,
+      acceptInviteFromCard,
       highlightedMessageId,
     ],
   );

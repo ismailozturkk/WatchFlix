@@ -32,6 +32,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { snapshotErrorHandler } from "../utils/firestoreError";
+import { matchingInvitationIds } from "../utils/importantInvites";
 import { trackFirestoreRead } from "./usageTrackerService";
 
 const PAGE = 30;
@@ -116,6 +117,23 @@ export async function respondToInvitation(uid, notifId, response) {
     }
     return true;
   });
+}
+
+/**
+ * An invitation accepted from its chat card also accepts its inbox record, so the priority bar on
+ * Profile (ImportantInvitesBar) stops asking. Reads only that sender's records (single equality query,
+ * no composite index); matching rule: utils/importantInvites.matchingInvitationIds.
+ * @returns {Promise<number>} records marked "accepted"
+ */
+export async function acceptMatchingInvitations(uid, match) {
+  if (!uid || !match?.type || !match?.fromUid) return 0;
+  const snap = await getDocs(
+    query(collection(db, "Users", uid, "notifications"), where("fromUid", "==", match.fromUid), limit(20)),
+  );
+  trackFirestoreRead("notifications", snap.docs.length);
+  const ids = matchingInvitationIds(snap.docs.map((d) => ({ id: d.id, ...d.data() })), match);
+  const saved = await Promise.all(ids.map((id) => respondToInvitation(uid, id, "accepted").catch(() => false)));
+  return saved.filter(Boolean).length;
 }
 
 /**

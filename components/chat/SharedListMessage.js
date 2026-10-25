@@ -10,6 +10,10 @@
 // ile aynı görünüm); balon HİÇBİR ZAMAN uzamaz, bu yüzden uzun listeler sohbeti
 // aşağı kaydırmaz. Yalnız GELEN balonda "Listeyi kaydet" düğmesi vardır.
 //
+// `source: "cineswipe"`: bir CineSwipe odasının ortak eşleşmeleri (oda bitince davetin geldiği sohbete
+// yazılır, bkz. screens/cineswipe/CineSwipeScreen). Başlık iki kişinin adı; üst etiket, simge ve renk
+// CineSwipe'ın (davet kartıyla aynı gül rengi).
+//
 // Gövde yazmaz ve gezinmez: dokunuşlar `onOpenItem` / `onOpenList` / `onSave`
 // ile bildirilir, kararı ChatScreen verir.
 
@@ -22,6 +26,9 @@ import { getListAccent, getListIcon, getSharedListAccent } from "../../utils/lis
 import { formatMinutes, sumListMinutes } from "../../utils/mediaFacts";
 import PosterStrip, { stripLayout } from "./PosterStrip";
 import { sharePalette } from "./shareKit";
+
+// CineSwipe'ın kimlik rengi (SharedCineRoomMessage ile aynı).
+const CINE_ROSE = "#E11D48";
 
 const DEFAULT_LABELS = {
   watchedMovies: () => i18nText("autoI18n.izlenen_filmler", "İzlenen Filmler"),
@@ -50,11 +57,14 @@ function SharedListMessage({
   const items = share?.items || [];
   const total = share?.total ?? items.length;
   const isShared = share?.source === "shared";
+  const isCine = share?.source === "cineswipe";
   const listAccent = share?.listKey
     ? getListAccent(share.listKey)
     : isShared
       ? getSharedListAccent()
-      : propAccent || theme.accent || "#6C63FF";
+      : isCine
+        ? CINE_ROSE
+        : propAccent || theme.accent || "#6C63FF";
   const palette = useMemo(
     () => sharePalette({ theme, isOutgoing, accent: listAccent }),
     [theme, isOutgoing, listAccent],
@@ -78,7 +88,9 @@ function SharedListMessage({
 
   const canOpen = typeof onOpenList === "function";
   const canSave = !isOutgoing && typeof onSave === "function";
-  const countText = i18nText("autoI18n.n_icerik", "{{n}} içerik", { n: total });
+  const countText = isCine
+    ? i18nText("autoI18n.paylas_cine_n_eslesme", "{{n}} ortak eşleşme", { n: total })
+    : i18nText("autoI18n.n_icerik", "{{n}} içerik", { n: total });
   const openLabel = i18nText("autoI18n.liste_paylas_listeyi_gor", "Listeyi gör");
 
   const HeaderWrap = canOpen ? TouchableOpacity : View;
@@ -97,7 +109,7 @@ function SharedListMessage({
       <HeaderWrap {...headerProps} style={[styles.header, { width: layout.blockWidth }]}>
         <View style={[styles.headerTile, { backgroundColor: palette.tile }]}>
           <Ionicons
-            name={isShared ? "people" : getListIcon(share?.listKey)}
+            name={isShared ? "people" : isCine ? "film" : getListIcon(share?.listKey)}
             size={15}
             color={palette.tileInk}
           />
@@ -110,7 +122,9 @@ function SharedListMessage({
           >
             {isShared
               ? i18nText("autoI18n.ortak_liste", "ORTAK LİSTE")
-              : i18nText("autoI18n.liste_2", "Liste")}
+              : isCine
+                ? i18nText("autoI18n.paylas_cine_eslesme_baslik", "CineSwipe eşleşmeleri")
+                : i18nText("autoI18n.liste_2", "Liste")}
           </Text>
           <Text style={[styles.title, { color: palette.primary }]} numberOfLines={2}>
             {shareListTitle(share)}

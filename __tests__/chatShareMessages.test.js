@@ -12,6 +12,7 @@ import {
   buildAiShare,
   buildChallengeShare,
   buildCineRoomShare,
+  buildDuelResultShare,
   buildListShare,
   buildPostShare,
   buildShareMessage,
@@ -97,6 +98,8 @@ jest.mock("../components/chat/SharedMediaCollection", () => ({ __esModule: true,
 jest.mock("../components/chat/SharedMediaMessage", () => ({ __esModule: true, default: "MediaBody" }));
 // Düello kartı gezinme/plan/Firestore kancaları kullanır; gövdesi __tests__/dailyDuel.test.js'te sınanır.
 jest.mock("../components/chat/SharedChallengeMessage", () => ({ __esModule: true, default: "ChallengeBody" }));
+// Düello sonucu kartı da tablo okur; gövdesi __tests__/inviteResults.test.js'te sınanır.
+jest.mock("../components/chat/SharedDuelResultMessage", () => ({ __esModule: true, default: "DuelResultBody" }));
 
 const getTmdbUrl = (path, _type, width) => `https://img.test/w${width}${path}`;
 
@@ -797,5 +800,80 @@ describe("MessageBubble: hub paylaşımları", () => {
     const item = { ...incoming(buildCineRoomShare({ code: "749215" })), senderId: "me" };
     const root = render(<MessageBubble {...base} navigation={{ push: jest.fn() }} item={item} />).root;
     expect(byLabel(root, "Odaya katıl")).toBeUndefined();
+  });
+
+  test("joining from the chat card carries this chat and accepts the matching invitation", () => {
+    const navigation = { push: jest.fn() };
+    const onAcceptInvite = jest.fn();
+    const chatTarget = { friendUid: "them", friendName: "Ali" };
+    const share = buildCineRoomShare({ code: "749215" });
+    const root = render(
+      <MessageBubble
+        {...base}
+        navigation={navigation}
+        item={incoming(share)}
+        chatTarget={chatTarget}
+        onAcceptInvite={onAcceptInvite}
+      />,
+    ).root;
+    press(byLabel(root, "Odaya katıl"));
+    expect(onAcceptInvite).toHaveBeenCalledWith(expect.objectContaining({ code: "749215" }), "them");
+    expect(navigation.push).toHaveBeenCalledWith("CineSwipeScreen", {
+      initialMode: "duo",
+      inviteCode: "749215",
+      inviteChat: chatTarget,
+    });
+  });
+
+  test("the challenge body gets this chat and an accept callback", () => {
+    const onAcceptInvite = jest.fn();
+    const chatTarget = { groupId: "g1", groupName: "Sinema" };
+    const share = buildChallengeShare({ dayKey: "2026-10-21", score: 7450, host: "Ali" });
+    const root = render(
+      <MessageBubble
+        {...base}
+        navigation={{ push: jest.fn() }}
+        item={incoming(share)}
+        chatTarget={chatTarget}
+        onAcceptInvite={onAcceptInvite}
+      />,
+    ).root;
+    const body = root.findByType("ChallengeBody");
+    expect(body.props.chatTarget).toBe(chatTarget);
+    act(() => body.props.onAccepted());
+    expect(onAcceptInvite).toHaveBeenCalledWith(expect.objectContaining({ type: "challenge" }), "them");
+  });
+
+  test("a duel result is drawn with the result body (sender = the player who accepted)", () => {
+    const share = buildDuelResultShare({ dayKey: "2026-10-21", hostUid: "me", host: "Ben", guestScore: 8200, hostScore: 7450 });
+    const item = { ...incoming(share), senderName: "Ali" };
+    const root = render(<MessageBubble {...base} navigation={{ push: jest.fn() }} item={item} />).root;
+    const body = root.findByType("DuelResultBody");
+    expect(body.props.share).toMatchObject({ type: "duelResult", guestScore: 8200, hostScore: 7450, hostUid: "me" });
+    expect(body.props.senderUid).toBe("them");
+    expect(incoming(share).text).toMatch(/^⚔️ /);
+  });
+
+  test("CineSwipe matches arrive as a saveable list with the CineSwipe label", () => {
+    const share = buildListShare({
+      title: "Ali & Ayşe",
+      items: [
+        { id: 1, title: "Dune", media_type: "movie", poster_path: "/d.jpg" },
+        { id: 2, name: "Dark", media_type: "tv", poster_path: "/k.jpg" },
+      ],
+      source: "cineswipe",
+    });
+    expect(share.source).toBe("cineswipe");
+    const onSaveList = jest.fn();
+    const root = render(
+      <MessageBubble {...base} navigation={{ push: jest.fn() }} item={incoming(share)} onSaveList={onSaveList} />,
+    ).root;
+    const texts = textOf(root);
+    expect(texts).toContain("CineSwipe eşleşmeleri");
+    expect(texts).toContain("Ali & Ayşe");
+    expect(texts).toContain("2 ortak eşleşme");
+    expect(incoming(share).text).toBe("🎬 CineSwipe · 2 ortak eşleşme");
+    press(byLabel(root, "Listeyi kaydet"));
+    expect(onSaveList).toHaveBeenCalledTimes(1);
   });
 });

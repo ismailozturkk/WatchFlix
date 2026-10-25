@@ -85,6 +85,7 @@ const LOCAL_PROGRESS_KEYS = Object.freeze([
   Keys.olderGame,
   Keys.followedPeople,
   Keys.cineLastResult,
+  Keys.cineResultHistory,
   Keys.aiCineConversations,
   // Etkinliklerim > Taslaklar / Story + not madde taslakları.
   Keys.postDrafts,

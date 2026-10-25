@@ -10,6 +10,10 @@
 // tablodan okunur (hooks/useDuelStatus). Tablo okunamazsa karttaki skor gösterilir ve karşılaştırma yapılmaz.
 //
 // Gönderen kendi kartında eylem/sorgu görmez. Metinler ALICININ diliyle (utils/dailyDuelCopy).
+//
+// Kabul, oyuna düello bağlamını verir (`chatTarget` = bu sohbet, utils/importantInvites.duelContextOf):
+// oyun bitince sonuç ekranı iki skoru bu sohbete bir "düello sonucu" kartı olarak yazar ve aynı davetin
+// Profil'deki bildirimi de "kabul edildi" olur (`onAccepted`).
 
 import React, { memo, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
@@ -21,10 +25,9 @@ import { usePremiumGate } from "../../hooks/usePremiumGate";
 import useDuelStatus from "../../hooks/useDuelStatus";
 import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
 import { intlLocaleOf } from "../../utils/appLanguages";
-import { DAILY_MODE_ID, DAILY_SOURCE_ID } from "../../utils/dailyChallenge";
 import { formatDuelScore } from "../../utils/dailyDuel";
 import { getDuelCopy } from "../../utils/dailyDuelCopy";
-import { SCENE_GAME_ID } from "../../screens/game/gameConfig";
+import { dailyDuelRoute, duelContextOf } from "../../utils/importantInvites";
 import GlassPressable from "../common/GlassPressable";
 import { sharePalette } from "./shareKit";
 
@@ -42,7 +45,7 @@ function dayLabel(dayKey, locale) {
   }
 }
 
-function SharedChallengeMessage({ share, isOutgoing = false, senderUid }) {
+function SharedChallengeMessage({ share, isOutgoing = false, senderUid, chatTarget, onAccepted }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const navigation = useNavigation();
@@ -60,13 +63,12 @@ function SharedChallengeMessage({ share, isOutgoing = false, senderUid }) {
       gamesGate.showUpsell();
       return;
     }
-    navigation.navigate("SceneGamePlayScreen", {
-      gameId: SCENE_GAME_ID,
-      modeId: DAILY_MODE_ID,
-      difficultyId: "normal",
-      sourceId: DAILY_SOURCE_ID,
-    });
-  }, [gamesGate, navigation]);
+    onAccepted?.();
+    const route = dailyDuelRoute(
+      duelContextOf({ dayKey: share.dayKey, hostUid: senderUid, hostName: share.host, chat: chatTarget }),
+    );
+    navigation.navigate(route.name, route.params);
+  }, [gamesGate, navigation, onAccepted, share.dayKey, share.host, senderUid, chatTarget]);
 
   const title = isOutgoing
     ? copy.titleOut

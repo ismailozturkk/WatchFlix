@@ -418,6 +418,15 @@ const dataKeys = {
     default: null,
     scope: "user",
   },
+  // CineSwipe çift oda GEÇMİŞİ (services/cineswipe/cineResultsStore.js): en yeni başta, en çok 20 tur;
+  // her kayıt cineLastResult ile aynı şekil (roomId, room, summary) + finishedAt. Yalnız bu cihazda.
+  cineResultHistory: {
+    key: "cineswipe_history_",
+    type: TYPES.json,
+    default: [],
+    scope: "user",
+    validate: Array.isArray,
+  },
   // ---- Kullanıcıya bağlı içerik ------------------------------------------
   //
   // GİZLİLİK DÜZELTMESİ: bu beş anahtar geçiş öncesinde uid'SİZ globaldi

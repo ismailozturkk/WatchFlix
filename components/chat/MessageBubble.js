@@ -26,6 +26,7 @@ import PollMessage from "./PollMessage";
 import SharedAiMessage from "./SharedAiMessage";
 import SharedCineRoomMessage from "./SharedCineRoomMessage";
 import SharedChallengeMessage from "./SharedChallengeMessage";
+import SharedDuelResultMessage from "./SharedDuelResultMessage";
 import SharedListMessage from "./SharedListMessage";
 import SharedMediaCollection from "./SharedMediaCollection";
 import SharedMediaMessage from "./SharedMediaMessage";
@@ -51,9 +52,10 @@ export const openMediaDetail = (navigation, m) => {
   navigation.push(route, params);
 };
 
-// Hedefi olan paylaşımlar (gönderi, turnuva, CineSwipe daveti) kendi ekranına gider.
-const openShareTarget = (navigation, share) => {
-  const route = shareRoute(share);
+// Hedefi olan paylaşımlar (gönderi, turnuva, CineSwipe daveti) kendi ekranına gider. CineSwipe
+// davetinde `inviteChat` bu sohbettir: oda bitince ortak eşleşmeler buraya yazılır.
+const openShareTarget = (navigation, share, inviteChat) => {
+  const route = shareRoute(share, { inviteChat });
   if (route) navigation.push(route.name, route.params);
 };
 
@@ -93,6 +95,8 @@ const MessageBubble = memo(
     onOpenList,
     onReply,
     onJumpToMessage,
+    chatTarget,
+    onAcceptInvite,
     highlighted,
     entrance,
   }) => {
@@ -300,12 +304,28 @@ const MessageBubble = memo(
             <SharedCineRoomMessage
               share={share}
               isOutgoing={isMe}
-              onOpen={() => openShareTarget(navigation, share)}
+              onOpen={() => {
+                onAcceptInvite?.(share, item.senderId);
+                openShareTarget(navigation, share, chatTarget);
+              }}
             />
           ) : share?.type === "tasteMatch" ? (
             <SharedTasteMatchMessage share={share} isOutgoing={isMe} getTmdbUrl={getTmdbUrl} />
           ) : share?.type === "challenge" ? (
-            <SharedChallengeMessage share={share} isOutgoing={isMe} senderUid={item.senderId} />
+            <SharedChallengeMessage
+              share={share}
+              isOutgoing={isMe}
+              senderUid={item.senderId}
+              chatTarget={chatTarget}
+              onAccepted={onAcceptInvite ? () => onAcceptInvite(share, item.senderId) : undefined}
+            />
+          ) : share?.type === "duelResult" ? (
+            <SharedDuelResultMessage
+              share={share}
+              isOutgoing={isMe}
+              senderUid={item.senderId}
+              senderName={senderName}
+            />
           ) : hasItems ? (
             <SharedMediaCollection
               items={item.items}

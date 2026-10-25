@@ -54,9 +54,11 @@ import {
   subscribeToCineRoom,
   summarizeCineRoom,
 } from "../../services/cineswipe/cineswipeService";
-import { persistCineResults } from "../../services/cineswipe/cineResultsStore";
+import { persistCineResults, readCineHistory, recordCineHistory } from "../../services/cineswipe/cineResultsStore";
 import ShareToChatSheet from "../../components/chat/ShareToChatSheet";
-import { buildCineRoomShare, chatParamsForShare } from "../../utils/chatShare";
+import useChatOutbox from "../../hooks/useChatOutbox";
+import { buildCineRoomShare, buildListShare, chatParamsForShare } from "../../utils/chatShare";
+import { chatTargetKey } from "../../utils/importantInvites";
 import { trackEvent, ANALYTICS_EVENTS } from "../../services/analytics";
 import {
   basketListName,
@@ -75,6 +77,9 @@ import { Keys, get, subscribe } from "../../services/storage";
 
 const IDLE_ROOM = { state: "idle", id: null };
 
+// Ortak eşleşmeleri sohbete yazılmış odalar (aynı oda iki kez yazılmasın; ekran yeniden açılsa da).
+const postedRooms = new Set();
+
 export default function CineSwipeScreen({ route, navigation }) {
   const { theme } = useTheme();
   const colors = useMemo(() => cineColors(theme), [theme]);
@@ -83,11 +88,23 @@ export default function CineSwipeScreen({ route, navigation }) {
   const { t, language } = useLanguage();
   const uid = user?.uid || null;
   const resultText = t.cineRoomResults;
+  const resultTextRef = useRef(resultText);
+  resultTextRef.current = resultText;
   const joinText = t.cineRoomJoin;
 
   // Sohbetteki CineSwipe davetinden gelindiyse (utils/chatShare.shareRoute) oda
   // kodu kutuya HAZIR yazılır; katılmak için "Katıl"a basmak alıcıya kalır.
   const inviteCode = extractRoomCode(route?.params?.inviteCode || "");
+  // Davetin geldiği sohbet (üst bardaki davet ya da sohbetteki kart, bkz. utils/importantInvites):
+  // bu koda katılan misafir oda bitince ortak eşleşmeleri oraya yazar. Kuran taraf yazmaz — tek yazar.
+  const inviteChat = inviteCode && chatTargetKey(route?.params?.inviteChat) ? route.params.inviteChat : null;
+  const inviteRef = useRef(null);
+  inviteRef.current = inviteChat ? { code: inviteCode, chat: inviteChat } : null;
+  // Ref: oda dinleyicisinin efekti receiveResults'a bağlı; gönderen kimliği/arkadaş listesi değişince
+  // dinleyici yeniden kurulmasın.
+  const postToChat = useChatOutbox();
+  const postToChatRef = useRef(postToChat);
+  postToChatRef.current = postToChat;
   const [mode, setMode] = useState(
     route?.params?.initialMode === "duo" || inviteCode || route?.params?.together ? "duo" : "solo",
   );
@@ -115,6 +132,7 @@ export default function CineSwipeScreen({ route, navigation }) {
   const [allMatches, setAllMatches] = useState([]);
   const [result, setResult] = useState(null);
   const [lastResult, setLastResult] = useState(() => (uid ? get(Keys.cineLastResult, { uid }) : null));
+  const [history, setHistory] = useState(() => readCineHistory(uid));
   const [cleanupError, setCleanupError] = useState(false);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState(null);
@@ -185,7 +203,19 @@ export default function CineSwipeScreen({ route, navigation }) {
   // Son sonuç başka yerden silinirse (hesap sıfırlama) ekran eski sonucu göstermesin.
   useEffect(() => {
     if (!uid) return undefined;
-    return subscribe(Keys.cineLastResult, () => setLastResult(get(Keys.cineLastResult, { uid })), { uid });
+    const unsubLast = subscribe(
+      Keys.cineLastResult,
+      () => {
+        setLastResult(get(Keys.cineLastResult, { uid }));
+        setHistory(readCineHistory(uid));
+      },
+      { uid },
+    );
+    const unsubHistory = subscribe(Keys.cineResultHistory, () => setHistory(readCineHistory(uid)), { uid });
+    return () => {
+      unsubLast();
+      unsubHistory();
+    };
   }, [uid]);
 
   useEffect(() => {
@@ -194,6 +224,7 @@ export default function CineSwipeScreen({ route, navigation }) {
     autoJoinCode.current = null;
     setJoining(false);
     setLastResult(uid ? get(Keys.cineLastResult, { uid }) : null);
+    setHistory(readCineHistory(uid));
     resetRoom();
   }, [uid, resetRoom]);
 
@@ -385,6 +416,31 @@ export default function CineSwipeScreen({ route, navigation }) {
   }, [winnerKey, mode, view.winner]);
 
   // ── Duo: oda yaşam döngüsü ─────────────────────────────────────────────────
+  // Davetle (üst bar / sohbet kartı) bu odaya katılan misafir, ortak eşleşmeleri davetin geldiği sohbete
+  // kaydedilebilir bir liste kartı olarak yazar. Eşleşme yoksa yazılmaz (boş liste kartı olmaz).
+  const shareMatchesToInviteChat = useCallback(
+    (rId, roomData, summary) => {
+      const invite = inviteRef.current;
+      if (!invite || !uid || roomData.guestUid !== uid || postedRooms.has(rId)) return;
+      if (extractRoomCode(String(roomData.roomCode || "")) !== invite.code) return;
+      const share = buildListShare({
+        title: [roomData.hostName, roomData.guestName].filter(Boolean).join(" & "),
+        items: summary.matches.map((media) => ({ ...media, media_type: media.mediaType })),
+        source: "cineswipe",
+      });
+      if (!share) return;
+      postedRooms.add(rId);
+      postToChatRef.current(invite.chat, share)
+        .then(() => Toast.show({ type: "success", text1: resultTextRef.current.postedToChat }))
+        .catch((error) => {
+          postedRooms.delete(rId);
+          if (__DEV__) console.warn("cineMatchesToChat:", error?.message);
+          Toast.show({ type: "error", text1: resultTextRef.current.postToChatFailed });
+        });
+    },
+    [uid],
+  );
+
   const receiveResults = useCallback(
     async (rId, roomData) => {
       const summary = summarizeCineRoom(roomData);
@@ -414,6 +470,9 @@ export default function CineSwipeScreen({ route, navigation }) {
       setRoomId(null); // Beklenen sunucu silmesinden önce ayrıl; yerel sonuç kalır.
       setSavingSwipe(false);
       triggerHaptic("notification");
+      // Geçmiş turlar: oda sunucuda silinse de eşleşmeler bu cihazda kalır (lobideki "Geçmiş turlar").
+      if (recordCineHistory(finalResult, uid)) setHistory(readCineHistory(uid));
+      shareMatchesToInviteChat(rId, roomData, summary);
       const session = roomSession.current;
       try {
         const saved = await persistCineResults(finalResult, uid);
@@ -428,7 +487,7 @@ export default function CineSwipeScreen({ route, navigation }) {
         }
       }
     },
-    [uid, showRoomError],
+    [uid, showRoomError, shareMatchesToInviteChat],
   );
 
   const retryResultSave = async () => {
@@ -702,13 +761,17 @@ export default function CineSwipeScreen({ route, navigation }) {
     }
   };
 
-  const openLastResult = () => {
-    if (!lastResult?.room || !lastResult?.summary) return;
-    setResult(lastResult);
-    setCleanupError(!!lastResult.receiptPending);
-    setCurrentRoomData(lastResult.room);
-    setAllMatches(lastResult.summary.matches);
-    setPartnerName(lastResult.room.hostUid === uid ? lastResult.room.guestName : lastResult.room.hostName);
+  // Geçmişten bir tur: en yenisi "son sonuç"tur ve teslim onayı bekliyorsa yeniden deneme yolu açılır
+  // (persistCineResults); eski turlarda onay zaten verilmiş ya da artık önemsiz.
+  const openSavedResult = (roomIdToOpen) => {
+    const saved =
+      lastResult?.roomId === roomIdToOpen ? lastResult : history.find((entry) => entry.roomId === roomIdToOpen);
+    if (!saved?.room || !saved?.summary) return;
+    setResult(saved);
+    setCleanupError(!!saved.receiptPending);
+    setCurrentRoomData(saved.room);
+    setAllMatches(saved.summary.matches);
+    setPartnerName(saved.room.hostUid === uid ? saved.room.guestName : saved.room.hostName);
     setSharedState("idle");
     setWatchlistState("idle");
     setRoomState("finished");
@@ -1023,8 +1086,10 @@ export default function CineSwipeScreen({ route, navigation }) {
             codeInputRef.current?.focus();
           }}
           onHub={returnToHub}
-          hasLastResult={!!lastResult}
-          onOpenLastResult={openLastResult}
+          history={history}
+          myUid={uid}
+          language={language}
+          onOpenResult={openSavedResult}
         />
       );
     }

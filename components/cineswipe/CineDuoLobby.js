@@ -5,7 +5,9 @@
 //     kod" demez) ve 6 hane dolunca "Katıl" belirginleşir.
 //   • "Panodan yapıştır": arkadaşın paylaştığı TÜM mesajdan kodu ayıklar.
 //   • Hata kartı sorunu ve çıkış yollarını (yeniden kod gir / Hub) birlikte verir.
-//   • Son oyun sonucu aynı kartın içinde, formun altında durur.
+//   • Geçmiş turlar formun altında: en yeni beş tur (partner, tarih, ortak eşleşme sayısı), fazlası
+//     "Tümünü göster" ile açılır. Bir tura basınca o turun sonuç sayfası açılır. Kayıtlar yalnız bu
+//     cihazda (services/cineswipe/cineResultsStore.readCineHistory).
 import React, { useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import AppIcon from "../AppIcon";
@@ -14,6 +16,19 @@ import PressableScale from "./PressableScale";
 import { alpha } from "../../theme/colors";
 import { sanitizeRoomCode } from "../../services/cineswipe/deckModel";
 import GlassTextInput from "../common/GlassTextInput";
+import { intlLocaleOf } from "../../utils/appLanguages";
+import { fillText } from "../../services/cineswipe/deckModel";
+
+const HISTORY_PREVIEW = 5;
+
+function historyDate(ms, locale) {
+  if (!Number.isFinite(ms)) return "";
+  try {
+    return new Date(ms).toLocaleDateString(locale, { day: "numeric", month: "short" });
+  } catch {
+    return "";
+  }
+}
 
 export default function CineDuoLobby({
   copy,
@@ -30,10 +45,15 @@ export default function CineDuoLobby({
   joinError,
   onRetryJoin,
   onHub,
-  hasLastResult,
-  onOpenLastResult,
+  history = [],
+  myUid,
+  language,
+  onOpenResult,
 }) {
   const [focused, setFocused] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const locale = intlLocaleOf(language);
+  const visibleHistory = showAll ? history : history.slice(0, HISTORY_PREVIEW);
   const ready = inputCode.length === 6 && !joining;
   const steps = [
     { icon: "add-circle-outline", label: copy.lobby.step1 },
@@ -175,16 +195,50 @@ export default function CineDuoLobby({
         </View>
       ) : null}
 
-      {hasLastResult ? (
-        <PressableScale
-          accessibilityRole="button"
-          onPress={onOpenLastResult}
-          style={[styles.last, { backgroundColor: alpha(colors.gold, 0.12), borderColor: alpha(colors.gold, 0.34) }]}
-        >
-          <AppIcon family="Ionicons" name="trophy-outline" size={18} color={colors.gold} />
-          <Text style={[styles.lastText, { color: colors.text }]}>{resultText.lastResult}</Text>
-          <AppIcon family="Ionicons" name="chevron-forward" size={16} color={colors.muted} />
-        </PressableScale>
+      {history.length ? (
+        <View style={styles.history}>
+          <Text style={[styles.historyTitle, { color: colors.muted }]}>{resultText.history}</Text>
+          {visibleHistory.map((entry) => {
+            const partner = entry.room.hostUid === myUid ? entry.room.guestName : entry.room.hostName;
+            const meta = [
+              historyDate(entry.finishedAt, locale),
+              fillText(resultText.historyMatches, { n: entry.summary.matches.length }),
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            return (
+              <PressableScale
+                key={entry.roomId}
+                accessibilityRole="button"
+                accessibilityLabel={`${partner || resultText.partner}, ${meta}`}
+                onPress={() => onOpenResult?.(entry.roomId)}
+                style={[styles.last, { backgroundColor: alpha(colors.gold, 0.1), borderColor: alpha(colors.gold, 0.3) }]}
+              >
+                <AppIcon family="Ionicons" name="trophy-outline" size={18} color={colors.gold} />
+                <View style={styles.lastCopy}>
+                  <Text style={[styles.lastText, { color: colors.text }]} numberOfLines={1}>
+                    {partner || resultText.partner}
+                  </Text>
+                  <Text style={[styles.lastMeta, { color: colors.muted }]} numberOfLines={1}>
+                    {meta}
+                  </Text>
+                </View>
+                <AppIcon family="Ionicons" name="chevron-forward" size={16} color={colors.muted} />
+              </PressableScale>
+            );
+          })}
+          {history.length > HISTORY_PREVIEW ? (
+            <PressableScale
+              accessibilityRole="button"
+              onPress={() => setShowAll((value) => !value)}
+              style={styles.more}
+            >
+              <Text style={[styles.moreText, { color: colors.accent }]}>
+                {showAll ? resultText.historyShowLess : resultText.historyShowAll}
+              </Text>
+            </PressableScale>
+          ) : null}
+        </View>
       ) : null}
     </ScrollView>
   );
@@ -342,19 +396,47 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
   },
+  history: {
+    marginTop: 18,
+    gap: 8,
+  },
+  historyTitle: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
   last: {
-    marginTop: 14,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     paddingHorizontal: 16,
-    height: 52,
+    minHeight: 56,
+    paddingVertical: 9,
     borderRadius: 16,
     borderWidth: 1,
   },
-  lastText: {
+  lastCopy: {
     flex: 1,
+    minWidth: 0,
+  },
+  lastText: {
     fontSize: 14,
+    fontWeight: "800",
+  },
+  lastMeta: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  more: {
+    alignSelf: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  moreText: {
+    fontSize: 13,
     fontWeight: "800",
   },
 });

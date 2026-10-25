@@ -271,6 +271,22 @@ describe("sohbet kartı", () => {
     expect(mockTrack).toHaveBeenCalledWith("duel_accepted", { locked: false });
   });
 
+  test("sohbetten kabul: oyun düello bağlamıyla açılır, bildirim kaydı da kabul edilir", async () => {
+    mockFetchRows.mockResolvedValue([{ uid: "host", bestScore: 7450 }]);
+    const onAccepted = jest.fn();
+    const chatTarget = { friendUid: "host", friendName: "Ali" };
+    await mount({ chatTarget, onAccepted });
+    act(() => accept().props.onPress());
+    expect(onAccepted).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith("SceneGamePlayScreen", {
+      gameId: "scene_guess",
+      modeId: "daily",
+      difficultyId: "normal",
+      sourceId: "daily",
+      duel: { dayKey: TODAY, hostUid: "host", hostName: "Ali", chat: chatTarget },
+    });
+  });
+
   test("planda oyun yoksa 'kabul et' yükseltme sayfasını açar, oyunu açmaz", async () => {
     mockGamesAllowed = false;
     mockFetchRows.mockResolvedValue([]);
@@ -403,7 +419,9 @@ describe("metin tablosu ve kaynak bekçileri", () => {
   test("metin tablosundaki her anahtar bir yerde kullanılıyor", () => {
     const used = [
       read("components/chat/SharedChallengeMessage.js"),
+      read("components/chat/SharedDuelResultMessage.js"),
       read("components/game/DuelSendButton.js"),
+      read("components/game/DuelReportStatus.js"),
     ].join("\n");
     const unused = Object.keys(DUEL_COPY.tr).filter((key) => !new RegExp(`copy\\.${key}\\b`).test(used));
     expect(unused).toEqual([]);

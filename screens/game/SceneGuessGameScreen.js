@@ -105,6 +105,9 @@ export default function SceneGuessGameScreen({ navigation, route }) {
   const routeGameId = route?.params?.gameId || SCENE_GAME_ID;
   const routeModeId = route?.params?.modeId || DEFAULT_MODE_ID;
   const routeDifficultyId = route?.params?.difficultyId || DEFAULT_DIFFICULTY_ID;
+  // Kabul edilen düello (üst bardaki davet ya da sohbetteki kart, bkz. utils/importantInvites
+  // .duelContextOf): sonuç ekranı skoru davetin geldiği sohbete yazar.
+  const routeDuel = route?.params?.duel || null;
 
   const {
     phase,
@@ -224,7 +227,10 @@ export default function SceneGuessGameScreen({ navigation, route }) {
     if (openedResultSessionRef.current === sessionId) return;
     openedResultSessionRef.current = sessionId;
     allowLeaveRef.current = true;
-    navigation.replace("SceneGameResultScreen", { sessionId });
+    // Düello yalnız AYNI günün günlük denemesine bağlanır (gün dönümünde açık kalan davet yeni günün
+    // skorunu eski düelloya yazmasın).
+    const duel = isDaily && routeDuel?.dayKey === dailyKey ? routeDuel : null;
+    navigation.replace("SceneGameResultScreen", { sessionId, ...(duel ? { duel } : {}) });
   }, [
     bestStreak,
     dailyKey,
@@ -237,6 +243,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
     round,
     routeDifficultyId,
     routeGameId,
+    routeDuel,
     routeModeId,
     saveStatsToFirebase,
     saveStatus,

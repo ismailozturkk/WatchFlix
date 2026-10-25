@@ -32,6 +32,8 @@ import { getGameEntry, resolveGameAccentColors } from "./gameRegistry";
 import { deleteGameSessionResult, getGameSessionResult } from "./gameSessionStore";
 import GlassTouchable from "../../components/common/GlassTouchable";
 import DuelSendButton from "../../components/game/DuelSendButton";
+import DuelReportStatus from "../../components/game/DuelReportStatus";
+import useDuelResultReport from "../../hooks/useDuelResultReport";
 import { duelPayloadFromResult } from "../../utils/dailyDuel";
 
 const SHARE_CARD_W = 320;
@@ -132,6 +134,16 @@ export default function SceneGameResultScreen({ navigation, route }) {
         : null,
     [isDaily, dailyKey, totalQuestions, result?.score, result?.totalCorrect],
   );
+  // Kabul edilen düello (üst bardaki davet / sohbetteki kart): iki skor davetin geldiği sohbete yazılır.
+  const duel = route.params?.duel || null;
+  const duelResult = useMemo(
+    () => ({ dailyKey, score: result?.score, correct: result?.totalCorrect, total: totalQuestions }),
+    [dailyKey, result?.score, result?.totalCorrect, totalQuestions],
+  );
+  const duelReport = useDuelResultReport({ duel: isDaily ? duel : null, sessionId, result: duelResult });
+  const openDuelChat = useCallback(() => {
+    if (duel?.chat) navigation.navigate("ChatScreen", duel.chat);
+  }, [duel, navigation]);
 
   // Yeni oyun bu ekranın YERİNE açılır; geri dönüş yine oyunun açıldığı yere.
   const replayWith = (params) => {
@@ -412,6 +424,15 @@ export default function SceneGameResultScreen({ navigation, route }) {
         <SecondaryAction icon="trophy-outline" label={tr ? "Liderlik" : es ? "Clasificación" : pt ? "Ranking" : de ? "Bestenliste" : "Leaderboard"} theme={theme} onPress={() => navigation.navigate("GameLeaderboardScreen", { gameId: result.gameId })} />
         <SecondaryAction icon={sharing ? null : "share-social-outline"} label={tr ? "Paylaş" : es ? "Compartir" : pt ? "Compartilhar" : de ? "Teilen" : "Share"} theme={theme} loading={sharing} onPress={handleShare} />
       </View>
+
+      {/* Kabul edilen düello: skorlar davetin geldiği sohbete yazıldı mı. */}
+      <DuelReportStatus
+        status={duelReport.status}
+        chatName={duel?.chat?.groupName || duel?.chat?.friendName || ""}
+        onOpenChat={openDuelChat}
+        onRetry={duelReport.retry}
+        theme={theme}
+      />
 
       {/* Günlük: sonucu bir arkadaşa düello olarak gönder (aynı 10 sahne, skorlar yan yana). */}
       {isDaily && duelPayload ? <DuelSendButton payload={duelPayload} theme={theme} source="result" /> : null}

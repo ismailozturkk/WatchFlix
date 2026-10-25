@@ -44,6 +44,7 @@ export const SHARE_KIND = Object.freeze({
   CINE_ROOM: "cineRoomShare",
   TASTE_MATCH: "tasteMatchShare",
   CHALLENGE: "challengeShare",
+  DUEL_RESULT: "duelResultShare",
 });
 
 export const SHARE_TYPE = Object.freeze({
@@ -54,6 +55,7 @@ export const SHARE_TYPE = Object.freeze({
   CINE_ROOM: "cineRoom",
   TASTE_MATCH: "tasteMatch",
   CHALLENGE: "challenge",
+  DUEL_RESULT: "duelResult",
 });
 
 const KIND_BY_TYPE = {
@@ -64,6 +66,7 @@ const KIND_BY_TYPE = {
   [SHARE_TYPE.CINE_ROOM]: SHARE_KIND.CINE_ROOM,
   [SHARE_TYPE.TASTE_MATCH]: SHARE_KIND.TASTE_MATCH,
   [SHARE_TYPE.CHALLENGE]: SHARE_KIND.CHALLENGE,
+  [SHARE_TYPE.DUEL_RESULT]: SHARE_KIND.DUEL_RESULT,
 };
 const SHARE_KINDS = Object.values(SHARE_KIND);
 
@@ -143,6 +146,10 @@ const idOf = (raw) => {
 
 // ─── Liste ───────────────────────────────────────────────────────────────────
 
+// Liste paylaşımının kaynağı: profil listesi, ortak liste ya da CineSwipe odasının
+// ortak eşleşmeleri. Tanınmayan kaynak düşürülür (kart düz liste olarak çizilir).
+export const LIST_SOURCES = Object.freeze(["profile", "shared", "cineswipe"]);
+
 /**
  * Profil/ortak liste öğesi veya paylaşım medyası → mesaja gömülecek kompakt medya.
  * Alan adları `utils/listShare.mediaToListItem` ile UYUMLU (alıcı "Listeyi kaydet"
@@ -190,7 +197,9 @@ export function toShareMedia(raw, { fallbackType = "movie" } = {}) {
  * @param {object[]} opts.items      Profil listesi öğeleri `{id,type,name,imagePath,…}`.
  * @param {string}  [opts.listKey]   Öntanımlı liste anahtarı (alıcı etiketi çevirir).
  * @param {string}  [opts.fallbackType]  Tür alanı olmayan öğeler için ("tv" listeleri).
- * @param {"profile"|"shared"} [opts.source]
+ * @param {"profile"|"shared"|"cineswipe"} [opts.source]
+ *   "cineswipe": bir CineSwipe odasının ortak eşleşmeleri (davetin geldiği sohbete
+ *   oda bitince yazılır); kart kendi başlığını ve rengini bu kaynaktan alır.
  */
 export function buildListShare({ title, items, listKey, fallbackType = "movie", source } = {}) {
   const seen = new Set();
@@ -215,7 +224,7 @@ export function buildListShare({ title, items, listKey, fallbackType = "movie", 
     items: media,
   };
   if (DEFAULT_LIST_KEYS.includes(listKey)) share.listKey = listKey;
-  if (source === "profile" || source === "shared") share.source = source;
+  if (LIST_SOURCES.includes(source)) share.source = source;
   return share;
 }
 
@@ -240,7 +249,7 @@ function sanitizeListShare(raw) {
     items,
   };
   if (DEFAULT_LIST_KEYS.includes(raw.listKey)) share.listKey = raw.listKey;
-  if (raw.source === "profile" || raw.source === "shared") share.source = raw.source;
+  if (LIST_SOURCES.includes(raw.source)) share.source = raw.source;
   return share;
 }
 
@@ -627,6 +636,52 @@ export function buildChallengeShare({ dayKey, score, correct, total, host } = {}
   return sanitizeChallengeShare({ dayKey, score, correct, total, host });
 }
 
+// ─── Düello sonucu ───────────────────────────────────────────────────────────
+
+// Firebase Auth uid'i (28 karakter) ve emülatör/test kimlikleri; yol ayırıcısı ya da boşluk taşımaz.
+const UID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+const duelScoreOf = (value) => {
+  // null/boş "skor yok" demek; Number(null) = 0 uydurma bir skor yazardı.
+  if (value === null || value === undefined || value === "") return null;
+  const score = Number(value);
+  return Number.isFinite(score) && score >= 0 ? Math.min(MAX_CHALLENGE_SCORE, Math.round(score)) : null;
+};
+
+function sanitizeDuelResultShare(raw) {
+  const dayKey = typeof raw.dayKey === "string" && CHALLENGE_DAY.test(raw.dayKey) ? raw.dayKey : null;
+  const hostUid = typeof raw.hostUid === "string" && UID_PATTERN.test(raw.hostUid) ? raw.hostUid : null;
+  const guestScore = duelScoreOf(raw.guestScore);
+  // Kimin meydan okuduğu bilinmeyen ya da kabul edenin skoru olmayan sonuç yazılmaz.
+  if (!dayKey || !hostUid || guestScore === null) return null;
+  const total = Math.max(1, Math.min(MAX_CHALLENGE_QUESTIONS, Math.round(Number(raw.total)) || 10));
+  const share = {
+    v: SHARE_VERSION,
+    type: SHARE_TYPE.DUEL_RESULT,
+    dayKey,
+    hostUid,
+    guestScore,
+    correct: Math.max(0, Math.min(total, Math.round(Number(raw.correct)) || 0)),
+    total,
+  };
+  const hostScore = duelScoreOf(raw.hostScore);
+  if (hostScore !== null) share.hostScore = hostScore;
+  const host = clip(raw.host, MAX_AUTHOR_NAME);
+  if (host) share.host = host;
+  const guest = clip(raw.guest, MAX_AUTHOR_NAME);
+  if (guest) share.guest = guest;
+  return share;
+}
+
+/**
+ * Kabul edilen günlük düellonun SONUCU: kabul eden oyunu bitirince davetin geldiği sohbete yazılır
+ * (mesajın göndereni = kabul eden, `hostUid` = meydan okuyan). Karttaki iki skor gönderenin cihazında
+ * yazıldığı için yalnız ilk görünümdür; kart iki tarafın skorunu günlük tablodan yeniden okur.
+ * `hostScore` yoksa (meydan okuyanın satırı okunamadı) kart onu tablodan bulmaya çalışır.
+ */
+export function buildDuelResultShare({ dayKey, hostUid, host, hostScore, guest, guestScore, correct, total } = {}) {
+  return sanitizeDuelResultShare({ dayKey, hostUid, host, hostScore, guest, guestScore, correct, total });
+}
+
 // ─── Ortak: doğrulama, okuma, önizleme ───────────────────────────────────────
 
 /** Bilinmeyen/bozuk gövde → null; geçerliyse temizlenmiş kopya. */
@@ -647,6 +702,8 @@ export function sanitizeShare(raw) {
       return sanitizeTasteMatchShare(raw);
     case SHARE_TYPE.CHALLENGE:
       return sanitizeChallengeShare(raw);
+    case SHARE_TYPE.DUEL_RESULT:
+      return sanitizeDuelResultShare(raw);
     default:
       return null;
   }
@@ -677,6 +734,11 @@ export function sharePreview(share) {
   if (!share) return "";
   switch (share.type) {
     case SHARE_TYPE.LIST:
+      if (share.source === "cineswipe") {
+        return i18nText("autoI18n.paylas_cine_eslesme_onizleme", "CineSwipe · {{n}} ortak eşleşme", {
+          n: share.total ?? share.items.length,
+        });
+      }
       return (
         share.title ||
         i18nText("autoI18n.n_icerik", "{{n}} içerik", { n: share.total ?? share.items.length })
@@ -696,6 +758,12 @@ export function sharePreview(share) {
       return i18nText("autoI18n.paylas_zevk_onizleme", "Zevk uyumu %{{n}}", { n: share.score });
     case SHARE_TYPE.CHALLENGE:
       return i18nText("autoI18n.paylas_meydan_onizleme", "Günlük meydan okuma · {{n}} puan", { n: share.score });
+    case SHARE_TYPE.DUEL_RESULT:
+      // Sıra kartla aynı: önce kabul eden (mesajın sahibi), sonra meydan okuyan.
+      return i18nText("autoI18n.paylas_duello_sonuc_onizleme", "Düello sonucu · {{a}} – {{b}}", {
+        a: share.guestScore,
+        b: share.hostScore ?? "?",
+      });
     default: {
       const head = titlesOf(share).slice(0, 3).join(", ");
       return head || firstLine(share.summary, 80) || share.question || "CineMatch";
@@ -712,7 +780,7 @@ export function shareMessageText(share) {
   let line;
   switch (share.type) {
     case SHARE_TYPE.LIST:
-      line = `📋 ${sharePreview(share)}`;
+      line = `${share.source === "cineswipe" ? "🎬" : "📋"} ${sharePreview(share)}`;
       break;
     case SHARE_TYPE.POST:
       line = `${POST_EMOJI[share.postType] || "📝"} ${sharePreview(share)}`;
@@ -727,6 +795,7 @@ export function shareMessageText(share) {
       line = `💞 ${sharePreview(share)}`;
       break;
     case SHARE_TYPE.CHALLENGE:
+    case SHARE_TYPE.DUEL_RESULT:
       line = `⚔️ ${sharePreview(share)}`;
       break;
     default:
@@ -760,6 +829,7 @@ export function shareThumb(share) {
       return share.champion?.poster_path || null;
     case SHARE_TYPE.CINE_ROOM:
     case SHARE_TYPE.CHALLENGE:
+    case SHARE_TYPE.DUEL_RESULT:
       return null;
     case SHARE_TYPE.TASTE_MATCH:
       return (share.items || []).find((item) => item.poster_path)?.poster_path || null;
@@ -780,15 +850,20 @@ export function shareThumb(share) {
  *
  * CineSwipe: oda kodu `inviteCode` ile gelir, ekran kodu kutuya HAZIR yazar ama
  * katılmayı alıcıya bırakır (katılmak oda hakkı / bildirim doğurabilir).
+ * `inviteChat` (davetin geldiği sohbet, bkz. utils/importantInvites.chatTargetOf)
+ * verilirse ekran oda bitince ortak eşleşmeleri o sohbete yazar.
  */
-export function shareRoute(share) {
+export function shareRoute(share, { inviteChat } = {}) {
   switch (share?.type) {
     case SHARE_TYPE.POST:
       return { name: "PostDetailScreen", params: { postId: share.postId } };
     case SHARE_TYPE.TOURNAMENT:
       return { name: "TournamentScreen", params: undefined };
     case SHARE_TYPE.CINE_ROOM:
-      return { name: "CineSwipeScreen", params: { initialMode: "duo", inviteCode: share.code } };
+      return {
+        name: "CineSwipeScreen",
+        params: { initialMode: "duo", inviteCode: share.code, ...(inviteChat ? { inviteChat } : {}) },
+      };
     default:
       return null;
   }

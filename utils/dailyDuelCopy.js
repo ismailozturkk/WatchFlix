@@ -1,8 +1,9 @@
 // utils/dailyDuelCopy.js
 //
-// "Arkadaşa meydan oku" (günlük düello) metinleri (tr / en / es / pt / de): sohbet kartı ve "meydan oku"
-// düğmesi. Saf veri — bkz. utils/socialLinksCopy.js. __tests__/copyTablesSpanish.test.js dillerin aynı şekle
-// sahip olduğunu, __tests__/dailyDuel.test.js "her anahtar kullanılıyor"u denetler.
+// "Arkadaşa meydan oku" (günlük düello) metinleri (tr / en / es / pt / de): sohbet kartı, "meydan oku"
+// düğmesi, düello SONUCU kartı ve sonuç ekranındaki "skorlar sohbete yazıldı" satırı. Saf veri — bkz.
+// utils/socialLinksCopy.js. __tests__/copyTablesSpanish.test.js dillerin aynı şekle sahip olduğunu,
+// __tests__/dailyDuel.test.js "her anahtar kullanılıyor"u denetler.
 
 import { copyLanguage } from "./appLanguages";
 
@@ -26,6 +27,16 @@ export const DUEL_COPY = {
     send: "Arkadaşına meydan oku",
     sendA11y: "Bugünkü sonucunla bir arkadaşına meydan oku",
     sendHint: "Aynı 10 sahneyi o da oynar, skorlar yan yana çıkar",
+    resultKicker: "DÜELLO SONUCU",
+    resultTitleOut: (host) => `${host} ile düellon`,
+    resultTitleHost: (guest) => `${guest} meydan okumanı kabul etti`,
+    resultTitleOther: (guest, host) => `${guest} – ${host}`,
+    leads: (name, diff) => `${name} kazandı · ${diff} puan fark`,
+    reportSending: "Skorlar sohbete yazılıyor…",
+    reportSent: (name) => (name ? `Skorlar sohbete yazıldı · ${name}` : "Skorlar sohbete yazıldı"),
+    reportFailed: "Skorlar sohbete yazılamadı",
+    reportRetry: "Yeniden dene",
+    openChat: "Sohbeti aç",
   },
   en: {
     kicker: "CHALLENGE",
@@ -46,6 +57,16 @@ export const DUEL_COPY = {
     send: "Challenge a friend",
     sendA11y: "Challenge a friend with today's result",
     sendHint: "They play the same 10 scenes and the scores appear side by side",
+    resultKicker: "DUEL RESULT",
+    resultTitleOut: (host) => `Your duel with ${host}`,
+    resultTitleHost: (guest) => `${guest} accepted your challenge`,
+    resultTitleOther: (guest, host) => `${guest} vs ${host}`,
+    leads: (name, diff) => `${name} won · by ${diff} pts`,
+    reportSending: "Posting the scores to the chat…",
+    reportSent: (name) => (name ? `Scores posted to the chat · ${name}` : "Scores posted to the chat"),
+    reportFailed: "Couldn't post the scores to the chat",
+    reportRetry: "Try again",
+    openChat: "Open chat",
   },
   es: {
     kicker: "RETO",
@@ -66,6 +87,16 @@ export const DUEL_COPY = {
     send: "Retar a un amigo",
     sendA11y: "Reta a un amigo con el resultado de hoy",
     sendHint: "Juega las mismas 10 escenas y los resultados aparecen juntos",
+    resultKicker: "RESULTADO DEL DUELO",
+    resultTitleOut: (host) => `Tu duelo con ${host}`,
+    resultTitleHost: (guest) => `${guest} aceptó tu reto`,
+    resultTitleOther: (guest, host) => `${guest} vs ${host}`,
+    leads: (name, diff) => `${name} ganó · por ${diff} pts`,
+    reportSending: "Enviando los resultados al chat…",
+    reportSent: (name) => (name ? `Resultados enviados al chat · ${name}` : "Resultados enviados al chat"),
+    reportFailed: "No se pudieron enviar los resultados al chat",
+    reportRetry: "Reintentar",
+    openChat: "Abrir chat",
   },
   pt: {
     kicker: "DESAFIO",
@@ -86,6 +117,16 @@ export const DUEL_COPY = {
     send: "Desafiar um amigo",
     sendA11y: "Desafie um amigo com o resultado de hoje",
     sendHint: "Ele joga as mesmas 10 cenas e os placares aparecem lado a lado",
+    resultKicker: "RESULTADO DO DUELO",
+    resultTitleOut: (host) => `Seu duelo com ${host}`,
+    resultTitleHost: (guest) => `${guest} aceitou seu desafio`,
+    resultTitleOther: (guest, host) => `${guest} vs ${host}`,
+    leads: (name, diff) => `${name} venceu · por ${diff} pts`,
+    reportSending: "Enviando os placares para o chat…",
+    reportSent: (name) => (name ? `Placares enviados ao chat · ${name}` : "Placares enviados ao chat"),
+    reportFailed: "Não foi possível enviar os placares ao chat",
+    reportRetry: "Tentar novamente",
+    openChat: "Abrir chat",
   },
   de: {
     kicker: "HERAUSFORDERUNG",
@@ -106,6 +147,16 @@ export const DUEL_COPY = {
     send: "Freund herausfordern",
     sendA11y: "Fordere einen Freund mit dem heutigen Ergebnis heraus",
     sendHint: "Er spielt dieselben 10 Szenen und die Ergebnisse stehen nebeneinander",
+    resultKicker: "DUELL-ERGEBNIS",
+    resultTitleOut: (host) => `Dein Duell mit ${host}`,
+    resultTitleHost: (guest) => `${guest} hat deine Herausforderung angenommen`,
+    resultTitleOther: (guest, host) => `${guest} gegen ${host}`,
+    leads: (name, diff) => `${name} hat gewonnen · mit ${diff} Pkt.`,
+    reportSending: "Ergebnisse werden in den Chat geschrieben…",
+    reportSent: (name) => (name ? `Ergebnisse im Chat · ${name}` : "Ergebnisse im Chat"),
+    reportFailed: "Ergebnisse konnten nicht in den Chat geschrieben werden",
+    reportRetry: "Erneut versuchen",
+    openChat: "Chat öffnen",
   },
 };
 
