@@ -156,8 +156,14 @@ function extendPromoUntil(currentUntilMs, nowMs, days) {
   return base + days * DAY_MS;
 }
 
-/** Aktif mağaza aboneliği var mı? (promosyon kaynaklı premium sayılmaz) */
+/**
+ * Aktif mağaza aboneliği var mı? (promosyon kaynaklı premium sayılmaz)
+ * `storeSubscribed`, RevenueCat'in gördüğü gerçek durumdur: daha yüksek bir
+ * promosyon planı üste çıkıp `premiumSource`'u "promo" yaptığında da abonelik
+ * görünür kalır (yoksa ödeme yapan kullanıcı promosyon kapılarından geçerdi).
+ */
 function hasActiveStoreSubscription(entitlements) {
+  if (entitlements?.storeSubscribed === true) return true;
   return (
     entitlements?.premium === true && entitlements?.premiumSource !== "promo"
   );

@@ -2,7 +2,7 @@
 //
 // `npm test` içinde ATLANIR (emülatör yoksa); çalıştırmak için kökten:
 //   export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" PATH="$JAVA_HOME/bin:$PATH"
-//   npx firebase emulators:exec --only firestore --project demo-referral \
+//   npx firebase emulators:exec --only firestore,auth --project demo-referral \
 //     "node --test functions/referral.integration.test.js"
 //
 // Neyi kanıtlar: transaction'ların gerçekten çalıştığı (sayaçlar, tek kullanım, tavan),
@@ -12,8 +12,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const emulator = process.env.FIRESTORE_EMULATOR_HOST;
-const skip = emulator ? false : "FIRESTORE_EMULATOR_HOST yok (emülatör gerekir)";
+// redeemCode kayıt tarihini Auth'tan okur ve okuyamazsa kodu reddeder; bu yüzden
+// Auth emülatörü de gerekir (test kullanıcıları mkUser'da orada da açılır).
+const emulator = process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST;
+const skip = emulator ? false : "Firestore + Auth emülatörü gerekir (--only firestore,auth)";
 
 if (!skip) {
   process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || "demo-referral";
@@ -26,6 +28,7 @@ const ENTITLEMENT = "com.smlztrk.seelogd Pro";
 
 let fns;
 let db;
+let auth;
 let FieldValue;
 let revenueCatState = null;
 
@@ -36,7 +39,7 @@ function setRevenueCat(state) {
 
 test.before(async () => {
   if (skip) return;
-  global.fetch = async () => ({
+  global.fetch = async () => revenueCatState === "fail" ? { ok: false, status: 503, json: async () => ({}) } : ({
     ok: true,
     json: async () => ({
       subscriber: {
@@ -55,6 +58,7 @@ test.before(async () => {
   fns = require("./index");
   const firestore = require("firebase-admin/firestore");
   db = firestore.getFirestore();
+  auth = require("firebase-admin/auth").getAuth();
   FieldValue = firestore.FieldValue;
 });
 
@@ -69,11 +73,17 @@ async function resetData() {
   ]) {
     await db.recursiveDelete(db.collection(name));
   }
+  const { users } = await auth.listUsers(1000);
+  if (users.length) await auth.deleteUsers(users.map((u) => u.uid));
   setRevenueCat(null);
 }
 
-const mkUser = (uid, extra = {}) =>
-  db.doc(`Users/${uid}`).set({ displayName: `Kisi ${uid}`, username: uid, avatarIndex: 1, ...extra });
+async function mkUser(uid, extra = {}) {
+  await auth.createUser({ uid }).catch((error) => {
+    if (error.code !== "auth/uid-already-exists") throw error;
+  });
+  await db.doc(`Users/${uid}`).set({ displayName: `Kisi ${uid}`, username: uid, avatarIndex: 1, ...extra });
+}
 
 const call = (fn, uid, data = {}) => fn.run({ auth: { uid }, data });
 
@@ -446,6 +456,61 @@ test("mağaza planı promosyondan yüksekse mağaza kazanır, promosyon bekler",
   assert.equal(ent.premiumPlan, "unlimited");
   assert.equal(ent.premiumSource, "revenuecat");
   assert.ok(ent.promoUntil, "bekleyen promosyon silinmemeli");
+});
+
+test("Max promosyonu sürerken mağaza aboneliği alınırsa abonelik izi korunur, promosyon kapıları kapanır", { skip }, async () => {
+  await resetData();
+  await db.doc("PromoCodes/MAXKOD02").set({ days: 360, plan: "unlimited", maxRedemptions: 5, redeemedCount: 0, active: true });
+  await mkUser("inviter2");
+  await mkUser("payer2");
+  const { code } = await call(fns.getReferralOverview, "inviter2");
+  await call(fns.redeemCode, "payer2", { code: "MAXKOD02" });
+
+  // Max promosyonu sürerken Premium aylık satın alındı: plan Max kalır (promosyon üstün)…
+  setRevenueCat({ productId: "premium_monthly" });
+  await webhook(purchase("evt-payer2", "payer2"));
+  const ent = (await db.doc("Users/payer2").get()).get("entitlements");
+  assert.equal(ent.premiumPlan, "unlimited");
+  assert.equal(ent.premiumSource, "promo");
+  // …ama abonelik izi silinmez.
+  assert.equal(ent.storeSubscribed, true);
+  const priv = (await db.doc("Users/payer2/private/entitlements").get()).data();
+  assert.equal(priv.productId, "premium_monthly");
+
+  // Ödeme yapan kullanıcı promosyon kapılarından geçemez.
+  await db.doc("ReferralAccounts/payer2").set({ creditMonths: 1 }, { merge: true });
+  assert.equal(await reasonOf(call(fns.claimReferralReward, "payer2")), "store-subscription-active");
+  assert.equal(await reasonOf(call(fns.redeemCode, "payer2", { code })), "store-subscription-active");
+});
+
+test("süpürme: RevenueCat'e ulaşılamazsa abonesi olmayanın dolan promosyonu yine kalkar, abonenin ki bekler", { skip }, async () => {
+  await resetData();
+  const expiredPromo = { premium: true, premiumPlan: "premium", premiumSource: "promo", promoUntil: new Date(Date.now() - 60 * 1000) };
+  await mkUser("nostore", { entitlements: expiredPromo });
+  await mkUser("store", { entitlements: { ...expiredPromo, premiumPlan: "unlimited", premiumUnlimited: true, storeSubscribed: true } });
+  setRevenueCat("fail");
+  await fns.expirePromoGrants.run();
+
+  const nostore = (await db.doc("Users/nostore").get()).get("entitlements");
+  assert.equal(nostore.premium, false);
+  assert.equal(nostore.premiumPlan, "free");
+  assert.equal(nostore.promoUntil, undefined);
+
+  // Bilinen abonelik: planını bilmeden Free yazılmaz; bir sonraki çalışmada tekrar denenir.
+  const store = (await db.doc("Users/store").get()).get("entitlements");
+  assert.equal(store.premiumPlan, "unlimited");
+  assert.ok(store.promoUntil);
+});
+
+test("redeemCode: hesabın kayıt tarihi okunamazsa kod denetimsiz kabul edilmez", { skip }, async () => {
+  await resetData();
+  await mkUser("inviter3");
+  const { code } = await call(fns.getReferralOverview, "inviter3");
+  // Firestore profili var, Auth kaydı yok → kayıt tarihi okunamaz.
+  await db.doc("Users/ghost").set({ displayName: "Ghost", username: "ghost", avatarIndex: 1 });
+  const reason = await reasonOf(call(fns.redeemCode, "ghost", { code }));
+  assert.match(reason, /Account lookup failed/);
+  assert.equal((await db.doc("Referrals/ghost").get()).exists, false);
 });
 
 test("süpürme: dolan ücretsiz ay temizlenir, plan Free'ye döner", { skip }, async () => {

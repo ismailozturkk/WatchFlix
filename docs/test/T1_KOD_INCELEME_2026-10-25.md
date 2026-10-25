@@ -156,6 +156,24 @@ Bulgu yok. İncelenenler:
 
 Kritik bulgu yok. Düzeltmeler kullanıcı kararıyla toplu yapılacak; fonksiyon tarafındakiler tek deploy'da gider (T1.2'deki bağımlılık güncellemesiyle birlikte olabilir).
 
-## Düzeltme durumu
+## Düzeltme durumu (2026-10-25)
 
-Hiçbir bulgu henüz düzeltilmedi.
+| Bulgu | Durum | Nasıl | Test |
+|---|---|---|---|
+| 2.1 | ✅ düzeltildi | indirme günlüğü kuyruktaki işlemlerle başlıyor (`createDomain.js`) | `userDataDomain.test.js` yeni vaka; düzeltmesiz düşüyordu |
+| 3.1 | ✅ düzeltildi | teklif alınamazsa `REFERRAL_OFFER_UNAVAILABLE`; ekran "tam fiyatla devam?" diye soruyor | `revenueCatPurchase.test.js` (4); düzeltmesiz 2'si düşüyordu |
+| 3.2 | ✅ düzeltildi | kutlama yalnız hak açıldıysa ve gerçek plan adıyla; açılmadıysa "ödemen alındı" + yenileme | `referral.test.js` bekçisi güncellendi |
+| 5.1 | ✅ düzeltildi | grup belgesi gelmediyse üyeler gönderimde okunuyor | sohbet testleri yeşil (ChatScreen için birim harness'i yok; cihazda T3) |
+| 1.1 | ✅ kodda, **deploy bekliyor** | herkese açık `entitlements.storeSubscribed` + promosyon üstündeyken özelde ürün/mağaza korunuyor; `hasActiveStoreSubscription` buna bakıyor | entegrasyon: Max promosyon + Premium satın alma |
+| 1.3 | ✅ kodda, **deploy bekliyor** | yalnız OMDb'nin kesin "yok" cevabı önbelleğe; diğerleri `unavailable` | `externalRatings.test.js` yeni vaka |
+| 1.4 | ✅ kodda, **deploy bekliyor** | RevenueCat düşerse bilinen aboneliği olmayanın promosyonu yine kalkıyor | entegrasyon: RevenueCat 503 vakası |
+| 1.7 | ✅ kodda, **deploy bekliyor** | kayıt tarihi okunamazsa `unavailable` (kod denetimsiz kabul edilmiyor) | entegrasyon: Auth kaydı olmayan kullanıcı |
+| 1.2, 3.3 | ⏸ bilerek bırakıldı | ürün kararı (kullanıcı: şimdilik olduğu gibi) | — |
+| 1.5 | ⏸ T4 | yük testinde ölçülecek | — |
+| 1.6 | ⏸ sonra | eski sürümler emekliye ayrılınca kural dalı kaldırılacak | — |
+| 1.8 | ⏸ T0.2 | gizlilik göçü (betik + Aşama 3) | — |
+| 1.9, 2.2 | ⏸ düşük | temizlik | — |
+
+Ayrıca: fonksiyon bağımlılıkları güncellendi (`firebase-functions` 7.4.0, `firebase-admin` 14.5.0, `npm audit fix`): `functions` altında **0 açık** (önce 15). Entegrasyon testleri artık Auth emülatörü de istiyor (`firebase.json` → `emulators.auth`, port 9099) ve sırayla koşuyor (`--test-concurrency=1`).
+
+Doğrulama: uygulama 351 suite / 6789 test, kurallar 267, fonksiyon birim 79, fonksiyon entegrasyon 22/22 (Firestore + Auth emülatörü) — hepsi yeşil.

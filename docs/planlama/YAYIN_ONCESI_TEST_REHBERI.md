@@ -60,7 +60,7 @@
    2026-10-25 tabanı: **267 test yeşil**.
 4. Fonksiyon testleri: `cd functions && npm test` (Node `--test`). Emülatörsüz 19 entegrasyon testi atlanır; onlar kural testleri bittikten sonra (aynı port) şu komutla koşar:
    ```bash
-   export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" && export PATH="$JAVA_HOME/bin:$PATH" && npx firebase emulators:exec --only firestore "cd functions && node --test accountPurge.integration.test.js referral.integration.test.js"
+   export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" && export PATH="$JAVA_HOME/bin:$PATH" && npx firebase emulators:exec --only firestore,auth "cd functions && node --test --test-concurrency=1 accountPurge.integration.test.js referral.integration.test.js"
    ```
 5. `npx expo-doctor` → 21/21 kontrol geçmeli.
 6. `npm run ai:eval` taban testine **girmez**: gerçek modelleri çağıran ücretli bir model karşılaştırmasıdır (`scripts/ai-eval/README.md`). AI istemleri değiştiyse yalnız PLAN kipinde maliyetini gör, gerçek koşuyu kullanıcı onaylar.
@@ -96,9 +96,9 @@
 
 ## FAZ T1 — STATİK HATA KONTROLÜ (ajan tek başına yapar)
 
-### [~] T1.1 — Kod incelemesi (2026-10-25, inceleme bitti, düzeltmeler bekliyor)
+### [x] T1.1 — Kod incelemesi (2026-10-25; fonksiyon düzeltmeleri deploy bekliyor)
 
-> **Durum:** `docs/test/T1_KOD_INCELEME_2026-10-25.md`. Aralık `391014b`→`ede86e2` (903 dosya) risk sırasıyla 5 alanda incelendi: sunucu+kurallar 9, veri katmanı 2, ödeme 2 (+1 ürün notu), giriş/hesap 0, sohbet 1 bulgu. Kritik yok. Öncelik tablosu raporun sonunda; düzeltmeler toplu yapılacak (kullanıcı kararı), sonra `[x]`.
+> **Durum:** `docs/test/T1_KOD_INCELEME_2026-10-25.md`. Aralık `391014b`→`ede86e2` (903 dosya) risk sırasıyla 5 alanda incelendi: sunucu+kurallar 9, veri katmanı 2, ödeme 2 (+1 ürün notu), giriş/hesap 0, sohbet 1 bulgu. Kritik yok. Düzeltildi: 2.1, 3.1, 3.2, 5.1 (istemci) ve 1.1, 1.3, 1.4, 1.7 (fonksiyonlar, deploy bekliyor) + fonksiyon bağımlılıkları (0 açık). Bilerek bırakılanlar raporun "Düzeltme durumu" tablosunda.
 
 **Adımlar:**
 1. Son mağaza build'inin commit'ini bul (`eas build:list --platform android --limit 5`, commit alanı). İnceleme aralığı: o commit → `HEAD`.

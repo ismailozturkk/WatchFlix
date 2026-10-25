@@ -70,6 +70,14 @@ function parseSeasonResponse(json) {
 /** OMDb'nin kota hatası ("Request limit reached!") mı? */
 const isQuotaResponse = (json) => /limit/i.test(String(json?.Error || ""));
 
+/**
+ * OMDb'nin KESİN "yok" cevabı mı? ("Movie not found!", "Series or season not found!",
+ * "Incorrect IMDb ID.") Yalnız bu önbelleğe "bulunamadı" olarak girer; geçersiz anahtar,
+ * "Error getting data." ya da HTTP hatası geçicidir ve 12–24 saat sabitlenmemeli.
+ */
+const isNotFoundResponse = (json) =>
+  json?.Response === "False" && /not found|incorrect imdb id/i.test(String(json?.Error || ""));
+
 /** Basit TTL önbellek (örnek içi). `now` enjekte edilebilir (test). */
 function createTtlCache({ ttlMs, maxEntries = 500, now = Date.now } = {}) {
   const map = new Map();
@@ -120,6 +128,7 @@ module.exports = {
   buildOmdbUrl,
   createRateLimiter,
   createTtlCache,
+  isNotFoundResponse,
   isQuotaResponse,
   parseSeasonResponse,
   parseTitleResponse,

@@ -6,11 +6,23 @@ const {
   buildOmdbUrl,
   createRateLimiter,
   createTtlCache,
+  isNotFoundResponse,
   isQuotaResponse,
   parseSeasonResponse,
   parseTitleResponse,
   validateRatingsRequest,
 } = require("./externalRatings");
+
+test("isNotFoundResponse yalnız OMDb'nin kesin 'yok' cevabını tanır (geçici hatalar önbelleğe girmez)", () => {
+  assert.equal(isNotFoundResponse({ Response: "False", Error: "Movie not found!" }), true);
+  assert.equal(isNotFoundResponse({ Response: "False", Error: "Series or season not found!" }), true);
+  assert.equal(isNotFoundResponse({ Response: "False", Error: "Incorrect IMDb ID." }), true);
+  assert.equal(isNotFoundResponse({ Response: "False", Error: "Invalid API key!" }), false);
+  assert.equal(isNotFoundResponse({ Response: "False", Error: "Error getting data." }), false);
+  assert.equal(isNotFoundResponse({ Response: "False", Error: "Request limit reached!" }), false);
+  assert.equal(isNotFoundResponse(null), false);
+  assert.equal(isNotFoundResponse({ Response: "True", Title: "X" }), false);
+});
 
 test("validateRatingsRequest yalnız IMDb kimliği ve geçerli sezon kabul eder", () => {
   assert.deepEqual(validateRatingsRequest({ imdbId: "tt0944947" }), { ok: true, kind: "title", imdbId: "tt0944947", season: null });

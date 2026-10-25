@@ -132,6 +132,9 @@ test("hasActiveStoreSubscription: promosyon kaynaklı premium mağaza aboneliği
   assert.equal(hasActiveStoreSubscription({ premium: true, premiumSource: "promo" }), false);
   assert.equal(hasActiveStoreSubscription({ premium: false }), false);
   assert.equal(hasActiveStoreSubscription(undefined), false);
+  // Promosyon üste çıktığında da gerçek mağaza aboneliği görünür kalır.
+  assert.equal(hasActiveStoreSubscription({ premium: true, premiumSource: "promo", storeSubscribed: true }), true);
+  assert.equal(hasActiveStoreSubscription({ premium: true, premiumSource: "promo", storeSubscribed: false }), false);
 });
 
 test("evaluatePromoCode: yok / pasif / süresi dolmuş / tükenmiş / uygun", () => {

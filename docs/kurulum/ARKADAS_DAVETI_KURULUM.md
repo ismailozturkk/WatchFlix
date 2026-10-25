@@ -90,6 +90,6 @@ vaat etmez. Teklif kimliği: **`referral-30-1m`** (`functions/referral.js` → `
 | Ne | Nasıl |
 |---|---|
 | Saf kurallar | `cd functions && npm test` (`referral.test.js`) |
-| Transaction'lar, webhook, süpürme — **gerçek Firestore** | `npx firebase emulators:exec --only firestore --project demo-referral "node --test functions/referral.integration.test.js"` (JDK 21: Android Studio JBR) |
+| Transaction'lar, webhook, süpürme — **gerçek Firestore** | `npx firebase emulators:exec --only firestore,auth --project demo-referral "node --test functions/referral.integration.test.js"` (JDK 21: Android Studio JBR) |
 | Güvenlik kuralları | `npm run test:rules` |
 | İstemci | `npx jest __tests__/referral.test.js` |

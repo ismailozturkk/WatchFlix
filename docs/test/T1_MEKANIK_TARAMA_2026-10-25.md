@@ -33,7 +33,7 @@ Düzeltme sonrası `npm test`: **350 suite / 6784 test yeşil** (+1 bekçi testi
 - Çalışma anında en ilgili olanlar: herkese açık `revenueCatWebhook` adresine gelen isteği ayrıştıran `qs` ve `body-parser` (bozuk istekle CPU tüketimi). `proxy-addr` yalnız `req.ip`'ye güvenen kodda önemli; bizde webhook yetki başlığıyla doğrulanıyor.
 - Ayrıca CLI uyarısı: `firebase-functions` 7.3.0 → 7.4.0, `firebase-admin` 14.1.0 → 14.5.0.
 - **Öneri:** `functions` içinde `npm audit fix` (zorlamasız) + bu iki paketin küçük sürüm yükseltmesi → fonksiyon birim + emülatör entegrasyon testleri → **tüm fonksiyonların** tek deploy'u (onay ister; `cleanupDeliveredCineRoom` `retry: true` olduğu için `--force`). Bu deploy, T0.2'deki "eski kaynak hâlinden çalışan 7 fonksiyon" kalemini de kapatır.
-- **Durum:** açık, karar bekliyor.
+- **Durum:** düzeltildi (25 Eki): `firebase-functions` 7.4.0, `firebase-admin` 14.5.0 + `npm audit fix` → 0 açık; testler yeşil. Deploy bekliyor (T1.1 düzeltmeleriyle birlikte).
 
 ### [Düşük] Uygulama bağımlılıkları
 29 uyarı (1 kritik, 17 yüksek, 11 orta). `npm audit`'in önerdiği "düzeltmeler" (`expo@44`, `firebase@9.14`) yıllar geriye sürüm düşürme; **uygulanmaz**. Ayrıştırma:

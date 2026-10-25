@@ -156,6 +156,14 @@ function writeEntitlements(
     applied.state,
     { store: applied.source ? null : store, source: effectiveSource },
   );
+  // Promosyon gerçek bir mağaza aboneliğinin ÜSTÜNE çıktıysa abonelik izi silinmez:
+  // "abone mi / daha önce satın aldı mı" kapıları (referral.hasActiveStoreSubscription,
+  // redeemCode) bunlara bakar. `state` burada promosyon uygulanmamış RevenueCat durumu.
+  const storeSubscribed = Boolean(state.premium);
+  if (applied.source && storeSubscribed) {
+    privateEntitlements.productId = state.productId || null;
+    privateEntitlements.store = store || state.store || null;
+  }
   const legacyCleanup = Object.fromEntries(
     LEGACY_PUBLIC_ENTITLEMENT_FIELDS.map((field) => [field, FieldValue.delete()]),
   );
@@ -170,6 +178,7 @@ function writeEntitlements(
     {
       entitlements: {
         ...publicEntitlements,
+        storeSubscribed,
         ...legacyCleanup,
         ...promoField,
         premiumSyncedAt: FieldValue.serverTimestamp(),
@@ -568,6 +577,8 @@ exports.redeemCode = onCall(async (request) => {
   const code = referral.normalizeCode(request.data?.code);
   if (!code) throw referralFailure(referral.REASONS.NOT_FOUND);
 
+  // Kayıt tarihi davet kodunun 14 günlük penceresi için şart: okunamazsa kod
+  // denetimsiz kabul edilmez (eskiden pencere atlanıyordu), kullanıcı tekrar dener.
   let accountCreatedMs = null;
   try {
     const record = await getAuth().getUser(uid);
@@ -575,6 +586,7 @@ exports.redeemCode = onCall(async (request) => {
     if (Number.isFinite(created)) accountCreatedMs = created;
   } catch (error) {
     console.warn(`[redeemCode] auth lookup failed uid=${uid}:`, error?.message);
+    throw new HttpsError("unavailable", "Account lookup failed, try again");
   }
 
   const nowMs = Date.now();
@@ -754,7 +766,17 @@ exports.expirePromoGrants = onSchedule(
     let cleared = 0;
     for (const doc of expired.docs) {
       try {
-        const state = await fetchRevenueCatPremiumState(doc.id);
+        let state;
+        try {
+          state = await fetchRevenueCatPremiumState(doc.id);
+        } catch (error) {
+          // RevenueCat'e ulaşılamadı. Bilinen bir mağaza aboneliği yoksa dolmuş promosyon
+          // yine de kaldırılır (plan vermeye devam etmesin); varsa abonelik planını
+          // bilmeden Free yazılmaz, bir sonraki çalışmada tekrar denenir.
+          if (referral.hasActiveStoreSubscription(doc.get("entitlements"))) throw error;
+          console.warn(`[expirePromoGrants] uid=${doc.id}: RevenueCat yok, Free yazılıyor:`, error?.message);
+          state = FREE_PLAN_STATE;
+        }
         const batch = db.batch();
         writeEntitlements(batch, doc.id, state, {
           source: "revenuecat_sync",
@@ -1315,12 +1337,17 @@ exports.getExternalRatings = onCall(
         req.kind === "title"
           ? externalRatings.parseTitleResponse(json)
           : externalRatings.parseSeasonResponse(json);
-      const out =
-        req.kind === "title"
-          ? parsed ? { found: true, ...parsed } : { found: false, reason: "not-found" }
-          : parsed ? { found: true, episodes: parsed } : { found: false, reason: "not-found" };
+      // "Yok" yalnız OMDb açıkça söylediyse; geçersiz anahtar, "Error getting data."
+      // ya da HTTP hatası geçicidir (unavailable) — istemci TMDB puanına düşer.
+      const miss = externalRatings.isNotFoundResponse(json);
+      const out = parsed
+        ? req.kind === "title" ? { found: true, ...parsed } : { found: true, episodes: parsed }
+        : { found: false, reason: miss ? "not-found" : "unavailable" };
       // Yalnız KESİN sonuç önbelleğe girer (geçici hata / kota 12 saat sabitlenmesin).
-      if (out.found || out.reason === "not-found") cache.set(cacheKey, out);
+      if (out.found || miss) cache.set(cacheKey, out);
+      if (!out.found && !miss) {
+        console.warn(`[getExternalRatings] OMDb geçici hata (HTTP ${res.status}):`, json?.Error || "yanıt yok");
+      }
       return out;
     } catch (err) {
       console.warn("[getExternalRatings] OMDb isteği başarısız:", err?.message);
