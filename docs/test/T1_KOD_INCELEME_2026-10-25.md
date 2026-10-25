@@ -158,16 +158,18 @@ Kritik bulgu yok. Düzeltmeler kullanıcı kararıyla toplu yapılacak; fonksiyo
 
 ## Düzeltme durumu (2026-10-25)
 
+> **Deploy (25 Eki 19:3x UTC, kullanıcı onayıyla):** `firebase deploy --only functions --force`, kaynak `d58811e`; 24/24 "Successful update operation". Duman testi: webhook GET 405, yetkisiz/yanlış yetkili POST 401; 7 callable oturumsuz çağrıda UNAUTHENTICATED, `checkGoogleSignInEligibility` boş girdide INVALID_ARGUMENT. Günlük: hata kaydı yok, yükleme hatası yok (yalnız duman isteklerinin 4xx uyarıları). Gizli anahtarsız 15 fonksiyon tek kaynak özetinde → yayındaki kod = repo. İstemci düzeltmeleri (2.1, 3.1, 3.2, 5.1) yeni build/OTA ile dağıtılacak.
+
 | Bulgu | Durum | Nasıl | Test |
 |---|---|---|---|
 | 2.1 | ✅ düzeltildi | indirme günlüğü kuyruktaki işlemlerle başlıyor (`createDomain.js`) | `userDataDomain.test.js` yeni vaka; düzeltmesiz düşüyordu |
 | 3.1 | ✅ düzeltildi | teklif alınamazsa `REFERRAL_OFFER_UNAVAILABLE`; ekran "tam fiyatla devam?" diye soruyor | `revenueCatPurchase.test.js` (4); düzeltmesiz 2'si düşüyordu |
 | 3.2 | ✅ düzeltildi | kutlama yalnız hak açıldıysa ve gerçek plan adıyla; açılmadıysa "ödemen alındı" + yenileme | `referral.test.js` bekçisi güncellendi |
 | 5.1 | ✅ düzeltildi | grup belgesi gelmediyse üyeler gönderimde okunuyor | sohbet testleri yeşil (ChatScreen için birim harness'i yok; cihazda T3) |
-| 1.1 | ✅ kodda, **deploy bekliyor** | herkese açık `entitlements.storeSubscribed` + promosyon üstündeyken özelde ürün/mağaza korunuyor; `hasActiveStoreSubscription` buna bakıyor | entegrasyon: Max promosyon + Premium satın alma |
-| 1.3 | ✅ kodda, **deploy bekliyor** | yalnız OMDb'nin kesin "yok" cevabı önbelleğe; diğerleri `unavailable` | `externalRatings.test.js` yeni vaka |
-| 1.4 | ✅ kodda, **deploy bekliyor** | RevenueCat düşerse bilinen aboneliği olmayanın promosyonu yine kalkıyor | entegrasyon: RevenueCat 503 vakası |
-| 1.7 | ✅ kodda, **deploy bekliyor** | kayıt tarihi okunamazsa `unavailable` (kod denetimsiz kabul edilmiyor) | entegrasyon: Auth kaydı olmayan kullanıcı |
+| 1.1 | ✅ yayında (25 Eki) | herkese açık `entitlements.storeSubscribed` + promosyon üstündeyken özelde ürün/mağaza korunuyor; `hasActiveStoreSubscription` buna bakıyor | entegrasyon: Max promosyon + Premium satın alma |
+| 1.3 | ✅ yayında (25 Eki) | yalnız OMDb'nin kesin "yok" cevabı önbelleğe; diğerleri `unavailable` | `externalRatings.test.js` yeni vaka |
+| 1.4 | ✅ yayında (25 Eki) | RevenueCat düşerse bilinen aboneliği olmayanın promosyonu yine kalkıyor | entegrasyon: RevenueCat 503 vakası |
+| 1.7 | ✅ yayında (25 Eki) | kayıt tarihi okunamazsa `unavailable` (kod denetimsiz kabul edilmiyor) | entegrasyon: Auth kaydı olmayan kullanıcı |
 | 1.2, 3.3 | ⏸ bilerek bırakıldı | ürün kararı (kullanıcı: şimdilik olduğu gibi) | — |
 | 1.5 | ⏸ T4 | yük testinde ölçülecek | — |
 | 1.6 | ⏸ sonra | eski sürümler emekliye ayrılınca kural dalı kaldırılacak | — |

@@ -124,6 +124,7 @@ export FUNCTIONS_DISCOVERY_TIMEOUT=60 && npx firebase deploy --only functions:de
 - Duman testi: `revenueCatWebhook` GET → 405, yetkisiz POST → 401.
 - Deploy sonrası günlük taraması: 9 fonksiyonda hata/uyarı yok (yalnız deploy'un kendi denetim kaydı).
 - **Özet (hash) kuralı doğrulandı:** gizli anahtarı olmayan ve aynı anda giden fonksiyonlar aynı özeti taşıyor (deploy sonrası `deleteAccountData`, davet fonksiyonları vb. 5'i tek özette). Yani özet = kaynak + gizli anahtar sürümleri; bölge etkilemiyor. Buna göre en eski özet grubundaki 7 fonksiyon (`cleanupDeliveredCineRoom`, `cleanupExpiredCineRooms`, `onTournamentVoteWritten`, `archiveTournamentWinners`, `onUserProfileUpdated`, `check*SignInEligibility`) **eski bir kaynak hâlinden** çalışıyor. Davranışları değişmedi (2.2'deki analiz), ama T8'de "yayındaki = repo" kesinliği istenirse bu 7'si de yeniden yayınlanır. Dikkat: `cleanupDeliveredCineRoom` `retry: true` olduğu için `--force` ister.
+- **25 Eki ikinci deploy:** T1.1 düzeltmeleri + bağımlılık güncellemesiyle **24 fonksiyonun tamamı** `--force` ile yayına alındı (`d58811e`); gizli anahtarsız 15 fonksiyon tek özette, eski kaynaktan çalışan 7 fonksiyon kalemi kapandı.
 - Yan bulgu (Düşük, T1'e): CLI "`firebase-functions` sürümü eski" uyarısı veriyor. Yükseltme ayrı iş, testle birlikte.
 
 ### 2.4 Gizlilik göçü bitmedi (Yüksek)

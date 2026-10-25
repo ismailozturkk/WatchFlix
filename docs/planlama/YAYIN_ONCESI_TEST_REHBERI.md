@@ -96,9 +96,9 @@
 
 ## FAZ T1 — STATİK HATA KONTROLÜ (ajan tek başına yapar)
 
-### [x] T1.1 — Kod incelemesi (2026-10-25; fonksiyon düzeltmeleri deploy bekliyor)
+### [x] T1.1 — Kod incelemesi (2026-10-25; fonksiyonlar yayında, istemci build/OTA bekliyor)
 
-> **Durum:** `docs/test/T1_KOD_INCELEME_2026-10-25.md`. Aralık `391014b`→`ede86e2` (903 dosya) risk sırasıyla 5 alanda incelendi: sunucu+kurallar 9, veri katmanı 2, ödeme 2 (+1 ürün notu), giriş/hesap 0, sohbet 1 bulgu. Kritik yok. Düzeltildi: 2.1, 3.1, 3.2, 5.1 (istemci) ve 1.1, 1.3, 1.4, 1.7 (fonksiyonlar, deploy bekliyor) + fonksiyon bağımlılıkları (0 açık). Bilerek bırakılanlar raporun "Düzeltme durumu" tablosunda.
+> **Durum:** `docs/test/T1_KOD_INCELEME_2026-10-25.md`. Aralık `391014b`→`ede86e2` (903 dosya) risk sırasıyla 5 alanda incelendi: sunucu+kurallar 9, veri katmanı 2, ödeme 2 (+1 ürün notu), giriş/hesap 0, sohbet 1 bulgu. Kritik yok. Düzeltildi: 2.1, 3.1, 3.2, 5.1 (istemci) ve 1.1, 1.3, 1.4, 1.7 (fonksiyonlar, 25 Eki tüm fonksiyonlarla yayına alındı) + fonksiyon bağımlılıkları (0 açık). Bilerek bırakılanlar raporun "Düzeltme durumu" tablosunda.
 
 **Adımlar:**
 1. Son mağaza build'inin commit'ini bul (`eas build:list --platform android --limit 5`, commit alanı). İnceleme aralığı: o commit → `HEAD`.
