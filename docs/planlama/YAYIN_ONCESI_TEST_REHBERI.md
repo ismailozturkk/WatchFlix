@@ -67,7 +67,9 @@
 
 **Kabul:** sayılar raporda, kırmızı test yok. Kırmızı varsa önce o düzeltilir.
 
-### [ ] T0.2 — "Cihazda görülmedi" ve "deploy edilmedi" listesini çıkar
+### [~] T0.2 — "Cihazda görülmedi" ve "deploy edilmedi" listesini çıkar (2026-10-25, kararlar bekliyor)
+
+> **Sonuç:** `docs/test/T0_ACIK_UCLAR_2026-10-25.md`. Kurallar, indeksler, RTDB ve hosting yayındakiyle aynı. Fonksiyonlarda 2 kesin (hesap silme, `PosterChoices`) + 7 belirsiz (davet/ödeme, `118f38d` sonrası) fark → dokuzu 25 Eki'de onayla yeniden yayınlandı, webhook duman testi ve günlükler temiz. Gizlilik göçü (kök `email`/`birthDate`) bitmedi, gizlilik metniyle çelişiyor (Yüksek). Play'deki son build 1.4.6, iPhone'daki 1.4.8: ikisi için yeni build şart. ~45 kalem cihazda görülmedi. Kullanıcı kararları alınınca `[x]`.
 
 **Bağlam:** son haftalarda birçok özellik yalnız testle doğrulandı; bazı sunucu değişiklikleri yayında değil.
 
