@@ -96,7 +96,9 @@
 
 ## FAZ T1 — STATİK HATA KONTROLÜ (ajan tek başına yapar)
 
-### [ ] T1.1 — Kod incelemesi
+### [~] T1.1 — Kod incelemesi (2026-10-25, inceleme bitti, düzeltmeler bekliyor)
+
+> **Durum:** `docs/test/T1_KOD_INCELEME_2026-10-25.md`. Aralık `391014b`→`ede86e2` (903 dosya) risk sırasıyla 5 alanda incelendi: sunucu+kurallar 9, veri katmanı 2, ödeme 2 (+1 ürün notu), giriş/hesap 0, sohbet 1 bulgu. Kritik yok. Öncelik tablosu raporun sonunda; düzeltmeler toplu yapılacak (kullanıcı kararı), sonra `[x]`.
 
 **Adımlar:**
 1. Son mağaza build'inin commit'ini bul (`eas build:list --platform android --limit 5`, commit alanı). İnceleme aralığı: o commit → `HEAD`.
