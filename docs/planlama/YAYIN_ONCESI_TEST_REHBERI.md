@@ -60,7 +60,7 @@
    2026-10-25 tabanı: **267 test yeşil**.
 4. Fonksiyon testleri: `cd functions && npm test` (Node `--test`). Emülatörsüz 19 entegrasyon testi atlanır; onlar kural testleri bittikten sonra (aynı port) şu komutla koşar:
    ```bash
-   export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" && export PATH="$JAVA_HOME/bin:$PATH" && npx firebase emulators:exec --only firestore,auth "cd functions && node --test --test-concurrency=1 accountPurge.integration.test.js referral.integration.test.js"
+   export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" && export PATH="$JAVA_HOME/bin:$PATH" && npx firebase emulators:exec --only firestore,auth "cd functions && node --test --test-concurrency=1 accountPurge.integration.test.js referral.integration.test.js callables.integration.test.js"
    ```
 5. `npx expo-doctor` → 21/21 kontrol geçmeli.
 6. `npm run ai:eval` taban testine **girmez**: gerçek modelleri çağıran ücretli bir model karşılaştırmasıdır (`scripts/ai-eval/README.md`). AI istemleri değiştiyse yalnız PLAN kipinde maliyetini gör, gerçek koşuyu kullanıcı onaylar.
@@ -135,7 +135,9 @@ Her biri ayrı madde olarak rapora:
 
 **Kanıtlamadıkları:** animasyon, görsel düzen, native modül, gerçek ağ ve kural davranışı.
 
-### [ ] T2.2 — Kural kapsam matrisi
+### [x] T2.2 — Kural kapsam matrisi (2026-10-25)
+
+> **Sonuç:** `docs/test/T2_OTOMATIK_TESTLER_2026-10-25.md`. 23 yeni kural testi (267 → 290). **2 açık bulundu ve kuralda düzeltildi, deploy bekliyor:** herkes kendini başkasının arkadaşı yapıp "yalnız arkadaşlar" listelerini okuyabiliyordu (Yüksek); gönderi sahibi `authorId`'yi değiştirebiliyordu (Orta). Kalan zayıflıklar T5'e.
 
 **Adımlar:**
 1. `firestore.rules`'taki her `match` bloğunu ve `database.rules.json` köklerini (`presence`, `chatMeta`) listele.
@@ -144,7 +146,9 @@ Her biri ayrı madde olarak rapora:
 
 **Kabul:** matriste "test yok" hücresi kalmadı ya da gerekçesi yazıldı; `npm run test:rules` yeşil.
 
-### [ ] T2.3 — Callable fonksiyon sözleşme testleri (emülatör)
+### [x] T2.3 — Callable fonksiyon sözleşme testleri (emülatör) (2026-10-25)
+
+> **Sonuç:** `functions/callables.integration.test.js` 10 test, hepsi yeşil (entegrasyon 22 → 32). AI kotası eşzamanlı çağrıda da aşılmıyor. Komut T0.1'de güncel.
 
 **Adımlar:**
 1. `firebase emulators:exec --only auth,firestore,functions "<test komutu>"` ile fonksiyonları emülatörde ayağa kaldıran bir test dosyası yaz (`functions/*.integration.test.js` deseni).
