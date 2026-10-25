@@ -123,7 +123,9 @@ Her biri ayrı madde olarak rapora:
 
 ## FAZ T2 — OTOMATİK DAVRANIŞ TESTLERİ
 
-### [ ] T2.1 — Ekran duman testi (geçici harness)
+### [x] T2.1 — Ekran duman testi (geçici harness) (2026-10-25)
+
+> **Sonuç:** 84 ekran × tr/en/es, dil başına ~2.380 işleyici; pozitif kontrol her koşuda yakalandı. Gerçek hata yok; `MovieScreen` tek başına çizilemiyor (düzenek: yalnız `DiscoverScreen`'in sağlayıcısı altında açılıyor), sohbet modalında yinelenen `-` anahtarı (düşük, T3'te). Düzenek silindi. Ayrıntı: `docs/test/T2_OTOMATIK_TESTLER_2026-10-25.md`.
 
 **Bağlam:** repoda RN render altyapısı yok. 4 Ekim'de 113 ekranı dolu veriyle render edip tüm `onPress` işleyicilerini tetikleyen geçici bir jest harness'i kuruldu ve gerçek hatalar yakaladı. Yöntem hafızadaki "UI smoke render yöntemi" notunda.
 
@@ -137,7 +139,7 @@ Her biri ayrı madde olarak rapora:
 
 ### [x] T2.2 — Kural kapsam matrisi (2026-10-25)
 
-> **Sonuç:** `docs/test/T2_OTOMATIK_TESTLER_2026-10-25.md`. 23 yeni kural testi (267 → 290). **2 açık bulundu ve kuralda düzeltildi, deploy bekliyor:** herkes kendini başkasının arkadaşı yapıp "yalnız arkadaşlar" listelerini okuyabiliyordu (Yüksek); gönderi sahibi `authorId`'yi değiştirebiliyordu (Orta). Kalan zayıflıklar T5'e.
+> **Sonuç:** `docs/test/T2_OTOMATIK_TESTLER_2026-10-25.md`. 23 yeni kural testi (267 → 290). **2 açık bulundu, kuralda düzeltildi ve 25 Eki'de yayına alındı:** herkes kendini başkasının arkadaşı yapıp "yalnız arkadaşlar" listelerini okuyabiliyordu (Yüksek); gönderi sahibi `authorId`'yi değiştirebiliyordu (Orta). Kalan zayıflıklar T5'e.
 
 **Adımlar:**
 1. `firestore.rules`'taki her `match` bloğunu ve `database.rules.json` köklerini (`presence`, `chatMeta`) listele.
