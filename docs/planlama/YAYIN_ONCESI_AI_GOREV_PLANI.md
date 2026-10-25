@@ -3,6 +3,7 @@
 > Kaynak: 2026-08-08 tam yayın denetimi (güvenlik + mağaza uyumu + kod sağlığı + i18n taramaları, `npm test`, `expo-doctor`).
 > Hedef: Google Play kapalı testine (24 Ağustos 2026) kod tarafında hazır olmak; Play TR yayını 21–25 Eylül 2026 (`docs/YAYIN_VE_GELIR_YOL_HARITASI.md`).
 > Durum işaretleri: `[ ]` yapılmadı · `[~]` devam ediyor · `[x]` bitti — görev bitince işaretle ve yanına tarih düş.
+> **2026-10-25:** yayın öncesi test aşaması (hata kontrolü, cihaz, yük, sızma, kullanıcı, A/B) ayrı dosyada: `docs/planlama/YAYIN_ONCESI_TEST_REHBERI.md`.
 
 ---
 
