@@ -372,10 +372,18 @@ service cloud.firestore {
 
     // friends subcollection — sahibi okur; sahibi VEYA arkadaşın kendisi
     // (cross-write için) yazabilir / silebilir.
+    //
+    // ÇAPRAZ OLUŞTURMA yalnız sahibin bu kişiye gönderdiği istek varken: kabul eden
+    // (friendUid) isteği gönderenin (uid) listesine kendini yazar; kanıt gönderenin
+    // sentRequests/{uid}_{friendUid} kaydıdır ve onu yalnız gönderen yazabilir.
+    // Kanıtsız serbest olsaydı herkes kendini arkadaş yapıp canReadLists'in "yalnız
+    // arkadaşlar" listelerini (izleme geçmişi, listeler, özel afişler) okuyabilirdi.
+    // Kabul batch'i isteği de siler; exists() yazım ÖNCESİ durumu okur.
     match /Users/{uid}/friends/{friendUid} {
       allow read: if isOwner(uid);
       allow create: if isOwner(uid)
-                    || (isSignedIn() && request.auth.uid == friendUid);
+                    || (isSignedIn() && request.auth.uid == friendUid
+                        && exists(/databases/$(database)/documents/Users/$(uid)/sentRequests/$(uid + '_' + friendUid)));
       allow delete: if isOwner(uid)
                     || (isSignedIn() && request.auth.uid == friendUid);
       // Profil değişiminde karşı tarafın listesindeki KENDİ kaydımı (doc id ==
@@ -709,7 +717,10 @@ service cloud.firestore {
       // counterOk: sahibi olmayan kullanıcı sayaçları en fazla ±1 oynatabilir
       // (istemci increment(±1) kullanır) — keyfî likesCount yazıp "top" feed'i
       // manipüle etmek kural düzeyinde engellenir.
-      allow update: if isOwner(resource.data.authorId)
+      // Sahibi düzenler ama yazarı değiştiremez: authorId başkasına çevrilirse
+      // gönderi o kişinin adına görünürdü (kimliğe bürünme).
+      allow update: if (isOwner(resource.data.authorId)
+                        && request.resource.data.authorId == resource.data.authorId)
                     || (isSignedIn() &&
                         onlyUpdating(['likesCount', 'commentsCount', 'updatedAt'])
                         && counterOk('likesCount')
