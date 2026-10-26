@@ -77,6 +77,7 @@ import {
 import {
   customListHas,
   listItemFromDetails,
+  listSourceOrCard,
   movieWatchItemFromDetails,
 } from "../../utils/libraryCore";
 import { showLibraryError, showWatchSpreadNotice } from "../../utils/libraryErrorText";
@@ -521,6 +522,9 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
   }, [closeThen]);
 
   /* ── Listeye ekle / çıkar ───────────────────────────────────────────────── */
+  // Dönüş: yazım yapılmadıysa `false` — ListView/ListViewTv düğmenin iyimser
+  // durumunu geri alır. Eskiden detay gelmeden (çevrimdışı) yazım atlanıyor,
+  // düğme ise "eklendi" kalıyordu (T3 B14).
   const updateList = useCallback(
     async (listType, type, date = null) => {
       if (!user?.uid) {
@@ -531,9 +535,11 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
             "Listeye eklemek için giriş yap",
           ),
         });
-        return;
+        return false;
       }
-      if (!details) {
+      // Detay yoksa kart verisi (id + ad + afiş) yeter; bkz. listSourceOrCard.
+      const source = listSourceOrCard(details, { id, title, posterPath });
+      if (!source) {
         Toast.show({
           type: "info",
           text1: i18nText(
@@ -541,7 +547,7 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
             "İçerik bilgisi yükleniyor…",
           ),
         });
-        return;
+        return false;
       }
 
       const kind = type || mediaType;
@@ -550,7 +556,7 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
       // doğru akışa yönlendirsin.
       if (listType === "watchedMovies") {
         requestWatchDate();
-        return;
+        return false;
       }
 
       // Hedef durum GÖRÜNEN (bindirmeli) durumdan türer: art arda iki dokunuş
@@ -563,9 +569,9 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
           listKey: listType,
           item: listItemFromDetails(
             {
-              ...details,
-              name: details.name || title,
-              poster_path: details.poster_path ?? posterPath,
+              ...source,
+              name: source.name || title,
+              poster_path: source.poster_path ?? posterPath,
             },
             kind,
             { dateAdded: date || formatDateSave(new Date()) },
@@ -582,13 +588,16 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
             { media: kindLabel, list: listLabel(listType) },
           ),
         });
+        return true;
       } catch (error) {
         showLibraryError(error, { source: "quick_actions_list" });
+        return false;
       }
     },
     [
       user?.uid,
       details,
+      id,
       mediaType,
       listStates,
       kindLabel,

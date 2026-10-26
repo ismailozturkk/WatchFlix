@@ -235,7 +235,18 @@ const ListView = ({
     }
     // Animasyonun donmaması için ana işlemi bir sonraki event loop'a bırak
     setTimeout(() => {
-      action();
+      // Eylem açıkça `false` dönerse (yazım yapılmadı: çevrimdışı, oturum yok,
+      // hata) iyimser durum geri alınır; aksi halde düğme "eklendi" kalıp
+      // kullanıcıyı yanıltıyordu (T3 B14). undefined dönen eski eylemler etkilenmez.
+      Promise.resolve(action()).then((done) => {
+        if (done === false && toggle) {
+          setOptimisticStates((prev) => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+        }
+      }, () => {});
     }, 15);
   };
 

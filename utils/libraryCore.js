@@ -242,6 +242,20 @@ export function listItemFromDetails(details, type, { dateAdded = null } = {}) {
 }
 
 /**
+ * Liste yazımının kaynağı: TMDB detay gövdesi, yoksa elde olan kart verisi.
+ *
+ * Hızlı eylem sayfası detayı ağdan çeker; çevrimdışıyken detay hiç gelmiyor ve
+ * izleme listesi / favori yazımı sessizce atlanıyordu, düğme ise "eklendi"
+ * görünüyordu (T3 B14). Kartta id + ad + afiş var; süre/tür olguları sonradan
+ * ilk detay açılışında tamamlanabilir, liste üyeliği için bunlar yeter.
+ */
+export function listSourceOrCard(details, { id, title, posterPath } = {}) {
+  if (details && details.id != null) return details;
+  if (id == null) return null;
+  return { id, title: title || "", name: title || "", poster_path: posterPath || null };
+}
+
+/**
  * İzlenen film yazımı için öğe: liste öğesi + yayın kapısı alanları
  * (`releaseDate`/`status` Firestore'a YAZILMAZ — normalizeItem beyaz liste).
  */

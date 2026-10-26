@@ -11,6 +11,7 @@ const {
   isSameMedia,
   customListHas,
   listItemFromDetails,
+  listSourceOrCard,
   movieWatchItemFromDetails,
   showMetaFromDetails,
   episodeFromTmdb,
@@ -299,6 +300,15 @@ describe("kanonik öğe kurucuları", () => {
   test("id yoksa null", () => {
     expect(listItemFromDetails(null, "movie")).toBeNull();
     expect(listItemFromDetails({ title: "x" }, "movie")).toBeNull();
+  });
+
+  test("detay yokken kart verisi liste öğesi kurar (T3 B14: çevrimdışı hızlı eylem)", () => {
+    const card = { id: 66732, title: "Stranger Things", posterPath: "/st.jpg" };
+    expect(listSourceOrCard(tvDetails, card)).toBe(tvDetails);
+    const item = listItemFromDetails(listSourceOrCard(null, card), "tv", { dateAdded: "2026-10-26" });
+    expect(item).toMatchObject({ id: 66732, type: "tv", imagePath: "/st.jpg", dateAdded: "2026-10-26" });
+    expect(item.name).toBe("Stranger Things");
+    expect(listSourceOrCard(null, {})).toBeNull();
   });
 
   test("movieWatchItemFromDetails yayın kapısı alanlarını taşır", () => {
