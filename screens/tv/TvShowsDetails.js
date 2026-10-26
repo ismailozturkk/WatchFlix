@@ -27,6 +27,7 @@ import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { DetailsSkeleton } from "../../components/Skeleton";
+import DetailLoadError from "../../components/detail/DetailLoadError";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import TVShowItem from "../../components/TVShowItem";
 import { LinearGradient } from "expo-linear-gradient";
@@ -193,6 +194,8 @@ export default function TvShowsDetails({ route, navigation }) {
   const { id, openComments = false, commentScope = null } = route.params;
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  // "Tekrar dene" aynı id/dil için isteği yeniden tetikler (bkz. DetailLoadError).
+  const [reloadKey, setReloadKey] = useState(0);
   const [commentModalVisible, setCommentModalVisible] = useState(
     !!openComments || !!commentScope,
   );
@@ -298,7 +301,7 @@ export default function TvShowsDetails({ route, navigation }) {
     return () => {
       cancelled = true;
     };
-  }, [id, language]);
+  }, [id, language, reloadKey]);
 
   // Önerilen diziler rayı: append_to_response yalnız ilk sayfayı getirir.
   // Ana ekran raylarındaki gibi (PaginatedRail) sona yaklaşınca sonraki TMDB
@@ -686,16 +689,11 @@ export default function TvShowsDetails({ route, navigation }) {
   if (loading) return <DetailsSkeleton />;
   if (!details)
     return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: theme.primary,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text style={{ color: theme.text.primary }}>{t.loading}</Text>
-      </View>
+      <DetailLoadError
+        theme={theme}
+        onRetry={() => setReloadKey((k) => k + 1)}
+        onBack={() => navigation.goBack()}
+      />
     );
 
   const watchedColor = watchStateColor(showWatchState, theme);

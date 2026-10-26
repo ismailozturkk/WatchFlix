@@ -1843,6 +1843,8 @@
     "oyun_yuklenemedi": "Game could not be loaded",
     "oyun_baglanti_kontrol": "Check your connection and try again.",
     "tekrar_dene": "Try Again",
+    "detay_yuklenemedi": "This page couldn't be loaded",
+    "detay_baglanti_kontrol": "Check your connection and try again.",
     "video_yuklenemedi": "Couldn't load the video",
     "youtube_da_ac": "Open in YouTube",
     "kaynaklara_don": "Back to Sources",

@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import axios from "axios";
 import { DetailsSkeleton } from "../../components/Skeleton";
+import DetailLoadError from "../../components/detail/DetailLoadError";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLanguage } from "../../context/LanguageContext";
@@ -297,6 +298,8 @@ export default function MovieDetails({ navigation, route }) {
   const { theme } = useTheme();
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+  // "Tekrar dene" aynı id/dil için isteği yeniden tetikler (bkz. DetailLoadError).
+  const [reloadKey, setReloadKey] = useState(0);
   const [showFullCast, setShowFullCast] = useState(false);
   const [commandModalVisible, setCommentModalVisible] = useState(!!openComments);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
@@ -426,7 +429,7 @@ export default function MovieDetails({ navigation, route }) {
     return () => {
       cancelled = true;
     };
-  }, [id, language]);
+  }, [id, language, reloadKey]);
 
   // Önerilen filmler rayı: append_to_response yalnız ilk sayfayı getirir.
   // Ana ekran raylarındaki gibi (PaginatedRail) sona yaklaşınca sonraki TMDB
@@ -869,18 +872,11 @@ export default function MovieDetails({ navigation, route }) {
   if (loading) return <DetailsSkeleton />;
   if (!details)
     return (
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: theme.primary,
-            justifyContent: "center",
-            alignItems: "center",
-          },
-        ]}
-      >
-        <Text style={{ color: theme.text.primary }}>{i18nText("autoI18n.yukleniyor", "Yükleniyor...")}</Text>
-      </View>
+      <DetailLoadError
+        theme={theme}
+        onRetry={() => setReloadKey((k) => k + 1)}
+        onBack={() => navigation.goBack()}
+      />
     );
 
   const dateInfo = calculateDateDifference(details.release_date);
