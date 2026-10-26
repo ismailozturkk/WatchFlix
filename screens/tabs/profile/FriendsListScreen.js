@@ -15,9 +15,9 @@ import {
   collection,
   onSnapshot,
   updateDoc,
-  deleteDoc,
   arrayRemove,
 } from "firebase/firestore";
+import { unfriend } from "../../../services/friendsService";
 import { getAuth } from "firebase/auth";
 import Toast from "@components/AppToast";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -106,11 +106,11 @@ export default function FriendsListScreen({ navigation }) {
 
   const handleDelete = async (friend) => {
     try {
-      // Subcollection sil
-      await Promise.all([
-        deleteDoc(doc(db, "Users", user.uid,   "friends", friend.uid)),
-        deleteDoc(doc(db, "Users", friend.uid, "friends", user.uid)),
-      ]);
+      // Ortak yol: arkadaşlık + iki taraftaki friendsCount + 1-1 sohbet
+      // (friendsService.unfriend). Eskiden burada yalnız iki friends belgesi
+      // siliniyordu; onay "sohbet de silinir" dediği halde sohbet ve sayaç
+      // kalıyordu (T3 B13).
+      const { chatFailed } = await unfriend(user.uid, friend.uid);
       // Eski format root-doc array'i de temizle (varsa)
       const [userSnap, friendSnap] = await Promise.all([
         getDoc(doc(db, "Users", user.uid)),
@@ -131,6 +131,16 @@ export default function FriendsListScreen({ navigation }) {
         type: "success",
         text1: i18nText("autoI18n.friend_removed_named", "{{name}} arkadaş listenizden silindi", { name: friend.displayName }),
       });
+      // Arkadaşlık çözüldü ama sohbetin bir kısmı silinemediyse (çevrimdışı…) söyle.
+      if (chatFailed?.length) {
+        Toast.show({
+          type: "warning",
+          text1: i18nText(
+            "autoI18n.sohbet_tam_silinemedi",
+            "Arkadaşlıktan çıkarıldı ancak sohbet tamamen silinemedi",
+          ),
+        });
+      }
     } catch (error) {
       console.error(i18nText("autoI18n.arkadas_silme_hatasi", "Arkadaş silme hatası:"), error);
       Toast.show({ type: "error", text1: i18nText("autoI18n.silme_islemi_basarisiz", "Silme işlemi başarısız"), text2: error.message });
