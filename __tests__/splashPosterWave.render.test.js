@@ -25,6 +25,7 @@ import {
   BREATH_MS,
   ORBIT_MS,
   ORBIT_SWEEP_DEG,
+  POSTER_WAIT_MS,
   STATIC_LEVEL,
   WAVE_PERIOD_MS,
   ringPeakOpacity,
@@ -197,10 +198,21 @@ const element = (props = {}, children = null) => (
     {children}
   </SplashPosterWave>
 );
-function mount(props, children) {
+// Native görüntü yükleyicinin "çözüldü" haberini taklit eder (giriş bunu bekler).
+function settlePosters(predicate = () => true) {
+  const tiles = [];
+  (function walk(n) {
+    if (!n || typeof n === "string") return;
+    if (n.type === "AImage" && n.props.onLoadEnd) tiles.push(n);
+    (n.children || []).forEach(walk);
+  })(renderer.toJSON());
+  act(() => tiles.filter(predicate).forEach((tile) => tile.props.onLoadEnd()));
+}
+function mount(props, children, { settle = true } = {}) {
   act(() => {
     renderer = create(element(props, children));
   });
+  if (settle) settlePosters();
   return renderer;
 }
 function startExit(onExited) {
@@ -291,6 +303,40 @@ describe("SplashPosterWave — gerçek Animated grafiği", () => {
       expect(after.rings[i].scale).toBeCloseTo(ring.scale, 9);
       expect(after.rings[i].tileOpacity).toBeCloseTo(ring.tileOpacity, 9);
     });
+  });
+});
+
+describe("SplashPosterWave — afiş hazırlığı", () => {
+  test("giriş, kullanılan afişlerin HEPSİ çözülene kadar başlamaz; sonra bir kez haber verir", () => {
+    const onIntroStart = jest.fn();
+    mount({ onIntroStart }, null, { settle: false });
+    expect(timingBy(INTRO_MS)).toBeUndefined();
+    // İlk yarı yüklendi: hâlâ bekler (halkalar boş karolarla açılmamalı).
+    let n = 0;
+    settlePosters(() => n++ % 2 === 0);
+    expect(timingBy(INTRO_MS)).toBeUndefined();
+    expect(onIntroStart).not.toHaveBeenCalled();
+    settlePosters();
+    expect(timingBy(INTRO_MS)).toBeDefined();
+    expect(onIntroStart).toHaveBeenCalledTimes(1);
+    settlePosters(); // geç gelen/tekrarlanan haberler girişi yeniden başlatmaz
+    expect(registry.filter((e) => e.config.duration === INTRO_MS)).toHaveLength(1);
+    expect(onIntroStart).toHaveBeenCalledTimes(1);
+  });
+
+  test("çözüm takılırsa giriş POSTER_WAIT_MS tavanında yine başlar", () => {
+    jest.useFakeTimers();
+    const onIntroStart = jest.fn();
+    mount({ onIntroStart }, null, { settle: false });
+    act(() => {
+      jest.advanceTimersByTime(POSTER_WAIT_MS - 1);
+    });
+    expect(timingBy(INTRO_MS)).toBeUndefined();
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(timingBy(INTRO_MS)).toBeDefined();
+    expect(onIntroStart).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -396,7 +442,10 @@ describe("SplashPosterWave — hata sınırı", () => {
     });
     // React 19 yakalanan hatayı console.error'a da yazar; bu testte beklenen.
     consoleError.mockImplementation(() => {});
-    mount();
+    const onIntroStart = jest.fn();
+    mount({ onIntroStart });
+    // Yedekte beklenecek afiş yok: App.js'in görünme sayacı takılı kalmamalı.
+    expect(onIntroStart).toHaveBeenCalledTimes(1);
 
     const tree = renderer.toJSON();
     const counted = countTree(tree);

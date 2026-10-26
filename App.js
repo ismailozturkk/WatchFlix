@@ -1,5 +1,5 @@
 import { isLightSurface } from "./utils/colorUtils";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 // Production'da gereksiz console çıktılarını kapat
@@ -226,7 +226,7 @@ setTimeout(() => {
 // Açılış ekranı: tüm hareket (giriş, döngü, çıkış) SplashPosterWave'de. Burası
 // yalnız tema/kar bağlamlarını ona taşır. `exiting` true olunca çıkış başlar,
 // bitince `onExited` çağrılır (overlay o zaman sökülür).
-const SplashScreen = ({ exiting, onExited }) => {
+const SplashScreen = ({ exiting, onExited, onIntroStart }) => {
   const { theme } = useTheme();
   const { showSnow } = useSnow();
   const light = isLightSurface(theme.primary);
@@ -237,6 +237,7 @@ const SplashScreen = ({ exiting, onExited }) => {
       light={light}
       exiting={exiting}
       onExited={onExited}
+      onIntroStart={onIntroStart}
     >
       {showSnow && (
         <LottieView
@@ -924,6 +925,16 @@ export default wrapRoot(function App() {
   const [splashVisible, setSplashVisible] = useState(true);
   // Çıkış animasyonu SplashPosterWave'in içinde; burada yalnız tetikleyici durur.
   const [splashExiting, setSplashExiting] = useState(false);
+  // Splash girişi, afişler çözülünce başlar (SplashPosterWave). En kısa görünme
+  // süresi o andan sayılır; yoksa hızlı açılışta splash afişler görünmeden kapanırdı.
+  const splashIntro = useRef(null);
+  if (!splashIntro.current) {
+    let resolve;
+    const promise = new Promise((r) => {
+      resolve = r;
+    });
+    splashIntro.current = { promise, resolve: () => resolve(Date.now()) };
+  }
 
   // AsyncStorage → MMKV göç kapısı.
   //
@@ -967,7 +978,6 @@ export default wrapRoot(function App() {
     // splash zaten APP_READY'ye kadar kalır — bu sabit yalnız "her şey hazırken"
     // ödenen tabandır (utils/splashMotion.js).
     const MIN_MS = MIN_VISIBLE_MS;
-    const startedAt = Date.now();
     let preloadDone = false;
     let dataReady = false;
     let timeoutFinished = false;
@@ -981,8 +991,8 @@ export default wrapRoot(function App() {
 
     const hideSplash = () => setSplashExiting(true);
 
-    startupPreloadPromise.then(() => {
-      const elapsed = Date.now() - startedAt;
+    Promise.all([splashIntro.current.promise, startupPreloadPromise]).then(([introAt]) => {
+      const elapsed = Date.now() - introAt;
       const wait = Math.max(0, MIN_MS - elapsed);
       setTimeout(() => {
         preloadDone = true;
@@ -1113,6 +1123,7 @@ export default wrapRoot(function App() {
                                 <SplashScreen
                                   exiting={splashExiting}
                                   onExited={() => setSplashVisible(false)}
+                                  onIntroStart={splashIntro.current.resolve}
                                 />
                               </View>
                             )}

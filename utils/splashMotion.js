@@ -30,6 +30,11 @@ export const EXIT_MS = 600;
 // splash en az bu kadar görünür. Veri geç gelirse zaten APP_READY'ye kadar kalır —
 // bu yalnız "her şey hazırken" ödenen tabandır.
 export const MIN_VISIBLE_MS = 800;
+// Afişler pakette gelir ama açılışta asenkron ÇÖZÜLÜR (decode). Giriş, afişler
+// hazır olana kadar (ilk kare yerel splash'le aynı: zemin + logo) bekler; aksi
+// halde halkalar boş karolarla açılır ve hızlı açılışta afişler hiç görünmeden
+// splash kapanırdı. Çözüm bu süreyi aşarsa giriş yine başlar (tavan).
+export const POSTER_WAIT_MS = 600;
 // Güvenlik ağı: APP_READY hiç gelmezse bu sürede zorla çıkış başlar.
 export const FALLBACK_EXIT_MS = 10000;
 // Çıkış animasyonunun "bitti" haberi (native → JS) kaybolursa overlay sonsuza

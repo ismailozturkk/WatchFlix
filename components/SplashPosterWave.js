@@ -39,7 +39,10 @@
 // bile overlay bir süre sonra zorla sökülür.
 //
 // Poster kaynağı: oy sayısı en yüksek film/dizilerden hazırlanmış yerel katalog.
-// Görseller JS bundle ile gelir; splash ağ veya disk cache beklemez.
+// Görseller JS bundle ile gelir; splash ağ veya disk cache beklemez. Ancak her
+// afiş yine de asenkron çözülür: giriş, kullanılan afişlerin hepsi yüklenene kadar
+// (en fazla POSTER_WAIT_MS) bekler, sonra `onIntroStart` ile haber verir — App.js
+// en kısa görünme süresini o andan sayar.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Dimensions, Easing, Image, StyleSheet, View } from "react-native";
 import { SPLASH_POSTER_CATALOG } from "../data/splashPosterCatalog";
@@ -57,6 +60,7 @@ import {
   LOGO_SIZE,
   NATIVE_SPLASH_BG,
   ORBIT_MS,
+  POSTER_WAIT_MS,
   STATIC_LEVEL,
   TILE_H,
   TILE_W,
@@ -119,7 +123,14 @@ const centered = (dx, dy, width, height) => ({
 const LOGO_PLACE = centered(0, 0, LOGO_SIZE, LOGO_SIZE);
 const GLOW_PLACE = centered(0, 0, GLOW_SIZE, GLOW_SIZE);
 
-function SplashStage({ backgroundColor, light = false, exiting = false, onExited, children }) {
+function SplashStage({
+  backgroundColor,
+  light = false,
+  exiting = false,
+  onExited,
+  onIntroStart,
+  children,
+}) {
   // Marka logosu seçili uygulama simgesini izler (hooks/useAppLogo.js).
   const { logo: appLogo } = useAppLogo();
   const reduced = useReduceMotion();
@@ -153,6 +164,33 @@ function SplashStage({ backgroundColor, light = false, exiting = false, onExited
       return base;
     });
   }, [plan]);
+
+  // Afiş hazırlığı: plan'ın gerçekten kullandığı her farklı kaynak bir kez
+  // yüklendiğinde (ya da hata verdiğinde) giriş başlar. Aynı kaynağın diğer
+  // karoları native bellek önbelleğinden gelir; onları beklemek gerekmez.
+  const [postersReady, setPostersReady] = useState(false);
+  const pendingPosters = useRef(null);
+  if (pendingPosters.current === null) {
+    const used = new Set();
+    plan.rings.forEach(({ tiles }, ringIndex) =>
+      tiles.forEach((_, s) => used.add((tileBases[ringIndex] + s) % posterSources.length)),
+    );
+    pendingPosters.current = used;
+  }
+  const onPosterSettled = useRef((index) => {
+    const pending = pendingPosters.current;
+    if (!pending.delete(index) || pending.size > 0) return;
+    setPostersReady(true);
+  }).current;
+  useEffect(() => {
+    if (postersReady) return undefined;
+    if (pendingPosters.current.size === 0) {
+      setPostersReady(true);
+      return undefined;
+    }
+    const cap = setTimeout(() => setPostersReady(true), POSTER_WAIT_MS);
+    return () => clearTimeout(cap);
+  }, [postersReady]);
 
   // Sürücüler (hepsi [0,1], hepsi native).
   const intro = useRef(new Animated.Value(0)).current;
@@ -225,8 +263,12 @@ function SplashStage({ backgroundColor, light = false, exiting = false, onExited
     };
   }, [plan, quality, light, intro, exit, wave, breath, glowSpin, orbit]);
 
-  // Giriş: mount'ta bir kez.
+  // Giriş: afişler hazır olunca (ya da tavan dolunca) bir kez.
+  const onIntroStartRef = useRef(onIntroStart);
+  onIntroStartRef.current = onIntroStart;
   useEffect(() => {
+    if (!postersReady) return undefined;
+    onIntroStartRef.current?.();
     const anim = Animated.timing(intro, {
       toValue: 1,
       duration: INTRO_MS,
@@ -236,7 +278,7 @@ function SplashStage({ backgroundColor, light = false, exiting = false, onExited
     });
     anim.start();
     return () => anim.stop();
-  }, [intro]);
+  }, [intro, postersReady]);
 
   // Döngüler: tek timing'li Animated.loop yinelemeyi tamamen native tarafta
   // yürütür (sequence'li kurgunun aksine yarım döngüde JS'e uğramaz) → açılış
@@ -323,22 +365,26 @@ function SplashStage({ backgroundColor, light = false, exiting = false, onExited
             collapsable={false}
             style={[StyleSheet.absoluteFill, node.containerTransform && { transform: node.containerTransform }]}
           >
-            {tiles.map((tile, s) => (
-              <Animated.Image
-                key={s}
-                source={posterSources[(tileBases[ringIndex] + s) % posterSources.length]}
-                style={[...tileStyle, centered(tile.dx, tile.dy, TILE_W, TILE_H)]}
-                resizeMode="cover"
-                // Android (Fresco): bitmap'i görünüm boyutuna indirger ve yüklenirken
-                // 300 ms'lik solma uygulamaz (aksi halde posterler iki kez solardı).
-                resizeMethod="resize"
-                fadeDuration={0}
-              />
-            ))}
+            {tiles.map((tile, s) => {
+              const sourceIndex = (tileBases[ringIndex] + s) % posterSources.length;
+              return (
+                <Animated.Image
+                  key={s}
+                  source={posterSources[sourceIndex]}
+                  onLoadEnd={() => onPosterSettled(sourceIndex)}
+                  style={[...tileStyle, centered(tile.dx, tile.dy, TILE_W, TILE_H)]}
+                  resizeMode="cover"
+                  // Android (Fresco): bitmap'i görünüm boyutuna indirger ve yüklenirken
+                  // 300 ms'lik solma uygulamaz (aksi halde posterler iki kez solardı).
+                  resizeMethod="resize"
+                  fadeDuration={0}
+                />
+              );
+            })}
           </Animated.View>
         );
       }),
-    [plan, nodes, posterSources, tileBases],
+    [plan, nodes, posterSources, tileBases, onPosterSettled],
   );
 
   return (
@@ -399,8 +445,12 @@ function SplashStage({ backgroundColor, light = false, exiting = false, onExited
 
 // Animasyonlu sahne düşerse: statik zemin + logo. Çıkış isteğine kısa bir bekleyişle
 // yanıt verir ki overlay yine sökülsün.
-function StaticSplash({ backgroundColor, exiting, onExited, children }) {
+function StaticSplash({ backgroundColor, exiting, onExited, onIntroStart, children }) {
   const { logo } = useAppLogo();
+  // Beklenecek giriş yok; App.js'in en kısa görünme sayacı hemen başlasın.
+  useEffect(() => {
+    onIntroStart?.();
+  }, [onIntroStart]);
   useEffect(() => {
     if (!exiting) return undefined;
     const timer = setTimeout(() => onExited?.(), 160);
@@ -439,6 +489,7 @@ class SplashBoundary extends React.Component {
  * @param {boolean}  light            zemin açık mı (ışıma açık zeminde daha silik)
  * @param {boolean}  exiting          true olunca çıkış animasyonu başlar
  * @param {function} onExited         çıkış bitince çağrılır (overlay'i söküp atmak için)
+ * @param {function} onIntroStart     afişler hazır olup giriş başlayınca (bir kez) çağrılır
  * @param {node}     children         halka/logonun üstünde çizilir, çıkışla birlikte solar
  */
 export default function SplashPosterWave(props) {
