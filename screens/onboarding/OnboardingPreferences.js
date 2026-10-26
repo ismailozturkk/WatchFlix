@@ -146,8 +146,12 @@ function GenreTile({ theme, accent, label, icon, order, locked, onPress }) {
           color={selected ? (isLightSurface(accent) ? "#111827" : "#FFFFFF") : accent}
         />
       </View>
+      {/* Tek kelimelik ad tek satırda küçülür: iki satır izni Android'de
+          "Documentar/y" diye kelimeyi ortadan bölüyordu (T3 B2). */}
       <Text
-        numberOfLines={2}
+        numberOfLines={/\s/.test(label) ? 2 : 1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
         maxFontSizeMultiplier={1.2}
         style={[styles.genreLabel, { color: theme.text.primary }]}
       >

@@ -846,8 +846,8 @@ export default function SettingsScreen() {
                 {t.posterQuality}
               </Text>
               <Text allowFontScaling={false} style={[s.rowSub, { color: C.muted }]}>
-                {currentQualityLabel} · poster:{imageQuality.poster} · backdrop:
-                {imageQuality.backdrop}
+                {/* Seviye adı sağdaki rozette; burada ham "poster:good" yazıyordu (T3 B11). */}
+                {i18nText("autoI18n.poster_kalitesi_alt", "Afiş ve arka plan görsellerinin çözünürlüğü")}
               </Text>
             </View>
             <View style={[s.qualityBadge, { backgroundColor: C.accentDim }]}>
@@ -906,7 +906,7 @@ export default function SettingsScreen() {
                 ? `${t.downloadDataSubtitle} · ${countEnabledTypes(dataCacheTypes)}/${DATA_TYPE_COUNT} ${i18nText("autoI18n.tur_kucuk", "tür")}`
                 : i18nText(
                     "autoI18n.veri_indirme_kapali_alt",
-                    "Kapalı — hiçbir veri veya poster indirilmez",
+                    "Kapalı — çevrimdışı kullanım için cihaza kaydedilmez",
                   )
             }
             right={

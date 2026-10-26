@@ -117,7 +117,10 @@ export default function OnboardingScreen({ navigation }) {
   // (ve hızlı kaydırmalar) huniye "görüldü" diye yazılmasın.
   useEffect(() => {
     if (phase !== "main") return undefined;
-    const key = `${index}:${language}`;
+    // Anahtar yalnız adım: dil düğmesine basmak aynı adımı yeniden "görüldü"
+    // saydırıp huninin ilk basamağını şişiriyordu (T3 B3). Olay, adımın ilk
+    // görüldüğü dili taşır.
+    const key = index;
     if (lastTracked.current === key) return undefined;
     const timer = setTimeout(() => {
       lastTracked.current = key;

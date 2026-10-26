@@ -449,10 +449,19 @@ export default function LoginScreen({ navigation }) {
               <AuthCardHeader
                 theme={theme}
                 title={i18nText("autoI18n.giris_kart_baslik", "Tekrar hoş geldin")}
-                subtitle={i18nText(
-                  "autoI18n.giris_kart_alt_baslik",
-                  "E-posta, Google veya Apple ile hızlıca giriş yap.",
-                )}
+                // Apple düğmesi yalnız destekleyen cihazda çiziliyor; alt başlık
+                // olmayan seçeneği saymasın (T3 B4).
+                subtitle={
+                  isAppleAvailable
+                    ? i18nText(
+                        "autoI18n.giris_kart_alt_baslik",
+                        "E-posta, Google veya Apple ile hızlıca giriş yap.",
+                      )
+                    : i18nText(
+                        "autoI18n.e_posta_veya_google_ile_hizlica_giris_yap",
+                        "E-posta veya Google ile hızlıca giriş yap.",
+                      )
+                }
               />
 
               {/* E-posta */}

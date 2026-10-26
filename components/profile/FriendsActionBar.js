@@ -18,6 +18,7 @@ import { StyleSheet, Text, View } from "react-native";
 import AppIcon from "../AppIcon";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
+import { useLanguage } from "../../context/LanguageContext";
 import {
   buildFriendsBarModel,
   formatBadge,
@@ -116,6 +117,9 @@ function FriendsActionBar({
   onMessages,
   onRequests,
 }) {
+  // Etiketler i18nText'ten (global i18n): memo'lu çubuk dil değişince
+  // yeniden çizilsin diye dile abone (T3 B8).
+  useLanguage();
   const model = buildFriendsBarModel({ friendCount, unreadMessages, incomingRequests });
 
   return (

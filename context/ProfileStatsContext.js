@@ -547,7 +547,10 @@ export const ProfileStatsProvider = ({ children }) => {
     ...suffixRankTier(getRankTierForMinutes(totalMinutesTime), "Movie"),
     ...suffixRankTier(getRankTierForMinutes(totalMinutesTimeTv), "Tv"),
     ...getRankTierForMinutes((totalMinutesTime || 0) + (totalMinutesTimeTv || 0)),
-  }), [totalMinutesTime, totalMinutesTimeTv]);
+    // Rütbe adı i18nText ile kuruluyor: dil değişince yeniden hesaplanmazsa
+    // profilde eski dilde kalıyordu ("0 weeks", T3 B8).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [totalMinutesTime, totalMinutesTimeTv, language]);
 
   // İzlenen diziler artık subcollection'da (Lists/{uid}/watchedTv/{showId}); kök
   // doc'taki watchedTv[] dizisi migration ile boşaltılıyor. Liste ekranlarının (Profile

@@ -30,6 +30,9 @@ const MEDIA_CARD_HEIGHT = 103;
 // gerçekten harcandı.
 
 const CountModeSwitch = memo(function CountModeSwitch({ theme, mode, onToggle }) {
+  // Etiketler i18nText'ten (global i18n): dil değişince memo yeniden çizilsin
+  // diye dile abone (T3 B8).
+  useLanguage();
   const [width, setWidth] = useState(0);
   const anim = useRef(new Animated.Value(mode === "unique" ? 1 : 0)).current;
 
