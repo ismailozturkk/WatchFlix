@@ -18,7 +18,8 @@ import {
 
 const cache = new Map(); // key -> Card
 // Kart şekli değişince artır: diskteki eski kartlar (ör. backdropPath yok) yeniden çekilir.
-const CARD_VERSION = "v2";
+// v3: eşleşme kuralı değişti (T3 B9) — diskte kalmış yanlış eşleşmeler yeniden çözülsün.
+const CARD_VERSION = "v3";
 
 const langOf = (language) => (tmdbLanguageOf(language));
 // Yetişkin içerik açıkken anahtara "+adult" ekleniyor: ayar sonradan
@@ -26,6 +27,43 @@ const langOf = (language) => (tmdbLanguageOf(language));
 const cacheKey = (mediaType, language, title, includeDetails = false, includeAdult = false) =>
   `${mediaType}|${langOf(language)}|${title.toLowerCase().trim()}|${includeDetails === "lite" ? "lite" : includeDetails ? "details" : "card"}${includeAdult ? "|+adult" : ""}|${CARD_VERSION}`;
 const regionOf = (language) => (tmdbRegionOf(language));
+
+const normTitle = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/** "Knives Out (2019)" → { title: "Knives Out", year: "2019" }; yıl yoksa year "". */
+export function splitTitleYear(raw) {
+  const text = (raw || "").trim();
+  const m = text.match(/^(.*\S)\s*\((\d{4})\)$/);
+  return m ? { title: m[1], year: m[2] } : { title: text, year: "" };
+}
+
+/**
+ * Arama sonuçlarından AI'ın kastettiği yapımı seçer.
+ *
+ * Tam ad eşleşmesi ÖZGÜN adla da aranır: AI başlığı çoğunlukla özgün (İngilizce)
+ * adla yazıyor, arama ise yerelleştirilmiş adı döndürüyor. Almancada gerçek
+ * "Knives Out" adı "Knives Out – Mord ist Familiensache" olduğu için tam
+ * eşleşme yalnız yerel adla aranınca, adı tam "Knives Out" olan az bilinen bir
+ * yapım kazanıyordu (T3 B9). Birden çok tam eşleşmede oy sayısı yüksek olan;
+ * AI yıl verdiyse o yılın yapımı önce gelir.
+ */
+export function pickBestMatch(results, query, year = "") {
+  const list = Array.isArray(results) ? results.filter(Boolean) : [];
+  if (!list.length) return null;
+  const q = normTitle(query);
+  const yearOf = (r) => String(r.release_date || r.first_air_date || "").slice(0, 4);
+  const byVotes = (a, b) => (b.vote_count || 0) - (a.vote_count || 0);
+  const yearFirst = (pool) => {
+    const sorted = [...pool].sort(byVotes);
+    return (year && sorted.find((r) => yearOf(r) === year)) || sorted[0];
+  };
+  const exact = list.filter((r) =>
+    [r.title, r.name, r.original_title, r.original_name].some(
+      (t) => t && normTitle(t) === q,
+    ),
+  );
+  return exact.length ? yearFirst(exact) : yearFirst(list);
+}
 
 function cardFromResult(result, mediaType, query) {
   const dateStr = result?.release_date || result?.first_air_date || "";
@@ -94,6 +132,7 @@ export async function lookupTitle({
   includeDetails = false,
 }) {
   const query = (title || "").trim();
+  const { title: searchTitle, year: queryYear } = splitTitleYear(query);
   const fallback = { key: `${mediaType}-${query}`, mediaType, query, found: false };
   if (!query) return fallback;
 
@@ -116,7 +155,7 @@ export async function lookupTitle({
     // RN'de URLSearchParams polyfill'i eksik olabildiğinden query'i elle kuruyoruz
     const url =
       `https://api.themoviedb.org/3/search/${mediaType}` +
-      `?query=${encodeURIComponent(query)}` +
+      `?query=${encodeURIComponent(searchTitle)}` +
       `&include_adult=${includeAdult ? "true" : "false"}` +
       `&language=${langOf(language)}` +
       `&page=1`;
@@ -130,16 +169,7 @@ export async function lookupTitle({
       (result) => includeAdult || result?.adult !== true,
     );
 
-    // En iyi eşleşme: tam ad eşleşmesini önceliklendir, yoksa en popüler/oy sayılı.
-    const norm = (s) => (s || "").toLowerCase().trim();
-    const exact = results.find(
-      (r) => norm(r.title || r.name) === norm(query),
-    );
-    const best =
-      exact ||
-      [...results].sort(
-        (a, b) => (b.vote_count || 0) - (a.vote_count || 0),
-      )[0];
+    const best = pickBestMatch(results, searchTitle, queryYear);
 
     if (!best) {
       cache.set(key, fallback);

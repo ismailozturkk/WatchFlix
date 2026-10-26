@@ -81,3 +81,30 @@ describe("TMDB detail hydration", () => {
     expect(global.fetch.mock.calls[1][0]).toContain("movie/329865");
   });
 });
+
+describe("pickBestMatch (T3 B9)", () => {
+  const { pickBestMatch, splitTitleYear } = require("../services/tmdbLookup");
+  const obscure = { id: 1, title: "Knives Out", original_title: "Knives Out", release_date: "2016-05-01", vote_count: 12 };
+  const real = {
+    id: 546554,
+    title: "Knives Out – Mord ist Familiensache",
+    original_title: "Knives Out",
+    release_date: "2019-11-27",
+    vote_count: 15000,
+  };
+
+  test("yerel ad farklıyken özgün adla eşleşir, oy sayısı yüksek olan kazanır", () => {
+    expect(pickBestMatch([obscure, real], "Knives Out").id).toBe(546554);
+  });
+
+  test("AI yıl verdiyse o yılın yapımı önce gelir", () => {
+    expect(pickBestMatch([real, obscure], "knives out", "2016").id).toBe(1);
+    expect(splitTitleYear("Knives Out (2019)")).toEqual({ title: "Knives Out", year: "2019" });
+    expect(splitTitleYear("Se7en")).toEqual({ title: "Se7en", year: "" });
+  });
+
+  test("tam eşleşme yoksa en çok oy alan; boşta null", () => {
+    expect(pickBestMatch([obscure, real], "Rian Johnson").id).toBe(546554);
+    expect(pickBestMatch([], "x")).toBeNull();
+  });
+});
