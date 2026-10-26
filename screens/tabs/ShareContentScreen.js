@@ -25,6 +25,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useProfileUi } from "../../context/ProfileUiContext";
 import { usePosts } from "../../context/PostsContext";
+import { useFriends } from "../../context/FriendsContext";
 import {
   useApiSettings,
   useImageQualitySettings,
@@ -171,7 +172,10 @@ export default function ShareContentScreen({ route }) {
     deletePost,
     editPost,
     votePoll,
+    hidePost,
+    unhidePost,
   } = usePosts();
+  const { block } = useFriends();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPost, setEditingPost] = useState(null); // null = create, obj = edit
@@ -258,7 +262,9 @@ export default function ShareContentScreen({ route }) {
     setCommentPost(null);
   }, []);
 
-  // Başkasının gönderisini şikayet et (onay → PostReports'a yaz).
+  // Başkasının gönderisini şikayet et (onay → PostReports'a yaz). Şikâyet edilen
+  // gönderi bu kullanıcının akışından kalkar ("Geri Al" ile döner); isteyen
+  // yazarı da aynı adımda engeller (T3 B15 — mağaza UGC şartı: bildir + engelle).
   const handleReportPost = useCallback(
     (post) => {
       if (!post?.id) return;
@@ -266,6 +272,37 @@ export default function ShareContentScreen({ route }) {
         toast.warning(i18nText("autoI18n.sikayet_icin_giris_yap", "Şikayet için giriş yap"));
         return;
       }
+      const submit = async (alsoBlock) => {
+        try {
+          await reportPost(post.id, user.uid, {
+            postAuthorId: post.authorId || null,
+          });
+        } catch (e) {
+          toast.error(i18nText("autoI18n.sikayet_gonderilemedi", "Şikayet gönderilemedi"));
+          return;
+        }
+        if (alsoBlock && post.authorId && post.authorId !== user.uid) {
+          // Engel süzgeci yazarın tüm gönderilerini zaten kaldırır; block kendi
+          // toast'ını gösterir.
+          await block(post.authorId);
+          return;
+        }
+        const hidden = await hidePost(post.id);
+        if (!hidden) {
+          toast.success(
+            i18nText("autoI18n.sikayetin_alindi", "Şikayetin alındı"),
+            i18nText("autoI18n.inceleyecegiz_tesekkurler", "İnceleyeceğiz, teşekkürler."),
+          );
+          return;
+        }
+        toast.undo(
+          i18nText(
+            "autoI18n.sikayet_alindi_gonderi_gizlendi",
+            "Şikayetin alındı, gönderi akışından kaldırıldı",
+          ),
+          () => unhidePost(post.id),
+        );
+      };
       appAlert(
         i18nText("autoI18n.gonderiyi_sikayet_et", "Gönderiyi şikayet et"),
         i18nText("autoI18n.bu_gonderiyi_uygunsuz_olarak_bildirmek_istiyor_musun", "Bu gönderiyi uygunsuz olarak bildirmek istiyor musun?"),
@@ -274,24 +311,21 @@ export default function ShareContentScreen({ route }) {
           {
             text: i18nText("autoI18n.sikayet_et", "Şikayet et"),
             style: "destructive",
-            onPress: async () => {
-              try {
-                await reportPost(post.id, user.uid, {
-                  postAuthorId: post.authorId || null,
-                });
-                toast.success(
-                  i18nText("autoI18n.sikayetin_alindi", "Şikayetin alındı"),
-                  i18nText("autoI18n.inceleyecegiz_tesekkurler", "İnceleyeceğiz, teşekkürler."),
-                );
-              } catch (e) {
-                toast.error(i18nText("autoI18n.sikayet_gonderilemedi", "Şikayet gönderilemedi"));
-              }
-            },
+            onPress: () => submit(false),
           },
+          ...(post.authorId && post.authorId !== user.uid
+            ? [
+                {
+                  text: i18nText("autoI18n.sikayet_et_ve_engelle", "Şikayet et ve engelle"),
+                  style: "destructive",
+                  onPress: () => submit(true),
+                },
+              ]
+            : []),
         ],
       );
     },
-    [user?.uid],
+    [user?.uid, hidePost, unhidePost, block],
   );
 
   const greeting = useMemo(() => {

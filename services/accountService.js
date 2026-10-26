@@ -557,6 +557,8 @@ export async function purgeUserData(uid) {
     // Grup okunmamış sayaçları (groupInbox/{groupId}); sunucu süpürmesi Users
     // ağacını recursiveDelete ile zaten götürür.
     "groupInbox",
+    // Şikâyet edilip gizlenen gönderiler (hiddenPostsService).
+    "hiddenPosts",
     "gameProfile",
     "gameStats",
     "gameSessions",

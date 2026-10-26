@@ -28,6 +28,11 @@ import { captureError } from "../services/crashReporting";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
 import { POST_TYPES } from "../utils/postComposer";
 import useStartupGate from "../hooks/useStartupGate";
+import {
+  hidePost as hidePostApi,
+  subscribeHiddenPosts,
+  unhidePost as unhidePostApi,
+} from "../services/hiddenPostsService";
 
 
 const PostsContext = createContext();
@@ -85,6 +90,58 @@ export function PostsProvider({ children }) {
 
   const [likedIds, setLikedIds] = useState(() => new Set());
   const [bookmarkIds, setBookmarkIds] = useState(() => new Set());
+  // Şikâyet edilip gizlenen gönderiler (Users/{uid}/hiddenPosts, T3 B15).
+  const [hiddenIds, setHiddenIds] = useState(() => new Set());
+
+  useEffect(() => {
+    if (!startupReady || !user?.uid) {
+      setHiddenIds(new Set());
+      return undefined;
+    }
+    return subscribeHiddenPosts(user.uid, setHiddenIds);
+  }, [startupReady, user?.uid]);
+
+  // İyimser: dinleyici gelmeden kart akıştan kalkar; yazım düşerse geri gelir.
+  const setHidden = useCallback((postId, hidden) => {
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      if (hidden) next.add(String(postId));
+      else next.delete(String(postId));
+      return next;
+    });
+  }, []);
+
+  const hidePost = useCallback(
+    async (postId) => {
+      if (!user?.uid || !postId) return false;
+      setHidden(postId, true);
+      try {
+        await hidePostApi(user.uid, postId);
+        return true;
+      } catch (error) {
+        setHidden(postId, false);
+        captureError(error, { tags: { source: "hide_post" } });
+        return false;
+      }
+    },
+    [user?.uid, setHidden],
+  );
+
+  const unhidePost = useCallback(
+    async (postId) => {
+      if (!user?.uid || !postId) return false;
+      setHidden(postId, false);
+      try {
+        await unhidePostApi(user.uid, postId);
+        return true;
+      } catch (error) {
+        setHidden(postId, true);
+        captureError(error, { tags: { source: "unhide_post" } });
+        return false;
+      }
+    },
+    [user?.uid, setHidden],
+  );
 
   // Realtime listener — sadece "all" filtresinde aktif.
   const unsubRef = useRef(null);
@@ -523,9 +580,13 @@ export function PostsProvider({ children }) {
   // `posts` state'inde YAPILMIYOR: sayfalama (loadMore) ve iyimser güncellemeler
   // (beğeni, düzenleme, silme) ham listeyi kimliğe göre buluyor; oradan öğe
   // çıkarmak o akışları bozardı. Süzme yalnız görünürlük katmanında.
+  // Şikâyet edilen gönderiler de aynı katmanda süzülür (T3 B15).
   const visiblePosts = useMemo(
-    () => posts.filter((post) => !isBlocked(post?.authorId)),
-    [posts, isBlocked],
+    () =>
+      posts.filter(
+        (post) => !isBlocked(post?.authorId) && !hiddenIds.has(String(post?.id)),
+      ),
+    [posts, isBlocked, hiddenIds],
   );
 
   const value = useMemo(
@@ -551,6 +612,8 @@ export function PostsProvider({ children }) {
       deletePost,
       editPost,
       votePoll,
+      hidePost,
+      unhidePost,
       // constants
       FILTERS,
       SORTS,
@@ -573,6 +636,8 @@ export function PostsProvider({ children }) {
       deletePost,
       editPost,
       votePoll,
+      hidePost,
+      unhidePost,
     ],
   );
 

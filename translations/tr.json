@@ -2075,6 +2075,8 @@
     "bu_gonderiyi_uygunsuz_olarak_bildirmek_istiyor_musun": "Bu gönderiyi uygunsuz olarak bildirmek istiyor musun?",
     "sikayet_et": "Şikayet et",
     "sikayetin_alindi": "Şikayetin alındı",
+    "sikayet_et_ve_engelle": "Şikayet et ve engelle",
+    "sikayet_alindi_gonderi_gizlendi": "Şikayetin alındı, gönderi akışından kaldırıldı",
     "inceleyecegiz_tesekkurler": "İnceleyeceğiz, teşekkürler.",
     "sikayet_gonderilemedi": "Şikayet gönderilemedi",
     "tamam": "Tamam",

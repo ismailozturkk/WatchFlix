@@ -2075,6 +2075,8 @@
     "bu_gonderiyi_uygunsuz_olarak_bildirmek_istiyor_musun": "Do you want to report this post as inappropriate?",
     "sikayet_et": "Report",
     "sikayetin_alindi": "Report received",
+    "sikayet_et_ve_engelle": "Report and block",
+    "sikayet_alindi_gonderi_gizlendi": "Report received, post removed from your feed",
     "inceleyecegiz_tesekkurler": "We will review it, thank you.",
     "sikayet_gonderilemedi": "Could not send report",
     "tamam": "OK",

@@ -453,6 +453,16 @@ service cloud.firestore {
       allow read, write: if isOwner(uid);
     }
 
+    // Şikâyet edilen gönderiler şikâyet edenin akışında gizlenir (T3 B15).
+    // Yalnız sahibi okur/yazar; belge kimliği gönderi kimliği.
+    match /Users/{uid}/hiddenPosts/{postId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+                            && request.resource.data.keys().hasOnly(['postId', 'reason', 'hiddenAt'])
+                            && request.resource.data.postId == postId
+                            && request.resource.data.get('reason', 'report') in ['report'];
+    }
+
     // ─── Gizli kullanıcı verisi (yalnız sahibi) ─────────────────────────
     // Users/{uid} kök dokümanı TÜM oturumlulara okunur (profil kartları,
     // arkadaş listeleri). Bu yüzden başkasının görmemesi gereken hiçbir alan
