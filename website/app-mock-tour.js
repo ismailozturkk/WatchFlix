@@ -109,19 +109,17 @@
       }).join("") + "</div></div>";
   };
 
-  /* ═══ Listeler · hatırlatıcılar · notlar ═════════════════════════════ */
+  /* ═══ Listeler · hatırlatıcılar · notlar (Kütüphane sekmesinin parçaları) ═ */
   S.lists = function () {
-    function lc(ids, name, n) { return '<div class="am-lc2"><div class="am-collage">' + ids.map(function (id) { return img(id, 185); }).join("") + "</div><b>" + name + "</b><small>" + n + "</small></div>"; }
-    function rem(id, tag, title, sub, chipTxt, hot) {
-      return '<div class="am-rem2"><span class="am-rem-img">' + img(id, 185) + '</span><div><small class="am-tag">' + tag + "</small><b>" + title + "</b><small>" + sub + '</small></div><span class="am-today' + (hot ? "" : " calm") + '">' + chipTxt + "</span></div>";
-    }
-    return '<div class="am-scroll am-pushed">' + nav(t("mLists"), '<span class="am-roundbtn sm">' + ic("plus", 16) + "</span>") +
-      '<div class="am-lgrid">' + lc([MOV.dune, MOV.interstellar, MOV.parasite, MOV.dark], t("mWatchedMovies"), "439") + lc([TVS.bb, TVS.st, TVS.tlou, TVS.got], t("mWatchedTv"), "128") + lc([MOV.eternal, MOV.ww84, MOV.dune, MOV.ddlj], t("mFavorites"), "64") + lc([TVS.jl, TVS.falcon, MOV.parasite, TVS.twd], t("mWatchlist"), "52") + "</div>" +
-      '<div class="am-lab">' + t("mReminders") + "</div>" +
-      rem(TVS.st, t("mTvTag"), "Stranger Things", t("mSeasonEp", { season: 4, episode: 6 }), t("mToday"), true) +
-      rem(MOV.dune, t("mFilmTag"), "Dune", date(2026, 10, 28, { day: "numeric", month: "short" }), "3 " + t("mDays"), false) +
-      '<div class="am-lab">' + t("mNotes") + "</div>" +
-      '<div class="am-card am-note"><b>' + t("mGroupName") + '</b><div class="am-todo done">' + ic("check", 12) + "<span>Dune</span></div>" + '<div class="am-todo">' + ic("check", 12) + "<span>Arrival</span></div>" + '<div class="am-todo">' + ic("check", 12) + "<span>Parasite</span></div></div></div>";
+    return '<div class="am-scroll am-pushed">' + nav(t("mLists"), '<span class="am-roundbtn sm">' + ic("plus", 14) + "</span>") +
+      '<div class="am-lgrid">' + H.lcard([TVS.fallout, TVS.moneyHeist, TVS.got, TVS.twd, TVS.office], "tv-fill", t("mWatchedTv"), 17, "#8B5CF6") +
+      H.lcard([MOV.venom, MOV.avengers, MOV.interstellar, MOV.inception, MOV.oneBattle], "film", t("mWatchedMovies"), 22, "#3B82F6") +
+      H.lcard([MOV.forrest, MOV.pulp, MOV.shawshank, MOV.fightClub, MOV.titanic], "heart-fill", t("mFavorites"), 12, "#EF4444") +
+      H.lcard([TVS.bear, TVS.reacher, TVS.mobland, TVS.shogun, TVS.pitt], "bookmark", t("mWatchlist"), 9, "#F59E0B") + "</div>" +
+      '<div class="am-lab">' + t("mReminderLabel") + "</div>" +
+      H.remCard(MOV.mongoose, true, "Mongoose", "99 " + t("mMin"), date(2026, 9, 29), 3) +
+      H.remCard(TVS.st, false, "Stranger Things", t("mSeShort", { s: 5, e: 1 }), date(2026, 10, 6), 11) +
+      '<div class="am-lab">' + t("mNotes") + "</div>" + H.notesCard() + "</div>";
   };
 
   /* ═══ Hikâye kartı ════════════════════════════════════════════════════ */
@@ -138,16 +136,11 @@
 
   /* ═══ Görünüm ve dil (Kişiselleştirme) ═══════════════════════════════ */
   S.custom = function (st) {
-    var fams = [["default", "mFamDefault"], ["blue", "mFamBlue"], ["green", "mFamGreen"]];
-    var tones = [["light", "mToneLight"], ["mid", "mToneMid"], ["dark", "mToneDark"]];
     var langs = [["Türkçe", "Turkish", 0], ["English", "English", 1], ["Español", "Spanish", 0], ["Português", "Portuguese", 0], ["Deutsch", "German", 0]];
     var cur = AM.lang();
     var code = { tr: 0, en: 1, es: 2, pt: 3, de: 4 }[cur];
     return '<div class="am-scroll am-pushed">' + nav(t("mGrpAppearance"), "") +
-      '<div class="am-card am-theme"><div class="am-theme-h"><span class="am-row-ic">' + ic("palette", 15) + "</span><b>" + t("mTheme") + "</b></div>" +
-      '<div class="am-seg3">' + fams.map(function (f) { return '<button type="button" data-fam="' + f[0] + '" class="' + (st.family === f[0] ? "on" : "") + '">' + t(f[1]) + "</button>"; }).join("") + "</div>" +
-      '<div class="am-seg3">' + tones.map(function (f) { return '<button type="button" data-tone="' + f[0] + '" class="' + (st.tone === f[0] ? "on" : "") + '">' + t(f[1]) + "</button>"; }).join("") + "</div>" +
-      '<div class="am-swatch"><span class="a"><b>Aa</b></span><span class="b"><b>Aa</b></span><span class="c"><b>Aa</b></span></div></div>' +
+      H.themeCard(st).replace(/<\/div>$/, '<div class="am-swatch"><span class="a"><b>Aa</b></span><span class="b"><b>Aa</b></span><span class="c"><b>Aa</b></span></div></div>') +
       '<div class="am-card stacked">' + H.row("palette", t("mThemeStudio"), null, { tone: "violet" }) + H.row("font", t("mFontsAll"), null, { tone: "orange" }) + H.row("key", t("mAppIcon"), null, { tone: "teal", right: '<span class="am-icons"><i style="--g:linear-gradient(135deg,#2ee6d6,#138df0)"></i><i style="--g:linear-gradient(135deg,#8b7cf6,#ff8ad4)"></i><i style="--g:linear-gradient(135deg,#ffc247,#ff7a59)"></i></span>' }) + "</div>" +
       '<div class="am-lab">' + t("mLanguage").toUpperCase() + "</div>" +
       '<div class="am-card">' + langs.map(function (l, i) {

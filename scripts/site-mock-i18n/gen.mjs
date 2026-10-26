@@ -19,6 +19,12 @@ LANGS.forEach((l) => (json[l] = JSON.parse(fs.readFileSync(root + `translations/
 const { AI_COPY } = await import(base + "utils/aiCopy.js");
 const { HOME_SECTIONS } = await import(base + "utils/homeSectionCopy.js");
 const { DISCOVER_FILTERS_COPY } = await import(base + "screens/shared/discoverFiltersCopy.js");
+const { BINGO_COPY } = await import(base + "utils/cinemaBingoCopy.js");
+const { OLDER_COPY } = await import(base + "utils/olderGameCopy.js");
+const { QUICK_COPY } = await import(base + "utils/quickGamesCopy.js");
+const { FAVORITES_COPY } = await import(base + "utils/favoritesCopy.js");
+const { getWrappedStrings } = await import(base + "utils/wrappedStrings.js");
+const { worldTourName, worldTourTitle } = await import(base + "utils/worldTour.js");
 
 const get = (o, p) => p.split(".").reduce((a, k) => (a == null ? a : a[k]), o);
 const clean = (s) => String(s).replace(/\{\{(\w+)\}\}/g, "{$1}");
@@ -29,6 +35,17 @@ const DF = (p) => (l) => get(DISCOVER_FILTERS_COPY[l], p);
 const HS = (id, sub) => (l) => get(HOME_SECTIONS[id].subtitle, sub ? `${sub}.${l}` : l);
 const T = (en, tr, es, pt, de) => (l) => ({ en, tr, es, pt, de }[l]);
 const SAME = (v) => () => v;
+// Kopya tabloları (5 dil, saf veri). İşlev olan metinler yer tutucuyla çağrılır: ("{n}") → "{n}/3 hedef".
+const COPY = (table, p, ...args) => (l) => {
+  const v = get(table[l], p);
+  return typeof v === "function" ? v(...args) : v;
+};
+const BINGO = (p, ...a) => COPY(BINGO_COPY, p, ...a);
+const OLDER = (p) => COPY(OLDER_COPY, p);
+const QUICK = (p) => COPY(QUICK_COPY, p);
+const FAV = (p, ...a) => COPY(FAVORITES_COPY, p, ...a);
+const WR = (p) => (l) => get(getWrappedStrings(l), p);
+const TRIM = (src) => (l) => { const v = src(l); return v == null ? v : String(v).trim(); };
 
 // Genel-özel anahtar → kaynak
 const SPEC = {
@@ -149,6 +166,88 @@ const SPEC = {
   mThemeStudio: T("Theme Studio", "Tema Stüdyosu", "Estudio de temas", "Estúdio de temas", "Theme-Studio"),
   mFontsAll: T("All fonts", "Tüm yazı tipleri", "Todas las fuentes", "Todas as fontes", "Alle Schriften"),
   mAppIcon: T("App icon", "Uygulama simgesi", "Icono de la app", "Ícone do app", "App-Symbol"),
+
+  // ── Film & Dizi raf başlıkları (uygulamanın 26 Eki görünümü) ─────────
+  mSeeAll: APP("autoI18n.tumu"),
+  mTrendMovies: APP("movieScreens.title"), mTrendTv: APP("tvShowScreens.title"),
+  mBestMovies: APP("autoI18n.en_iyi_filmler"), mBestTv: APP("autoI18n.en_iyi_diziler"),
+  mVotedTv: APP("tvShowScreens.voted"),
+  mOscar: APP("movieScreens.oscar"), mEmmy: APP("tvShowScreens.emmy"), mAwardSub: HS("oscar"),
+  mModeCat: APP("autoI18n.oscar_mode_category"), mModeYear: APP("autoI18n.oscar_mode_year"),
+  mBestPicture: APP("autoI18n.oscar_cat_best_picture"), mIntl: APP("autoI18n.oscar_cat_international"),
+  mOscarPending: APP("autoI18n.oscar_pending_title"), mOscarPendingSub: APP("autoI18n.oscar_pending_subtitle"),
+  mEmmyPending: APP("autoI18n.emmy_pending_title"), mEmmyPendingSub: APP("autoI18n.emmy_pending_subtitle"),
+  mEmmyDrama: APP("autoI18n.emmy_cat_drama"), mEmmyComedy: APP("autoI18n.emmy_cat_comedy"),
+  mCollections: APP("movieScreens.collection"), mCollectionsSub: HS("collection"),
+  mProviders: APP("autoI18n.saglayicilar"), mProvidersSub: HS("providers"),
+  mFromFav: FAV("rail.title"), mFromFavSub: FAV("rail.subtitle", "{names}"),
+  // Başlık components/DiscoveryMediaRail.js içinde satır içi (çeviri dosyasında yok) — aynı metinler.
+  mTopGenres: T("Favorite Genres", "Favori Türlerin", "Tus géneros favoritos", "Seus gêneros favoritos", "Lieblingsgenres"),
+  mRecentFav: T("Recent Favorites", "Yeni Beğenilenler", "Favoritos recientes", "Favoritos recentes", "Aktuelle Favoriten"),
+  mRecentFavSub: HS("recentFavorites"),
+  mGenreDrama: DF("genres.18"), mGenreComedy: DF("genres.35"), mGenreSciFan: DF("genres.10765"),
+  mWorldTour: (l) => worldTourTitle(l), mWorldTourSub: HS("worldTour", "tv"),
+  mWtKo: (l) => worldTourName("ko", l), mWtJa: (l) => worldTourName("ja", l),
+  mWtTr: (l) => worldTourName("tr", l), mWtFr: (l) => worldTourName("fr", l),
+
+  // ── Eğlence (Hub) ek kartlar ──────────────────────────────────────────
+  mBingoEyebrow: BINGO("eyebrow"), mBingoTitle: BINGO("title"), mBingoHint: BINGO("cardHint"),
+  mBingoWeekly: BINGO("weeklyTitle"), mBingoWeeklyCount: BINGO("weeklyCount", "{n}"),
+  mBingoLines: BINGO("lines", "{n}"), mBingoSquares: BINGO("squares", "{done}", "{total}"),
+  mBingoDaysLeft: BINGO("daysLeft", "{n}"),
+  mPollLabel: APP("autoI18n.gunun_sorusu_bolum"),
+  // Günün sorusu sunucudan (DailyPolls) gelir; maket için örnek bir soru.
+  mPollQ: T("What kind of ending?", "Nasıl bir son?", "¿Qué tipo de final?", "Que tipo de final?", "Was für ein Ende?"),
+  mPollA: T("Happy ending", "Mutlu son", "Final feliz", "Final feliz", "Happy End"),
+  mPollB: T("Sad or open ending", "Hüzünlü ya da açık son", "Triste o abierto", "Triste ou aberto", "Traurig oder offen"),
+  mPollHint: T("Tap one to see what everyone said", "Birine dokun, herkes ne dedi gör", "Toca una para ver qué dijo todo el mundo", "Toque em uma para ver o que todos disseram", "Tippe auf eine Antwort und sieh, was alle gesagt haben"),
+  mPollVotesN: T("{n} votes", "{n} oy", "{n} votos", "{n} votos", "{n} Stimmen"),
+  mTourHorror: T("Horror Movies", "Korku Film", "Películas de terror", "Filmes de terror", "Horrorfilme"),
+  mTree: T("BRACKET", "ELEME AĞACI", "CUADRO", "CHAVE", "TURNIERBAUM"),
+  mChampion: APP("autoI18n.tournament_champion"),
+  mRounds: T("32,16,QF,SF", "32,16,ÇF,YF", "32,16,CF,SF", "32,16,QF,SF", "32,16,VF,HF"),
+  mDailyEyebrow: APP("autoI18n.gunluk_meydan_okuma"), mDailyTitle: APP("autoI18n.gunluk_bugunun_sahneleri"),
+  mDailySub: APP("autoI18n.gunluk_herkes_ayni"), mStart: APP("autoI18n.gunluk_basla"),
+  mSceneGuess: APP("autoI18n.sahne_tahmini"), mPosterPuzzle: APP("autoI18n.poster_bulmaca"),
+  mGameNew: APP("autoI18n.oyun_yeni_etiket"),
+  mQuickGames: QUICK("gridTitle"), mOlder: OLDER("title"),
+  mPopularGame: QUICK("games.popular.title"), mDecadeGame: QUICK("games.decade.title"),
+
+  // ── Kütüphane ─────────────────────────────────────────────────────────
+  mWatchedBtn: APP("autoI18n.up_next_ray_izledim"),
+  mEpN: T("Episode {n}", "{n}. Bölüm", "Episodio {n}", "Episódio {n}", "Folge {n}"),
+  mSeShort: T("S{s}·E{e}", "S{s}·B{e}", "T{s}·E{e}", "T{s}·E{e}", "S{s}·F{e}"),
+  mReminderLabel: T("Reminders", "Hatırlatıcı", "Recordatorios", "Lembretes", "Erinnerungen"),
+  mNoteEntries: T("{n} entry", "{n} kayıt", "{n} entrada", "{n} item", "{n} Eintrag"),
+  mNoteWord: T("note", "not", "nota", "nota", "Notiz"), mListWord: T("list", "liste", "lista", "lista", "Liste"),
+  mWrTotal: WR("hubEyebrowTotal"), mWrHours: WR("hours"), mWrHoursShort: WR("hubHoursShort"),
+  mWrVsLast: WR("hubVsLastYear"), mWrPeak: WR("hubPeak"), mWrPersona: WR("hubPersonality"),
+  mWrActive: WR("hubTileActiveDays"), mWrStreak: WR("hubTileStreak"),
+  mWrReady: WR("entrySubtitle"), mWrCta: WR("entryCta"),
+  mWrArchive: WR("hubArchiveTitle"), mWrArchiveSub: WR("hubArchiveSubMany"),
+  mPersonaDrama: T("Soul Wanderer", "Duygu Yolcusu", "Alma errante", "Alma errante", "Seelenwanderer"),
+  mFilmWord: APP("AICineChat.movie"), mTvWord: APP("AICineChat.series"), mEpisodeWord: APP("autoI18n.bolum"),
+
+  // ── Profil ────────────────────────────────────────────────────────────
+  mJoined: APP("autoI18n.katilma_tarihi"),
+  mWithRewatch: APP("autoI18n.tekrarli"), mUnique: APP("autoI18n.tekrarsiz"),
+  mWeeksN: T("{n} wk", "{n} hafta", "{n} sem.", "{n} sem.", "{n} Wo."),
+  mUnitY: TRIM(APP("profileScreen.years")), mUnitMo: TRIM(APP("profileScreen.months")),
+  mUnitD: TRIM(APP("profileScreen.days")), mUnitH: TRIM(APP("profileScreen.hours")), mUnitMin: TRIM(APP("profileScreen.minutes")),
+  mActCount: T("{n} activities", "{n} etkinlik", "{n} actividades", "{n} atividades", "{n} Aktivitäten"),
+  mActSub: APP("autoI18n.aktivite_arsivi_aciklama"), mLogout: APP("logout"),
+
+  // ── CineMatch tam ekran ───────────────────────────────────────────────
+  mAiLeft: AI("quota.left"), mAiMoment: AI("moment.lateNight"),
+  mAiHero: APP("AICineChat.emptyTitle"), mAiHeroSub: APP("AICineChat.emptyText"),
+  mAiTabExplore: APP("AICineChat.tabs.explore"), mAiTabExploreHint: APP("AICineChat.tabHints.explore"),
+  mAiTabPlan: APP("AICineChat.tabs.plan"), mAiTabPlanHint: APP("AICineChat.tabHints.plan"),
+  mAiTabLists: APP("AICineChat.tabs.lists"), mAiTabListsHint: APP("AICineChat.tabHints.lists"),
+  mAiForYou: APP("AICineChat.personalizedChip"), mGenreAction: QUICK("genres.action"),
+  mAiChip0: APP("AICineChat.chips.explore.0.label"), mAiChip1: APP("AICineChat.chips.explore.1.label"),
+  mAiChip2: APP("AICineChat.chips.explore.2.label"), mAiChip3: APP("AICineChat.chips.explore.3.label"),
+  mAiChip4: APP("AICineChat.chips.explore.4.label"), mAiChip5: APP("AICineChat.chips.explore.5.label"),
+  mAiSurprise: AI("vibe.surprise"), mAiPlaceholder: APP("AICineChat.placeholder"),
 };
 
 const out = {};

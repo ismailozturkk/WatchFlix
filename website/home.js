@@ -516,7 +516,7 @@
     var front = $("#phoneFront");
     var back = $("#phoneBack");
     if (front) { AM.create(front, { tabs: true, screen: "movies" }); AM.fit(front, 1.05, 0.64); }
-    if (back) { AM.create(back, { tabs: false, screen: "stats" }); AM.fit(back, 1.05, 0.64); }
+    if (back) { AM.create(back, { tabs: false, screen: "hub" }); AM.fit(back, 1.05, 0.64); }
   }
 
   /* ── Başlat ─────────────────────────────────────────────────────── */

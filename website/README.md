@@ -88,9 +88,17 @@ Firebase Console'dan temizlenmeli (kural kaldırmak veriyi silmez).
   (`assets/avatar`) üçüncü taraf lisanslı olabileceği için kullanılmadı; avatarlar gradyan + harf.
 - **Hero telefonu** (`app-mock.js`) uygulamanın sekme yapısını izler: Film&Dizi · Eğlence · Kütüphane ·
   Profil + ayrık CineMatch düğmesi; Ayarlar sekme değil, Profil'in dişlisinden açılır. Sekmeler,
-  Film/Dizi anahtarı, Haftanın/Günün trendleri, tema seçici (Ayarlar → Görünüm: aile × ton, 9 tema
-  `theme/colors.js` belirteçleriyle) ve CineMatch ruh hali seçicisi (seçince "Bana öner" → sonuçlar)
-  tıklanır. Telefon 300×630 tasarım boyutunda çizilir, kap genişliğine göre `--k` ile ölçeklenir.
+  Diziler/Filmler anahtarı, Haftanın/Günün trendleri (ortalanan büyük afiş dönencesi), En çok oylanan /
+  En popüler çipleri, Günün sorusu (dokununca yüzdeler), tema seçici (Ayarlar → Görünüm: aile × ton +
+  Tema Stüdyosu düğmesi) ve tam ekran CineMatch'in ruh hali seçicisi ("Bana öner" → sonuçlar) tıklanır.
+  Telefon 300×630 tasarım boyutunda çizilir, kap genişliğine göre `--k` ile ölçeklenir.
+- **Görünüm uygulamanın 26 Eki 2026 ekran görüntülerinden ölçüldü** (736 px genişlik → 284 px ekran, ×0,386):
+  tema Tema Stüdyosu'nda `#121123` + `#545DF8` tohumlarından üretilen özel tema (`studio`; açık/koyu tonlar
+  `utils/themeStudio.js → deriveToneSet` ile), yazı tipleri uygulamanın rol bazlı seçimi: başlık **Denk One**,
+  gövde **Nova Square**, rakam **Audiowide** (Google Fonts, `index.html`), sekme etiketleri sistem fontu.
+  Varsayılan sistem fontuna dönmek için `app-mock.css`'teki `--fh/--fb/--fn`'i değiştirmek yeter.
+  Afiş yolları TMDB'nin en-US afişleridir (`MOV`/`TVS`/`COL` tabloları); karttaki sınıf adları siteyle
+  çakışmamalı (`.tour`, `.ok` ve `--ink` sitede tanımlı — turnuva kartı bu yüzden `.am-hub.trn`).
   **Sekme düzeni uygulamanın o günkü çalışma ağacından alındı** (21 Eki: Hub→Eğlence, Ayarlar→Profil,
   yeni Kütüphane). Uygulama düzeni değişirse `app-mock.js` içindeki `TABS`, `PARENT_TAB` ve ilgili
   `screens.*` işlevlerini güncelle; etiketler `mock-i18n.js`'te (`mTab*`).
