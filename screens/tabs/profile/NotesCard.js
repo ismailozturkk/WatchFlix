@@ -25,7 +25,7 @@ import { useProfileNotes } from "../../../context/ProfileNotesContext";
 import { useDeviceNotifications } from "../../../context/DeviceNotificationsContext";
 import * as Haptics from "../../../services/hapticsService";
 import { alpha } from "../../../theme/colors";
-import { i18nText } from "../../../utils/i18nText";
+import { i18nCount, i18nText } from "../../../utils/i18nText";
 import { PRIME_HANDOFF_MS } from "../../../utils/notificationPriming";
 import { buildNoteColorPairs, sortNotes, todoStats } from "../../../utils/notesView";
 import { formatNoteDate } from "./notes/NoteCards";
@@ -324,7 +324,7 @@ export default function NotesCard({ navigation }) {
 
   const headerTitle =
     ready && !isEmpty
-      ? i18nText("autoI18n.notes_toplam", "{{n}} kayıt", { n: noteCount + todoCount })
+      ? i18nCount("autoI18n.notes_toplam", "{{n}} kayıt", noteCount + todoCount)
       : title;
 
   return (
@@ -454,10 +454,16 @@ export default function NotesCard({ navigation }) {
               >
                 {i18nText("autoI18n.henuz_not_eklenmedi", "Henüz not eklenmedi")}
               </Text>
-              <View
-                style={[
+              {/* Gerçek düğme: eskiden görsel bir kutuydu, dokunuş kartın kendisine
+                  gidip yalnız Notlar ekranını açıyordu (T3 B11). */}
+              <Pressable
+                onPress={() => openEditor("note")}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={i18nText("autoI18n.notes_yeni_not", "Yeni not")}
+                style={({ pressed }) => [
                   styles.emptyCta,
-                  { backgroundColor: alpha(accent, 0.14), borderColor: alpha(accent, 0.4) },
+                  { backgroundColor: alpha(accent, pressed ? 0.24 : 0.14), borderColor: alpha(accent, 0.4) },
                 ]}
               >
                 <Ionicons name="add" size={14} color={accent} />
@@ -467,7 +473,7 @@ export default function NotesCard({ navigation }) {
                 >
                   {i18nText("autoI18n.notes_yeni_not", "Yeni not")}
                 </Text>
-              </View>
+              </Pressable>
             </View>
           ) : (
             <View style={styles.body}>

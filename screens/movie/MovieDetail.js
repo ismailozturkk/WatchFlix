@@ -1,5 +1,6 @@
 import { tmdbLanguageOf, tmdbRegionOf } from "../../utils/appLanguages";
 import { alpha } from "@theme/colors";
+import { isLightSurface } from "@utils/colorUtils";
 import React, { useEffect, useState, useMemo, useCallback, useRef, memo } from "react";
 import {
   StyleSheet,
@@ -770,7 +771,9 @@ export default function MovieDetails({ navigation, route }) {
       composePost: {
         composeKey: `movie-${id}-${Date.now()}`,
         postType: "review",
-        title: title ? `${title} incelemesi` : i18nText("autoI18n.yeni_inceleme", "Yeni inceleme"),
+        title: title
+          ? i18nText("autoI18n.inceleme_basligi", "{{title}} incelemesi", { title })
+          : i18nText("autoI18n.yeni_inceleme", "Yeni inceleme"),
         content: "",
         selectedMedia: [
           {
@@ -930,7 +933,13 @@ export default function MovieDetails({ navigation, route }) {
           )}
           {/* Deep gradient */}
           <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.15)", theme.primary]}
+            // Açık temada ara durak koyu değil tema rengi: başlık bu bölgede duruyor
+            // ve koyu yazı koyulaşmış görselin üstünde okunmuyordu (T3 B11).
+            colors={[
+              "transparent",
+              isLightSurface(theme.primary) ? alpha(theme.primary, 0.7) : "rgba(0,0,0,0.15)",
+              theme.primary,
+            ]}
             locations={[0.3, 0.65, 1]}
             style={styles.heroGradient}
             pointerEvents="none"
@@ -969,7 +978,18 @@ export default function MovieDetails({ navigation, route }) {
           <View style={styles.titleBlock}>
             <Text
               allowFontScaling={false}
-              style={[styles.title, { color: theme.text.primary }]}
+              // Başlık arka planın tema rengine solduğu sınırda duruyor; açık temada
+              // koyu yazı görselin koyu kısmına binince okunmuyordu (T3 B11). Tema
+              // yüzeyi renginde hale: açık temada açık, koyu temada koyu.
+              style={[
+                styles.title,
+                {
+                  color: theme.text.primary,
+                  textShadowColor: theme.primary,
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: 4,
+                },
+              ]}
             >
               {details.title}
             </Text>

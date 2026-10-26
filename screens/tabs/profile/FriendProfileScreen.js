@@ -902,7 +902,9 @@ export default function FriendProfileScreen({ route, navigation }) {
           socialLinks={canViewProfile ? profile.socialLinks : null}
           memberSince={
             canViewProfile && memberSince
-              ? `${memberSince} ${i18nText("autoI18n.tarihinden_beri_uye", "tarihinden beri üye")}`
+              ? i18nText("autoI18n.uye_tarihi_cumle", "{{date}} tarihinden beri üye", {
+                  date: memberSince,
+                })
               : null
           }
         />

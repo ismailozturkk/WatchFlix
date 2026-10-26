@@ -32,11 +32,11 @@ const AYLAR = Object.freeze({
   en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
   es: ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
   pt: ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"],
-  de: ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"],
+  de: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
 });
 
 /**
- * "2026-10-15" → "15 Ekim 2026" / "Oct 15, 2026". Geçersiz girdide null (çağıran
+ * "2026-10-15" → "15 Ekim 2026" / "Oct 15, 2026" / "15. Oktober 2026". Geçersiz girdide null (çağıran
  * etiketi hiç çizmez; "NaN Undefined" yazmaktan iyidir).
  */
 export function formatTarih(gunAnahtari, lang = "tr") {
@@ -49,6 +49,9 @@ export function formatTarih(gunAnahtari, lang = "tr") {
   const code = copyLanguage(lang, ["tr", "en", "es", "pt", "de"]);
   if (code === "en") return `${AYLAR.en[ay - 1]} ${gun}, ${yil}`;
   if (code === "es") return `${gun} de ${AYLAR.es[ay - 1]} de ${yil}`;
+  // pt/de eskiden Türkçe ay adına düşüyordu ("26 Ekim 2026", T3 B17).
+  if (code === "pt") return `${gun} de ${AYLAR.pt[ay - 1]} de ${yil}`;
+  if (code === "de") return `${gun}. ${AYLAR.de[ay - 1]} ${yil}`;
   return `${gun} ${AYLAR.tr[ay - 1]} ${yil}`;
 }
 

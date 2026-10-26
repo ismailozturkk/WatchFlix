@@ -39,7 +39,7 @@ import {
   shouldShowFilter,
   sortPeopleByName,
 } from "../../../utils/friendsListModel";
-import { i18nText } from "../../../utils/i18nText";
+import { i18nCount, i18nText } from "../../../utils/i18nText";
 
 // ConfirmSheet'i, menü sayfasının kapanış animasyonu (≈260 ms) BİTTİKTEN sonra
 // aç: iki Modal üst üste açılıp kapanırsa iOS ikincisini hiç göstermeyebilir.
@@ -270,7 +270,7 @@ export default function FriendsListScreen({ navigation }) {
         title={i18nText("autoI18n.arkadaslar", "Arkadaşlar")}
         subtitle={
           friends.length
-            ? i18nText("autoI18n.friends_ui_friends_count", "{{n}} arkadaş", { n: friends.length })
+            ? i18nCount("autoI18n.friends_ui_friends_count", "{{n}} arkadaş", friends.length)
             : undefined
         }
         right={

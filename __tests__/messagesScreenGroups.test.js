@@ -61,10 +61,12 @@ jest.mock("../components/friends/FriendsEmptyState", () => ({ __esModule: true, 
 jest.mock("../components/friends/PersonRow", () => ({ __esModule: true, default: "PersonRow" }));
 jest.mock("../components/friends/friendsTokens", () => ({ UNREAD_BADGE: "#e11d48" }));
 
-jest.mock("../utils/i18nText", () => ({
-  i18nText: (_key, fallback, vars) =>
-    String(fallback).replace(/\{\{(\w+)\}\}/g, (_, k) => String(vars?.[k] ?? "")),
-}));
+jest.mock("../utils/i18nText", () => {
+  const i18nText = (_key, fallback, vars) =>
+    String(fallback).replace(/\{\{(\w+)\}\}/g, (_, k) => String(vars?.[k] ?? ""));
+  return { i18nText, i18nCount: (key, fallback, n) => i18nText(key, fallback, { n }) };
+});
+jest.mock("../context/LanguageContext", () => ({ useLanguage: () => ({ language: "tr" }) }));
 jest.mock("../services/usageTrackerService", () => ({ trackFirestoreRead: jest.fn() }));
 
 let mockGroups = [];

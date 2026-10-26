@@ -12,6 +12,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import UserAvatar from "../common/UserAvatar";
 import { memberColor } from "@services/groupsService";
+import { readableOn } from "@utils/colorUtils";
 import { i18nText } from "@utils/i18nText";
 import { readShare, shareRoute } from "@utils/chatShare";
 import { countEmojiClusters, isEmojiOnly } from "@utils/emojiText";
@@ -208,7 +209,14 @@ const MessageBubble = memo(
               isCustomPhoto
               size={20}
             />
-            <Text style={[styles.senderName, { color: senderColor }]} numberOfLines={1}>
+            <Text
+              // Üye rengi açık temada (ör. sarı) zeminde kayboluyordu: tonu koru, okunurluğa çek.
+              style={[
+                styles.senderName,
+                { color: theme?.primary ? readableOn(senderColor, theme.primary) : senderColor },
+              ]}
+              numberOfLines={1}
+            >
               {senderName || i18nText("autoI18n.uye", "Üye")}
             </Text>
           </View>

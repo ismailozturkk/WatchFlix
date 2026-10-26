@@ -265,8 +265,8 @@ export const FAVORITES_COPY = {
     },
     counter: (count, max) => `${count}/${max}`,
     section: {
-      title: "Your four favorites",
-      hint: "Anyone who can see your profile sees these. Pick up to 4 per category — or leave it empty.",
+      title: "Deine vier Favoriten",
+      hint: "Alle, die dein Profil sehen können, sehen sie. Wähle bis zu 4 pro Kategorie – oder lass es leer.",
     },
     picker: {
       done: "Fertig",

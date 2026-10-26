@@ -412,6 +412,9 @@ describe("badgeFormat: ortak metin bicimleyiciler", () => {
     expect(formatTarih("2026-10-15", "en")).toBe("Oct 15, 2026");
     expect(formatTarih("2026-01-05", "tr")).toBe("5 Ocak 2026");      // bastaki sifir atilir
     expect(formatTarih("2026-12-31", "en")).toBe("Dec 31, 2026");
+    // pt/de Türkçe ay adına düşmez (T3 B17).
+    expect(formatTarih("2026-10-26", "de")).toBe("26. Oktober 2026");
+    expect(formatTarih("2026-10-26", "pt")).toBe("26 de outubro de 2026");
   });
 
   test("formatTarih: gecersiz girdide null", () => {

@@ -41,7 +41,7 @@ import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { useDeviceNotifications } from "../../../context/DeviceNotificationsContext";
 import ScreenDecor from "../../../components/ScreenDecor";
 import { toast } from "@components/AppToast";
-import { i18nText } from "../../../utils/i18nText";
+import { i18nCount, i18nText } from "../../../utils/i18nText";
 import { PRIME_HANDOFF_MS } from "../../../utils/notificationPriming";
 import { removeNoteTodoDraft, todoDraftKey } from "../../../services/noteTodoDraftService";
 import { Keys, get, set } from "../../../services/storage";
@@ -401,7 +401,7 @@ export default function NotesScreen({ navigation }) {
               {title}
             </Text>
             <Text allowFontScaling={false} style={[styles.headerSub, { color: theme.text.muted }]} numberOfLines={1}>
-              {i18nText("autoI18n.notes_toplam", "{{n}} kayıt", { n: totalCount })}
+              {i18nCount("autoI18n.notes_toplam", "{{n}} kayıt", totalCount)}
             </Text>
           </View>
           {/* Geri düğmesiyle aynı yapı taşı: iOS 26+'da cam, diğer yerlerde aynı köşeli

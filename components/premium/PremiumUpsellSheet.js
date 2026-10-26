@@ -61,6 +61,7 @@ import { useLanguage } from "@context/LanguageContext";
 import { usePremium } from "@context/PremiumContext";
 import useReduceMotion from "@hooks/useReduceMotion";
 import { alpha } from "@theme/colors";
+import { readableOn } from "@utils/colorUtils";
 import { createCloseGate, registerUpsellHost } from "@services/premiumUpsellHost";
 import { openPremiumScreen } from "@services/premiumUpsell";
 import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
@@ -1012,7 +1013,11 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
           <Medallion content={content} backdrop={theme.primary} ambient={ambient} />
           <Rise delay={240} dy={12}>
             <View style={[styles.eyebrow, { backgroundColor: alpha(color, 0.16) }]}>
-              <Text allowFontScaling={false} style={[styles.eyebrowText, { color }]}>
+              {/* Açık temada amber yazı zeminde kayboluyordu (T3 B11): tonu koru, okunurluğa çek. */}
+              <Text
+                allowFontScaling={false}
+                style={[styles.eyebrowText, { color: readableOn(color, theme.primary) }]}
+              >
                 {content.eyebrow}
               </Text>
             </View>

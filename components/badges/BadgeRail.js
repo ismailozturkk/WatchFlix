@@ -24,6 +24,24 @@ import { badgeAd, formatBadgeAralik, formatBadgeDeger } from "./watchBadgeCatalo
 import { hedefUyesi, kalanMiktar, kacGunOnce } from "./badgeInsights";
 import { formatTarih, yuzdeMetni } from "./badgeFormat";
 
+// Tek kelimelik uzun rozet adı (de "Vorstellungsbegleiter") tek satırda küçülür;
+// iki satır izni Android'de kelimeyi ortadan bölüyordu (T3 B17). Çok kelimeli
+// adlar iki satıra sarılmaya devam eder.
+function BadgeName({ style, children }) {
+  const oneWord = !/\s/.test(String(children || ""));
+  return (
+    <Text
+      allowFontScaling={false}
+      numberOfLines={oneWord ? 1 : 2}
+      adjustsFontSizeToFit={oneWord}
+      minimumFontScale={0.6}
+      style={style}
+    >
+      {children}
+    </Text>
+  );
+}
+
 export function BadgeRail({ baslik, altBaslik, children }) {
   const { theme } = useTheme();
   return (
@@ -90,9 +108,7 @@ export const HedefKarti = memo(function HedefKarti({ kart, onPress }) {
           {yuzdeMetni(oran, lang)}
         </Text>
       </View>
-      <Text allowFontScaling={false} numberOfLines={2} style={[styles.hedefAd, { color: theme.text.primary }]}>
-        {badgeAd(uye, lang)}
-      </Text>
+      <BadgeName style={[styles.hedefAd, { color: theme.text.primary }]}>{badgeAd(uye, lang)}</BadgeName>
       <View style={[styles.iz, { backgroundColor: withAlpha(theme.text.muted, 0.2) }]}>
         <View style={[styles.dolgu, { backgroundColor: theme.accent, width: `${Math.max(3, Math.round(oran * 100))}%` }]} />
       </View>
@@ -139,9 +155,7 @@ export const SonKarti = memo(function SonKarti({ kart, onPress, simdi }) {
         color={kadRenk}
         ornate={sekil.ornate}
       />
-      <Text allowFontScaling={false} numberOfLines={2} style={[styles.sonAd, { color: theme.text.primary }]}>
-        {badgeAd(kart, lang)}
-      </Text>
+      <BadgeName style={[styles.sonAd, { color: theme.text.primary }]}>{badgeAd(kart, lang)}</BadgeName>
       <Text allowFontScaling={false} numberOfLines={1} style={[styles.sonZaman, { color: vurgu }]}>
         {zaman}
       </Text>
@@ -196,9 +210,7 @@ export const FirsatKarti = memo(function FirsatKarti({ firsat, onPress }) {
         sides={sekil.kenar}
         color={kadRenk}
       />
-      <Text allowFontScaling={false} numberOfLines={2} style={[styles.firsatAd, { color: theme.text.primary }]}>
-        {badgeAd(kart, lang)}
-      </Text>
+      <BadgeName style={[styles.firsatAd, { color: theme.text.primary }]}>{badgeAd(kart, lang)}</BadgeName>
       <View
         style={[
           styles.firsatHap,

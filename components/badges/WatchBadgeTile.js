@@ -168,9 +168,13 @@ function WatchBadgeTile({ badge, onPress }) {
           : null}
       </View>
 
+      {/* Tek kelimelik uzun ad (de "Vorstellungsbegleiter") tek satırda küçülür:
+          iki satır izni Android'de kelimeyi ortadan bölüyordu (T3 B17). */}
       <Text
         allowFontScaling={false}
-        numberOfLines={2}
+        numberOfLines={/\s/.test(String(baslik || "")) ? 2 : 1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
         style={[styles.ad, { color: acik ? theme.text.primary : theme.text.muted }]}
       >
         {baslik}

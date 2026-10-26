@@ -12,6 +12,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import { alpha } from "../../theme/colors";
 import LottieView from "lottie-react-native";
 
 import useAppActive from "../../hooks/useAppActive";
@@ -139,7 +141,12 @@ const PREVIEW_ITEMS = buildPreviewItems();
  * kullanıcı bu ekrana geldiğinde yükleniyor (desen hiç açılmamışsa açılışta
  * ödenmiyor — bkz. IconBacground.getSources).
  */
-export function IconPatternPreview({ opacity = 0.5 }) {
+/**
+ * `fadeColor` verilirse desenin üstüne, yazının durduğu sol taraftan sağa
+ * solan bir perde çizilir: açık temada koyu desen ikonları başlık/alt yazının
+ * ÜSTÜNE biniyor, okunmuyordu (T3 B11). Desen sağda (anahtar tarafında) görünür kalır.
+ */
+export function IconPatternPreview({ opacity = 0.5, fadeColor }) {
   const items = useMemo(
     () =>
       PREVIEW_ITEMS.map((item) => ({
@@ -169,6 +176,16 @@ export function IconPatternPreview({ opacity = 0.5 }) {
           ]}
         />
       ))}
+      {fadeColor ? (
+        <LinearGradient
+          pointerEvents="none"
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          colors={[alpha(fadeColor, 0.94), alpha(fadeColor, 0.7), alpha(fadeColor, 0)]}
+          locations={[0, 0.5, 0.85]}
+          style={styles.fill}
+        />
+      ) : null}
     </View>
   );
 }

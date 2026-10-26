@@ -97,6 +97,9 @@ const CountModeSwitch = memo(function CountModeSwitch({ theme, mode, onToggle })
           >
             <Animated.Text
               allowFontScaling={false}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
               style={[
                 styles.countModeText,
                 { color: active ? "#FFFFFF" : theme.text.muted },
@@ -366,6 +369,8 @@ const MediaStatCard = memo(function MediaStatCard({
                 <Text
                   allowFontScaling={false}
                   numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
                   style={[styles.statLabel, { color: theme.text.muted }]}
                 >
                   {stat.label}
@@ -681,7 +686,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  mediaTitleCol: { flex: 1, minWidth: 0, alignItems: "flex-start", gap: 3 },
+  // minWidth: uzun sayı etiketleri (de/es/pt) başlık sütununu sıfıra itip rütbe
+  // çipini "0 Woch…" diye kesiyordu (T3 B8); sayı kümesi ise küçülebilir.
+  mediaTitleCol: { flex: 1, minWidth: 96, alignItems: "flex-start", gap: 3 },
   mediaTitle: { fontSize: 15, lineHeight: 18, fontWeight: "800", letterSpacing: -0.3 },
   rankChip: {
     flexDirection: "row",
@@ -696,8 +703,8 @@ const styles = StyleSheet.create({
   rankChipText: { flexShrink: 1, fontSize: 9.5, lineHeight: 12, fontWeight: "800", letterSpacing: 0.2 },
 
   // Sayılar başlıkla aynı satırda, sağa yaslı. Dizi kartında iki sütun var.
-  statsCluster: { flexDirection: "row", alignItems: "center" },
-  statCol: { alignItems: "flex-end" },
+  statsCluster: { flexDirection: "row", alignItems: "center", flexShrink: 1 },
+  statCol: { alignItems: "flex-end", flexShrink: 1 },
   statColDivided: { borderLeftWidth: 1, paddingLeft: 11, marginLeft: 11 },
   statNumber: {
     fontSize: 22,

@@ -39,11 +39,15 @@ import {
   totalGroupUnread,
   totalUnread,
 } from "@utils/friendsListModel";
-import { i18nText } from "@utils/i18nText";
+import { i18nCount, i18nText } from "@utils/i18nText";
+import { intlLocaleOf } from "@utils/appLanguages";
+import { useLanguage } from "../../context/LanguageContext";
 import { subscribeGroupInbox, subscribeUserGroups } from "@services/groupsService";
 import { trackFirestoreRead } from "@services/usageTrackerService";
 
-const formatTime = (ts) => {
+// Saat/tarih uygulama dilinde (cihaz dilinde değil): DE kullanıcıya "2:49 PM"
+// yazıyordu (T3 B17).
+const formatTime = (ts, locale) => {
   const ms = toEpochMs(ts);
   if (!ms) return "";
   const d = new Date(ms);
@@ -53,8 +57,8 @@ const formatTime = (ts) => {
     d.getMonth() === now.getMonth() &&
     d.getFullYear() === now.getFullYear();
   return sameDay
-    ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : d.toLocaleDateString([], { day: "2-digit", month: "2-digit" });
+    ? d.toLocaleTimeString(locale || [], { hour: "2-digit", minute: "2-digit" })
+    : d.toLocaleDateString(locale || [], { day: "2-digit", month: "2-digit" });
 };
 
 /** Okunmamış sayısı rozeti — satırın sağ ucunda. */
@@ -72,6 +76,8 @@ export default function MessagesScreen({ navigation }) {
   const auth = getAuth();
   const user = auth.currentUser;
   const { theme } = useTheme();
+  const { language } = useLanguage();
+  const timeLocale = intlLocaleOf(language);
 
   const [tab, setTab] = useState("dm"); // "dm" | "group"
   const [query, setQuery] = useState("");
@@ -144,7 +150,7 @@ export default function MessagesScreen({ navigation }) {
         titleStrong={unread}
         subtitle={item.lastText || ""}
         subtitleStrong={unread}
-        meta={formatTime(item.lastTime)}
+        meta={formatTime(item.lastTime, timeLocale)}
         metaAccent={unread}
         highlighted={unread}
         trailing={unread ? <UnreadPill count={item.unreadCount} /> : null}
@@ -187,7 +193,7 @@ export default function MessagesScreen({ navigation }) {
             : i18nText("autoI18n.n_uye", "{{n}} üye", { n: item.members?.length || 0 })
         }
         subtitleStrong={unread}
-        meta={formatTime(last?.time)}
+        meta={formatTime(last?.time, timeLocale)}
         metaAccent={unread}
         highlighted={unread}
         trailing={unread ? <UnreadPill count={unreadCount} /> : null}
@@ -206,14 +212,14 @@ export default function MessagesScreen({ navigation }) {
 
   const subtitle = isDm
     ? unreadTotal > 0
-      ? i18nText("autoI18n.friends_ui_unread_count", "{{n}} okunmamış mesaj", { n: unreadTotal })
+      ? i18nCount("autoI18n.friends_ui_unread_count", "{{n}} okunmamış mesaj", unreadTotal)
       : visibleConvs.length
-        ? i18nText("autoI18n.friends_ui_chats_count", "{{n}} sohbet", { n: visibleConvs.length })
+        ? i18nCount("autoI18n.friends_ui_chats_count", "{{n}} sohbet", visibleConvs.length)
         : undefined
     : groupUnreadTotal > 0
-      ? i18nText("autoI18n.friends_ui_unread_count", "{{n}} okunmamış mesaj", { n: groupUnreadTotal })
+      ? i18nCount("autoI18n.friends_ui_unread_count", "{{n}} okunmamış mesaj", groupUnreadTotal)
       : groups.length
-        ? i18nText("autoI18n.friends_ui_groups_count", "{{n}} grup", { n: groups.length })
+        ? i18nCount("autoI18n.friends_ui_groups_count", "{{n}} grup", groups.length)
         : undefined;
 
   let empty = null;

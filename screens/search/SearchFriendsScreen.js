@@ -24,7 +24,7 @@ import { FRIEND_GREEN, PENDING_AMBER } from "../../components/friends/friendsTok
 import * as Haptics from "../../services/hapticsService";
 import { searchUsersByUsername } from "../../services/userService";
 import { alpha } from "../../theme/colors";
-import { i18nText } from "../../utils/i18nText";
+import { i18nCount, i18nText } from "../../utils/i18nText";
 
 const DEBOUNCE_MS = 500;
 
@@ -253,9 +253,7 @@ export default function SearchFriendsScreen({ navigation }) {
               allowFontScaling={false}
               style={[styles.resultsLabel, { color: theme.text?.muted ?? "#888" }]}
             >
-              {i18nText("autoI18n.friends_ui_results_count", "{{n}} sonuç", {
-                n: visibleResults.length,
-              })}
+              {i18nCount("autoI18n.friends_ui_results_count", "{{n}} sonuç", visibleResults.length)}
             </Text>
           }
           contentContainerStyle={styles.listContent}

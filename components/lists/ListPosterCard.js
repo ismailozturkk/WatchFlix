@@ -25,6 +25,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import PosterImage from "@components/PosterImage";
 import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
+import { i18nText } from "@utils/i18nText";
 import {
   PRESS_SCALE,
   badgePlanOf,
@@ -95,7 +96,17 @@ function ListPosterCard({
   const title = useMemo(() => titleMetricsFor(posterWidth), [posterWidth]);
 
   const progress = listName === "watchedTv" ? watchProgressOf(watchedCount, totalCount) : null;
-  const plan = badgePlanOf({ info, posterWidth, type: item.type, durationMinutes, progress });
+  const plan = badgePlanOf({
+    info,
+    posterWidth,
+    type: item.type,
+    durationMinutes,
+    progress,
+    durationLabels: {
+      hour: i18nText("profileScreen.hoursShort", "sa"),
+      minute: i18nText("profileScreen.minutesShort", "dk"),
+    },
+  });
 
   const typeText = item.type === "movie" ? typeLabels?.movie : typeLabels?.tv;
   const hasBottomOverlay = plan.showProgress || bottomSlotHeight > 0;

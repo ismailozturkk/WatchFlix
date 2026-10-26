@@ -108,9 +108,10 @@ export function watchProgressOf(watched, total) {
  *  - durationText: süre rozeti metni (ayar kapalıysa / süre yoksa null)
  *  - progressText: dizi ilerleme yazısı ("12/24") yalnız m ve l'de
  */
-export function badgePlanOf({ info = {}, posterWidth, type, durationMinutes, progress }) {
+export function badgePlanOf({ info = {}, posterWidth, type, durationMinutes, progress, durationLabels }) {
   const tier = tierOf(posterWidth);
-  const durationText = info.duration ? durationBadgeText(durationMinutes, type) : null;
+  // Birim etiketleri dilden gelir; verilmezse Türkçe ("sa"/"dk") — DE'de "90 sa" yazıyordu (T3 B17).
+  const durationText = info.duration ? durationBadgeText(durationMinutes, type, durationLabels) : null;
   return {
     tier,
     showType: !!info.mediaType,

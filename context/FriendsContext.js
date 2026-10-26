@@ -154,7 +154,18 @@ export function FriendsProvider({ children }) {
         await sendReq(myProfile, targetProfile);
         Toast.show({ type: "success", text1: i18nText("autoI18n.istek_gonderildi_2", "İstek gönderildi") });
       } catch (e) {
-        Toast.show({ type: "error", text1: e.message });
+        // Kural reddi (karşı taraf engellemiş): ham SDK metni ("Missing or
+        // insufficient permissions.") yerine sade bir cümle; engel açık edilmez.
+        Toast.show({
+          type: "error",
+          text1:
+            e?.code === "permission-denied"
+              ? i18nText(
+                  "autoI18n.arkadas_istegi_alamiyor",
+                  "Bu kişiye şu an arkadaşlık isteği gönderilemiyor.",
+                )
+              : e.message,
+        });
       }
     },
     [myProfile, friendsGate, friendsInUse],

@@ -46,6 +46,12 @@ const mockTheme = {
 };
 jest.mock("../context/ThemeContext", () => ({ useTheme: () => ({ theme: mockTheme }) }));
 jest.mock("../context/LanguageContext", () => ({ useLanguage: () => ({ t: {}, language: "tr" }) }));
+jest.mock("../context/AppSettingsContext", () => ({ useApiSettings: () => ({ API_KEY: "" }) }));
+jest.mock("../services/tmdbFacts", () => ({
+  fetchMediaFacts: () => Promise.resolve(null),
+  fetchMediaOverview: () => Promise.resolve(null),
+  peekMediaFacts: () => null,
+}));
 
 // Sayfa kabuğu: görünürlük + kapanış sonrası (onDismissed) elle tetiklenir.
 let mockDismissed = null;

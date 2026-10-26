@@ -512,7 +512,7 @@ export default function PersonalizationScreen() {
           subtitle={t.iconBackgroundSubtitle}
           onPress={iconBackgroundAllowed ? undefined : openIconBackgroundUpsell}
           last={!showIconBackground}
-          background={<IconPatternPreview opacity={0.35} />}
+          background={<IconPatternPreview opacity={0.35} fadeColor={C.card} />}
           right={
             <View style={ps.rowRightGroup}>
               {iconBackgroundAllowed ? null : <PremiumPill />}

@@ -9,7 +9,7 @@
 // Tür renkleri (film turuncu, dizi mavi, oyuncu mor) arama sonucu kartı ve
 // liste balonuyla aynı — aynı içerik her yerde aynı renkte tanınır.
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -23,6 +23,9 @@ import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
+import { useLanguage } from "../../context/LanguageContext";
+import { useApiSettings } from "../../context/AppSettingsContext";
+import { fetchMediaFacts, fetchMediaOverview, peekMediaFacts } from "../../services/tmdbFacts";
 import { alpha } from "../../theme/colors";
 
 const POSTER_WIDTH = 92;
@@ -42,6 +45,39 @@ const TYPE_META = {
   person: { color: "#CE93D8", label: () => i18nText("autoI18n.oyuncu", "Oyuncu") },
 };
 
+/**
+ * Kartın başlığı/özeti İZLEYENİN dilinde (T3 B16): mesaj gönderenin dilindeki
+ * metni taşıyor, Türkçe kullanıcı Almanca "Die Tagebücher der Apothekerin"
+ * görüyordu. Önbellekli detay okuması (tmdbFacts); çözülemezse mesajdaki metin.
+ */
+function useViewerLanguageMedia(media) {
+  const { language } = useLanguage();
+  const { API_KEY } = useApiSettings();
+  const id = media?.id;
+  const type = media?.media_type;
+  const localizable = id != null && (type === "movie" || type === "tv");
+  const [title, setTitle] = useState(
+    () => (localizable && peekMediaFacts({ id, mediaType: type, language })?.title) || null,
+  );
+  const [overview, setOverview] = useState(null);
+
+  useEffect(() => {
+    if (!localizable) return undefined;
+    let alive = true;
+    fetchMediaFacts({ apiKey: API_KEY, id, mediaType: type, language }).then((facts) => {
+      if (alive && facts?.title) setTitle(facts.title);
+    });
+    fetchMediaOverview({ apiKey: API_KEY, id, mediaType: type, language }).then((text) => {
+      if (alive && text) setOverview(text);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [localizable, id, type, language, API_KEY]);
+
+  return { title, overview };
+}
+
 export default function SharedMediaMessage({
   item,
   getTmdbUrl,
@@ -56,8 +92,9 @@ export default function SharedMediaMessage({
   const media = item?.media;
   const poster = media?.poster_path || media?.profile_path;
   const isPerson = media?.media_type === "person";
-  const text = item?.text || media?.title || media?.name || "";
-  const summary = media?.overview;
+  const localized = useViewerLanguageMedia(media);
+  const text = localized.title || item?.text || media?.title || media?.name || "";
+  const summary = (!isPerson && localized.overview) || media?.overview;
   const typeMeta = TYPE_META[media?.media_type];
 
   const rawDate = media?.release_date || media?.first_air_date;
