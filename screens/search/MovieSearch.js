@@ -1,4 +1,5 @@
-import { tmdbLanguageOf } from "../../utils/appLanguages";
+import { normalizeAppLanguage, tmdbLanguageOf } from "../../utils/appLanguages";
+import { formatCompactVotes } from "../../utils/externalRatings";
 import { Image } from "expo-image";
 import React, { useCallback, useState, useRef, useEffect, memo } from "react";
 import {
@@ -130,6 +131,7 @@ const MovieRowItem = memo(
     const posterUri = usePosterUri();
     const backdropUri = useBackdropUri();
     const { posterBadges } = useListLayoutSettings();
+    const { language } = useLanguage();
     const { openQuickActions } = useMediaQuickActions();
     const { scale, onIn, onOut } = usePressAnim();
     const { opacity, translateY } = useEnterAnim(index);
@@ -242,9 +244,7 @@ const MovieRowItem = memo(
                         { color: theme.text?.secondary ?? "#aaa" },
                       ]}
                     >
-                      {item.vote_count >= 1000
-                        ? `${(item.vote_count / 1000).toFixed(1)}K oy`
-                        : `${item.vote_count} oy`}
+                      {`${formatCompactVotes(item.vote_count, normalizeAppLanguage(language))} ${i18nText("votes", "oy")}`}
                     </Text>
                   )}
                 </View>

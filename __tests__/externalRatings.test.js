@@ -46,6 +46,12 @@ describe("formatCompactVotes", () => {
     expect(formatCompactVotes(2345678)).toBe("2.3M");
     expect(formatCompactVotes(1500000)).toBe("1.5M");
   });
+  it("binlik ek yalnız Türkçede B (bin); başka dilde B milyar okunur (T3 B6)", () => {
+    expect(formatCompactVotes(11100, "tr")).toBe("11.1B");
+    expect(formatCompactVotes(11100, "en")).toBe("11.1K");
+    expect(formatCompactVotes(11100, "de")).toBe("11.1K");
+    expect(formatCompactVotes(2345678, "tr")).toBe("2.3M");
+  });
   it("geçersizde null", () => {
     for (const bad of [0, -5, null, undefined, "x", NaN]) expect(formatCompactVotes(bad)).toBeNull();
   });

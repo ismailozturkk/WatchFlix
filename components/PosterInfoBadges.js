@@ -9,7 +9,8 @@
 // (railPosterSize / listsGridColumns / posterWidth) bağlı `s` ölçek çarpanıyla
 // orantılı olarak küçülür. Böylesine rozetler hiçbir posterden taşmaz.
 
-import { copyLanguage } from "../utils/appLanguages";
+import { copyLanguage, normalizeAppLanguage } from "../utils/appLanguages";
+import { formatCompactVotes } from "../utils/externalRatings";
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -51,13 +52,6 @@ function ratingAccent(v) {
   if (n >= 6.5) return "#f5b301"; // iyi → amber
   if (n >= 5) return "#ff8a3d"; // orta → turuncu
   return "#ff5a5f"; // düşük → kırmızı
-}
-
-function formatVotes(n) {
-  const v = Number(n) || 0;
-  if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
-  if (v >= 1000) return `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}B`;
-  return String(v);
 }
 
 function daysUntil(dateStr) {
@@ -118,6 +112,7 @@ export function usePillMetrics(scale, posterWidth) {
 // ── RatingBadge ───────────────────────────────────────────────────────────────
 export function RatingBadge({ value, votes, corner, style, scale, posterWidth, showVotes = true }) {
   const { posterBadges } = useListLayoutSettings();
+  const { language } = useLanguage();
   const { s, r, box } = usePillMetrics(scale, posterWidth);
   const v = Number(value) || 0;
   if (posterBadges?.tmdbRating === false || v <= 0) return null;
@@ -147,7 +142,7 @@ export function RatingBadge({ value, votes, corner, style, scale, posterWidth, s
           />
           <Ionicons name="people" size={r(8.5)} color="rgba(255,255,255,0.6)" />
           <Text allowFontScaling={false} style={[styles.votes, { fontSize: r(9) }]}>
-            {formatVotes(votes)}
+            {formatCompactVotes(votes, normalizeAppLanguage(language))}
           </Text>
         </>
       )}

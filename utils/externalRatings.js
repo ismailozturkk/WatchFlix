@@ -13,13 +13,17 @@ export function formatImdbVotes(votes) {
 /**
  * Kısa oy sayısı (çip için): 845 → "845", 12 300 → "12.3K", 2 345 678 → "2.3M". Geçersizde null.
  * Binlik tek ondalık, sonda ".0" atılır ("12.0K" → "12K").
+ *
+ * `language` "tr" ise binlik eki "B" (bin). Başka dilde "B" milyar demek: afiş
+ * rozeti İngilizcede 11 bin oyu "11B" diye gösteriyordu (T3 B6). Ek her
+ * dilde yalnız Türkçede değişir; es/pt/de'de de "K/M" yaygın kısaltma.
  */
-export function formatCompactVotes(votes) {
+export function formatCompactVotes(votes, language) {
   const n = Number(votes);
   if (!Number.isFinite(n) || n <= 0) return null;
   const trim = (value) => String(Math.round(value * 10) / 10).replace(/\.0$/, "");
   if (n >= 999500) return `${trim(n / 1e6)}M`;
-  if (n >= 1000) return `${trim(n / 1e3)}K`;
+  if (n >= 1000) return `${trim(n / 1e3)}${language === "tr" ? "B" : "K"}`;
   return String(Math.trunc(n));
 }
 
