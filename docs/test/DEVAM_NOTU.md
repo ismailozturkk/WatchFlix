@@ -20,7 +20,7 @@ Yeni bir Claude Code oturumu (başka hesap dahil) bu dosyayı okuyarak kaldığ�
 
 1. **Kararlar:** B14 gerçek çevrimdışı liste yazımı (runTransaction yerine). B15 uygulandı + rules deploy edildi (60f1a32); açık: gizlenen gönderileri yönetme ekranı. Rules + index 26 Eki DEPLOY EDİLDİ (yayındaki kurallar başka oturumun sosyal hesaplar bloğunu da içeriyor, HEAD'de yok).
 2. **Kalan sosyal satırlar:** 8.4 (60+ mesaj), 8.13 (zevk uyumu), 8.15 (sosyal hesaplar, başka oturumun işi bitince); Premium isteyenler 8.9/8.12/10.5 (test hesaplarına promosyon kodu). Önce B'nin A'ya engelini kaldır ve yeniden arkadaş ol.
-3. **Açık artıklar (Düşük):** B8 Almanca segment kırılması + "0 Woch…"; B11 "+ New note", açık tema okunurluğu.
+3. **Düşük bulgular kapandı** (8b1008d). Kalan: "≈ 1 Filme" iki sayılı cümle.
 
 ## Kurallar ve kararlar (kullanıcıdan)
 
