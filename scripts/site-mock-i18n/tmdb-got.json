@@ -1,0 +1,273 @@
+{
+ "_kaynak": "TMDB tv/1399 (Game of Thrones), 26 Eki 2026 anlık görüntüsü — scripts/site-mock-i18n/gen.mjs okur. Özetler kısaltıldı (kartlar zaten 2 satır gösterir).",
+ "tr": {
+  "tagline": "Kış geliyor.",
+  "seasons": [
+   {
+    "name": "1. sezon",
+    "overview": "Kral Robert Baratheon, Lord Eddard Stark'tan başdanışmanı olmasını ister. Sürgündeki Viserys Targaryen ise tahtı Robert'tan geri almanın yollarını aramaktadır."
+   },
+   {
+    "name": "2. sezon",
+    "overview": "Stannis Baratheon,tahtın gerçek varisi olduğunu iddia etmektedir.Ve Sur'a giden Jon Snow'un yolu,çok geçmeden Yabanıllar ile kesişecektir."
+   },
+   {
+    "name": "3. sezon",
+    "overview": "Bu sırada Sur'un ötesindeki Ak Gezenler hareketlenirken; Doğu kıtasındaki Daenerys Targaryen'ın ejderhaları da,kendi şanı gibi büyümektedir."
+   },
+   {
+    "name": "4. sezon",
+    "overview": "Kralın Toprakları'nda düğün hazırlıkları başlamıştır. Daenerys Targaryen ise doğu kıtasında güçlenmeye devam etmektedir."
+   },
+   {
+    "name": "5. sezon",
+    "overview": "Meereen'de hüküm süren Daenerys Targaryen,ejderhalarını kontrol etmekte zorlanmaya başlamıştır.Ramsay Bolton'un Kışyarı'ndaki zalim hakimiyeti devam etmektedir..."
+   },
+   {
+    "name": "6. sezon",
+    "overview": "Ejderhası tarafından Dothraki topraklarının güney sınırına terk edilen Daenerys,Meereen'e dönmenin yollarını aramaktadır..."
+   },
+   {
+    "name": "7.Sezon",
+    "overview": "Demir taht üstüne kurulan oyunlar tüm hızıyla devam ederken Westeros ve Essos halklarını bekleyen çok daha ölümcül bir tehlike artık kapıdadır..."
+   },
+   {
+    "name": "8.Sezon",
+    "overview": "Büyük Savaş geldi, Duvar yıkıldı ve Ölülerin Gece Kralı ordusu Westeros'a yürüdü. Sonu burada, ama Demir Taht'ı kim alacak?"
+   }
+  ],
+  "season1": {
+   "overview": "Kral Robert Baratheon, Lord Eddard Stark'tan başdanışmanı olmasını ister. Sürgündeki Viserys Targaryen ise tahtı Robert'tan geri almanın yollarını aramaktadır.",
+   "episodes": [
+    {
+     "name": "Kış Geliyor",
+     "overview": "Duvarın ardında büyük gizemler yaşanıyor iken Kral Robert Baratheon,Winterfell’deki eski dostu Ned Stark’a önemli bir teklif yapmaya gelir."
+    },
+    {
+     "name": "Kral Yolu",
+     "overview": "Yaşanan kazanın gizemi henüz çözülmemiş iken Ned Stark güneye doğru yola çıkar.Targaryen’lar hak ettikleri demir tahtı geri almak istemektedir."
+    },
+    {
+     "name": "Lord Snow",
+     "overview": "Kara Kale’ye varan Jon Snow için zorlu gece nöbetçiliği başlar.Doğuda ise Daenerys,Dothraki’ler tarafından saygı görmeye başlar."
+    }
+   ]
+  }
+ },
+ "en": {
+  "tagline": "Winter is coming.",
+  "seasons": [
+   {
+    "name": "Season 1",
+    "overview": "Trouble is brewing in the Seven Kingdoms of Westeros. For the driven inhabitants of this visionary world, control of Westeros' Iron Throne holds the lure of great power. But in a land where the seasons can last a…"
+   },
+   {
+    "name": "Season 2",
+    "overview": "The cold winds of winter are rising in Westeros...war is coming...and five kings continue their savage quest for control of the all-powerful Iron Throne. With winter fast approaching, the coveted Iron Throne is occupied…"
+   },
+   {
+    "name": "Season 3",
+    "overview": "Duplicity and treachery...nobility and honor...conquest and triumph...and, of course, dragons. In Season 3, family and loyalty are the overarching themes as many critical storylines from the first two seasons come to a…"
+   },
+   {
+    "name": "Season 4",
+    "overview": "The War of the Five Kings is drawing to a close, but new intrigues and plots are in motion, and the surviving factions must contend with enemies not only outside their ranks, but within."
+   },
+   {
+    "name": "Season 5",
+    "overview": "The War of the Five Kings, once thought to be drawing to a close, is instead entering a new and more chaotic phase. Westeros is on the brink of collapse, and many are seizing what they can while the realm implodes, like…"
+   },
+   {
+    "name": "Season 6",
+    "overview": "Following the shocking developments at the conclusion of season five, survivors from all parts of Westeros and Essos regroup to press forward, inexorably, towards their uncertain individual fates. Familiar faces will…"
+   },
+   {
+    "name": "Season 7",
+    "overview": "The long winter is here. And with it comes a convergence of armies and attitudes that have been brewing for years."
+   },
+   {
+    "name": "Season 8",
+    "overview": "The Great War has come, the Wall has fallen and the Night King's army of the dead marches towards Westeros. The end is here, but who will take the Iron Throne?"
+   }
+  ],
+  "season1": {
+   "overview": "Trouble is brewing in the Seven Kingdoms of Westeros. For the driven inhabitants of this visionary world, control of Westeros' Iron Throne holds the lure of great power. But in a land where the seasons can last a lifetime, winter is coming...and beyond the Great Wall that protects them, an ancient evil has returned. In Season One, the story centers on three primary areas: the Stark and the Lannister families, whose…",
+   "episodes": [
+    {
+     "name": "Winter Is Coming",
+     "overview": "Jon Arryn, the Hand of the King, is dead. King Robert Baratheon plans to ask his oldest friend, Eddard Stark, to take Jon's place. Across the sea, Viserys Targaryen plans to wed his sister to a…"
+    },
+    {
+     "name": "The Kingsroad",
+     "overview": "While Bran recovers from his fall, Ned takes only his daughters to Kings Landing. Jon Snow goes with his uncle Benjen to The Wall. Tyrion joins them."
+    },
+    {
+     "name": "Lord Snow",
+     "overview": "Lord Stark and his daughters arrive at King's Landing to discover the intrigues of the king's realm."
+    }
+   ]
+  }
+ },
+ "es": {
+  "tagline": "Se acerca el invierno",
+  "seasons": [
+   {
+    "name": "Temporada 1",
+    "overview": "Se avecinan problemas en los Siete Reinos de Poniente. Para los motivados habitantes de este mundo visionario, el control del Trono de Hierro de Poniente representa el atractivo de un gran poder. Pero en una tierra…"
+   },
+   {
+    "name": "Temporada 2",
+    "overview": "Los vientos fríos del invierno se están levantando en Poniente... la guerra se acerca... y cinco reyes continúan su salvaje búsqueda por el control del todopoderoso Trono de Hierro. Con el invierno acercándose…"
+   },
+   {
+    "name": "Temporada 3",
+    "overview": "Duplicidad y traición... nobleza y honor... conquista y triunfo... y, por supuesto, dragones. En la temporada 3, la familia y la lealtad son los temas generales, ya que muchas historias críticas de las dos primeras…"
+   },
+   {
+    "name": "Temporada 4",
+    "overview": "La Guerra de los Cinco Reyes está llegando a su fin, pero nuevas intrigas y complots están en marcha, y las facciones supervivientes deben enfrentarse a enemigos no sólo fuera de sus filas, sino también dentro de ellas."
+   },
+   {
+    "name": "Temporada 5",
+    "overview": "La Guerra de los Cinco Reyes, que alguna vez se pensó que estaba llegando a su fin, está entrando en una fase nueva y más caótica. Poniente está al borde del colapso, y muchos están aprovechando lo que pueden mientras…"
+   },
+   {
+    "name": "Temporada 6",
+    "overview": "Tras los impactantes acontecimientos al final de la quinta temporada, los supervivientes de todas partes de Westeros y Essos se reagrupan para seguir adelante, inexorablemente, hacia sus inciertos destinos individuales.…"
+   },
+   {
+    "name": "Temporada 7",
+    "overview": "El largo invierno ya está aquí. Y con ello llega una convergencia de ejércitos y actitudes que se han estado gestando durante años."
+   },
+   {
+    "name": "Temporada 8",
+    "overview": "La Gran Guerra ha llegado, el Muro ha caído y el ejército de los muertos del Rey Nocturno marcha hacia Poniente. El fin está aquí, pero ¿quién ocupará el Trono de Hierro?"
+   }
+  ],
+  "season1": {
+   "overview": "Se avecinan problemas en los Siete Reinos de Poniente. Para los motivados habitantes de este mundo visionario, el control del Trono de Hierro de Poniente representa el atractivo de un gran poder. Pero en una tierra donde las estaciones pueden durar toda la vida, el invierno se acerca... y más allá de la Gran Muralla que las protege, un antiguo mal ha regresado. En la primera temporada, la historia se centra en tres…",
+   "episodes": [
+    {
+     "name": "Se acerca el invierno",
+     "overview": "El Lord Ned Stark está preocupado por los perturbantes reportes de un desertor del Nights Watch; El Rey Robert y los Lannisters llegan a Winterfell; el exiliado Viserys Targaryen forja una nueva y…"
+    },
+    {
+     "name": "El camino real",
+     "overview": "Cuando Bran sobrevive milagrosamente a su caída de la torre, Cersei y Jaime conspiran para asegurar su silencio; Jon Snow y Tyrion se dirigen a El Muro; al convertirse en la mano derecha del rey, Ned…"
+    },
+    {
+     "name": "Lord Nieve",
+     "overview": "Jon impresiona a Tyrion en Castle Black; Ned se enfrenta a su pasado y a su futuro en Kings Landing; En el camino a Vaes Dothrak, Daenerys se pelea con Viserys."
+    }
+   ]
+  }
+ },
+ "pt": {
+  "tagline": "O inverno está chegando!",
+  "seasons": [
+   {
+    "name": "Temporada 1",
+    "overview": "A nobre Casa Stark, liderada pelo lorde Eddard Stark se vê em meio de um esquema de traição ao rei Robert Baratheon quando a mão do rei, Jon Arryn, morre misteriosamente."
+   },
+   {
+    "name": "Temporada 2",
+    "overview": "À medida que o inverno se aproxima, o jovem e cruel Joffrey ocupa o trono em Porto Real, aconselhado por sua conivente mãe, Cersei, e seu tio, Tyrion, que foi indicado para ser a Mão do Rei. Mas a permanência dos…"
+   },
+   {
+    "name": "Temporada 3",
+    "overview": "Os Lannisters mal se aguentam no trono depois do brutal ataque naval promovido por Stannis Baratheon, enquanto agitações no Norte ameaçam alterar o equilíbrio do poder. Robb Stark, Rei do Norte, encara uma grande…"
+   },
+   {
+    "name": "Temporada 4",
+    "overview": "O controle dos Lannisters sobre o Trono de Ferro permanece intacto, mas será que eles sobreviverão aos seus próprios egos, bem como às ameaças em curso em torno deles? Enquanto o inabalável Stannis Baratheon continua a…"
+   },
+   {
+    "name": "Temporada 5",
+    "overview": "Há um vácuo de poder e as casas de Westeros a Essos tentam preenchê-lo. No Castelo Negro, Jon Snow se esforça para equilibrar as demandas feitas pela Patrulha da Noite e por Stannis Baratheon, recém-chegado ao local e…"
+   },
+   {
+    "name": "Temporada 6",
+    "overview": "Após os chocantes eventos no final da quinta temporada, incluindo o destino sangrento de Jon Snow nas mãos dos amotinados de Castelo Negro, o atentado à Daenerys nas arenas de luta de Meereen, e a humilhação pública de…"
+   },
+   {
+    "name": "Temporada 7",
+    "overview": "Daenerys Targaryen navega rumo a Westeros com seus exércitos, dragões e o novo Mão da Rainha, Tyrion Lannister. Jon Snow foi coroado Rei do Norte após derrotar Ramsay Bolton na Batalha dos Bastardos e retornar à Casa…"
+   },
+   {
+    "name": "Temporada 8",
+    "overview": "Game of Thrones está de volta para sua oitava e última temporada. Com o Rei da Noite finalmente cruzando a Muralha junto a um dragão de gelo, novas alianças e traições determinam o destino de todos em Westeros."
+   }
+  ],
+  "season1": {
+   "overview": "A nobre Casa Stark, liderada pelo lorde Eddard Stark se vê em meio de um esquema de traição ao rei Robert Baratheon quando a mão do rei, Jon Arryn, morre misteriosamente.",
+   "episodes": [
+    {
+     "name": "O Inverno Está Chegando",
+     "overview": "O Lord Ned Stark preocupa-se com as notícias de um desertor da Guarda da Noite; o Rei Robert e os Lannisters chegam a Winterfell; o exilado Viserys Targaryen forja uma nova e poderosa aliança."
+    },
+    {
+     "name": "A Estrada Real",
+     "overview": "Quando Bran miraculosamente sobrevive a uma queda da torre, Cersei e Jaime conspiram para assegurar seu silêncio; Jon Snow e Tyrion se dirigem à Muralha; ao se tornar o braço direito do Rei, Ned…"
+    },
+    {
+     "name": "Lorde Snow",
+     "overview": "Ned descobre a extravagância de Crown; Jon Snow impressiona Tyrion; Catelyn segue o marido até Porto Real; Arya estuda esgrima."
+    }
+   ]
+  }
+ },
+ "de": {
+  "tagline": "Das Lied von Eis und Feuer",
+  "seasons": [
+   {
+    "name": "Staffel 1",
+    "overview": "Die fiktive Welt von Westeros, in der Jahreszeiten sich über Jahre hinziehen: Sieben Königreiche bevölkern den Kontinent, ständig gibt es Kriege, Machtkämpfe in den einzelnen Königshäusern, Morde und Intrigen. Im…"
+   },
+   {
+    "name": "Staffel 2",
+    "overview": "Ned Stark (Sean Bean), Lord von Winterfell, ist tot. Doch der Kampf um den eisernen Thron von Westeros hat erst begonnen: Der junge König Joffrey (Jack Gleeson) setzt am Hof in Königsmund mit grausamer Härte seinen…"
+   },
+   {
+    "name": "Staffel 3",
+    "overview": "Nach dem brutalen Angriff von Stannis Baratheon muss die König Joffrey (Jack Gleeson) und die Lannisters weiter um ihre schwindende Vorherrschaft fürchten. Doch Westeros droht aus dem Norden jenseits der Mauer noch…"
+   },
+   {
+    "name": "Staffel 4",
+    "overview": "Walder Frey (David Bradley) hat \"den König des Nordens\" Robb und seine Mutter Catelyn Stark (Richard Madden, Michelle Fairley) auf der Hochzeit von Edmure (Tobias Menzies) und Roslin (Alexandra Dowling) verraten. Die…"
+   },
+   {
+    "name": "Staffel 5",
+    "overview": "Ganz Westeros ist im Aufruhr: Nach seiner unüberlegten Tat gegenüber seinem Vater Tywin (Charles Dance), befindet sich Tyrion (Peter Dinklage) auf der Flucht, dabei findet er eine neue Bestimmung. Währenddessen schreit…"
+   },
+   {
+    "name": "Staffel 6",
+    "overview": "Nach den schockierenden Entwicklungen am Ende der fünften Staffel, einschließlich Jon Schnees blutigem Schicksal, Daenerys knapper Flucht aus der Arena von Mereen und Cerseis öffentlicher Demütigung in den Straßen von…"
+   },
+   {
+    "name": "Staffel 7",
+    "overview": "Der Winter ist da! Lange haben sich die Bewohner von Westeros vor der nächsten jahrelangen Kälteperiode gefürchtet. Jetzt hält zunehmend die Kälte den Kontinent umklammert. Doch Westeros drohen noch ganz andere…"
+   },
+   {
+    "name": "Staffel 8",
+    "overview": "Der Nachtkönig und die Weißen Wanderer haben die Mauer überwunden, der Winter ist endgültig da. Und die vermeintliche Allianz der Lebenden gegen die Toten ist schon von Beginn an zum Scheitern verurteilt. Denn Cersei…"
+   }
+  ],
+  "season1": {
+   "overview": "Die fiktive Welt von Westeros, in der Jahreszeiten sich über Jahre hinziehen: Sieben Königreiche bevölkern den Kontinent, ständig gibt es Kriege, Machtkämpfe in den einzelnen Königshäusern, Morde und Intrigen. Im Zentrum dieser ständigen Machtverschiebungen stehen drei mächtige Adelshäuser: Die Starks, die Lannisters und die Baratheons. Doch auch die vor Jahren abgesetzte und verbannte Königsfamilie Targaryen plant…",
+   "episodes": [
+    {
+     "name": "Der Winter naht",
+     "overview": "Jon Arryn, die Hand des Königs, ist tot. König Robert Baratheon plant, seinen ältesten Freund, Eddard Stark, zu bitten, Jons Platz einzunehmen. Auf der anderen Seite des Meeres plant Viserys…"
+    },
+    {
+     "name": "Der Königsweg",
+     "overview": "Während sich Bran von seinem Sturz erholt, bringt Ned nur seine Töchter nach Kings Landing. Jon Snow geht mit seinem Onkel Benjen zur Mauer. Tyrion schließt sich ihnen an."
+    },
+    {
+     "name": "Lord Schnee",
+     "overview": "Lord Stark und seine Töchter kommen in King's Landing an, um die Intrigen des Königreichs des Königs zu entdecken."
+    }
+   ]
+  }
+ }
+}

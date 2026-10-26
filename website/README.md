@@ -98,7 +98,7 @@ Firebase Console'dan temizlenmeli (kural kaldırmak veriyi silmez).
   gövde **Nova Square**, rakam **Audiowide** (Google Fonts, `index.html`), sekme etiketleri sistem fontu.
   Varsayılan sistem fontuna dönmek için `app-mock.css`'teki `--fh/--fb/--fn`'i değiştirmek yeter.
   Afiş yolları TMDB'nin en-US afişleridir (`MOV`/`TVS`/`COL` tabloları); karttaki sınıf adları siteyle
-  çakışmamalı (`.tour`, `.ok` ve `--ink` sitede tanımlı — turnuva kartı bu yüzden `.am-hub.trn`).
+  çakışmamalı (`.tour`, `.ok`, `.more` ve `--ink` sitede tanımlı — turnuva kartı bu yüzden `.am-hub.trn`).
   **Sekme düzeni uygulamanın o günkü çalışma ağacından alındı** (21 Eki: Hub→Eğlence, Ayarlar→Profil,
   yeni Kütüphane). Uygulama düzeni değişirse `app-mock.js` içindeki `TABS`, `PARENT_TAB` ve ilgili
   `screens.*` işlevlerini güncelle; etiketler `mock-i18n.js`'te (`mTab*`).
@@ -107,6 +107,9 @@ Firebase Console'dan temizlenmeli (kural kaldırmak veriyi silmez).
   dokunan kullanıcı için durur, `prefers-reduced-motion`'da hiç başlamaz. Yeni özellik = `TOUR` dizisine
   satır + `app-mock-tour.js`'e `S.<ekran>` + `home-i18n.js`'e `f<n>t/d`. Altındaki "…ve çok daha fazlası"
   ızgarası `mo<n>t/d` anahtarlarından (12 kutucuk; `MORE_ICONS`) çizilir.
+  "Film ve dizi takibi" ekranı uygulamanın Game of Thrones dizi detayıdır (`S.series`): 1. sezon kartına
+  dokununca sezon detayı (`S.season`) açılır. Sezon/bölüm adları, özetler ve slogan TMDB'den alınmış 5 dilli
+  bir anlık görüntüdür: `scripts/site-mock-i18n/tmdb-got.json` (üretici `mGot*` anahtarlarını bundan yazar).
 - **Maket metinleri uygulamanın kendi çevirileridir.** `node --no-warnings scripts/site-mock-i18n/gen.mjs`
   (proje kökünden) `mock-i18n.js`'i `translations/*.json`, `utils/aiCopy`, `utils/homeSectionCopy` ve
   `screens/shared/discoverFiltersCopy`'den yeniden üretir; uygulamada olmayan metinler `SPEC`'te `T(...)`

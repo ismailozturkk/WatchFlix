@@ -371,10 +371,20 @@ button.am-chip { cursor: pointer; }
 .am-rem-tx small { display: flex; align-items: center; gap: 3px; margin-top: 1px; font-size: 8.4px; color: var(--t2); }
 .am-rem-tx small.muted { color: var(--t3); }
 .am-rem-tx small.am-tag { display: inline-flex; margin-top: 0; }
-.am-days { flex: none; width: 37px; height: 44px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: #34D399; border: 1.5px solid #34D399; background: rgba(52, 211, 153, .08); }
-.am-days b { font-family: var(--fn); font-size: 11px; line-height: 1; }
-.am-days small { font-size: 7px; }
-.am-days.calm { color: var(--t2); border-color: var(--bd); background: var(--btw); }
+.am-days { --cd: #22C55E; flex: none; width: 40px; height: 47px; padding: 0 2px; border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; text-align: center; color: var(--cd); border: 1px solid var(--cd); background: color-mix(in srgb, var(--cd) 18%, transparent); }
+.am-days b { font-family: var(--fn); font-size: 10px; line-height: 1.1; }
+.am-days small { font-size: 6.6px; }
+.am-days small.txt { font-size: 6.4px; line-height: 1.15; }
+/* Hatırlatıcı destesi (uygulamada PEEK 9 dp: arkadaki kart aşağıdan görünür, %95 / %90 boyda) */
+.am-remstack { position: relative; height: 80px; cursor: pointer; border-radius: 16px; }
+.am-remstack:focus-visible { outline: 2px solid var(--acl); outline-offset: 3px; }
+.am-remstack .am-rem { position: absolute; left: 0; right: 0; top: 0; height: 66px; margin: 0; box-shadow: 0 4px 8px -2px rgba(0, 0, 0, .3); transition: transform .3s cubic-bezier(.22, 1, .36, 1), opacity .3s; }
+.am-remstack .am-rem.p0 { z-index: 3; }
+.am-remstack .am-rem.p1 { z-index: 2; transform: translateY(6.5px) scale(.95); opacity: .82; }
+.am-remstack .am-rem.p2 { z-index: 1; transform: translateY(13px) scale(.9); opacity: .5; }
+.am-remdots { display: flex; justify-content: center; align-items: center; gap: 4px; margin-top: 5px; }
+.am-remdots i { width: 4.5px; height: 4.5px; border-radius: 3px; background: var(--bd); transition: width .2s, background .2s; }
+.am-remdots i.on { width: 12px; background: var(--ac); }
 .am-notes { padding: 9px; border-radius: 16px; background: var(--card); border: 1px solid var(--bd); }
 .am-notes-h { display: flex; align-items: center; gap: 8px; }
 .am-notes-ic { flex: none; width: 29px; height: 29px; border-radius: 9px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #FACC15, #F59E0B 55%, #7C3AED); }

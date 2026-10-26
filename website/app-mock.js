@@ -40,6 +40,7 @@
   var MOV = {
     clayface: "9l1NuFjel2j89hiuiJbsxfblqjy", frankenstein: "g4JtvGlQO7DByTI6frUobqvSL3R", blackPhone2: "vBOpqxW0SDhACwEO2LZT29DuNG2",
     oneBattle: "lbBWwxBht4JFP5PsuJ5onpMqugW", anora: "cgXk2tNYhJZLXdBDO5DidAVzQ82", mongoose: "eSS5mvSG84UUuvtbHel5Yu3Wik4",
+    secretWars: "f0YBuh4hyiAheXhh4JnJWoKi9g5",
     interstellar: "yQvGrMoipbRoddT0ZR8tPoR7NfX", inception: "xlaY2zyzMfkhk0HSC5VUwzoZPU1", avengers: "RYMX2wcKCBAr24UyPD7xwmjaTn",
     fightClub: "jSziioSwPVrOy9Yow3XhWIBDjq1", gotg: "r7vmZjiyZw9rpJMQJdXpjgiCOk9", shawshank: "9cqNxx0GxF0bflZmeSMuL5tnGzr",
     forrest: "saHP97rTPS5eLmrLQEcANmKrsFl", pulp: "vQWk5YBFWF4bZaofAbv0tShwBvQ", residentEvil: "1UKNef590A0ZaMnxsscIcWuK1Em",
@@ -167,6 +168,8 @@
     "ribbon": '<circle cx="12" cy="9" r="5.5"/><path d="M8.6 13.4L7 21l5-2.6 5 2.6-1.6-7.6"/>',
     "logout": '<path d="M14 4.5H6.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2H14"/><path d="M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5"/>',
     "skip": '<path d="M5 6l9 6-9 6z" fill="currentColor" stroke="none"/><path d="M18 6v12"/>',
+    "ellipse": '<circle cx="12" cy="12" r="6.5" fill="currentColor" stroke="none"/>',
+    "time": '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
     "notes": '<rect x="6.5" y="5" width="4" height="14" rx="1.8" fill="currentColor" stroke="none"/><rect x="13.5" y="5" width="4" height="14" rx="1.8" fill="currentColor" stroke="none"/>',
     "wifi": '<path d="M12 19.5l2.8-3.3a4 4 0 0 0-5.6 0z" fill="currentColor" stroke="none"/><path d="M6.6 13.2a7.6 7.6 0 0 1 10.8 0M3.4 9.9a12 12 0 0 1 17.2 0" stroke-width="2.4"/>',
     "aperture": '<circle cx="12" cy="12" r="9"/><path d="M12 3l3 9M21 12l-9 3M12 21l-3-9M3 12l9-3"/>',
@@ -420,15 +423,31 @@
   function lcard(ids, icon, name, n, tint) {
     return '<div class="am-lcard" style="--tint:' + tint + '"><div class="am-lfan">' + ids.map(function (id) { return img(id, 92); }).join("") + '</div><div class="am-lfoot"><i>' + ic(icon, 9) + "</i><span>" + name + "</span><b>" + n + "</b></div></div>";
   }
-  function remCard(id, film, title, sub, date, days) {
-    return '<div class="am-rem"><span class="am-rem-img">' + img(id, 92) + '</span><div class="am-rem-tx"><small class="am-tag">' + ic(film ? "film" : "tv", 8) + t(film ? "mFilmTag" : "mTvTag") + "</small><b>" + title + "</b><small>" + sub + '</small><small class="muted">' + ic("calendar", 8) + date + '</small></div><span class="am-days' + (days > 3 ? " calm" : "") + '">' + ic("flash", 10) + "<b>" + days + "</b><small>" + t("mDays") + "</small></span></div>";
+  // Kalan gün kutusu uygulamadaki gibi (RemindersPreviewButton → countdownStyle): <4 gün yeşil, <7 mavi,
+  // <1 ay turuncu, <3 ay kırmızı, sonrası mor; 99 günü aşınca sayı yerine "13 Ay 27 Gün".
+  var CD = [[4, "flash", "#22C55E"], [7, "time", "#3B82F6"], [30, "calendar", "#F97316"], [90, "hourglass", "#EF4444"], [Infinity, "ellipse", "#A855F7"]];
+  function remCard(id, film, title, sub, date, days, cls) {
+    var cd = CD.filter(function (c) { return days < c[0]; })[0];
+    var m = Math.floor(days / 30), r = days % 30;
+    var left = days <= 99 ? "<b>" + days + "</b><small>" + t("mDays") + "</small>"
+      : "<small class=\"txt\">" + m + " " + t("mMonthW") + (r ? " " + r + " " + t("mDayW") : "") + "</small>";
+    return '<div class="am-rem' + (cls ? " " + cls : "") + '"><span class="am-rem-img">' + img(id, 92) + '</span><div class="am-rem-tx"><small class="am-tag">' + ic(film ? "film" : "tv", 8) + t(film ? "mFilmTag" : "mTvTag") + "</small><b>" + title + "</b>" + (sub ? "<small>" + sub + "</small>" : "") + '<small class="muted">' + ic("calendar", 8) + date + '</small></div><span class="am-days" style="--cd:' + cd[2] + '">' + ic(cd[1], 10) + left + "</span></div>";
+  }
+  // Kütüphane'deki hatırlatıcı destesi: öndeki kart + arkada aşağıdan görünen kartlar (en fazla 3) ve noktalar.
+  // Uygulamada kaydırılır; makette desteye dokununca sıradaki öne gelir.
+  function remStack(items, top) {
+    var n = items.length;
+    return '<div class="am-remstack" data-remnext role="button" tabindex="0">' + items.map(function (x, i) {
+      var pos = (i - top + n) % n;
+      return pos > 2 ? "" : remCard(x[0], x[1], x[2], x[3], x[4], x[5], "p" + pos);
+    }).join("") + '</div><div class="am-remdots">' + items.map(function (x, i) { return "<i" + (i === top ? ' class="on"' : "") + "></i>"; }).join("") + "</div>";
   }
   function notesCard() {
     return '<div class="am-notes"><div class="am-notes-h"><span class="am-notes-ic">' + ic("notes", 13) + "</span><div><b>" + t("mNoteEntries", { n: 1 }) + "</b><small>" + t("mNotesSub") + '</small></div><span class="am-arrowtile">' + ic("arrow", 12) + "</span></div>" +
       '<div class="am-note1"><div><span>' + t("mGroupName") + "</span><small>" + t("mToday") + "</small></div><small>Dune · Arrival · Parasite</small></div>" +
       '<div class="am-note2"><span><i>' + ic("doc", 10) + "</i><div><b>1</b><small>" + t("mNoteWord") + "</small></div></span><span><i>" + ic("checkbox", 10) + "</i><div><b>0</b><small>" + t("mListWord") + "</small></div></span></div></div>";
   }
-  screens.library = function () {
+  screens.library = function (st) {
     function up(id, s, e, prog, pct, soon) {
       return '<div class="am-up">' + img(id, 185) + '<span class="am-up-se">' + t("mSeShort", { s: s, e: e }) + "</span>" + (prog ? '<span class="am-up-pr">' + prog + "</span>" : "") +
         (soon ? '<span class="am-up-ep">' + t("mEpN", { n: e }) + '</span><span class="am-up-act"><span class="soon">' + ic("clock", 8) + soon + "</span></span>"
@@ -446,7 +465,9 @@
       lcard([MOV.venom, MOV.avengers, MOV.interstellar, MOV.inception, MOV.oneBattle], "film", t("mWatchedMovies"), 22, "#3B82F6") +
       lcard([MOV.forrest, MOV.pulp, MOV.shawshank, MOV.fightClub, MOV.titanic], "heart-fill", t("mFavorites"), 12, "#EF4444") + "</div>" +
       '<div class="am-lab am-lab-row"><span>' + t("mReminderLabel") + '</span><span class="am-labbtns"><span class="am-pilltag">' + ic("film", 8) + '2</span><i class="ac">' + ic("calendar", 11) + "</i></span></div>" +
-      remCard(MOV.mongoose, true, "Mongoose", "99 " + t("mMin"), fdate(2026, 9, 29, { day: "numeric", month: "long", year: "numeric" }), 3) +
+      // Kalan günler 26 Eki 2026'ya göre; Secret Wars'ın süresi henüz yok (uygulama o satırı göstermez).
+      remStack([[MOV.mongoose, true, "Mongoose", "99 " + t("mMin"), fdate(2026, 9, 29, { day: "numeric", month: "long", year: "numeric" }), 3],
+        [MOV.secretWars, true, "Avengers: Secret Wars", null, fdate(2027, 11, 17, { day: "numeric", month: "long", year: "numeric" }), 417]], st.remTop) +
       '<div class="am-lab">' + t("mNotes") + "</div>" + notesCard() +
       '<div class="am-lab">' + t("mWrapped") + '</div><div class="am-wrapped"><div class="am-wr-top"><span class="am-wr-pill">' + ic("sparkles", 8) + 'SEELOGD · WRAPPED</span><span class="am-wr-pill yr">' + ic("calendar", 8) + "2026</span></div>" +
       '<div class="am-wr-mid"><div><small class="e">' + t("mWrTotal") + '</small><div class="am-wr-big"><span class="n">634</span><b>' + t("mWrHours") + '</b></div><small class="s">≈ 26 ' + t("mDays") + " 10 " + t("mWrHoursShort") + '</small><span class="am-wr-vs">' + ic("trend-up", 9) + pct(0.24, true) + " " + t("mWrVsLast") + "</span></div>" +
@@ -556,7 +577,7 @@
   function create(host, opts) {
     opts = opts || {};
     var st = {
-      screen: opts.screen || "movies", media: "movie", pick: { trend: 0, best: 0 }, poll: null, family: "studio", tone: "mid",
+      screen: opts.screen || "movies", media: "movie", pick: { trend: 0, best: 0 }, poll: null, remTop: 0, family: "studio", tone: "mid",
       ai: { open: false, phase: "pick", mood: null, length: null, company: null }, timer: null
     };
     var tabs = opts.tabs !== false;
@@ -648,8 +669,15 @@
       Array.prototype.forEach.call(pages.querySelectorAll(".am-hs,.am-chiprow"), function (r, i) { if (xs[i]) r.scrollLeft = xs[i]; });
     }
 
+    // Yeniden çizimde klavye odağı kaybolmasın (deste role="button" bir div).
+    function refocus(sel) { var n = pages.querySelector(sel); if (n && document.activeElement === document.body) n.focus({ preventScroll: true }); }
+    host.addEventListener("keydown", function (ev) {
+      var el = ev.target;
+      if ((ev.key === "Enter" || ev.key === " ") && el.hasAttribute && el.tagName !== "BUTTON" && (el.hasAttribute("data-remnext") || el.hasAttribute("data-go"))) { ev.preventDefault(); el.click(); }
+    });
+
     host.addEventListener("click", function (ev) {
-      var target = ev.target.closest ? ev.target.closest("[data-go],[data-ai],[data-ai-close],[data-mt],[data-pick],[data-poll],[data-fam],[data-tone],[data-vibe],[data-vibe-go],[data-vibe-reset]") : null;
+      var target = ev.target.closest ? ev.target.closest("[data-go],[data-ai],[data-ai-close],[data-mt],[data-pick],[data-poll],[data-remnext],[data-fam],[data-tone],[data-vibe],[data-vibe-go],[data-vibe-reset]") : null;
       if (!target || !host.contains(target)) return;
       if (target.hasAttribute("data-go")) { show(target.getAttribute("data-go")); return; }
       if (target.hasAttribute("data-ai")) {
@@ -667,6 +695,7 @@
         st.pick[kv[0]] = +kv[1]; keep(render); return;
       }
       if (target.hasAttribute("data-poll")) { st.poll = +target.getAttribute("data-poll"); keep(render); return; }
+      if (target.hasAttribute("data-remnext")) { st.remTop = (st.remTop + 1) % target.children.length; keep(render); refocus("[data-remnext]"); return; }
       if (target.hasAttribute("data-fam")) { st.family = target.getAttribute("data-fam"); applyTheme(); keep(render); return; }
       if (target.hasAttribute("data-tone")) { st.tone = target.getAttribute("data-tone"); applyTheme(); keep(render); return; }
       if (target.hasAttribute("data-vibe")) {

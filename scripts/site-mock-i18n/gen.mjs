@@ -26,7 +26,12 @@ const { FAVORITES_COPY } = await import(base + "utils/favoritesCopy.js");
 const { getWrappedStrings } = await import(base + "utils/wrappedStrings.js");
 const { worldTourName, worldTourTitle } = await import(base + "utils/worldTour.js");
 
+// "Film ve dizi takibi" turu Game of Thrones'u gösterir: slogan, sezon/bölüm adları ve özetleri
+// TMDB'den alınmış anlık görüntüdür (tmdb-got.json; uygulama da bu metinleri TMDB'den çeker).
+const GOT = JSON.parse(fs.readFileSync(root + "scripts/site-mock-i18n/tmdb-got.json", "utf8"));
+
 const get = (o, p) => p.split(".").reduce((a, k) => (a == null ? a : a[k]), o);
+const GOTV = (p) => (l) => get(GOT[l], p) || get(GOT.en, p);
 const clean = (s) => String(s).replace(/\{\{(\w+)\}\}/g, "{$1}");
 
 const APP = (p) => (l) => get(json[l], p);
@@ -216,6 +221,8 @@ const SPEC = {
   // ── Kütüphane ─────────────────────────────────────────────────────────
   mWatchedBtn: APP("autoI18n.up_next_ray_izledim"),
   mEpN: T("Episode {n}", "{n}. Bölüm", "Episodio {n}", "Episódio {n}", "Folge {n}"),
+  // Hatırlatıcı geri sayımı 99 günü aşınca uygulama "13 Ay 27 Gün" yazar (ProfileRemindersContext → buildDateText).
+  mMonthW: APP("month"), mDayW: APP("days"),
   mSeShort: T("S{s}·E{e}", "S{s}·B{e}", "T{s}·E{e}", "T{s}·E{e}", "S{s}·F{e}"),
   mReminderLabel: T("Reminders", "Hatırlatıcı", "Recordatorios", "Lembretes", "Erinnerungen"),
   mNoteEntries: T("{n} entry", "{n} kayıt", "{n} entrada", "{n} item", "{n} Eintrag"),
@@ -248,7 +255,26 @@ const SPEC = {
   mAiChip2: APP("AICineChat.chips.explore.2.label"), mAiChip3: APP("AICineChat.chips.explore.3.label"),
   mAiChip4: APP("AICineChat.chips.explore.4.label"), mAiChip5: APP("AICineChat.chips.explore.5.label"),
   mAiSurprise: AI("vibe.surprise"), mAiPlaceholder: APP("AICineChat.placeholder"),
+
+  // ── Dizi detayı · sezon listesi · sezon detayı (TvShowsDetails / SeasonItem / SeasonDetails) ──
+  mInList: APP("autoI18n.listede"), mWatchedLbl: APP("autoI18n.izlendi"), mFavorited: APP("autoI18n.favorim"), mOthers: APP("autoI18n.digerleri"),
+  mShareHub: APP("autoI18n.hubda_paylas"), mAiLbl: APP("autoI18n.yapay_zeka"), mAiInfo: APP("autoI18n.ai_action_subtitle"),
+  mSend: APP("autoI18n.gonder"), mSendChat: APP("autoI18n.sohbete_gonder"),
+  mSeasons: APP("tvShowsDetails.seasons"), mAirDate: APP("tvShowsDetails.airDate"), mEpisode: APP("tvShowsDetails.episode"),
+  mComments: APP("tvShowsDetails.reviews"), mMyNote: APP("autoI18n.notum"), mMyNoteSub: APP("autoI18n.bu_dizi_hakkinda_bir_not_ekle"),
+  mOverview: APP("overview"), mEpWord: APP("autoI18n.bolum_4"), mMinutes: APP("time"),
+  mSeasonN: T("Season {n}", "{n}. Sezon", "Temporada {n}", "Temporada {n}", "Staffel {n}"),
+  mGenreActAdv: DF("genres.10759"),
+  mGotTagline: GOTV("tagline"), mGotOv: GOTV("season1.overview"),
 };
+for (let n = 1; n <= 8; n++) {
+  SPEC[`mGotS${n}Name`] = GOTV(`seasons.${n - 1}.name`);
+  SPEC[`mGotS${n}Ov`] = GOTV(`seasons.${n - 1}.overview`);
+}
+for (let n = 1; n <= 3; n++) {
+  SPEC[`mGotE${n}Name`] = GOTV(`season1.episodes.${n - 1}.name`);
+  SPEC[`mGotE${n}Ov`] = GOTV(`season1.episodes.${n - 1}.overview`);
+}
 
 const out = {};
 LANGS.forEach((l) => {

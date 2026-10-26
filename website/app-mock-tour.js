@@ -15,7 +15,12 @@
     dice: '<rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/><circle cx="9" cy="15" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/>',
     fire: '<path d="M12 3c.6 3.3 4.6 5.1 4.6 9.6A4.6 4.6 0 0 1 12 17.2a4.6 4.6 0 0 1-4.6-4.6c0-1.9.8-3.1 1.9-4.1.2 1.2.9 1.8 1.7 2C11 10 10.5 6.4 12 3z" fill="currentColor" stroke="none"/>',
     font: '<path d="M5 19L10 5l5 14M7 14h6M17 9v10M17 12.5c.8-1.2 2.2-1.6 3-1"/>',
-    key: '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8 15l4-7 4 7M9.5 12.5h5"/>'
+    key: '<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8 15l4-7 4 7M9.5 12.5h5"/>',
+    "star-o": '<path d="M12 3.4l2.7 5.5 6 .9-4.4 4.2 1 6-5.3-2.8-5.3 2.8 1-6L3.3 9.8l6-.9z" stroke-width="1.7"/>',
+    "star-half": '<path d="M12 3.4l2.7 5.5 6 .9-4.4 4.2 1 6-5.3-2.8-5.3 2.8 1-6L3.3 9.8l6-.9z" stroke-width="1.7"/><path d="M12 3.4v14.4l-5.3 2.8 1-6L3.3 9.8l6-.9z" fill="currentColor" stroke="none"/>',
+    create: '<path d="M11 4.5H6.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V13"/><path d="M17.6 3.9a1.8 1.8 0 0 1 2.5 2.5L12 14.5l-3.3.8.8-3.3z"/>',
+    chats: '<path d="M4 4.5h11a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 15 14H9l-3.5 2.5V14H4a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 4 4.5z"/><path d="M16.5 8.5H20a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 20 18h-1v2.5L15.5 18H11a1.5 1.5 0 0 1-1.5-1.5V16"/>',
+    document: '<path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>'
   });
 
   function date(y, m, d, opts) {
@@ -24,23 +29,77 @@
   function pill(icon, txt, cls) { return '<span class="am-pill' + (cls ? " " + cls : "") + '">' + (icon ? ic(icon, 12) : "") + txt + "</span>"; }
   var DOTS = '<span class="am-roundbtn sm" aria-hidden="true">' + ic("dots", 16) + "</span>";
 
-  /* ═══ Dizi takibi ═════════════════════════════════════════════════════ */
+  /* ═══ Dizi detayı → sezon listesi → sezon detayı (Game of Thrones) ═════
+   * Uygulamadaki TvShowsDetails · SeasonItem · SeasonDetails ekranları. 1. sezon kartına dokununca
+   * sezon detayı açılır, oradaki geri düğmesi diziye döner. Sayılar/görseller TMDB'den; sezon ve
+   * bölüm metinleri mock-i18n.js'te (mGot*, kaynak scripts/site-mock-i18n/tmdb-got.json). */
+  var GOT = {
+    backdrop: "zZqpAXxVSBtxV9qPBcscfXBcL2w",
+    // [sezon, bölüm sayısı, yayın tarihi (yıl, ay-1, gün), puan, afiş]
+    seasons: [[1, 10, [2011, 3, 17], 8.4, "wgfKiqzuMrFIkU1M68DDDY8kGC1"], [2, 10, [2012, 3, 1], 8.3, "9xfNkPwDOqyeUvfNhs1XlWA0esP"],
+      [3, 10, [2013, 2, 31], 8.4, "5MkZjRnCKiIGn3bkXrXfndEzqOU"], [4, 10, [2014, 3, 6], 8.5, "jXIMScXE4J4EVHUba1JgxZnWbo4"],
+      [5, 10, [2015, 3, 12], 8.2, "7Q1Hy1AHxAzA2lsmzEMBvuWTX0x"], [6, 10, [2016, 3, 24], 8.3, "p1udLh0gfqyZFmXBGa393gk8go5"],
+      [7, 7, [2017, 6, 16], 8.2, "oX51n32QyHeFP5kErksemJsJljL"], [8, 6, [2019, 3, 14], 6.2, "yToCshWmirenreC6mrHwFAScFNJ"]],
+    // 1. sezonun ilk bölümleri: [no, yayın tarihi, süre (dk), puan, kare]
+    eps: [[1, [2011, 3, 17], 62, 8.2, "o4IX9Mm0kpLITVANJMx7inyEUaY"], [2, [2011, 3, 24], 56, 8.0, "l0GJx3IR8YasbztTJi5uK0XqkEo"], [3, [2011, 4, 1], 58, 8.1, "8HjOlb4slc1xusMgOtoNpxuTgSI"]]
+  };
+  var SHORT = { day: "numeric", month: "short", year: "numeric" };
+  // Uygulamadaki getRatingColor (SeasonItem / SeasonDetails)
+  function rc(r) { return r >= 8 ? "#29B864" : r >= 6 ? "#F5C518" : r >= 4 ? "#FF6400" : "#EE3333"; }
+  // RatingStars: 10'luk puan 5 yıldıza; kalan ≥ ,25 yarım, ≥ ,75 tam yıldız
+  function stars(r) {
+    var v = r / 2, full = Math.floor(v), f = v - full, h = "";
+    if (f >= 0.75) { full++; f = 0; }
+    for (var i = 0; i < 5; i++) h += ic(i < full ? "star" : i === full && f >= 0.25 ? "star-half" : "star-o", 9);
+    return '<span class="am-stars">' + h + "</span>";
+  }
+  function watchProgress(done, total) {
+    return '<div class="am-wprog"><span><b>' + done + "</b>&nbsp;/ " + total + " " + t("mEpWord") + "</span><em>" + Math.round(done / total * 100) + "%</em></div>";
+  }
+  function seasonItem(s) {
+    var n = s[0], open = n === 1; // yalnız 1. sezonun detayı çizili
+    return '<div class="am-sitem"' + (open ? ' data-go="season" role="button" tabindex="0"' : "") + '><span class="am-sitem-p">' + img(s[4], 185) + '</span>' +
+      '<div class="am-sitem-b"><div class="am-sitem-h"><b>' + t("mGotS" + n + "Name") + "</b><small>· " + s[1] + " " + t("mEpisode") + " · " + date(s[2][0], s[2][1], s[2][2], SHORT) + '</small><span class="am-ck">' + ic("check", 10) + "</span></div>" +
+      '<div class="am-sitem-r"><span class="am-rpill" style="--rc:' + rc(s[3]) + '">★<b>' + s[3].toFixed(1) + "</b></span>" + stars(s[3]) + "</div>" +
+      "<p>" + t("mGotS" + n + "Ov") + '</p><i class="am-sitem-bar"></i></div></div>';
+  }
   S.series = function () {
-    var eps = [
-      ["Chapter One: The Hellfire Club", 78, true],
-      ["Chapter Two: Vecna's Curse", 77, true],
-      ["Chapter Three: The Monster and the Superhero", 63, true],
-      ["Chapter Four: Dear Billy", 78, false],
-      ["Chapter Five: The Nina Project", 75, false]
-    ];
-    return '<div class="am-scroll am-pushed">' + nav("Stranger Things", DOTS) +
-      '<div class="am-show"><div class="am-show-p">' + img(TVS.st, 185) + '</div><div class="am-show-i"><b>Stranger Things</b>' +
-      '<div class="am-chips">' + pill(null, '<i class="am-star">★</i> 8.6') + pill(null, "2016") + "</div>" +
-      '<div class="am-prog"><span>26/34</span><div class="am-prog-b"><i style="width:76%"></i></div></div>' +
-      '<div class="am-show-btns"><span class="am-btn ac">' + ic("check", 13) + t("mWatched") + '</span><span class="am-btn icon">' + ic("heart", 14) + '</span><span class="am-btn icon">' + ic("bell", 14) + "</span></div></div></div>" +
-      '<div class="am-chips seasons">' + [1, 2, 3, 4].map(function (n) { return '<span class="am-chip' + (n === 4 ? " on" : "") + '">' + t("mSeasonWord") + " " + n + "</span>"; }).join("") + "</div>" +
-      eps.map(function (e, i) {
-        return '<div class="am-ep' + (e[2] ? " done" : i === 3 ? " next" : "") + '"><span class="am-ep-n">' + (i + 1) + '</span><div class="am-ep-t"><b>' + e[0] + "</b><small>" + (i === 3 ? t("mNextEp") + " · " : "") + t("mSeasonEp", { season: 4, episode: i + 1 }) + " · " + e[1] + " " + t("mMin") + '</small></div><span class="am-ep-ck">' + (e[2] ? ic("check", 13) : "") + "</span></div>";
+    var genres = [t("mGenreSciFan"), t("mGenreDrama"), t("mGenreActAdv")];
+    return '<div class="am-tvd-float"><span class="am-roundbtn" aria-hidden="true">' + ic("back", 14) + '</span><span class="am-roundbtn" aria-hidden="true">' + ic("share-social", 13) + "</span></div>" +
+      '<div class="am-scroll am-tvd"><div class="am-tvd-hero"><img loading="lazy" decoding="async" alt="" src="https://image.tmdb.org/t/p/w780/' + GOT.backdrop + '.jpg"></div>' +
+      '<div class="am-tvd-head"><span class="am-tvd-poster">' + img(TVS.got, 185) + '</span><div class="am-tvd-info"><b class="h">Game of Thrones</b><p class="am-tagline">“' + t("mGotTagline") + "”</p>" +
+      '<div class="am-gen"><span class="age">' + ic("shield", 8) + "18+</span><span>" + genres.join("</span><span>") + "</span></div>" +
+      '<div class="am-tvd-rate"><span class="st">' + ic("star", 17) + '</span><div><b class="n">8.5<small>/10</small></b><small>28K</small></div><span class="mine">' + ic("star", 9) + '<b class="n">10</b></span></div>' +
+      '<span class="am-imdb"><i>IMDb</i><b class="n">9.2</b></span></div></div>' +
+      '<div class="am-tvd-acts">' + [["bookmark", "#3B82F6", "mInList"], ["eye", "#22C55E", "mWatchedLbl"], ["heart-fill", "#EF4444", "mFavorited"]].map(function (a) {
+        return '<span><i style="color:' + a[1] + '">' + ic(a[0], 19) + "</i><small>" + t(a[2]) + "</small></span>";
+      }).join("") + '<span><i class="xtra">' + ic("apps9", 12) + "<u>2</u></i><small>" + t("mOthers") + "</small></span></div>" +
+      watchProgress(73, 73) +
+      '<div class="am-tvd-tiles">' + [["create", "#3B82F6", "mReview", "mShareHub"], ["sparkles", "#A855F7", "mAiLbl", "mAiInfo"], ["send", "#22C55E", "mSend", "mSendChat"]].map(function (x) {
+        return '<span><i style="--c:' + x[1] + '">' + ic(x[0], 12) + "</i><b>" + t(x[2]) + "</b><small>" + t(x[3]) + "</small></span>";
+      }).join("") + "</div>" +
+      '<div class="am-tvd-stats"><span><i>' + ic("layers", 12) + '</i><b class="n">8</b><small>' + t("mSeasons") + "</small></span>" +
+      "<span><i>" + ic("play", 12) + '</i><b class="n">73<u>/73</u></b><small>' + t("mEpisode") + "</small></span>" +
+      '<span><i class="g">' + ic("calendar", 12) + "</i><b>" + date(2011, 3, 17) + "</b><small>" + t("mAirDate") + "</small></span></div>" +
+      '<div class="am-tvd-row"><i>' + ic("chats", 13) + '</i><div><b class="h">' + t("mComments") + "</b></div>" + ic("chev", 12) + "</div>" +
+      '<div class="am-tvd-row"><i>' + ic("document", 13) + '</i><div><b class="h">' + t("mMyNote") + "</b><small>" + t("mMyNoteSub") + "</small></div>" + ic("chev", 12) + "</div>" +
+      '<h4 class="am-bar-h">' + t("mSeasons") + "</h4>" + GOT.seasons.map(seasonItem).join("") + "</div>";
+  };
+  S.season = function () {
+    var s = GOT.seasons[0];
+    return '<div class="am-tvd-float"><button type="button" class="am-ssd-back" data-go="series" aria-label="' + t("mBack") + '"><span class="am-roundbtn">' + ic("back", 14) + "</span>" + t("mSeasonN", { n: 1 }) + "</button></div>" +
+      '<div class="am-scroll am-ssd"><div class="am-ssd-hero">' + img(s[4], 342) + "</div>" +
+      '<p class="am-ssd-show">Game of Thrones</p><div class="am-ssd-chips"><span>' + ic("calendar", 10) + date(s[2][0], s[2][1], s[2][2]) + "</span><span>" + ic("play", 10) + s[1] + " " + t("mEpisode") + "</span></div>" +
+      '<span class="am-ssd-rate" style="--rc:' + rc(s[3]) + '">' + ic("star", 12) + '<b class="n">' + s[3].toFixed(1) + "</b><small>/10</small></span>" +
+      watchProgress(10, 10) +
+      '<div class="am-ssd-com">' + ic("chat-fill", 13) + "<div><b>" + t("mComments") + "</b><small>" + t("mSeasonN", { n: 1 }) + " – " + t("mGotS1Name") + "</small></div>" + ic("chev", 12) + "</div><hr>" +
+      '<h4 class="am-bar-h g">' + t("mOverview") + '</h4><p class="am-ssd-ov">' + t("mGotOv") + "</p>" +
+      '<h4 class="am-bar-h g">' + t("mEpisode") + '<span class="am-cnt">' + s[1] + "</span></h4>" +
+      GOT.eps.map(function (e, i) {
+        return '<div class="am-epc"><span class="am-epc-img"><img loading="lazy" decoding="async" alt="" src="https://image.tmdb.org/t/p/w300/' + e[4] + '.jpg">' +
+          '<em class="r" style="--rc:' + rc(e[3]) + '">★<b>' + e[3].toFixed(1) + '</b></em><em class="d">' + ic("clock", 7) + e[2] + " " + t("mMinutes") + "</em></span>" +
+          '<div class="am-epc-b"><div class="am-epc-h"><small>' + t("mEpN", { n: e[0] }) + "&nbsp;&nbsp;" + date(e[1][0], e[1][1], e[1][2], SHORT) + '</small><span class="am-ck">' + ic("check", 10) + "</span></div>" +
+          "<b>" + t("mGotE" + (i + 1) + "Name") + "</b><p>" + t("mGotE" + (i + 1) + "Ov") + "</p></div></div>";
       }).join("") + "</div>";
   };
 
@@ -118,7 +177,7 @@
       H.lcard([TVS.bear, TVS.reacher, TVS.mobland, TVS.shogun, TVS.pitt], "bookmark", t("mWatchlist"), 9, "#F59E0B") + "</div>" +
       '<div class="am-lab">' + t("mReminderLabel") + "</div>" +
       H.remCard(MOV.mongoose, true, "Mongoose", "99 " + t("mMin"), date(2026, 9, 29), 3) +
-      H.remCard(TVS.st, false, "Stranger Things", t("mSeShort", { s: 5, e: 1 }), date(2026, 10, 6), 11) +
+      H.remCard(MOV.secretWars, true, "Avengers: Secret Wars", null, date(2027, 11, 17), 417) +
       '<div class="am-lab">' + t("mNotes") + "</div>" + H.notesCard() + "</div>";
   };
 
