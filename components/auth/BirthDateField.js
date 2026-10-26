@@ -24,7 +24,13 @@ import DatePickerModal, { formatLongDateParts } from "../modals/DatePickerModal"
 import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
-import { calculateAge, MAX_AGE, MIN_ADULT_AGE, parseBirthDate } from "../../utils/ageGate";
+import {
+  birthDateHintKind,
+  calculateAge,
+  MAX_AGE,
+  MIN_REGISTER_AGE,
+  parseBirthDate,
+} from "../../utils/ageGate";
 import GlassPressable from "../common/GlassPressable";
 
 // Seçici boş değerle bugüne açılıyor; doğum tarihi için bu, çoğu kullanıcıya
@@ -67,6 +73,7 @@ export default function BirthDateField({
   const [acik, setAcik] = useState(false);
 
   const age = useMemo(() => calculateAge(value), [value]);
+  const hintKind = birthDateHintKind(age);
   const etiket = useMemo(() => tarihEtiketi(value, language), [value, language]);
 
   // Sınırlar: gelecekte doğum yok, 120 yaştan eskisi de gerçekçi değil.
@@ -151,19 +158,34 @@ export default function BirthDateField({
       </GlassPressable>
 
       {showHint && (
-        <Text style={[styles.hint, { color: theme.text.muted }]}>
-          {age === null
+        <Text
+          accessibilityLiveRegion={hintKind === "underRegister" ? "polite" : "none"}
+          style={[
+            styles.hint,
+            {
+              color:
+                hintKind === "underRegister"
+                  ? theme.colors?.red || "#E5484D"
+                  : theme.text.muted,
+            },
+          ]}
+        >
+          {hintKind === "unknown"
             ? i18nText(
                 "autoI18n.dogum_tarihi_neden",
                 "Doğum tarihin yetişkin içerik ayarı için gerekli; profilinde gösterilmez.",
               )
-            : age < MIN_ADULT_AGE
-              ? i18nText(
-                  "autoI18n.yas_alti_yetiskin_kapali",
-                  "{{age}} yaşındasın — yetişkin içerik kapalı kalacak.",
-                  { age },
-                )
-              : i18nText("autoI18n.yas_bilgisi", "{{age}} yaşındasın.", { age })}
+            : hintKind === "underRegister"
+              ? i18nText("autoI18n.yas_siniri_basligi", "Bu uygulama {{age}} yaş ve üzeri için", {
+                  age: MIN_REGISTER_AGE,
+                })
+              : hintKind === "underAdult"
+                ? i18nText(
+                    "autoI18n.yas_alti_yetiskin_kapali",
+                    "{{age}} yaşındasın — yetişkin içerik kapalı kalacak.",
+                    { age },
+                  )
+                : i18nText("autoI18n.yas_bilgisi", "{{age}} yaşındasın.", { age })}
         </Text>
       )}
 

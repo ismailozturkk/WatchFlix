@@ -133,6 +133,23 @@ export function canRegister(birthDate, now) {
   return age !== null && age >= MIN_REGISTER_AGE;
 }
 
+/**
+ * Doğum tarihi alanının altındaki ipucu hangi durumu anlatsın?
+ *
+ * "underRegister" ayrı dal: kayıt düğmesi 13 altında pasif kalıyor ve
+ * gönderimdeki yaş sınırı uyarısı hiç çalışmıyor — sebebi söyleyen tek yer bu
+ * ipucu. Eskiden 12 yaşına da "yetişkin içerik kapalı kalacak" deniyordu,
+ * kayıt devam edecekmiş gibi.
+ *
+ * @returns {"unknown"|"underRegister"|"underAdult"|"adult"}
+ */
+export function birthDateHintKind(age) {
+  if (age === null || age === undefined) return "unknown";
+  if (age < MIN_REGISTER_AGE) return "underRegister";
+  if (age < MIN_ADULT_AGE) return "underAdult";
+  return "adult";
+}
+
 /* ------------------------------------------------------------------ */
 /* Cihaz aynası                                                        */
 /* ------------------------------------------------------------------ */

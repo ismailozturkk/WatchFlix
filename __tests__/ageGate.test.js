@@ -11,6 +11,7 @@
 import {
   MIN_ADULT_AGE,
   MIN_REGISTER_AGE,
+  birthDateHintKind,
   canRegister,
   calculateAge,
   clearAgeRestriction,
@@ -198,5 +199,15 @@ describe("canRegister", () => {
 
   test("gelecek tarih kaydı engeller", () => {
     expect(canRegister("2027-01-01", bugun)).toBe(false);
+  });
+});
+
+describe("birthDateHintKind (T3 B1)", () => {
+  test("13 altı ayrı dal: kayıt pasifken sebebi ipucu söyler", () => {
+    expect(birthDateHintKind(12)).toBe("underRegister");
+    expect(birthDateHintKind(MIN_REGISTER_AGE)).toBe("underAdult");
+    expect(birthDateHintKind(MIN_ADULT_AGE - 1)).toBe("underAdult");
+    expect(birthDateHintKind(MIN_ADULT_AGE)).toBe("adult");
+    expect(birthDateHintKind(null)).toBe("unknown");
   });
 });
