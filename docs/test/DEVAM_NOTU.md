@@ -12,12 +12,12 @@ Yeni bir Claude Code oturumu (başka hesap dahil) bu dosyayı okuyarak kaldığ�
 | T1 statik tarama + kod incelemesi | ✅, düzeltmeler yapıldı ve deploy edildi | `T1_MEKANIK_TARAMA_2026-10-25.md`, `T1_KOD_INCELEME_2026-10-25.md` |
 | T2 otomatik testler | ✅, kural açıkları kapatıldı ve deploy edildi | `T2_OTOMATIK_TESTLER_2026-10-25.md` |
 | T3.1 cihaz kontrol listesi | ✅ | `T3_CIHAZ_KONTROL_LISTESI.md` |
-| T3.2 Android emülatör turu | ~ 22 satır yürütüldü, 11 bulgu, **düzeltme yok** | `T3_BULGULAR_2026-10-26.md` |
+| T3.2 Android emülatör turu | ~ 22 satır yürütüldü, 11 bulgu; Orta 5'i + Düşüklerin çoğu düzeltildi, emülatörde doğrulandı ve commit'lendi (d701fb3…ed22838, push yok); B8/B11'de yerleşim/okunurluk artıkları açık | `T3_BULGULAR_2026-10-26.md` → "Düzeltme durumu" |
 | T3.3 iPhone turu, T4–T8 | başlamadı | rehber: `docs/planlama/YAYIN_ONCESI_TEST_REHBERI.md` |
 
 ## Sıradaki iş (kullanıcı seçecek)
 
-1. **T3 Orta bulgularını düzelt:** B1 (13 yaş altı ipucu, `components/auth/BirthDateField.js`), B6 ("11B", `components/PosterInfoBadges.js`), B7 (e-posta uyarısı çevirisi, `translations/*.json` `profileScreen.emailVerified`), B9 (AI kart eşleşmesi, `services/tmdbLookup.js`), B10 (çevrimdışı detay, `TvShowsDetails.js` + `MovieDetail.js`). Düşükler (B2–B5, B8, B11) uygunsa aynı turda. Her biri için test + rapordaki "Düzeltme durumu".
+1. **Açık artıklar (Düşük):** B8 Almanca segment kırılması + "0 Woch…" kesilmesi; B11 "+ New note", açık tema okunurluğu, ikon arka planı önizlemesi, açık arka planlı detay başlığı. Düzeltmeler cihazlara build/OTA ile gidecek.
 2. **Sosyal satırlar (ikinci test hesabı):** 8.x, 9.x, 10.5; ayrıca 14.2 (çevrimdışı yazma → senkron).
 
 ## Kurallar ve kararlar (kullanıcıdan)
@@ -26,7 +26,7 @@ Yeni bir Claude Code oturumu (başka hesap dahil) bu dosyayı okuyarak kaldığ�
 - **iOS EAS build ALMA:** aylık iOS kotası doldu; iPhone'daki 1.4.8 dev build kullanılıyor.
 - T1'den 1.2 ve 3.3 bilerek bırakıldı.
 - Tek Firebase projesi (`movieandtv-2832a`) = canlı. Yük ve sızma testleri canlıya yapılmaz (T0.3 staging kararı açık).
-- Emülatördeki uygulama canlı Firebase'e bağlı: ajan orada **hesap açamaz, şifre giremez**. Kullanıcı test hesabıyla girer ("Test 1", Free). Test hesabı şu an **Almanca + yeşil açık tema**da.
+- Emülatördeki uygulama canlı Firebase'e bağlı: ajan orada **hesap açamaz, şifre giremez**. Kullanıcı test hesabıyla girer ("Test 1", Free). Test hesabı şu an **Almanca**; uygulama 26 Eki'de emülatöre yeniden kuruldu.
 - Servis hesabı anahtarı (`functions/scripts/sa.json`) gerekiyorsa kullanıcı oluşturur; iş bitince silinir ve konsolda iptal edilir. Gizli değerler ekrana yazılmaz.
 - Çalışma ağacında başka bir oturumun commit edilmemiş işi var (sosyal hesaplar, detay AI eylemleri: `DetailAiActionSheet`, `socialLinksService`…). Ona dokunma, commit'leme.
 
