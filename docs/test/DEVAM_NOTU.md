@@ -13,12 +13,12 @@ Yeni bir Claude Code oturumu (başka hesap dahil) bu dosyayı okuyarak kaldığ�
 | T2 otomatik testler | ✅, kural açıkları kapatıldı ve deploy edildi | `T2_OTOMATIK_TESTLER_2026-10-25.md` |
 | T3.1 cihaz kontrol listesi | ✅ | `T3_CIHAZ_KONTROL_LISTESI.md` |
 | T3.2 Android emülatör turu | ~ 22 satır yürütüldü, 11 bulgu; Orta 5'i + Düşüklerin çoğu düzeltildi, emülatörde doğrulandı ve commit'lendi (d701fb3…ed22838, push yok); B8/B11'de yerleşim/okunurluk artıkları açık | `T3_BULGULAR_2026-10-26.md` → "Düzeltme durumu" |
-| T3.2 sosyal tur (2 emülatör) | 20 satır: 10 ✅, 4 ❌ (B12–B15), 6 ⏸; B12/B13/B14 düzeltildi, rules+index DEPLOY EDİLDİ ve cihazda doğrulandı; B15 karar | `T3_BULGULAR_2026-10-26.md` → "Sosyal tur" |
+| T3.2 sosyal tur (2 emülatör) | 20 satır: 10 ✅, 4 ❌ (B12–B15), 6 ⏸; B12–B15 düzeltildi, rules+index DEPLOY EDİLDİ ve cihazda doğrulandı | `T3_BULGULAR_2026-10-26.md` → "Sosyal tur" |
 | T3.3 iPhone turu, T4–T8 | başlamadı | rehber: `docs/planlama/YAYIN_ONCESI_TEST_REHBERI.md` |
 
 ## Sıradaki iş (kullanıcı seçecek)
 
-1. **Kararlar:** B15 (şikâyet edilen gönderiyi gizleme; öneri raporda) ve B14 gerçek çevrimdışı liste yazımı (runTransaction yerine). Rules + index 26 Eki DEPLOY EDİLDİ (yayındaki kurallar başka oturumun sosyal hesaplar bloğunu da içeriyor, HEAD'de yok).
+1. **Kararlar:** B14 gerçek çevrimdışı liste yazımı (runTransaction yerine). B15 uygulandı + rules deploy edildi (60f1a32); açık: gizlenen gönderileri yönetme ekranı. Rules + index 26 Eki DEPLOY EDİLDİ (yayındaki kurallar başka oturumun sosyal hesaplar bloğunu da içeriyor, HEAD'de yok).
 2. **Kalan sosyal satırlar:** 8.4 (60+ mesaj), 8.13 (zevk uyumu), 8.15 (sosyal hesaplar, başka oturumun işi bitince); Premium isteyenler 8.9/8.12/10.5 (test hesaplarına promosyon kodu). Önce B'nin A'ya engelini kaldır ve yeniden arkadaş ol.
 3. **Açık artıklar (Düşük):** B8 Almanca segment kırılması + "0 Woch…"; B11 "+ New note", açık tema okunurluğu.
 
