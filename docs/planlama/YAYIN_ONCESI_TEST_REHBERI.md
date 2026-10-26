@@ -171,7 +171,9 @@ Her biri ayrı madde olarak rapora:
 **Matris (her senaryo için en az bir kez):** Android + iOS · tr + en (bir de es/pt/de'den biri) · açık + koyu · Free + Premium + Max · küçük ekran (≤ 360 dp) · çevrimdışı.
 Plan simülatörü (`__DEV__`) yalnız istemci kapılarını değiştirir; sunucu kapıları (AI kotası, arkadaşın özel afişi) için gerçek plan gerekir (test kullanıcılarına promosyon kodu).
 
-### [ ] T3.1 — Kontrol listesini üret
+### [x] T3.1 — Kontrol listesini üret
+
+> 26 Eki: `docs/test/T3_CIHAZ_KONTROL_LISTESI.md` (15 alan, ~120 satır, iPhone için 6 parça).
 
 **Adımlar:** T0.2'deki "cihazda doğrulanacaklar" listesi + aşağıdaki çekirdek akışlardan `docs/test/T3_CIHAZ_KONTROL_LISTESI.md` üret. Her satır: senaryo, adımlar, beklenen sonuç, platform, durum kutusu. Satırlar 2–5 adımı geçmesin.
 
@@ -191,7 +193,9 @@ Plan simülatörü (`__DEV__`) yalnız istemci kapılarını değiştirir; sunuc
 13. **Ayarlar:** tema stüdyosu, dil değişimi (5 dil), efektler, bölüm gizle/göster, yedekle/geri yükle, kütüphane dışa aktarma, geri bildirim kutusu, bildirim izinleri.
 14. **Dayanıklılık:** uçak modunda açılış, çevrimdışı izledim → çevrimiçi senkron, uygulamayı yazma ortasında öldürme, düşük bellek, uzun süre arka planda kalıp dönme, OTA güncellemesinin inmesi.
 
-### [ ] T3.2 — Android emülatör turu (ajan)
+### [~] T3.2 — Android emülatör turu (ajan)
+
+> 26 Eki: oturumsuz kısım + test hesabıyla tek hesaplık satırlar yürütüldü (22 satır) → `docs/test/T3_BULGULAR_2026-10-26.md`: B1, B6, B7, B9, B10 Orta; B2–B5, B8, B11 Düşük; düzeltme yok. Kalan: iki hesap isteyen sosyal satırlar (8.x, 9.x, 10.5), 14.2 çevrimdışı senkron, P satırları.
 
 Listenin Android satırlarını emülatörde yürüt, her satıra ekran görüntüsü yolu veya kısa sonuç yaz. Bulgular `docs/test/T3_BULGULAR_<tarih>.md`'ye.
 
