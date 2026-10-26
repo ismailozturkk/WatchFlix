@@ -99,29 +99,29 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
-| 8.1 | Arkadaş ekle / kabul | A hesabı B'ye istek → B kabul | İkisinde de arkadaş; rozet sayısı güncel | A 2H | [ ] |
-| 8.2 | Arkadaşlıktan çıkar | A, B'yi çıkarır | İkisinde de kalkar; 1-1 sohbet silinir | A 2H | [ ] |
-| 8.3 | DM + okundu | Mesaj gönder → karşı taraf açar | Okundu işareti yansır; sırası doğru | A 2H | [ ] |
-| 8.4 | Eski mesaj sayfalama | 60+ mesajlı sohbette yukarı kaydır | Eski sayfa gelir, konum zıplamaz | A | [ ] |
-| 8.5 | Alıntı (reply) | Mesaja uzun bas → Yanıtla → gönder | Balonda alıntı önizlemesi; dokununca kaynağa gider | A | [ ] |
-| 8.6 | Grup sohbeti + sayaç | Grup kur → üye mesaj atar | Okunmamış sayacı artar, açınca sıfırlanır | A 2H | [ ] |
-| 8.7 | Sohbete paylaş | Liste / CineMatch cevabı / Hub içeriği → Sohbete gönder | Zengin kart; dokununca içeriği açar | A 2H | [ ] |
-| 8.8 | Görünümümü paylaş | Ayarlar → Görünümümü paylaş → arkadaş bölüm seçip uygular → Geri Al | Ayar canlı uygulanır, Geri Al eski hale döndürür | A 2H | [ ] |
-| 8.9 | Davet sonucu sohbete | Düello bitir; CineSwipe eşleşmesi | Sonuç kartı / eşleşme listesi sohbette | A 2H | [ ] |
-| 8.10 | Push (uygulama kapalı) | B uygulamayı kapatır → A DM + grup mesajı atar | B'ye bildirim gelir; dokununca sohbet açılır | P i 2H | [ ] |
-| 8.11 | Şikâyet + engelle | Kullanıcı profili → Şikâyet et → Engelle | Engellenen mesaj atamaz, listede görünmez | A 2H | [ ] |
-| 8.12 | Arkadaşın özel afişi | Premium B bir afiş seçer → A, B'nin profiline bakar | B'nin seçtiği afiş görünür (B Free'ye düşerse varsayılan) | A 2H | [ ] |
-| 8.13 | Zevk uyumu + birlikte izleyelim | Arkadaş profili → Zevk uyumu | Yüzde ve ortak öneriler; liste gizliyse "gizli" der, "boş" demez | A 2H | [ ] |
-| 8.14 | Bildirimler: tümünü okundu | Bildirimler → ✓✓ | Hepsi okunur, rozet sıfırlanır | A | [ ] |
-| 8.15 | Sosyal hesaplar | Profili düzenle → sosyal hesap kullanıcı adı → kaydet | Profilde bağlantı doğru adresi açar | A | [ ] |
+| 8.1 | Arkadaş ekle / kabul | A hesabı B'ye istek → B kabul | İkisinde de arkadaş; rozet sayısı güncel | A 2H | ✅ |
+| 8.2 | Arkadaşlıktan çıkar | A, B'yi çıkarır | İkisinde de kalkar; 1-1 sohbet silinir | A 2H | ❌ B13 |
+| 8.3 | DM + okundu | Mesaj gönder → karşı taraf açar | Okundu işareti yansır; sırası doğru | A 2H | ✅ |
+| 8.4 | Eski mesaj sayfalama | 60+ mesajlı sohbette yukarı kaydır | Eski sayfa gelir, konum zıplamaz | A | ⏸ |
+| 8.5 | Alıntı (reply) | Mesaja uzun bas → Yanıtla → gönder | Balonda alıntı önizlemesi; dokununca kaynağa gider | A | ✅ |
+| 8.6 | Grup sohbeti + sayaç | Grup kur → üye mesaj atar | Okunmamış sayacı artar, açınca sıfırlanır | A 2H | ✅ |
+| 8.7 | Sohbete paylaş | Liste / CineMatch cevabı / Hub içeriği → Sohbete gönder | Zengin kart; dokununca içeriği açar | A 2H | ✅ (B16) |
+| 8.8 | Görünümümü paylaş | Ayarlar → Görünümümü paylaş → arkadaş bölüm seçip uygular → Geri Al | Ayar canlı uygulanır, Geri Al eski hale döndürür | A 2H | ✅ |
+| 8.9 | Davet sonucu sohbete | Düello bitir; CineSwipe eşleşmesi | Sonuç kartı / eşleşme listesi sohbette | A 2H | ⏸ Premium |
+| 8.10 | Push (uygulama kapalı) | B uygulamayı kapatır → A DM + grup mesajı atar | B'ye bildirim gelir; dokununca sohbet açılır | P i 2H | ⏸ P |
+| 8.11 | Şikâyet + engelle | Kullanıcı profili → Şikâyet et → Engelle | Engellenen mesaj atamaz, listede görünmez | A 2H | ❌ B12 |
+| 8.12 | Arkadaşın özel afişi | Premium B bir afiş seçer → A, B'nin profiline bakar | B'nin seçtiği afiş görünür (B Free'ye düşerse varsayılan) | A 2H | ⏸ Premium |
+| 8.13 | Zevk uyumu + birlikte izleyelim | Arkadaş profili → Zevk uyumu | Yüzde ve ortak öneriler; liste gizliyse "gizli" der, "boş" demez | A 2H | ⏸ |
+| 8.14 | Bildirimler: tümünü okundu | Bildirimler → ✓✓ | Hepsi okunur, rozet sıfırlanır | A | ✅ |
+| 8.15 | Sosyal hesaplar | Profili düzenle → sosyal hesap kullanıcı adı → kaydet | Profilde bağlantı doğru adresi açar | A | ⏸ |
 
 ## 9. Gönderi ve yorum
 
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
-| 9.1 | Gönderi oluştur | Paylaş → gönderi yaz → film ekle → paylaş | Akışta görünür; modal temiz kapanır | A i | [ ] |
-| 9.2 | Yorum + beğeni | Gönderiye yorum yaz, beğen, beğeniyi geri al | Sayaçlar doğru, tekrar beğeni sayıyı şişirmez | A 2H | [ ] |
-| 9.3 | Şikâyet | Başkasının gönderisi → Şikâyet et | Onay; gönderi bu kullanıcıda gizlenir | A 2H | [ ] |
+| 9.1 | Gönderi oluştur | Paylaş → gönderi yaz → film ekle → paylaş | Akışta görünür; modal temiz kapanır | A i | ✅ |
+| 9.2 | Yorum + beğeni | Gönderiye yorum yaz, beğen, beğeniyi geri al | Sayaçlar doğru, tekrar beğeni sayıyı şişirmez | A 2H | ✅ |
+| 9.3 | Şikâyet | Başkasının gönderisi → Şikâyet et | Onay; gönderi bu kullanıcıda gizlenir | A 2H | ❌ B15 |
 
 ## 10. Eğlence
 
@@ -131,7 +131,7 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 | 10.2 | Sinema Bingosu | Bingo kartı → kare işaretle | İşaretler kalıcı; satır tamamlanınca kutlama | A | [ ] |
 | 10.3 | Önce hangisi? + Günün Sorusu | İkisini de oyna / oy ver | Sonuç ve yüzdeler görünür | A | ✅ A |
 | 10.4 | Oyun Merkezi | Oyun seç → `GameSetupSheet` → oyna; Poster Bulmaca | Kurulum sayfası; afişte yazı yok | A | [ ] |
-| 10.5 | CineSwipe | Oda kur → arkadaş davet → kaydır → eşleşme | Eşleşme sonucu sohbete gider | A 2H | [ ] |
+| 10.5 | CineSwipe | Oda kur → arkadaş davet → kaydır → eşleşme | Eşleşme sonucu sohbete gider | A 2H | ⏸ Premium |
 | 10.6 | Turnuva | Turnuva aç → oy ver → kupa sayfası | Free yalnız seyirci; kupa metni açık temada okunur | A | [ ] |
 | 10.7 | Hub vitrin + Wrapped | Hub kartları → Wrapped şeridi → tam ekran Wrapped | Üst boşluk doğru; Free yalnız bu yıl | A i | [ ] |
 | 10.8 | Free kapısı | Free hesapta oyun / CineSwipe | Yükseltme sayfası (limit 0 = kapalı metni) | A | [ ] |
@@ -178,7 +178,7 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
 | 14.1 | Uçak modunda açılış | Uçak modu → soğuk aç | Çökme yok; önbellekten içerik veya anlaşılır çevrimdışı durum | A i | ✅ A |
-| 14.2 | Çevrimdışı yaz → senkron | Çevrimdışı izledim + not + hatırlatıcı → ağı aç | Hepsi buluta gider, kaybolmaz, çift kayıt yok | A | [ ] |
+| 14.2 | Çevrimdışı yaz → senkron | Çevrimdışı izledim + not + hatırlatıcı → ağı aç | Hepsi buluta gider, kaybolmaz, çift kayıt yok | A | ❌ B14 |
 | 14.3 | Yazma ortasında öldür | İzledim'e bas, hemen uygulamayı zorla kapat → aç | Kayıt ya tam ya hiç; tutarsız durum yok | A | [ ] |
 | 14.4 | Uzun arka plan | Uygulamayı 30+ dk arka planda bırak → dön | Oturum ve sohbet dinleyicileri canlanır, boş ekran yok | A i | [ ] |
 | 14.5 | Düşük bellek | `adb shell am send-trim-memory com.smlztrk.seelogd RUNNING_CRITICAL` | Çökme yok; dönüşte ekran yeniden kurulur | A | ✅ A |

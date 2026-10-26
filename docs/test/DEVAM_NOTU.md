@@ -13,12 +13,14 @@ Yeni bir Claude Code oturumu (başka hesap dahil) bu dosyayı okuyarak kaldığ�
 | T2 otomatik testler | ✅, kural açıkları kapatıldı ve deploy edildi | `T2_OTOMATIK_TESTLER_2026-10-25.md` |
 | T3.1 cihaz kontrol listesi | ✅ | `T3_CIHAZ_KONTROL_LISTESI.md` |
 | T3.2 Android emülatör turu | ~ 22 satır yürütüldü, 11 bulgu; Orta 5'i + Düşüklerin çoğu düzeltildi, emülatörde doğrulandı ve commit'lendi (d701fb3…ed22838, push yok); B8/B11'de yerleşim/okunurluk artıkları açık | `T3_BULGULAR_2026-10-26.md` → "Düzeltme durumu" |
+| T3.2 sosyal tur (2 emülatör) | 20 satır: 10 ✅, 4 ❌ (B12–B15), 6 ⏸; B12/B13/B14 düzeltildi (rules+index deploy bekliyor), B15 karar | `T3_BULGULAR_2026-10-26.md` → "Sosyal tur" |
 | T3.3 iPhone turu, T4–T8 | başlamadı | rehber: `docs/planlama/YAYIN_ONCESI_TEST_REHBERI.md` |
 
 ## Sıradaki iş (kullanıcı seçecek)
 
-1. **Açık artıklar (Düşük):** B8 Almanca segment kırılması + "0 Woch…" kesilmesi; B11 "+ New note", açık tema okunurluğu, ikon arka planı önizlemesi, açık arka planlı detay başlığı. Düzeltmeler cihazlara build/OTA ile gidecek.
-2. **Sosyal satırlar (ikinci test hesabı):** 8.x, 9.x, 10.5; ayrıca 14.2 (çevrimdışı yazma → senkron).
+1. **Deploy (onay bekliyor):** `firestore.rules` (B12 engel) + `firestore.indexes.json` (notifications.fromUid koleksiyon dizini). DİKKAT: rules deploy dosyanın TAMAMINI gönderir; çalışma ağacındaki başka oturumun commit'lenmemiş sosyal hesaplar kuralları da gider → ya o iş önce bitsin ya deploy HEAD'den (geçici kopya) yapılsın. Sonra B15 kararı (öneri raporda) ve B14 gerçek çevrimdışı yazım kararı.
+2. **Kalan sosyal satırlar:** 8.4 (60+ mesaj), 8.13 (zevk uyumu), 8.15 (sosyal hesaplar, başka oturumun işi bitince); Premium isteyenler 8.9/8.12/10.5 (test hesaplarına promosyon kodu). Önce B'nin A'ya engelini kaldır ve yeniden arkadaş ol.
+3. **Açık artıklar (Düşük):** B8 Almanca segment kırılması + "0 Woch…"; B11 "+ New note", açık tema okunurluğu.
 
 ## Kurallar ve kararlar (kullanıcıdan)
 
@@ -26,7 +28,7 @@ Yeni bir Claude Code oturumu (başka hesap dahil) bu dosyayı okuyarak kaldığ�
 - **iOS EAS build ALMA:** aylık iOS kotası doldu; iPhone'daki 1.4.8 dev build kullanılıyor.
 - T1'den 1.2 ve 3.3 bilerek bırakıldı.
 - Tek Firebase projesi (`movieandtv-2832a`) = canlı. Yük ve sızma testleri canlıya yapılmaz (T0.3 staging kararı açık).
-- Emülatördeki uygulama canlı Firebase'e bağlı: ajan orada **hesap açamaz, şifre giremez**. Kullanıcı test hesabıyla girer ("Test 1", Free). Test hesabı şu an **Almanca**; uygulama 26 Eki'de emülatöre yeniden kuruldu.
+- Emülatördeki uygulama canlı Firebase'e bağlı: ajan orada **hesap açamaz, şifre giremez**. Kullanıcı test hesabıyla girer ("Test 1", Free). Test hesabı şu an **Almanca**; uygulama 26 Eki'de emülatöre yeniden kuruldu. İkinci hesap: "test 2" @test1 (TR), Pixel_9_Pro_2'deki ÖNİZLEME APK 1.4.9'da (Metro'ya bağlanmaz, gömülü JS). Engel kaldırıldı; A ile B arkadaş DEĞİL (B13 doğrulamasında yeniden çıkarıldı).
 - Servis hesabı anahtarı (`functions/scripts/sa.json`) gerekiyorsa kullanıcı oluşturur; iş bitince silinir ve konsolda iptal edilir. Gizli değerler ekrana yazılmaz.
 - Çalışma ağacında başka bir oturumun commit edilmemiş işi var (sosyal hesaplar, detay AI eylemleri: `DetailAiActionSheet`, `socialLinksService`…). Ona dokunma, commit'leme.
 
