@@ -283,11 +283,11 @@ describe("kayıt (oyun başına)", () => {
 });
 
 describe("blur (Bulanık Afiş)", () => {
-  test("saat: bulanıklık %50'den 0'a, puan 100'den 10'a DOĞRUSAL iner; süre dolunca 0", () => {
-    expect(BLUR_START).toBe(0.5);
+  test("saat: bulanıklık %70'ten 0'a, puan 100'den 10'a DOĞRUSAL iner; süre dolunca 0", () => {
+    expect(BLUR_START).toBe(0.7);
     expect(BLUR_ROUND_MS).toBe(10000);
-    expect(blurAmount(0)).toBe(0.5);
-    expect(blurAmount(BLUR_ROUND_MS / 2)).toBe(0.25);
+    expect(blurAmount(0)).toBe(0.7);
+    expect(blurAmount(BLUR_ROUND_MS / 2)).toBeCloseTo(0.35);
     expect(blurAmount(BLUR_ROUND_MS)).toBe(0);
     expect(blurAmount(BLUR_ROUND_MS * 3)).toBe(0); // taşma yok
     expect(blurPoints(0)).toBe(BLUR_MAX_POINTS);

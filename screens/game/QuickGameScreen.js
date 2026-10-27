@@ -18,6 +18,7 @@
 
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import AppIcon from "@components/AppIcon";
 import { EndCard, ErrorState, FeedbackStrip, Hearts, LoadingState, PosterCard, QUICK_BAD, QUICK_GOOD, StatRow } from "@components/game/QuickGameParts";
 import BlurPoster from "@components/game/BlurPoster";
 import GameTimerBar from "@components/game/GameTimerBar";
@@ -35,22 +36,68 @@ import { keyOfItem } from "@utils/olderGame";
 import { GameScreenShell } from "./GameScreenShell";
 
 const TICK_MS = 100;
+const ROUND_SECONDS = BLUR_ROUND_MS / 1000;
 
-/** Canlı puan: saat işlerken kazanılacak puanı gösterir (hesap hook'ta, cevap anında yapılır — bu yalnız görsel). */
-function LivePoints({ startedAt, running, accent, theme, text }) {
-  const [now, setNow] = useState(() => Date.now());
+/** Saat → ekranda görünen { kalan saniye, kazanılacak puan }. Saat başlamadıysa tam süre / tam puan. */
+const clockFace = (startedAt, now) =>
+  startedAt == null
+    ? { seconds: ROUND_SECONDS, points: BLUR_MAX_POINTS }
+    : { seconds: Math.max(0, Math.ceil((BLUR_ROUND_MS - (now - startedAt)) / 1000)), points: blurPoints(now - startedAt) };
+
+/**
+ * Tur saati satırı: kalan saniye + azalan çubuk + o an kazanılacak puan (cevaptan sonra kazanılan / "süre doldu").
+ * Puan hesabı hook'ta cevap anında yapılır; bu satır yalnız görsel. Saniye/puan değişmedikçe yeniden çizilmez
+ * (10 Hz kontrol, ama durum yalnız değer değişince yazılır) — çubuk native sürücüde, JS'ten bağımsız akar.
+ */
+function RoundClock({ startedAt, running, reveal, resetKey, accent, theme, copy }) {
+  const [face, setFace] = useState(() => clockFace(startedAt, Date.now()));
   useEffect(() => {
+    const update = () => {
+      const next = clockFace(startedAt, Date.now());
+      setFace((prev) => (prev.seconds === next.seconds && prev.points === next.points ? prev : next));
+    };
+    update();
     if (!running) return undefined;
-    setNow(Date.now());
-    const id = setInterval(() => setNow(Date.now()), TICK_MS);
+    const id = setInterval(update, TICK_MS);
     return () => clearInterval(id);
   }, [running, startedAt]);
-  const points = startedAt == null ? BLUR_MAX_POINTS : blurPoints(now - startedAt);
+
+  const urgent = running && face.seconds <= 3;
+  const result = reveal
+    ? reveal.correct
+      ? copy.points(reveal.points)
+      : reveal.timedOut
+        ? copy.timeUp
+        : copy.points(0)
+    : copy.points(face.points);
+  const resultTone = reveal ? (reveal.correct ? QUICK_GOOD : QUICK_BAD) : accent;
   return (
-    <View style={[styles.livePoints, { backgroundColor: `${accent}22`, borderColor: `${accent}66` }]}>
-      <Text style={[styles.livePointsText, { color: theme.text.primary }]} allowFontScaling={false}>
-        {text(points)}
-      </Text>
+    <View style={styles.clockRow}>
+      <View
+        style={[styles.chip, styles.secondsChip, { backgroundColor: theme.secondary, borderColor: urgent ? QUICK_BAD : theme.border }]}
+        accessible
+        accessibilityLabel={copy.secondsLeft(face.seconds)}
+      >
+        <AppIcon family="Ionicons" name="timer-outline" size={14} color={urgent ? QUICK_BAD : theme.text.secondary} />
+        <Text style={[styles.chipText, { color: urgent ? QUICK_BAD : theme.text.primary }]} allowFontScaling={false}>
+          {copy.secondsLeft(face.seconds)}
+        </Text>
+      </View>
+      <View style={styles.clockBar}>
+        <GameTimerBar
+          timeLeft={ROUND_SECONDS}
+          totalSeconds={ROUND_SECONDS}
+          running={running}
+          resetKey={resetKey}
+          color={urgent ? QUICK_BAD : accent}
+          trackColor={theme.secondary}
+        />
+      </View>
+      <View style={[styles.chip, styles.pointsChip, { backgroundColor: `${resultTone}22`, borderColor: `${resultTone}66` }]}>
+        <Text style={[styles.chipText, { color: theme.text.primary }]} allowFontScaling={false} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+          {result}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -187,27 +234,15 @@ export default function QuickGameScreen({ navigation, route }) {
       {playing && meta.layout === "blur" ? (
         <View style={styles.board}>
           <Text style={[styles.prompt, { color: theme.text.primary }]}>{text.prompt}</Text>
-          <View style={styles.clockRow}>
-            <View style={styles.clockBar}>
-              <GameTimerBar
-                timeLeft={BLUR_ROUND_MS / 1000}
-                totalSeconds={BLUR_ROUND_MS / 1000}
-                running={clockRunning}
-                resetKey={question.correctKey}
-                color={accent}
-                trackColor={theme.secondary}
-              />
-            </View>
-            {reveal ? (
-              <View style={[styles.livePoints, { backgroundColor: reveal.correct ? `${QUICK_GOOD}26` : `${QUICK_BAD}26`, borderColor: reveal.correct ? QUICK_GOOD : QUICK_BAD }]}>
-                <Text style={[styles.livePointsText, { color: theme.text.primary }]} allowFontScaling={false}>
-                  {reveal.correct ? quick.blur.points(reveal.points) : reveal.timedOut ? quick.blur.timeUp : quick.blur.points(0)}
-                </Text>
-              </View>
-            ) : (
-              <LivePoints startedAt={roundStartedAt} running={clockRunning} accent={accent} theme={theme} text={quick.blur.points} />
-            )}
-          </View>
+          <RoundClock
+            startedAt={roundStartedAt}
+            running={clockRunning}
+            reveal={reveal}
+            resetKey={question.correctKey}
+            accent={accent}
+            theme={theme}
+            copy={quick.blur}
+          />
           <View
             style={[styles.single, { width: posterWidth }]}
             accessible
@@ -293,9 +328,12 @@ const styles = StyleSheet.create({
   option: { flexGrow: 1, flexBasis: "45%", minHeight: 52, borderRadius: 16, borderWidth: 1.5, alignItems: "center", justifyContent: "center", paddingHorizontal: 10, paddingVertical: 8 },
   optionText: { fontSize: 15, fontWeight: "800", textAlign: "center" },
   titleOption: { fontSize: 13.5 },
-  clockRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  clockRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   // GameTimerBar kendi yatay boşluğunu taşır (16); satırda kenara yaslansın.
   clockBar: { flex: 1, marginHorizontal: -16 },
-  livePoints: { minWidth: 78, height: 30, borderRadius: 15, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
-  livePointsText: { fontSize: 13, fontWeight: "900" },
+  chip: { height: 30, borderRadius: 15, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 9 },
+  // Sabit genişlik: saniye/puan metni değiştikçe çubuk genişliği oynamasın (oynarsa çubuk "sekerdi").
+  secondsChip: { width: 66 },
+  pointsChip: { width: 92 },
+  chipText: { fontSize: 13, fontWeight: "900", fontVariant: ["tabular-nums"] },
 });

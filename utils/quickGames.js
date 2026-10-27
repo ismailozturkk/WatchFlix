@@ -8,7 +8,7 @@
 //   decade  : bir afiş — hangi ON YIL? (dört şık)
 //   kind    : bir afiş — FİLM Mİ, DİZİ Mİ?
 //   genre   : bir afiş — hangi TÜR? (dört şık)
-//   blur    : bulanık afiş — HANGİ YAPIM? (dört başlık şıkkı). ZAMANLI: afiş %50 bulanık başlar, süre aktıkça
+//   blur    : bulanık afiş — HANGİ YAPIM? (dört başlık şıkkı). ZAMANLI: afiş %70 bulanık başlar, süre aktıkça
 //             netleşir; puan da aynı oranda düşer (erken bilen çok alır). Skor = puan TOPLAMI, doğru sayısı ayrı.
 //             Süre dolarsa yanlış sayılır (can gider).
 //
@@ -223,12 +223,12 @@ function genreQuestion({ pool, streak, recent, rng, maxYear }) {
 //
 // TEK SAAT: tur süresi. Bulanıklık ve puan aynı "kalan süre oranı"ndan (1 → 0) türer, yani ekranda gördüğün
 // netlik ile kazanacağın puan her an birbirini tutar:
-//   bulanıklık = BLUR_START × kalan      (%50 → %0; %100 = afiş hiç seçilmez, bkz. BlurPoster'daki yarıçap)
+//   bulanıklık = BLUR_START × kalan      (%70 → %0; %100 = afiş hiç seçilmez, bkz. BlurPoster'daki yarıçap)
 //   puan       = MIN + (MAX − MIN) × kalan (100 → 10; süre dolunca 0 ve yanlış)
 // Sayaç afiş YÜKLENİNCE başlar (hook: arm) — yavaş ağ oyuncunun puanını yemesin.
 
 export const BLUR_ROUND_MS = 10000;
-export const BLUR_START = 0.5;
+export const BLUR_START = 0.7;
 export const BLUR_MAX_POINTS = 100;
 export const BLUR_MIN_POINTS = 10;
 /** Bu kadar doğrudan sonra yanlış şıklar benzer yapımlardan (ortak tür ya da ±10 yıl) seçilir. */

@@ -1,6 +1,6 @@
 // components/game/BlurPoster.js
 //
-// Bulanık Afiş'in afişi: %50 bulanık başlar, tur süresince DOĞRUSAL netleşir (utils/quickGames.js blurAmount).
+// Bulanık Afiş'in afişi: %70 bulanık başlar, tur süresince DOĞRUSAL netleşir (utils/quickGames.js blurAmount).
 //
 // NEDEN KATMANLI: `blurRadius`ı her karede değiştirmek görüntüyü her seferinde yeniden bulanıklaştırır (Android'de
 // Glide dönüşümü, iOS'ta CIFilter) — JS thread'den kare başına native iş. Bunun yerine aynı afiş, sabit yarıçaplı
@@ -86,6 +86,10 @@ export default function BlurPoster({ uri, durationMs, running, revealed, resetKe
           // Ters sıra: dizideki ilk (en bulanık) katman en üstte çizilsin.
           <Animated.View
             key={amount}
+            // Sönme yalnız saydamlık: katman bir kez dokuya çizilir, her karede yeniden çizilmez (saat çubuğuyla
+            // aynı karelerde GPU/UI iş yükü yarışmasın).
+            renderToHardwareTextureAndroid
+            shouldRasterizeIOS
             style={[
               styles.fill,
               {

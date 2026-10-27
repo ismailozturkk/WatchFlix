@@ -68,7 +68,12 @@ jest.mock("../context/AppSettingsContext", () => ({ useApiSettings: () => ({ API
 
 let mockPools;
 const mockFetchPool = jest.fn((apiKey, language, source) => Promise.resolve(mockPools[source] || []));
-jest.mock("../services/sceneGameService", () => ({ fetchTitlePool: (...args) => mockFetchPool(...args) }));
+// Yazısız afiş: kimliği 3'e bölünen yapımların dilsiz afişi YOK (Bulanık Afiş onları sormamalı).
+const mockTextless = jest.fn((apiKey, entry) => Promise.resolve(entry.id % 3 === 0 ? null : `/textless${entry.id}.jpg`));
+jest.mock("../services/sceneGameService", () => ({
+  fetchTitlePool: (...args) => mockFetchPool(...args),
+  getTextlessPoster: (...args) => mockTextless(...args),
+}));
 
 const fs = require("fs");
 const path = require("path");
@@ -81,6 +86,7 @@ const QuickGamesGrid = require("../components/game/QuickGamesGrid").default;
 const { BLUR_ARM_FALLBACK_MS, QUICK_REVEAL_MS } = require("../hooks/useQuickGame");
 const { QUICK_COPY, quickOptionLabel } = require("../utils/quickGamesCopy");
 const { OLDER_COPY } = require("../utils/olderGameCopy");
+const { buildTextlessBlurQuestion, BLUR_PROBE_MAX } = require("../services/quickGamePool");
 const { BLUR_ROUND_MS, QUICK_GAME_IDS, QUICK_GAME_META, QUICK_GENRES, canonGenresOf, decadeOf } = require("../utils/quickGames");
 const STREAK_GAMES = QUICK_GAME_IDS.filter((id) => !QUICK_GAME_META[id].timed);
 
@@ -117,6 +123,7 @@ beforeEach(() => {
   __resetStoreCaches();
   mockTrack.mockClear();
   mockFetchPool.mockClear();
+  mockTextless.mockClear();
   mockLang = "tr";
   mockUser = { uid: "u1" };
   mockApiKey = "key";
@@ -350,6 +357,34 @@ describe("Bulanık Afiş (zamanlı)", () => {
     expect(has(blur().points(100))).toBe(true);
   });
 
+  test("afiş YAZISIZ: doğru cevabın dilsiz afişi kullanılır, dilsiz afişi olmayan yapım sorulmaz", async () => {
+    await mount("blur");
+    for (let i = 0; i < 6; i += 1) {
+      const key = poster().props.resetKey;
+      const entry = Object.values(INFO).find((x) => x.mediaKey === key);
+      expect(entry.id % 3).not.toBe(0);
+      expect(poster().props.uri).toContain(`/textless${entry.id}.jpg`);
+      expect(poster().props.uri).not.toContain(entry.posterPath);
+      await ready();
+      await press(rightOption());
+      await wait(QUICK_REVEAL_MS);
+    }
+  });
+
+  test("kalan süre saniye olarak görünür ve azalır; son 3 sn'de uyarı rengi", async () => {
+    await mount("blur");
+    expect(has(blur().secondsLeft(10))).toBe(true);
+    await ready();
+    await wait(2500);
+    expect(has(blur().secondsLeft(8))).toBe(true);
+    await wait(5000);
+    expect(has(blur().secondsLeft(3))).toBe(true);
+    expect(renderer.root.findByType("TimerBar").props.color).toBe("#EF4444");
+    await press(rightOption());
+    await wait(500);
+    expect(has(blur().secondsLeft(3))).toBe(true); // cevapta saat donar
+  });
+
   test("erken bilen çok alır: 3 sn'de doğru = 73 puan, canlı puan da iner", async () => {
     await mount("blur");
     await ready();
@@ -407,6 +442,38 @@ describe("Bulanık Afiş (zamanlı)", () => {
     act(() => renderer.unmount());
     renderer = null;
     expect(() => jest.advanceTimersByTime(BLUR_ROUND_MS * 2)).not.toThrow();
+  });
+});
+
+describe("yazısız afiş araması (buildTextlessBlurQuestion)", () => {
+  const pool = () => [...mockPools.top_rated_movie, ...mockPools.popular_movie, ...mockPools.popular_tv];
+
+  test("dilsiz afişi olmayanlar elenir ve bir daha denenmez; bulunan afiş soruya yazılır", async () => {
+    const rejected = new Set();
+    const lookup = jest.fn((key, entry) => Promise.resolve(entry.id % 2 === 0 ? null : `/t${entry.id}.jpg`));
+    for (let i = 0; i < 10; i += 1) {
+      const q = await buildTextlessBlurQuestion("key", pool(), { rejected, lookup });
+      expect(q.items[0].id % 2).toBe(1);
+      expect(q.items[0].posterPath).toBe(`/t${q.items[0].id}.jpg`);
+      expect(q.options.map((o) => o.key)).toContain(q.correctKey);
+    }
+    const asked = lookup.mock.calls.map(([, entry]) => entry.mediaKey);
+    [...rejected].forEach((key) => expect(asked.filter((k) => k === key)).toHaveLength(1));
+  });
+
+  test("hiçbirinin dilsiz afişi yoksa (ya da ağ hatası) en çok BLUR_PROBE_MAX deneme, sonra null", async () => {
+    const none = jest.fn(() => Promise.resolve(null));
+    expect(await buildTextlessBlurQuestion("key", pool(), { lookup: none })).toBeNull();
+    expect(none.mock.calls.length).toBeLessThanOrEqual(BLUR_PROBE_MAX);
+    const failing = jest.fn(() => Promise.reject(new Error("ağ")));
+    expect(await buildTextlessBlurQuestion("key", pool(), { lookup: failing })).toBeNull();
+  });
+
+  test("ekranda: hiçbir yapımın dilsiz afişi yoksa hata durumu", async () => {
+    mockTextless.mockImplementation(() => Promise.resolve(null));
+    await mount("blur");
+    expect(has(common().errorTitle)).toBe(true);
+    mockTextless.mockImplementation((apiKey, entry) => Promise.resolve(entry.id % 3 === 0 ? null : `/textless${entry.id}.jpg`));
   });
 });
 

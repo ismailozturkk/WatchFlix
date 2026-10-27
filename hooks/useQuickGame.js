@@ -11,11 +11,15 @@
 // `arm()` çağırır (yüklenmezse BLUR_ARM_FALLBACK_MS sonra kendiliğinden). Saat tek kaynaktır: puan cevap anındaki
 // `Date.now() − roundStartedAt`ten hesaplanır, ekrandaki bulanıklık/çubuk yalnız görseldir. Süre dolunca soru
 // yanlış sayılır (can gider). Skor = puan toplamı; doğru sayısı ayrıca kaydedilir (recordOlderRun `correct`).
+// Soru AĞDAN gelir: doğru cevabın YAZISIZ afişi aranır (services/quickGamePool buildTextlessBlurQuestion). Bekleme
+// hissedilmesin diye sıradaki soru cevap anında, 1,5 sn'lik gösterim sırasında hazırlanır ve afişi önceden indirilir.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Image } from "expo-image";
 import { Keys, get, set, remove, useStored } from "../services/storage";
 import { ANALYTICS_EVENTS, trackEvent } from "../services/analytics";
-import { MIN_USABLE_POOL, loadQuickPool } from "../services/quickGamePool";
+import { MIN_USABLE_POOL, buildTextlessBlurQuestion, loadQuickPool } from "../services/quickGamePool";
+import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import {
   BLUR_ROUND_MS,
   QUICK_LIVES,
@@ -35,6 +39,13 @@ export const QUICK_REVEAL_MS = 1500;
 export const BLUR_ARM_FALLBACK_MS = 4000;
 /** Süre dolduğunda `chosenKey` (hiçbir şık bu anahtarı taşımaz). */
 export const QUICK_TIMEOUT_KEY = "__timeout__";
+
+/** Afiş (BlurPoster ile aynı boy) indirilip önbelleğe alınır; yükleme anında beklenmez. Başarısızlık sessiz. */
+function prefetchPoster(question) {
+  const uri = buildTmdbUrl(question?.items?.[0]?.posterPath, "poster", 342);
+  if (!uri || typeof Image?.prefetch !== "function") return;
+  Promise.resolve(Image.prefetch(uri)).catch(() => {});
+}
 
 function writeStats(uid, gameId, run) {
   const options = { uid };
@@ -67,6 +78,9 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
   const timerRef = useRef(null);
   const roundRef = useRef({ startedAt: null, timer: null }); // zamanlı oyunun saati
   const chooseRef = useRef(null);
+  const pendingRef = useRef(null); // zamanlı: hazırlanan sıradaki soru { run, promise }
+  const rejectedRef = useRef(new Set()); // zamanlı: yazısız afişi olmayan yapımlar
+  const advancingRef = useRef(false); // zamanlı: sıradaki soru bekleniyor (çift ilerleme yok)
   const alive = useRef(true);
   const generation = useRef(0);
 
@@ -95,10 +109,27 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
     setRoundStartedAt(startedAt);
   }, [timed]);
 
-  const nextQuestion = useCallback(
+  /** Zamanlı oyunun sıradaki sorusunu (yazısız afişli) hazırlamaya başlar; sonuç pendingRef'te. */
+  const prepareTimed = useCallback(
     (streak) => {
-      const next = buildQuickQuestion(gameId, { pool: poolRef.current, streak, recent: recentRef.current });
-      if (!next) return false;
+      const promise = buildTextlessBlurQuestion(apiKey, poolRef.current, {
+        streak,
+        recent: recentRef.current,
+        rejected: rejectedRef.current,
+      })
+        .catch(() => null)
+        .then((next) => {
+          if (next) prefetchPoster(next);
+          return next;
+        });
+      pendingRef.current = { run: generation.current, promise };
+      return promise;
+    },
+    [apiKey],
+  );
+
+  const showQuestion = useCallback(
+    (next) => {
       recentRef.current = pushQuickRecent(recentRef.current, next);
       clearRound();
       setRoundStartedAt(null);
@@ -111,7 +142,30 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
       setPhase("playing");
       return true;
     },
-    [arm, gameId, timed],
+    [arm, timed],
+  );
+
+  /**
+   * Sıradaki soru. Zamansız oyunda EŞZAMANLI (true/false); zamanlıda Promise<boolean> — hazırlanmışsa onu bekler.
+   * Bayat (yeniden başlatılmış koşu) sonuç gösterilmez.
+   */
+  const nextQuestion = useCallback(
+    (streak) => {
+      if (!timed) {
+        const next = buildQuickQuestion(gameId, { pool: poolRef.current, streak, recent: recentRef.current });
+        return next ? showQuestion(next) : false;
+      }
+      const run = generation.current;
+      const pending = pendingRef.current?.run === run ? pendingRef.current.promise : prepareTimed(streak);
+      pendingRef.current = null;
+      advancingRef.current = true;
+      return pending.then((next) => {
+        if (!alive.current || run !== generation.current) return true;
+        advancingRef.current = false;
+        return next ? showQuestion(next) : false;
+      });
+    },
+    [gameId, prepareTimed, showQuestion, timed],
   );
 
   const start = useCallback(async () => {
@@ -120,6 +174,9 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
     clearTimer();
     clearRound();
     setRoundStartedAt(null);
+    pendingRef.current = null;
+    advancingRef.current = false;
+    rejectedRef.current = new Set(); // ağ hatasıyla elenenler "tekrar dene"de yeniden denensin
     runRef.current = { score: 0, correct: 0, answered: 0, lives: QUICK_LIVES };
     setScore(0);
     setLives(QUICK_LIVES);
@@ -132,7 +189,9 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
       if (!apiKey) throw new Error("api_unavailable");
       if (poolRef.current.length < MIN_USABLE_POOL) poolRef.current = await loadQuickPool(apiKey, language);
       if (!alive.current || run !== generation.current) return;
-      if (poolRef.current.length < MIN_USABLE_POOL || !nextQuestion(0)) throw new Error("pool_too_small");
+      if (poolRef.current.length < MIN_USABLE_POOL) throw new Error("pool_too_small");
+      if (!(await nextQuestion(0))) throw new Error("no_question");
+      if (!alive.current || run !== generation.current) return;
       trackEvent(ANALYTICS_EVENTS.QUICK_GAME_STARTED, { game_id: gameId, source });
     } catch {
       if (alive.current && run === generation.current) setPhase("error");
@@ -168,9 +227,17 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
       finish();
       return;
     }
+    if (timed && advancingRef.current) return; // sıradaki soru zaten bekleniyor (şerit + zamanlayıcı)
     // Zorluk doğru SAYISIYLA yükselir (zamanlı oyunda skor puandır).
-    if (!nextQuestion(runRef.current.correct)) setPhase("error");
-  }, [finish, nextQuestion]);
+    const result = nextQuestion(runRef.current.correct);
+    if (result === false) setPhase("error");
+    else if (result !== true) {
+      const run = generation.current;
+      result.then((ok) => {
+        if (!ok && alive.current && run === generation.current) setPhase("error");
+      });
+    }
+  }, [finish, nextQuestion, timed]);
 
   const choose = useCallback(
     (chosenKey) => {
@@ -194,10 +261,12 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
       setLives(run.lives);
       setReveal({ chosenKey, ...verdict, correct, points: correct ? points : 0, timedOut: timedOut || (verdict.correct && !correct) });
       setPhase("revealed");
+      // Gösterim süresince sıradaki yazısız afişli soruyu ara (oyun bitmediyse).
+      if (timed && run.lives > 0) prepareTimed(run.correct);
       clearTimer();
       timerRef.current = setTimeout(advance, QUICK_REVEAL_MS);
     },
-    [advance, phase, question, timed],
+    [advance, phase, prepareTimed, question, timed],
   );
   chooseRef.current = choose;
 
