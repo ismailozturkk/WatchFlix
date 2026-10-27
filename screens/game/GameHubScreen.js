@@ -7,6 +7,13 @@
 // Oyuncu Profili → Başarımlar) ve Oyun Merkezi, Eğlence sekmesindeki günlük kartı
 // ve oyun kartlarını bir kez daha gösteriyordu. Oynamak Eğlence'den (kurulum alt
 // sayfası), ilerlemeye bakmak buradan; tek ayrı ekran Liderlik Tablosu.
+//
+// TÜM OYUNLAR (27 Eki): eskiden sayılar, arkadaş sıralaması ve rekorlar yalnız
+// Sahne Tahmin'i (ve Poster Bulmaca modlarını) görüyordu; hızlı oyunlar hiç yoktu.
+// Şimdi arkadaş sıralaması GENEL sıralamadan (utils/gameBoards — oyun başına sıra
+// puanı), "Toplam Oyun" ve "Doğruluk" hızlı oyunları da sayar, "Rekorlar" her
+// hızlı oyunun cihaz-yerel rekorunu da listeler. Seviye/XP ve başarımlar Sahne
+// Tahmin + Poster Bulmaca'ya ait kalır (hızlı oyunlar XP vermez).
 
 import UserAvatar from "@components/common/UserAvatar";
 import React, { useCallback, useMemo, useState } from "react";
@@ -25,10 +32,14 @@ import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import useGameStats from "@hooks/useGameStats";
 import usePremiumScreenGuard from "@hooks/usePremiumScreenGuard";
-import { fetchLeaderboard } from "@services/sceneGameService";
+import { fetchOverallBoard } from "@services/gameLeaderboards";
+import { Keys, useStored } from "@services/storage";
 import { rarityStyle } from "@theme/badgeTokens";
 import { pickByLanguage } from "@utils/appLanguages";
 import { i18nText } from "@utils/i18nText";
+import { OLDER_BOARD_GAME, OVERALL_BOARD } from "@utils/gameBoards";
+import { normalizeOlderStats } from "@utils/olderGame";
+import { QUICK_GAME_IDS, normalizeQuickStats } from "@utils/quickGames";
 import { alpha } from "../../theme/colors";
 import { GameScreenShell } from "./GameScreenShell";
 import { buildSceneGameProgress, SCENE_ACHIEVEMENTS } from "./gameRegistry";
@@ -38,9 +49,8 @@ import {
   getModeConfig,
   parseModeScoreKey,
   POSTER_GAME_ID,
-  SCENE_GAME_ID,
 } from "./gameConfig";
-import { getGameTitle } from "./gameLabels";
+import { getBoardGameTitle, getGameTitle } from "./gameLabels";
 import GlassTouchable from "../../components/common/GlassTouchable";
 
 const RANK_COLORS = ["#FFC83D", "#C4CAD4", "#D98C4A"];
@@ -55,12 +65,25 @@ export default function GameHubScreen({ navigation }) {
   const { friends = [] } = useFriends() || {};
   const { ready, stats } = useGameStats();
   const [board, setBoard] = useState({ loading: true, error: false, rows: [] });
+  const uid = user?.uid || null;
+  const olderRaw = useStored(Keys.olderGame, { uid });
+  const quickRaw = useStored(Keys.quickGames, { uid });
+
+  // Hızlı oyunların cihaz-yerel kayıtları ("Önce hangisi?" ayrı anahtarda), oyun sırasıyla.
+  const quickRecords = useMemo(() => {
+    const all = normalizeQuickStats(quickRaw);
+    return [
+      { gameId: OLDER_BOARD_GAME, ...normalizeOlderStats(olderRaw) },
+      ...QUICK_GAME_IDS.map((gameId) => ({ gameId, ...normalizeOlderStats(all[gameId]) })),
+    ];
+  }, [olderRaw, quickRaw]);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      fetchLeaderboard(50)
-        .then((rows) => active && setBoard({ loading: false, error: false, rows }))
+      // Genel tablo kısa süre önbellekte (services/gameLeaderboards): odakta yeniden okumak ucuz.
+      fetchOverallBoard()
+        .then(({ rows }) => active && setBoard({ loading: false, error: false, rows }))
         .catch(() => active && setBoard({ loading: false, error: true, rows: [] }));
       return () => {
         active = false;
@@ -69,14 +92,24 @@ export default function GameHubScreen({ navigation }) {
   );
 
   const progress = useMemo(() => buildSceneGameProgress(stats), [stats]);
+  // Toplam oyun ve doğruluk: sahne oyunları + hızlı oyunlar.
+  const totals = useMemo(() => {
+    const quickPlays = quickRecords.reduce((sum, record) => sum + record.plays, 0);
+    const quickCorrect = quickRecords.reduce((sum, record) => sum + record.correct, 0);
+    const quickAnswered = quickRecords.reduce((sum, record) => sum + record.answered, 0);
+    const correct = (Number(stats?.totalCorrect) || 0) + quickCorrect;
+    const answered = correct + (Number(stats?.totalWrong) || 0) + (quickAnswered - quickCorrect);
+    return {
+      played: progress.totalPlayed + quickPlays,
+      accuracy: answered ? Math.round((correct / answered) * 100) : 0,
+    };
+  }, [progress.totalPlayed, quickRecords, stats?.totalCorrect, stats?.totalWrong]);
 
+  // Genel satırlar servisten sıralı gelir; arkadaşlar + ben süzülür.
   const friendRows = useMemo(() => {
     const uids = new Set(friends.map((friend) => friend.friendUid || friend.id));
     if (user?.uid) uids.add(user.uid);
-    return board.rows
-      .filter((entry) => uids.has(entry.uid))
-      .sort((a, b) => (Number(b.bestScore) || 0) - (Number(a.bestScore) || 0))
-      .slice(0, 3);
+    return board.rows.filter((entry) => uids.has(entry.uid)).slice(0, 3);
   }, [friends, board.rows, user?.uid]);
 
   // Katalog sırası korunur (aynı sayaç ailesi bitişik bir merdiven olarak okunur).
@@ -95,8 +128,13 @@ export default function GameHubScreen({ navigation }) {
 
   const modeBests = useMemo(() => {
     const byMode = stats?.bestScoresByMode;
-    if (!byMode || typeof byMode !== "object") return [];
-    return Object.entries(byMode)
+    // Hızlı oyun rekorları (cihaz-yerel): oyun adıyla, sahne modlarının ardından.
+    const quick = quickRecords
+      .filter((record) => record.best > 0)
+      .map((record) => ({ key: `quick_${record.gameId}`, score: record.best, label: getBoardGameTitle(record.gameId, language) }))
+      .sort((a, b) => b.score - a.score);
+    if (!byMode || typeof byMode !== "object") return quick;
+    const scene = Object.entries(byMode)
       .map(([key, score]) => {
         const { gameId, modeId, difficultyId } = parseModeScoreKey(key);
         const base = `${getLocalizedGameLabel(getModeConfig(modeId), language)} · ${getLocalizedGameLabel(getDifficultyConfig(difficultyId), language)}`;
@@ -108,10 +146,12 @@ export default function GameHubScreen({ navigation }) {
         };
       })
       .sort((a, b) => b.score - a.score);
-  }, [stats?.bestScoresByMode, language]);
+    return [...scene, ...quick];
+  }, [stats?.bestScoresByMode, language, quickRecords]);
 
+  // Liderlik Genel sıralamayla açılır (oyun seçici orada).
   const openLeaderboard = (scope) =>
-    navigation.navigate("GameLeaderboardScreen", { gameId: SCENE_GAME_ID, scope });
+    navigation.navigate("GameLeaderboardScreen", { gameId: OVERALL_BOARD, scope });
 
   const headerRight = (
     <GlassIconButton
@@ -127,9 +167,9 @@ export default function GameHubScreen({ navigation }) {
 
   const metrics = [
     { label: i18nText("autoI18n.en_iyi_skor", "En İyi Skor"), value: progress.bestClassicScore, color: "#E8B931" },
-    { label: i18nText("autoI18n.dogruluk", "Doğruluk"), value: `${progress.accuracy}%`, color: "#38BDF8" },
+    { label: i18nText("autoI18n.dogruluk", "Doğruluk"), value: `${totals.accuracy}%`, color: "#38BDF8" },
     { label: i18nText("autoI18n.en_iyi_seri", "En İyi Seri"), value: Number(stats?.bestStreak) || 0, color: "#FF7A59" },
-    { label: i18nText("autoI18n.toplam_oyun", "Toplam Oyun"), value: progress.totalPlayed, color: theme.accent },
+    { label: i18nText("autoI18n.toplam_oyun", "Toplam Oyun"), value: totals.played, color: theme.accent },
   ];
 
   return (
@@ -186,7 +226,7 @@ export default function GameHubScreen({ navigation }) {
           {modeBests.length > 0 ? (
             <>
               <SectionHeader
-                title={pickByLanguage(language, { tr: "Mod rekorları", en: "Mode records", es: "Récords por modo", pt: "Recordes por modo", de: "Modus-Rekorde" })}
+                title={pickByLanguage(language, { tr: "Rekorlar", en: "Records", es: "Récords", pt: "Recordes", de: "Rekorde" })}
                 theme={theme}
               />
               <GlassBox role="card" style={[styles.panel, styles.recordPanel, { backgroundColor: theme.secondary, borderColor: theme.border }]}>

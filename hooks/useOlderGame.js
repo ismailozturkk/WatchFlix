@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keys, get, set, remove, useStored } from "../services/storage";
 import { ANALYTICS_EVENTS, trackEvent } from "../services/analytics";
 import { MIN_USABLE_POOL, loadQuickPool } from "../services/quickGamePool";
+import { saveQuickBoardEntry } from "../services/gameLeaderboards";
 import {
   OLDER_LIVES,
   judgeAnswer,
@@ -40,7 +41,8 @@ function writeStats(uid, update) {
 /**
  * @param {{ apiKey: string, language: string, uid: string|null, source?: string }} p
  */
-export default function useOlderGame({ apiKey, language, uid, source = "hub" }) {
+// `identity`: liderlik tablosu kimliği (hooks/useGameIdentity); oyun sonunda rekor GameLeaderboards/quick_older'a.
+export default function useOlderGame({ apiKey, language, uid, source = "hub", identity = null }) {
   const raw = useStored(Keys.olderGame, { uid });
   const stats = useMemo(() => normalizeOlderStats(raw), [raw]);
 
@@ -112,6 +114,7 @@ export default function useOlderGame({ apiKey, language, uid, source = "hub" }) 
     let result = { newBest: false, previousBest: 0 };
     if (uid) {
       result = writeStats(uid, (current) => recordOlderRun(current, { score: finalScore, answered: finalAnswered }));
+      saveQuickBoardEntry(uid, "older", result.stats, identity);
     }
     trackEvent(ANALYTICS_EVENTS.OLDER_GAME_FINISHED, {
       score: finalScore,
@@ -122,7 +125,7 @@ export default function useOlderGame({ apiKey, language, uid, source = "hub" }) 
     if (!alive.current) return;
     setSummary({ newBest: !!result.newBest, previousBest: result.previousBest || 0 });
     setPhase("over");
-  }, [uid]);
+  }, [identity, uid]);
 
   const advance = useCallback(() => {
     clearTimer();

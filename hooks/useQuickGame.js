@@ -19,6 +19,7 @@ import { Image } from "expo-image";
 import { Keys, get, set, remove, useStored } from "../services/storage";
 import { ANALYTICS_EVENTS, trackEvent } from "../services/analytics";
 import { MIN_USABLE_POOL, buildTextlessBlurQuestion, loadQuickPool } from "../services/quickGamePool";
+import { saveQuickBoardEntry } from "../services/gameLeaderboards";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
 import {
   BLUR_ROUND_MS,
@@ -57,9 +58,11 @@ function writeStats(uid, gameId, run) {
 }
 
 /**
- * @param {{ gameId: string, apiKey: string, language: string, uid: string|null, source?: string }} p
+ * `identity`: liderlik tablosuna yazılacak ad/avatar (hooks/useGameIdentity). Oyun sonunda oyunun REKORU
+ * GameLeaderboards/quick_<oyun> tablosuna yazılır (services/gameLeaderboards; tablodakinden büyükse).
+ * @param {{ gameId: string, apiKey: string, language: string, uid: string|null, source?: string, identity?: object|null }} p
  */
-export default function useQuickGame({ gameId, apiKey, language, uid, source = "hub" }) {
+export default function useQuickGame({ gameId, apiKey, language, uid, source = "hub", identity = null }) {
   const raw = useStored(Keys.quickGames, { uid });
   const stats = useMemo(() => statsOfQuickGame(raw, gameId), [raw, gameId]);
 
@@ -207,7 +210,10 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
   const finish = useCallback(() => {
     const { score: finalScore, correct, answered } = runRef.current;
     let result = { newBest: false, previousBest: 0 };
-    if (uid) result = writeStats(uid, gameId, { score: finalScore, correct, answered });
+    if (uid) {
+      result = writeStats(uid, gameId, { score: finalScore, correct, answered });
+      saveQuickBoardEntry(uid, gameId, result.stats, identity);
+    }
     trackEvent(ANALYTICS_EVENTS.QUICK_GAME_FINISHED, {
       game_id: gameId,
       score: finalScore,
@@ -218,7 +224,7 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
     if (!alive.current) return;
     setSummary({ newBest: !!result.newBest, previousBest: result.previousBest || 0 });
     setPhase("over");
-  }, [gameId, uid]);
+  }, [gameId, identity, uid]);
 
   const advance = useCallback(() => {
     clearTimer();

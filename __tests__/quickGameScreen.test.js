@@ -66,6 +66,11 @@ jest.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: mockUser })
 let mockApiKey = "key";
 jest.mock("../context/AppSettingsContext", () => ({ useApiSettings: () => ({ API_KEY: mockApiKey }) }));
 
+// Liderlik yazımı (Firebase) ve profil kimliği taklit: oyun sonunda rekorun tabloya gönderildiği görülür.
+const mockSaveBoard = jest.fn(() => Promise.resolve(true));
+jest.mock("../services/gameLeaderboards", () => ({ saveQuickBoardEntry: (...args) => mockSaveBoard(...args) }));
+jest.mock("../hooks/useGameIdentity", () => ({ __esModule: true, default: () => ({ displayName: "Ben", avatarIndex: 3, photoURL: null }) }));
+
 let mockPools;
 const mockFetchPool = jest.fn((apiKey, language, source) => Promise.resolve(mockPools[source] || []));
 // Yazısız afiş: kimliği 3'e bölünen yapımların dilsiz afişi YOK (Bulanık Afiş onları sormamalı).
@@ -124,6 +129,7 @@ beforeEach(() => {
   mockTrack.mockClear();
   mockFetchPool.mockClear();
   mockTextless.mockClear();
+  mockSaveBoard.mockClear();
   mockLang = "tr";
   mockUser = { uid: "u1" };
   mockApiKey = "key";
@@ -217,6 +223,8 @@ describe.each(STREAK_GAMES)("oyun: %s", (gameId) => {
     expect(has(common().endScore(2))).toBe(true);
     expect(has(common().newBest)).toBe(true);
     expect(stored()).toEqual({ [gameId]: { best: 2, plays: 1, correct: 2, answered: 5 } });
+    // Rekor liderlik tablosuna (GameLeaderboards/quick_<oyun>) profil kimliğiyle gönderilir.
+    expect(mockSaveBoard).toHaveBeenCalledWith("u1", gameId, { best: 2, plays: 1, correct: 2, answered: 5 }, { displayName: "Ben", avatarIndex: 3, photoURL: null });
     expect(get(Keys.olderGame, { uid: "u1" })).toBeNull(); // "Önce hangisi?" kaydına dokunulmaz
     expect(mockTrack).toHaveBeenCalledWith("quick_game_finished", { game_id: gameId, score: 2, answered: 5, new_best: true, best: 2 });
   });
@@ -293,6 +301,7 @@ describe("ortak davranış", () => {
     for (let i = 0; i < 3; i += 1) await answer("decade", false);
     expect(has(common().endTitle.toUpperCase())).toBe(true);
     expect(get(Keys.quickGames, { uid: "u1" })).toBeNull();
+    expect(mockSaveBoard).not.toHaveBeenCalled(); // girişsiz: tabloya da yazılmaz
   });
 
   test("ekrandan çıkınca bekleyen zamanlayıcı sızmaz", async () => {
@@ -422,6 +431,7 @@ describe("Bulanık Afiş (zamanlı)", () => {
     expect(has(common().endTitle.toUpperCase())).toBe(true);
     expect(has(blur().endScore(91))).toBe(true);
     expect(stored()).toEqual({ blur: { best: 91, plays: 1, correct: 1, answered: 4 } });
+    expect(mockSaveBoard).toHaveBeenCalledWith("u1", "blur", { best: 91, plays: 1, correct: 1, answered: 4 }, expect.any(Object));
     expect(mockTrack).toHaveBeenCalledWith("quick_game_finished", { game_id: "blur", score: 91, answered: 4, new_best: true, best: 91 });
   });
 
@@ -559,7 +569,9 @@ describe("metin tablosu ve kaynak bekçileri", () => {
     expect(read("App.js")).toMatch(/name="QuickGameScreen"/);
     expect(read("components/profile/ProfileGamesModule.js")).toMatch(/<QuickGamesGrid[^>]*onOpen=\{openQuickGame\}/);
     expect(read("components/profile/ProfileGamesModule.js")).toMatch(/navigate\("QuickGameScreen"/);
-    expect(read("hooks/useQuickGame.js")).not.toMatch(/saveGameScore|loadGameData|GameLeaderboards|setDoc|updateDoc/);
+    // Sahne Tahmin skor hattına dokunmaz, Firestore'a doğrudan yazmaz; tabloya tek yol saveQuickBoardEntry (27 Eki).
+    expect(read("hooks/useQuickGame.js")).not.toMatch(/saveGameScore|loadGameData|setDoc|updateDoc|firebase\/firestore/);
+    expect(read("hooks/useQuickGame.js")).toMatch(/saveQuickBoardEntry\(uid, gameId/);
     expect(read("screens/game/QuickGameScreen.js")).not.toMatch(/usePremium/);
   });
 

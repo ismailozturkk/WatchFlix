@@ -109,6 +109,13 @@ jest.mock("../services/sceneGameService", () => ({
   buildWatchlistPool: (list) => list,
   fetchLeaderboard: () => Promise.resolve([]),
 }));
+// Oyun Merkezi'nin arkadaş sıralaması GENEL tablodan (services/gameLeaderboards) gelir.
+let mockOverallRows = [];
+jest.mock("../services/gameLeaderboards", () => ({
+  fetchOverallBoard: () => Promise.resolve({ rows: mockOverallRows, failed: [] }),
+  saveQuickBoardEntry: () => Promise.resolve(false),
+}));
+jest.mock("../hooks/useGameIdentity", () => ({ __esModule: true, default: () => null }));
 
 const fs = require("fs");
 const path = require("path");
@@ -306,7 +313,7 @@ describe("Kurulum sayfası seçim kuralları", () => {
 });
 
 describe("Oyun Merkezi (tek ilerleme ekranı)", () => {
-  test("başarımların tamamı ve mod rekorları aynı ekranda; başlık düğmesi liderlik tablosu", async () => {
+  test("başarımların tamamı ve rekorlar aynı ekranda; başlık düğmesi GENEL liderlik tablosu", async () => {
     mockStats = {
       totalPlayed: 6, totalCorrect: 40, totalWrong: 10, bestScore: 900, bestStreak: 12, totalXp: 500,
       bestScoresByMode: { classic_normal: 900, poster_classic_hard: 450 },
@@ -317,16 +324,41 @@ describe("Oyun Merkezi (tek ilerleme ekranı)", () => {
 
     expect(renderer.root.findAllByType("Badge")).toHaveLength(SCENE_ACHIEVEMENTS.length);
     const sections = renderer.root.findAllByType("Section").map((n) => n.props.title);
-    expect(sections).toEqual(["Arkadaş Sıralaması", "Başarımlar", "Mod rekorları"]);
+    expect(sections).toEqual(["Arkadaş Sıralaması", "Başarımlar", "Rekorlar"]);
     const texts = renderer.root.findAllByType("Text").map((n) => [].concat(n.props.children).join(""));
     expect(texts).toContain("80%"); // 40 / 50
     expect(texts).toContain("900");
     expect(texts).toContain("450");
 
     act(() => renderer.root.findByType("IconButton").props.onPress());
-    expect(navigation.navigate).toHaveBeenCalledWith("GameLeaderboardScreen", { gameId: SCENE_GAME_ID, scope: "global" });
+    expect(navigation.navigate).toHaveBeenCalledWith("GameLeaderboardScreen", { gameId: "overall", scope: "global" });
     // Eğlence'de zaten olan günlük kart ve oyun kartları burada tekrar edilmez.
     expect(renderer.root.findAllByType("DailyCard")).toHaveLength(0);
+  });
+});
+
+describe("Oyun Merkezi — tüm oyunlar", () => {
+  test("hızlı oyunlar toplam oyuna, doğruluğa ve rekorlara katılır; arkadaş sıralaması Genel tablodan", async () => {
+    mockStats = { totalPlayed: 4, totalCorrect: 30, totalWrong: 10, bestScore: 700, bestStreak: 5, totalXp: 100, bestScoresByMode: { classic_normal: 700 } };
+    set(Keys.olderGame, { best: 12, plays: 3, correct: 20, answered: 30 }, { uid: "u1" });
+    set(Keys.quickGames, { blur: { best: 340, plays: 2, correct: 6, answered: 10 } }, { uid: "u1" });
+    mockOverallRows = [
+      { uid: "stranger", displayName: "Yabancı", bestScore: 300, games: 6, firsts: 3 },
+      { uid: "u1", displayName: "Ben", bestScore: 140, games: 3, firsts: 1 },
+    ];
+    await act(async () => { renderer = create(<GameHubScreen navigation={{ navigate: jest.fn() }} />); });
+    await flush();
+    const texts = renderer.root.findAllByType("Text").map((n) => [].concat(n.props.children).join(""));
+    expect(texts).toContain("9"); // toplam oyun: 4 sahne + 3 + 2
+    expect(texts).toContain("70%"); // (30 + 20 + 6) / (40 + 30 + 10) = 56 / 80
+    expect(texts).toContain("Önce hangisi?");
+    expect(texts).toContain("12");
+    expect(texts).toContain("Bulanık Afiş");
+    expect(texts).toContain("340");
+    // Arkadaş sıralaması: arkadaş olmayan "Yabancı" görünmez, ben Genel puanımla.
+    expect(texts).not.toContain("Yabancı");
+    expect(texts).toContain("140");
+    mockOverallRows = [];
   });
 });
 

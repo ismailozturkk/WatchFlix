@@ -17,6 +17,7 @@ import { useAuth } from "@context/AuthContext";
 import { useApiSettings } from "@context/AppSettingsContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
+import useGameIdentity from "@hooks/useGameIdentity";
 import useOlderGame from "@hooks/useOlderGame";
 import { keyOfItem } from "@utils/olderGame";
 import { getOlderCopy } from "@utils/olderGameCopy";
@@ -30,7 +31,9 @@ export default function OlderGameScreen({ navigation, route }) {
   const { user } = useAuth();
   const { API_KEY } = useApiSettings();
   const copy = getOlderCopy(language);
+  const identity = useGameIdentity();
   const game = useOlderGame({
+    identity,
     apiKey: API_KEY,
     language,
     uid: user?.uid || null,

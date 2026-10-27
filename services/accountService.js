@@ -130,6 +130,7 @@ import { purgeUserData as purgeLocalUserData } from "./userData";
 import { deleteCollection, deleteRefsInChunks } from "./firestoreBulk";
 import { purgeUserScope } from "./storage";
 import { resetWatchLedger } from "../utils/watchBadgeLedger";
+import { QUICK_BOARD_IDS } from "../utils/gameBoards";
 
 // Sunucu silme aşamaları, ÇALIŞMA SIRASIYLA (functions/accountPurge.js PURGE_PHASES ile
 // aynı; eşitliği __tests__/deleteAccountProgress.test.js korur). Her aşama ayrı
@@ -585,7 +586,14 @@ export async function purgeUserData(uid) {
         await safe(`leaderboard scene_${m}_${dLevel}`, () =>
           deleteDoc(doc(db, "GameLeaderboards", `scene_${m}_${dLevel}`, "entries", uid)),
         );
+        await safe(`leaderboard poster_${m}_${dLevel}`, () =>
+          deleteDoc(doc(db, "GameLeaderboards", `poster_${m}_${dLevel}`, "entries", uid)),
+        );
       }
+    }
+    // Hızlı oyun tabloları (utils/gameBoards: quick_<oyun>).
+    for (const boardId of QUICK_BOARD_IDS) {
+      await safe(`leaderboard ${boardId}`, () => deleteDoc(doc(db, "GameLeaderboards", boardId, "entries", uid)));
     }
   });
 

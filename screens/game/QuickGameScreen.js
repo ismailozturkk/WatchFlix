@@ -27,6 +27,7 @@ import { useAuth } from "@context/AuthContext";
 import { useApiSettings } from "@context/AppSettingsContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
+import useGameIdentity from "@hooks/useGameIdentity";
 import useQuickGame from "@hooks/useQuickGame";
 import { BLUR_MAX_POINTS, BLUR_ROUND_MS, QUICK_GAME_META, blurPoints, isQuickGame } from "@utils/quickGames";
 import { buildTmdbUrl } from "@utils/tmdbImageUtils";
@@ -117,8 +118,10 @@ export default function QuickGameScreen({ navigation, route }) {
   // Bulanık Afiş'te skor PUANDIR: skor satırı ve oyun sonu metni ortak tablodan değil, oyunun kendinden.
   const shared = meta.layout === "blur" ? { ...copy, scoreLabel: quick.blur.scoreLabel, endScore: quick.blur.endScore } : copy;
 
+  const identity = useGameIdentity();
   const game = useQuickGame({
     gameId,
+    identity,
     apiKey: API_KEY,
     language,
     uid: user?.uid || null,

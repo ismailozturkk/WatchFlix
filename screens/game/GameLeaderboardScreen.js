@@ -9,19 +9,24 @@ import { useAuth } from "@context/AuthContext";
 import { useFriends } from "@context/FriendsContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
-import { fetchDailyLeaderboard, fetchLeaderboard } from "@services/sceneGameService";
+import { fetchDailyLeaderboard } from "@services/sceneGameService";
+import { fetchGameBoard, fetchOverallBoard } from "@services/gameLeaderboards";
+import { BOARD_GAME_IDS, OVERALL_BOARD, POSTER_BOARD_GAME, SCENE_BOARD_GAME, compareBoardRows, isBoardGame } from "@utils/gameBoards";
+import { getGameBoardsCopy } from "@utils/gameBoardsCopy";
 import { DAILY_MODE_ID, DAILY_QUESTION_COUNT, DAILY_SOURCE_ID, dayKeyOf } from "@utils/dailyChallenge";
 import UserAvatar from "@components/common/UserAvatar";
 import { GameScreenShell, gameSharedStyles } from "./GameScreenShell";
 import usePremiumScreenGuard from "@hooks/usePremiumScreenGuard";
 import { SCENE_GAME_ID } from "./gameConfig";
+import { getBoardGameTitle } from "./gameLabels";
 import GlassTouchable from "../../components/common/GlassTouchable";
 
 const PODIUM_COLORS = ["#E8B931", "#C7CDD6", "#CD7F32"];
 
-// Kapsam filtreleri (Part 14.1). Arkadaslar/Global genel tablodan, Gunluk ise
-// bugunun Gunluk Meydan Okuma tablosundan (GameLeaderboards/scene_daily_<gun>)
-// okunur. Haftalik/Sezonluk dereceli tablo backend uretimi gerektirdiginden
+// Kapsam filtreleri (Part 14.1). Arkadaslar/Global SECILI OYUNUN tablosundan
+// (ya da Genel siralamadan — utils/gameBoards.js), Gunluk ise bugunun Gunluk
+// Meydan Okuma tablosundan (GameLeaderboards/scene_daily_<gun>) okunur; Gunluk
+// yalniz Sahne Tahmin'e ait oldugundan secilince oyun secicisi gizlenir. Haftalik/Sezonluk dereceli tablo backend uretimi gerektirdiginden
 // (Part 14.4 / 17 — Faz E) bu surumde kilitli "Yakinda" durumundadir.
 const SCOPES = [
   { id: "friends", icon: "people-outline", tr: "Arkadaşlar", en: "Friends", es: "Amigos", pt: "Amigos", de: "Freunde", available: true },
@@ -36,15 +41,13 @@ const accuracyOf = (entry) => {
   return total ? Math.round(((Number(entry?.totalCorrect) || 0) / total) * 100) : 0;
 };
 
-// Tie-break: skor esitse daha yuksek dogru, sonra daha uzun seri (Part 14.3).
-// Kesin sure/joker tie-break'i oturum bazli veri backend'e tasininca eklenecek.
-const compareEntries = (a, b) =>
-  (Number(b.bestScore) || 0) - (Number(a.bestScore) || 0) ||
-  (Number(b.totalCorrect) || 0) - (Number(a.totalCorrect) || 0) ||
-  (Number(b.bestStreak) || 0) - (Number(a.bestStreak) || 0);
-
 // Hub ve sonuc ekrani `scope` gonderir; gecersiz/kilitli kapsam Global'e duser.
 const initialScopeOf = (value) => (SCOPES.find((item) => item.id === value && item.available) ? value : "global");
+// `gameId` (sonuc ekrani: o oyunun tablosu); yoksa/gecersizse Genel.
+const initialGameOf = (value) => (isBoardGame(value) ? value : OVERALL_BOARD);
+// Tablo durumu anahtari: gunluk ya da secili oyun.
+const boardKeyOf = (scope, game) => (scope === "daily" ? "daily" : game);
+const IDLE = { status: "idle", data: [], failed: [] };
 
 export default function GameLeaderboardScreen({ navigation, route }) {
   usePremiumScreenGuard("games", navigation);
@@ -56,27 +59,33 @@ export default function GameLeaderboardScreen({ navigation, route }) {
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
   const de = normalizeAppLanguage(language) === "de";
-  // Genel ve gunluk tablo ayri kaynaklardir; gunluk ilk acildiginda yuklenir.
-  const [boards, setBoards] = useState({ global: { status: "loading", data: [] }, daily: { status: "idle", data: [] } });
+  const boardCopy = getGameBoardsCopy(language);
+  // Her tablo (oyun basina + gunluk) ayri kaynaktir; ilk secildiginde yuklenir.
+  const [boards, setBoards] = useState({});
   const [scope, setScope] = useState(() => initialScopeOf(route?.params?.scope));
-  const source = scope === "daily" ? "daily" : "global";
-  const state = boards[source];
+  const [game, setGame] = useState(() => initialGameOf(route?.params?.gameId));
+  const source = boardKeyOf(scope, game);
+  const state = boards[source] || IDLE;
+  const isOverall = source === OVERALL_BOARD;
   const [rulesVisible, setRulesVisible] = useState(false);
 
-  const load = useCallback((which) => {
+  const load = useCallback((which, fresh = false) => {
     const put = (next) => setBoards((current) => ({ ...current, [which]: next }));
-    put({ status: "loading", data: [] });
-    (which === "daily" ? fetchDailyLeaderboard(dayKeyOf(), 50) : fetchLeaderboard(50))
-      .then((data) => put({ status: "success", data: Array.isArray(data) ? data : [] }))
-      .catch(() => put({ status: "error", data: [] }));
+    put({ status: "loading", data: [], failed: [] });
+    const request =
+      which === "daily"
+        ? fetchDailyLeaderboard(dayKeyOf(), 50).then((data) => ({ rows: data, failed: [] }))
+        : which === OVERALL_BOARD
+          ? fetchOverallBoard({ fresh })
+          : fetchGameBoard(which, { fresh }).then((data) => ({ rows: data, failed: [] }));
+    request
+      .then(({ rows, failed }) => put({ status: "success", data: Array.isArray(rows) ? rows : [], failed: failed || [] }))
+      .catch(() => put({ status: "error", data: [], failed: [] }));
   }, []);
   useEffect(() => {
-    load("global");
-  }, [load]);
-  useEffect(() => {
-    if (scope === "daily" && boards.daily.status === "idle") load("daily");
-  }, [scope, boards.daily.status, load]);
-  const reload = useCallback(() => load(source), [load, source]);
+    if (state.status === "idle") load(source);
+  }, [source, state.status, load]);
+  const reload = useCallback(() => load(source, true), [load, source]);
   const playDaily = () =>
     navigation.navigate("SceneGamePlayScreen", {
       gameId: SCENE_GAME_ID,
@@ -93,8 +102,18 @@ export default function GameLeaderboardScreen({ navigation, route }) {
 
   const entries = useMemo(() => {
     const filtered = scope === "friends" ? state.data.filter((e) => friendUids.has(e.uid)) : state.data;
-    return [...filtered].sort(compareEntries);
-  }, [scope, state.data, friendUids]);
+    // Genel satirlar servisten sirali gelir (sira puani + birincilik + oyun sayisi); oyun tablolari burada siralanir.
+    return isOverall ? filtered : [...filtered].sort(compareBoardRows);
+  }, [scope, state.data, friendUids, isOverall]);
+
+  // Satirin alt bilgisi tabloya gore: Genel → oyun/birincilik, Sahne → dogruluk + seri, digerleri → dogru sayisi.
+  const metaOf = useCallback((item) => {
+    if (item.isDaily) return `${Number(item.totalCorrect) || 0}/${DAILY_QUESTION_COUNT} ${tr ? "doğru" : es ? "aciertos" : pt ? "acertos" : de ? "richtig" : "correct"} · 🔥 ${Number(item.bestStreak) || 0}`;
+    if (isOverall) return boardCopy.overallMeta(item.games || 0, item.firsts || 0);
+    if (source === SCENE_BOARD_GAME) return `${accuracyOf(item)}% ${tr ? "doğruluk" : es ? "precisión" : pt ? "precisão" : de ? "Genauigkeit" : "accuracy"} · 🔥 ${Number(item.bestStreak) || 0}`;
+    if (source === POSTER_BOARD_GAME) return `${boardCopy.correctMeta(Number(item.totalCorrect) || 0)} · 🔥 ${Number(item.bestStreak) || 0}`;
+    return boardCopy.correctMeta(Number(item.totalCorrect) || 0);
+  }, [boardCopy, isOverall, source, tr, es, pt, de]);
 
   const podium = entries.slice(0, 3);
   const rest = entries.slice(3);
@@ -108,12 +127,12 @@ export default function GameLeaderboardScreen({ navigation, route }) {
         <UserAvatar avatarIndex={item.avatarIndex} photoURL={item.photoURL} isCustomPhoto size={36} />
         <View style={styles.player}>
           <Text style={[styles.name, { color: theme.text.primary }]} numberOfLines={1}>{isSelf ? (tr ? "Sen" : es ? "Tú" : pt ? "Você" : de ? "Du" : "You") : item.displayName || (tr ? "Anonim" : es ? "Anónimo" : pt ? "Anônimo" : de ? "Anonym" : "Anonymous")}</Text>
-          <Text style={[styles.meta, { color: theme.text.muted }]}>{item.isDaily ? `${Number(item.totalCorrect) || 0}/${DAILY_QUESTION_COUNT} ${tr ? "doğru" : es ? "aciertos" : pt ? "acertos" : de ? "richtig" : "correct"}` : `${accuracyOf(item)}% ${tr ? "doğruluk" : es ? "precisión" : pt ? "precisão" : de ? "Genauigkeit" : "accuracy"}`} · 🔥 {Number(item.bestStreak) || 0}</Text>
+          <Text style={[styles.meta, { color: theme.text.muted }]} numberOfLines={1}>{metaOf(item)}</Text>
         </View>
         <Text style={[styles.points, { color: theme.accent }]}>{Number(item.bestScore) || 0}</Text>
       </View>
     );
-  }, [theme, user?.uid, tr]);
+  }, [theme, user?.uid, tr, es, pt, de, metaOf]);
 
   const headerRight = (
     <GlassIconButton
@@ -135,8 +154,12 @@ export default function GameLeaderboardScreen({ navigation, route }) {
   );
 
   return (
-    <GameScreenShell navigation={navigation} scroll={false} title={tr ? "Liderlik" : es ? "Clasificación" : pt ? "Ranking" : de ? "Bestenliste" : "Leaderboard"} subtitle={tr ? "Sahne Tahmin sıralaması" : es ? "Clasificación de Adivina la escena" : pt ? "Ranking do Adivinhe a cena" : de ? "Szenenraten-Rangliste" : "Scene Guess ranking"} headerRight={headerRight}>
+    <GameScreenShell navigation={navigation} scroll={false} title={tr ? "Liderlik" : es ? "Clasificación" : pt ? "Ranking" : de ? "Bestenliste" : "Leaderboard"} subtitle={scope === "daily" ? getBoardGameTitle(SCENE_BOARD_GAME, language) : isOverall ? boardCopy.overallSubtitle : boardCopy.gameSubtitle(getBoardGameTitle(game, language))} headerRight={headerRight}>
       <ScopeBar scope={scope} onChange={setScope} theme={theme} tr={tr} es={es} pt={pt} de={de} />
+      {scope !== "daily" ? <GameBar game={game} onChange={setGame} theme={theme} language={language} /> : null}
+      {state.status === "success" && state.failed.length > 0 ? (
+        <Text style={[styles.partial, { color: theme.text.muted }]}>{boardCopy.partial}</Text>
+      ) : null}
 
       {state.status === "loading" || state.status === "idle" ? (
         <State icon="trophy-outline" text={tr ? "Sıralamalar yükleniyor..." : es ? "Cargando clasificaciones..." : pt ? "Carregando rankings..." : de ? "Ranglisten werden geladen..." : "Loading rankings..."} theme={theme} loading />
@@ -165,7 +188,7 @@ export default function GameLeaderboardScreen({ navigation, route }) {
         />
       )}
 
-      <RulesModal visible={rulesVisible} onClose={() => setRulesVisible(false)} theme={theme} tr={tr} es={es} pt={pt} de={de} />
+      <RulesModal visible={rulesVisible} onClose={() => setRulesVisible(false)} theme={theme} tr={tr} es={es} pt={pt} de={de} board={source} boardCopy={boardCopy} />
     </GameScreenShell>
   );
 }
@@ -194,6 +217,37 @@ function ScopeBar({ scope, onChange, theme, tr, es, pt, de }) {
             <AppIcon family="Ionicons" name={item.icon} size={14} color={active ? "#fff" : theme.text.secondary} />
             <Text style={[styles.scopeText, { color: active ? "#fff" : theme.text.secondary }]}>{tr ? item.tr : es ? item.es : pt ? item.pt : de ? item.de : item.en}</Text>
             {locked ? <View style={[styles.soonDot, { backgroundColor: theme.text.muted }]} /> : null}
+          </TouchableOpacity>
+        );
+      }}
+    />
+  );
+}
+
+/** Oyun secicisi: Genel + her oyun (utils/gameBoards BOARD_GAME_IDS sirasiyla). */
+function GameBar({ game, onChange, theme, language }) {
+  return (
+    <FlatList
+      horizontal
+      data={BOARD_GAME_IDS}
+      keyExtractor={(item) => item}
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.scopeBar}
+      style={styles.scopeBarWrap}
+      renderItem={({ item }) => {
+        const active = game === item;
+        const label = getBoardGameTitle(item, language);
+        return (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityState={{ selected: active }}
+            activeOpacity={0.8}
+            onPress={() => onChange(item)}
+            style={[styles.gameChip, { backgroundColor: active ? `${theme.accent}22` : "transparent", borderColor: active ? theme.accent : theme.border }]}
+          >
+            {item === OVERALL_BOARD ? <AppIcon family="Ionicons" name="podium-outline" size={13} color={active ? theme.accent : theme.text.secondary} /> : null}
+            <Text style={[styles.gameChipText, { color: active ? theme.accent : theme.text.secondary }]} numberOfLines={1}>{label}</Text>
           </TouchableOpacity>
         );
       }}
@@ -242,8 +296,9 @@ function State({ icon, text, theme, loading, action, actionText }) {
   );
 }
 
-function RulesModal({ visible, onClose, theme, tr, es, pt, de }) {
-  const rules = tr
+function RulesModal({ visible, onClose, theme, tr, es, pt, de, board, boardCopy }) {
+  const overall = board === OVERALL_BOARD;
+  const rules = overall ? boardCopy.overallRules : tr
     ? ["Önce daha yüksek skor sıralanır.", "Skor eşitse daha çok doğru cevap öne geçer.", "Sonra daha uzun en iyi seri.", "Kalan eşitlikler daha az joker ve skora daha erken ulaşma ile çözülür."]
     : es
       ? ["Primero va quien tiene la puntuación más alta.", "Si hay empate, gana quien tenga más aciertos.", "Después, quien tenga la mejor racha más larga.", "Los empates restantes se deshacen por menos comodines usados y por haber llegado antes a la puntuación."]
@@ -267,7 +322,7 @@ function RulesModal({ visible, onClose, theme, tr, es, pt, de }) {
               </View>
             ))}
           </View>
-          <Text style={[styles.sheetNote, { color: theme.text.muted }]}>{tr ? "Global tablo Klasik + Normal sonuçlarından beslenir; kişisel liste oyunları tabloyu etkilemez. Günlük sekme yalnızca bugünün Günlük Meydan Okuma sonuçlarını gösterir." : es ? "La clasificación global usa los resultados del modo Clásico con dificultad Normal; las partidas con listas personales no la afectan. La pestaña Diario solo muestra los resultados del reto diario de hoy." : pt ? "O ranking global usa os resultados do modo Clássico com dificuldade Normal; partidas com listas pessoais não o afetam. A aba Diário mostra apenas os resultados do desafio diário de hoje." : de ? "Die globale Tabelle nutzt Ergebnisse aus Klassik + Normal; Spiele mit eigenen Listen haben darauf keinen Einfluss. Der Tab „Täglich“ zeigt nur die Ergebnisse der heutigen täglichen Challenge." : "The global board uses Classic + Normal results; personal-list games don't affect it. The Daily tab only shows today's Daily Challenge results."}</Text>
+          <Text style={[styles.sheetNote, { color: theme.text.muted }]}>{overall ? boardCopy.overallNote : board === POSTER_BOARD_GAME ? boardCopy.posterNote : board !== SCENE_BOARD_GAME && board !== "daily" ? boardCopy.quickNote : tr ? "Global tablo Klasik + Normal sonuçlarından beslenir; kişisel liste oyunları tabloyu etkilemez. Günlük sekme yalnızca bugünün Günlük Meydan Okuma sonuçlarını gösterir." : es ? "La clasificación global usa los resultados del modo Clásico con dificultad Normal; las partidas con listas personales no la afectan. La pestaña Diario solo muestra los resultados del reto diario de hoy." : pt ? "O ranking global usa os resultados do modo Clássico com dificuldade Normal; partidas com listas pessoais não o afetam. A aba Diário mostra apenas os resultados do desafio diário de hoje." : de ? "Die globale Tabelle nutzt Ergebnisse aus Klassik + Normal; Spiele mit eigenen Listen haben darauf keinen Einfluss. Der Tab „Täglich“ zeigt nur die Ergebnisse der heutigen täglichen Challenge." : "The global board uses Classic + Normal results; personal-list games don't affect it. The Daily tab only shows today's Daily Challenge results."}</Text>
           <GlassTouchable onPress={onClose} style={[gameSharedStyles.primaryButton, { backgroundColor: theme.accent }]}><Text style={gameSharedStyles.primaryButtonText}>{tr ? "Anladım" : es ? "Entendido" : pt ? "Entendi" : de ? "Verstanden" : "Got it"}</Text></GlassTouchable>
       </SafeAreaView>
     </BottomSheetModal>
@@ -280,6 +335,9 @@ const styles = StyleSheet.create({
   scopeChip: { minHeight: 38, borderRadius: 12, borderWidth: 1, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 6 },
   scopeText: { fontSize: 12, fontWeight: "800" },
   soonDot: { width: 5, height: 5, borderRadius: 3, marginLeft: 1 },
+  gameChip: { minHeight: 32, borderRadius: 16, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 5 },
+  gameChipText: { fontSize: 12, fontWeight: "800" },
+  partial: { fontSize: 11, fontWeight: "650", textAlign: "center" },
   list: { flex: 1, marginTop: 4 },
   listContent: { paddingBottom: 30, gap: 9 },
   listHeader: { gap: 9 },

@@ -53,6 +53,11 @@ jest.mock("../context/AppSettingsContext", () => ({ useApiSettings: () => ({ API
 let mockPools;
 const mockFetchPool = jest.fn((apiKey, language, source) => Promise.resolve(mockPools[source] || []));
 jest.mock("../services/sceneGameService", () => ({ fetchTitlePool: (...args) => mockFetchPool(...args) }));
+// Liderlik yazımı (Firebase) ve profil kimliği taklit: oyun sonunda rekorun tabloya gönderildiği görülür.
+const mockSaveBoard = jest.fn(() => Promise.resolve(true));
+jest.mock("../services/gameLeaderboards", () => ({ saveQuickBoardEntry: (...args) => mockSaveBoard(...args) }));
+jest.mock("../hooks/useGameIdentity", () => ({ __esModule: true, default: () => ({ displayName: "Ben", avatarIndex: 3, photoURL: null }) }));
+
 
 const fs = require("fs");
 const path = require("path");
@@ -301,7 +306,9 @@ describe("kaynak bekçileri", () => {
     expect(read("App.js")).toMatch(/name="OlderGameScreen"/);
     expect(read("components/profile/ProfileGamesModule.js")).toMatch(/navigate\("OlderGameScreen"/);
     const hook = read("hooks/useOlderGame.js");
-    expect(hook).not.toMatch(/saveGameScore|loadGameData|GameLeaderboards|setDoc|updateDoc/);
+    // Sahne Tahmin skor hattına dokunmaz, Firestore'a doğrudan yazmaz; tabloya tek yol saveQuickBoardEntry (27 Eki).
+    expect(hook).not.toMatch(/saveGameScore|loadGameData|setDoc|updateDoc|firebase\/firestore/);
+    expect(hook).toMatch(/saveQuickBoardEntry\(uid, "older"/);
     // Premium kapısı yok (bilinçli): kapı eklenirse bu test kararı hatırlatsın.
     expect(read("screens/game/OlderGameScreen.js")).not.toMatch(/usePremium/);
   });

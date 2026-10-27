@@ -58,6 +58,7 @@ import { ensureListsRoot } from "./listItemsService";
 import { setLocalList } from "./listSyncService";
 import { purgeUserData as purgeLocalUserData, startUserData, stopUserData } from "./userData";
 import { Keys, remove as removeStored } from "./storage";
+import { QUICK_BOARD_IDS } from "../utils/gameBoards";
 
 /** İlerleme ekranı aşamaları, çalışma sırasıyla (metinler resetAccountCopy.js'te). */
 export const RESET_STAGES = Object.freeze([
@@ -220,7 +221,14 @@ export async function resetAccount({ password, reauthenticated = false, onProgre
         await step(`leaderboard scene_${mode}_${level}`, () =>
           deleteDoc(doc(db, "GameLeaderboards", `scene_${mode}_${level}`, "entries", uid)),
         );
+        await step(`leaderboard poster_${mode}_${level}`, () =>
+          deleteDoc(doc(db, "GameLeaderboards", `poster_${mode}_${level}`, "entries", uid)),
+        );
       }
+    }
+    // Hızlı oyun tabloları (utils/gameBoards: quick_<oyun>).
+    for (const boardId of QUICK_BOARD_IDS) {
+      await step(`leaderboard ${boardId}`, () => deleteDoc(doc(db, "GameLeaderboards", boardId, "entries", uid)));
     }
   });
   await step("daily-leaderboards", async () => {
