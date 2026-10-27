@@ -34,6 +34,7 @@ import {
   LayoutAnimation,
   UIManager,
   Keyboard,
+  ActivityIndicator,
 } from "react-native";
 
 // Compose tepsisi / başlık girişi geçişlerinde yumuşak yeniden-yerleşim için.
@@ -111,11 +112,11 @@ import axios from "axios";
 import {
   AntDesign,
     Feather,
-  FontAwesome,
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import ScreenDecor from "@components/ScreenDecor"; // Arka plan dekor
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import SheetScroll from "@components/common/SheetScroll";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { i18nText } from "@utils/i18nText";
@@ -139,6 +140,17 @@ import GroupAvatar from "@components/chat/GroupAvatar";
 import ComposerReplyBar from "@components/chat/ComposerReplyBar";
 import { buildReplySnapshot } from "@utils/chatReply";
 import { buildShareMessage, readShare, sharePreview } from "@utils/chatShare";
+import {
+  CHAT_SEARCH_DEBOUNCE_MS,
+  CHAT_SEARCH_MIN_CHARS,
+  chatSearchKey,
+  isSearchableQuery,
+  parseSearchQuery,
+  rankChatSearchResults,
+} from "@utils/chatMediaSearch";
+import { mediaMetaLabel } from "@components/chat/SharedMediaCollection";
+import { searchMediaWithFuzzyFallback } from "@services/fuzzyMediaSearch";
+import { PosterEdge } from "@components/chat/shareKit";
 import SaveSharedListModal from "@components/modals/SaveSharedListModal";
 import PinnedMessagesModal from "@components/chat/PinnedMessagesModal";
 import ReportReasonSheet from "@components/moderation/ReportReasonSheet";
@@ -169,10 +181,9 @@ import Reanimated, {
 import TrailerModal from "@components/video/TrailerModal";
 import GlassTouchable from "../../components/common/GlassTouchable";
 import GlassBox from "../../components/common/GlassBox";
-import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // ─── Sabit renkler (tema üzerine katman) ────────────────────────────────────
 const ACCENT = "#6C63FF";
@@ -291,88 +302,89 @@ const SearchResultCard = memo(({ item, onPress, getTmdbUrl, theme, selected }) =
     }).start();
   }, []);
 
-  const typeLabel =
-    item.media_type === "movie"
-      ? i18nText("autoI18n.film_upper", "FİLM")
-      : item.media_type === "tv"
-        ? i18nText("autoI18n.dizi_upper", "DİZİ")
-        : i18nText("autoI18n.kisi_upper", "KİŞİ");
-  const typeColor =
-    item.media_type === "movie"
-      ? "#FF8A65"
-      : item.media_type === "tv"
-        ? "#64B5F6"
-        : "#CE93D8";
+  const title = item.title || item.name;
+  const meta = mediaMetaLabel(item);
+  const accent = theme?.accent ?? ACCENT;
+  const poster = item.poster_path || item.profile_path;
 
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+    <Animated.View style={[styles.searchCardSlot, { transform: [{ scale: scaleAnim }] }]}>
       <TouchableOpacity
-        style={[styles.searchCard, selected && styles.searchCardSelected]}
+        style={styles.searchCard}
         onPress={() => onPress(item)}
         activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        accessibilityLabel={`${title}, ${meta}`}
       >
         {/* Poster + rozetler tek oran-kutusunda → tüm absolute öğeler postere
             göre hizalanır (tik kart altına kaymaz). */}
         <View style={styles.searchCardImageWrap}>
-          {item.poster_path || item.profile_path ? (
+          {poster ? (
             <Image
-              source={{
-                uri: getTmdbUrl(item.poster_path || item.profile_path, 'poster', 200),
-              }}
-              style={styles.searchCardImage}
+              source={{ uri: getTmdbUrl(poster, "poster", 200) }}
+              style={[styles.searchCardImage, { backgroundColor: theme.between }]}
+              cachePolicy="memory-disk"
+              transition={120}
             />
           ) : (
-            <View style={[styles.searchCardImage, styles.searchCardPlaceholder]}>
-              <FontAwesome
-                name="image"
+            <View
+              style={[
+                styles.searchCardImage,
+                styles.searchCardPlaceholder,
+                { backgroundColor: theme.between },
+              ]}
+            >
+              <Ionicons
+                name={item.media_type === "person" ? "person-outline" : "film-outline"}
                 size={24}
-                color="rgba(255,255,255,0.25)"
+                color={theme.text.muted}
               />
             </View>
           )}
+          {/* Kenar çizgisi görselin ÜSTÜNDE (borderWidth afişi kırpardı). */}
+          <PosterEdge radius={12} color={alpha(theme.text.primary, 0.1)} />
 
-          {/* Tip etiketi */}
-          <View
-            style={[
-              styles.typeTag,
-              {
-                backgroundColor: typeColor + "22",
-                borderColor: typeColor + "55",
-              },
-            ]}
-          >
-            <Text style={[styles.typeTagText, { color: typeColor }]}>
-              {typeLabel}
-            </Text>
-          </View>
-
-          {/* Rating */}
-          {item.vote_average > 0 && (
+          {item.media_type !== "person" && item.vote_average > 0 && (
             <View style={styles.ratingBadge}>
               <Ionicons name="star" size={9} color="#FFD54F" />
-              <Text style={styles.ratingText}>
-                {item.vote_average.toFixed(1)}
+              <Text allowFontScaling={false} style={styles.ratingText}>
+                {Number(item.vote_average).toFixed(1)}
               </Text>
             </View>
           )}
 
-          {/* Seçim göstergesi (posterin sol-alt köşesi) */}
-          <View style={[styles.selectDot, selected && styles.selectDotActive]}>
+          {selected && (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.searchCardSelectedOverlay,
+                { borderColor: accent, backgroundColor: alpha(accent, 0.22) },
+              ]}
+            />
+          )}
+          {/* Seçim işareti: sağ üst köşe; seçili değilken boş halka. */}
+          <View
+            style={[
+              styles.selectDot,
+              selected && { backgroundColor: accent, borderColor: "#fff" },
+            ]}
+          >
             {selected && <Ionicons name="checkmark" size={13} color="#fff" />}
           </View>
-          {selected && (
-            <View style={styles.searchCardSelectedOverlay} pointerEvents="none" />
-          )}
         </View>
 
         <Text
-          style={[
-            styles.searchCardTitle,
-            { color: theme?.text?.primary ?? "#fff" },
-          ]}
+          style={[styles.searchCardTitle, { color: theme.text.primary }]}
           numberOfLines={2}
         >
-          {item.title || item.name}
+          {title}
+        </Text>
+        <Text
+          style={[styles.searchCardMeta, { color: theme.text.muted }]}
+          numberOfLines={1}
+        >
+          {meta}
         </Text>
       </TouchableOpacity>
     </Animated.View>
@@ -434,12 +446,19 @@ export default function ChatScreen({ route, navigation }) {
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
+  // Ekrandaki sonuçların ait olduğu arama (chatSearchKey) — "sonuç yok" ile
+  // "henüz aranmadı"yı ayırır.
+  const [searchedKey, setSearchedKey] = useState(null);
+  const searchSeqRef = useRef(0); // yalnız en son isteğin cevabı yazılır
+  const searchTimerRef = useRef(null); // yazarken bekleme (debounce)
+  const searchCacheRef = useRef(new Map()); // chatSearchKey → sıralı sonuçlar
   const [searchModalVisible, setSearchModalVisible] = useState(false);
 
   // ── Çoklu içerik seçimi (compose tepsisi) ──────────────────────────────────
   // Arama sonucunda postere basınca ANINDA göndermek yerine seçime ekler.
   // 1 öğe → tekli media mesajı; 2+ öğe → koleksiyon (opsiyonel başlık + 🎲).
   const [selectedItems, setSelectedItems] = useState([]);
+  const [showSelectedPanel, setShowSelectedPanel] = useState(false);
   const [composeTitle, setComposeTitle] = useState("");
   const [showTitleInput, setShowTitleInput] = useState(false);
   const [pollMode, setPollMode] = useState(false); // medya anketi (compose toggle)
@@ -683,10 +702,19 @@ export default function ChatScreen({ route, navigation }) {
     }
     searchInputRef.current?.blur();
     Keyboard.dismiss();
+    // Bekleyen/uçuştaki arama kapanmış sayfaya sonuç yazmasın.
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+    searchSeqRef.current += 1;
+    setLoadingSearch(false);
+    setSearchedKey(null);
     setSearchModalVisible(false);
     setSearchResults([]);
     setSearchText("");
     setSearchOption(false);
+    setShowSelectedPanel(false);
     if (clearHashText) setText((prev) => prev.replace(/#.*/g, ""));
   }, []);
 
@@ -1647,62 +1675,139 @@ export default function ChatScreen({ route, navigation }) {
     [],
   );
 
-  const fetchSearchResults = useCallback(
-    async (type, currentQuery) => {
-      const queryText = currentQuery || searchText;
-      if (!queryText || queryText.trim().length < 1) {
+  // ── # araması ───────────────────────────────────────────────────────────────
+  // Yazarken CHAT_SEARCH_DEBOUNCE_MS duraksayınca aranır; her istek bir sıra
+  // numarası alır ve yalnız EN SON isteğin cevabı ekrana yazılır (eskiden geç
+  // dönen eski sorgu yeni sonuçları eziyordu). Sıralama utils/chatMediaSearch'te.
+  // include_adult yazılmaz — utils/tmdbAdultGuard uygular.
+  const tmdbSearch = useCallback(
+    async (endpoint, query, page = 1, extra = {}) => {
+      const response = await axios.get("https://api.themoviedb.org/3/" + endpoint, {
+        params: { query, language: tmdbLanguageOf(language), page, ...extra },
+        headers: { Authorization: API_KEY },
+      });
+      return response.data?.results || [];
+    },
+    [language, API_KEY],
+  );
+
+  const runSearch = useCallback(
+    async (type, rawQuery) => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+        searchTimerRef.current = null;
+      }
+      const seq = ++searchSeqRef.current;
+      if (!isSearchableQuery(rawQuery)) {
         setSearchResults([]);
+        setSearchedKey(null);
+        setLoadingSearch(false);
+        return;
+      }
+      const key = chatSearchKey(type, rawQuery);
+      const cached = searchCacheRef.current.get(key);
+      if (cached) {
+        setSearchResults(cached);
+        setSearchedKey(key);
+        setLoadingSearch(false);
         return;
       }
 
       setLoadingSearch(true);
+      const { text } = parseSearchQuery(rawQuery);
+      const lang = tmdbLanguageOf(language);
       try {
-        const typeEndpointMap = {
-          movie: "search/movie",
-          tv: "search/tv",
-          person: "search/person",
-        };
-        const endpoint = type ? typeEndpointMap[type] : "search/multi";
-        const url = "https://api.themoviedb.org/3/" + endpoint;
-        const params = {
-          query: queryText.trim(),
-          include_adult: adultContent,
-          language: tmdbLanguageOf(language),
-          page: 1,
-        };
-        const response = await axios.get(url, {
-          params,
-          headers: { Authorization: API_KEY },
-        });
-        // Kategori filtresiyle arama yapıldığında TMDB media_type döndürmez — elle ekle
-        const inferredType = type || null;
-        const results = response.data.results
-          .filter((item) => item.media_type !== "unknown")
-          .map((item) => ({
-            ...item,
-            media_type: item.media_type || inferredType || "movie",
-          }))
-          .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
-          .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
-        setSearchResults(results);
+        let raw;
+        if (type === "person") {
+          raw = await tmdbSearch("search/person", text);
+        } else if (type === "movie" || type === "tv") {
+          // Yazım hatasına dayanıklı yol (ana arama ekranlarıyla aynı servis).
+          const { results } = await searchMediaWithFuzzyFallback({
+            mediaType: type,
+            query: text,
+            language: lang,
+            adultContent,
+            API_KEY,
+          });
+          raw = results;
+        } else {
+          // İki sayfa: tek sayfada kişi/dizi kalabalığı aranan filmi dışarıda bırakabiliyor.
+          const [first, second] = await Promise.all([
+            tmdbSearch("search/multi", text, 1),
+            tmdbSearch("search/multi", text, 2).catch(() => []),
+          ]);
+          raw = [...first, ...second];
+          const hasMedia = raw.some((it) => it.media_type === "movie" || it.media_type === "tv");
+          if (!hasMedia) {
+            // "Tümü"de de yazım hatası affedilsin: film + dizi bulanık arama.
+            const fuzzy = await Promise.all(
+              ["movie", "tv"].map((mediaType) =>
+                searchMediaWithFuzzyFallback({ mediaType, query: text, language: lang, adultContent, API_KEY })
+                  .then(({ results }) => results.map((it) => ({ ...it, media_type: mediaType })))
+                  .catch(() => []),
+              ),
+            );
+            raw = [...fuzzy.flat(), ...raw];
+          }
+        }
+        if (seq !== searchSeqRef.current) return;
+        const ranked = rankChatSearchResults(raw, rawQuery, { type });
+        const cache = searchCacheRef.current;
+        cache.set(key, ranked);
+        if (cache.size > 30) cache.delete(cache.keys().next().value);
+        setSearchResults(ranked);
+        setSearchedKey(key);
       } catch (err) {
+        if (seq !== searchSeqRef.current) return;
         console.error(i18nText("autoI18n.arama_hatasi", "Arama hatası:"), err.message);
+        setSearchedKey(key);
       } finally {
-        setLoadingSearch(false);
+        if (seq === searchSeqRef.current) setLoadingSearch(false);
       }
     },
-    [searchText, adultContent, language, API_KEY],
+    [language, API_KEY, adultContent, tmdbSearch],
   );
 
-  // Kategori değişince yeniden ara
+  // Yazarken: kısa duraksamadan sonra ara (kısa sorgu sonuçları hemen temizler).
+  const scheduleSearch = useCallback(
+    (type, rawQuery) => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      if (!isSearchableQuery(rawQuery) || searchCacheRef.current.has(chatSearchKey(type, rawQuery))) {
+        runSearch(type, rawQuery);
+        return;
+      }
+      setLoadingSearch(true);
+      searchTimerRef.current = setTimeout(() => {
+        searchTimerRef.current = null;
+        runSearch(type, rawQuery);
+      }, CHAT_SEARCH_DEBOUNCE_MS);
+    },
+    [runSearch],
+  );
+
+  useEffect(
+    () => () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    },
+    [],
+  );
+
+  // Kategori değişince yeniden ara (aynı çipe ikinci basış "Tümü"ne döner).
   const handleCategoryChange = useCallback(
     (cat) => {
       const newCat = searchChoise === cat ? null : cat;
+      setShowSelectedPanel(false);
       setSearchChoise(newCat);
-      fetchSearchResults(newCat, searchText);
+      runSearch(newCat, searchText);
     },
-    [searchChoise, searchText, fetchSearchResults],
+    [searchChoise, searchText, runSearch],
   );
+
+  const clearSearchText = useCallback(() => {
+    setSearchText("");
+    runSearch(searchChoise, "");
+    searchInputRef.current?.focus();
+  }, [searchChoise, runSearch]);
 
   const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
   const renderMessageText = useCallback((msgText, isMe = false) => {
@@ -2063,6 +2168,22 @@ export default function ChatScreen({ route, navigation }) {
     selectedItemsRef.current = selectedItems;
   }, [selectedItems]);
 
+  useEffect(() => {
+    if (selectedItems.length === 0 && showSelectedPanel) {
+      setShowSelectedPanel(false);
+    }
+  }, [selectedItems.length, showSelectedPanel]);
+
+  const toggleSelectedPanel = useCallback(() => {
+    if (selectedItemsRef.current.length === 0) return;
+    easeLayout();
+    if (!showSelectedPanel) {
+      searchInputRef.current?.blur();
+      Keyboard.dismiss();
+    }
+    setShowSelectedPanel((visible) => !visible);
+  }, [showSelectedPanel]);
+
   // Postere basınca: seçimde varsa çıkar, yoksa ekle (anında göndermez).
   const toggleSelectItem = useCallback((item) => {
     if (!item) return;
@@ -2102,6 +2223,7 @@ export default function ChatScreen({ route, navigation }) {
     setComposeTitle("");
     setShowTitleInput(false);
     setPollMode(false);
+    setShowSelectedPanel(false);
   }, []);
 
   // ── Seçilen içerikleri gönder ──────────────────────────────────────────────
@@ -2176,6 +2298,13 @@ export default function ChatScreen({ route, navigation }) {
 
     // Modalı hemen kapat (optimistic), sonra yaz.
     resetCompose();
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+    searchSeqRef.current += 1;
+    setLoadingSearch(false);
+    setSearchedKey(null);
     setSearchResults([]);
     setSearchText("");
     setSearchOption(false);
@@ -2842,13 +2971,13 @@ export default function ChatScreen({ route, navigation }) {
           onClose={() => closeSearchModal(true)}
           intensity={35}
           dimColor="rgba(0,0,0,0.4)"
-          // Bu sayfanın KENDİ klavye kaldırması var (modalKeyboardStyle →
-          // paddingBottom). Kabuğunki de çalışsaydı ikisi toplanırdı.
-          liftWithKeyboard={false}
-          // paddingBottom sayfayı yukarı ittiği için sayfa ekrandan uzunsa tepesi
-          // taşardı (sonuç ızgarası + seçim tepsisi + başlık kutusu). Sarmalayıcı
-          // küçülebilir olur, sonuç listesi kalan alana sığıp kendi içinde kayar.
-          shrinkToFit
+          sheetStyle={[
+            styles.searchModal,
+            {
+              backgroundColor: theme.secondary,
+              borderColor: theme.border,
+            },
+          ]}
           // autoFocus yerine: açılış animasyonu BİTTİKTEN sonra odakla.
           // Aksi halde açılış + klavye aynı anda çakışıp zıplama yapıyordu.
           onShow={() => {
@@ -2861,35 +2990,53 @@ export default function ChatScreen({ route, navigation }) {
             }, 260);
           }}
         >
-            <Reanimated.View style={[styles.searchModalShrink, modalKeyboardStyle]}>
-                <View
-                  style={[
-                    styles.searchModal,
-                    {
-                      backgroundColor: theme.secondary,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
                   {/* Tutamaç */}
                   <View style={[styles.dragHandle, { backgroundColor: theme.border }]} />
 
                   {/* Başlık */}
                   <View style={styles.searchModalHeader}>
-                    <View
-                      style={[
-                        styles.searchHashBadge,
-                        {
-                          backgroundColor: alpha(theme.accent, 0.15),
-                          borderColor: alpha(theme.accent, 0.35),
-                        },
-                      ]}
-                    >
-                      <Feather name="search" size={15} color={theme.accent} />
+                    {showSelectedPanel ? (
+                      <GlassIconButton
+                        icon="chevron-back"
+                        size={32}
+                        iconSize={18}
+                        fallbackRadius={16}
+                        fallbackStyle={{ backgroundColor: theme.between }}
+                        color={theme.text.primary}
+                        onPress={toggleSelectedPanel}
+                        accessibilityLabel={i18nText("autoI18n.geri", "Geri")}
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          styles.searchHashBadge,
+                          {
+                            backgroundColor: alpha(theme.accent, 0.15),
+                            borderColor: alpha(theme.accent, 0.35),
+                          },
+                        ]}
+                      >
+                        <Feather name="search" size={15} color={theme.accent} />
+                      </View>
+                    )}
+                    <View style={styles.searchModalTitleCol}>
+                      <Text
+                        style={[styles.searchModalTitle, { color: theme.text.primary }]}
+                        numberOfLines={1}
+                      >
+                        {showSelectedPanel
+                          ? i18nText("autoI18n.secilenler", "Seçilenler")
+                          : i18nText("autoI18n.film_dizi_ara", "Film & Dizi Ara")}
+                      </Text>
+                      <Text
+                        style={[styles.searchModalSubtitle, { color: theme.text.muted }]}
+                        numberOfLines={1}
+                      >
+                        {showSelectedPanel
+                          ? i18nText("autoI18n.sohbet_arama_panel_alt", "Liste ya da anket olarak gönder")
+                          : i18nText("autoI18n.sohbet_arama_alt", "İçerik seç, tek tek ya da liste olarak gönder")}
+                      </Text>
                     </View>
-                    <Text style={[styles.searchModalTitle, { color: theme.text.primary }]}>
-                      {i18nText("autoI18n.film_dizi_ara", "Film & Dizi Ara")}
-                    </Text>
                     <GlassCloseButton
                       size={32}
                       fallbackRadius={16}
@@ -2901,6 +3048,7 @@ export default function ChatScreen({ route, navigation }) {
                   </View>
 
                   {/* Arama girişi (modaldaki) */}
+                  {!showSelectedPanel && (
                   <GlassBox role="field"
                     style={[
                       styles.searchInputWrapper,
@@ -2921,26 +3069,55 @@ export default function ChatScreen({ route, navigation }) {
                       value={searchText}
                       onChangeText={(val) => {
                         setSearchText(val);
-                        fetchSearchResults(searchChoise, val);
+                        scheduleSearch(searchChoise, val);
                       }}
+                      onSubmitEditing={() => runSearch(searchChoise, searchText)}
+                      returnKeyType="search"
+                      autoCorrect={false}
                       maxLength={80}
-                      placeholder={i18nText("autoI18n.bir_seyler_yazin", "Bir şeyler yazın...")}
+                      placeholder={
+                        searchChoise === "movie"
+                          ? i18nText("autoI18n.sohbet_arama_ph_film", "Film adı yaz…")
+                          : searchChoise === "tv"
+                            ? i18nText("autoI18n.sohbet_arama_ph_dizi", "Dizi adı yaz…")
+                            : searchChoise === "person"
+                              ? i18nText("autoI18n.sohbet_arama_ph_kisi", "Oyuncu ya da yönetmen ara…")
+                              : i18nText("autoI18n.sohbet_arama_ph_tumu", "Film, dizi ya da kişi ara…")
+                      }
                       placeholderTextColor={theme.text.muted}
                       selectionColor={theme.accent}
                       style={[styles.searchInput, { color: theme.text.primary }]}
                     />
-                    {loadingSearch && (
-                      <LottieView
-                        source={require("@lottie/typingAnimation.json")}
-                        autoPlay
-                        loop
-                        style={{ width: 40, height: 24, marginRight: 8 }}
+                    {loadingSearch ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={theme.accent}
+                        style={styles.searchInputTrail}
                       />
-                    )}
+                    ) : searchText.length > 0 ? (
+                      <TouchableOpacity
+                        onPress={clearSearchText}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        style={styles.searchInputTrail}
+                        accessibilityRole="button"
+                        accessibilityLabel={i18nText("autoI18n.temizle", "Temizle")}
+                      >
+                        <Ionicons name="close-circle" size={18} color={theme.text.muted} />
+                      </TouchableOpacity>
+                    ) : null}
                   </GlassBox>
+                  )}
 
                   {/* Kategori filtreleri */}
-                  <View style={styles.categoryRow}>
+                  {!showSelectedPanel && (
+                  <View style={styles.filterBar}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                      style={styles.categoryScroll}
+                      contentContainerStyle={styles.categoryRow}
+                    >
                     <GlassTouchable
                       style={[
                         styles.catBtn,
@@ -2982,11 +3159,7 @@ export default function ChatScreen({ route, navigation }) {
                         <Ionicons
                           name={cat.icon}
                           size={13}
-                          color={
-                            searchChoise === cat.key
-                              ? cat.color
-                              : theme.text.muted
-                          }
+                          color={searchChoise === cat.key ? cat.color : theme.text.muted}
                         />
                         <Text
                           style={[
@@ -2999,53 +3172,135 @@ export default function ChatScreen({ route, navigation }) {
                         </Text>
                       </GlassTouchable>
                     ))}
+                    </ScrollView>
                   </View>
+                  )}
 
                   {/* Sonuçlar */}
-                  {searchResults.length > 0 ? (
-                    <FlatList
-                      data={searchResults}
-                      extraData={selectedItems}
-                      keyExtractor={(item) =>
-                        (item.media_type || "x") + "-" + item.id
-                      }
-                      horizontal={false}
-                      numColumns={3}
-                      showsVerticalScrollIndicator={false}
-                      keyboardShouldPersistTaps="handled"
-                      contentContainerStyle={styles.searchGrid}
-                      // Seçim tepsisi açıkken sonuç alanını kısalt → alttaki
-                      // "Gönder" + seçilenler her zaman görünür kalır; sonuçlar
-                      // FlatList içinde kaydırılır.
-                      style={{
-                        maxHeight:
-                          SCREEN_HEIGHT *
-                          (selectedItems.length > 0 ? 0.3 : 0.42),
-                      }}
-                      renderItem={({ item }) => (
-                        <SearchResultCard
-                          item={item}
-                          onPress={toggleSelectItem}
-                          selected={isItemSelected(item)}
-                          getTmdbUrl={getTmdbUrl}
-                          theme={theme}
-                        />
-                      )}
-                    />
-                  ) : !loadingSearch ? (
-                    <View style={styles.searchEmpty}>
-                      <Ionicons
-                        name="search-outline"
-                        size={36}
-                        color="rgba(255,255,255,0.1)"
+                  {!showSelectedPanel && <View style={styles.searchResultsArea}>
+                    {searchResults.length > 0 ? (
+                      <FlatList
+                        data={searchResults}
+                        extraData={selectedItems}
+                        keyExtractor={(item) =>
+                          (item.media_type || "x") + "-" + item.id
+                        }
+                        horizontal={false}
+                        numColumns={3}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                        keyboardDismissMode="on-drag"
+                        contentContainerStyle={styles.searchGrid}
+                        columnWrapperStyle={styles.searchGridRow}
+                        style={styles.searchResultsList}
+                        renderItem={({ item }) => (
+                          <SearchResultCard
+                            item={item}
+                            onPress={toggleSelectItem}
+                            selected={isItemSelected(item)}
+                            getTmdbUrl={getTmdbUrl}
+                            theme={theme}
+                          />
+                        )}
                       />
-                      <Text style={styles.searchEmptyText}>{i18nText("autoI18n.aramak_icin_bir_kelime_yaz", "Aramak için bir kelime yaz")}</Text>
-                    </View>
-                  ) : null}
+                    ) : loadingSearch ? (
+                      <View style={styles.searchEmpty}>
+                        <ActivityIndicator color={theme.accent} />
+                      </View>
+                    ) : (() => {
+                      // Aranmış ve boş döndüyse "sonuç yok"; aksi halde ilk yönlendirme.
+                      const noResults =
+                        isSearchableQuery(searchText) &&
+                        searchedKey === chatSearchKey(searchChoise, searchText);
+                      return (
+                        <View style={styles.searchEmpty}>
+                          <View style={[styles.searchEmptyIcon, { backgroundColor: alpha(theme.accent, 0.1) }]}>
+                            <Ionicons
+                              name={noResults ? "sad-outline" : "film-outline"}
+                              size={24}
+                              color={theme.accent}
+                            />
+                          </View>
+                          <Text style={[styles.searchEmptyTitle, { color: theme.text.primary }]}>
+                            {noResults
+                              ? i18nText("autoI18n.sonuc_bulunamadi", "Sonuç bulunamadı")
+                              : i18nText("autoI18n.sohbet_arama_bos_baslik", "Ne paylaşmak istersin?")}
+                          </Text>
+                          <Text style={[styles.searchEmptyText, { color: theme.text.muted }]}>
+                            {noResults
+                              ? i18nText("autoI18n.sohbet_arama_sonuc_yok", "Yazımı kontrol et ya da başka bir kategori dene.")
+                              : i18nText("autoI18n.sohbet_arama_bos_metin", "En az {{n}} harf yaz; birden fazla seçip liste ya da anket yapabilirsin.", { n: CHAT_SEARCH_MIN_CHARS })}
+                          </Text>
+                        </View>
+                      );
+                    })()}
+                  </View>}
 
-                  {/* ── COMPOSE TEPSİSİ (seçilenler + gönder) ── */}
-                  {selectedItems.length > 0 && (
-                    <View style={[styles.composeTray, { borderTopColor: theme.border }]}>
+                  {/* Seçim çubuğu: kaç içerik seçildi + Seçilenler paneline geçiş */}
+                  {!showSelectedPanel && selectedItems.length > 0 && (
+                    <View
+                      style={[
+                        styles.selectionBar,
+                        { backgroundColor: theme.between, borderColor: theme.border },
+                      ]}
+                    >
+                      <View style={styles.selectionBarThumbs}>
+                        {selectedItems.slice(0, 3).map((it, idx) => (
+                          <View
+                            key={itemKey(it)}
+                            style={[
+                              styles.selectionBarThumb,
+                              {
+                                marginLeft: idx === 0 ? 0 : -14,
+                                zIndex: 3 - idx,
+                                borderColor: theme.between,
+                                backgroundColor: theme.secondary,
+                              },
+                            ]}
+                          >
+                            {it.poster_path ? (
+                              <Image
+                                source={{ uri: getTmdbUrl(it.poster_path, "poster", 200) }}
+                                style={styles.selectionBarThumbImg}
+                                cachePolicy="memory-disk"
+                              />
+                            ) : null}
+                          </View>
+                        ))}
+                      </View>
+                      <View style={styles.selectionBarTextCol}>
+                        <Text
+                          style={[styles.selectionBarTitle, { color: theme.text.primary }]}
+                          numberOfLines={1}
+                        >
+                          {i18nText("autoI18n.n_secildi", "{{n}} içerik seçildi", { n: selectedItems.length })}
+                        </Text>
+                        <Text
+                          style={[styles.selectionBarSub, { color: theme.text.muted }]}
+                          numberOfLines={1}
+                        >
+                          {selectedItems.length >= 2
+                            ? i18nText("autoI18n.sohbet_secim_liste", "Liste ya da anket olarak gönder")
+                            : i18nText("autoI18n.sohbet_secim_tek", "Liste için bir tane daha seç")}
+                        </Text>
+                      </View>
+                      <GlassTouchable
+                        onPress={toggleSelectedPanel}
+                        style={[styles.selectionBarBtn, { backgroundColor: theme.accent }]}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.selectionBarBtnText}>
+                          {i18nText("autoI18n.devam", "Devam")}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={15} color="#fff" />
+                      </GlassTouchable>
+                    </View>
+                  )}
+
+                  {/* ── SEÇİLENLER PANELİ (liste/anket + gönder) ── */}
+                  {showSelectedPanel && selectedItems.length > 0 && (
+                    <View style={[styles.composeTray, styles.composeTrayPanel]}>
                       {/* Aktif liste tipi rozeti (tek tip: oyuncu | dizi/film) */}
                       <View style={styles.composeTypeRow}>
                         {(() => {
@@ -3077,37 +3332,6 @@ export default function ChatScreen({ route, navigation }) {
                           {selectedItems.length}/{MAX_SELECT}
                         </Text>
                       </View>
-
-                      {/* Seçilen küçük posterler */}
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
-                        style={styles.composeThumbsScroll}
-                        contentContainerStyle={styles.composeThumbsRow}
-                      >
-                        {selectedItems.map((it) => (
-                          <View key={itemKey(it)} style={styles.composeThumb}>
-                            {it.poster_path ? (
-                              <Image
-                                source={{ uri: getTmdbUrl(it.poster_path, "poster", 200) }}
-                                style={[styles.composeThumbImg, { backgroundColor: theme.between }]}
-                              />
-                            ) : (
-                              <View style={[styles.composeThumbImg, styles.searchCardPlaceholder, { backgroundColor: theme.between }]}>
-                                <FontAwesome name="image" size={16} color={theme.text.muted} />
-                              </View>
-                            )}
-                            <GlassTouchable
-                              style={[styles.composeThumbRemove, { borderColor: theme.secondary }]}
-                              onPress={() => toggleSelectItem(it)}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            >
-                              <Ionicons name="close" size={11} color="#fff" />
-                            </GlassTouchable>
-                          </View>
-                        ))}
-                      </ScrollView>
 
                       {/* Liste / Anket modu (2+ dizi/film; oyuncuda anket yok) */}
                       {selectedItems.length >= 2 &&
@@ -3211,7 +3435,69 @@ export default function ChatScreen({ route, navigation }) {
                           </TouchableOpacity>
                         ))}
 
-                      {/* Aksiyon satırı */}
+                      {selectedItems.length === 1 && (
+                        <Text style={[styles.composeHint, { color: theme.text.muted }]}>
+                          {i18nText("autoI18n.sohbet_tek_icerik_ipucu", "Tek içerik kart olarak gider. Liste ya da anket için en az 2 içerik seç.")}
+                        </Text>
+                      )}
+
+                      {/* Seçilen içerikler — sığmazsa bu bölge kayar (flexGrow, basis auto:
+                          flex:1 + SheetScroll'un flexGrow:0'ı bölgeyi 0 yüksekliğe çökertiyordu). */}
+                      <SheetScroll
+                        style={styles.composeTrayScroll}
+                        contentContainerStyle={styles.composeList}
+                      >
+                        {selectedItems.map((it, idx) => (
+                          <View
+                            key={itemKey(it)}
+                            style={[styles.composeRow, { backgroundColor: theme.between }]}
+                          >
+                            <Text style={[styles.composeRowIndex, { color: theme.text.muted }]}>
+                              {idx + 1}
+                            </Text>
+                            <View style={[styles.composeRowThumb, { backgroundColor: theme.secondary }]}>
+                              {it.poster_path ? (
+                                <Image
+                                  source={{ uri: getTmdbUrl(it.poster_path, "poster", 200) }}
+                                  style={styles.composeRowThumbImg}
+                                  cachePolicy="memory-disk"
+                                />
+                              ) : (
+                                <Ionicons
+                                  name={it.media_type === "person" ? "person-outline" : "film-outline"}
+                                  size={16}
+                                  color={theme.text.muted}
+                                />
+                              )}
+                            </View>
+                            <View style={styles.composeRowTextCol}>
+                              <Text
+                                style={[styles.composeRowTitle, { color: theme.text.primary }]}
+                                numberOfLines={1}
+                              >
+                                {it.title}
+                              </Text>
+                              <Text
+                                style={[styles.composeRowMeta, { color: theme.text.muted }]}
+                                numberOfLines={1}
+                              >
+                                {mediaMetaLabel(it)}
+                              </Text>
+                            </View>
+                            <GlassTouchable
+                              style={[styles.composeRowRemove, { backgroundColor: alpha(theme.text.primary, 0.08) }]}
+                              onPress={() => toggleSelectItem(it)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              accessibilityRole="button"
+                              accessibilityLabel={i18nText("autoI18n.kaldir", "Kaldır") + ": " + it.title}
+                            >
+                              <Ionicons name="close" size={15} color={theme.text.secondary} />
+                            </GlassTouchable>
+                          </View>
+                        ))}
+                      </SheetScroll>
+
+                      {/* Aksiyon satırı — klavye açıkken de ekranın içinde kalır */}
                       <View style={styles.composeActions}>
                         <TouchableOpacity onPress={resetCompose} style={styles.composeClearBtn}>
                           <Text style={[styles.composeClearText, { color: theme.text.muted }]}>
@@ -3233,14 +3519,14 @@ export default function ChatScreen({ route, navigation }) {
                           <Text style={styles.composeSendText}>
                             {pollMode
                               ? i18nText("autoI18n.anket_olustur", "Anket Oluştur")
-                              : i18nText("autoI18n.gonder", "Gönder") + " (" + selectedItems.length + ")"}
+                              : selectedItems.length >= 2
+                                ? i18nText("autoI18n.listeyi_gonder_n", "Listeyi gönder ({{n}})", { n: selectedItems.length })
+                                : i18nText("autoI18n.gonder", "Gönder")}
                           </Text>
                         </GlassTouchable>
                       </View>
                     </View>
                   )}
-                </View>
-            </Reanimated.View>
         </BottomSheetModal>
 
         {/* ── UZUN BASIN MODAL ── */}
@@ -3952,10 +4238,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.65)",
   },
-  // shrinkToFit zinciri: BottomSheetModal sarmalayıcısı → bu görünüm → searchModal.
-  searchModalShrink: { flexShrink: 1 },
   searchModal: {
     flexShrink: 1,
+    minHeight: "56%",
+    maxHeight: "88%",
+    overflow: "hidden",
     backgroundColor: "#14142B",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -3981,13 +4268,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  searchModalTitleCol: { flex: 1, minWidth: 0 },
   searchModalTitle: {
-    flex: 1,
     fontSize: 17,
     fontWeight: "700",
     color: "#fff",
     letterSpacing: 0.2,
   },
+  searchModalSubtitle: { fontSize: 12, fontWeight: "500", marginTop: 1 },
   searchInputWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -4000,15 +4288,28 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: Platform.OS === "ios" ? 12 : 10,
     fontSize: 15,
     color: "#fff",
   },
+  searchInputTrail: { marginRight: 12 },
+  filterBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginBottom: 12,
+  },
+  categoryScroll: {
+    flex: 1,
+    minWidth: 0,
+    marginHorizontal: -4,
+  },
   categoryRow: {
     flexDirection: "row",
     gap: 7,
-    marginBottom: 14,
+    paddingHorizontal: 4,
+    paddingRight: 12,
   },
   catBtn: {
     flexDirection: "row",
@@ -4031,26 +4332,41 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   catBtnTextActive: { color: ACCENT },
-  searchGrid: { paddingBottom: 8 },
+  searchResultsArea: { flex: 1, minHeight: 76 },
+  searchResultsList: { flex: 1 },
+  searchGrid: { paddingBottom: 8, paddingHorizontal: 0 },
+  searchGridRow: { alignItems: "flex-start" },
   searchEmpty: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 40,
-    gap: 10,
+    paddingVertical: 22,
+    paddingHorizontal: 24,
+    gap: 8,
   },
+  searchEmptyIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  searchEmptyTitle: { fontSize: 15, fontWeight: "700", textAlign: "center" },
   searchEmptyText: {
     color: "rgba(255,255,255,0.22)",
-    fontSize: 14,
+    fontSize: 13,
+    lineHeight: 18,
     textAlign: "center",
   },
-  searchCard: {
+  searchCardSlot: {
     flex: 1,
-    margin: 5,
-    maxWidth: (SCREEN_WIDTH - 62) / 3,
+    minWidth: 0,
+    maxWidth: (SCREEN_WIDTH - 32) / 3,
+    paddingHorizontal: 4,
+    paddingBottom: 12,
   },
-  searchCardSelected: {
-    transform: [{ scale: 0.96 }],
-  },
+  searchCard: { width: "100%" },
   searchCardImageWrap: {
     width: "100%",
     aspectRatio: 2 / 3,
@@ -4058,42 +4374,100 @@ const styles = StyleSheet.create({
   },
   searchCardSelectedOverlay: {
     ...StyleSheet.absoluteFill,
-    borderRadius: 13,
+    borderRadius: 12,
     borderWidth: 2.5,
-    borderColor: ACCENT,
-    backgroundColor: "rgba(108,99,255,0.18)",
   },
   selectDot: {
     position: "absolute",
-    bottom: 8,
-    left: 8,
+    top: 6,
+    right: 6,
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.7)",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    borderColor: "rgba(255,255,255,0.85)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
     alignItems: "center",
-  },
-  selectDotActive: {
-    backgroundColor: ACCENT,
-    borderColor: "#fff",
   },
   searchCardImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 13,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 12,
   },
   searchCardPlaceholder: { justifyContent: "center", alignItems: "center" },
+  ratingBadge: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: "rgba(0,0,0,0.68)",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  ratingText: { fontSize: 9.5, fontWeight: "800", color: "#fff" },
+  searchCardTitle: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 15,
+  },
+  searchCardMeta: { marginTop: 2, fontSize: 10.5, fontWeight: "500" },
 
-  // ── Compose tepsisi ──────────────────────────────────────
+  // ── Seçim çubuğu (sonuçların altında) ────────────────────
+  selectionBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingLeft: 10,
+    paddingRight: 8,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  selectionBarThumbs: { flexDirection: "row", alignItems: "center" },
+  selectionBarThumb: {
+    width: 30,
+    height: 45,
+    borderRadius: 6,
+    borderWidth: 2,
+    overflow: "hidden",
+  },
+  selectionBarThumbImg: { width: "100%", height: "100%" },
+  selectionBarTextCol: { flex: 1, minWidth: 0 },
+  selectionBarTitle: { fontSize: 13.5, fontWeight: "800" },
+  selectionBarSub: { fontSize: 11.5, fontWeight: "500", marginTop: 1 },
+  selectionBarBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingLeft: 14,
+    paddingRight: 10,
+    paddingVertical: 9,
+    borderRadius: 14,
+  },
+  selectionBarBtnText: { color: "#fff", fontSize: 13.5, fontWeight: "800" },
+
+  // ── Seçilenler paneli ────────────────────────────────────
   composeTray: {
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: "rgba(255,255,255,0.1)",
+    flexShrink: 1,
+    minHeight: 0,
+  },
+  // flexGrow (basis auto): panel içeriği kadar uzar (sayfa en çok maxHeight'a
+  // kadar büyür), sığmazsa küçülür ve yalnız liste bölgesi kayar.
+  composeTrayPanel: {
+    flexGrow: 1,
+    marginTop: 0,
+    paddingTop: 0,
+    borderTopWidth: 0,
     gap: 10,
   },
   composeTypeRow: {
@@ -4118,6 +4492,41 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: "700",
   },
+  // SheetScroll flexGrow:0 / flexShrink:1 verir; burada flexGrow:1 ile alanı
+  // doldurur. `flex: 1` YAZMA: flexBasis 0 + SheetScroll'un flexGrow:0'ı bölgeyi
+  // 0 yüksekliğe çökertiyordu (seçilen içerikler hiç görünmüyordu).
+  composeTrayScroll: { flexGrow: 1 },
+  composeList: { gap: 6, paddingBottom: 4 },
+  composeHint: { fontSize: 12, lineHeight: 17 },
+  composeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 6,
+    paddingLeft: 8,
+    paddingRight: 8,
+    borderRadius: 14,
+  },
+  composeRowIndex: { width: 16, fontSize: 12, fontWeight: "800", textAlign: "center" },
+  composeRowThumb: {
+    width: 34,
+    height: 51,
+    borderRadius: 6,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  composeRowThumbImg: { width: "100%", height: "100%" },
+  composeRowTextCol: { flex: 1, minWidth: 0 },
+  composeRowTitle: { fontSize: 13.5, fontWeight: "700" },
+  composeRowMeta: { fontSize: 11.5, fontWeight: "500", marginTop: 2 },
+  composeRowRemove: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   modeRow: {
     flexDirection: "row",
     gap: 8,
@@ -4136,36 +4545,6 @@ const styles = StyleSheet.create({
   },
   modeBtnActive: { backgroundColor: ACCENT_SOFT, borderWidth: 1, borderColor: ACCENT + "55" },
   modeBtnText: { color: "rgba(255,255,255,0.5)", fontSize: 12.5, fontWeight: "800" },
-  // Üst/sağ padding: taşan "×" rozetinin ScrollView kenarında kırpılmaması için.
-  // Kaldır rozeti küçük afişin 6 pt dışına taşar; basılan cam rozet kırpma sınırında kesilmesin
-  // diye üstte/sağda taşma + GLASS_PRESS_ROOM. Eski dolgunun fazlası negatif dış boşlukla düşülür.
-  composeThumbsScroll: { marginTop: 8 - (6 + GLASS_PRESS_ROOM), marginRight: 10 - (6 + GLASS_PRESS_ROOM) },
-  composeThumbsRow: { gap: 8, paddingTop: 6 + GLASS_PRESS_ROOM, paddingRight: 6 + GLASS_PRESS_ROOM, paddingLeft: 2 },
-  composeThumb: {
-    width: 46,
-    height: 69,
-    borderRadius: 8,
-    position: "relative",
-  },
-  composeThumbImg: {
-    width: 46,
-    height: 69,
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  composeThumbRemove: {
-    position: "absolute",
-    top: -6,
-    right: -6,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: DANGER,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#0F0F1A",
-  },
   composeTitleWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -4197,6 +4576,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingTop: 2,
   },
   composeClearBtn: { paddingVertical: 8, paddingHorizontal: 6 },
   composeClearText: {
@@ -4219,37 +4599,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   composeSendText: { color: "#fff", fontSize: 13.5, fontWeight: "800" },
-  typeTag: {
-    position: "absolute",
-    top: 6,
-    left: 5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  typeTagText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.5 },
-  ratingBadge: {
-    position: "absolute",
-    top: 6,
-    right: 5,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  ratingText: { fontSize: 9, fontWeight: "700", color: "#FFD54F" },
-  searchCardTitle: {
-    marginTop: 5,
-    fontSize: 11.5,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.75)",
-    lineHeight: 15,
-    textAlign: "center",
-  },
 
   // ── Drag handle (paylaşımlı) ───────────────────────────
   dragHandle: {
