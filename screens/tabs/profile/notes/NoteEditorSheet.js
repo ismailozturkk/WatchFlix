@@ -10,6 +10,9 @@
 //   • İçeriği olmayan not kaydedilemez (eskiden boş kayıt oluşabiliyordu).
 //   • Kaydedilmemiş NOT metni varken kapatma onay ister (not taslağı yok).
 //   • Tarih için hızlı seçenekler (Bugün / Yarın / Haftaya) + takvim.
+//   • Hatırlatma hem notta hem yapılacakta: gün + SAAT (hızlı saatler + satır
+//     içi saat/dakika ızgarası — ikinci bir Modal açılmaz). Saat `scheduledTime`
+//     ("HH:MM"); hesaplar utils/noteReminders.js'te.
 //   • Tamamlananları tek dokunuşla temizle, ilerleme şeridi, kelime sayacı,
 //     sabitle anahtarı, renk seçicide seçili işareti.
 
@@ -54,6 +57,14 @@ import {
 import GlassTouchable from "../../../../components/common/GlassTouchable";
 import GlassBox from "../../../../components/common/GlassBox";
 import { GLASS_PRESS_ROOM } from "../../../../utils/liquidGlass";
+import {
+  formatReminderTime,
+  isReminderPast,
+  isValidReminderTime,
+  noteReminderAt,
+  splitReminderTime,
+  suggestedReminderTime,
+} from "../../../../utils/noteReminders";
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
@@ -85,6 +96,9 @@ const LimitCounter = ({ value, limit, theme, style }) => {
 };
 
 const EMPTY_TYPES = [];
+const QUICK_TIMES = ["09:00", "12:00", "18:00", "21:00"];
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
 
 export default function NoteEditorSheet({
   visible,
@@ -111,7 +125,9 @@ export default function NoteEditorSheet({
   const [pinned, setPinned] = useState(false);
   const [newTodoText, setNewTodoText] = useState("");
   const [scheduledDate, setScheduledDate] = useState(null);
+  const [scheduledTime, setScheduledTime] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePanel, setShowTimePanel] = useState(false);
   /* Satır içi madde düzenleme: düzenlenen maddenin id'si + taslak metni */
   const [editingTodoId, setEditingTodoId] = useState(null);
   const [editingTodoText, setEditingTodoText] = useState("");
@@ -130,6 +146,23 @@ export default function NoteEditorSheet({
   useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
   const todayStr = dateOffsetISO(0);
+  // Gün seçilince saat boşsa önerilen saat konur (bugünse bir sonraki tam saat):
+  // saatsiz hatırlatma 09:00'da çalardı, o da bugün için çoğu zaman geçmiş olur.
+  const pickDate = (iso) => {
+    setScheduledDate(iso);
+    if (!iso) {
+      setScheduledTime(null);
+      setShowTimePanel(false);
+      return;
+    }
+    setScheduledTime((prev) =>
+      isValidReminderTime(prev) && !isReminderPast(iso, prev) ? prev : suggestedReminderTime(iso),
+    );
+  };
+  const effectiveTime = isValidReminderTime(scheduledTime) ? scheduledTime : "09:00";
+  const timeParts = splitReminderTime(effectiveTime);
+  const isToday = scheduledDate === todayStr;
+  const timeIsPast = (time) => !!scheduledDate && isReminderPast(scheduledDate, time);
   const dateLabel = scheduledDate
     ? new Date(scheduledDate + "T12:00:00").toLocaleDateString(localeOf(language), {
         day: "numeric",
@@ -154,6 +187,7 @@ export default function NoteEditorSheet({
       setType(initialNote.type || "note");
       setPinned(!!initialNote.pinned);
       setScheduledDate(initialNote.scheduledDate || null);
+      setScheduledTime(initialNote.scheduledDate ? initialNote.scheduledTime || null : null);
     } else {
       setTitle("");
       setContent("");
@@ -162,7 +196,9 @@ export default function NoteEditorSheet({
       setType(defaultType);
       setPinned(false);
       setScheduledDate(null);
+      setScheduledTime(null);
     }
+    setShowTimePanel(false);
     setNewTodoText("");
     setEditingTodoId(null);
     setEditingTodoText("");
@@ -186,6 +222,7 @@ export default function NoteEditorSheet({
       setTodos(Array.isArray(draft.todos) ? draft.todos.map((item) => ({ ...item })) : []);
       setNewTodoText(typeof draft.newTodoText === "string" ? draft.newTodoText : "");
       setScheduledDate(draft.scheduledDate || null);
+      setScheduledTime(draft.scheduledDate ? draft.scheduledTime || null : null);
       setEditingTodoId(draft.editingTodoId || null);
       setEditingTodoText(typeof draft.editingTodoText === "string" ? draft.editingTodoText : "");
       const savedPair = colorPairs.find((item) => item.color === draft.color);
@@ -210,6 +247,7 @@ export default function NoteEditorSheet({
       todos,
       newTodoText,
       scheduledDate,
+      scheduledTime,
       editingTodoId,
       editingTodoText,
       color: pair.color,
@@ -228,6 +266,7 @@ export default function NoteEditorSheet({
     pair.background,
     pair.color,
     scheduledDate,
+    scheduledTime,
     title,
     todos,
     visible,
@@ -310,13 +349,9 @@ export default function NoteEditorSheet({
             t.id === editingTodoId && pendingText ? { ...t, text: pendingText } : t,
           )
         : [];
-    // Tarih yalnızca todo UI'ında düzenlenir; mevcut not tarihleri korunur.
-    const cleanScheduled =
-      activeType === "todo"
-        ? scheduledDate || null
-        : initialNote && initialNote.type === "note"
-          ? initialNote.scheduledDate || null
-          : null;
+    // Hatırlatma hem notta hem yapılacakta düzenlenir; saat yalnız günle birlikte anlamlı.
+    const cleanScheduled = scheduledDate || null;
+    const cleanTime = cleanScheduled && isValidReminderTime(scheduledTime) ? scheduledTime : null;
 
     return {
       id: base.id,
@@ -329,8 +364,16 @@ export default function NoteEditorSheet({
       backgroundColor: pair.background,
       pinned,
       scheduledDate: cleanScheduled,
+      scheduledTime: cleanTime,
     };
   };
+
+  // Hatırlatma bu oturumda değişti mi? (Geçmiş zamanlı ESKİ bir hatırlatmayla
+  // not kaydı engellenmesin — yalnız yeni kurulan/değiştirilen denetlenir.)
+  const reminderChanged =
+    (scheduledDate || null) !== (initialNote?.scheduledDate || null) ||
+    (scheduledDate ? scheduledTime || null : null) !==
+      (initialNote?.scheduledDate ? initialNote?.scheduledTime || null : null);
 
   const handleSave = async () => {
     const note = buildNote();
@@ -340,6 +383,11 @@ export default function NoteEditorSheet({
           ? i18nText("autoI18n.en_az_bir_todo_maddesi_girin", "En az bir yapılacak madde girin")
           : i18nText("autoI18n.bos_not_olusturulamaz", "Boş not oluşturulamaz"),
       );
+      return;
+    }
+    if (reminderChanged && note.scheduledDate && (noteReminderAt(note) ?? 0) <= Date.now()) {
+      toast.warning(i18nText("autoI18n.notes_gecmis_zaman", "Hatırlatma zamanı geçmişte olamaz"));
+      setShowTimePanel(true);
       return;
     }
     const saved = await onSave(note);
@@ -356,8 +404,9 @@ export default function NoteEditorSheet({
       ? title.trim() !== (initialNote.title || "").trim() ||
         content !== (initialNote.content || "") ||
         pair.color !== initialNote.color ||
-        pinned !== !!initialNote.pinned
-      : title.trim().length > 0 || content.trim().length > 0);
+        pinned !== !!initialNote.pinned ||
+        reminderChanged
+      : title.trim().length > 0 || content.trim().length > 0 || !!scheduledDate);
 
   const requestClose = () => {
     if (!noteDirty) {
@@ -726,8 +775,67 @@ export default function NoteEditorSheet({
           </View>
         </View>
 
-        {/* Hatırlatıcı: yalnız yapılacaklarda. Hızlı seçenekler + takvim. */}
-        {activeType === "todo" && (
+        {/* Hatırlatma (not + yapılacak): gün (hızlı seçenekler + takvim), gün seçilince saat. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={st.dateRow}
+          style={st.dateScroll}
+          keyboardShouldPersistTaps="handled"
+        >
+          <TouchableOpacity
+            onPress={() => setShowDatePicker(true)}
+            activeOpacity={0.85}
+            style={[
+              st.dateChip,
+              {
+                backgroundColor: scheduledDate ? alpha(color, 0.16) : theme.primary,
+                borderColor: scheduledDate ? color : theme.border,
+              },
+            ]}
+          >
+            <Ionicons name="calendar" size={14} color={scheduledDate ? color : theme.text.muted} />
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[st.dateChipText, { color: scheduledDate ? color : theme.text.secondary }]}
+            >
+              {dateLabel}
+            </Text>
+            {scheduledDate ? (
+              <TouchableOpacity onPress={() => pickDate(null)} hitSlop={ICON_HIT_SLOP}>
+                <Ionicons name="close-circle" size={15} color={theme.text.muted} />
+              </TouchableOpacity>
+            ) : null}
+          </TouchableOpacity>
+          {presets.map((p) => {
+            const selected = scheduledDate === p.value;
+            return (
+              <GlassTouchable
+                key={p.key}
+                onPress={() => pickDate(selected ? null : p.value)}
+                activeOpacity={0.85}
+                style={[
+                  st.presetChip,
+                  {
+                    backgroundColor: selected ? color : theme.primary,
+                    borderColor: selected ? color : theme.border,
+                  },
+                ]}
+              >
+                <Text
+                  allowFontScaling={false}
+                  style={[st.presetText, { color: selected ? "#fff" : theme.text.secondary }]}
+                >
+                  {p.label}
+                </Text>
+              </GlassTouchable>
+            );
+          })}
+        </ScrollView>
+
+        {/* Saat: gün seçilince görünür. Hızlı saatler + açılır saat/dakika ızgarası. */}
+        {scheduledDate ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -735,57 +843,133 @@ export default function NoteEditorSheet({
             style={st.dateScroll}
             keyboardShouldPersistTaps="handled"
           >
-            <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
+            <GlassTouchable
+              onPress={() => setShowTimePanel((v) => !v)}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showTimePanel }}
+              accessibilityLabel={`${i18nText("autoI18n.notes_hatirlatma_saati", "Hatırlatma saati")}: ${effectiveTime}`}
               style={[
                 st.dateChip,
                 {
-                  backgroundColor: scheduledDate ? alpha(color, 0.16) : theme.primary,
-                  borderColor: scheduledDate ? color : theme.border,
+                  backgroundColor: alpha(color, 0.16),
+                  borderColor: timeIsPast(effectiveTime) ? theme.colors?.red || "#EF4444" : color,
                 },
               ]}
             >
-              <Ionicons name="calendar" size={14} color={scheduledDate ? color : theme.text.muted} />
-              <Text
-                allowFontScaling={false}
-                numberOfLines={1}
-                style={[st.dateChipText, { color: scheduledDate ? color : theme.text.secondary }]}
-              >
-                {dateLabel}
+              <Ionicons name="alarm" size={14} color={color} />
+              <Text allowFontScaling={false} style={[st.dateChipText, st.timeChipText, { color }]}>
+                {effectiveTime}
               </Text>
-              {scheduledDate ? (
-                <TouchableOpacity onPress={() => setScheduledDate(null)} hitSlop={ICON_HIT_SLOP}>
-                  <Ionicons name="close-circle" size={15} color={theme.text.muted} />
-                </TouchableOpacity>
-              ) : null}
-            </TouchableOpacity>
-            {presets.map((p) => {
-              const selected = scheduledDate === p.value;
+              <Ionicons name={showTimePanel ? "chevron-up" : "chevron-down"} size={14} color={color} />
+            </GlassTouchable>
+            {QUICK_TIMES.map((time) => {
+              const selected = effectiveTime === time;
+              const past = timeIsPast(time);
               return (
                 <GlassTouchable
-                  key={p.key}
-                  onPress={() => setScheduledDate(selected ? null : p.value)}
+                  key={time}
+                  onPress={() => setScheduledTime(time)}
+                  disabled={past}
                   activeOpacity={0.85}
+                  accessibilityState={{ selected, disabled: past }}
                   style={[
                     st.presetChip,
                     {
                       backgroundColor: selected ? color : theme.primary,
                       borderColor: selected ? color : theme.border,
+                      opacity: past ? 0.35 : 1,
                     },
                   ]}
                 >
                   <Text
                     allowFontScaling={false}
-                    style={[st.presetText, { color: selected ? "#fff" : theme.text.secondary }]}
+                    style={[st.presetText, st.timeChipText, { color: selected ? "#fff" : theme.text.secondary }]}
                   >
-                    {p.label}
+                    {time}
                   </Text>
                 </GlassTouchable>
               );
             })}
           </ScrollView>
-        )}
+        ) : null}
+
+        {/* Satır içi saat seçici (ikinci Modal yok): saat (24) + dakika (5'er). Bugün için geçmiş hücreler kapalı. */}
+        {scheduledDate && showTimePanel ? (
+          <View style={[st.timePanel, { backgroundColor: theme.primary, borderColor: alpha(color, 0.35) }]}>
+            <Text allowFontScaling={false} style={[st.sectionLabel, st.timePanelLabel, { color: theme.text.muted }]}>
+              {i18nText("autoI18n.notes_saat", "Saat").toLocaleUpperCase(localeOf(language))}
+            </Text>
+            <View style={st.timeGrid}>
+              {HOURS.map((hour) => {
+                const selected = timeParts?.hour === hour;
+                // Saat hücresi, o saatin SON dakikası da geçmişse kapalı.
+                const past = isToday && timeIsPast(formatReminderTime(hour, 59));
+                return (
+                  <GlassTouchable
+                    key={hour}
+                    disabled={past}
+                    onPress={() => {
+                      const next = formatReminderTime(hour, timeParts?.minute ?? 0);
+                      if (!timeIsPast(next)) {
+                        setScheduledTime(next);
+                        return;
+                      }
+                      // Bu saatte seçili dakika geçmiş: o saatin ilk geçerli 5'liğine kay.
+                      const free = MINUTES.find((m) => !timeIsPast(formatReminderTime(hour, m)));
+                      setScheduledTime(formatReminderTime(hour, free ?? 59));
+                    }}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected, disabled: past }}
+                    style={[
+                      st.timeCell,
+                      { backgroundColor: selected ? color : alpha(color, 0.08), opacity: past ? 0.3 : 1 },
+                    ]}
+                  >
+                    <Text
+                      allowFontScaling={false}
+                      style={[st.timeCellText, { color: selected ? "#fff" : theme.text.primary }]}
+                    >
+                      {String(hour).padStart(2, "0")}
+                    </Text>
+                  </GlassTouchable>
+                );
+              })}
+            </View>
+            <Text allowFontScaling={false} style={[st.sectionLabel, st.timePanelLabel, { color: theme.text.muted }]}>
+              {i18nText("autoI18n.notes_dakika", "Dakika").toLocaleUpperCase(localeOf(language))}
+            </Text>
+            <View style={st.timeGrid}>
+              {MINUTES.map((minute) => {
+                const hour = timeParts?.hour ?? 9;
+                const selected = timeParts?.minute === minute;
+                const past = isToday && timeIsPast(formatReminderTime(hour, minute));
+                return (
+                  <GlassTouchable
+                    key={minute}
+                    disabled={past}
+                    onPress={() => setScheduledTime(formatReminderTime(hour, minute))}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected, disabled: past }}
+                    style={[
+                      st.timeCell,
+                      { backgroundColor: selected ? color : alpha(color, 0.08), opacity: past ? 0.3 : 1 },
+                    ]}
+                  >
+                    <Text
+                      allowFontScaling={false}
+                      style={[st.timeCellText, { color: selected ? "#fff" : theme.text.primary }]}
+                    >
+                      :{String(minute).padStart(2, "0")}
+                    </Text>
+                  </GlassTouchable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Madde ekleme: kaydırma alanının DIŞINDA — liste uzayınca da erişilebilir kalsın */}
@@ -833,7 +1017,7 @@ export default function NoteEditorSheet({
         value={scheduledDate || todayStr}
         onConfirm={(d) => {
           const iso = typeof d === "string" ? d : d.toISOString().split("T")[0];
-          setScheduledDate(iso);
+          pickDate(iso);
           setShowDatePicker(false);
         }}
         onClose={() => setShowDatePicker(false)}
@@ -1006,6 +1190,19 @@ const st = StyleSheet.create({
     justifyContent: "center",
   },
   presetText: { fontSize: 12.5, fontWeight: "800" },
+  timeChipText: { fontVariant: ["tabular-nums"] },
+  timePanel: { borderRadius: 20, borderWidth: 1, padding: 12, gap: 6 },
+  timePanelLabel: { marginTop: 0 },
+  timeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  // 6 sütun: (100% - 5 × 6 pt boşluk) / 6 ≈ %15,2.
+  timeCell: {
+    width: "15.2%",
+    height: 36,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  timeCellText: { fontSize: 13.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
 
   // Madde ekleme
   addTodoRow: { flexDirection: "row", alignItems: "center", gap: 8 },

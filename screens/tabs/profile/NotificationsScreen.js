@@ -15,6 +15,7 @@ import { toast } from "../../../components/AppToast";
 import { alpha } from "../../../theme/colors";
 import { fetchOlderNotifications } from "../../../services/notificationsService";
 import { notificationInboxCopy } from "../../../utils/notificationInboxCopy";
+import useNoteReminderInbox from "../../../hooks/useNoteReminderInbox";
 import {
   mergeNotifications, notificationContent, notificationDateLabel,
   notificationDestination, notificationSections,
@@ -31,6 +32,8 @@ function Inbox({ uid, navigation }) {
   const { language, t } = useLanguage();
   const { items, loading, error, cursor, hasMore, retry, markRead, markAll } = useNotifications();
   const { profile } = useUserProfile();
+  // Vadesi gelen not hatırlatmaları: sunucu kaydı değil, nottan türetilir; okundu durumu cihazda.
+  const reminders = useNoteReminderInbox();
   const copy = notificationInboxCopy(language);
   const accent = theme.accent || "#8B7CF8";
   const [filter, setFilter] = useState("all");
@@ -54,7 +57,10 @@ function Inbox({ uid, navigation }) {
     return () => { active.current = false; clearInterval(timer); };
   }, []);
 
-  const merged = useMemo(() => mergeNotifications(items, page?.items || [], readIds), [items, page, readIds]);
+  const merged = useMemo(
+    () => mergeNotifications([...items, ...reminders.items], page?.items || [], readIds),
+    [items, reminders.items, page, readIds],
+  );
   const sections = useMemo(() => notificationSections(
     // Keep the detail being read visible until it is collapsed or the filter changes.
     filter === "unread" ? merged.filter((item) => !item.read || item.id === expandedId) : merged,
@@ -86,7 +92,10 @@ function Inbox({ uid, navigation }) {
     setOpeningId(item.id);
     setActionError(null);
     try {
-      if (!item.read) await markRead(item.id);
+      if (!item.read) {
+        if (item.local) reminders.markSeen(item);
+        else await markRead(item.id);
+      }
       if (!active.current) return;
       setReadIds((previous) => new Set(previous).add(item.id));
       const destination = notificationDestination(item);
@@ -107,6 +116,7 @@ function Inbox({ uid, navigation }) {
     // Yazımdan ÖNCE alınır: işlem sürerken gelen yeni bildirim okunmamış kalmalı.
     const unreadIds = merged.filter((item) => !item.read).map((item) => item.id);
     try {
+      reminders.markAllSeen();
       await markAll();
       if (!active.current) return;
       // Eski sayfalar canlı dinlenmiyor; onlar da yerelde okundu görünsün.

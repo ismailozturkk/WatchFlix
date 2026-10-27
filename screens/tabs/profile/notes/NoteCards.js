@@ -24,6 +24,7 @@ import Skeleton from "@components/Skeleton";
 import { i18nText } from "../../../../utils/i18nText";
 import { dueStatus, parseISODate, todoStats } from "../../../../utils/notesView";
 import { alpha } from "../../../../theme/colors";
+import { isValidReminderTime } from "../../../../utils/noteReminders";
 import usePosterUri from "../../../../hooks/usePosterUri";
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
@@ -47,16 +48,17 @@ export function formatNoteDate(timestamp, language, now = new Date()) {
   });
 }
 
-/** Hatırlatıcı günü için rozet metni + rengi. Bitmiş listede gecikme gösterilmez. */
+/** Hatırlatıcı günü (+ seçildiyse saati) için rozet metni + rengi. Bitmiş listede gecikme gösterilmez. */
 function dueBadge(note, theme, language, complete) {
   if (!note.scheduledDate) return null;
   const status = dueStatus(note.scheduledDate);
   if (!status) return null;
   const color = note.color || theme.accent;
+  const time = isValidReminderTime(note.scheduledTime) ? ` · ${note.scheduledTime}` : "";
   const dateText = (parseISODate(note.scheduledDate) || new Date()).toLocaleDateString(
     localeOf(language),
     { day: "numeric", month: "short" },
-  );
+  ) + time;
 
   if (!complete && status.state === "overdue") {
     return {
@@ -69,11 +71,11 @@ function dueBadge(note, theme, language, complete) {
     return {
       color: theme.colors?.orange || "#F97316",
       icon: "time",
-      text: i18nText("autoI18n.bugun", "Bugün"),
+      text: i18nText("autoI18n.bugun", "Bugün") + time,
     };
   }
   if (status.state === "tomorrow") {
-    return { color, icon: "calendar", text: i18nText("autoI18n.notes_yarin", "Yarın") };
+    return { color, icon: "calendar", text: i18nText("autoI18n.notes_yarin", "Yarın") + time };
   }
   return { color: complete ? theme.text.muted : color, icon: "calendar-outline", text: dateText };
 }

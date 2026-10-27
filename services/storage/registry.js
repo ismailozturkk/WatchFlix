@@ -599,6 +599,17 @@ const dataKeys = {
     keepOnLogout: true,
     validate: plainObject,
   },
+  // Not hatırlatmalarının uygulama içi okundu durumu (hooks/useNoteReminderInbox.js):
+  // { "<notId>": okunan hatırlatma anı (ms) }. Yalnız bu cihazda; çıkışta SİLİNMEZ —
+  // silinseydi tekrar girişte eski hatırlatmalar okunmamış görünürdü.
+  noteReminderSeen: {
+    key: "note_reminder_seen:",
+    type: TYPES.json,
+    default: {},
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
   // İlk içerik aktivasyon damgası. Çıkışta SİLİNMEZ — silinirse kullanıcı geri
   // döndüğünde aynı analytics olayı ikinci kez üretilir ve metrik şişer.
   firstContentAt: {

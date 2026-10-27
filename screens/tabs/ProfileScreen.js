@@ -37,6 +37,7 @@ import SocialLinksRow from "../../components/profile/SocialLinksRow";
 import ProfileLogoutButton from "../../components/profile/ProfileLogoutButton";
 import ProfileNotificationsButton from "../../components/profile/ProfileNotificationsButton";
 import ImportantInvitesBar from "../../components/profile/ImportantInvitesBar";
+import NoteRemindersBar from "../../components/profile/NoteRemindersBar";
 import { hasAnySocialLinks, readProfileSocialLinks } from "../../utils/socialLinks";
 
 // iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için kaydırma
@@ -219,6 +220,8 @@ const ProfileScreen = ({ navigation }) => {
           style={[styles.container, { backgroundColor: "transparent" }]}
         >
           <ImportantInvitesBar key={user?.uid || "guest"} navigation={navigation} />
+          {/* Vadesi gelen not / liste hatırlatmaları: ertele · tamam · notu aç. */}
+          <NoteRemindersBar key={`reminders-${user?.uid || "guest"}`} navigation={navigation} />
           <View style={styles.images}>
             <ProfileAvatarHalo
               source={avatar}

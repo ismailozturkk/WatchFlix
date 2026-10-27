@@ -45,6 +45,11 @@ function parseReminderDate(dateValue, defaultHour) {
 
   let base;
   let dateOnly = false;
+  // "YYYY-MM-DDTHH:MM" (saniyesiz) = kullanıcının AÇIKÇA seçtiği saat (not
+  // hatırlatması, utils/noteReminders.js). 00:00 seçilmiş olsa bile aşağıdaki
+  // "gece yarısı = saat yok" varsayımı uygulanmaz.
+  const explicitTime =
+    typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dateValue.trim());
   if (typeof dateValue?.toMillis === "function") {
     // Firestore Timestamp güvencesi.
     base = new Date(dateValue.toMillis());
@@ -65,7 +70,7 @@ function parseReminderDate(dateValue, defaultHour) {
   if (isNaN(base.getTime())) return null;
 
   // Gece yarısı (00:00) ise — büyük ihtimalle saat seçilmemiş — defaultHour uygula.
-  if (base.getHours() === 0 && base.getMinutes() === 0 && base.getSeconds() === 0) {
+  if (!explicitTime && base.getHours() === 0 && base.getMinutes() === 0 && base.getSeconds() === 0) {
     base.setHours(defaultHour, 0, 0, 0);
     dateOnly = true;
   }

@@ -92,6 +92,7 @@ const LOCAL_PROGRESS_KEYS = Object.freeze([
   Keys.postDrafts,
   Keys.storyDrafts,
   Keys.noteTodoDrafts,
+  Keys.noteReminderSeen,
   // "Puanladım / yorumladım" işaretleri ve liste durumu önbelleği (canlı kök belge yeniden doldurur).
   Keys.mediaActivity,
   Keys.listStatus,

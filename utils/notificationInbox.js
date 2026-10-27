@@ -79,6 +79,8 @@ const TYPES = {
   message: ["mail-outline", "notifBodyMessage"],
   cineswipe_invite: ["film-outline", null],
   game_challenge: ["flash-outline", null],
+  // Yerel kayıt: vadesi gelen not hatırlatması (utils/noteReminders.js).
+  note_reminder: ["alarm-outline", null],
 };
 
 // Bildirim türünün simge tonu: theme.colors anahtarı (ekran temadan çözer; böylece her temada
@@ -93,6 +95,7 @@ const TONES = {
   mention: "orange",
   cineswipe_invite: "red",
   game_challenge: "orange",
+  note_reminder: "orange",
 };
 
 /** @returns {"red"|"blue"|"green"|"purple"|"orange"|"accent"} */
@@ -102,6 +105,16 @@ export function notificationTone(type) {
 
 export function notificationContent(item, t, copy) {
   const [icon, key] = TYPES[item.type] || ["notifications-outline", null];
+  if (item.type === "note_reminder") {
+    return {
+      icon,
+      tone: notificationTone(item.type),
+      title: item.title || (item.noteType === "todo" ? copy.untitledList : copy.untitledNote),
+      action: item.noteType === "todo" ? copy.listReminder : copy.noteReminder,
+      detail: item.text || "",
+      responseLabel: "",
+    };
+  }
   const responseLabel = item.type === "cineswipe_invite" || item.type === "game_challenge"
     ? item.response === "accepted" ? copy.acceptedInvite : item.response === "declined" ? copy.declinedInvite : ""
     : "";
@@ -118,6 +131,9 @@ export function notificationContent(item, t, copy) {
 }
 
 export function notificationDestination(item) {
+  if (item.type === "note_reminder") {
+    return item.noteId ? { name: "NotesScreen", params: { openNoteId: item.noteId } } : null;
+  }
   if (item.type === "cineswipe_invite" || item.type === "game_challenge") {
     return item.response === "accepted" ? invitationDestination(item) : null;
   }

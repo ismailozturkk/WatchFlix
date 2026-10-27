@@ -615,6 +615,7 @@ Firestore Root
 │           ├── color: string = "#6C63FF"
 │           ├── backgroundColor: string = "#1E1E2E"
 │           ├── scheduledDate: string = "2026-08-25"
+│           ├── scheduledTime: string|null = "14:30"   (yerel "HH:MM"; yoksa 09:00 — utils/noteReminders.js)
 │           ├── createdAt: int (ms) = 1724000000000
 │           └── updatedAt: int (ms) = 1724100000000
 │

@@ -35,6 +35,7 @@ import { useFriends } from "./FriendsContext";
 import { useUnreadMessages } from "./UnreadMessagesContext";
 import { useProfileReminders } from "./ProfileRemindersContext";
 import { useProfileNotes } from "./ProfileNotesContext";
+import { noteReminderDateValue } from "../utils/noteReminders";
 import {
   configureNotificationHandler,
   ensureAndroidChannels,
@@ -451,8 +452,9 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
         if (settings.noteRemindersEnabled) {
           (notes || []).forEach((n) => {
             if (!n?.id || !n.scheduledDate) return;
-            // Notlarda lead-time uygulanmaz; seçilen tam tarihte tetiklenir.
-            const fireMs = computeReminderSchedule(n.scheduledDate, {
+            // Notlarda lead-time uygulanmaz; seçilen gün + saatte tetiklenir
+            // (saatsiz eski notlar 09:00).
+            const fireMs = computeReminderSchedule(noteReminderDateValue(n), {
               leadTimeDays: 0,
             })?.fireMs;
             if (!fireMs) return;
@@ -685,8 +687,11 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
         } else if (data.kind === "weeklyDigest") {
           // Haftalık özet → bu haftanın çıkışlarını gösteren takvim ekranı.
           nav.navigate("CalendarScreen");
+        } else if (data.kind === "reminder" && data.type === "note" && data.noteId) {
+          // Not hatırlatması → Notlar'da o notun düzenleyicisi (okundu da sayılır).
+          nav.navigate("NotesScreen", { openNoteId: String(data.noteId) });
         }
-        // Reminder dokunuşları uygulamayı açar; özel yönlendirme gerekmez.
+        // Film / dizi reminder dokunuşları uygulamayı açar; özel yönlendirme gerekmez.
       } catch {
         /* yok say */
       }

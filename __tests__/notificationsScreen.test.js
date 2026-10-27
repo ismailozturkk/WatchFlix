@@ -21,6 +21,8 @@ jest.mock("../context/ThemeContext", () => ({ useTheme: () => ({ theme: {
 } }) }));
 jest.mock("../context/LanguageContext", () => ({ useLanguage: () => ({ language: mockLanguage, t: require(`../translations/${mockLanguage}.json`) }) }));
 jest.mock("../context/UserProfileContext", () => ({ useUserProfile: () => ({ profile: { unreadNotifsCount: mockUnreadCount } }) }));
+let mockReminderInbox;
+jest.mock("../hooks/useNoteReminderInbox", () => ({ __esModule: true, default: () => mockReminderInbox }));
 jest.mock("../components/ScreenDecor", () => "Decor");
 jest.mock("../components/friends/FriendsScreenHeader", () => "Header");
 jest.mock("../components/AppIcon", () => "Icon");
@@ -42,6 +44,7 @@ beforeEach(() => {
   mockUid = "user-a";
   mockLanguage = "tr";
   mockUnreadCount = 101;
+  mockReminderInbox = { items: [], unread: [], unreadCount: 0, markSeen: jest.fn(), markAllSeen: jest.fn() };
   mockInbox = { items: [item], loading: false, error: null, cursor: "first-cursor", hasMore: true, markRead: jest.fn().mockResolvedValue(), markAll: jest.fn().mockResolvedValue(1), retry: jest.fn() };
   const original = console.error;
   warn = jest.spyOn(console, "error").mockImplementation((message, ...args) => {
@@ -279,4 +282,35 @@ test("header action follows the unread counter even when no loaded item is unrea
   mockUnreadCount = 0;
   act(() => renderer.update(<Screen navigation={navigation} />));
   expect(markAllButton()).toBeNull();
+});
+
+test("vadesi gelen not hatırlatması kutuda görünür; okumak sunucuya değil cihaza yazar", async () => {
+  const reminder = {
+    id: "note-reminder:a@5000", type: "note_reminder", local: true, noteId: "a", noteType: "note",
+    title: "Film gecesi", text: "Patlamış mısır al", createdAt: 5000, read: false,
+  };
+  mockReminderInbox = { ...mockReminderInbox, items: [reminder], unread: [reminder], unreadCount: 1 };
+  render();
+  const ids = list().props.sections.flatMap((section) => section.data).map((entry) => entry.id);
+  expect(ids).toEqual([reminder.id, "n1"]);
+  const button = row(reminder.id);
+  await act(async () => { await button.props.onPress(); });
+  row(reminder.id);
+  expect(mockReminderInbox.markSeen).toHaveBeenCalledWith(reminder);
+  expect(mockInbox.markRead).not.toHaveBeenCalled();
+  await act(async () => { await rowRenderer.root.findByProps({ testID: `notification-open-${reminder.id}` }).props.onPress(); });
+  expect(navigation.navigate).toHaveBeenCalledWith("NotesScreen", { openNoteId: "a" });
+});
+
+test("profil zili okunmamış not hatırlatmalarını da sayar; tümünü okundu ikisini de temizler", async () => {
+  mockUnreadCount = 2;
+  mockReminderInbox = { ...mockReminderInbox, unreadCount: 3 };
+  act(() => { renderer = create(<ProfileButton navigation={navigation} />); });
+  expect(renderer.root.findByType("IconButton").props.accessibilityLabel).toContain("5");
+  act(() => renderer.unmount());
+  renderer = null;
+  render();
+  await act(async () => { await renderer.root.findByType("Header").props.right.props.onPress(); });
+  expect(mockReminderInbox.markAllSeen).toHaveBeenCalled();
+  expect(mockInbox.markAll).toHaveBeenCalled();
 });

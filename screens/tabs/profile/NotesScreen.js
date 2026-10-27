@@ -11,7 +11,7 @@ import { isLightSurface } from "@utils/colorUtils";
  * `handleToggleTodoItem` ile yapılır. Sıralama/arama/ilerleme mantığı SAF
  * utils/notesView.js'te.
  */
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Keyboard,
@@ -53,6 +53,7 @@ import {
   tabDirection,
 } from "../../../utils/notesView";
 import { alpha } from "../../../theme/colors";
+import { markRemindersSeen, noteReminderAt } from "../../../utils/noteReminders";
 import NoteEditorSheet from "./notes/NoteEditorSheet";
 import { MediaNoteCard, NoteCard, NotesEmptyState, NotesSkeleton } from "./notes/NoteCards";
 import { NotesFilterRow, NotesTabBar, RevealBox } from "./notes/NotesChrome";
@@ -112,7 +113,7 @@ const DeleteModal = ({ visible, onConfirm, onClose, theme }) => (
 );
 
 // ─── Ana Ekran ────────────────────────────────────────────────────────────────
-export default function NotesScreen({ navigation }) {
+export default function NotesScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const {
@@ -308,6 +309,22 @@ export default function NotesScreen({ navigation }) {
     setEditingNote(note);
     setModalVisible(true);
   }, []);
+  // Bildirim kutusu / profil hatırlatma şeridinden "Notu aç": o notun sekmesine geç
+  // ve düzenleyicisini aç. Parametre tüketilir; geri gelince yeniden açılmasın.
+  const openNoteId = route?.params?.openNoteId;
+  useEffect(() => {
+    if (!openNoteId) return;
+    const target = allNotes.find((n) => String(n?.id) === String(openNoteId));
+    if (!target) return;
+    navigation.setParams?.({ openNoteId: undefined });
+    // Çalmış hatırlatmanın notu açıldı: kutuda ve profil şeridinde okundu say.
+    const at = noteReminderAt(target);
+    if (at !== null && at <= Date.now()) {
+      set(Keys.noteReminderSeen, markRemindersSeen(get(Keys.noteReminderSeen), [{ noteId: String(target.id), createdAt: at }], allNotes));
+    }
+    setTab(target.type === "todo" ? "todo" : "note");
+    openEdit(target);
+  }, [openNoteId, allNotes, navigation, openEdit]);
   const requestNoteDelete = useCallback((note) => requestDelete(note.id, "note"), [requestDelete]);
   const requestMediaDelete = useCallback((note) => requestDelete(note.id, "media"), [requestDelete]);
 

@@ -11,6 +11,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { notificationInboxCopy } from "../../utils/notificationInboxCopy";
 import { alpha } from "../../theme/colors";
+import useNoteReminderInbox from "../../hooks/useNoteReminderInbox";
 
 export default function ProfileNotificationsButton({
   navigation,
@@ -23,7 +24,9 @@ export default function ProfileNotificationsButton({
   const { theme } = useTheme();
   const { language } = useLanguage();
   const copy = notificationInboxCopy(language);
-  const count = Math.max(0, Number(profile?.unreadNotifsCount) || 0);
+  // Sunucu sayacı + cihazda çalan, henüz okunmamış not hatırlatmaları.
+  const { unreadCount: reminderCount } = useNoteReminderInbox();
+  const count = Math.max(0, Number(profile?.unreadNotifsCount) || 0) + reminderCount;
   const resolvedSize = Number(size) > 0 ? Number(size) : 36;
   const resolvedIconSize = iconSize ?? Math.max(13, Math.round(resolvedSize * 0.5));
   const resolvedRadius = fallbackRadius ?? Math.max(8, Math.round(resolvedSize / 3));

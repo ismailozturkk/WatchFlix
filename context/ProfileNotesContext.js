@@ -277,6 +277,7 @@ export const ProfileNotesProvider = ({ children }) => {
             content: existingNote.content || "",
             todos: existingNote.todos || [],
             scheduledDate: existingNote.scheduledDate || null,
+            scheduledTime: existingNote.scheduledTime || null,
           }
         : {}),
       createdAt: note.createdAt || now,
