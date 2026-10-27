@@ -37,6 +37,8 @@ export const PREVIEW_FACTS = Object.freeze({
   decade: { poster: posterOf("movie", 680), options: [1970, 1990, 2010], correct: 1990 }, // Pulp Fiction (1994)
   kind: { poster: posterOf("tv", 1396), correct: "tv" }, // Breaking Bad
   genre: { poster: posterOf("movie", 155), options: ["comedy", "action", "romance"], correct: "action" }, // The Dark Knight
+  // Bulanık Afiş: şıklar yapım BAŞLIKLARI (çevrilmez); doğru olan afişin kendi adı.
+  blur: { poster: posterOf("movie", 550), options: ["Se7en", "Fight Club", "Memento"], correct: "Fight Club", points: 70 },
 });
 
 // Sahne karesinde gizlenen parçalar (3×3, soldan sağa) — afişin yarısı açık kalsın.
@@ -176,6 +178,27 @@ function ChoicePreview({ poster, labels, correctIndex, height, compact }) {
   );
 }
 
+/** Yarı netleşmiş afiş + kalan süre çubuğu + o anki puan; yanında başlık şıkları. */
+function BlurPreview({ height, compact, pointsLabel }) {
+  const { poster, options, correct, points } = PREVIEW_FACTS.blur;
+  return (
+    <View style={[styles.row, styles.choiceRow, { height }]}>
+      <MiniPoster poster={poster} height={height - 10}>
+        <Image source={poster.source} style={styles.fill} contentFit="cover" blurRadius={6} />
+        <View style={styles.blurTrack}>
+          <View style={[styles.blurFill, { width: `${points}%` }]} />
+        </View>
+        <View style={styles.blurPoints}>
+          <Text style={styles.blurPointsText} allowFontScaling={false} numberOfLines={1}>
+            {pointsLabel(points)}
+          </Text>
+        </View>
+      </MiniPoster>
+      <OptionStack labels={options} correctIndex={options.indexOf(correct)} compact={compact} />
+    </View>
+  );
+}
+
 /**
  * Oyun kimliğine göre önizleme. Bilinmeyen kimlikte null (kart yalnız simgeyle çizilir).
  * @param {{ gameId: string, height: number }} props
@@ -230,6 +253,8 @@ function GamePreview({ gameId, height }) {
         />
       );
     }
+    case "blur":
+      return <BlurPreview height={height} compact={compact} pointsLabel={quick.blur.points} />;
     default:
       return null;
   }
@@ -319,6 +344,20 @@ const styles = StyleSheet.create({
   voteTrack: { height: 5, borderRadius: 3, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.25)" },
   voteFill: { height: "100%", borderRadius: 3, backgroundColor: "rgba(255,255,255,0.7)" },
   voteFillRight: { backgroundColor: GREEN },
+
+  // Bulanık Afiş
+  blurTrack: { position: "absolute", left: 3, right: 3, top: 3, height: 3, borderRadius: 2, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.3)" },
+  blurFill: { height: "100%", borderRadius: 2, backgroundColor: "#FFFFFF" },
+  blurPoints: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingVertical: 1,
+    alignItems: "center",
+    backgroundColor: "rgba(6,78,59,0.9)",
+  },
+  blurPointsText: { color: "#FFFFFF", fontSize: 8, fontWeight: "900" },
 
   // Şıklı önizlemeler (on yıl / film-dizi / tür)
   options: { flex: 1, minWidth: 0, gap: 4 },

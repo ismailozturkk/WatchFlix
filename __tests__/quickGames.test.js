@@ -1,13 +1,15 @@
 // __tests__/quickGames.test.js
 //
-// Hızlı oyunların saf çekirdeği (utils/quickGames.js): dört oyunun soru üretimi, zorluk eğrileri, cevap
+// Hızlı oyunların saf çekirdeği (utils/quickGames.js): beş oyunun soru üretimi, zorluk eğrileri, cevap
 // değerlendirmesi, tür eşlemesi ve oyun başına cihaz-yerel kayıt.
 
 const {
-  KIND_HIDE_TITLE_AT, QUICK_GAME_IDS, QUICK_GAME_META, QUICK_GENRES, buildQuickQuestion, canonGenresOf, decadeOf,
+  BLUR_MAX_POINTS, BLUR_MIN_POINTS, BLUR_ROUND_MS, BLUR_SIMILAR_AT, BLUR_START, blurAmount, blurPoints, blurRemaining,
+  isTimedQuickGame, KIND_HIDE_TITLE_AT, QUICK_GAME_IDS, QUICK_GAME_META, QUICK_GENRES, buildQuickQuestion, canonGenresOf, decadeOf,
   isQuickGame, judgeQuickAnswer, normalizeQuickStats, pushQuickRecent, questionItemKeys, ratioForStreak,
   recordQuickRun, statsOfQuickGame, toStoredQuickStats, QUICK_RECENT_WINDOW,
 } = require("../utils/quickGames");
+const { recordOlderRun } = require("../utils/olderGame");
 
 function seeded(seed) {
   let a = seed >>> 0;
@@ -42,11 +44,12 @@ const ask = (gameId, streak, seed, extra = {}) =>
   buildQuickQuestion(gameId, { pool: pool(), streak, rng: seeded(seed), maxYear: MAX_YEAR, ...extra });
 
 describe("kayıt defteri", () => {
-  test("dört oyun, her birinin düzeni ve rengi var", () => {
-    expect(QUICK_GAME_IDS).toEqual(["popular", "decade", "kind", "genre"]);
+  test("beş oyun, her birinin düzeni ve rengi var; yalnız Bulanık Afiş zamanlı", () => {
+    expect(QUICK_GAME_IDS).toEqual(["popular", "decade", "kind", "genre", "blur"]);
+    expect(QUICK_GAME_IDS.filter(isTimedQuickGame)).toEqual(["blur"]);
     QUICK_GAME_IDS.forEach((id) => {
       expect(isQuickGame(id)).toBe(true);
-      expect(["pair", "single"]).toContain(QUICK_GAME_META[id].layout);
+      expect(["pair", "single", "blur"]).toContain(QUICK_GAME_META[id].layout);
       expect(QUICK_GAME_META[id].colors).toHaveLength(2);
     });
     expect(isQuickGame("older")).toBe(false);
@@ -276,5 +279,86 @@ describe("kayıt (oyun başına)", () => {
     expect(statsOfQuickGame(base, "genre")).toEqual({ best: 0, plays: 0, correct: 0, answered: 0 });
     expect(toStoredQuickStats({})).toBeNull();
     expect(toStoredQuickStats(base)).toEqual(base);
+  });
+});
+
+describe("blur (Bulanık Afiş)", () => {
+  test("saat: bulanıklık %50'den 0'a, puan 100'den 10'a DOĞRUSAL iner; süre dolunca 0", () => {
+    expect(BLUR_START).toBe(0.5);
+    expect(BLUR_ROUND_MS).toBe(10000);
+    expect(blurAmount(0)).toBe(0.5);
+    expect(blurAmount(BLUR_ROUND_MS / 2)).toBe(0.25);
+    expect(blurAmount(BLUR_ROUND_MS)).toBe(0);
+    expect(blurAmount(BLUR_ROUND_MS * 3)).toBe(0); // taşma yok
+    expect(blurPoints(0)).toBe(BLUR_MAX_POINTS);
+    expect(blurPoints(3000)).toBe(73); // 10 + 90 × 0,7
+    expect(blurPoints(BLUR_ROUND_MS / 2)).toBe(55);
+    expect(blurPoints(BLUR_ROUND_MS - 1)).toBe(BLUR_MIN_POINTS);
+    expect(blurPoints(BLUR_ROUND_MS)).toBe(0);
+    expect(blurPoints(-500)).toBe(BLUR_MAX_POINTS); // saat sapması fazladan puan vermez
+    expect(blurRemaining("bozuk")).toBe(1);
+    // Puan ve bulanıklık aynı saatten: hiçbir anda "daha net ama daha çok puan" olmaz.
+    for (let t = 0; t < BLUR_ROUND_MS; t += 250) {
+      expect(blurPoints(t + 250)).toBeLessThanOrEqual(blurPoints(t));
+      expect(blurAmount(t + 250)).toBeLessThan(blurAmount(t));
+    }
+  });
+
+  test("dört TEKİL başlık şıkkı; doğru cevap afişin kendisi; başlık gizli; şıklar aynı türden (film/dizi)", () => {
+    for (let seed = 1; seed <= 60; seed += 1) {
+      const q = ask("blur", 0, seed);
+      expect(q.layout).toBe("blur");
+      expect(q.showTitle).toBe(false);
+      expect(q.options).toHaveLength(4);
+      const [target] = q.items;
+      expect(q.correctKey).toBe(target.mediaKey);
+      expect(q.options.map((o) => o.key)).toContain(q.correctKey);
+      expect(new Set(q.options.map((o) => o.title.toLowerCase())).size).toBe(4);
+      const kinds = q.options.map((o) => pool().find((x) => x.mediaKey === o.key).type === "tv");
+      kinds.forEach((isTv) => expect(isTv).toBe(target.type === "tv"));
+      expect(judgeQuickAnswer(q, q.correctKey).correct).toBe(true);
+    }
+  });
+
+  test("aynı adlı yapımlar aynı soruda şık olmaz (yeniden çevrim)", () => {
+    const items = [
+      item(1, 1976, { title: "Carrie" }), item(2, 2013, { title: "carrie " }),
+      ...Array.from({ length: 10 }, (_, i) => item(10 + i, 1990 + i)),
+    ];
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const q = buildQuickQuestion("blur", { pool: items, rng: seeded(seed), maxYear: MAX_YEAR });
+      expect(new Set(q.options.map((o) => o.title.trim().toLowerCase())).size).toBe(4);
+    }
+  });
+
+  test("yüksek seride yanlış şıklar benzer yapımlardan (ortak tür ya da ±10 yıl)", () => {
+    let similar = 0;
+    let total = 0;
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const q = ask("blur", BLUR_SIMILAR_AT, seed);
+      const target = q.items[0];
+      const own = new Set(canonGenresOf(target));
+      q.options.filter((o) => o.key !== q.correctKey).forEach((o) => {
+        const other = pool().find((x) => x.mediaKey === o.key);
+        total += 1;
+        if (canonGenresOf(other).some((g) => own.has(g)) || Math.abs(Number(other.year) - Number(target.year)) <= 10) similar += 1;
+      });
+    }
+    expect(similar).toBe(total);
+  });
+
+  test("dörtten az farklı başlık varsa soru yok", () => {
+    const items = [item(1, 2000), item(2, 2001), item(3, 2002, { title: "Yapım 1" })];
+    expect(buildQuickQuestion("blur", { pool: items, rng: seeded(1), maxYear: MAX_YEAR })).toBeNull();
+  });
+
+  test("kayıt: skor puan toplamı, doğru sayısı AYRI (isabet oranı bozulmaz)", () => {
+    const first = recordQuickRun(null, "blur", { score: 245, correct: 3, answered: 6 });
+    expect(first.stats).toEqual({ best: 245, plays: 1, correct: 3, answered: 6 });
+    expect(first.newBest).toBe(true);
+    const second = recordQuickRun(first.all, "blur", { score: 180, correct: 2, answered: 5 });
+    expect(second.stats).toEqual({ best: 245, plays: 2, correct: 5, answered: 11 });
+    // `correct` verilmeyen eski çağrı: skor = doğru sayısı (diğer oyunlar değişmedi).
+    expect(recordOlderRun(null, { score: 4, answered: 7 }).stats).toEqual({ best: 4, plays: 1, correct: 4, answered: 7 });
   });
 });

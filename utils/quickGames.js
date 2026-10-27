@@ -8,6 +8,9 @@
 //   decade  : bir afiş — hangi ON YIL? (dört şık)
 //   kind    : bir afiş — FİLM Mİ, DİZİ Mİ?
 //   genre   : bir afiş — hangi TÜR? (dört şık)
+//   blur    : bulanık afiş — HANGİ YAPIM? (dört başlık şıkkı). ZAMANLI: afiş %50 bulanık başlar, süre aktıkça
+//             netleşir; puan da aynı oranda düşer (erken bilen çok alır). Skor = puan TOPLAMI, doğru sayısı ayrı.
+//             Süre dolarsa yanlış sayılır (can gider).
 //
 // SORU KAYNAĞI: havuz öğelerinde yıl, oy SAYISI, tür kimlikleri ve film/dizi bilgisi var; oy ORTALAMASI ve oyuncu
 // kadrosu YOK. Bu yüzden "hangisinin puanı yüksek" ya da "baş rolde kim" soruları kasten yok (her başlığı TMDB'den
@@ -23,16 +26,21 @@ import { shuffleWith } from "./seededRandom";
 
 export const QUICK_LIVES = OLDER_LIVES;
 export const QUICK_RECENT_WINDOW = 40;
-export const QUICK_GAME_IDS = Object.freeze(["popular", "decade", "kind", "genre"]);
+export const QUICK_GAME_IDS = Object.freeze(["popular", "decade", "kind", "genre", "blur"]);
 export const isQuickGame = (id) => QUICK_GAME_IDS.includes(id);
 
-/** Ekran düzeni: pair = iki afiş yan yana, single = tek büyük afiş + şık düğmeleri. */
+/**
+ * Ekran düzeni: pair = iki afiş yan yana, single = tek büyük afiş + şık düğmeleri, blur = netleşen afiş + başlık
+ * şıkları. `timed`: soru başına geri sayım ve süreye bağlı puan (bkz. "Bulanık afiş" bölümü).
+ */
 export const QUICK_GAME_META = Object.freeze({
   popular: { layout: "pair", icon: "people", colors: ["#F97316", "#C2410C"] },
   decade: { layout: "single", icon: "hourglass", colors: ["#0EA5E9", "#1D4ED8"] },
   kind: { layout: "single", icon: "film", colors: ["#EC4899", "#9D174D"] },
   genre: { layout: "single", icon: "pricetags", colors: ["#10B981", "#047857"] },
+  blur: { layout: "blur", icon: "eye", colors: ["#A855F7", "#7E22CE"], timed: true },
 });
+export const isTimedQuickGame = (id) => !!QUICK_GAME_META[id]?.timed;
 
 // ── Tür kimlikleri ───────────────────────────────────────────────────────────
 
@@ -211,7 +219,79 @@ function genreQuestion({ pool, streak, recent, rng, maxYear }) {
   };
 }
 
-const BUILDERS = { popular: popularQuestion, decade: decadeQuestion, kind: kindQuestion, genre: genreQuestion };
+// ── Bulanık afiş (blur) ──────────────────────────────────────────────────────
+//
+// TEK SAAT: tur süresi. Bulanıklık ve puan aynı "kalan süre oranı"ndan (1 → 0) türer, yani ekranda gördüğün
+// netlik ile kazanacağın puan her an birbirini tutar:
+//   bulanıklık = BLUR_START × kalan      (%50 → %0; %100 = afiş hiç seçilmez, bkz. BlurPoster'daki yarıçap)
+//   puan       = MIN + (MAX − MIN) × kalan (100 → 10; süre dolunca 0 ve yanlış)
+// Sayaç afiş YÜKLENİNCE başlar (hook: arm) — yavaş ağ oyuncunun puanını yemesin.
+
+export const BLUR_ROUND_MS = 10000;
+export const BLUR_START = 0.5;
+export const BLUR_MAX_POINTS = 100;
+export const BLUR_MIN_POINTS = 10;
+/** Bu kadar doğrudan sonra yanlış şıklar benzer yapımlardan (ortak tür ya da ±10 yıl) seçilir. */
+export const BLUR_SIMILAR_AT = 5;
+
+/** Geçen süre → kalan oran (1 → 0). */
+export function blurRemaining(elapsedMs, durationMs = BLUR_ROUND_MS) {
+  const elapsed = Math.max(0, Number(elapsedMs) || 0);
+  return Math.max(0, 1 - elapsed / durationMs);
+}
+
+/** Geçen süre → bulanıklık oranı (BLUR_START → 0). */
+export const blurAmount = (elapsedMs, durationMs = BLUR_ROUND_MS) => BLUR_START * blurRemaining(elapsedMs, durationMs);
+
+/** Geçen süre → doğru cevabın puanı (MAX → MIN); süre dolduysa 0. */
+export function blurPoints(elapsedMs, durationMs = BLUR_ROUND_MS) {
+  const remaining = blurRemaining(elapsedMs, durationMs);
+  if (remaining <= 0) return 0;
+  return Math.round(BLUR_MIN_POINTS + (BLUR_MAX_POINTS - BLUR_MIN_POINTS) * remaining);
+}
+
+const titleKeyOf = (item) => String(item?.title || "").trim().toLocaleLowerCase();
+
+function blurQuestion({ pool, streak, recent, rng, maxYear }) {
+  const usable = (Array.isArray(pool) ? pool : []).filter((item) => isUsable(item, maxYear) && titleKeyOf(item));
+  const base = freshOf(usable, recent, 1, maxYear);
+  if (base.length === 0) return null;
+  const item = pickOne(base, rng);
+  // Aynı adlı iki şık (yeniden çevrim, aynı adlı dizi) cevabı belirsiz yapar: başlıklar tekil.
+  const taken = new Set([titleKeyOf(item)]);
+  const others = usable.filter((other) => other !== item && !taken.has(titleKeyOf(other)));
+  // Film sorusunda film, dizi sorusunda dizi şıkları ("dizi olan tek şık" ipucu vermesin); yetmezse karışık.
+  const sameKind = others.filter((other) => (other.type === "tv") === (item.type === "tv"));
+  const kindPool = sameKind.length >= 3 ? sameKind : others;
+  const own = new Set(canonGenresOf(item));
+  const year = yearOf(item);
+  const similar = kindPool.filter(
+    (other) => canonGenresOf(other).some((g) => own.has(g)) || Math.abs(yearOf(other) - year) <= 10,
+  );
+  const preferred = streak >= BLUR_SIMILAR_AT ? shuffleWith(similar, rng) : [];
+  const ordered = [...preferred, ...shuffleWith(kindPool.filter((other) => !preferred.includes(other)), rng)];
+  const distractors = [];
+  for (const other of ordered) {
+    const key = titleKeyOf(other);
+    if (taken.has(key)) continue;
+    taken.add(key);
+    distractors.push(other);
+    if (distractors.length === 3) break;
+  }
+  if (distractors.length < 3) return null;
+  const options = shuffleWith([item, ...distractors], rng).map((option) => ({ key: keyOfItem(option), title: option.title }));
+  return {
+    gameId: "blur",
+    layout: "blur",
+    items: [item],
+    showTitle: false,
+    options,
+    correctKey: keyOfItem(item),
+    facts: { year },
+  };
+}
+
+const BUILDERS = { popular: popularQuestion, decade: decadeQuestion, kind: kindQuestion, genre: genreQuestion, blur: blurQuestion };
 
 /**
  * Bir sonraki soru. Havuz o oyun için yetersizse null (çağıran hata durumuna geçer).

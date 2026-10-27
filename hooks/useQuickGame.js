@@ -1,19 +1,27 @@
 // hooks/useQuickGame.js
 //
-// Hızlı oyunların (popular | decade | kind | genre) ortak durum makinesi. Kurallar utils/quickGames.js'te
+// Hızlı oyunların (popular | decade | kind | genre | blur) ortak durum makinesi. Kurallar utils/quickGames.js'te
 // (saf, testli); burada yalnız havuzun çekilmesi, can/skor akışı, gösterim süreleri ve cihaz-yerel kayıt.
 // "Önce hangisi?" (hooks/useOlderGame.js) aynı iskeletin ilk örneğidir ve kendi anahtarında kalır.
 //
 // AŞAMALAR: "loading" → "playing" (soru ekranda) → "revealed" (doğru cevap gösterildi, kısa bekleme)
 // → "playing" … → "over" (üç can bitti) | "error" (havuz kurulamadı / soru üretilemedi).
+//
+// ZAMANLI OYUN (Bulanık Afiş, QUICK_GAME_META.timed): soru gelince saat HENÜZ işlemez; ekran afiş yüklenince
+// `arm()` çağırır (yüklenmezse BLUR_ARM_FALLBACK_MS sonra kendiliğinden). Saat tek kaynaktır: puan cevap anındaki
+// `Date.now() − roundStartedAt`ten hesaplanır, ekrandaki bulanıklık/çubuk yalnız görseldir. Süre dolunca soru
+// yanlış sayılır (can gider). Skor = puan toplamı; doğru sayısı ayrıca kaydedilir (recordOlderRun `correct`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keys, get, set, remove, useStored } from "../services/storage";
 import { ANALYTICS_EVENTS, trackEvent } from "../services/analytics";
 import { MIN_USABLE_POOL, loadQuickPool } from "../services/quickGamePool";
 import {
+  BLUR_ROUND_MS,
   QUICK_LIVES,
+  blurPoints,
   buildQuickQuestion,
+  isTimedQuickGame,
   isQuickGame,
   judgeQuickAnswer,
   pushQuickRecent,
@@ -23,6 +31,10 @@ import {
 } from "../utils/quickGames";
 
 export const QUICK_REVEAL_MS = 1500;
+/** Afiş bu sürede yüklenmezse saat yine başlar (yavaş ağda soru sonsuza dek beklemesin). */
+export const BLUR_ARM_FALLBACK_MS = 4000;
+/** Süre dolduğunda `chosenKey` (hiçbir şık bu anahtarı taşımaz). */
+export const QUICK_TIMEOUT_KEY = "__timeout__";
 
 function writeStats(uid, gameId, run) {
   const options = { uid };
@@ -46,11 +58,15 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
   const [score, setScore] = useState(0);
   const [reveal, setReveal] = useState(null); // { chosenKey, correct, correctKey }
   const [summary, setSummary] = useState(null); // { newBest, previousBest }
+  const [roundStartedAt, setRoundStartedAt] = useState(null); // zamanlı oyunda saat başladıysa ms
+  const timed = isTimedQuickGame(gameId);
 
   const poolRef = useRef([]);
   const recentRef = useRef(new Set());
-  const runRef = useRef({ score: 0, answered: 0, lives: QUICK_LIVES });
+  const runRef = useRef({ score: 0, correct: 0, answered: 0, lives: QUICK_LIVES });
   const timerRef = useRef(null);
+  const roundRef = useRef({ startedAt: null, timer: null }); // zamanlı oyunun saati
+  const chooseRef = useRef(null);
   const alive = useRef(true);
   const generation = useRef(0);
 
@@ -58,29 +74,53 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
   };
+  const clearRound = () => {
+    if (roundRef.current.timer) clearTimeout(roundRef.current.timer);
+    roundRef.current = { startedAt: null, timer: null };
+  };
   useEffect(() => {
     alive.current = true; // StrictMode'un sahte sökümünden sonra yeniden canlı
-    return () => { alive.current = false; clearTimer(); };
+    return () => { alive.current = false; clearTimer(); clearRound(); };
   }, []);
+
+  /** Zamanlı oyunda saati başlatır (afiş yüklendi). İkinci çağrı / zamansız oyun etkisiz. */
+  const arm = useCallback(() => {
+    if (!timed || !alive.current || roundRef.current.startedAt !== null) return;
+    if (roundRef.current.timer) clearTimeout(roundRef.current.timer);
+    const startedAt = Date.now();
+    roundRef.current = {
+      startedAt,
+      timer: setTimeout(() => chooseRef.current?.(QUICK_TIMEOUT_KEY), BLUR_ROUND_MS),
+    };
+    setRoundStartedAt(startedAt);
+  }, [timed]);
 
   const nextQuestion = useCallback(
     (streak) => {
       const next = buildQuickQuestion(gameId, { pool: poolRef.current, streak, recent: recentRef.current });
       if (!next) return false;
       recentRef.current = pushQuickRecent(recentRef.current, next);
+      clearRound();
+      setRoundStartedAt(null);
+      if (timed) {
+        // Yedek: afiş yüklenmese de saat başlar (arm ikinci kez çağrılırsa etkisiz).
+        roundRef.current.timer = setTimeout(() => arm(), BLUR_ARM_FALLBACK_MS);
+      }
       setQuestion(next);
       setReveal(null);
       setPhase("playing");
       return true;
     },
-    [gameId],
+    [arm, gameId, timed],
   );
 
   const start = useCallback(async () => {
     const run = generation.current + 1;
     generation.current = run;
     clearTimer();
-    runRef.current = { score: 0, answered: 0, lives: QUICK_LIVES };
+    clearRound();
+    setRoundStartedAt(null);
+    runRef.current = { score: 0, correct: 0, answered: 0, lives: QUICK_LIVES };
     setScore(0);
     setLives(QUICK_LIVES);
     setSummary(null);
@@ -106,9 +146,9 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
   }, [language, gameId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const finish = useCallback(() => {
-    const { score: finalScore, answered } = runRef.current;
+    const { score: finalScore, correct, answered } = runRef.current;
     let result = { newBest: false, previousBest: 0 };
-    if (uid) result = writeStats(uid, gameId, { score: finalScore, answered });
+    if (uid) result = writeStats(uid, gameId, { score: finalScore, correct, answered });
     trackEvent(ANALYTICS_EVENTS.QUICK_GAME_FINISHED, {
       game_id: gameId,
       score: finalScore,
@@ -128,26 +168,38 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
       finish();
       return;
     }
-    if (!nextQuestion(runRef.current.score)) setPhase("error");
+    // Zorluk doğru SAYISIYLA yükselir (zamanlı oyunda skor puandır).
+    if (!nextQuestion(runRef.current.correct)) setPhase("error");
   }, [finish, nextQuestion]);
 
   const choose = useCallback(
     (chosenKey) => {
       if (phase !== "playing" || !question) return;
+      // Zamanlı oyunda saat başlamadan (afiş yüklenmeden) cevap yok.
+      if (timed && roundRef.current.startedAt === null) return;
+      const timedOut = chosenKey === QUICK_TIMEOUT_KEY;
       const verdict = judgeQuickAnswer(question, chosenKey);
+      const elapsed = timed ? Date.now() - roundRef.current.startedAt : 0;
+      const points = timed && verdict.correct ? blurPoints(elapsed) : verdict.correct ? 1 : 0;
+      // Saat dolma anında basılan doğru (puan 0) da süre dolmuş sayılır.
+      const correct = verdict.correct && points > 0;
+      clearRound();
       const run = runRef.current;
       run.answered += 1;
-      if (verdict.correct) run.score += 1;
-      else run.lives -= 1;
+      if (correct) {
+        run.score += points;
+        run.correct += 1;
+      } else run.lives -= 1;
       setScore(run.score);
       setLives(run.lives);
-      setReveal({ chosenKey, ...verdict });
+      setReveal({ chosenKey, ...verdict, correct, points: correct ? points : 0, timedOut: timedOut || (verdict.correct && !correct) });
       setPhase("revealed");
       clearTimer();
       timerRef.current = setTimeout(advance, QUICK_REVEAL_MS);
     },
-    [advance, phase, question],
+    [advance, phase, question, timed],
   );
+  chooseRef.current = choose;
 
-  return { phase, question, lives, score, reveal, summary, stats, choose, advance, restart: start };
+  return { phase, question, lives, score, reveal, summary, stats, choose, advance, restart: start, arm, roundStartedAt };
 }

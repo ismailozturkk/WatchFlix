@@ -126,7 +126,7 @@ export const ANALYTICS_EVENTS = {
   // Koşu BİTTİ (üç can doldu). `score` doğru sayısı, `answered` sorulan, `new_best` rekor mu, `best` kayıtlı rekor.
   // Ortalama skor ve rekor kırma oranı, zorluk eğrisinin (utils/olderGame.gapForStreak) dengesini söyler.
   OLDER_GAME_FINISHED: "older_game_finished",
-  // Hızlı oyun (utils/quickGames.js: popular | decade | kind | genre) BAŞLADI / BİTTİ. `game_id` oyun, `source` = "hub".
+  // Hızlı oyun (utils/quickGames.js: popular | decade | kind | genre | blur) BAŞLADI / BİTTİ. `game_id` oyun, `source` = "hub".
   // Bitişte `score` doğru sayısı, `answered` sorulan, `new_best`, `best`. Oyunlar arası ilgi ve zorluk eğrisinin
   // dengesi (ortalama skor) buradan okunur.
   QUICK_GAME_STARTED: "quick_game_started",

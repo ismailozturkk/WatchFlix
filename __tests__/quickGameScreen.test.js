@@ -2,7 +2,8 @@
 //
 // Hızlı oyunların BAĞLANTISI: durum makinesi (hooks/useQuickGame.js) + ekran (screens/game/QuickGameScreen.js) +
 // Eğlence ızgarası (components/game/QuickGamesGrid.js), GERÇEK depo (bellek-içi MMKV) ve GERÇEK çekirdekle;
-// havuz kaynağı (TMDB) ve görsel parçalar taklit. Dört oyun da aynı senaryodan geçer.
+// havuz kaynağı (TMDB) ve görsel parçalar taklit. Seri-skorlu dört oyun aynı senaryodan geçer; zamanlı Bulanık Afiş
+// (puan = kalan süre) kendi senaryosundan.
 
 import React from "react";
 import { act, create } from "react-test-renderer";
@@ -31,6 +32,9 @@ jest.mock("../components/game/ui", () => {
     SectionHeader: ({ title }) => React.createElement("Text", { testID: "section-title" }, title),
   };
 });
+// Netleşen afiş ve sayaç çubuğu Animated kullanır; burada yalnız props'ları görünür (onReady = afiş yüklendi).
+jest.mock("../components/game/BlurPoster", () => mockHost("BlurPoster"));
+jest.mock("../components/game/GameTimerBar", () => mockHost("TimerBar"));
 jest.mock("../screens/game/GameScreenShell", () => {
   const React = require("react");
   return {
@@ -74,10 +78,11 @@ const { __resetStoreCaches } = require("../services/storage/store");
 const { __resetStores } = require("../services/storage/instances");
 const QuickGameScreen = require("../screens/game/QuickGameScreen").default;
 const QuickGamesGrid = require("../components/game/QuickGamesGrid").default;
-const { QUICK_REVEAL_MS } = require("../hooks/useQuickGame");
+const { BLUR_ARM_FALLBACK_MS, QUICK_REVEAL_MS } = require("../hooks/useQuickGame");
 const { QUICK_COPY, quickOptionLabel } = require("../utils/quickGamesCopy");
 const { OLDER_COPY } = require("../utils/olderGameCopy");
-const { QUICK_GAME_IDS, QUICK_GAME_META, QUICK_GENRES, canonGenresOf, decadeOf } = require("../utils/quickGames");
+const { BLUR_ROUND_MS, QUICK_GAME_IDS, QUICK_GAME_META, QUICK_GENRES, canonGenresOf, decadeOf } = require("../utils/quickGames");
+const STREAK_GAMES = QUICK_GAME_IDS.filter((id) => !QUICK_GAME_META[id].timed);
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 const LANGS = ["tr", "en", "es", "pt", "de"];
@@ -174,7 +179,7 @@ const answer = async (gameId, correct) => {
   await wait(QUICK_REVEAL_MS);
 };
 
-describe.each(QUICK_GAME_IDS)("oyun: %s", (gameId) => {
+describe.each(STREAK_GAMES)("oyun: %s", (gameId) => {
   test("başlık, soru ve (oyuna göre) afiş / şıklar çizilir; havuz üç kaynaktan çekilir", async () => {
     await mount(gameId);
     expect(renderer.root.findByType("Shell").props.title).toBe(quick().games[gameId].title);
@@ -312,26 +317,120 @@ describe("ortak davranış", () => {
   });
 });
 
+describe("Bulanık Afiş (zamanlı)", () => {
+  const blur = () => QUICK_COPY[mockLang].blur;
+  const poster = () => renderer.root.findByType("BlurPoster");
+  const options = () => scales().filter((n) => n.props.accessibilityState && "disabled" in n.props.accessibilityState);
+  // Doğru şık: afişin anahtarı (BlurPoster'ın resetKey'i = correctKey).
+  const rightOption = () => {
+    const key = poster().props.resetKey;
+    const title = Object.values(INFO).find((x) => x.mediaKey === key).title;
+    return options().find((n) => n.props.accessibilityLabel === title);
+  };
+  const wrongOption = () => options().find((n) => n !== rightOption());
+  const ready = () => act(async () => { poster().props.onReady(); });
+  const press = (node) => act(async () => { node.props.onPress(); });
+
+  test("dört başlık şıkkı; afiş yüklenmeden saat işlemez ve cevap alınmaz; etiket başlığı sızdırmaz", async () => {
+    await mount("blur");
+    expect(renderer.root.findByType("Shell").props.title).toBe(quick().games.blur.title);
+    expect(has(quick().games.blur.prompt)).toBe(true);
+    expect(has(blur().scoreLabel)).toBe(true); // skor satırı "Puan"
+    expect(options()).toHaveLength(4);
+    options().forEach((n) => expect(n.props.disabled).toBe(true));
+    expect(poster().props.running).toBe(false);
+    const holder = renderer.root.findAll((n) => n.props.accessible && n.props.accessibilityLabel === blur().posterA11y);
+    expect(holder).toHaveLength(1);
+    await press(rightOption()); // yok sayılır
+    expect(has(common().correct)).toBe(false);
+    await ready();
+    expect(poster().props.running).toBe(true);
+    expect(renderer.root.findByType("TimerBar").props.running).toBe(true);
+    options().forEach((n) => expect(n.props.disabled).toBe(false));
+    expect(has(blur().points(100))).toBe(true);
+  });
+
+  test("erken bilen çok alır: 3 sn'de doğru = 73 puan, canlı puan da iner", async () => {
+    await mount("blur");
+    await ready();
+    await wait(3000);
+    expect(has(blur().points(73))).toBe(true);
+    await press(rightOption());
+    expect(has(common().correct)).toBe(true);
+    expect(has(blur().points(73))).toBe(true);
+    expect(texts()).toContain("73"); // skor
+    expect(poster().props.revealed).toBe(true);
+    expect(renderer.root.findAll((n) => n.props.accessible && n.props.accessibilityLabel === blur().posterA11y)).toHaveLength(0);
+    await wait(QUICK_REVEAL_MS);
+    expect(poster().props.revealed).toBe(false); // yeni soru
+    expect(poster().props.running).toBe(false); // yeni afiş yüklenene dek saat durur
+  });
+
+  test("süre dolarsa can gider ve 'süre doldu' yazar; üç kayıpta oyun biter, kayıt puan + doğru sayısı", async () => {
+    await mount("blur");
+    await ready();
+    await wait(1000);
+    await press(rightOption()); // 91
+    await wait(QUICK_REVEAL_MS);
+    await ready();
+    await wait(BLUR_ROUND_MS);
+    expect(has(blur().timeUp)).toBe(true);
+    const hearts = () => renderer.root.findAllByType("Icon").filter((n) => n.props.name === "heart");
+    expect(hearts()).toHaveLength(2);
+    await wait(QUICK_REVEAL_MS);
+    await ready();
+    await press(wrongOption());
+    await wait(QUICK_REVEAL_MS);
+    await ready();
+    await press(wrongOption());
+    await wait(QUICK_REVEAL_MS);
+    expect(has(common().endTitle.toUpperCase())).toBe(true);
+    expect(has(blur().endScore(91))).toBe(true);
+    expect(stored()).toEqual({ blur: { best: 91, plays: 1, correct: 1, answered: 4 } });
+    expect(mockTrack).toHaveBeenCalledWith("quick_game_finished", { game_id: "blur", score: 91, answered: 4, new_best: true, best: 91 });
+  });
+
+  test("afiş hiç yüklenmezse saat yedek süreden sonra kendiliğinden başlar", async () => {
+    await mount("blur");
+    await wait(BLUR_ARM_FALLBACK_MS - 10);
+    expect(poster().props.running).toBe(false);
+    await wait(20);
+    expect(poster().props.running).toBe(true);
+    await ready(); // geç gelen yükleme saati sıfırlamaz
+    await wait(BLUR_ROUND_MS - 10);
+    expect(has(blur().timeUp)).toBe(true);
+  });
+
+  test("ekrandan çıkınca tur saati sızmaz", async () => {
+    await mount("blur");
+    await ready();
+    act(() => renderer.unmount());
+    renderer = null;
+    expect(() => jest.advanceTimersByTime(BLUR_ROUND_MS * 2)).not.toThrow();
+  });
+});
+
 describe("Eğlence ızgarası", () => {
   const mountGrid = (onOpen = jest.fn()) => { act(() => { renderer = create(<QuickGamesGrid theme={mockTheme} onOpen={onOpen} />); }); return onOpen; };
 
-  test("beş kart (Önce hangisi? + dört oyun) tek yatay rayda, başlık ve 'Yeni'; her kartta önizleme", () => {
+  const TILE_COUNT = 1 + QUICK_GAME_IDS.length;
+  test("altı kart (Önce hangisi? + beş oyun) tek yatay rayda, başlık ve 'Yeni'; her kartta önizleme", () => {
     mountGrid();
     expect(has(quick().gridTitle)).toBe(true);
     const tiles = scales();
-    expect(tiles).toHaveLength(5);
+    expect(tiles).toHaveLength(TILE_COUNT);
     expect(tiles.map((t) => t.props.accessibilityLabel)).toEqual([
       OLDER_COPY.tr.title, ...QUICK_GAME_IDS.map((id) => QUICK_COPY.tr.games[id].title),
     ]);
-    expect(texts().filter((t) => t === OLDER_COPY.tr.cardNew)).toHaveLength(5);
+    expect(texts().filter((t) => t === OLDER_COPY.tr.cardNew)).toHaveLength(TILE_COUNT);
     const [rail] = renderer.root.findAllByType("ScrollView");
     expect(rail.props.horizontal).toBe(true);
-    expect(rail.findAll((n) => n.type === "Scale")).toHaveLength(5);
+    expect(rail.findAll((n) => n.type === "Scale")).toHaveLength(TILE_COUNT);
     // Her kart kendi oyununun önizlemesini taşır (afiş görselleri paketten, ağ yok).
     tiles.forEach((tile) => expect(tile.findAllByType("Image").length).toBeGreaterThan(0));
   });
 
-  test("dokununca kare kimliğiyle açılır: older + dört hızlı oyun", () => {
+  test("dokununca kare kimliğiyle açılır: older + beş hızlı oyun", () => {
     const onOpen = mountGrid();
     scales().forEach((tile) => act(() => tile.props.onPress()));
     expect(onOpen.mock.calls.map(([id]) => id)).toEqual(["older", ...QUICK_GAME_IDS]);
@@ -344,7 +443,7 @@ describe("Eğlence ızgarası", () => {
     expect(texts().filter((t) => t === OLDER_COPY.tr.cardBest(12))).toHaveLength(1);
     expect(has(OLDER_COPY.tr.cardBest(7))).toBe(true);
     expect(has(OLDER_COPY.tr.cardBest(4))).toBe(true);
-    expect(texts().filter((t) => t === OLDER_COPY.tr.cardNew)).toHaveLength(2); // popular + decade
+    expect(texts().filter((t) => t === OLDER_COPY.tr.cardNew)).toHaveLength(3); // popular + decade + blur
   });
 
   test.each(LANGS)("dil %s: başlıklar o dilde", (lang) => {

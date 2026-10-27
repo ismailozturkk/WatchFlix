@@ -557,7 +557,7 @@ const dataKeys = {
     keepOnLogout: true,
     validate: plainObject,
   },
-  // Hızlı oyunların kayıtları (utils/quickGames.js): { popular|decade|kind|genre: { best, plays, correct, answered } }.
+  // Hızlı oyunların kayıtları (utils/quickGames.js): { popular|decade|kind|genre|blur: { best, plays, correct, answered } } (blur: best = puan).
   // "Önce hangisi?" kendi anahtarında (olderGame) kaldı. Yalnız bu cihazda; çıkışta SİLİNMEZ (olderGame ile aynı karar).
   quickGames: {
     key: "quick_games:",

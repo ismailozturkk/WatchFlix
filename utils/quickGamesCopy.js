@@ -23,6 +23,14 @@ export const QUICK_COPY = {
       decade: { title: "Hangi on yıl?", hint: "Afişe bak, çıktığı on yılı bil", prompt: "Bu yapım hangi on yılda çıktı?" },
       kind: { title: "Film mi, dizi mi?", hint: "Afişe bak: film mi dizi mi?", prompt: "Bu bir film mi, dizi mi?" },
       genre: { title: "Hangi tür?", hint: "Afişin türünü tahmin et", prompt: "Bunlardan hangisi bu yapımın türü?" },
+      blur: { title: "Bulanık Afiş", hint: "Afiş netleşmeden bil, puanı kap", prompt: "Bu hangi yapım?" },
+    },
+    blur: {
+      scoreLabel: "Puan",
+      points: (n) => `+${n} puan`,
+      endScore: (n) => `${n} puan`,
+      timeUp: "Süre doldu",
+      posterA11y: "Bulanık afiş",
     },
     kind: { movie: "Film", tv: "Dizi" },
     decadeLabel: (d) => `${d}'lar`,
@@ -42,6 +50,14 @@ export const QUICK_COPY = {
       decade: { title: "Which decade?", hint: "Look at the poster and name its decade", prompt: "Which decade did this come out?" },
       kind: { title: "Movie or series?", hint: "Look at the poster: movie or series?", prompt: "Is this a movie or a series?" },
       genre: { title: "Which genre?", hint: "Guess the genre from the poster", prompt: "Which of these is one of its genres?" },
+      blur: { title: "Blurry Poster", hint: "Name it before it sharpens, grab the points", prompt: "What title is this?" },
+    },
+    blur: {
+      scoreLabel: "Points",
+      points: (n) => `+${n} pts`,
+      endScore: (n) => (n === 1 ? "1 point" : `${n} points`),
+      timeUp: "Time's up",
+      posterA11y: "Blurred poster",
     },
     kind: { movie: "Movie", tv: "Series" },
     decadeLabel: (d) => `${d}s`,
@@ -61,6 +77,14 @@ export const QUICK_COPY = {
       decade: { title: "¿Qué década?", hint: "Mira el cartel y adivina la década", prompt: "¿En qué década se estrenó?" },
       kind: { title: "¿Película o serie?", hint: "Mira el cartel: ¿película o serie?", prompt: "¿Es una película o una serie?" },
       genre: { title: "¿Qué género?", hint: "Adivina el género por el cartel", prompt: "¿Cuál de estos es uno de sus géneros?" },
+      blur: { title: "Cartel borroso", hint: "Adivínalo antes de que se aclare", prompt: "¿Qué título es este?" },
+    },
+    blur: {
+      scoreLabel: "Puntos",
+      points: (n) => `+${n} pts`,
+      endScore: (n) => (n === 1 ? "1 punto" : `${n} puntos`),
+      timeUp: "Se acabó el tiempo",
+      posterA11y: "Cartel borroso",
     },
     kind: { movie: "Película", tv: "Serie" },
     decadeLabel: (d) => `${d}s`,
@@ -80,6 +104,14 @@ export const QUICK_COPY = {
       decade: { title: "Qual década?", hint: "Veja o pôster e adivinhe a década", prompt: "Em que década estreou?" },
       kind: { title: "Filme ou série?", hint: "Veja o pôster: filme ou série?", prompt: "É um filme ou uma série?" },
       genre: { title: "Qual gênero?", hint: "Adivinhe o gênero pelo pôster", prompt: "Qual destes é um dos gêneros dele?" },
+      blur: { title: "Pôster borrado", hint: "Acerte antes que fique nítido", prompt: "Que título é este?" },
+    },
+    blur: {
+      scoreLabel: "Pontos",
+      points: (n) => `+${n} pts`,
+      endScore: (n) => (n === 1 ? "1 ponto" : `${n} pontos`),
+      timeUp: "Tempo esgotado",
+      posterA11y: "Pôster borrado",
     },
     kind: { movie: "Filme", tv: "Série" },
     decadeLabel: (d) => `Anos ${d}`,
@@ -99,6 +131,14 @@ export const QUICK_COPY = {
       decade: { title: "Welches Jahrzehnt?", hint: "Schau aufs Poster und nenne das Jahrzehnt", prompt: "In welchem Jahrzehnt erschien das?" },
       kind: { title: "Film oder Serie?", hint: "Schau aufs Poster: Film oder Serie?", prompt: "Ist das ein Film oder eine Serie?" },
       genre: { title: "Welches Genre?", hint: "Errate das Genre anhand des Posters", prompt: "Welches davon ist eines seiner Genres?" },
+      blur: { title: "Unscharfes Poster", hint: "Errate es, bevor es scharf wird", prompt: "Welcher Titel ist das?" },
+    },
+    blur: {
+      scoreLabel: "Punkte",
+      points: (n) => `+${n} Pkt.`,
+      endScore: (n) => (n === 1 ? "1 Punkt" : `${n} Punkte`),
+      timeUp: "Zeit abgelaufen",
+      posterA11y: "Unscharfes Poster",
     },
     kind: { movie: "Film", tv: "Serie" },
     decadeLabel: (d) => `${d}er`,
@@ -116,7 +156,10 @@ export const QUICK_COPY = {
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı).
 export const getQuickCopy = (language) => QUICK_COPY[copyLanguage(language, Object.keys(QUICK_COPY))];
 
-/** Bir şıkkın metni (oyuna göre): film/dizi etiketi, on yıl biçimi, tür adı. Pair oyunlarda şık afiştir (metin yok). */
+/**
+ * Bir şıkkın metni (oyuna göre): film/dizi etiketi, on yıl biçimi, tür adı. Pair oyunlarda şık afiştir (metin yok);
+ * Bulanık Afiş'te şık yapımın kendi başlığıdır (`option.title`, çeviri yok).
+ */
 export function quickOptionLabel(copy, gameId, key) {
   if (gameId === "kind") return copy.kind[key] || key;
   if (gameId === "decade") return copy.decadeLabel(Number(key));

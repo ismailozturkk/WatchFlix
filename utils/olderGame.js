@@ -132,16 +132,18 @@ export function normalizeOlderStats(raw) {
 
 /**
  * Biten bir koşuyu kayda işler. `score` = doğru sayısı, `answered` = cevaplanan soru.
+ * `correct` verilirse skor doğru sayısından AYRIDIR (Bulanık Afiş: skor = puan toplamı); verilmezse skor = doğru.
  * @returns {{ stats: object, newBest: boolean, previousBest: number }}
  */
-export function recordOlderRun(rawStats, { score, answered }) {
+export function recordOlderRun(rawStats, { score, answered, correct }) {
   const stats = normalizeOlderStats(rawStats);
   const s = clampInt(score, 100000);
-  const a = Math.max(s, clampInt(answered));
+  const c = correct === undefined ? s : clampInt(correct);
+  const a = Math.max(c, clampInt(answered));
   const next = {
     best: Math.max(stats.best, s),
     plays: stats.plays + 1,
-    correct: stats.correct + s,
+    correct: stats.correct + c,
     answered: stats.answered + a,
   };
   return { stats: next, newBest: s > stats.best && s > 0, previousBest: stats.best };
