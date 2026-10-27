@@ -62,10 +62,15 @@ import { usePremium } from "@context/PremiumContext";
 import useReduceMotion from "@hooks/useReduceMotion";
 import { alpha } from "@theme/colors";
 import { readableOn } from "@utils/colorUtils";
-import { createCloseGate, registerUpsellHost } from "@services/premiumUpsellHost";
+import { createCloseGate, mergeUpsellRequests, registerUpsellHost } from "@services/premiumUpsellHost";
 import { openPremiumScreen } from "@services/premiumUpsell";
 import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
-import { buildPriceHint, buildUpsellContent, planTierTypography } from "@utils/premiumUpsellContent";
+import {
+  buildPriceHint,
+  buildUpsellContent,
+  planTierTypography,
+  upsellKeyFor,
+} from "@utils/premiumUpsellContent";
 import BottomSheetModal from "../common/BottomSheetModal";
 import GlassPressable from "../common/GlassPressable";
 
@@ -730,7 +735,39 @@ const TierCard = memo(function TierCard({ tier, theme, tr, es, pt, de, color, am
         {tier.name}
       </Text>
       <View style={styles.tierBody}>
-        {figure ? (
+        {figure && tier.lines ? (
+          // Paket (CineSwipe kart + oda): üyelerin değerleri alt alta, ince çizgiyle ayrık.
+          tier.lines.map((line, index) => (
+            <View
+              key={line.featureId}
+              style={[styles.tierLine, index > 0 && [styles.tierLineDivided, { borderTopColor: theme.border }]]}
+            >
+              <Text
+                fontRole="heading"
+                allowFontScaling={false}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.6}
+                style={[
+                  styles.tierFigure,
+                  { fontSize: typo.text, lineHeight: Math.round(typo.text * 1.3), color: theme.text.primary },
+                ]}
+              >
+                {line.main}
+              </Text>
+              {line.sub ? (
+                <Text
+                  fontRole="body"
+                  allowFontScaling={false}
+                  numberOfLines={2}
+                  style={[styles.tierSub, { fontSize: typo.sub, lineHeight: Math.round(typo.sub * 1.3), color: theme.text.muted }]}
+                >
+                  {line.sub}
+                </Text>
+              ) : null}
+            </View>
+          ))
+        ) : figure ? (
           <>
             <Text
               fontRole="heading"
@@ -1204,6 +1241,7 @@ export function PremiumUpsellHost() {
   const [request, setRequest] = useState(null);
 
   const pendingRef = useRef([]);
+  const requestRef = useRef(null);
   const visibleRef = useRef(false);
   const closingRef = useRef(false);
   const closeGateRef = useRef(null);
@@ -1211,6 +1249,7 @@ export function PremiumUpsellHost() {
   const closeGate = closeGateRef.current;
 
   const showNow = useCallback((next) => {
+    requestRef.current = next;
     setRequest(next);
     setVisible(true);
     visibleRef.current = true;
@@ -1224,8 +1263,23 @@ export function PremiumUpsellHost() {
 
   useEffect(() => {
     const unregister = registerUpsellHost((next) => {
-      if (visibleRef.current) pendingRef.current.push(next);
-      else showNow(next);
+      if (!visibleRef.current) {
+        showNow(next);
+        return;
+      }
+      // Aynı sayfa zaten açık ya da sırada (ör. Free'de CineSwipe: ekran kapısı +
+      // oda kapısı aynı anda): ikinci sayfa açılmaz, callback'leri birinciye katılır.
+      const key = upsellKeyFor(next.featureId, next.plan);
+      const shown = requestRef.current;
+      if (!closingRef.current && shown && upsellKeyFor(shown.featureId, shown.plan) === key) {
+        const merged = mergeUpsellRequests(shown, next);
+        requestRef.current = merged;
+        setRequest(merged);
+        return;
+      }
+      const queued = pendingRef.current.findIndex((item) => upsellKeyFor(item.featureId, item.plan) === key);
+      if (queued >= 0) pendingRef.current[queued] = mergeUpsellRequests(pendingRef.current[queued], next);
+      else pendingRef.current.push(next);
     });
     return () => {
       unregister();
@@ -1517,6 +1571,8 @@ const styles = StyleSheet.create({
   tierBody: { flexGrow: 1, alignSelf: "stretch", alignItems: "center", justifyContent: "center", minHeight: 44 },
   tierFigure: { alignSelf: "stretch", textAlign: "center", fontWeight: "900", letterSpacing: -0.3 },
   tierSub: { textAlign: "center", fontWeight: "700" },
+  tierLine: { alignSelf: "stretch", alignItems: "center" },
+  tierLineDivided: { marginTop: 7, paddingTop: 7, borderTopWidth: StyleSheet.hairlineWidth, marginHorizontal: 8 },
   tierPhrase: { alignSelf: "stretch", textAlign: "center", fontWeight: "800" },
   tierFlag: {
     position: "absolute",

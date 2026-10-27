@@ -36,6 +36,7 @@ import {
   normalizePlan,
   planRank,
   unitLabel,
+  upsellBundleFor,
 } from "./premiumFeatures";
 
 const { ACCESS, COUNT, DAILY, AI_QUOTA } = FEATURE_KIND;
@@ -206,7 +207,10 @@ export function planTierTypography(tiers, columnWidth) {
   const longestName = Math.max(0, ...tiers.map((tier) => tier.name.length));
   const name = fitTierFontSize(longestName, inner, TIER_EM.name, TIER_TYPE.name);
   if (mode === "figure") {
-    const longest = Math.max(0, ...tiers.map((tier) => tier.main.length));
+    const longest = Math.max(
+      0,
+      ...tiers.flatMap((tier) => (tier.lines || [tier]).map((line) => line.main.length)),
+    );
     return {
       mode,
       name,
@@ -227,16 +231,47 @@ export function planTierTypography(tiers, columnWidth) {
   };
 }
 
-/** Planlar arası bu özellikteki fark: mevcut plandan yukarıya doğru sütunlar. */
-function buildTiers(featureId, current, targetPlan, language) {
-  return PLANS.filter((plan) => planRank(plan) >= planRank(current)).map((plan) => ({
-    plan,
-    name: getPremiumPlanDisplayName(plan),
-    value: formatFeatureValue(featureId, plan, language),
-    ...splitTierValue(featureId, plan, language),
-    isCurrent: plan === current,
-    isTarget: plan === targetPlan,
-  }));
+/**
+ * Planlar arası bu özellikteki fark: mevcut plandan yukarıya doğru sütunlar.
+ * Paket sayfasında (`members` birden çoksa) her sütun üyelerin değerlerini
+ * `lines` olarak alt alta taşır; `value`/`main`/`sub` önder üyeninkidir.
+ */
+function buildTiers(featureId, current, targetPlan, language, members = [featureId]) {
+  return PLANS.filter((plan) => planRank(plan) >= planRank(current)).map((plan) => {
+    const lines =
+      members.length > 1
+        ? members.map((id) => {
+            const split = splitTierValue(id, plan, language);
+            return {
+              featureId: id,
+              value: formatFeatureValue(id, plan, language),
+              ...split,
+              // Kapalı "—" birimsizdir; pakette satırlar sütunlar arasında hizalı ve
+              // okunur kalsın diye birimi hedef plandan alır ("— / kart/gün").
+              sub: split.sub ?? (targetPlan ? splitTierValue(id, targetPlan, language).sub : null),
+            };
+          })
+        : null;
+    return {
+      plan,
+      name: getPremiumPlanDisplayName(plan),
+      value: lines ? lines.map((line) => line.value).join(" · ") : formatFeatureValue(featureId, plan, language),
+      ...splitTierValue(featureId, plan, language),
+      // Paket satırı cümle değil figürdür: her üyenin değeri kendi "N birim"i.
+      ...(lines ? { lines, figure: lines.every((line) => line.figure) } : null),
+      isCurrent: plan === current,
+      isTarget: plan === targetPlan,
+    };
+  });
+}
+
+/**
+ * Host'un birleştirme anahtarı: paket geçerliyse paketin kimliği (iki üyenin
+ * isteği aynı sayfadır), değilse özelliğin kendisi.
+ */
+export function upsellKeyFor(featureId, plan) {
+  const bundle = upsellBundleFor(featureId, normalizePlan(plan));
+  return bundle ? `bundle:${bundle.id}` : featureId;
 }
 
 /**
@@ -312,6 +347,10 @@ export function buildUpsellContent(featureId, plan, language = "en", { used, pre
   const pt = normalizeAppLanguage(lang) === "pt";
   const de = normalizeAppLanguage(lang) === "de";
   const current = normalizePlan(plan);
+  // Paket (Free'de CineSwipe kart + oda): hangi üyeden gelinirse gelinsin aynı
+  // sayfa — önder üyenin rengi/simgesi, paketin başlığı/mesajı, sütunlarda tüm üyeler.
+  const bundle = upsellBundleFor(featureId, current);
+  if (bundle) featureId = bundle.features[0];
   const definition = getFeature(featureId);
 
   if (!definition) {
@@ -340,7 +379,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used, pre
 
   const targetPlan = nextPlanFor(featureId, current);
   const canUpgrade = Boolean(targetPlan);
-  const tiers = canUpgrade ? buildTiers(featureId, current, targetPlan, lang) : [];
+  const tiers = canUpgrade ? buildTiers(featureId, current, targetPlan, lang, bundle?.features) : [];
   const legacy = buildLimitCopy(featureId, current, lang);
   // "Kilitli": erişim özelliği ya da bu planda limiti 0 olan sayılı özellik
   // (Free'de oyun). İkisi de sayaç/yenilenme değil, "hangi plan açar" anlatır.
@@ -355,12 +394,15 @@ export function buildUpsellContent(featureId, plan, language = "en", { used, pre
   const locked = isAccess || windowed;
   const choicePreview = buildChoicePreview(preview, lang);
   const title =
+    (bundle ? pick(bundle.title, lang) : "") ||
     (lockedCountable ? pick(definition.upsell?.lockedTitle, lang) : "") ||
     (choicePreview ? pick(definition.upsell?.titleByPreview?.[choicePreview.kind], lang) : "") ||
     (targetPlan ? pick(definition.upsell?.titleByTarget?.[targetPlan], lang) : "") ||
     pick(definition.upsell?.title, lang) ||
     legacy.title;
-  const message = isAccess
+  const message = bundle
+    ? pick(bundle.message, lang)
+    : isAccess
     ? pick(definition.upsell?.message, lang) || legacy.message
     : describeCurrentLimit(featureId, current, lang);
 

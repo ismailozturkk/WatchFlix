@@ -5,6 +5,7 @@
 import {
   __resetUpsellHostForTests,
   createCloseGate,
+  mergeUpsellRequests,
   presentUpsell,
   registerUpsellHost,
 } from "../services/premiumUpsellHost";
@@ -89,6 +90,28 @@ describe("presentUpsell", () => {
     received.onDismiss();
     expect(onUpgrade).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Aynı sayfayı isteyen iki kapı (Free'de CineSwipe ekran kapısı + oda kapısı)
+// tek sayfa açar; ikincinin callback'leri kaybolmaz.
+describe("mergeUpsellRequests", () => {
+  test("görünen alan birincinin, callback'ler ikisinin de (sırayla)", () => {
+    const calls = [];
+    const base = request("cineswipe_swipes", { used: 3, onDismiss: () => calls.push("leave") });
+    const extra = request("cineswipe_rooms", { onDismiss: () => calls.push("rooms") });
+    const merged = mergeUpsellRequests(base, extra);
+    expect(merged.featureId).toBe("cineswipe_swipes");
+    expect(merged.used).toBe(3);
+    merged.onDismiss();
+    expect(calls).toEqual(["leave", "rooms"]);
+  });
+
+  test("tek tarafta olan callback aynen kalır, hiç yoksa undefined", () => {
+    const onUpgrade = jest.fn();
+    const merged = mergeUpsellRequests(request("a"), request("b", { onUpgrade }));
+    expect(merged.onUpgrade).toBe(onUpgrade);
+    expect(merged.onDismiss).toBeUndefined();
   });
 });
 

@@ -941,6 +941,41 @@ export const PREMIUM_FEATURES = Object.freeze({
 
 export const FEATURE_IDS = Object.freeze(Object.keys(PREMIUM_FEATURES));
 
+/**
+ * Yükseltme PAKETLERİ: tek bir yüzeyin ardındaki, aynı planda birlikte açılan
+ * kapılar. Planda hepsi KAPALIYKEN (Free'de CineSwipe: kart + oda) yükseltme
+ * sayfası tek olur — başlık/mesaj paketin, plan kartlarında her üyenin değeri alt
+ * alta. Aynı dokunuşta iki kapı birden sayfa isterse (ekran kapısı + oda kapısı)
+ * host ikinciyi birleştirir; kullanıcı arka arkaya iki sayfa görmez. Üyelerden biri
+ * açıksa (Premium'da günlük hak bitti) her kapı kendi sayfasını açar.
+ *
+ * İlk üye "önder"dir: renk, simge ve hedef plan ondan gelir.
+ */
+export const UPSELL_BUNDLES = Object.freeze({
+  cineswipe: Object.freeze({
+    id: "cineswipe",
+    features: Object.freeze(["cineswipe_swipes", "cineswipe_rooms"]),
+    title: { tr: "CineSwipe Premium'da", en: "CineSwipe is a Premium perk", es: "CineSwipe es una ventaja Premium", pt: "O CineSwipe é um benefício Premium", de: "CineSwipe ist ein Premium-Vorteil" },
+    message: {
+      tr: "Kartları tek başına kaydır ya da arkadaşınla ortak oda kur; eşleşin ve bu akşamki filmi birlikte seçin.",
+      en: "Swipe cards on your own or host a shared room with a friend; match up and pick tonight's movie together.",
+      es: "Desliza tarjetas tú solo o crea una sala compartida con un amigo; haced match y elegid juntos la película de esta noche.",
+      pt: "Deslize cards sozinho ou crie uma sala compartilhada com um amigo; deem match e escolham juntos o filme da noite.",
+      de: "Wische allein durch Karten oder hoste einen gemeinsamen Raum mit einem Freund; matcht und wählt gemeinsam den Film für heute Abend.",
+    },
+  }),
+});
+
+/**
+ * Bu plandaki yükseltme paketi: özellik bir paketin üyesiyse ve paketin TÜM
+ * üyeleri bu planda kapalıysa paket, aksi halde null.
+ */
+export function upsellBundleFor(featureId, plan) {
+  const bundle = Object.values(UPSELL_BUNDLES).find((entry) => entry.features.includes(featureId));
+  if (!bundle) return null;
+  return bundle.features.every((id) => isLockedFor(id, plan)) ? bundle : null;
+}
+
 // Bilinmeyen dil İngilizce (utils/appLanguages kuralı); `es` kolu olmayan girdi İngilizceye düşer.
 const pick = (copy, language) =>
   copy?.[copyLanguage(language, ["tr", "en", "es", "pt", "de"])] ?? copy?.en ?? copy?.tr ?? "";

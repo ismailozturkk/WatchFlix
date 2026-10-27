@@ -42,6 +42,30 @@ export function registerUpsellHost(fn) {
 }
 
 /**
+ * Aynı sayfayı isteyen ikinci isteği birincisine katar (bkz. upsellKeyFor):
+ * görünen alan birincinin, callback'ler ikisinin de — sırayla çalışır. Böylece
+ * ekran kapısının "geri dön"ü kaybolmaz, ama kullanıcı iki sayfa görmez.
+ *
+ * @param {UpsellRequest} base
+ * @param {UpsellRequest} extra
+ * @returns {UpsellRequest}
+ */
+export function mergeUpsellRequests(base, extra) {
+  const chain = (first, second) =>
+    first && second
+      ? () => {
+          first();
+          second();
+        }
+      : first || second;
+  return {
+    ...base,
+    onUpgrade: chain(base.onUpgrade, extra.onUpgrade),
+    onDismiss: chain(base.onDismiss, extra.onDismiss),
+  };
+}
+
+/**
  * "Önce pencere kalksın, SONRA devam et" kapısı. iOS kapanmakta olan bir Modal'ın
  * üstüne ikincisini sunamaz (ekran kilitlenmiş gibi kalır); bu yüzden sayfa
  * kapanırken çağıranın callback'i ve sıradaki istek, pencere gerçekten kalktığı

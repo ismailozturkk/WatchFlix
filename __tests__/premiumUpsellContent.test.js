@@ -10,8 +10,10 @@ import {
   FEATURE_KIND,
   FONT_CATALOG_SIZE,
   PREMIUM_FEATURES,
+  UPSELL_BUNDLES,
   describeCurrentLimit,
   formatFeatureValue,
+  upsellBundleFor,
 } from "../utils/premiumFeatures";
 import {
   MAX_PERKS,
@@ -24,6 +26,7 @@ import {
   pickPerks,
   planTierTypography,
   splitTierValue,
+  upsellKeyFor,
 } from "../utils/premiumUpsellContent";
 
 const { FREE, PREMIUM, UNLIMITED: MAX } = PREMIUM_PLAN;
@@ -243,8 +246,11 @@ describe("Free'de kapalı sayılı özellik (oyun, CineSwipe)", () => {
     expect(c.canUpgrade).toBe(true);
     expect(c.targetPlan).toBe(PREMIUM);
     // Kapalı durumun kendi başlığı ve mesajı var; "bugünkü hakkın bitti" değil.
+    // CineSwipe'ın iki kapısı Free'de TEK paket sayfasıdır (aşağıda).
     expect(c.title).not.toMatch(/hakkın bitti/);
-    expect(c.message).toBe(PREMIUM_FEATURES[id].upsell.message.tr);
+    expect(c.message).toBe(
+      id === "games" ? PREMIUM_FEATURES[id].upsell.message.tr : UPSELL_BUNDLES.cineswipe.message.tr,
+    );
   });
 
   test("aynı özellik Premium'da günlük hak olarak konuşur", () => {
@@ -264,6 +270,58 @@ describe("Free'de kapalı sayılı özellik (oyun, CineSwipe)", () => {
     expect(describeCurrentLimit("games", PREMIUM, "tr")).toBe(
       "Premium planında günde 20 oyun oynayabilirsin.",
     );
+  });
+});
+
+describe("paket sayfası: Free'de CineSwipe kart + oda tek sayfa", () => {
+  test("iki kapı da AYNI içeriği üretir (hangi düğmeden gelinirse gelinsin)", () => {
+    const swipes = buildUpsellContent("cineswipe_swipes", FREE, "tr");
+    const rooms = buildUpsellContent("cineswipe_rooms", FREE, "tr");
+    expect(rooms).toEqual(swipes);
+    expect(swipes.title).toBe("CineSwipe Premium'da");
+    expect(swipes.featureId).toBe("cineswipe_swipes");
+  });
+
+  test("plan kartları kart ve oda değerlerini alt alta taşır", () => {
+    const c = buildUpsellContent("cineswipe_rooms", FREE, "tr");
+    const premium = c.tiers.find((tier) => tier.plan === PREMIUM);
+    expect(premium.lines.map((line) => line.featureId)).toEqual(["cineswipe_swipes", "cineswipe_rooms"]);
+    expect(premium.lines.map((line) => [line.main, line.sub])).toEqual([
+      ["300", "kart/gün"],
+      ["10", "oda/gün"],
+    ]);
+    expect(premium.value).toBe("300 kart/gün · 10 oda/gün");
+    // Free sütunu "—" ama birim satırı hizalı kalır.
+    expect(c.tiers[0].lines.map((line) => [line.main, line.sub])).toEqual([
+      ["—", "kart/gün"],
+      ["—", "oda/gün"],
+    ]);
+    expect(c.tierMode).toBe("figure");
+  });
+
+  test("Premium'da hak bitince paket YOK: her kapı kendi sayfası", () => {
+    const swipes = buildUpsellContent("cineswipe_swipes", PREMIUM, "tr", { used: 300 });
+    const rooms = buildUpsellContent("cineswipe_rooms", PREMIUM, "tr", { used: 10 });
+    expect(swipes.title).toBe("Bugünkü kaydırma hakkın bitti");
+    expect(rooms.title).toBe("Bugünkü oda hakkın bitti");
+    expect(swipes.tiers[0].lines).toBeUndefined();
+    expect(upsellKeyFor("cineswipe_swipes", PREMIUM)).not.toBe(upsellKeyFor("cineswipe_rooms", PREMIUM));
+  });
+
+  test("birleştirme anahtarı Free'de iki üyede aynı, başka özellikte ayrı", () => {
+    expect(upsellKeyFor("cineswipe_swipes", FREE)).toBe(upsellKeyFor("cineswipe_rooms", FREE));
+    expect(upsellKeyFor("games", FREE)).toBe("games");
+    expect(upsellBundleFor("games", FREE)).toBeNull();
+  });
+
+  test("paket metni her dilde dolu", () => {
+    for (const bundle of Object.values(UPSELL_BUNDLES)) {
+      for (const lang of ["tr", "en", "es", "pt", "de"]) {
+        expect(bundle.title[lang]).toBeTruthy();
+        expect(bundle.message[lang]).toBeTruthy();
+      }
+      for (const id of bundle.features) expect(FEATURE_IDS).toContain(id);
+    }
   });
 });
 
