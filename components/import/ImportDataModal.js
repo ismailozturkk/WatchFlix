@@ -20,6 +20,7 @@ import {
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
+import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "../AppIcon";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import useSheetTransition from "../../hooks/useSheetTransition";
@@ -47,6 +48,7 @@ import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../common/GlassTouchable";
 import GlassBox from "../common/GlassBox";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
+import { buildImportResultRows, getImportPhase } from "./importPresentation";
 const { height: SCREEN_H } = Dimensions.get("window");
 const SHEET_MAX_H = SCREEN_H * 0.88;
 
@@ -429,6 +431,20 @@ export default function ImportDataModal({ visible, onClose }) {
   const itemsToImport = getItemsToImport();
   const customItemsToImport = getCustomItemsToImport();
   const totalItemsToImport = itemsToImport.length + customItemsToImport.length;
+  const progressPercent = Math.min(100, Math.round(progress * 100));
+  const importPhase = getImportPhase(progress);
+  const progressLines = String(progressText || "").split("\n");
+  const resultRows = buildImportResultRows(importStats, copy);
+  const resultTone = {
+    accent: theme.accent || "#138DF0",
+    gold: "#F5B942",
+    safe: "#43D17B",
+    muted: theme.text.secondary,
+    blue: "#4CA7FF",
+    rose: "#F05B7A",
+    violet: "#A78BFA",
+    warning: "#FF9F43",
+  };
 
   return (
     <Modal
@@ -827,47 +843,117 @@ export default function ImportDataModal({ visible, onClose }) {
             {/* Step 3: Progress */}
             {step === "importing" && (
               <View style={styles.progressContainer}>
-                <ActivityIndicator size="large" color={theme.accent || "#138DF0"} style={{ marginBottom: 16 }} />
-                <Text style={[styles.progressText, { color: theme.text.primary }]}>{progressText}</Text>
+                <View
+                  style={[
+                    styles.progressHero,
+                    { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.58), borderColor: alpha(theme.accent, 0.25) },
+                  ]}
+                >
+                  <View style={styles.progressHeroTop}>
+                    <View style={[styles.progressIcon, { backgroundColor: alpha(theme.accent, 0.14) }]}>
+                      <ActivityIndicator size="small" color={theme.accent || "#138DF0"} style={styles.progressSpinner} />
+                      <AppIcon family="Ionicons" name="cloud-upload-outline" size={22} color={theme.accent || "#138DF0"} />
+                    </View>
+                    <View style={styles.progressCopy}>
+                      <Text style={[styles.progressTitle, { color: theme.text.primary }]}>{copy.importingTitle}</Text>
+                      <Text style={[styles.progressHint, { color: theme.text.secondary }]}>{copy.importingHint}</Text>
+                    </View>
+                    <Text allowFontScaling={false} style={[styles.progressPercentHero, { color: theme.accent || "#138DF0" }]}>
+                      {copy.percent(progressPercent)}
+                    </Text>
+                  </View>
 
-                <View style={[styles.progressBarBg, { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.8) }]}>
-                  <View
-                    style={[
-                      styles.progressBarFill,
-                      {
-                        width: `${Math.min(100, Math.round(progress * 100))}%`,
-                        backgroundColor: theme.accent || "#138DF0",
-                      },
-                    ]}
-                  />
+                  <View style={[styles.progressBarBg, { backgroundColor: alpha(theme.text.muted || "#888", 0.2) }]}>
+                    <LinearGradient
+                      colors={[theme.accent || "#138DF0", "#65D6FF"]}
+                      start={{ x: 0, y: 0.5 }}
+                      end={{ x: 1, y: 0.5 }}
+                      style={[styles.progressBarFill, { width: `${progressPercent}%` }]}
+                    />
+                  </View>
+
+                  <View style={styles.phaseRail}>
+                    {[copy.stageMatching, copy.stageSaving, copy.stageLists].map((label, index) => {
+                      const done = importPhase > index;
+                      const active = importPhase === index;
+                      return (
+                        <View key={label} style={styles.phaseItem}>
+                          <View
+                            style={[
+                              styles.phaseDot,
+                              { backgroundColor: done || active ? theme.accent : alpha(theme.text.muted, 0.2) },
+                              active && { borderColor: alpha(theme.accent, 0.25) },
+                            ]}
+                          >
+                            <AppIcon
+                              family="Ionicons"
+                              name={done ? "checkmark" : active ? "ellipsis-horizontal" : "ellipse-outline"}
+                              size={12}
+                              color={done || active ? "#FFFFFF" : theme.text.muted}
+                            />
+                          </View>
+                          <Text
+                            numberOfLines={1}
+                            style={[styles.phaseLabel, { color: active ? theme.text.primary : theme.text.secondary }, active && styles.phaseLabelActive]}
+                          >
+                            {label}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
                 </View>
-                <Text style={[styles.progressPercent, { color: theme.text.secondary }]}>
-                  {copy.percent(Math.min(100, Math.round(progress * 100)))}
-                </Text>
+
+                <View style={[styles.currentWork, { backgroundColor: alpha(theme.accent, 0.08), borderColor: alpha(theme.accent, 0.2) }]}>
+                  <AppIcon family="Ionicons" name="sparkles-outline" size={17} color={theme.accent} />
+                  <View style={styles.currentWorkCopy}>
+                    <Text style={[styles.progressText, { color: theme.text.primary }]}>{progressLines[0]}</Text>
+                    {progressLines[1] ? (
+                      <Text numberOfLines={2} style={[styles.progressItem, { color: theme.text.secondary }]}>
+                        {progressLines.slice(1).join(" ")}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
               </View>
             )}
 
             {/* Step 4: Success */}
             {step === "success" && (
               <View style={styles.successContainer}>
-                <View style={[styles.successIconCircle, { backgroundColor: alpha("#64FF64", 0.16) }]}>
-                  <AppIcon family="Ionicons" name="checkmark-circle" size={48} color="#64FF64" />
+                <View style={[styles.successHero, { backgroundColor: alpha("#43D17B", 0.09), borderColor: alpha("#43D17B", 0.26) }]}>
+                  <View style={[styles.successIconCircle, { backgroundColor: alpha("#43D17B", 0.16) }]}>
+                    <AppIcon family="Ionicons" name="checkmark" size={32} color="#43D17B" />
+                  </View>
+                  <Text style={[styles.successTitle, { color: theme.text.primary }]}>
+                    {copy.successTitle}
+                  </Text>
+                  <Text style={[styles.successDesc, { color: theme.text.secondary }]}>
+                    {renderRich(copy.successTotal(importStats.count), { fontWeight: "900", color: "#43D17B" })}
+                  </Text>
                 </View>
-                <Text style={[styles.successTitle, { color: theme.text.primary }]}>
-                  {copy.successTitle}
-                </Text>
-                <Text style={[styles.successDesc, { color: theme.text.secondary }]}>
-                  {renderRich(copy.successTotal(importStats.count), { fontWeight: "800", color: theme.text.primary })}
-                  {importStats.addedWatchEventsCount > 0 && `\n${copy.addedWatchEvents(importStats.addedWatchEventsCount)}`}
-                  {importStats.ratingsCount > 0 && `\n${copy.addedRatings(importStats.ratingsCount)}`}
-                  {importStats.reviewsCount > 0 && `\n${copy.addedReviews(importStats.reviewsCount)}`}
-                  {(importStats.preservedRatingsCount > 0 || importStats.preservedReviewsCount > 0) && `\n${copy.preserved}`}
-                  {importStats.unchangedCount > 0 && `\n${copy.unchanged(importStats.unchangedCount)}`}
-                  {importStats.watchlistCount > 0 && `\n${copy.checkedWatchlist(importStats.watchlistCount)}`}
-                  {importStats.favoritesCount > 0 && `\n${copy.checkedFavorites(importStats.favoritesCount)}`}
-                  {importStats.customListsCount > 0 && `\n${copy.mergedCustomLists(importStats.customListsCount, importStats.customListItemsCount)}`}
-                  {importStats.unmatchedCount > 0 && `\n${copy.skippedUnmatched(importStats.unmatchedCount)}`}
-                </Text>
+
+                {resultRows.length > 0 ? (
+                  <View style={styles.resultsSection}>
+                    <Text style={[styles.resultsTitle, { color: theme.text.secondary }]}>{copy.resultDetails}</Text>
+                    <View style={[styles.resultsCard, { backgroundColor: alpha(theme.secondary || "#2C2C2E", 0.52), borderColor: alpha(theme.border, 0.7) }]}>
+                      {resultRows.map((row, index) => {
+                        const tone = resultTone[row.tone];
+                        return (
+                          <View key={row.key}>
+                            <View style={styles.resultRow}>
+                              <View style={[styles.resultIcon, { backgroundColor: alpha(tone, 0.13) }]}>
+                                <AppIcon family="Ionicons" name={row.icon} size={16} color={tone} />
+                              </View>
+                              <Text style={[styles.resultText, { color: row.tone === "warning" ? tone : theme.text.primary }]}>{row.text}</Text>
+                            </View>
+                            {index < resultRows.length - 1 ? <View style={[styles.resultDivider, { backgroundColor: alpha(theme.border, 0.65) }]} /> : null}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : null}
 
                 <GlassTouchable
                   style={[styles.doneBtn, { backgroundColor: theme.accent || "#138DF0" }]}
@@ -1235,42 +1321,52 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   progressContainer: {
-    alignItems: "center",
-    paddingVertical: 28,
+    paddingVertical: 12,
+    gap: 12,
   },
+  progressHero: { borderRadius: 20, borderWidth: 1, padding: 16, gap: 15 },
+  progressHeroTop: { flexDirection: "row", alignItems: "center", gap: 11 },
+  progressIcon: { width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  progressSpinner: { position: "absolute", opacity: 0.28, transform: [{ scale: 1.55 }] },
+  progressCopy: { flex: 1, minWidth: 0, gap: 2 },
+  progressTitle: { fontSize: 16, lineHeight: 20, fontWeight: "900" },
+  progressHint: { fontSize: 11.5, lineHeight: 16 },
+  progressPercentHero: { fontSize: 25, lineHeight: 30, fontWeight: "900", letterSpacing: -0.8 },
   progressText: {
     fontSize: 13,
-    fontWeight: "700",
-    marginBottom: 16,
-    textAlign: "center",
+    fontWeight: "800",
     lineHeight: 18,
   },
+  progressItem: { fontSize: 12, lineHeight: 16, marginTop: 2 },
   progressBarBg: {
     width: "100%",
-    height: 10,
-    borderRadius: 5,
+    height: 9,
+    borderRadius: 999,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
-    borderRadius: 5,
+    borderRadius: 999,
   },
-  progressPercent: {
-    marginTop: 8,
-    fontSize: 13,
-    fontWeight: "800",
-  },
+  phaseRail: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
+  phaseItem: { flex: 1, alignItems: "center", gap: 5 },
+  phaseDot: { width: 23, height: 23, borderRadius: 12, borderWidth: 4, borderColor: "transparent", alignItems: "center", justifyContent: "center" },
+  phaseLabel: { fontSize: 10.5, lineHeight: 14, fontWeight: "700", textAlign: "center" },
+  phaseLabelActive: { fontWeight: "900" },
+  currentWork: { minHeight: 58, borderRadius: 15, borderWidth: 1, paddingHorizontal: 13, paddingVertical: 11, flexDirection: "row", alignItems: "center", gap: 10 },
+  currentWorkCopy: { flex: 1, minWidth: 0 },
   successContainer: {
-    alignItems: "center",
-    paddingVertical: 20,
+    paddingVertical: 10,
+    gap: 14,
   },
+  successHero: { alignItems: "center", borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 18 },
   successIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
+    marginBottom: 11,
   },
   successTitle: {
     fontSize: 18,
@@ -1282,11 +1378,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center",
     lineHeight: 20,
-    marginBottom: 20,
   },
+  resultsSection: { gap: 7 },
+  resultsTitle: { fontSize: 11, fontWeight: "900", letterSpacing: 0.7, textTransform: "uppercase", paddingHorizontal: 2 },
+  resultsCard: { borderRadius: 17, borderWidth: 1, paddingHorizontal: 12 },
+  resultRow: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
+  resultIcon: { width: 31, height: 31, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  resultText: { flex: 1, fontSize: 12.5, lineHeight: 17, fontWeight: "600" },
+  resultDivider: { height: StyleSheet.hairlineWidth, marginLeft: 41 },
   doneBtn: {
-    paddingHorizontal: 36,
-    paddingVertical: 13,
+    minHeight: 48,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 14,
   },
   doneBtnText: {
