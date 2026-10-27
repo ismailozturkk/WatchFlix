@@ -88,7 +88,7 @@ describe("kayıt bütünlüğü", () => {
       const feature = PREMIUM_FEATURES[id];
       if (feature.kind !== FEATURE_KIND.ACCESS) continue;
       expect(PLANS).toContain(feature.minPlan);
-      expect(getFeatureLimit(id, FREE)).toBe(false);
+      expect(getFeatureLimit(id, FREE)).toBe(feature.minPlan === FREE);
     }
   });
 
@@ -521,13 +521,13 @@ describe("yeni özelliklerin kayıt bütünlüğü", () => {
   });
 });
 
-// ── Geri bildirim kutusu: hata bildirimi Premium+, özellik isteği yalnız Max ──
+// ── Geri bildirim kutusu: hata bildirimi Free, özellik isteği yalnız Max ──
 // Plan kuralı sunucuda da zorlanır (firestore.rules → Feedback); emülatör testi
 // __tests__/rules/firestore.rules.test.js'te, alan/sınır eşitliği
 // __tests__/feedbackRulesParity.test.js'te.
 describe("geri bildirim kapıları", () => {
-  test("hata bildirimi: Free kapalı, Premium ve Max açık", () => {
-    expect(canUseFeature("bug_report", FREE)).toBe(false);
+  test("hata bildirimi: Free, Premium ve Max açık", () => {
+    expect(canUseFeature("bug_report", FREE)).toBe(true);
     expect(canUseFeature("bug_report", PREMIUM)).toBe(true);
     expect(canUseFeature("bug_report", MAX)).toBe(true);
   });
@@ -539,7 +539,7 @@ describe("geri bildirim kapıları", () => {
   });
 
   test("kilitli planda hangi planın açtığı doğru önerilir", () => {
-    expect(nextPlanFor("bug_report", FREE)).toBe(PREMIUM);
+    expect(nextPlanFor("bug_report", FREE)).toBeNull();
     expect(nextPlanFor("bug_report", PREMIUM)).toBeNull();
     expect(nextPlanFor("feature_request", FREE)).toBe(MAX);
     expect(nextPlanFor("feature_request", PREMIUM)).toBe(MAX);
@@ -547,10 +547,6 @@ describe("geri bildirim kapıları", () => {
   });
 
   test("uyarı metni yalnız-Max özelliğini 'Premium ve Max'te açık' diye vaat etmez", () => {
-    const bug = buildLimitCopy("bug_report", FREE, "tr");
-    expect(bug.title).toBe("Premium özelliği");
-    expect(bug.message).toContain("Premium ve Premium Max");
-
     const request = buildLimitCopy("feature_request", PREMIUM, "tr");
     expect(request.title).toBe("Premium Max özelliği");
     expect(request.message).toContain("yalnızca Premium Max");
@@ -564,7 +560,7 @@ describe("geri bildirim kapıları", () => {
     const support = getComparisonSections("tr").find((section) => section.id === "support");
     expect(support.rows.map((row) => row.id)).toEqual(["bug_report", "feature_request"]);
     const [bug, request] = support.rows;
-    expect(bug.values).toEqual({ free: "Yalnız e-posta", premium: "Uygulamadan bildir", unlimited: "Uygulamadan bildir" });
+    expect(bug.values).toEqual({ free: "Uygulamadan bildir", premium: "Uygulamadan bildir", unlimited: "Uygulamadan bildir" });
     expect(request.values).toEqual({ free: "Yalnız e-posta", premium: "Yalnız e-posta", unlimited: "Uygulamadan öner" });
   });
 

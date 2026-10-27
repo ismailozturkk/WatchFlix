@@ -1,11 +1,11 @@
 // components/settings/FeedbackSettingsGroup.js
 //
 // Ayarlar ana ekranındaki "DESTEK VE GERİ BİLDİRİM" grubu: iki satır.
-//   • Hata bildir   → Premium ve üstü   (utils/premiumFeatures.js → bug_report)
+//   • Hata bildir   → Free dahil tüm oturum açmış kullanıcılar (bug_report)
 //   • Özellik iste  → yalnız Premium Max (feature_request)
 // Plan yetmiyorsa satır kilitli çizilir (sağda plan hapı) ve dokunmak yükseltme
-// sayfasını açar; yetiyorsa FeedbackScreen'e gider. Free'de e-posta desteği
-// Hakkında ekranında açık kalır.
+// sayfasını açar; yetiyorsa FeedbackScreen'e gider. Hata bildir satırı Free'de
+// doğrudan açılır; özellik isteği plan kapısını korur.
 
 import React, { useMemo } from "react";
 import { useNavigation } from "@react-navigation/native";

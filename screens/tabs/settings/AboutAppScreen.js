@@ -119,6 +119,17 @@ export default function AboutAppScreen() {
     });
   };
 
+  // Premium SSS metni eski sürümde uygulama içi hata bildirimini ücretli avantaj
+  // diye sayıyordu. Kaynak cümleler uzun ve beş dilli olduğu için görünür metni
+  // burada tek geçişte yeni Free kapsamına taşırız.
+  const bugReportIsFree = (text) => {
+    if (isTr) return text.replace("hatırlatması sunar; turnuvayı", "hatırlatması ve uygulama içinden hata bildirimi sunar; turnuvayı").replace(", uygulama içinden hata bildirimi ve", " ve");
+    if (es) return text.replace("; puedes seguir", " e informes de errores desde la app; puedes seguir").replace(", informes de errores desde la app y", " y");
+    if (pt) return text.replace("; você pode", " e relatos de erros pelo app; você pode").replace(", relatos de erros pelo app e", " e");
+    if (de) return text.replace("; du kannst", " sowie Fehlerberichte in der App; du kannst").replace(", Fehlerberichte in der App und", " und");
+    return text.replace("; you can watch", ", and in-app bug reports; you can watch").replace(", in-app bug reports and", " and");
+  };
+
   const FAQS = [
     {
       q: isTr ? "Seelogd nedir ve nasıl kullanılır?" : es ? "¿Qué es Seelogd y cómo funciona?" : pt ? "O que é o Seelogd e como funciona?" : de ? "Was ist Seelogd und wie funktioniert es?" : "What is Seelogd and how does it work?",
@@ -395,7 +406,7 @@ export default function AboutAppScreen() {
                     allowFontScaling={false}
                     style={[styles.faqAnswer, { color: C.muted }]}
                   >
-                    {faq.a}
+                    {bugReportIsFree(faq.a)}
                   </Text>
                 </View>
               )}

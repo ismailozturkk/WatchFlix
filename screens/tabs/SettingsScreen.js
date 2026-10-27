@@ -974,7 +974,7 @@ export default function SettingsScreen() {
           />
         </GlassBox>
 
-        {/* ── Destek ve geri bildirim: hata bildirimi (Premium+), özellik isteği (Max) ── */}
+        {/* ── Destek ve geri bildirim: hata bildirimi (Free), özellik isteği (Max) ── */}
         <FeedbackSettingsGroup C={C} />
 
         {/* ── Hakkında + hata ayıklama ── */}

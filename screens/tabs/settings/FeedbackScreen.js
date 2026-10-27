@@ -1,7 +1,7 @@
 // screens/tabs/settings/FeedbackScreen.js
 //
 // Ayarlar > Destek ve geri bildirim: tek ekran, iki tür.
-//   kind="bug"     → Hata bildir        (Premium ve üstü)
+//   kind="bug"     → Hata bildir        (Free dahil)
 //   kind="feature" → Özellik iste       (yalnız Premium Max)
 //
 // Form: kategori, (hata için) şiddet, kısa başlık, açıklama, (hata için) cihaz
@@ -66,7 +66,7 @@ import { fill, getFeedbackCopy } from "./feedbackCopy";
 
 // Türe göre görünüm: vurgu rengi (palet anahtarı), kahraman ikonu ve hangi planın açtığı.
 const KIND_LOOK = Object.freeze({
-  bug: { tint: "amber", icon: "bug", benefitIcon: "hardware-chip-outline", plan: PREMIUM_PLAN.PREMIUM },
+  bug: { tint: "amber", icon: "bug", benefitIcon: "hardware-chip-outline", plan: PREMIUM_PLAN.FREE },
   feature: { tint: "purple", icon: "bulb", benefitIcon: "analytics-outline", plan: PREMIUM_PLAN.UNLIMITED },
 });
 
@@ -309,7 +309,8 @@ export default function FeedbackScreen() {
             icon={look.icon}
             title={kindCopy.heroTitle}
             text={kindCopy.heroText}
-            planLabel={fill(copy.common.planChip, { plan: planName })}
+            planLabel={kind === "bug" ? copy.common.freeAccess : fill(copy.common.planChip, { plan: planName })}
+            planIcon={kind === "bug" ? "checkmark-circle" : "diamond"}
             benefit={kindCopy.heroBenefit}
             benefitIcon={look.benefitIcon}
           />

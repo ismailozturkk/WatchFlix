@@ -10,7 +10,7 @@
 // bir "gönderilemedi" görür. Şekil burada tek yerde tarif edilir; kurala
 // kopyalanan listelerin eşitliğini __tests__/feedbackRulesParity.test.js korur.
 //
-// PLAN KAPISI: hata bildirimi Premium ve üstü, özellik isteği yalnız Premium Max
+// PLAN KAPISI: hata bildirimi Free dahil açık, özellik isteği yalnız Premium Max
 // (utils/premiumFeatures.js → bug_report / feature_request). Plan burada
 // DOĞRULANMAZ: istemci planı kendi söyler, asıl kapı kuralda (entitlements).
 

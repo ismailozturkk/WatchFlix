@@ -39,6 +39,7 @@ const tr = {
     errFailed: "Gönderilemedi. Birazdan tekrar dene.",
     infoSlow: "Bağlantı yavaş; gönderim sürüyor.",
     planChip: "{plan} üyelere özel",
+    freeAccess: "Free kullanıcılarına açık",
   },
   bug: {
     title: "Hata bildir",
@@ -139,6 +140,7 @@ const en = {
     errFailed: "Couldn't send. Please try again in a moment.",
     infoSlow: "The connection is slow; sending is in progress.",
     planChip: "{plan} members only",
+    freeAccess: "Available on Free",
   },
   bug: {
     title: "Report a bug",
@@ -239,6 +241,7 @@ const es = {
     errFailed: "No se pudo enviar. Inténtalo de nuevo en un momento.",
     infoSlow: "La conexión es lenta; el envío está en curso.",
     planChip: "Solo para miembros {plan}",
+    freeAccess: "Disponible en Gratis",
   },
   bug: {
     title: "Informar de un error",
@@ -339,6 +342,7 @@ const pt = {
     errFailed: "Não foi possível enviar. Tente novamente em instantes.",
     infoSlow: "A conexão está lenta; o envio está em andamento.",
     planChip: "Somente para membros {plan}",
+    freeAccess: "Disponível no Grátis",
   },
   bug: {
     title: "Relatar um erro",
@@ -439,6 +443,7 @@ const de = {
     errFailed: "Senden nicht möglich. Bitte versuche es gleich noch einmal.",
     infoSlow: "Die Verbindung ist langsam; das Senden läuft.",
     planChip: "Nur für {plan}-Mitglieder",
+    freeAccess: "Im Free-Tarif verfügbar",
   },
   bug: {
     title: "Fehler melden",

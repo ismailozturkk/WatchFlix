@@ -877,20 +877,19 @@ export const PREMIUM_FEATURES = Object.freeze({
             : "du kannst die Wrapped-Rückblicke aller Jahre ansehen",
     },
   }),
-  // Uygulama içi geri bildirim kutusu (Ayarlar > Destek ve geri bildirim). Free'de
-  // e-posta desteği (Hakkında) açık kalır; bu iki kapı yalnız UYGULAMA İÇİ formu
-  // ve "gönderdiklerim" geçmişini açar. Plan kuralı sunucuda da zorlanır
-  // (firestore.rules → Feedback); iki taraf birlikte değişmeli.
+  // Uygulama içi geri bildirim kutusu (Ayarlar > Destek ve geri bildirim).
+  // Hata bildirimi Free dahil açıktır; özellik isteği Premium Max kapısını korur.
+  // Sunucu kuralı da aynı ayrımı uygular (firestore.rules → Feedback).
   bug_report: feature({
     id: "bug_report",
     kind: ACCESS,
     category: "support",
     icon: "bug",
     enforcedBy: "server",
-    minPlan: PREMIUM_PLAN.PREMIUM,
+    minPlan: PREMIUM_PLAN.FREE,
     title: { tr: "Hata bildirimi", en: "Bug reports", es: "Informes de errores", pt: "Relatos de erros", de: "Fehlerberichte" },
     upsell: {
-      title: { tr: "Hata bildirimi Premium'da", en: "Bug reports are a Premium perk", es: "Los informes de errores son una ventaja Premium", pt: "Os relatos de erros são um benefício Premium", de: "Fehlerberichte sind ein Premium-Vorteil" },
+      title: { tr: "Hata bildir", en: "Report a bug", es: "Informar de un error", pt: "Relatar um erro", de: "Fehler melden" },
       message: {
         tr: "Karşılaştığın sorunu uygulamadan doğrudan ilet; cihaz ve sürüm bilgisi kendiliğinden eklenir.",
         en: "Send the problem you ran into straight from the app; device and version details are attached for you.",
@@ -906,7 +905,7 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: "Pelo app, com dados do dispositivo e da versão",
       de: "Direkt aus der App, mit Geräte- und Versionsangaben",
     },
-    freeValue: { tr: "Yalnız e-posta", en: "Email only", es: "Solo correo", pt: "Somente e-mail", de: "Nur per E-Mail" },
+    freeValue: { tr: "Uygulamadan bildir", en: "Report in-app", es: "Informar en la app", pt: "Relatar no app", de: "In der App melden" },
     paidValue: { tr: "Uygulamadan bildir", en: "Report in-app", es: "Informar en la app", pt: "Relatar no app", de: "In der App melden" },
   }),
   feature_request: feature({

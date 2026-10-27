@@ -118,7 +118,7 @@ function Pill({ icon, label, color, textColor, soft }) {
 }
 
 /** Üstteki tanıtım kartı: büyük ikon, başlık, açıklama ve iki küçük hap. */
-export function FeedbackHero({ C, tint, icon, title, text, planLabel, benefit, benefitIcon }) {
+export function FeedbackHero({ C, tint, icon, title, text, planLabel, planIcon = "diamond", benefit, benefitIcon }) {
   return (
     <GlassBox role="card" style={[k.hero, { borderColor: alpha(tint, 0.4) }]}>
       <LinearGradient
@@ -145,7 +145,7 @@ export function FeedbackHero({ C, tint, icon, title, text, planLabel, benefit, b
           </View>
         </View>
         <View style={k.pillRow}>
-          <Pill icon="diamond" label={planLabel} color={tint} />
+          <Pill icon={planIcon} label={planLabel} color={tint} />
           <Pill icon={benefitIcon} label={benefit} color={C.muted} textColor={soft(C)} soft />
         </View>
       </LinearGradient>

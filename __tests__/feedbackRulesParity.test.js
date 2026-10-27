@@ -90,14 +90,15 @@ describe("Feedback kuralı ↔ istemci doğrulaması", () => {
     expect(num(/\[field\]\.size\(\) <= (\d+)/)).toBe(FEEDBACK_LIMITS.shortMax);
   });
 
-  test("plan kapısı: hata bildirimi ücretli plan, özellik isteği yalnız Max", () => {
-    const bugBranch = block.match(/kind == 'bug'[\s\S]*?isPaidPlan\(\)/);
+  test("plan kapısı: hata bildirimi Free, özellik isteği yalnız Max", () => {
+    const bugBranch = block.match(/kind == 'bug'[\s\S]*?request\.resource\.data\.category in/);
     const featureBranch = block.match(/kind == 'feature'[\s\S]*?isMaxPlan\(\)/);
     expect(bugBranch).toBeTruthy();
     expect(featureBranch).toBeTruthy();
-    // Kapılar yer değiştirmesin: 'bug' dalında isMaxPlan, 'feature' dalında isPaidPlan çağrısı yok.
+    // Hata dalı plan istemez; özellik dalı yalnız Max ister.
+    expect(bugBranch[0]).not.toContain("isPaidPlan()");
     expect(bugBranch[0]).not.toContain("isMaxPlan()");
-    expect(featureBranch[0]).not.toContain("isPaidPlan()");
+    expect(block).not.toContain("function isPaidPlan()");
   });
 
   test("istemci yalnız 'open' durumu yazar; kural da yalnız onu kabul eder", () => {
