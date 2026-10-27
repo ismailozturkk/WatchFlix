@@ -20,7 +20,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BackButton from "@components/BackButton";
 import BottomSheetModal from "@components/common/BottomSheetModal";

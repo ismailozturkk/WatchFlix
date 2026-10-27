@@ -23,7 +23,8 @@ import {
   Dimensions,
   Modal,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import { LinearGradient } from "expo-linear-gradient";
 import { getPostDrafts } from "../../../services/postDraftService";
 import { Ionicons } from "@expo/vector-icons";

@@ -17,7 +17,8 @@
 
 import React from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Pencere kenarına çizilir: ekranın Premium şeridiyle büyütülmüş üst boşluğunu değil gerçeğini al.
+import { useWindowSafeAreaInsets } from "@context/ScreenInsetsContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheetModal from "../common/BottomSheetModal";
 import SheetScroll from "../common/SheetScroll";
@@ -30,7 +31,7 @@ import { settingsSheetLayout } from "../../utils/settingsShareLayout";
 /** Ekran boyuna göre sayfa ölçüleri (önizlemenin büyüklüğü/afiş sayısı dahil). */
 export function useSettingsSheetLayout() {
   const { width, height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const insets = useWindowSafeAreaInsets();
   return settingsSheetLayout({ width, height, insetTop: insets.top, insetBottom: insets.bottom });
 }
 

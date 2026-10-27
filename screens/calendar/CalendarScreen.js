@@ -18,7 +18,9 @@ import { useCalendar, EVENT_COLORS } from "@context/CalendarContext";
 import { useLanguage } from "@context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import { i18nText } from "@utils/i18nText";
 import ScreenDecor from "@components/ScreenDecor";
 import {

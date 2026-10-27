@@ -19,7 +19,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useTheme } from "../../../context/ThemeContext";

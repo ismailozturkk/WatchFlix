@@ -20,7 +20,8 @@ import {
 import { unfriend } from "../../../services/friendsService";
 import { getAuth } from "firebase/auth";
 import Toast from "@components/AppToast";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import { db } from "../../../firebase";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";

@@ -37,7 +37,8 @@ import {
   FlatList,
   ActivityIndicator,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Pencere kenarına çizilir: ekranın Premium şeridiyle büyütülmüş üst boşluğunu değil gerçeğini al.
+import { useWindowSafeAreaInsets } from "@context/ScreenInsetsContext";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import ComposerBlur, { COMPOSER_GLASS_PILL_STYLE, ComposerBlurTarget, useComposerBlurTarget } from "../chat/ComposerBlur";
 import { useLiquidGlass } from "../../services/liquidGlass";
@@ -279,7 +280,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
     username: profileUsername,
   } = useUserProfile();
   const styles = getStyles(theme);
-  const insets = useSafeAreaInsets();
+  const insets = useWindowSafeAreaInsets();
 
   const postId = post?.id;
   const postPoster = post?.mediaList?.find((item) => item?.poster)?.poster || null;

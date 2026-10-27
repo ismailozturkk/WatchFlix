@@ -13,7 +13,8 @@ import {
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import AppIcon from "../../components/AppIcon";
 import RatingStars from "../../components/RatingStars";
 import StaggerItem from "../../components/StaggerItem";

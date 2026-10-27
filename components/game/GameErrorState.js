@@ -6,7 +6,8 @@
 
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import AppIcon from "@components/AppIcon";
 import { i18nText } from "@utils/i18nText";
 import GlassTouchable from "../common/GlassTouchable";

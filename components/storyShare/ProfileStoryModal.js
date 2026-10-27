@@ -45,7 +45,8 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Pencere kenarına çizilir: ekranın Premium şeridiyle büyütülmüş üst boşluğunu değil gerçeğini al.
+import { useWindowSafeAreaInsets } from "@context/ScreenInsetsContext";
 import BottomSheetModal from "../common/BottomSheetModal";
 import AppIcon from "../AppIcon";
 import GlassIconButton from "../common/GlassIconButton";
@@ -441,7 +442,7 @@ const ToggleChip = memo(function ToggleChip({ theme, item, on, disabled, onPress
 function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, badges, bio, joinedAt, favorites }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  const insets = useSafeAreaInsets();
+  const insets = useWindowSafeAreaInsets();
   const { height: winH } = useWindowDimensions();
   const { getTmdbUrl } = useImageQualitySettings();
   const stats = useProfileStats();

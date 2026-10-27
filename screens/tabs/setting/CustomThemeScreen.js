@@ -27,7 +27,8 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import * as Haptics from "@services/hapticsService";
 import AppIcon from "@components/AppIcon";
 import GlassIconButton from "@components/common/GlassIconButton";

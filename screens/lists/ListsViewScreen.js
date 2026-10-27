@@ -19,7 +19,8 @@ import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import Toast from "@components/AppToast";
 import { db } from "../../firebase";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import BackButton from "../../components/BackButton";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { useLanguage } from "@context/LanguageContext";

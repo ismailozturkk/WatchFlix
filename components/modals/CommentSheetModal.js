@@ -43,7 +43,8 @@ import {
   Platform,
   KeyboardAvoidingView
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Pencere kenarına çizilir: ekranın Premium şeridiyle büyütülmüş üst boşluğunu değil gerçeğini al.
+import { useWindowSafeAreaInsets } from "@context/ScreenInsetsContext";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -87,7 +88,7 @@ export default function CommentSheetModal({
 }) {
   const { getTmdbUrl } = useImageQualitySettings();
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
+  const insets = useWindowSafeAreaInsets();
 
   // Sheet slide-up animasyonu.
   // Yükseklik artık sabit değil, içerikten geliyor (bkz. useAdaptiveSheetHeight

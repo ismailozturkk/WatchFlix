@@ -17,7 +17,8 @@
 
 import React, { useEffect, useId, useSyncExternalStore } from "react";
 import { StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Pencere kenarına çizilir: ekranın Premium şeridiyle büyütülmüş üst boşluğunu değil gerçeğini al.
+import { useWindowSafeAreaInsets } from "@context/ScreenInsetsContext";
 import { toastStore } from "../../utils/toastStore";
 import { ToastItem } from "./ToastItem";
 
@@ -33,7 +34,7 @@ const MIN_TOP = 12;
  */
 export default function ToastHost({ scoped = false, enabled = true, topInset }) {
   const hostId = useId();
-  const insets = useSafeAreaInsets();
+  const insets = useWindowSafeAreaInsets();
   const snapshot = useSyncExternalStore(
     toastStore.subscribe,
     toastStore.getSnapshot,

@@ -10,7 +10,9 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "@components/AppToast";
 import { useTheme } from "../../../context/ThemeContext";

@@ -16,7 +16,8 @@ import {
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import GlassSurface from "../common/GlassSurface";
 import GlassIconButton from "../common/GlassIconButton";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Pencere kenarına çizilir: ekranın Premium şeridiyle büyütülmüş üst boşluğunu değil gerçeğini al.
+import { useWindowSafeAreaInsets } from "@context/ScreenInsetsContext";
 import axios from "axios";
 import {
   useApiSettings,
@@ -292,7 +293,7 @@ const ImageGalleryModal = ({
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
   const { language } = useLanguage();
-  const insets = useSafeAreaInsets();
+  const insets = useWindowSafeAreaInsets();
   const posterChoices = usePosterChoices();
   const pickerCopy = getPosterChoicesCopy(language);
   const pickerActive =

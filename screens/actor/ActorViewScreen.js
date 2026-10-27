@@ -24,7 +24,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import GlassIconButton from "../../components/common/GlassIconButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
+import { usePremiumBannerOverlap } from "../../context/ScreenInsetsContext";
 import { ActorSkeleton } from "../../components/Skeleton";
 import { i18nText } from "../../utils/i18nText";
 import ScreenDecor from "../../components/ScreenDecor";
@@ -261,6 +263,9 @@ const applyFilter = (list, filter, type) => {
 const ActorViewScreen = ({ route, navigation }) => {
   const { personId } = route.params;
   const { theme } = useTheme();
+  // Premium şeridi üstte yüzerken yüzen başlık sabit durum çubuğu boşluğuna (52 /
+  // currentHeight) şeridin taştığı kadarını ekler; yoksa başlık şeridin altında kalırdı.
+  const bannerOverlap = usePremiumBannerOverlap();
   // Android 12+: geri düğmesi altından kayan fotoğrafı/içeriği GERÇEKTEN
   // bulanıklaştırsın diye içerik yerel blur hedefine sarılır; düğme onun KARDEŞİ.
   const contentBlur = useLocalBlurTarget();
@@ -363,6 +368,9 @@ const ActorViewScreen = ({ route, navigation }) => {
         style={[
           styles.floatingHeader,
           { backgroundColor: theme.primary, opacity: headerOpacity },
+          bannerOverlap > 0 && {
+            paddingTop: StyleSheet.flatten(styles.floatingHeader).paddingTop + bannerOverlap,
+          },
         ]}
         pointerEvents="none"
       >

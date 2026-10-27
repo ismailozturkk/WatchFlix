@@ -7,7 +7,8 @@ import useScreenSections from "../../hooks/useSectionVisibility";
 import useEmailVerification from "../../hooks/useEmailVerification";
 import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import { markTabScroll } from "../../components/navigation/TabScrollMarker";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useFriends } from "../../context/FriendsContext";

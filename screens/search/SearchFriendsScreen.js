@@ -11,7 +11,8 @@ import { FlatList, StyleSheet, Text, View } from "react-native";
 import { getAuth } from "firebase/auth";
 import LottieView from "lottie-react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import { useTheme } from "../../context/ThemeContext";
 import { useFriends } from "../../context/FriendsContext";
 import ScreenDecor from "../../components/ScreenDecor";

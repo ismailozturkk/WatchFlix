@@ -16,7 +16,8 @@ import {
     ActivityIndicator,
   Keyboard,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import BackButton from "../../components/BackButton";
 import PosterImage from "@components/PosterImage";
 import { useTheme } from "@context/ThemeContext";

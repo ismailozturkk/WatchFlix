@@ -84,6 +84,7 @@ import { PostsProvider }            from "./context/PostsContext";
 import { TvShowProvider } from "./context/TvShowContex";
 import TabScreenNavigator from "@screens/navigation/TabScreenNavigator";
 import { PremiumProvider } from "./context/PremiumContext";
+import PremiumTopBannerLayout from "./components/premium/PremiumTopBannerLayout";
 import { PosterChoicesProvider } from "./context/PosterChoicesProvider";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { enableFreeze } from "react-native-screens";
@@ -375,6 +376,11 @@ function AppContent() {
     >
       <Stack.Navigator
         initialRouteName={initialRoute}
+        // Free kullanıcıda her ekranın üstünde "Premium'a geç" şeridi; kurallar
+        // utils/premiumTopBanner.js (gizlenen rotalar, Premium'da kalkar).
+        screenLayout={({ route, children }) => (
+          <PremiumTopBannerLayout routeName={route.name}>{children}</PremiumTopBannerLayout>
+        )}
         screenOptions={({ navigation }) => ({
           contentStyle: { backgroundColor: theme.primary },
           //animation: "fade", // iOS benzeri geçiş

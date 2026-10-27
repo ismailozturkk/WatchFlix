@@ -28,7 +28,10 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { doc, collection, onSnapshot, getDocs } from "firebase/firestore";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
+import SafeAreaView from "@components/common/ScreenSafeAreaView";
+import { useWindowSafeAreaInsets } from "../../../context/ScreenInsetsContext";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import ConfirmSheet from "@components/common/ConfirmSheet";
 import GlassCloseButton from "@components/common/GlassCloseButton";
@@ -273,6 +276,8 @@ export default function FriendProfileScreen({ route, navigation }) {
   const { openQuickActions } = useMediaQuickActions();
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  // Liste sayfası pencere kenarına çizilir: şerit varken de gerçek üst boşluk.
+  const windowInsets = useWindowSafeAreaInsets();
   // Kaydırma konumu: hero'daki isim üst çubuğa süzülür, arka plan gradyanı söner.
   // Native sürücüyle bağlı: kaydırırken JS iş parçacığı yorulmaz.
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -1118,8 +1123,8 @@ export default function FriendProfileScreen({ route, navigation }) {
         sheetStyle={[
           styles.listModalSheet,
           isFullScreenList && {
-            height: Math.round(windowHeight - insets.top - 12),
-            maxHeight: Math.round(windowHeight - insets.top - 12),
+            height: Math.round(windowHeight - windowInsets.top - 12),
+            maxHeight: Math.round(windowHeight - windowInsets.top - 12),
           },
           {
             backgroundColor: theme.secondary,

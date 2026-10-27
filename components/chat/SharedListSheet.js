@@ -24,7 +24,8 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+// Pencere kenarına çizilir: ekranın Premium şeridiyle büyütülmüş üst boşluğunu değil gerçeğini al.
+import { useWindowSafeAreaInsets } from "@context/ScreenInsetsContext";
 import BottomSheetModal from "../common/BottomSheetModal";
 import GlassCloseButton from "../common/GlassCloseButton";
 import GlassIconButton from "../common/GlassIconButton";
@@ -96,7 +97,7 @@ export default function SharedListSheet({
   getTmdbUrl,
 }) {
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
+  const insets = useWindowSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [columns, setColumns] = useState(3);
 
