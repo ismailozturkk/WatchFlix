@@ -40,6 +40,8 @@ import ProfileNotificationsButton from "../../components/profile/ProfileNotifica
 import ImportantInvitesBar from "../../components/profile/ImportantInvitesBar";
 import NoteRemindersBar from "../../components/profile/NoteRemindersBar";
 import { hasAnySocialLinks, readProfileSocialLinks } from "../../utils/socialLinks";
+import { PROFILE_PREVIEW } from "../../utils/profileViewer";
+import { i18nText } from "../../utils/i18nText";
 
 // iOS sekme çubuğunun "aşağı kaydırınca küçül" davranışı için kaydırma
 // görünümünü sekme ekranına tanıtır (bkz. components/navigation/TabScrollMarker.js).
@@ -191,6 +193,27 @@ const ProfileScreen = ({ navigation }) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowAvatarPreview(true);
   }, []);
+  // Avatar önizlemesindeki "Profilini gör": arkadaş profili ekranı kendi uid'inle,
+  // bir arkadaşın gözünden açılır (gizlilik aynı kuraldan, bkz. utils/profileViewer.js).
+  const ownUid = user?.uid;
+  const ownName = profile?.displayName || user?.displayName || "";
+  const viewOwnProfileAction = useMemo(
+    () =>
+      ownUid
+        ? {
+            label: i18nText("autoI18n.profilini_gor", "Profilini gör"),
+            icon: "eye-outline",
+            onPress: () =>
+              navigation.navigate("FriendProfileScreen", {
+                friendUid: ownUid,
+                friendName: ownName,
+                preview: PROFILE_PREVIEW.FRIEND,
+              }),
+          }
+        : null,
+    // Etiket dil değişince yeniden çözülsün.
+    [ownUid, ownName, navigation, language]
+  );
 
   // Kopyaların tazelenmesi selectAvatar → userService.setAvatarIndex içinde;
   // burada ayrıca yayılım yapılmaz (eskiden fotoğrafsız ikinci bir yayılım
@@ -350,6 +373,7 @@ const ProfileScreen = ({ navigation }) => {
             isCustomPhoto={selectAvatarIndex === -1}
             displayName={profile?.name || user?.displayName || ""}
             username={profileUsername}
+            action={viewOwnProfileAction}
           />
           <ProfileStoryModal
             visible={showStoryExport}

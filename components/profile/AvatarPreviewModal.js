@@ -11,6 +11,9 @@ import {
 } from "react-native";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import UserAvatar from "../common/UserAvatar";
+// Cam değil: içerik opaklıkla açılıyor, iOS opaklığı yükselen atadaki camı
+// düşürür (bkz. GlassPillButton kuralları) — düz hap düğme.
+import PillButton from "../friends/PillButton";
 import { useTheme } from "../../context/ThemeContext";
 
 const { width } = Dimensions.get("window");
@@ -27,6 +30,9 @@ const AVATAR_SIZE = Math.min(Math.round(width * 0.72), 280);
  * @param {boolean} [props.isCustomPhoto=false] - Kullanici ozel fotografi mi yoksa hazir avatar ikonu mu
  * @param {string} [props.displayName] - Kullanici gorunen adi
  * @param {string} [props.username] - Kullanici adi
+ * @param {{ label: string, icon?: string, onPress: Function }} [props.action] -
+ *   Kartin altindaki istege bagli dugme (kendi profilinde "Profilini gor").
+ *   Modal TAMAMEN kapaninca calisir: hedef ekran modalin altina degil ustune gelir.
  */
 export default function AvatarPreviewModal({
   visible,
@@ -35,6 +41,7 @@ export default function AvatarPreviewModal({
   isCustomPhoto = false,
   displayName,
   username,
+  action,
 }) {
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(visible);
@@ -43,6 +50,8 @@ export default function AvatarPreviewModal({
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const isClosingRef = useRef(false);
+  // Dugmeye basilinca yapilacak is; kapanis animasyonu bitince bir kez calisir.
+  const pendingActionRef = useRef(null);
 
   const handleClose = useCallback(() => {
     if (isClosingRef.current) return;
@@ -67,14 +76,23 @@ export default function AvatarPreviewModal({
     ]).start(() => {
       setMounted(false);
       isClosingRef.current = false;
+      const next = pendingActionRef.current;
+      pendingActionRef.current = null;
       if (onClose) onClose();
+      next?.();
     });
   }, [backdropAnim, opacityAnim, scaleAnim, onClose]);
+
+  const handleAction = useCallback(() => {
+    pendingActionRef.current = action?.onPress ?? null;
+    handleClose();
+  }, [action, handleClose]);
 
   useEffect(() => {
     if (visible) {
       setMounted(true);
       isClosingRef.current = false;
+      pendingActionRef.current = null;
       scaleAnim.setValue(0.35);
       opacityAnim.setValue(0);
       backdropAnim.setValue(0);
@@ -196,6 +214,23 @@ export default function AvatarPreviewModal({
               ) : null}
             </View>
           )}
+
+          {action?.label ? (
+            // Zemin her dokunuşun sonunda (onTouchEnd) kapanır; düğmenin dokunuşu
+            // oraya kabarmasın, kapanışı ve ardından gelen işi düğme yönetsin.
+            <View
+              style={styles.actionWrap}
+              onTouchEnd={(e) => e.stopPropagation()}
+            >
+              <PillButton
+                label={action.label}
+                icon={action.icon}
+                variant="primary"
+                onPress={handleAction}
+                style={styles.actionButton}
+              />
+            </View>
+          ) : null}
         </Animated.View>
       </Pressable>
     </Modal>
@@ -261,5 +296,23 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 2,
     textAlign: "center",
+  },
+  actionWrap: {
+    marginTop: 14,
+    alignItems: "center",
+  },
+  actionButton: {
+    minWidth: 180,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
   },
 });

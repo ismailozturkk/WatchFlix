@@ -27,6 +27,7 @@ import { hasAnySocialLinks, normalizeSocialLinks } from "@utils/socialLinks";
 import { useTheme } from "@context/ThemeContext";
 import { alpha } from "@theme/colors";
 import { FRIEND_GREEN } from "./friendsTokens";
+import PillButton from "./PillButton";
 import GlassBox from "../common/GlassBox";
 
 const AVATAR_SIZE = 100;
@@ -581,6 +582,57 @@ export const ProfileNoticeCard = memo(function ProfileNoticeCard({ icon, title }
   );
 });
 
+// ── Önizleme şeridi (kendi profilin, arkadaş gözünden) ───────────────────────
+// Ekranın gerçek bir arkadaş profili olmadığını söyler; sağdaki düğme görünenleri
+// belirleyen ayarlara götürür. Hero'nun opaklıkla giren kabının DIŞINDA durur.
+export const ProfilePreviewBanner = memo(function ProfilePreviewBanner({
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+}) {
+  const { theme } = useTheme();
+  return (
+    <GlassBox role="card"
+      style={[
+        styles.previewBanner,
+        { backgroundColor: alpha(theme.accent, 0.1), borderColor: alpha(theme.accent, 0.28) },
+      ]}
+    >
+      <View style={[styles.previewMedallion, { backgroundColor: alpha(theme.accent, 0.16) }]}>
+        <Ionicons name="eye-outline" size={18} color={theme.accent} />
+      </View>
+      <View style={styles.previewTexts}>
+        <Text
+          allowFontScaling={false}
+          numberOfLines={2}
+          style={[styles.previewTitle, { color: theme.text?.primary ?? "#fff" }]}
+        >
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text
+            allowFontScaling={false}
+            numberOfLines={3}
+            style={[styles.previewSubtitle, { color: theme.text?.secondary ?? "#aaa" }]}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {actionLabel && onAction ? (
+        <PillButton
+          label={actionLabel}
+          icon="lock-closed-outline"
+          size="sm"
+          variant="soft"
+          onPress={onAction}
+        />
+      ) : null}
+    </GlassBox>
+  );
+});
+
 const styles = StyleSheet.create({
   // ── Arka plan + üst çubuk ──────────────────────────────────────────────────
   backdrop: {
@@ -806,4 +858,26 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   noticeText: { fontSize: 14, fontWeight: "700", textAlign: "center", lineHeight: 20 },
+
+  // ── Önizleme şeridi ────────────────────────────────────────────────────────
+  previewBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  previewMedallion: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewTexts: { flex: 1, minWidth: 0, gap: 2 },
+  previewTitle: { fontSize: 14, fontWeight: "800", letterSpacing: -0.1 },
+  previewSubtitle: { fontSize: 12, fontWeight: "600", lineHeight: 16 },
 });

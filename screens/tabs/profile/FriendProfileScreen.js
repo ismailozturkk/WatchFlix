@@ -77,6 +77,7 @@ import {
   CountChip,
   WatchStatsCard,
   ProfileNoticeCard,
+  ProfilePreviewBanner,
 } from "../../../components/friends/FriendProfileSections";
 import ProfileOptionsSheet from "../../../components/friends/ProfileOptionsSheet";
 import * as Haptics from "../../../services/hapticsService";
@@ -99,6 +100,7 @@ import { candidatesToDeckSource, computeTasteMatch, findTogetherCandidates } fro
 import { buildTasteMatchShare, chatParamsForShare } from "../../../utils/chatShare";
 import { trackEvent, ANALYTICS_EVENTS } from "../../../services/analytics";
 import { getTasteMatchCopy } from "../../../utils/tasteMatchCopy";
+import { resolveProfileAccess, resolveProfileViewer } from "../../../utils/profileViewer";
 
 
 import ModalToastHost from "@components/toast/ModalToastHost";
@@ -272,7 +274,9 @@ const SharedListMediaCard = memo(function SharedListMediaCard({
 
 // ── Ana ekran ────────────────────────────────────────────────────────────────
 export default function FriendProfileScreen({ route, navigation }) {
-  const { friendUid, friendName } = route.params || {};
+  // preview: "friend" → kendi profilini bir arkadaşın gözünden önizleme
+  // (Profil > avatarı basılı tut > "Profilini gör"); bkz. utils/profileViewer.js.
+  const { friendUid, friendName, preview } = route.params || {};
   const { theme } = useTheme();
   const { user: currentUser } = useAuth();
   const { language } = useLanguage();
@@ -339,6 +343,14 @@ export default function FriendProfileScreen({ route, navigation }) {
   const blocked = isBlocked(friendUid);
   const incoming = hasIncomingFrom(friendUid);
   const outgoing = hasOutgoingTo(friendUid);
+  // Kendi profilinde Mesaj / arkadaşlık / ⋯ / zevk uyumu yok. Önizlemede gizlilik
+  // kuralları izleyiciyi ARKADAŞ sayar: "yalnız arkadaşlar" bölümleri de açılır.
+  const { isSelf, previewAsFriend, viewerIsFriend } = resolveProfileViewer({
+    viewerUid: currentUser?.uid,
+    profileUid: friendUid,
+    isFriend: friend,
+    preview,
+  });
 
   // ── Profil dinleyicisi ────────────────────────────────────────────────────
   useEffect(() => {
@@ -363,17 +375,11 @@ export default function FriendProfileScreen({ route, navigation }) {
 
   // ── Gizlilik kuralları ────────────────────────────────────────────────────
   const privacy = { ...DEFAULT_PRIVACY, ...(profile?.privacy || {}) };
-  const canViewProfile =
-    privacy.profile === "public" || (privacy.profile === "friends" && friend);
   // Profil belgesi gelmeden gizlilik BİLİNMİYOR: varsayılana ("herkese açık") düşüp
   // Lists/{uid} dinleyicisini açmak, listeleri kısıtlı her profilde kuraldan
   // permission-denied alırdı (belge gelince dinleyici kapanır ama hata çoktan düşmüştür).
-  const canViewLists =
-    profile != null &&
-    canViewProfile &&
-    (privacy.lists === "public" || (privacy.lists === "friends" && friend));
-  const canViewSocialLinks = profile != null && canViewProfile &&
-    (privacy.socialLinks === "public" || (privacy.socialLinks === "friends" && friend));
+  const { canViewProfile, canViewLists, canViewSocialLinks, showPresenceText } =
+    resolveProfileAccess(privacy, { viewerIsFriend, profileLoaded: profile != null });
   useEffect(() => {
     setVisibleSocialLinks(null);
     if (!friendUid || !canViewSocialLinks) return undefined;
@@ -385,10 +391,7 @@ export default function FriendProfileScreen({ route, navigation }) {
     entitlements: profile?.entitlements,
     canRead: canViewLists,
   });
-  const online = isOnlineVisible(presence, privacy, { viewerIsFriend: friend });
-  const showPresenceText =
-    privacy.onlineStatus === "everyone" ||
-    (privacy.onlineStatus === "friends" && friend);
+  const online = isOnlineVisible(presence, privacy, { viewerIsFriend });
 
   // ── Liste dinleyicisi (yalnız izin varsa açılır) ──────────────────────────
   useEffect(() => {
@@ -667,8 +670,6 @@ export default function FriendProfileScreen({ route, navigation }) {
     navigation.navigate("ChatScreen", params);
   }, [friendUid, tasteMatch, profile?.displayName, profile?.avatarIndex, friendName, currentUser?.displayName, navigation]);
   // ── Moderasyon: şikâyet + engelle ─────────────────────────────────────────
-  const isSelf = !!currentUser?.uid && currentUser.uid === friendUid;
-
   const submitUserReport = useCallback(
     async (reason) => {
       setReportVisible(false);
@@ -756,12 +757,13 @@ export default function FriendProfileScreen({ route, navigation }) {
   const profileShowcaseBadges = useMemo(() => {
     const remoteIds = readProfileShowcaseBadges(profile);
     if (remoteIds.length > 0) return resolveShowcaseBadges(remoteIds);
-    if (isSelf && friendUid) {
+    // Önizleme arkadaşın gördüğünü gösterir: o yalnız buluttaki seçimi okur.
+    if (isSelf && !previewAsFriend && friendUid) {
       const localIds = getStored(Keys.showcaseBadges, { uid: friendUid });
       return resolveShowcaseBadges(localIds);
     }
     return [];
-  }, [profile, isSelf, friendUid]);
+  }, [profile, isSelf, previewAsFriend, friendUid]);
   // Kimlik rozetleri arkadaşın SUNUCU alanlarından: istemci ne
   // entitlements'ı ne badges'ı yazabilir (firestore.rules), yani sahte rozet
   // gösterilemez.
@@ -913,6 +915,19 @@ export default function FriendProfileScreen({ route, navigation }) {
         onScroll={onScroll}
         scrollEventThrottle={16}
       >
+        {/* ── Önizleme: kendi profilin, bir arkadaşın gözünden ────────────── */}
+        {previewAsFriend && (
+          <ProfilePreviewBanner
+            title={i18nText("autoI18n.profil_onizleme_baslik", "Arkadaşların profilini böyle görüyor")}
+            subtitle={i18nText(
+              "autoI18n.profil_onizleme_aciklama",
+              "Neyin görüneceğini gizlilik ayarlarından seçebilirsin.",
+            )}
+            actionLabel={i18nText("autoI18n.gizlilik", "Gizlilik")}
+            onAction={() => navigation.navigate("PrivacySettingsScreen")}
+          />
+        )}
+
         {/* ── Hero: avatar, ad, durum, rozetler, bio ───────────────────────── */}
         <ProfileHero
           avatarIndex={profile.avatarIndex}
@@ -1098,7 +1113,7 @@ export default function FriendProfileScreen({ route, navigation }) {
             )}
 
             {/* ── Zevk uyumu + birlikte izleyelim (kendi profilinde yok) ──────── */}
-            {tasteMatch && together && currentUser?.uid !== friendUid ? (
+            {tasteMatch && together && !isSelf ? (
               <>
                 <SectionHeader title={getTasteMatchCopy(language).title} />
                 <TasteMatchCard
@@ -1194,18 +1209,21 @@ export default function FriendProfileScreen({ route, navigation }) {
                 </Text>
               </View>
               <View style={styles.listModalHeaderActions}>
-                <GlassIconButton
-                  icon="file-tray-full-outline"
-                  iconSize={18}
-                  size={38}
-                  fallbackRadius={13}
-                  color="#fff"
-                  tint={theme.accent}
-                  fallbackStyle={{ backgroundColor: theme.accent }}
-                  hitSlop={6}
-                  accessibilityLabel={i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
-                  onPress={openSaveList}
-                />
+                {/* Kendi listeni kendine kopyalamanın anlamı yok (önizleme dahil). */}
+                {!isSelf && (
+                  <GlassIconButton
+                    icon="file-tray-full-outline"
+                    iconSize={18}
+                    size={38}
+                    fallbackRadius={13}
+                    color="#fff"
+                    tint={theme.accent}
+                    fallbackStyle={{ backgroundColor: theme.accent }}
+                    hitSlop={6}
+                    accessibilityLabel={i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
+                    onPress={openSaveList}
+                  />
+                )}
 
                 <View
                   style={[
