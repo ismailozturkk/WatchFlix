@@ -1,14 +1,12 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   StyleSheet,
   View,
   TextInput,
   TouchableOpacity,
   Animated,
-  Easing,
   Keyboard,
   Platform,
-  useWindowDimensions,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useLanguage } from "../../context/LanguageContext";
@@ -32,12 +30,10 @@ import GlassField from "../../components/common/GlassField";
 import GlassIconButton from "../../components/common/GlassIconButton";
 import GlassSegmentedControl from "../../components/common/GlassSegmentedControl";
 import { getSearchHeaderCopy } from "../../components/search/searchHeaderCopy";
-import { liquidGlassSupported } from "../../services/liquidGlass";
 import { alpha } from "../../theme/colors";
 import { isLightSurface } from "../../utils/colorUtils";
 import { useFocusEffect } from "@react-navigation/native";
 import { Keys, get, set } from "../../services/storage";
-import ScreenToastHost from "@components/toast/ScreenToastHost";
 
 // Başlık satırındaki her öğe (geri, alan, görünüm) aynı yükseklikte ve cam olmayan
 // yolda da yuvarlak: hap alanın iki yanında daire düğmeler, tek hizada okunur.
@@ -102,23 +98,12 @@ export default function SearchScreen({ navigation, route }) {
   const linkBusy = useRef(false);
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  // Bu ekran native-stack'te `transparentModal` olarak açılıyor. iOS'ta bu
-  // sunum tipindeki SafeAreaView bazen üst inset'i 0 uygulayıp arama çubuğunu
-  // status barın altına taşıyor. Canlı inset'i, ilk pencere metriğini güvenli
-  // yedek olarak kullanarak doğrudan köke uygula.
+  // Canlı inset'i, ilk pencere metriğini güvenli yedek olarak kullanarak doğrudan
+  // köke uygula (inset ilk karede 0 gelirse arama çubuğu durum çubuğunun altına kaçmasın).
   const topInset = Math.max(
     insets.top,
     initialWindowMetrics?.insets?.top || 0,
   );
-  const searchOrigin = route?.params?.searchOrigin;
-  const hasSearchOrigin =
-    searchOrigin &&
-    [searchOrigin.x, searchOrigin.y, searchOrigin.width, searchOrigin.height].every(
-      Number.isFinite,
-    ) &&
-    searchOrigin.width > 0 &&
-    searchOrigin.height > 0;
 
   // Route'dan gelen initialType varsa al (örn: ana ekrandan "movie" veya "tv" tıklandıysa)
   const initialType = route?.params?.initialType || "movie";
@@ -183,96 +168,36 @@ export default function SearchScreen({ navigation, route }) {
     set(Keys.searchResultsViewMode, nextMode);
   }, []);
 
-  // Genişleme animasyonu bitti mi? Bittiğinde kabuk sabit ölçü yerine
-  // absoluteFill'e geçer; edge-to-edge'de kökün gerçek yüksekliği pencere
-  // yüksekliğinden büyük olduğu için (navigasyon çubuğu şeridi) aksi halde
-  // altta boyanmamış bir bant kalır ve transparentModal'ın altındaki ekran görünür.
-  const [expandDone, setExpandDone] = useState(!hasSearchOrigin);
-
-  // Kabuğun hedef ölçüsü kökün ölçülen layout'undan gelir; useWindowDimensions
-  // Android'de navigasyon çubuğunu hariç tutar.
-  const [rootSize, setRootSize] = useState(null);
-  const onRootLayout = useCallback((event) => {
-    const { width, height } = event.nativeEvent.layout;
-    setRootSize((prev) =>
-      prev && prev.width === width && prev.height === height
-        ? prev
-        : { width, height },
-    );
-  }, []);
-  const targetWidth = rootSize?.width ?? screenWidth;
-  const targetHeight = rootSize?.height ?? screenHeight;
-
-  const searchBarAnim = useRef(new Animated.Value(0)).current;
-  const expandAnim = useRef(new Animated.Value(hasSearchOrigin ? 0 : 1)).current;
-  const contentRevealAnim = useRef(
-    new Animated.Value(hasSearchOrigin ? 0 : 1),
-  ).current;
-
+  // AÇILIŞ: diğer ekranlar gibi normal yığın geçişi (App.js, varsayılan
+  // slide_from_right). Eskiden arama düğmesinden genişleyen bir kabuk (JS sürücülü
+  // top/left/width/height animasyonu) ve arama çubuğunun kayarak belirmesi vardı;
+  // ağır ilk render'la aynı karelere düşüp takılıyordu, kaldırıldı.
+  //
+  // Klavye geçiş BİTİNCE açılır: geçişle aynı anda açılan klavye kaymayı da takıltır.
+  // `transitionEnd` gelmezse (ör. kısayolla doğrudan açılış) zamanlayıcı yedeği odaklar.
   const hasAutoFocusedRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
-      if (route?.params?.autoFocus && !hasAutoFocusedRef.current) {
-        hasAutoFocusedRef.current = true;
-        setTimeout(() => inputRef.current?.focus(), hasSearchOrigin ? 320 : 100);
-      }
       if (route?.params?.initialType) {
         setActiveTab(route.params.initialType);
       }
-    }, [hasSearchOrigin, route?.params])
+      if (!route?.params?.autoFocus || hasAutoFocusedRef.current) return undefined;
+      const focusOnce = () => {
+        if (hasAutoFocusedRef.current) return;
+        hasAutoFocusedRef.current = true;
+        inputRef.current?.focus();
+      };
+      const unsubscribe = navigation.addListener?.("transitionEnd", (event) => {
+        if (!event?.data?.closing) focusOnce();
+      });
+      const fallback = setTimeout(focusOnce, 600);
+      return () => {
+        clearTimeout(fallback);
+        unsubscribe?.();
+      };
+    }, [navigation, route?.params])
   );
-
-  useEffect(() => {
-    const animations = [
-      Animated.timing(searchBarAnim, {
-        toValue: 1,
-        duration: 350,
-        useNativeDriver: true,
-      }),
-    ];
-
-    if (hasSearchOrigin) {
-      animations.push(
-        Animated.timing(expandAnim, {
-          toValue: 1,
-          duration: 300,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }),
-        Animated.timing(contentRevealAnim, {
-          toValue: 1,
-          delay: 100,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      );
-    }
-
-    let cancelled = false;
-    Animated.parallel(animations).start(() => {
-      if (!cancelled) setExpandDone(true);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [contentRevealAnim, expandAnim, hasSearchOrigin, searchBarAnim]);
-
-  // iOS 26+: Liquid Glass bir atası animasyonlu `opacity` taşıyorsa bozulur
-  // (bkz. components/common/GlassSurface.js) — bu yüzden cam açıkken giriş
-  // yalnız kaymayla yapılır, solma yok. Geri düğmesi ve arama alanı bu satırda.
-  const searchBarStyle = {
-    ...(liquidGlassSupported ? null : { opacity: searchBarAnim }),
-    transform: [
-      {
-        translateY: searchBarAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [12, 0],
-        }),
-      },
-    ],
-  };
 
   const typeOptions = ["movie", "tv", "actor"].map((id) => ({
     value: id,
@@ -280,45 +205,8 @@ export default function SearchScreen({ navigation, route }) {
     icon: TYPE_ICONS[id],
   }));
 
-  const expandingShellStyle =
-    hasSearchOrigin && !expandDone
-      ? {
-          top: expandAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [searchOrigin.y, 0],
-          }),
-          left: expandAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [searchOrigin.x, 0],
-          }),
-          width: expandAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [searchOrigin.width, targetWidth],
-          }),
-          height: expandAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [searchOrigin.height, targetHeight],
-          }),
-          borderRadius: expandAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [searchOrigin.radius ?? 18, 0],
-          }),
-        }
-      : StyleSheet.absoluteFill;
-
   return (
-    <View style={styles.transitionRoot} onLayout={onRootLayout}>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.expandingShell,
-          { backgroundColor: theme.primary },
-          expandingShellStyle,
-        ]}
-      />
-      <Animated.View
-        style={[styles.animatedContent, { opacity: contentRevealAnim }]}
-      >
+    <View style={[styles.root, { backgroundColor: theme.primary }]}>
         <View
           style={[
             styles.container,
@@ -329,7 +217,7 @@ export default function SearchScreen({ navigation, route }) {
 
       {/* ── Arama Kutusu ──────────────────────────────────────── */}
       {/* Geri · arama alanı · görünüm: üçü de BAR_HEIGHT, tek hizada. */}
-      <Animated.View style={[styles.searchContainer, searchBarStyle]}>
+      <View style={styles.searchContainer}>
         <BackButton
           absolute={false}
           size={BAR_HEIGHT}
@@ -413,10 +301,10 @@ export default function SearchScreen({ navigation, route }) {
           theme={theme}
           labels={copy}
         />
-      </Animated.View>
+      </View>
 
       {/* ── Tür anahtarı: Film · Dizi · Oyuncu (kayan vurgu hapı) ───────────── */}
-      <Animated.View style={[styles.tabsContainer, searchBarStyle]}>
+      <View style={styles.tabsContainer}>
         <GlassSegmentedControl
           options={typeOptions}
           value={activeTab}
@@ -425,7 +313,7 @@ export default function SearchScreen({ navigation, route }) {
           accessibilityLabel={copy.typeLabel}
           testIDPrefix="search-type"
         />
-      </Animated.View>
+      </View>
 
       {/* ── İçerik ──────────────────────────────────────── */}
           <View style={styles.contentContainer}>
@@ -458,23 +346,12 @@ export default function SearchScreen({ navigation, route }) {
         )}
           </View>
         </View>
-      </Animated.View>
-      {/* `transparentModal` iOS'ta kökün üstüne bir pencere açar: toast için kendi host'u. */}
-      <ScreenToastHost />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  transitionRoot: {
-    flex: 1,
-    backgroundColor: "transparent",
-  },
-  expandingShell: {
-    position: "absolute",
-    overflow: "hidden",
-  },
-  animatedContent: {
+  root: {
     flex: 1,
   },
   container: {

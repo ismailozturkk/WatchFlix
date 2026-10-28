@@ -513,9 +513,9 @@ function AppContent() {
           getComponent={() => require("./screens/tabs/SearchScreen").default}
           options={{
             headerShown: false,
-            presentation: "transparentModal",
-            animation: "none",
-            contentStyle: { backgroundColor: "transparent" },
+            // Normal yığın geçişi (diğer ekranlarla aynı); eski düğmeden genişleme
+            // geçişi (transparentModal + JS animasyonu) takılıyordu.
+            animation: "slide_from_right",
           }}
         />
         <Stack.Screen

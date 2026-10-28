@@ -1,9 +1,9 @@
 // Film / Dizi ana ekranının arama düğmesi (components/home/DiscoverSearchAction.js): Film/Dizi
 // anahtarının YANINDA duran yuvarlak cam düğme. Eskiden listelerin başında tam genişlikte
 // arama hapı (DiscoverSearchHeader) vardı; liste başlığı artık yalnız boşluk
-// (DiscoverHeaderSpacer). Gerçek çizim (cam, gölge, açılış geçişi) cihazda doğrulanır; burada
-// davranış kilitlenir: arama ekranı doğru tür + konum + köşeyle açılır, iki çizim yolunda boyut
-// anahtarla hizalı, liste başlığı bir ELEMENT.
+// (DiscoverHeaderSpacer). Gerçek çizim (cam, gölge) cihazda doğrulanır; burada davranış
+// kilitlenir: arama ekranı doğru türle, normal geçişle (konum ölçümü YOK) açılır, iki çizim
+// yolunda boyut anahtarla hizalı, liste başlığı bir ELEMENT.
 import fs from "fs";
 import path from "path";
 import React from "react";
@@ -112,62 +112,32 @@ describe("DiscoverSearchAction — görünüm", () => {
     const tree = render(<DiscoverSearchAction navigation={makeNavigation()} mediaType="tv" label="Dizi Ara" />);
     const src = fs.readFileSync(path.join(__dirname, "..", "components/home/DiscoverSearchAction.js"), "utf8");
     expect(src).not.toMatch(/react-native-reanimated|opacity|entering|exiting/);
-    expect(tree.root.findAllByType("View")).toHaveLength(1); // yalnız ölçülebilir kabuk
-    expect(tree.root.findByType("View").props.collapsable).toBe(false);
+    expect(tree.root.findAllByType("View")).toHaveLength(0); // ölçüm kabuğu yok
   });
 });
 
 describe("DiscoverSearchAction — arama ekranını açma", () => {
-  const measured = (cb) => ({ createNodeMock: () => ({ measureInWindow: cb }) });
-
-  it("dokununca düğmenin konumunu ve yuvarlak köşesini taşıyarak seçili türle açar", () => {
+  it("dokununca seçili türle, konum ölçmeden açar (normal yığın geçişi)", () => {
     const navigation = makeNavigation();
-    const tree = render(
-      <DiscoverSearchAction navigation={navigation} mediaType="tv" label="Dizi Ara" />,
-      measured((cb) => cb(251, 59, 46, 46)),
-    );
+    const tree = render(<DiscoverSearchAction navigation={navigation} mediaType="tv" label="Dizi Ara" />);
     act(() => button(tree).props.onPress());
     expect(navigation.navigate).toHaveBeenCalledWith("UnifiedSearch", {
       initialType: "tv",
       autoFocus: true,
-      searchOrigin: { x: 251, y: 59, width: 46, height: 46, radius: 23 },
     });
-  });
-
-  it("cam kapalıyken köşe yarıçapı 24 (daire 48)", () => {
-    mockGlass = false;
-    const navigation = makeNavigation();
-    const tree = render(
-      <DiscoverSearchAction navigation={navigation} mediaType="movie" label="Film Ara" />,
-      measured((cb) => cb(250, 58, 48, 48)),
-    );
-    act(() => button(tree).props.onPress());
-    expect(navigation.navigate.mock.calls[0][1].searchOrigin).toEqual({ x: 250, y: 58, width: 48, height: 48, radius: 24 });
+    const src = fs.readFileSync(path.join(__dirname, "..", "components/home/DiscoverSearchAction.js"), "utf8");
+    expect(src).not.toMatch(/measureInWindow\(/);
   });
 
   it("tür değişince arama o türle açılır (anahtar Film'e geçti)", () => {
     const navigation = makeNavigation();
-    const tree = render(
-      <DiscoverSearchAction navigation={navigation} mediaType="tv" label="Dizi Ara" />,
-      measured((cb) => cb(0, 0, 46, 46)),
-    );
+    const tree = render(<DiscoverSearchAction navigation={navigation} mediaType="tv" label="Dizi Ara" />);
     act(() => {
       tree.update(<DiscoverSearchAction navigation={navigation} mediaType="movie" label="Film Ara" />);
     });
     act(() => button(tree).props.onPress());
     expect(navigation.navigate.mock.calls[0][1].initialType).toBe("movie");
     expect(button(tree).props.accessibilityLabel).toBe("Film Ara");
-  });
-
-  it("ölçüm yoksa yine açar (geçişsiz)", () => {
-    const navigation = makeNavigation();
-    const tree = render(<DiscoverSearchAction navigation={navigation} mediaType="movie" label="Film Ara" />);
-    act(() => button(tree).props.onPress());
-    expect(navigation.navigate).toHaveBeenCalledWith("UnifiedSearch", {
-      initialType: "movie",
-      autoFocus: true,
-      searchOrigin: undefined,
-    });
   });
 });
 

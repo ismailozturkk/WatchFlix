@@ -11,14 +11,13 @@
 // tema yüzeyli, çerçeveli, hafif gölgeli daire. Cam yolunda yükseklik anahtarla birebir; eski
 // yolda anahtarın 1 px çerçevesi 2 px eklediği için daire de 2 px büyük (ikisi aynı hizada biter).
 //
-// AÇILIŞ GEÇİŞİ: dokununca arama ekranı düğmenin konumundan ve yuvarlak köşesinden genişleyerek
-// açılır (`searchOrigin`, bkz. screens/tabs/SearchScreen.js). Ölçüm düğmenin kendisinden alınır.
+// AÇILIŞ GEÇİŞİ: arama ekranı normal yığın geçişiyle açılır (App.js). Eskiden düğmenin konumundan
+// genişleyerek açılıyordu (`searchOrigin` ölçümü); takıldığı için kaldırıldı.
 //
 // Bu düğmede opaklık / giriş animasyonu YOK (cam kuralı: GlassSurface, kural 1; ve Reanimated
 // ilk-değer kaybolması — bkz. memory/reanimated-initial-value-vanish). Basma geri bildirimini
 // GlassIconButton verir (cam yolunda sistem esnemesi, eski yolda hafif saydamlık).
-import React, { memo, useCallback, useRef } from "react";
-import { View } from "react-native";
+import React, { memo, useCallback } from "react";
 import GlassIconButton from "../common/GlassIconButton";
 import { GLASS_FIELD_TINT_ALPHA } from "../common/GlassField";
 import { useTheme } from "../../context/ThemeContext";
@@ -61,42 +60,24 @@ export const discoverSearchActionSize = (shaped) =>
 function DiscoverSearchAction({ navigation, mediaType, label }) {
   const { theme } = useTheme();
   const size = discoverSearchActionSize(useGlassShape());
-  const buttonRef = useRef(null);
-
   const openSearch = useCallback(() => {
-    const navigateToSearch = (searchOrigin) => {
-      navigation.navigate("UnifiedSearch", {
-        initialType: mediaType,
-        autoFocus: true,
-        searchOrigin,
-      });
-    };
-
-    if (buttonRef.current?.measureInWindow) {
-      buttonRef.current.measureInWindow((x, y, width, height) => {
-        navigateToSearch({ x, y, width, height, radius: size / 2 });
-      });
-      return;
-    }
-
-    // Ölçülemiyorsa (nadir) geçişsiz aç; arama yine de açılır.
-    navigateToSearch(undefined);
-  }, [mediaType, navigation, size]);
+    navigation.navigate("UnifiedSearch", {
+      initialType: mediaType,
+      autoFocus: true,
+    });
+  }, [mediaType, navigation]);
 
   return (
-    // Ölçülebilir kabuk: `measureInWindow` düğmenin pencere içindeki konumunu verir.
-    <View ref={buttonRef} collapsable={false}>
-      <GlassIconButton
-        testID="discover-search-button"
-        icon="search"
-        iconSize={20}
-        size={size}
-        fallbackRadius={size / 2}
-        {...discoverActionStyle(theme)}
-        onPress={openSearch}
-        accessibilityLabel={label}
-      />
-    </View>
+    <GlassIconButton
+      testID="discover-search-button"
+      icon="search"
+      iconSize={20}
+      size={size}
+      fallbackRadius={size / 2}
+      {...discoverActionStyle(theme)}
+      onPress={openSearch}
+      accessibilityLabel={label}
+    />
   );
 }
 
