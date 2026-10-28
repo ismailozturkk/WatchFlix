@@ -77,7 +77,7 @@ const PICKER_LINK_HEIGHT = 34;
 // 'error'a dondugu anda rozet + halka + parlama birlikte oynuyor. Boylece
 // renderItem icinde ref sozlugu tutmaya gerek kalmiyor -- ayni anda tek gorsel
 // indirildigi icin de fazladan maliyeti yok.
-const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload }) => {
+const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload, onSelect, pickerActive, isSelected, selectionLabel }) => {
   const pressScale = useRef(new Animated.Value(1)).current;
   const popAnim = useRef(new Animated.Value(0)).current; // rozetin girisi/cikisi
   const ringAnim = useRef(new Animated.Value(0)).current; // disa acilan halka
@@ -148,7 +148,11 @@ const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload }) 
         useNativeDriver: true,
       }),
     ]).start();
-    onDownload(item.file_path);
+    if (pickerActive) {
+      if (!isSelected) onSelect(item.file_path);
+    } else {
+      onDownload(item.file_path);
+    }
   };
 
   const imageWidth = isPoster ? 300 : 380;
@@ -186,6 +190,9 @@ const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload }) 
   } else if (status === "success") {
     hintIcon = "checkmark-circle";
     hintLabel = i18nText("autoI18n.galeriye_kaydedildi", "Galeriye kaydedildi");
+  } else if (pickerActive) {
+    hintIcon = isSelected ? "checkmark-circle" : "image-outline";
+    hintLabel = selectionLabel;
   }
 
   return (
@@ -199,6 +206,9 @@ const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload }) 
           activeOpacity={0.9}
           onPress={handlePress}
           disabled={isLoading}
+          accessibilityRole="button"
+          accessibilityLabel={pickerActive ? selectionLabel : hintLabel}
+          accessibilityState={pickerActive ? { selected: isSelected } : undefined}
         >
           <View
             style={[
@@ -213,6 +223,8 @@ const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload }) 
                 { width: imageWidth, height: imageHeight },
               ]}
             />
+
+            {isSelected && <View pointerEvents="none" style={styles.selectedBorder} />}
 
             <Animated.View
               pointerEvents="none"
@@ -251,7 +263,7 @@ const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload }) 
             )}
           </View>
 
-          {/* İndirme ipucu */}
+          {/* Dokunma eylemi: seçim ya da indirme. */}
           <View
             style={[
               styles.downloadHint,
@@ -303,7 +315,7 @@ const ImageGalleryModal = ({
   const choiceKind = imageType === "poster" ? CHOICE_KIND.POSTER : CHOICE_KIND.BACKDROP;
   const isPosterChoice = choiceKind === CHOICE_KIND.POSTER;
   const chosenPath = pickerActive ? posterChoices.chosenFor(mediaType, mediaId, choiceKind) : null;
-  // Galeri açılırken seçili afiş listenin başına alınır; açıkken yapılan seçim
+  // Galeri açılırken kullanılan görsel listenin başına alınır; açıkken yapılan seçim
   // sırayı DEĞİŞTİRMEZ (yoksa kaydırılan liste elin altında kayardı).
   const chosenRef = useRef(chosenPath);
   chosenRef.current = chosenPath;
@@ -383,17 +395,17 @@ const ImageGalleryModal = ({
             grouped[code].sort(sortByVotes),
           );
 
-          setImages(pickerActive ? orderGalleryForChoice(finalImages, chosenRef.current) : finalImages);
+          setImages(pickerActive ? orderGalleryForChoice(finalImages, chosenRef.current || initialImage) : finalImages);
         } else {
           // Fallback if API returned nothing
           const fallback = initialImage ? [{ file_path: initialImage }] : [];
-          setImages(pickerActive ? orderGalleryForChoice(fallback, chosenRef.current) : fallback);
+          setImages(pickerActive ? orderGalleryForChoice(fallback, chosenRef.current || initialImage) : fallback);
         }
       } catch (error) {
         console.error("Error fetching images:", error);
         if (initialImage) {
           const fallback = [{ file_path: initialImage }];
-          setImages(pickerActive ? orderGalleryForChoice(fallback, chosenRef.current) : fallback);
+          setImages(pickerActive ? orderGalleryForChoice(fallback, chosenRef.current || initialImage) : fallback);
         }
       } finally {
         setLoading(false);
@@ -429,9 +441,8 @@ const ImageGalleryModal = ({
     []
   );
 
-  /* Ozel gorsel: ekrandaki gorseli bu yapimin afisi / arka plani yap (Premium). */
-  const chooseCurrentImage = () => {
-    const path = images[currentIndex]?.file_path || (images.length === 0 ? initialImage : null);
+  /* Ozel gorsel: dokunulan gorseli bu yapimin afisi / arka plani yap (Premium). */
+  const chooseImage = (path) => {
     if (!path) return;
     if (!posterChoices.allowed && posterChoices.uid) {
       Haptics.selectionAsync().catch(() => {});
@@ -553,6 +564,9 @@ const ImageGalleryModal = ({
     }, 150); // Yatay listin render olması için ufak gecikme
   };
 
+  // Özel seçim yoksa TMDB'nin varsayılan görseli de "kullanılan" görseldir.
+  const shownImage = chosenPath || initialImage;
+
   const renderItem = ({ item }) => {
     let status = "idle";
     if (downloadingPath === item.file_path) status = "loading";
@@ -570,6 +584,12 @@ const ImageGalleryModal = ({
         )}
         onClose={onClose}
         onDownload={downloadImage}
+        onSelect={chooseImage}
+        pickerActive={pickerActive}
+        isSelected={pickerActive && item.file_path === shownImage}
+        selectionLabel={item.file_path === shownImage
+          ? (isPosterChoice ? pickerCopy.currentPoster : pickerCopy.currentBackdrop)
+          : (isPosterChoice ? pickerCopy.useAsPoster : pickerCopy.useAsBackdrop)}
       />
     );
   };
@@ -578,6 +598,7 @@ const ImageGalleryModal = ({
     const gridItemWidth =
       (width - GRID_EDGE * 2 - GRID_GAP * (gridCols - 1)) / gridCols;
     const gridItemHeight = isPoster ? gridItemWidth * 1.5 : gridItemWidth * (9 / 16);
+    const isSelected = pickerActive && item.file_path === shownImage;
 
     // Bosluklar contentContainer/columnWrapper `gap`'inden geliyor; hucrenin
     // kendi margin'i yok, yoksa iki bosluk toplanirdi.
@@ -585,6 +606,9 @@ const ImageGalleryModal = ({
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => handleGridItemPress(index)}
+        accessibilityRole="button"
+        accessibilityLabel={i18nText("autoI18n.onizleme", "Önizleme")}
+        accessibilityState={pickerActive ? { selected: isSelected } : undefined}
       >
         {/* getTmdbUrl'in 3. argumani TMDB boyutu degil, EKRANDAKI genislik.
             Sabit 500 gecilince hedef 500*pixelRatio'ya cikiyor ve hicbir poster
@@ -603,7 +627,8 @@ const ImageGalleryModal = ({
             { width: gridItemWidth, height: gridItemHeight },
           ]}
         />
-        {pickerActive && chosenPath && item.file_path === chosenPath && (
+        {isSelected && <View pointerEvents="none" style={[styles.selectedBorder, { width: gridItemWidth, height: gridItemHeight, borderRadius: 8 }]} />}
+        {isSelected && (
           <View
             style={styles.chosenBadge}
             accessible
@@ -617,7 +642,6 @@ const ImageGalleryModal = ({
   };
 
   // Ekrandaki gorsel su an cizilen afis/arka plan mi (secim yoksa TMDB varsayilani).
-  const shownImage = chosenPath || initialImage;
   const currentPath = images[currentIndex]?.file_path || (images.length === 0 ? initialImage : null);
   const currentIsShown = Boolean(currentPath) && currentPath === shownImage;
   const useLabel = isPosterChoice ? pickerCopy.useAsPoster : pickerCopy.useAsBackdrop;
@@ -787,6 +811,7 @@ const ImageGalleryModal = ({
               key={isGrid ? `grid-${gridCols}` : "swipe"}
               style={{ flex: 1, width: "100%" }}
               data={images.length > 0 ? images : [{ file_path: initialImage }]}
+              extraData={chosenPath}
               keyExtractor={(item, index) => item.file_path || String(index)}
               renderItem={isGrid ? renderGridItem : renderItem}
               numColumns={isGrid ? gridCols : 1}
@@ -890,12 +915,12 @@ const ImageGalleryModal = ({
             height={PICKER_HEIGHT}
             paddingHorizontal={22}
             fallbackStyle={styles.pickerFallback}
-            onPress={currentIsShown ? undefined : chooseCurrentImage}
+            onPress={currentIsShown ? undefined : () => chooseImage(currentPath)}
             accessibilityLabel={currentIsShown ? currentLabel : useLabel}
           >
             {currentIsShown ? (
               <>
-                <Ionicons name="checkmark-circle" size={19} color="#FFD700" />
+                <Ionicons name="checkmark-circle" size={19} color="#3DDC84" />
                 <Text allowFontScaling={false} style={styles.pickerLabel}>
                   {currentLabel}
                 </Text>
@@ -1042,6 +1067,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
   },
+  selectedBorder: {
+    ...StyleSheet.absoluteFill,
+    borderWidth: 1.5,
+    borderColor: "#3DDC84",
+    borderRadius: 20,
+  },
   flashOverlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "#fff",
@@ -1105,7 +1136,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "#FFD700",
+    backgroundColor: "#3DDC84",
     justifyContent: "center",
     alignItems: "center",
   },
