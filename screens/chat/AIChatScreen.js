@@ -37,8 +37,6 @@ import {
   ActivityIndicator,
   Modal,
   Animated,
-  Easing,
-  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -47,6 +45,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import LottieView from "lottie-react-native";
 import Reanimated from "react-native-reanimated";
 import { useNavigation } from "@react-navigation/native";
+import { resolveAiMediaContext } from "@utils/aiMessageMediaContext";
 
 import useModalKeyboardLift from "@hooks/useModalKeyboardLift";
 import useAiPrefs from "@hooks/useAiPrefs";
@@ -110,9 +109,6 @@ import { AI_PLAN_LIMITS } from "@utils/premium";
 
 
 import ModalToastHost from "@components/toast/ModalToastHost";
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
-// FAB merkezi (ChatModal styles.fab: bottom 85, right 25, lottie 48x48)
-const FAB_ORIGIN = [SCREEN_W - 49, SCREEN_H - 109, 0];
 
 const TABS = ["explore", "plan", "lists"];
 const TAB_ICONS = {
@@ -145,7 +141,6 @@ const lastIndexWhere = (list, predicate) => {
 export default function AIChatScreen({
   visible,
   onClose,
-  fabOrigin,
   initialPrompt,
   // Baloncukta gösterilecek kısa metin (AI'a yine initialPrompt gider)
   initialDisplay,
@@ -174,7 +169,6 @@ export default function AIChatScreen({
   const [view, setView] = useState("chat"); // "chat" | "history"
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("explore");
   const [settingsVisible, setSettingsVisible] = useState(false);
   // Son cevapla gelen sunucu kotası (canlı kullanım okunana kadar ölçerin kaynağı)
   const [quota, setQuota] = useState(null);
@@ -203,8 +197,10 @@ export default function AIChatScreen({
 
   const quotaPlan = AI_PLAN_LIMITS[premiumPlan] ? premiumPlan : "free";
 
-  // ── Aç/kapa animasyonu (FAB'dan büyür / FAB'a küçülür) ──────────────────────
-  const anim = useRef(new Animated.Value(0)).current;
+  // ── Aç/kapa: Modal'ın yerel kayma geçişi ───────────────────────────────────
+  // Eskiden FAB'dan büyüyen JS animasyonu vardı (ölçek + opaklık, 460 ms); açılışta
+  // ağır ilk render'la aynı karelere düştüğü için takılıyordu. Geçiş artık
+  // `animationType="slide"` ile tamamen yerel tarafta.
   const [rendered, setRendered] = useState(false);
   const [blurReady, setBlurReady] = useState(false);
 
@@ -232,37 +228,22 @@ export default function AIChatScreen({
     if (visible) {
       setRendered(true);
       setBlurReady(false);
-      anim.setValue(0);
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 460,
-        easing: Easing.bezier(0.22, 1, 0.36, 1), // easeOutQuint — yumuşak yavaşlama
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) setBlurReady(true);
-      });
     }
-    return () => anim.stopAnimation();
-  }, [visible, anim]);
+  }, [visible]);
+
+  // Composer bulanıklığı Modal sunulduktan sonra bağlanır (geçiş sırasında hedef
+  // henüz çizilmemiş olabilir).
+  const handleShow = useCallback(() => setBlurReady(true), []);
 
   const handleClose = useCallback(() => {
     setBlurReady(false);
     Keyboard.dismiss();
-    Animated.timing(anim, {
-      toValue: 0,
-      duration: 340,
-      easing: Easing.bezier(0.4, 0, 0.2, 1), // yumuşak hızlanma/yavaşlama
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (finished) {
-        setRendered(false);
-        // Aynı yapım için "AI'ya sor" ikinci kez basıldığında prop değeri
-        // değişmemiş olabilir; kilidi burada açmazsak sohbet hiç başlamaz.
-        initialPromptRef.current = null;
-        onClose?.();
-      }
-    });
-  }, [anim, onClose]);
+    setRendered(false);
+    // Aynı yapım için "AI'ya sor" ikinci kez basıldığında prop değeri
+    // değişmemiş olabilir; kilidi burada açmazsak sohbet hiç başlamaz.
+    initialPromptRef.current = null;
+    onClose?.();
+  }, [onClose]);
 
   const scrollRef = useRef(null);
   // Kaydırma niyeti: "end" = en alta yapış (kullanıcı mesajı / düşünüyor),
@@ -389,11 +370,12 @@ export default function AIChatScreen({
     return parts.join(" · ");
   }, [language, prefs.enabled, prefs.mediaType, selectedGenreLabels, selectedProviders]);
 
-  // Tab'a göre prompt chip'leri (+ kişiselleştirilmiş / kütüphane chip'leri)
-  const chips = useMemo(() => {
-    const base = t?.AICineChat?.chips?.[activeTab] || [];
-    const list = Array.isArray(base) ? [...base] : [];
-    if (activeTab === "explore" && discoveryPreferences) {
+  // Bölüm başına hazır istekler (+ Keşfet'te kişiselleştirilmiş / kütüphane çipleri)
+  const chipsByTab = useMemo(() => {
+    const byTab = {};
+    TABS.forEach((tab) => { byTab[tab] = Array.isArray(t?.AICineChat?.chips?.[tab]) ? [...t.AICineChat.chips[tab]] : []; });
+    const list = byTab.explore;
+    if (discoveryPreferences) {
       list.unshift({
         label: pickByLanguage(language, { tr: "🎯 Seçimlerime göre öner", en: "🎯 Recommend from my filters", es: "🎯 Recomienda según mis filtros", pt: "🎯 Recomende com base nos meus filtros", de: "🎯 Nach meinen Filtern empfehlen" }),
         // Bu metin kullanıcı balonunda da görünür (handleSend → display): her dilde yerelleştirilmiş olmalı.
@@ -406,7 +388,7 @@ export default function AIChatScreen({
         }),
       });
     }
-    if (activeTab === "explore" && mostWatchedGenre) {
+    if (mostWatchedGenre) {
       const tpl = t?.AICineChat?.personalizedChip || i18nText("autoI18n.sana_ozel_genre", "Sana özel: {genre}");
       list.unshift({
         label: `🎯 ${tpl.replace("{genre}", mostWatchedGenre)}`,
@@ -416,7 +398,6 @@ export default function AIChatScreen({
       });
     }
     if (
-      activeTab === "explore" &&
       prefs.enabled &&
       prefs.watchList &&
       (allLists?.watchList?.length || 0) > 0
@@ -428,11 +409,9 @@ export default function AIChatScreen({
           i18nText("autoI18n.from_watchlist_prompt", "İzleme listemden bana ne izleyeyim diye birkaç seçim yap"),
       });
     }
-    if (activeTab === "explore") {
-      list.push({ label: copy.vibe.surprise, prompt: copy.vibe.surprisePrompt });
-    }
-    return list;
-  }, [t, activeTab, mostWatchedGenre, prefs.enabled, prefs.watchList, allLists, discoveryPreferences, language, copy]);
+    list.push({ label: copy.vibe.surprise, prompt: copy.vibe.surprisePrompt, preview: copy.vibe.surpriseHint });
+    return byTab;
+  }, [t, mostWatchedGenre, prefs.enabled, prefs.watchList, allLists, discoveryPreferences, language, copy]);
 
   // ── Aktif sohbeti kaydet (yerel kopya + kalıcı günlük anında, bulut arka planda) ──
   // Oluşturulma zamanı depoda korunur; saklama sınırını aşan en eski sohbetler
@@ -482,13 +461,9 @@ export default function AIChatScreen({
             return { role: m.role, text: m.text || m.display || "" };
           });
 
-        // Yalnız SON mesajın ataçı cevabı kilitler (title_spotlight). Önceki
-        // mesajlardaki ataç yalnız "bu / onu" zamirlerini çözer; aksi hâlde
-        // takip soruları hep aynı yapımın tanıtımını döndürürdü.
-        const targetMedia = lastUserMsg?.attachment?.title ? lastUserMsg.attachment : null;
-        const focusMedia = targetMedia
-          ? null
-          : [...msgsIncludingUser].reverse().find((item) => item.role === "user" && item.attachment?.title)?.attachment || null;
+        // Bilgi isteğinde son kart title_spotlight'ı kilitler. Benzer öneri
+        // isteğinde kart yalnız referanstır; öneri cevabı serbest kalır.
+        const { targetMedia, focusMedia, similarityRequest } = resolveAiMediaContext(msgsIncludingUser, lastUserMsg);
 
         const filterActive = countDiscoveryFilters(prefs) > 0;
         const requestedProviders = selectedProviders.map((provider) => provider.name);
@@ -513,6 +488,7 @@ export default function AIChatScreen({
           discoveryPreferences,
           targetMedia,
           focusMedia,
+          similarityRequest,
           responseStyle: prefs.responseStyle,
           spoilerLevel: prefs.spoilerLevel,
           maxItems: filterActive ? prefs.maxItems + FILTER_HEADROOM : prefs.maxItems,
@@ -872,14 +848,14 @@ export default function AIChatScreen({
   const handleOpenFilters = useCallback(() => setSettingsVisible(true), []);
 
   const filterCount = countDiscoveryFilters(prefs);
-  const origin = fabOrigin || FAB_ORIGIN;
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <Modal
       transparent
       visible={rendered}
-      animationType="none"
+      animationType="slide"
+      onShow={handleShow}
       statusBarTranslucent
       // navigationBarTranslucent, dialog penceresini HER API seviyesinde
       // edge-to-edge yapar: pencere IME için yeniden boyutlanmaz ve alt system
@@ -889,23 +865,7 @@ export default function AIChatScreen({
       navigationBarTranslucent
       onRequestClose={handleClose}
     >
-      {/* Karartma — animasyonla belirir */}
-      <Animated.View
-        pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { backgroundColor: "#000", opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] }) }]}
-      />
-
-      {/* FAB'dan büyüyen / küçülen kapsayıcı */}
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            opacity: anim,
-            transformOrigin: origin,
-            transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.08, 1] }) }],
-          },
-        ]}
-      >
+      <View style={StyleSheet.absoluteFill}>
         {/* RN Modal içinde SafeAreaView'in özellikle iOS alt inset'i güvenilir
             uygulanmayabiliyor. Klavye kaldırma hesabı bu inset'i düşürdüğü için
             üst ve alt güvenli alanı doğrudan uyguluyoruz; böylece composer
@@ -1049,10 +1009,7 @@ export default function AIChatScreen({
                     copy={copy}
                     tabs={TABS}
                     tabIcons={TAB_ICONS}
-                    activeTab={activeTab}
-                    onTabChange={setActiveTab}
-                    chips={chips}
-                    chipIcon={TAB_ICONS[activeTab]}
+                    chipsByTab={chipsByTab}
                     filterSummary={filterSummary}
                     onOpenFilters={handleOpenFilters}
                     onSendChip={handleSendChip}
@@ -1156,7 +1113,7 @@ export default function AIChatScreen({
             </Reanimated.View>
           )}
         </View>
-      </Animated.View>
+      </View>
 
       {/* "Sohbete gönder" alıcı sayfası bu Modal'ın İÇİNDE durur: iOS ikinci bir
           Modal'ı ancak ilkinin çocuğu olarak sunabilir. Alıcı seçilip sayfa

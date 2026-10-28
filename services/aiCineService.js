@@ -339,7 +339,7 @@ function formatGenres(genres) {
  * daha uzun olduğundan toplam öğe sayısı düşük tutulur. Varsayılan (dengeli,
  * spoilersız, 5 öğe) eski talimatla aynı kuralları üretir.
  */
-export function resolveStyleRules({ responseStyle, spoilerLevel, maxItems } = {}) {
+export function resolveStyleRules({ responseStyle, spoilerLevel, maxItems, allowFewerRecommendations = false } = {}) {
   const style = AI_RESPONSE_STYLES.includes(responseStyle) ? responseStyle : "balanced";
   const spoilers = AI_SPOILER_LEVELS.includes(spoilerLevel) ? spoilerLevel : "none";
   // Ayar 3/5/8'dir; filtre açıkken ekran yerelde elenecekler için 1-2 öğe fazla ister.
@@ -361,7 +361,7 @@ export function resolveStyleRules({ responseStyle, spoilerLevel, maxItems } = {}
       ? "Keep every text field to one short spoiler-free sentence."
       : `${textRule} ${spoilerRule}`;
 
-  const recMin = Math.min(3, max);
+  const recMin = allowFewerRecommendations ? 1 : Math.min(3, max);
   const watchlistCap = style === "detailed" ? 9 : 12;
   const generalWords = style === "concise" ? 50 : style === "detailed" ? 120 : 80;
   const sizeRules = [
@@ -389,13 +389,14 @@ export function buildCineSystemInstruction({
   discoveryPreferences = "",
   targetMedia = null,
   focusMedia = null,
+  similarityRequest = false,
   responseStyle = "balanced",
   spoilerLevel = "none",
   maxItems = 5,
   contextBlock = "",
   avoidBlock = "",
 } = {}) {
-  const rules = resolveStyleRules({ responseStyle, spoilerLevel, maxItems });
+  const rules = resolveStyleRules({ responseStyle, spoilerLevel, maxItems, allowFewerRecommendations: similarityRequest });
   const movieList = formatGenres(movieGenres);
   const tvList = formatGenres(tvGenres);
   const tasteLines = [];
@@ -416,13 +417,19 @@ export function buildCineSystemInstruction({
 - Cast: ${safeArr(targetMedia.cast).map(toStr).filter(Boolean).slice(0, 8).join(", ") || "unknown"}
 The user's title-specific question refers ONLY to this exact TMDB record. Return title_spotlight with its display title and media type.`
     : null;
-  // Önceki mesajdaki yapım: cevabı kilitlemez, yalnız "bunu / onu" gibi zamirleri çözer.
+  // Önceki mesajdaki yapım cevabı kilitlemez. Öneri isteğinde kart aynı zamanda
+  // hikâye bağlamıdır; yalnız tür/ad vermek genel ve alakasız öneriler üretir.
   const focusBlock =
     !targetMedia?.title && focusMedia?.title
-      ? `CONVERSATION FOCUS (earlier in this chat the user asked about this exact title; resolve "it", "this", "bu", "onu" to it unless they name another title):
+      ? `CONVERSATION FOCUS (resolve "it", "this", "bu", "onu" to this title unless the user names another):
 - TMDB ID: ${toStr(focusMedia.id)}
 - Media type: ${normMediaType(focusMedia.mediaType)}
-- Title: ${toStr(focusMedia.title)}${focusMedia.year ? ` (${toStr(focusMedia.year)})` : ""}`
+ - Title: ${toStr(focusMedia.title)}${focusMedia.year ? ` (${toStr(focusMedia.year)})` : ""}${similarityRequest ? `
+ - Plot premise: ${toStr(focusMedia.overview).slice(0, 900) || "unknown"}
+ - Tagline: ${toStr(focusMedia.tagline).slice(0, 180) || "unknown"}
+ - Specific story keywords: ${safeArr(focusMedia.keywords).map(toStr).filter(Boolean).slice(0, 20).join(", ") || "unknown"}
+ - Broad genres (secondary evidence): ${safeArr(focusMedia.genres).map(toStr).filter(Boolean).join(", ") || "unknown"}
+ SIMILARITY REQUEST: Return recommendations, not a title spotlight. Match the source's defining plot premise, protagonist goal, central conflict, distinctive themes, and concrete motifs before considering genre or mood. Shared broad genre labels alone are insufficient: for a heist crime drama, prefer stories about planning or carrying out a theft over unrelated crime dramas. Each reason must state a specific narrative link to the source. Omit weak genre-only matches; fewer strong matches are better than filling the list.` : ""}`
       : null;
 
   return [
@@ -544,6 +551,7 @@ export async function askCineStructured({
   discoveryPreferences = "",
   targetMedia = null,
   focusMedia = null,
+  similarityRequest = false,
   responseStyle,
   spoilerLevel,
   maxItems,
@@ -572,6 +580,7 @@ export async function askCineStructured({
       discoveryPreferences,
       targetMedia,
       focusMedia,
+      similarityRequest,
       responseStyle,
       spoilerLevel,
       maxItems,

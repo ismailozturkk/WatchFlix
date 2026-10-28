@@ -10,10 +10,14 @@ import {
   StatusBar,
   Dimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { SeasonSkeleton } from "../../components/Skeleton";
+import DetailHeroStage, {
+  computeDetailHeroMetrics,
+} from "../../components/detail/DetailHeroStage";
 import BackButton from "../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -34,6 +38,7 @@ import { COMMENT_SCOPE } from "../../utils/commentScope";
 import { alpha } from "../../theme/colors";
 
 const { width } = Dimensions.get("window");
+const SEASON_HERO_IMAGE_HEIGHT = Math.round(width * 1.25);
 
 // ─── Yardımcı: Puan rengi ────────────────────────────────────────────────────
 const getRatingColor = (r) => {
@@ -327,6 +332,7 @@ export default function SeasonDetails({ route, navigation }) {
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { API_KEY } = useApiSettings();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
@@ -435,6 +441,11 @@ export default function SeasonDetails({ route, navigation }) {
 
   const progressColor =
     isSeasonWatched === 1 ? theme.colors?.green : theme.colors?.orange;
+  const heroMetrics = computeDetailHeroMetrics({
+    width,
+    topInset: insets.top,
+    imageHeight: SEASON_HERO_IMAGE_HEIGHT,
+  });
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
@@ -461,49 +472,38 @@ export default function SeasonDetails({ route, navigation }) {
         />
       )}
 
-      {/* ── Hero: Poster ──────────────────────────────────────────────────── */}
-      <View style={styles.heroContainer}>
-        {details.poster_path ? (
-          <Image
-            source={{
-              uri: getTmdbUrl(details.poster_path, 'poster', 200),
-            }}
-            style={styles.heroPoster}
-          />
-        ) : (
-          <View
-            style={[
-              styles.heroPlaceholder,
-              { backgroundColor: theme.secondary },
-            ]}
-          >
-            <Ionicons
-              name="image"
-              size={90}
-              color={theme.text?.muted ?? "#555"}
-            />
-          </View>
-        )}
-        {/* Üstten hafif karartma */}
-        <LinearGradient
-          colors={["rgba(0,0,0,0.5)", "transparent"]}
-          locations={[0, 0.28]}
-          style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
-        />
-        {/* Alttan tema rengine geçiş */}
-        <LinearGradient
-          colors={["transparent", theme.primary]}
-          locations={[0.6, 1]}
-          style={[StyleSheet.absoluteFill, { zIndex: 1 }]}
-        />
-        {/* Sezon adı – sol alt, gradient üzerinde */}
-        <View style={[styles.seasonHeroBadge, { zIndex: 2 }]}>
+      {/* ── Hero: Poster Yuvası ───────────────────────────────────────────── */}
+      <DetailHeroStage
+        uri={
+          details.poster_path
+            ? getTmdbUrl(details.poster_path, 'poster', 200)
+            : null
+        }
+        theme={theme}
+        topInset={insets.top}
+        width={width}
+        imageHeight={SEASON_HERO_IMAGE_HEIGHT}
+        placeholderIcon="image"
+        placeholderSize={90}
+      >
+        {/* Sezon adı – sol alt, orta posterin alt kenarı üzerinde */}
+        <View
+          style={[
+            styles.seasonHeroBadge,
+            { bottom: heroMetrics.bottomAmbientHeight + 14, zIndex: 2 },
+          ]}
+        >
           <Text style={styles.seasonHeroBadgeText}>{details.name}</Text>
         </View>
-      </View>
+      </DetailHeroStage>
 
       {/* ── İçerik ───────────────────────────────────────────────────────── */}
-      <View style={[styles.content, { backgroundColor: theme.primary }]}>
+      <View
+        style={[
+          styles.content,
+          { marginTop: -heroMetrics.contentOverlap },
+        ]}
+      >
         {/* ── Başlık Bloğu ─────────────────────────────────────────────── */}
         <View style={styles.titleBlock}>
           <Text
@@ -745,24 +745,6 @@ const styles = StyleSheet.create({
   },
 
   // ── Hero ──────────────────────────────────────────────────────────────────
-  heroContainer: {
-    width: "100%",
-    height: Math.round(width * 1.35), // ~2:3 poster oranı, cihaza göre ölçekli
-    position: "relative",
-    overflow: "hidden",
-    backgroundColor: "#0a0a0a",
-  },
-  heroPoster: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  heroPlaceholder: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   seasonHeroBadge: {
     position: "absolute",
     bottom: 24,
@@ -784,9 +766,8 @@ const styles = StyleSheet.create({
   // ── İçerik ────────────────────────────────────────────────────────────────
   content: {
     flex: 1,
-    marginTop: 0,
     paddingHorizontal: 18,
-    paddingTop: 16,
+    paddingTop: 10,
   },
 
   // ── Başlık ────────────────────────────────────────────────────────────────

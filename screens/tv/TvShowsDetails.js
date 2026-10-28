@@ -20,7 +20,6 @@ import {
   StatusBar,
   Modal,
   Animated,
-    Linking,
   FlatList,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,10 +28,12 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { DetailsSkeleton } from "../../components/Skeleton";
 import DetailLoadError from "../../components/detail/DetailLoadError";
+import DetailHeroStage, {
+  computeDetailHeroMetrics,
+} from "../../components/detail/DetailHeroStage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import TVShowItem from "../../components/TVShowItem";
 import { LinearGradient } from "expo-linear-gradient";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useAuth } from "../../context/AuthContext";
 import Toast from "@components/AppToast";
 import SeasonItem from "./SeasonItem";
@@ -76,6 +77,15 @@ import { i18nText } from "../../utils/i18nText";
 import { useWatchedShow } from "../../hooks/useWatchedShow";
 import { refreshShowMeta } from "../../services/refreshShowMeta";
 import AIChatScreen from "@screens/chat/AIChatScreen";
+import DetailAiActionSheet from "@components/detail/DetailAiActionSheet";
+import {
+  DetailActionCluster,
+  DetailFactsStrip,
+  DetailJournalPanel,
+  DetailOverviewSection,
+  DetailProviderRail,
+} from "@components/detail/DetailContentSections";
+import { buildDetailAiRequest, detailAiKeywords, DETAIL_AI_ACTION } from "@utils/detailAiRequest";
 import NewConversationSheet from "@components/chat/NewConversationSheet";
 import {
   getWatchState,
@@ -229,6 +239,8 @@ export default function TvShowsDetails({ route, navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
+  const [aiActionSheetVisible, setAiActionSheetVisible] = useState(false);
+  const [aiAction, setAiAction] = useState(DETAIL_AI_ACTION.INFO);
   const [sendVisible, setSendVisible] = useState(false);
 
   /* ── Format helpers ── */
@@ -593,22 +605,9 @@ export default function TvShowsDetails({ route, navigation }) {
     });
   }, [chatMedia, navigation]);
 
-  const aiPrompt = useMemo(() => {
-    if (!details?.name) return "";
-    const year = details.first_air_date
-      ? ` (${String(details.first_air_date).slice(0, 4)})`
-      : "";
-    return i18nText(
-      "autoI18n.dizi_ai_prompt",
-      "{{title}} dizisi hakkında spoiler vermeden bilgi ver. Konusu, türü, sezon yapısı, öne çıkan oyuncuları, atmosferi, kimlere uygun olduğu ve neden izlenebileceğini kısa başlıklarla anlat.",
-      { title: `${details.name}${year}` },
-    );
-  }, [details]);
-
-  // Sohbet baloncuğunda uzun prompt yerine kısa istek + poster kartı görünür.
-  const aiDisplay = i18nText(
-    "autoI18n.dizi_ai_display",
-    "Bu dizi hakkında bilgi verir misin?",
+  const aiRequest = useMemo(
+    () => buildDetailAiRequest("tv", details?.name, details?.first_air_date, aiAction),
+    [details?.name, details?.first_air_date, aiAction, language],
   );
   const aiAttachment = useMemo(() => {
     if (!details?.name) return null;
@@ -625,6 +624,7 @@ export default function TvShowsDetails({ route, navigation }) {
       originalTitle: details.original_name || details.name,
       overview: details.overview || "",
       genres: details.genres?.map((genre) => genre.name).filter(Boolean) || [],
+      keywords: detailAiKeywords(details),
       cast: details.credits?.cast?.slice(0, 8).map((person) => person.name).filter(Boolean) || [],
       director:
         details.created_by?.[0]?.name ||
@@ -636,6 +636,12 @@ export default function TvShowsDetails({ route, navigation }) {
           .filter(Boolean) || [],
     };
   }, [details, id, providerRegion]);
+  const aiChatAttachment = useMemo(
+    () => aiAction === DETAIL_AI_ACTION.SIMILAR && aiAttachment
+      ? { ...aiAttachment, referenceOnly: true }
+      : aiAttachment,
+    [aiAction, aiAttachment],
+  );
 
   // Oyuncu kartı — MovieDetail.renderCastMember ile birebir aynı yapı.
   const renderCastMember = useCallback(
@@ -714,6 +720,10 @@ export default function TvShowsDetails({ route, navigation }) {
   const rowNetworks = (details.networks || []).filter(
     (nw) => !providerNames.has((nw.name || "").toLowerCase())
   );
+  const heroMetrics = computeDetailHeroMetrics({
+    width,
+    topInset: insets.top,
+  });
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
@@ -730,43 +740,23 @@ export default function TvShowsDetails({ route, navigation }) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── HERO / BACKDROP ── */}
-        <View style={styles.heroContainer}>
-          {backdropUri("tv", details.id, details.backdrop_path) ? (
-            <TouchableOpacity
-              activeOpacity={0.95}
-              onPress={() => setBacdropModalVisible(true)}
-            >
-              <Image
-                source={{
-                  uri: backdropUri("tv", details.id, details.backdrop_path),
-                }}
-                style={styles.backdrop}
-              />
-            </TouchableOpacity>
-          ) : (
-            <View
-              style={[styles.noBackdrop, { backgroundColor: theme.secondary }]}
-            >
-              <Ionicons name="tv-outline" size={64} color={theme.text.muted} />
-            </View>
-          )}
-          <LinearGradient
-            // Açık temada ara durak koyu değil tema rengi: başlık bu bölgede duruyor
-            // ve koyu yazı koyulaşmış görselin üstünde okunmuyordu (T3 B11).
-            colors={[
-              "transparent",
-              isLightSurface(theme.primary) ? alpha(theme.primary, 0.7) : "rgba(0,0,0,0.15)",
-              theme.primary,
-            ]}
-            locations={[0.3, 0.65, 1]}
-            style={styles.heroGradient}
-            pointerEvents="none"
-          />
-        </View>
+        {/* ── HERO / BACKDROP YUVASI ── */}
+        <DetailHeroStage
+          uri={backdropUri("tv", details.id, details.backdrop_path)}
+          theme={theme}
+          topInset={insets.top}
+          width={width}
+          placeholderIcon="tv-outline"
+          onPress={() => setBacdropModalVisible(true)}
+        />
 
         {/* ── POSTER + INFO HEADER ── */}
-        <View style={styles.infoHeader}>
+        <View
+          style={[
+            styles.infoHeader,
+            { marginTop: -heroMetrics.infoHeaderOverlap },
+          ]}
+        >
           <TouchableOpacity
             style={styles.posterShadow}
             onPress={() => setPosterModalVisible(true)}
@@ -905,316 +895,61 @@ export default function TvShowsDetails({ route, navigation }) {
             />
           </View>
 
-          <View style={styles.detailActionRow}>
-            <GlassTouchable
-              activeOpacity={0.88}
-              onPress={openReviewComposer}
-              style={[
-                styles.detailActionBtn,
-                { backgroundColor: theme.secondary, borderColor: theme.border },
-              ]}
-            >
-              <View
-                style={[
-                  styles.detailActionIcon,
-                  {
-                    backgroundColor:
-                      (theme.colors?.blue || theme.accent) + "20",
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="create-outline"
-                  size={18}
-                  color={theme.colors?.blue || theme.accent}
-                />
-              </View>
-              <View style={styles.detailActionCopy}>
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.detailActionTitle,
-                    { color: theme.text.primary },
-                  ]}
-                >
-                  {i18nText("autoI18n.inceleme", "İnceleme")}
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.detailActionSub, { color: theme.text.muted }]}
-                  numberOfLines={1}
-                >
-                  {i18nText("autoI18n.hubda_paylas", "Hub'da paylaş")}
-                </Text>
-              </View>
-            </GlassTouchable>
-
-            <GlassTouchable
-              activeOpacity={0.88}
-              onPress={() => setAiVisible(true)}
-              style={[
-                styles.detailActionBtn,
-                { backgroundColor: theme.secondary, borderColor: theme.border },
-              ]}
-            >
-              <View
-                style={[
-                  styles.detailActionIcon,
-                  {
-                    backgroundColor:
-                      (theme.colors?.purple || theme.accent) + "20",
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="sparkles-outline"
-                  size={18}
-                  color={theme.colors?.purple || theme.accent}
-                />
-              </View>
-              <View style={styles.detailActionCopy}>
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.detailActionTitle,
-                    { color: theme.text.primary },
-                  ]}
-                >
-                  {i18nText("autoI18n.yapay_zeka", "Yapay Zeka")}
-                </Text>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.detailActionSub, { color: theme.text.muted }]}
-                  numberOfLines={1}
-                >
-                  {i18nText("autoI18n.bilgi_al", "Bilgi al")}
-                </Text>
-              </View>
-            </GlassTouchable>
-
-            <GlassTouchable
-              activeOpacity={0.88}
-              onPress={() => setSendVisible(true)}
-              style={[
-                styles.detailActionBtn,
-                { backgroundColor: theme.secondary, borderColor: theme.border },
-              ]}
-            >
-              <View
-                style={[
-                  styles.detailActionIcon,
-                  { backgroundColor: (theme.colors?.green || "#3CCB9A") + "20" },
-                ]}
-              >
-                <Ionicons name="paper-plane-outline" size={17} color={theme.colors?.green || "#3CCB9A"} />
-              </View>
-              <View style={styles.detailActionCopy}>
-                <Text allowFontScaling={false} style={[styles.detailActionTitle, { color: theme.text.primary }]}>
-                  {i18nText("autoI18n.gonder", "Gönder")}
-                </Text>
-                <Text allowFontScaling={false} style={[styles.detailActionSub, { color: theme.text.muted }]} numberOfLines={1}>
-                  {i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
-                </Text>
-              </View>
-            </GlassTouchable>
-          </View>
-
-          {/* ── STAT KARTLARI ── */}
-          <View
-            style={[
-              styles.statRow,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <View style={styles.statPill}>
-              <View
-                style={[
-                  styles.statIconWrap,
-                  { backgroundColor: theme.accent + "18" },
-                ]}
-              >
-                <Ionicons
-                  name="layers-outline"
-                  size={16}
-                  color={theme.accent}
-                />
-              </View>
-              <Text
-                allowFontScaling={false}
-                style={[styles.statVal, { color: theme.text.primary }]}
-              >
-                {details.number_of_seasons || 0}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={[styles.statLbl, { color: theme.text.muted }]}
-              >
-                {t.seasons}
-              </Text>
-            </View>
-            <View
-              style={[styles.statDivider, { backgroundColor: theme.border }]}
-            />
-            <View style={styles.statPill}>
-              <View
-                style={[
-                  styles.statIconWrap,
-                  {
-                    backgroundColor:
-                      (theme.colors?.blue || theme.accent) + "18",
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="play-circle-outline"
-                  size={16}
-                  color={theme.colors?.blue || theme.accent}
-                />
-              </View>
-              <View
-                style={{ flexDirection: "row", alignItems: "flex-end", gap: 2 }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.statVal, { color: theme.text.primary }]}
-                >
-                  {details.number_of_episodes || 0}
-                </Text>
-                {watchedEpisodeCount > 0 && (
-                  <Text
-                    allowFontScaling={false}
-                    style={[styles.statValSub, { color: theme.text.muted }]}
-                  >
-                    /{watchedEpisodeCount}
-                  </Text>
-                )}
-              </View>
-              <Text
-                allowFontScaling={false}
-                style={[styles.statLbl, { color: theme.text.muted }]}
-              >
-                {t.episode}
-              </Text>
-            </View>
-            <View
-              style={[styles.statDivider, { backgroundColor: theme.border }]}
-            />
-            <View style={styles.statPill}>
-              <View
-                style={[
-                  styles.statIconWrap,
-                  {
-                    backgroundColor:
-                      (theme.colors?.green || theme.accent) + "18",
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="calendar-outline"
-                  size={16}
-                  color={theme.colors?.green || theme.accent}
-                />
-              </View>
-              <Text
-                allowFontScaling={false}
-                style={[
-                  styles.statVal,
-                  { color: theme.text.primary, fontSize: 13 },
-                ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-              >
-                {formatDate(details.first_air_date)}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                style={[styles.statLbl, { color: theme.text.muted }]}
-              >
-                {t.tvShowsDetails?.airDate}
-              </Text>
-            </View>
-          </View>
-
-          {/* ── YORUMLAR BUTONU ── */}
-          <GlassTouchable
-            activeOpacity={0.85}
-            onPress={() => setCommentModalVisible(true)}
-            style={[
-              styles.commentsBtn,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
-            ]}
-          >
-            <View
-              style={[
-                styles.commentsIconWrap,
-                { backgroundColor: theme.accent + "20" },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="comment-text-multiple-outline"
-                size={18}
-                color={theme.accent}
-              />
-            </View>
-            <Text
-              allowFontScaling={false}
-              style={[styles.commentsBtnText, { color: theme.text.primary }]}
-            >
-              {t.comments || i18nText("autoI18n.yorumlar", "Yorumlar")}
-            </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={theme.text.muted}
-            />
-          </GlassTouchable>
-
-          {/* ── NOTUM KARTI ── */}
-          <GlassTouchable
-            activeOpacity={0.85}
-            onPress={() => {
-              // Ücretsiz planda 20 dizi notu: dolduysa not sayfası hiç açılmaz.
-              if (checkCanCreateMediaNote("tv", id)) setNoteSheetVisible(true);
+          <DetailActionCluster
+            theme={theme}
+            review={{
+              title: i18nText("autoI18n.inceleme", "İnceleme"),
+              subtitle: i18nText("autoI18n.hubda_paylas", "Hub'da paylaş"),
+              icon: "create-outline",
+              onPress: openReviewComposer,
             }}
-            style={[
-              styles.commentsBtn,
-              { backgroundColor: theme.secondary, borderColor: theme.border },
+            ai={{
+              title: i18nText("autoI18n.yapay_zeka", "Yapay Zeka"),
+              subtitle: i18nText("autoI18n.ai_action_subtitle", "Bilgi / Öneri"),
+              icon: "sparkles-outline",
+              onPress: () => setAiActionSheetVisible(true),
+            }}
+            send={{
+              title: i18nText("autoI18n.gonder", "Gönder"),
+              subtitle: i18nText("autoI18n.sohbete_gonder", "Sohbete gönder"),
+              icon: "paper-plane-outline",
+              onPress: () => setSendVisible(true),
+            }}
+          />
+
+          <DetailFactsStrip
+            theme={theme}
+            facts={[
+              { key: "seasons", icon: "layers-outline", value: details.number_of_seasons || 0, label: t.seasons },
+              {
+                key: "episodes",
+                icon: "play-circle-outline",
+                value: details.number_of_episodes || 0,
+                trailing: watchedEpisodeCount > 0 ? ` / ${watchedEpisodeCount}` : null,
+                label: t.episode,
+                color: theme.colors?.blue,
+              },
+              { key: "date", icon: "calendar-outline", value: formatDate(details.first_air_date), label: t.tvShowsDetails?.airDate, color: theme.colors?.green },
             ]}
-          >
-            <View
-              style={[
-                styles.commentsIconWrap,
-                { backgroundColor: theme.accent + "20" },
-              ]}
-            >
-              <Ionicons
-                name={myMediaNote ? "document-text" : "document-text-outline"}
-                size={18}
-                color={theme.accent}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text
-                allowFontScaling={false}
-                style={{ fontSize: 15, fontWeight: "700", color: theme.text.primary }}
-              >
-                {i18nText("autoI18n.notum", "Notum")}
-              </Text>
-              <Text
-                allowFontScaling={false}
-                numberOfLines={1}
-                style={{ fontSize: 12, marginTop: 2, color: theme.text.muted }}
-              >
-                {myMediaNote?.text ||
-                  i18nText("autoI18n.bu_dizi_hakkinda_bir_not_ekle", "Bu dizi hakkında bir not ekle")}
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color={theme.text.muted}
-            />
-          </GlassTouchable>
+          />
+
+          <DetailJournalPanel
+            theme={theme}
+            comment={{
+              title: t.comments || i18nText("autoI18n.yorumlar", "Yorumlar"),
+              subtitle: i18nText("autoI18n.tum_yorumlari_gor", "Tüm yorumları gör"),
+              icon: "chatbubble-ellipses-outline",
+              onPress: () => setCommentModalVisible(true),
+            }}
+            note={{
+              title: i18nText("autoI18n.notum", "Notum"),
+              subtitle: myMediaNote?.text || i18nText("autoI18n.bu_dizi_hakkinda_bir_not_ekle", "Bu dizi hakkında bir not ekle"),
+              icon: myMediaNote ? "document-text" : "document-text-outline",
+              onPress: () => {
+                if (checkCanCreateMediaNote("tv", id)) setNoteSheetVisible(true);
+              },
+            }}
+          />
 
           {/* ── TV SHOW ITEM ── */}
           <View style={styles.section}>
@@ -1327,164 +1062,24 @@ export default function TvShowsDetails({ route, navigation }) {
             </View>
           )}
 
-          {/* ── ÖZET ACCORDION ── */}
-          <View style={{ marginBottom: 24 }}>
-            <GlassTouchable
-              activeOpacity={0.85}
-              onPress={() => toggleCard("overview")}
-              style={[
-                styles.accordionCard,
-                {
-                  backgroundColor: theme.secondary,
-                  borderColor:
-                    expandedCard === "overview"
-                      ? theme.accent + "88"
-                      : theme.border,
-                },
-              ]}
-            >
-              <View style={styles.accordionHeader}>
-                <View
-                  style={[
-                    styles.sectionAccent,
-                    { backgroundColor: theme.accent },
-                  ]}
-                />
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.accordionTitle, { color: theme.text.primary }]}
-                >
-                  {t.overview || i18nText("autoI18n.ozet", "Özet")}
-                </Text>
-                <Ionicons
-                  name={
-                    expandedCard === "overview" ? "chevron-up" : "chevron-down"
-                  }
-                  size={14}
-                  color={
-                    expandedCard === "overview"
-                      ? theme.accent
-                      : theme.text.muted
-                  }
-                />
-              </View>
-              <Animated.View
-                style={{
-                  maxHeight: overviewAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [52, 400],
-                  }),
-                  overflow: "hidden",
-                }}
-              >
-                <Text
-                  allowFontScaling={false}
-                  style={[
-                    styles.accordionBody,
-                    { color: theme.text.secondary },
-                  ]}
-                  numberOfLines={expandedCard === "overview" ? null : 2}
-                >
-                  {details.overview ||
-                    i18nText("autoI18n.ozet_bulunmuyor", "Özet bulunmuyor.")}
-                </Text>
-              </Animated.View>
-              {expandedCard !== "overview" && (
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.accordionMore, { color: theme.accent }]}
-                >
-                  {i18nText("autoI18n.devami", "devamı...")}
-                </Text>
-              )}
-            </GlassTouchable>
-          </View>
+          <DetailOverviewSection
+            theme={theme}
+            title={t.overview || i18nText("autoI18n.ozet", "Özet")}
+            body={details.overview || i18nText("autoI18n.ozet_bulunmuyor", "Özet bulunmuyor.")}
+            expanded={expandedCard === "overview"}
+            progress={overviewAnim}
+            onToggle={() => toggleCard("overview")}
+            moreLabel={i18nText("autoI18n.devami", "devamı...")}
+          />
 
-          {/* ── İZLEME PLATFORMLARI + YAYINCI ── */}
-          {/* Tek yatay satır: önce bölge sağlayıcıları (linkli), sonda yayıncılar. */}
-          {(flatrateProviders.length > 0 || rowNetworks.length > 0) && (
-            <View style={styles.section}>
-              <SectionHeader title={t.watchProviders} theme={theme} />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.providersRow}>
-                  {flatrateProviders.map((p) => (
-                    <TouchableOpacity
-                      key={`p-${p.provider_id}`}
-                      activeOpacity={0.8}
-                      disabled={!regionProviders?.link}
-                      onPress={() => {
-                        if (regionProviders?.link)
-                          Linking.openURL(regionProviders.link).catch(() => {});
-                      }}
-                      style={[
-                        styles.providerCard,
-                        {
-                          backgroundColor: theme.secondary,
-                          borderColor: theme.border,
-                        },
-                      ]}
-                    >
-                      <Image
-                        source={{
-                          uri: getTmdbUrl(p.logo_path, "poster", 200),
-                        }}
-                        style={styles.providerLogo}
-                      />
-                      <Text
-                        allowFontScaling={false}
-                        style={[
-                          styles.providerName,
-                          { color: theme.text.secondary },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {p.provider_name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-
-                  {/* Yayıncılar — satırın sonunda. Logoları çoğunlukla
-                      koyu/tek renk olduğundan beyaz zeminli kutuda gösterilir. */}
-                  {rowNetworks.map((n) => (
-                    <View
-                      key={`n-${n.id}`}
-                      style={[
-                        styles.providerCard,
-                        {
-                          backgroundColor: theme.secondary,
-                          borderColor: theme.border,
-                        },
-                      ]}
-                    >
-                      <View style={styles.networkLogoWrap}>
-                        {n.logo_path ? (
-                          <Image
-                            source={{
-                              uri: getTmdbUrl(n.logo_path, "poster", 200),
-                            }}
-                            style={styles.networkLogo}
-                            resizeMode="contain"
-                          />
-                        ) : (
-                          <Ionicons name="tv-outline" size={20} color="#666" />
-                        )}
-                      </View>
-                      <Text
-                        allowFontScaling={false}
-                        style={[
-                          styles.providerName,
-                          { color: theme.text.secondary },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {n.name}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-          )}
+          <DetailProviderRail
+            theme={theme}
+            title={t.watchProviders}
+            providers={flatrateProviders}
+            networks={rowNetworks}
+            link={regionProviders?.link}
+            getTmdbUrl={getTmdbUrl}
+          />
 
           {/* ── VİDEOLAR ── */}
           <TrailerSection
@@ -1819,12 +1414,21 @@ export default function TvShowsDetails({ route, navigation }) {
         <ModalToastHost visible={ratingModalVisible} />
       </Modal>
 
+      <DetailAiActionSheet
+        visible={aiActionSheetVisible}
+        onClose={() => setAiActionSheetVisible(false)}
+        onSelect={(action) => {
+          setAiAction(action);
+          setAiVisible(true);
+        }}
+      />
+
       <AIChatScreen
         visible={aiVisible}
         onClose={() => setAiVisible(false)}
-        initialPrompt={aiPrompt}
-        initialDisplay={aiDisplay}
-        initialAttachment={aiAttachment}
+        initialPrompt={aiRequest.prompt}
+        initialDisplay={aiRequest.display}
+        initialAttachment={aiChatAttachment}
       />
       <NewConversationSheet
         visible={sendVisible}
@@ -1862,22 +1466,7 @@ const styles = StyleSheet.create({
   },
   commentsBtnText: { flex: 1, fontSize: 15, fontWeight: "700" },
 
-  /* Hero */
-  heroContainer: { height: BACKDROP_HEIGHT, position: "relative" },
-  backdrop: { width: "100%", height: "100%", resizeMode: "cover" },
-  noBackdrop: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  heroGradient: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: BACKDROP_HEIGHT * 0.7,
-  },
+  /* Hero overlay buttons */
   backBtn: {
     position: "absolute",
     left: 16,
@@ -1895,7 +1484,6 @@ const styles = StyleSheet.create({
   infoHeader: {
     flexDirection: "row",
     paddingHorizontal: 16,
-    marginTop: -BACKDROP_HEIGHT * 0.28,
     gap: 14,
     alignItems: "flex-end",
     marginBottom: 20,

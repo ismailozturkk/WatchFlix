@@ -78,6 +78,7 @@ const EXCLUDED = {
   "screens/tv/SeasonDetails.js": "sezon afişi",
   "screens/tv/SeasonItem.js": "sezon afişi",
   // Diğer
+  "components/detail/DetailContentSections.js": "platform/kanal LOGOSU (\"poster\" boyutuyla), yapım afişi değil",
   "components/modals/ImageGalleryModal.js": "galeri TÜM afişleri listeler (seçici burada)",
   "components/video/TrailerModal.js": "fragman sayfası başlığı (sonraki faz)",
   "screens/onboarding/OnboardingShowcases.js": "hesap öncesi vitrin",

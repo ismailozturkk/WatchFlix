@@ -10,10 +10,14 @@ import {
   Dimensions,
   TouchableOpacity,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { EpisodeSkeleton } from "../../components/Skeleton";
+import DetailHeroStage, {
+  computeDetailHeroMetrics,
+} from "../../components/detail/DetailHeroStage";
 import RatingStars from "../../components/RatingStars";
 import BackButton from "../../components/BackButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -149,6 +153,7 @@ export default function EpisodeDetails({ route, navigation }) {
 
   const { t, language } = useLanguage();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { API_KEY } = useApiSettings();
   const { imageQuality, getTmdbUrl } = useImageQualitySettings();
 
@@ -206,6 +211,10 @@ export default function EpisodeDetails({ route, navigation }) {
 
   const navigateToPerson = (personId) =>
     navigation.navigate("ActorViewScreen", { personId });
+  const heroMetrics = computeDetailHeroMetrics({
+    width,
+    topInset: insets.top,
+  });
 
   return (
     <>
@@ -230,45 +239,38 @@ export default function EpisodeDetails({ route, navigation }) {
         />
       )}
 
-      {/* ── Hero Görsel ──────────────────────────────────────────────────── */}
-      <View style={styles.heroContainer}>
-        {details.still_path ? (
-          <Image
-            source={{
-              uri: getTmdbUrl(details.still_path, 'backdrop', 1000),
-            }}
-            style={styles.heroImage}
-          />
-        ) : (
-          <View
-            style={[
-              styles.heroPlaceholder,
-              { backgroundColor: theme.secondary },
-            ]}
-          >
-            <Ionicons
-              name="film-outline"
-              size={64}
-              color={theme.text?.muted ?? "#555"}
-            />
-          </View>
-        )}
-        {/* Çift gradient: alttan ana renk, üstten hafif karartma */}
-        <LinearGradient
-          colors={["rgba(0,0,0,0.35)", "transparent", theme.primary]}
-          locations={[0, 0.4, 1]}
-          style={StyleSheet.absoluteFill}
-        />
+      {/* ── Hero Görsel Yuvası ───────────────────────────────────────────── */}
+      <DetailHeroStage
+        uri={
+          details.still_path
+            ? getTmdbUrl(details.still_path, 'backdrop', 1000)
+            : null
+        }
+        theme={theme}
+        topInset={insets.top}
+        width={width}
+        placeholderIcon="film-outline"
+      >
         {/* Sezon / Bölüm etiketi hero üzerinde */}
-        <View style={styles.heroEpisodeBadge}>
+        <View
+          style={[
+            styles.heroEpisodeBadge,
+            { bottom: heroMetrics.bottomAmbientHeight + 12, zIndex: 2 },
+          ]}
+        >
           <Text style={styles.heroEpisodeBadgeText}>
             S{seasonNumber} · E{episodeNumber}
           </Text>
         </View>
-      </View>
+      </DetailHeroStage>
 
       {/* ── İçerik ───────────────────────────────────────────────────────── */}
-      <View style={[styles.content, { backgroundColor: theme.primary }]}>
+      <View
+        style={[
+          styles.content,
+          { marginTop: -heroMetrics.contentOverlap },
+        ]}
+      >
         <ScreenDecor scope="details" iconOpacity={0.25} />
 
         {/* ── Başlık Bloğu ─────────────────────────────────────────────── */}
@@ -498,26 +500,10 @@ const styles = StyleSheet.create({
   },
 
   // ── Hero ──────────────────────────────────────────────────────────────────
-  heroContainer: {
-    height: 280,
-    position: "relative",
-    overflow: "hidden",
-  },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  heroPlaceholder: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   heroEpisodeBadge: {
     position: "absolute",
-    top: 52,
-    left: 16,
+    bottom: 24,
+    left: 18,
     backgroundColor: "rgba(0,0,0,0.55)",
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -536,7 +522,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 18,
-    paddingTop: 4,
+    paddingTop: 10,
   },
 
   // ── Başlık Bloğu ──────────────────────────────────────────────────────────

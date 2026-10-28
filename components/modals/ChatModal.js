@@ -526,7 +526,6 @@ export const ChatModal = () => {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
-  const [aiOrigin, setAiOrigin] = useState(null); // pet konumu → modal oradan açılır
   const [view, setView] = useState("chat"); // "chat" | "history"
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
@@ -585,10 +584,6 @@ export const ChatModal = () => {
   // context'teki istek burada mount sonrasında güvenle tüketilir.
   useEffect(() => {
     if (!pendingAiRequest) return;
-    const origin = pendingAiRequest.origin;
-    if (origin && typeof origin.x === "number") {
-      setAiOrigin([origin.x, origin.y, 0]);
-    }
     setAiVisible(true);
     clearAiChatRequest(pendingAiRequest.requestId);
   }, [pendingAiRequest, clearAiChatRequest]);
@@ -867,7 +862,6 @@ export const ChatModal = () => {
       {/* CineMatch FAB/pet isteği kalıcı PetContext kuyruğundan gelir. */}
       <AIChatScreen
         visible={aiVisible}
-        fabOrigin={aiOrigin}
         onClose={() => setAiVisible(false)}
       />
 

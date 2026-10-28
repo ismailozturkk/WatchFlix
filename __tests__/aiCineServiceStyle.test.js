@@ -68,6 +68,29 @@ describe("sistem talimatındaki yeni bloklar", () => {
     expect(both).not.toContain("CONVERSATION FOCUS");
   });
 
+  test("benzer önerilerde olay ve anahtar kelimeler türden önce gelir, zayıf eşleşme zorlanmaz", () => {
+    const source = {
+      ...target,
+      overview: "A crew of thieves plans an elaborate bank robbery.",
+      tagline: "A perfect crime has a price.",
+      keywords: ["heist", "bank robbery"],
+      genres: ["Crime", "Drama"],
+    };
+    const prompt = buildCineSystemInstruction({ focusMedia: source, similarityRequest: true });
+    expect(prompt).toContain(source.overview);
+    expect(prompt).toContain("heist, bank robbery");
+    expect(prompt).toContain("Broad genres (secondary evidence): Crime, Drama");
+    expect(prompt).toContain("Shared broad genre labels alone are insufficient");
+    expect(prompt).toContain("Each reason must state a specific narrative link");
+    expect(prompt).toContain("recommendations: 1–5 items");
+    expect(prompt).not.toContain("AUTHORITATIVE TARGET MEDIA");
+
+    const followUp = buildCineSystemInstruction({ focusMedia: source });
+    expect(followUp).not.toContain("SIMILARITY REQUEST");
+    expect(followUp).not.toContain("Plot premise");
+    expect(followUp).toContain("recommendations: 3–5 items");
+  });
+
   test("stil ve sayı tercihleri talimata yansır", () => {
     const prompt = buildCineSystemInstruction({ responseStyle: "concise", spoilerLevel: "light", maxItems: 8 });
     expect(prompt).toContain("at most 8 words");

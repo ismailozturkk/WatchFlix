@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import {
   View,
   Animated,
@@ -6,9 +6,11 @@ import {
   Dimensions,
   ScrollView,
 } from "react-native";
+import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
 import useRailPosterStyle from "../hooks/useRailPosterStyle";
 import { PosterBadgeSkeleton, POSTER_BADGE_POS } from "./PosterInfoBadges";
+import { computeDetailHeroMetrics } from "./detail/DetailHeroStage";
 const { width } = Dimensions.get("window");
 
 export default function Skeleton({
@@ -317,23 +319,32 @@ export const ListsSkeleton = () => {
     </View>
   );
 };
-// MovieDetail / TvShowsDetails ile BİRE BİR: hero (9/16) + üste binen 110×165
-// poster + bilgi sütunu + stat satırı + yorum butonu + özet + cast rail.
+// MovieDetail / TvShowsDetails ile BİRE BİR: ambiyans hero yuvası
+// (üst bildirim şeridi + ortada 9/16 poster + alt ambiyans şeridi) +
+// yalnız alt ambiyansın üstüne binen 110×165 poster + bilgi sütunu.
 export const DetailsSkeleton = () => {
   const { theme } = useTheme();
-  const BACKDROP_H = width * (9 / 16);
+  const insets = useContext(SafeAreaInsetsContext);
+  const heroMetrics = computeDetailHeroMetrics({
+    width,
+    topInset: insets?.top || 0,
+  });
   const CAST_W = width * 0.26;
   return (
     <View style={[styles.detailsContainer, { backgroundColor: theme.primary }]}>
-      {/* Hero / backdrop */}
-      <Skeleton width={width} height={BACKDROP_H} style={{ borderRadius: 0 }} />
+      {/* Hero / backdrop yuvası */}
+      <Skeleton
+        width={width}
+        height={heroMetrics.stageHeight}
+        style={{ borderRadius: 0 }}
+      />
 
-      {/* Info header — poster hero'nun üstüne biner */}
+      {/* Info header — poster yalnız alt ambiyans şeridinin üstüne biner */}
       <View
         style={{
           flexDirection: "row",
           paddingHorizontal: 16,
-          marginTop: -BACKDROP_H * 0.28,
+          marginTop: -heroMetrics.infoHeaderOverlap,
           gap: 14,
           alignItems: "flex-end",
           marginBottom: 20,
@@ -381,15 +392,30 @@ export const DetailsSkeleton = () => {
   );
 };
 
-// SeasonDetails ile BİRE BİR: tam genişlik hero poster (width×width*1.35) +
+// SeasonDetails ile BİRE BİR: ambiyans hero poster yuvası +
 // içerik (show adı, meta rozetleri, bölüm başlığı) + bölüm kartları (thumb 155×110).
 export const SeasonSkeleton = () => {
   const { theme } = useTheme();
-  const HERO_H = Math.round(width * 1.35);
+  const insets = useContext(SafeAreaInsetsContext);
+  const heroMetrics = computeDetailHeroMetrics({
+    width,
+    topInset: insets?.top || 0,
+    imageHeight: Math.round(width * 1.25),
+  });
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
-      <Skeleton width={width} height={HERO_H} style={{ borderRadius: 0 }} />
-      <View style={{ paddingHorizontal: 18, paddingTop: 16 }}>
+      <Skeleton
+        width={width}
+        height={heroMetrics.stageHeight}
+        style={{ borderRadius: 0 }}
+      />
+      <View
+        style={{
+          paddingHorizontal: 18,
+          paddingTop: 10,
+          marginTop: -heroMetrics.contentOverlap,
+        }}
+      >
         <Skeleton width={"45%"} height={15} style={{ borderRadius: 4, marginBottom: 10 }} />
         <View style={{ flexDirection: "row", gap: 8, marginBottom: 18 }}>
           <Skeleton width={92} height={28} style={{ borderRadius: 20 }} />
@@ -426,12 +452,26 @@ export const SeasonSkeleton = () => {
 
 export const EpisodeSkeleton = () => {
   const { theme } = useTheme();
+  const insets = useContext(SafeAreaInsetsContext);
+  const heroMetrics = computeDetailHeroMetrics({
+    width,
+    topInset: insets?.top || 0,
+  });
   return (
     <ScrollView
       style={[styles.episodeContainer, { backgroundColor: theme.primary }]}
     >
-      <Skeleton width={width} height={280} style={styles.episodeBackdrop} />
-      <View style={styles.episodeContent}>
+      <Skeleton
+        width={width}
+        height={heroMetrics.stageHeight}
+        style={styles.episodeBackdrop}
+      />
+      <View
+        style={[
+          styles.episodeContent,
+          { marginTop: -heroMetrics.contentOverlap },
+        ]}
+      >
         <View style={styles.episodeHeader}>
           <Skeleton
             width={width * 0.8}
