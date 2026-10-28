@@ -846,7 +846,7 @@ service cloud.firestore {
     }
 
     // ─── Uygulama içi geri bildirim (Ayarlar > Destek ve geri bildirim) ──
-    // Hata bildirimi: Premium ve üstü. Özellik isteği: yalnız Premium Max.
+    // Hata bildirimi: Free dahil her oturum açmış kullanıcı. Özellik isteği: yalnız Premium Max.
     // Plan, Users/{uid}.entitlements'tan okunur — bu alanı istemci YAZAMAZ
     // (Users kuralı), bu yüzden istemcinin söylediği plana güvenilmez.
     //
@@ -864,9 +864,6 @@ service cloud.firestore {
       function isMaxPlan() {
         return entitlements().get('premiumUnlimited', false) == true
             || entitlements().get('premiumPlan', 'free') == 'unlimited';
-      }
-      function isPaidPlan() {
-        return isMaxPlan() || entitlements().get('premium', false) == true;
       }
       // Cihaz alanları isteğe bağlı: yoksa serbest, varsa kısa bir string.
       function optionalShort(field) {
@@ -904,7 +901,6 @@ service cloud.firestore {
                     && optionalShort('deviceModel')
                     && (
                          (request.resource.data.kind == 'bug'
-                          && isPaidPlan()
                           && request.resource.data.category in [
                                'crash', 'display', 'data', 'notifications',
                                'performance', 'other'

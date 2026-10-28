@@ -1439,7 +1439,7 @@ describe("grup uye tavani", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Uygulama içi geri bildirim: hata bildirimi Premium+, özellik isteği yalnız Max
+// Uygulama içi geri bildirim: hata bildirimi Free, özellik isteği yalnız Max
 // ─────────────────────────────────────────────────────────────────────────────
 describe("Feedback (geri bildirim kutusu)", () => {
   // alice = Premium, bob = Premium Max, carol = Free (entitlements yok).
@@ -1497,8 +1497,8 @@ describe("Feedback (geri bildirim kutusu)", () => {
     await assertFails(yaz(alice, istek(ALICE)));
   });
 
-  test("Free hicbirini yazamaz", async () => {
-    await assertFails(yaz(carol, hata(CAROL)));
+  test("Free hata bildirebilir ama ozellik istegi yazamaz", async () => {
+    await assertSucceeds(yaz(carol, hata(CAROL)));
     await assertFails(yaz(carol, istek(CAROL)));
   });
 
