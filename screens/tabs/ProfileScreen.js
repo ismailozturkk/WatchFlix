@@ -272,7 +272,7 @@ const ProfileScreen = ({ navigation }) => {
               showGoal={showSection("goal")}
             />
           </View>
-          {hasAnySocialLinks(socialLinks) && (
+          {profile?.privacy?.showSocialLinksOnOwnProfile !== false && hasAnySocialLinks(socialLinks) && (
             <SocialLinksRow
               links={socialLinks}
               theme={theme}

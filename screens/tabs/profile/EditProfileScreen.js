@@ -88,6 +88,7 @@ import {
   toProfilePayload,
 } from "../../../utils/fourFavorites";
 import SocialLinksEditor from "../../../components/profile/SocialLinksEditor";
+import { saveSocialLinks } from "../../../services/socialLinksService";
 import { SOCIAL_NAMES, getSocialCopy } from "../../../utils/socialLinksCopy";
 import { getDeleteAccountCopy } from "./deleteAccountCopy";
 import { getResetAccountCopy } from "./resetAccountCopy";
@@ -116,7 +117,7 @@ export default function EditProfileScreen({ navigation }) {
   const pt = normalizeAppLanguage(language) === "pt";
   const de = normalizeAppLanguage(language) === "de";
   const { user } = useAuth();
-  const { profile, loading, updateField, changeUsername } = useUserProfile();
+  const { profile, loading, uid, updateField, changeUsername } = useUserProfile();
   const { selectAvatarIndex, selectAvatar } = useProfileUi();
 
   // Kayıtlı avatar, seçim biçiminde ({ avatarIndex, photoURL, photoSource }).
@@ -344,11 +345,9 @@ export default function EditProfileScreen({ navigation }) {
       if (!favoritesEqual(favorites, readProfileFavorites(profile))) {
         patch.fourFavorites = toProfilePayload(favorites);
       }
-      // Sosyal hesaplar: hepsini silmek de bir değişikliktir (boş harita yazılır).
-      if (!socialLinksEqual(socialResolved.links, readProfileSocialLinks(profile))) {
-        patch.socialLinks = toSocialPayload(socialResolved.links);
-      }
+      const socialLinksChanged = !socialLinksEqual(socialResolved.links, readProfileSocialLinks(profile));
       if (Object.keys(patch).length) await updateField(patch);
+      if (socialLinksChanged) await saveSocialLinks(uid, toSocialPayload(socialResolved.links));
       if (patch.fourFavorites) {
         trackEvent(ANALYTICS_EVENTS.FOUR_FAVORITES_SAVED, {
           movies: countFavorites(favorites, "movies"),

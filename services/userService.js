@@ -40,6 +40,8 @@ import {
 } from "firebase/firestore";
 import { updateProfile } from "firebase/auth";
 import { auth, db } from "../firebase";
+import { socialLinksDocRef } from "./socialLinksService";
+import { normalizeSocialLinks } from "../utils/socialLinks";
 import { clampAvatarIndex, CUSTOM_AVATAR_INDEX, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
 import { avatarSnapshot, toAvatarChoice } from "../utils/avatarPhotos";
 import { parseBirthDate } from "../utils/ageGate";
@@ -75,6 +77,8 @@ export const DEFAULT_PRIVACY = {
   lists: "public",
   posts: "public",
   onlineStatus: "everyone",
+  socialLinks: "public",
+  showSocialLinksOnOwnProfile: true,
 };
 
 export const DEFAULT_LIST_VISIBLE = {
@@ -491,8 +495,28 @@ export async function setListVisibility(uid, changes) {
  */
 export async function updatePrivacy(uid, partialPrivacy) {
   const ref = doc(db, "Users", uid);
+  if (Object.prototype.hasOwnProperty.call(partialPrivacy, "socialLinks")) {
+    if (!["public", "friends", "private"].includes(partialPrivacy.socialLinks)) {
+      throw new Error("invalid-social-links-privacy");
+    }
+    const linksRef = socialLinksDocRef(uid);
+    await runTransaction(db, async (tx) => {
+      const [root, links] = await Promise.all([tx.get(ref), tx.get(linksRef)]);
+      if (!root.exists()) throw new Error("profile-not-found");
+      const data = root.data();
+      if (Object.prototype.hasOwnProperty.call(data, "socialLinks") && !links.exists()) {
+        tx.set(linksRef, { links: normalizeSocialLinks(data.socialLinks), updatedAt: serverTimestamp() });
+      }
+      tx.update(ref, {
+        ...(Object.prototype.hasOwnProperty.call(data, "socialLinks") ? { socialLinks: deleteField() } : {}),
+        privacy: { ...DEFAULT_PRIVACY, ...(data.privacy || {}), ...partialPrivacy },
+        updatedAt: serverTimestamp(),
+      });
+    });
+    return;
+  }
   const snap = await getDoc(ref);
-  const current = snap.exists() ? snap.data().privacy || DEFAULT_PRIVACY : DEFAULT_PRIVACY;
+  const current = snap.exists() ? { ...DEFAULT_PRIVACY, ...(snap.data().privacy || {}) } : DEFAULT_PRIVACY;
   await updateDoc(ref, {
     privacy: { ...current, ...partialPrivacy },
     updatedAt: serverTimestamp(),

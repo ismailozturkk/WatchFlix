@@ -338,7 +338,8 @@ service cloud.firestore {
     function socialLinksOk() {
       let s = request.resource.data.get('socialLinks', null);
       return s == null
-          || (s is map
+          || (request.resource.data.get('privacy', {}).get('socialLinks', 'public') == 'public'
+              && s is map
               && s.keys().hasOnly(['instagram', 'x', 'tiktok', 'youtube',
                                    'twitch', 'letterboxd', 'snapchat', 'threads'])
               && s.get('instagram', '') is string && s.get('instagram', '').size() <= 30
@@ -349,6 +350,35 @@ service cloud.firestore {
               && s.get('letterboxd', '') is string && s.get('letterboxd', '').size() <= 30
               && s.get('snapchat', '') is string && s.get('snapchat', '').size() <= 30
               && s.get('threads', '') is string && s.get('threads', '').size() <= 30);
+    }
+    function socialLinksDocumentOk() {
+      let s = request.resource.data.get('links', null);
+      return request.resource.data.keys().hasOnly(['links', 'updatedAt'])
+          && s is map
+          && s.keys().hasOnly(['instagram', 'x', 'tiktok', 'youtube',
+                               'twitch', 'letterboxd', 'snapchat', 'threads'])
+          && s.get('instagram', '') is string && s.get('instagram', '').size() <= 30
+          && s.get('x', '') is string && s.get('x', '').size() <= 30
+          && s.get('tiktok', '') is string && s.get('tiktok', '').size() <= 30
+          && s.get('youtube', '') is string && s.get('youtube', '').size() <= 30
+          && s.get('twitch', '') is string && s.get('twitch', '').size() <= 30
+          && s.get('letterboxd', '') is string && s.get('letterboxd', '').size() <= 30
+          && s.get('snapchat', '') is string && s.get('snapchat', '').size() <= 30
+          && s.get('threads', '') is string && s.get('threads', '').size() <= 30;
+    }
+    function socialLinksPrivacy(uid) {
+      return get(/databases/$(database)/documents/Users/$(uid))
+               .data.get('privacy', {}).get('socialLinks', 'public');
+    }
+    match /Users/{uid}/socialLinks/{docId} {
+      allow get: if docId == 'links' &&
+        (isOwner(uid) || (isSignedIn() &&
+          (socialLinksPrivacy(uid) == 'public' ||
+            (socialLinksPrivacy(uid) == 'friends' &&
+              exists(/databases/$(database)/documents/Users/$(uid)/friends/$(request.auth.uid))))));
+      allow list: if false;
+      allow create, update: if docId == 'links' && isOwner(uid) && socialLinksDocumentOk();
+      allow delete: if docId == 'links' && isOwner(uid);
     }
     match /Users/{uid} {
       allow read: if isSignedIn();

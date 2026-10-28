@@ -45,6 +45,7 @@ import {
   syncAgeRestriction,
 } from "../utils/ageGate";
 import { trackFirestoreRead } from "../services/usageTrackerService";
+import { migrateRootSocialLinks, subscribeSocialLinks } from "../services/socialLinksService";
 
 const UserProfileContext = createContext();
 export const useUserProfile = () => useContext(UserProfileContext);
@@ -53,9 +54,13 @@ export const useUserProfile = () => useContext(UserProfileContext);
 // herkese okunur). Uygulamanın geri kalanı `profile.birthDate` okumaya devam
 // etsin diye iki kaynak burada birleşir. Gizli belge KAZANIR; kökteki alan yalnız
 // henüz taşınmamış eski hesabın yedeği.
-function withAccount(root, account) {
-  if (!root || !account?.birthDate) return root;
-  return { ...root, birthDate: account.birthDate };
+function withAccount(root, account, socialLinks) {
+  if (!root) return root;
+  return {
+    ...root,
+    ...(account?.birthDate ? { birthDate: account.birthDate } : {}),
+    ...(socialLinks != null ? { socialLinks } : {}),
+  };
 }
 
 // Kökte taşınması gereken eski kopya var mı? (alan VAR olması yeterli: geçersiz
@@ -100,13 +105,15 @@ export function UserProfileProvider({ children }) {
   // `accountRef`: undefined = henüz bilinmiyor, null = belge yok, nesne = veri.
   const rootRef = useRef(null);
   const accountRef = useRef(undefined);
+  const socialLinksRef = useRef(undefined);
   const accountMigrationTried = useRef(new Set());
+  const socialMigrationTried = useRef(new Set());
   const [accountUid, setAccountUid] = useState(null);
   const applyProfile = useCallback((forUid) => {
     // Kök henüz gelmediyse DOKUNMA: state'te önbellekten tohumlanmış profil var,
     // null'lamak onu boşa düşürürdü.
     if (!rootRef.current) return;
-    const merged = withAccount(rootRef.current, accountRef.current);
+    const merged = withAccount(rootRef.current, accountRef.current, socialLinksRef.current);
     setProfile(merged);
     // "Verileri indir" ayarına bilerek TABİ DEĞİL: o ayar TMDB içeriğini
     // indirmekle ilgili, bu kullanıcının kendi profili. Tutmamak veri
@@ -177,6 +184,13 @@ export function UserProfileProvider({ children }) {
               if (__DEV__) console.warn("[UserProfile] hesap göçü:", e?.message);
             });
           }
+          if (Object.prototype.hasOwnProperty.call(data, "socialLinks") && !socialMigrationTried.current.has(uid)) {
+            socialMigrationTried.current.add(uid);
+            migrateRootSocialLinks(uid).catch((e) => {
+              socialMigrationTried.current.delete(uid);
+              if (__DEV__) console.warn("[UserProfile] sosyal hesap göçü:", e?.message);
+            });
+          }
         } else {
           rootRef.current = null;
           setProfile(null);
@@ -192,6 +206,23 @@ export function UserProfileProvider({ children }) {
     return () => {
       unsub();
       rootRef.current = null;
+    };
+  }, [uid, startupReady, applyProfile]);
+
+  useEffect(() => {
+    if (!startupReady || !uid) return undefined;
+    socialLinksRef.current = undefined;
+    const unsub = subscribeSocialLinks(uid, (links) => {
+      trackFirestoreRead("Users", 1);
+      socialLinksRef.current = links;
+      applyProfile(uid);
+    }, (err) => {
+      if (!isAuthTransitionError(err) && __DEV__)
+        console.warn("[UserProfile] sosyal hesaplar:", err.message);
+    });
+    return () => {
+      unsub();
+      socialLinksRef.current = undefined;
     };
   }, [uid, startupReady, applyProfile]);
 
@@ -323,7 +354,7 @@ export function UserProfileProvider({ children }) {
 
   // ── Derived helpers ──────────────────────────────────────────────────────
 
-  const privacy = profile?.privacy || DEFAULT_PRIVACY;
+  const privacy = { ...DEFAULT_PRIVACY, ...(profile?.privacy || {}) };
   const avatarIndex = typeof profile?.avatarIndex === "number" ? profile.avatarIndex : 0;
   const photoURL = profile?.photoURL || user?.photoURL || null;
   // Yaş her okumada doğum tarihinden türetilir — 18'ine giren kullanıcının

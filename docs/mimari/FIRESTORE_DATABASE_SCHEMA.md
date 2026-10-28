@@ -761,7 +761,8 @@ Ağaç (bölüm 1) 15 Ekim öncesini anlatır; sonrasında eklenenler aşağıda
 
 | Yol | Alanlar (özet) | Kim yazar / okur | Hesap silmede |
 |---|---|---|---|
-| `Users/{uid}.socialLinks` | `{ instagram, x, tiktok, youtube, twitch, letterboxd, snapchat, threads }` — yalnız KULLANICI ADI | sahibi yazar (`socialLinksOk` kuralı), profili görenler okur | `user-tree` (profil aşaması) |
+| `Users/{uid}/socialLinks/links` | `{ links: { instagram, x, tiktok, youtube, twitch, letterboxd, snapchat, threads }, updatedAt }` — yalnız KULLANICI ADI | sahibi yazar (`socialLinksDocumentOk`); okuma `Users/{uid}.privacy.socialLinks` ('public' \| 'friends' \| 'private') kuralına tabi. `privacy.showSocialLinksOnOwnProfile` yalnız sahibin kendi profil sekmesindeki şeridi gizler | `user-tree` (profil aşaması) |
+| `Users/{uid}.socialLinks` (eski) | aynı harita — kökte herkese açık eski kopya; sahibinin uygulaması açılınca alt belgeye taşınır ve silinir (`migrateRootSocialLinks`) | yalnız `privacy.socialLinks == 'public'` iken yazılabilir (`socialLinksOk`) | `user-tree` |
 | `Users/{uid}/private/{account,push,entitlements}` | e-posta + doğum tarihi / push jetonu / plan ayrıntısı | yalnız sahibi (entitlements'ı yalnız sunucu yazar) | `user-tree` |
 | `MediaNotes/{uid}/items/{id}` | film/dizi sayfasına bağlı notlar | sahibi (yerel-öncelikli, `services/userData`) | `root MediaNotes` |
 | `AiConversations/{uid}/items/{id}` | CineMatch sohbet geçmişi | sahibi | `root AiConversations` |

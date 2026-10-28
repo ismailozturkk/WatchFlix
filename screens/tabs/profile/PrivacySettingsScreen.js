@@ -9,6 +9,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  Switch,
 } from "react-native";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
@@ -42,6 +43,11 @@ const buildOptions = () => ({
     { value: "friends", label: i18nText("autoI18n.arkadaslar", "Arkadaşlar"),   icon: "people", desc: i18nText("autoI18n.sadece_arkadaslarin_gorur", "Sadece arkadaşların görür") },
     { value: "private", label: i18nText("autoI18n.gizli", "Gizli"), icon: "lock-closed", desc: i18nText("autoI18n.sadece_sen_gorursun", "Sadece sen görürsün") },
   ],
+  socialLinks: [
+    { value: "public", label: i18nText("autoI18n.herkes", "Herkes"), icon: "earth", desc: i18nText("autoI18n.sosyal_baglantilar_herkes", "Herkes hesap bağlantılarını görebilir") },
+    { value: "friends", label: i18nText("autoI18n.kisilerim", "Kişilerim"), icon: "people", desc: i18nText("autoI18n.sosyal_baglantilar_kisilerim", "Yalnızca bağlantı kurduğun kişiler görebilir") },
+    { value: "private", label: i18nText("autoI18n.sadece_ben", "Sadece ben"), icon: "lock-closed", desc: i18nText("autoI18n.sosyal_baglantilar_sadece_ben", "Hesap bağlantılarını yalnızca sen görebilirsin") },
+  ],
   // NOT: "posts" burada bilerek yok — paylaşım görünürlüğü post atarken
   // seçilen post-başına `visibility` alanıyla yönetiliyor (postsService),
   // Users.privacy.posts hiçbir okuma yolunda kullanılmıyor.
@@ -55,6 +61,7 @@ const buildOptions = () => ({
 const buildSections = () => [
   { key: "profile",      title: i18nText("autoI18n.profil_gorunurlugu", "Profil Görünürlüğü"),     icon: "person-circle" },
   { key: "lists",        title: i18nText("autoI18n.liste_gorunurlugu", "Liste Görünürlüğü"),      icon: "list" },
+  { key: "socialLinks", title: i18nText("autoI18n.hesap_baglantilari_gorunurlugu", "Hesap Bağlantıları"), icon: "link" },
   { key: "onlineStatus", title: i18nText("autoI18n.cevrimici_durumu", "Çevrimiçi Durumu"),        icon: "ellipse" },
 ];
 
@@ -159,7 +166,7 @@ export default function PrivacySettingsScreen({ navigation }) {
               <PrivacyOption
                 key={opt.value}
                 option={opt}
-                isActive={privacy?.[section.key] === opt.value}
+                isActive={(privacy?.[section.key] ?? (section.key === "socialLinks" ? "public" : undefined)) === opt.value}
                 onPress={() => handleChange(section.key, opt.value)}
                 theme={theme}
               />
@@ -186,6 +193,27 @@ export default function PrivacySettingsScreen({ navigation }) {
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={theme.text.muted} />
               </GlassTouchable>
+            ) : null}
+            {section.key === "socialLinks" ? (
+              <View style={[styles.linkRow, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+                <View style={[styles.optionIcon, { backgroundColor: theme.primary }]}>
+                  <Ionicons name="eye-outline" size={18} color={theme.text.secondary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionLabel, { color: theme.text.primary, fontWeight: "600" }]}>
+                    {i18nText("autoI18n.profil_sekmemde_goster", "Profil sekmemde göster")}
+                  </Text>
+                  <Text style={[styles.optionDesc, { color: theme.text.secondary }]}>
+                    {i18nText("autoI18n.profil_sekmemde_goster_alt", "Yalnızca kendi profil sekmendeki bağlantı alanını gizler")}
+                  </Text>
+                </View>
+                <Switch
+                  testID="own-profile-social-links-toggle"
+                  value={privacy?.showSocialLinksOnOwnProfile !== false}
+                  onValueChange={(value) => handleChange("showSocialLinksOnOwnProfile", value)}
+                  trackColor={{ true: theme.accent, false: theme.border }}
+                />
+              </View>
             ) : null}
           </View>
         ))}

@@ -74,6 +74,7 @@ jest.mock("../context/UserProfileContext", () => ({
   useUserProfile: () => ({
     profile: mockProfileState.profile,
     loading: mockProfileState.loading,
+    uid: "me",
     updateField: mockUpdateField,
     changeUsername: mockChangeUsername,
   }),
@@ -109,6 +110,10 @@ jest.mock("../services/appleAuthService", () => ({
 }));
 jest.mock("../services/profilePropagation", () => ({
   propagateProfileChange: jest.fn(() => Promise.resolve()),
+}));
+const mockSaveSocialLinks = jest.fn(() => Promise.resolve());
+jest.mock("../services/socialLinksService", () => ({
+  saveSocialLinks: (...args) => mockSaveSocialLinks(...args),
 }));
 
 global.IS_REACT_ACT_ENVIRONMENT = true;

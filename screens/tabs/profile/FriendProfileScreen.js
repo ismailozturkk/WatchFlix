@@ -31,7 +31,6 @@ import { doc, collection, onSnapshot, getDocs } from "firebase/firestore";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
-import { useWindowSafeAreaInsets } from "../../../context/ScreenInsetsContext";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import ConfirmSheet from "@components/common/ConfirmSheet";
 import GlassCloseButton from "@components/common/GlassCloseButton";
@@ -39,6 +38,7 @@ import GlassIconButton from "@components/common/GlassIconButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { db } from "../../../firebase";
 import Toast from "@components/AppToast";
+import { useWindowSafeAreaInsets } from "../../../context/ScreenInsetsContext";
 import { useTheme } from "../../../context/ThemeContext";
 import { useAuth } from "../../../context/AuthContext";
 import { getAvatarSource } from "../../../utils/avatars";
@@ -58,6 +58,7 @@ import { PosterActivityBadge } from "@components/PosterActivityBadge";
 import { buildActivityFromRoot } from "../../../utils/mediaActivityIndex";
 import { useLanguage } from "../../../context/LanguageContext";
 import { DEFAULT_PRIVACY } from "../../../services/userService";
+import { subscribeSocialLinks } from "../../../services/socialLinksService";
 import {
   subscribeToUserPresence,
   isOnlineVisible,
@@ -302,6 +303,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   } = useFriends();
 
   const [profile, setProfile] = useState(null);
+  const [visibleSocialLinks, setVisibleSocialLinks] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [presence, setPresence] = useState(null);
   const [allLists, setAllLists] = useState(null);
@@ -355,7 +357,7 @@ export default function FriendProfileScreen({ route, navigation }) {
   }, [friendUid]);
 
   // ── Gizlilik kuralları ────────────────────────────────────────────────────
-  const privacy = profile?.privacy || DEFAULT_PRIVACY;
+  const privacy = { ...DEFAULT_PRIVACY, ...(profile?.privacy || {}) };
   const canViewProfile =
     privacy.profile === "public" || (privacy.profile === "friends" && friend);
   // Profil belgesi gelmeden gizlilik BİLİNMİYOR: varsayılana ("herkese açık") düşüp
@@ -365,6 +367,13 @@ export default function FriendProfileScreen({ route, navigation }) {
     profile != null &&
     canViewProfile &&
     (privacy.lists === "public" || (privacy.lists === "friends" && friend));
+  const canViewSocialLinks = profile != null && canViewProfile &&
+    (privacy.socialLinks === "public" || (privacy.socialLinks === "friends" && friend));
+  useEffect(() => {
+    setVisibleSocialLinks(null);
+    if (!friendUid || !canViewSocialLinks) return undefined;
+    return subscribeSocialLinks(friendUid, (links) => setVisibleSocialLinks({ uid: friendUid, links }), () => setVisibleSocialLinks(null));
+  }, [friendUid, canViewSocialLinks]);
   // Profil sahibinin özel afişleri: listeleri görebiliyorsan ve sahibin planı izin
   // veriyorsa TEK okuma (aynı koşul kuralda: PosterChoices okuması = canReadLists).
   const friendPosterChoices = useUserPosterChoices(friendUid, {
@@ -904,7 +913,7 @@ export default function FriendProfileScreen({ route, navigation }) {
           badges={identityBadges}
           language={language}
           bio={canViewProfile ? profile.bio : null}
-          socialLinks={canViewProfile ? profile.socialLinks : null}
+          socialLinks={canViewSocialLinks ? (visibleSocialLinks?.uid === friendUid ? (visibleSocialLinks.links ?? profile.socialLinks) : profile.socialLinks) : null}
           memberSince={
             canViewProfile && memberSince
               ? i18nText("autoI18n.uye_tarihi_cumle", "{{date}} tarihinden beri üye", {
