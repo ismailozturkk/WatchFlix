@@ -72,6 +72,7 @@
     applyState();
     renderCount();
     renderOk();
+    renderBeta();
     renderTour();
     renderMore();
   }
@@ -317,6 +318,135 @@
     });
   }
 
+  /* ── 3b) Test kullanıcısı (kapalı test) ─────────────────────────── */
+  /* Kayıt: betaTesters/{base64(email)}_{platform}. Aynı kişi iki platforma ayrı
+     ayrı yazılabilir. Alanlar firestore.rules'taki betaTesters kuralıyla birebir:
+     { email, platform, lang, createdAt, source }. Alan eklersen kuralı da güncelle. */
+  var BETA_PLATFORMS = { android: "Android", ios: "iOS" };
+  var betaState = null; // { email, platforms: ["android"|"ios"], exists }
+
+  /* Bu tarayıcıdan yapılan kayıt (bekleme listesindeki wf_ticket gibi): sayfa
+     yenilenince form yerine "zaten listedesin" görünür. Farklı e-postayla
+     yeni kayıt eskisinin yerine geçer. */
+  function saveBetaTicket(res) {
+    var prev = LS.get("wf_beta_ticket", null);
+    var platforms = prev && prev.email === res.email && Array.isArray(prev.platforms) ? prev.platforms.slice() : [];
+    if (platforms.indexOf(res.platform) === -1) platforms.push(res.platform);
+    LS.set("wf_beta_ticket", { email: res.email, platforms: platforms });
+    return platforms;
+  }
+
+  function betaPlatformLabel(platforms) {
+    return platforms.length > 1 ? t("betaBoth") : BETA_PLATFORMS[platforms[0]];
+  }
+
+  function addBetaTester(email, platform) {
+    if (!CFG.firebaseConfig) {
+      var list = LS.get("wf_beta", []);
+      var key = email + "|" + platform;
+      var exists = list.indexOf(key) !== -1;
+      if (!exists) { list.push(key); LS.set("wf_beta", list); }
+      return Promise.resolve({ email: email, platform: platform, exists: exists });
+    }
+    return initDb().then(function () {
+      var fs = db.fs;
+      var id = btoa(unescape(encodeURIComponent(email))).replace(/[/+=]/g, "_") + "_" + platform;
+      var ref = fs.doc(db.app, "betaTesters", id);
+      return fs.getDoc(ref).then(function (snap) {
+        if (snap.exists()) return { email: email, platform: platform, exists: true };
+        return fs.setDoc(ref, { email: email, platform: platform, lang: lang, createdAt: fs.serverTimestamp(), source: "landing" })
+          .then(function () { return { email: email, platform: platform, exists: false }; });
+      });
+    });
+  }
+
+  function selectedPlatform() {
+    var el = document.querySelector('#betaForm input[name="platform"]:checked');
+    return el ? el.value : "";
+  }
+
+  function renderBeta() {
+    var hint = $("#betaHint");
+    if (hint) {
+      var p = selectedPlatform();
+      hint.textContent = t(p === "android" ? "betaHintAndroid" : p === "ios" ? "betaHintIos" : "betaHintNone");
+    }
+    var card = $("#betaCard");
+    var panel = $("#betaOk");
+    if (!card || !panel) return;
+    if (!betaState) { panel.hidden = true; card.classList.remove("done"); return; }
+    $("#betaOkText").textContent = fmt(t(betaState.exists ? "betaOkDup" : "betaOkText"), {
+      email: betaState.email,
+      platform: betaPlatformLabel(betaState.platforms),
+    });
+    // İki platform da kayıtlıysa "başka cihaz" seçeneği kalmaz.
+    $("#betaAgain").hidden = betaState.platforms.length >= Object.keys(BETA_PLATFORMS).length;
+    panel.hidden = false;
+    card.classList.add("done");
+  }
+
+  function setupBeta() {
+    var form = $("#betaForm");
+    if (!form) return;
+    var input = $("#betaEmail");
+    var msg = $("#betaMsg");
+    var btn = $("#betaBtn");
+    var plats = form.querySelector(".beta-platforms");
+
+    var shake = function (el) {
+      el.classList.remove("shake");
+      void el.offsetWidth;
+      el.classList.add("shake");
+    };
+
+    form.addEventListener("change", function (ev) {
+      if (ev.target.name === "platform") { msg.textContent = ""; renderBeta(); }
+    });
+
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      msg.textContent = "";
+      var platform = selectedPlatform();
+      if (!BETA_PLATFORMS[platform]) {
+        shake(plats);
+        msg.textContent = t("betaErrPlatform");
+        var first = form.querySelector('input[name="platform"]');
+        if (first) first.focus();
+        return;
+      }
+      var email = input.value.trim().toLowerCase();
+      if (!EMAIL_RE.test(email) || email.length >= 200) {
+        shake($("#betaRow"));
+        msg.textContent = t("errInvalid");
+        input.focus();
+        return;
+      }
+      btn.disabled = true;
+      withTimeout(addBetaTester(email, platform), 12000).then(function (res) {
+        var platforms = saveBetaTicket(res);
+        // Yeni kayıtta yalnız bu platform anılır; yinelenende kayıtlı olanların tümü.
+        betaState = { email: res.email, platforms: res.exists ? platforms : [res.platform], exists: res.exists };
+        renderBeta();
+      }).catch(function (err) {
+        console.error("Beta signup error:", err);
+        msg.textContent = t("errGeneric");
+      }).then(function () { btn.disabled = false; });
+    });
+
+    $("#betaAgain").addEventListener("click", function () {
+      var ticket = LS.get("wf_beta_ticket", null);
+      var done = ticket && Array.isArray(ticket.platforms) ? ticket.platforms : [];
+      betaState = null;
+      renderBeta();
+      // Henüz kayıtlı olmayan platformu ve aynı e-postayı önceden doldur: "ikinci cihaz" en sık durum.
+      var next = Object.keys(BETA_PLATFORMS).filter(function (p) { return done.indexOf(p) === -1; })[0];
+      var radio = next && form.querySelector('input[name="platform"][value="' + next + '"]');
+      if (radio) { radio.checked = true; renderBeta(); }
+      if (ticket && ticket.email) input.value = ticket.email;
+      input.focus();
+    });
+  }
+
   /* ── 4) Poster şeridi (dekoratif) ───────────────────────────────── */
   var POSTERS = [
     "d5NXSklXo0qyIYkgV94XAgMIckC", "gEU2QniE6E77NI6lCU6MxlNBvIx", "9yxep7oJdkj3Pla9TD9gKflRApY",
@@ -525,6 +655,7 @@
   setupPhones();
   setupTour();
   setupForm();
+  setupBeta();
   buildPosters();
   setupChrome();
   setupEyes();
@@ -533,6 +664,15 @@
   if (saved && saved.email && saved.queueNo) {
     okState = { email: saved.email, queueNo: saved.queueNo, exists: false };
     renderOk();
+  }
+
+  var savedBeta = LS.get("wf_beta_ticket", null);
+  if (savedBeta && savedBeta.email && Array.isArray(savedBeta.platforms)) {
+    var known = savedBeta.platforms.filter(function (p) { return BETA_PLATFORMS[p]; });
+    if (known.length) {
+      betaState = { email: savedBeta.email, platforms: known, exists: true };
+      renderBeta();
+    }
   }
 
   /* Sayaç: sayfa boşa çıkınca oku (kritik değil). */

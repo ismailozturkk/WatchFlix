@@ -1824,3 +1824,46 @@ describe("Özel afiş seçimleri (PosterChoices)", () => {
     await assertFails(getDoc(doc(carol, "PosterChoices", ALICE)));
   });
 });
+
+describe("betaTesters (landing test kullanıcısı formu)", () => {
+  const anon = () => testEnv.unauthenticatedContext().firestore();
+  const kayit = (extra = {}) => ({
+    email: "tester@example.com",
+    platform: "android",
+    lang: "tr",
+    createdAt: serverTimestamp(),
+    source: "landing",
+    ...extra,
+  });
+
+  test("oturumsuz ziyaretçi kendi kaydını yazar ve tek kaydı okur; liste dökülemez", async () => {
+    const db = anon();
+    const ref = doc(db, "betaTesters", "dGVzdGVy_android");
+    await assertSucceeds(setDoc(ref, kayit()));
+    await assertSucceeds(getDoc(ref));
+    await assertFails(getDocs(collection(db, "betaTesters")));
+  });
+
+  test("aynı kişi iOS için ayrı kayıt açar; kayıt değiştirilemez, silinemez", async () => {
+    const db = anon();
+    await assertSucceeds(setDoc(doc(db, "betaTesters", "dGVzdGVy_ios"), kayit({ platform: "ios" })));
+    const ref = doc(db, "betaTesters", "dGVzdGVy_android");
+    await assertSucceeds(setDoc(ref, kayit()));
+    await assertFails(updateDoc(ref, { platform: "ios" }));
+    await assertFails(deleteDoc(ref));
+  });
+
+  test("geçersiz platform, e-posta, dil, kaynak, belge kimliği ya da fazladan alan reddedilir", async () => {
+    const db = anon();
+    const ref = (id = "dGVzdGVy_android") => doc(db, "betaTesters", id);
+    await assertFails(setDoc(ref("dGVzdGVy_windows"), kayit({ platform: "windows" })));
+    await assertFails(setDoc(ref(), kayit({ email: "olmaz" })));
+    await assertFails(setDoc(ref(), kayit({ lang: "fr" })));
+    await assertFails(setDoc(ref(), kayit({ source: "app" })));
+    await assertFails(setDoc(ref("dGVzdGVy_ios"), kayit()));
+    await assertFails(setDoc(ref(), kayit({ name: "Ali" })));
+    await assertFails(setDoc(ref(), kayit({ createdAt: new Date(2020, 0, 1) })));
+    const { platform, ...eksik } = kayit();
+    await assertFails(setDoc(ref(), eksik));
+  });
+});

@@ -40,6 +40,7 @@
       <a href="#features" data-i18n="navFeatures">Features</a>
       <a href="#plans" data-i18n="navPlans">Plans</a>
       <a href="#faq" data-i18n="navFaq">FAQ</a>
+      <a href="#beta" class="nav-beta" data-i18n="navBeta">Beta</a>
     </nav>
     <div class="top-actions">
       <div id="langMenu"></div>
@@ -163,6 +164,65 @@
       </article>
     </div>
     <p class="plan-note reveal" data-i18n="planNote">Prices are set by Google Play and the App Store and shown in your local currency. Subscriptions renew automatically and can be cancelled any time in your store account.</p>
+  </section>
+
+  <!-- ───────────────────────── Test kullanıcısı (kapalı test) ─────────────────────────
+       Yayından önce: e-posta + platform → Firestore betaTesters (home.js → setupBeta).
+       İki mağaza da yayına girince (body.is-live) bölüm gizlenir. -->
+  <section class="section wrap" id="beta">
+    <div class="beta reveal">
+      <div class="beta-copy">
+        <span class="eyebrow" data-i18n="betaEyebrow">Closed testing</span>
+        <h2 class="sec-title" data-i18n="betaTitle">Try seelogd before everyone else.</h2>
+        <p class="sec-sub" data-i18n="betaSub">We're opening a small closed test before launch. Pick your phone, leave your email and we'll send you an invite.</p>
+        <ol class="beta-steps">
+          <li data-i18n="betaStep1">Choose Android or iOS and leave your email.</li>
+          <li data-i18n="betaStep2">We'll email you a test invite as spots open.</li>
+          <li data-i18n="betaStep3">Install the test build and tell us what you think.</li>
+        </ol>
+      </div>
+
+      <div class="beta-card" id="betaCard">
+        <form id="betaForm" novalidate>
+          <fieldset class="beta-platforms">
+            <legend class="beta-label" data-i18n="betaPlatformLabel">Your phone</legend>
+            <label class="beta-plat">
+              <input type="radio" name="platform" value="android" />
+              <span class="beta-plat-box">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85a.637.637 0 0 0-.83.22l-1.88 3.24a11.43 11.43 0 0 0-8.94 0L5.65 5.67a.643.643 0 0 0-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 0 0 1 18h22a10.78 10.78 0 0 0-5.4-8.52M7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5m10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5"/></svg>
+                <b>Android</b>
+              </span>
+            </label>
+            <label class="beta-plat">
+              <input type="radio" name="platform" value="ios" />
+              <span class="beta-plat-box">
+                <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M11.182.008C11.148-.03 9.923.023 8.857 1.18c-1.066 1.156-.902 2.482-.878 2.516s1.52.087 2.475-1.258.762-2.391.728-2.43m3.314 11.733c-.048-.096-2.325-1.234-2.113-3.422s1.675-2.789 1.698-2.854-.597-.79-1.254-1.157a3.7 3.7 0 0 0-1.563-.434c-.108-.003-.483-.095-1.254.116-.508.139-1.653.589-1.968.607-.316.018-1.256-.522-2.267-.665-.647-.125-1.333.131-1.824.328-.49.196-1.422.754-2.074 2.237-.652 1.482-.311 3.83-.067 4.56s.625 1.924 1.273 2.796c.576.984 1.34 1.667 1.659 1.899s1.219.386 1.843.067c.502-.308 1.408-.485 1.766-.472.357.013 1.061.154 1.782.539.571.197 1.111.115 1.652-.105.541-.221 1.324-1.059 2.238-2.758q.52-1.185.473-1.282"/></svg>
+                <b>iOS</b>
+              </span>
+            </label>
+          </fieldset>
+
+          <label class="beta-label" for="betaEmail" data-i18n="emailLabel">Email address</label>
+          <div class="notify-form" id="betaRow">
+            <input id="betaEmail" type="email" inputmode="email" autocomplete="email" required data-i18n-ph="emailPlaceholder" placeholder="you@email.com" aria-describedby="betaHint" />
+            <button class="btn btn-primary" type="submit" id="betaBtn" data-i18n="betaBtn">Become a tester</button>
+          </div>
+          <p class="beta-hint" id="betaHint" data-i18n="betaHintNone">Pick a platform first.</p>
+          <p class="form-msg" id="betaMsg" role="alert"></p>
+        </form>
+
+        <div class="ok" id="betaOk" hidden aria-live="polite">
+          <span class="ok-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+          <div>
+            <h3 data-i18n="betaOkTitle">You're on the tester list!</h3>
+            <p id="betaOkText"></p>
+            <button class="a-link beta-again" type="button" id="betaAgain" data-i18n="betaAgain">Sign up another device</button>
+          </div>
+        </div>
+
+        <p class="notify-note" data-i18n-html="betaNote">We use this address only to send test invites and test-related messages, as described in the <a href="privacy.html">Privacy Policy</a>. Test builds may contain bugs.</p>
+      </div>
+    </div>
   </section>
 
   <!-- ───────────────────────── SSS ───────────────────────── -->

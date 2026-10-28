@@ -71,6 +71,26 @@ service cloud.firestore {
                     && request.resource.data.queueNo is int;
     }
 
+    // Landing "Test kullanıcısı ol" formu (website/home.js → addBetaTester).
+    // docId = base64(email) + "_" + platform; aynı kişi iki platforma ayrı yazılır.
+    // waitlist ile aynı gerekçe: tek kayıt okunur (yinelenen kayıt kontrolü),
+    // liste dökülemez, kayıt değiştirilemez.
+    match /betaTesters/{docId} {
+      allow get: if true;
+      allow list: if false;
+      allow update, delete: if false;
+      allow create: if request.resource.data.keys().hasOnly(['email', 'platform', 'lang', 'createdAt', 'source'])
+                    && request.resource.data.keys().hasAll(['email', 'platform', 'createdAt', 'source'])
+                    && request.resource.data.email is string
+                    && request.resource.data.email.matches('^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$')
+                    && request.resource.data.email.size() < 200
+                    && request.resource.data.platform in ['android', 'ios']
+                    && docId.matches('.+_' + request.resource.data.platform)
+                    && (!('lang' in request.resource.data) || request.resource.data.lang in ['tr', 'en', 'es', 'pt', 'de'])
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.source == 'landing';
+    }
+
     match /meta/waitlist {
       allow read: if true;
       allow create: if request.resource.data.keys().hasOnly(['count'])
