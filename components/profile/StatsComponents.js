@@ -20,7 +20,6 @@ import {
 
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import AdaptiveBlurView from "../common/AdaptiveBlurView";
 import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
 import { i18nText } from "../../utils/i18nText";
 import { describeDateFilter } from "../../utils/statsFilters";
@@ -1258,22 +1257,30 @@ export const StatsSectionHeader = memo(function StatsSectionHeader({
         )}
       </View>
 
-      <View style={sectStyles.badges}>
-        {count > 0 && (
-          <View style={[sectStyles.badge, { backgroundColor: withAlpha(theme.primary, 0.7) }]}>
-            <Ionicons name={itemIcon} size={11} color={theme.text.secondary} />
-            <Text style={[sectStyles.badgeText, { color: theme.text.secondary }]}>{count}</Text>
-          </View>
-        )}
-        {totalMinutes > 0 && (
-          <View style={[sectStyles.badge, { backgroundColor: withAlpha(tint, 0.16) }]}>
-            <MaterialCommunityIcons name="clock-outline" size={11} color={tint} />
-            <Text style={[sectStyles.badgeText, { color: tint }]}>
-              {totalMinutes} {minutesLabel}
-            </Text>
-          </View>
-        )}
-      </View>
+      {/* Adet + süre TEK hapta: iki ayrı rozet başlığı iki satıra uzatıyordu. */}
+      {(count > 0 || totalMinutes > 0) && (
+        <View style={[sectStyles.badge, { backgroundColor: withAlpha(tint, 0.13) }]}>
+          {count > 0 && (
+            <>
+              <Ionicons name={itemIcon} size={11} color={tint} />
+              <Text allowFontScaling={false} style={[sectStyles.badgeText, { color: theme.text.primary }]}>
+                {count}
+              </Text>
+            </>
+          )}
+          {count > 0 && totalMinutes > 0 && (
+            <View style={[sectStyles.badgeDot, { backgroundColor: withAlpha(tint, 0.55) }]} />
+          )}
+          {totalMinutes > 0 && (
+            <>
+              <MaterialCommunityIcons name="clock-outline" size={11} color={tint} />
+              <Text allowFontScaling={false} style={[sectStyles.badgeText, { color: theme.text.primary }]}>
+                {totalMinutes} {minutesLabel}
+              </Text>
+            </>
+          )}
+        </View>
+      )}
     </View>
   );
 });
@@ -1282,48 +1289,47 @@ const sectStyles = StyleSheet.create({
   wrap: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 11,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 2,
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingTop: 10,
   },
   dateTile: {
-    width: 46,
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1,
+    width: 38,
+    height: 40,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",
   },
-  tileDay: { fontSize: 18, lineHeight: 21, fontWeight: "900", letterSpacing: -0.4 },
+  tileDay: { fontSize: 15, lineHeight: 17, fontWeight: "900", letterSpacing: -0.4 },
   tileMonth: {
-    marginTop: -1,
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: "900",
-    letterSpacing: 0.8,
+    letterSpacing: 0.7,
     textTransform: "uppercase",
   },
   copy: { flex: 1, minWidth: 0 },
-  title: { fontSize: 14, fontWeight: "800", letterSpacing: -0.2 },
-  genres: { marginTop: 2, fontSize: 10.5, fontWeight: "600" },
-  badges: { alignItems: "flex-end", gap: 5 },
+  title: { fontSize: 13.5, fontWeight: "800", letterSpacing: -0.2 },
+  genres: { marginTop: 1, fontSize: 10.5, fontWeight: "600" },
   badge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 3,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 999,
   },
+  badgeDot: { width: 3, height: 3, borderRadius: 1.5, marginHorizontal: 3 },
   badgeText: { fontSize: 10.5, fontWeight: "800" },
 });
 
 // ─── POSTER CARD ─────────────────────────────────────────────────────────────
 //
-// İzlenen film/bölüm görsel kartı. Modern: poster + alt başlık + üst-sağ
-// minutes badge + press animasyonu.
+// İzlenen film/bölüm görsel kartı. Kompakt: süre posterin alt kenarındaki
+// karartma üstünde, kişisel puan/yorum sol üstte ÜZERİNDE — posterin altında
+// ayrı bir satır ayrılmaz, gün kartı kısa kalır.
 
-const CARD_W = 110;
+const CARD_W = 76;
 const CARD_H = CARD_W * 1.5;
 
 export const StatsPosterCard = memo(function StatsPosterCard({
@@ -1380,41 +1386,42 @@ export const StatsPosterCard = memo(function StatsPosterCard({
             </View>
           )}
 
-          {/* Minutes badge (top-right) */}
+          {/* Süre — alt kenarda karartma üstünde */}
           {minutes > 0 && (
-            <AdaptiveBlurView
-              intensity={45}
-              tint="dark"
-              style={[cardStyles.minBadge, { backgroundColor: "rgba(0,0,0,0.45)" }]}
+            <LinearGradient
+              pointerEvents="none"
+              colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.78)"]}
+              style={cardStyles.minShade}
             >
               <MaterialCommunityIcons name="clock-time-four" size={9} color="#fff" />
-              <Text style={cardStyles.minText}>
+              <Text allowFontScaling={false} style={cardStyles.minText} numberOfLines={1}>
                 {minutes} {minutesLabel}
               </Text>
-            </AdaptiveBlurView>
+            </LinearGradient>
           )}
-        </View>
 
-        {/* Kişisel puan (yıldız) + yorum ikonu — posterin ALTINDA, içerik adı yerine */}
-        <MyPosterActivityBadge mediaId={mediaId} mediaType={mediaType} posterWidth={CARD_W} />
+          {/* Kişisel puan (yıldız) + yorum ikonu — posterin ÜZERİNDE, sol üstte */}
+          <MyPosterActivityBadge
+            mediaId={mediaId}
+            mediaType={mediaType}
+            posterWidth={CARD_W}
+            layout="overlay"
+            corner="topLeft"
+          />
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
 });
 
 const cardStyles = StyleSheet.create({
-  wrap: { marginRight: 10 },
+  wrap: { marginRight: 8 },
   posterWrap: {
     width: CARD_W,
     height: CARD_H,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: "hidden",
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-    elevation: 4,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   poster: { width: "100%", height: "100%" },
   posterPh: {
@@ -1423,19 +1430,19 @@ const cardStyles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  minBadge: {
+  minShade: {
     position: "absolute",
-    top: 5,
-    right: 5,
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
     paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 8,
-    overflow: "hidden",
+    paddingTop: 14,
+    paddingBottom: 5,
   },
-  minText: { color: "#fff", fontSize: 9, fontWeight: "700" },
+  minText: { flexShrink: 1, color: "#fff", fontSize: 9.5, fontWeight: "800" },
 });
 
 // ─── DATE SECTION ────────────────────────────────────────────────────────────
@@ -1445,7 +1452,7 @@ const cardStyles = StyleSheet.create({
 // ref'i vb.) değişmedikçe yeniden render edilmez. Poster'lar ekranın useMemo'sunda
 // önceden normalize edilip geldiği için onPress closure'ları da stabildir.
 
-const POSTER_STRIDE = CARD_W + 10; // kart genişliği + marginRight (StatsPosterCard)
+const POSTER_STRIDE = CARD_W + 8; // kart genişliği + marginRight (StatsPosterCard)
 
 const posterKeyExtractor = (it) => it.key;
 const posterGetItemLayout = (_data, index) => ({
@@ -1526,12 +1533,12 @@ export const StatsDateSection = memo(function StatsDateSection({
 const dateSectionStyles = StyleSheet.create({
   card: {
     marginHorizontal: 12,
-    marginTop: 10,
-    borderRadius: 22,
+    marginTop: 8,
+    borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
-  posterRow: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 },
+  posterRow: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10 },
 });
 
 // ─── COLLAPSING LIST ─────────────────────────────────────────────────────────
