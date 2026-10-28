@@ -19,15 +19,20 @@
 // bu yarışın bedeli kalıcı olurdu.
 
 import { copyLanguage, pickByLanguage } from "../../utils/appLanguages";
-import React, { memo, useMemo, useState } from "react";
+import React, { memo, useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import AppIcon from "@components/AppIcon";
 import AppBadge from "@components/badges/AppBadge";
 import WatchBadgeDetailModal from "@components/badges/WatchBadgeDetailModal";
+import Toast from "@components/AppToast";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
+import useBadgeShowcase from "@hooks/useBadgeShowcase";
+import * as Haptics from "@services/hapticsService";
 import { kademeRengi, kademeSekli, RARITY_ORDER } from "@theme/badgeTokens";
 import { badgeAd } from "@components/badges/watchBadgeCatalog";
+import { sortUnlockedWithShowcaseFirst } from "@utils/badgeShowcase";
+import { getBadgeShowcaseCopy } from "@utils/badgeShowcaseCopy";
 import { withAlpha } from "./StatsComponents";
 import GlassTouchable from "../common/GlassTouchable";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
@@ -39,7 +44,10 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const copy = getBadgeShowcaseCopy(lang);
   const { loading, kartlar, acikSayisi, toplamRozet } = progress || {};
+  const { showcaseIds, toggleBadge, isShowcased } = useBadgeShowcase();
+
   // Simgeye dokunmak DETAY MODALINI açar, Rozetler ekranına GİTMEZ. Gezinme
   // sonundaki sayaç çipinde kalır: raf bir vitrin, her simge kendi hikâyesini
   // anlatabilmeli — dokununca ekran değiştirmek o hikâyeyi atlamak olurdu.
@@ -47,17 +55,26 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
 
   const acikRozetler = useMemo(() => {
     if (!kartlar?.length) return [];
-    return kartlar
-      .filter((k) => k.acik)
-      // Nadir olan başta: rafın ilk gördüğün ucu en iyi parçan olmalı. Katalog
-      // sırası bıraksaydık raf "İlk Kare, İlk Bilet, Sezon Başı…" diye en ucuz
-      // üç rozetle açılırdı.
-      .sort((a, b) => {
-        const fark = RARITY_ORDER.indexOf(b.rarity) - RARITY_ORDER.indexOf(a.rarity);
-        // Eşit nadirlikte ilerlemişi öne al (4/4 tamamlanmış aile, 1/4'ten önce).
-        return fark !== 0 ? fark : (b.aileKademe || 0) - (a.aileKademe || 0);
-      });
-  }, [kartlar]);
+    const sadeceAcik = kartlar.filter((k) => k.acik);
+    return sortUnlockedWithShowcaseFirst(sadeceAcik, showcaseIds, RARITY_ORDER);
+  }, [kartlar, showcaseIds]);
+
+  const handleToggleVitrin = useCallback(
+    (badge) => {
+      const res = toggleBadge(badge);
+      if (res.action === "added" || res.action === "removed") {
+        Haptics.selectionAsync();
+      } else if (res.action === "full") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Toast.show({
+          type: "info",
+          text1: copy.showcaseFullTitle,
+          text2: copy.showcaseFullBody,
+        });
+      }
+    },
+    [toggleBadge, copy],
+  );
 
   // Açılış penceresinde (useStartupGate 3200 ms) ve hiç rozet yokken şerit
   // TAMAMEN gizlenir. Boş bir raf ya da iskelet göstermek, hemen üstündeki
@@ -77,7 +94,13 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
         <GlassTouchable
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={pickByLanguage(lang, { tr: "Tüm rozetler", en: "All badges", es: "Todas las insignias", pt: "Todos os emblemas", de: "Alle Abzeichen" })}
+          accessibilityLabel={pickByLanguage(lang, {
+            tr: "Tüm rozetler",
+            en: "All badges",
+            es: "Todas las insignias",
+            pt: "Todos os emblemas",
+            de: "Alle Abzeichen",
+          })}
           onPress={onPress}
           style={[
             styles.hepsi,
@@ -162,7 +185,14 @@ function WatchBadgeStrip({ progress, onPress, compact = false }) {
         })}
       </ScrollView>
 
-      <WatchBadgeDetailModal badge={secili} visible={!!secili} onClose={() => setSecili(null)} />
+      <WatchBadgeDetailModal
+        badge={secili}
+        visible={!!secili}
+        onClose={() => setSecili(null)}
+        vitrinde={secili ? isShowcased(secili) : false}
+        vitrinSayisi={showcaseIds.length}
+        onToggleVitrin={handleToggleVitrin}
+      />
     </View>
   );
 }

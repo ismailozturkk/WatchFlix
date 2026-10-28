@@ -50,16 +50,27 @@ import {
 } from "./watchBadgeCatalog";
 import { kalanMiktar, kartBul, prestijBilgisi, prestijEk, setUyeleri } from "./badgeInsights";
 import { formatTarih, nadirlikAdi, yuzdeMetni } from "./badgeFormat";
+import { getBadgeShowcaseCopy } from "../../utils/badgeShowcaseCopy";
+import { MAX_SHOWCASE_BADGES } from "../../utils/badgeShowcase";
 import GlassTouchable from "../common/GlassTouchable";
 
 const DUGUM_ROZET = 40;      // yol düğümündeki rozet boyu (hücre genişliği esnek)
 const BOS = [];
 
-export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
+export default function WatchBadgeDetailModal({
+  badge,
+  visible,
+  onClose,
+  readOnly = false,
+  vitrinde = false,
+  vitrinSayisi = 0,
+  onToggleVitrin,
+}) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const insets = useSafeAreaInsets();
   const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const showcaseCopy = getBadgeShowcaseCopy(lang);
 
   // Koleksiyon üyelerini çözmek ve üyeye dokununca onun kartını bulmak için
   // bağlamdan okunur. Çağıranlara ek prop taşımak (ekran + profil rafı) iki yerde
@@ -121,13 +132,13 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
     }
     return {
       gizliKilitli,
-      uyeler,
+      uyeler: readOnly ? null : uyeler,
       dolgu,
-      hedef: asil.sonrakiHedef || (!asil.acik ? asil : null),
-      prestij: prestijBilgisi(asil),
-      koleksiyon: asil.uyeIdleri ? setUyeleri(asil, rozetler) : null,
+      hedef: readOnly ? null : asil.sonrakiHedef || (!asil.acik ? asil : null),
+      prestij: readOnly ? null : prestijBilgisi(asil),
+      koleksiyon: !readOnly && asil.uyeIdleri ? setUyeleri(asil, rozetler) : null,
     };
-  }, [asil, rozetler]);
+  }, [asil, rozetler, readOnly]);
 
   if (!asil || !veri) return null;
 
@@ -249,7 +260,7 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
                 : i18nText("autoI18n.rozet_kilitli_etiket", "Kilitli")}
             </Text>
           </View>
-          {uyeler ? (
+          {uyeler || (asil.aileToplam || 0) > 1 ? (
             <View style={[styles.pill, { backgroundColor: withAlpha(vurgu, 0.14), borderColor: withAlpha(vurgu, 0.38) }]}>
               <Text allowFontScaling={false} style={[styles.pillText, { color: vurgu }]}>
                 {i18nText("autoI18n.rozet_aile_kademe", `Kademe ${asil.aileKademe}/${asil.aileToplam}`, {
@@ -283,6 +294,42 @@ export default function WatchBadgeDetailModal({ badge, visible, onClose }) {
         <Text allowFontScaling={false} style={[styles.aciklama, { color: theme.text.muted }]}>
           {aciklama}
         </Text>
+
+        {!readOnly && acik && typeof onToggleVitrin === "function" ? (
+          <GlassTouchable
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityState={{ selected: vitrinde }}
+            onPress={() => onToggleVitrin(asil)}
+            style={[
+              styles.vitrinButon,
+              {
+                backgroundColor: vitrinde
+                  ? withAlpha(theme.accent, 0.16)
+                  : withAlpha(theme.primary, 0.7),
+                borderColor: vitrinde ? theme.accent : theme.border,
+              },
+            ]}
+          >
+            <AppIcon
+              family="Ionicons"
+              name={vitrinde ? "sparkles" : "add-circle-outline"}
+              size={16}
+              color={vitrinde ? theme.accent : theme.text.primary}
+            />
+            <Text
+              allowFontScaling={false}
+              style={[
+                styles.vitrinButonYazi,
+                { color: vitrinde ? theme.accent : theme.text.primary },
+              ]}
+            >
+              {vitrinde
+                ? showcaseCopy.inShowcaseRemove
+                : `${showcaseCopy.addToShowcase} (${vitrinSayisi}/${MAX_SHOWCASE_BADGES})`}
+            </Text>
+          </GlassTouchable>
+        ) : null}
 
         {/* İlerleme. Gizli rozette ÇİZİLMEZ: "18/25" göstermek rozetin ne ölçtüğünü
             ele verir ve gizliliğin tek anlamını öldürür. */}
@@ -594,6 +641,21 @@ const styles = StyleSheet.create({
 
   govde: { paddingHorizontal: 20, paddingTop: 4, gap: 14 },
   aciklama: { fontSize: 13.5, fontWeight: "650", lineHeight: 20, textAlign: "center" },
+  vitrinButon: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 44,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignSelf: "center",
+  },
+  vitrinButonYazi: {
+    fontSize: 13,
+    fontWeight: "850",
+  },
 
   kutu: { borderRadius: 18, borderWidth: 1, padding: 14 },
   kutuBaslikSatir: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

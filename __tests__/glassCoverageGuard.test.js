@@ -40,6 +40,7 @@ const RAW_TOUCHABLE_ALLOWED = {
   "components/tv/TvGraphGrid.js": 1, // yüzlerce bölüm hücresi
   "components/cineswipe/SwipeCard.js": 1, // kart içi bilgi düğmesi
   "components/badges/BadgeRail.js": 3, // kart gibi raf öğeleri
+  "components/badges/BadgeShowcaseCard.js": 2, // kart gibi vitrin yuvası + yuvanın köşesindeki sil rozeti
   // Düğmenin KENDİSİ renk örneği / tema önizlemesi: cam tonu gösterdiği rengi bozar.
   "components/theme/ThemeShuffleDeck.js": 2,
   "components/theme/ThemeToneKit.js": 1,

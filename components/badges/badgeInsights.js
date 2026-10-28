@@ -17,7 +17,7 @@
 
 import { copyLanguage } from "../../utils/appLanguages";
 import { RARITY_ORDER } from "@theme/badgeTokens";
-import { BOLUM_SIRA, KATALOG_SURUMU } from "./watchBadgeCatalog";
+import { BOLUM_BASLIK, BOLUM_SIRA, KATALOG_SURUMU, badgeAciklama, badgeAd } from "./watchBadgeCatalog";
 
 const GUN_ANAHTARI = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -322,6 +322,90 @@ export function kartBul(kartlar, id) {
 }
 
 /**
+ * Arama sorgusu ve rozet metinlerini karşılaştırma için normalize eder:
+ * Türkçe karakter katlaması (İ/I/ı/ş/ğ/ü/ö/ç) + aksan temizliği + küçük harf.
+ */
+export function rozetMetniNormalize(metin) {
+  if (!metin) return "";
+  return String(metin)
+    .replace(/İ/g, "i")
+    .replace(/I/g, "i")
+    .replace(/ı/g, "i")
+    .replace(/Ş/g, "s")
+    .replace(/ş/g, "s")
+    .replace(/Ğ/g, "g")
+    .replace(/ğ/g, "g")
+    .replace(/Ü/g, "u")
+    .replace(/ü/g, "u")
+    .replace(/Ö/g, "o")
+    .replace(/ö/g, "o")
+    .replace(/Ç/g, "c")
+    .replace(/ç/g, "c")
+    .replace(/ß/g, "ss")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Bir rozet kartı arama sorgusuyla eşleşiyor mu?
+ *
+ * GİZLİLİK KURALI: Kilitli gizli rozetler (`hidden && !acik`) arama sorgusunda
+ * ASLA gerçek adları veya açıklamaları üzerinden eşleşmez; aksi halde "alfabe"
+ * ya da "gece" yazmak gizli rozetin ne olduğunu sızdırırdı.
+ */
+export function rozetAramaEslesirMi(kart, sorgu, lang = "tr") {
+  const temizSorgu = rozetMetniNormalize(sorgu);
+  if (!temizSorgu) return true;
+  if (!kart) return false;
+  if (gizliKilitli(kart)) return false;
+
+  const code = copyLanguage(lang, ["tr", "en", "es", "pt", "de"]);
+  const adayMetinler = [
+    badgeAd(kart, code),
+    badgeAciklama(kart, code),
+    BOLUM_BASLIK[kart.section]?.[code] || "",
+  ];
+
+  if (kart.sonrakiHedef) {
+    adayMetinler.push(
+      badgeAd(kart.sonrakiHedef, code),
+      badgeAciklama(kart.sonrakiHedef, code),
+    );
+  }
+
+  if (Array.isArray(kart.aileUyeleri)) {
+    for (const u of kart.aileUyeleri) {
+      if (u.hidden && !u.acik) continue;
+      adayMetinler.push(badgeAd(u, code), badgeAciklama(u, code));
+    }
+  }
+
+  const birlesik = rozetMetniNormalize(adayMetinler.filter(Boolean).join(" "));
+  const kelimeler = temizSorgu.split(" ").filter(Boolean);
+  return kelimeler.every((kelime) => birlesik.includes(kelime));
+}
+
+function kartSuzgeci(b, filtre, bolum, arama, lang) {
+  if (bolum && b.section !== bolum) return false;
+  if (filtre === "acik" && !b.acik) return false;
+  if (filtre === "kilitli" && !(!b.acik || !!b.sonrakiHedef)) return false;
+  // Son genişlemede eklenenler (kilitli ya da açık fark etmez): duyuru kartındaki
+  // "yeni olanları göster" bağı buraya düşer.
+  if (filtre === "yeni" && !b.yeniKatalog) return false;
+  if (arama && !rozetAramaEslesirMi(b, arama, lang)) return false;
+  return true;
+}
+
+/** Aktif süzgeç + arama sonucunda kaç rozet kartı kaldığını döndürür. */
+export function aramaSonucSayisi(kartlar, filtre = "tumu", bolum = null, arama = "", lang = "tr") {
+  if (!kartlar?.length) return 0;
+  return kartlar.filter((b) => kartSuzgeci(b, filtre, bolum, arama, lang)).length;
+}
+
+/**
  * Süzgeçlere göre ızgara satırlarını kurar. Ekran bunu useMemo ile çağırır; mantık burada
  * durur ki RN'siz test edilebilsin.
  *
@@ -330,17 +414,10 @@ export function kartBul(kartlar, id) {
  * yazsaydık böyle bir aile "Kilitli"de hiç görünmezdi — yani kullanıcının sıradaki
  * hedefi, tam da hedefleri listeleyen süzgeçte kaybolurdu.
  */
-export function izgaraSatirlari(kartlar, filtre, bolum, sutun = 3) {
+export function izgaraSatirlari(kartlar, filtre, bolum, sutun = 3, opts = {}) {
   if (!kartlar?.length) return [];
-  const suzulmus = kartlar.filter((b) => {
-    if (bolum && b.section !== bolum) return false;
-    if (filtre === "acik") return b.acik;
-    if (filtre === "kilitli") return !b.acik || !!b.sonrakiHedef;
-    // Son genişlemede eklenenler (kilitli ya da açık fark etmez): duyuru kartındaki
-    // "yeni olanları göster" bağı buraya düşer.
-    if (filtre === "yeni") return !!b.yeniKatalog;
-    return true;
-  });
+  const { arama = "", lang = "tr" } = opts || {};
+  const suzulmus = kartlar.filter((b) => kartSuzgeci(b, filtre, bolum, arama, lang));
 
   const bolumler = new Map();
   for (const b of suzulmus) {

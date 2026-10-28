@@ -36,15 +36,19 @@ import AppIcon from "@components/AppIcon";
 import BackButton from "@components/BackButton";
 import ScreenDecor from "@components/ScreenDecor";
 import StaggerItem from "@components/StaggerItem";
+import Toast from "@components/AppToast";
 import BadgeControls from "@components/badges/BadgeControls";
 import { BadgeRail, FirsatKarti, HedefKarti, SonKarti } from "@components/badges/BadgeRail";
+import { BadgeShowcaseEditorCard } from "@components/badges/BadgeShowcaseCard";
 import BadgeSummaryCard from "@components/badges/BadgeSummaryCard";
 import NewBadgesBanner from "@components/badges/NewBadgesBanner";
 import WatchBadgeCard from "@components/badges/WatchBadgeCard";
 import WatchBadgeDetailModal from "@components/badges/WatchBadgeDetailModal";
+import GlassTouchable from "@components/common/GlassTouchable";
 import WatchLevelCard from "@components/profile/WatchLevelCard";
 import { BOLUM_BASLIK, KATALOG_SURUMU } from "@components/badges/watchBadgeCatalog";
 import {
+  aramaSonucSayisi,
   bolumOzetleri,
   izgaraSatirlari,
   kartBul,
@@ -54,11 +58,15 @@ import {
   yaklasanlar,
   yeniRozetOzeti,
 } from "@components/badges/badgeInsights";
+import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { useWatchProgressContext } from "@context/WatchProgressContext";
+import useBadgeShowcase from "@hooks/useBadgeShowcase";
 import useEntranceGate from "@hooks/useEntranceGate";
+import * as Haptics from "@services/hapticsService";
 import { Keys, set as setStored, useStored } from "@services/storage";
 import { withAlpha } from "@components/profile/StatsComponents";
+import { getBadgeShowcaseCopy } from "@utils/badgeShowcaseCopy";
 import { i18nText } from "@utils/i18nText";
 
 const SUTUN = 3;   // ızgara sütunu (satır kurma: badgeInsights.izgaraSatirlari)
@@ -87,8 +95,12 @@ const bolumAdi = (bolum) => i18nText(BOLUM_KEY[bolum], BOLUM_BASLIK[bolum]?.tr |
 
 export default function WatchBadgesScreen({ navigation, route }) {
   const { theme } = useTheme();
+  const { language } = useLanguage();
+  const showcaseCopy = getBadgeShowcaseCopy(language);
   const [filtre, setFiltre] = useState("tumu");
   const [bolum, setBolum] = useState(null);
+  const [arama, setArama] = useState("");
+  const [vitrinDuzenle, setVitrinDuzenle] = useState(false);
   // Detay sayfası. `null` = kapalı. Kart nesnesinin KENDİSİ tutulur, id değil:
   // id tutup her render'da `kartlar` içinden aramak, süzgeç değişince (kart listeden
   // düşerse) sayfayı boşa düşürürdü.
@@ -98,10 +110,76 @@ export default function WatchBadgesScreen({ navigation, route }) {
   // hook'u burada da çağırmak defter mutabakatını ikiye katlardı.
   const watchProgress = useWatchProgressContext() || { loading: true };
   const { loading, kartlar, rozetler, acikSayisi, toplamRozet, ilkTohum, tohumRozetSayisi } = watchProgress;
+  const {
+    showcaseIds,
+    showcaseCards,
+    toggleBadge,
+    removeBadge,
+    isShowcased,
+  } = useBadgeShowcase();
 
   const acDetay = useCallback((b) => setSecili(b), []);
   const kapatDetay = useCallback(() => setSecili(null), []);
   const listeRef = useRef(null);
+
+  const handleToggleVitrin = useCallback(
+    (badge) => {
+      const res = toggleBadge(badge);
+      if (res.action === "added" || res.action === "removed") {
+        Haptics.selectionAsync();
+      } else if (res.action === "full") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Toast.show({
+          type: "info",
+          text1: showcaseCopy.showcaseFullTitle,
+          text2: showcaseCopy.showcaseFullBody,
+        });
+      } else if (res.action === "locked") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Toast.show({
+          type: "info",
+          text1: showcaseCopy.lockedBadgeHint,
+        });
+      }
+    },
+    [toggleBadge, showcaseCopy],
+  );
+
+  const handleRemoveVitrin = useCallback(
+    (badge) => {
+      Haptics.selectionAsync();
+      removeBadge(badge);
+    },
+    [removeBadge],
+  );
+
+  const baslatVitrinSecim = useCallback(() => {
+    Haptics.selectionAsync();
+    setVitrinDuzenle(true);
+    setFiltre("acik");
+    requestAnimationFrame(() => {
+      try {
+        listeRef.current?.scrollToIndex({ index: 0, animated: true, viewOffset: SUZGEC_PAYI });
+      } catch (e) {
+        /* liste henüz hazır değil */
+      }
+    });
+  }, []);
+
+  const toggleVitrinDuzenle = useCallback(() => {
+    Haptics.selectionAsync();
+    setVitrinDuzenle((prev) => {
+      const next = !prev;
+      if (next) setFiltre("acik");
+      return next;
+    });
+  }, []);
+
+  const sifirlaAramaVeFiltre = useCallback(() => {
+    setArama("");
+    setFiltre("tumu");
+    setBolum(null);
+  }, []);
 
   // Yeni-rozet duyurusu: kullanıcı bu katalog sürümünü görüp kapattıysa bir daha
   // çıkmaz. İlk kez tohumlanan (yeni) kullanıcı için sürüm zaten "görüldü"
@@ -118,6 +196,7 @@ export default function WatchBadgesScreen({ navigation, route }) {
     navigation?.setParams?.({ openId: undefined });
   }, [openId, kartlar, navigation]);
 
+  const aramaAktif = Boolean(arama.trim());
   const simdi = useMemo(() => Date.now(), [kartlar]); // eslint-disable-line react-hooks/exhaustive-deps
   const yaklasan = useMemo(() => yaklasanlar(kartlar, { limit: 6 }), [kartlar]);
   const firsatlar = useMemo(() => takvimFirsatlari(kartlar, { simdi, limit: 6 }), [kartlar, simdi]);
@@ -125,7 +204,14 @@ export default function WatchBadgesScreen({ navigation, route }) {
   const ozetler = useMemo(() => bolumOzetleri(kartlar), [kartlar]);
   const ozetMap = useMemo(() => Object.fromEntries(ozetler.map((o) => [o.bolum, o])), [ozetler]);
   const dagilim = useMemo(() => nadirlikDagilimi(rozetler), [rozetler]);
-  const veri = useMemo(() => izgaraSatirlari(kartlar, filtre, bolum), [kartlar, filtre, bolum]);
+  const veri = useMemo(
+    () => izgaraSatirlari(kartlar, filtre, bolum, SUTUN, { arama, lang: language }),
+    [kartlar, filtre, bolum, arama, language],
+  );
+  const sonucSayisi = useMemo(
+    () => (aramaAktif ? aramaSonucSayisi(kartlar, filtre, bolum, arama, language) : null),
+    [aramaAktif, kartlar, filtre, bolum, arama, language],
+  );
   const yeniOzet = useMemo(() => yeniRozetOzeti(rozetler), [rozetler]);
   const duyuruGorunur = !loading && yeniOzet.toplam > 0 && (Number(gorulenSurum) || 0) < KATALOG_SURUMU;
 
@@ -166,6 +252,17 @@ export default function WatchBadgesScreen({ navigation, route }) {
       {!loading && toplamRozet > 0 ? (
         <BadgeSummaryCard acik={acikSayisi} toplam={toplamRozet} dagilim={dagilim} style={styles.ozet} />
       ) : null}
+      {!loading && toplamRozet > 0 ? (
+        <BadgeShowcaseEditorCard
+          badges={showcaseCards}
+          editing={vitrinDuzenle}
+          onToggleEditing={toggleVitrinDuzenle}
+          onPressBadge={acDetay}
+          onRemoveBadge={handleRemoveVitrin}
+          onPressEmptySlot={baslatVitrinSecim}
+          style={styles.ozet}
+        />
+      ) : null}
       {duyuruGorunur ? (
         <NewBadgesBanner
           toplam={yeniOzet.toplam}
@@ -178,10 +275,14 @@ export default function WatchBadgesScreen({ navigation, route }) {
     </View>
   );
 
+  // Arama yaparken ya da vitrin seçim kipindeyken yatay rafları gizle:
+  // sonuç ızgarası arama çubuğunun hemen altında görünsün.
+  const raflariGoster = !aramaAktif && !vitrinDuzenle;
+
   const raflar =
     !loading && kartlar?.length ? (
       <View>
-        {yaklasan.length ? (
+        {raflariGoster && yaklasan.length ? (
           <BadgeRail
             baslik={i18nText("autoI18n.rozet_sirada_baslik", "Sıradaki hedefler")}
             altBaslik={i18nText("autoI18n.rozet_sirada_alt", "Tamamlanmaya en yakın")}
@@ -191,7 +292,7 @@ export default function WatchBadgesScreen({ navigation, route }) {
             ))}
           </BadgeRail>
         ) : null}
-        {firsatlar.length ? (
+        {raflariGoster && firsatlar.length ? (
           <BadgeRail
             baslik={i18nText("autoI18n.rozet_takvim_baslik", "Takvimde yakında")}
             altBaslik={i18nText("autoI18n.rozet_takvim_alt", "Yılda bir gelen fırsatlar")}
@@ -201,7 +302,7 @@ export default function WatchBadgesScreen({ navigation, route }) {
             ))}
           </BadgeRail>
         ) : null}
-        {son.length ? (
+        {raflariGoster && son.length ? (
           <BadgeRail
             baslik={i18nText("autoI18n.rozet_son_baslik", "Son kazanılanlar")}
             altBaslik={i18nText("autoI18n.rozet_son_alt", "Son 30 gün")}
@@ -219,6 +320,9 @@ export default function WatchBadgesScreen({ navigation, route }) {
           ozetler={ozetler}
           bolumAd={bolumAdi}
           yeniVar={duyuruGorunur}
+          arama={arama}
+          onArama={setArama}
+          sonucSayisi={sonucSayisi}
         />
       </View>
     ) : null;
@@ -247,11 +351,21 @@ export default function WatchBadgesScreen({ navigation, route }) {
     }
     return (
       <StaggerItem index={index} animate={shouldAnimate()} style={styles.badgeRow}>
-        {item.rozetler.map((badge) => (
-          <View key={badge.id} style={styles.badgeCell}>
-            <WatchBadgeCard badge={badge} compact onPress={() => acDetay(badge)} />
-          </View>
-        ))}
+        {item.rozetler.map((badge) => {
+          const seciliVitrin = isShowcased(badge);
+          return (
+            <View key={badge.id} style={styles.badgeCell}>
+              <WatchBadgeCard
+                badge={badge}
+                compact
+                vitrinde={seciliVitrin}
+                secimModu={vitrinDuzenle}
+                onPress={() => (vitrinDuzenle ? handleToggleVitrin(badge) : acDetay(badge))}
+                onLongPress={() => acDetay(badge)}
+              />
+            </View>
+          );
+        })}
         {Array.from({ length: SUTUN - item.rozetler.length }).map((_, i) => (
           <View key={`bos_${i}`} style={styles.badgeCell} />
         ))}
@@ -299,24 +413,59 @@ export default function WatchBadgesScreen({ navigation, route }) {
           <View style={styles.empty}>
             <AppIcon
               family="Ionicons"
-              name={loading ? "hourglass-outline" : filtre === "kilitli" ? "trophy-outline" : "ribbon-outline"}
+              name={
+                loading
+                  ? "hourglass-outline"
+                  : aramaAktif
+                    ? "search-outline"
+                    : filtre === "kilitli"
+                      ? "trophy-outline"
+                      : "ribbon-outline"
+              }
               size={34}
               color={theme.text.muted}
             />
             <Text allowFontScaling={false} style={[styles.emptyText, { color: theme.text.muted }]}>
               {loading
                 ? i18nText("autoI18n.rozet_veri_okunuyor", "İzleme verin okunuyor…")
-                : filtre === "acik"
-                  ? i18nText("autoI18n.rozet_bos_acik", "Henüz rozet açmadın. İlk karen seni bekliyor.")
-                  : filtre === "kilitli"
-                    ? i18nText("autoI18n.rozet_bos_kilitli", "Burada kilitli rozet kalmadı. Harikasın!")
-                    : i18nText("autoI18n.rozet_bos_filtre", "Bu filtrede rozet yok.")}
+                : aramaAktif
+                  ? showcaseCopy.searchEmpty
+                  : filtre === "acik"
+                    ? i18nText("autoI18n.rozet_bos_acik", "Henüz rozet açmadın. İlk karen seni bekliyor.")
+                    : filtre === "kilitli"
+                      ? i18nText("autoI18n.rozet_bos_kilitli", "Burada kilitli rozet kalmadı. Harikasın!")
+                      : i18nText("autoI18n.rozet_bos_filtre", "Bu filtrede rozet yok.")}
             </Text>
+            {!loading && (aramaAktif || filtre !== "tumu" || bolum !== null) ? (
+              <GlassTouchable
+                activeOpacity={0.82}
+                accessibilityRole="button"
+                onPress={sifirlaAramaVeFiltre}
+                style={[
+                  styles.emptyResetBtn,
+                  {
+                    backgroundColor: withAlpha(theme.accent, 0.14),
+                    borderColor: withAlpha(theme.accent, 0.4),
+                  },
+                ]}
+              >
+                <Text allowFontScaling={false} style={[styles.emptyResetText, { color: theme.accent }]}>
+                  {showcaseCopy.resetFilters}
+                </Text>
+              </GlassTouchable>
+            ) : null}
           </View>
         }
       />
 
-      <WatchBadgeDetailModal badge={secili} visible={!!secili} onClose={kapatDetay} />
+      <WatchBadgeDetailModal
+        badge={secili}
+        visible={!!secili}
+        onClose={kapatDetay}
+        vitrinde={secili ? isShowcased(secili) : false}
+        vitrinSayisi={showcaseIds.length}
+        onToggleVitrin={handleToggleVitrin}
+      />
     </SafeAreaView>
   );
 }
@@ -371,5 +520,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     lineHeight: 19,
+  },
+  emptyResetBtn: {
+    marginTop: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  emptyResetText: {
+    fontSize: 12.5,
+    fontWeight: "850",
   },
 });

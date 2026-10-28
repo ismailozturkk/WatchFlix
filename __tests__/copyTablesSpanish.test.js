@@ -41,6 +41,7 @@ const { LIST_VISIBILITY_COPY } = require("../screens/tabs/profile/listVisibility
 const { SEARCH_HEADER_COPY } = require("../components/search/searchHeaderCopy");
 const { UPCOMING_FILTERS_COPY } = require("../utils/upcomingFiltersCopy");
 const { POSTER_CHOICES_COPY } = require("../utils/posterChoicesCopy");
+const { BADGE_SHOWCASE_COPY } = require("../utils/badgeShowcaseCopy");
 
 // `{ad}`, `{{ad}}`, `%d` biçimli yer tutucuları çıkarır.
 const yerTutucular = (metin) =>
@@ -136,6 +137,7 @@ const TABLOLAR = {
   "Arama ekranı başlığı (searchHeaderCopy)": () => SEARCH_HEADER_COPY,
   "Yaklaşan Filmler süzgeci (upcomingFiltersCopy)": () => UPCOMING_FILTERS_COPY,
   "Özel afişler (posterChoicesCopy)": () => POSTER_CHOICES_COPY,
+  "Rozet vitrini ve arama (badgeShowcaseCopy)": () => BADGE_SHOWCASE_COPY,
   "Wrapped (wrappedStrings)": () => ({
     tr: getWrappedStrings("tr"),
     en: getWrappedStrings("en"),

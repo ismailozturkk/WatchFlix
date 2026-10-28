@@ -1,8 +1,8 @@
 // components/badges/BadgeControls.js
 //
-// Rozet ekranının süzgeçleri: durum (Tümü / Açık / Kilitli, duyuru varken + Yeni) ve
-// bölüm (Başlangıç, Kilometre taşları, Ritim…). İkisi birlikte çalışır — "Türler"
-// bölümünde yalnızca kilitliler gibi.
+// Rozet ekranının arama çubuğu ve süzgeçleri: durum (Tümü / Açık / Kilitli,
+// duyuru varken + Yeni) ve bölüm (Başlangıç, Kilometre taşları, Ritim…).
+// Üçü birlikte çalışır — "Türler" bölümünde arama yaparken yalnızca kilitliler gibi.
 //
 // BÖLÜM ÇİPİ KAYDIRMAZ, SÜZER. 140+ rozetlik, başlıkları ve satırları farklı
 // yükseklikte bir FlatList'te bir bölüme atlamak getItemLayout ister; satır
@@ -12,11 +12,15 @@
 // Çiplerdeki sayı KADEME düzeyinde (badgeInsights.bolumOzetleri): "Türler 4/9".
 
 import React, { memo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import AppIcon from "@components/AppIcon";
+import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
+import { getBadgeShowcaseCopy } from "@utils/badgeShowcaseCopy";
 import { withAlpha } from "@components/profile/StatsComponents";
 import GlassTouchable from "../common/GlassTouchable";
+import GlassBox from "../common/GlassBox";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 
 export const DURUM_FILTRELERI = [
@@ -30,12 +34,85 @@ export const DURUM_FILTRELERI = [
 // (kalıcı bir "Yeni" sekmesi, ilk haftadan sonra hep boş/anlamsız kalırdı).
 export const YENI_FILTRE = { id: "yeni", key: "autoI18n.rozet_filtre_yeni", fallback: "Yeni" };
 
-function BadgeControls({ filtre, onFiltre, bolum, onBolum, ozetler, bolumAd, yeniVar = false }) {
+function BadgeControls({
+  filtre,
+  onFiltre,
+  bolum,
+  onBolum,
+  ozetler,
+  bolumAd,
+  yeniVar = false,
+  arama = "",
+  onArama,
+  sonucSayisi = null,
+}) {
   const { theme } = useTheme();
+  const { language } = useLanguage();
+  const copy = getBadgeShowcaseCopy(language);
   const filtreler = yeniVar ? [...DURUM_FILTRELERI, YENI_FILTRE] : DURUM_FILTRELERI;
+  const aramaAktif = Boolean(String(arama || "").trim());
 
   return (
     <View style={styles.kap}>
+      {typeof onArama === "function" ? (
+        <GlassBox
+          role="field"
+          style={[
+            styles.aramaKap,
+            {
+              backgroundColor: theme.secondary,
+              borderColor: aramaAktif ? withAlpha(theme.accent, 0.65) : theme.border,
+            },
+          ]}
+        >
+          <AppIcon
+            family="Ionicons"
+            name="search-outline"
+            size={17}
+            color={aramaAktif ? theme.accent : theme.text.muted}
+          />
+          <TextInput
+            value={arama}
+            onChangeText={onArama}
+            placeholder={copy.searchPlaceholder}
+            placeholderTextColor={theme.text.muted}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            allowFontScaling={false}
+            style={[styles.aramaGirdi, { color: theme.text.primary }]}
+          />
+          {aramaAktif && typeof sonucSayisi === "number" ? (
+            <View
+              style={[
+                styles.aramaSayac,
+                { backgroundColor: withAlpha(theme.accent, 0.14) },
+              ]}
+            >
+              <Text allowFontScaling={false} style={[styles.aramaSayacYazi, { color: theme.accent }]}>
+                {sonucSayisi}
+              </Text>
+            </View>
+          ) : null}
+          {aramaAktif ? (
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={copy.searchClear}
+              onPress={() => onArama("")}
+              style={styles.aramaTemizle}
+            >
+              <AppIcon
+                family="Ionicons"
+                name="close-circle"
+                size={18}
+                color={theme.text.muted}
+              />
+            </TouchableOpacity>
+          ) : null}
+        </GlassBox>
+      ) : null}
+
       <View style={[styles.segment, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
         {filtreler.map((f) => {
           const secili = filtre === f.id;
@@ -110,6 +187,34 @@ function BadgeControls({ filtre, onFiltre, bolum, onBolum, ozetler, bolumAd, yen
 
 const styles = StyleSheet.create({
   kap: { marginTop: 22, gap: 12 },
+  aramaKap: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 14,
+    height: 44,
+    paddingHorizontal: 13,
+    borderRadius: 15,
+    borderWidth: 1,
+    gap: 9,
+  },
+  aramaGirdi: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: "700",
+    paddingVertical: 0,
+  },
+  aramaSayac: {
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 8,
+  },
+  aramaSayacYazi: {
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  aramaTemizle: {
+    padding: 2,
+  },
   segment: {
     flexDirection: "row",
     marginHorizontal: 14,

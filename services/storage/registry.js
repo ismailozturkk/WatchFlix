@@ -525,6 +525,17 @@ const dataKeys = {
     scope: "user",
     keepOnLogout: true,
   },
+  // Kullanıcının profil vitrininde (ve arkadaş profilinde) sergilediği en fazla 4
+  // rozetin id listesi (utils/badgeShowcase.js). Buluta (Users/{uid}.showcaseBadges)
+  // da yazılır; yerel kopya çevrimdışı/anlık tepki verir ve çıkışta korunur.
+  showcaseBadges: {
+    key: "watch_progress:showcase_badges:",
+    type: TYPES.json,
+    default: [],
+    scope: "user",
+    keepOnLogout: true,
+    validate: Array.isArray,
+  },
   // Yıllık izleme hedefi: { "2026": { target, unit } } (bkz. utils/yearlyGoal.js).
   // Yalnız bu cihazda tutulur (buluta yazılmaz). Çıkışta SİLİNMEZ: kullanıcı kendi
   // koyduğu hedefi çıkış-giriş yapınca yeniden kurmak zorunda kalmamalı ve bulut

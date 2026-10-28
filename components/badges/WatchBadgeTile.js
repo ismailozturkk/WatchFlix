@@ -24,21 +24,24 @@ import { copyLanguage } from "../../utils/appLanguages";
 import React, { memo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import AppIcon from "@components/AppIcon";
 import AppBadge from "@components/badges/AppBadge";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
 import { kademeRengi, kademeSekli, rarityStyle, GOLD } from "@theme/badgeTokens";
 import { i18nText } from "@utils/i18nText";
+import { getBadgeShowcaseCopy } from "@utils/badgeShowcaseCopy";
 import { withAlpha } from "@components/profile/StatsComponents";
 import { badgeAd, formatBadgeAralik } from "./watchBadgeCatalog";
 import { nadirlikAdi } from "./badgeFormat";
 
 export const TILE_YUKSEKLIK = 164;
 
-function WatchBadgeTile({ badge, onPress }) {
+function WatchBadgeTile({ badge, onPress, onLongPress, vitrinde = false, secimModu = false }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const copy = getBadgeShowcaseCopy(lang);
 
   const acik = badge.acik;
   const nadirlik = rarityStyle(badge.rarity, theme);
@@ -82,7 +85,14 @@ function WatchBadgeTile({ badge, onPress }) {
 
   const Sarmal = onPress ? TouchableOpacity : View;
   const sarmalProps = onPress
-    ? { onPress, activeOpacity: 0.78, accessibilityRole: "button", accessibilityLabel: etiket }
+    ? {
+        onPress,
+        onLongPress,
+        activeOpacity: 0.78,
+        accessibilityRole: "button",
+        accessibilityState: secimModu && acik ? { selected: vitrinde } : undefined,
+        accessibilityLabel: etiket,
+      }
     : {};
 
   return (
@@ -92,7 +102,13 @@ function WatchBadgeTile({ badge, onPress }) {
         styles.tile,
         {
           backgroundColor: theme.secondary,
-          borderColor: acik ? withAlpha(vurgu, 0.5) : theme.border,
+          borderColor: vitrinde
+            ? theme.accent
+            : acik
+              ? withAlpha(vurgu, 0.5)
+              : theme.border,
+          borderWidth: vitrinde ? 1.5 : 1,
+          opacity: secimModu && !acik ? 0.52 : 1,
         },
       ]}
     >
@@ -128,7 +144,34 @@ function WatchBadgeTile({ badge, onPress }) {
           </Text>
         </View>
       ) : null}
-      {badge.yeni ? (
+      {vitrinde ? (
+        <View
+          style={[
+            styles.kose,
+            styles.koseSag,
+            styles.koseVitrin,
+            { backgroundColor: theme.accent, borderColor: theme.accent },
+          ]}
+        >
+          <AppIcon family="Ionicons" name="sparkles" size={8.5} color="#FFFFFF" />
+          <Text allowFontScaling={false} style={[styles.koseText, { color: "#FFFFFF" }]}>
+            {copy.showcaseBadgeTag}
+          </Text>
+        </View>
+      ) : secimModu && acik ? (
+        <View
+          style={[
+            styles.koseSecim,
+            styles.koseSag,
+            {
+              backgroundColor: withAlpha(theme.accent, 0.14),
+              borderColor: withAlpha(theme.accent, 0.55),
+            },
+          ]}
+        >
+          <AppIcon family="Ionicons" name="add" size={12} color={theme.accent} />
+        </View>
+      ) : badge.yeni ? (
         <View style={[styles.kose, styles.koseSag, { backgroundColor: theme.accent, borderColor: theme.accent }]}>
           <Text allowFontScaling={false} style={[styles.koseText, { color: "#FFFFFF" }]}>
             {i18nText("autoI18n.rozet_yeni", "YENİ")}
@@ -251,6 +294,21 @@ const styles = StyleSheet.create({
   },
   koseSol: { left: 7 },
   koseSag: { right: 7 },
+  koseVitrin: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2.5,
+  },
+  koseSecim: {
+    position: "absolute",
+    top: 7,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   koseText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.3 },
 });
 

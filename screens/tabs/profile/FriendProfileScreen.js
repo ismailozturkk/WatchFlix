@@ -81,8 +81,13 @@ import {
 import ProfileOptionsSheet from "../../../components/friends/ProfileOptionsSheet";
 import * as Haptics from "../../../services/hapticsService";
 import FavoritesShowcase from "../../../components/favorites/FavoritesShowcase";
+import { FriendBadgeShowcase } from "../../../components/badges/BadgeShowcaseCard";
+import WatchBadgeDetailModal from "@components/badges/WatchBadgeDetailModal";
 import { getFavoritesCopy } from "../../../utils/favoritesCopy";
 import { hasAnyFavorites, readProfileFavorites } from "../../../utils/fourFavorites";
+import { readProfileShowcaseBadges, resolveShowcaseBadges } from "../../../utils/badgeShowcase";
+import { getBadgeShowcaseCopy } from "../../../utils/badgeShowcaseCopy";
+import { Keys, get as getStored } from "../../../services/storage";
 import { i18nText } from "../../../utils/i18nText";
 import { getIdentityBadges } from "../../../components/badges/badgeCatalog";
 import { PREMIUM_PLAN, resolveServerPlan } from "../../../utils/premium";
@@ -746,6 +751,17 @@ export default function FriendProfileScreen({ route, navigation }) {
   // zaten dinlenen belgeden gelir. Görünürlüğü profilin kendisiyle aynı
   // (canViewProfile): gizli profilde favoriler de gizli.
   const profileFavorites = useMemo(() => readProfileFavorites(profile), [profile]);
+  // Kullanıcının vitrine seçtiği en fazla 4 rozet (Users/{uid}.showcaseBadges).
+  const [selectedShowcaseBadge, setSelectedShowcaseBadge] = useState(null);
+  const profileShowcaseBadges = useMemo(() => {
+    const remoteIds = readProfileShowcaseBadges(profile);
+    if (remoteIds.length > 0) return resolveShowcaseBadges(remoteIds);
+    if (isSelf && friendUid) {
+      const localIds = getStored(Keys.showcaseBadges, { uid: friendUid });
+      return resolveShowcaseBadges(localIds);
+    }
+    return [];
+  }, [profile, isSelf, friendUid]);
   // Kimlik rozetleri arkadaşın SUNUCU alanlarından: istemci ne
   // entitlements'ı ne badges'ı yazabilir (firestore.rules), yani sahte rozet
   // gösterilemez.
@@ -974,6 +990,20 @@ export default function FriendProfileScreen({ route, navigation }) {
               },
             ]}
           />
+        )}
+
+        {/* ── Vitrin rozetleri: en fazla 4 rozet (varsa) ──────────────────── */}
+        {canViewProfile && profileShowcaseBadges.length > 0 && (
+          <>
+            <SectionHeader
+              title={getBadgeShowcaseCopy(language).profileTitle}
+              trailing={<CountChip value={profileShowcaseBadges.length} icon="ribbon-outline" />}
+            />
+            <FriendBadgeShowcase
+              badges={profileShowcaseBadges}
+              onPressBadge={setSelectedShowcaseBadge}
+            />
+          </>
         )}
 
         {/* ── Favori seçimleri: film / dizi / oyuncu (varsa) ───────────────── */}
@@ -1403,6 +1433,13 @@ export default function FriendProfileScreen({ route, navigation }) {
         isCustomPhoto={profile.avatarIndex === -1}
         displayName={displayName || profile.username || friendName}
         username={profile.username}
+      />
+
+      <WatchBadgeDetailModal
+        badge={selectedShowcaseBadge}
+        visible={!!selectedShowcaseBadge}
+        onClose={() => setSelectedShowcaseBadge(null)}
+        readOnly
       />
     </SafeAreaView>
     </PosterChoicesScope>

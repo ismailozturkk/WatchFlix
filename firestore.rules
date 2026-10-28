@@ -331,6 +331,24 @@ service cloud.firestore {
               && f.get('shows', []) is list && f.get('shows', []).size() <= 4
               && f.get('people', []) is list && f.get('people', []).size() <= 4);
     }
+    // "Vitrin rozetleri" (utils/badgeShowcase.js): kullanıcının profilinde
+    // sergilemek üzere seçtiği en fazla 4 rozet id'si (string[]).
+    function showcaseBadgeItemOk(item) {
+      return item is string
+          && item.size() >= 2
+          && item.size() <= 48
+          && item.matches('^[a-zA-Z0-9_]+$');
+    }
+    function showcaseBadgesOk() {
+      let b = request.resource.data.get('showcaseBadges', null);
+      return b == null
+          || (b is list
+              && b.size() <= 4
+              && (b.size() < 1 || showcaseBadgeItemOk(b[0]))
+              && (b.size() < 2 || showcaseBadgeItemOk(b[1]))
+              && (b.size() < 3 || showcaseBadgeItemOk(b[2]))
+              && (b.size() < 4 || showcaseBadgeItemOk(b[3])));
+    }
     // "Sosyal hesaplar" (utils/socialLinks.js): { instagram: "ad", x: "ad", … }
     // Yalnız bilinen platform anahtarları, her değer en fazla 30 karakterlik metin.
     // Adres DEĞİL kullanıcı adı saklanır; adresi istemci sabit alan adından kurar.
@@ -393,6 +411,7 @@ service cloud.firestore {
                     && !request.resource.data.keys().hasAny(['entitlements', 'badges'])
                     && rootCreateWithoutPrivateFields()
                     && fourFavoritesOk()
+                    && showcaseBadgesOk()
                     && socialLinksOk();
       // Sahibi her şeyi yazar; diğer signed-in kullanıcılar SADECE
       // counter/timestamp alanlarını günceller (friend req / like / comment
@@ -405,6 +424,7 @@ service cloud.firestore {
                         && birthDateKept(uid)
                         && rootUpdateWithoutPrivateFields()
                         && fourFavoritesOk()
+                        && showcaseBadgesOk()
                         && socialLinksOk())
                     || (isSignedIn()
                         && onlyUpdating([

@@ -53,6 +53,7 @@ export function resetWatchLedger(uid) {
   if (uid) {
     remove(Keys.watchLedger, { uid });
     remove(Keys.watchCatalogSeen, { uid });
+    remove(Keys.showcaseBadges, { uid });
   }
   resetListeners.forEach((listener) => {
     try {
