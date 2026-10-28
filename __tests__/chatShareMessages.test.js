@@ -71,6 +71,13 @@ const mockTheme = {
 };
 jest.mock("../context/ThemeContext", () => ({ useTheme: () => ({ theme: mockTheme }) }));
 jest.mock("../context/LanguageContext", () => ({ useLanguage: () => ({ t: {}, language: "tr" }) }));
+// Liste balonu Kütüphane'deki liste görünümünü (gridStyle) izler; testler değiştirir.
+const mockProfileUi = { gridStyle: 1, allCornersRounded: false };
+jest.mock("../context/ProfileUiContext", () => ({ useProfileUi: () => mockProfileUi }));
+jest.mock("../hooks/usePosterUri", () => ({
+  __esModule: true,
+  default: () => (_type, _id, path) => (path ? `https://img.test/w200${path}` : null),
+}));
 
 // Liste sayfası: kabuk ve cam düğmeler taklit (görünürlük + dokunuş bağlantısı sınanır).
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 47, bottom: 34 }) }));
@@ -136,71 +143,49 @@ const listShareOf = (count, extra = {}) =>
 describe("SharedListMessage", () => {
   const render7 = (props = {}) =>
     render(<SharedListMessage share={listShareOf(7)} getTmdbUrl={getTmdbUrl} {...props} />).root;
+  afterEach(() => {
+    mockProfileUi.gridStyle = 1;
+  });
 
-  test("shows three posters and a stacked card carrying the remaining count", () => {
-    const root = render7();
-    const text = textOf(root);
+  test("draws the library list card with the viewer's chosen layout", () => {
+    const imagesFor = (gridStyle) => {
+      mockProfileUi.gridStyle = gridStyle;
+      return render7().findAllByType("Image").length;
+    };
+    expect(imagesFor(1)).toBe(3); // Büyük Kapaklar
+    expect(imagesFor(2)).toBe(7); // Küçük Kapaklar: 8 yuva, 7 öğe
+    expect(imagesFor(3)).toBe(5); // Karışık
+    expect(imagesFor(4)).toBe(5); // Yığın
+  });
+
+  test("keeps the sender's order on the covers", () => {
+    const uris = render7().findAllByType("Image").map((node) => node.props.source.uri);
+    expect(uris).toEqual([
+      "https://img.test/w200/p1.jpg",
+      "https://img.test/w200/p2.jpg",
+      "https://img.test/w200/p3.jpg",
+    ]);
+  });
+
+  test("shows the name, count and kind under the covers", () => {
+    const text = textOf(render7());
     expect(text).toContain("Hafta sonu");
     expect(text).toContain("7 içerik");
-    // 3 düz afiş + yığın: ön kart ve 2 arka kart = 6 görsel.
-    expect(root.findAllByType("Image")).toHaveLength(6);
-    expect(root.findAllByType("Image")[0].props.source.uri).toBe("https://img.test/w200/p1.jpg");
-    // 7 - 3 = 4 kalan; yığının altında dokunma ipucu.
-    expect(text).toContain("+4");
-    expect(text).toContain("Listeyi gör");
+    expect(text).toContain("Liste");
   });
 
-  test("the bubble never grows: no expand control, no inline rows", () => {
-    const root = render7({ onOpenList: () => {} });
-    expect(byLabel(root, "Tümünü gör")).toBeUndefined();
-    expect(byLabel(root, "Daha az")).toBeUndefined();
-    // Yalnız üç düz afişin başlığı görünür; 4. ve sonrası yığının arkasında.
-    const text = textOf(root);
-    expect(text).toContain("Yapım 3");
-    expect(text).not.toContain("Yapım 4");
-  });
-
-  test("the stack gets shallower as fewer items remain", () => {
-    const imagesFor = (count) =>
-      render(<SharedListMessage share={listShareOf(count)} getTmdbUrl={getTmdbUrl} />).root.findAllByType(
-        "Image",
-      ).length;
-    expect(imagesFor(3)).toBe(3); // yığın yok
-    expect(imagesFor(4)).toBe(4); // tek kart, arka kart yok
-    expect(imagesFor(5)).toBe(5); // bir arka kart
-    expect(imagesFor(6)).toBe(6); // iki arka kart
-    expect(imagesFor(40)).toBe(6); // daha derin olmaz
-  });
-
-  test("a list of exactly three has no stack", () => {
-    const text = textOf(
-      render(<SharedListMessage share={listShareOf(3)} getTmdbUrl={getTmdbUrl} />).root,
-    );
-    expect(text).not.toContain("Listeyi gör");
-    expect(text).not.toContain("+");
-  });
-
-  test("tapping the stack opens the full list sheet; so does the header", () => {
+  test("tapping the card opens the full list sheet", () => {
     const onOpenList = jest.fn();
     const root = render7({ onOpenList });
-    press(byLabel(root, "+4 Listeyi gör"));
-    expect(onOpenList).toHaveBeenCalledTimes(1);
     press(byLabel(root, "Listeyi gör"));
-    expect(onOpenList).toHaveBeenCalledTimes(2);
+    expect(onOpenList).toHaveBeenCalledTimes(1);
   });
 
-  test("without a list handler the stack still opens a title", () => {
+  test("without a list handler the card opens the first title", () => {
     const onOpenItem = jest.fn();
     const root = render7({ onOpenItem });
-    press(byLabel(root, "+4 Listeyi gör"));
-    expect(onOpenItem).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
-  });
-
-  test("tapping a poster opens that title", () => {
-    const onOpenItem = jest.fn();
-    const root = render7({ onOpenItem });
-    press(byLabel(root, "Yapım 2"));
-    expect(onOpenItem).toHaveBeenCalledWith(expect.objectContaining({ id: 2, media_type: "tv" }));
+    press(byLabel(root, "Listeyi gör"));
+    expect(onOpenItem).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
   });
 
   test("default lists use the receiver's own language label", () => {
@@ -220,10 +205,9 @@ describe("SharedListMessage", () => {
     expect(byLabel(outgoing, "Listeyi kaydet")).toBeUndefined();
   });
 
-  test("a truncated list shows the real total on the stack", () => {
+  test("a truncated list shows the real total", () => {
     const share = listShareOf(130);
     const root = render(<SharedListMessage share={share} getTmdbUrl={getTmdbUrl} />).root;
-    expect(textOf(root)).toContain("+127");
     expect(textOf(root)).toContain("130 içerik");
   });
 
@@ -424,15 +408,13 @@ describe("MessageBubble yönlendirmesi", () => {
     press(byLabel(root, "Listeyi kaydet"));
     expect(onSaveList).toHaveBeenCalledWith(item, expect.objectContaining({ type: "list" }));
 
-    press(byLabel(root, "Yapım 1"));
-    expect(navigation.push).toHaveBeenCalledWith("MovieDetails", { id: 1 });
   });
 
-  test("the stacked card hands the whole message to the list-sheet opener", () => {
+  test("the list card hands the whole message to the list-sheet opener", () => {
     const onOpenList = jest.fn();
     const item = messageOf(listShareOf(9));
     const root = render(<MessageBubble {...base} item={item} onOpenList={onOpenList} />).root;
-    press(byLabel(root, "+6 Listeyi gör"));
+    press(byLabel(root, "Listeyi gör"));
     expect(onOpenList).toHaveBeenCalledWith(item, expect.objectContaining({ type: "list", total: 9 }));
   });
 
@@ -703,6 +685,20 @@ describe("SharedTasteMatchMessage", () => {
     );
   });
 
+  test.each([
+    [60, 1],
+    [70, 2],
+    [80, 3],
+    [90, 4],
+  ])("makes a %i match visibly hotter in chat (level %i)", (score, level) => {
+    const root = mount(taste({ score }));
+    expect(root.findAll((node) => node.props.accessibilityLabel === `heat-${level}`)).toHaveLength(1);
+    const progress = root.findAllByType("Gradient").find((node) =>
+      [].concat(node.props.style || []).some((style) => style?.width === `${score}%`),
+    );
+    expect(progress).toBeTruthy();
+  });
+
   test("shows the movie / show split only for the categories that have a score", () => {
     const both = textOf(mount(taste({ byType: { movie: { score: 80 }, tv: { score: 61 } } })));
     expect(both).toContain("Film %80");
@@ -841,7 +837,8 @@ describe("MessageBubble: hub paylaşımları", () => {
     const body = root.findByType("ChallengeBody");
     expect(body.props.chatTarget).toBe(chatTarget);
     act(() => body.props.onAccepted());
-    expect(onAcceptInvite).toHaveBeenCalledWith(expect.objectContaining({ type: "challenge" }), "them");
+    // Mesaj kimliği de gider: kabul mesaja yazılır (accepts.{uid}).
+    expect(onAcceptInvite).toHaveBeenCalledWith(expect.objectContaining({ type: "challenge" }), "them", incoming(share).id);
   });
 
   test("a duel result is drawn with the result body (sender = the player who accepted)", () => {
@@ -875,5 +872,12 @@ describe("MessageBubble: hub paylaşımları", () => {
     expect(incoming(share).text).toBe("🎬 CineSwipe · 2 ortak eşleşme");
     press(byLabel(root, "Listeyi kaydet"));
     expect(onSaveList).toHaveBeenCalledTimes(1);
+
+    // Ortak liste: eşleşmeleri yazan taraf da kendi balonundan kaydedebilir.
+    const own = render(
+      <SharedListMessage share={share} getTmdbUrl={getTmdbUrl} isOutgoing onSave={onSaveList} />,
+    ).root;
+    press(byLabel(own, "Listeyi kaydet"));
+    expect(onSaveList).toHaveBeenCalledTimes(2);
   });
 });

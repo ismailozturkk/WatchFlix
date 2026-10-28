@@ -3,12 +3,14 @@
 // Sohbette/grupta paylaşılan LİSTE balonunun gövdesi (mesaj kind: "listShare",
 // bkz. utils/chatShare.js).
 //
-// Görünüm: üstte ikon karolu liste adı + adet rozeti, altında ilk ÜÇ afiş; liste
-// üçten uzunsa dördüncü yuvada, üst üste binmiş kartlardan oluşan bir YIĞIN ve
-// üzerinde kalan adet ("+12") durur. Yığına (ya da başlığa) basınca listenin
-// tamamı alt sayfada açılır (SharedListSheet — arkadaş profilindeki liste sayfası
-// ile aynı görünüm); balon HİÇBİR ZAMAN uzamaz, bu yüzden uzun listeler sohbeti
-// aşağı kaydırmaz. Yalnız GELEN balonda "Listeyi kaydet" düğmesi vardır.
+// Görünüm: Kütüphane'deki liste kartının AYNISI — alıcının "Liste Görünümü Seçin"
+// tercihi (ProfileUiContext.gridStyle + "Ayrı Köşeli Afişler") ile çizilen kapak
+// bloğu (components/lists/ListCovers), altında ayırıcı ve ikon karolu ad + adet.
+// Böylece paylaşılan liste, kişinin kendi listeleriyle aynı yüzle görünür. Karta
+// basınca listenin tamamı alt sayfada açılır (SharedListSheet); balon HİÇBİR ZAMAN
+// uzamaz (kapak en fazla 8 afiş gösterir), uzun listeler sohbeti aşağı kaydırmaz.
+// Yalnız GELEN balonda "Listeyi kaydet" düğmesi vardır (CineSwipe eşleşmelerinde
+// iki tarafta da).
 //
 // `source: "cineswipe"`: bir CineSwipe odasının ortak eşleşmeleri (oda bitince davetin geldiği sohbete
 // yazılır, bkz. screens/cineswipe/CineSwipeScreen). Başlık iki kişinin adı; üst etiket, simge ve renk
@@ -24,11 +26,24 @@ import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { getListAccent, getListIcon, getSharedListAccent } from "../../utils/listAppearance";
 import { formatMinutes, sumListMinutes } from "../../utils/mediaFacts";
-import PosterStrip, { stripLayout } from "./PosterStrip";
+import { useProfileUi } from "../../context/ProfileUiContext";
+import ListCovers, { getNaturalCoverWidth } from "../lists/ListCovers";
 import { sharePalette } from "./shareKit";
 
 // CineSwipe'ın kimlik rengi (SharedCineRoomMessage ile aynı).
 const CINE_ROSE = "#E11D48";
+
+// Kart ölçüleri: kapak yüksekliği Kütüphane rayındakinden (112) biraz büyük; kapak
+// GENİŞLİĞİ rayın oranlarıyla düzene göre değişir, kart genişliği ise SABİT — balon
+// düzen değişince zıplamaz, kapak kartın ortasında durur.
+const COVER_H = 128;
+const CARD_PADDING = 10;
+const CARD_W = 240;
+const coverWidthFor = (gridStyle) => {
+  if (gridStyle === 1) return Math.round((COVER_H * 184) / 112); // Büyük Kapaklar
+  if (gridStyle === 2) return Math.round((COVER_H * 156) / 112); // Küçük Kapaklar
+  return Math.min(getNaturalCoverWidth(gridStyle, COVER_H), CARD_W - CARD_PADDING * 2);
+};
 
 const DEFAULT_LABELS = {
   watchedMovies: () => i18nText("autoI18n.izlenen_filmler", "İzlenen Filmler"),
@@ -70,7 +85,22 @@ function SharedListMessage({
     [theme, isOutgoing, listAccent],
   );
 
-  const layout = useMemo(() => stripLayout(total), [total]);
+  // Kütüphane'deki seçili liste görünümü (sağlayıcı yoksa ListCovers'ın varsayılanı).
+  const profileUi = useProfileUi();
+  const gridStyle = profileUi?.gridStyle;
+  const allCornersRounded = !!profileUi?.allCornersRounded;
+  // Paylaşım öğesi → ListCovers'ın beklediği profil öğesi biçimi. `listOrder`
+  // gönderenin sırasını korur (ListCovers kendi içinde listOrder'a göre dizer).
+  const coverItems = useMemo(
+    () =>
+      items.map((item, index) => ({
+        ...item,
+        type: item.media_type,
+        imagePath: item.poster_path,
+        listOrder: index,
+      })),
+    [items],
+  );
   const durationLabels = useMemo(
     () => ({
       hourLabel: i18nText("autoI18n.saat_kisa_birim", "sa"),
@@ -87,83 +117,82 @@ function SharedListMessage({
   }, [items, total, durationLabels]);
 
   const canOpen = typeof onOpenList === "function";
-  const canSave = !isOutgoing && typeof onSave === "function";
+  // CineSwipe eşleşmeleri iki kişinin ortak listesi: gönderen de kaydedebilir.
+  const canSave = (isCine || !isOutgoing) && typeof onSave === "function";
   const countText = isCine
     ? i18nText("autoI18n.paylas_cine_n_eslesme", "{{n}} ortak eşleşme", { n: total })
     : i18nText("autoI18n.n_icerik", "{{n}} içerik", { n: total });
   const openLabel = i18nText("autoI18n.liste_paylas_listeyi_gor", "Listeyi gör");
 
-  const HeaderWrap = canOpen ? TouchableOpacity : View;
-  const headerProps = canOpen
-    ? {
-        activeOpacity: 0.8,
-        onPress: onOpenList,
-        accessibilityRole: "button",
-        accessibilityLabel: openLabel,
-      }
-    : {};
+  // Kart her zaman basılabilir: liste sayfası yoksa ilk içerik açılır.
+  const openCard = canOpen ? onOpenList : () => items[0] && onOpenItem?.(items[0]);
+  const icon = isShared ? "people" : isCine ? "film" : getListIcon(share?.listKey);
+  const kicker = isShared
+    ? i18nText("autoI18n.ortak_liste", "ORTAK LİSTE")
+    : isCine
+      ? i18nText("autoI18n.paylas_cine_eslesme_baslik", "CineSwipe eşleşmeleri")
+      : i18nText("autoI18n.liste_2", "Liste");
 
   return (
     <View style={styles.wrap}>
-      {/* Başlık: ikon karosu + ad + adet; basınca liste sayfası açılır */}
-      <HeaderWrap {...headerProps} style={[styles.header, { width: layout.blockWidth }]}>
-        <View style={[styles.headerTile, { backgroundColor: palette.tile }]}>
-          <Ionicons
-            name={isShared ? "people" : isCine ? "film" : getListIcon(share?.listKey)}
-            size={15}
-            color={palette.tileInk}
+      {/* Kütüphane liste kartı: kapak bloğu + ayırıcı + ad/adet */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={openCard}
+        accessibilityRole="button"
+        accessibilityLabel={openLabel}
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, borderColor: palette.surfaceBorder },
+        ]}
+      >
+        <View style={styles.coverRow}>
+          <ListCovers
+            items={coverItems}
+            gridStyle={gridStyle}
+            allCornersRounded={allCornersRounded}
+            width={coverWidthFor(gridStyle)}
+            height={COVER_H}
+            getTmdbUrl={getTmdbUrl}
+            theme={theme}
           />
         </View>
-        <View style={styles.headerCopy}>
-          <Text
-            style={[styles.kicker, { color: palette.tileInk }]}
-            numberOfLines={1}
-            allowFontScaling={false}
-          >
-            {isShared
-              ? i18nText("autoI18n.ortak_liste", "ORTAK LİSTE")
-              : isCine
-                ? i18nText("autoI18n.paylas_cine_eslesme_baslik", "CineSwipe eşleşmeleri")
-                : i18nText("autoI18n.liste_2", "Liste")}
-          </Text>
-          <Text style={[styles.title, { color: palette.primary }]} numberOfLines={2}>
-            {shareListTitle(share)}
-          </Text>
+        <View style={[styles.divider, { backgroundColor: palette.divider }]} />
+        <View style={styles.footer}>
+          <View style={[styles.headerTile, { backgroundColor: palette.tile }]}>
+            <Ionicons name={icon} size={15} color={palette.tileInk} />
+          </View>
+          <View style={styles.headerCopy}>
+            <Text
+              style={[styles.kicker, { color: palette.tileInk }]}
+              numberOfLines={1}
+              allowFontScaling={false}
+            >
+              {kicker}
+            </Text>
+            <Text style={[styles.title, { color: palette.primary }]} numberOfLines={2}>
+              {shareListTitle(share)}
+            </Text>
+            <Text allowFontScaling={false} style={[styles.meta, { color: palette.muted }]} numberOfLines={1}>
+              {[countText, totalDuration].filter(Boolean).join(" · ")}
+            </Text>
+          </View>
+          <View style={[styles.countPill, { backgroundColor: palette.tile }]}>
+            <Text allowFontScaling={false} style={[styles.countText, { color: palette.tileInk }]}>
+              {total}
+            </Text>
+          </View>
+          {canOpen && <Ionicons name="chevron-forward" size={16} color={palette.muted} />}
         </View>
-        <View style={[styles.countPill, { backgroundColor: palette.tile }]}>
-          <Text allowFontScaling={false} style={[styles.countText, { color: palette.tileInk }]}>
-            {total}
-          </Text>
-        </View>
-        {canOpen && <Ionicons name="chevron-forward" size={16} color={palette.muted} />}
-      </HeaderWrap>
-      <Text
-        allowFontScaling={false}
-        style={[styles.meta, { color: palette.muted, width: layout.blockWidth }]}
-        numberOfLines={1}
-      >
-        {[countText, totalDuration].filter(Boolean).join(" · ")}
-      </Text>
+      </TouchableOpacity>
 
-      {/* İlk üç afiş + (liste uzunsa) yığın */}
-      <PosterStrip
-        items={items}
-        total={total}
-        layout={layout}
-        palette={palette}
-        getTmdbUrl={getTmdbUrl}
-        onOpenItem={onOpenItem}
-        onOpenAll={canOpen ? onOpenList : undefined}
-        caption={openLabel}
-      />
-
-      {/* Eylem: yalnız gelen balonda; yüksekliği sabit */}
+      {/* Eylem: gelen balonda (CineSwipe'ta iki tarafta); yüksekliği sabit */}
       {canSave && (
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={onSave}
           hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-          style={[styles.action, { width: layout.blockWidth, backgroundColor: palette.buttonBg }]}
+          style={[styles.action, { backgroundColor: palette.buttonBg }]}
           accessibilityRole="button"
           accessibilityLabel={i18nText("autoI18n.listeyi_kaydet", "Listeyi kaydet")}
         >
@@ -184,9 +213,17 @@ function SharedListMessage({
 export default memo(SharedListMessage);
 
 const styles = StyleSheet.create({
-  wrap: { alignSelf: "flex-start", marginBottom: 2 },
+  wrap: { alignSelf: "flex-start", width: CARD_W, marginBottom: 2 },
 
-  header: { flexDirection: "row", alignItems: "center", gap: 9 },
+  card: {
+    width: CARD_W,
+    padding: CARD_PADDING,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  coverRow: { alignItems: "center" },
+  divider: { height: StyleSheet.hairlineWidth, marginTop: 10, marginBottom: 9 },
+  footer: { flexDirection: "row", alignItems: "center", gap: 9 },
   headerTile: {
     width: 32,
     height: 32,
@@ -211,7 +248,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   countText: { fontSize: 12, fontWeight: "800" },
-  meta: { fontSize: 11, fontWeight: "600", marginTop: 6, marginBottom: 14 },
+  meta: { fontSize: 11, fontWeight: "600", marginTop: 2 },
 
   action: {
     flexDirection: "row",

@@ -126,7 +126,7 @@ function childInfo(el) {
     if (ALL_TOUCH.has(nm)) { info.touch++; return; }
     if (nm === "Text" || nm === "AppText" || nm === "Animated.Text" || ICONS.has(nm) || nm === "ActivityIndicator") return;
     if (nm === "View" || nm === "Animated.View") return n.children.forEach(visit);
-    if (/Image|Poster|Avatar|LinearGradient|Lottie|Svg|Skeleton|VideoThumb/.test(nm)) { info.img++; info.names.push(nm); return; }
+    if (/Image|Poster|Covers|Avatar|LinearGradient|Lottie|Svg|Skeleton|VideoThumb/.test(nm)) { info.img++; info.names.push(nm); return; }
     info.other++; info.names.push(nm);
   };
   el.children.forEach(visit);
