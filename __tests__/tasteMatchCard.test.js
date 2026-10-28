@@ -16,6 +16,7 @@ jest.mock("react-native", () => ({
 jest.mock("../components/typography/AppText", () => ({ AppText: "Text" }));
 jest.mock("@expo/vector-icons/Ionicons", () => ({ __esModule: true, default: "Icon" }));
 jest.mock("expo-image", () => ({ Image: "Image" }));
+jest.mock("expo-linear-gradient", () => ({ LinearGradient: "Gradient" }));
 jest.mock("react-native-svg", () => ({ __esModule: true, default: "Svg", Circle: "Circle" }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) }));
 jest.mock("../components/common/BottomSheetModal", () => ({
@@ -126,6 +127,19 @@ it("halka yüzdeyi oranla çizer; bileşen çubukları dökümden gelir", () => 
   const arc = renderer.root.findAllByType("Circle").find((c) => c.props.strokeDasharray);
   const circumference = Number(arc.props.strokeDasharray);
   expect(arc.props.strokeDashoffset).toBeCloseTo(circumference * (1 - 0.72), 5);
+});
+
+it.each([
+  [59, 0],
+  [60, 1],
+  [70, 2],
+  [80, 3],
+  [90, 4],
+])("ana progres çubuğu %i puanda ısı seviyesi %i olur", (score, level) => {
+  mount({ match: match({ score }) });
+  expect(byLabel(`heat-${level}`)).toHaveLength(1);
+  const gradient = renderer.root.findAllByType("Gradient")[0];
+  expect(gradient.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ width: `${score}%` })]));
 });
 
 describe("film / dizi kutuları", () => {

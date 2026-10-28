@@ -11,14 +11,16 @@
 import React, { memo, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import { getTasteMatchCopy } from "../../utils/tasteMatchCopy";
+import { TASTE_HEAT_THRESHOLDS, tasteMatchHeat } from "../../utils/tasteMatchVisuals";
 import { sharePalette } from "./shareKit";
 import { PosterFace } from "./PosterStrip";
 
-// Kalp/uyum rengi (Zevk uyumu kartının vurgusu tema vurgusudur; balonda sabit bir gül).
+// Düşük uyumda kalp/uyum rengi; 60+ puanlarda tasteMatchHeat giderek ısınır.
 const ROSE = "#E11D48";
 const POSTER_W = 50;
 const POSTER_H = 75;
@@ -38,19 +40,19 @@ function SharedTasteMatchMessage({ share, isOutgoing = false, getTmdbUrl }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const copy = getTasteMatchCopy(language);
-  const palette = useMemo(() => sharePalette({ theme, isOutgoing, accent: ROSE }), [theme, isOutgoing]);
+  const heat = tasteMatchHeat(share.score, ROSE);
+  const palette = useMemo(() => sharePalette({ theme, isOutgoing, accent: heat.accent }), [theme, isOutgoing, heat.accent]);
 
   const names = share.host && share.friend ? `${share.host} & ${share.friend}` : share.host || share.friend || "";
-  const trackColor = isOutgoing ? "rgba(255,255,255,0.22)" : alpha(ROSE, 0.18);
-  const fillColor = isOutgoing ? "#FFFFFF" : ROSE;
+  const trackColor = isOutgoing ? "rgba(255,255,255,0.22)" : alpha(heat.accent, 0.18);
   const items = share.items || [];
 
   return (
     <View style={styles.wrap}>
       <View style={styles.header}>
-        <View style={[styles.tile, { backgroundColor: palette.tile }]}>
+        <LinearGradient colors={heat.colors} style={[styles.tile, { backgroundColor: palette.tile }]}>
           <Ionicons name="heart" size={17} color={palette.tileInk} />
-        </View>
+        </LinearGradient>
         <View style={styles.headerCopy}>
           <Text allowFontScaling={false} style={[styles.kicker, { color: palette.tileInk }]} numberOfLines={1}>
             {copy.title.toUpperCase()}
@@ -63,16 +65,41 @@ function SharedTasteMatchMessage({ share, isOutgoing = false, getTmdbUrl }) {
         </View>
       </View>
 
-      <View style={styles.scoreRow} accessible accessibilityLabel={`${copy.title}: ${copy.percent(share.score)}`}>
-        <Text allowFontScaling={false} style={[styles.score, { color: palette.primary }]}>
-          {copy.percent(share.score)}
-        </Text>
-        <Text style={[styles.tier, { color: palette.primary }]} numberOfLines={2}>
-          {copy.tiers[share.tier]}
-        </Text>
-      </View>
-      <View style={[styles.track, { backgroundColor: trackColor }]}>
-        <View style={[styles.fill, { backgroundColor: fillColor, width: `${Math.max(3, share.score)}%` }]} />
+      <View
+        style={[styles.scoreHero, heat.level > 0 && { backgroundColor: alpha(heat.accent, isOutgoing ? 0.2 : 0.1), borderColor: alpha(heat.accent, 0.3) }]}
+        accessible
+        accessibilityLabel={`${copy.title}: ${copy.percent(share.score)}`}
+      >
+        <View style={styles.scoreRow}>
+          <Text allowFontScaling={false} style={[styles.score, { color: heat.level > 0 ? heat.accent : palette.primary }]}>
+            {copy.percent(share.score)}
+          </Text>
+          <Text style={[styles.tier, { color: palette.primary }]} numberOfLines={2}>
+            {copy.tiers[share.tier]}
+          </Text>
+          {heat.level > 0 ? (
+            <View accessibilityLabel={`heat-${heat.level}`} style={styles.flames}>
+              {Array.from({ length: heat.level }, (_, index) => (
+                <Ionicons key={index} name={index === heat.level - 1 ? "flame" : "flame-outline"} size={12} color={heat.accent} />
+              ))}
+            </View>
+          ) : null}
+        </View>
+        <View style={[styles.track, { backgroundColor: trackColor }]}>
+          <LinearGradient
+            colors={heat.colors}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={[styles.fill, { width: `${Math.max(3, heat.score)}%` }]}
+          />
+          {TASTE_HEAT_THRESHOLDS.map((threshold) => (
+            <View
+              key={threshold}
+              pointerEvents="none"
+              style={[styles.heatMark, { left: `${threshold}%`, backgroundColor: alpha("#FFFFFF", share.score >= threshold ? 0.9 : 0.35) }]}
+            />
+          ))}
+        </View>
       </View>
 
       {typeof share.movie === "number" || typeof share.tv === "number" ? (
@@ -141,11 +168,14 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 9.5, fontWeight: "800", letterSpacing: 0.8 },
   names: { fontSize: 13, fontWeight: "800", marginTop: 1 },
 
-  scoreRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12 },
+  scoreHero: { marginTop: 10, borderRadius: 14, borderWidth: 1, borderColor: "transparent", paddingHorizontal: 9, paddingVertical: 8 },
+  scoreRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   score: { fontSize: 34, fontWeight: "900", lineHeight: 40 },
   tier: { flex: 1, fontSize: 13.5, fontWeight: "800", lineHeight: 18 },
-  track: { height: 6, borderRadius: 3, overflow: "hidden", marginTop: 6 },
+  flames: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 1 },
+  track: { height: 7, borderRadius: 999, overflow: "hidden", marginTop: 5, position: "relative" },
   fill: { height: "100%", borderRadius: 3 },
+  heatMark: { position: "absolute", top: 1, bottom: 1, width: 1, marginLeft: -0.5 },
 
   types: { flexDirection: "row", gap: 6, marginTop: 10 },
   typeChip: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, borderWidth: 1 },

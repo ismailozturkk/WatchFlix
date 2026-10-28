@@ -14,6 +14,7 @@
 import React, { memo, useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Svg, { Circle } from "react-native-svg";
 import { useTheme } from "../../context/ThemeContext";
@@ -21,6 +22,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import usePosterUri from "../../hooks/usePosterUri";
 import { alpha } from "../../theme/colors";
 import { getTasteMatchCopy } from "../../utils/tasteMatchCopy";
+import { TASTE_HEAT_THRESHOLDS, tasteMatchHeat } from "../../utils/tasteMatchVisuals";
 import GlassBox from "../common/GlassBox";
 import TasteMatchInfoSheet from "./TasteMatchInfoSheet";
 
@@ -64,6 +66,40 @@ function Bar({ value, color, track }) {
   return (
     <View style={[styles.barTrack, { backgroundColor: track }]}>
       <View style={[styles.barFill, { backgroundColor: color, width: `${Math.max(4, Math.min(100, value))}%` }]} />
+    </View>
+  );
+}
+
+/** Ana uyum puanı: 60/70/80/90 eşiklerinde rengi ve alev yoğunluğu artan çubuk. */
+function HeatBar({ score, heat, track }) {
+  return (
+    <View
+      accessible
+      accessibilityLabel={`heat-${heat.level}`}
+      style={styles.heatBarWrap}
+    >
+      <View style={[styles.heatTrack, { backgroundColor: track }]}>
+        <LinearGradient
+          colors={heat.colors}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={[styles.heatFill, { width: `${Math.max(3, heat.score)}%` }]}
+        />
+        {TASTE_HEAT_THRESHOLDS.map((threshold) => (
+          <View
+            key={threshold}
+            pointerEvents="none"
+            style={[styles.heatMark, { left: `${threshold}%`, backgroundColor: alpha("#FFFFFF", score >= threshold ? 0.9 : 0.36) }]}
+          />
+        ))}
+      </View>
+      {heat.level > 0 ? (
+        <View style={[styles.heatFlames, { backgroundColor: alpha(heat.accent, 0.16) }]}>
+          {Array.from({ length: heat.level }, (_, index) => (
+            <Ionicons key={index} name={index === heat.level - 1 ? "flame" : "flame-outline"} size={11} color={heat.accent} />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -188,6 +224,7 @@ function TasteMatchCard({
   const orange = theme.colors?.orange ?? "#ff9650";
   const rose = "#E11D48";
   const pct = (n) => copy.percent(n);
+  const heat = tasteMatchHeat(match.score, theme.accent);
 
   const percent = match.ratings.agreement === null ? null : Math.round(match.ratings.agreement * 100);
   const valueOf = (id) => match.breakdown?.find((part) => part.id === id)?.value;
@@ -224,11 +261,17 @@ function TasteMatchCard({
   return (
     <GlassBox role="card" style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       {/* ── Başlık: kompakt halka · kademe · hızlı eylemler (sohbete gönder + !) ── */}
-      <View style={styles.head}>
+      <View
+        style={[
+          styles.head,
+          heat.level > 0 && styles.hotHead,
+          heat.level > 0 && { backgroundColor: alpha(heat.accent, heat.level >= 3 ? 0.12 : 0.07), borderColor: alpha(heat.accent, 0.28) },
+        ]}
+      >
         {match.score !== null ? (
           <View accessible accessibilityLabel={`${copy.title}: ${pct(match.score)}`}>
-            <Ring ratio={match.score / 100} accent={theme.accent} track={track}>
-              <Text allowFontScaling={false} style={[styles.ringText, { color: primary }]}>
+            <Ring ratio={match.score / 100} accent={heat.accent} track={track}>
+              <Text allowFontScaling={false} style={[styles.ringText, { color: heat.level > 0 ? heat.accent : primary }]}>
                 {pct(match.score)}
               </Text>
             </Ring>
@@ -263,6 +306,8 @@ function TasteMatchCard({
           <Ionicons name="information" size={16} color={muted} />
         </Pressable>
       </View>
+
+      {match.score !== null ? <HeatBar score={match.score} heat={heat} track={track} /> : null}
 
       {/* ── Film / Dizi ayrı uyum (kompakt yatay ikili) ── */}
       {showTypes ? (
@@ -439,12 +484,12 @@ function TasteMatchCard({
                 accessibilityLabel={copy.shareAction(friendName)}
                 style={({ pressed }) => [
                   styles.shareAction,
-                  { backgroundColor: alpha(theme.accent, 0.14), borderColor: alpha(theme.accent, 0.36) },
+                  { backgroundColor: alpha(heat.accent, heat.level > 0 ? 0.16 : 0.14), borderColor: alpha(heat.accent, heat.level > 0 ? 0.52 : 0.36) },
                   pressed && styles.pressed,
                 ]}
               >
-                <Ionicons name="chatbubble-ellipses-outline" size={14} color={theme.accent} />
-                <Text allowFontScaling={false} numberOfLines={1} style={[styles.shareActionText, { color: theme.accent }]}>
+                <Ionicons name={heat.level >= 2 ? "flame" : "chatbubble-ellipses-outline"} size={14} color={heat.accent} />
+                <Text allowFontScaling={false} numberOfLines={1} style={[styles.shareActionText, { color: heat.accent }]}>
                   {copy.shareLabel}
                 </Text>
               </Pressable>
@@ -463,6 +508,7 @@ export default memo(TasteMatchCard);
 const styles = StyleSheet.create({
   card: { borderRadius: 22, borderWidth: 1, padding: 14, gap: 10 },
   head: { flexDirection: "row", alignItems: "center", gap: 11 },
+  hotHead: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, margin: -4, padding: 4 },
   ring: { width: RING, height: RING, alignItems: "center", justifyContent: "center" },
   ringCenter: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
   ringText: { fontSize: 16, fontWeight: "900", letterSpacing: -0.4 },
@@ -477,6 +523,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignSelf: "flex-start",
   },
+
+  heatBarWrap: { minHeight: 18, flexDirection: "row", alignItems: "center", gap: 8 },
+  heatTrack: { flex: 1, height: 8, borderRadius: 999, overflow: "hidden", position: "relative" },
+  heatFill: { height: "100%", borderRadius: 999 },
+  heatMark: { position: "absolute", top: 1, bottom: 1, width: 1, marginLeft: -0.5 },
+  heatFlames: { minWidth: 25, height: 18, borderRadius: 9, paddingHorizontal: 5, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1 },
 
   tiles: { flexDirection: "row", gap: 8 },
   tile: { flex: 1, borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, gap: 4 },
