@@ -19,14 +19,14 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
-| 1.1 | E-posta kaydı (yetişkin) | Tanıtım → Ücretsiz kaydol → e-posta, şifre, 18+ doğum tarihi → Kaydol | Hesap açılır, doğrulama e-postası uyarısı görünür | A i | [ ] |
+| 1.1 | E-posta kaydı (yetişkin) | Tanıtım → Ücretsiz kaydol → e-posta, şifre, 18+ doğum tarihi → Kaydol | Hesap açılır, doğrulama e-postası uyarısı görünür | A i | ✅ i |
 | 1.2 | Yaş kapısı: 13 altı | Kayıtta 12 yaşında bir tarih seç → Kaydol | Kayıt reddedilir, anlaşılır mesaj; hesap oluşmaz | A | ❌ B1 |
 | 1.3 | Yaş kapısı: 13–17 | 15 yaşında tarihle kaydol → Ayarlar | Kayıt olur; yetişkin içerik satırı hiç çizilmez, aramada yetişkin sonuç yok | A | [ ] |
-| 1.4 | E-posta doğrulama | Kayıttan sonra gelen bağlantıyı aç → uygulamaya dön | Doğrulandı durumu yansır (yeniden açmadan ya da yenileyince) | A i | [ ] |
+| 1.4 | E-posta doğrulama | Kayıttan sonra gelen bağlantıyı aç → uygulamaya dön | Doğrulandı durumu yansır (yeniden açmadan ya da yenileyince) | A i | ✅ i |
 | 1.5 | Şifre sıfırlama | Giriş → Şifremi unuttum → e-posta → bağlantıyla yeni şifre → giriş | Tek giriş ekranı (`authEmail.js`), yeni şifreyle giriş olur | A | [ ] |
 | 1.6 | Google girişi | Giriş → Google ile devam → hesap seç | Giriş olur; yeni hesapsa doğum tarihi tamamlama ekranı | P i | [ ] |
-| 1.7 | Apple girişi | Giriş → Apple ile devam | Giriş olur; e-posta gizliyse de profil tamamlanır | i | [ ] |
-| 1.8 | Çıkış / giriş | Profil → dişli → Çıkış → aynı hesapla giriş | Önceki hesabın verisi çıkışta görünmez; girişte geri gelir | A i | [ ] |
+| 1.7 | Apple girişi | Giriş → Apple ile devam | Giriş olur; e-posta gizliyse de profil tamamlanır | i | ✅ i |
+| 1.8 | Çıkış / giriş | Profil → dişli → Çıkış → aynı hesapla giriş | Önceki hesabın verisi çıkışta görünmez; girişte geri gelir | A i | ✅ i |
 | 1.9 | Hesabı Sıfırla | Ayarlar → Hesap → Hesabı Sıfırla → 2 sn basılı tut | Listeler/izleme/not/rozet sıfırlanır; arkadaşlar, profil, sohbetler kalır; kısa dokunuş onaylamaz | A | [ ] |
 | 1.10 | Hesap silme | Ayarlar → Hesap → Hesabı sil → (şifre) → 2,5 sn basılı tut | Çıkış olur; aynı e-postayla yeniden kayıt olur ve eski veri gelmez | A | [ ] |
 
@@ -34,11 +34,11 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
-| 2.1 | Açılış ekranı | Uygulamayı soğuk aç | Halkalar afişler gelene kadar bekler, takılma yok, logo ortalı | A i | ✅ A |
-| 2.2 | Tanıtım: dil + atla | İlk açılış → dil seç → Atla | Seçilen dil hemen uygulanır, giriş/kayıt ekranına geçer | A i | ✅ A |
-| 2.3 | Tanıtım: tamamla | Poster duvarı → hikâye adımları → sabit alt çubukla ilerle → bitir | Adımlar sırayla, ilerleme çubuğu doğru; son adım kayda götürür | A i | ✅ A |
+| 2.1 | Açılış ekranı | Uygulamayı soğuk aç | Halkalar afişler gelene kadar bekler, takılma yok, logo ortalı | A i | ✅ A · ✅ i |
+| 2.2 | Tanıtım: dil + atla | İlk açılış → dil seç → Atla | Seçilen dil hemen uygulanır, giriş/kayıt ekranına geçer | A i | ✅ A · ✅ i |
+| 2.3 | Tanıtım: tamamla | Poster duvarı → hikâye adımları → sabit alt çubukla ilerle → bitir | Adımlar sırayla, ilerleme çubuğu doğru; son adım kayda götürür | A i | ✅ A · ✅ i |
 | 2.4 | Tanıtım olayları | Tanıtımı DebugView açıkken geç | `onboarding_*` olayları DebugView'da görünür | P | [ ] |
-| 2.5 | Paylaş menüsü + simge kısayolu | Tarayıcıdan bir TMDB bağlantısını Seelogd'a paylaş; simgeye uzun bas | Bağlantı ilgili detayı açar; kısayollar doğru ekrana gider | A i | [ ] |
+| 2.5 | Paylaş menüsü + simge kısayolu | Tarayıcıdan bir TMDB bağlantısını Seelogd'a paylaş; simgeye uzun bas | Bağlantı ilgili detayı açar; kısayollar doğru ekrana gider | A i | ⏸ i (native; 18 Eki build'inde yok) |
 
 ## 3. Keşif
 
