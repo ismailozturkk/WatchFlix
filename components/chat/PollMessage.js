@@ -89,6 +89,9 @@ export default function PollMessage({
   const primaryTextColor = isOutgoing ? "#fff" : activeTheme.text.primary;
   const mutedTextColor = isOutgoing ? "rgba(255,255,255,0.75)" : activeTheme.text.muted;
   const secondaryTextColor = isOutgoing ? "rgba(255,255,255,0.9)" : activeTheme.text.secondary;
+  const voteHint = userVote
+    ? i18nText("autoI18n.oyunu_degistirmek_icin_dokun", "Oyunu değiştirmek için dokun")
+    : i18nText("autoI18n.oy_vermek_icin_dokun", "Oy vermek için dokun");
   // Feed'de anket, kartın içindeki `primary` zeminli panelde durur; seçenekler
   // `secondary` ile paneldan ayrışır. Sohbet balonunda eski `between` kalır.
   const optBgColor = isOutgoing
@@ -134,20 +137,54 @@ export default function PollMessage({
             {i18nText("autoI18n.anket", "Anket")}
           </Text>
         </View>
-        <Text style={[styles.totalText, { color: mutedTextColor }]}>
-          {i18nText("autoI18n.n_oy", "{{n}} oy", { n: total })}
-        </Text>
+        <View
+          style={[
+            styles.totalChip,
+            {
+              backgroundColor: isOutgoing
+                ? "rgba(255,255,255,0.14)"
+                : alpha(activeAccent, 0.1),
+            },
+          ]}
+        >
+          <Ionicons name="people-outline" size={12} color={mutedTextColor} />
+          <Text style={[styles.totalText, { color: mutedTextColor }]}>
+            {i18nText("autoI18n.n_oy", "{{n}} oy", { n: total })}
+          </Text>
+        </View>
       </View>
       )}
 
       {/* Stili başlık imzası taşısa da bu, KULLANICININ yazdığı anket sorusu —
           dekoratif başlık fontuna sokulmamalı (bkz. utils/typographyRoles.js). */}
-      <Text
-        fontRole="body"
-        style={[styles.question, isFeed && styles.feedQuestion, { color: primaryTextColor }]}
+      <View
+        style={[
+          !isFeed && styles.questionBlock,
+          !isFeed && {
+            backgroundColor: isOutgoing
+              ? "rgba(255,255,255,0.1)"
+              : alpha(activeAccent, 0.08),
+            borderColor: isOutgoing
+              ? "rgba(255,255,255,0.16)"
+              : alpha(activeAccent, 0.18),
+          },
+        ]}
       >
-        {question}
-      </Text>
+        {!isFeed && (
+          <View
+            style={[
+              styles.questionRail,
+              { backgroundColor: isOutgoing ? "rgba(255,255,255,0.8)" : activeAccent },
+            ]}
+          />
+        )}
+        <Text
+          fontRole="body"
+          style={[styles.question, isFeed && styles.feedQuestion, { color: primaryTextColor }]}
+        >
+          {question}
+        </Text>
+      </View>
 
       {/* ── METİN ANKETİ ── */}
       {type === "text" && (
@@ -158,8 +195,13 @@ export default function PollMessage({
             return (
               <TouchableOpacity
                 key={opt.id}
+                testID={`poll-option-${opt.id}`}
                 activeOpacity={0.85}
                 onPress={() => onVote(opt.id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: voted }}
+                accessibilityLabel={`${opt.label}${total > 0 ? `, ${p}%` : ""}`}
+                accessibilityHint={voteHint}
                 style={[
                   styles.textOpt,
                   isFeed && styles.feedTextOpt,
@@ -188,17 +230,31 @@ export default function PollMessage({
                   }
                 />
                 <View style={styles.textOptRow}>
-                  <Ionicons
-                    name={voted ? "checkmark-circle" : "ellipse-outline"}
-                    size={17}
-                    color={
-                      voted
-                        ? isOutgoing
-                          ? "#fff"
-                          : activeAccent
-                        : mutedTextColor
-                    }
-                  />
+                  <View
+                    style={[
+                      styles.choiceMark,
+                      {
+                        borderColor: voted
+                          ? isOutgoing
+                            ? "#fff"
+                            : activeAccent
+                          : mutedTextColor,
+                        backgroundColor: voted
+                          ? isOutgoing
+                            ? "#fff"
+                            : activeAccent
+                          : "transparent",
+                      },
+                    ]}
+                  >
+                    {voted && (
+                      <Ionicons
+                        name="checkmark"
+                        size={12}
+                        color={isOutgoing ? activeAccent : "#fff"}
+                      />
+                    )}
+                  </View>
                   <Text
                     style={[styles.optLabel, { color: primaryTextColor }]}
                     numberOfLines={2}
@@ -206,11 +262,20 @@ export default function PollMessage({
                     {opt.label}
                   </Text>
                   {total > 0 && (
-                    <Text
-                      style={[styles.optPct, { color: secondaryTextColor }]}
+                    <View
+                      style={[
+                        styles.pctPill,
+                        {
+                          backgroundColor: isOutgoing
+                            ? "rgba(255,255,255,0.14)"
+                            : alpha(activeAccent, voted ? 0.16 : 0.08),
+                        },
+                      ]}
                     >
-                      {p}%
-                    </Text>
+                      <Text style={[styles.optPct, { color: secondaryTextColor }]}>
+                        {p}%
+                      </Text>
+                    </View>
                   )}
                 </View>
               </TouchableOpacity>
@@ -236,10 +301,16 @@ export default function PollMessage({
             return (
               <TouchableOpacity
                 key={opt.id}
+                testID={`poll-option-${opt.id}`}
                 activeOpacity={0.85}
                 onPress={() => onVote(opt.id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: voted }}
+                accessibilityLabel={`${opt.label}${total > 0 ? `, ${p}%` : ""}`}
+                accessibilityHint={voteHint}
                 style={[
                   styles.mediaOpt,
+                  !isFeed && styles.chatMediaOpt,
                   isFeed && styles.feedMediaOpt,
                   isFeed && { width: feedMediaWidth },
                 ]}
@@ -247,6 +318,7 @@ export default function PollMessage({
                 <View
                   style={[
                     styles.posterBox,
+                    !isFeed && styles.chatPosterBox,
                     isFeed && {
                       width: "100%",
                       height: undefined,
@@ -324,12 +396,13 @@ export default function PollMessage({
         </View>
       )}
 
-      <Text style={[styles.hint, isFeed && styles.feedHint, { color: mutedTextColor }]}>
-        {isFeed ? `${i18nText("autoI18n.n_oy", "{{n}} oy", { n: total })} · ` : ""}
-        {userVote
-          ? i18nText("autoI18n.oyunu_degistirmek_icin_dokun", "Oyunu değiştirmek için dokun")
-          : i18nText("autoI18n.oy_vermek_icin_dokun", "Oy vermek için dokun")}
-      </Text>
+      <View style={[styles.hintRow, isFeed && styles.feedHintRow]}>
+        {!isFeed && <Ionicons name="information-circle-outline" size={13} color={mutedTextColor} />}
+        <Text style={[styles.hint, isFeed && styles.feedHint, { color: mutedTextColor }]}>
+          {isFeed ? `${i18nText("autoI18n.n_oy", "{{n}} oy", { n: total })} · ` : ""}
+          {voteHint}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -353,8 +426,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   badgeText: { fontSize: 10.5, fontWeight: "800", letterSpacing: 0.3 },
+  totalChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
   totalText: { fontSize: 11, fontWeight: "700" },
   question: { fontSize: 15, fontWeight: "800", lineHeight: 20 },
+  questionBlock: {
+    position: "relative",
+    borderWidth: 1,
+    borderRadius: 13,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    overflow: "hidden",
+  },
+  questionRail: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+  },
   feedQuestion: { fontSize: 17, lineHeight: 23, letterSpacing: -0.2 },
 
   // text
@@ -362,7 +458,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5,
     overflow: "hidden",
-    minHeight: 42,
+    minHeight: 48,
     justifyContent: "center",
   },
   bar: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 10 },
@@ -373,14 +469,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 11,
-    paddingVertical: 9,
+    paddingVertical: 11,
+  },
+  choiceMark: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    justifyContent: "center",
+    alignItems: "center",
   },
   optLabel: { flex: 1, fontSize: 13.5, fontWeight: "600", lineHeight: 18 },
   optPct: { fontSize: 12.5, fontWeight: "800" },
+  pctPill: { minWidth: 42, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 9, alignItems: "center" },
 
   // media
   mediaGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   mediaOpt: { width: 82 },
+  chatMediaOpt: { width: "48%", flexGrow: 1, maxWidth: "49%" },
   feedMediaGrid: { flexWrap: "nowrap", gap: 5 },
   feedMediaOpt: { width: "23.5%", minWidth: 0 },
   posterBox: {
@@ -391,6 +497,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     position: "relative",
   },
+  chatPosterBox: { width: "100%", height: undefined, aspectRatio: 2 / 3, borderRadius: 12 },
   poster: { width: "100%", height: "100%" },
   posterPh: { justifyContent: "center", alignItems: "center" },
   voteCheck: {
@@ -419,8 +526,9 @@ const styles = StyleSheet.create({
 
   hint: {
     fontSize: 10.5,
-    fontStyle: "italic",
-    marginTop: 9,
+    fontWeight: "600",
   },
-  feedHint: { fontStyle: "normal", fontWeight: "600", fontSize: 11.5, marginTop: 12 },
+  hintRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 10, paddingHorizontal: 2 },
+  feedHintRow: { marginTop: 12, paddingHorizontal: 0 },
+  feedHint: { fontStyle: "normal", fontWeight: "600", fontSize: 11.5 },
 });

@@ -73,6 +73,7 @@ export default function useDailyPoll({ source = "hub" } = {}) {
   const [status, setStatus] = useState("idle");
   const alive = useRef(true);
   const retried = useRef(null); // hangi gün için yeniden deneme yapıldı
+  const voting = useRef(false); // aynı karede çift dokunuş kilidi
   useEffect(() => {
     alive.current = true;
     return () => { alive.current = false; };
@@ -80,6 +81,7 @@ export default function useDailyPoll({ source = "hub" } = {}) {
 
   // Gün değişince önceki günün sayaçları taşınmasın.
   useEffect(() => {
+    voting.current = false;
     setCounts(null);
     setStatus("idle");
   }, [dayKey, uid]);
@@ -111,7 +113,8 @@ export default function useDailyPoll({ source = "hub" } = {}) {
 
   const vote = useCallback(
     async (choice) => {
-      if (!uid || !question || mine) return;
+      if (!uid || !question || mine || voting.current) return;
+      voting.current = true;
       writeHistory(uid, (current) => recordPollVote(current, dayKey, choice, false));
       const outcome = await submit(choice);
       trackEvent(ANALYTICS_EVENTS.DAILY_POLL_VOTED, { question_id: question.id, synced: !!outcome?.synced, source });
@@ -154,19 +157,24 @@ export default function useDailyPoll({ source = "hub" } = {}) {
           }
         }
       } catch {
-        if (!cancelled && alive.current && mineRef.current) setStatus("pending");
+        if (!cancelled && alive.current && mineRef.current) {
+          setStatus(mineRef.current.synced ? "ready" : "pending");
+        }
       }
     })();
     return () => { cancelled = true; };
   }, [uid, dayKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sunucu henüz benim oyumu yansıtmadıysa (okuma geriden geldi) iyimser olarak ekle.
+  // Henüz okuma tamamlanmadıysa (`counts === null && status !== "ready"`) sahte 1 oy üretme:
+  // aksi hâlde önceden oy vermiş kullanıcıda sayaç gelene kadar "İlk oy verenlerdensin" yanıp söner.
   const shown = useMemo(() => {
     if (!mine) return null;
+    if (!counts && status !== "ready") return null;
     const base = counts || { a: 0, b: 0 };
     const total = base.a + base.b;
     return pollShares(total === 0 && mine.synced ? withMyVote(base, mine.choice) : base);
-  }, [counts, mine]);
+  }, [counts, mine, status]);
 
   const streak = useMemo(() => pollStreak(history, dayKey), [history, dayKey]);
 

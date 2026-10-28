@@ -50,8 +50,14 @@ function DailyPollWidget() {
             ? copy.nextQuestion
             : copy.hint;
 
+  const showPercent = voted && !!shares?.showPercent;
+
   return (
     <HubCard colors={COLORS} shadowColor={SHADOW} cardStyle={styles.card}>
+      <View pointerEvents="none" style={styles.watermark}>
+        <AppIcon family="Ionicons" name="help-circle-outline" size={136} color="rgba(255,255,255,0.08)" />
+      </View>
+
       <View style={styles.badges}>
         <GlassPill icon="help-circle" text={copy.eyebrow} tone="dark" />
         {streak >= 2 ? <GlassPill icon="flame" iconColor={GOLD} text={copy.streak(streak)} /> : null}
@@ -64,32 +70,75 @@ function DailyPollWidget() {
       <View style={styles.options}>
         {options.map((option) => {
           const chosen = myChoice === option.key;
-          const showBar = voted && !!shares?.showPercent;
+          const showBar = showPercent;
+          const pct = Math.max(0, Math.min(100, option.percent));
           return (
             <GlassPressable
               key={option.key}
+              glass={false}
               onPress={voted ? undefined : () => { triggerHaptic("selection"); vote(option.key); }}
               disabled={voted}
               accessibilityRole="button"
-              accessibilityLabel={voted && shares?.showPercent ? copy.resultA11y(option.text, option.percent) : copy.optionA11y(option.text)}
+              accessibilityLabel={showBar ? copy.resultA11y(option.text, pct) : copy.optionA11y(option.text)}
               accessibilityState={{ selected: chosen, disabled: voted }}
-              style={[styles.option, showBar && styles.optionClip, chosen && styles.optionChosen]}
+              style={({ pressed }) => [
+                styles.option,
+                voted && (chosen ? styles.optionChosen : styles.optionMuted),
+                voted && !showBar && chosen && styles.optionChosenSolid,
+                !voted && pressed && styles.optionPressed,
+              ]}
             >
               {showBar ? (
-                <View
-                  pointerEvents="none"
-                  style={[styles.fill, chosen && styles.fillChosen, { width: `${Math.max(4, option.percent)}%` }]}
-                />
+                <>
+                  <View
+                    pointerEvents="none"
+                    style={[
+                      styles.fill,
+                      chosen ? styles.fillChosen : styles.fillMuted,
+                      pct > 0 && pct < 100 && (chosen ? styles.fillEdgeChosen : styles.fillEdgeMuted),
+                      { width: `${pct}%` },
+                    ]}
+                  />
+                  <View pointerEvents="none" style={styles.barTrack}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        chosen ? styles.barFillChosen : styles.barFillMuted,
+                        { width: `${pct}%` },
+                      ]}
+                    />
+                  </View>
+                </>
               ) : null}
+
               <View style={styles.optionRow}>
-                {chosen ? <AppIcon family="Ionicons" name="checkmark-circle" size={18} color="#FFFFFF" /> : null}
-                <Text style={styles.optionText} allowFontScaling={false} numberOfLines={2}>
+                <View style={styles.indicatorWrap}>
+                  {chosen ? (
+                    <AppIcon family="Ionicons" name="checkmark-circle" size={20} color={GOLD} />
+                  ) : (
+                    <View style={[styles.radioRing, voted && styles.radioRingMuted]}>
+                      {!voted ? <View style={styles.radioDot} /> : null}
+                    </View>
+                  )}
+                </View>
+
+                <Text
+                  style={[styles.optionText, voted && !chosen && styles.optionTextMuted]}
+                  allowFontScaling={false}
+                  numberOfLines={2}
+                >
                   {option.text}
                 </Text>
+
                 {showBar ? (
-                  <Text style={styles.percent} allowFontScaling={false}>
-                    {`${option.percent}%`}
-                  </Text>
+                  <View style={[styles.percentBadge, chosen && styles.percentBadgeChosen]}>
+                    <Text
+                      style={[styles.percent, !chosen && styles.percentMuted]}
+                      allowFontScaling={false}
+                    >
+                      {`${pct}%`}
+                    </Text>
+                  </View>
                 ) : null}
               </View>
             </GlassPressable>
@@ -97,9 +146,23 @@ function DailyPollWidget() {
         })}
       </View>
 
-      <Text style={styles.footer} allowFontScaling={false} numberOfLines={2}>
-        {voted && myChoice && !(shares?.showPercent) && status === "ready" ? `${copy.youPicked} · ${footer}` : footer}
-      </Text>
+      <View style={styles.footerRow}>
+        {showPercent && status === "ready" ? (
+          <View style={styles.youPickedPill}>
+            <AppIcon family="Ionicons" name="checkmark-circle" size={13} color={GOLD} />
+            <Text style={styles.youPickedText} allowFontScaling={false} numberOfLines={1}>
+              {copy.youPicked}
+            </Text>
+          </View>
+        ) : null}
+        <Text
+          style={[styles.footer, showPercent && status === "ready" && styles.footerRight]}
+          allowFontScaling={false}
+          numberOfLines={2}
+        >
+          {voted && myChoice && !showPercent && status === "ready" ? `${copy.youPicked} · ${footer}` : footer}
+        </Text>
+      </View>
     </HubCard>
   );
 }
@@ -108,34 +171,174 @@ export default memo(DailyPollWidget);
 
 const styles = StyleSheet.create({
   card: { padding: 16 },
+  watermark: { position: "absolute", right: -16, top: -14, transform: [{ rotate: "-12deg" }] },
   badges: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, rowGap: 6 },
   prompt: {
     color: "#FFFFFF",
     fontSize: 21,
-    lineHeight: 26,
+    lineHeight: 27,
     fontWeight: "900",
     letterSpacing: -0.3,
     marginTop: 10,
+    textShadowColor: "rgba(0,0,0,0.18)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
   },
-  options: { gap: 8, marginTop: 12 },
+  options: { gap: 9, marginTop: 13 },
+  // Dış kabukta padding YOK: mutlak konumlu yüzde barı (`fill`) Yoga'da tam genişliği (%0–%100)
+  // kayıpsız ölçsün; çerçeve kalınlığı (1.5) her durumda sabit kalarak seçim anında zıplamayı önler.
   option: {
-    minHeight: 48,
+    minHeight: 54,
     borderRadius: 16,
     justifyContent: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.14)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.24)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.26)",
   },
-  optionChosen: { borderColor: "rgba(255,255,255,0.85)", borderWidth: 1.5 },
-  // Kırpma YALNIZ sonuç çubuğu görünürken (oy verilmiş = düğme kapalı): etkin cam düğmenin
-  // katmanı çocuğudur, overflow onu basılınca düğmenin sınırında keserdi.
-  optionClip: { overflow: "hidden" },
-  fill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "rgba(255,255,255,0.16)" },
-  fillChosen: { backgroundColor: "rgba(255,255,255,0.34)" },
-  optionRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  optionText: { flex: 1, color: "#FFFFFF", fontSize: 15, lineHeight: 19, fontWeight: "800" },
-  percent: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
-  footer: { color: "rgba(255,255,255,0.86)", fontSize: 12, lineHeight: 16, fontWeight: "600", marginTop: 10 },
+  optionPressed: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderColor: "rgba(255,255,255,0.48)",
+    transform: [{ scale: 0.988 }],
+  },
+  optionChosen: {
+    backgroundColor: "rgba(14, 5, 36, 0.30)",
+    borderColor: "rgba(255,255,255,0.92)",
+  },
+  optionChosenSolid: {
+    backgroundColor: "rgba(255,255,255,0.24)",
+  },
+  optionMuted: {
+    backgroundColor: "rgba(14, 5, 36, 0.34)",
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+
+  fill: { position: "absolute", left: 0, top: 0, bottom: 0 },
+  fillChosen: { backgroundColor: "rgba(255,255,255,0.26)" },
+  fillMuted: { backgroundColor: "rgba(255,255,255,0.10)" },
+  fillEdgeChosen: { borderRightWidth: 1.5, borderRightColor: "rgba(255,255,255,0.45)" },
+  fillEdgeMuted: { borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.18)" },
+
+  barTrack: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  barFill: { height: "100%", borderRadius: 1.5 },
+  barFillChosen: { backgroundColor: GOLD },
+  barFillMuted: { backgroundColor: "rgba(255,255,255,0.38)" },
+
+  optionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  indicatorWrap: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioRing: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.55)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioRingMuted: {
+    borderColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "transparent",
+  },
+  radioDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.45)",
+  },
+
+  optionText: {
+    flex: 1,
+    color: "#FFFFFF",
+    fontSize: 15,
+    lineHeight: 19,
+    fontWeight: "800",
+  },
+  optionTextMuted: {
+    color: "rgba(255,255,255,0.78)",
+    fontWeight: "700",
+  },
+
+  percentBadge: {
+    minWidth: 48,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.24)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  percentBadgeChosen: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderColor: "rgba(255,255,255,0.42)",
+  },
+  percent: {
+    color: "#FFFFFF",
+    fontSize: 13.5,
+    lineHeight: 17,
+    fontWeight: "900",
+    fontVariant: ["tabular-nums"],
+  },
+  percentMuted: {
+    color: "rgba(255,255,255,0.82)",
+    fontWeight: "800",
+  },
+
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    minHeight: 22,
+    marginTop: 11,
+  },
+  youPickedPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.24)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
+  youPickedText: {
+    color: "#FFFFFF",
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: "800",
+  },
+  footer: {
+    flex: 1,
+    color: "rgba(255,255,255,0.88)",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+  },
+  footerRight: {
+    textAlign: "right",
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
 });

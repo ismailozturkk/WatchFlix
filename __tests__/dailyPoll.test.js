@@ -265,6 +265,35 @@ describe("kart", () => {
     expect(mockHaptic).toHaveBeenCalledWith("selection");
     // Oy verildikten sonra düğmeler kilitli: ikinci dokunuş yeni yazım başlatmaz.
     expect(optionButtons().every((n) => n.props.disabled)).toBe(true);
+    expect(optionButtons().every((n) => n.props.glass === false)).toBe(true);
+    expect(has(POLL_COPY.tr.youPicked)).toBe(true);
+  });
+
+  test("aynı karede çift dokunuş tek yazım başlatır; önceden senkron oyda sayaç yüklenirken sahte 'ilk oy' yanıp sönmez", async () => {
+    let resolveCast;
+    mockCast.mockImplementation(() => new Promise((r) => { resolveCast = r; }));
+    await mount();
+    act(() => {
+      optionButtons()[0].props.onPress();
+      optionButtons()[0].props.onPress();
+    });
+    expect(mockCast).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveCast({ choice: "a", counts: { a: 6, b: 4 }, alreadyVoted: false });
+    });
+    expect(has("60%")).toBe(true);
+
+    act(() => renderer.unmount());
+    renderer = null;
+    let resolveCounts;
+    mockCounts.mockImplementation(() => new Promise((r) => { resolveCounts = r; }));
+    await mount();
+    // Sayaç henüz gelmedi: "İlk oy verenlerdensin" yanıp sönmemeli.
+    expect(texts().some((t) => t.includes(POLL_COPY.tr.firstVoter))).toBe(false);
+    await act(async () => {
+      resolveCounts({ a: 6, b: 4 });
+    });
+    expect(has("60%")).toBe(true);
   });
 
   test("az oy: yüzde yok, 'ilk oy verenlerdensin'; çok az değilse 'sonuçlar belirir'", async () => {

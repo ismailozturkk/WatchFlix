@@ -578,31 +578,6 @@ export default function ChatScreen({ route, navigation }) {
     setShowLatestMessageButton(false);
   }, []);
 
-  // React Native Modal ayrı bir native PENCEREDE açılır; useAnimatedKeyboard
-  // ana pencerenin insets animasyonuna bağlı olduğundan modal açıkken değeri
-  // 0'da kalıyor ve arama/anket sheet'leri klavyenin altında kalıyordu.
-  // Modal padding'i bu yüzden pencereden bağımsız Keyboard event'leriyle
-  // beslenen AYRI bir shared value'dan sürülür (iOS'ta willShow ile animasyona
-  // eşlik eder, Android'de didShow anında yumuşak geçiş uygulanır).
-  const modalKb = useSharedValue(0);
-  useEffect(() => {
-    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const show = Keyboard.addListener(showEvt, (e) => {
-      modalKb.value = withTiming(e?.endCoordinates?.height || 0, { duration: 220 });
-    });
-    const hide = Keyboard.addListener(hideEvt, () => {
-      modalKb.value = withTiming(0, { duration: 180 });
-    });
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, [modalKb]);
-  const modalKeyboardStyle = useAnimatedStyle(() => ({
-    paddingBottom: modalKb.value,
-  }));
-
   // Ana mesaj inputu odaktayken modalı aynı karede açmak iki farklı native
   // katmanın klavye animasyonlarını çakıştırıyor. Modal isteğini sakla; klavye
   // tamamen kapandıktan ve ana input alt konumuna döndükten bir kare sonra aç.
@@ -2803,13 +2778,14 @@ export default function ChatScreen({ route, navigation }) {
                     style={[
                       styles.attachAction,
                       {
-                        backgroundColor: theme.between,
-                        borderColor: theme.border,
+                        backgroundColor: alpha(theme.accent, 0.1),
+                        borderColor: alpha(theme.accent, 0.3),
                       },
                     ]}
                     onPress={() => handleAttachOption("poll")}
                     disabled={composerTransitioning}
                     activeOpacity={0.75}
+                    accessibilityRole="button"
                   >
                     <View
                       style={[
@@ -2828,19 +2804,21 @@ export default function ChatScreen({ route, navigation }) {
                     >
                       {i18nText("autoI18n.metin_anketi", "Metin Anketi")}
                     </Text>
+                    <Ionicons name="chevron-forward" size={15} color={theme.text.muted} />
                   </GlassTouchable>
 
                   <GlassTouchable
                     style={[
                       styles.attachAction,
                       {
-                        backgroundColor: theme.between,
-                        borderColor: theme.border,
+                        backgroundColor: "rgba(94,232,160,0.09)",
+                        borderColor: "rgba(94,232,160,0.28)",
                       },
                     ]}
                     onPress={() => handleAttachOption("search")}
                     disabled={composerTransitioning}
                     activeOpacity={0.75}
+                    accessibilityRole="button"
                   >
                     <View
                       style={[
@@ -2859,6 +2837,7 @@ export default function ChatScreen({ route, navigation }) {
                     >
                       {i18nText("autoI18n.film_dizi_ara", "Film & Dizi Ara")}
                     </Text>
+                    <Ionicons name="chevron-forward" size={15} color={theme.text.muted} />
                   </GlassTouchable>
                 </View>
               )}
@@ -3858,7 +3837,6 @@ export default function ChatScreen({ route, navigation }) {
           visible={textPollVisible}
           onClose={closeTextPollModal}
           onCreate={sendTextPoll}
-          keyboardAvoidanceStyle={modalKeyboardStyle}
         />
 
         <SharedListSheet
@@ -4200,17 +4178,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 18,
+    minHeight: 54,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 16,
     backgroundColor: "rgba(26,26,42,0.97)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
   attachActionIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 34,
+    height: 34,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -4218,7 +4197,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "rgba(255,255,255,0.9)",
     fontSize: 13.5,
-    fontWeight: "600",
+    fontWeight: "700",
   },
 
   // ── Düzenleme banner ───────────────────────────────────
