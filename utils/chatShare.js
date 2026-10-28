@@ -29,6 +29,7 @@
 // `id` yalnız TMDB'de BULUNAN başlıklarda var; yoksa kart dokunulamaz (alıcı
 // tarafında detay ekranına gidecek kimlik yok).
 
+import { isInviteMessageId } from "./chatInvites";
 import { i18nText } from "./i18nText";
 import { tmdbPathFromPoster, MAX_SHARED_LIST_ITEMS } from "./listShare";
 import { PREVIEW_MAX } from "./threadPreview";
@@ -870,16 +871,22 @@ export function shareThumb(share) {
  * `inviteChat` (davetin geldiği sohbet, bkz. utils/importantInvites.chatTargetOf)
  * verilirse ekran oda bitince ortak eşleşmeleri o sohbete yazar.
  */
-export function shareRoute(share, { inviteChat } = {}) {
+export function shareRoute(share, { inviteChat, inviteMessageId } = {}) {
   switch (share?.type) {
     case SHARE_TYPE.POST:
       return { name: "PostDetailScreen", params: { postId: share.postId } };
     case SHARE_TYPE.TOURNAMENT:
       return { name: "TournamentScreen", params: undefined };
     case SHARE_TYPE.CINE_ROOM:
+      // `inviteMessageId`: bu davet kartı — oda bitince kart iki tarafta "Tamamlandı" olur (utils/chatInvites).
       return {
         name: "CineSwipeScreen",
-        params: { initialMode: "duo", inviteCode: share.code, ...(inviteChat ? { inviteChat } : {}) },
+        params: {
+          initialMode: "duo",
+          inviteCode: share.code,
+          ...(inviteChat ? { inviteChat } : {}),
+          ...(inviteChat && isInviteMessageId(inviteMessageId) ? { inviteMessageId } : {}),
+        },
       };
     default:
       return null;

@@ -655,6 +655,65 @@ describe("SharedCineRoomMessage", () => {
     expect(byLabel(mount(room(), { onOpen, isOutgoing: true }), "Odaya katıl")).toBeUndefined();
   });
 
+  describe("response state (utils/chatInvites)", () => {
+    const sentAt = Date.now() - 60 * 1000;
+    const live = (props = {}) => mount(room(), { viewerUid: "me", sentAt, onOpen: jest.fn(), onAnswer: jest.fn(), ...props });
+
+    test("unanswered: decline + join side by side; join records the acceptance once, then opens", () => {
+      const onOpen = jest.fn();
+      const onAnswer = jest.fn();
+      const root = live({ onOpen, onAnswer });
+      expect(byLabel(root, "Oda davetini reddet")).toBeDefined();
+      press(byLabel(root, "Odaya katıl"));
+      expect(onAnswer).toHaveBeenCalledWith("accepted");
+      expect(onOpen).toHaveBeenCalledTimes(1);
+    });
+
+    test("accepted by me: 'Kabul ettin', 'Odaya dön' reopens without answering again, no decline", () => {
+      const onOpen = jest.fn();
+      const onAnswer = jest.fn();
+      const root = live({ onOpen, onAnswer, accepts: { me: 1 } });
+      expect(textOf(root)).toContain("Kabul ettin");
+      expect(byLabel(root, "Oda davetini reddet")).toBeUndefined();
+      press(byLabel(root, "Odaya dön"));
+      expect(onAnswer).not.toHaveBeenCalled();
+      expect(onOpen).toHaveBeenCalledTimes(1);
+    });
+
+    test("declined by me: 'Reddettin' and no buttons", () => {
+      const root = live({ declines: { me: 1 } });
+      expect(textOf(root)).toContain("Reddettin");
+      expect(byLabel(root, "Odaya katıl")).toBeUndefined();
+      expect(byLabel(root, "Oda davetini reddet")).toBeUndefined();
+    });
+
+    test("finished room: both sides read 'Tamamlandı' with the match count; no buttons", () => {
+      const guest = live({ accepts: { me: 1 }, done: { at: 1, matches: 4 } });
+      expect(textOf(guest)).toContain("Tamamlandı");
+      expect(textOf(guest)).toContain("4 ortak eşleşme");
+      expect(byLabel(guest, "Odaya dön")).toBeUndefined();
+      const host = mount(room(), { isOutgoing: true, viewerUid: "me", done: { at: 1, matches: 0 } });
+      expect(textOf(host)).toContain("Tamamlandı");
+      expect(textOf(host)).toContain("Ortak eşleşme çıkmadı");
+    });
+
+    test("the host sees awaiting → accepted / declined; a group host sees counts", () => {
+      const host = (props) => textOf(mount(room(), { isOutgoing: true, viewerUid: "me", sentAt, ...props }));
+      expect(host({})).toContain("Yanıt bekleniyor");
+      expect(host({ accepts: { them: 1 } })).toContain("Kabul edildi");
+      expect(host({ declines: { them: 1 } })).toContain("Reddedildi");
+      expect(host({ isGroup: true, accepts: { a: 1, b: 2 }, declines: { c: 3 } })).toContain("2 kişi kabul etti");
+      expect(host({ isGroup: true, declines: { c: 3 } })).toContain("1 kişi reddetti");
+    });
+
+    test("an unanswered invite expires after a day; the join button goes away", () => {
+      const root = live({ sentAt: Date.now() - 25 * 60 * 60 * 1000 });
+      expect(textOf(root)).toContain("Süresi doldu");
+      expect(textOf(root)).toContain("Bu davetin süresi doldu");
+      expect(byLabel(root, "Odaya katıl")).toBeUndefined();
+    });
+  });
+
   test("formatRoomCode groups digits 3+3", () => {
     expect(formatRoomCode("012345")).toBe("012 345");
   });
@@ -798,9 +857,9 @@ describe("MessageBubble: hub paylaşımları", () => {
     expect(byLabel(root, "Odaya katıl")).toBeUndefined();
   });
 
-  test("joining from the chat card carries this chat and accepts the matching invitation", () => {
+  test("joining from the chat card carries this chat + card and accepts the invitation on the message", () => {
     const navigation = { push: jest.fn() };
-    const onAcceptInvite = jest.fn();
+    const onAnswerInvite = jest.fn();
     const chatTarget = { friendUid: "them", friendName: "Ali" };
     const share = buildCineRoomShare({ code: "749215" });
     const root = render(
@@ -809,36 +868,54 @@ describe("MessageBubble: hub paylaşımları", () => {
         navigation={navigation}
         item={incoming(share)}
         chatTarget={chatTarget}
-        onAcceptInvite={onAcceptInvite}
+        onAnswerInvite={onAnswerInvite}
       />,
     ).root;
     press(byLabel(root, "Odaya katıl"));
-    expect(onAcceptInvite).toHaveBeenCalledWith(expect.objectContaining({ code: "749215" }), "them");
+    expect(onAnswerInvite).toHaveBeenCalledWith(expect.objectContaining({ code: "749215" }), "them", "m1", "accepted");
     expect(navigation.push).toHaveBeenCalledWith("CineSwipeScreen", {
       initialMode: "duo",
       inviteCode: "749215",
       inviteChat: chatTarget,
+      inviteMessageId: "m1",
     });
   });
 
-  test("the challenge body gets this chat and an accept callback", () => {
-    const onAcceptInvite = jest.fn();
+  test("declining the room invite answers on the message and opens nothing", () => {
+    const navigation = { push: jest.fn() };
+    const onAnswerInvite = jest.fn();
+    const share = buildCineRoomShare({ code: "749215" });
+    const root = render(
+      <MessageBubble {...base} navigation={navigation} item={incoming(share)} onAnswerInvite={onAnswerInvite} />,
+    ).root;
+    press(byLabel(root, "Oda davetini reddet"));
+    expect(onAnswerInvite).toHaveBeenCalledWith(expect.objectContaining({ code: "749215" }), "them", "m1", "declined");
+    expect(navigation.push).not.toHaveBeenCalled();
+  });
+
+  test("the challenge body gets this chat, the responses and accept / decline callbacks", () => {
+    const onAnswerInvite = jest.fn();
     const chatTarget = { groupId: "g1", groupName: "Sinema" };
     const share = buildChallengeShare({ dayKey: "2026-10-21", score: 7450, host: "Ali" });
+    const item = { ...incoming(share), accepts: { a: 1 }, declines: { b: 2 } };
     const root = render(
       <MessageBubble
         {...base}
         navigation={{ push: jest.fn() }}
-        item={incoming(share)}
+        item={item}
         chatTarget={chatTarget}
-        onAcceptInvite={onAcceptInvite}
+        onAnswerInvite={onAnswerInvite}
       />,
     ).root;
     const body = root.findByType("ChallengeBody");
     expect(body.props.chatTarget).toBe(chatTarget);
+    expect(body.props.accepts).toEqual({ a: 1 });
+    expect(body.props.declines).toEqual({ b: 2 });
     act(() => body.props.onAccepted());
-    // Mesaj kimliği de gider: kabul mesaja yazılır (accepts.{uid}).
-    expect(onAcceptInvite).toHaveBeenCalledWith(expect.objectContaining({ type: "challenge" }), "them", incoming(share).id);
+    act(() => body.props.onDeclined());
+    // Mesaj kimliği de gider: yanıt mesaja yazılır (accepts / declines.{uid}).
+    expect(onAnswerInvite).toHaveBeenNthCalledWith(1, expect.objectContaining({ type: "challenge" }), "them", "m1", "accepted");
+    expect(onAnswerInvite).toHaveBeenNthCalledWith(2, expect.objectContaining({ type: "challenge" }), "them", "m1", "declined");
   });
 
   test("a duel result is drawn with the result body (sender = the player who accepted)", () => {

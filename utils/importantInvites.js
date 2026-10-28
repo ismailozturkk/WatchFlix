@@ -1,3 +1,4 @@
+import { isInviteMessageId } from "./chatInvites";
 import { readShare } from "./chatShare";
 import { dayKeyOf } from "./dailyChallenge";
 import { DAILY_MODE_ID, DAILY_SOURCE_ID } from "./dailyChallenge";
@@ -52,15 +53,21 @@ export const chatTargetKey = (chat) =>
   chat?.groupId ? `group:${chat.groupId}` : chat?.friendUid ? `dm:${chat.friendUid}` : null;
 
 /**
- * Inbox records of an invitation accepted from its chat card, so the priority bar stops asking again.
- * Match: type + sender + room code / day (+ group).
+ * Inbox records of an invitation answered from its chat card, so the priority bar stops asking again.
+ * Match: type + sender + room code / day (+ group). Records that name their chat message (`messageId`,
+ * written with the invitation) must name THIS card; older records without it match by the fields alone.
  */
-export function matchingInvitationIds(items, { type, fromUid, inviteCode, dayKey, groupId } = {}, now = Date.now()) {
+export function matchingInvitationIds(
+  items,
+  { type, fromUid, inviteCode, dayKey, groupId, messageId } = {},
+  now = Date.now(),
+) {
   if (!type || !fromUid) return [];
   return pendingInvitations(items, now)
     .filter((item) => item.type === type && item.fromUid === fromUid)
     .filter((item) => (item.groupId || null) === (groupId || null))
     .filter((item) => (type === INVITE_TYPES.cine ? item.inviteCode === inviteCode : item.dayKey === dayKey))
+    .filter((item) => !isInviteMessageId(messageId) || !item.messageId || item.messageId === messageId)
     .map((item) => item.id);
 }
 
@@ -92,9 +99,11 @@ export function invitationDestination(item) {
   if (item?.response === "declined") return null;
   const chat = chatTargetOf(item || {});
   if (item?.type === INVITE_TYPES.cine && /^\d{6}$/.test(String(item.inviteCode || ""))) {
+    // Davet kartının kimliği odaya taşınır: oda bitince kart iki tarafta "Tamamlandı" olur (utils/chatInvites).
+    const card = chat && isInviteMessageId(item.messageId) ? { inviteMessageId: item.messageId } : {};
     return {
       name: "CineSwipeScreen",
-      params: { initialMode: "duo", inviteCode: item.inviteCode, autoJoin: true, ...(chat ? { inviteChat: chat } : {}) },
+      params: { initialMode: "duo", inviteCode: item.inviteCode, autoJoin: true, ...(chat ? { inviteChat: chat } : {}), ...card },
     };
   }
   if (item?.type === INVITE_TYPES.duel && item.dayKey === dayKeyOf()) {

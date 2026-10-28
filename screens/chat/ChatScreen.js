@@ -88,7 +88,8 @@ import { useUserProfile } from "@context/UserProfileContext";
 import { createSocialNotification } from "@services/socialNotificationsService";
 import { prepareOutgoingMessage } from "@utils/chatPush";
 import { invitationFieldsFromShare } from "@utils/importantInvites";
-import { acceptMatchingInvitations } from "@services/notificationsService";
+import { respondMatchingInvitations } from "@services/notificationsService";
+import { inviteResponsePatch } from "@services/chatInviteService";
 import { applyReceipts, newestIncoming, shouldMarkRead } from "@utils/chatReceipts";
 import { createMessagePager } from "@services/chatMessagePager";
 import { isOnlineVisible } from "@services/presenceService";
@@ -792,27 +793,27 @@ export default function ChatScreen({ route, navigation }) {
     [isGroup, groupId, friendUid, resolvedChatName],
   );
 
-  // Davet karttan kabul edildi: aynı davetin bildirim kaydı da "kabul edildi" olsun, Profil'deki önemli
-  // davetler çubuğu aynı şeyi yeniden sormasın. Hata kabulü engellemez (çubuk en kötü daveti gösterir).
-  const acceptInviteFromCard = useCallback(
-    (share, senderUid, messageId) => {
+  // Davet kartından yanıt (kabul / ret; CineSwipe odası ya da günlük düello). İki yere yazılır, hatalar
+  // birbirini ve gezinmeyi engellemez:
+  //   • mesaja kendi anahtarım (accepts / declines; firestore.rules → inviteAnswer): iki tarafın kartı
+  //     "kabul edildi" / "reddedildi"ye döner (utils/chatInvites),
+  //   • aynı davetin bildirim kaydı: Profil'deki önemli davetler çubuğu aynı şeyi yeniden sormasın.
+  const answerInviteFromCard = useCallback(
+    (share, senderUid, messageId, response = "accepted") => {
       if (!senderUid || senderUid === currentUser.uid) return;
-      // Düello kartı: kabul mesaja da yazılır, iki tarafın kartı "kabul edildi"ye döner
-      // (yalnız kendi anahtarım; firestore.rules → challengeAccept). Hata kabulü engellemez.
-      if (share?.type === "challenge" && messageId) {
-        updateDoc(doc(messagesRef, messageId), {
-          [`accepts.${currentUser.uid}`]: serverTimestamp(),
-        }).catch((err) => {
-          if (__DEV__) console.warn("challengeAccept:", err?.message);
+      const invitation = invitationFieldsFromShare(share);
+      const patch = inviteResponsePatch(currentUser.uid, response);
+      if (!invitation || !patch) return;
+      if (messageId) {
+        updateDoc(doc(messagesRef, messageId), patch).catch((err) => {
+          if (__DEV__) console.warn("inviteAnswer:", err?.message);
         });
       }
-      const invitation = invitationFieldsFromShare(share);
-      if (!invitation) return;
-      acceptMatchingInvitations(currentUser.uid, {
-        ...invitation,
-        fromUid: senderUid,
-        groupId: isGroup ? groupId : null,
-      }).catch(() => {});
+      respondMatchingInvitations(
+        currentUser.uid,
+        { ...invitation, fromUid: senderUid, groupId: isGroup ? groupId : null, messageId },
+        response,
+      ).catch(() => {});
     },
     [currentUser.uid, isGroup, groupId, messagesRef],
   );
@@ -1374,11 +1375,13 @@ export default function ChatScreen({ route, navigation }) {
   // istemci hiçbir alıcıya yazmaz (utils/chatPush.js). Davet belgeleri mesaj
   // batch'i işlendikten SONRA yazılır: sunucu push'u rozete yazacağı okunmamış
   // toplamını o an okur (functions/appBadge.js). Hata gönderimi geri almaz.
+  // `messageId`: davetin kartı — Profil çubuğundaki kabul/ret o mesaja da yazılır.
+  // `members`: gönderim anında çözülen grup üyeleri (dinleyici henüz gelmediyse de davet herkese gider).
   const notifyInvitation = useCallback(
-    (previewText, invitation) => {
+    (previewText, invitation, messageId, members) => {
       if (!invitation) return;
       if (isGroup) {
-        const others = (groupData?.members || []).filter(
+        const others = (Array.isArray(members) ? members : groupData?.members || []).filter(
           (u) => u !== currentUser.uid,
         );
         others.forEach((uid) =>
@@ -1391,6 +1394,7 @@ export default function ChatScreen({ route, navigation }) {
             text: previewText,
             groupId: chatId,
             groupName: groupData?.name || groupName || "",
+            messageId,
           }).catch(() => {}),
         );
         return;
@@ -1402,6 +1406,7 @@ export default function ChatScreen({ route, navigation }) {
         fromAvatarIndex,
         ...invitation,
         text: previewText,
+        messageId,
       }).catch(() => {});
     },
     [
@@ -1436,10 +1441,11 @@ export default function ChatScreen({ route, navigation }) {
         }
       }
       const batch = writeBatch(db);
-      batch.set(doc(messagesRef), message);
+      const messageRef = doc(messagesRef);
+      batch.set(messageRef, message);
       queueThreadWrites(batch, previewText, groupMembers);
       await batch.commit();
-      notifyInvitation(previewText, invitation);
+      notifyInvitation(previewText, invitation, messageRef.id, groupMembers);
     },
     [messagesRef, queueThreadWrites, notifyInvitation, isGroup, groupData, chatRef],
   );
@@ -2078,7 +2084,7 @@ export default function ChatScreen({ route, navigation }) {
           onReply={beginReply}
           onJumpToMessage={jumpToMessage}
           chatTarget={chatTarget}
-          onAcceptInvite={acceptInviteFromCard}
+          onAnswerInvite={answerInviteFromCard}
           highlighted={highlightedMessageId === item.id}
           entrance={
             reduceMotion
@@ -2107,7 +2113,7 @@ export default function ChatScreen({ route, navigation }) {
       beginReply,
       jumpToMessage,
       chatTarget,
-      acceptInviteFromCard,
+      answerInviteFromCard,
       highlightedMessageId,
     ],
   );

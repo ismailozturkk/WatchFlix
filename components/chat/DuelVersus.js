@@ -1,7 +1,8 @@
 // components/chat/DuelVersus.js
 //
 // Düello kartlarının (SharedChallengeMessage, SharedDuelResultMessage) ortak parçaları:
-//   • DuelStatusChip : başlığın altındaki durum hapı (bekleniyor / kabul edildi / bitti / süresi doldu)
+//   • DuelStatusChip : başlığın altındaki durum hapı (bekleniyor / kabul edildi / reddedildi / bitti /
+//                      süresi doldu); CineSwipe davet kartı da kullanır
 //   • DuelVersus     : iki taraf yan yana — baş harf rozeti, ad, skor; kazananın üstünde taç ve vurgu
 //                      halkası, altta iki skorun oranını gösteren ayrık çubuk. Skoru henüz olmayan taraf
 //                      "?" ve kum saati ile çizilir.
@@ -26,18 +27,29 @@ const initialOf = (name) => {
 };
 
 /**
- * @param {"waiting"|"accepted"|"done"|"expired"} tone
+ * CineSwipe davet kartı da aynı hapı kullanır (SharedCineRoomMessage).
+ * @param {"waiting"|"accepted"|"declined"|"done"|"expired"} tone
  */
 export const DuelStatusChip = memo(function DuelStatusChip({ tone, label, palette, isOutgoing }) {
   const color = isOutgoing
     ? palette.primary
     : tone === "accepted" || tone === "done"
       ? DUEL_WIN
-      : tone === "expired"
-        ? palette.muted
-        : DUEL_AMBER;
+      : tone === "declined"
+        ? DUEL_LOSE
+        : tone === "expired"
+          ? palette.muted
+          : DUEL_AMBER;
   const icon =
-    tone === "accepted" ? "checkmark-circle" : tone === "done" ? "flag" : tone === "expired" ? "time-outline" : "hourglass-outline";
+    tone === "accepted"
+      ? "checkmark-circle"
+      : tone === "declined"
+        ? "close-circle"
+        : tone === "done"
+          ? "flag"
+          : tone === "expired"
+            ? "time-outline"
+            : "hourglass-outline";
   return (
     <View
       style={[

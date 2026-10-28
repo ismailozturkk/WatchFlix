@@ -7,6 +7,7 @@
 // 24 saat açıktır; misafir bu sürede katılıp seçer. Son oyu veren cihaz (hangisi olursa) ortak
 // eşleşmeleri sohbete yazar ve diğer kişiye `cineswipe_result` bildirimi bırakır.
 
+import { isInviteMessageId } from "../../utils/chatInvites";
 import { cineMediaKey } from "./deckModel";
 
 export const ROOM_MODES = Object.freeze({ live: "live", async: "async" });
@@ -63,6 +64,23 @@ export function resultChatOf(room, uid) {
   const partnerName = room?.hostUid === uid ? room?.guestName : room?.hostName;
   if (!partnerUid || partnerUid === uid) return null;
   return { friendUid: partnerUid, friendName: String(partnerName || "") };
+}
+
+/**
+ * Oda bitince sohbetteki davet kartını ("Tamamlandı", utils/chatInvites) KİM ve NEREYE işaretler — tek yazar:
+ *   • canlı oda : davetle katılan misafir; bağlam ekranda (`invite` = { code, chat, messageId })
+ *   • sırayla   : son oyu veren (kurucu da olabilir); bağlam katılırken odaya yazıldı (`inviteMessageId`)
+ * @returns {{ chat: object, messageId: string } | null}  kart bilinmiyorsa null (kod elle girildi / eski davet)
+ */
+export function inviteCardOf(room, uid, { finishedByMe = false, invite = null } = {}) {
+  if (!room || !uid) return null;
+  let target = null;
+  if (isAsyncRoom(room)) {
+    if (finishedByMe) target = { chat: resultChatOf(room, uid), messageId: room.inviteMessageId };
+  } else if (invite?.chat && room.guestUid === uid && String(room.roomCode || "").trim() === invite.code) {
+    target = { chat: invite.chat, messageId: invite.messageId };
+  }
+  return target?.chat && isInviteMessageId(target.messageId) ? target : null;
 }
 
 /**

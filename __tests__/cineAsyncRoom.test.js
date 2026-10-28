@@ -22,6 +22,7 @@ const firestore = require("firebase/firestore");
 const {
   asyncRoomRow,
   asyncRoomStage,
+  inviteCardOf,
   nextCardIndex,
   resultChatOf,
   roomModeOf,
@@ -96,6 +97,30 @@ describe("asyncRoom kuralları", () => {
     expect(resultChatOf(baseRoom(), "host")).toBeNull();
   });
 
+  test("davet kartını tek kişi işaretler: sırayla odada son oyu veren, canlı odada davetle gelen misafir", () => {
+    const asyncRoom = baseRoom({ guestUid: "guest", guestName: "Can", status: "finished", inviteMessageId: "msg1" });
+    // Sırayla: son oyu veren kurucu da olabilir; sohbet 1-1 (ya da kayıtlı grup), kart odadan.
+    expect(inviteCardOf(asyncRoom, "host", { finishedByMe: true })).toEqual({
+      chat: { friendUid: "guest", friendName: "Can" },
+      messageId: "msg1",
+    });
+    expect(inviteCardOf({ ...asyncRoom, resultChat: { groupId: "g1" } }, "guest", { finishedByMe: true })).toEqual({
+      chat: { groupId: "g1", groupName: "" },
+      messageId: "msg1",
+    });
+    expect(inviteCardOf(asyncRoom, "host", { finishedByMe: false })).toBeNull();
+    expect(inviteCardOf({ ...asyncRoom, inviteMessageId: undefined }, "host", { finishedByMe: true })).toBeNull();
+
+    // Canlı: yalnız bu koda davetle katılan misafir; bağlam ekrandan.
+    const liveRoom = { ...asyncRoom, mode: "live", inviteMessageId: undefined };
+    const invite = { code: "123456", chat: { groupId: "g1", groupName: "Film" }, messageId: "msg2" };
+    expect(inviteCardOf(liveRoom, "guest", { invite })).toEqual({ chat: invite.chat, messageId: "msg2" });
+    expect(inviteCardOf(liveRoom, "host", { invite })).toBeNull();
+    expect(inviteCardOf(liveRoom, "guest", { invite: { ...invite, code: "999999" } })).toBeNull();
+    expect(inviteCardOf(liveRoom, "guest", { invite: { ...invite, messageId: null } })).toBeNull();
+    expect(inviteCardOf(liveRoom, "guest")).toBeNull();
+  });
+
   test("lobi satırı: canlı, süresi dolmuş ve yabancı oda gösterilmez; sıralama sıra-bende önce", () => {
     expect(asyncRoomRow("r", baseRoom({ mode: "live" }), "host", NOW)).toBeNull();
     expect(asyncRoomRow("r", baseRoom({ expiresAt: NOW - 1 }), "host", NOW)).toBeNull();
@@ -155,10 +180,29 @@ describe("sırayla oda servisi", () => {
   test("misafir katılınca süre uzar ve grup daveti sonuç sohbeti olarak kaydedilir", async () => {
     firestore.getDocs.mockResolvedValueOnce({ empty: false, docs: [{ id: "r", data: () => ({ createdAt: null }) }] });
     const update = mockTransaction(baseRoom({ expiresAt: Date.now() + 1000 }));
-    await joinCineRoom("123456", { uid: "guest", displayName: "Can" }, { resultChat: { groupId: "g1", groupName: "Film" } });
+    await joinCineRoom("123456", { uid: "guest", displayName: "Can" }, {
+      resultChat: { groupId: "g1", groupName: "Film" },
+      inviteMessageId: "msg1",
+    });
     const patch = update.mock.calls[0][1];
-    expect(patch).toMatchObject({ guestUid: "guest", status: "active", resultChat: { groupId: "g1", groupName: "Film" } });
+    expect(patch).toMatchObject({
+      guestUid: "guest",
+      status: "active",
+      resultChat: { groupId: "g1", groupName: "Film" },
+      inviteMessageId: "msg1",
+    });
     expect(patch.expiresAt - Date.now()).toBeGreaterThan(23 * 60 * 60 * 1000);
+  });
+
+  test("davet kartının kimliği yalnız geçerliyse ve yalnız sırayla odada odaya yazılır", async () => {
+    firestore.getDocs.mockResolvedValueOnce({ empty: false, docs: [{ id: "r", data: () => ({ createdAt: null }) }] });
+    let update = mockTransaction(baseRoom({ expiresAt: Date.now() + 1000 }));
+    await joinCineRoom("123456", { uid: "guest" }, { inviteMessageId: "../x" });
+    expect(update.mock.calls[0][1]).not.toHaveProperty("inviteMessageId");
+    firestore.getDocs.mockResolvedValueOnce({ empty: false, docs: [{ id: "r", data: () => ({ createdAt: null }) }] });
+    update = mockTransaction(baseRoom({ mode: "live", expiresAt: Date.now() + 1000 }));
+    await joinCineRoom("123456", { uid: "guest" }, { inviteMessageId: "msg1" });
+    expect(update.mock.calls[0][1]).not.toHaveProperty("inviteMessageId");
   });
 
   test("odaya dönüş yalnız katılımcıya; silinmiş oda hatası", async () => {

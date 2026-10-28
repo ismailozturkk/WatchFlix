@@ -13,6 +13,9 @@
 // "Sırayla" oda (services/cineswipe/asyncRoom): kurucu hemen seçer, davet 24 saat açık kalır.
 // Ekrandan çıkmak odayı kapatmaz (lobideki "Süren odalar"dan dönülür). Son oyu veren cihaz ortak
 // eşleşmeleri sohbete yazar ve diğer kişiye `cineswipe_result` bildirimi bırakır.
+//
+// Davetle gelinen odada (route.params.inviteMessageId) oda bitince sohbetteki davet kartı "Tamamlandı"
+// olur (markInviteCardDone → services/chatInviteService).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
@@ -63,6 +66,7 @@ import {
 import { persistCineResults, readCineHistory, recordCineHistory } from "../../services/cineswipe/cineResultsStore";
 import {
   ROOM_MODES,
+  inviteCardOf,
   isAsyncRoom,
   nextCardIndex,
   resultChatOf,
@@ -70,12 +74,14 @@ import {
   roomTimeLeft,
 } from "../../services/cineswipe/asyncRoom";
 import { createSocialNotification } from "../../services/socialNotificationsService";
+import { markCineInviteDone } from "../../services/chatInviteService";
 import { useUserProfile } from "../../context/UserProfileContext";
 import { useProfileUi } from "../../context/ProfileUiContext";
 import { avatarSnapshot } from "../../utils/avatarPhotos";
 import ShareToChatSheet from "../../components/chat/ShareToChatSheet";
 import useChatOutbox from "../../hooks/useChatOutbox";
 import { buildCineRoomShare, buildListShare, chatParamsForShare } from "../../utils/chatShare";
+import { isInviteMessageId } from "../../utils/chatInvites";
 import { chatTargetKey } from "../../utils/importantInvites";
 import { trackEvent, ANALYTICS_EVENTS } from "../../services/analytics";
 import {
@@ -123,8 +129,11 @@ export default function CineSwipeScreen({ route, navigation }) {
   // Davetin geldiği sohbet (üst bardaki davet ya da sohbetteki kart, bkz. utils/importantInvites):
   // bu koda katılan misafir oda bitince ortak eşleşmeleri oraya yazar. Kuran taraf yazmaz — tek yazar.
   const inviteChat = inviteCode && chatTargetKey(route?.params?.inviteChat) ? route.params.inviteChat : null;
+  // Davet kartının kendisi (sohbet kartı ya da üst bar, bkz. utils/chatShare.shareRoute): oda bitince kart
+  // iki tarafta "Tamamlandı" olur (utils/chatInvites). Eski bildirimden gelindiyse yok.
+  const inviteMessageId = inviteChat && isInviteMessageId(route?.params?.inviteMessageId) ? route.params.inviteMessageId : null;
   const inviteRef = useRef(null);
-  inviteRef.current = inviteChat ? { code: inviteCode, chat: inviteChat } : null;
+  inviteRef.current = inviteChat ? { code: inviteCode, chat: inviteChat, messageId: inviteMessageId } : null;
   // Ref: oda dinleyicisinin efekti receiveResults'a bağlı; gönderen kimliği/arkadaş listesi değişince
   // dinleyici yeniden kurulmasın.
   const postToChat = useChatOutbox();
@@ -515,6 +524,20 @@ export default function CineSwipeScreen({ route, navigation }) {
     [uid, copy],
   );
 
+  // Oda bitti: davet kartı iki tarafın sohbetinde "Tamamlandı · N ortak eşleşme" olur (eşleşme yoksa da).
+  // Tek yazar (asyncRoom.inviteCardOf); kart zaten işaretliyse kural ikinci yazımı reddeder.
+  const markInviteCardDone = useCallback(
+    (roomData, summary, { finishedByMe }) => {
+      const target = inviteCardOf(roomData, uid, { finishedByMe, invite: inviteRef.current });
+      if (!target) return;
+      markCineInviteDone({ uid, chat: target.chat, messageId: target.messageId, matches: summary.matches.length })
+        .catch((error) => {
+          if (__DEV__) console.warn("cineInviteDone:", error?.message);
+        });
+    },
+    [uid],
+  );
+
   const receiveResults = useCallback(
     async (rId, roomData, { finishedByMe = false } = {}) => {
       const summary = summarizeCineRoom(roomData);
@@ -551,6 +574,7 @@ export default function CineSwipeScreen({ route, navigation }) {
       } else {
         shareMatchesToInviteChat(rId, roomData, summary);
       }
+      markInviteCardDone(roomData, summary, { finishedByMe });
       const session = roomSession.current;
       try {
         const saved = await persistCineResults(finalResult, uid);
@@ -565,7 +589,7 @@ export default function CineSwipeScreen({ route, navigation }) {
         }
       }
     },
-    [uid, showRoomError, shareMatchesToInviteChat, reportAsyncResult],
+    [uid, showRoomError, shareMatchesToInviteChat, reportAsyncResult, markInviteCardDone],
   );
 
   const retryResultSave = async () => {
@@ -816,8 +840,10 @@ export default function CineSwipeScreen({ route, navigation }) {
     setJoining(true);
     setJoinError(null);
     try {
+      const invited = inviteRef.current?.code === extractRoomCode(code) ? inviteRef.current : null;
       const { roomId: joinedId, roomData } = await joinCineRoom(code, user, {
-        resultChat: inviteRef.current?.code === extractRoomCode(code) ? inviteRef.current.chat : null,
+        resultChat: invited?.chat || null,
+        inviteMessageId: invited?.messageId || null,
       });
       if (attempt !== joinAttempt.current) return;
       enterRoom(joinedId, roomData, code.trim());

@@ -516,6 +516,51 @@ describe("DM mesajlari", () => {
     await assertFails(
       updateDoc(doc(bob, "chats", CHAT, "messages", "m1"), { [`accepts.${BOB}`]: serverTimestamp() }),
     );
+    await assertFails(
+      updateDoc(doc(bob, "chats", CHAT, "messages", "m1"), { [`declines.${BOB}`]: serverTimestamp() }),
+    );
+  });
+
+  test("davet karti: alici reddeder; tek yon (reddeden kabul edemez, kabul eden reddedemez)", async () => {
+    const kart = (id, kind, share) => seed((db) => setDoc(doc(db, "chats", CHAT, "messages", id), mesaj(ALICE, { kind, share })));
+    await kart("c1", "challengeShare", { type: "challenge", dayKey: "2026-10-29", score: 7450 });
+    await kart("r1", "cineRoomShare", { type: "cineRoom", code: "123456" });
+    const ref = (db, id) => doc(db, "chats", CHAT, "messages", id);
+
+    await assertSucceeds(updateDoc(ref(bob, "c1"), { [`declines.${BOB}`]: serverTimestamp() }));
+    await assertFails(updateDoc(ref(bob, "c1"), { [`accepts.${BOB}`]: serverTimestamp() }));
+    // CineSwipe odası: kabul (katılmak) da mesaja yazılır; kabulden sonra ret yok.
+    await assertSucceeds(updateDoc(ref(bob, "r1"), { [`accepts.${BOB}`]: serverTimestamp() }));
+    await assertFails(updateDoc(ref(bob, "r1"), { [`declines.${BOB}`]: serverTimestamp() }));
+    // Başkası adına, uydurma zamanla, gönderenin kendi davetine ve iki alan birden yazılamaz.
+    await assertFails(updateDoc(ref(bob, "r1"), { [`declines.${ALICE}`]: serverTimestamp() }));
+    await assertFails(updateDoc(ref(alice, "r1"), { [`declines.${ALICE}`]: serverTimestamp() }));
+    await kart("r2", "cineRoomShare", { type: "cineRoom", code: "654321" });
+    await assertFails(updateDoc(ref(bob, "r2"), { [`declines.${BOB}`]: "dun" }));
+    await assertFails(
+      updateDoc(ref(bob, "r2"), { [`accepts.${BOB}`]: serverTimestamp(), [`declines.${BOB}`]: serverTimestamp() }),
+    );
+    await assertFails(updateDoc(ref(bob, "r2"), { "share.code": "111111" }));
+  });
+
+  test("CineSwipe karti: oda bitince iki uyeden biri BIR KEZ 'tamamlandi' yazar", async () => {
+    const ref = (db, id) => doc(db, "chats", CHAT, "messages", id);
+    await seed((db) => setDoc(ref(db, "r1"), mesaj(ALICE, { kind: "cineRoomShare", share: { type: "cineRoom", code: "123456" } })));
+    await seed((db) => setDoc(ref(db, "r2"), mesaj(ALICE, { kind: "cineRoomShare", share: { type: "cineRoom", code: "654321" } })));
+    await seed((db) => setDoc(ref(db, "c1"), mesaj(ALICE, { kind: "challengeShare", share: { type: "challenge" } })));
+
+    // Bozuk şekil / uydurma zaman / sınır dışı sayı reddedilir.
+    await assertFails(updateDoc(ref(bob, "r1"), { done: { at: serverTimestamp(), matches: -1 } }));
+    await assertFails(updateDoc(ref(bob, "r1"), { done: { at: "dun", matches: 2 } }));
+    await assertFails(updateDoc(ref(bob, "r1"), { done: { at: serverTimestamp(), matches: 2, roomId: "x" } }));
+    await assertFails(updateDoc(ref(bob, "r1"), { done: { at: serverTimestamp(), matches: 2 }, text: "x" }));
+    // Misafir yazar; sonradan kimse değiştiremez.
+    await assertSucceeds(updateDoc(ref(bob, "r1"), { done: { at: serverTimestamp(), matches: 2 } }));
+    await assertFails(updateDoc(ref(alice, "r1"), { done: { at: serverTimestamp(), matches: 5 } }));
+    // Kurucu (mesajın göndereni) de yazabilir — sırayla odada son oyu o verebilir.
+    await assertSucceeds(updateDoc(ref(alice, "r2"), { done: { at: serverTimestamp(), matches: 0 } }));
+    // Düello kartına bitiş kaydı yazılamaz.
+    await assertFails(updateDoc(ref(bob, "c1"), { done: { at: serverTimestamp(), matches: 1 } }));
   });
 
   test("silme UYE bazinda kalir (hesap silme purge'u icin) — bilincli", async () => {
@@ -1262,6 +1307,18 @@ describe("grup okunmamis sayaci", () => {
     await assertSucceeds(updateDoc(cardRef(bob), { [`accepts.${BOB}`]: serverTimestamp() }));
     await assertFails(updateDoc(cardRef(bob), { [`accepts.${ALICE}`]: serverTimestamp() }));
     await assertFails(updateDoc(cardRef(alice), { [`accepts.${ALICE}`]: serverTimestamp() }));
+    await assertFails(updateDoc(cardRef(bob), { [`declines.${BOB}`]: serverTimestamp() })); // kabul eden reddedemez
+  });
+
+  test("grupta CineSwipe karti: uye reddeder, bitis kaydi bir kez", async () => {
+    const cardRef = (db) => doc(db, "groups", GROUP, "messages", "r1");
+    await seed((db) =>
+      setDoc(cardRef(db), { senderId: ALICE, kind: "cineRoomShare", share: { type: "cineRoom", code: "123456" } }),
+    );
+    await assertSucceeds(updateDoc(cardRef(bob), { [`declines.${BOB}`]: serverTimestamp() }));
+    await assertFails(updateDoc(cardRef(bob), { [`accepts.${BOB}`]: serverTimestamp() }));
+    await assertSucceeds(updateDoc(cardRef(alice), { done: { at: serverTimestamp(), matches: 1 } }));
+    await assertFails(updateDoc(cardRef(bob), { done: { at: serverTimestamp(), matches: 2 } }));
   });
 
   test("sahibi kendi sayacini okur ve sifirlar; baskasi okuyamaz", async () => {

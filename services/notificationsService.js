@@ -32,6 +32,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { snapshotErrorHandler } from "../utils/firestoreError";
+import { INVITE_RESPONSES } from "../utils/chatInvites";
 import { matchingInvitationIds } from "../utils/importantInvites";
 import { trackFirestoreRead } from "./usageTrackerService";
 
@@ -100,7 +101,7 @@ export async function markNotificationRead(uid, notifId) {
 
 /** Accept or decline an actionable invitation once, across devices. Reading it alone leaves it pending. */
 export async function respondToInvitation(uid, notifId, response) {
-  if (!uid || !notifId || !["accepted", "declined"].includes(response)) return false;
+  if (!uid || !notifId || !INVITE_RESPONSES.includes(response)) return false;
   return runTransaction(db, async (transaction) => {
     const ref = doc(db, "Users", uid, "notifications", notifId);
     const snapshot = await transaction.get(ref);
@@ -120,19 +121,20 @@ export async function respondToInvitation(uid, notifId, response) {
 }
 
 /**
- * An invitation accepted from its chat card also accepts its inbox record, so the priority bar on
- * Profile (ImportantInvitesBar) stops asking. Reads only that sender's records (single equality query,
- * no composite index); matching rule: utils/importantInvites.matchingInvitationIds.
- * @returns {Promise<number>} records marked "accepted"
+ * An invitation accepted or declined from its chat card gets the same response on its inbox record, so
+ * the priority bar on Profile (ImportantInvitesBar) stops asking. Reads only that sender's records (single
+ * equality query, no composite index); matching rule: utils/importantInvites.matchingInvitationIds.
+ * @param {"accepted"|"declined"} response
+ * @returns {Promise<number>} records answered
  */
-export async function acceptMatchingInvitations(uid, match) {
-  if (!uid || !match?.type || !match?.fromUid) return 0;
+export async function respondMatchingInvitations(uid, match, response = "accepted") {
+  if (!uid || !match?.type || !match?.fromUid || !INVITE_RESPONSES.includes(response)) return 0;
   const snap = await getDocs(
     query(collection(db, "Users", uid, "notifications"), where("fromUid", "==", match.fromUid), limit(20)),
   );
   trackFirestoreRead("notifications", snap.docs.length);
   const ids = matchingInvitationIds(snap.docs.map((d) => ({ id: d.id, ...d.data() })), match);
-  const saved = await Promise.all(ids.map((id) => respondToInvitation(uid, id, "accepted").catch(() => false)));
+  const saved = await Promise.all(ids.map((id) => respondToInvitation(uid, id, response).catch(() => false)));
   return saved.filter(Boolean).length;
 }
 

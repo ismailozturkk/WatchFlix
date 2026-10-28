@@ -44,6 +44,7 @@ import {
   roomModeOf,
   sortAsyncRows,
 } from "./asyncRoom";
+import { isInviteMessageId } from "../../utils/chatInvites";
 
 export { SWIPE_CATEGORIES, GENRE_OPTIONS, cineMediaKey };
 
@@ -252,8 +253,10 @@ export function assertCineRoomAvailable(data, uid) {
  * Join by six-digit code; recheck occupancy inside the atomic write.
  * `resultChat`: the chat the invitation came from. A "sırayla" room stores it so whichever device casts
  * the final vote posts the matches there (the host may finish last, without the invite context).
+ * `inviteMessageId`: the invite card in that chat; stored the same way so the last voter marks the card
+ * finished (utils/chatInvites, services/chatInviteService.markCineInviteDone).
  */
-export async function joinCineRoom(roomCode, guestUser, { resultChat = null } = {}) {
+export async function joinCineRoom(roomCode, guestUser, { resultChat = null, inviteMessageId = null } = {}) {
   const code = typeof roomCode === "string" ? roomCode.trim() : "";
   if (!/^\d{6}$/.test(code)) throw cineRoomError("invalid-code");
   if (!guestUser?.uid) throw cineRoomError("unauthenticated");
@@ -284,6 +287,7 @@ export async function joinCineRoom(roomCode, guestUser, { resultChat = null } = 
       if (typeof resultChat?.groupId === "string" && resultChat.groupId) {
         payload.resultChat = { groupId: resultChat.groupId, groupName: String(resultChat.groupName || "") };
       }
+      if (isInviteMessageId(inviteMessageId)) payload.inviteMessageId = inviteMessageId;
     }
     transaction.update(roomRef, payload);
     return { roomId: candidates[0].id, roomData: { ...roomData, ...payload } };

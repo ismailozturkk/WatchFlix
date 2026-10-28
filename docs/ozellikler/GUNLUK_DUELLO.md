@@ -42,6 +42,21 @@ Kaynak: 21 Ekim 2026 "Eğlence sekmesine özellik" çalışması, 2. aday.
 - **Rules/functions değişikliği yok**, ama bu sürümden ESKİ bir uygulama `challengeShare` mesajını tanımaz ve düz
   metin (`⚔️ Günlük meydan okuma · N puan`) olarak gösterir — bozulmaz, yalnız kart olmaz (zevk uyumu ile aynı davranış).
 
+## Kabul / ret (29 Ekim 2026)
+
+- Yanıtsız kartta **[Reddet] [Kabul et]** yan yana (ortak `components/chat/InviteActions.js`; kısa etiket, ekran
+  okuyucu tam metni okur). Ret oyunu açmaz; reddeden kartında "Reddettin" görür, skor tablosu sorulmaz.
+- Yanıt mesajda: `accepts.{uid}` / `declines.{uid}` (model `utils/chatInvites.js`, kural `firestore.rules` →
+  `inviteAnswer`; eski `challengeAccept` bunun içine katıldı). Tek yön: kabul eden reddedemez, reddeden kabul edemez.
+- Gönderen 1-1'de "Yanıt bekleniyor" → "Kabul edildi" / "Reddedildi" (ret varsa rakibin skoru sorulmaz); grupta
+  "N kişi kabul etti" / "N kişi reddetti" (ikisi de varsa ret sayısı not satırında).
+- **Profil'deki önemli davetler çubuğu ile iki yönlü:** davet bildirimi kartın `messageId`'sini taşır; çubuktan
+  verilen yanıt `NotificationsContext.respond` → `services/chatInviteService.writeInviteResponse` ile aynı mesaja
+  yazılır. Karttan verilen yanıt `respondMatchingInvitations` ile bildirim kaydını aynı yanıta çeker. Eski (kimliksiz)
+  bildirimde çubuktaki yanıt kartı değiştirmez.
+- Bu blok yeni kural ister (`declines`, CineSwipe kartının kabulü ve bitiş kaydı); kural 29 Ekim 2026'da
+  yayınlandı. Kural olmadan bu yazımlar reddedilir ve kart eski hâline döner (bildirim kaydı yine güncellenir).
+
 ## Ölçüm
 
 `duel_sent {source: "result"|"hub", score}` · `duel_accepted {locked}`. Dönüşüm = accepted / sent. `locked:true` oranı,

@@ -8,19 +8,42 @@ service cloud.firestore {
     function onlyUpdating(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
-    // Günlük düello kartını (kind "challengeShare") karşı taraf kabul edince
-    // mesaja yalnız KENDİ anahtarını yazar: accepts.{uid} = zaman. Gönderen
-    // kendi meydan okumasını "kabul edemez"; kart içeriği değiştirilemez.
+    // Davet kartları (günlük düello "challengeShare", CineSwipe odası
+    // "cineRoomShare"): karşı taraf yanıtını mesaja yalnız KENDİ anahtarıyla
+    // yazar — accepts.{uid} (kabul) ya da declines.{uid} (ret) = zaman. Tek yön:
+    // kabul eden reddedemez, reddeden kabul edemez. Gönderen kendi davetini
+    // yanıtlayamaz; kart içeriği değiştirilemez. Model: utils/chatInvites.js.
     // Üyelik denetimi çağıran eşleşmede (sohbet/grup) zaten yapılıyor.
-    function challengeAccept() {
-      return resource.data.get('kind', '') == 'challengeShare'
+    function inviteKind() {
+      return resource.data.get('kind', '') in ['challengeShare', 'cineRoomShare'];
+    }
+    function inviteRespond(field, other) {
+      return inviteKind()
           && resource.data.get('senderId', '') != request.auth.uid
-          && onlyUpdating(['accepts'])
-          && request.resource.data.accepts is map
-          && request.resource.data.accepts
-               .diff(resource.data.get('accepts', {}))
+          && onlyUpdating([field])
+          && request.resource.data[field] is map
+          && request.resource.data[field]
+               .diff(resource.data.get(field, {}))
                .affectedKeys().hasOnly([request.auth.uid])
-          && request.resource.data.accepts[request.auth.uid] == request.time;
+          && request.resource.data[field][request.auth.uid] == request.time
+          && !(request.auth.uid in resource.data.get(other, {}));
+    }
+    function inviteAnswer() {
+      return inviteRespond('accepts', 'declines') || inviteRespond('declines', 'accepts');
+    }
+    // CineSwipe odası bitince davet kartı BİR KEZ "tamamlandı" olur:
+    // done = { at: zaman, matches: ortak eşleşme sayısı }. Odadaki iki kişiden
+    // biri yazar (kurucu = mesajın göndereni de olabilir); sonradan değişmez.
+    function cineInviteDone() {
+      return resource.data.get('kind', '') == 'cineRoomShare'
+          && !('done' in resource.data)
+          && onlyUpdating(['done'])
+          && request.resource.data.done is map
+          && request.resource.data.done.keys().hasOnly(['at', 'matches'])
+          && request.resource.data.done.at == request.time
+          && request.resource.data.done.matches is int
+          && request.resource.data.done.matches >= 0
+          && request.resource.data.done.matches <= 1000;
     }
     function notBlocked(uid) {
       return !exists(/databases/$(database)/documents/Users/$(uid)/blocked/$(request.auth.uid));
@@ -1044,7 +1067,9 @@ service cloud.firestore {
       // tarafın dokümanına dokunuyor (bkz. screens/chat/ChatScreen.js).
       //   • gönderen kendi mesajının metnini düzenler,
       //   • makbuz: gönderen kendi mesajına "delivered", ALICI "seen" yazar,
-      //   • ankette herkes yalnız KENDİ oy anahtarını değiştirir.
+      //   • ankette herkes yalnız KENDİ oy anahtarını değiştirir,
+      //   • davet kartında alıcı yalnız KENDİ yanıtını yazar (inviteAnswer);
+      //     CineSwipe kartı bir kez bitiş kaydı alır (cineInviteDone).
       // Alan okumaları .get()/`in` ile korunuyor: eksik alan değerlendirme
       // HATASI fırlatırsa hata kuralın tamamını düşürebiliyor, yani meşru bir
       // dal hiç denenmeden yazma reddedilebiliyor.
@@ -1065,7 +1090,8 @@ service cloud.firestore {
                           && request.resource.data.poll.get('votes', {})
                                .diff(resource.data.poll.get('votes', {}))
                                .affectedKeys().hasOnly([request.auth.uid]))
-                      || challengeAccept()
+                      || inviteAnswer()
+                      || cineInviteDone()
                     );
       // Silme GÖNDERENE değil ÜYEYE bağlı: hesap silme purge'u sohbeti
       // kapatırken karşı tarafın mesajlarını da temizlemek zorunda
@@ -1207,7 +1233,8 @@ service cloud.firestore {
                       && request.resource.data.senderId == request.auth.uid;
         // Gönderen yalnız kendi düz mesaj metnini düzenler. Diğer üyeler bir
         // ankette yalnız votes haritasını değiştirebilir; mesajın sorusu,
-        // seçenekleri, göndereni veya alıntı metası değiştirilemez.
+        // seçenekleri, göndereni veya alıntı metası değiştirilemez. Davet
+        // kartında üye yalnız kendi yanıtını yazar (inviteAnswer / cineInviteDone).
         allow update: if isSignedIn()
                       && request.auth.uid in groupMembers(groupId)
                       && (
@@ -1223,7 +1250,8 @@ service cloud.firestore {
                           && request.resource.data.poll.diff(resource.data.poll).affectedKeys()
                                .hasOnly(['votes'])
                         )
-                        || challengeAccept()
+                        || inviteAnswer()
+                        || cineInviteDone()
                       );
         allow delete: if isSignedIn()
                       && (

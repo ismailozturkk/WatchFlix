@@ -23,6 +23,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { clampAvatarIndex } from "../utils/avatars";
+import { isInviteMessageId } from "../utils/chatInvites";
 
 /**
  * Tek bir sosyal bildirim oluştur + alıcının unreadNotifsCount'unu +1.
@@ -44,6 +45,7 @@ export async function createSocialNotification({
   roomId,
   matchCount,
   chatPosted,
+  messageId,
 }) {
   if (!toUid || !fromUid || !type) return;
   if (toUid === fromUid) return; // kendine bildirim yok
@@ -64,6 +66,8 @@ export async function createSocialNotification({
     ...(groupName ? { groupName: String(groupName).slice(0, 80) } : {}),
     ...(type === "cineswipe_invite" && /^\d{6}$/.test(String(inviteCode || "")) ? { inviteCode } : {}),
     ...(type === "game_challenge" && /^\d{4}-\d{2}-\d{2}$/.test(String(dayKey || "")) ? { dayKey } : {}),
+    // Davetin sohbet kartı: Profil çubuğundaki kabul/ret o mesaja da yazılır (utils/chatInvites).
+    ...((type === "cineswipe_invite" || type === "game_challenge") && isInviteMessageId(messageId) ? { messageId } : {}),
     // Sırayla CineSwipe odasının sonucu: dokununca oda (ya da cihazdaki geçmiş) açılır.
     ...(type === "cineswipe_result" && typeof roomId === "string" && /^[\w-]{1,80}$/.test(roomId) ? { roomId } : {}),
     ...(type === "cineswipe_result" && Number.isInteger(matchCount) && matchCount >= 0 ? { matchCount } : {}),

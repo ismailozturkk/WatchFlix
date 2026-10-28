@@ -21,7 +21,6 @@ const RAW_TOUCHABLE_ALLOWED = {
   // (UIGlassEffect başına bir görsel efekt katmanı) ve iç içe kalabalık.
   "components/chat/PollMessage.js": 1,
   "components/chat/SharedAiMessage.js": 1,
-  "components/chat/SharedCineRoomMessage.js": 1,
   "components/chat/SharedListMessage.js": 1,
   "components/chat/SharedMediaCollection.js": 1,
   "components/chat/SharedMediaMessage.js": 2,

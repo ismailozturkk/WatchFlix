@@ -442,6 +442,87 @@ describe("sohbet kartı: kabul edildi", () => {
   });
 });
 
+describe("sohbet kartı: ret", () => {
+  const card = () => buildChallengeShare({ dayKey: TODAY, score: 7450, correct: 8, total: 10, host: "Ali" });
+  const texts = () => renderer.root.findAllByType("Text").map((n) => [].concat(n.props.children).join(""));
+  const has = (value) => texts().includes(value);
+  const button = (label) => renderer.root.findAllByType("GlassPressable").find((n) => n.props.accessibilityLabel === label);
+  const mount = async (props) => {
+    await act(async () => {
+      renderer = create(<SharedChallengeMessage share={card()} {...props} />);
+    });
+  };
+
+  test("yanıtsız alıcı: [Reddet] [Kabul et] yan yana; ret oyunu açmaz, yalnız yanıtı bildirir", async () => {
+    mockFetchRows.mockResolvedValue([{ uid: "host", bestScore: 7450 }]);
+    const onDeclined = jest.fn();
+    const onAccepted = jest.fn();
+    await mount({ senderUid: "host", onDeclined, onAccepted });
+    expect(button(DUEL_COPY.tr.accept)).toBeDefined(); // tam metin ekran okuyucuda
+    expect(has(DUEL_COPY.tr.acceptShort)).toBe(true); // kısa etiket düğmede
+    act(() => button(DUEL_COPY.tr.declineA11y).props.onPress());
+    expect(onDeclined).toHaveBeenCalledTimes(1);
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  test("ret işleyicisi yoksa ret düğmesi çizilmez", async () => {
+    mockFetchRows.mockResolvedValue([]);
+    await mount({ senderUid: "host" });
+    expect(button(DUEL_COPY.tr.declineA11y)).toBeUndefined();
+    expect(button(DUEL_COPY.tr.accept)).toBeDefined();
+  });
+
+  test("kabul etmiş alıcı ret göremez; 'Oyuna başla' yanıtı yeniden yazmaz", async () => {
+    mockFetchRows.mockResolvedValue([{ uid: "host", bestScore: 7450 }]);
+    const onAccepted = jest.fn();
+    await mount({ senderUid: "host", accepts: { me: 1 }, onAccepted, onDeclined: jest.fn() });
+    expect(button(DUEL_COPY.tr.declineA11y)).toBeUndefined();
+    act(() => button(DUEL_COPY.tr.play).props.onPress());
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith("SceneGamePlayScreen", expect.objectContaining({ modeId: "daily" }));
+  });
+
+  test("reddetmiş alıcı: 'Reddettin' hapı, düğme yok, skor tablosu sorulmaz", async () => {
+    await mount({ senderUid: "host", declines: { me: 1 }, onDeclined: jest.fn() });
+    expect(has(DUEL_COPY.tr.statusYouDeclined)).toBe(true);
+    expect(button(DUEL_COPY.tr.accept)).toBeUndefined();
+    expect(button(DUEL_COPY.tr.declineA11y)).toBeUndefined();
+    expect(mockFetchRows).not.toHaveBeenCalled();
+    expect(has("7450")).toBe(true); // meydan okuyanın skoru kartta kalır
+  });
+
+  test("1-1 gönderen, rakip reddetti: 'Reddedildi', rakibin skoru sorulmaz", async () => {
+    await mount({
+      isOutgoing: true,
+      senderUid: "me",
+      chatTarget: { friendUid: "bob", friendName: "Bob" },
+      declines: { bob: 1 },
+    });
+    expect(has(DUEL_COPY.tr.statusDeclined)).toBe(true);
+    expect(mockFetchRows).not.toHaveBeenCalled();
+    expect(has("VS")).toBe(false);
+  });
+
+  test("grupta gönderen: yalnız ret varsa ret sayısı; kabul de varsa kabul hapı + ret notu", async () => {
+    await mount({ isOutgoing: true, senderUid: "me", chatTarget: { groupId: "g1" }, declines: { bob: 1 } });
+    expect(has(DUEL_COPY.tr.declinedBy(1))).toBe(true);
+    act(() => renderer.unmount());
+    renderer = null;
+    await mount({ isOutgoing: true, senderUid: "me", chatTarget: { groupId: "g1" }, accepts: { eve: 1 }, declines: { bob: 1, ada: 2 } });
+    expect(has(DUEL_COPY.tr.acceptedBy(1))).toBe(true);
+    expect(has(DUEL_COPY.tr.declinedBy(2))).toBe(true);
+  });
+
+  test("challengeHostView: kabul yoksa ret 'declined'; kabul ve skor önce gelir", () => {
+    const base = { dayKey: TODAY, today: TODAY, hostScore: 7000 };
+    expect(challengeHostView({ ...base, declinedCount: 1 }).phase).toBe("declined");
+    expect(challengeHostView({ ...base, declinedCount: 1, today: "2026-10-22" }).phase).toBe("declined");
+    expect(challengeHostView({ ...base, declinedCount: 1, acceptedCount: 1 }).phase).toBe("accepted");
+    expect(challengeHostView({ ...base, declinedCount: 1, rivalScore: 8000 }).phase).toBe("played");
+  });
+});
+
 describe("meydan oku düğmesi", () => {
   const payload = { dayKey: TODAY, score: 7450, correct: 8, total: 10 };
   const mount = (props = {}) => { act(() => { renderer = create(<DuelSendButton payload={payload} theme={mockTheme} {...props} />); }); };

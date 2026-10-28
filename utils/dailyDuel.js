@@ -15,6 +15,8 @@
 //   "played"  : alıcı o günü oynamış → karşılaştırma (geçmiş günler için de gösterilir)
 //   "expired" : gün geçti (ya da henüz gelmedi) ve alıcı oynamadı → yalnız gönderenin skoru
 
+import { inviteResponders } from "./chatInvites";
+
 /** "YYYY-AA-GG" iki gün anahtarını karşılaştırır (metin sırası = takvim sırası). */
 export const compareDayKeys = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -93,38 +95,36 @@ export function duelResultView({ viewerUid, guestUid, hostUid, guestScore, hostS
   return { role, left, right, verdict, winner, diff: Math.abs(guest.score - host.score) };
 }
 
-// ─── Kabul durumu ────────────────────────────────────────────────────────────
-
-const ACCEPT_UID = /^[A-Za-z0-9_-]{1,128}$/;
+// ─── Kabul / ret durumu ──────────────────────────────────────────────────────
 
 /**
- * Düello mesajındaki kabul kaydı → kabul eden uid'ler. Kabul eden, mesaja yalnız kendi anahtarını yazar
- * (`accepts.{uid}` = zaman; firestore.rules → challengeAccept). Bozuk/eksik kayıt boş liste.
+ * Düello mesajındaki kabul (`accepts`) ya da ret (`declines`) kaydı → yanıtlayan uid'ler. Yanıtlayan, mesaja
+ * yalnız kendi anahtarını yazar (firestore.rules → inviteAnswer; ortak model utils/chatInvites). Bozuk/eksik
+ * kayıt boş liste.
  */
-export function challengeAcceptors(accepts) {
-  if (!accepts || typeof accepts !== "object" || Array.isArray(accepts)) return [];
-  return Object.keys(accepts).filter((uid) => ACCEPT_UID.test(uid) && accepts[uid] != null);
-}
+export const challengeAcceptors = inviteResponders;
 
 /**
  * Meydan okuyanın KENDİ kartındaki durum (giden balon). 1-1 sohbette karşı tarafın o günkü skoru
  * tablodan okunur: skor varsa düello bitmiştir — kabul kaydı olmasa da (eski kart / yazılamamış kabul)
- * iki skor yan yana gösterilir, set herkeste aynı.
+ * iki skor yan yana gösterilir, set herkeste aynı. Reddedilen meydan okumada skor sorulmaz (kart çağırmaz).
  *
  * @param {object} p
  * @param {string} p.dayKey
  * @param {string} p.today
  * @param {number} p.acceptedCount   kabul eden sayısı (challengeAcceptors)
+ * @param {number} [p.declinedCount] reddeden sayısı; kabul eden yoksa kart "reddedildi" olur
  * @param {number|null} p.rivalScore  karşı tarafın o günkü skoru (1-1; bilinmiyorsa null)
  * @param {number|null} p.hostScore   kendi skorum
- * @returns {{ phase: "pending"|"accepted"|"played"|"expired", verdict: "win"|"lose"|"tie"|null, diff: number }}
+ * @returns {{ phase: "pending"|"accepted"|"declined"|"played"|"expired", verdict: "win"|"lose"|"tie"|null, diff: number }}
  */
-export function challengeHostView({ dayKey, today, acceptedCount = 0, rivalScore = null, hostScore = null }) {
+export function challengeHostView({ dayKey, today, acceptedCount = 0, declinedCount = 0, rivalScore = null, hostScore = null }) {
   if (Number.isFinite(rivalScore)) {
     if (!Number.isFinite(hostScore)) return { phase: "played", verdict: null, diff: 0 };
     const diff = Math.abs(hostScore - rivalScore);
     return { phase: "played", verdict: hostScore > rivalScore ? "win" : hostScore < rivalScore ? "lose" : "tie", diff };
   }
   if (acceptedCount > 0) return { phase: "accepted", verdict: null, diff: 0 };
+  if (declinedCount > 0) return { phase: "declined", verdict: null, diff: 0 };
   return { phase: dayKey === today ? "pending" : "expired", verdict: null, diff: 0 };
 }

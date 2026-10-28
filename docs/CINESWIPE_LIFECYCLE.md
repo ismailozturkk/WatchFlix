@@ -27,6 +27,13 @@
 - Sırayla odada kurucu, misafir yokken (`status: waiting`) oy verebilir; davet 24 saat açıktır. Misafir katılınca `expiresAt` yeniden 24 saate uzar; grup davetinden geldiyse grup `resultChat` olarak odaya yazılır.
 - Ekrandan çıkmak sırayla odayı kapatmaz (onay sorulmaz). Lobide "Süren odalar" listesi (`listMyAsyncRooms`: hostUid / guestUid tek alanlı sorgular) odaya `loadCineRoom` ile döner. Kimse katılmadıysa kurucu odayı kapatabilir.
 - Son oyu veren cihaz (`recordSwipe` → `finishedByMe`) eşleşmeleri sohbete yazar (`resultChat` ya da 1-1 sohbet; eşleşme yoksa yazmaz) ve diğer kişiye `cineswipe_result` bildirimi bırakır (`roomId`, `matchCount`, `chatPosted`). Sohbete yazıldıysa sunucu bildirim push'unu atlar; mesaj push'u yeter.
+
+## Sohbetteki davet kartı
+
+- Kartın durumu mesajın kendisinde (`utils/chatInvites.js`): alıcı `accepts.{uid}` ya da `declines.{uid}` yazar (kartta [Reddet] [Odaya katıl]; katılmak = kabul), oda bitince `done = { at, matches }` bir kez yazılır. Kural: `firestore.rules` → `inviteAnswer`, `cineInviteDone`.
+- Profil'deki önemli davetler çubuğundan verilen yanıt da bildirim kaydındaki `messageId` ile aynı mesaja yazılır; karttan verilen yanıt bildirim kaydını aynı yanıta çeker (`respondMatchingInvitations`).
+- `done`'ı kim yazar: canlı odada davetle katılan misafir (karttan/çubuktan gelen `inviteMessageId` ekranda), sırayla odada son oyu veren — bunun için katılırken `inviteMessageId` odaya `resultChat` ile birlikte yazılır. Kod elle girilerek katılınan odada kart "Tamamlandı"ya dönmez.
+- Yanıtsız kart 24 saatte, kabul edilmiş ama bitmemiş kart 48 saatte "Süresi doldu" olur.
 - Bitmiş sırayla oda 24 saat durur (canlıda 1 saat): bildirime dokunan kişi sonucu açar; oda silinmişse cihazdaki geçmişten açılır.
 - Kural değişikliği yok. Sunucu (`functions/index.js` push metni + tekrar push atlama, `socialPush.js` `roomId`) deploy edilmeden bu bildirimin push'u genel "Bildirim" metniyle gider.
 

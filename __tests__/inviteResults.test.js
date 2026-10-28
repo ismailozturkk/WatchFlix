@@ -112,7 +112,7 @@ const {
 const { duelResultView } = require("../utils/dailyDuel");
 const { DUEL_COPY } = require("../utils/dailyDuelCopy");
 const { directChatId, postShareToChat } = require("../services/chatOutbox");
-const { acceptMatchingInvitations } = require("../services/notificationsService");
+const { respondMatchingInvitations } = require("../services/notificationsService");
 const { readCineHistory, recordCineHistory, MAX_CINE_HISTORY } = require("../services/cineswipe/cineResultsStore");
 const SharedDuelResultMessage = require("../components/chat/SharedDuelResultMessage").default;
 const useDuelResultReport = require("../hooks/useDuelResultReport").default;
@@ -174,24 +174,52 @@ describe("davetin sohbeti ve hedefler", () => {
     expect(matchingInvitationIds(items, { type: "game_challenge", fromUid: "ali", dayKey: "2026-10-24" }, now)).toEqual(["e"]);
     expect(matchingInvitationIds(items, { type: "game_challenge", fromUid: "veli", dayKey: "2026-10-24" }, now)).toEqual([]);
   });
+
+  test("mesaj kimliği taşıyan kayıt yalnız KENDİ kartıyla eşleşir; kimliksiz eski kayıt alanlarla eşleşir", () => {
+    const items = [
+      { id: "a", type: "game_challenge", fromUid: "ali", dayKey: "2026-10-24", messageId: "m1" },
+      { id: "b", type: "game_challenge", fromUid: "ali", dayKey: "2026-10-24", messageId: "m2" },
+      { id: "old", type: "game_challenge", fromUid: "ali", dayKey: "2026-10-24" },
+    ];
+    const match = { type: "game_challenge", fromUid: "ali", dayKey: "2026-10-24" };
+    expect(matchingInvitationIds(items, { ...match, messageId: "m1" }, now)).toEqual(["a", "old"]);
+    expect(matchingInvitationIds(items, match, now)).toEqual(["a", "b", "old"]);
+  });
 });
 
-describe("karttan kabul → bildirim kaydı (services/notificationsService)", () => {
+describe("karttan yanıt → bildirim kaydı (services/notificationsService)", () => {
   test("yalnız eşleşen bekleyen davet 'accepted' olur", async () => {
     const created = Date.now() - 1000;
     mockInbox.set("a", { type: "cineswipe_invite", fromUid: "ali", inviteCode: "123456", createdAt: created, read: true });
     mockInbox.set("b", { type: "cineswipe_invite", fromUid: "ali", inviteCode: "654321", createdAt: created, read: true });
     mockInbox.set("c", { type: "cineswipe_invite", fromUid: "veli", inviteCode: "123456", createdAt: created, read: true });
     await expect(
-      acceptMatchingInvitations("me", { type: "cineswipe_invite", fromUid: "ali", inviteCode: "123456" }),
+      respondMatchingInvitations("me", { type: "cineswipe_invite", fromUid: "ali", inviteCode: "123456" }, "accepted"),
     ).resolves.toBe(1);
     expect(mockInbox.get("a").response).toBe("accepted");
     expect(mockInbox.get("b").response).toBeUndefined();
     expect(mockInbox.get("c").response).toBeUndefined();
-    // İkinci kabul bir şey değiştirmez.
+    // İkinci yanıt bir şey değiştirmez (kayıt bir kez yanıtlanır).
     await expect(
-      acceptMatchingInvitations("me", { type: "cineswipe_invite", fromUid: "ali", inviteCode: "123456" }),
+      respondMatchingInvitations("me", { type: "cineswipe_invite", fromUid: "ali", inviteCode: "123456" }, "declined"),
     ).resolves.toBe(0);
+    expect(mockInbox.get("a").response).toBe("accepted");
+  });
+
+  test("karttan ret kaydı 'declined' yapar (Profil çubuğu artık sormaz); geçersiz yanıt yazılmaz", async () => {
+    mockInbox.set("d", { type: "game_challenge", fromUid: "ali", dayKey: TODAY, read: false });
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      await expect(
+        respondMatchingInvitations("me", { type: "game_challenge", fromUid: "ali", dayKey: TODAY }, "maybe"),
+      ).resolves.toBe(0);
+      await expect(
+        respondMatchingInvitations("me", { type: "game_challenge", fromUid: "ali", dayKey: TODAY }, "declined"),
+      ).resolves.toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+    expect(mockInbox.get("d")).toMatchObject({ response: "declined", read: true });
   });
 });
 

@@ -2,7 +2,7 @@
 //
 // Sohbette paylaşılan GÜNLÜK DÜELLO kartının gövdesi (mesaj kind: "challengeShare", bkz. utils/chatShare.js):
 // gönderenin adı, büyük skor, doğru sayısı ve — alıcı için — duruma göre bir eylem:
-//   • bugün + alıcı henüz oynamadı  → "Meydan okumayı kabul et" (günlük oyunu başlatır)
+//   • bugün + alıcı henüz oynamadı  → [Reddet] [Kabul et] (kabul günlük oyunu başlatır)
 //   • alıcı o günü oynamış          → iki skor yan yana + kazandın / geride kaldın / berabere
 //   • gün geçmiş + oynamamış        → yalnız gönderenin skoru ve "artık oynanamıyor"
 //
@@ -14,13 +14,16 @@
 //
 // Kabul, oyuna düello bağlamını verir (`chatTarget` = bu sohbet, utils/importantInvites.duelContextOf):
 // oyun bitince sonuç ekranı iki skoru bu sohbete bir "düello sonucu" kartı olarak yazar ve aynı davetin
-// Profil'deki bildirimi de "kabul edildi" olur (`onAccepted`).
+// Profil'deki bildirimi de "kabul edildi" olur (`onAccepted`). Ret (`onDeclined`) bildirimi "reddedildi" yapar.
 //
-// KABUL DURUMU: kabul eden mesaja `accepts.{uid}` yazar (ChatScreen.acceptInviteFromCard). İki tarafın kartı
+// YANIT DURUMU: alıcı mesaja `accepts.{uid}` ya da `declines.{uid}` yazar (ChatScreen.answerInviteFromCard;
+// Profil'deki önemli davetler çubuğundan yanıt da aynı mesaja yazılır — utils/chatInvites). İki tarafın kartı
 // buna göre değişir:
-//   • alıcı   : "Kabul ettin" hapı; oynamadıysa düğme "Oyuna başla" olur
-//   • gönderen: "Yanıt bekleniyor" → "Kabul edildi" (grupta "N kişi kabul etti") → 1-1 sohbette rakibin
-//               skoru tablodan gelince iki skor yan yana ve "Düello bitti" (utils/dailyDuel.challengeHostView)
+//   • alıcı   : yanıtsızsa [Reddet] [Kabul et]; kabul ettiyse "Kabul ettin" hapı ve "Oyuna başla";
+//               reddettiyse "Reddettin" hapı, düğme ve skor sorgusu yok
+//   • gönderen: "Yanıt bekleniyor" → "Kabul edildi" / "Reddedildi" (grupta "N kişi kabul etti" /
+//               "N kişi reddetti") → 1-1 sohbette rakibin skoru tablodan gelince iki skor yan yana ve
+//               "Düello bitti" (utils/dailyDuel.challengeHostView)
 
 import React, { memo, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
@@ -33,12 +36,13 @@ import { usePremiumGate } from "../../hooks/usePremiumGate";
 import useDuelStatus from "../../hooks/useDuelStatus";
 import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
 import { intlLocaleOf } from "../../utils/appLanguages";
+import { myInviteResponse } from "../../utils/chatInvites";
 import { dayKeyOf } from "../../utils/dailyChallenge";
 import { challengeAcceptors, challengeHostView, formatDuelScore } from "../../utils/dailyDuel";
 import { getDuelCopy } from "../../utils/dailyDuelCopy";
 import { dailyDuelRoute, duelContextOf } from "../../utils/importantInvites";
-import GlassPressable from "../common/GlassPressable";
 import { DUEL_AMBER, DuelStatusChip, DuelVerdict, DuelVersus } from "./DuelVersus";
+import InviteActions from "./InviteActions";
 import { sharePalette } from "./shareKit";
 
 function dayLabel(dayKey, locale) {
@@ -59,7 +63,16 @@ const verdictTextOf = (copy, verdict, diff) =>
         ? copy.tie
         : null;
 
-function SharedChallengeMessage({ share, isOutgoing = false, senderUid, chatTarget, accepts, onAccepted }) {
+function SharedChallengeMessage({
+  share,
+  isOutgoing = false,
+  senderUid,
+  chatTarget,
+  accepts,
+  declines,
+  onAccepted,
+  onDeclined,
+}) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const { user } = useAuth() || {};
@@ -67,27 +80,33 @@ function SharedChallengeMessage({ share, isOutgoing = false, senderUid, chatTarg
   const copy = getDuelCopy(language);
   const palette = useMemo(() => sharePalette({ theme, isOutgoing, accent: DUEL_AMBER }), [theme, isOutgoing]);
   const acceptors = useMemo(() => challengeAcceptors(accepts), [accepts]);
+  const decliners = useMemo(() => challengeAcceptors(declines), [declines]);
+  const myResponse = isOutgoing ? null : myInviteResponse({ accepts, declines, uid: user?.uid });
+  const acceptedByMe = myResponse === "accepted";
+  const declinedByMe = myResponse === "declined";
 
   // Oyunlar Premium'da (Hub'daki Oyunlar modülüyle aynı kural): kilitliyse kabul etmek yükseltme sayfasını açar.
+  // Reddedilen meydan okumada skor sorulmaz: kart "Reddettin"de kalır.
   const gamesGate = usePremiumGate("games");
-  const status = useDuelStatus({ share, hostUid: senderUid, enabled: !isOutgoing });
+  const status = useDuelStatus({ share, hostUid: senderUid, enabled: !isOutgoing && !declinedByMe });
   const { outcome, mine, hostScore, loading } = status;
 
-  // Gönderenin kendi kartı: 1-1 sohbette rakibin skoru (grupta kimin oynadığı belirsiz → yalnız kabul sayısı).
+  // Gönderenin kendi kartı: 1-1 sohbette rakibin skoru (grupta kimin oynadığı belirsiz → yalnız yanıt sayıları).
   const rivalUid = isOutgoing && !chatTarget?.groupId ? chatTarget?.friendUid || null : null;
-  const rivalStatus = useDuelStatus({ share, hostUid: senderUid, guestUid: rivalUid, enabled: !!rivalUid });
+  const rivalDeclined = !!rivalUid && decliners.includes(rivalUid) && !acceptors.includes(rivalUid);
+  const rivalStatus = useDuelStatus({ share, hostUid: senderUid, guestUid: rivalUid, enabled: !!rivalUid && !rivalDeclined });
   const rivalName = chatTarget?.friendName || copy.rival;
   const ownScore = rivalStatus.hostScore ?? share.score;
   const hostView = isOutgoing
     ? challengeHostView({
         dayKey: share.dayKey,
         today: dayKeyOf(),
-        acceptedCount: acceptors.length,
-        rivalScore: rivalUid ? rivalStatus.mine : null,
+        acceptedCount: rivalUid ? (acceptors.includes(rivalUid) ? 1 : 0) : acceptors.length,
+        declinedCount: rivalUid ? (rivalDeclined ? 1 : 0) : decliners.length,
+        rivalScore: rivalUid && !rivalDeclined ? rivalStatus.mine : null,
         hostScore: ownScore,
       })
     : null;
-  const acceptedByMe = !isOutgoing && !!user?.uid && acceptors.includes(user.uid);
 
   const accept = useCallback(() => {
     trackEvent(ANALYTICS_EVENTS.DUEL_ACCEPTED, { locked: !gamesGate.allows(0) });
@@ -95,12 +114,13 @@ function SharedChallengeMessage({ share, isOutgoing = false, senderUid, chatTarg
       gamesGate.showUpsell();
       return;
     }
-    onAccepted?.();
+    // Zaten kabul edildiyse (çubuktan ya da önceki basış) yanıt yeniden yazılmaz; yalnız oyun açılır.
+    if (!acceptedByMe) onAccepted?.();
     const route = dailyDuelRoute(
       duelContextOf({ dayKey: share.dayKey, hostUid: senderUid, hostName: share.host, chat: chatTarget }),
     );
     navigation.navigate(route.name, route.params);
-  }, [gamesGate, navigation, onAccepted, share.dayKey, share.host, senderUid, chatTarget]);
+  }, [gamesGate, navigation, onAccepted, acceptedByMe, share.dayKey, share.host, senderUid, chatTarget]);
 
   const title = isOutgoing
     ? hostView.phase === "played" && chatTarget?.friendName
@@ -111,6 +131,10 @@ function SharedChallengeMessage({ share, isOutgoing = false, senderUid, chatTarg
       : copy.titleInAnon;
   const dateText = copy.daily(dayLabel(share.dayKey, intlLocaleOf(language)));
 
+  const decline = useCallback(() => {
+    onDeclined?.();
+  }, [onDeclined]);
+
   // Durum hapı.
   let chip = null;
   if (isOutgoing) {
@@ -119,9 +143,13 @@ function SharedChallengeMessage({ share, isOutgoing = false, senderUid, chatTarg
         ? { tone: "done", label: copy.statusDone }
         : hostView.phase === "accepted"
           ? { tone: "accepted", label: rivalUid ? copy.statusAccepted : copy.acceptedBy(acceptors.length) }
-          : hostView.phase === "expired"
-            ? { tone: "expired", label: copy.statusExpired }
-            : { tone: "waiting", label: copy.statusWaiting };
+          : hostView.phase === "declined"
+            ? { tone: "declined", label: rivalUid ? copy.statusDeclined : copy.declinedBy(decliners.length) }
+            : hostView.phase === "expired"
+              ? { tone: "expired", label: copy.statusExpired }
+              : { tone: "waiting", label: copy.statusWaiting };
+  } else if (declinedByMe) {
+    chip = { tone: "declined", label: copy.statusYouDeclined };
   } else if (!loading) {
     chip =
       outcome.phase === "played"
@@ -132,10 +160,13 @@ function SharedChallengeMessage({ share, isOutgoing = false, senderUid, chatTarg
             ? { tone: "expired", label: copy.statusExpired }
             : null;
   }
+  // Grupta hem kabul hem ret varsa hap kabulü gösterir; ret sayısı altta not olarak kalır.
+  const groupDeclinedNote =
+    isOutgoing && !rivalUid && hostView.phase === "accepted" && decliners.length > 0 ? copy.declinedBy(decliners.length) : null;
 
   // İki taraf yan yana: alıcı oynadıysa; gönderende rakip kabul ettiyse (skoru gelene dek "?").
   let versus = null;
-  if (!isOutgoing && outcome.phase === "played" && Number.isFinite(mine) && hostScore != null) {
+  if (!isOutgoing && !declinedByMe && outcome.phase === "played" && Number.isFinite(mine) && hostScore != null) {
     versus = {
       left: { label: copy.you, score: mine },
       right: { label: share.host || copy.rival, score: hostScore },
@@ -208,27 +239,26 @@ function SharedChallengeMessage({ share, isOutgoing = false, senderUid, chatTarg
         <Text style={[styles.note, { color: palette.muted }]}>{copy.rivalPlaying(rivalName)}</Text>
       ) : null}
 
+      {groupDeclinedNote ? <Text style={[styles.note, { color: palette.muted }]}>{groupDeclinedNote}</Text> : null}
+
       {!isOutgoing && loading ? (
         <Text style={[styles.note, { color: palette.muted }]}>{copy.checking}</Text>
       ) : null}
 
-      {!isOutgoing && !loading && outcome.phase === "expired" ? (
+      {!isOutgoing && !declinedByMe && !loading && outcome.phase === "expired" ? (
         <Text style={[styles.note, { color: palette.muted }]}>{copy.expired}</Text>
       ) : null}
 
-      {!isOutgoing && !loading && outcome.phase === "open" ? (
-        <GlassPressable
-          onPress={accept}
-          accessibilityRole="button"
-          accessibilityLabel={acceptedByMe ? copy.play : copy.accept}
-          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-          style={[styles.action, { backgroundColor: palette.buttonBg }]}
-        >
-          <Ionicons name="play" size={15} color={palette.buttonInk} />
-          <Text allowFontScaling={false} style={[styles.actionText, { color: palette.buttonInk }]} numberOfLines={1}>
-            {acceptedByMe ? copy.play : copy.accept}
-          </Text>
-        </GlassPressable>
+      {!isOutgoing && !declinedByMe && !loading && outcome.phase === "open" ? (
+        <InviteActions
+          palette={palette}
+          accept={
+            acceptedByMe
+              ? { label: copy.play, icon: "play", onPress: accept }
+              : { label: copy.acceptShort, a11y: copy.accept, icon: "play", onPress: accept }
+          }
+          decline={!acceptedByMe && onDeclined ? { label: copy.decline, a11y: copy.declineA11y, onPress: decline } : null}
+        />
       ) : null}
     </View>
   );
@@ -260,21 +290,4 @@ const styles = StyleSheet.create({
   correct: { fontSize: 12, fontWeight: "700", marginTop: 4 },
 
   note: { fontSize: 12, fontWeight: "600", lineHeight: 16, marginTop: 10 },
-
-  action: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    height: 38,
-    marginTop: 12,
-    paddingHorizontal: 10,
-    borderRadius: 19,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  actionText: { fontSize: 13, fontWeight: "800", flexShrink: 1 },
 });

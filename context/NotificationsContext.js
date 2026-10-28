@@ -20,6 +20,8 @@ import {
   deleteNotification as deleteApi,
   respondToInvitation as respondApi,
 } from "../services/notificationsService";
+import { writeInviteResponse } from "../services/chatInviteService";
+import { chatTargetOf } from "../utils/importantInvites";
 import useStartupGate from "../hooks/useStartupGate";
 
 const NotificationsContext = createContext();
@@ -85,10 +87,21 @@ export function NotificationsProvider({ children }) {
     [uid, items],
   );
 
-  const respond = useCallback((notifId, decision) => {
-    if (!uid) return Promise.resolve(false);
-    return respondApi(uid, notifId, decision);
-  }, [uid]);
+  // Davete yanıt (Profil'deki önemli davetler çubuğu): önce bildirim kaydı (bir kez, cihazlar arası), sonra
+  // aynı yanıt davetin sohbet kartına — iki tarafın kartı kabul/ret durumuna döner (utils/chatInvites).
+  // Kayıtta mesaj kimliği yoksa (eski davet) kart değişmez; kart yazımı düşerse yanıt geri alınmaz.
+  const respond = useCallback(async (notifId, decision) => {
+    if (!uid) return false;
+    const saved = await respondApi(uid, notifId, decision);
+    const item = saved ? items.find((n) => n.id === notifId) : null;
+    if (item) {
+      writeInviteResponse({ uid, chat: chatTargetOf(item), messageId: item.messageId, response: decision })
+        .catch((error) => {
+          if (__DEV__) console.warn("inviteCardResponse:", error?.message);
+        });
+    }
+    return saved;
+  }, [uid, items]);
 
   const value = useMemo(
     () => ({ items, loading, error, cursor, hasMore, retry, markRead, markAll, remove, respond }),

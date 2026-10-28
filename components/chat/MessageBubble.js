@@ -55,9 +55,10 @@ export const openMediaDetail = (navigation, m) => {
 };
 
 // Hedefi olan paylaşımlar (gönderi, turnuva, CineSwipe daveti) kendi ekranına gider. CineSwipe
-// davetinde `inviteChat` bu sohbettir: oda bitince ortak eşleşmeler buraya yazılır.
-const openShareTarget = (navigation, share, inviteChat) => {
-  const route = shareRoute(share, { inviteChat });
+// davetinde `inviteChat` bu sohbettir: oda bitince ortak eşleşmeler buraya yazılır ve davet kartı
+// (`inviteMessageId`) iki tarafta "Tamamlandı" olur.
+const openShareTarget = (navigation, share, inviteChat, inviteMessageId) => {
+  const route = shareRoute(share, { inviteChat, inviteMessageId });
   if (route) navigation.push(route.name, route.params);
 };
 
@@ -98,7 +99,7 @@ const MessageBubble = memo(
     onReply,
     onJumpToMessage,
     chatTarget,
-    onAcceptInvite,
+    onAnswerInvite,
     highlighted,
     entrance,
   }) => {
@@ -313,10 +314,18 @@ const MessageBubble = memo(
             <SharedCineRoomMessage
               share={share}
               isOutgoing={isMe}
-              onOpen={() => {
-                onAcceptInvite?.(share, item.senderId);
-                openShareTarget(navigation, share, chatTarget);
-              }}
+              isGroup={isGroup}
+              viewerUid={currentUser.uid}
+              accepts={item.accepts}
+              declines={item.declines}
+              done={item.done}
+              sentAt={item.timestamp}
+              onAnswer={
+                onAnswerInvite
+                  ? (response) => onAnswerInvite(share, item.senderId, item.id, response)
+                  : undefined
+              }
+              onOpen={() => openShareTarget(navigation, share, chatTarget, item.id)}
             />
           ) : share?.type === "tasteMatch" ? (
             <SharedTasteMatchMessage share={share} isOutgoing={isMe} getTmdbUrl={getTmdbUrl} />
@@ -327,7 +336,13 @@ const MessageBubble = memo(
               senderUid={item.senderId}
               chatTarget={chatTarget}
               accepts={item.accepts}
-              onAccepted={onAcceptInvite ? () => onAcceptInvite(share, item.senderId, item.id) : undefined}
+              declines={item.declines}
+              onAccepted={
+                onAnswerInvite ? () => onAnswerInvite(share, item.senderId, item.id, "accepted") : undefined
+              }
+              onDeclined={
+                onAnswerInvite ? () => onAnswerInvite(share, item.senderId, item.id, "declined") : undefined
+              }
             />
           ) : share?.type === "duelResult" ? (
             <SharedDuelResultMessage
