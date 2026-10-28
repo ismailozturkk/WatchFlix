@@ -65,7 +65,7 @@ test("balon zengin balonun %90 sınırına sığar (dar telefonda taşmaz, geni�
     const room = (width - 16 - 32) * 0.9 - 20;
     expect(settingsBubbleWidth(width)).toBeLessThanOrEqual(room);
   }
-  expect(settingsBubbleWidth(1024)).toBe(288);
+  expect(settingsBubbleWidth(1024)).toBe(260);
 });
 
 test("ayar alt sayfası önizleme kartı: telefonda kenardan kenara (16 dp boşluk), tablette 560 dp", () => {

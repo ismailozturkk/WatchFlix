@@ -140,6 +140,7 @@ jest.mock("../components/chat/SwipeReplyContainer", () => ({ __esModule: true, d
 jest.mock("../components/chat/MessageReplyPreview", () => ({ __esModule: true, default: () => null }));
 jest.mock("../components/chat/SharedChallengeMessage", () => ({ __esModule: true, default: "ChallengeBody" }));
 jest.mock("../components/chat/SharedDuelResultMessage", () => ({ __esModule: true, default: "DuelResultBody" }));
+jest.mock("../components/chat/SharedListMessage", () => ({ __esModule: true, default: "ListBody" }));
 
 const MessageBubble = require("../components/chat/MessageBubble").default;
 const ShareSettingsScreen = require("../screens/tabs/settings/ShareSettingsScreen").default;
@@ -174,10 +175,10 @@ const texts = (root) => root.findAllByType("Text").map((node) => [].concat(node.
 const byTestId = (root, id) => root.findAll((node) => node.props.testID === id && node.type === "Button")[0];
 const press = (node) => act(() => node.props.onPress());
 
-const bubble = (senderId) =>
+const bubble = (senderId, share = SHARE) =>
   render(
     <MessageBubble
-      item={{ id: "m1", senderId, timestamp: null, ...buildShareMessage(SHARE) }}
+      item={{ id: "m1", senderId, timestamp: null, ...buildShareMessage(share) }}
       currentUser={{ uid: "me" }}
       theme={mockTheme}
       navigation={{ push: jest.fn() }}
@@ -194,22 +195,50 @@ beforeEach(() => {
   mockPlan = "free";
 });
 
-test("gelen balon: tema önizlemesi, font satırı, çipler ve İncele ve uygula", () => {
+test("gelen balon: küçük tema önizlemesi, yalnız bölüm ikonları ve İncele ve uygula", () => {
   const root = bubble("them");
   const all = texts(root);
   expect(all).toContain("GÖRÜNÜM AYARLARI");
   expect(all).toContain("Paylaşan: Ada");
   expect(all).toContain("Okyanus · Orta"); // önizlemenin başlığı
-  expect(all).toContain("Başlık Oswald · Yazı Sistem · Rakam Sistem");
-  expect(all).toEqual(expect.arrayContaining(["Afiş ve köşeler", "Liste görünümü"]));
+  expect(root.findAll((node) => node.props.testID === "settings-theme-mock-compact")).toHaveLength(1);
+  for (const id of ["fonts", "posters", "lists"]) {
+    const icon = root.findAll((node) => node.props.testID === `shared-settings-icon-${id}`);
+    expect(icon).toHaveLength(1);
+    expect(icon[0].props.accessibilityLabel).toBeTruthy();
+  }
+  expect(all).not.toContain("Başlık Oswald · Yazı Sistem · Rakam Sistem");
+  expect(all).not.toContain("Afiş ve köşeler");
+  expect(all).not.toContain("Liste görünümü");
   expect(all).not.toContain("Tema"); // temanın kendi önizlemesi var, çip olarak tekrar edilmez
   expect(byTestId(root, "shared-settings-review")).toBeTruthy();
 });
 
-test("giden balonda uygulama düğmesi yok, not var", () => {
+test("giden balon: ayarlarım hâlâ aynıysa yalnız not var", () => {
+  const postersOnly = { ...SHARE, sections: { posters: SHARE.sections.posters } };
+  const root = bubble("me", postersOnly);
+  expect(byTestId(root, "shared-settings-review")).toBeUndefined();
+  expect(byTestId(root, "shared-settings-apply-own")).toBeUndefined();
+  expect(texts(root)).toContain("Arkadaşın istediklerini seçip uygulayabilir");
+});
+
+test("giden balon: ayarlarımı değiştirdiysem Bende uygula aynı sayfayı açar", () => {
   const root = bubble("me");
   expect(byTestId(root, "shared-settings-review")).toBeUndefined();
-  expect(texts(root)).toContain("Arkadaşın istediklerini seçip uygulayabilir");
+  expect(texts(root)).toContain("Bende uygula");
+  press(byTestId(root, "shared-settings-apply-own"));
+  expect(texts(root).some((text) => text.startsWith("Paylaşan: Ada ·"))).toBe(false); // kendi paylaşımım: "Paylaşan" yok
+  expect(byTestId(root, "settings-share-row-lists").props.accessibilityState.checked).toBe(true);
+  expect(byTestId(root, "settings-share-row-posters").props.accessibilityState.checked).toBe(false); // zaten aynı
+  press(byTestId(root, "settings-share-apply"));
+  act(() => mockDismissed());
+  expect(mockApply).toHaveBeenCalledWith({ fonts: SHARE.sections.fonts, lists: SHARE.sections.lists });
+});
+
+test("balon önizlemesi küçük afişlerle çizilir", () => {
+  const root = bubble("them");
+  const mock = root.findAll((node) => node.props.compact === true && node.props.posterCount)[0];
+  expect(mock.props.posterCount).toBeGreaterThanOrEqual(7);
 });
 
 test("sayfa: kilitli ve zaten aynı bölümler baştan seçilmez; uygulama sayfa kapanınca yapılır, Geri Al çalışır", () => {

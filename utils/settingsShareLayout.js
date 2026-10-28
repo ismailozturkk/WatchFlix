@@ -79,5 +79,18 @@ export function settingsScreenPreview(windowWidth) {
  */
 export function settingsBubbleWidth(windowWidth) {
   const w = finite(windowWidth, 390);
-  return Math.max(208, Math.min(288, Math.round(w * 0.66)));
+  return Math.max(200, Math.min(260, Math.round(w * 0.62)));
+}
+
+/** Balondaki kompakt önizlemede hedef afiş genişliği (dp): 27 Eki "önizleme büyük". */
+export const BUBBLE_POSTER_TARGET = 28;
+// SettingsThemeMock kompakt gövdesi: yatay iç boşluk (2 × 6) ve afiş arası boşluk.
+const BUBBLE_INNER_PADDING = 12;
+const BUBBLE_POSTER_GAP = 3;
+
+/** Balon önizlemesinin afiş sayısı (6–9): afiş küçük kalır, önizleme alçalır. */
+export function bubbleMockPosterCount(bubbleWidth) {
+  const inner = finite(bubbleWidth, 244) - BUBBLE_INNER_PADDING;
+  const count = Math.floor((inner + BUBBLE_POSTER_GAP) / (BUBBLE_POSTER_TARGET + BUBBLE_POSTER_GAP));
+  return Math.max(6, Math.min(9, count));
 }

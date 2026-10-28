@@ -40,7 +40,7 @@ import SettingsThemeMock from "./SettingsThemeMock";
 import SettingsSectionList from "./SettingsSectionList";
 import SettingsShareSheetFrame, { useSettingsSheetLayout } from "./SettingsShareSheetFrame";
 
-export default function ApplySharedSettingsSheet({ visible, share, onClose }) {
+export default function ApplySharedSettingsSheet({ visible, share, own = false, onClose }) {
   const { theme } = useTheme();
   const { language, t } = useLanguage();
   const { plan } = usePremium();
@@ -140,7 +140,7 @@ export default function ApplySharedSettingsSheet({ visible, share, onClose }) {
       onDismissed={handleDismissed}
       icon="color-palette"
       title={copy.applyTitle}
-      subtitle={share?.owner ? `${copy.from(share.owner)} · ${copy.applySubtitle}` : copy.applySubtitle}
+      subtitle={share?.owner && !own ? `${copy.from(share.owner)} · ${copy.applySubtitle}` : copy.applySubtitle}
       cancelLabel={copy.cancel}
       confirmLabel={copy.applySelected(count)}
       confirmIcon="checkmark-done"

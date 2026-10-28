@@ -2,11 +2,12 @@
 //
 // Sohbette paylaşılan GÖRÜNÜM AYARLARI balonunun gövdesi (mesaj kind: "settingsShare",
 // gövde utils/settingsShare.js). Paylaşılan tema mini bir uygulama ekranı olarak
-// çizilir (afiş köşesi ve başlık fontu da paylaşılandan), altında yazı tipi satırı
-// ve diğer bölümlerin çipleri.
+// çizilir (afiş köşesi ve başlık fontu da paylaşılandan); altında diğer paylaşılan
+// bölümler yalnız ikon olarak kompakt biçimde gösterilir.
 //
 // GELEN balonda "İncele ve uygula": alıcı her bölümü ayrı seçip uygular
-// (ApplySharedSettingsSheet). GİDEN balonda düğme yok, kısa bir not var.
+// (ApplySharedSettingsSheet). GİDEN balonda kısa bir not var; gönderen o günden
+// beri ayarlarını değiştirdiyse "Bende uygula" ile aynı sayfadan geri dönebilir.
 // Metinler ALICININ dilinde; gönderenin dili yalnız gelen kutusu önizlemesinde.
 
 import React, { memo, useMemo, useState } from "react";
@@ -22,13 +23,11 @@ import {
   sharedFontRolesOf,
   sharedThemeColors,
 } from "../../utils/settingsShare";
-import { fontFamilyOf, getSettingsShareCopy, sectionSummary, themeLabel } from "../../utils/settingsShareCopy";
-import { settingsBubbleWidth } from "../../utils/settingsShareLayout";
+import { fontFamilyOf, getSettingsShareCopy, themeLabel } from "../../utils/settingsShareCopy";
+import { bubbleMockPosterCount, settingsBubbleWidth } from "../../utils/settingsShareLayout";
 import { sharePalette } from "./shareKit";
 
 const ICON_BY_ID = Object.fromEntries(SETTINGS_SHARE_SECTIONS.map((section) => [section.id, section.icon]));
-// Ayrı satırı olanlar (tema önizlemesi, yazı tipi satırı) çip olarak tekrar edilmez.
-const OWN_ROW = new Set(["theme", "fonts"]);
 
 // Uygulama sayfası (ayar context'leri, Premium, toast…) ancak düğmeye basılınca
 // yüklenir: balon sohbet listesinde çok kez çizilir, MessageBubble hafif kalmalı.
@@ -36,6 +35,13 @@ function LazyApplySheet(props) {
   // eslint-disable-next-line global-require
   const ApplySharedSettingsSheet = require("../settingsShare/ApplySharedSettingsSheet").default;
   return <ApplySharedSettingsSheet {...props} />;
+}
+
+// Giden satır ayar context'lerine bağlanır (karşılaştırma); o da tembel yüklenir.
+function LazyOutgoingApply(props) {
+  // eslint-disable-next-line global-require
+  const OutgoingSettingsApply = require("../settingsShare/OutgoingSettingsApply").default;
+  return <OutgoingSettingsApply {...props} />;
 }
 
 function SharedSettingsMessage({ share, isOutgoing = false }) {
@@ -53,8 +59,13 @@ function SharedSettingsMessage({ share, isOutgoing = false }) {
   const ids = settingsShareSectionIds(share);
   const sharedTheme = useMemo(() => sharedThemeColors(share), [share]);
   const headingFamily = fontFamilyOf(sharedFontRolesOf(share)?.heading);
-  const chips = ids.filter((id) => !OWN_ROW.has(id) || (id === "theme" && !sharedTheme));
+  // Tema kendi mini önizlemesinde görünür. Tema yoksa onun ikonu da diğerleriyle çizilir.
+  const compactSections = ids.filter((id) => id !== "theme" || !sharedTheme);
   const label = themeLabel(share, { language, t });
+  const openSheet = () => {
+    setSheetMounted(true);
+    setSheetVisible(true);
+  };
 
   return (
     <View style={[styles.wrap, { width: bubbleWidth }]}>
@@ -79,48 +90,36 @@ function SharedSettingsMessage({ share, isOutgoing = false }) {
             title={label}
             headingFamily={headingFamily}
             posterRadius={share.sections.posters?.listsPosterRadius ?? 10}
+            compact
+            posterCount={bubbleMockPosterCount(bubbleWidth)}
           />
         </View>
       ) : null}
 
-      {share.sections.fonts ? (
-        <View style={[styles.fontRow, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.fontGlyph, { color: palette.primary }, headingFamily ? { fontFamily: headingFamily } : null]}
-          >
-            Aa
-          </Text>
-          <Text numberOfLines={2} style={[styles.fontText, { color: palette.secondary }]}>
-            {sectionSummary(share, "fonts", { language, t })}
-          </Text>
-        </View>
-      ) : null}
-
-      {chips.length ? (
-        <View style={styles.chips}>
-          {chips.map((id) => (
-            <View key={id} style={[styles.chip, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
-              <Ionicons name={`${ICON_BY_ID[id]}-outline`} size={12} color={palette.tileInk} />
-              <Text allowFontScaling={false} numberOfLines={1} style={[styles.chipText, { color: palette.primary }]}>
-                {copy.sections[id]}
-              </Text>
+      {compactSections.length ? (
+        <View style={styles.sectionIcons} accessibilityRole="summary">
+          {compactSections.map((id) => (
+            <View
+              key={id}
+              testID={`shared-settings-icon-${id}`}
+              accessible
+              accessibilityLabel={copy.sections[id]}
+              style={[styles.sectionIcon, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}
+            >
+              <Ionicons name={`${ICON_BY_ID[id]}-outline`} size={14} color={palette.tileInk} />
             </View>
           ))}
         </View>
       ) : null}
 
       {isOutgoing ? (
-        <Text style={[styles.note, { color: palette.muted }]}>{copy.outgoingNote}</Text>
+        <LazyOutgoingApply share={share} copy={copy} palette={palette} onApply={openSheet} />
       ) : (
         <GlassPressable
           glass={false}
           testID="shared-settings-review"
           accessibilityRole="button"
-          onPress={() => {
-            setSheetMounted(true);
-            setSheetVisible(true);
-          }}
+          onPress={openSheet}
           style={({ pressed }) => [styles.button, { backgroundColor: palette.buttonBg }, pressed && styles.pressed]}
         >
           <Ionicons name="options-outline" size={15} color={palette.buttonInk} />
@@ -130,8 +129,8 @@ function SharedSettingsMessage({ share, isOutgoing = false }) {
         </GlassPressable>
       )}
 
-      {!isOutgoing && sheetMounted ? (
-        <LazyApplySheet visible={sheetVisible} share={share} onClose={() => setSheetVisible(false)} />
+      {sheetMounted ? (
+        <LazyApplySheet visible={sheetVisible} share={share} own={isOutgoing} onClose={() => setSheetVisible(false)} />
       ) : null}
     </View>
   );
@@ -142,45 +141,22 @@ export default memo(SharedSettingsMessage);
 const styles = StyleSheet.create({
   wrap: { alignSelf: "flex-start", marginBottom: 2 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
-  tile: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  tile: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   headerCopy: { flex: 1, minWidth: 0 },
   kicker: { fontSize: 9.5, fontWeight: "800", letterSpacing: 0.8 },
-  sub: { fontSize: 13, fontWeight: "800", marginTop: 1 },
-  mockBlock: { marginTop: 11 },
-  fontRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginTop: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-  },
-  fontGlyph: { fontSize: 20, fontWeight: "800" },
-  fontText: { flex: 1, fontSize: 12, fontWeight: "700", lineHeight: 16 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    maxWidth: "100%",
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  chipText: { flexShrink: 1, fontSize: 11.5, fontWeight: "700" },
-  note: { fontSize: 11.5, fontWeight: "600", lineHeight: 16, marginTop: 10 },
+  sub: { fontSize: 12, fontWeight: "800", marginTop: 1 },
+  mockBlock: { marginTop: 8 },
+  sectionIcons: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 7 },
+  sectionIcon: { width: 28, height: 28, borderRadius: 9, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   button: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
-    minHeight: 40,
-    borderRadius: 12,
-    marginTop: 11,
+    minHeight: 36,
+    borderRadius: 11,
+    marginTop: 8,
   },
   pressed: { opacity: 0.8 },
-  buttonText: { fontSize: 13.5, fontWeight: "800" },
+  buttonText: { fontSize: 12.5, fontWeight: "800" },
 });
