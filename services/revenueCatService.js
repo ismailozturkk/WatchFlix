@@ -18,6 +18,33 @@ const PRODUCTION_API_KEYS = {
 let configured = false;
 let identifiedUserId = null;
 
+// Yerel log işleyicisi, setLogHandler'ı çağıran yerel modül örneğine bağlanır.
+// JS yeniden yüklenince (dev reload) SDK yerelde yapılandırılmış kalır ve
+// configure() atlanır; işleyici eski örnekte kalır, her log "Sending
+// `Purchases-LogHandlerEvent` with no listeners registered" uyarısı basar.
+// Bu yüzden işleyici yeni JS oturumunda yeniden kurulur (SDK'nın varsayılanıyla aynı çıktı).
+function bindLogHandler() {
+  Purchases.setLogHandler((logLevel, message) => {
+    const line = `[RevenueCat] ${message}`;
+    switch (logLevel) {
+      case LOG_LEVEL.DEBUG:
+        console.debug(line);
+        break;
+      case LOG_LEVEL.INFO:
+        console.info(line);
+        break;
+      case LOG_LEVEL.WARN:
+        console.warn(line);
+        break;
+      case LOG_LEVEL.ERROR:
+        console.error(line);
+        break;
+      default:
+        console.log(line);
+    }
+  });
+}
+
 export function getRevenueCatConfiguration() {
   const testApiKey = process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY;
   const apiKey =
@@ -38,6 +65,7 @@ export async function configureRevenueCat(user) {
 
   if (!configured) {
     configured = await Purchases.isConfigured().catch(() => false);
+    if (configured) bindLogHandler();
   }
 
   if (!configured) {
