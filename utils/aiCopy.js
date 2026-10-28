@@ -44,6 +44,11 @@ const TR = {
     clear: "Seçimleri temizle",
     surprise: "🎲 Sürpriz yap",
     surprisePrompt: "Surprise me with one great pick I have probably not seen yet.",
+    surpriseHint: "Daha önce görmediğin tek bir güzel seçim",
+  },
+  welcome: {
+    count: "{n} hazır istek",
+    ask: "Sor",
   },
   quota: {
     perDay: "Günde {n} hak",
@@ -206,6 +211,11 @@ const EN = {
     clear: "Clear choices",
     surprise: "🎲 Surprise me",
     surprisePrompt: "Surprise me with one great pick I have probably not seen yet.",
+    surpriseHint: "One great pick you probably haven't seen yet",
+  },
+  welcome: {
+    count: "{n} ready prompts",
+    ask: "Ask",
   },
   quota: {
     perDay: "{n} per day",
@@ -368,6 +378,11 @@ const ES = {
     clear: "Borrar selección",
     surprise: "🎲 Sorpréndeme",
     surprisePrompt: "Sorpréndeme con una gran recomendación que probablemente aún no haya visto.",
+    surpriseHint: "Una gran recomendación que probablemente aún no has visto",
+  },
+  welcome: {
+    count: "{n} peticiones listas",
+    ask: "Preguntar",
   },
   quota: {
     perDay: "{n} al día",
@@ -530,6 +545,11 @@ const PT = {
     clear: "Limpar seleção",
     surprise: "🎲 Surpreenda-me",
     surprisePrompt: "Surpreenda-me com uma ótima recomendação que eu provavelmente ainda não assisti.",
+    surpriseHint: "Uma ótima escolha que você provavelmente ainda não viu",
+  },
+  welcome: {
+    count: "{n} pedidos prontos",
+    ask: "Perguntar",
   },
   quota: {
     perDay: "{n} por dia",
@@ -692,6 +712,11 @@ const DE = {
     clear: "Auswahl zurücksetzen",
     surprise: "🎲 Überrasch mich",
     surprisePrompt: "Überrasche mich mit einem großartigen Tipp, den ich wahrscheinlich noch nicht gesehen habe.",
+    surpriseHint: "Ein großartiger Tipp, den du wahrscheinlich noch nicht kennst",
+  },
+  welcome: {
+    count: "{n} fertige Anfragen",
+    ask: "Fragen",
   },
   quota: {
     perDay: "{n} pro Tag",
