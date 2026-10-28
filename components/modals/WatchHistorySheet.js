@@ -212,6 +212,7 @@ function HistoryEventCard({
 export default function WatchHistorySheet({
   visible,
   onClose,
+  onDismissed,
   title,
   events = [],
   onAddAgain,
@@ -289,6 +290,7 @@ export default function WatchHistorySheet({
     <BottomSheetModal
       visible={visible}
       onClose={closeSheet}
+      onDismissed={onDismissed}
       intensity={54}
       dimColor="rgba(0,0,0,0.48)"
       dismissOnBackdropPress={!busy && !deletingId}

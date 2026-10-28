@@ -30,6 +30,7 @@ import { isUnreleased } from "../../utils/watchState";
 import { selectionAsync } from "../../services/hapticsService";
 import {
   mediaKey,
+  removeMyRating,
   setMyRating,
   subscribeToMyRating,
 } from "../../services/ratingsService";
@@ -81,6 +82,7 @@ export default function WatchedDateSheet({
   const [myRating, setMyRatingValue] = useState(null);
   const [ratingDraft, setRatingDraft] = useState(0);
   const [commentText, setCommentText] = useState("");
+  const [commentInputHeight, setCommentInputHeight] = useState(42);
   const submitLock = useRef(false);
   const resetTimer = useRef(null);
 
@@ -137,6 +139,7 @@ export default function WatchedDateSheet({
       setSubmitting(false);
       setRatingDraft(0);
       setCommentText("");
+      setCommentInputHeight(42);
       submitLock.current = false;
       resetTimer.current = null;
     }, 300);
@@ -204,7 +207,16 @@ export default function WatchedDateSheet({
   // sadece kullanıcıya toast ile bildirilir.
   const submitExtras = async () => {
     if (!showExtras || !user?.uid || mediaId == null) return;
-    if (ratingDraft > 0 && !ratingLocked && ratingDraft !== (myRating ?? 0)) {
+    if (ratingDraft <= 0 && myRating != null && !ratingLocked) {
+      try {
+        await removeMyRating({ mediaType, mediaId, uid: user.uid });
+      } catch (e) {
+        Toast.show({
+          type: "error",
+          text1: i18nText("autoI18n.puan_kaydedilemedi", "Puan sıfırlanamadı"),
+        });
+      }
+    } else if (ratingDraft > 0 && !ratingLocked && ratingDraft !== (myRating ?? 0)) {
       try {
         await setMyRating({
           mediaType,
@@ -359,84 +371,6 @@ export default function WatchedDateSheet({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-      <GlassTouchable
-        accessibilityRole="button"
-        accessibilityState={{
-          selected: !!selectedDate,
-          disabled: !hasValidRange || isBusy,
-        }}
-        activeOpacity={0.8}
-        disabled={!hasValidRange || isBusy}
-        onPress={() => setDatePickerVisibility(true)}
-        style={[
-          styles.customDate,
-          {
-            backgroundColor: selectedDate
-              ? alpha(theme.accent, 0.12)
-              : theme.between,
-            borderColor: selectedDate ? theme.accent : theme.border,
-            opacity: hasValidRange ? 1 : 0.55,
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.optionIcon,
-            { backgroundColor: alpha(theme.accent, 0.16) },
-          ]}
-        >
-          <Ionicons name="calendar-outline" size={21} color={theme.accent} />
-        </View>
-        <View style={styles.optionText}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.optionTitle, { color: theme.text.primary }]}
-          >
-            {selectedDate
-              ? formatDate(selectedDate)
-              : i18nText("autoI18n.tarih_sec", "Tarih Seç")}
-          </Text>
-          <Text
-            allowFontScaling={false}
-            style={[styles.optionSubtitle, { color: theme.text.muted }]}
-          >
-            {hasValidRange
-              ? i18nText(
-                  "autoI18n.takvimden_izleme_tarihi_sec",
-                  "Takvimden izleme tarihini belirle",
-                )
-              : i18nText(
-                  "autoI18n.henuz_yayinlanmadi",
-                  "Bu içerik henüz yayınlanmadı",
-                )}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={19} color={theme.text.muted} />
-      </GlassTouchable>
-
-      <View style={styles.quickRow}>
-        <QuickDateOption
-          icon="time-outline"
-          title={i18nText("autoI18n.bugun", "Bugün")}
-          subtitle={formatDate(today)}
-          selected={selectedDate === today}
-          disabled={!hasValidRange || isBusy}
-          onPress={() => selectDate(today)}
-        />
-        <QuickDateOption
-          icon={mediaType === "tv" ? "tv-outline" : "film-outline"}
-          title={i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}
-          subtitle={
-            canUseReleaseDate
-              ? formatDate(releaseIso)
-              : i18nText("autoI18n.kullanilamaz", "Kullanılamaz")
-          }
-          selected={selectedDate === releaseIso}
-          disabled={!canUseReleaseDate || isBusy}
-          onPress={() => selectDate(releaseIso)}
-        />
-      </View>
-
       <View
         style={[
           styles.selectionSummary,
@@ -448,25 +382,14 @@ export default function WatchedDateSheet({
             : { backgroundColor: theme.primary, borderColor: theme.border },
         ]}
       >
-        <View
-          style={[
-            styles.selectionIcon,
-            {
-              backgroundColor: selectedDate
-                ? alpha(theme.accent, 0.18)
-                : alpha(theme.text.muted, 0.14),
-            },
-          ]}
-        >
-          <Ionicons
-            name={selectedDate ? "checkmark-circle" : "information-circle-outline"}
-            size={17}
-            color={selectedDate ? theme.accent : theme.text.muted}
-          />
-        </View>
+        <Ionicons
+          name={selectedDate ? "checkmark-circle" : "information-circle-outline"}
+          size={17}
+          color={selectedDate ? theme.accent : theme.text.muted}
+        />
         <Text
           allowFontScaling={false}
-          numberOfLines={2}
+          numberOfLines={1}
           style={[
             styles.selectionText,
             { color: selectedDate ? theme.text.primary : theme.text.muted },
@@ -485,15 +408,67 @@ export default function WatchedDateSheet({
         </Text>
       </View>
 
+      <View style={styles.quickRow}>
+        <QuickDateOption
+          icon="time-outline"
+          title={i18nText("autoI18n.bugun", "Bugün")}
+          subtitle={formatDate(today)}
+          selected={selectedDate === today}
+          disabled={!hasValidRange || isBusy}
+          onPress={() => selectDate(today)}
+        />
+        <QuickDateOption
+          calendarDate={selectedDate || today}
+          title={i18nText("autoI18n.tarih_sec", "Tarih Seç")}
+          subtitle={
+            hasValidRange
+              ? i18nText("autoI18n.takvim", "Takvim")
+              : i18nText("autoI18n.kullanilamaz", "Kullanılamaz")
+          }
+          selected={!!selectedDate && selectedDate !== today && selectedDate !== releaseIso}
+          disabled={!hasValidRange || isBusy}
+          onPress={() => setDatePickerVisibility(true)}
+        />
+        <QuickDateOption
+          icon={mediaType === "tv" ? "tv-outline" : "film-outline"}
+          title={i18nText("autoI18n.yayin_tarihi", "Yayın Tarihi")}
+          subtitle={
+            canUseReleaseDate
+              ? formatDate(releaseIso)
+              : i18nText("autoI18n.kullanilamaz", "Kullanılamaz")
+          }
+          selected={selectedDate === releaseIso}
+          disabled={!canUseReleaseDate || isBusy}
+          onPress={() => selectDate(releaseIso)}
+        />
+      </View>
+
       {showExtras && (
         <>
           <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
 
-          <View style={[styles.sectionPill, { backgroundColor: alpha(theme.colors.orange, 0.12) }]}>
-            <Ionicons name="star" size={12} color={theme.colors.orange} />
-            <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.orange }]}>
-              {i18nText("autoI18n.puanla_opsiyonel", "Puanla (opsiyonel)")}
-            </Text>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionPill, { backgroundColor: alpha(theme.colors.orange, 0.12) }]}>
+              <Ionicons name="star" size={12} color={theme.colors.orange} />
+              <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.colors.orange }]}>
+                {i18nText("autoI18n.puanla_opsiyonel", "Puanla (opsiyonel)")}
+              </Text>
+            </View>
+            <GlassTouchable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: ratingDraft <= 0 || isBusy }}
+              disabled={ratingDraft <= 0 || isBusy}
+              onPress={() => setRatingDraft(0)}
+              style={[
+                styles.ratingReset,
+                { borderColor: theme.border, opacity: ratingDraft > 0 && !isBusy ? 1 : 0.42 },
+              ]}
+            >
+              <Ionicons name="refresh" size={13} color={theme.text.muted} />
+              <Text allowFontScaling={false} style={[styles.ratingResetText, { color: theme.text.muted }]}>
+                {i18nText("autoI18n.sifirla", "Sıfırla")}
+              </Text>
+            </GlassTouchable>
           </View>
           {ratingLocked ? (
             <View style={[styles.lockedBox, { backgroundColor: theme.between, borderColor: theme.border }]}>
@@ -514,16 +489,19 @@ export default function WatchedDateSheet({
                 },
               ]}
             >
-              <RatingInput value={ratingDraft} onChange={setRatingDraft} size={30} color={theme.colors.orange} />
+              <RatingInput value={ratingDraft} onChange={setRatingDraft} size={27} color={theme.colors.orange} />
               <Text allowFontScaling={false} style={[styles.ratingValue, { color: ratingDraft > 0 ? theme.colors.orange : theme.text.muted }]}>
                 {ratingDraft > 0
                   ? `${ratingDraft.toFixed(1)} / 10`
-                  : i18nText("autoI18n.yildizlara_dokun", "Yıldızlara dokun")}
+                  : i18nText(
+                      "autoI18n.yildizlara_dokun_veya_kaydir",
+                      "Dokun veya kaydır",
+                    )}
               </Text>
             </View>
           )}
 
-          <View style={[styles.sectionPill, { backgroundColor: alpha(theme.accent, 0.12), marginTop: 16 }]}>
+          <View style={[styles.sectionPill, { backgroundColor: alpha(theme.accent, 0.12), marginTop: 10 }]}>
             <Ionicons name="chatbubble-ellipses-outline" size={12} color={theme.accent} />
             <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.accent }]}>
               {i18nText("autoI18n.yorum_yap_opsiyonel", "Yorum yap (opsiyonel)")}
@@ -540,7 +518,6 @@ export default function WatchedDateSheet({
           >
             <TextInput
               allowFontScaling={false}
-              style={[styles.commentInput, { color: theme.text.primary }]}
               placeholder={i18nText(
                 "autoI18n.bu_yapim_hakkinda_ne_dusunuyorsun",
                 "Bu yapım hakkında ne düşünüyorsun?",
@@ -549,9 +526,17 @@ export default function WatchedDateSheet({
               multiline
               value={commentText}
               onChangeText={setCommentText}
+              onContentSizeChange={({ nativeEvent }) => {
+                const next = Math.ceil(nativeEvent.contentSize.height + 18);
+                setCommentInputHeight(Math.max(42, Math.min(104, next)));
+              }}
               maxLength={COMMENT_TEXT_LIMIT}
-              textAlignVertical="top"
+              textAlignVertical="center"
               editable={!isBusy}
+              style={[
+                styles.commentInput,
+                { color: theme.text.primary, height: commentInputHeight },
+              ]}
             />
             <Text allowFontScaling={false} style={[styles.commentCounter, { color: theme.text.muted }]}>
               {Math.max(0, COMMENT_TEXT_LIMIT - commentText.length)}
@@ -618,6 +603,7 @@ export default function WatchedDateSheet({
 
 function QuickDateOption({
   icon,
+  calendarDate,
   title,
   subtitle,
   selected,
@@ -625,6 +611,11 @@ function QuickDateOption({
   onPress,
 }) {
   const { theme } = useTheme();
+  const { language } = useLanguage();
+  const calendarValue = parseLocalDate(calendarDate);
+  const calendarMonth = calendarValue
+    ? new Intl.DateTimeFormat(intlLocaleOf(language), { month: "short" }).format(calendarValue)
+    : "";
   return (
     <GlassTouchable
       accessibilityRole="button"
@@ -641,9 +632,21 @@ function QuickDateOption({
         },
       ]}
     >
-      <View style={[styles.quickIcon, { backgroundColor: alpha(theme.accent, 0.14) }]}>
-        <Ionicons name={icon} size={19} color={theme.accent} />
-      </View>
+      {calendarValue ? (
+        <View style={[styles.calendarPreview, { borderColor: alpha(theme.accent, 0.48) }]}>
+          <View style={[styles.calendarPreviewTop, { backgroundColor: theme.accent }]} />
+          <Text allowFontScaling={false} style={[styles.calendarPreviewDay, { color: theme.text.primary }]}>
+            {calendarValue.getDate()}
+          </Text>
+          <Text allowFontScaling={false} numberOfLines={1} style={[styles.calendarPreviewMonth, { color: theme.accent }]}>
+            {calendarMonth}
+          </Text>
+        </View>
+      ) : (
+        <View style={[styles.quickIcon, { backgroundColor: alpha(theme.accent, 0.14) }]}>
+          <Ionicons name={icon} size={18} color={theme.accent} />
+        </View>
+      )}
       <Text
         allowFontScaling={false}
         numberOfLines={1}
@@ -653,7 +656,7 @@ function QuickDateOption({
       </Text>
       <Text
         allowFontScaling={false}
-        numberOfLines={2}
+        numberOfLines={1}
         style={[styles.quickSubtitle, { color: theme.text.muted }]}
       >
         {subtitle}
@@ -676,8 +679,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     borderWidth: 1,
     borderBottomWidth: 0,
-    paddingHorizontal: 18,
-    paddingTop: 11,
+    paddingHorizontal: 16,
+    paddingTop: 9,
     paddingBottom: 34,
   },
   handle: {
@@ -685,11 +688,11 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     alignSelf: "center",
-    marginBottom: 16,
+    marginBottom: 10,
   },
-  header: { flexDirection: "row", alignItems: "center", gap: 11, marginBottom: 18 },
+  header: { flexDirection: "row", alignItems: "center", gap: 11, marginBottom: 12 },
   headerIcon: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  posterFrame: { width: 42, height: 60, borderRadius: 13, borderWidth: 1.5 },
+  posterFrame: { width: 48, height: 68, borderRadius: 13, borderWidth: 1.5 },
   poster: { width: "100%", height: "100%", borderRadius: 11.5 },
   posterIconBadge: { position: "absolute", right: -5, bottom: -5, width: 22, height: 22, borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   headerText: { flex: 1 },
@@ -698,36 +701,37 @@ const styles = StyleSheet.create({
   scopeDot: { width: 5, height: 5, borderRadius: 3 },
   scopeText: { fontSize: 9.5, lineHeight: 12, fontWeight: "800" },
   subtitle: { fontSize: 11.5, lineHeight: 16, marginTop: 2 },
-  customDate: { minHeight: 68, borderRadius: 17, borderWidth: 1, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 11 },
-  optionIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  optionText: { flex: 1 },
-  optionTitle: { fontSize: 13.5, fontWeight: "700" },
-  optionSubtitle: { fontSize: 10.5, lineHeight: 14, marginTop: 2 },
-  quickRow: { flexDirection: "row", gap: 10, marginTop: 10 },
-  quickOption: { flex: 1, minHeight: 104, borderRadius: 16, borderWidth: 1, padding: 11, justifyContent: "center" },
-  quickIcon: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center", marginBottom: 8 },
-  quickTitle: { fontSize: 12, fontWeight: "700" },
-  quickSubtitle: { fontSize: 9.5, lineHeight: 12.5, marginTop: 3 },
-  selectedMark: { position: "absolute", top: 8, right: 8 },
-  selectionSummary: { minHeight: 50, borderRadius: 16, borderWidth: 1, paddingHorizontal: 10, marginTop: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  selectionIcon: { width: 28, height: 28, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  quickRow: { flexDirection: "row", gap: 7, marginTop: 7 },
+  quickOption: { flex: 1, minHeight: 72, borderRadius: 14, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 6, alignItems: "center", justifyContent: "center" },
+  quickIcon: { width: 28, height: 28, borderRadius: 9, alignItems: "center", justifyContent: "center", marginBottom: 3 },
+  quickTitle: { fontSize: 10.5, lineHeight: 13, fontWeight: "800", textAlign: "center" },
+  quickSubtitle: { fontSize: 8.5, lineHeight: 11, marginTop: 1, textAlign: "center" },
+  selectedMark: { position: "absolute", top: 5, right: 5 },
+  calendarPreview: { width: 31, height: 34, borderRadius: 8, borderWidth: 1, overflow: "hidden", alignItems: "center", justifyContent: "center", marginBottom: 2 },
+  calendarPreviewTop: { position: "absolute", top: 0, left: 0, right: 0, height: 6 },
+  calendarPreviewDay: { fontSize: 13, lineHeight: 15, fontWeight: "900", marginTop: 5 },
+  calendarPreviewMonth: { fontSize: 6.5, lineHeight: 8, fontWeight: "900", textTransform: "uppercase" },
+  selectionSummary: { minHeight: 39, borderRadius: 13, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 8 },
   selectionText: { flex: 1, fontSize: 11, lineHeight: 15, fontWeight: "600" },
   // Tam genişlikteki cam kart/seçenekler basılınca kaydırma sınırında kesilmesin: üstte ve
   // yanlarda GLASS_PRESS_ROOM (dolgu + sayfanın yan/başlık boşluğuna taşan negatif dış boşluk).
   scroll: { flexGrow: 0, marginTop: -GLASS_PRESS_ROOM, marginHorizontal: -GLASS_PRESS_ROOM },
   scrollContent: { paddingTop: GLASS_PRESS_ROOM, paddingBottom: 2, paddingHorizontal: GLASS_PRESS_ROOM },
-  sectionDivider: { height: StyleSheet.hairlineWidth, marginTop: 18, marginBottom: 14 },
-  sectionPill: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, marginBottom: 9 },
+  sectionDivider: { height: StyleSheet.hairlineWidth, marginTop: 12, marginBottom: 9 },
+  sectionHeader: { minHeight: 28, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
+  sectionPill: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4, marginBottom: 6 },
   sectionTitle: { fontSize: 11.5, fontWeight: "800" },
+  ratingReset: { minHeight: 28, borderRadius: 10, borderWidth: 1, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 4 },
+  ratingResetText: { fontSize: 10.5, fontWeight: "700" },
   lockedBox: { minHeight: 44, borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 },
   lockedText: { flex: 1, fontSize: 11.5, lineHeight: 15, fontWeight: "600" },
-  ratingCard: { minHeight: 84, borderRadius: 16, borderWidth: 1.5, paddingVertical: 16, alignItems: "center", justifyContent: "center", gap: 10 },
+  ratingCard: { minHeight: 52, borderRadius: 14, borderWidth: 1.5, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   ratingValue: { fontSize: 11.5, fontWeight: "700" },
-  commentField: { position: "relative", borderRadius: 16, borderWidth: 1.5, overflow: "hidden" },
-  commentInput: { width: "100%", minHeight: 84, maxHeight: 130, paddingTop: 11, paddingHorizontal: 12, paddingBottom: 22, fontSize: 13.5, lineHeight: 19 },
-  commentCounter: { position: "absolute", right: 10, bottom: 7, fontSize: 10, fontWeight: "700" },
-  commentHint: { fontSize: 10.5, lineHeight: 14, marginTop: 6 },
-  confirmButtonWrap: { marginTop: 14, borderRadius: 17, overflow: "hidden" },
-  confirmButton: { height: 52, borderRadius: 17, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  commentField: { position: "relative", minHeight: 42, borderRadius: 14, borderWidth: 1.5, overflow: "hidden" },
+  commentInput: { width: "100%", minHeight: 42, maxHeight: 104, paddingTop: 9, paddingHorizontal: 11, paddingRight: 42, paddingBottom: 9, fontSize: 13, lineHeight: 18 },
+  commentCounter: { position: "absolute", right: 9, bottom: 6, fontSize: 9, fontWeight: "700" },
+  commentHint: { fontSize: 9.5, lineHeight: 12, marginTop: 4 },
+  confirmButtonWrap: { marginTop: 10, borderRadius: 16, overflow: "hidden" },
+  confirmButton: { height: 48, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   confirmText: { color: "#FFFFFF", fontSize: 14.5, fontWeight: "800", letterSpacing: -0.1 },
 });

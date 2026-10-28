@@ -95,12 +95,15 @@ import {
 
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../common/GlassTouchable";
+import { createCloseGate } from "../../services/premiumUpsellHost";
 const { width, height } = Dimensions.get("window");
 const BACKDROP_H = Math.round(width * (9 / 16) * 0.72);
 const POSTER_W = Math.round(width * 0.25);
-// Kapanış animasyonu ile bir sonraki sayfanın açılışı arasındaki nefes payı.
-// WatchHistorySheet'in "tekrar ekle" akışında kullanılan değerle aynı.
-const HANDOFF_MS = 220;
+// Native pencere `mounted` düştükten sonra bir sonraki işlem döngüsünde kalkar;
+// sıradaki Modal'ı hemen sunmamak için küçük bir pay (bkz. BottomSheetModal).
+const DISMISS_SETTLE_MS = 90;
+// Kapanış sinyali beklenmedik biçimde düşerse devir kilitli kalmasın.
+const CLOSE_FALLBACK_MS = 900;
 
 const formatDateSave = (value) => {
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
@@ -222,16 +225,27 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
   const sheetHeightRef = useRef(Math.round(height * 0.9));
   const [mounted, setMounted] = useState(false);
   const mountedRef = useRef(false);
+  const wasMountedRef = useRef(false);
+  const reopenDateAfterHistoryRef = useRef(false);
+  const closeGateRef = useRef(null);
+  if (!closeGateRef.current) {
+    closeGateRef.current = createCloseGate(CLOSE_FALLBACK_MS);
+  }
+  const closeGate = closeGateRef.current;
+
+  useEffect(() => () => closeGate.cancel(), [closeGate]);
 
   // Mount / unmount kapısı. Animasyonun kendisi AŞAĞIDAKİ effect'te.
   useEffect(() => {
     if (target) {
+      closeGate.cancel();
       mountedRef.current = true;
+      wasMountedRef.current = true;
       setMounted(true);
       return undefined;
     }
     if (!mountedRef.current) return undefined;
-    Animated.parallel([
+    const animation = Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 200,
@@ -247,13 +261,30 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
       // Yarıda kesilen kapanış (kullanıcı hemen başka bir postere bastı)
       // `finished:false` ile döner; orada unmount ETMEMELİYİZ, yoksa yeni
       // açılan sayfa anında kapanır.
-    ]).start(({ finished }) => {
+    ]);
+    animation.start(({ finished }) => {
       if (!finished) return;
       mountedRef.current = false;
       setMounted(false);
     });
-    return undefined;
-  }, [target, fadeAnim, slideAnim]);
+    return () => animation.stop();
+  }, [target, fadeAnim, slideAnim, closeGate]);
+
+  // iOS kapanmakta olan bir Modal'ın üstüne ikincisini sunamaz (UIKit "already
+  // presenting" der, ikinci pencere hiç çizilmez ama React onu açık sanır →
+  // ekran donmuş kalır). Sabit bir `setTimeout(220)` çıkış animasyonu (200 ms)
+  // daha `mounted`ı düşürmeden tetikleniyordu. Devir işini `mounted` gerçekten
+  // düştükten + native pencere kalktıktan (DISMISS_SETTLE_MS) sonra çalıştır.
+  useEffect(() => {
+    if (mounted) {
+      wasMountedRef.current = true;
+      return undefined;
+    }
+    if (!wasMountedRef.current) return undefined;
+    wasMountedRef.current = false;
+    const timer = setTimeout(() => closeGate.finish(), DISMISS_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [mounted, closeGate]);
 
   // Giriş animasyonu Modal GERÇEKTEN göründükten sonra başlar. Mount'tan önce
   // başlatılırsa native görünümler henüz yokken ilk kareler düşüyor ve fade
@@ -296,12 +327,12 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
   // aboneliği ve film hatırlatma dinleyicisi açık kalırdı. Gecikme kapanış
   // animasyonu içindir — erken bırakırsak kayarak kapanan sayfa boşalır.
   useEffect(() => {
-    if (target || dateSheetVisible || historyVisible || ratingVisible) {
+    if (target || mounted || dateSheetVisible || historyVisible || ratingVisible) {
       return undefined;
     }
     const timer = setTimeout(() => setShown(null), 600);
     return () => clearTimeout(timer);
-  }, [target, dateSheetVisible, historyVisible, ratingVisible]);
+  }, [target, mounted, dateSheetVisible, historyVisible, ratingVisible]);
 
   /* ── TMDB detayı ────────────────────────────────────────────────────────
      Ray öğesi yalnız afiş/ad/puan taşıyor; listeye yazılacak kayıt ise tür
@@ -448,10 +479,18 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
   /* ── Sayfa devri: önce kapan, sonra diğerini aç ─────────────────────────── */
   const closeThen = useCallback(
     (next) => {
+      if (typeof next !== "function") {
+        onClose();
+        return;
+      }
+      if (!mountedRef.current && !target) {
+        next();
+        return;
+      }
+      closeGate.begin(next);
       onClose();
-      setTimeout(next, HANDOFF_MS);
     },
-    [onClose],
+    [closeGate, onClose, target],
   );
 
   const navigateTo = useCallback(
@@ -1146,13 +1185,21 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
 
       <WatchHistorySheet
         visible={historyVisible}
-        onClose={() => setHistoryVisible(false)}
+        onClose={() => {
+          reopenDateAfterHistoryRef.current = false;
+          setHistoryVisible(false);
+        }}
+        onDismissed={() => {
+          if (!reopenDateAfterHistoryRef.current) return;
+          reopenDateAfterHistoryRef.current = false;
+          setDateSheetVisible(true);
+        }}
         title={title}
         events={isTv ? watchEvents : movieEvents}
         busy={busy}
         onAddAgain={() => {
+          reopenDateAfterHistoryRef.current = true;
           setHistoryVisible(false);
-          setTimeout(() => setDateSheetVisible(true), 300);
         }}
         onDeleteEvent={deleteWatchEvent}
       />

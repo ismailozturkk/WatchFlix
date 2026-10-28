@@ -103,7 +103,9 @@ export default function RatingSheetModal({
 
   useEffect(() => {
     if (visible) {
-      Animated.parallel([
+      slideAnim.setValue(SHEET_H);
+      backdropOpacity.setValue(0);
+      const anim = Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
           useNativeDriver: true,
@@ -116,9 +118,11 @@ export default function RatingSheetModal({
           duration: 280,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]);
+      anim.start();
+      return () => anim.stop();
     } else {
-      Animated.parallel([
+      const anim = Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: SHEET_H,
           duration: 260,
@@ -129,9 +133,11 @@ export default function RatingSheetModal({
           duration: 220,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]);
+      anim.start();
+      return () => anim.stop();
     }
-  }, [visible]);
+  }, [visible, SHEET_H, slideAnim, backdropOpacity]);
 
   // Agregat + kendi oyu dinle
   useEffect(() => {
@@ -225,7 +231,10 @@ export default function RatingSheetModal({
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]}>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.backdrop, { opacity: backdropOpacity }]}
+      >
         <ModalBlurBackdrop intensity={28} />
         <LinearGradient
           colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.82)"]}
