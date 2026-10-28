@@ -43,3 +43,19 @@ export function loadDuelScores({ dayKey, myUid, hostUid, force = false, now = Da
 
 /** Yalnız testler / çıkış için. */
 export const __resetDuelCache = () => cache.clear();
+
+// Sohbete yeni bir düello SONUCU kartı düştüğünde (SharedDuelResultMessage) aynı günün meydan okuma kartları
+// skorları yeniden okusun: meydan okuyan sohbet açıkken rakibin skoru kendi kartında da belirir.
+const listeners = new Set();
+
+/** @returns {() => void} aboneliği bırakır */
+export function subscribeDuelScores(listener) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function notifyDuelScores(dayKey) {
+  if (!dayKey) return;
+  for (const [key] of cache) if (key.startsWith(`${dayKey}|`)) cache.delete(key);
+  listeners.forEach((listener) => listener(dayKey));
+}

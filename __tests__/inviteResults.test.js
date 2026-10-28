@@ -39,7 +39,11 @@ jest.mock("../context/ThemeContext", () => ({
 jest.mock("../context/UserProfileContext", () => ({ useUserProfile: () => ({ displayName: "Ayşe Y." }) }));
 
 const mockLoadScores = jest.fn();
-jest.mock("../services/dailyDuelService", () => ({ loadDuelScores: (...args) => mockLoadScores(...args) }));
+const mockNotifyScores = jest.fn();
+jest.mock("../services/dailyDuelService", () => ({
+  loadDuelScores: (...args) => mockLoadScores(...args),
+  notifyDuelScores: (...args) => mockNotifyScores(...args),
+}));
 const mockPost = jest.fn();
 jest.mock("../hooks/useChatOutbox", () => ({ __esModule: true, default: () => mockPost }));
 
@@ -244,6 +248,9 @@ describe("SharedDuelResultMessage", () => {
     expect(has("7450")).toBe(true);
     expect(has("9999")).toBe(false);
     expect(has(DUEL_COPY.tr.lose("750"))).toBe(true);
+    expect(has(DUEL_COPY.tr.statusDone)).toBe(true);
+    // Aynı günün meydan okuma kartları tazelensin diye bir kez duyurulur.
+    expect(mockNotifyScores).toHaveBeenCalledWith(TODAY);
   });
 
   test("tablo okunamazsa kart skorları kalır; grupta üçüncü kişi kazananı görür", async () => {

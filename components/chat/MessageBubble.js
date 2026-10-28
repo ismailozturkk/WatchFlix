@@ -326,7 +326,8 @@ const MessageBubble = memo(
               isOutgoing={isMe}
               senderUid={item.senderId}
               chatTarget={chatTarget}
-              onAccepted={onAcceptInvite ? () => onAcceptInvite(share, item.senderId) : undefined}
+              accepts={item.accepts}
+              onAccepted={onAcceptInvite ? () => onAcceptInvite(share, item.senderId, item.id) : undefined}
             />
           ) : share?.type === "duelResult" ? (
             <SharedDuelResultMessage

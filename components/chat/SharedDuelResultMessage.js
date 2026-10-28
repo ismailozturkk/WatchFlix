@@ -11,23 +11,19 @@
 // (services/dailyDuelService) yeniden okunur ve doğrulanan değer karttakini ezer. Okunamazsa kart değeri kalır.
 // Metinler İZLEYİCİNİN diliyle (utils/dailyDuelCopy).
 
-import React, { memo, useCallback, useMemo, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
-import { loadDuelScores } from "../../services/dailyDuelService";
+import { loadDuelScores, notifyDuelScores } from "../../services/dailyDuelService";
 import { intlLocaleOf } from "../../utils/appLanguages";
 import { duelResultView, formatDuelScore } from "../../utils/dailyDuel";
 import { getDuelCopy } from "../../utils/dailyDuelCopy";
+import { DUEL_AMBER, DuelStatusChip, DuelVerdict, DuelVersus } from "./DuelVersus";
 import { sharePalette } from "./shareKit";
-
-// Düello kartıyla aynı kimlik rengi (SharedChallengeMessage).
-const AMBER = "#F59E0B";
-const WIN = "#22C55E";
-const LOSE = "#EF4444";
 
 function dayLabel(dayKey, locale) {
   const [y, m, d] = String(dayKey).split("-").map(Number);
@@ -37,6 +33,8 @@ function dayLabel(dayKey, locale) {
     return dayKey;
   }
 }
+
+const announced = new Set(); // "gün|kabul eden" — notifyDuelScores bir kez
 
 /** Tablodan iki tarafın doğrulanmış skoru; ekrana her odaklanışta tazelenir. */
 function useVerifiedScores({ dayKey, guestUid, hostUid }) {
@@ -64,7 +62,16 @@ function SharedDuelResultMessage({ share, isOutgoing = false, senderUid, senderN
   const { language } = useLanguage();
   const { user } = useAuth() || {};
   const copy = getDuelCopy(language);
-  const palette = useMemo(() => sharePalette({ theme, isOutgoing, accent: AMBER }), [theme, isOutgoing]);
+  const palette = useMemo(() => sharePalette({ theme, isOutgoing, accent: DUEL_AMBER }), [theme, isOutgoing]);
+
+  // Aynı günün meydan okuma kartı (özellikle meydan okuyanın kendi kartı) rakibin skorunu yeniden okusun.
+  // Liste kaydırılırken kart tekrar tekrar bağlanır: her sonuç oturumda bir kez duyurulur.
+  useEffect(() => {
+    const key = `${share.dayKey}|${senderUid}`;
+    if (announced.has(key)) return;
+    announced.add(key);
+    notifyDuelScores(share.dayKey);
+  }, [share.dayKey, senderUid]);
 
   const verified = useVerifiedScores({ dayKey: share.dayKey, guestUid: senderUid, hostUid: share.hostUid });
   const guestScore = Number.isFinite(verified.guest) ? verified.guest : share.guestScore;
@@ -97,8 +104,6 @@ function SharedDuelResultMessage({ share, isOutgoing = false, senderUid, senderN
           : view.verdict === "decided"
             ? copy.leads(view.winner === "guest" ? guestName : hostName, diff)
             : null;
-  const verdictColor = view.verdict === "win" ? WIN : view.verdict === "lose" ? LOSE : AMBER;
-  const strong = (side) => view.winner === side;
 
   return (
     <View style={styles.wrap}>
@@ -116,55 +121,28 @@ function SharedDuelResultMessage({ share, isOutgoing = false, senderUid, senderN
         </View>
       </View>
 
+      <DuelStatusChip tone="done" label={copy.statusDone} palette={palette} isOutgoing={isOutgoing} />
+
       <Text style={[styles.date, { color: palette.muted }]} numberOfLines={1}>
         {copy.daily(dayLabel(share.dayKey, intlLocaleOf(language)))}
       </Text>
 
-      <View
-        style={[styles.versus, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}
-        accessible
+      <DuelVersus
+        left={{ label: nameOf(view.left.side), score: view.left.score }}
+        right={{ label: nameOf(view.right.side), score: view.right.score }}
+        winner={view.winner ? (view.winner === view.left.side ? "left" : "right") : null}
+        palette={palette}
+        isOutgoing={isOutgoing}
         accessibilityLabel={`${nameOf(view.left.side)} ${view.left.score ?? "?"}, ${nameOf(view.right.side)} ${view.right.score ?? "?"}`}
-      >
-        <Side label={nameOf(view.left.side)} score={view.left.score} palette={palette} strong={strong(view.left.side)} />
-        <Text allowFontScaling={false} style={[styles.vs, { color: palette.muted }]}>
-          VS
-        </Text>
-        <Side label={nameOf(view.right.side)} score={view.right.score} palette={palette} strong={strong(view.right.side)} />
-      </View>
+      />
 
       <Text allowFontScaling={false} style={[styles.correct, { color: palette.secondary }]} numberOfLines={1}>
         {`${guestName}: ${copy.correct(share.correct, share.total)}`}
       </Text>
 
       {verdictText ? (
-        <View style={[styles.verdict, { borderColor: isOutgoing ? palette.surfaceBorder : verdictColor }]}>
-          <Ionicons
-            name={view.verdict === "win" || view.verdict === "decided" ? "trophy" : view.verdict === "lose" ? "trending-down" : "remove-circle"}
-            size={15}
-            color={isOutgoing ? palette.primary : verdictColor}
-          />
-          <Text allowFontScaling={false} style={[styles.verdictText, { color: palette.primary }]} numberOfLines={2}>
-            {verdictText}
-          </Text>
-        </View>
+        <DuelVerdict verdict={view.verdict} text={verdictText} palette={palette} isOutgoing={isOutgoing} />
       ) : null}
-    </View>
-  );
-}
-
-function Side({ label, score, palette, strong }) {
-  return (
-    <View style={styles.side}>
-      <Text allowFontScaling={false} style={[styles.sideLabel, { color: palette.muted }]} numberOfLines={1}>
-        {label}
-      </Text>
-      <Text
-        allowFontScaling={false}
-        style={[styles.sideScore, { color: palette.primary }, strong ? styles.sideScoreStrong : null]}
-        numberOfLines={1}
-      >
-        {score === null ? "?" : formatDuelScore(score)}
-      </Text>
     </View>
   );
 }
@@ -180,36 +158,7 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 9.5, fontWeight: "800", letterSpacing: 0.8 },
   title: { fontSize: 15, fontWeight: "900", lineHeight: 19, marginTop: 1 },
 
-  date: { fontSize: 11.5, fontWeight: "700", marginTop: 8 },
-
-  versus: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  side: { flex: 1, alignItems: "center", minWidth: 0 },
-  sideLabel: { fontSize: 10.5, fontWeight: "800", letterSpacing: 0.4 },
-  sideScore: { fontSize: 26, fontWeight: "800", lineHeight: 32 },
-  sideScoreStrong: { fontWeight: "900", fontSize: 30, lineHeight: 36 },
-  vs: { fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+  date: { fontSize: 11.5, fontWeight: "700", marginTop: 6 },
 
   correct: { fontSize: 11.5, fontWeight: "700", marginTop: 6, textAlign: "center" },
-
-  verdict: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginTop: 10,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  verdictText: { fontSize: 12.5, fontWeight: "800", flexShrink: 1, textAlign: "center" },
 });

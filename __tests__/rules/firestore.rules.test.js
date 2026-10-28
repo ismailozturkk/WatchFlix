@@ -488,6 +488,36 @@ describe("DM mesajlari", () => {
     );
   });
 
+  test("duello karti: alici yalniz KENDI kabul anahtarini yazar", async () => {
+    await seed((db) =>
+      setDoc(
+        doc(db, "chats", CHAT, "messages", "c1"),
+        mesaj(ALICE, { kind: "challengeShare", share: { type: "challenge", dayKey: "2026-10-27", score: 7450 } }),
+      ),
+    );
+    await assertSucceeds(
+      updateDoc(doc(bob, "chats", CHAT, "messages", "c1"), { [`accepts.${BOB}`]: serverTimestamp() }),
+    );
+    // Başkası adına kabul, uydurma zaman, kart içeriği ve gönderenin kendi kabulü reddedilir.
+    await assertFails(
+      updateDoc(doc(bob, "chats", CHAT, "messages", "c1"), { [`accepts.${ALICE}`]: serverTimestamp() }),
+    );
+    await assertFails(
+      updateDoc(doc(bob, "chats", CHAT, "messages", "c1"), { [`accepts.${BOB}`]: "dun" }),
+    );
+    await assertFails(
+      updateDoc(doc(bob, "chats", CHAT, "messages", "c1"), { "share.score": 99999 }),
+    );
+    await assertFails(
+      updateDoc(doc(alice, "chats", CHAT, "messages", "c1"), { [`accepts.${ALICE}`]: serverTimestamp() }),
+    );
+    // Düz mesaja kabul anahtarı yazılamaz.
+    await seed((db) => setDoc(doc(db, "chats", CHAT, "messages", "m1"), mesaj(ALICE)));
+    await assertFails(
+      updateDoc(doc(bob, "chats", CHAT, "messages", "m1"), { [`accepts.${BOB}`]: serverTimestamp() }),
+    );
+  });
+
   test("silme UYE bazinda kalir (hesap silme purge'u icin) — bilincli", async () => {
     await seed((db) => setDoc(doc(db, "chats", CHAT, "messages", "m1"), mesaj(ALICE)));
     // Karşı tarafın mesajını silebilmek BİLEREK açık: purge sohbeti
@@ -1222,6 +1252,16 @@ describe("grup okunmamis sayaci", () => {
     expect(await readAs((db) => inboxRef(db, BOB))).toEqual({ unread: 2 });
     // Grup belgesinin eski haritasına dokunulmaz.
     expect((await readGroup()).unread).toEqual({ [BOB]: 2 });
+  });
+
+  test("grupta duello karti: uye yalniz KENDI kabul anahtarini yazar", async () => {
+    const cardRef = (db) => doc(db, "groups", GROUP, "messages", "c1");
+    await seed((db) =>
+      setDoc(cardRef(db), { senderId: ALICE, kind: "challengeShare", share: { type: "challenge" } }),
+    );
+    await assertSucceeds(updateDoc(cardRef(bob), { [`accepts.${BOB}`]: serverTimestamp() }));
+    await assertFails(updateDoc(cardRef(bob), { [`accepts.${ALICE}`]: serverTimestamp() }));
+    await assertFails(updateDoc(cardRef(alice), { [`accepts.${ALICE}`]: serverTimestamp() }));
   });
 
   test("sahibi kendi sayacini okur ve sifirlar; baskasi okuyamaz", async () => {

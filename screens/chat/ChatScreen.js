@@ -820,16 +820,26 @@ export default function ChatScreen({ route, navigation }) {
   // Davet karttan kabul edildi: aynı davetin bildirim kaydı da "kabul edildi" olsun, Profil'deki önemli
   // davetler çubuğu aynı şeyi yeniden sormasın. Hata kabulü engellemez (çubuk en kötü daveti gösterir).
   const acceptInviteFromCard = useCallback(
-    (share, senderUid) => {
+    (share, senderUid, messageId) => {
+      if (!senderUid || senderUid === currentUser.uid) return;
+      // Düello kartı: kabul mesaja da yazılır, iki tarafın kartı "kabul edildi"ye döner
+      // (yalnız kendi anahtarım; firestore.rules → challengeAccept). Hata kabulü engellemez.
+      if (share?.type === "challenge" && messageId) {
+        updateDoc(doc(messagesRef, messageId), {
+          [`accepts.${currentUser.uid}`]: serverTimestamp(),
+        }).catch((err) => {
+          if (__DEV__) console.warn("challengeAccept:", err?.message);
+        });
+      }
       const invitation = invitationFieldsFromShare(share);
-      if (!invitation || !senderUid || senderUid === currentUser.uid) return;
+      if (!invitation) return;
       acceptMatchingInvitations(currentUser.uid, {
         ...invitation,
         fromUid: senderUid,
         groupId: isGroup ? groupId : null,
       }).catch(() => {});
     },
-    [currentUser.uid, isGroup, groupId],
+    [currentUser.uid, isGroup, groupId, messagesRef],
   );
 
   const currentUserIsCreator = isGroupCreator(groupData, currentUser.uid);

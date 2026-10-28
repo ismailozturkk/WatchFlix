@@ -8,6 +8,20 @@ service cloud.firestore {
     function onlyUpdating(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
+    // Günlük düello kartını (kind "challengeShare") karşı taraf kabul edince
+    // mesaja yalnız KENDİ anahtarını yazar: accepts.{uid} = zaman. Gönderen
+    // kendi meydan okumasını "kabul edemez"; kart içeriği değiştirilemez.
+    // Üyelik denetimi çağıran eşleşmede (sohbet/grup) zaten yapılıyor.
+    function challengeAccept() {
+      return resource.data.get('kind', '') == 'challengeShare'
+          && resource.data.get('senderId', '') != request.auth.uid
+          && onlyUpdating(['accepts'])
+          && request.resource.data.accepts is map
+          && request.resource.data.accepts
+               .diff(resource.data.get('accepts', {}))
+               .affectedKeys().hasOnly([request.auth.uid])
+          && request.resource.data.accepts[request.auth.uid] == request.time;
+    }
     function notBlocked(uid) {
       return !exists(/databases/$(database)/documents/Users/$(uid)/blocked/$(request.auth.uid));
     }
@@ -981,6 +995,7 @@ service cloud.firestore {
                           && request.resource.data.poll.get('votes', {})
                                .diff(resource.data.poll.get('votes', {}))
                                .affectedKeys().hasOnly([request.auth.uid]))
+                      || challengeAccept()
                     );
       // Silme GÖNDERENE değil ÜYEYE bağlı: hesap silme purge'u sohbeti
       // kapatırken karşı tarafın mesajlarını da temizlemek zorunda
@@ -1138,6 +1153,7 @@ service cloud.firestore {
                           && request.resource.data.poll.diff(resource.data.poll).affectedKeys()
                                .hasOnly(['votes'])
                         )
+                        || challengeAccept()
                       );
         allow delete: if isSignedIn()
                       && (

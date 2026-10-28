@@ -65,7 +65,8 @@ jest.mock("../services/sceneGameService", () => ({ fetchDailyFriendRows: (...arg
 const fs = require("fs");
 const path = require("path");
 const {
-  compareDayKeys, duelOutcome, duelPayloadFromResult, formatDuelScore, scoresFromRows,
+  challengeAcceptors, challengeHostView, compareDayKeys, duelOutcome, duelPayloadFromResult, formatDuelScore,
+  scoresFromRows,
 } = require("../utils/dailyDuel");
 const { DUEL_COPY, getDuelCopy } = require("../utils/dailyDuelCopy");
 const {
@@ -366,6 +367,78 @@ describe("sohbet kartı", () => {
       act(() => renderer.unmount());
       renderer = null;
     }
+  });
+});
+
+describe("kabul durumu", () => {
+  test("challengeAcceptors: yalnız geçerli uid ve dolu değer; bozuk kayıt boş", () => {
+    expect(challengeAcceptors({ bob: { seconds: 1 }, "x/y": 1, eve: null })).toEqual(["bob"]);
+    expect(challengeAcceptors(null)).toEqual([]);
+    expect(challengeAcceptors(["bob"])).toEqual([]);
+  });
+
+  test("challengeHostView: bekleniyor → kabul edildi → bitti (gönderenin gözünden); süresi dolan", () => {
+    const base = { dayKey: TODAY, today: TODAY, hostScore: 7000 };
+    expect(challengeHostView(base).phase).toBe("pending");
+    expect(challengeHostView({ ...base, today: "2026-10-22" }).phase).toBe("expired");
+    expect(challengeHostView({ ...base, acceptedCount: 1 }).phase).toBe("accepted");
+    expect(challengeHostView({ ...base, rivalScore: 8000 })).toEqual({ phase: "played", verdict: "lose", diff: 1000 });
+    expect(challengeHostView({ ...base, rivalScore: 6000, acceptedCount: 1 })).toEqual({ phase: "played", verdict: "win", diff: 1000 });
+    expect(challengeHostView({ ...base, rivalScore: 7000 }).verdict).toBe("tie");
+  });
+});
+
+describe("sohbet kartı: kabul edildi", () => {
+  const card = () => buildChallengeShare({ dayKey: TODAY, score: 7450, correct: 8, total: 10, host: "Ali" });
+  const texts = () => renderer.root.findAllByType("Text").map((n) => [].concat(n.props.children).join(""));
+  const has = (value) => texts().includes(value);
+  const button = (label) => renderer.root.findAllByType("GlassPressable").find((n) => n.props.accessibilityLabel === label);
+  const mount = async (props) => {
+    await act(async () => {
+      renderer = create(<SharedChallengeMessage share={card()} {...props} />);
+    });
+  };
+
+  test("alıcı kabul ettiyse ama oynamadıysa: 'Kabul ettin' hapı, düğme 'Oyuna başla'", async () => {
+    mockFetchRows.mockResolvedValue([{ uid: "host", bestScore: 7450 }]);
+    await mount({ senderUid: "host", accepts: { me: { seconds: 1 } } });
+    expect(has(DUEL_COPY.tr.statusYouAccepted)).toBe(true);
+    expect(button(DUEL_COPY.tr.play)).toBeDefined();
+    expect(button(DUEL_COPY.tr.accept)).toBeUndefined();
+  });
+
+  test("gönderen, kabul yokken: 'Yanıt bekleniyor' ve kendi skoru", async () => {
+    mockFetchRows.mockResolvedValue([{ uid: "me", bestScore: 7450 }]);
+    mockUser = { uid: "me" };
+    await mount({ isOutgoing: true, senderUid: "me", chatTarget: { friendUid: "bob", friendName: "Bob" } });
+    expect(mockFetchRows).toHaveBeenCalledWith(TODAY, ["bob", "me"]);
+    expect(has(DUEL_COPY.tr.statusWaiting)).toBe(true);
+    expect(has("7450")).toBe(true);
+  });
+
+  test("gönderen, rakip kabul etti ve oynuyor: 'Kabul edildi', rakip tarafı '?'", async () => {
+    mockFetchRows.mockResolvedValue([{ uid: "me", bestScore: 7450 }]);
+    await mount({ isOutgoing: true, senderUid: "me", chatTarget: { friendUid: "bob", friendName: "Bob" }, accepts: { bob: { seconds: 1 } } });
+    expect(has(DUEL_COPY.tr.statusAccepted)).toBe(true);
+    expect(has(DUEL_COPY.tr.rivalPlaying("Bob"))).toBe(true);
+    expect(has("?")).toBe(true);
+    expect(has("VS")).toBe(true);
+  });
+
+  test("gönderen, düello bitti: rakibin (meydan okunanın) skoru ve sonuç kendi gözünden", async () => {
+    mockFetchRows.mockResolvedValue([{ uid: "bob", bestScore: 8000 }, { uid: "me", bestScore: 7450 }]);
+    await mount({ isOutgoing: true, senderUid: "me", chatTarget: { friendUid: "bob", friendName: "Bob" }, accepts: { bob: { seconds: 1 } } });
+    expect(has(DUEL_COPY.tr.statusDone)).toBe(true);
+    expect(has(DUEL_COPY.tr.resultTitleOut("Bob"))).toBe(true);
+    expect(has("8000")).toBe(true);
+    expect(has("7450")).toBe(true);
+    expect(has(DUEL_COPY.tr.lose("550"))).toBe(true);
+  });
+
+  test("grupta gönderen: sorgu yok, kabul sayısı", async () => {
+    await mount({ isOutgoing: true, senderUid: "me", chatTarget: { groupId: "g1" }, accepts: { bob: 1, eve: 2 } });
+    expect(mockFetchRows).not.toHaveBeenCalled();
+    expect(has(DUEL_COPY.tr.acceptedBy(2))).toBe(true);
   });
 });
 

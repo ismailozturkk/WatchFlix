@@ -92,3 +92,39 @@ export function duelResultView({ viewerUid, guestUid, hostUid, guestScore, hostS
   const verdict = winner === null ? "tie" : role === "other" ? "decided" : winner === role ? "win" : "lose";
   return { role, left, right, verdict, winner, diff: Math.abs(guest.score - host.score) };
 }
+
+// ─── Kabul durumu ────────────────────────────────────────────────────────────
+
+const ACCEPT_UID = /^[A-Za-z0-9_-]{1,128}$/;
+
+/**
+ * Düello mesajındaki kabul kaydı → kabul eden uid'ler. Kabul eden, mesaja yalnız kendi anahtarını yazar
+ * (`accepts.{uid}` = zaman; firestore.rules → challengeAccept). Bozuk/eksik kayıt boş liste.
+ */
+export function challengeAcceptors(accepts) {
+  if (!accepts || typeof accepts !== "object" || Array.isArray(accepts)) return [];
+  return Object.keys(accepts).filter((uid) => ACCEPT_UID.test(uid) && accepts[uid] != null);
+}
+
+/**
+ * Meydan okuyanın KENDİ kartındaki durum (giden balon). 1-1 sohbette karşı tarafın o günkü skoru
+ * tablodan okunur: skor varsa düello bitmiştir — kabul kaydı olmasa da (eski kart / yazılamamış kabul)
+ * iki skor yan yana gösterilir, set herkeste aynı.
+ *
+ * @param {object} p
+ * @param {string} p.dayKey
+ * @param {string} p.today
+ * @param {number} p.acceptedCount   kabul eden sayısı (challengeAcceptors)
+ * @param {number|null} p.rivalScore  karşı tarafın o günkü skoru (1-1; bilinmiyorsa null)
+ * @param {number|null} p.hostScore   kendi skorum
+ * @returns {{ phase: "pending"|"accepted"|"played"|"expired", verdict: "win"|"lose"|"tie"|null, diff: number }}
+ */
+export function challengeHostView({ dayKey, today, acceptedCount = 0, rivalScore = null, hostScore = null }) {
+  if (Number.isFinite(rivalScore)) {
+    if (!Number.isFinite(hostScore)) return { phase: "played", verdict: null, diff: 0 };
+    const diff = Math.abs(hostScore - rivalScore);
+    return { phase: "played", verdict: hostScore > rivalScore ? "win" : hostScore < rivalScore ? "lose" : "tie", diff };
+  }
+  if (acceptedCount > 0) return { phase: "accepted", verdict: null, diff: 0 };
+  return { phase: dayKey === today ? "pending" : "expired", verdict: null, diff: 0 };
+}

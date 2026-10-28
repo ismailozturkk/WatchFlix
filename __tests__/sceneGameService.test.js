@@ -417,3 +417,24 @@ describe("randomSource ile sabit kaynak aynı arayüzü paylaşır", () => {
     expect(stable.float("a")).toBe(createStableSource("x").float("a"));
   });
 });
+
+describe("fetchDailyFriendRows (günlük tablo, arkadaş satırları)", () => {
+  test("sorgu YOK: her uid kendi belgesinden okunur (entries.uid koleksiyon dizini yok); olmayan satır atlanır", async () => {
+    const { service } = load();
+    const fs = require("firebase/firestore");
+    fs.getDocs.mockReset();
+    fs.doc.mockImplementation((_db, ...segments) => segments.join("/"));
+    fs.getDoc.mockImplementation(async (ref) => {
+      const uid = ref.split("/").pop();
+      return uid === "ali"
+        ? { id: "ali", exists: () => true, data: () => ({ uid: "ali", score: 7450, correctCount: 8 }) }
+        : { id: uid, exists: () => false, data: () => undefined };
+    });
+    const rows = await service.fetchDailyFriendRows("2026-10-27", ["me", "ali", "me", null]);
+    expect(fs.getDocs).not.toHaveBeenCalled();
+    expect(fs.where).not.toHaveBeenCalled();
+    expect(fs.getDoc).toHaveBeenCalledTimes(2); // tekilleştirilir
+    expect(fs.doc).toHaveBeenCalledWith({}, "GameLeaderboards", expect.stringContaining("2026-10-27"), "entries", "ali");
+    expect(rows).toEqual([expect.objectContaining({ uid: "ali", bestScore: 7450, totalCorrect: 8 })]);
+  });
+});

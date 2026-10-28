@@ -15,7 +15,6 @@ import {
   orderBy,
   query,
   runTransaction,
-  where,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { computeLevel, validateSessionResult } from "../utils/gameScoring";
@@ -1222,27 +1221,29 @@ export async function fetchDailyLeaderboard(dayKey = dayKeyOf(), limitCount = 50
   }
 }
 
-const FRIEND_QUERY_CHUNK = 10; // Firestore "in" sorgusu en fazla 10 değer alır.
-const FRIEND_QUERY_MAX = 60; // Okuma maliyetini sınırla (6 sorgu).
+const FRIEND_QUERY_MAX = 60; // Okuma maliyetini sınırla.
 
 /**
  * Yalnızca verilen kullanıcıların (arkadaşlar + ben) günlük sonuçları. Genel
  * ilk-50 listesini süzmek arkadaşı sıralamanın dışında kalan oyuncuyu gizlerdi.
+ *
+ * Satırlar belge kimliğiyle (entries/{uid}) DOĞRUDAN okunur, sorgu yok:
+ * `where("uid", "in", …)` koleksiyon kapsamında dizin ister, ama
+ * firestore.indexes.json'daki entries.uid geçersiz kılması yalnız
+ * COLLECTION_GROUP dizini tanımlıyor (varsayılan tek alan dizinlerinin YERİNE
+ * geçer). Sorgu her seferinde FAILED_PRECONDITION ile düşüyor, düello kartı
+ * "oynadı"yı hiç göremiyor ve sonuç kartında rakip skoru "?" kalıyordu.
  */
 export async function fetchDailyFriendRows(dayKey = dayKeyOf(), uids = []) {
   const unique = [...new Set((uids || []).filter(Boolean))].slice(0, FRIEND_QUERY_MAX);
   if (unique.length === 0) return [];
   try {
-    const col = collection(db, "GameLeaderboards", dailyBoardId(dayKey), "entries");
-    const chunks = [];
-    for (let i = 0; i < unique.length; i += FRIEND_QUERY_CHUNK) {
-      chunks.push(unique.slice(i, i + FRIEND_QUERY_CHUNK));
-    }
-    const snaps = await Promise.all(
-      chunks.map((chunk) => getDocs(query(col, where("uid", "in", chunk)))),
-    );
+    const boardId = dailyBoardId(dayKey);
+    const snaps = await Promise.all(unique.map((uid) => getDoc(leaderboardEntryRef(boardId, uid))));
     const rows = [];
-    snaps.forEach((snap) => snap.forEach((entry) => rows.push(dailyEntryToRow(entry.id, entry.data()))));
+    snaps.forEach((entry) => {
+      if (entry.exists()) rows.push(dailyEntryToRow(entry.id, entry.data()));
+    });
     return rows;
   } catch (e) {
     if (__DEV__) console.warn("fetchDailyFriendRows error:", e?.message);
