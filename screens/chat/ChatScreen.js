@@ -3869,7 +3869,10 @@ export default function ChatScreen({ route, navigation }) {
           onDismissed={handleListSheetDismissed}
           onOpenItem={openListSheetItem}
           onSave={
-            listSheet?.message?.senderId !== currentUser.uid ? saveFromListSheet : undefined
+            listSheet?.message?.senderId !== currentUser.uid ||
+            listSheet?.share?.source === "cineswipe"
+              ? saveFromListSheet
+              : undefined
           }
         />
 

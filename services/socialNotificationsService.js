@@ -41,6 +41,9 @@ export async function createSocialNotification({
   groupName,
   inviteCode,
   dayKey,
+  roomId,
+  matchCount,
+  chatPosted,
 }) {
   if (!toUid || !fromUid || !type) return;
   if (toUid === fromUid) return; // kendine bildirim yok
@@ -61,6 +64,11 @@ export async function createSocialNotification({
     ...(groupName ? { groupName: String(groupName).slice(0, 80) } : {}),
     ...(type === "cineswipe_invite" && /^\d{6}$/.test(String(inviteCode || "")) ? { inviteCode } : {}),
     ...(type === "game_challenge" && /^\d{4}-\d{2}-\d{2}$/.test(String(dayKey || "")) ? { dayKey } : {}),
+    // Sırayla CineSwipe odasının sonucu: dokununca oda (ya da cihazdaki geçmiş) açılır.
+    ...(type === "cineswipe_result" && typeof roomId === "string" && /^[\w-]{1,80}$/.test(roomId) ? { roomId } : {}),
+    ...(type === "cineswipe_result" && Number.isInteger(matchCount) && matchCount >= 0 ? { matchCount } : {}),
+    // Eşleşmeler sohbete de yazıldıysa sunucu ikinci push atmaz (sohbet mesajı zaten bildirir).
+    ...(type === "cineswipe_result" && chatPosted === true ? { chatPosted: true } : {}),
     read: false,
     createdAt: serverTimestamp(),
   });

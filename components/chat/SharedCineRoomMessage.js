@@ -10,6 +10,7 @@
 // kendi hata mesajıyla bildirir, burada ayrıca denetlenmez.
 //
 // Gönderen kendi davetinde düğme görmez (zaten odada).
+// Sırayla oda (`share.async`): kart "24 saat içinde katıl" çipini taşır.
 
 import React, { memo, useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
@@ -60,6 +61,15 @@ function SharedCineRoomMessage({ share, isOutgoing = false, onOpen }) {
       <Text style={[styles.invite, { color: palette.secondary }]} numberOfLines={2}>
         {invitation}
       </Text>
+
+      {share.async ? (
+        <View style={[styles.asyncChip, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
+          <Ionicons name="time-outline" size={13} color={palette.tileInk} />
+          <Text allowFontScaling={false} style={[styles.asyncText, { color: palette.secondary }]} numberOfLines={1}>
+            {i18nText("autoI18n.paylas_cine_sirayla", "Sırayla · 24 saat içinde katıl")}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Oda kodu: büyük, aralıklı, kutu içinde */}
       <View style={[styles.codeBox, { backgroundColor: palette.surface, borderColor: palette.surfaceBorder }]}>
@@ -116,6 +126,19 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: "900", lineHeight: 20, marginTop: 1 },
 
   invite: { fontSize: 12.5, fontWeight: "600", lineHeight: 17, marginTop: 10 },
+
+  asyncChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 5,
+    marginTop: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  asyncText: { fontSize: 11, fontWeight: "800", flexShrink: 1 },
 
   codeBox: {
     alignItems: "center",

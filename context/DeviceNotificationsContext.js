@@ -31,6 +31,7 @@ import {
 } from "./AppSettingsContext";
 import { useNotifications } from "./NotificationsContext";
 import { notificationInboxCopy } from "../utils/notificationInboxCopy";
+import { cineResultDestination } from "../utils/notificationInbox";
 import { useFriends } from "./FriendsContext";
 import { useUnreadMessages } from "./UnreadMessagesContext";
 import { useProfileReminders } from "./ProfileRemindersContext";
@@ -92,6 +93,7 @@ const SOCIAL_SETTING_KEY = {
   message: "messagesEnabled",
   cineswipe_invite: "messagesEnabled",
   game_challenge: "messagesEnabled",
+  cineswipe_result: "messagesEnabled",
 };
 
 // WhatsApp/Instagram tarzı: BAŞLIK = kişi/grup adı, GÖVDE = aksiyon (emoji) / mesaj.
@@ -140,6 +142,11 @@ function buildSocialContent(item, t, language) {
       return { title: name, body: `🎬 ${notificationInboxCopy(language).cineInvite}` };
     case "game_challenge":
       return { title: name, body: `⚔️ ${notificationInboxCopy(language).duelInvite}` };
+    case "cineswipe_result": {
+      const copy = notificationInboxCopy(language);
+      const detail = Number.isInteger(item.matchCount) ? ` · ${copy.cineResultDetail(item.matchCount)}` : "";
+      return { title: name, body: `🎬 ${copy.cineResult}${detail}` };
+    }
     default:
       return { title: t.notifications, body: name };
   }
@@ -663,6 +670,9 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
             }
           } else if (data.type === "cineswipe_invite" || data.type === "game_challenge") {
             nav.navigate("ProfileScreen");
+          } else if (data.type === "cineswipe_result") {
+            const target = cineResultDestination({ roomId: data.roomId });
+            nav.navigate(target.name, target.params);
           } else if (data.type === "friend_request") {
             nav.navigate("FriendRequestsScreen");
           } else if (

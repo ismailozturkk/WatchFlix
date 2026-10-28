@@ -8,10 +8,13 @@
 //   • Geçmiş turlar formun altında: en yeni beş tur (partner, tarih, ortak eşleşme sayısı), fazlası
 //     "Tümünü göster" ile açılır. Bir tura basınca o turun sonuç sayfası açılır. Kayıtlar yalnız bu
 //     cihazda (services/cineswipe/cineResultsStore.readCineHistory).
+//   • Süren "sırayla" odalar formun hemen altında (sıra sende / arkadaşında / sonuçlar hazır);
+//     satıra basınca oda kaldığı yerden açılır.
 import React, { useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import AppIcon from "../AppIcon";
 import CineEmptyState from "./CineEmptyState";
+import { CineAsyncRoomList } from "./CineAsyncRoom";
 import PressableScale from "./PressableScale";
 import { alpha } from "../../theme/colors";
 import { sanitizeRoomCode } from "../../services/cineswipe/deckModel";
@@ -49,6 +52,8 @@ export default function CineDuoLobby({
   myUid,
   language,
   onOpenResult,
+  asyncRooms = [],
+  onOpenAsyncRoom,
 }) {
   const [focused, setFocused] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -194,6 +199,8 @@ export default function CineDuoLobby({
           </View>
         </View>
       ) : null}
+
+      <CineAsyncRoomList rooms={asyncRooms} onOpen={onOpenAsyncRoom} copy={copy} colors={colors} />
 
       {history.length ? (
         <View style={styles.history}>

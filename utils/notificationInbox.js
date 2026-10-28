@@ -79,6 +79,7 @@ const TYPES = {
   message: ["mail-outline", "notifBodyMessage"],
   cineswipe_invite: ["film-outline", null],
   game_challenge: ["flash-outline", null],
+  cineswipe_result: ["trophy-outline", null],
   // Yerel kayıt: vadesi gelen not hatırlatması (utils/noteReminders.js).
   note_reminder: ["alarm-outline", null],
 };
@@ -95,6 +96,7 @@ const TONES = {
   mention: "orange",
   cineswipe_invite: "red",
   game_challenge: "orange",
+  cineswipe_result: "red",
   note_reminder: "orange",
 };
 
@@ -124,10 +126,20 @@ export function notificationContent(item, t, copy) {
     title: item.groupName || item.fromName || item.title || t.someone || copy.title,
     action: item.type === "cineswipe_invite" ? copy.cineInvite
       : item.type === "game_challenge" ? copy.duelInvite
-        : key ? t[key] || copy.title : item.body || copy.title,
-    detail: item.text ? `${item.groupId && item.fromName ? `${item.fromName}: ` : ""}${item.text}` : "",
+        : item.type === "cineswipe_result" ? copy.cineResult
+          : key ? t[key] || copy.title : item.body || copy.title,
+    detail: item.type === "cineswipe_result"
+      ? Number.isInteger(item.matchCount) ? copy.cineResultDetail(item.matchCount) : ""
+      : item.text ? `${item.groupId && item.fromName ? `${item.fromName}: ` : ""}${item.text}` : "",
     responseLabel,
   };
+}
+
+/** Sırayla CineSwipe sonucu: oda sunucuda silinmiş olsa da ekran cihazdaki geçmişten açar. */
+export function cineResultDestination(item) {
+  return typeof item?.roomId === "string" && item.roomId
+    ? { name: "CineSwipeScreen", params: { initialMode: "duo", resumeRoomId: item.roomId } }
+    : { name: "CineSwipeScreen", params: { initialMode: "duo" } };
 }
 
 export function notificationDestination(item) {
@@ -137,6 +149,7 @@ export function notificationDestination(item) {
   if (item.type === "cineswipe_invite" || item.type === "game_challenge") {
     return item.response === "accepted" ? invitationDestination(item) : null;
   }
+  if (item.type === "cineswipe_result") return cineResultDestination(item);
   if (item.type === "friend_request") return { name: "FriendRequestsScreen" };
   if (item.type === "friend_accepted" && item.fromUid) return {
     name: "FriendProfileScreen", params: { friendUid: item.fromUid, friendName: item.fromName || "" },

@@ -9,6 +9,10 @@
 // (`roomIndex`); oy yazılana kadar ilerlemez, yazma hatasında kart geri döner.
 // Odadan çıkış (geri tuşu / kaydırma / başlık oku) onay ister: bekleyen oda
 // kapatılır, oynanan oda yarım bırakılır.
+//
+// "Sırayla" oda (services/cineswipe/asyncRoom): kurucu hemen seçer, davet 24 saat açık kalır.
+// Ekrandan çıkmak odayı kapatmaz (lobideki "Süren odalar"dan dönülür). Son oyu veren cihaz ortak
+// eşleşmeleri sohbete yazar ve diğer kişiye `cineswipe_result` bildirimi bırakır.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, Share, StyleSheet, Text, View } from "react-native";
@@ -29,6 +33,7 @@ import CineMatchModal from "../../components/cineswipe/CineMatchModal";
 import CineRoomConfigModal from "../../components/cineswipe/CineRoomConfigModal";
 import CineSegmented from "../../components/cineswipe/CineSegmented";
 import CineWaitingRoom from "../../components/cineswipe/CineWaitingRoom";
+import { CineAsyncDone, CineAsyncInviteStrip } from "../../components/cineswipe/CineAsyncRoom";
 import PressableScale from "../../components/cineswipe/PressableScale";
 import { cineColors } from "../../components/cineswipe/cineTheme";
 import { describeFilters } from "../../components/cineswipe/filterLabels";
@@ -45,16 +50,29 @@ import { alpha } from "../../theme/colors";
 import {
   assertCineRoomAvailable,
   cineMediaKey,
-  cineVotesFor,
   createCineRoom,
   deleteCineRoom,
   fetchRoomDeck,
   joinCineRoom,
+  listMyAsyncRooms,
+  loadCineRoom,
   recordSwipe,
   subscribeToCineRoom,
   summarizeCineRoom,
 } from "../../services/cineswipe/cineswipeService";
 import { persistCineResults, readCineHistory, recordCineHistory } from "../../services/cineswipe/cineResultsStore";
+import {
+  ROOM_MODES,
+  isAsyncRoom,
+  nextCardIndex,
+  resultChatOf,
+  roomModeOf,
+  roomTimeLeft,
+} from "../../services/cineswipe/asyncRoom";
+import { createSocialNotification } from "../../services/socialNotificationsService";
+import { useUserProfile } from "../../context/UserProfileContext";
+import { useProfileUi } from "../../context/ProfileUiContext";
+import { avatarSnapshot } from "../../utils/avatarPhotos";
 import ShareToChatSheet from "../../components/chat/ShareToChatSheet";
 import useChatOutbox from "../../hooks/useChatOutbox";
 import { buildCineRoomShare, buildListShare, chatParamsForShare } from "../../utils/chatShare";
@@ -87,6 +105,13 @@ export default function CineSwipeScreen({ route, navigation }) {
   const { user } = useAuth();
   const { t, language } = useLanguage();
   const uid = user?.uid || null;
+  const { displayName: profileName } = useUserProfile() || {};
+  const { myAvatar } = useProfileUi() || {};
+  const senderRef = useRef(null);
+  senderRef.current = {
+    name: profileName || user?.displayName || "",
+    avatarIndex: avatarSnapshot(myAvatar).avatarIndex,
+  };
   const resultText = t.cineRoomResults;
   const resultTextRef = useRef(resultText);
   resultTextRef.current = resultText;
@@ -121,6 +146,8 @@ export default function CineSwipeScreen({ route, navigation }) {
 
   // ── Duo ────────────────────────────────────────────────────────────────────
   const [roomState, setRoomState] = useState("idle"); // idle | created | playing | finished
+  const [roomMode, setRoomMode] = useState(ROOM_MODES.live);
+  const [asyncRooms, setAsyncRooms] = useState([]);
   const [roomId, setRoomId] = useState(null);
   const [roomCode, setRoomCode] = useState("");
   const [roomMeta, setRoomMeta] = useState(null);
@@ -153,7 +180,9 @@ export default function CineSwipeScreen({ route, navigation }) {
   const swipeBusy = useRef(false);
   const finishedRoom = useRef(null);
   const roomRef = useRef(IDLE_ROOM); // geri tuşu dinleyicisi için güncel oda durumu
-  roomRef.current = roomState === "created" || roomState === "playing" ? { state: roomState, id: roomId } : IDLE_ROOM;
+  roomRef.current =
+    roomState === "created" || roomState === "playing" ? { state: roomState, id: roomId, mode: roomMode } : IDLE_ROOM;
+  const isAsync = roomMode === ROOM_MODES.async;
 
   // Premium hakları: oda KURMA ve tek başına kaydırma günlük; sonuçları yeni
   // özel/ortak listeye kaydetmek liste limitlerine tabi. Odaya katılmak ve
@@ -189,6 +218,7 @@ export default function CineSwipeScreen({ route, navigation }) {
     setRoomCode("");
     setRoomMeta(null);
     setRoomState("idle");
+    setRoomMode(ROOM_MODES.live);
     setCurrentRoomData(null);
     setPartnerName(null);
     setAllMatches([]);
@@ -247,8 +277,14 @@ export default function CineSwipeScreen({ route, navigation }) {
   useEffect(
     () =>
       navigation.addListener("beforeRemove", (event) => {
-        const { state, id } = roomRef.current;
+        const { state, id, mode: leavingMode } = roomRef.current;
         if (state === "idle") return;
+        // Sırayla oda kapanmaz: seçimler kayıtlı, sonuç gelince sohbet + bildirim haber verir.
+        if (leavingMode === ROOM_MODES.async) {
+          roomRef.current = IDLE_ROOM;
+          Toast.show({ type: "info", text1: copy.async.leaveToast });
+          return;
+        }
         event.preventDefault();
         Alert.alert(
           copy.leave.title,
@@ -277,17 +313,9 @@ export default function CineSwipeScreen({ route, navigation }) {
   // ── Ortak yardımcılar ──────────────────────────────────────────────────────
   const openDetails = useCallback(
     (media) => {
-      if (!media) return;
-      navigation.navigate(media.mediaType === "tv" ? "TvShowDetailsScreen" : "MovieDetailsScreen", {
-        movieId: media.id,
-        tvShowId: media.id,
-        media: {
-          id: media.id,
-          type: media.mediaType || "movie",
-          title: media.title,
-          name: media.name,
-          poster_path: media.poster_path,
-        },
+      if (!media?.id) return;
+      navigation.navigate(media.mediaType === "tv" ? "TvShowsDetails" : "MovieDetails", {
+        id: media.id,
       });
     },
     [navigation],
@@ -441,8 +469,54 @@ export default function CineSwipeScreen({ route, navigation }) {
     [uid],
   );
 
+  // Sırayla odada son oyu veren cihaz: ortak eşleşmeleri sohbete (misafirin davetle geldiği sohbet ya da
+  // 1-1 sohbet) yazar, oyunda olmayabilecek diğer kişiye sonuç bildirimi bırakır. Eşleşme yoksa sohbete
+  // boş liste gitmez; bildirim yine gider ("ortak eşleşme çıkmadı").
+  const reportAsyncResult = useCallback(
+    async (rId, roomData, summary) => {
+      if (!uid || postedRooms.has(rId)) return;
+      const partnerUid = roomData.hostUid === uid ? roomData.guestUid : roomData.hostUid;
+      if (!partnerUid) return;
+      postedRooms.add(rId);
+      const chat = resultChatOf(roomData, uid);
+      let chatPosted = false;
+      const share = summary.matches.length
+        ? buildListShare({
+            title: [roomData.hostName, roomData.guestName].filter(Boolean).join(" & "),
+            items: summary.matches.map((media) => ({ ...media, media_type: media.mediaType })),
+            source: "cineswipe",
+          })
+        : null;
+      if (chat && share) {
+        try {
+          await postToChatRef.current(chat, share);
+          chatPosted = true;
+        } catch (error) {
+          if (__DEV__) console.warn("cineAsyncResultToChat:", error?.message);
+        }
+      }
+      try {
+        await createSocialNotification({
+          toUid: partnerUid,
+          fromUid: uid,
+          fromName: senderRef.current.name,
+          fromAvatarIndex: senderRef.current.avatarIndex,
+          type: "cineswipe_result",
+          roomId: rId,
+          matchCount: summary.matches.length,
+          chatPosted,
+        });
+        Toast.show({ type: "success", text1: chatPosted ? copy.async.resultPosted : copy.async.resultNotified });
+      } catch (error) {
+        if (__DEV__) console.warn("cineAsyncResultNotify:", error?.message);
+        Toast.show({ type: chatPosted ? "success" : "error", text1: chatPosted ? resultTextRef.current.postedToChat : copy.async.resultFailed });
+      }
+    },
+    [uid, copy],
+  );
+
   const receiveResults = useCallback(
-    async (rId, roomData) => {
+    async (rId, roomData, { finishedByMe = false } = {}) => {
       const summary = summarizeCineRoom(roomData);
       if (finishedRoom.current === rId) return;
       if (!summary.complete) {
@@ -472,7 +546,11 @@ export default function CineSwipeScreen({ route, navigation }) {
       triggerHaptic("notification");
       // Geçmiş turlar: oda sunucuda silinse de eşleşmeler bu cihazda kalır (lobideki "Geçmiş turlar").
       if (recordCineHistory(finalResult, uid)) setHistory(readCineHistory(uid));
-      shareMatchesToInviteChat(rId, roomData, summary);
+      if (isAsyncRoom(roomData)) {
+        if (finishedByMe) reportAsyncResult(rId, roomData, summary);
+      } else {
+        shareMatchesToInviteChat(rId, roomData, summary);
+      }
       const session = roomSession.current;
       try {
         const saved = await persistCineResults(finalResult, uid);
@@ -487,7 +565,7 @@ export default function CineSwipeScreen({ route, navigation }) {
         }
       }
     },
-    [uid, showRoomError, shareMatchesToInviteChat],
+    [uid, showRoomError, shareMatchesToInviteChat, reportAsyncResult],
   );
 
   const retryResultSave = async () => {
@@ -581,7 +659,10 @@ export default function CineSwipeScreen({ route, navigation }) {
         mediaType: config.mediaType,
         genreId: config.genreId ?? null,
       });
-      setRoomState("created");
+      const createdMode = roomModeOf(config.mode);
+      setRoomMode(createdMode);
+      // Sırayla oda: kurucu arkadaşını beklemeden seçer (davet şeridi kartların üstünde).
+      setRoomState(createdMode === ROOM_MODES.async ? "playing" : "created");
       roomsGate.consume();
       triggerHaptic("notification");
       return { code: newCode, count: freshDeck.length };
@@ -641,6 +722,92 @@ export default function CineSwipeScreen({ route, navigation }) {
     }
   };
 
+  // Katılınan ya da geri dönülen odaya gir. Bitmiş oda dinleyiciden sonuca geçer.
+  const enterRoom = (rId, roomData, fallbackCode = "") => {
+    resetRoom();
+    const cards = roomData.deck || [];
+    const mode = roomModeOf(roomData.mode);
+    setRoomId(rId);
+    setRoomCode(roomData.roomCode || fallbackCode);
+    setRoomDeck(cards);
+    setRoomIndex(nextCardIndex(roomData, uid));
+    setRoomMeta({
+      count: cards.length,
+      category: roomData.category || "trending",
+      mediaType: roomData.mediaType || "all",
+      genreId: roomData.genreId ?? null,
+    });
+    setRoomMode(mode);
+    setCurrentRoomData(roomData);
+    setPartnerName((roomData.hostUid === uid ? roomData.guestName : roomData.hostName) || null);
+    setRoomState(roomData.status === "waiting" && mode !== ROOM_MODES.async ? "created" : "playing");
+    triggerHaptic("notification");
+  };
+
+  // Lobideki süren sırayla odalar (kurduklarım + katıldıklarım). Okuma hatası eski listeyi bırakır.
+  const screenAliveRef = useRef(true);
+  useEffect(
+    () => () => {
+      screenAliveRef.current = false;
+    },
+    [],
+  );
+  const refreshAsyncRooms = useCallback(() => {
+    if (!uid) {
+      setAsyncRooms([]);
+      return;
+    }
+    listMyAsyncRooms(uid)
+      .then((rows) => {
+        if (screenAliveRef.current) setAsyncRooms(rows);
+      })
+      .catch((error) => {
+        if (__DEV__) console.warn("listMyAsyncRooms:", error?.message);
+      });
+  }, [uid]);
+  useEffect(() => {
+    if (mode === "duo" && roomState === "idle") refreshAsyncRooms();
+  }, [mode, roomState, refreshAsyncRooms]);
+  useEffect(() => navigation.addListener("focus", () => {
+    if (roomRef.current.state === "idle") refreshAsyncRooms();
+  }), [navigation, refreshAsyncRooms]);
+
+  const openAsyncRoom = async (rId) => {
+    if (!rId || joinBusy.current) return;
+    joinBusy.current = true;
+    const attempt = ++joinAttempt.current;
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const { roomData } = await loadCineRoom(rId, uid);
+      if (attempt === joinAttempt.current) enterRoom(rId, roomData);
+    } catch (error) {
+      if (attempt !== joinAttempt.current) return;
+      const code = error?.code?.replace(/^firestore\//, "");
+      // Oda sunucuda temizlendiyse sonuç bu cihazın geçmişinde olabilir (bildirimden gelindi).
+      if (["room-deleted", "room-expired"].includes(code) && readCineHistory(uid).some((entry) => entry.roomId === rId)) {
+        setMode("duo");
+        openSavedResult(rId);
+      } else {
+        showRoomError(error);
+        refreshAsyncRooms();
+      }
+    } finally {
+      joinBusy.current = false;
+      if (attempt === joinAttempt.current) setJoining(false);
+    }
+  };
+
+  // Sonuç bildiriminden (utils/notificationInbox.cineResultDestination) gelindi: oda bir kez açılır.
+  const resumeRoomId = route?.params?.resumeRoomId || null;
+  const resumedRoom = useRef(null);
+  useEffect(() => {
+    if (!resumeRoomId || !uid || resumedRoom.current === resumeRoomId) return;
+    resumedRoom.current = resumeRoomId;
+    openAsyncRoom(resumeRoomId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeRoomId, uid]);
+
   const handleJoinRoom = async (candidate) => {
     const code = typeof candidate === "string" ? candidate : inputCode;
     if (joinBusy.current) return;
@@ -649,24 +816,11 @@ export default function CineSwipeScreen({ route, navigation }) {
     setJoining(true);
     setJoinError(null);
     try {
-      const { roomId: joinedId, roomData } = await joinCineRoom(code, user);
-      if (attempt !== joinAttempt.current) return;
-      resetRoom();
-      const cards = roomData.deck || [];
-      const nextIndex = cards.findIndex((media) => !cineVotesFor(roomData, media)[uid]);
-      setRoomId(joinedId);
-      setRoomCode(roomData.roomCode || code.trim());
-      setRoomDeck(cards);
-      setRoomIndex(nextIndex < 0 ? cards.length : nextIndex);
-      setRoomMeta({
-        count: cards.length,
-        category: roomData.category || "trending",
-        mediaType: roomData.mediaType || "all",
-        genreId: roomData.genreId ?? null,
+      const { roomId: joinedId, roomData } = await joinCineRoom(code, user, {
+        resultChat: inviteRef.current?.code === extractRoomCode(code) ? inviteRef.current.chat : null,
       });
-      setPartnerName(roomData.hostUid === uid ? roomData.guestName : roomData.hostName);
-      setRoomState(roomData.status === "waiting" ? "created" : "playing");
-      triggerHaptic("notification");
+      if (attempt !== joinAttempt.current) return;
+      enterRoom(joinedId, roomData, code.trim());
     } catch (error) {
       if (attempt === joinAttempt.current) showRoomError(error);
     } finally {
@@ -692,10 +846,11 @@ export default function CineSwipeScreen({ route, navigation }) {
     setSwipeError(false);
     const session = roomSession.current;
     try {
-      const { roomData } = await recordSwipe(roomId, uid, media, direction);
+      const { roomData, finishedByMe } = await recordSwipe(roomId, uid, media, direction);
       if (session !== roomSession.current) return;
       setRoomIndex((index) => index + 1);
-      if (roomData.status === "finished") receiveResults(roomId, roomData);
+      if (roomData.status === "finished") receiveResults(roomId, roomData, { finishedByMe });
+      else setCurrentRoomData(roomData);
     } catch (error) {
       if (session !== roomSession.current || finishedRoom.current) return;
       if (["permission-denied", "unauthenticated", "room-deleted", "room-expired"].includes(error?.code?.replace(/^firestore\//, ""))) {
@@ -734,6 +889,7 @@ export default function CineSwipeScreen({ route, navigation }) {
       code: roomCode,
       host: user?.displayName || "",
       count: roomMeta?.count,
+      async: isAsync,
     });
     if (share) setInviteShare(share);
   };
@@ -856,7 +1012,9 @@ export default function CineSwipeScreen({ route, navigation }) {
       ? copy.header.solo
       : partnerName
         ? fillText(copy.header.duoWith, { name: partnerName })
-        : copy.header.duo;
+        : isAsync && roomState === "playing"
+          ? `${copy.async.badge} · ${copy.header.duo}`
+          : copy.header.duo;
 
   const modeOptions = [
     { id: "solo", icon: "person", label: copy.modes.solo },
@@ -1090,6 +1248,8 @@ export default function CineSwipeScreen({ route, navigation }) {
           myUid={uid}
           language={language}
           onOpenResult={openSavedResult}
+          asyncRooms={asyncRooms}
+          onOpenAsyncRoom={openAsyncRoom}
         />
       );
     }
@@ -1136,17 +1296,57 @@ export default function CineSwipeScreen({ route, navigation }) {
     }
 
     // playing
+    const guestJoined = !!currentRoomData?.guestUid;
     const progressBar = (
       <CineDuoProgress
         youCount={roomIndex}
         partnerCount={partnerProgress?.reviewed || 0}
         total={roomDeck.length}
-        partnerName={partnerName}
+        partnerName={partnerName || (isAsync && !guestJoined ? copy.async.waitingPartner : null)}
         statusText={duoStatusText}
         copy={copy}
         colors={colors}
       />
     );
+
+    const leaveToLobby = () => {
+      resetRoom(); // Oda sunucuda kalır; lobideki "Süren odalar" yeniden yüklenir.
+      setInputCode("");
+    };
+    const inviteStrip =
+      isAsync && !guestJoined && roomCode ? (
+        <CineAsyncInviteStrip
+          roomCode={roomCode}
+          timeLeft={roomTimeLeft(currentRoomData)}
+          onSendInvite={handleSendInvite}
+          onCopy={handleCopyCode}
+          copy={copy}
+          colors={colors}
+        />
+      ) : null;
+
+    if (isAsync && roomIndex >= roomDeck.length) {
+      return (
+        <View style={styles.flex}>
+          {progressBar}
+          <CineAsyncDone
+            stage={guestJoined ? "partnerTurn" : "waitingGuest"}
+            partnerName={partnerName}
+            partnerDone={partnerProgress?.reviewed || 0}
+            total={roomDeck.length}
+            timeLeft={roomTimeLeft(currentRoomData)}
+            roomCode={roomCode}
+            canClose={isHost && !guestJoined}
+            onSendInvite={handleSendInvite}
+            onCopy={handleCopyCode}
+            onLobby={leaveToLobby}
+            onClose={handleCancelRoom}
+            copy={copy}
+            colors={colors}
+          />
+        </View>
+      );
+    }
 
     if (roomIndex >= roomDeck.length) {
       return (
@@ -1159,6 +1359,7 @@ export default function CineSwipeScreen({ route, navigation }) {
 
     return (
       <View style={styles.flex}>
+        {inviteStrip}
         {progressBar}
         <CineCardStack
           ref={stackRef}

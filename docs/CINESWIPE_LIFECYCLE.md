@@ -21,6 +21,15 @@
 - Odadan çıkış (geri tuşu, kaydırma, başlık oku) `beforeRemove` ile onay ister: bekleyen oda silinir, oynanan oda yarım bırakılır (24 saatlik süre sonunda temizlenir). Kendi silmemizde dinleyicinin "oda silindi" hatası yok sayılır.
 - Metinler `translations/*.json → cineSwipe`; `__tests__/cineCopy.test.js` her `copy.*` kullanımının iki dilde bulunduğunu ve yer tutucuların eşleştiğini doğrular.
 
+## Sırayla (oturumlu) oda
+
+- Oda kurulurken `mode`: `live` (eski davranış) ya da `async` (sırayla). Kural: `services/cineswipe/asyncRoom.js`; görünüm `components/cineswipe/CineAsyncRoom.js`.
+- Sırayla odada kurucu, misafir yokken (`status: waiting`) oy verebilir; davet 24 saat açıktır. Misafir katılınca `expiresAt` yeniden 24 saate uzar; grup davetinden geldiyse grup `resultChat` olarak odaya yazılır.
+- Ekrandan çıkmak sırayla odayı kapatmaz (onay sorulmaz). Lobide "Süren odalar" listesi (`listMyAsyncRooms`: hostUid / guestUid tek alanlı sorgular) odaya `loadCineRoom` ile döner. Kimse katılmadıysa kurucu odayı kapatabilir.
+- Son oyu veren cihaz (`recordSwipe` → `finishedByMe`) eşleşmeleri sohbete yazar (`resultChat` ya da 1-1 sohbet; eşleşme yoksa yazmaz) ve diğer kişiye `cineswipe_result` bildirimi bırakır (`roomId`, `matchCount`, `chatPosted`). Sohbete yazıldıysa sunucu bildirim push'unu atlar; mesaj push'u yeter.
+- Bitmiş sırayla oda 24 saat durur (canlıda 1 saat): bildirime dokunan kişi sonucu açar; oda silinmişse cihazdaki geçmişten açılır.
+- Kural değişikliği yok. Sunucu (`functions/index.js` push metni + tekrar push atlama, `socialPush.js` `roomId`) deploy edilmeden bu bildirimin push'u genel "Bildirim" metniyle gider.
+
 ## Yayınlama
 
 Sunucu temizliği istemci güncellemesinden önce yayınlanmalıdır. Bu değişiklikte canlı yayın yapılmadı.

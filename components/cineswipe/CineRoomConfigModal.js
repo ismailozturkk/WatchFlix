@@ -1,6 +1,7 @@
 // components/cineswipe/CineRoomConfigModal.js
 //
-// Duo oda kurulumu: kart sayısı, içerik havuzu, içerik türü ve tür.
+// Duo oda kurulumu: oyun şekli (canlı / sırayla), kart sayısı, içerik havuzu, içerik türü ve tür.
+// "Sırayla": kurucu hemen seçer, arkadaş 24 saat içinde katılır (services/cineswipe/asyncRoom).
 // Eski sürüm yalnız sayı + kaynak soruyordu; içerik türü ve tür seçimi de eklendi
 // (servis zaten `mediaType`/`genreId` alanlarını belgeliyordu ama hiç iletilmiyordu).
 // Son seçim oturum boyunca hatırlanır: bileşen sürekli bağlı, taslak state'te kalır.
@@ -23,6 +24,7 @@ import {
   fillText,
   normalizeFilters,
 } from "../../services/cineswipe/deckModel";
+import { ROOM_MODES } from "../../services/cineswipe/asyncRoom";
 
 // Odada izleme listesi kaynağı yok: iki kişinin ortak destesi ev sahibinin listesi olamaz.
 const ROOM_CATEGORIES = SWIPE_CATEGORIES.filter((category) => category.id !== "watchlist");
@@ -33,6 +35,8 @@ export default function CineRoomConfigModal({ visible, onClose, onConfirmCreate 
   const colors = cineColors(theme);
   const copy = useCineCopy();
   const [count, setCount] = useState(20);
+  const [mode, setMode] = useState(ROOM_MODES.live);
+  const isAsync = mode === ROOM_MODES.async;
   const [draft, setDraft] = useState(INITIAL_FILTERS);
 
   const category = categoryOf(draft.category);
@@ -40,7 +44,7 @@ export default function CineRoomConfigModal({ visible, onClose, onConfirmCreate 
   const change = (patch) => setDraft((current) => normalizeFilters({ ...current, ...patch }));
 
   const handleCreate = () => {
-    onConfirmCreate({ targetCardsCount: count, ...draft });
+    onConfirmCreate({ targetCardsCount: count, ...draft, mode });
     onClose();
   };
 
@@ -49,6 +53,11 @@ export default function CineRoomConfigModal({ visible, onClose, onConfirmCreate 
     icon: typeIcon(option.id),
     label: typeLabel(option.id, copy),
   }));
+  const modeOptions = [
+    { id: ROOM_MODES.live, icon: "flash-outline", label: copy.async.live },
+    { id: ROOM_MODES.async, icon: "time-outline", label: copy.async.async },
+  ];
+  const createLabel = isAsync ? copy.async.createAsync : copy.roomConfig.create;
   const summary = describeFilters(draft, copy)
     .map((part) => part.label)
     .join(" · ");
@@ -64,23 +73,28 @@ export default function CineRoomConfigModal({ visible, onClose, onConfirmCreate 
       footer={
         <View style={styles.footer}>
           <Text numberOfLines={1} style={[styles.summary, { color: colors.textSecondary }]}>
+            {isAsync ? `${copy.async.badge} · ` : ""}
             {fillText(copy.roomConfig.summary, { count, filters: summary })}
           </Text>
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel={copy.roomConfig.create}
+            accessibilityLabel={createLabel}
             onPress={handleCreate}
             style={[styles.create, { backgroundColor: colors.accent }]}
           >
-            <AppIcon family="Ionicons" name="arrow-forward-circle" size={21} color={colors.onAccent} />
-            <Text style={[styles.createText, { color: colors.onAccent }]}>{copy.roomConfig.create}</Text>
+            <AppIcon family="Ionicons" name={isAsync ? "play-circle" : "arrow-forward-circle"} size={21} color={colors.onAccent} />
+            <Text style={[styles.createText, { color: colors.onAccent }]}>{createLabel}</Text>
           </PressableScale>
         </View>
       }
     >
       <SectionLabel colors={colors} style={styles.firstSection}>
-        {copy.roomConfig.cardCount}
+        {copy.async.modeLabel}
       </SectionLabel>
+      <CineSegmented options={modeOptions} value={mode} onChange={setMode} colors={colors} />
+      <Hint colors={colors}>{isAsync ? copy.async.asyncHint : copy.async.liveHint}</Hint>
+
+      <SectionLabel colors={colors}>{copy.roomConfig.cardCount}</SectionLabel>
       <CountChips
         options={CARD_COUNT_OPTIONS}
         value={count}

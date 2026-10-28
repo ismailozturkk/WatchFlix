@@ -10,6 +10,7 @@
 
 import {
   doc,
+  getDoc,
   setDoc,
   deleteDoc,
   collection,
@@ -34,6 +35,15 @@ import {
   interleaveCards,
   shuffleCards,
 } from "./deckModel";
+import {
+  ASYNC_JOIN_MS,
+  ASYNC_RESULT_MS,
+  LIVE_RESULT_MS,
+  asyncRoomRow,
+  isAsyncRoom,
+  roomModeOf,
+  sortAsyncRows,
+} from "./asyncRoom";
 
 export { SWIPE_CATEGORIES, GENRE_OPTIONS, cineMediaKey };
 
@@ -158,7 +168,8 @@ export async function fetchRoomDeck(config = {}, { language = "tr-TR", userId = 
  * Duo Mod: Yeni bir eşleşme odası oluşturur.
  * @param {Object} hostUser - { uid, displayName, photoURL }
  * @param {Array<Object>} deck - Odaya ait kart destesi
- * @param {Object} config - { targetCardsCount, category, mediaType, genreId }
+ * @param {Object} config - { targetCardsCount, category, mediaType, genreId, mode }
+ *   mode "async" (sırayla): kurucu hemen seçer, davet 24 saat açık kalır (bkz. ./asyncRoom).
  * @returns {Promise<{ roomId: string, roomCode: string }>}
  */
 export async function createCineRoom(hostUser, deck = [], config = {}) {
@@ -196,6 +207,7 @@ export async function createCineRoom(hostUser, deck = [], config = {}) {
     guestName: null,
     guestAvatar: null,
     status: "waiting", // "waiting" | "active" | "finished"
+    mode: roomModeOf(config.mode), // "live" | "async"
     deck: cleanDeck,
     targetCount,
     category: config.category || "trending",
@@ -204,7 +216,7 @@ export async function createCineRoom(hostUser, deck = [], config = {}) {
     swipes: {}, // { [mediaId]: { [uid]: "like" | "pass" } }
     matches: [], // [mediaId, ...]
     createdAt: serverTimestamp(),
-    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+    expiresAt: Date.now() + ASYNC_JOIN_MS,
   };
 
   await setDoc(roomRef, payload);
@@ -236,8 +248,12 @@ export function assertCineRoomAvailable(data, uid) {
   if (data.status !== "waiting") throw cineRoomError("room-expired");
 }
 
-/** Join by six-digit code; recheck occupancy inside the atomic write. */
-export async function joinCineRoom(roomCode, guestUser) {
+/**
+ * Join by six-digit code; recheck occupancy inside the atomic write.
+ * `resultChat`: the chat the invitation came from. A "sırayla" room stores it so whichever device casts
+ * the final vote posts the matches there (the host may finish last, without the invite context).
+ */
+export async function joinCineRoom(roomCode, guestUser, { resultChat = null } = {}) {
   const code = typeof roomCode === "string" ? roomCode.trim() : "";
   if (!/^\d{6}$/.test(code)) throw cineRoomError("invalid-code");
   if (!guestUser?.uid) throw cineRoomError("unauthenticated");
@@ -261,6 +277,14 @@ export async function joinCineRoom(roomCode, guestUser) {
       guestAvatar: guestUser.photoURL || null,
       status: "active",
     };
+    if (isAsyncRoom(roomData)) {
+      // Katılan misafire seçimlerini bitirmesi için yeniden bir gün.
+      payload.expiresAt = Math.max(Number(roomData.expiresAt) || 0, Date.now() + ASYNC_JOIN_MS);
+      // Grup daveti grubun kendisine; 1-1 davet zaten iki kişinin sohbeti (resultChatOf varsayılanı).
+      if (typeof resultChat?.groupId === "string" && resultChat.groupId) {
+        payload.resultChat = { groupId: resultChat.groupId, groupName: String(resultChat.groupName || "") };
+      }
+    }
     transaction.update(roomRef, payload);
     return { roomId: candidates[0].id, roomData: { ...roomData, ...payload } };
   });
@@ -296,7 +320,9 @@ export async function recordSwipe(roomId, uid, media, direction = "like") {
     const room = snapshot.data();
     if (uid !== room.hostUid && uid !== room.guestUid) throw cineRoomError("permission-denied");
     assertCineRoomAvailable(room, uid);
-    if (room.status !== "active") throw cineRoomError("room-expired");
+    // Sırayla odada kurucu, misafir katılmadan (status "waiting") seçimlerini yapar.
+    const canVote = room.status === "active" || (room.status === "waiting" && isAsyncRoom(room) && uid === room.hostUid);
+    if (!canVote) throw cineRoomError("room-expired");
     const card = room.deck?.find((item) => cineMediaKey(item) === cineMediaKey(media));
     if (!card) throw cineRoomError("invalid-vote");
     const votes = cineVotesFor(room, card);
@@ -307,11 +333,40 @@ export async function recordSwipe(roomId, uid, media, direction = "like") {
     const summary = summarizeCineRoom(next);
     const patch = { swipes, matches: summary.matches };
     if (summary.complete) Object.assign(patch, {
-      status: "finished", finishedAt: serverTimestamp(), expiresAt: Date.now() + 60 * 60 * 1000,
+      status: "finished", finishedAt: serverTimestamp(),
+      expiresAt: Date.now() + (isAsyncRoom(room) ? ASYNC_RESULT_MS : LIVE_RESULT_MS),
     });
     transaction.update(ref, patch);
-    return { roomData: { ...next, ...patch } };
+    // finishedByMe: bu oy odayı bitirdi; sırayla odada sonucu sohbete/bildirime bu cihaz yazar.
+    return { roomData: { ...next, ...patch }, finishedByMe: !!summary.complete };
   });
+}
+
+/** Odaya kimliğiyle dön (lobi satırı / sonuç bildirimi). Yalnız katılımcı; süresi dolduysa hata. */
+export async function loadCineRoom(roomId, uid) {
+  if (!roomId || !uid) throw cineRoomError("unauthenticated");
+  const snapshot = await getDoc(doc(db, "CineRooms", roomId));
+  if (!snapshot.exists()) throw cineRoomError("room-deleted");
+  const roomData = snapshot.data();
+  if (roomData.hostUid !== uid && roomData.guestUid !== uid) throw cineRoomError("permission-denied");
+  assertCineRoomAvailable(roomData, uid);
+  return { roomId, roomData };
+}
+
+/** Benim süren "sırayla" odalarım (kurduklarım + katıldıklarım), lobide gösterilecek sırayla. */
+export async function listMyAsyncRooms(uid, now = Date.now()) {
+  if (!uid) return [];
+  const rooms = collection(db, "CineRooms");
+  const [hosted, joined] = await Promise.all([
+    getDocs(query(rooms, where("hostUid", "==", uid))),
+    getDocs(query(rooms, where("guestUid", "==", uid))),
+  ]);
+  const rows = new Map();
+  [...hosted.docs, ...joined.docs].forEach((entry) => {
+    const row = asyncRoomRow(entry.id, entry.data(), uid, now);
+    if (row) rows.set(entry.id, row);
+  });
+  return sortAsyncRows([...rows.values()]);
 }
 
 /** Sent only after the final result has been stored locally. */

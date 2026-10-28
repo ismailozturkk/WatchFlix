@@ -506,12 +506,14 @@ function sanitizeCineRoomShare(raw) {
   if (host) share.host = host;
   const count = finitePositive(raw.count);
   if (count && count <= 500) share.count = Math.round(count);
+  // Sırayla oda: kurucu seçimini yaptı/yapıyor, davet 24 saat açık (kart bunu söyler).
+  if (raw.async === true) share.async = true;
   return share;
 }
 
-/** CineSwipe odası daveti: 6 haneli kod + (varsa) kuran kişi ve kart sayısı. */
-export function buildCineRoomShare({ code, host, count } = {}) {
-  return sanitizeCineRoomShare({ code, host, count });
+/** CineSwipe odası daveti: 6 haneli kod + (varsa) kuran kişi, kart sayısı ve "sırayla" işareti. */
+export function buildCineRoomShare({ code, host, count, async } = {}) {
+  return sanitizeCineRoomShare({ code, host, count, async });
 }
 
 // ─── Zevk uyumu ──────────────────────────────────────────────────────────────

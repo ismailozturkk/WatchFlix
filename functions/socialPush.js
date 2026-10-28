@@ -42,6 +42,7 @@ const TYPE_SETTING_KEY = {
   message: "messagesEnabled",
   cineswipe_invite: "messagesEnabled",
   game_challenge: "messagesEnabled",
+  cineswipe_result: "messagesEnabled",
 };
 
 /** Bu mesajın push'unu sunucu mu dağıtacak (yeni istemci işareti)? */
@@ -236,6 +237,7 @@ function createSocialPush({
         groupName: n.groupName || null,
         inviteCode: n.inviteCode || null,
         dayKey: n.dayKey || null,
+        roomId: n.roomId || null,
         // İstemci bununla "kullanıcı bu sohbeti izliyor mu" kararını verir ve
         // sohbet açılınca çekmecedeki bildirimleri temizler.
         chatId,

@@ -1367,6 +1367,8 @@ const STRINGS = {
     notification: "Bildirim",
     messageFallback: "sana bir mesaj gönderdi",
     cineswipe_invite: "🎬 seni CineSwipe odasına davet etti",
+    cineswipe_result: "🎬 CineSwipe sonuçları hazır",
+    cineswipe_result_detail: "🎬 CineSwipe sonuçları hazır · {n} ortak eşleşme",
     game_challenge: "⚔️ seni günlük düelloya davet etti",
     friend_request: "👤 sana arkadaşlık isteği gönderdi",
     friend_accepted: "🤝 arkadaşlık isteğini kabul etti",
@@ -1383,6 +1385,8 @@ const STRINGS = {
     notification: "Notification",
     messageFallback: "sent you a message",
     cineswipe_invite: "🎬 invited you to a CineSwipe room",
+    cineswipe_result: "🎬 CineSwipe results are ready",
+    cineswipe_result_detail: "🎬 CineSwipe results are ready · {n} shared matches",
     game_challenge: "⚔️ challenged you to a daily duel",
     friend_request: "👤 sent you a friend request",
     friend_accepted: "🤝 accepted your friend request",
@@ -1399,6 +1403,8 @@ const STRINGS = {
     notification: "Notificación",
     messageFallback: "te ha enviado un mensaje",
     cineswipe_invite: "🎬 te invitó a una sala de CineSwipe",
+    cineswipe_result: "🎬 Los resultados de CineSwipe están listos",
+    cineswipe_result_detail: "🎬 Los resultados de CineSwipe están listos · {n} coincidencias",
     game_challenge: "⚔️ te retó a un duelo diario",
     friend_request: "👤 te ha enviado una solicitud de amistad",
     friend_accepted: "🤝 ha aceptado tu solicitud de amistad",
@@ -1415,6 +1421,8 @@ const STRINGS = {
     notification: "Notificação",
     messageFallback: "enviou uma mensagem para você",
     cineswipe_invite: "🎬 convidou você para uma sala do CineSwipe",
+    cineswipe_result: "🎬 Os resultados do CineSwipe estão prontos",
+    cineswipe_result_detail: "🎬 Os resultados do CineSwipe estão prontos · {n} matches em comum",
     game_challenge: "⚔️ desafiou você para um duelo diário",
     friend_request: "👤 enviou um pedido de amizade para você",
     friend_accepted: "🤝 aceitou seu pedido de amizade",
@@ -1431,6 +1439,8 @@ const STRINGS = {
     notification: "Benachrichtigung",
     messageFallback: "hat dir eine Nachricht gesendet",
     cineswipe_invite: "🎬 hat dich in einen CineSwipe Raum eingeladen",
+    cineswipe_result: "🎬 Deine CineSwipe-Ergebnisse sind da",
+    cineswipe_result_detail: "🎬 Deine CineSwipe-Ergebnisse sind da · {n} gemeinsame Treffer",
     game_challenge: "⚔️ hat dich zu einem Tagesduell herausgefordert",
     friend_request: "👤 hat dir eine Freundschaftsanfrage gesendet",
     friend_accepted: "🤝 hat deine Freundschaftsanfrage angenommen",
@@ -1482,6 +1492,13 @@ function buildContent(n, lang) {
     case "cineswipe_invite":
     case "game_challenge":
       return { title: name, body: S[n.type] };
+    case "cineswipe_result":
+      return {
+        title: name,
+        body: Number.isInteger(n.matchCount) && n.matchCount > 0
+          ? S.cineswipe_result_detail.replace("{n}", String(n.matchCount))
+          : S.cineswipe_result,
+      };
     default:
       return { title: S.notification, body: name };
   }
@@ -1576,7 +1593,10 @@ exports.onSocialNotificationCreated = onDocumentCreated(
   async (event) => {
     const snap = event.data;
     if (!snap) return;
-    const prepared = await socialPush.prepare(event.params.uid, snap.data() || {}, {
+    const data = snap.data() || {};
+    // Sırayla CineSwipe sonucu sohbete de yazıldıysa o mesajın push'u yeter; ikincisi gürültü.
+    if (data.type === "cineswipe_result" && data.chatPosted === true) return;
+    const prepared = await socialPush.prepare(event.params.uid, data, {
       notifId: event.params.notifId,
     });
     if (prepared) await socialPush.send([prepared]);

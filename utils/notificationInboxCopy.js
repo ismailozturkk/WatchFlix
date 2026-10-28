@@ -4,6 +4,7 @@ export const NOTIFICATION_INBOX_COPY = {
   tr: {
     importantTitle: "Önemli davetler",
     noteReminder: "Not hatırlatması", listReminder: "Liste hatırlatması", untitledNote: "Başlıksız not", untitledList: "Başlıksız liste", reminderTitle: "Hatırlatma", reminderCount: (n) => `${n} hatırlatma`, nextReminder: "Sonraki hatırlatma", reminderDone: "Tamam", reminderOpen: "Notu aç", reminderSnooze: "1 saat ertele", reminderSnoozed: "Hatırlatma 1 saat ertelendi", reminderSnoozeError: "Hatırlatma ertelenemedi. Tekrar dene.", cineInvite: "seni CineSwipe odasına davet etti", duelInvite: "seni günlük düelloya davet etti",
+    cineResult: "CineSwipe sonuçları hazır", cineResultDetail: (n) => n > 0 ? `${n} ortak eşleşme` : "Ortak eşleşme çıkmadı",
     acceptInvite: "Kabul et", declineInvite: "Reddet", acceptedInvite: "Kabul edildi", declinedInvite: "Reddedildi", inviteCount: (n) => `${n} davet`, nextInvite: "Sonraki davet", inviteError: "Davet yanıtı kaydedilemedi. Tekrar dene.",
     expand: "Detayları göster", collapse: "Detayları gizle",
     title: "Bildirimler", subtitle: "En yeniden eskiye tüm hareketler", today: "Bugün", yesterday: "Dün",
@@ -20,6 +21,7 @@ export const NOTIFICATION_INBOX_COPY = {
   en: {
     importantTitle: "Important invitations",
     noteReminder: "Note reminder", listReminder: "List reminder", untitledNote: "Untitled note", untitledList: "Untitled list", reminderTitle: "Reminder", reminderCount: (n) => `${n} reminder${n === 1 ? "" : "s"}`, nextReminder: "Next reminder", reminderDone: "Done", reminderOpen: "Open note", reminderSnooze: "Snooze 1 hour", reminderSnoozed: "Reminder snoozed for 1 hour", reminderSnoozeError: "Couldn't snooze the reminder. Try again.", cineInvite: "invited you to a CineSwipe room", duelInvite: "challenged you to a daily duel",
+    cineResult: "CineSwipe results are ready", cineResultDetail: (n) => n > 0 ? `${n} shared match${n === 1 ? "" : "es"}` : "No shared matches",
     acceptInvite: "Accept", declineInvite: "Decline", acceptedInvite: "Accepted", declinedInvite: "Declined", inviteCount: (n) => `${n} invitation${n === 1 ? "" : "s"}`, nextInvite: "Next invitation", inviteError: "Couldn't save your response. Try again.",
     expand: "Show details", collapse: "Hide details",
     title: "Notifications", subtitle: "All activity, newest first", today: "Today", yesterday: "Yesterday",
@@ -36,6 +38,7 @@ export const NOTIFICATION_INBOX_COPY = {
   es: {
     importantTitle: "Invitaciones importantes",
     noteReminder: "Recordatorio de nota", listReminder: "Recordatorio de lista", untitledNote: "Nota sin título", untitledList: "Lista sin título", reminderTitle: "Recordatorio", reminderCount: (n) => `${n} recordatorio${n === 1 ? "" : "s"}`, nextReminder: "Siguiente recordatorio", reminderDone: "Hecho", reminderOpen: "Abrir nota", reminderSnooze: "Posponer 1 hora", reminderSnoozed: "Recordatorio pospuesto 1 hora", reminderSnoozeError: "No se pudo posponer el recordatorio. Inténtalo de nuevo.", cineInvite: "te invitó a una sala de CineSwipe", duelInvite: "te retó a un duelo diario",
+    cineResult: "Los resultados de CineSwipe están listos", cineResultDetail: (n) => n > 0 ? `${n} coincidencia${n === 1 ? "" : "s"} en común` : "Sin coincidencias en común",
     acceptInvite: "Aceptar", declineInvite: "Rechazar", acceptedInvite: "Aceptada", declinedInvite: "Rechazada", inviteCount: (n) => `${n} invitación${n === 1 ? "" : "es"}`, nextInvite: "Siguiente invitación", inviteError: "No se pudo guardar tu respuesta. Inténtalo de nuevo.",
     expand: "Mostrar detalles", collapse: "Ocultar detalles",
     title: "Notificaciones", subtitle: "Toda la actividad, de más reciente a más antigua", today: "Hoy", yesterday: "Ayer",
@@ -52,6 +55,7 @@ export const NOTIFICATION_INBOX_COPY = {
   pt: {
     importantTitle: "Convites importantes",
     noteReminder: "Lembrete de nota", listReminder: "Lembrete de lista", untitledNote: "Nota sem título", untitledList: "Lista sem título", reminderTitle: "Lembrete", reminderCount: (n) => `${n} lembrete${n === 1 ? "" : "s"}`, nextReminder: "Próximo lembrete", reminderDone: "Concluir", reminderOpen: "Abrir nota", reminderSnooze: "Adiar 1 hora", reminderSnoozed: "Lembrete adiado por 1 hora", reminderSnoozeError: "Não foi possível adiar o lembrete. Tente novamente.", cineInvite: "convidou você para uma sala do CineSwipe", duelInvite: "desafiou você para um duelo diário",
+    cineResult: "Os resultados do CineSwipe estão prontos", cineResultDetail: (n) => n > 0 ? `${n} ${n === 1 ? "match em comum" : "matches em comum"}` : "Nenhum match em comum",
     acceptInvite: "Aceitar", declineInvite: "Recusar", acceptedInvite: "Aceito", declinedInvite: "Recusado", inviteCount: (n) => `${n} convite${n === 1 ? "" : "s"}`, nextInvite: "Próximo convite", inviteError: "Não foi possível salvar sua resposta. Tente novamente.",
     expand: "Mostrar detalhes", collapse: "Ocultar detalhes",
     title: "Notificações", subtitle: "Toda a atividade, da mais recente à mais antiga", today: "Hoje", yesterday: "Ontem",
@@ -68,6 +72,7 @@ export const NOTIFICATION_INBOX_COPY = {
   de: {
     importantTitle: "Wichtige Einladungen",
     noteReminder: "Notiz-Erinnerung", listReminder: "Listen-Erinnerung", untitledNote: "Notiz ohne Titel", untitledList: "Liste ohne Titel", reminderTitle: "Erinnerung", reminderCount: (n) => `${n} Erinnerung${n === 1 ? "" : "en"}`, nextReminder: "Nächste Erinnerung", reminderDone: "Erledigt", reminderOpen: "Notiz öffnen", reminderSnooze: "1 Stunde später", reminderSnoozed: "Erinnerung um 1 Stunde verschoben", reminderSnoozeError: "Erinnerung konnte nicht verschoben werden. Bitte erneut versuchen.", cineInvite: "hat dich in einen CineSwipe Raum eingeladen", duelInvite: "hat dich zu einem Tagesduell herausgefordert",
+    cineResult: "Deine CineSwipe-Ergebnisse sind da", cineResultDetail: (n) => n > 0 ? `${n} gemeinsame${n === 1 ? "r Treffer" : " Treffer"}` : "Keine gemeinsamen Treffer",
     acceptInvite: "Annehmen", declineInvite: "Ablehnen", acceptedInvite: "Angenommen", declinedInvite: "Abgelehnt", inviteCount: (n) => `${n} Einladung${n === 1 ? "" : "en"}`, nextInvite: "Nächste Einladung", inviteError: "Antwort konnte nicht gespeichert werden. Bitte erneut versuchen.",
     expand: "Details anzeigen", collapse: "Details ausblenden",
     title: "Benachrichtigungen", subtitle: "Alle Aktivitäten, neueste zuerst", today: "Heute", yesterday: "Gestern",
