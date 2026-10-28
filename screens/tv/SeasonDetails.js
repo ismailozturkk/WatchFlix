@@ -33,6 +33,7 @@ import {
 import Reminder from "../../components/Reminder";
 import ScreenDecor from "../../components/ScreenDecor";
 import { daysUntil, parseAirDate } from "../../utils/airDate";
+import { seasonRuntime } from "../../utils/seasonRuntime";
 import ScopedCommentButton from "../../components/comments/ScopedCommentButton";
 import { COMMENT_SCOPE } from "../../utils/commentScope";
 import { alpha } from "../../theme/colors";
@@ -343,6 +344,8 @@ export default function SeasonDetails({ route, navigation }) {
     details?.episodes?.length > 0
       ? Math.min(1, watchedSeasonCount / details.episodes.length)
       : 0;
+  // Başlıktaki toplam süre rozeti: bölüm sürelerinin toplamı (utils/seasonRuntime).
+  const seasonTotal = seasonRuntime(details?.episodes);
 
   // ── Yardımcılar ───────────────────────────────────────────────────────────
   const formatDate = useCallback(
@@ -559,6 +562,30 @@ export default function SeasonDetails({ route, navigation }) {
                 {details.episodes.length} {t.episode}
               </Text>
             </View>
+            {seasonTotal.minutes > 0 && (
+              <View
+                style={[
+                  styles.metaBadge,
+                  { backgroundColor: "rgba(255,255,255,0.08)" },
+                ]}
+              >
+                <Ionicons
+                  name="time-outline"
+                  size={12}
+                  color={theme.text?.secondary ?? "#aaa"}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={[
+                    styles.metaBadgeText,
+                    { color: theme.text?.secondary ?? "#aaa" },
+                  ]}
+                >
+                  {seasonTotal.minutes}
+                  {seasonTotal.partial ? "+" : ""} {t.time}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
