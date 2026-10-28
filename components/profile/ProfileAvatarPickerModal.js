@@ -24,7 +24,9 @@ import {
   getAvatarSource,
 } from "@utils/avatars";
 import { buildAvatarChoices, sameAvatarChoice } from "@utils/avatarPhotos";
+import { OWN_PHOTO_CHECK_TTL_MS } from "@utils/photoRevalidation";
 import { i18nText } from "@utils/i18nText";
+import useFreshPhotoSource from "../../hooks/useFreshPhotoSource";
 
 const PROVIDER_ICON = {
   "google.com": "logo-google",
@@ -39,7 +41,12 @@ function photoLabel(photoSource) {
 
 const AvatarCell = memo(function AvatarCell({ item, selected, accent, onSelect }) {
   const isPhoto = item.avatarIndex === CUSTOM_AVATAR_INDEX;
-  const avatarSource = getAvatarSource(item.avatarIndex, item.photoURL);
+  // Bağlı hesap fotoğrafları kullanıcının kendisinin: seçici açılınca kısa
+  // aralıkla denetlenir (Google'da değişen resim aynı adresten gelir).
+  const avatarSource = useFreshPhotoSource(
+    getAvatarSource(item.avatarIndex, item.photoURL),
+    isPhoto ? { maxAgeMs: OWN_PHOTO_CHECK_TTL_MS, priority: true } : undefined,
+  );
 
   return (
     <TouchableOpacity

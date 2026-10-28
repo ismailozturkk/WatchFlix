@@ -672,6 +672,15 @@ const cacheKeys = {
     default: null,
     scope: "user",
   },
+  // Adresi değişmeden yenilenen fotoğrafların (Google profil resmi) görsel
+  // önbellek sürümleri: adres → { v, h, at } (services/photoRevalidation.js).
+  // Cihaz düzeyi: görsel önbelleği hesaplar arasında ortak.
+  photoVersions: {
+    key: "photo_versions_v1",
+    type: TYPES.json,
+    default: null,
+    validate: plainObject,
+  },
 };
 
 /* ================================================================== */

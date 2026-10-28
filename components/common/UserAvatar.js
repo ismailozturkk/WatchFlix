@@ -15,6 +15,7 @@ import React, { memo, useCallback, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Image } from "expo-image";
 import { getAvatarSource, CUSTOM_AVATAR_INDEX, DEFAULT_AVATAR_INDEX, AVATARS } from "@utils/avatars";
+import useFreshPhotoSource from "../../hooks/useFreshPhotoSource";
 import Skeleton from "../Skeleton";
 
 const BADGE_POSITIONS = {
@@ -60,7 +61,11 @@ const UserAvatar = memo(function UserAvatar({
   // anlık kopyalardaki eski Google adresleri gibi) boş daire yerine yedek
   // avatar. Hangi adresin düştüğü tutulur: kaynak değişince yeniden denenir.
   const [failedUri, setFailedUri] = useState(null);
-  const candidate = source ?? getAvatarSource(avatarIndex, photoURL) ?? fallbackSource;
+  // Google fotoğrafı adresi değişmeden yenilenir; önbellekteki eski kopya
+  // arka planda denetlenir (bkz. utils/photoRevalidation.js).
+  const candidate = useFreshPhotoSource(
+    source ?? getAvatarSource(avatarIndex, photoURL) ?? fallbackSource,
+  );
   const candidateUri = typeof candidate === "object" ? candidate?.uri || null : null;
   const handleError = useCallback(() => {
     if (candidateUri) setFailedUri(candidateUri);

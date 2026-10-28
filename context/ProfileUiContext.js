@@ -32,6 +32,9 @@ import {
   refreshLinkedPhotos,
   subscribeLinkedPhotos,
 } from "../services/avatarPhotoSync";
+import { requestPhotoCheck } from "../services/photoRevalidation";
+import { OWN_PHOTO_CHECK_TTL_MS, revalidatedUriOf } from "../utils/photoRevalidation";
+import useFreshPhotoSource from "../hooks/useFreshPhotoSource";
 import { i18nText } from "../utils/i18nText";
 
 const ProfileUiContext = createContext();
@@ -220,10 +223,27 @@ export const ProfileUiProvider = ({ children }) => {
 
   // Fotoğrafta getAvatarSource her çağrıda yeni { uri } döner; sabit tutulmazsa
   // context değeri her render'da değişir ve bütün tüketiciler yeniden çizilir.
-  const avatar = useMemo(
+  const avatarSource = useMemo(
     () => getAvatarSource(myAvatar.avatarIndex, myAvatar.photoURL),
     [myAvatar.avatarIndex, myAvatar.photoURL],
   );
+  // Google'da değiştirilen fotoğraf AYNI adresten gelir; cihazdaki eski kopya
+  // açılışta ve uygulama öne geldikçe (kısmalı) denetlenir. Sürümlü kaynak
+  // (`cacheKey`'li) tüketicilere geçer — UserAvatar onu ayrıca denetlemez.
+  const avatar = useFreshPhotoSource(avatarSource, {
+    maxAgeMs: OWN_PHOTO_CHECK_TTL_MS,
+    priority: true,
+  });
+  const ownPhotoUri = revalidatedUriOf(avatarSource);
+  useEffect(() => {
+    if (!ownPhotoUri) return undefined;
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") {
+        requestPhotoCheck(ownPhotoUri, { maxAgeMs: OWN_PHOTO_CHECK_TTL_MS, priority: true });
+      }
+    });
+    return () => sub.remove();
+  }, [ownPhotoUri]);
   const isloadingAvatar = avatarSaving;
   const selectAvatarIndex = myAvatar.avatarIndex;
 
