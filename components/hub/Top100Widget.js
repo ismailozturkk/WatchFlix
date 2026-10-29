@@ -1,6 +1,6 @@
 // components/hub/Top100Widget.js
 //
-// Eğlence'deki "Seelogd Top 100" kartı (Günün Sorusu'nun altında): sıralamanın ilk üç yapımı kürsü gibi yan yana,
+// Eğlence'deki "Seelogd Top 100" kartı (Günün Sorusu'nun altında): en çok oy alan ilk üç yapım kürsü gibi yan yana (oy sayılarıyla),
 // toplam Seelogd oyu ve kendi oy sayın. Dokununca tam liste (screens/fun/Top100Screen) açılır.
 // Veri hooks/useTop100'den; ekranla aynı bellek önbelleğini paylaşır.
 
@@ -13,7 +13,7 @@ import useTop100 from "@hooks/useTop100";
 import { useLanguage } from "@context/LanguageContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { getTop100Copy } from "@utils/top100Copy";
-import { formatScore } from "@utils/top100";
+import { showsTotalVotes } from "@utils/top100";
 
 const COLORS = ["#F59E0B", "#B45309", "#431407"];
 const SHADOW = "#B45309";
@@ -25,9 +25,9 @@ function Top100Widget({ navigation }) {
   const { language } = useLanguage();
   const copy = getTop100Copy(language);
   const { getTmdbUrl } = useImageQualitySettings();
-  const { status, ranked, totalVotes, myVotes } = useTop100();
+  const { status, ranked, totalVotes, myHype } = useTop100();
   const top = ranked.slice(0, 3);
-  const mine = Object.keys(myVotes).length;
+  const mine = Object.keys(myHype).length;
 
   return (
     <HubCard
@@ -44,7 +44,7 @@ function Top100Widget({ navigation }) {
 
       <View style={styles.badges}>
         <GlassPill icon="trophy" iconColor={MEDALS[0]} text={copy.eyebrow} tone="dark" />
-        {totalVotes > 0 ? <GlassPill icon="people" text={copy.totalVotes(totalVotes)} /> : null}
+        {showsTotalVotes(totalVotes) ? <GlassPill icon="people" text={copy.totalVotes(totalVotes)} /> : null}
       </View>
 
       <View style={styles.body}>
@@ -82,7 +82,7 @@ function Top100Widget({ navigation }) {
                 </View>
                 {row ? (
                   <Text style={styles.score} allowFontScaling={false}>
-                    {`★ ${formatScore(row.avg)}`}
+                    {copy.num(row.votes)}
                   </Text>
                 ) : null}
               </View>

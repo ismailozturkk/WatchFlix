@@ -1558,70 +1558,53 @@ service cloud.firestore {
       }
     }
 
-    // Top100/{movie|tv}_{tmdbId}: { type, id, sum, count } — "Seelogd Top 100" topluluk puan sayacı
-    // (services/top100Service.js). Sıralama istemcide: TMDB puanı + bu sayaçlar (utils/top100.js).
+    // Top100Hype/{movie|tv}_{tmdbId}: { type, id, count } — "Seelogd Top 100" oy sayacı
+    // (services/top100Service.js). Oy puansızdır ("hype"); sıralama istemcide: TMDB değerlendirme sayısı +
+    // Seelogd oyu × ağırlık (utils/top100.js).
     //
     // GÜVEN MODELİ (DailyPolls ile aynı): sayaç yalnız AYNI toplu yazımda kullanıcının oy dokümanı
-    // (votes/{uid} → { score: 1–10 }) yazılırken oynar.
-    //   • Yeni oy: count +1, sum +puan.
-    //   • Oy değişimi: count aynı, sum (yeni − eski) kadar.
-    //   • Kimlik/tür değişmez; oy ve sayaç silinemez. Oyların sahibi başkasına açık değildir.
-    match /Top100/{mediaKey} {
-      function t100VotePath() {
-        return /databases/$(database)/documents/Top100/$(mediaKey)/votes/$(request.auth.uid);
+    // (votes/{uid} → { hype: true }) oluşturulurken +1, silinirken −1 oynar. Kullanıcı başına yapım başına
+    // tek oy; geri alınabilir. Kimlik/tür değişmez, sayaç silinemez. Oyların sahibi başkasına açık değildir.
+    match /Top100Hype/{mediaKey} {
+      function hypeVotePath() {
+        return /databases/$(database)/documents/Top100Hype/$(mediaKey)/votes/$(request.auth.uid);
       }
-      function t100NewScore() { return getAfter(t100VotePath()).data.score; }
-      function t100Shape() {
-        return request.resource.data.keys().hasOnly(['type', 'id', 'sum', 'count'])
-            && request.resource.data.sum is int
+      function hypeShape() {
+        return request.resource.data.keys().hasOnly(['type', 'id', 'count'])
             && request.resource.data.count is int;
       }
 
       allow read: if isSignedIn();
       allow create: if isSignedIn()
                     && mediaKey.matches('^(movie|tv)_[1-9][0-9]{0,8}$')
-                    && t100Shape()
+                    && hypeShape()
                     && request.resource.data.type == mediaKey.split('_')[0]
                     && request.resource.data.id == int(mediaKey.split('_')[1])
-                    && !exists(t100VotePath())
-                    && existsAfter(t100VotePath())
-                    && request.resource.data.count == 1
-                    && request.resource.data.sum == t100NewScore();
+                    && !exists(hypeVotePath())
+                    && existsAfter(hypeVotePath())
+                    && request.resource.data.count == 1;
       allow update: if isSignedIn()
-                    && t100Shape()
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sum', 'count'])
-                    && existsAfter(t100VotePath())
-                    && (exists(t100VotePath())
-                        ? (request.resource.data.count == resource.data.count
-                           && request.resource.data.sum
-                              == resource.data.sum - get(t100VotePath()).data.score + t100NewScore())
-                        : (request.resource.data.count == resource.data.count + 1
-                           && request.resource.data.sum == resource.data.sum + t100NewScore()));
+                    && hypeShape()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
+                    && ((!exists(hypeVotePath()) && existsAfter(hypeVotePath())
+                         && request.resource.data.count == resource.data.count + 1)
+                     || (exists(hypeVotePath()) && !existsAfter(hypeVotePath())
+                         && resource.data.count > 0
+                         && request.resource.data.count == resource.data.count - 1));
       allow delete: if false;
 
       match /votes/{uid} {
-        function t100CounterPath() { return /databases/$(database)/documents/Top100/$(mediaKey); }
-        function t100ScoreOk() {
-          return request.resource.data.keys().hasOnly(['score'])
-              && request.resource.data.score is int
-              && request.resource.data.score >= 1
-              && request.resource.data.score <= 10;
-        }
+        function hypeCounterPath() { return /databases/$(database)/documents/Top100Hype/$(mediaKey); }
         allow read: if isOwner(uid);
         allow create: if isOwner(uid)
-                      && t100ScoreOk()
-                      && existsAfter(t100CounterPath())
-                      && getAfter(t100CounterPath()).data.count
-                         == (exists(t100CounterPath()) ? get(t100CounterPath()).data.count : 0) + 1
-                      && getAfter(t100CounterPath()).data.sum
-                         == (exists(t100CounterPath()) ? get(t100CounterPath()).data.sum : 0)
-                            + request.resource.data.score;
-        allow update: if isOwner(uid)
-                      && t100ScoreOk()
-                      && getAfter(t100CounterPath()).data.count == get(t100CounterPath()).data.count
-                      && getAfter(t100CounterPath()).data.sum
-                         == get(t100CounterPath()).data.sum - resource.data.score + request.resource.data.score;
-        allow delete: if false;
+                      && request.resource.data.keys().hasOnly(['hype'])
+                      && request.resource.data.hype == true
+                      && existsAfter(hypeCounterPath())
+                      && getAfter(hypeCounterPath()).data.count
+                         == (exists(hypeCounterPath()) ? get(hypeCounterPath()).data.count : 0) + 1;
+        allow delete: if isOwner(uid)
+                      && getAfter(hypeCounterPath()).data.count == get(hypeCounterPath()).data.count - 1;
+        allow update: if false;
       }
     }
   }

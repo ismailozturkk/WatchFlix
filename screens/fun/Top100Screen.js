@@ -2,16 +2,16 @@
 //
 // "Seelogd Top 100": film ve dizilerin KARIŞIK topluluk sıralaması (Eğlence > Günün Sorusu'nun altındaki karttan).
 //
-//   • Varsayılan liste: TMDB'nin en çok oylanan film + dizileri, TMDB puanına Seelogd oyları eklenerek sıralanır
-//     (model utils/top100.js; veri hooks/useTop100).
+//   • Sıra = hibrit oy sayısı: TMDB değerlendirme sayısı + Seelogd oyu × ağırlık (utils/top100.js; veri hooks/useTop100).
+//     En çok oy alan en üstte; puan ortalaması sıralamaya girmez.
+//   • 4'lü afiş ızgarası: her afişte sıra rozeti, oy sayısı ve tek dokunuşluk "Oy ver" (hype; tekrar dokununca geri alınır).
 //   • Üstte arama: herhangi bir film/diziyi bulup oy ver; Top 100 dışındaysa oyu onu yarışa sokar.
-//   • Her satırda "Oy ver" (1–10, Top100VoteSheet); kendi oyun satırda renkli rozet olarak görünür.
-//   • "Liste olarak kaydet" ve "Sohbete gönder": önce uzunluk (İlk 20/50/70/100, Top100CountSheet), sonra mevcut
-//     SaveSharedListModal / ShareToChatSheet (listShare). İkinci sayfa birincinin onDismissed'ında açılır
-//     (iOS iki Modal kuralı).
+//   • Üst kart: ünlem düğmesi (ayrıntılı açıklama, Top100InfoSheet) + "Liste olarak kaydet" / "Sohbete gönder".
+//     İkisi önce uzunluk sorar (İlk 20/50/70/100, Top100CountSheet), sonra SaveSharedListModal / ShareToChatSheet
+//     açılır — ikinci sayfa birincinin onDismissed'ında (iOS iki Modal kuralı).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
@@ -20,50 +20,39 @@ import GlassField from "@components/common/GlassField";
 import GlassTouchable from "@components/common/GlassTouchable";
 import ShareToChatSheet from "@components/chat/ShareToChatSheet";
 import SaveSharedListModal from "@components/modals/SaveSharedListModal";
-import Top100VoteSheet, { scoreColor } from "@components/top100/Top100VoteSheet";
 import Top100CountSheet from "@components/top100/Top100CountSheet";
+import Top100InfoSheet from "@components/top100/Top100InfoSheet";
 import { GameScreenShell } from "../game/GameScreenShell";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useApiSettings, useImageQualitySettings } from "@context/AppSettingsContext";
-import useTop100 from "@hooks/useTop100";
 import { useGlassScheme } from "@components/common/GlassSurface";
+import useTop100 from "@hooks/useTop100";
 import { searchTop100 } from "@services/top100Service";
 import { triggerHaptic } from "@services/hapticsService";
 import { buildListShare } from "@utils/chatShare";
-import { asCounter, combinedScore, formatScore, top100MediaList } from "@utils/top100";
+import { decorateItem, showsTotalVotes, top100MediaList } from "@utils/top100";
 import { getTop100Copy } from "@utils/top100Copy";
 
 const MEDALS = ["#F5B70A", "#A8B0BC", "#CD7F42"];
+const HYPE = "#F97316";
 const FILTERS = ["all", "movie", "tv"];
 const SEARCH_DEBOUNCE_MS = 350;
+const COLUMNS = 4;
+const GAP = 8;
+const SIDE = 16; // GameScreenShell içerik dolgusu
 
-const Row = React.memo(function Row({ row, myScore, copy, theme, getTmdbUrl, onOpen, onVote }) {
+const Cell = React.memo(function Cell({ row, width, hyped, copy, theme, getTmdbUrl, onOpen, onHype }) {
   const medal = row.rank && row.rank <= 3 ? MEDALS[row.rank - 1] : null;
   return (
-    <GlassTouchable
-      glass={false}
-      onPress={() => onOpen(row)}
-      accessibilityRole="button"
-      accessibilityLabel={copy.rowA11y(row.rank || "–", row.title, formatScore(row.avg))}
-      style={[styles.row, { backgroundColor: theme.secondary, borderColor: medal ? `${medal}88` : theme.border }]}
-    >
-      <View style={styles.rankCol}>
-        {medal ? (
-          <View style={[styles.medal, { backgroundColor: medal }]}>
-            <Text style={styles.medalText}>{row.rank}</Text>
-          </View>
-        ) : (
-          <Text
-            style={[styles.rankText, { color: row.rank ? theme.text.secondary : theme.text.muted }]}
-            allowFontScaling={false}
-          >
-            {row.rank || "–"}
-          </Text>
-        )}
-      </View>
-
-      <View style={[styles.poster, { backgroundColor: theme.border }]}>
+    <View style={{ width }}>
+      <GlassTouchable
+        glass={false}
+        onPress={() => onOpen(row)}
+        accessibilityRole="button"
+        accessibilityLabel={copy.cellA11y(row.rank, row.title, row.votes)}
+        style={[styles.poster, { width, height: width * 1.5, backgroundColor: theme.border }]}
+      >
         {row.poster_path ? (
           <Image
             source={{ uri: getTmdbUrl(row.poster_path, "poster", 200) }}
@@ -73,50 +62,48 @@ const Row = React.memo(function Row({ row, myScore, copy, theme, getTmdbUrl, onO
             recyclingKey={row.key}
           />
         ) : null}
-      </View>
-
-      <View style={styles.rowCopy}>
-        <Text style={[styles.rowTitle, { color: theme.text.primary }]} numberOfLines={2}>
-          {row.title}
-        </Text>
-        <Text style={[styles.rowMeta, { color: theme.text.muted }]} numberOfLines={1}>
-          {[row.media_type === "tv" ? copy.tv : copy.movie, row.year].filter(Boolean).join(" · ")}
-        </Text>
-        <View style={styles.scoreLine}>
-          <AppIcon family="Ionicons" name="star" size={12} color={MEDALS[0]} />
-          <Text style={[styles.scoreText, { color: theme.text.primary }]}>{formatScore(row.avg)}</Text>
-          <Text style={[styles.scoreSub, { color: theme.text.muted }]} numberOfLines={1}>
-            {`${copy.tmdb} ${formatScore(row.tmdbAvg)}${row.count > 0 ? ` · ${copy.votes(row.count)}` : ""}`}
+        <View style={[styles.rankBadge, medal ? { backgroundColor: medal } : styles.rankBadgePlain]}>
+          <Text style={[styles.rankText, medal && styles.rankTextMedal]} allowFontScaling={false}>
+            {row.rank ? `#${row.rank}` : "–"}
           </Text>
         </View>
-        {!row.rank ? (
-          <Text style={[styles.outside, { color: theme.text.muted }]}>{copy.outside}</Text>
+        {hyped ? (
+          <View style={styles.hypedMark}>
+            <AppIcon family="Ionicons" name="flame" size={11} color="#FFFFFF" />
+          </View>
         ) : null}
+      </GlassTouchable>
+
+      <Text style={[styles.cellTitle, { color: theme.text.primary }]} numberOfLines={1} allowFontScaling={false}>
+        {row.title}
+      </Text>
+      <View style={styles.votesLine}>
+        <AppIcon family="Ionicons" name="people" size={10} color={theme.text.muted} />
+        <Text style={[styles.votesText, { color: theme.text.secondary }]} numberOfLines={1} allowFontScaling={false}>
+          {copy.votes(row.votes)}
+        </Text>
       </View>
 
       <GlassTouchable
         glass={false}
-        onPress={() => onVote(row)}
-        hitSlop={6}
+        onPress={() => onHype(row)}
+        hitSlop={4}
         accessibilityRole="button"
-        accessibilityLabel={myScore ? `${copy.yourVote} ${myScore}` : copy.vote}
+        accessibilityState={{ selected: hyped }}
+        accessibilityLabel={copy.hypeA11y(row.title, hyped)}
         style={[
-          styles.voteBtn,
-          myScore
-            ? { backgroundColor: scoreColor(myScore), borderColor: scoreColor(myScore) }
-            : { borderColor: theme.accent, backgroundColor: `${theme.accent}14` },
+          styles.hypeBtn,
+          hyped
+            ? { backgroundColor: HYPE, borderColor: HYPE }
+            : { borderColor: `${HYPE}AA`, backgroundColor: `${HYPE}14` },
         ]}
       >
-        {myScore ? (
-          <>
-            <AppIcon family="Ionicons" name="star" size={12} color="#FFFFFF" />
-            <Text style={[styles.voteText, { color: "#FFFFFF" }]}>{myScore}</Text>
-          </>
-        ) : (
-          <Text style={[styles.voteText, { color: theme.accent }]}>{copy.vote}</Text>
-        )}
+        <AppIcon family="Ionicons" name={hyped ? "flame" : "flame-outline"} size={12} color={hyped ? "#FFFFFF" : HYPE} />
+        <Text style={[styles.hypeText, { color: hyped ? "#FFFFFF" : HYPE }]} numberOfLines={1} allowFontScaling={false}>
+          {hyped ? copy.voted : copy.vote}
+        </Text>
       </GlassTouchable>
-    </GlassTouchable>
+    </View>
   );
 });
 
@@ -125,21 +112,25 @@ export default function Top100Screen({ navigation }) {
   const { language } = useLanguage();
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
+  const { width: screenWidth } = useWindowDimensions();
   const glassScheme = useGlassScheme();
   const copy = getTop100Copy(language);
-  const { status, ranked, counters, myVotes, totalVotes, refresh, vote, rankOf, syncMyVote } = useTop100();
+  const { status, ranked, counters, myHype, totalVotes, refresh, toggleHype, rankOf, syncMyHype } = useTop100();
 
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [search, setSearch] = useState({ status: "idle", results: [] });
-  const [voteItem, setVoteItem] = useState(null);
+  const [infoVisible, setInfoVisible] = useState(false);
   const [countMode, setCountMode] = useState(null);
   const [countVisible, setCountVisible] = useState(false);
   const [pending, setPending] = useState(null); // { mode, count } — sayım sayfası kapanınca açılacak sayfa
   const [saveTarget, setSaveTarget] = useState(null);
   const [chatShare, setChatShare] = useState(null);
   const searchSeq = useRef(0);
+
+  // Afiş genişliği ÇİFT tam sayı (2:3 afiş yarım piksel kırpılmasın — shareKit PosterEdge dersi).
+  const cellWidth = Math.max(60, Math.floor((screenWidth - SIDE * 2 - GAP * (COLUMNS - 1)) / COLUMNS / 2) * 2);
 
   const trimmed = query.trim();
   const searching = trimmed.length > 0;
@@ -154,26 +145,22 @@ export default function Top100Screen({ navigation }) {
     const timer = setTimeout(() => {
       searchTop100(API_KEY, language, trimmed)
         .then((results) => {
-          if (seq === searchSeq.current) setSearch({ status: "ready", results });
+          if (seq !== searchSeq.current) return;
+          setSearch({ status: "ready", results });
+          syncMyHype(results.map((item) => item.key));
         })
         .catch(() => {
           if (seq === searchSeq.current) setSearch({ status: "error", results: [] });
         });
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [trimmed, searching, API_KEY, language]);
+  }, [trimmed, searching, API_KEY, language, syncMyHype]);
 
   const rankedByKey = useMemo(() => new Map(ranked.map((row) => [row.key, row])), [ranked]);
 
-  // Arama sonucu: Top 100'deyse sıralı satır, değilse sayaçtan hesaplanan puanla sırasız satır.
+  // Arama sonucu: Top 100'deyse sıralı satır, değilse sayaçla hesaplanan oy sayısıyla sırasız satır.
   const decorate = useCallback(
-    (item) => {
-      const hit = rankedByKey.get(item.key);
-      if (hit) return hit;
-      const counter = asCounter(counters[item.key]);
-      const { avg, score } = combinedScore({ ...item, ...counter });
-      return { ...item, ...counter, avg, score, rank: rankOf(item.key) };
-    },
+    (item) => rankedByKey.get(item.key) || { ...decorateItem(item, counters[item.key]), rank: rankOf(item.key) },
     [rankedByKey, counters, rankOf],
   );
 
@@ -182,39 +169,29 @@ export default function Top100Screen({ navigation }) {
     return filter === "all" ? ranked : ranked.filter((row) => row.media_type === filter);
   }, [searching, search.results, decorate, filter, ranked]);
 
-  const liveVoteItem = voteItem ? decorate(voteItem) : null;
-
   const openDetails = useCallback(
     (row) => navigation.navigate(row.media_type === "tv" ? "TvShowsDetails" : "MovieDetails", { id: row.id }),
     [navigation],
   );
 
-  const openVote = useCallback(
-    (row) => {
-      triggerHaptic("selection");
-      setVoteItem(row);
-      syncMyVote(row.key);
-    },
-    [syncMyVote],
-  );
-
-  const submitVote = useCallback(
-    async (score) => {
-      if (!voteItem) return;
+  const onHype = useCallback(
+    async (row) => {
+      const adding = !myHype[row.key];
+      triggerHaptic(adding ? "success" : "selection");
       try {
-        const { rank } = await vote(voteItem, score);
-        triggerHaptic("success");
-        Toast.show({
-          type: "success",
-          text1: copy.voteSaved,
-          text2: `${voteItem.title} · ${rank ? copy.newRank(rank) : copy.notRanked}`,
-        });
-        setVoteItem(null);
+        const { hyped, rank } = await toggleHype(row);
+        if (adding && hyped) {
+          Toast.show({
+            type: "success",
+            text1: copy.voteAdded,
+            text2: `${row.title} · ${rank ? copy.newRank(rank) : copy.notRanked}`,
+          });
+        }
       } catch {
         Toast.show({ type: "error", text1: copy.voteFailed });
       }
     },
-    [voteItem, vote, copy],
+    [myHype, toggleHype, copy],
   );
 
   const openCount = (mode) => {
@@ -239,7 +216,8 @@ export default function Top100Screen({ navigation }) {
     else setChatShare(buildListShare({ title, items: mediaList }));
   };
 
-  const myCount = Object.keys(myVotes).length;
+  const myCount = Object.keys(myHype).length;
+  const showTotal = showsTotalVotes(totalVotes);
 
   const header = (
     <View style={styles.headerWrap}>
@@ -252,20 +230,42 @@ export default function Top100Screen({ navigation }) {
         <View pointerEvents="none" style={styles.heroMark}>
           <AppIcon family="Ionicons" name="trophy-outline" size={130} color="rgba(255,255,255,0.08)" />
         </View>
-        <Text style={styles.heroEyebrow}>{copy.eyebrow}</Text>
-        <Text style={styles.heroBody}>{copy.heroBody}</Text>
-        <View style={styles.heroStats}>
-          <View style={styles.heroPill}>
-            <AppIcon family="Ionicons" name="people" size={12} color="#FFFFFF" />
-            <Text style={styles.heroPillText}>{copy.totalVotes(totalVotes)}</Text>
-          </View>
-          {myCount > 0 ? (
-            <View style={styles.heroPill}>
-              <AppIcon family="Ionicons" name="star" size={12} color="#FFD76A" />
-              <Text style={styles.heroPillText}>{copy.myVotes(myCount)}</Text>
-            </View>
-          ) : null}
+        <View style={styles.heroTop}>
+          <AppIcon family="Ionicons" name="trophy" size={15} color="#FFE7A3" />
+          <Text style={styles.heroEyebrow} numberOfLines={1}>
+            {copy.eyebrow}
+          </Text>
+          {/* Ayrıntılı açıklama: ünlem düğmesi → Top100InfoSheet */}
+          <GlassTouchable
+            glass={false}
+            onPress={() => {
+              triggerHaptic("selection");
+              setInfoVisible(true);
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={copy.infoA11y}
+            style={styles.infoBtn}
+          >
+            <AppIcon family="Ionicons" name="alert-circle-outline" size={20} color="#FFFFFF" />
+          </GlassTouchable>
         </View>
+        {showTotal || myCount > 0 ? (
+          <View style={styles.heroStats}>
+            {showTotal ? (
+              <View style={styles.heroPill}>
+                <AppIcon family="Ionicons" name="people" size={12} color="#FFFFFF" />
+                <Text style={styles.heroPillText}>{copy.totalVotes(totalVotes)}</Text>
+              </View>
+            ) : null}
+            {myCount > 0 ? (
+              <View style={styles.heroPill}>
+                <AppIcon family="Ionicons" name="flame" size={12} color="#FFD76A" />
+                <Text style={styles.heroPillText}>{copy.myVotes(myCount)}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
         <View style={styles.heroActions}>
           {[
             { mode: "save", icon: "bookmark-outline", label: copy.saveList },
@@ -376,17 +376,18 @@ export default function Top100Screen({ navigation }) {
 
   const renderItem = useCallback(
     ({ item }) => (
-      <Row
+      <Cell
         row={item}
-        myScore={myVotes[item.key] || null}
+        width={cellWidth}
+        hyped={!!myHype[item.key]}
         copy={copy}
         theme={theme}
         getTmdbUrl={getTmdbUrl}
         onOpen={openDetails}
-        onVote={openVote}
+        onHype={onHype}
       />
     ),
-    [myVotes, copy, theme, getTmdbUrl, openDetails, openVote],
+    [cellWidth, myHype, copy, theme, getTmdbUrl, openDetails, onHype],
   );
 
   return (
@@ -395,24 +396,19 @@ export default function Top100Screen({ navigation }) {
         data={data}
         keyExtractor={(row) => row.key}
         renderItem={renderItem}
+        numColumns={COLUMNS}
+        columnWrapperStyle={styles.gridRow}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        initialNumToRender={12}
+        initialNumToRender={16}
         windowSize={9}
       />
 
-      <Top100VoteSheet
-        visible={!!voteItem}
-        item={liveVoteItem}
-        myScore={voteItem ? myVotes[voteItem.key] || null : null}
-        copy={copy}
-        onClose={() => setVoteItem(null)}
-        onSubmit={submitVote}
-      />
+      <Top100InfoSheet visible={infoVisible} copy={copy} onClose={() => setInfoVisible(false)} />
 
       <Top100CountSheet
         visible={countVisible}
@@ -432,13 +428,24 @@ export default function Top100Screen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  list: { paddingBottom: 40, gap: 8 },
-  headerWrap: { gap: 12, marginBottom: 4 },
+  list: { paddingBottom: 40, gap: 14 },
+  gridRow: { gap: GAP },
+  headerWrap: { gap: 12, marginBottom: 2 },
   hero: { borderRadius: 24, padding: 16, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)" },
   heroMark: { position: "absolute", right: -20, top: -18, transform: [{ rotate: "-12deg" }] },
-  heroEyebrow: { color: "#FFE7A3", fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },
-  heroBody: { color: "#FFFFFF", fontSize: 14, lineHeight: 19, fontWeight: "700", marginTop: 6 },
-  heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 },
+  heroTop: { flexDirection: "row", alignItems: "center", gap: 7 },
+  heroEyebrow: { flex: 1, color: "#FFE7A3", fontSize: 12, fontWeight: "900", letterSpacing: 1.2 },
+  infoBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.32)",
+  },
+  heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
   heroPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -449,7 +456,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.24)",
   },
   heroPillText: { color: "#FFFFFF", fontSize: 11.5, fontWeight: "800" },
-  heroActions: { flexDirection: "row", gap: 8, marginTop: 14 },
+  heroActions: { flexDirection: "row", gap: 8, marginTop: 12 },
   heroBtn: {
     flex: 1,
     minHeight: 42,
@@ -472,39 +479,47 @@ const styles = StyleSheet.create({
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, borderWidth: 1 },
   filterText: { fontSize: 13, fontWeight: "800" },
 
-  row: {
-    flexDirection: "row",
+  poster: { borderRadius: 10, overflow: "hidden" },
+  rankBadge: {
+    position: "absolute",
+    left: 4,
+    top: 4,
+    minWidth: 24,
+    height: 20,
+    paddingHorizontal: 5,
+    borderRadius: 10,
     alignItems: "center",
-    gap: 10,
-    padding: 10,
-    borderRadius: 18,
-    borderWidth: 1,
+    justifyContent: "center",
   },
-  rankCol: { width: 30, alignItems: "center" },
-  rankText: { fontSize: 16, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  medal: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  medalText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
-  // 2:3 afiş, genişlik çift (kırpılma dersi).
-  poster: { width: 48, height: 72, borderRadius: 10, overflow: "hidden" },
-  rowCopy: { flex: 1, minWidth: 0 },
-  rowTitle: { fontSize: 14.5, fontWeight: "800", lineHeight: 18 },
-  rowMeta: { fontSize: 11.5, fontWeight: "600", marginTop: 2 },
-  scoreLine: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5 },
-  scoreText: { fontSize: 13, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  scoreSub: { flexShrink: 1, fontSize: 11, fontWeight: "600" },
-  outside: { fontSize: 10.5, fontWeight: "700", marginTop: 3 },
-  voteBtn: {
-    minWidth: 62,
-    height: 34,
-    borderRadius: 17,
+  rankBadgePlain: { backgroundColor: "rgba(0,0,0,0.68)" },
+  rankText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  rankTextMedal: { color: "#1F1300" },
+  hypedMark: {
+    position: "absolute",
+    right: 4,
+    top: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: HYPE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cellTitle: { fontSize: 11, fontWeight: "800", marginTop: 5 },
+  votesLine: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 1 },
+  votesText: { flexShrink: 1, fontSize: 10, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  hypeBtn: {
+    height: 26,
+    marginTop: 5,
+    borderRadius: 13,
     borderWidth: 1,
-    paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 3,
+    paddingHorizontal: 4,
   },
-  voteText: { fontSize: 12.5, fontWeight: "900" },
+  hypeText: { fontSize: 10.5, fontWeight: "900", flexShrink: 1 },
 
   state: { alignItems: "center", gap: 10, paddingVertical: 40 },
   stateText: { fontSize: 13, fontWeight: "700", textAlign: "center" },

@@ -1926,90 +1926,104 @@ describe("betaTesters (landing test kullanıcısı formu)", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Seelogd Top 100 (Top100): sayaç yalnız oy kaydıyla BİRLİKTE; yeni oy count+1/sum+puan, değişim sum farkı kadar.
+// Seelogd Top 100 (Top100Hype): puansız oy; sayaç yalnız oy kaydı oluşturulurken +1, silinirken −1.
 // ─────────────────────────────────────────────────────────────────────────────
-describe("Seelogd Top 100 (Top100)", () => {
+describe("Seelogd Top 100 (Top100Hype)", () => {
   const MK = "movie_550";
+  const C = "Top100Hype";
 
-  /** Top100Service.castTop100Vote ile aynı transaction. */
-  const castVote = (db, uid, score, key = MK) =>
+  /** Top100Service.setTop100Hype ile aynı transaction. */
+  const setHype = (db, uid, hyped, key = MK) =>
     runTransaction(db, async (tx) => {
-      const counterRef = doc(db, "Top100", key);
-      const voteRef = doc(db, "Top100", key, "votes", uid);
+      const counterRef = doc(db, C, key);
+      const voteRef = doc(db, C, key, "votes", uid);
       const counter = await tx.get(counterRef);
       const vote = await tx.get(voteRef);
-      const c = counter.exists() ? counter.data() : { sum: 0, count: 0 };
-      const prev = vote.exists() ? vote.data().score : null;
-      const next = prev === null ? { sum: c.sum + score, count: c.count + 1 } : { sum: c.sum - prev + score, count: c.count };
-      tx.set(voteRef, { score });
-      if (counter.exists()) tx.update(counterRef, next);
-      else {
-        const [type, id] = key.split("_");
-        tx.set(counterRef, { type, id: Number(id), ...next });
+      const count = counter.exists() ? counter.data().count : 0;
+      if (vote.exists() === hyped) return;
+      if (hyped) {
+        tx.set(voteRef, { hype: true });
+        if (counter.exists()) tx.update(counterRef, { count: count + 1 });
+        else {
+          const [type, id] = key.split("_");
+          tx.set(counterRef, { type, id: Number(id), count: 1 });
+        }
+      } else {
+        tx.delete(voteRef);
+        tx.update(counterRef, { count: count - 1 });
       }
     });
 
-  const rawBatch = (db, uid, score, counterFields, { update = true, key = MK } = {}) => {
+  const addBatch = (db, uid, counterFields, { create = false, vote = { hype: true }, key = MK } = {}) => {
     const batch = writeBatch(db);
-    batch.set(doc(db, "Top100", key, "votes", uid), { score });
-    if (update) batch.update(doc(db, "Top100", key), counterFields);
-    else batch.set(doc(db, "Top100", key), counterFields);
+    batch.set(doc(db, C, key, "votes", uid), vote);
+    if (create) batch.set(doc(db, C, key), counterFields);
+    else batch.update(doc(db, C, key), counterFields);
+    return batch.commit();
+  };
+  const removeBatch = (db, uid, counterFields, key = MK) => {
+    const batch = writeBatch(db);
+    batch.delete(doc(db, C, key, "votes", uid));
+    batch.update(doc(db, C, key), counterFields);
     return batch.commit();
   };
 
-  test("ilk oy sayacı kurar, sonrakiler ekler, oy değişimi farkı yazar; sayaç herkese okunur", async () => {
-    await assertSucceeds(castVote(alice, ALICE, 9));
-    await assertSucceeds(castVote(bob, BOB, 7));
-    await assertSucceeds(castVote(alice, ALICE, 4)); // değişim: 9 → 4
-    const snap = await assertSucceeds(getDoc(doc(carol, "Top100", MK)));
-    expect(snap.data()).toEqual({ type: "movie", id: 550, sum: 11, count: 2 });
+  test("oy sayacı kurar, sonrakiler +1, geri alma −1; sayaç herkese okunur", async () => {
+    await assertSucceeds(setHype(alice, ALICE, true));
+    await assertSucceeds(setHype(bob, BOB, true));
+    await assertSucceeds(setHype(alice, ALICE, false));
+    const snap = await assertSucceeds(getDoc(doc(carol, C, MK)));
+    expect(snap.data()).toEqual({ type: "movie", id: 550, count: 1 });
+    await assertSucceeds(setHype(alice, ALICE, true)); // geri alınan oy yeniden verilebilir
+    expect((await getDoc(doc(carol, C, MK))).data().count).toBe(2);
   });
 
-  test("dizi anahtarı da çalışır; bozuk anahtar ve uyumsuz tür/id reddedilir", async () => {
-    await assertSucceeds(castVote(alice, ALICE, 10, "tv_1396"));
-    await assertFails(castVote(alice, ALICE, 8, "person_12"));
-    await assertFails(castVote(alice, ALICE, 8, "movie_0"));
-    await assertFails(rawBatch(alice, ALICE, 8, { type: "tv", id: 550, sum: 8, count: 1 }, { update: false }));
-    await assertFails(rawBatch(alice, ALICE, 8, { type: "movie", id: 551, sum: 8, count: 1 }, { update: false }));
+  test("dizi anahtarı çalışır; bozuk anahtar ve uyumsuz tür/id reddedilir", async () => {
+    await assertSucceeds(setHype(alice, ALICE, true, "tv_1396"));
+    await assertFails(setHype(alice, ALICE, true, "person_12"));
+    await assertFails(setHype(alice, ALICE, true, "movie_0"));
+    await assertFails(addBatch(alice, ALICE, { type: "tv", id: 550, count: 1 }, { create: true }));
+    await assertFails(addBatch(alice, ALICE, { type: "movie", id: 551, count: 1 }, { create: true }));
+    await assertFails(addBatch(alice, ALICE, { type: "movie", id: 550, count: 1, sum: 9 }, { create: true }));
   });
 
-  test("puan 1–10 tam sayı olmalı; sayaç puanla tutarsızsa reddedilir", async () => {
-    await assertFails(rawBatch(alice, ALICE, 11, { type: "movie", id: 550, sum: 11, count: 1 }, { update: false }));
-    await assertFails(rawBatch(alice, ALICE, 0, { type: "movie", id: 550, sum: 0, count: 1 }, { update: false }));
-    await assertFails(rawBatch(alice, ALICE, 7.5, { type: "movie", id: 550, sum: 7.5, count: 1 }, { update: false }));
-    await assertFails(rawBatch(alice, ALICE, 8, { type: "movie", id: 550, sum: 80, count: 1 }, { update: false }));
-    await assertFails(rawBatch(alice, ALICE, 8, { type: "movie", id: 550, sum: 8, count: 5 }, { update: false }));
-    await assertSucceeds(rawBatch(alice, ALICE, 8, { type: "movie", id: 550, sum: 8, count: 1 }, { update: false }));
+  test("oy belgesi yalnız { hype: true }; sayaç tam +1 olmalı", async () => {
+    await assertFails(addBatch(alice, ALICE, { type: "movie", id: 550, count: 1 }, { create: true, vote: { hype: false } }));
+    await assertFails(addBatch(alice, ALICE, { type: "movie", id: 550, count: 1 }, { create: true, vote: { score: 10 } }));
+    await assertFails(addBatch(alice, ALICE, { type: "movie", id: 550, count: 5 }, { create: true }));
+    await assertSucceeds(addBatch(alice, ALICE, { type: "movie", id: 550, count: 1 }, { create: true }));
+    await assertFails(addBatch(bob, BOB, { count: 3 }));
+    await assertFails(addBatch(bob, BOB, { count: 2, type: "tv" }));
+    await assertSucceeds(addBatch(bob, BOB, { count: 2 }));
   });
 
-  test("yeni oyda count +1 dışı ve sum keyfî değer reddedilir; tür/id değiştirilemez", async () => {
-    await seed((db) => setDoc(doc(db, "Top100", MK), { type: "movie", id: 550, sum: 40, count: 5 }));
-    await assertFails(rawBatch(alice, ALICE, 8, { sum: 48, count: 7 }));
-    await assertFails(rawBatch(alice, ALICE, 8, { sum: 100, count: 6 }));
-    await assertFails(rawBatch(alice, ALICE, 8, { sum: 48, count: 6, type: "tv" }));
-    await assertSucceeds(rawBatch(alice, ALICE, 8, { sum: 48, count: 6 }));
+  test("ikinci oy reddedilir; oy kaydı olmadan sayaç oynatılamaz; sayaçsız oy olmaz", async () => {
+    await assertSucceeds(setHype(alice, ALICE, true));
+    await assertFails(addBatch(alice, ALICE, { count: 2 })); // aynı kullanıcı ikinci kez
+    await assertFails(updateDoc(doc(bob, C, MK), { count: 2 }));
+    await assertFails(setDoc(doc(bob, C, MK, "votes", BOB), { hype: true }));
+    await assertFails(updateDoc(doc(alice, C, MK, "votes", ALICE), { hype: true }));
+    await assertFails(deleteDoc(doc(alice, C, MK)));
   });
 
-  test("oy kaydı olmadan sayaç oynatılamaz; sayaçsız oy kaydı da olmaz; silinemez", async () => {
-    await seed((db) => setDoc(doc(db, "Top100", MK), { type: "movie", id: 550, sum: 40, count: 5 }));
-    await assertFails(updateDoc(doc(alice, "Top100", MK), { sum: 50, count: 6 }));
-    await assertFails(setDoc(doc(alice, "Top100", MK, "votes", ALICE), { score: 10 }));
-    await assertSucceeds(castVote(alice, ALICE, 6));
-    await assertFails(deleteDoc(doc(alice, "Top100", MK, "votes", ALICE)));
-    await assertFails(deleteDoc(doc(alice, "Top100", MK)));
+  test("geri alma: tam −1 olmalı; sayaç düşürülmeden oy silinemez; olmayan oy geri alınamaz", async () => {
+    await assertSucceeds(setHype(alice, ALICE, true));
+    await assertSucceeds(setHype(bob, BOB, true));
+    await assertFails(deleteDoc(doc(alice, C, MK, "votes", ALICE)));
+    await assertFails(removeBatch(alice, ALICE, { count: 0 }));
+    await assertFails(removeBatch(carol, CAROL, { count: 1 })); // carol hiç oy vermedi
+    await assertSucceeds(removeBatch(alice, ALICE, { count: 1 }));
   });
 
-  test("oy değişiminde count sabit, sum yalnız fark kadar oynar", async () => {
-    await assertSucceeds(castVote(alice, ALICE, 6));
-    await assertFails(rawBatch(alice, ALICE, 9, { sum: 9, count: 2 })); // count'u artırdı
-    await assertFails(rawBatch(alice, ALICE, 9, { sum: 15, count: 1 })); // eskiyi düşmedi
-    await assertSucceeds(rawBatch(alice, ALICE, 9, { sum: 9, count: 1 }));
+  test("başkası adına oy verilemez/geri alınamaz; oylar yalnız sahibine okunur", async () => {
+    await assertFails(setHype(alice, BOB, true));
+    await assertSucceeds(setHype(alice, ALICE, true));
+    await assertFails(removeBatch(bob, ALICE, { count: 0 }));
+    await assertSucceeds(getDoc(doc(alice, C, MK, "votes", ALICE)));
+    await assertFails(getDoc(doc(bob, C, MK, "votes", ALICE)));
   });
 
-  test("başkası adına oy yazılamaz; oylar yalnız sahibine okunur", async () => {
-    await assertFails(castVote(alice, BOB, 7));
-    await assertSucceeds(castVote(alice, ALICE, 7));
-    await assertSucceeds(getDoc(doc(alice, "Top100", MK, "votes", ALICE)));
-    await assertFails(getDoc(doc(bob, "Top100", MK, "votes", ALICE)));
+  test("eski puanlı Top100 koleksiyonu artık kapalı", async () => {
+    await assertFails(getDoc(doc(alice, "Top100", MK)));
   });
 });

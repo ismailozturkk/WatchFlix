@@ -1,13 +1,14 @@
 // hooks/useTop100.js
 //
-// "Seelogd Top 100"ün veri bağı: TMDB havuzu + topluluk sayaçları (services/top100Service) → sıralı liste
-// (utils/top100.rankTop100), cihazdaki kendi oylarım (Keys.top100Votes) ve oy verme.
+// "Seelogd Top 100"ün veri bağı: TMDB havuzu + topluluk sayaçları (services/top100Service) → hibrit oy sayısına
+// göre sıralı liste (utils/top100.rankTop100), cihazdaki kendi oylarım (Keys.top100Hype) ve oy aç/kapa.
 //
 // AKIŞ
 //   • Havuz + sayaçlar modül belleğinde CACHE_MS boyunca paylaşılır: Eğlence kartı ile ekran aynı yükü iki kez yapmaz.
-//   • Oy iyimserdir: sayaç ve kendi puanım anında güncellenir, sıralama yeniden hesaplanır; transaction düşerse ikisi
-//     de geri alınır ve hata fırlatılır (çağıran toast gösterir).
+//   • Oy iyimserdir: sayaç ve kendi oyum anında değişir, sıralama yeniden hesaplanır; transaction düşerse ikisi de
+//     geri alınır ve hata fırlatılır (çağıran toast gösterir).
 //   • Arama sonucundan oy verilen yapım havuzda yoksa `extras`a eklenir; böylece sıralamaya hemen girer.
+//   • Aynı yapıma üst üste dokunuş: yazım sürerken ikinci dokunuş yok sayılır (sayaç tutarlı kalsın).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -15,13 +16,13 @@ import { useApiSettings } from "../context/AppSettingsContext";
 import { useLanguage } from "../context/LanguageContext";
 import { Keys, get, set, useStored } from "../services/storage";
 import {
-  castTop100Vote,
+  fetchMyTop100Hype,
   fetchTop100Counters,
-  fetchMyTop100Vote,
   fetchTop100Details,
   fetchTop100Pool,
+  setTop100Hype,
 } from "../services/top100Service";
-import { applyVote, asCounter, normalizeMyVotes, rankTop100 } from "../utils/top100";
+import { applyHype, asCounter, normalizeMyHype, rankTop100 } from "../utils/top100";
 
 const CACHE_MS = 10 * 60 * 1000;
 let memory = null; // { language, at, pool, counters }
@@ -44,9 +45,10 @@ async function loadAll(apiKey, language) {
 
 /**
  * @returns {{
- *   status: "loading"|"ready"|"error", ranked: object[], counters: Record<string,{sum:number,count:number}>,
- *   myVotes: Record<string,number>, totalVotes: number, refresh: () => void,
- *   vote: (item: object, score: number) => Promise<{ rank: number|null }>, rankOf: (key: string) => number|null,
+ *   status: "loading"|"ready"|"error", ranked: object[], counters: Record<string,{count:number}>,
+ *   myHype: Record<string,true>, totalVotes: number, refresh: () => void,
+ *   toggleHype: (item: object) => Promise<{ hyped: boolean, rank: number|null }>, rankOf: (key: string) => number|null,
+ *   syncMyHype: (keys: string[]) => void,
  * }}
  */
 export default function useTop100() {
@@ -62,6 +64,7 @@ export default function useTop100() {
   const [status, setStatus] = useState(fresh ? "ready" : "loading");
   const [nonce, setNonce] = useState(0);
   const alive = useRef(true);
+  const busy = useRef(new Set());
   useEffect(() => {
     alive.current = true;
     return () => { alive.current = false; };
@@ -92,8 +95,8 @@ export default function useTop100() {
     return () => { cancelled = true; };
   }, [API_KEY, language, nonce]);
 
-  const raw = useStored(Keys.top100Votes, { uid });
-  const myVotes = useMemo(() => normalizeMyVotes(raw), [raw]);
+  const raw = useStored(Keys.top100Hype, { uid });
+  const myHype = useMemo(() => normalizeMyHype(raw), [raw]);
 
   const ranked = useMemo(
     () => rankTop100([...pool, ...Object.values(extras)], counters),
@@ -112,65 +115,78 @@ export default function useTop100() {
   );
 
   const writeMine = useCallback(
-    (key, score) => {
-      const next = { ...normalizeMyVotes(get(Keys.top100Votes, { uid })) };
-      if (score) next[key] = score;
+    (key, hyped) => {
+      const next = { ...normalizeMyHype(get(Keys.top100Hype, { uid })) };
+      if (hyped) next[key] = true;
       else delete next[key];
-      set(Keys.top100Votes, next, { uid });
+      set(Keys.top100Hype, next, { uid });
     },
     [uid],
   );
 
-  const vote = useCallback(
-    async (item, score) => {
+  const toggleHype = useCallback(
+    async (item) => {
       if (!uid || !item?.key) throw new Error("top100_no_user");
       const key = item.key;
-      const previous = myVotes[key] ?? null;
+      if (busy.current.has(key)) return { hyped: !!myHype[key], rank: rankOf(key) };
+      busy.current.add(key);
+      const was = !!myHype[key];
       const before = asCounter(counters[key]);
-      const optimistic = applyVote(before, previous, score);
+      const optimistic = applyHype(before, was, !was);
 
       const known = pool.some((row) => row.key === key);
       if (!known) setExtras((prev) => (prev[key] ? prev : { ...prev, [key]: item }));
       setCounters((prev) => ({ ...prev, [key]: optimistic }));
-      writeMine(key, score);
+      writeMine(key, !was);
 
       try {
-        const result = await castTop100Vote({ uid, type: item.media_type, id: item.id, score });
-        const settled = { ...counters, [key]: result.counter };
+        const result = await setTop100Hype({ uid, type: item.media_type, id: item.id, hyped: !was });
         if (memory && memory.language === language) {
           memory = {
             ...memory,
             counters: { ...memory.counters, [key]: result.counter },
-            pool: known || memory.pool.some((row) => row.key === key) ? memory.pool : [...memory.pool, item],
+            pool: memory.pool.some((row) => row.key === key) ? memory.pool : [...memory.pool, item],
           };
         }
         if (alive.current) setCounters((prev) => ({ ...prev, [key]: result.counter }));
-        const next = rankTop100([...pool, ...Object.values(extras), ...(known ? [] : [item])], settled);
-        return { rank: next.find((row) => row.key === key)?.rank ?? null };
+        if (result.hyped !== !was) writeMine(key, result.hyped);
+        const next = rankTop100([...pool, ...Object.values(extras), ...(known ? [] : [item])], {
+          ...counters,
+          [key]: result.counter,
+        });
+        return { hyped: result.hyped, rank: next.find((row) => row.key === key)?.rank ?? null };
       } catch (error) {
         if (alive.current) setCounters((prev) => ({ ...prev, [key]: before }));
-        writeMine(key, previous);
+        writeMine(key, was);
         throw error;
+      } finally {
+        busy.current.delete(key);
       }
     },
-    [uid, myVotes, counters, pool, extras, language, writeMine],
+    [uid, myHype, counters, pool, extras, language, rankOf, writeMine],
   );
 
-  // Oy sayfası açılınca: başka cihazdan verilmiş oyu yerel kayda getirir (puan seçicisi doğru başlasın).
-  const syncMyVote = useCallback(
-    async (key) => {
-      try {
-        const server = await fetchMyTop100Vote(uid, key);
-        if (server && server !== normalizeMyVotes(get(Keys.top100Votes, { uid }))[key]) writeMine(key, server);
-        return server;
-      } catch {
-        return null;
-      }
+  // Başka cihazdan verilmiş oyları görünen yapımlar için yerel kayda getirir (en fazla bir kez / yapım).
+  const synced = useRef(new Set());
+  const syncMyHype = useCallback(
+    (keys) => {
+      if (!uid) return;
+      (keys || []).forEach((key) => {
+        if (synced.current.has(key)) return;
+        synced.current.add(key);
+        fetchMyTop100Hype(uid, key)
+          .then((server) => {
+            if (server === null) return;
+            const local = !!normalizeMyHype(get(Keys.top100Hype, { uid }))[key];
+            if (server !== local && !busy.current.has(key)) writeMine(key, server);
+          })
+          .catch(() => {});
+      });
     },
     [uid, writeMine],
   );
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
-  return { status, ranked, counters, myVotes, totalVotes, refresh, vote, rankOf, syncMyVote };
+  return { status, ranked, counters, myHype, totalVotes, refresh, toggleHype, rankOf, syncMyHype };
 }

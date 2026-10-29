@@ -601,11 +601,11 @@ const dataKeys = {
     keepOnLogout: true,
     validate: plainObject,
   },
-  // Seelogd Top 100'de verdiğin puanlar (utils/top100.js): { "<movie|tv>_<id>": 1–10 }. Sunucudaki oy
-  // (Top100/{key}/votes/{uid}) asıl kayıttır; bu kopya listede "senin oyun"u ağ beklemeden göstermek için.
-  // Çıkışta SİLİNMEZ (dailyPoll ile aynı karar).
-  top100Votes: {
-    key: "top100_votes:",
+  // Seelogd Top 100'de oy verdiğin yapımlar (utils/top100.js): { "<movie|tv>_<id>": true }. Sunucudaki oy
+  // (Top100Hype/{key}/votes/{uid}) asıl kayıttır; bu kopya afişte "oy verdin"i ağ beklemeden göstermek için.
+  // Çıkışta SİLİNMEZ (dailyPoll ile aynı karar). Eski puanlı sürümün "top100_votes:" kaydı bilerek okunmaz.
+  top100Hype: {
+    key: "top100_hype:",
     type: TYPES.json,
     default: null,
     scope: "user",

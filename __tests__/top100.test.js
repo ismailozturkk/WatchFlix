@@ -1,74 +1,58 @@
-// __tests__/top100.test.js — Seelogd Top 100 sıralama çekirdeği (utils/top100.js).
+// __tests__/top100.test.js — Seelogd Top 100 sıralama çekirdeği (utils/top100.js): hibrit oy sayısı + hype.
 
 const {
   TOP100_SIZE,
   TOP100_PICK_COUNTS,
-  MIN_TMDB_VOTES,
-  PRIOR_MEAN,
-  applyVote,
+  SEELOGD_VOTE_WEIGHT,
+  applyHype,
   asCounter,
-  combinedScore,
-  formatScore,
+  groupDigits,
+  hybridVotes,
   mediaKeyOf,
-  normalizeMyVotes,
+  normalizeMyHype,
   parseMediaKey,
   pickableCounts,
   rankTop100,
-  tmdbWeight,
+  showsTotalVotes,
   toPoolItem,
   top100MediaList,
 } = require("../utils/top100");
 
-const item = (key, tmdbAvg, tmdbCount, extra = {}) => {
+const item = (key, tmdbCount, extra = {}) => {
   const { type, id } = parseMediaKey(key);
-  return { key, id, media_type: type, title: key, poster_path: "/p.jpg", year: "2000", tmdbAvg, tmdbCount, ...extra };
+  return { key, id, media_type: type, title: key, poster_path: "/p.jpg", year: "2000", tmdbAvg: 7, tmdbCount, ...extra };
 };
 
-describe("anahtarlar", () => {
+describe("anahtarlar ve biçim", () => {
   test("mediaKeyOf / parseMediaKey yalnız film ve dizi kabul eder", () => {
     expect(mediaKeyOf("movie", 550)).toBe("movie_550");
     expect(mediaKeyOf("tv", "1396")).toBe("tv_1396");
     expect(mediaKeyOf("person", 1)).toBeNull();
     expect(mediaKeyOf("movie", 0)).toBeNull();
-    expect(mediaKeyOf("movie", -3)).toBeNull();
     expect(parseMediaKey("tv_1396")).toEqual({ type: "tv", id: 1396 });
     expect(parseMediaKey("movie_0")).toBeNull();
     expect(parseMediaKey("movie_12x")).toBeNull();
   });
+
+  test("groupDigits dilin ayracıyla basamak gruplar", () => {
+    expect(groupDigits(34215)).toBe("34.215");
+    expect(groupDigits(1234567, ",")).toBe("1,234,567");
+    expect(groupDigits(999)).toBe("999");
+    expect(groupDigits(-5)).toBe("0");
+  });
+
+  test("toplam Seelogd oyu 100'ün altında gösterilmez", () => {
+    expect(showsTotalVotes(99)).toBe(false);
+    expect(showsTotalVotes(100)).toBe(true);
+  });
 });
 
-describe("puan modeli", () => {
-  test("TMDB ağırlığı log ölçekli ve tavanlı", () => {
-    expect(tmdbWeight(0)).toBe(0);
-    expect(tmdbWeight(999)).toBeCloseTo(60, 0);
-    expect(tmdbWeight(30000)).toBeLessThanOrEqual(100);
-    expect(tmdbWeight(1e9)).toBe(100);
-  });
-
-  test("Seelogd oyu yokken birleşik ortalama TMDB ortalamasıdır", () => {
-    const { avg } = combinedScore({ tmdbAvg: 8.4, tmdbCount: 20000 });
-    expect(avg).toBeCloseTo(8.4, 6);
-  });
-
-  test("Seelogd oyları TMDB ortalamasına EKLENİR (yüksek oy yukarı, düşük oy aşağı çeker)", () => {
-    const base = combinedScore({ tmdbAvg: 7.5, tmdbCount: 5000 });
-    const up = combinedScore({ tmdbAvg: 7.5, tmdbCount: 5000, sum: 100, count: 10 });
-    const down = combinedScore({ tmdbAvg: 7.5, tmdbCount: 5000, sum: 20, count: 10 });
-    expect(up.avg).toBeGreaterThan(base.avg);
-    expect(down.avg).toBeLessThan(base.avg);
-    expect(up.score).toBeGreaterThan(base.score);
-  });
-
-  test("tek bir 10 oyu az oylu yapımı zirveye taşımaz (Bayes çekimi)", () => {
-    const lone = combinedScore({ tmdbAvg: 0, tmdbCount: 0, sum: 10, count: 1 });
-    expect(lone.avg).toBe(10);
-    expect(lone.score).toBeLessThan(PRIOR_MEAN + 0.2);
-  });
-
-  test("formatScore tek ondalık; sıfır/boş tire", () => {
-    expect(formatScore(8.456)).toBe("8.5");
-    expect(formatScore(0)).toBe("–");
-    expect(formatScore(undefined)).toBe("–");
+describe("hibrit oy", () => {
+  test("TMDB değerlendirme sayısı + Seelogd oyu × ağırlık", () => {
+    expect(SEELOGD_VOTE_WEIGHT).toBe(100);
+    expect(hybridVotes({ tmdbCount: 30000 })).toBe(30000);
+    expect(hybridVotes({ tmdbCount: 30000, count: 5 })).toBe(30500);
+    expect(hybridVotes({ tmdbCount: "x", count: -3 })).toBe(0);
   });
 });
 
@@ -76,88 +60,79 @@ describe("havuz öğesi", () => {
   test("film/dizi, afişli ve başlıklı kayıtlar alınır; kişi ve afişsiz düşer", () => {
     expect(
       toPoolItem({ id: 550, title: "Fight Club", poster_path: "/a.jpg", release_date: "1999-10-15", vote_average: 8.4, vote_count: 30000 }, "movie"),
-    ).toMatchObject({ key: "movie_550", media_type: "movie", year: "1999", tmdbAvg: 8.4, tmdbCount: 30000 });
+    ).toMatchObject({ key: "movie_550", media_type: "movie", year: "1999", tmdbCount: 30000 });
     expect(toPoolItem({ id: 1396, media_type: "tv", name: "Breaking Bad", poster_path: "/b.jpg", first_air_date: "2008-01-20" }))
-      .toMatchObject({ key: "tv_1396", title: "Breaking Bad", year: "2008" });
+      .toMatchObject({ key: "tv_1396", title: "Breaking Bad", year: "2008", tmdbCount: 0 });
     expect(toPoolItem({ id: 5, media_type: "person", name: "X", poster_path: "/c.jpg" })).toBeNull();
     expect(toPoolItem({ id: 5, title: "No poster" }, "movie")).toBeNull();
   });
 
-  test("sayaç bozuk alanlarda sıfır; sum puan tavanını aşamaz", () => {
-    expect(asCounter(null)).toEqual({ sum: 0, count: 0 });
-    expect(asCounter({ sum: "x", count: -2 })).toEqual({ sum: 0, count: 0 });
-    expect(asCounter({ sum: 999, count: 2 })).toEqual({ sum: 20, count: 2 });
+  test("sayaç bozuk alanlarda sıfır", () => {
+    expect(asCounter(null)).toEqual({ count: 0 });
+    expect(asCounter({ count: -2 })).toEqual({ count: 0 });
+    expect(asCounter({ count: 7.9 })).toEqual({ count: 7 });
   });
 });
 
 describe("sıralama", () => {
-  test("film ve diziler KARIŞIK, puana göre sıralanır ve sıra numarası alır", () => {
+  test("en çok oy alan en üstte; film ve dizi KARIŞIK; puan ortalaması sırayı belirlemez", () => {
     const ranked = rankTop100([
-      item("movie_1", 7.0, 10000),
-      item("tv_2", 8.9, 10000),
-      item("movie_3", 8.2, 10000),
+      item("movie_1", 10000, { tmdbAvg: 9.5 }),
+      item("tv_2", 25000, { tmdbAvg: 6.1 }),
+      item("movie_3", 18000, { tmdbAvg: 8.0 }),
     ]);
     expect(ranked.map((r) => r.key)).toEqual(["tv_2", "movie_3", "movie_1"]);
     expect(ranked.map((r) => r.rank)).toEqual([1, 2, 3]);
+    expect(ranked[0].votes).toBe(25000);
   });
 
-  test("Seelogd oyları sırayı değiştirir", () => {
-    const pool = [item("movie_1", 8.0, 2000), item("movie_2", 8.1, 2000)];
+  test("Seelogd oyları ağırlıkla eklenir ve sırayı değiştirir", () => {
+    const pool = [item("movie_1", 20000), item("movie_2", 20500)];
     expect(rankTop100(pool)[0].key).toBe("movie_2");
-    const flipped = rankTop100(pool, { movie_1: { sum: 400, count: 40 } });
-    expect(flipped[0].key).toBe("movie_1");
-    expect(flipped[0]).toMatchObject({ sum: 400, count: 40 });
+    const flipped = rankTop100(pool, { movie_1: { count: 6 } }); // 20000 + 600 > 20500
+    expect(flipped[0]).toMatchObject({ key: "movie_1", count: 6, votes: 20600 });
   });
 
-  test("tekrarlar elenir, liste TOP100_SIZE ile sınırlanır", () => {
-    const pool = Array.from({ length: 130 }, (_, i) => item(`movie_${i + 1}`, 6 + (i % 30) / 10, 5000));
-    pool.push(item("movie_1", 9.9, 5000));
-    const ranked = rankTop100(pool);
-    expect(ranked).toHaveLength(TOP100_SIZE);
-    expect(new Set(ranked.map((r) => r.key)).size).toBe(TOP100_SIZE);
-    // İlk gelen kazanır: sonradan eklenen 9.9'luk kopya yok sayılır.
-    const dup = rankTop100([item("movie_1", 7, 5000), item("movie_1", 9.9, 5000)]);
+  test("eşitlikte Seelogd oyu, sonra TMDB ortalaması belirler", () => {
+    const tie = rankTop100([item("movie_1", 1000, { tmdbAvg: 9 }), item("movie_2", 900, { tmdbAvg: 5 })], { movie_2: { count: 1 } });
+    expect(tie.map((r) => r.key)).toEqual(["movie_2", "movie_1"]);
+    const avg = rankTop100([item("movie_1", 1000, { tmdbAvg: 6 }), item("movie_2", 1000, { tmdbAvg: 8 })]);
+    expect(avg[0].key).toBe("movie_2");
+  });
+
+  test("tekrarlar elenir (ilk gelen kazanır), liste TOP100_SIZE ile sınırlanır", () => {
+    const pool = Array.from({ length: 130 }, (_, i) => item(`movie_${i + 1}`, 50000 - i));
+    expect(rankTop100(pool)).toHaveLength(TOP100_SIZE);
+    const dup = rankTop100([item("movie_1", 5), item("movie_1", 99999)]);
     expect(dup).toHaveLength(1);
-    expect(dup[0].tmdbAvg).toBe(7);
-  });
-
-  test("az oylu TMDB kaydı yalnız Seelogd oyu varsa yarışır", () => {
-    const pool = [item("movie_9", 9.5, MIN_TMDB_VOTES - 1)];
-    expect(rankTop100(pool)).toHaveLength(0);
-    expect(rankTop100(pool, { movie_9: { sum: 9, count: 1 } })).toHaveLength(1);
+    expect(dup[0].tmdbCount).toBe(5);
   });
 });
 
-describe("oy aritmetiği (sunucu kuralıyla aynı)", () => {
-  test("yeni oy count+1 sum+puan; değişim count sabit sum farkı", () => {
-    expect(applyVote({ sum: 40, count: 5 }, null, 8)).toEqual({ sum: 48, count: 6 });
-    expect(applyVote({ sum: 48, count: 6 }, 8, 3)).toEqual({ sum: 43, count: 6 });
-    expect(applyVote({ sum: 0, count: 0 }, null, 10)).toEqual({ sum: 10, count: 1 });
-    expect(applyVote({ sum: 10, count: 1 }, null, 11)).toEqual({ sum: 10, count: 1 });
+describe("oy (hype) aritmetiği — sunucu kuralıyla aynı", () => {
+  test("oy +1, geri alma −1, aynı durum değişmez, sıfırın altına inmez", () => {
+    expect(applyHype({ count: 4 }, false, true)).toEqual({ count: 5 });
+    expect(applyHype({ count: 5 }, true, false)).toEqual({ count: 4 });
+    expect(applyHype({ count: 5 }, true, true)).toEqual({ count: 5 });
+    expect(applyHype({ count: 0 }, true, false)).toEqual({ count: 0 });
   });
 
-  test("normalizeMyVotes bozuk anahtar ve puanları düşürür", () => {
-    expect(normalizeMyVotes({ movie_1: 9, tv_2: 0, foo: 5, movie_3: 7.5, tv_4: 10 })).toEqual({ movie_1: 9, tv_4: 10 });
-    expect(normalizeMyVotes(null)).toEqual({});
-    expect(normalizeMyVotes([1, 2])).toEqual({});
+  test("normalizeMyHype yalnız geçerli anahtar + true kabul eder (eski puan kaydı düşer)", () => {
+    expect(normalizeMyHype({ movie_1: true, tv_2: 9, foo: true, tv_4: true })).toEqual({ movie_1: true, tv_4: true });
+    expect(normalizeMyHype(null)).toEqual({});
+    expect(normalizeMyHype([1])).toEqual({});
   });
 });
 
 describe("liste kaydı / sohbet", () => {
   test("seçilen uzunluklar 20·50·70·100; eksik listede uzun seçenekler pasif", () => {
     expect(TOP100_PICK_COUNTS).toEqual([20, 50, 70, 100]);
-    expect(pickableCounts(60)).toEqual([
-      { count: 20, enabled: true },
-      { count: 50, enabled: true },
-      { count: 70, enabled: false },
-      { count: 100, enabled: false },
-    ]);
+    expect(pickableCounts(60).map((o) => o.enabled)).toEqual([true, true, false, false]);
   });
 
   test("top100MediaList sıralı ilk N öğeyi paylaşım/kayıt şekline çevirir", () => {
-    const ranked = rankTop100([item("tv_2", 8.9, 10000), item("movie_1", 7.0, 10000)]);
-    const list = top100MediaList(ranked, 1);
-    expect(list).toEqual([
+    const ranked = rankTop100([item("tv_2", 9000, { tmdbAvg: 8.94 }), item("movie_1", 100)]);
+    expect(top100MediaList(ranked, 1)).toEqual([
       { id: 2, media_type: "tv", title: "tv_2", poster_path: "/p.jpg", release_date: "2000-01-01", vote_average: 8.9 },
     ]);
   });
@@ -165,7 +140,7 @@ describe("liste kaydı / sohbet", () => {
   test("chatShare.buildListShare ve listShare.sharedListToItems ile uyumlu", () => {
     const { buildListShare } = require("../utils/chatShare");
     const { sharedListToItems } = require("../utils/listShare");
-    const ranked = rankTop100([item("tv_2", 8.9, 10000), item("movie_1", 7.0, 10000)]);
+    const ranked = rankTop100([item("tv_2", 9000), item("movie_1", 100)]);
     const mediaList = top100MediaList(ranked, 20);
     const share = buildListShare({ title: "Seelogd Top 20", items: mediaList });
     expect(share).toMatchObject({ type: "list", title: "Seelogd Top 20", total: 2 });
