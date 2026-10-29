@@ -601,6 +601,17 @@ const dataKeys = {
     keepOnLogout: true,
     validate: plainObject,
   },
+  // Seelogd Top 100'de verdiğin puanlar (utils/top100.js): { "<movie|tv>_<id>": 1–10 }. Sunucudaki oy
+  // (Top100/{key}/votes/{uid}) asıl kayıttır; bu kopya listede "senin oyun"u ağ beklemeden göstermek için.
+  // Çıkışta SİLİNMEZ (dailyPoll ile aynı karar).
+  top100Votes: {
+    key: "top100_votes:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
   // "Önce hangisi?" hızlı oyununun kaydı (utils/olderGame.js): { best, plays, correct, answered }. Yalnız bu
   // cihazda tutulur (liderlik / XP yok) ve çıkışta SİLİNMEZ: rekor kullanıcıya aittir, bulut kopyası yoktur.
   olderGame: {

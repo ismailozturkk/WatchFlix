@@ -89,6 +89,7 @@ export const SECTION_SCREENS = Object.freeze(
         section("cineswipe", "heart-half-outline", "purple"),
         section("bingo", "grid-outline", "teal"),
         section("poll", "help-circle-outline", "purple"),
+        section("top100", "podium-outline", "amber"),
         section("tournament", "trophy-outline", "amber"),
         section("games", "game-controller-outline", "purple"),
       ],

@@ -62,6 +62,11 @@ const EXCLUDED = {
   "components/tournament/NomineeSearchModal.js": "ortak turnuva",
   "components/tournament/PodiumModal.js": "ortak turnuva",
   "screens/tournament/TournamentScreen.js": "ortak turnuva",
+  // Seelogd Top 100: topluluk sıralaması; turnuva gibi herkes aynı afişi görür (liste/sohbete de bu afiş gider).
+  "components/hub/Top100Widget.js": "ortak Top 100",
+  "components/top100/Top100CountSheet.js": "ortak Top 100",
+  "components/top100/Top100VoteSheet.js": "ortak Top 100",
+  "screens/fun/Top100Screen.js": "ortak Top 100",
   // CineMatch yanıt kartları: yanıtta kayıtlı öneri anlık görüntüsü.
   "components/AICineCards.js": "AI yanıt kartı",
   "components/ai/AIHistory.js": "AI yanıt kartı",

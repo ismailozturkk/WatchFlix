@@ -39,6 +39,7 @@ import TournamentWidget from "@components/hub/TournamentWidget";
 import CineSwipeWidget from "@components/hub/CineSwipeWidget";
 import BingoWidget from "@components/hub/BingoWidget";
 import DailyPollWidget from "@components/hub/DailyPollWidget";
+import Top100Widget from "@components/hub/Top100Widget";
 import { SectionHeader } from "@components/game/ui";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -143,6 +144,13 @@ export default function HubScreen({ navigation }) {
         {show("poll") && (
           <HubSection title={i18nText("autoI18n.gunun_sorusu_bolum", "Günün sorusu")} theme={theme}>
             <DailyPollWidget />
+          </HubSection>
+        )}
+
+        {/* Seelogd Top 100 (film + dizi topluluk sıralaması; oy, liste kaydı, sohbete gönder) */}
+        {show("top100") && (
+          <HubSection title="SEELOGD TOP 100" theme={theme}>
+            <Top100Widget navigation={navigation} />
           </HubSection>
         )}
 

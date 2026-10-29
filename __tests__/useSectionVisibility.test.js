@@ -118,7 +118,7 @@ describe("useScreenSections", () => {
     mount("hub");
     act(() => { setScreenSectionsShown("hub", false); });
     expect(seen.hub.allHidden).toBe(true);
-    expect(seen.hub.hiddenCount).toBe(6);
+    expect(seen.hub.hiddenCount).toBe(7);
     act(() => { setSectionShown("hub", "games", true); });
     expect(seen.hub.allHidden).toBe(false);
     act(() => { setScreenSectionsShown("hub", true); });

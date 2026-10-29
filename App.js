@@ -882,6 +882,11 @@ function AppContent() {
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
+          name="Top100Screen"
+          getComponent={() => require("./screens/fun/Top100Screen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
           name="OlderGameScreen"
           getComponent={() => require("./screens/game/OlderGameScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}

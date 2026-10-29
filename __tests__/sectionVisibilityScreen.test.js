@@ -147,7 +147,7 @@ describe("ilk görünüm", () => {
     pressTile("library");
     expect(rowIds()).toEqual(["nextUp", "lists", "reminders", "notes", "wrapped"]);
     pressTile("hub");
-    expect(rowIds()).toEqual(["feed", "cineswipe", "bingo", "poll", "tournament", "games"]);
+    expect(rowIds()).toEqual(["feed", "cineswipe", "bingo", "poll", "top100", "tournament", "games"]);
   });
 
   test("her dilde ekran adı ve bölüm başlığı gösterilir", () => {
