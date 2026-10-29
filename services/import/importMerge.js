@@ -70,6 +70,10 @@ const importDates = (item, fallbackDate) => {
   return [...new Set(raw.map(normalizeWatchDate).filter(Boolean))];
 };
 
+// Aktarımın eklediği izleme olayı kaynağını taşır ("letterboxd" | "imdb"): kaynak bazında
+// sıfırlama yalnız bu olayları geri alır, kullanıcının kendi izlemelerine dokunmaz.
+const sourceExtra = (item) => (item?.importSource ? { source: item.importSource } : {});
+
 export function mergeImportedMovie(existing = {}, item = {}, options = {}) {
   const dates = importDates(item, options.fallbackDate);
   const currentEvents = materializeMovieWatchEvents(existing);
@@ -77,6 +81,7 @@ export function mergeImportedMovie(existing = {}, item = {}, options = {}) {
     scope: "movie",
     idPrefix: `import_movie_${item.id}`,
     now: options.now,
+    extra: sourceExtra(item),
   });
   const cleanDate = dates[dates.length - 1] || options.fallbackDate;
   const metadata = fillMissingFields(existing, {
@@ -114,6 +119,7 @@ export function mergeImportedTv(existing = {}, item = {}, options = {}) {
     idPrefix: `import_tv_${item.id}`,
     now: options.now,
     extra: {
+      ...sourceExtra(item),
       episodeKeys: [],
       seasonNumbers: Array.from({ length: seasonCount }, (_, index) => index + 1),
       episodeCount,

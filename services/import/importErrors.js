@@ -10,11 +10,18 @@ export const IMPORT_ERROR_CODES = Object.freeze({
   noBundle: "noBundle",
   noBundleItems: "noBundleItems",
   zipNoCsv: "zipNoCsv",
+  zipTooLarge: "zipTooLarge",
   emptyHeaders: "emptyHeaders",
   unrecognizedCsv: "unrecognizedCsv",
   noItemsInFile: "noItemsInFile",
   noTmdbMatch: "noTmdbMatch",
   zipOpen: "zipOpen",
+  // Aktarım sırasında: kullanıcı durdurdu / bağlantı koptu / TMDB erişilemez /
+  // art arda kayıt hatası. Hepsinde tamamlanan kayıtlar korunur, iş kaldığı yerden sürer.
+  cancelled: "cancelled",
+  network: "network",
+  tmdbUnavailable: "tmdbUnavailable",
+  saveInterrupted: "saveInterrupted",
 });
 
 export class ImportError extends Error {
@@ -28,3 +35,5 @@ export class ImportError extends Error {
     this.code = code;
   }
 }
+
+export const isCancelledImport = (error) => error?.code === IMPORT_ERROR_CODES.cancelled;

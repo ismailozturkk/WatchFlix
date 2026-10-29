@@ -80,5 +80,5 @@ test.each(SUPPORTED_LANGUAGE_CODES)("%s import errors and help placeholders use 
   }
   expect(importErrorText(new Error("raw service error"), copy)).toBe(copy.unexpected);
   expect(withPickLabel("{{pick}} / {{pick}}", copy)).toBe(`${copy.pickBtn} / ${copy.pickBtn}`);
-  expect(copy.matchingProgress(2, 5, "Film")).toContain("2 / 5");
+  expect(copy.run.counter(2, 5)).toContain("2 / 5");
 });

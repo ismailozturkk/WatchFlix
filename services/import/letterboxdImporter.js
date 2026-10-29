@@ -104,6 +104,7 @@ export function parseLetterboxdCsv(csvText, fileNameHint = null) {
         review,
         letterboxdUri,
         targetList,
+        importSource: "letterboxd",
       };
     })
     .filter(Boolean);

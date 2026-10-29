@@ -1,10 +1,25 @@
 // services/import/imdbImporter.js
 //
 // IMDb dışa aktarım (CSV) formatını tanıyan ve normalleştiren servis.
-// ratings.csv ve watchlist.csv formatlarını, dizi/film ayrımını ve süre/tür alanlarını destekler.
+// ratings.csv ve watchlist/liste dışa aktarımlarını, dizi/film ayrımını ve süre/tür alanlarını destekler.
+//
+// IMDb'nin iki başlık yazımı vardır: eski dışa aktarım "tvSeries", "tvMovie"; yenisi
+// "TV Series", "TV Movie". "tv" içeren her türü dizi saymak TV filmlerini ve TV
+// özel yayınlarını DİZİ olarak arıyordu; bölüm/oyun/podcast kayıtları da yanlış
+// eşleşmelerle kütüphaneye giriyordu. Tür artık tabloyla çözülür, desteklenmeyenler atlanır.
 
 import { parseCsv } from "./csvParser";
 import { ImportError } from "./importErrors";
+
+const TV_TYPES = new Set(["tvseries", "tvminiseries"]);
+const UNSUPPORTED_TYPES = new Set(["tvepisode", "videogame", "podcastseries", "podcastepisode"]);
+
+/** IMDb "Title Type" → "movie" | "tv"; desteklenmeyen tür (bölüm, oyun, podcast) → null. */
+export function imdbMediaType(rawType) {
+  const key = String(rawType || "movie").toLowerCase().replace(/[\s_-]+/g, "");
+  if (UNSUPPORTED_TYPES.has(key)) return null;
+  return TV_TYPES.has(key) ? "tv" : "movie";
+}
 
 /**
  * Verilen CSV'nin IMDb formatında olup olmadığını belirler.
@@ -26,9 +41,11 @@ export function isImdbCsv(headers) {
  * @returns {{
  *   source: "imdb",
  *   type: "watched" | "watchlist",
+ *   skippedCount: number,
  *   items: Array<{
  *     imdbId: string,
  *     title: string,
+ *     originalTitle: string | null,
  *     year: number | null,
  *     titleType: string | null,
  *     mediaType: "movie" | "tv",
@@ -49,23 +66,30 @@ export function parseImdbCsv(csvText) {
   }
 
   const hSet = new Set(headers);
-  const isWatchlist = !hSet.has("your rating") && (hSet.has("created") || hSet.has("description"));
+  // Liste/izleme listesi dışa aktarımı "Position" ve "Created" sütunlarını taşır. Yeni
+  // biçimde listelerde de "Your Rating" sütunu bulunduğundan ona bakmak izleme listesini
+  // "izlenenler" sanıyordu.
+  const isWatchlist = hSet.has("position") || hSet.has("created");
   const type = isWatchlist ? "watchlist" : "watched";
+  let skippedCount = 0;
 
   const items = data
     .map((row) => {
       const imdbId = (row["const"] || "").trim();
       const title = (row["title"] || "").trim();
+      const originalTitle = (row["original title"] || "").trim() || null;
       const rawYear = parseInt(row["year"], 10);
       const year = Number.isNaN(rawYear) ? null : rawYear;
       const titleType = (row["title type"] || "movie").trim().toLowerCase();
 
+      if (!imdbId && !title) return null;
+
       // Dizi veya Film tespiti
-      const isTv =
-        titleType.includes("tv") ||
-        titleType.includes("series") ||
-        titleType.includes("miniseries");
-      const mediaType = isTv ? "tv" : "movie";
+      const mediaType = imdbMediaType(titleType);
+      if (!mediaType) {
+        skippedCount += 1;
+        return null;
+      }
 
       // Puan (1-10 arası)
       let rating = null;
@@ -76,7 +100,8 @@ export function parseImdbCsv(csvText) {
         }
       }
 
-      const dateRated = row["date rated"] || row["created"] || null;
+      const dateRated = row["date rated"] || null;
+      const dateAdded = row["created"] || dateRated || null;
 
       // IMDb dosyasındaki süre (Runtime mins)
       const rawRuntime = parseInt(row["runtime (mins)"] || row["runtime"] || "", 10);
@@ -89,20 +114,20 @@ export function parseImdbCsv(csvText) {
         .map((g) => g.trim())
         .filter((g) => g.length > 0);
 
-      if (!imdbId && !title) return null;
-
       return {
         imdbId,
         title,
+        originalTitle,
         year,
         titleType,
         mediaType,
         rating,
         watchedDate: type === "watchlist" ? null : dateRated,
-        dateAdded: dateRated,
+        dateAdded,
         rawMinutes,
         rawGenres,
         targetList: type === "watchlist" ? "watchList" : "watchedMovies",
+        importSource: "imdb",
       };
     })
     .filter(Boolean);
@@ -110,6 +135,7 @@ export function parseImdbCsv(csvText) {
   return {
     source: "imdb",
     type,
+    skippedCount,
     items,
   };
 }

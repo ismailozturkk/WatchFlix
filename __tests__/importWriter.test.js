@@ -162,8 +162,8 @@ describe("transactional import writer", () => {
     expect(root["Weekend Picks"]).toHaveLength(1);
     expect(root["Weekend Picks"][0]).toMatchObject({ id: 7, name: "Imported", imagePath: "/a.jpg" });
     expect(root.statusIndex.movie[7].isInOtherLists).toBe(true);
-    expect(first).toEqual({ customListsCount: 1, customListItemsCount: 1 });
-    expect(second).toEqual({ customListsCount: 1, customListItemsCount: 0 });
+    expect(first).toMatchObject({ customListsCount: 1, customListItemsCount: 1, failedListsCount: 0, createdLists: ["Weekend Picks"] });
+    expect(second).toMatchObject({ customListsCount: 1, customListItemsCount: 0, failedListsCount: 0, createdLists: [] });
   });
 
   test("film import emits both buckets before progress and retains unrelated favorites, TV and activity", async () => {

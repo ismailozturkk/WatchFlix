@@ -167,9 +167,11 @@ describe("Letterboxd Bundle & ZIP Importer", () => {
     // Inception'ın harmanlanmış zengin kaydı:
     const inception = bundle.watchedItems.find((i) => i.title === "Inception");
     expect(inception).toBeDefined();
-    expect(inception.rating).toBe(10); // son 5 yıldız puanı -> 10
+    // ratings.csv filmin GÜNCEL puanıdır (4.5 → 9); günlükteki eski/yeni puanlar onu ezmez.
+    expect(inception.rating).toBe(9);
     expect(inception.watchedDate).toBe("2025-06-14"); // en son izleme tarihi
-    expect(inception.watchDates).toEqual(["2024-01-01", "2024-01-09", "2025-06-14"]);
+    // Günlük tarihleri varsa yalnız onlar izlemedir; watched.csv'nin "Date"i günlüğe ekleme günü.
+    expect(inception.watchDates).toEqual(["2024-01-09", "2025-06-14"]);
     expect(inception.isRewatch).toBe(true);
     expect(inception.review).toBe("Incredible film");
     expect(inception.targetList).toBe("watchedMovies");

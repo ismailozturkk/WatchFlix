@@ -27,7 +27,9 @@ export function decodeHtmlEntities(str) {
  */
 export function detectDelimiter(text) {
   if (!text) return ",";
-  const firstLine = text.split(/[\r\n]+/)[0] || "";
+  // Yalnız ilk satır: büyük dışa aktarımlarda tüm metni satırlara bölmek gereksiz bellek.
+  const lineEnd = text.search(/[\r\n]/);
+  const firstLine = lineEnd === -1 ? text : text.slice(0, lineEnd);
   const commaCount = (firstLine.match(/,/g) || []).length;
   const semicolonCount = (firstLine.match(/;/g) || []).length;
   const tabCount = (firstLine.match(/\t/g) || []).length;
@@ -109,6 +111,21 @@ export function parseCsvRows(text, customDelimiter = null) {
   }
 
   return rows.filter((row) => row.length > 0 && row.some((c) => c.length > 0));
+}
+
+/**
+ * Yalnız başlık satırını (küçük harfli) okur — dosya türünü tanımak için tüm dosyayı
+ * ayrıştırmaya gerek yok.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function parseCsvHeaders(text) {
+  if (!text || typeof text !== "string") return [];
+  const clean = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  const lineEnd = clean.search(/[\r\n]/);
+  const firstLine = lineEnd === -1 ? clean : clean.slice(0, lineEnd);
+  const [row] = parseCsvRows(firstLine);
+  return (row || []).map((cell) => cell.trim().toLowerCase());
 }
 
 /**
