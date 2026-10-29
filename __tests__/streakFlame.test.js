@@ -473,11 +473,13 @@ describe("StreakFlameSheet", () => {
 describe("bağlantılar (bekçi)", () => {
   const oku = (...p) => fs.readFileSync(path.join(__dirname, "..", ...p), "utf8");
 
-  test("profil: alev adın yanında ve 'streak' bölümüyle gizlenebilir", () => {
+  test("profil: alev kimlik rozetlerinin yanında ve 'streak' bölümüyle gizlenebilir", () => {
     const src = oku("screens", "tabs", "ProfileScreen.js");
     expect(src).toMatch(/showSection\("streak"\)/);
-    expect(src).toMatch(/nameAccessory=\{streakBadge\}/);
-    expect(oku("components", "profile", "ProfileIdentityBlock.js")).toMatch(/\{nameAccessory\}/);
+    expect(src).toMatch(/badgeAccessory=\{streakBadge\}/);
+    expect(oku("components", "profile", "ProfileIdentityBlock.js")).toMatch(/trailing=\{badgeAccessory\}/);
+    // Rozet yoksa (Free) satır yalnız aleviyle çizilir.
+    expect(oku("components", "badges", "IdentityBadgesRow.js")).toMatch(/!badges\?\.length && !trailing/);
   });
 
   test("kademe kutlaması uygulama genelinde (profil açılmasa da) koşar", () => {

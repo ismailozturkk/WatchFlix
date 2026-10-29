@@ -10,8 +10,10 @@ import { StyleSheet, Text, View } from "react-native";
 import AppBadge from "./AppBadge";
 import { badgeLabel } from "./badgeCatalog";
 
-export default function IdentityBadgesRow({ badges, theme, language, style }) {
-  if (!badges?.length) return null;
+// `trailing`: rozetlerin hemen sağında duran öğe (kendi profilde günlük seri
+// alevi). Rozet yoksa (Free) satır yalnız onu taşır.
+export default function IdentityBadgesRow({ badges, theme, language, style, trailing = null }) {
+  if (!badges?.length && !trailing) return null;
   return (
     <View style={[styles.row, style]}>
       {badges.map((badge) => (
@@ -35,6 +37,7 @@ export default function IdentityBadgesRow({ badges, theme, language, style }) {
           </Text>
         </View>
       ))}
+      {trailing}
     </View>
   );
 }
@@ -43,6 +46,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     flexWrap: "wrap",
+    alignItems: "center",
     gap: 5,
     marginTop: 6,
     marginBottom: 4,

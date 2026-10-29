@@ -131,7 +131,8 @@ const ProfileScreen = ({ navigation }) => {
   // Rozet/Perde kutlaması ARTIK burada değil: WatchProgressProvider içinde, profil
   // sekmesi hiç açılmamış olsa da oynar (hooks/useBadgeCelebration.js).
 
-  // Günlük seri alevi: art arda 3+ gün işaretleyince adın yanında yanar
+  // Günlük seri alevi: art arda 3+ gün işaretleyince Premium/Max rozetinin
+  // yanında (Free'de rozet satırında tek başına) yanar
   // (utils/streakFlame.js). Ayarlar > Ekran bölümleri > Profil > "Seri alevi" ile
   // gizlenir. Kimlik bloğu memo'lu; eleman yalnız seri değişince yenilenir.
   const showStreak = showSection("streak");
@@ -307,7 +308,7 @@ const ProfileScreen = ({ navigation }) => {
               // Yıllık hedef halkası düğmesi (Düzenle / Paylaş'ın yanında). Ayarlar > Ekran
               // bölümleri > Profil > "Yıllık izleme hedefi" ile gizlenir.
               showGoal={showSection("goal")}
-              nameAccessory={streakBadge}
+              badgeAccessory={streakBadge}
             />
           </View>
           {profile?.privacy?.showSocialLinksOnOwnProfile !== false && hasAnySocialLinks(socialLinks) && (

@@ -132,8 +132,9 @@ function ProfileIdentityBlock({
   settingsLabel,
   notificationsAction = null,
   showGoal = false,
-  // Adın hemen sağında duran öğe (günlük seri alevi, components/streak/StreakFlameBadge).
-  nameAccessory = null,
+  // Kimlik rozetlerinin (Premium/Max/Kurucu) hemen sağında duran öğe (günlük seri
+  // alevi, components/streak/StreakFlameBadge). Rozet yoksa satırda tek başına durur.
+  badgeAccessory = null,
 }) {
   const windowDims =
     typeof ReactNative.useWindowDimensions === "function"
@@ -170,9 +171,7 @@ function ProfileIdentityBlock({
 
   return (
     <View style={styles.root}>
-      {/* Ad satırı: ad + (varsa) seri alevi (Ayarlar dişlisi eylem satırına taşındı).
-          Alev varken ad sütunu DOLDURMAZ, yalnız sığmazsa küçülür: alev adın hemen
-          yanında durur, sütunun sağ ucuna itilmez. */}
+      {/* Ad satırı (Ayarlar dişlisi eylem satırına taşındı; seri alevi rozet satırında). */}
       <View style={styles.nameRow}>
         <Text
           allowFontScaling={false}
@@ -182,11 +181,10 @@ function ProfileIdentityBlock({
           // Ekranın en büyük metni olsa da bu kullanıcının kendi adı; geniş bir
           // başlık fontu tek satırda hemen kırpılır (bkz. utils/typographyRoles.js).
           fontRole="body"
-          style={[styles.name, nameAccessory ? styles.nameShrink : styles.nameFill, { color: theme.text.primary }]}
+          style={[styles.name, styles.nameFill, { color: theme.text.primary }]}
         >
           {displayName}
         </Text>
-        {nameAccessory}
       </View>
       {!!username && (
         <Text
@@ -203,6 +201,7 @@ function ProfileIdentityBlock({
         theme={theme}
         language={language}
         style={styles.badges}
+        trailing={badgeAccessory}
       />
 
       <View style={styles.meta}>
@@ -377,7 +376,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   nameFill: { flex: 1 },
-  nameShrink: { flexShrink: 1 },
   username: {
     marginTop: 1,
     fontSize: 13,
