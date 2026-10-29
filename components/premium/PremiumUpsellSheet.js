@@ -676,6 +676,80 @@ const ChoicePreviewCard = memo(function ChoicePreviewCard({ content, theme, ambi
   );
 });
 
+// ── Top 100 oy önizlemesi ────────────────────────────────────────────────────
+
+const VOTE_POSTER_W = 48;
+
+/**
+ * Top 100'de oy vermeye çalışırken gelen yükseltme: oy verilmek istenen yapım afişi (köşede kilit),
+ * "Seelogd Top 100 · #sıra", başlık ve "N oy · oyun +100 sayılır" satırıyla; ChoicePreviewCard'la aynı kart dili.
+ */
+const VotePreviewCard = memo(function VotePreviewCard({ content, theme, ambient, delay }) {
+  const { preview, color } = content;
+  return (
+    <Rise
+      delay={delay}
+      dy={18}
+      style={[
+        styles.card,
+        styles.reminderCard,
+        { backgroundColor: theme.secondary, borderColor: alpha(color, 0.45) },
+      ]}
+    >
+      <Rise delay={delay + 120} dy={0} from={0.88} style={styles.votePosterWrap}>
+        <View style={[styles.votePoster, { backgroundColor: alpha(color, 0.25) }]}>
+          {preview.posterUri ? (
+            <Image source={{ uri: preview.posterUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          ) : (
+            <Ionicons name="flame" size={22} color={color} />
+          )}
+          {ambient ? <Sheen width={VOTE_POSTER_W} delay={1500} rest={2800} strength={0.3} /> : null}
+        </View>
+        <View style={[styles.previewLock, { backgroundColor: theme.secondary }]}>
+          <View style={[styles.previewLockInner, { backgroundColor: color }]}>
+            <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+          </View>
+        </View>
+      </Rise>
+      <View style={styles.reminderBody}>
+        <View style={styles.reminderHead}>
+          <Text allowFontScaling={false} numberOfLines={1} style={[styles.reminderLabel, { color: theme.text.muted }]}>
+            {preview.label}
+          </Text>
+          {preview.rank ? (
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.reminderWhen, { color: readableOn(color, theme.secondary) }]}
+            >
+              {preview.rank}
+            </Text>
+          ) : null}
+        </View>
+        <Text allowFontScaling={false} numberOfLines={2} style={[styles.reminderTitle, { color: theme.text.primary }]}>
+          {preview.title}
+        </Text>
+        <View style={styles.voteMeta}>
+          <Ionicons name="people" size={12} color={theme.text.muted} />
+          <Text allowFontScaling={false} numberOfLines={1} style={[styles.voteMetaText, { color: theme.text.secondary }]}>
+            {preview.votes}
+          </Text>
+        </View>
+        <View style={styles.voteMeta}>
+          <Ionicons name="flame" size={12} color={color} />
+          <Text
+            allowFontScaling={false}
+            numberOfLines={2}
+            style={[styles.voteMetaText, { color: readableOn(color, theme.secondary) }]}
+          >
+            {preview.gain}
+          </Text>
+        </View>
+      </View>
+    </Rise>
+  );
+});
+
 // ── Plan kartları ────────────────────────────────────────────────────────────
 
 /**
@@ -1084,7 +1158,9 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
           />
         ) : null}
 
-        {content.preview ? (
+        {content.preview?.kind === "vote" ? (
+          <VotePreviewCard content={content} theme={theme} ambient={ambient} delay={meterDelay} />
+        ) : content.preview ? (
           <ChoicePreviewCard
             content={content}
             theme={theme}
@@ -1525,6 +1601,24 @@ const styles = StyleSheet.create({
   previewLabel: { fontSize: 12, fontWeight: "800", letterSpacing: 0.2 },
   previewArrowWrap: { width: PREVIEW_ARROW_SPACE, alignItems: "center", marginBottom: 22 },
   previewArrow: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  // Top 100 oy önizlemesi (afiş + sıra + oy sayısı); 2:3 afiş, genişlik çift.
+  reminderCard: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
+  reminderBody: { flex: 1, minWidth: 0 },
+  reminderHead: { flexDirection: "row", alignItems: "baseline", gap: 8 },
+  reminderLabel: { flexShrink: 1, fontSize: 11.5, fontWeight: "700", letterSpacing: 0.2 },
+  reminderWhen: { marginLeft: "auto", fontSize: 12, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  reminderTitle: { marginTop: 3, fontSize: 14.5, lineHeight: 19, fontWeight: "800" },
+  votePosterWrap: { width: VOTE_POSTER_W, height: VOTE_POSTER_W * 1.5 },
+  votePoster: {
+    width: VOTE_POSTER_W,
+    height: VOTE_POSTER_W * 1.5,
+    borderRadius: 10,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  voteMeta: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  voteMetaText: { flexShrink: 1, fontSize: 12, fontWeight: "700", fontVariant: ["tabular-nums"] },
   inlineRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
   inlineText: { fontSize: 12, fontWeight: "600" },
   noteText: { flex: 1, lineHeight: 17, marginTop: 0 },

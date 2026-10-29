@@ -25,9 +25,9 @@ function Top100Widget({ navigation }) {
   const { language } = useLanguage();
   const copy = getTop100Copy(language);
   const { getTmdbUrl } = useImageQualitySettings();
-  const { status, ranked, totalVotes, myHype } = useTop100();
+  const { status, ranked, totalVotes, used } = useTop100();
   const top = ranked.slice(0, 3);
-  const mine = Object.keys(myHype).length;
+  const mine = used;
 
   return (
     <HubCard

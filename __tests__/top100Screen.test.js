@@ -78,16 +78,30 @@ jest.mock("../context/AppSettingsContext", () => ({
   useImageQualitySettings: () => ({ getTmdbUrl: (p) => `img${p}` }),
 }));
 
+let mockLimit = 10;
+const mockShowUpsell = jest.fn();
+jest.mock("../hooks/usePremiumGate", () => ({
+  usePremiumGate: (featureId) => ({
+    featureId,
+    limit: mockLimit,
+    allows: (used = 0) => used < mockLimit,
+    showUpsell: (...a) => mockShowUpsell(featureId, ...a),
+  }),
+}));
+
 let mockPool = [];
 let mockCounters = {};
 const mockSetHype = jest.fn();
 const mockSearch = jest.fn();
 const mockMyHype = jest.fn();
+const mockUsage = jest.fn();
 jest.mock("../services/top100Service", () => ({
   fetchTop100Pool: () => Promise.resolve(mockPool),
   fetchTop100Counters: () => Promise.resolve(mockCounters),
   fetchTop100Details: () => Promise.resolve([]),
   fetchMyTop100Hype: (...a) => mockMyHype(...a),
+  fetchMyTop100Usage: (...a) => mockUsage(...a),
+  TOP100_LIMIT_ERROR: "top100_limit",
   searchTop100: (...a) => mockSearch(...a),
   setTop100Hype: (...a) => mockSetHype(...a),
 }));
@@ -121,6 +135,9 @@ beforeEach(() => {
   mockSetHype.mockReset();
   mockSearch.mockReset();
   mockMyHype.mockReset().mockResolvedValue(false);
+  mockLimit = 10;
+  mockUsage.mockReset().mockResolvedValue(0);
+  mockShowUpsell.mockClear();
   mockCounters = {};
   // 60 yapım: film ve dizi karışık, değerlendirme sayısı azalan (Yapım 1 en çok).
   mockPool = Array.from({ length: 60 }, (_, i) =>
@@ -199,26 +216,51 @@ test("Film/Dizi süzgeci yalnız o türü gösterir", async () => {
 });
 
 test("oy ver tek dokunuş: sunucuya yazılır, sayı +100 artar, yerelde saklanır; tekrar dokunuş geri alır", async () => {
-  mockSetHype.mockImplementation(({ hyped }) => Promise.resolve({ counter: { count: hyped ? 1 : 0 }, hyped }));
+  mockSetHype.mockImplementation(({ hyped }) => Promise.resolve({ counter: { count: hyped ? 1 : 0 }, hyped, used: hyped ? 1 : 0 }));
   await mount(<Top100Screen navigation={navigation()} />);
 
   await act(async () => { await hypeBtn("Yapım 3").props.onPress(); });
   await flush();
-  expect(mockSetHype).toHaveBeenLastCalledWith({ uid: "u1", type: "movie", id: 3, hyped: true });
+  expect(mockSetHype).toHaveBeenLastCalledWith({ uid: "u1", type: "movie", id: 3, hyped: true, limit: 10 });
   expect(get(Keys.top100Hype, { uid: "u1" })).toEqual({ movie_3: true });
   // 29800 + 100 = 29900: Yapım 2 ile eşit, eşitlikte Seelogd oyu kazanır → 2. sıraya çıkar.
   expect(touchByLabel(copy.cellA11y(2, "Yapım 3", 29900))).toBeTruthy();
   expect(hypeBtn("Yapım 3").findAllByType("Text")[0].props.children).toBe(copy.voted);
   expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ type: "success", text1: copy.voteAdded }));
-  expect(texts()).toContain(copy.myVotes(1));
+  expect(texts()).toContain(copy.budget(1, 10));
 
   mockToast.mockClear();
   await act(async () => { await hypeBtn("Yapım 3").props.onPress(); });
   await flush();
-  expect(mockSetHype).toHaveBeenLastCalledWith({ uid: "u1", type: "movie", id: 3, hyped: false });
+  expect(mockSetHype).toHaveBeenLastCalledWith({ uid: "u1", type: "movie", id: 3, hyped: false, limit: 10 });
   expect(get(Keys.top100Hype, { uid: "u1" })).toEqual({});
   expect(hypeBtn("Yapım 3").findAllByType("Text")[0].props.children).toBe(copy.vote);
   expect(mockToast).not.toHaveBeenCalled(); // geri almada toast yok
+  expect(texts()).toContain(copy.budget(0, 10)); // hak geri geldi
+});
+
+test("Premium hak doluyken (10/10): düğmeler kilitli, dokunuş yazmaz, kullanım göstergeli yükseltme sayfası açılır", async () => {
+  mockUsage.mockResolvedValue(10);
+  await mount(<Top100Screen navigation={navigation()} />);
+  expect(texts()).toContain(copy.budget(10, 10));
+  const btn = hypeBtn("Yapım 3");
+  expect(btn.findByType("Icon").props.name).toBe("lock-closed");
+  await act(async () => { await btn.props.onPress(); });
+  await flush();
+  expect(mockSetHype).not.toHaveBeenCalled();
+  expect(mockShowUpsell).toHaveBeenCalledWith("top100_vote", expect.objectContaining({ used: 10 }));
+});
+
+test("başka cihazda hak dolmuşsa sunucunun hata sayısıyla yükseltme sayfası açılır, oy geri alınır", async () => {
+  const limitError = Object.assign(new Error("top100_limit"), { code: "top100_limit", used: 10 });
+  mockSetHype.mockRejectedValue(limitError);
+  await mount(<Top100Screen navigation={navigation()} />);
+  await act(async () => { await hypeBtn("Yapım 3").props.onPress(); });
+  await flush();
+  expect(mockShowUpsell).toHaveBeenCalledWith("top100_vote", expect.objectContaining({ used: 10 }));
+  expect(mockToast).not.toHaveBeenCalled();
+  expect(get(Keys.top100Hype, { uid: "u1" })).toEqual({});
+  expect(texts()).toContain(copy.budget(10, 10));
 });
 
 test("oy yazılamazsa yerel kayıt ve sayı geri alınır, hata toast'ı çıkar", async () => {
@@ -229,6 +271,40 @@ test("oy yazılamazsa yerel kayıt ve sayı geri alınır, hata toast'ı çıkar
   expect(get(Keys.top100Hype, { uid: "u1" })).toEqual({});
   expect(texts()).toContain("29.800 oy");
   expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ type: "error", text1: copy.voteFailed }));
+});
+
+test("Free: oy düğmesi kilitli; dokunuş yazmaz, yapımın önizlemesiyle yükseltme sayfasını açar", async () => {
+  mockLimit = 0;
+  await mount(<Top100Screen navigation={navigation()} />);
+  const btn = hypeBtn("Yapım 3");
+  expect(btn.findByType("Icon").props.name).toBe("lock-closed");
+  await act(async () => { await btn.props.onPress(); });
+  await flush();
+  expect(mockSetHype).not.toHaveBeenCalled();
+  expect(get(Keys.top100Hype, { uid: "u1" })).toBeNull();
+  expect(mockShowUpsell).toHaveBeenCalledWith("top100_vote", {
+    used: 0,
+    preview: { kind: "vote", title: "Yapım 3", posterUri: "img/movie_3.jpg", rank: 3, votes: 29800 },
+  });
+  expect(texts().some((t) => t.includes("Oy hakkın"))).toBe(false); // Free'de hak çubuğu yok
+  // Liste olarak kaydet ve sohbete gönder Free'de de açık.
+  expect(touchWithText(copy.saveList).props.disabled).toBe(false);
+  expect(touchWithText(copy.sendChat).props.disabled).toBe(false);
+});
+
+test("Free: daha önce verilmiş oy görünür ve geri alınabilir (geri almak kapılı değil)", async () => {
+  mockLimit = 0;
+  mockUsage.mockResolvedValue(1);
+  const { set } = require("../services/storage");
+  set(Keys.top100Hype, { movie_3: true }, { uid: "u1" });
+  mockSetHype.mockResolvedValue({ counter: { count: 0 }, hyped: false, used: 0 });
+  await mount(<Top100Screen navigation={navigation()} />);
+  const btn = hypeBtn("Yapım 3");
+  expect(btn.findAllByType("Text")[0].props.children).toBe(copy.voted);
+  await act(async () => { await btn.props.onPress(); });
+  await flush();
+  expect(mockShowUpsell).not.toHaveBeenCalled();
+  expect(mockSetHype).toHaveBeenCalledWith({ uid: "u1", type: "movie", id: 3, hyped: false, limit: 0 });
 });
 
 test("ünlem düğmesi ayrıntılı açıklamayı açar; kartta kaydet/gönder durur", async () => {
@@ -282,7 +358,7 @@ test("arama: Top 100 dışındaki yapım sırasız görünür; oy verilince sır
   const outsider = poolItem("movie_999", 50, "Bilinmeyen");
   mockSearch.mockResolvedValue([outsider]);
   mockMyHype.mockResolvedValue(false);
-  mockSetHype.mockResolvedValue({ counter: { count: 1 }, hyped: true });
+  mockSetHype.mockResolvedValue({ counter: { count: 1 }, hyped: true, used: 1 });
   await mount(<Top100Screen navigation={navigation()} />);
   act(() => renderer.root.findByType("TextInput").props.onChangeText("bilin"));
   await act(async () => { jest.advanceTimersByTime(400); });
@@ -293,7 +369,7 @@ test("arama: Top 100 dışındaki yapım sırasız görünür; oy verilince sır
   expect(texts()).toContain("–"); // sıra rozeti yok
   await act(async () => { await hypeBtn("Bilinmeyen").props.onPress(); });
   await flush();
-  expect(mockSetHype).toHaveBeenCalledWith({ uid: "u1", type: "movie", id: 999, hyped: true });
+  expect(mockSetHype).toHaveBeenCalledWith({ uid: "u1", type: "movie", id: 999, hyped: true, limit: 10 });
   act(() => renderer.root.findByType("TextInput").props.onChangeText(""));
   await flush();
   expect(texts()).toContain("Bilinmeyen");

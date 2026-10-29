@@ -1595,17 +1595,67 @@ service cloud.firestore {
 
       match /votes/{uid} {
         function hypeCounterPath() { return /databases/$(database)/documents/Top100Hype/$(mediaKey); }
+        function hypeUserPath() { return /databases/$(database)/documents/Top100HypeUsers/$(request.auth.uid); }
+        // Aktif oy hakkı (utils/premiumFeatures "top100_vote" ile AYNI sayılar): Free 0, Premium 10, Max 20.
+        // Plan Users/{uid}.entitlements'tan okunur — istemci bu alanı YAZAMAZ.
+        function hypeVoteLimit() {
+          let ent = get(/databases/$(database)/documents/Users/$(request.auth.uid)).data.get('entitlements', {});
+          return (ent.get('premiumUnlimited', false) == true || ent.get('premiumPlan', 'free') == 'unlimited')
+              ? 20
+              : (ent.get('premiumPlan', 'free') == 'premium' ? 10 : 0);
+        }
+        function hypeUsedBefore() { return exists(hypeUserPath()) ? get(hypeUserPath()).data.used : 0; }
         allow read: if isOwner(uid);
+        // Yeni oy: yapım sayacı +1 VE kullanıcının hak sayacı +1 (last = bu yapım), hak sınırı aşılmaz.
         allow create: if isOwner(uid)
                       && request.resource.data.keys().hasOnly(['hype'])
                       && request.resource.data.hype == true
                       && existsAfter(hypeCounterPath())
                       && getAfter(hypeCounterPath()).data.count
-                         == (exists(hypeCounterPath()) ? get(hypeCounterPath()).data.count : 0) + 1;
+                         == (exists(hypeCounterPath()) ? get(hypeCounterPath()).data.count : 0) + 1
+                      && existsAfter(hypeUserPath())
+                      && getAfter(hypeUserPath()).data.last == mediaKey
+                      && getAfter(hypeUserPath()).data.used == hypeUsedBefore() + 1
+                      && getAfter(hypeUserPath()).data.used <= hypeVoteLimit();
+        // Geri alma her planda serbest: yapım sayacı −1 VE hak sayacı −1 (last = bu yapım). Hak sayacı
+        // olmayan (hak sisteminden önce verilmiş) oy, hak sayacına dokunmadan geri alınabilir.
         allow delete: if isOwner(uid)
-                      && getAfter(hypeCounterPath()).data.count == get(hypeCounterPath()).data.count - 1;
+                      && getAfter(hypeCounterPath()).data.count == get(hypeCounterPath()).data.count - 1
+                      && ((exists(hypeUserPath())
+                           && getAfter(hypeUserPath()).data.last == mediaKey
+                           && getAfter(hypeUserPath()).data.used == get(hypeUserPath()).data.used - 1)
+                       || (!exists(hypeUserPath()) && !existsAfter(hypeUserPath())));
         allow update: if false;
       }
+    }
+
+    // Top100HypeUsers/{uid}: { used, last } — kullanıcının AKTİF Top 100 oy sayısı (hak sınırı için).
+    // Yalnız AYNI toplu yazımda `last` yapımına oy verilirken +1, o oy geri alınırken −1 oynar; böylece
+    // sayaç oy olmadan düşürülüp hak şişirilemez. Sahibi okur; silinemez.
+    match /Top100HypeUsers/{uid} {
+      function hypeLastVote() {
+        return /databases/$(database)/documents/Top100Hype/$(request.resource.data.last)/votes/$(uid);
+      }
+      function hypeUserShape() {
+        return request.resource.data.keys().hasOnly(['used', 'last'])
+            && request.resource.data.used is int
+            && request.resource.data.used >= 0
+            && request.resource.data.last is string
+            && request.resource.data.last.matches('^(movie|tv)_[1-9][0-9]{0,8}$');
+      }
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+                    && hypeUserShape()
+                    && request.resource.data.used == 1
+                    && !exists(hypeLastVote())
+                    && existsAfter(hypeLastVote());
+      allow update: if isOwner(uid)
+                    && hypeUserShape()
+                    && ((request.resource.data.used == resource.data.used + 1
+                         && !exists(hypeLastVote()) && existsAfter(hypeLastVote()))
+                     || (request.resource.data.used == resource.data.used - 1
+                         && exists(hypeLastVote()) && !existsAfter(hypeLastVote())));
+      allow delete: if false;
     }
   }
 }

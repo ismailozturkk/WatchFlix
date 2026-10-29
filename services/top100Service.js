@@ -9,8 +9,9 @@
 //   • Topluluk sayaçları: Top100Hype/{mediaKey} → { type, id, count } (en çok oy alan TOP100_COUNTER_READ kadarı).
 //     Havuzda olmayan oylu yapımların TMDB verisi detay ucundan tamamlanır (axios önbelleği tekrar istemez).
 //
-// OY = tek transaction, aç/kapa: Top100Hype/{key}/votes/{uid} → { hype: true } oluşturulur (+1) ya da silinir (−1),
-// sayaç AYNI yazımda. firestore.rules eşleşmeyi zorunlu kılar.
+// OY = tek transaction, aç/kapa: Top100Hype/{key}/votes/{uid} → { hype: true } oluşturulur (+1) ya da silinir (−1);
+// yapım sayacı ve kullanıcının hak sayacı (Top100HypeUsers/{uid}) AYNI yazımda. firestore.rules eşleşmeyi ve
+// planın aktif oy hakkını (Free 0 · Premium 10 · Max 20) zorunlu kılar.
 
 import axios from "axios";
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, runTransaction } from "firebase/firestore";
@@ -26,6 +27,8 @@ const DETAIL_CONCURRENCY = 6;
 
 const counterRef = (key) => doc(db, TOP100_COLLECTION, key);
 const voteRef = (key, uid) => doc(db, TOP100_COLLECTION, key, "votes", uid);
+export const TOP100_USERS_COLLECTION = "Top100HypeUsers";
+const userRef = (uid) => doc(db, TOP100_USERS_COLLECTION, uid);
 
 async function tmdbGet(apiKey, path, params = {}) {
   const response = await axios.get(TMDB + path, {
@@ -119,32 +122,57 @@ export async function fetchMyTop100Hype(uid, key) {
   return snap.exists();
 }
 
+/** Kullanıcının kullandığı aktif oy hakkı (Top100HypeUsers/{uid}.used); kayıt yoksa 0. Hata fırlatır. */
+export async function fetchMyTop100Usage(uid) {
+  if (!uid) return 0;
+  const snap = await getDoc(userRef(uid));
+  return snap.exists() ? Math.max(0, Math.trunc(Number(snap.data()?.used)) || 0) : 0;
+}
+
+/** Hak doluyken oy denendi: `error.code === TOP100_LIMIT_ERROR`, `error.used` sunucudaki sayı. */
+export const TOP100_LIMIT_ERROR = "top100_limit";
+
 /**
- * Oyu açar ya da kapatır. Sunucudaki durum zaten istenen gibiyse hiçbir şey yazmaz.
- * @param {{ uid: string, type: "movie"|"tv", id: number, hyped: boolean }} p  hyped: istenen SON durum
- * @returns {Promise<{ counter: {count:number}, hyped: boolean }>}
+ * Oyu açar ya da kapatır; aynı yazımda yapım sayacı ve kullanıcının hak sayacı (Top100HypeUsers/{uid}
+ * → { used, last }) ±1 oynar. Sunucudaki durum zaten istenen gibiyse hiçbir şey yazmaz.
+ * Yeni oyda `used >= limit` ise yazmaz, TOP100_LIMIT_ERROR fırlatır (kural da aynı sınırı uygular).
+ *
+ * @param {{ uid: string, type: "movie"|"tv", id: number, hyped: boolean, limit: number }} p
+ *   hyped: istenen SON durum; limit: planın aktif oy hakkı (utils/premiumFeatures "top100_vote")
+ * @returns {Promise<{ counter: {count:number}, hyped: boolean, used: number }>}
  */
-export function setTop100Hype({ uid, type, id, hyped }) {
+export function setTop100Hype({ uid, type, id, hyped, limit = 0 }) {
   const key = mediaKeyOf(type, id);
   if (!uid) return Promise.reject(new Error("top100_no_user"));
   if (!key) return Promise.reject(new Error("top100_bad_media"));
   return runTransaction(db, async (tx) => {
     const counterSnap = await tx.get(counterRef(key));
     const voteSnap = await tx.get(voteRef(key, uid));
+    const userSnap = await tx.get(userRef(uid));
     const counter = counterSnap.exists() ? asCounter(counterSnap.data()) : { count: 0 };
+    const used = userSnap.exists() ? Math.max(0, Math.trunc(Number(userSnap.data()?.used)) || 0) : 0;
     const was = voteSnap.exists();
-    if (was === !!hyped) return { counter, hyped: was };
+    if (was === !!hyped) return { counter, hyped: was, used };
 
     if (hyped) {
+      if (used >= limit) {
+        const error = new Error(TOP100_LIMIT_ERROR);
+        error.code = TOP100_LIMIT_ERROR;
+        error.used = used;
+        throw error;
+      }
       const next = { count: counter.count + 1 };
       tx.set(voteRef(key, uid), { hype: true });
       if (counterSnap.exists()) tx.update(counterRef(key), next);
       else tx.set(counterRef(key), { type, id: Math.trunc(Number(id)), ...next });
-      return { counter: next, hyped: true };
+      tx.set(userRef(uid), { used: used + 1, last: key });
+      return { counter: next, hyped: true, used: used + 1 };
     }
     const next = { count: Math.max(0, counter.count - 1) };
     tx.delete(voteRef(key, uid));
     tx.update(counterRef(key), next);
-    return { counter: next, hyped: false };
+    // Hak sisteminden önce verilmiş oy (hak kaydı yok): kayda dokunmadan geri alınır.
+    if (userSnap.exists()) tx.set(userRef(uid), { used: Math.max(0, used - 1), last: key });
+    return { counter: next, hyped: false, used: userSnap.exists() ? Math.max(0, used - 1) : used };
   });
 }

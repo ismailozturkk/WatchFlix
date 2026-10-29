@@ -17,6 +17,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { Keys, get, set, useStored } from "../services/storage";
 import {
   fetchMyTop100Hype,
+  fetchMyTop100Usage,
   fetchTop100Counters,
   fetchTop100Details,
   fetchTop100Pool,
@@ -46,8 +47,9 @@ async function loadAll(apiKey, language) {
 /**
  * @returns {{
  *   status: "loading"|"ready"|"error", ranked: object[], counters: Record<string,{count:number}>,
- *   myHype: Record<string,true>, totalVotes: number, refresh: () => void,
- *   toggleHype: (item: object) => Promise<{ hyped: boolean, rank: number|null }>, rankOf: (key: string) => number|null,
+ *   myHype: Record<string,true>, used: number, totalVotes: number, refresh: () => void,
+ *   toggleHype: (item: object, options?: { limit?: number }) => Promise<{ hyped: boolean, rank: number|null }>,
+ *   rankOf: (key: string) => number|null,
  *   syncMyHype: (keys: string[]) => void,
  * }}
  */
@@ -124,8 +126,25 @@ export default function useTop100() {
     [uid],
   );
 
+  // Aktif oy hakkı kullanımı: sunucudaki Top100HypeUsers/{uid}.used (başka cihazdaki oylar dahil). Okunana dek
+  // cihazdaki oy sayısı; her yazımdan sonra transaction'ın döndürdüğü değer.
+  const [serverUsed, setServerUsed] = useState(null);
+  useEffect(() => {
+    if (!uid) return undefined;
+    let cancelled = false;
+    fetchMyTop100Usage(uid)
+      .then((value) => { if (!cancelled) setServerUsed(value); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [uid]);
+  const used = serverUsed ?? Object.keys(myHype).length;
+
+  /**
+   * @param {object} item
+   * @param {{ limit?: number }} [options]  limit: planın aktif oy hakkı (yeni oyda aşılırsa TOP100_LIMIT_ERROR)
+   */
   const toggleHype = useCallback(
-    async (item) => {
+    async (item, { limit = 0 } = {}) => {
       if (!uid || !item?.key) throw new Error("top100_no_user");
       const key = item.key;
       if (busy.current.has(key)) return { hyped: !!myHype[key], rank: rankOf(key) };
@@ -133,14 +152,17 @@ export default function useTop100() {
       const was = !!myHype[key];
       const before = asCounter(counters[key]);
       const optimistic = applyHype(before, was, !was);
+      const usedBefore = used;
 
       const known = pool.some((row) => row.key === key);
       if (!known) setExtras((prev) => (prev[key] ? prev : { ...prev, [key]: item }));
       setCounters((prev) => ({ ...prev, [key]: optimistic }));
+      setServerUsed(Math.max(0, usedBefore + (was ? -1 : 1)));
       writeMine(key, !was);
 
       try {
-        const result = await setTop100Hype({ uid, type: item.media_type, id: item.id, hyped: !was });
+        const result = await setTop100Hype({ uid, type: item.media_type, id: item.id, hyped: !was, limit });
+        if (alive.current) setServerUsed(result.used);
         if (memory && memory.language === language) {
           memory = {
             ...memory,
@@ -156,14 +178,17 @@ export default function useTop100() {
         });
         return { hyped: result.hyped, rank: next.find((row) => row.key === key)?.rank ?? null };
       } catch (error) {
-        if (alive.current) setCounters((prev) => ({ ...prev, [key]: before }));
+        if (alive.current) {
+          setCounters((prev) => ({ ...prev, [key]: before }));
+          setServerUsed(Number.isInteger(error?.used) ? error.used : usedBefore);
+        }
         writeMine(key, was);
         throw error;
       } finally {
         busy.current.delete(key);
       }
     },
-    [uid, myHype, counters, pool, extras, language, rankOf, writeMine],
+    [uid, myHype, counters, pool, extras, language, rankOf, writeMine, used],
   );
 
   // Başka cihazdan verilmiş oyları görünen yapımlar için yerel kayda getirir (en fazla bir kez / yapım).
@@ -188,5 +213,5 @@ export default function useTop100() {
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
-  return { status, ranked, counters, myHype, totalVotes, refresh, toggleHype, rankOf, syncMyHype };
+  return { status, ranked, counters, myHype, used, totalVotes, refresh, toggleHype, rankOf, syncMyHype };
 }

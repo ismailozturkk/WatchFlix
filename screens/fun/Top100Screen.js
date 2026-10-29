@@ -28,7 +28,8 @@ import { useLanguage } from "@context/LanguageContext";
 import { useApiSettings, useImageQualitySettings } from "@context/AppSettingsContext";
 import { useGlassScheme } from "@components/common/GlassSurface";
 import useTop100 from "@hooks/useTop100";
-import { searchTop100 } from "@services/top100Service";
+import { usePremiumGate } from "@hooks/usePremiumGate";
+import { searchTop100, TOP100_LIMIT_ERROR } from "@services/top100Service";
 import { triggerHaptic } from "@services/hapticsService";
 import { buildListShare } from "@utils/chatShare";
 import { decorateItem, showsTotalVotes, top100MediaList } from "@utils/top100";
@@ -42,7 +43,8 @@ const COLUMNS = 4;
 const GAP = 8;
 const SIDE = 16; // GameScreenShell içerik dolgusu
 
-const Cell = React.memo(function Cell({ row, width, hyped, copy, theme, getTmdbUrl, onOpen, onHype }) {
+// locked: Free'de henüz oy verilmemiş yapım — düğme kilit simgesiyle çizilir, dokunuş yükseltme sayfasını açar.
+const Cell = React.memo(function Cell({ row, width, hyped, locked, copy, theme, getTmdbUrl, onOpen, onHype }) {
   const medal = row.rank && row.rank <= 3 ? MEDALS[row.rank - 1] : null;
   return (
     <View style={{ width }}>
@@ -98,7 +100,12 @@ const Cell = React.memo(function Cell({ row, width, hyped, copy, theme, getTmdbU
             : { borderColor: `${HYPE}AA`, backgroundColor: `${HYPE}14` },
         ]}
       >
-        <AppIcon family="Ionicons" name={hyped ? "flame" : "flame-outline"} size={12} color={hyped ? "#FFFFFF" : HYPE} />
+        <AppIcon
+          family="Ionicons"
+          name={hyped ? "flame" : locked ? "lock-closed" : "flame-outline"}
+          size={locked && !hyped ? 11 : 12}
+          color={hyped ? "#FFFFFF" : HYPE}
+        />
         <Text style={[styles.hypeText, { color: hyped ? "#FFFFFF" : HYPE }]} numberOfLines={1} allowFontScaling={false}>
           {hyped ? copy.voted : copy.vote}
         </Text>
@@ -115,7 +122,12 @@ export default function Top100Screen({ navigation }) {
   const { width: screenWidth } = useWindowDimensions();
   const glassScheme = useGlassScheme();
   const copy = getTop100Copy(language);
-  const { status, ranked, counters, myHype, totalVotes, refresh, toggleHype, rankOf, syncMyHype } = useTop100();
+  const { status, ranked, counters, myHype, used, totalVotes, refresh, toggleHype, rankOf, syncMyHype } = useTop100();
+  // Aktif oy hakkı (registry "top100_vote": Free 0 · Premium 10 · Max 20; sunucu aynası firestore.rules).
+  // Listeyi görmek, aramak, kaydetmek, paylaşmak ve verilmiş oyu GERİ ALMAK (hakkı geri verir) her planda serbest.
+  const voteGate = usePremiumGate("top100_vote");
+  const voteLimit = Number(voteGate.limit) || 0;
+  const canVote = voteGate.allows(used);
 
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
@@ -177,9 +189,26 @@ export default function Top100Screen({ navigation }) {
   const onHype = useCallback(
     async (row) => {
       const adding = !myHype[row.key];
+      // Free: kilitli sayfa; Premium'da hak doluysa "hakkın doldu" + kullanım göstergesi (used / limit).
+      const upsell = (usedNow) =>
+        voteGate.showUpsell({
+          used: usedNow,
+          preview: {
+            kind: "vote",
+            title: row.title,
+            posterUri: row.poster_path ? getTmdbUrl(row.poster_path, "poster", 200) : null,
+            rank: row.rank || null,
+            votes: row.votes,
+          },
+        });
+      if (adding && !canVote) {
+        triggerHaptic("selection");
+        upsell(used);
+        return;
+      }
       triggerHaptic(adding ? "success" : "selection");
       try {
-        const { hyped, rank } = await toggleHype(row);
+        const { hyped, rank } = await toggleHype(row, { limit: voteLimit });
         if (adding && hyped) {
           Toast.show({
             type: "success",
@@ -187,11 +216,13 @@ export default function Top100Screen({ navigation }) {
             text2: `${row.title} · ${rank ? copy.newRank(rank) : copy.notRanked}`,
           });
         }
-      } catch {
-        Toast.show({ type: "error", text1: copy.voteFailed });
+      } catch (error) {
+        // Başka cihazda hak dolmuş olabilir: sunucunun sayısıyla yükseltme sayfası.
+        if (error?.code === TOP100_LIMIT_ERROR) upsell(error.used);
+        else Toast.show({ type: "error", text1: copy.voteFailed });
       }
     },
-    [myHype, toggleHype, copy],
+    [myHype, canVote, used, voteLimit, voteGate, getTmdbUrl, toggleHype, copy],
   );
 
   const openCount = (mode) => {
@@ -216,8 +247,9 @@ export default function Top100Screen({ navigation }) {
     else setChatShare(buildListShare({ title, items: mediaList }));
   };
 
-  const myCount = Object.keys(myHype).length;
   const showTotal = showsTotalVotes(totalVotes);
+  // Hak çubuğu: Premium/Max'ta "Oy hakkın 3/10"; Free'de yalnız (hak sisteminden önceki) oyları varsa sayı.
+  const budgetText = voteLimit > 0 ? copy.budget(used, voteLimit) : used > 0 ? copy.myVotes(used) : null;
 
   const header = (
     <View style={styles.headerWrap}>
@@ -250,7 +282,7 @@ export default function Top100Screen({ navigation }) {
             <AppIcon family="Ionicons" name="alert-circle-outline" size={20} color="#FFFFFF" />
           </GlassTouchable>
         </View>
-        {showTotal || myCount > 0 ? (
+        {showTotal || budgetText ? (
           <View style={styles.heroStats}>
             {showTotal ? (
               <View style={styles.heroPill}>
@@ -258,10 +290,10 @@ export default function Top100Screen({ navigation }) {
                 <Text style={styles.heroPillText}>{copy.totalVotes(totalVotes)}</Text>
               </View>
             ) : null}
-            {myCount > 0 ? (
-              <View style={styles.heroPill}>
+            {budgetText ? (
+              <View style={[styles.heroPill, voteLimit > 0 && used >= voteLimit && styles.heroPillFull]}>
                 <AppIcon family="Ionicons" name="flame" size={12} color="#FFD76A" />
-                <Text style={styles.heroPillText}>{copy.myVotes(myCount)}</Text>
+                <Text style={styles.heroPillText}>{budgetText}</Text>
               </View>
             ) : null}
           </View>
@@ -380,6 +412,7 @@ export default function Top100Screen({ navigation }) {
         row={item}
         width={cellWidth}
         hyped={!!myHype[item.key]}
+        locked={!canVote}
         copy={copy}
         theme={theme}
         getTmdbUrl={getTmdbUrl}
@@ -387,7 +420,7 @@ export default function Top100Screen({ navigation }) {
         onHype={onHype}
       />
     ),
-    [cellWidth, myHype, copy, theme, getTmdbUrl, openDetails, onHype],
+    [cellWidth, myHype, canVote, copy, theme, getTmdbUrl, openDetails, onHype],
   );
 
   return (
@@ -456,6 +489,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.24)",
   },
   heroPillText: { color: "#FFFFFF", fontSize: 11.5, fontWeight: "800" },
+  // Hak doldu: hap koyu kırmızıya döner (oy düğmeleri de kilitli çizilir).
+  heroPillFull: { backgroundColor: "rgba(127,29,29,0.55)" },
   heroActions: { flexDirection: "row", gap: 8, marginTop: 12 },
   heroBtn: {
     flex: 1,

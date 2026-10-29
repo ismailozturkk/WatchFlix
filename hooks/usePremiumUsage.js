@@ -24,6 +24,8 @@ import { useMediaNotes } from "../context/MediaNotesContext";
 import { usePremium } from "../context/PremiumContext";
 import { countOwnedGroups } from "../services/groupsService";
 import { useDailyUsed } from "../services/premiumUsage";
+import { Keys, useStored } from "../services/storage";
+import { normalizeMyHype } from "../utils/top100";
 import { isAuthTransitionError } from "../utils/firestoreError";
 import { readAiUsageDoc } from "../utils/premiumUsageModel";
 import useReminderGate from "./useReminderGate";
@@ -85,6 +87,10 @@ export default function usePremiumUsage() {
     ? combinedLists.watchList.length
     : null;
 
+  // Top 100 aktif oy hakkı: cihazdaki oy kaydı (sunucu sayacı Top100Screen'de okunur; burada ek okuma yok).
+  const top100Raw = useStored(Keys.top100Hype, { uid });
+  const top100Votes = useMemo(() => Object.keys(normalizeMyHype(top100Raw)).length, [top100Raw]);
+
   const usage = useMemo(
     () => ({
       // Kapıyla aynı sayım: arkadaşlar + bekleyen giden istekler (FriendsContext).
@@ -104,6 +110,7 @@ export default function usePremiumUsage() {
       // Platform bildirimi: izleme listesinin son N yapımı takipte; "kullanılan"
       // listenin boyu (üst sınırı model uygular).
       streaming_alerts: watchlistSize,
+      top100_vote: top100Votes,
       // aiDoc undefined iken (henüz okunmadı) sayaç "bilinmiyor" kalır: 0 göstermek
       // yanıltıcı olurdu.
       ai: aiDoc === undefined ? null : readAiUsageDoc(aiDoc),
@@ -122,6 +129,7 @@ export default function usePremiumUsage() {
       cineRooms,
       cineSwipes,
       watchlistSize,
+      top100Votes,
       aiDoc,
     ],
   );

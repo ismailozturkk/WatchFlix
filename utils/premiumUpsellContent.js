@@ -12,6 +12,8 @@
 // vaat yok, her değer bir kapının arkasındaki gerçek limit.
 
 import { copyLanguage, normalizeAppLanguage, pickByLanguage } from "./appLanguages";
+import { SEELOGD_VOTE_WEIGHT } from "./top100";
+import { getTop100Copy } from "./top100Copy";
 import {
   getPackageDisplayProduct,
   getPackageIntroOffer,
@@ -333,12 +335,49 @@ export function buildChoicePreview(preview, language = "en") {
   };
 }
 
+// ── Top 100 oy önizlemesi ───────────────────────────────────────────────────
+
+const VOTE_TITLE_MAX = 80;
+
+/**
+ * Top 100'de oy vermeye çalışırken gelen önizleme: sayfa, oy verilmek istenen yapımı afişi, sırası ve
+ * hibrit oy sayısıyla çizer; afişin köşesinde kilit. Afiş yalnız TMDB adresinden kabul edilir.
+ *
+ * @param {{ kind?: string, title?: string, posterUri?: string, rank?: number|null, votes?: number }} [preview]
+ * @returns {{ kind: "vote", label: string, title: string, posterUri: string|null, rank: string|null,
+ *   votes: string, gain: string } | null}
+ */
+export function buildVotePreview(preview, language = "en") {
+  if (!preview || typeof preview !== "object" || preview.kind !== "vote") return null;
+  const rawTitle = typeof preview.title === "string" ? preview.title.trim() : "";
+  if (!rawTitle) return null;
+  const copy = getTop100Copy(language);
+  const title =
+    rawTitle.length > VOTE_TITLE_MAX ? `${rawTitle.slice(0, VOTE_TITLE_MAX - 1).trimEnd()}…` : rawTitle;
+  const rank = Number.isInteger(preview.rank) && preview.rank > 0 ? `#${preview.rank}` : null;
+  const votes = Math.max(0, Math.trunc(Number(preview.votes)) || 0);
+  return {
+    kind: "vote",
+    label: copy.screenTitle,
+    title,
+    posterUri: typeof preview.posterUri === "string" && PREVIEW_URI.test(preview.posterUri) ? preview.posterUri : null,
+    rank,
+    votes: copy.votes(votes),
+    gain: copy.voteGain(SEELOGD_VOTE_WEIGHT),
+  };
+}
+
+/** Sayfanın önizleme kartı: galeriden seçilen görsel ya da Top 100 oyu. */
+const buildPreview = (preview, language) =>
+  buildChoicePreview(preview, language) || buildVotePreview(preview, language);
+
 /**
  * @param {string} featureId
  * @param {string} plan             kullanıcının mevcut planı
  * @param {"tr"|"en"} language
  * @param {{ used?: number, preview?: object }} [options]  COUNT: sahip olunan adet; DAILY:
- *   bugünkü kullanım; preview: seçilmeye çalışılan görsel (buildChoicePreview)
+ *   bugünkü kullanım; preview: seçilmeye çalışılan görsel (buildChoicePreview) ya da
+ *   oy verilmek istenen Top 100 yapımı (buildVotePreview)
  */
 export function buildUpsellContent(featureId, plan, language = "en", { used, preview } = {}) {
   const lang = normalizeAppLanguage(language);
@@ -392,7 +431,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used, pre
   // "bu yıl kilitli" konuşur; mesajı yine planın mevcut penceresini söyler.
   const windowed = definition.window === true;
   const locked = isAccess || windowed;
-  const choicePreview = buildChoicePreview(preview, lang);
+  const choicePreview = buildPreview(preview, lang);
   const title =
     (bundle ? pick(bundle.title, lang) : "") ||
     (lockedCountable ? pick(definition.upsell?.lockedTitle, lang) : "") ||

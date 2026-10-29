@@ -536,6 +536,52 @@ export const PREMIUM_FEATURES = Object.freeze({
     freeValue: { tr: "Yalnız izleyici", en: "Spectator only", es: "Solo espectador", pt: "Somente espectador", de: "Nur Zuschauer" },
     paidValue: { tr: "Oy kullanabilir", en: "Can vote", es: "Puede votar", pt: "Pode votar", de: "Darf abstimmen" },
   }),
+  // Seelogd Top 100'de oy (hype) — AKTİF oy hakkı: Free 0, Premium 10, Max 20 (29 Eki kullanıcı kararı:
+  // sınırlı hak; herkes her yapıma oy verseydi oy sırayı oynatmazdı). Listeyi görmek, aramak, liste olarak
+  // kaydetmek ve sohbete göndermek her planda açık. Oyu geri almak her planda serbest ve hakkı geri verir;
+  // plan düşünce verilmiş oylar sayılmaya devam eder. Sunucu aynası (aynı sayılar!): firestore.rules
+  // Top100Hype votes create + Top100HypeUsers/{uid}.used.
+  top100_vote: feature({
+    id: "top100_vote",
+    kind: COUNT,
+    category: "play",
+    icon: "flame",
+    limits: { free: 0, premium: 10, unlimited: 20 },
+    title: { tr: "Top 100 oy hakkı", en: "Top 100 votes", es: "Votos en el Top 100", pt: "Votos no Top 100", de: "Stimmen in den Top 100" },
+    upsell: {
+      title: { tr: "Oy hakkın doldu", en: "You've used all your votes", es: "Has usado todos tus votos", pt: "Você usou todos os seus votos", de: "Du hast alle Stimmen vergeben" },
+      lockedTitle: { tr: "Top 100'de oy Premium'da", en: "Top 100 voting is a Premium perk", es: "Votar en el Top 100 es una ventaja Premium", pt: "Votar no Top 100 é um benefício Premium", de: "Abstimmen in den Top 100 ist ein Premium-Vorteil" },
+      message: {
+        tr: "Listeyi herkes görebilir, kaydedip paylaşabilir; sıralamayı oyunla değiştirmek Premium'a özel. Her Seelogd oyu 100 TMDB değerlendirmesi değerinde.",
+        en: "Anyone can browse, save and share the list; moving the ranking with your vote is for Premium. Each Seelogd vote is worth 100 TMDB ratings.",
+        es: "Cualquiera puede ver, guardar y compartir la lista; mover el ranking con tu voto es solo para Premium. Cada voto de Seelogd vale 100 valoraciones de TMDB.",
+        pt: "Qualquer pessoa pode ver, salvar e compartilhar a lista; mudar o ranking com seu voto é só para o Premium. Cada voto do Seelogd vale 100 avaliações do TMDB.",
+        de: "Jeder kann die Liste ansehen, speichern und teilen; das Ranking mit deiner Stimme zu bewegen ist Premium vorbehalten. Jede Seelogd-Stimme zählt wie 100 TMDB-Bewertungen.",
+      },
+    },
+    detail: {
+      tr: "Seelogd Top 100 sıralamasına oy ver",
+      en: "Vote in the Seelogd Top 100 ranking",
+      es: "Vota en el ranking Seelogd Top 100",
+      pt: "Vote no ranking Seelogd Top 100",
+      de: "Stimme im Seelogd-Top-100-Ranking ab",
+    },
+    unit: { tr: "oy", en: "votes", es: "votos", pt: "votos", de: "Stimmen" },
+    note: {
+      tr: "Oyu geri alınca hakkın geri gelir; verdiğin oylar abonelik bitince de sayılır",
+      en: "Taking a vote back returns it to you; votes you've cast still count if your subscription ends",
+      es: "Al quitar un voto lo recuperas; tus votos siguen contando si termina tu suscripción",
+      pt: "Ao retirar um voto você o recupera; seus votos continuam contando se a assinatura acabar",
+      de: "Ziehst du eine Stimme zurück, bekommst du sie wieder; abgegebene Stimmen zählen weiter, wenn dein Abo endet",
+    },
+    phrase: {
+      tr: (n) => `aynı anda ${n} yapıma oy verebilirsin`,
+      en: (n) => `you can back up to ${n} titles at once`,
+      es: (n) => `puedes votar hasta ${n} títulos a la vez`,
+      pt: (n) => `você pode votar em até ${n} títulos ao mesmo tempo`,
+      de: (n) => `du kannst bis zu ${n} Titel gleichzeitig unterstützen`,
+    },
+  }),
   custom_themes: feature({
     id: "custom_themes",
     kind: ACCESS,
