@@ -1445,12 +1445,154 @@ const cardStyles = StyleSheet.create({
   minText: { flexShrink: 1, color: "#fff", fontSize: 9.5, fontWeight: "800" },
 });
 
+// ─── POSTER STACK ────────────────────────────────────────────────────────────
+//
+// Gün kartının sonundaki "yığın" karosu: önizlemeye sığmayan afişlerin ilk
+// üçü üst üste kaydırılmış kartlar olarak, önde "+N". Puan rozeti ve süre
+// yok — yalnız görsel; amaç kalabalık günü tek karoda toplamak.
+
+const STACK_LAYERS = 3;
+const STACK_STEP = 5;
+const STACK_LAYER_W = CARD_W - STACK_STEP * (STACK_LAYERS - 1);
+const STACK_LAYER_H = CARD_H - STACK_STEP * (STACK_LAYERS - 1);
+// Arkadaki katlar daha koyu: derinlik hissi + öndeki yazı okunur kalır.
+const STACK_SHADE = ["rgba(0,0,0,0.55)", "rgba(0,0,0,0.42)", "rgba(0,0,0,0.3)"];
+
+const StatsPosterStack = memo(function StatsPosterStack({
+  theme,
+  posters = [],
+  hiddenCount,
+  rankColor,
+  onPress,
+}) {
+  const tint = rankColor || theme.accent;
+  const borderColor = rankColor ? withAlpha(rankColor, 0.33) : theme.border;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={i18nText(
+        "autoI18n.stats_yigin_erisim",
+        "{{n}} içerik daha göster",
+        { n: hiddenCount },
+      )}
+      style={stackStyles.wrap}
+    >
+      {/* Arkadan öne çizilir: i=0 öndeki kart (sol alt), son kat sağ üstte. */}
+      {Array.from({ length: STACK_LAYERS }, (_, n) => STACK_LAYERS - 1 - n).map((i) => {
+        const uri = posters[i]?.imageUri;
+        return (
+          <View
+            key={i}
+            style={[
+              stackStyles.layer,
+              {
+                left: i * STACK_STEP,
+                top: (STACK_LAYERS - 1 - i) * STACK_STEP,
+                borderColor,
+                backgroundColor: withAlpha(tint, 0.18),
+              },
+            ]}
+          >
+            {!!uri && (
+              <Image
+                source={{ uri }}
+                style={cardStyles.poster}
+                contentFit="cover"
+                recyclingKey={`stats-${uri}`}
+                cachePolicy="memory-disk"
+                transition={120}
+              />
+            )}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: STACK_SHADE[i] }]} />
+            {i === 0 && (
+              <View style={stackStyles.label}>
+                <Text allowFontScaling={false} style={stackStyles.count} numberOfLines={1}>
+                  +{hiddenCount}
+                </Text>
+                <Text allowFontScaling={false} style={stackStyles.caption} numberOfLines={1}>
+                  {i18nText("autoI18n.stats_yigin_tumu", "Tümünü gör")}
+                </Text>
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </TouchableOpacity>
+  );
+});
+
+// Açılmış günün sonundaki "Daralt" karosu — yığına geri döner.
+const StatsStackCollapse = memo(function StatsStackCollapse({ theme, rankColor, onPress }) {
+  const tint = rankColor || theme.accent;
+  return (
+    <GlassTouchable
+      activeOpacity={0.85}
+      onPress={onPress}
+      accessibilityRole="button"
+      style={[
+        stackStyles.collapse,
+        { backgroundColor: withAlpha(tint, 0.12), borderColor: withAlpha(tint, 0.3) },
+      ]}
+    >
+      <Ionicons name="chevron-back" size={18} color={tint} />
+      <Text
+        allowFontScaling={false}
+        style={[stackStyles.collapseText, { color: theme.text.primary }]}
+        numberOfLines={1}
+      >
+        {i18nText("autoI18n.stats_yigin_daralt", "Daralt")}
+      </Text>
+    </GlassTouchable>
+  );
+});
+
+const stackStyles = StyleSheet.create({
+  wrap: { width: CARD_W, height: CARD_H },
+  layer: {
+    position: "absolute",
+    width: STACK_LAYER_W,
+    height: STACK_LAYER_H,
+    borderRadius: 10,
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  label: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  count: { color: "#fff", fontSize: 22, fontWeight: "900", letterSpacing: -0.5 },
+  caption: { marginTop: 1, color: "rgba(255,255,255,0.85)", fontSize: 9.5, fontWeight: "800" },
+  collapse: {
+    width: 56,
+    height: CARD_H,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  collapseText: { fontSize: 9.5, fontWeight: "800" },
+});
+
 // ─── DATE SECTION ────────────────────────────────────────────────────────────
 //
 // Bir tarih grubunun tamamı: başlık (StatsSectionHeader) + yatay poster listesi.
 // memo'lu — parent (ekran) re-render olduğunda, bu section'ın prop'ları (posters
 // ref'i vb.) değişmedikçe yeniden render edilmez. Poster'lar ekranın useMemo'sunda
 // önceden normalize edilip geldiği için onPress closure'ları da stabildir.
+//
+// Gün başına en fazla DAY_PREVIEW_LIMIT afiş çizilir; kalanı sondaki yığın
+// karosunda "+N" olarak durur, basınca o gün yerinde açılır. Kalabalık günlerde
+// (toplu ekleme, dizi maratonu) her günün tüm kartlarını + puan rozetlerini
+// çizmek kaydırmayı takılatıyordu. Açık/kapalı durumu karta yereldir: ekranlar
+// bölüme tarih anahtarı verir, gün ekrandan çıkıp dönünce yığın yeniden kapanır.
+
+export const DAY_PREVIEW_LIMIT = 5;
 
 const POSTER_STRIDE = CARD_W + 8; // kart genişliği + marginRight (StatsPosterCard)
 
@@ -1494,6 +1636,40 @@ export const StatsDateSection = memo(function StatsDateSection({
     [theme, rankColor, posterMinutesLabel],
   );
 
+  const listRef = useRef(null);
+  const [expanded, setExpanded] = useState(false);
+  const hiddenCount = Math.max(0, posters.length - DAY_PREVIEW_LIMIT);
+  const visiblePosters = useMemo(
+    () => (expanded || hiddenCount === 0 ? posters : posters.slice(0, DAY_PREVIEW_LIMIT)),
+    [posters, expanded, hiddenCount],
+  );
+  const stackPosters = useMemo(
+    () => posters.slice(DAY_PREVIEW_LIMIT, DAY_PREVIEW_LIMIT + STACK_LAYERS),
+    [posters],
+  );
+  // Aynı FlatList kalır, yalnız verisi büyür: kaydırma konumu korunur ve yeni
+  // afişler tam yığının durduğu yerden akar.
+  const expand = useCallback(() => setExpanded(true), []);
+  const collapse = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    setExpanded(false);
+  }, []);
+
+  let footer = null;
+  if (hiddenCount > 0) {
+    footer = expanded ? (
+      <StatsStackCollapse theme={theme} rankColor={rankColor} onPress={collapse} />
+    ) : (
+      <StatsPosterStack
+        theme={theme}
+        posters={stackPosters}
+        hiddenCount={hiddenCount}
+        rankColor={rankColor}
+        onPress={expand}
+      />
+    );
+  }
+
   return (
     <GlassBox role="card"
       style={[
@@ -1514,12 +1690,14 @@ export const StatsDateSection = memo(function StatsDateSection({
         accent={rankColor}
       />
       <FlatList
-        data={posters}
+        ref={listRef}
+        data={visiblePosters}
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={posterKeyExtractor}
         getItemLayout={posterGetItemLayout}
         renderItem={renderPoster}
+        ListFooterComponent={footer}
         contentContainerStyle={dateSectionStyles.posterRow}
         initialNumToRender={5}
         maxToRenderPerBatch={6}

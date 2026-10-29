@@ -99,6 +99,9 @@ const TvStatisticsScreen = ({ navigation }) => {
       .filter((s) => s.items.length > 0)
       .filter((s) => matchesDateFilter(s.title, selectedDateTv))
       .map((s) => ({
+        // Tarih anahtarı: gün kartındaki yığının açık/kapalı durumu filtre
+        // değişince başka bir güne geçmesin (sıra indeksi kayar, tarih kaymaz).
+        key: String(s.title),
         title: s.title,
         data: [],
         count: s.items.length,
