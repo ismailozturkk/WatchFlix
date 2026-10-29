@@ -69,7 +69,7 @@ import { i18nText } from "@utils/i18nText";
 import { daysText, hoursText, minutesText } from "@utils/durationText";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { appAlert } from "@components/AppAlert";
-import { usePet } from "@context/PetContext";
+import { useAiChatRequest } from "@context/AiChatRequestContext";
 
 import {
   loadConversations,
@@ -514,7 +514,7 @@ export const ChatModal = () => {
   const { theme, selectedTheme, changeTheme } = useTheme();
   const { API_KEY, adultContent } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
-  const { pendingAiRequest, clearAiChatRequest } = usePet();
+  const { pendingAiRequest, clearAiChatRequest } = useAiChatRequest();
   const {
     mostWatchedGenre,
     secondWatchedGenre,
@@ -859,7 +859,7 @@ export const ChatModal = () => {
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <View>
-      {/* CineMatch FAB/pet isteği kalıcı PetContext kuyruğundan gelir. */}
+      {/* CineMatch isteği kalıcı AiChatRequestContext kuyruğundan gelir. */}
       <AIChatScreen
         visible={aiVisible}
         onClose={() => setAiVisible(false)}

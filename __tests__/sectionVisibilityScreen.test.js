@@ -142,12 +142,12 @@ describe("ilk görünüm", () => {
   test("ekran karosuna basınca o ekranın satırları gelir", () => {
     render();
     pressTile("profile");
-    expect(rowIds()).toEqual(["goal", "badges", "friends", "stats", "activity"]);
+    expect(rowIds()).toEqual(["goal", "streak", "badges", "friends", "stats", "activity"]);
     expect(tile("profile").props.accessibilityState).toEqual({ selected: true });
     pressTile("library");
     expect(rowIds()).toEqual(["nextUp", "lists", "reminders", "notes", "wrapped"]);
     pressTile("hub");
-    expect(rowIds()).toEqual(["feed", "cineswipe", "bingo", "poll", "tournament", "games"]);
+    expect(rowIds()).toEqual(["feed", "tournament", "cineswipe", "bingo", "poll", "games"]);
   });
 
   test("her dilde ekran adı ve bölüm başlığı gösterilir", () => {

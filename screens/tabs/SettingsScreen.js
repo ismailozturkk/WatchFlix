@@ -616,7 +616,7 @@ export default function SettingsScreen() {
             title={t.personalization}
             subtitle={i18nText(
               "autoI18n.kisisellestirme_aciklama",
-              "Kar efekti, ikon arka planı ve pet",
+              "Uygulama simgesi, kar, ambiyans ve ikon arka planı",
             )}
             onPress={() => navigation.navigate("PersonalizationScreen")}
             right={<Chevron color={C.muted} />}

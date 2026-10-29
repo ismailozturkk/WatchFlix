@@ -13,9 +13,15 @@
 //   • item === undefined → henüz çözülmedi (iskelet)
 //   • item === null      → çözüldü, sıradaki bölüm yok (yeni sezon bekleniyor)
 //   • item.isAired false → bölüm var ama yayınlanmadı (işaretlenemez)
+//
+// "İzledim" kartı beklemeden sıradaki bölüme ilerletir (useUpNextQueue). Bölüm
+// değişimi sessiz bir metin değişimi gibi görünmesin diye bölüm katmanı sağdan
+// kayarak, bölüm numarası rozeti zıplayarak gelir. İlk çizimde ve iskeletten
+// çözülmeye geçişte oynamaz — yalnız gösterilen bölüm BAŞKA bir bölüme
+// döndüğünde (izlendi, geri alındı ya da arka plan tazelemesi ilerletti).
 
 import { intlLocaleOf } from "../../utils/appLanguages";
-import React, { memo } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import {
   Animated,
   Pressable,
@@ -29,6 +35,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
 
 import PosterImage from "../PosterImage";
+import useReduceMotion from "../../hooks/useReduceMotion";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { getWatchedShowProgress } from "../../utils/watchState";
@@ -61,6 +68,42 @@ function UpNextRailCard({
   const { watched, total, progress } = getWatchedShowProgress(show);
   const progressColor = progress > 0 ? "#FF9500" : theme.accent;
   const upcomingColor = theme.colors?.orange || "#FF9500";
+  const reduceMotion = useReduceMotion();
+
+  // 1 = durgun. Bölüm değişince 0'a çekilip yaya bırakılır; yay hafif aşar,
+  // kayma bu yüzden yerine "oturur".
+  const swap = useRef(new Animated.Value(1)).current;
+  // undefined iskelet demek; oradan ilk çözülme animasyonsuz.
+  const shownId = resolved ? item?.id ?? null : undefined;
+  const lastShownId = useRef(shownId);
+  useEffect(() => {
+    const previous = lastShownId.current;
+    lastShownId.current = shownId;
+    if (previous === undefined || previous === shownId || reduceMotion) return;
+    swap.setValue(0);
+    Animated.spring(swap, {
+      toValue: 1,
+      friction: 7,
+      tension: 70,
+      useNativeDriver: true,
+    }).start();
+  }, [shownId, reduceMotion, swap]);
+
+  const overlaySwapStyle = {
+    opacity: swap.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 1],
+      extrapolate: "clamp",
+    }),
+    transform: [
+      { translateX: swap.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) },
+    ],
+  };
+  const pillSwapStyle = {
+    transform: [
+      { scale: swap.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) },
+    ],
+  };
 
   // Basış işleyicisi olmayan Text dokunmayı yakalamaz; bölüm adına dokunmak
   // posterin kendisine (dizi detayına) gider.
@@ -153,7 +196,7 @@ function UpNextRailCard({
 
         {/* Sıradaki bölüm numarası — sol üst */}
         {item ? (
-          <View
+          <Animated.View
             style={[
               styles.episodePill,
               {
@@ -161,16 +204,17 @@ function UpNextRailCard({
                   ? alpha(theme.accent, 0.92)
                   : alpha(upcomingColor, 0.92),
               },
+              pillSwapStyle,
             ]}
           >
             <Text allowFontScaling={false} style={styles.episodePillText}>
               S{item.seasonNumber}·B{item.episodeNumber}
             </Text>
-          </View>
+          </Animated.View>
         ) : null}
 
         {/* ── Sıradaki bölüm katmanı: posterin alt kısmında ── */}
-        <View style={styles.overlay}>
+        <Animated.View style={[styles.overlay, overlaySwapStyle]}>
           {!resolved ? (
             <View style={styles.skeletonAction} />
           ) : !item ? (
@@ -270,7 +314,7 @@ function UpNextRailCard({
                 </Pressable>
             </View>
           )}
-        </View>
+        </Animated.View>
       </Animated.View>
     </TouchableOpacity>
   );

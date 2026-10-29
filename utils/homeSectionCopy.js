@@ -124,7 +124,14 @@ export const HOME_SECTIONS = Object.freeze({
   },
   upcoming: {
     icon: "calendar",
-    subtitle: tri("Yakında vizyona girecekler", "Coming soon to cinemas", "Próximamente en cines", "Em breve nos cinemas", "Bald im Kino"),
+    subtitle: {
+      movie: tri("Yakında vizyona girecekler", "Coming soon to cinemas", "Próximamente en cines", "Em breve nos cinemas", "Bald im Kino"),
+      tv: tri(
+        "Yakında yayına başlayacak yeni diziler",
+        "New shows premiering soon",
+        "Series nuevas que se estrenan pronto", "Séries novas que estreiam em breve", "Neue Serien, die bald starten",
+      ),
+    },
   },
   collection: {
     icon: "albums",
@@ -148,17 +155,14 @@ export const HOME_SECTIONS = Object.freeze({
       "Ganadores por categoría o año", "Vencedores por categoria ou ano", "Gewinner nach Kategorie oder Jahr",
     ),
   },
+  // "Yayında": Bugün / Bu hafta çipli tek raf (eski "airingToday" rafı buraya katıldı).
   onTheAir: {
     icon: "radio",
     subtitle: tri(
-      "Bu hafta yeni bölümü yayınlananlar",
-      "Shows with new episodes this week",
-      "Episodios nuevos esta semana", "Episódios novos esta semana", "Serien mit neuen Folgen diese Woche",
+      "Yeni bölümü yayınlanan diziler",
+      "Shows with new episodes",
+      "Series con episodios nuevos", "Séries com episódios novos", "Serien mit neuen Folgen",
     ),
-  },
-  airingToday: {
-    icon: "today",
-    subtitle: tri("Bugün yeni bölümü çıkanlar", "New episodes airing today", "Episodios nuevos hoy", "Episódios novos hoje", "Heute laufen neue Folgen"),
   },
 });
 

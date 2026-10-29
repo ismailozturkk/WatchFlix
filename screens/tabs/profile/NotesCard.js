@@ -24,6 +24,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileNotes } from "../../../context/ProfileNotesContext";
 import { useDeviceNotifications } from "../../../context/DeviceNotificationsContext";
 import * as Haptics from "../../../services/hapticsService";
+import { openPremiumScreen } from "../../../services/premiumUpsell";
 import { alpha } from "../../../theme/colors";
 import { i18nCount, i18nText } from "../../../utils/i18nText";
 import { PRIME_HANDOFF_MS } from "../../../utils/notificationPriming";
@@ -203,7 +204,17 @@ const StatCell = memo(function StatCell({
 export default function NotesCard({ navigation }) {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
-  const { notes, loadingNotes, saveNote, canCreateNote, checkCanCreateNote } = useProfileNotes();
+  const {
+    notes,
+    loadingNotes,
+    saveNote,
+    canCreateNote,
+    checkCanCreateNote,
+    noteTextLimits,
+    showNoteTextLimit,
+    canSetNoteReminder,
+    showNoteReminderUpsell,
+  } = useProfileNotes();
   const { primeNotificationPermission } = useDeviceNotifications();
   const { scale, onPressIn, onPressOut } = usePressScale();
 
@@ -291,10 +302,20 @@ export default function NotesCard({ navigation }) {
     pendingFullTypeRef.current = type;
     setEditorVisible(false);
   }, []);
+  // Editör içindeki yükseltme sayfasından (harf sınırı) "Premium'a geç": ödeme
+  // ekranı editörün arkasında kalmasın, editör kalkınca açılır.
+  const pendingUpgradeRef = useRef(null);
+  const handleEditorUpgrade = useCallback((featureId) => {
+    pendingUpgradeRef.current = featureId;
+    setEditorVisible(false);
+  }, []);
   const handleEditorDismissed = useCallback(() => {
     const type = pendingFullTypeRef.current;
+    const upgrade = pendingUpgradeRef.current;
     pendingFullTypeRef.current = null;
-    if (type) checkCanCreateNote(type);
+    pendingUpgradeRef.current = null;
+    if (upgrade) openPremiumScreen(upgrade);
+    else if (type) checkCanCreateNote(type);
   }, [checkCanCreateNote]);
   const onQuickDismissed = useCallback(() => {
     const type = pendingTypeRef.current;
@@ -535,6 +556,11 @@ export default function NotesCard({ navigation }) {
             onSave={handleSave}
             fullTypes={fullTypes}
             onFullTypePress={handleFullTypePress}
+            textLimits={noteTextLimits}
+            onTextLimit={showNoteTextLimit}
+            reminderLocked={!canSetNoteReminder}
+            onReminderLocked={showNoteReminderUpsell}
+            onUpgrade={handleEditorUpgrade}
             onDismissed={handleEditorDismissed}
             onClose={() => setEditorVisible(false)}
           />

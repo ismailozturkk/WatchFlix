@@ -5,7 +5,7 @@ import {
   Modal,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   Animated,
   Easing,
   Pressable,
@@ -95,14 +95,15 @@ const GridCard = ({
     ]}
     onPress={onPress}
     activeOpacity={1}
+    accessibilityRole="button"
+    accessibilityState={{ selected: isIn }}
+    accessibilityLabel={item}
   >
     <Animated.View
-      style={{
+      style={[styles.gridCardContent, {
         transform: [{ scale: scale || 1 }],
         opacity: opacity !== undefined ? opacity : 1,
-        alignItems: "center",
-        gap: 8,
-      }}
+      }]}
     >
       <View
         style={[
@@ -118,12 +119,12 @@ const GridCard = ({
           inactiveName="folder-outline"
           activeColor={theme.colors.green}
           inactiveColor={theme.text.muted}
-          size={26}
+          size={20}
         />
       </View>
       <Text
         allowFontScaling={false}
-        numberOfLines={2}
+        numberOfLines={1}
         style={[
           styles.gridCardLabel,
           { color: isIn ? theme.colors.green : theme.text.secondary },
@@ -131,6 +132,11 @@ const GridCard = ({
       >
         {item}
       </Text>
+      <Ionicons
+        name={isIn ? "checkmark-circle" : "add-circle-outline"}
+        size={18}
+        color={isIn ? theme.colors.green : theme.text.muted}
+      />
     </Animated.View>
   </GlassTouchable>
 );
@@ -308,7 +314,7 @@ const ListViewTv = ({
           activeName="bookmark"
           inactiveName="bookmark-outline"
           activeColor={theme.colors.blue}
-          inactiveColor={theme.text.secondary}
+          inactiveColor={theme.colors.blue}
           size={compact ? 24 : 30}
         />
       </ActionButton>
@@ -367,7 +373,7 @@ const ListViewTv = ({
               activeName="eye"
               inactiveName="eye-outline"
               activeColor={watchedColor}
-              inactiveColor={theme.text.secondary}
+              inactiveColor={theme.colors.green}
               pulseKey={showWatchState}
               size={compact ? 24 : 30}
             />
@@ -391,7 +397,7 @@ const ListViewTv = ({
           activeName="heart"
           inactiveName="heart-outline"
           activeColor={theme.colors.red}
-          inactiveColor={theme.text.secondary}
+          inactiveColor={theme.colors.red}
           size={compact ? 24 : 30}
         />
       </ActionButton>
@@ -502,17 +508,17 @@ const ListViewTv = ({
             {otherListKeys?.length > 0 ||
             (sharedLists.length > 0 && sharedItem) ? (
               <>
-                {otherListKeys?.length > 0 && (
-                  <FlatList
-                    data={otherListKeys}
-                    keyExtractor={(item) => item}
-                    numColumns={3}
-                    contentContainerStyle={styles.gridContainer}
-                    showsVerticalScrollIndicator={false}
-                    style={styles.gridList}
-                    columnWrapperStyle={{ gap: 10 }}
-                    renderItem={({ item }) => (
+                <ScrollView
+                  style={styles.listsScroll}
+                  contentContainerStyle={styles.listsScrollContent}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                >
+                  {otherListKeys?.length > 0 && (
+                    <View style={styles.gridContainer}>
+                      {otherListKeys.map((item) => (
                       <GridCard
+                        key={item}
                         item={item}
                         isIn={!!getIsActive(item)}
                         scale={scaleValuesRef.current[item]}
@@ -520,15 +526,16 @@ const ListViewTv = ({
                         theme={theme}
                         onPress={() => handleOptimisticPress(item, () => updateList(item, type))}
                       />
-                    )}
-                  />
-                )}
+                      ))}
+                    </View>
+                  )}
 
-                {/* Ortak listeler */}
-                <SharedListsSection
-                  sharedItem={sharedItem}
-                  visible={modalVisible}
-                />
+                  {/* Ortak listeler */}
+                  <SharedListsSection
+                    sharedItem={sharedItem}
+                    visible={modalVisible}
+                  />
+                </ScrollView>
                 <View style={[styles.separator, { backgroundColor: theme.border, marginBottom: 12 }]} />
                 <View style={styles.sheetActions}>
                   <TouchableOpacity
@@ -689,6 +696,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
+    maxHeight: "88%",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
@@ -739,35 +747,47 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  /* Grid */
-  // 3 sütunlu cam kart ızgarası: kenardaki kart basılınca listenin kırpma sınırında kesilmesin
-  // diye dört yanda GLASS_PRESS_ROOM (dolgu + eşit negatif dış boşluk; görünür yükseklik aynı).
-  gridList: { maxHeight: 300 + 2 * GLASS_PRESS_ROOM, margin: -GLASS_PRESS_ROOM },
+  /* Liste seçimi: tüm özel + ortak listeler tek kaydırılabilir alanda kalır. */
+  listsScroll: {
+    flexShrink: 1,
+    marginHorizontal: -GLASS_PRESS_ROOM,
+  },
+  listsScrollContent: {
+    paddingHorizontal: GLASS_PRESS_ROOM,
+    paddingVertical: GLASS_PRESS_ROOM,
+  },
   gridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: 10,
-    padding: GLASS_PRESS_ROOM,
-    paddingBottom: 4 + GLASS_PRESS_ROOM,
   },
   gridCard: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderRadius: 16,
+    width: "48%",
+    minHeight: 62,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 15,
     borderWidth: 1,
-    alignItems: "center",
     justifyContent: "center",
   },
+  gridCardContent: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   gridCardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
   gridCardLabel: {
-    fontSize: 10.5,
-    fontWeight: "600",
-    textAlign: "center",
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "700",
     letterSpacing: 0.1,
   },
 

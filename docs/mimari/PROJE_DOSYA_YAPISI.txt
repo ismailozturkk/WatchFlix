@@ -167,7 +167,6 @@ Seelogd/
 │   ├── hubWrappedModule.test.js
 │   ├── i18nKeys.test.js
 │   ├── importantInvites.test.js
-│   ├── importantInvitesBar.test.js
 │   ├── importMerge.test.js
 │   ├── importWriter.test.js
 │   ├── kesifBadges.test.js
@@ -922,7 +921,6 @@ Seelogd/
 │   │   ├── EditProfileKit.js
 │   │   ├── FriendsActionBar.js
 │   │   ├── HoldToConfirmButton.js
-│   │   ├── ImportantInvitesBar.js
 │   │   ├── ProfileAvatarHalo.js
 │   │   ├── ProfileAvatarPickerModal.js
 │   │   ├── ProfileGamesModule.js

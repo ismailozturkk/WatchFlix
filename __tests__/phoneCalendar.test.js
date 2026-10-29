@@ -32,6 +32,9 @@ jest.mock("../components/AppToast", () => {
   };
   return { __esModule: true, default: mockApi, toast: mockApi, showToast: mockApi.show };
 });
+// Plan (services/premiumState): not hatırlatmasını telefona eklemek Premium'a özel.
+const mockPremium = { plan: "premium" };
+jest.mock("../services/premiumState", () => ({ getPremiumPlanSnapshot: () => mockPremium.plan }));
 jest.mock("../utils/i18nText", () => ({
   i18nText: (_key, fallback, options) =>
     options?.count != null ? fallback.replace("{{count}}", options.count) : fallback,
@@ -119,6 +122,7 @@ import {
   removeAllEventsFromPhoneCalendar,
   removeEventFromPhoneCalendar,
   removeManyEventsFromPhoneCalendar,
+  isPhoneCalendarItemLocked,
   saveEventToPhoneCalendar,
   saveManyEventsToPhoneCalendar,
 } from "../utils/phoneCalendar";
@@ -147,6 +151,7 @@ beforeEach(() => {
   mockState.createCalendarCalls = [];
   mockState.legacyCalls = [];
   mockState.requestCalls = 0;
+  mockPremium.plan = "premium";
   Toast.show.mockClear();
   jest.spyOn(console, "warn").mockImplementation(() => {});
   jest.spyOn(console, "error").mockImplementation(() => {});
@@ -465,5 +470,63 @@ describe("Ayarlar > İzinlerim > Takvim", () => {
       missing: 0,
       total: 0,
     });
+  });
+});
+
+describe("not hatırlatması Premium'a özel (Free'de telefona yeni ekleme yok)", () => {
+  it("yalnız not öğesi kilitli; film/dizi her planda serbest", () => {
+    mockPremium.plan = "free";
+    expect(isPhoneCalendarItemLocked(note)).toBe(true);
+    expect(isPhoneCalendarItemLocked(movie)).toBe(false);
+    expect(isPhoneCalendarItemLocked(episode)).toBe(false);
+    mockPremium.plan = "premium";
+    expect(isPhoneCalendarItemLocked(note)).toBe(false);
+  });
+
+  it("Free'de tek not: izin istenmez, takvim açılmaz, etkinlik yazılmaz", async () => {
+    mockPremium.plan = "free";
+    expect(await saveEventToPhoneCalendar(note)).toEqual({ ok: false, locked: true });
+    expect(mockState.requestCalls).toBe(0);
+    expect(mockState.createCalendarCalls).toHaveLength(0);
+    expect(mockState.events.size).toBe(0);
+    expect(Toast.show).not.toHaveBeenCalled();
+    // Film aynı planda eklenir.
+    expect((await saveEventToPhoneCalendar(movie)).ok).toBe(true);
+  });
+
+  it("Free'de toplu aktarım notları atlar, diğerlerini ekler; atlananı geri bildirir", async () => {
+    mockPremium.plan = "free";
+    const res = await saveManyEventsToPhoneCalendar([movie, note, episode]);
+    expect(res).toMatchObject({ added: 2, skipped: 0, failed: 0, total: 3 });
+    expect(res.lockedItems).toEqual([note]);
+    expect((await loadSavedKeysSet()).has(buildEventKey(note))).toBe(false);
+  });
+
+  it("Free'de yalnız not varsa telefona hiç dokunulmaz", async () => {
+    mockPremium.plan = "free";
+    const res = await saveManyEventsToPhoneCalendar([note]);
+    expect(res).toEqual({ added: 0, skipped: 0, failed: 0, total: 1, addedKeys: [], lockedItems: [note] });
+    expect(mockState.createCalendarCalls).toHaveLength(0);
+    expect(Toast.show).not.toHaveBeenCalled();
+  });
+
+  it("Premium'dayken eklenmiş not Free'de kalır: 'zaten vardı', kaldırılabilir, kaldırmanın Geri Al'ı geri koyar", async () => {
+    await saveEventToPhoneCalendar(note);
+    mockPremium.plan = "free";
+    const res = await saveManyEventsToPhoneCalendar([note]);
+    expect(res).toMatchObject({ added: 0, skipped: 1, lockedItems: [] });
+
+    Toast.show.mockClear();
+    const onSavedChange = jest.fn();
+    expect(await removeEventFromPhoneCalendar(note, { onSavedChange })).toEqual({ ok: true });
+    expect(mockState.events.size).toBe(0);
+    const calls = Toast.show.mock.calls;
+    await calls[calls.length - 1][0].props.action.onPress();
+    expect(mockState.events.size).toBe(1);
+    expect(onSavedChange).toHaveBeenCalledWith(buildEventKey(note), true);
+
+    // Ama kaldırılmış bir notu sonradan yeniden eklemek yeni eklemedir: kapalı.
+    await removeEventFromPhoneCalendar(note);
+    expect(await saveEventToPhoneCalendar(note)).toEqual({ ok: false, locked: true });
   });
 });

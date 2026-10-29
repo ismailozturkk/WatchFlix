@@ -21,6 +21,7 @@ import {
   TIER_EM,
   buildChoicePreview,
   buildPriceHint,
+  buildReminderPreview,
   buildUpsellContent,
   fitTierFontSize,
   pickPerks,
@@ -793,5 +794,74 @@ describe("özel afiş / arka plan önizlemesi", () => {
   test("başka özellikler önizlemeyi yok saymaz ama başlıkları değişmez", () => {
     const c = buildUpsellContent("ambient_background", FREE, "tr", { preview: posterPreview });
     expect(c.title).toBe("Ambiyans Premium'da");
+  });
+});
+
+describe("not hatırlatıcısı: bildirim kartı önizlemesi", () => {
+  const NOW = new Date(2026, 9, 29, 14, 0);
+  const reminder = (extra = {}) => ({
+    kind: "reminder",
+    noteType: "note",
+    title: "Film gecesi",
+    scheduledDate: "2026-10-30",
+    scheduledTime: "09:00",
+    ...extra,
+  });
+
+  test("Free'de kilitli erişim sayfası; başlık, mesaj ve sütunlar kayıttan", () => {
+    const c = buildUpsellContent("note_reminders", FREE, "tr");
+    expect(c).toMatchObject({ state: "locked", icon: "alarm", targetPlan: PREMIUM, canUpgrade: true });
+    expect(c.title).toBe("Hatırlatıcılar Premium'da");
+    expect(c.message).toMatch(/gün ve saat/);
+    expect(c.meter).toBeNull();
+    expect(c.tiers.map((t) => t.value)).toEqual(["Kapalı", "Gün ve saatle", "Gün ve saatle"]);
+    expect(c.preview).toBeNull();
+    expect(buildUpsellContent("note_reminders", PREMIUM, "tr").canUpgrade).toBe(false);
+  });
+
+  test("denenen gün/saat ve notun başlığı kartta; yarın/bugün dile göre", () => {
+    expect(buildReminderPreview(reminder(), "tr", NOW)).toEqual({
+      kind: "reminder",
+      label: "Not hatırlatması",
+      title: "Film gecesi",
+      when: "Yarın",
+      time: "09:00",
+    });
+    expect(buildReminderPreview(reminder({ scheduledDate: "2026-10-29", scheduledTime: "15:00" }), "en", NOW)).toMatchObject({
+      label: "Note reminder",
+      when: "Today",
+      time: "15:00",
+    });
+    expect(buildReminderPreview(reminder({ scheduledDate: "2026-11-05" }), "tr", NOW).when).toBe("5 Kasım");
+  });
+
+  test("gün yoksa genel cümle ve saat yok; başlıksız liste etiketi; uzun başlık kısalır", () => {
+    const anyDay = buildReminderPreview(reminder({ noteType: "todo", title: "  ", scheduledDate: null }), "tr", NOW);
+    expect(anyDay).toMatchObject({ label: "Liste hatırlatması", title: "Başlıksız liste", time: null });
+    expect(anyDay.when).toBe("Seçtiğin gün ve saatte");
+    const long = buildReminderPreview(reminder({ title: "a".repeat(200) }), "tr", NOW);
+    expect(long.title.length).toBeLessThanOrEqual(80);
+    expect(long.title.endsWith("…")).toBe(true);
+  });
+
+  test("yalnız hatırlatma türü kabul edilir; afiş önizlemesi bozulmaz", () => {
+    expect(buildReminderPreview(null, "tr")).toBeNull();
+    expect(buildReminderPreview({ kind: "poster" }, "tr")).toBeNull();
+    expect(buildChoicePreview(reminder(), "tr")).toBeNull();
+  });
+
+  test("önizlemeyle açılan sayfa kartı taşır, kazanç satırları yerine (kaydırmasız sığsın)", () => {
+    const c = buildUpsellContent("note_reminders", FREE, "es", { preview: reminder({ scheduledDate: null }) });
+    expect(c.preview).toMatchObject({ kind: "reminder", label: "Recordatorio de nota", title: "Film gecesi" });
+    expect(c.title).toBe("Los recordatorios son una ventaja Premium");
+    expect(c.perks).toEqual([]);
+  });
+
+  test.each(["tr", "en", "es", "pt", "de"])("%s → kayıt metinleri dolu", (language) => {
+    const c = buildUpsellContent("note_reminders", FREE, language);
+    expect(c.title).toBeTruthy();
+    expect(c.message).toBeTruthy();
+    expect(c.note).toBeTruthy();
+    expect(c.featureTitle).toBeTruthy();
   });
 });

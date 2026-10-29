@@ -62,6 +62,8 @@ export const FEATURE_KIND = Object.freeze({
    * Toplam adet: sahip olunan liste/arkadaş/grup sayısı. `window: true` olan
    * girdi (Wrapped arşivi) harcanan bir miktar değil geriye doğru görülebilen
    * yıl penceresidir: sayaç/gösterge çizilmez, etiketi `planValue`dan gelir.
+   * `perItem: true` olan girdi (not / madde uzunluğu) TEK kaydın tavanıdır: kapı
+   * `used` olarak o anki metnin uzunluğunu sorar; Kullanım ekranında sayaç yok.
    */
   COUNT: "count",
   /** Günlük hak: yerel gün değişince sıfırlanır. */
@@ -156,6 +158,10 @@ export const PRESET_THEME_COUNT = 9;
  * limitleri ve karşılaştırma metinleri buradan türer.
  */
 export const WRAPPED_YEARS_VISIBLE = Object.freeze({ free: 1, premium: 5 });
+
+/** "1.000" / "1,000" — dört basamaklı limitler (harf sınırları) dilin biçiminde. */
+const grouped = (n, language) =>
+  Number.isFinite(n) ? n.toLocaleString(intlLocaleOf(normalizeAppLanguage(language))) : String(n);
 
 const feature = (definition) =>
   Object.freeze({
@@ -380,6 +386,102 @@ export const PREMIUM_FEATURES = Object.freeze({
       pt: (n) => `você pode ter até ${n} listas de tarefas`,
       de: (n) => `du kannst bis zu ${n} Aufgabenlisten behalten`,
     },
+  }),
+  // Harf sınırları: TEK notun metni ve TEK yapılacak maddesi (başlık her planda 120).
+  // Sınır yalnız büyümeyi durdurur; plan düşünce daha uzun eski kayıtlar kısalmaz
+  // (utils/noteTextLimits.js). Max'te de sayı var: metin kutusu sınırsız uzunlukta
+  // akıcı kalmaz, "Sınırsız" yazıp gizli bir tavan koymak vaadi bozardı.
+  note_length: feature({
+    id: "note_length",
+    kind: COUNT,
+    perItem: true,
+    category: "notes",
+    icon: "reader",
+    limits: { free: 500, premium: 2000, unlimited: 20000 },
+    title: { tr: "Not uzunluğu", en: "Note length", es: "Longitud de la nota", pt: "Tamanho da nota", de: "Notizlänge" },
+    upsell: {
+      title: { tr: "Not uzunluk sınırına ulaştın", en: "You've reached the note length limit", es: "Has alcanzado el límite de longitud de la nota", pt: "Você atingiu o limite de tamanho da nota", de: "Du hast die maximale Notizlänge erreicht" },
+    },
+    unit: { tr: "karakter", en: "characters", es: "caracteres", pt: "caracteres", de: "Zeichen" },
+    note: {
+      tr: "Daha uzun eski notların kısaltılmaz; düzenlemek her zaman serbest",
+      en: "Longer existing notes are never cut; editing them is always free",
+      es: "Las notas existentes más largas nunca se recortan; editarlas siempre es gratis",
+      pt: "Notas existentes mais longas nunca são cortadas; editá-las é sempre grátis",
+      de: "Längere vorhandene Notizen werden nie gekürzt; sie zu bearbeiten ist immer kostenlos",
+    },
+    phrase: {
+      tr: (n) => `bir not en fazla ${grouped(n, "tr")} karakter olabilir`,
+      en: (n) => `a note can be up to ${grouped(n, "en")} characters long`,
+      es: (n) => `una nota puede tener hasta ${grouped(n, "es")} caracteres`,
+      pt: (n) => `uma nota pode ter até ${grouped(n, "pt")} caracteres`,
+      de: (n) => `eine Notiz kann bis zu ${grouped(n, "de")} Zeichen lang sein`,
+    },
+  }),
+  todo_item_length: feature({
+    id: "todo_item_length",
+    kind: COUNT,
+    perItem: true,
+    category: "notes",
+    icon: "create",
+    limits: { free: 180, premium: 360, unlimited: 1000 },
+    title: { tr: "Yapılacak maddesi uzunluğu", en: "To-do item length", es: "Longitud de cada tarea", pt: "Tamanho de cada item", de: "Länge eines Aufgabeneintrags" },
+    upsell: {
+      title: { tr: "Madde uzunluk sınırına ulaştın", en: "You've reached the item length limit", es: "Has alcanzado el límite de longitud de la tarea", pt: "Você atingiu o limite de tamanho do item", de: "Du hast die maximale Eintragslänge erreicht" },
+    },
+    unit: { tr: "karakter", en: "characters", es: "caracteres", pt: "caracteres", de: "Zeichen" },
+    note: {
+      tr: "Daha uzun eski maddeler kısaltılmaz; düzenlemek her zaman serbest",
+      en: "Longer existing items are never cut; editing them is always free",
+      es: "Las tareas existentes más largas nunca se recortan; editarlas siempre es gratis",
+      pt: "Itens existentes mais longos nunca são cortados; editá-los é sempre grátis",
+      de: "Längere vorhandene Einträge werden nie gekürzt; sie zu bearbeiten ist immer kostenlos",
+    },
+    phrase: {
+      tr: (n) => `bir yapılacak maddesi en fazla ${grouped(n, "tr")} karakter olabilir`,
+      en: (n) => `a to-do item can be up to ${grouped(n, "en")} characters long`,
+      es: (n) => `cada tarea puede tener hasta ${grouped(n, "es")} caracteres`,
+      pt: (n) => `cada item da lista pode ter até ${grouped(n, "pt")} caracteres`,
+      de: (n) => `ein Aufgabeneintrag kann bis zu ${grouped(n, "de")} Zeichen lang sein`,
+    },
+  }),
+  // Not / yapılacak HATIRLATICISI (gün + saat, cihaz bildirimi, profil şeridi, kutu).
+  // Kapı yalnız KURMAYI durdurur: yeni hatırlatıcı, günü/saati değiştirmek ve
+  // ertelemek. Kaldırmak her planda serbest; plan düşünce kurulu hatırlatıcılar
+  // silinmez ve çalmaya devam eder (ProfileNotesContext saveNote ikinci kapı).
+  note_reminders: feature({
+    id: "note_reminders",
+    kind: ACCESS,
+    category: "notes",
+    icon: "alarm",
+    minPlan: PREMIUM_PLAN.PREMIUM,
+    title: { tr: "Not hatırlatıcısı", en: "Note reminders", es: "Recordatorios de notas", pt: "Lembretes de notas", de: "Notiz-Erinnerungen" },
+    upsell: {
+      title: { tr: "Hatırlatıcılar Premium'da", en: "Reminders are a Premium perk", es: "Los recordatorios son una ventaja Premium", pt: "Os lembretes são um benefício Premium", de: "Erinnerungen sind ein Premium-Vorteil" },
+      message: {
+        tr: "Notlarına ve yapılacak listelerine gün ve saat seç; zamanı gelince bildirim gelsin, profilinde ve bildirim kutunda görünsün.",
+        en: "Pick a day and time for your notes and to-do lists; get notified when it's time, right on your profile and in your inbox.",
+        es: "Elige día y hora para tus notas y listas de tareas; recibe un aviso cuando llegue el momento, en tu perfil y en tu bandeja.",
+        pt: "Escolha dia e horário para suas notas e listas de tarefas; receba um aviso na hora certa, no seu perfil e na sua caixa de entrada.",
+        de: "Wähle Tag und Uhrzeit für deine Notizen und Aufgabenlisten; werde rechtzeitig benachrichtigt, in deinem Profil und im Posteingang.",
+      },
+    },
+    detail: {
+      tr: "Notlara ve yapılacaklara gün + saatli bildirim",
+      en: "Notifications on a day and time for notes and to-dos",
+      es: "Avisos con día y hora para notas y tareas",
+      pt: "Avisos com dia e horário para notas e tarefas",
+      de: "Benachrichtigungen mit Tag und Uhrzeit für Notizen und Aufgaben",
+    },
+    note: {
+      tr: "Kurduğun hatırlatıcılar abonelik bitince de çalar; kaldırmak her zaman serbest",
+      en: "Reminders you've set still go off if your subscription ends; removing them is always free",
+      es: "Los recordatorios que creaste siguen sonando si termina tu suscripción; quitarlos siempre es gratis",
+      pt: "Os lembretes que você criou continuam tocando se a assinatura acabar; removê-los é sempre grátis",
+      de: "Gesetzte Erinnerungen bleiben aktiv, wenn dein Abo endet; sie zu entfernen ist immer kostenlos",
+    },
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" },
+    paidValue: { tr: "Gün ve saatle", en: "Day and time", es: "Día y hora", pt: "Dia e horário", de: "Tag und Uhrzeit" },
   }),
   movie_notes: feature({
     id: "movie_notes",
@@ -704,26 +806,6 @@ export const PREMIUM_FEATURES = Object.freeze({
     },
     freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" },
     paidValue: { tr: "Desenli arka plan", en: "Patterned background", es: "Fondo con patrón", pt: "Fundo com padrão", de: "Hintergrund mit Muster" },
-  }),
-  pet_companion: feature({
-    id: "pet_companion",
-    kind: ACCESS,
-    category: "personal",
-    icon: "paw",
-    minPlan: PREMIUM_PLAN.PREMIUM,
-    title: { tr: "Pet / Dost", en: "Pet companion", es: "Mascota compañera", pt: "Pet companheiro", de: "Begleiter" },
-    upsell: {
-      title: { tr: "Pet Premium'da", en: "The pet companion is a Premium perk", es: "La mascota compañera es una ventaja Premium", pt: "O pet companheiro é um benefício Premium", de: "Der Begleiter ist ein Premium-Vorteil" },
-      message: {
-        tr: "Ekranında dolaşan bir dost edin; dokununca durumu değişir, basılı tutunca AI açılır.",
-        en: "Get a companion that roams your screen; tap it to change its mood, hold it to open the AI.",
-        es: "Consigue una mascota que pasea por tu pantalla; tócala para cambiar su estado de ánimo y mantenla pulsada para abrir la IA.",
-        pt: "Ganhe um companheiro que passeia pela sua tela; toque nele para mudar o humor e segure para abrir a IA.",
-        de: "Hol dir einen Begleiter, der über deinen Bildschirm streift; tippe ihn an, um seine Stimmung zu ändern, halte ihn gedrückt, um die KI zu öffnen.",
-      },
-    },
-    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" },
-    paidValue: { tr: "Ekranda pet", en: "On-screen pet", es: "Mascota en pantalla", pt: "Pet na tela", de: "Begleiter auf dem Bildschirm" },
   }),
   streaming_alerts: feature({
     id: "streaming_alerts",
@@ -1161,16 +1243,17 @@ export function formatFeatureValue(featureId, plan, language = "en") {
   // Limit 0 = özellik bu planda kapalı ("0 oyun/gün" yazmak yanıltıcı olur).
   if (limit <= 0) return definition.freeValue ? pick(definition.freeValue, language) : "—";
   const unit = unitLabel(definition, limit, language);
+  const count = grouped(limit, lang);
   if (definition.kind === DAILY) {
     return pickByLanguage(lang, {
-      tr: `${limit} ${unit}/gün`,
-      en: `${limit} ${unit}/day`,
-      es: `${limit} ${unit}/día`,
-      pt: `${limit} ${unit}/dia`,
-      de: `${limit} ${unit}/Tag`,
+      tr: `${count} ${unit}/gün`,
+      en: `${count} ${unit}/day`,
+      es: `${count} ${unit}/día`,
+      pt: `${count} ${unit}/dia`,
+      de: `${count} ${unit}/Tag`,
     });
   }
-  return `${limit} ${unit}`;
+  return `${count} ${unit}`;
 }
 
 /** "Premium ile 25, Premium Max ile sınırsız." — üst planların bu özellikteki değeri. */
@@ -1187,7 +1270,7 @@ function upgradeSentence(featureId, plan, language) {
     const value = definition.window
       ? formatFeatureValue(featureId, candidate, language).toLocaleLowerCase(intlLocaleOf(lang))
       : Number.isFinite(limit)
-        ? String(limit)
+        ? grouped(limit, lang)
         : pickByLanguage(lang, { tr: "sınırsız", en: "unlimited", es: "ilimitado", pt: "ilimitado", de: "unbegrenzt" });
     const name = getPremiumPlanDisplayName(candidate);
     parts.push(

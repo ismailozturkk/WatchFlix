@@ -1,14 +1,15 @@
 // components/tournament/TournamentHero.js
 //
 // Turnuva ekranının üst kartı (seçim / oylama / "yakında" fazları). Üç katman:
-//   1. Kimlik   → ay + ortam (cam çipler) ve büyük TÜR başlığı; faz ikonu soluk
-//                 bir filigran olarak arkada durur.
+//   1. Kimlik   → ay + ortam (cam çipler) ve büyük TÜR başlığı; sağ üst köşede
+//                 türün animasyonlu simgesi (GenreGlyph).
 //   2. Zaman    → "şuna kadar" etiketi + bitiş tarihi ve tam genişlik geri sayım.
 //   3. İlerleme → interaktif aşama çizelgesi (düğüme bas: o turun listesine git).
 //
-// Renkler fazdan gelir (phaseMeta.gradient): mavi=seçim, turuncu/kırmızı=oylama,
-// gri=yakında. Üzerindeki her şey beyaz/yarı saydam beyazdır, bu yüzden tema
-// (açık/koyu) değişse de okunurluk değişmez. Şampiyon kartı (results) ayrıdır.
+// Renkler AYIN TÜRÜNDEN gelir (genreMeta.gradient) — Hub kartıyla aynı.
+// Faz, başlıktaki faz çipi + geri sayım etiketi + aşama çizelgesiyle anlatılır.
+// Üzerindeki her şey beyaz/yarı saydam beyazdır, bu yüzden tema (açık/koyu)
+// değişse de okunurluk değişmez. Şampiyon kartı (results) ayrıdır.
 
 import { tmdbLanguageOf } from "../../utils/appLanguages";
 import React, { memo, useMemo } from "react";
@@ -17,6 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import CountdownTimer from "@components/tournament/CountdownTimer";
 import StageTimeline from "@components/tournament/StageTimeline";
+import GenreGlyph from "@components/tournament/GenreGlyph";
 import { monthLabel, mediaLabel } from "@services/tournamentEngine";
 import { i18nText } from "@utils/i18nText";
 import GlassBox from "../common/GlassBox";
@@ -35,7 +37,7 @@ function GlassChip({ icon, text }) {
 }
 
 function TournamentHero({
-  phaseMeta, theTheme, mediaType, monthIndex, year, lang = "tr",
+  genreMeta, theTheme, mediaType, monthIndex, year, lang = "tr",
   label, deadlineMs, periodId, nowMs, onStagePress,
 }) {
   const deadlineText = useMemo(
@@ -48,16 +50,14 @@ function TournamentHero({
 
   return (
     <LinearGradient
-      colors={phaseMeta.gradient}
+      colors={genreMeta.gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.hero}
     >
       <View pointerEvents="none" style={styles.glowOne} />
       <View pointerEvents="none" style={styles.glowTwo} />
-      <View pointerEvents="none" style={styles.watermark}>
-        <AppIcon family="Ionicons" name={phaseMeta.icon} size={150} color="rgba(255,255,255,0.11)" />
-      </View>
+      <GenreGlyph meta={genreMeta} size={58} style={styles.glyph} />
 
       <View style={styles.chipsRow}>
         <GlassChip icon="calendar" text={`${monthLabel(monthIndex, lang)}${year ? ` ${year}` : ""}`} />
@@ -109,16 +109,18 @@ const styles = StyleSheet.create({
     position: "absolute", width: 150, height: 150, borderRadius: 75,
     left: -50, bottom: -70, backgroundColor: "rgba(255,255,255,0.07)",
   },
-  watermark: { position: "absolute", right: -12, top: 8, transform: [{ rotate: "-12deg" }] },
+  // Sağ üst köşe: çiplerin ve "Ayın türü" satırının sağı (başlık simgenin altından başlar).
+  glyph: { position: "absolute", top: 14, right: 14 },
 
-  chipsRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // Sağdaki pay simge rozetine (58 + hale) yer bırakır.
+  chipsRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 76 },
   chip: {
-    flexDirection: "row", alignItems: "center", gap: 5,
+    flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 1,
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.18)",
     borderWidth: 1, borderColor: "rgba(255,255,255,0.28)",
   },
-  chipText: { color: "#fff", fontSize: 11.5, fontWeight: "800" },
+  chipText: { color: "#fff", fontSize: 11.5, fontWeight: "800", flexShrink: 1 },
 
   kicker: {
     color: "rgba(255,255,255,0.78)", fontSize: 10.5, fontWeight: "800",

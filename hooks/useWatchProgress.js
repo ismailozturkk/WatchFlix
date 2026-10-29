@@ -25,6 +25,7 @@ import { useAuth } from "@context/AuthContext";
 import { useProfileStats } from "@context/ProfileStatsContext";
 import { loadGameData } from "@services/sceneGameService";
 import { computePerde, computeWatchScore, hesapYasiYil } from "@utils/watchScoring";
+import { bingoTotals } from "@utils/cinemaBingo";
 import { kanonikTur } from "@utils/genreCanon";
 import {
   bilinenRozetIdleri,
@@ -33,13 +34,14 @@ import {
   KATALOG_SURUMU,
   prestijIdleri,
 } from "@components/badges/watchBadgeCatalog";
-import { Keys, set as setStored } from "@services/storage";
+import { Keys, set as setStored, useStored } from "@services/storage";
 import { bilinenSetIdleri, evaluateBadgeSets } from "@components/badges/badgeSets";
 import { muhurIdleri, muhurleriHesapla } from "@components/badges/seasonSeals";
 import {
   kutlanacaklar, loadLedger, markCelebrated, reconcileLedger, subscribeLedgerReset,
 } from "@utils/watchBadgeLedger";
-import { serileriHesapla } from "@utils/watchActivity";
+import { ayniSeriler, serileriHesapla, seriGunuAnahtari } from "@utils/watchActivity";
+import useAppActive from "@hooks/useAppActive";
 import { kartlariDekorle } from "@components/badges/badgeInsights";
 import useKesifSignals from "@hooks/useKesifSignals";
 import { kesifHazirImzasi } from "@utils/kesifSignals";
@@ -63,6 +65,8 @@ const YERLESME_MS = 1500;
 export default function useWatchProgress() {
   const { user } = useAuth();
   const uid = user?.uid || null;
+  const bingoHistory = useStored(Keys.cinemaBingoMonthly, { uid });
+  const bingoFullCards = useMemo(() => bingoTotals(bingoHistory).fullCards, [bingoHistory]);
   // Kıdem rozetlerinin ölçütü. AuthContext ham Firebase Auth nesnesini sakladığı
   // için `metadata.creationTime` doğrudan elimizde — yeni Firestore alanı, yeni
   // okuma ve yeni listener GEREKMEZ (sistemin temel sözleşmesi). Değeri sunucu
@@ -145,6 +149,29 @@ export default function useWatchProgress() {
     return () => { iptal = true; };
   }, [uid, sifirlamaNo]);
 
+  // ── SERİ GÜNÜ DÖNÜMÜ ───────────────────────────────────────────────────────
+  // Mutabakat yalnız izleme verisi değişince koşar. Uygulama geceyi arka planda
+  // geçirip sabah öne gelince hiçbir şey değişmemiştir ama seri durumu değişmiştir
+  // ("bugün henüz işaretlemedin", telafi bekliyor, kalkan devreye girdi). Seri günü
+  // döndüyse seriler bellekteki defterden YAZMADAN yeniden hesaplanır; kesinleşen
+  // kararlar bir sonraki mutabakatta diske iner (seriKorumasiniIlerlet idempotent).
+  const appActive = useAppActive();
+  const seriGunuRef = useRef(seriGunuAnahtari());
+  useEffect(() => {
+    if (!appActive || !defter) return undefined;
+    const yenile = () => {
+      const gun = seriGunuAnahtari();
+      if (gun === seriGunuRef.current) return;
+      seriGunuRef.current = gun;
+      const s = serileriHesapla(defter.aktiflik.gunler, defter.aktiflik);
+      setSeriler((o) => (ayniSeriler(o, s) ? o : s));
+    };
+    yenile();
+    // Uygulama açıkken de gün dönebilir; dakikada bir tek dize kıyası.
+    const zamanlayici = setInterval(yenile, 60000);
+    return () => clearInterval(zamanlayici);
+  }, [appActive, defter]);
+
   // Oyun seviyesi — tek seferlik okuma, listener değil.
   useEffect(() => {
     let iptal = false;
@@ -221,6 +248,10 @@ export default function useWatchProgress() {
       perde: perde.perde, oyunSeviye, hesapYili,
       rekorHaftaSerisi: seriler?.rekorHafta || 0,
       rekorGunSerisi: seriler?.rekorGun || 0,
+      // Sinema Bingosu rozeti: yalnız aylık TAM kartlar sayılır. MMKV aboneliği
+      // kullanıldığı için yeni Firestore dinleyicisi açılmaz; Bingo kartı dolduğu
+      // anda aynı rozet defteri/kutlama hattına girer.
+      bingoFullCards,
       // Keşif: sayılar + hangi kaynağın yüklendiği (ikincisi deftere gidecek id
       // listesini belirler, bkz. mutabakat effect'i).
       kesif: kesif.sayilar,
@@ -253,7 +284,7 @@ export default function useWatchProgress() {
     // kartına "doğrulanmamış" etiketi basmanın kimseye faydası yok. Fonksiyon
     // utils/watchScoring.js'te duruyor çünkü sunucu tarafına geçildiğinde
     // (docs §8.4) orada gerçek bir tüketicisi olacak.
-  }, [hesap, perdeFloor, makaraFloor, oyunSeviye, hesapYili, seriler, aktifGunler, kazanilmis, kesif]);
+  }, [hesap, perdeFloor, makaraFloor, oyunSeviye, hesapYili, seriler, aktifGunler, kazanilmis, kesif, bingoFullCards]);
 
   // ── Defter mutabakatı ──────────────────────────────────────────────────────
   // Yalnızca açık rozet kümesi ya da Perde gerçekten değiştiğinde çalışır;
@@ -347,13 +378,11 @@ export default function useWatchProgress() {
         // Değişmediyse ÖNCEKİ REFERANS döner: `seriler` bir memo bağımlılığı
         // olduğu için her mutabakatta yeni nesne yazmak, hiçbir şey değişmese
         // bile tüm hesabı (512 film + 3.400 bölüm) yeniden koştururdu.
+        // Koruma alanları (telafi bekliyor, kalkan sayısı, bugünkü kazanım) da
+        // karşılaştırılır: yalnız seri sayılarına bakmak "bugün 1/2 → 2/2" gibi
+        // değişiklikleri ekrana hiç yansıtmazdı (utils/watchActivity ayniSeriler).
         if (r.seriler) {
-          setSeriler((o) => (
-            o && o.gunSerisi === r.seriler.gunSerisi && o.haftaSerisi === r.seriler.haftaSerisi
-              && o.rekorGun === r.seriler.rekorGun && o.rekorHafta === r.seriler.rekorHafta
-              && o.bugunAktif === r.seriler.bugunAktif
-              ? o : r.seriler
-          ));
+          setSeriler((o) => (ayniSeriler(o, r.seriler) ? o : r.seriler));
         }
         // Gün listesi de aynı gerekçeyle referans korur: her mutabakatta yeni
         // dizi yazmak tüm hesabı (512 film + 3.400 bölüm) yeniden koştururdu.

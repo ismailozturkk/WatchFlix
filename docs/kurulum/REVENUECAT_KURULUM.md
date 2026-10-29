@@ -225,6 +225,9 @@ Ayarlar kartı ve limit uyarıları bu kayıttan üretilir — kaydı olmayan bi
 | Ortak liste kurma | 2 | 10 | Sınırsız | `CreateSharedListModal`, CineSwipe |
 | Not | 5 | 50 | Sınırsız | `ProfileNotesContext.saveNote`, `NotesScreen`, `NotesCard` |
 | Yapılacaklar listesi | 5 | 50 | Sınırsız | `ProfileNotesContext.saveNote`, `NotesScreen`, `NotesCard` |
+| Not uzunluğu (karakter) | 500 | 2.000 | 20.000 | `NoteEditorSheet` (`textLimits`, editör içi yükseltme sayfası) |
+| Yapılacak maddesi uzunluğu (karakter) | 180 | 360 | 1.000 | `NoteEditorSheet` (`textLimits`) |
+| Not hatırlatıcısı (gün + saat; 29 Eki) | — | ✓ | ✓ | `NoteEditorSheet` (`reminderLocked`, editör içi yükseltme sayfası), `NoteRemindersBar` (erteleme), `ProfileNotesContext.saveNote` (ikinci kapı) |
 | Film notu | 20 | 200 | Sınırsız | `MediaNotesContext`, `MovieDetail` |
 | Dizi notu | 20 | 200 | Sınırsız | `MediaNotesContext`, `TvShowsDetails` |
 | Film hatırlatması | 10 | 50 | Sınırsız | `useReminderGate` (`Reminder`, `MovieDetail`, `MediaQuickActionsSheet`) |
@@ -240,7 +243,6 @@ Ayarlar kartı ve limit uyarıları bu kayıttan üretilir — kaydı olmayan bi
 | Ambiyans arka planı | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen`, `DecorScopesScreen` |
 | Özel afiş ve arka planlar (25 Eki) | Varsayılan görseller | ✓ | ✓ | `ImageGalleryModal` (seçici), `PosterChoicesProvider` (çizim + arkadaş görünürlüğü sahibin `entitlements` planına bağlı) |
 | İkon arka planı | — | ✓ | ✓ | `AppSettingsContext`, `PersonalizationScreen`, `DecorScopesScreen` |
-| Pet / Dost | — | ✓ | ✓ | `PetContext`, `PetSettingsSection` |
 | Platform bildirimi | 10 başlık | 100 | 100 | Sunucu (`dailyStreamingAvailability`) |
 | Wrapped arşivi | Yalnız bu yıl | Son 5 yıl | Tüm yıllar | `WrappedScreen`, `HubWrappedModule` (`canViewWrappedYear`) |
 | Hata bildirimi (uygulama içi) | Yalnız e-posta | ✓ | ✓ | `FeedbackScreen`, `FeedbackSettingsGroup`; sunucu: `firestore.rules` → `Feedback` |
@@ -254,6 +256,11 @@ olarak eklendi (kar ve ikon arka planıyla aynı kural). Üç dekor efektinin
 (kar / ambiyans / ikon arka planı) her birinin kayıtta bir erişim girdisi olmak
 zorundadır; `__tests__/decorScopes.test.js` "Premium kapısı bekçisi" bunu ve
 ham tercih bayrağının kapıyı atlayarak okunmadığını doğrular.
+Not / yapılacak hatırlatıcısı 29 Ekim'de Premium'a özel oldu (kullanıcı kararı):
+kapı yalnız KURMAYI durdurur (yeni hatırlatıcı, gün/saat değişikliği, profil
+şeridinden erteleme); kaldırmak her planda serbest, plan düşünce kurulu
+hatırlatıcılar silinmez ve çalmaya devam eder (`utils/noteReminders.js`
+`reminderScheduleChanged`).
 Premium ve Max değerleri bu kararın PARÇASI DEĞİL,
 önerilen varsayılandır (özellikle not, hatırlatma ve film/dizi notu): satış
 verisi geldikçe `utils/premiumFeatures.js`'ten değişir.
@@ -295,7 +302,7 @@ Kurallar:
 - **Abonelik bitince veri silinmez:** fazla listeler ve arkadaşlar kalır,
   yalnız yenisi engellenir. Özel tema ve premium font seçimi saklanır ama
   varsayılan tema / sistem fontu çizilir; abonelik yenilenince kendiliğinden
-  geri gelir. Aynısı kar animasyonu, ambiyans, ikon arka planı ve pet için de geçerli:
+  geri gelir. Aynısı kar animasyonu, ambiyans ve ikon arka planı için de geçerli:
   tercih saklanır, Free'de kapalı çizilir. Uygulama simgesinde varsayılana
   dönmek her zaman serbesttir.
 - **Maliyetli ve başkalarına görünen özellikler sunucuda** (AI, platform

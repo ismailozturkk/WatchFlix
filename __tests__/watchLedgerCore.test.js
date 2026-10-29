@@ -347,7 +347,37 @@ describe("aktiflik damgasi (gercek isaretleme ani)", () => {
     const v1 = { v: 1, baseline: { kare: 5, perde: 3, badgeIds: [], seenAt: null },
                  earned: { badgeIds: ["a"], perdeFloor: 3 }, seen: [] };
     const l = normalizeLedger(v1);
-    expect(l.aktiflik).toEqual({ gunler: [], sonSayim: -1, rekorGun: 0, rekorHafta: 0 });
+    expect(l.aktiflik).toEqual({
+      gunler: [], sonSayim: -1, rekorGun: 0, rekorHafta: 0,
+      gunluk: {}, koruma: { yamalar: {}, kalkan: 0, kalkanAy: 0, islenen: null },
+    });
+  });
+
+  test("ayni icerigi geri alip yeniden basmak gun DAMGALAMAZ (net kazanim 0)", () => {
+    // Dunku bir icerigi bugun geri al (500 → 499) ve yeniden bas (→ 500): bugun
+    // yeni bir sey izlenmedi. Eskiden her artis damgaliyordu; seri bununla sisiriliyordu.
+    let l = aktifligiGuncelle(tohumlu(500), { icerikSayisi: 499, bugun: "2026-07-15" }).ledger;
+    const r = aktifligiGuncelle(l, { icerikSayisi: 500, bugun: "2026-07-15" });
+    expect(r.yeniGun).toBe(false);
+    expect(r.ledger.aktiflik.gunler).toEqual([]);
+    expect(r.ledger.aktiflik.gunluk["2026-07-15"]).toEqual({ taban: 500, kazanim: 0 });
+    // Hata duzeltmek (yanlis filmi kaldirip dogrusunu basmak) yine 1 kazanimdir.
+    l = aktifligiGuncelle(r.ledger, { icerikSayisi: 501, bugun: "2026-07-15" }).ledger;
+    expect(l.aktiflik.gunler).toEqual(["2026-07-15"]);
+    expect(l.aktiflik.gunluk["2026-07-15"].kazanim).toBe(1);
+  });
+
+  test("gunluk kazanim: gun icindeki NET yeni icerik, en yeni 10 gun tutulur", () => {
+    let l = tohumlu(100);
+    l = aktifligiGuncelle(l, { icerikSayisi: 101, bugun: "2026-07-15" }).ledger;
+    l = aktifligiGuncelle(l, { icerikSayisi: 103, bugun: "2026-07-15" }).ledger;
+    l = aktifligiGuncelle(l, { icerikSayisi: 102, bugun: "2026-07-15" }).ledger;
+    expect(l.aktiflik.gunluk["2026-07-15"]).toEqual({ taban: 100, kazanim: 3 });
+    for (let i = 1; i <= 14; i++) {
+      l = aktifligiGuncelle(l, { icerikSayisi: 102 + i, bugun: `2026-08-${String(i).padStart(2, "0")}` }).ledger;
+    }
+    expect(Object.keys(l.aktiflik.gunluk)).toHaveLength(10);
+    expect(Object.keys(l.aktiflik.gunluk)[0]).toBe("2026-08-05");
   });
 });
 

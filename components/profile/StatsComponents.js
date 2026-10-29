@@ -220,9 +220,8 @@ const StatTile = memo(function StatTile({
   };
 
   // Tek kutucuk tüm genişliği kaplar: köşeye yapışık küçük ikon + sola yaslı
-  // 10.5 pt etiket bu genişlikte kaybolup hizasız duruyordu. Bunun yerine hemen
-  // altındaki "Toplam izlenme" satırıyla aynı kalıp (soldaki ikon kutusu, üstte
-  // etiket, altta değer) kullanılır; iki satırın metin sütunu aynı hizada başlar.
+  // 10.5 pt etiket bu genişlikte kaybolup hizasız duruyordu. Bunun yerine solda
+  // ikon, ortada etiket + değer, sağda tekrarsız rozeti olan yatay kalıp kullanılır.
   if (large) {
     return (
       <View style={[heroStyles.tile, heroStyles.tileWide, surface]}>
@@ -678,6 +677,7 @@ export const StatsHeroCard = memo(function StatsHeroCard({
         <GlassPressable
           onPress={onTimePress}
           accessibilityRole="button"
+          hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
           style={[
             heroStyles.totalRow,
             {
@@ -687,11 +687,14 @@ export const StatsHeroCard = memo(function StatsHeroCard({
           ]}
         >
           <View style={[heroStyles.totalIcon, { backgroundColor: withAlpha(accent, 0.2) }]}>
-            <Ionicons name="time-outline" size={19} color={accent} />
+            <Ionicons name="time-outline" size={14} color={accent} />
           </View>
           <View style={heroStyles.totalCopy}>
             <Text
               allowFontScaling={false}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
               style={[heroStyles.totalLabelText, { color: theme.text.muted }]}
             >
               {i18nText("autoI18n.toplam_izlenme", "Toplam izlenme")}
@@ -706,7 +709,7 @@ export const StatsHeroCard = memo(function StatsHeroCard({
               {formatDuration?.(totalMinutes || 0, timeDisplayMode)}
             </Text>
           </View>
-          <Ionicons name="swap-horizontal" size={17} color={theme.text.muted} />
+          <Ionicons name="swap-horizontal" size={14} color={theme.text.muted} />
         </GlassPressable>
 
         {/* Expand toggle */}
@@ -837,8 +840,8 @@ const heroStyles = StyleSheet.create({
     letterSpacing: -0.5,
     includeFontPadding: false,
   },
-  // Tek kutucuk (film ekranı): yatay düzen. Dolgu ve ikon kutusu "Toplam izlenme"
-  // satırıyla (totalRow/totalIcon) aynı; iki satırın metni aynı sütundan başlar.
+  // Tek kutucuk (film ekranı): yatay düzen. Ana sayı burada geniş kalır; alttaki
+  // toplam süre satırı ise profil başlığının boyunu azaltmak için kompakt tutulur.
   tileWide: {
     flexDirection: "row",
     alignItems: "center",
@@ -883,23 +886,38 @@ const heroStyles = StyleSheet.create({
   totalRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 11,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 16,
+    gap: 8,
+    minHeight: 32,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   totalIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 23,
+    height: 23,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
-  totalCopy: { flex: 1, minWidth: 0 },
-  totalLabelText: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.2 },
-  totalValueText: { marginTop: 1, fontSize: 18, lineHeight: 23, fontWeight: "800", letterSpacing: -0.3 },
+  totalCopy: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  totalLabelText: { flexShrink: 1, fontSize: 9.5, fontWeight: "700", letterSpacing: 0.15 },
+  totalValueText: {
+    flexShrink: 1,
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+    textAlign: "right",
+  },
 
   chartCard: {
     paddingTop: 11,

@@ -32,12 +32,12 @@ const SECTION_FILES = [
   "screens/movie/MovieUpcoming.js",
   "screens/tv/TvOngoingSection.js",
   "screens/tv/TvShowBests.js",
-  "screens/tv/TvShowsAiringToday.js",
   "screens/tv/TvShowsEmmy.js",
   "screens/tv/TvShowsGenres.js",
   "screens/tv/TvShowsOnTheAir.js",
   "screens/tv/TvShowsProvders.js",
   "screens/tv/TvShowsTrends.js",
+  "screens/tv/TvShowsUpcoming.js",
 ];
 
 describe("HOME_SECTIONS tablosu", () => {

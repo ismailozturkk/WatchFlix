@@ -10,16 +10,19 @@
 // final) tek bakışta okunan iki taraflı bir huni olarak çizilir. Basınca
 // TournamentScreen'e gider.
 //
-// Kartın rengi/ikonu fazdan gelir (components/tournament/phaseMeta.js) — karta
-// basıp açılan ekranın hero'suyla aynı gradyan. Üst satır: kimlik çipi +
-// katılımcı sayısı + beyaz "aç" düğmesi.
+// Kartın rengi ve köşedeki animasyonlu simge AYIN TÜRÜNDEN gelir
+// (components/tournament/genreMeta.js + GenreGlyph) — karta basıp açılan
+// ekranın hero'suyla aynı gradyan ve aynı simge. Faz, durum satırı ve ağaç
+// çipiyle anlatılır. Üst satır: kimlik çipi + katılımcı sayısı + beyaz "aç"
+// düğmesi; altında başlık/durum/geri sayım (+ "sohbete gönder") bloğu ve
+// sağında simge rozeti.
 //
 // Hafiftir: aday listesini OLUŞTURMAZ (getTournamentDoc — yoksa null); sayımlar
 // tek agregat dokümandan (fetchAggOnce), kişisel durum tek kendi-oy dokümanından
 // (fetchMyVoteOnce) okunur. Tür/faz/geri sayım motordan (ağ gerekmez) gelir.
 
 import React, { memo, useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, useWindowDimensions } from "react-native";
 import Animated, {
   useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming,
   ReduceMotion,
@@ -44,7 +47,8 @@ import {
   getTournamentDoc, fetchVotesOnce, fetchAggOnce, fetchMyVoteOnce,
 } from "@services/tournamentService";
 import CountdownTimer from "@components/tournament/CountdownTimer";
-import { PHASE_META } from "@components/tournament/phaseMeta";
+import GenreGlyph from "@components/tournament/GenreGlyph";
+import { genreMetaFor } from "@components/tournament/genreMeta";
 
 // ─── Eleme ağacı önizlemesi ───────────────────────────────────────────────────
 // Ölçüler tek yerden türer (BracketTree'nin yaptığı gibi); tuval genişliği
@@ -386,6 +390,10 @@ function TournamentTreePreview({ bracket, getTmdbUrl, accent, lang, phase, activ
 
 export default function TournamentWidget({ navigation }) {
   const { theme } = useTheme();
+  // Simge rozeti dar ekranda (360 dp) küçülür: geri sayım (≈187) + gönder (36)
+  // sol sütuna aralıkla sığsın diye (390 dp'de 60, 360 dp'de 48).
+  const { width: screenW } = useWindowDimensions();
+  const glyphSize = screenW >= 380 ? 60 : 48;
   const { user } = useAuth();
   const { getTmdbUrl } = useImageQualitySettings();
   const { selectedLanguage: lang } = useLanguageSettings();
@@ -454,7 +462,7 @@ export default function TournamentWidget({ navigation }) {
     [seed, periodId, nowMs],
   );
 
-  const meta = PHASE_META[phaseInfo.phase] || PHASE_META.selection;
+  const genre = genreMetaFor(entry);
   const theTheme = themeLabel(entry, lang);
 
   // Kişisel durum: hype hakkı / aktif turdaki oy sayısı.
@@ -524,18 +532,13 @@ export default function TournamentWidget({ navigation }) {
   return (
     <>
     <HubCard
-      colors={meta.gradient}
-      shadowColor={meta.gradient[0]}
+      colors={genre.gradient}
+      shadowColor={genre.gradient[1]}
       onPress={() => navigation.navigate("TournamentScreen")}
       accessibilityRole="button"
       accessibilityLabel={`${i18nText("autoI18n.tournament_open", "Aylık turnuvayı aç")} — ${theTheme}, ${phaseLabel}${votersLabel ? `, ${votersLabel}` : ""}${bracketProgress ? `, ${bracketProgress}` : ""}`}
       cardStyle={styles.card}
     >
-      {/* Faz ikonu: hero'daki filigranın küçük kardeşi */}
-      <View pointerEvents="none" style={styles.watermark}>
-        <AppIcon family="Ionicons" name={meta.icon} size={150} color="rgba(255,255,255,0.10)" />
-      </View>
-
       <View style={styles.topRow}>
         {/* Kimlik çipi dar ekranda küçülüp kısalabilir; sayı ve ok yerinde kalır. */}
         <GlassPill
@@ -547,26 +550,33 @@ export default function TournamentWidget({ navigation }) {
           <GlassPill icon="people" text={String(voters)} tone="dark" textStyle={styles.votersText} />
         )}
         <View style={styles.topSpacer} />
-        <HubArrow color={meta.gradient[0]} />
+        <HubArrow color={genre.ink} />
       </View>
 
-      <Text style={styles.theme} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-        {theTheme} {mediaLabel(entry.mediaType, lang)}
-      </Text>
-      <Text style={styles.phaseLabel} numberOfLines={2}>{phaseLabel}</Text>
-
-      <View style={styles.countdownRow}>
-        <CountdownTimer
-          deadlineMs={phaseInfo.nextDeadlineMs}
-          lang={lang}
-          size="sm"
-          boxColor="rgba(0,0,0,0.24)"
-        />
-        <View style={styles.topSpacer} />
-        <HubSendButton
-          onPress={() => setSendVisible(true)}
-          label={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
-        />
+      {/* Sol: tür başlığı + durum + geri sayım (yanında "sohbete gönder").
+          Sağ: türün animasyonlu simgesi — okun altında, bloğun dikey ortasında
+          bir amblem (üst üste dizilmiş düğmeler gibi okunmasın diye ayrı sütun). */}
+      <View style={styles.bodyRow}>
+        <View style={styles.bodyCol}>
+          <Text style={styles.theme} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+            {theTheme} {mediaLabel(entry.mediaType, lang)}
+          </Text>
+          <Text style={styles.phaseLabel} numberOfLines={2}>{phaseLabel}</Text>
+          <View style={styles.countdownRow}>
+            <CountdownTimer
+              deadlineMs={phaseInfo.nextDeadlineMs}
+              lang={lang}
+              size="sm"
+              boxColor="rgba(0,0,0,0.24)"
+            />
+            <View style={styles.countdownSpacer} />
+            <HubSendButton
+              onPress={() => setSendVisible(true)}
+              label={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+            />
+          </View>
+        </View>
+        <GenreGlyph meta={genre} size={glyphSize} />
       </View>
 
       <TournamentTreePreview
@@ -590,22 +600,25 @@ export default function TournamentWidget({ navigation }) {
 
 const styles = StyleSheet.create({
   card: { padding: 16 },
-  watermark: { position: "absolute", right: -14, top: 34, transform: [{ rotate: "-12deg" }] },
 
   topRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   kickerPill: { flexShrink: 1 },
   topSpacer: { flex: 1 },
   votersText: { letterSpacing: 0 },
 
+  // Metin sütunu esner; simge rozeti sağda sabit genişlikte durur (hale
+  // rozetin dışına taşar, bu yüzden araya biraz fazla boşluk).
+  bodyRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 12 },
+  bodyCol: { flex: 1, minWidth: 0 },
   theme: {
     color: "#fff", fontSize: 24, lineHeight: 30, fontWeight: "900", letterSpacing: -0.4,
-    marginTop: 12,
     textShadowColor: "rgba(0,0,0,0.18)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
   },
   phaseLabel: {
     color: "rgba(255,255,255,0.92)", fontSize: 12, lineHeight: 16, fontWeight: "800", marginTop: 3,
   },
   countdownRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
+  countdownSpacer: { flex: 1, minWidth: 8 },
 
   // ── Eleme ağacı önizlemesi ──────────────────────────────────────────────────
   // Panelin yüksekliği SABİT DEĞİL: başlık (26) + tuval (TREE_H) kadar büyür,

@@ -422,12 +422,20 @@ describe("Free planı kararları", () => {
     expect(canUseFeature("tournament_vote", PREMIUM)).toBe(true);
   });
 
-  test("kişiselleştirme: simge, kar, ambiyans, özel afiş, ikon arka planı, pet Free'de YOK", () => {
-    for (const id of ["app_icon", "snow_effect", "ambient_background", "custom_posters", "icon_background", "pet_companion"]) {
+  test("kişiselleştirme: simge, kar, ambiyans, özel afiş, ikon arka planı Free'de YOK", () => {
+    for (const id of ["app_icon", "snow_effect", "ambient_background", "custom_posters", "icon_background"]) {
       expect(freeLimit(id)).toBe(false);
       expect(isLockedFor(id, FREE)).toBe(true);
       expect(canUseFeature(id, PREMIUM)).toBe(true);
     }
+  });
+
+  test("not hatırlatıcısı Free'de YOK, Premium ve Max'te açık (29 Eki kararı)", () => {
+    expect(freeLimit("note_reminders")).toBe(false);
+    expect(isLockedFor("note_reminders", FREE)).toBe(true);
+    expect(canUseFeature("note_reminders", PREMIUM)).toBe(true);
+    expect(canUseFeature("note_reminders", MAX)).toBe(true);
+    expect(PREMIUM_FEATURES.note_reminders.category).toBe("notes");
   });
 
   test("hatırlatma: 10 film, 20 dizi", () => {
@@ -503,7 +511,7 @@ describe("yeni özelliklerin kayıt bütünlüğü", () => {
   });
 
   test("erişim özelliklerinin ücretsiz ve ücretli değeri tanımlı (karşılaştırma tablosu '—' basmasın)", () => {
-    for (const id of ["tournament_vote", "app_icon", "snow_effect", "ambient_background", "custom_posters", "icon_background", "pet_companion", "bug_report", "feature_request"]) {
+    for (const id of ["tournament_vote", "app_icon", "snow_effect", "ambient_background", "custom_posters", "icon_background", "note_reminders", "bug_report", "feature_request"]) {
       const feature = PREMIUM_FEATURES[id];
       expect(feature.freeValue.tr && feature.freeValue.en).toBeTruthy();
       expect(feature.paidValue.tr && feature.paidValue.en).toBeTruthy();

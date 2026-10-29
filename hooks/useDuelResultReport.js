@@ -1,8 +1,8 @@
 // hooks/useDuelResultReport.js
 //
 // Kabul edilen günlük düellonun sonucunu davetin geldiği sohbete BİR KEZ yazar (SceneGameResultScreen).
-// Düello bağlamı oyuna davet kabul edilirken verilir (utils/importantInvites.duelContextOf): üst bardaki
-// davet ya da sohbetteki "Meydan okumayı kabul et" kartı.
+// Düello bağlamı oyuna davet kabul edilirken verilir (utils/importantInvites.duelContextOf): yüzen
+// davet kartı ya da sohbetteki "Meydan okumayı kabul et" kartı.
 //
 // Meydan okuyanın skoru günlük tablodan okunur (kart yalnız ilk görünüm; sohbetteki kart yeniden doğrular).
 // Kendi skorum bu denemenin skoru; aynı gün daha önce daha iyisi yapıldıysa tablodaki en iyi skor geçer

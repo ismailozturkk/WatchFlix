@@ -64,7 +64,7 @@ export const EFFECT_MODE_PRESETS = {
 
 // HER BASAMAK GÖRÜNÜR OLMALI. İlk denemede "orta" ile "kapalı" aynı desen
 // yoğunluğunu paylaşıyordu; aradaki tek fark blur olunca "orta" seçeneği
-// varsayılan kurulumda (desen zaten kapalı, pet yoksa) hiçbir şeyi
+// varsayılan kurulumda (desen zaten kapalıyken) hiçbir şeyi
 // değiştirmiyordu — yani kullanıcıya yalan söyleyen bir seçenekti. Şimdi üç
 // mod da hem yoğunlukta hem kare hızında ayrışıyor: 45 → 28 → 15 öğe,
 // %100 → %70 → %50 kare hızı, blur yalnız "kapalı"da gider.

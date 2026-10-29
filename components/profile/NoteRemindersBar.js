@@ -1,9 +1,11 @@
 // components/profile/NoteRemindersBar.js
 //
-// Profilin üstündeki etkileşimli hatırlatma şeridi (ImportantInvitesBar'ın
-// kardeşi, aynı görsel dil): vadesi gelmiş, okunmamış not / liste
+// Profilin üstündeki etkileşimli hatırlatma şeridi (davetler artık
+// yüzen bildirimde, components/floatingNotice): vadesi gelmiş, okunmamış not / liste
 // hatırlatmaları. Eylemler:
-//   • 1 saat ertele → notun gün + saatini ileri alır (cihaz bildirimi yeniden kurulur)
+//   • 1 saat ertele → notun gün + saatini ileri alır (cihaz bildirimi yeniden kurulur).
+//     Ertelemek yeni bir zaman kurmaktır: hatırlatıcı Premium'a özel (registry:
+//     note_reminders), Free'de yükseltme sayfası açılır (düğmede ◆ işareti).
 //   • Tamam        → okundu (bildirim kutusunda da okundu görünür)
 //   • Notu aç      → okundu + Notlar'da o notun düzenleyicisi
 import React, { useMemo, useState } from "react";
@@ -18,7 +20,7 @@ import { alpha } from "../../theme/colors";
 import useNoteReminderInbox from "../../hooks/useNoteReminderInbox";
 import { notificationContent, notificationDateLabel } from "../../utils/notificationInbox";
 import { notificationInboxCopy } from "../../utils/notificationInboxCopy";
-import { snoozedSchedule } from "../../utils/noteReminders";
+import { noteReminderPreview, snoozedSchedule } from "../../utils/noteReminders";
 
 const SNOOZE_MINUTES = 60;
 
@@ -43,13 +45,19 @@ export default function NoteRemindersBar({ navigation }) {
     markSeen(item);
     navigation.navigate("NotesScreen", { openNoteId: item.noteId });
   };
+  const reminderLocked = !notesApi?.canSetNoteReminder;
   const snooze = async () => {
     if (busy) return;
     const note = (notesApi?.notes || []).find((entry) => String(entry?.id) === item.noteId);
     if (!note || !notesApi?.saveNote) return;
+    const schedule = snoozedSchedule(SNOOZE_MINUTES);
+    if (reminderLocked) {
+      notesApi.showNoteReminderUpsell?.(noteReminderPreview(note, schedule));
+      return;
+    }
     setBusy(true);
     try {
-      const saved = await notesApi.saveNote({ ...note, ...snoozedSchedule(SNOOZE_MINUTES) });
+      const saved = await notesApi.saveNote({ ...note, ...schedule });
       if (saved === false) throw new Error("snooze");
       toast.success(copy.reminderSnoozed);
     } catch {
@@ -84,10 +92,16 @@ export default function NoteRemindersBar({ navigation }) {
         <Text style={[styles.date, { color: theme.text.muted }]}>{when}</Text>
       </View>
       <View style={styles.actions}>
-        <GlassPressable testID="note-reminder-snooze" accessibilityRole="button" accessibilityLabel={copy.reminderSnooze}
+        <GlassPressable testID="note-reminder-snooze" accessibilityRole="button"
+          accessibilityLabel={reminderLocked ? `${copy.reminderSnooze} · Premium` : copy.reminderSnooze}
           disabled={busy} onPress={snooze}
           style={[styles.iconButton, { borderColor: theme.border, backgroundColor: theme.primary }]}>
           <AppIcon family="Ionicons" name="time-outline" size={18} color={theme.text.primary} />
+          {reminderLocked ? (
+            <View testID="note-reminder-snooze-premium" style={[styles.premiumBadge, { backgroundColor: theme.accent, borderColor: theme.secondary }]}>
+              <AppIcon family="Ionicons" name="diamond" size={7} color="#FFFFFF" />
+            </View>
+          ) : null}
         </GlassPressable>
         <GlassPressable testID="note-reminder-done" accessibilityRole="button" accessibilityLabel={copy.reminderDone}
           disabled={busy} onPress={done}
@@ -116,6 +130,7 @@ const styles = StyleSheet.create({
   date: { fontSize: 11, marginTop: 2 },
   actions: { flexDirection: "row", gap: 8, marginTop: 11 },
   iconButton: { width: 39, minHeight: 39, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  premiumBadge: { position: "absolute", top: -4, right: -4, width: 15, height: 15, borderRadius: 8, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   button: { flex: 1, minHeight: 39, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
   buttonText: { fontSize: 12, fontWeight: "800" },
 });

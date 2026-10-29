@@ -134,7 +134,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
         : null,
     [isDaily, dailyKey, totalQuestions, result?.score, result?.totalCorrect],
   );
-  // Kabul edilen düello (üst bardaki davet / sohbetteki kart): iki skor davetin geldiği sohbete yazılır.
+  // Kabul edilen düello (yüzen davet kartı / sohbetteki kart): iki skor davetin geldiği sohbete yazılır.
   const duel = route.params?.duel || null;
   const duelResult = useMemo(
     () => ({ dailyKey, score: result?.score, correct: result?.totalCorrect, total: totalQuestions }),

@@ -349,13 +349,6 @@ const settingsKeys = {
   },
   // Widget tercihleri — sahibi services/widgetPreferencesService.js
   widgetPreferences: { key: "widgetPreferences", type: TYPES.json, default: null },
-  // Pet
-  petEnabled: { key: "pet_enabled", type: TYPES.boolean, default: false },
-  // { [petId]: true } — dizi DEĞİL, kilidi açılmış petlerin haritası.
-  petOwned: { key: "pet_owned", type: TYPES.json, default: null, validate: plainObject },
-  petSelected: { key: "pet_selected", type: TYPES.string, default: null },
-  petPosition: { key: "pet_position", type: TYPES.json, default: null },
-  petSize: { key: "pet_size", type: TYPES.number, default: 124 },
   // Film/Dizi sekmesinde (screens/tabs/DiscoverScreen.js) en son seçilen bölüm:
   // uygulama o bölümle açılır. "tv" | "movie".
   homeMediaType: {
@@ -525,6 +518,18 @@ const dataKeys = {
     scope: "user",
     keepOnLogout: true,
   },
+  // Günlük seri alevinin en son kutlanan durumu: { seviye, yama }. `seviye` =
+  // utils/streakFlame.js streakLevel().index (ay × 5 + hafta; -1 = alev yok), `yama` =
+  // en son duyurulan telafi/kalkan günü. Kademe yükselince ya da seri kurtarılınca bir
+  // kez kutlanır; seri sönünce seviye düşer, alev yeniden yanınca yine kutlanır
+  // (hooks/useStreakCelebration.js).
+  streakFlameSeen: {
+    key: "watch_progress:streak_flame_seen:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+  },
   // Kullanıcının profil vitrininde (ve arkadaş profilinde) sergilediği en fazla 4
   // rozetin id listesi (utils/badgeShowcase.js). Buluta (Users/{uid}.showcaseBadges)
   // da yazılır; yerel kopya çevrimdışı/anlık tepki verir ve çıkışta korunur.
@@ -619,6 +624,24 @@ const dataKeys = {
     default: {},
     scope: "user",
     keepOnLogout: true,
+    validate: plainObject,
+  },
+  // Yüzen bildirimlerin cihaz durumu (utils/floatingNotices.js): { announced: {id: ms}, dismissed:
+  // {id: ms} } — hangi davet / turnuva anı toast oldu, hangi an kapatıldı. Çıkışta SİLİNMEZ:
+  // silinseydi tekrar girişte aynı bildirimler yeniden toast olurdu. 60 günden eskiler budanır.
+  floatingNotices: {
+    key: "floating_notices:",
+    type: TYPES.json,
+    default: {},
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
+  // Yüzen bildirim simgesinin kenar yuvası: { side: "left"|"right", y }. Cihaz tercihi, hesaptan bağımsız.
+  floatingNoticeDock: {
+    key: "floating_notice_dock",
+    type: TYPES.json,
+    default: null,
     validate: plainObject,
   },
   // İlk içerik aktivasyon damgası. Çıkışta SİLİNMEZ — silinirse kullanıcı geri

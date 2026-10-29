@@ -189,7 +189,7 @@ describe("bolumOzetleri + nadirlikDagilimi", () => {
     const { BADGE_SETS } = require("../components/badges/badgeSets");
     const ozet = bolumOzetleri(kartlar);
     const toplam = ozet.reduce((n, o) => n + o.toplam, 0);
-    expect(WATCH_BADGES).toHaveLength(154);
+    expect(WATCH_BADGES).toHaveLength(158);
     expect(toplam).toBe(WATCH_BADGES.length + BADGE_SETS.length /* koleksiyon */ + 1 /* guncel muhur */);
     for (const o of ozet) {
       expect(o.acik).toBeLessThanOrEqual(o.toplam);
@@ -214,10 +214,10 @@ describe("bolumOzetleri + nadirlikDagilimi", () => {
     expect(baslangic.acik).toBe(6);
   });
 
-  test("nadirlik dagilimi: bes kademe, toplam 154, acik <= toplam", () => {
+  test("nadirlik dagilimi: bes kademe, toplam 158, acik <= toplam", () => {
     const d = nadirlikDagilimi(rozetler);
     expect(d.map((x) => x.rarity)).toEqual(RARITY_ORDER);
-    expect(d.reduce((n, x) => n + x.toplam, 0)).toBe(154);
+    expect(d.reduce((n, x) => n + x.toplam, 0)).toBe(158);
     for (const x of d) expect(x.acik).toBeLessThanOrEqual(x.toplam);
     expect(d.find((x) => x.rarity === "legendary").toplam).toBe(3);   // katalog kotasi
     expect(nadirlikDagilimi(null).every((x) => x.toplam === 0)).toBe(true);
@@ -545,11 +545,10 @@ describe("prestijEk: prestij adiminin birim adi", () => {
   });
 });
 
-// ── KATALOG v2/v3: yeni etiketi, duyuru ozeti, takvim firsatlari ─────────────
+// ── KATALOG v2/v3/v4: yeni etiketi, duyuru özeti ────────────────────────────
 //
-// "Yeni" HER ZAMAN son surumdur (KATALOG_SURUMU). v3 gelince v2'nin 60 rozeti yeni
-// SAYILMAZ — duyuru karti yalniz son genislemeyi anlatir. v2 davranisi `surum`
-// parametresiyle (2) ayrica kilitli kalir.
+// "Yeni" HER ZAMAN son sürümdür (KATALOG_SURUMU). v4 gelince yalnız Bingo ailesi
+// yeni sayılır; eski sürümler `surum` parametresiyle ayrıca kilitli kalır.
 
 describe("v2: yeni eklenen rozetler (yeniEklendi / yeniRozetOzeti)", () => {
   const { yeniEklendi, yeniRozetOzeti } = require("../components/badges/badgeInsights");
@@ -567,11 +566,12 @@ describe("v2: yeni eklenen rozetler (yeniEklendi / yeniRozetOzeti)", () => {
     expect(yeniEklendi({}, 2)).toBe(false);
   });
 
-  test("varsayilan surum = v3: yalniz 13 Kesif rozeti yeni, v2'nin rozetleri artik degil", () => {
+  test("varsayilan surum = v4: yalnız 4 Bingo kademesi yeni", () => {
     const { kartlar } = kurKartlar({});
     const kart = (id) => kartlar.find((k) => k.id === id || k.aileUyeleri?.some((u) => u.id === id));
-    expect(yeniEklendi(kart("kesif_ilk_not"))).toBe(true);
-    expect(yeniEklendi(kart("kesif_cinematch"))).toBe(true);
+    expect(yeniEklendi(kart("bingo_1"))).toBe(true);
+    expect(yeniEklendi(kart("bingo_12"))).toBe(true);
+    expect(yeniEklendi(kart("kesif_ilk_not"))).toBe(false);
     expect(yeniEklendi(kart("ilk_film"))).toBe(false);          // v2 artik eski
     expect(yeniEklendi(kart("dizi_5"))).toBe(false);
     expect(yeniEklendi(kart("film_10"))).toBe(false);
@@ -586,31 +586,33 @@ describe("v2: yeni eklenen rozetler (yeniEklendi / yeniRozetOzeti)", () => {
   });
 
   test("kartlariDekorle yeniKatalog'u ekler ve `yeni` (kazanildi) ile KARISMAZ", () => {
-    const { kartlar } = kurKartlar({ filmSayisi: 3 }, ["kesif_ilk_not", "film_10"]);
-    const dekore = kartlariDekorle(kartlar, { kesif_ilk_not: "2026-10-14" }, { simdi: SIMDI });
-    const ilkNot = dekore.find((k) => k.id === "kesif_ilk_not");
-    expect(ilkNot.yeniKatalog).toBe(true);      // kataloga yeni
-    expect(ilkNot.yeni).toBe(true);             // ...VE bu hafta kazanildi
+    const { kartlar } = kurKartlar({ filmSayisi: 3, bingoFullCards: 1 }, ["bingo_1", "film_10"]);
+    const dekore = kartlariDekorle(kartlar, { bingo_1: "2026-10-14" }, { simdi: SIMDI });
+    const bingo = dekore.find((k) => k.family === "bingo");
+    expect(bingo.yeniKatalog).toBe(true);       // kataloga yeni
+    expect(bingo.yeni).toBe(true);              // ...VE bu hafta kazanildi
     const film10 = dekore.find((k) => k.family === "film");
     expect(film10.yeniKatalog).toBe(false);     // v1 ailesi
-    const kilitliYeni = dekore.find((k) => k.id === "kesif_arkadas");
-    expect([kilitliYeni.yeniKatalog, kilitliYeni.yeni]).toEqual([true, false]);   // kilitli ama yeni hedef
+    const eskiKesif = dekore.find((k) => k.id === "kesif_arkadas");
+    expect([eskiKesif.yeniKatalog, eskiKesif.yeni]).toEqual([false, false]);
     const eskiV2 = dekore.find((k) => k.id === "aksiyon_50");
     expect(eskiV2.yeniKatalog).toBe(false);     // v2 rozeti v3 geldikten sonra "yeni" degil
   });
 
-  test("ozet: kac rozet eklendi, kaci ZATEN acik (hak edilmis odul) — v3: 13 Kesif rozeti", () => {
+  test("ozet: v4 ile 4 Bingo kademesi eklendi; önceki sürüm ayrıca okunabilir", () => {
     const bos = kurKartlar({}).rozetler;
-    expect(yeniRozetOzeti(bos)).toEqual({ toplam: 13, acik: 0 });
+    expect(yeniRozetOzeti(bos)).toEqual({ toplam: 4, acik: 0 });
     const { rozetler } = kurKartlar({
       filmSayisi: 30, bolumSayisi: 30, diziSayisi: 6,
+      bingoFullCards: 3,
       kesif: { not: 1, favori: 2, dortFavori: 4, arkadas: 1 },
     });
     const o = yeniRozetOzeti(rozetler);
-    expect(o.toplam).toBe(13);
-    const beklenen = rozetler.filter((r) => r.since === 3 && r.acik).length;
+    expect(o.toplam).toBe(4);
+    const beklenen = rozetler.filter((r) => r.since === 4 && r.acik).length;
     expect(o.acik).toBe(beklenen);
-    expect(o.acik).toBe(4);   // kesif_ilk_not, kesif_favori, kesif_dort_favori, kesif_arkadas
+    expect(o.acik).toBe(2);   // bingo_1 + bingo_3
+    expect(yeniRozetOzeti(rozetler, 3).toplam).toBe(13);
     expect(yeniRozetOzeti(null)).toEqual({ toplam: 0, acik: 0 });
     // Eski surumde (1) "yeni" diye bir sey yok.
     expect(yeniRozetOzeti(rozetler, 1)).toEqual({ toplam: 0, acik: 0 });
@@ -631,14 +633,15 @@ describe("v2: yeni eklenen rozetler (yeniEklendi / yeniRozetOzeti)", () => {
     const dekore = kartlariDekorle(kartlar, {});
     const satirlar = izgaraSatirlari(dekore, "yeni", null);
     const kartSayisi = satirlar.filter((s) => s.tur === "rozetSatiri").reduce((n, s) => n + s.rozetler.length, 0);
-    // v3: 13 Kesif rozeti, hepsi tekil (aile yok) → 13 kart, tek bolum.
-    expect(kartSayisi).toBe(13);
-    expect(satirlar.filter((s) => s.tur === "baslik").map((s) => s.bolum)).toEqual(["kesif"]);
+    // v4: 4 Bingo kademesi tek aile kartında, Kilometre bölümünde görünür.
+    expect(kartSayisi).toBe(1);
+    expect(satirlar.filter((s) => s.tur === "baslik").map((s) => s.bolum)).toEqual(["kilometre"]);
     for (const s of satirlar.filter((x) => x.tur === "rozetSatiri")) {
       for (const k of s.rozetler) expect([k.id, k.yeniKatalog]).toEqual([k.id, true]);
     }
     // film ailesi (tamamen v1) listede YOK
     const hepsi = satirlar.filter((s) => s.tur === "rozetSatiri").flatMap((s) => s.rozetler);
+    expect(hepsi[0].family).toBe("bingo");
     expect(hepsi.some((k) => k.family === "film")).toBe(false);
     // Bolum basliklari BOLUM_SIRA'da
     const { BOLUM_SIRA } = require("../components/badges/watchBadgeCatalog");

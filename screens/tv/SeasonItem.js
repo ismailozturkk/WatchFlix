@@ -24,15 +24,13 @@ import {
 } from "../../utils/watchState";
 import LottieView from "lottie-react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Octicons from "@expo/vector-icons/Octicons";
-import RatingStars from "../../components/RatingStars";
-import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import {
   useApiSettings,
   useImageQualitySettings,
 } from "../../context/AppSettingsContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
+import { alpha } from "../../theme/colors";
 
 // ─── Puan rengi ───────────────────────────────────────────────────────────────
 const getRatingColor = (r) => {
@@ -98,8 +96,8 @@ const SeasonItem = ({
   const openModal = useCallback(() => setModalVisible(true), []);
   const closeModal = useCallback(() => setModalVisible(false), []);
 
-  // Kart başlığının yanında kullanılan kısa tarih ("5 Oca 2020") — uzun ay
-  // adları tek satırlık başlık satırını taşırıyordu.
+  // Başlığın altındaki puan satırında kullanılan kısa tarih ("5 Oca 2020") —
+  // uzun ay adları tek satırlık puan satırını taşırıyordu.
   const formatDateShort = useCallback(
     (timestamp) => {
       const date = new Date(timestamp);
@@ -169,15 +167,22 @@ const SeasonItem = ({
       : theme.colors?.orange;
   const progressWidth = `${Math.round(seasonEpisodeWatch * 100)}%`;
 
-  // Başlığın yanına gelen tek satırlık bilgi: "10 Bölüm · 5 Oca 2020"
+  // Başlığın altında, puan hapının yanına gelen tek satırlık bilgi:
+  // "5 Oca 2020 · 10 Bölüm"
   const seasonMetaText = [
+    season.air_date ? formatDateShort(season.air_date) : null,
     season.episode_count
       ? `${season.episode_count} ${t.episode}`
       : t.episodeCountUnknown,
-    season.air_date ? formatDateShort(season.air_date) : null,
   ]
     .filter(Boolean)
     .join(" · ");
+
+  // Puan hapı — puanı olmayan sezonda soluk "★ –" (satır hizası bozulmasın).
+  const isRated = season.vote_average > 0;
+  const ratingColor = isRated
+    ? getRatingColor(season.vote_average)
+    : theme.text?.muted ?? "#555";
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -264,9 +269,10 @@ const SeasonItem = ({
 
               {/* ── Sağ: Bilgiler ──────────────────────────────────────── */}
               <View style={styles.infoCol}>
-                {/* Başlık + bölüm/tarih (tek satır) + izlenme butonu */}
-                <View style={styles.infoTopRow}>
-                  <View style={styles.titleRow}>
+                {/* Başlık, altında puan + tarih; sağda iki satırın ortasına
+                    hizalı izlenme düğmesi */}
+                <View style={styles.headerRow}>
+                  <View style={styles.headerText}>
                     <Text
                       allowFontScaling={false}
                       style={[
@@ -277,26 +283,55 @@ const SeasonItem = ({
                     >
                       {season.name}
                     </Text>
-                    {!!seasonMetaText && (
-                      <Text
-                        allowFontScaling={false}
+
+                    <View style={styles.metaRow}>
+                      <View
+                        accessibilityLabel={isRated ? undefined : t.notYetRated}
                         style={[
-                          styles.seasonMeta,
-                          { color: theme.text?.secondary ?? "#aaa" },
+                          styles.ratingPill,
+                          {
+                            borderColor: alpha(ratingColor, 0.33),
+                            backgroundColor: alpha(ratingColor, 0.1),
+                          },
                         ]}
-                        numberOfLines={1}
                       >
-                        {`· ${seasonMetaText}`}
-                      </Text>
-                    )}
+                        <Text
+                          allowFontScaling={false}
+                          style={[styles.ratingPillText, { color: ratingColor }]}
+                        >
+                          {`★ ${isRated ? season.vote_average.toFixed(1) : "–"}`}
+                        </Text>
+                      </View>
+                      {!!seasonMetaText && (
+                        <Text
+                          allowFontScaling={false}
+                          style={[
+                            styles.seasonMeta,
+                            { color: theme.text?.secondary ?? "#aaa" },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {seasonMetaText}
+                        </Text>
+                      )}
+                    </View>
                   </View>
 
-                  {/* İzlenme / Ekle / Hatırlat butonu (4 durum) */}
-                  <View style={styles.watchBtn}>
+                  {/* İzlenme / Ekle / Hatırlat düğmesi (4 durum) — durum
+                      rengine boyanmış yuvarlak; dokunma alanı tüm daire */}
+                  <View
+                    style={[
+                      styles.watchBtn,
+                      {
+                        backgroundColor: alpha(watchBtnColor, 0.14),
+                        borderColor: alpha(watchBtnColor, 0.35),
+                      },
+                    ]}
+                  >
                     {isLoading ? (
                       <LottieView
                         source={require("@lottie/loading15.json")}
-                        style={{ width: 32, height: 32 }}
+                        style={{ width: 30, height: 30 }}
                         autoPlay
                         loop
                       />
@@ -312,70 +347,34 @@ const SeasonItem = ({
                         airDate={season.air_date}
                         seasonPosterPath={season.poster_path}
                         type="tv"
+                        hitSlop={8}
                       />
                     ) : (
                       <TouchableOpacity
+                        style={styles.watchBtnTouch}
                         onPress={() =>
                           isWatched ? setWatchHistoryVisible(true) : openModal()
                         }
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          isWatched
+                            ? i18nText("autoI18n.izleme_gecmisi", "İzleme geçmişi")
+                            : i18nText(
+                                "autoI18n.izlendi_olarak_isaretle",
+                                "İzlendi olarak işaretle",
+                              )
+                        }
                       >
-                        {isWatched ? (
-                          <Octicons
-                            name="check-circle-fill"
-                            size={26}
-                            color={watchBtnColor}
-                          />
-                        ) : (
-                          <FontAwesome6
-                            name="circle-plus"
-                            size={26}
-                            color={theme.text?.secondary ?? "#aaa"}
-                          />
-                        )}
+                        <Ionicons
+                          name={isWatched ? "checkmark" : "add"}
+                          size={20}
+                          color={watchBtnColor}
+                        />
                       </TouchableOpacity>
                     )}
                   </View>
                 </View>
-
-                {/* Puan */}
-                {season.vote_average > 0 ? (
-                  <View style={styles.ratingRow}>
-                    <View
-                      style={[
-                        styles.ratingPill,
-                        {
-                          borderColor:
-                            getRatingColor(season.vote_average) + "55",
-                          backgroundColor:
-                            getRatingColor(season.vote_average) + "18",
-                        },
-                      ]}
-                    >
-                      <Text
-                        allowFontScaling={false}
-                        style={[
-                          styles.ratingPillText,
-                          { color: getRatingColor(season.vote_average) },
-                        ]}
-                      >
-                        ★ {season.vote_average.toFixed(1)}
-                      </Text>
-                    </View>
-                    <RatingStars rating={season.vote_average} />
-                  </View>
-                ) : (
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      styles.notRatedText,
-                      { color: theme.text?.muted ?? "#555" },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {t.notYetRated}
-                  </Text>
-                )}
 
                 {/* Özet */}
                 <Text
@@ -384,7 +383,7 @@ const SeasonItem = ({
                     styles.overviewText,
                     { color: theme.text?.secondary ?? "#aaa" },
                   ]}
-                  numberOfLines={2}
+                  numberOfLines={3}
                 >
                   {season.overview || t.noOverviewAvailable}
                 </Text>
@@ -538,32 +537,37 @@ const styles = StyleSheet.create({
   },
 
   // ── Bilgi Kolonu ──────────────────────────────────────────────────────────
+  // Kart yüksekliği sabit (120): başlık bloğu (~43) + 8 + özetin 3 satırı
+  // (45) = 96 ≤ 104 iç alan → özet başlığın hemen altından akar.
   infoCol: {
     flex: 1,
     marginLeft: 4,
     paddingRight: 12,
     paddingVertical: 8,
-    justifyContent: "space-between",
   },
-  infoTopRow: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4,
+    gap: 8,
+    marginBottom: 8,
   },
-  // Sezon adı + bölüm/tarih aynı satırda; ikisi de daralabilir, uzun
-  // isimler/ay adları satırı taşırmak yerine "…" ile kırpılır.
-  titleRow: {
+  headerText: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: 8,
-    gap: 5,
+    minWidth: 0,
+    gap: 4,
   },
   seasonTitle: {
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 19,
     fontWeight: "700",
     letterSpacing: -0.2,
-    flexShrink: 1,
+  },
+  // Puan hapı + "tarih · bölüm"; meta daralabilir, uzun ay adları satırı
+  // taşırmak yerine "…" ile kırpılır.
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   seasonMeta: {
     fontSize: 11,
@@ -571,29 +575,31 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   watchBtn: {
-    marginTop: 0,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  watchBtnTouch: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // ── Puan ──────────────────────────────────────────────────────────────────
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 4,
-  },
   ratingPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 20,
     borderWidth: 1,
   },
   ratingPillText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  notRatedText: {
     fontSize: 11,
-    marginBottom: 4,
+    lineHeight: 14,
+    fontWeight: "700",
   },
 
   // ── Özet ──────────────────────────────────────────────────────────────────

@@ -1031,6 +1031,8 @@ export default function MediaQuickActionsSheet({ target, onClose, onDismiss }) {
                         airDate={details.first_air_date}
                         seasonPosterPath={details.poster_path}
                         type="tv"
+                        // Dar (compact) eylem satırı: öteki simgeler 24.
+                        size={24}
                         onLimitReached={(blocked) =>
                           closeThen(() => reminderGate.checkAdd(blocked))
                         }

@@ -45,6 +45,8 @@ import {
   saveManyEventsToPhoneCalendar,
   removeManyEventsFromPhoneCalendar,
 } from "@utils/phoneCalendar";
+import { noteReminderPreview } from "@utils/noteReminders";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 import GlassTouchable from "../../components/common/GlassTouchable";
 
 /* ── Takvim yerelleştirmesi ──
@@ -181,6 +183,7 @@ export default function CalendarScreen({ navigation }) {
     loadSavedKeysSet().then(setSavedSet);
   }, []);
 
+  const reminderGate = usePremiumGate("note_reminders");
   const onSavedChange = useCallback((key, saved) => {
     setSavedSet((prev) => {
       const next = new Set(prev);
@@ -357,6 +360,10 @@ export default function CalendarScreen({ navigation }) {
             return next;
           });
         }
+        // Free'de not hatırlatmaları telefona aktarılmaz (Premium'a özel); diğerleri gider.
+        if (res.lockedItems?.length) {
+          reminderGate.showUpsell({ preview: noteReminderPreview(res.lockedItems[0]) });
+        }
       } else {
         // past mode → kayıtlı olanları sil
         const itemsToDelete = flatRangeItems.filter((it) =>
@@ -375,7 +382,7 @@ export default function CalendarScreen({ navigation }) {
     } finally {
       setIsBulkLoading(false);
     }
-  }, [flatRangeItems, isBulkLoading, viewMode, savedSet, onSavedChange]);
+  }, [flatRangeItems, isBulkLoading, viewMode, savedSet, onSavedChange, reminderGate]);
 
   const currentRangeLabel = useMemo(
     () => getCalendarRangeLabel(rangeMonths),

@@ -14,11 +14,12 @@ Yeni bir Claude Code oturumu (başka hesap dahil) bu dosyayı okuyarak kaldığ�
 | T3.1 cihaz kontrol listesi | ✅ | `T3_CIHAZ_KONTROL_LISTESI.md` |
 | T3.2 Android emülatör turu | ~ 22 satır yürütüldü, 11 bulgu; Orta 5'i + Düşüklerin çoğu düzeltildi, emülatörde doğrulandı ve commit'lendi (d701fb3…ed22838, push yok); B8/B11'de yerleşim/okunurluk artıkları açık | `T3_BULGULAR_2026-10-26.md` → "Düzeltme durumu" |
 | T3.2 sosyal tur (2 emülatör) | 20 satır: 10 ✅, 4 ❌ (B12–B15), 6 ⏸; B12–B15 düzeltildi, rules+index DEPLOY EDİLDİ ve cihazda doğrulandı | `T3_BULGULAR_2026-10-26.md` → "Sosyal tur" |
-| T3.3 iPhone turu, T4–T8 | başlamadı | rehber: `docs/planlama/YAYIN_ONCESI_TEST_REHBERI.md` |
+| T3.3 iPhone turu | ✅ parça 1–4 (27–28 Eki); parça 5–6 kullanıcı kararıyla atlandı (günlük kullanımda deneniyor) | `T3_BULGULAR_2026-10-26.md` → "T3.3 iPhone turu" |
+| T4–T8 | başlamadı | rehber: `docs/planlama/YAYIN_ONCESI_TEST_REHBERI.md` |
 
 ## Sıradaki iş (kullanıcı seçecek)
 
-0. **ŞİMDİ: T3.3 iPhone turu, parça 2** (keşif + detay; parça 1 27 Eki ✅). Parçalar `T3_CIHAZ_KONTROL_LISTESI.md` sonunda ("T3.3 için parçalar"); parça 2 = 3.1–3.5, 4.1–4.6. Telefon Metro 8081'e bağlanıyor (aynı çalışma ağacı); PC Wi-Fi "Genel" ise önce Özel yaptır. Satırları adım adım kullanıcıya ver, ekran görüntülerini işle. iPhone build 1.4.8 (18 Eki): sonraki düzeltmeler telefonda YOK, "yeni build bekliyor" diye işaretle.
+0. **Cihaz testi kapandı (28 Eki, kullanıcı kararı):** kullanıcı uygulamayı günlük kullanıyor ve sorunları kendisi bildirecek; tekrar adım adım cihaz turu önerme. Yeni iOS build gelince yalnız 2.5 (paylaş menüsü/kısayollar), 6.5 (widget yeni düzeni) ve 15.1'e bakılır. Sıradaki faz için rehberdeki T4 ve sonrası.
 
 1. **Kararlar:** B14 gerçek çevrimdışı liste yazımı (runTransaction yerine). B15 uygulandı + rules deploy edildi (60f1a32); açık: gizlenen gönderileri yönetme ekranı. Rules + index 26 Eki DEPLOY EDİLDİ (yayındaki kurallar başka oturumun sosyal hesaplar bloğunu da içeriyor, HEAD'de yok).
 2. **Kalan sosyal satırlar:** 8.4 (60+ mesaj), 8.13 (zevk uyumu), 8.15 (sosyal hesaplar, başka oturumun işi bitince); Premium isteyenler 8.9/8.12/10.5 (test hesaplarına promosyon kodu). Önce B'nin A'ya engelini kaldır ve yeniden arkadaş ol.

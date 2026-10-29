@@ -25,6 +25,8 @@ jest.mock("@context/CalendarContext", () => ({
 jest.mock("@utils/i18nText", () => ({
   i18nText: (_key, fallback) => fallback,
 }));
+const mockShowUpsell = jest.fn();
+jest.mock("@hooks/usePremiumGate", () => ({ usePremiumGate: () => ({ showUpsell: mockShowUpsell }) }));
 jest.mock("@utils/phoneCalendar", () => ({
   buildEventKey: (item) => `movie_${item.id}_${item.date}`,
   removeEventFromPhoneCalendar: jest.fn(),
@@ -119,6 +121,20 @@ describe("takvim satırı düğmesi", () => {
     const unsaved = await mount({ saved: false, viewMode: "past" });
     expect(find(unsaved.tree, ADD)).toBeUndefined();
     expect(find(unsaved.tree, REMOVE)).toBeUndefined();
+  });
+
+  it("kilitli (Free'de not) eklemede yükseltme sayfası açılır, küme değişmez", async () => {
+    phoneCalendar.saveEventToPhoneCalendar.mockResolvedValue({ ok: false, locked: true });
+    const { tree, onSavedChange } = await mount();
+
+    await act(async () => {
+      await find(tree, ADD).props.onPress();
+    });
+
+    expect(onSavedChange).not.toHaveBeenCalled();
+    expect(mockShowUpsell).toHaveBeenCalledWith({
+      preview: expect.objectContaining({ kind: "reminder", title: "Dune" }),
+    });
   });
 
   it("başarısız işlemde kümeyi değiştirmez", async () => {

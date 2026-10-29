@@ -61,8 +61,11 @@ import TournamentHero from "@components/tournament/TournamentHero";
 import RoundRail from "@components/tournament/RoundRail";
 import PodiumModal from "@components/tournament/PodiumModal";
 import ScreenDecor from "@components/ScreenDecor";
-// Faz kimliği (renk/gradyan/ikon) Hub kartıyla ortak: components/tournament/phaseMeta.js
+// Faz kimliği (başlıktaki faz çipi): components/tournament/phaseMeta.js.
+// Tür kimliği (hero + ağaç gradyanı, animasyonlu simge) Hub kartıyla ortak:
+// components/tournament/genreMeta.js.
 import { PHASE_META, phaseLabel } from "@components/tournament/phaseMeta";
+import { genreMetaFor } from "@components/tournament/genreMeta";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../../components/common/GlassTouchable";
@@ -572,6 +575,7 @@ export default function TournamentScreen() {
 
   const theTheme = themeLabel(entry, lang);
   const phaseMeta = PHASE_META[phaseInfo.phase] || PHASE_META.selection;
+  const genreMeta = genreMetaFor(entry);
 
   // ── Geçen ayın kazananı (ilk 3 + oy sayıları) — küçük kupa ikonu, podyum
   // modalını açar. Başlık/alt yazı kaldırıldı; tüm bilgi accessibilityLabel'da.
@@ -630,7 +634,7 @@ export default function TournamentScreen() {
   // Tür başlığı + ay/ortam çipleri + geri sayım paneli + interaktif aşama çizelgesi.
   const Hero = (
     <TournamentHero
-      phaseMeta={phaseMeta}
+      genreMeta={genreMeta}
       theTheme={theTheme}
       mediaType={entry.mediaType}
       monthIndex={monthIndex}
@@ -757,7 +761,9 @@ export default function TournamentScreen() {
         : (
           <BracketTree
             rounds={bracket.rounds}
-            theme={theme}
+            genre={genreMeta}
+            periodId={periodId}
+            focusRound={tab}
             getTmdbUrl={getTmdbUrl}
             lang={lang}
             myPicks={myPicks}

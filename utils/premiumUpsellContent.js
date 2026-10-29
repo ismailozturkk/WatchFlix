@@ -11,7 +11,10 @@
 // üretilir; "burada olmayan bir şey satılamaz" kuralı korunur: elle yazılmış
 // vaat yok, her değer bir kapının arkasındaki gerçek limit.
 
-import { copyLanguage, normalizeAppLanguage, pickByLanguage } from "./appLanguages";
+import { copyLanguage, intlLocaleOf, normalizeAppLanguage, pickByLanguage } from "./appLanguages";
+import { notificationInboxCopy } from "./notificationInboxCopy";
+import { isValidReminderTime } from "./noteReminders";
+import { parseISODate } from "./notesView";
 import {
   getPackageDisplayProduct,
   getPackageIntroOffer,
@@ -333,12 +336,75 @@ export function buildChoicePreview(preview, language = "en") {
   };
 }
 
+// ── Hatırlatıcı önizlemesi (not hatırlatıcısı) ──────────────────────────────
+
+const REMINDER_COPY = Object.freeze({
+  today: { tr: "Bugün", en: "Today", es: "Hoy", pt: "Hoje", de: "Heute" },
+  tomorrow: { tr: "Yarın", en: "Tomorrow", es: "Mañana", pt: "Amanhã", de: "Morgen" },
+  anyDay: {
+    tr: "Seçtiğin gün ve saatte",
+    en: "On the day and time you pick",
+    es: "El día y la hora que elijas",
+    pt: "No dia e horário que você escolher",
+    de: "An dem Tag und zur Uhrzeit deiner Wahl",
+  },
+});
+const REMINDER_TITLE_MAX = 80;
+
+/**
+ * Hatırlatıcı kurmaya çalışırken gelen önizleme: sayfa, kurulmak istenen hatırlatmayı
+ * telefon bildirimi gibi çizer ("Not hatırlatması · Yarın · 09:00 · <not başlığı>").
+ * Gün verilmemişse (takvim çipi) zaman satırı genel cümledir; saat günsüz anlamsız.
+ *
+ * @param {{ kind?: string, noteType?: string, title?: string,
+ *   scheduledDate?: string|null, scheduledTime?: string|null }} [preview]
+ * @returns {{ kind: "reminder", label: string, title: string, when: string,
+ *   time: string|null } | null}
+ */
+export function buildReminderPreview(preview, language = "en", now = new Date()) {
+  if (!preview || typeof preview !== "object" || preview.kind !== "reminder") return null;
+  const copy = notificationInboxCopy(language);
+  const list = preview.noteType === "todo";
+  const rawTitle = typeof preview.title === "string" ? preview.title.trim() : "";
+  const title = rawTitle
+    ? rawTitle.length > REMINDER_TITLE_MAX
+      ? `${rawTitle.slice(0, REMINDER_TITLE_MAX - 1).trimEnd()}…`
+      : rawTitle
+    : list ? copy.untitledList : copy.untitledNote;
+  const day = parseISODate(preview.scheduledDate);
+  const time = day && isValidReminderTime(preview.scheduledTime) ? preview.scheduledTime : null;
+  let when = pick(REMINDER_COPY.anyDay, language);
+  if (day) {
+    const offset = Math.round(
+      (day.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000,
+    );
+    when =
+      offset === 0
+        ? pick(REMINDER_COPY.today, language)
+        : offset === 1
+          ? pick(REMINDER_COPY.tomorrow, language)
+          : day.toLocaleDateString(intlLocaleOf(normalizeAppLanguage(language)), { day: "numeric", month: "long" });
+  }
+  return {
+    kind: "reminder",
+    label: list ? copy.listReminder : copy.noteReminder,
+    title,
+    when,
+    time,
+  };
+}
+
+/** Sayfanın önizleme kartı: galeriden seçilen görsel ya da kurulmak istenen hatırlatma. */
+const buildPreview = (preview, language) =>
+  buildChoicePreview(preview, language) || buildReminderPreview(preview, language);
+
 /**
  * @param {string} featureId
  * @param {string} plan             kullanıcının mevcut planı
  * @param {"tr"|"en"} language
  * @param {{ used?: number, preview?: object }} [options]  COUNT: sahip olunan adet; DAILY:
- *   bugünkü kullanım; preview: seçilmeye çalışılan görsel (buildChoicePreview)
+ *   bugünkü kullanım; preview: seçilmeye çalışılan görsel (buildChoicePreview) ya da
+ *   kurulmak istenen hatırlatma (buildReminderPreview)
  */
 export function buildUpsellContent(featureId, plan, language = "en", { used, preview } = {}) {
   const lang = normalizeAppLanguage(language);
@@ -392,7 +458,7 @@ export function buildUpsellContent(featureId, plan, language = "en", { used, pre
   // "bu yıl kilitli" konuşur; mesajı yine planın mevcut penceresini söyler.
   const windowed = definition.window === true;
   const locked = isAccess || windowed;
-  const choicePreview = buildChoicePreview(preview, lang);
+  const choicePreview = buildPreview(preview, lang);
   const title =
     (bundle ? pick(bundle.title, lang) : "") ||
     (lockedCountable ? pick(definition.upsell?.lockedTitle, lang) : "") ||

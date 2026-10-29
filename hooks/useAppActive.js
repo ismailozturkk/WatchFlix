@@ -1,6 +1,6 @@
 // hooks/useAppActive.js
 //
-// Uygulama ön planda mı? Sürekli dönen animasyonları (sprite pet, Lottie FAB)
+// Uygulama ön planda mı? Sürekli dönen animasyonları (Lottie FAB vb.)
 // arka plana geçince durdurmak için. Arka planda dönen bir animasyon ekrana
 // çizilmez ama zamanlayıcısı/JS işi çalışmaya devam eder — pil ve ısınma
 // maliyeti ödenip karşılığında hiçbir şey görünmez.

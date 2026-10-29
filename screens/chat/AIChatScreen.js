@@ -132,7 +132,7 @@ const lastIndexWhere = (list, predicate) => {
 
 /**
  * İKİ GİRİŞ NOKTASI, TEK BİLEŞEN:
- *   1. FAB / pet akışı — components/modals/ChatModal.js: boş sohbet açar.
+ *   1. Sekme çubuğundaki AI düğmesi — components/modals/ChatModal.js: boş sohbet açar.
  *   2. "Bu yapım hakkında sor" — film/dizi detayı: `initialPrompt` ile açılır,
  *      panel görünür görünmez ilk mesaj kendiliğinden gönderilir.
  * (Detay ekranları için ayrı bir kopya vardı; kota göstergesi ve i18n yalnız

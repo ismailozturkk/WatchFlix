@@ -9,7 +9,7 @@
 //   • Selamlama başlığı + avatar
 //   • Sosyal: Paylaşımlar kartı (components/hub/FeedWidget) — feed'e gider;
 //     içinde hızlı paylaşım çubuğu + tür karoları (İnceleme/Liste/Sohbet/Anket)
-//   • CineSwipe ve Turnuva vitrin kartları (components/hub/*)
+//   • Turnuva (2. sıra), CineSwipe, Bingo ve Günün Sorusu kartları (components/hub/*)
 //   • Oyunlar: taşınan ProfileGamesModule (öne çıkan oyun + istatistik)
 //
 // Üç vitrin bölümü aynı SectionHeader'ı kullanır (Oyunlar modülüyle aynı başlık
@@ -125,6 +125,13 @@ export default function HubScreen({ navigation }) {
           </HubSection>
         )}
 
+        {/* Turnuva — Sosyal'in hemen altında (2. sıra) */}
+        {show("tournament") && (
+          <HubSection title={i18nText("autoI18n.tournament_section", "Turnuva")} theme={theme}>
+            <TournamentWidget navigation={navigation} />
+          </HubSection>
+        )}
+
         {/* CineSwipe (Birlikte Ne İzlesek?) */}
         {show("cineswipe") && (
           <HubSection title="CINESWIPE" theme={theme}>
@@ -143,13 +150,6 @@ export default function HubScreen({ navigation }) {
         {show("poll") && (
           <HubSection title={i18nText("autoI18n.gunun_sorusu_bolum", "Günün sorusu")} theme={theme}>
             <DailyPollWidget />
-          </HubSection>
-        )}
-
-        {/* Turnuva */}
-        {show("tournament") && (
-          <HubSection title={i18nText("autoI18n.tournament_section", "Turnuva")} theme={theme}>
-            <TournamentWidget navigation={navigation} />
           </HubSection>
         )}
 

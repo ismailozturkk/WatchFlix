@@ -12,6 +12,8 @@ import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import SectionHeader from "../../components/home/SectionHeader";
+import { SectionChipRail } from "../../components/home/SectionChips";
+import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 //import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
@@ -55,7 +57,7 @@ const TvOnTheAirCard = memo(function TvOnTheAirCard({ item, navigation, theme, g
             { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
           ]}
           cachePolicy="memory-disk"
-          recyclingKey={`tvontheair-${item.id}`}
+          recyclingKey={`tvairing-${item.id}`}
           transition={120}
         />
 
@@ -76,6 +78,12 @@ const TvOnTheAirCard = memo(function TvOnTheAirCard({ item, navigation, theme, g
   );
 });
 
+// "Yayında" rafı: eskiden iki ayrı raf olan "Bugün Yayında" (tv/airing_today) ile "Bu Hafta Yayında"
+// (tv/on_the_air) tek rafta, başlık altındaki çiple seçilir. İki uç bağlamda ayrı bölüm olarak kaldı
+// (önbellek anahtarları, "Tümü" ekranı); yalnız SEÇİLİ çipin bölümü etkinleştirilir → seçilmeyen uç istek atmaz.
+const AIRING_RANGES = ["today", "week"];
+const RANGE_SECTION = { today: "airingToday", week: "onTheAir" };
+
 export default function TvShowsOnTheAir({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
@@ -87,13 +95,26 @@ export default function TvShowsOnTheAir({ navigation }) {
     loadingOnTheAir,
     loadMoreOnTheAir,
     loadingMoreOnTheAir,
+    moviesAiringToday,
+    totalPagesAiringToday,
+    loadingAiringToday,
+    loadMoreAiringToday,
+    loadingMoreAiringToday,
+    pageAiringToday,
+    selectedAiringRange,
+    setSelectedAiringRange,
     activateTvSection,
   } = useTvShow();
 
-  useEffect(() => {
-    activateTvSection("onTheAir");
-  }, [activateTvSection]);
+  const range = selectedAiringRange === "week" ? "week" : "today";
+  const isToday = range === "today";
 
+  useEffect(() => {
+    activateTvSection(RANGE_SECTION[range]);
+  }, [activateTvSection, range]);
+
+  const rangeLabel = (id) =>
+    id === "today" ? t.tvShowScreens.airingRangeToday : t.tvShowScreens.airingRangeWeek;
 
   // Başlık iki durumda da AYNI bileşenden gelir: yükleme sırasında düz bir
   // Text, sonrasında "tümünü gör" hapı olan bir satır çizilirse başlık yüksekliği
@@ -102,18 +123,32 @@ export default function TvShowsOnTheAir({ navigation }) {
     <SectionHeader
       section="onTheAir"
       mediaType="tv"
-      title={t.tvShowScreens.onTheAir}
+      title={t.tvShowScreens.onAir}
       onPressAction={() =>
         navigation.navigate("SeeAllScreen", {
           mediaType: "tv",
-          section: "onTheAir",
-          title: t.tvShowScreens.onTheAir,
+          section: RANGE_SECTION[range],
+          title: isToday ? t.tvShowScreens.airingToday : t.tvShowScreens.onTheAir,
         })
       }
-    />
+    >
+      <SectionChipRail
+        data={AIRING_RANGES}
+        keyExtractor={(item) => item}
+        extraData={range}
+        renderChip={(item) => (
+          <DiscoverFilterChip
+            label={rangeLabel(item)}
+            selected={range === item}
+            onPress={() => setSelectedAiringRange(item)}
+          />
+        )}
+      />
+    </SectionHeader>
   );
 
-  if (loadingOnTheAir) {
+  const loading = isToday ? loadingAiringToday : loadingOnTheAir;
+  if (loading) {
     return (
       <View style={styles.container}>
         {onTheAirHeader}
@@ -136,13 +171,15 @@ export default function TvShowsOnTheAir({ navigation }) {
     <View style={styles.container}>
       {onTheAirHeader}
       <PaginatedRail
-        data={moviesOnTheAir}
+        // Çip değişince ray baştan kurulur: öteki listenin kaydırma konumu yeni veride kalmasın.
+        key={range}
+        data={isToday ? moviesAiringToday : moviesOnTheAir}
         contentContainerStyle={{ paddingHorizontal: 15 }}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMovieItem}
-        onLoadMore={loadMoreOnTheAir}
-        loadingMore={loadingMoreOnTheAir}
-        hasMore={pageOnTheAir < totalPagesOnTheAir}
+        onLoadMore={isToday ? loadMoreAiringToday : loadMoreOnTheAir}
+        loadingMore={isToday ? loadingMoreAiringToday : loadingMoreOnTheAir}
+        hasMore={isToday ? pageAiringToday < totalPagesAiringToday : pageOnTheAir < totalPagesOnTheAir}
         initialNumToRender={3}
         maxToRenderPerBatch={3}
         updateCellsBatchingPeriod={80}

@@ -22,7 +22,7 @@ const TIME_UNITS = ["years", "months", "days", "hours", "minutes"];
 // Film/dizi kartının yüklenirken tuttuğu yer. Gerçek kartın yüksekliğiyle AYNI
 // olmalı (aşağıdaki mediaCard bütçesi), yoksa veri gelince sayfa zıplar.
 // Bütçe: kenarlık 2 + dikey dolgu 24 + başlık 38 + boşluk 9 + süre şeridi 30
-// = 103. Toplam süre kartı ≈ 114.
+// = 103. Kompakt toplam süre kartı ≈ 64.
 const MEDIA_CARD_HEIGHT = 103;
 
 // ─── Tekrarlı / tekrarsız anahtarı ───────────────────────────────────────────
@@ -155,6 +155,7 @@ const TotalTimeCard = memo(function TotalTimeCard({
     <Animated.View
       style={[
         styles.cardShadow,
+        styles.totalCardShadow,
         { backgroundColor: theme.secondary, shadowColor: theme.shadow },
         { transform: [{ scale }] },
       ]}
@@ -177,11 +178,14 @@ const TotalTimeCard = memo(function TotalTimeCard({
 
         <View style={styles.totalTop}>
           <View style={[styles.totalIcon, { backgroundColor: withAlpha(theme.accent, 0.18) }]}>
-            <Ionicons name="time-outline" size={20} color={theme.accent} />
+            <Ionicons name="time-outline" size={15} color={theme.accent} />
           </View>
           <View style={styles.totalCopy}>
             <Text
               allowFontScaling={false}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
               style={[styles.eyebrow, { color: theme.text.muted }]}
             >
               {totalLabel}
@@ -196,7 +200,7 @@ const TotalTimeCard = memo(function TotalTimeCard({
               {formatDuration(total, timeDisplayMode, short)}
             </Text>
           </View>
-          <Ionicons name="swap-horizontal" size={17} color={theme.text.muted} />
+          <Ionicons name="swap-horizontal" size={14} color={theme.text.muted} />
         </View>
 
         {/* Film / dizi payı: segment genişliği dakikayla orantılı */}
@@ -612,6 +616,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
   },
+  totalCardShadow: { borderRadius: 17 },
   card: {
     borderRadius: 22,
     borderWidth: 1,
@@ -634,42 +639,50 @@ const styles = StyleSheet.create({
   },
 
   // Toplam süre
-  totalCard: { paddingVertical: 13 },
-  totalTop: { flexDirection: "row", alignItems: "center", gap: 12 },
+  totalCard: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 17 },
+  totalTop: { flexDirection: "row", alignItems: "center", gap: 8 },
   totalIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
   },
-  totalCopy: { flex: 1, minWidth: 0 },
+  totalCopy: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
   totalValue: {
-    marginTop: 1,
-    fontSize: 24,
-    lineHeight: 29,
+    flexShrink: 1,
+    fontSize: 16,
+    lineHeight: 19,
     fontWeight: "800",
-    letterSpacing: -0.5,
+    letterSpacing: -0.25,
+    textAlign: "right",
   },
   splitBar: {
     flexDirection: "row",
-    gap: 3,
-    height: 7,
-    marginTop: 13,
-    borderRadius: 4,
+    gap: 2,
+    height: 4,
+    marginTop: 6,
+    borderRadius: 3,
     overflow: "hidden",
   },
-  splitSegment: { height: "100%", minWidth: 4, borderRadius: 4 },
+  splitSegment: { height: "100%", minWidth: 3, borderRadius: 3 },
   legendRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 10,
-    marginTop: 10,
+    gap: 8,
+    marginTop: 4,
   },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 1 },
-  legendDot: { width: 7, height: 7, borderRadius: 4 },
-  legendLabel: { fontSize: 11, fontWeight: "600" },
-  legendValue: { fontSize: 11, fontWeight: "800" },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
+  legendDot: { width: 5, height: 5, borderRadius: 3 },
+  legendLabel: { fontSize: 10, fontWeight: "600" },
+  legendValue: { fontSize: 10, fontWeight: "800" },
 
   // Film / dizi kartı — toplam süre kartıyla aynı ölçekte (≈ 103 pt, eskiden ≈ 240).
   //

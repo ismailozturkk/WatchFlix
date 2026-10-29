@@ -203,8 +203,6 @@ describe("planImport — değerler", () => {
     ["imageQualityLevel", "dev"],
     ["streamingProviderIds", [1, "2"]],
     ["streamingProviderIds", [-1]],
-    ["petSize", 9999],
-    ["petPosition", { x: "a", y: 1 }],
     ["notificationSettings", [1, 2]],
     ["notificationSettings", "x"],
     ["decorScopes", 5],
@@ -407,9 +405,6 @@ describe("uçtan uca gidiş-dönüş", () => {
     autoDataCache: true,
     dataCacheTypes: { images: false },
     widgetPreferences: { stats: { showDuration: true } },
-    petEnabled: true,
-    petSize: 150,
-    petPosition: { x: 10, y: 20 },
   };
 
   test("dışa aktar → metin → içe aktar: değerler aynen döner", () => {
@@ -433,8 +428,6 @@ describe("uçtan uca gidiş-dönüş", () => {
     expect(w.autoDataCache).toBe(true);
     expect(w.dataCacheTypes.images).toBe(false);
     expect(w.widgetPreferences).toEqual({ stats: { showDuration: true } });
-    expect(w.petSize).toBe(150);
-    expect(w.petPosition).toEqual({ x: 10, y: 20 });
   });
 
   test("boş cihazın yedeği bile geçerli: her giriş null, hepsi 'sil' olarak planlanır", () => {
@@ -453,7 +446,7 @@ describe("summarizeBackupContents", () => {
     expect(ozet.themeCount).toBe(2);
     expect(ozet.groups.find((g) => g.id === "appearance").saved).toBe(2);
     expect(ozet.groups.find((g) => g.id === "notifications").saved).toBe(1);
-    expect(ozet.groups.find((g) => g.id === "pet").saved).toBe(0);
+    expect(ozet.groups.find((g) => g.id === "widgets").saved).toBe(0);
   });
 
   test("bozuk girdide patlamaz", () => {

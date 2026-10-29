@@ -126,7 +126,7 @@ export default function CineSwipeScreen({ route, navigation }) {
   // Sohbetteki CineSwipe davetinden gelindiyse (utils/chatShare.shareRoute) oda
   // kodu kutuya HAZIR yazılır; katılmak için "Katıl"a basmak alıcıya kalır.
   const inviteCode = extractRoomCode(route?.params?.inviteCode || "");
-  // Davetin geldiği sohbet (üst bardaki davet ya da sohbetteki kart, bkz. utils/importantInvites):
+  // Davetin geldiği sohbet (yüzen davet kartı ya da sohbetteki kart, bkz. utils/importantInvites):
   // bu koda katılan misafir oda bitince ortak eşleşmeleri oraya yazar. Kuran taraf yazmaz — tek yazar.
   const inviteChat = inviteCode && chatTargetKey(route?.params?.inviteChat) ? route.params.inviteChat : null;
   // Davet kartının kendisi (sohbet kartı ya da üst bar, bkz. utils/chatShare.shareRoute): oda bitince kart

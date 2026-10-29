@@ -45,6 +45,7 @@ import { toast } from "@components/AppToast";
 import { i18nCount, i18nText } from "../../../utils/i18nText";
 import { PRIME_HANDOFF_MS } from "../../../utils/notificationPriming";
 import { removeNoteTodoDraft, todoDraftKey } from "../../../services/noteTodoDraftService";
+import { openPremiumScreen } from "../../../services/premiumUpsell";
 import { Keys, get, set } from "../../../services/storage";
 import {
   buildNoteColorPairs,
@@ -126,6 +127,10 @@ export default function NotesScreen({ navigation, route }) {
     handleToggleTodoItem,
     canCreateNote,
     checkCanCreateNote,
+    noteTextLimits,
+    showNoteTextLimit,
+    canSetNoteReminder,
+    showNoteReminderUpsell,
   } = useProfileNotes();
   const { mediaNotes, loadingMediaNotes, deleteMediaNote } = useMediaNotes();
   const { getTmdbUrl } = useImageQualitySettings();
@@ -301,10 +306,20 @@ export default function NotesScreen({ navigation, route }) {
     pendingFullTypeRef.current = type;
     setModalVisible(false);
   }, []);
+  // Editör içindeki yükseltme sayfasından (harf sınırı) "Premium'a geç": ödeme
+  // ekranı editörün arkasında kalmasın, editör kalkınca açılır.
+  const pendingUpgradeRef = useRef(null);
+  const handleEditorUpgrade = useCallback((featureId) => {
+    pendingUpgradeRef.current = featureId;
+    setModalVisible(false);
+  }, []);
   const handleEditorDismissed = useCallback(() => {
     const type = pendingFullTypeRef.current;
+    const upgrade = pendingUpgradeRef.current;
     pendingFullTypeRef.current = null;
-    if (type) checkCanCreateNote(type);
+    pendingUpgradeRef.current = null;
+    if (upgrade) openPremiumScreen(upgrade);
+    else if (type) checkCanCreateNote(type);
   }, [checkCanCreateNote]);
   const openEdit = useCallback((note) => {
     setEditingNote(note);
@@ -595,6 +610,11 @@ export default function NotesScreen({ navigation, route }) {
         onSave={handleSave}
         fullTypes={fullTypes}
         onFullTypePress={handleFullTypePress}
+        textLimits={noteTextLimits}
+        onTextLimit={showNoteTextLimit}
+        reminderLocked={!canSetNoteReminder}
+        onReminderLocked={showNoteReminderUpsell}
+        onUpgrade={handleEditorUpgrade}
         onDismissed={handleEditorDismissed}
         onClose={() => {
           setModalVisible(false);

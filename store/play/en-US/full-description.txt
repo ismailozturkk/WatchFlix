@@ -20,7 +20,6 @@ Every movie and show you watch, in one place — seelogd is your watch diary, so
 🎮 PLAY
 • Test your movie knowledge with the scene-guessing game
 • Collect points, level up, and earn badges
-• Raise the virtual pet that keeps you company
 
 🤖 DISCOVER
 • AI-powered recommendations tailored to your watch history
@@ -30,9 +29,10 @@ Every movie and show you watch, in one place — seelogd is your watch diary, so
 The core features are free. Paid plans add:
 • CineMatch AI: Free 3 per day / 30 per month, Premium 20 / 300, Premium Max 50 / 900 messages
 • A plan-specific profile identity badge your friends can see
-• Higher limits: custom lists (Free 1 · Premium 25 · Max unlimited), friends (2 · 150 · unlimited), group chats (1 · 10 · unlimited), notes and to-do lists (5 · 50 · unlimited), movie and show notes (20 · 200 · unlimited), movie and show reminders (10 and 20 · 50 and 100 · unlimited)
+• Higher limits: custom lists (Free 1 · Premium 25 · Max unlimited), friends (2 · 150 · unlimited), group chats (1 · 10 · unlimited), notes and to-do lists (5 · 50 · unlimited), note length (500 · 2,000 · 20,000 characters), movie and show notes (20 · 200 · unlimited), movie and show reminders (10 and 20 · 50 and 100 · unlimited)
+• Day-and-time reminders for your notes and to-do lists
 • Games, CineSwipe and voting in the monthly tournament (Free can watch the tournament)
-• Your own themes, all 56 fonts, app icon picker, snowfall, ambient background, icon background and the on-screen pet
+• Your own themes, all 56 fonts, app icon picker, snowfall, ambient background and icon background
 • Wrapped archive (Free this year only · Premium last 5 years · Max every year) and streaming alerts for up to 100 titles (Free: 10)
 • In-app bug reports (Premium and Max) and feature requests (Max only)
 

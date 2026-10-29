@@ -134,6 +134,41 @@ export function markRemindersSeen(seen, items, notes) {
   return next;
 }
 
+// Saat yalnız günle birlikte anlamlı; geçersiz saat "saatsiz" (09:00) sayılır.
+const scheduleOf = (note) => {
+  const day = parseISODate(note?.scheduledDate) ? note.scheduledDate : null;
+  return { day, time: day && isValidReminderTime(note?.scheduledTime) ? note.scheduledTime : null };
+};
+
+/**
+ * `next` YENİ bir hatırlatıcı kuruyor ya da mevcudun gününü/saatini değiştiriyor mu?
+ * Kaldırmak (gün yok) ve aynı hatırlatıcıyla kaydetmek false — Premium kapısı
+ * (registry: note_reminders) yalnız kurmayı durdurur, kaldırmayı değil.
+ */
+export function reminderScheduleChanged(next, previous) {
+  const after = scheduleOf(next);
+  if (!after.day) return false;
+  const before = scheduleOf(previous);
+  return after.day !== before.day || after.time !== before.time;
+}
+
+/**
+ * Yükseltme sayfasının bildirim kartı için önizleme (utils/premiumUpsellContent
+ * buildReminderPreview): notun başlığı (yoksa notta ilk satır) + hatırlatma zamanı.
+ * `schedule` denenen yeni zamanı verir (ör. ertelenmiş saat).
+ */
+export function noteReminderPreview(note, schedule = {}) {
+  const list = note?.type === "todo";
+  return {
+    kind: "reminder",
+    noteType: list ? "todo" : "note",
+    title: String(note?.title || "").trim() || (list ? "" : String(note?.content || "").trim().split("\n")[0]),
+    scheduledDate: note?.scheduledDate ?? null,
+    scheduledTime: note?.scheduledTime ?? null,
+    ...schedule,
+  };
+}
+
 /** Ertele: hatırlatmayı şimdiden `minutes` sonraya taşır → { scheduledDate, scheduledTime }. */
 export function snoozedSchedule(minutes, now = new Date()) {
   const at = new Date(now.getTime() + minutes * 60 * 1000);

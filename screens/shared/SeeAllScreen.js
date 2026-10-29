@@ -9,7 +9,7 @@
 // Route params: { mediaType: "movie" | "tv", section: string, title: string,
 //                 genreIds?: number[], providerId?: number }
 //   movie section: "trends" | "bests" | "nowPlaying" | "upcoming"
-//   tv    section: "trends" | "best"  | "airingToday" | "onTheAir"
+//   tv    section: "trends" | "best"  | "airingToday" | "onTheAir" | "upcoming"
 //   ortak: "genres" (genreIds ile) | "providers" (providerId ile) |
 //          "subscriptions" | "recentFavorites" | "worldTour" (originalLanguage ile) — bunlar
 //          context yerine bağımsız discover isteğiyle yüklenir (bkz. DiscoverSeeAll).
@@ -62,6 +62,7 @@ import GlassTouchable from "../../components/common/GlassTouchable";
 import { useLiquidGlass } from "../../services/liquidGlass";
 import { worldTourDiscoverParams } from "../../utils/worldTour";
 import UpcomingFilterChips from "../../components/home/UpcomingFilterChips";
+import TvUpcomingRangeChips from "../../components/home/TvUpcomingRangeChips";
 import UpcomingFilterSheet from "../../components/home/UpcomingFilterSheet";
 import UpcomingEmptyState from "../../components/home/UpcomingEmptyState";
 import useUpcomingFilterControls from "../../hooks/useUpcomingFilterControls";
@@ -647,6 +648,12 @@ function TvSeeAll({ section, title, navigation }) {
       loadingMore: ctx.loadingMoreOnTheAir,
       hasMore: ctx.pageOnTheAir < ctx.totalPagesOnTheAir,
     },
+    upcoming: {
+      data: ctx.seriesUpcoming,
+      loadMore: ctx.loadMoreUpcoming,
+      loadingMore: ctx.loadingMoreUpcoming,
+      hasMore: ctx.pageUpcoming < ctx.totalPagesUpcoming,
+    },
     emmy: {
       data: ctx.tvShowsEmmy,
       loadMore: ctx.loadMoreEmmy,
@@ -723,7 +730,14 @@ function TvSeeAll({ section, title, navigation }) {
       loadingMore={cfg?.loadingMore}
       hasMore={!!cfg?.hasMore}
       onActivate={onActivate}
-      headerExtra={headerExtra}
+      headerExtra={
+        // Yaklaşan Diziler: raftakiyle AYNI aralık çipleri; seçim bağlamda, ana ekrandaki raf da güncellenir.
+        section === "upcoming" ? (
+          <TvUpcomingRangeChips range={ctx.selectedUpcomingRange} onSelectRange={ctx.setSelectedUpcomingRange} />
+        ) : (
+          headerExtra
+        )
+      }
     />
   );
 }

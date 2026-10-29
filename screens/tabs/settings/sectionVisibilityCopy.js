@@ -58,8 +58,8 @@ const tr = {
       emmy: ["Emmy Ödüllü Diziler", "Yıllara göre Emmy kazananları"],
       providers: ["Sağlayıcılar", "Platformlara göre dizi keşfi"],
       genres: ["Türler", "Türe göre dizi keşfi"],
-      onTheAir: ["Bu Hafta Yayında", "Bu hafta yeni bölümü çıkan diziler"],
-      airingToday: ["Bugün Yayında", "Bugün yeni bölümü çıkan diziler"],
+      onTheAir: ["Yayında", "Bugün ya da bu hafta yeni bölümü çıkan diziler"],
+      upcoming: ["Yaklaşan Diziler", "Yakında yayına başlayacak yeni diziler"],
     },
     movie: {
       trends: ["Trend Filmler", "Gündemdeki filmler; haftalık ve günlük kategoriler"],
@@ -94,6 +94,7 @@ const tr = {
     },
     profile: {
       goal: ["Yıllık izleme hedefi", "Profil başlığındaki hedef halkası düğmesi (Düzenle ve Paylaş'ın yanında)"],
+      streak: ["Seri alevi", "Art arda 3 gün ve üzeri izleyince adının yanında yanan alev"],
       badges: ["Rozetler", "İzleme puanın, Perde seviyen ve rozet şeridin"],
       friends: ["Arkadaşlar", "Ara, arkadaşlar, mesajlar ve istekler. Gizlersen bunlara buradan ulaşamazsın"],
       stats: ["İstatistikler", "İzlediğin film ve dizi sayıları, toplam süreler"],
@@ -148,8 +149,8 @@ const en = {
       emmy: ["Emmy-Winning TV Shows", "Emmy winners by year"],
       providers: ["Providers", "Browse shows by streaming service"],
       genres: ["Genres", "Browse shows by genre"],
-      onTheAir: ["Airing This Week", "Shows with a new episode this week"],
-      airingToday: ["Airing Today", "Shows with a new episode today"],
+      onTheAir: ["On the Air", "Shows with a new episode today or this week"],
+      upcoming: ["Upcoming Shows", "New shows premiering soon"],
     },
     movie: {
       trends: ["Trend Movies", "What's trending, with weekly and daily categories"],
@@ -184,6 +185,7 @@ const en = {
     },
     profile: {
       goal: ["Yearly watch goal", "The goal ring button in the profile header (next to Edit and Share)"],
+      streak: ["Streak flame", "The flame next to your name after watching 3 or more days in a row"],
       badges: ["Badges", "Your watch score, Perde level and badge strip"],
       friends: ["Friends", "Search, friends, messages and requests. If you hide it you can't reach them from here"],
       stats: ["Statistics", "How many movies and shows you've watched, and total time"],
@@ -238,8 +240,8 @@ const es = {
       emmy: ["Series ganadoras del Emmy", "Ganadoras del Emmy por año"],
       providers: ["Plataformas", "Descubre series por plataforma"],
       genres: ["Géneros", "Descubre series por género"],
-      onTheAir: ["Se emiten esta semana", "Series con un episodio nuevo esta semana"],
-      airingToday: ["Se emiten hoy", "Series con un episodio nuevo hoy"],
+      onTheAir: ["En emisión", "Series con un episodio nuevo hoy o esta semana"],
+      upcoming: ["Próximas series", "Series nuevas que se estrenan pronto"],
     },
     movie: {
       trends: ["Películas en tendencia", "Lo que está de moda, con categorías semanales y diarias"],
@@ -274,6 +276,7 @@ const es = {
     },
     profile: {
       goal: ["Meta anual de visionado", "El botón del anillo de meta en la cabecera del perfil (junto a Editar y Compartir)"],
+      streak: ["Llama de racha", "La llama junto a tu nombre al ver 3 días o más seguidos"],
       badges: ["Insignias", "Tu puntuación de visionado, tu nivel Perde y tus insignias"],
       friends: ["Amigos", "Buscar, amigos, mensajes y solicitudes. Si la ocultas no podrás acceder a ellos desde aquí"],
       stats: ["Estadísticas", "Cuántas películas y series has visto y el tiempo total"],
@@ -328,8 +331,8 @@ const pt = {
       emmy: ["Séries vencedoras do Emmy", "Vencedoras do Emmy por ano"],
       providers: ["Serviços", "Descubra séries por serviço"],
       genres: ["Gêneros", "Descubra séries por gênero"],
-      onTheAir: ["No ar esta semana", "Séries com um episódio novo esta semana"],
-      airingToday: ["No ar hoje", "Séries com um episódio novo hoje"],
+      onTheAir: ["No ar", "Séries com um episódio novo hoje ou esta semana"],
+      upcoming: ["Próximas séries", "Séries novas que estreiam em breve"],
     },
     movie: {
       trends: ["Filmes em alta", "O que está em alta, com categorias semanais e diárias"],
@@ -364,6 +367,7 @@ const pt = {
     },
     profile: {
       goal: ["Meta anual de visualização", "O botão do anel de meta no cabeçalho do perfil (ao lado de Editar e Compartilhar)"],
+      streak: ["Chama da sequência", "A chama ao lado do seu nome ao assistir 3 dias ou mais seguidos"],
       badges: ["Emblemas", "Sua pontuação de visualização, seu nível Perde e seus emblemas"],
       friends: ["Amigos", "Buscar, amigos, mensagens e pedidos. Se você ocultar, não conseguirá acessá-los por aqui"],
       stats: ["Estatísticas", "Quantos filmes e séries você assistiu e o tempo total"],
@@ -418,8 +422,8 @@ const de = {
       emmy: ["Emmy-prämierte Serien", "Emmy-Gewinner nach Jahr"],
       providers: ["Anbieter", "Serien nach Streaming-Dienst durchstöbern"],
       genres: ["Genres", "Serien nach Genre durchstöbern"],
-      onTheAir: ["Diese Woche im Programm", "Serien mit einer neuen Folge in dieser Woche"],
-      airingToday: ["Heute im Programm", "Serien mit einer neuen Folge heute"],
+      onTheAir: ["Im Programm", "Serien mit einer neuen Folge heute oder diese Woche"],
+      upcoming: ["Kommende Serien", "Neue Serien, die bald starten"],
     },
     movie: {
       trends: ["Trendfilme", "Was gerade im Trend ist, mit Wochen- und Tageskategorien"],
@@ -454,6 +458,7 @@ const de = {
     },
     profile: {
       goal: ["Jährliches Seh-Ziel", "Die Zielring-Schaltfläche im Profilkopf (neben Bearbeiten und Teilen)"],
+      streak: ["Serienflamme", "Die Flamme neben deinem Namen, wenn du 3 oder mehr Tage in Folge schaust"],
       badges: ["Abzeichen", "Dein Seh-Score, dein Akt-Level und die Abzeichenleiste"],
       friends: ["Freunde", "Suche, Freunde, Nachrichten und Anfragen. Wenn du sie ausblendest, erreichst du sie von hier aus nicht mehr"],
       stats: ["Statistik", "Wie viele Filme und Serien du gesehen hast, und die Gesamtzeit"],

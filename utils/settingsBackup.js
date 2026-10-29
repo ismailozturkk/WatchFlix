@@ -114,11 +114,6 @@ export const BACKUP_GROUPS = Object.freeze([
     icon: "share-social-outline",
     keys: ["profileStoryCard", "wrappedCard"],
   },
-  {
-    id: "pet",
-    icon: "paw-outline",
-    keys: ["petEnabled", "petSize", "petPosition"],
-  },
 ]);
 
 export const BACKUP_ENTRIES = Object.freeze(
@@ -140,8 +135,6 @@ export const BACKUP_EXCLUDED = Object.freeze({
   recentUsers: "Hızlı giriş çipleri kullanıcı kimlikleri içerir; dosyada dolaşmamalı.",
   usageStats: "Tanılama sayaçları.",
   appIcon: "Gerçek simge işletim sisteminde; yalnızca önbelleği tutuluyor.",
-  petOwned: "Kilidi açılmış petler ilerleme verisi, ayar değil.",
-  petSelected: "Seçili pet sahip olunan petlere bağlı.",
   homeMediaType: "Film/Dizi sekmesinde son bakılan bölüm; gezinme durumu, ayar değil.",
   discoverFilters: "Ne izlesem? ekranında en son kullanılan süzgeç; gezinme durumu (kayıtlı süzgeçler yedeğe girer).",
   upcomingFilters: "Yaklaşan Filmler rafının son süzgeci; tarihe bağlı gezinme durumu (seçilen ay/aralık zamanla geçersizleşir).",
@@ -184,10 +177,6 @@ const RULES = {
   effectMode: { check: (v) => EFFECT_MODES.includes(v) },
   imageQualityLevel: { check: (v) => ["low", "medium", "good", "high", "original"].includes(v) },
   streamingProviderIds: { check: isPositiveIntList },
-  petSize: { check: (v) => typeof v === "number" && v >= 32 && v <= 400 },
-  petPosition: {
-    check: (v) => isPlain(v) && Number.isFinite(v.x) && Number.isFinite(v.y),
-  },
   fontRoles: { check: isPlain, normalize: normalizeFontRoles },
   decorScopes: { check: isPlain, normalize: normalizeDecorScopes },
   sectionVisibility: { check: isPlain, normalize: normalizeSectionVisibility },

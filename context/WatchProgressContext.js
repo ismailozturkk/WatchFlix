@@ -20,6 +20,7 @@
 import React, { createContext, useContext } from "react";
 import useWatchProgress from "@hooks/useWatchProgress";
 import useBadgeCelebration from "@hooks/useBadgeCelebration";
+import useStreakCelebration from "@hooks/useStreakCelebration";
 
 const WatchProgressContext = createContext(null);
 
@@ -29,6 +30,8 @@ export function WatchProgressProvider({ children }) {
   const deger = useWatchProgress();
   // Kutlama burada, profil sekmesinden BAĞIMSIZ oynar (hooks/useBadgeCelebration.js).
   useBadgeCelebration(deger);
+  // Seri alevi yeni kademeye ulaşınca (3 gün, 1 hafta, 1 ay …) aynı yerde kutlanır.
+  useStreakCelebration(deger);
   return (
     <WatchProgressContext.Provider value={deger}>
       {children}

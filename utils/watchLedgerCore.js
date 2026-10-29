@@ -73,7 +73,20 @@ export const bosLedger = () => ({
 // işaretledi" sinyali elde edilir.
 // `rekorGun`/`rekorHafta` MONOTONdur ve pencereden bağımsız durur: `gunler` 400
 // günde budandığı için rekor orada tutulsaydı budama eski rekoru silerdi.
-export const bosAktiflik = () => ({ gunler: [], sonSayim: -1, rekorGun: 0, rekorHafta: 0 });
+//
+// `gunluk` (son GUNLUK_TUT gün): gün → { taban, kazanim }. `taban` o günün İLK
+// ölçümündeki toplam, `kazanim` gün içinde tabanın üstüne çıkılan en yüksek fark —
+// yani o gün NET kaç yeni içerik işaretlendi. İki işi var: (1) aynı içeriği geri
+// alıp yeniden basmak artık gün damgalamaz (kazanım 0 kalır), (2) seri TELAFİSİ
+// "ertesi gün 2 içerik" ister ve bunu yalnız bu sayı söyleyebilir.
+//
+// `koruma`: seri koruma durumu (telafi + kalkan). Kararları utils/watchActivity.js
+// seriKorumasiniIlerlet verir; burada yalnız biçimi korunur.
+export const GUNLUK_TUT = 10;
+export const bosKoruma = () => ({ yamalar: {}, kalkan: 0, kalkanAy: 0, islenen: null });
+export const bosAktiflik = () => ({
+  gunler: [], sonSayim: -1, rekorGun: 0, rekorHafta: 0, gunluk: {}, koruma: bosKoruma(),
+});
 
 const dizi = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
 const tamsayi = (v, alt = 1) => {
@@ -91,6 +104,40 @@ function tarihHaritasi(v) {
     if (typeof gun === "string" && GUN_ANAHTARI.test(gun)) out[id] = gun;
   }
   return out;
+}
+
+const nesneMi = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+const sayiAlt = (v, alt) => {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) ? Math.max(alt, n) : alt;
+};
+
+/** gün → { taban, kazanim }; bozuk girdi atılır, en yeni GUNLUK_TUT gün kalır. */
+export function gunlukOku(v, tut = GUNLUK_TUT) {
+  if (!nesneMi(v)) return {};
+  const gunler = Object.keys(v).filter((g) => GUN_ANAHTARI.test(g) && nesneMi(v[g])).sort();
+  const out = {};
+  for (const g of gunler.slice(Math.max(0, gunler.length - tut))) {
+    out[g] = { taban: sayiAlt(v[g].taban, 0), kazanim: sayiAlt(v[g].kazanim, 0) };
+  }
+  return out;
+}
+
+/** Seri koruma durumunu güvenli biçime indirger (bkz. watchActivity seriKorumasiniIlerlet). */
+export function korumaOku(v) {
+  if (!nesneMi(v)) return bosKoruma();
+  const yamalar = {};
+  if (nesneMi(v.yamalar)) {
+    for (const [g, tur] of Object.entries(v.yamalar)) {
+      if (GUN_ANAHTARI.test(g) && (tur === "telafi" || tur === "kalkan")) yamalar[g] = tur;
+    }
+  }
+  return {
+    yamalar,
+    kalkan: sayiAlt(v.kalkan, 0),
+    kalkanAy: sayiAlt(v.kalkanAy, 0),
+    islenen: typeof v.islenen === "string" && GUN_ANAHTARI.test(v.islenen) ? v.islenen : null,
+  };
 }
 
 /** Bilinmeyen/bozuk JSON'u güvenli biçime indirger. Asla atmaz. */
@@ -127,6 +174,8 @@ export function normalizeLedger(raw) {
       sonSayim: Number.isFinite(Number(raw.aktiflik?.sonSayim)) ? Math.floor(Number(raw.aktiflik.sonSayim)) : -1,
       rekorGun: tamsayi(raw.aktiflik?.rekorGun, 0),
       rekorHafta: tamsayi(raw.aktiflik?.rekorHafta, 0),
+      gunluk: gunlukOku(raw.aktiflik?.gunluk),
+      koruma: korumaOku(raw.aktiflik?.koruma),
     },
   };
 }
@@ -180,24 +229,43 @@ export function tohumla(ledger, {
  *
  * `sonSayim` düşüşte de güncellenir: işaretini geri alıp yeniden basan kullanıcı
  * aksi halde bir daha hiç artış üretemezdi.
+ *
+ * NET KAZANIM ŞARTI: gün, o günün ilk ölçümüne (`taban`) göre NET artış varsa
+ * damgalanır. Eskiden her artış damgalıyordu; dünkü bir içeriği bugün geri alıp
+ * yeniden basmak (100 → 99 → 100) bugünü "izlendi" sayıyordu. Artık kazanım 0
+ * kalır. Hata düzeltmek (yanlış filmi kaldırıp doğrusunu basmak) etkilenmez:
+ * 100 → 101 → 100 → 101 yine 1 kazanımdır.
  */
 export function aktifligiGuncelle(ledger, { icerikSayisi = null, bugun = null, tut = 400 } = {}) {
   const l = normalizeLedger(ledger);
   const sayi = Number(icerikSayisi);
-  if (!Number.isFinite(sayi) || typeof bugun !== "string") return { ledger: l, degisti: false, yeniGun: false };
+  if (!Number.isFinite(sayi) || typeof bugun !== "string" || !GUN_ANAHTARI.test(bugun)) {
+    return { ledger: l, degisti: false, yeniGun: false };
+  }
 
   const yeniSayim = Math.floor(sayi);
   const onceki = l.aktiflik.sonSayim;
-  // İlk ölçüm (-1) damgalamaz: o an kullanıcının ne yaptığını bilmiyoruz,
-  // yalnızca mevcut durumu ölçüyoruz.
-  const artti = onceki >= 0 && yeniSayim > onceki;
-  if (!artti && yeniSayim === onceki) return { ledger: l, degisti: false, yeniGun: false };
+  if (yeniSayim === onceki) return { ledger: l, degisti: false, yeniGun: false };
 
-  const gunler = artti ? ekleGun(l.aktiflik.gunler, bugun, tut) : l.aktiflik.gunler;
-  const yeniGun = artti && gunler.length !== l.aktiflik.gunler.length;
+  // İlk ölçüm (-1) damgalamaz ve gün kaydı açmaz: o an kullanıcının ne yaptığını
+  // bilmiyoruz, yalnızca mevcut durumu ölçüyoruz.
+  let gunluk = l.aktiflik.gunluk;
+  let kazanim = 0;
+  if (onceki >= 0) {
+    const kayit = gunluk[bugun];
+    const taban = kayit ? kayit.taban : onceki;
+    kazanim = Math.max(kayit ? kayit.kazanim : 0, yeniSayim - taban);
+    if (!kayit || kayit.kazanim !== kazanim) {
+      gunluk = gunlukOku({ ...gunluk, [bugun]: { taban, kazanim } });
+    }
+  }
+
+  const damga = kazanim >= 1;
+  const gunler = damga ? ekleGun(l.aktiflik.gunler, bugun, tut) : l.aktiflik.gunler;
+  const yeniGun = damga && gunler.length !== l.aktiflik.gunler.length;
 
   return {
-    ledger: { ...l, aktiflik: { ...l.aktiflik, gunler, sonSayim: yeniSayim } },
+    ledger: { ...l, aktiflik: { ...l.aktiflik, gunler, sonSayim: yeniSayim, gunluk } },
     degisti: true,
     yeniGun,
   };

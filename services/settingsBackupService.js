@@ -6,7 +6,7 @@
 // (platform G/Ç) services/settingsBackupFiles.js'te.
 //
 // NEDEN YENİDEN BAŞLATMA GEREKİYOR: ayarların bir kısmı (tema, dil, düzen
-// tercihleri…) AppSettingsContext/PetContext'e açılışta SENKRON okunup state'e
+// tercihleri…) AppSettingsContext'e açılışta SENKRON okunup state'e
 // alınıyor; depo sonradan değişince bu state'ler izlemiyor. Servislerin çoğu
 // (efekt, yazı tipi, simge, titreşim) depoyu zaten dinliyor ama hepsi değil —
 // tek doğru yol, yazımdan sonra uygulamayı yeniden yüklemek (bkz. appReload.js).

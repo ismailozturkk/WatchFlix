@@ -95,8 +95,10 @@ jest.mock("../context/LanguageContext", () => ({
 jest.mock("../context/AppSettingsContext", () => ({
   useImageQualitySettings: () => ({ getTmdbUrl: (p) => `https://img${p}` }),
 }));
+// Kapalı kapılar (ör. Free'de "note_reminders") test başına eklenir.
+const mockLockedGates = new Set();
 jest.mock("../hooks/usePremiumGate", () => ({
-  usePremiumGate: () => ({ allows: () => true, check: () => true }),
+  usePremiumGate: (id) => ({ allows: () => !mockLockedGates.has(id), check: () => true, showUpsell: () => {} }),
 }));
 jest.mock("../components/AppToast", () => {
   const mockApi = {
@@ -315,6 +317,56 @@ describe("yazma", () => {
     expect(mockCloud.get("Notes/u1/items/n9").content).toBe("yeni not");
     expect(mockStats.commits).toHaveLength(1);
     expect(mockStats.reads).toBe(0); // yazmak okuma tetiklemez
+  });
+
+  test("hatırlatıcı kilitliyken (Free) yeni gün/saat kaydedilmez; aynısıyla kaydetmek ve kaldırmak serbest", async () => {
+    mockLockedGates.add("note_reminders");
+    try {
+      const { Notes } = await ready();
+      const { box } = mountWith(Notes.ProfileNotesProvider, Notes.useProfileNotes);
+      await flush();
+      const n2 = box.value.notes.find((n) => n.id === "n2"); // Premium'dayken kurulmuş: 2026-12-24
+      const save = async (doc) => {
+        let sonuc;
+        await act(async () => { sonuc = await box.value.saveNote(doc); });
+        return sonuc;
+      };
+
+      expect(await save({ ...n2, scheduledDate: "2026-12-25" })).toBe(false); // gün değişti
+      expect(await save({ ...n2, scheduledTime: "18:00" })).toBe(false); // saat değişti
+      expect(await save(note("n8", { createdAt: 800, scheduledDate: "2026-12-01" }))).toBe(false); // yeni not
+      expect(box.value.notes.map((n) => n.id)).not.toContain("n8");
+
+      expect(await save({ ...n2, content: "değişti" })).toBe(true); // kurulu hatırlatıcı kalır
+      expect(box.value.notes.find((n) => n.id === "n2").scheduledDate).toBe("2026-12-24");
+      expect(await save({ ...n2, scheduledDate: null })).toBe(true); // kaldırmak serbest
+      expect(box.value.notes.find((n) => n.id === "n2").scheduledDate).toBeNull();
+    } finally {
+      mockLockedGates.delete("note_reminders");
+    }
+  });
+
+  test("kilitliyken eski işleyiciler de (tek yazma kapısı) gün yazamaz; sabitlemek serbest", async () => {
+    mockLockedGates.add("note_reminders");
+    try {
+      const { Notes } = await ready();
+      const { box } = mountWith(Notes.ProfileNotesProvider, Notes.useProfileNotes);
+      await flush();
+      const count = box.value.notes.length;
+
+      act(() => { box.value.setMessage("eski yol"); box.value.setScheduledDate("2026-12-01"); });
+      await act(async () => { await box.value.handleAddNote(); });
+      expect(box.value.notes).toHaveLength(count); // yazılmadı
+
+      act(() => { box.value.setNoteContent("güncel"); box.value.setScheduledDate("2026-12-30"); });
+      await act(async () => { await box.value.handleUpdateNote("n2"); });
+      expect(box.value.notes.find((n) => n.id === "n2")).toMatchObject({ scheduledDate: "2026-12-24" });
+
+      await act(async () => { await box.value.handleTogglePin("n2"); });
+      expect(box.value.notes.find((n) => n.id === "n2")).toMatchObject({ pinned: true, scheduledDate: "2026-12-24" });
+    } finally {
+      mockLockedGates.delete("note_reminders");
+    }
   });
 
   test("todo işaretleme tam belge yazar (kısmi updateDoc değil)", async () => {

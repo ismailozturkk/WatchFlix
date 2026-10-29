@@ -1375,7 +1375,7 @@ export default function ChatScreen({ route, navigation }) {
   // istemci hiçbir alıcıya yazmaz (utils/chatPush.js). Davet belgeleri mesaj
   // batch'i işlendikten SONRA yazılır: sunucu push'u rozete yazacağı okunmamış
   // toplamını o an okur (functions/appBadge.js). Hata gönderimi geri almaz.
-  // `messageId`: davetin kartı — Profil çubuğundaki kabul/ret o mesaja da yazılır.
+  // `messageId`: davetin kartı — yüzen davet kartındaki kabul/ret o mesaja da yazılır.
   // `members`: gönderim anında çözülen grup üyeleri (dinleyici henüz gelmediyse de davet herkese gider).
   const notifyInvitation = useCallback(
     (previewText, invitation, messageId, members) => {

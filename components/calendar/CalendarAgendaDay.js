@@ -20,6 +20,8 @@ import {
 } from "@utils/phoneCalendar";
 import { dayDiff, formatEpisodeCode, urgencyTone } from "@utils/calendarAgenda";
 import { i18nText } from "@utils/i18nText";
+import { noteReminderPreview } from "@utils/noteReminders";
+import { usePremiumGate } from "@hooks/usePremiumGate";
 import GlassTouchable from "../common/GlassTouchable";
 import GlassBox from "../common/GlassBox";
 
@@ -65,6 +67,9 @@ const SaveButton = ({ item, savedSet, onSavedChange, viewMode, theme }) => {
   const isPast = viewMode === "past";
   // İşlem sürerken ikinci dokunuş "ekle"nin hemen ardından "kaldır"ı tetiklemesin.
   const [busy, setBusy] = useState(false);
+  // Free'de not hatırlatmasını telefona eklemek kapalı (phoneCalendar `locked`):
+  // eklenmiş olanı kaldırmak serbest, yenisi yükseltme sayfasını açar.
+  const reminderGate = usePremiumGate("note_reminders");
 
   const toggle = useCallback(async () => {
     if (busy) return;
@@ -75,12 +80,13 @@ const SaveButton = ({ item, savedSet, onSavedChange, viewMode, theme }) => {
         if (res.ok) onSavedChange(key, false);
       } else {
         const res = await saveEventToPhoneCalendar(item, { onSavedChange });
-        if (res.ok || res.alreadySaved) onSavedChange(key, true);
+        if (res.locked) reminderGate.showUpsell({ preview: noteReminderPreview(item) });
+        else if (res.ok || res.alreadySaved) onSavedChange(key, true);
       }
     } finally {
       setBusy(false);
     }
-  }, [busy, isSaved, item, key, onSavedChange]);
+  }, [busy, isSaved, item, key, onSavedChange, reminderGate]);
 
   // Geçmiş + telefonda yok → silinecek bir şey yok, düğme gösterme.
   if (isPast && !isSaved) return <View style={styles.actionSlot} />;

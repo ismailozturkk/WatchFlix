@@ -15,10 +15,16 @@
 //     ("HH:MM"); hesaplar utils/noteReminders.js'te.
 //   • Tamamlananları tek dokunuşla temizle, ilerleme şeridi, kelime sayacı,
 //     sabitle anahtarı, renk seçicide seçili işareti.
+//   • Not metni ve madde HARF sınırı plana göre (`textLimits`, utils/noteTextLimits.js).
+//     Yazarken sınıra dayanınca yükseltme sayfası bir kez açılır — bu sayfanın
+//     İÇİNDEKİ host'ta, çünkü kökteki sayfa bu native Modal'ın arkasında kalırdı.
+//   • Hatırlatıcı Premium'a özel (`reminderLocked`): Free'de gün/saat seçimi aynı
+//     host'ta yükseltme sayfasını açar; mevcut hatırlatıcıyı kaldırmak serbest.
 
 import { intlLocaleOf } from "../../../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Keyboard,
   ScrollView,
   StyleSheet,
   Text,
@@ -31,6 +37,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import DatePickerModal from "@components/modals/DatePickerModal";
+import { PremiumUpsellHost } from "@components/premium/PremiumUpsellSheet";
+import PremiumPill from "@components/premium/PremiumPill";
 import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
 import { i18nText } from "../../../../utils/i18nText";
@@ -65,33 +73,58 @@ import {
   splitReminderTime,
   suggestedReminderTime,
 } from "../../../../utils/noteReminders";
+import { PREMIUM_PLAN } from "../../../../utils/premium";
+import {
+  noteTextLimitsFor,
+  reachedTextLimit,
+  textInputMaxLength,
+} from "../../../../utils/noteTextLimits";
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 // Küçük ikon butonları için ortak dokunma alanı payı.
 const ICON_HIT_SLOP = { top: 8, bottom: 8, left: 6, right: 6 };
-export const NOTE_CONTENT_LIMIT = 5000;
-export const TODO_ITEM_LIMIT = 240;
+// Başlık her planda aynı; not metni ve madde sınırı plana göre (`textLimits`).
 export const NOTE_TITLE_LIMIT = 120;
+// Çağıran sınır vermezse en kısıtlayıcı plan (kapı açık kalmasın).
+const FREE_TEXT_LIMITS = noteTextLimitsFor(PREMIUM_PLAN.FREE);
 
 const localeOf = (language) => (intlLocaleOf(language));
 
-// Sayaç yalnız sınıra yaklaşınca belirir (%85+); aksi halde ekranı kirletir.
-const LimitCounter = ({ value, limit, theme, style }) => {
+// Sayaç yalnız sınıra yaklaşınca belirir (%85+); aksi halde ekranı kirletir. Sınıra
+// dayanınca ve üst plan daha uzununa izin veriyorsa (`onUpgrade`) ✦ ile dokunulur
+// olur: yükseltme sayfasını yeniden açar. `hint` yer olan satırda yanına yazılır.
+const LimitCounter = ({ value, limit, theme, style, onUpgrade, hint }) => {
   const length = String(value || "").length;
-  if (length < limit * 0.85) return null;
+  if (!(length >= limit * 0.85)) return null;
+  const full = length >= limit;
+  const color = full ? "#EF4444" : theme.colors?.orange || theme.accent;
+  if (!full || !onUpgrade) {
+    return (
+      <Text allowFontScaling={false} pointerEvents="none" style={[st.limitCounter, { color }, style]}>
+        {length}/{limit}
+      </Text>
+    );
+  }
   return (
-    <Text
-      allowFontScaling={false}
-      pointerEvents="none"
-      style={[
-        st.limitCounter,
-        { color: length >= limit ? "#EF4444" : theme.colors?.orange || theme.accent },
-        style,
-      ]}
+    <TouchableOpacity
+      onPress={onUpgrade}
+      hitSlop={ICON_HIT_SLOP}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`${length}/${limit}. ${hint || i18nText("autoI18n.notes_sinir_doldu", "Sınıra ulaştın")}`}
+      style={[st.limitUpgrade, style]}
     >
-      {length}/{limit}
-    </Text>
+      <Ionicons name="sparkles" size={11} color={theme.accent} />
+      <Text allowFontScaling={false} style={[st.limitCounter, { color }]}>
+        {length}/{limit}
+      </Text>
+      {hint ? (
+        <Text allowFontScaling={false} numberOfLines={1} style={[st.limitHint, { color: theme.accent }]}>
+          {hint}
+        </Text>
+      ) : null}
+    </TouchableOpacity>
   );
 };
 
@@ -116,6 +149,19 @@ export default function NoteEditorSheet({
   fullTypes = EMPTY_TYPES,
   onFullTypePress,
   onDismissed,
+  // Plana göre harf sınırları (ProfileNotesContext `noteTextLimits`). Sınıra
+  // dayanınca `onTextLimit(featureId, uzunluk)` yükseltme sayfasını açar; oradan
+  // "Premium'a geç" → `onUpgrade(featureId)`: çağıran bu sayfayı kapatıp ödeme
+  // ekranını `onDismissed`ta açar (ekran bu Modal'ın arkasında kalırdı).
+  textLimits = FREE_TEXT_LIMITS,
+  onTextLimit,
+  onUpgrade,
+  // Hatırlatıcı Premium'a özel (ProfileNotesContext `canSetNoteReminder`). Kilitliyken
+  // kurmak / günü-saati değiştirmek `onReminderLocked(preview)` ile yükseltme
+  // sayfasını açar (bu sayfanın İÇİNDEKİ host'ta); kaldırmak serbest. Çağıran
+  // vermezse kilitli (kapı açık kalmasın).
+  reminderLocked = true,
+  onReminderLocked,
 }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -136,6 +182,9 @@ export default function NoteEditorSheet({
   const [draftReadyKey, setDraftReadyKey] = useState(null);
   const copyTimerRef = useRef(null);
   const todoInputRef = useRef(null);
+  // Bu açılışta kendiliğinden yükseltme sayfası gösterilen sınırlar (özellik
+  // kimliği): sınırda silip yeniden yazan kullanıcıya sayfa tekrar tekrar açılmaz.
+  const promptedLimitsRef = useRef(new Set());
   // Mevcut kaydın tipi düzenleme sırasında değiştirilemez. `type` state'i yalnızca
   // yeni kayıt oluştururken üstteki Not/Todo seçicisini yönetir.
   const activeType = initialNote
@@ -148,7 +197,19 @@ export default function NoteEditorSheet({
   const todayStr = dateOffsetISO(0);
   // Gün seçilince saat boşsa önerilen saat konur (bugünse bir sonraki tam saat):
   // saatsiz hatırlatma 09:00'da çalardı, o da bugün için çoğu zaman geçmiş olur.
+  // Hatırlatıcı kilitliyken (Free) gün seçen HER yol (hızlı günler, takvim seçicisi)
+  // burada durur: kaldırmak (iso null) ve kaydın KENDİ hatırlatıcısını geri seçmek
+  // (kaldırıp vazgeçmek; gün + saat aynen) serbest, başka her gün yükseltme sayfası.
   const pickDate = (iso) => {
+    if (iso && reminderLocked) {
+      if (iso === initialNote?.scheduledDate) {
+        setScheduledDate(iso);
+        setScheduledTime(initialNote.scheduledTime || null);
+        return;
+      }
+      promptReminder({ scheduledDate: iso, scheduledTime: suggestedReminderTime(iso) });
+      return;
+    }
     setScheduledDate(iso);
     if (!iso) {
       setScheduledTime(null);
@@ -158,6 +219,25 @@ export default function NoteEditorSheet({
     setScheduledTime((prev) =>
       isValidReminderTime(prev) && !isReminderPast(iso, prev) ? prev : suggestedReminderTime(iso),
     );
+  };
+  // Kilitli hatırlatıcı: seçim uygulanmaz, yükseltme sayfası denenen günü/saati
+  // bu notun başlığıyla bildirim kartı olarak gösterir (gün yoksa "seçtiğin gün").
+  const promptReminder = (schedule = {}) => {
+    Keyboard.dismiss();
+    onReminderLocked?.({
+      kind: "reminder",
+      noteType: activeType,
+      title: title.trim() || (activeType === "note" ? content.trim().split("\n")[0] : ""),
+      ...schedule,
+    });
+  };
+  // Saat seçen her yol (hızlı saatler, saat/dakika ızgarası) — kilitliyken aynı kural.
+  const pickTime = (time) => {
+    if (!reminderLocked) {
+      setScheduledTime(time);
+      return;
+    }
+    if (time !== effectiveTime) promptReminder({ scheduledDate, scheduledTime: time });
   };
   const effectiveTime = isValidReminderTime(scheduledTime) ? scheduledTime : "09:00";
   const timeParts = splitReminderTime(effectiveTime);
@@ -203,6 +283,7 @@ export default function NoteEditorSheet({
     setEditingTodoId(null);
     setEditingTodoText("");
     setCopiedTodoId(null);
+    promptedLimitsRef.current.clear();
   }, [visible, initialNote, defaultType]);
 
   // Todo değişiklikleri buluta gönderilmeden önce cihazdaki kullanıcı kapsamlı
@@ -221,8 +302,11 @@ export default function NoteEditorSheet({
       setTitle(typeof draft.title === "string" ? draft.title : initialNote?.title || "");
       setTodos(Array.isArray(draft.todos) ? draft.todos.map((item) => ({ ...item })) : []);
       setNewTodoText(typeof draft.newTodoText === "string" ? draft.newTodoText : "");
-      setScheduledDate(draft.scheduledDate || null);
-      setScheduledTime(draft.scheduledDate ? draft.scheduledTime || null : null);
+      // Hatırlatıcı kilitliyse taslağın (Premium'dayken kalmış olabilir) yeni günü
+      // alınmaz: kayıt kapıya takılırdı. Kaydın kendi hatırlatıcısı kalır.
+      const reminderSource = reminderLocked ? initialNote : draft;
+      setScheduledDate(reminderSource?.scheduledDate || null);
+      setScheduledTime(reminderSource?.scheduledDate ? reminderSource.scheduledTime || null : null);
       setEditingTodoId(draft.editingTodoId || null);
       setEditingTodoText(typeof draft.editingTodoText === "string" ? draft.editingTodoText : "");
       const savedPair = colorPairs.find((item) => item.color === draft.color);
@@ -235,6 +319,7 @@ export default function NoteEditorSheet({
     draftReadyKey,
     draftStorageKey,
     initialNote,
+    reminderLocked,
     visible,
   ]);
 
@@ -273,6 +358,35 @@ export default function NoteEditorSheet({
   ]);
 
   const color = pair.color;
+
+  /* ── Harf sınırı: yazarak sınıra dayanınca yükseltme sayfası ── */
+  // Üst plan yoksa (Premium Max) sayfa açılmaz; sayaç kırmızıya döner, o kadar.
+  const promptTextLimit = (entry, length) => {
+    if (!entry.canUpgrade || !onTextLimit) return;
+    Keyboard.dismiss();
+    onTextLimit(entry.featureId, length);
+  };
+  const upgradeHandlerFor = (entry, value) =>
+    entry.canUpgrade && onTextLimit ? () => promptTextLimit(entry, String(value || "").length) : undefined;
+  // Değişiklik sınıra YENİ dayandıysa sayfayı (bu açılışta özellik başına bir kez) aç.
+  const watchTextLimit = (entry, previous, next) => {
+    if (!reachedTextLimit(entry.limit, previous, next)) return;
+    if (promptedLimitsRef.current.has(entry.featureId)) return;
+    promptedLimitsRef.current.add(entry.featureId);
+    promptTextLimit(entry, next.length);
+  };
+  const changeContent = (text) => {
+    watchTextLimit(textLimits.content, content, text);
+    setContent(text);
+  };
+  const changeNewTodoText = (text) => {
+    watchTextLimit(textLimits.todoItem, newTodoText, text);
+    setNewTodoText(text);
+  };
+  const changeEditingTodoText = (text) => {
+    watchTextLimit(textLimits.todoItem, editingTodoText, text);
+    setEditingTodoText(text);
+  };
 
   const addTodo = () => {
     if (!newTodoText.trim()) return;
@@ -375,6 +489,7 @@ export default function NoteEditorSheet({
     (scheduledDate ? scheduledTime || null : null) !==
       (initialNote?.scheduledDate ? initialNote?.scheduledTime || null : null);
 
+  /** Kaydedildiyse true (doğrulamaya takılırsa uyarır ve false döner). */
   const handleSave = async () => {
     const note = buildNote();
     if (isNoteEmpty(note)) {
@@ -383,17 +498,18 @@ export default function NoteEditorSheet({
           ? i18nText("autoI18n.en_az_bir_todo_maddesi_girin", "En az bir yapılacak madde girin")
           : i18nText("autoI18n.bos_not_olusturulamaz", "Boş not oluşturulamaz"),
       );
-      return;
+      return false;
     }
     if (reminderChanged && note.scheduledDate && (noteReminderAt(note) ?? 0) <= Date.now()) {
       toast.warning(i18nText("autoI18n.notes_gecmis_zaman", "Hatırlatma zamanı geçmişte olamaz"));
       setShowTimePanel(true);
-      return;
+      return false;
     }
     const saved = await onSave(note);
     if (saved !== false && activeType === "todo") {
       removeNoteTodoDraft(draftStorageKey);
     }
+    return saved !== false;
   };
 
   // Not metninin taslağı tutulmaz (todo'nun tutulur): kaydedilmemiş yazı varken
@@ -433,6 +549,18 @@ export default function NoteEditorSheet({
   const words = useMemo(() => countWords(content), [content]);
   const empty = isNoteEmpty({ type: activeType, title, content, todos });
 
+  // Yükseltme sayfasından "Premium'a geç". Ödeme ekranı bu sayfanın arkasında
+  // açılacağı için sayfa kapanmalı; notun taslağı tutulmadığından yazılan önce
+  // kaydedilir (yapılacakların taslağı zaten cihazda). Kayıt olmazsa (ör. geçmiş
+  // hatırlatma saati) sayfa açık kalır, uyarı görünür.
+  const handleUpgrade = async (featureId) => {
+    if (noteDirty && !empty) {
+      const saved = await handleSave();
+      if (!saved) return;
+    }
+    onUpgrade?.(featureId);
+  };
+
   /* Tek satır: yapılacak / yapılan ayrımı `item.done` ile yapılır. */
   const renderTodoRow = (item) => {
     const isEditing = editingTodoId === item.id;
@@ -460,13 +588,19 @@ export default function NoteEditorSheet({
               allowFontScaling={false}
               style={[st.todoItemText, st.todoEditInput, { color: theme.text.primary, borderBottomColor: color }]}
               value={editingTodoText}
-              onChangeText={setEditingTodoText}
-              maxLength={TODO_ITEM_LIMIT}
+              onChangeText={changeEditingTodoText}
+              maxLength={textInputMaxLength(textLimits.todoItem.limit, editingTodoText)}
               autoFocus
               returnKeyType="done"
               onSubmitEditing={commitEditTodo}
             />
-            <LimitCounter value={editingTodoText} limit={TODO_ITEM_LIMIT} theme={theme} style={st.todoEditCounter} />
+            <LimitCounter
+              value={editingTodoText}
+              limit={textLimits.todoItem.limit}
+              theme={theme}
+              style={st.todoEditCounter}
+              onUpgrade={upgradeHandlerFor(textLimits.todoItem, editingTodoText)}
+            />
           </View>
         ) : (
           // Satıra dokunmak düzenlemeyi açar (ayrı kalem ikonuna gerek yok).
@@ -704,8 +838,8 @@ export default function NoteEditorSheet({
                   placeholderTextColor={theme.text.muted}
                   multiline
                   value={content}
-                  onChangeText={setContent}
-                  maxLength={NOTE_CONTENT_LIMIT}
+                  onChangeText={changeContent}
+                  maxLength={textInputMaxLength(textLimits.content.limit, content)}
                   textAlignVertical="top"
                 />
                 <View style={st.contentFooter}>
@@ -714,7 +848,20 @@ export default function NoteEditorSheet({
                     {i18nText("autoI18n.notes_kelime_n", "{{n}} kelime", { n: words })}
                   </Text>
                   <View style={{ flex: 1 }} />
-                  <LimitCounter value={content} limit={NOTE_CONTENT_LIMIT} theme={theme} style={st.inlineCounter} />
+                  <LimitCounter
+                    value={content}
+                    limit={textLimits.content.limit}
+                    theme={theme}
+                    style={st.inlineCounter}
+                    onUpgrade={upgradeHandlerFor(textLimits.content, content)}
+                    hint={
+                      textLimits.content.upgradePlanName
+                        ? i18nText("autoI18n.notes_plan_ile_daha_uzun", "{{plan}} ile daha uzun", {
+                            plan: textLimits.content.upgradePlanName,
+                          })
+                        : null
+                    }
+                  />
                 </View>
               </>
             ) : (
@@ -784,7 +931,7 @@ export default function NoteEditorSheet({
           keyboardShouldPersistTaps="handled"
         >
           <TouchableOpacity
-            onPress={() => setShowDatePicker(true)}
+            onPress={() => (reminderLocked ? promptReminder() : setShowDatePicker(true))}
             activeOpacity={0.85}
             style={[
               st.dateChip,
@@ -802,6 +949,7 @@ export default function NoteEditorSheet({
             >
               {dateLabel}
             </Text>
+            {reminderLocked && !scheduledDate ? <PremiumPill color={color} /> : null}
             {scheduledDate ? (
               <TouchableOpacity onPress={() => pickDate(null)} hitSlop={ICON_HIT_SLOP}>
                 <Ionicons name="close-circle" size={15} color={theme.text.muted} />
@@ -844,7 +992,11 @@ export default function NoteEditorSheet({
             keyboardShouldPersistTaps="handled"
           >
             <GlassTouchable
-              onPress={() => setShowTimePanel((v) => !v)}
+              onPress={() =>
+                reminderLocked
+                  ? promptReminder({ scheduledDate, scheduledTime: effectiveTime })
+                  : setShowTimePanel((v) => !v)
+              }
               activeOpacity={0.85}
               accessibilityRole="button"
               accessibilityState={{ expanded: showTimePanel }}
@@ -869,7 +1021,7 @@ export default function NoteEditorSheet({
               return (
                 <GlassTouchable
                   key={time}
-                  onPress={() => setScheduledTime(time)}
+                  onPress={() => pickTime(time)}
                   disabled={past}
                   activeOpacity={0.85}
                   accessibilityState={{ selected, disabled: past }}
@@ -912,12 +1064,12 @@ export default function NoteEditorSheet({
                     onPress={() => {
                       const next = formatReminderTime(hour, timeParts?.minute ?? 0);
                       if (!timeIsPast(next)) {
-                        setScheduledTime(next);
+                        pickTime(next);
                         return;
                       }
                       // Bu saatte seçili dakika geçmiş: o saatin ilk geçerli 5'liğine kay.
                       const free = MINUTES.find((m) => !timeIsPast(formatReminderTime(hour, m)));
-                      setScheduledTime(formatReminderTime(hour, free ?? 59));
+                      pickTime(formatReminderTime(hour, free ?? 59));
                     }}
                     activeOpacity={0.8}
                     accessibilityRole="button"
@@ -949,7 +1101,7 @@ export default function NoteEditorSheet({
                   <GlassTouchable
                     key={minute}
                     disabled={past}
-                    onPress={() => setScheduledTime(formatReminderTime(hour, minute))}
+                    onPress={() => pickTime(formatReminderTime(hour, minute))}
                     activeOpacity={0.8}
                     accessibilityRole="button"
                     accessibilityState={{ selected, disabled: past }}
@@ -983,13 +1135,19 @@ export default function NoteEditorSheet({
               placeholder={i18nText("autoI18n.yeni_madde_ekle", "Yeni madde ekle…")}
               placeholderTextColor={theme.text.muted}
               value={newTodoText}
-              onChangeText={setNewTodoText}
-              maxLength={TODO_ITEM_LIMIT}
+              onChangeText={changeNewTodoText}
+              maxLength={textInputMaxLength(textLimits.todoItem.limit, newTodoText)}
               onSubmitEditing={addTodo}
               returnKeyType="done"
               blurOnSubmit={false}
             />
-            <LimitCounter value={newTodoText} limit={TODO_ITEM_LIMIT} theme={theme} style={st.todoInputCounter} />
+            <LimitCounter
+              value={newTodoText}
+              limit={textLimits.todoItem.limit}
+              theme={theme}
+              style={st.todoInputCounter}
+              onUpgrade={upgradeHandlerFor(textLimits.todoItem, newTodoText)}
+            />
           </GlassBox>
           <GlassTouchable
             onPress={addTodo}
@@ -1027,6 +1185,10 @@ export default function NoteEditorSheet({
         minDate={new Date()}
         minDateErrorMsg={i18nText("autoI18n.gecmis_bir_tarih_secilemez", "Geçmiş bir tarih seçilemez")}
       />
+
+      {/* Sayfa açıkken gelen yükseltme istekleri (harf sınırı, hatırlatıcı) burada, bu Modal'ın
+          ÇOCUĞU olarak açılır; kökteki host bu pencerenin arkasında kalırdı. */}
+      <PremiumUpsellHost scoped enabled={visible} onUpgrade={handleUpgrade} />
     </BottomSheetModal>
   );
 }
@@ -1120,6 +1282,8 @@ const st = StyleSheet.create({
   contentFooter: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   footerText: { fontSize: 11, fontWeight: "700" },
   limitCounter: { fontSize: 10.5, fontWeight: "800" },
+  limitUpgrade: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1 },
+  limitHint: { fontSize: 10.5, fontWeight: "800", flexShrink: 1 },
   inlineCounter: {},
 
   // Yapılacaklar

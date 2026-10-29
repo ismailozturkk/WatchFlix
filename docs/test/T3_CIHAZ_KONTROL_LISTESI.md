@@ -44,11 +44,11 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
-| 3.1 | Film&Dizi sekmesi | Sekmeyi aç → `MediaTypeSwitch` ile Film/Dizi arasında geç | Raflar türe göre değişir; başlıklar ortak `SectionHeader` | A i | ✅ A |
-| 3.2 | Raflar | Ana ekranı sonuna kadar kaydır | Dünya Turu çipleri çalışır, takip edilenlerin yaklaşanları var, boş raf yok | A i | ✅ A |
-| 3.3 | Arama | Arama düğmesi → film, dizi, kişi bölmeleri → keşif çipleri | Cam bölmeli kontrol + çip satırı; üç türde sonuç | A i | ❌ B5 |
-| 3.4 | Ne izlesem? | Ne izlesem? → süzgeç seç → Şaşırt beni | Süzgece uyan öneri; yaş sınırı rozeti; AI kotası düşmez | A i | ✅ A |
-| 3.5 | Yaklaşan Filmler süzgeci | Yaklaşanlar → hazır aralık, ay, özel aralık → sinemada/dijitalde → tür/dil/sıralama | Liste her seçimde değişir, sonuç süzgece uyar | A i | [ ] |
+| 3.1 | Film&Dizi sekmesi | Sekmeyi aç → `MediaTypeSwitch` ile Film/Dizi arasında geç | Raflar türe göre değişir; başlıklar ortak `SectionHeader` | A i | ✅ A · ✅ i |
+| 3.2 | Raflar | Ana ekranı sonuna kadar kaydır | Dünya Turu çipleri çalışır, takip edilenlerin yaklaşanları var, boş raf yok | A i | ✅ A · ✅ i |
+| 3.3 | Arama | Arama düğmesi → film, dizi, kişi bölmeleri → keşif çipleri | Cam bölmeli kontrol + çip satırı; üç türde sonuç | A i | ❌ B5 (A, düzeltildi) · ✅ i |
+| 3.4 | Ne izlesem? | Ne izlesem? → süzgeç seç → Şaşırt beni | Süzgece uyan öneri; yaş sınırı rozeti; AI kotası düşmez | A i | ✅ A · ✅ i |
+| 3.5 | Yaklaşan Filmler süzgeci | Yaklaşanlar → hazır aralık, ay, özel aralık → sinemada/dijitalde → tür/dil/sıralama | Liste her seçimde değişir, sonuç süzgece uyar | A i | ✅ i |
 | 3.6 | Yetişkin içerik koruması | Ayarlar'da yetişkin içerik kapalı → arama + keşif | Yetişkin sonuç hiçbir yüzeyde yok | A | [ ] |
 | 3.7 | Ayar değişince yenilenme | Yetişkin içerik / platformlar / poster kalitesi değiştir → Film&Dizi'ye dön | Ana ekran yeniden yüklenir, yeni ayar uygulanmış | A | [ ] |
 
@@ -56,21 +56,21 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
-| 4.1 | Film detayı | Bir filmi aç → oyuncular, benzerler, puanlar | Bölümler yüklenir; dış puanlar (IMDb/RT) gelir ya da sessizce gizlenir | A i | ✅ A |
-| 4.2 | Dizi detayı + sezon | Bir diziyi aç → sezon → bölüm | Sezon/bölüm listesi, izleme düğmeleri | A i | ✅ A |
-| 4.3 | Fragman + galeri | Fragman düğmesi → sayfayı kapat; galeriyi aç → kaydır → kapat | Alt sayfa kapanışı temiz; galeri yakınlaştırma/kapama | A i | [ ] |
-| 4.4 | Bölüm grafiği | Dizi detayı → bölüm grafiği ekranı | Geri düğmesi durum çubuğunun altında, dokunulabilir | A i | ✅ A |
-| 4.5 | Oyuncu sayfası | Bir oyuncuya dokun → filmografi → takip et | Sayfa açılır; takip edilenlere eklenir | A i | [ ] |
-| 4.6 | Özel afiş (Premium) | Detay → afiş/arka plan seç → kütüphane, liste, profilde bak → varsayılana dön | Seçim her yüzeyde görünür; varsayılana dönünce geri gelir | A i | [ ] |
+| 4.1 | Film detayı | Bir filmi aç → oyuncular, benzerler, puanlar | Bölümler yüklenir; dış puanlar (IMDb/RT) gelir ya da sessizce gizlenir | A i | ✅ A · ✅ i |
+| 4.2 | Dizi detayı + sezon | Bir diziyi aç → sezon → bölüm | Sezon/bölüm listesi, izleme düğmeleri | A i | ✅ A · ✅ i |
+| 4.3 | Fragman + galeri | Fragman düğmesi → sayfayı kapat; galeriyi aç → kaydır → kapat | Alt sayfa kapanışı temiz; galeri yakınlaştırma/kapama | A i | ✅ i |
+| 4.4 | Bölüm grafiği | Dizi detayı → bölüm grafiği ekranı | Geri düğmesi durum çubuğunun altında, dokunulabilir | A i | ✅ A · ✅ i |
+| 4.5 | Oyuncu sayfası | Bir oyuncuya dokun → filmografi → takip et | Sayfa açılır; takip edilenlere eklenir | A i | ✅ i |
+| 4.6 | Özel afiş (Premium) | Detay → afiş/arka plan seç → kütüphane, liste, profilde bak → varsayılana dön | Seçim her yüzeyde görünür; varsayılana dönünce geri gelir | A i | ✅ i (plan belirtilmedi) |
 | 4.7 | Özel afiş (Free) | Free hesapta aynı düğme | Önizlemeli yükseltme sayfası açılır, seçim kaydedilmez | A | [ ] |
 
 ## 5. Kütüphane
 
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
-| 5.1 | İzledim / liste / favori | Bir filmi İzledim, İzleme listesi, Favori yap → Kütüphane | Üç listede de görünür; geri almak kaldırır | A i | ✅ A |
-| 5.2 | Bölüm takibi | Bir dizide 3 bölüm işaretle → sezonu tamamla | İlerleme ve "sıradaki" doğru | A i | [ ] |
-| 5.3 | Sırala ve filtrele | Kütüphane → listeyi aç → Sırala ve filtrele sayfası | İlk basışta doğal yön; poster kartları ve giriş animasyonu düzgün | A i | [ ] |
+| 5.1 | İzledim / liste / favori | Bir filmi İzledim, İzleme listesi, Favori yap → Kütüphane | Üç listede de görünür; geri almak kaldırır | A i | ✅ A · ✅ i |
+| 5.2 | Bölüm takibi | Bir dizide 3 bölüm işaretle → sezonu tamamla | İlerleme ve "sıradaki" doğru | A i | ✅ i |
+| 5.3 | Sırala ve filtrele | Kütüphane → listeyi aç → Sırala ve filtrele sayfası | İlk basışta doğal yön; poster kartları ve giriş animasyonu düzgün | A i | ✅ i |
 | 5.4 | Liste oluştur / paylaş / kopyala | Yeni liste → film ekle → paylaş → arkadaşın listesini kopyala | Liste oluşur; paylaşım kartı; kopya kendi listelerimde | A 2H | [ ] |
 | 5.5 | Profilde görünen listeler | Gizlilik → Profilde görünen listeler → birini gizle; Listelerim başlığındaki kilit | Gizlenen liste arkadaş profilinde görünmez | A 2H | [ ] |
 | 5.6 | Günlük 1440 dk sınırı | Uzun bir diziyi bugün tümüyle izledim yap | Bölümler geriye doğru günlere yayılır; tek film sığmazsa anlaşılır uyarı | A | [ ] |
@@ -81,17 +81,17 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
-| 6.1 | Hatırlatıcı kur | Yaklaşan bir film → zil → tarih | Afişte zil rozeti; Hatırlatıcılar listesinde | A i | [ ] |
-| 6.2 | Bildirim gelir | Yakın tarihli hatırlatıcı kur, uygulamayı kapat | Bildirim zamanında gelir, dokununca detaya gider | A i | [ ] |
+| 6.1 | Hatırlatıcı kur | Yaklaşan bir film → zil → tarih | Afişte zil rozeti; Hatırlatıcılar listesinde | A i | ✅ i |
+| 6.2 | Bildirim gelir | Yakın tarihli hatırlatıcı kur, uygulamayı kapat | Bildirim zamanında gelir, dokununca detaya gider | A i | ✅ i |
 | 6.3 | "Yayınlandı" hızlı sil | Yayınlanmış hatırlatıcıyı sil → Geri Al | Onaysız silinir, toast'taki Geri Al geri getirir | A | [ ] |
-| 6.4 | Telefon takvimi | Takvime ekle → izin sayfası → izin ver → sil → Geri Al | Etkinlik takvimde oluşur/silinir/geri gelir | A i | [ ] |
-| 6.5 | Widget'lar | Ana ekrana widget ekle; Ayarlar → Widget'lar önizlemesi | Widget veri gösterir; önizleme ayarla aynı | A i | [ ] |
+| 6.4 | Telefon takvimi | Takvime ekle → izin sayfası → izin ver → sil → Geri Al | Etkinlik takvimde oluşur/silinir/geri gelir | A i | ✅ i (18 Eki build) |
+| 6.5 | Widget'lar | Ana ekrana widget ekle; Ayarlar → Widget'lar önizlemesi | Widget veri gösterir; önizleme ayarla aynı | A i | ✅ i (18 Eki build; yeni Swift düzeni derlenmedi) |
 
 ## 7. Notlar
 
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
-| 7.1 | Not ve yapılacaklar | Not ekle; yapılacak listesi → madde ekle | Masonry ızgara düzgün; yeni madde üstte | A i | ✅ A |
+| 7.1 | Not ve yapılacaklar | Not ekle; yapılacak listesi → madde ekle | Masonry ızgara düzgün; yeni madde üstte | A i | ✅ A · ✅ i |
 | 7.2 | Sekme ve arama | Notlar ↔ Yapılacaklar sekmesi; aramaya yaz | Kayan hap sekme; arama süzer | A | [ ] |
 | 7.3 | Free sınırı | Free hesapta 6. notu ekle | Yükseltme sayfası; not eklenmez | A | [ ] |
 
@@ -101,14 +101,14 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 |---|---|---|---|---|---|
 | 8.1 | Arkadaş ekle / kabul | A hesabı B'ye istek → B kabul | İkisinde de arkadaş; rozet sayısı güncel | A 2H | ✅ |
 | 8.2 | Arkadaşlıktan çıkar | A, B'yi çıkarır | İkisinde de kalkar; 1-1 sohbet silinir | A 2H | ❌ B13 |
-| 8.3 | DM + okundu | Mesaj gönder → karşı taraf açar | Okundu işareti yansır; sırası doğru | A 2H | ✅ |
+| 8.3 | DM + okundu | Mesaj gönder → karşı taraf açar | Okundu işareti yansır; sırası doğru | A 2H | ✅ · ✅ i |
 | 8.4 | Eski mesaj sayfalama | 60+ mesajlı sohbette yukarı kaydır | Eski sayfa gelir, konum zıplamaz | A | ⏸ |
 | 8.5 | Alıntı (reply) | Mesaja uzun bas → Yanıtla → gönder | Balonda alıntı önizlemesi; dokununca kaynağa gider | A | ✅ |
-| 8.6 | Grup sohbeti + sayaç | Grup kur → üye mesaj atar | Okunmamış sayacı artar, açınca sıfırlanır | A 2H | ✅ |
+| 8.6 | Grup sohbeti + sayaç | Grup kur → üye mesaj atar | Okunmamış sayacı artar, açınca sıfırlanır | A 2H | ✅ · ✅ i |
 | 8.7 | Sohbete paylaş | Liste / CineMatch cevabı / Hub içeriği → Sohbete gönder | Zengin kart; dokununca içeriği açar | A 2H | ✅ (B16) |
 | 8.8 | Görünümümü paylaş | Ayarlar → Görünümümü paylaş → arkadaş bölüm seçip uygular → Geri Al | Ayar canlı uygulanır, Geri Al eski hale döndürür | A 2H | ✅ |
 | 8.9 | Davet sonucu sohbete | Düello bitir; CineSwipe eşleşmesi | Sonuç kartı / eşleşme listesi sohbette | A 2H | ⏸ Premium |
-| 8.10 | Push (uygulama kapalı) | B uygulamayı kapatır → A DM + grup mesajı atar | B'ye bildirim gelir; dokununca sohbet açılır | P i 2H | ⏸ P |
+| 8.10 | Push (uygulama kapalı) | B uygulamayı kapatır → A DM + grup mesajı atar | B'ye bildirim gelir; dokununca sohbet açılır | P i 2H | ⏸ P · ✅ i |
 | 8.11 | Şikâyet + engelle | Kullanıcı profili → Şikâyet et → Engelle | Engellenen mesaj atamaz, listede görünmez | A 2H | ❌ B12 |
 | 8.12 | Arkadaşın özel afişi | Premium B bir afiş seçer → A, B'nin profiline bakar | B'nin seçtiği afiş görünür (B Free'ye düşerse varsayılan) | A 2H | ⏸ Premium |
 | 8.13 | Zevk uyumu + birlikte izleyelim | Arkadaş profili → Zevk uyumu | Yüzde ve ortak öneriler; liste gizliyse "gizli" der, "boş" demez | A 2H | ⏸ |
@@ -119,7 +119,7 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 
 | ID | Senaryo | Adımlar | Beklenen | Plt | Durum |
 |---|---|---|---|---|---|
-| 9.1 | Gönderi oluştur | Paylaş → gönderi yaz → film ekle → paylaş | Akışta görünür; modal temiz kapanır | A i | ✅ |
+| 9.1 | Gönderi oluştur | Paylaş → gönderi yaz → film ekle → paylaş | Akışta görünür; modal temiz kapanır | A i | ✅ · ✅ i |
 | 9.2 | Yorum + beğeni | Gönderiye yorum yaz, beğen, beğeniyi geri al | Sayaçlar doğru, tekrar beğeni sayıyı şişirmez | A 2H | ✅ |
 | 9.3 | Şikâyet | Başkasının gönderisi → Şikâyet et | Onay; gönderi bu kullanıcıda gizlenir | A 2H | ❌ B15 |
 
@@ -206,6 +206,8 @@ Kaynak: rehberdeki T3 çekirdek akışları (`docs/planlama/YAYIN_ONCESI_TEST_RE
 4. Sosyal (ikinci hesap emülatörde): 8.3, 8.6, 8.10, 9.1
 5. Eğlence + AI + ayarlar: 10.7, 11.1, 11.4, 13.1, 13.2, 13.9, 13.10, 14.1, 14.4
 6. iOS'a özgü: 15.2–15.6 (15.1 yeni build gelince)
+
+28 Eki: parça 1–4 iPhone'da ✅. Parça 5–6 kullanıcı kararıyla yürütülmedi (günlük kullanımda deneniyor; sorun çıkarsa kullanıcı bildirir).
 
 ## Önkoşullar
 

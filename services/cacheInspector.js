@@ -5,7 +5,6 @@
 //
 //   Dosya sistemi (<cache>/...):
 //     datacache/<ns>   → profil, notlar, hatırlatıcılar, listeler, generic network JSON
-//     pets/            → pet sprite'ları
 //     (diğer her şey)  → çoğunlukla expo-image disk cache = posterler/görseller
 //
 //   MMKV `cache` deposu (yalnız yeniden üretilebilir veri):
@@ -27,8 +26,6 @@ import { Image } from "expo-image";
 import * as cacheStore from "../utils/cacheStore";
 import { DATACACHE_DIRNAME } from "../utils/cacheStore";
 import { resyncUserData } from "./userData";
-import * as petCache from "./petCache";
-import { PETS_DIRNAME } from "./petCache";
 import { clearCachedByPrefix, cachedByteSize } from "../utils/apiCache";
 import {
   Keys,
@@ -55,9 +52,9 @@ function recurseSize(dir) {
   return total;
 }
 
-// Dosya sistemi kovaları: { datacache:{ns:bytes}, pets, images }
+// Dosya sistemi kovaları: { datacache:{ns:bytes}, images }
 function fsBuckets() {
-  const out = { datacache: {}, pets: 0, images: 0 };
+  const out = { datacache: {}, images: 0 };
   try {
     const root = new Directory(Paths.cache);
     if (!root.exists) return out;
@@ -71,8 +68,6 @@ function fsBuckets() {
         for (const ns of child.list()) {
           if (ns instanceof Directory) out.datacache[leaf(ns.uri)] = recurseSize(ns);
         }
-      } else if (name === PETS_DIRNAME) {
-        out.pets += recurseSize(child);
       } else {
         // expo-image disk cache + diğer geçici dosyalar
         out.images += recurseSize(child);
@@ -114,7 +109,6 @@ export async function getBreakdown() {
 
   const categories = [
     { id: "images", bytes: fs.images },
-    { id: "pets", bytes: fs.pets },
     { id: "tvContent", bytes: kv.tv },
     { id: "movieContent", bytes: kv.movie },
     { id: "posts", bytes: kv.posts },
@@ -148,9 +142,6 @@ export async function clearCategory(id) {
       try {
         await Image.clearMemoryCache();
       } catch {}
-      break;
-    case "pets":
-      petCache.clearAllPets();
       break;
     case "tvContent":
       clearCachedByPrefix("tv_");
@@ -213,7 +204,6 @@ export async function clearAllCaches() {
   try {
     await Image.clearDiskCache();
   } catch {}
-  petCache.clearAllPets();
   cacheStore.clearAll();
   clearAllCacheStorage();
 }

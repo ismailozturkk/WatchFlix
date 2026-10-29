@@ -30,19 +30,22 @@ const pad2 = (n) => String(n).padStart(2, "0");
 // (TMDB'de film ve TV genre id'leri farklıdır; Korku/Romantik/Gerilim'in TV
 // karşılığı yoktur → bunlar film aylarına düşer). sortBy, aynı TV genre'ına
 // düşen iki ayı (SciFi/Fantastik=10765, Aksiyon/Macera=10759) farklılaştırır.
+// `key`: türün görsel kimliğinin anahtarı (components/tournament/genreMeta.js —
+// renk + animasyonlu ikon). genreId paylaşılabildiği için kimlik ona bağlanmaz.
+// Firestore'a YAZILMAZ (ensureTournament yalnız tr/en/mediaType/genreId'yi saklar).
 export const SCHEDULE = [
-  { monthIndex: 0,  tr: "Bilim Kurgu", en: "Sci-Fi", es: "Ciencia ficción", pt: "Ficção científica", de: "Sci-Fi",     mediaType: "tv",    genreId: 10765, sortBy: "popularity.desc" },
-  { monthIndex: 1,  tr: "Romantik",    en: "Romance", es: "Romance", pt: "Romance", de: "Liebesfilm",    mediaType: "movie", genreId: 10749, sortBy: "popularity.desc" },
-  { monthIndex: 2,  tr: "Aksiyon",     en: "Action", es: "Acción", pt: "Ação", de: "Action",     mediaType: "tv",    genreId: 10759, sortBy: "popularity.desc" },
-  { monthIndex: 3,  tr: "Komedi",      en: "Comedy", es: "Comedia", pt: "Comédia", de: "Komödie",     mediaType: "movie", genreId: 35,    sortBy: "popularity.desc" },
-  { monthIndex: 4,  tr: "Macera",      en: "Adventure", es: "Aventura", pt: "Aventura", de: "Abenteuer",  mediaType: "tv",    genreId: 10759, sortBy: "vote_count.desc"  },
-  { monthIndex: 5,  tr: "Suç",         en: "Crime", es: "Crimen", pt: "Crime", de: "Krimi",      mediaType: "movie", genreId: 80,    sortBy: "popularity.desc" },
-  { monthIndex: 6,  tr: "Animasyon",   en: "Animation", es: "Animación", pt: "Animação", de: "Animation",  mediaType: "tv",    genreId: 16,    sortBy: "popularity.desc" },
-  { monthIndex: 7,  tr: "Gerilim",     en: "Thriller", es: "Suspense", pt: "Thriller", de: "Thriller",   mediaType: "movie", genreId: 53,    sortBy: "popularity.desc" },
-  { monthIndex: 8,  tr: "Dram",        en: "Drama", es: "Drama", pt: "Drama", de: "Drama",      mediaType: "tv",    genreId: 18,    sortBy: "popularity.desc" },
-  { monthIndex: 9,  tr: "Korku",       en: "Horror", es: "Terror", pt: "Terror", de: "Horror",     mediaType: "movie", genreId: 27,    sortBy: "popularity.desc" },
-  { monthIndex: 10, tr: "Fantastik",   en: "Fantasy", es: "Fantasía", pt: "Fantasia", de: "Fantasy",    mediaType: "tv",    genreId: 10765, sortBy: "vote_count.desc"  },
-  { monthIndex: 11, tr: "Aile",        en: "Family", es: "Familia", pt: "Família", de: "Familie",     mediaType: "movie", genreId: 10751, sortBy: "popularity.desc" },
+  { monthIndex: 0,  key: "scifi",     tr: "Bilim Kurgu", en: "Sci-Fi", es: "Ciencia ficción", pt: "Ficção científica", de: "Sci-Fi",     mediaType: "tv",    genreId: 10765, sortBy: "popularity.desc" },
+  { monthIndex: 1,  key: "romance",   tr: "Romantik",    en: "Romance", es: "Romance", pt: "Romance", de: "Liebesfilm",    mediaType: "movie", genreId: 10749, sortBy: "popularity.desc" },
+  { monthIndex: 2,  key: "action",    tr: "Aksiyon",     en: "Action", es: "Acción", pt: "Ação", de: "Action",     mediaType: "tv",    genreId: 10759, sortBy: "popularity.desc" },
+  { monthIndex: 3,  key: "comedy",    tr: "Komedi",      en: "Comedy", es: "Comedia", pt: "Comédia", de: "Komödie",     mediaType: "movie", genreId: 35,    sortBy: "popularity.desc" },
+  { monthIndex: 4,  key: "adventure", tr: "Macera",      en: "Adventure", es: "Aventura", pt: "Aventura", de: "Abenteuer",  mediaType: "tv",    genreId: 10759, sortBy: "vote_count.desc"  },
+  { monthIndex: 5,  key: "crime",     tr: "Suç",         en: "Crime", es: "Crimen", pt: "Crime", de: "Krimi",      mediaType: "movie", genreId: 80,    sortBy: "popularity.desc" },
+  { monthIndex: 6,  key: "animation", tr: "Animasyon",   en: "Animation", es: "Animación", pt: "Animação", de: "Animation",  mediaType: "tv",    genreId: 16,    sortBy: "popularity.desc" },
+  { monthIndex: 7,  key: "thriller",  tr: "Gerilim",     en: "Thriller", es: "Suspense", pt: "Thriller", de: "Thriller",   mediaType: "movie", genreId: 53,    sortBy: "popularity.desc" },
+  { monthIndex: 8,  key: "drama",     tr: "Dram",        en: "Drama", es: "Drama", pt: "Drama", de: "Drama",      mediaType: "tv",    genreId: 18,    sortBy: "popularity.desc" },
+  { monthIndex: 9,  key: "horror",    tr: "Korku",       en: "Horror", es: "Terror", pt: "Terror", de: "Horror",     mediaType: "movie", genreId: 27,    sortBy: "popularity.desc" },
+  { monthIndex: 10, key: "fantasy",   tr: "Fantastik",   en: "Fantasy", es: "Fantasía", pt: "Fantasia", de: "Fantasy",    mediaType: "tv",    genreId: 10765, sortBy: "vote_count.desc"  },
+  { monthIndex: 11, key: "family",    tr: "Aile",        en: "Family", es: "Familia", pt: "Família", de: "Familie",     mediaType: "movie", genreId: 10751, sortBy: "popularity.desc" },
 ];
 
 const MONTHS_TR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];

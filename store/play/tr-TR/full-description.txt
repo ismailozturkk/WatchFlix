@@ -20,7 +20,6 @@
 🎮 OYNA
 • Sahne tahmin oyunuyla film bilgini test et
 • Puan topla, seviye atla, rozetler kazan
-• Sana eşlik eden sanal evcil hayvanını büyüt
 
 🤖 KEŞFET
 • Yapay zekâ destekli öneriler: izleme geçmişine göre sana özel film ve dizi tavsiyeleri
@@ -30,9 +29,10 @@
 Temel özellikler ücretsizdir. Ücretli planlar şunları ekler:
 • CineMatch AI: Free günde 3 / ayda 30, Premium günde 20 / ayda 300, Premium Max günde 50 / ayda 900 mesaj
 • Arkadaşlarının da gördüğü plana özel profil kimlik rozeti
-• Daha yüksek limitler: özel liste (Free 1 · Premium 25 · Max sınırsız), arkadaş (2 · 150 · sınırsız), sohbet grubu (1 · 10 · sınırsız), not ve yapılacaklar (5 · 50 · sınırsız), film ve dizi notu (20 · 200 · sınırsız), film ve dizi hatırlatması (10 ve 20 · 50 ve 100 · sınırsız)
+• Daha yüksek limitler: özel liste (Free 1 · Premium 25 · Max sınırsız), arkadaş (2 · 150 · sınırsız), sohbet grubu (1 · 10 · sınırsız), not ve yapılacaklar (5 · 50 · sınırsız), not uzunluğu (500 · 2.000 · 20.000 karakter), film ve dizi notu (20 · 200 · sınırsız), film ve dizi hatırlatması (10 ve 20 · 50 ve 100 · sınırsız)
+• Notlarına ve yapılacak listelerine gün ve saatli hatırlatıcı
 • Oyunlar, CineSwipe ve aylık turnuvada oy kullanma (Free turnuvayı izleyebilir)
-• Kendi temanı oluşturma, 56 yazı tipinin tamamı, uygulama simgesi seçici, kar animasyonu, ambiyans arka planı, ikon arka planı ve ekranda gezen pet
+• Kendi temanı oluşturma, 56 yazı tipinin tamamı, uygulama simgesi seçici, kar animasyonu, ambiyans arka planı ve ikon arka planı
 • Wrapped arşivi (Free yalnız bu yıl · Premium son 5 yıl · Max tüm yıllar) ve 100 başlığa kadar platform bildirimi (Free: 10)
 • Uygulama içinden hata bildirimi (Premium ve Max) ve özellik isteği gönderme (yalnız Max)
 

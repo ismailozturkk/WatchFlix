@@ -531,7 +531,9 @@ const MeterCard = memo(function MeterCard({ content, theme, language, reduceMoti
             delay={delay + 260}
             style={[styles.meterValue, { color: barColor }]}
           />
-          <Text style={[styles.meterValue, { color: theme.text.muted }]}>{` / ${meter.cap}`}</Text>
+          <Text style={[styles.meterValue, { color: theme.text.muted }]}>
+            {` / ${meter.cap.toLocaleString(intlLocaleOf(language))}`}
+          </Text>
           {meter.unit ? (
             <Text style={[styles.meterUnit, { color: theme.text.muted }]}>{` ${meter.unit}`}</Text>
           ) : null}
@@ -671,6 +673,69 @@ const ChoicePreviewCard = memo(function ChoicePreviewCard({ content, theme, ambi
           ambient={ambient}
           delay={delay + 280}
         />
+      </View>
+    </Rise>
+  );
+});
+
+// ── Hatırlatıcı önizlemesi (not hatırlatıcısı) ──────────────────────────────
+
+const REMINDER_ICON = 44;
+
+/**
+ * Hatırlatıcı kurmaya çalışırken gelen yükseltme: kurulmak istenen hatırlatma telefon
+ * bildirimi gibi çizilir (simge · etiket · zaman / not başlığı). Erişim özelliğinde
+ * gösterge olmadığından onun yerinde, ChoicePreviewCard'la aynı kart diliyle durur;
+ * kilit rozeti "Seçtiğin" görseldeki gibi simgenin köşesinde.
+ */
+const ReminderPreviewCard = memo(function ReminderPreviewCard({ content, theme, ambient, delay }) {
+  const { preview, color } = content;
+  const when = preview.time ? `${preview.when} · ${preview.time}` : preview.when;
+  return (
+    <Rise
+      delay={delay}
+      dy={18}
+      style={[
+        styles.card,
+        styles.reminderCard,
+        { backgroundColor: theme.secondary, borderColor: alpha(color, 0.45) },
+      ]}
+    >
+      <Rise delay={delay + 120} dy={0} from={0.88} style={styles.reminderIconWrap}>
+        <View style={[styles.reminderIcon, { backgroundColor: color }]}>
+          <Ionicons name="alarm" size={22} color="#FFFFFF" />
+          {ambient ? <Sheen width={REMINDER_ICON} delay={1500} rest={2800} strength={0.3} /> : null}
+        </View>
+        <View style={[styles.previewLock, { backgroundColor: theme.secondary }]}>
+          <View style={[styles.previewLockInner, { backgroundColor: color }]}>
+            <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+          </View>
+        </View>
+      </Rise>
+      <View style={styles.reminderBody}>
+        <View style={styles.reminderHead}>
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={[styles.reminderLabel, { color: theme.text.muted }]}
+          >
+            {preview.label}
+          </Text>
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={[styles.reminderWhen, { color: readableOn(color, theme.secondary) }]}
+          >
+            {when}
+          </Text>
+        </View>
+        <Text
+          allowFontScaling={false}
+          numberOfLines={2}
+          style={[styles.reminderTitle, { color: theme.text.primary }]}
+        >
+          {preview.title}
+        </Text>
       </View>
     </Rise>
   );
@@ -1084,7 +1149,9 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
           />
         ) : null}
 
-        {content.preview ? (
+        {content.preview?.kind === "reminder" ? (
+          <ReminderPreviewCard content={content} theme={theme} ambient={ambient} delay={meterDelay} />
+        ) : content.preview ? (
           <ChoicePreviewCard
             content={content}
             theme={theme}
@@ -1231,11 +1298,20 @@ export const PremiumUpsellSheet = memo(function PremiumUpsellSheet({
  * olan Modal'ın üstüne yenisini sunamaz. Sinyal hiç gelmezse CLOSE_FALLBACK_MS
  * sonra aynı devam eder, host kilitli kalmaz. İçerik ve callback'ler o süre
  * boyunca korunur.
+ *
+ * Sayfa içi kip: açık bir alt sayfanın İÇİNE `<PremiumUpsellHost scoped
+ * enabled={visible} onUpgrade={…} />` asılır; `enabled` iken yığının üstüne
+ * kaydolur ve o sayfadan gelen istekler sayfanın üstünde açılır (bkz.
+ * services/premiumUpsellHost.js). Ödeme ekranı alt sayfanın ARKASINDA kalacağı
+ * için "Premium'a geç" doğrudan gezinmez, `onUpgrade(featureId)` çağrılır:
+ * alt sayfa kendini kapatıp ödeme ekranını açar.
  */
-export function PremiumUpsellHost() {
+export function PremiumUpsellHost({ scoped = false, enabled = true, onUpgrade } = {}) {
   const { language } = useLanguage();
   const { packages, introEligibleIds, usingTestStore } = usePremium();
   const lang = normalizeAppLanguage(language);
+  const onUpgradeRef = useRef(onUpgrade);
+  onUpgradeRef.current = onUpgrade;
 
   const [visible, setVisible] = useState(false);
   const [request, setRequest] = useState(null);
@@ -1262,6 +1338,7 @@ export function PremiumUpsellHost() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return undefined;
     const unregister = registerUpsellHost((next) => {
       if (!visibleRef.current) {
         showNow(next);
@@ -1285,7 +1362,7 @@ export function PremiumUpsellHost() {
       unregister();
       closeGate.cancel();
     };
-  }, [closeGate, showNow]);
+  }, [closeGate, enabled, showNow]);
 
   const close = useCallback(
     (callback) => {
@@ -1345,12 +1422,14 @@ export function PremiumUpsellHost() {
       action: "upgrade",
     });
     // Eski akışla aynı sıra: sayfa kapanır, sonra çağıranın onUpgrade'i
-    // (ör. üstteki modalı kapat) ve ödeme ekranı.
+    // (ör. üstteki modalı kapat) ve ödeme ekranı. Sayfa içi kipte ödeme ekranını
+    // dış sayfa açar (kendini kapattıktan sonra).
     close(() => {
       request.onUpgrade?.();
-      openPremiumScreen(request.featureId);
+      if (scoped && onUpgradeRef.current) onUpgradeRef.current(request.featureId);
+      else openPremiumScreen(request.featureId);
     });
-  }, [close, content, request]);
+  }, [close, content, request, scoped]);
 
   const onSecondary = useCallback(() => {
     if (!request) return;
@@ -1525,6 +1604,22 @@ const styles = StyleSheet.create({
   previewLabel: { fontSize: 12, fontWeight: "800", letterSpacing: 0.2 },
   previewArrowWrap: { width: PREVIEW_ARROW_SPACE, alignItems: "center", marginBottom: 22 },
   previewArrow: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  // hatırlatıcı önizlemesi (bildirim kartı)
+  reminderCard: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
+  reminderIconWrap: { width: REMINDER_ICON, height: REMINDER_ICON },
+  reminderIcon: {
+    width: REMINDER_ICON,
+    height: REMINDER_ICON,
+    borderRadius: 12,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reminderBody: { flex: 1, minWidth: 0 },
+  reminderHead: { flexDirection: "row", alignItems: "baseline", gap: 8 },
+  reminderLabel: { flexShrink: 1, fontSize: 11.5, fontWeight: "700", letterSpacing: 0.2 },
+  reminderWhen: { marginLeft: "auto", fontSize: 12, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  reminderTitle: { marginTop: 3, fontSize: 14.5, lineHeight: 19, fontWeight: "800" },
   inlineRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
   inlineText: { fontSize: 12, fontWeight: "600" },
   noteText: { flex: 1, lineHeight: 17, marginTop: 0 },

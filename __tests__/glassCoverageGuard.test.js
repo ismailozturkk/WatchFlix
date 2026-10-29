@@ -36,6 +36,9 @@ const RAW_TOUCHABLE_ALLOWED = {
   "components/lists/GlobalSearchResults.js": 1,
   "components/modals/createPost/DraftCard.js": 2,
   "screens/tabs/profile/notes/NoteCards.js": 5,
+  // Metin kutusunun köşesindeki harf sayacı (✦ 1000/1000): sınır dolunca dokunulur
+  // olan küçük etiket; çoğu kez zaten camın (GlassBox field) içinde, düğme değil.
+  "screens/tabs/profile/notes/NoteEditorSheet.js": 1,
   "components/tv/TvGraphGrid.js": 1, // yüzlerce bölüm hücresi
   "components/cineswipe/SwipeCard.js": 1, // kart içi bilgi düğmesi
   "components/badges/BadgeRail.js": 3, // kart gibi raf öğeleri
@@ -46,6 +49,9 @@ const RAW_TOUCHABLE_ALLOWED = {
   "screens/tabs/setting/SettingsTheme.js": 2,
   // Animasyonlu opaklıklı bildirim kartı (cam opaklıkla soldurulamaz).
   "components/toast/ToastCards.js": 1,
+  // Yüzen bildirim kartı: simgeye küçülürken/simgeden büyürken opaklığı animasyonlu (sonraki,
+  // küçült, Reddet/Tamam, Kabul/Aç) — ToastCards ile aynı gerekçe.
+  "components/floatingNotice/FloatingNoticeCard.js": 4,
   // Marka renkli giriş düğmeleri (Apple / Google) — AuthKit'te glass={false}.
   "components/auth/AuthKit.js": 1,
   // Hata sınırı sağlayıcıların DIŞINDA: cam bileşeni tema okuyup "useTheme must be used within a

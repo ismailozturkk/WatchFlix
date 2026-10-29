@@ -57,8 +57,9 @@ export const SECTION_SCREENS = Object.freeze(
         section("emmy", "trophy-outline", "amber"),
         section("providers", "apps-outline", "teal"),
         section("genres", "shapes-outline", "blue"),
+        // Bugün + Bu hafta yayında tek rafta (çiple seçilir). Eski "airingToday" kaydı normalize'da düşer.
         section("onTheAir", "radio-outline", "green"),
-        section("airingToday", "today-outline", "amber"),
+        section("upcoming", "calendar-outline", "blue"),
       ],
     },
     {
@@ -86,10 +87,10 @@ export const SECTION_SCREENS = Object.freeze(
       icon: "game-controller-outline",
       sections: [
         section("feed", "chatbubbles-outline", "blue"),
+        section("tournament", "trophy-outline", "amber"),
         section("cineswipe", "heart-half-outline", "purple"),
         section("bingo", "grid-outline", "teal"),
         section("poll", "help-circle-outline", "purple"),
-        section("tournament", "trophy-outline", "amber"),
         section("games", "game-controller-outline", "purple"),
       ],
     },
@@ -115,6 +116,8 @@ export const SECTION_SCREENS = Object.freeze(
       sections: [
         // Başlıktaki (Düzenle / Paylaş'ın yanındaki) halka düğmesi: ekranda en üstte.
         section("goal", "flag-outline", "amber"),
+        // Adın yanındaki günlük seri alevi (components/streak/StreakFlameBadge.js).
+        section("streak", "flame-outline", "amber"),
         section("badges", "ribbon-outline", "amber"),
         // Mesajlar, arkadaş listesi ve istekler uygulamada YALNIZ buradan açılıyor.
         section("friends", "people-outline", "blue", { confirmHide: true }),

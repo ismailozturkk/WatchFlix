@@ -1,8 +1,8 @@
 // screens/tabs/settings/PersonalizationScreen.js
 //
 // Ayarlar > Kişiselleştirme. Görsel efekt modu + kar efekti + ambiyans arka
-// planı + ikon arka planı (görünürlük + opaklık + düzen) + Pet/Dost. Hub'dan
-// ayrı ekrana taşındı.
+// planı + ikon arka planı (görünürlük + opaklık + düzen). Hub'dan ayrı ekrana
+// taşındı.
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
@@ -20,7 +20,6 @@ import {
   IconPatternPreview,
   SnowPreview,
 } from "@components/settings/SettingPreviews";
-import PetSettingsSection from "@components/pet/PetSettingsSection";
 import FontSettingsSection from "@components/typography/FontSettingsSection";
 import AppIconSection from "@components/settings/AppIconSection";
 import PremiumPill from "@components/premium/PremiumPill";
@@ -685,9 +684,6 @@ export default function PersonalizationScreen() {
           }
         />
       </View>
-
-      <View style={ps.personalizationGap} />
-      <PetSettingsSection colors={C} showLabel={false} />
     </SettingsSubScreen>
   );
 }

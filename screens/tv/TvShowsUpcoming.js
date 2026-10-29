@@ -12,18 +12,20 @@ import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import SectionHeader from "../../components/home/SectionHeader";
+import TvUpcomingRangeChips from "../../components/home/TvUpcomingRangeChips";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-//import { API_KEY } from "@env";
 import { useTvShow } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
 import ListBadges from "../../components/ListBadges";
-import { RatingBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
-import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
-
+import { CountdownBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
+import { useListLayoutSettings } from "../../context/AppSettingsContext";
 const { width } = Dimensions.get("window");
 
+// "Yaklaşan Diziler": ilk bölümü seçili pencereye düşen YENİ diziler (sorgu: utils/tvUpcoming.js).
+// Kart "Yaklaşan Filmler"deki gibi geri sayım + çıkış tarihi taşır; tarih dizinin ilk yayın günü.
+
 // Stable, module-scope item component → no remount → no flicker.
-const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, theme, getTmdbUrl }) {
+const TvUpcomingCard = memo(function TvUpcomingCard({ item, navigation, theme }) {
   const rp = useRailPosterStyle();
   const { posterBadges } = useListLayoutSettings();
   const { openQuickActions } = useMediaQuickActions();
@@ -56,15 +58,15 @@ const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, th
             { width: rp.posterWidth, height: rp.posterHeight, borderRadius: rp.radius, shadowColor: theme.shadow },
           ]}
           cachePolicy="memory-disk"
-          recyclingKey={`tvairing-${item.id}`}
+          recyclingKey={`tvupcoming-${item.id}`}
           transition={120}
         />
 
-        {posterBadges?.releaseDate !== false && (
-          <ReleaseDateBadge date={item.first_air_date} variant="year" style={POSTER_BADGE_POS.topRight} />
+        {posterBadges?.countdown !== false && (
+          <CountdownBadge date={item.first_air_date} style={POSTER_BADGE_POS.topLeft} />
         )}
-        {posterBadges?.tmdbRating !== false && (
-          <RatingBadge value={item.vote_average} votes={item.vote_count} style={POSTER_BADGE_POS.bottomRight} />
+        {posterBadges?.releaseDate !== false && (
+          <ReleaseDateBadge date={item.first_air_date} style={POSTER_BADGE_POS.topRight} />
         )}
         <ListBadges
           mediaId={item.id}
@@ -77,73 +79,67 @@ const TvAiringTodayCard = memo(function TvAiringTodayCard({ item, navigation, th
   );
 });
 
-export default function TvShowsAiringToday({ navigation }) {
+export default function TvShowsUpcoming({ navigation }) {
   const { theme } = useTheme();
   const { t } = useLanguage();
   const {
-    moviesAiringToday,
-    totalPagesAiringToday,
-    loadingAiringToday,
-    loadMoreAiringToday,
-    loadingMoreAiringToday,
-    pageAiringToday,
+    seriesUpcoming,
+    pageUpcoming,
+    totalPagesUpcoming,
+    loadingUpcoming,
+    loadingMoreUpcoming,
+    loadMoreUpcoming,
+    selectedUpcomingRange,
+    setSelectedUpcomingRange,
     activateTvSection,
   } = useTvShow();
 
   useEffect(() => {
-    activateTvSection("airingToday");
+    activateTvSection("upcoming");
   }, [activateTvSection]);
-  // Film türlerini API'den almak
-  const { getTmdbUrl } = useImageQualitySettings();
 
-  // Başlık iki durumda da AYNI bileşenden gelir (bkz. TvShowsOnTheAir): düz
-  // Text ile "tümünü gör" haplı satırın yüksekliği farklı, aradaki fark ray'ı
-  // zıplatıyordu.
-  const airingTodayHeader = (
+  // Başlık iki durumda da AYNI öğeden gelir: yükleme ile yüklenmiş dal arasında başlık
+  // yüksekliği değişirse ray aşağı zıplar.
+  const upcomingHeader = (
     <SectionHeader
-      section="airingToday"
+      section="upcoming"
       mediaType="tv"
-      title={t.tvShowScreens.airingToday}
+      title={t.tvShowScreens.upcoming}
       onPressAction={() =>
         navigation.navigate("SeeAllScreen", {
           mediaType: "tv",
-          section: "airingToday",
-          title: t.tvShowScreens.airingToday,
+          section: "upcoming",
+          title: t.tvShowScreens.upcoming,
         })
       }
-    />
+    >
+      <TvUpcomingRangeChips range={selectedUpcomingRange} onSelectRange={setSelectedUpcomingRange} />
+    </SectionHeader>
   );
 
-  if (loadingAiringToday) {
+  if (loadingUpcoming) {
     return (
       <View style={styles.container}>
-        {airingTodayHeader}
+        {upcomingHeader}
         <RailSkeleton showReleaseDate />
       </View>
     );
   }
-  const renderMovieItem = ({ item }) => {
+  const renderItem = ({ item }) => {
     if (!item.poster_path) return null;
-    return (
-      <TvAiringTodayCard
-        item={item}
-        navigation={navigation}
-        theme={theme}
-        getTmdbUrl={getTmdbUrl}
-      />
-    );
+    return <TvUpcomingCard item={item} navigation={navigation} theme={theme} />;
   };
   return (
     <View style={styles.container}>
-      {airingTodayHeader}
+      {upcomingHeader}
       <PaginatedRail
-        data={moviesAiringToday}
+        data={seriesUpcoming}
         contentContainerStyle={{ paddingHorizontal: 15 }}
         keyExtractor={(item) => item.id.toString()}
-        renderItem={renderMovieItem}
-        onLoadMore={loadMoreAiringToday}
-        loadingMore={loadingMoreAiringToday}
-        hasMore={pageAiringToday < totalPagesAiringToday}
+        renderItem={renderItem}
+        onLoadMore={loadMoreUpcoming}
+        loadingMore={loadingMoreUpcoming}
+        hasMore={pageUpcoming < totalPagesUpcoming}
         initialNumToRender={3}
         maxToRenderPerBatch={3}
         updateCellsBatchingPeriod={80}

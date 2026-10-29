@@ -1,304 +1,560 @@
 // components/tournament/BracketTree.js
 //
 // Klasik İKİ TARAFLI eleme ağacı: 16 yapım solda, 16 sağda; iki yarı ortadaki
-// FİNAL'e doğru daralır. Maçlar gerçek BAĞLANTI ÇİZGİLERİ ile bağlanır.
+// FİNAL'e doğru daralır. Yerleşim (düğüm kutuları, bağlantı yolları, şampiyon
+// yuvası) saf modülde hesaplanır: components/tournament/bracketLayout.js.
+//
+// "Arena" görünümü: ağaç, ayın TÜRÜNÜN renginden koyulaştırılmış bir zeminde
+// durur (genreMeta.arenaColors) — hero ile aynı renk dili, tema açık/koyu ne
+// olursa olsun koyu → üstündeki beyaz/parıltı her zaman okunur.
 //
 // Görsel kurallar:
-//   • Düğümlerde yalnız POSTER var (isim YOK), posterler büyük.
-//   • Kazananın bir üst tura İLERLEDİĞİ yol accent (vurgu) renkli + kalın çizilir;
-//     henüz oynanmamış/kaybeden yollar soluk (border) kalır.
-//   • Kazanan poster accent çerçeveli + kupa rozetli; kaybeden solar.
-//   • Final bittiyse finalin ÜSTÜNE şampiyonun büyük posteri (kupa + accent) konur.
+//   • Düğümde iki poster + altında oy dağılımı çubuğu (önde olan taraf parlak).
+//   • Kazananın bir üst tura İLERLEDİĞİ yol türün parıltı renginde, kalın ve
+//     hafif ışımalı; henüz oynanmamış yollar soluk. Dirsekler yuvarlak.
+//   • Kazanan poster parıltı çerçeveli, kaybeden solar; sıra numarası poster altında.
+//   • Final altın çerçeveli; üstünde şampiyon yuvası: final bittiyse şampiyonun
+//     büyük posteri, bitmediyse boş kupa (soru işaretli) bekler.
+//   • Şu an oylanan tur: sütunları renkli şeritle vurgulanır, başlığında canlı
+//     nokta; o turun maçlarının çevresinde nabız atan halka.
+//   • Sütun başlıkları turun durumunu söyler: ✓ bitti · ● canlı · 🔒 başlangıç günü.
 //
-// ETKİLEŞİM (genel yapı bozulmadan):
-//   • Her maç düğümü DOKUNULABİLİR → onMatchPress(match): ekran, MatchCard'lı
+// ETKİLEŞİM:
+//   • Her maç düğümü DOKUNULABİLİR → onMatchPress(match): ekran MatchCard'lı
 //     detay/oy modalını açar (oy verme buradan da mümkün).
-//   • Şu an oylanabilir maçlar accent kesikli çerçeve + canlı nokta ile vurgulanır.
-//   • Oyumu kullandığım taraf posterinde küçük accent onay rozeti görünür.
+//   • `focusRound` (ekrandaki tur rayının seçimi) değişince ağaç o tura kayar;
+//     ilk açılışta da seçili tura (oylamada aktif tur, sonuçta final) konumlanır.
+//   • Oyumu kullandığım taraf posterinde küçük onay rozeti.
 
-import React, { useMemo } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { View, StyleSheet, ScrollView, Text, Pressable } from "react-native";
+import Animated, {
+  useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming,
+  cancelAnimation, ReduceMotion,
+} from "react-native-reanimated";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Path } from "react-native-svg";
 import AppIcon from "@components/AppIcon";
-import { roundLabel, ROUNDS } from "@services/tournamentEngine";
+import { roundLabel, ROUNDS, DAY, getPeriodStartMs } from "@services/tournamentEngine";
+import { pickByLanguage, tmdbLanguageOf } from "../../utils/appLanguages";
+import { FALLBACK_GENRE_META, arenaColors } from "@components/tournament/genreMeta";
+import {
+  bracketLayout, focusScrollX, isDecided, SLOT_ROUND, HEADER_H,
+  POSTER_W, POSTER_H, FINAL_POSTER_W, FINAL_POSTER_H, CHAMP_W, CHAMP_H, CHAMP_LABEL_H,
+} from "@components/tournament/bracketLayout";
 
-// ─── Ölçüler ──────────────────────────────────────────────────────────────────
-const POSTER_W = 34;
-const POSTER_H = 50;
-const NODE_W = 2 * POSTER_W + 6 + 8;   // iki poster + aralarındaki boşluk + iç pay
-const MATCH_H = POSTER_H + 8;
-const GAP = 16;
-const STEP = MATCH_H + GAP;
-const CONN_W = 26;
-const COLSPAN = NODE_W + CONN_W;
-const HEADER_H = 24;
-const PAD_TOP = HEADER_H + 18;
-const LINE = 1.4;
-const LINE_A = 2.6;
-const CHAMP_W = 58;
-const CHAMP_H = 86;
+const GOLD = "#F5C518";
+const GOLD_SOFT = "#FDE68A";
+const LINE_MUTED = "rgba(255,255,255,0.15)";
+const NODE_BG = "rgba(255,255,255,0.06)";
+const NODE_BORDER = "rgba(255,255,255,0.13)";
+const BAR_TRACK = "rgba(255,255,255,0.12)";
+const BAR_TRAIL = "rgba(255,255,255,0.38)";
+const INK = "#0B0F1A"; // parıltı rengi (açık pastel) üstünde koyu simge
 
-const SLOT_ROUND = [0, 1, 2, 3, 4, 3, 2, 1, 0];
+const COPY = {
+  tr: { title: "ELEME AĞACI", live: "Canlı", done: "Bitti", mine: "Oyum", path: "Kazanan yolu", champion: "ŞAMPİYON", tbd: "ŞAMPİYON ?", hint: "Maça dokun", matches: "maç" },
+  en: { title: "BRACKET", live: "Live", done: "Done", mine: "Your vote", path: "Winner's path", champion: "CHAMPION", tbd: "CHAMPION ?", hint: "Tap a match", matches: "matches" },
+  es: { title: "CUADRO", live: "En vivo", done: "Terminado", mine: "Tu voto", path: "Camino del ganador", champion: "CAMPEÓN", tbd: "¿CAMPEÓN?", hint: "Toca un duelo", matches: "duelos" },
+  pt: { title: "CHAVE", live: "Ao vivo", done: "Concluído", mine: "Seu voto", path: "Caminho do vencedor", champion: "CAMPEÃO", tbd: "CAMPEÃO?", hint: "Toque num duelo", matches: "duelos" },
+  de: { title: "TURNIERBAUM", live: "Live", done: "Fertig", mine: "Deine Stimme", path: "Siegerweg", champion: "CHAMPION", tbd: "CHAMPION?", hint: "Duell antippen", matches: "Duelle" },
+};
+
+// Türkçe-güvenli BÜYÜK harf: JS'in toUpperCase'i 'i' → 'I' yapar ("FINAL"),
+// doğrusu 'İ'dir (eski sürüm textTransform ile "ÇEYREK FINAL" yazıyordu).
+const upper = (s, lang) => (lang === "tr" ? String(s).replace(/i/g, "İ") : String(s)).toUpperCase();
+
+// ─── Canlı maç halkası — tüm canlı düğümler TEK nabız değerini paylaşır ───────
+// Dinlenme değeri (p=0) görünürdür: Reanimated ilk değeri geri yazsa da halka kalır.
+function LiveHalo({ pulse, color }) {
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.75 * (1 - pulse.value),
+    transform: [{ scale: 1 + 0.07 * pulse.value }],
+  }));
+  return <Animated.View pointerEvents="none" style={[styles.liveHalo, { borderColor: color }, style]} />;
+}
+
+function LiveDot({ pulse, color }) {
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.6 * (1 - pulse.value),
+    transform: [{ scale: 1 + 1.2 * pulse.value }],
+  }));
+  return (
+    <View style={styles.liveDotWrap}>
+      <Animated.View style={[styles.liveDotRing, { backgroundColor: color }, style]} />
+      <View style={[styles.liveDot, { backgroundColor: color }]} />
+    </View>
+  );
+}
 
 // ─── Tek poster ───────────────────────────────────────────────────────────────
-function PosterCell({ c, isWinner, isLoser, isMine, theme, getTmdbUrl, w = POSTER_W, h = POSTER_H }) {
-  const empty = !c;
-  const uri = !empty && c.posterPath ? getTmdbUrl(c.posterPath, "poster", w) : null;
+function PosterCell({ c, w, h, winner, loser, mine, glow, gold, getTmdbUrl }) {
+  const uri = c?.posterPath ? getTmdbUrl(c.posterPath, "poster", w) : null;
   return (
     <View
-      style={{
-        width: w, height: h, borderRadius: 6, overflow: "hidden",
-        borderWidth: isWinner ? 2 : 1,
-        borderColor: isWinner ? theme.accent : theme.border,
-        opacity: isLoser ? 0.4 : 1,
-        backgroundColor: theme.between,
-      }}
+      style={[
+        styles.poster,
+        {
+          width: w, height: h,
+          borderWidth: winner ? 2 : 1,
+          borderColor: winner ? (gold ? GOLD : glow) : "rgba(255,255,255,0.18)",
+          opacity: loser ? 0.34 : 1,
+        },
+      ]}
     >
       {uri ? (
-        <Image source={{ uri }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={120} />
+        <Image source={{ uri }} style={styles.fill} contentFit="cover" transition={120} />
       ) : (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <AppIcon family="Ionicons" name={empty ? "help" : "image-outline"} size={13} color={theme.text.muted} />
+        <View style={styles.posterEmpty}>
+          <AppIcon family="Ionicons" name={c ? "image-outline" : "help"} size={13} color="rgba(255,255,255,0.45)" />
         </View>
       )}
-      {isWinner && (
+      {!!c?.seed && (
+        <View style={styles.seedStrip} pointerEvents="none">
+          <Text allowFontScaling={false} style={styles.seedText}>#{c.seed}</Text>
+        </View>
+      )}
+      {winner && gold && (
         <View style={styles.winBadge}>
-          <AppIcon family="Ionicons" name="trophy" size={9} color="#F5C518" />
+          <AppIcon family="Ionicons" name="trophy" size={9} color={GOLD} />
         </View>
       )}
-      {/* Benim oyum — kesinleşmiş seçim rozeti */}
-      {isMine && (
-        <View style={[styles.mineBadge, { backgroundColor: theme.accent }]}>
-          <AppIcon family="Ionicons" name="checkmark" size={8} color="#fff" />
+      {mine && (
+        <View style={[styles.mineBadge, { backgroundColor: glow }]}>
+          <AppIcon family="Ionicons" name="checkmark" size={8} color={INK} />
         </View>
       )}
     </View>
   );
 }
 
-// ─── Maç (2 poster yan yana) — dokunulabilir düğüm ───────────────────────────
-function Node({ match, theme, getTmdbUrl, isFinal, mySide, onPress }) {
-  const dec = match.decided && !!match.winnerSide;
-  const hot = match.votable && !dec; // şu an oy verilebilir
+// ─── Oy dağılımı çubuğu ───────────────────────────────────────────────────────
+function VoteBar({ match, glow }) {
+  const total = match?.total || 0;
+  if (!total) return <View style={styles.barTrack} />;
+  const decidedSide = isDecided(match) ? match.winnerSide : null;
+  const aLead = decidedSide ? decidedSide === "a" : match.aVotes > match.bVotes;
+  const bLead = decidedSide ? decidedSide === "b" : match.bVotes > match.aVotes;
+  return (
+    <View style={[styles.barTrack, styles.barRow]}>
+      {match.aVotes > 0 && <View style={{ flex: match.aVotes, backgroundColor: aLead ? glow : BAR_TRAIL }} />}
+      {match.aVotes > 0 && match.bVotes > 0 && <View style={styles.barGap} />}
+      {match.bVotes > 0 && <View style={{ flex: match.bVotes, backgroundColor: bLead ? glow : BAR_TRAIL }} />}
+    </View>
+  );
+}
+
+// ─── Maç düğümü (2 poster + oy çubuğu) — dokunulabilir ────────────────────────
+function Node({ node, mySide, onPress, getTmdbUrl, glow, pulse }) {
+  const m = node.match;
+  const dec = isDecided(m);
+  const live = !!(m?.votable && !dec);
+  const isFinal = !!node.isFinal;
+  const pw = isFinal ? FINAL_POSTER_W : POSTER_W;
+  const ph = isFinal ? FINAL_POSTER_H : POSTER_H;
+  const total = m?.total || 0;
+  const pct = total ? Math.round((m.aVotes / total) * 100) : null;
+  const label = [
+    m?.a?.title || "?",
+    "—",
+    m?.b?.title || "?",
+    pct != null ? `(%${pct} – %${100 - pct})` : "",
+  ].join(" ");
+
   return (
     <Pressable
-      onPress={onPress ? () => onPress(match) : undefined}
-      disabled={!onPress}
+      onPress={onPress && m ? () => onPress(m) : undefined}
+      disabled={!onPress || !m}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => [
         styles.node,
         {
-          backgroundColor: theme.secondary,
-          borderColor: hot ? theme.accent : isFinal ? "#F5C518" : theme.border,
-          borderWidth: hot || isFinal ? 1.5 : 1,
-          borderStyle: hot ? "dashed" : "solid",
-          opacity: pressed ? 0.75 : 1,
+          backgroundColor: isFinal ? "rgba(245,197,24,0.10)" : NODE_BG,
+          borderColor: live ? glow : isFinal ? GOLD : NODE_BORDER,
+          borderWidth: live || isFinal ? 1.5 : 1,
+          opacity: pressed ? 0.72 : 1,
         },
       ]}
-      accessibilityRole="button"
     >
-      <PosterCell c={match.a} isWinner={dec && match.winnerSide === "a"} isLoser={dec && match.winnerSide === "b"} isMine={mySide === "a"} theme={theme} getTmdbUrl={getTmdbUrl} />
-      <PosterCell c={match.b} isWinner={dec && match.winnerSide === "b"} isLoser={dec && match.winnerSide === "a"} isMine={mySide === "b"} theme={theme} getTmdbUrl={getTmdbUrl} />
-      {/* Canlı (oylanabilir) nokta */}
-      {hot && <View style={[styles.hotDot, { backgroundColor: theme.accent }]} />}
+      {live && <LiveHalo pulse={pulse} color={glow} />}
+      <View style={styles.posterRow}>
+        <PosterCell
+          c={m?.a} w={pw} h={ph} glow={glow} gold={isFinal} getTmdbUrl={getTmdbUrl}
+          winner={dec && m.winnerSide === "a"} loser={dec && m.winnerSide === "b"} mine={mySide === "a"}
+        />
+        <PosterCell
+          c={m?.b} w={pw} h={ph} glow={glow} gold={isFinal} getTmdbUrl={getTmdbUrl}
+          winner={dec && m.winnerSide === "b"} loser={dec && m.winnerSide === "a"} mine={mySide === "b"}
+        />
+      </View>
+      <VoteBar match={m} glow={glow} />
     </Pressable>
   );
 }
 
-export default function BracketTree({
-  rounds = [], theme, getTmdbUrl, lang = "tr", myPicks = {}, onMatchPress,
-}) {
-  const geo = useMemo(() => {
-    if (rounds.length < 5) return null;
-
-    // Sol yarı maç Y-merkezleri (sağ yarı aynı Y'leri kullanır).
-    const centers = [];
-    const n0 = Math.floor(rounds[0].matches.length / 2); // 8
-    centers[0] = Array.from({ length: n0 }, (_, i) => PAD_TOP + i * STEP + MATCH_H / 2);
-    for (let r = 1; r < 4; r++) {
-      const cnt = Math.floor(rounds[r].matches.length / 2);
-      centers[r] = Array.from({ length: cnt }, (_, j) => (centers[r - 1][2 * j] + centers[r - 1][2 * j + 1]) / 2);
-    }
-    const midY = centers[3][0];
-    const width = 8 * COLSPAN + NODE_W;
-    const height = centers[0][n0 - 1] + MATCH_H / 2 + 16;
-
-    // Düğümler
-    const nodes = [];
-    for (let r = 0; r < 4; r++) {
-      const cnt = centers[r].length;
-      for (let j = 0; j < cnt; j++) {
-        nodes.push({ key: `L${r}_${j}`, x: r * COLSPAN, y: centers[r][j] - MATCH_H / 2, match: rounds[r].matches[j] });
-        nodes.push({ key: `R${r}_${j}`, x: (8 - r) * COLSPAN, y: centers[r][j] - MATCH_H / 2, match: rounds[r].matches[cnt + j] });
-      }
-    }
-    const finalMatch = rounds[4].matches[0];
-    nodes.push({ key: "F", x: 4 * COLSPAN, y: midY - MATCH_H / 2, match: finalMatch, isFinal: true });
-
-    // Çizgiler (active = kazananın ilerlediği yol)
-    const lines = [];
-    const addH = (x1, x2, y, active) => {
-      const th = active ? LINE_A : LINE;
-      lines.push({ left: Math.min(x1, x2), top: y - th / 2, width: Math.abs(x2 - x1), height: th, active });
-    };
-    const addV = (x, y1, y2, active) => {
-      const th = active ? LINE_A : LINE;
-      lines.push({ left: x - th / 2, top: Math.min(y1, y2), width: th, height: Math.abs(y2 - y1), active });
-    };
-    const dec = (m) => !!(m && m.decided && m.winnerSide); // maç bitti → kazananı ilerledi
-
-    for (let r = 1; r < 4; r++) {
-      const cnt = centers[r].length;
-      const cntPrev = Math.floor(rounds[r - 1].matches.length / 2);
-      for (let j = 0; j < cnt; j++) {
-        const cT = centers[r - 1][2 * j];
-        const cB = centers[r - 1][2 * j + 1];
-        const cP = centers[r][j];
-        // SOL yarı (sağa akar)
-        {
-          const topM = rounds[r - 1].matches[2 * j];
-          const botM = rounds[r - 1].matches[2 * j + 1];
-          const childR = (r - 1) * COLSPAN + NODE_W;
-          const conn = childR + CONN_W / 2;
-          addH(childR, conn, cT, dec(topM)); addV(conn, cT, cP, dec(topM));
-          addH(childR, conn, cB, dec(botM)); addV(conn, cB, cP, dec(botM));
-          addH(conn, r * COLSPAN, cP, dec(topM) || dec(botM));
-        }
-        // SAĞ yarı (sola akar — ayna)
-        {
-          const topM = rounds[r - 1].matches[cntPrev + 2 * j];
-          const botM = rounds[r - 1].matches[cntPrev + 2 * j + 1];
-          const childL = (8 - (r - 1)) * COLSPAN;
-          const conn = childL - CONN_W / 2;
-          addH(childL, conn, cT, dec(topM)); addV(conn, cT, cP, dec(topM));
-          addH(childL, conn, cB, dec(botM)); addV(conn, cB, cP, dec(botM));
-          addH(conn, (8 - r) * COLSPAN + NODE_W, cP, dec(topM) || dec(botM));
-        }
-      }
-    }
-    // Yarı finallerden finale
-    addH(3 * COLSPAN + NODE_W, 4 * COLSPAN, midY, dec(rounds[3].matches[0]));
-    addH(4 * COLSPAN + NODE_W, 5 * COLSPAN, midY, dec(rounds[3].matches[1]));
-
-    // Şampiyon (final bittiyse)
-    const champion = dec(finalMatch) ? finalMatch.winner : null;
-    let champBox = null;
-    if (champion) {
-      const cx = 4 * COLSPAN + NODE_W / 2;
-      const finalTop = midY - MATCH_H / 2;
-      const imgTop = finalTop - 16 - CHAMP_H;
-      champBox = { cx, champion, top: imgTop - 18, imgTop, imgBottom: finalTop - 16 };
-      addV(cx, finalTop - 16, finalTop, true); // postere bağlayan accent çizgi
-    }
-
-    return { nodes, lines, width, height, midY, champBox };
-  }, [rounds]);
-
-  if (!geo) return null;
-  const muted = geo.lines.filter((l) => !l.active);
-  const active = geo.lines.filter((l) => l.active);
-
+// ─── Sütun başlığı: tur adı + durum ───────────────────────────────────────────
+function ColumnHeader({ x, w, round, def, isFinal, lang, copy, glow, pulse, startText }) {
+  const state = round?.decided ? "done" : round?.votable ? "live" : "next";
+  const color = isFinal ? GOLD_SOFT : state === "live" ? "#fff" : "rgba(255,255,255,0.72)";
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ paddingBottom: 10 }}>
-      <View style={{ width: geo.width, height: geo.height }}>
-        {/* Sütun başlıkları */}
-        {SLOT_ROUND.map((rIdx, slot) => (
-          <Text key={`h${slot}`} numberOfLines={1} style={[styles.colLabel, { left: slot * COLSPAN, width: NODE_W, color: slot === 4 ? "#F5C518" : theme.text.muted }]}>
-            {roundLabel(ROUNDS[rIdx], lang)}
-          </Text>
-        ))}
-
-        {/* Çizgiler: önce soluk, sonra accent (üstte kalsın) */}
-        {muted.map((l, i) => (
-          <View key={`m${i}`} style={{ position: "absolute", left: l.left, top: l.top, width: l.width, height: l.height, backgroundColor: theme.border, borderRadius: LINE }} />
-        ))}
-        {active.map((l, i) => (
-          <View key={`a${i}`} style={{ position: "absolute", left: l.left, top: l.top, width: l.width, height: l.height, backgroundColor: theme.accent, borderRadius: LINE_A }} />
-        ))}
-
-        {/* Maç düğümleri */}
-        {geo.nodes.map((n) => (
-          <View key={n.key} style={{ position: "absolute", left: n.x, top: n.y, width: NODE_W, height: MATCH_H }}>
-            <Node
-              match={n.match}
-              isFinal={n.isFinal}
-              mySide={myPicks[n.match?.matchId] || null}
-              onPress={onMatchPress}
-              theme={theme}
-              getTmdbUrl={getTmdbUrl}
-            />
-          </View>
-        ))}
-
-        {/* Şampiyon posteri (finalin üstünde) */}
-        {geo.champBox && (
-          <View style={{ position: "absolute", left: geo.champBox.cx - CHAMP_W / 2, top: geo.champBox.top, width: CHAMP_W, alignItems: "center" }}>
-            <AppIcon family="Ionicons" name="trophy" size={15} color="#F5C518" />
-            <View style={styles.champFrame}>
-              {geo.champBox.champion.posterPath ? (
-                <Image source={{ uri: getTmdbUrl(geo.champBox.champion.posterPath, "poster", CHAMP_W) }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
-              ) : (
-                <View style={{ flex: 1, backgroundColor: theme.between }} />
-              )}
-            </View>
-          </View>
+    <View style={[styles.colHead, { left: x, width: w }]}>
+      <Text
+        allowFontScaling={false}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        style={[styles.colLabel, { color }]}
+      >
+        {upper(roundLabel(def, lang), lang)}
+      </Text>
+      <View style={styles.colState}>
+        {state === "live" ? (
+          <>
+            <LiveDot pulse={pulse} color={glow} />
+            <Text allowFontScaling={false} style={[styles.colStateText, { color: glow }]}>{copy.live}</Text>
+          </>
+        ) : state === "done" ? (
+          <>
+            <AppIcon family="Ionicons" name="checkmark-circle" size={10} color="rgba(255,255,255,0.55)" />
+            <Text allowFontScaling={false} style={styles.colStateText}>{copy.done}</Text>
+          </>
+        ) : (
+          <>
+            <AppIcon family="Ionicons" name="lock-closed" size={9} color="rgba(255,255,255,0.45)" />
+            {!!startText && <Text allowFontScaling={false} style={styles.colStateText}>{startText}</Text>}
+          </>
         )}
       </View>
-    </ScrollView>
+    </View>
+  );
+}
+
+function BracketTree({
+  rounds = [], genre, periodId, focusRound, getTmdbUrl, lang = "tr", myPicks = {}, onMatchPress,
+}) {
+  const meta = genre || FALLBACK_GENRE_META;
+  const glow = meta.glow;
+  const copy = pickByLanguage(lang, COPY);
+  const layout = useMemo(() => bracketLayout(rounds), [rounds]);
+
+  const paths = useMemo(() => {
+    if (!layout) return null;
+    return {
+      muted: layout.paths.filter((p) => !p.active).map((p) => p.d).join(" "),
+      active: layout.paths.filter((p) => p.active).map((p) => p.d).join(" "),
+    };
+  }, [layout]);
+
+  const activeRound = rounds.findIndex((r) => r.votable);
+  const totalMatches = rounds.reduce((n, r) => n + (r.matches?.length || 0), 0);
+  const doneCount = useMemo(
+    () => rounds.reduce((n, r) => n + r.matches.filter(isDecided).length, 0),
+    [rounds],
+  );
+
+  // Kilitli turların başlangıç günü ("16 Eki").
+  const startTexts = useMemo(() => {
+    if (!periodId) return [];
+    const base = getPeriodStartMs(periodId);
+    return ROUNDS.map((d) => {
+      try {
+        return new Date(base + d.startDay * DAY).toLocaleDateString(tmdbLanguageOf(lang), { day: "numeric", month: "short" });
+      } catch {
+        return "";
+      }
+    });
+  }, [periodId, lang]);
+
+  // Canlı tur varsa tek nabız (tüm halkalar + başlık noktası paylaşır).
+  const pulse = useSharedValue(0);
+  const hasLive = activeRound >= 0;
+  useEffect(() => {
+    if (!hasLive) return undefined;
+    const cfg = { reduceMotion: ReduceMotion.System };
+    pulse.value = withRepeat(
+      withSequence(withTiming(1, { duration: 1300, ...cfg }), withTiming(0, { duration: 0, ...cfg })),
+      -1,
+    );
+    return () => cancelAnimation(pulse);
+  }, [hasLive, pulse]);
+
+  // Seçili tura kaydır. Ağaç 30 sn'de bir yeniden hesaplanır (nowMs) — kaydırma
+  // yalnız TUR SEÇİMİ ya da görünüm genişliği değişince olur, yoksa kullanıcının
+  // elle kaydırdığı yer her tazelemede geri alınırdı. Geometri sabittir (yalnız
+  // durum bayrakları değişir), bu yüzden son yerleşimi ref'ten okumak yeterli.
+  const scrollRef = useRef(null);
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  const [viewportW, setViewportW] = useState(0);
+  const scrolledOnce = useRef(false);
+  const ready = !!layout;
+  useEffect(() => {
+    if (!ready || !viewportW || focusRound == null) return;
+    const x = focusScrollX(layoutRef.current, focusRound, viewportW);
+    scrollRef.current?.scrollTo({ x, y: 0, animated: scrolledOnce.current });
+    scrolledOnce.current = true;
+  }, [ready, viewportW, focusRound]);
+
+  if (!layout) return null;
+  const { champ } = layout;
+  const progress = totalMatches ? doneCount / totalMatches : 0;
+
+  return (
+    <LinearGradient colors={arenaColors(meta)} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.arena}>
+      {/* Üst şerit: başlık + ilerleme */}
+      <View style={styles.topBar}>
+        <AppIcon family="Ionicons" name="git-network" size={13} color={glow} />
+        <Text allowFontScaling={false} style={styles.topTitle}>{copy.title}</Text>
+        <View style={styles.flex} />
+        <Text allowFontScaling={false} style={styles.topCount}>
+          {doneCount}/{totalMatches} {copy.matches}
+        </Text>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: glow }]} />
+        </View>
+      </View>
+
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        onLayout={(e) => {
+          const w = Math.round(e.nativeEvent.layout.width);
+          if (w > 0 && w !== viewportW) setViewportW(w);
+        }}
+      >
+        <View style={{ width: layout.width, height: layout.height }}>
+          {/* Aktif turun şeritleri (iki yarıda da) */}
+          {hasLive &&
+            layout.lanes
+              .filter((l) => l.round === activeRound)
+              .map((l) => (
+                <View
+                  key={l.key}
+                  pointerEvents="none"
+                  style={[styles.lane, { left: l.x, width: l.w, height: layout.height - 8, backgroundColor: glow }]}
+                />
+              ))}
+
+          {/* Sütun başlıkları */}
+          {SLOT_ROUND.map((r, slot) => (
+            <ColumnHeader
+              key={`h${slot}`}
+              x={layout.colX[slot]}
+              w={layout.colW[slot]}
+              round={rounds[r]}
+              def={ROUNDS[r]}
+              isFinal={r === ROUNDS.length - 1}
+              lang={lang}
+              copy={copy}
+              glow={glow}
+              pulse={pulse}
+              startText={startTexts[r]}
+            />
+          ))}
+
+          {/* Bağlantılar: soluk ray → kazananın yolu (ışıma + çizgi) → şampiyon bağı */}
+          <Svg width={layout.width} height={layout.height} style={StyleSheet.absoluteFill}>
+            {!!paths.muted && (
+              <Path d={paths.muted} fill="none" stroke={LINE_MUTED} strokeWidth={1.5}
+                strokeLinecap="round" strokeLinejoin="round" />
+            )}
+            {!!paths.active && (
+              <>
+                <Path d={paths.active} fill="none" stroke={glow} strokeOpacity={0.22} strokeWidth={6}
+                  strokeLinecap="round" strokeLinejoin="round" />
+                <Path d={paths.active} fill="none" stroke={glow} strokeWidth={2.2}
+                  strokeLinecap="round" strokeLinejoin="round" />
+              </>
+            )}
+            <Path
+              d={champ.path} fill="none"
+              stroke={champ.champion ? GOLD : "rgba(245,197,24,0.45)"}
+              strokeWidth={champ.champion ? 2.4 : 1.5}
+              strokeDasharray={champ.champion ? undefined : "3 4"}
+              strokeLinecap="round"
+            />
+          </Svg>
+
+          {/* Maç düğümleri */}
+          {layout.nodes.map((n) => (
+            <View key={n.key} style={[styles.nodeSlot, { left: n.x, top: n.y, width: n.w, height: n.h }]}>
+              <Node
+                node={n}
+                mySide={myPicks[n.match?.matchId] || null}
+                onPress={onMatchPress}
+                getTmdbUrl={getTmdbUrl}
+                glow={glow}
+                pulse={pulse}
+              />
+            </View>
+          ))}
+
+          {/* Şampiyon yuvası (finalin üstünde) */}
+          <View
+            style={[styles.champWrap, { left: champ.x - 14, top: champ.labelY, width: CHAMP_W + 28 }]}
+            accessible
+            accessibilityLabel={champ.champion ? `${copy.champion}: ${champ.champion.title || ""}` : copy.tbd}
+          >
+            <View style={styles.champLabelRow}>
+              <AppIcon family="Ionicons" name="trophy" size={11} color={GOLD} />
+              <Text allowFontScaling={false} numberOfLines={1} style={styles.champLabel}>
+                {champ.champion ? copy.champion : copy.tbd}
+              </Text>
+            </View>
+            {champ.champion ? (
+              <View style={styles.champFrame}>
+                {champ.champion.posterPath ? (
+                  <Image
+                    source={{ uri: getTmdbUrl(champ.champion.posterPath, "poster", CHAMP_W) }}
+                    style={styles.fill}
+                    contentFit="cover"
+                    transition={160}
+                  />
+                ) : (
+                  <View style={styles.posterEmpty}>
+                    <AppIcon family="Ionicons" name="image-outline" size={18} color="rgba(255,255,255,0.5)" />
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={styles.champEmpty}>
+                <AppIcon family="Ionicons" name="trophy-outline" size={26} color="rgba(245,197,24,0.6)" />
+                <Text allowFontScaling={false} style={styles.champEmptyQ}>?</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Lejant + ipucu */}
+      <View style={styles.legend}>
+        {hasLive && (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendLive, { borderColor: glow }]} />
+            <Text allowFontScaling={false} style={styles.legendText}>{copy.live}</Text>
+          </View>
+        )}
+        <View style={styles.legendItem}>
+          <View style={[styles.legendMine, { backgroundColor: glow }]}>
+            <AppIcon family="Ionicons" name="checkmark" size={7} color={INK} />
+          </View>
+          <Text allowFontScaling={false} style={styles.legendText}>{copy.mine}</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendLine, { backgroundColor: glow }]} />
+          <Text allowFontScaling={false} style={styles.legendText}>{copy.path}</Text>
+        </View>
+        <View style={styles.flex} />
+        <View style={styles.legendItem}>
+          <AppIcon family="Ionicons" name="hand-left-outline" size={11} color="rgba(255,255,255,0.55)" />
+          <Text allowFontScaling={false} style={styles.legendText}>{copy.hint}</Text>
+        </View>
+      </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  colLabel: {
-    position: "absolute",
-    top: 4,
-    fontSize: 9.5,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.2,
-    textAlign: "center",
+  flex: { flex: 1 },
+  fill: { width: "100%", height: "100%" },
+
+  arena: {
+    borderRadius: 22, overflow: "hidden", marginBottom: 6,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.10)",
   },
+  topBar: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4,
+  },
+  topTitle: { color: "#fff", fontSize: 10.5, fontWeight: "900", letterSpacing: 0.9 },
+  topCount: { color: "rgba(255,255,255,0.62)", fontSize: 10, fontWeight: "800" },
+  progressTrack: {
+    width: 56, height: 4, borderRadius: 2, overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+  progressFill: { height: "100%", borderRadius: 2 },
+
+  lane: { position: "absolute", top: 4, borderRadius: 12, opacity: 0.08 },
+
+  colHead: { position: "absolute", top: 6, height: HEADER_H - 6, alignItems: "center" },
+  colLabel: { fontSize: 9.5, fontWeight: "900", letterSpacing: 0.4, textAlign: "center", maxWidth: "100%" },
+  colState: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 3, height: 12 },
+  colStateText: { color: "rgba(255,255,255,0.55)", fontSize: 8.5, fontWeight: "800" },
+  liveDotWrap: { width: 8, height: 8, alignItems: "center", justifyContent: "center" },
+  liveDotRing: { position: "absolute", width: 8, height: 8, borderRadius: 4 },
+  liveDot: { width: 5, height: 5, borderRadius: 2.5 },
+
+  nodeSlot: { position: "absolute" },
   node: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    borderRadius: 9,
-    padding: 4,
+    flex: 1, borderRadius: 10, padding: 4,
+    alignItems: "center", justifyContent: "space-between",
   },
+  liveHalo: {
+    position: "absolute", left: -4, right: -4, top: -4, bottom: -4,
+    borderRadius: 13, borderWidth: 2,
+  },
+  posterRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+
+  poster: { borderRadius: 6, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.08)" },
+  posterEmpty: { flex: 1, alignItems: "center", justifyContent: "center" },
+  seedStrip: {
+    position: "absolute", left: 0, right: 0, bottom: 0,
+    paddingHorizontal: 3, paddingVertical: 1,
+    backgroundColor: "rgba(4,7,18,0.62)",
+  },
+  seedText: { color: "rgba(255,255,255,0.92)", fontSize: 7.5, fontWeight: "900" },
   winBadge: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    borderRadius: 8,
-    padding: 2,
+    position: "absolute", top: 2, right: 2,
+    backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 8, padding: 2,
   },
+  // Sağ alt: widget'taki treeMineBadge ile aynı köşe (sıra numarası solda).
   mineBadge: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
+    position: "absolute", bottom: 1.5, right: 1.5,
+    width: 12, height: 12, borderRadius: 6,
+    alignItems: "center", justifyContent: "center",
   },
-  hotDot: {
-    position: "absolute",
-    top: -3,
-    right: -3,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
+
+  barTrack: {
+    alignSelf: "stretch", height: 3, borderRadius: 1.5, overflow: "hidden",
+    backgroundColor: BAR_TRACK, marginHorizontal: 1,
   },
+  barRow: { flexDirection: "row" },
+  barGap: { width: 1.5 },
+
+  champWrap: { position: "absolute", alignItems: "center" },
+  champLabelRow: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    height: CHAMP_LABEL_H - 4, marginBottom: 4,
+  },
+  champLabel: { color: GOLD_SOFT, fontSize: 9.5, fontWeight: "900", letterSpacing: 0.8 },
   champFrame: {
-    width: CHAMP_W,
-    height: CHAMP_H,
-    borderRadius: 7,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "#F5C518",
-    marginTop: 2,
+    width: CHAMP_W, height: CHAMP_H, borderRadius: 9, overflow: "hidden",
+    borderWidth: 2, borderColor: GOLD,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
+  champEmpty: {
+    width: CHAMP_W, height: CHAMP_H, borderRadius: 9,
+    borderWidth: 1.5, borderStyle: "dashed", borderColor: "rgba(245,197,24,0.5)",
+    backgroundColor: "rgba(245,197,24,0.06)",
+    alignItems: "center", justifyContent: "center", gap: 2,
+  },
+  champEmptyQ: { color: "rgba(253,230,138,0.7)", fontSize: 15, fontWeight: "900" },
+
+  legend: {
+    flexDirection: "row", alignItems: "center", flexWrap: "wrap",
+    columnGap: 12, rowGap: 6,
+    paddingHorizontal: 14, paddingTop: 6, paddingBottom: 12,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(255,255,255,0.10)",
+  },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  legendText: { color: "rgba(255,255,255,0.68)", fontSize: 9.5, fontWeight: "800" },
+  legendLive: { width: 12, height: 9, borderRadius: 3, borderWidth: 1.5 },
+  legendMine: { width: 11, height: 11, borderRadius: 5.5, alignItems: "center", justifyContent: "center" },
+  legendLine: { width: 14, height: 2.5, borderRadius: 1.5 },
 });
+
+export default memo(BracketTree);

@@ -7,7 +7,7 @@ import Animated from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import TvShowsOnTheAir from "../tv/TvShowsOnTheAir";
-import TvShowsAiringToday from "../tv/TvShowsAiringToday";
+import TvShowsUpcoming from "../tv/TvShowsUpcoming";
 import TvShowsGenres from "../tv/TvShowsGenres";
 import TvShowsProvders from "../tv/TvShowsProvders";
 import TvShowsTrends from "../tv/TvShowsTrends";
@@ -96,8 +96,10 @@ export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
       { key: "emmy", Component: TvShowsEmmy },
       { key: "providers", Component: TvShowsProvders },
       { key: "genres", Component: TvShowsGenres },
+      // Bugün / Bu hafta yayında: tek raf, çiple seçilir (kimlik eski "onTheAir").
       { key: "onTheAir", Component: TvShowsOnTheAir },
-      { key: "airingToday", Component: TvShowsAiringToday },
+      // Yeni başlayacak diziler (filmlerdeki "Yaklaşan Filmler"in karşılığı).
+      { key: "upcoming", Component: TvShowsUpcoming },
     ];
 
     // Raf kimlikleri (`key`) utils/sectionVisibility.js'teki "tv" bölümleriyle aynı.

@@ -867,6 +867,8 @@ export default function TvShowsDetails({ route, navigation }) {
                     airDate={details.first_air_date}
                     seasonPosterPath={details.poster_path}
                     type="tv"
+                    // Eylem satırındaki öteki simgelerle aynı (ListViewTv: 30, dar düzende 24).
+                    size={30}
                   />
                 ) : null
               }
