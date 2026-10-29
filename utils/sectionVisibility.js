@@ -115,6 +115,8 @@ export const SECTION_SCREENS = Object.freeze(
       sections: [
         // Başlıktaki (Düzenle / Paylaş'ın yanındaki) halka düğmesi: ekranda en üstte.
         section("goal", "flag-outline", "amber"),
+        // Adın yanındaki günlük seri alevi (components/streak/StreakFlameBadge.js).
+        section("streak", "flame-outline", "amber"),
         section("badges", "ribbon-outline", "amber"),
         // Mesajlar, arkadaş listesi ve istekler uygulamada YALNIZ buradan açılıyor.
         section("friends", "people-outline", "blue", { confirmHide: true }),

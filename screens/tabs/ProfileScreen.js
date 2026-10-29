@@ -29,6 +29,7 @@ import AvatarPreviewModal from "../../components/profile/AvatarPreviewModal";
 import ProfileIdentityBlock from "../../components/profile/ProfileIdentityBlock";
 import ProfileAvatarHalo from "../../components/profile/ProfileAvatarHalo";
 import WatchBadgeStrip from "../../components/profile/WatchBadgeStrip";
+import StreakFlameBadge from "../../components/streak/StreakFlameBadge";
 import { useWatchProgressContext } from "../../context/WatchProgressContext";
 import ProfileStoryModal from "../../components/storyShare/ProfileStoryModal";
 import { getIdentityBadges } from "../../components/badges/badgeCatalog";
@@ -129,6 +130,19 @@ const ProfileScreen = ({ navigation }) => {
 
   // Rozet/Perde kutlaması ARTIK burada değil: WatchProgressProvider içinde, profil
   // sekmesi hiç açılmamış olsa da oynar (hooks/useBadgeCelebration.js).
+
+  // Günlük seri alevi: art arda 3+ gün işaretleyince adın yanında yanar
+  // (utils/streakFlame.js). Ayarlar > Ekran bölümleri > Profil > "Seri alevi" ile
+  // gizlenir. Kimlik bloğu memo'lu; eleman yalnız seri değişince yenilenir.
+  const showStreak = showSection("streak");
+  const seriler = watchProgress?.seriler;
+  const streakBadge = useMemo(
+    () =>
+      showStreak && seriler ? (
+        <StreakFlameBadge seriler={seriler} theme={theme} language={language} />
+      ) : null,
+    [showStreak, seriler, theme, language]
+  );
 
 
 
@@ -293,6 +307,7 @@ const ProfileScreen = ({ navigation }) => {
               // Yıllık hedef halkası düğmesi (Düzenle / Paylaş'ın yanında). Ayarlar > Ekran
               // bölümleri > Profil > "Yıllık izleme hedefi" ile gizlenir.
               showGoal={showSection("goal")}
+              nameAccessory={streakBadge}
             />
           </View>
           {profile?.privacy?.showSocialLinksOnOwnProfile !== false && hasAnySocialLinks(socialLinks) && (

@@ -94,6 +94,7 @@ const tr = {
     },
     profile: {
       goal: ["Yıllık izleme hedefi", "Profil başlığındaki hedef halkası düğmesi (Düzenle ve Paylaş'ın yanında)"],
+      streak: ["Seri alevi", "Art arda 3 gün ve üzeri izleyince adının yanında yanan alev"],
       badges: ["Rozetler", "İzleme puanın, Perde seviyen ve rozet şeridin"],
       friends: ["Arkadaşlar", "Ara, arkadaşlar, mesajlar ve istekler. Gizlersen bunlara buradan ulaşamazsın"],
       stats: ["İstatistikler", "İzlediğin film ve dizi sayıları, toplam süreler"],
@@ -184,6 +185,7 @@ const en = {
     },
     profile: {
       goal: ["Yearly watch goal", "The goal ring button in the profile header (next to Edit and Share)"],
+      streak: ["Streak flame", "The flame next to your name after watching 3 or more days in a row"],
       badges: ["Badges", "Your watch score, Perde level and badge strip"],
       friends: ["Friends", "Search, friends, messages and requests. If you hide it you can't reach them from here"],
       stats: ["Statistics", "How many movies and shows you've watched, and total time"],
@@ -274,6 +276,7 @@ const es = {
     },
     profile: {
       goal: ["Meta anual de visionado", "El botón del anillo de meta en la cabecera del perfil (junto a Editar y Compartir)"],
+      streak: ["Llama de racha", "La llama junto a tu nombre al ver 3 días o más seguidos"],
       badges: ["Insignias", "Tu puntuación de visionado, tu nivel Perde y tus insignias"],
       friends: ["Amigos", "Buscar, amigos, mensajes y solicitudes. Si la ocultas no podrás acceder a ellos desde aquí"],
       stats: ["Estadísticas", "Cuántas películas y series has visto y el tiempo total"],
@@ -364,6 +367,7 @@ const pt = {
     },
     profile: {
       goal: ["Meta anual de visualização", "O botão do anel de meta no cabeçalho do perfil (ao lado de Editar e Compartilhar)"],
+      streak: ["Chama da sequência", "A chama ao lado do seu nome ao assistir 3 dias ou mais seguidos"],
       badges: ["Emblemas", "Sua pontuação de visualização, seu nível Perde e seus emblemas"],
       friends: ["Amigos", "Buscar, amigos, mensagens e pedidos. Se você ocultar, não conseguirá acessá-los por aqui"],
       stats: ["Estatísticas", "Quantos filmes e séries você assistiu e o tempo total"],
@@ -454,6 +458,7 @@ const de = {
     },
     profile: {
       goal: ["Jährliches Seh-Ziel", "Die Zielring-Schaltfläche im Profilkopf (neben Bearbeiten und Teilen)"],
+      streak: ["Serienflamme", "Die Flamme neben deinem Namen, wenn du 3 oder mehr Tage in Folge schaust"],
       badges: ["Abzeichen", "Dein Seh-Score, dein Akt-Level und die Abzeichenleiste"],
       friends: ["Freunde", "Suche, Freunde, Nachrichten und Anfragen. Wenn du sie ausblendest, erreichst du sie von hier aus nicht mehr"],
       stats: ["Statistik", "Wie viele Filme und Serien du gesehen hast, und die Gesamtzeit"],

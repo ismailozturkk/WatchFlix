@@ -39,7 +39,8 @@ import { muhurIdleri, muhurleriHesapla } from "@components/badges/seasonSeals";
 import {
   kutlanacaklar, loadLedger, markCelebrated, reconcileLedger, subscribeLedgerReset,
 } from "@utils/watchBadgeLedger";
-import { serileriHesapla } from "@utils/watchActivity";
+import { ayniSeriler, serileriHesapla, seriGunuAnahtari } from "@utils/watchActivity";
+import useAppActive from "@hooks/useAppActive";
 import { kartlariDekorle } from "@components/badges/badgeInsights";
 import useKesifSignals from "@hooks/useKesifSignals";
 import { kesifHazirImzasi } from "@utils/kesifSignals";
@@ -144,6 +145,29 @@ export default function useWatchProgress() {
     }).catch(() => {});
     return () => { iptal = true; };
   }, [uid, sifirlamaNo]);
+
+  // ── SERİ GÜNÜ DÖNÜMÜ ───────────────────────────────────────────────────────
+  // Mutabakat yalnız izleme verisi değişince koşar. Uygulama geceyi arka planda
+  // geçirip sabah öne gelince hiçbir şey değişmemiştir ama seri durumu değişmiştir
+  // ("bugün henüz işaretlemedin", telafi bekliyor, kalkan devreye girdi). Seri günü
+  // döndüyse seriler bellekteki defterden YAZMADAN yeniden hesaplanır; kesinleşen
+  // kararlar bir sonraki mutabakatta diske iner (seriKorumasiniIlerlet idempotent).
+  const appActive = useAppActive();
+  const seriGunuRef = useRef(seriGunuAnahtari());
+  useEffect(() => {
+    if (!appActive || !defter) return undefined;
+    const yenile = () => {
+      const gun = seriGunuAnahtari();
+      if (gun === seriGunuRef.current) return;
+      seriGunuRef.current = gun;
+      const s = serileriHesapla(defter.aktiflik.gunler, defter.aktiflik);
+      setSeriler((o) => (ayniSeriler(o, s) ? o : s));
+    };
+    yenile();
+    // Uygulama açıkken de gün dönebilir; dakikada bir tek dize kıyası.
+    const zamanlayici = setInterval(yenile, 60000);
+    return () => clearInterval(zamanlayici);
+  }, [appActive, defter]);
 
   // Oyun seviyesi — tek seferlik okuma, listener değil.
   useEffect(() => {
@@ -347,13 +371,11 @@ export default function useWatchProgress() {
         // Değişmediyse ÖNCEKİ REFERANS döner: `seriler` bir memo bağımlılığı
         // olduğu için her mutabakatta yeni nesne yazmak, hiçbir şey değişmese
         // bile tüm hesabı (512 film + 3.400 bölüm) yeniden koştururdu.
+        // Koruma alanları (telafi bekliyor, kalkan sayısı, bugünkü kazanım) da
+        // karşılaştırılır: yalnız seri sayılarına bakmak "bugün 1/2 → 2/2" gibi
+        // değişiklikleri ekrana hiç yansıtmazdı (utils/watchActivity ayniSeriler).
         if (r.seriler) {
-          setSeriler((o) => (
-            o && o.gunSerisi === r.seriler.gunSerisi && o.haftaSerisi === r.seriler.haftaSerisi
-              && o.rekorGun === r.seriler.rekorGun && o.rekorHafta === r.seriler.rekorHafta
-              && o.bugunAktif === r.seriler.bugunAktif
-              ? o : r.seriler
-          ));
+          setSeriler((o) => (ayniSeriler(o, r.seriler) ? o : r.seriler));
         }
         // Gün listesi de aynı gerekçeyle referans korur: her mutabakatta yeni
         // dizi yazmak tüm hesabı (512 film + 3.400 bölüm) yeniden koştururdu.

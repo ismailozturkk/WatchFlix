@@ -20,7 +20,9 @@ import {
   kutlanacaklar, isaretleGorulmus, tohumlandiMi,
   aktifligiGuncelle, rekorYukselt,
 } from "./watchLedgerCore";
-import { bugunAnahtari, GUN_TUT, serileriHesapla } from "./watchActivity";
+import {
+  bugunAnahtari, GUN_TUT, serileriHesapla, seriGunuAnahtari, seriKorumasiniIlerlet,
+} from "./watchActivity";
 import { Keys, get, remove, set } from "../services/storage";
 
 // ── SIFIRLAMA ────────────────────────────────────────────────────────────────
@@ -123,14 +125,24 @@ export async function reconcileLedger(uid, {
   // kabul edilmiştir: `perdeFloor` ve `kazanilmis` de tam olarak aynı yoldan
   // besleniyor. Yükselen rekor state'e yazılınca hesap yeniden koşar, imza
   // değişir ve rozet aynı oturumda açılır.
-  const a = aktifligiGuncelle(mevcut, { icerikSayisi, bugun, tut: GUN_TUT });
-  const seriler = serileriHesapla(a.ledger.aktiflik.gunler, a.ledger.aktiflik);
-  const r = rekorYukselt(a.ledger, seriler);
+  //
+  // İKİ AYRI GÜN: aktiflik SERİ GÜNÜYLE damgalanır (04:00 dönümü — gece yarısından
+  // sonra biten bölüm "dün gece"dir), rozet kazanma tarihi TAKVİM GÜNÜYLE.
+  const seriGunu = seriGunuAnahtari();
+  const a = aktifligiGuncelle(mevcut, { icerikSayisi, bugun: seriGunu, tut: GUN_TUT });
+  // Seri koruması (telafi/kalkan) kesinleşen kararları deftere işler; idempotent.
+  const islem = seriKorumasiniIlerlet(a.ledger.aktiflik, seriGunu);
+  const korumaDegisti = JSON.stringify(islem.koruma) !== JSON.stringify(a.ledger.aktiflik.koruma);
+  const korunmus = korumaDegisti
+    ? { ...a.ledger, aktiflik: { ...a.ledger.aktiflik, koruma: islem.koruma } }
+    : a.ledger;
+  const seriler = serileriHesapla(korunmus.aktiflik.gunler, korunmus.aktiflik);
+  const r = rekorYukselt(korunmus, seriler);
 
   // `bugun` yeni kazanılan rozetlere KAZANMA GÜNÜ olarak yazılır (defter v3).
   const sonuc = birlestir(r.ledger, { badgeIds, tumIds, perde, makara, bugun });
   if (donem !== epoch) return null; // araya sıfırlama girdi: eski defteri geri yazma
-  if (sonuc.degisti || a.degisti || r.degisti) await saveLedger(uid, sonuc.ledger);
+  if (sonuc.degisti || a.degisti || r.degisti || korumaDegisti) await saveLedger(uid, sonuc.ledger);
   return {
     ledger: sonuc.ledger,
     seriler,

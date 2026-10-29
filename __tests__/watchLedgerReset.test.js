@@ -23,6 +23,8 @@ jest.mock("@context/ProfileStatsContext", () => ({ useProfileStats: () => mockSt
 jest.mock("@services/sceneGameService", () => ({ loadGameData: jest.fn(async () => ({ level: 0 })) }));
 const mockKesif = { sayilar: {}, hazir: {} };
 jest.mock("@hooks/useKesifSignals", () => ({ __esModule: true, default: () => mockKesif }));
+// Seri günü dönümü kancası (useWatchProgress) RN AppState'e bağlı; testte hep önde.
+jest.mock("@hooks/useAppActive", () => ({ __esModule: true, default: () => true }));
 
 const { Keys, get, set } = require("../services/storage");
 const { __resetStoreCaches } = require("../services/storage/store");

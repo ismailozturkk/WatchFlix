@@ -525,6 +525,18 @@ const dataKeys = {
     scope: "user",
     keepOnLogout: true,
   },
+  // Günlük seri alevinin en son kutlanan durumu: { seviye, yama }. `seviye` =
+  // utils/streakFlame.js streakLevel().index (ay × 5 + hafta; -1 = alev yok), `yama` =
+  // en son duyurulan telafi/kalkan günü. Kademe yükselince ya da seri kurtarılınca bir
+  // kez kutlanır; seri sönünce seviye düşer, alev yeniden yanınca yine kutlanır
+  // (hooks/useStreakCelebration.js).
+  streakFlameSeen: {
+    key: "watch_progress:streak_flame_seen:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+  },
   // Kullanıcının profil vitrininde (ve arkadaş profilinde) sergilediği en fazla 4
   // rozetin id listesi (utils/badgeShowcase.js). Buluta (Users/{uid}.showcaseBadges)
   // da yazılır; yerel kopya çevrimdışı/anlık tepki verir ve çıkışta korunur.

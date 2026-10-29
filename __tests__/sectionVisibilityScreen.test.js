@@ -142,7 +142,7 @@ describe("ilk görünüm", () => {
   test("ekran karosuna basınca o ekranın satırları gelir", () => {
     render();
     pressTile("profile");
-    expect(rowIds()).toEqual(["goal", "badges", "friends", "stats", "activity"]);
+    expect(rowIds()).toEqual(["goal", "streak", "badges", "friends", "stats", "activity"]);
     expect(tile("profile").props.accessibilityState).toEqual({ selected: true });
     pressTile("library");
     expect(rowIds()).toEqual(["nextUp", "lists", "reminders", "notes", "wrapped"]);
