@@ -28,6 +28,7 @@ const {
   readAiUsage,
   buildAiQuota,
 } = require("./aiQuota");
+const aiProxy = require("./aiProxy");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
@@ -1009,9 +1010,11 @@ exports.revokeAppleAuthorization = onCall(
 //
 // Kota: kullanıcı başına günlük + aylık mesaj tavanı — AiUsage/{uid}
 // dokümanında transaction'lı sayaç (UTC). Free 3/30, Premium 20/300,
-// Unlimited 50/900.
-// Premium durumu Users/{uid}.entitlements.premium alanından okunur (Faz 1'de
-// RevenueCat webhook'u bu alanı dolduracak; alan yoksa herkes free'dir).
+// Unlimited 50/900. Premium durumu Users/{uid}.entitlements alanından okunur.
+//
+// Girdi doğrulama, yeniden deneme/yedek model ve yanıt doğrulama ./aiProxy.js'te.
+// Hak YALNIZ kullanıcıya bir cevap ya da kendi içeriğinden doğan güvenlik
+// engeli döndüğünde harcanır; üst akış hatası ve boş model yanıtı iade edilir.
 //
 // App Check: Faz 0 Hafta 2'de Play Integrity kurulunca aşağıdaki
 // enforceAppCheck true yapılmalı (şimdilik false — istemcide App Check yok).
@@ -1022,51 +1025,31 @@ const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 // uygunluk bildirimleri). Kurulum: firebase functions:secrets:set TMDB_API_KEY
 const TMDB_API_KEY = defineSecret("TMDB_API_KEY");
 
-const AI_MODEL = "gemini-2.5-flash";
-const AI_UPSTREAM_TIMEOUT_MS = 25000;
-// İstek boyutu tavanları (kötüye kullanım / maliyet freni)
-const AI_MAX_HISTORY = 12;          // istemcideki MAX_HISTORY_MESSAGES ile aynı
-const AI_MAX_MSG_CHARS = 4000;      // tek kullanıcı mesajı
-const AI_MAX_HISTORY_CHARS = 8000;  // geçmişteki tek mesaj
-const AI_MAX_SYSTEM_CHARS = 24000;  // sistem talimatı (kütüphane özeti dahil)
+// Kısa süreli patlama freni (örnek içi, dağıtık değil): günlük kota maliyeti
+// sınırlar; bu yalnız betikli seri çağrının üst akış hız sınırını herkes için
+// tüketmesini önler. Arayüz bir sohbette aynı anda tek istek gönderdiği için
+// gerçek kullanımda dolmaz.
+const aiBurstAllow = externalRatings.createRateLimiter({ limit: 8, windowMs: 60 * 1000 });
 
-const aiSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const toHttpsError = (err) => new HttpsError(err.code, err.message, err.details);
 
-/** UTC gün anahtarı (kota penceresi). */
-function aiTodayKey() {
-  return new Date().toISOString().slice(0, 10); // "2026-07-08"
+/** UTC gün/ay anahtarı (kota penceresi): "2026-07-08" / "2026-07". */
+function aiQuotaWindow(date = new Date()) {
+  const iso = date.toISOString();
+  return { today: iso.slice(0, 10), month: iso.slice(0, 7) };
 }
 
-/** UTC ay anahtarı. */
-function aiMonthKey() {
-  return new Date().toISOString().slice(0, 7); // "2026-07"
-}
-
-/** İstemciden gelen history'yi doğrula + Gemini `contents` dizisine çevir. */
-function buildAiContents(history, userMessage) {
-  const contents = [];
-  const recent = Array.isArray(history) ? history.slice(-AI_MAX_HISTORY) : [];
-  for (const m of recent) {
-    if (!m || typeof m.text !== "string" || m.text.trim() === "") continue;
-    if (m.text.length > AI_MAX_HISTORY_CHARS) {
-      throw new HttpsError("invalid-argument", "History message too long");
-    }
-    contents.push({
-      role: m.role === "assistant" || m.role === "model" ? "model" : "user",
-      parts: [{ text: m.text }],
-    });
-  }
-  contents.push({ role: "user", parts: [{ text: userMessage }] });
-  return contents;
-}
-
-/** Kota transaction'ı: günlük ve aylık hakkı birlikte, atomik olarak tüketir. */
+/**
+ * Kota transaction'ı: günlük ve aylık hakkı birlikte, atomik olarak tüketir.
+ * Pencere geri döner: iade AYNI güne/aya yazılsın (gece yarısını aşan istek
+ * yeni günün sayacından düşmesin).
+ */
 async function consumeAiQuota(uid, plan) {
   const ref = db.doc(`AiUsage/${uid}`);
-  const today = aiTodayKey();
-  const month = aiMonthKey();
+  const window = aiQuotaWindow();
+  const { today, month } = window;
   const limits = getAiPlanLimits(plan);
-  return db.runTransaction(async (tx) => {
+  const quota = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const data = snap.exists ? snap.data() : {};
     const { dailyUsed, monthlyUsed } = readAiUsage(data, today, month);
@@ -1105,14 +1088,13 @@ async function consumeAiQuota(uid, plan) {
     );
     return buildAiQuota(plan, nextDaily, nextMonthly);
   });
+  return { quota, window };
 }
 
-/** Üst akış hatasında günlük ve aylık sayaçları birlikte geri al. */
-async function refundAiQuota(uid) {
+/** Üst akış hatasında günlük ve aylık sayaçları, tüketildikleri pencerede geri al. */
+async function refundAiQuota(uid, { today, month }) {
   try {
     const ref = db.doc(`AiUsage/${uid}`);
-    const today = aiTodayKey();
-    const month = aiMonthKey();
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists) return;
@@ -1134,46 +1116,6 @@ async function refundAiQuota(uid) {
   }
 }
 
-/** Gemini generateContent'e tek istek (timeout'lu). */
-async function postGeminiOnce(body, apiKey) {
-  const url =
-    `https://generativelanguage.googleapis.com/v1beta/models/${AI_MODEL}` +
-    `:generateContent?key=${apiKey}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), AI_UPSTREAM_TIMEOUT_MS);
-  let res;
-  try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    const e = new Error(err?.name === "AbortError" ? "UPSTREAM_TIMEOUT" : "UPSTREAM_NETWORK");
-    e.transient = true;
-    throw e;
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!res.ok) {
-    let detail = "";
-    try {
-      detail = await res.text();
-    } catch {
-      /* yoksay */
-    }
-    // Anahtar sızıntısı olmasın: detail'i logla ama istemciye statü dışında bilgi verme.
-    console.warn(`[callGemini] Gemini HTTP ${res.status}: ${detail.slice(0, 500)}`);
-    const e = new Error(`UPSTREAM_${res.status}`);
-    e.status = res.status;
-    e.transient = res.status === 500 || res.status === 503;
-    throw e;
-  }
-  return res.json();
-}
-
 exports.callGemini = onCall(
   {
     secrets: [GEMINI_API_KEY],
@@ -1187,103 +1129,82 @@ exports.callGemini = onCall(
     }
     const uid = request.auth.uid;
 
-    // ── Girdi doğrulama ──
-    const { mode, history, userMessage, systemInstruction } = request.data || {};
-    if (mode !== "chat" && mode !== "cine") {
-      throw new HttpsError("invalid-argument", "mode must be 'chat' or 'cine'");
-    }
-    if (typeof userMessage !== "string" || userMessage.trim() === "") {
-      throw new HttpsError("invalid-argument", "userMessage required");
-    }
-    if (userMessage.length > AI_MAX_MSG_CHARS) {
-      throw new HttpsError("invalid-argument", "userMessage too long");
-    }
-    if (typeof systemInstruction !== "string" || systemInstruction.trim() === "") {
-      throw new HttpsError("invalid-argument", "systemInstruction required");
-    }
-    if (systemInstruction.length > AI_MAX_SYSTEM_CHARS) {
-      throw new HttpsError("invalid-argument", "systemInstruction too long");
-    }
-    const contents = buildAiContents(history, userMessage);
-
-    // ── Üyelik seviyesi → kota tavanı ──
-    let plan = "free";
+    // ── Girdi doğrulama (geçersizse Gemini'ye ve kotaya hiç dokunmadan) ──
+    let parsed;
     try {
-      const userSnap = await db.doc(`Users/${uid}`).get();
-      const entitlements = userSnap.data()?.entitlements;
-      plan = resolveAiPlan(entitlements);
-    } catch (e) {
-      console.warn("[callGemini] Users okunamadı (free varsayıldı):", e?.message);
+      parsed = aiProxy.parseAiRequest(request.data);
+    } catch (err) {
+      if (err instanceof aiProxy.AiProxyError) throw toHttpsError(err);
+      throw err;
+    }
+    const { mode, contents, systemInstruction } = parsed;
+
+    if (!aiBurstAllow(uid)) {
+      throw new HttpsError("resource-exhausted", "Too many AI requests", { reason: "BURST_LIMIT" });
     }
 
-    // ── Kota tüket (yetersizse burada resource-exhausted fırlar) ──
-    const quota = await consumeAiQuota(uid, plan);
-
-    // ── Gemini isteği ──
-    const body = {
-      contents,
-      systemInstruction: { parts: [{ text: systemInstruction }] },
-      generationConfig: {
-        temperature: mode === "cine" ? 0.8 : 0.85,
-        topP: 0.95,
-        topK: 40,
-        // CineMatch yalnız kompakt JSON döndürür; düz sohbet biraz daha geniş kalır.
-        // Cine tavanı: ayrıntılı üslup + 10 öğe (8 ayarı + filtre payı) 1200'de
-        // kesiliyordu; istemci kesik JSON'u onarır (repairTruncatedJSON) ama
-        // tavan sonuca yetmeli. Ücret yalnız üretilen token kadar artar.
-        maxOutputTokens: mode === "cine" ? 1800 : 2048,
-        responseMimeType: mode === "cine" ? "application/json" : "text/plain",
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-      safetySettings: [
-        "HARM_CATEGORY_HARASSMENT",
-        "HARM_CATEGORY_HATE_SPEECH",
-        "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-        "HARM_CATEGORY_DANGEROUS_CONTENT",
-      ].map((category) => ({ category, threshold: "BLOCK_ONLY_HIGH" })),
-    };
-
+    // Anahtar yoksa hak HİÇ harcanmaz (eskiden tüketilip iade ediliyordu).
     const apiKey = GEMINI_API_KEY.value();
     if (!apiKey) {
-      await refundAiQuota(uid);
       console.error("[callGemini] GEMINI_API_KEY secret tanımsız!");
       throw new HttpsError("failed-precondition", "AI is not configured");
     }
 
+    // ── Üyelik seviyesi → kota tavanı ──
+    // Okunamazsa "free" VARSAYILMAZ: ücretli kullanıcı geçici bir okuma
+    // hatasında Free tavanına çarpıp "Planları gör" satışıyla karşılaşırdı.
+    let plan;
     try {
-      let data;
-      try {
-        data = await postGeminiOnce(body, apiKey);
-      } catch (err) {
-        if (!err.transient) throw err;
-        await aiSleep(800); // geçici hatada tek retry (istemcideki davranışla aynı)
-        data = await postGeminiOnce(body, apiKey);
-      }
-      const u = data?.usageMetadata || {};
-      const quotaLabel =
-        `${quota.plan} daily=${quota.daily.used}/${quota.daily.limit} ` +
-        `monthly=${quota.monthly.used}/${quota.monthly.limit}`;
+      const userSnap = await db.doc(`Users/${uid}`).get();
+      plan = resolveAiPlan(userSnap.data()?.entitlements);
+    } catch (e) {
+      console.error("[callGemini] Users okunamadı:", e?.message);
+      throw new HttpsError("unavailable", "Account could not be read");
+    }
+
+    // ── Kota tüket (yetersizse burada resource-exhausted fırlar) ──
+    let quota;
+    let quotaWindow;
+    try {
+      ({ quota, window: quotaWindow } = await consumeAiQuota(uid, plan));
+    } catch (e) {
+      if (e instanceof HttpsError) throw e;
+      console.error("[callGemini] kota işlemi başarısız:", e?.message);
+      throw new HttpsError("unavailable", "AI quota could not be checked");
+    }
+
+    // ── Gemini isteği (yeniden deneme + yedek model aiProxy'de) ──
+    const started = Date.now();
+    const quotaLabel =
+      `${quota.plan} daily=${quota.daily.used}/${quota.daily.limit} ` +
+      `monthly=${quota.monthly.used}/${quota.monthly.limit}`;
+    try {
+      const result = await aiProxy.generateWithFallback({
+        body: aiProxy.buildGenerateBody({ mode, contents, systemInstruction }),
+        apiKey,
+      });
+      const u = result.data.usageMetadata;
       console.log(
         `[callGemini] uid=${uid} mode=${mode} kota=${quotaLabel} ` +
-          `token(giriş/çıkış/toplam)=${u.promptTokenCount || 0}/${u.candidatesTokenCount || 0}/${u.totalTokenCount || 0}`,
+          `sonuç=${result.verdict} denemeler=${aiProxy.describeAttempts(result.attempts)} ` +
+          `süre=${Date.now() - started}ms ` +
+          `token(giriş/çıkış/toplam)=${u.promptTokenCount}/${u.candidatesTokenCount}/${u.totalTokenCount}`,
       );
-      return { data, quota };
+      return { data: result.data, quota, model: result.model };
     } catch (err) {
-      // Üst akış başarısız → kullanıcının hakkını iade et.
-      await refundAiQuota(uid);
-      if (err.status === 429) {
-        throw new HttpsError("resource-exhausted", "Upstream rate limited", {
-          reason: "UPSTREAM_RATE_LIMIT",
-        });
+      // Kullanıcıya cevap gitmedi → hakkını iade et.
+      await refundAiQuota(uid, quotaWindow);
+      if (!(err instanceof aiProxy.UpstreamError)) {
+        console.error("[callGemini] beklenmeyen hata:", err?.message);
+        throw new HttpsError("internal", "AI request failed");
       }
-      if (err.message === "UPSTREAM_TIMEOUT") {
-        throw new HttpsError("deadline-exceeded", "Upstream timeout");
-      }
-      if (err.transient || err.message === "UPSTREAM_NETWORK") {
-        throw new HttpsError("unavailable", "Upstream unavailable");
-      }
-      console.error("[callGemini] hata:", err?.message);
-      throw new HttpsError("internal", "AI request failed");
+      const line =
+        `[callGemini] uid=${uid} mode=${mode} kota=${quotaLabel} (iade edildi) ` +
+        `denemeler=${aiProxy.describeAttempts(err.attempts)} süre=${Date.now() - started}ms`;
+      // Kalıcı hata (anahtar iptal, model adı yanlış, 400) her isteği düşürür: hata düzeyinde görünsün.
+      if (err.transient) console.warn(line);
+      else console.error(line);
+      throw toHttpsError(aiProxy.toClientError(err));
     }
   },
 );

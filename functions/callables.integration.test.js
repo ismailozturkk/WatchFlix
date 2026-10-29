@@ -26,7 +26,8 @@ if (!skip) {
 
 const ENTITLEMENT = "com.smlztrk.seelogd Pro";
 const calls = { gemini: 0, omdb: 0, tokeninfo: 0, revenuecat: 0 };
-const fake = { omdb: null, tokeninfo: null, revenuecat: null };
+const fake = { omdb: null, tokeninfo: null, revenuecat: null, gemini: null };
+const geminiUrls = [];
 
 let fns;
 let db;
@@ -39,7 +40,12 @@ test.before(async () => {
     const u = String(url);
     if (u.includes("generativelanguage.googleapis.com")) {
       calls.gemini += 1;
-      return json({ candidates: [{ content: { parts: [{ text: "merhaba" }] } }], usageMetadata: {} });
+      geminiUrls.push(u);
+      // fake.gemini: sırayla dönülecek yanıtlar ("503" | "empty" | undefined=başarılı)
+      const step = Array.isArray(fake.gemini) ? fake.gemini.shift() : undefined;
+      if (step === "503") return json({ error: { status: "UNAVAILABLE" } }, false, 503);
+      if (step === "empty") return json({ candidates: [{ finishReason: "OTHER", content: { parts: [] } }] });
+      return json({ candidates: [{ content: { parts: [{ text: "merhaba" }] }, finishReason: "STOP" }], usageMetadata: {} });
     }
     if (u.includes("omdbapi.com")) {
       calls.omdb += 1;
@@ -71,6 +77,7 @@ async function reset() {
   for (const name of ["Users", "AiUsage"]) await db.recursiveDelete(db.collection(name));
   Object.keys(calls).forEach((k) => (calls[k] = 0));
   Object.keys(fake).forEach((k) => (fake[k] = null));
+  geminiUrls.length = 0;
 }
 
 const nowSec = () => Math.floor(Date.now() / 1000);
@@ -147,6 +154,51 @@ test("callGemini: plan istemciden değil sunucudaki entitlements'tan okunur", { 
   await mkUser("prem", { entitlements: { premium: true, premiumPlan: "premium" } });
   assert.equal(await codeOf(call(fns.callGemini, "prem", { ...ai(), plan: "unlimited" })), "ok");
   assert.equal((await db.doc("AiUsage/prem").get()).get("plan"), "premium");
+});
+
+test("callGemini: birincil model 503 verince yedek modelle cevap döner, tek hak harcanır", { skip }, async () => {
+  await reset();
+  await mkUser("fallback1");
+  fake.gemini = ["503"];
+  const res = await call(fns.callGemini, "fallback1", ai());
+  assert.equal(res.data.candidates[0].content.parts[0].text, "merhaba");
+  assert.equal(calls.gemini, 2);
+  assert.ok(geminiUrls[1].includes("gemini-2.5-flash-lite"), geminiUrls[1]);
+  assert.ok(geminiUrls.every((u) => !u.includes("key=")), "anahtar URL'de olmamalı");
+  assert.equal(res.model, "gemini-2.5-flash-lite");
+  assert.equal((await db.doc("AiUsage/fallback1").get()).get("dailyCount"), 1);
+});
+
+test("callGemini: model iki kez boş dönerse hak iade edilir", { skip }, async () => {
+  await reset();
+  await mkUser("empty1");
+  fake.gemini = ["empty", "empty"];
+  let error;
+  try {
+    await call(fns.callGemini, "empty1", ai());
+  } catch (e) {
+    error = e;
+  }
+  assert.equal(error?.code, "unavailable");
+  assert.equal(error?.details?.reason, "EMPTY_RESPONSE");
+  const usage = (await db.doc("AiUsage/empty1").get()).data();
+  assert.equal(usage.dailyCount, 0);
+  assert.equal(usage.monthlyCount, 0);
+});
+
+test("callGemini: dakikalık patlama freni kotadan önce devreye girer", { skip }, async () => {
+  await reset();
+  await mkUser("burst", { entitlements: { premium: true, premiumPlan: "unlimited" } });
+  for (let i = 0; i < 8; i += 1) assert.equal(await codeOf(call(fns.callGemini, "burst", ai())), "ok");
+  let error;
+  try {
+    await call(fns.callGemini, "burst", ai());
+  } catch (e) {
+    error = e;
+  }
+  assert.equal(error?.code, "resource-exhausted");
+  assert.equal(error?.details?.reason, "BURST_LIMIT");
+  assert.equal((await db.doc("AiUsage/burst").get()).get("dailyCount"), 8, "frenlenen çağrı hak yakmaz");
 });
 
 test("getExternalRatings: kimlik doğrulama, geçici hata önbelleğe girmez, kesin 'yok' girer", { skip }, async () => {

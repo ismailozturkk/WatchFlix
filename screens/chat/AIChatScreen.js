@@ -168,13 +168,41 @@ export default function AIChatScreen({
 
   const [view, setView] = useState("chat"); // "chat" | "history"
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   // Son cevapla gelen sunucu kotası (canlı kullanım okunana kadar ölçerin kaynağı)
   const [quota, setQuota] = useState(null);
 
   const [messages, setMessages] = useState([]);
   const [activeId, setActiveId] = useState(null);
+
+  // ── Bekleyen istekler sohbete bağlıdır ──
+  // Cevap beklerken yeni sohbete ya da geçmişten başka bir sohbete geçilebilir;
+  // geç gelen cevap EKRANDAKİ sohbetin üstüne değil kendi sohbetine yazılır
+  // (eskiden görünen sohbeti ezer, sonraki mesajda başka bir kaydın üstüne
+  // kaydedilirdi). Async dönüşte state kapanışı eski kalacağı için güncel değerler
+  // ref'lerden okunur; activeId her zaman selectConversation ile değişir.
+  const [pendingIds, setPendingIds] = useState(() => new Set());
+  const pendingRef = useRef(pendingIds);
+  const activeIdRef = useRef(null);
+  // Cevap beklerken silinen sohbetler: geç gelen cevap onları geri yaratmasın.
+  const discardedRef = useRef(new Set());
+  const setPending = useCallback((id, on) => {
+    const next = new Set(pendingRef.current);
+    if (on) next.add(id);
+    else next.delete(id);
+    pendingRef.current = next;
+    setPendingIds(next);
+  }, []);
+  const selectConversation = useCallback((id) => {
+    activeIdRef.current = id;
+    setActiveId(id);
+  }, []);
+  // Ekrandaki sohbet cevap bekliyor mu? (çift dokunuşta da senkron doğru)
+  const isBusy = useCallback(
+    () => activeIdRef.current != null && pendingRef.current.has(activeIdRef.current),
+    [],
+  );
+  const loading = activeId != null && pendingIds.has(activeId);
   // Sohbet geçmişi hesaba (Firestore) yedeklenir ve yerel kopyadan SENKRON okunur
   // (hooks/useAiConversations). Yazmalar yerelde anında, buluta arka planda gider.
   const {
@@ -442,9 +470,18 @@ export default function AIChatScreen({
   // options.regenerate: aynı soru, farklı seçimler.
   const runAssistant = useCallback(
     async (msgsIncludingUser, convId, userText, options = {}) => {
-      setLoading(true);
+      setPending(convId, true);
       scrollTargetRef.current = { mode: "end", id: null };
       scrollToEndSoon();
+      // Cevap döndüğünde: silinmişse hiçbir şey yazılmaz; kullanıcı başka sohbete
+      // geçtiyse yalnız kayda yazılır, ekrana dokunulmaz.
+      const finish = (finalMessages, present) => {
+        if (discardedRef.current.has(convId)) return;
+        saveActive(finalMessages, convId);
+        if (activeIdRef.current !== convId) return;
+        present?.();
+        setMessages(finalMessages);
+      };
       try {
         const lastUserIndex = lastIndexWhere(msgsIncludingUser, (m) => m.role === "user");
         const lastUserMsg = lastUserIndex >= 0 ? msgsIncludingUser[lastUserIndex] : null;
@@ -497,52 +534,59 @@ export default function AIChatScreen({
           onQuota: setQuota,
         });
 
-        // Başlıkları TMDB poster kartlarına çöz. Spotlight'ta tam detay (oyuncu,
-        // benzer yapım); diğerlerinde "lite" (süre + tür + platform): zevk uyumu,
-        // süre rozeti, platform/tür doğrulaması bunlara bağlı.
-        const pairs = collectTitles(response);
+        // Bu noktada hak harcandı: poster/süzgeç adımı ne olursa olsun cevap
+        // ekrana düşmeli. Beklenmeyen bir şekil kart çözümünü ya da süzgeci
+        // patlatırsa cevap postersiz ve süzgeçsiz gösterilir, hata balonu çıkmaz.
         let posterMap = {};
-        if (pairs.length) {
-          const { movies, series } = splitTitlesForLookup(pairs);
-          const cards = await resolveCards({
-            apiKey: API_KEY,
-            movies,
-            series,
-            language,
-            includeAdult: adultContent,
-            includeDetails: response.type === "title_spotlight" ? true : "lite",
+        let watchedChecked = response;
+        const notes = { removed: 0, relaxed: false, seen: 0, truncated: Boolean(response.truncated) };
+        try {
+          // Başlıkları TMDB poster kartlarına çöz. Spotlight'ta tam detay (oyuncu,
+          // benzer yapım); diğerlerinde "lite" (süre + tür + platform): zevk uyumu,
+          // süre rozeti, platform/tür doğrulaması bunlara bağlı.
+          const pairs = collectTitles(response);
+          if (pairs.length) {
+            const { movies, series } = splitTitlesForLookup(pairs);
+            const cards = await resolveCards({
+              apiKey: API_KEY,
+              movies,
+              series,
+              language,
+              includeAdult: adultContent,
+              includeDetails: response.type === "title_spotlight" ? true : "lite",
+            });
+            posterMap = buildPosterMap(cards);
+            if (targetMedia?.title) {
+              const key = posterKey(targetMedia.mediaType, targetMedia.title);
+              const targetCard = buildTargetCard(targetMedia, posterMap[key]);
+              posterMap[posterKey(targetCard.mediaType, targetCard.title)] = targetCard;
+            }
+          }
+
+          // Model filtreleri sistem yönergesinden alır; sonuç kartları TMDB'den
+          // çözüldükten sonra platform/tür/içerik tipi/süre yerelde de doğrulanır
+          // ve öneri sayısı ayardaki sınıra çekilir.
+          const filtered = applyDiscoveryFilters(response, posterMap, {
+            mediaType: prefs.mediaType,
+            providers: requestedProviders,
+            genres: selectedGenreLabels,
+            maxRuntime,
+            maxItems: prefs.maxItems,
           });
-          posterMap = buildPosterMap(cards);
-          if (targetMedia?.title) {
-            const key = posterKey(targetMedia.mediaType, targetMedia.title);
-            const targetCard = buildTargetCard(targetMedia, posterMap[key]);
-            posterMap[posterKey(targetCard.mediaType, targetCard.title)] = targetCard;
+
+          watchedChecked =
+            library && prefs.watched
+              ? applyWatchedFilter(filtered.response, posterMap, library.watchedIndex)
+              : filtered.response;
+          notes.removed = filtered.report.removed;
+          notes.relaxed = filtered.report.relaxed;
+          notes.seen = Math.max(0, countResponseItems(filtered.response) - countResponseItems(watchedChecked));
+        } catch (presentErr) {
+          if (__DEV__) {
+            // eslint-disable-next-line no-console
+            console.warn("[CineMatch Pro] kart/süzgeç adımı düştü, cevap ham gösteriliyor:", presentErr?.message);
           }
         }
-
-        // Model filtreleri sistem yönergesinden alır; sonuç kartları TMDB'den
-        // çözüldükten sonra platform/tür/içerik tipi/süre yerelde de doğrulanır
-        // ve öneri sayısı ayardaki sınıra çekilir.
-        const filtered = applyDiscoveryFilters(response, posterMap, {
-          mediaType: prefs.mediaType,
-          providers: requestedProviders,
-          genres: selectedGenreLabels,
-          maxRuntime,
-          maxItems: prefs.maxItems,
-        });
-
-        const watchedChecked =
-          library && prefs.watched
-            ? applyWatchedFilter(filtered.response, posterMap, library.watchedIndex)
-            : filtered.response;
-        const seen = Math.max(0, countResponseItems(filtered.response) - countResponseItems(watchedChecked));
-
-        const notes = {
-          removed: filtered.report.removed,
-          relaxed: filtered.report.relaxed,
-          seen,
-          truncated: Boolean(response.truncated),
-        };
         const hasNotes = notes.removed > 0 || notes.relaxed || notes.seen > 0 || notes.truncated;
 
         const aiMsg = {
@@ -553,10 +597,7 @@ export default function AIChatScreen({
           text: responseToHistoryText(watchedChecked),
           ...(hasNotes ? { notes } : null),
         };
-        const finalMessages = [...msgsIncludingUser, aiMsg];
-        focusAnswer(aiMsg.id);
-        setMessages(finalMessages);
-        saveActive(finalMessages, convId);
+        finish([...msgsIncludingUser, aiMsg], () => focusAnswer(aiMsg.id));
       } catch (err) {
         const code = err?.code || "GENERIC";
         if (err?.quota) setQuota(err.quota);
@@ -591,18 +632,18 @@ export default function AIChatScreen({
               }
             : null,
         };
-        const finalMessages = [...msgsIncludingUser, errMsg];
-        scrollTargetRef.current = { mode: "end", id: null };
-        setMessages(finalMessages);
-        saveActive(finalMessages, convId);
-        scrollToEndSoon();
+        finish([...msgsIncludingUser, errMsg], () => {
+          scrollTargetRef.current = { mode: "end", id: null };
+          scrollToEndSoon();
+        });
       } finally {
-        setLoading(false);
+        setPending(convId, false);
       }
     },
     [
       language, movieGenres, tvGenres, t, API_KEY, adultContent, saveActive, scrollToEndSoon,
       focusAnswer, library, prefs, selectedProviders, selectedGenreLabels, discoveryPreferences, premiumPlan,
+      setPending,
     ],
   );
 
@@ -612,12 +653,12 @@ export default function AIChatScreen({
   // options.maxRuntime: "kısa" süre seçimi için yerel doğrulama üst sınırı (dk).
   const handleSend = useCallback(
     (explicit, options) => {
-      if (loading) return;
+      if (isBusy()) return;
       const text = (typeof explicit === "string" ? explicit : message).trim();
       if (!text) return;
 
-      const convId = activeId || makeId();
-      if (!activeId) setActiveId(convId);
+      const convId = activeIdRef.current || makeId();
+      if (!activeIdRef.current) selectConversation(convId);
 
       const display = String(options?.display || "").trim() || text;
       const userMsg = { id: makeId(), role: "user", text, display };
@@ -628,16 +669,17 @@ export default function AIChatScreen({
       Keyboard.dismiss();
       runAssistant(msgs, convId, text);
     },
-    [loading, message, activeId, messages, runAssistant],
+    [isBusy, message, messages, runAssistant, selectConversation],
   );
 
   // ── Hazır bir soruyla YENİ sohbet başlat ──
   // handleSend'den farkı: mevcut sohbetin üstüne eklemez, HER ZAMAN yeni bir
   // konuşma açar (detay ekranından gelen soru geçmiş bir sohbetin devamı gibi
   // görünmesin) ve baloncukta ham yönerge yerine kısa `display` metnini gösterir.
+  // Başka bir sohbetin cevap beklemesi onu DURDURMAZ: eskiden "yükleniyor"
+  // kilidine takılan detay sorusu, kilit (initialPromptRef) konduğu için hiç gitmezdi.
   const startPromptChat = useCallback(
     (promptText, options) => {
-      if (loading) return;
       const text = String(promptText || "").trim();
       if (!text) return;
       const convId = makeId();
@@ -646,13 +688,13 @@ export default function AIChatScreen({
       if (options?.attachment?.title) userMsg.attachment = options.attachment;
       const msgs = [userMsg];
       setView("chat");
-      setActiveId(convId);
+      selectConversation(convId);
       setMessages(msgs);
       setMessage("");
       Keyboard.dismiss();
       runAssistant(msgs, convId, text);
     },
-    [loading, runAssistant],
+    [runAssistant, selectConversation],
   );
 
   useEffect(() => {
@@ -681,65 +723,68 @@ export default function AIChatScreen({
 
   const handleRetry = useCallback(
     (userText) => {
-      if (loading) return;
+      if (isBusy()) return;
       const cleaned = messages.filter((m) => m.status !== "error");
       setMessages(cleaned);
-      const convId = activeId || makeId();
-      if (!activeId) setActiveId(convId);
+      const convId = activeIdRef.current || makeId();
+      if (!activeIdRef.current) selectConversation(convId);
       runAssistant([...cleaned], convId, userText);
     },
-    [loading, messages, activeId, runAssistant],
+    [isBusy, messages, runAssistant, selectConversation],
   );
 
   // "Yeniden öner": son soru aynı kalır, son cevap atılır; atılan cevaptaki
   // başlıklar tekrar-engeline girer ki gerçekten farklı seçimler gelsin.
   const handleRegenerate = useCallback(() => {
-    if (loading) return;
+    if (isBusy()) return;
     const lastUserIndex = lastIndexWhere(messages, (m) => m.role === "user");
     if (lastUserIndex < 0) return;
     const kept = messages.slice(0, lastUserIndex + 1);
-    const convId = activeId || makeId();
-    if (!activeId) setActiveId(convId);
+    const convId = activeIdRef.current || makeId();
+    if (!activeIdRef.current) selectConversation(convId);
     setMessages(kept);
     runAssistant(kept, convId, messages[lastUserIndex].text, {
       regenerate: true,
       avoidSource: messages,
     });
-  }, [loading, messages, activeId, runAssistant]);
+  }, [isBusy, messages, runAssistant, selectConversation]);
 
   // ── Sohbet yönetimi ──
   const newChat = useCallback(() => {
     setMessages([]);
-    setActiveId(null);
+    selectConversation(null);
     setMessage("");
     setView("chat");
-  }, []);
+  }, [selectConversation]);
 
   const openConversation = useCallback(
     (conv) => {
       scrollTargetRef.current = { mode: "end", id: null };
       setMessages(conv.messages || []);
-      setActiveId(conv.id);
+      selectConversation(conv.id);
       setView("chat");
       scrollToEndSoon();
     },
-    [scrollToEndSoon],
+    [scrollToEndSoon, selectConversation],
   );
 
   const deleteConversation = useCallback(
     (id) => {
+      discardedRef.current.add(id);
       removeConversation(id);
-      if (id === activeId) newChat();
+      if (id === activeIdRef.current) newChat();
     },
-    [activeId, newChat, removeConversation],
+    [newChat, removeConversation],
   );
 
   const clearAll = useCallback(() => {
+    // Cevabı beklenen sohbetler de silinmiş sayılır: geç gelen cevap onları geri yaratmasın.
+    pendingRef.current.forEach((id) => discardedRef.current.add(id));
     clearConversations();
     // Açık sohbet de silinmiş sayılır; sonraki mesaj eski bir kayda yazmasın.
     setMessages([]);
-    setActiveId(null);
-  }, [clearConversations]);
+    selectConversation(null);
+  }, [clearConversations, selectConversation]);
 
   // Geçmişte aşağı çek: başka cihazdaki sohbetleri hesaptan getirir (yerel kopya
   // buluttan YENİDEN kurulur; bekleyen yerel değişiklikler korunur).

@@ -1,8 +1,8 @@
 // scripts/ai-eval/lib/providers.js
 //
 // Aynı istemi (sistem talimatı + geçmiş + kullanıcı mesajı) farklı sağlayıcılara
-// gönderir. Gemini ayarları functions/index.js'teki callGemini ile BİREBİR aynıdır
-// (cine modu); değiştirirsen ikisini birlikte güncelle.
+// gönderir. Gemini ayarları functions/aiProxy.js'teki buildGenerateBody ile BİREBİR
+// aynıdır (cine modu); değiştirirsen ikisini birlikte güncelle.
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

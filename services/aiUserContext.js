@@ -9,7 +9,7 @@
 // allLists öğe şekli (MovieDetail.updateMovieList'ten):
 //   { id, name, type:"movie"|"tv", genres:[adlar], imagePath, dateAdded, minutes? }
 
-import { posterKey, toStr, normMediaType, safeArr } from "./aiCineService";
+import { posterKey, toStr, normMediaType, safeArr, clampBlock } from "./aiCineService";
 
 const norm = (s) => toStr(s).toLowerCase().trim();
 
@@ -17,6 +17,14 @@ const PREDEFINED = new Set(["watchedTv", "favorites", "watchList", "watchedMovie
 const DEFAULT_CAP = 100;
 const RECENT_WATCHED = 20;
 const TOP_GENRES = 8;
+// Özetin karakter bütçesi. Liste başına 100 öğe sınırı tek başına yetmez:
+// izleme listesi + favoriler + birkaç dolu özel liste özeti 30 000 karakterin
+// üstüne çıkarıp sunucunun sistem talimatı tavanını (24 000) deliyordu → her
+// istek reddedilirdi. Sabit talimat ~4 000 karakter; bu bütçe kalanına rahat sığar
+// ve istek başına giriş token'ını da sınırlar.
+const DEFAULT_MAX_CHARS = 12000;
+// Bütçeye sığdırırken liste başına inilebilecek en az öğe; altı kırpılır.
+const MIN_CAP = 10;
 
 const byRecent = (a, b) => new Date(b?.dateAdded || 0) - new Date(a?.dateAdded || 0);
 
@@ -30,18 +38,20 @@ const EMPTY = Object.freeze({
  * Kullanıcı kütüphanesinden prompt bağlamı + yerel eleme indeksi üretir.
  * @param {object} allLists  ListStatusContext.allLists
  * @param {object} options   { watchList, favorites, custom, watched } booleans
- * @param {object} opts      { capPerList, favoritesBlock }
+ * @param {object} opts      { capPerList, maxChars, favoritesBlock }
  *   `favoritesBlock`: "dört favori" için hazır metin (utils/fourFavorites.buildFavoritesPrompt).
  *   Listelerden ÖNCE gelir — kullanıcının açıkça seçtiği en güçlü zevk işareti.
+ *   `maxChars`: özetin üst sınırı. Aşılırsa liste başına öğe sayısı (en yeniler
+ *   kalır) adım adım düşürülür; yine sığmazsa satır sınırında kırpılır.
  */
 export function buildLibraryContext(allLists, options = {}, opts = {}) {
   if (!allLists || typeof allLists !== "object") return EMPTY;
-  const cap = opts.capPerList || DEFAULT_CAP;
+  const maxChars = opts.maxChars || DEFAULT_MAX_CHARS;
 
   const watchedIndex = { movieIds: new Set(), tvIds: new Set(), names: new Set() };
-  const blocks = [];
+  const head = [];
   if (typeof opts.favoritesBlock === "string" && opts.favoritesBlock.trim()) {
-    blocks.push(opts.favoritesBlock.trim());
+    head.push(opts.favoritesBlock.trim());
   }
 
   const fmtItems = (arr) =>
@@ -55,24 +65,31 @@ export function buildLibraryContext(allLists, options = {}, opts = {}) {
       .filter(Boolean)
       .join("\n");
 
-  const listBlock = (label, key) => {
-    const full = safeArr(allLists[key]);
-    if (!full.length) return;
-    const capped = full.slice().sort(byRecent).slice(0, cap);
-    const trunc = full.length > capped.length ? ` [showing ${capped.length} of ${full.length}, most recent]` : "";
-    const body = fmtItems(capped);
-    if (body) blocks.push(`${label}${trunc}:\n${body}`);
+  // Listeler bir kez sıralanır; bütçe döngüsü yalnız kesme noktasını değiştirir.
+  const lists = [];
+  const addList = (label, key) => {
+    const sorted = safeArr(allLists[key]).slice().sort(byRecent);
+    if (sorted.length) lists.push({ label, sorted });
   };
-
-  if (options.watchList) listBlock("WATCHLIST (titles the user plans to watch)", "watchList");
-  if (options.favorites) listBlock("FAVORITES", "favorites");
-
+  if (options.watchList) addList("WATCHLIST (titles the user plans to watch)", "watchList");
+  if (options.favorites) addList("FAVORITES", "favorites");
   if (options.custom) {
     Object.keys(allLists)
       .filter((k) => !PREDEFINED.has(k) && Array.isArray(allLists[k]))
-      .forEach((k) => listBlock(`CUSTOM LIST "${k}"`, k));
+      .forEach((k) => addList(`CUSTOM LIST "${k}"`, k));
   }
 
+  const listBlocks = (cap) =>
+    lists
+      .map(({ label, sorted }) => {
+        const capped = sorted.slice(0, cap);
+        const trunc = sorted.length > capped.length ? ` [showing ${capped.length} of ${sorted.length}, most recent]` : "";
+        const body = fmtItems(capped);
+        return body ? `${label}${trunc}:\n${body}` : null;
+      })
+      .filter(Boolean);
+
+  const tail = [];
   if (options.watched) {
     const movies = safeArr(allLists.watchedMovies);
     const tv = safeArr(allLists.watchedTv);
@@ -111,15 +128,33 @@ export function buildLibraryContext(allLists, options = {}, opts = {}) {
     ];
     if (topGenres.length) lines.push(`Most-watched genres: ${topGenres.join(", ")}.`);
     if (recent.length) lines.push(`Recently watched: ${recent.join(", ")}.`);
-    blocks.push(lines.join("\n"));
+    tail.push(lines.join("\n"));
   }
 
-  const hasAny = blocks.length > 0;
-  const librarySummary = hasAny
-    ? `USER LIBRARY (the user's own lists — personalize with these. When the user says "my watchlist / favorites / my list", choose ONLY from the items listed here):\n\n${blocks.join("\n\n")}`
-    : "";
+  // İzlenenler özeti listelerin ÜSTÜNE alınmaz (kaynak sırası korunur) ama
+  // bütçeden önce hesaplanır: kırpma gerekirse kısa ve kritik olan o blok
+  // ("bunları önerme") yerinde kalsın, listelerin sonu kısalsın.
+  const render = (cap, withTail = true) => {
+    const blocks = [...head, ...listBlocks(cap), ...(withTail ? tail : [])];
+    return blocks.length
+      ? `USER LIBRARY (the user's own lists — personalize with these. When the user says "my watchlist / favorites / my list", choose ONLY from the items listed here):\n\n${blocks.join("\n\n")}`
+      : "";
+  };
 
-  return { librarySummary, watchedIndex, hasAny };
+  let cap = opts.capPerList || DEFAULT_CAP;
+  let librarySummary = render(cap);
+  while (librarySummary.length > maxChars && cap > MIN_CAP) {
+    cap = Math.max(MIN_CAP, Math.floor(cap * 0.6));
+    librarySummary = render(cap);
+  }
+  if (librarySummary.length > maxChars) {
+    // Çok sayıda özel liste: en az öğede bile sığmadı. İzlenenler bloğu sonda
+    // olduğundan kırpmada kaybolmasın; yalnız listeler satır sınırında kısalır.
+    const tailText = tail.length ? `\n\n${tail.join("\n\n")}` : "";
+    librarySummary = `${clampBlock(render(cap, false), maxChars - tailText.length)}${tailText}`;
+  }
+
+  return { librarySummary, watchedIndex, hasAny: librarySummary.length > 0 };
 }
 
 /**

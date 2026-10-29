@@ -12,6 +12,7 @@
 import {
   GeminiError,
   GEMINI_MODEL,
+  AI_REQUEST_LIMITS,
   parseResponse,
   logUsage,
   callGeminiProxy,
@@ -334,7 +335,7 @@ function formatGenres(genres) {
 /**
  * Cevap stili tercihlerini (Ayarlar > Yapay zeka) talimat cümlelerine çevirir.
  *
- * ÇIKTI BÜTÇESİ: sunucu cine modunda 1200 token'da keser (functions/index.js).
+ * ÇIKTI BÜTÇESİ: sunucu cine modunda 1800 token'da keser (functions/aiProxy.js).
  * Liste üst sınırları bu yüzden stile göre daralır: ayrıntılı üslupta her satır
  * daha uzun olduğundan toplam öğe sayısı düşük tutulur. Varsayılan (dengeli,
  * spoilersız, 5 öğe) eski talimatla aynı kuralları üretir.
@@ -498,6 +499,40 @@ general:
     .join("\n\n");
 }
 
+/**
+ * Metin bloğunu `maxChars`a SATIR sınırında kırpar ve kırpıldığını modele söyler
+ * (yarım satır "- Başlık (Mov" gibi bozuk bir öğe bırakmaz). Sığıyorsa aynen döner.
+ */
+export function clampBlock(text, maxChars) {
+  const s = toStr(text);
+  if (s.length <= maxChars) return s;
+  const note = "\n[… truncated to fit]";
+  const room = Math.max(0, maxChars - note.length);
+  const cut = s.lastIndexOf("\n", room);
+  const head = (cut > 0 ? s.slice(0, cut) : s.slice(0, room)).trimEnd();
+  return head ? `${head}${note}` : "";
+}
+
+/**
+ * Sistem talimatını sunucu tavanına (AI_REQUEST_LIMITS.maxSystemChars) sığdırır.
+ * Tavanı aşan istek sunucuda reddedilir ve kullanıcı her mesajda "kullanılamıyor"
+ * görürdü; büyüyebilen tek parça kullanıcı kütüphanesi olduğundan önce o, sonra
+ * tekrar-engeli kısaltılır. Sabit kısım (şemalar, kurallar) hiç kırpılmaz.
+ */
+export function fitCineSystemInstruction(options = {}, maxChars = AI_REQUEST_LIMITS.maxSystemChars) {
+  let opts = options;
+  let prompt = buildCineSystemInstruction(opts);
+  for (const field of ["userLibrary", "avoidBlock"]) {
+    if (prompt.length <= maxChars) break;
+    const block = toStr(opts[field]);
+    if (!block) continue;
+    const overflow = prompt.length - maxChars;
+    opts = { ...opts, [field]: clampBlock(block, block.length - overflow) };
+    prompt = buildCineSystemInstruction(opts);
+  }
+  return prompt;
+}
+
 export function enforceTargetMediaResponse(response, targetMedia) {
   if (!targetMedia?.title || !response || typeof response !== "object") return response;
 
@@ -571,7 +606,7 @@ export async function askCineStructured({
     mode: "cine",
     history: sanitizeHistory(history),
     userMessage,
-    systemInstruction: buildCineSystemInstruction({
+    systemInstruction: fitCineSystemInstruction({
       language,
       movieGenres,
       tvGenres,

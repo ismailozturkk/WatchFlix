@@ -82,6 +82,41 @@ describe("TMDB detail hydration", () => {
   });
 });
 
+describe("geçici TMDB hatası önbelleğe girmez", () => {
+  const found = {
+    ok: true,
+    status: 200,
+    json: async () => ({ results: [{ id: 27205, title: "Inception", release_date: "2010-07-15", vote_count: 30000 }] }),
+  };
+  const lookup = (title) => lookupTitle({ apiKey: "Bearer token", title, mediaType: "movie", language: "en" });
+
+  test("503 / ağ hatası sonrası aynı başlık yeniden aranır", async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+      .mockRejectedValueOnce(new TypeError("Network request failed"))
+      .mockResolvedValue(found);
+    expect((await lookup("Inception")).found).toBe(false);
+    expect((await lookup("Inception")).found).toBe(false);
+    const card = await lookup("Inception");
+    expect(card).toMatchObject({ found: true, id: 27205 });
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  test("kesin 'bulunamadı' (boş sonuç) önbelleğe girer", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ results: [] }) });
+    expect((await lookup("Yok Böyle Bir Film")).found).toBe(false);
+    expect((await lookup("Yok Böyle Bir Film")).found).toBe(false);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("istek zaman aşımı sinyaliyle gider", async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ results: [] }) });
+    await lookup("Sinyal Testi");
+    expect(global.fetch.mock.calls[0][1].signal).toBeDefined();
+  });
+});
+
 describe("pickBestMatch (T3 B9)", () => {
   const { pickBestMatch, splitTitleYear } = require("../services/tmdbLookup");
   const obscure = { id: 1, title: "Knives Out", original_title: "Knives Out", release_date: "2016-05-01", vote_count: 12 };

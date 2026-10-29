@@ -30,6 +30,24 @@ const regionOf = (language) => (tmdbRegionOf(language));
 
 const normTitle = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").trim();
 
+// AI cevabı geldikten (hak harcandıktan) sonra kartlar çözülür; TMDB takılırsa
+// cevap ekrana hiç düşmezdi. Aşan istek "bulunamadı" kartına düşer.
+const LOOKUP_TIMEOUT_MS = 8000;
+
+async function fetchWithTimeout(url, init, timeoutMs = LOOKUP_TIMEOUT_MS) {
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    return await fetch(url, controller ? { ...init, signal: controller.signal } : init);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+// Geçici yanıt (hız sınırı, sunucu hatası): "bulunamadı" diye ÖNBELLEĞE ALINMAZ,
+// yoksa o başlık uygulama yeniden başlayana kadar posterleri olmadan kalırdı.
+const isTransientStatus = (status) => status === 429 || status >= 500;
+
 /** "Knives Out (2019)" → { title: "Knives Out", year: "2019" }; yıl yoksa year "". */
 export function splitTitleYear(raw) {
   const text = (raw || "").trim();
@@ -159,8 +177,9 @@ export async function lookupTitle({
       `&include_adult=${includeAdult ? "true" : "false"}` +
       `&language=${langOf(language)}` +
       `&page=1`;
-    const res = await fetch(url, { headers: { Authorization: apiKey } });
+    const res = await fetchWithTimeout(url, { headers: { Authorization: apiKey } });
     if (!res.ok) {
+      if (isTransientStatus(res.status)) return fallback;
       cache.set(key, fallback);
       return fallback;
     }
@@ -189,7 +208,7 @@ export async function lookupTitle({
           (includeDetails === "lite"
             ? "&append_to_response=watch%2Fproviders"
             : "&append_to_response=credits%2Cwatch%2Fproviders%2Crecommendations%2Ctranslations");
-        const detailsRes = await fetch(detailsUrl, { headers: { Authorization: apiKey } });
+        const detailsRes = await fetchWithTimeout(detailsUrl, { headers: { Authorization: apiKey } });
         if (detailsRes.ok) {
           let details = await detailsRes.json();
           details = await resolveTmdbItemTitle(details, {
@@ -226,12 +245,13 @@ export async function lookupTitle({
     }
     return card;
   } catch {
+    // Ağ hatası / zaman aşımı geçicidir: bellek önbelleğine "bulunamadı" yazılmaz,
+    // aynı başlık bir sonraki cevapta yeniden aranır.
     const stale = cacheStore.getJSON("tmdbLookup", key);
     if (stale) {
       cache.set(key, stale);
       return stale;
     }
-    cache.set(key, fallback);
     return fallback;
   }
 }

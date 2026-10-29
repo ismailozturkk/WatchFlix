@@ -39,7 +39,19 @@ Notlar:
 - Kota sabitleri: `AI_PLAN_LIMITS` (`functions/aiQuota.js`, istemci aynası
   `utils/premium.js`). Plan tespiti `Users/{uid}.entitlements` alanından;
   alanı `revenueCatWebhook` ve `syncPremiumStatus` yazar, istemci yazamaz
-  (`firestore.rules`).
+  (`firestore.rules`). `Users` okunamazsa istek `unavailable` ile düşer (Free
+  varsayılmaz — ücretli kullanıcı geçici hatada Free tavanına çarpmasın).
+- İstek çekirdeği `functions/aiProxy.js` (emülatörsüz testi `aiProxy.test.js`):
+  girdi tavanları `AI_LIMITS` (istemci aynası `services/geminiService.js`
+  `AI_REQUEST_LIMITS`, eşitliği `__tests__/aiRequestLimits.test.js` sınar),
+  anahtar `x-goog-api-key` başlığında, deneme başına 25 sn / toplam 55 sn.
+  Birincil `AI_MODEL` geçici hata (408/429/5xx, zaman aşımı, ağ), boş yanıt ya
+  da 404 verirse ikinci deneme `AI_FALLBACK_MODEL` (Flash-Lite) ile yapılır;
+  yedek istenmiyorsa iki sabiti eşitle.
+- Hak iadesi: kullanıcıya cevap ya da KENDİ içeriğinden doğan güvenlik engeli
+  dönmediyse (üst akış hatası, iki denemede boş yanıt) hak, tüketildiği gün/ay
+  penceresinde geri verilir. Dakikada 8 çağrı patlama freni (örnek içi) kotadan
+  ÖNCE çalışır, hak yakmaz.
 
 ## Mimari
 

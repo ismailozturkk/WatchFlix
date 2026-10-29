@@ -23,6 +23,15 @@ export const GEMINI_MODEL = "gemini-2.5-flash";
 // API'ye gönderilecek azami mesaj sayısı (6 gidiş-geliş). Token şişmesini önler.
 export const MAX_HISTORY_MESSAGES = 12;
 
+// Sunucu aynası: functions/aiProxy.js AI_LIMITS (eşitliği __tests__/aiRequestLimits.test.js
+// doğrular). Sistem talimatı ve mesaj tavanı aşılırsa sunucu isteği REDDEDER; istemci
+// bu yüzden göndermeden önce sığdırır (askCineStructured → fitCineSystemInstruction).
+export const AI_REQUEST_LIMITS = Object.freeze({
+  maxMessageChars: 4000,
+  maxHistoryMessageChars: 8000,
+  maxSystemChars: 24000,
+});
+
 // ── Maliyet analizi ───────────────────────────────────────────────────────────
 // gemini-2.5-flash fiyatlandırması (USD / 1.000.000 token).
 // ⚠️ Bunlar referans değerlerdir; KENDİ Google AI / Vertex faturanıza göre
@@ -153,9 +162,14 @@ export function buildUserPrompt({ message = "", movieGenres = [], tvGenres = [] 
 
 export const CALLABLE_TIMEOUT_MS = 75000; // sunucu tavanı 70 sn + pay
 
+const clampChars = (text, max) =>
+  text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+
 /**
  * Geçmişi proxy'ye gidecek sade [{role, text}] biçimine indirger.
  * (UI mesaj nesnelerindeki cards/posterMap gibi ağır alanları taşımayız.)
+ * Uzun mesaj kırpılır: eski sunucu tavanı aşan geçmişi reddederdi ve tek uzun
+ * mesaj o sohbetteki her isteği düşürürdü.
  */
 export function sanitizeHistory(history = []) {
   return (Array.isArray(history) ? history : [])
@@ -163,14 +177,26 @@ export function sanitizeHistory(history = []) {
     .filter((m) => m && typeof m.text === "string" && m.text.trim() !== "")
     .map((m) => ({
       role: m.role === "assistant" || m.role === "model" ? "model" : "user",
-      text: m.text,
+      text: clampChars(m.text, AI_REQUEST_LIMITS.maxHistoryMessageChars),
     }));
 }
 
 /** Firebase callable hatasını tipli GeminiError'a çevirir. */
-function mapCallableError(err) {
+export function mapCallableError(err) {
   const code = String(err?.code || ""); // örn. "functions/resource-exhausted"
   const details = err?.details;
+  const msg = String(err?.message || "");
+
+  // İstek sunucuya hiç ulaşmadı (uçak modu, DNS, bağlantı koptu): Firebase SDK
+  // fetch hatasını yutup durum 0 → `functions/internal` + mesaj "internal" verir.
+  // Sunucunun kendi internal hatası her zaman açıklamalı mesaj taşır.
+  if (code.endsWith("/internal") && (msg === "internal" || msg === "")) {
+    return new GeminiError("NETWORK", "Network request failed", { cause: err });
+  }
+  if (details?.reason === "EMPTY_RESPONSE") {
+    // Model iki denemede de boş döndü; hak sunucuda iade edildi.
+    return new GeminiError("EMPTY", "Empty model response", { cause: err });
+  }
 
   if (code.endsWith("resource-exhausted")) {
     if (details?.reason === "DAILY_QUOTA" || details?.reason === "MONTHLY_QUOTA") {
@@ -200,9 +226,7 @@ function mapCallableError(err) {
     e.transient = true;
     return e;
   }
-  // Callable'a hiç ulaşılamadı (uçak modu vb.) → FirebaseError "internal"
-  // ya da düz fetch TypeError'ı olarak gelir.
-  const msg = String(err?.message || "");
+  // Kodsuz hata (düz fetch TypeError'ı vb.) ya da ağ belirten mesaj.
   if (!code || /network|fetch|internet|ECONN|timeout/i.test(msg)) {
     return new GeminiError("NETWORK", msg || "Network request failed", { cause: err });
   }
@@ -268,6 +292,16 @@ export async function callGeminiProxy({
   return data;
 }
 
+// Kullanıcının içeriği yüzünden kesilen yanıt (sunucu aynası: aiProxy BLOCK_FINISH_REASONS).
+const BLOCK_FINISH_REASONS = new Set([
+  "SAFETY",
+  "RECITATION",
+  "PROHIBITED_CONTENT",
+  "BLOCKLIST",
+  "SPII",
+  "IMAGE_SAFETY",
+]);
+
 /**
  * Gemini yanıt gövdesini savunmacı şekilde düz metne çevirir.
  * @returns {{ text: string, truncated: boolean }}
@@ -284,12 +318,17 @@ export function parseResponse(data) {
   }
 
   const finishReason = candidate.finishReason;
-  if (finishReason === "SAFETY" || finishReason === "RECITATION") {
+  if (BLOCK_FINISH_REASONS.has(finishReason)) {
     throw new GeminiError("BLOCKED", `Response blocked: ${finishReason}`);
   }
 
   const parts = candidate.content?.parts || [];
-  const text = parts.map((p) => p?.text || "").join("").trim();
+  // Düşünce parçaları kullanıcıya gösterilmez (sunucu da ayıklar; eski sunucuya karşı).
+  const text = parts
+    .filter((p) => p?.thought !== true)
+    .map((p) => p?.text || "")
+    .join("")
+    .trim();
   if (!text) {
     // finishReason'ı mesaja koy: MAX_TOKENS (düşünme bütçesi tükenmesi),
     // OTHER vb. teşhis için toast/konsolda görünür.
