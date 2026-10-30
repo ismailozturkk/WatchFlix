@@ -892,6 +892,11 @@ function AppContent() {
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
+          name="FilmChainScreen"
+          getComponent={() => require("./screens/game/FilmChainScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
           name="CinemaBingoScreen"
           getComponent={() => require("./screens/bingo/CinemaBingoScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}

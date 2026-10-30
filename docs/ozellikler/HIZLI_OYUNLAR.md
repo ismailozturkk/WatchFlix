@@ -5,6 +5,9 @@ başlık havuzundan kurulan kısa sorular, **üç can**, art arda doğru sayıs�
 (dokununca hemen ilerler). Rekor ve doğruluk yalnız bu cihazda. Liderlik / XP / günlük hak / premium kapısı **yok**.
 Yeni sunucu, rules, native build gerekmez (OTA).
 
+> Rayın İLK kartı **Film Zinciri** bu ailenin üyesi DEĞİL (can/skor yok, kendi rotası `FilmChainScreen`, kendi kaydı
+> `Keys.filmChain`); kartında rekor yerine günlük durum yazar. Bkz. `docs/ozellikler/FILM_ZINCIRI.md`.
+
 Kaynak: 21 Ekim 2026, "Önce hangisi? gibi birkaç tane daha" isteği. İlk üye: `docs/ozellikler/ONCE_HANGISI.md`.
 
 | Oyun | Düzen | Soru | Zorluk eğrisi |

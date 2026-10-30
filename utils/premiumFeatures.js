@@ -582,6 +582,37 @@ export const PREMIUM_FEATURES = Object.freeze({
       de: (n) => `du kannst bis zu ${n} Titel gleichzeitig unterstützen`,
     },
   }),
+  // Film Zinciri (docs/ozellikler/FILM_ZINCIRI.md) — 30 Eki kullanıcı kararı: oyunun tamamı Premium (günlük +
+  // serbest + sohbetten gelen meydan okuma). Free'de Oyunlar rayında kart "Premium" yazar, dokununca yükseltme;
+  // sohbetteki meydan okuma kartını Free de GÖRÜR (gönderenin sonucu), "Zinciri kur" yükseltme açar. Kayıtlı
+  // sonuçlar plan düşünce silinmez. Sunucu aynası yok (TMDB okuması + cihaz-yerel kayıt).
+  film_chain: feature({
+    id: "film_chain",
+    kind: ACCESS,
+    category: "play",
+    icon: "git-network",
+    minPlan: PREMIUM_PLAN.PREMIUM,
+    title: { tr: "Film Zinciri", en: "Film Chain", es: "Cadena de Cine", pt: "Corrente de Cinema", de: "Filmkette" },
+    upsell: {
+      title: { tr: "Film Zinciri Premium'da", en: "Film Chain is a Premium perk", es: "Cadena de Cine es una ventaja Premium", pt: "A Corrente de Cinema é um benefício Premium", de: "Filmkette ist ein Premium-Vorteil" },
+      message: {
+        tr: "İki oyuncuyu ortak filmlerle bağla: her gün yeni bir zincir, sınırsız serbest mod ve arkadaşlarına spoiler'sız meydan okuma.",
+        en: "Connect two actors through shared films: a new chain every day, unlimited free play and spoiler-free challenges for your friends.",
+        es: "Conecta a dos actores con películas en común: una cadena nueva cada día, modo libre ilimitado y retos sin spoilers para tus amigos.",
+        pt: "Ligue dois atores por filmes em comum: uma corrente nova por dia, modo livre ilimitado e desafios sem spoiler para seus amigos.",
+        de: "Verbinde zwei Stars über gemeinsame Filme: jeden Tag eine neue Kette, unbegrenztes freies Spiel und spoilerfreie Challenges für Freunde.",
+      },
+    },
+    detail: {
+      tr: "Günlük zincir, serbest mod ve arkadaşa meydan okuma",
+      en: "Daily chain, free play and friend challenges",
+      es: "Cadena diaria, modo libre y retos a amigos",
+      pt: "Corrente diária, modo livre e desafios a amigos",
+      de: "Tägliche Kette, freies Spiel und Challenges für Freunde",
+    },
+    freeValue: { tr: "Kapalı", en: "Off", es: "Desactivado", pt: "Desativado", de: "Aus" },
+    paidValue: { tr: "Günlük + serbest", en: "Daily + free play", es: "Diaria + libre", pt: "Diária + livre", de: "Täglich + frei" },
+  }),
   custom_themes: feature({
     id: "custom_themes",
     kind: ACCESS,

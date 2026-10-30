@@ -25,6 +25,8 @@ import { useLanguage } from "@context/LanguageContext";
 import { Keys, useStored } from "@services/storage";
 import { normalizeOlderStats } from "@utils/olderGame";
 import { getOlderCopy } from "@utils/olderGameCopy";
+import { dailyChainRecord } from "@utils/filmChain";
+import { getFilmChainCopy } from "@utils/filmChainCopy";
 import { QUICK_GAME_IDS, QUICK_GAME_META, normalizeQuickStats } from "@utils/quickGames";
 import { getQuickCopy } from "@utils/quickGamesCopy";
 import GamePreview from "./GamePreviews";
@@ -37,6 +39,8 @@ const RAIL_PREVIEW = 72;
 
 /** "Önce hangisi?" bu ailenin ilk üyesi; kendi rotası ve kayıt anahtarı var. */
 const OLDER_TILE = { id: "older", colors: ["#6366F1", "#4338CA"] };
+/** Film Zinciri (screens/game/FilmChainScreen): rayın başında, günlük bulmacası olan tek hızlı oyun. */
+const CHAIN_TILE = { id: "chain", colors: ["#14B8A6", "#0F766E"] };
 
 function GameCard({ tile, best, copy, onOpen, feature, style }) {
   return (
@@ -66,12 +70,12 @@ function GameCard({ tile, best, copy, onOpen, feature, style }) {
         <View style={styles.meta}>
           <AppIcon
             family="Ionicons"
-            name={tile.locked ? "diamond" : best > 0 ? "trophy" : "sparkles"}
+            name={tile.locked ? "diamond" : tile.meta ? tile.meta.icon : best > 0 ? "trophy" : "sparkles"}
             size={11}
-            color={!tile.locked && best > 0 ? GOLD : "#FFFFFF"}
+            color={!tile.locked && (tile.meta ? tile.meta.highlight : best > 0) ? GOLD : "#FFFFFF"}
           />
           <Text style={styles.metaText} numberOfLines={1} allowFontScaling={false}>
-            {tile.locked ? "Premium" : best > 0 ? copy.cardBest(best) : copy.cardNew}
+            {tile.locked ? "Premium" : tile.meta ? tile.meta.text : best > 0 ? copy.cardBest(best) : copy.cardNew}
           </Text>
           {feature && !tile.locked ? (
             <View style={styles.play}>
@@ -84,12 +88,14 @@ function GameCard({ tile, best, copy, onOpen, feature, style }) {
   );
 }
 
-function QuickGamesGrid({ theme, onOpen, leadingTiles = EMPTY, title, bleed = 0 }) {
+// `chainLocked`: Film Zinciri bu planda kapalı (registry "film_chain") — kart "Premium" yazar; dokunuş yine `onOpen`.
+function QuickGamesGrid({ theme, onOpen, leadingTiles = EMPTY, title, bleed = 0, chainLocked = false }) {
   const { language } = useLanguage();
   const { user } = useAuth() || {};
   const uid = user?.uid || null;
   const copy = getOlderCopy(language); // ortak metinler + "Önce hangisi?" başlığı
   const quick = getQuickCopy(language);
+  const chainCopy = getFilmChainCopy(language);
 
   const olderRaw = useStored(Keys.olderGame, { uid });
   const quickRaw = useStored(Keys.quickGames, { uid });
@@ -100,7 +106,19 @@ function QuickGamesGrid({ theme, onOpen, leadingTiles = EMPTY, title, bleed = 0 
     return map;
   }, [olderRaw, quickRaw]);
 
+  // Film Zinciri: rekor yerine bugünün günlük durumu ("Bugün çözüldü" / "Bugünün zinciri").
+  const chainRaw = useStored(Keys.filmChain, { uid });
+  const chainDone = useMemo(() => !!dailyChainRecord(chainRaw), [chainRaw]);
+
   const railTiles = [
+    {
+      ...CHAIN_TILE,
+      title: chainCopy.title,
+      locked: chainLocked,
+      meta: chainDone
+        ? { icon: "checkmark-circle", text: chainCopy.cardDone, highlight: true }
+        : { icon: "git-network-outline", text: chainCopy.cardToday, highlight: false },
+    },
     { ...OLDER_TILE, title: copy.title },
     ...QUICK_GAME_IDS.map((id) => ({
       id,

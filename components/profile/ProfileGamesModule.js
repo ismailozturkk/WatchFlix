@@ -73,6 +73,9 @@ export default function ProfileGamesModule({ navigation }) {
   // Günlük hakkı biten Premium kullanıcı kilitli SAYILMAZ: allows(0) yalnız
   // planda oyun hiç yoksa false döner; hak bitişini oyun başlangıcı denetler.
   const gamesGate = usePremiumGate("games");
+  // Film Zinciri ayrı bir Premium erişimi (registry "film_chain"): kartı "Premium" yazar, dokununca yükseltme.
+  const chainGate = usePremiumGate("film_chain");
+  const chainLocked = !chainGate.allows(0);
   const locked = !gamesGate.allows(0);
   const guarded = (action) => (...args) => {
     if (locked) {
@@ -101,7 +104,11 @@ export default function ProfileGamesModule({ navigation }) {
       openSetup(gameId);
       return;
     }
-    if (gameId === "older") navigation.navigate("OlderGameScreen", { source: "hub" });
+    if (gameId === "chain") {
+      if (chainLocked) chainGate.showUpsell();
+      else navigation.navigate("FilmChainScreen", { mode: "daily" });
+    }
+    else if (gameId === "older") navigation.navigate("OlderGameScreen", { source: "hub" });
     else navigation.navigate("QuickGameScreen", { gameId, source: "hub" });
   };
 
@@ -155,7 +162,13 @@ export default function ProfileGamesModule({ navigation }) {
           {duelPayload ? <DuelSendButton payload={duelPayload} theme={theme} source="hub" dense /> : null}
 
           {/* Önizlemeli oyun kartları; hızlı oyunlar kilit şeridinden bağımsız, her planda açık. */}
-          <QuickGamesGrid theme={theme} onOpen={openQuickGame} leadingTiles={leadingTiles} bleed={bleed} />
+          <QuickGamesGrid
+            theme={theme}
+            onOpen={openQuickGame}
+            leadingTiles={leadingTiles}
+            bleed={bleed}
+            chainLocked={chainLocked}
+          />
         </View>
       )}
 

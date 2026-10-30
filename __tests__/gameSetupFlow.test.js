@@ -180,7 +180,7 @@ describe("Eğlence > Oyunlar modülü", () => {
     await mountModule();
     const grid = renderer.root.findAll((n) => n.type === "Scale" && typeof n.props.accessibilityLabel === "string");
     expect(grid.map((n) => n.props.accessibilityLabel).slice(0, 2)).toEqual(GAME_REGISTRY.map((g) => g.id));
-    expect(grid).toHaveLength(2 + 1 + QUICK_GAME_IDS.length);
+    expect(grid).toHaveLength(2 + 2 + QUICK_GAME_IDS.length); // + Film Zinciri + Önce hangisi?
     const titles = renderer.root.findAllByType("Section").map((n) => n.props.title);
     expect(titles).toEqual(["Oyunlar", "Hızlı oyunlar"]); // "Oyun Merkezi" kısayolu yok; giriş oyuncu çipi
     grid.forEach((tile) => expect(tile.findAllByType("Image").length).toBeGreaterThan(0));
@@ -242,7 +242,7 @@ describe("Eğlence > Oyunlar modülü", () => {
     mockLocked = true;
     const navigation = await mountModule();
     const texts = renderer.root.findAllByType("Text").map((n) => [].concat(n.props.children).join(""));
-    expect(texts.filter((t) => t === "Premium")).toHaveLength(2);
+    expect(texts.filter((t) => t === "Premium")).toHaveLength(3); // iki sahne oyunu + Film Zinciri
 
     await press(SCENE_GAME_ID);
     expect(mockUpsell).toHaveBeenCalledTimes(1);
@@ -251,6 +251,10 @@ describe("Eğlence > Oyunlar modülü", () => {
     const quickTiles = renderer.root.findAll((n) => n.type === "Scale" && typeof n.props.accessibilityLabel === "string").slice(2);
     await act(async () => quickTiles[0].props.onPress());
     await act(async () => quickTiles[1].props.onPress());
+    await act(async () => quickTiles[2].props.onPress());
+    // Film Zinciri ayrı Premium erişimi: kilitliyken ekrana değil yükseltmeye.
+    expect(navigation.navigate).not.toHaveBeenCalledWith("FilmChainScreen", expect.anything());
+    expect(mockUpsell).toHaveBeenCalledTimes(2);
     expect(navigation.navigate).toHaveBeenCalledWith("OlderGameScreen", { source: "hub" });
     expect(navigation.navigate).toHaveBeenCalledWith("QuickGameScreen", { gameId: QUICK_GAME_IDS[0], source: "hub" });
   });

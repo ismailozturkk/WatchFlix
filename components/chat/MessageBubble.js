@@ -33,6 +33,7 @@ import SharedMediaCollection from "./SharedMediaCollection";
 import SharedMediaMessage from "./SharedMediaMessage";
 import SharedPostMessage from "./SharedPostMessage";
 import SharedSettingsMessage from "./SharedSettingsMessage";
+import SharedChainMessage from "./SharedChainMessage";
 import SharedTasteMatchMessage from "./SharedTasteMatchMessage";
 import SharedTournamentMessage from "./SharedTournamentMessage";
 import SwipeReplyContainer from "./SwipeReplyContainer";
@@ -353,6 +354,8 @@ const MessageBubble = memo(
             />
           ) : share?.type === "settings" ? (
             <SharedSettingsMessage share={share} isOutgoing={isMe} />
+          ) : share?.type === "chain" ? (
+            <SharedChainMessage share={share} isOutgoing={isMe} />
           ) : hasItems ? (
             <SharedMediaCollection
               items={item.items}

@@ -78,6 +78,7 @@ export const PREMIUM_TOP_BANNER_HIDDEN_ROUTES = Object.freeze(
     "SceneGamePlayScreen",
     "QuickGameScreen",
     "OlderGameScreen",
+    "FilmChainScreen",
     "CinemaBingoScreen",
     // Geliştirici ekranı
     "UsageDebugScreen",

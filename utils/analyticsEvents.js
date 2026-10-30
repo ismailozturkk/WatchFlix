@@ -131,6 +131,11 @@ export const ANALYTICS_EVENTS = {
   // dengesi (ortalama skor) buradan okunur.
   QUICK_GAME_STARTED: "quick_game_started",
   QUICK_GAME_FINISHED: "quick_game_finished",
+  // Film Zinciri (utils/filmChain.js): bulmaca açıldı {mode: "daily"|"free", number, par} / bitti {mode, number, par,
+  // links, gave_up, points} / sonuç paylaşıldı {mode, number, target: "out" (sistem sayfası) | "chat" (meydan okuma)}. Ortalama `links - par` bulmacaların zorluğunu söyler.
+  FILM_CHAIN_STARTED: "film_chain_started",
+  FILM_CHAIN_FINISHED: "film_chain_finished",
+  FILM_CHAIN_SHARED: "film_chain_shared",
   // Günün Sorusu'nda OY VERİLDİ (utils/dailyPoll.js). `question_id` kalıcı soru kimliği (seçilen taraf GÖNDERİLMEZ),
   // `synced` oy sunucuya yazıldı mı (false = çevrimdışı / kurallar yayında değil → yerelde bekliyor).
   DAILY_POLL_VOTED: "daily_poll_voted",

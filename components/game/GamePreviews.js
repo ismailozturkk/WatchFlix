@@ -39,6 +39,8 @@ export const PREVIEW_FACTS = Object.freeze({
   genre: { poster: posterOf("movie", 155), options: ["comedy", "action", "romance"], correct: "action" }, // The Dark Knight
   // Bulanık Afiş: şıklar yapım BAŞLIKLARI (çevrilmez); doğru olan afişin kendi adı.
   blur: { poster: posterOf("movie", 550), options: ["Se7en", "Fight Club", "Memento"], correct: "Fight Club", points: 70 },
+  // Film Zinciri: iki oyuncu ortak filmle bağlanır (Tom Hanks — Forrest Gump — Robin Wright).
+  chain: { from: "TH", poster: posterOf("movie", 13), to: "RW" },
 });
 
 // Sahne karesinde gizlenen parçalar (3×3, soldan sağa) — afişin yarısı açık kalsın.
@@ -199,6 +201,26 @@ function BlurPreview({ height, compact, pointsLabel }) {
   );
 }
 
+/** İki oyuncu (baş harfleri) ortadaki ortak filmle bağlanmış: oyuncu → film → oyuncu. */
+function ChainPreview({ height }) {
+  const { from, poster, to } = PREVIEW_FACTS.chain;
+  const dot = Math.min(30, Math.round(height * 0.42));
+  const person = (initials, right) => (
+    <View style={[styles.chainDot, { width: dot, height: dot, borderRadius: dot / 2 }, right && styles.posterRight]}>
+      <Text style={styles.chainDotText} allowFontScaling={false}>{initials}</Text>
+    </View>
+  );
+  return (
+    <View style={[styles.row, { height }]}>
+      {person(from)}
+      <View style={styles.chainLink} />
+      <MiniPoster poster={poster} height={height - 14} />
+      <View style={styles.chainLink} />
+      {person(to, true)}
+    </View>
+  );
+}
+
 /**
  * Oyun kimliğine göre önizleme. Bilinmeyen kimlikte null (kart yalnız simgeyle çizilir).
  * @param {{ gameId: string, height: number }} props
@@ -255,6 +277,8 @@ function GamePreview({ gameId, height }) {
     }
     case "blur":
       return <BlurPreview height={height} compact={compact} pointsLabel={quick.blur.points} />;
+    case "chain":
+      return <ChainPreview height={height} />;
     default:
       return null;
   }
@@ -279,6 +303,17 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.3)",
   },
   posterRight: { borderColor: GREEN, borderWidth: 1.5 },
+
+  // Film Zinciri
+  chainDot: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.6)",
+  },
+  chainDotText: { color: "#FFFFFF", fontSize: 10, fontWeight: "900" },
+  chainLink: { width: 8, height: 2, borderRadius: 1, backgroundColor: "rgba(255,255,255,0.75)" },
 
   // Sahne Tahmin
   frame: { overflow: "hidden" },

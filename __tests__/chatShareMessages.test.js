@@ -107,6 +107,7 @@ jest.mock("../components/chat/SharedMediaMessage", () => ({ __esModule: true, de
 jest.mock("../components/chat/SharedChallengeMessage", () => ({ __esModule: true, default: "ChallengeBody" }));
 // Düello sonucu kartı da tablo okur; gövdesi __tests__/inviteResults.test.js'te sınanır.
 jest.mock("../components/chat/SharedDuelResultMessage", () => ({ __esModule: true, default: "DuelResultBody" }));
+jest.mock("../components/chat/SharedChainMessage", () => ({ __esModule: true, default: "ChainBody" }));
 
 const getTmdbUrl = (path, _type, width) => `https://img.test/w${width}${path}`;
 

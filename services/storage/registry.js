@@ -622,6 +622,16 @@ const dataKeys = {
     keepOnLogout: true,
     validate: plainObject,
   },
+  // Film Zinciri kaydı (utils/filmChain.js): { plays, solved, perfect, gaveUp, bestStreak, days: { "<gün>": { puzzleId,
+  // links, par, points, gaveUp, path } } } — son 60 günlük bulmaca. Yalnız bu cihazda; çıkışta SİLİNMEZ (olderGame ile aynı).
+  filmChain: {
+    key: "film_chain:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
   // Takip edilen oyuncu / yönetmenler (utils/followedPeople.js): { "<kişiId>": { id, name, photo,
   // department, at } }. Yalnız bu cihazda tutulur (buluta yazılmaz) ve çıkışta SİLİNMEZ: bulut
   // kopyası olmadığından silinen liste geri getirilemez (yearlyGoals ile aynı karar).

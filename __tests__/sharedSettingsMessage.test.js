@@ -140,6 +140,7 @@ jest.mock("../components/chat/SwipeReplyContainer", () => ({ __esModule: true, d
 jest.mock("../components/chat/MessageReplyPreview", () => ({ __esModule: true, default: () => null }));
 jest.mock("../components/chat/SharedChallengeMessage", () => ({ __esModule: true, default: "ChallengeBody" }));
 jest.mock("../components/chat/SharedDuelResultMessage", () => ({ __esModule: true, default: "DuelResultBody" }));
+jest.mock("../components/chat/SharedChainMessage", () => ({ __esModule: true, default: "ChainBody" }));
 jest.mock("../components/chat/SharedListMessage", () => ({ __esModule: true, default: "ListBody" }));
 
 const MessageBubble = require("../components/chat/MessageBubble").default;

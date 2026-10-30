@@ -91,6 +91,7 @@ const QuickGamesGrid = require("../components/game/QuickGamesGrid").default;
 const { BLUR_ARM_FALLBACK_MS, QUICK_REVEAL_MS } = require("../hooks/useQuickGame");
 const { QUICK_COPY, quickOptionLabel } = require("../utils/quickGamesCopy");
 const { OLDER_COPY } = require("../utils/olderGameCopy");
+const { FILM_CHAIN_COPY } = require("../utils/filmChainCopy");
 const { buildTextlessBlurQuestion, BLUR_PROBE_MAX } = require("../services/quickGamePool");
 const { BLUR_ROUND_MS, QUICK_GAME_IDS, QUICK_GAME_META, QUICK_GENRES, canonGenresOf, decadeOf } = require("../utils/quickGames");
 const STREAK_GAMES = QUICK_GAME_IDS.filter((id) => !QUICK_GAME_META[id].timed);
@@ -490,19 +491,21 @@ describe("yazısız afiş araması (buildTextlessBlurQuestion)", () => {
 describe("Eğlence ızgarası", () => {
   const mountGrid = (onOpen = jest.fn()) => { act(() => { renderer = create(<QuickGamesGrid theme={mockTheme} onOpen={onOpen} />); }); return onOpen; };
 
+  // Film Zinciri rayın başında; kartında rekor yerine günlük durum yazar ("Bugünün zinciri").
   const TILE_COUNT = 1 + QUICK_GAME_IDS.length;
   test("altı kart (Önce hangisi? + beş oyun) tek yatay rayda, başlık ve 'Yeni'; her kartta önizleme", () => {
     mountGrid();
     expect(has(quick().gridTitle)).toBe(true);
     const tiles = scales();
-    expect(tiles).toHaveLength(TILE_COUNT);
+    expect(tiles).toHaveLength(TILE_COUNT + 1);
     expect(tiles.map((t) => t.props.accessibilityLabel)).toEqual([
-      OLDER_COPY.tr.title, ...QUICK_GAME_IDS.map((id) => QUICK_COPY.tr.games[id].title),
+      FILM_CHAIN_COPY.tr.title, OLDER_COPY.tr.title, ...QUICK_GAME_IDS.map((id) => QUICK_COPY.tr.games[id].title),
     ]);
     expect(texts().filter((t) => t === OLDER_COPY.tr.cardNew)).toHaveLength(TILE_COUNT);
+    expect(has(FILM_CHAIN_COPY.tr.cardToday)).toBe(true);
     const [rail] = renderer.root.findAllByType("ScrollView");
     expect(rail.props.horizontal).toBe(true);
-    expect(rail.findAll((n) => n.type === "Scale")).toHaveLength(TILE_COUNT);
+    expect(rail.findAll((n) => n.type === "Scale")).toHaveLength(TILE_COUNT + 1);
     // Her kart kendi oyununun önizlemesini taşır (afiş görselleri paketten, ağ yok).
     tiles.forEach((tile) => expect(tile.findAllByType("Image").length).toBeGreaterThan(0));
   });
@@ -510,7 +513,7 @@ describe("Eğlence ızgarası", () => {
   test("dokununca kare kimliğiyle açılır: older + beş hızlı oyun", () => {
     const onOpen = mountGrid();
     scales().forEach((tile) => act(() => tile.props.onPress()));
-    expect(onOpen.mock.calls.map(([id]) => id)).toEqual(["older", ...QUICK_GAME_IDS]);
+    expect(onOpen.mock.calls.map(([id]) => id)).toEqual(["chain", "older", ...QUICK_GAME_IDS]);
   });
 
   test("her karede kendi rekoru görünür (Önce hangisi? ayrı anahtardan)", () => {

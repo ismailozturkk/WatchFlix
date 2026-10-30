@@ -84,6 +84,7 @@ const LOCAL_PROGRESS_KEYS = Object.freeze([
   Keys.quickGames,
   Keys.dailyPoll,
   Keys.olderGame,
+  Keys.filmChain,
   Keys.followedPeople,
   Keys.cineLastResult,
   Keys.cineResultHistory,

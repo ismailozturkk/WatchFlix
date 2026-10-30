@@ -48,6 +48,7 @@ export const SHARE_KIND = Object.freeze({
   CHALLENGE: "challengeShare",
   DUEL_RESULT: "duelResultShare",
   SETTINGS: "settingsShare",
+  CHAIN: "chainShare",
 });
 
 export const SHARE_TYPE = Object.freeze({
@@ -61,6 +62,7 @@ export const SHARE_TYPE = Object.freeze({
   DUEL_RESULT: "duelResult",
   // Gövdenin kendisi utils/settingsShare.js'te (görünüm ayarları; alıcı seçerek uygular).
   SETTINGS: SETTINGS_SHARE_TYPE,
+  CHAIN: "chain",
 });
 
 const KIND_BY_TYPE = {
@@ -73,6 +75,7 @@ const KIND_BY_TYPE = {
   [SHARE_TYPE.CHALLENGE]: SHARE_KIND.CHALLENGE,
   [SHARE_TYPE.DUEL_RESULT]: SHARE_KIND.DUEL_RESULT,
   [SHARE_TYPE.SETTINGS]: SHARE_KIND.SETTINGS,
+  [SHARE_TYPE.CHAIN]: SHARE_KIND.CHAIN,
 };
 const SHARE_KINDS = Object.values(SHARE_KIND);
 
@@ -690,6 +693,80 @@ export function buildDuelResultShare({ dayKey, hostUid, host, hostScore, guest, 
   return sanitizeDuelResultShare({ dayKey, hostUid, host, hostScore, guest, guestScore, correct, total });
 }
 
+// ─── Film Zinciri meydan okuması ─────────────────────────────────────────────
+
+const CHAIN_PUZZLE_ID = /^\d{1,9}-\d{1,9}$/;
+const CHAIN_MAX_LINKS = 6; // utils/filmChain.CHAIN_MAX_FILMS ile aynı (oraya bağlanmaz: bulmaca verisini çekmesin)
+const MAX_CHAIN_NUMBER = 100000;
+
+function sanitizeChainPerson(raw) {
+  if (!isObject(raw)) return null;
+  const id = Math.round(Number(raw.id));
+  const name = clip(raw.name, 80);
+  if (!Number.isFinite(id) || id <= 0 || !name) return null;
+  const profilePath = typeof raw.profilePath === "string" && /^\/[\w.-]+$/.test(raw.profilePath) ? raw.profilePath : null;
+  return { id, name, profilePath };
+}
+
+/** utils/filmChain.chainPoints'in aynısı (bekçi testi eşitliği denetler); karttaki puan gönderenden alınmaz. */
+export const chainSharePoints = (links, par, gaveUp) =>
+  gaveUp || !links ? 0 : Math.max(10, 100 - 25 * Math.max(0, links - par));
+
+function sanitizeChainShare(raw) {
+  const puzzleId = typeof raw.puzzleId === "string" && CHAIN_PUZZLE_ID.test(raw.puzzleId) ? raw.puzzleId : null;
+  const start = sanitizeChainPerson(raw.start);
+  const target = sanitizeChainPerson(raw.target);
+  const par = Math.round(Number(raw.par));
+  const gaveUp = raw.gaveUp === true;
+  const links = gaveUp ? 0 : Math.round(Number(raw.links));
+  if (!puzzleId || !start || !target || start.id === target.id) return null;
+  if (!Number.isFinite(par) || par < 1 || par > CHAIN_MAX_LINKS) return null;
+  if (!gaveUp && (!Number.isFinite(links) || links < 1 || links > CHAIN_MAX_LINKS)) return null;
+  const share = {
+    v: SHARE_VERSION,
+    type: SHARE_TYPE.CHAIN,
+    puzzleId,
+    mode: "free",
+    start,
+    target,
+    par,
+    links,
+    gaveUp,
+    points: chainSharePoints(links, par, gaveUp),
+  };
+  const dayKey = typeof raw.dayKey === "string" && CHALLENGE_DAY.test(raw.dayKey) ? raw.dayKey : null;
+  const number = Math.round(Number(raw.number));
+  if (raw.mode === "daily" && dayKey && Number.isFinite(number) && number >= 1 && number <= MAX_CHAIN_NUMBER) {
+    share.mode = "daily";
+    share.dayKey = dayKey;
+    share.number = number;
+  }
+  const host = clip(raw.host, MAX_AUTHOR_NAME);
+  if (host) share.host = host;
+  return share;
+}
+
+/**
+ * Film Zinciri sonucu → sohbette meydan okuma kartı. Yalnız bulmacanın kendisi (başlangıç → hedef, en kısa) ve
+ * gönderenin SAYILARI taşınır (film sayısı, puan); zincirin film ve oyuncuları ASLA — alıcı aynı bulmacayı karttan
+ * oynar (`puzzleId`). Günlükse ve gün bugünse alıcı günlük modda, değilse serbest modda aynı bulmacayı açar.
+ */
+export function buildChainShare({ puzzle, links, gaveUp, mode, host } = {}) {
+  if (!isObject(puzzle)) return null;
+  return sanitizeChainShare({
+    puzzleId: puzzle.id,
+    start: puzzle.start,
+    target: puzzle.target,
+    par: puzzle.par,
+    links,
+    gaveUp: !!gaveUp,
+    mode,
+    dayKey: puzzle.dayKey,
+    number: puzzle.number,
+    host,
+  });
+}
+
 // ─── Ortak: doğrulama, okuma, önizleme ───────────────────────────────────────
 
 /** Bilinmeyen/bozuk gövde → null; geçerliyse temizlenmiş kopya. */
@@ -714,6 +791,8 @@ export function sanitizeShare(raw) {
       return sanitizeDuelResultShare(raw);
     case SHARE_TYPE.SETTINGS:
       return sanitizeSettingsShare(raw);
+    case SHARE_TYPE.CHAIN:
+      return sanitizeChainShare(raw);
     default:
       return null;
   }
@@ -778,6 +857,11 @@ export function sharePreview(share) {
       return i18nText("autoI18n.paylas_ayar_onizleme", "Görünüm ayarları ({{n}})", {
         n: settingsShareSectionIds(share).length,
       });
+    case SHARE_TYPE.CHAIN:
+      return i18nText("autoI18n.paylas_zincir_onizleme", "Film Zinciri · {{a}} → {{b}}", {
+        a: share.start.name,
+        b: share.target.name,
+      });
     default: {
       const head = titlesOf(share).slice(0, 3).join(", ");
       return head || firstLine(share.summary, 80) || share.question || "CineMatch";
@@ -815,6 +899,10 @@ export function shareMessageText(share) {
     case SHARE_TYPE.SETTINGS:
       line = `🎨 ${sharePreview(share)}`;
       break;
+    case SHARE_TYPE.CHAIN:
+      // Sayı spoiler değil; zincirin halkaları yazılmaz.
+      line = `🔗 ${sharePreview(share)}${share.gaveUp ? "" : ` · ${"🎬".repeat(share.links)}`}`;
+      break;
     default:
       line = `✨ CineMatch · ${sharePreview(share)}`;
   }
@@ -848,6 +936,7 @@ export function shareThumb(share) {
     case SHARE_TYPE.CHALLENGE:
     case SHARE_TYPE.DUEL_RESULT:
     case SHARE_TYPE.SETTINGS:
+    case SHARE_TYPE.CHAIN:
       return null;
     case SHARE_TYPE.TASTE_MATCH:
       return (share.items || []).find((item) => item.poster_path)?.poster_path || null;
