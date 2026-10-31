@@ -50,7 +50,8 @@ lig blokları, `firestore.rules` ~205 satır, 8 dosyalık staged silme). Bunlara
 ### T-PERF-2 — `maxInstances` ve fan-out maliyetini açık yönet
 > **DURUM: KOD TAMAM (2026-10-31), DEPLOY BEKLİYOR.** Canlı yapılandırma okundu: gen2 = 1 vCPU + eşzamanlılık 80
 > (10 instance ≈ 800 eşzamanlı istek) → "10 tavanı throughput'u boğar" varsayımı abartılıydı. `functions/capacity.js`
-> sınıfları: `light` 20 (yalnız Firestore'lu callable'lar), `upstream` 10 (Gemini/OMDb/RevenueCat/Apple —
+> sınıfları: `light` 10 (1 Kas'ta 20'den geri alındı: Cloud Run "Total CPU allocation" kotası us-central1'de
+> toplam 20 vCPU = tüm fonksiyonlar birlikte en fazla 20 instance; yalnız Firestore'lu callable'lar), `upstream` 10 (Gemini/OMDb/RevenueCat/Apple —
 > `syncPremiumStatus` RevenueCat API çağırdığı için burada, rehberin ilk önerisinden bilinçli sapma), `trigger` 10,
 > `singleton` 1 (zamanlanmışlar). gen1 `purgeOnAuthUserDeleted` 3000 → 10 (`runWith`). Bekçi:
 > `functions/capacity.test.js` (her export açık tavan seçmeli). Manifest (`__endpoint.maxInstances`) ile doğrulandı.

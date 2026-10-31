@@ -6,6 +6,16 @@ Her sayının yanında **ÖLÇÜLDÜ** ya da **TAHMİN** yazar.
 
 ---
 
+> **Yayın (1 Kas, kullanıcı onayıyla):** push + Firestore kuralları + fonksiyonlar + Hosting yayında. CDN ucu
+> canlıda doğrulandı (`seelogd.com/api/top100`: 1. istek MISS, 2. HIT). Ölçülen yeni sınır: Cloud Run "Total CPU
+> allocation" us-central1'de **20 vCPU** → bölgedeki bütün fonksiyonlar birlikte en fazla 20 instance (1 vCPU'luk).
+> 10K hedefinde asıl kapasite tavanı budur; büyümeden önce kota artışı istenmeli (Cloud Console → IAM ve Yönetici →
+> Kotalar). `functions/capacity.js`'te hiçbir sınıf 10'u geçmez.
+>
+> **Cihaz testi (1 Kas):** Kullanıcı Aşama 1-2-3 değişikliklerini cihazda denedi, sorun bildirmedi. Kural/fonksiyon/Hosting
+> henüz yayında olmadığı için sunucu tarafı yeni yollar (CDN, tablo anlık görüntüsü, ortak liste damga kuralı) değil, istemcinin
+> eski yola düşüşü denenmiş oldu; yeni yollar deploy sonrası ayrıca bakılmalı.
+
 ## 0. Kısa cevap
 
 1. **Bugün Firestore için 0 TL ödüyorsun.** Son 31 günün en yoğun gününde 18.313 okuma oldu. Günlük ücretsiz kota 50.000.

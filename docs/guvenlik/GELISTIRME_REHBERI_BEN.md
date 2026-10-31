@@ -10,7 +10,9 @@ Her madde şu düzende: **Ne sorun · Neden önemli · Ne yapılmalı · Zorluk/
 
 ## 📌 NOTLAR — 31 Ekim gecesi durumu (kalktığında buradan başla)
 
-**Kodda yapılabilecek her madde bitti ve commit'lendi** (dalda: `codex/release-candidate-1.4.3`). **Hiçbir şey push'lanmadı, yayına (deploy) alınmadı.** Testler: uygulama 8.130/8.130, kurallar 363/363, sunucu 116 geçti / 0 başarısız.
+**Kodda yapılabilecek her madde bitti ve commit'lendi** (dalda: `codex/release-candidate-1.4.3`). Testler: uygulama 8.171/8.171, kurallar 369/369, sunucu 121 geçti / 0 başarısız.
+
+> ✅ **1 Kasım — PUSH + DEPLOY YAPILDI (senin onayınla):** dal GitHub'a gönderildi; Firestore kuralları, fonksiyonlar ve Hosting yayında. Kural yayınından önce canlı kurallarla karşılaştırdım: başka oturumların kuralları zaten yayındaydı, giden fark yalnız bizim değişikliklerimizdi. `seelogd.com/api/top100` CDN'den çalışıyor (ikinci istek önbellekten). Deploy sırasında bir bulgu: projenin Cloud Run kotası bölge başına **toplam 20 vCPU** — bütün fonksiyonlar birlikte en fazla 20 kopya çalıştırabilir. Bu yüzden hafif fonksiyonların tavanını 20'den 10'a geri çektim (tek fonksiyon bölgenin tamamını kapmasın). Büyümede ilk yapılacak iş Cloud Console'dan kota artışı istemek. **Kalan senin işin:** uygulamanın yeni sürümü (build).
 
 ### ✋ Senin yapacakların
 1. **Yayına alma (deploy) — sırası önemli:**
@@ -73,7 +75,7 @@ Yani 10.000 kullanıcı hedefinde, yüzlerce kişi aynı ankete oy verirse çoğ
 > ✅ **YAPILDI (31 Ekim) — yayına alınmayı bekliyor.** Firebase'deki gerçek ayara salt-okunur baktım: her fonksiyon kopyası aynı anda **80 isteğe** bakabiliyor. Yani "10 kopya" aslında aynı anda ~800 istek demek; düşündüğümüz kadar dar değilmiş. Asıl sorunlar başka çıktı ve düzeltildi:
 > - Hesap silindiğinde çalışan eski tip bir fonksiyon bu sınırı hiç tanımıyordu (**3.000 kopyaya** kadar çıkabiliyordu) → 10'a çekildi.
 > - Gece/haftalık çalışan toplu işler (bildirim özeti, platform taraması vb.) aynı anda iki kez çalışabiliyordu → tek kopyaya sınırlandı.
-> - Hafif fonksiyonlar (davet, kod kullanma, arkadaş araması, lig XP) 20'ye çıktı. Yapay zekâ, IMDb puanları ve abonelik kontrolü gibi dış servise bağlı olanlar 10'da kaldı (karşı tarafın kotası zaten sınırlı).
+> - Hafif fonksiyonlar (davet, kod kullanma, arkadaş araması, lig XP) önce 20'ye çıkarıldı, 1 Kasım'da 10'a geri alındı: projenin bölge kotası toplam 20 vCPU, yani 20 tek fonksiyonun bölgenin tamamını kapması demek. Yapay zekâ, IMDb puanları ve abonelik kontrolü gibi dış servise bağlı olanlar 10'da.
 > - Bundan sonra eklenen her fonksiyon sınırını açıkça seçmek zorunda; seçmezse test düşüyor.
 > - Profil yayılımı kontrol edildi, iyi durumda: yalnız ad/kullanıcı adı/fotoğraf değişince çalışıyor ve yalnız değişen alanı yazıyor.
 
