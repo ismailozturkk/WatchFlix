@@ -8,37 +8,54 @@ Her madde şu düzende: **Ne sorun · Neden önemli · Ne yapılmalı · Zorluk/
 
 ---
 
-## 📌 NOTLAR — 31 Ekim gecesi durumu (kalktığında buradan başla)
+## 📌 NOTLAR — 1 Kasım durumu (buradan devam)
 
-**Kodda yapılabilecek her madde bitti ve commit'lendi** (dalda: `codex/release-candidate-1.4.3`). Testler: uygulama 8.171/8.171, kurallar 369/369, sunucu 121 geçti / 0 başarısız.
+Dal: `codex/release-candidate-1.4.3`, **push'lu**. Sürüm **1.5.0**. Testler: uygulama 8.186/8.186, kurallar 368/368, sunucu 121 geçti / 0 başarısız.
 
-> ✅ **1 Kasım — PUSH + DEPLOY YAPILDI (senin onayınla):** dal GitHub'a gönderildi; Firestore kuralları, fonksiyonlar ve Hosting yayında. Kural yayınından önce canlı kurallarla karşılaştırdım: başka oturumların kuralları zaten yayındaydı, giden fark yalnız bizim değişikliklerimizdi. `seelogd.com/api/top100` CDN'den çalışıyor (ikinci istek önbellekten). Deploy sırasında bir bulgu: projenin Cloud Run kotası bölge başına **toplam 20 vCPU** — bütün fonksiyonlar birlikte en fazla 20 kopya çalıştırabilir. Bu yüzden hafif fonksiyonların tavanını 20'den 10'a geri çektim (tek fonksiyon bölgenin tamamını kapmasın). Büyümede ilk yapılacak iş Cloud Console'dan kota artışı istemek. **Kalan senin işin:** uygulamanın yeni sürümü (build).
+**Sunucu tarafı tamamen yayında:** Firestore kuralları, 29 fonksiyon ve Hosting. `seelogd.com/api/top100` CDN'den çalışıyor. Maliyet çalışmasının üç aşaması da (okuma azaltma, önbellekleme, CDN) bitti ve canlıda.
 
-### ✋ Senin yapacakların
-1. **Yayına alma (deploy) — sırası önemli:**
-   1. `firebase deploy --only firestore:rules,functions`
-   2. Sonra uygulamanın yeni sürümü (build).
+### ✋ Sende olan tek iş: build
 
-   Ters sırada olursa yeni sürümde Günün Sorusu oyu ve arkadaş araması çalışmaz.
-   (1 Kas eki: aynı kural yayını, ortak listede kurucu olmayan üyenin eklediği/çıkardığı içeriğin diğer üyelere hemen yansıması için gereken küçük kuralı da taşıyor. Yayınlanana dek en geç 30 dakikada yansıyor.)
-   3. **Ek (1 Kas, Aşama 3):** `firebase deploy --only hosting` — Top 100 sayaçlarının CDN adresi (`seelogd.com/api/top100`) bununla açılır. Fonksiyonlardan SONRA yapılmalı. Dikkat: bu komut `website/` klasörünü de olduğu gibi yayınlar. Liderlik tablolarının tek belgelik özeti de aynı kural + fonksiyon yayınıyla gelir. Yayınlanmadan önce uygulama eski yoldan çalışmaya devam ediyor; sıra hiçbir şeyi bozmaz.
-   ⚠️ Kural dosyası bütün olarak gider. Başka oturumların henüz yayınlanmamış kuralları (Haftalık Lig vb.) da onunla birlikte yayına çıkar. Fonksiyonlar da çalışma klasöründen gider: commit'lenmemiş lig kodu dahil. Bunu bilerek yaptırmak için deploy'u sana bıraktım.
-2. **Cihaz doğrulaması (App Check):**
-   1. Apple Developer'da DeviceCheck `.p8` anahtarı oluştur ve Firebase'e yükle.
-   2. Play Console → Uygulama bütünlüğü bölümünde Firebase bağlantısını kontrol et.
-   3. Yeni TestFlight ve Play dahili test sürümü çıkar.
-   4. Birkaç gün sonra `npm run appcheck:status` çalıştır.
-3. **Yük testi için:** ayrı bir Firebase (Blaze) test projesi aç ve k6'yı kur. Adımlar `load-test/README.md`'de; sonrasını ben yaparım.
-4. **İmza anahtarı:** `@smlztrk__seelogd.jks`'i parola yöneticine koy, sonra proje klasöründen kaldır. Ben dokunmadım.
-5. **Push:** commit'leri uzak depoya göndermek istediğinde söyle.
+```
+eas build --platform android --profile production
+eas build --platform ios --profile production
+```
 
-### 🤝 Birlikte karar vereceklerimiz
-- **TMDB anahtarı:** (a) olduğu gibi kalsın + gerektiğinde yenile (önerim), ya da (b) sunucudan geçir. Ayrıntı: `TMDB_JETON_YONETIMI.md`.
-- **Bekleme listesi sızıntısı:** olduğu gibi kalsın, ya da site "zaten kayıtlısın" demeyi bıraksın (sızıntıyı tamamen kapatır).
-- ~~**Eski arama yolunu kapatma zamanı**~~ → 1 Kasım'da KAPATILDI ve yayınlandı (senin kararın). Mağazadaki eski sürümlerde arkadaş araması artık çalışmıyor; 1.5.0 çıkıp kullanıcılar geçince düzelecek. Geri almak istersen tek satır + yayın, bir dakika sürer.
-- **Ad/avatar değiştirmeye bekleme süresi** konsun mu? Şu an sınırsız; her değişiklik kişinin bütün mesaj ve yorum geçmişini yeniden yazdırıyor.
-- **Sunucu tavanları:** hafif fonksiyonlar 20, dış servise bağlı olanlar 10, toplu işler 1. Uygun mu?
-- **App Check'i zorunlu yapma zamanı:** geçerli doğrulama oranı %95'i geçince adım adım açılacak.
+Bu acil, çünkü eski arama yolunu kapattık: **mağazadaki sürümlerde arkadaş araması şu an çalışmıyor.** Ayrıca App Check ayarları ancak bu sürümle gerçek jeton üretmeye başlayacak.
+
+Yayınlandıktan sonra:
+1. **Arkadaş aramasını dene** — çalışıyorsa yeni sunucu ucu bağlanmış demektir.
+2. **Ödeme ekranındaki fiyatı doğrula** (önizlemede ₺59,99 görünüyordu).
+3. Birkaç gün sonra `npm run appcheck:status` çalıştır, çıktıyı bana göster. Ölçümü **Play'in dahili test kanalından** indirdiğin sürümle yap; emülatör ve elle kurulan APK Play Integrity doğrulamasını bilerek geçemiyor.
+
+### 🤝 Birlikte yapacaklarımız (sen hazır olduğunda)
+
+1. **İmza anahtarı (`.jks`) taşıma.** Ben silmiyorum — yedeği doğrulanmadan silinirse Android uygulaması bir daha güncellenemez. Sıra:
+   - `@smlztrk__seelogd.jks`'i **parolasıyla birlikte** parola yöneticine ek dosya olarak kaydet.
+   - `eas credentials` → Android → keystore EAS'te duruyor mu, bak.
+   - Play Console → Release → Setup → **App signing** etkin mi, bak. Etkinse asıl anahtarı Google tutuyor, seninki yalnız yükleme anahtarı olur (kaybolsa bile sıfırlanabilir).
+   - Üçü tamamsa söyle, dosyayı projeden kaldırırım.
+2. **Gizlilik göçü (Yüksek).** Eski hesaplarda e-posta ve doğum tarihi hâlâ `Users/{uid}` kökünde; `website/privacy.html` ise durmadığını söylüyor. Kullanıcılar 1.5.0'a geçtikten SONRA: sen bir servis hesabı anahtarı oluşturursun → `migrateAccountPrivate.js` kuru çalışma → `--apply` → kuralın son aşaması kapanır → site güncellenir.
+3. **App Check'i zorunlu yapma.** Geçerli doğrulama oranı %95'i geçince kademeli: callable'lar → Firestore → Auth → RTDB.
+4. **Yük testi.** Ayrı bir Firebase (Blaze) test projesi açman ve k6 kurman gerekiyor (`load-test/README.md`); sonrasını ben yaparım.
+
+### ✍️ Senin yazman gerekenler
+
+- **TMDB ticari lisansı.** `sales@themoviedb.org`, konu `Commercial API Use`, ülkeni belirt. **TMDB hesabının e-postasından** gönder (lisans o hesaba bağlanıyor), kullanıcı adını yaz, API anahtarını yazma. Taslak metin sohbette hazır.
+
+### 🤔 Hâlâ açık tek karar
+
+- **Bekleme listesi sızıntısı:** bir e-postayı bilen, o kişinin listede olup olmadığını öğrenebiliyor. Olduğu gibi kalabilir, ya da site "zaten kayıtlısın" demeyi bırakır (sızıntıyı tamamen kapatır, küçük bir UX değişikliği).
+
+### ✅ Kapanan maddeler (1 Kasım)
+
+- Push + kurallar/fonksiyonlar/Hosting yayını · Sürüm 1.5.0
+- App Check ön koşulları: DeviceCheck `.p8` yüklendi, Play Integrity bağlandı (Cloud projesine Owner yetkisi vererek), jeton ömrü Android+iOS 12 saat
+- Eski arama yolu kapatıldı ve yayınlandı
+- Ad/avatar değişimine 1 gün bekleme kondu
+- TMDB anahtarı uygulamada kaldı + 401/429 izlemesi eklendi
+- Mağaza metinlerine yeni oyunlar, Film Kulübü ve 5 dil
+- Sunucu tavanları: hepsi 10 ve altı (bölge kotası toplam 20 vCPU olduğu için)
 
 ---
 
