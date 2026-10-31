@@ -2,10 +2,12 @@
 //
 // Firebase App Check sarmalayıcısı (Faz 0 güvenlik maddesi). İki katman var:
 //
-//   1. NATIVE (@react-native-firebase/app-check): Play Integrity'den gerçek
-//      cihaz/uygulama doğrulama token'ı üretir. Yayın build'inde provider
-//      "playIntegrity", geliştirmede "debug"dur (debug token'ı Firebase
-//      Console → App Check'e kaydedilmeli, logcat'te basılır).
+//   1. NATIVE (@react-native-firebase/app-check): Play Integrity / App Attest'ten
+//      gerçek cihaz/uygulama doğrulama token'ı üretir. Yayın build'inde provider
+//      Android "playIntegrity", iOS "appAttestWithDeviceCheckFallback". Geliştirme
+//      build'inde App Check KAPALI; EXPO_PUBLIC_APPCHECK_DEBUG=1 ile "debug"
+//      sağlayıcısıyla açılır (debug token'ı Firebase Console → App Check'e
+//      kaydedilmeli, logcat / Xcode konsolunda basılır).
 //
 //   2. WEB SDK KÖPRÜSÜ: Uygulamanın Firestore/Functions çağrıları web SDK'dan
 //      (firebase paketi) çıkıyor; web SDK'nın kendi provider'ları (ReCaptcha)
@@ -22,10 +24,41 @@
 // Console'daki Firestore/RTDB enforce anahtarları) ANCAK tüm aktif build'ler
 // bu modülü içerdikten sonra açılmalı; yoksa eski build'lerdeki istekler
 // reddedilir.
+//
+// 2026-10-31 ölçümü: 28 günde Firestore'a 0 GEÇERLİ jeton geldi (yayın
+// build'lerinde yerel jeton alınamıyor, geliştirme build'leri App Check'i
+// atlıyor). Zorunluluk bu düzelmeden AÇILMAMALI — durumu ölçmek için:
+// `npm run appcheck:status` (docs/guvenlik/DENETIM_2026-10-31_GUVENLIK_PERFORMANS.md M-3).
+
+// Geliştirme build'inde App Check'i debug sağlayıcısıyla AÇAR (varsayılan kapalı).
+// Zorunluluk açılınca jetonsuz geliştirme build'leri reddedileceği için gerekir:
+// native SDK cihazın debug jetonunu logcat / Xcode konsoluna basar; o jeton
+// Firebase Console → App Check → uygulama → "Debug jetonlarını yönet"e
+// kaydedilmeli. Yayın build'ini ETKİLEMEZ (orada her zaman gerçek sağlayıcı).
+const DEV_DEBUG_PROVIDER = process.env.EXPO_PUBLIC_APPCHECK_DEBUG === "1";
 
 let nativeAppCheck = null; // RNFB app-check modül nesnesi
 let resolved = false;
 let initialized = false;
+
+// Yerel jeton alınamadığında sebebi Sentry'ye düşer (Play Integrity / App Attest
+// reddi, ağ). Web SDK jetonu her istekte yeniden isteyebildiği için aynı hata
+// oturum başına BİR KEZ bildirilir.
+const reportedTokenErrors = new Set();
+function reportTokenError(error) {
+  const message = String(error?.message || error || "unknown").slice(0, 200);
+  const code = String(error?.code || "").slice(0, 60);
+  const key = `${code}|${message}`;
+  if (reportedTokenErrors.has(key)) return;
+  reportedTokenErrors.add(key);
+  try {
+    // eslint-disable-next-line global-require
+    const { captureError } = require("./crashReporting");
+    captureError(new Error(`[appCheck] token alınamadı: ${message}`), {
+      tags: { label: "AppCheck/getToken", appCheckCode: code || "none" },
+    });
+  } catch {}
+}
 
 function loadNative() {
   if (resolved) return nativeAppCheck;
@@ -79,18 +112,21 @@ export function initAppCheck(webApp) {
     // Geliştirmede (__DEV__) debug token Firebase Console'a kaydedilmediğinde
     // Realtime Database "Provided AppCheck credentials are invalid" uyarısı basar.
     // Geliştirme ortamında bu uyarıyı engellemek ve gereksiz ağ trafiği oluşturmamak
-    // için web SDK App Check köprüsü yalnız yayın (release) build'lerinde bağlanır.
-    if (dev) {
+    // için web SDK App Check köprüsü yalnız yayın (release) build'lerinde bağlanır —
+    // EXPO_PUBLIC_APPCHECK_DEBUG=1 verilmedikçe (yukarıda DEV_DEBUG_PROVIDER).
+    if (dev && !DEV_DEBUG_PROVIDER) {
       initialized = true;
       return true;
     }
 
     provider.configure({
       android: {
-        provider: "playIntegrity",
+        provider: dev ? "debug" : "playIntegrity",
       },
       apple: {
-        provider: "appAttestWithDeviceCheckFallback",
+        // App Attest, app.json'daki com.apple.developer.devicecheck.appattest-environment
+        // yetkisi olmadan jeton üretemez; DeviceCheck yedeği Firebase'e .p8 anahtarı ister.
+        provider: dev ? "debug" : "appAttestWithDeviceCheckFallback",
       },
     });
     const nativeInstance = initNativeAppCheck(undefined, {
@@ -112,10 +148,13 @@ export function initAppCheck(webApp) {
                 expireTimeMillis: Date.now() + 30 * 60 * 1000,
               };
             }
+            reportTokenError(new Error("empty token"));
           } catch (err) {
-            // Token alınamadığında hata fırlatılır; böylece RTDB ve Firestore'a
-            // geçersiz/boş token gönderilmez ve sunucu websocket hatası atmaz.
+            reportTokenError(err);
           }
+          // Hata fırlatınca web SDK isteğe kendi "hata jetonunu" ekler: zorunluluk
+          // kapalıyken istek yine geçer (App Check metriklerinde INVALID görünür),
+          // açıkken reddedilir. Boş/sahte jeton BİZ göndermeyiz.
           throw new Error("AppCheck token unavailable");
         },
       }),

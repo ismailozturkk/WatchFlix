@@ -33,7 +33,8 @@
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.smlztrk.seelogd"
-        ]
+        ],
+        "com.apple.developer.devicecheck.appattest-environment": "production"
       }
     },
     "android": {

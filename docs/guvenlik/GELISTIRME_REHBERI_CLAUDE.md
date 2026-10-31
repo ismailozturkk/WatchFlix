@@ -86,6 +86,22 @@ match /Users/{uid} {
 >    "boş jeton gönderilmez" yorumunu düzelt (JS SDK hata jetonu ekliyor).
 > 4. İzleme: `firebaseappcheck.googleapis.com/services/verification_count` (security etiketi) VALID payı mevcut sürümde
 >    ≥ %95 olunca sırayla ENFORCE: callable'lar → Firestore → Auth → RTDB.
+>
+> **KODDA YAPILANLAR (2026-10-31, commit bekliyor → bkz. git log):**
+> - (1) `app.json` `ios.entitlements` → `appattest-environment: production` eklendi (`expo config --type introspect`
+>   ile son yapılandırmada doğrulandı). Yeni iOS native build ŞART; EAS kimlik bilgisi yönetimi App ID'ye App Attest
+>   yeteneğini senkronlar — senkronlamazsa Apple Developer → Identifiers → App Attest elle açılır.
+> - (3) `services/appCheck.js`: yayın build'inde yerel `getToken` hatası / boş jeton Sentry'ye (`AppCheck/getToken`,
+>   oturum başına sebep başına 1 kez); yanıltıcı yorum düzeltildi; `EXPO_PUBLIC_APPCHECK_DEBUG=1` ile geliştirmede
+>   debug sağlayıcı (varsayılan kapalı, yayın etkilenmez). Testler: `__tests__/appCheck.test.js` (8).
+> - (4) `npm run appcheck:status` (`scripts/appcheck-status.cjs`, salt-okunur): modlar, sağlayıcılar, servis başına
+>   VALID payı ve "zorunluluğa hazır mı" kararı.
+> - Debug jetonu notu: geliştirme build'leri App Check'i varsayılan ATLADIĞI için debug jetonu yalnız
+>   `EXPO_PUBLIC_APPCHECK_DEBUG=1` ile ya da zorunluluk açıldıktan sonra gerekir (Android 1, iOS 0 kayıtlı).
+>
+> **KULLANICIDA KALAN:** DeviceCheck `.p8` anahtarını Firebase'e yüklemek; Play Console ↔ Cloud projesi bağlantısını
+> doğrulamak; yeni iOS + Android yayın build'i (Play dahili test / TestFlight) çıkarıp `appcheck:status` ile VALID'i
+> izlemek. Sentry'de `AppCheck/getToken` olayları sebebi gösterecek.
 > Okuma yöntemi (salt-okunur): firebase-tools oturumu + `requireAuth({user, tokens})` + `getAccessToken()` + fetch
 > (bkz. hafıza `rules-tests-jdk`).
 **KONUM:** `functions/index.js:1124` (`callGemini` `enforceAppCheck:false`), `index.js:1230` (`getExternalRatings`), `index.js:89` (global), istemci `firebase.js:33` + `services/appCheck.js`.

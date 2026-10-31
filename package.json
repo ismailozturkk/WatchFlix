@@ -11,7 +11,8 @@
     "postinstall": "patch-package",
     "licenses": "node scripts/generate-oss-licenses.js",
     "ai:eval": "jest -c scripts/ai-eval/jest.config.js --runInBand",
-    "test:rules": "firebase emulators:exec --only firestore \"jest -c jest.rules.config.js\""
+    "test:rules": "firebase emulators:exec --only firestore \"jest -c jest.rules.config.js\"",
+    "appcheck:status": "node scripts/appcheck-status.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/alegreya": "^0.4.2",

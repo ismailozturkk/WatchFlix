@@ -77,6 +77,17 @@ Yani 10.000 kullanıcı hedefinde, yüzlerce kişi aynı ankete oy verirse çoğ
 > - **iOS:** uygulamada "App Attest" yetkisi eksik (küçük bir ayar + yeni sürüm) ve yedek yöntem DeviceCheck'in anahtarı Firebase'e yüklenmemiş — bunu Apple hesabınla **senin** yapman gerekiyor.
 > - **Android:** Play Console'da "Uygulama bütünlüğü" bölümünde Firebase projesinin bağlı olduğunu kontrol etmelisin (bunu uzaktan göremiyorum). Ayrıca test, Play Store'un dahili test kanalından yüklenen sürümle yapılmalı; elle yüklenen APK'lar bilerek reddedilir.
 > - Sonra birkaç gün izleyip geçerli doğrulama oranı %95'i geçince adım adım açacağız.
+>
+> ✅ **Koddaki kısmı YAPILDI (31 Ekim):**
+> - iOS'a eksik "App Attest" yetkisi eklendi (yeni iOS sürümüyle devreye girer).
+> - Yayın sürümünde doğrulama alınamazsa sebebi artık Sentry'ye düşüyor — Android'in neden başarısız olduğunu sahadan göreceğiz.
+> - Tek komutla durum raporu: **`npm run appcheck:status`** — hangi serviste ne kadar geçerli doğrulama var, "açmaya hazır mı" yazıyor. Hiçbir ayarı değiştirmez.
+> - İstersen geliştirme sürümünde de doğrulamayı açabilen bir anahtar eklendi (varsayılan kapalı; `.env.example`'da açıklaması var).
+>
+> **Senin yapacakların (bilgisayara dönünce):**
+> 1. Apple Developer'da DeviceCheck anahtarı (.p8) oluşturup Firebase Console → App Check → iOS uygulaması → DeviceCheck'e yüklemek.
+> 2. Play Console → Uygulama bütünlüğü → Play Integrity API'nin Firebase projesine bağlı olduğunu kontrol etmek.
+> 3. Yeni iOS (TestFlight) ve Android (Play dahili test) sürümü çıkarıp birkaç gün kullanmak, sonra `npm run appcheck:status` çalıştırmak.
 
 ---
 

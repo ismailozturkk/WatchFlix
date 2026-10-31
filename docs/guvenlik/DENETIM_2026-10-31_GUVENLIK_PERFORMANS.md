@@ -116,6 +116,11 @@ ayar değiştirilmedi):**
 bağlantısını doğrula ve yalnız Play'den yüklenen build'le dene → yayın build'inde jeton hatasını Sentry'ye düşür →
 mevcut sürümde VALID payı ≥ %95 olunca servis servis ENFORCE (callable'lar → Firestore → Auth → RTDB).
 
+**Kodda yapılanlar (2026-10-31):** iOS App Attest yetkisi `app.json`'a eklendi (yeni native build ile); yayın build'inde
+jeton hatası Sentry'ye (`AppCheck/getToken`); geliştirme için isteğe bağlı debug sağlayıcı
+(`EXPO_PUBLIC_APPCHECK_DEBUG=1`); durum/karar betiği `npm run appcheck:status` (salt-okunur). Kullanıcıda kalan:
+DeviceCheck `.p8` anahtarı, Play Console bağlantısı, yeni yayın build'leri.
+
 ### L-1 — Bekleme listesi/beta e-posta varlık sızıntısı (Düşük)
 **Yer:** `firestore.rules:80-115` — `waitlist`/`betaTesters` `allow get: if true`, docId = `base64(email)`.
 **Sorun:** docId e-postadan türediği için, bir e-postayı bilen biri `get` ile o kişinin listede olup olmadığını doğrulayabilir (varlık oracle'ı). `list` kapalı (iyi), toplu döküm yok.
