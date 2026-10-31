@@ -29,3 +29,10 @@ test("sohbet ekranı çevrimiçi / yazıyor sinyali okumuyor ve yazmıyor", () =
   const header = read("components/chat/ChatHeader.js");
   expect(header).not.toMatch(/formatLastSeen|TypingDots|chat_typing/);
 });
+
+test("çevrimiçi durumu hiçbir ekranda okunmuyor ve ayarı yok (1 Kas 2026, kullanıcı kararı)", () => {
+  expect(read("screens/tabs/profile/FriendProfileScreen.js")).not.toMatch(/subscribeToUserPresence|presence=\{|online=\{/);
+  expect(read("components/friends/FriendProfileSections.js")).not.toMatch(/presenceChip|onlineDot/);
+  expect(read("screens/tabs/profile/PrivacySettingsScreen.js")).not.toMatch(/key: "onlineStatus"|onlineStatus: \[/);
+  expect(read("services/presenceService.js")).not.toMatch(/export function (subscribeToUserPresence|formatLastSeen)/);
+});

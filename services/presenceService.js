@@ -2,6 +2,11 @@
 //
 // Presence (çevrimiçi / son görülme) — Realtime Database üzerinde /presence/{uid}.
 //
+// 1 Kas 2026: çevrimiçi / son görülme GÖSTERGELERİ uygulamadan kaldırıldı (kullanıcı kararı;
+// profil ve sohbet artık kimsenin durumunu okumuyor). Kayıt yine tutulur, çünkü sohbetin
+// görünmez "inChat" bayrağı yalnız canlı bir conns kaydıyla geçerli sayılır ve sunucu açık
+// sohbetin push'unu bununla susturur (functions/chatPresence.js).
+//
 // MİMARİ:
 //   • Karar mantığı services/presenceSession.js'de (saf durum makinesi, testli).
 //     Burası yalnızca onu gerçek RTDB + AppState'e bağlayan ince katman.
@@ -24,7 +29,6 @@
 
 import { AppState } from "react-native";
 import { auth, rtdb } from "../firebase";
-import { i18nText } from "../utils/i18nText";
 import {
   ref,
   onValue,
@@ -34,13 +38,9 @@ import {
   serverTimestamp as rtdbServerTimestamp,
 } from "firebase/database";
 import { createPresenceSession } from "./presenceSession";
-import {
-  isOnlineEffective,
-  isOnlineVisible,
-  lastSeenMs,
-} from "./presenceModel";
+import { isOnlineEffective } from "./presenceModel";
 
-export { isOnlineEffective, isOnlineVisible };
+export { isOnlineEffective };
 
 // Çıkış yolunu bekletmemek için kaydı silmeye ayrılan azami süre.
 const SIGN_OUT_BUDGET_MS = 1500;
@@ -132,40 +132,4 @@ export function startPresence(uid) {
 /** Kaydı siler (mümkünse) ve dinleyicileri bırakır. Çıkışta beklenebilir. */
 export function stopPresence() {
   return session ? session.stop() : Promise.resolve();
-}
-
-// ─── Son görülme biçimlendirme ───────────────────────────────────────────────
-
-/**
- * "5 dakika önce" gibi relative string.
- */
-export function formatLastSeen(presence, t = {}) {
-  const ms = lastSeenMs(presence);
-  if (!ms) return t.unknown || "";
-  const diff = Date.now() - ms;
-  const sec = Math.floor(diff / 1000);
-  if (sec < 60) return t.now || i18nText("autoI18n.az_once", "az önce");
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} ${t.minute || i18nText("autoI18n.dk_once", "dk önce")}`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} ${t.hour || i18nText("autoI18n.saat_once", "saat önce")}`;
-  const d = Math.floor(hr / 24);
-  return `${d} ${t.day || i18nText("autoI18n.gun_once", "gün önce")}`;
-}
-
-// ─── Diğer kullanıcıların presence'ini sorgulama ─────────────────────────────
-
-/**
- * Tek kullanıcının presence'ini realtime dinle.
- * Profil ekranlarında veya chat'te kullanılır. Liste ekranlarında
- * (örn. arkadaş listesi) AÇMA — N adet listener pahalıdır.
- * Geri dönen fonksiyon dinleyiciyi kapatır.
- */
-export function subscribeToUserPresence(uid, callback) {
-  if (!uid || !rtdb) return () => {};
-  return onValue(
-    presenceRef(uid),
-    (snap) => callback(snap.exists() ? snap.val() : null),
-    (err) => __DEV__ && console.warn("subscribeToUserPresence:", err.message),
-  );
 }

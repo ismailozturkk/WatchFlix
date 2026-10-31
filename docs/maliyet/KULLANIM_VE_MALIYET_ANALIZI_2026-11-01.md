@@ -171,10 +171,12 @@ Yazma, depolama ve Functions bugünkü oranlarla bu tablonun yanında küçük k
    >
    > **Ek (1 Kas, kullanıcı kararı):** Sohbette çevrimiçi / "Sohbette" / "yazıyor" / son görülme göstergeleri
    > kaldırıldı. Sohbet ekranı artık arkadaşın RTDB durumunu dinlemiyor ve "yazıyor" sinyali yazmıyor. Başlıkta
-   > `@kullanıcıadı` gösteriliyor. Kalanlar: görünmez "sohbette" bayrağı (sunucu açık sohbetin push'unu bununla
-   > susturuyor), uygulama genelindeki presence (arkadaş profilindeki çevrimiçi durumu ve gizlilik ayarı hâlâ onu
-   > kullanıyor). `services/chatRtdb.js` içindeki typing/meta fonksiyonları artık çağrılmıyor, testleriyle
-   > birlikte duruyor.
+   > `@kullanıcıadı` gösteriliyor. Aynı gün ikinci adımda **çevrimiçi durumu uygulamanın tamamından kaldırıldı**:
+   > arkadaş profilindeki durum çipi ve avatar noktası, gizlilik ayarlarındaki "Çevrimiçi Durumu" seçeneği, yeni
+   > hesapların `privacy.onlineStatus` varsayılanı ve tanıtım ekranındaki "çevrimiçi" etiketi. Artık hiçbir ekran
+   > başka birinin RTDB durumunu okumuyor. Kalan tek parça görünmez altyapı: kişinin kendi bağlantı kaydı ve "sohbette"
+   > bayrağı (sunucu açık sohbetin push'unu bununla susturuyor; bayrak yalnız canlı bağlantı kaydıyla geçerli).
+   > `services/chatRtdb.js` içindeki typing/meta fonksiyonları artık çağrılmıyor, testleriyle birlikte duruyor.
 3. **Arkadaş profili:** üst kısım ve istatistik için yalnız `Lists/{friendUid}` kök belgesi (zaten dinleniyor, 1
    okuma). Koleksiyonlar yalnız ilgili sekme açılınca ve `cachedRead` ile (ör. 6 saat taze kabul) okunsun.
 4. **`refreshList` → `syncListDelta`:** yenilemede yalnız `updatedAt > son senkron` okunur. Silinen öğeler için kök

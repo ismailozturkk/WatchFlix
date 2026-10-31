@@ -66,7 +66,6 @@ describe("resolveProfileAccess", () => {
       canViewProfile: true,
       canViewLists: true,
       canViewSocialLinks: true,
-      showPresenceText: true,
     });
   });
 
@@ -75,7 +74,6 @@ describe("resolveProfileAccess", () => {
       canViewProfile: false,
       canViewLists: false,
       canViewSocialLinks: false,
-      showPresenceText: false,
     });
   });
 
@@ -88,7 +86,6 @@ describe("resolveProfileAccess", () => {
       canViewProfile: true,
       canViewLists: false,
       canViewSocialLinks: false,
-      showPresenceText: false,
     });
   });
 
@@ -100,8 +97,6 @@ describe("resolveProfileAccess", () => {
     expect(access.canViewProfile).toBe(false);
     expect(access.canViewLists).toBe(false);
     expect(access.canViewSocialLinks).toBe(false);
-    // Çevrimiçi bilgisi profil gizliliğinden bağımsız (ekrandaki eski kural).
-    expect(access.showPresenceText).toBe(true);
   });
 
   it("profil belgesi gelmeden listeler/sosyal hesaplar açılmaz", () => {

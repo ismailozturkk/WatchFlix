@@ -51,18 +51,13 @@ const buildOptions = () => ({
   // NOT: "posts" burada bilerek yok — paylaşım görünürlüğü post atarken
   // seçilen post-başına `visibility` alanıyla yönetiliyor (postsService),
   // Users.privacy.posts hiçbir okuma yolunda kullanılmıyor.
-  onlineStatus: [
-    { value: "everyone", label: i18nText("autoI18n.herkes", "Herkes"), icon: "earth", desc: i18nText("autoI18n.herkes_online_oldugunu_gorur", "Herkes online olduğunu görür") },
-    { value: "friends",  label: i18nText("autoI18n.arkadaslar", "Arkadaşlar"), icon: "people", desc: i18nText("autoI18n.sadece_arkadaslarin_gorur", "Sadece arkadaşların görür") },
-    { value: "none",     label: i18nText("autoI18n.hic_kimse", "Hiç Kimse"),  icon: "eye-off", desc: i18nText("autoI18n.hic_kimse_online_oldugunu_gormez", "Hiç kimse online olduğunu görmez") },
-  ],
+  // "onlineStatus" da yok: çevrimiçi durumu 1 Kas 2026'da uygulamadan kaldırıldı.
 });
 
 const buildSections = () => [
   { key: "profile",      title: i18nText("autoI18n.profil_gorunurlugu", "Profil Görünürlüğü"),     icon: "person-circle" },
   { key: "lists",        title: i18nText("autoI18n.liste_gorunurlugu", "Liste Görünürlüğü"),      icon: "list" },
   { key: "socialLinks", title: i18nText("autoI18n.hesap_baglantilari_gorunurlugu", "Hesap Bağlantıları"), icon: "link" },
-  { key: "onlineStatus", title: i18nText("autoI18n.cevrimici_durumu", "Çevrimiçi Durumu"),        icon: "ellipse" },
 ];
 
 const PrivacyOption = memo(function PrivacyOption({

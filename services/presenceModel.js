@@ -47,20 +47,6 @@ export function isLiveFlag(flag, presence) {
   return !!conns && typeof conns === "object" && conns[flag] != null;
 }
 
-/**
- * Gizlilik filtreli versiyon (Users.privacy.onlineStatus alanına bakar).
- */
-export function isOnlineVisible(
-  presence,
-  userPrivacy,
-  { viewerIsFriend = false } = {},
-) {
-  const mode = userPrivacy?.onlineStatus || "everyone";
-  if (mode === "none") return false;
-  if (mode === "friends" && !viewerIsFriend) return false;
-  return isOnlineEffective(presence);
-}
-
 /** Zaman damgası (number ms | Firestore Timestamp) → ms. */
 export function toMillis(v) {
   if (v == null) return null;

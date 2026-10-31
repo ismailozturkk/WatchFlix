@@ -9,7 +9,6 @@ import {
 import {
   isLiveFlag,
   isOnlineEffective,
-  isOnlineVisible,
   lastSeenMs,
   liveConnectionIds,
 } from "../services/presenceModel";
@@ -50,15 +49,6 @@ describe("presenceModel", () => {
     expect(isLiveFlag("c1", { conns: {} })).toBe(false);
     // Eski istemcinin boolean'ı artık geçerli sayılmaz (takılı kalabiliyordu).
     expect(isLiveFlag(true, presence)).toBe(false);
-  });
-
-  test("gizlilik: 'none' hiç göstermez, 'friends' arkadaş değilse göstermez", () => {
-    const online = { conns: { a: 1 } };
-    expect(isOnlineVisible(online, { onlineStatus: "none" }, { viewerIsFriend: true })).toBe(false);
-    expect(isOnlineVisible(online, { onlineStatus: "friends" }, { viewerIsFriend: false })).toBe(false);
-    expect(isOnlineVisible(online, { onlineStatus: "friends" }, { viewerIsFriend: true })).toBe(true);
-    expect(isOnlineVisible(online, null)).toBe(true);
-    expect(isOnlineVisible({ lastSeen: 1 }, null)).toBe(false);
   });
 
   test("lastSeenMs sayı ve Timestamp'i okur", () => {

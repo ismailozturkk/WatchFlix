@@ -1,13 +1,13 @@
 // screens/tabs/profile/FriendProfileScreen.js
 //
-// Arkadaş profil ekranı: kullanıcı bilgileri (avatar, isim, bio, online durumu,
+// Arkadaş profil ekranı: kullanıcı bilgileri (avatar, isim, bio,
 // sayaçlar, katılım tarihi) + izleme istatistikleri (film/dizi süreleri, tür
 // analizi) + paylaşmayı seçtiği listeler (Users/{uid}.listVisible haritası).
-// privacy.profile / privacy.lists / privacy.onlineStatus ayarlarına saygı duyar.
+// privacy.profile / privacy.lists ayarlarına saygı duyar. Çevrimiçi durumu / son görülme
+// 1 Kas 2026'da kaldırıldı (kullanıcı kararı).
 //
 // Veri kaynakları:
 //   Users/{uid}                        → profil + privacy + listVisible
-//   Presence/{uid}                     → canlı online/son görülme
 //   Lists/{uid}                        → eski format listeler + özel listeler
 //   Lists/{uid}/watchedMovies          → yeni format filmler (tek seferlik)
 //   Lists/{uid}/watchedTv              → yeni format diziler (tek seferlik)
@@ -59,11 +59,6 @@ import { buildActivityFromRoot } from "../../../utils/mediaActivityIndex";
 import { useLanguage } from "../../../context/LanguageContext";
 import { DEFAULT_PRIVACY } from "../../../services/userService";
 import { subscribeSocialLinks } from "../../../services/socialLinksService";
-import {
-  subscribeToUserPresence,
-  isOnlineVisible,
-  formatLastSeen,
-} from "../../../services/presenceService";
 import ScreenDecor from "../../../components/ScreenDecor";
 import SaveSharedListModal from "../../../components/modals/SaveSharedListModal";
 import AvatarPreviewModal from "../../../components/profile/AvatarPreviewModal";
@@ -314,7 +309,6 @@ export default function FriendProfileScreen({ route, navigation }) {
   const [profile, setProfile] = useState(null);
   const [visibleSocialLinks, setVisibleSocialLinks] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
-  const [presence, setPresence] = useState(null);
   const [allLists, setAllLists] = useState(null);
   // Yeni format alt koleksiyonlar — null: henüz çekilmedi
   const [subMovies, setSubMovies] = useState(null);
@@ -366,19 +360,12 @@ export default function FriendProfileScreen({ route, navigation }) {
     return () => unsub();
   }, [friendUid]);
 
-  // ── Presence dinleyicisi (ayrı koleksiyon — Users dokümanı stabil kalır) ──
-  useEffect(() => {
-    if (!friendUid) return;
-    const unsub = subscribeToUserPresence(friendUid, setPresence);
-    return () => unsub();
-  }, [friendUid]);
-
   // ── Gizlilik kuralları ────────────────────────────────────────────────────
   const privacy = { ...DEFAULT_PRIVACY, ...(profile?.privacy || {}) };
   // Profil belgesi gelmeden gizlilik BİLİNMİYOR: varsayılana ("herkese açık") düşüp
   // Lists/{uid} dinleyicisini açmak, listeleri kısıtlı her profilde kuraldan
   // permission-denied alırdı (belge gelince dinleyici kapanır ama hata çoktan düşmüştür).
-  const { canViewProfile, canViewLists, canViewSocialLinks, showPresenceText } =
+  const { canViewProfile, canViewLists, canViewSocialLinks } =
     resolveProfileAccess(privacy, { viewerIsFriend, profileLoaded: profile != null });
   useEffect(() => {
     setVisibleSocialLinks(null);
@@ -391,7 +378,6 @@ export default function FriendProfileScreen({ route, navigation }) {
     entitlements: profile?.entitlements,
     canRead: canViewLists,
   });
-  const online = isOnlineVisible(presence, privacy, { viewerIsFriend });
 
   // ── Liste dinleyicisi (yalnız izin varsa açılır) ──────────────────────────
   useEffect(() => {
@@ -773,7 +759,6 @@ export default function FriendProfileScreen({ route, navigation }) {
     isPremium: friendPlan !== PREMIUM_PLAN.FREE,
     isUnlimited: friendPlan === PREMIUM_PLAN.UNLIMITED,
   });
-  const lastSeenText = formatLastSeen(presence);
   const memberSince = formatMemberSince(profile?.createdAt, language);
   const selectedListName = selectedSharedList?.[0] ?? "";
   const selectedListItems = selectedSharedList?.[1] ?? [];
@@ -888,14 +873,6 @@ export default function FriendProfileScreen({ route, navigation }) {
   const movieShare = stats?.totalMinutes ? Math.round((stats.movieMinutes / stats.totalMinutes) * 100) : 0;
   const tvShare = stats?.totalMinutes ? 100 - movieShare : 0;
   const genreColors = [orange, blue, green, theme.accent ?? "#8847ff", "#e4ae39"];
-  const presenceInfo = showPresenceText
-    ? {
-        online,
-        text: online
-          ? i18nText("autoI18n.cevrimici", "Çevrimiçi")
-          : lastSeenText || i18nText("autoI18n.cevrimdisi", "Çevrimdışı"),
-      }
-    : null;
 
   return (
     <PosterChoicesScope choices={friendPosterChoices}>
@@ -939,8 +916,6 @@ export default function FriendProfileScreen({ route, navigation }) {
           }}
           name={displayName || i18nText("autoI18n.isimsiz_kullanici", "İsimsiz kullanıcı")}
           username={profile.username}
-          online={online}
-          presence={presenceInfo}
           badges={identityBadges}
           language={language}
           bio={canViewProfile ? profile.bio : null}

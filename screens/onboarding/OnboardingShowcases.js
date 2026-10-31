@@ -703,8 +703,8 @@ export function ChatDuoShowcase({ theme, accent, mediaItems = [], getTmdbUrl, la
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[duo.headName, { color: theme.text.primary }]}>ayşe</Text>
-              <Text style={[duo.headSub, { color: theme.colors.green }]}>
-                {L(lang, "çevrimiçi", "online", "en línea", "online", "online")}
+              <Text style={[duo.headSub, { color: theme.text.muted }]}>
+                @ayse
               </Text>
             </View>
             <Ionicons name="videocam-outline" size={13} color={theme.text.muted} />

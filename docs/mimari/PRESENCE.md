@@ -2,6 +2,13 @@
 
 Realtime Database üzerinde; kalıcı mesaj verisi Firestore'da kalır.
 
+> **1 Kasım 2026 — göstergeler kaldırıldı (kullanıcı kararı).** Uygulamada çevrimiçi durumu, "Sohbette",
+> "yazıyor" ve son görülme artık hiçbir yerde gösterilmiyor, gizlilik ayarı da yok. Hiçbir ekran başkasının
+> `/presence` ya da `chatMeta` düğümünü okumuyor; "yazıyor" yazılmıyor. **Kalan:** kişinin kendi
+> `conns` kaydı (aşağıdaki kural aynen geçerli) ve sohbet görünürken yazılan `inChat` bayrağı. Sunucu
+> (`functions/chatPresence.js`) açık sohbetin push'unu bu bayrakla susturur; bayrak yalnız canlı bir `conns`
+> kaydıyla geçerlidir. Bu yüzden presence oturumu silinmedi. Aşağıdaki okuyucu/gösterge anlatımı tarihsel.
+
 ## Kural
 
 Çevrimiçi kaydı yalnız şu üç koşul birlikte doğruyken durur:

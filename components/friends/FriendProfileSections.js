@@ -26,7 +26,6 @@ import SocialLinksRow from "@components/profile/SocialLinksRow";
 import { hasAnySocialLinks, normalizeSocialLinks } from "@utils/socialLinks";
 import { useTheme } from "@context/ThemeContext";
 import { alpha } from "@theme/colors";
-import { FRIEND_GREEN } from "./friendsTokens";
 import PillButton from "./PillButton";
 import GlassBox from "../common/GlassBox";
 
@@ -128,8 +127,6 @@ export function ProfileTopBar({ title, scrollY, onMore, moreLabel }) {
 }
 
 // ── Hero ─────────────────────────────────────────────────────────────────────
-// `presence` = { online, text } | null. null → durum çipi çizilmez (gizlilik
-// ayarı yüzünden çevrimiçi bilgisi bu izleyiciye gösterilmiyor).
 export const ProfileHero = memo(function ProfileHero({
   avatarIndex,
   photoURL,
@@ -137,8 +134,6 @@ export const ProfileHero = memo(function ProfileHero({
   onAvatarLongPress,
   name,
   username,
-  online,
-  presence,
   badges,
   language,
   bio,
@@ -153,8 +148,6 @@ export const ProfileHero = memo(function ProfileHero({
   useEffect(() => {
     Animated.timing(enter, { toValue: 1, duration: 420, useNativeDriver: true }).start();
   }, [enter]);
-
-  const presenceColor = presence?.online ? FRIEND_GREEN : theme.text?.muted ?? "#888";
 
   return (
     <Animated.View
@@ -190,17 +183,6 @@ export const ProfileHero = memo(function ProfileHero({
             />
           </View>
         </LinearGradient>
-        {/* Çevrimiçi noktası avatarın DIŞINDA: UserAvatar kabı taşanı kırpar,
-            squircle köşesinde nokta yarım görünürdü. */}
-        {online ? (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.onlineDot,
-              { backgroundColor: FRIEND_GREEN, borderColor: theme.primary },
-            ]}
-          />
-        ) : null}
       </View>
 
       <Text
@@ -214,29 +196,15 @@ export const ProfileHero = memo(function ProfileHero({
         {name}
       </Text>
 
-      {username || presence ? (
+      {username ? (
         <View style={styles.identityRow}>
-          {username ? (
-            <Text
-              allowFontScaling={false}
-              numberOfLines={1}
-              style={[styles.username, { color: theme.text?.secondary ?? "#aaa" }]}
-            >
-              @{username}
-            </Text>
-          ) : null}
-          {presence ? (
-            <View style={[styles.presenceChip, { backgroundColor: alpha(presenceColor, 0.14) }]}>
-              <View style={[styles.presenceDot, { backgroundColor: presenceColor }]} />
-              <Text
-                allowFontScaling={false}
-                numberOfLines={1}
-                style={[styles.presenceText, { color: presenceColor }]}
-              >
-                {presence.text}
-              </Text>
-            </View>
-          ) : null}
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={[styles.username, { color: theme.text?.secondary ?? "#aaa" }]}
+          >
+            @{username}
+          </Text>
         </View>
       ) : null}
 
@@ -675,15 +643,6 @@ const styles = StyleSheet.create({
     padding: RING_PADDING,
     borderRadius: RING_RADIUS - RING_BORDER,
   },
-  onlineDot: {
-    position: "absolute",
-    right: 3,
-    bottom: 3,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 4,
-  },
   name: {
     marginTop: 14,
     fontSize: 26,
@@ -703,17 +662,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   username: { fontSize: 14, fontWeight: "600", flexShrink: 1 },
-  presenceChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    maxWidth: "100%",
-  },
-  presenceDot: { width: 6, height: 6, borderRadius: 3 },
-  presenceText: { fontSize: 11.5, fontWeight: "800", flexShrink: 1 },
   badgesRow: { justifyContent: "center", marginTop: 8, marginBottom: 0 },
   bio: {
     marginTop: 12,

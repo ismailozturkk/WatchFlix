@@ -51,7 +51,5 @@ export function resolveProfileAccess(
     canViewLists: profileLoaded && canViewProfile && allows(p.lists, viewerIsFriend),
     canViewSocialLinks:
       profileLoaded && canViewProfile && allows(p.socialLinks, viewerIsFriend),
-    showPresenceText:
-      p.onlineStatus === "everyone" || (p.onlineStatus === "friends" && viewerIsFriend),
   };
 }

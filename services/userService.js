@@ -7,8 +7,7 @@
 //   uid, username, usernameLower, displayName, bio?, avatarIndex,
 //   friendsCount, postsCount, followersCount, followingCount,
 //   pendingRequestsInCount, pendingRequestsOutCount, unreadNotifsCount,
-//   isOnline, lastActiveAt, lastSeen,
-//   privacy: { profile, lists, posts, onlineStatus },
+//   privacy: { profile, lists, posts }  (eski belgelerde onlineStatus kalabilir — okunmuyor),
 //   listVisible: { ...map },
 //   createdAt, updatedAt,
 //   _schemaVersion           ← migration tracking için
@@ -71,7 +70,6 @@ export const DEFAULT_PRIVACY = {
   profile: "public",
   lists: "public",
   posts: "public",
-  onlineStatus: "everyone",
   socialLinks: "public",
   showSocialLinksOnOwnProfile: true,
 };
