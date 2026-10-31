@@ -15,12 +15,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useHapticsSettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
-import { subscribeToMyRatings } from "@services/ratingsService";
-import {
-  subscribeToMyComments,
-  subscribeToMyLikes,
-  subscribeToMyBookmarks,
-} from "@services/activityService";
+import { fetchMyActivityCounts, peekMyActivityCounts } from "@services/activityService";
 import { StoryDraftService } from "@services/StoryDraftService";
 import GlassBox from "../../../components/common/GlassBox";
 
@@ -70,33 +65,41 @@ export default function MyActivityButton({ navigation }) {
   const { hapticsEnabled } = useHapticsSettings();
   const uid = user?.uid;
 
-  const [ratingCount, setRatingCount] = useState(0);
-  const [commentCount, setCommentCount] = useState(0);
+  // Puan/yorum/beğeni/kaydetme sayıları: sayım sorgusu, odakta tazelenir (activityService).
+  // Eskiden dört koleksiyonun tamamı canlı dinleniyordu — yalnız sayı göstermek için.
+  const [counts, setCounts] = useState(
+    () => peekMyActivityCounts(uid) || { ratings: 0, comments: 0, likes: 0, bookmarks: 0 },
+  );
+  const { ratings: ratingCount, comments: commentCount, likes: likeCount, bookmarks: bookmarkCount } =
+    counts;
   const [postCount, setPostCount] = useState(0);
-  const [likeCount, setLikeCount] = useState(0);
-  const [bookmarkCount, setBookmarkCount] = useState(0);
   const [draftCount, setDraftCount] = useState(0);
   const [storyCount, setStoryCount] = useState(0);
 
   useEffect(() => {
     if (!uid) return undefined;
-    const unsubR = subscribeToMyRatings(uid, (list) => setRatingCount(list.length));
-    const unsubC = subscribeToMyComments(uid, (list) => setCommentCount(list.length));
-    const unsubL = subscribeToMyLikes(uid, (list) => setLikeCount(list.length));
-    const unsubB = subscribeToMyBookmarks(uid, (list) => setBookmarkCount(list.length));
+    // Kendi profil belgem zaten UserProfileContext'te dinleniyor; aynı belge tek hedef olarak
+    // paylaşılır, ek okuma yok.
     const unsubU = onSnapshot(
       doc(db, "Users", uid),
       (snap) => setPostCount(snap.exists() ? Math.max(0, snap.data()?.postsCount || 0) : 0),
       () => {},
     );
-    return () => {
-      unsubR();
-      unsubC();
-      unsubL();
-      unsubB();
-      unsubU();
-    };
+    return () => unsubU();
   }, [uid]);
+
+  const loadCounts = useCallback(() => {
+    if (!uid) return;
+    fetchMyActivityCounts(uid)
+      .then(setCounts)
+      .catch(() => {});
+  }, [uid]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", loadCounts);
+    loadCounts();
+    return unsubscribe;
+  }, [navigation, loadCounts]);
 
   const loadLocal = useCallback(async () => {
     setDraftCount(countPostDrafts());

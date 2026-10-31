@@ -11,6 +11,8 @@
 
 import {
   collection,
+  doc,
+  getDoc,
   query,
   where,
   getDocs,
@@ -171,6 +173,46 @@ export async function fetchFullListOnce(uid, listKey) {
     return m;
   } catch (err) {
     if (__DEV__) console.warn(`[listSyncService] fetchFullListOnce error (${listKey}):`, err);
+    return getLocalList(uid, listKey);
+  }
+}
+
+// Bundan fazla eksik öğede tek tek okumak yerine liste tamamen çekilir (gecikme; okuma sayısı
+// zaten eksik sayısından az olamaz).
+export const DRIFT_REPAIR_MAX_DOCS = 100;
+
+/**
+ * Sapan listeyi `planDriftRepair` planıyla onarır: fazlalar yerelden silinir (0 okuma), eksikler
+ * belge kimliğiyle tek tek okunur (eksik başına 1 okuma). Plan yoksa, eksik çoksa ya da beklenen
+ * kimlikte belge bulunamazsa (eski kimlik biçimli kayıtlar) tam çekime düşülür.
+ * @param {string} uid
+ * @param {string} listKey
+ * @param {{missing: string[], extra: string[]} | null} plan
+ * @returns {Promise<Record<string, any>>} güncel harita
+ */
+export async function repairListDrift(uid, listKey, plan) {
+  if (!uid || !listKey) return {};
+  if (!plan || plan.missing.length > DRIFT_REPAIR_MAX_DOCS) return fetchFullListOnce(uid, listKey);
+  if (plan.missing.length === 0 && plan.extra.length === 0) return getLocalList(uid, listKey);
+  try {
+    const next = { ...getLocalList(uid, listKey) };
+    plan.extra.forEach((key) => {
+      delete next[key];
+    });
+    if (plan.missing.length > 0) {
+      const snaps = await Promise.all(
+        plan.missing.map((id) => getDoc(doc(db, "Lists", uid, listKey, id))),
+      );
+      trackFirestoreRead(`Lists/${listKey}/repair`, snaps.length);
+      if (snaps.some((snap) => !snap.exists())) return fetchFullListOnce(uid, listKey);
+      snaps.forEach((snap) => {
+        next[snap.id] = snap.data();
+      });
+    }
+    setLocalList(uid, listKey, next);
+    return next;
+  } catch (err) {
+    if (__DEV__) console.warn(`[listSyncService] repairListDrift error (${listKey}):`, err);
     return getLocalList(uid, listKey);
   }
 }

@@ -7,7 +7,7 @@
 //     aynı kök sürümünde ikinci kez çekilmez (sonsuz döngü yok)
 //   • çevrimdışı açılışta indirilemeyen listeler bağlantı dönünce yeniden denenir
 
-const mockFs = { handlers: {}, collections: {}, getDocsCalls: [], failGetDocs: false };
+const mockFs = { handlers: {}, collections: {}, getDocsCalls: [], getDocCalls: [], failGetDocs: false };
 jest.mock("firebase/firestore", () => ({
   doc: (_db, ...parts) => ({ kind: "doc", path: parts.join("/") }),
   collection: (_db, ...parts) => ({ kind: "col", path: parts.join("/") }),
@@ -19,6 +19,14 @@ jest.mock("firebase/firestore", () => ({
     return () => {
       delete mockFs.handlers[ref.path];
     };
+  },
+  // Sapma onarımı eksik öğeyi belge kimliğiyle tek tek okur (listSyncService.repairListDrift).
+  getDoc: async (ref) => {
+    mockFs.getDocCalls.push(ref.path);
+    const parts = ref.path.split("/");
+    const id = parts.pop();
+    const value = (mockFs.collections[parts.join("/")] || {})[id];
+    return { id, exists: () => value != null, data: () => value };
   },
   getDocs: async (ref) => {
     mockFs.getDocsCalls.push(ref.path);
@@ -134,6 +142,7 @@ const pushRoot = async (uid, data, options) => {
 };
 
 const getDocsFor = (path) => mockFs.getDocsCalls.filter((entry) => entry === path).length;
+const getDocFor = (path) => mockFs.getDocCalls.filter((entry) => entry === path).length;
 
 // react-test-renderer 19 her create()'te kullanımdan kaldırma uyarısı basıyor; testin
 // gürültüsü olmasın diye YALNIZ onu süz (diğer console.error'lar görünür kalır).
@@ -260,7 +269,7 @@ describe("sapma onarımı", () => {
     statusIndex: { movie: { 7: { inWatchList: true } }, tv: {} },
   });
 
-  test("sunucuda olup yerelde olmayan öğe için YALNIZ o liste yeniden çekilir; aynı sürümde tekrarlanmaz", async () => {
+  test("sunucuda olup yerelde olmayan öğe YALNIZ kendisi okunarak onarılır; liste yeniden çekilmez, tekrarlanmaz", async () => {
     mockSession.user = { uid: "u-drift" };
     const view = mount();
     await pushRoot("u-drift", driftRoot(1000));
@@ -270,14 +279,34 @@ describe("sapma onarımı", () => {
     // Başka cihaz film 7'yi izlenecekler'e eklemiş: sunucu belgesi artık orada.
     mockFs.collections["Lists/u-drift/watchList"] = { movie_7: { id: 7, type: "movie", name: "Yeni" } };
     await advance(3000);
-    expect(getDocsFor("Lists/u-drift/watchList")).toBe(2);
+    expect(getDocFor("Lists/u-drift/watchList/movie_7")).toBe(1);
+    expect(getDocsFor("Lists/u-drift/watchList")).toBe(1);
     expect(getDocsFor("Lists/u-drift/favorites")).toBe(1);
     expect(view.ref.current.watchListItems).toHaveLength(1);
 
-    // Aynı kök sürümü tekrar gelse de (tutarlıyken) yeni sorgu yok.
+    // Aynı kök sürümü tekrar gelse de (tutarlıyken) yeni okuma yok.
     await pushRoot("u-drift", driftRoot(1000));
     await advance(3000);
-    expect(getDocsFor("Lists/u-drift/watchList")).toBe(2);
+    expect(getDocFor("Lists/u-drift/watchList/movie_7")).toBe(1);
+    expect(getDocsFor("Lists/u-drift/watchList")).toBe(1);
+    view.unmount();
+  });
+
+  test("başka cihazda silinen öğe yerelden okumasız düşer", async () => {
+    mockSession.user = { uid: "u-del" };
+    mockFs.collections["Lists/u-del/watchList"] = { movie_7: { id: 7, type: "movie", name: "Eski" } };
+    const view = mount();
+    await pushRoot("u-del", driftRoot(1000));
+    expect(view.ref.current.watchListItems).toHaveLength(1);
+    const reads = mockFs.getDocsCalls.length + mockFs.getDocCalls.length;
+
+    await pushRoot("u-del", {
+      updatedAt: stamp(2000),
+      statusIndex: { movie: { 7: { inWatchList: false } }, tv: {} },
+    });
+    await advance(3000);
+    expect(view.ref.current.watchListItems).toHaveLength(0);
+    expect(mockFs.getDocsCalls.length + mockFs.getDocCalls.length).toBe(reads);
     view.unmount();
   });
 
@@ -287,8 +316,10 @@ describe("sapma onarımı", () => {
     await pushRoot("u-ghost", driftRoot(1000));
     expect(getDocsFor("Lists/u-ghost/watchList")).toBe(1);
 
-    // Sunucuda belge YOK ama bayrak true (eski bir hatadan kalma hayalet bayrak).
+    // Sunucuda belge YOK ama bayrak true (eski bir hatadan kalma hayalet bayrak): tek belge
+    // okunur, bulunamayınca eski kimlik biçimi ihtimaline karşı liste bir kez tam çekilir.
     await advance(3000);
+    expect(getDocFor("Lists/u-ghost/watchList/movie_7")).toBe(1);
     expect(getDocsFor("Lists/u-ghost/watchList")).toBe(2);
     await advance(10000);
     await advance(10000);

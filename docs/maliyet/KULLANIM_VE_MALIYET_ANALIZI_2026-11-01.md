@@ -179,13 +179,31 @@ Yazma, depolama ve Functions bugünkü oranlarla bu tablonun yanında küçük k
    > `services/chatRtdb.js` içindeki typing/meta fonksiyonları artık çağrılmıyor, testleriyle birlikte duruyor.
 3. **Arkadaş profili:** üst kısım ve istatistik için yalnız `Lists/{friendUid}` kök belgesi (zaten dinleniyor, 1
    okuma). Koleksiyonlar yalnız ilgili sekme açılınca ve `cachedRead` ile (ör. 6 saat taze kabul) okunsun.
+   > ✅ **YAPILDI (1 Kas), farklı yolla.** `utils/friendListsCache.js`: beş koleksiyon cihaz önbelleğinde, geçerlilik
+   > arkadaşın kök belgesindeki `updatedAt` damgası (her liste yazımı onu günceller). Damga aynıysa **0 okuma**,
+   > değişince bir kez okunur; damgayı güncellemeyen nadir yazımlara karşı en fazla 24 saat. Okumalardan biri bile
+   > başarısızsa önbelleğe yazılmaz. Testler: `friendListsCache.test.js` (3).
 4. **`refreshList` → `syncListDelta`:** yenilemede yalnız `updatedAt > son senkron` okunur. Silinen öğeler için kök
    belgedeki `statusIndex` sapma denetimi zaten var.
+   > ✅ **YAPILDI (1 Kas), daha ucuz yolla.** Tam yeniden çekim yalnız sapma onarımında tetikleniyordu (başka cihazda
+   > ekleme/silme). Artık `planDriftRepair` + `repairListDrift`: fazlalar yerelden **okumasız** silinir, eksikler belge
+   > kimliğiyle **tek tek** okunur (eksik başına 1). 100'den fazla eksik ya da beklenen kimlikte belge yoksa (eski
+   > kayıt biçimi) eskisi gibi tam çekim. İçe aktarma sonrası tam yenileme bilerek aynı kaldı. Testler:
+   > `listDriftRepair.test.js` (7) + `listStatusContext.test.js` güncellendi (+1 silme senaryosu).
 5. **CineSwipe** izleme listesini `getLocalList(uid, "watchList")`'ten okusun → 0 okuma.
+   > ✅ **YAPILDI (1 Kas).** Yerel kopya yoksa (ilk eşitleme bitmeden) Firestore'a düşer. Test:
+   > `cineswipeWatchlistLocal.test.js` (2).
 6. **Puanlarım / etkinliğim** dinleyicilerine `limit` + sayfalama.
+   > ✅ **YAPILDI (1 Kas), asıl sorun başka çıktı.** Profil sekmesindeki "Etkinliklerim" düğmesi yalnız SAYI göstermek
+   > için **dört koleksiyonun tamamını** (puanlar, yorumlar, beğeniler, kaydedilenler) canlı dinliyordu; profil sekmesi
+   > açık kaldıkça her açılış/yeniden bağlanmada hepsi okunuyordu. Artık sayım sorgusu (`getCountFromServer`, 1.000
+   > belge başına 1 okuma), profil odaklanınca, en sık 15 sn'de bir. Etkinliklerim ekranının kendisi (isteyerek açılan)
+   > listeleri hâlâ tam dinliyor; sayfalama orada ayrı iş. Test: `activityCounts.test.js` (2).
 7. **OMDb önbelleği (düşük öncelik, günde 100.000 sınırı var):** istemcide oturumluk `Map` yerine MMKV, 7 gün
    (puanlar yavaş değişir). Amaç kotayı korumak değil, detay sayfasında puanın anında gelmesi ve Functions çağrısının
    azalması. Sunucu tarafı paylaşımlı önbellek bu kotayla gerekmiyor.
+   > ✅ **YAPILDI (1 Kas).** Oturum Map'i + cihaz önbelleği (`cacheStore`, 7 gün); yalnız kesin sonuçlar (bulundu /
+   > bulunamadı) saklanır. Test: `externalRatingsPersist.test.js` (2).
 
 ### Aşama 2 — Yapısal ama mimariyi değiştirmeyen (asıl büyük kazanç; toplam hedef ~10 kat)
 8. **Seyrek değişen hep-açık dinleyicileri "önbellek + delta"ya çevir.** Bu desen listelerde zaten çalışıyor.

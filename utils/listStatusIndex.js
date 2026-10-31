@@ -128,6 +128,42 @@ export function findDriftedLists(statusIndex, maps) {
   return drifted;
 }
 
+/**
+ * Sapan bir listeyi TAMAMEN yeniden çekmek yerine onarım planı (findDriftedLists ile aynı kural):
+ *   • missing: bayrak true ama yerelde yok → sunucudan tek tek okunacak belge kimlikleri (`tür_id`)
+ *   • extra:   bayrak false ama yerelde var → yerelden silinecek anahtarlar
+ * Tam yeniden çekim liste boyu kadar okuma demekti (1.000 izlemeli kütüphanede 1.000); onarım yalnız
+ * eksik öğe sayısı kadar okur, silme hiç okumaz.
+ *
+ * @returns {{missing: string[], extra: string[]} | null} liste ya da veri tanınmıyorsa null
+ */
+export function planDriftRepair(statusIndex, listKey, map) {
+  const spec = DRIFT_LISTS.find((entry) => entry.listKey === listKey);
+  if (!spec || !isMap(statusIndex) || !isMap(map)) return null;
+
+  const localKeys = new Map(); // "tür:id" → yerel anahtarlar (eski "id" + yeni "tür_id" birlikte olabilir)
+  Object.entries(map).forEach(([key, item]) => {
+    if (!item || item.id == null) return;
+    const type = spec.type || (item.type === "tv" ? "tv" : "movie");
+    const mediaKey = `${type}:${item.id}`;
+    localKeys.set(mediaKey, [...(localKeys.get(mediaKey) || []), key]);
+  });
+
+  const missing = [];
+  const extra = [];
+  for (const type of ["movie", "tv"]) {
+    if (spec.type && spec.type !== type) continue;
+    const bucket = statusIndex[type];
+    if (!isMap(bucket)) continue;
+    for (const [id, status] of Object.entries(bucket)) {
+      const keys = localKeys.get(`${type}:${id}`);
+      if (status?.[spec.flag] === true && !keys) missing.push(`${type}_${id}`);
+      else if (status?.[spec.flag] === false && keys) extra.push(...keys);
+    }
+  }
+  return { missing, extra };
+}
+
 export function buildStatusIndex({ allLists, favoritesMap = {}, watchListMap = {}, watchedMoviesMap = {}, watchedTvMap = {}, customItemsMap = {} } = {}) {
   const index = { movie: {}, tv: {} };
   const mark = (item, flag, fallback = "movie") => {

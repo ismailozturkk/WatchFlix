@@ -45,6 +45,7 @@ import {
   sortAsyncRows,
 } from "./asyncRoom";
 import { isInviteMessageId } from "../../utils/chatInvites";
+import { getLocalList, hasLocalList } from "../listSyncService";
 
 export { SWIPE_CATEGORIES, GENRE_OPTIONS, cineMediaKey };
 
@@ -97,13 +98,20 @@ export async function fetchSwipeDeckPage(options = {}) {
   const { language = "tr-TR", page = 1, userId = null } = options;
   const filters = normalizeFilters(options);
 
-  // 1. Kendi izleme listemden: tek seferde gelir, sayfalama yok.
+  // 1. Kendi izleme listemden: tek seferde gelir, sayfalama yok. Liste cihazda zaten
+  // tutuluyor (listSyncService, ListStatusContext eşitler) → 0 okuma. Yerel kopya henüz
+  // kurulmadıysa (ilk açılış eşitlemesi bitmeden) Firestore'a düşülür.
   if (filters.category === "watchlist") {
     if (!userId || page > 1) return { items: [], hasMore: false };
-    const snap = await getDocs(collection(db, "Lists", userId, "watchList"));
+    const entries = hasLocalList(userId, "watchList")
+      ? Object.entries(getLocalList(userId, "watchList"))
+      : (await getDocs(collection(db, "Lists", userId, "watchList"))).docs.map((entry) => [
+          entry.id,
+          entry.data(),
+        ]);
     const items = [];
-    snap.forEach((entry) => {
-      const card = normalizeWatchlistItem(entry.data(), entry.id);
+    entries.forEach(([id, data]) => {
+      const card = normalizeWatchlistItem(data, id);
       if (card && (filters.mediaType === "all" || card.mediaType === filters.mediaType)) {
         items.push(card);
       }

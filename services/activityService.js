@@ -17,6 +17,7 @@
 
 import {
   collection,
+  getCountFromServer,
   query,
   orderBy,
   onSnapshot,
@@ -53,3 +54,43 @@ export const subscribeToMyLikes = (uid, cb) =>
 /** Kullanıcının kaydettiği postlar, en yeni üstte. */
 export const subscribeToMyBookmarks = (uid, cb) =>
   subColumn(uid, "bookmarks", "bookmarkedAt", cb);
+
+// ─── Sayaçlar (Profil'deki "Etkinliklerim" düğmesi) ──────────────────────────
+// Düğme yalnız SAYI gösterir. Eskiden dört koleksiyonun TAMAMI canlı dinleniyordu (profil
+// sekmesi açık kaldıkça; 1.000 puan + 500 beğeni = her açılış/yeniden bağlanmada 1.500+ okuma).
+// Artık sayım sorgusu: 1.000 belge başına 1 okuma. Kısa sürede tekrar sorulursa (sekme
+// geçişleri) bellekteki son değer döner.
+export const ACTIVITY_COUNTS_MIN_INTERVAL_MS = 15 * 1000;
+const ACTIVITY_COUNT_SUBS = {
+  ratings: "myRatings",
+  comments: "myComments",
+  likes: "likedPosts",
+  bookmarks: "bookmarks",
+};
+const countsCache = new Map(); // uid → { at, counts }
+
+/** Son bilinen sayılar (ağ yok); hiç sorulmadıysa null. */
+export function peekMyActivityCounts(uid) {
+  return countsCache.get(uid)?.counts ?? null;
+}
+
+/**
+ * @returns {Promise<{ratings:number, comments:number, likes:number, bookmarks:number}>}
+ *   Okunamayan sayı son bilinen değerde (yoksa 0) kalır.
+ */
+export async function fetchMyActivityCounts(uid, { force = false, now = Date.now } = {}) {
+  if (!uid) return { ratings: 0, comments: 0, likes: 0, bookmarks: 0 };
+  const cached = countsCache.get(uid);
+  if (!force && cached && now() - cached.at < ACTIVITY_COUNTS_MIN_INTERVAL_MS) return cached.counts;
+  const keys = Object.keys(ACTIVITY_COUNT_SUBS);
+  const results = await Promise.allSettled(
+    keys.map((key) => getCountFromServer(collection(db, "Users", uid, ACTIVITY_COUNT_SUBS[key]))),
+  );
+  const counts = {};
+  keys.forEach((key, i) => {
+    const r = results[i];
+    counts[key] = r.status === "fulfilled" ? r.value.data().count : cached?.counts?.[key] ?? 0;
+  });
+  countsCache.set(uid, { at: now(), counts });
+  return counts;
+}

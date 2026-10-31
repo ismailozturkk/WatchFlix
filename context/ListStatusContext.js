@@ -2,6 +2,7 @@ import {
   applyStatusOverlay,
   buildStatusIndex,
   findDriftedLists,
+  planDriftRepair,
   resolveStatusIndex,
 } from "../utils/listStatusIndex";
 import React, {
@@ -55,6 +56,7 @@ import {
   hasLocalList,
   subscribeLocalList,
   fetchFullListOnce,
+  repairListDrift,
 } from "../services/listSyncService";
 
 const RESERVED_SET = new Set(RESERVED_LIST_NAMES);
@@ -439,8 +441,9 @@ export const ListStatusProvider = ({ children }) => {
   // Kök dokümandaki statusIndex canlı dinlenir; yerel liste haritaları ise
   // yalnız bu cihazın yazımlarıyla ve ilk indirmeyle güncellenir. Başka cihazda
   // yapılan ekleme/silme (ya da commit sonrası yerel güncellemeden önce kapanan
-  // uygulama) ikisini ayırır. Sapma SIFIR okumayla tespit edilir; yalnız sapan
-  // liste yeniden çekilir. Aynı kök sürümünde bir liste bir kez denenir:
+  // uygulama) ikisini ayırır. Sapma SIFIR okumayla tespit edilir; sapan liste
+  // tamamen yeniden çekilmez, onarılır: fazlalar yerelden silinir, yalnız eksik
+  // öğeler okunur (repairListDrift). Aynı kök sürümünde bir liste bir kez denenir:
   // yeniden çekmeyle de kapanmayan sapma (ör. eski bir hatadan kalma hayalet
   // bayrak) sonsuz sorgu döngüsüne dönmez.
   const overlayIdle = overlay === EMPTY_OVERLAY;
@@ -453,15 +456,26 @@ export const ListStatusProvider = ({ children }) => {
     const timer = setTimeout(() => {
       if (currentUidRef.current !== uid) return;
       const stamp = rootStamp(allListsRef.current);
-      findDriftedLists(index, {
+      const maps = {
         favorites: favoritesMap,
         watchList: watchListMap,
         watchedMovies: watchedMoviesMap,
         watchedTv: watchedTvMap,
-      }).forEach((listKey) => {
+      };
+      const setters = {
+        favorites: setFavoritesMap,
+        watchList: setWatchListMap,
+        watchedMovies: setWatchedMoviesMap,
+        watchedTv: setWatchedTvMap,
+      };
+      findDriftedLists(index, maps).forEach((listKey) => {
         if (driftResyncRef.current[listKey] === stamp) return;
         driftResyncRef.current[listKey] = stamp;
-        refreshList(listKey).catch(() => {});
+        repairListDrift(uid, listKey, planDriftRepair(index, listKey, maps[listKey]))
+          .then((map) => {
+            if (currentUidRef.current === uid) setters[listKey](map);
+          })
+          .catch(() => {});
       });
     }, DRIFT_CHECK_DELAY_MS);
     return () => clearTimeout(timer);
@@ -474,7 +488,6 @@ export const ListStatusProvider = ({ children }) => {
     watchListMap,
     watchedMoviesMap,
     watchedTvMap,
-    refreshList,
   ]);
 
   // Bağlantı geri geldiğinde, çevrimdışı açılışta indirilemeyen listeler varsa

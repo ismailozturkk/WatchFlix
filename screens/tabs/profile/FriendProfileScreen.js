@@ -59,6 +59,7 @@ import { buildActivityFromRoot } from "../../../utils/mediaActivityIndex";
 import { useLanguage } from "../../../context/LanguageContext";
 import { DEFAULT_PRIVACY } from "../../../services/userService";
 import { subscribeSocialLinks } from "../../../services/socialLinksService";
+import { listsRootStamp, readFriendLists, writeFriendLists } from "../../../utils/friendListsCache";
 import ScreenDecor from "../../../components/ScreenDecor";
 import SaveSharedListModal from "../../../components/modals/SaveSharedListModal";
 import AvatarPreviewModal from "../../../components/profile/AvatarPreviewModal";
@@ -416,6 +417,9 @@ export default function FriendProfileScreen({ route, navigation }) {
   // Öntanımlı dört liste + özel listeler artık kök dokümanda değil, kendi alt
   // koleksiyonlarında yaşıyor (bkz. listItemsService.js). Hepsi çekilmezse
   // arkadaş profilinde "boş" görünürler.
+  // Cihaz önbelleği (utils/friendListsCache): kök belgenin damgası değişmediyse beş koleksiyon
+  // yeniden OKUNMAZ — eskiden her profil açılışı arkadaşın tüm kütüphanesini okuyordu.
+  const friendListsStamp = allLists ? listsRootStamp(allLists) : null;
   useEffect(() => {
     if (!friendUid || !canViewLists) {
       setSubMovies(null);
@@ -423,6 +427,20 @@ export default function FriendProfileScreen({ route, navigation }) {
       setSubFavorites(null);
       setSubWatchList(null);
       setSubCustomItems(null);
+      return;
+    }
+    // Kök belge gelmeden damga bilinmiyor: önbellek doğrulanamaz, okuma da ertelenir.
+    if (friendListsStamp === null) return;
+    const applyLists = (lists) => {
+      setSubMovies(lists.movies);
+      setSubShows(lists.shows);
+      setSubFavorites(lists.favorites);
+      setSubWatchList(lists.watchList);
+      setSubCustomItems(lists.customItems);
+    };
+    const cached = readFriendLists(friendUid, friendListsStamp);
+    if (cached) {
+      applyLists(cached);
       return;
     }
     let cancelled = false;
@@ -437,17 +455,24 @@ export default function FriendProfileScreen({ route, navigation }) {
       if (cancelled) return;
       const mapSnap = (snap) =>
         snap ? snap.docs.map((d) => ({ ...d.data(), id: d.data().id ?? d.id })) : [];
-      setSubMovies(mapSnap(movSnap));
-      setSubShows(mapSnap(tvSnap));
-      setSubFavorites(mapSnap(favSnap));
-      setSubWatchList(mapSnap(wlSnap));
-      setSubCustomItems(mapSnap(customSnap));
+      const lists = {
+        movies: mapSnap(movSnap),
+        shows: mapSnap(tvSnap),
+        favorites: mapSnap(favSnap),
+        watchList: mapSnap(wlSnap),
+        customItems: mapSnap(customSnap),
+      };
+      applyLists(lists);
+      // Biri bile okunamadıysa (izin/ağ) eksik veri önbelleğe girmez.
+      if (movSnap && tvSnap && favSnap && wlSnap && customSnap) {
+        writeFriendLists(friendUid, friendListsStamp, lists);
+      }
     };
     fetchSubs();
     return () => {
       cancelled = true;
     };
-  }, [friendUid, canViewLists]);
+  }, [friendUid, canViewLists, friendListsStamp]);
 
   // ── İzleme istatistikleri — yeni + eski format birleşimi ─────────────────
   // (ProfileStatsContext ile aynı merge mantığı: subcollection öncelikli,
