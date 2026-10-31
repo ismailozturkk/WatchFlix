@@ -18,6 +18,7 @@ Her madde şu düzende: **Ne sorun · Neden önemli · Ne yapılmalı · Zorluk/
    2. Sonra uygulamanın yeni sürümü (build).
 
    Ters sırada olursa yeni sürümde Günün Sorusu oyu ve arkadaş araması çalışmaz.
+   (1 Kas eki: aynı kural yayını, ortak listede kurucu olmayan üyenin eklediği/çıkardığı içeriğin diğer üyelere hemen yansıması için gereken küçük kuralı da taşıyor. Yayınlanana dek en geç 30 dakikada yansıyor.)
    ⚠️ Kural dosyası bütün olarak gider. Başka oturumların henüz yayınlanmamış kuralları (Haftalık Lig vb.) da onunla birlikte yayına çıkar. Fonksiyonlar da çalışma klasöründen gider: commit'lenmemiş lig kodu dahil. Bunu bilerek yaptırmak için deploy'u sana bıraktım.
 2. **Cihaz doğrulaması (App Check):**
    1. Apple Developer'da DeviceCheck `.p8` anahtarı oluştur ve Firebase'e yükle.

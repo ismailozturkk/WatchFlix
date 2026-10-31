@@ -211,15 +211,33 @@ Yazma, depolama ve Functions bugünkü oranlarla bu tablonun yanında küçük k
      açılışta MMKV'den çiz, `where("updatedAt", ">", sonSenkron)` ile yalnız değişenleri oku.
    - Canlı kalması gerekenler: sohbetler, bildirimler, gelen istekler, kendi profilim.
    - Gereken: ilgili belgelere `updatedAt` alanı (çoğunda var) ve silme için "tombstone" ya da kök sayaç.
+   > ✅ **Arkadaşlar YAPILDI (1 Kas), tombstone gerekmeden.** Damga: kendi profil belgemdeki `friendsCount` (zaten
+   > canlı; ekleme/çıkarma/engelleme iki tarafın sayacını aynı batch'te oynatır). Damga aynıysa cihaz önbelleği,
+   > değişince bir kez okunur; ad/avatar güncellemeleri için kayıt en fazla 1 saat (ön plana dönüşte denetlenir).
+   > Gelen/giden istekler ve engeller canlı kaldı (küçük, sık değişir). Test: `friendsListCache.test.js` (4).
+   > **Bilerek yapılmayanlar:** engellenenler, gizlenen gönderiler (birkaç belge), sosyal bağlantılar ve gizli hesap
+   > bilgisi (tek belge) — kazanç yok denecek kadar az.
 9. **Ortak liste öğeleri:** liste başına hep-açık dinleyici yerine yalnız liste ekranı açıkken. Uygulama genelindeki
    "bu film ortak listede mi" işareti için `SharedLists/{id}` belgesine küçük bir öğe kimliği dizini (en fazla birkaç
    yüz kimlik) yazılsın; 3 × 50 okuma yerine 3 okuma.
+   > ✅ **YAPILDI (1 Kas), dizin yazmadan.** Uygulama geneli öğe dinleyicileri kalktı; liste belgesinin `updatedAt`
+   > damgası (üyelik sorgusu zaten canlı) değişince o liste bir kez okunur, aynıysa cihaz önbelleği (en fazla 30 dk).
+   > Liste ekranı kendi canlı dinleyicisini kullanmaya devam ediyor. Bu cihazdaki ekleme/çıkarma o listeyi hemen
+   > yeniden okutur. Öğe çıkarma artık damgayı da tazeliyor. **Kural değişikliği (DEPLOY GEREKİR):** şimdiye kadar yalnız
+   > kurucu liste belgesini yazabildiği için, kurucu olmayan üyenin eklemesi damgayı tazeleyemiyordu. Yeni kural:
+   > üye YALNIZ `updatedAt`'i sunucu saatine çekebilir. Kural testleri 4 yeni (367/367). Deploy edilene dek kurucu
+   > olmayan üyelerin değişiklikleri diğer üyelerin rozetine en geç 30 dk'da yansır. Test:
+   > `sharedListsItemsCache.test.js` (5).
 10. **Kalıcı yerel önbellek: Firestore'u yerel SDK'ya taşımak** (`@react-native-firebase/firestore`; app,
     app-check ve analytics zaten bu aileden). Disk önbelleği ve "30 dakika içinde yeniden bağlanınca yalnız
     değişeni öde" kuralı bununla devreye girer. Açılış performansı notundaki "çift Firebase SDK birleştirme" işiyle
     aynı iş: 69 dosya `firebase/firestore`'dan import ediyor, modüler API büyük ölçüde aynı. Orta-büyük, mekanik bir
     geçiş. Tek başına hep-açık dinleyici maliyetini kısa arka plan dönüşlerinde büyük ölçüde siler. 8. ile birlikte
     yapılırsa en büyük kazanç.
+    > ⚠️ **BAŞLANMADI (1 Kas) — tahminimden büyük çıktı.** Oturum web SDK'sında (`firebase/auth`, 18 dosya), yerel
+    > Auth paketi kurulu değil. Yerel Firestore SDK'sı kimliği yerel Auth'tan alır; yalnız Firestore taşınırsa bütün
+    > istekler oturumsuz gider ve kurallar hepsini reddeder. Bu yüzden iş = Firestore + Auth (Google/Apple/e-posta giriş
+    > akışları) birlikte taşıma + yeni native build. Cihazda denenmeden yapılamaz; ayrı bir proje olarak planlanmalı.
 
 ### Aşama 3 — Herkese aynı görünen veriyi CDN'den ver
 11. **Firestore veri paketleri (bundles) + Firebase Hosting CDN:** Top 100, turnuva havuzu, liderlik tabloları,

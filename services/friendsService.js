@@ -54,7 +54,20 @@ const sortByCreatedAtDesc = (docs) =>
 // ── Sorgular (Reads) ─────────────────────────────────────────────────────────
 
 /**
- * Realtime: kullanıcının arkadaş listesi.
+ * Arkadaş listesini bir kez oku. FriendsContext artık listeyi canlı dinlemiyor: kendi
+ * profil belgemdeki friendsCount damgası değişince (ekleme/çıkarma iki tarafın sayacını da
+ * aynı batch'te oynatır) ya da önbellek bayatlayınca okur — her yeniden bağlanmada tüm
+ * arkadaş kayıtları faturalanmasın diye.
+ */
+export async function fetchFriends(uid) {
+  if (!uid) return [];
+  const snap = await getDocs(collection(db, "Users", uid, "friends"));
+  trackFirestoreRead("Users/friends", snap.docs.length || 1);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Realtime: kullanıcının arkadaş listesi (yalnız ekran düzeyinde; uygulama geneli fetchFriends).
  */
 export function subscribeToFriends(uid, callback) {
   if (!uid) return () => {};

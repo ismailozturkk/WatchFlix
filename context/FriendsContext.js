@@ -10,12 +10,13 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Toast from "@components/AppToast";
 import { useAuth } from "./AuthContext";
 import {
-  subscribeToFriends,
+  fetchFriends,
   subscribeToIncomingRequests,
   subscribeToOutgoingRequests,
   subscribeToBlocked,
@@ -32,8 +33,17 @@ import { useUserProfile } from "./UserProfileContext";
 import { getUserProfile } from "../services/userService";
 import { i18nText } from "../utils/i18nText";
 import useStartupGate from "../hooks/useStartupGate";
+import useAppActive from "../hooks/useAppActive";
+import { peekStamped, readStamped, writeStamped } from "../utils/stampedCache";
 import { usePremiumGate } from "../hooks/usePremiumGate";
 
+
+// Arkadaş listesi canlı DİNLENMEZ (eskiden hep-açık dinleyici her yeniden bağlanmada tüm arkadaş
+// kayıtlarını yeniden faturalıyordu). Damga: kendi profil belgemdeki friendsCount (zaten canlı).
+// Ad/avatar gibi sayacı değiştirmeyen güncellemeler için kayıt en fazla bu kadar geçerli;
+// süre ön plana dönüşte de denetlenir.
+const FRIENDS_NS = "friendsList";
+const FRIENDS_MAX_AGE = 60 * 60 * 1000;
 
 const FriendsContext = createContext();
 export const useFriends = () => useContext(FriendsContext);
@@ -47,7 +57,13 @@ export function FriendsProvider({ children }) {
   const [incomingRequests, setIncomingRequests] = useState([]);
   const [outgoingRequests, setOutgoingRequests] = useState([]);
   const [blockedUsers, setBlockedUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [friendsLoaded, setFriendsLoaded] = useState(false);
+  const loading = requestsLoading || !friendsLoaded;
+  const appActive = useAppActive();
+  // Profil belgesi gelmeden sayaç bilinmiyor (null): okuma bekler, önbellek çizilir.
+  const friendsStamp = myProfile ? Math.max(0, myProfile.friendsCount || 0) : null;
+  const seededUidRef = useRef(null);
 
   // Açılış yolundaki hiçbir ekran bu context'i okumuyor (sekmeler + ilk
   // raylar); 3 listener'ı splash sonrası pencerenin dışına ertele. Kademeler
@@ -55,28 +71,62 @@ export function FriendsProvider({ children }) {
   const startupReady = useStartupGate(1400);
 
   // ── Realtime listeners ───────────────────────────────────────────────────
+  // ── Arkadaş listesi: damgalı önbellek ───────────────────────────────────
   useEffect(() => {
     if (!startupReady) return undefined;
     if (!uid) {
+      seededUidRef.current = null;
       setFriends([]);
+      setFriendsLoaded(true);
+      return undefined;
+    }
+    // Hesap değişince (ya da ilk açılışta) son bilinen liste anında çizilir.
+    if (seededUidRef.current !== uid) {
+      seededUidRef.current = uid;
+      const last = peekStamped(FRIENDS_NS, uid);
+      setFriends(last || []);
+      setFriendsLoaded(!!last);
+    }
+    if (friendsStamp === null || !appActive) return undefined;
+    const fresh = readStamped(FRIENDS_NS, uid, friendsStamp, FRIENDS_MAX_AGE);
+    if (fresh) {
+      setFriends(fresh);
+      setFriendsLoaded(true);
+      return undefined;
+    }
+    let cancelled = false;
+    fetchFriends(uid)
+      .then((list) => {
+        writeStamped(FRIENDS_NS, uid, friendsStamp, list);
+        if (!cancelled) setFriends(list);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setFriendsLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [uid, startupReady, friendsStamp, appActive]);
+
+  // ── Realtime listeners (istekler + engeller: küçük ve sık değişir) ───────
+  useEffect(() => {
+    if (!startupReady) return undefined;
+    if (!uid) {
       setIncomingRequests([]);
       setOutgoingRequests([]);
       setBlockedUsers([]);
-      setLoading(false);
+      setRequestsLoading(false);
       return;
     }
-    setLoading(true);
+    setRequestsLoading(true);
     let mounted = true;
     let loadedCount = 0;
     const markLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 3 && mounted) setLoading(false);
+      if (loadedCount >= 2 && mounted) setRequestsLoading(false);
     };
 
-    const unsubFriends = subscribeToFriends(uid, (list) => {
-      setFriends(list);
-      markLoaded();
-    });
     const unsubIn = subscribeToIncomingRequests(uid, (list) => {
       setIncomingRequests(list);
       markLoaded();
@@ -85,15 +135,13 @@ export function FriendsProvider({ children }) {
       setOutgoingRequests(list);
       markLoaded();
     });
-    // markLoaded ÇAĞIRMIYOR: `loading` üç listener'ın sayacına bağlı ve
-    // ekranlar onu "arkadaş verisi hazır" anlamında kullanıyor. Engel listesi
-    // ayrı bir yüzey (süzgeç) besliyor; sayaca katarsak eşik 3'te kalır ve
-    // loading hiç kapanmaz.
+    // markLoaded ÇAĞIRMIYOR: `loading` iki istek dinleyicisine + arkadaş listesine
+    // bağlı ve ekranlar onu "arkadaş verisi hazır" anlamında kullanıyor. Engel listesi
+    // ayrı bir yüzey (süzgeç) besliyor; sayaca katarsak loading hiç kapanmayabilir.
     const unsubBlocked = subscribeToBlocked(uid, setBlockedUsers);
 
     return () => {
       mounted = false;
-      unsubFriends();
       unsubIn();
       unsubOut();
       unsubBlocked();

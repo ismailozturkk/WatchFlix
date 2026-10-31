@@ -164,6 +164,47 @@ describe("ortak liste siralama yetkisi", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 1) Film/dizi yorumları: create dokümandaki userId ile kimliği bağlamalı
 // ─────────────────────────────────────────────────────────────────────────────
+describe("ortak liste damgasi (uye updatedAt tazeler)", () => {
+  beforeEach(async () => {
+    await seed((db) =>
+      setDoc(doc(db, "SharedLists", "shared-2"), {
+        name: "Ortak",
+        ownerId: ALICE,
+        memberIds: [ALICE, BOB],
+        members: { [ALICE]: { canAdd: true }, [BOB]: { canAdd: true } },
+        updatedAt: new Date(0),
+      }),
+    );
+  });
+
+  test("uye yalniz updatedAt'i sunucu saatine tazeleyebilir", async () => {
+    await assertSucceeds(
+      updateDoc(doc(bob, "SharedLists", "shared-2"), { updatedAt: serverTimestamp() }),
+    );
+  });
+
+  test("uye istemci saati yazamaz", async () => {
+    await assertFails(
+      updateDoc(doc(bob, "SharedLists", "shared-2"), { updatedAt: new Date(2000) }),
+    );
+  });
+
+  test("uye damgayla birlikte baska alan degistiremez", async () => {
+    await assertFails(
+      updateDoc(doc(bob, "SharedLists", "shared-2"), {
+        updatedAt: serverTimestamp(),
+        name: "Ele gecirildi",
+      }),
+    );
+  });
+
+  test("uye olmayan damga tazeleyemez", async () => {
+    await assertFails(
+      updateDoc(doc(carol, "SharedLists", "shared-2"), { updatedAt: serverTimestamp() }),
+    );
+  });
+});
+
 describe("yorum create kimlik bagi", () => {
   const yorum = (userId) => ({
     userId,

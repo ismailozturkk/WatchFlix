@@ -201,6 +201,14 @@ service cloud.firestore {
                             .addedKeys().size() == 0
                        && request.resource.data.members.diff(resource.data.members)
                             .changedKeys().size() == 0)
+                      ||
+                      // Üye: yalnız updatedAt'i SUNUCU saatine tazeler. Öğe ekleme/çıkarmada
+                      // diğer üyelerin cihazındaki öğe önbelleği (SharedListsContext) bu damgayla
+                      // geçersizlenir; başka alan değiştirilemez, saat uydurulamaz.
+                      (request.auth.uid in resource.data.memberIds
+                       && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['updatedAt'])
+                       && request.resource.data.updatedAt == request.time)
                     );
 
       allow delete: if isSignedIn() && request.auth.uid == resource.data.ownerId;

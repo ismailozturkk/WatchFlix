@@ -183,6 +183,24 @@ export async function leaveSharedList(listId, uid) {
 
 // ─── ÖĞELER ───────────────────────────────────────────────────────────────────
 
+// Bu cihazda bir ortak listeye öğe eklenince/çıkarılınca haber verir. SharedListsContext öğeleri
+// canlı dinlemiyor (liste damgasıyla önbellekten); kendi değişikliğimiz damgaya yansımasa bile
+// (kural yalnız kurucuya liste belgesini yazdırıyorsa) o listeyi bir kez yeniden okusun diye.
+const itemsChangedListeners = new Set();
+export function onSharedListItemsChanged(listener) {
+  itemsChangedListeners.add(listener);
+  return () => itemsChangedListeners.delete(listener);
+}
+const emitItemsChanged = (listId) => {
+  itemsChangedListeners.forEach((listener) => {
+    try {
+      listener(listId);
+    } catch {
+      // dinleyici hatası yazımı etkilemesin
+    }
+  });
+};
+
 /**
  * Listeye içerik ekle. Doc id deterministik (`movie_550`) — aynı içerik iki kez
  * eklenemez, kim önce eklediyse çipte o görünür (setDoc üzerine yazmasın diye
@@ -213,6 +231,7 @@ export async function addItemToSharedList({ listId, user, item }) {
     addedByPhotoURL: user.photoURL || null,
     addedAt: serverTimestamp(),
   });
+  emitItemsChanged(listId);
   // Liste kartı önizlemeleri "son eklenen" görünsün diye updatedAt tazele
   // (best-effort; üye kuralı buna izin vermiyorsa sessiz geç).
   updateDoc(doc(db, "SharedLists", listId), {
@@ -223,6 +242,12 @@ export async function addItemToSharedList({ listId, user, item }) {
 export async function removeItemFromSharedList(listId, type, id) {
   if (!listId || id == null) throw new Error("removeItemFromSharedList: eksik parametre");
   await deleteDoc(doc(db, "SharedLists", listId, "items", sharedItemKey(type, id)));
+  emitItemsChanged(listId);
+  // Üyelerin cihazındaki öğe önbelleği (SharedListsContext) liste damgasıyla doğrulanır;
+  // çıkarma da damgayı tazelemeli, yoksa öğe diğer üyelerde "listede" görünmeye devam eder.
+  updateDoc(doc(db, "SharedLists", listId), {
+    updatedAt: serverTimestamp(),
+  }).catch(() => {});
 }
 
 /** Ortak listedeki manuel sırayı yalnız `listOrder` alanıyla günceller. */
@@ -289,28 +314,39 @@ export function subscribeToSharedList(listId, callback) {
   );
 }
 
-/** Listenin öğelerini canlı dinle (manuel sıra, yoksa eklenme sırası). */
+// Firestore Timestamp ya da önbellekten dönen düz {seconds} → ms.
+const addedAtMs = (value) => {
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  return Number.isFinite(value?.seconds) ? value.seconds * 1000 : Infinity;
+};
+
+/** Manuel sıra (listOrder), yoksa eklenme sırası. Yerinde sıralar ve döner. */
+export function sortSharedListItems(items) {
+  return items.sort((a, b) => {
+    const aHasOrder = Number.isFinite(a.listOrder);
+    const bHasOrder = Number.isFinite(b.listOrder);
+    if (aHasOrder && bHasOrder && a.listOrder !== b.listOrder)
+      return a.listOrder - b.listOrder;
+    if (aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1;
+    return addedAtMs(a.addedAt) - addedAtMs(b.addedAt);
+  });
+}
+
+/** Listenin öğelerini canlı dinle (manuel sıra, yoksa eklenme sırası). Liste ekranı kullanır. */
 export function subscribeToSharedListItems(listId, callback) {
   if (!listId) return () => {};
   return onSnapshot(
     collection(db, "SharedLists", listId, "items"),
-    (snap) => {
-      const items = snap.docs.map((d) => ({ key: d.id, ...d.data() }));
-      items.sort((a, b) => {
-        const aHasOrder = Number.isFinite(a.listOrder);
-        const bHasOrder = Number.isFinite(b.listOrder);
-        if (aHasOrder && bHasOrder && a.listOrder !== b.listOrder)
-          return a.listOrder - b.listOrder;
-        if (aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1;
-        return (
-          (a.addedAt?.toMillis?.() ?? Infinity) -
-          (b.addedAt?.toMillis?.() ?? Infinity)
-        );
-      });
-      callback(items);
-    },
+    (snap) => callback(sortSharedListItems(snap.docs.map((d) => ({ key: d.id, ...d.data() })))),
     snapshotErrorHandler("SharedLists/items"),
   );
+}
+
+/** Öğeleri bir kez oku (SharedListsContext: liste damgası değişince). */
+export async function fetchSharedListItems(listId) {
+  if (!listId) return [];
+  const snap = await getDocs(collection(db, "SharedLists", listId, "items"));
+  return sortSharedListItems(snap.docs.map((d) => ({ key: d.id, ...d.data() })));
 }
 
 // ─── Yardımcılar ──────────────────────────────────────────────────────────────
