@@ -1,6 +1,12 @@
 {
   "hosting": {
     "public": "website",
+    "rewrites": [
+      {
+        "source": "/api/top100",
+        "function": { "functionId": "top100Counters", "region": "us-central1" }
+      }
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",

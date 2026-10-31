@@ -244,6 +244,23 @@ Yazma, depolama ve Functions bugünkü oranlarla bu tablonun yanında küçük k
     Oscar/Emmy (`AppConfig`), Günün Sorusu metni gibi herkes için aynı olan veriler. Bir zamanlanmış fonksiyon
     saatte bir paketi üretir, istemci CDN'den indirir. **Firestore okuması 0** (Hosting: ayda 10 GB ücretsiz,
     sonrası GB başına ücret). Kullanıcı sayısıyla büyüyen okumayı sabit maliyete çevirir.
+    > ✅ **YAPILDI (1 Kas), veriye göre iki yol (paket/zamanlanmış fonksiyon yerine istek üzerine):**
+    > - **Top 100 sayaçları → CDN.** Kişisel veri yok. `top100Counters` (HTTP) + Hosting rewrite
+    >   `seelogd.com/api/top100`; CDN 10 dk, fonksiyon örneği 60 sn bellekte saklar (CDN'i atlayan doğrudan istek de
+    >   her seferinde okutmaz). Eskiden Top 100'ü açan her kullanıcı **120 okuma**; artık 0 (CDN tazelenince 120,
+    >   en sık 10 dk'da bir). Kendi oyun 10 dk'ya dek sayıya yansımayabilir (kozmetik).
+    > - **Liderlik tabloları → tek belgelik anlık görüntü (CDN'e KONMADI).** Satırlarda ad/avatar/foto var ve kurallar
+    >   yalnız oturumluya okutuyor; CDN önbelleği oturumsuz isteğe de aynı yanıtı verirdi. `BoardSnapshots/{boardId}`
+    >   = ilk 50 + `builtAt`; istemci 1 belge okur, 10 dk'dan bayatsa `getBoardSnapshot` callable'ı yeniden kurar.
+    >   "Genel" tablo açılışı **400 okuma → 8**, tek oyun ve günlük Sahne tablosu 50 → 1. Yeni rekor tabloya 10 dk'ya
+    >   dek gecikebilir.
+    > - Uç kesinlikleri: tanınmayan tablo kimliği reddedilir (keyfi koleksiyon okunamaz), oturumsuz çağrı reddedilir,
+    >   anlık görüntüyü yalnız sunucu yazar (kural). Emülatörde uçtan uca denendi.
+    > - **Sıra önemsiz, istemci her durumda eski yola düşer:** kural/fonksiyon/Hosting yayında değilse doğrudan sorgu.
+    > - Bilerek dışarıda: turnuva havuzu (seçim fazında canlı ekleme gerekiyor), Oscar/Emmy (`AppConfig`, zaten 7 gün
+    >   cihaz önbelleğinde), Günün Sorusu (1 + 10 parça belge, küçük).
+    > - Testler: `functions/publicBoards.test.js` (5, istemci sabitleriyle parite), `publicBoardsClient.test.js` (7),
+    >   kural testleri +2 (369/369).
 
 ### Bilinçli olarak ÖNERMEDİKLERİM
 - **Veritabanını tek bölgeye (Belçika) taşımak:** okuma %45 daha ucuz. Ama konum sonradan değiştirilemez; yeni

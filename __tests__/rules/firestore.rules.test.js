@@ -205,6 +205,26 @@ describe("ortak liste damgasi (uye updatedAt tazeler)", () => {
   });
 });
 
+describe("liderlik anlik goruntusu", () => {
+  beforeEach(async () => {
+    await seed((db) =>
+      setDoc(doc(db, "BoardSnapshots", "quick_blur_poster"), { entries: [], builtAt: 1 }),
+    );
+  });
+
+  test("oturumlu kullanici okur, kimse yazamaz", async () => {
+    await assertSucceeds(getDoc(doc(alice, "BoardSnapshots", "quick_blur_poster")));
+    await assertFails(
+      setDoc(doc(alice, "BoardSnapshots", "quick_blur_poster"), { entries: [], builtAt: 2 }),
+    );
+  });
+
+  test("oturumsuz okuyamaz", async () => {
+    const anon = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anon, "BoardSnapshots", "quick_blur_poster")));
+  });
+});
+
 describe("yorum create kimlik bagi", () => {
   const yorum = (userId) => ({
     userId,

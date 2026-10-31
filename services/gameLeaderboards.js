@@ -16,6 +16,7 @@
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { fetchLeaderboard } from "./sceneGameService";
+import { readBoardSnapshot } from "./boardSnapshots";
 import {
   BOARD_LIMIT,
   RANKED_GAME_IDS,
@@ -42,6 +43,15 @@ const sceneRow = (row) => ({
 });
 
 async function readBoard(gameId) {
+  // Önce sunucunun anlık görüntüsü (1 okuma); yoksa tablo doğrudan okunur (BOARD_LIMIT okuma).
+  // "Genel" tablo 8 oyunu okuduğu için açılış başına 400 okuma → 8.
+  const snapshotId = gameId === SCENE_BOARD_GAME ? SCENE_BOARD_GAME : boardIdOf(gameId);
+  const entries = snapshotId ? await readBoardSnapshot(snapshotId) : null;
+  if (entries) {
+    return entries.map(({ id, data }) =>
+      gameId === SCENE_BOARD_GAME ? sceneRow({ uid: id, ...data }) : boardEntryToRow(id, data),
+    );
+  }
   if (gameId === SCENE_BOARD_GAME) return (await fetchLeaderboard(BOARD_LIMIT)).map(sceneRow);
   const boardId = boardIdOf(gameId);
   if (!boardId) return [];

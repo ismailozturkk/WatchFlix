@@ -70,6 +70,7 @@ const { createSocialPush } = require("./socialPush");
 const { sendExpoPushes } = require("./expoSend");
 const referral = require("./referral");
 const userSearch = require("./userSearch");
+const publicBoards = require("./publicBoards");
 const { CAPACITY } = require("./capacity");
 const { purgeAccountData, PURGE_PHASES } = require("./accountPurge");
 const functionsV1 = require("firebase-functions/v1");
@@ -1029,6 +1030,67 @@ exports.searchUsers = onCall(CAPACITY.light, async (request) => {
     .limit(userSearch.SEARCH_LIMIT + 1)
     .get();
   return { users: userSearch.pickResults(snap.docs, request.auth.uid) };
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// HERKESE AYNI TABLOLAR (maliyet analizi Aşama 3) — gerekçe: publicBoards.js
+// ───────────────────────────────────────────────────────────────────────────
+
+// Top 100 sayaçları: Hosting rewrite /api/top100 (firebase.json). Kişisel veri yok; CDN saklar.
+let top100Memory = null; // { at, body }
+exports.top100Counters = onRequest(CAPACITY.light, async (req, res) => {
+  if (req.method !== "GET") {
+    res.status(405).set("Allow", "GET").end();
+    return;
+  }
+  try {
+    const now = Date.now();
+    if (!top100Memory || now - top100Memory.at >= publicBoards.TOP100_MEMORY_MS) {
+      const snap = await db
+        .collection("Top100Hype")
+        .orderBy("count", "desc")
+        .limit(publicBoards.TOP100_COUNTER_LIMIT)
+        .get();
+      top100Memory = { at: now, body: { counters: publicBoards.top100Payload(snap.docs), builtAt: now } };
+    }
+    res.set("Cache-Control", publicBoards.TOP100_CACHE_CONTROL);
+    res.status(200).json(top100Memory.body);
+  } catch (err) {
+    console.error("[top100Counters]", err?.message || err);
+    res.set("Cache-Control", "no-store");
+    res.status(503).json({ error: "unavailable" });
+  }
+});
+
+// Liderlik tablosu anlık görüntüsü: BoardSnapshots/{boardId} bayatsa (10 dk) yeniden kurar.
+// Yalnız oturumlu; tanınmayan tablo kimliği reddedilir. Aynı örnekte aynı tablo için eşzamanlı
+// yeniden kurma tek sorguya indirgenir.
+const boardRebuilds = new Map(); // boardId → Promise
+exports.getBoardSnapshot = onCall(CAPACITY.light, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  const boardId = request.data?.boardId;
+  const source = publicBoards.boardSource(boardId);
+  if (!source) throw new HttpsError("invalid-argument", "Unknown board");
+  const ref = db.doc(`BoardSnapshots/${boardId}`);
+  const current = await ref.get();
+  const data = current.exists ? current.data() : null;
+  if (data && publicBoards.isFreshSnapshot(data.builtAt)) {
+    return { entries: data.entries || [], builtAt: data.builtAt };
+  }
+  if (!boardRebuilds.has(boardId)) {
+    const rebuild = (async () => {
+      const snap = await db
+        .collection(source.collection)
+        .orderBy(source.orderField, "desc")
+        .limit(publicBoards.BOARD_SNAPSHOT_LIMIT)
+        .get();
+      const body = { entries: publicBoards.snapshotEntries(snap.docs), builtAt: Date.now() };
+      await ref.set({ boardId, ...body });
+      return body;
+    })().finally(() => boardRebuilds.delete(boardId));
+    boardRebuilds.set(boardId, rebuild);
+  }
+  return boardRebuilds.get(boardId);
 });
 
 // ───────────────────────────────────────────────────────────────────────────

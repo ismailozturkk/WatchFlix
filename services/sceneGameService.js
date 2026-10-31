@@ -20,6 +20,7 @@ import { db } from "../firebase";
 import { computeLevel, validateSessionResult } from "../utils/gameScoring";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { cachedRead } from "../utils/cachedRead";
+import { readBoardSnapshot } from "./boardSnapshots";
 import { createStableSource, randomSource } from "../utils/seededRandom";
 import {
   dailyBoardId,
@@ -1205,6 +1206,11 @@ const dailyEntryToRow = (id, data) => ({
 });
 
 export async function fetchDailyLeaderboard(dayKey = dayKeyOf(), limitCount = 50) {
+  // Sunucu anlık görüntüsü ilk 50'yi tek belgede tutar (Aşama 3); yoksa tablo doğrudan okunur.
+  if (limitCount <= 50) {
+    const entries = await readBoardSnapshot(dailyBoardId(dayKey));
+    if (entries) return entries.slice(0, limitCount).map(({ id, data }) => dailyEntryToRow(id, data));
+  }
   try {
     const q = query(
       collection(db, "GameLeaderboards", dailyBoardId(dayKey), "entries"),

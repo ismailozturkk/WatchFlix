@@ -28,6 +28,10 @@ const TMDB = "https://api.themoviedb.org/3/";
 export const TOP100_COLLECTION = "Top100Hype";
 export const TOP100_POOL_PAGES = 5;
 export const TOP100_COUNTER_READ = 120;
+// Sayaçların CDN kopyası (functions/publicBoards.js, Hosting rewrite). Kişisel veri yok; 10 dk'ya dek
+// bayat olabilir (kendi oyun bu sürede sayıya yansımayabilir — kozmetik). Ulaşılamazsa Firestore'a düşülür.
+export const TOP100_CDN_URL = "https://seelogd.com/api/top100";
+const TOP100_CDN_TIMEOUT_MS = 5000;
 const DETAIL_CONCURRENCY = 6;
 
 const counterRef = (key) => doc(db, TOP100_COLLECTION, key);
@@ -73,8 +77,33 @@ export async function fetchTop100Pool(apiKey, language) {
   return pool;
 }
 
-/** En çok Seelogd oyu alan yapımların sayaçları: { mediaKey: { count } }. Hata fırlatır. */
+/** CDN yanıtı → { mediaKey: { count } }; biçim bozuksa null. */
+export function parseTop100CdnBody(body) {
+  const counters = body?.counters;
+  if (!counters || typeof counters !== "object" || Array.isArray(counters)) return null;
+  const out = {};
+  Object.keys(counters).forEach((key) => {
+    if (parseMediaKey(key)) out[key] = asCounter(counters[key]);
+  });
+  return out;
+}
+
+async function fetchTop100CountersFromCdn() {
+  try {
+    const response = await axios.get(TOP100_CDN_URL, { timeout: TOP100_CDN_TIMEOUT_MS });
+    return parseTop100CdnBody(response?.data);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * En çok Seelogd oyu alan yapımların sayaçları: { mediaKey: { count } }. Hata fırlatır.
+ * Önce CDN (0 Firestore okuması), olmazsa doğrudan sorgu (TOP100_COUNTER_READ okuma).
+ */
 export async function fetchTop100Counters() {
+  const fromCdn = await fetchTop100CountersFromCdn();
+  if (fromCdn) return fromCdn;
   const snap = await getDocs(
     query(collection(db, TOP100_COLLECTION), orderBy("count", "desc"), limit(TOP100_COUNTER_READ)),
   );

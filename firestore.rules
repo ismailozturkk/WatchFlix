@@ -740,6 +740,14 @@ service cloud.firestore {
       allow write: if isOwner(uid);
     }
 
+    // Liderlik tablosu anlık görüntüsü (ilk 50) — yalnız getBoardSnapshot (Admin SDK) yazar.
+    // İstemci 50 girdi yerine bu tek belgeyi okur (maliyet analizi Aşama 3). Okuma yetkisi
+    // kaynak tablolarla aynı: oturumlu herkes.
+    match /BoardSnapshots/{boardId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // ─── Film / dizi yorumları ──────────────────────────────────────────
     // Sahibi metnini düzenler ve siler. Sahibi OLMAYAN kullanıcı yalnız
     // sayaç/beğeni alanlarına dokunabilir — Posts/{postId}/comments'taki
