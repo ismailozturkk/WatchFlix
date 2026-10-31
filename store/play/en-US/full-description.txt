@@ -16,11 +16,15 @@ Every movie and show you watch, in one place — seelogd is your watch diary, so
 • Add friends, browse their profiles and stats
 • Share posts, comment, and like
 • Plan movie nights in one-to-one and group chats
+• Film Club: pick, watch and discuss a film together with your group
 
 🎮 PLAY
-• Test your movie knowledge with the scene-guessing game
-• Collect points, level up, and earn badges
-• Raise the virtual pet that keeps you company
+• Test your movie knowledge: Scene Guess, Poster Puzzle, Blurred Poster and "Which came first?"
+• Frame of the Day: name the film from a single frame — hints cost you points
+• Film Chain: connect two actors through the films they share
+• Question of the Day, daily duels, Cinema Bingo and Watch Challenges
+• Vote in the Seelogd Top 100 and follow the monthly genre tournament
+• Earn XP in the Weekly League, climb the leaderboards, collect badges
 
 🤖 DISCOVER
 • AI-powered recommendations tailored to your watch history
@@ -30,13 +34,14 @@ Every movie and show you watch, in one place — seelogd is your watch diary, so
 The core features are free. Paid plans add:
 • CineMatch AI: Free 3 per day / 30 per month, Premium 20 / 300, Premium Max 50 / 900 messages
 • A plan-specific profile identity badge your friends can see
-• Higher limits: custom lists (Free 1 · Premium 25 · Max unlimited), friends (2 · 150 · unlimited), group chats (1 · 10 · unlimited), notes and to-do lists (5 · 50 · unlimited), movie and show notes (20 · 200 · unlimited), movie and show reminders (10 and 20 · 50 and 100 · unlimited)
-• Games, CineSwipe and voting in the monthly tournament (Free can watch the tournament)
-• Your own themes, all 56 fonts, app icon picker, snowfall, ambient background, icon background and the on-screen pet
+• Higher limits: custom lists (Free 1 · Premium 25 · Max unlimited), friends (2 · 150 · unlimited), group chats (1 · 10 · unlimited), notes and to-do lists (5 · 50 · unlimited), note length (500 · 2,000 · 20,000 characters), movie and show notes (20 · 200 · unlimited), movie and show reminders (10 and 20 · 50 and 100 · unlimited)
+• Day-and-time reminders for your notes and to-do lists
+• Games (Scene Guess, Poster Puzzle and the quick games), Film Chain, Frame of the Day, Film Club, CineSwipe and voting in the monthly tournament — Free can watch the tournament, while Question of the Day and the Weekly League are open to everyone
+• Your own themes, all 56 fonts, app icon picker, snowfall, ambient background and icon background
 • Wrapped archive (Free this year only · Premium last 5 years · Max every year) and streaming alerts for up to 100 titles (Free: 10)
 • In-app bug reports (Premium and Max) and feature requests (Max only)
 
-Available in English and Turkish. Dark theme included. Free to use.
+Available in English, Turkish, Spanish, Portuguese and German. Dark theme included. Free to use.
 
 —
 This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability data provided by JustWatch.
