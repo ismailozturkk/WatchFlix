@@ -35,7 +35,7 @@ Her madde şu düzende: **Ne sorun · Neden önemli · Ne yapılmalı · Zorluk/
 ### 🤝 Birlikte karar vereceklerimiz
 - **TMDB anahtarı:** (a) olduğu gibi kalsın + gerektiğinde yenile (önerim), ya da (b) sunucudan geçir. Ayrıntı: `TMDB_JETON_YONETIMI.md`.
 - **Bekleme listesi sızıntısı:** olduğu gibi kalsın, ya da site "zaten kayıtlısın" demeyi bıraksın (sızıntıyı tamamen kapatır).
-- **Eski arama yolunu kapatma zamanı** (`legacyUserSearchList`): eski uygulama sürümleri azalınca.
+- ~~**Eski arama yolunu kapatma zamanı**~~ → 1 Kasım'da KAPATILDI ve yayınlandı (senin kararın). Mağazadaki eski sürümlerde arkadaş araması artık çalışmıyor; 1.5.0 çıkıp kullanıcılar geçince düzelecek. Geri almak istersen tek satır + yayın, bir dakika sürer.
 - **Ad/avatar değiştirmeye bekleme süresi** konsun mu? Şu an sınırsız; her değişiklik kişinin bütün mesaj ve yorum geçmişini yeniden yazdırıyor.
 - **Sunucu tavanları:** hafif fonksiyonlar 20, dış servise bağlı olanlar 10, toplu işler 1. Uygun mu?
 - **App Check'i zorunlu yapma zamanı:** geçerli doğrulama oranı %95'i geçince adım adım açılacak.

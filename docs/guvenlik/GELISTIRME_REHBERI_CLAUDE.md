@@ -72,8 +72,10 @@ lig blokları, `firestore.rules` ~205 satır, 8 dosyalık staged silme). Bunlara
 > Uygulanan: `searchUsers` callable (`functions/userSearch.js`, 30/dk/uid, 5 alan, ≤ 20 sonuç); istemci araması
 > callable'a geçti; kural `Users` → `get` açık, `list` yalnız `legacyUserSearchList()` + `request.query.limit <= 20`;
 > `Usernames` → `get: true`, `list: false` (oturumsuz kullanıcı adı→uid dökümü kapandı, H-1b).
-> **Yayın sırası:** functions → istemci → eski sürümler bitince `legacyUserSearchList()` = false + rules deploy.
-> Kalan: anahtarı kapatma zamanı (eski sürüm oranına bağlı) kullanıcı kararı; cihazda arama denenmedi.
+> **TAMAMLANDI (1 Kas):** functions deploy edildi, `legacyUserSearchList()` = **false** ve rules DEPLOY EDİLDİ
+> (kullanıcı "şimdi kapat" dedi; 1.5.0 build'i çıkmadan önce bilerek). Sonuç: mağazadaki eski sürümlerde (Play 1.4.6,
+> iPhone 1.4.8) arkadaş araması çalışmaz — 1.5.0 yayılana kadar geçerli. Acil geri alma: anahtarı `true` yapıp
+> `firebase deploy --only firestore:rules` (~1 dk); test dosyası iki konumu da sınıyor.
 
 **KONUM:** `firestore.rules:424-425`.
 **SORUN:** `allow read: if isSignedIn()` → `list` açık; oturumlu saldırgan tüm kullanıcı tabanını (profil + plan) kazıyabilir.

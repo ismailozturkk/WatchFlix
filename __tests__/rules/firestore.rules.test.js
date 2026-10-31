@@ -2430,6 +2430,7 @@ describe("Ratings — increment'li toplu yazım (services/ratingsService)", () =
 // Arama `searchUsers` callable'ında (Admin SDK, kural dışı); kuralda eski istemcinin tek sayfalık ön-ek sorgusu
 // legacyUserSearchList() açıkken kalır.
 // ─────────────────────────────────────────────────────────────────────────────
+const RETURN_FALSE_RE = /(function legacyUserSearchList\(\) \{ return )false;/;
 describe("Users / Usernames listeleme (H-1)", () => {
   const { limit } = require("firebase/firestore");
   /** services/userService'in ESKİ arama sorgusu (n = limit; null = limitsiz). */
@@ -2449,13 +2450,9 @@ describe("Users / Usernames listeleme (H-1)", () => {
     await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), "Users", ALICE)));
   });
 
-  test("anahtar açıkken eski istemcinin tek sayfalık (≤ 20) arama sorgusu geçer", async () => {
-    const snap = await assertSucceeds(getDocs(prefixQuery(bob, 20)));
-    expect(snap.size).toBe(1);
-    await assertSucceeds(getDocs(prefixQuery(bob, 5)));
-  });
-
-  test("sınırsız, büyük sayfalı ve oturumsuz liste reddedilir (toplu döküm yok)", async () => {
+  test("Users hiç listelenemez: eski istemcinin tek sayfalık sorgusu da reddedilir", async () => {
+    await assertFails(getDocs(prefixQuery(bob, 20)));
+    await assertFails(getDocs(prefixQuery(bob, 5)));
     await assertFails(getDocs(prefixQuery(bob, null)));
     await assertFails(getDocs(prefixQuery(bob, 21)));
     await assertFails(getDocs(collection(bob, "Users")));
@@ -2472,30 +2469,33 @@ describe("Users / Usernames listeleme (H-1)", () => {
     await assertFails(getDocs(query(collection(bob, "Usernames"), where("uid", "==", ALICE))));
   });
 
-  describe("anahtar kapalı (legacyUserSearchList = false)", () => {
-    let strictEnv;
+  // Anahtar geri açılırsa ne olacağı (acil geri alma yolu): eski istemcinin TEK SAYFALIK
+  // sorgusu yine çalışır, sınırsız/büyük sayfalı döküm her durumda reddedilir.
+  describe("anahtar açık (legacyUserSearchList = true)", () => {
+    let legacyEnv;
     beforeAll(async () => {
       const source = fs.readFileSync(path.join(__dirname, "..", "..", "firestore.rules"), "utf8");
-      const strict = source.replace(/(function legacyUserSearchList\(\) \{ return )true;/, "$1false;");
+      const legacy = source.replace(RETURN_FALSE_RE, "$1true;");
       // Çeviri sessizce tutmazsa bu blok hiçbir şeyi kanıtlamaz.
-      expect(strict).not.toBe(source);
-      strictEnv = await initializeTestEnvironment({
+      expect(legacy).not.toBe(source);
+      legacyEnv = await initializeTestEnvironment({
         projectId: "seelogd-rules-test-search",
-        firestore: { rules: strict, host: "127.0.0.1", port: 8085 },
+        firestore: { rules: legacy, host: "127.0.0.1", port: 8085 },
       });
     });
     afterAll(async () => {
-      if (strictEnv) await strictEnv.cleanup();
+      if (legacyEnv) await legacyEnv.cleanup();
     });
 
-    test("Users hiç listelenemez (tek sayfa bile); tek profil okunmaya devam eder", async () => {
-      await strictEnv.clearFirestore();
-      await strictEnv.withSecurityRulesDisabled((ctx) =>
+    test("tek sayfalık (≤ 20) sorgu geçer, toplu döküm yine reddedilir", async () => {
+      await legacyEnv.clearFirestore();
+      await legacyEnv.withSecurityRulesDisabled((ctx) =>
         setDoc(doc(ctx.firestore(), "Users", ALICE), { uid: ALICE, usernameLower: "alice" }),
       );
-      const sBob = strictEnv.authenticatedContext(BOB).firestore();
-      await assertFails(getDocs(prefixQuery(sBob, 20)));
-      await assertSucceeds(getDoc(doc(sBob, "Users", ALICE)));
+      const lBob = legacyEnv.authenticatedContext(BOB).firestore();
+      expect((await assertSucceeds(getDocs(prefixQuery(lBob, 20)))).size).toBe(1);
+      await assertFails(getDocs(prefixQuery(lBob, 21)));
+      await assertFails(getDocs(prefixQuery(lBob, null)));
     });
   });
 });

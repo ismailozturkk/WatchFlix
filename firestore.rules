@@ -306,7 +306,10 @@ service cloud.firestore {
     // koleksiyonunda doğrudan ön-ek sorgusuyla yapar (limit 20) — liste yalnız bu tek sayfalık sorguya açık.
     // Tüm istemciler `searchUsers` callable'ına geçince false yap + rules deploy: Users hiç listelenemez.
     // Testler anahtarın iki konumunu da dener (firestore.rules.test.js).
-    function legacyUserSearchList() { return true; }
+    // 1 Kas 2026: KAPALI. Arama tamamen `searchUsers` callable'ında (Admin SDK, kural dışı).
+    // Açık bırakıldığı sürece oturumlu herkes tek sayfalık ön-ek sorgusuyla kullanıcı tabanını
+    // sayfa sayfa dökebiliyordu (denetim H-1). Yeniden açılırsa testler de ters çevrilmeli.
+    function legacyUserSearchList() { return false; }
     // Kökte artık durmaması gereken alanlar.
     function rootCreateWithoutPrivateFields() {
       return legacyRootAccountWrites()
