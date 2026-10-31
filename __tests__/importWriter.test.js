@@ -30,6 +30,16 @@ jest.mock("firebase/firestore", () => {
     exists: () => store.has(path),
     data: () => clone(store.get(path)),
   });
+  // Transaction ve toplu yazım (writeBatch) aynı commit anlamını paylaşır: yazımlar sırayla, en sonda uygulanır.
+  const applyWrites = (writes) => {
+    writes.forEach(({ ref, data, options, remove }) => {
+      if (remove) { store.delete(ref.path); return; }
+      const next = options?.mergeFields
+        ? { ...clone(store.get(ref.path)), ...clone(data) }
+        : options?.merge ? mergeInto(clone(store.get(ref.path)) || {}, data) : clone(data);
+      store.set(ref.path, next);
+    });
+  };
 
   return {
     __store: store,
@@ -54,14 +64,18 @@ jest.mock("firebase/firestore", () => {
         delete: jest.fn((ref) => writes.push({ ref, remove: true })),
       };
       const result = await callback(tx);
-      writes.forEach(({ ref, data, options, remove }) => {
-        if (remove) { store.delete(ref.path); return; }
-        const next = options?.mergeFields
-          ? { ...clone(store.get(ref.path)), ...clone(data) }
-          : options?.merge ? mergeInto(clone(store.get(ref.path)) || {}, data) : clone(data);
-        store.set(ref.path, next);
-      });
+      applyWrites(writes);
       return result;
+    }),
+    // services/ratingsService transaction yerine kendi oyunu okuyup increment'li toplu yazım yapar (2026-10-31).
+    getDoc: jest.fn(async (ref) => snapshot(ref.path)),
+    writeBatch: jest.fn(() => {
+      const writes = [];
+      return {
+        set: jest.fn((ref, data, options) => writes.push({ ref, data, options })),
+        delete: jest.fn((ref) => writes.push({ ref, remove: true })),
+        commit: jest.fn(async () => applyWrites(writes)),
+      };
     }),
   };
 });
@@ -194,7 +208,12 @@ describe("transactional import writer", () => {
     expect(firestore.__store.get("Lists/user-1")).toMatchObject({ statusIndex: { tv: { 9: { inFavorites: false } } }, counts: { favorites: 0 } });
     await setMyRating({ uid, mediaType: "tv", mediaId: 9, rating: 7 });
     expect(firestore.__store.get("Lists/user-1").activityIndex.ratings.tv_9).toBe(7);
+    // Agregat increment'le: ilk oy +1/+7, oyu değiştirmek sayacı değil yalnız farkı oynatır, kaldırmak geri alır.
+    expect(firestore.__store.get("Ratings/tv_9")).toMatchObject({ count: 1, sum: 7 });
+    await setMyRating({ uid, mediaType: "tv", mediaId: 9, rating: 4 });
+    expect(firestore.__store.get("Ratings/tv_9")).toMatchObject({ count: 1, sum: 4 });
     await removeMyRating({ uid, mediaType: "tv", mediaId: 9 });
+    expect(firestore.__store.get("Ratings/tv_9")).toMatchObject({ count: 0, sum: 0 });
     expect(firestore.__store.get("Lists/user-1").activityIndex.ratings.tv_9).toBeNull();
     expect(Object.keys(firestore.__store.get("Lists/user-1")).some((key) => key.includes("."))).toBe(false);
   });
