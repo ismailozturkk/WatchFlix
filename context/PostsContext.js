@@ -1,7 +1,9 @@
 // context/PostsContext.js
 //
 // Feed state yönetimi:
-//  - Cold start: yerel önbellek → fetchFeed (ilk sayfa) → realtime listener
+//  - Cold start: yalnız yerel önbellek (ağ yok). İlk sayfa, akışı gösteren bir ekran
+//    odaklanınca açılan canlı dinleyiciden gelir (useLiveFeed) — akışa hiç girmeyen
+//    kullanıcı akış için okuma ödemez.
 //  - Filter değişimi: fetchFeed yeni filtreyle çekilir, realtime devre dışı kalır
 //    (yine de "all" filtresine dönüldüğünde tekrar açılır)
 //  - Pagination: onEndReached → loadMore (startAfter ile sayfa sonrası)
@@ -28,6 +30,8 @@ import { captureError } from "../services/crashReporting";
 import { shouldPersistInternetData } from "../utils/dataCacheSettings";
 import { POST_TYPES } from "../utils/postComposer";
 import useStartupGate from "../hooks/useStartupGate";
+import { useFocusEffect } from "@react-navigation/native";
+import { getIsOnline } from "./ConnectivityContext";
 import {
   hidePost as hidePostApi,
   subscribeHiddenPosts,
@@ -63,6 +67,13 @@ const sortLoadedPosts = (posts, sort) => {
   return next.sort((a, b) => (b._createdAtMs || 0) - (a._createdAtMs || 0));
 };
 
+// Canlı akış dinleyicisi yalnız akışı gösteren bir ekran odaktayken açık. Eskiden uygulama
+// boyunca açıktı: ilk 15 gönderiye düşen her yeni gönderi/beğeni, o an çevrimiçi HERKESE bir
+// okuma yazıyordu (kullanıcı × olay — ölçekte karesel büyür). Kapanış gecikmeli: kısa sekme
+// geçişlerinde dinleyici yeniden kurulup aynı 15 belge tekrar faturalanmasın.
+const LIVE_FEED_GRACE_MS = 60 * 1000;
+const FEED_PAGE = 15;
+
 const sameIds = (a, b) =>
   a.length === b.length && a.every((x, i) => x.id === b[i].id);
 
@@ -87,6 +98,29 @@ export function PostsProvider({ children }) {
 
   // Pagination cursor — Firestore DocumentSnapshot, JSON'a serialize edilmez.
   const lastDocRef = useRef(null);
+  // loadMore ile ilk sayfanın ötesine geçildi mi? Geçildiyse canlı snapshot imleci ezmez.
+  const paginatedRef = useRef(false);
+
+  // ── Canlı akış talebi (useLiveFeed) ──────────────────────────────────────
+  // Odaktaki her tüketici sayacı 1 artırır; sayaç 0'a inince dinleyici
+  // LIVE_FEED_GRACE_MS sonra kapanır. withMarks: beğeni/kaydetme kümeleri de gerekli
+  // (yalnız akış ekranı) — bu iki koleksiyon da artık açılışta değil ilk talepte okunur.
+  const [liveDemand, setLiveDemand] = useState(0);
+  const [liveActive, setLiveActive] = useState(false);
+  const [marksWanted, setMarksWanted] = useState(false);
+  const acquireLiveFeed = useCallback(({ withMarks = false } = {}) => {
+    setLiveDemand((n) => n + 1);
+    if (withMarks) setMarksWanted(true);
+    return () => setLiveDemand((n) => Math.max(0, n - 1));
+  }, []);
+  useEffect(() => {
+    if (liveDemand > 0) {
+      setLiveActive(true);
+      return undefined;
+    }
+    const timer = setTimeout(() => setLiveActive(false), LIVE_FEED_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [liveDemand]);
 
   const [likedIds, setLikedIds] = useState(() => new Set());
   const [bookmarkIds, setBookmarkIds] = useState(() => new Set());
@@ -146,78 +180,55 @@ export function PostsProvider({ children }) {
   // Realtime listener — sadece "all" filtresinde aktif.
   const unsubRef = useRef(null);
 
-  // Cold-start fetch'i geç biterse ve kullanıcı bu arada filtre değiştirdiyse
-  // "all" sonuçları filtreli listeyi ezmesin diye güncel filtreyi ref'te tut.
-  const filterStateRef = useRef({ filter, sort });
-  filterStateRef.current = { filter, sort };
-
-  // ── 1. Cold start: cache + ilk fetch ─────────────────────────────────────
+  // ── 1. Cold start: yalnız yerel önbellek ─────────────────────────────────
+  // Ağ isteği yok; ilk taze sayfa canlı dinleyiciden gelir (effect 2).
   useEffect(() => {
-    if (!startupReady) return undefined;
-    let cancelled = false;
-    (async () => {
-      const cached = get(Keys.feed);
-      if (Array.isArray(cached) && !cancelled) setPosts(cached);
-
-      try {
-        const { posts: fresh, lastDoc } = await PostsApi.fetchFeed({
-          filter: "all",
-        });
-        if (cancelled) return;
-        if (
-          filterStateRef.current.filter !== "all" ||
-          filterStateRef.current.sort !== "recent"
-        ) {
-          // Kullanıcı startup penceresinde filtre değiştirmiş; effect 3 hallediyor.
-          setLoading(false);
-          return;
-        }
-        setPosts((prev) => (sameIds(prev, fresh) ? prev : fresh));
-        lastDocRef.current = lastDoc;
-        setHasMore(fresh.length > 0);
-        if (shouldPersistInternetData({ category: "posts" })) set(Keys.feed, fresh);
-      } catch (e) {
-        if (__DEV__) console.warn("Initial feed fetch failed:", e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!startupReady) return;
+    const cached = get(Keys.feed);
+    if (Array.isArray(cached)) setPosts((prev) => (prev.length ? prev : cached));
   }, [startupReady]);
 
-  // ── 2. Realtime listener (sadece "all" filtresinde) ──────────────────────
+  // ── 2. Realtime listener (yalnız "all/recent" + akış odaktayken) ─────────
   useEffect(() => {
-    if (!startupReady || filter !== "all" || sort !== "recent") {
+    if (!startupReady || !liveActive || filter !== "all" || sort !== "recent") {
       unsubRef.current?.();
       unsubRef.current = null;
       return;
     }
+    // Çevrimdışı açılış: sunucu snapshot'ı gelmez; önbellekteki akış gösterilir.
+    if (!getIsOnline()) setLoading(false);
     // İlk snapshot'ta listeyi olduğu gibi değiştir: başka bir filtreden
     // dönülüyorsa prev o filtrenin gönderilerini içerir; slice(15) merge'ü
     // yabancı gönderileri feed'e karıştırır (yinelenen key'ler dahil).
     let isFirstSnapshot = true;
-    unsubRef.current = PostsApi.subscribeToFreshFeed((live) => {
-      setPosts((prev) => {
-        if (isFirstSnapshot) {
-          isFirstSnapshot = false;
-          return live;
+    unsubRef.current = PostsApi.subscribeToFreshFeed(
+      (live, { lastDoc, fromCache }) => {
+        // Bellek önbelleğinden gelen ara snapshot eksik olabilir; MMKV akışını ezmesin.
+        if (fromCache) return;
+        const first = isFirstSnapshot;
+        isFirstSnapshot = false;
+        if (first || !paginatedRef.current) {
+          lastDocRef.current = lastDoc;
+          setHasMore(live.length > 0);
         }
-        // Eğer paginate edilmişse (ilk 15'ten fazla varsa), realtime'dan gelen
-        // ilk 15'i prev'in geri kalanıyla birleştir; aksi halde direkt değiştir.
-        if (prev.length <= 15) return live;
-        const extra = prev.slice(15);
-        return [...live, ...extra];
-      });
-      if (shouldPersistInternetData({ category: "posts" })) set(Keys.feed, live);
-    });
+        setPosts((prev) => {
+          if (first) return sameIds(prev, live) ? prev : live;
+          // Eğer paginate edilmişse (ilk 15'ten fazla varsa), realtime'dan gelen
+          // ilk 15'i prev'in geri kalanıyla birleştir; aksi halde direkt değiştir.
+          if (prev.length <= FEED_PAGE) return live;
+          const extra = prev.slice(FEED_PAGE);
+          return [...live, ...extra];
+        });
+        if (first) setLoading(false);
+        if (shouldPersistInternetData({ category: "posts" })) set(Keys.feed, live);
+      },
+      { onError: () => setLoading(false) },
+    );
     return () => {
       unsubRef.current?.();
       unsubRef.current = null;
     };
-  }, [startupReady, filter, sort]);
+  }, [startupReady, liveActive, filter, sort]);
 
   // ── 3. Filter değişimi ────────────────────────────────────────────────────
   // İlk mount'ta cold-start effect'i (1) fetch'i yapıyor; burada atla.
@@ -234,6 +245,7 @@ export function PostsProvider({ children }) {
     (async () => {
       setLoading(true);
       lastDocRef.current = null;
+      paginatedRef.current = false;
       try {
         if (filter === "following") {
           if (!user?.uid) {
@@ -271,10 +283,12 @@ export function PostsProvider({ children }) {
       setBookmarkIds(new Set());
       return;
     }
-    if (!startupReady) return;
+    // İki koleksiyonun tamamı okunuyor (beğeni başına 1 belge): açılışta değil, akış ekranı
+    // ilk kez istediğinde.
+    if (!startupReady || !marksWanted) return;
     PostsApi.fetchMyLikedPostIds(user.uid).then(setLikedIds).catch(() => {});
     PostsApi.fetchMyBookmarkIds(user.uid).then(setBookmarkIds).catch(() => {});
-  }, [user?.uid, startupReady]);
+  }, [user?.uid, startupReady, marksWanted]);
 
   // ── 5. Pagination ────────────────────────────────────────────────────────
   const loadMore = useCallback(async () => {
@@ -291,6 +305,7 @@ export function PostsProvider({ children }) {
       });
       setPosts((prev) => [...prev, ...more]);
       lastDocRef.current = lastDoc;
+      paginatedRef.current = true;
       setHasMore(more.length > 0);
     } catch (e) {
       if (__DEV__) console.warn("loadMore failed:", e.message);
@@ -303,6 +318,7 @@ export function PostsProvider({ children }) {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     lastDocRef.current = null;
+    paginatedRef.current = false;
     try {
       if (filter === "following" && user?.uid) {
         const { posts: p } = await PostsApi.fetchFollowingFeed(user.uid, sort);
@@ -614,6 +630,7 @@ export function PostsProvider({ children }) {
       votePoll,
       hidePost,
       unhidePost,
+      acquireLiveFeed,
       // constants
       FILTERS,
       SORTS,
@@ -638,8 +655,20 @@ export function PostsProvider({ children }) {
       votePoll,
       hidePost,
       unhidePost,
+      acquireLiveFeed,
     ],
   );
 
   return <PostsContext.Provider value={value}>{children}</PostsContext.Provider>;
+}
+
+/**
+ * Akışı gösteren ekran/kart bunu çağırır: odaktayken canlı akış açık kalır.
+ * withMarks: beğeni/kaydetme işaretleri de gerekli (akış ekranı).
+ */
+export function useLiveFeed({ withMarks = false } = {}) {
+  const acquire = useContext(PostsContext)?.acquireLiveFeed;
+  useFocusEffect(
+    useCallback(() => (acquire ? acquire({ withMarks }) : undefined), [acquire, withMarks]),
+  );
 }

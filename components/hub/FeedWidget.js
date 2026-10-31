@@ -24,7 +24,7 @@ import HubCard, { HubArrow } from "@components/hub/HubCard";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
-import { usePosts } from "@context/PostsContext";
+import { usePosts, useLiveFeed } from "@context/PostsContext";
 import { getAvatarSource } from "@utils/avatars";
 import { postTypeBadge } from "@utils/postComposer";
 import { i18nText } from "@utils/i18nText";
@@ -48,6 +48,8 @@ function FeedWidget({ navigation }) {
   const { user } = useAuth();
   const { avatar } = useProfileUi();
   const { posts } = usePosts();
+  // Hub odaktayken akış canlı; başka sekmedeyken dinleyici kapanır (bkz. PostsContext).
+  useLiveFeed();
 
   const blue = theme.colors?.blue || "#3B82F6";
   const colors = [blue, "#4A5BD4", "#1C2A74"];

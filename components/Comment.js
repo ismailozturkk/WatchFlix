@@ -10,6 +10,7 @@ import {
   Platform,
   Animated,
   StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { db } from "../firebase";
 import {
@@ -22,6 +23,7 @@ import {
   getDocs,
   where,
   orderBy,
+  limit,
   doc,
   updateDoc,
   deleteDoc,
@@ -495,6 +497,11 @@ const CommentItem = memo(
   },
 );
 
+// Yorum sayfası: dinleyici en yeni bu kadar yorumu okur; "daha fazla" bir sayfa ekler.
+const COMMENT_PAGE = 20;
+// Kapsam süzgecinde (sezon/bölüm) eşleşme aramak için kendiliğinden çekilecek üst sınır.
+const COMMENT_SCOPE_FILL_MAX = 200;
+
 // Boş girdi durumu — sıfırlamalar tek yerden.
 const EMPTY_INPUT = {
   text: "",
@@ -546,6 +553,15 @@ const Comment = ({
   } = useUserProfile();
   const { isBlocked, block } = useFriends();
   const [comments, setComments] = useState([]);
+  // Yorum sayfalama: sınır içerik anahtarına bağlı, başka içeriğe geçince ilk sayfaya döner.
+  const pageKey = `${collectionName}/${contextId}`;
+  const [pageState, setPageState] = useState({ key: pageKey, limit: COMMENT_PAGE });
+  const commentLimit = pageState.key === pageKey ? pageState.limit : COMMENT_PAGE;
+  // Son snapshot'ın hangi sınırla geldiği: sınır büyütülüp yeni snapshot gelmeden
+  // ikinci kez büyütülmesin (otomatik doldurma döngüye girmesin).
+  const [loaded, setLoaded] = useState({ key: null, limit: 0, hasMore: false });
+  const pageLoaded = loaded.key === pageKey && loaded.limit === commentLimit;
+  const hasMoreComments = loaded.key === pageKey && loaded.hasMore;
   const [isSending, setIsSending] = useState(false);
   const [sourceFilter, setSourceFilter] = useState("all");
   const [repliesMap, setRepliesMap] = useState({});
@@ -723,16 +739,18 @@ const Comment = ({
     onCommentCountChange?.(feedItems.length);
   }, [feedItems.length, onCommentCountChange]);
 
+  // Yorumlar sayfalı yüklendiği için sayı yalnız yüklenenleri bilir; devamı varsa "+".
+  const moreMark = hasMoreComments ? "+" : "";
   const sourceFilters = [
     {
       key: "all",
       label: i18nText("autoI18n.tumu", "Tümü"),
-      count: scopedComments.length + visibleTmdbReviews.length,
+      count: `${scopedComments.length + visibleTmdbReviews.length}${moreMark}`,
     },
     {
       key: "community",
       label: i18nText("autoI18n.topluluk", "Topluluk"),
-      count: scopedComments.length,
+      count: `${scopedComments.length}${moreMark}`,
     },
     { key: "tmdb", label: "TMDB", count: visibleTmdbReviews.length },
   ];
@@ -788,24 +806,47 @@ const Comment = ({
     [scopeSheet.mode, handleScopeFilterChange],
   );
 
-  // ── Comments listener ────────────────────────────────────
+  // ── Comments listener (sayfalı) ──────────────────────────
+  // Eskiden limit yoktu: popüler bir içeriğin sayfası açılınca TÜM yorumları okunuyordu
+  // (kullanıcı × yorum sayısı). Artık en yeni COMMENT_PAGE yorum dinlenir; "daha fazla"
+  // sınırı büyütür (sayfa durumu bileşenin başında: pageState / loaded).
   useEffect(() => {
     if (!contextId) return;
     const cid = contextId.toString();
     const q = query(
       collection(db, collectionName, cid, "comments"),
       orderBy("timestamp", "desc"),
+      limit(commentLimit),
     );
     const unsub = onSnapshot(
       q,
       (snapshot) => {
-        const loaded = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setComments(loaded);
+        const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setComments(docs);
+        // Sınır büyüyünce önce bellekteki eski sayfa (fromCache) gelebilir; "devamı var mı"
+        // yalnız sunucu onaylı snapshot'tan okunur, yoksa düğme bir an kaybolup geri gelirdi.
+        if (snapshot.metadata?.fromCache) return;
+        setLoaded({ key: pageKey, limit: commentLimit, hasMore: snapshot.size >= commentLimit });
       },
       (err) => __DEV__ && console.warn("Comment comments:", err.message),
     );
     return () => unsub();
-  }, [contextId, collectionName]);
+  }, [contextId, collectionName, commentLimit, pageKey]);
+
+  const loadMoreComments = useCallback(() => {
+    if (!pageLoaded || !hasMoreComments) return;
+    setPageState({ key: pageKey, limit: commentLimit + COMMENT_PAGE });
+  }, [pageLoaded, hasMoreComments, pageKey, commentLimit]);
+
+  // Kapsam süzgeci (sezon/bölüm) istemcide çalışır: eski yorumlarda kapsam alanı yok,
+  // sunucu sorgusuyla süzülemez. Süzgeç açıkken yüklenenlerde az eşleşme varsa sonraki
+  // sayfalar kendiliğinden çekilir (en fazla COMMENT_SCOPE_FILL_MAX yoruma kadar).
+  useEffect(() => {
+    if (!scopeEnabled || isAllFilter(scopeFilter)) return;
+    if (scopedComments.length >= COMMENT_PAGE) return;
+    if (commentLimit >= COMMENT_SCOPE_FILL_MAX) return;
+    loadMoreComments();
+  }, [scopeEnabled, scopeFilter, scopedComments.length, commentLimit, loadMoreComments]);
 
   // ── Moderasyon: şikâyet + engelle ────────────────────────
   // Yanıt ile üst yorum farklı yollarda duruyor; moderatör kaydı yalnız tam
@@ -1212,6 +1253,24 @@ const Comment = ({
               </TouchableOpacity>
             )}
           </View>
+        }
+        ListFooterComponent={
+          hasMoreComments && sourceFilter !== "tmdb" ? (
+            <TouchableOpacity
+              onPress={loadMoreComments}
+              disabled={!pageLoaded}
+              style={[styles.emptyStateAction, styles.loadMoreComments]}
+            >
+              {pageLoaded ? (
+                <Ionicons name="chevron-down" size={14} color={theme.accent} />
+              ) : (
+                <ActivityIndicator size="small" color={theme.accent} />
+              )}
+              <Text allowFontScaling={false} style={styles.emptyStateActionText}>
+                {i18nText("autoI18n.daha_fazla_yorum", "Daha fazla yorum göster")}
+              </Text>
+            </TouchableOpacity>
+          ) : null
         }
         renderItem={({ item }) =>
           item.source === "tmdb" ? (
@@ -1902,6 +1961,7 @@ const getStyles = (theme) =>
       fontSize: 12,
       fontWeight: "800",
     },
+    loadMoreComments: { alignSelf: "center", marginBottom: 16 },
   });
 
 export default Comment;

@@ -25,7 +25,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
 import { useProfileUi } from "../../context/ProfileUiContext";
-import { usePosts } from "../../context/PostsContext";
+import { usePosts, useLiveFeed } from "../../context/PostsContext";
 import { useFriends } from "../../context/FriendsContext";
 import {
   useApiSettings,
@@ -176,6 +176,8 @@ export default function ShareContentScreen({ route }) {
     hidePost,
     unhidePost,
   } = usePosts();
+  // Ekran odaktayken akış canlı; beğeni/kaydetme işaretleri de ilk girişte okunur.
+  useLiveFeed({ withMarks: true });
   const { block } = useFriends();
 
   const [modalVisible, setModalVisible] = useState(false);

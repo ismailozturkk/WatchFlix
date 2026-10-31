@@ -321,7 +321,7 @@ export async function fetchUserPosts(uid, lastDoc = null) {
  *
  * @returns {Function} unsubscribe
  */
-export function subscribeToFreshFeed(callback, { filter = "all" } = {}) {
+export function subscribeToFreshFeed(callback, { filter = "all", onError } = {}) {
   const typeFilter = POST_TYPES.includes(filter)
     ? [where("type", "==", filter)]
     : [];
@@ -332,11 +332,19 @@ export function subscribeToFreshFeed(callback, { filter = "all" } = {}) {
     orderBy("createdAt", "desc"),
     limit(PAGE),
   );
+  // `lastDoc` sayfalama imlecidir: ilk sayfayı ayrıca fetchFeed ile çekmeye gerek kalmaz
+  // (aynı 15 belge iki kez faturalanmasın). `fromCache` bellek önbelleğinden gelen,
+  // sunucuyla henüz doğrulanmamış (eksik olabilecek) ara snapshot'ı ayırır.
   return onSnapshot(
     q,
-    (snap) => callback(snap.docs.map(serializePost)),
+    (snap) =>
+      callback(snap.docs.map(serializePost), {
+        lastDoc: snap.docs[snap.docs.length - 1] || null,
+        fromCache: snap.metadata?.fromCache === true,
+      }),
     (err) => {
       if (__DEV__) console.warn("subscribeToFreshFeed error:", err.message);
+      onError?.(err);
     },
   );
 }
