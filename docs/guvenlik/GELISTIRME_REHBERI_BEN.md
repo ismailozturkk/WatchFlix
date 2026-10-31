@@ -102,6 +102,7 @@ Yani 10.000 kullanıcı hedefinde, yüzlerce kişi aynı ankete oy verirse çoğ
 
 - **Firestore cihaz-doğrulama ayarı:** Bu, kodda değil Firebase panelinde. ✅ Kontrol edildi (31 Ekim): zorunlu **değil** — ayrıntı yukarıda.
 - **TMDB anahtarı:** Film verisi için kullanılan TMDB anahtarı uygulamanın içine gömülü (çıkarılabilir). Bu anahtar "sadece okuma" olduğu için düşük riskli. **İki seçenek var, senin kararın:** (a) olduğu gibi bırak + anahtarı ara ara yenile, ya da (b) onu da sunucu üzerinden geçir (Gemini'de yaptığımız gibi). (b) daha güvenli ama daha çok iş.
+  > 📝 **İnceledim (31 Ekim) — önerim (a), karar senin.** Uygulamada TMDB'ye giden **239 çağrı, 112 dosyada**. Hepsini sunucudan geçirmek büyük iş; üstelik bütün kullanıcıların isteği birkaç sunucu adresinden çıkacağı için TMDB'nin hız sınırına toplu takılma riski doğar ve her film sayfası açılışı fatura kalemi olur. Güvenlik kazancı da cihaz doğrulaması (App Check) çalışmadan gerçekleşmiyor — o da şu an çalışmıyor. Anahtar zaten yalnız okuma yapabiliyor. Sızarsa ne yapılacağını adım adım yazdım: `docs/guvenlik/TMDB_JETON_YONETIMI.md` (yeni anahtar → EAS'e gir → `eas update` → eskiyi sonra iptal).
 
 ---
 

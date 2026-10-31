@@ -125,6 +125,10 @@ match /Users/{uid} {
 **KABUL KRİTERİ:** `docs/guvenlik/` altında enforcement durum notu + planlanan geçiş tarihi.
 
 ### T-SEC-4 — TMDB jetonu stratejisi (M-1)
+> **DURUM: KARAR BEKLİYOR (2026-10-31) — kod değişmedi.** Analiz + (a) döndürme prosedürü:
+> `docs/guvenlik/TMDB_JETON_YONETIMI.md`. Öneri (a). (b) seçilirse önce App Check VALID ≥ %95 şart, sonra tek istemci
+> TMDB katmanı (112 dosya / 239 çağrı) + önbellekli proxy; proxy IP'leri TMDB hız sınırına takılmasın diye önbellek
+> zorunlu. Kullanıcı (b) demeden başlama.
 **KONUM:** `services/cineswipe/cineswipeService.js:52`, `services/dataDownloader.js:57`, `services/import/tmdbResolver.js:24`, `services/tournamentService.js:38`, `context/AppSettingsContext.js:75`.
 **SORUN:** TMDB v4 okuma jetonu istemci paketine gömülü (çıkarılabilir).
 **YAPILACAK (karar gerektirir — kullanıcıya sor):** (a) Kabul et + jeton rotasyonu/anomali izleme belgele, YA DA (b) TMDB'yi önbellekli bir Cloud Function proxy arkasına al (Gemini/OMDb deseniyle aynı; `functions/` + `defineSecret("TMDB_API_KEY")` zaten var).

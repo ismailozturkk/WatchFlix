@@ -74,6 +74,9 @@ Yayın sırası: functions (`searchUsers`) → istemci → (eski sürümler biti
 **Sorun:** `EXPO_PUBLIC_` değişkenleri paket içine gömülür → APK/IPA'dan çıkarılabilir. Gemini/OMDb sunucuya taşınmış ama genel TMDB gezinmesi hâlâ istemci jetonuyla.
 **Risk seviyesi:** TMDB v4 "read access token" salt-okunur ve hesap seviyesinde kota sınırlı; sızması veri değiştiremez, yalnızca kotanı harcar / jetonu yenilemen gerekir. Bu yüzden Orta.
 **Öneri:** Kabul edilebilir bir risk olarak bırakılabilir (çoğu istemci-doğrudan uygulama böyle yapar) **ya da** TMDB'yi de hafif bir Cloud Function proxy'nin (önbellekli) arkasına al. En azından: jetonu düzenli döndürülebilir tut ve TMDB panelinden kullanım anomalisi izle.
+> **31 Eki:** Karşılaştırma + döndürme prosedürü `docs/guvenlik/TMDB_JETON_YONETIMI.md`'de. Öneri (a): istemci 112
+> dosyada 239 TMDB çağrısı yapıyor; proxy tüm trafiği birkaç Cloud Run IP'sinde toplayıp TMDB hız sınırı ve maliyet
+> riskini büyütür, güvenlik kazancı ise App Check çalışmadan (bugün 0 VALID) gerçekleşmez. Karar kullanıcıda.
 
 ### M-2 — İzole test/staging ortamı yok (Orta)
 **Yer:** `.firebaserc` — tek proje: `movieandtv-2832a` (prod).
