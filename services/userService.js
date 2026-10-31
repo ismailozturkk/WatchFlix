@@ -38,6 +38,7 @@ import { socialLinksDocRef } from "./socialLinksService";
 import { normalizeSocialLinks } from "../utils/socialLinks";
 import { clampAvatarIndex, CUSTOM_AVATAR_INDEX, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
 import { avatarSnapshot, toAvatarChoice } from "../utils/avatarPhotos";
+import { touchesIdentity } from "../utils/profileIdentityCooldown";
 import { parseBirthDate } from "../utils/ageGate";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { propagateProfileChange } from "./profilePropagation";
@@ -315,8 +316,14 @@ export async function getUserProfile(uid) {
 
 /**
  * Tek alan güncelleme — updatedAt otomatik.
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.stampIdentity=false] Kullanıcının KENDİ başlattığı ad/avatar
+ *   değişikliği: `identityChangedAt` damgalanır, bir sonraki değişiklik 1 gün bekler
+ *   (utils/profileIdentityCooldown.js). Sistem yazımları (bağlı hesap fotoğrafı senkronu)
+ *   bunu geçmez — kullanıcıyı istemediği bir değişiklik yüzünden bekletmeyelim.
  */
-export async function updateUserProfile(uid, partial) {
+export async function updateUserProfile(uid, partial, { stampIdentity = false } = {}) {
   // Gizli alanlar (e-posta, doğum tarihi) kök belgeye değil private/account'a
   // gider. ÖNCE o yazılır: düşerse kök yazımı hiç başlamaz, hata kullanıcıya
   // döner ve tekrar denenebilir.
@@ -327,6 +334,8 @@ export async function updateUserProfile(uid, partial) {
   if (Object.keys(rest).length > 0) {
     await updateDoc(doc(db, "Users", uid), {
       ...rest,
+      // Aynı yazımda gider: ek tetikleyici ya da ek maliyet yok.
+      ...(stampIdentity && touchesIdentity(rest) ? { identityChangedAt: serverTimestamp() } : null),
       updatedAt: serverTimestamp(),
     });
   }
@@ -413,7 +422,7 @@ export async function changeUsername(uid, newUsername) {
  *   Hazır avatar indeksi ya da utils/avatarPhotos.js seçim nesnesi.
  * @param {string|null} [photoURL] Eski imza: avatar sayıyken -1 için fotoğraf.
  */
-export async function setAvatarIndex(uid, avatar, photoURL = null) {
+export async function setAvatarIndex(uid, avatar, photoURL = null, { stampIdentity = false } = {}) {
   const choice = toAvatarChoice(avatar, { photoURL });
   const patch = { avatarIndex: choice.avatarIndex };
   if (choice.avatarIndex === CUSTOM_AVATAR_INDEX) {
@@ -422,7 +431,7 @@ export async function setAvatarIndex(uid, avatar, photoURL = null) {
     // fotoğrafa yapışıp senkronu yanlış yöne çekmesin.
     patch.photoSource = choice.photoSource || deleteField();
   }
-  await updateUserProfile(uid, patch);
+  await updateUserProfile(uid, patch, { stampIdentity });
   propagateProfileChange(uid, avatarSnapshot(choice)).catch(() => {});
 }
 

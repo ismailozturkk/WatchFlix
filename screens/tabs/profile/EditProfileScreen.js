@@ -89,6 +89,8 @@ import {
 } from "../../../utils/fourFavorites";
 import SocialLinksEditor from "../../../components/profile/SocialLinksEditor";
 import { saveSocialLinks } from "../../../services/socialLinksService";
+import { cooldownRemainingMs } from "../../../utils/profileIdentityCooldown";
+import { identityCooldownToast } from "../../../utils/profileIdentityCooldownCopy";
 import { SOCIAL_NAMES, getSocialCopy } from "../../../utils/socialLinksCopy";
 import { getDeleteAccountCopy } from "./deleteAccountCopy";
 import { getResetAccountCopy } from "./resetAccountCopy";
@@ -325,6 +327,18 @@ export default function EditProfileScreen({ navigation }) {
       return;
     }
 
+    // Ad/avatar değişimi profil yayılımını tetikliyor (geçmişteki tüm kopyalar yeniden
+    // yazılıyor) — günde bir. Bio/kullanıcı adı/favoriler etkilenmez, onlar serbest.
+    const wantsNameChange = dn !== (profile?.displayName || "");
+    const wantsAvatarChange = !sameAvatarChoice(avatarChoice, savedAvatar);
+    if (wantsNameChange || wantsAvatarChange) {
+      const remaining = cooldownRemainingMs(profile?.identityChangedAt);
+      if (remaining > 0) {
+        Toast.show(identityCooldownToast(remaining));
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       if (usernameChanged) {
@@ -346,7 +360,7 @@ export default function EditProfileScreen({ navigation }) {
         patch.fourFavorites = toProfilePayload(favorites);
       }
       const socialLinksChanged = !socialLinksEqual(socialResolved.links, readProfileSocialLinks(profile));
-      if (Object.keys(patch).length) await updateField(patch);
+      if (Object.keys(patch).length) await updateField(patch, { stampIdentity: wantsNameChange });
       if (socialLinksChanged) await saveSocialLinks(uid, toSocialPayload(socialResolved.links));
       if (patch.fourFavorites) {
         trackEvent(ANALYTICS_EVENTS.FOUR_FAVORITES_SAVED, {
@@ -364,8 +378,7 @@ export default function EditProfileScreen({ navigation }) {
 
       // Avatar kopyalarını selectAvatar → userService.setAvatarIndex tazeler
       // (fotoğraf adresiyle birlikte); aşağıdaki yayılım yalnız ad içindir.
-      const avatarChanged = !sameAvatarChoice(avatarChoice, savedAvatar);
-      if (avatarChanged) {
+      if (wantsAvatarChange) {
         await selectAvatar(avatarChoice);
       }
 

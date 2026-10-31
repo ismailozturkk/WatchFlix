@@ -319,9 +319,9 @@ export function UserProfileProvider({ children }) {
   // ── Actions ──────────────────────────────────────────────────────────────
 
   const updateField = useCallback(
-    async (partial) => {
+    async (partial, options) => {
       if (!uid) return;
-      await updateUserProfile(uid, partial);
+      await updateUserProfile(uid, partial, options);
     },
     [uid],
   );
@@ -329,9 +329,9 @@ export function UserProfileProvider({ children }) {
   // `avatar`: hazır avatar indeksi ya da seçim nesnesi
   // ({ avatarIndex, photoURL, photoSource } — utils/avatarPhotos.js).
   const changeAvatarIndex = useCallback(
-    async (avatar, photoURL = null) => {
+    async (avatar, photoURL = null, options) => {
       if (!uid) return;
-      await setAvatarIndexService(uid, avatar, photoURL);
+      await setAvatarIndexService(uid, avatar, photoURL, options);
     },
     [uid],
   );

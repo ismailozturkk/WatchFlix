@@ -93,6 +93,7 @@ import { FALLBACK_EXIT_MS, MIN_VISIBLE_MS } from "./utils/splashMotion";
 import { CalendarProvider } from "./context/CalendarContext";
 import { installAxiosDataCache } from "./utils/axiosDataCache";
 import { installTmdbAdultGuard } from "./utils/tmdbAdultGuard";
+import { installTmdbKeyHealth } from "./utils/tmdbKeyHealth";
 import { installTmdbTitleFallback } from "./utils/tmdbTitleFallback";
 import { isMigrated, runStorageMigration } from "./services/storage";
 import { startPresence, stopPresence } from "./services/presenceService";
@@ -128,6 +129,9 @@ installAxiosDataCache();
 // SIRA: önbellekten SONRA kurulmalı — önbelleğe ham cevap yazılsın, yetişkin
 // süzmesi hem taze hem önbellekten gelen cevaba uygulansın.
 installTmdbAdultGuard();
+// Jeton sağlığı: 401 (iptal/geçersiz) ve ard arda 429 (kota) Sentry'ye düşer. Yalnız
+// gözlem — isteği değiştirmez (bkz. docs/guvenlik/TMDB_JETON_YONETIMI.md).
+installTmdbKeyHealth();
 // Baslik secimi filtre uygulamaz: uygulama dili -> Ingilizce -> ozgun ad.
 // Ham cevap once cache'e yazilir, yetiskin filtresi uygulanir, en son yalniz
 // gosterilecek title/name alani ortak kuralla cozulur.

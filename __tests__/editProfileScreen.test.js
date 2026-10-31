@@ -191,11 +191,38 @@ describe("EditProfileScreen", () => {
     await render();
     await type("person-outline", "Ali V.");
     await act(async () => { await header().props.onSave(); });
-    expect(mockUpdateField).toHaveBeenCalledWith({ displayName: "Ali V." });
+    expect(mockUpdateField).toHaveBeenCalledWith({ displayName: "Ali V." }, { stampIdentity: true });
     expect(mockChangeUsername).not.toHaveBeenCalled();
     expect(mockSelectAvatar).not.toHaveBeenCalled();
     expect(mockToast.show).toHaveBeenCalledWith(expect.objectContaining({ type: "success" }));
     expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("günde bir kez: ad değişimi beklemedeyken kaydedilmez, bio serbest kalır", async () => {
+    // Son kimlik değişikliği 2 saat önce → 22 saat bekleme kaldı.
+    mockProfileState = {
+      profile: { ...SAVED, identityChangedAt: Date.now() - 2 * 60 * 60 * 1000 },
+      loading: false,
+    };
+    await render();
+    await type("person-outline", "Ali V.");
+    await act(async () => { await header().props.onSave(); });
+    expect(mockUpdateField).not.toHaveBeenCalled();
+    expect(mockToast.show).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "info", text2: expect.stringContaining("saat") }),
+    );
+    expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+
+  it("günde bir kez: beklemedeyken ad DIŞI alanlar kaydedilir", async () => {
+    mockProfileState = {
+      profile: { ...SAVED, identityChangedAt: Date.now() - 2 * 60 * 60 * 1000 },
+      loading: false,
+    };
+    await render();
+    await type("chatbubble-ellipses-outline", "Yeni bio");
+    await act(async () => { await header().props.onSave(); });
+    expect(mockUpdateField).toHaveBeenCalledWith({ bio: "Yeni bio" }, { stampIdentity: false });
   });
 
   it("refuses to save an empty name with a toast", async () => {
@@ -311,10 +338,10 @@ describe("EditProfileScreen", () => {
       await type("person-outline", "Ali V.");
       await act(() => editor().props.onChange(favs([7, 8])));
       await act(async () => { await header().props.onSave(); });
-      expect(mockUpdateField).toHaveBeenCalledWith({
-        displayName: "Ali V.",
-        fourFavorites: favs([7, 8]),
-      });
+      expect(mockUpdateField).toHaveBeenCalledWith(
+        { displayName: "Ali V.", fourFavorites: favs([7, 8]) },
+        { stampIdentity: true },
+      );
       expect(mockTrack).toHaveBeenCalledWith(
         "four_favorites_saved",
         { movies: 2, shows: 0, people: 0, total: 2 },
@@ -326,7 +353,7 @@ describe("EditProfileScreen", () => {
       await render();
       await type("person-outline", "Ali V.");
       await act(async () => { await header().props.onSave(); });
-      expect(mockUpdateField).toHaveBeenCalledWith({ displayName: "Ali V." });
+      expect(mockUpdateField).toHaveBeenCalledWith({ displayName: "Ali V." }, { stampIdentity: true });
       expect(mockTrack).not.toHaveBeenCalled();
     });
 
@@ -336,9 +363,10 @@ describe("EditProfileScreen", () => {
       await act(() => editor().props.onChange({ movies: [], shows: [], people: [] }));
       expect(header().props.canSave).toBe(true);
       await act(async () => { await header().props.onSave(); });
-      expect(mockUpdateField).toHaveBeenCalledWith({
-        fourFavorites: { movies: [], shows: [], people: [] },
-      });
+      expect(mockUpdateField).toHaveBeenCalledWith(
+        { fourFavorites: { movies: [], shows: [], people: [] } },
+        { stampIdentity: false },
+      );
     });
   });
 
@@ -357,7 +385,7 @@ describe("EditProfileScreen", () => {
       await act(() => renderer.root.findByType("BirthDateField").props.onChange("2000-01-01"));
       expect(header().props.canSave).toBe(true);
       await act(async () => { await header().props.onSave(); });
-      expect(mockUpdateField).toHaveBeenCalledWith({ birthDate: "2000-01-01" });
+      expect(mockUpdateField).toHaveBeenCalledWith({ birthDate: "2000-01-01" }, { stampIdentity: false });
     });
   });
 

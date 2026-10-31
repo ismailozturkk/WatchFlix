@@ -13,6 +13,8 @@ import { Keys, get, set, has } from "../services/storage";
 import Toast from "@components/AppToast";
 import { useAuth } from "./AuthContext";
 import { useUserProfile } from "./UserProfileContext";
+import { cooldownRemainingMs } from "../utils/profileIdentityCooldown";
+import { identityCooldownToast } from "../utils/profileIdentityCooldownCopy";
 import {
   AVATARS as avatars,
   CUSTOM_AVATAR_INDEX,
@@ -155,11 +157,18 @@ export const ProfileUiProvider = ({ children }) => {
         return true;
       }
 
+      // Ad/avatar değişimi tüm geçmişi yeniden yazdırıyor (profil yayılımı): günde bir.
+      const remaining = cooldownRemainingMs(profile?.identityChangedAt);
+      if (remaining > 0) {
+        Toast.show(identityCooldownToast(remaining));
+        return false;
+      }
+
       avatarSavingRef.current = true;
       setAvatarSaving(true);
       setPendingChoice(choice);
       try {
-        await changeAvatarIndex(choice);
+        await changeAvatarIndex(choice, null, { stampIdentity: true });
         set(Keys.avatarIndex, choice.avatarIndex, { uid });
         setModalVisible(false);
         return true;
