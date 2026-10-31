@@ -9,12 +9,17 @@
 //   • Topluluk sayaçları: Top100Hype/{mediaKey} → { type, id, count } (en çok oy alan TOP100_COUNTER_READ kadarı).
 //     Havuzda olmayan oylu yapımların TMDB verisi detay ucundan tamamlanır (axios önbelleği tekrar istemez).
 //
-// OY = tek transaction, aç/kapa: Top100Hype/{key}/votes/{uid} → { hype: true } oluşturulur (+1) ya da silinir (−1);
+// OY = tek toplu yazım, aç/kapa: Top100Hype/{key}/votes/{uid} → { hype: true } oluşturulur (+1) ya da silinir (−1);
 // yapım sayacı ve kullanıcının hak sayacı (Top100HypeUsers/{uid}) AYNI yazımda. firestore.rules eşleşmeyi ve
 // planın aktif oy hakkını (Free 0 · Premium 10 · Max 20) zorunlu kılar.
+//
+// Sayaçlar increment(±1) ile yazılır, transaction YOK (2026-10-31 denetimi): popüler yapımda oku-değiştir-yaz
+// transaction'ı aynı belgeye yığılınca yeniden deneme bütçesini tüketip düşüyordu. Kural farkı (tam ±1) zaten
+// sunucuda doğruladığı için okumaya gerek yok. Sayaç `count` sıralama sorgusunda kullanıldığından PARÇALANMAZ
+// (DailyPolls'tan farkı); oylar yapımlara dağıldığı ve oy Premium olduğu için tek belgeye yük sınırlı.
 
 import axios from "axios";
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, runTransaction } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, increment, limit, orderBy, query, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
 import { tmdbLanguageOf } from "../utils/appLanguages";
 import { asCounter, mediaKeyOf, parseMediaKey, toPoolItem } from "../utils/top100";
@@ -132,6 +137,21 @@ export async function fetchMyTop100Usage(uid) {
 /** Hak doluyken oy denendi: `error.code === TOP100_LIMIT_ERROR`, `error.used` sunucudaki sayı. */
 export const TOP100_LIMIT_ERROR = "top100_limit";
 
+/** Yapım sayacı, bu kullanıcının oyu ve hak sayacı (tek seferde, transaction dışı). */
+async function readHypeState(key, uid) {
+  const [counterSnap, voteSnap, userSnap] = await Promise.all([
+    getDoc(counterRef(key)),
+    getDoc(voteRef(key, uid)),
+    getDoc(userRef(uid)),
+  ]);
+  return {
+    counter: counterSnap.exists() ? asCounter(counterSnap.data()) : { count: 0 },
+    hasUser: userSnap.exists(),
+    used: userSnap.exists() ? Math.max(0, Math.trunc(Number(userSnap.data()?.used)) || 0) : 0,
+    was: voteSnap.exists(),
+  };
+}
+
 /**
  * Oyu açar ya da kapatır; aynı yazımda yapım sayacı ve kullanıcının hak sayacı (Top100HypeUsers/{uid}
  * → { used, last }) ±1 oynar. Sunucudaki durum zaten istenen gibiyse hiçbir şey yazmaz.
@@ -141,38 +161,54 @@ export const TOP100_LIMIT_ERROR = "top100_limit";
  *   hyped: istenen SON durum; limit: planın aktif oy hakkı (utils/premiumFeatures "top100_vote")
  * @returns {Promise<{ counter: {count:number}, hyped: boolean, used: number }>}
  */
-export function setTop100Hype({ uid, type, id, hyped, limit = 0 }) {
+export async function setTop100Hype({ uid, type, id, hyped, limit = 0 }) {
   const key = mediaKeyOf(type, id);
-  if (!uid) return Promise.reject(new Error("top100_no_user"));
-  if (!key) return Promise.reject(new Error("top100_bad_media"));
-  return runTransaction(db, async (tx) => {
-    const counterSnap = await tx.get(counterRef(key));
-    const voteSnap = await tx.get(voteRef(key, uid));
-    const userSnap = await tx.get(userRef(uid));
-    const counter = counterSnap.exists() ? asCounter(counterSnap.data()) : { count: 0 };
-    const used = userSnap.exists() ? Math.max(0, Math.trunc(Number(userSnap.data()?.used)) || 0) : 0;
-    const was = voteSnap.exists();
-    if (was === !!hyped) return { counter, hyped: was, used };
+  if (!uid) throw new Error("top100_no_user");
+  if (!key) throw new Error("top100_bad_media");
+  const want = !!hyped;
+  const { counter, hasUser, used, was } = await readHypeState(key, uid);
+  if (was === want) return { counter, hyped: was, used };
 
-    if (hyped) {
-      if (used >= limit) {
-        const error = new Error(TOP100_LIMIT_ERROR);
-        error.code = TOP100_LIMIT_ERROR;
-        error.used = used;
-        throw error;
-      }
-      const next = { count: counter.count + 1 };
-      tx.set(voteRef(key, uid), { hype: true });
-      if (counterSnap.exists()) tx.update(counterRef(key), next);
-      else tx.set(counterRef(key), { type, id: Math.trunc(Number(id)), ...next });
-      tx.set(userRef(uid), { used: used + 1, last: key });
-      return { counter: next, hyped: true, used: used + 1 };
-    }
-    const next = { count: Math.max(0, counter.count - 1) };
-    tx.delete(voteRef(key, uid));
-    tx.update(counterRef(key), next);
+  if (want && used >= limit) {
+    const error = new Error(TOP100_LIMIT_ERROR);
+    error.code = TOP100_LIMIT_ERROR;
+    error.used = used;
+    throw error;
+  }
+
+  const batch = writeBatch(db);
+  if (want) {
+    batch.set(voteRef(key, uid), { hype: true });
+    // type/id aynı değerle yeniden yazılır (kural: güncellemede yalnız `count` değişir); ilk oyda belge doğar.
+    batch.set(counterRef(key), { type, id: Math.trunc(Number(id)), count: increment(1) }, { merge: true });
+    batch.set(userRef(uid), { used: increment(1), last: key }, { merge: true });
+  } else {
+    batch.delete(voteRef(key, uid));
+    batch.update(counterRef(key), { count: increment(-1) });
     // Hak sisteminden önce verilmiş oy (hak kaydı yok): kayda dokunmadan geri alınır.
-    if (userSnap.exists()) tx.set(userRef(uid), { used: Math.max(0, used - 1), last: key });
-    return { counter: next, hyped: false, used: userSnap.exists() ? Math.max(0, used - 1) : used };
-  });
+    if (hasUser) batch.set(userRef(uid), { used: increment(-1), last: key }, { merge: true });
+  }
+
+  try {
+    await batch.commit();
+  } catch (error) {
+    // Okuma ile yazım arasında başka cihaz aynı oyu değiştirdiyse kural reddeder: sunucu durumu istenen gibiyse
+    // başarı say, hak dolduysa sınır hatasını ver, değilse hatayı ilet.
+    const now = await readHypeState(key, uid).catch(() => null);
+    if (now && now.was === want) return { counter: now.counter, hyped: now.was, used: now.used };
+    if (now && want && now.used >= limit) {
+      const limitError = new Error(TOP100_LIMIT_ERROR);
+      limitError.code = TOP100_LIMIT_ERROR;
+      limitError.used = now.used;
+      throw limitError;
+    }
+    throw error;
+  }
+
+  if (want) return { counter: { count: counter.count + 1 }, hyped: true, used: used + 1 };
+  return {
+    counter: { count: Math.max(0, counter.count - 1) },
+    hyped: false,
+    used: hasUser ? Math.max(0, used - 1) : used,
+  };
 }

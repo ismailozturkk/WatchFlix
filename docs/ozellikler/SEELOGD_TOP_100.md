@@ -25,7 +25,7 @@ Eğlence sekmesinde, Günün Sorusu'nun altında. Film ve dizilerin **karışık
 - `Top100Hype/{movie|tv}_{tmdbId}` → `{ type, id, count }` (herkes okur).
 - `Top100Hype/{key}/votes/{uid}` → `{ hype: true }` (yalnız sahibi okur).
 - `Top100HypeUsers/{uid}` → `{ used, last }` (aktif oy hakkı sayacı; yalnız sahibi okur).
-- Aç/kapa tek transaction (`services/top100Service.setTop100Hype`): oy oluşturulurken yapım sayacı ve hak sayacı +1, silinirken −1; hak doluysa yazmaz (`TOP100_LIMIT_ERROR`). `firestore.rules` eşleşmeyi zorunlu kılar. Emülatör testleri: `__tests__/rules/firestore.rules.test.js` → "Seelogd Top 100 (Top100Hype)".
+- Aç/kapa tek toplu yazım (`services/top100Service.setTop100Hype`): oy oluşturulurken yapım sayacı ve hak sayacı `increment(+1)`, silinirken `increment(−1)`; hak doluysa yazmaz (`TOP100_LIMIT_ERROR`). `firestore.rules` eşleşmeyi zorunlu kılar. 2026-10-31'den beri transaction YOK: popüler yapımda oku-değiştir-yaz transaction'ı aynı belgeye yığılıp düşüyordu; kural farkı (tam ±1) sunucuda doğruladığı için okumaya gerek yok. Yazım reddedilirse (başka cihaz arada değiştirdi) durum yeniden okunur. Sayaç `count` sıralama sorgusunda kullanıldığı için **parçalanmaz**. Emülatör testleri: `__tests__/rules/firestore.rules.test.js` → "Seelogd Top 100 (Top100Hype)".
 - İlk sürümün puanlı `Top100` koleksiyonu kapatıldı (kural yok → erişilemez).
 - Kendi oylarının cihaz kopyası: `Keys.top100Hype` (`top100_hype:`); eski `top100_votes:` bilerek okunmaz.
 

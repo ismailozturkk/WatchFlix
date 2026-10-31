@@ -58,8 +58,8 @@ const { __resetStoreCaches } = require("../services/storage/store");
 const { __resetStores } = require("../services/storage/instances");
 const { DAILY_POLL_QUESTIONS } = require("../data/dailyPollQuestions");
 const {
-  POLL_HISTORY_DAYS, POLL_MIN_VOTES_FOR_PERCENT, dayNumberOf, localizeQuestion, normalizePollHistory, pollShares,
-  pollStreak, questionForDay, recordPollVote, toStoredPollHistory, withMyVote,
+  POLL_HISTORY_DAYS, POLL_MIN_VOTES_FOR_PERCENT, POLL_SHARD_COUNT, dayNumberOf, localizeQuestion, normalizePollHistory,
+  pickPollShard, pollShares, pollStreak, questionForDay, recordPollVote, sumPollCounts, toStoredPollHistory, withMyVote,
 } = require("../utils/dailyPoll");
 const { POLL_COPY } = require("../utils/dailyPollCopy");
 const DailyPollWidget = require("../components/hub/DailyPollWidget").default;
@@ -138,6 +138,34 @@ describe("günün sorusu seçimi", () => {
     expect(localizeQuestion(q, "de").a).toBe(q.de[1]);
     expect(localizeQuestion(q, "zz").prompt).toBe(q.en[0]);
     expect(localizeQuestion(null, "tr")).toBeNull();
+  });
+});
+
+describe("parçalı sayaç (sumPollCounts / pickPollShard)", () => {
+  test("gün belgesi + parçalar toplanır; eksik/bozuk parça 0 sayılır", () => {
+    expect(sumPollCounts([])).toEqual({ a: 0, b: 0 });
+    expect(sumPollCounts([{ a: 3, b: 1 }, null, { a: 2 }, { b: 4 }, undefined])).toEqual({ a: 5, b: 5 });
+    expect(sumPollCounts([{ a: "x", b: -2 }, { a: 1.9, b: 2 }])).toEqual({ a: 1, b: 2 });
+    expect(sumPollCounts(null)).toEqual({ a: 0, b: 0 });
+  });
+
+  test("parça her zaman 0..N-1; bozuk rastgele değer 0'a düşer", () => {
+    expect(pickPollShard(() => 0)).toBe(0);
+    expect(pickPollShard(() => 0.999999)).toBe(POLL_SHARD_COUNT - 1);
+    expect(pickPollShard(() => 0.35)).toBe(3);
+    expect(pickPollShard(() => 1)).toBe(0); // aralık dışı
+    expect(pickPollShard(() => NaN)).toBe(0);
+    for (let i = 0; i < 200; i += 1) {
+      const shard = pickPollShard();
+      expect(Number.isInteger(shard) && shard >= 0 && shard < POLL_SHARD_COUNT).toBe(true);
+    }
+  });
+
+  test("parça sayısı firestore.rules ile aynı (shardId '^[0-9]$', shard <= 9)", () => {
+    const rules = require("fs").readFileSync(require("path").join(__dirname, "..", "firestore.rules"), "utf8");
+    expect(POLL_SHARD_COUNT).toBe(10);
+    expect(rules).toContain("shardId.matches('^[0-9]$')");
+    expect(rules).toContain("request.resource.data.shard <= 9");
   });
 });
 

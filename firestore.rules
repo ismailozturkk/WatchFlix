@@ -1504,6 +1504,13 @@ service cloud.firestore {
     //     (!exists = oy daha önce yok), artış tam +1 ve YALNIZ seçilen tarafa.
     //   • Gün anahtarı sunucu saatine göre BUGÜN olmalı: gelecek/geçmiş günlerin sayacı doldurulamaz.
     //   • Oyların kim olduğu başkasına açık değildir (votes yalnız sahibine okunur).
+    //
+    // PARÇALI SAYAÇ (2026-10-31 denetimi, sıcak nokta): herkes aynı gün aynı belgeye yazınca tek belge
+    // kilitleniyordu (emülatörde 100 eşzamanlı oyda 3/100 başarı). Yeni istemci sayacı
+    // DailyPolls/{gün}/shards/{0-9} belgelerinden birine yazar ve oyuna `shard` numarasını koyar; toplam =
+    // gün belgesi + tüm parçalar (utils/dailyPoll.sumPollCounts). Parça sayısı utils/dailyPoll.POLL_SHARD_COUNT
+    // ile AYNI (10 → shardId '^[0-9]$'). Eski istemcinin yolu (gün belgesi, `shard` yok) açık kalır; bir oy
+    // ya gün belgesini ya TEK bir parçayı artırır — ikisini birden asla (çift sayım yok).
     function pollTrNow() { return request.time + duration.value(3, 'h'); }
     function pollTwo(n) { return (n < 10 ? '0' : '') + string(n); }
     function pollToday() {
@@ -1527,7 +1534,9 @@ service cloud.firestore {
             && request.resource.data.a is int
             && request.resource.data.b is int
             && !exists(pollVotePath())
-            && existsAfter(pollVotePath());
+            && existsAfter(pollVotePath())
+            // Parçalı oy gün belgesini artıramaz (parçayı artırır).
+            && !('shard' in getAfter(pollVotePath()).data);
       }
 
       allow read: if isSignedIn();
@@ -1543,18 +1552,66 @@ service cloud.firestore {
                          && request.resource.data.a == resource.data.a));
       allow delete: if false;
 
+      // Parça belgesinin yolu (shard: 0-9 tam sayı).
+      function pollShardPath(shard) {
+        return /databases/$(database)/documents/DailyPolls/$(dayKey)/shards/$(string(shard));
+      }
+
       match /votes/{uid} {
         allow read: if isOwner(uid);
         allow create: if isOwner(uid)
                       && dayKey == pollToday()
-                      && request.resource.data.keys().hasOnly(['choice'])
                       && request.resource.data.choice in ['a', 'b']
                       // Sayaç aynı toplu yazımda artmadan oy kaydı olmaz (oy "sayılmadan" kaydedilemez):
                       // seçilen yanın sayacı yazım SONRASI, yazım ÖNCESİNDEN tam 1 fazla olmalı.
-                      && existsAfter(/databases/$(database)/documents/DailyPolls/$(dayKey))
-                      && getAfter(/databases/$(database)/documents/DailyPolls/$(dayKey)).data[request.resource.data.choice]
-                         == pollCountBefore(request.resource.data.choice);
+                      && (
+                        // Eski yol: gün belgesindeki sayaç.
+                        (request.resource.data.keys().hasOnly(['choice'])
+                         && existsAfter(/databases/$(database)/documents/DailyPolls/$(dayKey))
+                         && getAfter(/databases/$(database)/documents/DailyPolls/$(dayKey)).data[request.resource.data.choice]
+                            == pollCountBefore(request.resource.data.choice))
+                        ||
+                        // Parçalı yol: oyun söylediği parça tam +1.
+                        (request.resource.data.keys().hasOnly(['choice', 'shard'])
+                         && request.resource.data.shard is int
+                         && request.resource.data.shard >= 0
+                         && request.resource.data.shard <= 9
+                         && existsAfter(pollShardPath(request.resource.data.shard))
+                         && getAfter(pollShardPath(request.resource.data.shard)).data[request.resource.data.choice]
+                            == (exists(pollShardPath(request.resource.data.shard))
+                                  ? get(pollShardPath(request.resource.data.shard)).data[request.resource.data.choice]
+                                  : 0) + 1)
+                      );
         allow update, delete: if false;
+      }
+
+      // Parçalar: herkes okur (toplam için), yalnız AYNI yazımda kendi oyunu oluşturan ve oyunda BU parçanın
+      // numarası yazan kullanıcı tam +1 artırır. Silinemez.
+      match /shards/{shardId} {
+        function shardVote() { return getAfter(pollVotePath()).data; }
+        function shardBase() {
+          return isSignedIn()
+              && dayKey == pollToday()
+              && shardId.matches('^[0-9]$')
+              && request.resource.data.keys().hasOnly(['a', 'b'])
+              && request.resource.data.a is int
+              && request.resource.data.b is int
+              && !exists(pollVotePath())
+              && existsAfter(pollVotePath())
+              && shardVote().get('shard', -1) == int(shardId);
+        }
+        allow read: if isSignedIn();
+        allow create: if shardBase()
+                      && ((shardVote().choice == 'a' && request.resource.data.a == 1 && request.resource.data.b == 0)
+                       || (shardVote().choice == 'b' && request.resource.data.a == 0 && request.resource.data.b == 1));
+        allow update: if shardBase()
+                      && ((shardVote().choice == 'a'
+                           && request.resource.data.a == resource.data.a + 1
+                           && request.resource.data.b == resource.data.b)
+                       || (shardVote().choice == 'b'
+                           && request.resource.data.b == resource.data.b + 1
+                           && request.resource.data.a == resource.data.a));
+        allow delete: if false;
       }
     }
 

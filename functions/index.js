@@ -2004,6 +2004,20 @@ exports.onTournamentVoteWritten = onDocumentWritten(
     updates.updatedAt = FieldValue.serverTimestamp();
 
     const aggRef = db.doc(`tournaments/${periodId}/agg/tallies`);
+    // Agregat varken yalnız increment'ler yazılır: değişmeli oldukları için okumaya/transaction'a gerek yok ve
+    // kör update çekişmede DÜŞMEZ (2026-10-31 denetimi: tüm oylar tek belgede transaction'a yığılınca yeniden
+    // deneme bütçesi doluyor, catch yalnız logladığı için o oy sayımdan sessizce kayboluyordu). Belge yoksa
+    // (NOT_FOUND) aşağıdaki ilk-yazım yolu koleksiyondan sıfırdan kurar.
+    try {
+      await aggRef.update(updates);
+      return;
+    } catch (e) {
+      const notFound = e?.code === 5 || /NOT_FOUND|No document to update/i.test(String(e?.message));
+      if (!notFound) {
+        console.error(`turnuva agg (${periodId}):`, e);
+        return;
+      }
+    }
     try {
       await db.runTransaction(async (tx) => {
         const snap = await tx.get(aggRef);

@@ -30,7 +30,9 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
-  runTransaction,
+  getDoc,
+  increment,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { trackFirestoreWrite, trackFirestoreDelete } from "./usageTrackerService";
@@ -103,7 +105,12 @@ export function subscribeToMyRating(key, uid, callback) {
   );
 }
 
-// ─── WRITE (transaction — agregat tutarlılığı) ─────────────────────────────────
+// ─── WRITE (toplu yazım — agregat tutarlılığı) ─────────────────────────────────
+// Agregat OKUNMAZ; increment(±fark) ile yazılır (2026-10-31 denetimi: popüler içerikte oku-değiştir-yaz
+// transaction'ı aynı belgeye yığılıp yeniden deneme bütçesini tüketiyordu). Fark yalnız KENDİ oy belgemden
+// hesaplanır (başkasıyla çekişmez); firestore.rules farkı o belgeyle birebir doğrular. Okuma ile yazım arasında
+// başka cihaz oyumu değiştirirse yazım reddedilir → bir kez taze okumayla yeniden denenir.
+const withOneRetry = (write) => write().catch(() => write());
 
 /**
  * Kullanıcının oyunu ekle/güncelle. Agregat sum/count atomik güncellenir.
@@ -125,35 +132,25 @@ export async function setMyRating({ mediaType, mediaId, uid, rating, title = "",
   const mirrorRef = doc(db, "Users", uid, "myRatings", key);
   const rootListsRef = doc(db, "Lists", uid);
 
-  await runTransaction(db, async (tx) => {
-    const aggSnap = await tx.get(aggRef);
-    const userSnap = await tx.get(userRef);
+  await withOneRetry(async () => {
+    const userSnap = await getDoc(userRef);
+    // Güncellemede sayaç değişmez, toplam yalnız fark kadar oynar; ilk oyda +1 / +değer.
+    const prev = userSnap.exists() ? clampRating(userSnap.data()?.rating) : null;
 
-    const agg = aggSnap.exists() ? aggSnap.data() : { count: 0, sum: 0 };
-    let count = agg.count || 0;
-    let sum = agg.sum || 0;
-
-    if (userSnap.exists()) {
-      const prev = clampRating(userSnap.data()?.rating);
-      sum += value - prev; // güncelleme: yalnız farkı uygula
-    } else {
-      count += 1;
-      sum += value;
-    }
-
-    tx.set(userRef, { rating: value, updatedAt: serverTimestamp() });
-    tx.set(
+    const batch = writeBatch(db);
+    batch.set(userRef, { rating: value, updatedAt: serverTimestamp() });
+    batch.set(
       aggRef,
       {
         mediaType,
         mediaId: String(mediaId),
-        count: Math.max(0, count),
-        sum: Math.max(0, sum),
+        count: increment(prev === null ? 1 : 0),
+        sum: increment(prev === null ? value : value - prev),
         updatedAt: serverTimestamp(),
       },
       { merge: true },
     );
-    tx.set(mirrorRef, {
+    batch.set(mirrorRef, {
       mediaType,
       mediaId: String(mediaId),
       rating: value,
@@ -161,7 +158,7 @@ export async function setMyRating({ mediaType, mediaId, uid, rating, title = "",
       poster: poster || null,
       updatedAt: serverTimestamp(),
     });
-    tx.set(
+    batch.set(
       rootListsRef,
       nestedSummaryFields({
         [`activityIndex.ratings.${key}`]: value,
@@ -170,6 +167,7 @@ export async function setMyRating({ mediaType, mediaId, uid, rating, title = "",
       }),
       { merge: true },
     );
+    await batch.commit();
   });
   trackFirestoreWrite("Ratings", 2);
   trackFirestoreWrite("Lists/activityIndex", 1);
@@ -188,31 +186,26 @@ export async function removeMyRating({ mediaType, mediaId, uid }) {
   const mirrorRef = doc(db, "Users", uid, "myRatings", key);
   const rootListsRef = doc(db, "Lists", uid);
 
-  await runTransaction(db, async (tx) => {
-    const userSnap = await tx.get(userRef);
+  await withOneRetry(async () => {
+    const userSnap = await getDoc(userRef);
     if (!userSnap.exists()) return; // zaten yok
-
-    const aggSnap = await tx.get(aggRef);
-    const agg = aggSnap.exists() ? aggSnap.data() : { count: 0, sum: 0 };
     const prev = clampRating(userSnap.data()?.rating);
 
-    const count = Math.max(0, (agg.count || 0) - 1);
-    const sum = Math.max(0, (agg.sum || 0) - prev);
-
-    tx.delete(userRef);
-    tx.delete(mirrorRef);
-    tx.set(
+    const batch = writeBatch(db);
+    batch.delete(userRef);
+    batch.delete(mirrorRef);
+    batch.set(
       aggRef,
       {
         mediaType,
         mediaId: String(mediaId),
-        count,
-        sum,
+        count: increment(-1),
+        sum: increment(-prev),
         updatedAt: serverTimestamp(),
       },
       { merge: true },
     );
-    tx.set(
+    batch.set(
       rootListsRef,
       nestedSummaryFields({
         [`activityIndex.ratings.${key}`]: null,
@@ -221,6 +214,7 @@ export async function removeMyRating({ mediaType, mediaId, uid }) {
       }),
       { merge: true },
     );
+    await batch.commit();
   });
   trackFirestoreDelete("Ratings", 1);
   trackFirestoreWrite("Lists/activityIndex", 1);

@@ -62,6 +62,32 @@ export function pollShares(counts) {
   return { a, b, total, percentA, percentB: 100 - percentA, showPercent: total >= POLL_MIN_VOTES_FOR_PERCENT };
 }
 
+// ── Parçalı sayaç ───────────────────────────────────────────────────────────
+// Herkes aynı günün sayacına yazdığı için tek belge kilitleniyordu; oylar POLL_SHARD_COUNT parçaya dağılır
+// (DailyPolls/{gün}/shards/{0..N-1}). firestore.rules parça kimliğini '^[0-9]$' ile sınırlar: sayı değişirse
+// kural da değişmeli.
+export const POLL_SHARD_COUNT = 10;
+
+/** Oyun yazılacağı parça (0..POLL_SHARD_COUNT-1). `random` testte sabitlenir. */
+export function pickPollShard(random = Math.random) {
+  const n = Math.floor(Number(random()) * POLL_SHARD_COUNT);
+  return Number.isInteger(n) && n >= 0 && n < POLL_SHARD_COUNT ? n : 0;
+}
+
+/**
+ * Gün belgesi (eski istemcilerin sayacı) + parçalar → tek sayaç. Bozuk/eksik parça 0 sayılır.
+ * @param {Array<{a?: number, b?: number} | null | undefined>} parts
+ */
+export function sumPollCounts(parts) {
+  return (parts || []).reduce(
+    (acc, part) => ({
+      a: acc.a + (Math.max(0, Math.trunc(Number(part?.a)) || 0)),
+      b: acc.b + (Math.max(0, Math.trunc(Number(part?.b)) || 0)),
+    }),
+    { a: 0, b: 0 },
+  );
+}
+
 /** Benim oyum dahil edilmiş sayaç (sunucu henüz yansıtmadıysa iyimser gösterim için). */
 export function withMyVote(counts, choice) {
   const a = Math.max(0, Math.trunc(Number(counts?.a)) || 0);

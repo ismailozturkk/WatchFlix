@@ -1830,6 +1830,133 @@ describe("Günün Sorusu (DailyPolls)", () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Günün Sorusu — PARÇALI sayaç (2026-10-31 sıcak nokta düzeltmesi). services/dailyPollService.castPollVote:
+// oy { choice, shard } + DailyPolls/{gün}/shards/{shard} üzerinde increment. Eski yol (yukarıdaki blok) hâlâ açık;
+// burada yeni yolun meşru akışları ve iki yolun birlikte çift sayım üretemediği sınanır.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Günün Sorusu — parçalı sayaç (DailyPolls/shards)", () => {
+  const trDay = (offsetDays = 0) => {
+    const shifted = new Date(Date.now() + 3 * 3600000 + offsetDays * 86400000);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${shifted.getUTCFullYear()}-${p(shifted.getUTCMonth() + 1)}-${p(shifted.getUTCDate())}`;
+  };
+  const TODAY = trDay();
+  const shardDoc = (db, shard, day = TODAY) => doc(db, "DailyPolls", day, "shards", String(shard));
+  const voteDoc = (db, uid, day = TODAY) => doc(db, "DailyPolls", day, "votes", uid);
+
+  /** İstemcideki toplu yazımın birebir aynısı. */
+  const castShard = (db, uid, choice, shard, { day = TODAY, vote, fields } = {}) => {
+    const batch = writeBatch(db);
+    batch.set(voteDoc(db, uid, day), vote || { choice, shard });
+    batch.set(
+      shardDoc(db, shard, day),
+      fields || { a: increment(choice === "a" ? 1 : 0), b: increment(choice === "b" ? 1 : 0) },
+      { merge: true },
+    );
+    return batch.commit();
+  };
+  const sumAll = async (db, day = TODAY) => {
+    const shards = await getDocs(collection(db, "DailyPolls", day, "shards"));
+    const legacy = await getDoc(doc(db, "DailyPolls", day));
+    return [legacy.exists() ? legacy.data() : null, ...shards.docs.map((d) => d.data())].reduce(
+      (acc, part) => ({ a: acc.a + (part?.a || 0), b: acc.b + (part?.b || 0) }),
+      { a: 0, b: 0 },
+    );
+  };
+
+  test("parçaya oy: ilk oy parçayı kurar, sonrakiler +1; farklı parçalar ve eski sayaç birlikte toplanır", async () => {
+    await assertSucceeds(castShard(alice, ALICE, "a", 3));
+    await assertSucceeds(castShard(bob, BOB, "b", 3));
+    await assertSucceeds(castShard(carol, CAROL, "a", 7));
+    expect((await getDoc(shardDoc(alice, 3))).data()).toEqual({ a: 1, b: 1 });
+    // Eski istemcinin oyu gün belgesine: toplamda birlikte görünür.
+    const dave = testEnv.authenticatedContext("dave").firestore();
+    const legacy = writeBatch(dave);
+    legacy.set(voteDoc(dave, "dave"), { choice: "b" });
+    legacy.set(doc(dave, "DailyPolls", TODAY), { a: 0, b: 1 });
+    await assertSucceeds(legacy.commit());
+    expect(await sumAll(bob)).toEqual({ a: 2, b: 2 });
+  });
+
+  test("ÇİFT SAYIM YOK: parçalı oy gün belgesini de artıramaz; eski oy parçayı artıramaz", async () => {
+    await seed((db) => setDoc(doc(db, "DailyPolls", TODAY), { a: 5, b: 5 }));
+    const both = writeBatch(alice);
+    both.set(voteDoc(alice, ALICE), { choice: "a", shard: 2 });
+    both.set(shardDoc(alice, 2), { a: increment(1), b: increment(0) }, { merge: true });
+    both.update(doc(alice, "DailyPolls", TODAY), { a: increment(1) });
+    await assertFails(both.commit());
+    // Parça numarası olmayan (eski biçim) oy parçayı artıramaz.
+    await assertFails(castShard(alice, ALICE, "a", 2, { vote: { choice: "a" } }));
+    // Parçalı oy gün belgesini tek başına da artıramaz.
+    const legacyOnly = writeBatch(alice);
+    legacyOnly.set(voteDoc(alice, ALICE), { choice: "a", shard: 2 });
+    legacyOnly.update(doc(alice, "DailyPolls", TODAY), { a: increment(1) });
+    await assertFails(legacyOnly.commit());
+    expect(await sumAll(alice)).toEqual({ a: 5, b: 5 });
+  });
+
+  test("oyun söylediği parça dışında parça artırılamaz; iki parça birden artırılamaz", async () => {
+    await assertFails(castShard(alice, ALICE, "a", 4, { vote: { choice: "a", shard: 3 } }));
+    const two = writeBatch(alice);
+    two.set(voteDoc(alice, ALICE), { choice: "a", shard: 3 });
+    two.set(shardDoc(alice, 3), { a: increment(1), b: increment(0) }, { merge: true });
+    two.set(shardDoc(alice, 4), { a: increment(1), b: increment(0) }, { merge: true });
+    await assertFails(two.commit());
+    await assertSucceeds(castShard(alice, ALICE, "a", 3));
+  });
+
+  test("parça aralığı 0-9: 10, -1, metin ve kesirli numara reddedilir", async () => {
+    await assertFails(castShard(alice, ALICE, "a", 10));
+    await assertFails(castShard(alice, ALICE, "a", "x", { vote: { choice: "a", shard: -1 } }));
+    await assertFails(castShard(alice, ALICE, "a", 3, { vote: { choice: "a", shard: "3" } }));
+    await assertFails(castShard(alice, ALICE, "a", 3, { vote: { choice: "a", shard: 3.5 } }));
+    await assertSucceeds(castShard(alice, ALICE, "a", 0));
+    await assertSucceeds(castShard(bob, BOB, "b", 9));
+  });
+
+  test("parçada yanlış taraf, +2, keyfî değer ve fazladan alan reddedilir", async () => {
+    await seed((db) => setDoc(doc(db, "DailyPolls", TODAY, "shards", "5"), { a: 4, b: 4 }));
+    await assertFails(castShard(alice, ALICE, "a", 5, { fields: { a: increment(0), b: increment(1) } }));
+    await assertFails(castShard(alice, ALICE, "a", 5, { fields: { a: increment(2), b: increment(0) } }));
+    await assertFails(castShard(alice, ALICE, "a", 5, { fields: { a: 99, b: 4 } }));
+    await assertFails(castShard(alice, ALICE, "a", 5, { fields: { a: increment(1), b: increment(0), total: 9 } }));
+    await assertFails(castShard(alice, ALICE, "a", 5, { vote: { choice: "a", shard: 5, weight: 9 } }));
+    await assertSucceeds(castShard(alice, ALICE, "a", 5));
+    expect((await getDoc(shardDoc(alice, 5))).data()).toEqual({ a: 5, b: 4 });
+  });
+
+  test("oysuz parça artırılamaz; oy parçasız yazılamaz; ikinci oy reddedilir; parça silinemez", async () => {
+    await assertFails(setDoc(shardDoc(alice, 1), { a: increment(1), b: increment(0) }, { merge: true }));
+    await assertFails(setDoc(voteDoc(alice, ALICE), { choice: "a", shard: 1 }));
+    await assertSucceeds(castShard(alice, ALICE, "a", 1));
+    await assertFails(castShard(alice, ALICE, "b", 2));
+    await assertFails(castShard(alice, ALICE, "a", 1));
+    await assertFails(deleteDoc(shardDoc(alice, 1)));
+    expect(await sumAll(alice)).toEqual({ a: 1, b: 0 });
+  });
+
+  test("dün/yarın parçası yazılamaz; parçalar oturumluya okunur, oturumsuza değil", async () => {
+    await assertFails(castShard(alice, ALICE, "a", 1, { day: trDay(-1) }));
+    await assertFails(castShard(alice, ALICE, "a", 1, { day: trDay(1) }));
+    await assertSucceeds(castShard(alice, ALICE, "a", 1));
+    await assertSucceeds(getDocs(collection(bob, "DailyPolls", TODAY, "shards")));
+    const anon = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDocs(collection(anon, "DailyPolls", TODAY, "shards")));
+  });
+
+  test("EŞZAMANLI: 40 kullanıcı aynı anda parçalı yoldan oy verir — hepsi geçer, toplam kesin", async () => {
+    const users = Array.from({ length: 40 }, (_, i) => `voter${i}`);
+    const results = await Promise.allSettled(
+      users.map((uid, i) =>
+        castShard(testEnv.authenticatedContext(uid).firestore(), uid, i % 2 ? "b" : "a", i % 10),
+      ),
+    );
+    expect(results.filter((r) => r.status === "rejected")).toHaveLength(0);
+    expect(await sumAll(alice)).toEqual({ a: 20, b: 20 });
+  });
+});
+
 describe("Özel afiş seçimleri (PosterChoices)", () => {
   const belge = (choices = { movie_603: "/abc123.jpg" }) => ({ id: "all", choices, updatedAt: 1 });
   const profil = (lists) => ({ uid: ALICE, username: "alice", usernameLower: "alice", privacy: { lists } });
@@ -2097,5 +2224,142 @@ describe("Seelogd Top 100 (Top100Hype)", () => {
 
   test("eski puanlı Top100 koleksiyonu artık kapalı", async () => {
     await assertFails(getDoc(doc(alice, "Top100", MK)));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sayaçlar transaction'sız (2026-10-31 sıcak nokta düzeltmesi): Top100Hype ve Ratings istemcide artık
+// oku-değiştir-yaz transaction'ı DEĞİL, increment'li toplu yazımla güncellenir. Kurallar aynı kalır; burada
+// yeni istemci biçiminin geçtiği, keyfî farkın yine reddedildiği ve eşzamanlı yazımların kaybolmadığı sınanır.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Top100Hype — increment'li toplu yazım (services/top100Service)", () => {
+  const MK = "movie_550";
+  const C = "Top100Hype";
+  const U = "Top100HypeUsers";
+  beforeEach(() =>
+    seed(async (db) => {
+      await setDoc(doc(db, "Users", ALICE), { entitlements: { premiumPlan: "premium", premium: true } });
+      await setDoc(doc(db, "Users", BOB), { entitlements: { premiumPlan: "premium", premium: true } });
+      await setDoc(doc(db, "Users", CAROL), { entitlements: { premiumPlan: "free" } });
+    }),
+  );
+
+  /** setTop100Hype'ın yazım biçimi (okuma yok; increment). */
+  const hypeOn = (db, uid, key = MK) => {
+    const [type, id] = key.split("_");
+    const batch = writeBatch(db);
+    batch.set(doc(db, C, key, "votes", uid), { hype: true });
+    batch.set(doc(db, C, key), { type, id: Number(id), count: increment(1) }, { merge: true });
+    batch.set(doc(db, U, uid), { used: increment(1), last: key }, { merge: true });
+    return batch.commit();
+  };
+  const hypeOff = (db, uid, key = MK) => {
+    const batch = writeBatch(db);
+    batch.delete(doc(db, C, key, "votes", uid));
+    batch.update(doc(db, C, key), { count: increment(-1) });
+    batch.set(doc(db, U, uid), { used: increment(-1), last: key }, { merge: true });
+    return batch.commit();
+  };
+
+  test("ilk oy sayacı kurar, ikinci kullanıcı +1, geri alma −1; hak sayacı birlikte oynar", async () => {
+    await assertSucceeds(hypeOn(alice, ALICE));
+    await assertSucceeds(hypeOn(bob, BOB));
+    await assertSucceeds(hypeOff(alice, ALICE));
+    expect((await getDoc(doc(carol, C, MK))).data()).toEqual({ type: "movie", id: 550, count: 1 });
+    expect((await getDoc(doc(alice, U, ALICE))).data()).toEqual({ used: 0, last: MK });
+    expect((await getDoc(doc(bob, U, BOB))).data()).toEqual({ used: 1, last: MK });
+  });
+
+  test("hak sınırı increment'le de aşılamaz; Free yine oy veremez; ikinci oy reddedilir", async () => {
+    const keys = Array.from({ length: 10 }, (_, i) => `movie_${1000 + i}`);
+    for (const key of keys) await assertSucceeds(hypeOn(alice, ALICE, key));
+    await assertFails(hypeOn(alice, ALICE, "movie_2000"));
+    await assertFails(hypeOn(carol, CAROL));
+    await assertFails(hypeOn(alice, ALICE, keys[0]));
+  });
+
+  test("keyfî artış (+2) ve oysuz artış reddedilir", async () => {
+    await assertSucceeds(hypeOn(alice, ALICE));
+    const plusTwo = writeBatch(bob);
+    plusTwo.set(doc(bob, C, MK, "votes", BOB), { hype: true });
+    plusTwo.set(doc(bob, C, MK), { type: "movie", id: 550, count: increment(2) }, { merge: true });
+    plusTwo.set(doc(bob, U, BOB), { used: increment(1), last: MK }, { merge: true });
+    await assertFails(plusTwo.commit());
+    await assertFails(updateDoc(doc(bob, C, MK), { count: increment(1) }));
+  });
+
+  test("EŞZAMANLI: 30 Premium kullanıcı aynı yapıma aynı anda oy verir — hiçbiri kaybolmaz", async () => {
+    const users = Array.from({ length: 30 }, (_, i) => `fan${i}`);
+    await seed(async (db) => {
+      for (const uid of users) {
+        await setDoc(doc(db, "Users", uid), { entitlements: { premiumPlan: "premium", premium: true } });
+      }
+    });
+    const results = await Promise.allSettled(users.map((uid) => hypeOn(testEnv.authenticatedContext(uid).firestore(), uid)));
+    expect(results.filter((r) => r.status === "rejected")).toHaveLength(0);
+    expect((await getDoc(doc(alice, C, MK))).data().count).toBe(30);
+  });
+});
+
+describe("Ratings — increment'li toplu yazım (services/ratingsService)", () => {
+  /** setMyRating'in yazım biçimi: kendi oyumu okur, agregata yalnız farkı increment'ler. */
+  const rate = async (db, uid, value) => {
+    const userRef = doc(db, "Ratings", KEY, "userRatings", uid);
+    const snap = await getDoc(userRef);
+    const prev = snap.exists() ? snap.data().rating : null;
+    const batch = writeBatch(db);
+    batch.set(userRef, { rating: value, updatedAt: serverTimestamp() });
+    batch.set(
+      doc(db, "Ratings", KEY),
+      {
+        mediaType: "movie",
+        mediaId: "550",
+        count: increment(prev === null ? 1 : 0),
+        sum: increment(prev === null ? value : value - prev),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+    return batch.commit();
+  };
+  const unrate = async (db, uid) => {
+    const userRef = doc(db, "Ratings", KEY, "userRatings", uid);
+    const prev = (await getDoc(userRef)).data().rating;
+    const batch = writeBatch(db);
+    batch.delete(userRef);
+    batch.set(
+      doc(db, "Ratings", KEY),
+      { mediaType: "movie", mediaId: "550", count: increment(-1), sum: increment(-prev), updatedAt: serverTimestamp() },
+      { merge: true },
+    );
+    return batch.commit();
+  };
+
+  test("ilk oy, ikinci kullanıcı, kendi oyunu değiştirme ve kaldırma doğru sayar", async () => {
+    await assertSucceeds(rate(alice, ALICE, 8));
+    await assertSucceeds(rate(bob, BOB, 4));
+    await assertSucceeds(rate(alice, ALICE, 6));
+    expect((await getDoc(doc(alice, "Ratings", KEY))).data()).toMatchObject({ count: 2, sum: 10 });
+    await assertSucceeds(unrate(bob, BOB));
+    expect((await getDoc(doc(alice, "Ratings", KEY))).data()).toMatchObject({ count: 1, sum: 6 });
+  });
+
+  test("bayat fark (oy arada değişti) reddedilir — istemci taze okumayla yeniden dener", async () => {
+    await assertSucceeds(rate(alice, ALICE, 8));
+    // Başka cihaz oyu 3 yaptı; bu cihaz hâlâ 8 sanıp +2 (8→10) farkı yazarsa sum tutmaz.
+    await assertSucceeds(rate(alice, ALICE, 3));
+    const stale = writeBatch(alice);
+    stale.set(doc(alice, "Ratings", KEY, "userRatings", ALICE), { rating: 10, updatedAt: serverTimestamp() });
+    stale.set(doc(alice, "Ratings", KEY), { count: increment(0), sum: increment(2), updatedAt: serverTimestamp() }, { merge: true });
+    await assertFails(stale.commit());
+    await assertSucceeds(rate(alice, ALICE, 10)); // taze okuma: 3→10 = +7
+    expect((await getDoc(doc(alice, "Ratings", KEY))).data()).toMatchObject({ count: 1, sum: 10 });
+  });
+
+  test("EŞZAMANLI: 30 kullanıcı aynı içeriği aynı anda puanlar — sayım ve toplam kesin", async () => {
+    const users = Array.from({ length: 30 }, (_, i) => `critic${i}`);
+    const results = await Promise.allSettled(users.map((uid) => rate(testEnv.authenticatedContext(uid).firestore(), uid, 5)));
+    expect(results.filter((r) => r.status === "rejected")).toHaveLength(0);
+    expect((await getDoc(doc(alice, "Ratings", KEY))).data()).toMatchObject({ count: 30, sum: 150 });
   });
 });
