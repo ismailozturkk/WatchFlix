@@ -41,6 +41,14 @@
 - Eski sayaç verisi için göç/migration notu (`docs/`); okuma tarafı eski tek-belge + yeni shard'ı geriye dönük okuyabilir.
 
 ### T-PERF-2 — `maxInstances` ve fan-out maliyetini açık yönet
+> **DURUM: KOD TAMAM (2026-10-31), DEPLOY BEKLİYOR.** Canlı yapılandırma okundu: gen2 = 1 vCPU + eşzamanlılık 80
+> (10 instance ≈ 800 eşzamanlı istek) → "10 tavanı throughput'u boğar" varsayımı abartılıydı. `functions/capacity.js`
+> sınıfları: `light` 20 (yalnız Firestore'lu callable'lar), `upstream` 10 (Gemini/OMDb/RevenueCat/Apple —
+> `syncPremiumStatus` RevenueCat API çağırdığı için burada, rehberin ilk önerisinden bilinçli sapma), `trigger` 10,
+> `singleton` 1 (zamanlanmışlar). gen1 `purgeOnAuthUserDeleted` 3000 → 10 (`runWith`). Bekçi:
+> `functions/capacity.test.js` (her export açık tavan seçmeli). Manifest (`__endpoint.maxInstances`) ile doğrulandı.
+> Fan-out doğrulandı (değişiklik-varsa + alan bazlı patch + 450 batch). Kalan: staging k6 p95 (T-LOAD-1'e bağlı);
+> ad/avatar değişikliğine bekleme süresi (ürün kararı).
 **KONUM:** `functions/index.js:89` (`setGlobalOptions({ maxInstances: 10 })`), `index.js:1610` `onUserProfileUpdated`.
 **SORUN:** Global 10 instance tavanı yük altında callable throughput'unu sınırlar; profil fan-out bir düzenlemeyi ~15 yüzeye yayar.
 **YAPILACAK:** Maliyet-kritik olmayan callable'lara (`getReferralOverview`, `syncPremiumStatus`) daha yüksek per-fonksiyon `maxInstances`; AI/OMDb'de düşük bırak (kota zaten frenliyor). Fan-out'u batch ve değişiklik-varsa-yaz ile sınırla (zaten kısmen var — doğrula). Karar gerekçesini yorum olarak yaz.

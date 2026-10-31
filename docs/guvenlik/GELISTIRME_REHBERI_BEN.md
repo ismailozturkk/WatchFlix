@@ -38,6 +38,13 @@ Yani 10.000 kullanıcı hedefinde, yüzlerce kişi aynı ankete oy verirse çoğ
 
 **Zorluk/risk:** Düşük-orta. Ölçüm için ayrı test ortamı (aşağıya bak) gerekir.
 
+> ✅ **YAPILDI (31 Ekim) — yayına alınmayı bekliyor.** Firebase'deki gerçek ayara salt-okunur baktım: her fonksiyon kopyası aynı anda **80 isteğe** bakabiliyor. Yani "10 kopya" aslında aynı anda ~800 istek demek; düşündüğümüz kadar dar değilmiş. Asıl sorunlar başka çıktı ve düzeltildi:
+> - Hesap silindiğinde çalışan eski tip bir fonksiyon bu sınırı hiç tanımıyordu (**3.000 kopyaya** kadar çıkabiliyordu) → 10'a çekildi.
+> - Gece/haftalık çalışan toplu işler (bildirim özeti, platform taraması vb.) aynı anda iki kez çalışabiliyordu → tek kopyaya sınırlandı.
+> - Hafif fonksiyonlar (davet, kod kullanma, arkadaş araması, lig XP) 20'ye çıktı. Yapay zekâ, IMDb puanları ve abonelik kontrolü gibi dış servise bağlı olanlar 10'da kaldı (karşı tarafın kotası zaten sınırlı).
+> - Bundan sonra eklenen her fonksiyon sınırını açıkça seçmek zorunda; seçmezse test düşüyor.
+> - Profil yayılımı kontrol edildi, iyi durumda: yalnız ad/kullanıcı adı/fotoğraf değişince çalışıyor ve yalnız değişen alanı yazıyor.
+
 ---
 
 ## 🟠 Güvenlik — Tüm kullanıcı listesi toplu çekilebiliyor

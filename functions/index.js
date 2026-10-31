@@ -70,6 +70,7 @@ const { createSocialPush } = require("./socialPush");
 const { sendExpoPushes } = require("./expoSend");
 const referral = require("./referral");
 const userSearch = require("./userSearch");
+const { CAPACITY } = require("./capacity");
 const { purgeAccountData, PURGE_PHASES } = require("./accountPurge");
 const functionsV1 = require("firebase-functions/v1");
 
@@ -86,7 +87,7 @@ try {
   console.warn("RTDB başlatılamadı (inChat kontrolü atlanacak):", e.message);
 }
 
-// Aynı anda çok fazla instance açıp maliyeti şişirmemek için tavan.
+// Yedek tavan: her fonksiyon kendi tavanını CAPACITY'den açıkça seçer (gerekçe capacity.js).
 setGlobalOptions({ maxInstances: 10 });
 
 // Google native SDK'nin idToken'i bu web OAuth client'i icin uretilir.
@@ -251,6 +252,7 @@ function applyReferralUpdate(tx, { patch, reward, capped, referralRef, inviterRe
 
 exports.revenueCatWebhook = onRequest(
   {
+    ...CAPACITY.upstream,
     secrets: [REVENUECAT_WEBHOOK_AUTH, REVENUECAT_SECRET_API_KEY],
     cors: false,
   },
@@ -370,7 +372,7 @@ const PREMIUM_SYNC_MIN_INTERVAL_MS = 15 * 1000;
  * yeni planını webhook'u beklemeden görür.
  */
 exports.syncPremiumStatus = onCall(
-  { secrets: [REVENUECAT_SECRET_API_KEY] },
+  { ...CAPACITY.upstream, secrets: [REVENUECAT_SECRET_API_KEY] },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Sign-in required");
@@ -487,7 +489,7 @@ function profileSummary(snap) {
  * Davet ekranının tüm verisi: kodum, davet ettiklerim (kayıtlı / abone / ödül),
  * kazandığım ücretsiz aylar ve BEN davetle geldiysem ilk ay indirimim.
  */
-exports.getReferralOverview = onCall(async (request) => {
+exports.getReferralOverview = onCall(CAPACITY.light, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
   const uid = request.auth.uid;
   const userSnap = await db.doc(`Users/${uid}`).get();
@@ -573,7 +575,7 @@ exports.getReferralOverview = onCall(async (request) => {
  * ya da bir arkadaşın davet kodu (ilk ay indirimi) kabul edilir.
  * Hepsi tek transaction'da: sayaç, kullanım kaydı ve plan birlikte yazılır.
  */
-exports.redeemCode = onCall(async (request) => {
+exports.redeemCode = onCall(CAPACITY.light, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
   const uid = request.auth.uid;
   const code = referral.normalizeCode(request.data?.code);
@@ -709,7 +711,7 @@ exports.redeemCode = onCall(async (request) => {
 });
 
 /** Birikmiş davet ödülünü (1 ay) başlatır. Mağaza aboneliği sürerken başlatılamaz. */
-exports.claimReferralReward = onCall(async (request) => {
+exports.claimReferralReward = onCall(CAPACITY.light, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
   const uid = request.auth.uid;
   const userRef = db.doc(`Users/${uid}`);
@@ -755,6 +757,7 @@ exports.claimReferralReward = onCall(async (request) => {
  */
 exports.expirePromoGrants = onSchedule(
   {
+    ...CAPACITY.singleton,
     schedule: "every 60 minutes",
     timeZone: "Etc/UTC",
     secrets: [REVENUECAT_SECRET_API_KEY],
@@ -796,7 +799,7 @@ exports.expirePromoGrants = onSchedule(
 
 /** Hesap silinince davet verisi de silinir (kod, davet hesabı, davet kayıtları). */
 exports.cleanupReferralOnUserDeleted = onDocumentDeleted(
-  "Users/{uid}",
+  { ...CAPACITY.trigger, document: "Users/{uid}" },
   async (event) => {
     const uid = event.params.uid;
     const accountRef = db.doc(`ReferralAccounts/${uid}`);
@@ -828,7 +831,7 @@ exports.cleanupReferralOnUserDeleted = onDocumentDeleted(
 // Aşamalı silme (aşağıdaki `phase`) birkaç dakika sürebilir; tek belirteç bütün aşamaları taşır.
 const DELETE_ACCOUNT_MAX_AUTH_AGE_SEC = 15 * 60;
 exports.deleteAccountData = onCall(
-  { timeoutSeconds: 540, memory: "512MiB" },
+  { ...CAPACITY.light, timeoutSeconds: 540, memory: "512MiB" },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Authentication required");
@@ -853,7 +856,11 @@ exports.deleteAccountData = onCall(
  * süpürür: istemci silme sürerken açık kalan dinleyiciler (presence, senkron…)
  * silinmiş belgeleri geri yazmış olabilir. İşlem idempotent.
  */
-exports.purgeOnAuthUserDeleted = functionsV1.auth.user().onDelete(async (user) => {
+// gen1: setGlobalOptions buna UYGULANMAZ (canlı tavan 3000'di) — tavan runWith ile.
+exports.purgeOnAuthUserDeleted = functionsV1
+  .runWith(CAPACITY.trigger)
+  .auth.user()
+  .onDelete(async (user) => {
   const result = await purgeAccountData({ db, rtdb }, user.uid);
   console.log(
     `[purgeOnAuthUserDeleted] uid=${user.uid} failed=${result.failed.length} skipped=${result.skipped.length}`,
@@ -871,7 +878,7 @@ exports.purgeOnAuthUserDeleted = functionsV1.auth.user().onDelete(async (user) =
  * verir; boylece email hesabi once normal giris yapip Ayarlar'dan Google'i acikca
  * baglamadan Google credential Firebase'e hic gonderilmez.
  */
-exports.checkGoogleSignInEligibility = onCall(async (request) => {
+exports.checkGoogleSignInEligibility = onCall(CAPACITY.light, async (request) => {
   const idToken = request.data?.idToken;
   if (typeof idToken !== "string" || idToken.length < 100 || idToken.length > 5000) {
     throw new HttpsError("invalid-argument", "Valid Google idToken required");
@@ -924,7 +931,7 @@ exports.checkGoogleSignInEligibility = onCall(async (request) => {
 });
 
 /** Apple credential Firebase'e girmeden once ayni e-posta cakismasini denetler. */
-exports.checkAppleSignInEligibility = onCall(async (request) => {
+exports.checkAppleSignInEligibility = onCall(CAPACITY.light, async (request) => {
   const identityToken = request.data?.identityToken;
   if (
     typeof identityToken !== "string" ||
@@ -970,7 +977,7 @@ exports.checkAppleSignInEligibility = onCall(async (request) => {
  * code'u Apple tokenina cevirir ve Apple yetkilendirmesini iptal eder.
  */
 exports.revokeAppleAuthorization = onCall(
-  { secrets: [APPLE_SIGN_IN_KEY_ID, APPLE_SIGN_IN_PRIVATE_KEY] },
+  { ...CAPACITY.upstream, secrets: [APPLE_SIGN_IN_KEY_ID, APPLE_SIGN_IN_PRIVATE_KEY] },
   async (request) => {
     if (!request.auth?.uid) {
       throw new HttpsError("unauthenticated", "Authentication required");
@@ -1005,7 +1012,7 @@ exports.revokeAppleAuthorization = onCall(
 // (arama yazarken gecikmeli tetiklenir).
 const userSearchAllow = externalRatings.createRateLimiter({ limit: 30, windowMs: 60 * 1000 });
 
-exports.searchUsers = onCall(async (request) => {
+exports.searchUsers = onCall(CAPACITY.light, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
   const term = userSearch.normalizeSearchTerm(request.data?.term);
   if (!term) return { users: [] };
@@ -1143,6 +1150,7 @@ async function refundAiQuota(uid, { today, month }) {
 
 exports.callGemini = onCall(
   {
+    ...CAPACITY.upstream,
     secrets: [GEMINI_API_KEY],
     timeoutSeconds: 70,
     // TODO(Faz 0 Hafta 2): App Check (Play Integrity) istemcide kurulunca aç.
@@ -1252,7 +1260,7 @@ const omdbSeasonCache = externalRatings.createTtlCache({ ttlMs: 24 * 60 * 60 * 1
 const omdbAllow = externalRatings.createRateLimiter({ limit: 60, windowMs: 60 * 1000 });
 
 exports.getExternalRatings = onCall(
-  { secrets: [OMDB_API_KEY], timeoutSeconds: 20, enforceAppCheck: false },
+  { ...CAPACITY.upstream, secrets: [OMDB_API_KEY], timeoutSeconds: 20, enforceAppCheck: false },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
     const req = externalRatings.validateRatingsRequest(request.data);
@@ -1535,7 +1543,7 @@ const socialPush = createSocialPush({
 });
 
 exports.onSocialNotificationCreated = onDocumentCreated(
-  "Users/{uid}/notifications/{notifId}",
+  { ...CAPACITY.trigger, document: "Users/{uid}/notifications/{notifId}" },
   async (event) => {
     const snap = event.data;
     if (!snap) return;
@@ -1554,7 +1562,7 @@ exports.onSocialNotificationCreated = onDocumentCreated(
 // gönderimde). İşaretsiz mesaj (eski istemci) yok sayılır — onun push'u bildirim
 // belgesinden gelir. Ayrıntı: socialPush.js.
 exports.onDirectMessageCreated = onDocumentCreated(
-  "chats/{chatId}/messages/{msgId}",
+  { ...CAPACITY.trigger, document: "chats/{chatId}/messages/{msgId}" },
   async (event) => {
     const snap = event.data;
     if (!snap) return;
@@ -1567,7 +1575,7 @@ exports.onDirectMessageCreated = onDocumentCreated(
 );
 
 exports.onGroupMessageCreated = onDocumentCreated(
-  "groups/{groupId}/messages/{msgId}",
+  { ...CAPACITY.trigger, document: "groups/{groupId}/messages/{msgId}" },
   async (event) => {
     const snap = event.data;
     if (!snap) return;
@@ -1634,6 +1642,7 @@ async function commitUpdates(items) {
 
 exports.onUserProfileUpdated = onDocumentUpdated(
   {
+    ...CAPACITY.trigger,
     document: "Users/{uid}",
     timeoutSeconds: 540,
     memory: "512MiB",
@@ -1983,7 +1992,7 @@ function accumulateVoteDoc(acc, v) {
 }
 
 exports.onTournamentVoteWritten = onDocumentWritten(
-  "tournaments/{periodId}/votes/{voterUid}",
+  { ...CAPACITY.trigger, document: "tournaments/{periodId}/votes/{voterUid}" },
   async (event) => {
     const periodId = event.params.periodId;
     const before = event.data?.before?.exists ? event.data.before.data() : null;
@@ -2254,6 +2263,7 @@ async function processUserStreaming(userDoc, getProviders) {
 
 exports.dailyStreamingAvailability = onSchedule(
   {
+    ...CAPACITY.singleton,
     schedule: "0 18 * * *", // her gün 18:00
     timeZone: "Europe/Istanbul",
     secrets: [TMDB_API_KEY],
@@ -2395,6 +2405,7 @@ async function processUserDigest(userDoc, getDetails, window) {
 
 exports.weeklyReleaseDigest = onSchedule(
   {
+    ...CAPACITY.singleton,
     schedule: "0 10 * * 0", // her Pazar 10:00
     timeZone: "Europe/Istanbul",
     secrets: [TMDB_API_KEY],
@@ -2561,6 +2572,7 @@ async function archivePeriod(periodId, tournament) {
 
 exports.archiveTournamentWinners = onSchedule(
   {
+    ...CAPACITY.singleton,
     schedule: "30 3 * * *", // her gün 03:30 — ay dönümünü ertesi gün yakalar
     timeZone: "Europe/Istanbul",
     timeoutSeconds: 300,
@@ -2608,7 +2620,7 @@ exports.archiveTournamentWinners = onSchedule(
 // CineSwipe: wait until both devices have saved the final result locally.
 const { resultsDelivered, deleteDeliveredRoom, deleteExpiredRooms } = require("./cineRoomCleanup");
 exports.cleanupDeliveredCineRoom = onDocumentUpdated(
-  { document: "CineRooms/{roomId}", retry: true },
+  { ...CAPACITY.trigger, document: "CineRooms/{roomId}", retry: true },
   async (event) => {
     if (event.data?.after && resultsDelivered(event.data.after.data())) {
       await deleteDeliveredRoom(db, event.data.after.ref);
@@ -2618,7 +2630,7 @@ exports.cleanupDeliveredCineRoom = onDocumentUpdated(
 
 // Fallback for disconnected/abandoned clients (including legacy rooms).
 exports.cleanupExpiredCineRooms = onSchedule(
-  { schedule: "every 15 minutes", timeoutSeconds: 300, maxInstances: 1 },
+  { ...CAPACITY.singleton, schedule: "every 15 minutes", timeoutSeconds: 300 },
   async () => {
     const { Timestamp } = require("firebase-admin/firestore");
     await deleteExpiredRooms(db, Timestamp);

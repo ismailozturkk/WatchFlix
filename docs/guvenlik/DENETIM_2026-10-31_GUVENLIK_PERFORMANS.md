@@ -183,6 +183,17 @@ Firestore tek bir belgeye **sürdürülebilir ~1 yazma/sn** (kısa patlamalarda 
 ### 3.3 Fonksiyon tavanı
 `setGlobalOptions({ maxInstances: 10 })` (`index.js:89`) maliyet freni. gen2 eşzamanlılığıyla birlikte callable'ların eşzamanlı yürütme tavanını belirler. 10K eşzamanlı AI/OMDb çağrısı **sıraya girer/kısılır** — bu, kota tasarımıyla tutarlı (kötüye kullanımı sınırlar) ama "10K eşzamanlı AI isteği" senaryosunda yüksek gecikme/zaman aşımı beklenir. Yük testinde bu tavan açıkça modellenmeli (ve testte artırılmamalı — maliyet).
 
+> **Düzeltme (31 Eki, ÖLÇÜLDÜ — canlı yapılandırma, yük değil):** Cloud Functions v2 API'den salt-okunur okumaya göre
+> gen2 servislerin hepsi **1 vCPU + eşzamanlılık 80**. Gerçek tavan = instance × 80 → 10 instance ≈ **800 eşzamanlı
+> istek / fonksiyon**. Yukarıdaki "tavan throughput'u boğar" tahmini bu yüzden abartılıydı; tavan esas olarak maliyet ve
+> upstream kota frenidir. Asıl açık: gen1 `purgeOnAuthUserDeleted` global ayardan etkilenmiyordu (canlı tavan **3000**),
+> zamanlanmış toplu işler ise 10'da (eşzamanlı çift koşum mümkün). Uygulanan (T-PERF-2, `functions/capacity.js`):
+> ucuz callable'lar 20 · kotalı üçüncü taraf uçları (Gemini, OMDb, RevenueCat, Apple) 10 · tetikleyiciler 10 (gen1 dahil,
+> `runWith`) · zamanlanmış işler 1. Bekçi test: `functions/capacity.test.js`. Deploy EDİLMEDİ.
+> Fan-out (`onUserProfileUpdated`) doğrulandı: yalnız kimlik alanı değişince çalışıyor, hedef başına yalnız değişen
+> alanları yazıyor, 450'lik batch. Açık konu: ad/avatar değişikliğine bekleme süresi yok → sık değiştiren biri her
+> seferinde tüm mesaj/yorum geçmişini yeniden yazdırır (karar: ürün).
+
 ### 3.4 Okuma ölçeği
 Firestore okuma/dinleyici fan-out'u 10K ölçeğinde throughput açısından rahat; asıl kısıt **maliyet** ve yukarıdaki sıcak noktalardır. Kurallardaki `get()` çağrıları (ör. `isPaidPlan()`, `canReadLists()`, `groupMembers()`) her değerlendirmede faturalı okuma üretir → yoğun işlemlerde okuma maliyeti amplifikasyonu (hem performans hem maliyet notu).
 
@@ -283,7 +294,8 @@ testi dahil). Birim: 66/66 (dailyPoll + top100). Functions: 100 geçti / 0 başa
 10.000 eşzamanlı hedefi için **ön şart**: paylaşılan sayaçları (`DailyPolls`, `Top100Hype`, popüler `Ratings`, turnuva `agg`) ya **event-append + toplama** ya da **sharded counter (≥10 shard)** desenine taşı. Mevcut tek-belge sayaç, birkaç yüz eşzamanlı oyda bile kullanıcıya başarısız/çok yavaş yanıt verir.
 
 ### Henüz ölçülmeyen (staging B gerektirir)
-- Callable throughput + `maxInstances:10` + soğuk başlangıç (k6, upstream stub) — §4.3 senaryo 1-2.
+- Callable throughput + soğuk başlangıç (k6, upstream stub) — §4.3 senaryo 1-2. (Yapılandırma ölçüldü: §3.3 düzeltme
+  notu — 1 vCPU, eşzamanlılık 80; gecikme/p95 hâlâ ölçülmedi.)
 - Mesaj fan-out tetikleyici kuyruğu, RTDB presence — §4.3 senaryo 4-5.
 - Prod-benzeri gerçek gecikme/throughput (emülatör modellemez).
 
