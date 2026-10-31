@@ -29,17 +29,12 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-    collection,
-  query,
-  where,
-  limit,
-  getDocs,
   runTransaction,
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
 import { updateProfile } from "firebase/auth";
-import { auth, db } from "../firebase";
+import { auth, db, fns } from "../firebase";
 import { socialLinksDocRef } from "./socialLinksService";
 import { normalizeSocialLinks } from "../utils/socialLinks";
 import { clampAvatarIndex, CUSTOM_AVATAR_INDEX, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
@@ -129,27 +124,20 @@ export function formatUsernameInput(text) {
 }
 
 /**
- * Username arama — usernameLower üzerinden prefix sorgu.
- * Single-field index Firestore'da otomatik, ek ayar gerek yok.
+ * Kullanıcı adı ön-ek araması — `searchUsers` Cloud Function'ı (functions/userSearch.js).
+ * Users koleksiyonu istemciden artık LİSTELENMEZ (2026-10-31 denetimi H-1: liste izni herkesin kullanıcı tabanını
+ * kazımasına açıktı). Sunucu hız sınırlıdır ve tüm profil belgesi yerine yalnız arama kartının alanlarını döner:
+ * { uid, username, displayName, avatarIndex, photoURL }. Hata fırlatır (ekran "arama başarısız" durumunu çizer).
  */
 export async function searchUsersByUsername(searchTerm, { excludeUid, max = 20 } = {}) {
   const q = normalizeUsername(searchTerm);
   if (!q) return [];
-  const usersRef = collection(db, "Users");
-  const snap = await getDocs(
-    query(
-      usersRef,
-      where("usernameLower", ">=", q),
-      where("usernameLower", "<=", q + ""),
-      limit(max),
-    ),
-  );
-  const results = [];
-  snap.forEach((d) => {
-    if (d.id === excludeUid) return;
-    results.push({ uid: d.id, ...d.data() });
-  });
-  return results;
+  // Lazy require: bu modül saf JS testlerinde firebase/functions'ı yüklemesin (services/externalRatings ile aynı kalıp).
+  // eslint-disable-next-line global-require
+  const { httpsCallable } = require("firebase/functions");
+  const { data } = await httpsCallable(fns, "searchUsers")({ term: q });
+  const users = Array.isArray(data?.users) ? data.users : [];
+  return users.filter((user) => user?.uid && user.uid !== excludeUid).slice(0, max);
 }
 
 /**

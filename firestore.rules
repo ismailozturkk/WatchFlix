@@ -294,6 +294,11 @@ service cloud.firestore {
     // kök belgeye bu alanlar EKLENEMEZ/DEĞİŞTİRİLEMEZ (silmek hep serbest).
     // Testler anahtarın iki konumunu da dener (firestore.rules.test.js).
     function legacyRootAccountWrites() { return true; }
+    // ARAMA ANAHTARI (2026-10-31 denetimi H-1). true: sahadaki eski istemciler arkadaş aramasını Users
+    // koleksiyonunda doğrudan ön-ek sorgusuyla yapar (limit 20) — liste yalnız bu tek sayfalık sorguya açık.
+    // Tüm istemciler `searchUsers` callable'ına geçince false yap + rules deploy: Users hiç listelenemez.
+    // Testler anahtarın iki konumunu da dener (firestore.rules.test.js).
+    function legacyUserSearchList() { return true; }
     // Kökte artık durmaması gereken alanlar.
     function rootCreateWithoutPrivateFields() {
       return legacyRootAccountWrites()
@@ -422,7 +427,12 @@ service cloud.firestore {
       allow delete: if docId == 'links' && isOwner(uid);
     }
     match /Users/{uid} {
-      allow read: if isSignedIn();
+      // Tek profil (get) oturumlulara açık: profil kartı, arkadaş listesi, sohbet başlığı. TOPLU LİSTELEME (list)
+      // herkesin kullanıcı tabanını sayfalayıp kazımasına açıktı; arama artık `searchUsers` callable'ı
+      // (functions/userSearch.js: hız sınırlı, yalnız 5 alan). Eski istemciler için tek sayfa (≤ 20) sorgu,
+      // legacyUserSearchList() açıkken kalır; sınırsız ya da büyük sayfalı sorgu her durumda reddedilir.
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && legacyUserSearchList() && request.query.limit <= 20;
       // Sunucuya ait alanlar — istemci ne kendi belgesinde ne başkasınınkinde
       // yazabilir:
       //   • entitlements: RevenueCat planı (webhook + syncPremiumStatus).
@@ -1037,7 +1047,12 @@ service cloud.firestore {
 
     // ─── Usernames (uniqueness için reservation) ────────────────────────
     match /Usernames/{usernameLower} {
-      allow read: if true;       // checkUsername & arama için
+      // Tek kayıt herkese açık: kayıt ekranındaki "ad boşta mı?" denetimi oturum açılmadan yapılır. LİSTE kapalı
+      // (2026-10-31 denetimi): `read: if true` oturumsuz birinin bile tüm kullanıcı adı → uid eşlemesini
+      // dökmesine izin veriyordu. İstemci bu koleksiyonu hiç sorgulamaz (yalnız belge kimliğiyle okur); tek liste
+      // sorgusu hesap silme purge'unda, Admin SDK ile (functions/accountPurge.js).
+      allow get: if true;
+      allow list: if false;
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
       // Update yok — username değişimi delete+create transaction'ı.

@@ -69,6 +69,7 @@ const {
 const { createSocialPush } = require("./socialPush");
 const { sendExpoPushes } = require("./expoSend");
 const referral = require("./referral");
+const userSearch = require("./userSearch");
 const { purgeAccountData, PURGE_PHASES } = require("./accountPurge");
 const functionsV1 = require("firebase-functions/v1");
 
@@ -996,6 +997,30 @@ exports.revokeAppleAuthorization = onCall(
     }
   },
 );
+
+// ─── Arkadaş araması (searchUsers) ──────────────────────────────────────────
+// İstemci Users koleksiyonunu artık LİSTELEMEZ (firestore.rules → legacyUserSearchList, 2026-10-31 denetimi H-1);
+// kullanıcı adı ön-ek araması buradan, kullanıcı başına hız sınırıyla ve yalnız arama kartının beş alanıyla döner
+// (functions/userSearch.js). Sınır örnek içidir (dağıtık değil): betikli kazımayı yavaşlatır, ekranda dolmaz
+// (arama yazarken gecikmeli tetiklenir).
+const userSearchAllow = externalRatings.createRateLimiter({ limit: 30, windowMs: 60 * 1000 });
+
+exports.searchUsers = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  const term = userSearch.normalizeSearchTerm(request.data?.term);
+  if (!term) return { users: [] };
+  if (!userSearchAllow(request.auth.uid)) {
+    throw new HttpsError("resource-exhausted", "Too many searches", { reason: "RATE_LIMITED" });
+  }
+  // Bir fazla çekilir: arayan kendi adıyla eşleşip listeden çıkınca sonuç yine tam sayfa kalsın.
+  const snap = await db
+    .collection("Users")
+    .where("usernameLower", ">=", term)
+    .where("usernameLower", "<=", `${term}${userSearch.PREFIX_END}`)
+    .limit(userSearch.SEARCH_LIMIT + 1)
+    .get();
+  return { users: userSearch.pickResults(snap.docs, request.auth.uid) };
+});
 
 // ───────────────────────────────────────────────────────────────────────────
 // GEMINI PROXY (callGemini callable)

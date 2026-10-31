@@ -51,17 +51,25 @@
 ## P1 — Güvenlik (orta)
 
 ### T-SEC-1 — `Users` koleksiyonunda toplu listelemeyi kapat (H-1)
+> **DURUM: KOD TAMAM (2026-10-31), DEPLOY BEKLİYOR.** DİKKAT — ilk yazımdaki "arama Usernames koleksiyonundan
+> yapılıyor" varsayımı YANLIŞTI: `services/userService.searchUsersByUsername` Users'ı doğrudan listeliyordu.
+> Uygulanan: `searchUsers` callable (`functions/userSearch.js`, 30/dk/uid, 5 alan, ≤ 20 sonuç); istemci araması
+> callable'a geçti; kural `Users` → `get` açık, `list` yalnız `legacyUserSearchList()` + `request.query.limit <= 20`;
+> `Usernames` → `get: true`, `list: false` (oturumsuz kullanıcı adı→uid dökümü kapandı, H-1b).
+> **Yayın sırası:** functions → istemci → eski sürümler bitince `legacyUserSearchList()` = false + rules deploy.
+> Kalan: anahtarı kapatma zamanı (eski sürüm oranına bağlı) kullanıcı kararı; cihazda arama denenmedi.
+
 **KONUM:** `firestore.rules:424-425`.
 **SORUN:** `allow read: if isSignedIn()` → `list` açık; oturumlu saldırgan tüm kullanıcı tabanını (profil + plan) kazıyabilir.
-**YAPILACAK:**
+**YAPILACAK (ilk plan — yukarıdaki durum notu geçerlidir):**
 ```
 match /Users/{uid} {
   allow get:  if isSignedIn();
-  allow list: if false;   // arama Usernames koleksiyonundan yapılıyor
+  allow list: if false;
   ... (create/update/delete aynı kalır)
 }
 ```
-İstemcide `Users` üzerinde koleksiyon sorgusu (getDocs/where) var mı tara (`services/`, `screens/`); varsa `Usernames` ya da callable'a taşı.
+İstemcide `Users` üzerinde koleksiyon sorgusu (getDocs/where) var mı tara (`services/`, `screens/`); varsa callable'a taşı.
 **KABUL KRİTERİ:** Yeni kural testi: oturumlu kullanıcı `list(Users)` reddedilir, `get(Users/{uid})` geçer. İstemci hiçbir yerde `Users` koleksiyonunu sorgulamıyor. `npm run test:rules` yeşil.
 
 ### T-SEC-2 — App Check'i callable'larda kademeli zorunlu kıl (H-2)

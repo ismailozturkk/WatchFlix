@@ -46,9 +46,15 @@ Yani 10.000 kullanıcı hedefinde, yüzlerce kişi aynı ankete oy verirse çoğ
 
 **Neden önemli:** E-posta ve doğum tarihi zaten gizli (iyi). Ama bir rakip ya da kötü niyetli biri tüm kullanıcı tabanını kopyalayabilir (veri kazıma).
 
-**Ne yapılmalı:** "Tek bir profili aç" serbest kalsın, "hepsini birden listele" kapatılsın. Arama zaten ayrı bir yerden çalışıyor, etkilenmez.
+**Ne yapılmalı:** "Tek bir profili aç" serbest kalsın, "hepsini birden listele" kapatılsın.
 
-**Zorluk/risk:** Düşük iş, düşük risk. Küçük bir kural değişikliği + test.
+**Zorluk/risk:** ~~Düşük iş, düşük risk. Arama zaten ayrı bir yerden çalışıyor, etkilenmez.~~ **Bunu yanlış yazmıştım — düzeltme:** arkadaş araması tam da bu toplu listeleme izniyle çalışıyordu; listeyi düz kapatsaydık arama bozulurdu. O yüzden iş orta ölçekli çıktı.
+
+> ✅ **YAPILDI (31 Ekim) — yayına alınmayı bekliyor.**
+> - Arama artık sunucudaki yeni bir fonksiyon üzerinden çalışıyor: dakikada en fazla 30 arama, sonuçta yalnız ad / kullanıcı adı / avatar görünüyor (eskiden plan bilgisi gibi gereksiz alanlar da geliyordu).
+> - Ek bulgu: kullanıcı adları listesi, **giriş yapmamış** birine bile tümüyle açıktı — kapatıldı. "Bu ad boşta mı?" kontrolü çalışmaya devam ediyor.
+> - Eski uygulama sürümleri aramaya devam edebilsin diye liste şimdilik yalnız "tek sayfa (20 kişi)" sorgusuna açık. Eski sürümler kalmayınca tek satırlık bir anahtarla tamamen kapatılacak — **ne zaman kapatılacağı senin kararın.**
+> - **Yayın sırası:** önce sunucu fonksiyonları, sonra uygulama; anahtarı kapatmak en sonda.
 
 ---
 

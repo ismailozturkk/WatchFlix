@@ -51,15 +51,17 @@ Sunucusuz, **istemci-doğrudan Firebase** mimarisi:
 **Yer:** `firestore.rules:424-425` — `match /Users/{uid} { allow read: if isSignedIn(); }`
 **Sorun:** Firestore'da `read` = `get` + `list`. Kural `list`'i de açtığı için, oturum açmış herhangi bir kullanıcı `getDocs(collection(db,'Users'))` ile **tüm kullanıcıların** kök profil belgesini sayfalayarak çekebilir: `displayName`, `username`, `photoURL`, `avatarIndex`, sayaçlar, `privacy`, `fourFavorites`, `showcaseBadges` ve **`entitlements` (plan bilgisi)**. Kayıt açık olduğundan (e-posta/Google/Apple) saldırgan bir hesap açıp tüm kullanıcı tabanını kazıyabilir.
 **Not:** E-posta ve doğum tarihi zaten `private/account`'a taşınmış (iyi); sızan veri "profil" verisiyle sınırlı. Yine de toplu kazıma, tek tek `get` ile profil okumadan farklıdır.
-**Öneri:** Profil araması zaten `Usernames` koleksiyonundan yapılıyor. `Users` için `get` ve `list`'i ayır:
-```
-match /Users/{uid} {
-  allow get:  if isSignedIn();
-  allow list: if false;   // ya da sorgu bazlı sıkı sınır
-  ...
-}
-```
-Bir yere toplu liste gerekiyorsa (ör. yönetim) onu callable üzerinden ver.
+**Öneri (ilk sürüm — YANLIŞTI, düzeltildi):** Bu bölümün ilk hâli "profil araması zaten `Usernames` koleksiyonundan yapılıyor, `list: false` aramayı etkilemez" diyordu. **Doğru değil:** arkadaş araması (`services/userService.searchUsersByUsername` → `SearchFriendsScreen`) `Users` koleksiyonunu doğrudan ön-ek sorgusuyla listeliyordu ve üstelik **tüm profil belgesini** (plan bilgisi dahil) döndürüyordu. Düz `list: false` aramayı kırardı.
+
+**Ek bulgu (H-1b):** `Usernames` kuralı `allow read: if true` idi — `list` dahil, **oturum açmamış** biri bile tüm kullanıcı adı → uid eşlemesini dökebiliyordu (sonra her uid için `get(Users/{uid})` ile profil). İstemci bu koleksiyonu hiç listelemiyor.
+
+**Uygulanan (2026-10-31):**
+- Yeni `searchUsers` callable'ı (`functions/userSearch.js` + `index.js`): oturum zorunlu, kullanıcı başına 30/dk hız sınırı, terim doğrulama (`[a-z0-9_]{1,20}`), en fazla 20 sonuç, **yalnız 5 alan** (`uid, username, displayName, avatarIndex, photoURL`). İstemci arama bunu çağırıyor.
+- `Users`: `get` oturumluya açık; `list` yalnız `legacyUserSearchList()` açıkken ve `request.query.limit <= 20` iken (sahadaki eski sürümlerin aramasını kırmamak için). Sınırsız ya da büyük sayfalı sorgu her durumda reddedilir. Eski sürümler emekliye ayrılınca anahtar `false` + rules deploy → `Users` hiç listelenemez.
+- `Usernames`: `get: if true` (kayıt ekranı oturumsuz kontrol eder), `list: if false`.
+- Kalan risk (anahtar açıkken): oturumlu biri 20'lik sayfalarla ön-ek taraması yapabilir — tek sorguda toplu döküm kapandı ama tam kapanış anahtarın kapanmasıyla olur.
+
+Yayın sırası: functions (`searchUsers`) → istemci → (eski sürümler bitince) anahtar `false` + rules. `Usernames` ve `limit ≤ 20` kısıtı geriye uyumlu, ilk rules deploy'uyla hemen gidebilir.
 
 ### H-2 — App Check hiçbir fonksiyonda zorunlu değil (Orta)
 **Yer:** `firebase.js:33` (istemci App Check init) vs `functions/index.js:1124` (`enforceAppCheck: false`), `index.js:1230` (aynı), diğer callable'larda ayar hiç verilmemiş (varsayılan `false`).

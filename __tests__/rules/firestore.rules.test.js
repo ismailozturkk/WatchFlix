@@ -2363,3 +2363,78 @@ describe("Ratings — increment'li toplu yazım (services/ratingsService)", () =
     expect((await getDoc(doc(alice, "Ratings", KEY))).data()).toMatchObject({ count: 30, sum: 150 });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Users / Usernames toplu listeleme (2026-10-31 denetimi H-1): tek profil okunur, kullanıcı tabanı dökülemez.
+// Arama `searchUsers` callable'ında (Admin SDK, kural dışı); kuralda eski istemcinin tek sayfalık ön-ek sorgusu
+// legacyUserSearchList() açıkken kalır.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Users / Usernames listeleme (H-1)", () => {
+  const { limit } = require("firebase/firestore");
+  /** services/userService'in ESKİ arama sorgusu (n = limit; null = limitsiz). */
+  const prefixQuery = (db, n, prefix = "a") => {
+    const parts = [where("usernameLower", ">=", prefix), where("usernameLower", "<=", `${prefix}\uf8ff`)];
+    return query(collection(db, "Users"), ...parts, ...(n === null ? [] : [limit(n)]));
+  };
+  beforeEach(() =>
+    seed(async (db) => {
+      await setDoc(doc(db, "Users", ALICE), { uid: ALICE, username: "alice", usernameLower: "alice", displayName: "Alice" });
+      await setDoc(doc(db, "Usernames", "alice"), { uid: ALICE });
+    }),
+  );
+
+  test("tek profil oturumluya okunur, oturumsuza okunmaz", async () => {
+    await assertSucceeds(getDoc(doc(bob, "Users", ALICE)));
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), "Users", ALICE)));
+  });
+
+  test("anahtar açıkken eski istemcinin tek sayfalık (≤ 20) arama sorgusu geçer", async () => {
+    const snap = await assertSucceeds(getDocs(prefixQuery(bob, 20)));
+    expect(snap.size).toBe(1);
+    await assertSucceeds(getDocs(prefixQuery(bob, 5)));
+  });
+
+  test("sınırsız, büyük sayfalı ve oturumsuz liste reddedilir (toplu döküm yok)", async () => {
+    await assertFails(getDocs(prefixQuery(bob, null)));
+    await assertFails(getDocs(prefixQuery(bob, 21)));
+    await assertFails(getDocs(collection(bob, "Users")));
+    await assertFails(getDocs(query(collection(bob, "Users"), limit(500))));
+    await assertFails(getDocs(prefixQuery(testEnv.unauthenticatedContext().firestore(), 20)));
+  });
+
+  test("Usernames: tek kayıt oturumsuza bile açık (ad boşta mı?), liste kimseye açık değil", async () => {
+    const anon = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(anon, "Usernames", "alice")));
+    await assertSucceeds(getDoc(doc(anon, "Usernames", "bosta_bir_ad")));
+    await assertFails(getDocs(collection(anon, "Usernames")));
+    await assertFails(getDocs(collection(bob, "Usernames")));
+    await assertFails(getDocs(query(collection(bob, "Usernames"), where("uid", "==", ALICE))));
+  });
+
+  describe("anahtar kapalı (legacyUserSearchList = false)", () => {
+    let strictEnv;
+    beforeAll(async () => {
+      const source = fs.readFileSync(path.join(__dirname, "..", "..", "firestore.rules"), "utf8");
+      const strict = source.replace(/(function legacyUserSearchList\(\) \{ return )true;/, "$1false;");
+      // Çeviri sessizce tutmazsa bu blok hiçbir şeyi kanıtlamaz.
+      expect(strict).not.toBe(source);
+      strictEnv = await initializeTestEnvironment({
+        projectId: "seelogd-rules-test-search",
+        firestore: { rules: strict, host: "127.0.0.1", port: 8085 },
+      });
+    });
+    afterAll(async () => {
+      if (strictEnv) await strictEnv.cleanup();
+    });
+
+    test("Users hiç listelenemez (tek sayfa bile); tek profil okunmaya devam eder", async () => {
+      await strictEnv.clearFirestore();
+      await strictEnv.withSecurityRulesDisabled((ctx) =>
+        setDoc(doc(ctx.firestore(), "Users", ALICE), { uid: ALICE, usernameLower: "alice" }),
+      );
+      const sBob = strictEnv.authenticatedContext(BOB).firestore();
+      await assertFails(getDocs(prefixQuery(sBob, 20)));
+      await assertSucceeds(getDoc(doc(sBob, "Users", ALICE)));
+    });
+  });
+});
