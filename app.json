@@ -2,7 +2,7 @@
   "expo": {
     "name": "Seelogd",
     "slug": "seelogd",
-    "version": "1.4.9",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon_default/icon.png",
     "userInterfaceStyle": "automatic",
