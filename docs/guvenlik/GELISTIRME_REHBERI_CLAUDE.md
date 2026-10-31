@@ -1,0 +1,118 @@
+# Geliştirme Rehberi — Claude Code (ajan için)
+
+**Kaynak:** `docs/guvenlik/DENETIM_2026-10-31_GUVENLIK_PERFORMANS.md`
+**Biçim:** Her görev bağımsız uygulanabilir. Sıra önem derecesine göredir. Her görevde: KONUM · SORUN · YAPILACAK · KABUL KRİTERİ.
+**Kurallar:**
+- `firestore.rules` değişiklikleri `__tests__/rules/` emülatör testleriyle kanıtlanmalı (`npm run test:rules`). Emülatör JDK 21 ister; bu makinede `JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"`.
+- Kural/istemci parite testleri varsa (örn. `feedbackRulesParity`, `aiRequestLimits`) ikisi birlikte güncellenmeli.
+- Prod projesi `movieandtv-2832a`. Hiçbir test/deploy onay olmadan prod'a gitmez.
+- Her görev ayrı commit; mesaj TR, sonunda `Co-Authored-By` satırı (bkz. repo attribution).
+
+---
+
+## P0 — Performans sıcak noktaları (ölçümle kanıtlı, 10K ön şartı)
+
+### T-PERF-1 — Tek-belge sayaçları dağıt (DailyPolls / Top100Hype / Ratings / turnuva agg)
+> **DURUM: KOD TAMAM (2026-10-31), DEPLOY BEKLİYOR.** Uygulanan (tercih edilen desen yerine belge başına uygun olan):
+> DailyPolls → 10 parçalı sayaç `shards/{0-9}` + increment'li toplu yazım (eski gün-belgesi yolu geriye uyum için açık,
+> çift sayım kuralda kapalı); Top100Hype → transaction yerine increment'li toplu yazım (`count` sıralama sorgusunda,
+> parçalanamaz); Ratings → increment'li toplu yazım + bayat farkta tek yeniden deneme; turnuva agg → kör `update`,
+> transaction yalnız ilk-yazımda. Ölçüm: denetim §5 "Ölçüm 3". **Yayın sırası: önce `firestore.rules` + functions
+> deploy, sonra istemci** (yeni istemci yeni kural olmadan oy yazamaz). Deploy kararı kullanıcıda.
+> Kalan: cihazda iki cihazla gerçek oylama; eski sayaç verisi göçü GEREKMİYOR (okuma iki kaynağı topluyor).
+**KONUM:**
+- `firestore.rules:1717` `DailyPolls/{dayKey}` (a/b sayaç) + `rules:1751` `votes/{uid}`
+- `firestore.rules:1773` `Top100Hype/{mediaKey}.count` + `rules:1801` `votes/{uid}`
+- `firestore.rules:836` `Ratings/{mediaKey}` (count/sum)
+- `functions/index.js:1967` `onTournamentVoteWritten` → `tournaments/{id}/agg/tallies`
+- İstemci: `services/top100Service.js`, `utils/dailyChallenge*`, `services/ratingsService.js`
+
+**SORUN (ölçüldü, emülatör):** Tek sayaç belgesine eşzamanlı yazma çöküyor — 100 eşzamanlıda 3/100, 1.000'de 1/1000 başarılı (gerisi transaction abort). Ayrı belgeye yazınca 1.000/1.000 başarılı, p95≈46ms. Kaynak: denetim §5.
+
+**YAPILACAK (desen seçimi tutarlı olmalı — tüm sayaçlar aynı desene):**
+1. **Tercih edilen — event-append + tetikleyici toplama:** İstemci yalnız kendi oy belgesini yazar (zaten var: `DailyPolls/{gün}/votes/{uid}`, `Top100Hype/{m}/votes/{uid}`). Toplam sayaç istemci tarafından DEĞİL, `onDocumentWritten` tetikleyicisiyle **N parçalı shard'a** (`.../agg/shard_{0..9}`) yazılır. İstemci okurken shard'ları toplar.
+2. `firestore.rules`'tan istemcinin sayaç belgesine yazma iznini kaldır (sayaç artık yalnız Admin SDK/tetikleyici). Oy belgesi kuralları (tek oy, değiştirilemez) kalır.
+3. Turnuva `agg` zaten tetikleyiciyle yazılıyor (`onTournamentVoteWritten`); onu da tek `tallies` belgesinden shard'lı yapıya geçir (fan-in çekişmesini kaldır).
+4. İstemci toplam okuma yardımcıları (`utils/`): shard toplama fonksiyonu + testi.
+
+**KABUL KRİTERİ:**
+- `load-test/firestore-hotspot-harness.mjs` benzeri koşumda yeni desen 1.000 eşzamanlı oyda ≥%99 başarı (emülatör), çöküş yok.
+- `npm run test:rules` yeşil; istemcinin artık sayaç belgesine doğrudan yazamadığını doğrulayan yeni kural testi eklendi.
+- Eski sayaç verisi için göç/migration notu (`docs/`); okuma tarafı eski tek-belge + yeni shard'ı geriye dönük okuyabilir.
+
+### T-PERF-2 — `maxInstances` ve fan-out maliyetini açık yönet
+**KONUM:** `functions/index.js:89` (`setGlobalOptions({ maxInstances: 10 })`), `index.js:1610` `onUserProfileUpdated`.
+**SORUN:** Global 10 instance tavanı yük altında callable throughput'unu sınırlar; profil fan-out bir düzenlemeyi ~15 yüzeye yayar.
+**YAPILACAK:** Maliyet-kritik olmayan callable'lara (`getReferralOverview`, `syncPremiumStatus`) daha yüksek per-fonksiyon `maxInstances`; AI/OMDb'de düşük bırak (kota zaten frenliyor). Fan-out'u batch ve değişiklik-varsa-yaz ile sınırla (zaten kısmen var — doğrula). Karar gerekçesini yorum olarak yaz.
+**KABUL KRİTERİ:** Her callable'ın `maxInstances`'ı bilinçli ayarlı; staging k6 ile p95 ölçülüp denetim §5'e eklendi.
+
+---
+
+## P1 — Güvenlik (orta)
+
+### T-SEC-1 — `Users` koleksiyonunda toplu listelemeyi kapat (H-1)
+**KONUM:** `firestore.rules:424-425`.
+**SORUN:** `allow read: if isSignedIn()` → `list` açık; oturumlu saldırgan tüm kullanıcı tabanını (profil + plan) kazıyabilir.
+**YAPILACAK:**
+```
+match /Users/{uid} {
+  allow get:  if isSignedIn();
+  allow list: if false;   // arama Usernames koleksiyonundan yapılıyor
+  ... (create/update/delete aynı kalır)
+}
+```
+İstemcide `Users` üzerinde koleksiyon sorgusu (getDocs/where) var mı tara (`services/`, `screens/`); varsa `Usernames` ya da callable'a taşı.
+**KABUL KRİTERİ:** Yeni kural testi: oturumlu kullanıcı `list(Users)` reddedilir, `get(Users/{uid})` geçer. İstemci hiçbir yerde `Users` koleksiyonunu sorgulamıyor. `npm run test:rules` yeşil.
+
+### T-SEC-2 — App Check'i callable'larda kademeli zorunlu kıl (H-2)
+**KONUM:** `functions/index.js:1124` (`callGemini` `enforceAppCheck:false`), `index.js:1230` (`getExternalRatings`), `index.js:89` (global), istemci `firebase.js:33` + `services/appCheck.js`.
+**SORUN:** İstemci App Check jetonu üretiyor ama sunucu doğrulamıyor; cihaz doğrulaması fiilen kapalı.
+**YAPILACAK:** Önce staging'de `callGemini`, `getExternalRatings`, `redeemCode`'da `enforceAppCheck: true` yap; Play Integrity sahada stabil doğrulandıktan sonra prod. Debug/CI için App Check debug token akışını belgele.
+**KABUL KRİTERİ:** Belirtilen callable'lar App Check jetonu olmadan `unauthenticated`/`failed-precondition` döndürüyor; gerçek istemci etkilenmiyor (staging cihaz testi). Rollback planı yazılı.
+
+### T-SEC-3 — Firestore/RTDB App Check enforcement'ı doğrula (M-3)
+**KONUM:** Firebase Console (kodda görünmez).
+**YAPILACAK:** Console → App Check → Firestore/RTDB/Functions "Monitor→Enforce" durumunu kontrol et; `docs/`'a mevcut durumu ve hedefi yaz.
+**KABUL KRİTERİ:** `docs/guvenlik/` altında enforcement durum notu + planlanan geçiş tarihi.
+
+### T-SEC-4 — TMDB jetonu stratejisi (M-1)
+**KONUM:** `services/cineswipe/cineswipeService.js:52`, `services/dataDownloader.js:57`, `services/import/tmdbResolver.js:24`, `services/tournamentService.js:38`, `context/AppSettingsContext.js:75`.
+**SORUN:** TMDB v4 okuma jetonu istemci paketine gömülü (çıkarılabilir).
+**YAPILACAK (karar gerektirir — kullanıcıya sor):** (a) Kabul et + jeton rotasyonu/anomali izleme belgele, YA DA (b) TMDB'yi önbellekli bir Cloud Function proxy arkasına al (Gemini/OMDb deseniyle aynı; `functions/` + `defineSecret("TMDB_API_KEY")` zaten var).
+**KABUL KRİTERİ:** Seçilen yol belgeli; (b) seçilirse istemci TMDB çağrıları proxy'den geçiyor ve `EXPO_PUBLIC_API_KEY` paketten kalkıyor.
+
+---
+
+## P2 — Güvenlik (düşük) ve hijyen
+
+### T-SEC-5 — waitlist/beta e-posta oracle'ı (L-1)
+**KONUM:** `firestore.rules:80-115`.
+**YAPILACAK:** `allow get: if true`'yu kaldırıp "zaten kayıtlı mı" kontrolünü bir callable'a taşı (ya da kabul edilen risk olarak belgele). Düşük öncelik.
+**KABUL KRİTERİ:** Karar belgeli; değiştiyse landing akışı bozulmadan çalışıyor (`website/`).
+
+### T-SEC-6 — İmza anahtarı + `.env` hijyeni (L-2)
+**KONUM:** Kök: `@smlztrk__seelogd.jks`, `.env`, `.env.local`.
+**YAPILACAK:** `.jks`'i depo dışına (EAS credentials / parola yöneticisi) taşı; depo paylaşımında bu dosyaları dışarıda bırak. `.gitignore` zaten kapsıyor (doğrulandı) — ek olarak README'ye "repo'yu zip'lerken hariç tut" notu.
+**KABUL KRİTERİ:** `.jks` depo kökünde durmuyor ya da taşınma planı belgeli; git takibinde olmadığı teyitli.
+
+---
+
+## P3 — Yük testi altyapısı (ertelenen ölçümler)
+
+### T-LOAD-1 — k6 + staging ile callable/fan-out/presence senaryoları
+**KONUM:** `load-test/` (iskeletler hazır), `.firebaserc` (tek proje — M-2).
+**SORUN:** k6 bu makinede kurulu değil; anlamlı throughput için izole staging + upstream stub şart.
+**YAPILACAK:**
+1. Ayrı Blaze projesi (örn. `movieandtv-staging`); `.firebaserc`'a `staging` alias.
+2. `functions/`'a `FUNCTIONS_TEST=1` bayrağı: Gemini/OMDb/TMDB/RevenueCat çağrılarını sabit/sahte yanıta kısa devre.
+3. k6 kur; `load-test/k6-callables.js`'i staging'e yönelt; §4.3 senaryo 1-2 + fan-out + RTDB presence.
+**KABUL KRİTERİ:** 100/1k/5k/10k kademelerinde p50/p95/p99, hata oranı, instance/cold-start ölçüldü; denetim §5'e "measured (staging)" olarak eklendi. Prod'a hiç dokunulmadı.
+
+---
+
+## Uygulama sırası (özet)
+1. T-PERF-1 (en kritik, ölçümle kanıtlı)
+2. T-SEC-1, T-SEC-2, T-SEC-3
+3. T-PERF-2, T-SEC-4 (kullanıcı kararı)
+4. T-SEC-5, T-SEC-6
+5. T-LOAD-1 (staging kurulunca)
