@@ -146,6 +146,15 @@ saklanmalıdır (bkz. `docs/guvenlik/DENETIM_2026-10-31_GUVENLIK_PERFORMANS.md` 
 
 ---
 
+## 🤖 Yapay zekâ asistanıyla çalışma
+
+Projede birden fazla asistan dönüşümlü çalışıyor. Devralan asistanın ilk okuyacağı dosya:
+
+> **`docs/DEVAM.md`** — projedeki durum, çalışma ağacı ve commit kuralları, test komutları,
+> sıradaki iş ve projeye özgü tuzaklar.
+
+---
+
 ## 📚 Dokümantasyon
 
 Projenin kapsamlı mimari ve teknik dokümanları `docs/` klasöründe yer almaktadır:
