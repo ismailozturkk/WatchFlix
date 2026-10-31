@@ -69,7 +69,6 @@ import {
 import { trackFirestoreRead } from "../../services/usageTrackerService";
 import { useTheme } from "@context/ThemeContext";
 import { alpha } from "../../theme/colors";
-import LottieView from "lottie-react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -92,14 +91,7 @@ import { respondMatchingInvitations } from "@services/notificationsService";
 import { inviteResponsePatch } from "@services/chatInviteService";
 import { applyReceipts, newestIncoming, shouldMarkRead } from "@utils/chatReceipts";
 import { createMessagePager } from "@services/chatMessagePager";
-import { isOnlineVisible } from "@services/presenceService";
-import {
-  createTypingController,
-  enterChat,
-  leaveChat,
-  setTyping,
-  subscribeChatMeta,
-} from "@services/chatRtdb";
+import { enterChat, leaveChat } from "@services/chatRtdb";
 import { enterActiveChat } from "@services/activeChatTracker";
 import { dismissChatNotifications } from "@services/pushNotificationsService";
 import { useIsFocused } from "@react-navigation/native";
@@ -126,7 +118,6 @@ import { toast } from "@components/AppToast";
 import MessageBubble, { openMediaDetail } from "@components/chat/MessageBubble";
 import SharedListSheet from "@components/chat/SharedListSheet";
 import ChatHeader, { CHAT_HEADER_AVATAR_SIZE } from "@components/chat/ChatHeader";
-import BounceIn from "@components/chat/BounceIn";
 import useReduceMotion from "../../hooks/useReduceMotion";
 import useAppActive from "../../hooks/useAppActive";
 import useDecorVisibility from "../../hooks/useDecorVisibility";
@@ -513,7 +504,6 @@ export default function ChatScreen({ route, navigation }) {
   const flatListRef = useRef();
   const pagerRef = useRef(null);           // imleçli mesaj sayfaları (chatMessagePager)
   const scrollRetryRef = useRef(0);        // scrollToIndex yeniden deneme sayacı
-  const typingCtrlRef    = useRef(null);   // "yazıyor" bayrağı (ilk tuşta yaz, boşta kapat)
   const messageInputRef  = useRef(null);
   const searchInputRef   = useRef(null);   // arama input — modal açıldıktan SONRA odakla
   const pendingComposerRef = useRef(null); // "search" | "poll"
@@ -752,10 +742,6 @@ export default function ChatScreen({ route, navigation }) {
     // İlk mesaj snapshot'ı geldi mi? Yüklenmeden önceki boş liste "boş sohbet"
     // sayılmasın ki ilk yükleme yeni mesaj animasyonu tetiklemesin.
     loaded: false,
-    friendTyping: false,
-    friendIsOnline: false,
-    friendInChat: false,
-    friendPresence: null,
   });
 
   // threadId: grup → groupId; 1-1 → sıralı uid'ler. Koleksiyon kökü de moda göre.
@@ -836,30 +822,14 @@ export default function ChatScreen({ route, navigation }) {
   const appActive = useAppActive();
   const isViewing = isFocused && appActive;
 
-  // "Yazıyor" bayrağı: ilk tuşta hemen yazılır, 4 sn hareketsizlikte / gönderince /
-  // odak kaybında kapanır (services/chatSignals.js). Grupta typing yok.
-  useEffect(() => {
-    if (isGroup) return undefined;
-    const ctrl = createTypingController({
-      send: (value) => setTyping(chatId, currentUser.uid, value),
-    });
-    typingCtrlRef.current = ctrl;
-    return () => {
-      ctrl.stop();
-      if (typingCtrlRef.current === ctrl) typingCtrlRef.current = null;
-    };
-  }, [isGroup, chatId, currentUser.uid]);
-
-  // Çevrimiçi/typing/inChat (RTDB) yalnızca 1-1 modunda. Grupta per-üye presence
-  // gösterilmez (üye sayısı header'da). enterChat/leaveChat sadece 1-1.
-  // Sunucu push'u bu bayrağa bakıp mesajı atlıyor (functions/index.js).
+  // "Sohbette" bayrağı (RTDB inChat) yalnızca 1-1 modunda ve yalnız SUNUCU için:
+  // push bu bayrağa bakıp açık sohbetin mesajını atlıyor (functions/index.js).
+  // Çevrimiçi / Sohbette / yazıyor GÖSTERGELERİ 1 Kas 2026'da kaldırıldı (kullanıcı
+  // kararı); bu yazım görünmez, bildirimi susturmak için kalıyor.
   useEffect(() => {
     if (isGroup || !isViewing) return undefined;
     enterChat(chatId, currentUser.uid);
     return () => {
-      // Görünmez olunca "yazıyor" da kapanmalı: denetleyici bayrağı hâlâ açık
-      // sanırsa dönüşteki ilk tuş hiç yazılmazdı.
-      typingCtrlRef.current?.stop();
       leaveChat(chatId, currentUser.uid);
     };
   }, [isGroup, isViewing, chatId, currentUser.uid]);
@@ -986,53 +956,17 @@ export default function ChatScreen({ route, navigation }) {
   }, [messagesRef, chatId]);
 
   useEffect(() => {
-    // Grup: doc'u dinle (header + memberInfo). 1-1: typing + presence.
-    let unsubMeta = () => {};
+    // Grup: doc'u dinle (header + memberInfo). 1-1: arkadaşın kimliği (ad/avatar).
     let unsubFriendProfile = () => {};
     let unsubGroup = () => {};
     if (isGroup) {
       unsubGroup = subscribeGroup(groupId, (g) => setGroupData(g));
     } else {
-      // Arkadaşın privacy.onlineStatus tercihi sohbette de geçerli: "none"
-      // seçtiyse yeşil nokta, "Sohbette" VE son görülme gizlenir ("yazıyor"
-      // sohbet içi etkileşim olduğundan gizlenmez). 1-1 sohbet arkadaşlar
-      // arası olduğundan viewerIsFriend=true. Privacy yüklenene dek çevrimdışı
-      // varsayılır (anlık "çevrimiçi" sızıntısı olmasın); okuma başarısızsa
-      // varsayılan (görünür) davranışa düşülür.
-      let friendPrivacy = null;
-      let privacyReady = false;
-      let lastPresence = null;
-      let lastInChat = false;
-      const applyPresence = () => {
-        if (!privacyReady) return;
-        const hidden = friendPrivacy?.onlineStatus === "none";
-        setChatData((prev) => ({
-          ...prev,
-          friendIsOnline: isOnlineVisible(lastPresence, friendPrivacy, {
-            viewerIsFriend: true,
-          }),
-          friendInChat: !hidden && lastInChat,
-          friendPresence: hidden ? null : lastPresence,
-        }));
-      };
-      // typing/inChat yalnız arkadaşın bağlantısı CANLIYSA true gelir (bkz.
-      // services/chatRtdb.js): uygulamayı kapatan kullanıcı takılı kalmaz.
-      unsubMeta = subscribeChatMeta(chatId, friendUid, (meta) => {
-        lastPresence = meta.presence;
-        lastInChat = meta.inChat;
-        setChatData((prev) =>
-          prev.friendTyping === meta.typing
-            ? prev
-            : { ...prev, friendTyping: meta.typing },
-        );
-        applyPresence();
-      });
       unsubFriendProfile = onSnapshot(
         doc(db, "Users", friendUid),
         (snap) => {
           trackFirestoreRead("Users", 1);
           const data = snap.data() || {};
-          friendPrivacy = data.privacy || null;
           setFriendIdentity((prev) => ({
             displayName: data.displayName || prev.displayName,
             username: data.username || "",
@@ -1042,22 +976,16 @@ export default function ChatScreen({ route, navigation }) {
                 : prev.avatarIndex,
             photoURL: data.photoURL || null,
           }));
-          privacyReady = true;
-          applyPresence();
         },
-        () => {
-          privacyReady = true;
-          applyPresence();
-        },
+        () => {},
       );
     }
 
     return () => {
-      unsubMeta();
       unsubFriendProfile();
       unsubGroup();
     };
-  }, [isGroup, groupId, chatId, friendUid]);
+  }, [isGroup, groupId, friendUid]);
 
   // Okundu işaretleri (1-1): sohbet belgesindeki readAt.{uid} — iki tarafın da
   // gördüğü en yeni gelen mesajın zamanı (utils/chatReceipts.js). Sohbet belgesi
@@ -1141,8 +1069,6 @@ export default function ChatScreen({ route, navigation }) {
     }).start();
   };
   const handleInputBlur = () => {
-    // Odak gidince "yazıyor" kapanır (metin kutuda kalsa bile).
-    typingCtrlRef.current?.stop();
     Animated.timing(inputBorderAnim, {
       toValue: 0,
       duration: 200,
@@ -1535,17 +1461,12 @@ export default function ChatScreen({ route, navigation }) {
     (value) => {
       setText(value);
       setTextLink(isLink(value));
-      // Grupta typing göstergesi yok (denetleyici oluşturulmaz). İlk tuşta hemen
-      // yazılır, hareketsizlikte kapanır (services/chatSignals.js).
-      typingCtrlRef.current?.input(value.length > 0);
     },
     [isLink],
   );
 
   const sendMessage = useCallback(async () => {
     if (text.trim() === "") return;
-    // Gönderince "yazıyor" hemen kapanır.
-    typingCtrlRef.current?.stop();
     const outgoing = text;
     const replySnapshot = replyingTo;
 
@@ -2535,16 +2456,7 @@ export default function ChatScreen({ route, navigation }) {
             />
           )
         }
-        status={
-          isGroup
-            ? null
-            : {
-                typing: chatData.friendTyping,
-                inChat: chatData.friendInChat,
-                online: chatData.friendIsOnline,
-                presence: chatData.friendPresence,
-              }
-        }
+        username={isGroup ? null : friendIdentity?.username || null}
         memberNames={groupMemberNames}
         memberCount={groupData?.members?.length || 0}
         groupColor={groupData?.color}
@@ -2676,20 +2588,6 @@ export default function ChatScreen({ route, navigation }) {
             initialNumToRender={15}
             updateCellsBatchingPeriod={30}
             onScrollToIndexFailed={handleScrollToIndexFailed}
-            ListHeaderComponent={
-              chatData.friendTyping ? (
-                <BounceIn kind={reduceMotion ? null : "receive"}>
-                  <View style={styles.typingBubble}>
-                    <LottieView
-                      source={require("@lottie/typingAnimation.json")}
-                      autoPlay
-                      loop
-                      style={{ width: 68, height: 34 }}
-                    />
-                  </View>
-                </BounceIn>
-              ) : null
-            }
           />
 
           </ComposerBlurTarget>
@@ -4047,18 +3945,6 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.28)",
     marginTop: 3,
     fontStyle: "italic",
-  },
-
-  // ── Typing ─────────────────────────────────────────────
-  typingBubble: {
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.1)",
-    borderRadius: 20,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    marginBottom: 4,
   },
 
   // ── Ambiyans (Android 12+ hedef içi kopya) ─────────────
