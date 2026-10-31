@@ -77,6 +77,8 @@ const functionsV1 = require("firebase-functions/v1");
 initializeApp();
 const db = getFirestore();
 const expo = new Expo();
+// Yük testi (staging) kısa devresi: FUNCTIONS_TEST=1 değilse ya da prod projesindeyse hiçbir şey yapmaz.
+require("./upstreamStub").setupUpstreamStub({ expo });
 // RTDB'ye erişim yalnızca "alıcı zaten bu sohbeti ekranda açık tutuyor mu"
 // kontrolü için (bkz. onSocialNotificationCreated) — RTDB yoksa (proje
 // database.rules.json'suz kurulmuşsa) null kalır, kontrol sessizce atlanır.

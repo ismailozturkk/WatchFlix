@@ -124,6 +124,9 @@ Yapay zekâ/sohbet fonksiyonlarının ve mesaj/presence yükünün gerçek hız 
 
 **Yapılması gereken:** Canlının kopyası ama ayrı bir Firebase (Blaze) projesi kurmak; üçüncü taraf çağrılarını (Gemini/TMDB vb.) sahte yanıtla değiştirip orada 100 / 1.000 / 5.000 / 10.000 kullanıcı testini çalıştırmak.
 
+> ✅ **Kod tarafı HAZIR (31 Ekim).** Sunucuya "test modu" anahtarı eklendi: açıkken yapay zekâ, IMDb puanı, abonelik, TMDB ve bildirim gönderimi gerçek servise **hiç gitmiyor**, sahte cevap dönüyor. Canlı projede bu anahtar açılsa bile **çalışmıyor** (bilerek kilitli). Emülatörde denedim: yapay zekâ isteği baştan sona sahte cevapla döndü, dışarıya tek istek çıkmadı. Test betiğindeki iki hatayı da düzelttim (yapay zekâ isteği eksik alanla gidip reddedilecekti; tek kullanıcıyla test kotaya takılıp anlamsız sonuç verecekti).
+> **Senin yapacakların:** ayrı bir Firebase projesi açmak (faturalı hesap ister) ve bilgisayara k6 kurmak. Kurulum adımları: `load-test/README.md`. Sonrasını ben yaparım.
+
 ---
 
 ## Önerilen sıra

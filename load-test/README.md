@@ -20,13 +20,29 @@ firebase emulators:start --only firestore,auth,functions
 
 ### (B) Staging — gerçek sayılar
 ```bash
-# 1) Ayrı proje oluştur (bir kez): movieandtv-staging gibi
-# 2) Aynı kurallar + functions'ı FUNCTIONS_TEST=1 ile deploy et
-# 3) k6 senaryosunu staging functions taban URL'sine yönelt:
+# 1) Ayrı Blaze proje oluştur (bir kez, KULLANICI): movieandtv-staging gibi;
+#    .firebaserc'a "staging" alias'ı ekle: firebase use --add
+# 2) Sahte secret'lar (gerçek anahtar KOYMA — stub zaten dışarı çıkmaz):
+#    firebase functions:secrets:set GEMINI_API_KEY -P staging   (değer: dummy) — OMDB_API_KEY,
+#    REVENUECAT_SECRET_API_KEY, REVENUECAT_WEBHOOK_AUTH, TMDB_API_KEY, APPLE_* için de aynı
+# 3) functions/.env.<staging-proje-kimliği> dosyasına:
+#      FUNCTIONS_TEST=1
+#      FUNCTIONS_TEST_LATENCY_MS=300   (isteğe bağlı: gerçek upstream gecikmesini taklit)
+#    sonra: firebase deploy -P staging --only firestore:rules,functions
+# 4) Test kullanıcıları + ID jetonları (tokens.json, JSON dizi) üret, k6'yı staging'e yönelt:
 #   BASE_URL=https://<region>-<staging-proj>.cloudfunctions.net \
-#   ID_TOKEN=<staging test kullanıcısının auth jetonu> \
+#   ID_TOKENS_FILE=./tokens.json STAGE=smoke \
 #   k6 run load-test/k6-callables.js
 ```
+
+**Stub (`functions/upstreamStub.js`):** `FUNCTIONS_TEST=1` iken Gemini, OMDb, RevenueCat, TMDB sahte yanıt döner;
+Google/Apple kimlik uçları her zaman reddeder (sahte kimlik üretmez); Expo push gönderilmez (her mesaja "ok" bileti).
+Proje kimliği `movieandtv-2832a` ise bayrak **yok sayılır** ve hata günlüğe yazılır. Bayrak yoksa hiçbir şey
+değişmez. Emülatörde uçtan uca doğrulandı (31 Eki): `getExternalRatings` ve `callGemini` (kimlik → Firestore kota →
+sahte Gemini → yanıt) dışarıya istek atmadan döndü.
+
+**k6 notu:** kota ve hız sınırı kullanıcı başına → tek jetonla koşum ilk saniyelerde 429'a düşer. 429 beklenen
+sonuç sayılır (hata oranına girmez), ama anlamlı ölçüm için VU sayısı kadar test kullanıcısı gerekir.
 
 ## Dosyalar
 - `k6-callables.js` — Cloud Functions callable uçları için k6 senaryosu (100→1k→5k→10k VU kademeleri).

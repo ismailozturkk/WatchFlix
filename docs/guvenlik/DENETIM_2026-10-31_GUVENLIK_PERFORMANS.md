@@ -316,6 +316,9 @@ testi dahil). Birim: 66/66 (dailyPoll + top100). Functions: 100 geçti / 0 başa
   notu — 1 vCPU, eşzamanlılık 80; gecikme/p95 hâlâ ölçülmedi.)
 - Mesaj fan-out tetikleyici kuyruğu, RTDB presence — §4.3 senaryo 4-5.
 - Prod-benzeri gerçek gecikme/throughput (emülatör modellemez).
+- Hazırlık (31 Eki): upstream stub `functions/upstreamStub.js` (`FUNCTIONS_TEST=1`, prod'da kilitli) + düzeltilmiş
+  `load-test/k6-callables.js`; staging projesi ve k6 kurulumu bekleniyor. Emülatördeki tek-istek doğrulaması
+  (callGemini ~92 ms) bir **işlevsellik** kontrolüdür, gecikme ölçümü değildir.
 
 ---
 

@@ -161,6 +161,16 @@ match /Users/{uid} {
 ## P3 — Yük testi altyapısı (ertelenen ölçümler)
 
 ### T-LOAD-1 — k6 + staging ile callable/fan-out/presence senaryoları
+> **DURUM: KOD HAZIR (2026-10-31), ÖLÇÜM BLOKE — staging projesi yok (kullanıcı açmalı), k6 kurulu değil.**
+> Yapılan: (2) `functions/upstreamStub.js` — `FUNCTIONS_TEST=1` iken Gemini/OMDb/RevenueCat/TMDB sahte yanıt,
+> Google/Apple kimlik uçları ret, Expo push gönderilmez; prod proje kimliğinde bayrak yok sayılır. `index.js`'te tek
+> satır (`setupUpstreamStub({ expo })`). Testler: `functions/upstreamStub.test.js` (6; sahte yanıtlar gerçek
+> ayrıştırıcılardan geçiyor). Emülatörde uçtan uca: `getExternalRatings` + `callGemini` (Firestore kota dahil, ~92 ms)
+> dışarı çıkmadan döndü; prod kimliğiyle `fetch` değişmedi. (3) `load-test/k6-callables.js` düzeltildi: callGemini
+> gövdesine eksik `systemInstruction` (400 alırdı), jeton havuzu (`ID_TOKENS_FILE`), 429 beklenen durum,
+> `searchUsers` adımı. `load-test/README.md` staging kurulum adımları; `load-test/tokens*.json` gitignore'da.
+> Kalan: (1) staging projesi + `.firebaserc` alias (kullanıcı, faturalı hesap); k6 kurulumu; koşum + §5'e "measured
+> (staging)". Fan-out ve RTDB presence senaryosu henüz yazılmadı (staging olmadan doğrulanamaz).
 **KONUM:** `load-test/` (iskeletler hazır), `.firebaserc` (tek proje — M-2).
 **SORUN:** k6 bu makinede kurulu değil; anlamlı throughput için izole staging + upstream stub şart.
 **YAPILACAK:**
