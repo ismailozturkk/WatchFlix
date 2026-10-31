@@ -8,6 +8,36 @@ Her madde şu düzende: **Ne sorun · Neden önemli · Ne yapılmalı · Zorluk/
 
 ---
 
+## 📌 NOTLAR — 31 Ekim gecesi durumu (kalktığında buradan başla)
+
+**Kodda yapılabilecek her madde bitti ve commit'lendi** (dalda: `codex/release-candidate-1.4.3`). **Hiçbir şey push'lanmadı, yayına (deploy) alınmadı.** Testler: uygulama 8.130/8.130, kurallar 363/363, sunucu 116 geçti / 0 başarısız.
+
+### ✋ Senin yapacakların
+1. **Yayına alma (deploy) — sırası önemli:**
+   1. `firebase deploy --only firestore:rules,functions`
+   2. Sonra uygulamanın yeni sürümü (build).
+
+   Ters sırada olursa yeni sürümde Günün Sorusu oyu ve arkadaş araması çalışmaz.
+   ⚠️ Kural dosyası bütün olarak gider. Başka oturumların henüz yayınlanmamış kuralları (Haftalık Lig vb.) da onunla birlikte yayına çıkar. Fonksiyonlar da çalışma klasöründen gider: commit'lenmemiş lig kodu dahil. Bunu bilerek yaptırmak için deploy'u sana bıraktım.
+2. **Cihaz doğrulaması (App Check):**
+   1. Apple Developer'da DeviceCheck `.p8` anahtarı oluştur ve Firebase'e yükle.
+   2. Play Console → Uygulama bütünlüğü bölümünde Firebase bağlantısını kontrol et.
+   3. Yeni TestFlight ve Play dahili test sürümü çıkar.
+   4. Birkaç gün sonra `npm run appcheck:status` çalıştır.
+3. **Yük testi için:** ayrı bir Firebase (Blaze) test projesi aç ve k6'yı kur. Adımlar `load-test/README.md`'de; sonrasını ben yaparım.
+4. **İmza anahtarı:** `@smlztrk__seelogd.jks`'i parola yöneticine koy, sonra proje klasöründen kaldır. Ben dokunmadım.
+5. **Push:** commit'leri uzak depoya göndermek istediğinde söyle.
+
+### 🤝 Birlikte karar vereceklerimiz
+- **TMDB anahtarı:** (a) olduğu gibi kalsın + gerektiğinde yenile (önerim), ya da (b) sunucudan geçir. Ayrıntı: `TMDB_JETON_YONETIMI.md`.
+- **Bekleme listesi sızıntısı:** olduğu gibi kalsın, ya da site "zaten kayıtlısın" demeyi bıraksın (sızıntıyı tamamen kapatır).
+- **Eski arama yolunu kapatma zamanı** (`legacyUserSearchList`): eski uygulama sürümleri azalınca.
+- **Ad/avatar değiştirmeye bekleme süresi** konsun mu? Şu an sınırsız; her değişiklik kişinin bütün mesaj ve yorum geçmişini yeniden yazdırıyor.
+- **Sunucu tavanları:** hafif fonksiyonlar 20, dış servise bağlı olanlar 10, toplu işler 1. Uygun mu?
+- **App Check'i zorunlu yapma zamanı:** geçerli doğrulama oranı %95'i geçince adım adım açılacak.
+
+---
+
 ## 🔴 En öncelikli: Çok kişi aynı anda oy verince sayaçlar tıkanıyor
 
 **Ne sorun:** "Günün Sorusu", "Top 100" ve popüler film puanları tek bir hücreye yazıyor. Çok sayıda kişi aynı anda oy verince bu hücre kilitleniyor.

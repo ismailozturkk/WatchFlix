@@ -8,6 +8,13 @@
 - Prod projesi `movieandtv-2832a`. Hiçbir test/deploy onay olmadan prod'a gitmez.
 - Her görev ayrı commit; mesaj TR, sonunda `Co-Authored-By` satırı (bkz. repo attribution).
 
+**DEVAM NOKTASI (2026-10-31 gece):** Tüm görevlerin kod kısmı bitti. Commit'ler: f662792, 6f98cef, ba06e73, d992cbf,
+ebb818f, b59f668, 1d6e77b (T-PERF-2), 362d550 (T-SEC-4), 2ad7601 (T-SEC-5/6), 576288e (T-LOAD-1). Push YOK, deploy YOK.
+Kalanların hepsi kullanıcı eylemi ya da kararı. Liste: `GELISTIRME_REHBERI_BEN.md` → "📌 NOTLAR". Kullanıcı karar
+vermeden yeni kod işi açma. Çalışma ağacında başka oturumların commit'lenmemiş işi var (Haftalık Lig: `functions/index.js`
+lig blokları, `firestore.rules` ~205 satır, 8 dosyalık staged silme). Bunlara dokunma; commit'leri geçici
+`GIT_INDEX_FILE` ile hunk seçerek yap.
+
 ---
 
 ## P0 — Performans sıcak noktaları (ölçümle kanıtlı, 10K ön şartı)
