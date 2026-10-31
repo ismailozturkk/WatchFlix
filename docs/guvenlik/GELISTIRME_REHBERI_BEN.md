@@ -109,7 +109,9 @@ Yani 10.000 kullanıcı hedefinde, yüzlerce kişi aynı ankete oy verirse çoğ
 ## 🟡 Küçük düzeltmeler (acil değil)
 
 - **Bekleme/beta listesi:** Bir e-postayı bilen biri, o kişinin listede olup olmadığını öğrenebiliyor. Küçük bir sızıntı; istenirse kapatılır.
+  > 📝 **İnceledim (31 Ekim) — olduğu gibi bıraktım, karar senin.** Sitedeki "zaten listedesin, sıran #X" mesajı tam da bu kontrolle çalışıyor. Kontrolü sunucuya taşımak işe yaramıyor, çünkü site giriş istemiyor ve sunucu da herkese aynı "evet/hayır" cevabını verirdi. Gerçekten kapatmanın tek yolu sitenin "zaten kayıtlısın" demeyi bırakıp her zaman "kaydın alındı" demesi. İstersen bunu yaparım. Sızan bilgi de yalnızca "bu e-posta listede"; ad ya da telefon gibi bir şey değil.
 - **İmza anahtarı dosyası (.jks) ve .env:** Bilgisayarında duruyor ama **git'e gönderilmemiş** (kontrol ettim, güvende). Yine de bu dosyaları depo dışında tutmak, projeyi sıkıştırıp paylaşırken hariç bırakmak iyi olur. İmza anahtarı çok değerli — kaybolursa uygulamayı güncelleyemezsin.
+  > ✅ **Kontrol edildi (31 Ekim):** bu dosyalar git geçmişine hiç girmemiş. README'ye "projeyi paylaşırken bu dosyaları dahil etme" bölümü ve bunu otomatik yapan tek komut eklendi. Anahtar dosyasına **dokunmadım**. Dosya adı EAS'ten indirildiğini gösteriyor, yani asıl kopya EAS'te duruyor. **Senin yapacağın:** `.jks`'i parola yöneticine ek dosya olarak koy, sonra proje klasöründen kaldır.
 - **Grup kuralları karmaşık:** Şu an güvenli ama çok dallı; ileride değiştirirken testlerle korunmalı.
 
 ---

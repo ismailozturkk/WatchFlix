@@ -131,6 +131,19 @@ Projeyi yerel ortamınızda çalıştırmak için aşağıdaki adımları izleyi
    npm test
    ```
 
+### 🔑 Gizli dosyalar — projeyi paylaşırken DAHİL ETME
+
+Çalışma klasöründe git'e girmeyen (`.gitignore` kapsıyor) ama değerli dosyalar durabilir: `*.jks` (Android imza
+anahtarı), `.env`, `.env.local`, `credentials.json`, `*.p8`. Projeyi zip'leyip paylaşacaksan klasörü değil
+`git archive` çıktısını gönder; yalnız commit'lenmiş dosyaları aldığı için bunlar kendiliğinden dışarıda kalır:
+
+```bash
+git archive --format=zip -o seelogd.zip HEAD
+```
+
+İmza anahtarının asıl kopyası EAS'tedir (`eas credentials`); yerel `.jks` yalnız yedektir ve parola yöneticisinde
+saklanmalıdır (bkz. `docs/guvenlik/DENETIM_2026-10-31_GUVENLIK_PERFORMANS.md` L-2).
+
 ---
 
 ## 📚 Dokümantasyon

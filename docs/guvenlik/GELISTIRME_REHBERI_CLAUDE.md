@@ -139,11 +139,19 @@ match /Users/{uid} {
 ## P2 — Güvenlik (düşük) ve hijyen
 
 ### T-SEC-5 — waitlist/beta e-posta oracle'ı (L-1)
+> **DURUM: KABUL EDİLEN RİSK OLARAK BELGELENDİ (2026-10-31) — kod değişmedi.** Gerekçe denetim L-1 notunda: callable
+> oturumsuz sitede oracle'ı kaldırmaz, yalnız taşır. Gerçek kapatma = UX değişikliği (site "zaten kayıtlı" demez,
+> sıra no yalnız `wf_ticket`'ta; kural `get: false`). Kullanıcı isterse uygula: `website/home.js` `addEmail` +
+> `addBetaTester` önce `getDoc` yerine doğrudan `setDoc`, `permission-denied` = sessizce "alındı"; kural testleri
+> (`__tests__/rules/`) waitlist/betaTesters `get` reddi.
 **KONUM:** `firestore.rules:80-115`.
 **YAPILACAK:** `allow get: if true`'yu kaldırıp "zaten kayıtlı mı" kontrolünü bir callable'a taşı (ya da kabul edilen risk olarak belgele). Düşük öncelik.
 **KABUL KRİTERİ:** Karar belgeli; değiştiyse landing akışı bozulmadan çalışıyor (`website/`).
 
 ### T-SEC-6 — İmza anahtarı + `.env` hijyeni (L-2)
+> **DURUM: KOD/BELGE TAMAM (2026-10-31).** Takip dışı olduğu ve geçmişte hiç bulunmadığı teyitli (`git ls-files`,
+> `git log --all`). README'ye "Gizli dosyalar" bölümü (`git archive` ile paylaş). Taşıma planı denetim L-2 notunda.
+> `.jks`'i ajan TAŞIMAZ/SİLMEZ — kullanıcı parola yöneticisine koyup EAS parmak iziyle karşılaştırdıktan sonra kaldırır.
 **KONUM:** Kök: `@smlztrk__seelogd.jks`, `.env`, `.env.local`.
 **YAPILACAK:** `.jks`'i depo dışına (EAS credentials / parola yöneticisi) taşı; depo paylaşımında bu dosyaları dışarıda bırak. `.gitignore` zaten kapsıyor (doğrulandı) — ek olarak README'ye "repo'yu zip'lerken hariç tut" notu.
 **KABUL KRİTERİ:** `.jks` depo kökünde durmuyor ya da taşınma planı belgeli; git takibinde olmadığı teyitli.

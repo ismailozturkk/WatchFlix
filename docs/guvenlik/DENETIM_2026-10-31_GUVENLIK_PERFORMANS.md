@@ -128,10 +128,25 @@ DeviceCheck `.p8` anahtarı, Play Console bağlantısı, yeni yayın build'leri.
 **Yer:** `firestore.rules:80-115` — `waitlist`/`betaTesters` `allow get: if true`, docId = `base64(email)`.
 **Sorun:** docId e-postadan türediği için, bir e-postayı bilen biri `get` ile o kişinin listede olup olmadığını doğrulayabilir (varlık oracle'ı). `list` kapalı (iyi), toplu döküm yok.
 **Öneri:** Düşük öncelik. İstenirse `get`'i de kapatıp "zaten kayıtlı mı" kontrolünü callable'a taşı.
+> **31 Eki — karar: KABUL EDİLEN RİSK (kod değişmedi).** Landing `get`'i "zaten listedesin, sıran #X" demek için
+> kullanıyor (`website/home.js` `addEmail` / `addBetaTester`). Callable'a taşımak oracle'ı kaldırmaz: site oturumsuz
+> olduğu için callable da herkese açık olur ve aynı evet/hayır cevabını verir; App Check bugün çalışmadığından (M-3)
+> yalnız instance başına bellek içi IP sınırı kalır. Sızan bilgi: "bu e-posta Seelogd bekleme/beta listesinde" —
+> kimlik ya da iletişim verisi değil. Oracle'ı gerçekten kapatan tek yol UX değişikliği: site kayıtlı olup olmadığını
+> hiç söylemez, her zaman "kaydın alındı" der, sıra numarasını yalnız tarayıcıda saklar (`wf_ticket`); kural
+> `get: false` olur, yinelenen kayıt `create`'in var olan belgede reddedilmesiyle zaten engellenir. Karar kullanıcıda.
+> Yan not (aynı blok, düşük): `meta/waitlist.count` herkesçe +1 artırılabilir ve `queueNo` istemcinin seçtiği bir
+> sayı — vitrin sayacı şişirilebilir, güvenlik etkisi yok.
 
 ### L-2 — İmza anahtarı ve `.env` çalışma ağacında (Düşük / hijyen)
 **Yer:** Kök dizinde `@smlztrk__seelogd.jks`, `.env`, `.env.local`. **git takibinde değiller** (`.gitignore` kapsıyor — doğrulandı). Ancak dizin zip'lenir/paylaşılırsa sızarlar.
 **Öneri:** İmza anahtarını depo dışında (ör. parola yöneticisi / EAS credentials) sakla. `.env`'i yalnızca yerelde tut. Depoyu paylaşırken bu dosyaları dışarıda bırak. (Not: `firestore-debug.log` 2 MB ve `.theme-audit-export.log` de ağaçta ama gitignored.)
+> **31 Eki — yeniden doğrulandı:** `git ls-files` yalnız `.env.example`'ı izliyor; `.jks` / `.env` / `.env.local` /
+> `credentials.json` **git geçmişinin hiçbir dalında yok** (`git log --all` boş). Dosya adı (`@smlztrk__seelogd.jks`)
+> EAS'in kimlik bilgisi indirme biçimi → anahtarın asıl kopyası EAS'te, yereldeki yedek. README'ye "paylaşırken
+> `git archive` kullan" notu eklendi. **Taşıma planı (kullanıcı):** `.jks`'i parola yöneticisine (ek dosya) koy,
+> `eas credentials -p android` ile EAS'teki anahtarın parmak izinin yerel yedekle aynı olduğunu doğrula, sonra yerel
+> kopyayı proje klasöründen kaldır. Ajan imza anahtarını taşımadı/silmedi.
 
 ### L-3 — Grup kuralları karmaşıklığı (Düşük / Bilgi)
 **Yer:** `firestore.rules:1188-1490` (gruplar + film kulübü).
