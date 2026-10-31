@@ -73,12 +73,29 @@ match /Users/{uid} {
 **KABUL KRİTERİ:** Yeni kural testi: oturumlu kullanıcı `list(Users)` reddedilir, `get(Users/{uid})` geçer. İstemci hiçbir yerde `Users` koleksiyonunu sorgulamıyor. `npm run test:rules` yeşil.
 
 ### T-SEC-2 — App Check'i callable'larda kademeli zorunlu kıl (H-2)
+> **DURUM: BLOKE (2026-10-31).** Son 28 günde Firestore'da **0 VALID** doğrulama (37.258 INVALID + 110.125 jetonsuz;
+> denetim M-3 tablosu). `enforceAppCheck: true` ya da konsolda ENFORCE şu an TÜM trafiği keser — YAPMA.
+> Önce jeton üretimi çalışmalı:
+> 1. iOS: `app.json` → `expo.ios.entitlements` içine `"com.apple.developer.devicecheck.appattest-environment": "production"`
+>    (yeni native build + Apple App ID'de App Attest yeteneği); DeviceCheck `.p8` anahtarını Firebase'e kaydet (kullanıcı,
+>    Apple hesabı); iOS debug jetonu ekle (şu an 0).
+> 2. Android: Play Console → Uygulama bütünlüğü → Play Integrity'nin Cloud projesi 427087836931'e bağlı olduğunu
+>    doğrula (API'den görünmüyor); yalnız Play'den (dahili test kanalı) yüklenen build ile dene — yandan yüklenen APK
+>    `appIntegrity` varsayılanında BİLEREK INVALID olur.
+> 3. `services/appCheck.js`: yayın build'inde yerel `getToken` hatasını Sentry'ye düşür (şu an sessizce yutuluyor);
+>    "boş jeton gönderilmez" yorumunu düzelt (JS SDK hata jetonu ekliyor).
+> 4. İzleme: `firebaseappcheck.googleapis.com/services/verification_count` (security etiketi) VALID payı mevcut sürümde
+>    ≥ %95 olunca sırayla ENFORCE: callable'lar → Firestore → Auth → RTDB.
+> Okuma yöntemi (salt-okunur): firebase-tools oturumu + `requireAuth({user, tokens})` + `getAccessToken()` + fetch
+> (bkz. hafıza `rules-tests-jdk`).
 **KONUM:** `functions/index.js:1124` (`callGemini` `enforceAppCheck:false`), `index.js:1230` (`getExternalRatings`), `index.js:89` (global), istemci `firebase.js:33` + `services/appCheck.js`.
 **SORUN:** İstemci App Check jetonu üretiyor ama sunucu doğrulamıyor; cihaz doğrulaması fiilen kapalı.
 **YAPILACAK:** Önce staging'de `callGemini`, `getExternalRatings`, `redeemCode`'da `enforceAppCheck: true` yap; Play Integrity sahada stabil doğrulandıktan sonra prod. Debug/CI için App Check debug token akışını belgele.
 **KABUL KRİTERİ:** Belirtilen callable'lar App Check jetonu olmadan `unauthenticated`/`failed-precondition` döndürüyor; gerçek istemci etkilenmiyor (staging cihaz testi). Rollback planı yazılı.
 
 ### T-SEC-3 — Firestore/RTDB App Check enforcement'ı doğrula (M-3)
+> **DURUM: DOĞRULANDI (2026-10-31).** Firestore, RTDB, Auth: UNENFORCED; Functions: kodda kapalı. Sağlayıcı ve trafik
+> ayrıntısı denetim M-3'te. Sonraki iş T-SEC-2'nin 1-4. adımları.
 **KONUM:** Firebase Console (kodda görünmez).
 **YAPILACAK:** Console → App Check → Firestore/RTDB/Functions "Monitor→Enforce" durumunu kontrol et; `docs/`'a mevcut durumu ve hedefi yaz.
 **KABUL KRİTERİ:** `docs/guvenlik/` altında enforcement durum notu + planlanan geçiş tarihi.

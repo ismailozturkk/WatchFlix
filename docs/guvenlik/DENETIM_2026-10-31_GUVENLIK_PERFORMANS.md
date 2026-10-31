@@ -84,6 +84,38 @@ Yayın sırası: functions (`searchUsers`) → istemci → (eski sürümler biti
 **Sorun:** Firestore/RTDB için App Check zorunluluğu konsol ayarıdır, kodda görünmez. İstemci App Check init ediyor ama zorunluluk kapalıysa, kurallara uyan her istek (sahte istemciden de) geçer.
 **Öneri:** Firebase Console → App Check → Firestore/RTDB/Functions "Enforce" durumunu doğrula. Kademeli "monitor → enforce" geçişi yap.
 
+**DOĞRULANDI (2026-10-31, salt-okunur API — App Check, Firebase Management, Cloud Monitoring, Service Usage; hiçbir
+ayar değiştirilmedi):**
+
+| Kontrol | Sonuç |
+|---|---|
+| Zorunluluk modu | Firestore, Realtime Database, Auth (identitytoolkit): **UNENFORCED**. Functions: kodda `enforceAppCheck: false`. |
+| Android Play Integrity | Yapılandırma var; `deviceIntegrity: NO_INTEGRITY` (en serbest), `appIntegrity` varsayılan (Play'in tanımadığı sürüm reddedilir). 6 imza parmak izi (3 SHA-1, 3 SHA-256). Play Integrity API: **ENABLED**. 1 debug jetonu. |
+| iOS App Attest | Firebase'de kaydı var, ama `app.json` → `ios.entitlements` içinde **`com.apple.developer.devicecheck.appattest-environment` YOK** → App Attest jeton üretemez. |
+| iOS DeviceCheck (yedek) | **Özel anahtar kayıtlı değil** (`keyId`/`privateKeySet` yok) → yedek de çalışmaz. iOS debug jetonu: **0**. |
+
+**Trafik (Cloud Monitoring `firebaseappcheck.googleapis.com/services/verification_count`):**
+
+| Son 28 gün | Geçersiz jeton (INVALID) | Jeton yok (MISSING_*) | **Geçerli (VALID)** |
+|---|---|---|---|
+| Firestore | 37.258 | 110.125 | **0** |
+| Auth | 164 | 941 | **0** |
+
+(Son 7 günde de VALID yok: Firestore 23.920 geçersiz + 67.342 jetonsuz.)
+
+**Yorum:** Bugün zorunluluk açılsa **trafiğin tamamı reddedilir.**
+- *Jetonsuz (~%75):* `services/appCheck.js` `__DEV__` build'lerinde App Check'i bilerek atlıyor. Uygulama yayında olmadığı için
+  trafiğin çoğu geliştirme build'leri — beklenen durum.
+- *Geçersiz (~%25):* yayın build'lerinde yerel jeton alınamayınca `CustomProvider` hata fırlatıyor; Firebase JS SDK bu durumda
+  isteğe sahte bir hata jetonu ekler (koddaki "boş jeton gönderilmez" yorumu bu yüzden doğru değil). Yani **her yayın
+  build'inde jeton değişimi başarısız.** Olası nedenler — iOS: eksik App Attest yetkisi + DeviceCheck anahtarı; Android:
+  Play'den yüklenmemiş (EAS önizleme APK'sı vb.) sürüm `appIntegrity` varsayılanına takılır, ya da Play Console'da
+  Play Integrity ↔ Cloud projesi bağlantısı eksik (API'den görülemiyor).
+
+**Yeni sıra (H-2 bu düzeltilmeden açılamaz):** iOS yetkisi + DeviceCheck anahtarı + iOS debug jetonu → Android'de Play
+bağlantısını doğrula ve yalnız Play'den yüklenen build'le dene → yayın build'inde jeton hatasını Sentry'ye düşür →
+mevcut sürümde VALID payı ≥ %95 olunca servis servis ENFORCE (callable'lar → Firestore → Auth → RTDB).
+
 ### L-1 — Bekleme listesi/beta e-posta varlık sızıntısı (Düşük)
 **Yer:** `firestore.rules:80-115` — `waitlist`/`betaTesters` `allow get: if true`, docId = `base64(email)`.
 **Sorun:** docId e-postadan türediği için, bir e-postayı bilen biri `get` ile o kişinin listede olup olmadığını doğrulayabilir (varlık oracle'ı). `list` kapalı (iyi), toplu döküm yok.

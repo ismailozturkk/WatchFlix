@@ -68,11 +68,21 @@ Yani 10.000 kullanıcı hedefinde, yüzlerce kişi aynı ankete oy verirse çoğ
 
 **Zorluk/risk:** Düşük-orta. Dikkatli yapılmazsa gerçek kullanıcıları dışarıda bırakabilir, o yüzden kademeli ve test ortamında önce.
 
+> ⚠️ **KONTROL EDİLDİ (31 Ekim) — şu an AÇILAMAZ.** Firebase'e bilgisayardan salt-okunur baktım (hiçbir ayarı değiştirmedim):
+> - Kontrol hiçbir yerde zorunlu değil (Firestore, Realtime Database, giriş).
+> - **Son 28 günde tek bir geçerli doğrulama yok:** ~147 bin Firestore isteğinin yaklaşık dörtte üçü hiç doğrulama taşımıyor (bunlar senin geliştirme sürümlerin — orada kontrol bilerek kapalı, sorun değil), dörtte biri ise bozuk doğrulama taşıyor (yayın sürümlerinde doğrulama hiç alınamıyor).
+> - Yani bugün açsaydık **uygulama tamamen dururdu.**
+>
+> **Önce düzeltilmesi gerekenler:**
+> - **iOS:** uygulamada "App Attest" yetkisi eksik (küçük bir ayar + yeni sürüm) ve yedek yöntem DeviceCheck'in anahtarı Firebase'e yüklenmemiş — bunu Apple hesabınla **senin** yapman gerekiyor.
+> - **Android:** Play Console'da "Uygulama bütünlüğü" bölümünde Firebase projesinin bağlı olduğunu kontrol etmelisin (bunu uzaktan göremiyorum). Ayrıca test, Play Store'un dahili test kanalından yüklenen sürümle yapılmalı; elle yüklenen APK'lar bilerek reddedilir.
+> - Sonra birkaç gün izleyip geçerli doğrulama oranı %95'i geçince adım adım açacağız.
+
 ---
 
 ## 🟠 Güvenlik — İki ayar doğrulanmalı / bir karar gerekiyor
 
-- **Firestore cihaz-doğrulama ayarı:** Bu, kodda değil Firebase panelinde. Panelden "zorunlu mu" diye kontrol edilmeli.
+- **Firestore cihaz-doğrulama ayarı:** Bu, kodda değil Firebase panelinde. ✅ Kontrol edildi (31 Ekim): zorunlu **değil** — ayrıntı yukarıda.
 - **TMDB anahtarı:** Film verisi için kullanılan TMDB anahtarı uygulamanın içine gömülü (çıkarılabilir). Bu anahtar "sadece okuma" olduğu için düşük riskli. **İki seçenek var, senin kararın:** (a) olduğu gibi bırak + anahtarı ara ara yenile, ya da (b) onu da sunucu üzerinden geçir (Gemini'de yaptığımız gibi). (b) daha güvenli ama daha çok iş.
 
 ---
