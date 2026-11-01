@@ -14,19 +14,21 @@ Dal: `codex/release-candidate-1.4.3`, **push'lu**. Sürüm **1.5.0**. Testler: u
 
 **Sunucu tarafı tamamen yayında:** Firestore kuralları, 29 fonksiyon ve Hosting. `seelogd.com/api/top100` CDN'den çalışıyor. Maliyet çalışmasının üç aşaması da (okuma azaltma, önbellekleme, CDN) bitti ve canlıda.
 
-### ✋ Sende olan tek iş: build
+### ✅ Build alındı ve mağazalara yüklendi (1 Kasım)
 
-```
-eas build --platform android --profile production
-eas build --platform ios --profile production
-```
+iOS build 25 ve Android versionCode 5 — ikisi de 1.5.0, `production` profili, mağaza dağıtımı,
+commit `9cb0651`. Sürüm numaralarını EAS kendi artırdı.
 
-Bu acil, çünkü eski arama yolunu kapattık: **mağazadaki sürümlerde arkadaş araması şu an çalışmıyor.** Ayrıca App Check ayarları ancak bu sürümle gerçek jeton üretmeye başlayacak.
+### ✋ Sıra sende: test sürümünü indirip dört şeyi kontrol et
 
-Yayınlandıktan sonra:
-1. **Arkadaş aramasını dene** — çalışıyorsa yeni sunucu ucu bağlanmış demektir.
-2. **Ödeme ekranındaki fiyatı doğrula** (önizlemede ₺59,99 görünüyordu).
-3. Birkaç gün sonra `npm run appcheck:status` çalıştır, çıktıyı bana göster. Ölçümü **Play'in dahili test kanalından** indirdiğin sürümle yap; emülatör ve elle kurulan APK Play Integrity doğrulamasını bilerek geçemiyor.
+1. **Arkadaş araması.** Çalışmalı. Eski yolu kapattığımız için yedeği yok; çalışmazsa haber ver.
+2. **Yeni özellikler yerinde mi:** Haftalık Lig, Film Kulübü, Meydan Okumalar, Günün Karesi,
+   Film Zinciri ve yeni uygulama simgeleri. Bunlar commit'lenmemiş dosyalardan geliyordu —
+   görünmüyorlarsa build'e girmemişler demektir, mağaza metnini düzeltmemiz gerekir.
+3. **Ödeme ekranındaki fiyat** (önizlemede ₺59,99 görünüyordu).
+4. **Birkaç gün kullandıktan sonra** `npm run appcheck:status` çalıştır, çıktıyı bana göster.
+   Ölçümü **Play'in dahili test kanalından** indirdiğin sürümle yap; emülatör ve bilgisayardan
+   kurduğun APK bu doğrulamayı bilerek geçemiyor.
 
 ### 🤝 Birlikte yapacaklarımız (sen hazır olduğunda)
 

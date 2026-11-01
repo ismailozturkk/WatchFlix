@@ -5,7 +5,7 @@
 Bu projede birden fazla yapay zekâ asistanı dönüşümlü çalışıyor. Bu dosya, araç fark etmeksizin
 devralan asistanın kaldığı yerden devam edebilmesi için var. **Durum değiştikçe bu dosyayı güncelle.**
 
-Son güncelleme: **1 Kasım 2026**
+Son güncelleme: **1 Kasım 2026** (1.5.0 mağazalara test olarak yüklendi)
 
 ---
 
@@ -20,7 +20,9 @@ Son güncelleme: **1 Kasım 2026**
 | **Staging YOK** | Tek proje var ve **canlı**. Yük/sızma testi canlıya yapılmaz. |
 
 **Yayın durumu:** Firestore kuralları, 29 Cloud Function ve Hosting **canlıda ve çalışma ağacıyla
-eşleşiyor**. Mağazadaki uygulama sürümü eski (Play 1.4.6, iPhone 1.4.8); 1.5.0 build'i kullanıcıda.
+eşleşiyor**. **1.5.0 build'leri alındı ve 1 Kasım'da mağazalara test olarak yüklendi:**
+iOS build 25 ve Android versionCode 5, ikisi de `production` profili, `STORE` dağıtımı, commit
+`9cb0651`. İnceleme/işleme sürerken mağazadaki yayın sürümü hâlâ eski (Play 1.4.6, iPhone 1.4.8).
 
 **Bilinen ve kabul edilmiş durum:** `legacyUserSearchList()` kapatıldı, bu yüzden **mağazadaki eski
 sürümlerde arkadaş araması çalışmıyor**. 1.5.0 yayılınca düzelir. Kullanıcı bunu bilerek seçti.
@@ -103,10 +105,17 @@ NODE_ENV=production npx expo export --platform android --output-dir /tmp/exp
 
 ## 4. Sıradaki iş
 
-### Kullanıcıda
-- **Build + yayın** (`eas build --platform android|ios --profile production`). Tek bekleyen iş bu.
-- Yayından sonra: arkadaş aramasını dene, Play'de fiyatı doğrula, birkaç gün sonra
-  `npm run appcheck:status`.
+### Kullanıcıda — test sürümü elindeyken doğrulanacaklar
+Build alındı ve mağazalara yüklendi; sıra **test kanalından indirip kontrol etmekte**:
+1. **Arkadaş araması** — çalışmalı. Çalışmıyorsa `searchUsers` callable'ına ulaşılamıyor demektir
+   (eski yol kapalı olduğu için yedeği yok).
+2. **Yeni özellikler görünüyor mu:** Haftalık Lig, Film Kulübü, Meydan Okumalar, Günün Karesi,
+   Film Zinciri ve yeni uygulama simgeleri. Bunlar commit'lenmemiş çalışma ağacından geliyordu;
+   görünmüyorlarsa build yalnız commit'li koddan alınmış demektir ve mağaza metni onları
+   anlattığı için metin düzeltilmeli.
+3. **Ödeme ekranındaki fiyat** (önizlemede ₺59,99 görünüyordu).
+4. **Birkaç gün sonra** `npm run appcheck:status` — ölçümü **Play dahili test kanalından** inen
+   sürümle yap; emülatör ve elle kurulan APK Play Integrity doğrulamasını bilerek geçemiyor.
 
 ### Birlikte yapılacaklar (kullanıcı hazır olduğunda)
 1. **İmza anahtarı `.jks` taşıma** — yedeği doğrulanmadan **SİLME**. Adımlar:
