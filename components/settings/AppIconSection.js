@@ -92,9 +92,14 @@ export default function AppIconSection({ colors: C }) {
         );
       } catch (e) {
         if (__DEV__) console.warn("setActiveAppIcon:", e?.message);
+        // Sebep yayın yapısında da gösterilir: simge değişimi yalnız cihazda
+        // denenebiliyor ve sebebi gizlendiğinde (1.5.0) sorunu ancak derleme
+        // kaydından tahmin edebildik. Sistemin kendi metni Türkçeleştirilemez,
+        // ama tanıyı bir build turu kısaltıyor.
+        const reason = typeof e?.message === "string" ? e.message.trim() : "";
         toast.error(
           i18nText("autoI18n.uygulama_simgesi_hata", "Simge değiştirilemedi"),
-          i18nText("autoI18n.uygulama_simgesi_hata_alt", "Biraz sonra tekrar dene"),
+          reason || i18nText("autoI18n.uygulama_simgesi_hata_alt", "Biraz sonra tekrar dene"),
         );
       } finally {
         if (mountedRef.current) setBusyId(null);

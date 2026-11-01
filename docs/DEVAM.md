@@ -5,7 +5,7 @@
 Bu projede birden fazla yapay zekâ asistanı dönüşümlü çalışıyor. Bu dosya, araç fark etmeksizin
 devralan asistanın kaldığı yerden devam edebilmesi için var. **Durum değiştikçe bu dosyayı güncelle.**
 
-Son güncelleme: **1 Kasım 2026** (1.5.0 mağazalara test olarak yüklendi)
+Son güncelleme: **1 Kasım 2026** (1.5.0 TestFlight'ta denendi; iki bulgu)
 
 ---
 
@@ -105,16 +105,30 @@ NODE_ENV=production npx expo export --platform android --output-dir /tmp/exp
 
 ## 4. Sıradaki iş
 
-### Kullanıcıda — test sürümü elindeyken doğrulanacaklar
-Build alındı ve mağazalara yüklendi; sıra **test kanalından indirip kontrol etmekte**:
-1. **Arkadaş araması** — çalışmalı. Çalışmıyorsa `searchUsers` callable'ına ulaşılamıyor demektir
-   (eski yol kapalı olduğu için yedeği yok).
-2. **Yeni özellikler görünüyor mu:** Haftalık Lig, Film Kulübü, Meydan Okumalar, Günün Karesi,
-   Film Zinciri ve yeni uygulama simgeleri. Bunlar commit'lenmemiş çalışma ağacından geliyordu;
-   görünmüyorlarsa build yalnız commit'li koddan alınmış demektir ve mağaza metni onları
-   anlattığı için metin düzeltilmeli.
-3. **Ödeme ekranındaki fiyat** (önizlemede ₺59,99 görünüyordu).
-4. **Birkaç gün sonra** `npm run appcheck:status` — ölçümü **Play dahili test kanalından** inen
+### TestFlight denemesi (1 Kasım) — doğrulananlar
+Kullanıcı 1.5.0'ı iOS TestFlight'ta denedi. **Arkadaş araması çalışıyor**; **yeni özelliklerin
+hepsi build'de** (yani EAS commit'lenmemiş çalışma ağacını da arşive almış — mağaza metni doğru).
+
+### Açık iki bulgu
+1. **iOS alternatif uygulama simgesi seçilemiyordu — düzeltildi, DOĞRULANMADI.**
+   Kök sebep EAS derleme kaydından ölçüldü: `plugins/withAlternateAppIcons.js` her alternatif
+   kümeyi tek ölçülü (1024, `idiom: "universal"`) yazıyordu. actool `--alternate-app-icon Glass
+   … Light` bayraklarını hatasız aldı ama pakete yalnız `AppIcon60x60@2x.png` ve
+   `AppIcon76x76@2x~ipad.png` koydu — alternatifler için hiçbir dosya yok, `setAlternateIconName`
+   de cihazda düşüyor. (Expo birincil simgeyi aynı tek-ölçülü biçimde yazar ve orada sorun
+   olmaz; fark alternatif kümelerde.) Eklenti artık Xcode'un klasik 16 slotunu yazıyor;
+   bekçi test: `__tests__/alternateAppIconsIos.test.js`. `components/settings/AppIconSection.js`
+   artık hata sebebini yayın yapısında da gösteriyor. **Yalnız yeni bir iOS build'i doğrular.**
+2. **iOS'ta "premium mağaza paketleri henüz hazır değil" — kodda değil, App Store Connect'te.**
+   RevenueCat yapılandırılmış (`EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` build ortamında vardı, yoksa
+   mesaj "API anahtarı bekleniyor" olurdu); teklif iOS ürünü döndürmüyor. Kullanıcı tarafı:
+   ürünler "Ready to Submit", ilk IAP'ler bir sürümle incelemeye gönderilmiş, Paid Applications
+   Agreement etkin, RevenueCat offering'inde iOS ürünleri bağlı. Android'de fiyat (₺59,99)
+   görünüyordu.
+
+### Kullanıcıda
+1. **App Store Connect IAP durumu** (yukarıdaki dört madde).
+2. **Birkaç gün sonra** `npm run appcheck:status` — ölçümü **Play dahili test kanalından** inen
    sürümle yap; emülatör ve elle kurulan APK Play Integrity doğrulamasını bilerek geçemiyor.
 
 ### Birlikte yapılacaklar (kullanıcı hazır olduğunda)

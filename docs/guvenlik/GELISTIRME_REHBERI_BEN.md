@@ -19,16 +19,39 @@ Dal: `codex/release-candidate-1.4.3`, **push'lu**. Sürüm **1.5.0**. Testler: u
 iOS build 25 ve Android versionCode 5 — ikisi de 1.5.0, `production` profili, mağaza dağıtımı,
 commit `9cb0651`. Sürüm numaralarını EAS kendi artırdı.
 
-### ✋ Sıra sende: test sürümünü indirip dört şeyi kontrol et
+### ✅ TestFlight denemesi (1 Kasım) — iki bulgu
 
-1. **Arkadaş araması.** Çalışmalı. Eski yolu kapattığımız için yedeği yok; çalışmazsa haber ver.
-2. **Yeni özellikler yerinde mi:** Haftalık Lig, Film Kulübü, Meydan Okumalar, Günün Karesi,
-   Film Zinciri ve yeni uygulama simgeleri. Bunlar commit'lenmemiş dosyalardan geliyordu —
-   görünmüyorlarsa build'e girmemişler demektir, mağaza metnini düzeltmemiz gerekir.
-3. **Ödeme ekranındaki fiyat** (önizlemede ₺59,99 görünüyordu).
-4. **Birkaç gün kullandıktan sonra** `npm run appcheck:status` çalıştır, çıktıyı bana göster.
+Sen 1.5.0'ı iOS TestFlight'ta denedin. **Arkadaş araması çalışıyor** (yeni sunucu ucu bağlı) ve
+**yeni özelliklerin hepsi yerinde** — yani commit'lenmemiş dosyalar build'e girmiş, mağaza metni
+doğru. İki şey çıktı:
+
+**1. Uygulama simgesi değiştirilemiyor (düzeltildi, yeni build gerekir).**
+Sebebi EAS derleme kaydından buldum: alternatif simge kümeleri tek ölçülü (1024, "universal")
+yazılıyordu. Expo birincil simgeyi böyle yazar ve sorun olmaz, ama alternatif kümelerde aynı
+biçim sessizce boş geçiyor — actool `--alternate-app-icon` bayraklarını hatasız aldı, pakete
+birincil simge dışında hiçbir simge dosyası koymadı. `plugins/withAlternateAppIcons.js` artık
+Xcode'un klasik şablonundaki 16 slotu (iPhone 60@2x/@3x, iPad 76@2x, 83.5@2x…) yazıyor.
+Hata metni de artık ekranda görünüyor; yine düşerse sebebi okuyabileceğiz.
+**Cihazda denenmedi** — ancak yeni bir build ile doğrulanabilir.
+
+**2. "Premium mağaza paketleri henüz hazır değil" (sende olan iş).**
+Bu kod hatası değil: RevenueCat yapılandırıldı (iOS anahtarı build'e girmiş) ama App Store'dan
+ürün dönmüyor. TestFlight gerçek StoreKit kum havuzunu kullanır, ürünlerin hazır olması şart:
+- App Store Connect → Abonelikler: her ürün **"Gönderilmeye hazır"** durumunda olmalı
+  (fiyat, yerelleştirme, 1024 görsel, abonelik grubu eksiksiz).
+- İlk kez IAP yayınlıyorsan ürünler bir **uygulama sürümüyle birlikte incelemeye gönderilmeli**;
+  onaylanana kadar kum havuzunda da boş dönebilir.
+- **Paid Applications Agreement** (Anlaşmalar, Vergi ve Bankacılık) etkin olmalı.
+- RevenueCat → Products/Offerings: iOS ürünleri teklife (offering) **eklenmiş** olmalı.
+Android'de ₺59,99 görünüyordu, yani teklif yapısı Play tarafında doğru kurulmuş.
+
+### ✋ Sıra sende
+
+1. **App Store Connect'te yukarıdaki dört maddeyi kontrol et** — hangisi eksikse söyle.
+2. **Birkaç gün kullandıktan sonra** `npm run appcheck:status` çalıştır, çıktıyı bana göster.
    Ölçümü **Play'in dahili test kanalından** indirdiğin sürümle yap; emülatör ve bilgisayardan
    kurduğun APK bu doğrulamayı bilerek geçemiyor.
+3. **Simge düzeltmesi için yeni build** — ne zaman istersen (tek başına acil değil).
 
 ### 🤝 Birlikte yapacaklarımız (sen hazır olduğunda)
 

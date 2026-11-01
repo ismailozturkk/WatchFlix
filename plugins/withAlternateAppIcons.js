@@ -269,6 +269,50 @@ function withAndroidAlternateIcons(config, icons) {
 
 // ──────────────────────────────── iOS ──────────────────────────────────────
 
+// Alternatif simge kümesinin SLOTLARI (Xcode'un "iOS App Icon" şablonuyla aynı).
+//
+// NEDEN TEK 1024 YETMİYOR: Expo birincil simgeyi tek ölçülü ("universal",
+// 1024x1024) yazıyor ve actool bunu kabul edip gerçek boyutları kendi türetiyor.
+// ALTERNATİF kümelerde ise aynı biçim sessizce boş geçiyor: 1.5.0 build'inde
+// actool'a `--alternate-app-icon Glass … Light` verildi, hata vermedi ama
+// paketin içine birincil simge dışında hiçbir simge dosyası koymadı
+// (derleme kaydı yalnız AppIcon60x60@2x.png + AppIcon76x76@2x~ipad.png gösteriyor).
+// Sonuç: `setAlternateIconName` cihazda "simge yok" diye düşüyor.
+// Bu yüzden alternatifler, Xcode'un klasik şablonundaki slotlarla yazılıyor.
+const IOS_ICON_SLOTS = [
+  { idiom: "iphone", size: 20, scale: 2 },
+  { idiom: "iphone", size: 20, scale: 3 },
+  { idiom: "iphone", size: 29, scale: 2 },
+  { idiom: "iphone", size: 29, scale: 3 },
+  { idiom: "iphone", size: 40, scale: 2 },
+  { idiom: "iphone", size: 40, scale: 3 },
+  { idiom: "iphone", size: 60, scale: 2 },
+  { idiom: "iphone", size: 60, scale: 3 },
+  { idiom: "ipad", size: 20, scale: 1 },
+  { idiom: "ipad", size: 20, scale: 2 },
+  { idiom: "ipad", size: 29, scale: 1 },
+  { idiom: "ipad", size: 29, scale: 2 },
+  { idiom: "ipad", size: 40, scale: 1 },
+  { idiom: "ipad", size: 40, scale: 2 },
+  { idiom: "ipad", size: 76, scale: 2 },
+  { idiom: "ipad", size: 83.5, scale: 2 },
+];
+
+/** "83.5" gibi ölçüler dosya adında noktalı kalır (Xcode böyle yazar). */
+const slotSizeText = (size) => String(size);
+const slotFileName = (name, slot) =>
+  `${name}-${slotSizeText(slot.size)}x${slotSizeText(slot.size)}@${slot.scale}x~${slot.idiom}.png`;
+
+/** Kümenin Contents.json "images" dizisi — saf, testten doğrulanır. */
+function iosImagesJson(name) {
+  return IOS_ICON_SLOTS.map((slot) => ({
+    filename: slotFileName(name, slot),
+    idiom: slot.idiom,
+    scale: `${slot.scale}x`,
+    size: `${slotSizeText(slot.size)}x${slotSizeText(slot.size)}`,
+  }));
+}
+
 async function generateIosIcon(projectRoot, icon) {
   const iosRoot = path.join(projectRoot, "ios");
   const projectName = IOSConfig.XcodeUtils.getProjectName(projectRoot);
@@ -277,29 +321,32 @@ async function generateIosIcon(projectRoot, icon) {
 
   // App Store simgesi alfa kanalı İÇEREMEZ; kaynak görseller neredeyse opak ama
   // alfa kanallı (254). Expo'nun kendi iOS simgesinde yaptığı gibi düzleştir.
-  const { source } = await generateImageAsync(
-    { projectRoot, cacheType: `${resourcePrefix(icon.name)}-ios` },
-    {
-      src: icon.ios,
-      width: 1024,
-      height: 1024,
-      resizeMode: "cover",
-      backgroundColor: "#000000",
-      removeTransparency: true,
-    },
-  );
-  const fileName = `${icon.name}.png`;
-  fs.writeFileSync(path.join(setDir, fileName), source);
+  // Aynı piksel ölçüsü birden çok slotta geçiyor (ör. 40x40@3x ve 60x60@2x = 120px);
+  // görsel bir kez üretilip her slotun dosyasına yazılır.
+  const images = iosImagesJson(icon.name);
+  const byPixels = new Map();
+  for (const [index, slot] of IOS_ICON_SLOTS.entries()) {
+    const pixels = Math.round(slot.size * slot.scale);
+    if (!byPixels.has(pixels)) {
+      const { source } = await generateImageAsync(
+        { projectRoot, cacheType: `${resourcePrefix(icon.name)}-ios-${pixels}` },
+        {
+          src: icon.ios,
+          width: pixels,
+          height: pixels,
+          resizeMode: "cover",
+          backgroundColor: "#000000",
+          removeTransparency: true,
+        },
+      );
+      byPixels.set(pixels, source);
+    }
+    fs.writeFileSync(path.join(setDir, images[index].filename), byPixels.get(pixels));
+  }
+
   fs.writeFileSync(
     path.join(setDir, "Contents.json"),
-    JSON.stringify(
-      {
-        images: [{ filename: fileName, idiom: "universal", platform: "ios", size: "1024x1024" }],
-        info: { version: 1, author: "expo" },
-      },
-      null,
-      2,
-    ),
+    JSON.stringify({ images, info: { version: 1, author: "expo" } }, null, 2),
   );
 }
 
@@ -375,3 +422,5 @@ module.exports = function withAlternateAppIcons(config, props) {
 };
 
 module.exports.DEFAULT_ALIAS = DEFAULT_ALIAS;
+module.exports.IOS_ICON_SLOTS = IOS_ICON_SLOTS;
+module.exports.iosImagesJson = iosImagesJson;
