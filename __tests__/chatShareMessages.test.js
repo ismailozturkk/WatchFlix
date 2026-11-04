@@ -375,7 +375,103 @@ describe("SharedAiMessage", () => {
     const text = textOf(render(<SharedAiMessage share={share} getTmdbUrl={getTmdbUrl} />).root);
     ["Gün 1", "Erken yat", "Gün 2", "Severance", "Dizi"].forEach((part) => expect(text).toContain(part));
   });
-});
+
+  test("recommendations are ranked and show runtime and genre chips", () => {
+    const share = aiShare({ sections: [{ picks: picks(2, { minutes: 135, genres: ["Gerilim"] }) }] });
+    const text = textOf(render(<SharedAiMessage share={share} getTmdbUrl={getTmdbUrl} />).root);
+    expect(text).toContain("2 sa 15 dk");
+    expect(text).toContain("Gerilim");
+    expect(text).toMatch(/\|1\|.*\|2\|/);
+  });
+
+  test("a watch plan sums each session's movie runtime and counts series", () => {
+    const share = buildAiShare({
+      variant: "watch_plan",
+      sections: [
+        {
+          label: "Cuma",
+          picks: [
+            { media_type: "movie", title: "A", id: 1, minutes: 100 },
+            { media_type: "movie", title: "B", id: 2, minutes: 50 },
+            { media_type: "tv", title: "C", id: 3 },
+          ],
+        },
+      ],
+    });
+    const text = textOf(render(<SharedAiMessage share={share} getTmdbUrl={getTmdbUrl} />).root);
+    expect(text).toContain("2 sa 30 dk · 2 film");
+    expect(text).toContain("+ 1 dizi");
+  });
+
+  test("a long watch plan folds after three sessions", () => {
+    const share = buildAiShare({
+      variant: "watch_plan",
+      sections: [1, 2, 3, 4, 5].map((n) => ({ label: `Oturum ${n}`, picks: picks(1) })),
+    });
+    const root = render(<SharedAiMessage share={share} getTmdbUrl={getTmdbUrl} />).root;
+    expect(textOf(root)).toContain("Oturum 3");
+    expect(textOf(root)).not.toContain("Oturum 4");
+    expect(textOf(root)).toContain("Tümünü gör (5)");
+  });
+
+  test("a comparison crowns the higher total and lists metrics, pros and cons", () => {
+    const share = buildAiShare({
+      variant: "comparison",
+      versus: true,
+      summary: "B daha iyi",
+      sections: [{ picks: picks(2) }],
+      compare: {
+        metrics: [
+          { key: "story", label: "Hikâye", left: 3, right: 5 },
+          { key: "pacing", label: "Tempo", left: 4, right: 4 },
+        ],
+        leftPros: ["Hızlı"],
+        rightCons: ["Uzun"],
+      },
+    });
+    const root = render(<SharedAiMessage share={share} getTmdbUrl={getTmdbUrl} />).root;
+    const text = textOf(root);
+    ["Hikâye", "Tempo", "Hızlı", "Uzun", "Sonuç", "B daha iyi"].forEach((part) => expect(text).toContain(part));
+    expect(text).toContain("|7|9|");
+    const trophies = root.findAll((node) => node.type === "Icon" && node.props.name === "trophy");
+    // Kazananın tacı + sonuç kutusu
+    expect(trophies).toHaveLength(2);
+  });
+
+  test("a title spotlight shows its banner, credits and a detail button", () => {
+    const onOpenItem = jest.fn();
+    const share = buildAiShare({
+      variant: "title_spotlight",
+      summary: "Görsel şölen",
+      sections: [{ picks: [{ media_type: "movie", title: "Dune", id: 5, year: "2021", minutes: 155, rating: 8.1 }] }],
+      spotlight: {
+        backdrop_path: "/bg.jpg",
+        tagline: "Kaderin ötesinde",
+        director: "Denis Villeneuve",
+        cast: ["Zendaya"],
+      },
+    });
+    const root = render(<SharedAiMessage share={share} getTmdbUrl={getTmdbUrl} onOpenItem={onOpenItem} />).root;
+    const text = textOf(root);
+    ["Kaderin ötesinde", "Denis Villeneuve", "Zendaya", "2 sa 35 dk", "★ 8.1", "Görsel şölen", "Detay"].forEach(
+      (part) => expect(text).toContain(part),
+    );
+    const images = root.findAllByType("Image").map((node) => node.props.source.uri);
+    expect(images).toContain("https://img.test/w780/bg.jpg");
+    press(byLabel(root, "Dune"));
+    expect(onOpenItem).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }));
+  });
+
+  test("an old spotlight message without extras still renders its title and take", () => {
+    const share = buildAiShare({
+      variant: "title_spotlight",
+      summary: "Görsel şölen",
+      sections: [{ picks: [{ media_type: "movie", title: "Dune" }] }],
+    });
+    const root = render(<SharedAiMessage share={share} getTmdbUrl={getTmdbUrl} />).root;
+    expect(textOf(root)).toContain("Dune");
+    expect(root.findAllByType("Gradient")).toHaveLength(0);
+  });});
 
 describe("MessageBubble yönlendirmesi", () => {
   const currentUser = { uid: "me" };

@@ -95,6 +95,7 @@ const USES_RESOLVER = /\busePosterUri\b|\busePosterResolver\b/;
 // Arka planı doğrudan kuran ama BİLEREK çözücüden geçmeyen dosyalar.
 const EXCLUDED_BACKDROP = {
   "components/AICineCards.js": "AI yanıt kartı",
+  "components/chat/SharedAiMessage.js": "sohbet anlık görüntüsü (gönderenin AI kartındaki banner)",
   "components/modals/ImageGalleryModal.js": "galeri TÜM arka planları listeler (seçici burada)",
   "components/wrapped/WrappedShareCard.js": "Wrapped (sonraki faz)",
   "screens/story/StoryShareScreen.js": "paylaşım kartı (sonraki faz)",

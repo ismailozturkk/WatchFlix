@@ -715,6 +715,8 @@ function sharePickOf(item, posterMap) {
           poster_path: card.posterPath || undefined,
           year: card.year ? String(card.year) : undefined,
           rating: safeNum(card.rating) > 0 ? safeNum(card.rating) : undefined,
+          minutes: safeNum(card.runtimeMinutes) > 0 ? safeNum(card.runtimeMinutes) : undefined,
+          genres: safeArr(card.genres).map(toStr).filter(Boolean).slice(0, 3),
         }
       : {}),
     note: shareNote(item?.reason || item?.why || item?.hook || item?.note),
@@ -745,6 +747,13 @@ export function buildChatShare(response, posterMap, { question } = {}) {
         versus: true,
         summary: toStr(response.verdict),
         sections: [{ picks: picksOf([response.left, response.right]) }],
+        compare: {
+          metrics: safeArr(response.metrics),
+          leftPros: safeArr(response.leftPros),
+          leftCons: safeArr(response.leftCons),
+          rightPros: safeArr(response.rightPros),
+          rightCons: safeArr(response.rightCons),
+        },
       });
     case "watch_plan":
       return buildAiShare({
@@ -764,12 +773,22 @@ export function buildChatShare(response, posterMap, { question } = {}) {
           picks: picksOf(section?.items),
         })),
       });
-    case "title_spotlight":
+    case "title_spotlight": {
+      const card = (posterMap || {})[posterKey(response.mediaType, toStr(response.title))];
+      const found = !!card?.found;
       return buildAiShare({
         ...base,
         summary: toStr(response.take || response.summary),
         sections: [{ picks: picksOf([response]) }],
+        spotlight: {
+          backdrop_path: found ? card.backdropPath : undefined,
+          tagline: found ? toStr(card.tagline) : "",
+          director: toStr((found && card.director) || response.director),
+          cast: safeArr((found && card.cast) || response.cast),
+          overview: found ? toStr(card.overview) : "",
+        },
       });
+    }
     default:
       return buildAiShare({
         ...base,

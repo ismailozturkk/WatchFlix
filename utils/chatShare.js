@@ -22,9 +22,13 @@
 //   (post / tournament / cineRoom gövdeleri aşağıdaki build*/sanitize* içinde)
 //   list share  { v, type:"list", title, listKey?, source?, total, items[] }
 //     item      { id, media_type, title, poster_path?, genres?, minutes?, … }
-//   ai share    { v, type:"ai", variant, question?, summary?, versus?, total, sections[] }
+//   ai share    { v, type:"ai", variant, question?, summary?, versus?, compare?, spotlight?,
+//                 total, sections[] }
 //     section   { label?, labelKey?, note?, picks[] }
-//     pick      { media_type, title, id?, poster_path?, year?, rating?, note?, must? }
+//     pick      { media_type, title, id?, poster_path?, year?, rating?, note?, must?,
+//                 minutes?, genres? }
+//     compare   { metrics?[{key?,label?,left,right}], leftPros?, leftCons?, rightPros?, rightCons? }
+//     spotlight { backdrop_path?, tagline?, director?, cast?, overview? }
 //
 // `id` yalnız TMDB'de BULUNAN başlıklarda var; yoksa kart dokunulamaz (alıcı
 // tarafında detay ekranına gidecek kimlik yok).
@@ -280,7 +284,75 @@ function sanitizePick(raw) {
   const note = clip(raw.note, MAX_NOTE);
   if (note) pick.note = note;
   if (raw.must === true) pick.must = true;
+  // Kalıp olguları (CineMatch kartındaki gibi): süre ve en çok üç tür.
+  const minutes = finitePositive(raw.minutes ?? raw.runtimeMinutes);
+  if (minutes && minutes <= MAX_PICK_MINUTES) pick.minutes = Math.round(minutes);
+  const genres = shortList(raw.genres, 3, 24);
+  if (genres.length) pick.genres = genres;
   return pick;
+}
+
+// Karşılaştırma tablosu ve yapım detayı — AI ekranındaki kalıbın sohbette aynı
+// düzende çizilebilmesi için gereken ek alanlar. Hepsi isteğe bağlı: eski
+// mesajlarda yoktur, kart yokluğunda o bloğu çizmez.
+const MAX_PICK_MINUTES = 1000;
+const MAX_METRICS = 6;
+const MAX_PROS = 3;
+const MAX_PRO_TEXT = 100;
+const MAX_OVERVIEW = 420;
+
+function shortList(raw, max, maxText) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry) => clip(entry, maxText))
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+const scoreOf = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, Math.min(5, Math.round(n))) : null;
+};
+
+function sanitizeCompare(raw) {
+  if (!isObject(raw)) return null;
+  const metrics = [];
+  (Array.isArray(raw.metrics) ? raw.metrics : []).forEach((entry) => {
+    if (!isObject(entry) || metrics.length >= MAX_METRICS) return;
+    const left = scoreOf(entry.left ?? entry.leftScore);
+    const right = scoreOf(entry.right ?? entry.rightScore);
+    if (left === null || right === null) return;
+    const metric = { left, right };
+    const key = clip(entry.key, 20).toLowerCase();
+    if (/^[a-z_]+$/.test(key)) metric.key = key;
+    const label = clip(entry.label, 30);
+    if (label) metric.label = label;
+    if (!metric.key && !metric.label) return;
+    metrics.push(metric);
+  });
+  const compare = {};
+  if (metrics.length) compare.metrics = metrics;
+  ["leftPros", "leftCons", "rightPros", "rightCons"].forEach((field) => {
+    const list = shortList(raw[field], MAX_PROS, MAX_PRO_TEXT);
+    if (list.length) compare[field] = list;
+  });
+  return Object.keys(compare).length ? compare : null;
+}
+
+function sanitizeSpotlight(raw) {
+  if (!isObject(raw)) return null;
+  const spotlight = {};
+  const backdrop = raw.backdrop_path || raw.backdropPath;
+  if (typeof backdrop === "string" && /^\/[\w.-]{1,80}$/.test(backdrop)) spotlight.backdrop_path = backdrop;
+  const tagline = clip(raw.tagline, 120);
+  if (tagline) spotlight.tagline = tagline;
+  const director = clip(raw.director, 60);
+  if (director) spotlight.director = director;
+  const cast = shortList(raw.cast, 4, 40);
+  if (cast.length) spotlight.cast = cast;
+  const overview = clipMultiline(raw.overview, MAX_OVERVIEW);
+  if (overview) spotlight.overview = overview;
+  return Object.keys(spotlight).length ? spotlight : null;
 }
 
 function sanitizeAiShare(raw) {
@@ -323,16 +395,25 @@ function sanitizeAiShare(raw) {
   // Karşılaştırma yalnız İKİ başlık varken yan yana çizilebilir.
   if (raw.versus === true && sections.length === 1 && sections[0].picks.length === 2) {
     share.versus = true;
+    const compare = sanitizeCompare(raw.compare);
+    if (compare) share.compare = compare;
+  }
+  if (variant === "title_spotlight" && sections.length === 1 && sections[0].picks.length === 1) {
+    const spotlight = sanitizeSpotlight(raw.spotlight);
+    if (spotlight) share.spotlight = spotlight;
   }
   return share;
 }
 
+
 /**
  * CineMatch cevabının serileştirilebilir özeti. `sections` çağıran tarafça
  * (services/aiCineInsights.buildChatShare) kurulur; burada yalnız doğrulanır.
+ * `compare` (karşılaştırma tablosu) yalnız iki başlıklı `versus` kartta,
+ * `spotlight` (yapım detayı ekleri) yalnız tek başlıklı yapım detayında kalır.
  */
-export function buildAiShare({ variant, question, summary, versus, sections } = {}) {
-  return sanitizeAiShare({ variant, question, summary, versus, sections });
+export function buildAiShare({ variant, question, summary, versus, sections, compare, spotlight } = {}) {
+  return sanitizeAiShare({ variant, question, summary, versus, sections, compare, spotlight });
 }
 
 // ─── Gönderi (Hub'daki Paylaşımlar) ──────────────────────────────────────────

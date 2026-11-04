@@ -294,6 +294,78 @@ describe("buildChatShare (CineMatch cevabı → mesaj)", () => {
     expect(share.sections[0].picks).toHaveLength(1);
   });
 
+  it("kalıp olguları: bulunan başlık süre ve en çok üç tür taşır", () => {
+    const share = buildChatShare(
+      { type: "recommendations", items: [{ title: "Dune", mediaType: "movie" }] },
+      card("movie", "Dune", { runtimeMinutes: 155, genres: ["Bilim Kurgu", "Macera", "Dram", "Aksiyon"] }),
+    );
+    expect(share.sections[0].picks[0]).toMatchObject({ minutes: 155, genres: ["Bilim Kurgu", "Macera", "Dram"] });
+  });
+
+  it("karşılaştırma: metrikler, artı/eksiler sohbete taşınır", () => {
+    const posterMap = { ...card("movie", "Dune"), ...card("movie", "Arrival") };
+    const share = buildChatShare(
+      {
+        type: "comparison",
+        left: { title: "Dune", mediaType: "movie" },
+        right: { title: "Arrival", mediaType: "movie" },
+        metrics: [
+          { key: "story", left: 4, right: 5 },
+          { key: "visuals", left: 5.4, right: -2 },
+          { key: "bozuk" },
+        ],
+        leftPros: ["Görsellik"],
+        rightCons: ["Yavaş", "", "Soğuk", "Uzun", "Fazla"],
+        verdict: "Arrival daha sakin",
+      },
+      posterMap,
+    );
+    expect(share.compare.metrics).toEqual([
+      { key: "story", left: 4, right: 5 },
+      { key: "visuals", left: 5, right: 0 },
+    ]);
+    expect(share.compare.leftPros).toEqual(["Görsellik"]);
+    expect(share.compare.rightCons).toEqual(["Yavaş", "Soğuk", "Uzun"]);
+    expect(share.compare.leftCons).toBeUndefined();
+  });
+
+  it("yapım detayı: banner, slogan, yönetmen, oyuncular ve özet taşınır", () => {
+    const share = buildChatShare(
+      { type: "title_spotlight", title: "Dune", mediaType: "movie", take: "Görsel şölen" },
+      card("movie", "Dune", {
+        backdropPath: "/dune-bg.jpg",
+        tagline: "Kaderin ötesinde",
+        director: "Denis Villeneuve",
+        cast: ["Timothée Chalamet", "Zendaya", "Rebecca Ferguson", "Oscar Isaac", "Josh Brolin"],
+        overview: "Paul Atreides çöl gezegenine gelir.",
+      }),
+    );
+    expect(share.spotlight).toEqual({
+      backdrop_path: "/dune-bg.jpg",
+      tagline: "Kaderin ötesinde",
+      director: "Denis Villeneuve",
+      cast: ["Timothée Chalamet", "Zendaya", "Rebecca Ferguson", "Oscar Isaac"],
+      overview: "Paul Atreides çöl gezegenine gelir.",
+    });
+  });
+
+  it("ek alanlar yalnız kendi kalıbında kalır, bozuk banner yolu düşer", () => {
+    const rec = buildAiShare({
+      variant: "recommendations",
+      sections: [{ picks: [{ media_type: "movie", title: "A" }] }],
+      compare: { leftPros: ["x"] },
+      spotlight: { tagline: "y" },
+    });
+    expect(rec.compare).toBeUndefined();
+    expect(rec.spotlight).toBeUndefined();
+    const spot = buildAiShare({
+      variant: "title_spotlight",
+      sections: [{ picks: [{ media_type: "movie", title: "A" }] }],
+      spotlight: { backdrop_path: "https://evil.test/x.jpg" },
+    });
+    expect(spot.spotlight).toBeUndefined();
+  });
+
   it("genel cevap: yalnız metin yeterli", () => {
     const share = buildChatShare({ type: "general", content: "Merhaba, nasıl yardımcı olayım?" }, {});
     expect(share.variant).toBe("general");
