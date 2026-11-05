@@ -27,6 +27,7 @@ import { fetchPersonTitles } from "@services/watchChallengeMeta";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 import { flagOf } from "../../utils/watchChallenges";
 import { ChallengeBar, ChallengeMedal, ChallengePoster } from "./ChallengeParts";
+import { upperText } from "@utils/i18nText";
 
 const COLUMNS = 4;
 const GAP = 8;
@@ -203,7 +204,7 @@ export default function ChallengeSheet({
 function Counted({ challenge, progress, copy, theme, color, posterWidth, titles, onOpen }) {
   const kind = challenge.rule.kind;
   const header = (
-    <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{copy.counted.toLocaleUpperCase()}</Text>
+    <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{upperText(copy.counted)}</Text>
   );
   const pending = progress.pending?.length ? (
     <Text style={[styles.pending, { color: theme.text.muted }]}>{copy.pending}</Text>

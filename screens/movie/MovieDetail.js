@@ -656,7 +656,10 @@ export default function MovieDetails({ navigation, route }) {
     const toastAdd = () =>
       Toast.show({
         type: "success",
-        text1: `${type === "movie" ? i18nText("autoI18n.film", "Film") : i18nText("autoI18n.dizi", "Dizi")} ${getListName(listType)} listesine eklendi!`,
+        text1: i18nText("autoI18n.media_added_to_list", "{{media}} {{list}} listesine eklendi!", {
+          media: type === "movie" ? i18nText("autoI18n.film", "Film") : i18nText("autoI18n.dizi", "Dizi"),
+          list: getListName(listType),
+        }),
       });
 
     try {
@@ -981,12 +984,15 @@ export default function MovieDetails({ navigation, route }) {
             >
               {details.title}
             </Text>
-            {details.alternative_titles?.titles?.length > 0 && (
+            {/* Özgün ad, yalnız görünen addan farklıysa. Eskiden alternatif
+                adların İLKİ basılıyordu; TMDB sırası rastgele bir ülkeninki
+                olduğundan İngilizce arayüzde "星际穿越" çıkıyordu. */}
+            {!!details.original_title && details.original_title !== details.title && (
               <Text
                 allowFontScaling={false}
                 style={[styles.altTitle, { color: theme.text.muted }]}
               >
-                {details.alternative_titles.titles[0].title}
+                {details.original_title}
               </Text>
             )}
             {details.tagline ? (

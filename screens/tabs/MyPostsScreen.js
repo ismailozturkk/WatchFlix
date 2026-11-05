@@ -29,7 +29,7 @@ import { useAuth } from "../../context/AuthContext";
 import { usePosts } from "../../context/PostsContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { fetchUserPosts } from "../../services/postsService";
-import { i18nText } from "../../utils/i18nText";
+import { i18nText, percentText } from "../../utils/i18nText";
 import { formatTimeAgo } from "../../utils/postTime";
 import { postTypeBadge, tallyVotes } from "../../utils/postComposer";
 import { alpha } from "../../theme/colors";
@@ -111,7 +111,7 @@ function MyPostCard({ post, theme, t, onMenu }) {
                           i18nText("autoI18n.secenek_n", "Seçenek {{n}}", { n: o._idx + 1 })}
                       </Text>
                       <Text style={[st.pollPct, { color: rank === 0 && total > 0 ? accent : theme.text.muted }]}>
-                        %{p}
+                        {percentText(p)}
                       </Text>
                     </View>
                     <View style={[st.pollTrack, { backgroundColor: theme.border }]}>

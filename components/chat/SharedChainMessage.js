@@ -26,6 +26,7 @@ import { chainPuzzleById, chainResultOf } from "../../utils/filmChain";
 import { getFilmChainCopy } from "../../utils/filmChainCopy";
 import { buildTmdbUrl } from "../../utils/tmdbImageUtils";
 import GlassPressable from "../common/GlassPressable";
+import { upperText } from "@utils/i18nText";
 
 const COLORS = ["#134E4A", "#0F766E", "#14B8A6"];
 const GOLD = "#FFD76A";
@@ -60,7 +61,7 @@ function SharedChainMessage({ share, isOutgoing = false }) {
   const mine = useMemo(() => chainResultOf(raw, share.puzzleId), [raw, share.puzzleId]);
   const known = useMemo(() => !!chainPuzzleById(share.puzzleId), [share.puzzleId]);
 
-  const kicker = share.number ? `${copy.title.toLocaleUpperCase()} · #${share.number}` : copy.title.toLocaleUpperCase();
+  const kicker = share.number ? `${upperText(copy.title)} · #${share.number}` : upperText(copy.title);
   const actors = share.links + 1;
 
   const open = () => {

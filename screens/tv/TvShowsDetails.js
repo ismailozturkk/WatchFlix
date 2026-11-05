@@ -926,7 +926,7 @@ export default function TvShowsDetails({ route, navigation }) {
                 icon: "play-circle-outline",
                 value: details.number_of_episodes || 0,
                 trailing: watchedEpisodeCount > 0 ? ` / ${watchedEpisodeCount}` : null,
-                label: t.episode,
+                label: t.episodes || t.episode,
                 color: theme.colors?.blue,
               },
               { key: "date", icon: "calendar-outline", value: formatDate(details.first_air_date), label: t.tvShowsDetails?.airDate, color: theme.colors?.green },
@@ -1006,7 +1006,7 @@ export default function TvShowsDetails({ route, navigation }) {
                         {
                           icon: "play-circle-outline",
                           val: details.number_of_episodes,
-                          lbl: t.episode,
+                          lbl: t.episodes || t.episode,
                         },
                         {
                           icon: "star-outline",

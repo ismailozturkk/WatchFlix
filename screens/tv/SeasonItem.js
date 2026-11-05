@@ -172,7 +172,7 @@ const SeasonItem = ({
   // Başlığın yanına gelen tek satırlık bilgi: "10 Bölüm · 5 Oca 2020"
   const seasonMetaText = [
     season.episode_count
-      ? `${season.episode_count} ${t.episode}`
+      ? `${season.episode_count} ${season.episode_count === 1 ? t.episode : t.episodes || t.episode}`
       : t.episodeCountUnknown,
     season.air_date ? formatDateShort(season.air_date) : null,
   ]

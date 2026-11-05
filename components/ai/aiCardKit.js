@@ -17,6 +17,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { alpha } from "../../theme/colors";
 import { normMediaType, posterKey, safeArr, safeNum, toStr } from "../../services/aiCineService";
 import { MATCH_SCORE_MIN_VISIBLE, computeMatchScore, matchLevel } from "../../services/aiCineInsights";
+import { percentText } from "@utils/i18nText";
 
 export const ratingColor = (r) => {
   if (r >= 8) return "#29b864";
@@ -104,7 +105,7 @@ export const MatchPill = memo(({ score, theme, copy }) => {
     <View style={[s.matchPill, { backgroundColor: alpha(tint, 0.14), borderColor: alpha(tint, 0.5) }]}>
       <Ionicons name="sparkles" size={11} color={tint} />
       <Text style={[s.matchText, { color: tint }]} numberOfLines={1}>
-        {copy.actions.matchLabel} %{score}
+        {copy.actions.matchLabel} {percentText(score)}
       </Text>
     </View>
   );

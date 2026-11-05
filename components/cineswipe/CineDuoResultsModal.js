@@ -21,6 +21,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
 import { cineMediaKey, fillText, posterUrl } from "../../services/cineswipe/deckModel";
+import { percentText } from "@utils/i18nText";
 
 /** 0 → hedef arası kübik yavaşlayan sayaç (halka ve yüzde birlikte dolsun). */
 function useCountUp(target, duration = 900) {
@@ -130,7 +131,7 @@ function ResultsBody({
             color={percent >= 50 ? colors.like : colors.accent}
             trackColor={alpha(colors.text, 0.1)}
           >
-            <Text style={[styles.ringValue, { color: colors.text }]}>%{Math.round(animated)}</Text>
+            <Text style={[styles.ringValue, { color: colors.text }]}>{percentText(Math.round(animated))}</Text>
             <Text style={[styles.ringLabel, { color: colors.textSecondary }]}>{text.matchRate}</Text>
           </LevelRing>
           <View style={styles.heroStats}>

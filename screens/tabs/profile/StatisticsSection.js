@@ -19,6 +19,14 @@ import { useProfileStats } from "../../../context/ProfileStatsContext";
 
 const COUNT_MODES = ["total", "unique"];
 const TIME_UNITS = ["years", "months", "days", "hours", "minutes"];
+
+// Değer 1 olduğunda tekil birim ("1 Month", "1 Mes"); Türkçe'de tekil/çoğul aynı.
+const SINGULAR_UNITS = {
+  en: { years: "Year", months: "Month", days: "Day", hours: "Hour", minutes: "Minute" },
+  es: { years: "Año", months: "Mes", days: "Día", hours: "Hora", minutes: "Minuto" },
+  pt: { years: "ano", months: "mês", days: "dia", hours: "hora", minutes: "minuto" },
+  de: { years: "Jahr", months: "Monat", days: "Tag", hours: "Stunde", minutes: "Minute" },
+};
 // Film/dizi kartının yüklenirken tuttuğu yer. Gerçek kartın yüksekliğiyle AYNI
 // olmalı (aşağıdaki mediaCard bütçesi), yoksa veri gelince sayfa zıplar.
 // Bütçe: kenarlık 2 + dikey dolgu 24 + başlık 38 + boşluk 9 + süre şeridi 30
@@ -404,7 +412,7 @@ const MediaStatCard = memo(function MediaStatCard({
                   numberOfLines={1}
                   style={[styles.timeLabel, { color: theme.text.muted }]}
                 >
-                  {unitLabels[unit]}
+                  {(time?.[unit] === 1 && unitLabels.singular?.[unit]) || unitLabels[unit]}
                 </Text>
               </View>
             );
@@ -420,7 +428,7 @@ const MediaStatCard = memo(function MediaStatCard({
 const StatisticsSection = () => {
   const navigation = useNavigation();
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const {
     displayMovieCount,
     displayTvCount,
@@ -453,8 +461,9 @@ const StatisticsSection = () => {
       days: (t.profileScreen.days || "").trim(),
       hours: (t.profileScreen.hours || "").trim(),
       minutes: (t.profileScreen.minutes || "").trim(),
+      singular: SINGULAR_UNITS[String(language || "").split(/[-_]/)[0]] || null,
     }),
-    [t.profileScreen],
+    [t.profileScreen, language],
   );
 
   const movieStats = useMemo(

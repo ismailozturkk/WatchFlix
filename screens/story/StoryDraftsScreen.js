@@ -16,7 +16,9 @@ import Toast from "@components/AppToast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@context/ThemeContext";
 import { StoryDraftService } from "@services/StoryDraftService";
+import i18n from "../../translations";
 import { i18nText } from "@utils/i18nText";
+import { intlLocaleOf } from "@utils/appLanguages";
 import { storyDraftGrid } from "@utils/storyCanvasLayout";
 import { appAlert } from "@components/AppAlert";
 import ScreenDecor from "@components/ScreenDecor";
@@ -29,7 +31,8 @@ const GRID_GAP = 10;
 const formatDate = (ts) => {
   if (!ts) return "";
   const d = new Date(ts);
-  return d.toLocaleDateString() + " " + d.toLocaleTimeString().slice(0, 5);
+  const locale = intlLocaleOf(i18n.language);
+  return d.toLocaleDateString(locale) + " " + d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 };
 
 export default function StoryDraftsScreen({ navigation }) {

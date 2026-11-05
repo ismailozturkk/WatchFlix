@@ -58,7 +58,7 @@ import { MyPosterActivityBadge } from "@components/PosterActivityBadge";
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "@services/hapticsService";
-import { i18nText } from "@utils/i18nText";
+import { i18nText, percentText } from "@utils/i18nText";
 import { buildGenreMap } from "@utils/genreLabels";
 import { todayListDate } from "@utils/mediaFacts";
 import {
@@ -1586,7 +1586,7 @@ export default function ListsScreen({ route, navigation }) {
                                 { color: accent },
                               ]}
                             >
-                              %{Math.round(pct * 100)}
+                              {percentText(Math.round(pct * 100))}
                             </Text>
                           </View>
                           <Text

@@ -10,6 +10,26 @@ export function i18nText(key, fallback, options) {
 }
 
 /**
+ * Yüzde metni dilin yazımıyla: Türkçe "%70", Almanca "70 %", diğerleri "70%".
+ * Dil verilmezse uygulamanın o anki dili kullanılır.
+ */
+export function percentText(value, language = i18n.language) {
+  const code = String(language || "en").toLowerCase().split(/[-_]/)[0];
+  if (code === "tr") return `%${value}`;
+  if (code === "de") return `${value} %`;
+  return `${value}%`;
+}
+
+/**
+ * Büyük harf, uygulama diliyle: argümansız `toLocaleUpperCase()` CİHAZ diline
+ * bakar; Türkçe telefonda İngilizce arayüz "FİLM CHAİN" yazıyordu.
+ */
+export function upperText(text, language = i18n.language) {
+  const code = String(language || "en").toLowerCase().split(/[-_]/)[0];
+  return String(text ?? "").toLocaleUpperCase(code === "tr" ? "tr-TR" : code === "de" ? "de-DE" : "en-US");
+}
+
+/**
  * Sayılı metin: sayı 1 ise `${key}_tekil` (varsa), yoksa çoğul anahtar.
  * compatibilityJSON v3'ün çoğul kuralları dillerimizle tutarsız olduğu için
  * i18next çoğulu yerine açık tekil anahtar ("1 Freunde" → "1 Freund").

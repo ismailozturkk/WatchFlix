@@ -25,7 +25,7 @@ import { useProfileNotes } from "../../../context/ProfileNotesContext";
 import { useDeviceNotifications } from "../../../context/DeviceNotificationsContext";
 import * as Haptics from "../../../services/hapticsService";
 import { alpha } from "../../../theme/colors";
-import { i18nCount, i18nText } from "../../../utils/i18nText";
+import { i18nCount, i18nText, percentText } from "../../../utils/i18nText";
 import { PRIME_HANDOFF_MS } from "../../../utils/notificationPriming";
 import { buildNoteColorPairs, sortNotes, todoStats } from "../../../utils/notesView";
 import { formatNoteDate } from "./notes/NoteCards";
@@ -500,7 +500,7 @@ export default function NotesCard({ navigation }) {
                   <StatCell
                     icon="checkmark-done"
                     color={green}
-                    value={`%${progressPct}`}
+                    value={percentText(progressPct)}
                     label={i18nText("autoI18n.tamamlandi_lower", "tamamlandı")}
                     theme={theme}
                     flex={1.25}

@@ -26,6 +26,7 @@ import {
 import { fontFamilyOf, getSettingsShareCopy, themeLabel } from "../../utils/settingsShareCopy";
 import { bubbleMockPosterCount, settingsBubbleWidth } from "../../utils/settingsShareLayout";
 import { sharePalette } from "./shareKit";
+import { upperText } from "@utils/i18nText";
 
 const ICON_BY_ID = Object.fromEntries(SETTINGS_SHARE_SECTIONS.map((section) => [section.id, section.icon]));
 
@@ -75,7 +76,7 @@ function SharedSettingsMessage({ share, isOutgoing = false }) {
         </View>
         <View style={styles.headerCopy}>
           <Text allowFontScaling={false} numberOfLines={1} style={[styles.kicker, { color: palette.tileInk }]}>
-            {copy.kicker.toLocaleUpperCase()}
+            {upperText(copy.kicker)}
           </Text>
           <Text numberOfLines={1} style={[styles.sub, { color: palette.secondary }]}>
             {share.owner ? copy.from(share.owner) : copy.groups(ids.length)}

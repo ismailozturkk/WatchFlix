@@ -39,6 +39,7 @@ import { buildUiColors } from "../../screens/tabs/settings/settingsUi";
 import SettingsThemeMock from "./SettingsThemeMock";
 import SettingsSectionList from "./SettingsSectionList";
 import SettingsShareSheetFrame, { useSettingsSheetLayout } from "./SettingsShareSheetFrame";
+import { upperText } from "@utils/i18nText";
 
 export default function ApplySharedSettingsSheet({ visible, share, own = false, onClose }) {
   const { theme } = useTheme();
@@ -161,7 +162,7 @@ export default function ApplySharedSettingsSheet({ visible, share, own = false, 
 
       <View style={styles.listHead}>
         <Text allowFontScaling={false} numberOfLines={1} style={[styles.listTitle, { color: C.muted }]}>
-          {copy.groups(rows.length).toLocaleUpperCase()}
+          {upperText(copy.groups(rows.length))}
         </Text>
         {selectable.length > 1 ? (
           <GlassPressable glass={false} accessibilityRole="button" onPress={toggleAll} hitSlop={8}>

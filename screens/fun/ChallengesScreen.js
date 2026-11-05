@@ -34,6 +34,7 @@ import useWatchChallenges from "@hooks/useWatchChallenges";
 import { triggerHaptic } from "@services/hapticsService";
 import { getWatchChallengesCopy } from "@utils/watchChallengesCopy";
 import { MAX_ACTIVE_CHALLENGES, PERSON_GROUPS, getChallenge } from "@utils/watchChallenges";
+import { upperText } from "@utils/i18nText";
 
 const GROUP_ICONS = {
   seasonal: "calendar-outline",
@@ -247,7 +248,7 @@ export default function ChallengesScreen({ navigation, route }) {
 }
 
 function SectionTitle({ text, theme }) {
-  return <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{text.toLocaleUpperCase()}</Text>;
+  return <Text style={[styles.sectionTitle, { color: theme.text.muted }]}>{upperText(text)}</Text>;
 }
 
 const styles = StyleSheet.create({

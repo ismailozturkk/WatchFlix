@@ -31,7 +31,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "@services/hapticsService";
 import AppIcon from "@components/AppIcon";
-import { i18nText } from "@utils/i18nText";
+import { i18nText, percentText } from "@utils/i18nText";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const PRESS_SPRING = { mass: 0.5, damping: 13, stiffness: 200 };
@@ -144,7 +144,7 @@ function Cell({
                   ]}
                 />
               </View>
-              <Text style={styles.pctText}>%{pct}</Text>
+              <Text style={styles.pctText}>{percentText(pct)}</Text>
             </View>
           )}
         </LinearGradient>

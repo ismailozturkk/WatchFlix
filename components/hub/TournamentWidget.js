@@ -499,7 +499,7 @@ export default function TournamentWidget({ navigation }) {
   // ekranda İngilizce kimlik çipiyle yan yana sığsın); kelime ekran okuyucuda.
   const voters = agg?.voters > 0 ? agg.voters : 0;
   const votersLabel = voters
-    ? `${voters} ${i18nText("autoI18n.tournament_widget_voters", "katılımcı")}`
+    ? `${voters} ${voters === 1 ? i18nText("autoI18n.tournament_voter_one", "katılımcı") : i18nText("autoI18n.tournament_widget_voters", "katılımcı")}`
     : null;
 
   // Sohbete gönderilecek gövde (utils/chatShare.js): ay + faz + (bittiyse) şampiyon

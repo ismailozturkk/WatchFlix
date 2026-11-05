@@ -55,6 +55,10 @@ jest.mock("expo-image", () => ({ Image: "Image" }));
 jest.mock("expo-linear-gradient", () => ({ LinearGradient: "Gradient" }));
 jest.mock("@expo/vector-icons/Ionicons", () => ({ __esModule: true, default: "Icon" }));
 jest.mock("../utils/i18nText", () => ({
+  // Eski davranışı taklit eder: cihaz diliyle büyük harf, Türkçe yüzde.
+  upperText: (text) => String(text ?? "").toLocaleUpperCase(),
+  percentText: (n) => `%${n}`,
+  i18nCount: (_key, fallback, n) => String(fallback).replace("{{n}}", String(n)),
   i18nText: (_key, fallback, params) =>
     Object.entries(params || {}).reduce(
       (text, [name, value]) => text.replace(`{{${name}}}`, String(value)),

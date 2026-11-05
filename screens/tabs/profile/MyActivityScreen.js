@@ -32,7 +32,9 @@ import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import usePosterUri from "../../../hooks/usePosterUri";
-import { i18nText } from "@utils/i18nText";
+import i18n from "../../../translations";
+import { i18nText, percentText } from "@utils/i18nText";
+import { intlLocaleOf } from "@utils/appLanguages";
 import { tallyVotes } from "@utils/postComposer";
 import RatingStars from "@components/RatingStars";
 import StaggerItem from "@components/StaggerItem";
@@ -86,7 +88,8 @@ const fmtDate = (v) => {
   if (diff < day && d.getDate() === new Date(now).getDate())
     return i18nText("autoI18n.bugun", "Bugün");
   if (diff < 2 * day) return i18nText("autoI18n.dun", "Dün");
-  return d.toLocaleDateString();
+  // Argümansız toLocaleDateString cihaz dilini kullanır (Türkçe telefonda "2.11.2026").
+  return d.toLocaleDateString(intlLocaleOf(i18n.language));
 };
 
 const TABS = [
@@ -1025,7 +1028,7 @@ function PollMiniBody({ poll, accent, theme }) {
               <Text style={[st.pPollBarLabel, { color: theme.text.primary }]} numberOfLines={1}>
                 {label}
               </Text>
-              <Text style={[st.pPollBarPct, { color: lead ? accent : theme.text.muted }]}>%{pct}</Text>
+              <Text style={[st.pPollBarPct, { color: lead ? accent : theme.text.muted }]}>{percentText(pct)}</Text>
             </View>
             <View style={[st.pPollBarTrack, { backgroundColor: theme.border }]}>
               <View

@@ -34,7 +34,7 @@ import AppIcon from "@components/AppIcon";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import { alpha } from "@theme/colors";
-import { i18nText } from "@utils/i18nText";
+import { i18nText, percentText } from "@utils/i18nText";
 import {
   buildBracket, tallyVotes, tallyNominations, selectFinalists, parsePeriodId,
   monthLabel, mediaLabel, getScheduleEntry, themeLabel, now,
@@ -235,8 +235,8 @@ const ChampionHero = memo(({ item, rival, meta, theme, getTmdbUrl, lang }) => {
             <View style={[styles.finalFillRival, { flex: Math.max(rivalVotes, 0.0001) }]} />
           </View>
           <View style={styles.finalHead}>
-            <Text style={[styles.finalPct, { color: GOLD }]}>%{item.score.pct}</Text>
-            <Text style={[styles.finalPct, { color: "rgba(255,255,255,0.62)" }]}>%{rivalPct}</Text>
+            <Text style={[styles.finalPct, { color: GOLD }]}>{percentText(item.score.pct)}</Text>
+            <Text style={[styles.finalPct, { color: "rgba(255,255,255,0.62)" }]}>{percentText(rivalPct)}</Text>
           </View>
         </View>
       ) : null}
@@ -275,7 +275,7 @@ const PlaceRow = memo(({ item, theme, getTmdbUrl, lang }) => {
           {item.c.title}
         </Text>
         <Text style={[styles.placeScore, { color: theme.text.muted }]} numberOfLines={1}>
-          {scoreLabel} {item.score.v}/{item.score.t} · %{item.score.pct}
+          {scoreLabel} {item.score.v}/{item.score.t} · {percentText(item.score.pct)}
         </Text>
       </View>
 
@@ -402,7 +402,7 @@ const WinnerCard = memo(({ w, expanded, onToggle, theme, getTmdbUrl, lang }) => 
             {w.voters != null ? (
               <InfoChip
                 icon="people"
-                text={`${formatNumber(w.voters, lang)} ${i18nText("autoI18n.tournament_voters", "katılımcı")}`}
+                text={`${formatNumber(w.voters, lang)} ${w.voters === 1 ? i18nText("autoI18n.tournament_voter_one", "katılımcı") : i18nText("autoI18n.tournament_voters", "katılımcı")}`}
                 theme={theme}
               />
             ) : null}

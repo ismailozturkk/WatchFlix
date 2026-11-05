@@ -37,6 +37,7 @@ import { seasonRuntime } from "../../utils/seasonRuntime";
 import ScopedCommentButton from "../../components/comments/ScopedCommentButton";
 import { COMMENT_SCOPE } from "../../utils/commentScope";
 import { alpha } from "../../theme/colors";
+import { i18nText } from "../../utils/i18nText";
 
 const { width } = Dimensions.get("window");
 const SEASON_HERO_IMAGE_HEIGHT = Math.round(width * 1.25);
@@ -194,7 +195,7 @@ const EpisodeCard = memo(
                   { color: theme.text?.secondary ?? "#aaa" },
                 ]}
               >
-                {episode.episode_number}. {t.episode}
+                {i18nText("episodeNumbered", `{{n}}. ${t.episode}`, { n: episode.episode_number })}
               </Text>
               {episode.air_date && (
                 <View
@@ -559,7 +560,7 @@ export default function SeasonDetails({ route, navigation }) {
                   { color: theme.text?.secondary ?? "#aaa" },
                 ]}
               >
-                {details.episodes.length} {t.episode}
+                {details.episodes.length} {details.episodes.length === 1 ? t.episode : t.episodes || t.episode}
               </Text>
             </View>
             {seasonTotal.minutes > 0 && (
@@ -701,7 +702,7 @@ export default function SeasonDetails({ route, navigation }) {
         {/* ── Bölüm Listesi ────────────────────────────────────────────── */}
         <View style={[styles.section, { paddingBottom: 30 }]}>
           <SectionTitle
-            label={t.episode}
+            label={t.episodes || t.episode}
             theme={theme}
             count={details.episodes.length}
           />

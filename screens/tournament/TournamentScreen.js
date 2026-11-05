@@ -43,7 +43,7 @@ import {
   useHapticsSettings,
   useLanguageSettings,
 } from "@context/AppSettingsContext";
-import { i18nText } from "@utils/i18nText";
+import { i18nText, percentText } from "@utils/i18nText";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import {
   ROUNDS, getPeriodId, getScheduleEntry, parsePeriodId, getPeriodStartMs,
@@ -964,7 +964,7 @@ export default function TournamentScreen() {
           <Animated.View entering={FadeInDown.delay(320).duration(400)} style={styles.champStatsRow}>
             <View style={styles.champStatCard}>
               <AppIcon family="Ionicons" name="stats-chart" size={13} color="#7A4A00" />
-              <Text style={styles.champStatValue}>%{stats.pct}</Text>
+              <Text style={styles.champStatValue}>{percentText(stats.pct)}</Text>
               <Text style={styles.champStatLabel} numberOfLines={1}>
                 {i18nText("autoI18n.tournament_final_score", "Final skoru")} · {stats.finalVotes}/{stats.finalTotal}
               </Text>

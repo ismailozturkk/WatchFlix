@@ -19,7 +19,7 @@ import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
-import { i18nText } from "../../utils/i18nText";
+import { i18nText, i18nCount } from "../../utils/i18nText";
 import { readableOn } from "../../utils/colorUtils";
 import {
   getPeriodId,
@@ -165,7 +165,7 @@ function SharedTournamentMessage({ share, isOutgoing = false, getTmdbUrl, onOpen
 
       {share.voters ? (
         <Text allowFontScaling={false} style={[styles.voters, { color: palette.muted }]}>
-          {i18nText("autoI18n.paylas_turnuva_katilimci", "{{n}} katılımcı", { n: share.voters })}
+          {i18nCount("autoI18n.paylas_turnuva_katilimci", "{{n}} katılımcı", share.voters)}
         </Text>
       ) : null}
 
