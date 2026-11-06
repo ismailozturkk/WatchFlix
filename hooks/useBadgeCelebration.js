@@ -23,7 +23,7 @@ import { useLanguage } from "@context/LanguageContext";
 import { toast } from "@components/AppToast";
 import { baslikOdulu } from "@components/badges/badgeMeta";
 import { navigateRoot } from "@services/rootNavigation";
-import { NotificationFeedbackType, notificationAsync } from "@services/hapticsService";
+import { haptic } from "@services/hapticsService";
 import { PERDE_ADLARI, perdeAdlariOf } from "@utils/watchScoring";
 import { i18nText } from "@utils/i18nText";
 
@@ -43,7 +43,7 @@ export default function useBadgeCelebration({ kutlama, kutlamayiKapat }) {
         { gorunum, ek, ipucu: i18nText("autoI18n.rozet_toast_ipucu", "Görmek için dokun") },
         { onPress: () => navigateRoot("WatchBadgesScreen", { openId: gorunum.id }) },
       );
-      notificationAsync(NotificationFeedbackType.Success).catch(() => {});
+      haptic("badge");
     } else if (kutlama.perdeAtladi) {
       const adlar = perdeAdlariOf(lang);
       toast.success(
@@ -53,7 +53,7 @@ export default function useBadgeCelebration({ kutlama, kutlamayiKapat }) {
         adlar[kutlama.yeniPerde - 1] || "",
         { onPress: () => navigateRoot("WatchBadgesScreen") },
       );
-      notificationAsync(NotificationFeedbackType.Success).catch(() => {});
+      haptic("celebrate");
     } else if (kutlama.makaraAtladi) {
       // Makara ayrı bildirilir: zirvedeki kullanıcının Perdesi değişmiyor,
       // "Perde 20'e yükseldin" demek yanlış olurdu.
@@ -64,7 +64,7 @@ export default function useBadgeCelebration({ kutlama, kutlamayiKapat }) {
         perdeAdlariOf(lang)[PERDE_ADLARI.length - 1],
         { onPress: () => navigateRoot("WatchBadgesScreen") },
       );
-      notificationAsync(NotificationFeedbackType.Success).catch(() => {});
+      haptic("celebrate");
     }
     kutlamayiKapat();
   }, [kutlama, kutlamayiKapat, language]);

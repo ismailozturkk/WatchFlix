@@ -901,7 +901,7 @@ export default function CineSwipeScreen({ route, navigation }) {
   const handleCopyCode = async () => {
     try {
       await Clipboard.setStringAsync(roomCode);
-      triggerHaptic("selection");
+      triggerHaptic("copy");
       Toast.show({ type: "success", text1: copy.toasts.codeCopied });
     } catch (error) {
       // Pano kullanılamıyorsa paylaşım yolu hâlâ açık.

@@ -33,9 +33,8 @@ export default function RatingInput({
   const set = (v) => {
     if (v === valueRef.current) return;
     valueRef.current = v;
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (e) {}
+    // Yarım yıldız başına bir tik; uçlarda (yarım ve tam puan) daha belirgin bir "duvar".
+    Haptics.haptic(v <= 1 || v >= count * 2 ? "sliderEdge" : "sliderTick");
     onChangeRef.current?.(v);
   };
 

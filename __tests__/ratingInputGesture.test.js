@@ -13,8 +13,8 @@ jest.mock("react-native", () => ({
 }));
 jest.mock("@expo/vector-icons/Ionicons", () => "Ionicons");
 jest.mock("../services/hapticsService", () => ({
-  impactAsync: (...args) => mockImpactAsync(...args),
-  ImpactFeedbackStyle: { Light: "light" },
+  // Yarım yıldız başına bir desen (sliderTick; uçlarda sliderEdge).
+  haptic: (...args) => mockImpactAsync(...args),
 }));
 
 const RatingInput = require("../components/RatingInput").default;

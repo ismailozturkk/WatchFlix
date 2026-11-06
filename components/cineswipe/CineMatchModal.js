@@ -59,7 +59,7 @@ function MatchBody({
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    triggerHaptic("notification");
+    triggerHaptic("match");
     pop.value = withSpring(1, { damping: 11, stiffness: 120, mass: 0.9 });
     glow.value = withRepeat(withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.quad) }), -1, true);
     return () => cancelAnimation(glow);

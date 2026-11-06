@@ -6,13 +6,24 @@
 //    doğru değer geçerli, eskisi gibi bir promise beklenmiyor. Servis anahtarın
 //    TEK sahibi: AppSettingsContext yalnız yazıyor, buradaki abonelik yakalıyor.
 //
-// 2) POLİTİKA ("titreşim az olsun"): sıradan dokunuşlar (selection, Light impact)
-//    SESSİZ; yalnız baskı (Medium+), başarı, uyarı ve hata titreşir; art arda
-//    gelenler tek vuruşa iner; Android'de önce cihazın kendi efekti denenir.
+// 2) POLİTİKA: "Az" (minimal) düzeyi 15 Eki'deki "titreşim az olsun" kuralının
+//    aynısı — sıradan dokunuşlar (selection, Light impact) SESSİZ; yalnız baskı
+//    (Medium+), başarı, uyarı ve hata titreşir; art arda gelenler tek vuruşa iner;
+//    Android'de önce cihazın kendi efekti denenir. Bu bloklar `level: "minimal"`
+//    ile yüklenir. Dengeli/Bol düzeyleri, kategoriler, güç kademesi ve anlamsal
+//    desenler (`haptic("like")`) dosyanın sonundaki bloklarda.
 
 const { withSeededStorage } = require("./helpers/storageTestKit");
 
-const loadService = ({ stored = true, os = "ios", native = {} } = {}) => {
+const loadService = ({
+  stored = true,
+  os = "ios",
+  native = {},
+  level = "minimal",
+  intensity = null,
+  categories = null,
+  vibration = null,
+} = {}) => {
   jest.resetModules();
   const nativeHaptics = {
     ImpactFeedbackStyle: { Light: "light", Medium: "medium", Heavy: "heavy" },
@@ -25,14 +36,21 @@ const loadService = ({ stored = true, os = "ios", native = {} } = {}) => {
     ...native,
   };
   jest.doMock("expo-haptics", () => nativeHaptics);
-  jest.doMock("react-native", () => ({ Platform: { OS: os } }));
+  const Vibration = vibration || { vibrate: jest.fn(), cancel: jest.fn() };
+  jest.doMock("react-native", () => ({ Platform: { OS: os }, Vibration }));
 
   const service = withSeededStorage(
-    (Keys) => [[Keys.haptics, stored]],
+    (Keys) =>
+      [
+        [Keys.haptics, stored],
+        level ? [Keys.hapticsLevel, level] : null,
+        intensity ? [Keys.hapticsIntensity, intensity] : null,
+        categories ? [Keys.hapticsCategories, categories] : null,
+      ].filter(Boolean),
     () => require("../services/hapticsService"),
   );
 
-  return { service, nativeHaptics, storage: require("../services/storage") };
+  return { service, nativeHaptics, Vibration, storage: require("../services/storage") };
 };
 
 // Kısma kapısı `Date.now()`'a bakar; testler saati elle ilerletir.
@@ -265,7 +283,7 @@ describe("hapticsService — Android", () => {
       ["long-press"],
       ["confirm"],
       ["reject"],
-      ["context-click"],
+      ["long-press"],
     ]);
     expect(nativeHaptics.impactAsync).not.toHaveBeenCalled();
     expect(nativeHaptics.notificationAsync).not.toHaveBeenCalled();
@@ -359,5 +377,186 @@ describe("hapticsService — sözleşme", () => {
     await expect(
       service.notificationAsync(service.NotificationFeedbackType.Error),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("hapticsService — düzey, kategori, güç ve desenler", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.resetModules();
+    jest.dontMock("expo-haptics");
+    jest.dontMock("react-native");
+    jest.useRealTimers();
+  });
+
+  test("Dengeli (varsayılan) düzeyde seçim tiki çalar, hafif dokunuş susar", async () => {
+    const { service, nativeHaptics } = loadService({ level: null });
+    expect(service.getHapticPrefs().level).toBe("balanced");
+
+    await service.selectionAsync();
+    advance(1000);
+    await service.impactAsync(service.ImpactFeedbackStyle.Light);
+
+    expect(nativeHaptics.selectionAsync).toHaveBeenCalledTimes(1);
+    expect(nativeHaptics.impactAsync).not.toHaveBeenCalled();
+  });
+
+  test("Bol düzeyde hafif dokunuş da çalar", async () => {
+    const { service, nativeHaptics } = loadService({ level: "rich" });
+    await service.impactAsync(service.ImpactFeedbackStyle.Light);
+    expect(nativeHaptics.impactAsync).toHaveBeenCalledWith("light");
+  });
+
+  test("kapatılan kategori susar, ana anahtar açık olsa da", async () => {
+    const { service, nativeHaptics } = loadService({ level: "rich", categories: { games: false } });
+    await service.haptic("wrong");
+    advance(1000);
+    await service.haptic("success");
+    expect(nativeHaptics.notificationAsync.mock.calls).toEqual([["success"]]);
+  });
+
+  test("setHapticCategory / setHapticLevel / setHapticIntensity anında etkili ve kalıcı", async () => {
+    const { service, nativeHaptics, storage } = loadService({ level: "minimal" });
+
+    expect(service.setHapticLevel("rich")).toBe(true);
+    expect(service.setHapticLevel("abartı")).toBe(false);
+    await service.impactAsync(service.ImpactFeedbackStyle.Light);
+    expect(nativeHaptics.impactAsync).toHaveBeenCalledWith("light");
+
+    service.setHapticCategory("social", false);
+    expect(storage.get(storage.Keys.hapticsCategories)).toMatchObject({ social: false });
+    service.setHapticCategory("social", true);
+    expect(storage.get(storage.Keys.hapticsCategories)).toBeNull(); // hepsi açık = varsayılan
+
+    service.setHapticIntensity("strong");
+    advance(1000);
+    await service.impactAsync(service.ImpactFeedbackStyle.Medium);
+    expect(nativeHaptics.impactAsync).toHaveBeenLastCalledWith("heavy");
+  });
+
+  test("çok adımlı desen: ilk vuruş hemen, sonrakiler zamanlayıcıyla", async () => {
+    jest.useFakeTimers({ doNotFake: ["Date"] });
+    const { service, nativeHaptics } = loadService({ level: "balanced" });
+
+    await service.haptic("like");
+    expect(nativeHaptics.impactAsync.mock.calls).toEqual([["light"]]);
+    jest.advanceTimersByTime(90);
+    await Promise.resolve();
+    expect(nativeHaptics.impactAsync.mock.calls).toEqual([["light"], ["medium"]]);
+  });
+
+  test("yüksek öncelikli desen düşük öncelikli olanın kalan adımlarını iptal eder", async () => {
+    jest.useFakeTimers({ doNotFake: ["Date"] });
+    const { service, nativeHaptics } = loadService({ level: "balanced" });
+
+    await service.haptic("like"); // light @0, medium @90
+    advance(20);
+    await service.haptic("error"); // öncelik 4 > 2 → keser
+    jest.advanceTimersByTime(200);
+    await Promise.resolve();
+
+    expect(nativeHaptics.impactAsync.mock.calls).toEqual([["light"]]);
+    expect(nativeHaptics.notificationAsync.mock.calls).toEqual([["error"]]);
+  });
+
+  test("düşük öncelikli istek kutlamanın penceresinde düşer", async () => {
+    jest.useFakeTimers({ doNotFake: ["Date"] });
+    const { service, nativeHaptics } = loadService({ level: "balanced" });
+
+    await service.haptic("badge");
+    advance(100);
+    await service.selectionAsync();
+    expect(nativeHaptics.selectionAsync).not.toHaveBeenCalled();
+  });
+
+  test("tikler kısa arayla akar (sürükleme/kaydırıcı)", async () => {
+    const { service, nativeHaptics } = loadService({ level: "balanced" });
+    for (let i = 0; i < 5; i += 1) {
+      await service.haptic("sliderTick");
+      advance(35);
+    }
+    expect(nativeHaptics.selectionAsync).toHaveBeenCalledTimes(5);
+  });
+
+  test("triggerHaptic desen adlarını da kabul eder", async () => {
+    const { service, nativeHaptics } = loadService({ level: "balanced" });
+    await service.triggerHaptic("reaction");
+    expect(nativeHaptics.impactAsync).toHaveBeenCalledWith("light");
+  });
+
+  test("previewPattern düzey/kategori filtresini atlar ama ana anahtara uyar", async () => {
+    const acik = loadService({ level: "minimal", categories: { navigation: false } });
+    await acik.service.previewPattern("select");
+    expect(acik.nativeHaptics.selectionAsync).toHaveBeenCalledTimes(1);
+
+    const kapali = loadService({ stored: false });
+    await kapali.service.previewPattern("select");
+    expect(kapali.nativeHaptics.selectionAsync).not.toHaveBeenCalled();
+  });
+
+  test("previewPattern verilen güçle çalar (seçim yaparken hissettirmek için)", async () => {
+    const { service, nativeHaptics } = loadService({ intensity: "normal" });
+    await service.previewPattern("press", { intensity: "soft" });
+    expect(nativeHaptics.impactAsync).toHaveBeenCalledWith("light");
+  });
+
+  test("bilinmeyen desen adı sessizce yok sayılır", async () => {
+    const { service, nativeHaptics } = loadService({ level: "rich" });
+    await expect(service.haptic("yok-boyle")).resolves.toBeUndefined();
+    expect(nativeHaptics.impactAsync).not.toHaveBeenCalled();
+  });
+
+  test("tercih aboneliği anahtar değişince haber verir", () => {
+    const { service, storage } = loadService();
+    const listener = jest.fn();
+    const off = service.subscribeHapticPrefs(listener);
+    storage.set(storage.Keys.hapticsLevel, "rich");
+    expect(listener).toHaveBeenCalled();
+    expect(service.getHapticPrefs().level).toBe("rich");
+    off();
+  });
+});
+
+describe("hapticsService — Android ince ayar", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.resetModules();
+    jest.dontMock("expo-haptics");
+    jest.dontMock("react-native");
+  });
+
+  test("hafif atomun zinciri biterse Vibrator'a DÜŞMEZ (zırlama yok)", async () => {
+    const { service, nativeHaptics } = loadService({
+      os: "android",
+      level: "balanced",
+      native: { performAndroidHapticsAsync: jest.fn(() => Promise.reject(new Error("yok"))) },
+    });
+    await service.selectionAsync();
+    expect(nativeHaptics.performAndroidHapticsAsync.mock.calls).toEqual([["segment-tick"], ["clock-tick"]]);
+    expect(nativeHaptics.selectionAsync).not.toHaveBeenCalled();
+    expect(nativeHaptics.impactAsync).not.toHaveBeenCalled();
+  });
+
+  test("desteklenmeyen sabit önbelleğe alınır, ikinci seferde doğrudan yedeğe geçer", async () => {
+    const perform = jest.fn((type) =>
+      type === "segment-tick" ? Promise.reject(new Error("API < 34")) : Promise.resolve(),
+    );
+    const { service } = loadService({ os: "android", level: "balanced", native: { performAndroidHapticsAsync: perform } });
+    await service.selectionAsync();
+    advance(1000);
+    await service.selectionAsync();
+    expect(perform.mock.calls).toEqual([["segment-tick"], ["clock-tick"], ["clock-tick"]]);
+  });
+
+  test("strong güç tüm deseni tek Vibration dalga formuyla çalar", async () => {
+    const { service, nativeHaptics, Vibration } = loadService({
+      os: "android",
+      level: "balanced",
+      intensity: "strong",
+    });
+    await service.haptic("like");
+    expect(Vibration.cancel).toHaveBeenCalled();
+    expect(Vibration.vibrate).toHaveBeenCalledWith([0, 12, 78, 18]);
+    expect(nativeHaptics.performAndroidHapticsAsync).not.toHaveBeenCalled();
   });
 });

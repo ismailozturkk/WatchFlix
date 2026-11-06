@@ -75,7 +75,7 @@ export default function HoldToConfirmButton({
 
   const confirm = useCallback(() => {
     fired.current = true;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    Haptics.haptic("pressHeavy");
     onConfirm?.();
     // onConfirm hiçbir işlem başlatmadıysa (busy hiç açılmadıysa) çubuk dolu kalmasın.
     setTimeout(() => {
@@ -83,12 +83,28 @@ export default function HoldToConfirmButton({
     }, 700);
   }, [onConfirm, rearm]);
 
+  // Basılı tutarken dolum boyunca sıklaşan tikler: parmak "ilerlediğini" hisseder.
+  const holdTicks = useRef([]);
+  const clearHoldTicks = () => {
+    holdTicks.current.forEach(clearTimeout);
+    holdTicks.current = [];
+  };
+  useEffect(() => clearHoldTicks, []);
+
   const onPressIn = () => {
     if (disabled || busy || fired.current) return;
     if (canStart && !canStart()) return;
     holding.current = true;
     setActive(true);
+    Haptics.haptic("holdTick");
     progress.stopAnimation((value) => {
+      const remaining = Math.max(1, holdMs * (1 - (value || 0)));
+      clearHoldTicks();
+      holdTicks.current = [0.45, 0.7, 0.88].map((f) =>
+        setTimeout(() => {
+          if (holding.current && !fired.current) Haptics.haptic("holdTick");
+        }, remaining * f),
+      );
       Animated.timing(progress, {
         toValue: 1,
         duration: Math.max(1, holdMs * (1 - (value || 0))),
@@ -101,6 +117,7 @@ export default function HoldToConfirmButton({
   };
 
   const onPressOut = () => {
+    clearHoldTicks();
     if (!holding.current) return;
     holding.current = false;
     setActive(false);

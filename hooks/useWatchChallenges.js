@@ -18,7 +18,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { useListStatusContext } from "../context/ListStatusContext";
 import { useProfileStats } from "../context/ProfileStatsContext";
 import { toast } from "../components/AppToast";
-import { NotificationFeedbackType, notificationAsync } from "../services/hapticsService";
+import { haptic } from "../services/hapticsService";
 import { navigateRoot } from "../services/rootNavigation";
 import { Keys, get, remove, set, useStored } from "../services/storage";
 import { cachedChallengeMeta, fetchChallengeMeta } from "../services/watchChallengeMeta";
@@ -134,7 +134,7 @@ export default function useWatchChallenges() {
         onPress: () => navigateRoot("ChallengesScreen", { openId: id }),
       });
     }
-    notificationAsync(NotificationFeedbackType.Success).catch(() => {});
+    haptic("goal");
   }, [loading, uid, active, progressOf, today, language]);
 
   const activeItems = useMemo(

@@ -316,7 +316,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
 
     // Süre dolduysa (kullanıcı cevap vermedi) hata geri bildirimi göster.
     if (selectedIndex === -1) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Haptics.haptic("timeUp");
       if (!reduceMotion) {
         Animated.sequence([
           Animated.timing(resultFlash, { toValue: -1, duration: 200, useNativeDriver: true }),
@@ -335,7 +335,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
   // Son 3 saniye: her saniye hafif titreşim (süre baskısı hissi).
   useEffect(() => {
     if (!timerRunning || timeLeft > 3 || timeLeft <= 0) return;
-    Haptics.selectionAsync().catch(() => {});
+    Haptics.haptic("countdown");
   }, [timeLeft, timerRunning]);
 
   const handleAnswerPress = useCallback(
@@ -346,7 +346,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
       const isCorrect = answerQuestion(index);
 
       if (isCorrect) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.haptic("correct");
         // Reduce Motion etkinse scale ve flash animasyonlari atlanir (Part 12.4).
         if (!reduceMotion) {
           Animated.sequence([
@@ -363,7 +363,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
           ]).start();
         }
       } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+        Haptics.haptic("wrong");
         if (!reduceMotion) {
           Animated.sequence([
             Animated.timing(resultFlash, { toValue: -1, duration: 200, useNativeDriver: true }),
@@ -450,14 +450,14 @@ export default function SceneGuessGameScreen({ navigation, route }) {
       if (useChangeImageJoker()) {
         setUsedHintIndex(usedHintIndex + 1);
       } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+        Haptics.haptic("warning"); // joker hakkı kalmadı
       }
     }
   }, [question, usedHintIndex, useChangeImageJoker]);
 
   const handleFiftyFiftyPress = useCallback(() => {
     if (!useFiftyFiftyJoker()) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Haptics.haptic("warning"); // joker hakkı kalmadı
     }
   }, [useFiftyFiftyJoker]);
 

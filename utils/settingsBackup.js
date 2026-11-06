@@ -97,7 +97,7 @@ export const BACKUP_GROUPS = Object.freeze([
   {
     id: "notifications",
     icon: "notifications-outline",
-    keys: ["notificationSettings", "haptics"],
+    keys: ["notificationSettings", "haptics", "hapticsLevel", "hapticsIntensity", "hapticsCategories"],
   },
   {
     id: "data",

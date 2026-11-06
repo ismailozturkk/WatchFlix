@@ -78,7 +78,7 @@ export default function FriendRequestsScreen({ navigation }) {
 
   // Tüm yazma mantığı FriendsContext + friendsService'te (atomic batch).
   const handleAccept = (friend) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.haptic("friend");
     acceptRequest(friend.uid);
   };
   const handleDecline = (friend) => declineRequest(friend.uid);

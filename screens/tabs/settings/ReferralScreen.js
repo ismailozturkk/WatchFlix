@@ -19,6 +19,7 @@ import {
   View,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import { haptic } from "@services/hapticsService";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import Toast from "@components/AppToast";
@@ -100,6 +101,7 @@ export default function ReferralScreen() {
   const copyCode = useCallback(async () => {
     if (!data?.code) return;
     await Clipboard.setStringAsync(data.displayCode);
+    haptic("copy");
     trackEvent(ANALYTICS_EVENTS.REFERRAL_ACTION, { action: "copy" });
     Toast.success(copy.copied);
   }, [copy.copied, data]);

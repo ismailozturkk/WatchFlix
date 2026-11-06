@@ -35,6 +35,7 @@ import { formatTimeAgo } from "../../utils/postTime";
 import { postTypeMeta } from "./postTypeMeta";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
+import { haptic } from "@services/hapticsService";
 // İNCELEME posteri: eski 86×129'dan büyütüldü (2:3 oranı korunur).
 const REVIEW_POSTER_W = 118;
 const REVIEW_POSTER_H = 177;
@@ -863,7 +864,10 @@ const FeedPostCard = memo(function FeedPostCard({
             <LikeButton
               liked={!!post.likedByMe}
               count={post.likesCount || 0}
-              onPress={() => onLike(post.id)}
+              onPress={() => {
+                haptic(post.likedByMe ? "unlike" : "like");
+                onLike(post.id);
+              }}
               theme={theme}
             />
             {/* Yorum: post'ta yorum varsa dolu ikon (renk nötr kalır) */}

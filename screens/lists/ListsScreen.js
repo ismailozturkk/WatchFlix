@@ -237,7 +237,7 @@ export default function ListsScreen({ route, navigation }) {
         ),
       );
       setReorderModalVisible(false);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.haptic("delete");
       Toast.show({
         type: "success",
         text1: i18nText("autoI18n.listeden_kaldirildi", "Listeden kaldırıldı"),
@@ -253,7 +253,8 @@ export default function ListsScreen({ route, navigation }) {
     const current = Number(value) || index + 1;
     const next = Math.min(Math.max(current + delta, 1), listItems.length);
     setValue(String(next));
-    Haptics.selectionAsync().catch(() => {});
+    // Adım düğmesi: uçlara (1 / son sıra) dayanınca "duvar" hissi.
+    Haptics.haptic(next === 1 || next === listItems.length ? "sliderEdge" : "sliderTick");
   };
   const [tvShowStatus, setTvShowStatus] = useState(null);
 
@@ -457,9 +458,7 @@ export default function ListsScreen({ route, navigation }) {
       suppressNextPressRef.current = false;
       setReorderModalVisible(false);
       setValue("");
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success,
-      ).catch(() => {});
+      Haptics.haptic("drop"); // yeni sırasına "bırakıldı"
       Toast.show({
         type: "success",
         text1: i18nText("autoI18n.item_moved_to_position", "{{name}} başarıyla {{position}}. sıraya taşındı.", {
@@ -1039,7 +1038,7 @@ export default function ListsScreen({ route, navigation }) {
   const handlePosterLongPress = useCallback(
     (item) => {
       suppressNextPressRef.current = true;
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      Haptics.haptic("dragStart");
       setReorderModalVisible(true);
       const originalIndex = listItems.findIndex(
         (i) => i.type === item.type && String(i.id) === String(item.id),

@@ -27,6 +27,7 @@ import {
   View,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import { haptic } from "@services/hapticsService";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -325,6 +326,7 @@ export default function NoteEditorSheet({
   const copyTodo = async (item) => {
     if (!item.text?.trim()) return;
     await Clipboard.setStringAsync(item.text);
+    haptic("copy");
     toast.success(i18nText("autoI18n.panoya_kopyalandi", "Panoya kopyalandı"));
     // Toast sayfanın üstünde görünür (BottomSheetModal kendi host'unu taşır); ayrıca
     // satırda da kısa bir onay göster — kullanıcının gözü zaten oradadır.

@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image } from "expo-image";
 import { Keys, get, set, remove, useStored } from "../services/storage";
+import { haptic } from "../services/hapticsService";
 import { ANALYTICS_EVENTS, trackEvent } from "../services/analytics";
 import { MIN_USABLE_POOL, buildTextlessBlurQuestion, loadQuickPool } from "../services/quickGamePool";
 import { saveQuickBoardEntry } from "../services/gameLeaderboards";
@@ -267,6 +268,8 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
       setLives(run.lives);
       setReveal({ chosenKey, ...verdict, correct, points: correct ? points : 0, timedOut: timedOut || (verdict.correct && !correct) });
       setPhase("revealed");
+      // Doğru = tık + onay; yanlış = hata; süre doldu = iki ağır vuruş; son can = kaybetme.
+      haptic(correct ? "correct" : run.lives <= 0 ? "lose" : timedOut ? "timeUp" : "wrong");
       // Gösterim süresince sıradaki yazısız afişli soruyu ara (oyun bitmediyse).
       if (timed && run.lives > 0) prepareTimed(run.correct);
       clearTimer();

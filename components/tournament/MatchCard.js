@@ -243,7 +243,7 @@ export default function MatchCard({
         onVoteBlocked?.();
         return;
       }
-      if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      if (hapticsEnabled) Haptics.haptic("select");
       setPending(side);
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setPending(null), PENDING_TIMEOUT);

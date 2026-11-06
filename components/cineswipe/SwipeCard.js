@@ -114,8 +114,11 @@ const SwipeCard = forwardRef(function SwipeCard(
     [media],
   );
   const blocked = useCallback(() => onBlockedRef.current?.(), []);
-  const tick = useCallback(() => triggerHaptic("selection"), []);
-  const thump = useCallback((direction) => triggerHaptic(direction === 1 ? "impact" : "selection"), []);
+  // Eşik geçilince belirgin "çentik", geri dönülünce yumuşak bırakma; fırlatmada
+  // beğeni = dolgun çift vuruş, geç = tek hafif darbe.
+  const tick = useCallback(() => triggerHaptic("swipeThreshold"), []);
+  const untick = useCallback(() => triggerHaptic("swipeCancel"), []);
+  const thump = useCallback((direction) => triggerHaptic(direction === 1 ? "like" : "drop"), []);
 
   const settle = () => {
     "worklet";
@@ -161,7 +164,7 @@ const SwipeCard = forwardRef(function SwipeCard(
           return false;
         }
         const direction = action === "like" ? 1 : -1;
-        triggerHaptic(direction === 1 ? "impact" : "selection");
+        triggerHaptic(direction === 1 ? "like" : "drop");
         flingTo(direction);
         return true;
       },
@@ -184,6 +187,7 @@ const SwipeCard = forwardRef(function SwipeCard(
         runOnJS(tick)();
       } else if (!over && crossed.value === 1) {
         crossed.value = 0;
+        runOnJS(untick)();
       }
     })
     .onEnd((event) => {

@@ -76,9 +76,7 @@ export const MediaQuickActionsProvider = ({ children }) => {
       // navigation olmadan sayfanın alt yönlendirmeleri ölü düğmeye dönerdi;
       // eksikse hiç açma.
       if (!media || !navigation) return;
-      if (hapticsEnabled) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
+      if (hapticsEnabled) Haptics.haptic("longPress");
       setActiveTarget({ media, navigation, onDismiss });
     },
     [hapticsEnabled, setActiveTarget],

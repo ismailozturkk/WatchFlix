@@ -168,13 +168,7 @@ function QuickListButtons({
     // Hedef durum GÖRÜNEN (bindirmeli) durumdan türer: art arda iki dokunuş
     // ekle→çıkar olur, ekle→ekle değil; sıralamayı libraryActions korur.
     const nextActive = !(listKey === "favorites" ? inFavorites : inWatchList);
-    if (hapticsEnabled) {
-      Haptics.impactAsync(
-        nextActive
-          ? Haptics.ImpactFeedbackStyle.Medium
-          : Haptics.ImpactFeedbackStyle.Light,
-      );
-    }
+    if (hapticsEnabled) Haptics.haptic(nextActive ? "added" : "removed");
     const listLabel = listKey === "favorites" ? t.favorites : t.watchList;
     try {
       await setListMembership({

@@ -30,6 +30,7 @@ import GlassField from "@components/common/GlassField";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { useGlassScheme } from "@components/common/GlassSurface";
 import * as Clipboard from "expo-clipboard";
+import { haptic } from "@services/hapticsService";
 import { LinearGradient } from "expo-linear-gradient";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
@@ -282,6 +283,7 @@ export default function NotesScreen({ navigation, route }) {
         : [note.title, note.content].filter(Boolean).join("\n\n");
     if (!text.trim()) return;
     await Clipboard.setStringAsync(text);
+    haptic("copy");
     toast.success(i18nText("autoI18n.panoya_kopyalandi", "Panoya kopyalandı"));
   }, []);
 

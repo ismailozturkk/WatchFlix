@@ -912,12 +912,16 @@ export default function ChatScreen({ route, navigation }) {
     }
   }, [isGroup, friendsLoading, friendNow, navigation]);
 
+  // Gelen mesaj titreşimi için görülen en yeni mesaj zamanı (ms).
+  const newestSeenAtRef = useRef(0);
+
   // Mesajlar: imleçli sayfalar (services/chatMessagePager.js). Eskiden tek
   // dinleyicinin limiti büyütülüp yeniden kuruluyordu — her "daha eski" yüklenmiş
   // tüm mesajları baştan okutuyor, aynı efektteki profil/RTDB dinleyicilerini de
   // yeniden kuruyordu. Artık sohbet başına bir kez kurulur; eski sayfa eklemek
   // yalnız o sayfayı okur.
   useEffect(() => {
+    newestSeenAtRef.current = 0;
     const pager = createMessagePager({
       messagesRef,
       fs: { query, orderBy, limit, startAfter, endAt, onSnapshot },
@@ -937,6 +941,26 @@ export default function ChatScreen({ route, navigation }) {
       // (utils/chatReceipts.js); mesajlara durum yazılmaz.
       onChange: ({ messages, loaded }) => {
         if (!loaded) return;
+        // Ekran açıkken karşı taraftan YENİ mesaj gelince ince çift tik. İlk
+        // yüklemede ve eski sayfa eklenirken (zaman damgası en yeniden eski)
+        // titremez; kendi mesajımızın sunucu dönüşü de saymaz.
+        let newest = 0;
+        let incoming = false;
+        for (const message of messages) {
+          const at = message.timestamp?.toMillis?.() ?? (message.timestamp ? +new Date(message.timestamp) : 0);
+          if (!at) continue;
+          if (at > newest) newest = at;
+          if (
+            newestSeenAtRef.current > 0 &&
+            at > newestSeenAtRef.current &&
+            message.senderId &&
+            message.senderId !== currentUser.uid
+          ) {
+            incoming = true;
+          }
+        }
+        if (newest > newestSeenAtRef.current) newestSeenAtRef.current = newest;
+        if (incoming) Haptics.haptic("receive");
         setChatData((prev) => ({
           ...prev,
           loaded: true,
@@ -1120,7 +1144,8 @@ export default function ChatScreen({ route, navigation }) {
   const beginReply = useCallback(
     (message) => {
       if (!message?.id) return;
-      if (hapticsEnabled) Haptics.selectionAsync().catch(() => {});
+      // Kaydırarak yanıt eşiği geçildi: belirgin bir "çentik".
+      Haptics.haptic("swipeThreshold");
       setEditingMessage(null);
       setReplyingTo(
         buildReplySnapshot(message, {
@@ -1536,6 +1561,7 @@ export default function ChatScreen({ route, navigation }) {
       ...prev,
       messages: [optimisticMessage, ...prev.messages],
     }));
+    Haptics.haptic("send");
     setText("");
     setTextLink(false);
     setReplyingTo(null);
@@ -1581,6 +1607,7 @@ export default function ChatScreen({ route, navigation }) {
 
   const handleLongPress = useCallback(
     (item) => {
+      Haptics.haptic("longPress");
       setSelectedMessage(item);
       setOptionsVisible(true);
     },

@@ -17,6 +17,7 @@ import {
   UIManager,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import { haptic } from "@services/hapticsService";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Constants from "expo-constants";
@@ -102,6 +103,7 @@ export default function AboutAppScreen() {
     } catch (e) {
       // Tarayıcı yoksa/açılmazsa bağlantı en azından panoda kalsın.
       await Clipboard.setStringAsync(url);
+      haptic("copy");
       Toast.show({
         type: "info",
         text1: isTr ? "Bağlantı Kopyalandı" : es ? "Enlace copiado" : pt ? "Link copiado" : de ? "Link kopiert" : "Link Copied",
@@ -112,6 +114,7 @@ export default function AboutAppScreen() {
 
   const copyEmailToClipboard = async () => {
     await Clipboard.setStringAsync(SUPPORT_EMAIL);
+    haptic("copy");
     Toast.show({
       type: "info",
       text1: isTr ? "E-Posta Kopyalandı" : es ? "Correo copiado" : pt ? "E-mail copiado" : de ? "E-Mail-Adresse kopiert" : "Email Copied",

@@ -14,6 +14,7 @@
 // başparmağı düz renge çevirir.
 import React, { useCallback, useEffect, useState } from "react";
 import { Platform, Pressable, StyleSheet, Switch, View } from "react-native";
+import { haptic } from "../services/hapticsService";
 import {
   guessNativeSwitchBox,
   iosMajorVersion,
@@ -146,6 +147,9 @@ function AnimatedSwitchToggle({
       return;
     }
     const nextValue = !value;
+    // iOS'ta sistem UISwitch kendi titreşimini verir; bu çizim yalnız Android'de
+    // (ve web'de) kullanıldığı için açma/kapama hissini biz veriyoruz.
+    haptic(nextValue ? "toggleOn" : "toggleOff");
     // Anında (optimistic) animasyonu başlat
     progress.value = withSpring(nextValue ? 1 : 0, TOGGLE_SPRING);
     // Daha sonra state'i güncelle (gecikmeyi önler)

@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keys, get, set, remove, useStored } from "../services/storage";
+import { haptic } from "../services/hapticsService";
 import { ANALYTICS_EVENTS, trackEvent } from "../services/analytics";
 import { MIN_USABLE_POOL, loadQuickPool } from "../services/quickGamePool";
 import { saveQuickBoardEntry } from "../services/gameLeaderboards";
@@ -150,6 +151,7 @@ export default function useOlderGame({ apiKey, language, uid, source = "hub", id
       setLives(run.lives);
       setReveal({ chosenKey, ...verdict });
       setPhase("revealed");
+      haptic(verdict.correct ? "correct" : run.lives <= 0 ? "lose" : "wrong");
       clearTimer();
       timerRef.current = setTimeout(advance, REVEAL_MS);
     },

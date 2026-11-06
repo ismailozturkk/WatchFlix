@@ -17,7 +17,7 @@ import { useEffect } from "react";
 import { useAuth } from "@context/AuthContext";
 import { useLanguage } from "@context/LanguageContext";
 import { toast } from "@components/AppToast";
-import { NotificationFeedbackType, notificationAsync } from "@services/hapticsService";
+import { haptic } from "@services/hapticsService";
 import { Keys, get as getStored, set as setStored } from "@services/storage";
 import { streakCelebrationStep } from "@utils/streakFlame";
 import { getStreakFlameCopy, streakLevelText } from "@utils/streakFlameCopy";
@@ -54,7 +54,7 @@ export default function useStreakCelebration({ seriler }) {
     } else {
       return;
     }
-    notificationAsync(NotificationFeedbackType.Success).catch(() => {});
+    haptic("streak");
     // Dil değişimi kutlamayı yeniden tetiklemesin: kayıt zaten güncellendi.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid, seriler]);

@@ -736,6 +736,11 @@ function AppContent() {
           options={{ headerShown: false }}
         />
         <Stack.Screen
+          name="HapticsSettingsScreen"
+          getComponent={() => require("./screens/tabs/settings/HapticsSettingsScreen").default}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="DecorScopesScreen"
           getComponent={() => require("./screens/tabs/settings/DecorScopesScreen").default}
           options={{ headerShown: false }}

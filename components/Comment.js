@@ -225,9 +225,7 @@ const CommentItem = memo(
     const likeCount = item.likeCount ?? item.likes?.length ?? 0;
 
     const onLikePress = () => {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch (e) {}
+      Haptics.haptic(isLiked ? "unlike" : "like");
       Animated.sequence([
         Animated.timing(scaleAnim, {
           toValue: 1.2,

@@ -32,8 +32,7 @@ jest.mock("react-native", () => {
 });
 const mockHaptic = jest.fn(() => Promise.resolve());
 jest.mock("../services/hapticsService", () => ({
-  impactAsync: (...args) => mockHaptic(...args),
-  ImpactFeedbackStyle: { Heavy: "heavy" },
+  haptic: (...args) => mockHaptic(...args),
 }));
 jest.mock("../components/typography/AppText", () => ({ AppText: "Text" }));
 jest.mock("../theme/colors", () => ({ alpha: (c, a) => `${c}@${a}` }));
@@ -78,7 +77,9 @@ describe("basılı tutma", () => {
     expect(onConfirm).not.toHaveBeenCalled();
     finish(true);
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(mockHaptic).toHaveBeenCalledWith("heavy");
+    // Basışta ilerleme tiki, dolunca ağır onay vuruşu.
+    expect(mockHaptic).toHaveBeenCalledWith("holdTick");
+    expect(mockHaptic).toHaveBeenLastCalledWith("pressHeavy");
     // Onaydan sonra ikinci basış yeniden onaylamaz.
     const before = mockTimings.length;
     act(() => press().props.onPressIn());

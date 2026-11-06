@@ -50,6 +50,7 @@ jest.mock("../screens/game/GameScreenShell", () => ({
 }));
 jest.mock("../services/hapticsService", () => ({
   triggerHaptic: () => {},
+  haptic: () => Promise.resolve(),
   notificationAsync: () => Promise.resolve(),
   NotificationFeedbackType: { Success: "success" },
 }));

@@ -22,6 +22,13 @@
 
 import { APP_ICON_IDS, DEFAULT_APP_ICON_ID } from "../../utils/appIcons";
 import {
+  DEFAULT_HAPTIC_INTENSITY,
+  DEFAULT_HAPTIC_LEVEL,
+  HAPTIC_INTENSITIES,
+  HAPTIC_LEVELS,
+  isHapticCategoryMap,
+} from "../../utils/hapticPatterns";
+import {
   TYPES,
   oneOf,
   range,
@@ -149,6 +156,26 @@ const settingsKeys = {
     ],
   },
   haptics: { key: "hapticsEnabled", type: TYPES.boolean, default: false },
+  // Titreşim ince ayarları (bkz. utils/hapticPatterns.js). Ana anahtar `haptics`.
+  hapticsLevel: {
+    key: "hapticsLevel",
+    type: TYPES.string,
+    default: DEFAULT_HAPTIC_LEVEL,
+    validate: oneOf(...HAPTIC_LEVELS),
+  },
+  hapticsIntensity: {
+    key: "hapticsIntensity",
+    type: TYPES.string,
+    default: DEFAULT_HAPTIC_INTENSITY,
+    validate: oneOf(...HAPTIC_INTENSITIES),
+  },
+  // null = hepsi açık; yalnız kapatılanlar `false` olarak yazılır.
+  hapticsCategories: {
+    key: "hapticsCategories",
+    type: TYPES.json,
+    default: null,
+    validate: isHapticCategoryMap,
+  },
   notificationSettings: {
     key: "notificationSettings",
     type: TYPES.json,

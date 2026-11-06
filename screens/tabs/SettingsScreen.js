@@ -76,6 +76,8 @@ import {
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../../components/common/GlassTouchable";
 import GlassBox from "../../components/common/GlassBox";
+import useHapticPrefs from "../../hooks/useHapticPrefs";
+import { getHapticsCopy, hapticsRowSubtitle } from "./settings/hapticsCopy";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 const APP_VERSION = `v${Constants.expoConfig?.version ?? "1.4.5"}`;
 
@@ -358,6 +360,8 @@ export default function SettingsScreen() {
     useImageQualitySettings();
   const { API_KEY } = useApiSettings();
   const { hapticsEnabled, changeHapticsEnabled } = useHapticsSettings();
+  const hapticPrefs = useHapticPrefs();
+  const hapticsCopy = getHapticsCopy(language);
   const {
     autoDataCacheEnabled,
     changeAutoDataCacheEnabled,
@@ -660,13 +664,17 @@ export default function SettingsScreen() {
             iconColor={C.amber}
             iconName={hapticsEnabled ? "phone-portrait-outline" : "phone-portrait"}
             title={t.haptics}
-            subtitle={t.hapticsSubtitle}
+            subtitle={hapticsEnabled ? hapticsRowSubtitle(hapticsCopy, hapticPrefs) : t.hapticsSubtitle}
+            onPress={() => navigation.navigate("HapticsSettingsScreen")}
             right={
-              <SwitchToggle
-                value={hapticsEnabled}
-                onValueChange={changeHapticsEnabled}
-                size={36}
-              />
+              <View style={s.hapticsRight}>
+                <SwitchToggle
+                  value={hapticsEnabled}
+                  onValueChange={changeHapticsEnabled}
+                  size={36}
+                />
+                <Chevron color={C.muted} />
+              </View>
             }
             last
           />
@@ -1412,6 +1420,7 @@ export default function SettingsScreen() {
 }
 
 const s = StyleSheet.create({
+  hapticsRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   // ── "Verileri indir" tür seçici ───────────────────────────────────────────
   // Üstteki SettingRow'un alt çizgisi ayırıcı görevi görür; burada tekrar
   // kenarlık verilmez (yoksa 2px'lik çift çizgi oluşur).

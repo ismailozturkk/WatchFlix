@@ -146,13 +146,7 @@ export default function OtherListsPickerModal({
     const current = isIn(key);
     const next = !current;
     setOptimistic((prev) => ({ ...prev, [key]: next }));
-    if (hapticsEnabled) {
-      Haptics.impactAsync(
-        next
-          ? Haptics.ImpactFeedbackStyle.Medium
-          : Haptics.ImpactFeedbackStyle.Light,
-      );
-    }
+    if (hapticsEnabled) Haptics.haptic(next ? "added" : "removed");
     try {
       // Özel listeler kök dokümanda: libraryActions bunları tek sırada, noktalı
       // adlara ve eşzamanlı yazımlara karşı güvenli (transaction) yazar.
