@@ -76,7 +76,7 @@ body {
   color: var(--paper); text-decoration: none;
   display: inline-flex; align-items: center; gap: 9px;
 }
-.bar-brand img { width: 28px; height: 28px; border-radius: 8px; }
+.bar-brand img { width: 28px; height: 28px; object-fit: contain; }
 .bar-brand:hover { color: var(--blue-hi); }
 .bar-sep { color: var(--ink-faint); font-size: 15px; }
 .bar-page { color: var(--ink-muted); font-size: 14px; letter-spacing: .02em; }

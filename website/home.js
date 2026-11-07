@@ -75,6 +75,7 @@
     renderBeta();
     renderTour();
     renderMore();
+    renderReel();
   }
 
   function setLang(next) {
@@ -171,20 +172,69 @@
     if (actions) actions.hidden = info.all;
   }
 
-  function focusNotify() {
-    var input = $("#emailInput");
+  /* Katılım kartı iki yol sunar: "notify" (yayın günü e-posta) ve "beta" (şimdi test et;
+     beta kaydı aynı e-postayı yayın listesine de ekler). */
+  function setJoinMode(mode) {
+    var box = $("#notify");
+    if (!box) return;
+    mode = mode === "beta" ? "beta" : "notify";
+    box.setAttribute("data-mode", mode);
+    $$(".join-tab").forEach(function (tab) {
+      var on = tab.getAttribute("data-mode") === mode;
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+      tab.tabIndex = on ? 0 : -1;
+    });
+    var paneNotify = $("#paneNotify");
+    var paneBeta = $("#betaCard");
+    if (paneNotify) paneNotify.hidden = mode !== "notify";
+    if (paneBeta) paneBeta.hidden = mode !== "beta";
+  }
+
+  function focusJoin(mode) {
+    setJoinMode(mode);
     var box = $("#notify");
     if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
-    if (input && !$("#notify").classList.contains("done")) {
-      setTimeout(function () { input.focus({ preventScroll: true }); }, 450);
+    var beta = mode === "beta";
+    var pane = beta ? $("#betaCard") : $("#paneNotify");
+    if (!pane || pane.classList.contains("done")) return;
+    var target = beta
+      ? (document.querySelector('#betaForm input[name="platform"]:checked') ? $("#betaEmail") : document.querySelector('#betaForm input[name="platform"]'))
+      : $("#emailInput");
+    if (target) setTimeout(function () { target.focus({ preventScroll: true }); }, 450);
+  }
+
+  function setupJoin() {
+    var tabs = $$(".join-tab");
+    tabs.forEach(function (tab, i) {
+      tab.addEventListener("click", function () { setJoinMode(tab.getAttribute("data-mode")); });
+      tab.addEventListener("keydown", function (ev) {
+        if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+        ev.preventDefault();
+        var next = tabs[(i + (ev.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+        setJoinMode(next.getAttribute("data-mode"));
+        next.focus();
+      });
+    });
+    // seelogd.com/#beta (Instagram bio vb.) beta sekmesiyle açılır.
+    if (location.hash === "#beta") {
+      setJoinMode("beta");
+      var box = document.getElementById("notify");
+      // Yükleme sırasında (maket/afiş yerleşirken) yumuşak kaydırma kesiliyor: sayfa
+      // yüklenince anında kaydır.
+      var jump = function () { if (box) box.scrollIntoView({ block: "center", behavior: "instant" }); };
+      if (document.readyState === "complete") setTimeout(jump, 60);
+      else window.addEventListener("load", function () { setTimeout(jump, 60); });
     }
   }
 
   document.addEventListener("click", function (ev) {
-    var soon = ev.target.closest && ev.target.closest(".store.is-soon");
-    if (soon) { ev.preventDefault(); focusNotify(); return; }
-    var toNotify = ev.target.closest && ev.target.closest('a[href="#notify"]');
-    if (toNotify) { ev.preventDefault(); focusNotify(); }
+    if (!ev.target.closest) return;
+    var soon = ev.target.closest(".store.is-soon");
+    if (soon) { ev.preventDefault(); focusJoin("notify"); return; }
+    var toBeta = ev.target.closest('[data-join="beta"], a[href="#beta"]');
+    if (toBeta) { ev.preventDefault(); focusJoin("beta"); if (history.replaceState) history.replaceState(null, "", "#beta"); return; }
+    var toNotify = ev.target.closest('a[href="#notify"]');
+    if (toNotify) { ev.preventDefault(); focusJoin("notify"); }
   });
 
   /* ── 3) Bekleme listesi ─────────────────────────────────────────── */
@@ -193,6 +243,38 @@
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* yoksay */ } },
   };
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  /* Gizlilik: tarayıcıda e-postanın kendisi SAKLANMAZ. Bilet (wf_ticket /
+     wf_beta_ticket) yalnız maskeli gösterimi ("is•••@gmail.com"), eşitlik
+     karşılaştırması için kısa bir özeti ve sıra numarasını tutar. */
+  function maskEmail(email) {
+    var at = String(email || "").lastIndexOf("@");
+    if (at < 1) return "•••";
+    var local = email.slice(0, at);
+    return local.slice(0, local.length > 2 ? 2 : 1) + "•••" + email.slice(at);
+  }
+  function emailKey(email) { // FNV-1a 32 bit: yalnız "aynı adres mi?" sorusu için
+    var h = 0x811c9dc5, s = String(email || "");
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return ("0000000" + h.toString(16)).slice(-8);
+  }
+  /* Eski biletlerde düz e-posta vardı: okurken maskeli biçime çevirip yeniden yaz. */
+  function readTicket(key) {
+    var v = LS.get(key, null);
+    if (!v || typeof v !== "object") return null;
+    if (v.email) {
+      v.m = maskEmail(v.email);
+      v.h = emailKey(v.email);
+      delete v.email;
+      LS.set(key, v);
+    }
+    return v.h ? v : null;
+  }
+  /* Kural gereği kayıtlar herkese okunmaz ve var olan kayıt değiştirilemez:
+     aynı adresle ikinci yazma "permission-denied" döner = zaten listede. */
+  function isAlreadyListed(err) {
+    return !!err && (err.code === "permission-denied" || /permission/i.test(String(err.message || "")));
+  }
   var db = null;
   var dbReady = null;
 
@@ -245,18 +327,19 @@
         var fs = db.fs;
         var id = btoa(unescape(encodeURIComponent(email))).replace(/[/+=]/g, "_");
         var ref = fs.doc(db.app, "waitlist", id);
-        return fs.getDoc(ref).then(function (snap) {
-          if (snap.exists()) {
-            return { email: email, queueNo: snap.data().queueNo || store.base() + 1, exists: true };
-          }
-          return fs.getDoc(fs.doc(db.app, "meta", "waitlist")).then(function (countSnap) {
-            var queueNo = store.base() + (countSnap.exists() ? countSnap.data().count || 0 : 0) + 1;
-            return fs.setDoc(ref, { email: email, createdAt: fs.serverTimestamp(), source: "landing", queueNo: queueNo })
-              .then(function () {
-                return fs.setDoc(fs.doc(db.app, "meta", "waitlist"), { count: fs.increment(1) }, { merge: true });
-              })
-              .then(function () { return { email: email, queueNo: queueNo, exists: false }; });
-          });
+        // Kayıt okunmaz (kural: get yalnız yönetici) — doğrudan yazılır; var olan
+        // kayıt reddedilir. Sıra numarası o zaman yalnız bu tarayıcının biletinden gelir.
+        return fs.getDoc(fs.doc(db.app, "meta", "waitlist")).then(function (countSnap) {
+          var queueNo = store.base() + (countSnap.exists() ? countSnap.data().count || 0 : 0) + 1;
+          return fs.setDoc(ref, { email: email, createdAt: fs.serverTimestamp(), source: "landing", queueNo: queueNo })
+            .then(function () {
+              return fs.setDoc(fs.doc(db.app, "meta", "waitlist"), { count: fs.increment(1) }, { merge: true })
+                .then(function () { return { email: email, queueNo: queueNo, exists: false }; });
+            }, function (err) {
+              if (!isAlreadyListed(err)) throw err;
+              var tk = readTicket("wf_ticket");
+              return { email: email, queueNo: tk && tk.h === emailKey(email) ? tk.queueNo || null : null, exists: true };
+            });
         });
       });
     },
@@ -276,13 +359,21 @@
 
   function renderOk() {
     var panel = $("#joinOk");
-    var notify = $("#notify");
+    var notify = $("#paneNotify");
     if (!panel || !notify) return;
     if (!okState) { panel.hidden = true; notify.classList.remove("done"); return; }
     $("#okText").textContent = okState.exists ? t("okDup") : fmt(t("okText"), { email: okState.email });
-    $("#okNo").textContent = "#" + String(okState.queueNo).padStart(6, "0");
+    var okWrap = $("#okNoWrap");
+    if (okWrap) okWrap.hidden = !okState.queueNo;
+    if (okState.queueNo) $("#okNo").textContent = "#" + String(okState.queueNo).padStart(6, "0");
     panel.hidden = false;
     notify.classList.add("done");
+  }
+
+  function saveTicket(res) {
+    // Numarası bilinmeyen yineleme kaydı, bu adresin eski biletini silmesin.
+    if (!res.queueNo) return;
+    LS.set("wf_ticket", { m: maskEmail(res.email), h: emailKey(res.email), queueNo: res.queueNo });
   }
 
   function setupForm() {
@@ -307,7 +398,7 @@
       btn.disabled = true;
       withTimeout(store.addEmail(email), 12000).then(function (res) {
         okState = res;
-        LS.set("wf_ticket", { email: res.email, queueNo: res.queueNo });
+        saveTicket(res);
         if (!res.exists && countValue != null && res.queueNo > countValue) countValue = res.queueNo;
         renderOk();
         renderCount();
@@ -329,10 +420,11 @@
      yenilenince form yerine "zaten listedesin" görünür. Farklı e-postayla
      yeni kayıt eskisinin yerine geçer. */
   function saveBetaTicket(res) {
-    var prev = LS.get("wf_beta_ticket", null);
-    var platforms = prev && prev.email === res.email && Array.isArray(prev.platforms) ? prev.platforms.slice() : [];
+    var prev = readTicket("wf_beta_ticket");
+    var h = emailKey(res.email);
+    var platforms = prev && prev.h === h && Array.isArray(prev.platforms) ? prev.platforms.slice() : [];
     if (platforms.indexOf(res.platform) === -1) platforms.push(res.platform);
-    LS.set("wf_beta_ticket", { email: res.email, platforms: platforms });
+    LS.set("wf_beta_ticket", { m: maskEmail(res.email), h: h, platforms: platforms });
     return platforms;
   }
 
@@ -352,11 +444,12 @@
       var fs = db.fs;
       var id = btoa(unescape(encodeURIComponent(email))).replace(/[/+=]/g, "_") + "_" + platform;
       var ref = fs.doc(db.app, "betaTesters", id);
-      return fs.getDoc(ref).then(function (snap) {
-        if (snap.exists()) return { email: email, platform: platform, exists: true };
-        return fs.setDoc(ref, { email: email, platform: platform, lang: lang, createdAt: fs.serverTimestamp(), source: "landing" })
-          .then(function () { return { email: email, platform: platform, exists: false }; });
-      });
+      // Okuma yok (kural: get yalnız yönetici); var olan kayıt reddedilir = zaten listede.
+      return fs.setDoc(ref, { email: email, platform: platform, lang: lang, createdAt: fs.serverTimestamp(), source: "landing" })
+        .then(function () { return { email: email, platform: platform, exists: false }; }, function (err) {
+          if (!isAlreadyListed(err)) throw err;
+          return { email: email, platform: platform, exists: true };
+        });
     });
   }
 
@@ -369,7 +462,8 @@
     var hint = $("#betaHint");
     if (hint) {
       var p = selectedPlatform();
-      hint.textContent = t(p === "android" ? "betaHintAndroid" : p === "ios" ? "betaHintIos" : "betaHintNone");
+      // Platform seçilmeden ipucu yok (kart kompakt kalsın); seçilince hangi e-postanın gerektiği yazar.
+      hint.textContent = p === "android" ? t("betaHintAndroid") : p === "ios" ? t("betaHintIos") : "";
     }
     var card = $("#betaCard");
     var panel = $("#betaOk");
@@ -379,6 +473,11 @@
       email: betaState.email,
       platform: betaPlatformLabel(betaState.platforms),
     });
+    var noWrap = $("#betaNoWrap");
+    if (noWrap) {
+      noWrap.hidden = !betaState.queueNo;
+      if (betaState.queueNo) $("#betaNo").textContent = "#" + String(betaState.queueNo).padStart(6, "0");
+    }
     // İki platform da kayıtlıysa "başka cihaz" seçeneği kalmaz.
     $("#betaAgain").hidden = betaState.platforms.length >= Object.keys(BETA_PLATFORMS).length;
     panel.hidden = false;
@@ -425,8 +524,19 @@
       withTimeout(addBetaTester(email, platform), 12000).then(function (res) {
         var platforms = saveBetaTicket(res);
         // Yeni kayıtta yalnız bu platform anılır; yinelenende kayıtlı olanların tümü.
-        betaState = { email: res.email, platforms: res.exists ? platforms : [res.platform], exists: res.exists };
-        renderBeta();
+        betaState = { email: res.email, platforms: res.exists ? platforms : [res.platform], exists: res.exists, queueNo: null };
+        // Beta'ya kaydolan yayın günü de haber alsın: aynı e-posta bekleme listesine yazılır.
+        // Bu adım başarısız olsa da beta kaydı geçerlidir (yalnız sıra numarası görünmez).
+        return withTimeout(store.addEmail(email), 12000).then(function (wl) {
+          okState = wl;
+          saveTicket(wl);
+          if (!wl.exists && countValue != null && wl.queueNo > countValue) countValue = wl.queueNo;
+          betaState.queueNo = wl.queueNo;
+          renderOk();
+          renderCount();
+        }).catch(function (err) {
+          console.warn("Waitlist (from beta) error:", err && err.message);
+        }).then(function () { renderBeta(); });
       }).catch(function (err) {
         console.error("Beta signup error:", err);
         msg.textContent = t("errGeneric");
@@ -434,15 +544,15 @@
     });
 
     $("#betaAgain").addEventListener("click", function () {
-      var ticket = LS.get("wf_beta_ticket", null);
+      var ticket = readTicket("wf_beta_ticket");
       var done = ticket && Array.isArray(ticket.platforms) ? ticket.platforms : [];
       betaState = null;
       renderBeta();
-      // Henüz kayıtlı olmayan platformu ve aynı e-postayı önceden doldur: "ikinci cihaz" en sık durum.
+      // Henüz kayıtlı olmayan platformu önceden seç: "ikinci cihaz" en sık durum.
       var next = Object.keys(BETA_PLATFORMS).filter(function (p) { return done.indexOf(p) === -1; })[0];
       var radio = next && form.querySelector('input[name="platform"][value="' + next + '"]');
       if (radio) { radio.checked = true; renderBeta(); }
-      if (ticket && ticket.email) input.value = ticket.email;
+      // E-posta tarayıcıda saklanmaz; bu oturumda yazılmışsa alanda zaten duruyor.
       input.focus();
     });
   }
@@ -544,7 +654,6 @@
     { screen: "stats", icon: "bars" }, { screen: "chat", icon: "people" }, { screen: "game", icon: "gamepad" },
     { screen: "lists", icon: "list" }, { screen: "story", icon: "image" }, { screen: "custom", icon: "sliders" },
   ];
-  var MORE_ICONS = ["apps", "calendar", "bell", "star", "download", "user", "heart", "play", "trophy", "shield", "clock", "share"];
   var tour = { phone: null, index: 0, autoplay: true, visible: false, built: false };
 
   function icon(name, size) { return window.AppMock ? window.AppMock.helpers.ic(name, size) : ""; }
@@ -630,12 +739,207 @@
     }
   }
 
+  /* "Çok daha fazlası" — görsel döşemeler (6 Kas). Metin kartta yalnız başlık; açıklama karta
+     dokununca ayrıntı penceresinde (peek) açılır. `k` = home-i18n.js'teki mo<k>t / mo<k>d.
+     img: media/t-*.webp (kapalı test ekranından kırpım); ani: simge döşemesinin hareketi. */
+  var MORE = [
+    { k: 1, img: "tier" },
+    { k: 13, icon: "swap", ani: "sway", c: ["#ff3d5e", "#ff8a5c"] },
+    { k: 6, icon: "flame", ani: "flicker", c: ["#ffb347", "#ff3d5e"] },
+    { k: 4, img: "top100" },
+    { k: 3, img: "league" },
+    { k: 2, icon: "ticket", ani: "float", c: ["#8b7cf6", "#14c8e8"] },
+    { k: 14, img: "graph" },
+    { k: 9, icon: "star", ani: "twinkle", c: ["#ffc247", "#ff8a5c"] },
+    { k: 12, icon: "heart", ani: "beat", c: ["#ff5c8a", "#8b7cf6"] },
+    { k: 15, img: "badge" },
+    { k: 16, img: "tournament" },
+    { k: 8, icon: "bell", ani: "ring", c: ["#14c8e8", "#138df0"] },
+    { k: 5, img: "challenges" },
+    { k: 7, icon: "apps", ani: "pop", c: ["#3ddc97", "#14c8e8"] },
+    { k: 11, img: "people" },
+    { k: 10, icon: "download", ani: "drop", c: ["#138df0", "#8b7cf6"] },
+  ];
+  // Döşemenin küçük simgesi (görselli döşemelerde başlığın yanında)
+  var MORE_ICON = { 1: "layers", 4: "trend-up", 3: "trophy", 14: "bars", 15: "shield", 16: "ribbon", 5: "flag", 11: "user" };
+
   function renderMore() {
     var grid = $("#moreGrid");
     if (!grid) return;
-    grid.innerHTML = MORE_ICONS.map(function (name, i) {
-      return '<article class="more-tile"><span class="more-ico">' + icon(name, 20) + "</span><div><h4>" + t("mo" + (i + 1) + "t") + "</h4><p>" + t("mo" + (i + 1) + "d") + "</p></div></article>";
+    grid.innerHTML = MORE.map(function (m, i) {
+      var title = t("mo" + m.k + "t");
+      var aria = ' aria-label="' + title.replace(/"/g, "&quot;") + " · " + t("tapMore") + '" aria-haspopup="dialog"';
+      var plus = '<span class="mt-plus" aria-hidden="true"></span>';
+      if (m.img) {
+        return '<button type="button" class="mt mt-img" data-more="' + i + '"' + aria + '>' +
+          '<img loading="lazy" decoding="async" alt="" src="media/t-' + m.img + '.webp">' +
+          '<span class="mt-cap"><span class="mt-sico">' + icon(MORE_ICON[m.k] || "sparkles", 16) + "</span><b>" + title + "</b>" + plus + "</span></button>";
+      }
+      return '<button type="button" class="mt mt-ico" data-more="' + i + '" style="--c1:' + m.c[0] + ";--c2:" + m.c[1] + '"' + aria + '>' +
+        '<span class="mt-badge ani-' + m.ani + '">' + icon(m.icon, 24) + "</span><b>" + title + "</b>" + plus + "</button>";
     }).join("");
+  }
+
+  /* ── Gerçek ekranlar şeridi (kapalı test kayıtları) ─────────────── */
+  // v: media/v-<id>.mp4 + .webp (poster); s: media/s-<id>.webp (durağan ekran). t/d: i18n anahtarları.
+  var REEL = [
+    { v: "open", t: "rOpenT", d: "rOpenD" },
+    { v: "swipe", t: "mo13t", d: "mo13d" },
+    { s: "cinematch", t: "f3t", d: "f3d" },
+    { v: "search", t: "f2t", d: "f2d" },
+    { v: "stats", t: "f4t", d: "f4d" },
+    { s: "story", t: "f8t", d: "f8d" },
+    { v: "badges", t: "mo15t", d: "mo15d" },
+    { v: "custom", t: "f9t", d: "f9d" },
+  ];
+  var REDUCE = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var reelIO = null;
+
+  function reelMedia(r, big) {
+    if (r.s) return '<img ' + (big ? "" : 'loading="lazy" ') + 'decoding="async" alt="" src="media/s-' + r.s + '.webp">';
+    return '<video muted loop playsinline preload="none" aria-hidden="true" poster="media/v-' + r.v + '.webp" data-src="media/v-' + r.v + '.mp4"' +
+      (big && REDUCE.matches ? " controls" : "") + "></video>";
+  }
+
+  function playIfVisible(video, on) {
+    if (!video) return;
+    if (on && !REDUCE.matches) {
+      if (!video.src) video.src = video.getAttribute("data-src");
+      var p = video.play();
+      if (p && p.catch) p.catch(function () { /* otomatik oynatma engellendiyse poster kalır */ });
+    } else if (!video.paused) {
+      video.pause();
+    }
+  }
+
+  function renderReel() {
+    var host = $("#reel");
+    if (!host) return;
+    if (!host.children.length) {
+      host.innerHTML = REEL.map(function (r, i) {
+        return '<button type="button" class="reel-card" data-reel="' + i + '" aria-haspopup="dialog">' +
+          '<span class="reel-phone">' + reelMedia(r, false) + "</span>" +
+          '<span class="reel-cap"><b></b><span class="mt-plus" aria-hidden="true"></span></span></button>';
+      }).join("");
+      if ("IntersectionObserver" in window) {
+        reelIO = new IntersectionObserver(function (entries) {
+          entries.forEach(function (en) { playIfVisible(en.target, en.isIntersecting); });
+        }, { threshold: 0.45 });
+        $$("#reel video").forEach(function (v) { reelIO.observe(v); });
+      }
+    }
+    Array.prototype.forEach.call(host.children, function (card, i) {
+      var title = t(REEL[i].t);
+      card.querySelector(".reel-cap b").textContent = title;
+      card.setAttribute("aria-label", title + " · " + t("tapMore"));
+    });
+  }
+
+  function setupReel() {
+    var host = $("#reel");
+    if (!host) return;
+    renderReel();
+    var step = function (dir) {
+      var card = host.querySelector(".reel-card");
+      var w = card ? card.getBoundingClientRect().width + 18 : 260;
+      host.scrollBy({ left: dir * Math.max(w, Math.floor(host.clientWidth / w) * w), behavior: "smooth" });
+    };
+    var prev = $("#reelPrev"), next = $("#reelNext");
+    if (prev) prev.addEventListener("click", function () { step(-1); });
+    if (next) next.addEventListener("click", function () { step(1); });
+    var edges = function () {
+      if (prev) prev.disabled = host.scrollLeft < 8;
+      if (next) next.disabled = host.scrollLeft + host.clientWidth > host.scrollWidth - 8;
+    };
+    host.addEventListener("scroll", edges, { passive: true });
+    window.addEventListener("resize", edges);
+    edges();
+    host.addEventListener("click", function (ev) {
+      var card = ev.target.closest(".reel-card");
+      if (!card) return;
+      var r = REEL[+card.getAttribute("data-reel")];
+      openPeek({ title: t(r.t), text: t(r.d), html: reelMedia(r, true), phone: true }, card);
+    });
+    // Fareyle üzerine gelince hafif eğim (yalnız fare, hareket azaltma kapalıyken)
+    host.addEventListener("pointermove", function (ev) {
+      if (ev.pointerType !== "mouse" || REDUCE.matches) return;
+      var card = ev.target.closest(".reel-card");
+      if (!card) return;
+      var b = card.getBoundingClientRect();
+      card.style.setProperty("--rx", ((ev.clientY - b.top) / b.height - 0.5) * -8 + "deg");
+      card.style.setProperty("--ry", ((ev.clientX - b.left) / b.width - 0.5) * 10 + "deg");
+    });
+    host.addEventListener("pointerout", function (ev) {
+      var card = ev.target.closest(".reel-card");
+      if (card && !card.contains(ev.relatedTarget)) { card.style.removeProperty("--rx"); card.style.removeProperty("--ry"); }
+    });
+  }
+
+  /* ── Ayrıntı penceresi (peek) ───────────────────────────────────── */
+  var peekFrom = null;
+  function openPeek(o, from) {
+    var dlg = $("#peek");
+    if (!dlg || typeof dlg.showModal !== "function") return;
+    peekFrom = from || null;
+    var media = $("#peekMedia");
+    media.className = "peek-media" + (o.phone ? " is-phone" : "") + (o.tile ? " is-tile" : "");
+    if (o.tile) media.setAttribute("style", o.tile); else media.removeAttribute("style");
+    media.innerHTML = o.html;
+    $("#peekTitle").textContent = o.title;
+    $("#peekText").textContent = o.text;
+    dlg.showModal();
+    playIfVisible(media.querySelector("video"), true);
+  }
+  function setupPeek() {
+    var dlg = $("#peek");
+    if (!dlg) return;
+    var close = function () { if (dlg.open) dlg.close(); };
+    $("#peekClose").addEventListener("click", close);
+    // Pencerenin dışına (arka plana) dokununca kapan
+    dlg.addEventListener("click", function (ev) { if (ev.target === dlg) close(); });
+    dlg.addEventListener("close", function () {
+      var v = dlg.querySelector("video");
+      if (v) { v.pause(); v.removeAttribute("src"); v.load(); }
+      $("#peekMedia").innerHTML = "";
+      if (peekFrom && peekFrom.focus) peekFrom.focus({ preventScroll: true });
+    });
+    var grid = $("#moreGrid");
+    if (grid) grid.addEventListener("click", function (ev) {
+      var tile = ev.target.closest(".mt");
+      if (!tile) return;
+      var m = MORE[+tile.getAttribute("data-more")];
+      var html = m.img
+        ? '<img decoding="async" alt="" src="media/t-' + m.img + '.webp">'
+        : '<span class="mt-badge big ani-' + m.ani + '">' + icon(m.icon, 44) + "</span>";
+      openPeek({
+        title: t("mo" + m.k + "t"), text: t("mo" + m.k + "d"), html: html,
+        tile: m.img ? "" : "--c1:" + m.c[0] + ";--c2:" + m.c[1],
+      }, tile);
+    });
+  }
+
+  /* ── Rakamlar bandı: görünür olunca sayılar sıfırdan yükselir ─────── */
+  function setupCountUp() {
+    var nums = $$(".num-grid b");
+    if (!nums.length || REDUCE.matches || !("IntersectionObserver" in window)) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        io.unobserve(en.target);
+        var el = en.target, txt = el.getAttribute("data-final") || el.textContent;
+        var m = /^(\d+)(.*)$/.exec(txt);
+        if (!m) return;
+        el.setAttribute("data-final", txt);
+        var end = +m[1], suf = m[2], t0 = performance.now(), dur = 1100 + Math.min(end, 200) * 3;
+        var tick = function (now) {
+          var p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(end * e) + suf;
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }, { threshold: 0.6 });
+    nums.forEach(function (b) { io.observe(b); });
   }
 
   /* ── Etkileşimli uygulama maketi (hero) ─────────────────────────── */
@@ -649,28 +953,44 @@
     if (back) { AM.create(back, { tabs: false, screen: "hub" }); AM.fit(back, 1.05, 0.64); }
   }
 
+  /* Planlar: beta süresince gizli (site-config.js → showPlans). HTML'de
+   * `hidden` gelir, JS çalışmasa da gizli kalır. */
+  function setupPlans() {
+    if (CFG.showPlans !== true) return;
+    $$("[data-plans]").forEach(function (el) { el.hidden = false; });
+  }
+
   /* ── Başlat ─────────────────────────────────────────────────────── */
   menu = SL.mountMenu($("#langMenu"), lang, setLang, t("langLabel"));
   applyI18n();
   setupPhones();
   setupTour();
+  setupReel();
+  setupPeek();
+  setupCountUp();
+  setupJoin();
   setupForm();
   setupBeta();
   buildPosters();
   setupChrome();
   setupEyes();
+  setupPlans();
 
-  var saved = LS.get("wf_ticket", null);
-  if (saved && saved.email && saved.queueNo) {
-    okState = { email: saved.email, queueNo: saved.queueNo, exists: false };
+  // Biletler maskeli adresle geri yüklenir (eski düz e-postalı biletler burada dönüştürülür).
+  var saved = readTicket("wf_ticket");
+  if (saved && saved.queueNo) {
+    okState = { email: saved.m, queueNo: saved.queueNo, exists: false };
     renderOk();
   }
 
-  var savedBeta = LS.get("wf_beta_ticket", null);
-  if (savedBeta && savedBeta.email && Array.isArray(savedBeta.platforms)) {
+  var savedBeta = readTicket("wf_beta_ticket");
+  if (savedBeta && Array.isArray(savedBeta.platforms)) {
     var known = savedBeta.platforms.filter(function (p) { return BETA_PLATFORMS[p]; });
     if (known.length) {
-      betaState = { email: savedBeta.email, platforms: known, exists: true };
+      betaState = {
+        email: savedBeta.m, platforms: known, exists: true,
+        queueNo: saved && saved.h === savedBeta.h ? saved.queueNo : null,
+      };
       renderBeta();
     }
   }

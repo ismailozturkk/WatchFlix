@@ -4,8 +4,8 @@ Statik site, build gerekmez (`firebase.json` → `hosting.public = website`).
 
 | Dosya | İçerik |
 | --- | --- |
-| [index.html](index.html) | Tanıtım sayfası (hero · özellikler · planlar · SSS · son çağrı). Yalnız işaretleme; metinler JS'ten gelir |
-| [site-config.js](site-config.js) | **Elle değiştirilen ayarlar:** mağaza bağlantıları, lansman tarihi, Firebase, sayaç ofseti |
+| [index.html](index.html) | Tanıtım sayfası (hero · özellikler · planlar [beta süresince gizli] · SSS · son çağrı). Yalnız işaretleme; metinler JS'ten gelir |
+| [site-config.js](site-config.js) | **Elle değiştirilen ayarlar:** mağaza bağlantıları, lansman tarihi, planların görünürlüğü (`showPlans`), Firebase, sayaç ofseti |
 | [home-i18n.js](home-i18n.js) | Tanıtım sayfasının 5 dillik metin sözlüğü (tr · en · es · pt · de) |
 | [home.js](home.js) | Davranış: dil uygulama, mağaza düğmeleri, bekleme listesi, poster şeridi, animasyonlar |
 | [site.css](site.css) | Tanıtım sayfası stili |
@@ -15,7 +15,9 @@ Statik site, build gerekmez (`firebase.json` → `hosting.public = website`).
 | [site-lang.js](site-lang.js) · [lang-menu.css](lang-menu.css) | **Ortak** dil mantığı + dil menüsü (tanıtım ve yasal sayfalar kullanır) |
 | [privacy.html](privacy.html) · [terms.html](terms.html) · [delete-account.html](delete-account.html) | Gizlilik / Şartlar / Hesap silme — mağaza formlarının istediği URL'ler |
 | [legal.css](legal.css) · [legal.js](legal.js) | Üç yasal sayfanın ortak stili ve davranışı |
-| `s-mark.png` · `s-mark-tight.png` | Uygulama ikonunun "S" harfi (wordmark ve küçük logo). `logo.png` artık kullanılmıyor |
+| [site-beacon.js](site-beacon.js) | Çerezsiz ziyaret sayacı (dört genel sayfada; `admin.html`'de YOK) → `/api/beacon` |
+| [admin.html](admin.html) · [admin.js](admin.js) · [admin.css](admin.css) · [admin-stats.js](admin-stats.js) | **Yönetim paneli** (`/admin`): ziyaret istatistiği, beta testçileri, bekleme listesi. Arama motorlarına kapalı |
+| `lens-mark.svg` · `favicon.svg` · `favicon.ico` · `apple-touch-icon.png` · `og-image.png` | Lens logosu (5 Kas 2026): üst çubuk/altbilgi işareti, sekme simgesi, paylaşım görseli. Kaynak `marketing/marka/yeni-logo/lens`; altbilgideki büyük logo `index.html` içinde satır içi SVG (göz kırpar, bebek imleci izler: `home.js → setupEyes`). Eski "S" görselleri kaldırıldı |
 
 ## Diller (5)
 
@@ -58,6 +60,68 @@ stores: {
   yayında" der; `null` ise "Yakında". **Geri sayım sayacı kaldırıldı:** geçmiş tarihte sıfırlanmış sayaç
   ve "YAYINDA!" yazısı yanıltıcıydı (uygulama mağazada değilken).
 
+## Görsel bölümler (6 Kas 2026)
+
+Kullanıcı isteği: "ziyaretçi yazı okumaz; kompakt, görsel, animasyonlu, videolu olsun; uzun metin dokununca açılsın".
+
+- **Gerçek ekranlar** (`#screens`, `home.js → REEL / setupReel`): kapalı test iPhone kayıtları telefon çerçevesinde,
+  sessiz döngü. Video yalnız görünürken yüklenir/oynar (`preload="none"` + IntersectionObserver); hareket azaltma
+  açıksa oynamaz, ayrıntı penceresinde denetimli açılır. Kartta yalnız başlık; açıklama `peek` penceresinde.
+- **…ve çok daha fazlası** (`home.js → MORE`): 4 sütunlu bento. 8 döşeme kapalı test ekranından kırpım
+  (`media/t-*.webp`, 2 satır), 8 döşeme hareketli simge (`ani-*` CSS). Açıklama yalnız `peek` penceresinde.
+- **Ayrıntı penceresi** (`<dialog id="peek">`): masaüstünde ortada, telefonda alttan sayfa; Esc / arka plana
+  dokunma kapatır, odak açan karta döner.
+- **Rakamlar bandı** görünür olunca sayarak yükselir (`setupCountUp`).
+- **Medya** (`website/media/`, toplam ~4,8 MB, hepsi tembel): kaynak
+  `marketing/sosyal-medya/kaynak/img/ekranlar/iphone/` (rötuşlu ekranlar + K02/K04/K05/K07/K09/e-arama kayıtları;
+  K01/K08/K10 KULLANILMAZ — gerçek kişi fotoğrafı / Türkçe toast / Türkçe klavye). Durum çubuğu (üst 150 px)
+  kırpılır; videolar 432 px genişlik, H.264 CRF 29, 30 fps, sessiz, faststart; poster `.webp`.
+  Üretici betik oturum scratchpad'indeydi (`media_build.py`: ffmpeg-static + Pillow); yeniden üretmek için
+  aynı ayarlar yeterli. `mp4` de görseller gibi 7 gün önbellekte (`firebase.json`).
+- Alt bilgi notu değişti: "etkileşimli önizlemeler çizimdir; videolar ve ekran görüntüleri kapalı testten".
+
+## Katılım kartı (hero): haber ver | beta
+
+6 Kas 2026'dan beri tek kart, hero'da ve mağaza düğmelerinin ÜSTÜNDE (`#notify`, `home.js → setupJoin`).
+Aynı gün kompaktlaştı: iki yol tek satırlık bölümlü düğme, sayaç düğmenin yanında, platform seçimi küçük haplar,
+ipucu yalnız platform seçilince; uzun bilgilendirme metinleri (`formNote`, `betaSub`, `betaNote`) "Ayrıntılar"
+(`details.join-more`) altında, görünür satırda kilit simgesi + "Yalnız bunun için kullanılır · spam yok". Eski ayrı
+"Test kullanıcısı ol" bölümü (`section#beta`, sayfanın altında kalıyordu) kaldırıldı. İki sekme:
+
+- **Yayınlanınca haber ver** (`#paneNotify`) → yalnız bekleme listesi (aşağıda).
+- **Beta'yı şimdi dene** (`#betaCard`) → platform + e-posta → `betaTesters` kaydı, **ardından aynı e-posta bekleme
+  listesine de yazılır** (yayın günü haber alsın; sıra no beta başarı kartında görünür). Bekleme listesi adımı
+  başarısız olursa beta kaydı yine geçerlidir. Beta notu (`betaNote`, 5 dil) bunu açıkça söyler.
+- `seelogd.com/#beta` (Instagram bio'su bu adresi kullanıyor), üst çubuktaki "Beta" ve son çağrıdaki "Beta'yı dene"
+  (`data-join="beta"`) beta sekmesini açar; `#beta` artık kartın hemen üstündeki boş bir çapa. Yükleme sırasında
+  yumuşak kaydırma kesildiği için `#beta` ile gelişte `load` sonrası anında kaydırılır.
+- Kurallar değişmedi: bekleme listesine beta'dan gelen kayıt da `source:"landing"` ile yazılır (kural yalnız bunu kabul
+  ediyor). Ayırt etmek istenirse kural + admin paneli birlikte güncellenmeli.
+- Tarayıcıda deneme: `window.SITE_CONFIG.firebaseConfig = null` yapıp formu gönder → gerçek Firestore yerine
+  localStorage (`wf_beta`, `wf_emails`; bu iki anahtar YALNIZ demo modunda yazılır).
+- Yinelenen kayıt: site kaydı OKUMAZ (kural), doğrudan `setDoc` yapar; var olan belge update sayılıp reddedilir
+  (`permission-denied`) ve bu "zaten listede" diye gösterilir. Sıra numarası o zaman yalnız bu tarayıcının
+  biletinden gelir; yoksa rozet gizlenir.
+
+## Gizlilik (6 Kas 2026)
+
+- **Tarayıcıda e-posta saklanmaz.** `wf_ticket` = `{ m: "is•••@gmail.com", h: <FNV-1a özeti>, queueNo }`,
+  `wf_beta_ticket` = `{ m, h, platforms }`. `h` yalnız "aynı adres mi?" karşılaştırması için. Eski düz e-postalı
+  biletler `readTicket()` ile ilk okumada dönüştürülür. "Başka cihaz" düğmesi e-postayı önceden doldurmaz.
+- **Yazı tipleri kendi sunucumuzda** (`fonts/`, yalnız latin + latin-ext woff2, `fonts/OFL.txt` lisans). Google
+  Fonts'a hiçbir sayfadan istek gitmez (ziyaretçi IP'si Google'a aktarılmasın — AB'de bilinen dava konusu).
+  Yeni aile/ağırlık gerekirse: Google Fonts css2 adresini masaüstü Chrome kullanıcı ajanıyla indir, yalnız
+  `latin`/`latin-ext` bloklarını al, woff2'leri `fonts/`'a koy, `fonts.css`'e ekle, OFL metnini `OFL.txt`'ye ekle.
+- **`*.md` yayınlanmaz** (`firebase.json → hosting.ignore`): bu README de dahil, eskiden seelogd.com/README.md açıktı.
+- **Güvenlik başlıkları** (`firebase.json`, tüm yollar): `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+  strict-origin-when-cross-origin` (Firebase API anahtarı yönlendiren kısıtlıysa `same-origin` onu bozar),
+  `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'; object-src 'none'; base-uri 'self'`, `Permissions-Policy`.
+  Tam CSP (script-src vb.) bilerek yok: gstatic Firebase modülleri, Firestore, TMDB görselleri ve satır içi
+  stil/JSON-LD için ayrıca test gerekir.
+- Hâlâ üçüncü taraflara giden istekler (gizlilik politikasında yazılı): TMDB görsel sunucusu (afiş şeridi ve
+  maket), Google (`www.gstatic.com` Firebase modülleri + Firestore; sayaç boşta okunduğu için her ziyaret).
+- `site-config.js`'teki `measurementId` kaldırıldı (sitede Analytics yok).
+
 ## Bekleme listesi
 
 `index.html` formu Firestore'a yazar (proje `movieandtv-2832a`):
@@ -95,7 +159,7 @@ Firebase Console'dan temizlenmeli (kural kaldırmak veriyi silmez).
 - **Görünüm uygulamanın 26 Eki 2026 ekran görüntülerinden ölçüldü** (736 px genişlik → 284 px ekran, ×0,386):
   tema Tema Stüdyosu'nda `#121123` + `#545DF8` tohumlarından üretilen özel tema (`studio`; açık/koyu tonlar
   `utils/themeStudio.js → deriveToneSet` ile), yazı tipleri uygulamanın rol bazlı seçimi: başlık **Denk One**,
-  gövde **Nova Square**, rakam **Audiowide** (Google Fonts, `index.html`), sekme etiketleri sistem fontu.
+  gövde **Nova Square**, rakam **Audiowide** (`fonts/fonts.css`, kendi sunucumuzdan), sekme etiketleri sistem fontu.
   Varsayılan sistem fontuna dönmek için `app-mock.css`'teki `--fh/--fb/--fn`'i değiştirmek yeter.
   Afiş yolları TMDB'nin en-US afişleridir (`MOV`/`TVS`/`COL` tabloları); karttaki sınıf adları siteyle
   çakışmamalı (`.tour`, `.ok`, `.more` ve `--ink` sitede tanımlı — turnuva kartı bu yüzden `.am-hub.trn`).
@@ -116,6 +180,14 @@ Firebase Console'dan temizlenmeli (kural kaldırmak veriyi silmez).
   ile elle yazılı. Uygulamadan bir anahtar silinirse betik "EKSİK: anahtar (dil)" der.
 - Güncel, başlıksız ekran görüntüleri hazır olunca ilgili maketi `<img>` ile değiştirmek istersen telefonun
   `.am-screen` içeriğini değiştir ve alt bilgideki "illüstrasyon" cümlesini kaldır.
+- **Planlar bölümü beta süresince GİZLİ (6 Kas 2026, kullanıcı kararı):** uygulama daha kapalı testte ve
+  siteyi ilk açan kişiye ücretli bir uygulama gibi görünmesin. `site-config.js → showPlans: false`;
+  bölüm ve iki "Planlar" bağlantısı `data-plans hidden` taşır (JS'siz de gizli; `site.css` sonundaki
+  `[data-plans][hidden]` kuralı bağlantıların `display`'ını ezer). `true` yapınca olduğu gibi geri gelir.
+  Aynı gün sayfadaki ücret çağrışımları da kalktı: "Ücretsiz başla" çipi → "Kapalı testte", meta açıklama,
+  SSS "ücretsiz mi?" cevabı (Premium'a yönlendirmeden yalnız ücretsiz olanları sayar) ve maketteki Premium
+  izleri (Ayarlar'daki Premium kartı, profildeki Premium hapı, CineMatch başlığındaki "Premium ·").
+  Planları açarken bunları da geri getirmek gerekip gerekmediğine bak.
 - **Planlar bölümü** (AI kotası, arkadaş/grup/liste limitleri, Wrapped arşivi…) `utils/premiumFeatures.js`
   ve `store/play/*` açıklamasıyla AYNI olmalı; orada değişirse `home-i18n.js`'teki `plan*B` listelerini
   5 dilde güncelle. **Fiyat yazılmaz** (mağaza belirler, yerel para birimiyle gösterilir).
@@ -123,14 +195,7 @@ Firebase Console'dan temizlenmeli (kural kaldırmak veriyi silmez).
 - Gezinme çubuğundaki bağlantılar 940 px altında gizlenir (tek sayfa; bölümlere kaydırılır).
 - Hareket azaltma tercihi (`prefers-reduced-motion`) tüm animasyonları kapatır; JS yoksa metin İngilizce
   ve statik görünür.
-- **Wordmark:** alt bilgideki büyük `seelogd` inline SVG; "s" uygulama ikonunun ön planıdır
-  (`assets/icon_default/android-icon-foreground.png` → `s-mark.png`), gözler imleci/dokunuşu yumuşakça
-  takip eder (`home.js → setupEyes`), arada kırpar. İkon değişirse `<image>` konumu yeniden
-  hesaplanmalı: PNG'nin opak bloğunu ölç (mevcut "S" bloğu x 337–671, y 280–742, tuval 1024²), S'in
-  görünür dikdörtgeni 760×240 viewBox'ta **x 27,8–165,3 · y 24,0–214,0** olmalı; ölçek
-  `k = 190 / S_yüksekliği`, `width = height = 1024k`, `x = 165,3 − (S_sağ+1)k`, `y = 24 − S_üst·k`
-  (şu an `k ≈ 0,4104` → `x="-110.5" y="-90.9" width="420.2" height="420.2"`). `s-mark-tight.png`
-  (519×519) S bloğunun etrafından kırpılıp ortalanmış sürümdür; ikon değişince onu da yeniden üret.
+- **Wordmark:** alt bilgideki büyük logo, Lens yatay logosunun (`marketing/marka/yeni-logo/lens/svg/lens-yatay-koyu-zemin.svg`) satır içi kopyasıdır: iki daire, kesişimde göz, Sora `seelogd` yazısı (yol olarak, yazı tipi yüklenmez). Göz arada kırpar (`.sl-eye`, kendi merkezinde scaleY), bebek imleci/dokunuşu yumuşakça izler (`home.js → setupEyes`; `data-cx/cy` viewBox koordinatı, `data-max` en fazla kayma). viewBox 0 kökenli olmalı: `setupEyes` imleci viewBox başlangıcını hesaba katmadan çevirir, bu yüzden çizim `translate(-124 -64)` içinde.
 
 ## Yasal sayfalar
 
@@ -149,7 +214,9 @@ Sayfa çerçevesi için işaretleme: `<body data-page="privacy|terms|delete">`, 
 > Mağaza formu karşılığı: `docs/kurulum/PLAY_DATA_SAFETY.md`. Yeni bir boşluk bırakırsan
 > `<mark class="todo">` kullan; tarayıcıda amber renkte görünür.
 >
-> **Güncel damgalar (21 Eki 2026):** gizlilik **1.3**, şartlar **1.2**, hesap silme 21 Eki. 1.3/1.2
+> **4 Kas 2026:** gizlilik **1.5** (beta formu + çerezsiz site istatistiği).
+>
+> **Önceki damgalar (21 Eki 2026):** gizlilik **1.3**, şartlar **1.2**, hesap silme 21 Eki. 1.3/1.2
 > şunları ekledi: arkadaş daveti + promosyon kodu (veri modeli ve silme davranışı
 > `functions/referral.js` + `cleanupReferralOnUserDeleted`; davet edenin davetliyi nasıl gördüğü
 > `getReferralOverview`), Firebase App Check, yapıştırılan/paylaşılan IMDb–TMDB bağlantısı, cihazda kalan
@@ -157,14 +224,70 @@ Sayfa çerçevesi için işaretleme: `<body data-page="privacy|terms|delete">`, 
 > SİLİNMİYOR (sayfalar bunu açıkça yazıyor); silinmesi istenirse `cleanupReferralOnUserDeleted`a
 > collectionGroup sorgusu eklenmeli (functions deploy) ve üç sayfadaki cümle kalkmalı.
 
+## Rakamlar bandı
+
+Poster şeridinin altındaki altı sayı (`index.html` → `.numbers`) uygulamanın kodundan sayıldı (4 Kas 2026, 6 Kas'ta oyun ve simge güncellendi);
+uygulama değişince elle güncelle — etiketler `home-i18n.js` `num1–6`:
+
+| Sayı | Kaynak |
+| --- | --- |
+| 1M+ film ve dizi | TMDB kataloğu (yaklaşık) |
+| 16 oyun ve etkinlik | Sahne Tahmin, Poster Bulmaca, Bulanık Afiş, Önce hangisi?, Hangisinin puanı daha yüksek? (5 Kas), Günün Karesi, Film Zinciri, Günün Sorusu, günlük düello, Sinema Bingosu, Meydan Okumalar, CineSwipe, aylık turnuva, Top 100, Haftalık Lig, tier list |
+| 158 rozet | `components/badges/watchBadgeCatalog.js` (`__tests__/watchBadgeCatalog.test.js` sayıyı sabitler) |
+| 56 yazı tipi | `utils/premiumFeatures.js → FONT_CATALOG_SIZE` |
+| 6 uygulama simgesi | `utils/appIcons.js → APP_ICONS` (5 Kas: 3 Lens + 3 S) |
+| 5 dil | `utils/appLanguages.js` |
+
+Planlar bölümü ve "…ve çok daha fazlası" (16 kutucuk, `home.js → MORE_ICONS` sırasıyla `mo1–16`) da aynı gün
+`utils/premiumFeatures.js` ve `store/play/*/full-description.txt` ile eşitlendi.
+
+**6 Kas 2026 güncellemesi** (4 Kas'tan sonra gelenler): tier list akışta paylaşım (`mo1d`), Meydan Okumalar'ın
+genişlemesi: 59 yönetmen + 43 oyuncu (`mo5d`), "Takvim senkronu" kutucuğu yerine **Bölüm grafiği** (`mo14`,
+simge `bars`; takvim zaten `f7d`'de), CineMatch cevabını sohbette paylaşma (`f3d`), "Hangisinin puanı daha yüksek?"
+oyunu (`f6d`), titreşim ayarları + oyuncu/yönetmen fotoğrafını avatar yapma (`f9d`). Maketteki rozet sayacı 57/158.
+
+## Ziyaret istatistiği ve yönetim paneli
+
+**Toplama** — `site-beacon.js` her sayfa açılışında `/api/beacon`'a (Hosting rewrite → `functions/index.js →
+siteBeacon`) tek bir sayım olayı, sekme gizlenince de görünür kalınan süreyi gönderir. Sunucu yalnız **günlük
+toplam** yazar: `siteStats/{YYYY-MM-DD}_{0-3}` (gün İstanbul saatiyle; 4 parça, tek belgeye saniyede ~1 yazma
+sınırı yüzünden). Model ve alanlar `functions/siteStats.js` başında. Gizlilik kararları:
+
+- Çerez, kimlik ve IP kaydı **yok**; ülke tarayıcının **saat diliminden** tahmin edilir (`TZ_COUNTRY`, bilinmeyen → `XX`).
+- Tarayıcıda yalnız `localStorage.wf_visit` (son ziyaret günü) ve `sessionStorage.wf_session` tutulur.
+- Do Not Track / Global Privacy Control açıksa, bot kimliğinde ve `localhost`'ta hiç sayılmaz.
+- Pazarlama bağlantılarına `?utm_source=instagram` eklersen "Nereden geldi" listesinde o ad görünür.
+- `privacy.html` 1.5 bunu anlatıyor; toplanan alanı değiştirirsen orayı da güncelle.
+
+**Panel** (`https://seelogd.com/admin`) — Google ya da e-posta/şifreyle giriş; yetki tamamen
+`firestore.rules → isSiteAdmin()` (`siteAdmins/{uid}` belgesi var mı). Panel hiçbir şey yazmaz.
+
+- *Genel bakış:* son 7 günlük trafik ve yeni kayıt özeti, en yoğun gün ve bölümlere hızlı geçiş. Günlük tekil
+  ziyaretçilerin toplamı, dönem boyunca tekil kişi sayısı olarak sunulmaz.
+- *Ziyaretler:* bugün/7/30/90 gün; ziyaretçi, yeni ziyaretçi, oturum, görüntüleme, ortalama kalma süresi;
+  günlük grafik; ülke, yönlendiren, cihaz, işletim sistemi, dil, sayfa, saat dağılımı.
+- *Beta testçileri / Bekleme listesi:* arama, platform ve tarih süzgeci, sıralama, 25 satırlık sayfalama,
+  "E-postaları kopyala" (Play Console / TestFlight test kullanıcısı kutusuna yapıştırmak için virgüllü)
+  ve CSV (Excel için BOM'lu; formül enjeksiyonu kaçışlı). Kopyalama ve CSV, sayfadan bağımsız olarak etkin
+  filtredeki tüm kayıtları içerir.
+
+**Kurulum (bir kez):**
+1. Kuralları, fonksiyonu ve siteyi yayınla (sıra önemli: kural → fonksiyon → hosting):
+   `firebase deploy --only firestore:rules` → `firebase deploy --only functions:siteBeacon` → `firebase deploy --only hosting`.
+2. `/admin`'e uygulamadaki hesabınla gir; "yönetici değil" ekranındaki UID'yi kopyala.
+3. Firebase Console → Firestore → `siteAdmins` koleksiyonu → belge kimliği = o UID (alan gerekmez; `note` yazılabilir).
+4. Google ile giriş açılmazsa: Firebase Console → Authentication → Settings → Authorized domains'e `seelogd.com` ekli olmalı.
+
 ## Firestore kuralları
 
 Kurallar tek kaynakta: kökteki [firestore.rules](../firestore.rules) → "Landing sitesi" bölümü
 (`waitlist`, `meta/waitlist`). Kural değişikliğini yalnız orada yap.
 
-- `waitlist` üzerinde **`get` açık, `list` kapalı.** Doküman kimliği `base64(email)` ve `email` alanı düz
-  metin olduğundan koleksiyon listeleme açık olsa herkes tüm bekleme listesini dökebilirdi. Site yalnızca
-  kendi kaydını tek doküman olarak okur, o yüzden bu ayrım siteyi bozmaz.
+- `waitlist` ve `betaTesters`: **`get` ve `list` yalnız site yöneticisine** (`isSiteAdmin`, 6 Kas 2026'dan beri).
+  Doküman kimliği `base64(email)` olduğu için açık `get`, adresi bilen herkese "bu kişi listede mi, hangi
+  platformda, kaçıncı sırada" sorusunu cevaplatıyordu. Site artık okumaz; yinelenen yazma reddedilir (yukarıda).
+- `siteStats` yalnız yöneticiye okunur, kimse yazamaz (yalnız `siteBeacon`, Admin SDK). `siteAdmins/{uid}`'i
+  kişi yalnız kendisi için okuyabilir; kimse yazamaz (Console'dan elle açılır).
 - Sayaç `meta/waitlist` okumaya açıktır ve yalnız `+1` artırılabilir.
 - Bu uçlar anonim yazıma açıktır (bekleme listesi doğası gereği). Spam'e karşı Firebase **App Check**
   etkinleştirilmesi önerilir.
@@ -176,5 +299,6 @@ firebase deploy --only hosting            # yalnız site
 firebase deploy --only firestore:rules,hosting   # kural da değiştiyse
 ```
 
-HTML/JS/CSS `no-cache`, görseller 7 gün önbellekte (`firebase.json`). Lansman günü e-posta göndermek için
+HTML/JS/CSS `no-cache`, görseller ve woff2 7 gün önbellekte (`firebase.json`). Kural ve site birlikte
+değişiyorsa ÖNCE hosting, SONRA kural: yeni istemci eski kuralla çalışır, tersi bir süre formu bozar. Lansman günü e-posta göndermek için
 `waitlist` koleksiyonunu CSV dışa aktarıp (Console → Export) bir e-posta servisine yükleyebilirsin.

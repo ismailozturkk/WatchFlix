@@ -16,6 +16,11 @@
  *   hero'daki hap "… tarihinde yayında" der. Belli değilse null bırak.
  *   (Geri sayım sayacı kaldırıldı: geçmiş bir tarih "YAYINDA" yazdırıyordu.)
  *
+ * showPlans:
+ *   false iken "Planlar" bölümü ve ona giden bağlantılar gizli kalır (6 Kas 2026:
+ *   beta süresince uygulama ücretli gibi lanse edilmesin). true yapınca bölüm
+ *   olduğu gibi geri gelir; metinleri home-i18n.js `plan*` anahtarlarında duruyor.
+ *
  * firebaseConfig: bekleme listesi (waitlist) ve sayaç (meta/waitlist) için.
  *   null yapılırsa form tarayıcının localStorage'ında DEMO modunda çalışır.
  *   Firestore kuralı yalnızca { email, createdAt, source, queueNo } alanlarına
@@ -27,6 +32,7 @@ window.SITE_CONFIG = {
     google: "",
   },
   launchDate: null,
+  showPlans: false, // beta süresince planlar gizli
   baseCount: 1071, // gösterilen sayı = baseCount + Firestore kayıt sayısı
   firebaseConfig: {
     apiKey: "AIzaSyDoooqZO4XPh8ExhpHsDap9GCW8jyGKvuI",
@@ -35,6 +41,6 @@ window.SITE_CONFIG = {
     storageBucket: "movieandtv-2832a.firebasestorage.app",
     messagingSenderId: "427087836931",
     appId: "1:427087836931:web:dbfa3ca10b4d725fe91b36",
-    measurementId: "G-ML19ZRGCE4",
+    // measurementId kaldırıldı (6 Kas): sitede Analytics yok, kullanılmıyordu.
   },
 };

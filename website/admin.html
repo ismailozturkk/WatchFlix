@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#06080c" />
+<title>seelogd · Yönetim</title>
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="stylesheet" href="fonts/fonts.css" /><!-- kendi sunucumuzdan; Google Fonts yok (gizlilik) -->
+<link rel="stylesheet" href="admin.css" />
+</head>
+<!-- Site yönetim paneli (yalnız siteAdmins/{uid} belgesi olan hesap). Veri: betaTesters, waitlist, siteStats.
+     Yetki tamamen firestore.rules'ta; bu sayfa yalnız okur. Ayrıntı: README.md → "Yönetim paneli". -->
+<body>
+<a class="skip" href="#main">İçeriğe geç</a>
+<header class="bar">
+  <div class="wrap bar-in">
+    <a class="brand" href="/" aria-label="seelogd ana sayfa"><img src="lens-mark.svg" width="30" height="30" alt="" />seelogd <span>Yönetim merkezi</span></a>
+    <div class="who" id="who" hidden>
+      <span class="secure-pill">● Güvenli oturum</span>
+      <span id="whoEmail"></span>
+      <button class="btn ghost sm" type="button" id="signOut">Çıkış</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="main">
+  <!-- Yükleniyor -->
+  <section class="state" id="stLoading"><p class="muted">Yükleniyor…</p></section>
+
+  <!-- Giriş -->
+  <section class="state card login" id="stLogin" hidden>
+    <h1>Yönetim paneli</h1>
+    <p class="muted">Uygulamadaki hesabınla giriş yap. Yalnız yönetici olarak eklenen hesap verileri görebilir.</p>
+    <button class="btn primary wide" type="button" id="googleBtn">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6a5.1 5.1 0 0 1-2.2 3.3v2.8h3.6c2.1-1.9 3.2-4.8 3.2-8.2z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.4-2.7l-3.6-2.8c-1 .7-2.3 1.1-3.8 1.1-2.9 0-5.4-2-6.3-4.6H2v2.9A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.7 14c-.2-.7-.4-1.4-.4-2.1s.1-1.4.4-2.1V6.9H2A11 11 0 0 0 1 12c0 1.8.4 3.4 1.1 4.9l3.6-2.9z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2 6.9l3.7 2.9C6.6 7.3 9.1 5.4 12 5.4z"/></svg>
+      Google ile giriş yap
+    </button>
+    <details class="pw">
+      <summary>E-posta ve şifreyle giriş</summary>
+      <form id="pwForm" novalidate>
+        <label for="pwEmail">E-posta</label>
+        <input id="pwEmail" type="email" autocomplete="username" required />
+        <label for="pwPass">Şifre</label>
+        <input id="pwPass" type="password" autocomplete="current-password" required />
+        <button class="btn wide" type="submit">Giriş yap</button>
+      </form>
+    </details>
+    <p class="err" id="loginErr" role="alert"></p>
+  </section>
+
+  <!-- Yetki yok -->
+  <section class="state card login" id="stDenied" hidden>
+    <h1>Bu hesap yönetici değil</h1>
+    <p class="muted">Panel yalnız <code>siteAdmins</code> koleksiyonunda belgesi olan hesaplara açık. Kendini eklemek için
+      Firebase Console → Firestore'da <code>siteAdmins</code> koleksiyonuna, kimliği aşağıdaki UID olan boş bir belge ekle
+      (istersen <code>note</code> alanı yaz), sonra bu sayfayı yenile.</p>
+    <div class="uid"><code id="uid"></code><button class="btn sm" type="button" id="copyUid">Kopyala</button></div>
+    <a class="btn ghost wide" id="consoleLink" target="_blank" rel="noopener" href="https://console.firebase.google.com/project/movieandtv-2832a/firestore/databases/-default-/data">Firebase Console'u aç</a>
+  </section>
+
+  <!-- Panel -->
+  <section class="state" id="stPanel" hidden>
+    <div class="panel-hero">
+      <div>
+        <p class="eyebrow">SEELOGD / SİTE YÖNETİMİ</p>
+        <h1>Her şey tek bakışta.</h1>
+        <p>Site trafiğini ve katılım kayıtlarını buradan takip et. Veriler yalnız bu hesap için okunur.</p>
+      </div>
+      <div class="hero-side">
+        <span class="hero-live"><i></i> Yönetici erişimi açık</span>
+        <span id="updatedAt">Veriler yükleniyor…</span>
+        <button class="btn hero-refresh" type="button" id="refresh">↻ &nbsp; Verileri yenile</button>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Bölümler">
+      <button role="tab" id="tab-overview" aria-controls="pane-overview" type="button" class="tab" data-tab="overview" aria-selected="true">Genel bakış</button>
+      <button role="tab" id="tab-stats" aria-controls="pane-stats" type="button" class="tab" data-tab="stats" aria-selected="false">Ziyaret analizi</button>
+      <button role="tab" id="tab-beta" aria-controls="pane-beta" type="button" class="tab" data-tab="beta" aria-selected="false">Beta testçileri <b id="betaBadge"></b></button>
+      <button role="tab" id="tab-wait" aria-controls="pane-wait" type="button" class="tab" data-tab="wait" aria-selected="false">Bekleme listesi <b id="waitBadge"></b></button>
+    </nav>
+
+    <div class="pane" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
+      <div class="section-heading"><div><p class="eyebrow">DURUM ÖZETİ</p><h2>Bugün neler oluyor?</h2><p>Son 7 günlük site etkinliği ve toplam katılım kayıtları.</p></div></div>
+      <div class="overview-kpis" id="overviewKpis" aria-live="polite"></div>
+      <div class="overview-grid">
+        <article class="card insight-card"><div class="card-head"><div><p class="eyebrow">TRAFİK</p><h2>7 günlük görünüm</h2></div><button class="text-link" type="button" data-go="stats">Ayrıntıları aç →</button></div><div id="overviewTraffic" class="insight-body"></div></article>
+        <article class="card insight-card"><div class="card-head"><div><p class="eyebrow">KATILIM</p><h2>Kayıt hareketi</h2></div><button class="text-link" type="button" data-go="beta">Beta listesini aç →</button></div><div id="overviewJoin" class="insight-body"></div></article>
+      </div>
+      <div class="section-heading compact"><div><p class="eyebrow">HIZLI ERİŞİM</p><h2>Çalışma alanları</h2></div></div>
+      <div class="quick-grid">
+        <button class="quick-card" type="button" data-go="stats"><span class="quick-icon">↗</span><b>Ziyaret analizi</b><span>Kaynak, cihaz, ülke ve saat dağılımını incele.</span><i>Analize git →</i></button>
+        <button class="quick-card" type="button" data-go="beta"><span class="quick-icon">◈</span><b>Beta testçileri</b><span>Platforma göre filtrele, listeyi kopyala veya indir.</span><i>Listeye git →</i></button>
+        <button class="quick-card" type="button" data-go="wait"><span class="quick-icon">≋</span><b>Bekleme listesi</b><span>Sıra numaralarını gör ve kayıtları dışa aktar.</span><i>Listeye git →</i></button>
+      </div>
+      <details class="info-panel"><summary>Bu paneldeki sayılar nasıl hesaplanır?</summary><p>Ziyaret verileri günlük toplam olarak saklanır. “Ziyaretçi” her gün ayrı sayılır; birden fazla günün toplamı gerçek tekil kişi sayısı değildir. Beta ve bekleme listesi sayıları ise tüm kayıtların güncel toplamıdır. İstatistikler çerez veya saklanan IP kullanmaz.</p></details>
+    </div>
+
+    <!-- Ziyaretler -->
+    <div class="pane" id="pane-stats" role="tabpanel" aria-labelledby="tab-stats" hidden>
+      <div class="section-heading"><div><p class="eyebrow">ZİYARET ANALİZİ</p><h2>Site performansı</h2><p>Günlük ziyaret eğilimini ve kitlenin dağılımını incele.</p></div></div>
+      <div class="toolbar">
+        <div class="seg" role="group" aria-label="Zaman aralığı" id="range">
+          <button type="button" data-days="1">Bugün</button>
+          <button type="button" data-days="7">7 gün</button>
+          <button type="button" data-days="30" class="on">30 gün</button>
+          <button type="button" data-days="90">90 gün</button>
+        </div>
+      </div>
+      <p class="note">Gün ve saatler İstanbul saatiyle. Ülke, ziyaretçinin saat diliminden tahmin edilir; çerez ve IP kullanılmaz.
+        Do Not Track açık tarayıcılar ve botlar sayılmaz.</p>
+
+      <div class="kpis" id="kpis"></div>
+
+      <article class="card chart-card">
+        <header class="card-head">
+          <h2>Günlük ziyaret</h2>
+          <ul class="legend" id="trendLegend"></ul>
+        </header>
+        <div class="trend" id="trend"></div>
+      </article>
+
+      <div class="grid2">
+        <article class="card"><header class="card-head"><h2>Ülkeler</h2><small>tekil ziyaretçi</small></header><ol class="bars" id="countries"></ol></article>
+        <article class="card"><header class="card-head"><h2>Nereden geldi</h2><small>oturum</small></header><ol class="bars" id="refs"></ol></article>
+        <article class="card"><header class="card-head"><h2>Cihaz</h2><small>tekil ziyaretçi</small></header><ol class="bars" id="devices"></ol></article>
+        <article class="card"><header class="card-head"><h2>İşletim sistemi</h2><small>tekil ziyaretçi</small></header><ol class="bars" id="os"></ol></article>
+        <article class="card"><header class="card-head"><h2>Tarayıcı dili</h2><small>tekil ziyaretçi</small></header><ol class="bars" id="langs"></ol></article>
+        <article class="card"><header class="card-head"><h2>Sayfalar</h2><small>görüntüleme</small></header><ol class="bars" id="pages"></ol></article>
+      </div>
+
+      <article class="card">
+        <header class="card-head"><h2>Saatlere göre</h2><small>görüntüleme · İstanbul saati</small></header>
+        <div class="hours" id="hours"></div>
+      </article>
+    </div>
+
+    <!-- Beta testçileri -->
+    <div class="pane" id="pane-beta" role="tabpanel" aria-labelledby="tab-beta" hidden>
+      <div class="section-heading"><div><p class="eyebrow">KAPALI TEST</p><h2>Beta testçileri</h2><p>Başvuruları platforma ve tarihe göre incele; görünen sonuçları dışa aktar.</p></div></div>
+      <div class="kpis small" id="betaKpis"></div>
+      <div class="toolbar list-toolbar">
+        <div class="seg" role="group" aria-label="Platform" id="betaFilter">
+          <button type="button" data-p="" class="on">Tümü</button>
+          <button type="button" data-p="android">Android</button>
+          <button type="button" data-p="ios">iOS</button>
+        </div>
+        <input class="search" type="search" id="betaSearch" placeholder="E-postada ara" aria-label="Beta e-postalarında ara" />
+        <select id="betaPeriod" aria-label="Beta kayıt tarihi"><option value="all">Tüm tarihler</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option></select>
+        <select id="betaSort" aria-label="Beta sıralaması"><option value="new">En yeni</option><option value="old">En eski</option><option value="email">E-posta A–Z</option></select>
+        <div class="actions">
+          <button class="btn sm" type="button" id="betaCopy">E-postaları kopyala</button>
+          <button class="btn ghost sm" type="button" id="betaCsv">CSV indir</button>
+        </div>
+      </div>
+      <p class="note">Android davetinde e-postalar Play Console → Kapalı test → Test kullanıcıları listesine, iOS'ta App Store Connect →
+        TestFlight → Harici test kullanıcılarına yapıştırılır. "Kopyala" görünen (süzülmüş) listeyi virgülle ayırır.</p>
+      <p class="result-count" id="betaCount" role="status"></p>
+      <div class="table-wrap"><table class="table" id="betaTable"><thead><tr><th>E-posta</th><th>Platform</th><th>Dil</th><th>Kayıt</th></tr></thead><tbody></tbody></table></div>
+      <div class="pager"><button class="btn ghost sm" type="button" id="betaPrev">← Önceki</button><span id="betaPage"></span><button class="btn ghost sm" type="button" id="betaNext">Sonraki →</button></div>
+      <details class="info-panel"><summary>Beta davetleri için kısa rehber</summary><p>Android e-postalarını Play Console'daki kapalı test kullanıcı listesine, iOS e-postalarını App Store Connect'teki TestFlight harici test kullanıcılarına ekle. Platform filtresi ve arama, kopyalama ile CSV çıktısına da uygulanır. Davetler bu panelden gönderilmez.</p></details>
+    </div>
+
+    <!-- Bekleme listesi -->
+    <div class="pane" id="pane-wait" role="tabpanel" aria-labelledby="tab-wait" hidden>
+      <div class="section-heading"><div><p class="eyebrow">YAYIN HABERİ</p><h2>Bekleme listesi</h2><p>Yayın duyurusu için kayıtları ve sıra numaralarını görüntüle.</p></div></div>
+      <div class="kpis small" id="waitKpis"></div>
+      <div class="toolbar list-toolbar">
+        <input class="search" type="search" id="waitSearch" placeholder="E-postada ara" aria-label="E-postada ara" />
+        <select id="waitPeriod" aria-label="Bekleme listesi kayıt tarihi"><option value="all">Tüm tarihler</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option></select>
+        <select id="waitSort" aria-label="Bekleme listesi sıralaması"><option value="new">En yeni</option><option value="old">En eski</option><option value="queue">Sıra numarası</option><option value="email">E-posta A–Z</option></select>
+        <div class="actions">
+          <button class="btn sm" type="button" id="waitCopy">E-postaları kopyala</button>
+          <button class="btn ghost sm" type="button" id="waitCsv">CSV indir</button>
+        </div>
+      </div>
+      <p class="result-count" id="waitCount" role="status"></p>
+      <div class="table-wrap"><table class="table" id="waitTable"><thead><tr><th>E-posta</th><th>Sıra</th><th>Kayıt</th></tr></thead><tbody></tbody></table></div>
+      <div class="pager"><button class="btn ghost sm" type="button" id="waitPrev">← Önceki</button><span id="waitPage"></span><button class="btn ghost sm" type="button" id="waitNext">Sonraki →</button></div>
+      <details class="info-panel"><summary>Bekleme listesi hakkında</summary><p>Beta başvurusu yapan adresler yayın haberi için bu listede de bulunabilir. Sıra numarası kayıt sırasında atanır. Kopyalama ve CSV, etkin filtreye uyan tüm sonuçları içerir; yalnız ekrandaki sayfayla sınırlı değildir.</p></details>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="site-config.js"></script>
+<script src="admin-stats.js"></script>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

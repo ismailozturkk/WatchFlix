@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#08090c" />
 <title>Hesap Silme — seelogd</title>
 <meta name="description" content="seelogd hesabınızı ve verilerinizi nasıl silersiniz: uygulama içinden anında veya e-posta ile talep. Silinen ve saklanan veriler. / How to delete your seelogd account and data." />
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230a1626'/%3E%3Ccircle cx='24' cy='33' r='11' fill='%23f4fbff'/%3E%3Ccircle cx='40' cy='33' r='11' fill='%23f4fbff'/%3E%3Ccircle cx='26' cy='35' r='5' fill='%2304121f'/%3E%3Ccircle cx='42' cy='35' r='5' fill='%2304121f'/%3E%3C/svg%3E" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="stylesheet" href="fonts/fonts.css" /><!-- kendi sunucumuzdan; Google Fonts yok (gizlilik) -->
 <link rel="stylesheet" href="legal.css" />
 <link rel="stylesheet" href="lang-menu.css" />
 </head>
@@ -17,7 +17,7 @@
 <div class="glow" aria-hidden="true"></div>
 
 <header class="bar">
-  <a class="bar-brand" href="index.html"><img src="s-mark-tight.png" alt="" />seelogd</a>
+  <a class="bar-brand" href="index.html"><img src="lens-mark.svg" alt="" />seelogd</a>
   <span class="bar-sep">/</span>
   <span class="bar-page" id="barPage">Hesap Silme</span>
   <span class="bar-spacer"></span>
@@ -404,5 +404,6 @@ I understand this request is irreversible.</pre>
 
 <script src="site-lang.js"></script>
 <script src="legal.js"></script>
+<script src="site-beacon.js" defer></script>
 </body>
 </html>

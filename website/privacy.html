@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#08090c" />
 <title>Gizlilik Politikası — seelogd</title>
 <meta name="description" content="seelogd gizlilik politikası: hangi verileri işliyoruz, neden işliyoruz, kimlerle paylaşıyoruz ve haklarınızı nasıl kullanırsınız. / seelogd privacy policy." />
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230a1626'/%3E%3Ccircle cx='24' cy='33' r='11' fill='%23f4fbff'/%3E%3Ccircle cx='40' cy='33' r='11' fill='%23f4fbff'/%3E%3Ccircle cx='26' cy='35' r='5' fill='%2304121f'/%3E%3Ccircle cx='42' cy='35' r='5' fill='%2304121f'/%3E%3C/svg%3E" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="stylesheet" href="fonts/fonts.css" /><!-- kendi sunucumuzdan; Google Fonts yok (gizlilik) -->
 <link rel="stylesheet" href="legal.css" />
 <link rel="stylesheet" href="lang-menu.css" />
 </head>
@@ -17,7 +17,7 @@
 <div class="glow" aria-hidden="true"></div>
 
 <header class="bar">
-  <a class="bar-brand" href="index.html"><img src="s-mark-tight.png" alt="" />seelogd</a>
+  <a class="bar-brand" href="index.html"><img src="lens-mark.svg" alt="" />seelogd</a>
   <span class="bar-sep">/</span>
   <span class="bar-page" id="barPage">Gizlilik Politikası</span>
   <span class="bar-spacer"></span>
@@ -50,8 +50,8 @@
       </p>
       <div class="stamp">
         <span>Yürürlük: <b>16 Ekim 2026</b></span>
-        <span>Son güncelleme: <b>21 Ekim 2026</b></span>
-        <span>Sürüm: <b>1.4</b></span>
+        <span>Son güncelleme: <b>6 Kasım 2026</b></span>
+        <span>Sürüm: <b>1.6</b></span>
       </div>
     </div>
 
@@ -165,7 +165,7 @@
             </tr>
             <tr>
               <td><strong>Web sitesi</strong></td>
-              <td>Bekleme listesine yazdığınız e-posta adresi ve sıra numaranız; “Test kullanıcısı ol” formunda yazdığınız e-posta adresi, seçtiğiniz platform (Android/iOS) ve site dili</td>
+              <td>Bekleme listesine yazdığınız e-posta adresi ve sıra numaranız; “Test kullanıcısı ol” formunda yazdığınız e-posta adresi, seçtiğiniz platform (Android/iOS) ve site dili — test kullanıcısı olan adres, yayın günü haber verebilmemiz için bekleme listesine de eklenir; sitenin <strong>ziyaret istatistiği</strong> için her sayfa görüntülemede açılan sayfa, nereden gelindiği (yönlendiren site ya da kampanya etiketi), tarayıcı dili, saat dilimi (yalnız ülke tahmini için), cihaz türü ve işletim sistemi ile sayfada kalınan süre. Bunlar <strong>yalnız günlük toplam sayılar</strong> olarak saklanır; IP adresi kaydedilmez, çerez ve kimlik kullanılmaz, tek tek ziyaret kaydı tutulmaz. Tarayıcınızda “Do Not Track” ya da “Global Privacy Control” açıksa hiç sayılmazsınız.</td>
               <td>Sizden</td>
             </tr>
           </tbody>
@@ -246,7 +246,7 @@
               <td>Meşru menfaat — KVKK m.5/2-f · GDPR m.6(1)(f)</td>
             </tr>
             <tr>
-              <td>Bekleme listesi: lansmanı duyurmak · Test kullanıcısı listesi: kapalı test daveti ve testle ilgili mesajlar göndermek</td>
+              <td>Bekleme listesi: lansmanı duyurmak · Test kullanıcısı listesi: kapalı test daveti ve testle ilgili mesajlar göndermek, ayrıca yayın günü haber vermek (bu yüzden adres bekleme listesine de yazılır)</td>
               <td>Açık rıza — KVKK m.5/1 · GDPR m.6(1)(a)</td>
             </tr>
           </tbody>
@@ -293,8 +293,8 @@
           <tbody>
             <tr>
               <td><strong>Google Firebase</strong><br /><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Politika</a></td>
-              <td>Kimlik doğrulama, veritabanı (Firestore + Realtime Database), sunucu fonksiyonları, web barındırma</td>
-              <td>Yukarıdaki tablodaki tüm hesap ve uygulama verileri</td>
+              <td>Kimlik doğrulama, veritabanı (Firestore + Realtime Database), sunucu fonksiyonları, web barındırma; web sitesindeki bekleme listesi/test formları ve kayıt sayacı (Firebase kütüphanesi Google sunucularından yüklenir)</td>
+              <td>Yukarıdaki tablodaki tüm hesap ve uygulama verileri; web sitesinde formlara yazdıklarınız. Site ve bu kütüphane Google sunucularından geldiği için Google IP adresinizi görebilir.</td>
             </tr>
             <tr>
               <td><strong>Firebase App Check</strong><br />(Google Play Integrity / Apple App Attest)</td>
@@ -344,7 +344,7 @@
             <tr>
               <td><strong>TMDB</strong><br /><a href="https://www.themoviedb.org/privacy-policy" target="_blank" rel="noopener">Politika</a></td>
               <td>Film/dizi bilgileri, posterler, yayın platformu verisi (JustWatch kaynaklı)</td>
-              <td>Yalnızca içerik sorguları (ör. aradığınız film adı ya da yapıştırdığınız veya başka bir uygulamadan seelogd’a paylaştığınız IMDb/TMDB bağlantısındaki yapım kimliği); hesap kimliğinizi TMDB’ye göndermiyoruz. İstekler cihazınızdan doğrudan yapıldığı için TMDB IP adresinizi görebilir.</td>
+              <td>Yalnızca içerik sorguları (ör. aradığınız film adı ya da yapıştırdığınız veya başka bir uygulamadan seelogd’a paylaştığınız IMDb/TMDB bağlantısındaki yapım kimliği); hesap kimliğinizi TMDB’ye göndermiyoruz. İstekler cihazınızdan doğrudan yapıldığı için TMDB IP adresinizi görebilir. Web sitesindeki afişler de doğrudan TMDB’nin görsel sunucusundan yüklenir; bu sırada TMDB yalnız IP adresinizi ve tarayıcı bilgisini görür.</td>
             </tr>
             <tr>
               <td><strong>OMDb API</strong><br /><a href="https://www.omdbapi.com/legal.htm" target="_blank" rel="noopener">Şartlar</a></td>
@@ -450,6 +450,7 @@
         <li><strong>Turnuva oyları:</strong> hesabınızı sildiğinizde oylarınız kaldırılır ve turnuva sayaçları buna göre düzeltilir.</li>
         <li><strong>Bekleme listesi e-postası:</strong> lansman duyurusu yapılana kadar; talebiniz üzerine hemen sileriz.</li>
         <li><strong>Test kullanıcısı kaydı:</strong> kapalı test sona erene kadar; talebiniz üzerine hemen sileriz.</li>
+        <li><strong>Web sitesi ziyaret istatistiği:</strong> yalnız günlük toplamlar (ör. “bugün Türkiye’den 40 ziyaretçi”); kimseyle ilişkilendirilemediği için kişisel veri içermez.</li>
         <li><strong>Abonelik/işlem kayıtları:</strong> mali ve hukuki saklama yükümlülükleri gereği hesap silindikten sonra da tutulabilir.</li>
         <li><strong>Davet ve promosyon kayıtları:</strong> hesabınız açık olduğu sürece. Hesabı sildiğinizde davet kodunuz, davet hesabınız (biriken ücretsiz aylar) ve sizin davet ettiğiniz ya da sizi davet eden kayıtları silinir. Promosyon kodu kullanım kaydınız da silinir.</li>
         <li><strong>İçerik şikâyetleri:</strong> yaptığınız şikâyetler moderasyon kararının dayanağı olarak saklanabilir, ancak hesabınızı sildiğinizde şikâyeti sizin yaptığınızı gösteren hesap kimliğiniz kayıttan çıkarılır; hakkınızda yapılmış şikâyetler silinir.</li>
@@ -544,9 +545,15 @@
       <h2 id="tr-13" data-toc="Çerezler ve yerel depolama">Çerezler ve yerel depolama</h2>
       <p>
         Web sitemizde <strong>reklam veya izleme çerezi kullanmıyoruz</strong>.
-        Yalnızca tarayıcınızın yerel depolamasında dil tercihinizi ve bekleme
-        listesi sıra numaranızı tutuyoruz; bunlar cihazınızda kalır ve
-        tarayıcı verilerini temizleyerek silebilirsiniz. Mobil uygulama; ayarlar,
+        Yalnızca tarayıcınızın yerel depolamasında dil tercihinizi, bu
+        tarayıcıdan katıldıysanız sıra numaranızı, seçtiğiniz test platformunu
+        ve e-posta adresinizin <strong>maskeli</strong> hâlini (ör.
+        “is•••@gmail.com”; adresin kendisi saklanmaz), ziyaret sayımı için de
+        “bugün ve daha önce geldiniz mi” bilgisini (son ziyaret günü), oturum
+        deposunda da “bu oturum sayıldı” işaretini tutuyoruz; bunlar cihazınızda
+        kalır ve tarayıcı verilerini temizleyerek silebilirsiniz. Yazı tipleri
+        kendi sunucumuzdan yüklenir; Google Fonts gibi bir yazı tipi
+        hizmetine bağlanılmaz. Mobil uygulama; ayarlar,
         önbellek, notlar/hatırlatıcılar/listeler/AI sohbetlerinin yerel kopyası
         ve oturum bilgisi için cihazın yerel depolamasını ve güvenli depolama
         alanını kullanır. Uygulamayı kaldırırsanız bu yerel veriler de silinir.
@@ -563,6 +570,8 @@
       </p>
       <p><strong>Sürüm geçmişi</strong></p>
       <ul>
+        <li><strong>1.6 — 6 Kasım 2026:</strong> Test kullanıcısı olan adresin yayın günü haber için bekleme listesine de eklendiği belirtildi. Tarayıcıda e-posta adresinin yalnız maskeli hâlinin tutulduğu, yazı tiplerinin kendi sunucumuzdan geldiği, sitedeki afişlerin TMDB’den, form kütüphanesinin Google sunucularından yüklendiği eklendi. Bekleme ve test listesindeki kayıtlar artık siteden kimse tarafından tek tek sorgulanamaz.</li>
+        <li><strong>1.5 — 4 Kasım 2026:</strong> Web sitesine “Test kullanıcısı ol” formu (e-posta, platform, site dili) ve çerezsiz, IP saklamayan ziyaret istatistiği (yalnız günlük toplamlar) eklendi; saklama süresi ve yerel depolama bölümleri buna göre güncellendi.</li>
         <li><strong>1.4 — 21 Ekim 2026:</strong> Profilde isteğe bağlı sosyal hesap kullanıcı adları ve arkadaşla zevk uyumu eklendi. Hesap silme artık sunucuda tam kapsamlı çalışıyor: turnuva oyları, geri bildirimler, promosyon kullanım kaydı, başkalarının gönderilerindeki beğenileriniz, başkalarının bildirim kutusuna gönderdiğiniz bildirimler ve günlük liderlik kayıtlarınız da silinir; içerik şikâyetlerinde hesap kimliğiniz kayıttan çıkarılır.</li>
         <li><strong>1.3 — 21 Ekim 2026:</strong> Arkadaş daveti ve promosyon kodu eklendi (hangi kayıtların tutulduğu, davet edenin neleri gördüğü, saklama ve silme). Firebase App Check (Google Play Integrity / Apple App Attest) üçüncü taraf listesine eklendi. Yapıştırılan veya başka uygulamadan paylaşılan IMDb/TMDB bağlantısının TMDB sorgusu olduğu belirtildi. Cihazda kalan verilere takip edilen kişiler ve yıllık hedef eklendi. Yasal sayfaların Portekizce ve Almanca kullanıcılara İngilizce açıldığı belirtildi.</li>
         <li><strong>1.2 — 18 Ekim 2026:</strong> “Kütüphaneni Dışa Aktar” ekranı eklendi; “Verilerinizin kopyası” bölümü ve hak listesi buna göre güncellendi. Harici puanlar için OMDb işleyici olarak ve (isteğe bağlı) haftalık yayın özeti bildirimi eklendi.</li>
@@ -608,8 +617,8 @@
       </p>
       <div class="stamp">
         <span>Effective: <b>16 October 2026</b></span>
-        <span>Last updated: <b>21 October 2026</b></span>
-        <span>Version: <b>1.4</b></span>
+        <span>Last updated: <b>6 November 2026</b></span>
+        <span>Version: <b>1.6</b></span>
       </div>
     </div>
 
@@ -724,7 +733,7 @@
             </tr>
             <tr>
               <td><strong>Website</strong></td>
-              <td>The e-mail address you submit to the waitlist and your queue number; on the “Become a tester” form, the e-mail address you enter, the platform you pick (Android/iOS) and the site language</td>
+              <td>The e-mail address you submit to the waitlist and your queue number; on the “Become a tester” form, the e-mail address you enter, the platform you pick (Android/iOS) and the site language — a tester’s address is also added to the waitlist so we can tell you on launch day; for the site’s <strong>visit statistics</strong>, on each page view: the page, where you came from (referring site or campaign tag), browser language, time zone (only to estimate the country), device type and operating system, plus the time spent on the page. These are stored <strong>only as daily totals</strong>; no IP address is recorded, no cookies or identifiers are used and no individual visit is kept. If “Do Not Track” or “Global Privacy Control” is on in your browser, you are not counted at all.</td>
               <td>From you</td>
             </tr>
           </tbody>
@@ -805,7 +814,7 @@
               <td>Legitimate interests — GDPR Art. 6(1)(f) · KVKK Art. 5/2-f</td>
             </tr>
             <tr>
-              <td>Waitlist: telling you when we launch · Tester list: sending closed-test invites and test-related messages</td>
+              <td>Waitlist: telling you when we launch · Tester list: sending closed-test invites and test-related messages, and telling you on launch day (which is why the address is also added to the waitlist)</td>
               <td>Consent — GDPR Art. 6(1)(a) · KVKK Art. 5/1</td>
             </tr>
           </tbody>
@@ -852,8 +861,8 @@
           <tbody>
             <tr>
               <td><strong>Google Firebase</strong><br /><a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Policy</a></td>
-              <td>Authentication, database (Firestore + Realtime Database), server functions, web hosting</td>
-              <td>All account and app data listed above</td>
+              <td>Authentication, database (Firestore + Realtime Database), server functions, web hosting; the website’s waitlist/tester forms and sign-up counter (the Firebase library is loaded from Google’s servers)</td>
+              <td>All account and app data listed above; what you enter in the website forms. Because the site and this library are served by Google, Google can see your IP address.</td>
             </tr>
             <tr>
               <td><strong>Firebase App Check</strong><br />(Google Play Integrity / Apple App Attest)</td>
@@ -903,7 +912,7 @@
             <tr>
               <td><strong>TMDB</strong><br /><a href="https://www.themoviedb.org/privacy-policy" target="_blank" rel="noopener">Policy</a></td>
               <td>Movie/TV metadata, posters, streaming availability (sourced from JustWatch)</td>
-              <td>Content queries only (e.g. the title you search for, or the title ID in an IMDb/TMDB link you paste or share into seelogd from another app); we do not send your account identity to TMDB. Because requests are made directly from your device, TMDB can see your IP address.</td>
+              <td>Content queries only (e.g. the title you search for, or the title ID in an IMDb/TMDB link you paste or share into seelogd from another app); we do not send your account identity to TMDB. Because requests are made directly from your device, TMDB can see your IP address. The posters on our website are also loaded directly from TMDB’s image server; TMDB then sees only your IP address and browser details.</td>
             </tr>
             <tr>
               <td><strong>OMDb API</strong><br /><a href="https://www.omdbapi.com/legal.htm" target="_blank" rel="noopener">Terms</a></td>
@@ -1007,6 +1016,7 @@
         <li><strong>Tournament votes:</strong> when you delete your account your votes are removed and the tournament tallies are corrected accordingly.</li>
         <li><strong>Waitlist e-mail:</strong> until we announce the launch; removed immediately on request.</li>
         <li><strong>Tester sign-up:</strong> until the closed test ends; removed immediately on request.</li>
+        <li><strong>Website visit statistics:</strong> daily totals only (e.g. “40 visitors from Turkey today”); they cannot be linked to anyone and contain no personal data.</li>
         <li><strong>Subscription/transaction records:</strong> may be retained after account deletion where financial and legal retention duties apply.</li>
         <li><strong>Invite and promo records:</strong> as long as your account exists. When you delete your account, your invite code, your invite account (accrued free months) and the records of people you invited or who invited you are deleted. Your promo code redemption record is deleted as well.</li>
         <li><strong>Content reports:</strong> reports you filed may be retained as the basis of a moderation decision, but when you delete your account your account id is removed from them; reports filed about you are deleted.</li>
@@ -1097,9 +1107,15 @@
       <h2 id="en-13" data-toc="Cookies">Cookies and local storage</h2>
       <p>
         Our website uses <strong>no advertising or tracking cookies</strong>. We
-        only keep your language preference and waitlist queue number in your
-        browser’s local storage; these stay on your device and can be removed by
-        clearing browser data. The mobile app uses local device storage and the
+        only keep your language preference — and, if you signed up from this
+        browser, your queue number, the test platform you picked and a
+        <strong>masked</strong> form of your e-mail address (e.g.
+        “is•••@gmail.com”; the address itself is not stored) — and, for visit
+        counting, whether you have visited today or before (your last visit day)
+        in your browser’s local storage, plus a “this session was counted” flag
+        in session storage; these stay on your device and can be removed by
+        clearing browser data. Fonts are served from our own server; no font
+        service such as Google Fonts is contacted. The mobile app uses local device storage and the
         secure-storage area for settings, cache, the on-device copy of your
         notes/reminders/lists/AI chats and your sign-in session. Uninstalling the
         app removes this local data.
@@ -1115,6 +1131,8 @@
       </p>
       <p><strong>Version history</strong></p>
       <ul>
+        <li><strong>1.6 — 6 November 2026:</strong> Stated that a tester’s address is also added to the waitlist for the launch-day notice. Added that the browser keeps only a masked form of your e-mail address, that fonts are served from our own server, and that the website’s posters load from TMDB and the form library from Google’s servers. Waitlist and tester-list entries can no longer be looked up one by one from the site.</li>
+        <li><strong>1.5 — 4 November 2026:</strong> Added the website’s “Become a tester” form (e-mail, platform, site language) and cookie-free visit statistics that store no IP address (daily totals only); the retention and local-storage sections were updated accordingly.</li>
         <li><strong>1.4 — 21 October 2026:</strong> Added optional social account usernames on the profile and taste match with a friend. Account deletion now runs in full on the server: tournament votes, feedback, promo redemption record, your likes on other people’s posts, notifications you sent to other users’ inboxes and your daily leaderboard entries are deleted too; your account id is removed from content reports you filed.</li>
         <li><strong>1.3 — 21 October 2026:</strong> added friend invites and promo codes (which records are kept, what the inviter sees, retention and deletion). Added Firebase App Check (Google Play Integrity / Apple App Attest) to the third-party list. Stated that a pasted or shared IMDb/TMDB link results in a TMDB query. Added followed people and the yearly goal to the on-device data. Stated that Portuguese and German users are shown the English legal pages.</li>
         <li><strong>1.2 — 18 October 2026:</strong> added the “Export Your Library” screen; the “A copy of your data” section and the rights list were updated accordingly. OMDb was added as a processor for external ratings, and the optional weekly release-digest notification was added.</li>
@@ -1161,5 +1179,6 @@
 
 <script src="site-lang.js"></script>
 <script src="legal.js"></script>
+<script src="site-beacon.js" defer></script>
 </body>
 </html>

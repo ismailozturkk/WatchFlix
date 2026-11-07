@@ -237,6 +237,7 @@
 .am-swatch .c { background: var(--ac); color: #fff; border-color: var(--ac); }
 .am-icons { display: inline-flex; gap: 5px; }
 .am-icons i { width: 20px; height: 20px; border-radius: 6px; background: var(--g); }
+.am-icons .am-icon-s { display: grid; place-items: center; color: #fff; font: 800 12px/1 var(--font, sans-serif); font-style: normal; }
 .am-lang-c { flex: none; width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-size: 10.5px; color: var(--acl); background: color-mix(in srgb, var(--ac) 14%, transparent); }
 .am-chev.on { color: var(--ac); }
 

@@ -404,9 +404,7 @@
   }
   screens.settings = function (st) {
     return '<div class="am-scroll am-settop">' + navBack(t("mTabSettings"), "profile") +
-      '<div class="am-lab first">SEELOGD PREMIUM</div>' +
-      '<div class="am-prem"><div class="am-prem-top"><span class="am-prem-ic">' + ic("diamond", 18) + "</span><b>" + t("mPremiumTitle") + '</b></div><div class="am-prem-cta"><span>' + t("mPremiumCta") + "</span>" + ic("arrow", 14) + "</div></div>" +
-      '<div class="am-lab">' + t("mGrpAccount") + "</div>" +
+      '<div class="am-lab first">' + t("mGrpAccount") + "</div>" +
       '<div class="am-card">' + row("user", t("mRowConn"), t("mRowConnSub")) + row("shield", t("mRowPrivacy"), null, { tone: "green" }) + "</div>" +
       '<div class="am-lab">' + t("mGrpAppearance") + "</div>" + themeCard(st) +
       '<div class="am-card stacked">' + row("palette", t("mRowPersonal"), null, { tone: "violet" }) + row("image", t("mRowPoster"), null, { tone: "orange" }) + row("apps", t("mRowWidgets"), null, { tone: "teal" }) + row("phone", t("mRowHaptics"), null, { right: toggle(true) }) + "</div>" +
@@ -490,11 +488,10 @@
     var hexes = [["#22C55E", "tv"], ["#22C55E", "inbox"], ["#22C55E", "flag"], ["#EAB308", "infinite"], ["#A855F7", "trend-up"], ["#A855F7", "aperture"], ["#A855F7", "star"], ["#A855F7", "library"]];
     return '<div class="am-scroll am-proftop">' +
       '<div class="am-phead"><div class="am-halo" style="--p:58">' + avatar(0, 74, "A") + '</div><div class="am-pid"><h3>Alex Morgan</h3><p>@alex</p>' +
-      '<span class="am-prem-pill">' + ic("diamond", 10) + "Premium</span>" +
       '<div class="am-pmeta">' + ic("mail", 10) + '<span>alex@example.com</span><span class="v">' + ic("verified", 10) + "</span></div>" +
       '<div class="am-pmeta">' + ic("calendar", 10) + "<span>" + t("mJoined") + " " + fdate(2026, 5, 11, { day: "numeric", month: "short", year: "numeric" }) + "</span></div>" +
       '<div class="am-pbtns"><span class="ac">' + ic("edit", 11) + "</span><span>" + ic("bell", 11) + '</span><button type="button" class="am-gear" data-go="settings" aria-label="' + t("mTabSettings") + '">' + ic("gear", 12) + "</button><span>" + ic("share-social", 11) + "</span><span>" + ic("flag", 11) + "</span></div></div></div>" +
-      '<div class="am-bstrip"><span class="am-bcount">' + ic("ribbon", 9) + "57/154" + ic("chev", 8) + "</span>" + hexes.map(function (h) { return '<span class="am-hex" style="--c:' + h[0] + '"><span>' + ic(h[1], 10) + "</span></span>"; }).join("") + "</div>" +
+      '<div class="am-bstrip"><span class="am-bcount">' + ic("ribbon", 9) + "57/158" + ic("chev", 8) + "</span>" + hexes.map(function (h) { return '<span class="am-hex" style="--c:' + h[0] + '"><span>' + ic(h[1], 10) + "</span></span>"; }).join("") + "</div>" +
       '<div class="am-fbar">' + [["search", "#6366F1", "mFriendSearch"], [null, "#6366F1", "mFriends"], ["chat-fill", "#8B5CF6", "mMessages"], ["mail-fill", "#22C55E", "mRequests"]].map(function (x) {
         return '<span><i style="color:' + x[1] + ";background:color-mix(in srgb," + x[1] + ' 20%,transparent)">' + (x[0] ? ic(x[0], 13) : '<b class="n">2</b>') + "</i><small>" + t(x[2]) + "</small></span>";
       }).join("") + "</div>" +
@@ -526,7 +523,7 @@
       }).join("") + "</div>";
     }
     var head = '<div class="am-ai-h"><button type="button" class="am-aiclose" data-ai-close aria-label="' + t("mClose") + '">' + ic("chev-down", 17) + '</button><span class="am-star4"></span>' +
-      '<div class="am-ai-t"><b class="h">CineMatch</b><div class="am-ai-q"><i></i><span>Premium · ' + t("mAiLeft", { n: 20 }) + "</span></div></div>" +
+      '<div class="am-ai-t"><b class="h">CineMatch</b><div class="am-ai-q"><i></i><span>' + t("mAiLeft", { n: 20 }) + "</span></div></div>" +
       '<div class="am-ai-hb"><span>' + ic("sliders", 12) + "</span><span>" + ic("chat-plus", 12) + "</span><span>" + ic("history", 12) + "</span></div></div>";
     var body;
     if (ai.phase === "think") {

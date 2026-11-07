@@ -1,18 +1,45 @@
 {
   "hosting": {
     "public": "website",
+    "redirects": [
+      { "source": "/admin", "destination": "/admin.html", "type": 301 }
+    ],
     "rewrites": [
       {
         "source": "/api/top100",
         "function": { "functionId": "top100Counters", "region": "us-central1" }
+      },
+      {
+        "source": "/api/beacon",
+        "function": { "functionId": "siteBeacon", "region": "us-central1" }
       }
     ],
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "**/*.md"
     ],
     "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          { "key": "X-Frame-Options", "value": "DENY" },
+          { "key": "Content-Security-Policy", "value": "frame-ancestors 'none'; object-src 'none'; base-uri 'self'" },
+          { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=()" }
+        ]
+      },
+      {
+        "source": "/admin.@(html|js|css)",
+        "headers": [
+          {
+            "key": "X-Robots-Tag",
+            "value": "noindex, nofollow"
+          }
+        ]
+      },
       {
         "source": "**/*.@(html|js|css)",
         "headers": [
@@ -23,7 +50,7 @@
         ]
       },
       {
-        "source": "**/*.@(png|jpg|jpeg|webp|gif|svg)",
+        "source": "**/*.@(png|jpg|jpeg|webp|gif|svg|woff2|mp4)",
         "headers": [
           {
             "key": "Cache-Control",
