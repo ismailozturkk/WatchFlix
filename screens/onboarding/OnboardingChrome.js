@@ -23,7 +23,7 @@ const { width } = Dimensions.get("window");
 const SIDE = 20;
 const SEG_GAP = 5;
 
-export const HEADER_BODY = 62; // üst çubuk + ilerleme yüksekliği (inset hariç)
+export const HEADER_BODY = 96; // üst çubuk + ilerleme + adım bilgisi (inset hariç)
 export const DOCK_BODY = 138; // alt çubuk yüksekliği (inset hariç)
 
 // ── İlerleme: hikâye tarzı bölmeli çubuk ─────────────────────────────────────
@@ -49,10 +49,16 @@ function Segment({ index, scrollX, accent, track, segW }) {
   );
 }
 
-function OnboardingProgress({ count, scrollX, accent, track }) {
+function OnboardingProgress({ count, currentStep, stepLabel, scrollX, accent, track }) {
   const segW = (width - SIDE * 2 - SEG_GAP * (count - 1)) / count;
   return (
-    <View style={styles.progress} accessibilityRole="progressbar" pointerEvents="none">
+    <View
+      style={styles.progress}
+      accessibilityRole="progressbar"
+      accessibilityLabel={stepLabel}
+      accessibilityValue={{ min: 1, max: count, now: currentStep }}
+      pointerEvents="none"
+    >
       {Array.from({ length: count }, (_, i) => (
         <Segment key={i} index={i} scrollX={scrollX} accent={accent} track={track} segW={segW} />
       ))}
@@ -73,6 +79,8 @@ export function OnboardingHeader({
   showSkip,
   onSkip,
   count,
+  currentStep,
+  stepLabel,
   scrollX,
 }) {
   const chip = {
@@ -90,9 +98,11 @@ export function OnboardingHeader({
       <View style={styles.headerRow} pointerEvents="box-none">
         <View style={styles.brand} pointerEvents="none">
           <Image source={logo} style={styles.brandLogo} />
-          <Text allowFontScaling={false} style={[styles.brandText, { color: theme.text.primary }]}>
-            See<Text style={{ color: accent }}>logd</Text>
-          </Text>
+          {width >= 380 && (
+            <Text allowFontScaling={false} style={[styles.brandText, { color: theme.text.primary }]}>
+              See<Text style={{ color: accent }}>logd</Text>
+            </Text>
+          )}
         </View>
 
         <View style={styles.headerActions} pointerEvents="box-none">
@@ -126,10 +136,18 @@ export function OnboardingHeader({
 
       <OnboardingProgress
         count={count}
+        currentStep={currentStep}
+        stepLabel={stepLabel}
         scrollX={scrollX}
         accent={accent}
         track={alpha(theme.text.muted, isLightTheme ? 0.22 : 0.26)}
       />
+      <View style={styles.stepRow} pointerEvents="none" importantForAccessibility="no-hide-descendants">
+        <Text numberOfLines={1} style={[styles.stepLabel, { color: theme.text.secondary }]}>
+          {stepLabel}
+        </Text>
+        <Text style={[styles.stepCount, { color: accent }]}>{currentStep} / {count}</Text>
+      </View>
     </View>
   );
 }
@@ -278,6 +296,9 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: "700" },
   progress: { flexDirection: "row", gap: SEG_GAP, marginTop: 12 },
   segment: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
+  stepRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 9 },
+  stepLabel: { flex: 1, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.8 },
+  stepCount: { fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
 
   dock: {
     position: "absolute",

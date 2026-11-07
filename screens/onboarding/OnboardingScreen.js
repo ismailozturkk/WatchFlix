@@ -2,11 +2,11 @@
 //
 // Tanıtım akışının orkestratörü: durum (seçimler, adım), analitik, gezinme ve
 // slaytların dizilimi. Görünüm parçaları aynı klasörde:
-//   OnboardingBackdrop  — poster duvarı + ışıma      OnboardingIntro  — marka açılışı
+//   OnboardingBackdrop  — poster duvarı + ışıma
 //   OnboardingChrome    — üst çubuk, alt düğmeler    OnboardingSlides — karşılama / önizleme / son slayt
-//   OnboardingPreferences — tür ve platform seçimi   onboardingCopy   — tr/en metinler
+//   OnboardingPreferences — tür ve platform seçimi   onboardingCopy   — beş dilde metinler
 //
-// Akış: intro → [keşfet, türler, AI, platformlar, profil] → kayıt/giriş. "Atla"
+// Akış: [keşfet, türler, AI, platformlar, profil, favoriler] → kayıt/giriş. "Atla"
 // akıştan çıkarmaz, doğrudan son (kayıt) slayta götürür.
 
 import { copyLanguage, nextAppLanguage } from "../../utils/appLanguages";
@@ -29,7 +29,6 @@ import { isLightSurface } from "../../utils/colorUtils";
 import useAppLogo from "@hooks/useAppLogo";
 import { AiShowcase, ProfileShowcase } from "./OnboardingShowcases";
 import OnboardingBackdrop from "./OnboardingBackdrop";
-import OnboardingIntro from "./OnboardingIntro";
 import {
   OnboardingCtaDock,
   OnboardingHeader,
@@ -76,7 +75,6 @@ export default function OnboardingScreen({ navigation }) {
   const lang = copyLanguage(language, Object.keys(ONBOARDING_COPY));
   const copy = getOnboardingCopy(lang);
 
-  const [phase, setPhase] = useState("intro"); // "intro" | "main"
   const [index, setIndex] = useState(0);
   const [selectedGenreKeys, setSelectedGenreKeys] = useState(onboardingGenreKeys);
   const [selectedProviderIds, setSelectedProviderIds] = useState(streamingProviderIds);
@@ -116,7 +114,6 @@ export default function OnboardingScreen({ navigation }) {
   // Adım, kısa bir süre yerinde kalınca sayılır: "Atla" ile arada kayan slaytlar
   // (ve hızlı kaydırmalar) huniye "görüldü" diye yazılmasın.
   useEffect(() => {
-    if (phase !== "main") return undefined;
     // Anahtar yalnız adım: dil düğmesine basmak aynı adımı yeniden "görüldü"
     // saydırıp huninin ilk basamağını şişiriyordu (T3 B3). Olay, adımın ilk
     // görüldüğü dili taşır.
@@ -132,7 +129,7 @@ export default function OnboardingScreen({ navigation }) {
       });
     }, STEP_VIEW_SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [step, index, language, phase, count, copy, lang]);
+  }, [step, index, language, count, copy, lang]);
 
   // ── Tercihler ───────────────────────────────────────────────────────────────
   // Ayar yazımı (changeXxx) AppSettingsProvider'ı günceller. setState GÜNCELLEYİCİSİNİN içinde çağrılırsa React onu
@@ -212,8 +209,11 @@ export default function OnboardingScreen({ navigation }) {
   const handleSkip = useCallback(() => {
     buzz();
     trackEvent(ANALYTICS_EVENTS.ONBOARDING_SKIPPED, { from_step: index + 1, total_steps: count });
-    scrollToIndex(count - 1);
-  }, [index, scrollToIndex, count]);
+    const lastOffset = (count - 1) * width;
+    scrollRef.current?.scrollTo({ x: lastOffset, animated: false });
+    scrollX.setValue(lastOffset);
+    setIndex(count - 1);
+  }, [index, count, scrollX]);
 
   const handleRegister = useCallback(() => {
     goTo("RegisterScreen", "register_cta");
@@ -263,6 +263,11 @@ export default function OnboardingScreen({ navigation }) {
   );
 
   const nextLabel = index === count - 2 ? copy.start : copy.next;
+  const stepLabel = step.type === "cta"
+    ? copy.cta.freeBadge
+    : step.type === "preference"
+      ? copy[step.kind].eyebrow
+      : copy.features[step.featureIndex].eyebrow;
 
   const renderSlide = (item, i) => {
     const common = {
@@ -366,12 +371,10 @@ export default function OnboardingScreen({ navigation }) {
         isLightTheme={isLightTheme}
         posters={posters}
         scrollX={scrollX}
-        settled={phase === "main"}
+        settled
         wallPaused={index > 0}
       />
 
-      {phase === "main" && (
-        <>
           <AnimatedScrollView
             ref={scrollRef}
             horizontal
@@ -397,6 +400,8 @@ export default function OnboardingScreen({ navigation }) {
             showSkip={!isCta}
             onSkip={handleSkip}
             count={count}
+            currentStep={index + 1}
+            stepLabel={stepLabel}
             scrollX={scrollX}
           />
 
@@ -426,18 +431,6 @@ export default function OnboardingScreen({ navigation }) {
               onLogin={handleLogin}
             />
           </Animated.View>
-        </>
-      )}
-
-      {phase === "intro" && (
-        <OnboardingIntro
-          theme={theme}
-          accent={accent}
-          isLightTheme={isLightTheme}
-          copy={copy}
-          onDone={() => setPhase("main")}
-        />
-      )}
     </View>
   );
 }

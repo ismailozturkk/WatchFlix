@@ -40,8 +40,8 @@ import {
 import FavoriteArt from "./FavoriteArt";
 import GlassPressable from "../common/GlassPressable";
 import GlassBox from "../common/GlassBox";
+import { SEARCH_DEBOUNCE_MS } from "../../utils/searchDebounce";
 
-const SEARCH_DEBOUNCE_MS = 350;
 const ART_W = 46;
 
 const VARIANT_LABEL_KEY = {

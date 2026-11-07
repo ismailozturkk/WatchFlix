@@ -29,7 +29,6 @@ const CONTENT_W = PAGE_W - SIDE_PAD * 2;
 const GENRE_W = Math.floor((Math.min(CONTENT_W, 400) - GRID_GAP) / 2);
 const PROVIDER_W = Math.floor((Math.min(CONTENT_W, 400) - GRID_GAP * 2) / 3);
 const PROVIDERS_COLLAPSED = 12;
-const PROVIDERS_EXPANDED = 36;
 const MAX_GENRES = 3;
 
 // ── Film / Dizi anahtarı: kayan gösterge + seçim sayısı noktaları ─────────────
@@ -79,6 +78,7 @@ function MediaTypeSwitch({ theme, accent, isLightTheme, value, onChange, options
           <Pressable
             key={option.key}
             accessibilityRole="button"
+            accessibilityLabel={option.pips == null ? option.label : `${option.label}, ${option.pips} / ${MAX_GENRES}`}
             accessibilityState={{ selected: active }}
             onPress={() => onChange(option.key)}
             style={styles.switchItem}
@@ -115,13 +115,14 @@ function MediaTypeSwitch({ theme, accent, isLightTheme, value, onChange, options
 }
 
 // ── Tür kutusu ───────────────────────────────────────────────────────────────
-function GenreTile({ theme, accent, label, icon, order, locked, onPress }) {
+function GenreTile({ theme, accent, label, icon, order, locked, limitHint, onPress }) {
   const selected = order > 0;
   return (
     <AuthPressable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected, disabled: locked }}
+      accessibilityHint={locked ? limitHint : undefined}
       disabled={locked}
       onPress={onPress}
       pressedScale={0.96}
@@ -262,7 +263,7 @@ export default function PreferenceSlide({
   );
   // Sıra seçime göre DEĞİŞMEZ: dokunduğun kutu parmağının altından kaçmasın.
   const providers = useMemo(() => {
-    const limit = expanded ? PROVIDERS_EXPANDED : PROVIDERS_COLLAPSED;
+    const limit = expanded ? catalog.length : PROVIDERS_COLLAPSED;
     return [
       ...catalog.slice(0, limit),
       ...catalog.slice(limit).filter((provider) => initialProviders.includes(provider.id)),
@@ -296,11 +297,9 @@ export default function PreferenceSlide({
       >
         <Animated.View style={parallax.head}>
           <FeatureHeading
-            eyebrow={text.eyebrow}
             title={text.title}
             titleAccent={text.titleAccent}
             desc={text.desc}
-            icon={isGenre ? "color-palette-outline" : "tv-outline"}
             theme={theme}
             accent={accent}
             size={28}
@@ -321,23 +320,37 @@ export default function PreferenceSlide({
           />
 
           {isGenre ? (
-            <View style={styles.grid}>
-              {genres.map((genre) => {
-                const at = activeGenres.indexOf(genre.key);
-                return (
-                  <GenreTile
-                    key={genre.key}
-                    theme={theme}
-                    accent={accent}
-                    label={genreLabel(genre, mediaType, language)}
-                    icon={genre.icon}
-                    order={at + 1}
-                    locked={at < 0 && activeGenres.length >= MAX_GENRES}
-                    onPress={() => onToggleGenre(mediaType, genre.key)}
-                  />
-                );
-              })}
-            </View>
+            <>
+              <View style={styles.countRow}>
+                <View style={[styles.countPill, { backgroundColor: alpha(accent, 0.12), borderColor: alpha(accent, 0.22) }]}>
+                  <Ionicons name="checkmark-circle" size={13} color={accent} />
+                  <Text style={[styles.countText, { color: accent }]}>
+                    {activeGenres.length} / {MAX_GENRES}
+                  </Text>
+                </View>
+                <Text style={[styles.countHint, { color: theme.text.muted }]}>
+                  {activeGenres.length >= MAX_GENRES ? text.max : text.pickHint}
+                </Text>
+              </View>
+              <View style={styles.grid}>
+                {genres.map((genre) => {
+                  const at = activeGenres.indexOf(genre.key);
+                  return (
+                    <GenreTile
+                      key={genre.key}
+                      theme={theme}
+                      accent={accent}
+                      label={genreLabel(genre, mediaType, language)}
+                      icon={genre.icon}
+                      order={at + 1}
+                      locked={at < 0 && activeGenres.length >= MAX_GENRES}
+                      limitHint={text.max}
+                      onPress={() => onToggleGenre(mediaType, genre.key)}
+                    />
+                  );
+                })}
+              </View>
+            </>
           ) : (
             <>
               <View style={styles.countRow}>
@@ -375,6 +388,7 @@ export default function PreferenceSlide({
               {catalog.length > PROVIDERS_COLLAPSED && (
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityState={{ expanded }}
                   onPress={() => setExpanded((value) => !value)}
                   style={styles.more}
                   hitSlop={8}
@@ -454,8 +468,8 @@ const styles = StyleSheet.create({
   orderText: { fontSize: 11.5, fontWeight: "900" },
   ring: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5 },
 
-  countRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  countHint: { flex: 1, fontSize: 11.5, fontWeight: "600", lineHeight: 15 },
+  countRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10 },
+  countHint: { flexGrow: 1, flexShrink: 1, fontSize: 11.5, fontWeight: "600", lineHeight: 16 },
   countPill: {
     flexDirection: "row",
     alignItems: "center",

@@ -34,8 +34,9 @@ const tick = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
  * @param {object} props.value                normalize edilmiş favoriler
  * @param {(next:object)=>void} props.onChange
  * @param {string} [props.accent]             vurgu rengi (varsayılan tema)
+ * @param {string[]} [props.visibleKinds]     gösterilecek kategoriler (varsayılan: tümü)
  */
-export default function FavoritesEditor({ value, onChange, accent: accentProp }) {
+export default function FavoritesEditor({ value, onChange, accent: accentProp, visibleKinds = FAVORITE_KINDS }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const copy = getFavoritesCopy(language);
@@ -70,7 +71,7 @@ export default function FavoritesEditor({ value, onChange, accent: accentProp })
 
   return (
     <View style={styles.root}>
-      {FAVORITE_KINDS.map((kind) => {
+      {visibleKinds.map((kind) => {
         const kindCopy = copy.kinds[kind];
         const count = countFavorites(value, kind);
         return (

@@ -5,8 +5,6 @@
 
 import React, { useMemo } from "react";
 import { Dimensions, StyleSheet, Text, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { alpha } from "../../theme/colors";
 import { DOCK_BODY, HEADER_BODY } from "./OnboardingChrome";
 
 export const PAGE_W = Dimensions.get("window").width;
@@ -33,47 +31,21 @@ export function renderAccentedTitle(title, accentWord, accentColor) {
 }
 
 export function FeatureHeading({
-  eyebrow,
   title,
   titleAccent,
   desc,
-  tags = [],
-  icon,
   theme,
   accent,
   size = 30,
 }) {
   return (
     <View style={styles.copy}>
-      <View style={styles.eyebrowRow}>
-        <View style={[styles.eyebrowIcon, { backgroundColor: alpha(accent, 0.15) }]}>
-          <Ionicons name={icon} size={15} color={accent} />
-        </View>
-        <Text style={[styles.eyebrow, { color: accent }]}>{eyebrow}</Text>
-      </View>
-
       <Text style={[styles.title, { color: theme.text.primary, fontSize: size, lineHeight: size + 5 }]}>
         {renderAccentedTitle(title, titleAccent, accent)}
       </Text>
 
       {!!desc && <Text style={[styles.desc, { color: theme.text.secondary }]}>{desc}</Text>}
 
-      {tags.length > 0 && (
-        <View style={styles.tagRow}>
-          {tags.map((tag) => (
-            <View
-              key={tag}
-              style={[
-                styles.tag,
-                { backgroundColor: alpha(accent, 0.09), borderColor: alpha(accent, 0.18) },
-              ]}
-            >
-              <View style={[styles.tagDot, { backgroundColor: accent }]} />
-              <Text style={[styles.tagText, { color: theme.text.secondary }]}>{tag}</Text>
-            </View>
-          ))}
-        </View>
-      )}
     </View>
   );
 }
@@ -118,27 +90,6 @@ export function useSlideParallax(scrollX, slideIndex) {
 
 const styles = StyleSheet.create({
   copy: { width: "100%", maxWidth: 400, alignSelf: "center" },
-  eyebrowRow: { flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 12 },
-  eyebrowIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  eyebrow: { fontSize: 11, fontWeight: "900", letterSpacing: 1.4 },
   title: { fontWeight: "900", letterSpacing: -0.8 },
   desc: { fontSize: 14.5, lineHeight: 21.5, marginTop: 10 },
-  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 16 },
-  tag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    height: 28,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  tagDot: { width: 4, height: 4, borderRadius: 2 },
-  tagText: { fontSize: 11, fontWeight: "700" },
 });

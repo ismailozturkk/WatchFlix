@@ -65,21 +65,26 @@ export function DiscoverSlide({
         </View>
       )}
 
-      <View style={[styles.discoverBody, { paddingBottom: slideBottom(bottomInset) - 44 }]}>
+      <ScrollView
+        style={styles.discoverScroll}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        contentContainerStyle={[
+          styles.discoverBody,
+          { paddingTop: slideTop(topInset), paddingBottom: slideBottom(bottomInset) - 44 },
+        ]}
+      >
         <Animated.View style={[{ width: "100%" }, parallax.head]}>
           <FeatureHeading
-            eyebrow={feature.eyebrow}
             title={feature.title}
             titleAccent={feature.titleAccent}
             desc={feature.desc}
-            tags={feature.tags}
-            icon={feature.icon}
             theme={theme}
             accent={accent}
             size={COMPACT ? 32 : 36}
           />
         </Animated.View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -120,11 +125,9 @@ export function ShowcaseSlide({
       >
         <Animated.View style={parallax.head}>
           <FeatureHeading
-            eyebrow={feature.eyebrow}
             title={feature.title}
             titleAccent={feature.titleAccent}
             desc={feature.desc}
-            icon={feature.icon}
             theme={theme}
             accent={accent}
           />
@@ -249,16 +252,6 @@ export function CtaSlide({
       <Animated.View style={[styles.ctaInner, parallax.head]}>
         <PosterFan posters={posters} theme={theme} accent={accent} logo={logo} />
 
-        <View
-          style={[
-            styles.freeBadge,
-            { backgroundColor: alpha(accent, isLightTheme ? 0.1 : 0.14), borderColor: alpha(accent, 0.26) },
-          ]}
-        >
-          <Ionicons name="sparkles" size={13} color={accent} />
-          <Text style={[styles.freeBadgeText, { color: accent }]}>{cta.freeBadge}</Text>
-        </View>
-
         <Text style={[styles.ctaTitle, { color: theme.text.primary }]}>
           {renderAccentedTitle(cta.title, cta.titleAccent, accent)}
         </Text>
@@ -295,8 +288,9 @@ export function CtaSlide({
 
 const styles = StyleSheet.create({
   // Karşılama
+  discoverScroll: { flex: 1 },
   discoverBody: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "flex-end",
     paddingHorizontal: SIDE_PAD,
   },
@@ -370,17 +364,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoTileImage: { width: 104, height: 104 },
-  freeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    height: 30,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    marginTop: 14,
-  },
-  freeBadgeText: { fontSize: 10.5, fontWeight: "900", letterSpacing: 0.9 },
   ctaTitle: {
     fontSize: 30,
     lineHeight: 35,
