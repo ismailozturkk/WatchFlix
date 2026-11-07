@@ -25,6 +25,8 @@ import { useUserProfile } from "@context/UserProfileContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BackButton from "@components/BackButton";
 import GlassPillButton from "@components/common/GlassPillButton";
+import GlassBox from "@components/common/GlassBox";
+import { useGlassScheme } from "@components/common/GlassSurface";
 import ScreenDecor from "@components/ScreenDecor";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import GroupAvatarPickerModal from "@components/chat/GroupAvatarPickerModal";
@@ -48,10 +50,13 @@ export default function CreateGroupScreen({ navigation }) {
   const { theme } = useTheme();
   const { myAvatar } = useProfileUi();
   const { displayName, username } = useUserProfile();
+  const keyboardAppearance = useGlassScheme();
 
   const [friends, setFriends] = useState([]);
   const [selected, setSelected] = useState({}); // uid -> friend
   const [name, setName] = useState("");
+  const [nameFocused, setNameFocused] = useState(false);
+  const nameInputRef = useRef(null);
   // Ekran her açıldığında görsel + renk rastgele başlar; kullanıcı isterse
   // aşağıdaki seçicilerden değiştirir. Sabit "0 + ilk renk" ile açılınca
   // grupların çoğu aynı görünüyordu.
@@ -258,21 +263,72 @@ export default function CreateGroupScreen({ navigation }) {
             <Ionicons name="pencil" size={10} color="#fff" />
           </View>
         </TouchableOpacity>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder={i18nText("autoI18n.grup_adi", "Grup adı")}
-          placeholderTextColor={theme.text?.muted ?? "#777"}
-          maxLength={40}
+        <GlassBox
+          role="field"
+          focused={nameFocused}
+          accent={color}
           style={[
-            styles.nameInput,
+            styles.nameField,
             {
               backgroundColor: theme.secondary,
-              color: theme.text?.primary ?? "#fff",
-              borderColor: theme.border,
+              borderColor: nameFocused ? color : theme.border,
             },
           ]}
-        />
+        >
+          <View style={styles.nameFieldHead}>
+            <Ionicons
+              name="people-outline"
+              size={13}
+              color={nameFocused ? color : theme.text?.muted ?? "#777"}
+            />
+            <Text
+              style={[
+                styles.nameFieldLabel,
+                { color: nameFocused ? color : theme.text?.muted ?? "#777" },
+              ]}
+            >
+              {i18nText("autoI18n.grup_adi", "Grup adı")}
+            </Text>
+            <Text style={[styles.nameCounter, { color: theme.text?.muted ?? "#777" }]}>
+              {name.length}/40
+            </Text>
+          </View>
+          <View style={styles.nameInputRow}>
+            <TextInput
+              ref={nameInputRef}
+              value={name}
+              onChangeText={setName}
+              placeholder={i18nText("autoI18n.grup_adi", "Grup adı")}
+              placeholderTextColor={theme.text?.muted ?? "#777"}
+              maxLength={40}
+              autoCapitalize="sentences"
+              autoCorrect={false}
+              returnKeyType="done"
+              selectionColor={color}
+              keyboardAppearance={keyboardAppearance}
+              onFocus={() => setNameFocused(true)}
+              onBlur={() => setNameFocused(false)}
+              onSubmitEditing={handleCreate}
+              style={[styles.nameInput, { color: theme.text?.primary ?? "#fff" }]}
+              accessibilityLabel={i18nText("autoI18n.grup_adi", "Grup adı")}
+            />
+            {name.length > 0 ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                hitSlop={8}
+                onPress={() => {
+                  setName("");
+                  nameInputRef.current?.focus();
+                }}
+                style={styles.clearNameButton}
+                accessibilityRole="button"
+                accessibilityLabel={i18nText("autoI18n.temizle", "Temizle")}
+              >
+                <Ionicons name="close-circle" size={19} color={theme.text?.muted ?? "#777"} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </GlassBox>
       </View>
 
       {/* Renk seçimi */}
@@ -380,13 +436,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  nameField: {
+    flex: 1,
+    minHeight: 72,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    paddingHorizontal: 13,
+    paddingTop: 9,
+    paddingBottom: 8,
+    justifyContent: "center",
+  },
+  nameFieldHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    minHeight: 16,
+  },
+  nameFieldLabel: {
+    flex: 1,
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 0.45,
+    textTransform: "uppercase",
+  },
+  nameCounter: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  nameInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 34,
+  },
   nameInput: {
     flex: 1,
+    minWidth: 0,
+    paddingVertical: 4,
+    paddingHorizontal: 0,
     fontSize: 16,
-    fontWeight: "600",
-    borderBottomWidth: 1.5,
-    paddingVertical: 8,
+    lineHeight: 20,
+    fontWeight: "700",
+    includeFontPadding: false,
   },
+  clearNameButton: { marginLeft: 8, alignItems: "center", justifyContent: "center" },
 
   colorRow: {
     flexDirection: "row",

@@ -20,23 +20,28 @@ import {
   addGroupMember,
   removeGroupMember,
   setGroupAdminRole,
+  setGroupAdminsOnlyMessages,
   updateGroupAvatar,
 } from "@services/groupsService";
 import {
   canManageGroup,
   groupRoleOf,
+  isAdminsOnlyGroup,
   isGroupAdmin,
   isGroupCreator,
   sortMembersByRole,
 } from "@utils/groupRoles";
 import { MAX_GROUP_MEMBERS, groupSlotsLeft } from "@utils/groupLimits";
 import { i18nText } from "@utils/i18nText";
+import { getIsOnline } from "@context/ConnectivityContext";
+import { waitForGroupMemberAction } from "@utils/groupMemberAction";
 import { toast } from "@components/AppToast";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import GroupAvatarGrid from "@components/chat/GroupAvatarGrid";
-import { appAlert } from "@components/AppAlert";
+import LeaveSheet from "@components/modals/createPost/LeaveSheet";
 import UserAvatar from "@components/common/UserAvatar";
 import GlassTouchable from "../common/GlassTouchable";
+import SwitchToggle from "@components/SwitchToggle";
 
 const ACCENT = "#6C63FF";
 const DANGER = "#FF6B6B";
@@ -48,6 +53,7 @@ export default function GroupInfoModal({
   groupData,
   currentUid,
   onOpenProfile,
+  onOpenClub,
 }) {
   const { theme } = useTheme();
   const { profile } = useUserProfile();
@@ -57,15 +63,31 @@ export default function GroupInfoModal({
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [busyUid, setBusyUid] = useState(null);
   const [savingAvatar, setSavingAvatar] = useState(false);
+  const [savingSendPolicy, setSavingSendPolicy] = useState(false);
+  // Üye çıkar / yönetici yap onayı: { title, message, actions } | null.
+  // `appAlert` KULLANMA: bu sayfa açıkken o, köke bağlı ikinci bir native Modal
+  // ister; iOS sunamaz, uyarı hiç görünmez ve AppAlertHost takılı kalır →
+  // uygulama donmuş gibi davranır. Onay bu pencerenin içinde çizilir.
+  const [confirm, setConfirm] = useState(null);
 
   const isCreator = isGroupCreator(groupData, currentUid);
   const isAdmin = isGroupAdmin(groupData, currentUid);
   const canManage = canManageGroup(groupData, currentUid);
   const memberIds = groupData?.members || [];
+  const adminsOnly = isAdminsOnlyGroup(groupData);
 
   useEffect(() => {
-    if (!visible) setTab("members");
+    if (!visible) {
+      setTab("members");
+      setConfirm(null);
+    }
   }, [visible]);
+
+  // Geri tuşu / dışarı dokunuş önce açık onayı kapatır, sonra sayfayı.
+  const handleClose = useCallback(() => {
+    if (confirm) setConfirm(null);
+    else onClose?.();
+  }, [confirm, onClose]);
 
   useEffect(() => {
     if (!visible || !canManage || !currentUid) return undefined;
@@ -151,6 +173,51 @@ export default function GroupInfoModal({
     [friends, memberIds]
   );
 
+  const runMemberAction = useCallback(
+    (member, action, successText, failureText, logLabel) => {
+      // Firestore writes do not resolve while offline. Do not turn the whole
+      // member row into an endless loader in that case.
+      if (busyUid) return;
+      if (!getIsOnline()) {
+        toast.warning(
+          i18nText("autoI18n.cevrimdisi", "Çevrimdışı"),
+          i18nText(
+            "autoI18n.kutuphane_cevrimdisi",
+            "İnternet bağlantısı yok. Bağlanınca tekrar dene.",
+          ),
+        );
+        return;
+      }
+
+      setBusyUid(member.uid);
+      // Intentionally do not return this promise: the confirm callback stays
+      // synchronous and this sheet owns the complete operation lifecycle.
+      void waitForGroupMemberAction(action)
+        .then(() => toast.success(successText))
+        .catch((error) => {
+          console.error(`${logLabel}:`, error);
+          if (error?.code === "timeout") {
+            toast.warning(
+              i18nText(
+                "autoI18n.islem_tamamlanamadi",
+                "İşlem tamamlanamadı",
+              ),
+              i18nText("autoI18n.tekrar_dene", "Tekrar dene"),
+            );
+            return;
+          }
+          toast.error(
+            i18nText("autoI18n.hata", "Hata"),
+            failureText,
+          );
+        })
+        .finally(() => {
+          setBusyUid((current) => (current === member.uid ? null : current));
+        });
+    },
+    [busyUid],
+  );
+
   const addMember = useCallback(
     async (friend) => {
       if (busyUid) return;
@@ -188,40 +255,39 @@ export default function GroupInfoModal({
 
   const confirmRemove = useCallback(
     (member) => {
-      appAlert(
-        i18nText("autoI18n.uyeyi_cikar", "Üyeyi çıkar"),
-        i18nText(
+      setConfirm({
+        title: i18nText("autoI18n.uyeyi_cikar", "Üyeyi çıkar"),
+        message: i18nText(
           "autoI18n.uyeyi_cikar_onay",
           "{{name}} gruptan çıkarılsın mı?",
           { name: member.displayName }
         ),
-        [
-          { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
+        actions: [
           {
-            text: i18nText("autoI18n.cikar", "Çıkar"),
-            style: "destructive",
-            onPress: async () => {
-              setBusyUid(member.uid);
-              try {
-                await removeGroupMember(groupId, member.uid);
-                toast.success(
-                  i18nText("autoI18n.uye_cikarildi", "Üye çıkarıldı")
-                );
-              } catch (error) {
-                console.error("removeGroupMember:", error);
-                toast.error(
-                  i18nText("autoI18n.hata", "Hata"),
-                  i18nText("autoI18n.uye_cikarilamadi", "Üye çıkarılamadı")
-                );
-              } finally {
-                setBusyUid(null);
-              }
+            key: "remove",
+            label: i18nText("autoI18n.cikar", "Çıkar"),
+            icon: "person-remove-outline",
+            tone: "danger",
+            onPress: () => {
+              setConfirm(null);
+              runMemberAction(
+                member,
+                () => removeGroupMember(groupId, member.uid),
+                i18nText("autoI18n.uye_cikarildi", "Üye çıkarıldı"),
+                i18nText("autoI18n.uye_cikarilamadi", "Üye çıkarılamadı"),
+                "removeGroupMember",
+              );
             },
           },
-        ]
-      );
+          {
+            key: "cancel",
+            label: i18nText("autoI18n.iptal", "İptal"),
+            onPress: () => setConfirm(null),
+          },
+        ],
+      });
     },
-    [groupId]
+    [groupId, runMemberAction]
   );
 
   const changeAvatar = useCallback(
@@ -246,6 +312,40 @@ export default function GroupInfoModal({
     [savingAvatar, groupData?.avatarIndex, groupId]
   );
 
+  const toggleAdminsOnly = useCallback(
+    async (enabled) => {
+      if (savingSendPolicy || !canManage) return;
+      if (!getIsOnline()) {
+        toast.warning(
+          i18nText("autoI18n.cevrimdisi", "Çevrimdışı"),
+          i18nText(
+            "autoI18n.kutuphane_cevrimdisi",
+            "İnternet bağlantısı yok. Bağlanınca tekrar dene.",
+          ),
+        );
+        return;
+      }
+      setSavingSendPolicy(true);
+      try {
+        await waitForGroupMemberAction(() => setGroupAdminsOnlyMessages(groupId, enabled));
+        toast.success(
+          enabled
+            ? i18nText("autoI18n.yalniz_yoneticiler_acildi", "Artık yalnız yöneticiler mesaj gönderebilir")
+            : i18nText("autoI18n.herkes_yazabilir_acildi", "Artık tüm üyeler mesaj gönderebilir"),
+        );
+      } catch (error) {
+        console.error("setGroupAdminsOnlyMessages:", error);
+        toast.error(
+          i18nText("autoI18n.hata", "Hata"),
+          i18nText("autoI18n.ayar_kaydedilemedi", "Ayar kaydedilemedi"),
+        );
+      } finally {
+        setSavingSendPolicy(false);
+      }
+    },
+    [savingSendPolicy, canManage, groupId],
+  );
+
   const confirmAdminRole = useCallback(
     (member, shouldBeAdmin) => {
       const title = shouldBeAdmin
@@ -254,30 +354,37 @@ export default function GroupInfoModal({
       const message = shouldBeAdmin
         ? i18nText("autoI18n.yonetici_yap_onay", "{{name}} grup yöneticisi yapılsın mı?", { name: member.displayName })
         : i18nText("autoI18n.yoneticilikten_al_onay", "{{name}} yöneticilikten alınsın mı?", { name: member.displayName });
-      appAlert(title, message, [
-        { text: i18nText("autoI18n.iptal", "İptal"), style: "cancel" },
-        {
-          text: i18nText("autoI18n.onayla", "Onayla"),
-          onPress: async () => {
-            setBusyUid(member.uid);
-            try {
-              await setGroupAdminRole(groupId, member.uid, shouldBeAdmin);
-              toast.success(
+      setConfirm({
+        title,
+        message,
+        actions: [
+          {
+            key: "confirm",
+            label: i18nText("autoI18n.onayla", "Onayla"),
+            icon: shouldBeAdmin ? "shield-checkmark-outline" : "shield-outline",
+            tone: "primary",
+            onPress: () => {
+              setConfirm(null);
+              runMemberAction(
+                member,
+                () => setGroupAdminRole(groupId, member.uid, shouldBeAdmin),
                 shouldBeAdmin
                   ? i18nText("autoI18n.yonetici_yapildi", "Yönetici atandı")
                   : i18nText("autoI18n.yoneticilik_kaldirildi", "Yöneticilik kaldırıldı"),
+                i18nText("autoI18n.rol_guncellenemedi", "Rol güncellenemedi"),
+                "setGroupAdminRole",
               );
-            } catch (error) {
-              console.error("setGroupAdminRole:", error);
-              toast.error(i18nText("autoI18n.rol_guncellenemedi", "Rol güncellenemedi"));
-            } finally {
-              setBusyUid(null);
-            }
+            },
           },
-        },
-      ]);
+          {
+            key: "cancel",
+            label: i18nText("autoI18n.iptal", "İptal"),
+            onPress: () => setConfirm(null),
+          },
+        ],
+      });
     },
-    [groupId],
+    [groupId, runMemberAction],
   );
 
   const renderRow = ({ item, adding = false }) => {
@@ -445,9 +552,21 @@ export default function GroupInfoModal({
   return (
     <BottomSheetModal
       visible={visible}
-      onClose={onClose}
+      onClose={handleClose}
       intensity={35}
       dimColor="rgba(0,0,0,0.42)"
+      overlay={
+        confirm ? (
+          <LeaveSheet
+            theme={theme}
+            accent={groupData?.color || ACCENT}
+            title={confirm.title}
+            message={confirm.message}
+            actions={confirm.actions}
+            onDismiss={() => setConfirm(null)}
+          />
+        ) : null
+      }
       sheetStyle={[
         styles.sheet,
         {
@@ -527,9 +646,97 @@ export default function GroupInfoModal({
             />
           </View>
 
+          {onOpenClub ? (
+            <GlassTouchable
+              onPress={onOpenClub}
+              testID="group-open-club"
+              accessibilityRole="button"
+              style={[
+                styles.clubRow,
+                {
+                  backgroundColor: theme.primary || "rgba(0,0,0,0.18)",
+                  borderColor: theme.border || "rgba(255,255,255,0.08)",
+                },
+              ]}
+            >
+              <View style={styles.clubIcon}>
+                <Ionicons name="ticket" size={17} color="#E8A33D" />
+              </View>
+              <View style={styles.groupCopy}>
+                <Text style={[styles.clubTitle, { color: theme.text?.primary || "#fff" }]}>
+                  {i18nText("autoI18n.film_kulubu", "Film Kulübü")}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.groupCount, { color: theme.text?.muted || "#888" }]}
+                >
+                  {groupData?.club?.enabled
+                    ? i18nText("autoI18n.film_kulubu_acik", "Oylama, izleme turu ve tartışma")
+                    : i18nText("autoI18n.film_kulubu_kapali", "Grubunla düzenli film gecesi kur")}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={theme.text?.muted || "#888"} />
+            </GlassTouchable>
+          ) : null}
+
+          {/* Mesaj gönderme izni: kurucu/yönetici açıp kapatır; sıradan üye
+              yalnız açıkken bilgi satırını görür. */}
+          {canManage || adminsOnly ? (
+            <View
+              testID="group-send-policy"
+              style={[
+                styles.clubRow,
+                {
+                  backgroundColor: theme.primary || "rgba(0,0,0,0.18)",
+                  borderColor: theme.border || "rgba(255,255,255,0.08)",
+                },
+              ]}
+            >
+              <View style={[styles.clubIcon, styles.sendPolicyIcon]}>
+                <Ionicons name="megaphone-outline" size={17} color="#72D6A0" />
+              </View>
+              <View style={styles.groupCopy}>
+                <Text style={[styles.clubTitle, { color: theme.text?.primary || "#fff" }]}>
+                  {i18nText(
+                    "autoI18n.yalniz_yoneticiler_mesaj_gonderebilir",
+                    "Yalnız yöneticiler mesaj gönderebilir",
+                  )}
+                </Text>
+                <Text
+                  numberOfLines={2}
+                  style={[styles.groupCount, { color: theme.text?.muted || "#888" }]}
+                >
+                  {canManage
+                    ? i18nText(
+                        "autoI18n.yalniz_yoneticiler_aciklama_yonetici",
+                        "Açıkken üyeler okur, oy verir; yalnız kurucu ve yöneticiler yazar",
+                      )
+                    : i18nText(
+                        "autoI18n.yalniz_yoneticiler_yazabilir_aciklama",
+                        "Bu grupta yalnız kurucu ve yöneticiler mesaj gönderebilir",
+                      )}
+                </Text>
+              </View>
+              {canManage ? (
+                savingSendPolicy ? (
+                  <ActivityIndicator size="small" color={groupData?.color || ACCENT} />
+                ) : (
+                  <SwitchToggle
+                    value={adminsOnly}
+                    onValueChange={toggleAdminsOnly}
+                    size={36}
+                  />
+                )
+              ) : (
+                <Ionicons name="lock-closed" size={16} color={theme.text?.muted || "#888"} />
+              )}
+            </View>
+          ) : null}
+
           <View
             style={[
               styles.tabs,
+              (onOpenClub || canManage || adminsOnly) && styles.tabsAfterClub,
               { backgroundColor: theme.primary || "rgba(0,0,0,0.18)" },
             ]}
           >
@@ -752,6 +959,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 8,
   },
+  tabsAfterClub: { marginTop: 12 },
   tab: {
     flex: 1,
     minHeight: 38,
@@ -772,6 +980,26 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   list: { minHeight: 250 },
+  clubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 14,
+  },
+  clubIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(232,163,61,0.16)",
+  },
+  clubTitle: { fontSize: 15, fontWeight: "800" },
+  sendPolicyIcon: { backgroundColor: "rgba(114,214,160,0.14)" },
   memberRow: {
     flexDirection: "row",
     alignItems: "center",

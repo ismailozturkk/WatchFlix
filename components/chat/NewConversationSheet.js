@@ -15,6 +15,7 @@ import GroupAvatar from "@components/chat/GroupAvatar";
 import { useFriends } from "@context/FriendsContext";
 import { useTheme } from "@context/ThemeContext";
 import { subscribeUserGroups } from "@services/groupsService";
+import { canSendGroupMessage } from "@utils/groupRoles";
 import { i18nText } from "@utils/i18nText";
 import UserAvatar from "../common/UserAvatar";
 import GlassTouchable from "../common/GlassTouchable";
@@ -184,9 +185,16 @@ export default function NewConversationSheet({
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          // "Yalnız yöneticiler mesaj gönderebilir" grubunda sıradan üye bu
+          // listeden gönderemez: satır görünür ama seçilemez.
+          const locked =
+            recipientType === "group" &&
+            !canSendGroupMessage(item, getAuth().currentUser?.uid);
+          return (
           <TouchableOpacity
             activeOpacity={0.82}
+            disabled={locked}
             onPress={() => {
               onSelect(
                 recipientType === "group"
@@ -198,6 +206,7 @@ export default function NewConversationSheet({
             style={[
               styles.friendRow,
               { backgroundColor: theme.secondary, borderColor: theme.border },
+              locked && styles.lockedRow,
             ]}
           >
             {recipientType === "group" ? (
@@ -225,7 +234,9 @@ export default function NewConversationSheet({
               </Text>
               {recipientType === "group" ? (
                 <Text numberOfLines={1} style={[styles.username, { color: theme.text.muted }]}>
-                  {i18nText("autoI18n.n_uye", "{{n}} üye", { n: item.members?.length || 0 })}
+                  {locked
+                    ? i18nText("autoI18n.yalniz_yoneticiler_yazabilir", "Yalnız yöneticiler yazabilir")
+                    : i18nText("autoI18n.n_uye", "{{n}} üye", { n: item.members?.length || 0 })}
                 </Text>
               ) : !!item.username && (
                 <Text numberOfLines={1} style={[styles.username, { color: theme.text.muted }]}>
@@ -234,10 +245,15 @@ export default function NewConversationSheet({
               )}
             </View>
             <View style={[styles.arrow, { backgroundColor: theme.accent + "18" }]}>
-              <Ionicons name="arrow-forward" size={18} color={theme.accent} />
+              <Ionicons
+                name={locked ? "lock-closed" : "arrow-forward"}
+                size={locked ? 15 : 18}
+                color={locked ? theme.text.muted : theme.accent}
+              />
             </View>
           </TouchableOpacity>
-        )}
+          );
+        }}
       />
     </BottomSheetModal>
   );
@@ -255,6 +271,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   handle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 14 },
+  lockedRow: { opacity: 0.55 },
   header: { flexDirection: "row", alignItems: "center", gap: 11 },
   headerIcon: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   headerCopy: { flex: 1, minWidth: 0 },

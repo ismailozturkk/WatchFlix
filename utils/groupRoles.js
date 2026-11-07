@@ -27,3 +27,23 @@ export const sortMembersByRole = (members, group) => {
     return String(a.displayName || "").localeCompare(String(b.displayName || ""), "tr");
   });
 };
+
+// ── Mesaj yetkileri ──────────────────────────────────────────────────────────
+// Hiyerarşi: kurucu > yönetici > üye. firestore.rules groups/{id}/messages ve
+// pins silme kuralları AYNI tabloyu uygular (__tests__/groupMessagePermissions).
+//   • Herkes kendi mesajını siler.
+//   • Kurucu herkesin mesajını siler.
+//   • Yönetici yalnız sıradan üyelerin mesajını siler; kurucunun ve diğer
+//     yöneticilerin mesajlarına dokunamaz (üye çıkarma kuralıyla aynı sınır).
+export const canDeleteGroupMessage = (group, actorUid, senderUid) => {
+  if (!actorUid || !senderUid) return false;
+  if (actorUid === senderUid) return true;
+  if (isGroupCreator(group, actorUid)) return true;
+  return isGroupAdmin(group, actorUid) && groupRoleOf(group, senderUid) === "member";
+};
+
+// "Yalnız yöneticiler mesaj gönderebilir" ayarı (groups/{id}.adminsOnlyMessages).
+export const isAdminsOnlyGroup = (group) => group?.adminsOnlyMessages === true;
+
+export const canSendGroupMessage = (group, uid) =>
+  Boolean(uid) && (!isAdminsOnlyGroup(group) || canManageGroup(group, uid));

@@ -18,6 +18,7 @@ import { db } from "../firebase";
 import { buildShareMessage } from "../utils/chatShare";
 import { prepareOutgoingMessage } from "../utils/chatPush";
 import { queueGroupUnreadIncrements } from "./groupsService";
+import { canSendGroupMessage } from "../utils/groupRoles";
 
 /** 1-1 sohbet kimliği: ChatScreen'deki sıralı uid birleşimiyle AYNI. */
 export const directChatId = (a, b) => (a > b ? `${a}_${b}` : `${b}_${a}`);
@@ -31,7 +32,7 @@ const definedOnly = (fields) =>
  * @param {{friendUid:string, friendName?:string}|{groupId:string}} p.chat  utils/importantInvites.chatTargetOf
  * @param {object} p.share  utils/chatShare gövdesi
  * @returns {Promise<{chatId:string}>}
- * @throws "invalid-share" | "no-chat" | "not-a-member" ya da Firestore hatası
+ * @throws "invalid-share" | "no-chat" | "not-a-member" | "admins-only" ya da Firestore hatası
  */
 export async function postShareToChat({ sender, chat, share }) {
   const fields = buildShareMessage(share);
@@ -44,8 +45,11 @@ export async function postShareToChat({ sender, chat, share }) {
   if (chat?.groupId) {
     const groupRef = doc(db, "groups", chat.groupId);
     const snapshot = await getDoc(groupRef);
-    const members = snapshot.exists() ? snapshot.data()?.members : null;
+    const group = snapshot.exists() ? snapshot.data() : null;
+    const members = group?.members;
     if (!Array.isArray(members) || !members.includes(sender.uid)) throw new Error("not-a-member");
+    // "Yalnız yöneticiler mesaj gönderebilir" açık: kural da reddeder, boşuna yazma.
+    if (!canSendGroupMessage(group, sender.uid)) throw new Error("admins-only");
     const { message } = prepareOutgoingMessage({
       ...base,
       ...definedOnly({

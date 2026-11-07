@@ -26,6 +26,7 @@ import {
   increment,
 } from "firebase/firestore";
 import { groupUnreadRecipients } from "../utils/friendsListModel";
+import { identityAvatar } from "../utils/avatarPhotos";
 import { MAX_GROUP_MEMBERS } from "../utils/groupLimits";
 
 // ─── Üye baloncuk rengi (uid'den deterministik) ──────────────────────────────
@@ -179,10 +180,13 @@ export async function addGroupMember(groupId, member) {
   if (!groupId || !member?.uid) throw new Error("Geçersiz grup veya üye");
   await updateDoc(doc(db, "groups", groupId), {
     members: arrayUnion(member.uid),
+    // photoURL eskiden yazılmıyordu: sonradan eklenen fotoğraf avatarlı üye,
+    // grup bilgisinde ve mesajlarında varsayılan avatarla görünüyordu
+    // (CreateGroupScreen kurarken yazıyor; burada da aynı kural).
     [`memberInfo.${member.uid}`]: {
       name: member.displayName || member.name || "",
       username: member.username || "",
-      avatarIndex: member.avatarIndex ?? 0,
+      ...identityAvatar(member),
     },
     updatedAt: serverTimestamp(),
   });
@@ -204,6 +208,16 @@ export async function updateGroupAvatar(groupId, avatarIndex) {
   }
   await updateDoc(doc(db, "groups", groupId), {
     avatarIndex,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// "Yalnız yöneticiler mesaj gönderebilir" (utils/groupRoles canSendGroupMessage).
+// Kurucu ve yöneticiler açıp kapatır; kural hem bu alanı hem mesaj yazımını denetler.
+export async function setGroupAdminsOnlyMessages(groupId, enabled) {
+  if (!groupId) throw new Error("Geçersiz grup");
+  await updateDoc(doc(db, "groups", groupId), {
+    adminsOnlyMessages: enabled === true,
     updatedAt: serverTimestamp(),
   });
 }
