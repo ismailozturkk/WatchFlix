@@ -126,8 +126,8 @@ export async function reconcileLedger(uid, {
   // besleniyor. Yükselen rekor state'e yazılınca hesap yeniden koşar, imza
   // değişir ve rozet aynı oturumda açılır.
   //
-  // İKİ AYRI GÜN: aktiflik SERİ GÜNÜYLE damgalanır (04:00 dönümü — gece yarısından
-  // sonra biten bölüm "dün gece"dir), rozet kazanma tarihi TAKVİM GÜNÜYLE.
+  // İKİ AYRI GÜN: aktiflik SERİ GÜNÜYLE damgalanır (cihazın yerel gece yarısı;
+  // eskiden 04:00'tü), rozet kazanma tarihi TAKVİM GÜNÜYLE.
   const seriGunu = seriGunuAnahtari();
   const a = aktifligiGuncelle(mevcut, { icerikSayisi, bugun: seriGunu, tut: GUN_TUT });
   // Seri koruması (telafi/kalkan) kesinleşen kararları deftere işler; idempotent.

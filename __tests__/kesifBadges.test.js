@@ -517,7 +517,7 @@ describe("YÜKLENME YARIŞI: kaynak geç yüklenince eski kullanıcıya kutlama 
 describe("katalog genişleme koruması Keşif'le bozulmadı", () => {
   test("WATCH_BADGE_IDS Keşif'i de içerir (koruma buna dayanır)", () => {
     for (const id of KESIF_IDLERI) expect(WATCH_BADGE_IDS).toContain(id);
-    expect(WATCH_BADGE_IDS).toHaveLength(154);
+    expect(WATCH_BADGE_IDS).toHaveLength(158);
   });
 
   test("v2 defteri + Keşif hazır: yeni rozetler since:3, mevcut id'ler değişmedi", () => {

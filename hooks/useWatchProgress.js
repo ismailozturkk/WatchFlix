@@ -23,8 +23,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@context/AuthContext";
 import { useProfileStats } from "@context/ProfileStatsContext";
+import { useListStatusContext } from "@context/ListStatusContext";
 import { loadGameData } from "@services/sceneGameService";
 import { computePerde, computeWatchScore, hesapYasiYil } from "@utils/watchScoring";
+import { bingoTotals } from "@utils/cinemaBingo";
 import { kanonikTur } from "@utils/genreCanon";
 import {
   bilinenRozetIdleri,
@@ -33,7 +35,7 @@ import {
   KATALOG_SURUMU,
   prestijIdleri,
 } from "@components/badges/watchBadgeCatalog";
-import { Keys, set as setStored } from "@services/storage";
+import { Keys, set as setStored, useStored } from "@services/storage";
 import { bilinenSetIdleri, evaluateBadgeSets } from "@components/badges/badgeSets";
 import { muhurIdleri, muhurleriHesapla } from "@components/badges/seasonSeals";
 import {
@@ -64,6 +66,8 @@ const YERLESME_MS = 1500;
 export default function useWatchProgress() {
   const { user } = useAuth();
   const uid = user?.uid || null;
+  const bingoHistory = useStored(Keys.cinemaBingoMonthly, { uid });
+  const bingoFullCards = useMemo(() => bingoTotals(bingoHistory).fullCards, [bingoHistory]);
   // Kıdem rozetlerinin ölçütü. AuthContext ham Firebase Auth nesnesini sakladığı
   // için `metadata.creationTime` doğrudan elimizde — yeni Firestore alanı, yeni
   // okuma ve yeni listener GEREKMEZ (sistemin temel sözleşmesi). Değeri sunucu
@@ -77,6 +81,8 @@ export default function useWatchProgress() {
   // Son mutabakat imzası. Diğer state'lerle birlikte yukarıda durur çünkü
   // hesap değişimi effect'i de onu sıfırlıyor (aşağıda).
   const sonImza = useRef("");
+  // Yerleşme beklemesindeki mutabakatı hemen koşturan fonksiyon (arka plana geçişte).
+  const bekleyenMutabakat = useRef(null);
   const [perdeFloor, setPerdeFloor] = useState(1);
   const [makaraFloor, setMakaraFloor] = useState(0);
   const [kazanilmis, setKazanilmis] = useState(BOS_ROZETLER);
@@ -117,7 +123,18 @@ export default function useWatchProgress() {
   // kullanıcıda sistem SIFIR diziyle hesap yapıp defteri eksik tohumlar; kök
   // doküman gelince de yıllardır sahip olduğu rozetler "yeni kazandın" diye
   // kutlanır. Tohumlama BİR KEZ yapıldığı için bu hata kalıcıdır.
-  const veriHazir = Array.isArray(listItems) && Array.isArray(listItemsTv)
+  //
+  // BU DÖRT BAYRAK ARTIK HİÇ `true` OLMUYOR: ProfileStatsContext onları sabit `false`
+  // tutuyor (veri ListStatusContext'ten senkron geliyor). Gerçek hazır sinyali
+  // ListStatusContext'te: `loading` (yerel önbellek ya da ilk indirme bitti) ve
+  // `watchedTvLoaded`. Onlara bakılmadığında YENİ CİHAZDA / YENİDEN KURULUMDA listeler
+  // ağdan inerken defter BOŞ veriyle tohumlanıyor, liste gelince de tüm rozetler
+  // "yeni kazandın" diye kutlanıyor ve o gün seriye sahte bir işaretleme yazılıyordu.
+  // Sağlayıcı yoksa (testler, ağaç dışı render) hazır sayılır.
+  const listeDurumu = useListStatusContext();
+  const listelerHazir = !listeDurumu
+    || (!listeDurumu.loading && listeDurumu.watchedTvLoaded !== false);
+  const veriHazir = listelerHazir && Array.isArray(listItems) && Array.isArray(listItemsTv)
     && !loadingTv && !loadingMovies && !isloadingShowInfo && !isloadingMovieInfo;
 
   // ── Defter OKUMASI — gecikmesiz ────────────────────────────────────────────
@@ -245,6 +262,10 @@ export default function useWatchProgress() {
       perde: perde.perde, oyunSeviye, hesapYili,
       rekorHaftaSerisi: seriler?.rekorHafta || 0,
       rekorGunSerisi: seriler?.rekorGun || 0,
+      // Sinema Bingosu rozeti: yalnız aylık TAM kartlar sayılır. MMKV aboneliği
+      // kullanıldığı için yeni Firestore dinleyicisi açılmaz; Bingo kartı dolduğu
+      // anda aynı rozet defteri/kutlama hattına girer.
+      bingoFullCards,
       // Keşif: sayılar + hangi kaynağın yüklendiği (ikincisi deftere gidecek id
       // listesini belirler, bkz. mutabakat effect'i).
       kesif: kesif.sayilar,
@@ -277,7 +298,7 @@ export default function useWatchProgress() {
     // kartına "doğrulanmamış" etiketi basmanın kimseye faydası yok. Fonksiyon
     // utils/watchScoring.js'te duruyor çünkü sunucu tarafına geçildiğinde
     // (docs §8.4) orada gerçek bir tüketicisi olacak.
-  }, [hesap, perdeFloor, makaraFloor, oyunSeviye, hesapYili, seriler, aktifGunler, kazanilmis, kesif]);
+  }, [hesap, perdeFloor, makaraFloor, oyunSeviye, hesapYili, seriler, aktifGunler, kazanilmis, kesif, bingoFullCards]);
 
   // ── Defter mutabakatı ──────────────────────────────────────────────────────
   // Yalnızca açık rozet kümesi ya da Perde gerçekten değiştiğinde çalışır;
@@ -339,7 +360,8 @@ export default function useWatchProgress() {
     // Yazmadan önce imzanın durulmasını beklemek bu yarışların TAMAMINI kapatır
     // ve hiçbir şeyi geciktirmez: mutabakatın tek görünür çıktısı kutlama ve
     // Perde tabanıdır, ikisi de anlık değildir.
-    const zamanlayici = setTimeout(() => {
+    const calistir = () => {
+      if (bekleyenMutabakat.current === hemenCalistir) bekleyenMutabakat.current = null;
       if (iptal) return;
       reconcileLedger(uid, {
         badgeIds: acikIds,
@@ -415,8 +437,22 @@ export default function useWatchProgress() {
           });
         }
       })
-        .catch(() => { yerlesti = true; sonImza.current = ""; });
-    }, YERLESME_MS);
+        .catch((e) => {
+          yerlesti = true;
+          sonImza.current = "";
+          if (__DEV__) console.warn("[useWatchProgress] defter mutabakatı başarısız:", e);
+        });
+    };
+    const zamanlayici = setTimeout(calistir, YERLESME_MS);
+    // ARKA PLANA GEÇİŞTE BEKLEMEDEN YAZ. İşaretleyip hemen uygulamadan çıkan kullanıcıda
+    // (iOS JS'i askıya alır) 1,5 sn'lik zamanlayıcı hiç çalışmıyordu; o günün damgası bir
+    // sonraki açılışa, yani açılış GÜNÜNE kayıyordu ve seri "ekledim ama saymadı" görünüyordu.
+    // Yalnız tohumlanmış defterde: tohumlama geri alınamaz, onu yerleşme beklemesi korur.
+    const hemenCalistir = () => {
+      clearTimeout(zamanlayici);
+      calistir();
+    };
+    bekleyenMutabakat.current = defter?.baseline ? hemenCalistir : null;
 
     // İPTAL EDİLEN MUTABAKAT TEKRAR DENENMELİ. İmza, işlem başlamadan önce
     // "yapıldı" diye yazılıyor (eşzamanlı ikinci bir çağrıyı engellemek için).
@@ -430,6 +466,7 @@ export default function useWatchProgress() {
     return () => {
       iptal = true;
       clearTimeout(zamanlayici);
+      if (bekleyenMutabakat.current === hemenCalistir) bekleyenMutabakat.current = null;
       if (!yerlesti) sonImza.current = "";
     };
     // perdeFloor/kazanilmis kasıtlı olarak bağımlılık DEĞİL: ikisini de bu
@@ -437,6 +474,11 @@ export default function useWatchProgress() {
     // tekrarlı çalışmayı zaten engelliyor.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid, sonuc]);
+
+  // Uygulama arka plana geçerken bekleyen mutabakat hemen yazılır (yukarıdaki not).
+  useEffect(() => {
+    if (!appActive && bekleyenMutabakat.current) bekleyenMutabakat.current();
+  }, [appActive]);
 
   const kutlamayiKapat = useCallback(async () => {
     const ids = kutlama?.rozetler || [];

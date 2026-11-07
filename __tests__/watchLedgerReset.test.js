@@ -25,6 +25,8 @@ const mockKesif = { sayilar: {}, hazir: {} };
 jest.mock("@hooks/useKesifSignals", () => ({ __esModule: true, default: () => mockKesif }));
 // Seri günü dönümü kancası (useWatchProgress) RN AppState'e bağlı; testte hep önde.
 jest.mock("@hooks/useAppActive", () => ({ __esModule: true, default: () => true }));
+// Liste hazır sinyali (useWatchProgress veriHazir); gerçek sağlayıcı firebase'i yükler.
+jest.mock("@context/ListStatusContext", () => ({ useListStatusContext: () => ({ loading: false, watchedTvLoaded: true }) }));
 
 const { Keys, get, set } = require("../services/storage");
 const { __resetStoreCaches } = require("../services/storage/store");
@@ -130,6 +132,18 @@ describe("useWatchProgress — bellekteki rozet kümesi", () => {
     await mount();
     expect(last.acikSayisi).toBeGreaterThanOrEqual(1);
     expect(last.rozetler.find((b) => b.id === ROZET).acik).toBe(true);
+  });
+
+  it("aylık Bingo geçmişindeki tam kartları kademeli rozete bağlar", async () => {
+    set(Keys.cinemaBingoMonthly, {
+      "2026-08-01": { lines: 8, squares: 9, full: true },
+      "2026-09-01": { lines: 8, squares: 9, full: true },
+      "2026-10-01": { lines: 8, squares: 9, full: true },
+    }, { uid: UID });
+    await mount();
+    const bingo = last.kartlar.find((b) => b.family === "bingo");
+    expect(bingo).toMatchObject({ id: "bingo_3", aileKademe: 2, aileToplam: 4, acik: true });
+    expect(bingo.sonrakiHedef).toMatchObject({ id: "bingo_5", ilerleme: 3, target: 5 });
   });
 
   it("hesap SIFIRLANINCA rozetler kalkar ve bellekteki küme deftere GERİ YAZILMAZ", async () => {

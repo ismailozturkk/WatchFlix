@@ -23,6 +23,7 @@ jest.mock("@expo/vector-icons/Ionicons", () => ({ __esModule: true, default: "Ic
 const mockHost = (name) => ({ __esModule: true, default: ({ children, ...props }) => require("react").createElement(name, props, children) });
 jest.mock("../components/AppIcon", () => mockHost("Icon"));
 jest.mock("../components/common/GlassPressable", () => mockHost("GlassPressable"));
+jest.mock("../components/badges/WatchBadgeCard", () => mockHost("WatchBadgeCard"));
 // Kart kabuğu: onPress'i taşır, çocukları çizer. Yapı taşları yalnız metni/simgeyi gösterir.
 jest.mock("../components/hub/HubCard", () => {
   const React = require("react");
@@ -60,6 +61,8 @@ const mockTheme = {
   text: { primary: "#ffffff", secondary: "#bbbbbb", muted: "#888888" },
 };
 jest.mock("../context/ThemeContext", () => ({ useTheme: () => ({ theme: mockTheme }) }));
+let mockBadgeCards = [];
+jest.mock("../context/WatchProgressContext", () => ({ useWatchProgressContext: () => ({ kartlar: mockBadgeCards }) }));
 jest.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "u1" } }) }));
 let mockStats;
 jest.mock("../context/ProfileStatsContext", () => ({ useProfileStats: () => mockStats }));
@@ -93,6 +96,7 @@ beforeEach(() => {
   __resetStoreCaches();
   [mockTrack, mockHaptic, mockToastSuccess, Share.share].forEach((fn) => fn.mockClear());
   mockLang = "tr";
+  mockBadgeCards = [];
   mockLists = { loading: false, watchedTvLoaded: true };
   mockStats = { movieHistoryItems: [], flatEpisodesTv: [] };
   const original = console.error;
@@ -256,6 +260,16 @@ describe("tam sayfa", () => {
     const button = renderer.root.findAllByType("GlassPressable").find((n) => n.props.accessibilityLabel === BINGO_COPY.tr.share);
     await act(async () => { await button.props.onPress(); });
     expect(mockTrack).not.toHaveBeenCalledWith("bingo_shared", expect.anything());
+  });
+
+  test("kademeli Bingo rozetini ekran içinde gösterir", () => {
+    az();
+    const badge = { id: "bingo_3", family: "bingo", aileKademe: 2, aileToplam: 4 };
+    mockBadgeCards = [badge];
+    mount(<CinemaBingoScreen navigation={navigation()} route={{}} />);
+    expect(hasText(BINGO_COPY.tr.badgeTitle)).toBe(true);
+    expect(hasText(BINGO_COPY.tr.badgeHint)).toBe(true);
+    expect(renderer.root.findByType("WatchBadgeCard").props.badge).toBe(badge);
   });
 
   test("beş dilde sayfa metni çizilir (anahtar sızıntısı / undefined yok)", () => {

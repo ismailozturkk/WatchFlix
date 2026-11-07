@@ -18,20 +18,21 @@ const sayimlar = () => WATCH_BADGES.reduce((acc, b) => {
 }, {});
 
 describe("katalog butunlugu", () => {
-  test("154 rozet ve benzersiz id", () => {
+  test("158 rozet ve benzersiz id", () => {
     // v1: 81 rozet. v2 (KATALOG_SURUMU 2): +60 — hedef "100'un uzerinde, her asamada
     // elinin altinda bir sonraki rozet". v3: +13 Kesif (izleme disi ozellikler).
-    expect(WATCH_BADGES).toHaveLength(154);
-    expect(new Set(WATCH_BADGES.map((b) => b.id)).size).toBe(154);
-    expect(Object.keys(WATCH_BADGE_BY_ID)).toHaveLength(154);
+    expect(WATCH_BADGES).toHaveLength(158);
+    expect(new Set(WATCH_BADGES.map((b) => b.id)).size).toBe(158);
+    expect(Object.keys(WATCH_BADGE_BY_ID)).toHaveLength(158);
   });
 
   test("katalog surumleri: ilk 81 rozet v1, 60 rozet v2, 13 Kesif rozeti v3 (v1 ids degismedi)", () => {
     const { KATALOG_SURUMU } = require("../components/badges/watchBadgeCatalog");
-    expect(KATALOG_SURUMU).toBe(3);
+    expect(KATALOG_SURUMU).toBe(4);
     expect(WATCH_BADGES.filter((b) => b.since === 1)).toHaveLength(81);
     expect(WATCH_BADGES.filter((b) => b.since === 2)).toHaveLength(60);
     expect(WATCH_BADGES.filter((b) => b.since === 3)).toHaveLength(13);
+    expect(WATCH_BADGES.filter((b) => b.since === 4)).toHaveLength(4);
     // v1'deki HER id katalogda durmali: kullanicinin defterindeki kazanilmis rozet
     // katalogda karsiliksiz kalirsa ekrandan SILINIR (watchLedgerCore).
     const v1 = [
@@ -79,7 +80,7 @@ describe("katalog butunlugu", () => {
       if (b.family) (acc[b.family] = acc[b.family] || []).push(b.tier);
       return acc;
     }, {});
-    expect(Object.keys(aileler)).toHaveLength(20);
+    expect(Object.keys(aileler)).toHaveLength(21);
     for (const [ad, tierler] of Object.entries(aileler)) {
       const sirali = [...tierler].sort((a, b) => a - b);
       expect([ad, sirali.length]).toEqual([ad, expect.any(Number)]);
@@ -98,6 +99,7 @@ describe("katalog butunlugu", () => {
     expect(uzunluk("tekOturus")).toBe(3);
     // Yil ici ay sayisi 12'de doyar.
     expect(uzunluk("ay")).toBe(4);
+    expect(uzunluk("bingo")).toBe(4);
     // v2 aileleri: dort kademe (sezon, eser, gunluk seri, hafta sonu, tekrar, sadakat).
     for (const fam of ["sezon", "eser", "ardisik", "haftaSonu", "tekrar", "sadik"]) {
       expect([fam, uzunluk(fam)]).toEqual([fam, 4]);
@@ -153,7 +155,7 @@ describe("nadirlik kotalari (rozet enflasyonuna karsi)", () => {
     // epic'ten rare'e indi (aile 5. kademeye uzadi). v3 +13 Kesif: 10 common, 3
     // uncommon, hic rare/epic. LEGENDARY KOTASI DEGISMEDI.
     // Medyan uncommon KALDI — profil mor duvara donmuyor (asagidaki test kilitliyor).
-    expect(sayimlar()).toEqual({ common: 35, uncommon: 60, rare: 46, epic: 10, legendary: 3 });
+    expect(sayimlar()).toEqual({ common: 36, uncommon: 62, rare: 47, epic: 10, legendary: 3 });
   });
 
   test("nadir rozet ORANI buyumedi (rare+ payi v1'den fazla degil)", () => {
@@ -247,6 +249,15 @@ describe("nadirlik kotalari (rozet enflasyonuna karsi)", () => {
     for (const b of ay) expect(b.getProgress({ enCokAyliYil: 7 })).toBe(7);
   });
 
+  test("BINGO ailesi 1-3-5-12 tam kartla adım adım ilerler", () => {
+    const bingo = WATCH_BADGES.filter((b) => b.family === "bingo").sort((a, b) => a.tier - b.tier);
+    expect(bingo.map((b) => b.id)).toEqual(["bingo_1", "bingo_3", "bingo_5", "bingo_12"]);
+    expect(bingo.map((b) => b.target)).toEqual([1, 3, 5, 12]);
+    expect(bingo.map((b) => b.since)).toEqual([4, 4, 4, 4]);
+    for (const b of bingo) expect(b.getProgress({ bingoFullCards: 5 })).toBe(5);
+    expect(bingo[bingo.length - 1].rarity).toBe("rare");
+  });
+
   test("MARATON ve TEK OTURUS aileleri tek gunun icinde kalir", () => {
     const mar = WATCH_BADGES.filter((b) => b.family === "maraton").sort((a, b) => a.tier - b.tier);
     expect(mar.map((b) => b.target)).toEqual([3, 5, 8]);
@@ -328,6 +339,8 @@ describe("nadirlik kotalari (rozet enflasyonuna karsi)", () => {
       // Tekrar izleme olaylari kullanici girdisi (tarih secici + tekrar ekle) —
       // ayni gerekceyle rare tavani.
       "tekrar_1", "tekrar_5", "tekrar_15", "tekrar_40", "gizli_basucu",
+      // Aylık Bingo kartı da kullanıcı tarihli izlemelerden türetilir.
+      "bingo_1", "bingo_3", "bingo_5", "bingo_12",
     ]);
     for (const b of WATCH_BADGES) {
       if (!tarihTuremli.has(b.id)) continue;
@@ -375,7 +388,7 @@ describe("performans sozlesmesi", () => {
     expect(okunan.size).toBeGreaterThan(10);
   });
 
-  test("154 rozetin tamami 2 ms altinda degerlendirilir", () => {
+  test("158 rozetin tamami 2 ms altinda degerlendirilir", () => {
     const stats = { filmSayisi: 300, bolumSayisi: 1500, perde: 12, turSayaci: new Map([["horror", 30]]) };
     // En hizli parti olculur (bkz. watchScoring.test.js: tek olcum yuk altinda gurultulu).
     //
@@ -518,17 +531,17 @@ describe("kesisim rozetleri: TEK sayac buyuterek alinamaz", () => {
 describe("kademeli aileler tek karta iner", () => {
   const grupla = (stats) => gruplaAileler(evaluateWatchBadges({ turSayaci: new Map(), ...stats }, []));
 
-  test("20 aile karti + 65 ailesiz rozet = 85 kart", () => {
+  test("21 aile karti + 65 ailesiz rozet = 86 kart", () => {
     const kartlar = grupla({});
     expect(kartlar.length).toBeLessThan(WATCH_BADGES.length);
-    // 20 aile 89 uyeyi 20 karta indirir. v2'de 60 rozet eklendi ama ekran 37 kart
+    // 21 aile 93 üyeyi 21 karta indirir. v2'de 60 rozet eklendi ama ekran 37 kart
     // uzadi (35 → 72): 23'u mevcut/yeni aile kartlarinin ICINE indi. v3'un 13 Kesif
     // rozeti tekil: ekran 13 kart uzar (72 → 85).
     const uye = WATCH_BADGES.filter((b) => b.family).length;
     const aile = new Set(WATCH_BADGES.filter((b) => b.family).map((b) => b.family)).size;
-    expect([uye, aile]).toEqual([89, 20]);
+    expect([uye, aile]).toEqual([93, 21]);
     expect(kartlar.length).toBe(WATCH_BADGES.length - uye + aile);
-    expect(kartlar.length).toBe(85);
+    expect(kartlar.length).toBe(86);
   });
 
   test("kidem ailesi de tek karta iner ve sonraki hedefi tasir", () => {

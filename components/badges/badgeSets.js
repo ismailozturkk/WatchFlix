@@ -145,7 +145,7 @@ export const BADGE_SETS = [
   //   • Katalog büyüdükçe merdiven kendiliğinden anlam kazanır; eşikler sabit,
   //     üyeler değil (üye listesi 140+ id olurdu ve sayfada hiçbir şey anlatmazdı).
   //
-  // Sayım KATALOG rozetleridir (koleksiyon/mühür/prestij değil): ekrandaki "x/154"
+  // Sayım KATALOG rozetleridir (koleksiyon/mühür/prestij değil): ekrandaki "x/toplam"
   // sayacıyla birebir aynı sayı. `esik` verilen set, üye listesini göstermez.
   {
     id: "set_sayi_10", esik: 10,

@@ -1,6 +1,6 @@
 // components/badges/watchBadgeCatalog.js
 //
-// İZLEME rozetleri — 154 adet: 20 kademeli aile (89 üye) + 65 tekil. Kimlik
+// İZLEME rozetleri — 158 adet: 21 kademeli aile (93 üye) + 65 tekil. Kimlik
 // rozetlerinden (badgeCatalog.js) ve oyun başarımlarından
 // (screens/game/gameRegistry.js) ayrı bir aile, aynı render altyapısını
 // (AppBadge) kullanır.
@@ -16,6 +16,8 @@
 //        izleme listesi, hatırlatıcı, ortak liste, arkadaş, gönderi, dört favori,
 //        biyografi, CineMatch) ilk kez kullanınca açılır. Girdileri computeWatchScore'dan
 //        değil utils/kesifSignals.js'ten gelir (bkz. oradaki YÜKLENME YARIŞI notu).
+//   v4 — +4 Sinema Bingosu kademesi. Aylık tam kartlar 1 → 3 → 5 → 12
+//        merdiveniyle izleme rozet defterine ve profil vitrinine bağlanır.
 //   Genişlemenin amacı "her aşamada elinin altında bir sonraki rozet olsun":
 //   v1'de kilometre taşları arasında aylarca ödülsüz çöller vardı (ör. 150→500
 //   film, Perde 8→14, yalnız dizi izleyenin tür sütunu). v2 bu çölleri doldurur,
@@ -51,7 +53,7 @@
 //    yerine gelen iki hedef eskisinden dört kat zor. İkisi kabaca eşit emek
 //    istiyor (2.000 × 165 ≈ 330.000 Kare, 10.000 × 37 ≈ 370.000 Kare), bu yüzden
 //    birini legendary yapıp diğerini epic bırakmak bir izleme biçimini
-//    ödüllendirip diğerini cezalandırmak olurdu. 154 rozette 3 legendary = %1,9
+//    ödüllendirip diğerini cezalandırmak olurdu. 158 rozette 3 legendary = %1,9
 //    (v1'de 81 rozette %3,7 idi); hâlâ nadir ve v2/v3 legendary EKLEMEDİ.
 //
 // 2. TARİH TÜREVİ ROZET TAVANI = rare. Gün/seri/mevsim rozetleri kullanıcının
@@ -84,12 +86,12 @@
 // beşgen → altıgen, theme/badgeTokens.js `kademeSekli`). Renk nadirliği, kenar
 // sayısı kademeyi kodlar; ikisi bağımsız iki eksendir.
 //
-// METİNLER İNLİNE: 154 rozet × 2 metin × 3 dil = 924 autoI18n anahtarı yazmak
+// METİNLER İNLİNE: yüzlerce rozet metnini autoI18n anahtarlarına dağıtmak
 // yerine tr/en/es + descTr/descEn/descEs burada durur (badgeCatalog.js emsali).
 // i18n maliyeti yalnızca ekranın UI dizelerine iner.
 //
 // PERFORMANS SÖZLEŞMESİ: her getProgress YALNIZCA `stats` okur. Hiçbir rozet
-// izleme listesini ayrıca taramaz — 154 rozet × 3.900 kayıt taraması JS
+// izleme listesini ayrıca taramaz — 158 rozet × 3.900 kayıt taraması JS
 // thread'ini kilitlerdi. Tüm ölçütler computeWatchScore'un tek geçişinden çıkar.
 // v2'nin yeni ölçütleri (tekrar, sezon, hafta sonu, takvim olayları, tür derinliği)
 // da o geçişe eklendi — rozet başına ayrı tarama YOK, puan formülü DEĞİŞMEDİ.
@@ -168,9 +170,10 @@ export const BOLUM_SIRA = Object.freeze([
 // ona BAKMAZ (yeni rozetin sessiz emilmesi `WATCH_BADGE_IDS`e dayanır, bkz. 0.
 // kural). Sürüm 1 = ilk 81 rozet; sürüm 2 = Başlangıç/Bağlılık genişlemesi;
 // sürüm 3 = Keşif bölümü (izleme dışı özellikler).
-export const KATALOG_SURUMU = 3;
+export const KATALOG_SURUMU = 4;
 const S2 = 2;
 const S3 = 3;
+const S4 = 4;
 
 // gameRegistry.defineAchievement ile AYNI sözleşme + beş ek alan:
 // `family` (kademe ailesi), `tier` (aile içi sıra), `hidden` (gizli rozet),
@@ -1418,6 +1421,43 @@ export const WATCH_BADGES = [
     target: 100, getProgress: (s) => say(s, "yuksekPuanliBolum"),
   }),
 
+  // ── Sinema Bingosu ────────────────────────────────────────────────────────
+  // Aylık kartın TAMAMINI doldurmak sayılır; çizgi veya haftalık küçük hedefler
+  // bu aileyi ilerletmez. Ölçüt kullanıcı tarihli izlemelerden türediği için
+  // tarih-türevi rozet tavanına uyar ve rare'i aşmaz.
+  defineWatchBadge({
+    id: "bingo_1", since: S4, section: BOLUM.KILOMETRE,
+    icon: "grid-outline", iconSolid: "grid", rarity: RARITY.common,
+    family: "bingo", tier: 1,
+    tr: "İlk Tam Kart", en: "First Full Card", es: "Primer cartón completo", pt: "Primeira cartela cheia", de: "Erste volle Karte",
+    descTr: "1 Sinema Bingosu kartını tamamen doldur", descEn: "Complete 1 Cinema Bingo card", descEs: "Completa 1 cartón de Bingo de cine", descPt: "Complete 1 cartela do Bingo de cinema", descDe: "Vervollständige 1 Kino-Bingo-Karte",
+    target: 1, getProgress: (s) => say(s, "bingoFullCards"),
+  }),
+  defineWatchBadge({
+    id: "bingo_3", since: S4, section: BOLUM.KILOMETRE,
+    icon: "grid-outline", iconSolid: "grid", rarity: RARITY.uncommon,
+    family: "bingo", tier: 2,
+    tr: "Bingo Üçlüsü", en: "Bingo Trio", es: "Trío de bingo", pt: "Trio de bingo", de: "Bingo-Trio",
+    descTr: "3 Sinema Bingosu kartını tamamen doldur", descEn: "Complete 3 Cinema Bingo cards", descEs: "Completa 3 cartones de Bingo de cine", descPt: "Complete 3 cartelas do Bingo de cinema", descDe: "Vervollständige 3 Kino-Bingo-Karten",
+    target: 3, getProgress: (s) => say(s, "bingoFullCards"),
+  }),
+  defineWatchBadge({
+    id: "bingo_5", since: S4, section: BOLUM.KILOMETRE,
+    icon: "grid-outline", iconSolid: "grid", rarity: RARITY.uncommon,
+    family: "bingo", tier: 3,
+    tr: "Bingo Müdavimi", en: "Bingo Regular", es: "Habitual del bingo", pt: "Frequentador do bingo", de: "Bingo-Stammgast",
+    descTr: "5 Sinema Bingosu kartını tamamen doldur", descEn: "Complete 5 Cinema Bingo cards", descEs: "Completa 5 cartones de Bingo de cine", descPt: "Complete 5 cartelas do Bingo de cinema", descDe: "Vervollständige 5 Kino-Bingo-Karten",
+    target: 5, getProgress: (s) => say(s, "bingoFullCards"),
+  }),
+  defineWatchBadge({
+    id: "bingo_12", since: S4, section: BOLUM.KILOMETRE,
+    icon: "grid-outline", iconSolid: "grid", rarity: RARITY.rare,
+    family: "bingo", tier: 4,
+    tr: "Bingo Yılı", en: "Year of Bingo", es: "Un año de bingo", pt: "Um ano de bingo", de: "Ein Jahr Bingo",
+    descTr: "12 Sinema Bingosu kartını tamamen doldur", descEn: "Complete 12 Cinema Bingo cards", descEs: "Completa 12 cartones de Bingo de cine", descPt: "Complete 12 cartelas do Bingo de cinema", descDe: "Vervollständige 12 Kino-Bingo-Karten",
+    target: 12, getProgress: (s) => say(s, "bingoFullCards"),
+  }),
+
   // ── Keşif ─────────────────────────────────────────────────────────────────
   // İZLEME DIŞI ÖZELLİKLERİ ilk kez kullanınca açılır. Amaç ödül değil KEŞİF: hiç
   // hatırlatıcı kurmamış kullanıcı, kilitli "Aklında Olsun"u görür ve o özelliğin var
@@ -1653,7 +1693,7 @@ export function prestijIdleri(kartlar, { sonraki = 0 } = {}) {
 
 /**
  * Kademeli aileleri TEK karta indirir: açık en yüksek kademe gösterilir,
- * ilerleme bir sonraki kademeye göre çizilir. 154 rozet 85 aile/tekil karta iner
+ * ilerleme bir sonraki kademeye göre çizilir. 158 rozet 86 aile/tekil karta iner
  * (ekrana ayrıca mühür ve koleksiyon kartları eklenir — bkz. useWatchProgress).
  * Tamamlanmış ailelerde `prestij` sayacı da burada hesaplanır.
  */
