@@ -5,6 +5,8 @@ import Toast from "@components/AppToast";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { useUserProfile } from "../context/UserProfileContext";
+import { useProfileUi } from "../context/ProfileUiContext";
+import { avatarSnapshot } from "../utils/avatarPhotos";
 import { useSharedLists } from "../context/SharedListsContext";
 import ListActionIcon from "./common/ListActionIcon";
 import {
@@ -37,7 +39,9 @@ export default function SharedListsSection({ sharedItem, visible }) {
   const { theme } = useTheme();
   const ACCENT = getSharedListAccent(theme.primary);
   const { user } = useAuth();
-  const { displayName, username, avatarIndex } = useUserProfile();
+  const { displayName, username } = useUserProfile();
+  // "Ekleyen" kopyasına kendi avatarım (fotoğraf avatarı dahil) yazılır.
+  const { myAvatar } = useProfileUi();
   const { sharedLists, sharedItemsByList } = useSharedLists();
 
   // listId → item verisi | null (bu içerik listede mi + kim eklemiş)
@@ -167,7 +171,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
     try {
       await addItemToSharedList({
         listId: list.id,
-        user: { uid, displayName, username, avatarIndex },
+        user: { uid, displayName, username, ...avatarSnapshot(myAvatar) },
         item: sharedItem,
       });
     } catch (e) {
@@ -197,6 +201,9 @@ export default function SharedListsSection({ sharedItem, visible }) {
               key={list.id}
               activeOpacity={0.85}
               onPress={() => toggle(list)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: inList, disabled: locked }}
+              accessibilityLabel={list.name}
               style={[
                 styles.card,
                 {
@@ -220,30 +227,38 @@ export default function SharedListsSection({ sharedItem, visible }) {
                   inactiveName={locked ? "lock-closed" : "people-outline"}
                   activeColor={ACCENT}
                   inactiveColor={theme.text.muted}
-                  size={22}
+                  size={20}
                 />
               </View>
-              <Text
-                allowFontScaling={false}
-                numberOfLines={2}
-                style={[
-                  styles.cardLabel,
-                  { color: inList ? ACCENT : theme.text.secondary },
-                ]}
-              >
-                {list.name}
-              </Text>
-              {/* Listedeyse kim eklemiş */}
-              {inList && (
+              <View style={styles.cardCopy}>
                 <Text
+                  allowFontScaling={false}
                   numberOfLines={1}
-                  style={[styles.addedBy, { color: theme.text.muted }]}
+                  style={[
+                    styles.cardLabel,
+                    { color: inList ? ACCENT : theme.text.secondary },
+                  ]}
                 >
-                  {states[list.id]?.addedBy === uid
-                    ? i18nText("autoI18n.sen_ekledin", "sen ekledin")
-                    : states[list.id]?.addedByName || ""}
+                  {list.name}
                 </Text>
-              )}
+                {/* Listedeyse kim eklemiş */}
+                {inList && (
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    style={[styles.addedBy, { color: theme.text.muted }]}
+                  >
+                    {states[list.id]?.addedBy === uid
+                      ? i18nText("autoI18n.sen_ekledin", "sen ekledin")
+                      : states[list.id]?.addedByName || ""}
+                  </Text>
+                )}
+              </View>
+              <Ionicons
+                name={inList ? "checkmark-circle" : locked ? "lock-closed" : "add-circle-outline"}
+                size={18}
+                color={inList ? ACCENT : theme.text.muted}
+              />
             </GlassTouchable>
           );
         })}
@@ -253,7 +268,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
 }
 
 const styles = StyleSheet.create({
-  section: { marginTop: 4, marginBottom: 4 },
+  section: { marginTop: 16, marginBottom: 4 },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -265,30 +280,31 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: 10,
   },
   card: {
-    width: "31%",
-    flexGrow: 1,
-    maxWidth: "32%",
+    width: "48%",
+    minHeight: 62,
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 15,
     paddingVertical: 10,
-    paddingHorizontal: 6,
+    paddingHorizontal: 10,
+    flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
   cardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     justifyContent: "center",
     alignItems: "center",
   },
   cardLabel: {
     fontSize: 11,
     fontWeight: "700",
-    textAlign: "center",
   },
+  cardCopy: { flex: 1, minWidth: 0 },
   addedBy: { fontSize: 9, fontWeight: "600" },
 });

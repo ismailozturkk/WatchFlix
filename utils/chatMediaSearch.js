@@ -11,11 +11,12 @@
 // kayıtlar sona itilir, aynı eser bir kez döner.
 
 import { foldText } from "./listSearch";
+import { SEARCH_DEBOUNCE_MS } from "./searchDebounce";
 
 // TMDB'ye çıkmak için en az bu kadar karakter (listSearch ile aynı eşik).
 export const CHAT_SEARCH_MIN_CHARS = 2;
 // Yazarken her tuşta istek atılmasın; bu kadar duraksayınca aranır.
-export const CHAT_SEARCH_DEBOUNCE_MS = 280;
+export const CHAT_SEARCH_DEBOUNCE_MS = SEARCH_DEBOUNCE_MS;
 
 const SUPPORTED = new Set(["movie", "tv", "person"]);
 

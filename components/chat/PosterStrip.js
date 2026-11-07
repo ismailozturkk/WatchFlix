@@ -9,7 +9,7 @@
 // görünüm (SharedListSheet / gönderi detayı) açılır. Böylece uzun içerik sohbeti
 // aşağı kaydırmaz ve balon yüksekliği öğe sayısından bağımsızdır.
 //
-// Yerleşim ölçüleri `stripLayout(total)` ile hesaplanır; kapsayan balon aynı
+// Yerleşim ölçüleri `stripLayout(total, maxWidth)` ile hesaplanır; kapsayan balon aynı
 // sonucu başlık/eylem genişliği için kullanır (bu yüzden dışarıya verilir).
 
 import React from "react";
@@ -39,14 +39,19 @@ const STACK_BLEED = 12;
 const MIN_BLOCK_W = 220;
 
 /** Şerit düzeni: az öğede büyük afiş, dört yuvada dar. Genişlik hep hesaplanır. */
-export function stripLayout(total) {
+// `maxWidth`: kapsayan kartın iç genişliği (sohbet kartı genişliği). Verilirse
+// şerit onu aşmaz; geniş telefonda 3 afiş / yığın kart kenarından taşıyordu.
+export function stripLayout(total, maxWidth) {
   const hasStack = total > STRIP_SHOWN;
   const cols = hasStack ? SLOTS : Math.max(1, total);
   const bleed = hasStack ? STACK_BLEED : 0;
+  const target = maxWidth > 0 ? Math.min(STRIP_TARGET, maxWidth) : STRIP_TARGET;
   // Çift genişlik: yükseklik (1,5 x) tam sayı kalır → kutu TAM 2:3, `cover`
   // afişi kırpmaz (tek genişlikte yükseklik yukarı yuvarlanıp 0,5 dp kırpıyordu).
-  const fit = Math.floor((STRIP_TARGET - bleed - GAP * (cols - 1)) / cols / 2) * 2;
-  const cardW = Math.max(MIN_CARD_W, Math.min(MAX_CARD_W, fit));
+  const fit = Math.floor((target - bleed - GAP * (cols - 1)) / cols / 2) * 2;
+  // Genişlik sınırı varken alt sınır da ona uyar (dar sohbet kartı: 4 yuva ≈ 48 dp).
+  const minW = maxWidth > 0 ? Math.min(MIN_CARD_W, Math.max(40, fit)) : MIN_CARD_W;
+  const cardW = Math.max(minW, Math.min(MAX_CARD_W, fit));
   const width = cardW * cols + GAP * (cols - 1) + bleed;
   return { cols, cardW, hasStack, width, blockWidth: Math.max(width, MIN_BLOCK_W) };
 }
@@ -182,7 +187,7 @@ function StackCard({ items, remaining, cardW, getTmdbUrl, palette, onPress, capt
  * @param {object}   props
  * @param {object[]} props.items      { media_type, id, title, poster_path } (en az STRIP_SHOWN+3 gerekmez).
  * @param {number}   props.total      Gerçek toplam (items kırpılmış olabilir).
- * @param {object}   props.layout     `stripLayout(total)` çıktısı.
+ * @param {object}   props.layout     `stripLayout(total, maxWidth)` çıktısı.
  * @param {object}   props.palette    shareKit.sharePalette çıktısı.
  * @param {(path: string, type: string, width: number) => string} props.getTmdbUrl
  * @param {(item: object) => void} [props.onOpenItem]

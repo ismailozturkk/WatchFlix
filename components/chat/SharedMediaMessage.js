@@ -20,17 +20,20 @@ import {
   UIManager,
 } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { useLanguage } from "../../context/LanguageContext";
 import { useApiSettings } from "../../context/AppSettingsContext";
+import { useBackdropResolver, usePosterResolver } from "../../context/PosterChoicesContext";
 import { fetchMediaFacts, fetchMediaOverview, peekMediaFacts } from "../../services/tmdbFacts";
 import { alpha } from "../../theme/colors";
+import { hoursMinutesText } from "../../utils/durationText";
 
-const POSTER_WIDTH = 92;
-const POSTER_HEIGHT = 138;
 const MEDIA_GAP = 12;
+// blurRadius (18) saydam kenarından geniş olmalı.
+const BACKDROP_BLEED = 36;
 
 if (
   Platform.OS === "android" &&
@@ -60,12 +63,18 @@ function useViewerLanguageMedia(media) {
     () => (localizable && peekMediaFacts({ id, mediaType: type, language })?.title) || null,
   );
   const [overview, setOverview] = useState(null);
+  // Süre / sezon / türler: başlıkla AYNI önbellekli okuma, ek istek yok.
+  const [facts, setFacts] = useState(
+    () => (localizable && peekMediaFacts({ id, mediaType: type, language })) || null,
+  );
 
   useEffect(() => {
     if (!localizable) return undefined;
     let alive = true;
     fetchMediaFacts({ apiKey: API_KEY, id, mediaType: type, language }).then((facts) => {
-      if (alive && facts?.title) setTitle(facts.title);
+      if (!alive || !facts) return;
+      if (facts.title) setTitle(facts.title);
+      setFacts(facts);
     });
     fetchMediaOverview({ apiKey: API_KEY, id, mediaType: type, language }).then((text) => {
       if (alive && text) setOverview(text);
@@ -75,7 +84,20 @@ function useViewerLanguageMedia(media) {
     };
   }, [localizable, id, type, language, API_KEY]);
 
-  return { title, overview };
+  return { title, overview, facts };
+}
+
+/** Yan sütundaki süre çipi: film "2 sa 49 dk", dizi "4 sezon". Bilinmiyorsa null. */
+function durationChip(facts, mediaType) {
+  if (!facts) return null;
+  if (mediaType === "tv") {
+    const seasons = Number(facts.seasonCount);
+    return seasons > 0
+      ? { icon: "layers-outline", text: i18nText("autoI18n.sezon_sayisi", "{{count}} sezon", { count: seasons }) }
+      : null;
+  }
+  const text = hoursMinutesText(facts.minutes);
+  return text ? { icon: "time-outline", text } : null;
 }
 
 export default function SharedMediaMessage({
@@ -86,12 +108,26 @@ export default function SharedMediaMessage({
   isOutgoing = false,
 }) {
   const { theme } = useTheme();
+  const resolvePoster = usePosterResolver();
+  const resolveBackdrop = useBackdropResolver();
   const accent = propAccent || theme.accent || "#6C63FF";
   const [summaryOpen, setSummaryOpen] = useState(false);
 
   const media = item?.media;
-  const poster = media?.poster_path || media?.profile_path;
   const isPerson = media?.media_type === "person";
+  const mediaType = media?.media_type === "tv" ? "tv" : "movie";
+  const basePoster = media?.poster_path || media?.profile_path || null;
+  const poster = isPerson ? basePoster : resolvePoster(mediaType, media?.id, basePoster);
+  const baseBackdrop = media?.backdrop_path || media?.backdropPath || null;
+  const chosenBackdrop = isPerson
+    ? null
+    : resolveBackdrop(mediaType, media?.id, baseBackdrop);
+  // Kart fonunda yalnız arka plan görseli kullanılır. Seçilmiş/varsayılan bir
+  // backdrop yoksa poster büyütülmez; koyu düz kart yüzeyi korunur.
+  // Yol yoksa gönderenin yazdığı hazır URL (utils/chatMediaBackdrop) yedek fon.
+  const backdropUri = chosenBackdrop
+    ? getTmdbUrl(chosenBackdrop, "backdrop", 780)
+    : (!isPerson && typeof media?.backdrop_url === "string" && media.backdrop_url) || null;
   const localized = useViewerLanguageMedia(media);
   const text = localized.title || item?.text || media?.title || media?.name || "";
   const summary = (!isPerson && localized.overview) || media?.overview;
@@ -103,24 +139,56 @@ export default function SharedMediaMessage({
     media?.media_type === "movie"
       ? i18nText("autoI18n.vizyon", "Vizyon")
       : i18nText("autoI18n.yayin", "Yayın");
+  const duration = isPerson ? null : durationChip(localized.facts, mediaType);
+  // İzleyenin dilinde en fazla iki tür (tmdbFacts): "Bilim Kurgu · Dram".
+  const genreLine = isPerson ? "" : (localized.facts?.genres || []).slice(0, 2).join(" · ");
 
   const toggleSummary = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSummaryOpen((o) => !o);
   };
 
-  const primaryTextColor = isOutgoing ? "#fff" : theme.text.primary;
-  const secondaryTextColor = isOutgoing ? "rgba(255,255,255,0.8)" : theme.text.secondary;
-  const mutedTextColor = isOutgoing ? "rgba(255,255,255,0.65)" : theme.text.muted;
+  // Film/dizi kartı poster fonu nedeniyle her iki yönde de koyu bir yüzeydir.
+  const onDarkCard = !isPerson;
+  const primaryTextColor = onDarkCard || isOutgoing ? "#fff" : theme.text.primary;
+  const secondaryTextColor = onDarkCard || isOutgoing ? "rgba(255,255,255,0.82)" : theme.text.secondary;
+  const mutedTextColor = onDarkCard || isOutgoing ? "rgba(255,255,255,0.68)" : theme.text.muted;
 
   // Giden balon vurgu renginde: rozet/buton zeminleri beyaz-şeffaf, gelende tür/vurgu renkli.
-  const pillBg = isOutgoing
+  const pillBg = onDarkCard || isOutgoing
     ? "rgba(255,255,255,0.2)"
     : alpha(typeMeta?.color || accent, 0.16);
-  const pillInk = isOutgoing ? "#fff" : typeMeta?.color || accent;
+  const pillInk = onDarkCard || isOutgoing ? "#fff" : typeMeta?.color || accent;
 
   return (
-    <View style={styles.wrap}>
+    <View
+      style={[
+        styles.wrap,
+        isPerson
+          ? { backgroundColor: theme.secondary, borderColor: theme.border, borderWidth: 1 }
+          : { backgroundColor: "#11141C" },
+      ]}
+    >
+      {backdropUri ? (
+        <>
+          <Image
+            pointerEvents="none"
+            source={{ uri: backdropUri }}
+            style={styles.backgroundPoster}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            blurRadius={18}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={["rgba(5,7,12,0.82)", "rgba(5,7,12,0.58)", "rgba(5,7,12,0.76)"]}
+            locations={[0, 0.48, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.backgroundScrim}
+          />
+        </>
+      ) : null}
       <View style={styles.row}>
         {/* Poster (basınca dış balon yönlendirir) */}
         <View style={styles.posterShadow}>
@@ -168,6 +236,12 @@ export default function SharedMediaMessage({
           <View style={styles.sideTop}>
             {!!typeMeta && (
               <View style={[styles.typePill, { backgroundColor: pillBg }]}>
+                <Ionicons
+                  name={media?.media_type === "tv" ? "tv-outline" : isPerson ? "person-outline" : "film-outline"}
+                  size={11}
+                  // Koyu kartta simge tür renginde: film turuncu, dizi mavi her yerde aynı tanınır.
+                  color={onDarkCard && typeMeta?.color ? typeMeta.color : pillInk}
+                />
                 <Text
                   allowFontScaling={false}
                   style={[styles.typePillText, { color: pillInk }]}
@@ -178,26 +252,52 @@ export default function SharedMediaMessage({
             )}
             <Text
               style={[styles.title, { color: primaryTextColor }]}
-              numberOfLines={3}
+              // Süre/tür satırı eklenince üç satırlık başlık eylemleri aşağı itiyordu.
+              numberOfLines={duration || genreLine ? 2 : 3}
             >
               {text}
             </Text>
 
-            {!!releaseDateText && !isPerson && (
-              <View style={styles.releaseRow}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={12}
-                  color={mutedTextColor}
-                />
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.releaseText, { color: secondaryTextColor }]}
-                  numberOfLines={1}
-                >
-                  {releaseDateLabel}: {releaseDateText}
-                </Text>
+            {!isPerson && (!!releaseDateText || !!duration) && (
+              <View style={styles.metaRow}>
+                {!!releaseDateText && (
+                  <View
+                    style={styles.releaseRow}
+                    accessibilityLabel={`${releaseDateLabel}: ${releaseDateText}`}
+                  >
+                    <Ionicons name="calendar-outline" size={12} color={mutedTextColor} />
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.releaseText, { color: secondaryTextColor }]}
+                      numberOfLines={1}
+                    >
+                      {releaseDateText}
+                    </Text>
+                  </View>
+                )}
+                {!!duration && (
+                  <View style={styles.releaseRow}>
+                    <Ionicons name={duration.icon} size={12} color={mutedTextColor} />
+                    <Text
+                      allowFontScaling={false}
+                      style={[styles.releaseText, { color: secondaryTextColor }]}
+                      numberOfLines={1}
+                    >
+                      {duration.text}
+                    </Text>
+                  </View>
+                )}
               </View>
+            )}
+
+            {!!genreLine && (
+              <Text
+                allowFontScaling={false}
+                style={[styles.genreLine, { color: mutedTextColor }]}
+                numberOfLines={1}
+              >
+                {genreLine}
+              </Text>
             )}
 
             {/* Oyuncuda overview alanı "bilinen yapımlar" listesidir. */}
@@ -220,7 +320,7 @@ export default function SharedMediaMessage({
                 style={[
                   styles.action,
                   styles.actionPrimary,
-                  { backgroundColor: isOutgoing ? "rgba(255,255,255,0.24)" : accent },
+                  { backgroundColor: onDarkCard || isOutgoing ? "rgba(255,255,255,0.24)" : accent },
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel={i18nText("autoI18n.ozet", "Özet")}
@@ -244,10 +344,10 @@ export default function SharedMediaMessage({
                   styles.action,
                   styles.actionOutline,
                   {
-                    backgroundColor: isOutgoing
+                    backgroundColor: onDarkCard || isOutgoing
                       ? "rgba(255,255,255,0.1)"
                       : "transparent",
-                    borderColor: isOutgoing
+                    borderColor: onDarkCard || isOutgoing
                       ? "rgba(255,255,255,0.4)"
                       : alpha(accent, 0.5),
                   },
@@ -258,11 +358,11 @@ export default function SharedMediaMessage({
                 <Ionicons
                   name="play-circle-outline"
                   size={15}
-                  color={isOutgoing ? "#fff" : accent}
+                  color={onDarkCard || isOutgoing ? "#fff" : accent}
                 />
                 <Text
                   allowFontScaling={false}
-                  style={[styles.actionText, { color: isOutgoing ? "#fff" : accent }]}
+                  style={[styles.actionText, { color: onDarkCard || isOutgoing ? "#fff" : accent }]}
                 >
                   {i18nText("autoI18n.fragman", "Fragman")}
                 </Text>
@@ -278,11 +378,11 @@ export default function SharedMediaMessage({
           style={[
             styles.summaryBox,
             {
-              borderColor: isOutgoing
+              borderColor: onDarkCard || isOutgoing
                 ? "rgba(255,255,255,0.3)"
                 : alpha(accent, 0.4),
-              backgroundColor: isOutgoing
-                ? "rgba(255,255,255,0.1)"
+              backgroundColor: onDarkCard || isOutgoing
+                ? "rgba(0,0,0,0.28)"
                 : theme.between,
             },
           ]}
@@ -292,12 +392,47 @@ export default function SharedMediaMessage({
           </Text>
         </View>
       )}
+      {/* Film/dizi çerçevesi kabın değil, EN ÜSTTEKİ katmanın: kabın borderWidth'i
+          overflow:hidden ile çocukları çerçevenin İÇİNDEN kırpıyor, fon görseli
+          çerçevenin altına giremiyor ve kenarda gri bir halka kalıyordu. */}
+      {!isPerson && <View pointerEvents="none" style={styles.edge} />}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { width: "100%", minWidth: 250 },
+  wrap: {
+    width: "100%",
+    minWidth: 250,
+    padding: 13,
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.24,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  // Bulanık görselin kenarları saydamlaşır (blur kutunun dışını boş örnekler);
+  // kart sınırına kadar çizilince bu şerit koyu zeminle "boşluk" gibi görünüyordu.
+  // Görsel her yönden BACKDROP_BLEED kadar taşar, saydam kenar `overflow:hidden`
+  // ile kırpılan bölgede kalır.
+  backgroundPoster: {
+    position: "absolute",
+    top: -BACKDROP_BLEED,
+    left: -BACKDROP_BLEED,
+    right: -BACKDROP_BLEED,
+    bottom: -BACKDROP_BLEED,
+  },
+  backgroundScrim: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  edge: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+  },
   row: {
     flexDirection: "row",
     alignItems: "stretch",
@@ -305,8 +440,8 @@ const styles = StyleSheet.create({
   },
 
   posterShadow: {
-    width: POSTER_WIDTH,
-    height: POSTER_HEIGHT,
+    width: 92,
+    height: 138,
     flexShrink: 0,
     borderRadius: 14,
     shadowColor: "#000",
@@ -316,8 +451,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   poster: {
-    width: POSTER_WIDTH,
-    height: POSTER_HEIGHT,
+    width: 92,
+    height: 138,
     borderRadius: 14,
     backgroundColor: "rgba(255,255,255,0.06)",
   },
@@ -344,16 +479,19 @@ const styles = StyleSheet.create({
   side: {
     flex: 1,
     minWidth: 0,
-    minHeight: POSTER_HEIGHT,
+    minHeight: 138,
     justifyContent: "space-between",
     gap: 8,
   },
   sideTop: { gap: 5 },
   typePill: {
     alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 2.5,
-    borderRadius: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   typePillText: {
     fontSize: 10,
@@ -361,11 +499,36 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
-  title: { fontSize: 15.5, fontWeight: "800", lineHeight: 20 },
+  title: {
+    fontSize: 16,
+    fontWeight: "900",
+    lineHeight: 20,
+    letterSpacing: -0.2,
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 5,
+  },
+  genreLine: {
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
+    letterSpacing: 0.1,
+  },
   releaseRow: {
+    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 9,
+    backgroundColor: "rgba(0,0,0,0.24)",
   },
   releaseText: {
     fontSize: 11,
@@ -375,15 +538,16 @@ const styles = StyleSheet.create({
   },
   knownFor: { fontSize: 11.5, lineHeight: 16 },
 
-  actions: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  actions: { flexDirection: "row", alignItems: "center", gap: 7 },
   action: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 5,
-    height: 30,
-    paddingHorizontal: 11,
-    borderRadius: 15,
+    height: 34,
+    paddingHorizontal: 8,
+    borderRadius: 12,
   },
   actionPrimary: {
     shadowColor: "#000",

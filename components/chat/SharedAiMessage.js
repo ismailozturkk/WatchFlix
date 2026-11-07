@@ -766,7 +766,7 @@ function PosterFan({ picks, getTmdbUrl, palette }) {
 
 // ── Kart ─────────────────────────────────────────────────────────────────────
 
-function SharedAiMessage({ share, isOutgoing = false, neutralCard = false, accent: propAccent, getTmdbUrl, onOpenItem }) {
+function SharedAiMessage({ share, isOutgoing = false, neutralCard = false, cardWidth, accent: propAccent, getTmdbUrl, onOpenItem }) {
   const { theme } = useTheme();
   const { t, language } = useLanguage();
   const accent = propAccent || theme.accent || "#6C63FF";
@@ -812,7 +812,7 @@ function SharedAiMessage({ share, isOutgoing = false, neutralCard = false, accen
   else body = <RecommendationsBody sections={visible} ctx={ctx} />;
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, cardWidth ? { width: cardWidth } : null]}>
       <View style={styles.header}>
         <View style={[styles.headerTile, { backgroundColor: palette.tile }]}>
           <Ionicons name={VARIANT_ICON[variant] || "sparkles"} size={15} color={palette.tileInk} />
@@ -864,7 +864,7 @@ function SharedAiMessage({ share, isOutgoing = false, neutralCard = false, accen
 export default memo(SharedAiMessage);
 
 const styles = StyleSheet.create({
-  wrap: { width: "100%", minWidth: 250, marginBottom: 2 },
+  wrap: { width: "100%", minWidth: 0, marginBottom: 2 },
 
   header: { flexDirection: "row", alignItems: "center", gap: 9 },
   headerTile: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center" },

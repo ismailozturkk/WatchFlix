@@ -57,12 +57,13 @@ function useVerifiedScores({ dayKey, guestUid, hostUid }) {
   return scores;
 }
 
-function SharedDuelResultMessage({ share, isOutgoing = false, senderUid, senderName }) {
+function SharedDuelResultMessage({ share, isOutgoing = false, neutralCard = false, senderUid, senderName, cardWidth = 240 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const { user } = useAuth() || {};
   const copy = getDuelCopy(language);
-  const palette = useMemo(() => sharePalette({ theme, isOutgoing, accent: DUEL_AMBER }), [theme, isOutgoing]);
+  const visualOutgoing = isOutgoing && !neutralCard;
+  const palette = useMemo(() => sharePalette({ theme, isOutgoing: visualOutgoing, accent: DUEL_AMBER }), [theme, visualOutgoing]);
 
   // Aynı günün meydan okuma kartı (özellikle meydan okuyanın kendi kartı) rakibin skorunu yeniden okusun.
   // Liste kaydırılırken kart tekrar tekrar bağlanır: her sonuç oturumda bir kez duyurulur.
@@ -106,7 +107,7 @@ function SharedDuelResultMessage({ share, isOutgoing = false, senderUid, senderN
             : null;
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { width: cardWidth }]}>
       <View style={styles.header}>
         <View style={[styles.tile, { backgroundColor: palette.tile }]}>
           <Ionicons name="trophy" size={17} color={palette.tileInk} />
@@ -121,7 +122,7 @@ function SharedDuelResultMessage({ share, isOutgoing = false, senderUid, senderN
         </View>
       </View>
 
-      <DuelStatusChip tone="done" label={copy.statusDone} palette={palette} isOutgoing={isOutgoing} />
+      <DuelStatusChip tone="done" label={copy.statusDone} palette={palette} isOutgoing={visualOutgoing} />
 
       <Text style={[styles.date, { color: palette.muted }]} numberOfLines={1}>
         {copy.daily(dayLabel(share.dayKey, intlLocaleOf(language)))}
@@ -132,7 +133,7 @@ function SharedDuelResultMessage({ share, isOutgoing = false, senderUid, senderN
         right={{ label: nameOf(view.right.side), score: view.right.score }}
         winner={view.winner ? (view.winner === view.left.side ? "left" : "right") : null}
         palette={palette}
-        isOutgoing={isOutgoing}
+        isOutgoing={visualOutgoing}
         accessibilityLabel={`${nameOf(view.left.side)} ${view.left.score ?? "?"}, ${nameOf(view.right.side)} ${view.right.score ?? "?"}`}
       />
 
@@ -141,7 +142,7 @@ function SharedDuelResultMessage({ share, isOutgoing = false, senderUid, senderN
       </Text>
 
       {verdictText ? (
-        <DuelVerdict verdict={view.verdict} text={verdictText} palette={palette} isOutgoing={isOutgoing} />
+        <DuelVerdict verdict={view.verdict} text={verdictText} palette={palette} isOutgoing={visualOutgoing} />
       ) : null}
     </View>
   );

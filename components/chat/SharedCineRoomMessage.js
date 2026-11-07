@@ -58,6 +58,7 @@ function chipOf(view, { isOutgoing, isGroup, copy }) {
 function SharedCineRoomMessage({
   share,
   isOutgoing = false,
+  neutralCard = false,
   isGroup = false,
   viewerUid,
   accepts,
@@ -66,13 +67,14 @@ function SharedCineRoomMessage({
   sentAt,
   onOpen,
   onAnswer,
+  cardWidth = 240,
 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const copy = getCineInviteCopy(language);
   const palette = useMemo(
-    () => sharePalette({ theme, isOutgoing, accent: ROSE }),
-    [theme, isOutgoing],
+    () => sharePalette({ theme, isOutgoing: isOutgoing && !neutralCard, accent: ROSE }),
+    [theme, isOutgoing, neutralCard],
   );
   const view = cineInviteView({ isOutgoing, viewerUid, accepts, declines, done, sentAt });
   const chip = chipOf(view, { isOutgoing, isGroup, copy });
@@ -96,7 +98,7 @@ function SharedCineRoomMessage({
     : i18nText("autoI18n.paylas_cine_davet_anon", "Odaya davetlisin");
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { width: cardWidth }]}>
       <View style={styles.header}>
         <View style={[styles.tile, { backgroundColor: palette.tile }]}>
           <Ionicons name="film" size={17} color={palette.tileInk} />
@@ -115,7 +117,7 @@ function SharedCineRoomMessage({
         </View>
       </View>
 
-      {chip ? <DuelStatusChip tone={chip.tone} label={chip.label} palette={palette} isOutgoing={isOutgoing} /> : null}
+      {chip ? <DuelStatusChip tone={chip.tone} label={chip.label} palette={palette} isOutgoing={isOutgoing && !neutralCard} /> : null}
 
       <Text style={[styles.invite, { color: palette.secondary }]} numberOfLines={2}>
         {invitation}

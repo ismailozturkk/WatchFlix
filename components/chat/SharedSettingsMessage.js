@@ -45,14 +45,17 @@ function LazyOutgoingApply(props) {
   return <OutgoingSettingsApply {...props} />;
 }
 
-function SharedSettingsMessage({ share, isOutgoing = false }) {
+function SharedSettingsMessage({ share, isOutgoing = false, neutralCard = false, cardWidth }) {
   const { theme } = useTheme();
   const { language, t } = useLanguage();
   const copy = getSettingsShareCopy(language);
-  const palette = useMemo(() => sharePalette({ theme, isOutgoing, accent: theme.accent }), [theme, isOutgoing]);
+  const palette = useMemo(
+    () => sharePalette({ theme, isOutgoing: isOutgoing && !neutralCard, accent: theme.accent }),
+    [theme, isOutgoing, neutralCard],
+  );
   // Dar telefonda (320 dp) sabit genişlik zengin balonun %90 sınırını taşırıyordu.
   const { width: windowWidth } = useWindowDimensions();
-  const bubbleWidth = settingsBubbleWidth(windowWidth);
+  const bubbleWidth = cardWidth || settingsBubbleWidth(windowWidth);
   const [sheetVisible, setSheetVisible] = useState(false);
   // İlk açılıştan sonra bağlı kalır: kapanış animasyonu ve onDismissed çalışabilsin.
   const [sheetMounted, setSheetMounted] = useState(false);

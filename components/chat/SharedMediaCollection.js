@@ -4,15 +4,13 @@
 // sohbetteki "#" aramasından 2+ içerik seçilip "Listeyi gönder" denince gelir.
 //
 // Görünüm: üstte ikon karolu başlık (liste adı ya da "Paylaşılan liste") ve
-// altında içerik dağılımı ("2 film · 3 dizi"); ortada afiş ızgarası (afiş +
-// ad + yıl/tür satırı); altta 2+ dizi/filmde "Rastgele Seç". Rastgele seçim her
+// altında içerik dağılımı ("2 film · 3 dizi"); ortada küçük afişlerin yatay rayı
+// (afiş + ad + yıl/tür satırı); altta 2+ dizi/filmde "Rastgele Seç". Rastgele seçim her
 // izleyende YEREL çalışır (yazma yok), "bu akşam ne izlesek?" kararını
 // eğlenceli hale getirir.
 //
-// BOY SINIRI: 12 öğelik liste eskiden 4 sıra tam ızgara olup balonu ekran
-// boyu yapıyordu. Artık en çok 6 kare görünür; fazlası 6. karede "+N" olarak
-// katlanır, dokununca açılır ("Daha az göster" ile geri katlanır). Rastgele
-// seçim katlıyken başlarsa önce açılır — vurgu gizli karede kaybolmasın.
+// BOY SINIRI: liste kaç öğe olursa olsun tek satırdır; içerik yana kayar. Rastgele
+// seçim sırasında ray vurgulanan afişi görünür tutacak şekilde ilerler.
 //
 // AFİŞ KENARI: çerçeve görselin ÜSTÜNDE ayrı katman (shareKit.PosterEdge);
 // kutuya borderWidth vermek afişi 2:3'ten saptırıp kırpıyordu.
@@ -22,8 +20,10 @@ import {
   View,
   Text,
   TouchableOpacity,
+  ScrollView,
   StyleSheet,
   Animated,
+  Easing,
   Dimensions,
 } from "react-native";
 import { Image } from "expo-image";
@@ -31,25 +31,21 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { countByType, resultMeta } from "../../utils/chatMediaSearch";
-import { PosterEdge, easeLayout, sharePalette } from "./shareKit";
+import { PosterEdge, sharePalette } from "./shareKit";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const GAP = 8;
 const POSTER_RADIUS = 10;
-// Katlıyken görünen en çok kare (fazlası son karede "+N").
-const COLLAPSED_SLOTS = 6;
 // Balon içeriğinin hedef genişliği (PosterStrip / SharedListMessage ile yakın).
 const ROW_W = Math.min(Math.round(SCREEN_W * 0.7), 288);
+const COMPACT_CARD_W = 58;
 
-// İçerik sayısına göre sütun + kart genişliği: 2 → 2'li, 4 → 2x2, diğerleri 3'lü.
-// Genişlik ÇİFT tutulur (yükseklik = 1,5 x tam sayı; tek genişlik yukarı
-// yuvarlanıp afişi yarım dp kırpıyordu).
-export const computeLayout = (n) => {
-  const cols = n <= 2 ? Math.max(1, n) : n === 4 ? 2 : 3;
-  let cardW = Math.floor((ROW_W - GAP * (cols - 1)) / cols);
-  cardW = Math.max(64, Math.min(cardW, 124));
-  cardW -= cardW % 2;
-  return { cols, cardW, gridWidth: cardW * cols + GAP * (cols - 1) };
+// Sohbet listesindeki posterler içerik sayısından bağımsız aynı küçük ölçüyü
+// kullanır. `gridWidth` rayın ekrandaki penceresi, `contentWidth` kaydırılan alan.
+export const computeLayout = (n, viewportWidth = ROW_W) => {
+  const cols = Math.max(1, n);
+  const contentWidth = COMPACT_CARD_W * cols + GAP * (cols - 1);
+  return { cols, cardW: COMPACT_CARD_W, gridWidth: viewportWidth, contentWidth };
 };
 
 // Kişide bölüm etiketi; dizi/filmde "2021 · Dizi". Sohbet araması da kullanır.
@@ -83,107 +79,96 @@ export const compositionLabel = (items) => {
 function MiniCard({ item, getTmdbUrl, palette, accent, highlighted, picked, dimmed, onPress, cardW, isOutgoing }) {
   const poster = item.poster_path || item.profile_path;
   const ring = isOutgoing ? "#fff" : accent;
+  const focusAnim = useRef(new Animated.Value(highlighted || picked ? 1 : 0)).current;
+  const opacityAnim = useRef(new Animated.Value(dimmed ? 0.42 : 1)).current;
+
+  useEffect(() => {
+    Animated.spring(focusAnim, {
+      toValue: highlighted || picked ? 1 : 0,
+      useNativeDriver: true,
+      friction: 7,
+      tension: 170,
+    }).start();
+    Animated.timing(opacityAnim, {
+      toValue: dimmed ? 0.42 : 1,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [dimmed, focusAnim, highlighted, opacityAnim, picked]);
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => onPress?.(item)}
-      accessibilityRole="button"
-      accessibilityLabel={`${item.title}, ${mediaMetaLabel(item)}`}
+    <Animated.View
       style={{
         width: cardW,
-        opacity: dimmed ? 0.4 : 1,
-        transform: [{ scale: highlighted ? 1.05 : 1 }],
+        opacity: opacityAnim,
+        transform: [
+          {
+            scale: focusAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 1.06],
+            }),
+          },
+        ],
       }}
     >
-      <View
-        style={[
-          styles.posterBox,
-          { width: cardW, height: cardW * 1.5, backgroundColor: palette.posterBg },
-        ]}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => onPress?.(item)}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.title}, ${mediaMetaLabel(item)}`}
       >
-        {poster ? (
-          <Image
-            source={{ uri: getTmdbUrl(poster, "poster", 200) }}
-            style={styles.poster}
-            cachePolicy="memory-disk"
-            transition={120}
-          />
-        ) : (
-          <View style={[styles.poster, styles.posterPlaceholder]}>
-            <Ionicons
-              name={item.media_type === "person" ? "person" : "film-outline"}
-              size={20}
-              color={palette.muted}
+        <View
+          style={[
+            styles.posterBox,
+            { width: cardW, height: cardW * 1.5, backgroundColor: palette.posterBg },
+          ]}
+        >
+          {poster ? (
+            <Image
+              source={{ uri: getTmdbUrl(poster, "poster", 200) }}
+              style={styles.poster}
+              cachePolicy="memory-disk"
+              transition={120}
             />
-          </View>
-        )}
+          ) : (
+            <View style={[styles.poster, styles.posterPlaceholder]}>
+              <Ionicons
+                name={item.media_type === "person" ? "person" : "film-outline"}
+                size={20}
+                color={palette.muted}
+              />
+            </View>
+          )}
 
-        {item.media_type !== "person" && item.vote_average > 0 && (
-          <View style={styles.ratingBadge}>
-            <Ionicons name="star" size={8} color="#FFD54F" />
-            <Text allowFontScaling={false} style={styles.ratingText}>
-              {Number(item.vote_average).toFixed(1)}
-            </Text>
-          </View>
-        )}
+          {item.media_type !== "person" && item.vote_average > 0 && (
+            <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={8} color="#FFD54F" />
+              <Text allowFontScaling={false} style={styles.ratingText}>
+                {Number(item.vote_average).toFixed(1)}
+              </Text>
+            </View>
+          )}
 
-        {picked && (
-          <View style={[styles.pickedOverlay, { backgroundColor: accent + "b3" }]}>
-            <Ionicons name="checkmark-circle" size={24} color="#fff" />
-          </View>
-        )}
-        <PosterEdge
-          radius={POSTER_RADIUS}
-          color={highlighted || picked ? ring : palette.posterEdge}
-          width={highlighted || picked ? 2 : 1}
-        />
-      </View>
-      <Text style={[styles.cardTitle, { color: palette.primary }]} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <Text style={[styles.cardMeta, { color: palette.muted }]} numberOfLines={1}>
-        {mediaMetaLabel(item)}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
-// Katlıyken son kare: arkada bir sonraki afiş, üstünde "+N".
-function OverflowCard({ item, hiddenCount, getTmdbUrl, palette, cardW, onPress }) {
-  const poster = item?.poster_path || item?.profile_path;
-  return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={i18nText("autoI18n.n_icerik_daha", "{{n}} içerik daha", { n: hiddenCount })}
-      style={{ width: cardW }}
-    >
-      <View
-        style={[
-          styles.posterBox,
-          { width: cardW, height: cardW * 1.5, backgroundColor: palette.posterBg },
-        ]}
-      >
-        {poster ? (
-          <Image
-            source={{ uri: getTmdbUrl(poster, "poster", 200) }}
-            style={styles.poster}
-            cachePolicy="memory-disk"
-            blurRadius={6}
+          {picked && (
+            <View style={[styles.pickedOverlay, { backgroundColor: accent + "b3" }]}>
+              <Ionicons name="checkmark-circle" size={24} color="#fff" />
+            </View>
+          )}
+          <PosterEdge
+            radius={POSTER_RADIUS}
+            color={highlighted || picked ? ring : palette.posterEdge}
+            width={highlighted || picked ? 2 : 1}
           />
-        ) : null}
-        <View style={styles.overflowVeil}>
-          <Text allowFontScaling={false} style={styles.overflowCount}>
-            +{hiddenCount}
-          </Text>
-          <Text allowFontScaling={false} style={styles.overflowLabel}>
-            {i18nText("autoI18n.tumunu_gor", "Tümünü Gör")}
-          </Text>
         </View>
-        <PosterEdge radius={POSTER_RADIUS} color={palette.posterEdge} />
-      </View>
-    </TouchableOpacity>
+        <Text style={[styles.cardTitle, { color: palette.primary }]} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={[styles.cardMeta, { color: palette.muted }]} numberOfLines={1}>
+          {mediaMetaLabel(item)}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -193,6 +178,7 @@ export default function SharedMediaCollection({
   accent: propAccent,
   getTmdbUrl,
   isOutgoing = false,
+  cardWidth = ROW_W,
   onOpenItem,
 }) {
   const { theme } = useTheme();
@@ -202,13 +188,13 @@ export default function SharedMediaCollection({
   // "rastgele seç" anlamsız — yalnızca dizi/film listelerinde göster.
   const isPersonList = items[0]?.media_type === "person";
   const canRandom = items.length >= 2 && !isPersonList;
-  const { cardW, gridWidth } = computeLayout(items.length);
-  const collapsible = items.length > COLLAPSED_SLOTS;
-  const [expanded, setExpanded] = useState(false);
+  const { cardW, gridWidth, contentWidth } = computeLayout(items.length, cardWidth);
   const [spinning, setSpinning] = useState(false);
   const [highlight, setHighlight] = useState(-1);
   const [picked, setPicked] = useState(-1);
   const timerRef = useRef(null);
+  const railRef = useRef(null);
+  const railX = useRef(new Animated.Value(0)).current;
   const bannerAnim = useRef(new Animated.Value(0)).current;
   const composition = useMemo(() => compositionLabel(items), [items]);
 
@@ -219,48 +205,75 @@ export default function SharedMediaCollection({
     [],
   );
 
-  const toggleExpanded = useCallback(() => {
-    easeLayout();
-    setExpanded((v) => !v);
-  }, []);
+  // ScrollView'un art arda gelen `animated: true` komutları birbirini kesip
+  // zıplamasın: tek Animated.Value rayı kesintisiz ilerletir.
+  useEffect(() => {
+    if (typeof railX.addListener !== "function") return undefined;
+    const listenerId = railX.addListener(({ value }) => {
+      railRef.current?.scrollTo?.({ x: value, animated: false });
+    });
+    return () => railX.removeListener?.(listenerId);
+  }, [railX]);
+
+  const moveRailTo = useCallback(
+    (index, duration = 150) => {
+      const centered = index * (cardW + GAP) - (gridWidth - cardW) / 2;
+      const x = Math.max(0, Math.min(centered, Math.max(0, contentWidth - gridWidth)));
+      if (typeof railX.addListener !== "function") {
+        railRef.current?.scrollTo?.({ x, animated: true });
+        return;
+      }
+      railX.stopAnimation?.();
+      Animated.timing(railX, {
+        toValue: x,
+        duration,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    },
+    [cardW, contentWidth, gridWidth, railX],
+  );
 
   const spin = useCallback(() => {
     if (spinning || !canRandom) return;
-    if (collapsible && !expanded) {
-      easeLayout();
-      setExpanded(true);
-    }
     setPicked(-1);
     bannerAnim.setValue(0);
     setSpinning(true);
     const target = Math.floor(Math.random() * items.length);
-    const totalSteps = 16 + Math.floor(Math.random() * items.length);
+    const start = highlight >= 0 ? highlight : -1;
+    const distanceToTarget = (target - start + items.length) % items.length || items.length;
+    // En az iki tam tur; adım sayısı hedefte TAM biter, sonda sert sıçrama olmaz.
+    const totalSteps = items.length * 2 + distanceToTarget;
     let step = 0;
+    let cursor = start;
 
     const tick = () => {
       step += 1;
+      cursor = (cursor + 1) % items.length;
+      setHighlight(cursor);
+      const progress = step / totalSteps;
+      // Başta canlı, hedefe yaklaşırken doğal biçimde yavaşlayan seçim ruleti.
+      const delay = 48 + Math.round(Math.pow(progress, 2.2) * 230);
+      moveRailTo(cursor, Math.min(190, delay + 45));
+
       if (step >= totalSteps) {
-        setHighlight(target);
-        setPicked(target);
-        setSpinning(false);
-        Animated.spring(bannerAnim, {
-          toValue: 1,
-          useNativeDriver: true,
-          friction: 7,
-        }).start();
+        timerRef.current = setTimeout(() => {
+          setPicked(target);
+          setSpinning(false);
+          Animated.spring(bannerAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            friction: 7,
+          }).start();
+        }, 150);
         return;
       }
-      setHighlight((prev) => (prev + 1) % items.length);
-      const delay = 55 + Math.floor((step / totalSteps) * 190);
       timerRef.current = setTimeout(tick, delay);
     };
     tick();
-  }, [spinning, canRandom, collapsible, expanded, items.length, bannerAnim]);
+  }, [spinning, canRandom, items.length, bannerAnim, highlight, moveRailTo]);
 
   const pickedItem = picked >= 0 ? items[picked] : null;
-  const showAll = !collapsible || expanded;
-  const visible = showAll ? items : items.slice(0, COLLAPSED_SLOTS - 1);
-
   return (
     <View style={[styles.wrap, { width: gridWidth }]}>
       {/* Başlık: ikon karosu + liste adı + içerik dağılımı */}
@@ -282,9 +295,17 @@ export default function SharedMediaCollection({
         </View>
       </View>
 
-      {/* Afiş ızgarası — genişlik içerik sayısına göre (computeLayout) */}
-      <View style={styles.grid}>
-        {visible.map((item, idx) => (
+      {/* Küçük afiş rayı — tüm içerikler tek satırda yana kayar. */}
+      <ScrollView
+        ref={railRef}
+        horizontal
+        nestedScrollEnabled
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={cardW + GAP}
+        contentContainerStyle={styles.railContent}
+      >
+        {items.map((item, idx) => (
           <MiniCard
             key={(item.media_type || "x") + "-" + item.id + "-" + idx}
             item={item}
@@ -299,31 +320,7 @@ export default function SharedMediaCollection({
             onPress={onOpenItem}
           />
         ))}
-        {!showAll && (
-          <OverflowCard
-            item={items[COLLAPSED_SLOTS - 1]}
-            hiddenCount={items.length - (COLLAPSED_SLOTS - 1)}
-            getTmdbUrl={getTmdbUrl}
-            palette={palette}
-            cardW={cardW}
-            onPress={toggleExpanded}
-          />
-        )}
-      </View>
-
-      {collapsible && expanded && !spinning && (
-        <TouchableOpacity
-          onPress={toggleExpanded}
-          style={styles.collapseLink}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.collapseLinkText, { color: palette.secondary }]}>
-            {i18nText("autoI18n.daha_az_goster", "Daha az göster")}
-          </Text>
-          <Ionicons name="chevron-up" size={13} color={palette.secondary} />
-        </TouchableOpacity>
-      )}
+      </ScrollView>
 
       {/* Seçilen sonuç bandı */}
       {pickedItem && (
@@ -406,10 +403,10 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 14.5, fontWeight: "800", lineHeight: 19 },
   headerSub: { fontSize: 11.5, fontWeight: "600", marginTop: 1 },
 
-  grid: {
+  railContent: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: GAP,
+    paddingRight: 2,
   },
 
   posterBox: {
@@ -437,31 +434,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  overflowVeil: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-  },
-  overflowCount: { color: "#fff", fontSize: 22, fontWeight: "900" },
-  overflowLabel: { color: "rgba(255,255,255,0.85)", fontSize: 10, fontWeight: "700" },
   cardTitle: {
-    fontSize: 11,
+    fontSize: 9.5,
     fontWeight: "700",
-    lineHeight: 14,
-    marginTop: 5,
+    lineHeight: 12,
+    marginTop: 3,
   },
-  cardMeta: { fontSize: 9.5, fontWeight: "600", marginTop: 1 },
-
-  collapseLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "center",
-    gap: 4,
-    marginTop: 8,
-  },
-  collapseLinkText: { fontSize: 12, fontWeight: "700" },
+  cardMeta: { fontSize: 8.5, fontWeight: "600", marginTop: 1 },
 
   randomBtn: {
     flexDirection: "row",

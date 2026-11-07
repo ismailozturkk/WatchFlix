@@ -14,6 +14,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  ScrollView,
   StyleSheet,
 } from "react-native";
 import { Image } from "expo-image";
@@ -22,6 +23,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import { tallyVotes } from "../../utils/postComposer";
 import { alpha } from "../../theme/colors";
+import { chatPosterWidth } from "../../utils/chatCardFit";
 
 // Sonuç barı: oy değişince genişlik yumuşakça yeni yüzdeye akar (eskiden anında
 // zıplıyordu). İlk çizimde animasyon yok — anket zaten balonla birlikte giriyor.
@@ -73,6 +75,7 @@ export default function PollMessage({
   variant = "chat",
   theme,
   isOutgoing = false,
+  cardWidth,
 }) {
   const { theme: contextTheme } = useTheme();
   const activeTheme = theme || contextTheme;
@@ -104,9 +107,30 @@ export default function PollMessage({
   const feedMediaWidth =
     options.length <= 2 ? "34%" : options.length === 3 ? "31%" : "23.5%";
   const optBorderColor = isOutgoing ? "rgba(255,255,255,0.25)" : activeTheme.border;
+  // Sohbet kartı genişliği verildiyse anket o genişliğe oturur; afiş şeridi
+  // dört seçenekte bile kaydırmasız sığacak kadar küçülür (en çok 56 dp).
+  const chatWidth = !isFeed && cardWidth > 0 ? cardWidth : null;
+  const chatPosterW = chatPosterWidth(options.length, chatWidth);
+  const MediaOptionsContainer = isFeed ? View : ScrollView;
+  const mediaOptionsContainerProps = isFeed
+    ? {
+        style: [
+          styles.mediaGrid,
+          styles.feedMediaGrid,
+          options.length < 4 && { justifyContent: "center" },
+          { marginTop: 12 },
+        ],
+      }
+    : {
+        horizontal: true,
+        nestedScrollEnabled: true,
+        showsHorizontalScrollIndicator: false,
+        style: styles.chatMediaScroll,
+        contentContainerStyle: [styles.mediaGrid, styles.chatMediaGrid],
+      };
 
   return (
-    <View style={[styles.wrap, isFeed && styles.feedWrap]}>
+    <View style={[styles.wrap, isFeed && styles.feedWrap, chatWidth && { width: chatWidth, minWidth: 0 }]}>
       {/* Başlık — feed'de kartın kendi tip rozeti var, burada tekrarlanmaz */}
       {!isFeed && (
       <View style={styles.head}>
@@ -188,7 +212,7 @@ export default function PollMessage({
 
       {/* ── METİN ANKETİ ── */}
       {type === "text" && (
-        <View style={{ gap: isFeed ? 8 : 7, marginTop: isFeed ? 12 : 8 }}>
+        <View style={{ gap: isFeed ? 6 : 7, marginTop: 8 }}>
           {options.map((opt) => {
             const voted = userVote === opt.id;
             const p = pct(opt.id);
@@ -229,7 +253,7 @@ export default function PollMessage({
                         : alpha(activeTheme.border, 0.5)
                   }
                 />
-                <View style={styles.textOptRow}>
+                <View style={[styles.textOptRow, isFeed && styles.feedTextOptRow]}>
                   <View
                     style={[
                       styles.choiceMark,
@@ -286,14 +310,7 @@ export default function PollMessage({
 
       {/* ── MEDYA ANKETİ ── */}
       {type === "media" && (
-        <View
-          style={[
-            styles.mediaGrid,
-            isFeed && styles.feedMediaGrid,
-            isFeed && options.length < 4 && { justifyContent: "center" },
-            isFeed && { marginTop: 12 },
-          ]}
-        >
+        <MediaOptionsContainer {...mediaOptionsContainerProps}>
           {options.map((opt) => {
             const voted = userVote === opt.id;
             const p = pct(opt.id);
@@ -311,6 +328,7 @@ export default function PollMessage({
                 style={[
                   styles.mediaOpt,
                   !isFeed && styles.chatMediaOpt,
+                  !isFeed && { width: chatPosterW, maxWidth: chatPosterW },
                   isFeed && styles.feedMediaOpt,
                   isFeed && { width: feedMediaWidth },
                 ]}
@@ -319,6 +337,7 @@ export default function PollMessage({
                   style={[
                     styles.posterBox,
                     !isFeed && styles.chatPosterBox,
+                    !isFeed && { width: chatPosterW, height: Math.round(chatPosterW * 1.5) },
                     isFeed && {
                       width: "100%",
                       height: undefined,
@@ -393,7 +412,7 @@ export default function PollMessage({
               </TouchableOpacity>
             );
           })}
-        </View>
+        </MediaOptionsContainer>
       )}
 
       <View style={[styles.hintRow, isFeed && styles.feedHintRow]}>
@@ -451,7 +470,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 3,
   },
-  feedQuestion: { fontSize: 17, lineHeight: 23, letterSpacing: -0.2 },
+  feedQuestion: { fontSize: 15.5, lineHeight: 21, letterSpacing: -0.2 },
 
   // text
   textOpt: {
@@ -462,7 +481,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   bar: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 10 },
-  feedTextOpt: { borderRadius: 14, minHeight: 48 },
+  feedTextOpt: { borderRadius: 10, minHeight: 42, borderWidth: 1 },
   feedBar: { borderRadius: 12 },
   textOptRow: {
     flexDirection: "row",
@@ -471,6 +490,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 11,
   },
+  feedTextOptRow: { paddingVertical: 8 },
   choiceMark: {
     width: 20,
     height: 20,
@@ -484,11 +504,15 @@ const styles = StyleSheet.create({
   pctPill: { minWidth: 42, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 9, alignItems: "center" },
 
   // media
-  mediaGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  mediaGrid: { flexDirection: "row", flexWrap: "nowrap", gap: 6, marginTop: 8 },
+  chatMediaScroll: { width: "100%", marginTop: 8 },
+  chatMediaGrid: { marginTop: 0, paddingRight: 2 },
   mediaOpt: { width: 82 },
-  chatMediaOpt: { width: "48%", flexGrow: 1, maxWidth: "49%" },
+  // Sohbet anketi küçük bir seçim şeridi olarak kalır; dört seçenek dahi mesajı
+  // poster duvarına dönüştürmeden tek satıra sığar.
+  chatMediaOpt: { width: 56, flexGrow: 0, maxWidth: 56 },
   feedMediaGrid: { flexWrap: "nowrap", gap: 5 },
-  feedMediaOpt: { width: "23.5%", minWidth: 0 },
+  feedMediaOpt: { width: "23.5%", minWidth: 0, maxWidth: 82 },
   posterBox: {
     width: 82,
     height: 123,
@@ -497,7 +521,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     position: "relative",
   },
-  chatPosterBox: { width: "100%", height: undefined, aspectRatio: 2 / 3, borderRadius: 12 },
+  chatPosterBox: { width: 56, height: 84, borderRadius: 8 },
   poster: { width: "100%", height: "100%" },
   posterPh: { justifyContent: "center", alignItems: "center" },
   voteCheck: {
@@ -521,14 +545,14 @@ const styles = StyleSheet.create({
     borderRadius: 7,
   },
   pctTagText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-  mediaLabel: { fontSize: 10.5, fontWeight: "600", marginTop: 4, lineHeight: 13 },
-  feedMediaLabel: { fontSize: 10.5, lineHeight: 13, marginTop: 6 },
+  mediaLabel: { fontSize: 9.5, fontWeight: "600", marginTop: 3, lineHeight: 12 },
+  feedMediaLabel: { fontSize: 10.5, lineHeight: 13, marginTop: 4 },
 
   hint: {
     fontSize: 10.5,
     fontWeight: "600",
   },
   hintRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 10, paddingHorizontal: 2 },
-  feedHintRow: { marginTop: 12, paddingHorizontal: 0 },
+  feedHintRow: { marginTop: 7, paddingHorizontal: 0 },
   feedHint: { fontStyle: "normal", fontWeight: "600", fontSize: 11.5 },
 });

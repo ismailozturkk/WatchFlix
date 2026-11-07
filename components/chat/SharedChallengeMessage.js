@@ -66,19 +66,22 @@ const verdictTextOf = (copy, verdict, diff) =>
 function SharedChallengeMessage({
   share,
   isOutgoing = false,
+  neutralCard = false,
   senderUid,
   chatTarget,
   accepts,
   declines,
   onAccepted,
   onDeclined,
+  cardWidth = 240,
 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const { user } = useAuth() || {};
   const navigation = useNavigation();
   const copy = getDuelCopy(language);
-  const palette = useMemo(() => sharePalette({ theme, isOutgoing, accent: DUEL_AMBER }), [theme, isOutgoing]);
+  const visualOutgoing = isOutgoing && !neutralCard;
+  const palette = useMemo(() => sharePalette({ theme, isOutgoing: visualOutgoing, accent: DUEL_AMBER }), [theme, visualOutgoing]);
   const acceptors = useMemo(() => challengeAcceptors(accepts), [accepts]);
   const decliners = useMemo(() => challengeAcceptors(declines), [declines]);
   const myResponse = isOutgoing ? null : myInviteResponse({ accepts, declines, uid: user?.uid });
@@ -187,7 +190,7 @@ function SharedChallengeMessage({
   const scoreText = (value) => (Number.isFinite(value) ? formatDuelScore(value) : "?");
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { width: cardWidth }]}>
       <View style={styles.header}>
         <View style={[styles.tile, { backgroundColor: palette.tile }]}>
           <Ionicons name="flash" size={17} color={palette.tileInk} />
@@ -202,7 +205,7 @@ function SharedChallengeMessage({
         </View>
       </View>
 
-      {chip ? <DuelStatusChip tone={chip.tone} label={chip.label} palette={palette} isOutgoing={isOutgoing} /> : null}
+      {chip ? <DuelStatusChip tone={chip.tone} label={chip.label} palette={palette} isOutgoing={visualOutgoing} /> : null}
 
       <Text style={[styles.date, { color: palette.muted }]} numberOfLines={1}>
         {dateText}
@@ -214,7 +217,7 @@ function SharedChallengeMessage({
           right={versus.right}
           winner={versus.winner}
           palette={palette}
-          isOutgoing={isOutgoing}
+          isOutgoing={visualOutgoing}
           accessibilityLabel={`${versus.left.label} ${scoreText(versus.left.score)}, ${versus.right.label} ${scoreText(versus.right.score)}`}
         />
       ) : (
@@ -232,7 +235,7 @@ function SharedChallengeMessage({
       )}
 
       {verdictText ? (
-        <DuelVerdict verdict={versus.verdict} text={verdictText} palette={palette} isOutgoing={isOutgoing} />
+        <DuelVerdict verdict={versus.verdict} text={verdictText} palette={palette} isOutgoing={visualOutgoing} />
       ) : null}
 
       {isOutgoing && rivalUid && hostView.phase === "accepted" ? (

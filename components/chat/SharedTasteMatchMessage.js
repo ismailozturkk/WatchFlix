@@ -16,14 +16,16 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import { getTasteMatchCopy } from "../../utils/tasteMatchCopy";
+import { localizeGenreList } from "../../utils/genreDisplay";
 import { TASTE_HEAT_THRESHOLDS, tasteMatchHeat } from "../../utils/tasteMatchVisuals";
 import { sharePalette } from "./shareKit";
 import { PosterFace } from "./PosterStrip";
+import { TASTE_POSTER_GAP, tastePosterWidth } from "../../utils/chatCardFit";
 
 // Düşük uyumda kalp/uyum rengi; 60+ puanlarda tasteMatchHeat giderek ısınır.
 const ROSE = "#E11D48";
-const POSTER_W = 50;
-const POSTER_H = 75;
+// Dört afiş yuvası kart genişliğine sığar (utils/chatCardFit).
+const POSTER_GAP = TASTE_POSTER_GAP;
 
 function Line({ icon, text, palette }) {
   return (
@@ -36,19 +38,21 @@ function Line({ icon, text, palette }) {
   );
 }
 
-function SharedTasteMatchMessage({ share, isOutgoing = false, getTmdbUrl }) {
+function SharedTasteMatchMessage({ share, isOutgoing = false, neutralCard = false, cardWidth = 240, getTmdbUrl }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const copy = getTasteMatchCopy(language);
   const heat = tasteMatchHeat(share.score, ROSE);
-  const palette = useMemo(() => sharePalette({ theme, isOutgoing, accent: heat.accent }), [theme, isOutgoing, heat.accent]);
+  const visualOutgoing = isOutgoing && !neutralCard;
+  const palette = useMemo(() => sharePalette({ theme, isOutgoing: visualOutgoing, accent: heat.accent }), [theme, visualOutgoing, heat.accent]);
 
   const names = share.host && share.friend ? `${share.host} & ${share.friend}` : share.host || share.friend || "";
-  const trackColor = isOutgoing ? "rgba(255,255,255,0.22)" : alpha(heat.accent, 0.18);
+  const trackColor = visualOutgoing ? "rgba(255,255,255,0.22)" : alpha(heat.accent, 0.18);
   const items = share.items || [];
+  const posterW = tastePosterWidth(cardWidth);
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { width: cardWidth }]}>
       <View style={styles.header}>
         <LinearGradient colors={heat.colors} style={[styles.tile, { backgroundColor: palette.tile }]}>
           <Ionicons name="heart" size={17} color={palette.tileInk} />
@@ -66,7 +70,7 @@ function SharedTasteMatchMessage({ share, isOutgoing = false, getTmdbUrl }) {
       </View>
 
       <View
-        style={[styles.scoreHero, heat.level > 0 && { backgroundColor: alpha(heat.accent, isOutgoing ? 0.2 : 0.1), borderColor: alpha(heat.accent, 0.3) }]}
+        style={[styles.scoreHero, heat.level > 0 && { backgroundColor: alpha(heat.accent, visualOutgoing ? 0.2 : 0.1), borderColor: alpha(heat.accent, 0.3) }]}
         accessible
         accessibilityLabel={`${copy.title}: ${copy.percent(share.score)}`}
       >
@@ -129,7 +133,7 @@ function SharedTasteMatchMessage({ share, isOutgoing = false, getTmdbUrl }) {
         ) : null}
         {share.favorites > 0 ? <Line icon="heart-outline" palette={palette} text={copy.rows.favorites(share.favorites)} /> : null}
         {share.genres?.length ? (
-          <Line icon="pricetags-outline" palette={palette} text={copy.rows.genres(share.genres.join(", "))} />
+          <Line icon="pricetags-outline" palette={palette} text={copy.rows.genres(localizeGenreList(share.genres, language).join(", "))} />
         ) : null}
         {typeof share.agreement === "number" ? (
           <Line icon="star-half-outline" palette={palette} text={copy.rows.ratings(share.agreement, share.pairs)} />
@@ -145,8 +149,8 @@ function SharedTasteMatchMessage({ share, isOutgoing = false, getTmdbUrl }) {
             <PosterFace
               key={`${item.media_type}_${item.id}`}
               item={item}
-              width={POSTER_W}
-              height={POSTER_H}
+              width={posterW}
+              height={Math.round(posterW * 1.5)}
               getTmdbUrl={getTmdbUrl}
               palette={palette}
             />
@@ -185,5 +189,5 @@ const styles = StyleSheet.create({
   line: { flexDirection: "row", alignItems: "center", gap: 7 },
   lineText: { flexShrink: 1, fontSize: 12, fontWeight: "600", lineHeight: 16 },
 
-  posters: { flexDirection: "row", gap: 6, marginTop: 10 },
+  posters: { flexDirection: "row", gap: POSTER_GAP, marginTop: 10 },
 });

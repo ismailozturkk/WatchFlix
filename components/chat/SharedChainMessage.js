@@ -51,7 +51,7 @@ function Person({ person, target }) {
   );
 }
 
-function SharedChainMessage({ share, isOutgoing = false }) {
+function SharedChainMessage({ share, isOutgoing = false, cardWidth = CARD_WIDTH }) {
   const { language } = useLanguage();
   const { user } = useAuth() || {};
   const navigation = useNavigation();
@@ -143,7 +143,7 @@ function SharedChainMessage({ share, isOutgoing = false }) {
   }
 
   return (
-    <LinearGradient colors={COLORS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
+    <LinearGradient colors={COLORS} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.card, { width: cardWidth }]}>
       <View pointerEvents="none" style={styles.watermark}>
         <Ionicons name="git-network" size={120} color="rgba(255,255,255,0.07)" />
       </View>

@@ -57,6 +57,8 @@ function Stars({ rating, muted }) {
 function SharedPostMessage({
   share,
   isOutgoing = false,
+  neutralCard = false,
+  cardWidth,
   getTmdbUrl,
   onOpenPost,
   onOpenItem,
@@ -64,8 +66,8 @@ function SharedPostMessage({
   const { theme } = useTheme();
   const meta = useMemo(() => postTypeMeta(share.postType, theme.colors), [share.postType, theme.colors]);
   const palette = useMemo(
-    () => sharePalette({ theme, isOutgoing, accent: meta.color }),
-    [theme, isOutgoing, meta.color],
+    () => sharePalette({ theme, isOutgoing: isOutgoing && !neutralCard, accent: meta.color }),
+    [theme, isOutgoing, neutralCard, meta.color],
   );
   const [revealed, setRevealed] = useState(false);
 
@@ -74,10 +76,10 @@ function SharedPostMessage({
   // Tek afiş + anket değil: afiş metnin YANINDA. Diğer her şey: metin üstte, şerit altta.
   const single = items.length === 1 && total === 1 && !share.poll;
   const layout = useMemo(
-    () => (items.length && !single ? stripLayout(total) : null),
-    [items.length, total, single],
+    () => (items.length && !single ? stripLayout(total, cardWidth) : null),
+    [items.length, total, single, cardWidth],
   );
-  const blockW = Math.max(TEXT_W, layout?.width ?? 0);
+  const blockW = cardWidth || Math.max(TEXT_W, layout?.width ?? 0);
   const hidden = share.spoiler === true && !revealed;
   const canOpen = typeof onOpenPost === "function";
   const openLabel = i18nText("autoI18n.paylas_gonderiyi_ac", "Gönderiyi aç");

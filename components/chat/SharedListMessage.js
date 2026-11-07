@@ -27,7 +27,7 @@ import { i18nText } from "../../utils/i18nText";
 import { getListAccent, getListIcon, getSharedListAccent } from "../../utils/listAppearance";
 import { formatMinutes, sumListMinutes } from "../../utils/mediaFacts";
 import { useProfileUi } from "../../context/ProfileUiContext";
-import ListCovers, { getNaturalCoverWidth } from "../lists/ListCovers";
+import ListCovers, { getNaturalCoverWidth, getSizingStyle } from "../lists/ListCovers";
 import { sharePalette } from "./shareKit";
 
 // CineSwipe'ın kimlik rengi (SharedCineRoomMessage ile aynı).
@@ -39,10 +39,16 @@ const CINE_ROSE = "#E11D48";
 const COVER_H = 128;
 const CARD_PADDING = 10;
 const CARD_W = 240;
-const coverWidthFor = (gridStyle) => {
-  if (gridStyle === 1) return Math.round((COVER_H * 184) / 112); // Büyük Kapaklar
-  if (gridStyle === 2) return Math.round((COVER_H * 156) / 112); // Küçük Kapaklar
-  return Math.min(getNaturalCoverWidth(gridStyle, COVER_H), CARD_W - CARD_PADDING * 2);
+const CARD_BORDER = StyleSheet.hairlineWidth;
+export const coverWidthFor = (rawGridStyle, cardWidth = CARD_W) => {
+  const gridStyle = getSizingStyle(rawGridStyle); // 5–8 eşinin genişliğini alır
+  const natural =
+    gridStyle === 1
+      ? Math.round((COVER_H * 184) / 112) // Büyük Kapaklar
+      : gridStyle === 2
+        ? Math.round((COVER_H * 156) / 112) // Küçük Kapaklar
+        : getNaturalCoverWidth(gridStyle, COVER_H);
+  return Math.min(natural, Math.floor(cardWidth - (CARD_PADDING + (CARD_BORDER || 0)) * 2));
 };
 
 const DEFAULT_LABELS = {
@@ -61,6 +67,8 @@ export function shareListTitle(share) {
 function SharedListMessage({
   share,
   isOutgoing = false,
+  neutralCard = false,
+  cardWidth = CARD_W,
   accent: propAccent,
   getTmdbUrl,
   onOpenItem,
@@ -81,8 +89,8 @@ function SharedListMessage({
         ? CINE_ROSE
         : propAccent || theme.accent || "#6C63FF";
   const palette = useMemo(
-    () => sharePalette({ theme, isOutgoing, accent: listAccent }),
-    [theme, isOutgoing, listAccent],
+    () => sharePalette({ theme, isOutgoing: isOutgoing && !neutralCard, accent: listAccent }),
+    [theme, isOutgoing, neutralCard, listAccent],
   );
 
   // Kütüphane'deki seçili liste görünümü (sağlayıcı yoksa ListCovers'ın varsayılanı).
@@ -134,7 +142,7 @@ function SharedListMessage({
       : i18nText("autoI18n.liste_2", "Liste");
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { width: cardWidth }]}>
       {/* Kütüphane liste kartı: kapak bloğu + ayırıcı + ad/adet */}
       <TouchableOpacity
         activeOpacity={0.85}
@@ -143,6 +151,7 @@ function SharedListMessage({
         accessibilityLabel={openLabel}
         style={[
           styles.card,
+          { width: cardWidth },
           { backgroundColor: palette.surface, borderColor: palette.surfaceBorder },
         ]}
       >
@@ -151,7 +160,7 @@ function SharedListMessage({
             items={coverItems}
             gridStyle={gridStyle}
             allCornersRounded={allCornersRounded}
-            width={coverWidthFor(gridStyle)}
+            width={coverWidthFor(gridStyle, cardWidth)}
             height={COVER_H}
             getTmdbUrl={getTmdbUrl}
             theme={theme}
@@ -219,7 +228,7 @@ const styles = StyleSheet.create({
     width: CARD_W,
     padding: CARD_PADDING,
     borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: CARD_BORDER,
   },
   coverRow: { alignItems: "center" },
   divider: { height: StyleSheet.hairlineWidth, marginTop: 10, marginBottom: 9 },

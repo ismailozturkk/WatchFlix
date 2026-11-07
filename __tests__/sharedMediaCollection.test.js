@@ -16,17 +16,27 @@ jest.mock("react-native", () => {
     constructor(v) { this.v = v; }
     setValue(v) { this.v = v; }
     interpolate() { return this; }
+    addListener() { return "listener"; }
+    removeListener() {}
+    stopAnimation() {}
   }
   return {
     View: "View",
     Text: "Text",
     TouchableOpacity: passthrough("TouchableOpacity"),
+    ScrollView: passthrough("ScrollView"),
     StyleSheet: { create: (s) => s, absoluteFill: { position: "absolute" }, hairlineWidth: 1 },
     Dimensions: { get: () => ({ width: 390, height: 844 }) },
     LayoutAnimation: { configureNext: () => {}, Presets: { easeInEaseOut: {} } },
     Platform: { OS: "ios" },
     UIManager: {},
-    Animated: { Value, View: "AnimatedView", spring: () => ({ start: () => {} }) },
+    Easing: { out: (value) => value, cubic: "cubic" },
+    Animated: {
+      Value,
+      View: "AnimatedView",
+      spring: () => ({ start: () => {} }),
+      timing: () => ({ start: () => {} }),
+    },
   };
 });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -90,30 +100,12 @@ test("başlıksız liste 'Paylaşılan liste' der", () => {
   expect(textOf(render({ items: mk(3) }))).toContain("Paylaşılan liste");
 });
 
-test("6'dan fazla öğe katlanır: 5 afiş + '+N' karesi, dokununca açılır ve geri katlanır", () => {
+test("uzun liste tek satırlı yatay rayda tüm küçük afişleri gösterir", () => {
   const r = render({ items: mk(12) });
-  const posters = () => r.root.findAll((n) => n.type === "Image").length;
-  expect(posters()).toBe(6); // 5 afiş + bulanık arka plan afişi
-  expect(textOf(r)).toContain("+7");
-
-  const overflow = r.root.find(
-    (n) => n.type === "TouchableOpacity" && n.props.accessibilityLabel === "7 içerik daha",
-  );
-  act(() => overflow.props.onPress());
-  expect(posters()).toBe(12);
-  expect(textOf(r)).not.toContain("+7");
-
-  const collapse = r.root.find(
-    (n) => n.type === "TouchableOpacity" && textOf({ root: n }).includes("Daha az göster"),
-  );
-  act(() => collapse.props.onPress());
-  expect(posters()).toBe(6);
-});
-
-test("6 ve altı öğe katlanmaz", () => {
-  const r = render({ items: mk(6) });
-  expect(r.root.findAll((n) => n.type === "Image")).toHaveLength(6);
-  expect(textOf(r)).not.toMatch(/\+\d/);
+  const rail = r.root.findByType("ScrollView");
+  expect(rail.props.horizontal).toBe(true);
+  expect(rail.props.showsHorizontalScrollIndicator).toBe(false);
+  expect(r.root.findAll((n) => n.type === "Image")).toHaveLength(12);
 });
 
 test("afişe dokunmak öğeyi açar", () => {
@@ -127,7 +119,7 @@ test("afişe dokunmak öğeyi açar", () => {
   expect(onOpenItem).toHaveBeenCalledWith(items[1]);
 });
 
-test("rastgele seçim katlı listeyi açar ve bir öğe seçer", () => {
+test("rastgele seçim yatay listedeki bir öğeyi seçer", () => {
   jest.useFakeTimers();
   const r = render({ items: mk(9) });
   const btn = r.root.find(
@@ -136,7 +128,9 @@ test("rastgele seçim katlı listeyi açar ve bir öğe seçer", () => {
   act(() => btn.props.onPress());
   expect(r.root.findAll((n) => n.type === "Image")).toHaveLength(9);
   act(() => jest.runAllTimers());
-  const banner = r.root.find((n) => n.type === "AnimatedView");
+  const banner = r.root.find(
+    (n) => n.type === "AnimatedView" && textOf({ root: n }).includes("Seçilen"),
+  );
   const picked = banner.findAll((n) => n.type === "Text").pop().props.children;
   expect(picked).toMatch(/^Eser \d$/);
   expect(textOf(r)).toContain("Yeniden seç");
@@ -150,10 +144,11 @@ test("oyuncu listesinde rastgele seçim yok, bölüm etiketi var", () => {
   expect(mediaMetaLabel({ media_type: "person", known_for_department: "Directing" })).toBe("Yönetmen");
 });
 
-test("kart genişliği çift ve ızgara satıra tam sığar", () => {
+test("kartlar sabit küçük ölçüdedir ve yatay içerik genişliği doğru hesaplanır", () => {
   for (const n of [2, 3, 4, 5, 6, 12]) {
-    const { cols, cardW, gridWidth } = computeLayout(n);
-    expect(cardW % 2).toBe(0);
-    expect(gridWidth).toBe(cardW * cols + 8 * (cols - 1));
+    const { cols, cardW, gridWidth, contentWidth } = computeLayout(n);
+    expect(cardW).toBe(58);
+    expect(gridWidth).toBeLessThanOrEqual(288);
+    expect(contentWidth).toBe(cardW * cols + 8 * (cols - 1));
   }
 });

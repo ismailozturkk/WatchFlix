@@ -19,6 +19,7 @@ jest.mock("react-native", () => {
     View: "View",
     Text: "Text",
     TouchableOpacity: passthrough("TouchableOpacity"),
+    ScrollView: passthrough("ScrollView"),
     StyleSheet: { create: (styles) => styles },
     Animated: {
       Value,
@@ -121,4 +122,58 @@ test("feed varyantı kendi sade başlık düzenini korur", () => {
 
   expect(texts).not.toContain("Anket");
   expect(texts).toContain("3 oy · Oyunu değiştirmek için dokun");
+});
+
+test("sohbet medya anketi posterleri küçük tek satırlı seçenekler olarak çizer", () => {
+  const renderer = renderPoll({
+    poll: {
+      question: "Hangisi?",
+      type: "media",
+      options: [
+        { id: "a", label: "Arrival", media: { poster_path: "/a.jpg" } },
+        { id: "b", label: "Dune", media: { poster_path: "/b.jpg" } },
+      ],
+      votes: {},
+    },
+  });
+  const option = renderer.root.findByProps({ testID: "poll-option-a" });
+  const flattened = [].concat(option.props.style).filter(Boolean);
+  expect(flattened).toEqual(expect.arrayContaining([expect.objectContaining({ width: 56 })]));
+});
+
+test("çok seçenekli sohbet medya anketini taşırmak yerine yatay kaydırır", () => {
+  const renderer = renderPoll({
+    poll: {
+      question: "Hangileri?",
+      type: "media",
+      options: Array.from({ length: 7 }, (_, index) => ({
+        id: String(index),
+        label: `Film ${index + 1}`,
+        media: { poster_path: `/p${index + 1}.jpg` },
+      })),
+      votes: {},
+    },
+  });
+  const rail = renderer.root.findByType("ScrollView");
+  expect(rail.props.horizontal).toBe(true);
+  expect(rail.props.showsHorizontalScrollIndicator).toBe(false);
+  const optionIds = new Set(
+    renderer.root
+      .findAll((node) => node.props.testID?.startsWith("poll-option-"))
+      .map((node) => node.props.testID),
+  );
+  expect(optionIds.size).toBe(7);
+});
+
+test("chat poll posters shrink so every option fits the chat card width", () => {
+  const { chatPosterWidth } = require("../utils/chatCardFit");
+  // Dar telefon (nötr kart içi 228): dört afiş + 3 boşluk + 2 sağ pay sığar.
+  [228, 260, 284].forEach((width) => {
+    [2, 3, 4].forEach((count) => {
+      const w = chatPosterWidth(count, width);
+      expect(w).toBeLessThanOrEqual(56);
+      expect(count * w + 6 * (count - 1) + 2).toBeLessThanOrEqual(width);
+    });
+  });
+  expect(chatPosterWidth(4, undefined)).toBe(56); // genişlik verilmezse eski ölçü
 });
