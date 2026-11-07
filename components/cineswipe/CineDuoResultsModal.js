@@ -21,6 +21,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
 import { cineMediaKey, fillText, posterUrl } from "../../services/cineswipe/deckModel";
+import usePosterCorner from "@hooks/usePosterCorner";
 import { percentText } from "@utils/i18nText";
 
 /** 0 → hedef arası kübik yavaşlayan sayaç (halka ve yüzde birlikte dolsun). */
@@ -115,6 +116,7 @@ function ResultsBody({
   copy,
   colors,
 }) {
+  const corner = usePosterCorner("fun");
   const you = (isHost ? summary?.host : summary?.guest) || {};
   const partner = (isHost ? summary?.guest : summary?.host) || {};
   const percent = summary?.matchRate || 0;
@@ -201,7 +203,7 @@ function ResultsBody({
                     }}
                     style={[styles.card, { backgroundColor: alpha(colors.surface, 0.6) }]}
                   >
-                    <View style={[styles.poster, { backgroundColor: colors.between }]}>
+                    <View style={[styles.poster, { borderRadius: corner(11), backgroundColor: colors.between }]}>
                       {uri ? (
                         <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
                       ) : (

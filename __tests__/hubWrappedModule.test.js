@@ -99,6 +99,7 @@ jest.mock("react-native-reanimated", () => {
     withTiming: (value) => value,
     withDelay: (_ms, value) => value,
     withRepeat: (value) => value,
+    cancelAnimation: () => {},
     withSequence: (...values) => values[values.length - 1],
     Easing: { inOut: ease, sin: ease, quad: ease, out: ease, cubic: ease },
     ReduceMotion: { System: "system" },
@@ -132,6 +133,7 @@ jest.mock("../hooks/usePremiumGate", () => ({
 }));
 // Hareketi azalt açık: sayaçlar ilk efektte doğrudan son değere atlar.
 jest.mock("../hooks/useReduceMotion", () => ({ __esModule: true, default: () => true }));
+jest.mock("../hooks/useScreenFocused", () => ({ __esModule: true, default: () => true }));
 jest.mock("../services/hapticsService", () => ({ triggerHaptic: jest.fn() }));
 jest.mock("../utils/i18nText", () => ({ i18nText: (_key, fallback) => fallback }));
 

@@ -21,6 +21,7 @@ import SectionHeader from "../../components/home/SectionHeader";
 import { SectionChipRail } from "../../components/home/SectionChips";
 import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import { trendPosterRadius } from "../../utils/posterCorners";
 import usePosterUri from "../../hooks/usePosterUri";
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width * 0.6;
@@ -118,7 +119,9 @@ const TvTrendCard = memo(function TvTrendCard({
       : scale;
 
   const pressScale = useRef(new Animated.Value(1)).current;
-  const { posterBadges } = useListLayoutSettings();
+  const { posterBadges, railPosterRadius } = useListLayoutSettings();
+  // Köşe Ayarlar > Poster görünümü > Ana Ekran ayarını izler (eskiden sabit 25).
+  const cardRadius = trendPosterRadius(railPosterRadius);
   const { openQuickActions } = useMediaQuickActions();
   const onPressIn = () =>
     Animated.timing(pressScale, { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
@@ -154,6 +157,7 @@ const TvTrendCard = memo(function TvTrendCard({
           style={[
             styles.cardContainer,
             {
+              borderRadius: cardRadius,
               shadowColor: theme.shadow,
               transform: [{ scale: finalScale }],
               opacity,
@@ -349,7 +353,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: CARD_WIDTH,
     height: CARD_WIDTH * 1.5,
-    borderRadius: 25,
+    // borderRadius: kartta, raf köşe ayarından (trendPosterRadius).
     backgroundColor: "#2a2a2a",
     overflow: "hidden",
     shadowColor: "#000",

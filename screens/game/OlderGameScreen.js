@@ -11,8 +11,8 @@
 // da çalışan, tek elle oynanan bir oyun.
 
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { EndCard, ErrorState, FeedbackStrip, Hearts, LoadingState, PosterCard, StatRow } from "@components/game/QuickGameParts";
+import { StyleSheet, View } from "react-native";
+import { EndCard, ErrorState, FeedbackStrip, Hearts, LoadingState, PosterCard, QuestionPrompt, StatRow } from "@components/game/QuickGameParts";
 import { useAuth } from "@context/AuthContext";
 import { useApiSettings } from "@context/AppSettingsContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -57,7 +57,7 @@ export default function OlderGameScreen({ navigation, route }) {
 
       {(phase === "playing" || phase === "revealed") && pair ? (
         <View style={styles.board}>
-          <Text style={[styles.prompt, { color: theme.text.primary }]}>{copy.prompt}</Text>
+          <QuestionPrompt theme={theme} accent={INDIGO} icon="swap-horizontal">{copy.prompt}</QuestionPrompt>
           <View style={styles.posters}>
             {[pair.a, pair.b].map((item, index) => (
               <PosterCard
@@ -102,7 +102,6 @@ export default function OlderGameScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  board: { flex: 1, gap: 14 },
-  prompt: { fontSize: 19, fontWeight: "900", textAlign: "center", marginTop: 4 },
+  board: { flex: 1, gap: 12 },
   posters: { flexDirection: "row", gap: 12 },
 });

@@ -25,6 +25,7 @@ import { dailySeed, dayKeyOf } from "@utils/dailyChallenge";
 import { usePremiumDailyGate } from "@hooks/usePremiumGate";
 import { getDailyUsed } from "@services/premiumUsage";
 import { ANALYTICS_EVENTS, trackEvent } from "@services/analytics";
+import { awardDailyXp, awardGameXp } from "@services/leagueService";
 
 const PERSONAL_SOURCES = new Set([
   "watchlist",
@@ -399,6 +400,9 @@ export default function useSceneGame({
       const scoreSaved = Boolean(saveResult) && !saveResult.rejected;
       // Yinelenen kayitta rekor durumu degismez; ilk basarili kayitta guncellenir.
       if (saveResult && !saveResult.duplicate && !saveResult.rejected) {
+        // Haftalık Lig: günlük meydan okuma günde bir kez "daily", diğer oyunlar "game" (tavanlı).
+        if (isDaily) awardDailyXp("challenge", dailyKeyRef.current || dayKeyOf());
+        else awardGameXp(isPoster ? "poster" : "scene", sessionIdRef.current || Date.now());
         setIsNewRecord(Boolean(saveResult.newRecord));
         setProgressSummary({
           levelBefore: Number(saveResult.levelBefore) || Number(saveResult.level) || 1,

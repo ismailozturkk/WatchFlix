@@ -32,8 +32,10 @@ import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
 import { cineMediaKey, fillText, posterUrl } from "../../services/cineswipe/deckModel";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 function BasketPoster({ item, highlighted, dimmed, busy, onOpen, onRemove, copy, colors }) {
+  const corner = usePosterCorner("fun");
   const pulse = useSharedValue(0);
   const dim = useSharedValue(1);
 
@@ -63,7 +65,7 @@ function BasketPoster({ item, highlighted, dimmed, busy, onOpen, onRemove, copy,
       layout={LinearTransition.duration(220)}
       style={styles.itemWrap}
     >
-      <Animated.View style={[styles.item, { backgroundColor: alpha(colors.surface, 0.6) }, body]}>
+      <Animated.View style={[styles.item, { borderRadius: corner(14), backgroundColor: alpha(colors.surface, 0.6) }, body]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${title} — ${copy.basket.openDetails}`}

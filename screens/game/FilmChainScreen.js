@@ -50,6 +50,7 @@ import {
 import { getFilmChainCopy } from "@utils/filmChainCopy";
 import { buildTmdbUrl } from "@utils/tmdbImageUtils";
 import { GameScreenShell, gameSharedStyles } from "./GameScreenShell";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 export const CHAIN_ACCENT = "#14B8A6";
 const HERO = ["#134E4A", "#0F766E", "#14B8A6"];
@@ -71,8 +72,9 @@ function Avatar({ path, size, theme, style }) {
 
 function Thumb({ path, width, theme, style }) {
   const uri = buildTmdbUrl(path, "poster", width);
+  const corner = usePosterCorner("fun");
   return (
-    <View style={[styles.thumb, { width, height: Math.round((width * 3) / 2), backgroundColor: theme.secondary }, style]}>
+    <View style={[styles.thumb, { width, height: Math.round((width * 3) / 2), borderRadius: corner(5), backgroundColor: theme.secondary }, style]}>
       {uri ? (
         <Image source={{ uri }} style={styles.fill} contentFit="cover" />
       ) : (

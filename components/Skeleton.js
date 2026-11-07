@@ -9,6 +9,7 @@ import {
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import { useTheme } from "../context/ThemeContext";
 import useRailPosterStyle from "../hooks/useRailPosterStyle";
+import { trendPosterRadius } from "../utils/posterCorners";
 import { PosterBadgeSkeleton, POSTER_BADGE_POS } from "./PosterInfoBadges";
 import { computeDetailHeroMetrics } from "./detail/DetailHeroStage";
 const { width } = Dimensions.get("window");
@@ -77,6 +78,9 @@ export default function Skeleton({
 //   • ölçek    → odaktaki kart 1.0, diğerleri 0.7: listenin durgun hâli
 export const TrendRailSkeleton = ({ metrics, count = 3 }) => {
   const { itemSize, cardWidth, cardHeight, spacing, edge, headroom } = metrics;
+  // Köşe gerçek kartla aynı: raf köşe ayarından (utils/posterCorners trendPosterRadius).
+  const { radius } = useRailPosterStyle();
+  const cardRadius = trendPosterRadius(radius);
   return (
     <View
       style={{
@@ -99,7 +103,7 @@ export const TrendRailSkeleton = ({ metrics, count = 3 }) => {
             <Skeleton
               width={cardWidth}
               height={cardWidth * 1.5}
-              style={{ borderRadius: 25 }}
+              style={{ borderRadius: cardRadius }}
             />
             {/* Gerçek kartın puan rozetiyle aynı köşe (trendRating: 8/8) */}
             <PosterBadgeSkeleton

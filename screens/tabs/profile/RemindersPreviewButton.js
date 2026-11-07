@@ -28,6 +28,7 @@ import { minutesText } from "../../../utils/durationText";
 import GlassIconButton from "../../../components/common/GlassIconButton";
 import { parseAirDate, startOfDay } from "../../../utils/airDate";
 import GlassTouchable from "../../../components/common/GlassTouchable";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 
 const H_MARGIN = 16;
@@ -268,6 +269,8 @@ function ReminderDot({ active, activeColor, inactiveColor }) {
 }
 
 export default function RemindersPreviewButton({ navigation }) {
+  const corner = usePosterCorner("library");
+
   const { width } = useWindowDimensions();
   const cardWidth = Math.max(0, width - H_MARGIN * 2);
   const { theme } = useTheme();
@@ -367,7 +370,7 @@ export default function RemindersPreviewButton({ navigation }) {
     return (
       <>
         {/* Poster */}
-        <View style={[styles.posterBox, { backgroundColor: theme.primary }]}>
+        <View style={[styles.posterBox, { borderRadius: corner(8), backgroundColor: theme.primary }]}>
           {item.poster ? (
             <Image
               source={{

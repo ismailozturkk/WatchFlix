@@ -31,10 +31,13 @@ import HubCard, { GlassPill } from "@components/hub/HubCard";
 import { PressableScale } from "@components/game/ui";
 import PremiumPill from "@components/premium/PremiumPill";
 import { usePremiumGate } from "@hooks/usePremiumGate";
+import { useLanguage } from "@context/LanguageContext";
 import { i18nText } from "@utils/i18nText";
 import { hashString } from "@utils/seededRandom";
 import { triggerHaptic } from "@services/hapticsService";
+import useScreenFocused from "@hooks/useScreenFocused";
 import { SPLASH_POSTER_CATALOG } from "../../data/splashPosterCatalog";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 const COLORS = ["#E11D48", "#9F1239", "#25091A"];
 const ROSE = "#E11D48";
@@ -61,9 +64,12 @@ function pickPosters(dayKey) {
 }
 
 // Yelpazenin yavaş süzülmesi: UI thread'de, sonsuz ama çok ucuz.
+// Hub sekmesi arka planda bağlı kalır: odakta değilken süzülme durur.
 function useFloat() {
   const t = useSharedValue(0);
+  const focused = useScreenFocused();
   useEffect(() => {
+    if (!focused) return undefined;
     const cfg = { duration: 2800, easing: Easing.inOut(Easing.sin), reduceMotion: RM };
     t.value = withRepeat(
       withSequence(withTiming(1, cfg), withTiming(0, cfg)),
@@ -72,14 +78,20 @@ function useFloat() {
       undefined,
       RM,
     );
-    return () => cancelAnimation(t);
-  }, [t]);
+    return () => {
+      cancelAnimation(t);
+      t.value = 0;
+    };
+  }, [t, focused]);
   return useAnimatedStyle(() => ({
     transform: [{ translateY: -5 * t.value }, { rotate: `${t.value * 1.6}deg` }],
   }));
 }
 
 function CineSwipeWidget({ navigation }) {
+  const corner = usePosterCorner("fun");
+  // memo() props değişmeden çizmez; dil aboneliği olmadan metinler eski dilde kalıyordu.
+  useLanguage();
   const floatStyle = useFloat();
   const posters = useMemo(() => {
     const d = new Date();
@@ -158,7 +170,7 @@ function CineSwipeWidget({ navigation }) {
                   },
                 ]}
               >
-                <View style={styles.poster}>
+                <View style={[styles.poster, { borderRadius: corner(10) }]}>
                   <Image source={poster.source} style={styles.posterImage} contentFit="cover" />
                 </View>
                 {front && (

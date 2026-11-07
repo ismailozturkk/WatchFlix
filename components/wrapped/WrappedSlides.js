@@ -40,6 +40,7 @@ import { buildYearHeat } from "../../utils/wrappedCard";
 import WrappedYearPath from "./WrappedYearPath";
 import YearHeat from "./YearHeat";
 import RollingNumber from "../animated/RollingNumber";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 const PATH_W = SCREEN_W - 56;
@@ -449,8 +450,10 @@ const Kicker = ({ children, step, delay = 0 }) => (
   </Reveal>
 );
 
-/** Küçük afiş: TMDB posteri, yoksa yer tutucu. */
-const Poster = ({ path, getTmdbUrl, width, height, radius = 10, style, glow }) => (
+/** Küçük afiş: TMDB posteri, yoksa yer tutucu. `radius` taban köşe; Kütüphane köşe ayarıyla ölçeklenir. */
+const Poster = ({ path, getTmdbUrl, width, height, radius: baseRadius = 10, style, glow }) => {
+  const radius = usePosterCorner("library")(baseRadius);
+  return (
   <View
     style={[
       {
@@ -483,7 +486,8 @@ const Poster = ({ path, getTmdbUrl, width, height, radius = 10, style, glow }) =
       </View>
     )}
   </View>
-);
+  );
+};
 
 /** Halka gösterge: ilerleme 0–1 (renk + iz). */
 const Ring = ({ size, stroke, progress, color = WHITE, track = "rgba(255,255,255,0.18)", children }) => {

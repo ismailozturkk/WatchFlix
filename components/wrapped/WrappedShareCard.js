@@ -51,6 +51,7 @@ import {
   wrappedBarcode,
   wrappedSerial,
 } from "../../utils/wrappedCard";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 // Profil hikâye kartı (ProfileStoryCard) bu üç dışa aktarımı kullanır: ortak
 // altı palet + vurgu rengi üstündeki yazı rengi. Kaynak utils/wrappedCard.js.
@@ -524,8 +525,10 @@ function HeatStrip({ ctx, style, width = CW }) {
 }
 
 // Poster: dikey 2:3 karo + sıra rozeti. `highlight` birinciyi vurgular.
-function PosterThumb({ ctx, item, w, h, radius = 11, rank, highlight, onSettled }) {
+function PosterThumb({ ctx, item, w, h, radius: baseRadius = 11, rank, highlight, onSettled }) {
   const { palette, t } = ctx;
+  // Taban köşe Kütüphane köşe ayarıyla ölçeklenir (hooks/usePosterCorner).
+  const radius = usePosterCorner("library")(baseRadius);
   return (
     <View
       style={[

@@ -22,6 +22,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Easing, Platform, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import { BLUR_START } from "@utils/quickGames";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 const FULL_BLUR_RADIUS = Platform.OS === "android" ? 25 : 60;
 // Bulanıklık oranları: en üstteki başlangıç (BLUR_START), en alttaki 0 (net afiş, her zaman opak).
@@ -30,6 +31,7 @@ const radiusOf = (amount) => Math.max(1, Math.round(amount * FULL_BLUR_RADIUS));
 const LAYER_COUNT = LEVELS.length + 1; // + net afiş
 
 export default function BlurPoster({ uri, durationMs, running, revealed, resetKey, theme, borderColor, borderWidth = 1, onReady, children }) {
+  const corner = usePosterCorner("fun");
   const progress = useRef(new Animated.Value(0)).current;
   const cover = useRef(new Animated.Value(1)).current;
   const pausedAt = useRef(0);
@@ -78,7 +80,7 @@ export default function BlurPoster({ uri, durationMs, running, revealed, resetKe
 
   const span = 1 / LEVELS.length;
   return (
-    <View style={[styles.frame, { borderColor: borderColor || theme.border, borderWidth, backgroundColor: theme.secondary }]}>
+    <View style={[styles.frame, { borderRadius: corner(18), borderColor: borderColor || theme.border, borderWidth, backgroundColor: theme.secondary }]}>
       {/* En alttaki net afiş: yüklenince saat başlar. */}
       <Image key={`sharp-${uri}`} source={{ uri }} style={styles.fill} contentFit="cover" onLoad={settle("sharp")} onError={settle("sharp")} />
       <Animated.View pointerEvents="none" style={[styles.fill, { opacity: cover }]}>

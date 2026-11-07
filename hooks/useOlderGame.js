@@ -17,6 +17,7 @@ import { haptic } from "../services/hapticsService";
 import { ANALYTICS_EVENTS, trackEvent } from "../services/analytics";
 import { MIN_USABLE_POOL, loadQuickPool } from "../services/quickGamePool";
 import { saveQuickBoardEntry } from "../services/gameLeaderboards";
+import { awardGameXp } from "../services/leagueService";
 import {
   OLDER_LIVES,
   judgeAnswer,
@@ -116,6 +117,7 @@ export default function useOlderGame({ apiKey, language, uid, source = "hub", id
     if (uid) {
       result = writeStats(uid, (current) => recordOlderRun(current, { score: finalScore, answered: finalAnswered }));
       saveQuickBoardEntry(uid, "older", result.stats, identity);
+      if (finalAnswered > 0) awardGameXp("older");
     }
     trackEvent(ANALYTICS_EVENTS.OLDER_GAME_FINISHED, {
       score: finalScore,

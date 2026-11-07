@@ -17,6 +17,7 @@ import { hashString } from "@utils/seededRandom";
 import { formatRemaining } from "@utils/dailyChallenge";
 import { SPLASH_POSTER_CATALOG } from "../../data/splashPosterCatalog";
 import { PressableScale } from "./ui";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 // Üç afişin yığın yerleşimi (sağdan taşan, hafif dönük).
 const POSTER_LAYOUT = [
@@ -46,6 +47,7 @@ function pickPosters(dayKey) {
 export default function DailyChallengeCard({ daily, theme, onPlay, onResult, compact = false }) {
   const completed = daily.status === "completed";
   const posters = useMemo(() => pickPosters(daily.dayKey), [daily.dayKey]);
+  const corner = usePosterCorner("fun");
   const remaining = formatRemaining(daily.expiresAt, daily.now);
   const result = daily.result;
 
@@ -88,6 +90,7 @@ export default function DailyChallengeCard({ daily, theme, onPlay, onResult, com
                   styles.poster,
                   compact && styles.posterCompact,
                   {
+                    borderRadius: corner(compact ? 8 : 10),
                     right: layout.right,
                     top: layout.top,
                     opacity: layout.opacity,

@@ -9,7 +9,7 @@
 // Route params: { mediaType: "movie" | "tv", section: string, title: string,
 //                 genreIds?: number[], providerId?: number }
 //   movie section: "trends" | "bests" | "nowPlaying" | "upcoming"
-//   tv    section: "trends" | "best"  | "airingToday" | "onTheAir"
+//   tv    section: "trends" | "best"  | "airingToday" | "onTheAir" | "upcoming"
 //   ortak: "genres" (genreIds ile) | "providers" (providerId ile) |
 //          "subscriptions" | "recentFavorites" | "worldTour" (originalLanguage ile) — bunlar
 //          context yerine bağımsız discover isteğiyle yüklenir (bkz. DiscoverSeeAll).
@@ -59,9 +59,11 @@ import { fetchFavoriteRecommendations } from "../../services/favoriteRecommendat
 import { getFavoritesCopy } from "../../utils/favoritesCopy";
 import { readProfileFavorites, recommendationSources } from "../../utils/fourFavorites";
 import GlassTouchable from "../../components/common/GlassTouchable";
+import { POSTER_CORNER_LEVELS, nextPosterCorner, posterCornerIndex } from "../../utils/posterCorners";
 import { useLiquidGlass } from "../../services/liquidGlass";
 import { worldTourDiscoverParams } from "../../utils/worldTour";
 import UpcomingFilterChips from "../../components/home/UpcomingFilterChips";
+import TvUpcomingRangeChips from "../../components/home/TvUpcomingRangeChips";
 import UpcomingFilterSheet from "../../components/home/UpcomingFilterSheet";
 import UpcomingEmptyState from "../../components/home/UpcomingEmptyState";
 import useUpcomingFilterControls from "../../hooks/useUpcomingFilterControls";
@@ -230,12 +232,10 @@ const PosterCard = React.memo(function PosterCard({
   );
 });
 
-// Header sağındaki kompakt görünüm kontrolleri: sütun (3|4) ve köşe (3 önizleme).
-const RADIUS_OPTS = [
-  { value: 2, preview: 2 },
-  { value: 10, preview: 5 },
-  { value: 20, preview: 9 },
-];
+// Header sağındaki kompakt görünüm kontrolleri: sütun (3|4) ve köşe. Köşenin beş
+// kademesi (utils/posterCorners) başlığa yan yana sığmaz: tek düğme o anki biçimi
+// çizer, her dokunuş bir sonraki kademeye geçer; yanındaki beş nokta yeri gösterir.
+const RADIUS_PREVIEW = [1, 2.5, 4, 5.25, 6.5]; // en çok genişliğin yarısı
 const LayoutControls = React.memo(function LayoutControls({
   theme,
   columns,
@@ -248,6 +248,7 @@ const LayoutControls = React.memo(function LayoutControls({
   const glass = useLiquidGlass();
   const segStyle = [styles.seg, !glass && styles.segClip, { backgroundColor: theme.secondary, borderColor: theme.border }];
   const cellStyle = [styles.segCell, glass && styles.segCellGlass];
+  const cornerIndex = posterCornerIndex("grid", radius);
   return (
     <View style={styles.controls}>
       <View style={segStyle}>
@@ -274,27 +275,35 @@ const LayoutControls = React.memo(function LayoutControls({
         })}
       </View>
       <View style={segStyle}>
-        {RADIUS_OPTS.map((opt) => {
-          const active = radius === opt.value;
-          return (
-            <GlassTouchable
-              key={opt.value}
-              activeOpacity={0.7}
-              onPress={() => onRadius(opt.value)}
-              style={[cellStyle, active && { backgroundColor: theme.accent }]}
-            >
+        <GlassTouchable
+          activeOpacity={0.7}
+          onPress={() => onRadius(nextPosterCorner("grid", radius))}
+          accessibilityRole="button"
+          accessibilityLabel={i18nText("autoI18n.kose_yuvarlakligi", "Köşe yuvarlaklığı")}
+          accessibilityValue={{ min: 1, max: POSTER_CORNER_LEVELS.length, now: cornerIndex + 1 }}
+          style={[cellStyle, styles.cornerCell]}
+        >
+          <View
+            style={{
+              width: 13,
+              height: 16,
+              borderRadius: RADIUS_PREVIEW[cornerIndex],
+              borderWidth: 1.5,
+              borderColor: theme.accent,
+            }}
+          />
+          <View style={styles.cornerDots}>
+            {POSTER_CORNER_LEVELS.map((level, i) => (
               <View
-                style={{
-                  width: 13,
-                  height: 16,
-                  borderRadius: opt.preview,
-                  borderWidth: 1.5,
-                  borderColor: active ? "#fff" : theme.text.secondary,
-                }}
+                key={level}
+                style={[
+                  styles.cornerDot,
+                  { backgroundColor: i <= cornerIndex ? theme.accent : theme.border },
+                ]}
               />
-            </GlassTouchable>
-          );
-        })}
+            ))}
+          </View>
+        </GlassTouchable>
       </View>
     </View>
   );
@@ -647,6 +656,12 @@ function TvSeeAll({ section, title, navigation }) {
       loadingMore: ctx.loadingMoreOnTheAir,
       hasMore: ctx.pageOnTheAir < ctx.totalPagesOnTheAir,
     },
+    upcoming: {
+      data: ctx.seriesUpcoming,
+      loadMore: ctx.loadMoreUpcoming,
+      loadingMore: ctx.loadingMoreUpcoming,
+      hasMore: ctx.pageUpcoming < ctx.totalPagesUpcoming,
+    },
     emmy: {
       data: ctx.tvShowsEmmy,
       loadMore: ctx.loadMoreEmmy,
@@ -723,7 +738,14 @@ function TvSeeAll({ section, title, navigation }) {
       loadingMore={cfg?.loadingMore}
       hasMore={!!cfg?.hasMore}
       onActivate={onActivate}
-      headerExtra={headerExtra}
+      headerExtra={
+        // Yaklaşan Diziler: raftakiyle AYNI aralık çipleri; seçim bağlamda, ana ekrandaki raf da güncellenir.
+        section === "upcoming" ? (
+          <TvUpcomingRangeChips range={ctx.selectedUpcomingRange} onSelectRange={ctx.setSelectedUpcomingRange} />
+        ) : (
+          headerExtra
+        )
+      }
     />
   );
 }
@@ -1059,6 +1081,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
+  cornerCell: { flexDirection: "row", gap: 5 },
+  cornerDots: { gap: 1, justifyContent: "center" },
+  cornerDot: { width: 2.5, height: 2.5, borderRadius: 1.25 },
   listContent: {
     paddingHorizontal: SIDE,
     paddingBottom: 90,

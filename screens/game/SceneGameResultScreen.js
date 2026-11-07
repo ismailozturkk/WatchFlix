@@ -35,6 +35,7 @@ import DuelSendButton from "../../components/game/DuelSendButton";
 import DuelReportStatus from "../../components/game/DuelReportStatus";
 import useDuelResultReport from "../../hooks/useDuelResultReport";
 import { duelPayloadFromResult } from "../../utils/dailyDuel";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 const SHARE_CARD_W = 320;
 const SHARE_CARD_H = 569; // ~9:16
@@ -67,6 +68,7 @@ function verdictFor(accuracy, tr, es, pt, de) {
 }
 
 export default function SceneGameResultScreen({ navigation, route }) {
+  const corner = usePosterCorner("fun");
   const { theme } = useTheme();
   const { language } = useLanguage();
   const { user } = useAuth();
@@ -134,7 +136,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
         : null,
     [isDaily, dailyKey, totalQuestions, result?.score, result?.totalCorrect],
   );
-  // Kabul edilen düello (üst bardaki davet / sohbetteki kart): iki skor davetin geldiği sohbete yazılır.
+  // Kabul edilen düello (yüzen davet kartı / sohbetteki kart): iki skor davetin geldiği sohbete yazılır.
   const duel = route.params?.duel || null;
   const duelResult = useMemo(
     () => ({ dailyKey, score: result?.score, correct: result?.totalCorrect, total: totalQuestions }),
@@ -356,7 +358,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
                     onPress={() => openTitle(answer.item)}
                     style={[styles.reviewRow, { borderTopColor: theme.border }]}
                   >
-                    <View style={[styles.reviewPoster, { borderColor: answer.isCorrect ? "#2ECC71" : "#E74C3C", backgroundColor: theme.primary }]}>
+                    <View style={[styles.reviewPoster, { borderRadius: corner(8), borderColor: answer.isCorrect ? "#2ECC71" : "#E74C3C", backgroundColor: theme.primary }]}>
                       {poster ? <Image source={{ uri: poster }} style={styles.reviewPosterImg} contentFit="cover" /> : <AppIcon family="Ionicons" name="image-outline" size={18} color={theme.text.muted} />}
                       <View style={[styles.reviewState, { backgroundColor: answer.isCorrect ? "#2ECC71" : "#E74C3C" }]}>
                         <AppIcon family="Ionicons" name={answer.isCorrect ? "checkmark" : "close"} size={11} color="#fff" />

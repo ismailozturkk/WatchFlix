@@ -23,6 +23,7 @@ jest.mock("react-native", () => {
     Text: "Text",
     TouchableOpacity: ({ children, ...rest }) => React.createElement("TouchableOpacity", rest, children),
     StyleSheet: { create: (styles) => styles, flatten: (style) => style, hairlineWidth: 1 },
+    useWindowDimensions: () => ({ width: 390, height: 844 }),
   };
 });
 // Babel eklentisi (scripts/babel-transform-app-text.js) `Text`'i AppText'e çevirir.
@@ -59,6 +60,10 @@ function makeSettings(posterBadges = {}) {
     changeRailPosterSize: jest.fn(),
     railPosterRadius: 15,
     changeRailPosterRadius: jest.fn(),
+    funPosterRadius: 10,
+    changeFunPosterRadius: jest.fn(),
+    libraryPosterRadius: 10,
+    changeLibraryPosterRadius: jest.fn(),
     postListPosterLayout: "spaced",
     changePostListPosterLayout: jest.fn(),
     posterBadges,
@@ -80,11 +85,16 @@ const textOf = (node) =>
     .findAllByType("Text")
     .map((n) => [].concat(n.props.children).join(""))
     .join("|");
+// Satır/sekmenin ilk yazısı = adı (altında açıklama, yanında sayaç olabilir).
+const firstText = (node) => {
+  const texts = node.findAllByType("Text");
+  return texts.length ? [].concat(texts[0].props.children).join("") : "";
+};
 const findTab = (tree, label) =>
-  tree.root.findAll((n) => n.type === "TouchableOpacity" && textOf(n) === label)[0];
-const openBadgesTab = (tree) => act(() => findTab(tree, "Poster Rozetleri").props.onPress());
+  tree.root.findAll((n) => n.type === "TouchableOpacity" && firstText(n) === label)[0];
+const openBadgesTab = (tree) => act(() => findTab(tree, "Rozetler").props.onPress());
 const toggles = (tree) => tree.root.findAll((n) => n.type === "TouchableOpacity" && n.props.accessibilityRole === "checkbox");
-const toggleFor = (tree, label) => toggles(tree).find((n) => textOf(n) === label);
+const toggleFor = (tree, label) => toggles(tree).find((n) => firstText(n) === label);
 const iconCount = (tree, name) => tree.root.findAllByType("Icon").filter((n) => n.props.name === name).length;
 
 beforeEach(() => {
@@ -131,7 +141,7 @@ describe("Poster görünümü — hatırlatma rozeti satırı", () => {
   test("satır 'Liste Durumları' grubunda: diğer durum rozetleriyle aynı yerde", () => {
     const tree = render();
     openBadgesTab(tree);
-    const labels = toggles(tree).map((n) => textOf(n));
+    const labels = toggles(tree).map((n) => firstText(n));
     const status = labels.slice(0, 8);
     expect(status).toEqual(["İzleme listesi", "İzlendi", "Favori", "Diğer listeler", "Ortak", "Hatırlatma", "Benim", "Yorum"]);
     expect(labels.slice(8)).toEqual(["TMDB", "Oy", "Tarih", "Sayaç"]);
@@ -184,5 +194,70 @@ describe("Poster görünümü — önizleme ve özet", () => {
     });
     // Bilgi grubuna dokunulmadı.
     expect(patch).not.toHaveProperty("countdown");
+  });
+});
+
+describe("Poster görünümü — alan seçici ve beş kademeli köşe", () => {
+  const radios = (tree) => tree.root.findAll((n) => n.type === "TouchableOpacity" && n.props.accessibilityRole === "radio");
+  const radio = (tree, label) => radios(tree).find((n) => n.props.accessibilityLabel === label);
+  const CORNERS = ["Köşeli", "Hafif", "Normal", "Yumuşak", "Yuvarlak"];
+
+  test("varsayılan alan Listeler: beş köşe seçeneği, seçili olan 'Normal'; basınca liste köşesi yazılır", () => {
+    const tree = render();
+    const labels = radios(tree).map((n) => n.props.accessibilityLabel);
+    expect(labels.slice(0, 5)).toEqual(CORNERS);
+    expect(radio(tree, "Normal").props.accessibilityState).toEqual({ selected: true });
+
+    act(() => radio(tree, "Yumuşak").props.onPress());
+    expect(mockSettings.changeListsPosterRadius).toHaveBeenCalledWith(15);
+    act(() => radio(tree, "Köşeli").props.onPress());
+    expect(mockSettings.changeListsPosterRadius).toHaveBeenCalledWith(2);
+    expect(mockSettings.changeSeeAllPosterRadius).not.toHaveBeenCalled();
+    expect(mockSettings.changeRailPosterRadius).not.toHaveBeenCalled();
+  });
+
+  test("Ana Ekran alanı raf ölçeğini ve poster boyutunu yazar", () => {
+    const tree = render();
+    act(() => findTab(tree, "Ana Ekran").props.onPress());
+    act(() => radio(tree, "Yuvarlak").props.onPress());
+    expect(mockSettings.changeRailPosterRadius).toHaveBeenCalledWith(32);
+    act(() => radio(tree, "Küçük").props.onPress());
+    expect(mockSettings.changeRailPosterSize).toHaveBeenCalledWith("small");
+    expect(mockSettings.changeListsPosterRadius).not.toHaveBeenCalled();
+  });
+
+  test("Tümünü Gör alanı kendi sütununu yazar", () => {
+    const tree = render();
+    act(() => findTab(tree, "Tümünü Gör").props.onPress());
+    act(() => radio(tree, "4'lü").props.onPress());
+    expect(mockSettings.changeSeeAllGridColumns).toHaveBeenCalledWith(4);
+    expect(mockSettings.changeListsGridColumns).not.toHaveBeenCalled();
+  });
+
+  test("'tüm alanlara uygula' yalnız kademeler farklıyken çıkar ve her alana kendi ölçeğinden yazar", () => {
+    const applyAll = (tree) =>
+      tree.root.findAll((n) => n.type === "TouchableOpacity" && firstText(n) === "Bu köşeyi tüm alanlara uygula")[0];
+    expect(applyAll(render())).toBeUndefined(); // 10 / 10 / 15 → üçü de "Normal"
+
+    mockSettings = { ...makeSettings(), listsPosterRadius: 20 };
+    const tree = render();
+    act(() => applyAll(tree).props.onPress());
+    expect(mockSettings.changeSeeAllPosterRadius).toHaveBeenCalledWith(20);
+    expect(mockSettings.changeRailPosterRadius).toHaveBeenCalledWith(32);
+    expect(mockSettings.changeListsPosterRadius).not.toHaveBeenCalled();
+  });
+
+  test("Eğlence ve Kütüphane alanları yalnız köşe ayarı gösterir ve kendi anahtarlarını yazar", () => {
+    const tree = render();
+    act(() => findTab(tree, "Eğlence").props.onPress());
+    expect(radios(tree).map((n) => n.props.accessibilityLabel).slice(0, 5)).toEqual(CORNERS);
+    expect(radio(tree, "3'lü")).toBeUndefined(); // sütun/boyut yok
+    act(() => radio(tree, "Yuvarlak").props.onPress());
+    expect(mockSettings.changeFunPosterRadius).toHaveBeenCalledWith(20);
+
+    act(() => findTab(tree, "Kütüphane").props.onPress());
+    act(() => radio(tree, "Hafif").props.onPress());
+    expect(mockSettings.changeLibraryPosterRadius).toHaveBeenCalledWith(6);
+    expect(mockSettings.changeListsPosterRadius).not.toHaveBeenCalled();
   });
 });

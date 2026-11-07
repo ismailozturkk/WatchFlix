@@ -111,7 +111,7 @@ export default function CineSwipeScreen({ route, navigation }) {
   const { user } = useAuth();
   const { t, language } = useLanguage();
   const uid = user?.uid || null;
-  const { displayName: profileName } = useUserProfile() || {};
+  const { displayName: profileName, username: profileUsername } = useUserProfile() || {};
   const { myAvatar } = useProfileUi() || {};
   const senderRef = useRef(null);
   senderRef.current = {
@@ -126,7 +126,7 @@ export default function CineSwipeScreen({ route, navigation }) {
   // Sohbetteki CineSwipe davetinden gelindiyse (utils/chatShare.shareRoute) oda
   // kodu kutuya HAZIR yazılır; katılmak için "Katıl"a basmak alıcıya kalır.
   const inviteCode = extractRoomCode(route?.params?.inviteCode || "");
-  // Davetin geldiği sohbet (üst bardaki davet ya da sohbetteki kart, bkz. utils/importantInvites):
+  // Davetin geldiği sohbet (yüzen davet kartı ya da sohbetteki kart, bkz. utils/importantInvites):
   // bu koda katılan misafir oda bitince ortak eşleşmeleri oraya yazar. Kuran taraf yazmaz — tek yazar.
   const inviteChat = inviteCode && chatTargetKey(route?.params?.inviteChat) ? route.params.inviteChat : null;
   // Davet kartının kendisi (sohbet kartı ya da üst bar, bkz. utils/chatShare.shareRoute): oda bitince kart
@@ -995,11 +995,19 @@ export default function CineSwipeScreen({ route, navigation }) {
             },
           ]
         : [];
-      const listId = await createSharedList({ owner: user, name: listName, friends });
+      // Auth kullanıcısı avatar seçimini bilmez (avatarIndex yok, photoURL hep
+      // Google): kurucu/ekleyen kopyasına profildeki kimlik yazılır.
+      const me = {
+        uid,
+        displayName: profileName || user.displayName || "",
+        username: profileUsername || "",
+        ...avatarSnapshot(myAvatar),
+      };
+      const listId = await createSharedList({ owner: me, name: listName, friends });
       for (const item of items) {
         await addItemToSharedList({
           listId,
-          user,
+          user: me,
           item: {
             id: item.id,
             type: item.mediaType === "tv" ? "tv" : "movie",

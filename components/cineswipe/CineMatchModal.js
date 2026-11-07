@@ -29,6 +29,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { alpha } from "../../theme/colors";
 import { triggerHaptic } from "../../services/hapticsService";
 import { cardGenreNames, cineMediaKey, fillText, posterUrl } from "../../services/cineswipe/deckModel";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 function Sparkle({ glow, phase, style, color, size }) {
   const animated = useAnimatedStyle(() => {
@@ -53,6 +54,7 @@ function MatchBody({
   copy,
   colors,
 }) {
+  const corner = usePosterCorner("fun");
   const pop = useSharedValue(0);
   const glow = useSharedValue(0);
   const [added, setAdded] = useState(false);
@@ -116,8 +118,8 @@ function MatchBody({
 
       <View style={[styles.mediaCard, { backgroundColor: alpha(colors.surface, 0.6) }]}>
         <View style={styles.posterWrap}>
-          <Animated.View style={[styles.halo, { backgroundColor: colors.accent }, haloStyle]} />
-          <Animated.View style={[styles.poster, { backgroundColor: colors.between }, posterStyle]}>
+          <Animated.View style={[styles.halo, { borderRadius: corner(13) + 7, backgroundColor: colors.accent }, haloStyle]} />
+          <Animated.View style={[styles.poster, { borderRadius: corner(13), backgroundColor: colors.between }, posterStyle]}>
             {uri ? (
               <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={160} />
             ) : (

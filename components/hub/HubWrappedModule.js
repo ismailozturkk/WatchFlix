@@ -23,6 +23,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import Animated, {
+  cancelAnimation,
   useSharedValue,
   useAnimatedStyle,
   withSpring,
@@ -63,8 +64,10 @@ import {
 import { PREMIUM_PLAN, getPremiumPlanDisplayName } from "@utils/premium";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import useReduceMotion from "@hooks/useReduceMotion";
+import useScreenFocused from "@hooks/useScreenFocused";
 import { triggerHaptic } from "@services/hapticsService";
 import GlassPressable from "../common/GlassPressable";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 const RM = ReduceMotion.System;
 const PRESS_SPRING = { mass: 0.4, damping: 12, stiffness: 180 };
@@ -174,6 +177,10 @@ const GlowOrb = memo(function GlowOrb({
       withRepeat(withSequence(withTiming(1, cfg), withTiming(0, cfg)), -1, false, undefined, RM),
       RM,
     );
+    return () => {
+      cancelAnimation(t);
+      t.value = 0;
+    };
   }, [active, duration, delay, t]);
   const a = useAnimatedStyle(() => ({
     transform: [
@@ -224,6 +231,10 @@ const Sheen = memo(function Sheen({ width, active }) {
       ),
       RM,
     );
+    return () => {
+      cancelAnimation(t);
+      t.value = 0;
+    };
   }, [active, t]);
   const a = useAnimatedStyle(() => ({
     transform: [{ translateX: -140 + t.value * (width + 280) }, { skewX: "-18deg" }],
@@ -262,6 +273,10 @@ const NudgeArrow = memo(function NudgeArrow({ active }) {
       ),
       RM,
     );
+    return () => {
+      cancelAnimation(t);
+      t.value = 0;
+    };
   }, [active, t]);
   const a = useAnimatedStyle(() => ({ transform: [{ translateX: t.value * 3.5 }] }));
   return (
@@ -319,6 +334,8 @@ const POSTER_H = 62;
 const POSTER_STEP = 21;
 
 const FanPoster = memo(function FanPoster({ uri, rot, left, lift, index, active, z }) {
+  const corner = usePosterCorner("library");
+
   const p = useSharedValue(0);
   useEffect(() => {
     if (!active) return;
@@ -338,7 +355,7 @@ const FanPoster = memo(function FanPoster({ uri, rot, left, lift, index, active,
     ],
   }));
   return (
-    <Animated.View style={[styles.fanPoster, { left, zIndex: z }, a]}>
+    <Animated.View style={[styles.fanPoster, { left, zIndex: z, borderRadius: corner(8) }, a]}>
       <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={160} />
     </Animated.View>
   );
@@ -537,6 +554,8 @@ export default function HubWrappedModule({ navigation, revealed = true }) {
   const { listItems, flatEpisodesTv } = useProfileStats();
   const { getTmdbUrl } = useImageQualitySettings();
   const reduceMotion = useReduceMotion();
+  // Kütüphane sekmesi arka planda bağlı kalır: odakta değilken döngüler durur.
+  const focused = useScreenFocused();
 
   const str = useMemo(() => getWrappedStrings(language), [language]);
 
@@ -638,7 +657,7 @@ export default function HubWrappedModule({ navigation, revealed = true }) {
     return null;
   }
 
-  const active = revealed;
+  const active = revealed && focused;
   const totalMin = recap.totalMinutes;
   const { hours, days } = minutesBreakdown(totalMin);
   const showMinutes = totalMin < 60;

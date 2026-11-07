@@ -107,7 +107,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
   const routeGameId = route?.params?.gameId || SCENE_GAME_ID;
   const routeModeId = route?.params?.modeId || DEFAULT_MODE_ID;
   const routeDifficultyId = route?.params?.difficultyId || DEFAULT_DIFFICULTY_ID;
-  // Kabul edilen düello (üst bardaki davet ya da sohbetteki kart, bkz. utils/importantInvites
+  // Kabul edilen düello (yüzen davet kartı ya da sohbetteki kart, bkz. utils/importantInvites
   // .duelContextOf): sonuç ekranı skoru davetin geldiği sohbete yazar.
   const routeDuel = route?.params?.duel || null;
 

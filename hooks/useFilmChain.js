@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keys, get, remove, set, useStored } from "../services/storage";
 import { ANALYTICS_EVENTS, trackEvent } from "../services/analytics";
+import { awardDailyXp, awardGameXp } from "../services/leagueService";
 import { fetchChainCast, fetchChainFilms } from "../services/filmChainService";
 import { dayKeyOf } from "../utils/dailyChallenge";
 import {
@@ -137,6 +138,11 @@ export default function useFilmChain({ apiKey, language, uid, mode = "daily", pu
         outcome = writeStats(uid, (current) =>
           recordChainResult(current, { mode, dayKey, puzzle, chain: finalChain, gaveUp }),
         );
+        // Haftalık Lig: yalnız ÇÖZÜLEN zincir sayılır (pes etmek XP vermez).
+        if (!gaveUp) {
+          if (mode === "daily") awardDailyXp("chain", dayKey);
+          else awardGameXp("chain", puzzle.id);
+        }
       }
       const links = gaveUp ? 0 : chainFilmCount(finalChain);
       const points = chainPoints(links, puzzle.par, gaveUp);
