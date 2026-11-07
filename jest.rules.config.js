@@ -5,6 +5,10 @@
 module.exports = {
   testEnvironment: "node",
   testMatch: ["**/__tests__/rules/**/*.test.js"],
+  // `.claude/` altındaki oturum worktree'leri aynı emülatöre paralel yazıp
+  // birbirinin verisini siliyordu (sahte FAIL).
+  testPathIgnorePatterns: ["/node_modules/", "/\\.claude/"],
+  modulePathIgnorePatterns: ["<rootDir>/\\.claude/"],
   transform: {
     "^.+\\.[jt]sx?$": "babel-jest",
   },

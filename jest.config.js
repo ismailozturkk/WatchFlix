@@ -11,11 +11,15 @@ module.exports = {
   // __tests__/helpers/* test degil, yardimci modul.
   // __tests__/rules/* calisan bir Firestore emulatoru ister; `npm test`
   // emulatorsuz kosabilmeli (bkz. jest.rules.config.js + `npm run test:rules`).
+  // `.claude/` altında oturum worktree'leri (projenin tam kopyaları) durur;
+  // toplanırsa her test 2-4 kez koşar ve kopyalar birbirini bozar.
   testPathIgnorePatterns: [
     "/node_modules/",
     "/__tests__/helpers/",
     "/__tests__/rules/",
+    "/\\.claude/",
   ],
+  modulePathIgnorePatterns: ["<rootDir>/\\.claude/"],
   transform: {
     "^.+\\.[jt]sx?$": "babel-jest",
   },
