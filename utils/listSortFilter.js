@@ -7,6 +7,8 @@
 // Z→A gelirdi; yön metinleri ("Artan"/"Azalan") çevrilmemişti; tür çipleri (20+ olabilir) hiç daraltılmadan
 // sayfayı uzatıyordu. Hepsi buradaki küçük kurallardan türer.
 
+import { posterCornerIndex, posterCornerValueAt } from "./posterCorners";
+
 /** İlk seçildiğinde doğal yön: ada göre A→Z, tarih / süre / yenilik büyükten küçüğe. */
 export const SORT_DEFAULT_DIR = Object.freeze({
   dateAdded: "desc",
@@ -54,9 +56,7 @@ export function countActiveFilters({ typeFilter, dateRange, genres, platformOnly
   );
 }
 
-/** "3'lü · Normal" gibi görünüm özeti için köşe adı: yarıçap değerinden en yakın seçenek. */
+/** "3'lü · Normal" gibi görünüm özeti için köşe adı: yarıçap değerinden en yakın kademe (utils/posterCorners). */
 export function radiusKeyOf(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 10;
-  return [2, 10, 20].reduce((best, key) => (Math.abs(key - n) < Math.abs(best - n) ? key : best), 10);
+  return posterCornerValueAt("grid", posterCornerIndex("grid", value));
 }

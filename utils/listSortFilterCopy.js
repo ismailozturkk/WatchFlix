@@ -22,7 +22,7 @@ export const LIST_SORT_FILTER_COPY = {
     posterInfo: "POSTERDE GÖSTER",
     moreChips: "+{n} daha",
     lessChips: "Daralt",
-    radius: { 2: "Köşeli", 10: "Normal", 20: "Yuvarlak" },
+    radius: { 2: "Köşeli", 6: "Hafif", 10: "Normal", 15: "Yumuşak", 20: "Yuvarlak" },
     columnsOption: { 3: "3'lü", 4: "4'lü" },
   },
   en: {
@@ -40,7 +40,7 @@ export const LIST_SORT_FILTER_COPY = {
     posterInfo: "SHOW ON POSTER",
     moreChips: "+{n} more",
     lessChips: "Show less",
-    radius: { 2: "Square", 10: "Normal", 20: "Round" },
+    radius: { 2: "Square", 6: "Subtle", 10: "Normal", 15: "Soft", 20: "Round" },
     columnsOption: { 3: "3 across", 4: "4 across" },
   },
   es: {
@@ -58,7 +58,7 @@ export const LIST_SORT_FILTER_COPY = {
     posterInfo: "MOSTRAR EN EL PÓSTER",
     moreChips: "+{n} más",
     lessChips: "Mostrar menos",
-    radius: { 2: "Rectas", 10: "Normales", 20: "Redondas" },
+    radius: { 2: "Rectas", 6: "Leves", 10: "Normales", 15: "Suaves", 20: "Redondas" },
     columnsOption: { 3: "De 3", 4: "De 4" },
   },
   pt: {
@@ -76,7 +76,7 @@ export const LIST_SORT_FILTER_COPY = {
     posterInfo: "MOSTRAR NO PÔSTER",
     moreChips: "+{n} mais",
     lessChips: "Mostrar menos",
-    radius: { 2: "Retos", 10: "Normais", 20: "Redondos" },
+    radius: { 2: "Retos", 6: "Leves", 10: "Normais", 15: "Suaves", 20: "Redondos" },
     columnsOption: { 3: "De 3", 4: "De 4" },
   },
   de: {
@@ -94,7 +94,7 @@ export const LIST_SORT_FILTER_COPY = {
     posterInfo: "AUF POSTER ANZEIGEN",
     moreChips: "+{n} weitere",
     lessChips: "Weniger anzeigen",
-    radius: { 2: "Eckig", 10: "Normal", 20: "Rund" },
+    radius: { 2: "Eckig", 6: "Leicht", 10: "Normal", 15: "Weich", 20: "Rund" },
     columnsOption: { 3: "3 nebeneinander", 4: "4 nebeneinander" },
   },
 };

@@ -11,13 +11,17 @@
 //     memberIds: [uid, ...]            ← kurucu DAHİL; array-contains sorgusu
 //                                        ve kural üyelik kontrolü buradan
 //     members: {                       ← uid → meta + yetkiler
-//       [uid]: { name, username, avatarIndex, canAdd, canRemove, canReorder, addedAt }
+//       [uid]: { name, username, avatarIndex, photoURL, canAdd, canRemove, canReorder, addedAt }
 //     }
 //     createdAt, updatedAt
 //
 //   SharedLists/{listId}/items/{itemKey}   itemKey = `${type}_${id}`
 //     id, type, name, imagePath, minutes, genres, dateAdded
-//     addedBy, addedByName, addedByAvatarIndex, addedAt
+//     addedBy, addedByName, addedByAvatarIndex, addedByPhotoURL, addedAt
+//
+// Avatar kopyaları (üye, kurucu, ekleyen) utils/avatarPhotos.identityAvatar
+// kuralıyla yazılır: fotoğraf avatarında adres taşınır, hazır avatarda null.
+// Sonraki değişiklikleri functions/index.js:onUserProfileUpdated yayar.
 //
 // Yetki modeli (kurallarda da zorlanır — firestore.rules):
 //   • Kurucu tam yetkili: üye ekle/çıkar, canAdd/canRemove/canReorder ver/al,
@@ -45,16 +49,19 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { clampAvatarIndex } from "../utils/avatars";
+import { identityAvatar } from "../utils/avatarPhotos";
 import { normalizeWatchDate } from "../utils/watchHistory";
 import { snapshotErrorHandler } from "../utils/firestoreError";
+import { listOrderWrites } from "../utils/listOrder";
 
 export const sharedItemKey = (type, id) => `${type}_${id}`;
 
-const memberMeta = ({ name, username, avatarIndex, canAdd, canRemove, canReorder }) => ({
+// photoURL eskiden yazılmıyordu: fotoğraf avatarlı üye, profilini bir dahaki
+// değiştirişine (sunucu yayılımı) kadar listede varsayılan avatarla görünüyordu.
+const memberMeta = ({ name, username, avatarIndex, photoURL, canAdd, canRemove, canReorder }) => ({
   name: name || "",
   username: username || "",
-  avatarIndex: clampAvatarIndex(avatarIndex),
+  ...identityAvatar({ avatarIndex, photoURL }),
   canAdd: !!canAdd,
   canRemove: !!canRemove,
   canReorder: !!canReorder,
@@ -66,7 +73,7 @@ const memberMeta = ({ name, username, avatarIndex, canAdd, canRemove, canReorder
 /**
  * Ortak liste oluştur. Kurucu members map'ine tam yetkiyle girer.
  * @param {Object} p
- * @param {{uid,displayName,username,avatarIndex}} p.owner
+ * @param {{uid,displayName,username,avatarIndex,photoURL?}} p.owner
  * @param {string} p.name
  * @param {Array<{uid,name,username,avatarIndex,canAdd,canRemove}>} p.friends
  * @returns {string} listId
@@ -82,6 +89,7 @@ export async function createSharedList({ owner, name, friends = [] }) {
       name: owner.displayName,
       username: owner.username,
       avatarIndex: owner.avatarIndex,
+      photoURL: owner.photoURL,
       canAdd: true,
       canRemove: true,
       canReorder: true,
@@ -99,7 +107,8 @@ export async function createSharedList({ owner, name, friends = [] }) {
     ownerId: owner.uid,
     ownerName: owner.displayName || "",
     ownerUsername: owner.username || "",
-    ownerAvatarIndex: clampAvatarIndex(owner.avatarIndex),
+    ownerAvatarIndex: identityAvatar(owner).avatarIndex,
+    ownerPhotoURL: identityAvatar(owner).photoURL,
     memberIds,
     members,
     createdAt: serverTimestamp(),
@@ -208,7 +217,7 @@ const emitItemsChanged = (listId) => {
  * zararsızdır — aynı içerik, sadece ekleyen adı değişir).
  * @param {Object} p
  * @param {string} p.listId
- * @param {{uid,displayName,username,avatarIndex}} p.user
+ * @param {{uid,displayName,username,avatarIndex,photoURL?}} p.user
  * @param {{id,type,name,imagePath,minutes,totalMinutes,genres,dateAdded}} p.item
  */
 export async function addItemToSharedList({ listId, user, item }) {
@@ -227,8 +236,9 @@ export async function addItemToSharedList({ listId, user, item }) {
     addedBy: user.uid,
     addedByName: user.displayName || "",
     addedByUsername: user.username || "",
-    addedByAvatarIndex: clampAvatarIndex(user.avatarIndex),
-    addedByPhotoURL: user.photoURL || null,
+    addedByAvatarIndex: identityAvatar(user).avatarIndex,
+    // Hazır avatarlı kullanıcının (Auth) Google fotoğrafı buraya yazılmasın.
+    addedByPhotoURL: identityAvatar(user).photoURL,
     addedAt: serverTimestamp(),
   });
   emitItemsChanged(listId);
@@ -251,23 +261,21 @@ export async function removeItemFromSharedList(listId, type, id) {
 }
 
 /** Ortak listedeki manuel sırayı yalnız `listOrder` alanıyla günceller. */
-export async function reorderSharedListItems(listId, orderedItems, fromIndex, toIndex) {
+export async function reorderSharedListItems(listId, orderedItems) {
   if (!listId || !Array.isArray(orderedItems) || orderedItems.length < 2) return;
-  const start = orderedItems.every((it) => Number.isFinite(it?.listOrder))
-    ? Math.min(fromIndex, toIndex)
-    : 0;
-  const end = orderedItems.every((it) => Number.isFinite(it?.listOrder))
-    ? Math.max(fromIndex, toIndex)
-    : orderedItems.length - 1;
-  const batch = writeBatch(db);
-  for (let index = start; index <= end; index += 1) {
-    const item = orderedItems[index];
-    batch.update(
-      doc(db, "SharedLists", listId, "items", sharedItemKey(item.type, item.id)),
-      { listOrder: index },
-    );
+  // Konumu değişen her öğe yazılır (silinenlerin bıraktığı boşluklar da normalize
+  // olur; bkz. utils/listOrder.listOrderWrites). Kural yalnız `listOrder` alanına izin verir.
+  const writes = listOrderWrites(orderedItems).filter(({ item }) => item?.type);
+  for (let offset = 0; offset < writes.length; offset += 450) {
+    const batch = writeBatch(db);
+    writes.slice(offset, offset + 450).forEach(({ item, index }) => {
+      batch.update(
+        doc(db, "SharedLists", listId, "items", sharedItemKey(item.type, item.id)),
+        { listOrder: index },
+      );
+    });
+    await batch.commit();
   }
-  await batch.commit();
 }
 
 /** Tek öğe var mı? (detay ekranı toggle durumu için) */

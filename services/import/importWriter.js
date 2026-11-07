@@ -23,6 +23,7 @@ import { db } from "../../firebase";
 import { updateLocalItem } from "../listSyncService";
 import { RESERVED_LIST_NAMES } from "../../utils/listShare";
 import { normalizeWatchDate } from "../../utils/watchHistory";
+import { identityAvatar } from "../../utils/avatarPhotos";
 import {
   fillMissingFields,
   importedReviewId,
@@ -452,9 +453,10 @@ export async function writeImportedItems(uid, resolvedItems, optionsOrProgress =
               userId: uid,
               username: userProfile.displayName || userProfile.name || "Kullanıcı",
               userHandle: userProfile.username || userProfile.userHandle || "",
-              avatar: userProfile.photoURL || null,
-              authorPhotoURL: userProfile.photoURL || null,
-              avatarIndex: userProfile.avatarIndex ?? 0,
+              // Hazır avatarda fotoğraf yazılmaz (utils/avatarPhotos.identityAvatar).
+              avatar: identityAvatar(userProfile).photoURL,
+              authorPhotoURL: identityAvatar(userProfile).photoURL,
+              avatarIndex: identityAvatar(userProfile).avatarIndex,
               text: reviewText,
               isSpoiler: false,
               parentId: null,

@@ -4,14 +4,17 @@
 // (4 sıralama satırı + 2 görünüm satırı + 6 anahtarlı poster bilgisi satırı + tür/tarih/tür çipleri ≈ 3 ekran
 // boyu) ve iki ekranda ayrı ayrı kopyalanmıştı. Burada:
 //
-//   • Sıralama tek sırada çipler; seçili çipte yön oku, tekrar basınca yön çevrilir.
+//   • Sıralama tek sırada karolar (simge üstte, ad altta); seçili karoda yön oku, tekrar basınca yön çevrilir.
+//     Başlık satırının sağında yön hapı ("↓ Azalan") — dokununca yön çevrilir.
 //   • Süzgeçler (tür, tarih, türler, platform, üye…) ekrandan `sections` olarak gelir; sayfa çizer:
 //       segment  — az seçenekli, tek seçim (Hepsi / Film / Dizi)
 //       chips    — tek seçimli çipler (tarih aralığı)
-//       multi    — çok seçimli çipler; çok olunca ilk 8 + "+N daha" (seçililer hep görünür)
+//       multi    — çok seçimli çipler; çok olunca ilk 8 + "+N daha" (seçililer hep görünür); başlıkta seçili sayısı
 //       node     — ekranın kendi bölümü (Platformlarım, Paylaşan üye)
-//   • Görünüm (sütun, köşe, poster bilgisi) KAPALI bir satırda: "Görünüm · 3'lü · Normal"; açılınca çipler.
-//   • Üstte etkin süzgeç sayısı + Sıfırla; altta tek büyük "N sonuç göster".
+//     Bölümler ince çizgiyle ayrılır.
+//   • Görünüm (sütun, köşe, poster bilgisi) KAPALI bir kartta: "Görünüm · 3'lü · Normal"; açılınca sütun
+//     karoları (küçük ızgara çizimi), köşe karoları (köşe çizimi) ve poster bilgisi çipleri.
+//   • Altta sabit çubuk: Sıfırla (etkin süzgeç sayısı rozeti) + büyük "N sonuç göster".
 //
 // Ortak alt sayfa kabuğu (BottomSheetModal: blur yerinde solar). Karar mantığı utils/listSortFilter.js (saf, testli).
 
@@ -26,26 +29,60 @@ import ListPosterInfoControls from "@components/lists/ListPosterInfoControls";
 import { alpha } from "@theme/colors";
 import { readableTextOn } from "@utils/colorUtils";
 import { collapseChips, nextSort, radiusKeyOf } from "@utils/listSortFilter";
+import { POSTER_CORNER_SCALES } from "@utils/posterCorners";
 import { fillSortFilterCopy } from "@utils/listSortFilterCopy";
 import GlassPressable from "../common/GlassPressable";
 
 const COLUMN_KEYS = [3, 4];
-const RADIUS_KEYS = [2, 10, 20];
+const RADIUS_KEYS = POSTER_CORNER_SCALES.grid;
+// Seçici simgesindeki köşe: gerçek oranla (≈ değer/8) beş kademe ayırt edilmiyor;
+// abartılı çizilir (en çok 7; 18 pt'lik köşe çiziminde ×1.6).
+const RADIUS_PREVIEW = [1, 2.5, 4, 5.5, 7];
 
-function Label({ children, theme, style }) {
+function Label({ children, theme, style, trailing }) {
   return (
-    <Text allowFontScaling={false} style={[styles.label, { color: theme.text.muted }, style]}>
-      {children}
-    </Text>
+    <View style={[styles.labelRow, style]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, { color: theme.text.muted }]}>
+        {children}
+      </Text>
+      {trailing}
+    </View>
   );
 }
 
-function Segment({ options, value, onChange, theme, accent, testID }) {
+function CountBadge({ count, accent, testID }) {
+  if (!count) return null;
+  return (
+    <View testID={testID} style={[styles.countBadge, { backgroundColor: alpha(accent, 0.16) }]}>
+      <Text allowFontScaling={false} style={[styles.countBadgeText, { color: accent }]}>
+        {count}
+      </Text>
+    </View>
+  );
+}
+
+// Sütun karosundaki küçük ızgara: n sütunlu iki sıra poster.
+function GridGlyph({ columns, color }) {
+  return (
+    <View style={styles.gridGlyph}>
+      {[0, 1].map((row) => (
+        <View key={row} style={styles.gridGlyphRow}>
+          {Array.from({ length: columns }, (_, i) => (
+            <View key={i} style={[styles.gridGlyphCell, { backgroundColor: color, width: columns === 3 ? 5 : 3.6 }]} />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function Segment({ options, value, onChange, theme, accent, testID, stacked = false }) {
   const onAccent = readableTextOn(accent);
   return (
     <View style={[styles.segment, { backgroundColor: theme.primary, borderColor: theme.border }]}>
       {options.map((option) => {
         const selected = option.key === value;
+        const tint = selected ? onAccent : theme.text.muted;
         return (
           <GlassPressable
             key={String(option.key)}
@@ -53,23 +90,17 @@ function Segment({ options, value, onChange, theme, accent, testID }) {
             accessibilityRole="button"
             accessibilityState={{ selected }}
             onPress={() => onChange(option.key)}
-            style={[styles.segmentItem, selected && { backgroundColor: accent }]}
+            style={[styles.segmentItem, stacked && styles.segmentItemStacked, selected && { backgroundColor: accent }]}
           >
-            {option.icon ? (
-              <Feather name={option.icon} size={14} color={selected ? onAccent : theme.text.muted} />
-            ) : null}
+            {option.icon ? <Feather name={option.icon} size={14} color={tint} /> : null}
+            {option.grid ? <GridGlyph columns={option.grid} color={tint} /> : null}
             {option.preview != null ? (
-              <View
-                style={[
-                  styles.radiusPreview,
-                  { borderRadius: option.preview, borderColor: selected ? onAccent : theme.text.muted },
-                ]}
-              />
+              <View style={[styles.radiusPreview, { borderTopLeftRadius: option.preview * 1.6, borderColor: tint }]} />
             ) : null}
             <Text
               allowFontScaling={false}
               numberOfLines={1}
-              style={[styles.segmentText, { color: selected ? onAccent : theme.text.secondary }]}
+              style={[styles.segmentText, stacked && styles.segmentTextStacked, { color: selected ? onAccent : theme.text.secondary }]}
             >
               {option.label}
             </Text>
@@ -80,7 +111,7 @@ function Segment({ options, value, onChange, theme, accent, testID }) {
   );
 }
 
-function Chip({ label, selected, onPress, theme, accent, testID, icon, trailing }) {
+function Chip({ label, selected, onPress, theme, accent, testID, icon, trailing, check = false }) {
   const onAccent = readableTextOn(accent);
   return (
     <GlassPressable
@@ -96,6 +127,7 @@ function Chip({ label, selected, onPress, theme, accent, testID, icon, trailing 
         },
       ]}
     >
+      {check && selected ? <Feather name="check" size={13} color={onAccent} /> : null}
       {icon ? <Feather name={icon} size={14} color={selected ? onAccent : theme.text.muted} /> : null}
       <Text
         allowFontScaling={false}
@@ -127,6 +159,7 @@ function MultiChips({ section, theme, accent }) {
           onPress={() => section.onToggle(option)}
           theme={theme}
           accent={accent}
+          check
         />
       ))}
       {hiddenCount > 0 || (expanded && section.options.length > 8) ? (
@@ -166,6 +199,7 @@ function ListSortFilterSheet({
   const sortValue = { key: sort.value, dir: sort.dir };
   const radiusKey = radiusKeyOf(view.radius);
   const viewSummary = `${copy.columnsOption[view.columns] || view.columns} · ${copy.radius[radiusKey]}`;
+  const showDir = sort.supportsDir && sort.value !== "default";
 
   return (
     <BottomSheetModal
@@ -177,7 +211,7 @@ function ListSortFilterSheet({
 
       <View style={styles.header}>
         <View style={[styles.headerTile, { backgroundColor: alpha(accent, 0.16) }]}>
-          <Feather name="sliders" size={17} color={accent} />
+          <Feather name="sliders" size={18} color={accent} />
         </View>
         <View style={styles.headerCopy}>
           <Text allowFontScaling={false} numberOfLines={1} style={[styles.title, { color: theme.text.primary }]}>
@@ -192,67 +226,89 @@ function ListSortFilterSheet({
             {fillSortFilterCopy(copy.results, resultCount)}
           </Text>
         </View>
-        <GlassPressable
-          testID="sort-filter-reset"
-          accessibilityRole="button"
-          disabled={activeCount === 0}
-          onPress={onReset}
-          style={[
-            styles.reset,
-            { backgroundColor: alpha(accent, 0.14), borderColor: alpha(accent, 0.35) },
-            activeCount === 0 && styles.resetDisabled,
-          ]}
-        >
-          <Text allowFontScaling={false} style={[styles.resetText, { color: accent }]}>
-            {copy.reset}
-            {activeCount > 0 ? ` · ${activeCount}` : ""}
-          </Text>
-        </GlassPressable>
-        <GlassCloseButton size={34} fallbackRadius={11} onPress={onClose} accessibilityLabel={copy.close} />
+        <GlassCloseButton size={36} fallbackRadius={18} onPress={onClose} accessibilityLabel={copy.close} />
       </View>
 
       <SheetScroll contentContainerStyle={styles.body}>
         {/* ── Sıralama ── */}
-        <Label theme={theme}>{copy.sort}</Label>
-        <View style={styles.chips}>
+        <Label
+          theme={theme}
+          trailing={
+            showDir ? (
+              <GlassPressable
+                testID="sort-filter-dir-toggle"
+                accessibilityRole="button"
+                onPress={() => sort.onChange({ key: sort.value, dir: sort.dir === "asc" ? "desc" : "asc" })}
+                hitSlop={8}
+                style={[styles.dirPill, { backgroundColor: alpha(accent, 0.14) }]}
+              >
+                <Feather name={sort.dir === "asc" ? "arrow-up" : "arrow-down"} size={12} color={accent} />
+                <Text testID="sort-filter-dir-text" allowFontScaling={false} style={[styles.dirPillText, { color: accent }]}>
+                  {sort.dir === "asc" ? copy.asc : copy.desc}
+                </Text>
+              </GlassPressable>
+            ) : null
+          }
+        >
+          {copy.sort}
+        </Label>
+        <View style={styles.sortRow}>
           {sort.options.map((option) => {
             const selected = sort.value === option.key;
-            const showDir = selected && sort.supportsDir && option.key !== "default";
+            const tileDir = selected && sort.supportsDir && option.key !== "default";
             return (
-              <Chip
+              <GlassPressable
                 key={option.key}
                 testID={`sort-filter-sort-${option.key}`}
-                label={option.label}
-                icon={option.icon}
-                selected={selected}
-                theme={theme}
-                accent={accent}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
                 onPress={() => sort.onChange(nextSort(sort.supportsDir ? sortValue : { key: sort.value, dir: "desc" }, option.key))}
-                trailing={
-                  showDir ? (
-                    <View testID="sort-filter-dir" style={styles.dir}>
-                      <Feather name={sort.dir === "asc" ? "arrow-up" : "arrow-down"} size={14} color={onAccent} />
-                    </View>
-                  ) : null
-                }
-              />
+                style={[
+                  styles.sortTile,
+                  selected
+                    ? { backgroundColor: alpha(accent, 0.16), borderColor: accent }
+                    : { backgroundColor: theme.primary, borderColor: theme.border },
+                ]}
+              >
+                <View style={[styles.sortIcon, { backgroundColor: selected ? accent : alpha(theme.text.muted, 0.14) }]}>
+                  <Feather name={option.icon} size={15} color={selected ? onAccent : theme.text.secondary} />
+                </View>
+                <Text
+                  allowFontScaling={false}
+                  numberOfLines={2}
+                  style={[styles.sortText, { color: selected ? theme.text.primary : theme.text.secondary }]}
+                >
+                  {option.label}
+                </Text>
+                {tileDir ? (
+                  <View testID="sort-filter-dir" style={[styles.sortDir, { backgroundColor: accent }]}>
+                    <Feather name={sort.dir === "asc" ? "arrow-up" : "arrow-down"} size={11} color={onAccent} />
+                  </View>
+                ) : null}
+              </GlassPressable>
             );
           })}
         </View>
-        {sort.supportsDir && sort.value !== "default" ? (
-          <Text
-            testID="sort-filter-dir-text"
-            allowFontScaling={false}
-            style={[styles.hint, { color: theme.text.muted }]}
-          >
-            {sort.dir === "asc" ? copy.asc : copy.desc}
-          </Text>
-        ) : null}
 
         {/* ── Süzgeçler ── */}
         {sections.map((section) => (
-          <View key={section.id} testID={`sort-filter-section-${section.id}`} style={styles.section}>
-            {section.title ? <Label theme={theme}>{section.title}</Label> : null}
+          <View
+            key={section.id}
+            testID={`sort-filter-section-${section.id}`}
+            style={[styles.section, { borderTopColor: theme.border }]}
+          >
+            {section.title ? (
+              <Label
+                theme={theme}
+                trailing={
+                  section.kind === "multi" ? (
+                    <CountBadge testID={`sort-filter-${section.id}-count`} count={(section.value || []).length} accent={accent} />
+                  ) : null
+                }
+              >
+                {section.title}
+              </Label>
+            ) : null}
             {section.kind === "segment" ? (
               <Segment
                 testID={`sort-filter-${section.id}`}
@@ -283,7 +339,7 @@ function ListSortFilterSheet({
           </View>
         ))}
 
-        {/* ── Görünüm (kapalı satır) ── */}
+        {/* ── Görünüm (kapalı kart) ── */}
         <View style={[styles.viewCard, { backgroundColor: theme.primary, borderColor: theme.border }]}>
           <Pressable
             testID="sort-filter-view-toggle"
@@ -292,7 +348,9 @@ function ListSortFilterSheet({
             onPress={() => setViewOpen((current) => !current)}
             style={styles.viewHeader}
           >
-            <Feather name="grid" size={16} color={accent} />
+            <View style={[styles.viewIcon, { backgroundColor: alpha(accent, 0.14) }]}>
+              <Feather name="layout" size={15} color={accent} />
+            </View>
             <Text allowFontScaling={false} style={[styles.viewTitle, { color: theme.text.primary }]}>
               {copy.view}
             </Text>
@@ -308,11 +366,11 @@ function ListSortFilterSheet({
           </Pressable>
 
           {viewOpen ? (
-            <View style={styles.viewBody}>
+            <View style={[styles.viewBody, { borderTopColor: theme.border }]}>
               <Label theme={theme}>{copy.columns}</Label>
               <Segment
                 testID="sort-filter-columns"
-                options={COLUMN_KEYS.map((key) => ({ key, label: copy.columnsOption[key], icon: "grid" }))}
+                options={COLUMN_KEYS.map((key) => ({ key, label: copy.columnsOption[key], grid: key }))}
                 value={view.columns}
                 onChange={view.onColumns}
                 theme={theme}
@@ -323,11 +381,12 @@ function ListSortFilterSheet({
               </Label>
               <Segment
                 testID="sort-filter-radius"
-                options={RADIUS_KEYS.map((key) => ({ key, label: copy.radius[key], preview: key === 2 ? 3 : key === 10 ? 8 : 14 }))}
+                options={RADIUS_KEYS.map((key, i) => ({ key, label: copy.radius[key], preview: RADIUS_PREVIEW[i] }))}
                 value={radiusKey}
                 onChange={view.onRadius}
                 theme={theme}
                 accent={accent}
+                stacked
               />
               <Label theme={theme} style={styles.viewGap}>
                 {copy.posterInfo}
@@ -345,27 +404,53 @@ function ListSortFilterSheet({
         </View>
       </SheetScroll>
 
-      <GlassPressable
-        testID="sort-filter-apply"
-        accessibilityRole="button"
-        onPress={onClose}
-        style={[styles.apply, { backgroundColor: accent }]}
-      >
-        {filtering ? (
-          <ActivityIndicator size="small" color={onAccent} />
-        ) : (
-          <Text allowFontScaling={false} style={[styles.applyText, { color: onAccent }]}>
-            {fillSortFilterCopy(copy.showResults, resultCount)}
+      <View style={[styles.footer, { borderTopColor: theme.border }]}>
+        <GlassPressable
+          testID="sort-filter-reset"
+          accessibilityRole="button"
+          accessibilityLabel={activeCount > 0 ? `${copy.reset} · ${activeCount}` : copy.reset}
+          disabled={activeCount === 0}
+          onPress={onReset}
+          style={[
+            styles.reset,
+            { backgroundColor: theme.primary, borderColor: theme.border },
+            activeCount === 0 && styles.resetDisabled,
+          ]}
+        >
+          <Feather name="rotate-ccw" size={15} color={theme.text.primary} />
+          <Text allowFontScaling={false} numberOfLines={1} style={[styles.resetText, { color: theme.text.primary }]}>
+            {copy.reset}
           </Text>
-        )}
-      </GlassPressable>
+          {activeCount > 0 ? (
+            <View style={[styles.resetBadge, { backgroundColor: accent }]}>
+              <Text allowFontScaling={false} style={[styles.resetBadgeText, { color: onAccent }]}>
+                {activeCount}
+              </Text>
+            </View>
+          ) : null}
+        </GlassPressable>
+        <GlassPressable
+          testID="sort-filter-apply"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={[styles.apply, { backgroundColor: accent }]}
+        >
+          {filtering ? (
+            <ActivityIndicator size="small" color={onAccent} />
+          ) : (
+            <Text allowFontScaling={false} numberOfLines={1} style={[styles.applyText, { color: onAccent }]}>
+              {fillSortFilterCopy(copy.showResults, resultCount)}
+            </Text>
+          )}
+        </GlassPressable>
+      </View>
     </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
   sheet: {
-    maxHeight: "86%",
+    maxHeight: "88%",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
@@ -374,26 +459,45 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 22,
   },
-  handle: { alignSelf: "center", width: 42, height: 5, borderRadius: 3, marginBottom: 12 },
-  header: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 },
-  headerTile: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  handle: { alignSelf: "center", width: 40, height: 5, borderRadius: 3, marginBottom: 14 },
+  header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 6 },
+  headerTile: { width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   headerCopy: { flex: 1, minWidth: 0, gap: 1 },
-  title: { fontSize: 17, fontWeight: "800", letterSpacing: -0.3 },
-  subtitle: { fontSize: 12, fontWeight: "600" },
-  reset: { height: 32, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  resetDisabled: { opacity: 0.4 },
-  resetText: { fontSize: 12.5, fontWeight: "800" },
+  title: { fontSize: 18, fontWeight: "800", letterSpacing: -0.3 },
+  subtitle: { fontSize: 12.5, fontWeight: "600" },
 
-  body: { paddingTop: 10, paddingBottom: 8 },
-  section: { marginTop: 14 },
-  label: { fontSize: 10.5, fontWeight: "800", letterSpacing: 0.9, marginBottom: 7 },
-  hint: { fontSize: 11, fontWeight: "600", marginTop: 6 },
+  body: { paddingTop: 12, paddingBottom: 10 },
+  section: { marginTop: 16, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 22, marginBottom: 8 },
+  label: { flex: 1, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.9 },
+  countBadge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
+  countBadgeText: { fontSize: 11, fontWeight: "800" },
+
+  dirPill: { flexDirection: "row", alignItems: "center", gap: 4, height: 24, paddingHorizontal: 9, borderRadius: 12 },
+  dirPillText: { fontSize: 11.5, fontWeight: "800" },
+
+  sortRow: { flexDirection: "row", gap: 8 },
+  sortTile: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 78,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingHorizontal: 4,
+    paddingVertical: 10,
+  },
+  sortIcon: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  sortText: { fontSize: 11.5, fontWeight: "700", textAlign: "center", lineHeight: 14 },
+  sortDir: { position: "absolute", top: 6, right: 6, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
 
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     minHeight: 34,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingHorizontal: 14,
+    borderRadius: 17,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -402,32 +506,54 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: 12.5, fontWeight: "700", flexShrink: 1 },
   moreChip: { backgroundColor: "transparent", borderStyle: "dashed" },
-  dir: { marginLeft: 1 },
 
-  segment: { flexDirection: "row", padding: 3, gap: 3, borderRadius: 13, borderWidth: 1 },
+  segment: { flexDirection: "row", padding: 4, gap: 4, borderRadius: 16, borderWidth: 1 },
   segmentItem: {
     flex: 1,
     minWidth: 0,
-    height: 34,
-    borderRadius: 10,
+    height: 36,
+    borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 7,
     paddingHorizontal: 6,
   },
+  // Beş seçenekli köşe satırı: önizleme üstte, ad altta (yan yana sığmıyor).
+  segmentItemStacked: { height: 58, flexDirection: "column", gap: 6, paddingHorizontal: 2 },
   segmentText: { fontSize: 12.5, fontWeight: "800", flexShrink: 1 },
-  radiusPreview: { width: 12, height: 15, borderWidth: 1.5 },
+  segmentTextStacked: { fontSize: 11, flexShrink: 0 },
+  // Köşe çizimi: yalnız sol üst köşe yuvarlanan bir çerçeve parçası — kademeler arası fark net görünür.
+  radiusPreview: { width: 18, height: 18, borderTopWidth: 2, borderLeftWidth: 2 },
+  gridGlyph: { gap: 2 },
+  gridGlyphRow: { flexDirection: "row", gap: 2 },
+  gridGlyphCell: { height: 7, borderRadius: 1.5 },
 
-  viewCard: { marginTop: 16, borderRadius: 16, borderWidth: 1, overflow: "hidden" },
-  viewHeader: { minHeight: 46, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 13 },
-  viewTitle: { fontSize: 13.5, fontWeight: "800" },
+  viewCard: { marginTop: 18, borderRadius: 18, borderWidth: 1, overflow: "hidden" },
+  viewHeader: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12 },
+  viewIcon: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  viewTitle: { fontSize: 14, fontWeight: "800" },
   viewSummary: { flex: 1, fontSize: 12, fontWeight: "600", textAlign: "right" },
-  viewBody: { paddingHorizontal: 13, paddingBottom: 14 },
-  viewGap: { marginTop: 12 },
+  viewBody: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  viewGap: { marginTop: 14 },
 
-  apply: { height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center", marginTop: 10 },
-  applyText: { fontSize: 14.5, fontWeight: "800" },
+  footer: { flexDirection: "row", gap: 10, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, marginHorizontal: -16, paddingHorizontal: 16 },
+  reset: {
+    height: 52,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+  resetDisabled: { opacity: 0.4 },
+  resetText: { fontSize: 13.5, fontWeight: "800" },
+  resetBadge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
+  resetBadgeText: { fontSize: 11, fontWeight: "800" },
+  apply: { flex: 1, minWidth: 0, height: 52, borderRadius: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
+  applyText: { fontSize: 15, fontWeight: "800" },
 });
 
 export default memo(ListSortFilterSheet);

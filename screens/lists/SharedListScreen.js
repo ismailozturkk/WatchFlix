@@ -26,7 +26,8 @@ import appAlert from "../../components/AppAlert";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
-import { getAvatarSource } from "@utils/avatars";
+import { avatarRenderPx, getAvatarSource } from "@utils/avatars";
+import { avatarSnapshot } from "@utils/avatarPhotos";
 import UserAvatar from "@components/common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
 import CreateSharedListModal from "../../components/modals/CreateSharedListModal";
@@ -85,6 +86,7 @@ import {
   reorderSharedListItems,
 } from "@services/sharedListsService";
 import GlassTouchable from "../../components/common/GlassTouchable";
+import { SEARCH_DEBOUNCE_MS } from "../../utils/searchDebounce";
 
 const ACCENT = "#38bdf8"; // ListsViewScreen'deki ortak liste vurgusuyla aynı
 const SHARED_SEARCH_LIST = "__shared__";
@@ -101,7 +103,7 @@ export default function SharedListScreen({ route, navigation }) {
   const { listId } = route.params || {};
   const { theme } = useTheme();
   const { user } = useAuth();
-  const { avatar } = useProfileUi();
+  const { avatar, myAvatar } = useProfileUi();
   const uid = user?.uid;
   const { language, t } = useLanguage();
   const { API_KEY } = useApiSettings();
@@ -170,7 +172,8 @@ export default function SharedListScreen({ route, navigation }) {
         avatarSource:
           mUid === uid && avatar
             ? avatar
-            : getAvatarSource(m.avatarIndex, m.photoURL),
+            // En büyük çizim 38 pt (üye sayfası); kişi fotoğrafında küçük kopya.
+            : getAvatarSource(m.avatarIndex, m.photoURL, avatarRenderPx(38)),
       }))
       .sort((a, b) => {
         if (a.uid === list.ownerId) return -1;
@@ -307,7 +310,7 @@ export default function SharedListScreen({ route, navigation }) {
       } finally {
         if (requestId === globalReqRef.current) setGlobalLoading(false);
       }
-    }, 450);
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [searchMode, queryText, API_KEY, language, adultContent]);
 
@@ -366,7 +369,8 @@ export default function SharedListScreen({ route, navigation }) {
           uid,
           displayName: profile?.displayName || user?.displayName || "",
           username: profile?.username || "",
-          avatarIndex: profile?.avatarIndex ?? 0,
+          // Fotoğraf avatarı da "ekleyen" kopyasına gitsin (eskiden yalnız indeks).
+          ...avatarSnapshot(myAvatar),
         },
         media,
         apiKey: API_KEY,
@@ -397,7 +401,7 @@ export default function SharedListScreen({ route, navigation }) {
     setActionBusy(true);
     setItems(ordered);
     try {
-      await reorderSharedListItems(listId, ordered, actionIndex, targetIndex);
+      await reorderSharedListItems(listId, ordered);
       setActionItem(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       Toast.show({
@@ -939,11 +943,19 @@ export default function SharedListScreen({ route, navigation }) {
         itemCount={items.length}
         accent={ACCENT}
         busy={actionBusy}
-        canMove={canReorder}
-        moveDisabledHint={i18nText(
-          "autoI18n.yer_degistirme_yetkin_yok",
-          "Bu listede yer değiştirme yetkin yok",
-        )}
+        // Elle sıra yalnız "Liste sırası" görünümünde görünür (bkz. ListsScreen).
+        canMove={canReorder && sortBy === "default"}
+        moveDisabledHint={
+          canReorder
+            ? i18nText(
+                "autoI18n.tasima_yalniz_liste_sirasinda",
+                "Taşımak için Sırala menüsünden \"Liste sırası\"nı seç",
+              )
+            : i18nText(
+                "autoI18n.yer_degistirme_yetkin_yok",
+                "Bu listede yer değiştirme yetkin yok",
+              )
+        }
         canDelete={canRemoveFromSharedList(list, uid, actionItem)}
         deleteDisabledHint={i18nText(
           "autoI18n.silme_yetkin_yok",

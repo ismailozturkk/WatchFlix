@@ -5,9 +5,12 @@ import {
   View,
   FlatList,
   Animated,
+  useWindowDimensions,
   } from "react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import BottomSheetModal from "@components/common/BottomSheetModal";
+import SheetScroll from "@components/common/SheetScroll";
+import { SPLASH_POSTER_CATALOG } from "../../../data/splashPosterCatalog";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useTheme } from "../../../context/ThemeContext";
@@ -21,7 +24,12 @@ import { useSharedLists } from "../../../context/SharedListsContext";
 import SwitchToggle from "../../../components/SwitchToggle";
 import { i18nText } from "../../../utils/i18nText";
 import { sortItemsByListOrder } from "../../../utils/listOrder";
-import ListCovers, { getNaturalCoverWidth } from "../../../components/lists/ListCovers";
+import ListCovers, {
+  getNaturalCoverWidth,
+  getSizingStyle,
+  LAYOUT_COUNT_VARIANTS,
+  LIST_LAYOUT,
+} from "../../../components/lists/ListCovers";
 import ListManageSheet from "../../../components/lists/ListManageSheet";
 import CreateListModal from "../../../components/lists/CreateListModal";
 import { useAuth } from "../../../context/AuthContext";
@@ -55,7 +63,8 @@ const NATURAL_W_4 = getNaturalCoverWidth(4, COVER_H); // Yığın: 5'li yelpaze
 // Kart genişliği aktif poster düzenine orantılı: poster alanı + 2×10 dolgu.
 // Aynı anda tek düzen aktif olduğundan raydaki tüm kartlar yine eşit kalır.
 export const getRailCardWidth = (gridStyle) => {
-  switch (gridStyle) {
+  // 3/5 seçimi ve Film Şeridi/Vitrin kendi eşinin genişliğini kullanır.
+  switch (getSizingStyle(gridStyle)) {
     case 1:
       return 204; // Büyük Kapaklar: 3×60 + 2×2 boşluk
     case 2:
@@ -69,15 +78,154 @@ export const getRailCardWidth = (gridStyle) => {
 const getCardWidth = getRailCardWidth;
 
 // ── "Liste Görünümü Seçin" modalındaki önizlemeler ──────────────────────────
-// Gerçek ListCovers bileşeni boş bir listeyle (items=[]) çizilir: her afiş
-// otomatik olarak yer tutucu kutuya düşer, oranlar/köşe mantığı/kenarlıklar
-// gerçek karttakiyle BİREBİR aynı kalır — burada ayrıca kopyalanmaz.
-const PREVIEW_H = 101;
-const PREVIEW_W_1 = 166; // Büyük Kapaklar: 3 eşit afiş
-const PREVIEW_W_2 = 142; // Küçük Kapaklar: 4×2 afiş
-const PREVIEW_W_3 = getNaturalCoverWidth(3, PREVIEW_H); // Karışık
-const PREVIEW_W_4 = getNaturalCoverWidth(4, PREVIEW_H); // Yığın
-const noPreviewTmdbUrl = () => undefined;
+// Gerçek ListCovers bileşeni raydaki GERÇEK ölçüsünde (COVER_H × kart içi
+// genişlik) çizilir, sonra kutuya sığacak kadar `scale` ile küçültülür: oranlar,
+// kaymalar, köşe mantığı gerçek karttakiyle BİREBİR aynı kalır, küçük boyda
+// sabit piksel kaymaları (yığın, polaroid) bozulmaz. Tüm düzenler AYNI ölçekle
+// küçülür — aralarındaki gerçek genişlik farkı önizlemede de görünür.
+//
+// Afişler uygulamayla paketlenen açılış posterleri (ağ beklemez, boş liste de
+// anlamlı görünür). listOrder verilir: ListCovers sırayı ona göre dizer.
+const PREVIEW_SAMPLE_ITEMS = SPLASH_POSTER_CATALOG.slice(0, 8).map((p, i) => ({
+  id: p.id,
+  type: p.mediaType,
+  localSource: p.source,
+  listOrder: i,
+}));
+const PICKER_COLUMNS = 3;
+const PICKER_GAP = 6;
+// Sayfanın iki yanındaki boşluk (SheetScroll contentContainerStyle).
+const PICKER_SIDE = 12;
+// Kartın iç dolgusu + kenarlığı (styles.pickerTile).
+const PICKER_TILE_INSET = 4;
+const coverWidthAt = (gridStyle) => getRailCardWidth(gridStyle) - CARD_PADDING * 2;
+const MAX_COVER_W = coverWidthAt(LIST_LAYOUT.BIG);
+
+// Başlıktaki "Görünümü değiştir" düğmesinin simgesi — seçili düzeni gösterir.
+const LAYOUT_ICONS = {
+  [LIST_LAYOUT.BIG]: "grid-large",
+  [LIST_LAYOUT.BIG_5]: "view-column",
+  [LIST_LAYOUT.SMALL]: "grid",
+  [LIST_LAYOUT.MIXED]: "view-dashboard",
+  [LIST_LAYOUT.STACK]: "layers",
+  [LIST_LAYOUT.STACK_3]: "layers-outline",
+  [LIST_LAYOUT.FILMSTRIP]: "filmstrip",
+  [LIST_LAYOUT.SHOWCASE]: "view-carousel",
+  [LIST_LAYOUT.POLAROID]: "polaroid",
+  [LIST_LAYOUT.DIAGONAL]: "view-parallel",
+  [LIST_LAYOUT.WALL]: "view-quilt",
+};
+
+// Seçicideki tek düzen kartı (kompakt, 3 sütunlu ızgarada). `variants`
+// verilirse ({3: id, 5: id}) önizlemenin sağ üst köşesinde 3/5 seçimi çıkar:
+// karta basmak ailenin o anki (yoksa varsayılan) sayısını seçip sayfayı
+// kapatır; sayıya basmak yalnız sayıyı değiştirir ve sayfa açık kalır —
+// önizleme yerinde güncellenir.
+const LayoutOption = ({
+  layout,
+  variants,
+  defaultCount,
+  label,
+  icon,
+  current,
+  allCornersRounded,
+  theme,
+  scale,
+  onSelect,
+}) => {
+  const familyIds = variants ? Object.values(variants) : [layout];
+  const isActive = familyIds.includes(current);
+  const activeCount = variants
+    ? Number(Object.keys(variants).find((n) => variants[n] === current) ?? defaultCount)
+    : null;
+  const shown = variants ? variants[activeCount] : layout;
+  const realW = coverWidthAt(shown);
+  const boxH = COVER_H * scale;
+
+  return (
+    <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={() => onSelect(shown, true)}>
+      <View
+        style={[
+          styles.pickerTile,
+          {
+            backgroundColor: theme.secondary,
+            borderColor: isActive ? theme.colors.orange : theme.border,
+          },
+        ]}
+      >
+        <View style={{ width: "100%", height: boxH, alignItems: "center", opacity: isActive ? 1 : 0.75 }}>
+          {/* Gerçek ölçüde çizip ölçekle: transform yerleşimi etkilemez, bu yüzden
+              iç kutu dış kutunun ortasına mutlak konumlanır. */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              width: realW,
+              height: COVER_H,
+              top: (boxH - COVER_H) / 2,
+              left: "50%",
+              marginLeft: -realW / 2,
+              transform: [{ scale }],
+            }}
+          >
+            <ListCovers
+              items={PREVIEW_SAMPLE_ITEMS}
+              gridStyle={shown}
+              allCornersRounded={allCornersRounded}
+              width={realW}
+              height={COVER_H}
+              theme={theme}
+            />
+          </View>
+        </View>
+        <View style={styles.pickerLabelRow}>
+          {icon}
+          <Text
+            numberOfLines={1}
+            style={{ flexShrink: 1, color: theme.text.primary, fontSize: 11, fontWeight: "600" }}
+          >
+            {label}
+          </Text>
+        </View>
+        {variants && (
+            <View
+              style={[
+                styles.countSwitch,
+                { borderColor: theme.border, backgroundColor: theme.secondary },
+              ]}
+            >
+              {Object.keys(variants).map((n) => {
+                const on = Number(n) === activeCount;
+                return (
+                  <TouchableOpacity
+                    key={n}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    onPress={() => onSelect(variants[n], false)}
+                    style={[
+                      styles.countChip,
+                      on && { backgroundColor: theme.colors.orange },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: "700",
+                        color: on ? "#fff" : theme.text.secondary ?? theme.text.primary,
+                      }}
+                    >
+                      {n}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const SHARED_KEY_PREFIX = "shared:";
 
@@ -88,6 +236,36 @@ export default function ProfileLists({ navigation }) {
   const { user } = useAuth();
   const { gridStyle, saveListGridStyle, allCornersRounded, saveAllCornersRounded } = useProfileUi();
   const cardW = getCardWidth(gridStyle);
+  // Seçici kartlarının ölçeği: 3 sütun, en geniş düzen (Büyük Kapaklar) kartın
+  // iç genişliğine sığar; diğerleri aynı ölçekle küçülür.
+  const { width: windowW } = useWindowDimensions();
+  const pickerTileW = (windowW - PICKER_SIDE * 2 - PICKER_GAP * (PICKER_COLUMNS - 1)) / PICKER_COLUMNS;
+  const pickerScale = Math.max(0.3, (pickerTileW - PICKER_TILE_INSET * 2) / MAX_COVER_W);
+  const pickerOptions = [
+    { key: "big", variants: LAYOUT_COUNT_VARIANTS.big, defaultCount: 3, label: i18nText("autoI18n.buyuk_kapaklar", "Büyük Kapaklar"), icon: <MaterialCommunityIcons name="movie" size={12} color={theme.colors.green} /> },
+    { key: "stack", variants: LAYOUT_COUNT_VARIANTS.stack, defaultCount: 5, label: i18nText("autoI18n.yigin_gorunum", "Yığın"), icon: <MaterialCommunityIcons name="layers" size={12} color={theme.colors.purple || "#a78bfa"} /> },
+    { key: "mixed", layout: LIST_LAYOUT.MIXED, label: i18nText("autoI18n.karisik_gorunum", "Karışık"), icon: <MaterialCommunityIcons name="view-dashboard" size={12} color={theme.colors.blue} /> },
+    { key: "small", layout: LIST_LAYOUT.SMALL, label: i18nText("autoI18n.kucuk_kapaklar", "Küçük Kapaklar"), icon: <Ionicons name="grid" size={12} color={theme.colors.orange} /> },
+    { key: "film", layout: LIST_LAYOUT.FILMSTRIP, label: i18nText("autoI18n.film_seridi_gorunum", "Film Şeridi"), icon: <MaterialCommunityIcons name="filmstrip" size={12} color={theme.colors.red || "#ef4444"} /> },
+    { key: "showcase", layout: LIST_LAYOUT.SHOWCASE, label: i18nText("autoI18n.vitrin_gorunum", "Vitrin"), icon: <MaterialCommunityIcons name="view-carousel" size={12} color={theme.colors.yellow || "#facc15"} /> },
+    { key: "polaroid", layout: LIST_LAYOUT.POLAROID, label: i18nText("autoI18n.polaroid_gorunum", "Polaroid"), icon: <MaterialCommunityIcons name="polaroid" size={12} color={theme.colors.pink || "#f472b6"} /> },
+    { key: "diagonal", layout: LIST_LAYOUT.DIAGONAL, label: i18nText("autoI18n.diyagonal_gorunum", "Diyagonal"), icon: <MaterialCommunityIcons name="view-parallel" size={12} color={theme.colors.teal || "#2dd4bf"} /> },
+    { key: "wall", layout: LIST_LAYOUT.WALL, label: i18nText("autoI18n.afis_duvari_gorunum", "Afiş Duvarı"), icon: <MaterialCommunityIcons name="view-quilt" size={12} color={theme.colors.orange || "#fb923c"} /> },
+  ];
+  const pickerRows = [];
+  for (let i = 0; i < pickerOptions.length; i += PICKER_COLUMNS) {
+    pickerRows.push(pickerOptions.slice(i, i + PICKER_COLUMNS));
+  }
+  const optionProps = {
+    current: gridStyle,
+    scale: pickerScale,
+    allCornersRounded,
+    theme,
+    onSelect: (layout, close) => {
+      saveListGridStyle(layout);
+      if (close) setLayoutModalVisible(false);
+    },
+  };
   const [layoutModalVisible, setLayoutModalVisible] = useState(false);
   const [createListVisible, setCreateListVisible] = useState(false);
   // Uzun basılan özel liste — yönetim sayfası (ad değiştir / sil) buna bakar.
@@ -197,7 +375,7 @@ export default function ProfileLists({ navigation }) {
             onPress={() => setLayoutModalVisible(true)}
           >
             <MaterialCommunityIcons
-              name={gridStyle === 1 ? "grid-large" : gridStyle === 2 ? "grid" : gridStyle === 3 ? "view-dashboard" : "layers"}
+              name={LAYOUT_ICONS[gridStyle] ?? "layers"}
               size={18}
               color={theme.text.primary ?? "white"}
             />
@@ -397,164 +575,20 @@ export default function ProfileLists({ navigation }) {
               {i18nText("autoI18n.liste_gorunumu_secin", "Liste Görünümü Seçin")}
             </Text>
 
-            <View style={{ width: "100%", paddingHorizontal: 20, gap: 10 }}>
-              {/* Üst Sıra */}
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                {/* Option 1: Büyük Kapaklar */}
-                <TouchableOpacity
-                  style={{ flex: 1 }}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    saveListGridStyle(1);
-                    setLayoutModalVisible(false);
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.listContainer,
-                      {
-                        width: "100%",
-                        backgroundColor: theme.secondary,
-                        borderColor: gridStyle === 1 ? theme.colors.orange : theme.border,
-                        opacity: gridStyle === 1 ? 1 : 0.6,
-                      },
-                    ]}
-                  >
-                    <ListCovers
-                      items={[]}
-                      gridStyle={1}
-                      allCornersRounded={allCornersRounded}
-                      width={PREVIEW_W_1}
-                      height={PREVIEW_H}
-                      getTmdbUrl={noPreviewTmdbUrl}
-                      theme={theme}
-                    />
-                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
-                      <MaterialCommunityIcons name="movie" size={16} color={theme.colors.green} />
-                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
-                        {i18nText("autoI18n.buyuk_kapaklar", "Büyük Kapaklar")}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Option 3: Karışık Kapaklar */}
-                <TouchableOpacity
-                  style={{ flex: 1 }}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    saveListGridStyle(3);
-                    setLayoutModalVisible(false);
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.listContainer,
-                      {
-                        width: "100%",
-                        backgroundColor: theme.secondary,
-                        borderColor: gridStyle === 3 ? theme.colors.orange : theme.border,
-                        opacity: gridStyle === 3 ? 1 : 0.6,
-                      },
-                    ]}
-                  >
-                    <ListCovers
-                      items={[]}
-                      gridStyle={3}
-                      allCornersRounded={allCornersRounded}
-                      width={PREVIEW_W_3}
-                      height={PREVIEW_H}
-                      getTmdbUrl={noPreviewTmdbUrl}
-                      theme={theme}
-                    />
-                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
-                      <MaterialCommunityIcons name="view-dashboard" size={16} color={theme.colors.blue} />
-                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
-                        {i18nText("autoI18n.karisik_gorunum", "Karışık")}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-              {/* Alt Sıra */}
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                {/* Option 4: Yığın Kapaklar */}
-                <TouchableOpacity
-                  style={{ flex: 1 }}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    saveListGridStyle(4);
-                    setLayoutModalVisible(false);
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.listContainer,
-                      {
-                        width: "100%",
-                        backgroundColor: theme.secondary,
-                        borderColor: gridStyle === 4 ? theme.colors.orange : theme.border,
-                        opacity: gridStyle === 4 ? 1 : 0.6,
-                      },
-                    ]}
-                  >
-                    <ListCovers
-                      items={[]}
-                      gridStyle={4}
-                      allCornersRounded={allCornersRounded}
-                      width={PREVIEW_W_4}
-                      height={PREVIEW_H}
-                      getTmdbUrl={noPreviewTmdbUrl}
-                      theme={theme}
-                    />
-                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
-                      <MaterialCommunityIcons name="layers" size={16} color={theme.colors.purple || "#a78bfa"} />
-                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
-                        {i18nText("autoI18n.yigin_gorunum", "Yığın")}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Option 2: Küçük Kapaklar */}
-                <TouchableOpacity
-                  style={{ flex: 1 }}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    saveListGridStyle(2);
-                    setLayoutModalVisible(false);
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.listContainer,
-                      {
-                        width: "100%",
-                        backgroundColor: theme.secondary,
-                        borderColor: gridStyle === 2 ? theme.colors.orange : theme.border,
-                        opacity: gridStyle === 2 ? 1 : 0.6,
-                      },
-                    ]}
-                  >
-                    <ListCovers
-                      items={[]}
-                      gridStyle={2}
-                      allCornersRounded={allCornersRounded}
-                      width={PREVIEW_W_2}
-                      height={PREVIEW_H}
-                      getTmdbUrl={noPreviewTmdbUrl}
-                      theme={theme}
-                    />
-                    <View style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 5 }}>
-                      <Ionicons name="grid" size={16} color={theme.colors.orange} />
-                      <Text style={{ color: theme.text.primary, fontSize: 13, fontWeight: "600" }}>
-                        {i18nText("autoI18n.kucuk_kapaklar", "Küçük Kapaklar")}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              </View>
+            {/* 10 düzen + köşe anahtarı küçük ekranda sığmaz: bölge küçülüp kayar. */}
+            <SheetScroll style={{ width: "100%" }} contentContainerStyle={{ paddingHorizontal: PICKER_SIDE, gap: PICKER_GAP }}>
+              {/* Kompakt 3 sütunlu ızgara: 3/5 seçimli aileler önde, yeni düzenler arkada.
+                  9 düzen = 3×3; ileride sayı değişip son satır eksik kalırsa boş hücreyle doldurulur (kartlar eşit genişlikte kalır). */}
+              {pickerRows.map((row, r) => (
+                <View key={r} style={{ flexDirection: "row", gap: PICKER_GAP }}>
+                  {row.map(({ key, ...opt }) => (
+                    <LayoutOption key={key} {...opt} {...optionProps} />
+                  ))}
+                  {Array.from({ length: PICKER_COLUMNS - row.length }, (_, i) => (
+                    <View key={`pad-${i}`} style={{ flex: 1 }} />
+                  ))}
+                </View>
+              ))}
 
               <View 
                 style={{ 
@@ -587,36 +621,52 @@ export default function ProfileLists({ navigation }) {
                   offColor={theme.border || "#cacacaad"}
                 />
               </View>
-            </View>
+            </SheetScroll>
       </BottomSheetModal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  pickerTile: {
+    width: "100%",
+    padding: 3,
+    borderWidth: 1,
+    borderRadius: 10,
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  pickerLabelRow: {
+    marginTop: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    maxWidth: "100%",
+  },
+  countSwitch: {
+    position: "absolute",
+    top: 3,
+    right: 3,
+    zIndex: 10,
+    flexDirection: "row",
+    padding: 2,
+    gap: 2,
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+  countChip: {
+    minWidth: 17,
+    height: 15,
+    paddingHorizontal: 4,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   section: { width: "100%", marginBottom: 14 },
   sectionTitle: {
     fontSize: 14,
     textTransform: "uppercase",
   },
-  // Görünüm modalındaki önizleme kartları hâlâ bu stili kullanır.
-  listContainer: {
-    padding: 7,
-    alignItems: "center",
-    borderRadius: 15,
-    marginBottom: 10,
-    gap: 2,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.94,
-    shadowRadius: 10.32,
-    elevation: 5,
-  },
-
   // ── Raydaki liste kartı çerçevesi — ListsViewScreen kartlarıyla aynı ──────
   // 1) Arka plan — kartla birebir aynı kutu, en arkada durur.
   cardBg: {
@@ -701,6 +751,7 @@ const styles = StyleSheet.create({
   // ── Layout Modal Styles ──────────────────────────────────────────────────
   bottomModalSheet: {
     width: "100%",
+    maxHeight: "88%",
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     borderWidth: 1,

@@ -45,7 +45,8 @@ import {
   filterWatchableEpisodes,
 } from "../utils/watchState";
 import { LIBRARY_ERROR, LibraryError } from "../utils/libraryCore";
-import { updateLocalItem, deleteLocalItem } from "./listSyncService";
+import { updateLocalItem, deleteLocalItem, patchLocalListOrder } from "./listSyncService";
+import { listOrderWrites } from "../utils/listOrder";
 
 // Doküman id şeması: `tv_${showId}` — TÜM liste öğesi koleksiyonlarıyla aynı
 // (`${type}_${id}`). favorites/watchList film+dizi karışık tuttuğu için type
@@ -659,38 +660,30 @@ export async function unmarkShow(uid, showId) {
 /**
  * İzlenen diziler ekranındaki manuel sırayı show belgelerinde saklar.
  *
- * Eski model tek bir watchedTv[] dizisini yeniden yazıyordu. Yeni modelde her
- * dizi ayrı belge olduğu için taşınan aralıktaki belgelerin `listOrder` alanı
- * batch ile güncellenir. İlk sıralamada eski belgelerde listOrder bulunmuyorsa
- * bütün liste bir kez normalize edilir.
+ * Her dizi ayrı belge: konumu değişen belgelerin `listOrder` alanı batch ile
+ * güncellenir (utils/listOrder.listOrderWrites — boşluklu eski değerler de
+ * normalize olur), sonra YEREL harita yamanır: ekran yerelden okur, yalnız buluta
+ * yazılan sıra bir sonraki tazelemede eski hâline dönüyordu.
  */
-export async function reorderWatchedShows(
-  uid,
-  orderedShows,
-  fromIndex,
-  toIndex,
-) {
+export async function reorderWatchedShows(uid, orderedShows) {
   if (!uid || !Array.isArray(orderedShows) || orderedShows.length === 0) return;
 
-  const hasCompleteOrder = orderedShows.every((show) =>
-    Number.isFinite(show?.listOrder),
-  );
-  const start = hasCompleteOrder ? Math.min(fromIndex, toIndex) : 0;
-  const end = hasCompleteOrder
-    ? Math.max(fromIndex, toIndex)
-    : orderedShows.length - 1;
-  const writes = orderedShows
-    .map((show, index) => ({ id: show?.id, index }))
-    .filter(({ id, index }) => id != null && index >= start && index <= end);
+  const writes = listOrderWrites(orderedShows);
 
   // Firestore batch limiti 500; güvenli pay bırakarak büyük listeleri böl.
   const CHUNK_SIZE = 450;
   for (let offset = 0; offset < writes.length; offset += CHUNK_SIZE) {
+    const part = writes.slice(offset, offset + CHUNK_SIZE);
     const batch = writeBatch(db);
-    writes.slice(offset, offset + CHUNK_SIZE).forEach(({ id, index }) => {
-      batch.update(showRef(uid, id), { listOrder: index });
+    part.forEach(({ item, index }) => {
+      batch.update(showRef(uid, item.id), { listOrder: index, updatedAt: serverTimestamp() });
     });
     await batch.commit();
+    patchLocalListOrder(
+      uid,
+      "watchedTv",
+      part.map(({ item, index }) => [`tv_${item.id}`, index]),
+    );
   }
 }
 

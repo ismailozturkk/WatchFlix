@@ -57,7 +57,13 @@ import {
 } from "../utils/libraryCore";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import { trackFirstContentActivation } from "./activationAnalytics";
-import { updateLocalItem, updateLocalItems, deleteLocalItem } from "./listSyncService";
+import {
+  updateLocalItem,
+  updateLocalItems,
+  deleteLocalItem,
+  patchLocalListOrder,
+} from "./listSyncService";
+import { listOrderWrites } from "../utils/listOrder";
 
 export const PREDEFINED_MOVIE_LISTS = ["favorites", "watchList", "watchedMovies"];
 const CUSTOM_ITEMS = "customItems";
@@ -482,17 +488,13 @@ export async function removeWatchedMovie(uid, movieId) {
 }
 
 /**
- * Bir öntanımlı listede manuel sırayı `listOrder` ile saklar (watchedTv
- * `reorderWatchedShows` deseni: yalnız taşınan aralığı yaz, ilk seferde normalize).
+ * Bir öntanımlı listede manuel sırayı `listOrder` ile saklar: konumu değişen
+ * belgeler yazılır (utils/listOrder.listOrderWrites), sonra YEREL harita da
+ * güncellenir (ekran yerelden okur).
  */
-export async function reorderList(uid, listKey, orderedItems, fromIndex, toIndex) {
+export async function reorderList(uid, listKey, orderedItems) {
   if (!uid || !listKey || !Array.isArray(orderedItems) || orderedItems.length === 0) return;
-  await reorderDocs(
-    orderedItems,
-    fromIndex,
-    toIndex,
-    (it) => doc(db, "Lists", uid, listKey, itemKey(it.type, it.id)),
-  );
+  await reorderDocs(uid, listKey, orderedItems, (it) => itemKey(it.type, it.id));
 }
 
 // ── Özel listeler ────────────────────────────────────────────────────────────
@@ -606,14 +608,9 @@ export async function removeFromCustomList(uid, listId, type, id) {
 }
 
 /** Özel listede manuel sırayı `listOrder` ile saklar. */
-export async function reorderCustomList(uid, listId, orderedItems, fromIndex, toIndex) {
+export async function reorderCustomList(uid, listId, orderedItems) {
   if (!uid || !listId || !Array.isArray(orderedItems) || orderedItems.length === 0) return;
-  await reorderDocs(
-    orderedItems,
-    fromIndex,
-    toIndex,
-    (it) => doc(db, "Lists", uid, CUSTOM_ITEMS, customDocId(listId, it.type, it.id)),
-  );
+  await reorderDocs(uid, CUSTOM_ITEMS, orderedItems, (it) => customDocId(listId, it.type, it.id));
 }
 
 /**
@@ -879,22 +876,29 @@ export async function saveSharedListToProfile(uid, name, items, meta = {}) {
   return finalName;
 }
 
-// Ortak reorder: yalnız taşınan aralığı yaz; tüm liste listOrder içermiyorsa
-// (ilk sıralama) baştan sona normalize et. 450'lik batch parçaları.
-async function reorderDocs(orderedItems, fromIndex, toIndex, refFor) {
-  const complete = orderedItems.every((it) => Number.isFinite(it?.listOrder));
-  const start = complete ? Math.min(fromIndex, toIndex) : 0;
-  const end = complete ? Math.max(fromIndex, toIndex) : orderedItems.length - 1;
-  const writes = orderedItems
-    .map((it, index) => ({ it, index }))
-    .filter(({ it, index }) => it?.id != null && it?.type && index >= start && index <= end);
+// Ortak reorder: konumu değişen her belgeye yeni `listOrder` (boşluklu eski
+// değerler de normalize olur; bkz. listOrderWrites). `updatedAt`: diğer cihazların
+// delta eşitlemesi (syncListDelta) sıra değişikliğini de görsün. Her batch
+// sonrası yerel harita yamanır. 450'lik batch parçaları.
+async function reorderDocs(uid, collectionKey, orderedItems, docKeyFor) {
+  const writes = listOrderWrites(orderedItems).filter(({ item }) => item?.type);
 
   for (let offset = 0; offset < writes.length; offset += 450) {
+    const part = writes.slice(offset, offset + 450);
     const batch = writeBatch(db);
-    writes.slice(offset, offset + 450).forEach(({ it, index }) => {
-      batch.set(refFor(it), { listOrder: index }, { merge: true });
+    part.forEach(({ item, index }) => {
+      batch.set(
+        doc(db, "Lists", uid, collectionKey, docKeyFor(item)),
+        { listOrder: index, updatedAt: serverTimestamp() },
+        { merge: true },
+      );
     });
     await batch.commit();
+    patchLocalListOrder(
+      uid,
+      collectionKey,
+      part.map(({ item, index }) => [docKeyFor(item), index]),
+    );
   }
 }
 

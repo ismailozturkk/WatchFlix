@@ -15,6 +15,8 @@ import Toast from "@components/AppToast";
 import { useTheme } from "@context/ThemeContext";
 import { useFriends } from "@context/FriendsContext";
 import { useUserProfile } from "@context/UserProfileContext";
+import { useProfileUi } from "@context/ProfileUiContext";
+import { avatarSnapshot } from "@utils/avatarPhotos";
 import { useSharedLists } from "@context/SharedListsContext";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import { createSharedList, addSharedListMembers } from "@services/sharedListsService";
@@ -43,7 +45,9 @@ export default function CreateSharedListModal({
 }) {
   const { theme } = useTheme();
   const { friends } = useFriends();
-  const { uid, displayName, username, avatarIndex } = useUserProfile();
+  const { uid, displayName, username } = useUserProfile();
+  // Kendi avatarımın tek kaynağı (fotoğraf avatarı dahil) — kurucu kopyasına yazılır.
+  const { myAvatar } = useProfileUi();
   // Ortak liste KURMA premium limiti (üye ekleme ve katılma serbest).
   const { sharedLists } = useSharedLists();
   const sharedListsGate = usePremiumGate("shared_lists");
@@ -131,7 +135,7 @@ export default function CreateSharedListModal({
         Toast.show({ type: "success", text1: i18nText("autoI18n.uyeler_eklendi", "Üyeler eklendi") });
       } else {
         const listId = await createSharedList({
-          owner: { uid, displayName, username, avatarIndex },
+          owner: { uid, displayName, username, ...avatarSnapshot(myAvatar) },
           name,
           friends: members,
         });

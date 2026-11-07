@@ -120,7 +120,9 @@ describe("üst bölüm", () => {
     act(() => renderer.unmount());
     const props = render({ activeCount: 3 });
     expect(one("sort-filter-reset").props.disabled).toBe(false);
-    expect(textOf("sort-filter-reset")).toBe("Sıfırla · 3");
+    // Altta sabit çubukta: "Sıfırla" + etkin süzgeç sayısı rozeti.
+    expect(textOf("sort-filter-reset")).toBe("Sıfırla3");
+    expect(one("sort-filter-reset").props.accessibilityLabel).toBe("Sıfırla · 3");
     press("sort-filter-reset");
     expect(props.onReset).toHaveBeenCalledTimes(1);
   });
@@ -161,6 +163,12 @@ describe("sıralama", () => {
     render({ sort: { ...baseProps().sort, value: "default" } });
     expect(has("sort-filter-dir")).toBe(false);
     expect(has("sort-filter-dir-text")).toBe(false);
+  });
+
+  it("başlıktaki yön hapı yönü çevirir", () => {
+    const props = render({ sort: { ...baseProps().sort, value: "dateAdded", dir: "desc" } });
+    press("sort-filter-dir-toggle");
+    expect(props.sort.onChange).toHaveBeenCalledWith({ key: "dateAdded", dir: "asc" });
   });
 
   it("azalan yönde aşağı ok ve 'Azalan'", () => {
@@ -231,6 +239,7 @@ describe("bölümler", () => {
     expect(has("sort-filter-genre-Tür 13")).toBe(true);
     expect(one("sort-filter-genre-Tür 13").props.accessibilityState.selected).toBe(true);
     expect(textOf("sort-filter-genre-more")).toBe("+5 daha");
+    expect(textOf("sort-filter-genre-count")).toBe("1");
   });
 
   it("az türde 'daha' çipi çıkmaz", () => {
@@ -240,6 +249,7 @@ describe("bölümler", () => {
       ],
     });
     expect(has("sort-filter-genre-more")).toBe(false);
+    expect(has("sort-filter-genre-count")).toBe(false);
   });
 
   it("ekranın kendi düğümü (Platformlarım / Paylaşan üye) olduğu gibi çizilir", () => {

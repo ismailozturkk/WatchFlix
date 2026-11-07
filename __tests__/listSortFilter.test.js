@@ -80,7 +80,10 @@ describe("countActiveFilters / radiusKeyOf", () => {
     expect(radiusKeyOf(10)).toBe(10);
     expect(radiusKeyOf(20)).toBe(20);
     expect(radiusKeyOf(12)).toBe(10);
-    expect(radiusKeyOf(17)).toBe(20);
+    expect(radiusKeyOf(6)).toBe(6);
+    expect(radiusKeyOf(15)).toBe(15);
+    expect(radiusKeyOf(17)).toBe(15);
+    expect(radiusKeyOf(19)).toBe(20);
     expect(radiusKeyOf(undefined)).toBe(10);
     expect(radiusKeyOf("x")).toBe(10);
   });
@@ -96,7 +99,7 @@ describe("metinler", () => {
       expect(copy.results).toContain("{n}");
       expect(copy.showResults).toContain("{n}");
       expect(copy.moreChips).toContain("{n}");
-      for (const r of [2, 10, 20]) expect(copy.radius[r].length).toBeGreaterThan(0);
+      for (const r of [2, 6, 10, 15, 20]) expect(copy.radius[r].length).toBeGreaterThan(0);
       for (const c of [3, 4]) expect(copy.columnsOption[c].length).toBeGreaterThan(0);
     }
   });

@@ -102,6 +102,7 @@ import {
 import GlassTouchable from "../../components/common/GlassTouchable";
 import GlassBox from "../../components/common/GlassBox";
 import usePosterUri from "../../hooks/usePosterUri";
+import { SEARCH_DEBOUNCE_MS } from "../../utils/searchDebounce";
 const { width, height } = Dimensions.get("window");
 // Diziyi `size`'lık satırlara böler (elle grid için — Android'de dinamik
 // numColumns'lu FlatList "addViewAt: failed to insert view" çökmesine yol açıyor).
@@ -436,16 +437,11 @@ export default function ListsScreen({ route, navigation }) {
       if (listName === "watchedTv") {
         // Snapshot gelene kadar kartın yeni yerini anında göster.
         setListItems(currentItems);
-        await reorderWatchedShows(
-          user.uid,
-          currentItems,
-          fromIndex,
-          targetIndex,
-        );
+        await reorderWatchedShows(user.uid, currentItems);
       } else if (PREDEFINED_MOVIE_LISTS.includes(listName)) {
         // Yeni model: her öğe ayrı doküman → listOrder batch.
         setListItems(currentItems);
-        await reorderList(user.uid, listName, currentItems, fromIndex, targetIndex);
+        await reorderList(user.uid, listName, currentItems);
       } else {
         // Özel liste (kök dokümandaki dizi): ekrandaki nihai sırayı libraryActions
         // transaction içinde uygular; ekranın görmediği (başka cihazda eklenen)
@@ -704,7 +700,7 @@ export default function ListsScreen({ route, navigation }) {
       } finally {
         if (reqId === globalReqRef.current) setGlobalLoading(false);
       }
-    }, 450);
+    }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
   }, [searchMode, searchQuery, listName, API_KEY, language, adultContent]);
@@ -1772,6 +1768,13 @@ export default function ListsScreen({ route, navigation }) {
         itemCount={listItems.length}
         accent={accent}
         busy={isReordering}
+        // Elle sıra yalnız "Liste sırası" görünümünde görünür: ada/tarihe/süreye göre
+        // sıralıyken taşıma kaydedilse de ekranda hiçbir şey kıpırdamıyordu.
+        canMove={!sortActive}
+        moveDisabledHint={i18nText(
+          "autoI18n.tasima_yalniz_liste_sirasinda",
+          "Taşımak için Sırala menüsünden \"Liste sırası\"nı seç",
+        )}
         onClose={closeReorderModal}
         onMove={(targetIndex) =>
           reorderWatchedTv(index, String(targetIndex + 1), listName)

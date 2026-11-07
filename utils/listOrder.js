@@ -24,3 +24,21 @@ export const sortItemsByListOrder = (items) =>
     const bDate = new Date(b?.dateAdded || 0).getTime() || 0;
     return aDate - bDate || String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
   });
+
+/**
+ * Elle taşıma sonrası yazılacak `listOrder` değerleri: ekrandaki NİHAİ sıradaki
+ * her öğe için konumu (0…n-1), yalnız kayıtlı değeri farklı olanlar döner.
+ *
+ * NEDEN "yalnız taşınan aralık" DEĞİL: eskiden yalnız from…to aralığı yazılıyordu.
+ * Silinen öğeler `listOrder`da boşluk bırakır (ör. [3, 4, 5]); aralık dışında kalan
+ * öğenin eski değeri yeni yazılan küçük değerlerden BÜYÜK kalınca o öğe listenin
+ * sonuna kayıyor, taşıma "işe yaramamış" gibi görünüyordu. Değer zaten konumuna
+ * eşitse yazılmaz: bitişik listede yine yalnız taşınan aralık yazılır.
+ *
+ * @param {Array<{id:any, listOrder?:number}>} orderedItems ekrandaki nihai sıra
+ * @returns {Array<{ item: object, index: number }>}
+ */
+export const listOrderWrites = (orderedItems) =>
+  (Array.isArray(orderedItems) ? orderedItems : [])
+    .map((item, index) => ({ item, index }))
+    .filter(({ item, index }) => item?.id != null && item.listOrder !== index);

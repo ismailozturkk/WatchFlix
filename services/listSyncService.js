@@ -136,6 +136,24 @@ export function updateLocalItems(uid, listKey, patch) {
 }
 
 /**
+ * Elle sıralama sonrası yerel haritadaki `listOrder` alanlarını TEK yazımda
+ * günceller. Listeler yerelden okunur ve yerel harita yalnız bu cihazın
+ * yazımlarıyla güncellenir: sıra yalnız buluta yazıldığında ekran bir sonraki
+ * tazelemede (ya da yeniden açılışta) ESKİ sıraya dönüyordu. Yerelde olmayan
+ * öğe eklenmez (yarım kayıt oluşmasın).
+ * @param {Array<[string, number]>} entries [[itemKey, listOrder], …]
+ */
+export function patchLocalListOrder(uid, listKey, entries) {
+  if (!uid || !listKey || !Array.isArray(entries) || entries.length === 0) return;
+  const current = getLocalList(uid, listKey);
+  const patch = {};
+  entries.forEach(([key, listOrder]) => {
+    if (current[key]) patch[key] = { ...current[key], listOrder };
+  });
+  updateLocalItems(uid, listKey, patch);
+}
+
+/**
  * Tek bir öğeyi yerel depodan hemen siler (Optimistic delete).
  * @param {string} uid
  * @param {string} listKey
