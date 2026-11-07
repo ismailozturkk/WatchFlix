@@ -3,11 +3,11 @@
 // Eğlence sekmesindeki "Oyunlar" modülü (dosya adı, profilden taşındığı günden
 // kaldı). Yukarıdan aşağıya:
 //   0) Başlık + oyuncu çipi — seviye halkası/seri; dokununca Oyun Merkezi (ilerleme)
-//   1) Günlük Meydan Okuma  — ince bant, tek dokunuşla oynanır, her gün yeni set
-//   2) Oyunlar              — Sahne Tahmin + Poster Bulmaca yan yana iki büyük kart,
-//                             altında hızlı oyunlar yatay rayda; her kartta oyunun
-//                             küçük önizlemesi (components/game/QuickGamesGrid +
-//                             GamePreviews)
+//   1) Günün Karesi         — Framed tarzı günlük film (Premium "daily_frame"; screens/game/DailyFrameScreen)
+//   1b) Günlük Meydan Okuma — ince bant, tek dokunuşla oynanır, her gün yeni set
+//   2) Hızlı oyunlar        — Sahne Tahmin + Poster Bulmaca dahil bütün oyunlar
+//                             tek yatay rayda; her kartta küçük bir mekanik önizlemesi
+//                             (components/game/QuickGamesGrid + GamePreviews)
 //
 // KOMPAKT DÜZEN (23 Eki, aynı gün ikinci istek): modül ~800 pt'den ~590 pt'ye indi —
 // tam genişlik oyuncu şeridi başlığa çip oldu, günlük kart ince banda, 4 satırlık
@@ -27,6 +27,7 @@ import Skeleton from "@components/Skeleton";
 import PremiumPill from "@components/premium/PremiumPill";
 import { usePremiumGate } from "@hooks/usePremiumGate";
 import DailyChallengeCard from "@components/game/DailyChallengeCard";
+import DailyFrameCard from "@components/game/DailyFrameCard";
 import DuelSendButton from "@components/game/DuelSendButton";
 import GameSetupSheet from "@components/game/GameSetupSheet";
 import QuickGamesGrid from "@components/game/QuickGamesGrid";
@@ -76,6 +77,13 @@ export default function ProfileGamesModule({ navigation }) {
   // Film Zinciri ayrı bir Premium erişimi (registry "film_chain"): kartı "Premium" yazar, dokununca yükseltme.
   const chainGate = usePremiumGate("film_chain");
   const chainLocked = !chainGate.allows(0);
+  // Günün Karesi de ayrı bir Premium erişimi (registry "daily_frame"): Free'de kart görünür, dokununca yükseltme.
+  const frameGate = usePremiumGate("daily_frame");
+  const frameLocked = !frameGate.allows(0);
+  const openFrame = () => {
+    if (frameLocked) frameGate.showUpsell();
+    else navigation.navigate("DailyFrameScreen");
+  };
   const locked = !gamesGate.allows(0);
   const guarded = (action) => (...args) => {
     if (locked) {
@@ -112,7 +120,7 @@ export default function ProfileGamesModule({ navigation }) {
     else navigation.navigate("QuickGameScreen", { gameId, source: "hub" });
   };
 
-  // Sahne Tahmin + Poster Bulmaca, hızlı oyunlarla aynı karo dilinde ızgaranın başında.
+  // Sahne Tahmin + Poster Bulmaca, Hızlı oyunlar rayının başında aynı kompakt karo dilinde.
   const leadingTiles = useMemo(
     () =>
       GAME_REGISTRY.map((game) => ({
@@ -156,12 +164,15 @@ export default function ProfileGamesModule({ navigation }) {
         <GamesModuleSkeleton theme={theme} />
       ) : (
         <View style={styles.stack}>
+          {/* Günün Karesi: kendi kapısı (daily_frame); kilitliyken kart "Premium" der. */}
+          <DailyFrameCard locked={frameLocked} onPlay={openFrame} />
+
           <DailyChallengeCard daily={daily} theme={theme} onPlay={playDaily} onResult={openDailyBoard} compact />
 
           {/* Bugünkü deneme bittiyse: sonucu bir arkadaşa düello olarak gönder. */}
           {duelPayload ? <DuelSendButton payload={duelPayload} theme={theme} source="hub" dense /> : null}
 
-          {/* Önizlemeli oyun kartları; hızlı oyunlar kilit şeridinden bağımsız, her planda açık. */}
+          {/* Sahne oyunları rayın başında; yerel hızlı oyunlar kilit şeridinden bağımsız ve her planda açık. */}
           <QuickGamesGrid
             theme={theme}
             onOpen={openQuickGame}
@@ -192,13 +203,10 @@ function GamesModuleSkeleton({ theme }) {
       accessibilityLabel={i18nText("autoI18n.oyunlar_yukleniyor", "Oyunlar yükleniyor")}
     >
       <Skeleton height={134} style={[styles.skeletonHero, box]} />
-      <View style={[styles.tiles, styles.tilesSkeleton]}>
-        <Skeleton width="48.5%" height={170} style={[styles.skeletonTile, box]} />
-        <Skeleton width="48.5%" height={170} style={[styles.skeletonTile, box]} />
-      </View>
+      <Skeleton height={82} style={[styles.skeletonDaily, box]} />
       <View style={styles.tiles}>
-        <Skeleton width={150} height={142} style={[styles.skeletonTile, box]} />
-        <Skeleton width={150} height={142} style={[styles.skeletonTile, box]} />
+        <Skeleton width={166} height={190} style={[styles.skeletonTile, box]} />
+        <Skeleton width={166} height={190} style={[styles.skeletonTile, box]} />
       </View>
     </View>
   );
@@ -223,5 +231,6 @@ const styles = StyleSheet.create({
   tiles: { flexDirection: "row", gap: 10, overflow: "hidden" },
   tilesSkeleton: { justifyContent: "space-between" },
   skeletonHero: { borderRadius: 22 },
-  skeletonTile: { borderRadius: 20 },
+  skeletonDaily: { borderRadius: 18 },
+  skeletonTile: { borderRadius: 22 },
 });
