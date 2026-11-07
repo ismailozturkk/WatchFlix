@@ -58,6 +58,7 @@ import { avatarSnapshot } from "@utils/avatarPhotos";
 import { useUserProfile } from "@context/UserProfileContext";
 import UserAvatar from "../common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
+import { postPreviewPosters } from "@utils/postComposer";
 import appAlert from "@components/AppAlert";
 import { toast } from "@components/AppToast";
 import { alpha } from "../../theme/colors";
@@ -283,7 +284,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
   const insets = useWindowSafeAreaInsets();
 
   const postId = post?.id;
-  const postPoster = post?.mediaList?.find((item) => item?.poster)?.poster || null;
+  const postPoster = postPreviewPosters(post)[0] || null;
   const isPostAuthorMe = post?.authorId === user?.uid;
 
   const [comments, setComments] = useState([]);
@@ -436,7 +437,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
           authorAvatarIndex: avatarSnapshot(myAvatar).avatarIndex,
           authorPhotoURL: avatarSnapshot(myAvatar).photoURL,
           postTitle: post?.title || "",
-          postPoster: post?.mediaList?.[0]?.poster || null,
+          postPoster: postPreviewPosters(post)[0] || null,
           },
         );
         // Yanıt yazıldıysa o thread'i otomatik aç
@@ -687,6 +688,10 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
                     ? i18nText("autoI18n.liste", "Liste")
                     : post?.type === "poll"
                       ? i18nText("autoI18n.anket", "Anket")
+                      : post?.type === "tierlist"
+                        ? i18nText("autoI18n.tier_list", "Tier list")
+                      : post?.type === "tvgraph"
+                        ? i18nText("autoI18n.bolum_grafigi", "Bölüm grafiği")
                       : post?.type === "text"
                         ? i18nText("autoI18n.sohbet", "Sohbet")
                         : i18nText("autoI18n.inceleme", "İnceleme")}

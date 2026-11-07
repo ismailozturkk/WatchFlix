@@ -25,6 +25,7 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useApiSettings, useContentSettings, useImageQualitySettings } from "@context/AppSettingsContext";
@@ -80,19 +81,31 @@ import {
 } from "./createPost/ComposerParts";
 import { DraftCard, DraftsEmpty } from "./createPost/DraftCard";
 import LeaveSheet from "./createPost/LeaveSheet";
+import TierListPicker from "./createPost/TierListPicker";
+import TvGraphShareCard from "../tv/TvGraphShareCard";
+import useTierLists from "@hooks/useTierLists";
+import { buildTierListShare } from "@utils/chatShare";
+import { tierListShareView } from "@utils/tierList";
+import { getTierListCopy } from "@utils/tierListCopy";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../common/GlassTouchable";
 import GlassTextInput from "../common/GlassTextInput";
 import GlassBox from "../common/GlassBox";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
+import { SEARCH_DEBOUNCE_MS } from "../../utils/searchDebounce";
 // Karakter sınırları — büyük Firestore dökümanlarını ve aşırı uzun
 // içerikleri önler. Sayaçlar bu sabitlere göre gösterilir.
 const MAX_TITLE = 100;
 const MAX_CONTENT = 2000;
 
-// Post tipi → segmented control indeksi (kayan gösterge konumu 0..3).
-const TYPE_INDEX = { review: 0, list: 1, text: 2, poll: 3 };
+// Post tipi → segmented control indeksi (kayan gösterge konumu 0..4). "tvgraph" seçicide YOK: yalnız dizinin Bölüm
+// Grafiği ekranından (initialPost) ya da taslaktan gelir; o türde tür seçici gizlenir.
+const TYPE_INDEX = { review: 0, list: 1, text: 2, poll: 3, tierlist: 4, tvgraph: 5 };
+const TYPES = Object.keys(TYPE_INDEX);
+
+// Taslağın "kayıtlı mı?" karşılaştırması için tier list gövdesinin imzası.
+const tierListSig = (tierList) => (tierList ? JSON.stringify(tierList.tiers || []) + (tierList.title || "") : "");
 const MAX_POLL = 4;
 
 
@@ -149,6 +162,9 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   const { displayName, username } = useUserProfile();
 
   const isEditing = !!editingPost;
+  const navigation = useNavigation();
+  const tierCopy = getTierListCopy(language);
+  const { lists: tierLists } = useTierLists();
 
   // Poster URI: taze TMDB öğesinde poster_path, düzenlenen gönderide tam URL (poster).
   const posterUri = (item, size = 200) =>
@@ -203,6 +219,14 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   // Anket: seçenekler [{ id, label, media }] + tip ("media" | "text")
   const [pollOptions, setPollOptions] = useState([]);
   const [pollKind, setPollKind] = useState("media");
+  // Tier list: paylaşım gövdesi (utils/chatShare.buildTierListShare) + cihazdaki kaynağı (seçim işareti için).
+  const [tierList, setTierList] = useState(null);
+  const [tierListSourceId, setTierListSourceId] = useState(null);
+  const [tierListChoosing, setTierListChoosing] = useState(false);
+  // "Yeni tier list oluştur": pencere tamamen kapandıktan sonra gidilecek ekran (iOS iki Modal kuralı).
+  const pendingNavRef = useRef(null);
+  // Bölüm grafiği: utils/tvGraphShare.buildTvGraphShare anlık görüntüsü (selectedMedia'da dizinin kendisi durur).
+  const [tvGraph, setTvGraph] = useState(null);
 
   // Search state
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -262,7 +286,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   // Düzenleme: modal açıldığında gönderiyi forma yükle (yeni oluşturmada dokunma).
   useEffect(() => {
     if (visible && editingPost) {
-      const type = ["review", "list", "text", "poll"].includes(editingPost.type)
+      const type = TYPES.includes(editingPost.type)
         ? editingPost.type
         : "review";
       setPostType(type);
@@ -274,6 +298,10 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       setSelectedMedia(postMediaToSelected(editingPost.mediaList));
       setPollKind(editingPost.poll?.type === "text" ? "text" : "media");
       setPollOptions(pollOptionsFromPost(editingPost.poll));
+      setTierList(editingPost.tierList || null);
+      setTvGraph(editingPost.tvGraph || null);
+      setTierListSourceId(null);
+      setTierListChoosing(false);
       setError("");
       setShowDrafts(false);
       setCurrentDraftId(null);
@@ -285,7 +313,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   // başlığı/içeriği düzenleyip mevcut Hub paylaşım yapısıyla gönderir.
   useEffect(() => {
     if (!visible || editingPost || !initialPost) return;
-    const type = ["review", "list", "text", "poll"].includes(initialPost.postType)
+    const type = TYPES.includes(initialPost.postType)
       ? initialPost.postType
       : "review";
     setPostType(type);
@@ -299,6 +327,10 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     );
     setPollKind(initialPost.pollKind === "text" ? "text" : "media");
     setPollOptions(initialPost.pollOptions || []);
+    setTierList(initialPost.tierList || null);
+    setTvGraph(initialPost.tvGraph || null);
+    setTierListSourceId(initialPost.tierListId || null);
+    setTierListChoosing(false);
     setError("");
     setShowDrafts(false);
     setCurrentDraftId(null);
@@ -317,17 +349,19 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       existing.postType === postType &&
       existing.userRating === userRating &&
       existing.hasSpoiler === hasSpoiler &&
+      tierListSig(existing.tierList) === tierListSig(tierList) &&
+      (existing.tvGraph?.id || null) === (tvGraph?.id || null) &&
       // KİMLİK imzası, tam nesne değil: süre/tür arka planda dolarken taslak
       // "değişmiş" görünüp yer imi ikonunu söndürmesin ve kapanışta gereksiz
       // "Paylaşımı bırak?" uyarısı çıkmasın.
       mediaSignature(existing.selectedMedia) === mediaSignature(selectedMedia)
     );
-  }, [currentDraftId, title, content, postType, userRating, hasSpoiler, selectedMedia, drafts]);
+  }, [currentDraftId, title, content, postType, userRating, hasSpoiler, selectedMedia, tierList, tvGraph, drafts]);
 
   // Dönüş: taslak artık diskte mi? "Taslağa kaydet ve çık" yalnız true iken
   // pencereyi kapatır; kaydedilemediyse kullanıcı yazdığıyla baş başa kalır.
   const saveDraft = async () => {
-    if (!title.trim() && !content.trim() && selectedMedia.length === 0) {
+    if (!title.trim() && !content.trim() && selectedMedia.length === 0 && !tierList && !tvGraph) {
       Toast.show({ type: "warning", text1: i18nText("autoI18n.bos_taslak_olusturulamadi", "Boş taslak oluşturulamadı") });
       return false;
     }
@@ -338,6 +372,8 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     const draftData = {
       id: currentDraftId || Date.now().toString(),
       postType, title, content, selectedMedia, userRating, hasSpoiler,
+      tierList: postType === "tierlist" ? tierList : null,
+      tvGraph: postType === "tvgraph" ? tvGraph : null,
       createdAt: Date.now(),
     };
     let updatedDrafts;
@@ -364,6 +400,10 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     setSelectedMedia(draft.selectedMedia || []);
     setUserRating(draft.userRating || 0);
     setHasSpoiler(draft.hasSpoiler || false);
+    setTierList(draft.tierList || null);
+    setTvGraph(draft.tvGraph || null);
+    setTierListSourceId(null);
+    setTierListChoosing(false);
     setShowDrafts(false);
   };
 
@@ -383,7 +423,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       } else {
         fetchPopularMedia(reqId);
       }
-    }, 450);
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [searchQuery, searchType, isSearchActive]);
 
@@ -560,6 +600,8 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       content,
       selectedMedia,
       pollOptions,
+      tierList,
+      tvGraph,
     });
     if (!ok) {
       const messages = {
@@ -568,6 +610,8 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
         reviewMedia: i18nText("autoI18n.lutfen_incelemeniz_icin_bir_film_veya_dizi_secin", "Lütfen incelemeniz için bir film veya dizi seçin."),
         listMedia: i18nText("autoI18n.liste_olusturmak_icin_en_az_2_icerik_secmelisiniz", "Liste oluşturmak için en az 2 içerik seçmelisiniz."),
         pollOptions: i18nText("autoI18n.anket_icin_en_az_2_secenek_ekle", "Anket için en az 2 seçenek ekle."),
+        tierList: i18nText("autoI18n.tier_list_sec_uyari", "Paylaşmak için bir tier list seç."),
+        tvGraph: i18nText("autoI18n.tvgraph_sec_uyari", "Paylaşılacak bölüm grafiği yok."),
         type: i18nText("autoI18n.gecersiz_paylasim_tipi", "Geçersiz paylaşım tipi."),
       };
       failWith(messages[vErr] || messages.content);
@@ -579,7 +623,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     // kalanlar burada toplanır. Bütçeli (12 öğe / 2.5 sn) ve BLOKLAMAZ —
     // süre gelmezse paylaşım yine gider, kısmi sonuç bile kullanılır.
     let media = selectedMedia;
-    if (postType !== "poll" && API_KEY) {
+    if (postType !== "poll" && postType !== "tierlist" && API_KEY) {
       const missing = pickFactTargets(media, { limit: 12 });
       if (missing.length > 0) {
         const reqId = ++factsReqRef.current;
@@ -638,9 +682,9 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
       type: postType,
       title: title.trim(),
       content: content.trim(),
-      mediaList: postType === "poll" ? [] : mediaList,
+      mediaList: postType === "poll" || postType === "tierlist" ? [] : mediaList,
       userRating:
-        postType === "text" || postType === "poll"
+        postType === "text" || postType === "poll" || postType === "tierlist" || postType === "tvgraph"
           ? null
           : userRating > 0
             ? userRating
@@ -664,6 +708,8 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
         options: pollOptions,
       });
     }
+    if (postType === "tierlist") payload.tierList = tierList;
+    if (postType === "tvgraph") payload.tvGraph = tvGraph;
 
     // Eğer parent `onSubmit` verdiyse (PostsContext.submitPost) onu kullan;
     // vermediyse fallback olarak sadece toast göster.
@@ -707,6 +753,8 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     setPostType("review"); setShowDrafts(false); setCurrentDraftId(null);
     setHasSpoiler(false); setUserRating(0);
     setRanked(false); setPollOptions([]); setPollKind("media");
+    setTierList(null); setTierListSourceId(null); setTierListChoosing(false);
+    setTvGraph(null);
     setListPickerVisible(false);
     setLeavePrompt(null);
     importedListRef.current = null;
@@ -741,7 +789,9 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
         title.trim() ||
         content.trim() ||
         selectedMedia.length > 0 ||
-        userRating > 0
+        userRating > 0 ||
+        !!tierList ||
+        !!tvGraph
       ),
       isEditing,
       isSavedDraft,
@@ -873,8 +923,8 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
   // Form eksiksizse Paylaş tam renkli; eksikse soluk ama YİNE DE basılabilir
   // (basınca neyin eksik olduğunu söyleyen hata kutusu açılır).
   const canShare = useMemo(
-    () => validatePost({ type: postType, title, content, selectedMedia, pollOptions }).ok,
-    [postType, title, content, selectedMedia, pollOptions],
+    () => validatePost({ type: postType, title, content, selectedMedia, pollOptions, tierList, tvGraph }).ok,
+    [postType, title, content, selectedMedia, pollOptions, tierList, tvGraph],
   );
 
   // ─── HIZLI EKLE (inceleme) ───────────────────────────────────────────────────
@@ -961,13 +1011,49 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
     { key: "list", icon: "list", label: i18nText("autoI18n.liste_2", "Liste"), color: typeColor("list") },
     { key: "text", icon: "chatbubble-ellipses", label: i18nText("autoI18n.sohbet", "Sohbet"), color: typeColor("text") },
     { key: "poll", icon: "stats-chart", label: i18nText("autoI18n.anket", "Anket"), color: typeColor("poll") },
+    { key: "tierlist", icon: "podium", label: i18nText("autoI18n.tier_list", "Tier list"), color: typeColor("tierlist") },
   ];
+
+  // ─── TIER LIST ───────────────────────────────────────────────────────────────
+  // Cihazdaki tablo → gönderi gövdesi (yalnız kademelere yerleşmiş yapımlar). Başlık boşsa tablonun adı yazılır.
+  const handlePickTierList = (list) => {
+    const share = buildTierListShare(tierListShareView(list));
+    if (!share) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setTierList(share);
+    setTierListSourceId(list.id);
+    setTierListChoosing(false);
+    if (!title.trim() && share.title) setTitle(share.title.slice(0, MAX_TITLE));
+    setError("");
+  };
+
+  const flushPendingNav = () => {
+    const target = pendingNavRef.current;
+    pendingNavRef.current = null;
+    if (target) navigation.navigate(target.name, target.params);
+  };
+
+  // Tablo oluşturma Eğlence'deki Tablolarım ekranında; yazılan metin kaybolmasın diye önce taslağa alınır.
+  const handleCreateTierList = async () => {
+    if (title.trim() || content.trim()) {
+      const saved = await saveDraft();
+      if (!saved) return;
+    }
+    pendingNavRef.current = { name: "TierListsScreen", params: { create: true } };
+    handleClose();
+    // Android'de Modal onDismiss gelmez: gezinme hemen.
+    if (Platform.OS !== "ios") flushPendingNav();
+  };
 
   const titlePlaceholder =
     postType === "review"
       ? i18nText("autoI18n.inceleme_basligi", "İnceleme başlığı...")
       : postType === "poll"
         ? i18nText("autoI18n.anket_sorusu", "Anket sorusu (Örn: Bu akşam hangisi?)...")
+        : postType === "tierlist"
+          ? i18nText("autoI18n.tier_list_basligi", "Tier list başlığı...")
+        : postType === "tvgraph"
+          ? i18nText("autoI18n.tvgraph_baslik_ph", "Grafik başlığı...")
         : postType === "text"
           ? i18nText("autoI18n.baslik", "Başlık...")
           : i18nText("autoI18n.liste_basligi_orn_en_iyi_10_bilim_kurgu", "Liste başlığı (Örn: En İyi 10 Bilim Kurgu)...");
@@ -1007,7 +1093,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
 
   // ─── RENDER ──────────────────────────────────────────────────────────────────
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={requestClose}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={requestClose} onDismiss={flushPendingNav}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <View style={s.backdrop}>
           <TouchableWithoutFeedback onPress={requestClose}>
@@ -1145,14 +1231,16 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
             ══════════════════════════════════════════════ */}
             {!isSearchActive && !showDrafts && (
               <>
-                {/* Tip seçici (4 tip) */}
-                <TypeSelector
-                  theme={theme}
-                  items={typeItems}
-                  active={postType}
-                  onChange={setPostType}
-                  anim={postTypeAnim}
-                />
+                {/* Tip seçici (5 tip; bölüm grafiği gönderisinde gizli — o tür yalnız grafik ekranından gelir) */}
+                {postType !== "tvgraph" && (
+                  <TypeSelector
+                    theme={theme}
+                    items={typeItems}
+                    active={postType}
+                    onChange={setPostType}
+                    anim={postTypeAnim}
+                  />
+                )}
 
                 <ScrollView ref={formScrollRef} style={s.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                   {/* Error */}
@@ -1363,6 +1451,66 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                           )}
                         </View>
                       )}
+                    </>
+                  )}
+
+                  {/* ── TIER LIST LAYOUT ── */}
+                  {postType === "tierlist" && (
+                    <>
+                      <FieldCard
+                        theme={theme}
+                        accent={currentAccent}
+                        icon="create-outline"
+                        label={i18nText("autoI18n.composer_label_aciklama", "Açıklama")}
+                        value={content}
+                        onChangeText={(text) => { setContent(text); setError(""); }}
+                        placeholder={tierCopy.postPlaceholder}
+                        maxLength={MAX_CONTENT}
+                        multiline
+                        minHeight={90}
+                        style={[s.gapTop, hasSpoiler && { borderColor: "rgba(240,79,79,0.5)" }]}
+                      />
+                      <OptionsCard theme={theme}>{spoilerRow}</OptionsCard>
+                      <TierListPicker
+                        theme={theme}
+                        accent={currentAccent}
+                        copy={tierCopy}
+                        lists={tierLists}
+                        selected={tierList}
+                        selectedId={tierListSourceId}
+                        choosing={tierListChoosing}
+                        onChoose={() => setTierListChoosing(true)}
+                        onPick={handlePickTierList}
+                        onCreate={handleCreateTierList}
+                      />
+                    </>
+                  )}
+
+                  {/* ── BÖLÜM GRAFİĞİ LAYOUT ── */}
+                  {postType === "tvgraph" && (
+                    <>
+                      <FieldCard
+                        theme={theme}
+                        accent={currentAccent}
+                        icon="create-outline"
+                        label={i18nText("autoI18n.composer_label_aciklama", "Açıklama")}
+                        value={content}
+                        onChangeText={(text) => { setContent(text); setError(""); }}
+                        placeholder={i18nText("autoI18n.tvgraph_aciklama_ph", "Grafik hakkında ne düşünüyorsun? En iyi sezon hangisi?")}
+                        maxLength={MAX_CONTENT}
+                        multiline
+                        minHeight={90}
+                        style={[s.gapTop, hasSpoiler && { borderColor: "rgba(240,79,79,0.5)" }]}
+                      />
+                      <OptionsCard theme={theme}>{spoilerRow}</OptionsCard>
+                      <SectionHeader
+                        theme={theme}
+                        accent={currentAccent}
+                        label={i18nText("autoI18n.bolum_grafigi", "Bölüm grafiği")}
+                      />
+                      {tvGraph ? (
+                        <TvGraphShareCard graph={tvGraph} maxGraphHeight={360} showLegend style={{ marginBottom: 6 }} testID="composer-tvgraph" />
+                      ) : null}
                     </>
                   )}
 

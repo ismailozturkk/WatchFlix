@@ -4,6 +4,9 @@ const {
   buildPollObject,
   tallyVotes,
   POST_TYPES,
+  postTypeBadge,
+  postPreviewPosters,
+  tierListMediaOf,
 } = require("../utils/postComposer");
 
 describe("validatePost", () => {
@@ -197,5 +200,37 @@ describe("resolveCloseIntent", () => {
     expect(resolveCloseIntent({ hasContent: true, isEditing: true, isSavedDraft: true })).toBe(
       "confirm-edit",
     );
+  });
+});
+
+describe("tier list gönderisi", () => {
+  const tierList = {
+    title: "Seri katiller",
+    total: 2,
+    tiers: [
+      { label: "S", color: "#FF7F7F", items: [{ id: 1, media_type: "movie", title: "Se7en", poster_path: "/se7en.jpg" }] },
+      { label: "A", color: "#FFBF7F", items: [] },
+      { label: "B", color: "#FFDF7F", items: [{ id: 2, media_type: "tv", title: "Mindhunter" }] },
+    ],
+  };
+
+  test("tür listede; rozet kendi rengi ve etiketiyle", () => {
+    expect(POST_TYPES).toContain("tierlist");
+    expect(postTypeBadge("tierlist", { orange: "#123456" })).toMatchObject({ fallback: "TIER LIST", color: "#123456" });
+  });
+
+  test("tablo zorunlu (en az bir yerleşmiş yapım); açıklama isteğe bağlı", () => {
+    expect(validatePost({ type: "tierlist", title: "T" }).error).toBe("tierList");
+    expect(validatePost({ type: "tierlist", title: "T", tierList: { ...tierList, total: 0 } }).error).toBe("tierList");
+    expect(validatePost({ type: "tierlist", title: "", tierList }).error).toBe("title");
+    expect(validatePost({ type: "tierlist", title: "T", content: "", tierList }).ok).toBe(true);
+  });
+
+  test("yapımlar kademe sırasıyla; küçük resimler yalnız afişi olanlardan", () => {
+    expect(tierListMediaOf(tierList).map((m) => m.id)).toEqual([1, 2]);
+    expect(tierListMediaOf(null)).toEqual([]);
+    expect(postPreviewPosters({ type: "tierlist", tierList })).toEqual(["https://image.tmdb.org/t/p/w342/se7en.jpg"]);
+    expect(postPreviewPosters({ type: "list", mediaList: [{ poster: "u1" }, { poster: null }] })).toEqual(["u1"]);
+    expect(postPreviewPosters(null)).toEqual([]);
   });
 });

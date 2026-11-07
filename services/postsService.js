@@ -7,11 +7,17 @@
 //   authorId          : string
 //   authorName        : string                (denormalize)
 //   authorAvatarIndex : number 0-55           (utils/avatars.js -> getAvatarSource)
-//   type              : 'review' | 'list' | 'text' | 'poll'
+//   type              : 'review' | 'list' | 'text' | 'poll' | 'tierlist' | 'tvgraph'
 //   title, content    : string
 //   mediaList         : Array<{ id, type, title, poster, year }>
 //   userRating?       : 1-5
 //   hasSpoiler?       : boolean
+//   tierList?         : { title, total, tiers: [{ label, color, items: [{ id, media_type, title, poster_path?, year? }] }] }
+//                       yalnız 'tierlist' — utils/chatShare.buildTierListShare anlık görüntüsü (cihazdaki tablo değişse de
+//                       gönderi paylaşıldığı gibi kalır); en çok 10 kademe / 100 yapım
+//   tvGraph?          : { id, title, poster_path?, years?, rating?, seasons: [{ s, r: [puan] }], totalSeasons, totalEpisodes }
+//                       yalnız 'tvgraph' — dizinin bölüm grafiği anlık görüntüsü (utils/tvGraphShare.postTvGraphOf);
+//                       mediaList'te dizinin kendisi durur (küçük resimler + eski sürümlerde inceleme gibi görünür)
 //   visibility        : 'public' | 'followers'
 //   likesCount, commentsCount : number
 //   createdAt, updatedAt      : Timestamp
@@ -54,6 +60,8 @@ import { i18nText } from "../utils/i18nText";
 import { clampAvatarIndex, DEFAULT_AVATAR_INDEX } from "../utils/avatars";
 // Paylaşım tipleri tek yerden gelir (composer + feed filtreleri aynı listeyi kullanır).
 import { POST_TYPES } from "../utils/postComposer";
+import { buildTierListShare } from "../utils/chatShare";
+import { postTvGraphOf } from "../utils/tvGraphShare";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics";
 import {
   createSocialNotification,
@@ -65,6 +73,12 @@ import {
 } from "./usageTrackerService";
 
 const PAGE = 15;
+
+// Tier list gövdesi: sohbet kartıyla AYNI temizlik; sohbete özgü alanlar (sürüm, tür, gönderen) gönderiye yazılmaz.
+const postTierListOf = (raw) => {
+  const share = buildTierListShare({ title: raw?.title, tiers: raw?.tiers });
+  return share ? { title: share.title, total: share.total, tiers: share.tiers } : null;
+};
 
 const FEED_SORT_FIELDS = {
   recent: "createdAt",
@@ -107,6 +121,10 @@ export async function createPost(user, payload) {
   if (!payload?.type || !POST_TYPES.includes(payload.type))
     throw new Error("createPost: geçersiz type");
   if (!payload?.title?.trim()) throw new Error("createPost: title boş olamaz");
+  const tierList = payload.type === "tierlist" ? postTierListOf(payload.tierList) : null;
+  if (payload.type === "tierlist" && !tierList) throw new Error("createPost: tier list boş");
+  const tvGraph = payload.type === "tvgraph" ? postTvGraphOf(payload.tvGraph) : null;
+  if (payload.type === "tvgraph" && !tvGraph) throw new Error("createPost: bölüm grafiği boş");
 
   // Avatar index — payload'dan al, yoksa 0'a düşür. clamp güvenli.
   const authorAvatarIndex = clampAvatarIndex(
@@ -145,6 +163,8 @@ export async function createPost(user, payload) {
       votes: {},
     };
   }
+  if (tierList) base.tierList = tierList;
+  if (tvGraph) base.tvGraph = tvGraph;
   const docRef = await addDoc(collection(db, "Posts"), base);
   trackFirestoreWrite("Posts", 1);
 
@@ -177,7 +197,7 @@ export async function deletePost(postId, uid) {
 /**
  * Post'u güncelle. Yalnız sahibi yapabilir (rules enforce).
  * Güncellenebilir alanlar: title, content, type, mediaList, userRating,
- * hasSpoiler, visibility. Counter / createdAt / authorId değiştirilemez.
+ * hasSpoiler, visibility, tierList / tvGraph (temizlenerek). Counter / createdAt / authorId değiştirilemez.
  *
  * @param {string} postId
  * @param {Object} partial   Üstüne yazılacak alanlar
@@ -196,6 +216,14 @@ export async function updatePost(postId, partial) {
   const safe = {};
   for (const key of ALLOWED) {
     if (partial[key] !== undefined) safe[key] = partial[key];
+  }
+  if (partial.tierList !== undefined) {
+    const tierList = postTierListOf(partial.tierList);
+    if (tierList) safe.tierList = tierList;
+  }
+  if (partial.tvGraph !== undefined) {
+    const tvGraph = postTvGraphOf(partial.tvGraph);
+    if (tvGraph) safe.tvGraph = tvGraph;
   }
   if (safe.title) safe.title = String(safe.title).trim();
   if (safe.content) safe.content = String(safe.content).trim();

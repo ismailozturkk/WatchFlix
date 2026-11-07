@@ -27,30 +27,33 @@ import AppIcon from "../AppIcon";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import RatingStars from "../RatingStars";
 import PollMessage from "../chat/PollMessage";
+import PostTierListBlock from "./PostTierListBlock";
+import PostTvGraphBlock from "./PostTvGraphBlock";
 import UserAvatar from "../common/UserAvatar";
 import ClampedText, { ReadMoreToggle } from "./ClampedText";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 import { formatTimeAgo } from "../../utils/postTime";
 import { postTypeMeta } from "./postTypeMeta";
+import { postPreviewPosters } from "../../utils/postComposer";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
 import { haptic } from "@services/hapticsService";
-// İNCELEME posteri: eski 86×129'dan büyütüldü (2:3 oranı korunur).
-const REVIEW_POSTER_W = 118;
-const REVIEW_POSTER_H = 177;
-const LIST_POSTER_W = 96;
-const LIST_POSTER_H = 144;
+// Akış önizlemeleri: gönderi ayrıntısı açılmadan da içeriği tanınır tutan 2:3 oran.
+const REVIEW_POSTER_W = 82;
+const REVIEW_POSTER_H = 123;
+const LIST_POSTER_W = 76;
+const LIST_POSTER_H = 114;
 
 // Uzun metin kısaltma sınırları ("Devamını oku" ile açılır). MAX_CONTENT 2000
 // karakter: sınırsız bırakılan tek bir paylaşım akışta ekranın birkaç katını
 // kaplıyordu. İnceleme metni poster yanındaki dar sütunda; başlık ve içerik
-// toplamı posterin yüksekliğine (177) yaklaşacak şekilde seçildi.
-const REVIEW_TITLE_LINES = 3;
-const REVIEW_CONTENT_LINES = 4;
+// toplamı kısa bir akış satırına sığacak şekilde seçildi.
+const REVIEW_TITLE_LINES = 2;
+const REVIEW_CONTENT_LINES = 3;
 const TITLE_LINES = 2;
-const CONTENT_LINES = 4;
-const QUOTE_LINES = 7;
+const CONTENT_LINES = 3;
+const QUOTE_LINES = 4;
 
 // Spoiler'lı postlarda posterler bulanıklaştırılır; "Spoiler'ı göster/gizle"
 // ile blur açılıp kapanır. Küçük ve geniş posterler için ayrı yarıçap.
@@ -80,7 +83,7 @@ const LikeButton = memo(function LikeButton({ liked, count, onPress, theme }) {
       style={[
         st.pill,
         {
-          backgroundColor: liked ? alpha(LIKE_RED, 0.13) : theme.primary,
+          backgroundColor: liked ? alpha(LIKE_RED, 0.13) : theme.secondary,
           borderColor: liked ? alpha(LIKE_RED, 0.4) : theme.border,
         },
       ]}
@@ -117,7 +120,7 @@ function PostMenuSheet({
   onAskDelete,
   onReport,
 }) {
-  const posters = (post.mediaList || []).filter((m) => m?.poster).slice(0, 3);
+  const posters = postPreviewPosters(post).slice(0, 3).map((poster) => ({ poster }));
 
   return (
     <Modal
@@ -397,7 +400,7 @@ function SpoilerCard({ theme, t, onReveal, compact = false }) {
   );
 }
 
-// ─── Kart ────────────────────────────────────────────────────────────────────
+// ─── Akış gönderisi ──────────────────────────────────────────────────────────
 
 const FeedPostCard = memo(function FeedPostCard({
   post,
@@ -488,7 +491,7 @@ const FeedPostCard = memo(function FeedPostCard({
         showsHorizontalScrollIndicator={false}
         style={st.stripBleed}
         contentContainerStyle={{
-          gap: joinedListPosters ? 0 : 10,
+          gap: joinedListPosters ? 0 : 8,
           paddingVertical: 6,
           paddingHorizontal: 16,
         }}
@@ -547,6 +550,80 @@ const FeedPostCard = memo(function FeedPostCard({
           theme={theme}
         />
       </View>
+    );
+  } else if (post.type === "tierlist" && post.tierList) {
+    // Tier list: başlık + isteğe bağlı açıklama + tablo (spoiler'da tablo da gizli).
+    body = (
+      <>
+        <ClampedText
+          text={post.title}
+          lines={TITLE_LINES}
+          expanded={textOpen}
+          onOverflowChange={setTitleCut}
+          style={[st.title, { color: theme.text.primary }]}
+        />
+        {showSpoiler ? (
+          <>
+            <SpoilerCard theme={theme} t={t} onReveal={revealSpoiler} />
+            {readMore}
+          </>
+        ) : (
+          <>
+            {post.content ? (
+              <ClampedText
+                text={post.content}
+                lines={CONTENT_LINES}
+                expanded={textOpen}
+                onOverflowChange={setContentCut}
+                style={[st.content, { color: theme.text.secondary }]}
+              />
+            ) : null}
+            {readMore}
+            <PostTierListBlock
+              tierList={post.tierList}
+              authorName={post.authorName}
+              canCopy={!isOwner}
+              theme={theme}
+              maxRows={3}
+              compact
+              style={st.tierBlock}
+            />
+          </>
+        )}
+      </>
+    );
+  } else if (post.type === "tvgraph" && post.tvGraph) {
+    // Bölüm grafiği: başlık + isteğe bağlı açıklama + grafik kartı (dokununca dizinin canlı grafiği).
+    body = (
+      <>
+        <ClampedText
+          text={post.title}
+          lines={TITLE_LINES}
+          expanded={textOpen}
+          onOverflowChange={setTitleCut}
+          style={[st.title, { color: theme.text.primary }]}
+        />
+        {showSpoiler ? (
+          <>
+            <SpoilerCard theme={theme} t={t} onReveal={revealSpoiler} />
+            {readMore}
+          </>
+        ) : (
+          <>
+            {post.content ? (
+              <ClampedText
+                text={post.content}
+                lines={CONTENT_LINES}
+                expanded={textOpen}
+                onOverflowChange={setContentCut}
+                style={[st.content, { color: theme.text.secondary }]}
+              />
+            ) : null}
+            {readMore}
+            <PostTvGraphBlock tvGraph={post.tvGraph} maxGraphHeight={152} showLegend={false} style={st.tierBlock} />
+          </>
+        )}
+      </>
     );
   } else if (post.type === "review" && mediaCount > 0) {
     const first = post.mediaList[0];
@@ -720,25 +797,21 @@ const FeedPostCard = memo(function FeedPostCard({
   }
 
   return (
-    <View
-      style={[
-        st.shadow,
-        { shadowColor: theme.shadow || "#000", backgroundColor: theme.secondary },
-      ]}
-    >
+    <View style={st.shadow}>
       <View
         style={[
           st.card,
-          { backgroundColor: theme.secondary, borderColor: theme.border },
+          { backgroundColor: theme.primary, borderColor: theme.border },
         ]}
       >
-        {/* Tip rengiyle üstten yumuşak ışık — kartı tipine göre ayırır */}
         <LinearGradient
-          colors={[alpha(accentColor, 0.14), alpha(accentColor, 0)]}
-          style={st.wash}
+          colors={[alpha(accentColor, 0.11), alpha(accentColor, 0)]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={st.headerTint}
           pointerEvents="none"
         />
-
+        <View pointerEvents="none" style={[st.typeMarker, { backgroundColor: accentColor }]} />
         {/* Kullanıcı + zaman + tip + menü */}
         <View style={st.header}>
           <Pressable
@@ -749,8 +822,8 @@ const FeedPostCard = memo(function FeedPostCard({
             {isOwner && currentUserAvatar ? (
               <UserAvatar
                 source={currentUserAvatar}
-                size={40}
-                borderWidth={2}
+                size={34}
+                borderWidth={1}
                 borderColor={alpha(accentColor, 0.5)}
               />
             ) : (
@@ -761,8 +834,8 @@ const FeedPostCard = memo(function FeedPostCard({
                   (typeof post.authorAvatar === "string" ? post.authorAvatar : null)
                 }
                 isCustomPhoto
-                size={40}
-                borderWidth={2}
+                size={34}
+                borderWidth={1}
                 borderColor={alpha(accentColor, 0.5)}
               />
             )}
@@ -873,7 +946,7 @@ const FeedPostCard = memo(function FeedPostCard({
             {/* Yorum: post'ta yorum varsa dolu ikon (renk nötr kalır) */}
             <Pressable
               accessibilityRole="button"
-              style={[st.pill, { backgroundColor: theme.primary, borderColor: theme.border }]}
+              style={[st.pill, { backgroundColor: theme.secondary, borderColor: theme.border }]}
               onPress={() => onComment?.(post)}
             >
               <AppIcon
@@ -923,7 +996,7 @@ const FeedPostCard = memo(function FeedPostCard({
                 style={[
                   st.pill,
                   st.iconPill,
-                  { backgroundColor: theme.primary, borderColor: theme.border },
+                   { backgroundColor: theme.secondary, borderColor: theme.border },
                 ]}
                 onPress={() => onSend(post)}
               >
@@ -940,7 +1013,7 @@ const FeedPostCard = memo(function FeedPostCard({
                 {
                   backgroundColor: post.bookmarkedByMe
                     ? alpha(theme.accent, 0.14)
-                    : theme.primary,
+                    : theme.secondary,
                   borderColor: post.bookmarkedByMe
                     ? alpha(theme.accent, 0.45)
                     : theme.border,
@@ -970,43 +1043,35 @@ const st = StyleSheet.create({
   fill: { width: "100%", height: "100%" },
   center: { alignItems: "center", justifyContent: "center" },
 
-  // iOS gölgesi overflow:hidden ile kırpılır → gölge dış sarmalayıcıda.
-  shadow: {
-    marginHorizontal: 14,
-    marginBottom: 14,
-    borderRadius: 24,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 3,
-  },
+  // Akış satırları ekran genişliğini kullanır; ayırıcı her gönderiyi tanımlar.
+  shadow: { marginBottom: 0 },
   card: {
-    borderRadius: 24,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
+    position: "relative",
+    borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
   },
-  wash: { position: "absolute", left: 0, right: 0, top: 0, height: 150 },
+  headerTint: { position: "absolute", left: 0, right: 0, top: 0, height: 72 },
+  typeMarker: { position: "absolute", left: 0, top: 12, width: 3, height: 34, borderTopRightRadius: 3, borderBottomRightRadius: 3 },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 9,
   },
   identity: {
     flex: 1,
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
   identityText: { flex: 1, minWidth: 0 },
-  userName: { fontSize: 14.5, fontWeight: "800" },
+  userName: { fontSize: 13.5, fontWeight: "800" },
   subRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 1 },
-  time: { fontSize: 12, fontWeight: "500" },
+  time: { fontSize: 11, fontWeight: "500" },
   spoilerBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -1021,8 +1086,8 @@ const st = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
   },
@@ -1034,24 +1099,20 @@ const st = StyleSheet.create({
     justifyContent: "center",
   },
 
-  title: { fontSize: 17, lineHeight: 23, fontWeight: "800", marginBottom: 8, letterSpacing: -0.2 },
-  content: { fontSize: 14.5, lineHeight: 22, marginBottom: 12 },
+  title: { fontSize: 15.5, lineHeight: 21, fontWeight: "800", marginBottom: 5, letterSpacing: -0.2 },
+  content: { fontSize: 13.5, lineHeight: 19, marginBottom: 8 },
 
-  // ── İnceleme: büyük poster + metin ──
-  reviewRow: { flexDirection: "row", gap: 14, marginBottom: 12 },
+  // ── İnceleme: kompakt poster + metin ──
+  reviewRow: { flexDirection: "row", gap: 10, marginBottom: 9 },
   posterShadow: {
     width: REVIEW_POSTER_W,
     height: REVIEW_POSTER_H,
-    borderRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.28,
-    shadowRadius: 12,
-    elevation: 6,
+    borderRadius: 10,
   },
   reviewPoster: {
     width: "100%",
     height: "100%",
-    borderRadius: 18,
+    borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
@@ -1068,49 +1129,49 @@ const st = StyleSheet.create({
   posterRating: { flexDirection: "row", alignItems: "center", gap: 5 },
   posterRatingNum: { color: "#fff", fontSize: 11.5, fontWeight: "800" },
   reviewCopy: { flex: 1, minWidth: 0 },
-  mediaMeta: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 6 },
-  mediaMetaText: { flexShrink: 1, fontSize: 11.5, fontWeight: "800" },
-  reviewTitle: { fontSize: 18, lineHeight: 24, fontWeight: "800", marginBottom: 8, letterSpacing: -0.2 },
+  mediaMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 },
+  mediaMetaText: { flexShrink: 1, fontSize: 10.5, fontWeight: "800" },
+  reviewTitle: { fontSize: 15.5, lineHeight: 21, fontWeight: "800", marginBottom: 5, letterSpacing: -0.2 },
   // "Devamını oku": üstündeki metin/panel zaten 12 pt alt boşluk taşıyor;
   // düğme metne yakın dursun, altındaki öğeyle de nefes payı kalsın.
-  readMore: { marginTop: -6, marginBottom: 10 },
+  readMore: { marginTop: -3, marginBottom: 6 },
 
   // ── Sohbet: alıntı paneli ──
   quote: {
-    borderLeftWidth: 3,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginBottom: 12,
+    borderLeftWidth: 2,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 8,
   },
-  quoteText: { fontSize: 14.5, lineHeight: 22 },
+  quoteText: { fontSize: 13.5, lineHeight: 19 },
 
   // ── Liste ──
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 6 },
   infoChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
   },
   infoChipText: { fontSize: 11.5, fontWeight: "800" },
-  stripBleed: { marginHorizontal: -16, marginBottom: 6 },
+  stripBleed: { marginHorizontal: -16, marginBottom: 4 },
   listPoster: {
     width: LIST_POSTER_W,
     height: LIST_POSTER_H,
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
   wideCard: {
-    height: 200,
-    borderRadius: 18,
+    height: 128,
+    borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   mediaYear: {
     position: "absolute",
@@ -1137,12 +1198,8 @@ const st = StyleSheet.create({
   rankNumText: { color: "#fff", fontSize: 11.5, fontWeight: "900" },
 
   // ── Anket ──
-  pollWrap: {
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: 12,
-    marginBottom: 12,
-  },
+  pollWrap: { marginBottom: 8 },
+  tierBlock: { marginBottom: 8 },
 
   // ── Spoiler ──
   spoilerToggle: {
@@ -1154,7 +1211,7 @@ const st = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   spoilerToggleText: { color: SPOILER_RED, fontSize: 11.5, fontWeight: "700" },
   spoilerCard: {
@@ -1197,14 +1254,14 @@ const st = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    paddingTop: 12,
+    paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  actionsLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  actionsLeft: { flexDirection: "row", alignItems: "center", gap: 4 },
   actionsRight: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 4,
     flexShrink: 1,
   },
   pill: {
@@ -1212,11 +1269,11 @@ const st = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    height: 36,
+    height: 40,
     minWidth: 40,
-    paddingHorizontal: 12,
+    paddingHorizontal: 9,
     borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 0,
   },
   pillText: { fontSize: 12.5, fontWeight: "800" },
   iconPill: { paddingHorizontal: 0, width: 40 },

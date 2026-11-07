@@ -33,9 +33,15 @@ export const DraftCard = memo(function DraftCard({
 }) {
   const meta = postTypeMeta(draft.postType, theme.colors);
   const accent = meta.color;
-  const media = Array.isArray(draft.selectedMedia) ? draft.selectedMedia : [];
+  // Tier list taslağı: afişler tablonun kademe sırasıyla.
+  const media =
+    draft.postType === "tierlist"
+      ? (draft.tierList?.tiers || []).flatMap((tier) => tier?.items || [])
+      : Array.isArray(draft.selectedMedia)
+        ? draft.selectedMedia
+        : [];
   const uris = media.map((m) => draftPosterUri(m, getTmdbUrl)).filter(Boolean);
-  const wantsPoster = draft.postType === "review" || draft.postType === "list";
+  const wantsPoster = draft.postType === "review" || draft.postType === "list" || draft.postType === "tierlist";
   const hasVisual = uris.length > 0 || (wantsPoster && media.length > 0);
   const isText = draft.postType === "text";
   const rating = draft.userRating || 0;

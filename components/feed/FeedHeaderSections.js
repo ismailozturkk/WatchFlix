@@ -31,6 +31,7 @@ export const FEED_FILTERS = {
   LIST: "list",
   TEXT: "text",
   POLL: "poll",
+  TIERLIST: "tierlist",
   FOLLOWING: "following",
 };
 
@@ -41,6 +42,7 @@ const COMPOSE_TYPES = [
   { key: "list", labelKey: "autoI18n.liste_2", fallback: "Liste" },
   { key: "text", labelKey: "autoI18n.sohbet", fallback: "Sohbet" },
   { key: "poll", labelKey: "autoI18n.anket", fallback: "Anket" },
+  { key: "tierlist", labelKey: "autoI18n.tier_list", fallback: "Tier list" },
 ];
 
 // ─── Composer kartı ──────────────────────────────────────────────────────────
@@ -343,6 +345,7 @@ export const FeedFilterBar = memo(function FeedFilterBar({
     { key: FEED_FILTERS.LIST, label: t.filters.lists, icon: "list" },
     { key: FEED_FILTERS.TEXT, label: t.filters.texts, icon: "chatbubble-ellipses" },
     { key: FEED_FILTERS.POLL, label: t.filters.polls, icon: "stats-chart" },
+    { key: FEED_FILTERS.TIERLIST, label: t.filters.tierLists || i18nText("autoI18n.tier_list", "Tier list"), icon: "podium" },
     { key: FEED_FILTERS.FOLLOWING, label: t.filters.following, icon: "people" },
   ];
 

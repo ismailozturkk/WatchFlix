@@ -13,10 +13,12 @@ export const POST_TYPE_ICONS = {
   list: "list",
   text: "chatbubble-ellipses",
   poll: "stats-chart",
+  tierlist: "podium",
+  tvgraph: "grid",
 };
 
 /**
- * @param {string} type        review | list | text | poll (bilinmeyen → review)
+ * @param {string} type        review | list | text | poll | tierlist | tvgraph (bilinmeyen → review)
  * @param {Object} themeColors theme.colors
  * @returns {{ icon: string, color: string, label: string }}
  */

@@ -32,6 +32,9 @@ import { postTypeBadge } from "@utils/postComposer";
 import AppIcon from "@components/AppIcon";
 import RatingStars from "@components/RatingStars";
 import PollMessage from "@components/chat/PollMessage";
+import PostTierListBlock from "@components/feed/PostTierListBlock";
+import PostTvGraphBlock from "@components/feed/PostTvGraphBlock";
+import { postPreviewPosters } from "@utils/postComposer";
 import PostCommentSheetModal from "@components/modals/PostCommentSheetModal";
 import SaveSharedListModal from "@components/modals/SaveSharedListModal";
 import { PostCardSkeleton } from "@components/Skeleton";
@@ -108,7 +111,7 @@ export default function PostDetailScreen({ route, navigation }) {
           title: post.title,
           authorName: post.authorName,
           type: post.type,
-          poster: post.mediaList?.[0]?.poster || null,
+          poster: postPreviewPosters(post)[0] || null,
         },
       );
     } catch (e) {
@@ -252,7 +255,8 @@ export default function PostDetailScreen({ route, navigation }) {
           </View>
 
           {/* Posterler */}
-          {Array.isArray(post.mediaList) && post.mediaList.some((m) => m?.poster) && (
+          {/* Bölüm grafiğinde dizinin afişi zaten grafik kartında. */}
+          {post.type !== "tvgraph" && Array.isArray(post.mediaList) && post.mediaList.some((m) => m?.poster) && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -316,6 +320,23 @@ export default function PostDetailScreen({ route, navigation }) {
                 theme={theme}
               />
             </View>
+          )}
+
+          {/* Tier list gövdesi — feed kartıyla aynı blok (dokununca tam tablo + kopyala). */}
+          {post.type === "tierlist" && post.tierList && (
+            <PostTierListBlock
+              tierList={post.tierList}
+              authorName={post.authorName}
+              canCopy={!!user?.uid && post.authorId !== user.uid}
+              theme={theme}
+              maxRows={10}
+              style={styles.tierBlock}
+            />
+          )}
+
+          {/* Bölüm grafiği — feed kartıyla aynı, detayda daha uzun. */}
+          {post.type === "tvgraph" && post.tvGraph && (
+            <PostTvGraphBlock tvGraph={post.tvGraph} maxGraphHeight={900} style={styles.tierBlock} />
           )}
 
           {/* Derecelendirme (inceleme) */}
@@ -401,6 +422,7 @@ export default function PostDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
+  tierBlock: { marginTop: 4, marginBottom: 14 },
   container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12, paddingHorizontal: 32 },
   missingText: { fontSize: 14, textAlign: "center", lineHeight: 20 },

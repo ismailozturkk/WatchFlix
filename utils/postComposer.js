@@ -4,7 +4,8 @@
 // nesnesi kurma, dizi yeniden sıralama ve oy sayımı. CreatePostModal bunları
 // kullanır; jest ile test edilir (__tests__/postComposer.test.js).
 
-export const POST_TYPES = ["review", "list", "text", "poll"];
+// "tvgraph" yalnız dizinin Bölüm Grafiği ekranından açılır (composer tür seçicisinde yok).
+export const POST_TYPES = ["review", "list", "text", "poll", "tierlist", "tvgraph"];
 export const MIN_POLL_OPTIONS = 2;
 export const MAX_POLL_OPTIONS = 4;
 
@@ -18,6 +19,8 @@ export function validatePost({
   content,
   selectedMedia = [],
   pollOptions = [],
+  tierList = null,
+  tvGraph = null,
 }) {
   const t = (title || "").trim();
   const c = (content || "").trim();
@@ -38,6 +41,12 @@ export function validatePost({
       (o) => (o?.label || "").trim() || o?.media,
     );
     if (valid.length < MIN_POLL_OPTIONS) return { ok: false, error: "pollOptions" };
+  } else if (type === "tierlist") {
+    // Gövde utils/chatShare.buildTierListShare çıktısı (en az bir yerleşmiş yapım); açıklama isteğe bağlı.
+    if (!(tierList?.total > 0) || !Array.isArray(tierList?.tiers)) return { ok: false, error: "tierList" };
+  } else if (type === "tvgraph") {
+    // Gövde utils/tvGraphShare.buildTvGraphShare çıktısı; açıklama isteğe bağlı.
+    if (!(tvGraph?.id > 0) || !(tvGraph?.seasons?.length > 0)) return { ok: false, error: "tvGraph" };
   }
 
   return { ok: true, error: null };
@@ -90,13 +99,15 @@ export function buildPollObject({ pollType, question, options = [] }) {
 }
 
 // Post tipi → rozet dili (feed'deki PostCard ile ortak: list=yeşil,
-// poll=mor, text/review=mavi). Modül SAF kaldığı için i18n burada
+// poll=mor, text/review=mavi, tierlist=turuncu, tvgraph=camgöbeği). Modül SAF kaldığı için i18n burada
 // uygulanmaz; çağıran taraf i18nText(labelKey, fallback) ile çevirir.
 const POST_TYPE_BADGES = {
   review: { labelKey: "autoI18n.inceleme_upper", fallback: "İNCELEME", colorKey: "blue",   colorFallback: "#4a7cf6" },
   list:   { labelKey: "autoI18n.liste_upper",    fallback: "LİSTE",    colorKey: "green",  colorFallback: "#3ddc84" },
   text:   { labelKey: "autoI18n.sohbet_upper",   fallback: "SOHBET",   colorKey: "blue",   colorFallback: "#4a7cf6" },
   poll:   { labelKey: "autoI18n.anket_upper",    fallback: "ANKET",    colorKey: "purple", colorFallback: "#a855f7" },
+  tierlist: { labelKey: "autoI18n.tier_list_upper", fallback: "TIER LIST", colorKey: "orange", colorFallback: "#F97316" },
+  tvgraph: { labelKey: "autoI18n.bolum_grafigi_upper", fallback: "BÖLÜM GRAFİĞİ", colorKey: "tvGraph", colorFallback: "#14B8A6" },
 };
 
 /**
@@ -199,4 +210,26 @@ export function resolveCloseIntent({
   if (isEditing) return "confirm-edit";
   if (isSavedDraft) return "close";
   return "confirm-draft";
+}
+
+/** Tier list gövdesinin yapımları, kademe sırasıyla düzleşmiş (post.tierList / taslak). */
+export function tierListMediaOf(tierList) {
+  return (Array.isArray(tierList?.tiers) ? tierList.tiers : []).flatMap((tier) =>
+    Array.isArray(tier?.items) ? tier.items.filter(Boolean) : [],
+  );
+}
+
+const TMDB_POSTER_BASE = "https://image.tmdb.org/t/p/w342";
+
+/**
+ * Gönderinin küçük resim afişleri (tam adres): tier list'te tablonun yapımları (yalnız `poster_path` taşır),
+ * diğerlerinde mediaList'in kayıtlı `poster` adresi. Anket seçenek afişleri çağıranda (getTmdbUrl ile) kurulur.
+ */
+export function postPreviewPosters(post) {
+  if (post?.type === "tierlist") {
+    return tierListMediaOf(post.tierList)
+      .map((media) => (typeof media.poster_path === "string" && media.poster_path ? TMDB_POSTER_BASE + media.poster_path : null))
+      .filter(Boolean);
+  }
+  return (Array.isArray(post?.mediaList) ? post.mediaList : []).map((media) => media?.poster).filter(Boolean);
 }

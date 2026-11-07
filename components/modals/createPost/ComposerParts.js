@@ -115,6 +115,8 @@ export const TypeSelector = memo(function TypeSelector({
   anim,
 }) {
   const range = items.map((_, i) => i);
+  // 4'ten fazla tür yan yana sığmaz (etiket kesilir): simge yazının üstüne çıkar.
+  const stacked = items.length > 4;
   const left = anim.interpolate({
     inputRange: range,
     outputRange: range.map((i) => `${(i * 100) / items.length}%`),
@@ -149,7 +151,7 @@ export const TypeSelector = memo(function TypeSelector({
               key={item.key}
               accessibilityRole="button"
               accessibilityState={{ selected: isActive }}
-              style={st.typeBtn}
+              style={[st.typeBtn, stacked && st.typeBtnStacked]}
               onPress={() => onChange(item.key)}
             >
               <Ionicons
@@ -164,6 +166,7 @@ export const TypeSelector = memo(function TypeSelector({
                     color: isActive ? theme.text.primary : theme.text.secondary,
                     fontWeight: isActive ? "800" : "600",
                   },
+                  stacked && st.typeTextStacked,
                 ]}
                 numberOfLines={1}
               >
@@ -544,6 +547,8 @@ const st = StyleSheet.create({
     paddingVertical: 10,
   },
   typeText: { fontSize: 11.5 },
+  typeBtnStacked: { flexDirection: "column", gap: 3, paddingVertical: 8, paddingHorizontal: 2 },
+  typeTextStacked: { fontSize: 11 },
 
   // Hızlı ekle
   quick: { borderRadius: 18, borderWidth: 1, padding: 12, marginTop: 12 },

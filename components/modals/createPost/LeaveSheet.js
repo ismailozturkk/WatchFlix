@@ -14,6 +14,9 @@
 // Katman aynı native pencerenin içinde olduğu için böyle bir yarış yoktur.
 // Bkz. memory/ios-modal-sequencing.md ve components/common/BottomSheetModal.js.
 //
+// Grup bilgi sayfası (chat/GroupInfoModal) da üye çıkar / yönetici yap onayı
+// için aynı bileşeni BottomSheetModal'ın `overlay` proparıyla kullanır.
+//
 // Düğmeler yukarıdan aşağıya verilen sırayla dizilir. Boşluğa dokunmak ve
 // donanım geri tuşu `onDismiss` (= "Vazgeç") çağırır.
 
