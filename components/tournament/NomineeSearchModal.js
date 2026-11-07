@@ -33,8 +33,9 @@ import useKeyboardInset from "@hooks/useKeyboardInset";
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassPressable from "../common/GlassPressable";
 import GlassBox from "../common/GlassBox";
+import usePosterCorner from "@hooks/usePosterCorner";
+import { SEARCH_DEBOUNCE_MS } from "../../utils/searchDebounce";
 const PENDING_TIMEOUT = 2600;
-const SEARCH_DEBOUNCE = 380;
 const MIN_QUERY = 2;
 
 // Türkçe uyumlu, aksan bağışlayıcı küçük harf karşılaştırma.
@@ -48,6 +49,7 @@ const Row = memo(function Row({
   item, mine, canVote, isPending, external, onPress, onOpen, theme, getTmdbUrl, lang,
 }) {
   const uri = item.posterPath ? getTmdbUrl(item.posterPath, "poster", 92) : null;
+  const corner = usePosterCorner("fun");
   const rankColor = item.finalist ? "#22C55E" : "#9CA3AF";
 
   // Satırın GÖVDESİ her zaman detaya gider; hype butonu iç içe Pressable olduğu
@@ -91,7 +93,7 @@ const Row = memo(function Row({
       style={[styles.row, { backgroundColor: theme.secondary, borderColor: theme.border }]}
       accessibilityRole="button"
     >
-      <View style={[styles.rowPosterWrap, { backgroundColor: theme.between }]}>
+      <View style={[styles.rowPosterWrap, { borderRadius: corner(8), backgroundColor: theme.between }]}>
         {uri ? (
           <Image source={{ uri }} style={styles.rowPoster} contentFit="cover" transition={120} />
         ) : (
@@ -188,7 +190,7 @@ export default function NomineeSearchModal({
           // İptal (yeni tuş) hata değildir; yalnız gerçek başarısızlığı göster.
           if (active && !controller.signal.aborted) { setRemoteError(true); setSearching(false); }
         });
-    }, SEARCH_DEBOUNCE);
+    }, SEARCH_DEBOUNCE_MS);
     return () => { active = false; clearTimeout(id); controller.abort(); };
   }, [visible, trimmed, mediaType, genreId, lang]);
 

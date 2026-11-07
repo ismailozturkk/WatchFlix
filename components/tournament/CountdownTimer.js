@@ -7,12 +7,17 @@
 //
 // Her saniye kendi içinde yeniden render olur (parent'i tetiklemez). "now()"
 // motordan gelir → setDebugNow ile dondurulduğunda sayaç da durur (önizleme).
+//
+// Ölçüler yazı boyutundan türer (countdownLayout.js); `fill` kipinde satır
+// ölçülür ve yazı, dört kutu her yazı tipinde sığacak kadar küçülür. Rakam,
+// ayraç ve etiketler sistem yazı büyütmesini almaz (kutular sabit ölçülü).
 
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, useWindowDimensions } from "react-native";
 import { now } from "@services/tournamentEngine";
 import { pickByLanguage } from "@utils/appLanguages";
 import { RollingDigit } from "../animated/RollingNumber";
+import { countdownDims, SEP_FONT_RATIO } from "@components/tournament/countdownLayout";
 
 const DUR = 420;
 
@@ -53,6 +58,8 @@ function Unit({ value, label, dims, textColor, boxColor, labelColor, fill }) {
         />
       </View>
       <Text
+        allowFontScaling={false}
+        numberOfLines={1}
         style={{
           color: labelColor,
           fontSize: dims.label,
@@ -79,6 +86,7 @@ export default function CountdownTimer({
   fill = false,
 }) {
   const { width: screenW } = useWindowDimensions();
+  const [rowW, setRowW] = useState(0); // yalnız fill kipinde ölçülür
   const [, force] = useState(0);
   useEffect(() => {
     const id = setInterval(() => force((x) => (x + 1) % 1e6), 1000);
@@ -92,13 +100,8 @@ export default function CountdownTimer({
   const m = Math.floor((tot % 3600) / 60);
   const s = tot % 60;
 
-  // lg: dar ekranda (≤ 350dp) hero panelinin içine sığsın diye bir kademe küçülür.
-  const dims =
-    size === "lg"
-      ? screenW <= 350
-        ? { h: 28, w: 17, font: 22, label: 9, gap: 3, pad: 5, radius: 10 }
-        : { h: 32, w: 20, font: 27, label: 10, gap: 3, pad: 6, radius: 10 }
-      : { h: 19, w: 14, font: 15, label: 7, gap: 2, pad: 5, radius: 8 };
+  // lg dar ekranda (≤ 350dp) bir kademe küçülür; fill'de satıra sığdırılır.
+  const dims = countdownDims(size, screenW, fill ? rowW : 0);
   const labels = pickByLanguage(lang, {
     tr: ["GÜN", "SAAT", "DK", "SN"],
     en: ["DAY", "HR", "MIN", "SEC"],
@@ -109,7 +112,13 @@ export default function CountdownTimer({
   const values = [d, h, m, s];
 
   return (
-    <View style={[styles.row, fill && styles.rowFill]}>
+    <View
+      style={[styles.row, fill && styles.rowFill]}
+      onLayout={fill ? (e) => {
+        const w = Math.round(e.nativeEvent.layout.width);
+        if (w > 0 && w !== rowW) setRowW(w);
+      } : undefined}
+    >
       {values.map((v, i) => (
         <React.Fragment key={i}>
           <Unit
@@ -123,11 +132,12 @@ export default function CountdownTimer({
           />
           {i < 3 && (
             <Text
+              allowFontScaling={false}
               style={[
                 styles.sep,
                 {
                   color: textColor,
-                  fontSize: dims.font * 0.62,
+                  fontSize: dims.font * SEP_FONT_RATIO,
                   marginBottom: dims.label + 6,
                 },
               ]}

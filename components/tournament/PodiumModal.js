@@ -43,6 +43,7 @@ import {
 import {
   getTournamentDoc, fetchVotesOnce, fetchAggOnce, fetchWinnerArchive,
 } from "@services/tournamentService";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 const GOLD = "#F5C518";
 // Tema yüzeyleri (açık temada beyaz kart) üzerindeki altın METİN/İKON için koyulaştırılmış ton —
@@ -112,8 +113,10 @@ function computePodium(docData, { nomTally, tallies, voters }) {
 
 // ─── Ortak parçalar ──────────────────────────────────────────────────────────
 // Poster yoksa tema renkli yer tutucu; boyutlar çağırandan gelir.
-const Poster = memo(({ uri, width, height, radius, theme, style }) =>
-  uri ? (
+// `radius` yüzeyin taban köşesi; Eğlence köşe ayarıyla ölçeklenir (hooks/usePosterCorner).
+const Poster = memo(({ uri, width, height, radius: baseRadius, theme, style }) => {
+  const radius = usePosterCorner("fun")(baseRadius);
+  return uri ? (
     <Image
       source={{ uri }}
       style={[{ width, height, borderRadius: radius }, style]}
@@ -129,8 +132,8 @@ const Poster = memo(({ uri, width, height, radius, theme, style }) =>
     >
       <AppIcon family="Ionicons" name="image-outline" size={Math.max(12, Math.min(width * 0.4, 22))} color={theme.text.muted} />
     </View>
-  ),
-);
+  );
+});
 
 // Küçük bilgi hapı (ikon + metin) — arşiv kartının açılan bölümünde.
 const InfoChip = memo(({ icon, text, theme }) => (

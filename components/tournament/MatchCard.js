@@ -32,6 +32,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "@services/hapticsService";
 import AppIcon from "@components/AppIcon";
 import { i18nText, percentText } from "@utils/i18nText";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const PRESS_SPRING = { mass: 0.5, damping: 13, stiffness: 200 };
@@ -50,6 +51,7 @@ function Cell({
   isMyPick, isWinner, isLoser, isPending, locked,
   onPress, onConfirm, onInfo, theme, getTmdbUrl, lang,
 }) {
+  const corner = usePosterCorner("fun");
   // İki ölçek AYRI tutulup çarpılır: biri parmak basılıyken küçültür, diğeri
   // onay katmanı açıkken kartı hafifçe öne çıkarır. Tek değere yazsalardı
   // basış bırakıldığında pending büyümesi de sıfırlanırdı.
@@ -80,6 +82,7 @@ function Cell({
         style={[
           styles.posterWrap,
           {
+            borderRadius: corner(16),
             backgroundColor: theme.between,
             borderColor: ringColor,
             borderWidth: isMyPick || isWinner ? 2.5 : 0,

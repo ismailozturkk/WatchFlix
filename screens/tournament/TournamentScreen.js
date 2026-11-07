@@ -35,6 +35,7 @@ import GlassCloseButton from "@components/common/GlassCloseButton";
 import { toast } from "@components/AppToast";
 import MatchCard from "@components/tournament/MatchCard";
 import BracketTree from "@components/tournament/BracketTree";
+import BracketFullscreen from "@components/tournament/BracketFullscreen";
 import NomineeSearchModal from "@components/tournament/NomineeSearchModal";
 import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
@@ -61,12 +62,16 @@ import TournamentHero from "@components/tournament/TournamentHero";
 import RoundRail from "@components/tournament/RoundRail";
 import PodiumModal from "@components/tournament/PodiumModal";
 import ScreenDecor from "@components/ScreenDecor";
-// Faz kimliği (renk/gradyan/ikon) Hub kartıyla ortak: components/tournament/phaseMeta.js
+// Faz kimliği (başlıktaki faz çipi): components/tournament/phaseMeta.js.
+// Tür kimliği (hero + ağaç gradyanı, animasyonlu simge) Hub kartıyla ortak:
+// components/tournament/genreMeta.js.
 import { PHASE_META, phaseLabel } from "@components/tournament/phaseMeta";
+import { genreMetaFor } from "@components/tournament/genreMeta";
 
 import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "../../components/common/GlassTouchable";
 import GlassPressable from "../../components/common/GlassPressable";
+import usePosterCorner from "@hooks/usePosterCorner";
 // Onay katmanında artık okunacak iki seçenek var; eski 2.6 sn karar vermeye
 // yetmiyordu (MatchCard'daki PENDING_TIMEOUT ile aynı).
 const NOM_PENDING_TIMEOUT = 6000;
@@ -78,6 +83,10 @@ const TREE_MODAL_HANDOFF_MS = 350;
 // Uygulamanın onay/başarı yeşili — finalist rozeti ve "Hype verildi" çipiyle
 // AYNI değer (temada `success` belirteci yok, turnuva ekranı bunu sabit kullanır).
 const CONFIRM_GREEN = "#22C55E";
+// Şampiyon kartı: açık altın zemin üstünde koyu mürekkep, kupa/çip altını.
+const CHAMP_INK = "#3B2300";
+const CHAMP_GOLD = "#F5C518";
+const CHAMP_GOLD_SOFT = "#FDE68A";
 
 // Basış geri bildirimi: parmak inince poster hafifçe küçülür, kalkınca yayla
 // eski boyuna döner (MatchCard ile aynı yay ve oran).
@@ -100,6 +109,7 @@ const NomineeCell = React.memo(function NomineeCell({
   id, title, posterPath, rank, nomVotes, finalist, mine, isPending,
   onPress, onConfirm, onInfo, theme, getTmdbUrl,
 }) {
+  const corner = usePosterCorner("fun");
   const uri = posterPath ? getTmdbUrl(posterPath, "poster", 185) : null;
   const rankColor = finalist ? CONFIRM_GREEN : "#9CA3AF";
 
@@ -124,6 +134,7 @@ const NomineeCell = React.memo(function NomineeCell({
           styles.gridPosterWrap,
           pressStyle,
           {
+            borderRadius: corner(12),
             backgroundColor: theme.between,
             // Kenarlık HER ZAMAN 2.5: RN kenarlığı kutunun İÇİNDEN yediği için
             // 0 ↔ 2.5 arası geçiş posteri her basışta 2.5px küçültüp zıplatırdı.
@@ -233,6 +244,7 @@ const DEV_PRESETS = [
 ];
 
 export default function TournamentScreen() {
+  const corner = usePosterCorner("fun");
   const { theme } = useTheme();
   const navigation = useNavigation();
   const { user } = useAuth();
@@ -270,6 +282,7 @@ export default function TournamentScreen() {
   const [searchVisible, setSearchVisible] = useState(false);   // aday arama modalı
   const [pendingNom, setPendingNom] = useState(null);          // 2 adımlı hype onayı
   const [treeMatchId, setTreeMatchId] = useState(null);        // ağaçtan seçilen maç
+  const [treeFullscreen, setTreeFullscreen] = useState(false); // yatay tam ekran ağaç
   const [infoVisible, setInfoVisible] = useState(false);       // liste/ağaç kullanım ipucu modalı
   const nomTimer = useRef(null);
 
@@ -572,6 +585,7 @@ export default function TournamentScreen() {
 
   const theTheme = themeLabel(entry, lang);
   const phaseMeta = PHASE_META[phaseInfo.phase] || PHASE_META.selection;
+  const genreMeta = genreMetaFor(entry);
 
   // ── Geçen ayın kazananı (ilk 3 + oy sayıları) — küçük kupa ikonu, podyum
   // modalını açar. Başlık/alt yazı kaldırıldı; tüm bilgi accessibilityLabel'da.
@@ -630,7 +644,7 @@ export default function TournamentScreen() {
   // Tür başlığı + ay/ortam çipleri + geri sayım paneli + interaktif aşama çizelgesi.
   const Hero = (
     <TournamentHero
-      phaseMeta={phaseMeta}
+      genreMeta={genreMeta}
       theTheme={theTheme}
       mediaType={entry.mediaType}
       monthIndex={monthIndex}
@@ -757,11 +771,14 @@ export default function TournamentScreen() {
         : (
           <BracketTree
             rounds={bracket.rounds}
-            theme={theme}
+            genre={genreMeta}
+            periodId={periodId}
+            focusRound={tab}
             getTmdbUrl={getTmdbUrl}
             lang={lang}
             myPicks={myPicks}
             onMatchPress={(m) => setTreeMatchId(m.matchId)}
+            onExpand={() => setTreeFullscreen(true)}
           />
         )}
     </View>
@@ -820,10 +837,12 @@ export default function TournamentScreen() {
   // ── Ağaçtan seçilen maçın oy modalı ─────────────────────────────────────────
   // matchId üzerinden CANLI bracket'ten çözülür ki oy sonrası yüzdeler/rozet
   // modal açıkken de güncellensin.
-  // Seyirci (Free) ağaç modalında oy vermeye kalkarsa: önce modal kalkar, sonra
-  // yükseltme sayfası açılır — iOS iki Modal'ı aynı anda sunamaz.
+  // Seyirci (Free) ağaç modalında oy vermeye kalkarsa: önce modal (ve açıksa
+  // tam ekran ağaç) kalkar, sonra yükseltme sayfası açılır — iOS iki Modal'ı
+  // aynı anda sunamaz.
   const handleTreeVoteBlocked = useCallback(() => {
     setTreeMatchId(null);
+    setTreeFullscreen(false);
     setTimeout(() => voteGate.showUpsell(), TREE_MODAL_HANDOFF_MS);
   }, [voteGate]);
 
@@ -835,15 +854,9 @@ export default function TournamentScreen() {
     return null;
   }, [treeMatchId, bracket]);
 
-  const treeMatchModal = (
-    <Modal
-      visible={!!treeMatch}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setTreeMatchId(null)}
-    >
-      <Pressable style={styles.matchModalOverlay} onPress={() => setTreeMatchId(null)}>
-        {/* Kartın kendisine basınca kapanmasın */}
+  // Kartın kendisi: dikey ekranda ayrı Modal'da, tam ekran (yatay) ağaçta ise
+  // aynı pencerenin içinde katman olarak çizilir.
+  const treeMatchCard = (
         <GlassPressable onPress={() => {}} style={[styles.matchModalCard, { backgroundColor: theme.primary, borderColor: theme.border }]}>
           {treeMatch && (
             <>
@@ -888,27 +901,58 @@ export default function TournamentScreen() {
             </>
           )}
         </GlassPressable>
+  );
+
+  const treeMatchModal = (
+    <Modal
+      visible={!!treeMatch && !treeFullscreen}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setTreeMatchId(null)}
+    >
+      <Pressable style={styles.matchModalOverlay} onPress={() => setTreeMatchId(null)}>
+        {/* Kartın kendisine basınca kapanmasın */}
+        {treeMatchCard}
       </Pressable>
-      <ModalToastHost visible={!!treeMatch} />
+      <ModalToastHost visible={!!treeMatch && !treeFullscreen} />
     </Modal>
   );
 
+  // Tam ekran ağaç: yatay döndürülmüş modal; maç kartı onun içinde katman.
+  const treeFullscreenModal = (
+    <BracketFullscreen
+      visible={treeFullscreen && viewMode === "tree"}
+      onClose={() => { setTreeMatchId(null); setTreeFullscreen(false); }}
+      rounds={bracket.rounds}
+      genre={genreMeta}
+      periodId={periodId}
+      focusRound={tab}
+      getTmdbUrl={getTmdbUrl}
+      lang={lang}
+      myPicks={myPicks}
+      onMatchPress={(m) => setTreeMatchId(m.matchId)}
+      matchCard={treeMatch ? treeMatchCard : null}
+      onMatchClose={() => setTreeMatchId(null)}
+      closeLabel={i18nText("autoI18n.kapat", "Kapat")}
+    />
+  );
+
   // ── Şampiyon hero (results) ───────────────────────────────────────────────────
-  // Konfeti + kademeli giriş animasyonları (poster ZoomIn, metin/istatistikler
-  // FadeInDown gecikmeli) ile "ödül töreni" hissi verir. `stats` yalnız BU AYIN
-  // canlı bracket'inden gelir (getChampionStats); geçmiş ay podyumu ayrı akışta
-  // (PodiumModal → butonla açılır), burada karışmaz.
+  // KOMPAKT yatay kart: solda şampiyon posteri (kupa + sıra rozeti), sağda
+  // kimlik çipi, başlık, tür/ay ve iki mini istatistik; altta ikinci/üçüncü
+  // tek satırda. Altın zemin açık tonlu → üstündeki tüm yazı koyu mürekkep
+  // (CHAMP_INK) ile okunur. Konfeti + kademeli giriş "ödül töreni" hissini
+  // korur. `stats` yalnız BU AYIN canlı bracket'inden gelir (getChampionStats);
+  // geçmiş ay podyumu ayrı akışta (PodiumModal → butonla açılır).
   const ChampionHero = ({ champion, label, stats }) => {
-    const posterUri = champion?.posterPath ? getTmdbUrl(champion.posterPath, "poster", 342) : null;
-    const runnerUpUri = stats?.runnerUp?.posterPath
-      ? getTmdbUrl(stats.runnerUp.posterPath, "poster", 92)
-      : null;
-    const thirdUri = stats?.third?.c?.posterPath
-      ? getTmdbUrl(stats.third.c.posterPath, "poster", 92)
-      : null;
+    const posterUri = champion?.posterPath ? getTmdbUrl(champion.posterPath, "poster", 185) : null;
+    const runners = [
+      stats?.runnerUp && { key: "2", c: stats.runnerUp, medal: "#9CA3AF" },
+      stats?.third?.c && { key: "3", c: stats.third.c, medal: "#B45309" },
+    ].filter(Boolean);
     return (
       <LinearGradient
-        colors={["#92400E", "#F5C518", "#FDE68A"]}
+        colors={["#FEF3C7", "#FCD34D", "#F59E0B"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.champHero}
@@ -923,91 +967,72 @@ export default function TournamentScreen() {
           loop={false}
         />
 
-        <Animated.View entering={FadeInDown.duration(380)} style={styles.champKicker}>
-          <AppIcon family="Ionicons" name="trophy" size={12} color="#7A4A00" />
-          <Text style={styles.champKickerText}>
-            {label || i18nText("autoI18n.tournament_champion", "ŞAMPİYON")}
-          </Text>
-        </Animated.View>
-
-        <Animated.View entering={ZoomIn.delay(120).duration(480)} style={styles.champPosterWrap}>
-          <View pointerEvents="none" style={styles.champPosterHalo} />
-          {posterUri ? (
-            <Image source={{ uri: posterUri }} style={styles.champPoster} contentFit="cover" />
-          ) : (
-            <View style={[styles.champPoster, styles.champPosterEmpty]} />
-          )}
-          <View style={styles.champCrown}>
-            <AppIcon family="Ionicons" name="trophy" size={16} color="#fff" />
-          </View>
-          {champion?.seed != null && (
-            <View style={styles.champSeedBadge}>
-              <Text style={styles.champSeedBadgeText}>
-                #{champion.seed} {i18nText("autoI18n.tournament_seed", "sıra")}
-              </Text>
+        <View style={styles.champMain}>
+          <Animated.View entering={ZoomIn.delay(80).duration(420)} style={styles.champPosterWrap}>
+            {posterUri ? (
+              <Image source={{ uri: posterUri }} style={[styles.champPoster, { borderRadius: corner(12) }]} contentFit="cover" />
+            ) : (
+              <View style={[styles.champPoster, styles.champPosterEmpty, { borderRadius: corner(12) }]} />
+            )}
+            <View style={styles.champCrown}>
+              <AppIcon family="Ionicons" name="trophy" size={13} color="#FFFFFF" />
             </View>
-          )}
-        </Animated.View>
-
-        <Animated.Text
-          entering={FadeInDown.delay(200).duration(400)}
-          numberOfLines={2}
-          style={styles.champTitle}
-        >
-          {champion?.title}
-        </Animated.Text>
-        <Animated.Text entering={FadeInDown.delay(250).duration(400)} style={styles.champSubtitle}>
-          {theTheme} · {mediaLabel(entry.mediaType, lang)} · {monthLabel(monthIndex, lang)}
-        </Animated.Text>
-
-        {stats && (
-          <Animated.View entering={FadeInDown.delay(320).duration(400)} style={styles.champStatsRow}>
-            <View style={styles.champStatCard}>
-              <AppIcon family="Ionicons" name="stats-chart" size={13} color="#7A4A00" />
-              <Text style={styles.champStatValue}>{percentText(stats.pct)}</Text>
-              <Text style={styles.champStatLabel} numberOfLines={1}>
-                {i18nText("autoI18n.tournament_final_score", "Final skoru")} · {stats.finalVotes}/{stats.finalTotal}
-              </Text>
-            </View>
-            <View style={styles.champStatDivider} />
-            <View style={styles.champStatCard}>
-              <AppIcon family="Ionicons" name="flame" size={13} color="#7A4A00" />
-              <Text style={styles.champStatValue}>{stats.totalVotes}</Text>
-              <Text style={styles.champStatLabel} numberOfLines={1}>
-                {i18nText("autoI18n.tournament_total_votes", "Toplam oy")}
-              </Text>
-            </View>
+            {champion?.seed != null && (
+              <View style={styles.champSeedBadge}>
+                <Text allowFontScaling={false} style={styles.champSeedBadgeText}>#{champion.seed}</Text>
+              </View>
+            )}
           </Animated.View>
-        )}
 
-        {(stats?.runnerUp || stats?.third) && (
-          <Animated.View entering={FadeInDown.delay(380).duration(400)} style={styles.champRunnersRow}>
-            {stats?.runnerUp && (
-              <View style={styles.champRunnerItem}>
-                {runnerUpUri ? (
-                  <Image source={{ uri: runnerUpUri }} style={styles.champRunnerThumb} contentFit="cover" />
-                ) : (
-                  <View style={[styles.champRunnerThumb, styles.champPosterEmpty]} />
-                )}
-                <AppIcon family="Ionicons" name="medal" size={12} color="#C0C4CE" />
-                <Text style={styles.champRunnerText} numberOfLines={1}>
-                  {stats.runnerUp.title}
-                </Text>
+          <Animated.View entering={FadeInDown.delay(160).duration(380)} style={styles.champInfo}>
+            <View style={styles.champKicker}>
+              <AppIcon family="Ionicons" name="trophy" size={10} color={CHAMP_GOLD} />
+              <Text allowFontScaling={false} numberOfLines={1} style={styles.champKickerText}>
+                {label || i18nText("autoI18n.tournament_champion", "ŞAMPİYON")}
+              </Text>
+            </View>
+            <Text numberOfLines={2} style={styles.champTitle}>{champion?.title}</Text>
+            <Text numberOfLines={1} style={styles.champSubtitle}>
+              {theTheme} · {mediaLabel(entry.mediaType, lang)} · {monthLabel(monthIndex, lang)}
+            </Text>
+
+            {stats && (
+              <View style={styles.champStatsRow}>
+                <View style={styles.champStatCard}>
+                  <Text style={styles.champStatValue}>{percentText(stats.pct)}</Text>
+                  <Text style={styles.champStatLabel} numberOfLines={1}>
+                    {i18nText("autoI18n.tournament_final_score", "Final skoru")} {stats.finalVotes}/{stats.finalTotal}
+                  </Text>
+                </View>
+                <View style={styles.champStatCard}>
+                  <Text style={styles.champStatValue}>{stats.totalVotes}</Text>
+                  <Text style={styles.champStatLabel} numberOfLines={1}>
+                    {i18nText("autoI18n.tournament_total_votes", "Toplam oy")}
+                  </Text>
+                </View>
               </View>
             )}
-            {stats?.third?.c && (
-              <View style={styles.champRunnerItem}>
-                {thirdUri ? (
-                  <Image source={{ uri: thirdUri }} style={styles.champRunnerThumb} contentFit="cover" />
-                ) : (
-                  <View style={[styles.champRunnerThumb, styles.champPosterEmpty]} />
-                )}
-                <AppIcon family="Ionicons" name="medal" size={12} color="#CD7F32" />
-                <Text style={styles.champRunnerText} numberOfLines={1}>
-                  {stats.third.c.title}
-                </Text>
-              </View>
-            )}
+          </Animated.View>
+        </View>
+
+        {runners.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(260).duration(380)} style={styles.champRunnersRow}>
+            {runners.map(({ key, c, medal }) => {
+              const uri = c.posterPath ? getTmdbUrl(c.posterPath, "poster", 92) : null;
+              return (
+                <View key={key} style={styles.champRunnerItem}>
+                  <View style={[styles.champRunnerRank, { backgroundColor: medal }]}>
+                    <Text allowFontScaling={false} style={styles.champRunnerRankText}>{key}</Text>
+                  </View>
+                  {uri ? (
+                    <Image source={{ uri }} style={[styles.champRunnerThumb, { borderRadius: corner(3) }]} contentFit="cover" />
+                  ) : (
+                    <View style={[styles.champRunnerThumb, styles.champPosterEmpty, { borderRadius: corner(3) }]} />
+                  )}
+                  <Text style={styles.champRunnerText} numberOfLines={1}>{c.title}</Text>
+                </View>
+              );
+            })}
           </Animated.View>
         )}
       </LinearGradient>
@@ -1320,6 +1345,7 @@ export default function TournamentScreen() {
 
       {/* Ağaçtan seçilen maçın detay/oy modalı */}
       {treeMatchModal}
+      {treeFullscreenModal}
 
       {/* Liste/ağaç kullanım ipucu — "!" ikonuna basınca açılır */}
       {infoModal}
@@ -1424,73 +1450,67 @@ const styles = StyleSheet.create({
   noticeText: { flex: 1, fontSize: 12, fontWeight: "600", lineHeight: 16 },
 
   champHero: {
-    borderRadius: 24, padding: 22, alignItems: "center",
+    borderRadius: 22, padding: 14,
     marginTop: 6, marginBottom: 14, overflow: "hidden",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.55)",
   },
   champGlowOne: {
-    position: "absolute", width: 220, height: 220, borderRadius: 110,
-    right: -70, top: -90, backgroundColor: "rgba(255,255,255,0.14)",
+    position: "absolute", width: 180, height: 180, borderRadius: 90,
+    right: -60, top: -80, backgroundColor: "rgba(255,255,255,0.28)",
   },
   champGlowTwo: {
-    position: "absolute", width: 140, height: 140, borderRadius: 70,
-    left: -40, bottom: -60, backgroundColor: "rgba(255,255,255,0.10)",
+    position: "absolute", width: 120, height: 120, borderRadius: 60,
+    left: -40, bottom: -60, backgroundColor: "rgba(255,255,255,0.22)",
   },
 
-  champKicker: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "rgba(255,255,255,0.55)", paddingHorizontal: 11, paddingVertical: 5,
-    borderRadius: 12,
-  },
-  champKickerText: { color: "#7A4A00", fontSize: 11.5, fontWeight: "900", letterSpacing: 1.5 },
-
-  champPosterWrap: { alignItems: "center", justifyContent: "center", marginTop: 16 },
-  champPosterHalo: {
-    position: "absolute", width: 170, height: 170, borderRadius: 85,
-    backgroundColor: "rgba(255,255,255,0.30)",
-  },
+  champMain: { flexDirection: "row", alignItems: "center", gap: 14 },
+  champPosterWrap: { paddingTop: 6 },
   champPoster: {
-    width: 132, height: 198, borderRadius: 14, borderWidth: 3, borderColor: "#fff",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10,
-    elevation: 8,
+    width: 88, height: 132, borderRadius: 12, borderWidth: 2.5, borderColor: "#FFFFFF",
+    shadowColor: "#78350F", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 8,
+    elevation: 6,
   },
-  champPosterEmpty: { backgroundColor: "rgba(255,255,255,0.25)" },
+  champPosterEmpty: { backgroundColor: "rgba(255,255,255,0.45)" },
   champCrown: {
-    position: "absolute", top: -14, alignSelf: "center",
-    width: 32, height: 32, borderRadius: 16, backgroundColor: "#F5C518",
-    borderWidth: 2.5, borderColor: "#fff", alignItems: "center", justifyContent: "center",
+    position: "absolute", top: -4, left: -6,
+    width: 26, height: 26, borderRadius: 13, backgroundColor: CHAMP_GOLD,
+    borderWidth: 2, borderColor: "#FFFFFF", alignItems: "center", justifyContent: "center",
   },
   champSeedBadge: {
-    position: "absolute", bottom: 8, alignSelf: "center",
-    backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 9, paddingVertical: 3, borderRadius: 9,
+    position: "absolute", bottom: 6, right: 6,
+    backgroundColor: "rgba(0,0,0,0.6)", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 7,
   },
-  champSeedBadgeText: { color: "#fff", fontSize: 10.5, fontWeight: "800" },
+  champSeedBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "900" },
 
-  champTitle: { color: "#fff", fontSize: 20, fontWeight: "900", marginTop: 16, textAlign: "center" },
-  champSubtitle: { color: "rgba(255,255,255,0.92)", fontSize: 12.5, fontWeight: "700", marginTop: 4 },
-
-  champStatsRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 10, marginTop: 16, width: "100%",
+  champInfo: { flex: 1, minWidth: 0 },
+  champKicker: {
+    alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: CHAMP_INK, paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8,
   },
+  champKickerText: { color: CHAMP_GOLD_SOFT, fontSize: 9.5, fontWeight: "900", letterSpacing: 1.2 },
+  champTitle: { color: CHAMP_INK, fontSize: 18, lineHeight: 22, fontWeight: "900", marginTop: 7, letterSpacing: -0.2 },
+  champSubtitle: { color: "#6B4300", fontSize: 11.5, fontWeight: "700", marginTop: 2 },
+
+  champStatsRow: { flexDirection: "row", gap: 6, marginTop: 10 },
   champStatCard: {
-    flex: 1, maxWidth: 150, alignItems: "center", gap: 2,
-    backgroundColor: "rgba(255,255,255,0.32)", borderRadius: 14, paddingVertical: 10, paddingHorizontal: 8,
+    flex: 1, minWidth: 0,
+    backgroundColor: "rgba(255,255,255,0.5)", borderRadius: 10, paddingVertical: 6, paddingHorizontal: 8,
   },
-  champStatValue: { color: "#4A2E00", fontSize: 16, fontWeight: "900" },
-  champStatLabel: { color: "#5C3D00", fontSize: 10, fontWeight: "700" },
-  champStatDivider: { width: 1, height: 34, backgroundColor: "rgba(255,255,255,0.4)" },
+  champStatValue: { color: CHAMP_INK, fontSize: 15, fontWeight: "900" },
+  champStatLabel: { color: "#6B4300", fontSize: 9.5, fontWeight: "700", marginTop: 1 },
 
-  champRunnersRow: {
-    flexDirection: "row", alignItems: "stretch", justifyContent: "center",
-    gap: 8, marginTop: 12, width: "100%",
-  },
+  champRunnersRow: { flexDirection: "row", gap: 6, marginTop: 12 },
   champRunnerItem: {
-    flex: 1, maxWidth: 165, flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "rgba(255,255,255,0.28)", borderRadius: 12,
-    paddingHorizontal: 9, paddingVertical: 6,
+    flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(255,255,255,0.42)", borderRadius: 10,
+    paddingHorizontal: 6, paddingVertical: 5,
   },
-  champRunnerThumb: { width: 20, height: 30, borderRadius: 4 },
-  champRunnerText: { color: "#4A2E00", fontSize: 11.5, fontWeight: "800", flexShrink: 1 },
+  champRunnerRank: {
+    width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center",
+  },
+  champRunnerRankText: { color: "#FFFFFF", fontSize: 9.5, fontWeight: "900" },
+  champRunnerThumb: { width: 18, height: 27, borderRadius: 3 },
+  champRunnerText: { color: CHAMP_INK, fontSize: 11.5, fontWeight: "800", flexShrink: 1 },
 
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4, marginBottom: 8 },
   gridItem: { width: "25%", padding: 4 },
