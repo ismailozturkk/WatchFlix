@@ -44,8 +44,8 @@ describe("iOS alternatif simge kümesi", () => {
   });
 
   test("dosya adı küme adını taşır (kümeler birbirinin dosyasını ezmez)", () => {
-    const gold = iosImagesJson("Gold");
-    const overlap = gold.filter((g) => images.some((i) => i.filename === g.filename));
+    const flat = iosImagesJson("Flat");
+    const overlap = flat.filter((g) => images.some((i) => i.filename === g.filename));
     expect(overlap).toHaveLength(0);
   });
 });

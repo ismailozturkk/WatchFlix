@@ -22,6 +22,7 @@ import { toast } from "@components/AppToast";
 import * as Haptics from "@services/hapticsService";
 import {
   getAppIconSupportStatus,
+  getAvailableAppIconIds,
   reconcileAppIconWithSystem,
   setActiveAppIcon,
 } from "@services/appIconService";
@@ -41,6 +42,9 @@ export default function AppIconSection({ colors: C }) {
   // ile giriş/splash/paylaşım logoları AYNI değeri gösterir, ayrı state tutulmaz.
   const activeId = useAppIconId();
   const [busyId, setBusyId] = useState(null);
+  // Bu binary'de bulunan simgeler. Katalog native build'den önce büyüyebilir (JS OTA
+  // ile gelir); olmayan simge listelenirse seçince "Simge değiştirilemedi" çıkar.
+  const [availableIds, setAvailableIds] = useState([DEFAULT_APP_ICON_ID]);
   const mountedRef = useRef(true);
   // Simge değiştirmek Premium'da. Ücretsiz kullanıcı varsayılan simgede kalır;
   // plan düşmüş olsa bile varsayılana DÖNMEK serbest (kilit yalnız diğer simgeler).
@@ -57,8 +61,9 @@ export default function AppIconSection({ colors: C }) {
         return;
       }
       // Store açılışta zaten eşitlendi; kart açılırken bir kez daha doğrula.
-      await reconcileAppIconWithSystem();
+      const [ids] = await Promise.all([getAvailableAppIconIds(), reconcileAppIconWithSystem()]);
       if (!mountedRef.current) return;
+      setAvailableIds(ids);
       setStatus(next);
     })();
     return () => {
@@ -108,6 +113,11 @@ export default function AppIconSection({ colors: C }) {
     [activeId, busyId, iconGate, iconLocked],
   );
 
+  const icons = APP_ICONS.filter((i) => availableIds.includes(i.id));
+  // Varsayılan dışındaki her simge Premium (kapı: "app_icon").
+  const premiumIconCount = icons.filter((i) => i.id !== DEFAULT_APP_ICON_ID).length;
+  const missingCount = APP_ICONS.length - icons.length;
+
   if (status !== "supported") {
     if (!__DEV__ || !status) return null;
     return (
@@ -135,17 +145,23 @@ export default function AppIconSection({ colors: C }) {
             {i18nText("autoI18n.uygulama_simgesi_baslik", "Uygulama simgesi")}
           </Text>
           <Text allowFontScaling={false} style={[styles.sub, { color: C.muted }]}>
-            {i18nText(
-              "autoI18n.uygulama_simgesi_aciklama",
-              "Ana ekranda görünecek simgeyi seç",
-            )}
+            {iconLocked
+              ? i18nText(
+                  "autoI18n.uygulama_simgesi_premium_alt",
+                  `Premium ile ${premiumIconCount} özel simgenin kilidi açılır`,
+                  { count: premiumIconCount },
+                )
+              : i18nText(
+                  "autoI18n.uygulama_simgesi_aciklama",
+                  "Ana ekranda görünecek simgeyi seç",
+                )}
           </Text>
         </View>
         {iconLocked ? <PremiumPill /> : null}
       </View>
 
       <View style={styles.options}>
-        {APP_ICONS.map((icon) => {
+        {icons.map((icon) => {
           const active = icon.id === activeId;
           const pending = busyId === icon.id;
           const locked = iconLocked && icon.id !== DEFAULT_APP_ICON_ID;
@@ -189,6 +205,8 @@ export default function AppIconSection({ colors: C }) {
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
                 style={[
                   styles.optionLabel,
                   { color: active ? C.accentStrong : C.text },
@@ -200,6 +218,11 @@ export default function AppIconSection({ colors: C }) {
           );
         })}
       </View>
+      {__DEV__ && missingCount > 0 ? (
+        <Text allowFontScaling={false} style={[styles.devFootnote, { color: C.muted }]}>
+          {`${missingCount} simge bu native build'de yok (yalnız geliştirme build'inde görünür). Yeni build gerekir.`}
+        </Text>
+      ) : null}
     </GlassBox>
   );
 }
@@ -230,37 +253,43 @@ const styles = StyleSheet.create({
   devNote: { borderStyle: "dashed", padding: 12, gap: 4, opacity: 0.8 },
   devTitle: { fontSize: 12, fontWeight: "600" },
   devBody: { fontSize: 11, lineHeight: 16 },
+  devFootnote: { fontSize: 10.5, lineHeight: 15, paddingHorizontal: 14, paddingBottom: 12, marginTop: -4 },
+  // Üç sütunlu ızgara: katalog sırasıyla üst satır Lens (Varsayılan · 3B · Cam), alt satır S
+  // (Klasik · Cam · Düz). Sütun aralığı yüzde genişlik + space-between ile verilir: `gap`
+  // yüzdelere eklenince son sütun alt satıra düşüyordu.
   options: {
     flexDirection: "row",
-    gap: 10,
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 10,
     paddingHorizontal: 14,
     paddingBottom: 14,
   },
   option: {
-    flex: 1,
+    width: "31.5%",
     alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     borderRadius: 14,
     borderWidth: 1.5,
-    gap: 10,
+    gap: 7,
   },
   optionPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   optionDimmed: { opacity: 0.55 },
   optionLocked: { opacity: 0.72 },
-  previewWrap: { width: 72, height: 72 },
+  previewWrap: { width: 56, height: 56 },
   // iOS simge köşesi ≈ kenarın %22'si.
-  preview: { width: 72, height: 72, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
+  preview: { width: 56, height: 56, borderRadius: 12.5, borderWidth: StyleSheet.hairlineWidth },
   check: {
     position: "absolute",
-    right: -6,
-    top: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    right: -5,
+    top: -5,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
   },
-  optionLabel: { fontSize: 13, fontWeight: "700" },
+  optionLabel: { fontSize: 11.5, fontWeight: "700", alignSelf: "stretch", textAlign: "center" },
 });

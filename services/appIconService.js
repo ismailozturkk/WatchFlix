@@ -19,6 +19,7 @@ import { requireOptionalNativeModule } from "expo-modules-core";
 import {
   APP_ICON_NATIVE_NAMES,
   DEFAULT_APP_ICON_ID,
+  LEGACY_NATIVE_NAMES,
   iconIdFromNativeName,
   nativeNameFromIconId,
 } from "../utils/appIcons";
@@ -62,11 +63,43 @@ export async function getAppIconSupportStatus() {
   return (await isAppIconChangeSupported()) ? "supported" : "unsupported";
 }
 
+// Bu binary'de GERÇEKTEN bulunan simge adları (katalog sırasıyla). Native modüle
+// yalnız bunlar gönderilir: eski Android modülü listedeki her alias'ı kapatmaya
+// çalışır ve bulamadığında tüm değişimi hatayla düşürür. Sorgu yoksa (eski build)
+// o build'lerin taşıdığı küme varsayılır. Binary oturum içinde değişmez → önbellek.
+const LEGACY_AVAILABLE = APP_ICON_NATIVE_NAMES.filter((n) => LEGACY_NATIVE_NAMES.includes(n));
+let availableNamesPromise = null;
+function loadAvailableNames() {
+  if (!NativeAppIcon) return Promise.resolve([]);
+  if (!availableNamesPromise) {
+    availableNamesPromise = (async () => {
+      if (typeof NativeAppIcon.getAvailableNamesAsync !== "function") {
+        return LEGACY_AVAILABLE;
+      }
+      try {
+        const names = await NativeAppIcon.getAvailableNamesAsync(APP_ICON_NATIVE_NAMES);
+        const found = APP_ICON_NATIVE_NAMES.filter((n) => Array.isArray(names) && names.includes(n));
+        return found.length > 0 ? found : LEGACY_AVAILABLE;
+      } catch {
+        availableNamesPromise = null; // geçici hata: sonraki çağrı yeniden sorsun
+        return LEGACY_AVAILABLE;
+      }
+    })();
+  }
+  return availableNamesPromise;
+}
+
+/** Bu yapıda seçilebilen simgelerin katalog kimlikleri (katalog sırasıyla). */
+export async function getAvailableAppIconIds() {
+  const names = await loadAvailableNames();
+  return names.map(iconIdFromNativeName);
+}
+
 /** Şu an etkin simgenin katalog kimliği. Okunamazsa varsayılan. */
 export async function getActiveAppIconId() {
   if (!NativeAppIcon) return DEFAULT_APP_ICON_ID;
   try {
-    const nativeName = await NativeAppIcon.getAppIconNameAsync(APP_ICON_NATIVE_NAMES);
+    const nativeName = await NativeAppIcon.getAppIconNameAsync(await loadAvailableNames());
     return iconIdFromNativeName(nativeName);
   } catch {
     return DEFAULT_APP_ICON_ID;
@@ -96,9 +129,11 @@ export async function setActiveAppIcon(id) {
   const nativeName = nativeNameFromIconId(id);
   if (!nativeName) throw new Error(`Bilinmeyen uygulama simgesi: ${id}`);
   if (!NativeAppIcon) throw new Error("Uygulama simgesi modülü bu yapıda yok.");
-  const applied = iconIdFromNativeName(
-    await NativeAppIcon.setAppIconNameAsync(nativeName, APP_ICON_NATIVE_NAMES),
-  );
+  const names = await loadAvailableNames();
+  if (!names.includes(nativeName)) {
+    throw new Error(`Bu yapıda "${nativeName}" simgesi yok (yeni native build gerekir).`);
+  }
+  const applied = iconIdFromNativeName(await NativeAppIcon.setAppIconNameAsync(nativeName, names));
   setAppIconId(applied);
   refreshWidgetHeaders();
   return applied;
@@ -125,7 +160,7 @@ export async function reconcileAppIconWithSystem() {
       setAppIconId(DEFAULT_APP_ICON_ID);
       return;
     }
-    const nativeName = await NativeAppIcon.getAppIconNameAsync(APP_ICON_NATIVE_NAMES);
+    const nativeName = await NativeAppIcon.getAppIconNameAsync(await loadAvailableNames());
     setAppIconId(iconIdFromNativeName(nativeName));
   } catch {
     /* geçici hata — önbellek olduğu gibi kalır */

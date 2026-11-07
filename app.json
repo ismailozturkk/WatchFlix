@@ -87,7 +87,7 @@
         "expo-notifications",
         {
           "icon": "./assets/icon_default/notification-icon.png",
-          "color": "#1E1E1E",
+          "color": "#14C8E8",
           "defaultChannel": "default"
         }
       ],
@@ -121,12 +121,48 @@
         {
           "icons": [
             {
+              "name": "LensSolid",
+              "ios": "./assets/icon_lens3d/icon.png",
+              "android": {
+                "foregroundImage": "./assets/icon_lens3d/android-icon-foreground.png",
+                "backgroundImage": "./assets/icon_lens3d/android-icon-background.png",
+                "monochromeImage": "./assets/icon_lens3d/android-icon-monochrome.png"
+              }
+            },
+            {
+              "name": "LensGlass",
+              "ios": "./assets/icon_lensglass/icon.png",
+              "android": {
+                "foregroundImage": "./assets/icon_lensglass/android-icon-foreground.png",
+                "backgroundImage": "./assets/icon_lensglass/android-icon-background.png",
+                "monochromeImage": "./assets/icon_lensglass/android-icon-monochrome.png"
+              }
+            },
+            {
+              "name": "Classic",
+              "ios": "./assets/icon_classic/icon.png",
+              "android": {
+                "foregroundImage": "./assets/icon_classic/android-icon-foreground.png",
+                "backgroundImage": "./assets/icon_classic/android-icon-background.png",
+                "monochromeImage": "./assets/icon_classic/android-icon-monochrome.png"
+              }
+            },
+            {
               "name": "Glass",
               "ios": "./assets/icon_glass/icon.png",
               "android": {
                 "foregroundImage": "./assets/icon_glass/android-icon-foreground.png",
                 "backgroundImage": "./assets/icon_glass/android-icon-background.png",
                 "monochromeImage": "./assets/icon_glass/android-icon-monochrome.png"
+              }
+            },
+            {
+              "name": "Flat",
+              "ios": "./assets/icon_flat/icon.png",
+              "android": {
+                "foregroundImage": "./assets/icon_flat/android-icon-foreground.png",
+                "backgroundImage": "./assets/icon_flat/android-icon-background.png",
+                "monochromeImage": "./assets/icon_flat/android-icon-monochrome.png"
               }
             }
           ]

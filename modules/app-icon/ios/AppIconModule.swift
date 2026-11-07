@@ -24,6 +24,22 @@ public class AppIconModule: Module {
       }
     }
 
+    // `names` içinden bu yapıda appiconset'i OLANLAR (derlenmiş Info.plist'teki
+    // CFBundleAlternateIcons + Default). Katalog binary'den önce büyüyebilir; JS yalnız
+    // bunları seçtirir. Liste okunamazsa hepsi döner: iOS'ta olmayan simge yalnız kendi
+    // seçimini reddeder (Android'deki gibi tüm değişimi düşürmez).
+    AsyncFunction("getAvailableNamesAsync") { (names: [String]) -> [String] in
+      var alternates = Set<String>()
+      for key in ["CFBundleIcons", "CFBundleIcons~ipad"] {
+        let icons = Bundle.main.object(forInfoDictionaryKey: key) as? [String: Any]
+        if let found = icons?["CFBundleAlternateIcons"] as? [String: Any] {
+          alternates.formUnion(found.keys)
+        }
+      }
+      if alternates.isEmpty { return names }
+      return names.filter { $0 == self.defaultName || alternates.contains($0) }
+    }
+
     AsyncFunction("getAppIconNameAsync") { (names: [String], promise: Promise) in
       DispatchQueue.main.async {
         promise.resolve(UIApplication.shared.alternateIconName ?? self.defaultName)

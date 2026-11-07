@@ -103,9 +103,19 @@ describe("app.json görsel yolları gerçekten var", () => {
     expect(fs.existsSync(path.join(ROOT, rel))).toBe(true);
   });
 
-  test("ayar kartının önizleme görselleri var", () => {
-    expect(fs.existsSync(path.join(ROOT, "assets/icon_default/icon.png"))).toBe(true);
-    expect(fs.existsSync(path.join(ROOT, "assets/icon_glass/icon.png"))).toBe(true);
+  // Her simgenin klasörü varsayılan setle aynı dosyaları taşır (scripts/generate-app-icons.py).
+  const SET_FILES = [
+    "icon.png",
+    "android-icon-foreground.png",
+    "android-icon-background.png",
+    "android-icon-monochrome.png",
+    "favicon.png",
+    "notification-icon.png",
+  ];
+  test.each(APP_ICONS.map((i) => [i.id]))("assets/icon_%s eksiksiz", (id) => {
+    for (const file of SET_FILES) {
+      expect(fs.existsSync(path.join(ROOT, `assets/icon_${id}`, file))).toBe(true);
+    }
   });
 });
 

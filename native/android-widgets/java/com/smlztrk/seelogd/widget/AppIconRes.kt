@@ -21,6 +21,10 @@ import com.smlztrk.seelogd.R
  */
 object AppIconRes {
   private val ALTERNATES = listOf(
+    "LensSolid" to "icon_alt_lens_solid",
+    "LensGlass" to "icon_alt_lens_glass",
+    "Classic" to "icon_alt_classic",
+    "Flat" to "icon_alt_flat",
     "Glass" to "icon_alt_glass",
   )
 

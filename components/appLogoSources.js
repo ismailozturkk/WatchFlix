@@ -6,7 +6,7 @@
 // hepsi `useAppLogo()` ile seçili simgeye göre buradan beslenir.
 //
 // İki görsel türü:
-//   logo → android-icon-foreground.png: ŞEFFAF zeminli "S" (uyarlanabilir
+//   logo → android-icon-foreground.png: ŞEFFAF zeminli işaret (varsayılanda Lens, uyarlanabilir
 //          simgenin ön planı). Koyu/renkli yüzeylerde marka işareti olarak
 //          kullanılır (giriş, splash, hakkında, filigran...).
 //   icon → icon.png: arka planıyla birlikte TAM simge. Launcher'daki simgenin
@@ -22,9 +22,25 @@ export const APP_LOGO_SOURCES = Object.freeze({
     logo: require("../assets/icon_default/android-icon-foreground.png"),
     icon: require("../assets/icon_default/icon.png"),
   }),
+  classic: Object.freeze({
+    logo: require("../assets/icon_classic/android-icon-foreground.png"),
+    icon: require("../assets/icon_classic/icon.png"),
+  }),
   glass: Object.freeze({
     logo: require("../assets/icon_glass/android-icon-foreground.png"),
     icon: require("../assets/icon_glass/icon.png"),
+  }),
+  lens3d: Object.freeze({
+    logo: require("../assets/icon_lens3d/android-icon-foreground.png"),
+    icon: require("../assets/icon_lens3d/icon.png"),
+  }),
+  lensglass: Object.freeze({
+    logo: require("../assets/icon_lensglass/android-icon-foreground.png"),
+    icon: require("../assets/icon_lensglass/icon.png"),
+  }),
+  flat: Object.freeze({
+    logo: require("../assets/icon_flat/android-icon-foreground.png"),
+    icon: require("../assets/icon_flat/icon.png"),
   }),
 });
 

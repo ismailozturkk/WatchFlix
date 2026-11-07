@@ -17,6 +17,7 @@ const loadService = (nativeModule) => {
     loadWidgetPreferences: jest.fn(() => Promise.resolve({})),
     syncWidgetPreferences: jest.fn(() => Promise.resolve()),
   }));
+  jest.doMock("../services/appIconStore", () => ({ setAppIconId: jest.fn() }));
   return require("../services/appIconService");
 };
 
@@ -47,5 +48,48 @@ describe("getAppIconSupportStatus", () => {
       isSupportedAsync: jest.fn(() => Promise.resolve(true)),
     });
     await expect(getAppIconSupportStatus()).resolves.toBe("supported");
+  });
+});
+
+// Katalog (JS, OTA ile gelir) native build'den önce büyüyebilir. Eski Android modülü
+// listedeki HER alias'ı kapatmaya çalışıyor ve bulamadığında tüm değişimi düşürüyordu:
+// yeni simgeler eklenince Cam/Varsayılan bile "Simge değiştirilemedi" verdi.
+describe("bu yapıda olmayan simgeler native'e gönderilmez", () => {
+  const nativeWith = (extra) => ({
+    isSupportedAsync: jest.fn(() => Promise.resolve(true)),
+    getAppIconNameAsync: jest.fn(() => Promise.resolve("Default")),
+    setAppIconNameAsync: jest.fn((name) => Promise.resolve(name)),
+    ...extra,
+  });
+
+  test("eski build (sorgu yok): yalnız Default + Glass gönderilir", async () => {
+    const native = nativeWith();
+    const { setActiveAppIcon, getAvailableAppIconIds } = loadService(native);
+    await expect(getAvailableAppIconIds()).resolves.toEqual(["default", "glass"]);
+    await expect(setActiveAppIcon("glass")).resolves.toBe("glass");
+    expect(native.setAppIconNameAsync).toHaveBeenCalledWith("Glass", ["Default", "Glass"]);
+  });
+
+  test("eski build: olmayan simge native'e ulaşmadan reddedilir", async () => {
+    const native = nativeWith();
+    const { setActiveAppIcon } = loadService(native);
+    await expect(setActiveAppIcon("flat")).rejects.toThrow(/Flat/);
+    expect(native.setAppIconNameAsync).not.toHaveBeenCalled();
+  });
+
+  test("yeni build: native'in bildirdiği küme kullanılır (katalog sırasıyla)", async () => {
+    const native = nativeWith({
+      getAvailableNamesAsync: jest.fn(() => Promise.resolve(["Flat", "Default", "Glass"])),
+    });
+    const { setActiveAppIcon, getAvailableAppIconIds } = loadService(native);
+    await expect(getAvailableAppIconIds()).resolves.toEqual(["default", "glass", "flat"]);
+    await setActiveAppIcon("flat");
+    expect(native.setAppIconNameAsync).toHaveBeenCalledWith("Flat", ["Default", "Glass", "Flat"]);
+  });
+
+  test("sorgu hata verirse eski küme varsayılır", async () => {
+    const native = nativeWith({ getAvailableNamesAsync: jest.fn(() => Promise.reject(new Error("x"))) });
+    const { getAvailableAppIconIds } = loadService(native);
+    await expect(getAvailableAppIconIds()).resolves.toEqual(["default", "glass"]);
   });
 });

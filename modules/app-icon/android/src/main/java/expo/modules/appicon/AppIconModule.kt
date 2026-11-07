@@ -37,6 +37,12 @@ class AppIconModule : Module() {
       isSupported()
     }
 
+    // `names` içinden bu yapının manifestinde alias'ı OLANLAR. Katalog (JS, OTA ile
+    // gelir) binary'den önce büyüyebilir; JS yalnız bunları seçtirir ve gönderir.
+    AsyncFunction("getAvailableNamesAsync") { names: List<String> ->
+      names.filter { aliasExists(it) }
+    }
+
     AsyncFunction("getAppIconNameAsync") { names: List<String> ->
       currentIconName(names)
     }
@@ -56,10 +62,10 @@ class AppIconModule : Module() {
     return ComponentName(context.packageName, "$classPackage.$ALIAS_PREFIX$name")
   }
 
-  private fun isSupported(): Boolean {
+  private fun aliasExists(name: String): Boolean {
     return try {
       context.packageManager.getActivityInfo(
-        aliasComponent(DEFAULT_NAME),
+        aliasComponent(name),
         PackageManager.MATCH_DISABLED_COMPONENTS
       )
       true
@@ -67,6 +73,8 @@ class AppIconModule : Module() {
       false
     }
   }
+
+  private fun isSupported(): Boolean = aliasExists(DEFAULT_NAME)
 
   private fun currentIconName(names: List<String>): String {
     val pm = context.packageManager
@@ -93,6 +101,9 @@ class AppIconModule : Module() {
         null
       )
     }
+    if (!aliasExists(name)) {
+      throw CodedException("ERR_APP_ICON_UNAVAILABLE", "Bu yapıda \"$name\" simgesi yok.", null)
+    }
     val pm = context.packageManager
     // ÖNCE hedefi etkinleştir, sonra diğerlerini kapat: her an en az bir
     // başlatıcı girişi kalsın. DONT_KILL_APP: uygulama açık kalır; başlatıcı
@@ -105,11 +116,17 @@ class AppIconModule : Module() {
     )
     for (other in names) {
       if (other == name) continue
-      pm.setComponentEnabledSetting(
-        aliasComponent(other),
-        PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-        PackageManager.DONT_KILL_APP
-      )
+      // Bu yapıda olmayan alias'ı kapatmaya çalışmak IllegalArgumentException
+      // fırlatır ve hedef zaten açılmışken tüm değişimi hata diye düşürürdü.
+      try {
+        pm.setComponentEnabledSetting(
+          aliasComponent(other),
+          PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+          PackageManager.DONT_KILL_APP
+        )
+      } catch (e: IllegalArgumentException) {
+        continue
+      }
     }
     return name
   }
