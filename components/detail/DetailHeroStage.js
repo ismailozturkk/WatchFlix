@@ -14,6 +14,7 @@
 
 import React, { memo } from "react";
 import {
+  Animated,
   Dimensions,
   Image,
   Platform,
@@ -25,6 +26,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { alpha } from "@theme/colors";
 import { isLightSurface } from "@utils/colorUtils";
+import { measureWindowRect } from "@utils/measureWindowRect";
 
 const DEFAULT_WIDTH = Dimensions.get("window").width;
 
@@ -91,9 +93,38 @@ const DetailHeroStage = memo(function DetailHeroStage({
   imageHeight,
   placeholderIcon = "film-outline",
   placeholderSize = 64,
+  // Dokunulunca net görselin PENCERE dikdörtgeniyle çağrılır (`onPress(rect)`):
+  // galeri görseli tam bu yuvadan kalkıp ortaya uçar (ImageGalleryModal `origin`).
   onPress,
+  // İsteğe bağlı Animated.Value: galeri açıkken net görsel yuvadan "kalkmış"
+  // görünsün diye 0'a çekilir (altta bulanık ambiyans kalır).
+  centerOpacity,
   children,
 }) {
+  // Kanca yok (bileşen testlerde doğrudan fonksiyon olarak çağrılıyor): düğüm
+  // her render'da yeni bir kutuya geri çağırımlı ref ile yazılır.
+  const center = { node: null, pressRect: null };
+  const setCenterNode = (node) => {
+    center.node = node;
+    if (!node) center.pressRect = null;
+  };
+  const handlePressIn = onPress
+    ? () => measureWindowRect(center.node, (rect) => { center.pressRect = rect; })
+    : undefined;
+  const handlePress = onPress
+    ? () => measureWindowRect(center.node, (rect) => {
+        if (rect || center.pressRect || !center.node) {
+          onPress(rect || center.pressRect);
+          return;
+        }
+        // Native ölçüm, kaydırma bittiği ilk karede geçici olarak sıfır dönebilir.
+        const retry = () => measureWindowRect(center.node, (next) =>
+          onPress(next || null),
+        );
+        if (typeof requestAnimationFrame === "function") requestAnimationFrame(retry);
+        else setTimeout(retry, 16);
+      })
+    : undefined;
   const {
     backdropHeight,
     topAmbientHeight,
@@ -175,21 +206,25 @@ const DetailHeroStage = memo(function DetailHeroStage({
           </View>
 
           {/* 4) Ortada net arka plan görseli + kenar geçiş yumuşatması */}
-          <View
+          <Animated.View
             testID="detail-hero-center-slot"
+            ref={setCenterNode}
+            collapsable={false}
             style={[
               styles.centerPosterSlot,
               {
                 top: topAmbientHeight,
                 height: backdropHeight,
               },
+              centerOpacity ? { opacity: centerOpacity } : null,
             ]}
           >
             {onPress ? (
               <TouchableOpacity
                 testID="detail-hero-backdrop-touch"
                 activeOpacity={0.95}
-                onPress={onPress}
+                onPressIn={handlePressIn}
+                onPress={handlePress}
                 style={styles.backdropTouch}
               >
                 <Image
@@ -266,7 +301,7 @@ const DetailHeroStage = memo(function DetailHeroStage({
                 resizeMode="cover"
               />
             </View>
-          </View>
+          </Animated.View>
         </>
       ) : (
         <View

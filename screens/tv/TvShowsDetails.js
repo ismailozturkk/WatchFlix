@@ -1,4 +1,5 @@
-import { tmdbLanguageOf, tmdbRegionOf } from "../../utils/appLanguages";
+import { tmdbImageLanguageOrderOf, tmdbLanguageOf, tmdbRegionOf } from "../../utils/appLanguages";
+import { localizeMediaDetails } from "../../utils/tmdbLocalizedMedia";
 import { alpha } from "@theme/colors";
 import { isLightSurface } from "@utils/colorUtils";
 import React, {
@@ -44,6 +45,7 @@ import {
   useImageQualitySettings,
   useListLayoutSettings,
 } from "../../context/AppSettingsContext";
+import { detailPosterRadius } from "../../utils/posterCorners";
 import WatchedDateSheet from "@components/detail/WatchedDateSheet";
 import WatchHistorySheet from "@components/modals/WatchHistorySheet";
 import MediaNoteSheet from "@components/detail/MediaNoteSheet";
@@ -66,6 +68,7 @@ import ScreenDecor from "../../components/ScreenDecor";
 import { LocalBlurTarget, useLocalBlurTarget } from "../../components/common/BlurTarget";
 
 import ImageGalleryModal from "@components/modals/ImageGalleryModal";
+import { measureWindowRect } from "@utils/measureWindowRect";
 import TrailerSection from "@components/video/TrailerSection";
 import PaginatedRail from "../../components/PaginatedRail";
 import CommentSheetModal from "@components/modals/CommentSheetModal";
@@ -126,7 +129,8 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
   navigation,
   theme,
 }) {
-  const { posterBadges } = useListLayoutSettings();
+  const { posterBadges, railPosterRadius } = useListLayoutSettings();
+  const posterRadius = detailPosterRadius(railPosterRadius);
   const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -162,7 +166,7 @@ const RecommendedTvShow = memo(function RecommendedTvShow({
           mediaId={item.id}
           size={200}
           iconSize={46}
-          style={[styles.railPoster, { borderColor: alpha(theme.border, 0.3333333333333333) }]}
+          style={[styles.railPoster, { borderRadius: posterRadius, borderColor: alpha(theme.border, 0.3333333333333333) }]}
         />
         {posterBadges?.tmdbRating !== false && (
           <View
@@ -220,6 +224,9 @@ export default function TvShowsDetails({ route, navigation }) {
   const [showFullCast, setShowFullCast] = useState(false);
   const { t, language } = useLanguage();
   const { theme } = useTheme();
+  // Poster köşeleri Ayarlar > Poster görünümü > Ana Ekran ayarını izler (eskiden sabit 14).
+  const { railPosterRadius } = useListLayoutSettings();
+  const mainPosterRadius = detailPosterRadius(railPosterRadius);
   const { user } = useAuth();
   const { API_KEY } = useAppSettings();
   const { getTmdbUrl } = useImageQualitySettings();
@@ -234,8 +241,24 @@ export default function TvShowsDetails({ route, navigation }) {
 
   const [isLoading, setIsLoading] = useState(false);
 
-  const [PosterModalVisible, setPosterModalVisible] = useState(false);
-  const [backdropModalVisible, setBacdropModalVisible] = useState(false);
+  // Afiş / arka plan galerisi. `kind` kapanışta korunur: galeri, görsel yuvasına
+  // geri uçarken hâlâ doğru türü (afiş mi arka plan mı) çizmeli.
+  const [gallery, setGallery] = useState({ visible: false, kind: "poster", origin: null });
+  const posterSlotRef = useRef(null);
+  // Galeri açıkken kaynak görsel yuvadan "kalkmış" görünür (bkz. ImageGalleryModal).
+  const posterSlotOpacity = useRef(new Animated.Value(1)).current;
+  const backdropSlotOpacity = useRef(new Animated.Value(1)).current;
+  const openPosterGallery = useCallback(() => {
+    measureWindowRect(posterSlotRef.current, (origin) =>
+      setGallery({ visible: true, kind: "poster", origin }),
+    );
+  }, []);
+  const openBackdropGallery = useCallback((origin) => {
+    setGallery({ visible: true, kind: "backdrop", origin: origin || null });
+  }, []);
+  const closeGallery = useCallback(() => {
+    setGallery((g) => (g.visible ? { ...g, visible: false } : g));
+  }, []);
   const [modalVisible, setModalVisible] = useState(false);
   const [watchHistoryVisible, setWatchHistoryVisible] = useState(false);
   const [aiVisible, setAiVisible] = useState(false);
@@ -300,10 +323,11 @@ export default function TvShowsDetails({ route, navigation }) {
             language: tmdbLanguageOf(language),
             append_to_response:
               "account_states,alternative_titles,changes,credits,external_ids,images,keywords,lists,recommendations,content_ratings,translations,videos,watch/providers",
+            include_image_language: tmdbImageLanguageOrderOf(language),
           },
           headers: { accept: "application/json", Authorization: API_KEY },
         });
-        if (!cancelled) setDetails(res.data);
+        if (!cancelled) setDetails(localizeMediaDetails(res.data, language));
       } catch (e) {
         console.error(e);
       } finally {
@@ -575,6 +599,7 @@ export default function TvShowsDetails({ route, navigation }) {
       media_type: "tv",
       title: details.name || "",
       poster_path: details.poster_path || null,
+      backdrop_path: details.backdrop_path || null,
       vote_average: details.vote_average ?? null,
       vote_count: details.vote_count ?? null,
       overview: details.overview || null,
@@ -747,7 +772,8 @@ export default function TvShowsDetails({ route, navigation }) {
           topInset={insets.top}
           width={width}
           placeholderIcon="tv-outline"
-          onPress={() => setBacdropModalVisible(true)}
+          onPress={openBackdropGallery}
+          centerOpacity={backdropSlotOpacity}
         />
 
         {/* ── POSTER + INFO HEADER ── */}
@@ -757,9 +783,14 @@ export default function TvShowsDetails({ route, navigation }) {
             { marginTop: -heroMetrics.infoHeaderOverlap },
           ]}
         >
+          <Animated.View
+            ref={posterSlotRef}
+            collapsable={false}
+            style={{ opacity: posterSlotOpacity }}
+          >
           <TouchableOpacity
             style={styles.posterShadow}
-            onPress={() => setPosterModalVisible(true)}
+            onPress={openPosterGallery}
             activeOpacity={0.92}
           >
             {posterUri("tv", details.id, details.poster_path) ? (
@@ -767,11 +798,11 @@ export default function TvShowsDetails({ route, navigation }) {
                 source={{
                   uri: posterUri("tv", details.id, details.poster_path),
                 }}
-                style={[styles.poster, { borderColor: alpha(theme.border, 0.5019607843137255) }]}
+                style={[styles.poster, { borderRadius: mainPosterRadius, borderColor: alpha(theme.border, 0.5019607843137255) }]}
               />
             ) : (
               <View
-                style={[styles.noPoster, { backgroundColor: theme.secondary }]}
+                style={[styles.noPoster, { borderRadius: mainPosterRadius, backgroundColor: theme.secondary }]}
               >
                 <Ionicons
                   name="image-outline"
@@ -781,6 +812,7 @@ export default function TvShowsDetails({ route, navigation }) {
               </View>
             )}
           </TouchableOpacity>
+          </Animated.View>
 
           <View style={styles.titleBlock}>
             <Text
@@ -867,6 +899,8 @@ export default function TvShowsDetails({ route, navigation }) {
                     airDate={details.first_air_date}
                     seasonPosterPath={details.poster_path}
                     type="tv"
+                    // Eylem satırındaki öteki simgelerle aynı (ListViewTv: 30, dar düzende 24).
+                    size={30}
                   />
                 ) : null
               }
@@ -1357,18 +1391,25 @@ export default function TvShowsDetails({ route, navigation }) {
 
       {/* Poster / Backdrop galerisi (tüm görseller + indir) */}
       <ImageGalleryModal
-        visible={PosterModalVisible || backdropModalVisible}
-        onClose={() => {
-          setPosterModalVisible(false);
-          setBacdropModalVisible(false);
-        }}
+        visible={gallery.visible}
+        onClose={closeGallery}
         mediaId={id}
         mediaType="tv"
-        imageType={PosterModalVisible ? "poster" : "backdrop"}
+        imageType={gallery.kind}
+        originalLanguage={details?.original_language}
         initialImage={
-          PosterModalVisible ? details.poster_path : details.backdrop_path
+          gallery.kind === "poster" ? details.poster_path : details.backdrop_path
         }
         posterPicker
+        // Paylaşılan öğe geçişi: görsel dokunulan yuvadan ortaya uçar, geri döner.
+        origin={gallery.origin}
+        originUri={
+          gallery.kind === "poster"
+            ? posterUri("tv", details.id, details.poster_path)
+            : backdropUri("tv", details.id, details.backdrop_path)
+        }
+        originRadius={gallery.kind === "poster" ? mainPosterRadius : 0}
+        originOpacity={gallery.kind === "poster" ? posterSlotOpacity : backdropSlotOpacity}
       />
 
       {/* Yorumlar (film ile aynı yapı, TvComment koleksiyonu) */}

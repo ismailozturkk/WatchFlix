@@ -5,7 +5,7 @@ import {
   Modal,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   Animated,
   Easing,
   Pressable,
@@ -21,6 +21,7 @@ import SharedListsSection from "./SharedListsSection";
 import { useHapticsSettings } from "../context/AppSettingsContext";
 import ModalBlurBackdrop from "./common/ModalBlurBackdrop";
 import ListActionIcon from "./common/ListActionIcon";
+import DetailListActionTile from "./detail/DetailListActionTile";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import * as Haptics from "@services/hapticsService";
 import Toast from "@components/AppToast";
@@ -37,44 +38,6 @@ const formatDateSave = (timestamp) => {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;
 };
-
-/* ─── Ana buton bileşeni ──────────────────────────────── */
-const ActionButton = ({
-  onPress,
-  scale,
-  opacity,
-  children,
-  badge,
-  compact = false,
-}) => (
-  <TouchableOpacity
-    onPress={onPress}
-    activeOpacity={1}
-    style={[
-      styles.actionButtonWrapper,
-      compact && styles.actionButtonWrapperCompact,
-    ]}
-  >
-    <Animated.View
-      style={{
-        transform: [{ scale: scale || 1 }],
-        opacity: opacity !== undefined ? opacity : 1,
-      }}
-    >
-      {children}
-      {badge != null && badge > 0 && (
-        <View style={[styles.badgeWrap, compact && styles.badgeWrapCompact]}>
-          <Text
-            allowFontScaling={false}
-            style={[styles.badgeText, compact && styles.badgeTextCompact]}
-          >
-            {badge}
-          </Text>
-        </View>
-      )}
-    </Animated.View>
-  </TouchableOpacity>
-);
 
 /* ─── Grid liste kartı ────────────────────────────────── */
 const GridCard = ({
@@ -95,14 +58,15 @@ const GridCard = ({
     ]}
     onPress={onPress}
     activeOpacity={1}
+    accessibilityRole="button"
+    accessibilityState={{ selected: isIn }}
+    accessibilityLabel={item}
   >
     <Animated.View
-      style={{
+      style={[styles.gridCardContent, {
         transform: [{ scale: scale || 1 }],
         opacity: opacity !== undefined ? opacity : 1,
-        alignItems: "center",
-        gap: 8,
-      }}
+      }]}
     >
       <View
         style={[
@@ -118,12 +82,12 @@ const GridCard = ({
           inactiveName="folder-outline"
           activeColor={theme.colors.green}
           inactiveColor={theme.text.muted}
-          size={26}
+          size={20}
         />
       </View>
       <Text
         allowFontScaling={false}
-        numberOfLines={2}
+        numberOfLines={1}
         style={[
           styles.gridCardLabel,
           { color: isIn ? theme.colors.green : theme.text.secondary },
@@ -131,6 +95,11 @@ const GridCard = ({
       >
         {item}
       </Text>
+      <Ionicons
+        name={isIn ? "checkmark-circle" : "add-circle-outline"}
+        size={18}
+        color={isIn ? theme.colors.green : theme.text.muted}
+      />
     </Animated.View>
   </GlassTouchable>
 );
@@ -293,7 +262,7 @@ const ListView = ({
       activeName: "bookmark",
       inactiveName: "bookmark-outline",
       activeColor: theme.colors.blue,
-      inactiveColor: theme.text.secondary,
+      inactiveColor: theme.colors.blue,
       label: getIsActive("watchList")
         ? i18nText("autoI18n.listede", "Listede")
         : i18nText("autoI18n.izleme_listesi", "İzleme Listesi"),
@@ -308,7 +277,7 @@ const ListView = ({
       activeName: "heart",
       inactiveName: "heart-outline",
       activeColor: theme.colors.red,
-      inactiveColor: theme.text.secondary,
+      inactiveColor: theme.colors.red,
       label: getIsActive("favorites")
         ? i18nText("autoI18n.favorim", "Favorim")
         : i18nText("autoI18n.favori", "Favori"),
@@ -321,7 +290,7 @@ const ListView = ({
       style={[
         styles.container,
         compact && styles.containerCompact,
-        { backgroundColor: theme.secondary, shadowColor: theme.shadow },
+        { backgroundColor: theme.secondary, borderColor: theme.border, shadowColor: theme.shadow },
       ]}
     >
       {/* ── Standart butonlar ── */}
@@ -346,13 +315,29 @@ const ListView = ({
           // kaldırabilmeli, aksi hâlde kayıt ekranda kilitli kalırdı.
           const isWatchBlocked =
             !isReminderMode && watchLocked && !getIsActive("watchedMovies");
+          const watchActionColor = isWatchBlocked
+            ? theme.text.muted
+            : isReminderMode
+              ? isReleasedReminder ? theme.colors.green : theme.colors.orange
+              : theme.colors.green;
+          const watchActionLabel = isReminderMode
+            ? isReleasedReminder
+              ? i18nText("autoI18n.yayinlandi", "Yayınlandı")
+              : (t.remind || i18nText("autoI18n.hatirlat", "Hatırlat"))
+            : getIsActive("watchedMovies")
+              ? (t.watched || i18nText("autoI18n.izlendi", "İzlendi"))
+              : (t.watch || i18nText("autoI18n.izle", "İzle"));
           return (
-            <View key={key} style={[styles.iconCol, compact && styles.iconColCompact]}>
-              <ActionButton
-                scale={scaleValuesRef.current[key]}
-                opacity={opacityValuesRef.current[key]}
-                compact={compact}
-                onPress={
+            <DetailListActionTile
+              key={key}
+              scale={scaleValuesRef.current[key]}
+              opacity={opacityValuesRef.current[key]}
+              compact={compact}
+              theme={theme}
+              color={watchActionColor}
+              active={isReminderMode ? reminderOn : !!getIsActive("watchedMovies")}
+              label={watchActionLabel}
+              onPress={
                   isWatchBlocked
                     ? () =>
                         Toast.show({
@@ -372,8 +357,8 @@ const ListView = ({
                           getIsActive("watchedMovies")
                             ? handleOptimisticPress("watchedMovies", openWatchedHistory, false)
                             : handleOptimisticPress("watchedMovies", updateWatchedList, false)
-                }
-              >
+              }
+            >
                 {isWatchBlocked ? (
                   <ListActionIcon
                     active={false}
@@ -394,7 +379,9 @@ const ListView = ({
                     activeColor={
                       isReleasedReminder ? theme.colors.green : theme.colors.orange
                     }
-                    inactiveColor={theme.text.secondary}
+                    inactiveColor={
+                      isReleasedReminder ? theme.colors.green : theme.colors.orange
+                    }
                     size={compact ? 24 : 30}
                   />
                 ) : /* Yükleme göstergesi YALNIZ henüz işaretlenmemişken çıkar.
@@ -416,114 +403,61 @@ const ListView = ({
                     activeName="eye"
                     inactiveName="eye-outline"
                     activeColor={theme.colors.green}
-                    inactiveColor={theme.text.secondary}
+                    inactiveColor={theme.colors.green}
                     size={compact ? 24 : 30}
                   />
                 )}
-              </ActionButton>
-              <Text
-                allowFontScaling={false}
-                style={[
-                  styles.iconLabel,
-                  compact && styles.iconLabelCompact,
-                  { color: theme.text.muted },
-                ]}
-              >
-                {isReminderMode
-                  ? isReleasedReminder
-                    ? i18nText("autoI18n.yayinlandi", "Yayınlandı")
-                    : (t.remind || i18nText("autoI18n.hatirlat", "Hatırlat"))
-                  : getIsActive("watchedMovies")
-                    ? (t.watched || i18nText("autoI18n.izlendi", "İzlendi"))
-                    : (t.watch || i18nText("autoI18n.izle", "İzle"))}
-              </Text>
-            </View>
+            </DetailListActionTile>
           );
         }
         return (
-          <View key={key} style={[styles.iconCol, compact && styles.iconColCompact]}>
-            <ActionButton
-              scale={scaleValuesRef.current[key]}
-              opacity={opacityValuesRef.current[key]}
-              compact={compact}
-              onPress={onPress}
-            >
-              <ListActionIcon
-                active={!!getIsActive(key)}
-                activeName={activeName}
-                inactiveName={inactiveName}
-                activeColor={activeColor}
-                inactiveColor={inactiveColor}
-                size={compact ? 24 : 30}
-              />
-            </ActionButton>
-            <Text
-              allowFontScaling={false}
-              style={[
-                styles.iconLabel,
-                compact && styles.iconLabelCompact,
-                { color: theme.text.muted },
-              ]}
-            >
-              {label}
-            </Text>
-          </View>
+          <DetailListActionTile
+            key={key}
+            scale={scaleValuesRef.current[key]}
+            opacity={opacityValuesRef.current[key]}
+            compact={compact}
+            theme={theme}
+            color={activeColor}
+            active={!!getIsActive(key)}
+            label={label}
+            onPress={onPress}
+          >
+            <ListActionIcon
+              active={!!getIsActive(key)}
+              activeName={activeName}
+              inactiveName={inactiveName}
+              activeColor={activeColor}
+              inactiveColor={inactiveColor}
+              size={compact ? 24 : 30}
+            />
+          </DetailListActionTile>
         );
       })}
 
       {/* ── Diğer listeler butonu ── */}
-      <View style={[styles.iconCol, compact && styles.iconColCompact]}>
-        <ActionButton
-          onPress={() => { animateBounce("apps"); openModal(); }}
-          scale={scaleValuesRef.current["apps"]}
-          opacity={opacityValuesRef.current["apps"]}
-          badge={trueCount > 0 ? trueCount : null}
-          compact={compact}
-        >
-          <View
-            style={[
-              styles.appsIconWrap,
-              compact && styles.appsIconWrapCompact,
-              {
-                backgroundColor:
-                  trueCount > 0
-                    ? theme.colors.orange + "18"
-                    : otherListKeys?.length > 0
-                      ? theme.accent + "15"
-                      : theme.primary,
-                borderColor:
-                  trueCount > 0
-                    ? theme.colors.orange + "55"
-                    : otherListKeys?.length > 0
-                      ? theme.accent + "40"
-                      : theme.border,
-              },
-            ]}
-          >
-            <Ionicons
-              name={trueCount > 0 ? "grid" : "grid-outline"}
-              size={compact ? 18 : 22}
-              color={
-                trueCount > 0
-                  ? theme.colors.orange
-                  : otherListKeys?.length > 0
-                    ? theme.accent
-                    : theme.text.secondary
-              }
-            />
-          </View>
-        </ActionButton>
-        <Text
-          allowFontScaling={false}
-          style={[
-            styles.iconLabel,
-            compact && styles.iconLabelCompact,
-            { color: theme.text.muted },
-          ]}
-        >
-          {i18nText("autoI18n.digerleri", "Diğerleri")}
-        </Text>
-      </View>
+      <DetailListActionTile
+        onPress={() => { animateBounce("apps"); openModal(); }}
+        scale={scaleValuesRef.current["apps"]}
+        opacity={opacityValuesRef.current["apps"]}
+        badge={trueCount > 0 ? trueCount : null}
+        compact={compact}
+        theme={theme}
+        color={trueCount > 0 ? theme.colors.orange : theme.accent}
+        active={trueCount > 0}
+        label={i18nText("autoI18n.digerleri", "Diğerleri")}
+      >
+        <Ionicons
+          name={trueCount > 0 ? "grid" : "grid-outline"}
+          size={compact ? 21 : 25}
+          color={
+            trueCount > 0
+              ? theme.colors.orange
+              : otherListKeys?.length > 0
+                ? theme.accent
+                : theme.text.secondary
+          }
+        />
+      </DetailListActionTile>
 
       {/* ─────────── MODAL ─────────── */}
       <Modal
@@ -571,17 +505,17 @@ const ListView = ({
             {otherListKeys?.length > 0 ||
             (sharedLists.length > 0 && sharedItem) ? (
               <>
-                {otherListKeys?.length > 0 && (
-                  <FlatList
-                    data={otherListKeys}
-                    keyExtractor={(item) => item}
-                    numColumns={3}
-                    contentContainerStyle={styles.gridContainer}
-                    showsVerticalScrollIndicator={false}
-                    style={styles.gridList}
-                    columnWrapperStyle={{ gap: 10 }}
-                    renderItem={({ item }) => (
+                <ScrollView
+                  style={styles.listsScroll}
+                  contentContainerStyle={styles.listsScrollContent}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                >
+                  {otherListKeys?.length > 0 && (
+                    <View style={styles.gridContainer}>
+                      {otherListKeys.map((item) => (
                       <GridCard
+                        key={item}
                         item={item}
                         isIn={!!getIsActive(item)}
                         scale={scaleValuesRef.current[item]}
@@ -589,15 +523,16 @@ const ListView = ({
                         theme={theme}
                         onPress={() => handleOptimisticPress(item, () => updateList(item, type, formatDateSave(new Date())))}
                       />
-                    )}
-                  />
-                )}
+                      ))}
+                    </View>
+                  )}
 
-                {/* Ortak listeler */}
-                <SharedListsSection
-                  sharedItem={sharedItem}
-                  visible={modalVisible}
-                />
+                  {/* Ortak listeler */}
+                  <SharedListsSection
+                    sharedItem={sharedItem}
+                    visible={modalVisible}
+                  />
+                </ScrollView>
 
                 {/* Eylemler */}
                 <View style={[styles.separator, { backgroundColor: theme.border, marginBottom: 12 }]} />
@@ -662,99 +597,25 @@ const styles = StyleSheet.create({
   /* Ana kart */
   container: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    borderRadius: 18,
+    alignItems: "stretch",
+    gap: 7,
+    padding: 8,
+    borderRadius: 22,
+    borderWidth: 1,
     marginBottom: 20,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
   containerCompact: {
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 14,
+    padding: 6,
+    gap: 5,
+    borderRadius: 17,
     marginBottom: 0,
     elevation: 2,
     shadowOpacity: 0.04,
     shadowRadius: 6,
-  },
-
-  /* İkon kolonları */
-  iconCol: {
-    alignItems: "center",
-    gap: 5,
-    flex: 1,
-  },
-  iconColCompact: {
-    gap: 2,
-  },
-  iconLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    letterSpacing: 0.2,
-  },
-  iconLabelCompact: {
-    fontSize: 9,
-    letterSpacing: 0.1,
-  },
-  actionButtonWrapper: {
-    position: "relative",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 44,
-    height: 44,
-  },
-  actionButtonWrapperCompact: {
-    width: 36,
-    height: 36,
-  },
-
-  /* Badge */
-  badgeWrap: {
-    position: "absolute",
-    top: -3,
-    right: -4,
-    backgroundColor: "#FF6B35",
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 3,
-  },
-  badgeWrapCompact: {
-    top: -2,
-    right: -3,
-    minWidth: 14,
-    height: 14,
-    borderRadius: 7,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 9,
-    fontWeight: "800",
-  },
-  badgeTextCompact: {
-    fontSize: 8,
-  },
-
-  /* Diğer listeler butonu */
-  appsIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  appsIconWrapCompact: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
   },
 
   /* ── MODAL ── */
@@ -763,6 +624,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
+    maxHeight: "88%",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: 1,
@@ -813,35 +675,47 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  /* Grid */
-  // 3 sütunlu cam kart ızgarası: kenardaki kart basılınca listenin kırpma sınırında kesilmesin
-  // diye dört yanda GLASS_PRESS_ROOM (dolgu + eşit negatif dış boşluk; görünür yükseklik aynı).
-  gridList: { maxHeight: 300 + 2 * GLASS_PRESS_ROOM, margin: -GLASS_PRESS_ROOM },
+  /* Liste seçimi: tüm özel + ortak listeler tek kaydırılabilir alanda kalır. */
+  listsScroll: {
+    flexShrink: 1,
+    marginHorizontal: -GLASS_PRESS_ROOM,
+  },
+  listsScrollContent: {
+    paddingHorizontal: GLASS_PRESS_ROOM,
+    paddingVertical: GLASS_PRESS_ROOM,
+  },
   gridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: 10,
-    padding: GLASS_PRESS_ROOM,
-    paddingBottom: 4 + GLASS_PRESS_ROOM,
   },
   gridCard: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderRadius: 16,
+    width: "48%",
+    minHeight: 62,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 15,
     borderWidth: 1,
-    alignItems: "center",
     justifyContent: "center",
   },
+  gridCardContent: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   gridCardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
   gridCardLabel: {
-    fontSize: 10.5,
-    fontWeight: "600",
-    textAlign: "center",
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "700",
     letterSpacing: 0.1,
   },
 

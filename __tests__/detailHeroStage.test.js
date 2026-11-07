@@ -24,6 +24,7 @@ jest.mock("react-native", () => ({
     },
   },
   View: "View",
+  Animated: { View: "Animated.View" },
   Image: "Image",
   TouchableOpacity: "TouchableOpacity",
 }));
@@ -154,6 +155,35 @@ describe("DetailHeroStage çizimi", () => {
 
     touch.props.onPress();
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  test("ilk ölçümler boşsa arka plan yuvanın konumunu yeniden ölçer", () => {
+    jest.useFakeTimers();
+    const onPress = jest.fn();
+    const tree = renderTree(
+      React.createElement(DetailHeroStage, {
+        uri: "https://image.tmdb.org/t/p/w780/sample.jpg",
+        theme: DARK_THEME,
+        onPress,
+      }),
+    );
+    const center = collectNodes(tree, (n) => n.props?.testID === "detail-hero-center-slot")[0];
+    const touch = collectNodes(tree, (n) => n.props?.testID === "detail-hero-backdrop-touch")[0];
+    let calls = 0;
+    center.props.ref({
+      measureInWindow: (done) => {
+        calls += 1;
+        if (calls < 3) done(0, 0, 0, 0);
+        else done(0, 40, 390, 220);
+      },
+    });
+
+    touch.props.onPressIn();
+    touch.props.onPress();
+    expect(onPress).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(20);
+    expect(onPress).toHaveBeenCalledWith({ x: 0, y: 40, width: 390, height: 220 });
+    jest.useRealTimers();
   });
 
   test("görsel yokken yer tutucu ikonu orta yuvada gösterir", () => {

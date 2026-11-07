@@ -5,14 +5,24 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
   ActivityIndicator,
   Animated,
+  // Kaynak görselin alt katmanı: detay ekranındakiyle AYNI bileşen ve URL, bellek
+  // önbelleğinden anında çizilir (bkz. GalleryImageItem `underlayUri`).
+  Image as NativeImage,
   LayoutAnimation,
   Platform,
   UIManager,
   Text
 } from "react-native";
+import GalleryFlier from "./gallery/GalleryFlier";
+import useGalleryTransition from "./gallery/useGalleryTransition";
+import {
+  VIEW_RADIUS,
+  centeredRect,
+  flightStart,
+  heroViewSize,
+} from "./gallery/galleryGeometry";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import GlassSurface from "../common/GlassSurface";
 import GlassIconButton from "../common/GlassIconButton";
@@ -50,7 +60,6 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const { width, height } = Dimensions.get("window");
 
 const DOT_SIZE = 8;
 const DOT_SPACING = 4;
@@ -71,13 +80,18 @@ const PICKER_BOTTOM = 16;
 const PICKER_HEIGHT = 48;
 const PICKER_LINK_HEIGHT = 34;
 
+
 // Buyutulmus gorselin indirme geri bildirimi.
 //
 // Her satir kendi Animated deger setini tasiyor: `status` prop'u 'success' ya da
 // 'error'a dondugu anda rozet + halka + parlama birlikte oynuyor. Boylece
 // renderItem icinde ref sozlugu tutmaya gerek kalmiyor -- ayni anda tek gorsel
 // indirildigi icin de fazladan maliyeti yok.
-const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload, onSelect, pickerActive, isSelected, selectionLabel }) => {
+// `viewSize` / `pageSize` galeriyle AYNI hesaptan gelir (galleryGeometry): uçan
+// kopya tam bu kutuya iner. `underlayUri` yalnız kaynak görselde dolu: yüksek
+// çözünürlüklü görsel yüklenene kadar altta önbellekteki kaynak görsel durur, bu
+// yüzden kopya söküldüğünde ekranda hiçbir şey değişmez.
+const GalleryImageItem = ({ item, status, uri, viewSize, pageSize, underlayUri, onClose, onDownload, onSelect, pickerActive, isSelected, selectionLabel }) => {
   const pressScale = useRef(new Animated.Value(1)).current;
   const popAnim = useRef(new Animated.Value(0)).current; // rozetin girisi/cikisi
   const ringAnim = useRef(new Animated.Value(0)).current; // disa acilan halka
@@ -155,8 +169,8 @@ const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload, on
     }
   };
 
-  const imageWidth = isPoster ? 300 : 380;
-  const imageHeight = isPoster ? 450 : 380 * (9 / 16);
+  const imageWidth = viewSize.width;
+  const imageHeight = viewSize.height;
 
   const badgeScale = popAnim.interpolate({
     inputRange: [0, 1],
@@ -197,7 +211,7 @@ const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload, on
 
   return (
     <TouchableOpacity
-      style={styles.imageContainer}
+      style={[styles.imageContainer, { width: pageSize.width, height: pageSize.height }]}
       activeOpacity={1}
       onPress={onClose}
     >
@@ -216,8 +230,17 @@ const GalleryImageItem = ({ item, status, isPoster, uri, onClose, onDownload, on
               { width: imageWidth, height: imageHeight },
             ]}
           >
+            {underlayUri ? (
+              <NativeImage
+                source={{ uri: underlayUri }}
+                style={styles.underlay}
+                resizeMode="cover"
+                fadeDuration={0}
+              />
+            ) : null}
             <Image
               source={{ uri }}
+              transition={underlayUri ? 160 : 0}
               style={[
                 styles.image,
                 { width: imageWidth, height: imageHeight },
@@ -299,8 +322,18 @@ const ImageGalleryModal = ({
   seasonNumber, // used when mediaType is 'season'
   imageType, // 'poster' or 'backdrop'
   initialImage, // fallback/initial path
+  originalLanguage, // yapımın özgün dili: görseller seçili dil → İngilizce → özgün dil → dilsiz sıralanır
   // Film/dizi detayından açılınca: "Afiş / Arka plan olarak kullan" (özel görsel, Premium).
   posterPicker = false,
+  // Paylaşılan öğe geçişi (isteğe bağlı): dokunulan görselin PENCERE koordinatındaki
+  // dikdörtgeni, ekranda çizilen URL'si ve köşe yarıçapı. Verilirse görsel
+  // yerinden kalkıp ortaya uçar, kapanışta (aynı görseldeyse) yuvasına döner.
+  origin = null,
+  originUri = null,
+  originRadius = 0,
+  // Kaynak görselin opaklığı (Animated.Value): uçuş boyunca yuva boş kalsın diye
+  // 0'a çekilir, görsel geri oturunca 1 olur. Ekran yeniden çizilmez.
+  originOpacity = null,
 }) => {
   const { API_KEY } = useApiSettings();
   const { getTmdbUrl } = useImageQualitySettings();
@@ -323,8 +356,8 @@ const ImageGalleryModal = ({
   // sayfası pencere kalktıktan SONRA açılır (iOS iki Modal'ı aynı anda sunamaz).
   const upsellGateRef = useRef(null);
   if (!upsellGateRef.current) upsellGateRef.current = createCloseGate(700);
-  const imageLanguages = tmdbImageLanguagesOf(language);
-  const imageLanguageOrder = tmdbImageLanguageOrderOf(language);
+  const imageLanguages = tmdbImageLanguagesOf(language, originalLanguage);
+  const imageLanguageOrder = tmdbImageLanguageOrderOf(language, originalLanguage);
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isGrid, setIsGrid] = useState(false);
@@ -338,10 +371,38 @@ const ImageGalleryModal = ({
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef(null);
   const feedbackTimer = useRef(null);
+  // Kaydırmalı listenin anlık ofseti ve sürükleme durumu: kapanışta görsel
+  // yuvaya dönsün mü kararı (yarım kalmış kaydırmada dönmez).
+  const scrollOffsetRef = useRef(0);
+  const draggingRef = useRef(false);
+  // Açılış uçuşu sürerken gelen liste bekletilir; iniş bitince uygulanır (UI
+  // iş parçacığı uçuşu çizerken yüzlerce görünüm bağlanmasın).
+  const pendingImagesRef = useRef(null);
+  const returnToSlotRef = useRef(() => false);
+
+  const transition = useGalleryTransition({
+    visible,
+    origin,
+    originUri,
+    originRadius,
+    originOpacity,
+    shouldReturnToSlot: () => returnToSlotRef.current(),
+    onOpened: () => {
+      if (pendingImagesRef.current) {
+        setImages(pendingImagesRef.current);
+        pendingImagesRef.current = null;
+      }
+    },
+  });
+  const { mounted, page } = transition;
+  const pageW = page.width;
+  const pageH = page.height;
 
   const downloading = !!downloadingPath;
 
   const isPoster = imageType === "poster";
+  // Kaydırmalı kipteki büyük görselin kutusu (uçuşun hedefi ile aynı hesap).
+  const heroView = heroViewSize(isPoster, pageW, pageH);
   // Izgara yogunlugu: varsayilan (poster 3 / backdrop 2) ya da sik (4 / 3).
   // Adet siniri kalkinca yuzlerce gorsel gelebiliyor; sik kip kaydirmayi
   // belirgin sekilde kisaltiyor. Secim modal kapaninca sifirlanmiyor.
@@ -354,7 +415,16 @@ const ImageGalleryModal = ({
       : 2;
 
   useEffect(() => {
-    if (!visible || !mediaId || !mediaType) return;
+    if (!visible || !mediaId || !mediaType) return undefined;
+    let cancelled = false;
+    // Kaynak görsel (özel seçim varsa o) her zaman başta: liste gelince kaydırma
+    // konumu ve uçuşun indiği görsel değişmez.
+    const heroFirst = (list) => orderGalleryForChoice(list, chosenRef.current || initialImage);
+    const apply = (list) => {
+      if (cancelled) return;
+      if (transition.isOpening()) pendingImagesRef.current = list;
+      else setImages(list);
+    };
 
     const fetchImages = async () => {
       setLoading(true);
@@ -389,35 +459,41 @@ const ImageGalleryModal = ({
           const sortByVotes = (a, b) => b.vote_average - a.vote_average;
 
           // Adet siniri yok: TMDB'nin dondurdugu tum gorseller gosteriliyor.
-          // Sadece siralama uygulanir (once kullanicinin dili, sonra diger dil,
-          // en son dilsiz gorseller; her grup kendi icinde puana gore).
+          // Sadece siralama uygulanir (once kullanicinin dili, sonra Ingilizce, sonra
+          // yapimin ozgun dili, en son dilsiz gorseller; her grup kendi icinde puana gore).
           const finalImages = [...imageLanguages, "null"].flatMap((code) =>
             grouped[code].sort(sortByVotes),
           );
 
-          setImages(pickerActive ? orderGalleryForChoice(finalImages, chosenRef.current || initialImage) : finalImages);
+          apply(heroFirst(finalImages));
         } else {
           // Fallback if API returned nothing
           const fallback = initialImage ? [{ file_path: initialImage }] : [];
-          setImages(pickerActive ? orderGalleryForChoice(fallback, chosenRef.current || initialImage) : fallback);
+          apply(heroFirst(fallback));
         }
       } catch (error) {
         console.error("Error fetching images:", error);
         if (initialImage) {
-          const fallback = [{ file_path: initialImage }];
-          setImages(pickerActive ? orderGalleryForChoice(fallback, chosenRef.current || initialImage) : fallback);
+          apply(heroFirst([{ file_path: initialImage }]));
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchImages();
+    return () => {
+      cancelled = true;
+    };
   }, [visible, mediaId, mediaType, seasonNumber, imageType, API_KEY, initialImage, imageLanguageOrder, language, pickerActive]);
 
-  // Handle reset state when modal closes
+  // Modal tamamen kalkınca durumu sıfırla. `visible` değil `mounted`: kapanış
+  // animasyonu boyunca görsel/kip yerinde kalmalı (yoksa uçan görsel boşa döner).
   useEffect(() => {
-    if (!visible) {
+    if (!mounted) {
+      pendingImagesRef.current = null;
+      scrollOffsetRef.current = 0;
+      draggingRef.current = false;
       setImages([]);
       setLoading(true);
       scrollX.setValue(0);
@@ -430,7 +506,7 @@ const ImageGalleryModal = ({
       setFeedback(null);
       setDownloadingPath(null);
     }
-  }, [visible]);
+  }, [mounted]);
 
   // Modal kapali sayfa degistiginde de zamanlayici asili kalmasin.
   useEffect(
@@ -553,13 +629,14 @@ const ImageGalleryModal = ({
     setCurrentIndex(index);
 
     // Doğrudan noktanın konumunu da güncelleyelim
-    scrollX.setValue(index * width);
+    scrollX.setValue(index * pageW);
     
     setTimeout(() => {
       if (flatListRef.current && images.length > 0) {
         // scrollToIndex yerine scrollToOffset kullanıyoruz. 
         // Öğeler henüz render edilmese bile X pikseline doğrudan zıplar ve çökme yapmaz.
-        flatListRef.current.scrollToOffset({ offset: index * width, animated: false });
+        scrollOffsetRef.current = index * pageW;
+        flatListRef.current.scrollToOffset({ offset: index * pageW, animated: false });
       }
     }, 150); // Yatay listin render olması için ufak gecikme
   };
@@ -571,16 +648,23 @@ const ImageGalleryModal = ({
     let status = "idle";
     if (downloadingPath === item.file_path) status = "loading";
     else if (feedback?.path === item.file_path) status = feedback.status;
+    // Detay ekranında çizilen görsel: altında önbellekteki kaynak görsel durur.
+    const isHero = Boolean(item.file_path) && item.file_path === shownImage;
 
     return (
       <GalleryImageItem
         item={item}
         status={status}
-        isPoster={isPoster}
+        viewSize={heroView}
+        pageSize={page}
+        underlayUri={isHero && originUri ? originUri : null}
+        // 3. argüman EKRANDAKİ genişlik (TMDB boyutu değil): eskiden afişe 500,
+        // arka plana "original" (4K'ya varan) gidiyordu — her kaydırmada dev
+        // görsel çözülüyordu. İndirme düğmesi yine "original"i ayrıca ister.
         uri={getTmdbUrl(
           item.file_path,
           isPoster ? "poster" : "backdrop",
-          isPoster ? 500 : "original"
+          heroView.width
         )}
         onClose={onClose}
         onDownload={downloadImage}
@@ -596,7 +680,7 @@ const ImageGalleryModal = ({
 
   const renderGridItem = ({ item, index }) => {
     const gridItemWidth =
-      (width - GRID_EDGE * 2 - GRID_GAP * (gridCols - 1)) / gridCols;
+      (pageW - GRID_EDGE * 2 - GRID_GAP * (gridCols - 1)) / gridCols;
     const gridItemHeight = isPoster ? gridItemWidth * 1.5 : gridItemWidth * (9 / 16);
     const isSelected = pickerActive && item.file_path === shownImage;
 
@@ -666,7 +750,7 @@ const ImageGalleryModal = ({
     const outputRange = [];
 
     for (let i = 0; i < images.length; i++) {
-      inputRange.push(i * width);
+      inputRange.push(i * pageW);
       let shift = 0;
       if (i > 0 && i < images.length - 1) {
         shift = -(i - 1) * DOT_FULL_WIDTH;
@@ -685,15 +769,51 @@ const ImageGalleryModal = ({
 
   const translateX = getTranslateX();
 
+  // Kapanışta görsel yuvasına dönsün mü: kaydırmalı kipte, kaynak görselin
+  // sayfasında ve kaydırma ortada kalmamışken.
+  returnToSlotRef.current = () => {
+    if (isGrid || draggingRef.current) return false;
+    const data = images.length > 0 ? images : [{ file_path: shownImage }];
+    const heroIndex = data.findIndex((it) => it.file_path === shownImage);
+    if (heroIndex < 0) return false;
+    return Math.abs(scrollOffsetRef.current - heroIndex * pageW) < 2;
+  };
+
+  // Uçan kopyanın hedefi = listedeki kaynak görselin kutusu (aynı formül).
+  const heroTarget = centeredRect(heroView, pageW, pageH);
+  const flight = transition.flight;
+  const flierStart = flight ? flightStart(flight.rect, heroTarget) : null;
+
   return (
     <Modal
-      visible={visible}
+      visible={mounted}
       onRequestClose={onClose}
+      onShow={transition.onModalShow}
       onDismiss={() => upsellGateRef.current?.finish()}
-      animationType="fade"
+      // Geçiş elle (useGalleryTransition): blur + çubuklar yerinde solar, görsel
+      // kaynağından uçar.
+      animationType="none"
       transparent
+      // Pencere tüm ekranı kaplasın. Kaynak yuva yine de KÖKE göre çevrilir
+      // (kök de ölçülür): Android'de measureInWindow durum çubuğu kadar kayık döner.
+      statusBarTranslucent
+      navigationBarTranslucent
     >
-      <ModalBlurBackdrop intensity={60} />
+      <View
+        ref={transition.rootRef}
+        collapsable={false}
+        style={styles.root}
+        onLayout={transition.onRootLayout}
+        // Geçiş sürerken dokunuş yok: yarım uçuşta ızgaraya geçmek / ikinci kez
+        // kapatmak durum makinesini karıştırmasın. Android geri tuşu yine çalışır.
+        pointerEvents={transition.interactive ? "auto" : "none"}
+      >
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { opacity: transition.backdropOpacity }]}
+      >
+        <ModalBlurBackdrop intensity={60} />
+      </Animated.View>
       <TouchableOpacity
         style={StyleSheet.absoluteFill}
         onPress={onClose}
@@ -704,7 +824,7 @@ const ImageGalleryModal = ({
           Eylemler tek bir hap icinde gruplandi; onceden ekranin sagina yapisik
           dort ayri daire duruyordu. Konum artik guvenli alandan hesaplaniyor,
           iOS/Android icin sabit 50/30 degil. */}
-      <View style={[styles.headerBar, { top: insets.top + 12 }]}>
+      <Animated.View style={[styles.headerBar, { top: insets.top + 12, opacity: transition.backdropOpacity }]}>
         {images.length > 0 && (
           <View style={styles.countBadge}>
             <Ionicons name="images-outline" size={14} color="rgba(255,255,255,0.75)" />
@@ -799,9 +919,12 @@ const ImageGalleryModal = ({
           accessibilityLabel={i18nText("autoI18n.kapat", "Kapat")}
           onPress={onClose}
         />
-      </View>
+      </Animated.View>
 
-      <View style={styles.contentContainer} pointerEvents="box-none">
+      <Animated.View
+        style={[styles.contentContainer, { opacity: transition.contentOpacity }]}
+        pointerEvents="box-none"
+      >
         {loading && !initialImage ? (
           <ActivityIndicator size="large" color="#FFD700" />
         ) : (
@@ -810,7 +933,15 @@ const ImageGalleryModal = ({
               ref={flatListRef}
               key={isGrid ? `grid-${gridCols}` : "swipe"}
               style={{ flex: 1, width: "100%" }}
-              data={images.length > 0 ? images : [{ file_path: initialImage }]}
+              // Liste gelene kadar ekrandaki görsel (özel seçim varsa o) gösterilir.
+              data={images.length > 0 ? images : [{ file_path: shownImage }]}
+              onScrollBeginDrag={!isGrid ? () => { draggingRef.current = true; } : undefined}
+              onScrollEndDrag={!isGrid ? () => { draggingRef.current = false; } : undefined}
+              // Kaydırmalı kipte her sayfa tam ekran görsel: yalnız komşular bağlı kalsın.
+              initialNumToRender={isGrid ? 12 : 1}
+              maxToRenderPerBatch={isGrid ? 12 : 2}
+              windowSize={isGrid ? 7 : 3}
+              removeClippedSubviews={Platform.OS === "android"}
               extraData={chosenPath}
               keyExtractor={(item, index) => item.file_path || String(index)}
               renderItem={isGrid ? renderGridItem : renderItem}
@@ -830,22 +961,30 @@ const ImageGalleryModal = ({
                 !isGrid
                   ? Animated.event(
                       [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                      { useNativeDriver: true }
+                      {
+                        useNativeDriver: true,
+                        listener: (e) => {
+                          scrollOffsetRef.current = e.nativeEvent.contentOffset.x;
+                        },
+                      }
                     )
                   : undefined
               }
               scrollEventThrottle={16}
               onMomentumScrollEnd={
                 !isGrid
-                  ? (e) =>
+                  ? (e) => {
+                      draggingRef.current = false;
+                      scrollOffsetRef.current = e.nativeEvent.contentOffset.x;
                       setCurrentIndex(
-                        Math.round(e.nativeEvent.contentOffset.x / width)
-                      )
+                        Math.round(e.nativeEvent.contentOffset.x / pageW)
+                      );
+                    }
                   : undefined
               }
               getItemLayout={
                 !isGrid
-                  ? (data, index) => ({ length: width, offset: width * index, index })
+                  ? (data, index) => ({ length: pageW, offset: pageW * index, index })
                   : undefined
               }
             />
@@ -870,9 +1009,9 @@ const ImageGalleryModal = ({
                 >
                   {images.map((_, i) => {
                     const inputRange = [
-                      (i - 1) * width,
-                      i * width,
-                      (i + 1) * width,
+                      (i - 1) * pageW,
+                      i * pageW,
+                      (i + 1) * pageW,
                     ];
 
                     const opacity = scrollX.interpolate({
@@ -902,13 +1041,30 @@ const ImageGalleryModal = ({
             )}
           </>
         )}
-      </View>
+      </Animated.View>
+
+      {/* Uçan kopya: kaynak yuvadan ortaya (ve geri). Her uçuşta yeni anahtar. */}
+      {flight && flierStart ? (
+        <GalleryFlier
+          key={flight.id}
+          uri={flight.uri}
+          target={heroTarget}
+          start={flierStart}
+          fromRadius={flight.radius || 0}
+          toRadius={VIEW_RADIUS}
+          progress={transition.progress}
+          onMounted={() => transition.onFlierMounted(flight.id)}
+          onReady={() => transition.onFlierReady(flight.id)}
+          onFailed={() => transition.onFlierFailed(flight.id)}
+          onCoverChange={(covering) => transition.onFlierCover(flight.id, covering)}
+        />
+      ) : null}
 
       {/* Ozel gorsel secici: ekrandaki gorsel = cizilen afis/arka plansa "... bu",
           degilse "... olarak kullan" (Free'de kilit + Premium etiketi → yukseltme). */}
       {showPicker && (
-        <View
-          style={[styles.pickerBar, { bottom: insets.bottom + PICKER_BOTTOM }]}
+        <Animated.View
+          style={[styles.pickerBar, { bottom: insets.bottom + PICKER_BOTTOM, opacity: transition.backdropOpacity }]}
           pointerEvents="box-none"
         >
           <GlassPillButton
@@ -956,8 +1112,9 @@ const ImageGalleryModal = ({
               </TouchableOpacity>
             ) : null}
           </View>
-        </View>
+        </Animated.View>
       )}
+      </View>
       <ModalToastHost visible={visible} />
     </Modal>
   );
@@ -1035,6 +1192,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
   },
+  root: {
+    flex: 1,
+  },
+  underlay: {
+    ...StyleSheet.absoluteFill,
+    width: "100%",
+    height: "100%",
+  },
   contentContainer: {
     flex: 1,
     justifyContent: "center",
@@ -1052,19 +1217,18 @@ const styles = StyleSheet.create({
   gridRow: {
     gap: GRID_GAP, // sutunlar arasi
   },
+  // Boyut çalışma anında kök görünümün ölçüsünden (sayfa) verilir.
   imageContainer: {
-    width: width,
-    height: height,
     justifyContent: "center",
     alignItems: "center",
   },
   image: {
-    borderRadius: 20,
+    borderRadius: VIEW_RADIUS,
     contentFit: "cover",
   },
   // Parlama ve rozet katmanini gorselin kose yaricapina kirpar.
   imageClip: {
-    borderRadius: 20,
+    borderRadius: VIEW_RADIUS,
     overflow: "hidden",
   },
   selectedBorder: {
