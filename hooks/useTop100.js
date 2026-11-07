@@ -23,6 +23,7 @@ import {
   fetchTop100Pool,
   setTop100Hype,
 } from "../services/top100Service";
+import { awardTop100VoteXp } from "../services/leagueService";
 import { applyHype, asCounter, normalizeMyHype, rankTop100 } from "../utils/top100";
 
 const CACHE_MS = 10 * 60 * 1000;
@@ -162,6 +163,7 @@ export default function useTop100() {
 
       try {
         const result = await setTop100Hype({ uid, type: item.media_type, id: item.id, hyped: !was, limit });
+        if (result.hyped) awardTop100VoteXp(key); // Haftalık Lig (sunucu oyu doğrular; geri alıp yeniden vermek tekrar saymaz)
         if (alive.current) setServerUsed(result.used);
         if (memory && memory.language === language) {
           memory = {

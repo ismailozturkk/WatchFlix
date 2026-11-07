@@ -14,6 +14,7 @@ import { useLanguage } from "@context/LanguageContext";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { getTop100Copy } from "@utils/top100Copy";
 import { showsTotalVotes } from "@utils/top100";
+import usePosterCorner from "@hooks/usePosterCorner";
 
 const COLORS = ["#F59E0B", "#B45309", "#431407"];
 const SHADOW = "#B45309";
@@ -22,6 +23,7 @@ const MEDALS = ["#FFD76A", "#E5E7EB", "#F0A15E"];
 const PODIUM = [1, 0, 2];
 
 function Top100Widget({ navigation }) {
+  const corner = usePosterCorner("fun");
   const { language } = useLanguage();
   const copy = getTop100Copy(language);
   const { getTmdbUrl } = useImageQualitySettings();
@@ -63,7 +65,7 @@ function Top100Widget({ navigation }) {
             const lead = index === 0;
             return (
               <View key={index} style={[styles.slot, lead && styles.slotLead]}>
-                <View style={[styles.poster, lead && styles.posterLead]}>
+                <View style={[styles.poster, lead && styles.posterLead, { borderRadius: corner(lead ? 12 : 10) }]}>
                   {row?.poster_path ? (
                     <Image
                       source={{ uri: getTmdbUrl(row.poster_path, "poster", 200) }}

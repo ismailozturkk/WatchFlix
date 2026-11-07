@@ -4,7 +4,8 @@
 //
 //   • Sıra = hibrit oy sayısı: TMDB değerlendirme sayısı + Seelogd oyu × ağırlık (utils/top100.js; veri hooks/useTop100).
 //     En çok oy alan en üstte; puan ortalaması sıralamaya girmez.
-//   • 4'lü afiş ızgarası: her afişte sıra rozeti, oy sayısı ve tek dokunuşluk "Oy ver" (hype; tekrar dokununca geri alınır).
+//   • 4'lü afiş ızgarası: afiş (seçilmişse turuncu çerçeve) + altında sıra numarası ve oy sayısı (ad/düğme yok).
+//     Hücreye dokunuş seçenek sayfasını açar (Top100PosterSheet): Bilgi → detay · Seçim yap → oy ver / geri al · İptal et.
 //   • Üstte arama: herhangi bir film/diziyi bulup oy ver; Top 100 dışındaysa oyu onu yarışa sokar.
 //   • Üst kart: ünlem düğmesi (ayrıntılı açıklama, Top100InfoSheet) + "Liste olarak kaydet" / "Sohbete gönder".
 //     İkisi önce uzunluk sorar (İlk 20/50/70/100, Top100CountSheet), sonra SaveSharedListModal / ShareToChatSheet
@@ -22,6 +23,7 @@ import ShareToChatSheet from "@components/chat/ShareToChatSheet";
 import SaveSharedListModal from "@components/modals/SaveSharedListModal";
 import Top100CountSheet from "@components/top100/Top100CountSheet";
 import Top100InfoSheet from "@components/top100/Top100InfoSheet";
+import Top100PosterSheet from "@components/top100/Top100PosterSheet";
 import { GameScreenShell } from "../game/GameScreenShell";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
@@ -34,27 +36,35 @@ import { triggerHaptic } from "@services/hapticsService";
 import { buildListShare } from "@utils/chatShare";
 import { decorateItem, showsTotalVotes, top100MediaList } from "@utils/top100";
 import { getTop100Copy } from "@utils/top100Copy";
+import usePosterCorner from "@hooks/usePosterCorner";
+import { SEARCH_DEBOUNCE_MS } from "../../utils/searchDebounce";
 
 const MEDALS = ["#F5B70A", "#A8B0BC", "#CD7F42"];
+const RANK_FILL = "#5B6B80"; // 4. sıradan itibaren rozet dolgusu (arduvaz)
 const HYPE = "#F97316";
 const FILTERS = ["all", "movie", "tv"];
-const SEARCH_DEBOUNCE_MS = 350;
 const COLUMNS = 4;
-const GAP = 8;
+const GAP = 10;
 const SIDE = 16; // GameScreenShell içerik dolgusu
 
-// locked: Free'de henüz oy verilmemiş yapım — düğme kilit simgesiyle çizilir, dokunuş yükseltme sayfasını açar.
-const Cell = React.memo(function Cell({ row, width, hyped, locked, copy, theme, getTmdbUrl, onOpen, onHype }) {
+// Afişin altında yalnız sıra rozeti + oy sayısı: dokunuş seçenek sayfasını açar (Bilgi · Seçim yap · İptal et; Top100PosterSheet).
+const Cell = React.memo(function Cell({ row, width, hyped, copy, theme, getTmdbUrl, onPress }) {
+  const corner = usePosterCorner("fun");
+  const radius = corner(10);
+  const height = width * 1.5;
   const medal = row.rank && row.rank <= 3 ? MEDALS[row.rank - 1] : null;
+  const label = row.rank ? String(row.rank) : "–";
   return (
-    <View style={{ width }}>
-      <GlassTouchable
-        glass={false}
-        onPress={() => onOpen(row)}
-        accessibilityRole="button"
-        accessibilityLabel={copy.cellA11y(row.rank, row.title, row.votes)}
-        style={[styles.poster, { width, height: width * 1.5, backgroundColor: theme.border }]}
-      >
+    <GlassTouchable
+      glass={false}
+      onPress={() => onPress(row)}
+      accessibilityRole="button"
+      accessibilityState={{ selected: hyped }}
+      accessibilityLabel={copy.cellA11y(row.rank, row.title, row.votes)}
+      accessibilityHint={copy.menuA11y(row.title)}
+      style={{ width }}
+    >
+      <View style={[styles.poster, { width, height, borderRadius: radius, backgroundColor: theme.border }]}>
         {row.poster_path ? (
           <Image
             source={{ uri: getTmdbUrl(row.poster_path, "poster", 200) }}
@@ -64,53 +74,38 @@ const Cell = React.memo(function Cell({ row, width, hyped, locked, copy, theme, 
             recyclingKey={row.key}
           />
         ) : null}
-        <View style={[styles.rankBadge, medal ? { backgroundColor: medal } : styles.rankBadgePlain]}>
-          <Text style={[styles.rankText, medal && styles.rankTextMedal]} allowFontScaling={false}>
-            {row.rank ? `#${row.rank}` : "–"}
-          </Text>
-        </View>
         {hyped ? (
-          <View style={styles.hypedMark}>
-            <AppIcon family="Ionicons" name="flame" size={11} color="#FFFFFF" />
-          </View>
+          <>
+            {/* Kenar çerçevesi görselin ÜSTÜNDE ayrı katman: 2:3 afiş oranı bozulmaz (shareKit PosterEdge dersi). */}
+            <View pointerEvents="none" style={[styles.hypedBorder, { borderRadius: radius }]} />
+            <View pointerEvents="none" style={styles.hypedMark}>
+              <AppIcon family="Ionicons" name="flame" size={10} color="#FFFFFF" />
+            </View>
+          </>
         ) : null}
-      </GlassTouchable>
-
-      <Text style={[styles.cellTitle, { color: theme.text.primary }]} numberOfLines={1} allowFontScaling={false}>
-        {row.title}
-      </Text>
-      <View style={styles.votesLine}>
-        <AppIcon family="Ionicons" name="people" size={10} color={theme.text.muted} />
-        <Text style={[styles.votesText, { color: theme.text.secondary }]} numberOfLines={1} allowFontScaling={false}>
-          {copy.votes(row.votes)}
-        </Text>
       </View>
 
-      <GlassTouchable
-        glass={false}
-        onPress={() => onHype(row)}
-        hitSlop={4}
-        accessibilityRole="button"
-        accessibilityState={{ selected: hyped }}
-        accessibilityLabel={copy.hypeA11y(row.title, hyped)}
-        style={[
-          styles.hypeBtn,
-          hyped
-            ? { backgroundColor: HYPE, borderColor: HYPE }
-            : { borderColor: `${HYPE}AA`, backgroundColor: `${HYPE}14` },
-        ]}
-      >
-        <AppIcon
-          family="Ionicons"
-          name={hyped ? "flame" : locked ? "lock-closed" : "flame-outline"}
-          size={locked && !hyped ? 11 : 12}
-          color={hyped ? "#FFFFFF" : HYPE}
-        />
-        <Text style={[styles.hypeText, { color: hyped ? "#FFFFFF" : HYPE }]} numberOfLines={1} allowFontScaling={false}>
-          {hyped ? copy.voted : copy.vote}
-        </Text>
-      </GlassTouchable>
-    </View>
+      <View style={styles.cellFoot}>
+        <View style={[styles.rankBadge, { backgroundColor: medal || (hyped ? HYPE : RANK_FILL) }]}>
+          <Text
+            style={[styles.rankText, label.length > 2 && styles.rankTextSmall, medal && styles.rankTextMedal]}
+            allowFontScaling={false}
+          >
+            {label}
+          </Text>
+        </View>
+        <View style={styles.votesRow}>
+          <AppIcon family="Ionicons" name="people" size={10} color={hyped ? HYPE : theme.text.muted} />
+          <Text
+            style={[styles.votesText, { color: hyped ? theme.text.primary : theme.text.secondary }]}
+            numberOfLines={1}
+            allowFontScaling={false}
+          >
+            {copy.num(row.votes)}
+          </Text>
+        </View>
+      </View>
+    </GlassTouchable>
   );
 });
 
@@ -139,6 +134,8 @@ export default function Top100Screen({ navigation }) {
   const [pending, setPending] = useState(null); // { mode, count } — sayım sayfası kapanınca açılacak sayfa
   const [saveTarget, setSaveTarget] = useState(null);
   const [chatShare, setChatShare] = useState(null);
+  const [menuRow, setMenuRow] = useState(null); // seçenek sayfasındaki afiş
+  const menuAction = useRef(null); // sayfa kapanınca çalışacak iş: { action, row }
   const searchSeq = useRef(0);
 
   // Afiş genişliği ÇİFT tam sayı (2:3 afiş yarım piksel kırpılmasın — shareKit PosterEdge dersi).
@@ -225,6 +222,28 @@ export default function Top100Screen({ navigation }) {
     [myHype, canVote, used, voteLimit, voteGate, getTmdbUrl, toggleHype, copy],
   );
 
+  // Afiş dokunuşu → seçenek sayfası. Seçilen iş sayfa kapandıktan SONRA çalışır (onMenuDismissed): yükseltme sayfası
+  // da bir Modal ve iOS kapanmakta olan Modal'ın üstüne ikincisini sunamaz; detay geçişi de perdenin arkasında kalmaz.
+  const openMenu = useCallback((row) => {
+    triggerHaptic("selection");
+    menuAction.current = null;
+    setMenuRow(row);
+  }, []);
+
+  const onMenuAction = (action) => {
+    if (!menuRow) return;
+    menuAction.current = { action, row: menuRow };
+    setMenuRow(null);
+  };
+
+  const onMenuDismissed = () => {
+    const pendingAction = menuAction.current;
+    menuAction.current = null;
+    if (!pendingAction) return;
+    if (pendingAction.action === "info") openDetails(pendingAction.row);
+    else if (pendingAction.action === "vote") onHype(pendingAction.row);
+  };
+
   const openCount = (mode) => {
     if (!ranked.length) return;
     triggerHaptic("selection");
@@ -250,23 +269,36 @@ export default function Top100Screen({ navigation }) {
   const showTotal = showsTotalVotes(totalVotes);
   // Hak çubuğu: Premium/Max'ta "Oy hakkın 3/10"; Free'de yalnız (hak sisteminden önceki) oyları varsa sayı.
   const budgetText = voteLimit > 0 ? copy.budget(used, voteLimit) : used > 0 ? copy.myVotes(used) : null;
+  const budgetFull = voteLimit > 0 && used >= voteLimit;
 
   const header = (
     <View style={styles.headerWrap}>
-      <LinearGradient
-        colors={["#F59E0B", "#B45309", "#431407"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <View pointerEvents="none" style={styles.heroMark}>
-          <AppIcon family="Ionicons" name="trophy-outline" size={130} color="rgba(255,255,255,0.08)" />
-        </View>
+      <View style={styles.hero}>
+        <LinearGradient
+          colors={["#3A1D07", "#1C1009", "#0F0A08"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* Sağ üstte kehribar ışıma + ince üst parıltı: düz turuncu yerine derinlikli, koyu kart. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(245,158,11,0.46)", "rgba(245,158,11,0.10)", "rgba(245,158,11,0)"]}
+          locations={[0, 0.45, 1]}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0.3, y: 0.8 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View pointerEvents="none" style={styles.heroSheen} />
+
         <View style={styles.heroTop}>
-          <AppIcon family="Ionicons" name="trophy" size={15} color="#FFE7A3" />
-          <Text style={styles.heroEyebrow} numberOfLines={1}>
-            {copy.eyebrow}
-          </Text>
+          <View style={styles.heroChip}>
+            <AppIcon family="Ionicons" name="trophy" size={12} color="#FCD34D" />
+            <Text style={styles.heroEyebrow} numberOfLines={1}>
+              {copy.eyebrow}
+            </Text>
+          </View>
+          <View style={{ flex: 1 }} />
           {/* Ayrıntılı açıklama: ünlem düğmesi → Top100InfoSheet */}
           <GlassTouchable
             glass={false}
@@ -279,29 +311,79 @@ export default function Top100Screen({ navigation }) {
             accessibilityLabel={copy.infoA11y}
             style={styles.infoBtn}
           >
-            <AppIcon family="Ionicons" name="alert-circle-outline" size={20} color="#FFFFFF" />
+            <AppIcon family="Ionicons" name="alert-circle-outline" size={19} color="#FFFFFF" />
           </GlassTouchable>
         </View>
+
+        <View style={styles.heroMain}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroTitle} numberOfLines={2}>
+              {copy.widgetTitle}
+            </Text>
+            <Text style={styles.heroBody} numberOfLines={3}>
+              {copy.heroBody}
+            </Text>
+          </View>
+          {/* İlk üç: ortada 1., solda 2., sağda 3. — yelpaze. */}
+          <View style={styles.podium} pointerEvents="none">
+            {[1, 0, 2].map((index) => {
+              const row = ranked[index];
+              const front = index === 0;
+              return (
+                <View
+                  key={index}
+                  style={[
+                    styles.podiumPoster,
+                    front ? styles.podiumFront : index === 1 ? styles.podiumLeft : styles.podiumRight,
+                    { borderColor: MEDALS[index] },
+                  ]}
+                >
+                  {row?.poster_path ? (
+                    <Image
+                      source={{ uri: getTmdbUrl(row.poster_path, "poster", 200) }}
+                      style={StyleSheet.absoluteFill}
+                      contentFit="cover"
+                      transition={160}
+                    />
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
         {showTotal || budgetText ? (
           <View style={styles.heroStats}>
             {showTotal ? (
               <View style={styles.heroPill}>
-                <AppIcon family="Ionicons" name="people" size={12} color="#FFFFFF" />
+                <AppIcon family="Ionicons" name="people" size={12} color="#FDE68A" />
                 <Text style={styles.heroPillText}>{copy.totalVotes(totalVotes)}</Text>
               </View>
             ) : null}
             {budgetText ? (
-              <View style={[styles.heroPill, voteLimit > 0 && used >= voteLimit && styles.heroPillFull]}>
-                <AppIcon family="Ionicons" name="flame" size={12} color="#FFD76A" />
+              <View style={[styles.heroPill, budgetFull && styles.heroPillFull, voteLimit > 0 && styles.heroBudget]}>
+                <AppIcon family="Ionicons" name="flame" size={12} color={budgetFull ? "#FCA5A5" : "#FDBA74"} />
                 <Text style={styles.heroPillText}>{budgetText}</Text>
+                {voteLimit > 0 ? (
+                  <View style={styles.budgetTrack}>
+                    <View
+                      style={[
+                        styles.budgetFill,
+                        { width: `${Math.min(100, (used / voteLimit) * 100)}%` },
+                        budgetFull && { backgroundColor: "#F87171" },
+                      ]}
+                    />
+                  </View>
+                ) : null}
               </View>
             ) : null}
           </View>
         ) : null}
+
         <View style={styles.heroActions}>
           {[
-            { mode: "save", icon: "bookmark-outline", label: copy.saveList },
-            { mode: "chat", icon: "paper-plane-outline", label: copy.sendChat },
+            { mode: "save", icon: "bookmark", label: copy.saveList, primary: true },
+            { mode: "chat", icon: "paper-plane", label: copy.sendChat },
           ].map((action) => (
             <GlassTouchable
               key={action.mode}
@@ -309,16 +391,16 @@ export default function Top100Screen({ navigation }) {
               disabled={!ranked.length}
               onPress={() => openCount(action.mode)}
               accessibilityRole="button"
-              style={[styles.heroBtn, !ranked.length && { opacity: 0.5 }]}
+              style={[styles.heroBtn, action.primary && styles.heroBtnPrimary, !ranked.length && { opacity: 0.5 }]}
             >
-              <AppIcon family="Ionicons" name={action.icon} size={16} color="#FFFFFF" />
-              <Text style={styles.heroBtnText} numberOfLines={1}>
+              <AppIcon family="Ionicons" name={action.icon} size={15} color={action.primary ? "#1F1300" : "#FFFFFF"} />
+              <Text style={[styles.heroBtnText, action.primary && styles.heroBtnTextPrimary]} numberOfLines={1}>
                 {action.label}
               </Text>
             </GlassTouchable>
           ))}
         </View>
-      </LinearGradient>
+      </View>
 
       <GlassField
         height={46}
@@ -412,15 +494,13 @@ export default function Top100Screen({ navigation }) {
         row={item}
         width={cellWidth}
         hyped={!!myHype[item.key]}
-        locked={!canVote}
         copy={copy}
         theme={theme}
         getTmdbUrl={getTmdbUrl}
-        onOpen={openDetails}
-        onHype={onHype}
+        onPress={openMenu}
       />
     ),
-    [cellWidth, myHype, canVote, copy, theme, getTmdbUrl, openDetails, onHype],
+    [cellWidth, myHype, copy, theme, getTmdbUrl, openMenu],
   );
 
   return (
@@ -453,6 +533,18 @@ export default function Top100Screen({ navigation }) {
         onDismissed={onCountDismissed}
       />
 
+      <Top100PosterSheet
+        visible={!!menuRow}
+        row={menuRow}
+        hyped={!!(menuRow && myHype[menuRow.key])}
+        locked={!canVote}
+        copy={copy}
+        getTmdbUrl={getTmdbUrl}
+        onAction={onMenuAction}
+        onClose={() => setMenuRow(null)}
+        onDismissed={onMenuDismissed}
+      />
+
       <SaveSharedListModal visible={!!saveTarget} post={saveTarget} onClose={() => setSaveTarget(null)} />
 
       <ShareToChatSheet visible={!!chatShare} share={chatShare} onClose={() => setChatShare(null)} />
@@ -463,49 +555,98 @@ export default function Top100Screen({ navigation }) {
 const styles = StyleSheet.create({
   list: { paddingBottom: 40, gap: 14 },
   gridRow: { gap: GAP },
-  headerWrap: { gap: 12, marginBottom: 2 },
-  hero: { borderRadius: 24, padding: 16, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)" },
-  heroMark: { position: "absolute", right: -20, top: -18, transform: [{ rotate: "-12deg" }] },
-  heroTop: { flexDirection: "row", alignItems: "center", gap: 7 },
-  heroEyebrow: { flex: 1, color: "#FFE7A3", fontSize: 12, fontWeight: "900", letterSpacing: 1.2 },
+  headerWrap: { gap: 12, marginBottom: 6 },
+  hero: {
+    borderRadius: 26,
+    padding: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.22)",
+    backgroundColor: "#1C1009",
+  },
+  heroSheen: {
+    position: "absolute",
+    left: 24,
+    right: 24,
+    top: 0,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.22)",
+  },
+  heroTop: { flexDirection: "row", alignItems: "center" },
+  heroChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(251,191,36,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(251,191,36,0.30)",
+  },
+  heroEyebrow: { color: "#FCD34D", fontSize: 11, fontWeight: "900", letterSpacing: 1.3 },
   infoBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.10)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.32)",
+    borderColor: "rgba(255,255,255,0.20)",
   },
-  heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
+  heroMain: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 14 },
+  heroCopy: { flex: 1, minWidth: 0 },
+  heroTitle: { color: "#FFFFFF", fontSize: 21, lineHeight: 25, fontWeight: "900", letterSpacing: -0.4 },
+  heroBody: { color: "rgba(255,237,213,0.72)", fontSize: 12, lineHeight: 17, fontWeight: "600", marginTop: 6 },
+  // İlk üç afiş yelpazesi: 1. önde ve büyük, 2. solda, 3. sağda; çerçeve madalya renginde.
+  podium: { width: 116, height: 96 },
+  podiumPoster: {
+    position: "absolute",
+    borderRadius: 9,
+    borderWidth: 1.5,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  podiumFront: { left: 30, top: 0, width: 56, height: 84, zIndex: 2, elevation: 4 },
+  podiumLeft: { left: 0, top: 14, width: 46, height: 69, transform: [{ rotate: "-10deg" }], opacity: 0.92 },
+  podiumRight: { right: 0, top: 14, width: 46, height: 69, transform: [{ rotate: "10deg" }], opacity: 0.92 },
+  heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 14 },
   heroPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.24)",
+    gap: 6,
+    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
   },
-  heroPillText: { color: "#FFFFFF", fontSize: 11.5, fontWeight: "800" },
-  // Hak doldu: hap koyu kırmızıya döner (oy düğmeleri de kilitli çizilir).
-  heroPillFull: { backgroundColor: "rgba(127,29,29,0.55)" },
-  heroActions: { flexDirection: "row", gap: 8, marginTop: 12 },
+  heroPillText: { color: "#FFFFFF", fontSize: 11.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  // Hak çubuğu: metnin yanında ince doluluk göstergesi.
+  heroBudget: { paddingRight: 12 },
+  budgetTrack: { width: 44, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.14)", overflow: "hidden" },
+  budgetFill: { height: "100%", borderRadius: 3, backgroundColor: "#FB923C" },
+  // Hak doldu: hap koyu kırmızıya döner.
+  heroPillFull: { backgroundColor: "rgba(127,29,29,0.45)", borderColor: "rgba(248,113,113,0.35)" },
+  heroActions: { flexDirection: "row", gap: 8, marginTop: 14 },
   heroBtn: {
     flex: 1,
-    minHeight: 42,
-    borderRadius: 14,
+    minHeight: 44,
+    borderRadius: 15,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
     paddingHorizontal: 8,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.10)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.32)",
+    borderColor: "rgba(255,255,255,0.18)",
   },
+  heroBtnPrimary: { backgroundColor: "#FBBF24", borderColor: "#FCD34D" },
   heroBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900", flexShrink: 1 },
+  heroBtnTextPrimary: { color: "#1F1300" },
   searchField: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14 },
   searchBox: { borderRadius: 16, borderWidth: 1 },
   searchInput: { flex: 1, height: "100%", fontSize: 15, padding: 0 },
@@ -515,46 +656,42 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 13, fontWeight: "800" },
 
   poster: { borderRadius: 10, overflow: "hidden" },
-  rankBadge: {
-    position: "absolute",
-    left: 4,
-    top: 4,
-    minWidth: 24,
-    height: 20,
-    paddingHorizontal: 5,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
+  hypedBorder: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 2,
+    borderColor: HYPE,
   },
-  rankBadgePlain: { backgroundColor: "rgba(0,0,0,0.68)" },
-  rankText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  rankTextMedal: { color: "#1F1300" },
   hypedMark: {
     position: "absolute",
-    right: 4,
-    top: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    right: 5,
+    top: 5,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: HYPE,
     alignItems: "center",
     justifyContent: "center",
   },
-  cellTitle: { fontSize: 11, fontWeight: "800", marginTop: 5 },
-  votesLine: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 1 },
-  votesText: { flexShrink: 1, fontSize: 10, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  hypeBtn: {
-    height: 26,
-    marginTop: 5,
-    borderRadius: 13,
-    borderWidth: 1,
+  cellFoot: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    paddingHorizontal: 4,
+    justifyContent: "space-between",
+    gap: 4,
+    marginTop: 5,
   },
-  hypeText: { fontSize: 10.5, fontWeight: "900", flexShrink: 1 },
+  rankBadge: {
+    minWidth: 18,
+    height: 17,
+    paddingHorizontal: 4,
+    borderRadius: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rankText: { color: "#FFFFFF", fontSize: 10, fontWeight: "800", fontVariant: ["tabular-nums"], includeFontPadding: false },
+  rankTextSmall: { fontSize: 9 },
+  rankTextMedal: { color: "#1F1300", fontWeight: "900" },
+  votesRow: { flexDirection: "row", alignItems: "center", gap: 3, flexShrink: 1, minWidth: 0 },
+  votesText: { flexShrink: 1, fontSize: 10.5, fontWeight: "700", fontVariant: ["tabular-nums"], includeFontPadding: false },
 
   state: { alignItems: "center", gap: 10, paddingVertical: 40 },
   stateText: { fontSize: 13, fontWeight: "700", textAlign: "center" },
