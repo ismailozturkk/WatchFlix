@@ -30,6 +30,11 @@ import { mergeEpisodeRatings, pickMainRating } from "../../utils/externalRatings
 import { getRatingColors } from "../../utils/ratingColors";
 import { TV_GRAPH_GRID_SIZES } from "../../utils/tvGraphGrid";
 import TvGraphGrid from "../../components/tv/TvGraphGrid";
+import TvGraphShareSheet from "../../components/tv/TvGraphShareSheet";
+import ShareToChatSheet from "../../components/chat/ShareToChatSheet";
+import GlassIconButton from "../../components/common/GlassIconButton";
+import { useAuth } from "../../context/AuthContext";
+import { buildTvGraphShare } from "../../utils/tvGraphShare";
 
 import {
   useApiSettings,
@@ -39,6 +44,7 @@ import ScreenDecor from "../../components/ScreenDecor";
 import GlassPressable from "../../components/common/GlassPressable";
 import GlassTouchable from "../../components/common/GlassTouchable";
 import usePosterUri from "../../hooks/usePosterUri";
+import { usePosterResolver } from "../../context/PosterChoicesContext";
 import useBackdropUri from "../../hooks/useBackdropUri";
 
 // ─── Rating Renk Sistemi ──────────────────────────────────────────────────────
@@ -205,6 +211,58 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   const posterUri = usePosterUri();
   const backdropUri = useBackdropUri();
   const { API_KEY } = useApiSettings();
+  const { user } = useAuth() || {};
+  // Özel afiş: paylaşım gövdesine gönderenin SEÇTİĞİ afiş yazılır (panelde gördüğüyle aynı; seçim yoksa TMDB afişi).
+  const resolvePoster = usePosterResolver();
+
+  // ── Paylaşım ──────────────────────────────────────────────────────────────
+  // Grafik anlık görüntüsü (utils/tvGraphShare): sohbet kartı ve Paylaşımlar gönderisi aynı gövdeyi taşır;
+  // alıcı yeniden çekmeden çizer. Seçim sayfası kapandıktan sonra uygulanır (iOS iki Modal kuralı).
+  const [shareOpen, setShareOpen] = useState(false);
+  const [chatShare, setChatShare] = useState(null);
+  const graphShare = useMemo(
+    () =>
+      showDetail && tvShows.length ? buildTvGraphShare({ show: showDetail, seasons: tvShows, resolvePoster }) : null,
+    [showDetail, tvShows, resolvePoster],
+  );
+  const handleShareChoice = useCallback(
+    (choice) => {
+      if (!graphShare) return;
+      if (choice === "chat") {
+        setChatShare({ ...graphShare, host: user?.displayName?.split(" ")[0] || "" });
+        return;
+      }
+      if (choice !== "feed") return;
+      const name = showDetail?.name || "";
+      // Gönderi küçük resimleri de grafikteki afişle aynı (özel afiş dahil).
+      const posterPath = graphShare.poster_path || showDetail.poster_path || null;
+      navigation.navigate("ShareContentScreen", {
+        composePost: {
+          composeKey: `tvgraph-${id}-${Date.now()}`,
+          postType: "tvgraph",
+          title: i18nText("autoI18n.tvgraph_gonderi_basligi", "{{title}} bölüm grafiği", { title: name }).slice(0, 100),
+          content: "",
+          tvGraph: graphShare,
+          // Dizinin kendisi: gönderi küçük resimleri + eski sürümlerde inceleme gibi görünür.
+          selectedMedia: [
+            {
+              id: showDetail.id,
+              media_type: "tv",
+              type: "tv",
+              title: name,
+              name,
+              poster_path: posterPath,
+              poster: posterPath ? getTmdbUrl(posterPath, "poster", 500) : null,
+              first_air_date: showDetail.first_air_date,
+              year: showDetail.first_air_date ? String(showDetail.first_air_date).slice(0, 4) : "",
+              genre_ids: showDetail.genres?.map((g) => g.id).filter(Boolean) || [],
+            },
+          ],
+        },
+      });
+    },
+    [graphShare, user, showDetail, navigation, id, getTmdbUrl],
+  );
 
   // Animasyon ref'i – panel geçişi için
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -322,18 +380,17 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
   // yüzlerce EpisodeCell yeniden render edilir; functional updater ile sabit.
   const handleEpisodePress = useCallback(
     (seasonNum, epIndex) => {
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 120,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      // Panel içeriği ANINDA değişir; eskiden opaklık 1 → 0 → 1 inip çıkıyordu ve
+      // YENİ içerik sönüp geri geliyordu (sekme gibi git-gel / titreme). Şimdi
+      // yumuşak bir belirme: 0,45'ten 1'e. Art arda dokunuşta önceki animasyon
+      // durdurulur, aksi halde iki animasyon opaklığı çekiştirir.
+      fadeAnim.stopAnimation();
+      fadeAnim.setValue(0.45);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
 
       setSelectedEpisode((prev) =>
         prev && prev.season === seasonNum && prev.index === epIndex
@@ -412,12 +469,26 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
       <ScreenDecor scope="details" iconOpacity={0.25} />
 
       <TopBar>
-        <GridModeSwitch
-          options={gridOptions}
-          value={gridMode}
-          onChange={handleGridModeChange}
-          theme={theme}
-        />
+        <View style={styles.topActions}>
+          {graphShare ? (
+            <GlassIconButton
+              icon="share-outline"
+              iconSize={18}
+              size={38}
+              fallbackRadius={12}
+              color={theme.text.primary}
+              accessibilityLabel={i18nText("autoI18n.tvgraph_paylas", "Grafiği paylaş")}
+              onPress={() => setShareOpen(true)}
+              testID="tvgraph-share-button"
+            />
+          ) : null}
+          <GridModeSwitch
+            options={gridOptions}
+            value={gridMode}
+            onChange={handleGridModeChange}
+            theme={theme}
+          />
+        </View>
       </TopBar>
 
       {/* ── Üst Bilgi Paneli ─────────────────────────────────────────────── */}
@@ -438,18 +509,24 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
           style={[
             styles.infoPanelContainer,
             // Sağ kenar yalnız seçili bölümde kapat düğmesi için ayrılır.
-            { opacity: fadeAnim, paddingRight: selectedEpisode ? 52 : 14 },
+            // Sağ boşluk SABİT (kapat düğmesi yeri hep ayrılı): seçimde 14 ↔ 52
+            // değişirse metin sütunu daralıp satır kaydırıyordu.
+            { opacity: fadeAnim },
           ]}
         >
-          {/* Sol: Poster veya Bölüm Görseli */}
-          <Image
-            source={{
-              uri: selectedEpisodeData?.still_path
-                ? getTmdbUrl(selectedEpisodeData.still_path, 'poster', 200)
-                : posterUri("tv", showDetail.id, showDetail.poster_path),
-            }}
-            style={selectedEpisodeData ? styles.panelStill : styles.panelPoster}
-          />
+          {/* Sol: Poster veya Bölüm Görseli — SABİT genişlikli yuva; poster (82)
+              ve bölüm görseli (120) yuvanın içinde ortalanır, böylece metin
+              sütununun sol kenarı seçimde sağa sola oynamaz. */}
+          <View style={styles.panelMediaSlot}>
+            <Image
+              source={{
+                uri: selectedEpisodeData?.still_path
+                  ? getTmdbUrl(selectedEpisodeData.still_path, 'poster', 200)
+                  : posterUri("tv", showDetail.id, showDetail.poster_path),
+              }}
+              style={selectedEpisodeData ? styles.panelStill : styles.panelPoster}
+            />
+          </View>
 
           {/* Sağ: Bilgiler */}
           <View style={styles.panelInfo}>
@@ -613,11 +690,28 @@ const TvGraphDetailScreen = ({ route, navigation }) => {
         headerColor={theme.text.secondary}
         labels={gridLabels}
       />
+
+      <TvGraphShareSheet
+        visible={shareOpen}
+        graph={graphShare}
+        theme={theme}
+        onClose={() => setShareOpen(false)}
+        onDismissed={handleShareChoice}
+      />
+      <ShareToChatSheet
+        visible={!!chatShare}
+        share={chatShare}
+        onClose={() => setChatShare(null)}
+        onSent={() => setChatShare(null)}
+      />
     </SafeAreaView>
   );
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+// Bilgi panelinin sabit yüksekliği (dizi kartı = bölüm kartı; bkz. infoPanelContainer).
+const PANEL_HEIGHT = 196;
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
@@ -647,6 +741,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modeBtnPressed: { backgroundColor: "rgba(127,127,127,0.18)" },
+  topActions: { flexDirection: "row", alignItems: "center", gap: 8 },
 
   // ── Bilgi Paneli ────────────────────────────────────────────────────────
   infoPanelWrapper: {
@@ -676,13 +771,26 @@ const styles = StyleSheet.create({
   },
   infoPanelContainer: {
     flexDirection: "row",
-    padding: 14,
+    paddingVertical: 14,
+    paddingLeft: 14,
+    paddingRight: 52,
     alignItems: "center",
-    minHeight: 154,
+    // SABİT yükseklik: dizi kartı ile bölüm kartı aynı boyda olmalı. İçerik
+    // uzunluğuna göre (başlık/özet satırı) değişirse panelin altındaki bütün
+    // ızgara aşağı yukarı oynuyordu. 196 = bölüm kartının en uzun hâli
+    // (rozetler + 2 satır başlık + tarih + 2 satır özet + alt satır + dolgu).
+    height: PANEL_HEIGHT,
+    overflow: "hidden",
   },
+  panelMediaSlot: {
+    width: 120,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Panel 196 yüksek, dikey dolgu 14+14 → 168'lik alanı 2:3 oranla doldurur.
   panelPoster: {
-    width: 82,
-    height: 122,
+    width: 112,
+    height: 168,
     borderRadius: 10,
     backgroundColor: "#111",
   },
@@ -697,6 +805,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 14,
     gap: 6,
+    justifyContent: "center",
   },
   panelBadgeRow: {
     flexDirection: "row",
@@ -795,7 +904,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: 14,
     alignItems: "center",
-    minHeight: 154,
+    height: PANEL_HEIGHT,
   },
   skeletonGrid: {
     flex: 1,
