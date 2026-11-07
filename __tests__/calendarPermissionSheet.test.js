@@ -28,6 +28,20 @@ jest.mock("@components/common/GlassIconButton", () => ({
   default: "GlassIconButton",
 }));
 jest.mock("@components/AppAlert", () => ({ appAlert: jest.fn() }));
+jest.mock("../components/permissions/PermissionHero", () => ({
+  __esModule: true,
+  default: "PermissionHero",
+  SheetGlow: "SheetGlow",
+}));
+jest.mock("../components/permissions/PermissionActionSheet", () => ({
+  __esModule: true,
+  default: "PermissionActionSheet",
+}));
+jest.mock("@hooks/useReduceMotion", () => ({ __esModule: true, default: () => false }));
+jest.mock("@utils/colorUtils", () => ({ isLightSurface: () => false }));
+jest.mock("@context/DeviceNotificationsContext", () => ({
+  useDeviceNotifications: () => ({ permissionStatus: "granted", primeNotificationPermission: () => false }),
+}));
 jest.mock("@services/pushNotificationsService", () => ({
   ensureAndroidChannels: jest.fn(),
 }));
@@ -71,6 +85,71 @@ const CalendarPermissionSheet = require("../components/permissions/CalendarPermi
 const PermissionsSection = require("../components/PermissionsSection").default;
 
 const COLORS = new Proxy({}, { get: (_t, key) => `#${String(key)}` });
+
+// Genel izin satırları: sistem uyarısı yerine PermissionActionSheet açılır.
+describe("PermissionsSection izin sayfası", () => {
+  const Notifications = require("expo-notifications");
+  const MediaLibrary = require("expo-media-library");
+
+  async function mountSection() {
+    Calendar.getCalendarPermissions.mockResolvedValue({ status: "undetermined", canAskAgain: true });
+    let tree;
+    await act(async () => {
+      tree = create(React.createElement(PermissionsSection, { colors: COLORS }));
+    });
+    return tree;
+  }
+  const row = (tree, name) =>
+    tree.root.findAllByType("TouchableOpacity").find((n) => String(n.props.accessibilityLabel).startsWith(name));
+  const sheet = (tree) => tree.root.findByType("PermissionActionSheet");
+  const tr = require("../translations/tr.json");
+
+  beforeEach(() => {
+    Linking.openSettings.mockClear();
+    appAlert.mockClear();
+    Notifications.getPermissionsAsync.mockResolvedValue({ status: "granted", canAskAgain: true });
+    MediaLibrary.getPermissionsAsync.mockResolvedValue({ status: "denied", canAskAgain: true });
+    MediaLibrary.requestPermissionsAsync.mockReset();
+  });
+
+  test("verilmiş izin: geri çekme sayfası; sistem ayarları sayfa kapanınca açılır", async () => {
+    const tree = await mountSection();
+    await act(async () => row(tree, tr.permNotifications).props.onPress());
+    expect(appAlert).not.toHaveBeenCalled();
+    expect(sheet(tree).props).toMatchObject({ visible: true, kind: "notifications", mode: "revoke" });
+
+    await act(async () => sheet(tree).props.onPrimary());
+    expect(sheet(tree).props.visible).toBe(false);
+    expect(Linking.openSettings).not.toHaveBeenCalled();
+    await act(async () => sheet(tree).props.onDismissed());
+    expect(Linking.openSettings).toHaveBeenCalledTimes(1);
+  });
+
+  test("sorulabilen izin: istek sayfası; sistem diyaloğu sayfa kapanınca açılır", async () => {
+    MediaLibrary.requestPermissionsAsync.mockResolvedValue({ status: "granted", canAskAgain: true });
+    const tree = await mountSection();
+    await act(async () => row(tree, tr.permGallery).props.onPress());
+    expect(sheet(tree).props).toMatchObject({ kind: "mediaLibrary", mode: "request" });
+
+    await act(async () => sheet(tree).props.onPrimary());
+    expect(MediaLibrary.requestPermissionsAsync).not.toHaveBeenCalled();
+    await act(async () => sheet(tree).props.onDismissed());
+    expect(MediaLibrary.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+  });
+
+  test("istek kalıcı reddedilirse sistem ayarları sayfası açılır; vazgeçince hiçbir şey olmaz", async () => {
+    MediaLibrary.requestPermissionsAsync.mockResolvedValue({ status: "denied", canAskAgain: false });
+    const tree = await mountSection();
+    await act(async () => row(tree, tr.permGallery).props.onPress());
+    await act(async () => sheet(tree).props.onPrimary());
+    await act(async () => sheet(tree).props.onDismissed());
+    expect(sheet(tree).props).toMatchObject({ visible: true, mode: "blocked" });
+
+    await act(async () => sheet(tree).props.onClose());
+    await act(async () => sheet(tree).props.onDismissed());
+    expect(Linking.openSettings).not.toHaveBeenCalled();
+  });
+});
 
 const flat = (children) => [].concat(children).join("");
 const texts = (tree) => tree.root.findAllByType("Text").map((n) => flat(n.props.children));

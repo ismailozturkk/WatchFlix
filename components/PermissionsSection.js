@@ -7,10 +7,12 @@
 //   - Takvim        (expo-calendar — hatırlatma/not etkinliklerini telefonun
 //                    takvimine yazma; mevcut etkinlikler okunmuyor)
 //
-// Her satır: durum rozeti (Verildi / Reddedildi / Belirsiz) + aksiyon.
-//   • İzin verilmemişse  → "İzin ver" (tekrar sorulabiliyorsa sistem sorar,
-//                          kalıcı reddedilmişse sistem ayarlarını açar).
-//   • İzin verilmişse     → "Geri çek" (mobil OS uygulamanın kendi iznini
+// Her satır: durum rozeti (Verildi / Reddedildi / Belirsiz) + aksiyon. Sistem
+// diyaloğundan ya da ayarlarından önce PermissionActionSheet açılır:
+//   • İzin verilmemişse  → "İzin ver" sayfası; bildirimde henüz gösterilmediyse
+//                          onun ön-açıklaması (NotificationPrimingSheet).
+//   • Kalıcı reddedilmişse → sistem ayarlarına götüren sayfa.
+//   • İzin verilmişse     → "Geri çek" sayfası (mobil OS uygulamanın kendi iznini
 //                          program ile geri almasına izin VERMEZ; bu yüzden
 //                          sistem ayarları açılır, kullanıcı oradan kapatır).
 //   • `detail: true` olan satır (Takvim) genel akışa girmez: basınca kendi bilgi
@@ -37,8 +39,10 @@ import AppIcon from "@components/AppIcon";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { appAlert } from "@components/AppAlert";
 import CalendarPermissionSheet from "@components/permissions/CalendarPermissionSheet";
+import PermissionActionSheet from "@components/permissions/PermissionActionSheet";
 import StatusPill from "@components/permissions/StatusPill";
 import { ensureAndroidChannels } from "@services/pushNotificationsService";
+import { useDeviceNotifications } from "@context/DeviceNotificationsContext";
 import { useLanguage } from "@context/LanguageContext";
 
 // İzin tanımları — her biri get/request fonksiyonunu kendi modülüne bağlar.
@@ -87,6 +91,7 @@ const DEFAULT_STATE = { status: "undetermined", canAskAgain: true };
 
 export default function PermissionsSection({ colors: C }) {
   const { t } = useLanguage();
+  const { permissionStatus, primeNotificationPermission } = useDeviceNotifications();
   const [states, setStates] = useState(() =>
     PERMISSIONS.reduce((acc, p) => ((acc[p.key] = DEFAULT_STATE), acc), {}),
   );
@@ -94,6 +99,15 @@ export default function PermissionsSection({ colors: C }) {
   const [busyKey, setBusyKey] = useState(null);
   const busyRef = useRef(false);
   const [calendarSheetVisible, setCalendarSheetVisible] = useState(false);
+  // Kapanış animasyonunda içerik değişmesin diye kip, `visible`dan ayrı tutulur.
+  const [actionSheet, setActionSheet] = useState({ kind: "notifications", mode: "request" });
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const afterSheetRef = useRef(null);
+
+  const openActionSheet = useCallback((kind, mode) => {
+    setActionSheet({ kind, mode });
+    setActionSheetVisible(true);
+  }, []);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -129,26 +143,14 @@ export default function PermissionsSection({ colors: C }) {
     return () => sub.remove();
   }, [refresh]);
 
-  const handleGrant = useCallback(
+  // Bildirim izni ön-açıklama sayfasından (sağlayıcıda çizilir) verildiyse satır tazelensin.
+  useEffect(() => {
+    refresh();
+  }, [permissionStatus, refresh]);
+
+  const requestPermission = useCallback(
     async (perm) => {
       if (busyRef.current) return;
-      const cur = states[perm.key] || DEFAULT_STATE;
-      // Kalıcı reddedilmiş (tekrar sorulamaz) → sistem ayarlarını aç.
-      if (cur.status !== "granted" && cur.canAskAgain === false) {
-        appAlert(
-          t.permOpenSettingsTitle || "Sistem ayarları",
-          t.permOpenSettingsMessage ||
-            "Bu izin kalıcı olarak reddedilmiş. Açmak için sistem ayarlarına gidin.",
-          [
-            { text: t.cancel || "İptal", style: "cancel" },
-            {
-              text: t.permOpenSettings || "Ayarları aç",
-              onPress: () => Linking.openSettings().catch(() => {}),
-            },
-          ],
-        );
-        return;
-      }
       busyRef.current = true;
       setBusyKey(perm.key);
       try {
@@ -156,18 +158,7 @@ export default function PermissionsSection({ colors: C }) {
         await refresh();
         // Sorulamaz hâle geldiyse kullanıcıyı ayarlara yönlendir.
         if (res?.status !== "granted" && res?.canAskAgain === false) {
-          appAlert(
-            t.permOpenSettingsTitle || "Sistem ayarları",
-            t.permOpenSettingsMessage ||
-              "İzni açmak için sistem ayarlarına gidin.",
-            [
-              { text: t.cancel || "İptal", style: "cancel" },
-              {
-                text: t.permOpenSettings || "Ayarları aç",
-                onPress: () => Linking.openSettings().catch(() => {}),
-              },
-            ],
-          );
+          openActionSheet(perm.key, "blocked");
         }
       } catch {
         appAlert(
@@ -180,8 +171,41 @@ export default function PermissionsSection({ colors: C }) {
         setBusyKey(null);
       }
     },
-    [states, refresh, t],
+    [refresh, openActionSheet, t],
   );
+
+  const handleRowPress = useCallback(
+    (perm) => {
+      if (perm.detail) {
+        setCalendarSheetVisible(true);
+        return;
+      }
+      const cur = states[perm.key] || DEFAULT_STATE;
+      if (cur.status === "granted") openActionSheet(perm.key, "revoke");
+      else if (cur.canAskAgain === false) openActionSheet(perm.key, "blocked");
+      // Bildirim ön-açıklaması tek seferlik: daha önce gösterildiyse false döner.
+      else if (perm.key !== "notifications" || !primeNotificationPermission()) {
+        openActionSheet(perm.key, "request");
+      }
+    },
+    [states, openActionSheet, primeNotificationPermission],
+  );
+
+  // Ana düğme: sayfa TAM kapandıktan sonra sistem diyaloğu ya da ayarları açılır.
+  const handleSheetPrimary = useCallback(() => {
+    const perm = PERMISSIONS.find((p) => p.key === actionSheet.kind);
+    afterSheetRef.current =
+      actionSheet.mode === "request"
+        ? () => requestPermission(perm)
+        : () => Linking.openSettings().catch(() => {});
+    setActionSheetVisible(false);
+  }, [actionSheet, requestPermission]);
+
+  const handleSheetDismissed = useCallback(() => {
+    const next = afterSheetRef.current;
+    afterSheetRef.current = null;
+    if (next) next();
+  }, []);
 
   // Takvim sayfasından istek: sayfa AÇIKKEN `appAlert` iOS'ta sunulamaz (modal
   // üstünde), bu yüzden hata/kalıcı ret burada sessiz geçilir — sayfa durum
@@ -195,26 +219,6 @@ export default function PermissionsSection({ colors: C }) {
     }
     await refresh();
   }, [refresh]);
-
-  // OS, uygulamanın kendi iznini program ile geri almasına izin vermez →
-  // sistem ayarlarını açıp kullanıcıya bırakıyoruz.
-  const handleRevoke = useCallback(
-    (perm) => {
-      appAlert(
-        t.permRevokeTitle || "İzni geri çek",
-        t.permRevokeMessage ||
-          "İzni geri çekmek için sistem ayarlarını açmanız gerekir. Oradan bu uygulamanın iznini kapatabilirsiniz.",
-        [
-          { text: t.cancel || "İptal", style: "cancel" },
-          {
-            text: t.permOpenSettings || "Ayarları aç",
-            onPress: () => Linking.openSettings().catch(() => {}),
-          },
-        ],
-      );
-    },
-    [t],
-  );
 
   const grantedCount = PERMISSIONS.reduce(
     (count, permission) =>
@@ -291,13 +295,7 @@ export default function PermissionsSection({ colors: C }) {
               { borderBottomColor: C.borderMuted },
               last && { borderBottomWidth: 0 },
             ]}
-            onPress={() =>
-              perm.detail
-                ? setCalendarSheetVisible(true)
-                : granted
-                  ? handleRevoke(perm)
-                  : handleGrant(perm)
-            }
+            onPress={() => handleRowPress(perm)}
             disabled={busy || refreshing}
             activeOpacity={0.65}
           >
@@ -348,6 +346,14 @@ export default function PermissionsSection({ colors: C }) {
         colors={C}
         state={states.calendar || DEFAULT_STATE}
         onRequest={requestCalendar}
+      />
+      <PermissionActionSheet
+        visible={actionSheetVisible}
+        kind={actionSheet.kind}
+        mode={actionSheet.mode}
+        onPrimary={handleSheetPrimary}
+        onClose={() => setActionSheetVisible(false)}
+        onDismissed={handleSheetDismissed}
       />
     </View>
   );

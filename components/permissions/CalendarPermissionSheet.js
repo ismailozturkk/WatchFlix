@@ -38,6 +38,9 @@ import {
   countSavedPhoneEvents,
   removeAllEventsFromPhoneCalendar,
 } from "@utils/phoneCalendar";
+import { isLightSurface } from "@utils/colorUtils";
+import useReduceMotion from "@hooks/useReduceMotion";
+import PermissionHero, { SheetGlow } from "./PermissionHero";
 import StatusPill from "./StatusPill";
 import GlassTouchable from "../common/GlassTouchable";
 import GlassBox from "../common/GlassBox";
@@ -125,6 +128,7 @@ export default function CalendarPermissionSheet({
 }) {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReduceMotion();
 
   const [savedCount, setSavedCount] = useState(0);
   const [confirming, setConfirming] = useState(false);
@@ -244,6 +248,7 @@ export default function CalendarPermissionSheet({
       onClose={onClose}
       sheetStyle={[styles.sheet, { backgroundColor: C.bg, borderColor: C.border }]}
     >
+      <SheetGlow accent={C.accent} isLightTheme={isLightSurface(C.bg)} />
       <View style={[styles.grabber, { backgroundColor: C.handle }]} />
 
       <ScrollView
@@ -256,18 +261,12 @@ export default function CalendarPermissionSheet({
         bounces={false}
         overScrollMode="never"
       >
+        <PermissionHero icon="calendar" tone={C.accent} animate={!reduceMotion} />
         <View style={styles.header}>
-          <View style={[styles.headerIcon, { backgroundColor: C.iconPurple }]}>
-            <AppIcon name="calendar" size={24} color={C.purple} />
-          </View>
-          <View style={styles.headerCopy}>
-            <Text accessibilityRole="header" style={[styles.title, { color: C.text }]}>
-              {t.permCalendar || "Takvim"}
-            </Text>
-            <View style={styles.pillRow}>
-              <StatusPill status={state?.status} colors={C} t={t} />
-            </View>
-          </View>
+          <Text accessibilityRole="header" style={[styles.title, { color: C.text }]}>
+            {t.permCalendar || "Takvim"}
+          </Text>
+          <StatusPill status={state?.status} colors={C} t={t} />
         </View>
 
         <Text style={[styles.intro, { color: C.muted }]}>
@@ -461,18 +460,9 @@ const styles = StyleSheet.create({
   },
   scroll: { flexShrink: 1 },
   content: { paddingHorizontal: 18, paddingTop: 8 },
-  header: { flexDirection: "row", alignItems: "center", gap: 12 },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerCopy: { flex: 1, gap: 5 },
-  title: { fontSize: 22, fontWeight: "800", letterSpacing: -0.3 },
-  pillRow: { flexDirection: "row" },
-  intro: { fontSize: 13.5, lineHeight: 20, marginTop: 14 },
+  header: { alignItems: "center", gap: 7 },
+  title: { fontSize: 24, lineHeight: 30, fontWeight: "800", letterSpacing: -0.4, textAlign: "center" },
+  intro: { fontSize: 14, lineHeight: 21, marginTop: 10, textAlign: "center", paddingHorizontal: 6 },
   card: {
     borderRadius: 18,
     borderWidth: 1,
