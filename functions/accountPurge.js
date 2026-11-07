@@ -439,6 +439,10 @@ async function purgeAccountData({ db, rtdb = null, warn = console.warn }, uid, {
     }
     await deleteRefs(db, refs);
   });
+  // Haftalık Lig: grup satırları (tüm haftalar) + lig durumu. Grubun `size` sayacı düşürülmez;
+  // yalnız açık grubun dolmasını ölçer, sıralama satırlardan okunur.
+  await sweepGroup("sweep-league-members", "leagueMembers", "uid");
+  await step("league-user", () => deleteRefs(db, [db.doc(`LeagueUsers/${uid}`)]));
   // Turnuva oyları: istemci silemez (kural "oylar kalıcıdır"); hesap silinirken
   // kaldırılır. `onTournamentVoteWritten` silmeyi sayaçlara yansıtır.
   await step("tournament-votes", async () => {

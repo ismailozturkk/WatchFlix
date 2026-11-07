@@ -126,6 +126,11 @@ async function seed() {
   await set(`GameLeaderboards/scene_daily_2026-10-20/entries/${ME}`, { uid: ME, score: 5 });
   await set(`GameLeaderboards/scene_classic_easy/entries/${ME}`, { uid: ME, score: 9 });
   await set(`GameLeaderboards/scene_daily_2026-10-20/entries/${OTHER}`, { uid: OTHER, score: 7 });
+  await set(`LeagueUsers/${ME}`, { tier: 2, week: "2026-10-26" });
+  await set(`LeagueUsers/${OTHER}`, { tier: 1, week: "2026-10-26" });
+  await set(`LeagueWeeks/2026-10-19/groups/gold-1/leagueMembers/${ME}`, { uid: ME, xp: 90 });
+  await set(`LeagueWeeks/2026-10-26/groups/gold-1/leagueMembers/${ME}`, { uid: ME, xp: 40 });
+  await set(`LeagueWeeks/2026-10-26/groups/gold-1/leagueMembers/${OTHER}`, { uid: OTHER, xp: 30 });
   await set(`tournaments/2026-10`, { createdBy: OTHER });
   await set(`tournaments/2026-10/votes/${ME}`, { uid: ME });
   await set(`tournaments/2026-10/votes/${OTHER}`, { uid: OTHER });
@@ -277,6 +282,10 @@ test("sunucu silmesi tüm izleri götürür, başkalarının verisini ve sayaçl
   // Liderlik, turnuva, odalar
   assert.deepEqual(await listIds(`GameLeaderboards/scene_daily_2026-10-20/entries`), [OTHER]);
   assert.equal(await exists(`GameLeaderboards/scene_classic_easy/entries/${ME}`), false);
+  assert.equal(await exists(`LeagueUsers/${ME}`), false);
+  assert.equal(await exists(`LeagueUsers/${OTHER}`), true);
+  assert.deepEqual(await listIds(`LeagueWeeks/2026-10-19/groups/gold-1/leagueMembers`), []);
+  assert.deepEqual(await listIds(`LeagueWeeks/2026-10-26/groups/gold-1/leagueMembers`), [OTHER]);
   assert.deepEqual(await listIds(`tournaments/2026-10/votes`), [OTHER]);
   assert.equal(await exists(`tournaments/2026-10`), true);
   assert.deepEqual(await listIds(`CineRooms`), ["room_other"]);
