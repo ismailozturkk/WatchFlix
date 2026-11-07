@@ -39,6 +39,7 @@ import { getSearchHeaderCopy } from "../../components/search/searchHeaderCopy";
 import GlassField from "@components/common/GlassField";
 import { liquidGlassSupported } from "@services/liquidGlass";
 import { isLightSurface } from "@utils/colorUtils";
+import { SEARCH_DEBOUNCE_MS } from "../../utils/searchDebounce";
 
 
 const { width } = Dimensions.get("window");
@@ -659,7 +660,7 @@ export default function TvShowSearch({ navigation, route, isUnified, unifiedQuer
       if (text.trim().length >= 2) {
         setError(null);
         setLoading(true);
-        searchTimeout.current = setTimeout(() => fetchResults(text), 500);
+        searchTimeout.current = setTimeout(() => fetchResults(text), SEARCH_DEBOUNCE_MS);
       } else {
         // Boş veya 1 karakter: bekleyen istek iptal edildi. loading/error'ı
         // burada sıfırlamazsak ekran skeleton'da ya da eski hatada takılı kalır

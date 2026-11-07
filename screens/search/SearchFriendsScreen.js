@@ -26,8 +26,7 @@ import * as Haptics from "../../services/hapticsService";
 import { searchUsersByUsername } from "../../services/userService";
 import { alpha } from "../../theme/colors";
 import { i18nCount, i18nText } from "../../utils/i18nText";
-
-const DEBOUNCE_MS = 500;
+import { SEARCH_DEBOUNCE_MS } from "../../utils/searchDebounce";
 
 export default function SearchFriendsScreen({ navigation }) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -86,7 +85,7 @@ export default function SearchFriendsScreen({ navigation }) {
       setSearchFailed(false);
       return undefined;
     }
-    const handler = setTimeout(() => handleSearch(trimmed), DEBOUNCE_MS);
+    const handler = setTimeout(() => handleSearch(trimmed), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(handler);
   }, [trimmed, handleSearch]);
 
