@@ -63,7 +63,7 @@ afterEach(() => warn.mockRestore());
 describe("SectionHeader — kimlik", () => {
   it("`section` verilince simge ve alt başlık tablodan gelir; başlık çağıranın metnidir", () => {
     const tree = render(<SectionHeader section="onTheAir" mediaType="tv" title="Bu Hafta Yayında" />);
-    expect(texts(tree)).toEqual(["Bu Hafta Yayında", "Bu hafta yeni bölümü yayınlananlar"]);
+    expect(texts(tree)).toEqual(["Bu Hafta Yayında", "Yeni bölümü yayınlanan diziler"]);
     expect(tree.root.findAllByType("Ionicons").map((n) => n.props.name)).toEqual(["radio"]);
   });
 

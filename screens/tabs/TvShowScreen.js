@@ -7,7 +7,7 @@ import Animated from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import TvShowsOnTheAir from "../tv/TvShowsOnTheAir";
-import TvShowsAiringToday from "../tv/TvShowsAiringToday";
+import TvShowsUpcoming from "../tv/TvShowsUpcoming";
 import TvShowsGenres from "../tv/TvShowsGenres";
 import TvShowsProvders from "../tv/TvShowsProvders";
 import TvShowsTrends from "../tv/TvShowsTrends";
@@ -16,7 +16,6 @@ import TvShowsEmmy from "../tv/TvShowsEmmy";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { useTvShow } from "../../context/TvShowContex";
 import { DeviceEventEmitter } from "react-native";
-import ScreenDecor from "../../components/ScreenDecor";
 import DiscoverHeaderSpacer from "../../components/home/DiscoverHeaderSpacer";
 import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import usePullToRefresh from "../../hooks/usePullToRefresh";
@@ -96,8 +95,10 @@ export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
       { key: "emmy", Component: TvShowsEmmy },
       { key: "providers", Component: TvShowsProvders },
       { key: "genres", Component: TvShowsGenres },
+      // Bugün / Bu hafta yayında: tek raf, çiple seçilir (kimlik eski "onTheAir").
       { key: "onTheAir", Component: TvShowsOnTheAir },
-      { key: "airingToday", Component: TvShowsAiringToday },
+      // Yeni başlayacak diziler (filmlerdeki "Yaklaşan Filmler"in karşılığı).
+      { key: "upcoming", Component: TvShowsUpcoming },
     ];
 
     // Raf kimlikleri (`key`) utils/sectionVisibility.js'teki "tv" bölümleriyle aynı.
@@ -150,8 +151,9 @@ export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
   );
 
   return (
-    <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
-      <ScreenDecor scope="home" iconOpacity={0.3} />
+    // Saydam: zemin ve dekor (kar/ikon/ambiyans) DiscoverScreen'de, iki sayfanın
+    // arkasında TEK kez çiziliyor. Bu ekran yalnız orada kullanılıyor.
+    <View style={styles.page}>
       <MarkedFlatList
         data={visibleSections}
         keyExtractor={(item) => item.key}
@@ -180,6 +182,7 @@ export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
 }
 
 const styles = StyleSheet.create({
+  page: { flex: 1 },
   container: {
     paddingBottom: 75,
   },

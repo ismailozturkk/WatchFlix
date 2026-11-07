@@ -27,12 +27,12 @@ const SECTION_FILES = [
   "screens/movie/MovieUpcoming.js",
   "screens/tv/TvOngoingSection.js",
   "screens/tv/TvShowBests.js",
-  "screens/tv/TvShowsAiringToday.js",
   "screens/tv/TvShowsEmmy.js",
   "screens/tv/TvShowsGenres.js",
   "screens/tv/TvShowsOnTheAir.js",
   "screens/tv/TvShowsProvders.js",
   "screens/tv/TvShowsTrends.js",
+  "screens/tv/TvShowsUpcoming.js",
 ];
 
 // Yükleme dalı ile yüklenmiş dal başlığı AYNI öğe değişkeniyle çizmeli (≥ 2 kullanım).
@@ -46,12 +46,12 @@ const HEADER_REUSE = {
   "screens/movie/MovieTrends.js": "trendHeader",
   "screens/movie/MovieUpcoming.js": "headerComponent",
   "screens/tv/TvShowBests.js": "bestsHeader",
-  "screens/tv/TvShowsAiringToday.js": "airingTodayHeader",
   "screens/tv/TvShowsEmmy.js": "headerComponent",
   "screens/tv/TvShowsGenres.js": "genreHeader",
   "screens/tv/TvShowsOnTheAir.js": "onTheAirHeader",
   "screens/tv/TvShowsProvders.js": "providerHeader",
   "screens/tv/TvShowsTrends.js": "trendHeader",
+  "screens/tv/TvShowsUpcoming.js": "upcomingHeader",
 };
 
 // Çip satırı olan raflar ortak rayı (SectionChipRail) ve çip dilini (DiscoverFilterChip / ProviderChip) kullanır.
@@ -63,9 +63,12 @@ const CHIP_FILES = {
   "screens/movie/MovieTrends.js": "DiscoverFilterChip",
   // Yaklaşan: çip satırı raf ile "Tümü" ekranında ortak bileşende (tarih çipleri + Filtreler).
   "components/home/UpcomingFilterChips.js": "DiscoverFilterChip",
+  // Yaklaşan Diziler: aralık çipleri raf ile "Tümü" ekranında ortak bileşende.
+  "components/home/TvUpcomingRangeChips.js": "DiscoverFilterChip",
   "screens/tv/TvShowBests.js": "DiscoverFilterChip",
   "screens/tv/TvShowsEmmy.js": "DiscoverFilterChip",
   "screens/tv/TvShowsGenres.js": "DiscoverFilterChip",
+  "screens/tv/TvShowsOnTheAir.js": "DiscoverFilterChip",
   "screens/tv/TvShowsProvders.js": "ProviderChip",
   "screens/tv/TvShowsTrends.js": "DiscoverFilterChip",
 };

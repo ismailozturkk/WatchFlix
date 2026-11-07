@@ -16,6 +16,8 @@ import { setIfChanged, setListIfChanged } from "../utils/sameData";
 import { adultScoped, dropAdult } from "../utils/homeContentSettings";
 import { useHomeDataSettings } from "../hooks/useHomeContentSettings";
 import { i18nText } from "../utils/i18nText";
+import { isoDate } from "../utils/discoverFilters";
+import { DEFAULT_TV_UPCOMING_RANGE, buildTvUpcomingUrl, tvUpcomingQuerySignature } from "../utils/tvUpcoming";
 import { getWatchedShowActivityTime } from "../utils/watchState";
 import {
   getEmmyConfig,
@@ -355,6 +357,10 @@ export const TvShowProvider = ({ children }) => {
     fetchSeriesBest(next, true);
   };
 
+  // "Yayında" rafının çipi ("today" → airing_today, "week" → on_the_air). Bağlamda durur: raf
+  // ekran listesinde sökülüp yeniden kurulunca seçim kaybolmasın.
+  const [selectedAiringRange, setSelectedAiringRange] = useState("today");
+
   const [moviesAiringToday, setMoviesAiringToday] = useState([]);
   const [totalPagesAiringToday, setTotalPagesAiringToday] = useState(1);
   const [loadingAiringToday, setLoadingAiringToday] = useState(true);
@@ -615,6 +621,57 @@ export const TvShowProvider = ({ children }) => {
     fetchOnTheAir(next, true);
   };
 
+  // ── YAKLAŞAN DİZİLER: ilk bölümü seçili pencereye düşen yeni diziler (utils/tvUpcoming.js) ──
+  // Aralık çipi bağlamda: raf ile "Tümü" ekranı aynı kök sağlayıcıyı kullanıyor, seçim ikisinde ortak.
+  const [selectedUpcomingRange, setSelectedUpcomingRange] = useState(DEFAULT_TV_UPCOMING_RANGE);
+  const [seriesUpcoming, setSeriesUpcoming] = useState([]);
+  const [totalPagesUpcoming, setTotalPagesUpcoming] = useState(1);
+  const [loadingUpcoming, setLoadingUpcoming] = useState(true);
+  const [loadingMoreUpcoming, setLoadingMoreUpcoming] = useState(false);
+  const [pageUpcoming, setPageUpcoming] = useState(1);
+  // `day` imzada: pencere "yarından" başlıyor, gün dönünce sorgu da kayar.
+  const upcomingDay = isoDate(new Date());
+  const upcomingQuery = useMemo(
+    () => tvUpcomingQuerySignature({ range: selectedUpcomingRange, language: tmdbLanguage }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedUpcomingRange, tmdbLanguage, upcomingDay],
+  );
+
+  const fetchTvUpcoming = (page = 1, append = false, forceRefresh = false) => {
+    const gen = append ? currentGen("upcoming") : beginFreshRequest("upcoming");
+    return loadPage({
+      cacheKey: adultKey(`tv_upcoming_${upcomingQuery}_p${page}`),
+      ttl: TTL.NOW_PLAYING,
+      append,
+      forceRefresh,
+      isStale: () => currentGen("upcoming") !== gen,
+      setData: setSeriesUpcoming,
+      setTotal: setTotalPagesUpcoming,
+      setLoading: setLoadingUpcoming,
+      setLoadingMore: setLoadingMoreUpcoming,
+      request: async () => {
+        const url = buildTvUpcomingUrl({ range: selectedUpcomingRange, language: tmdbLanguage, page });
+        const response = await axios.get(url, { headers: { Authorization: API_KEY } });
+        return {
+          results: response.data.results,
+          total_pages: response.data.total_pages,
+        };
+      },
+    });
+  };
+  useEffect(() => {
+    if (!activeSections.upcoming) return;
+    setPageUpcoming(1);
+    fetchTvUpcoming(1, false);
+  }, [activeSections.upcoming, upcomingQuery, adultContent]);
+
+  const loadMoreUpcoming = () => {
+    if (loadingUpcoming || loadingMoreUpcoming || pageUpcoming >= totalPagesUpcoming) return;
+    const next = pageUpcoming + 1;
+    setPageUpcoming(next);
+    fetchTvUpcoming(next, true);
+  };
+
   // ── DİZİ EMMY ÖDÜLLERİ ───────────────────────────────────────────────
   const [emmyMode, setEmmyMode] = useState("category"); // "category" | "year"
   const [selectedEmmyCategory, setSelectedEmmyCategory] = useState(DEFAULT_EMMY_CATEGORY);
@@ -767,6 +824,7 @@ export const TvShowProvider = ({ children }) => {
     if (activeSections.best)       jobs.push(fetchSeriesBest(1, false, true));
     if (activeSections.airingToday)jobs.push(fetchAiringToday(1, false, true));
     if (activeSections.onTheAir)   jobs.push(fetchOnTheAir(1, false, true));
+    if (activeSections.upcoming)   jobs.push(fetchTvUpcoming(1, false, true));
     if (activeSections.genres)     jobs.push(fetchTvByGenres(1, false, true));
     if (activeSections.emmy) {
       if (emmyMode === "category") jobs.push(fetchTvShowsEmmy(selectedEmmyCategory, true));
@@ -779,6 +837,7 @@ export const TvShowProvider = ({ children }) => {
     fetchSeriesBest,
     fetchAiringToday,
     fetchOnTheAir,
+    fetchTvUpcoming,
     fetchTvByGenres,
     emmyMode,
     selectedEmmyCategory,
@@ -798,6 +857,7 @@ export const TvShowProvider = ({ children }) => {
   const visibleProviders = useMemo(() => dropAdult(moviesProviders, adultContent), [moviesProviders, adultContent]);
   const visibleGenres = useMemo(() => dropAdult(moviesGenres, adultContent), [moviesGenres, adultContent]);
   const visibleOnTheAir = useMemo(() => dropAdult(moviesOnTheAir, adultContent), [moviesOnTheAir, adultContent]);
+  const visibleUpcoming = useMemo(() => dropAdult(seriesUpcoming, adultContent), [seriesUpcoming, adultContent]);
 
   const contextValue = useMemo(() => ({
     seriesTrend: visibleTrend,
@@ -824,6 +884,14 @@ export const TvShowProvider = ({ children }) => {
     loadingGenres,
     pageOnTheAir,
     moviesOnTheAir: visibleOnTheAir,
+    seriesUpcoming: visibleUpcoming,
+    pageUpcoming,
+    totalPagesUpcoming,
+    loadingUpcoming,
+    loadingMoreUpcoming,
+    loadMoreUpcoming,
+    selectedUpcomingRange,
+    setSelectedUpcomingRange,
     totalPagesOnTheAir,
     loadingOnTheAir,
     categoriesBest,
@@ -858,6 +926,8 @@ export const TvShowProvider = ({ children }) => {
     setSelectedGenres,
     setPageGenres,
     setPageOnTheAir,
+    selectedAiringRange,
+    setSelectedAiringRange,
     activateTvSection,
     getCategoryTitleBest,
     getCategoryTitleTrends,
@@ -903,7 +973,8 @@ export const TvShowProvider = ({ children }) => {
     visibleOnTheAir, totalPagesOnTheAir, loadingOnTheAir, categoriesBest,
     categoriesTrends, refreshing, watchedTvShows, loadingWatchedTv, activateTvSection,
     loadingMoreBest, loadingMoreAiringToday, loadingMoreGenres, totalPagesGenres,
-    loadingMoreOnTheAir,
+    loadingMoreOnTheAir, selectedAiringRange,
+    visibleUpcoming, pageUpcoming, totalPagesUpcoming, loadingUpcoming, loadingMoreUpcoming, selectedUpcomingRange,
     loadingMoreProvider, pageProvider, totalPagesProvider,
     loadingMoreTrend, pageTrend, totalPagesTrend,
     emmyMode, selectedEmmyCategory, selectedEmmyYear, tvShowsEmmy, tvShowsEmmyYear,

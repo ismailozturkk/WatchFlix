@@ -24,6 +24,7 @@ const KAPSAMLI = [
   "tv_bests_",
   "tv_provider_",
   "tv_genres_content_",
+  "tv_upcoming_",
 ];
 
 // Ayardan bağımsız uçlar / liste olmayan kayıtlar: kapsamsız kalmaları bilinçli.
