@@ -102,6 +102,7 @@ import AIPrefsPanel, { genreLabel } from "@components/ai/AIPrefsPanel";
 import { getAiCopy } from "@utils/aiCopy";
 import { countDiscoveryFilters } from "@utils/aiPrefs";
 import { i18nText } from "@utils/i18nText";
+import { localizeGenreName } from "@utils/genreDisplay";
 import GlassIconButton from "@components/common/GlassIconButton";
 import { appAlert } from "@components/AppAlert";
 import { ONBOARDING_GENRES } from "@utils/onboardingPreferences";
@@ -132,7 +133,7 @@ const lastIndexWhere = (list, predicate) => {
 
 /**
  * İKİ GİRİŞ NOKTASI, TEK BİLEŞEN:
- *   1. FAB / pet akışı — components/modals/ChatModal.js: boş sohbet açar.
+ *   1. Sekme çubuğundaki AI düğmesi — components/modals/ChatModal.js: boş sohbet açar.
  *   2. "Bu yapım hakkında sor" — film/dizi detayı: `initialPrompt` ile açılır,
  *      panel görünür görünmez ilk mesaj kendiliğinden gönderilir.
  * (Detay ekranları için ayrı bir kopya vardı; kota göstergesi ve i18n yalnız
@@ -354,11 +355,12 @@ export default function AIChatScreen({
   );
 
   const movieGenres = useMemo(
-    () => [mostWatchedGenre, secondWatchedGenre, threeWatchedGenre].filter(Boolean),
+    // ProfileStats eksik türler için "-" yer tutucusu döner.
+    () => [mostWatchedGenre, secondWatchedGenre, threeWatchedGenre].filter((g) => g && g !== "-"),
     [mostWatchedGenre, secondWatchedGenre, threeWatchedGenre],
   );
   const tvGenres = useMemo(
-    () => [mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv].filter(Boolean),
+    () => [mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv].filter((g) => g && g !== "-"),
     [mostWatchedGenreTv, secondWatchedGenreTv, thirdWatchedGenreTv],
   );
 
@@ -418,10 +420,12 @@ export default function AIChatScreen({
     }
     if (mostWatchedGenre) {
       const tpl = t?.AICineChat?.personalizedChip || i18nText("autoI18n.sana_ozel_genre", "Sana özel: {genre}");
+      // İstatistikteki tür adı Türkçe saklanır; çip ve istek uygulama dilinde yazılır.
+      const genreName = localizeGenreName(mostWatchedGenre, language);
       list.unshift({
-        label: `🎯 ${tpl.replace("{genre}", mostWatchedGenre)}`,
+        label: `🎯 ${tpl.replace("{genre}", genreName)}`,
         prompt: i18nText("autoI18n.genre_recommendation_prompt", "{{genre}} türünde bana birkaç film/dizi öner", {
-          genre: mostWatchedGenre,
+          genre: genreName,
         }),
       });
     }

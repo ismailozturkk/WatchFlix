@@ -32,6 +32,7 @@ import {
   resolveGenreIds,
 } from "../utils/discoveryPersonalization";
 import { sameListIdentity } from "../utils/sameData";
+import { localizeGenreList } from "../utils/genreDisplay";
 import { adultScoped, dropAdult } from "../utils/homeContentSettings";
 import { useHomeDataSettings } from "../hooks/useHomeContentSettings";
 import {
@@ -236,7 +237,7 @@ export default function DiscoveryMediaRail({
     if (preset === "topGenres") {
       return {
         title: L("Favori Türlerin", "Favorite Genres", "Tus géneros favoritos", "Seus gêneros favoritos", "Lieblingsgenres"),
-        subtitle: normalizedGenreNames.join("  •  ") || undefined,
+        subtitle: localizeGenreList(normalizedGenreNames, language).join("  •  ") || undefined,
       };
     }
     return { title: L("Yeni Beğenilenler", "Recent Favorites", "Favoritos recientes", "Favoritos recentes", "Aktuelle Favoriten") };

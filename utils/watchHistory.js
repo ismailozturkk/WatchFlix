@@ -2,6 +2,8 @@
 // Eski kayıtlardaki dateAdded / episodeWatchTime alanları ilk izleme olayı
 // olarak materialize edilir; yeni şema her tekrar izlemeyi ayrı kimlikle saklar.
 
+import { localizeGenreName } from "./genreDisplay";
+
 const cleanPart = (value) =>
   String(value ?? "unknown").replace(/[^a-zA-Z0-9_-]/g, "_");
 
@@ -407,12 +409,14 @@ export function buildRecentWatchChartData(
  * "en çok izlenen" türler birbirinden ayrışmaz. Her kayıt (tekrar izlemeler dahil)
  * bir kez sayılır.
  */
-export function countGenres(groupedData = []) {
+export function countGenres(groupedData = [], language) {
   const counts = {};
   (groupedData || []).forEach((section) =>
     (section?.data || []).forEach((item) =>
       (item?.genres || []).forEach((genre) => {
-        if (genre) counts[genre] = (counts[genre] || 0) + 1;
+        if (!genre) return;
+        const name = language ? localizeGenreName(genre, language) : genre;
+        counts[name] = (counts[name] || 0) + 1;
       }),
     ),
   );

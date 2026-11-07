@@ -19,7 +19,7 @@
 // `İIı → i` eşlemesi ÖNCE yapılır: toLocaleLowerCase("tr-TR") "Science Fiction"
 // gibi ASCII adlarda sorun çıkarmaz ama "Batı" → "batı" bırakır ve NFD dotless
 // ı'yı ayrıştıramaz (birleşik işaret değil, ayrı bir taban karakterdir).
-const fold = (value) =>
+export const foldGenreName = (value) =>
   String(value || "")
     .replace(/[İIı]/g, "i")
     .toLowerCase()
@@ -83,7 +83,7 @@ for (const id of Object.keys(ALIASES)) {
  * @returns {string} kanonik id | "other" | "" (boş girdi)
  */
 export function kanonikTur(name) {
-  const key = fold(name);
+  const key = foldGenreName(name);
   if (!key) return "";
   return LOOKUP.get(key) || "other";
 }

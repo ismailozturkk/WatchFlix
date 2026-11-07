@@ -22,6 +22,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import usePosterUri from "../../hooks/usePosterUri";
 import { alpha } from "../../theme/colors";
 import { getTasteMatchCopy } from "../../utils/tasteMatchCopy";
+import { localizeGenreList, localizeGenreName } from "../../utils/genreDisplay";
 import { TASTE_HEAT_THRESHOLDS, tasteMatchHeat } from "../../utils/tasteMatchVisuals";
 import GlassBox from "../common/GlassBox";
 import TasteMatchInfoSheet from "./TasteMatchInfoSheet";
@@ -234,12 +235,13 @@ function TasteMatchCard({
   const lean = match.genres.lean ?? null;
   const leanText =
     lean?.mine && lean?.theirs
-      ? copy.insights.lean(lean.mine, lean.theirs, friendName)
+      ? copy.insights.lean(localizeGenreName(lean.mine, language), localizeGenreName(lean.theirs, language), friendName)
       : lean?.mine
-        ? copy.insights.leanMine(lean.mine)
+        ? copy.insights.leanMine(localizeGenreName(lean.mine, language))
         : lean?.theirs
-          ? copy.insights.leanTheirs(lean.theirs, friendName)
+          ? copy.insights.leanTheirs(localizeGenreName(lean.theirs, language), friendName)
           : null;
+  const sharedGenres = localizeGenreList(match.genres.shared, language);
   const hasInsights = loved.length > 0 || !!split || !!leanText;
   const hasData = match.state !== "no-data";
   const scope = match.scope ?? "both";
@@ -356,10 +358,10 @@ function TasteMatchCard({
               </>
             ) : null}
           </View>
-          {match.genres.shared.length > 0 ? (
-            <View style={styles.chips} accessible accessibilityLabel={`${copy.parts.genres}: ${match.genres.shared.join(", ")}`}>
+          {sharedGenres.length > 0 ? (
+            <View style={styles.chips} accessible accessibilityLabel={`${copy.parts.genres}: ${sharedGenres.join(", ")}`}>
               <Ionicons name="pricetags-outline" size={13} color={muted} />
-              {match.genres.shared.map((genre) => (
+              {sharedGenres.map((genre) => (
                 <View key={genre} style={[styles.chip, { backgroundColor: alpha(theme.accent, 0.13), borderColor: alpha(theme.accent, 0.25) }]}>
                   <Text allowFontScaling={false} numberOfLines={1} style={[styles.chipText, { color: theme.accent }]}>
                     {genre}

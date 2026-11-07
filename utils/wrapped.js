@@ -8,6 +8,7 @@
 // ile sarılır, böylece her render'da yeniden hesaplanmaz.
 
 import { copyLanguage, intlLocaleOf } from "./appLanguages";
+import { localizeGenreName } from "./genreDisplay";
 
 // "YYYY-MM-DD" — uygulamanın dateAdded/episodeWatchTime için ürettiği biçim
 // (bkz. utils/mediaFacts.todayListDate, utils/watchHistory.normalizeWatchDate).
@@ -264,10 +265,14 @@ export const buildYearlyRecap = ({ movies = [], episodes = [], year, language = 
 
   // ── Türler (film + dizi birleşik) ──
   const genreCount = {};
+  const rawGenre = {};
   const addGenres = (arr) =>
     (arr || []).forEach((g) => {
-      const name = typeof g === "string" ? g : g?.name;
-      if (name) genreCount[name] = (genreCount[name] || 0) + 1;
+      const raw = typeof g === "string" ? g : g?.name;
+      if (!raw) return;
+      const name = localizeGenreName(raw, language);
+      genreCount[name] = (genreCount[name] || 0) + 1;
+      if (!rawGenre[name]) rawGenre[name] = raw;
     });
   myMovies.forEach((m) => addGenres(m.genres));
   myEps.forEach((e) => addGenres(e.genres));
@@ -362,7 +367,8 @@ export const buildYearlyRecap = ({ movies = [], episodes = [], year, language = 
       favoriteWeekday = i;
   });
 
-  const personality = getPersonality(topGenres[0]?.genre, language);
+  // Kişilik eşleyicisi tr/en/es kelimeleriyle çalışır; çevrilmiş ad pt/de'de eşleşmezdi.
+  const personality = getPersonality(rawGenre[topGenres[0]?.genre] || topGenres[0]?.genre, language);
 
   return {
     year,

@@ -107,9 +107,10 @@ it("yüzdeyi, kademeyi ve sayı kutularını gösterir (uzun cümle yok)", () =>
   expect(t).toContain(copy.parts.favorites);
   expect(t).toContain("%83");
   expect(t).toContain(copy.parts.ratings);
-  // ortak türler çip olarak
-  expect(t).toContain("Drama");
+  // ortak türler çip olarak, arayüz dilinde ("Drama" Türkçe arayüzde "Dram")
+  expect(t).toContain("Dram");
   expect(t).toContain("Komedi");
+  expect(t).not.toContain("Drama");
   expect(t).not.toContain(copy.limited);
   expect(t.some((x) => x.includes("ortak izlenen"))).toBe(false); // eski satır cümleleri kalktı
 });
@@ -377,6 +378,7 @@ it("ortak tür / puan uyumu / favori yoksa o kutular çizilmez", () => {
   mount({ match: match({ genres: { similarity: null, shared: [], comparable: false, lean: { mine: null, theirs: null } }, ratings: { pairs: 0, agreement: null }, favorites: [] }) });
   const t = texts();
   expect(t).not.toContain("Drama");
+  expect(t).not.toContain("Dram");
   expect(t).not.toContain(copy.parts.ratings);
   expect(t).not.toContain(copy.parts.favorites);
   expect(t).toContain(copy.parts.overlap);
@@ -391,4 +393,17 @@ it("dökümsüz eski biçimde çubuk çizmez ama çökmez", () => {
   delete legacy.genres.lean;
   mount({ match: legacy });
   expect(texts()).toContain(copy.parts.overlap);
+});
+
+it("türler arayüz diline çevrilir (Türkçe eklenmiş türler İngilizce arayüzde)", () => {
+  mockLang = "en";
+  try {
+    mount({ match: match({ genres: { similarity: 0.9, shared: ["Dram", "Bilim-Kurgu"], comparable: true, lean: { mine: "Suç", theirs: "Macera" } } }) });
+    const t = texts();
+    expect(t).toContain("Drama");
+    expect(t).toContain("Sci-Fi");
+    expect(t).toContain(TASTE_MATCH_COPY.en.insights.lean("Crime", "Adventure", "Ada"));
+  } finally {
+    mockLang = "tr";
+  }
 });
