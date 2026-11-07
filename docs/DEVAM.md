@@ -40,12 +40,15 @@ Karesi, yeni uygulama simgeleri, seri alevi, turnuva yenilemesi…).
 
 1. **Başka oturumun işini commit'leme.** Bir dosyada hem senin hem başkasının değişikliği varsa,
    HEAD kopyası üzerine YALNIZ kendi değişikliğini uygulayıp onu stage'le.
-2. **Gerçek indekste başka oturumun staged silmeleri duruyor: 8 dosya / 1.774 silme**
-   (`__tests__/r2.test.js`, `utils/r2.js`, `components/pet/*`, `context/PetContext.js`,
-   `services/petCache.js`, `screens/tv/TvShowsAiringToday.js`). **Bunlara dokunma.**
+2. **Codex ve Claude aynı klasörde AYNI ANDA çalışabiliyor.** Commit'ten hemen önce
+   `~/.codex/sessions/<yıl>/<ay>/<gün>/` son günlüklerine ve commit'leyeceğin dosyaların değişme
+   zamanına bak; son kendi düzenlemenden yeniyse o satırlar başkasınındır (7 Kas'ta bu yüzden
+   yarım bir Codex düzenlemesi commit'e girdi, geri ayıklandı). Commit sonrası HEAD'i
+   `git archive` ile dışa aktarıp jest'i orada koş: çalışma ağacı testi HEAD'i doğrulamaz.
 3. Commit sonrası `git reset HEAD -- <dosya>` yaparken **klasör verme, tek tek dosya adı ver.**
-   Klasör verirsen o klasördeki başka oturumun staged silmeleri de geri alınır.
-   Doğrulama: `git diff --cached --stat | tail -1` → **8 files changed, 1774 deletions(-)** olmalı.
+   Klasör verirsen o klasördeki başka oturumların staged değişiklikleri de geri alınır.
+   Gerçek indeks 7 Kas'tan beri boş (eski 8 staged pet/r2 silmesi `4515e0e`'de commit'lendi):
+   `git diff --cached --stat` commit öncesi ve sonrası boş olmalı.
 
 ### Güvenli commit yöntemi (geçici indeks)
 
