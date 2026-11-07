@@ -38,10 +38,11 @@ export const RollingDigit = memo(function RollingDigit({
 
   return (
     <View style={{ width, height, overflow: "hidden" }}>
-      <Animated.Text style={[styles.absoluteGlyph, textStyle, previousStyle]}>
+      {/* Kutu sabit ölçülü: sistem yazı büyütmesi rakamı kutudan taşırırdı. */}
+      <Animated.Text allowFontScaling={false} style={[styles.absoluteGlyph, textStyle, previousStyle]}>
         {pair.previous}
       </Animated.Text>
-      <Animated.Text style={[styles.absoluteGlyph, textStyle, currentStyle]}>
+      <Animated.Text allowFontScaling={false} style={[styles.absoluteGlyph, textStyle, currentStyle]}>
         {pair.current}
       </Animated.Text>
     </View>

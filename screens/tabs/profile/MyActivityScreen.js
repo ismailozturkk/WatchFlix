@@ -35,7 +35,7 @@ import usePosterUri from "../../../hooks/usePosterUri";
 import i18n from "../../../translations";
 import { i18nText, percentText } from "@utils/i18nText";
 import { intlLocaleOf } from "@utils/appLanguages";
-import { tallyVotes } from "@utils/postComposer";
+import { postPreviewPosters, tallyVotes } from "@utils/postComposer";
 import RatingStars from "@components/RatingStars";
 import StaggerItem from "@components/StaggerItem";
 import PosterStack from "@components/feed/PosterStack";
@@ -464,7 +464,7 @@ export default function MyActivityScreen({ navigation, route }) {
                 .slice(0, 3)
                 .map((p) => getTmdbUrl(p, "poster", 200))
             : [];
-        const mediaPosters = (item.mediaList || []).map((m) => m?.poster).filter(Boolean);
+        const mediaPosters = postPreviewPosters(item);
         node = (
           <PostMini
             theme={theme}

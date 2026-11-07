@@ -8,6 +8,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import usePosterUri from "../../../hooks/usePosterUri";
 import { i18nText } from "../../../utils/i18nText";
 import { buildWatchChartData, countGenres } from "../../../utils/watchHistory";
+import { localizeGenreList } from "../../../utils/genreDisplay";
 import { countByDate, matchesDateFilter } from "../../../utils/statsFilters";
 import BackButton from "../../../components/BackButton";
 import ScreenDecor from "../../../components/ScreenDecor";
@@ -20,6 +21,7 @@ import {
   StatsCollapsingList,
 } from "../../../components/profile/StatsComponents";
 import StatsFilterModal from "../../../components/profile/StatsFilterModal";
+import StatsDayModal from "../../../components/profile/StatsDayModal";
 
 const sectionKeyExtractor = (_item, index) => `m-${index}`;
 
@@ -53,6 +55,9 @@ const MovieStatisticsScreen = ({ navigation }) => {
   const [expanded, setExpanded] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
+  // Gün özeti: anahtar kapanışta silinmez, sayfa çıkış animasyonunda dolu kalır.
+  const [dayKey, setDayKey] = useState(null);
+  const [dayVisible, setDayVisible] = useState(false);
 
   const locale = intlLocaleOf(language);
 
@@ -66,7 +71,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
 
   // Hero'daki tür çubukları ve filtre modalındaki tür listesi aynı sayımdan
   // beslenir (izlenme sıklığına göre azalan).
-  const genreStats = useMemo(() => countGenres(groupedData), [groupedData]);
+  const genreStats = useMemo(() => countGenres(groupedData, language), [groupedData, language]);
   // Filtre penceresinin yıl/ay çiplerindeki sayaçlar (gün → izlenen film sayısı).
   const dateCounts = useMemo(() => countByDate(groupedData), [groupedData]);
 
@@ -81,7 +86,8 @@ const MovieStatisticsScreen = ({ navigation }) => {
           .filter((item) => !q || item.name?.toLowerCase().includes(q))
           .filter(
             (item) =>
-              selectedGenre == null || (item.genres || []).includes(selectedGenre),
+              selectedGenre == null ||
+              localizeGenreList(item.genres, language).includes(selectedGenre),
           ),
       }))
       .filter((s) => s.items.length > 0)
@@ -93,7 +99,7 @@ const MovieStatisticsScreen = ({ navigation }) => {
         title: s.title,
         data: [],
         count: s.items.length,
-        genres: [...new Set(s.items.flatMap((m) => m.genres || []).filter(Boolean))],
+        genres: localizeGenreList(s.items.flatMap((m) => m.genres || []), language),
         totalMinutes: s.items.reduce((acc, item) => acc + (item.minutes || 0), 0),
         posters: s.items.map((item) => ({
           key: String(item.historyId || item.watchEventId || item.id),
@@ -101,10 +107,23 @@ const MovieStatisticsScreen = ({ navigation }) => {
           mediaId: item.id,
           mediaType: "movie",
           minutes: item.minutes,
+          // Gün özeti listesi + tür dağılımı (StatsDayModal).
+          title: item.name,
+          genres: localizeGenreList(item.genres, language),
           onPress: () => navigation.navigate("MovieDetails", { id: item.id }),
         })),
       }));
-  }, [groupedData, search, selectedDate, selectedGenre, posterUri, navigation]);
+  }, [groupedData, search, selectedDate, selectedGenre, posterUri, navigation, language]);
+
+  const onOpenDay = useCallback((title) => {
+    setDayKey(title);
+    setDayVisible(true);
+  }, []);
+  const onCloseDay = useCallback(() => setDayVisible(false), []);
+  const daySection = useMemo(
+    () => sections.find((s) => s.title === dayKey) || null,
+    [sections, dayKey],
+  );
 
   const renderSectionHeader = useCallback(
     ({ section }) => (
@@ -121,9 +140,10 @@ const MovieStatisticsScreen = ({ navigation }) => {
         formatDate={formatDate}
         locale={locale}
         rankColor={borderColorMovie}
+        onOpenDay={onOpenDay}
       />
     ),
-    [theme, t.minutes, t.profileScreen?.minutesShort, formatDate, locale, borderColorMovie],
+    [theme, t.minutes, t.profileScreen?.minutesShort, formatDate, locale, borderColorMovie, onOpenDay],
   );
 
   const onToggleSearch = useCallback(() => setSearchVisible((v) => !v), []);
@@ -229,6 +249,17 @@ const MovieStatisticsScreen = ({ navigation }) => {
         onSelectGenre={onSelectGenre}
         formatDate={formatDate}
         locale={locale}
+      />
+      <StatsDayModal
+        visible={dayVisible}
+        onClose={onCloseDay}
+        theme={theme}
+        kind="movie"
+        day={daySection}
+        formatDate={formatDate}
+        locale={locale}
+        minutesLabel={t.profileScreen?.minutesShort}
+        accent={borderColorMovie}
       />
       <BackButton />
     </View>

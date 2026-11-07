@@ -26,8 +26,9 @@
 //     edilemeyen günü kendiliğinden korur. "Kontrol noktası" budur: seri sayısı
 //     asla yalan söylemez (kopan seri 30'a geri DÖNMEZ), ama 30. günü geçen seri
 //     tek bir kötü günde de sönmez.
-// Gün dönümü gece yarısı değil 04:00 (seriGunuAnahtari): 00:30'da biten bölüm
-// "dün gece"dir. Yalnız seri günlerine uygulanır; rozet kazanma tarihi takvim günüdür.
+// Gün dönümü cihazın YEREL gece yarısıdır (seriGunuAnahtari): her ülkede kendi 00:00'ı.
+// (30 Eki'ye kadar 04:00'tü; 00:00–03:59 arası işaretlemeler bir önceki güne yazılıyor,
+// kullanıcıya "ekliyorum ama seri değişmiyor" ve istatistikle uyuşmazlık olarak görünüyordu.)
 //
 // SAF MODÜL: React, AsyncStorage, Firestore importu YOKTUR.
 
@@ -42,7 +43,17 @@ export const GUN_TUT = 400;
 export const gunIndexi = (key) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || ""));
   if (!m) return NaN;
-  return Math.round(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000);
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (year < 1000 || month < 1 || month > 12 || day < 1 || day > 31) return NaN;
+  const epoch = Date.UTC(year, month - 1, day);
+  const date = new Date(epoch);
+  // Date.UTC taşan günleri sessizce sonraki aya yuvarlar (2026-02-31 → 3 Mart).
+  // Böyle bozuk bir anahtar seri defterine girerse iki gerçek günü atlayıp seriyi
+  // yanlış uzatabilir; takvim bileşenlerini geri karşılaştırarak kesin reddet.
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return NaN;
+  return Math.round(epoch / 86400000);
 };
 
 // PAZARTESİ BAŞLANGIÇLI hafta indeksi.
@@ -60,8 +71,8 @@ export const bugunAnahtari = (simdi = Date.now()) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-/** Seri günü 04:00'te döner: gece yarısından sonraki izleme bir önceki güne sayılır. */
-export const SERI_GUN_DONUMU_SAAT = 4;
+/** Seri günü cihazın yerel gece yarısında döner (istatistik takvimiyle aynı gün). */
+export const SERI_GUN_DONUMU_SAAT = 0;
 export const seriGunuAnahtari = (simdi = Date.now()) =>
   bugunAnahtari(Number(simdi) - SERI_GUN_DONUMU_SAAT * 3600000);
 

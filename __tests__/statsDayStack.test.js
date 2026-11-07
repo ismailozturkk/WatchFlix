@@ -3,7 +3,7 @@
 // Film / Dizi istatistik ekranlarındaki gün kartı (StatsDateSection).
 // Eskiden her gün o günün TÜM afişlerini (+ puan rozetlerini) çiziyordu; toplu
 // eklemeli ya da maratonlu günlerde liste kaydırırken takılıyordu. Burada
-// sabitlenen: gün başına en çok DAY_PREVIEW_LIMIT afiş, kalanı "+N" yazan tek
+// sabitlenen: gün başına en çok 4 yuva — 4'e kadar hepsi, fazlasında 3 afiş + kalanı "+N" yazan tek
 // yığın karosu; yığına basınca o gün yerinde açılır, "Daralt" geri toplar.
 
 import React from "react";
@@ -77,6 +77,7 @@ const {
   StatsDateSection,
   StatsPosterCard,
   DAY_PREVIEW_LIMIT,
+  DAY_INLINE_LIMIT,
 } = require("../components/profile/StatsComponents");
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
@@ -140,40 +141,85 @@ const collapseButton = () =>
 const allTextOf = (node) =>
   node.findAll((n) => n.type === "Text").map((n) => [].concat(n.props.children).join(""));
 
-test("önizleme sınırı 5", () => {
-  expect(DAY_PREVIEW_LIMIT).toBe(5);
+test("gün kartı 4 yuva: 3 afiş + yığın", () => {
+  expect(DAY_INLINE_LIMIT).toBe(4);
+  expect(DAY_PREVIEW_LIMIT).toBe(3);
 });
 
-test("sınırı aşmayan gün tüm afişlerini çizer, yığın göstermez", () => {
-  render(makePosters(DAY_PREVIEW_LIMIT));
-  expect(cardCount()).toBe(DAY_PREVIEW_LIMIT);
-  expect(allText()).not.toContain("Tümünü gör");
+test("4 ve daha az içerikli gün tüm afişlerini çizer, yığın göstermez", () => {
+  render(makePosters(4));
+  expect(cardCount()).toBe(4);
+  expect(allText().some((t) => t.startsWith("+"))).toBe(false);
 });
 
-test("kalabalık gün: 5 afiş + kalanı sayan yığın; basınca açılır, Daralt geri toplar", () => {
+test("kalabalık gün: 3 afiş + kalanı sayan yığın; basınca açılır, Daralt geri toplar", () => {
   render(makePosters(12));
-  expect(cardCount()).toBe(5);
-  expect(allText()).toContain("+7");
-  expect(stackButton().props.accessibilityLabel).toBe("7 içerik daha göster");
+  expect(cardCount()).toBe(3);
+  expect(allText()).toContain("+9");
+  expect(stackButton().props.accessibilityLabel).toBe("9 içerik daha göster");
 
-  // Yığın katları gizli kalan afişlerden (6., 7., 8.) gelir — görünenleri tekrarlamaz.
+  // Yığın katları gizli kalan afişlerden (4., 5., 6.) gelir — görünenleri tekrarlamaz.
   const stackUris = stackButton()
     .findAll((n) => n.type === "Image")
     .map((n) => n.props.source.uri);
-  expect(stackUris.sort()).toEqual(["https://img/5.jpg", "https://img/6.jpg", "https://img/7.jpg"]);
+  expect(stackUris.sort()).toEqual(["https://img/3.jpg", "https://img/4.jpg", "https://img/5.jpg"]);
 
   act(() => stackButton().props.onPress());
   expect(cardCount()).toBe(12);
-  expect(allText()).not.toContain("+7");
+  expect(allText()).not.toContain("+9");
 
   act(() => collapseButton().props.onPress());
   expect(mockScrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
-  expect(cardCount()).toBe(5);
-  expect(allText()).toContain("+7");
+  expect(cardCount()).toBe(3);
+  expect(allText()).toContain("+9");
 });
 
-test("tek gizli afişte de yığın üç katlı kalır (boş katlar renkli dolgu)", () => {
-  render(makePosters(6));
-  expect(allText()).toContain("+1");
-  expect(stackButton().findAll((n) => n.type === "Image")).toHaveLength(1);
+test("5 içerikte 3 afiş + \"+2\" yığın (yığın tek gizli afiş için açılmaz)", () => {
+  render(makePosters(5));
+  expect(cardCount()).toBe(3);
+  expect(allText()).toContain("+2");
+  expect(stackButton().findAll((n) => n.type === "Image")).toHaveLength(2);
+});
+
+describe("takvim yaprağı (tarih afişlerin yanında)", () => {
+  const leaf = () =>
+    renderer.root.find((n) => n.props.accessible && n.props.accessibilityLabel != null && typeof n.type === "string");
+  const renderDay = (title, extra = {}) => {
+    act(() => {
+      renderer = create(
+        <StatsDateSection theme={theme} title={title} posters={makePosters(2)} locale="en-US" {...extra} />,
+      );
+    });
+  };
+
+  test("üstte ay adı, ortada gün sayısı ve günün adı, en altta yıl", () => {
+    renderDay("2026-10-29", { totalMinutes: 180, posterMinutesLabel: "min", formatDate: () => "29 Oct" });
+    expect(allTextOf(leaf())).toEqual(["October", "29", "Thursday", "2026"]);
+    expect(leaf().props.accessibilityLabel).toBe("29 Oct");
+    expect(cardCount()).toBe(2);
+  });
+
+  test("geçen yılların yaprağında da yıl en altta", () => {
+    renderDay("2019-03-05");
+    expect(allTextOf(leaf())).toEqual(["March", "5", "Tuesday", "2019"]);
+  });
+
+  test("tarihsiz grup: yaprakta Eski Kayıtlar, yıl satırı yok", () => {
+    renderDay("unknown");
+    expect(allTextOf(leaf())).toEqual(["—", "Eski Kayıtlar"]);
+  });
+
+  test("onOpenDay verilirse yaprak düğmedir ve günün anahtarını iletir", () => {
+    const onOpenDay = jest.fn();
+    renderDay("2026-10-29", { onOpenDay });
+    expect(leaf().type).toBe("Pressable");
+    expect(leaf().props.accessibilityRole).toBe("button");
+    act(() => leaf().props.onPress());
+    expect(onOpenDay).toHaveBeenCalledWith("2026-10-29");
+  });
+
+  test("onOpenDay yoksa yaprak düz görünümdür", () => {
+    renderDay("2026-10-29");
+    expect(leaf().type).toBe("View");
+  });
 });

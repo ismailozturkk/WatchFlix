@@ -49,6 +49,11 @@ describe("hafta indeksi PAZARTESI baslangicli", () => {
     expect(Number.isNaN(gunIndexi("cop"))).toBe(true);
     expect(Number.isNaN(gunIndexi(""))).toBe(true);
     expect(Number.isNaN(gunIndexi("2026-7-1"))).toBe(true);   // sifir dolgusuz
+    expect(Number.isNaN(gunIndexi("2026-02-29"))).toBe(true); // artik yil degil
+    expect(Number.isNaN(gunIndexi("2024-02-30"))).toBe(true); // Date.UTC Mart'a tasimamali
+    expect(Number.isNaN(gunIndexi("2026-13-01"))).toBe(true);
+    expect(Number.isNaN(gunIndexi("2026-01-00"))).toBe(true);
+    expect(Number.isFinite(gunIndexi("2024-02-29"))).toBe(true);
   });
 });
 
@@ -66,7 +71,7 @@ describe("aktifGunEkle", () => {
   });
 
   test("bozuk girdileri ayiklar", () => {
-    expect(aktifGunEkle(["cop", null, 5, "2026-07-13"], "2026-07-14"))
+    expect(aktifGunEkle(["cop", null, 5, "2026-02-31", "2026-07-13"], "2026-07-14"))
       .toEqual(["2026-07-13", "2026-07-14"]);
   });
 

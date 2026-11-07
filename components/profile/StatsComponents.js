@@ -220,9 +220,8 @@ const StatTile = memo(function StatTile({
   };
 
   // Tek kutucuk tüm genişliği kaplar: köşeye yapışık küçük ikon + sola yaslı
-  // 10.5 pt etiket bu genişlikte kaybolup hizasız duruyordu. Bunun yerine hemen
-  // altındaki "Toplam izlenme" satırıyla aynı kalıp (soldaki ikon kutusu, üstte
-  // etiket, altta değer) kullanılır; iki satırın metin sütunu aynı hizada başlar.
+  // 10.5 pt etiket bu genişlikte kaybolup hizasız duruyordu. Bunun yerine solda
+  // ikon, ortada etiket + değer, sağda tekrarsız rozeti olan yatay kalıp kullanılır.
   if (large) {
     return (
       <View style={[heroStyles.tile, heroStyles.tileWide, surface]}>
@@ -678,6 +677,7 @@ export const StatsHeroCard = memo(function StatsHeroCard({
         <GlassPressable
           onPress={onTimePress}
           accessibilityRole="button"
+          hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
           style={[
             heroStyles.totalRow,
             {
@@ -687,11 +687,14 @@ export const StatsHeroCard = memo(function StatsHeroCard({
           ]}
         >
           <View style={[heroStyles.totalIcon, { backgroundColor: withAlpha(accent, 0.2) }]}>
-            <Ionicons name="time-outline" size={19} color={accent} />
+            <Ionicons name="time-outline" size={14} color={accent} />
           </View>
           <View style={heroStyles.totalCopy}>
             <Text
               allowFontScaling={false}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
               style={[heroStyles.totalLabelText, { color: theme.text.muted }]}
             >
               {i18nText("autoI18n.toplam_izlenme", "Toplam izlenme")}
@@ -706,7 +709,7 @@ export const StatsHeroCard = memo(function StatsHeroCard({
               {formatDuration?.(totalMinutes || 0, timeDisplayMode)}
             </Text>
           </View>
-          <Ionicons name="swap-horizontal" size={17} color={theme.text.muted} />
+          <Ionicons name="swap-horizontal" size={14} color={theme.text.muted} />
         </GlassPressable>
 
         {/* Expand toggle */}
@@ -837,8 +840,8 @@ const heroStyles = StyleSheet.create({
     letterSpacing: -0.5,
     includeFontPadding: false,
   },
-  // Tek kutucuk (film ekranı): yatay düzen. Dolgu ve ikon kutusu "Toplam izlenme"
-  // satırıyla (totalRow/totalIcon) aynı; iki satırın metni aynı sütundan başlar.
+  // Tek kutucuk (film ekranı): yatay düzen. Ana sayı burada geniş kalır; alttaki
+  // toplam süre satırı ise profil başlığının boyunu azaltmak için kompakt tutulur.
   tileWide: {
     flexDirection: "row",
     alignItems: "center",
@@ -883,23 +886,38 @@ const heroStyles = StyleSheet.create({
   totalRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 11,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 16,
+    gap: 8,
+    minHeight: 32,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   totalIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 23,
+    height: 23,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
-  totalCopy: { flex: 1, minWidth: 0 },
-  totalLabelText: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.2 },
-  totalValueText: { marginTop: 1, fontSize: 18, lineHeight: 23, fontWeight: "800", letterSpacing: -0.3 },
+  totalCopy: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  totalLabelText: { flexShrink: 1, fontSize: 9.5, fontWeight: "700", letterSpacing: 0.15 },
+  totalValueText: {
+    flexShrink: 1,
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: "800",
+    letterSpacing: -0.2,
+    textAlign: "right",
+  },
 
   chartCard: {
     paddingTop: 11,
@@ -1183,144 +1201,201 @@ const filterStyles = StyleSheet.create({
   pillText: { fontSize: 12, flexShrink: 1 },
 });
 
-// ─── SECTION HEADER (her tarih grubunun başlığı) ─────────────────────────────
+// ─── CALENDAR LEAF (her tarih grubunun tarihi) ───────────────────────────────
 //
-// Sol: gün/ay "takvim kutucuğu". Orta: tarih + türler. Sağ: adet ve süre
-// rozetleri. Geçersiz tarihli ("Eski Kayıtlar") gruplarda kutucukta ikon çıkar.
+// Gün kartının solunda, afişlerin yanında duran küçük "takvim yaprağı": üstte
+// renkli bantta (halka delikleriyle) ayın adı, ortada gün sayısı ve haftanın
+// günü, en altta yıl. Afiş yüksekliğindedir; ayrı bir başlık satırı açmaz, gün
+// kartı tek satırda kalır. `onPress` verilirse yaprak düğmedir (gün özeti,
+// StatsDayModal); adet/süre/türler oradadır, yaprak yalnız tarihi taşır.
+// `large`: gün özeti sayfasının başlığındaki büyük kopya.
+// Geçersiz tarihli ("Eski Kayıtlar") gruplarda gövdede ikon + kısa ad çıkar.
 
 const dateTileParts = (title, locale) => {
   const match = typeof title === "string" ? title.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
   if (!match) return null;
   const date = new Date(Date.UTC(+match[1], +match[2] - 1, +match[3], 12));
   if (Number.isNaN(date.getTime())) return null;
+  const format = (options) =>
+    new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" }).format(date);
   return {
     day: String(+match[3]),
-    month: new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }).format(date),
+    month: format({ month: "long" }),
+    weekday: format({ weekday: "long" }),
+    year: match[1],
   };
 };
 
-export const StatsSectionHeader = memo(function StatsSectionHeader({
+export const StatsCalendarLeaf = memo(function StatsCalendarLeaf({
   theme,
   title,
-  totalMinutes,
-  count,
-  itemIcon = "film-outline",
   genres = [],
-  minutesLabel = "dk",
   fallbackTitle = i18nText("autoI18n.eski_kayitlar", "Eski Kayıtlar"),
   formatDate,
   locale,
   accent,
+  onPress,
+  large = false,
 }) {
   const tint = accent || theme.accent;
-  const isDateValid = title && !isNaN(new Date(title).getTime());
-  const displayTitle = isDateValid ? formatDate?.(title) || title : fallbackTitle;
   const tile = useMemo(() => dateTileParts(title, locale), [title, locale]);
-  const genreLine = genres.slice(0, 3).join(" · ");
+  const displayTitle = tile ? formatDate?.(title) || title : fallbackTitle;
+  // Türler görsel olarak yaprağa sığmaz; ekran okuyucu tarihle birlikte okur.
+  const a11yLabel = [displayTitle, genres.slice(0, 3).join(", ")].filter(Boolean).join(". ");
+  const s = large ? leafLargeStyles : leafSmallStyles;
 
-  return (
-    <View style={sectStyles.wrap}>
-      <View
-        style={[
-          sectStyles.dateTile,
-          { backgroundColor: withAlpha(tint, 0.14), borderColor: withAlpha(tint, 0.32) },
-        ]}
-      >
+  const content = (
+    <>
+      <View style={[leafStyles.band, s.band, { backgroundColor: tint }]}>
+        <View style={[leafStyles.rings, s.rings]} pointerEvents="none">
+          <View style={[leafStyles.ring, s.ring, { backgroundColor: theme.secondary }]} />
+          <View style={[leafStyles.ring, s.ring, { backgroundColor: theme.secondary }]} />
+        </View>
+        <Text
+          allowFontScaling={false}
+          style={[leafStyles.month, s.month]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+        >
+          {tile ? tile.month : "—"}
+        </Text>
+      </View>
+
+      <View style={leafStyles.body}>
         {tile ? (
           <>
-            <Text allowFontScaling={false} style={[sectStyles.tileDay, { color: theme.text.primary }]}>
+            <Text allowFontScaling={false} style={[s.day, { color: theme.text.primary }]}>
               {tile.day}
             </Text>
-            <Text allowFontScaling={false} style={[sectStyles.tileMonth, { color: tint }]}>
-              {tile.month}
+            <Text
+              allowFontScaling={false}
+              style={[leafStyles.weekday, s.weekday, { color: theme.text.muted }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
+              {tile.weekday}
             </Text>
           </>
         ) : (
-          <Ionicons name="time-outline" size={20} color={tint} />
+          <>
+            <Ionicons name="time-outline" size={large ? 22 : 18} color={tint} />
+            <Text
+              allowFontScaling={false}
+              style={[leafStyles.fallback, { color: theme.text.muted }]}
+              numberOfLines={2}
+            >
+              {fallbackTitle}
+            </Text>
+          </>
         )}
       </View>
 
-      <View style={sectStyles.copy}>
-        <Text
-          style={[sectStyles.title, { color: theme.text.primary }]}
-          numberOfLines={1}
-        >
-          {displayTitle}
-        </Text>
-        {!!genreLine && (
+      {tile ? (
+        <View style={[leafStyles.foot, s.foot, { borderTopColor: withAlpha(tint, 0.22) }]}>
           <Text
-            style={[sectStyles.genres, { color: theme.text.muted }]}
+            allowFontScaling={false}
+            style={[leafStyles.year, s.year, { color: tint }]}
             numberOfLines={1}
           >
-            {genreLine}
+            {tile.year}
           </Text>
-        )}
-      </View>
-
-      {/* Adet + süre TEK hapta: iki ayrı rozet başlığı iki satıra uzatıyordu. */}
-      {(count > 0 || totalMinutes > 0) && (
-        <View style={[sectStyles.badge, { backgroundColor: withAlpha(tint, 0.13) }]}>
-          {count > 0 && (
-            <>
-              <Ionicons name={itemIcon} size={11} color={tint} />
-              <Text allowFontScaling={false} style={[sectStyles.badgeText, { color: theme.text.primary }]}>
-                {count}
-              </Text>
-            </>
-          )}
-          {count > 0 && totalMinutes > 0 && (
-            <View style={[sectStyles.badgeDot, { backgroundColor: withAlpha(tint, 0.55) }]} />
-          )}
-          {totalMinutes > 0 && (
-            <>
-              <MaterialCommunityIcons name="clock-outline" size={11} color={tint} />
-              <Text allowFontScaling={false} style={[sectStyles.badgeText, { color: theme.text.primary }]}>
-                {totalMinutes} {minutesLabel}
-              </Text>
-            </>
-          )}
         </View>
-      )}
-    </View>
+      ) : null}
+    </>
+  );
+
+  const frame = [
+    leafStyles.wrap,
+    s.wrap,
+    { backgroundColor: withAlpha(tint, 0.1), borderColor: withAlpha(tint, 0.34) },
+  ];
+
+  if (!onPress) {
+    return (
+      <View accessible accessibilityLabel={a11yLabel} style={frame}>
+        {content}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      accessibilityHint={i18nText("autoI18n.gun_ozeti_ipucu", "Günün özetini açar")}
+      onPress={onPress}
+      hitSlop={4}
+      style={({ pressed }) => [frame, pressed && leafStyles.pressed]}
+    >
+      {content}
+    </Pressable>
   );
 });
 
-const sectStyles = StyleSheet.create({
+const leafStyles = StyleSheet.create({
   wrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 10,
-    paddingTop: 10,
-  },
-  dateTile: {
-    width: 38,
-    height: 40,
-    borderRadius: 11,
     borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  pressed: { opacity: 0.7, transform: [{ scale: 0.97 }] },
+  band: {
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingHorizontal: 3,
+  },
+  // Takvim halkaları: kart zemini renginde iki küçük delik; bant, ay adı
+  // deliklerin altında kalacak kadar yüksek (uzun ay adı tüm genişliği kaplar).
+  rings: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  ring: {},
+  month: {
+    color: "#fff",
+    fontWeight: "900",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  body: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  weekday: { fontWeight: "800", textTransform: "capitalize" },
+  fallback: { marginTop: 2, fontSize: 8.5, fontWeight: "800", textAlign: "center" },
+  foot: {
+    borderTopWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",
   },
-  tileDay: { fontSize: 15, lineHeight: 17, fontWeight: "900", letterSpacing: -0.4 },
-  tileMonth: {
-    fontSize: 8,
-    fontWeight: "900",
-    letterSpacing: 0.7,
-    textTransform: "uppercase",
-  },
-  copy: { flex: 1, minWidth: 0 },
-  title: { fontSize: 13.5, fontWeight: "800", letterSpacing: -0.2 },
-  genres: { marginTop: 1, fontSize: 10.5, fontWeight: "600" },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  badgeDot: { width: 3, height: 3, borderRadius: 1.5, marginHorizontal: 3 },
-  badgeText: { fontSize: 10.5, fontWeight: "800" },
+  year: { fontWeight: "900", letterSpacing: 0.8 },
+});
+
+// Gün kartındaki yaprak: afiş yüksekliğine gerilir (genişlik sabit).
+const leafSmallStyles = StyleSheet.create({
+  wrap: { width: 58, borderRadius: 10 },
+  band: { height: 21, paddingBottom: 2 },
+  rings: { top: 3, paddingHorizontal: 12 },
+  ring: { width: 4, height: 4, borderRadius: 2 },
+  month: { fontSize: 8.5 },
+  day: { fontSize: 24, lineHeight: 26, fontWeight: "900", letterSpacing: -0.8 },
+  weekday: { fontSize: 9, maxWidth: 54 },
+  foot: { height: 16 },
+  year: { fontSize: 9 },
+});
+
+// Gün özeti sayfasının başlığı.
+const leafLargeStyles = StyleSheet.create({
+  wrap: { width: 76, height: 96, borderRadius: 14 },
+  band: { height: 27, paddingBottom: 3 },
+  rings: { top: 4, paddingHorizontal: 16 },
+  ring: { width: 5, height: 5, borderRadius: 2.5 },
+  month: { fontSize: 10 },
+  day: { fontSize: 30, lineHeight: 33, fontWeight: "900", letterSpacing: -1 },
+  weekday: { fontSize: 10.5, maxWidth: 70 },
+  foot: { height: 18 },
+  year: { fontSize: 10.5 },
 });
 
 // ─── POSTER CARD ─────────────────────────────────────────────────────────────
@@ -1329,7 +1404,7 @@ const sectStyles = StyleSheet.create({
 // karartma üstünde, kişisel puan/yorum sol üstte ÜZERİNDE — posterin altında
 // ayrı bir satır ayrılmaz, gün kartı kısa kalır.
 
-const CARD_W = 76;
+const CARD_W = 64;
 const CARD_H = CARD_W * 1.5;
 
 export const StatsPosterCard = memo(function StatsPosterCard({
@@ -1565,10 +1640,10 @@ const stackStyles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 4,
   },
-  count: { color: "#fff", fontSize: 22, fontWeight: "900", letterSpacing: -0.5 },
-  caption: { marginTop: 1, color: "rgba(255,255,255,0.85)", fontSize: 9.5, fontWeight: "800" },
+  count: { color: "#fff", fontSize: 19, fontWeight: "900", letterSpacing: -0.5 },
+  caption: { marginTop: 1, color: "rgba(255,255,255,0.85)", fontSize: 8.5, fontWeight: "800" },
   collapse: {
-    width: 56,
+    width: 48,
     height: CARD_H,
     borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1581,18 +1656,24 @@ const stackStyles = StyleSheet.create({
 
 // ─── DATE SECTION ────────────────────────────────────────────────────────────
 //
-// Bir tarih grubunun tamamı: başlık (StatsSectionHeader) + yatay poster listesi.
+// Bir tarih grubunun tamamı: solda takvim yaprağı (StatsCalendarLeaf), yanında
+// yatay poster listesi — tek satır. Yaprağa basınca `onOpenDay(title)` çağrılır;
+// ekran o günün özetini (StatsDayModal) açar.
 // memo'lu — parent (ekran) re-render olduğunda, bu section'ın prop'ları (posters
 // ref'i vb.) değişmedikçe yeniden render edilmez. Poster'lar ekranın useMemo'sunda
 // önceden normalize edilip geldiği için onPress closure'ları da stabildir.
 //
-// Gün başına en fazla DAY_PREVIEW_LIMIT afiş çizilir; kalanı sondaki yığın
+// Gün başına en fazla DAY_INLINE_LIMIT yuva: fazlasında DAY_PREVIEW_LIMIT afiş + yığın
 // karosunda "+N" olarak durur, basınca o gün yerinde açılır. Kalabalık günlerde
 // (toplu ekleme, dizi maratonu) her günün tüm kartlarını + puan rozetlerini
 // çizmek kaydırmayı takılatıyordu. Açık/kapalı durumu karta yereldir: ekranlar
 // bölüme tarih anahtarı verir, gün ekrandan çıkıp dönünce yığın yeniden kapanır.
 
-export const DAY_PREVIEW_LIMIT = 5;
+// Gün kartı en çok DAY_INLINE_LIMIT afiş yer açar: o kadar ya da daha az
+// içerik varsa hepsi normal çizilir; fazlaysa ilk DAY_PREVIEW_LIMIT afiş +
+// son yuvada yığın ("+N" = kalan hepsi). Yığın tek gizli afiş için açılmaz.
+export const DAY_INLINE_LIMIT = 4;
+export const DAY_PREVIEW_LIMIT = DAY_INLINE_LIMIT - 1;
 
 const POSTER_STRIDE = CARD_W + 8; // kart genişliği + marginRight (StatsPosterCard)
 
@@ -1619,6 +1700,7 @@ export const StatsDateSection = memo(function StatsDateSection({
   formatDate,
   locale,
   rankColor,
+  onOpenDay,
 }) {
   const renderPoster = useCallback(
     ({ item }) => (
@@ -1638,7 +1720,7 @@ export const StatsDateSection = memo(function StatsDateSection({
 
   const listRef = useRef(null);
   const [expanded, setExpanded] = useState(false);
-  const hiddenCount = Math.max(0, posters.length - DAY_PREVIEW_LIMIT);
+  const hiddenCount = posters.length > DAY_INLINE_LIMIT ? posters.length - DAY_PREVIEW_LIMIT : 0;
   const visiblePosters = useMemo(
     () => (expanded || hiddenCount === 0 ? posters : posters.slice(0, DAY_PREVIEW_LIMIT)),
     [posters, expanded, hiddenCount],
@@ -1654,6 +1736,7 @@ export const StatsDateSection = memo(function StatsDateSection({
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
     setExpanded(false);
   }, []);
+  const openDay = useCallback(() => onOpenDay?.(title), [onOpenDay, title]);
 
   let footer = null;
   if (hiddenCount > 0) {
@@ -1677,33 +1760,33 @@ export const StatsDateSection = memo(function StatsDateSection({
         { backgroundColor: withAlpha(theme.secondary, 0.62), borderColor: theme.border },
       ]}
     >
-      <StatsSectionHeader
-        theme={theme}
-        title={title}
-        totalMinutes={totalMinutes}
-        count={count ?? posters.length}
-        itemIcon={itemIcon}
-        genres={genres}
-        minutesLabel={posterMinutesLabel || minutesLabel}
-        formatDate={formatDate}
-        locale={locale}
-        accent={rankColor}
-      />
-      <FlatList
-        ref={listRef}
-        data={visiblePosters}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={posterKeyExtractor}
-        getItemLayout={posterGetItemLayout}
-        renderItem={renderPoster}
-        ListFooterComponent={footer}
-        contentContainerStyle={dateSectionStyles.posterRow}
-        initialNumToRender={5}
-        maxToRenderPerBatch={6}
-        windowSize={5}
-        removeClippedSubviews={false}
-      />
+      <View style={dateSectionStyles.row}>
+        <StatsCalendarLeaf
+          theme={theme}
+          title={title}
+          genres={genres}
+          formatDate={formatDate}
+          locale={locale}
+          accent={rankColor}
+          onPress={onOpenDay ? openDay : undefined}
+        />
+        <FlatList
+          ref={listRef}
+          style={dateSectionStyles.list}
+          data={visiblePosters}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={posterKeyExtractor}
+          getItemLayout={posterGetItemLayout}
+          renderItem={renderPoster}
+          ListFooterComponent={footer}
+          contentContainerStyle={dateSectionStyles.posterRow}
+          initialNumToRender={5}
+          maxToRenderPerBatch={6}
+          windowSize={5}
+          removeClippedSubviews={false}
+        />
+      </View>
     </GlassBox>
   );
 });
@@ -1711,12 +1794,15 @@ export const StatsDateSection = memo(function StatsDateSection({
 const dateSectionStyles = StyleSheet.create({
   card: {
     marginHorizontal: 12,
-    marginTop: 8,
-    borderRadius: 18,
+    marginTop: 6,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: "hidden",
   },
-  posterRow: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10 },
+  // Yaprak afiş yüksekliğine gerilir: takvim ile afişler aynı hizada, tek satır.
+  row: { flexDirection: "row", alignItems: "stretch", height: CARD_H, margin: 8 },
+  list: { flex: 1, marginLeft: 8 },
+  posterRow: { paddingRight: 2 },
 });
 
 // ─── COLLAPSING LIST ─────────────────────────────────────────────────────────

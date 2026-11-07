@@ -8,6 +8,7 @@ import { useLanguage } from "../../../context/LanguageContext";
 import { useImageQualitySettings } from "../../../context/AppSettingsContext";
 import { i18nText } from "../../../utils/i18nText";
 import { buildWatchChartData, countGenres } from "../../../utils/watchHistory";
+import { localizeGenreList } from "../../../utils/genreDisplay";
 import { countByDate, matchesDateFilter } from "../../../utils/statsFilters";
 import BackButton from "../../../components/BackButton";
 import ScreenDecor from "../../../components/ScreenDecor";
@@ -20,6 +21,7 @@ import {
   StatsCollapsingList,
 } from "../../../components/profile/StatsComponents";
 import StatsFilterModal from "../../../components/profile/StatsFilterModal";
+import StatsDayModal from "../../../components/profile/StatsDayModal";
 
 const sectionKeyExtractor = (_item, index) => `tv-${index}`;
 
@@ -57,6 +59,9 @@ const TvStatisticsScreen = ({ navigation }) => {
   const [expanded, setExpanded] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
+  // Gün özeti: anahtar kapanışta silinmez, sayfa çıkış animasyonunda dolu kalır.
+  const [dayKey, setDayKey] = useState(null);
+  const [dayVisible, setDayVisible] = useState(false);
 
   // Üç sütunun altında da aynı etiket kullanılıyor; profil anahtarındaki
   // "Tekrarsız" ile birebir aynı sözcük olması bilinçli.
@@ -74,7 +79,7 @@ const TvStatisticsScreen = ({ navigation }) => {
 
   // Hero'daki tür çubukları ve filtre modalındaki tür listesi aynı sayımdan
   // beslenir (izlenme sıklığına göre azalan). Sayım bölüm bazlıdır.
-  const genreStats = useMemo(() => countGenres(groupedDataTv), [groupedDataTv]);
+  const genreStats = useMemo(() => countGenres(groupedDataTv, language), [groupedDataTv, language]);
   // Filtre penceresinin yıl/ay çiplerindeki sayaçlar (gün → izlenen bölüm sayısı).
   const dateCounts = useMemo(() => countByDate(groupedDataTv), [groupedDataTv]);
 
@@ -93,7 +98,8 @@ const TvStatisticsScreen = ({ navigation }) => {
           )
           .filter(
             (item) =>
-              selectedGenre == null || (item.genres || []).includes(selectedGenre),
+              selectedGenre == null ||
+              localizeGenreList(item.genres, language).includes(selectedGenre),
           ),
       }))
       .filter((s) => s.items.length > 0)
@@ -105,7 +111,7 @@ const TvStatisticsScreen = ({ navigation }) => {
         title: s.title,
         data: [],
         count: s.items.length,
-        genres: [...new Set(s.items.flatMap((e) => e.genres || []).filter(Boolean))],
+        genres: localizeGenreList(s.items.flatMap((e) => e.genres || []), language),
         totalMinutes: s.items.reduce((acc, item) => acc + (item.episodeMinutes || 0), 0),
         posters: s.items.map((item) => ({
           key: String(item.id),
@@ -115,10 +121,32 @@ const TvStatisticsScreen = ({ navigation }) => {
           mediaId: item.showId,
           mediaType: "tv",
           minutes: item.episodeMinutes,
+          // Gün özeti listesi + tür dağılımı (StatsDayModal).
+          title: item.showName,
+          subtitle: [
+            i18nText("autoI18n.gun_ozeti_bolum_kodu", "S{{s}} · B{{e}}", {
+              s: item.seasonNumber,
+              e: item.episodeNumber,
+            }),
+            item.episodeName,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          genres: localizeGenreList(item.genres, language),
           onPress: () => navigation.navigate("TvShowsDetails", { id: item.showId }),
         })),
       }));
-  }, [groupedDataTv, search, selectedDateTv, selectedGenre, getTmdbUrl, navigation]);
+  }, [groupedDataTv, search, selectedDateTv, selectedGenre, getTmdbUrl, navigation, language]);
+
+  const onOpenDay = useCallback((title) => {
+    setDayKey(title);
+    setDayVisible(true);
+  }, []);
+  const onCloseDay = useCallback(() => setDayVisible(false), []);
+  const daySection = useMemo(
+    () => sections.find((s) => s.title === dayKey) || null,
+    [sections, dayKey],
+  );
 
   const renderSectionHeader = useCallback(
     ({ section }) => (
@@ -135,9 +163,10 @@ const TvStatisticsScreen = ({ navigation }) => {
         formatDate={formatDate}
         locale={locale}
         rankColor={borderColorTv}
+        onOpenDay={onOpenDay}
       />
     ),
-    [theme, t.minutes, t.profileScreen?.minutesShort, formatDate, locale, borderColorTv],
+    [theme, t.minutes, t.profileScreen?.minutesShort, formatDate, locale, borderColorTv, onOpenDay],
   );
 
   const onToggleSearch = useCallback(() => setSearchVisible((v) => !v), []);
@@ -251,6 +280,17 @@ const TvStatisticsScreen = ({ navigation }) => {
         onSelectGenre={onSelectGenre}
         formatDate={formatDate}
         locale={locale}
+      />
+      <StatsDayModal
+        visible={dayVisible}
+        onClose={onCloseDay}
+        theme={theme}
+        kind="tv"
+        day={daySection}
+        formatDate={formatDate}
+        locale={locale}
+        minutesLabel={t.profileScreen?.minutesShort}
+        accent={borderColorTv}
       />
       <BackButton />
     </View>
