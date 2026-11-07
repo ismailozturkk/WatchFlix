@@ -31,6 +31,12 @@ export default function Reminder({
   posterPath,
   movieId,
   onLimitReached,
+  // Zilin boyutu. Bölüm/sezon satırlarında küçük (18); detaydaki eylem satırında (ListViewTv
+  // `watchedOverride`) yanındaki İzleme Listesi / Favori simgeleriyle AYNI boyut verilir.
+  size = 18,
+  // Zil küçük bir dairenin içinde durduğunda (SeasonItem) dokunma alanını
+  // dairenin tamamına yaymak için.
+  hitSlop,
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -124,10 +130,10 @@ export default function Reminder({
 
   return (
     <View>
-      <TouchableOpacity onPress={addReminder}>
+      <TouchableOpacity onPress={addReminder} hitSlop={hitSlop}>
         <MaterialCommunityIcons
           name={isReminderSet ? "bell-ring" : "bell-ring-outline"}
-          size={18}
+          size={size}
           color={theme.colors.orange}
         />
       </TouchableOpacity>

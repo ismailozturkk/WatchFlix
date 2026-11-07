@@ -5,7 +5,8 @@
 //   • düğme YALNIZ "Yayınlandı" görünen kartta, rozetle aynı hapın içinde çıkar,
 //   • yaklaşan hatırlatıcıda ve Ayarlar > Poster görünümü'nde geri sayım rozeti
 //     kapalıyken çıkmaz,
-//   • dokununca doğru kimlikle (uid + kart belgesi) silme yardımcısı çağrılır.
+//   • dokununca seçim sayfası (izlendi / izleme listesi / yalnız sil) açılır; seçilen yol
+//     doğru kimlikle (uid + kart belgesi) utils/reminderReleasedActions'a gider.
 import React from "react";
 import { act, create } from "react-test-renderer";
 
@@ -74,24 +75,28 @@ jest.mock("../context/ThemeContext", () => ({
   }),
 }));
 jest.mock("../context/LanguageContext", () => ({
-  useLanguage: () => ({ t: require("../translations/tr.json") }),
+  useLanguage: () => ({ t: require("../translations/tr.json"), language: "tr" }),
 }));
 jest.mock("../context/AuthContext", () => ({
   useAuth: () => ({ user: mockState.uid ? { uid: mockState.uid } : null }),
 }));
 jest.mock("../context/AppSettingsContext", () => ({
+  useApiSettings: () => ({ API_KEY: "key" }),
   useImageQualitySettings: () => ({ getTmdbUrl: () => "https://img/x.jpg" }),
   useListLayoutSettings: () => ({ posterBadges: mockState.posterBadges }),
 }));
 jest.mock("../context/ProfileRemindersContext", () => ({
   useProfileReminders: () => mockState.view,
 }));
-jest.mock("../utils/reminderQuickDelete", () => ({
-  removeMovieReminderWithUndo: jest.fn(),
-  removeEpisodeReminderWithUndo: jest.fn(),
+jest.mock("../utils/reminderReleasedActions", () => ({
+  finishReleasedReminder: jest.fn(),
+}));
+jest.mock("../components/reminders/ReleasedReminderSheet", () => ({
+  __esModule: true,
+  default: "ReleasedReminderSheet",
 }));
 
-const quickDelete = require("../utils/reminderQuickDelete");
+const released = require("../utils/reminderReleasedActions");
 const ProfileReminders = require("../screens/tabs/profile/ProfileReminders").default;
 
 const DELETE = "Hatırlatmayı kaldır";
@@ -140,6 +145,7 @@ const deleteButtons = (tree) =>
   tree.root
     .findAllByType("TouchableOpacity")
     .filter((n) => n.props.accessibilityLabel === DELETE);
+const sheetOf = (tree) => tree.root.findByType("ReleasedReminderSheet");
 const textsOf = (node) => node.findAllByType("Text").map((n) => [].concat(n.props.children).join(""));
 
 beforeEach(() => {
@@ -167,26 +173,64 @@ describe("Profil hatırlatıcıları: Yayınlandı kartında kaldırma düğmesi
     ]);
   });
 
-  it("film: dokununca doğru kullanıcı ve kart belgesiyle silme yardımcısını çağırır", () => {
+  it("film: dokununca seçim sayfası açılır; hiçbir şey seçilmeden yazılmaz", () => {
     setView("movie");
     const tree = mount();
+    expect(sheetOf(tree).props.visible).toBe(false);
 
     act(() => deleteButtons(tree)[0].props.onPress());
 
-    expect(quickDelete.removeMovieReminderWithUndo).toHaveBeenCalledTimes(1);
-    expect(quickDelete.removeMovieReminderWithUndo).toHaveBeenCalledWith("u1", releasedMovie);
-    expect(quickDelete.removeEpisodeReminderWithUndo).not.toHaveBeenCalled();
+    expect(sheetOf(tree).props.visible).toBe(true);
+    expect(sheetOf(tree).props.target).toEqual({ kind: "movie", reminder: releasedMovie });
+    expect(released.finishReleasedReminder).not.toHaveBeenCalled();
   });
 
-  it("dizi: yayınlanmış bölümde çıkar, bölüm belgesiyle çağrılır", () => {
+  it.each(["delete", "watchlist", "watched"])(
+    "film: '%s' seçilince sayfa kapanır, doğru kullanıcı ve kart belgesiyle yazılır",
+    (action) => {
+      setView("movie");
+      const tree = mount();
+      act(() => deleteButtons(tree)[0].props.onPress());
+
+      act(() => sheetOf(tree).props.onSelect(action));
+
+      expect(sheetOf(tree).props.visible).toBe(false);
+      // Kapanış animasyonu boyunca başlık boşalmasın: hedef korunur.
+      expect(sheetOf(tree).props.target).not.toBeNull();
+      expect(released.finishReleasedReminder).toHaveBeenCalledTimes(1);
+      expect(released.finishReleasedReminder).toHaveBeenCalledWith({
+        action,
+        uid: "u1",
+        kind: "movie",
+        reminder: releasedMovie,
+        apiKey: "key",
+        language: "tr",
+      });
+    },
+  );
+
+  it("dizi: yayınlanmış bölümde çıkar, bölüm belgesiyle yazılır", () => {
     setView("tv");
     const tree = mount();
 
     expect(deleteButtons(tree)).toHaveLength(1);
     act(() => deleteButtons(tree)[0].props.onPress());
+    act(() => sheetOf(tree).props.onSelect("watched"));
 
-    expect(quickDelete.removeEpisodeReminderWithUndo).toHaveBeenCalledWith("u1", releasedEpisode);
-    expect(quickDelete.removeMovieReminderWithUndo).not.toHaveBeenCalled();
+    expect(released.finishReleasedReminder).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "watched", kind: "tv", reminder: releasedEpisode }),
+    );
+  });
+
+  it("sayfa kapatılırsa (dışarı dokunma) hiçbir şey yazılmaz", () => {
+    setView("movie");
+    const tree = mount();
+    act(() => deleteButtons(tree)[0].props.onPress());
+
+    act(() => sheetOf(tree).props.onClose());
+
+    expect(sheetOf(tree).props.visible).toBe(false);
+    expect(released.finishReleasedReminder).not.toHaveBeenCalled();
   });
 
   it("yaklaşan kartta geri sayım rozeti eskisi gibi, düğme yok", () => {

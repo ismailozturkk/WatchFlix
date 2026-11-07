@@ -7,20 +7,22 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
-import React, { useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useCallback, useState } from "react";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
 import { useProfileReminders } from "../../../context/ProfileRemindersContext";
 import { useAuth } from "../../../context/AuthContext";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useImageQualitySettings, useListLayoutSettings } from "../../../context/AppSettingsContext";
+import {
+  useApiSettings,
+  useImageQualitySettings,
+  useListLayoutSettings,
+} from "../../../context/AppSettingsContext";
 import usePosterUri from "../../../hooks/usePosterUri";
 import { i18nText } from "../../../utils/i18nText";
-import {
-  removeEpisodeReminderWithUndo,
-  removeMovieReminderWithUndo,
-} from "../../../utils/reminderQuickDelete";
+import { finishReleasedReminder } from "../../../utils/reminderReleasedActions";
+import ReleasedReminderSheet from "../../../components/reminders/ReleasedReminderSheet";
 import Skeleton from "../../../components/Skeleton";
 import StaggerItem from "../../../components/StaggerItem";
 import GlassIconButton from "../../../components/common/GlassIconButton";
@@ -440,7 +442,7 @@ function EpisodeCard({
 // ─── Ana bileşen ─────────────────────────────────────────────────────────────
 export default function ProfileReminders({ navigation }) {
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const {
     loading,
     activeTab,
@@ -450,14 +452,31 @@ export default function ProfileReminders({ navigation }) {
     calculateDateDifference,
   } = useProfileReminders();
   const uid = useAuth().user?.uid;
-  // "Yayınlandı" kartındaki çöp düğmesi: onaysız kaldırır, toast'ta Geri Al çıkar.
-  const deleteMovie = useCallback(
-    (reminder) => removeMovieReminderWithUndo(uid, reminder),
-    [uid],
-  );
-  const deleteEpisode = useCallback(
-    (episode) => removeEpisodeReminderWithUndo(uid, episode),
-    [uid],
+  const { API_KEY } = useApiSettings() || {};
+  // "Yayınlandı" kartındaki çöp düğmesi seçim sayfasını açar: izlendi işaretle /
+  // izleme listesine ekle / yalnız sil (yazma: utils/reminderReleasedActions).
+  // `releasedTarget` kapanışta SIFIRLANMAZ: sayfa ≈260 ms daha çizilir.
+  const [releasedTarget, setReleasedTarget] = useState(null);
+  const [releasedSheetVisible, setReleasedSheetVisible] = useState(false);
+  const openReleasedSheet = useCallback((kind, reminder) => {
+    setReleasedTarget({ kind, reminder });
+    setReleasedSheetVisible(true);
+  }, []);
+  const closeReleasedSheet = useCallback(() => setReleasedSheetVisible(false), []);
+  const handleReleasedAction = useCallback(
+    (action) => {
+      setReleasedSheetVisible(false);
+      if (!releasedTarget) return;
+      finishReleasedReminder({
+        action,
+        uid,
+        kind: releasedTarget.kind,
+        reminder: releasedTarget.reminder,
+        apiKey: API_KEY,
+        language,
+      });
+    },
+    [releasedTarget, uid, API_KEY, language],
   );
   // Kartlar her bağlanışta kademeli girer: ilk yükleme (iskeletten sonra) ve
   // Film↔Dizi sekme geçişi. Anahtarlar sabit olduğundan veri tazelenince
@@ -711,7 +730,7 @@ export default function ProfileReminders({ navigation }) {
                   theme={theme}
                   formatDate={formatDate}
                   calculateDateDifference={calculateDateDifference}
-                  onDelete={() => deleteMovie(reminder)}
+                  onDelete={() => openReleasedSheet("movie", reminder)}
                 />
               </StaggerItem>
             ))}
@@ -752,7 +771,7 @@ export default function ProfileReminders({ navigation }) {
                 theme={theme}
                 formatDate={formatDate}
                 calculateDateDifference={calculateDateDifference}
-                onDelete={() => deleteEpisode(episode)}
+                onDelete={() => openReleasedSheet("tv", episode)}
               />
             </StaggerItem>
           ))}
@@ -772,6 +791,13 @@ export default function ProfileReminders({ navigation }) {
           >{i18nText("autoI18n.dizi_detay_sayfasindan_hatirlatici_ekleyebilirsin", "Dizi detay sayfasından hatırlatıcı ekleyebilirsin.")}</Text>
         </View>
       )}
+
+      <ReleasedReminderSheet
+        visible={releasedSheetVisible}
+        target={releasedTarget}
+        onClose={closeReleasedSheet}
+        onSelect={handleReleasedAction}
+      />
     </View>
   );
 }
