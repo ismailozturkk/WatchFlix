@@ -3,9 +3,9 @@
 // Ayarlar > Veri ve depolama > Kütüphaneni Dışa Aktar.
 //
 // İzlenenler, listeler, izleme tarihleri ve puanlar iki biçimde dışa aktarılır: tek JSON (eksiksiz kopya)
-// ya da ZIP (library.csv + Letterboxd'a aktarılabilir CSV'ler). Veri ListStatusContext'te zaten bellekte;
-// ek okuma yok. Ücretsiz (taşınabilirlik hakkı — plan kapısı yok). Biçim: utils/libraryExport.js,
-// dosya G/Ç: services/libraryExportFiles.js.
+// ya da ZIP (library.csv + Letterboxd'a aktarılabilir CSV'ler). Hangi içeriğin dosyaya gireceği satırlardan
+// seçilir. Veri ListStatusContext'te zaten bellekte; ek okuma yok. Ücretsiz (taşınabilirlik hakkı — plan
+// kapısı yok). Biçim: utils/libraryExport.js, dosya G/Ç: services/libraryExportFiles.js.
 
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
@@ -17,9 +17,11 @@ import { useLanguage } from "@context/LanguageContext";
 import { useListStatusContext } from "@context/ListStatusContext";
 import { useTheme } from "@context/ThemeContext";
 import { exportLibraryJson, exportLibraryZip, snapshotFromLibrary } from "@services/libraryExportFiles";
-import { isSnapshotEmpty } from "@utils/libraryExport";
-import { SettingsSubScreen, SectionLabel, SettingRow, Chevron, buildUiColors, ui } from "./settingsUi";
+import { isSnapshotEmpty, pickLibrarySections } from "@utils/libraryExport";
+import { SettingsSubScreen, SettingRow, Chevron, buildUiColors, ui } from "./settingsUi";
 import { exportErrorMessage, getLibraryExportCopy } from "./libraryExportCopy";
+import { fill } from "./backupCopy";
+import { PickListHead, PickRow, SectionHead, StatGrid } from "./BackupKit";
 import GlassBox from "../../../components/common/GlassBox";
 
 const tick = () => {
@@ -38,19 +40,66 @@ export default function LibraryExportScreen() {
   const locale = intlLocaleOf(language);
   const { combinedLists, activityIndex, loading, watchedTvLoaded } = useListStatusContext() || {};
   const [busy, setBusy] = useState(null); // "json" | "zip"
+  const [excluded, setExcluded] = useState([]); // seçimi kaldırılan içerik kimlikleri
 
   // Listeler gelmeden dışa aktarmak EKSİK dosya üretir (özellikle diziler alt koleksiyondan geç gelir).
   const ready = !loading && !!watchedTvLoaded && !!combinedLists;
 
-  const snapshot = useMemo(
+  const fullSnapshot = useMemo(
     () => (ready ? snapshotFromLibrary({ lists: combinedLists, ratings: activityIndex?.ratings }) : null),
     [ready, combinedLists, activityIndex],
   );
-  const empty = ready && isSnapshotEmpty(snapshot);
-  const counts = snapshot?.counts;
+  const empty = ready && isSnapshotEmpty(fullSnapshot);
+  const counts = fullSnapshot?.counts;
+
+  const rows = counts
+    ? [
+        { id: "films", icon: "film-outline", tone: [C.iconAmber, C.amber], text: copy.films(counts.watchedMovies), amount: counts.watchedMovies },
+        {
+          id: "shows",
+          icon: "tv-outline",
+          tone: [C.iconBlue, C.blue],
+          text: copy.shows(counts.watchedShows, counts.watchedEpisodes),
+          amount: counts.watchedShows,
+        },
+        { id: "watchList", icon: "bookmark-outline", tone: [C.iconPurple, C.purple], text: copy.watchList(counts.watchList), amount: counts.watchList },
+        { id: "favorites", icon: "heart-outline", tone: [C.dangerDim, C.danger], text: copy.favorites(counts.favorites), amount: counts.favorites },
+        {
+          id: "customLists",
+          icon: "albums-outline",
+          tone: [C.iconTeal, C.teal],
+          text: copy.customLists(counts.customLists, counts.customListItems),
+          amount: counts.customListItems,
+        },
+        { id: "ratings", icon: "star-outline", tone: [C.iconGreen, C.green], text: copy.ratings(counts.ratings), amount: counts.ratings },
+      ].filter((row) => row.amount > 0)
+    : [];
+  const largest = rows.reduce((max, row) => Math.max(max, row.amount), 1);
+  const selectedIds = rows.filter((row) => !excluded.includes(row.id)).map((row) => row.id);
+  const selectionKey = selectedIds.join(",");
+
+  const snapshot = useMemo(
+    () => (fullSnapshot ? pickLibrarySections(fullSnapshot, selectionKey ? selectionKey.split(",") : []) : null),
+    [fullSnapshot, selectionKey],
+  );
+  const picked = snapshot?.counts;
+  const nothingSelected = ready && !empty && selectedIds.length === 0;
+
+  const toggleRow = (id) => {
+    tick();
+    setExcluded((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]));
+  };
+  const toggleAll = () => {
+    tick();
+    setExcluded(selectedIds.length === rows.length ? rows.map((row) => row.id) : []);
+  };
 
   const run = async (id, task) => {
     if (busy || !snapshot || empty) return;
+    if (nothingSelected) {
+      toast.info(copy.noneSelected);
+      return;
+    }
     tick();
     setBusy(id);
     try {
@@ -69,29 +118,6 @@ export default function LibraryExportScreen() {
   const spinner = <ActivityIndicator size="small" color={C.accent} />;
   const disabled = !ready || empty;
 
-  const summary = counts
-    ? [
-        { id: "films", icon: "film-outline", tone: [C.iconAmber, C.amber], text: copy.films(counts.watchedMovies), show: counts.watchedMovies > 0 },
-        {
-          id: "shows",
-          icon: "tv-outline",
-          tone: [C.iconBlue, C.blue],
-          text: copy.shows(counts.watchedShows, counts.watchedEpisodes),
-          show: counts.watchedShows > 0,
-        },
-        { id: "watchList", icon: "bookmark-outline", tone: [C.iconPurple, C.purple], text: copy.watchList(counts.watchList), show: counts.watchList > 0 },
-        { id: "favorites", icon: "heart-outline", tone: [C.dangerDim, C.danger], text: copy.favorites(counts.favorites), show: counts.favorites > 0 },
-        {
-          id: "customLists",
-          icon: "albums-outline",
-          tone: [C.iconTeal, C.teal],
-          text: copy.customLists(counts.customLists, counts.customListItems),
-          show: counts.customLists > 0,
-        },
-        { id: "ratings", icon: "star-outline", tone: [C.iconGreen, C.green], text: copy.ratings(counts.ratings), show: counts.ratings > 0 },
-      ].filter((row) => row.show)
-    : [];
-
   return (
     <SettingsSubScreen title={copy.title}>
       {/* ── Tanıtım ── */}
@@ -99,18 +125,31 @@ export default function LibraryExportScreen() {
         <View style={[s.heroIcon, { backgroundColor: C.accentDim }]}>
           <AppIcon family="Ionicons" name="share-outline" size={26} color={C.accent} />
         </View>
-        <View style={s.heroCopy}>
-          <Text allowFontScaling={false} style={[s.heroTitle, { color: C.text }]}>
-            {copy.heroTitle}
-          </Text>
-          <Text allowFontScaling={false} style={[s.heroText, { color: C.muted }]}>
-            {copy.heroText}
-          </Text>
-        </View>
+        <Text allowFontScaling={false} style={[s.heroTitle, { color: C.text }]}>
+          {copy.heroTitle}
+        </Text>
       </GlassBox>
 
       {/* ── Neler dahil ── */}
-      <SectionLabel color={C.muted}>{copy.sectionIncluded.toLocaleUpperCase(locale)}</SectionLabel>
+      <SectionHead
+        colors={C}
+        label={copy.sectionIncluded.toLocaleUpperCase(locale)}
+        info={[copy.heroText, copy.notIncluded]}
+        infoLabel={copy.infoLabel}
+      />
+      {picked && !empty ? (
+        <View style={s.stats}>
+          <StatGrid
+            colors={C}
+            items={[
+              { id: "films", value: picked.watchedMovies, label: copy.statFilms },
+              { id: "shows", value: picked.watchedShows, label: copy.statShows },
+              { id: "episodes", value: picked.watchedEpisodes, label: copy.statEpisodes },
+              { id: "ratings", value: picked.ratings, label: copy.statRatings },
+            ]}
+          />
+        </View>
+      ) : null}
       <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         {!ready ? (
           <View style={s.stateRow}>
@@ -126,32 +165,45 @@ export default function LibraryExportScreen() {
             </Text>
           </View>
         ) : (
-          summary.map((row, index) => (
-            <View
-              key={row.id}
-              style={[ui.row, { borderBottomColor: C.borderMuted }, index === summary.length - 1 && { borderBottomWidth: 0 }]}
-            >
-              <View style={ui.rowLeft}>
-                <View style={[ui.iconWrap, { backgroundColor: row.tone[0] }]}>
-                  <AppIcon family="Ionicons" name={row.icon} size={15} color={row.tone[1]} />
-                </View>
-                <View style={ui.rowTexts}>
-                  <Text allowFontScaling={false} style={[ui.rowTitle, { color: C.text }]}>
-                    {row.text}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ))
+          <>
+            <PickListHead
+              colors={C}
+              summary={fill(copy.sectionsSelected, { n: selectedIds.length, total: rows.length })}
+              allSelected={selectedIds.length === rows.length}
+              selectAllLabel={copy.selectAll}
+              selectNoneLabel={copy.selectNone}
+              onToggleAll={toggleAll}
+            />
+            {rows.map((row, index) => (
+              <PickRow
+                key={row.id}
+                colors={C}
+                icon={row.icon}
+                iconBg={row.tone[0]}
+                iconColor={row.tone[1]}
+                title={row.text}
+                stat={String(row.amount)}
+                ratio={row.amount / largest}
+                selected={selectedIds.includes(row.id)}
+                onToggle={() => toggleRow(row.id)}
+                last={index === rows.length - 1}
+              />
+            ))}
+          </>
         )}
       </GlassBox>
-      <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
-        {copy.notIncluded}
-      </Text>
 
       {/* ── Dışa aktar ── */}
-      <SectionLabel color={C.muted}>{copy.sectionExport.toLocaleUpperCase(locale)}</SectionLabel>
-      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border, opacity: disabled ? 0.55 : 1 }]}>
+      <SectionHead
+        colors={C}
+        label={copy.sectionExport.toLocaleUpperCase(locale)}
+        info={[copy.noteLetterboxd, copy.notePrivacy]}
+        infoLabel={copy.infoLabel}
+      />
+      <GlassBox
+        role="card"
+        style={[ui.card, { backgroundColor: C.card, borderColor: C.border, opacity: disabled || nothingSelected ? 0.55 : 1 }]}
+      >
         <SettingRow
           colors={C}
           iconBg={C.iconBlue}
@@ -174,23 +226,15 @@ export default function LibraryExportScreen() {
           last
         />
       </GlassBox>
-      <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
-        {copy.noteLetterboxd}
-      </Text>
-      <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
-        {copy.notePrivacy}
-      </Text>
     </SettingsSubScreen>
   );
 }
 
 const s = StyleSheet.create({
-  hero: { flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 18, borderWidth: 1, padding: 16, marginTop: 6 },
-  heroIcon: { width: 52, height: 52, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  heroCopy: { flexShrink: 1, flexGrow: 1 },
-  heroTitle: { fontSize: 16, fontWeight: "800" },
-  heroText: { fontSize: 12, fontWeight: "500", marginTop: 4, lineHeight: 17 },
+  hero: { flexDirection: "row", alignItems: "center", gap: 14, borderRadius: 18, borderWidth: 1, padding: 14, marginTop: 6 },
+  heroIcon: { width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  heroTitle: { flexShrink: 1, fontSize: 16, fontWeight: "800" },
+  stats: { marginBottom: 10 },
   stateRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16 },
   stateText: { flexShrink: 1, fontSize: 12.5, fontWeight: "600", lineHeight: 18 },
-  note: { fontSize: 11, fontWeight: "500", lineHeight: 16, marginTop: 10, marginHorizontal: 4 },
 });

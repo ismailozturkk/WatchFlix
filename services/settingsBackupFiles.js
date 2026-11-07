@@ -18,6 +18,7 @@ import {
   MAX_BACKUP_CHARS,
   backupFileName,
   parseBackup,
+  pickBackupGroups,
   serializeBackup,
 } from "../utils/settingsBackup";
 import { collectCurrentBackup } from "./settingsBackupService";
@@ -27,13 +28,16 @@ const appMeta = () => ({
   platform: Platform.OS,
 });
 
+/** `groups` verilirse yalnız o grupların ayarları; verilmezse tamamı. */
+const backupText = (groups) => serializeBackup(pickBackupGroups(collectCurrentBackup(appMeta()), groups));
+
 /** Dosya olarak yazar ve sistem paylaşım sayfasını açar ("Dosyalara kaydet" dahil). */
-export async function exportToFile({ dialogTitle } = {}) {
+export async function exportToFile({ dialogTitle, groups } = {}) {
   let file;
   let fileName;
   try {
     fileName = backupFileName();
-    const text = serializeBackup(collectCurrentBackup(appMeta()));
+    const text = backupText(groups);
     file = new File(Paths.cache, fileName);
     // utils/cacheStore.js ile aynı kalıp: write() dosyayı kendisi oluşturur.
     if (file.exists) file.delete();
@@ -56,9 +60,9 @@ export async function exportToFile({ dialogTitle } = {}) {
 }
 
 /** Yedek metnini panoya kopyalar (dosya paylaşamayan ya da hızlı aktarmak isteyen için). */
-export async function exportToClipboard() {
+export async function exportToClipboard({ groups } = {}) {
   try {
-    await Clipboard.setStringAsync(serializeBackup(collectCurrentBackup(appMeta())));
+    await Clipboard.setStringAsync(backupText(groups));
     return { ok: true };
   } catch {
     return { ok: false, error: "clipboard-failed" };

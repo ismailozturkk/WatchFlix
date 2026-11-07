@@ -3,8 +3,9 @@
 // Ayarlar > Veri ve depolama > Ayarları Yedekle ve Geri Yükle.
 //
 // Ayarlar (özel temalar dahil) tek bir JSON dosyasına yazılır, dosya olarak
-// paylaşılır/kaydedilir ya da panoya kopyalanır; geri yüklerken önce NE
-// uygulanacağı gösterilir, onaydan sonra yazılır ve uygulama yeniden başlar.
+// paylaşılır/kaydedilir ya da panoya kopyalanır. Hangi içeriğin dosyaya gireceği
+// satırlardan seçilir; geri yüklerken de önce NE uygulanacağı aynı biçimde
+// gösterilir ve seçtirilir, onaydan sonra yazılır ve uygulama yeniden başlar.
 // Önceki ayarlar "geri alma noktası" olarak saklanır (bkz. services/
 // settingsBackupService.js). Biçim/doğrulama: utils/settingsBackup.js.
 
@@ -34,9 +35,17 @@ import {
   readClipboardBackup,
 } from "@services/settingsBackupFiles";
 import { reloadApp } from "@services/appReload";
-import { backupFileName, summarizeBackupContents } from "@utils/settingsBackup";
+import {
+  BACKUP_GROUPS,
+  backupFileName,
+  filterPlanByGroups,
+  pickBackupGroups,
+  serializeBackup,
+  summarizeBackupContents,
+} from "@utils/settingsBackup";
 import { alpha } from "../../../theme/colors";
-import { SettingsSubScreen, SectionLabel, SettingRow, Chevron, buildUiColors, ui } from "./settingsUi";
+import { SettingsSubScreen, SettingRow, Chevron, buildUiColors, ui } from "./settingsUi";
+import { PickListHead, PickRow, SectionHead, StatGrid } from "./BackupKit";
 import {
   count,
   errorMessage,
@@ -59,6 +68,11 @@ const tick = () => {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const ALL_GROUP_IDS = BACKUP_GROUPS.map((group) => group.id);
+
+const fmtSize = (chars) =>
+  chars >= 1024 * 1024 ? `${(chars / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(chars / 1024))} KB`;
+
 const fmtDate = (iso, locale) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -80,15 +94,40 @@ export default function BackupSettingsScreen() {
   const [pending, setPending] = useState(null); // { plan, fileName }
   const [sheetVisible, setSheetVisible] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [exportIds, setExportIds] = useState(ALL_GROUP_IDS); // dosyaya girecek gruplar
+  const [importIds, setImportIds] = useState(ALL_GROUP_IDS); // yedekten uygulanacak gruplar
   const afterCloseRef = useRef(null);
 
   // Ekran açılınca bir kez okunur; içe aktarma/geri alma sonrası uygulama zaten yeniden başlar.
-  const contents = useMemo(() => summarizeBackupContents(collectCurrentBackup()), []);
+  const currentBackup = useMemo(() => collectCurrentBackup(), []);
+  const contents = useMemo(() => summarizeBackupContents(currentBackup), [currentBackup]);
   const restorePoint = useMemo(() => getRestorePoint(), []);
   const fileName = useMemo(() => backupFileName(), []);
 
+  const exportStats = useMemo(() => {
+    const picked = contents.groups.filter((group) => exportIds.includes(group.id));
+    return {
+      settings: picked.reduce((sum, group) => sum + group.total, 0),
+      customized: picked.reduce((sum, group) => sum + group.saved, 0),
+      themes: exportIds.includes("appearance") ? contents.themeCount : 0,
+      size: fmtSize(serializeBackup(pickBackupGroups(currentBackup, exportIds)).length),
+    };
+  }, [contents, currentBackup, exportIds]);
+  const nothingToExport = exportIds.length === 0;
+
+  const toggleId = (setter) => (id) => {
+    tick();
+    setter((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  };
+  const toggleExport = toggleId(setExportIds);
+  const toggleImport = toggleId(setImportIds);
+
   const run = async (id, task) => {
     if (busy || applying) return;
+    if (id.startsWith("export") && nothingToExport) {
+      toast.info(copy.noneSelected);
+      return;
+    }
     tick();
     setBusy(id);
     try {
@@ -101,14 +140,14 @@ export default function BackupSettingsScreen() {
   /* ── Dışa aktar ── */
   const exportFile = () =>
     run("export-file", async () => {
-      const res = await exportToFile({ dialogTitle: copy.title });
+      const res = await exportToFile({ dialogTitle: copy.title, groups: exportIds });
       if (res.ok) toast.success(copy.exported);
       else toast.error(errorMessage(copy, res.error));
     });
 
   const exportClipboard = () =>
     run("export-clipboard", async () => {
-      const res = await exportToClipboard();
+      const res = await exportToClipboard({ groups: exportIds });
       if (res.ok) toast.success(copy.copied);
       else toast.error(errorMessage(copy, res.error));
     });
@@ -128,6 +167,7 @@ export default function BackupSettingsScreen() {
         return;
       }
       setPending({ plan, fileName: res.fileName || null });
+      setImportIds(plan.groups.filter((g) => g.applied > 0).map((g) => g.id));
       setSheetVisible(true);
     });
 
@@ -139,12 +179,21 @@ export default function BackupSettingsScreen() {
     if (!reloaded) appAlert(copy.manualRestartTitle, copy.manualRestartBody);
   };
 
+  // Önizleme sayfasında işaretli gruplara göre uygulanacak plan ve sayıları.
+  const plan = pending?.plan;
+  const selectedPlan = useMemo(() => (plan ? filterPlanByGroups(plan, importIds) : null), [plan, importIds]);
+  const importGroups = plan ? plan.groups.filter((g) => g.applied > 0) : [];
+  const importChanged = selectedPlan
+    ? selectedPlan.writes.filter((write) => plan.changedIds?.includes(write.id)).length
+    : 0;
+  const importThemesShown = !!plan && plan.themes.incoming > 0 && importIds.includes("appearance");
+
   const confirmImport = async () => {
-    if (!pending || applying) return;
+    if (!pending || applying || !selectedPlan?.writes.length) return;
     setApplying(true);
     let result;
     try {
-      result = await applyImport(pending.plan);
+      result = await applyImport(selectedPlan);
     } finally {
       setApplying(false);
     }
@@ -186,7 +235,6 @@ export default function BackupSettingsScreen() {
   };
 
   const spinner = <ActivityIndicator size="small" color={C.accent} />;
-  const plan = pending?.plan;
   const metaLine = plan
     ? [
         plan.meta.createdAt ? fmtDate(plan.meta.createdAt, locale) : "",
@@ -216,61 +264,68 @@ export default function BackupSettingsScreen() {
           <Text allowFontScaling={false} style={[s.heroTitle, { color: C.text }]}>
             {copy.heroTitle}
           </Text>
-          <Text allowFontScaling={false} style={[s.heroText, { color: C.muted }]}>
-            {copy.heroText}
-          </Text>
         </View>
       </GlassBox>
 
-      {/* ── Neler dahil ── */}
-      <SectionLabel color={C.muted}>{copy.sectionIncluded.toLocaleUpperCase(locale)}</SectionLabel>
+      {/* ── Neler dahil: istatistik + seçim ── */}
+      <SectionHead
+        colors={C}
+        label={copy.sectionIncluded.toLocaleUpperCase(locale)}
+        info={[copy.heroText, copy.notIncluded]}
+        infoLabel={copy.infoLabel}
+      />
+      <View style={s.stats}>
+        <StatGrid
+          colors={C}
+          items={[
+            { id: "settings", value: exportStats.settings, label: copy.statSettings },
+            { id: "customized", value: exportStats.customized, label: copy.statCustomized },
+            { id: "themes", value: exportStats.themes, label: copy.statThemes },
+            { id: "size", value: exportStats.size, label: copy.statSize },
+          ]}
+        />
+      </View>
       <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+        <PickListHead
+          colors={C}
+          summary={fill(copy.groupsSelected, { n: exportIds.length, total: ALL_GROUP_IDS.length })}
+          allSelected={exportIds.length === ALL_GROUP_IDS.length}
+          selectAllLabel={copy.selectAll}
+          selectNoneLabel={copy.selectNone}
+          onToggleAll={() => {
+            tick();
+            setExportIds(exportIds.length === ALL_GROUP_IDS.length ? [] : ALL_GROUP_IDS);
+          }}
+        />
         {contents.groups.map((group, index) => {
           const [bg, fg] = GROUP_TONES[index % GROUP_TONES.length];
-          const last = index === contents.groups.length - 1;
           const showThemes = group.id === "appearance" && contents.themeCount > 0;
           return (
-            <View
+            <PickRow
               key={group.id}
-              style={[ui.row, { borderBottomColor: C.borderMuted }, last && { borderBottomWidth: 0 }]}
-            >
-              <View style={ui.rowLeft}>
-                <View style={[ui.iconWrap, { backgroundColor: bg }]}>
-                  <AppIcon family="Ionicons" name={group.icon} size={15} color={fg} />
-                </View>
-                <View style={ui.rowTexts}>
-                  <Text allowFontScaling={false} style={[ui.rowTitle, { color: C.text }]}>
-                    {groupTitle(copy, group.id)}
-                  </Text>
-                  <Text allowFontScaling={false} style={[ui.rowSub, { color: C.muted }]}>
-                    {groupSub(copy, group.id)}
-                  </Text>
-                  {showThemes ? (
-                    <Text allowFontScaling={false} style={[s.themeLine, { color: C.accent }]}>
-                      {count(copy, "themeCount", contents.themeCount)}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-              <View style={[s.badge, { backgroundColor: group.saved ? C.accentDim : C.closeBg }]}>
-                <Text
-                  allowFontScaling={false}
-                  style={[s.badgeText, { color: group.saved ? C.accentStrong : C.muted }]}
-                >
-                  {group.saved ? fill(copy.customized, { n: group.saved }) : copy.allDefault}
-                </Text>
-              </View>
-            </View>
+              colors={C}
+              icon={group.icon}
+              iconBg={bg}
+              iconColor={fg}
+              title={groupTitle(copy, group.id)}
+              sub={groupSub(copy, group.id)}
+              stat={group.saved ? fill(copy.customized, { n: group.saved }) : copy.allDefault}
+              ratio={group.total ? group.saved / group.total : 0}
+              note={showThemes ? count(copy, "themeCount", contents.themeCount) : null}
+              selected={exportIds.includes(group.id)}
+              onToggle={() => toggleExport(group.id)}
+              last={index === contents.groups.length - 1}
+            />
           );
         })}
       </GlassBox>
-      <Text allowFontScaling={false} style={[s.note, { color: C.muted }]}>
-        {copy.notIncluded}
-      </Text>
 
       {/* ── Dışa aktar ── */}
-      <SectionLabel color={C.muted}>{copy.sectionExport.toLocaleUpperCase(locale)}</SectionLabel>
-      <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
+      <SectionHead colors={C} label={copy.sectionExport.toLocaleUpperCase(locale)} />
+      <GlassBox
+        role="card"
+        style={[ui.card, { backgroundColor: C.card, borderColor: C.border, opacity: nothingToExport ? 0.55 : 1 }]}
+      >
         <SettingRow
           colors={C}
           iconBg={C.iconBlue}
@@ -295,7 +350,7 @@ export default function BackupSettingsScreen() {
       </GlassBox>
 
       {/* ── İçe aktar ── */}
-      <SectionLabel color={C.muted}>{copy.sectionImport.toLocaleUpperCase(locale)}</SectionLabel>
+      <SectionHead colors={C} label={copy.sectionImport.toLocaleUpperCase(locale)} />
       <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         <SettingRow
           colors={C}
@@ -323,7 +378,7 @@ export default function BackupSettingsScreen() {
       {/* ── Geri al (yalnız bir içe aktarma yapıldıysa) ── */}
       {restorePoint ? (
         <>
-          <SectionLabel color={C.muted}>{copy.sectionRestore.toLocaleUpperCase(locale)}</SectionLabel>
+          <SectionHead colors={C} label={copy.sectionRestore.toLocaleUpperCase(locale)} />
           <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
             <SettingRow
               colors={C}
@@ -380,32 +435,62 @@ export default function BackupSettingsScreen() {
 
             {plan ? (
               <>
-                <Text allowFontScaling={false} style={[s.willApply, { color: C.text }]}>
-                  {count(copy, "sheetWillApply", plan.writes.length)}
-                </Text>
+                <SectionHead
+                  colors={C}
+                  label={count(copy, "sheetWillApply", selectedPlan.writes.length)}
+                  info={copy.restartNote}
+                  infoLabel={copy.infoLabel}
+                />
+                <StatGrid
+                  colors={C}
+                  tileColor={C.bg}
+                  items={[
+                    { id: "apply", value: selectedPlan.writes.length, label: copy.statApply },
+                    { id: "changed", value: importChanged, label: copy.statChanged },
+                    { id: "same", value: selectedPlan.writes.length - importChanged, label: copy.statSame },
+                    { id: "themes", value: importIds.includes("appearance") ? plan.themes.incoming : 0, label: copy.statThemes },
+                  ]}
+                />
 
                 <View style={[s.listBox, { backgroundColor: C.bg, borderColor: C.border }]}>
-                  {plan.groups
-                    .filter((g) => g.applied > 0)
-                    .map((g, i, arr) => (
-                      <View
+                  <PickListHead
+                    colors={C}
+                    summary={fill(copy.groupsSelected, {
+                      n: importGroups.filter((g) => importIds.includes(g.id)).length,
+                      total: importGroups.length,
+                    })}
+                    allSelected={importGroups.every((g) => importIds.includes(g.id))}
+                    selectAllLabel={copy.selectAll}
+                    selectNoneLabel={copy.selectNone}
+                    onToggleAll={() => {
+                      tick();
+                      setImportIds(
+                        importGroups.every((g) => importIds.includes(g.id)) ? [] : importGroups.map((g) => g.id),
+                      );
+                    }}
+                  />
+                  {importGroups.map((g, i) => {
+                    const group = BACKUP_GROUPS.find((item) => item.id === g.id);
+                    const [bg, fg] = GROUP_TONES[BACKUP_GROUPS.indexOf(group) % GROUP_TONES.length];
+                    return (
+                      <PickRow
                         key={g.id}
-                        style={[
-                          s.listRow,
-                          i !== arr.length - 1 && { borderBottomColor: C.borderMuted, borderBottomWidth: StyleSheet.hairlineWidth },
-                        ]}
-                      >
-                        <Text allowFontScaling={false} style={[s.listTitle, { color: C.text }]}>
-                          {groupTitle(copy, g.id)}
-                        </Text>
-                        <Text allowFontScaling={false} style={[s.listValue, { color: C.muted }]}>
-                          {count(copy, "sheetGroupLine", g.applied)}
-                        </Text>
-                      </View>
-                    ))}
+                        colors={C}
+                        icon={group.icon}
+                        iconBg={bg}
+                        iconColor={fg}
+                        title={groupTitle(copy, g.id)}
+                        stat={fill(copy.sheetGroupChanged, { changed: g.changed ?? 0, n: g.applied })}
+                        ratio={g.applied ? (g.changed ?? 0) / g.applied : 0}
+                        selected={importIds.includes(g.id)}
+                        onToggle={() => toggleImport(g.id)}
+                        last={i === importGroups.length - 1}
+                      />
+                    );
+                  })}
                 </View>
 
-                {plan.themes.incoming > 0 ? (
+                {importThemesShown ? (
                   <View style={[s.themeBox, { backgroundColor: C.accentDim, borderColor: alpha(C.accent, 0.35) }]}>
                     <View style={s.themeHead}>
                       <AppIcon family="Ionicons" name="color-palette" size={15} color={C.accent} />
@@ -434,19 +519,15 @@ export default function BackupSettingsScreen() {
                   </View>
                 ) : null}
 
-                {plan.warnings.includes("some-invalid") ? (
+                {selectedPlan.warnings.includes("some-invalid") ? (
                   <Warn colors={C}>
                     {count(copy, "warnInvalid", plan.skipped.filter((x) => x.reason !== "unknown").length)}
                   </Warn>
                 ) : null}
-                {plan.warnings.includes("theme-missing") ? <Warn colors={C}>{copy.warnThemeMissing}</Warn> : null}
-                {plan.warnings.includes("themes-dropped") ? (
+                {selectedPlan.warnings.includes("theme-missing") ? <Warn colors={C}>{copy.warnThemeMissing}</Warn> : null}
+                {selectedPlan.warnings.includes("themes-dropped") ? (
                   <Warn colors={C}>{count(copy, "warnThemesDropped", plan.themes.dropped)}</Warn>
                 ) : null}
-
-                <Text allowFontScaling={false} style={[s.restartNote, { color: C.muted }]}>
-                  {copy.restartNote}
-                </Text>
               </>
             ) : null}
           </SheetScroll>
@@ -466,9 +547,9 @@ export default function BackupSettingsScreen() {
             <GlassTouchable
               accessibilityRole="button"
               activeOpacity={0.85}
-              disabled={applying}
+              disabled={applying || !selectedPlan?.writes.length}
               onPress={confirmImport}
-              style={[s.confirmBtn, { backgroundColor: C.accent }]}
+              style={[s.confirmBtn, { backgroundColor: C.accent, opacity: selectedPlan?.writes.length ? 1 : 0.5 }]}
             >
               {applying ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
@@ -504,20 +585,13 @@ const s = StyleSheet.create({
   heroTitle: { fontSize: 16, fontWeight: "800" },
   heroText: { fontSize: 12, fontWeight: "500", marginTop: 4, lineHeight: 17 },
 
-  badge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, marginLeft: 8 },
-  badgeText: { fontSize: 10.5, fontWeight: "700" },
-  themeLine: { fontSize: 11, fontWeight: "700", marginTop: 3 },
-  note: { fontSize: 11, fontWeight: "500", lineHeight: 16, marginTop: 10, marginHorizontal: 4 },
+  stats: { marginBottom: 10 },
 
   sheet: { flexShrink: 1, borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: 1, paddingHorizontal: 18, paddingTop: 9, paddingBottom: 14 },
   handle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 14 },
   sheetHead: { flexDirection: "row", alignItems: "center", gap: 14 },
   fileLine: { fontSize: 11, fontWeight: "600", marginTop: 3 },
-  willApply: { fontSize: 14, fontWeight: "800", marginTop: 16 },
-  listBox: { marginTop: 10, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14 },
-  listRow: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
-  listTitle: { fontSize: 13, fontWeight: "650", flexShrink: 1 },
-  listValue: { fontSize: 12, fontWeight: "700" },
+  listBox: { marginTop: 10, borderRadius: 14, borderWidth: 1, overflow: "hidden" },
   themeBox: { marginTop: 10, borderRadius: 14, borderWidth: 1, padding: 12, gap: 4 },
   themeHead: { flexDirection: "row", alignItems: "center", gap: 7 },
   themeTitle: { fontSize: 13, fontWeight: "800" },
@@ -525,7 +599,6 @@ const s = StyleSheet.create({
   themeNames: { fontSize: 11.5, fontWeight: "600", lineHeight: 16 },
   warn: { marginTop: 10, borderRadius: 12, borderWidth: 1, padding: 11, flexDirection: "row", alignItems: "flex-start", gap: 8 },
   warnText: { flex: 1, fontSize: 12, fontWeight: "600", lineHeight: 17 },
-  restartNote: { fontSize: 11.5, fontWeight: "500", lineHeight: 16, marginTop: 12 },
   actions: { flexDirection: "row", gap: 11, marginTop: 16 },
   cancelBtn: { flex: 1, minHeight: 50, borderRadius: 15, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   cancelText: { fontSize: 14.5, fontWeight: "800" },

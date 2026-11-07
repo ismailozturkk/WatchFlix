@@ -8,6 +8,20 @@ import { copyLanguage } from "../../../utils/appLanguages";
 
 const tr = {
   title: "Ayarları Yedekle",
+  selectAll: "Tümünü seç",
+  selectNone: "Temizle",
+  noneSelected: "En az bir içerik seç",
+  infoLabel: "Bilgi",
+  groupsSelected: "{n}/{total} içerik seçili",
+  statSettings: "Yedeklenecek ayar",
+  statCustomized: "Özelleştirilmiş",
+  statThemes: "Özel tema",
+  statSize: "Yedek boyutu",
+  groupStat: "{saved}/{total}",
+  statApply: "Uygulanacak",
+  statChanged: "Değişecek",
+  statSame: "Aynı kalacak",
+  sheetGroupChanged: "{changed}/{n} değişecek",
 
   heroTitle: "Ayarların tek dosyada",
   heroText:
@@ -28,8 +42,6 @@ const tr = {
   groupWidgetsSub: "Widget görünümü ve içerik seçimleri",
   groupSharing: "Paylaşım kartları",
   groupSharingSub: "Hikâye ve Wrapped kartı son seçimleri",
-  groupPet: "Pet",
-  groupPetSub: "Açık/kapalı, boyut ve konum",
   customized: "{n} özelleştirilmiş",
   allDefault: "Varsayılan",
   themeCount: "{n} özel tema",
@@ -105,6 +117,20 @@ const tr = {
 
 const en = {
   title: "Back Up Settings",
+  selectAll: "Select all",
+  selectNone: "Clear",
+  noneSelected: "Select at least one item",
+  infoLabel: "Info",
+  groupsSelected: "{n}/{total} items selected",
+  statSettings: "Settings to back up",
+  statCustomized: "Customized",
+  statThemes: "Custom themes",
+  statSize: "Backup size",
+  groupStat: "{saved}/{total}",
+  statApply: "To apply",
+  statChanged: "Will change",
+  statSame: "Stay the same",
+  sheetGroupChanged: "{changed}/{n} will change",
 
   heroTitle: "Your settings in one file",
   heroText:
@@ -125,8 +151,6 @@ const en = {
   groupWidgetsSub: "Widget look and content choices",
   groupSharing: "Share cards",
   groupSharingSub: "Last story and Wrapped card choices",
-  groupPet: "Pet",
-  groupPetSub: "On/off, size and position",
   customized: "{n} customized",
   allDefault: "Default",
   themeCount: "{n} custom themes",
@@ -200,6 +224,20 @@ const en = {
 
 const es = {
   title: "Copia de seguridad de ajustes",
+  selectAll: "Seleccionar todo",
+  selectNone: "Borrar",
+  noneSelected: "Selecciona al menos un elemento",
+  infoLabel: "Información",
+  groupsSelected: "{n}/{total} elementos seleccionados",
+  statSettings: "Ajustes a guardar",
+  statCustomized: "Personalizados",
+  statThemes: "Temas propios",
+  statSize: "Tamaño de la copia",
+  groupStat: "{saved}/{total}",
+  statApply: "Se aplicarán",
+  statChanged: "Cambiarán",
+  statSame: "Sin cambios",
+  sheetGroupChanged: "Cambiarán {changed}/{n}",
 
   heroTitle: "Tus ajustes en un solo archivo",
   heroText:
@@ -220,8 +258,6 @@ const es = {
   groupWidgetsSub: "Aspecto y contenido de los widgets",
   groupSharing: "Tarjetas para compartir",
   groupSharingSub: "Últimas elecciones de las tarjetas de historia y de Wrapped",
-  groupPet: "Mascota",
-  groupPetSub: "Activada o no, tamaño y posición",
   customized: "{n} personalizados",
   allDefault: "Predeterminado",
   themeCount: "{n} temas personalizados",
@@ -295,6 +331,20 @@ const es = {
 
 const pt = {
   title: "Backup das configurações",
+  selectAll: "Selecionar tudo",
+  selectNone: "Limpar",
+  noneSelected: "Selecione pelo menos um item",
+  infoLabel: "Informação",
+  groupsSelected: "{n}/{total} itens selecionados",
+  statSettings: "Configurações a salvar",
+  statCustomized: "Personalizadas",
+  statThemes: "Temas próprios",
+  statSize: "Tamanho do backup",
+  groupStat: "{saved}/{total}",
+  statApply: "Serão aplicadas",
+  statChanged: "Vão mudar",
+  statSame: "Sem mudança",
+  sheetGroupChanged: "{changed}/{n} vão mudar",
 
   heroTitle: "Suas configurações em um só arquivo",
   heroText:
@@ -315,8 +365,6 @@ const pt = {
   groupWidgetsSub: "Aparência e conteúdo dos widgets",
   groupSharing: "Cards para compartilhar",
   groupSharingSub: "Últimas escolhas dos cards de story e do Wrapped",
-  groupPet: "Pet",
-  groupPetSub: "Ativado ou não, tamanho e posição",
   customized: "{n} personalizados",
   allDefault: "Padrão",
   themeCount: "{n} temas personalizados",
@@ -390,6 +438,20 @@ const pt = {
 
 const de = {
   title: "Einstellungen sichern",
+  selectAll: "Alle auswählen",
+  selectNone: "Leeren",
+  noneSelected: "Wähle mindestens einen Eintrag",
+  infoLabel: "Info",
+  groupsSelected: "{n}/{total} Einträge ausgewählt",
+  statSettings: "Zu sichernde Einstellungen",
+  statCustomized: "Angepasst",
+  statThemes: "Eigene Designs",
+  statSize: "Sicherungsgröße",
+  groupStat: "{saved}/{total}",
+  statApply: "Werden angewendet",
+  statChanged: "Ändern sich",
+  statSame: "Bleiben gleich",
+  sheetGroupChanged: "{changed}/{n} ändern sich",
 
   heroTitle: "Deine Einstellungen in einer Datei",
   heroText:
@@ -410,8 +472,6 @@ const de = {
   groupWidgetsSub: "Widget-Aussehen und Inhaltsauswahl",
   groupSharing: "Teilen-Karten",
   groupSharingSub: "Letzte Story- und Wrapped-Kartenauswahl",
-  groupPet: "Begleiter",
-  groupPetSub: "An/Aus, Größe und Position",
   customized: "{n} angepasst",
   allDefault: "Standard",
   themeCount: "{n} eigene Designs",

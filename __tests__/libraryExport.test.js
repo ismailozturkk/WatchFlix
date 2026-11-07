@@ -281,3 +281,38 @@ describe("ZIP paketi", () => {
     expect(cleanRating(7.55)).toBe(7.6);
   });
 });
+
+describe("pickLibrarySections", () => {
+  const { buildLibrarySnapshot: build, pickLibrarySections, isSnapshotEmpty: isEmpty, LIBRARY_SECTIONS } = require("../utils/libraryExport");
+  const snapshot = () => build({
+    lists: {
+      watchedMovies: [{ id: 1, title: "F" }],
+      watchList: [{ id: 2, title: "W" }],
+      favorites: [{ id: 3, title: "A" }],
+      Benim: [{ id: 4, title: "L" }],
+    },
+    ratings: { movie_1: 8 },
+  });
+
+  test("seçilmeyen içerik düşer, sayılar yeniden hesaplanır", () => {
+    const out = pickLibrarySections(snapshot(), ["films"]);
+    expect(out.counts.watchedMovies).toBe(1);
+    expect(out.counts.watchList).toBe(0);
+    expect(out.counts.customLists).toBe(0);
+    expect(out.watchList).toEqual([]);
+  });
+
+  test("puan seçilmediyse kayıtlarda da puan kalmaz", () => {
+    const out = pickLibrarySections(snapshot(), ["films"]);
+    expect(out.ratings).toEqual([]);
+    expect(out.watchedMovies[0].rating).toBeNull();
+    const withRatings = pickLibrarySections(snapshot(), ["films", "ratings"]);
+    expect(withRatings.watchedMovies[0].rating).toBe(8);
+  });
+
+  test("hepsi seçiliyse aynı sayılar; hiçbiri seçili değilse boş", () => {
+    const whole = snapshot();
+    expect(pickLibrarySections(whole, [...LIBRARY_SECTIONS]).counts).toEqual(whole.counts);
+    expect(isEmpty(pickLibrarySections(whole, []))).toBe(true);
+  });
+});

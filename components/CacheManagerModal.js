@@ -1,6 +1,6 @@
 // components/CacheManagerModal.js
 //
-// "Önbellek" ekranı: uygulamadaki önbelleği kategori kategori (posterler, pet,
+// "Önbellek" ekranı: uygulamadaki önbelleği kategori kategori (posterler,
 // dizi/film içerik, gönderiler, izleme listesi, hatırlatıcılar, notlar, profil)
 // boyutlarıyla gösterir; tek tek veya tümden temizlenebilir.
 
@@ -29,7 +29,6 @@ import ModalToastHost from "@components/toast/ModalToastHost";
 import GlassTouchable from "./common/GlassTouchable";
 const META = {
   images: { tr: "Posterler ve görseller", family: "Ionicons", icon: "images-outline", color: "#3B82F6" },
-  pets: { tr: "Pet'ler", family: "MaterialCommunityIcons", icon: "paw", color: "#F59E0B" },
   tvContent: { tr: "Dizi içerikleri", family: "Ionicons", icon: "tv-outline", color: "#8B5CF6" },
   movieContent: { tr: "Film içerikleri", family: "Ionicons", icon: "film-outline", color: "#EC4899" },
   posts: { tr: "Gönderiler", family: "Ionicons", icon: "newspaper-outline", color: "#10B981" },

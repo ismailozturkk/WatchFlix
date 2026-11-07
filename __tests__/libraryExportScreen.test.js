@@ -10,11 +10,16 @@ jest.mock("react-native", () => ({
   View: "View",
   Text: "Text",
   ActivityIndicator: "Spinner",
+  TouchableOpacity: "Touch",
+  LayoutAnimation: { configureNext: () => {}, Presets: {} },
 }));
 jest.mock("../components/typography/AppText", () => ({ AppText: "Text" }));
 jest.mock("@components/AppIcon", () => ({ __esModule: true, default: "Icon" }));
 
-const mockToast = { success: jest.fn(), error: jest.fn() };
+jest.mock("@components/common/GlassIconButton", () => ({ __esModule: true, default: "GlassIconButton" }));
+jest.mock("../components/common/GlassBox", () => ({ __esModule: true, default: "GlassBox" }));
+
+const mockToast = { success: jest.fn(), error: jest.fn(), info: jest.fn() };
 jest.mock("@components/AppToast", () => ({ toast: mockToast }));
 jest.mock("@services/hapticsService", () => ({ selectionAsync: () => Promise.resolve() }));
 
@@ -171,4 +176,34 @@ it("çalışırken ikinci dokunuş yeni dışa aktarma başlatmaz", async () => 
     await first;
   });
   expect(mockExportJson).toHaveBeenCalledTimes(1);
+});
+
+const pickRow = (title) =>
+  renderer.root.findAll((n) => n.props.accessibilityRole === "checkbox" && String(n.props.accessibilityLabel).startsWith(title))[0];
+
+it("seçimi kaldırılan içerik dosyaya girmez", async () => {
+  mount();
+  await act(async () => pickRow(copy.watchList(1)).props.onPress());
+  await tap(rowFor(copy.jsonTitle));
+  const sent = mockExportJson.mock.calls[0][0];
+  expect(sent.counts.watchList).toBe(0);
+  expect(sent.counts.watchedMovies).toBe(1);
+});
+
+it("hiçbir içerik seçili değilse dışa aktarmaz, uyarır", async () => {
+  mount();
+  for (const title of [copy.films(1), copy.watchList(1), copy.ratings(1)]) {
+    await act(async () => pickRow(title).props.onPress());
+  }
+  await tap(rowFor(copy.jsonTitle));
+  expect(mockExportJson).not.toHaveBeenCalled();
+  expect(mockToast.info).toHaveBeenCalledWith(copy.noneSelected);
+});
+
+it("bilgi metinleri ünlem düğmesine basılana kadar kapalı", async () => {
+  mount();
+  expect(texts()).not.toContain(copy.heroText);
+  const button = renderer.root.findAllByType("GlassIconButton")[0];
+  await act(async () => button.props.onPress());
+  expect(texts()).toContain(copy.heroText);
 });

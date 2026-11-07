@@ -159,6 +159,47 @@ export const isSnapshotEmpty = (snapshot) => {
   );
 };
 
+/** Dışa aktarma ekranında seçilebilen içerikler. */
+export const LIBRARY_SECTIONS = Object.freeze(["films", "shows", "watchList", "favorites", "customLists", "ratings"]);
+
+/**
+ * Anlık görüntüyü seçili içeriklere indirger; sayılar yeniden hesaplanır. Puanlar
+ * seçilmediyse film/dizi kayıtlarındaki `rating` de silinir: dosyada puan kalmasın.
+ */
+export function pickLibrarySections(snapshot, sectionIds) {
+  if (!snapshot || !Array.isArray(sectionIds)) return snapshot;
+  const keep = new Set(sectionIds);
+  const withRatings = keep.has("ratings");
+  const entries = (list) => (withRatings ? list : list.map((item) => ({ ...item, rating: null })));
+  const watchedMovies = keep.has("films") ? entries(snapshot.watchedMovies) : [];
+  const watchedShows = keep.has("shows") ? entries(snapshot.watchedShows) : [];
+  const watchList = keep.has("watchList") ? entries(snapshot.watchList) : [];
+  const favorites = keep.has("favorites") ? entries(snapshot.favorites) : [];
+  const customLists = keep.has("customLists")
+    ? snapshot.customLists.map((list) => ({ ...list, items: entries(list.items) }))
+    : [];
+  const ratings = withRatings ? snapshot.ratings : [];
+  return {
+    ...snapshot,
+    counts: {
+      watchedMovies: watchedMovies.length,
+      watchedShows: watchedShows.length,
+      watchedEpisodes: watchedShows.reduce((sum, show) => sum + show.episodesWatched, 0),
+      watchList: watchList.length,
+      favorites: favorites.length,
+      customLists: customLists.length,
+      customListItems: customLists.reduce((sum, list) => sum + list.items.length, 0),
+      ratings: ratings.length,
+    },
+    watchedMovies,
+    watchedShows,
+    watchList,
+    favorites,
+    customLists,
+    ratings,
+  };
+}
+
 export const serializeSnapshot = (snapshot) => JSON.stringify(snapshot, null, 2);
 
 /* ── CSV ─────────────────────────────────────────────────────────────────── */
