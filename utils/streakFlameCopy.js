@@ -39,7 +39,7 @@ export const STREAK_FLAME_COPY = {
     },
     status: {
       lit: "Bugünü yaktın. Yarın da bir şey işaretle, alev büyüsün.",
-      risk: "Bugün henüz bir şey işaretlemedin. Gün bitmeden (04:00'e kadar) bir film ya da bölüm işaretle.",
+      risk: "Bugün henüz bir şey işaretlemedin. Gün bitmeden (gece 00:00'a kadar) bir film ya da bölüm işaretle.",
       repair: (have, need) => `Dünü kaçırdın ama serin kurtarılabilir: bugün ${need} içerik işaretle (${have}/${need}).`,
       shield: "Dünü kaçırdın; telafi hakkın dolu olduğu için gün sonunda kalkanın seriyi koruyacak. Bugün bir şey işaretlemeyi unutma.",
     },
@@ -58,7 +58,8 @@ export const STREAK_FLAME_COPY = {
     ladderTitle: "Ay kademeleri",
     ladderStart: "3 gün",
     howTitle: "Nasıl çalışır?",
-    how: "Her gün en az bir film ya da bölüm işaretlediğinde serin bir gün uzar ve alev biraz daha harlanır. Her hafta alevine yeni bir efekt, her ay yeni bir renk gelir. Gün 04:00'te döner; gece yarısından sonra biten bölüm o geceye sayılır.",
+    howHint: "Günlük seri ve alev kademeleri hakkında bilgi gösterir.",
+    how: "Her gün en az bir film ya da bölüm işaretlediğinde serin bir gün uzar ve alev biraz daha harlanır. Her hafta alevine yeni bir efekt, her ay yeni bir renk gelir. Gün, telefonunun saatiyle gece 00:00'da döner.",
     close: "Kapat",
     celebrate: {
       litTitle: "🔥 Alevin yandı!",
@@ -104,7 +105,7 @@ export const STREAK_FLAME_COPY = {
     },
     status: {
       lit: "You lit today. Log something tomorrow too and the flame grows.",
-      risk: "You haven't logged anything today. Log a movie or an episode before the day ends (4 AM).",
+      risk: "You haven't logged anything today. Log a movie or an episode before the day ends (midnight).",
       repair: (have, need) => `You missed yesterday, but your streak can be saved: log ${need} titles today (${have}/${need}).`,
       shield: "You missed yesterday; your repair is used up, so a shield will cover it at the end of the day. Don't forget to log something today.",
     },
@@ -123,7 +124,8 @@ export const STREAK_FLAME_COPY = {
     ladderTitle: "Month levels",
     ladderStart: "3 days",
     howTitle: "How it works",
-    how: "Each day you log at least one movie or episode, your streak grows by a day and the flame burns a bit hotter. Every week adds a new effect, every month a new color. The day turns over at 4 AM, so an episode you finish after midnight counts for that night.",
+    howHint: "Shows information about day streaks and flame levels.",
+    how: "Each day you log at least one movie or episode, your streak grows by a day and the flame burns a bit hotter. Every week adds a new effect, every month a new color. The day turns over at midnight on your phone's clock.",
     close: "Close",
     celebrate: {
       litTitle: "🔥 Your flame is lit!",
@@ -169,7 +171,7 @@ export const STREAK_FLAME_COPY = {
     },
     status: {
       lit: "Hoy ya encendiste la llama. Registra algo mañana también y crecerá.",
-      risk: "Hoy aún no registraste nada. Registra una película o un episodio antes de que acabe el día (4:00).",
+      risk: "Hoy aún no registraste nada. Registra una película o un episodio antes de que acabe el día (medianoche).",
       repair: (have, need) => `Ayer no registraste nada, pero tu racha se puede salvar: registra ${need} títulos hoy (${have}/${need}).`,
       shield: "Ayer no registraste nada; ya usaste tu recuperación, así que un escudo lo cubrirá al final del día. No olvides registrar algo hoy.",
     },
@@ -188,7 +190,8 @@ export const STREAK_FLAME_COPY = {
     ladderTitle: "Niveles mensuales",
     ladderStart: "3 días",
     howTitle: "¿Cómo funciona?",
-    how: "Cada día que registras al menos una película o un episodio, tu racha suma un día y la llama arde un poco más. Cada semana suma un efecto nuevo y cada mes, un color nuevo. El día cambia a las 4:00, así que un episodio que terminas después de medianoche cuenta para esa noche.",
+    howHint: "Muestra información sobre las rachas diarias y los niveles de llama.",
+    how: "Cada día que registras al menos una película o un episodio, tu racha suma un día y la llama arde un poco más. Cada semana suma un efecto nuevo y cada mes, un color nuevo. El día cambia a medianoche según la hora de tu teléfono.",
     close: "Cerrar",
     celebrate: {
       litTitle: "🔥 ¡Tu llama se encendió!",
@@ -234,7 +237,7 @@ export const STREAK_FLAME_COPY = {
     },
     status: {
       lit: "Você já acendeu hoje. Registre algo amanhã também e a chama cresce.",
-      risk: "Você ainda não registrou nada hoje. Registre um filme ou episódio antes de o dia acabar (4h).",
+      risk: "Você ainda não registrou nada hoje. Registre um filme ou episódio antes de o dia acabar (meia-noite).",
       repair: (have, need) => `Você não registrou nada ontem, mas sua sequência pode ser salva: registre ${need} títulos hoje (${have}/${need}).`,
       shield: "Você não registrou nada ontem; sua recuperação já foi usada, então um escudo vai cobrir no fim do dia. Não esqueça de registrar algo hoje.",
     },
@@ -253,7 +256,8 @@ export const STREAK_FLAME_COPY = {
     ladderTitle: "Níveis mensais",
     ladderStart: "3 dias",
     howTitle: "Como funciona?",
-    how: "Cada dia em que você registra pelo menos um filme ou episódio, sua sequência ganha um dia e a chama arde um pouco mais. Cada semana traz um efeito novo e cada mês, uma cor nova. O dia vira às 4h, então um episódio terminado depois da meia-noite conta para aquela noite.",
+    howHint: "Mostra informações sobre sequências diárias e níveis da chama.",
+    how: "Cada dia em que você registra pelo menos um filme ou episódio, sua sequência ganha um dia e a chama arde um pouco mais. Cada semana traz um efeito novo e cada mês, uma cor nova. O dia vira à meia-noite, pelo relógio do seu celular.",
     close: "Fechar",
     celebrate: {
       litTitle: "🔥 Sua chama acendeu!",
@@ -299,7 +303,7 @@ export const STREAK_FLAME_COPY = {
     },
     status: {
       lit: "Heute hast du die Flamme schon entfacht. Trag morgen wieder etwas ein, dann wächst sie.",
-      risk: "Du hast heute noch nichts eingetragen. Trag vor Tagesende (4 Uhr) einen Film oder eine Folge ein.",
+      risk: "Du hast heute noch nichts eingetragen. Trag vor Tagesende (Mitternacht) einen Film oder eine Folge ein.",
       repair: (have, need) => `Gestern hast du nichts eingetragen, aber deine Serie lässt sich retten: trag heute ${need} Titel ein (${have}/${need}).`,
       shield: "Gestern hast du nichts eingetragen; deine Rettung ist verbraucht, also deckt ein Schild den Tag zum Tagesende. Vergiss nicht, heute etwas einzutragen.",
     },
@@ -318,7 +322,8 @@ export const STREAK_FLAME_COPY = {
     ladderTitle: "Monatsstufen",
     ladderStart: "3 Tage",
     howTitle: "So funktioniert es",
-    how: "An jedem Tag, an dem du mindestens einen Film oder eine Folge einträgst, wächst deine Serie um einen Tag und die Flamme brennt etwas heißer. Jede Woche bringt einen neuen Effekt, jeder Monat eine neue Farbe. Der Tag wechselt um 4 Uhr, eine nach Mitternacht beendete Folge zählt also noch zu diesem Abend.",
+    howHint: "Zeigt Informationen über Tagesserien und Flammenstufen.",
+    how: "An jedem Tag, an dem du mindestens einen Film oder eine Folge einträgst, wächst deine Serie um einen Tag und die Flamme brennt etwas heißer. Jede Woche bringt einen neuen Effekt, jeder Monat eine neue Farbe. Der Tag wechselt um Mitternacht nach der Uhrzeit deines Handys.",
     close: "Schließen",
     celebrate: {
       litTitle: "🔥 Deine Flamme brennt!",

@@ -15,7 +15,7 @@
 // (BottomSheetModal). `state` profil verisinden gelir ve kapanışta sıfırlanmaz,
 // yani bu pencerede boş içerik görünmez.
 
-import React, { memo } from "react";
+import React, { memo, useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -76,30 +76,32 @@ function LevelColumn({ label, value, children, theme }) {
   );
 }
 
-function ProtectionRow({ icon, title, hint, value, valueColor, theme, accent }) {
+function ProtectionItem({ icon, title, value, valueColor, theme, accent }) {
   return (
-    <View style={styles.protRow}>
+    <View style={styles.protItem}>
       <View style={[styles.protIcon, { backgroundColor: alpha(accent, 0.14) }]}>
-        <AppIcon family="Ionicons" name={icon} size={16} color={accent} />
+        <AppIcon family="Ionicons" name={icon} size={14} color={accent} />
       </View>
       <View style={styles.protBody}>
-        <Text allowFontScaling={false} style={[styles.protTitle, { color: theme.text.primary }]}>
+        <Text allowFontScaling={false} numberOfLines={2} style={[styles.protTitle, { color: theme.text.muted }]}>
           {title}
         </Text>
-        <Text allowFontScaling={false} style={[styles.protHint, { color: theme.text.muted }]}>
-          {hint}
+        <Text allowFontScaling={false} numberOfLines={2} style={[styles.protValue, { color: valueColor }]}>
+          {value}
         </Text>
       </View>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.protValue, { color: valueColor }]}>
-        {value}
-      </Text>
     </View>
   );
 }
 
 function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language, animated = true }) {
+  const [infoOpen, setInfoOpen] = useState(false);
   const copy = getStreakFlameCopy(language);
-  const state = stateProp?.visible ? stateProp : FALLBACK_STATE;
+  // BottomSheet kapanış animasyonu sırasında profil verisi eşik altına düşebilir.
+  // Sahte 3 günlük fallback göstermek yerine son gerçek görünür durumu koru.
+  const lastVisibleState = useRef(FALLBACK_STATE);
+  if (stateProp?.visible) lastVisibleState.current = stateProp;
+  const state = stateProp?.visible ? stateProp : lastVisibleState.current;
   const { level, look, next, protection } = state;
   const palette = look.palette;
   const locale = intlLocaleOf(language);
@@ -109,6 +111,11 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
     ? copy.status.repair(protection.repairHave, protection.repairNeed)
     : copy.status[state.status];
   const nextLook = next.nextPalette ? streakLook(next.monthAt) : null;
+
+  // Her açılışta ayrıntı metni kapalı başlar; böylece ana kademe özeti kompakt kalır.
+  useEffect(() => {
+    if (!visible) setInfoOpen(false);
+  }, [visible]);
 
   return (
     <BottomSheetModal
@@ -135,17 +142,68 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
           <Text allowFontScaling={false} style={[styles.daysLabel, { color: theme.text.muted }]}>
             {copy.dayStreak}
           </Text>
-          <View
-            style={[
-              styles.tierChip,
-              { backgroundColor: alpha(palette.glow, 0.16), borderColor: alpha(palette.glow, 0.45) },
-            ]}
-          >
-            <AppIcon family="Ionicons" name="flame" size={13} color={palette.text} />
-            <Text allowFontScaling={false} style={[styles.tierChipText, { color: palette.text }]}>
-              {copy.palettes[palette.id]} · {streakLevelText(copy, level)}
-            </Text>
+          <View style={styles.summaryHead}>
+            <View
+              style={[
+                styles.tierChip,
+                { backgroundColor: alpha(palette.glow, 0.16), borderColor: alpha(palette.glow, 0.45) },
+              ]}
+            >
+              <AppIcon family="Ionicons" name="flame" size={13} color={palette.text} />
+              <Text allowFontScaling={false} style={[styles.tierChipText, { color: palette.text }]}>
+                {copy.palettes[palette.id]} · {streakLevelText(copy, level)}
+              </Text>
+            </View>
+            <GlassTouchable
+              testID="streak-info-toggle"
+              style={[
+                styles.infoButton,
+                {
+                  backgroundColor: infoOpen ? alpha(palette.glow, 0.16) : alpha(theme.text.muted, 0.08),
+                  borderColor: infoOpen ? alpha(palette.glow, 0.45) : alpha(theme.text.muted, 0.2),
+                },
+              ]}
+              onPress={() => setInfoOpen((open) => !open)}
+              activeOpacity={0.78}
+              accessibilityRole="button"
+              accessibilityLabel={copy.howTitle}
+              accessibilityHint={copy.howHint}
+              accessibilityState={{ expanded: infoOpen }}
+            >
+              <AppIcon
+                family="Ionicons"
+                name={infoOpen ? "alert-circle" : "alert-circle-outline"}
+                size={20}
+                color={infoOpen ? palette.text : theme.text.secondary}
+              />
+            </GlassTouchable>
           </View>
+
+          {infoOpen ? (
+            <View
+              testID="streak-info-panel"
+              style={[
+                styles.infoPanel,
+                { backgroundColor: alpha(palette.glow, 0.08), borderColor: alpha(palette.glow, 0.26) },
+              ]}
+            >
+              <Text allowFontScaling={false} style={[styles.infoTitle, { color: theme.text.primary }]}>
+                {copy.howTitle}
+              </Text>
+              <Text allowFontScaling={false} style={[styles.how, { color: theme.text.muted }]}>
+                {copy.how}
+              </Text>
+              <View style={[styles.infoDivider, { backgroundColor: alpha(theme.text.muted, 0.16) }]} />
+              <Text allowFontScaling={false} style={[styles.infoDetail, { color: theme.text.muted }]}>
+                <Text style={[styles.infoDetailTitle, { color: theme.text.primary }]}>{copy.repairTitle}: </Text>
+                {copy.repairHint}
+              </Text>
+              <Text allowFontScaling={false} style={[styles.infoDetail, { color: theme.text.muted }]}>
+                <Text style={[styles.infoDetailTitle, { color: theme.text.primary }]}>{copy.shieldTitle}: </Text>
+                {copy.shieldHint}
+              </Text>
+            </View>
+          ) : null}
 
           {/* AY · HAFTA · GÜN: seri bu üç kademenin toplamı. */}
           <View style={[styles.levelRow, { borderColor: alpha(theme.text.muted, 0.16) }]}>
@@ -212,34 +270,30 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
                 {copy.maxed}
               </Text>
             )}
-            {state.record > state.days ? (
-              <View style={styles.recordRow}>
-                <AppIcon family="Ionicons" name="trophy-outline" size={12} color={theme.text.muted} />
-                <Text allowFontScaling={false} style={[styles.recordText, { color: theme.text.muted }]}>
-                  {copy.record(state.record)}
-                </Text>
-              </View>
-            ) : null}
+            <View style={[styles.recordRow, { backgroundColor: alpha("#FFD76A", 0.08), borderColor: alpha("#FFD76A", 0.22) }]}>
+              <AppIcon family="Ionicons" name="trophy-outline" size={13} color="#D9A514" />
+              <Text allowFontScaling={false} style={[styles.recordText, { color: theme.text.secondary }]}>
+                {copy.record(state.record)}
+              </Text>
+            </View>
           </View>
 
           <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.text.secondary }]}>
             {copy.protectionTitle}
           </Text>
           <View style={[styles.protCard, { borderColor: alpha(theme.text.muted, 0.16) }]}>
-            <ProtectionRow
+            <ProtectionItem
               icon="bandage"
               title={copy.repairTitle}
-              hint={copy.repairHint}
               value={protection.repairReady ? copy.repairReady : copy.repairWait(protection.repairIn)}
               valueColor={protection.repairReady ? OK_COLOR : theme.text.muted}
               accent={palette.text}
               theme={theme}
             />
             <View style={[styles.protDivider, { backgroundColor: alpha(theme.text.muted, 0.14) }]} />
-            <ProtectionRow
+            <ProtectionItem
               icon="shield-checkmark"
               title={copy.shieldTitle}
-              hint={copy.shieldHint}
               value={copy.shields(protection.shields, protection.shieldMax)}
               valueColor={protection.shields > 0 ? palette.text : theme.text.muted}
               accent={palette.text}
@@ -289,13 +343,6 @@ function StreakFlameSheet({ visible, onClose, state: stateProp, theme, language,
             })}
           </ScrollView>
 
-          <Text allowFontScaling={false} style={[styles.sectionTitle, { color: theme.text.secondary }]}>
-            {copy.howTitle}
-          </Text>
-          <Text allowFontScaling={false} style={[styles.how, { color: theme.text.muted }]}>
-            {copy.how}
-          </Text>
-
           <GlassTouchable
             // Dış alevin koyu tonu: beyaz yazı her kademede okunur (açık paletlerin
             // `glow` tonu üstünde okunmazdı).
@@ -336,10 +383,10 @@ const styles = StyleSheet.create({
   days: { fontSize: 46, fontWeight: "900", letterSpacing: -1, fontVariant: ["tabular-nums"] },
   daysLabel: { fontSize: 13, fontWeight: "700", marginTop: -4 },
   tierChip: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginTop: 10,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 14,
@@ -347,77 +394,110 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
   },
   tierChipText: { fontSize: 13, fontWeight: "900", flexShrink: 1 },
+  summaryHead: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+  },
+  infoButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  infoPanel: {
+    alignSelf: "stretch",
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 13,
+    borderWidth: 1,
+  },
+  infoTitle: { fontSize: 12.5, fontWeight: "900", marginBottom: 3 },
+  infoDivider: { height: 1, marginVertical: 8 },
+  infoDetail: { fontSize: 11.5, fontWeight: "500", lineHeight: 16, marginTop: 3 },
+  infoDetailTitle: { fontWeight: "800" },
   levelRow: {
     alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "stretch",
-    marginTop: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
     borderWidth: 1,
   },
   levelCol: { flex: 1, alignItems: "center", gap: 2 },
-  levelValue: { fontSize: 22, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  levelValue: { fontSize: 19, fontWeight: "900", fontVariant: ["tabular-nums"] },
   levelLabel: { fontSize: 11, fontWeight: "800", letterSpacing: 0.4 },
   levelDivider: { width: 1, marginVertical: 4 },
-  monthDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
-  pips: { flexDirection: "row", gap: 3, marginTop: 6 },
-  pip: { width: 7, height: 7, borderRadius: 3.5 },
+  monthDot: { width: 8, height: 8, borderRadius: 4, marginTop: 3 },
+  pips: { flexDirection: "row", gap: 3, marginTop: 4 },
+  pip: { width: 6, height: 6, borderRadius: 3 },
   status: {
     alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    marginTop: 12,
+    marginTop: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
     borderWidth: 1,
   },
   statusText: { flex: 1, fontSize: 12.5, fontWeight: "600", lineHeight: 17 },
-  progressBlock: { alignSelf: "stretch", marginTop: 14, gap: 7 },
-  progressLabel: { fontSize: 12.5, fontWeight: "800" },
-  track: { height: 8, borderRadius: 4, overflow: "hidden" },
+  progressBlock: { alignSelf: "stretch", marginTop: 10, gap: 5 },
+  progressLabel: { fontSize: 12, fontWeight: "800" },
+  track: { height: 6, borderRadius: 3, overflow: "hidden" },
   fill: { height: "100%", borderRadius: 4 },
-  recordRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  recordText: { fontSize: 11.5, fontWeight: "700" },
+  recordRow: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, borderWidth: 1 },
+  recordText: { fontSize: 11.5, fontWeight: "800" },
   sectionTitle: {
     alignSelf: "stretch",
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.8,
     textTransform: "uppercase",
-    marginTop: 20,
-    marginBottom: 8,
+    marginTop: 14,
+    marginBottom: 6,
   },
-  protCard: { alignSelf: "stretch", borderRadius: 16, borderWidth: 1, paddingHorizontal: 12 },
-  protRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11 },
-  protIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  protBody: { flex: 1, gap: 2 },
-  protTitle: { fontSize: 13, fontWeight: "800" },
-  protHint: { fontSize: 11.5, fontWeight: "500", lineHeight: 15 },
-  protValue: { fontSize: 13, fontWeight: "900", maxWidth: 96 },
-  protDivider: { height: 1 },
+  protCard: {
+    alignSelf: "stretch",
+    alignItems: "stretch",
+    borderRadius: 13,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  protItem: { minWidth: 0, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 2, paddingVertical: 4 },
+  protIcon: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  protBody: { flex: 1, minWidth: 0 },
+  protTitle: { fontSize: 10.5, lineHeight: 13, fontWeight: "700" },
+  protValue: { fontSize: 12.5, fontWeight: "900", marginTop: 1 },
+  protDivider: { height: 1, marginVertical: 5 },
   ladderScroll: { alignSelf: "stretch", flexGrow: 0 },
-  ladder: { gap: 6, paddingRight: 4 },
+  ladder: { gap: 4, paddingRight: 4 },
   step: {
-    width: 58,
+    width: 52,
     alignItems: "center",
-    gap: 6,
-    paddingTop: 10,
-    paddingBottom: 8,
-    borderRadius: 14,
+    gap: 4,
+    paddingTop: 7,
+    paddingBottom: 6,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "transparent",
   },
   stepFlame: { height: LADDER_FLAME, justifyContent: "flex-end" },
   stepLabel: { fontSize: 11, fontWeight: "800" },
-  how: { alignSelf: "stretch", fontSize: 12.5, fontWeight: "500", lineHeight: 18 },
+  how: { alignSelf: "stretch", fontSize: 12, fontWeight: "500", lineHeight: 17 },
   closeBtn: {
     alignSelf: "stretch",
-    minHeight: 48,
-    marginTop: 18,
-    borderRadius: 16,
+    minHeight: 44,
+    marginTop: 14,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },

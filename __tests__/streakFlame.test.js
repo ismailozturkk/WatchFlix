@@ -53,6 +53,7 @@ jest.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView
 jest.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
 let mockMotion = true;
 jest.mock("../components/streak/useStreakFlameMotion", () => ({ __esModule: true, default: () => mockMotion }));
+jest.mock("../hooks/useScreenFocused", () => ({ __esModule: true, default: () => true }));
 
 const {
   STREAK_MIN_DAYS,
@@ -224,9 +225,17 @@ describe("streakFlameState", () => {
   });
 
   test("telafi hakkı yok ama kalkan var → shield", () => {
-    const s = streakFlameState(seri(0, { bekleyen: bekleyen({ telafi: false, kalkan: true }), kalkan: 1 }));
+    const s = streakFlameState(seri(0, { bekleyen: bekleyen({ telafi: false, kalkan: true }), kalkan: 1, bugunAktif: false }));
     expect(s.status).toBe("shield");
     expect(s.protection.shields).toBe(1);
+  });
+
+  // Eski hata: kalkan beklerken bugün içerik eklemek rozeti değiştirmiyordu (gün dönene
+  // kadar sönük, eski sayı). Kalkan dünü kesin kapatacağı için alev hemen yanmalı.
+  test("kalkan beklerken bugün işaretlendi → lit; sayı kurtarılan + dün + bugün; kalkan harcanmış", () => {
+    const s = streakFlameState(seri(1, { bekleyen: bekleyen({ telafi: false, kalkan: true }), kalkan: 1 }));
+    expect(s).toMatchObject({ visible: true, status: "lit", days: 12, dimmed: false });
+    expect(s.protection.shields).toBe(0);
   });
 
   test("koruma alanları: kalkan tavanı, telafi bekleme süresi", () => {
@@ -395,12 +404,14 @@ describe("StreakFlameBadge", () => {
     const root = render(<StreakFlameBadge seriler={seri(12)} theme={theme} language="tr" />);
     const pill = root.findByProps({ testID: "profile-streak-flame" });
     expect(pill.props.accessibilityLabel).toBe("12 günlük izleme serisi. Ayrıntılar");
+    expect(pill.props.accessibilityState).toEqual({ expanded: false });
     const cocuklar = pill.children.map((c) => (typeof c === "string" ? c : c.type));
     expect(cocuklar[0]).toBe("Text");
     expect(cocuklar[1]).toBe(Flame);
     expect(root.findByType("Text").props.children).toBe("12");
     expect(root.findByType(Flame).props.look.effects).toEqual(["embers"]);
     expect(root.findAllByType("Icon")).toHaveLength(0);
+    expect(root.findByProps({ testID: "streak-milestone-progress" })).toBeDefined();
   });
 
   test("bugün işaretleme yoksa alev solar ve ⌛ çıkar", () => {
@@ -412,7 +423,9 @@ describe("StreakFlameBadge", () => {
 
   test("telafi beklerken kurtarılacak seri ve 🩹 gösterilir", () => {
     const root = render(<StreakFlameBadge seriler={seri(1, { bekleyen: bekleyen() })} theme={theme} language="tr" />);
-    expect(root.findByType("Text").props.children).toBe("10");
+    const texts = root.findAllByType("Text").map((t) => t.props.children);
+    // Sayı kurtarılacak seri; yanında telafi ilerlemesi (bugün 1/2).
+    expect(texts).toEqual(["10", "1/2"]);
     expect(root.findByType("Icon").props.name).toBe("bandage");
   });
 
@@ -421,7 +434,19 @@ describe("StreakFlameBadge", () => {
     expect(root.findByType("StreakFlameSheet").props.visible).toBe(false);
     act(() => root.findByProps({ testID: "profile-streak-flame" }).props.onPress());
     expect(root.findByType("StreakFlameSheet").props.visible).toBe(true);
+    expect(root.findByProps({ testID: "profile-streak-flame" }).props.accessibilityState).toEqual({ expanded: true });
     expect(root.findByType(Flame).props.animated).toBe(false);
+  });
+
+  test("ayrıntı açıkken seri eşik altına düşerse sheet aniden unmount olmaz", () => {
+    const props = { theme, language: "tr" };
+    const root = render(<StreakFlameBadge seriler={seri(9)} {...props} />);
+    act(() => root.findByProps({ testID: "profile-streak-flame" }).props.onPress());
+    act(() => renderer.update(<StreakFlameBadge seriler={seri(2)} {...props} />));
+    expect(renderer.root.findAllByProps({ testID: "profile-streak-flame" })).toHaveLength(0);
+    expect(renderer.root.findByType("StreakFlameSheet").props.visible).toBe(true);
+    act(() => renderer.root.findByType("StreakFlameSheet").props.onClose());
+    expect(renderer.toJSON()).toBeNull();
   });
 });
 
@@ -460,6 +485,34 @@ describe("StreakFlameSheet", () => {
     expect(t).toContain("0/2");
   });
 
+  test("mevcut seri rekorsa da rekor görünür; kapanışta son gerçek durum korunur", () => {
+    let root = open(seri(12));
+    expect(metin(root)).toContain("Rekorun: 12 gün");
+    act(() => renderer.update(
+      <StreakFlameSheet visible onClose={jest.fn()} state={streakFlameState(seri(2))} theme={theme} language="tr" />,
+    ));
+    root = renderer.root;
+    expect(metin(root)).toContain("Turuncu Alev · 1 hafta 5 gün");
+    expect(metin(root)).toContain("Rekorun: 12 gün");
+  });
+
+  test("nasıl çalışır bilgisi ünlem düğmesiyle açılıp kapanır", () => {
+    const root = open(seri(12));
+    const toggle = root.findByProps({ testID: "streak-info-toggle" });
+    expect(toggle.props.accessibilityState).toEqual({ expanded: false });
+    expect(root.findAllByProps({ testID: "streak-info-panel" })).toHaveLength(0);
+
+    act(() => toggle.props.onPress());
+    expect(root.findByProps({ testID: "streak-info-toggle" }).props.accessibilityState).toEqual({ expanded: true });
+    expect(root.findAllByProps({ testID: "streak-info-panel" })).toHaveLength(1);
+    expect(metin(root)).toContain("Her gün en az bir film ya da bölüm");
+    expect(metin(root)).toContain("Bir günü kaçırırsan ertesi gün 2 içerik işaretle");
+    expect(metin(root)).toContain("Her ay kademesinde 1 kalkan kazanırsın");
+
+    act(() => root.findByProps({ testID: "streak-info-toggle" }).props.onPress());
+    expect(root.findAllByProps({ testID: "streak-info-panel" })).toHaveLength(0);
+  });
+
   test("sönmek üzereyken uyarı; zirvede 'en yüksek renk' metni", () => {
     let root = open(seri(5, { bugunAktif: false }), "en");
     expect(metin(root)).toContain("You haven't logged anything today");
@@ -486,7 +539,7 @@ describe("bağlantılar (bekçi)", () => {
     expect(oku("context", "WatchProgressContext.js")).toMatch(/useStreakCelebration\(deger\)/);
   });
 
-  test("defter mutabakatı seri korumasını işler ve 04:00 seri gününü kullanır", () => {
+  test("defter mutabakatı seri korumasını işler ve seri gününü kullanır", () => {
     const src = oku("utils", "watchBadgeLedger.js");
     expect(src).toMatch(/seriKorumasiniIlerlet\(/);
     expect(src).toMatch(/bugun: seriGunu/);

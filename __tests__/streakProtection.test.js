@@ -4,7 +4,7 @@
 //   • TELAFİ — bir gün kaçarsa ertesi gün NET 2 içerik → kaçan gün dolar (7 günde bir)
 //   • KALKAN — her ay kademesinde 1 (en fazla 2); telafi edilemeyen günü kendiliğinden korur
 //   • seri sayısı yalan söylemez: korunmayan kopuş geri gelmez, geçmiş sonradan iyileşmez
-//   • gün 04:00'te döner (gece yarısından sonraki izleme "dün gece")
+//   • gün cihazın yerel gece yarısında döner (istatistik takvimiyle aynı)
 // Ve uçtan uca: defter mutabakatı kararları diske yazar (utils/watchBadgeLedger.js).
 
 import { __resetAllMMKV } from "react-native-mmkv";
@@ -25,11 +25,11 @@ const OGLEN = new Date(2026, 6, 15, 12).getTime();
 const koruma = (ek = {}) => ({ ...bosKoruma(), ...ek });
 const hesap = (gunler, k, gunluk = {}) => serileriHesapla(gunler, { simdi: OGLEN, koruma: k, gunluk });
 
-describe("gün dönümü 04:00", () => {
-  test("00:00–03:59 bir önceki seri gününe sayılır, 04:00'te yeni gün", () => {
-    expect(seriGunuAnahtari(new Date(2026, 6, 16, 1, 30).getTime())).toBe("2026-07-15");
-    expect(seriGunuAnahtari(new Date(2026, 6, 16, 3, 59).getTime())).toBe("2026-07-15");
-    expect(seriGunuAnahtari(new Date(2026, 6, 16, 4, 0).getTime())).toBe("2026-07-16");
+describe("gün dönümü yerel gece yarısı", () => {
+  test("23:59 o güne, 00:00 ve 01:30 yeni güne sayılır", () => {
+    expect(seriGunuAnahtari(new Date(2026, 6, 15, 23, 59).getTime())).toBe("2026-07-15");
+    expect(seriGunuAnahtari(new Date(2026, 6, 16, 0, 0).getTime())).toBe("2026-07-16");
+    expect(seriGunuAnahtari(new Date(2026, 6, 16, 1, 30).getTime())).toBe("2026-07-16");
   });
 
   test("indekstenGun gunIndexi'nin tersi", () => {
@@ -189,10 +189,11 @@ describe("uçtan uca: defter mutabakatı telafiyi diske yazar", () => {
     const defter = await loadLedger(UID);
     expect(defter.aktiflik.koruma.yamalar).toEqual({ "2026-07-05": "telafi" });
     expect(defter.aktiflik.rekorGun).toBe(6);
-    // 7 Temmuz 01:30 — hâlâ 6 Temmuz'un gecesi: yeni gün açılmaz.
-    jest.setSystemTime(new Date(2026, 6, 7, 1, 30));
+    // 7 Temmuz 00:30 — gece yarısı geçti: yeni gün, seri 7 (eskiden 04:00'e kadar
+    // 6 Temmuz sayılıyor, ekleme seriyi değiştirmiyordu).
+    jest.setSystemTime(new Date(2026, 6, 7, 0, 30));
     r = await mutabakat(7);
-    expect((await loadLedger(UID)).aktiflik.gunler).not.toContain("2026-07-07");
-    expect(r.seriler.gunSerisi).toBe(6);
+    expect((await loadLedger(UID)).aktiflik.gunler).toContain("2026-07-07");
+    expect(r.seriler.gunSerisi).toBe(7);
   });
 });

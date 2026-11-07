@@ -268,6 +268,13 @@ describe("buildStoryStreak", () => {
     expect(buildStoryStreak({ gunSerisi: 7, rekorGun: 3 }).record).toBe(7);
   });
 
+  // Telafi/kalkan beklerken kart profildeki alevle AYNI sayıyı paylaşır.
+  test("telafi beklerken kurtarılacak seri gösterilir (ham gunSerisi değil)", () => {
+    const bekleyen = { gun: "2026-07-14", telafi: true, kalkan: false, gerekli: 2, mevcut: 1, korunanSeri: 10 };
+    const out = buildStoryStreak({ gunSerisi: 1, rekorGun: 10, bugunAktif: true, bekleyen, haftaKutulari: week });
+    expect(out).toMatchObject({ current: 10, showRecord: false });
+  });
+
   test("hiç aktiflik yoksa ya da veri bozuksa null", () => {
     expect(buildStoryStreak(null)).toBeNull();
     expect(buildStoryStreak(undefined)).toBeNull();

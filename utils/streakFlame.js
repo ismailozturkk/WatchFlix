@@ -152,13 +152,22 @@ export const lookHasEffect = (look, effect) => Boolean(look?.effects?.includes(e
  *   "risk"   seri canlı, bugün henüz bir şey yok (gün bitince kopar ya da korunur)
  *   "repair" dün kaçtı; bugün 2 içerikle telafi edilebilir
  *   "shield" dün kaçtı; telafi hakkı yok ama gün sonunda kalkan koruyacak
+ *
+ * Kalkan beklerken bugün işaretlendiyse sonuç KESİNDİR (kalkan gün sonunda dünü
+ * her durumda kapatır): alev "lit" yanar ve sayı kalkan + bugünle birlikte gösterilir.
+ * Eskiden gün dönene kadar sönük "shield"de kalıyor, içerik eklemek hiçbir şeyi
+ * değiştirmiyor görünüyordu.
  */
 function statusOf(seriler) {
   const bekleyen = seriler?.bekleyen;
   if (bekleyen && bekleyen.telafi) return "repair";
-  if (bekleyen && bekleyen.kalkan) return "shield";
+  if (bekleyen && bekleyen.kalkan && !seriler?.bugunAktif) return "shield";
   return seriler?.bugunAktif ? "lit" : "risk";
 }
+
+// Kalkanın gün sonunda kapatacağı dün + bugün işaretlenmiş: seri kesin olarak sürüyor.
+const shieldSettled = (seriler) =>
+  Boolean(seriler?.bekleyen?.kalkan && !seriler.bekleyen.telafi && seriler.bugunAktif);
 
 /**
  * `seriler` → alevin tüm görünür durumu. Seri yoksa / 3 günün altındaysa
@@ -170,12 +179,17 @@ function statusOf(seriler) {
 export function streakFlameState(seriler) {
   const status = statusOf(seriler);
   const pending = status === "repair" || status === "shield";
-  const days = pending ? toDays(seriler?.bekleyen?.korunanSeri) : toDays(seriler?.gunSerisi);
+  const settled = shieldSettled(seriler);
+  // settled: kurtarılan seri + kalkanın kapatacağı dün + bugün.
+  const days = settled
+    ? toDays(seriler.bekleyen.korunanSeri) + 2
+    : pending ? toDays(seriler?.bekleyen?.korunanSeri) : toDays(seriler?.gunSerisi);
   const level = streakLevel(days);
   const look = streakLook(days);
   const next = nextStreakMilestones(days);
   const record = Math.max(days, toDays(seriler?.rekorGun));
-  const shields = Math.min(KALKAN_TAVANI, toDays(seriler?.kalkan));
+  // settled'da bir kalkan gün sonunda harcanacak; sayfa onu zaten harcanmış gösterir.
+  const shields = Math.min(KALKAN_TAVANI, Math.max(0, toDays(seriler?.kalkan) - (settled ? 1 : 0)));
   return {
     visible: days >= STREAK_MIN_DAYS,
     days,

@@ -9,7 +9,9 @@
 import { copyLanguage, intlLocaleOf } from "./appLanguages";
 import { sortItemsByListOrder } from "./listOrder";
 import { toDate } from "./watchScoring";
+import { streakFlameState } from "./streakFlame";
 import { kanonikTur } from "./genreCanon";
+import { GENRE_LABELS } from "./genreDisplay";
 import { hexToHsl, hslToHex } from "./colorUtils";
 import { FAVORITE_KINDS, normalizeFavorites } from "./fourFavorites";
 import { RARITY_ORDER, kademeRengi, kademeSekli } from "../theme/badgeTokens";
@@ -243,28 +245,7 @@ export function cleanStoryUsername(raw) {
 // Kanonik tür kimliği → karttaki ad. Uygulama tür adını TMDB'nin o anki dilinde
 // saklar (utils/genreCanon.js başlığı); aynı türün "Bilim Kurgu"/"Science
 // Fiction" yazımları tek kimliğe iner ve kart adı BURADAN, kartın diliyle çıkar.
-export const STORY_GENRE_LABELS = Object.freeze({
-  action: { tr: "Aksiyon", en: "Action", es: "Acción", pt: "Ação", de: "Action" },
-  adventure: { tr: "Macera", en: "Adventure", es: "Aventura", pt: "Aventura", de: "Abenteuer" },
-  animation: { tr: "Animasyon", en: "Animation", es: "Animación", pt: "Animação", de: "Animation" },
-  comedy: { tr: "Komedi", en: "Comedy", es: "Comedia", pt: "Comédia", de: "Komödie" },
-  crime: { tr: "Suç", en: "Crime", es: "Crimen", pt: "Crime", de: "Krimi" },
-  documentary: { tr: "Belgesel", en: "Documentary", es: "Documental", pt: "Documentário", de: "Dokumentarfilm" },
-  drama: { tr: "Dram", en: "Drama", es: "Drama", pt: "Drama", de: "Drama" },
-  family: { tr: "Aile", en: "Family", es: "Familia", pt: "Família", de: "Familie" },
-  fantasy: { tr: "Fantastik", en: "Fantasy", es: "Fantasía", pt: "Fantasia", de: "Fantasy" },
-  history: { tr: "Tarih", en: "History", es: "Historia", pt: "História", de: "Historie" },
-  horror: { tr: "Korku", en: "Horror", es: "Terror", pt: "Terror", de: "Horror" },
-  music: { tr: "Müzik", en: "Music", es: "Música", pt: "Música", de: "Musik" },
-  mystery: { tr: "Gizem", en: "Mystery", es: "Misterio", pt: "Mistério", de: "Mystery" },
-  romance: { tr: "Romantik", en: "Romance", es: "Romance", pt: "Romance", de: "Liebesfilm" },
-  scifi: { tr: "Bilim Kurgu", en: "Sci-Fi", es: "Ciencia ficción", pt: "Ficção científica", de: "Sci-Fi" },
-  thriller: { tr: "Gerilim", en: "Thriller", es: "Suspense", pt: "Thriller", de: "Thriller" },
-  war: { tr: "Savaş", en: "War", es: "Bélica", pt: "Guerra", de: "Kriegsfilm" },
-  western: { tr: "Vahşi Batı", en: "Western", es: "Western", pt: "Faroeste", de: "Western" },
-  reality: { tr: "Realite", en: "Reality", es: "Reality", pt: "Reality", de: "Reality" },
-  tvmovie: { tr: "TV Filmi", en: "TV Movie", es: "Película de TV", pt: "Filme para TV", de: "TV-Film" },
-});
+export const STORY_GENRE_LABELS = GENRE_LABELS;
 
 const GENRE_ORDER = Object.keys(STORY_GENRE_LABELS);
 
@@ -321,11 +302,15 @@ export function buildStoryGenres(items, language = "tr", limit = 3) {
  *
  * `showRecord`: şu an seri yok ama geçmişte vardı → karo REKORU gösterir
  * ("rekor 12 gün"); kırık bir seriyi "0" diye paylaşmak kimseye yaramaz.
+ *
+ * Güncel seri profildeki alevle AYNI sayıdır (streakFlameState): telafi/kalkan
+ * beklerken ham `gunSerisi` 0 ya da 1'dir ama alev kurtarılacak seriyi gösterir;
+ * eskiden kart "rekor 10 gün" derken profil "10 🔥" gösteriyordu.
  */
 export function buildStoryStreak(seriler) {
   if (!seriler || typeof seriler !== "object") return null;
   const n = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.floor(Number(v)) : 0);
-  const current = n(seriler.gunSerisi);
+  const current = n(streakFlameState(seriler).days);
   const record = Math.max(n(seriler.rekorGun), current);
   if (!current && !record) return null;
   const week =
