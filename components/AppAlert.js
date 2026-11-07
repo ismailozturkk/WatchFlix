@@ -17,6 +17,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
+  Platform,
   View,
   Text,
   StyleSheet,
@@ -28,39 +29,24 @@ import { useTheme } from "@context/ThemeContext";
 import { i18nText } from "@utils/i18nText";
 import BottomSheetModal from "./common/BottomSheetModal";
 import GlassPressable from "./common/GlassPressable";
+import {
+  ALERT_TYPES,
+  createPresentWatchdog,
+  resolveAlertType,
+} from "@utils/alertPresentation";
 
-// Tür → ikon + vurgu geçişi. 'confirm' rengi render'da theme.accent olur.
-const ALERT_TYPES = {
-  info: {
-    icon: "information-circle-outline",
-    gradient: ["#60A5FA", "#2563EB"],
-  },
-  success: {
-    icon: "checkmark-circle-outline",
-    gradient: ["#4ADE80", "#16A34A"],
-  },
-  warning: {
-    icon: "warning-outline",
-    gradient: ["#FBBF24", "#F97316"],
-  },
-  error: {
-    icon: "alert-circle-outline",
-    gradient: ["#F87171", "#DC2626"],
-  },
-  confirm: {
-    icon: "help-circle-outline",
-    gradient: ["#8B5CF6", "#6D5DFB"],
-  },
-};
+// iOS'ta sunum sessizce başarısız olabilir (başka Modal açık). onShow bu süre
+// içinde gelmezse kutu "görünmedi" sayılır. Süre cömert: yanlış alarm ancak
+// native sunumun KENDİSİ bu kadar sürerse olur (bkz. createPresentWatchdog).
+const PRESENT_TIMEOUT_MS = 2000;
+const WATCH_PRESENTATION = Platform.OS === "ios";
 
-// options.type açıkça verilmişse onu kullan; yoksa butonlardan çıkar:
-// destructive varsa 'warning', 2+ buton varsa 'confirm', aksi halde 'info'.
-function resolveAlertType(options, buttons) {
-  if (options?.type && ALERT_TYPES[options.type]) return options.type;
-  if (buttons.some((b) => b.style === "destructive")) return "warning";
-  if (buttons.length >= 2) return "confirm";
-  return "info";
-}
+// Tür tablosu ve tür çıkarımı modal-içi onay katmanıyla ortak (utils/alertPresentation.js).
+//
+// DİKKAT — BAŞKA BİR MODAL AÇIKKEN appAlert ÇAĞIRMA: bu kutu kökte AYRI bir
+// native pencere; iOS başka bir Modal açıkken onu sunamaz ("already presenting"),
+// kutu hiç görünmez. Modal içinden soru: hooks/useInlineConfirm.js. Yine de biri
+// kaçarsa aşağıdaki sunum bekçisi kuyruğu serbest bırakır (uygulama donmaz).
 
 // Yalnız SONUÇ bildiren uyarılar titreşir. Onay/uyarı/bilgi kutuları bir soru ya
 // da duyurudur; her açılışta zırlamasın.
@@ -112,12 +98,39 @@ export function AppAlertHost() {
   const visibleRef = useRef(false);
   const closingRef = useRef(false);
   const closeTimerRef = useRef(null);
+  const closeRef = useRef(null);
+  // Native pencere gerçekten ekranda mı: onShow → true, onDismissed → false.
+  const presentedRef = useRef(false);
+
+  // Sunum bekçisi: iOS kutuyu sunamazsa (başka bir native Modal açık) onShow hiç
+  // gelmez; eskiden visibleRef true'da takılır, sonraki TÜM uyarılar kuyrukta
+  // beklerdi (uygulama donmuş gibi). Süre dolunca görünmeyen kutu callback
+  // çalıştırılmadan düşer, kuyruk akmaya devam eder.
+  const watchdogRef = useRef(null);
+  if (!watchdogRef.current) {
+    watchdogRef.current = createPresentWatchdog({
+      timeoutMs: PRESENT_TIMEOUT_MS,
+      onTimeout: () => {
+        if (!visibleRef.current || closingRef.current) return;
+        if (__DEV__) {
+          console.warn(
+            "[AppAlert] kutu sunulamadı (onShow gelmedi) — başka bir Modal açıkken appAlert çağrılmış olabilir; hooks/useInlineConfirm kullan.",
+          );
+        }
+        closeRef.current?.();
+      },
+    });
+  }
 
   const showNow = (payload) => {
     setData(payload);
     setVisible(true);
     visibleRef.current = true;
     closingRef.current = false;
+    // Pencere hâlâ ayaktaysa (önceki kutunun çıkış hareketi kesildi, Modal hiç
+    // kalkmadı) yeniden sunum olmaz → onShow da gelmez; bekçi kurulursa görünen
+    // kutuyu yanlışlıkla düşürürdü.
+    if (WATCH_PRESENTATION && !presentedRef.current) watchdogRef.current.arm();
   };
 
   useEffect(() => {
@@ -133,6 +146,7 @@ export function AppAlertHost() {
     return () => {
       listener = null;
       if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+      watchdogRef.current?.disarm();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -145,6 +159,7 @@ export function AppAlertHost() {
     (cb) => {
       if (closingRef.current) return;
       closingRef.current = true;
+      watchdogRef.current?.disarm();
       setVisible(false);
       // BottomSheetModal kapanış hareketini 260 ms'de tamamlar. İçerik ve
       // callback bu pencere boyunca korunur; sıradaki uyarı ancak sonra açılır.
@@ -159,6 +174,7 @@ export function AppAlertHost() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+  closeRef.current = close;
 
   if (!data) return null;
   const { title, message, buttons, options, type } = data;
@@ -182,6 +198,13 @@ export function AppAlertHost() {
     <BottomSheetModal
       visible={visible}
       onClose={onBackdrop}
+      onShow={() => {
+        presentedRef.current = true;
+        watchdogRef.current?.confirm();
+      }}
+      onDismissed={() => {
+        presentedRef.current = false;
+      }}
       intensity={30}
       dimColor="rgba(0,0,0,0.18)"
       dismissOnBackdropPress={options?.cancelable !== false}

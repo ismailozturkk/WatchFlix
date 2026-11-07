@@ -17,7 +17,7 @@ import LensLoader from "./LensLoader";
 import AppIcon from "./AppIcon";
 import GlassIconButton from "./common/GlassIconButton";
 import { i18nText } from "../utils/i18nText";
-import { appAlert } from "./AppAlert";
+import useInlineConfirm from "@hooks/useInlineConfirm";
 import { toast } from "./AppToast";
 import {
   getBreakdown,
@@ -55,6 +55,13 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
   const [data, setData] = useState({ total: 0, categories: [] });
   const [busyId, setBusyId] = useState(null);
   const [clearingAll, setClearingAll] = useState(false);
+  // Onay bu pencerenin İÇİNDE sorulur: appAlert kökte ayrı bir pencere, iOS onu
+  // bu Modal açıkken sunamaz (bkz. components/common/InlineConfirmSheet.js).
+  const confirm = useInlineConfirm({ active: visible });
+  const askConfirm = confirm.ask;
+  const requestClose = () => {
+    if (!confirm.dismiss()) onClose();
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,7 +96,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
   );
 
   const onClearAll = useCallback(() => {
-    appAlert(
+    askConfirm(
       i18nText("autoI18n.tumOnbellek", "Tüm önbellek"),
       i18nText(
         "autoI18n.tumOnbellekTemizleOnay",
@@ -115,7 +122,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
         },
       ],
     );
-  }, [load]);
+  }, [load, askConfirm]);
 
   // Boş olmayanlar üstte, boyuta göre azalan.
   const sorted = useMemo(
@@ -129,7 +136,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={requestClose}
     >
       <View style={styles.overlay}>
         <View style={[styles.card, { backgroundColor: C.card, borderColor: C.border }]}>
@@ -256,6 +263,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
           </GlassTouchable>
         </View>
       </View>
+      {confirm.element}
       <ModalToastHost visible={visible} />
     </Modal>
   );

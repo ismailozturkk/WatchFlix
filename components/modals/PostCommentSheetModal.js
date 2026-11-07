@@ -35,6 +35,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   FlatList,
+  Keyboard,
 } from "react-native";
 import LensLoader from "../LensLoader";
 // Pencere kenarına çizilir: ekranın Premium şeridiyle büyütülmüş üst boşluğunu değil gerçeğini al.
@@ -59,7 +60,7 @@ import { useUserProfile } from "@context/UserProfileContext";
 import UserAvatar from "../common/UserAvatar";
 import { i18nText } from "@utils/i18nText";
 import { postPreviewPosters } from "@utils/postComposer";
-import appAlert from "@components/AppAlert";
+import useInlineConfirm from "@hooks/useInlineConfirm";
 import { toast } from "@components/AppToast";
 import { alpha } from "../../theme/colors";
 import {
@@ -117,6 +118,7 @@ const CommentItem = memo(function CommentItem({
   onReply,
   onEdit,
   onDelete,
+  askConfirm,
   theme,
   styles,
   currentUserAvatar,
@@ -128,8 +130,10 @@ const CommentItem = memo(function CommentItem({
 
   const timeText = shortTimeAgo(item.createdAt);
 
+  // appAlert DEĞİL: bu sayfa bir Modal'ın içinde, iOS kökten ikinci pencereyi
+  // sunamaz. Menü sayfanın kendi penceresinde çizilir (useInlineConfirm).
   const openOwnerMenu = () => {
-    appAlert(
+    askConfirm(
       i18nText("autoI18n.yorum_secenekleri", "Yorum seçenekleri"),
       undefined,
       [
@@ -294,6 +298,18 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
   const [input, setInput] = useState(EMPTY_INPUT);
   const composerBlur = useComposerBlurTarget();
   const glass = useLiquidGlass();
+
+  // Yorum menüsü bu sayfanın İÇİNDE çizilir (bkz. InlineConfirmSheet.js). Klavye
+  // önce iner: katman pencerenin altına yaslı, açık klavye düğmeleri örterdi.
+  const confirm = useInlineConfirm({ active: visible });
+  const confirmAsk = confirm.ask;
+  const askConfirm = useCallback(
+    (...args) => {
+      Keyboard.dismiss();
+      confirmAsk(...args);
+    },
+    [confirmAsk],
+  );
 
   // Sheet yüksekliği İÇERİĞE göre canlı hesaplanır: yorum (+ yanıt) sayısı
   // arttıkça SHEET_MIN_H'tan SHEET_MAX_H'a doğru büyür, klavye açıkken
@@ -546,6 +562,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
             onReply={startReply}
             onEdit={startEdit}
             onDelete={handleDelete}
+            askConfirm={askConfirm}
             theme={theme}
             styles={styles}
           />
@@ -561,6 +578,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
                 onLike={handleLike}
                 onEdit={startEdit}
                 onDelete={handleDelete}
+                askConfirm={askConfirm}
                 theme={theme}
                 styles={styles}
               />
@@ -581,6 +599,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
       startReply,
       startEdit,
       handleDelete,
+      askConfirm,
     ],
   );
 
@@ -817,6 +836,9 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
         </View>
       </Animated.View>
       </Animated.View>
+
+      {/* Yorum menüsü: pencerenin en üst katmanı (appAlert burada sunulamaz). */}
+      {confirm.element}
     </KeyboardAvoidingView>
   );
 }

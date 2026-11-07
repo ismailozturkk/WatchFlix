@@ -68,7 +68,7 @@ import AIChatScreen from "@screens/chat/AIChatScreen";
 import { i18nText } from "@utils/i18nText";
 import { daysText, hoursText, minutesText } from "@utils/durationText";
 import GlassIconButton from "@components/common/GlassIconButton";
-import { appAlert } from "@components/AppAlert";
+import { toast } from "@components/AppToast";
 import { useAiChatRequest } from "@context/AiChatRequestContext";
 
 import {
@@ -719,7 +719,10 @@ export const ChatModal = () => {
         const code = err?.code || "GENERIC";
         if (__DEV__) {
           console.warn(i18nText("autoI18n.gemini_hata", "[Gemini] hata:"), code, err?.message);
-          appAlert(i18nText("autoI18n.gemini_hatasi_dev", "Gemini hatası (DEV)"), `${code}\n\n${err?.message ?? ""}`);
+          // toast, appAlert DEĞİL: sohbet penceresi açık, iOS kökteki uyarı
+          // penceresini onun üstüne sunamaz (AppAlertHost takılırdı). Toast bu
+          // pencerenin kendi ModalToastHost'unda görünür.
+          toast.error(i18nText("autoI18n.gemini_hatasi_dev", "Gemini hatası (DEV)"), `${code}: ${err?.message ?? ""}`);
         }
         const errMsg = {
           id: makeId(),

@@ -51,6 +51,9 @@
 // başka bir Modal açılacaksa (ör. arşivden Premium sayfası) `visible`i düşürüp
 // açılışı `onDismissed`e bırak; sabit bir `setTimeout` tahmini yerine pencerenin
 // gerçekten kalktığını bildirir.
+//
+// AYNI SEBEPLE sayfa AÇIKKEN `appAlert` çağırma (o da kökte ayrı bir pencere):
+// soru sayfanın içinde `overlay` + hooks/useInlineConfirm.js ile sorulur.
 import React, { useEffect, useRef } from "react";
 import { Animated, Modal, Pressable, StyleSheet, View } from "react-native";
 import ModalBlurBackdrop from "./ModalBlurBackdrop";
@@ -90,7 +93,9 @@ const DISMISS_SETTLE_MS = 90;
  *        Çıkış animasyonu bitip native pencere kalktıktan SONRA bir kez çağrılır.
  *        Ardından başka bir Modal açılacaksa o işi burada başlat.
  * @param {React.ReactNode} [props.overlay]
- *        Sayfanın üstünde, aynı pencerede çizilen tam ekran katman (ör. LeaveSheet).
+ *        Sayfanın ÜSTÜNDE, pencerenin tamamını kaplayan katman — sayfa açıkken
+ *        soru sormak için (`useInlineConfirm().element`). Sayfa açıkken `appAlert`
+ *        çağırma: iOS kökten ikinci pencereyi sunamaz.
  */
 export default function BottomSheetModal({
   visible,
@@ -184,9 +189,8 @@ export default function BottomSheetModal({
           {children}
         </Animated.View>
 
-        {/* Sayfanın üstünde, AYNI native pencerede tam ekran katman (onay vb.).
-            Açık sayfadan `appAlert` çağırmak iOS'ta ikinci pencere ister ve
-            sunulamaz — bkz. modals/createPost/LeaveSheet.js. */}
+        {/* Pencerenin tamamını kaplayan katman (sayfanın içinde değil: orada
+            yalnız sayfayı kaplardı). Bkz. hooks/useInlineConfirm.js. */}
         {overlay || null}
 
         {/* Sayfanın üstünde: toast sayfa açıkken de görünsün. */}
