@@ -9,6 +9,7 @@
 import axios from "axios";
 import * as cacheStore from "./cacheStore";
 import { isSupportedAppLanguage, tmdbLanguageOf } from "./appLanguages";
+import { resolveTmdbItemImages } from "./tmdbPosterFallback";
 
 const TMDB_HOST = "themoviedb.org";
 const CACHE_NS = "tmdbTitles";
@@ -278,6 +279,22 @@ function mediaTypeFromUrl(url) {
   return null;
 }
 
+// Ortak katmanda baslikla birlikte afis/arka plan da ayni oncelikle cozulur
+// (utils/tmdbPosterFallback); iki arama paralel gider.
+async function resolveTmdbItemMedia(item, options) {
+  const [titled, imaged] = await Promise.all([
+    resolveTmdbItemTitle(item, options),
+    resolveTmdbItemImages(item, options),
+  ]);
+  if (imaged === item || !titled || typeof titled !== "object") return titled;
+  return { ...titled, poster_path: imaged.poster_path, backdrop_path: imaged.backdrop_path };
+}
+
+const resolveTmdbMediaItems = (items, options) =>
+  Array.isArray(items) && items.length
+    ? mapWithLimit(items, (item) => resolveTmdbItemMedia(item, options))
+    : items || [];
+
 async function resolvePayload(data, options) {
   if (!data || typeof data !== "object") return data;
   let next = data;
@@ -285,20 +302,20 @@ async function resolvePayload(data, options) {
   if (Array.isArray(data.results)) {
     next = {
       ...next,
-      results: await resolveTmdbItems(data.results, options),
+      results: await resolveTmdbMediaItems(data.results, options),
     };
   } else if (data.id) {
-    next = await resolveTmdbItemTitle(data, options);
+    next = await resolveTmdbItemMedia(data, options);
   }
 
-  // Detay yanitlarinin icindeki raylar da ayni baslik kuralini kullanir.
+  // Detay yanitlarinin icindeki raylar da ayni baslik/afis kuralini kullanir.
   for (const key of ["recommendations", "similar"]) {
     if (Array.isArray(next?.[key]?.results)) {
       next = {
         ...next,
         [key]: {
           ...next[key],
-          results: await resolveTmdbItems(next[key].results, options),
+          results: await resolveTmdbMediaItems(next[key].results, options),
         },
       };
     }
@@ -306,7 +323,7 @@ async function resolvePayload(data, options) {
   if (Array.isArray(next?.parts)) {
     next = {
       ...next,
-      parts: await resolveTmdbItems(next.parts, { ...options, mediaType: "movie" }),
+      parts: await resolveTmdbMediaItems(next.parts, { ...options, mediaType: "movie" }),
     };
   }
   return next;
@@ -319,7 +336,7 @@ export function installTmdbTitleFallback() {
   axios.interceptors.response.use(async (response) => {
     const config = response?.config || {};
     const url = clean(config.url);
-    if (!url.includes(TMDB_HOST) || /\/translations(?:\?|$)/.test(url)) {
+    if (!url.includes(TMDB_HOST) || /\/(?:translations|images)(?:\?|$)/.test(url)) {
       return response;
     }
     const mediaType = mediaTypeFromUrl(url);

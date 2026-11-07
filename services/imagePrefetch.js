@@ -1,6 +1,6 @@
 // services/imagePrefetch.js
 //
-// Görselleri (TMDB poster/backdrop, avatar, pet vb.) topluca expo-image disk
+// Görselleri (TMDB poster/backdrop, avatar vb.) topluca expo-image disk
 // cache'ine indirir. Bir kez indirilince offline'da da gösterilir.
 // Sınırlı eşzamanlılıkla çalışır → cihazı/ağı boğmaz.
 

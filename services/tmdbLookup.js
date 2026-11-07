@@ -15,11 +15,13 @@ import {
   resolveTmdbItemTitle,
   resolveTmdbItems,
 } from "../utils/tmdbTitleFallback";
+import { resolveTmdbItemImages } from "../utils/tmdbPosterFallback";
 
 const cache = new Map(); // key -> Card
 // Kart şekli değişince artır: diskteki eski kartlar (ör. backdropPath yok) yeniden çekilir.
 // v3: eşleşme kuralı değişti (T3 B9) — diskte kalmış yanlış eşleşmeler yeniden çözülsün.
-const CARD_VERSION = "v3";
+// v4: afiş/arka plan dil önceliği (seçili dil → İngilizce → varsayılan) eklendi.
+const CARD_VERSION = "v4";
 
 const langOf = (language) => (tmdbLanguageOf(language));
 // Yetişkin içerik açıkken anahtara "+adult" ekleniyor: ayar sonradan
@@ -195,12 +197,16 @@ export async function lookupTitle({
       return fallback;
     }
 
-    const titledBest = await resolveTmdbItemTitle(best, {
+    const lookupOptions = { mediaType, language, authorization: apiKey };
+    const [titledBest, imagedBest] = await Promise.all([
+      resolveTmdbItemTitle(best, lookupOptions),
+      resolveTmdbItemImages(best, lookupOptions),
+    ]);
+    let card = cardFromResult(
+      { ...titledBest, poster_path: imagedBest.poster_path, backdrop_path: imagedBest.backdrop_path },
       mediaType,
-      language,
-      authorization: apiKey,
-    });
-    let card = cardFromResult(titledBest, mediaType, query);
+      query,
+    );
     if (includeDetails) {
       try {
         const detailsUrl = `https://api.themoviedb.org/3/${mediaType}/${best.id}` +
@@ -211,11 +217,9 @@ export async function lookupTitle({
         const detailsRes = await fetchWithTimeout(detailsUrl, { headers: { Authorization: apiKey } });
         if (detailsRes.ok) {
           let details = await detailsRes.json();
-          details = await resolveTmdbItemTitle(details, {
-            mediaType,
-            language,
-            authorization: apiKey,
-          });
+          // Detay yanıtı da afişi kendi seçer; aramada çözülen (önbellekteki) yol kullanılır.
+          const imagedDetails = await resolveTmdbItemImages(details, lookupOptions);
+          details = await resolveTmdbItemTitle(imagedDetails, lookupOptions);
           if (Array.isArray(details?.recommendations?.results)) {
             details = {
               ...details,
