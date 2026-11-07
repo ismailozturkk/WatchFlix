@@ -56,6 +56,10 @@ export const BACKUP_GROUPS = Object.freeze([
       "showAmbientBackground",
       "iconBackgroundMode",
       "iconBackgroundOpacity",
+      "iconBackgroundDensity",
+      "ambientDensity",
+      "ambientOpacity",
+      "decorSeed",
       "decorScopes",
       "allCornersRounded",
     ],
@@ -74,6 +78,8 @@ export const BACKUP_GROUPS = Object.freeze([
       "seeAllPosterRadius",
       "railPosterSize",
       "railPosterRadius",
+      "funPosterRadius",
+      "libraryPosterRadius",
       "postListPosterLayout",
       "reminderPreviewLimit",
       "posterBadges",
@@ -114,11 +120,6 @@ export const BACKUP_GROUPS = Object.freeze([
     icon: "share-social-outline",
     keys: ["profileStoryCard", "wrappedCard"],
   },
-  {
-    id: "pet",
-    icon: "paw-outline",
-    keys: ["petEnabled", "petSize", "petPosition"],
-  },
 ]);
 
 export const BACKUP_ENTRIES = Object.freeze(
@@ -140,8 +141,6 @@ export const BACKUP_EXCLUDED = Object.freeze({
   recentUsers: "Hızlı giriş çipleri kullanıcı kimlikleri içerir; dosyada dolaşmamalı.",
   usageStats: "Tanılama sayaçları.",
   appIcon: "Gerçek simge işletim sisteminde; yalnızca önbelleği tutuluyor.",
-  petOwned: "Kilidi açılmış petler ilerleme verisi, ayar değil.",
-  petSelected: "Seçili pet sahip olunan petlere bağlı.",
   homeMediaType: "Film/Dizi sekmesinde son bakılan bölüm; gezinme durumu, ayar değil.",
   discoverFilters: "Ne izlesem? ekranında en son kullanılan süzgeç; gezinme durumu (kayıtlı süzgeçler yedeğe girer).",
   upcomingFilters: "Yaklaşan Filmler rafının son süzgeci; tarihe bağlı gezinme durumu (seçilen ay/aralık zamanla geçersizleşir).",
@@ -184,10 +183,6 @@ const RULES = {
   effectMode: { check: (v) => EFFECT_MODES.includes(v) },
   imageQualityLevel: { check: (v) => ["low", "medium", "good", "high", "original"].includes(v) },
   streamingProviderIds: { check: isPositiveIntList },
-  petSize: { check: (v) => typeof v === "number" && v >= 32 && v <= 400 },
-  petPosition: {
-    check: (v) => isPlain(v) && Number.isFinite(v.x) && Number.isFinite(v.y),
-  },
   fontRoles: { check: isPlain, normalize: normalizeFontRoles },
   decorScopes: { check: isPlain, normalize: normalizeDecorScopes },
   sectionVisibility: { check: isPlain, normalize: normalizeSectionVisibility },
@@ -511,6 +506,55 @@ export function planImport(backup, options = {}) {
       appVersion: typeof backup?.app?.version === "string" ? backup.app.version : null,
       platform: typeof backup?.app?.platform === "string" ? backup.app.platform : null,
     },
+  };
+}
+
+/**
+ * Yedeği seçili gruplara indirger. Seçilmeyen grubun anahtarları dosyada HİÇ olmaz
+ * (`null` değil): `planImport` yedekte olmayan anahtara dokunmaz, yani kısmi yedek
+ * geri yüklenince diğer ayarlar olduğu gibi kalır.
+ */
+export function pickBackupGroups(backup, groupIds) {
+  if (!Array.isArray(groupIds)) return backup;
+  const keep = new Set(groupIds);
+  const settings = {};
+  for (const entry of BACKUP_ENTRIES) {
+    if (keep.has(entry.group) && entry.id in (backup?.settings || {})) {
+      settings[entry.id] = backup.settings[entry.id];
+    }
+  }
+  return { ...backup, settings };
+}
+
+/** Planı seçili gruplara indirger (ekranda işaretlenenler uygulansın). */
+export function filterPlanByGroups(plan, groupIds) {
+  const keep = new Set(groupIds);
+  const writes = plan.writes.filter((write) => keep.has(ENTRY_BY_ID.get(write.id)?.group));
+  const warnings = plan.warnings.filter((warning) => {
+    if (warning === "theme-missing" || warning === "themes-dropped") return keep.has("appearance");
+    return true;
+  });
+  return { ...plan, writes, warnings };
+}
+
+const sameValue = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * Plana "gerçekten değişecek" sayılarını ekler: her gruba `changed`, kök düzeye
+ * `changedTotal`. `read` registry anahtar adı → cihazdaki değer (kayıt yoksa null).
+ */
+export function annotatePlanChanges(plan, read) {
+  const changedIds = new Set(
+    plan.writes.filter((write) => !sameValue(read(write.key), write.value)).map((write) => write.id),
+  );
+  return {
+    ...plan,
+    changedIds: [...changedIds],
+    changedTotal: changedIds.size,
+    groups: plan.groups.map((group) => ({
+      ...group,
+      changed: GROUP_BY_ID.get(group.id).keys.filter((key) => changedIds.has(key)).length,
+    })),
   };
 }
 

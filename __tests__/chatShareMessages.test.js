@@ -5,7 +5,10 @@ import SharedListSheet from "../components/chat/SharedListSheet";
 import SharedAiMessage from "../components/chat/SharedAiMessage";
 import MessageBubble from "../components/chat/MessageBubble";
 import SharedPostMessage from "../components/chat/SharedPostMessage";
-import SharedTournamentMessage, { livePhase } from "../components/chat/SharedTournamentMessage";
+import SharedTournamentMessage, {
+  livePhase,
+  resetTournamentVoteCache,
+} from "../components/chat/SharedTournamentMessage";
 import SharedCineRoomMessage, { formatRoomCode } from "../components/chat/SharedCineRoomMessage";
 import { setDebugNow } from "../services/tournamentEngine";
 import {
@@ -13,6 +16,7 @@ import {
   buildChallengeShare,
   buildCineRoomShare,
   buildDuelResultShare,
+  buildFrameShare,
   buildListShare,
   buildPostShare,
   buildShareMessage,
@@ -25,6 +29,8 @@ import SharedTasteMatchMessage from "../components/chat/SharedTasteMatchMessage"
 // hangi gövdeyle çizildiği, aç/kapa ve dokunuş bağlantıları, bozuk kaydın düz
 // metne düşmesi. Görsel ince ayar (renk, boşluk) cihazda bakılır.
 
+// Afiş köşesi (Ayarlar > Poster görünümü) burada sınanmıyor: taban köşe aynen döner.
+jest.mock("../hooks/usePosterCorner", () => () => (base) => base);
 jest.mock("react-native", () => {
   const React = require("react");
   const passthrough = (name) => ({ children, ...rest }) => React.createElement(name, rest, children);
@@ -111,7 +117,27 @@ jest.mock("../components/chat/SharedMediaMessage", () => ({ __esModule: true, de
 jest.mock("../components/chat/SharedChallengeMessage", () => ({ __esModule: true, default: "ChallengeBody" }));
 // Düello sonucu kartı da tablo okur; gövdesi __tests__/inviteResults.test.js'te sınanır.
 jest.mock("../components/chat/SharedDuelResultMessage", () => ({ __esModule: true, default: "DuelResultBody" }));
+// Günün Karesi kartı gezinme + cihaz kaydı kancası kullanır; gövde temizliği __tests__/dailyFrame.test.js'te.
+jest.mock("../components/chat/SharedFrameMessage", () => ({ __esModule: true, default: "FrameBody" }));
 jest.mock("../components/chat/SharedChainMessage", () => ({ __esModule: true, default: "ChainBody" }));
+jest.mock("../components/chat/SharedTierListMessage", () => ({ __esModule: true, default: "TierListBody" }));
+jest.mock("../components/chat/SharedTvGraphMessage", () => ({ __esModule: true, default: "TvGraphBody" }));
+jest.mock("../components/chat/SharedClubMessage", () => ({ __esModule: true, default: "ClubBody" }));
+
+// Turnuva kartı: görüntüleyenin oy dokümanı (tek okuma) ve ağaç önizlemesi
+// (SVG/reanimated — burada yalnız aldığı prop'lar sınanır).
+const mockUser = { uid: "me" };
+let mockMyVote = null;
+const mockFetchMyVote = jest.fn(() => Promise.resolve(mockMyVote));
+jest.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: mockUser }) }));
+jest.mock("../services/tournamentService", () => ({
+  fetchMyVoteOnce: (...args) => mockFetchMyVote(...args),
+}));
+jest.mock("../components/AppIcon", () => ({ __esModule: true, default: "AppIcon" }));
+jest.mock("../components/tournament/TournamentTreePreview", () => ({
+  __esModule: true,
+  default: "TreePreview",
+}));
 
 const getTmdbUrl = (path, _type, width) => `https://img.test/w${width}${path}`;
 
@@ -130,6 +156,10 @@ const textOf = (root) =>
 const byLabel = (root, label) =>
   root.findAll((node) => node.props.accessibilityLabel === label && typeof node.props.onPress === "function")[0];
 const press = (node) => act(() => node.props.onPress());
+const flatStyle = (style) =>
+  (Array.isArray(style) ? style.flat(Infinity) : [style])
+    .filter(Boolean)
+    .reduce((all, part) => ({ ...all, ...part }), {});
 
 const profileItem = (id, extra = {}) => ({
   id,
@@ -475,7 +505,8 @@ describe("SharedAiMessage", () => {
     const root = render(<SharedAiMessage share={share} getTmdbUrl={getTmdbUrl} />).root;
     expect(textOf(root)).toContain("Dune");
     expect(root.findAllByType("Gradient")).toHaveLength(0);
-  });});
+  });
+});
 
 describe("MessageBubble yönlendirmesi", () => {
   const currentUser = { uid: "me" };
@@ -523,6 +554,143 @@ describe("MessageBubble yönlendirmesi", () => {
     const item = messageOf(listShareOf(6), { senderId: "me" });
     const root = render(<MessageBubble {...base} item={item} onSaveList={() => {}} />).root;
     expect(byLabel(root, "Listeyi kaydet")).toBeUndefined();
+  });
+
+  test("self-contained rich UI is not wrapped in a second chat bubble", () => {
+    const root = render(<MessageBubble {...base} item={messageOf(listShareOf(3), { senderId: "me" })} />).root;
+    const outer = root.findAllByType("TouchableOpacity")[0];
+    expect(flatStyle(outer.props.style)).toMatchObject({
+      padding: 0,
+      maxWidth: 306,
+      backgroundColor: "transparent",
+      borderWidth: 0,
+      shadowOpacity: 0,
+      elevation: 0,
+    });
+    expect(root.findAllByType("Gradient")).toHaveLength(0);
+  });
+
+  test("rich UI without its own surface gets one neutral card in both directions", () => {
+    const poll = { id: "m-poll", senderId: "me", kind: "poll", poll: { question: "Hangisi?" } };
+    const root = render(<MessageBubble {...base} item={poll} />).root;
+    const outer = root.findAllByType("TouchableOpacity")[0];
+    expect(flatStyle(outer.props.style)).toMatchObject({
+      padding: 10,
+      maxWidth: 306,
+      borderWidth: 1,
+      backgroundColor: mockTheme.secondary,
+      borderColor: mockTheme.border,
+    });
+    expect(root.findAllByType("Gradient")).toHaveLength(0);
+  });
+
+  test("movie and TV cards use a balanced responsive width instead of filling the row", () => {
+    const item = {
+      id: "m-media",
+      senderId: "them",
+      media: { id: 11, media_type: "tv", title: "Severance", poster_path: "/s.jpg" },
+      text: "Severance",
+    };
+    const root = render(<MessageBubble {...base} item={item} />).root;
+    const outer = root.findAllByType("TouchableOpacity")[0];
+    expect(flatStyle(outer.props.style)).toMatchObject({
+      width: 306,
+      maxWidth: 306,
+      padding: 0,
+    });
+  });
+
+  test("group chat renders the same direct media card with a separate sender identity", () => {
+    const item = {
+      id: "m-group-media",
+      senderId: "friend-1",
+      media: { id: 22, media_type: "movie", title: "Arrival", poster_path: "/a.jpg" },
+      text: "Arrival",
+    };
+    const root = render(
+      <MessageBubble
+        {...base}
+        item={item}
+        isGroup
+        memberInfo={{ "friend-1": { name: "Ada", avatarIndex: 4 } }}
+      />,
+    ).root;
+    const outer = root.findAllByType("TouchableOpacity")[0];
+    expect(flatStyle(outer.props.style)).toMatchObject({
+      width: 306,
+      maxWidth: 306,
+      padding: 0,
+      borderWidth: 0,
+      backgroundColor: "transparent",
+      borderColor: "transparent",
+    });
+    expect(textOf(root)).toContain("Ada");
+    expect(root.findAllByType("UserAvatar")).toHaveLength(1);
+    expect(root.findByType("MediaBody").props.isOutgoing).toBe(false);
+    expect(root.findAllByType("Gradient")).toHaveLength(0);
+  });
+
+  test("the group-only club card is not nested in another message bubble", () => {
+    const item = {
+      id: "m-club",
+      senderId: "friend-1",
+      kind: "clubShare",
+      share: {
+        type: "club",
+        event: "picked",
+        groupId: "group-1",
+        roundId: "round-1",
+        number: 2,
+        pick: { id: 603, media_type: "movie", title: "The Matrix", poster_path: "/m.jpg" },
+      },
+    };
+    const root = render(
+      <MessageBubble
+        {...base}
+        item={item}
+        isGroup
+        memberInfo={{ "friend-1": { name: "Ada", avatarIndex: 4 } }}
+      />,
+    ).root;
+    expect(root.findAllByType("ClubBody")).toHaveLength(1);
+    // Kendi yüzeyini çizen kart sohbet kartı genişliğinde (390 dp ekranda 306).
+    expect(root.findByType("ClubBody").props.cardWidth).toBe(306);
+    expect(flatStyle(root.findAllByType("TouchableOpacity")[0].props.style)).toMatchObject({
+      padding: 0,
+      borderWidth: 0,
+      backgroundColor: "transparent",
+    });
+  });
+
+  test("every rich card gets the chat card width; neutral-surface cards get its inner width", () => {
+    // Nötr yüzey: 306 − (dolgu 10 + çerçeve 1) × 2 = 284. Çerçeve payı düşülmezse içerik 2 dp taşar.
+    const poll = {
+      id: "m-poll",
+      senderId: "them",
+      kind: "poll",
+      poll: { question: "?", type: "text", options: [{ id: "a", label: "A" }, { id: "b", label: "B" }], votes: {} },
+    };
+    expect(render(<MessageBubble {...base} item={poll} />).root.findByType("PollBody").props.cardWidth).toBe(284);
+    const taste = messageOf(buildTasteMatchShare({ score: 72, host: "Ada", friend: "Can" }));
+    const tasteRoot = render(<MessageBubble {...base} item={taste} />).root;
+    const tasteCard = tasteRoot.find((node) => node.props?.share?.type === "tasteMatch" && "cardWidth" in node.props);
+    expect(tasteCard.props.cardWidth).toBe(284);
+    const frame = messageOf(
+      buildFrameShare({ dayKey: "2026-11-06", number: 3, marks: ["miss", "hit", "empty", "empty", "empty", "empty"] }),
+    );
+    expect(render(<MessageBubble {...base} item={frame} />).root.findByType("FrameBody").props.cardWidth).toBe(306);
+  });
+
+  test("game cards know when the viewer is the sender (no play / compare footer on my own card)", () => {
+    const frameShare = buildFrameShare({
+      dayKey: "2026-11-06",
+      number: 3,
+      marks: ["miss", "hit", "empty", "empty", "empty", "empty"],
+    });
+    const mine = render(<MessageBubble {...base} item={messageOf(frameShare, { senderId: "me" })} />).root;
+    expect(mine.findByType("FrameBody").props.isOutgoing).toBe(true);
+    const theirs = render(<MessageBubble {...base} item={messageOf(frameShare)} />).root;
+    expect(theirs.findByType("FrameBody").props.isOutgoing).toBe(false);
   });
 
   test("an AI share renders the CineMatch body and opens a pick's detail", () => {
@@ -678,34 +846,116 @@ describe("SharedTournamentMessage", () => {
     buildTournamentShare({ periodId: "2026-10", phase: "voting", ...extra });
   const mount = (share, props = {}) =>
     render(<SharedTournamentMessage share={share} getTmdbUrl={getTmdbUrl} {...props} />).root;
+  // Oy dokümanı okuması bir söz (promise) — çözülmesini bekleyip sonra bakarız.
+  const mountSettled = async (share, props = {}) => {
+    const root = mount(share, props);
+    await act(async () => {});
+    return root;
+  };
   const at = (y, m, d) => setDebugNow(new Date(y, m, d, 12).getTime());
+  // Ekim 2026'nın 10'u: oylama, aktif tur Son 16 (8 maç).
+  const r16Picks = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`r16_${i}`, "a"]));
+  const bracketOf = (states, extra = {}) => ({ states, round: 1, ...extra });
+  beforeEach(() => {
+    mockMyVote = null;
+    mockFetchMyVote.mockClear();
+    resetTournamentVoteCache();
+  });
   afterEach(() => setDebugNow(null));
 
-  test("titles the card from the period in the viewer's language", () => {
+  test("titles the card from the period in the viewer's language", async () => {
     at(2026, 9, 10);
-    const text = textOf(mount(sendTournament()));
+    const text = textOf(await mountSettled(sendTournament()));
     expect(text).toContain("AYLIK TURNUVA");
     // Ekim = Korku, film ayı.
     expect(text).toContain("Korku Film");
     expect(text).toContain("Ekim 2026");
   });
 
-  test("a live voting month says voting and invites the viewer to join", () => {
+  test("a live voting month with no vote yet asks the viewer to vote", async () => {
     at(2026, 9, 10);
     const onOpen = jest.fn();
-    const root = mount(sendTournament({ voters: 42 }), { onOpen });
+    const root = await mountSettled(sendTournament({ voters: 42 }), { onOpen });
+    expect(mockFetchMyVote).toHaveBeenCalledWith("2026-10", "me");
     expect(textOf(root)).toContain("Oylama sürüyor");
     expect(textOf(root)).toContain("42 katılımcı");
-    press(byLabel(root, "Turnuvaya katıl"));
+    expect(textOf(root)).toContain("Bu turda henüz oy vermedin");
+    press(byLabel(root, "Oy ver"));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
-  test("the card follows the calendar: shared in voting, opened after results", () => {
+  test("says 'already voted' once every match of the live round has the viewer's vote", async () => {
+    at(2026, 9, 10);
+    mockMyVote = { picks: { ...r16Picks(8), r32_0: "b" } };
+    const root = await mountSettled(sendTournament(), { onOpen: () => {} });
+    expect(textOf(root)).toContain("Zaten oy verdin");
+    expect(textOf(root)).toContain("Son 16 · 8/8");
+    expect(byLabel(root, "Ağacı gör")).toBeDefined();
+    expect(byLabel(root, "Oy ver")).toBeUndefined();
+  });
+
+  test("a half-voted round invites the viewer to keep going", async () => {
+    at(2026, 9, 10);
+    mockMyVote = { picks: r16Picks(3) };
+    const root = await mountSettled(sendTournament(), { onOpen: () => {} });
+    expect(textOf(root)).toContain("3/8 maça oy verdin");
+    expect(byLabel(root, "Oylamaya devam et")).toBeDefined();
+  });
+
+  test("selection: tells whether the viewer's hype is in, and shows the hype leaders", async () => {
+    at(2026, 9, 3);
+    mockMyVote = { noms: { 77: true } };
+    const top = [
+      { id: 1, title: "Alien", poster_path: "/a.jpg", seed: 1 },
+      { id: 2, title: "Hereditary", poster_path: "/h.jpg", seed: 2 },
+      { id: 3, title: "Scream", seed: 3 },
+    ];
+    const root = await mountSettled(
+      sendTournament({ phase: "selection", bracket: bracketOf(".".repeat(31), { round: -1, top }) }),
+      { onOpen: () => {} },
+    );
+    const text = textOf(root);
+    expect(text).toContain("Hype'ını zaten verdin");
+    expect(text).toContain("Hype liderleri");
+    expect(text).toContain("Alien");
+    expect(text).toContain("Scream");
+    expect(byLabel(root, "Sıralamayı gör")).toBeDefined();
+  });
+
+  test("draws the bracket as it was when sent, with the viewer's own picks", async () => {
+    at(2026, 9, 10);
+    mockMyVote = { picks: { final_0: "a" } };
+    const states = `${"a".repeat(16)}${"v".repeat(8)}${".".repeat(7)}`;
+    const root = await mountSettled(
+      sendTournament({
+        bracket: bracketOf(states, { final: { a: { id: 1, title: "Alien", poster_path: "/a.jpg", seed: 1 } } }),
+      }),
+    );
+    const tree = root.findByType("TreePreview");
+    expect(tree.props.activeRound).toBe(1);
+    expect(tree.props.phase).toBe("voting");
+    expect(tree.props.animated).toBe(false);
+    expect(tree.props.myPicks).toEqual({ final_0: "a" });
+    const { rounds } = tree.props.bracket;
+    expect(rounds[0].matches.every((m) => m.decided && m.winnerSide === "a")).toBe(true);
+    expect(rounds[1].matches.every((m) => m.votable)).toBe(true);
+    expect(rounds[4].matches[0].a).toMatchObject({ id: 1, posterPath: "/a.jpg", seed: 1 });
+  });
+
+  test("an old message without a bracket snapshot still renders, without a tree", async () => {
+    at(2026, 9, 10);
+    const root = await mountSettled(sendTournament());
+    expect(root.findAllByType("TreePreview")).toHaveLength(0);
+  });
+
+  test("the card follows the calendar: shared in voting, opened after results", async () => {
     at(2026, 9, 25);
-    const root = mount(sendTournament(), { onOpen: () => {} });
+    const root = await mountSettled(sendTournament(), { onOpen: () => {} });
     expect(textOf(root)).toContain("Sonuçlar açıklandı");
     expect(byLabel(root, "Sonuçları gör")).toBeDefined();
-    expect(byLabel(root, "Turnuvaya katıl")).toBeUndefined();
+    expect(byLabel(root, "Oy ver")).toBeUndefined();
+    // Bitmiş turnuvada kişisel durum sorulmaz.
+    expect(mockFetchMyVote).not.toHaveBeenCalled();
   });
 
   test("a past month is always finished", () => {
@@ -715,9 +965,9 @@ describe("SharedTournamentMessage", () => {
     expect(livePhase("2027-01", "selection")).toBe("selection");
   });
 
-  test("shows the champion once the tournament is over", () => {
+  test("shows the champion once the tournament is over", async () => {
     at(2026, 9, 25);
-    const root = mount(
+    const root = await mountSettled(
       sendTournament({ phase: "results", champion: { id: 5, title: "Hereditary", posterPath: "/h.jpg", mediaType: "movie" } }),
     );
     expect(textOf(root)).toContain("Şampiyon");
@@ -725,9 +975,26 @@ describe("SharedTournamentMessage", () => {
     expect(root.findAllByType("Image")[0].props.source.uri).toBe("https://img.test/w200/h.jpg");
   });
 
-  test("a champion snapshot is ignored while the tournament is still running", () => {
+  test("with a bracket snapshot the champion lives in the tree, not in a separate panel", async () => {
+    at(2026, 9, 25);
+    const root = await mountSettled(
+      sendTournament({
+        phase: "results",
+        champion: { id: 5, title: "Hereditary", posterPath: "/h.jpg", mediaType: "movie" },
+        bracket: bracketOf(`${"a".repeat(31)}`, {
+          round: 5,
+          final: { a: { id: 5, title: "Hereditary", poster_path: "/h.jpg", seed: 1 } },
+        }),
+      }),
+    );
+    expect(textOf(root)).not.toContain("Şampiyon");
+    expect(root.findAllByType("Image")).toHaveLength(0);
+    expect(root.findByType("TreePreview").props.bracket.champion).toMatchObject({ id: 5 });
+  });
+
+  test("a champion snapshot is ignored while the tournament is still running", async () => {
     at(2026, 9, 10);
-    const root = mount(
+    const root = await mountSettled(
       sendTournament({ champion: { id: 5, title: "Hereditary", posterPath: "/h.jpg" } }),
     );
     expect(textOf(root)).not.toContain("Hereditary");
@@ -1057,5 +1324,40 @@ describe("MessageBubble: hub paylaşımları", () => {
     ).root;
     press(byLabel(own, "Listeyi kaydet"));
     expect(onSaveList).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("kart içeriği sohbet kartı genişliğine sığar", () => {
+  test("post poster strip never exceeds the card's inner width", () => {
+    const { stripLayout } = require("../components/chat/PosterStrip");
+    [228, 254, 284].forEach((width) => {
+      [2, 3, 4, 9].forEach((total) => {
+        expect(stripLayout(total, width).width).toBeLessThanOrEqual(width);
+      });
+    });
+  });
+
+  test("film club candidate strip fits inside the card at every chat width", () => {
+    const { clubStripLayout } = require("../utils/chatCardFit");
+    [250, 278, 306].forEach((cardWidth) => {
+      [2, 4, 5, 8].forEach((count) => {
+        const { shown, more, posterW } = clubStripLayout(count, cardWidth);
+        const slots = shown + (more > 0 ? 1 : 0);
+        expect(slots * posterW + 6 * (slots - 1)).toBeLessThanOrEqual(cardWidth - 28);
+      });
+    });
+  });
+
+  test("daily frame marks span the card without overflowing", () => {
+    const { frameMarkSize, tastePosterWidth } = require("../utils/chatCardFit");
+    [250, 278, 306].forEach((cardWidth) => {
+      const size = frameMarkSize(6, cardWidth);
+      expect(6 * size + 5 * 5).toBeLessThanOrEqual(cardWidth - 28);
+      expect(size).toBeGreaterThanOrEqual(30);
+    });
+    // Zevk uyumu: dört afiş yuvası nötr kartın iç genişliğine (228–284) sığar.
+    [228, 256, 284].forEach((width) => {
+      expect(4 * tastePosterWidth(width) + 6 * 3).toBeLessThanOrEqual(width);
+    });
   });
 });

@@ -136,6 +136,18 @@ export const ANALYTICS_EVENTS = {
   FILM_CHAIN_STARTED: "film_chain_started",
   FILM_CHAIN_FINISHED: "film_chain_finished",
   FILM_CHAIN_SHARED: "film_chain_shared",
+  // Film Kulübü (utils/filmClub.js, services/filmClubService.js): kulüp kuruldu {cadence, members} / tur açıldı
+  // {number, candidates} / film seçildi {number, media_type} / tur bitti {number, watched_pct, rated}. Katılım
+  // (watched_pct) kulübün yaşayıp yaşamadığını söyler; film adı ve grup kimliği GÖNDERİLMEZ.
+  FILM_CLUB_CREATED: "film_club_created",
+  FILM_CLUB_ROUND_STARTED: "film_club_round_started",
+  FILM_CLUB_PICKED: "film_club_picked",
+  FILM_CLUB_FINISHED: "film_club_finished",
+  // Günün Karesi (utils/dailyFrame.js): günün ilk tahmini / oyun bitti {won, guesses} / sonuç paylaşıldı
+  // {target: "out" | "chat"}. Bulmaca numarası `number` hepsinde (hangi gün zor geldi).
+  DAILY_FRAME_STARTED: "daily_frame_started",
+  DAILY_FRAME_FINISHED: "daily_frame_finished",
+  DAILY_FRAME_SHARED: "daily_frame_shared",
   // Günün Sorusu'nda OY VERİLDİ (utils/dailyPoll.js). `question_id` kalıcı soru kimliği (seçilen taraf GÖNDERİLMEZ),
   // `synced` oy sunucuya yazıldı mı (false = çevrimdışı / kurallar yayında değil → yerelde bekliyor).
   DAILY_POLL_VOTED: "daily_poll_voted",

@@ -57,7 +57,7 @@ describe("kapsam", () => {
 
   test("kişiye/cihaza özel ayarlar ASLA paylaşılmaz", () => {
     const personal = [
-      ...BACKUP_GROUPS.filter((g) => ["content", "notifications", "data", "widgets", "pet"].includes(g.id)).flatMap((g) => g.keys),
+      ...BACKUP_GROUPS.filter((g) => ["content", "notifications", "data", "widgets"].includes(g.id)).flatMap((g) => g.keys),
       "customThemes",
       "effectMode",
     ];

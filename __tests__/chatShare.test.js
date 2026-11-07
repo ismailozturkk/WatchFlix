@@ -460,6 +460,28 @@ const feedPost = (extra = {}) => ({
 });
 
 describe("buildPostShare", () => {
+  it("tier list gönderisi: afişler kademe sırasıyla düzleşir, tür korunur", () => {
+    const share = buildPostShare(
+      feedPost({
+        type: "tierlist",
+        title: "2024 sıralamam",
+        userRating: null,
+        mediaList: [],
+        tierList: {
+          title: "2024",
+          total: 3,
+          tiers: [
+            { label: "S", color: "#FF7F7F", items: [{ id: 2, media_type: "movie", title: "B", poster_path: "/b.jpg" }] },
+            { label: "A", color: "#FFBF7F", items: [{ id: 1, media_type: "tv", title: "A", poster_path: "/a.jpg" }, { id: 3, media_type: "movie", title: "C" }] },
+          ],
+        },
+      }),
+    );
+    expect(share.postType).toBe("tierlist");
+    expect(share.items.map((item) => item.id)).toEqual([2, 1, 3]);
+    expect(share.total).toBe(3);
+  });
+
   it("feed gönderisini paylaşım gövdesine çevirir", () => {
     const share = buildPostShare(feedPost());
     expect(share).toMatchObject({

@@ -9,7 +9,7 @@
 //   • Selamlama başlığı + avatar
 //   • Sosyal: Paylaşımlar kartı (components/hub/FeedWidget) — feed'e gider;
 //     içinde hızlı paylaşım çubuğu + tür karoları (İnceleme/Liste/Sohbet/Anket)
-//   • CineSwipe ve Turnuva vitrin kartları (components/hub/*)
+//   • Turnuva (2. sıra), CineSwipe, Bingo ve Günün Sorusu kartları (components/hub/*)
 //   • Oyunlar: taşınan ProfileGamesModule (öne çıkan oyun + istatistik)
 //
 // Üç vitrin bölümü aynı SectionHeader'ı kullanır (Oyunlar modülüyle aynı başlık
@@ -29,8 +29,9 @@ import {
   ScrollView,
 } from "react-native";
 import { Image } from "expo-image";
-// Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
-import SafeAreaView from "@components/common/ScreenSafeAreaView";
+// Üst boşluk kaydırılan içeriğin içinde (diğer sekmeler gibi): Premium şeridi
+// yüzerken içerik onun ALTINDAN geçer; büyütülmüş insets.top şeridi de kapsar.
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import ScreenDecor from "@components/ScreenDecor";
 import ProfileGamesModule from "@components/profile/ProfileGamesModule";
@@ -40,12 +41,17 @@ import CineSwipeWidget from "@components/hub/CineSwipeWidget";
 import BingoWidget from "@components/hub/BingoWidget";
 import DailyPollWidget from "@components/hub/DailyPollWidget";
 import Top100Widget from "@components/hub/Top100Widget";
+import ChallengesWidget from "@components/hub/ChallengesWidget";
+import LeagueWidget from "@components/hub/LeagueWidget";
+import TierListWidget from "@components/hub/TierListWidget";
 import { SectionHeader } from "@components/game/ui";
 import { useTheme } from "@context/ThemeContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { i18nText } from "@utils/i18nText";
+import { getWatchChallengesCopy } from "@utils/watchChallengesCopy";
+import { getTierListCopy } from "@utils/tierListCopy";
 
 // Başlık + kart: bölüm genişliği ve başlık hizası tek yerde.
 function HubSection({ title, theme, children }) {
@@ -63,6 +69,7 @@ function HubSection({ title, theme, children }) {
 const MarkedScrollView = markTabScroll(ScrollView);
 
 export default function HubScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { contentBottom } = useTabBarLayout();
   const onTabBarScroll = useTabBarScrollSync();
   const { theme } = useTheme();
@@ -84,9 +91,12 @@ export default function HubScreen({ navigation }) {
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
       {/* Arka plan dekoru (ikon deseni + kar) — içeriğin ARKASINDA */}
       <ScreenDecor scope="home" iconOpacity={0.15} />
-      <SafeAreaView edges={["top"]} style={styles.container}>
+      <View style={styles.container}>
         <MarkedScrollView
-          contentContainerStyle={[styles.scroll, { paddingBottom: contentBottom }]}
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingTop: insets.top + SCROLL_TOP, paddingBottom: contentBottom },
+          ]}
           showsVerticalScrollIndicator={false}
           onScroll={onTabBarScroll}
           scrollEventThrottle={16}
@@ -119,10 +129,24 @@ export default function HubScreen({ navigation }) {
           )}
         </View>
 
+        {/* Haftalık Lig — en üstte: sıran, XP'n, kalan süre */}
+        {show("league") && (
+          <HubSection title={i18nText("autoI18n.haftalik_lig_bolum", "Haftalık Lig")} theme={theme}>
+            <LeagueWidget navigation={navigation} />
+          </HubSection>
+        )}
+
         {/* Sosyal */}
         {show("feed") && (
           <HubSection title={i18nText("autoI18n.sosyal", "Sosyal")} theme={theme}>
             <FeedWidget navigation={navigation} />
+          </HubSection>
+        )}
+
+        {/* Turnuva — Sosyal'in hemen altında (2. sıra) */}
+        {show("tournament") && (
+          <HubSection title={i18nText("autoI18n.tournament_section", "Turnuva")} theme={theme}>
+            <TournamentWidget navigation={navigation} />
           </HubSection>
         )}
 
@@ -154,10 +178,17 @@ export default function HubScreen({ navigation }) {
           </HubSection>
         )}
 
-        {/* Turnuva */}
-        {show("tournament") && (
-          <HubSection title={i18nText("autoI18n.tournament_section", "Turnuva")} theme={theme}>
-            <TournamentWidget navigation={navigation} />
+        {/* Meydan okumalar (52 haftada 52 film, her on yıldan bir film, yönetmen filmografisi…) */}
+        {show("challenges") && (
+          <HubSection title={getWatchChallengesCopy(language).sectionTitle} theme={theme}>
+            <ChallengesWidget navigation={navigation} />
+          </HubSection>
+        )}
+
+        {/* Tier list (film / dizi kademeli sıralama; görsel ve sohbet paylaşımı) */}
+        {show("tierlist") && (
+          <HubSection title={getTierListCopy(language).sectionTitle} theme={theme}>
+            <TierListWidget navigation={navigation} />
           </HubSection>
         )}
 
@@ -166,14 +197,16 @@ export default function HubScreen({ navigation }) {
 
         {allHidden && <SectionsHiddenNotice navigation={navigation} screen="hub" />}
         </MarkedScrollView>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
 
+const SCROLL_TOP = 10;
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scroll: { alignItems: "center", paddingTop: 10, paddingBottom: 110 },
+  scroll: { alignItems: "center", paddingBottom: 110 },
 
   headerRow: {
     width: "90%",

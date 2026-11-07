@@ -128,10 +128,13 @@ import {
 } from "@utils/chatEntrance";
 import TextPollComposer from "@components/chat/TextPollComposer";
 import GroupInfoModal from "@components/chat/GroupInfoModal";
+import ClubChatBanner from "@components/club/ClubChatBanner";
 import GroupAvatar from "@components/chat/GroupAvatar";
 import ComposerReplyBar from "@components/chat/ComposerReplyBar";
 import { buildReplySnapshot } from "@utils/chatReply";
 import { buildShareMessage, readShare, sharePreview } from "@utils/chatShare";
+import { withSenderBackdrop } from "@utils/chatMediaBackdrop";
+import { useBackdropResolver } from "@context/PosterChoicesContext";
 import {
   CHAT_SEARCH_DEBOUNCE_MS,
   CHAT_SEARCH_MIN_CHARS,
@@ -149,8 +152,9 @@ import ReportReasonSheet from "@components/moderation/ReportReasonSheet";
 import { useFriends } from "@context/FriendsContext";
 import { reportMessage } from "@services/reportService";
 import {
+  canDeleteGroupMessage,
   canManageGroup,
-  isGroupCreator,
+  canSendGroupMessage,
 } from "@utils/groupRoles";
 import {
   createMessageClientId,
@@ -220,6 +224,7 @@ const buildMediaPayload = (item) => {
     media_type: mediaType,
     title: item.title || item.name || i18nText("autoI18n.bilinmiyor", "bilinmiyor"),
     poster_path: item.poster_path || item.profile_path || null,
+    ...(!isPerson ? { backdrop_path: item.backdrop_path || null } : {}),
     ...(isPerson
       ? {
           overview: knownForTitles || null,
@@ -276,6 +281,23 @@ const messagePreview = (message) => {
 
 const timestampMs = (value) => value?.toMillis?.() || value?.toDate?.()?.getTime?.() || 0;
 
+// Grup "Yalnız yöneticiler mesaj gönderebilir" kipindeyken postMessage bu kodla
+// reddeder; gönderim yolları genel "gönderilemedi" yerine nedeni söyler.
+const ADMINS_ONLY_ERROR = "admins-only";
+const toastSendError = (error) => {
+  if (error?.code === ADMINS_ONLY_ERROR) {
+    toast.warning(
+      i18nText("autoI18n.yalniz_yoneticiler_yazabilir", "Yalnız yöneticiler yazabilir"),
+      i18nText(
+        "autoI18n.yalniz_yoneticiler_yazabilir_aciklama",
+        "Bu grupta yalnız kurucu ve yöneticiler mesaj gönderebilir",
+      ),
+    );
+    return;
+  }
+  toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
+};
+
 // Mesaj sayfaları (services/chatMessagePager.js): açılışta ve her "daha eski"de
 // bu kadar mesaj; alıntıya atlamada daha büyük sayfa, en çok 6 sayfa (≈300 mesaj).
 const MESSAGE_PAGE_SIZE = 30;
@@ -283,6 +305,11 @@ const JUMP_PAGE_SIZE = 50;
 const JUMP_MAX_PAGES = 6;
 
 // ─── Arama Sonuç Kartı ──────────────────────────────────────────────────────
+// Liste/anket için içerik seçme ızgarası: 4 sütun, küçük ve sade afişler
+// (3 sütunda afişler sayfayı dolduruyordu; seçim için tanınmaları yeterli).
+const SEARCH_GRID_COLUMNS = 4;
+const SEARCH_CARD_RADIUS = 8;
+
 const SearchResultCard = memo(({ item, onPress, getTmdbUrl, theme, selected }) => {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
@@ -329,22 +356,13 @@ const SearchResultCard = memo(({ item, onPress, getTmdbUrl, theme, selected }) =
             >
               <Ionicons
                 name={item.media_type === "person" ? "person-outline" : "film-outline"}
-                size={24}
+                size={18}
                 color={theme.text.muted}
               />
             </View>
           )}
           {/* Kenar çizgisi görselin ÜSTÜNDE (borderWidth afişi kırpardı). */}
-          <PosterEdge radius={12} color={alpha(theme.text.primary, 0.1)} />
-
-          {item.media_type !== "person" && item.vote_average > 0 && (
-            <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={9} color="#FFD54F" />
-              <Text allowFontScaling={false} style={styles.ratingText}>
-                {Number(item.vote_average).toFixed(1)}
-              </Text>
-            </View>
-          )}
+          <PosterEdge radius={SEARCH_CARD_RADIUS} color={alpha(theme.text.primary, 0.1)} />
 
           {selected && (
             <View
@@ -362,13 +380,13 @@ const SearchResultCard = memo(({ item, onPress, getTmdbUrl, theme, selected }) =
               selected && { backgroundColor: accent, borderColor: "#fff" },
             ]}
           >
-            {selected && <Ionicons name="checkmark" size={13} color="#fff" />}
+            {selected && <Ionicons name="checkmark" size={11} color="#fff" />}
           </View>
         </View>
 
         <Text
           style={[styles.searchCardTitle, { color: theme.text.primary }]}
-          numberOfLines={2}
+          numberOfLines={1}
         >
           {title}
         </Text>
@@ -425,6 +443,8 @@ export default function ChatScreen({ route, navigation }) {
     photoURL: null,
   }));
   const { getTmdbUrl } = useImageQualitySettings();
+  // Tekli film/dizi mesajına gönderenin GÖRDÜĞÜ arka plan yazılır (özel seçim dahil).
+  const resolveBackdrop = useBackdropResolver();
   const [editingMessage, setEditingMessage] = useState(null);
   const [text, setText] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -804,8 +824,12 @@ export default function ChatScreen({ route, navigation }) {
     [currentUser.uid, isGroup, groupId, messagesRef],
   );
 
-  const currentUserIsCreator = isGroupCreator(groupData, currentUser.uid);
   const currentUserCanManageGroup = canManageGroup(groupData, currentUser.uid);
+  // "Yalnız yöneticiler mesaj gönderebilir" açıkken sıradan üye yazamaz (kural da
+  // reddeder). Grup belgesi henüz gelmediyse kilitleme: kural son sözü söyler.
+  const groupSendLocked = Boolean(
+    isGroup && groupData && !canSendGroupMessage(groupData, currentUser.uid),
+  );
 
   // "Sohbet ekranda" durumu EKRANIN ODAĞINA bağlı, yalnız mount'a değil.
   // ChatScreen yığında kalıp üstüne başka ekran (arkadaş profili, başka bir
@@ -1143,7 +1167,8 @@ export default function ChatScreen({ route, navigation }) {
 
   const beginReply = useCallback(
     (message) => {
-      if (!message?.id) return;
+      // Yazamayan üye için kaydırarak yanıt da kapalı (yazma kutusu yok).
+      if (!message?.id || groupSendLocked) return;
       // Kaydırarak yanıt eşiği geçildi: belirgin bir "çentik".
       Haptics.haptic("swipeThreshold");
       setEditingMessage(null);
@@ -1156,7 +1181,7 @@ export default function ChatScreen({ route, navigation }) {
       setOptionsVisible(false);
       setTimeout(() => messageInputRef.current?.focus(), 100);
     },
-    [hapticsEnabled, resolveSenderName],
+    [hapticsEnabled, resolveSenderName, groupSendLocked],
   );
 
   const replyFields = useCallback(
@@ -1168,9 +1193,10 @@ export default function ChatScreen({ route, navigation }) {
     (pin) =>
       Boolean(
         pin &&
-          (pin.pinnedBy === currentUser.uid || (isGroup && currentUserIsCreator)),
+          (pin.pinnedBy === currentUser.uid ||
+            (isGroup && canDeleteGroupMessage(groupData, currentUser.uid, pin.senderId))),
       ),
-    [currentUser.uid, isGroup, currentUserIsCreator],
+    [currentUser.uid, isGroup, groupData],
   );
 
   const pinMessage = useCallback(
@@ -1326,7 +1352,7 @@ export default function ChatScreen({ route, navigation }) {
   // istemci hiçbir alıcıya yazmaz (utils/chatPush.js). Davet belgeleri mesaj
   // batch'i işlendikten SONRA yazılır: sunucu push'u rozete yazacağı okunmamış
   // toplamını o an okur (functions/appBadge.js). Hata gönderimi geri almaz.
-  // `messageId`: davetin kartı — Profil çubuğundaki kabul/ret o mesaja da yazılır.
+  // `messageId`: davetin kartı — yüzen davet kartındaki kabul/ret o mesaja da yazılır.
   // `members`: gönderim anında çözülen grup üyeleri (dinleyici henüz gelmediyse de davet herkese gider).
   const notifyInvitation = useCallback(
     (previewText, invitation, messageId, members) => {
@@ -1378,6 +1404,11 @@ export default function ChatScreen({ route, navigation }) {
   // işaretini taşır; davet ise ardından bildirim belgesi yazar.
   const postMessage = useCallback(
     async (messageData, previewText) => {
+      if (groupSendLocked) {
+        const error = new Error("admins-only");
+        error.code = ADMINS_ONLY_ERROR;
+        throw error;
+      }
       const { message, invitation } = prepareOutgoingMessage(messageData);
       // Grup belgesi dinleyiciden henüz gelmediyse (sohbet yeni açıldı ya da
       // dinleyici düştü) üyeler gönderim anında okunur; yoksa diğer üyelerin
@@ -1398,7 +1429,7 @@ export default function ChatScreen({ route, navigation }) {
       await batch.commit();
       notifyInvitation(previewText, invitation, messageRef.id, groupMembers);
     },
-    [messagesRef, queueThreadWrites, notifyInvitation, isGroup, groupData, chatRef],
+    [messagesRef, queueThreadWrites, notifyInvitation, isGroup, groupData, chatRef, groupSendLocked],
   );
 
   // Mesajlar listesindeki önizlemeyi sohbetin GÜNCEL son mesajına eşitler (bkz.
@@ -1476,7 +1507,7 @@ export default function ChatScreen({ route, navigation }) {
         setReplyingTo(null);
       } catch (err) {
         console.error("textPoll:", err);
-        toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
+        toastSendError(err);
       }
     },
     [currentUser.uid, replyFields, senderFields, postMessage, closeTextPollModal],
@@ -1589,7 +1620,7 @@ export default function ChatScreen({ route, navigation }) {
       setTextLink(isLink(outgoing));
       if (replySnapshot) setReplyingTo((current) => current || replySnapshot);
       console.error(i18nText("autoI18n.mesaj_gonderme_hatasi", "Mesaj gönderme hatası:"), error);
-      toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
+      toastSendError(error);
     }
   }, [
     text,
@@ -1904,6 +1935,7 @@ export default function ChatScreen({ route, navigation }) {
   );
   const canUnpinSelected = Boolean(selectedPin && canRemovePin(selectedPin));
   const canEditSelected = Boolean(
+    !groupSendLocked &&
     selectedMessage?.senderId === currentUser.uid &&
       !selectedMessage?.media &&
       !selectedMessage?.items &&
@@ -1912,7 +1944,9 @@ export default function ChatScreen({ route, navigation }) {
   );
   const canDeleteSelected = Boolean(
     selectedMessage &&
-      (selectedMessage.senderId === currentUser.uid || (isGroup && currentUserIsCreator)),
+      (selectedMessage.senderId === currentUser.uid ||
+        (isGroup &&
+          canDeleteGroupMessage(groupData, currentUser.uid, selectedMessage.senderId))),
   );
   // Moderasyon eylemleri YALNIZ karşı tarafın mesajında: kendi mesajını
   // şikâyet etmek anlamsız, kendini engellemek zaten kural düzeyinde reddedilir.
@@ -1970,6 +2004,31 @@ export default function ChatScreen({ route, navigation }) {
     [block, currentUser.uid],
   );
 
+  // Alıcı bir liste paylaşımını kendi profiline kaydetmek istedi: kayıt modalı
+  // zaten "paylaşım gönderisi" şeklini (id, başlık, mediaList) okuyor.
+  const savePostOf = useCallback(
+    (message, share) => ({
+      id: message?.id,
+      title: share?.title || "",
+      mediaList: share?.items || [],
+    }),
+    [],
+  );
+  const openSaveList = useCallback(
+    (message, share) => {
+      if (!share?.items?.length) return;
+      setSaveListPost(savePostOf(message, share));
+      setSaveListVisible(true);
+    },
+    [savePostOf],
+  );
+
+  const openListSheet = useCallback((message, share) => {
+    if (!share?.items?.length) return;
+    setListSheet({ message, share });
+    setListSheetVisible(true);
+  }, []);
+  const closeListSheet = useCallback(() => setListSheetVisible(false), []);
   const renderItem = useCallback(
     ({ item, index }) => {
       // Firestore desc + FlatList inverted:
@@ -2213,7 +2272,7 @@ export default function ChatScreen({ route, navigation }) {
         timestamp: serverTimestamp(),
         status: "sent",
         ...senderFields(),
-        media: m,
+        media: withSenderBackdrop(m, resolveBackdrop),
       };
     } else {
       previewText = title
@@ -2255,7 +2314,7 @@ export default function ChatScreen({ route, navigation }) {
       setReplyingTo(null);
     } catch (err) {
       console.error(i18nText("autoI18n.arama_sonucu_gonderme_hatasi", "Arama sonucu gönderme hatası:"), err);
-      toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
+      toastSendError(err);
     }
   }, [
     selectedItems,
@@ -2266,6 +2325,7 @@ export default function ChatScreen({ route, navigation }) {
     senderFields,
     postMessage,
     resetCompose,
+    resolveBackdrop,
   ]);
 
   // Detay ekranındaki "Gönder" akışı da sohbet aramasının ürettiği tekli
@@ -2289,13 +2349,13 @@ export default function ChatScreen({ route, navigation }) {
             timestamp: serverTimestamp(),
             status: "sent",
             ...senderFields(),
-            media: initialMedia,
+            media: withSenderBackdrop(initialMedia, resolveBackdrop),
           },
           previewText,
         );
       } catch (error) {
         console.error("detailMediaSend:", error);
-        toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
+        toastSendError(error);
       }
     };
 
@@ -2309,6 +2369,7 @@ export default function ChatScreen({ route, navigation }) {
     isGroup,
     navigation,
     senderFields,
+    resolveBackdrop,
   ]);
 
   // "Sohbete gönder" ile gelen liste / CineMatch cevabı (utils/chatShare.js):
@@ -2345,7 +2406,7 @@ export default function ChatScreen({ route, navigation }) {
         );
       } catch (error) {
         console.error("shareToChatSend:", error);
-        toast.error(i18nText("autoI18n.mesaj_gonderilemedi", "Mesaj gönderilemedi."));
+        toastSendError(error);
       }
     };
 
@@ -2361,31 +2422,6 @@ export default function ChatScreen({ route, navigation }) {
     senderFields,
   ]);
 
-  // Alıcı bir liste paylaşımını kendi profiline kaydetmek istedi: kayıt modalı
-  // zaten "paylaşım gönderisi" şeklini (id, başlık, mediaList) okuyor.
-  const savePostOf = useCallback(
-    (message, share) => ({
-      id: message?.id,
-      title: share?.title || "",
-      mediaList: share?.items || [],
-    }),
-    [],
-  );
-  const openSaveList = useCallback(
-    (message, share) => {
-      if (!share?.items?.length) return;
-      setSaveListPost(savePostOf(message, share));
-      setSaveListVisible(true);
-    },
-    [savePostOf],
-  );
-
-  const openListSheet = useCallback((message, share) => {
-    if (!share?.items?.length) return;
-    setListSheet({ message, share });
-    setListSheetVisible(true);
-  }, []);
-  const closeListSheet = useCallback(() => setListSheetVisible(false), []);
   // Sayfada bir afişe basıldı: sayfa kapanır ve detay açılır (arkadaş profilindeki
   // liste sayfasıyla aynı akış).
   const openListSheetItem = useCallback(
@@ -2499,6 +2535,14 @@ export default function ChatScreen({ route, navigation }) {
         ]}
       >
           {/* ── MESAJ LİSTESİ ── */}
+          {isGroup && (
+            <ClubChatBanner
+              groupId={groupId}
+              enabled={groupData?.club?.enabled === true}
+              uid={currentUser.uid}
+              onPress={(round) => navigation.navigate("FilmClubScreen", { groupId, roundId: round.id })}
+            />
+          )}
           {pinnedMessages.length > 0 && (
             <GlassTouchable
               onPress={() => setPinnedModalVisible(true)}
@@ -2664,7 +2708,7 @@ export default function ChatScreen({ route, navigation }) {
             onLayout={(event) => setComposerHeight(event.nativeEvent.layout.height)}
           >
               {/* Alıntı kartı */}
-              {replyingTo && (
+              {replyingTo && !groupSendLocked && (
                 <ComposerReplyBar
                   reply={replyingTo}
                   isSelf={replyingTo.senderId === currentUser.uid}
@@ -2679,7 +2723,7 @@ export default function ChatScreen({ route, navigation }) {
                 />
               )}
               {/* Düzenleme banner */}
-              {editingMessage && (
+              {editingMessage && !groupSendLocked && (
                 <View style={styles.editingBanner}>
                   <View style={styles.editingAccent} />
                   <MaterialIcons name="edit" size={13} color={EDIT_COLOR} />
@@ -2703,7 +2747,7 @@ export default function ChatScreen({ route, navigation }) {
               )}
 
               {/* FAB menüsü — anket & arama kısayolları */}
-              {attachMenuVisible && (
+              {attachMenuVisible && !groupSendLocked && (
                 <View style={styles.attachMenuRow}>
                   <GlassTouchable
                     style={[
@@ -2788,6 +2832,22 @@ export default function ChatScreen({ route, navigation }) {
                     {i18nText(
                       "autoI18n.engellendi_mesaj_gonderilemez",
                       "Bu kullanıcıyı engelledin",
+                    )}
+                  </Text>
+                </View>
+              ) : groupSendLocked ? (
+                // Grup "Yalnız yöneticiler mesaj gönderebilir" kipinde: sıradan
+                // üye okur, ankete oy verir, davete yanıt verir ama yazamaz.
+                <View style={[styles.composerPill, styles.composerBlocked, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
+                  <Ionicons
+                    name="megaphone-outline"
+                    size={17}
+                    color={theme.text.muted}
+                  />
+                  <Text style={[styles.composerBlockedText, { color: theme.text.muted }]}>
+                    {i18nText(
+                      "autoI18n.yalniz_yoneticiler_mesaj_gonderebilir",
+                      "Yalnız yöneticiler mesaj gönderebilir",
                     )}
                   </Text>
                 </View>
@@ -3106,7 +3166,7 @@ export default function ChatScreen({ route, navigation }) {
                           (item.media_type || "x") + "-" + item.id
                         }
                         horizontal={false}
-                        numColumns={3}
+                        numColumns={SEARCH_GRID_COLUMNS}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
                         keyboardDismissMode="on-drag"
@@ -3544,6 +3604,7 @@ export default function ChatScreen({ route, navigation }) {
                     },
                   ]}
                 >
+                  {!groupSendLocked && (
                   <GlassTouchable
                     style={[styles.actionRowL, { backgroundColor: theme.secondary }]}
                     onPress={() => beginReply(selectedMessage)}
@@ -3561,6 +3622,7 @@ export default function ChatScreen({ route, navigation }) {
                       </Text>
                     </View>
                   </GlassTouchable>
+                  )}
 
                   {(canPinSelected || canUnpinSelected) && (
                     <GlassTouchable
@@ -3801,6 +3863,10 @@ export default function ChatScreen({ route, navigation }) {
             onOpenProfile={(uid, name) => {
               setGroupInfoVisible(false);
               navigation.navigate("FriendProfileScreen", { friendUid: uid, friendName: name });
+            }}
+            onOpenClub={() => {
+              setGroupInfoVisible(false);
+              navigation.navigate("FilmClubScreen", { groupId, groupName: groupData?.name || groupName || "" });
             }}
           />
         )}
@@ -4273,9 +4339,9 @@ const styles = StyleSheet.create({
   searchCardSlot: {
     flex: 1,
     minWidth: 0,
-    maxWidth: (SCREEN_WIDTH - 32) / 3,
-    paddingHorizontal: 4,
-    paddingBottom: 12,
+    maxWidth: (SCREEN_WIDTH - 32) / SEARCH_GRID_COLUMNS,
+    paddingHorizontal: 3,
+    paddingBottom: 10,
   },
   searchCard: { width: "100%" },
   searchCardImageWrap: {
@@ -4285,16 +4351,16 @@ const styles = StyleSheet.create({
   },
   searchCardSelectedOverlay: {
     ...StyleSheet.absoluteFill,
-    borderRadius: 12,
-    borderWidth: 2.5,
+    borderRadius: SEARCH_CARD_RADIUS,
+    borderWidth: 2,
   },
   selectDot: {
     position: "absolute",
-    top: 6,
-    right: 6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.85)",
     backgroundColor: "rgba(0,0,0,0.35)",
@@ -4304,29 +4370,16 @@ const styles = StyleSheet.create({
   searchCardImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 12,
+    borderRadius: SEARCH_CARD_RADIUS,
   },
   searchCardPlaceholder: { justifyContent: "center", alignItems: "center" },
-  ratingBadge: {
-    position: "absolute",
-    bottom: 6,
-    left: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    backgroundColor: "rgba(0,0,0,0.68)",
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  ratingText: { fontSize: 9.5, fontWeight: "800", color: "#fff" },
   searchCardTitle: {
-    marginTop: 6,
-    fontSize: 12,
+    marginTop: 4,
+    fontSize: 11,
     fontWeight: "700",
-    lineHeight: 15,
+    lineHeight: 14,
   },
-  searchCardMeta: { marginTop: 2, fontSize: 10.5, fontWeight: "500" },
+  searchCardMeta: { marginTop: 1, fontSize: 9.5, fontWeight: "500" },
 
   // ── Seçim çubuğu (sonuçların altında) ────────────────────
   selectionBar: {

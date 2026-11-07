@@ -21,6 +21,7 @@
 // Başka hiçbir yere fiziksel anahtar adı yazma.
 
 import { APP_ICON_IDS, DEFAULT_APP_ICON_ID } from "../../utils/appIcons";
+import { POSTER_CORNER_SCALES } from "../../utils/posterCorners";
 import {
   DEFAULT_HAPTIC_INTENSITY,
   DEFAULT_HAPTIC_LEVEL,
@@ -140,6 +141,37 @@ const settingsKeys = {
     default: 1,
     validate: range(0.1, 1),
   },
+  // İkon deseninin öğe sayısı: "auto" efekt modunu izler, diğerleri sabit ızgara
+  // (bkz. utils/decorLayout.js ICON_DENSITY_GRIDS).
+  iconBackgroundDensity: {
+    key: "iconBackgroundDensity",
+    type: TYPES.string,
+    default: "auto",
+    validate: oneOf("auto", "low", "medium", "high"),
+  },
+  // Ambiyans leke sayısı: "auto" efekt modunu izler.
+  ambientDensity: {
+    key: "ambientDensity",
+    type: TYPES.string,
+    default: "auto",
+    validate: oneOf("auto", "low", "medium", "high"),
+  },
+  // Ambiyans saydamlık çarpanı (0.2–1); 1 = tasarlanan loşluk.
+  ambientOpacity: {
+    key: "ambientOpacity",
+    type: TYPES.number,
+    default: 1,
+    validate: range(0.2, 1),
+  },
+  // Arka plan deseninin (ikon yerleşimi + ambiyans renkleri) TOHUMU. 0 = henüz
+  // üretilmedi; ilk ihtiyaçta rastgele üretilip yazılır, sonra her ekranda ve
+  // her açılışta aynı desen çizilir (bkz. services/decorSeed.js).
+  decorSeed: {
+    key: "decorSeed",
+    type: TYPES.number,
+    default: 0,
+    validate: range(0, 4294967295),
+  },
   imageQualityLevel: {
     key: "imageQualityLevel",
     type: TYPES.string,
@@ -195,7 +227,7 @@ const settingsKeys = {
     key: "listsPosterRadius",
     type: TYPES.number,
     default: 10,
-    validate: oneOf(2, 10, 20),
+    validate: oneOf(...POSTER_CORNER_SCALES.grid),
   },
   listPosterInfo: {
     key: "listPosterInfo",
@@ -231,7 +263,7 @@ const settingsKeys = {
     key: "seeAllPosterRadius",
     type: TYPES.number,
     default: 10,
-    validate: oneOf(2, 10, 20),
+    validate: oneOf(...POSTER_CORNER_SCALES.grid),
   },
   railPosterSize: {
     key: "railPosterSize",
@@ -243,7 +275,20 @@ const settingsKeys = {
     key: "railPosterRadius",
     type: TYPES.number,
     default: 15,
-    validate: oneOf(4, 15, 24),
+    validate: oneOf(...POSTER_CORNER_SCALES.rail),
+  },
+  // Göreli köşe alanları (utils/posterCorners scalePosterCorner): değer çarpan olarak okunur.
+  funPosterRadius: {
+    key: "funPosterRadius",
+    type: TYPES.number,
+    default: 10,
+    validate: oneOf(...POSTER_CORNER_SCALES.grid),
+  },
+  libraryPosterRadius: {
+    key: "libraryPosterRadius",
+    type: TYPES.number,
+    default: 10,
+    validate: oneOf(...POSTER_CORNER_SCALES.grid),
   },
   postListPosterLayout: {
     key: "postListPosterLayout",
@@ -328,15 +373,15 @@ const settingsKeys = {
     key: "listGridStyle",
     type: TYPES.number,
     default: 1,
-    validate: oneOf(1, 2, 3, 4),
+    validate: oneOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
     // Anahtar iki kuşak gördü: önce boolean ("true"/"false" = 1/2 sütun),
-    // sonra sayı ("1".."4"). İkisi de aynı fiziksel adı kullandığı için
-    // dönüşüm burada; okuma yolunda tolerans bırakmıyoruz.
+    // sonra sayı ("1".."4"; 5–11 sonradan eklendi, bkz. ListCovers.LIST_LAYOUT).
+    // İkisi de aynı fiziksel adı kullandığı için dönüşüm burada; okuma yolunda tolerans bırakmıyoruz.
     fromLegacy: (raw) => {
       if (raw === "true") return { ok: true, value: 1 };
       if (raw === "false") return { ok: true, value: 2 };
       const n = parseInt(raw, 10);
-      return n >= 1 && n <= 4 ? { ok: true, value: n } : { ok: false };
+      return n >= 1 && n <= 11 ? { ok: true, value: n } : { ok: false };
     },
   },
   allCornersRounded: { key: "allCornersRounded", type: TYPES.boolean, default: false },
@@ -376,13 +421,6 @@ const settingsKeys = {
   },
   // Widget tercihleri — sahibi services/widgetPreferencesService.js
   widgetPreferences: { key: "widgetPreferences", type: TYPES.json, default: null },
-  // Pet
-  petEnabled: { key: "pet_enabled", type: TYPES.boolean, default: false },
-  // { [petId]: true } — dizi DEĞİL, kilidi açılmış petlerin haritası.
-  petOwned: { key: "pet_owned", type: TYPES.json, default: null, validate: plainObject },
-  petSelected: { key: "pet_selected", type: TYPES.string, default: null },
-  petPosition: { key: "pet_position", type: TYPES.json, default: null },
-  petSize: { key: "pet_size", type: TYPES.number, default: 124 },
   // Film/Dizi sekmesinde (screens/tabs/DiscoverScreen.js) en son seçilen bölüm:
   // uygulama o bölümle açılır. "tv" | "movie".
   homeMediaType: {
@@ -617,6 +655,17 @@ const dataKeys = {
     keepOnLogout: true,
     validate: plainObject,
   },
+  // Günün Karesi (utils/dailyFrame.js): { rounds: { "<gün>": { answerKey, guesses, status } }, stats: { played, won,
+  // streak, bestStreak, lastDay, lastWinDay, dist } }, son 30 gün. Yalnız bu cihazda; çıkışta SİLİNMEZ (quickGames ile
+  // aynı karar: bulut kopyası yok, seri kullanıcıya ait).
+  dailyFrame: {
+    key: "daily_frame:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
   // Günün Sorusu'nda verdiğin oylar (utils/dailyPoll.js): { "<gün>": { choice: "a"|"b", synced } }, son 14 gün.
   // Oyun sunucuya yazılana dek (ya da çevrimdışıyken) kartı bu kayıt doğru gösterir. Çıkışta SİLİNMEZ: sunucudaki
   // oy zaten tek ve kalıcı; yerel kayıt silinirse kart, oyu sunucudan geri okuyana dek "oy ver" gibi görünürdü.
@@ -659,6 +708,28 @@ const dataKeys = {
     keepOnLogout: true,
     validate: plainObject,
   },
+  // Meydan Okumalar (utils/watchChallenges.js): { runs: [{ id, joinedAt, status, endedAt?, count?, target? }] }.
+  // İlerleme izleme geçmişinden her açılışta yeniden hesaplanır; burada yalnız katılım ve sonuç durur. Yalnız bu
+  // cihazda; çıkışta SİLİNMEZ (filmChain ile aynı karar: bulut kopyası yok, madalyalar kullanıcıya ait).
+  watchChallenges: {
+    key: "watch_challenges:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
+  // Tier list'ler (utils/tierList.js): { lists: [{ id, title, template, createdAt, updatedAt, tiers, pool, media }] }.
+  // Yalnız bu cihazda; çıkışta SİLİNMEZ (watchChallenges ile aynı karar: bulut kopyası yok, tablolar kullanıcıya ait).
+  // Hesabı Sıfırla siler (services/accountResetService.js LOCAL_PROGRESS_KEYS).
+  tierLists: {
+    key: "tier_lists:",
+    type: TYPES.json,
+    default: null,
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
   // Takip edilen oyuncu / yönetmenler (utils/followedPeople.js): { "<kişiId>": { id, name, photo,
   // department, at } }. Yalnız bu cihazda tutulur (buluta yazılmaz) ve çıkışta SİLİNMEZ: bulut
   // kopyası olmadığından silinen liste geri getirilemez (yearlyGoals ile aynı karar).
@@ -679,6 +750,24 @@ const dataKeys = {
     default: {},
     scope: "user",
     keepOnLogout: true,
+    validate: plainObject,
+  },
+  // Yüzen bildirimlerin cihaz durumu (utils/floatingNotices.js): { announced: {id: ms}, dismissed:
+  // {id: ms} } — hangi davet / turnuva anı toast oldu, hangi an kapatıldı. Çıkışta SİLİNMEZ:
+  // silinseydi tekrar girişte aynı bildirimler yeniden toast olurdu. 60 günden eskiler budanır.
+  floatingNotices: {
+    key: "floating_notices:",
+    type: TYPES.json,
+    default: {},
+    scope: "user",
+    keepOnLogout: true,
+    validate: plainObject,
+  },
+  // Yüzen bildirim simgesinin kenar yuvası: { side: "left"|"right", y }. Cihaz tercihi, hesaptan bağımsız.
+  floatingNoticeDock: {
+    key: "floating_notice_dock",
+    type: TYPES.json,
+    default: null,
     validate: plainObject,
   },
   // İlk içerik aktivasyon damgası. Çıkışta SİLİNMEZ — silinirse kullanıcı geri

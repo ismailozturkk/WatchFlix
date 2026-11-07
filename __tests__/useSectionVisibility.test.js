@@ -118,7 +118,7 @@ describe("useScreenSections", () => {
     mount("hub");
     act(() => { setScreenSectionsShown("hub", false); });
     expect(seen.hub.allHidden).toBe(true);
-    expect(seen.hub.hiddenCount).toBe(7);
+    expect(seen.hub.hiddenCount).toBe(10);
     act(() => { setSectionShown("hub", "games", true); });
     expect(seen.hub.allHidden).toBe(false);
     act(() => { setScreenSectionsShown("hub", true); });
@@ -138,7 +138,7 @@ describe("useScreenSections", () => {
     mount("tv");
     act(() => { setScreenSectionsShown("tv", false); });
     expect(seen.tv.allHidden).toBe(true);
-    // 14 bölümden 13'ü bu kayıtta saklanır, "ongoing" kendi ayarında.
+    // Dizi ekranının 13 bölümünün hepsi bu kayıtta (Bugün/Bu hafta yayında tek rafta).
     expect(seen.tv.hiddenCount).toBe(13);
   });
 

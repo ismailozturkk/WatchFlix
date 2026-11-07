@@ -1,8 +1,8 @@
 // screens/tabs/settings/PersonalizationScreen.js
 //
 // Ayarlar > Kişiselleştirme. Görsel efekt modu + kar efekti + ambiyans arka
-// planı + ikon arka planı (görünürlük + opaklık + düzen) + Pet/Dost. Hub'dan
-// ayrı ekrana taşındı.
+// planı + ikon arka planı (görünürlük + opaklık + düzen). Hub'dan ayrı ekrana
+// taşındı.
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
@@ -20,7 +20,6 @@ import {
   IconPatternPreview,
   SnowPreview,
 } from "@components/settings/SettingPreviews";
-import PetSettingsSection from "@components/pet/PetSettingsSection";
 import FontSettingsSection from "@components/typography/FontSettingsSection";
 import AppIconSection from "@components/settings/AppIconSection";
 import PremiumPill from "@components/premium/PremiumPill";
@@ -39,9 +38,17 @@ import {
   onerilenEffectMode,
   setEffectMode,
   useEffectMode,
+  useEffectPreset,
 } from "@services/effectSettings";
+import { reshuffleDecorSeed } from "@services/decorSeed";
 import * as Haptics from "@services/hapticsService";
-import { i18nText } from "@utils/i18nText";
+import { i18nText, percentText } from "@utils/i18nText";
+import {
+  AMBIENT_OPACITY_MIN,
+  DECOR_DENSITIES,
+  resolveAmbientBlobCount,
+  resolveIconGrid,
+} from "@utils/decorLayout";
 import { clamp } from "@utils/colorUtils";
 import { isDecorCustomized } from "@utils/decorScopes";
 import { countHiddenSections } from "@utils/sectionVisibility";
@@ -57,8 +64,8 @@ import GlassTouchable from "../../../components/common/GlassTouchable";
 import { GLASS_PRESS_ROOM } from "../../../utils/liquidGlass";
 
 // İkon arka planı saydamlık kaydırıcısı (0.1–1). Delta-based native 120 FPS PanResponder.
-function OpacitySlider({ value, onChange, colors }) {
-  const MIN = 0.1;
+function OpacitySlider({ value, onChange, colors, min = 0.1 }) {
+  const MIN = min;
   const MAX = 1;
   const [trackW, setTrackW] = useState(0);
   const widthRef = useRef(0);
@@ -214,13 +221,109 @@ function OpacitySlider({ value, onChange, colors }) {
   );
 }
 
+const DENSITY_LABELS = {
+  auto: () => i18nText("autoI18n.dekor_yogunluk_otomatik", "Otomatik"),
+  low: () => i18nText("autoI18n.dekor_yogunluk_az", "Az"),
+  medium: () => i18nText("autoI18n.dekor_yogunluk_orta", "Orta"),
+  high: () => i18nText("autoI18n.dekor_yogunluk_cok", "Çok"),
+};
+
+// Yoğunluk seçici: kartın ORTASINDA durduğu için alt köşe yuvarlaması yok
+// (kart sonundaki "Düzen" segmentinden farkı bu).
+function DensitySegment({ value, onChange, colors }) {
+  return (
+    <View
+      accessibilityRole="radiogroup"
+      style={[ps.densitySegment, { backgroundColor: colors.cardAlt, borderColor: colors.border }]}
+    >
+      {DECOR_DENSITIES.map((d) => {
+        const active = value === d;
+        return (
+          <GlassTouchable
+            key={d}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: active }}
+            style={[ps.segOpt, active && { backgroundColor: colors.accent }]}
+            onPress={() => {
+              if (active) return;
+              Haptics.selectionAsync();
+              onChange(d);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text
+              allowFontScaling={false}
+              style={[
+                ps.segText,
+                { color: active ? colors.white : colors.muted, fontWeight: active ? "700" : "500" },
+              ]}
+            >
+              {DENSITY_LABELS[d]()}
+            </Text>
+          </GlassTouchable>
+        );
+      })}
+    </View>
+  );
+}
+
+// Başlık (ikon + başlık + alt yazı + sağda rozet) + altında kontrol.
+function ControlBlock({
+  colors,
+  iconName,
+  iconFamily,
+  iconBg,
+  iconColor,
+  title,
+  subtitle,
+  badge,
+  children,
+}) {
+  return (
+    <View style={[ps.iconBgOpacity, { borderBottomColor: colors.borderMuted }]}>
+      <View style={ps.iconBgModeHeader}>
+        <View style={[ps.iconWrap, { backgroundColor: iconBg }]}>
+          <AppIcon family={iconFamily} name={iconName} size={16} color={iconColor} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text allowFontScaling={false} style={[ps.rowTitle, { color: colors.text }]}>
+            {title}
+          </Text>
+          <Text allowFontScaling={false} style={[ps.rowSub, { color: colors.muted }]}>
+            {subtitle}
+          </Text>
+        </View>
+        {badge != null ? (
+          <View style={[ps.qualityBadge, { backgroundColor: colors.accentDim }]}>
+            <Text
+              allowFontScaling={false}
+              style={[ps.qualityBadgeText, { color: colors.accentStrong }]}
+            >
+              {badge}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={ps.iconBgSliderWrap}>{children}</View>
+    </View>
+  );
+}
+
 export default function PersonalizationScreen() {
   const { t, language } = useLanguage();
   const { theme } = useTheme();
   const C = buildUiColors(theme);
   const { showSnow, snowAllowed, changeShowSnow } = useSnowSettings();
-  const { showAmbientBackground, ambientAllowed, changeShowAmbientBackground } =
-    useAmbientBackgroundSettings();
+  const {
+    showAmbientBackground,
+    ambientAllowed,
+    changeShowAmbientBackground,
+    ambientDensity,
+    changeAmbientDensity,
+    ambientOpacity,
+    changeAmbientOpacity,
+  } = useAmbientBackgroundSettings();
+  const effectPreset = useEffectPreset();
   const { decorHidden } = useDecorScopeSettings();
   // Ekran bölümleri: gizlenen bölüm sayısı satırdaki rozeti besler. "Devam Edenler"in
   // kendi ayarı (Dil ve içerik) de aynı listeye girdiği için o da sayılır.
@@ -238,7 +341,17 @@ export default function PersonalizationScreen() {
     changeIconBackgroundMode,
     iconBackgroundOpacity,
     changeIconBackgroundOpacity,
+    iconBackgroundDensity,
+    changeIconBackgroundDensity,
   } = useIconBackgroundSettings();
+  const iconGrid = resolveIconGrid(iconBackgroundDensity, effectPreset);
+  const ambientBlobCount = resolveAmbientBlobCount(ambientDensity, effectPreset);
+  // Desen tohumu ikon yerleşimini ve ambiyans renklerini birlikte belirler.
+  const showRegenerate = showIconBackground || showAmbientBackground;
+  const regenerateBackground = useCallback(() => {
+    Haptics.selectionAsync();
+    reshuffleDecorSeed();
+  }, []);
 
   // Kar, ambiyans ve ikon arka planı Premium'da. Free kullanıcıda anahtar KİLİTLİ
   // ve kapalı çizilir (bkz. AppSettingsContext: kayıtlı tercih silinmez, yalnız
@@ -499,6 +612,49 @@ export default function PersonalizationScreen() {
             </View>
           }
         />
+        {/* Ambiyans açıkken: leke sayısı (yoğunluk) + saydamlık. Leke sayısı
+            doğrudan çizim maliyeti; "Otomatik" efekt modunu izler. */}
+        {showAmbientBackground ? (
+          <>
+            <ControlBlock
+              colors={C}
+              iconName="color-filter-outline"
+              iconBg={C.iconPurple}
+              iconColor={C.purple}
+              title={i18nText("autoI18n.ambiyans_yogunluk_baslik", "Ambiyans yoğunluğu")}
+              subtitle={i18nText(
+                "autoI18n.ambiyans_yogunluk_alt",
+                "Işık lekesi sayısı · {{n}} leke",
+                { n: ambientBlobCount },
+              ).replace("{{n}}", String(ambientBlobCount))}
+            >
+              <DensitySegment
+                value={ambientDensity}
+                onChange={changeAmbientDensity}
+                colors={C}
+              />
+            </ControlBlock>
+            <ControlBlock
+              colors={C}
+              iconName="contrast-outline"
+              iconBg={C.iconPurple}
+              iconColor={C.purple}
+              title={i18nText("autoI18n.ambiyans_saydamlik_baslik", "Ambiyans saydamlığı")}
+              subtitle={i18nText(
+                "autoI18n.ambiyans_saydamlik_alt",
+                "Renklerin ne kadar belirgin olacağı",
+              )}
+              badge={percentText(Math.round((ambientOpacity ?? 1) * 100), language)}
+            >
+              <OpacitySlider
+                value={ambientOpacity ?? 1}
+                onChange={changeAmbientOpacity}
+                colors={C}
+                min={AMBIENT_OPACITY_MIN}
+              />
+            </ControlBlock>
+          </>
+        ) : null}
         {/* Desen önizlemesi hem açık hem kapalıyken durur: statik ve ucuz,
             ayrıca ayar açıkken de "şu an bu desen kullanılıyor" bilgisini
             veriyor. Sabit opaklık kullanılıyor — buradaki iş deseni
@@ -546,7 +702,7 @@ export default function PersonalizationScreen() {
                     allowFontScaling={false}
                     style={[ps.qualityBadgeText, { color: C.accentStrong }]}
                   >
-                    {Math.round((iconBackgroundOpacity ?? 1) * 100)}%
+                    {percentText(Math.round((iconBackgroundOpacity ?? 1) * 100), language)}
                   </Text>
                 </View>
               </View>
@@ -558,6 +714,27 @@ export default function PersonalizationScreen() {
                 />
               </View>
             </View>
+
+            {/* Öğe sayısı = ekran başına görsel görünümü sayısı (12–45). */}
+            <ControlBlock
+              colors={C}
+              iconFamily="MaterialCommunityIcons"
+              iconName="dots-grid"
+              iconBg={C.iconBlue}
+              iconColor={C.blue}
+              title={i18nText("autoI18n.ikon_yogunluk_baslik", "İçerik yoğunluğu")}
+              subtitle={i18nText(
+                "autoI18n.ikon_yogunluk_alt",
+                "Daha az ikon daha hafif çizilir · {{n}} ikon",
+                { n: iconGrid.cols * iconGrid.rows },
+              ).replace("{{n}}", String(iconGrid.cols * iconGrid.rows))}
+            >
+              <DensitySegment
+                value={iconBackgroundDensity}
+                onChange={changeIconBackgroundDensity}
+                colors={C}
+              />
+            </ControlBlock>
 
             <View style={ps.iconBgMode}>
               <View style={ps.iconBgModeHeader}>
@@ -620,6 +797,30 @@ export default function PersonalizationScreen() {
           { backgroundColor: C.card, borderColor: C.border },
         ]}
       >
+        {showRegenerate ? (
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="shuffle-outline"
+            title={i18nText("autoI18n.dekor_yeniden_baslik", "Arka planı yeniden oluştur")}
+            subtitle={i18nText(
+              "autoI18n.dekor_yeniden_alt",
+              "Desen ve ambiyans renkleri bir kez üretilir, her ekranda aynısı kullanılır",
+            )}
+            onPress={regenerateBackground}
+            right={
+              <View style={[ps.qualityBadge, { backgroundColor: C.accentDim }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[ps.qualityBadgeText, { color: C.accentStrong }]}
+                >
+                  {i18nText("autoI18n.dekor_yeniden_dugme", "Yenile")}
+                </Text>
+              </View>
+            }
+          />
+        ) : null}
         <SettingRow
           colors={C}
           iconBg={C.iconBlue}
@@ -685,9 +886,6 @@ export default function PersonalizationScreen() {
           }
         />
       </View>
-
-      <View style={ps.personalizationGap} />
-      <PetSettingsSection colors={C} showLabel={false} />
     </SettingsSubScreen>
   );
 }
@@ -836,4 +1034,11 @@ const ps = StyleSheet.create({
     borderRadius: 10,
   },
   segText: { fontSize: 11, textAlign: "center" },
+  densitySegment: {
+    flexDirection: "row",
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 3,
+    gap: 2,
+  },
 });

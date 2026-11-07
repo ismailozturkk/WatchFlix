@@ -7,7 +7,7 @@
 // kararları utils/chatBubbleStyle.js'te, giriş (sekme) animasyonu BounceIn'de.
 
 import React, { memo, useMemo } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import UserAvatar from "../common/UserAvatar";
@@ -33,13 +33,20 @@ import SharedMediaCollection from "./SharedMediaCollection";
 import SharedMediaMessage from "./SharedMediaMessage";
 import SharedPostMessage from "./SharedPostMessage";
 import SharedSettingsMessage from "./SharedSettingsMessage";
+import SharedFrameMessage from "./SharedFrameMessage";
 import SharedChainMessage from "./SharedChainMessage";
+import SharedTierListMessage from "./SharedTierListMessage";
+import SharedTvGraphMessage from "./SharedTvGraphMessage";
+import SharedClubMessage from "./SharedClubMessage";
 import SharedTasteMatchMessage from "./SharedTasteMatchMessage";
 import SharedTournamentMessage from "./SharedTournamentMessage";
 import SwipeReplyContainer from "./SwipeReplyContainer";
 
 const ACCENT = "#6C63FF";
 const SEEN_COLOR = "#5EE8A0";
+// Kendi yüzeyini çizmeyen özel kartları saran nötr sohbet kartının iç boşluğu.
+const RICH_CARD_PADDING = 10;
+const RICH_CARD_BORDER = 1;
 
 
 // Bir media öğesini (tekli veya koleksiyon içindeki) detay ekranına yönlendir.
@@ -104,12 +111,24 @@ const MessageBubble = memo(
     highlighted,
     entrance,
   }) => {
+    const { width: windowWidth } = useWindowDimensions();
     const isMe = item.senderId === currentUser.uid;
     const hasItems = Array.isArray(item.items) && item.items.length > 0;
     const hasPoll = item.kind === "poll" && !!item.poll;
     // Sohbete gönderilen liste / CineMatch cevabı; bozuk kayıt null → düz metne düşer.
     const share = useMemo(() => readShare(item), [item.kind, item.share]);
     const isRich = !!item.media || hasItems || hasPoll || !!share;
+    const mediaCardWidth = Math.min(306, Math.max(250, windowWidth - 56));
+    // Bu türler kendi dış kart yüzeyini zaten çiziyor. Zengin içeriklerin geri
+    // kalanı klasik konuşma balonu yerine tek katmanlı nötr bir sohbet kartı alır.
+    const ownsCardSurface =
+      !!item.media || ["list", "tournament", "frame", "chain", "club", "tierList", "tvGraph"].includes(share?.type);
+    const needsRichCardSurface = isRich && !ownsCardSurface;
+    // Nötr kart yüzeyinin içi: dış genişlik − (dolgu 10 + çerçeve 1) × 2. Çerçeve
+    // payı düşülmezse içerik kartın sağ kenarından 2 dp taşar.
+    const richContentWidth = ownsCardSurface
+      ? mediaCardWidth
+      : mediaCardWidth - (RICH_CARD_PADDING + RICH_CARD_BORDER) * 2;
     const bodyText = typeof item.text === "string" ? item.text : "";
     // 1–3 emoji (yanıt alıntısı yoksa): balon yok, büyük emoji.
     const emojiOnly = !isRich && !item.replyTo && isEmojiOnly(bodyText);
@@ -129,7 +148,9 @@ const MessageBubble = memo(
 
     // Balon zemini: giden = tema vurgusu (+ hafif degrade), gelen = ikincil yüzey.
     // Balonsuz emojide yüzey yok → saat/ikon renkleri sayfa zeminine göre.
-    const onAccent = isMe && !emojiOnly;
+    // Özel içeriklerde yönü renk değil hizalama + mesaj durumu anlatır. Böylece
+    // özel UI, renkli bir sohbet balonunun içine gömülmüş gibi görünmez.
+    const onAccent = isMe && !emojiOnly && !isRich;
     const gradient = onAccent ? outgoingGradient(theme?.accent) : null;
     const radii = bubbleRadii({ isMe, groupTop, groupBottom });
     const metaColor = onAccent
@@ -226,21 +247,42 @@ const MessageBubble = memo(
         <TouchableOpacity
           style={[
             styles.message,
-            isRich ? styles.richMessage : styles.textMessage,
+            isRich
+              ? [
+                  styles.richMessage,
+                  ownsCardSurface ? styles.standaloneRichMessage : styles.richCardMessage,
+                ]
+              : styles.textMessage,
             emojiOnly
               ? styles.emojiMessage
               : isMe
-                ? { backgroundColor: theme?.accent ?? "#17245c" }
+                ? isRich
+                  ? needsRichCardSurface
+                    ? {
+                        backgroundColor: theme?.secondary ?? "rgba(32,36,48,0.96)",
+                        borderColor: theme?.border ?? "rgba(255,255,255,0.14)",
+                      }
+                    : styles.transparentRichMessage
+                  : { backgroundColor: theme?.accent ?? "#17245c" }
                 : [
-                    styles.friendMsg,
+                    // Gelen özel kart kendi yüzeyini çiziyorsa klasik gelen
+                    // balonun 1 px çerçevesini yeniden ekleme. Grup sohbetinde
+                    // gönderen kimliği ayrı başlıkta zaten görünür.
+                    (!isRich || needsRichCardSurface) && styles.friendMsg,
                     {
-                      backgroundColor: theme?.secondary ?? "rgba(68, 68, 68, 1)",
-                      borderColor: theme?.border ?? "rgba(255,255,255,0.2)",
+                      backgroundColor: isRich && !needsRichCardSurface
+                        ? "transparent"
+                        : theme?.secondary ?? "rgba(68, 68, 68, 1)",
+                      borderColor: isRich && !needsRichCardSurface
+                        ? "transparent"
+                        : theme?.border ?? "rgba(255,255,255,0.2)",
                     },
                   ],
             radii,
+            isRich && { maxWidth: mediaCardWidth },
+            item.media && { width: mediaCardWidth },
             // Grupta gelen baloncukta gönderen renginde ince çerçeve.
-            senderColor && !emojiOnly && { borderColor: senderColor + "66" },
+            senderColor && !emojiOnly && (!isRich || needsRichCardSurface) && { borderColor: senderColor + "66" },
             item.status === "sending" && styles.sendingMessage,
             highlighted && styles.highlightedMessage,
           ]}
@@ -250,7 +292,7 @@ const MessageBubble = memo(
             item.media ? openMediaDetail(navigation, item.media) : null
           }
         >
-          {gradient ? (
+          {gradient && !isRich ? (
             <LinearGradient
               pointerEvents="none"
               colors={gradient}
@@ -275,7 +317,8 @@ const MessageBubble = memo(
               accent={theme?.accent ?? ACCENT}
               getTmdbUrl={getTmdbUrl}
               theme={theme}
-              isOutgoing={isMe}
+              isOutgoing={false}
+              cardWidth={richContentWidth}
               onVote={(optionId) => onVote?.(item, optionId)}
             />
           ) : share?.type === "list" ? (
@@ -284,6 +327,8 @@ const MessageBubble = memo(
               accent={theme?.accent ?? ACCENT}
               getTmdbUrl={getTmdbUrl}
               isOutgoing={isMe}
+              neutralCard
+              cardWidth={richContentWidth}
               onOpenItem={(it) => openMediaDetail(navigation, it)}
               onOpenList={onOpenList ? () => onOpenList(item, share) : undefined}
               onSave={onSaveList ? () => onSaveList(item, share) : undefined}
@@ -294,6 +339,8 @@ const MessageBubble = memo(
               accent={theme?.accent ?? ACCENT}
               getTmdbUrl={getTmdbUrl}
               isOutgoing={isMe}
+              neutralCard
+              cardWidth={richContentWidth}
               onOpenItem={(it) => openMediaDetail(navigation, it)}
             />
           ) : share?.type === "post" ? (
@@ -301,6 +348,8 @@ const MessageBubble = memo(
               share={share}
               getTmdbUrl={getTmdbUrl}
               isOutgoing={isMe}
+              neutralCard
+              cardWidth={richContentWidth}
               onOpenPost={() => openShareTarget(navigation, share)}
               onOpenItem={(it) => openMediaDetail(navigation, it)}
             />
@@ -309,12 +358,16 @@ const MessageBubble = memo(
               share={share}
               getTmdbUrl={getTmdbUrl}
               isOutgoing={isMe}
+              neutralCard
+              cardWidth={richContentWidth}
               onOpen={() => openShareTarget(navigation, share)}
             />
           ) : share?.type === "cineRoom" ? (
             <SharedCineRoomMessage
               share={share}
               isOutgoing={isMe}
+              neutralCard
+              cardWidth={richContentWidth}
               isGroup={isGroup}
               viewerUid={currentUser.uid}
               accepts={item.accepts}
@@ -329,11 +382,19 @@ const MessageBubble = memo(
               onOpen={() => openShareTarget(navigation, share, chatTarget, item.id)}
             />
           ) : share?.type === "tasteMatch" ? (
-            <SharedTasteMatchMessage share={share} isOutgoing={isMe} getTmdbUrl={getTmdbUrl} />
+            <SharedTasteMatchMessage
+              share={share}
+              isOutgoing={isMe}
+              neutralCard
+              cardWidth={richContentWidth}
+              getTmdbUrl={getTmdbUrl}
+            />
           ) : share?.type === "challenge" ? (
             <SharedChallengeMessage
               share={share}
               isOutgoing={isMe}
+              neutralCard
+              cardWidth={richContentWidth}
               senderUid={item.senderId}
               chatTarget={chatTarget}
               accepts={item.accepts}
@@ -349,20 +410,31 @@ const MessageBubble = memo(
             <SharedDuelResultMessage
               share={share}
               isOutgoing={isMe}
+              neutralCard
+              cardWidth={richContentWidth}
               senderUid={item.senderId}
               senderName={senderName}
             />
           ) : share?.type === "settings" ? (
-            <SharedSettingsMessage share={share} isOutgoing={isMe} />
+            <SharedSettingsMessage share={share} isOutgoing={isMe} neutralCard cardWidth={richContentWidth} />
+          ) : share?.type === "frame" ? (
+            <SharedFrameMessage share={share} isOutgoing={isMe} cardWidth={richContentWidth} />
           ) : share?.type === "chain" ? (
-            <SharedChainMessage share={share} isOutgoing={isMe} />
+            <SharedChainMessage share={share} isOutgoing={isMe} cardWidth={richContentWidth} />
+          ) : share?.type === "club" ? (
+            <SharedClubMessage share={share} cardWidth={richContentWidth} />
+          ) : share?.type === "tierList" ? (
+            <SharedTierListMessage share={share} isOutgoing={isMe} cardWidth={richContentWidth} />
+          ) : share?.type === "tvGraph" ? (
+            <SharedTvGraphMessage share={share} isOutgoing={isMe} cardWidth={richContentWidth} />
           ) : hasItems ? (
             <SharedMediaCollection
               items={item.items}
               listTitle={item.listTitle}
               accent={theme?.accent ?? ACCENT}
               getTmdbUrl={getTmdbUrl}
-              isOutgoing={isMe}
+              isOutgoing={false}
+              cardWidth={richContentWidth}
               onOpenItem={(it) => openMediaDetail(navigation, it)}
             />
           ) : item.media ? (
@@ -374,7 +446,7 @@ const MessageBubble = memo(
               accent={theme?.accent ?? ACCENT}
               getTmdbUrl={getTmdbUrl}
               onOpenTrailer={() => onOpenTrailer?.(item.media)}
-              isOutgoing={isMe}
+              isOutgoing={false}
             />
           ) : emojiOnly ? (
             /* ── 1–3 emoji: balonsuz, büyük ── */
@@ -462,7 +534,25 @@ const styles = StyleSheet.create({
   // Poster / liste / anket: içerik kartı balonu daha geniş, ince dolgulu.
   richMessage: {
     maxWidth: "90%",
-    padding: 10,
+  },
+  // Klasik balondan bağımsız özel içerik kartı. Kendi kartını çizmeyen türler
+  // bu tek yüzeyi kullanır; yön farkı renk yerine satır hizasında kalır.
+  richCardMessage: {
+    padding: RICH_CARD_PADDING,
+    borderWidth: RICH_CARD_BORDER,
+  },
+  // Liste/turnuva/oyun/medya zaten kendi dış yüzeyine sahiptir; ikinci bir
+  // balon, dolgu ya da gölge oluşturma.
+  standaloneRichMessage: {
+    padding: 0,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  transparentRichMessage: {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
   },
   // 1–3 emoji: balon yok.
   emojiMessage: {

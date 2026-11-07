@@ -77,8 +77,11 @@ export const PREMIUM_TOP_BANNER_HIDDEN_ROUTES = Object.freeze(
     "CineSwipeScreen",
     "SceneGamePlayScreen",
     "QuickGameScreen",
+    "DailyFrameScreen",
     "OlderGameScreen",
     "FilmChainScreen",
+    // Film Kulübü tartışması: altta yazma çubuğu var, yüzen şerit klavyeyle çakışmasın.
+    "FilmClubDiscussionScreen",
     "CinemaBingoScreen",
     // Geliştirici ekranı
     "UsageDebugScreen",

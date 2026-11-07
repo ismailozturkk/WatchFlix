@@ -38,7 +38,9 @@ import { i18nText } from "./i18nText";
 import { tmdbPathFromPoster, MAX_SHARED_LIST_ITEMS } from "./listShare";
 import { PREVIEW_MAX } from "./threadPreview";
 import { tierOf } from "./tasteMatch";
+import { sanitizeBracketSnapshot } from "./tournamentShare";
 import { sanitizeSettingsShare, SETTINGS_SHARE_TYPE, settingsShareSectionIds } from "./settingsShare";
+import { sanitizeTvGraphShare, TV_GRAPH_SHARE_TYPE } from "./tvGraphShare";
 
 export const SHARE_VERSION = 1;
 
@@ -52,7 +54,11 @@ export const SHARE_KIND = Object.freeze({
   CHALLENGE: "challengeShare",
   DUEL_RESULT: "duelResultShare",
   SETTINGS: "settingsShare",
+  FRAME: "frameShare",
   CHAIN: "chainShare",
+  CLUB: "clubShare",
+  TIER_LIST: "tierListShare",
+  TV_GRAPH: "tvGraphShare",
 });
 
 export const SHARE_TYPE = Object.freeze({
@@ -64,9 +70,14 @@ export const SHARE_TYPE = Object.freeze({
   TASTE_MATCH: "tasteMatch",
   CHALLENGE: "challenge",
   DUEL_RESULT: "duelResult",
+  FRAME: "frame",
+  CHAIN: "chain",
+  CLUB: "club",
+  TIER_LIST: "tierList",
+  // Gövde utils/tvGraphShare.js'te (dizi bölüm grafiği anlık görüntüsü).
+  TV_GRAPH: TV_GRAPH_SHARE_TYPE,
   // Gövdenin kendisi utils/settingsShare.js'te (görünüm ayarları; alıcı seçerek uygular).
   SETTINGS: SETTINGS_SHARE_TYPE,
-  CHAIN: "chain",
 });
 
 const KIND_BY_TYPE = {
@@ -79,7 +90,11 @@ const KIND_BY_TYPE = {
   [SHARE_TYPE.CHALLENGE]: SHARE_KIND.CHALLENGE,
   [SHARE_TYPE.DUEL_RESULT]: SHARE_KIND.DUEL_RESULT,
   [SHARE_TYPE.SETTINGS]: SHARE_KIND.SETTINGS,
+  [SHARE_TYPE.FRAME]: SHARE_KIND.FRAME,
   [SHARE_TYPE.CHAIN]: SHARE_KIND.CHAIN,
+  [SHARE_TYPE.CLUB]: SHARE_KIND.CLUB,
+  [SHARE_TYPE.TIER_LIST]: SHARE_KIND.TIER_LIST,
+  [SHARE_TYPE.TV_GRAPH]: SHARE_KIND.TV_GRAPH,
 };
 const SHARE_KINDS = Object.values(SHARE_KIND);
 
@@ -405,7 +420,6 @@ function sanitizeAiShare(raw) {
   return share;
 }
 
-
 /**
  * CineMatch cevabının serileştirilebilir özeti. `sections` çağıran tarafça
  * (services/aiCineInsights.buildChatShare) kurulur; burada yalnız doğrulanır.
@@ -418,7 +432,7 @@ export function buildAiShare({ variant, question, summary, versus, sections, com
 
 // ─── Gönderi (Hub'daki Paylaşımlar) ──────────────────────────────────────────
 
-export const POST_TYPES = Object.freeze(["review", "list", "text", "poll"]);
+export const POST_TYPES = Object.freeze(["review", "list", "text", "poll", "tierlist", "tvgraph"]);
 export const MAX_POST_SHARE_ITEMS = 12;
 const MAX_POST_TITLE = 120;
 const MAX_EXCERPT = 280;
@@ -510,7 +524,13 @@ function sanitizePostShare(raw) {
 export function buildPostShare(post) {
   if (!isObject(post) || !post.id) return null;
   if (post.visibility && post.visibility !== "public") return null;
-  const media = Array.isArray(post.mediaList) ? post.mediaList : [];
+  // Tier list gönderisinin afişleri kademe sırasıyla düzleşir (kart ilk afişleri çizer).
+  const media =
+    post.type === "tierlist" && isObject(post.tierList) && Array.isArray(post.tierList.tiers)
+      ? post.tierList.tiers.flatMap((tier) => (Array.isArray(tier?.items) ? tier.items : []))
+      : Array.isArray(post.mediaList)
+        ? post.mediaList
+        : [];
   const poll = isObject(post.poll) ? post.poll : null;
   return sanitizePostShare({
     postId: String(post.id),
@@ -567,6 +587,9 @@ function sanitizeTournamentShare(raw) {
   }
   const voters = finitePositive(raw.voters);
   if (voters) share.voters = Math.round(voters);
+  // Gönderim anındaki eleme ağacı (utils/tournamentShare.js) — eski mesajlarda yok.
+  const bracket = sanitizeBracketSnapshot(raw.bracket);
+  if (bracket) share.bracket = bracket;
   return share;
 }
 
@@ -574,8 +597,8 @@ function sanitizeTournamentShare(raw) {
  * Hub turnuva kartının anlık görüntüsü: ay, o anki faz, (bittiyse) şampiyon ve
  * katılımcı sayısı. Tür/tema adı alıcının dilinde `periodId`'den çözülür.
  */
-export function buildTournamentShare({ periodId, phase, champion, voters } = {}) {
-  return sanitizeTournamentShare({ periodId, phase, champion, voters });
+export function buildTournamentShare({ periodId, phase, champion, voters, bracket } = {}) {
+  return sanitizeTournamentShare({ periodId, phase, champion, voters, bracket });
 }
 
 // ─── CineSwipe daveti ────────────────────────────────────────────────────────
@@ -774,6 +797,37 @@ export function buildDuelResultShare({ dayKey, hostUid, host, hostScore, guest, 
   return sanitizeDuelResultShare({ dayKey, hostUid, host, hostScore, guest, guestScore, correct, total });
 }
 
+// ─── Günün Karesi sonucu ─────────────────────────────────────────────────────
+
+export const FRAME_SHARE_MARKS = Object.freeze(["miss", "skip", "hit", "empty"]);
+const MAX_FRAME_NUMBER = 100000;
+
+function sanitizeFrameShare(raw) {
+  const dayKey = typeof raw.dayKey === "string" && CHALLENGE_DAY.test(raw.dayKey) ? raw.dayKey : null;
+  const number = Math.round(Number(raw.number));
+  const marks = Array.isArray(raw.marks) ? raw.marks : [];
+  if (!dayKey || !Number.isFinite(number) || number < 1 || number > MAX_FRAME_NUMBER) return null;
+  if (marks.length !== 6 || !marks.every((mark) => FRAME_SHARE_MARKS.includes(mark))) return null;
+  // Yalnız BİTMİŞ oyun paylaşılır: ya bilinmiş (tek "hit") ya da altı hak da harcanmış.
+  const hits = marks.filter((mark) => mark === "hit").length;
+  const used = marks.filter((mark) => mark !== "empty").length;
+  if (hits > 1 || (hits === 0 && used < 6)) return null;
+  const share = { v: SHARE_VERSION, type: SHARE_TYPE.FRAME, dayKey, number, marks: [...marks] };
+  const host = clip(raw.host, MAX_AUTHOR_NAME);
+  if (host) share.host = host;
+  return share;
+}
+
+/**
+ * Günün Karesi sonucu → sohbet kartı. Yalnız numara ve kutucuklar taşınır; filmin adı / kimliği ASLA (alıcı
+ * henüz oynamamış olabilir). Alıcı aynı gün kendi oyununu karttan açar.
+ */
+export function buildFrameShare({ dayKey, number, marks, host } = {}) {
+  return sanitizeFrameShare({ dayKey, number, marks, host });
+}
+
+const FRAME_EMOJI = { miss: "🟥", skip: "⬜", hit: "🟩", empty: "⬛" };
+
 // ─── Film Zinciri meydan okuması ─────────────────────────────────────────────
 
 const CHAIN_PUZZLE_ID = /^\d{1,9}-\d{1,9}$/;
@@ -848,6 +902,121 @@ export function buildChainShare({ puzzle, links, gaveUp, mode, host } = {}) {
   });
 }
 
+// ─── Film Kulübü duyurusu ────────────────────────────────────────────────────
+
+export const CLUB_SHARE_EVENTS = Object.freeze(["voting", "picked", "done"]);
+const CLUB_DOC_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const MAX_CLUB_CANDIDATES = 6; // utils/filmClub.CLUB_MAX_CANDIDATES (bekçi testi eşitliği denetler)
+const MAX_CLUB_NUMBER = 100000;
+
+function sanitizeClubMedia(raw) {
+  if (!isObject(raw)) return null;
+  // toShareMedia bilinmeyen türü filme çevirir; kişi (oyuncu) kulüp adayı olamaz.
+  if (raw.media_type != null && raw.media_type !== "movie" && raw.media_type !== "tv") return null;
+  const media = toShareMedia(raw);
+  if (!media || !media.title || (media.media_type !== "movie" && media.media_type !== "tv")) return null;
+  const out = { id: media.id, media_type: media.media_type, title: media.title };
+  if (media.poster_path) out.poster_path = media.poster_path;
+  if (media.year) out.year = media.year;
+  return out;
+}
+
+const finiteInt = (value, min, max) => {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) && n >= min && n <= max ? n : null;
+};
+
+function sanitizeClubShare(raw) {
+  const event = CLUB_SHARE_EVENTS.includes(raw.event) ? raw.event : null;
+  const groupId = typeof raw.groupId === "string" && CLUB_DOC_ID.test(raw.groupId) ? raw.groupId : null;
+  const roundId = typeof raw.roundId === "string" && CLUB_DOC_ID.test(raw.roundId) ? raw.roundId : null;
+  const number = finiteInt(raw.number, 1, MAX_CLUB_NUMBER);
+  if (!event || !groupId || !roundId || number === null) return null;
+  const share = { v: SHARE_VERSION, type: SHARE_TYPE.CLUB, event, groupId, roundId, number };
+  if (event === "voting") {
+    const candidates = (Array.isArray(raw.candidates) ? raw.candidates : [])
+      .map(sanitizeClubMedia)
+      .filter(Boolean)
+      .slice(0, MAX_CLUB_CANDIDATES);
+    if (candidates.length < 2) return null;
+    share.candidates = candidates;
+  } else {
+    const pick = sanitizeClubMedia(raw.pick);
+    if (!pick) return null;
+    share.pick = pick;
+  }
+  const endsAt = finiteInt(raw.endsAt, 1, Number.MAX_SAFE_INTEGER);
+  if (event !== "done" && endsAt !== null) share.endsAt = endsAt;
+  if (event === "done") {
+    const avg = Number(raw.avgRating);
+    if (raw.avgRating != null && Number.isFinite(avg) && avg >= 1 && avg <= 10) share.avgRating = Math.round(avg * 10) / 10;
+    const watchedCount = finiteInt(raw.watchedCount, 0, 1000);
+    const memberCount = finiteInt(raw.memberCount, 0, 1000);
+    if (watchedCount !== null) share.watchedCount = watchedCount;
+    if (memberCount !== null) share.memberCount = memberCount;
+  }
+  return share;
+}
+
+/**
+ * Film Kulübü olayı → grup sohbetinde duyuru kartı (services/filmClubService.js yazar). Kart yalnız anlık
+ * görüntüdür; canlı durum (oylar, izleyenler, tartışma) kulüp ekranında, `groupId` + `roundId` ile açılır.
+ * Tartışmanın içeriği ASLA karta girmez (spoiler kalkanı kural tarafında).
+ *   event "voting" → adaylar + oylama bitişi · "picked" → seçilen film + izleme bitişi · "done" → film + ortalama
+ */
+export function buildClubShare({ event, groupId, roundId, number, candidates, pick, endsAt, avgRating, watchedCount, memberCount } = {}) {
+  return sanitizeClubShare({ event, groupId, roundId, number, candidates, pick, endsAt, avgRating, watchedCount, memberCount });
+}
+
+// ─── Tier list ───────────────────────────────────────────────────────────────
+
+// utils/tierList.TIER_LIMITS ile aynı (oraya bağlanmaz: chatShare saf ve hafif kalsın; bekçi testi eşitliği denetler).
+export const MAX_TIER_SHARE_TIERS = 10;
+export const MAX_TIER_SHARE_ITEMS = 100;
+const MAX_TIER_LABEL = 24;
+const MAX_TIER_TITLE = 50;
+const TIER_HEX = /^#[0-9A-F]{6}$/i;
+
+function sanitizeTierListShare(raw) {
+  const seen = new Set();
+  let budget = MAX_TIER_SHARE_ITEMS;
+  const tiers = (Array.isArray(raw.tiers) ? raw.tiers : [])
+    .filter(isObject)
+    .slice(0, MAX_TIER_SHARE_TIERS)
+    .map((tier, index) => {
+      const items = [];
+      (Array.isArray(tier.items) ? tier.items : []).forEach((entry) => {
+        const media = sanitizeClubMedia(entry);
+        if (!media || budget <= 0) return;
+        const key = `${media.media_type}_${media.id}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        budget -= 1;
+        items.push(media);
+      });
+      return {
+        label: clip(tier.label, MAX_TIER_LABEL) || String(index + 1),
+        color: typeof tier.color === "string" && TIER_HEX.test(tier.color) ? tier.color.toUpperCase() : "#CFCFCF",
+        items,
+      };
+    });
+  const total = tiers.reduce((sum, tier) => sum + tier.items.length, 0);
+  // Boş tablo gönderilmez: en az iki kademe ve en az bir yerleşmiş yapım.
+  if (tiers.length < 2 || total === 0) return null;
+  const share = { v: SHARE_VERSION, type: SHARE_TYPE.TIER_LIST, title: clip(raw.title, MAX_TIER_TITLE), total, tiers };
+  const host = clip(raw.host, MAX_AUTHOR_NAME);
+  if (host) share.host = host;
+  return share;
+}
+
+/**
+ * Tier list → sohbet kartı (anlık görüntü). Girdi utils/tierList.tierListShareView çıktısı: yalnız yerleştirilmiş
+ * yapımlar, kademe sırasıyla; havuz paylaşılmaz. Alıcı karttan "Kopyasını düzenle" ile kendi tablosunu açar.
+ */
+export function buildTierListShare({ title, tiers, host } = {}) {
+  return sanitizeTierListShare({ title, tiers, host });
+}
+
 // ─── Ortak: doğrulama, okuma, önizleme ───────────────────────────────────────
 
 /** Bilinmeyen/bozuk gövde → null; geçerliyse temizlenmiş kopya. */
@@ -872,8 +1041,16 @@ export function sanitizeShare(raw) {
       return sanitizeDuelResultShare(raw);
     case SHARE_TYPE.SETTINGS:
       return sanitizeSettingsShare(raw);
+    case SHARE_TYPE.FRAME:
+      return sanitizeFrameShare(raw);
     case SHARE_TYPE.CHAIN:
       return sanitizeChainShare(raw);
+    case SHARE_TYPE.CLUB:
+      return sanitizeClubShare(raw);
+    case SHARE_TYPE.TIER_LIST:
+      return sanitizeTierListShare(raw);
+    case SHARE_TYPE.TV_GRAPH:
+      return sanitizeTvGraphShare(raw);
     default:
       return null;
   }
@@ -895,7 +1072,7 @@ const titlesOf = (share) => {
 
 const firstLine = (text, max) => clip(String(text || "").split("\n")[0], max);
 
-const POST_EMOJI = { review: "⭐", list: "📋", text: "💬", poll: "📊" };
+const POST_EMOJI = { review: "⭐", list: "📋", text: "💬", poll: "📊", tierlist: "🏅", tvgraph: "📈" };
 
 /**
  * Alıntı kartı / sabitleme için SİMGESİZ önizleme (tür simgesi bileşende çizilir).
@@ -938,11 +1115,32 @@ export function sharePreview(share) {
       return i18nText("autoI18n.paylas_ayar_onizleme", "Görünüm ayarları ({{n}})", {
         n: settingsShareSectionIds(share).length,
       });
+    case SHARE_TYPE.FRAME:
+      return i18nText("autoI18n.paylas_kare_onizleme", "Günün Karesi #{{n}}", { n: share.number });
     case SHARE_TYPE.CHAIN:
       return i18nText("autoI18n.paylas_zincir_onizleme", "Film Zinciri · {{a}} → {{b}}", {
         a: share.start.name,
         b: share.target.name,
       });
+    case SHARE_TYPE.CLUB:
+      if (share.event === "voting") {
+        return i18nText("autoI18n.paylas_kulup_oylama_onizleme", "Film Kulübü #{{n}} · oylama başladı", { n: share.number });
+      }
+      return share.event === "done"
+        ? i18nText("autoI18n.paylas_kulup_bitti_onizleme", "Film Kulübü #{{n}} bitti · {{title}}", {
+            n: share.number,
+            title: share.pick.title,
+          })
+        : i18nText("autoI18n.paylas_kulup_secildi_onizleme", "Film Kulübü #{{n}} · {{title}}", {
+            n: share.number,
+            title: share.pick.title,
+          });
+    case SHARE_TYPE.TIER_LIST:
+      return share.title
+        ? i18nText("autoI18n.paylas_tier_onizleme", "Tier list · {{title}}", { title: share.title })
+        : i18nText("autoI18n.paylas_tier_onizleme_adsiz", "Tier list · {{n}} yapım", { n: share.total });
+    case SHARE_TYPE.TV_GRAPH:
+      return i18nText("autoI18n.tvgraph_onizleme", "Bölüm grafiği · {{title}}", { title: share.title });
     default: {
       const head = titlesOf(share).slice(0, 3).join(", ");
       return head || firstLine(share.summary, 80) || share.question || "CineMatch";
@@ -980,9 +1178,21 @@ export function shareMessageText(share) {
     case SHARE_TYPE.SETTINGS:
       line = `🎨 ${sharePreview(share)}`;
       break;
+    case SHARE_TYPE.FRAME:
+      line = `🎬 ${sharePreview(share)} ${share.marks.map((mark) => FRAME_EMOJI[mark]).join("")}`;
+      break;
     case SHARE_TYPE.CHAIN:
       // Sayı spoiler değil; zincirin halkaları yazılmaz.
       line = `🔗 ${sharePreview(share)}${share.gaveUp ? "" : ` · ${"🎬".repeat(share.links)}`}`;
+      break;
+    case SHARE_TYPE.CLUB:
+      line = `🎟️ ${sharePreview(share)}`;
+      break;
+    case SHARE_TYPE.TIER_LIST:
+      line = `🏅 ${sharePreview(share)}`;
+      break;
+    case SHARE_TYPE.TV_GRAPH:
+      line = `📈 ${sharePreview(share)}`;
       break;
     default:
       line = `✨ CineMatch · ${sharePreview(share)}`;
@@ -1013,14 +1223,25 @@ export function shareThumb(share) {
       return (share.items || []).find((item) => item.poster_path)?.poster_path || null;
     case SHARE_TYPE.TOURNAMENT:
       return share.champion?.poster_path || null;
+    case SHARE_TYPE.TV_GRAPH:
+      return share.poster_path || null;
     case SHARE_TYPE.CINE_ROOM:
     case SHARE_TYPE.CHALLENGE:
     case SHARE_TYPE.DUEL_RESULT:
     case SHARE_TYPE.SETTINGS:
+    case SHARE_TYPE.FRAME:
     case SHARE_TYPE.CHAIN:
       return null;
     case SHARE_TYPE.TASTE_MATCH:
       return (share.items || []).find((item) => item.poster_path)?.poster_path || null;
+    case SHARE_TYPE.CLUB:
+      return (share.pick || share.candidates.find((item) => item.poster_path))?.poster_path || null;
+    case SHARE_TYPE.TIER_LIST:
+      for (const tier of share.tiers) {
+        const hit = tier.items.find((item) => item.poster_path);
+        if (hit) return hit.poster_path;
+      }
+      return null;
     default:
       for (const section of share.sections) {
         const hit = section.picks.find((pick) => pick.poster_path);

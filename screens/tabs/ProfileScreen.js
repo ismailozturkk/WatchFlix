@@ -33,13 +33,12 @@ import StreakFlameBadge from "../../components/streak/StreakFlameBadge";
 import { useWatchProgressContext } from "../../context/WatchProgressContext";
 import ProfileStoryModal from "../../components/storyShare/ProfileStoryModal";
 import { getIdentityBadges } from "../../components/badges/badgeCatalog";
+import ChallengeMedalsRow from "../../components/challenges/ChallengeMedalsRow";
 import { usePremium } from "../../context/PremiumContext";
 import { readProfileFavorites } from "../../utils/fourFavorites";
 import SocialLinksRow from "../../components/profile/SocialLinksRow";
 import ProfileLogoutButton from "../../components/profile/ProfileLogoutButton";
 import ProfileNotificationsButton from "../../components/profile/ProfileNotificationsButton";
-import ImportantInvitesBar from "../../components/profile/ImportantInvitesBar";
-import NoteRemindersBar from "../../components/profile/NoteRemindersBar";
 import { hasAnySocialLinks, readProfileSocialLinks } from "../../utils/socialLinks";
 import { PROFILE_PREVIEW } from "../../utils/profileViewer";
 import { i18nText } from "../../utils/i18nText";
@@ -85,6 +84,7 @@ const ProfileScreen = ({ navigation }) => {
   );
   const {
     avatar,
+    myAvatar,
     selectAvatarIndex,
     modalVisible,
     setModalVisible,
@@ -127,6 +127,7 @@ const ProfileScreen = ({ navigation }) => {
     () => navigation.navigate("WatchBadgesScreen"),
     [navigation]
   );
+  const acMeydanOkumalar = useCallback(() => navigation.navigate("ChallengesScreen"), [navigation]);
 
   // Rozet/Perde kutlaması ARTIK burada değil: WatchProgressProvider içinde, profil
   // sekmesi hiç açılmamış olsa da oynar (hooks/useBadgeCelebration.js).
@@ -229,6 +230,10 @@ const ProfileScreen = ({ navigation }) => {
     // Etiket dil değişince yeniden çözülsün.
     [ownUid, ownName, navigation, language]
   );
+  const openAvatarPerson = useCallback(
+    (person) => navigation.navigate("ActorViewScreen", { personId: person.id }),
+    [navigation]
+  );
 
   // Kopyaların tazelenmesi selectAvatar → userService.setAvatarIndex içinde;
   // burada ayrıca yayılım yapılmaz (eskiden fotoğrafsız ikinci bir yayılım
@@ -258,9 +263,6 @@ const ProfileScreen = ({ navigation }) => {
         <SafeAreaView
           style={[styles.container, { backgroundColor: "transparent" }]}
         >
-          <ImportantInvitesBar key={user?.uid || "guest"} navigation={navigation} />
-          {/* Vadesi gelen not / liste hatırlatmaları: ertele · tamam · notu aç. */}
-          <NoteRemindersBar key={`reminders-${user?.uid || "guest"}`} navigation={navigation} />
           <View style={styles.images}>
             <ProfileAvatarHalo
               source={avatar}
@@ -326,6 +328,8 @@ const ProfileScreen = ({ navigation }) => {
                 onPress={acRozetler}
                 compact
               />
+              {/* Meydan okuma madalyaları: yalnız en az bir görev bitmişse çizilir. */}
+              <ChallengeMedalsRow onPress={acMeydanOkumalar} style={styles.challengeMedals} />
             </View>
           )}
           {/* ── Arkadaş aksiyonları ── */}
@@ -390,6 +394,9 @@ const ProfileScreen = ({ navigation }) => {
             displayName={profile?.name || user?.displayName || ""}
             username={profileUsername}
             action={viewOwnProfileAction}
+            // Avatar bir oyuncu/yönetmen fotoğrafıysa kimin olduğu + kişi sayfası.
+            person={selectAvatarIndex === -1 ? myAvatar?.photoPerson ?? null : null}
+            onPersonPress={openAvatarPerson}
           />
           <ProfileStoryModal
             visible={showStoryExport}
@@ -465,6 +472,7 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     paddingHorizontal: 16,
   },
+  challengeMedals: { marginTop: 8 },
   section: {
     width: "90%",
     //marginBottom: 10,

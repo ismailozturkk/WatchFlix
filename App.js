@@ -52,7 +52,7 @@ import { SnowProvider, useSnow } from "./context/SnowContext";
 import { AppSettingsProvider } from "./context/AppSettingsContext";
 import { TypographyProvider } from "./context/TypographyContext";
 import { ConnectivityProvider } from "./context/ConnectivityContext";
-import { PetProvider } from "./context/PetContext";
+import { AiChatRequestProvider } from "./context/AiChatRequestContext";
 import { ListStatusProvider } from "./context/ListStatusContext";
 import { MediaActivityProvider } from "./context/MediaActivityContext";
 import { SharedListsProvider } from "./context/SharedListsContext";
@@ -61,6 +61,7 @@ import { auth } from "./firebase";
 import { i18nText } from "./utils/i18nText";
 import { toast } from "@components/AppToast";
 import ToastHost from "@components/toast/ToastHost";
+import FloatingNoticeHost from "@components/floatingNotice/FloatingNoticeHost";
 import ConnectivityToast from "@components/toast/ConnectivityToast";
 import { AppAlertHost } from "@components/AppAlert";
 import { PremiumUpsellHost } from "@components/premium/PremiumUpsellSheet";
@@ -243,6 +244,7 @@ const SplashScreen = ({ exiting, onExited, onIntroStart }) => {
       exiting={exiting}
       onExited={onExited}
       onIntroStart={onIntroStart}
+      background={theme.primary}
     >
       {showSnow && (
         <LottieView
@@ -886,8 +888,33 @@ function AppContent() {
           options={{ headerShown: false, animation: "fade" }}
         />
         <Stack.Screen
+          name="DailyFrameScreen"
+          getComponent={() => require("./screens/game/DailyFrameScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
           name="QuickGameScreen"
           getComponent={() => require("./screens/game/QuickGameScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="ChallengesScreen"
+          getComponent={() => require("./screens/fun/ChallengesScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="TierListsScreen"
+          getComponent={() => require("./screens/fun/TierListsScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="TierListEditorScreen"
+          getComponent={() => require("./screens/fun/TierListEditorScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="LeagueScreen"
+          getComponent={() => require("./screens/fun/LeagueScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
@@ -898,6 +925,16 @@ function AppContent() {
         <Stack.Screen
           name="OlderGameScreen"
           getComponent={() => require("./screens/game/OlderGameScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="FilmClubScreen"
+          getComponent={() => require("./screens/club/FilmClubScreen").default}
+          options={{ headerShown: false, animation: "slide_from_right" }}
+        />
+        <Stack.Screen
+          name="FilmClubDiscussionScreen"
+          getComponent={() => require("./screens/club/FilmClubDiscussionScreen").default}
           options={{ headerShown: false, animation: "slide_from_right" }}
         />
         <Stack.Screen
@@ -933,6 +970,9 @@ function AppContent() {
       </Stack.Navigator>
 
       {showChatModal && swipeViewReady && <SwipeViewHost />}
+      {/* Yanıt bekleyen davetler + turnuva anları: önce üstte toast gibi kart, sonra kenarda
+          yüzen simge (components/floatingNotice/FloatingNoticeHost). Toast'ların ALTINDA çizilir. */}
+      <FloatingNoticeHost />
       <ToastHost />
       <ConnectivityToast />
       <AppAlertHost />
@@ -1125,7 +1165,7 @@ export default wrapRoot(function App() {
                           <ProfileUiProvider>
                             <PostsProvider>
                         <TvShowProvider>
-                          <PetProvider>
+                          <AiChatRequestProvider>
                             <DeviceNotificationsProvider navigationRef={navigationRef}>
                               {/* Postere basılı tutunca açılan hızlı eylem
                                   sayfası. Listeler + puan + izlenme durumunu
@@ -1139,7 +1179,7 @@ export default wrapRoot(function App() {
                               </MediaQuickActionsProvider>
                               </PosterChoicesProvider>
                             </DeviceNotificationsProvider>
-                          </PetProvider>
+                          </AiChatRequestProvider>
                             {splashVisible && (
                               <View
                                 style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}

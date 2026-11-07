@@ -6,7 +6,7 @@
 // (platform G/Ç) services/settingsBackupFiles.js'te.
 //
 // NEDEN YENİDEN BAŞLATMA GEREKİYOR: ayarların bir kısmı (tema, dil, düzen
-// tercihleri…) AppSettingsContext/PetContext'e açılışta SENKRON okunup state'e
+// tercihleri…) AppSettingsContext'e açılışta SENKRON okunup state'e
 // alınıyor; depo sonradan değişince bu state'ler izlemiyor. Servislerin çoğu
 // (efekt, yazı tipi, simge, titreşim) depoyu zaten dinliyor ama hepsi değil —
 // tek doğru yol, yazımdan sonra uygulamayı yeniden yüklemek (bkz. appReload.js).
@@ -14,6 +14,7 @@
 import { Keys, get, has, remove, set } from "./storage";
 import {
   BACKUP_ENTRIES,
+  annotatePlanChanges,
   buildBackup,
   parseBackup,
   planImport,
@@ -35,7 +36,11 @@ const currentThemes = () => {
 
 /** İçe aktarmadan ÖNCE kullanıcıya gösterilecek plan (diske yazmaz). */
 export function previewImport(backup, { themeMode = "merge" } = {}) {
-  return planImport(backup, { currentThemes: currentThemes(), themeMode });
+  const plan = planImport(backup, { currentThemes: currentThemes(), themeMode });
+  return annotatePlanChanges(plan, (name) => {
+    const descriptor = Keys[name];
+    return descriptor && has(descriptor) ? get(descriptor) : null;
+  });
 }
 
 /**

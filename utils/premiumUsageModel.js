@@ -233,10 +233,10 @@ export function buildUsageRow(featureId, plan, usage = {}, now = new Date(), lan
     };
   }
 
-  // ── Pencere özellikleri (Wrapped arşivi): harcanan bir şey yok ──
+  // ── Pencere (Wrapped arşivi) ve tek kayıt tavanı (not uzunluğu): harcanan bir şey yok ──
   // "3 / 5" çizmek yanıltıcı olur (5 yıl bir tavan değil, görülebilen aralık);
-  // satır planın penceresini söyler ("Yalnız bu yıl", "Son 5 yıl", "Tüm yıllar").
-  if (definition.window) {
+  // satır planın değerini söyler ("Son 5 yıl", "1.000 karakter").
+  if (definition.window || definition.perItem) {
     return {
       ...base,
       state: "included",

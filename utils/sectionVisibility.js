@@ -57,8 +57,9 @@ export const SECTION_SCREENS = Object.freeze(
         section("emmy", "trophy-outline", "amber"),
         section("providers", "apps-outline", "teal"),
         section("genres", "shapes-outline", "blue"),
+        // Bugün + Bu hafta yayında tek rafta (çiple seçilir). Eski "airingToday" kaydı normalize'da düşer.
         section("onTheAir", "radio-outline", "green"),
-        section("airingToday", "today-outline", "amber"),
+        section("upcoming", "calendar-outline", "blue"),
       ],
     },
     {
@@ -85,12 +86,15 @@ export const SECTION_SCREENS = Object.freeze(
       id: "hub",
       icon: "game-controller-outline",
       sections: [
+        section("league", "podium-outline", "amber"),
         section("feed", "chatbubbles-outline", "blue"),
+        section("tournament", "trophy-outline", "amber"),
         section("cineswipe", "heart-half-outline", "purple"),
         section("bingo", "grid-outline", "teal"),
         section("poll", "help-circle-outline", "purple"),
         section("top100", "podium-outline", "amber"),
-        section("tournament", "trophy-outline", "amber"),
+        section("challenges", "flag-outline", "green"),
+        section("tierlist", "podium-outline", "amber"),
         section("games", "game-controller-outline", "purple"),
       ],
     },

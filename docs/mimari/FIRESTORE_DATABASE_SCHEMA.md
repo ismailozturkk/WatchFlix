@@ -750,6 +750,8 @@ Firestore Root
 | `tournamentWinners`| `{periodId}` | `YYYY-MM` | `tournaments/{periodId}` |
 | `CineRooms` | `room_${code}_${ms}`| 6 haneli kod + Timestamp | `hostUid`, `guestUid` (`Users`) |
 | `GameLeaderboards`| `scene_${mode}_${difficulty}` | Örn: `scene_classic_normal` | `entries/{uid}` (`Users`) |
+| `LeagueUsers` | `{uid}` | Auth UID | `LeagueWeeks/{week}/groups/{groupId}` (Haftalık Lig, yalnız sunucu yazar) |
+| `LeagueWeeks` | `{week}` | Pazartesi günü `YYYY-MM-DD` | `groups/{lig-n}/leagueMembers/{uid}`, `open/{lig}` — bkz. `docs/ozellikler/HAFTALIK_LIG.md` |
 | `ProviderWatch` | `{uid}` | Auth UID | `Lists/{uid}/watchList` |
 | `AiUsage` | `{uid}` | Auth UID | `Users/{uid}.entitlements` |
 
@@ -771,6 +773,7 @@ Ağaç (bölüm 1) 15 Ekim öncesini anlatır; sonrasında eklenenler aşağıda
 | `ReferralAccounts/{uid}`, `ReferralCodes/{code}`, `Referrals/{inviteeUid}` | davet kodu, biriken aylar, davet bağı (`inviterUid`) | YALNIZ Cloud Functions (kurallar kapalı) | `referral` (`records`) |
 | `PromoCodes/{code}` + `redemptions/{uid}` | promosyon kodu, plan (Premium / Premium Max), kullanım | YALNIZ Cloud Functions | `promo-redemptions` (`records`) |
 | `GameLeaderboards/scene_daily_{gün}/entries/{uid}` | günlük meydan okuma girdisi (`uid, score, correctCount, …`) | sahibi | `sweep-leaderboard-entries` (`games`) |
+| `LeagueUsers/{uid}`, `LeagueWeeks/{hafta}/groups/{grup}/leagueMembers/{uid}` | Haftalık Lig durumu ve tablo satırları (`uid, xp`, kimlik snapshot'ı) | YALNIZ Cloud Functions | `sweep-league-members` + `league-user` (`games`) |
 | `tournaments/{dönem}/votes/{uid}` | `noms`, `picks` | sahibi create; silme kural gereği KAPALI | `tournament-votes` (`games`, Admin ile) |
 | `CineRooms/{id}` | `hostUid`, `guestUid`, deste, oylar | taraflar; sonuç teslimi/24 saatte sunucu siler | `cine-rooms` (`games`) |
 | `ContentReports/{id}`, `PostReports/{id}` | `reporterId`, `targetUserId`… | yalnız create | `reporterId → "deleted-user"`; hakkımdaki `ContentReports` silinir |

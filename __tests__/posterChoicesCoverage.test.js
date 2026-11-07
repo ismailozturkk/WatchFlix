@@ -45,10 +45,11 @@ const EXCLUDED = {
   "components/chat/SharedAiMessage.js": "sohbet anlık görüntüsü",
   "components/chat/SharedListSheet.js": "başkasının paylaştığı liste",
   "components/chat/SharedMediaCollection.js": "sohbet anlık görüntüsü",
-  "components/chat/SharedMediaMessage.js": "sohbet anlık görüntüsü",
   "components/chat/SharedTournamentMessage.js": "sohbet anlık görüntüsü",
   "components/modals/ChatModal.js": "sohbete gönderilecek kart",
   "screens/chat/ChatScreen.js": "sohbet anlık görüntüsü",
+  // Bölüm grafiği kartı (sohbet + gönderi): gövdede gönderenin özel afişi zaten çözülmüş (TvGraphDetailScreen).
+  "components/tv/TvGraphShareCard.js": "bölüm grafiği anlık görüntüsü (gönderenin seçtiği afiş gövdede)",
   "components/modals/SaveSharedListModal.js": "başkasının paylaştığı liste",
   // Gönderi / yorum: topluluk içeriği, yazarın paylaştığı afiş.
   "components/modals/CommentSheetModal.js": "topluluk içeriği",
@@ -56,15 +57,16 @@ const EXCLUDED = {
   "components/modals/createPost/DraftCard.js": "topluluk içeriği",
   "screens/tabs/MyPostsScreen.js": "topluluk içeriği",
   // Turnuva: herkesin AYNI afişi gördüğü ortak yarışma.
-  "components/hub/TournamentWidget.js": "ortak turnuva",
   "components/tournament/BracketTree.js": "ortak turnuva",
   "components/tournament/MatchCard.js": "ortak turnuva",
   "components/tournament/NomineeSearchModal.js": "ortak turnuva",
   "components/tournament/PodiumModal.js": "ortak turnuva",
+  "components/tournament/TournamentTreePreview.js": "ortak turnuva",
   "screens/tournament/TournamentScreen.js": "ortak turnuva",
   // Seelogd Top 100: topluluk sıralaması; turnuva gibi herkes aynı afişi görür (liste/sohbete de bu afiş gider).
   "components/hub/Top100Widget.js": "ortak Top 100",
   "components/top100/Top100CountSheet.js": "ortak Top 100",
+  "components/top100/Top100PosterSheet.js": "ortak Top 100",
   "screens/fun/Top100Screen.js": "ortak Top 100",
   // CineMatch yanıt kartları: yanıtta kayıtlı öneri anlık görüntüsü.
   "components/AICineCards.js": "AI yanıt kartı",
@@ -87,6 +89,7 @@ const EXCLUDED = {
   "components/video/TrailerModal.js": "fragman sayfası başlığı (sonraki faz)",
   "screens/onboarding/OnboardingShowcases.js": "hesap öncesi vitrin",
   "screens/onboarding/useOnboardingData.js": "hesap öncesi vitrin",
+  "components/auth/AuthPosterField.js": "hesap öncesi dekor (giriş/kayıt arka planı)",
 };
 
 const DIRECT_POSTER = /getTmdbUrl\([^)]*["']poster["']/;

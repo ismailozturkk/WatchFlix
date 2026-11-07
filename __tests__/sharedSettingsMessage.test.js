@@ -143,9 +143,15 @@ jest.mock("../components/chat/BounceIn", () => ({ __esModule: true, default: ({ 
 jest.mock("../components/chat/SwipeReplyContainer", () => ({ __esModule: true, default: ({ children }) => children }));
 jest.mock("../components/chat/MessageReplyPreview", () => ({ __esModule: true, default: () => null }));
 jest.mock("../components/chat/SharedChallengeMessage", () => ({ __esModule: true, default: "ChallengeBody" }));
-jest.mock("../components/chat/SharedDuelResultMessage", () => ({ __esModule: true, default: "DuelResultBody" }));
+jest.mock("../components/chat/SharedFrameMessage", () => ({ __esModule: true, default: "FrameBody" }));
 jest.mock("../components/chat/SharedChainMessage", () => ({ __esModule: true, default: "ChainBody" }));
+jest.mock("../components/chat/SharedTierListMessage", () => ({ __esModule: true, default: "TierListBody" }));
+jest.mock("../components/chat/SharedTvGraphMessage", () => ({ __esModule: true, default: "TvGraphBody" }));
+jest.mock("../components/chat/SharedClubMessage", () => ({ __esModule: true, default: "ClubBody" }));
+jest.mock("../components/chat/SharedDuelResultMessage", () => ({ __esModule: true, default: "DuelResultBody" }));
 jest.mock("../components/chat/SharedListMessage", () => ({ __esModule: true, default: "ListBody" }));
+// Turnuva kartı oy dokümanı okur ve ağaç çizer; gövdesi __tests__/chatShareMessages.test.js'te sınanır.
+jest.mock("../components/chat/SharedTournamentMessage", () => ({ __esModule: true, default: "TournamentBody" }));
 
 const MessageBubble = require("../components/chat/MessageBubble").default;
 const ShareSettingsScreen = require("../screens/tabs/settings/ShareSettingsScreen").default;

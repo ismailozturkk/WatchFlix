@@ -422,6 +422,14 @@ describe("Free planı kararları", () => {
     expect(canUseFeature("tournament_vote", PREMIUM)).toBe(true);
   });
 
+  test("kişiselleştirme: simge, kar, ambiyans, özel afiş, ikon arka planı Free'de YOK", () => {
+    for (const id of ["app_icon", "snow_effect", "ambient_background", "custom_posters", "icon_background"]) {
+      expect(freeLimit(id)).toBe(false);
+      expect(isLockedFor(id, FREE)).toBe(true);
+      expect(canUseFeature(id, PREMIUM)).toBe(true);
+    }
+  });
+
   test("Film Zinciri Free'de YOK, Premium ve Max'te açık (30 Eki kararı)", () => {
     expect(freeLimit("film_chain")).toBe(false);
     expect(isLockedFor("film_chain", FREE)).toBe(true);
@@ -430,12 +438,19 @@ describe("Free planı kararları", () => {
     expect(PREMIUM_FEATURES.film_chain.category).toBe("play");
   });
 
-  test("kişiselleştirme: simge, kar, ambiyans, özel afiş, ikon arka planı, pet Free'de YOK", () => {
-    for (const id of ["app_icon", "snow_effect", "ambient_background", "custom_posters", "icon_background", "pet_companion"]) {
-      expect(freeLimit(id)).toBe(false);
-      expect(isLockedFor(id, FREE)).toBe(true);
-      expect(canUseFeature(id, PREMIUM)).toBe(true);
-    }
+  test("not hatırlatıcısı Free'de YOK, Premium ve Max'te açık (29 Eki kararı)", () => {
+    expect(freeLimit("note_reminders")).toBe(false);
+    expect(isLockedFor("note_reminders", FREE)).toBe(true);
+    expect(canUseFeature("note_reminders", PREMIUM)).toBe(true);
+    expect(canUseFeature("note_reminders", MAX)).toBe(true);
+    expect(PREMIUM_FEATURES.note_reminders.category).toBe("notes");
+  });
+
+  test("Günün Karesi Free'de YOK, Premium ve Max'te açık (30 Eki kararı)", () => {
+    expect(isLockedFor("daily_frame", FREE)).toBe(true);
+    expect(canUseFeature("daily_frame", PREMIUM)).toBe(true);
+    expect(canUseFeature("daily_frame", MAX)).toBe(true);
+    expect(PREMIUM_FEATURES.daily_frame.category).toBe("play");
   });
 
   test("hatırlatma: 10 film, 20 dizi", () => {
@@ -486,7 +501,7 @@ describe("isLockedFor ve kapalı özellik metinleri", () => {
     expect(formatFeatureValue("tournament_vote", FREE, "tr")).toBe("Yalnız izleyici");
     expect(formatFeatureValue("tournament_vote", PREMIUM, "tr")).toBe("Oy kullanabilir");
     expect(formatFeatureValue("snow_effect", FREE, "en")).toBe("Off");
-    expect(formatFeatureValue("app_icon", PREMIUM, "en")).toBe("Icon picker");
+    expect(formatFeatureValue("app_icon", PREMIUM, "en")).toBe("Exclusive icons");
   });
 
   test("kapalı sayılı özellik 'günlük hakkın doldu' demez", () => {
@@ -511,7 +526,7 @@ describe("yeni özelliklerin kayıt bütünlüğü", () => {
   });
 
   test("erişim özelliklerinin ücretsiz ve ücretli değeri tanımlı (karşılaştırma tablosu '—' basmasın)", () => {
-    for (const id of ["tournament_vote", "app_icon", "snow_effect", "ambient_background", "custom_posters", "icon_background", "pet_companion", "film_chain", "bug_report", "feature_request"]) {
+    for (const id of ["tournament_vote", "app_icon", "snow_effect", "ambient_background", "custom_posters", "icon_background", "note_reminders", "film_chain", "daily_frame", "bug_report", "feature_request"]) {
       const feature = PREMIUM_FEATURES[id];
       expect(feature.freeValue.tr && feature.freeValue.en).toBeTruthy();
       expect(feature.paidValue.tr && feature.paidValue.en).toBeTruthy();

@@ -27,6 +27,12 @@ import {
   setDecorEffectVisible,
   setDecorVisible,
 } from "../utils/decorScopes";
+import { POSTER_CORNER_SCALES } from "../utils/posterCorners";
+import {
+  DECOR_DENSITIES,
+  clampAmbientOpacity,
+  normalizeDensity,
+} from "../utils/decorLayout";
 
 
 const AppSettingsContext = createContext();
@@ -255,6 +261,16 @@ export const AppSettingsProvider = ({ children }) => {
   const [iconBackgroundOpacity, setIconBackgroundOpacity] = useState(() =>
     get(Keys.iconBackgroundOpacity),
   );
+  // Desen öğe sayısı ve ambiyans leke sayısı/saydamlığı (bkz. utils/decorLayout.js).
+  const [iconBackgroundDensity, setIconBackgroundDensity] = useState(() =>
+    normalizeDensity(get(Keys.iconBackgroundDensity)),
+  );
+  const [ambientDensity, setAmbientDensity] = useState(() =>
+    normalizeDensity(get(Keys.ambientDensity)),
+  );
+  const [ambientOpacity, setAmbientOpacity] = useState(() =>
+    clampAmbientOpacity(get(Keys.ambientOpacity)),
+  );
   const [imageQualityLevel, setImageQualityLevel] = useState(() => {
     const level = get(Keys.imageQualityLevel);
     return IMAGE_QUALITY_PRESETS[level] ? level : "good";
@@ -290,6 +306,10 @@ export const AppSettingsProvider = ({ children }) => {
   // TV/Film ana ekran yatay rail posterleri: boyut ("normal" | "small") ve köşe (4 | 15 varsayılan | 24)
   const [railPosterSize, setRailPosterSize] = useState(() => get(Keys.railPosterSize));
   const [railPosterRadius, setRailPosterRadius] = useState(() => get(Keys.railPosterRadius));
+  // Eğlence (oyunlar, Top 100, turnuva…) ve Kütüphane (liste kapakları, Wrapped) afiş köşesi:
+  // göreli kademe (utils/posterCorners scalePosterCorner) — 10 = her yüzeyin kendi köşesi.
+  const [funPosterRadius, setFunPosterRadius] = useState(() => get(Keys.funPosterRadius));
+  const [libraryPosterRadius, setLibraryPosterRadius] = useState(() => get(Keys.libraryPosterRadius));
   // Paylaşım akışındaki liste postları: "spaced" (varsayılan aralıklı) | "joined" (bitişik şerit)
   const [postListPosterLayout, setPostListPosterLayout] = useState(() =>
     get(Keys.postListPosterLayout),
@@ -485,6 +505,29 @@ export const AppSettingsProvider = ({ children }) => {
     }, 250);
   }, []);
 
+  const changeIconBackgroundDensity = useCallback((density) => {
+    if (!DECOR_DENSITIES.includes(density)) return;
+    setIconBackgroundDensity(density);
+    persist(Keys.iconBackgroundDensity, density, IKON_HATASI);
+  }, []);
+
+  const changeAmbientDensity = useCallback((density) => {
+    if (!DECOR_DENSITIES.includes(density)) return;
+    setAmbientDensity(density);
+    persist(Keys.ambientDensity, density, GORUNUM_HATASI);
+  }, []);
+
+  // İkon saydamlığıyla aynı kalıp: state anında (canlı), disk yazımı debounce.
+  const ambientOpacityPersistTimer = useRef(null);
+  const changeAmbientOpacity = useCallback((val) => {
+    const v = clampAmbientOpacity(val);
+    setAmbientOpacity(v);
+    if (ambientOpacityPersistTimer.current) clearTimeout(ambientOpacityPersistTimer.current);
+    ambientOpacityPersistTimer.current = setTimeout(() => {
+      persist(Keys.ambientOpacity, v, GORUNUM_HATASI);
+    }, 250);
+  }, []);
+
   const changeImageQuality = useCallback((level) => {
     if (!IMAGE_QUALITY_PRESETS[level]) return;
     setImageQualityLevel(level);
@@ -519,7 +562,7 @@ export const AppSettingsProvider = ({ children }) => {
   }, []);
 
   const changeListsPosterRadius = useCallback((n) => {
-    if (n !== 2 && n !== 10 && n !== 20) return;
+    if (!POSTER_CORNER_SCALES.grid.includes(n)) return;
     setListsPosterRadius(n);
     persist(Keys.listsPosterRadius, n, GORUNUM_HATASI);
   }, []);
@@ -540,7 +583,7 @@ export const AppSettingsProvider = ({ children }) => {
   }, []);
 
   const changeSeeAllPosterRadius = useCallback((n) => {
-    if (n !== 2 && n !== 10 && n !== 20) return;
+    if (!POSTER_CORNER_SCALES.grid.includes(n)) return;
     setSeeAllPosterRadius(n);
     persist(Keys.seeAllPosterRadius, n, GORUNUM_HATASI);
   }, []);
@@ -552,9 +595,21 @@ export const AppSettingsProvider = ({ children }) => {
   }, []);
 
   const changeRailPosterRadius = useCallback((n) => {
-    if (n !== 4 && n !== 15 && n !== 24) return;
+    if (!POSTER_CORNER_SCALES.rail.includes(n)) return;
     setRailPosterRadius(n);
     persist(Keys.railPosterRadius, n, GORUNUM_HATASI);
+  }, []);
+
+  const changeFunPosterRadius = useCallback((n) => {
+    if (!POSTER_CORNER_SCALES.grid.includes(n)) return;
+    setFunPosterRadius(n);
+    persist(Keys.funPosterRadius, n, GORUNUM_HATASI);
+  }, []);
+
+  const changeLibraryPosterRadius = useCallback((n) => {
+    if (!POSTER_CORNER_SCALES.grid.includes(n)) return;
+    setLibraryPosterRadius(n);
+    persist(Keys.libraryPosterRadius, n, GORUNUM_HATASI);
   }, []);
 
   const changePostListPosterLayout = useCallback((layout) => {
@@ -759,6 +814,8 @@ export const AppSettingsProvider = ({ children }) => {
       changeIconBackgroundMode,
       iconBackgroundOpacity,
       changeIconBackgroundOpacity,
+      iconBackgroundDensity,
+      changeIconBackgroundDensity,
     }),
     [
       effectiveShowIconBackground,
@@ -768,6 +825,8 @@ export const AppSettingsProvider = ({ children }) => {
       changeIconBackgroundMode,
       iconBackgroundOpacity,
       changeIconBackgroundOpacity,
+      iconBackgroundDensity,
+      changeIconBackgroundDensity,
     ],
   );
 
@@ -777,8 +836,20 @@ export const AppSettingsProvider = ({ children }) => {
       // Ayarlar ekranı kilit rozetini ve yükseltme akışını buna göre çizer.
       ambientAllowed,
       changeShowAmbientBackground,
+      ambientDensity,
+      changeAmbientDensity,
+      ambientOpacity,
+      changeAmbientOpacity,
     }),
-    [effectiveShowAmbientBackground, ambientAllowed, changeShowAmbientBackground],
+    [
+      effectiveShowAmbientBackground,
+      ambientAllowed,
+      changeShowAmbientBackground,
+      ambientDensity,
+      changeAmbientDensity,
+      ambientOpacity,
+      changeAmbientOpacity,
+    ],
   );
 
   const decorScopeValue = useMemo(
@@ -877,6 +948,10 @@ export const AppSettingsProvider = ({ children }) => {
       changeRailPosterSize,
       railPosterRadius,
       changeRailPosterRadius,
+      funPosterRadius,
+      changeFunPosterRadius,
+      libraryPosterRadius,
+      changeLibraryPosterRadius,
       postListPosterLayout,
       changePostListPosterLayout,
       reminderPreviewLimit,
@@ -902,6 +977,10 @@ export const AppSettingsProvider = ({ children }) => {
       changeRailPosterSize,
       railPosterRadius,
       changeRailPosterRadius,
+      funPosterRadius,
+      changeFunPosterRadius,
+      libraryPosterRadius,
+      changeLibraryPosterRadius,
       postListPosterLayout,
       changePostListPosterLayout,
       reminderPreviewLimit,

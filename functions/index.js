@@ -71,6 +71,7 @@ const { sendExpoPushes } = require("./expoSend");
 const referral = require("./referral");
 const userSearch = require("./userSearch");
 const publicBoards = require("./publicBoards");
+const siteStats = require("./siteStats");
 const { CAPACITY } = require("./capacity");
 const { purgeAccountData, PURGE_PHASES } = require("./accountPurge");
 const functionsV1 = require("firebase-functions/v1");
@@ -1062,6 +1063,32 @@ exports.top100Counters = onRequest(CAPACITY.light, async (req, res) => {
   }
 });
 
+// Site ziyaret sayacı: Hosting rewrite /api/beacon (firebase.json), istemci website/site-beacon.js.
+// Yalnız günlük toplamlar (siteStats/{gün}_{parça}); IP yalnız bu örneğin hız sınırlayıcısında bellekte
+// durur, yazılmaz. Model ve gizlilik: siteStats.js. Yanıt her zaman 204 — sayaç hatası siteyi etkilemez.
+const beaconLimiter = externalRatings.createRateLimiter({ limit: 120, windowMs: 60 * 1000 });
+exports.siteBeacon = onRequest(CAPACITY.light, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  if (req.method !== "POST") {
+    res.status(405).set("Allow", "POST").end();
+    return;
+  }
+  const ip = String(req.get("x-forwarded-for") || req.ip || "").split(",")[0].trim();
+  const event = !siteStats.isBot(req.get("user-agent")) && beaconLimiter(ip || "?")
+    ? siteStats.parseBeacon(req.rawBody || req.body)
+    : null;
+  if (event) {
+    const clock = siteStats.istanbulClock(new Date());
+    const docId = siteStats.shardDocId(clock.day, randomInt(siteStats.SHARDS));
+    try {
+      await db.doc(`siteStats/${docId}`).set(siteStats.statsPatch(event, clock, (n) => FieldValue.increment(n)), { merge: true });
+    } catch (err) {
+      console.error("[siteBeacon]", err?.message || err);
+    }
+  }
+  res.status(204).end();
+});
+
 // Liderlik tablosu anlık görüntüsü: BoardSnapshots/{boardId} bayatsa (10 dk) yeniden kurar.
 // Yalnız oturumlu; tanınmayan tablo kimliği reddedilir. Aynı örnekte aynı tablo için eşzamanlı
 // yeniden kurma tek sorguya indirgenir.
@@ -1994,6 +2021,13 @@ exports.onUserProfileUpdated = onDocumentUpdated(
     } catch (e) {
       console.error("fan-out leaderboards:", e);
     }
+    // Haftalık Lig satırları (aynı snapshot alanları; geçmiş haftalar da tazelenir).
+    try {
+      const s = await db.collectionGroup("leagueMembers").where("uid", "==", uid).get();
+      log("league-members", await commitRefs(s.docs.map((d) => d.ref), patchLeaderboard));
+    } catch (e) {
+      console.error("fan-out league members:", e);
+    }
     const legacyPatch = mappedPatch(changes, {
       displayName: "displayName",
       username: "username",
@@ -2698,5 +2732,38 @@ exports.cleanupExpiredCineRooms = onSchedule(
   async () => {
     const { Timestamp } = require("firebase-admin/firestore");
     await deleteExpiredRooms(db, Timestamp);
+  },
+);
+
+// ─── Haftalık Lig ────────────────────────────────────────────────────────────
+// XP yalnız bu callable ile yazılır (kurallar: leagueRules.js, Firestore işi: league.js). Kimlik
+// Users/{uid}'den okunur, istemcinin gönderdiğine güvenilmez. Oy kaynağı gerçek oy belgesiyle doğrulanır.
+const league = require("./league");
+const { normalizeIdentity } = require("./profileIdentity");
+const { SOURCE_IDS: LEAGUE_SOURCES, prevWeekId: leaguePrevWeek, weekIdOf: leagueWeekOf } = require("./leagueRules");
+
+exports.awardLeagueXp = onCall(CAPACITY.light, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign-in required");
+  const uid = request.auth.uid;
+  const source = request.data?.source;
+  const ref = request.data?.ref;
+  if (!LEAGUE_SOURCES.includes(source) || typeof ref !== "string" || ref.length > 96) {
+    throw new HttpsError("invalid-argument", "Bad league event");
+  }
+  if (source === "vote" && !(await league.voteExists(db, uid, ref))) {
+    return { awarded: 0, reason: "not_verified" };
+  }
+  const profile = await db.doc(`Users/${uid}`).get();
+  const identity = normalizeIdentity(profile.exists ? profile.data() : {});
+  return league.awardXp(db, { uid, source, ref, identity });
+});
+
+// Pazartesi 00:10 (İstanbul): geçen haftanın sonuçlanmamış gruplarını sonuçlandırır (terfi / düşme).
+exports.settleLeagueWeek = onSchedule(
+  { schedule: "10 0 * * 1", timeZone: "Europe/Istanbul", timeoutSeconds: 540, memory: "512MiB", maxInstances: 1 },
+  async () => {
+    const week = leaguePrevWeek(leagueWeekOf(Date.now()));
+    const { groups, players } = await league.settleWeek(db, week);
+    console.log(`[lig] ${week} sonuçlandı — grup: ${groups}, oyuncu: ${players}.`);
   },
 );

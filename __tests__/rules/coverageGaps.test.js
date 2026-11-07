@@ -3,7 +3,7 @@
 // yapamamalı" sorusunu gerçek kurallarla sınar; meşru yol da bir kez denenir.
 
 const { assertFails, assertSucceeds } = require("@firebase/rules-unit-testing");
-const { doc, getDoc, setDoc, updateDoc, deleteDoc } = require("firebase/firestore");
+const { collection, deleteDoc, doc, getDoc, getDocs, limit, orderBy, query, setDoc, updateDoc } = require("firebase/firestore");
 const { createEmulatorEnv } = require("../helpers/libraryEmulator");
 
 let testEnv;
@@ -163,5 +163,37 @@ describe("oyun ve kişisel kayıtlar", () => {
     await assertFails(getDoc(doc(b, "SceneGameHistory", ALICE)));
     await assertFails(getDoc(doc(b, "Users", ALICE, "myRatings", "movie_1")));
     await assertFails(getDoc(doc(b, "Users", ALICE, "bookmarks", "p1")));
+  });
+});
+
+describe("Haftalık Lig yalnız sunucunun", () => {
+  const MEMBER = ["LeagueWeeks", "2026-10-26", "groups", "gold-1", "leagueMembers"];
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "LeagueUsers", ALICE), { tier: 2, week: "2026-10-26", xp: 40 });
+      await setDoc(doc(db, "LeagueWeeks", "2026-10-26", "groups", "gold-1"), { tier: 2, size: 2, settled: false });
+      await setDoc(doc(db, ...MEMBER, ALICE), { uid: ALICE, xp: 40 });
+      await setDoc(doc(db, ...MEMBER, BOB), { uid: BOB, xp: 30 });
+      await setDoc(doc(db, "LeagueWeeks", "2026-10-26", "open", "gold"), { groupId: "gold-1", size: 2 });
+    });
+  });
+
+  test("lig durumu: sahibi okur, kimse yazamaz; başkası okuyamaz", async () => {
+    await assertSucceeds(getDoc(doc(as(ALICE), "LeagueUsers", ALICE)));
+    await assertFails(getDoc(doc(as(BOB), "LeagueUsers", ALICE)));
+    await assertFails(updateDoc(doc(as(ALICE), "LeagueUsers", ALICE), { xp: 9999 }));
+    await assertFails(setDoc(doc(as(BOB), "LeagueUsers", BOB), { tier: 4 }));
+    await assertFails(deleteDoc(doc(as(ALICE), "LeagueUsers", ALICE)));
+  });
+
+  test("lig tablosu: oturum açan okur, kendi satırını bile yazamaz; atama imleci kapalı", async () => {
+    await assertSucceeds(getDocs(query(collection(as(BOB), ...MEMBER), orderBy("xp", "desc"), limit(30))));
+    await assertSucceeds(getDoc(doc(as(BOB), "LeagueWeeks", "2026-10-26", "groups", "gold-1")));
+    await assertFails(getDoc(doc(anon(), ...MEMBER, ALICE)));
+    await assertFails(updateDoc(doc(as(ALICE), ...MEMBER, ALICE), { xp: 9999 }));
+    await assertFails(setDoc(doc(as(CAROL), ...MEMBER, CAROL), { uid: CAROL, xp: 1 }));
+    await assertFails(updateDoc(doc(as(ALICE), "LeagueWeeks", "2026-10-26", "groups", "gold-1"), { settled: true }));
+    await assertFails(getDoc(doc(as(ALICE), "LeagueWeeks", "2026-10-26", "open", "gold")));
+    await assertFails(setDoc(doc(as(ALICE), "LeagueWeeks", "2026-10-26", "open", "gold"), { size: 0 }));
   });
 });

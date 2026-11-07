@@ -33,6 +33,7 @@ const {
   increment,
   arrayUnion,
   arrayRemove,
+  Timestamp,
 } = require("firebase/firestore");
 
 const ALICE = "alice";
@@ -2081,12 +2082,20 @@ describe("betaTesters (landing test kullanıcısı formu)", () => {
     ...extra,
   });
 
-  test("oturumsuz ziyaretçi kendi kaydını yazar ve tek kaydı okur; liste dökülemez", async () => {
+  test("oturumsuz ziyaretçi kaydını yazar; ne tek kaydı ne listeyi okuyabilir", async () => {
     const db = anon();
     const ref = doc(db, "betaTesters", "dGVzdGVy_android");
     await assertSucceeds(setDoc(ref, kayit()));
-    await assertSucceeds(getDoc(ref));
+    // docId e-postadan türer: açık get, adresi bilen herkese "listede mi?" cevaplatırdı.
+    await assertFails(getDoc(ref));
     await assertFails(getDocs(collection(db, "betaTesters")));
+  });
+
+  test("aynı adresle ikinci kayıt reddedilir (landing bunu 'zaten listede' diye okur)", async () => {
+    const db = anon();
+    const ref = doc(db, "betaTesters", "dGVzdGVy_android");
+    await assertSucceeds(setDoc(ref, kayit()));
+    await assertFails(setDoc(ref, kayit()));
   });
 
   test("aynı kişi iOS için ayrı kayıt açar; kayıt değiştirilemez, silinemez", async () => {
@@ -2110,6 +2119,84 @@ describe("betaTesters (landing test kullanıcısı formu)", () => {
     await assertFails(setDoc(ref(), kayit({ createdAt: new Date(2020, 0, 1) })));
     const { platform, ...eksik } = kayit();
     await assertFails(setDoc(ref(), eksik));
+  });
+});
+
+describe("waitlist (landing 'yayınlanınca haber ver' formu)", () => {
+  const anon = () => testEnv.unauthenticatedContext().firestore();
+  const kayit = (extra = {}) => ({
+    email: "bekleyen@example.com",
+    createdAt: serverTimestamp(),
+    source: "landing",
+    queueNo: 1072,
+    ...extra,
+  });
+
+  test("oturumsuz ziyaretçi kaydını yazar; ne tek kaydı ne listeyi okuyabilir", async () => {
+    const db = anon();
+    const ref = doc(db, "waitlist", "YmVrbGV5ZW4");
+    await assertSucceeds(setDoc(ref, kayit()));
+    await assertFails(getDoc(ref));
+    await assertFails(getDocs(collection(db, "waitlist")));
+  });
+
+  test("aynı adresle ikinci kayıt, değiştirme ve silme reddedilir", async () => {
+    const db = anon();
+    const ref = doc(db, "waitlist", "YmVrbGV5ZW4");
+    await assertSucceeds(setDoc(ref, kayit()));
+    await assertFails(setDoc(ref, kayit({ queueNo: 1 })));
+    await assertFails(updateDoc(ref, { queueNo: 1 }));
+    await assertFails(deleteDoc(ref));
+  });
+
+  test("geçersiz e-posta, kaynak, sıra numarası ya da fazladan alan reddedilir", async () => {
+    const db = anon();
+    const ref = doc(db, "waitlist", "YmVrbGV5ZW4");
+    await assertFails(setDoc(ref, kayit({ email: "olmaz" })));
+    await assertFails(setDoc(ref, kayit({ source: "app" })));
+    await assertFails(setDoc(ref, kayit({ queueNo: "1" })));
+    await assertFails(setDoc(ref, kayit({ name: "Ali" })));
+  });
+});
+
+describe("site yönetim paneli (siteAdmins · siteStats · liste okuma)", () => {
+  const anon = () => testEnv.unauthenticatedContext().firestore();
+  beforeEach(() =>
+    seed(async (db) => {
+      await setDoc(doc(db, "siteAdmins", ALICE), { note: "site sahibi" });
+      await setDoc(doc(db, "siteStats", "2026-11-04_0"), { day: "2026-11-04", views: 3 });
+      await setDoc(doc(db, "betaTesters", "dGVzdGVy_android"), { email: "tester@example.com", platform: "android" });
+      await setDoc(doc(db, "waitlist", "dGVzdGVy"), { email: "tester@example.com", queueNo: 1 });
+    }));
+
+  test("yönetici beta, bekleme listesi ve istatistiği listeler; kimse yazamaz", async () => {
+    await assertSucceeds(getDocs(collection(alice, "betaTesters")));
+    await assertSucceeds(getDocs(collection(alice, "waitlist")));
+    await assertSucceeds(getDocs(collection(alice, "siteStats")));
+    await assertSucceeds(getDoc(doc(alice, "betaTesters", "dGVzdGVy_android")));
+    await assertSucceeds(getDoc(doc(alice, "waitlist", "dGVzdGVy")));
+    await assertFails(setDoc(doc(alice, "siteStats", "2026-11-04_1"), { day: "2026-11-04", views: 999 }));
+    await assertFails(updateDoc(doc(alice, "betaTesters", "dGVzdGVy_android"), { platform: "ios" }));
+  });
+
+  test("yönetici olmayan ve oturumsuz ziyaretçi listeyi ve istatistiği okuyamaz", async () => {
+    for (const db of [bob, anon()]) {
+      await assertFails(getDocs(collection(db, "betaTesters")));
+      await assertFails(getDocs(collection(db, "waitlist")));
+      await assertFails(getDoc(doc(db, "betaTesters", "dGVzdGVy_android")));
+      await assertFails(getDoc(doc(db, "waitlist", "dGVzdGVy")));
+      await assertFails(getDocs(collection(db, "siteStats")));
+      await assertFails(getDoc(doc(db, "siteStats", "2026-11-04_0")));
+    }
+  });
+
+  test("yönetici kaydını yalnız sahibi görür; kimse kendini yönetici yapamaz", async () => {
+    await assertSucceeds(getDoc(doc(alice, "siteAdmins", ALICE)));
+    await assertSucceeds(getDoc(doc(bob, "siteAdmins", BOB)));
+    await assertFails(getDoc(doc(bob, "siteAdmins", ALICE)));
+    await assertFails(getDocs(collection(alice, "siteAdmins")));
+    await assertFails(setDoc(doc(bob, "siteAdmins", BOB), { note: "ben de" }));
+    await assertFails(deleteDoc(doc(alice, "siteAdmins", ALICE)));
   });
 });
 
@@ -2285,6 +2372,197 @@ describe("Seelogd Top 100 (Top100Hype)", () => {
 
   test("eski puanlı Top100 koleksiyonu artık kapalı", async () => {
     await assertFails(getDoc(doc(alice, "Top100", MK)));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Film Kulübü (groups/{gid}.club + clubRounds + discussion)
+// ─────────────────────────────────────────────────────────────────────────────
+describe("Film Kulübü", () => {
+  // alice = kurucu (Premium), bob = üye (Free), carol = grup dışı.
+  const G = "grp-kulup";
+  const R = "tur-1";
+  const DAY = 24 * 60 * 60 * 1000;
+  const inDays = (n) => Timestamp.fromMillis(Date.now() + n * DAY);
+  const film = (id) => ({ id, media_type: "movie", title: `Film ${id}`, poster_path: null, release_date: null });
+  const grup = (club) => ({
+    name: "Kulüp",
+    members: [ALICE, BOB],
+    memberInfo: {},
+    admins: [],
+    createdBy: ALICE,
+    lastMessage: null,
+    ...(club ? { club } : {}),
+  });
+  const acik = { enabled: true, cadence: "weekly", updatedBy: ALICE };
+  const tur = (extra = {}) => ({
+    number: 1,
+    status: "voting",
+    cadence: "weekly",
+    createdBy: ALICE,
+    candidates: [film(1), film(2)],
+    candidateIds: ["movie-1", "movie-2"],
+    votes: {},
+    voteEndsAt: inDays(2),
+    pickId: null,
+    pick: null,
+    watched: {},
+    ratings: {},
+    commentCount: 0,
+    ...extra,
+  });
+  const roundRef = (db) => doc(db, "groups", G, "clubRounds", R);
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "Users", ALICE), { entitlements: { premiumPlan: "premium" } });
+      await setDoc(doc(db, "Users", BOB), {});
+    });
+  });
+
+  test("kulübü yalnız Premium yönetici açar; kapatmak serbest", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "groups", G), grup());
+      await setDoc(doc(db, "groups", "grp-bob"), { ...grup(), createdBy: BOB });
+    });
+    // Üye açamaz
+    await assertFails(updateDoc(doc(bob, "groups", G), { club: { ...acik, updatedBy: BOB } }));
+    // Free yönetici açamaz
+    await assertFails(updateDoc(doc(bob, "groups", "grp-bob"), { club: { ...acik, updatedBy: BOB } }));
+    // Premium yönetici açar
+    await assertSucceeds(updateDoc(doc(alice, "groups", G), { club: acik, updatedAt: serverTimestamp() }));
+    // Biçim dışı alan reddedilir
+    await assertFails(updateDoc(doc(alice, "groups", G), { club: { ...acik, extra: 1 } }));
+    // Plan düşse de sıklık değişir ve kapanır
+    await seed((db) => setDoc(doc(db, "Users", ALICE), {}));
+    await assertSucceeds(updateDoc(doc(alice, "groups", G), { club: { ...acik, cadence: "monthly" } }));
+    await assertSucceeds(updateDoc(doc(alice, "groups", G), { club: { ...acik, enabled: false } }));
+    // Kapandıktan sonra Free iken yeniden açamaz
+    await assertFails(updateDoc(doc(alice, "groups", G), { club: acik }));
+  });
+
+  test("tur açmak: yönetici + kulüp açık + 2–6 aday + 4 günden kısa oylama", async () => {
+    await seed((db) => setDoc(doc(db, "groups", G), grup(acik)));
+    const yaz = (db, extra) => setDoc(roundRef(db), { ...tur(extra), createdAt: serverTimestamp() });
+    await assertFails(yaz(bob, { createdBy: BOB }));
+    await assertFails(yaz(alice, { candidates: [film(1)], candidateIds: ["movie-1"] }));
+    await assertFails(yaz(alice, { voteEndsAt: inDays(5) }));
+    await assertFails(yaz(alice, { votes: { [ALICE]: "movie-1" } }));
+    await assertSucceeds(yaz(alice));
+  });
+
+  test("kulüp kapalıyken tur açılamaz", async () => {
+    await seed((db) => setDoc(doc(db, "groups", G), grup({ ...acik, enabled: false })));
+    await assertFails(setDoc(roundRef(alice), { ...tur(), createdAt: serverTimestamp() }));
+  });
+
+  test("oy: yalnız kendi oyu, yalnız adaylardan; grup dışı okuyamaz", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "groups", G), grup(acik));
+      await setDoc(roundRef(db), tur());
+    });
+    await assertSucceeds(updateDoc(roundRef(bob), { [`votes.${BOB}`]: "movie-2" }));
+    await assertFails(updateDoc(roundRef(bob), { [`votes.${BOB}`]: "movie-99" }));
+    await assertFails(updateDoc(roundRef(bob), { [`votes.${ALICE}`]: "movie-1" }));
+    await assertSucceeds(updateDoc(roundRef(bob), { [`votes.${BOB}`]: deleteField() }));
+    await assertFails(getDoc(roundRef(carol)));
+    await assertSucceeds(getDoc(roundRef(bob)));
+  });
+
+  test("oylamayı kapatma: üye süre dolmadan kapatamaz, yönetici kapatır; seçilen aday olmalı", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "groups", G), grup(acik));
+      await setDoc(roundRef(db), tur());
+    });
+    const kapat = (db, pick) =>
+      updateDoc(roundRef(db), {
+        status: "watching",
+        pickId: `movie-${pick.id}`,
+        pick,
+        pickedAt: serverTimestamp(),
+        watchEndsAt: inDays(7),
+      });
+    await assertFails(kapat(bob, film(1)));
+    await assertFails(kapat(alice, film(99)));
+    await assertSucceeds(kapat(alice, film(2)));
+  });
+
+  test("süresi dolan oylamayı herhangi bir üye kapatır", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, "groups", G), grup(acik));
+      await setDoc(roundRef(db), tur({ voteEndsAt: Timestamp.fromMillis(Date.now() - 1000) }));
+    });
+    await assertSucceeds(
+      updateDoc(roundRef(bob), {
+        status: "watching",
+        pickId: "movie-1",
+        pick: film(1),
+        pickedAt: serverTimestamp(),
+        watchEndsAt: inDays(7),
+      }),
+    );
+  });
+
+  describe("izleme evresi", () => {
+    beforeEach(async () => {
+      await seed(async (db) => {
+        await setDoc(doc(db, "groups", G), grup(acik));
+        await setDoc(roundRef(db), tur({ status: "watching", pickId: "movie-1", pick: film(1), watchEndsAt: inDays(7) }));
+      });
+    });
+
+    test("izledim + puan yalnız kendi alanı, puan 1–10 ve izlediyse", async () => {
+      await assertFails(updateDoc(roundRef(bob), { [`ratings.${BOB}`]: 8 }));
+      await assertSucceeds(updateDoc(roundRef(bob), { [`watched.${BOB}`]: serverTimestamp(), [`ratings.${BOB}`]: 8 }));
+      await assertFails(updateDoc(roundRef(bob), { [`ratings.${BOB}`]: 11 }));
+      await assertFails(updateDoc(roundRef(bob), { [`ratings.${BOB}`]: 7.5 }));
+      await assertSucceeds(updateDoc(roundRef(bob), { [`ratings.${BOB}`]: 6 }));
+      await assertFails(updateDoc(roundRef(bob), { [`watched.${ALICE}`]: serverTimestamp() }));
+      // Keyfî tarih yazılamaz
+      await assertFails(updateDoc(roundRef(alice), { [`watched.${ALICE}`]: Timestamp.fromMillis(0) }));
+      // Geri alınca puan da gider
+      await assertFails(updateDoc(roundRef(bob), { [`watched.${BOB}`]: deleteField() }));
+      await assertSucceeds(
+        updateDoc(roundRef(bob), { [`watched.${BOB}`]: deleteField(), [`ratings.${BOB}`]: deleteField() }),
+      );
+    });
+
+    test("tartışmayı yalnız izleyen okur ve yazar; sayaç tam +1", async () => {
+      const yorum = (db, uid, text = "Sonu harikaydı") => {
+        const batch = writeBatch(db);
+        batch.set(doc(collection(roundRef(db), "discussion")), {
+          senderId: uid,
+          senderName: "Ad",
+          text,
+          createdAt: serverTimestamp(),
+        });
+        batch.update(roundRef(db), { commentCount: increment(1) });
+        return batch.commit();
+      };
+      await assertFails(yorum(bob, BOB));
+      await assertFails(getDocs(collection(roundRef(bob), "discussion")));
+      await assertSucceeds(updateDoc(roundRef(bob), { [`watched.${BOB}`]: serverTimestamp() }));
+      await assertSucceeds(yorum(bob, BOB));
+      await assertSucceeds(getDocs(collection(roundRef(bob), "discussion")));
+      // İzlemeyen alice (kurucu bile olsa) okuyamaz
+      await assertFails(getDocs(collection(roundRef(alice), "discussion")));
+      await assertFails(yorum(bob, BOB, "x".repeat(1001)));
+      await assertFails(yorum(bob, ALICE));
+      await assertFails(updateDoc(roundRef(bob), { commentCount: 5 }));
+    });
+
+    test("turu bitirme: üye süreden önce bitiremez, yönetici bitirir", async () => {
+      const bitir = (db) => updateDoc(roundRef(db), { status: "done", finishedAt: serverTimestamp() });
+      await assertFails(bitir(bob));
+      await assertSucceeds(bitir(alice));
+      // Arşivde de izledim/puan eklenebilir
+      await assertSucceeds(updateDoc(roundRef(bob), { [`watched.${BOB}`]: serverTimestamp(), [`ratings.${BOB}`]: 9 }));
+    });
+
+    test("turu yalnız yönetici siler", async () => {
+      await assertFails(deleteDoc(roundRef(bob)));
+      await assertSucceeds(deleteDoc(roundRef(alice)));
+    });
   });
 });
 
@@ -2497,5 +2775,185 @@ describe("Users / Usernames listeleme (H-1)", () => {
       await assertFails(getDocs(prefixQuery(lBob, 21)));
       await assertFails(getDocs(prefixQuery(lBob, null)));
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Grup mesaj yetkileri (utils/groupRoles.js canDeleteGroupMessage /
+// canSendGroupMessage ile AYNI tablo). Kurucu > yönetici > üye:
+//   • yönetici kurucunun ve diğer yöneticilerin mesajına dokunamaz,
+//   • yönetici ve kurucu sıradan üyenin mesajını siler,
+//   • "Yalnız yöneticiler mesaj gönderebilir" (adminsOnlyMessages) açıkken
+//     sıradan üye yazamaz; oy/davet yanıtı (update) ve kulüp kartları serbest.
+describe("grup mesaj yetkileri", () => {
+  const DAVE = "dave";
+  const G = "grp-yetki";
+  const msg = (db, id) => doc(db, "groups", G, "messages", id);
+  const pin = (db, id) => doc(db, "groups", G, "pins", id);
+  let dave;
+
+  const seedGroup = (extra = {}) =>
+    seed(async (db) => {
+      await setDoc(doc(db, "groups", G), {
+        name: "Yetki",
+        createdBy: ALICE,
+        admins: [BOB, DAVE],
+        members: [ALICE, BOB, CAROL, DAVE],
+        ...extra,
+      });
+      await setDoc(msg(db, "m-alice"), { senderId: ALICE, text: "kurucu" });
+      await setDoc(msg(db, "m-bob"), { senderId: BOB, text: "yönetici" });
+      await setDoc(msg(db, "m-dave"), { senderId: DAVE, text: "diğer yönetici" });
+      await setDoc(msg(db, "m-carol"), { senderId: CAROL, text: "üye" });
+      await setDoc(msg(db, "m-poll"), {
+        senderId: ALICE,
+        kind: "poll",
+        poll: { question: "?", type: "text", options: [{ id: "o0", label: "a" }], votes: {} },
+      });
+    });
+
+  beforeEach(() => {
+    dave = testEnv.authenticatedContext(DAVE).firestore();
+  });
+
+  test("yönetici sıradan üyenin mesajını siler, kurucunun ve diğer yöneticinin mesajını silemez", async () => {
+    await seedGroup();
+    await assertSucceeds(deleteDoc(msg(bob, "m-carol")));
+    await assertFails(deleteDoc(msg(bob, "m-alice")));
+    await assertFails(deleteDoc(msg(bob, "m-dave")));
+    await assertSucceeds(deleteDoc(msg(bob, "m-bob")));
+  });
+
+  test("kurucu herkesin mesajını siler; sıradan üye yalnız kendi mesajını", async () => {
+    await seedGroup();
+    await assertFails(deleteDoc(msg(carol, "m-bob")));
+    await assertFails(deleteDoc(msg(carol, "m-alice")));
+    await assertSucceeds(deleteDoc(msg(carol, "m-carol")));
+    await assertSucceeds(deleteDoc(msg(alice, "m-bob")));
+    await assertSucceeds(deleteDoc(msg(alice, "m-dave")));
+  });
+
+  test("yönetici, sildiği üye mesajının pin'ini kaldırır; kurucu mesajının pin'ini kaldıramaz", async () => {
+    await seedGroup();
+    await seed(async (db) => {
+      await setDoc(pin(db, "m-carol"), { messageId: "m-carol", senderId: CAROL, pinnedBy: ALICE });
+      await setDoc(pin(db, "m-alice"), { messageId: "m-alice", senderId: ALICE, pinnedBy: ALICE });
+    });
+    await assertFails(deleteDoc(pin(bob, "m-alice")));
+    await assertSucceeds(deleteDoc(pin(bob, "m-carol")));
+  });
+
+  test("yalnız kurucu/yönetici 'yalnız yöneticiler yazabilir' ayarını değiştirir", async () => {
+    await seedGroup();
+    await assertFails(updateDoc(doc(carol, "groups", G), { adminsOnlyMessages: true }));
+    await assertFails(updateDoc(doc(bob, "groups", G), { adminsOnlyMessages: "evet" }));
+    await assertSucceeds(
+      updateDoc(doc(bob, "groups", G), { adminsOnlyMessages: true, updatedAt: serverTimestamp() }),
+    );
+    await assertSucceeds(updateDoc(doc(alice, "groups", G), { adminsOnlyMessages: false }));
+  });
+
+  test("ayar açıkken sıradan üye yazamaz; yöneticiler yazar, üye oy verebilir", async () => {
+    await seedGroup({ adminsOnlyMessages: true });
+    const yeni = (db, senderId, extra = {}) =>
+      addDoc(collection(db, "groups", G, "messages"), { senderId, text: "selam", ...extra });
+
+    await assertFails(yeni(carol, CAROL));
+    await assertSucceeds(yeni(bob, BOB));
+    await assertSucceeds(yeni(alice, ALICE));
+    await assertSucceeds(
+      updateDoc(msg(carol, "m-poll"), { "poll.votes.carol": "o0" }),
+    );
+    // Film Kulübü: süre dolunca herhangi bir üye "seçildi"/"bitti" kartını yazar.
+    await assertSucceeds(yeni(carol, CAROL, { kind: "clubShare", share: { type: "club", event: "picked" } }));
+    await assertFails(yeni(carol, CAROL, { kind: "clubShare", share: { type: "club", event: "voting" } }));
+  });
+
+  test("ayar kapalıyken (ya da hiç yokken) herkes yazar", async () => {
+    await seedGroup();
+    await assertSucceeds(addDoc(collection(carol, "groups", G, "messages"), { senderId: CAROL, text: "a" }));
+    await seed((db) => updateDoc(doc(db, "groups", G), { adminsOnlyMessages: false }));
+    await assertSucceeds(addDoc(collection(carol, "groups", G, "messages"), { senderId: CAROL, text: "b" }));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Avatar fotoğrafı (utils/avatarPhotos.js): photoURL herkesin gördüğü her
+// avatarda çizilir → yalnız Google hesabı ve TMDB kişi fotoğrafı adresleri.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("avatar fotografi adresi", () => {
+  const profil = (extra = {}) => ({
+    uid: ALICE,
+    username: "alice",
+    usernameLower: "alice",
+    displayName: "Alice",
+    avatarIndex: 3,
+    friendsCount: 0,
+    ...extra,
+  });
+  const TMDB = "https://image.tmdb.org/t/p/h632/keanu.jpg";
+  const GOOGLE = "https://lh3.googleusercontent.com/a/ACg8ocK=s500-c";
+
+  test("oyuncu fotografi kisi etiketiyle yazilabilir", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertSucceeds(
+      updateDoc(doc(alice, "Users", ALICE), {
+        avatarIndex: -1,
+        photoURL: TMDB,
+        photoSource: "tmdb.person",
+        photoPerson: { id: 6384, name: "Keanu Reeves" },
+      }),
+    );
+  });
+
+  test("Google fotografi ve kisi etiketini silmek serbest", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "Users", ALICE), profil({ photoURL: TMDB, photoPerson: { id: 1, name: "X" } })),
+    );
+    await assertSucceeds(
+      updateDoc(doc(alice, "Users", ALICE), {
+        avatarIndex: -1,
+        photoURL: GOOGLE,
+        photoSource: "google.com",
+        photoPerson: deleteField(),
+      }),
+    );
+  });
+
+  test("keyfi resim adresi reddedilir", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    for (const photoURL of [
+      "https://evil.example/x.jpg",
+      "http://image.tmdb.org/t/p/h632/keanu.jpg",
+      "https://image.tmdb.org.evil.com/t/p/h632/keanu.jpg",
+      "https://image.tmdb.org/t/p/h632/../x.jpg",
+      "https://googleusercontent.com.evil.com/a/x",
+    ]) {
+      await assertFails(updateDoc(doc(alice, "Users", ALICE), { avatarIndex: -1, photoURL }));
+    }
+  });
+
+  test("bozuk kisi etiketi ve kaynak reddedilir", async () => {
+    await seed((db) => setDoc(doc(db, "Users", ALICE), profil()));
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { photoURL: TMDB, photoPerson: { id: "6384", name: "K" } }),
+    );
+    await assertFails(
+      updateDoc(doc(alice, "Users", ALICE), { photoURL: TMDB, photoPerson: { id: 1, name: "K", extra: true } }),
+    );
+    await assertFails(updateDoc(doc(alice, "Users", ALICE), { photoSource: "x".repeat(41) }));
+  });
+
+  test("baska kaynaktan kalmis eski adres diger guncellemeleri engellemez", async () => {
+    await seed((db) =>
+      setDoc(doc(db, "Users", ALICE), profil({ avatarIndex: -1, photoURL: "https://old.example/me.png" })),
+    );
+    await assertSucceeds(updateDoc(doc(alice, "Users", ALICE), { displayName: "Alice B", avatarIndex: 5 }));
+  });
+
+  test("kayitta Auth fotografi yazilabilir, https olmayan yazilamaz", async () => {
+    // Önce reddedilen: aynı belge, yalnız adres farklı — başka bir nedenle düşmüyor.
+    await assertFails(setDoc(doc(alice, "Users", ALICE), profil({ photoURL: "javascript:alert(1)" })));
+    await assertSucceeds(setDoc(doc(alice, "Users", ALICE), profil({ photoURL: GOOGLE })));
   });
 });

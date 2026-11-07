@@ -36,16 +36,31 @@ const RAW_TOUCHABLE_ALLOWED = {
   "components/lists/GlobalSearchResults.js": 1,
   "components/modals/createPost/DraftCard.js": 2,
   "screens/tabs/profile/notes/NoteCards.js": 5,
+  // Metin kutusunun köşesindeki harf sayacı (✦ 1000/1000): sınır dolunca dokunulur
+  // olan küçük etiket; çoğu kez zaten camın (GlassBox field) içinde, düğme değil.
+  "screens/tabs/profile/notes/NoteEditorSheet.js": 1,
   "components/tv/TvGraphGrid.js": 1, // yüzlerce bölüm hücresi
   "components/cineswipe/SwipeCard.js": 1, // kart içi bilgi düğmesi
   "components/badges/BadgeRail.js": 3, // kart gibi raf öğeleri
+  // Liste görünümü seçicisindeki önizleme kartının içindeki minik 3/5 sayı çipi
+  // (her kartta bir çift): kartın kendisi zaten dokunulur, cam iç içe kalabalık olur.
+  "screens/tabs/profile/ProfileLists.js": 1,
   "components/badges/BadgeShowcaseCard.js": 2, // kart gibi vitrin yuvası + yuvanın köşesindeki sil rozeti
   // Düğmenin KENDİSİ renk örneği / tema önizlemesi: cam tonu gösterdiği rengi bozar.
   "components/theme/ThemeShuffleDeck.js": 2,
   "components/theme/ThemeToneKit.js": 1,
   "screens/tabs/setting/SettingsTheme.js": 2,
   // Animasyonlu opaklıklı bildirim kartı (cam opaklıkla soldurulamaz).
+  // İstatistik gün kartındaki takvim yaprağı (gün özetini açar): ay bandı + tonlu zemin
+  // tarihin kendisi; zaten GlassBox kartın içinde, cam tonu rütbe rengini bozar.
+  "components/profile/StatsComponents.js": 1,
   "components/toast/ToastCards.js": 1,
+  // Yüzen bildirim kartı: simgeye küçülürken/simgeden büyürken opaklığı animasyonlu (sonraki,
+  // küçült, Ertele, Reddet/Tamam, Kabul/Aç) — ToastCards ile aynı gerekçe.
+  "components/floatingNotice/FloatingNoticeCard.js": 5,
+  // Tanıtım "dört favori" adımında Film/Dizi/Oyuncu sekmeleri: tek tonlu kabuğun içindeki
+  // segmentler (aktif olan accent tonlu); her segmente cam = iç içe cam.
+  "screens/onboarding/OnboardingFavorites.js": 1,
   // Marka renkli giriş düğmeleri (Apple / Google) — AuthKit'te glass={false}.
   "components/auth/AuthKit.js": 1,
   // Hata sınırı sağlayıcıların DIŞINDA: cam bileşeni tema okuyup "useTheme must be used within a
@@ -62,8 +77,7 @@ const RAW_INPUT_ALLOWED = {
   "components/auth/AuthKit.js": 1,
   // Kabuğu bir üst bileşende cam: FilterSearchInput, GlassBox'lı satırın içinde.
   "components/profile/StatsComponents.js": 1,
-  // Alt çizgili (kutusuz) alanlar ve not kâğıdı: kutu yok, cam olacak şey yok.
-  "screens/chat/CreateGroupScreen.js": 1,
+  // Not kâğıdı alanları: kutu yok, cam olacak şey yok.
   "screens/tabs/profile/notes/NoteEditorSheet.js": 3,
   // Opaklığı animasyonlu atası olan alan (cam opaklıkla soldurulamaz).
   "screens/lists/ListsViewScreen.js": 1,

@@ -76,15 +76,34 @@ service cloud.firestore {
           && !exists(/databases/$(database)/documents/Users/$(request.auth.uid)/blocked/$(peerUid));
     }
 
+    // ─── Site yönetim paneli (website/admin.html) ───────────────────────
+    // Yönetici = siteAdmins/{uid} belgesi VAR. Belgeyi yalnız Firebase Console'dan
+    // (ya da Admin SDK ile) elle açarsın; istemci yazamaz. Kişi yalnız KENDİ belgesinin
+    // varlığını okuyabilir (panel "yetkin yok" ekranını buna göre gösterir).
+    function isSiteAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/siteAdmins/$(request.auth.uid));
+    }
+    match /siteAdmins/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+    // Site ziyaret istatistiği: günlük toplamlar, yalnız siteBeacon (Admin SDK) yazar.
+    match /siteStats/{docId} {
+      allow read: if isSiteAdmin();
+      allow write: if false;
+    }
+
     // ─── Landing sitesi: geçici bekleme listesi ─────────────────────────
     match /waitlist/{docId} {
       // E-posta adresi kişisel veridir: koleksiyonu LİSTELEMEK serbest olamaz,
       // yoksa herkes tüm bekleme listesini dökebilir (docId = base64(email) ve
-      // 'email' alanı düz metin). Landing yalnızca kendi kaydını tek doküman
-      // olarak okur (store.addEmail → getDoc(doc(...,"waitlist", id))), o yüzden
-      // get açık, list kapalı.
-      allow get: if true;
-      allow list: if false;
+      // 'email' alanı düz metin). TEK KAYIT da okunamaz (6 Kas): docId e-postadan
+      // türediği için açık get, adresi bilen herkese "bu kişi listede mi, kaçıncı
+      // sırada" sorusunu cevaplatıyordu. Landing okumaz, doğrudan yazar; var olan
+      // kayıt update sayılır ve reddedilir = "zaten listede" (store.addEmail).
+      allow get: if isSiteAdmin();
+      allow list: if isSiteAdmin();
       allow update, delete: if false;
       allow create: if request.resource.data.keys().hasOnly(['email', 'createdAt', 'source', 'queueNo'])
                     && request.resource.data.email is string
@@ -96,11 +115,12 @@ service cloud.firestore {
 
     // Landing "Test kullanıcısı ol" formu (website/home.js → addBetaTester).
     // docId = base64(email) + "_" + platform; aynı kişi iki platforma ayrı yazılır.
-    // waitlist ile aynı gerekçe: tek kayıt okunur (yinelenen kayıt kontrolü),
-    // liste dökülemez, kayıt değiştirilemez.
+    // waitlist ile aynı gerekçe: ne tek kayıt ne liste herkese açık (yalnız site
+    // yöneticisi, admin.html); kayıt değiştirilemez — yinelenen yazma reddedilir
+    // ve landing bunu "zaten listede" diye okur (addBetaTester).
     match /betaTesters/{docId} {
-      allow get: if true;
-      allow list: if false;
+      allow get: if isSiteAdmin();
+      allow list: if isSiteAdmin();
       allow update, delete: if false;
       allow create: if request.resource.data.keys().hasOnly(['email', 'platform', 'lang', 'createdAt', 'source'])
                     && request.resource.data.keys().hasAll(['email', 'platform', 'createdAt', 'source'])
@@ -370,6 +390,43 @@ service cloud.firestore {
               && f.get('shows', []) is list && f.get('shows', []).size() <= 4
               && f.get('people', []) is list && f.get('people', []).size() <= 4);
     }
+    // Avatar fotoğrafı (utils/avatarPhotos.js): photoURL her arkadaşın, akışın,
+    // sohbetin avatarında çizilir. İstemci yalnız iki kaynaktan adres yazar:
+    // bağlı Google hesabı (googleusercontent / ggpht) ve oyuncu/yönetmen
+    // fotoğrafı (image.tmdb.org, "tmdb.person"). Kural olmadan herkes kendine
+    // keyfî bir resim adresi (uygunsuz içerik, izleme pikseli) yazabiliyordu.
+    // Adres yalnız DEĞİŞTİRİLİRKEN denetlenir: alanı başka kaynaktan kalmış
+    // eski hesaplar diğer alanlarını güncellemeye devam eder.
+    // photoSource kısa bir etiket; photoPerson yalnız { id:int, name:string }.
+    function avatarPhotoUrlOk(url) {
+      return url == null
+          || (url is string
+              && url.size() <= 1024
+              && (url.matches('^https://([a-z0-9-]+[.])*(googleusercontent|ggpht)[.]com/[^ ]*$')
+                  || url.matches('^https://image[.]tmdb[.]org/t/p/[a-z0-9_]+/[A-Za-z0-9_-]+[.](jpg|jpeg|png|webp)$')));
+    }
+    function avatarPhotoMetaOk() {
+      let src = request.resource.data.get('photoSource', null);
+      let person = request.resource.data.get('photoPerson', null);
+      return (src == null || (src is string && src.size() <= 40 && src.matches('^[a-z0-9.:_-]+$')))
+          && (person == null
+              || (person is map
+                  && person.keys().hasOnly(['id', 'name'])
+                  && person.id is int && person.id > 0
+                  && person.name is string && person.name.size() > 0 && person.name.size() <= 120));
+    }
+    function avatarPhotoCreateOk() {
+      let url = request.resource.data.get('photoURL', null);
+      // Kayıtta Auth fotoğrafı yazılır; sağlayıcıdan bağımsız, yalnız biçim.
+      return (url == null || (url is string && url.size() <= 1024 && url.matches('^https://[^ ]+$')))
+          && avatarPhotoMetaOk();
+    }
+    function avatarPhotoUpdateOk() {
+      return (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoURL'])
+              || avatarPhotoUrlOk(request.resource.data.get('photoURL', null)))
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['photoSource', 'photoPerson'])
+              || avatarPhotoMetaOk());
+    }
     // "Vitrin rozetleri" (utils/badgeShowcase.js): kullanıcının profilinde
     // sergilemek üzere seçtiği en fazla 4 rozet id'si (string[]).
     function showcaseBadgeItemOk(item) {
@@ -456,7 +513,8 @@ service cloud.firestore {
                     && rootCreateWithoutPrivateFields()
                     && fourFavoritesOk()
                     && showcaseBadgesOk()
-                    && socialLinksOk();
+                    && socialLinksOk()
+                    && avatarPhotoCreateOk();
       // Sahibi her şeyi yazar; diğer signed-in kullanıcılar SADECE
       // counter/timestamp alanlarını günceller (friend req / like / comment
       // akışlarında karşı tarafın dokümanı güncellenir).
@@ -469,7 +527,8 @@ service cloud.firestore {
                         && rootUpdateWithoutPrivateFields()
                         && fourFavoritesOk()
                         && showcaseBadgesOk()
-                        && socialLinksOk())
+                        && socialLinksOk()
+                        && avatarPhotoUpdateOk())
                     || (isSignedIn()
                         && onlyUpdating([
                              'friendsCount','followersCount','followingCount',
@@ -749,6 +808,32 @@ service cloud.firestore {
     match /BoardSnapshots/{boardId} {
       allow read: if isSignedIn();
       allow write: if false;
+    }
+
+    // ─── Haftalık Lig ───────────────────────────────────────────────────
+    // Hepsini yalnız Cloud Functions yazar (awardLeagueXp + settleLeagueWeek;
+    // functions/league.js). XP istemciden gelirse lig anlamını yitirir.
+    //   LeagueUsers/{uid}: lig, hafta XP'si, geçen haftanın sonucu — sahibi okur.
+    //   groups/{grup} + leagueMembers/{uid}: lig tablosu — oturum açan okur
+    //     (oyun liderlikleriyle aynı görünürlük: ad, avatar, XP).
+    //   open/{lig}: grup atama imleci — istemciye kapalı.
+    match /LeagueUsers/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+    match /LeagueWeeks/{weekId} {
+      allow read, write: if false;
+      match /groups/{groupId} {
+        allow read: if isSignedIn();
+        allow write: if false;
+        match /leagueMembers/{uid} {
+          allow read: if isSignedIn();
+          allow write: if false;
+        }
+      }
+      match /open/{tier} {
+        allow read, write: if false;
+      }
     }
 
     // ─── Film / dizi yorumları ──────────────────────────────────────────
@@ -1168,6 +1253,28 @@ service cloud.firestore {
     function isGroupManager(groupId) {
       return isGroupCreator(groupId) || isGroupAdmin(groupId);
     }
+    // Mesaj silme hiyerarşisi (utils/groupRoles.js canDeleteGroupMessage ile AYNI):
+    // kendi mesajı herkes; kurucu herkesinkini; yönetici yalnız SIRADAN üyeninkini
+    // (kurucunun ve diğer yöneticilerin mesajına dokunamaz).
+    function canDeleteGroupMessageOf(groupId, senderUid) {
+      let g = get(/databases/$(database)/documents/groups/$(groupId)).data;
+      return senderUid == request.auth.uid
+             || request.auth.uid == g.createdBy
+             || (isGroupManagerOf(g)
+                 && senderUid != g.createdBy
+                 && !(senderUid in g.get('admins', [])));
+    }
+    // "Yalnız yöneticiler mesaj gönderebilir" (groups/{id}.adminsOnlyMessages,
+    // utils/groupRoles.js canSendGroupMessage). Film Kulübü'nün "film seçildi" /
+    // "tur bitti" kartlarını süre dolunca HERHANGİ bir üye yazar
+    // (services/filmClubService.js) — o kartlar kipten muaf.
+    function canSendGroupMessageNow(groupId) {
+      let g = get(/databases/$(database)/documents/groups/$(groupId)).data;
+      return g.get('adminsOnlyMessages', false) != true
+             || isGroupManagerOf(g)
+             || (request.resource.data.get('kind', '') == 'clubShare'
+                 && request.resource.data.get('share', {}).get('event', '') in ['picked', 'done']);
+    }
     // Grup üye tavanı — utils/groupLimits.js MAX_GROUP_MEMBERS ile AYNI sayı
     // (__tests__/groupLimits.test.js eşitliği denetler). Tavanı aşan eski bir
     // grupta üye ÇIKARMA serbest kalsın diye küçülen yazım her zaman geçer.
@@ -1175,6 +1282,23 @@ service cloud.firestore {
       return request.resource.data.members.size() <= 50
              || (resource != null
                  && request.resource.data.members.size() <= resource.data.members.size());
+    }
+    // Film Kulübü yardımcıları (aşağıdaki club dalı ve clubRounds).
+    function isGroupManagerOf(data) {
+      return request.auth.uid == data.createdBy
+             || (data.get('admins', []) is list && request.auth.uid in data.get('admins', []));
+    }
+    function isPaidPlan() {
+      let ent = get(/databases/$(database)/documents/Users/$(request.auth.uid)).data.get('entitlements', {});
+      return ent.get('premiumUnlimited', false) == true
+             || ent.get('premiumPlan', 'free') in ['premium', 'unlimited'];
+    }
+    function clubFieldOk(club) {
+      return club is map
+             && club.keys().hasOnly(['enabled', 'cadence', 'updatedBy'])
+             && club.enabled is bool
+             && club.cadence in ['weekly', 'monthly']
+             && club.updatedBy == request.auth.uid;
     }
     match /groups/{groupId} {
       allow read:   if isSignedIn() && request.auth.uid in resource.data.members;
@@ -1225,6 +1349,28 @@ service cloud.firestore {
                                'name', 'color', 'avatarIndex'
                              ])
                       )
+                      // Film Kulübü aç/kapat (utils/filmClub.js, docs/ozellikler/FILM_KULUBU.md): yalnız kurucu
+                      // ya da yönetici. AÇMAK Premium ister (registry `film_club`; plan entitlements'tan, istemci
+                      // yazamaz); kapatmak ve sıklığı değiştirmek her planda serbest. Kulüp açıkken plan düşerse
+                      // turlar sürer — kapı yalnız kurmakta.
+                      // "Yalnız yöneticiler mesaj gönderebilir" aç/kapat: kurucu ya da yönetici.
+                      || (
+                        isGroupManagerOf(resource.data)
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['adminsOnlyMessages', 'updatedAt'])
+                        && request.resource.data.adminsOnlyMessages is bool
+                      )
+                      || (
+                        isGroupManagerOf(resource.data)
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['club', 'updatedAt'])
+                        && clubFieldOk(request.resource.data.club)
+                        && (
+                          request.resource.data.club.enabled == false
+                          || resource.data.get('club', {}).get('enabled', false) == true
+                          || isPaidPlan()
+                        )
+                      )
                       // Üye KENDİNİ çıkarır (gruptan ayrılma + hesap silme
                       // purge'u). Yalnız ayrılanın kendi izleri silinebilir:
                       // başkası çıkarılamaz, yeni üye/yönetici eklenemez.
@@ -1264,7 +1410,8 @@ service cloud.firestore {
         allow read:   if isSignedIn() && request.auth.uid in groupMembers(groupId);
         allow create: if isSignedIn()
                       && request.auth.uid in groupMembers(groupId)
-                      && request.resource.data.senderId == request.auth.uid;
+                      && request.resource.data.senderId == request.auth.uid
+                      && canSendGroupMessageNow(groupId);
         // Gönderen yalnız kendi düz mesaj metnini düzenler. Diğer üyeler bir
         // ankette yalnız votes haritasını değiştirebilir; mesajın sorusu,
         // seçenekleri, göndereni veya alıntı metası değiştirilemez. Davet
@@ -1288,10 +1435,7 @@ service cloud.firestore {
                         || cineInviteDone()
                       );
         allow delete: if isSignedIn()
-                      && (
-                        resource.data.senderId == request.auth.uid
-                        || isGroupCreator(groupId)
-                      );
+                      && canDeleteGroupMessageOf(groupId, resource.data.senderId);
       }
 
       match /pins/{pinId} {
@@ -1312,9 +1456,158 @@ service cloud.firestore {
                       && request.auth.uid in groupMembers(groupId)
                       && (
                         resource.data.pinnedBy == request.auth.uid
-                        || isGroupCreator(groupId)
+                        // Pin'in senderId'si oluştururken mesajınkiyle eşitlendi
+                        // (yukarıdaki create). Mesajı silebilen pin'i de kaldırır.
+                        || canDeleteGroupMessageOf(groupId, resource.data.senderId)
                         || get(/databases/$(database)/documents/groups/$(groupId)/messages/$(pinId)).data.senderId == request.auth.uid
                       );
+      }
+
+      // ─── Film Kulübü turları ──────────────────────────────────────────
+      // groups/{gid}/clubRounds/{rid}: voting → watching → done (utils/filmClub.js; sayılar oradaki
+      // CLUB_* sabitleriyle AYNI — __tests__/filmClub.test.js metni karşılaştırır).
+      //   • Tur açmak: kurucu/yönetici, kulüp açıkken. Tek açık tur kuralı istemcide (yöneticiler güvenilir).
+      //   • Oy: üye yalnız KENDİ oyunu yazar/geri çeker, yalnız adaylardan biri.
+      //   • Oylamayı kapat / turu bitir: yönetici her zaman, herhangi bir üye SÜRE DOLUNCA. Kazananı istemci
+      //     sayar (kural oy sayamaz); seçilen film adaylardan biri olmak zorunda.
+      //   • İzledim + puan: üye yalnız kendi alanı; puan 1–10 tam sayı ve yalnız izlediyse.
+      //   • Tartışma sayacı: izlemiş üye tam +1 (tartışma mesajıyla aynı batch).
+      match /clubRounds/{roundId} {
+        function clubGroup() {
+          return get(/databases/$(database)/documents/groups/$(groupId)).data;
+        }
+        function isClubMember() {
+          return isSignedIn() && request.auth.uid in clubGroup().members;
+        }
+        function isClubManager() {
+          return isGroupManagerOf(clubGroup());
+        }
+        function changed() {
+          return request.resource.data.diff(resource.data).affectedKeys();
+        }
+        function onlyMine(field) {
+          return request.resource.data.get(field, {}).diff(resource.data.get(field, {}))
+                   .affectedKeys().hasOnly([request.auth.uid]);
+        }
+        function voteOk() {
+          let votes = request.resource.data.votes;
+          return votes is map
+                 && (!(request.auth.uid in votes) || votes[request.auth.uid] in resource.data.candidateIds);
+        }
+        function watchOk() {
+          let me = request.auth.uid;
+          let watched = request.resource.data.watched;
+          let ratings = request.resource.data.ratings;
+          return watched is map && ratings is map
+                 && (!(me in watched)
+                     || watched[me] == request.time
+                     || (me in resource.data.watched && watched[me] == resource.data.watched[me]))
+                 && (!(me in ratings)
+                     || (me in watched && ratings[me] is int && ratings[me] >= 1 && ratings[me] <= 10));
+        }
+
+        allow read: if isClubMember();
+        allow create: if isClubMember()
+                      && isClubManager()
+                      && clubGroup().get('club', {}).get('enabled', false) == true
+                      && request.resource.data.keys().hasOnly([
+                           'number', 'status', 'cadence', 'createdBy', 'createdAt', 'candidates',
+                           'candidateIds', 'votes', 'voteEndsAt', 'pickId', 'pick', 'watched',
+                           'ratings', 'commentCount'
+                         ])
+                      && request.resource.data.number is int
+                      && request.resource.data.status == 'voting'
+                      && request.resource.data.cadence in ['weekly', 'monthly']
+                      && request.resource.data.createdBy == request.auth.uid
+                      && request.resource.data.createdAt == request.time
+                      && request.resource.data.candidateIds is list
+                      && request.resource.data.candidateIds.size() >= 2
+                      && request.resource.data.candidateIds.size() <= 6
+                      && request.resource.data.candidates is list
+                      && request.resource.data.candidates.size() == request.resource.data.candidateIds.size()
+                      && request.resource.data.votes == {}
+                      && request.resource.data.watched == {}
+                      && request.resource.data.ratings == {}
+                      && request.resource.data.commentCount == 0
+                      && request.resource.data.pickId == null
+                      && request.resource.data.pick == null
+                      && request.resource.data.voteEndsAt is timestamp
+                      && request.resource.data.voteEndsAt > request.time
+                      && request.resource.data.voteEndsAt <= request.time + duration.value(4, 'd');
+        allow update: if isClubMember()
+                      && (
+                        // Oy ver / geri çek
+                        (
+                          resource.data.status == 'voting'
+                          && changed().hasOnly(['votes'])
+                          && onlyMine('votes')
+                          && voteOk()
+                        )
+                        // Oylamayı kapat → izleme
+                        || (
+                          resource.data.status == 'voting'
+                          && (isClubManager() || request.time >= resource.data.voteEndsAt)
+                          && changed().hasOnly(['status', 'pickId', 'pick', 'pickedAt', 'watchEndsAt'])
+                          && request.resource.data.status == 'watching'
+                          && request.resource.data.pickId in resource.data.candidateIds
+                          && request.resource.data.pick is map
+                          && string(request.resource.data.pick.media_type) + '-' + string(request.resource.data.pick.id)
+                               == request.resource.data.pickId
+                          && request.resource.data.pickedAt == request.time
+                          && request.resource.data.watchEndsAt is timestamp
+                          && request.resource.data.watchEndsAt > request.time
+                          && request.resource.data.watchEndsAt <= request.time + duration.value(31, 'd')
+                        )
+                        // İzledim / puan (izleme ve arşiv evresinde)
+                        || (
+                          resource.data.status in ['watching', 'done']
+                          && changed().hasOnly(['watched', 'ratings'])
+                          && onlyMine('watched')
+                          && onlyMine('ratings')
+                          && watchOk()
+                        )
+                        // Tartışma sayacı +1
+                        || (
+                          resource.data.status in ['watching', 'done']
+                          && request.auth.uid in resource.data.watched
+                          && changed().hasOnly(['commentCount'])
+                          && request.resource.data.commentCount == resource.data.get('commentCount', 0) + 1
+                        )
+                        // Turu bitir → arşiv
+                        || (
+                          resource.data.status == 'watching'
+                          && (isClubManager() || request.time >= resource.data.watchEndsAt)
+                          && changed().hasOnly(['status', 'finishedAt'])
+                          && request.resource.data.status == 'done'
+                          && request.resource.data.finishedAt == request.time
+                        )
+                      );
+        allow delete: if isClubMember() && isClubManager();
+
+        // Spoiler'sız tartışma: YALNIZ filmi izlediğini işaretleyen üye okur ve yazar. İzlemeyen istemciyi
+        // değiştirse de mesajları çekemez (kural her okumada tur belgesine bakar).
+        match /discussion/{commentId} {
+          function roundData() {
+            return get(/databases/$(database)/documents/groups/$(groupId)/clubRounds/$(roundId)).data;
+          }
+          function watchedRound() {
+            return request.auth.uid in roundData().get('watched', {});
+          }
+          allow read: if isClubMember() && watchedRound();
+          allow create: if isClubMember()
+                        && watchedRound()
+                        && request.resource.data.keys().hasOnly(['senderId', 'senderName', 'text', 'createdAt'])
+                        && request.resource.data.senderId == request.auth.uid
+                        && request.resource.data.senderName is string
+                        && request.resource.data.senderName.size() <= 60
+                        && request.resource.data.text is string
+                        && request.resource.data.text.size() >= 1
+                        && request.resource.data.text.size() <= 1000
+                        && request.resource.data.createdAt == request.time;
+          allow update: if false;
+          allow delete: if isClubMember()
+                        && (resource.data.senderId == request.auth.uid || isClubManager());
+        }
       }
     }
 

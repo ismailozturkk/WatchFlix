@@ -43,6 +43,8 @@ Deploy = Cloud Functions veya Firestore rules deploy'u gerekir mi. "Kodda" = tar
 - **Premium fikri:** Geçmiş günlerin arşivini oynamak Premium.
 
 ### E2 · Haftalık Lig
+> **Yapıldı (30 Eki 2026)** → `docs/ozellikler/HAFTALIK_LIG.md`. İlk XP'de 30 kişilik gruba katılım, sunucuda tavanlı XP
+> (`awardLeagueXp`), pazartesi 00:10 terfi işi (`settleLeagueWeek`). Functions + rules + index deploy'u bekliyor; cihazda görülmedi, commit yok.
 - **Ne yapar:** Kullanıcılar her pazartesi 20–30 kişilik gruplara düşer. Oyun puanı, izleme, oy ve görevlerden
   haftalık XP toplanır. Pazar gecesi ilk 5 üst lige, son 5 alt lige geçer (Bronz → Gümüş → Altın → Elmas → Efsane).
 - **Akış:** Eğlence üstünde lig şeridi ("Altın Lig · 7. sıra · 2 gün kaldı") → lig tablosu → hafta sonu sonuç kartı.
@@ -63,6 +65,9 @@ Deploy = Cloud Functions veya Firestore rules deploy'u gerekir mi. "Kodda" = tar
 - **Efor:** Orta · Build: Hayır · Deploy: Hayır
 
 ### E4 · Meydan Okumalar (Challenges)
+> **Yapıldı (30 Eki 2026)** → `docs/ozellikler/MEYDAN_OKUMALAR.md`. 10 hazır görev + 10 yönetmen filmografisi (önceden
+> üretilmiş), ilerleme izleme geçmişinden, madalya ekranda + profilde. Arkadaşla ortak katılım ve kendi görevini kurma
+> YAPILMADI. Cihazda görülmedi, commit yok.
 - **Ne yapar:** Hazır, süreli görevler: "52 haftada 52 film", "Her on yıldan bir film", "10 ülkenin sineması",
   "Bir yönetmenin tüm filmleri", "Ekim: 13 korku filmi". İlerleme çubuğu, bitirince rozet. Arkadaşla ortak katılım.
 - **Akış:** Eğlence → Meydan okumalar → katıl → ilerleme izlemeden otomatik dolar → profilde rozet.
@@ -86,6 +91,8 @@ Deploy = Cloud Functions veya Firestore rules deploy'u gerekir mi. "Kodda" = tar
 - **Efor:** Orta · Build: Hayır · Deploy: Evet (karşılıklı ilerleme için)
 
 ### E7 · Film Kulübü
+> **Yapıldı (30 Eki 2026)** → `docs/ozellikler/FILM_KULUBU.md`. Grup sohbetine bağlı; oylama → izleme → arşiv turları,
+> izleyene açık tartışma (kural kapısı), sohbet duyuru kartı + şerit. Kurmak Premium. Rules deploy edildi (31 Eki); cihazda görülmedi, commit yok.
 - **Ne yapar:** Arkadaş grubu kulüp kurar. Her hafta (ya da ay) oylamayla bir film seçilir; herkes izleyince
   spoiler'sız tartışma odası açılır; kulübün izlediklerinden ortak bir arşiv ve kulüp istatistiği oluşur.
 - **Akış:** Grup sohbeti → "Kulüp yap" → haftanın filmi oylaması → izleyenler işaretlenir → tartışma açılır.
@@ -294,10 +301,10 @@ Deploy = Cloud Functions veya Firestore rules deploy'u gerekir mi. "Kodda" = tar
 | E1 | Günlük Kare Avı | Eğlence | Düşük–Orta | Hayır | ⭐⭐⭐ günlük açılma + paylaşım |
 | E2 | Haftalık Lig | Eğlence | Orta–Yüksek | Evet | ⭐⭐⭐ haftalık bağlılık |
 | E3 | Film Zinciri ✅ | Eğlence | Orta | Hayır | ⭐⭐ |
-| E4 | Meydan Okumalar | Eğlence | Orta | Hayır | ⭐⭐⭐ |
+| E4 | Meydan Okumalar ✅ | Eğlence | Orta | Hayır | ⭐⭐⭐ |
 | E5 | Sezon Etkinlikleri | Eğlence | Orta | Hayır | ⭐⭐ |
 | E6 | Arkadaş Görevleri | Eğlence | Orta | Evet | ⭐⭐ |
-| E7 | Film Kulübü | Eğlence | Orta–Yüksek | Evet | ⭐⭐⭐ sosyal ritüel |
+| E7 | Film Kulübü ✅ | Eğlence | Orta–Yüksek | Evet | ⭐⭐⭐ sosyal ritüel |
 | E8 | Ödül Tahmin Ligi | Eğlence | Orta | Evet | ⭐⭐ sezonluk |
 | E9 | Puanını Tahmin Et | Eğlence | Düşük–Orta | Hayır | ⭐⭐ |
 | E10 | Replik Tahmini | Eğlence | Orta | Hayır | ⭐ |
