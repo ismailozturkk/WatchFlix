@@ -31,15 +31,16 @@ import { keyboardLift } from "@utils/sheetKeyboardFit";
 
 /**
  * @param {boolean} [active=true]  Modal ekranda mı (kapanınca sıfırlanır).
+ * @param {object}  [options]      useKeyboardMetrics seçenekleri (overlapFromScreenY).
  * @returns {{
  *   inset: number,
  *   animatedInset: Animated.Value,
  *   onLayout: (event: any) => void,
  * }}
  */
-export default function useKeyboardInset(active = true) {
+export default function useKeyboardInset(active = true, options) {
   const { keyboardHeight, overlayHeight, baseOverlayHeight, onOverlayLayout } =
-    useKeyboardMetrics(active);
+    useKeyboardMetrics(active, options);
   const animatedInset = useRef(new Animated.Value(0)).current;
 
   const inset = keyboardLift({ keyboardHeight, baseOverlayHeight, overlayHeight });

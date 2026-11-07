@@ -66,7 +66,7 @@ export const SETTINGS_SHARE_COPY = {
     roles: { heading: "Başlık", body: "Yazı", numeric: "Rakam" },
     effects: { snow: "Kar", ambient: "Ambiyans", icon: "İkon arka planı" },
     effectsOff: "Tüm efektler kapalı",
-    radius: { sharp: "Keskin köşeler", soft: "Yumuşak köşeler", round: "Yuvarlak köşeler" },
+    radius: { sharp: "Keskin köşeler", subtle: "Hafif köşeler", normal: "Normal köşeler", soft: "Yumuşak köşeler", round: "Yuvarlak köşeler" },
     allRounded: "Tüm kartlar yuvarlak",
     smallPosters: "Küçük afişler",
     columns: (lists, seeAll) => `Listeler ${lists} sütun · Tümü ${seeAll} sütun`,
@@ -125,7 +125,7 @@ export const SETTINGS_SHARE_COPY = {
     roles: { heading: "Heading", body: "Body", numeric: "Numbers" },
     effects: { snow: "Snow", ambient: "Ambient", icon: "Icon background" },
     effectsOff: "All effects off",
-    radius: { sharp: "Sharp corners", soft: "Soft corners", round: "Round corners" },
+    radius: { sharp: "Sharp corners", subtle: "Subtle corners", normal: "Normal corners", soft: "Soft corners", round: "Round corners" },
     allRounded: "All cards rounded",
     smallPosters: "Small posters",
     columns: (lists, seeAll) => `Lists ${lists} columns · See all ${seeAll} columns`,
@@ -184,7 +184,7 @@ export const SETTINGS_SHARE_COPY = {
     roles: { heading: "Título", body: "Texto", numeric: "Números" },
     effects: { snow: "Nieve", ambient: "Ambiente", icon: "Fondo de iconos" },
     effectsOff: "Todos los efectos desactivados",
-    radius: { sharp: "Esquinas rectas", soft: "Esquinas suaves", round: "Esquinas redondas" },
+    radius: { sharp: "Esquinas rectas", subtle: "Esquinas leves", normal: "Esquinas normales", soft: "Esquinas suaves", round: "Esquinas redondas" },
     allRounded: "Todas las tarjetas redondeadas",
     smallPosters: "Pósteres pequeños",
     columns: (lists, seeAll) => `Listas ${lists} columnas · Ver todo ${seeAll} columnas`,
@@ -243,7 +243,7 @@ export const SETTINGS_SHARE_COPY = {
     roles: { heading: "Título", body: "Texto", numeric: "Números" },
     effects: { snow: "Neve", ambient: "Ambiente", icon: "Fundo de ícones" },
     effectsOff: "Todos os efeitos desligados",
-    radius: { sharp: "Cantos retos", soft: "Cantos suaves", round: "Cantos redondos" },
+    radius: { sharp: "Cantos retos", subtle: "Cantos leves", normal: "Cantos normais", soft: "Cantos suaves", round: "Cantos redondos" },
     allRounded: "Todos os cartões arredondados",
     smallPosters: "Pôsteres pequenos",
     columns: (lists, seeAll) => `Listas ${lists} colunas · Ver tudo ${seeAll} colunas`,
@@ -302,7 +302,7 @@ export const SETTINGS_SHARE_COPY = {
     roles: { heading: "Titel", body: "Text", numeric: "Zahlen" },
     effects: { snow: "Schnee", ambient: "Ambiente", icon: "Symbolhintergrund" },
     effectsOff: "Alle Effekte aus",
-    radius: { sharp: "Eckige Ecken", soft: "Weiche Ecken", round: "Runde Ecken" },
+    radius: { sharp: "Eckige Ecken", subtle: "Leicht gerundete Ecken", normal: "Normale Ecken", soft: "Weiche Ecken", round: "Runde Ecken" },
     allRounded: "Alle Karten abgerundet",
     smallPosters: "Kleine Poster",
     columns: (lists, seeAll) => `Listen ${lists} Spalten · Alle ${seeAll} Spalten`,
@@ -368,7 +368,8 @@ function effectsSummary(values, copy) {
   return on.length ? on.join(", ") : copy.effectsOff;
 }
 
-const RADIUS_BUCKET = { 2: "sharp", 10: "soft", 20: "round" };
+// Kademe adları utils/posterCorners ile aynı sırada (grid ölçeği 2/6/10/15/20).
+const RADIUS_BUCKET = { 2: "sharp", 6: "subtle", 10: "normal", 15: "soft", 20: "round" };
 
 function postersSummary(values, copy) {
   const parts = [];

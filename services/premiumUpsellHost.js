@@ -8,9 +8,15 @@
 // Host henüz mount olmadıysa (açılışta erken bir kapı) istekler kuyruğa alınır
 // ve host hazır olunca sırayla verilir; hiçbiri kaybolmaz.
 //
+// Host'lar YIĞINDIR: istekleri en son kaydolan alır. Kökteki host hep altta; açık
+// bir alt sayfa kendi içine `scoped` host asarsa (ör. not editörü) o sayfa açıkken
+// gelen istekler onun içinde açılır — iOS açık bir Modal'ın üstüne kökten ikinci bir
+// Modal sunamaz, ama Modal'ın ÇOCUĞU olan Modal'ı sunar. Kaydı düşen üstteki host
+// isteği alttakine bırakır.
+//
 // Saf modül: RN/React importu yok (jest doğrudan test eder).
 
-let listener = null;
+const listeners = [];
 const queue = [];
 
 /**
@@ -25,19 +31,22 @@ const queue = [];
 /** Yükseltme sayfasını göster. */
 export function presentUpsell(request) {
   if (!request || !request.featureId) return;
+  const listener = listeners[listeners.length - 1];
   if (listener) listener(request);
   else queue.push(request);
 }
 
 /**
- * Host'u kaydeder. Kuyrukta bekleyen istekler SIRAYLA host'a verilir (host kendi
- * içinde görünür olanın arkasına dizer). Geri dönen fonksiyon kaydı kaldırır.
+ * Host'u yığının üstüne kaydeder. Kuyrukta bekleyen istekler SIRAYLA host'a verilir
+ * (host kendi içinde görünür olanın arkasına dizer). Geri dönen fonksiyon YALNIZ bu
+ * kaydı kaldırır; sonradan kaydolan host yerinde kalır.
  */
 export function registerUpsellHost(fn) {
-  listener = fn;
+  listeners.push(fn);
   while (queue.length) fn(queue.shift());
   return () => {
-    if (listener === fn) listener = null;
+    const index = listeners.lastIndexOf(fn);
+    if (index >= 0) listeners.splice(index, 1);
   };
 }
 
@@ -113,6 +122,6 @@ export function createCloseGate(fallbackMs) {
 
 /** Test yardımcısı. */
 export function __resetUpsellHostForTests() {
-  listener = null;
+  listeners.length = 0;
   queue.length = 0;
 }

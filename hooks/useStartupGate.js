@@ -22,7 +22,7 @@
 //   3000  UnreadMessagesContext  (okunmamış mesaj toplamı; OS rozeti buradan)
 //   3200  ChatModal mount'u (App.js, bu hook'u kullanmaz)
 //   3600  DeviceNotificationsContext (izin + push token + hatırlatıcı zamanlama)
-//   4000  Font kataloğu (context/TypographyContext.js, kendi zamanlayıcısı)
+//   4000  (boş — font kataloğu artık açılışta yüklenmiyor, yalnız font galerisi isteyince)
 //
 // Kapı SADECE ertelenebilir işleri korumalı: açılış karesinin çizdiği veri ya
 // senkron tohumdan gelmeli (snapshotCache/MMKV) ya da hiç kapılanmamalı

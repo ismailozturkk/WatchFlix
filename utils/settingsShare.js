@@ -61,6 +61,8 @@ export const SETTINGS_SHARE_SECTIONS = Object.freeze([
       "listsPosterRadius",
       "seeAllPosterRadius",
       "railPosterRadius",
+      "funPosterRadius",
+      "libraryPosterRadius",
       "railPosterSize",
       "postListPosterLayout",
     ]),

@@ -11,10 +11,10 @@
 // plain function from a regular JS onScroll callback for screens still on a
 // plain ScrollView/FlatList.
 
-// How much the bar shrinks at full collapse: 20% smaller, nothing else about
-// it changes. ONE number for both bars — the JS bar (Android, iOS fallbacks;
-// components/navigation/TabBar.js) and the real UIKit bar on iOS 26+ (scaled by
-// modules/tab-bar-scale through services/tabBarScale.js).
+// How much the bar shrinks at full collapse: 20% smaller. ONE number for both
+// bars — the JS bar (Android, iOS fallbacks; components/navigation/TabBar.js,
+// icons only) and the real UIKit bar on iOS 26+ (modules/tab-bar-scale through
+// services/tabBarScale.js, which also fades the tab titles out as it shrinks).
 export const TAB_BAR_COLLAPSE_SCALE_DELTA = 0.2;
 export const TAB_BAR_MIN_SCALE = 1 - TAB_BAR_COLLAPSE_SCALE_DELTA;
 

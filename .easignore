@@ -31,6 +31,10 @@ docs/
 store/
 README.md
 
+# Pazarlama / sosyal medya (videolar, ekran görüntüleri, logo setleri ~490 MB;
+# uygulama kodu buradan hiçbir şey içe aktarmaz)
+marketing/
+
 # Testler ve Mock'lar
 __tests__/
 __mocks__/

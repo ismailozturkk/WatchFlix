@@ -17,6 +17,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { Keys, get, set, remove, useStored } from "../services/storage";
 import { ANALYTICS_EVENTS, trackEvent } from "../services/analytics";
 import { castPollVote, fetchMyPollVote, fetchPollCounts } from "../services/dailyPollService";
+import { awardPollVoteXp } from "../services/leagueService";
 import { dayKeyOf } from "../utils/dailyChallenge";
 import {
   localizeQuestion,
@@ -92,6 +93,7 @@ export default function useDailyPoll({ source = "hub" } = {}) {
       setStatus("saving");
       try {
         const result = await castPollVote({ uid, dayKey, choice });
+        if (!result.alreadyVoted) awardPollVoteXp(dayKey); // Haftalık Lig (sunucu oyu doğrular)
         // Başka cihazdaki oy kazanır (sunucudaki tek oy); yerel kayıt ona hizalanır.
         writeHistory(uid, (current) => {
           const synced = recordPollVote(current, dayKey, result.choice, true);

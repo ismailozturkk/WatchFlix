@@ -55,9 +55,14 @@ import GlassCloseButton from "@components/common/GlassCloseButton";
 import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { i18nText } from "@utils/i18nText";
 import useAdaptiveSheetHeight from "@hooks/useAdaptiveSheetHeight";
+import useKeyboardInset from "@hooks/useKeyboardInset";
 
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
+const IS_IOS = Platform.OS === "ios";
+// Android klavye ölçümü: sayfa ekranın en altına (gezinme çubuğunun arkasına)
+// kadar uzandığı için örtüşme klavyenin üst kenarından ölçülür.
+const KEYBOARD_INSET_OPTIONS = { overlapFromScreenY: true };
 
 // Sheet artık İÇERİĞE göre canlı büyüyüp küçülüyor (bkz. useAdaptiveSheetHeight):
 // hiç yorum yoksa SHEET_MIN_H, yorum sayısı arttıkça SHEET_MAX_H'a doğru büyür.
@@ -108,6 +113,8 @@ export default function CommentSheetModal({
     minHeight: SHEET_MIN_H,
     maxHeight: SHEET_MAX_H,
     topInset: insets.top + 12,
+    // Android'de klavye sığdırması düzende (aşağıdaki "Klavye" notu).
+    trackKeyboard: IS_IOS,
   });
 
   // Gerçek blur hedefi sheet açılış kayması + yükseklik animasyonu OTURANA
@@ -169,11 +176,31 @@ export default function CommentSheetModal({
     ]).start(() => onClose());
   }, [onClose]);
 
+  // ── Klavye ──
+  // iOS: KeyboardAvoidingView "padding" sayfayı klavyenin üstüne iter.
+  // Android: KAV "height" sekiyordu — klavye açılınca kaplayıcı 914 → 531 → 579 dp
+  // gidiyor, sayfa önce ~48 dp fazla kalkıp bir kare sonra geri iniyordu
+  // (emülatörde ölçüldü). Bu modalın penceresi klavye için yeniden
+  // boyutlanmıyor; kaldırma ÖLÇÜLÜR (useKeyboardInset, AI sohbeti/diyaloglarla
+  // aynı yaklaşım) ve kökün alt boşluğu olarak tek adımda uygulanır. Pencere bir
+  // cihazda yine de küçülürse keyboardLift o kısmı ikinci kez eklemez.
+  // Kalkan sayfa (dolu listede ~%94) kalan alana sığmayabilir: kökün üst payı +
+  // sayfa ve sarmalayıcısındaki flexShrink ile Yoga aynı düzen geçişinde onu
+  // kırpar (useAdaptiveSheetHeight'ın yay animasyonunu beklemez).
+  const { animatedInset: keyboardInset, onLayout: onRootLayout } = useKeyboardInset(
+    visible && !IS_IOS,
+    KEYBOARD_INSET_OPTIONS,
+  );
+  const Root = IS_IOS ? KeyboardAvoidingView : Animated.View;
+  const rootProps = IS_IOS
+    ? { behavior: "padding", style: styles.root }
+    : {
+        onLayout: onRootLayout,
+        style: [styles.root, { paddingTop: insets.top + 12, paddingBottom: keyboardInset }],
+      };
+
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
+    <Root {...rootProps}>
       {/* ── Karartma overlay ── */}
       <Animated.View
         pointerEvents="none"
@@ -200,7 +227,7 @@ export default function CommentSheetModal({
           RN "Style property 'height' is not supported by native animated
           module" hatası atıyor. Dış katman yalnız kaymayı (native) taşır,
           iç katman yalnız yüksekliği (JS) — birbirlerinden bağımsız düğümler. */}
-      <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
+      <Animated.View style={[styles.sheetWrap, { transform: [{ translateY: slideAnim }] }]}>
       <Animated.View
         onLayout={(e) => {
           sheetHRef.current = e.nativeEvent.layout.height;
@@ -341,7 +368,7 @@ export default function CommentSheetModal({
         </View>
       </Animated.View>
       </Animated.View>
-    </KeyboardAvoidingView>
+    </Root>
   );
 }
 
@@ -366,7 +393,11 @@ const styles = StyleSheet.create({
   // height artık sabit değil: useAdaptiveSheetHeight'ın Animated değeri
   // (bkz. JSX'teki inline `height: heightAnim`) burada SHEET_MIN_H/MAX_H
   // arasında canlı olarak veriliyor.
+  // Yalnız Android'de etkili (kök orada üst pay alır): klavye boşluğu açılınca
+  // sarmalayıcı ve sayfa kalan alana sığacak kadar daralır.
+  sheetWrap: { flexShrink: 1 },
   sheet: {
+    flexShrink: 1,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     overflow: "hidden",

@@ -41,6 +41,8 @@ import {
 import { normalizeWatchDate } from "../utils/watchHistory";
 import { MAX_SPREAD_DAYS, dayUsage, planDailyWatch } from "../utils/dailyWatchLimit";
 import { assertWatchable } from "../utils/watchState";
+// Haftalık Lig: yakın tarihli izleme XP olarak bildirilir (sessiz; yazımı asla bozmaz).
+import { awardWatchXp } from "./leagueService";
 import {
   addItemsToList,
   addToCustomRootList,
@@ -296,6 +298,7 @@ export function markMovieWatched({ uid, movie, watchDate }) {
       enqueue(itemKey(uid, "movie", movie.id), token, async () => {
         assertFitsDay(uid, watchDate, movie.minutes);
         const event = await markMovieWatch(uid, { ...movie, type: "movie" }, watchDate);
+        awardWatchXp({ type: "movie", id: movie.id }, watchDate);
         return { event };
       }),
     );
@@ -340,6 +343,7 @@ export function markShowWatched({ uid, details, watchDate, apiKey, language }) {
             planSchedule: spreadPlanner(uid, watchDate, sink),
           });
           // Hiçbir bölüm yayınlanmamışsa servis hiçbir şey yazmaz (null).
+          if (event) awardWatchXp({ type: "tv", id: details.id }, watchDate);
           return event
             ? { status: "added", event, spread: spreadOf(sink.plan) }
             : { status: "empty-show", event: null, spread: null };
@@ -384,6 +388,7 @@ export function markSeasonWatched({ uid, details, season, watchDate, apiKey, lan
             watchDate,
             { planSchedule: spreadPlanner(uid, watchDate, sink) },
           );
+          if (event) awardWatchXp({ type: "tv", id: details.id, season: season.season_number }, watchDate);
           return {
             status: event ? "added" : "empty-season",
             event: event || null,
@@ -419,6 +424,10 @@ export function markEpisodeWatched({ uid, showMeta, seasonMeta, episode, watchDa
           scope: "episode",
           ...(source ? { source } : {}),
         });
+        if (event) {
+          const number = episode.episodeNumber ?? episode.episode_number;
+          awardWatchXp({ type: "tv", id: showMeta.id, season: seasonMeta.seasonNumber, episode: number }, watchDate);
+        }
         return { status: event ? "added" : "empty-episode", event: event || null };
       }),
     );

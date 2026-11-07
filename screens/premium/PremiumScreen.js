@@ -1,10 +1,7 @@
 import { normalizeAppLanguage } from "../../utils/appLanguages";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
-  InteractionManager,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -16,11 +13,6 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import Toast from "@components/AppToast";
 import AppIcon from "../../components/AppIcon";
-import AppBadge from "../../components/badges/AppBadge";
-import {
-  IDENTITY_BADGES,
-  badgeLabel,
-} from "../../components/badges/badgeCatalog";
 import { useLanguage } from "../../context/LanguageContext";
 import { usePremium } from "../../context/PremiumContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -47,11 +39,11 @@ import { i18nText } from "../../utils/i18nText";
 import { openLegalPage } from "../../utils/legalLinks";
 import { useRoute } from "@react-navigation/native";
 import {
-  FONT_CATALOG_SIZE,
   PLANS,
   formatFeatureValue,
   getComparisonSections,
   getFeature,
+  isLockedFor,
 } from "../../utils/premiumFeatures";
 import { ANALYTICS_EVENTS, trackEvent } from "../../services/analytics";
 import RedeemCodeSheet, { formatRedeemDate } from "../../components/premium/RedeemCodeSheet";
@@ -62,64 +54,6 @@ import { getReferralCopy } from "../../utils/referralCopy";
 import GlassPressable from "../../components/common/GlassPressable";
 import GlassBox from "../../components/common/GlassBox";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
-
-// ÖNE ÇIKAN FAYDALAR — seçili plana göre, utils/premiumFeatures.js
-// değerlerinden üretilir. Buradaki her cümlenin arkasında bir kapı var; yeni
-// bir fayda eklemek için önce registry'e girdi ve kapı ekle, sonra buraya.
-// (P0.2: elle yazılmış vaat listeleri uygulamada karşılığı olmayan
-// "reklamsız", "tüm Wrapped yılları" gibi iddialara dönüşmüştü.)
-function buildHighlights(tier, language) {
-  const tr = language === "tr";
-  const es = language === "es";
-  const pt = language === "pt";
-  const de = language === "de";
-  const lang = normalizeAppLanguage(language);
-  const ai = AI_PLAN_LIMITS[tier];
-  // Aşağı yuvarlanır: 50/3 = 16,7 için "17X" vaat etmek fazla olurdu.
-  const multiplier = Math.floor(ai.daily / AI_PLAN_LIMITS.free.daily);
-  const isMax = tier === PREMIUM_PLAN.UNLIMITED;
-  const value = (featureId) => formatFeatureValue(featureId, tier, lang);
-  return [
-    {
-      id: "ai",
-      icon: "sparkles",
-      color: "#8B5CF6",
-      badge: tr ? `${multiplier}X KOTA` : es ? `${multiplier}X CUOTA` : pt ? `${multiplier}X COTA` : de ? `${multiplier}X KONTINGENT` : `${multiplier}X QUOTA`,
-      title: "CineMatch AI",
-      tagline: tr ? `Günde ${ai.daily}, ayda ${ai.monthly} mesaj` : es ? `${ai.daily} al día, ${ai.monthly} al mes` : pt ? `${ai.daily} por dia, ${ai.monthly} por mês` : de ? `${ai.daily} pro Tag, ${ai.monthly} pro Monat` : `${ai.daily} per day, ${ai.monthly} per month`,
-      desc: tr ? "Ruh haline ve izleme geçmişine göre nokta atışı film ve dizi önerileri." : es ? "Recomendaciones de películas y series a tu medida, según tu estado de ánimo y tu historial." : pt ? "Recomendações de filmes e séries sob medida, de acordo com o seu humor e o seu histórico." : de ? "Treffsichere Film- und Serientipps nach deiner Stimmung und deinem Sehverlauf." : "Spot-on movie and TV picks based on your mood and watch history.",
-    },
-    {
-      id: "badge",
-      icon: "diamond",
-      color: "#F59E0B",
-      badge: isMax ? (tr ? "EFSANEVİ" : es ? "LEGENDARIA" : pt ? "LENDÁRIO" : de ? "LEGENDÄR" : "LEGENDARY") : tr ? "EPİK" : es ? "ÉPICA" : pt ? "ÉPICO" : de ? "EPISCH" : "EPIC",
-      title: tr ? "Kimlik Rozeti" : es ? "Insignia de identidad" : pt ? "Emblema de identidade" : de ? "Identitäts-Abzeichen" : "Identity Badge",
-      tagline: tr ? "Arkadaşların da görür" : es ? "Tus amigos también la ven" : pt ? "Seus amigos também veem" : de ? "Deine Freunde sehen es auch" : "Your friends see it too",
-      desc: tr ? "Profilinde ve arkadaşlarının gördüğü profil sayfanda parıldayan plan rozeti." : es ? "Una insignia de plan en tu perfil y en el perfil que ven tus amigos." : pt ? "Um emblema do plano no seu perfil e no perfil que seus amigos veem." : de ? "Ein Plan-Abzeichen in deinem Profil und auf dem Profil, das deine Freunde sehen." : "A plan badge on your profile and on the profile your friends see.",
-    },
-    {
-      id: "social",
-      icon: "people",
-      color: "#EC4899",
-      badge: isMax ? (tr ? "SINIRSIZ" : es ? "ILIMITADO" : pt ? "ILIMITADO" : de ? "UNBEGRENZT" : "UNLIMITED") : tr ? "DAHA FAZLA" : es ? "MÁS" : pt ? "MAIS" : de ? "MEHR" : "MORE",
-      title: tr ? "Sosyal & Oyun" : es ? "Social y juegos" : pt ? "Social e jogos" : de ? "Soziales & Spiele" : "Social & Games",
-      tagline: isMax
-        ? tr ? "Liste, arkadaş, grup ve oyun sınırsız" : es ? "Listas, amigos, grupos y juegos ilimitados" : pt ? "Listas, amigos, grupos e jogos ilimitados" : de ? "Unbegrenzt Listen, Freunde, Gruppen, Spiele" : "Unlimited lists, friends, groups, games"
-        : `${value("custom_lists")} · ${value("friends")}`,
-      desc: tr ? `Sohbet grubu: ${value("chat_groups")} · Oyun: ${value("games")} · CineSwipe odası: ${value("cineswipe_rooms")} · Turnuvada oy kullanma.` : es ? `Chats de grupo: ${value("chat_groups")} · Juegos: ${value("games")} · Salas de CineSwipe: ${value("cineswipe_rooms")} · Votación en el torneo.` : pt ? `Conversas em grupo: ${value("chat_groups")} · Jogos: ${value("games")} · Salas do CineSwipe: ${value("cineswipe_rooms")} · Votação no torneio.` : de ? `Gruppenchats: ${value("chat_groups")} · Spiele: ${value("games")} · CineSwipe-Räume: ${value("cineswipe_rooms")} · Abstimmen im Turnier.` : `Group chats: ${value("chat_groups")} · Games: ${value("games")} · CineSwipe rooms: ${value("cineswipe_rooms")} · Tournament voting.`,
-    },
-    {
-      id: "personal",
-      icon: "color-palette",
-      color: "#10B981",
-      badge: tr ? "KİŞİSEL" : es ? "PERSONAL" : pt ? "PESSOAL" : de ? "PERSÖNLICH" : "PERSONAL",
-      title: tr ? "Tema & Yazı Tipi" : es ? "Temas y fuentes" : pt ? "Temas e fontes" : de ? "Designs & Schriften" : "Themes & Fonts",
-      tagline: tr ? `Kendi temanı oluştur · ${FONT_CATALOG_SIZE} yazı tipi` : es ? `Tus propios temas · ${FONT_CATALOG_SIZE} fuentes` : pt ? `Seus próprios temas · ${FONT_CATALOG_SIZE} fontes` : de ? `Eigene Designs · ${FONT_CATALOG_SIZE} Schriften` : `Your own themes · ${FONT_CATALOG_SIZE} fonts`,
-      desc: tr ? `Kar efekti, ikon arka planı, pet, uygulama simgesi seçici, Wrapped arşivi (${value("wrapped_archive")}) ve ${value("streaming_alerts")} için platform bildirimi de dahil.` : es ? `Incluye también nieve, fondo de iconos, la mascota en pantalla, el selector de icono de la app, tu archivo de Wrapped (${value("wrapped_archive")}) y avisos de streaming para ${value("streaming_alerts")}.` : pt ? `Inclui também neve, fundo de ícones, o pet na tela, o seletor de ícone do app, seu arquivo do Wrapped (${value("wrapped_archive")}) e avisos de streaming para ${value("streaming_alerts")}.` : de ? `Enthält außerdem Schneefall, Symbolhintergrund, den Begleiter auf dem Bildschirm, die App-Symbolauswahl, dein Wrapped-Archiv (${value("wrapped_archive")}) und Streaming-Benachrichtigungen für ${value("streaming_alerts")}.` : `Also includes snowfall, icon background, the on-screen pet, the app icon picker, your Wrapped archive (${value("wrapped_archive")}) and streaming alerts for ${value("streaming_alerts")}.`,
-    },
-  ];
-}
 
 // Mağazada tanımlı giriş teklifinin (lansman indirimi) vurgusu.
 const OFFER_COLOR = "#EC4899";
@@ -260,6 +194,7 @@ export default function PremiumScreen() {
 
   const [selectedTier, setSelectedTier] = useState(PREMIUM_PLAN.PREMIUM);
   const [selectedId, setSelectedId] = useState(null);
+  const [showAllBenefits, setShowAllBenefits] = useState(false);
   const [showDetailedSection, setShowDetailedSection] = useState(Boolean(sourceFeature));
   const [categoryFilter, setCategoryFilter] = useState(sourceFeature?.category || "all");
 
@@ -271,8 +206,6 @@ export default function PremiumScreen() {
     (total, section) => total + section.rows.length,
     0,
   );
-
-  const ctaShimmer = useRef(new Animated.Value(0)).current;
 
   const displayPackages = useMemo(
     () =>
@@ -323,30 +256,6 @@ export default function PremiumScreen() {
     );
   }, [packages, plan, selectedId]);
 
-  // CTA Shimmer Animation (ekran geçiş animasyonu tamamlandıktan sonra başlar, kasılmayı önler)
-  useEffect(() => {
-    let animation;
-    const task = InteractionManager.runAfterInteractions(() => {
-      animation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(ctaShimmer, {
-            toValue: 1,
-            duration: 2400,
-            easing: Easing.inOut(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.delay(800),
-        ])
-      );
-      animation.start();
-    });
-
-    return () => {
-      task?.cancel?.();
-      animation?.stop?.();
-    };
-  }, [ctaShimmer]);
-
   const selectedPackage =
     packages.find((item) => item.identifier === selectedId) || null;
   const selectedDisplayPackage =
@@ -370,11 +279,26 @@ export default function PremiumScreen() {
   const selectedOffer = selectedDisplayPackage ? introOfferFor(selectedDisplayPackage) : null;
   const busy = Boolean(busyAction);
   const selectedPlanName = getPremiumPlanDisplayName(selectedTier);
-  const selectedIdentityBadge =
-    selectedTier === PREMIUM_PLAN.UNLIMITED
-      ? IDENTITY_BADGES.unlimited
-      : IDENTITY_BADGES.premium;
-  const highlights = buildHighlights(selectedTier, language);
+  // Tek kaynak premiumFeatures kaydıdır: seçili planda gerçekten açık olan her
+  // özellik otomatik listelenir; Max'e özel ve Premium'da kapalı maddeler Premium
+  // görünümüne sızmaz. Yeni bir kayıt eklendiğinde bu bölüm de kendiliğinden büyür.
+  const selectedBenefits = useMemo(
+    () =>
+      comparisonSections.flatMap((section) =>
+        section.rows
+          .filter((row) => !isLockedFor(row.id, selectedTier))
+          .map((row) => ({
+            ...row,
+            categoryTitle: section.title,
+            color: section.color,
+            value: row.values[selectedTier],
+          })),
+      ),
+    [comparisonSections, selectedTier],
+  );
+  const visibleBenefits = showAllBenefits
+    ? selectedBenefits
+    : selectedBenefits.slice(0, 6);
 
   const handleSelectTier = (tier) => {
     if (isUnlimited && tier !== PREMIUM_PLAN.UNLIMITED) return;
@@ -575,53 +499,27 @@ export default function PremiumScreen() {
           <View style={styles.heroBody}>
             <Text style={[styles.heroTitle, { color: C.text }]}>
               {isUnlimited
-                ? tr ? "Premium Max ile sınırları kaldır." : es ? "Sin límites con Premium Max." : pt ? "Sem limites com o Premium Max." : de ? "Grenzenlos mit Premium Max." : "Boundless with Premium Max."
+                ? tr ? "Premium Max aktif." : es ? "Premium Max está activo." : pt ? "Premium Max está ativo." : de ? "Premium Max ist aktiv." : "Premium Max is active."
                 : isPremium
-                ? tr ? "Premium ayrıcalıkların seninle." : es ? "Tus ventajas Premium están activas." : pt ? "Seus benefícios Premium estão ativos." : de ? "Deine Premium-Vorteile sind aktiv." : "Your Premium benefits are active."
-                : tr ? "Sinema Deneyimini Zirveye Taşı." : es ? "Lleva tu experiencia de cine al siguiente nivel." : pt ? "Leve sua experiência de cinema para o próximo nível." : de ? "Hebe dein Kinoerlebnis auf ein neues Level." : "Elevate Your Cinema Experience."}
+                ? tr ? "Premium planın aktif." : es ? "Tu plan Premium está activo." : pt ? "Seu plano Premium está ativo." : de ? "Dein Premium-Plan ist aktiv." : "Your Premium plan is active."
+                : tr ? "Sana uygun planı seç." : es ? "Elige el plan que te conviene." : pt ? "Escolha o plano ideal para você." : de ? "Wähle den passenden Plan." : "Choose the plan that fits you."}
             </Text>
             <Text style={[styles.heroSubtitle, { color: C.muted }]}>
-              {tr ? "CineMatch AI önerileri, arkadaşlarının da gördüğü kimlik rozeti, daha geniş sosyal limitler ve kişiselleştirme tek abonelikte." : es ? "Recomendaciones de CineMatch IA, una insignia de identidad que ven tus amigos, límites sociales más altos y personalización en una sola suscripción." : pt ? "Recomendações do CineMatch IA, um emblema de identidade que seus amigos veem, limites sociais maiores e personalização em uma única assinatura." : de ? "CineMatch-KI-Empfehlungen, ein Identitäts-Abzeichen, das deine Freunde sehen können, höhere soziale Limits und Personalisierung in einem Abo." : "CineMatch AI picks, an identity badge your friends can see, higher social limits and personalization in one subscription."}
+              {tr ? "AI kotası, sosyal limitler ve kişiselleştirme seçeneklerini tek yerden karşılaştır." : es ? "Compara la cuota de IA, los límites sociales y la personalización en un solo lugar." : pt ? "Compare a cota de IA, os limites sociais e a personalização em um só lugar." : de ? "Vergleiche KI-Kontingent, soziale Limits und Personalisierung an einem Ort." : "Compare AI allowance, social limits and personalization in one place."}
             </Text>
           </View>
 
-          {/* Quick Metrics Bar */}
-          <View style={styles.quickMetricsRow}>
-            <View style={[styles.quickMetricBox, { backgroundColor: alpha(C.cardAlt, 0.8), borderColor: alpha(C.accent, 0.15) }]}>
-              <AppIcon name="sparkles" size={15} color={C.accent} />
-              <View>
-                <Text fontRole="numeric" style={[styles.quickMetricNum, { color: C.text }]}>
-                  {AI_PLAN_LIMITS[selectedTier].daily}
-                </Text>
-                <Text style={[styles.quickMetricLabel, { color: C.muted }]}>
-                  {tr ? "AI / gün" : es ? "IA / día" : pt ? "IA / dia" : de ? "KI / Tag" : "AI / day"}
-                </Text>
+          <View style={styles.heroBenefitsRow}>
+            {[
+              ["sparkles", tr ? "Daha fazla AI" : es ? "Más IA" : pt ? "Mais IA" : de ? "Mehr KI" : "More AI"],
+              ["people", tr ? "Daha geniş limitler" : es ? "Más límites" : pt ? "Mais limites" : de ? "Höhere Limits" : "Higher limits"],
+              ["color-palette", tr ? "Kişiselleştirme" : es ? "Personalización" : pt ? "Personalização" : de ? "Personalisierung" : "Personalization"],
+            ].map(([icon, label]) => (
+              <View key={icon} style={styles.heroBenefitItem}>
+                <AppIcon name={icon} size={14} color={C.accent} />
+                <Text style={[styles.heroBenefitText, { color: C.text }]}>{label}</Text>
               </View>
-            </View>
-
-            <View style={[styles.quickMetricBox, { backgroundColor: alpha(C.cardAlt, 0.8), borderColor: alpha(C.accent, 0.15) }]}>
-              <AppIcon name="calendar" size={15} color={C.purple} />
-              <View>
-                <Text fontRole="numeric" style={[styles.quickMetricNum, { color: C.text }]}>
-                  {AI_PLAN_LIMITS[selectedTier].monthly}
-                </Text>
-                <Text style={[styles.quickMetricLabel, { color: C.muted }]}>
-                  {tr ? "AI / ay" : es ? "IA / mes" : pt ? "IA / mês" : de ? "KI / Monat" : "AI / month"}
-                </Text>
-              </View>
-            </View>
-
-            <View style={[styles.quickMetricBox, { backgroundColor: alpha(C.cardAlt, 0.8), borderColor: alpha(C.accent, 0.15) }]}>
-              <AppIcon name="diamond" size={15} color="#F59E0B" />
-              <View>
-                <Text style={[styles.quickMetricNum, { color: C.text }]}>
-                  {selectedTier === PREMIUM_PLAN.UNLIMITED ? (tr ? "Efsanevi" : es ? "Legendaria" : pt ? "Lendária" : de ? "Legende" : "Legend") : (tr ? "Epik" : es ? "Épica" : pt ? "Épica" : de ? "Episch" : "Epic")}
-                </Text>
-                <Text style={[styles.quickMetricLabel, { color: C.muted }]}>
-                  {tr ? "Rozet Statüsü" : es ? "Rareza de la insignia" : pt ? "Raridade do emblema" : de ? "Abzeichen-Seltenheit" : "Badge Rarity"}
-                </Text>
-              </View>
-            </View>
+            ))}
           </View>
         </LinearGradient>
       </View>
@@ -630,10 +528,10 @@ export default function PremiumScreen() {
       <View style={styles.pricingSection}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: C.text }]}>
-            {tr ? "Planını ve Fiyatını Seç" : es ? "Elige tu plan y tu precio" : pt ? "Escolha seu plano e seu preço" : de ? "Wähle deinen Plan & Preis" : "Select Your Plan & Price"}
+            {tr ? "Plan seç" : es ? "Elige un plan" : pt ? "Escolha um plano" : de ? "Plan wählen" : "Choose a plan"}
           </Text>
           <Text style={[styles.sectionSubtitle, { color: C.muted }]}>
-            {tr ? "Tüm paketler doğrudan listelenir. İstediğin an iptal edebilirsin." : es ? "Todos los paquetes, con precios claros. Cancela cuando quieras." : pt ? "Todos os pacotes, com preços claros. Cancele quando quiser." : de ? "Alle Pakete transparent aufgelistet. Jederzeit kündbar." : "All packages listed transparently. Cancel anytime."}
+            {tr ? "Önce planı, ardından ödeme dönemini seç." : es ? "Primero el plan y después el periodo de pago." : pt ? "Primeiro o plano, depois o período de pagamento." : de ? "Wähle zuerst den Plan, dann den Abrechnungszeitraum." : "Pick a plan, then choose the billing period."}
           </Text>
         </View>
 
@@ -648,6 +546,9 @@ export default function PremiumScreen() {
               <Pressable
                 key={tier}
                 disabled={disabled}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected, disabled }}
+                accessibilityLabel={getPremiumPlanDisplayName(tier)}
                 onPress={() => handleSelectTier(tier)}
                 style={[
                   styles.tierSegmentTab,
@@ -678,10 +579,10 @@ export default function PremiumScreen() {
                     >
                       {getPremiumPlanDisplayName(tier)}
                     </Text>
-                    {isMax && (
+                    {isMax && !isSelected && (
                       <View style={[styles.tierTabMiniBadge, { backgroundColor: isSelected ? "rgba(255,255,255,0.22)" : alpha("#F59E0B", 0.16) }]}>
                         <Text style={[styles.tierTabMiniBadgeText, { color: isSelected ? "#fff" : "#F59E0B" }]}>
-                          {tr ? "EN GÜÇLÜ" : es ? "MAX" : pt ? "MAX" : de ? "MAX" : "MAX"}
+                          {tr ? "EN YÜKSEK" : es ? "MÁXIMO" : pt ? "MÁXIMO" : de ? "MAXIMAL" : "HIGHEST"}
                         </Text>
                       </View>
                     )}
@@ -693,75 +594,13 @@ export default function PremiumScreen() {
                     ]}
                   >
                     {isMax
-                      ? tr ? `Günde ${AI_PLAN_LIMITS.unlimited.daily} AI · Efsanevi Rozet` : es ? `${AI_PLAN_LIMITS.unlimited.daily} IA/día · Insignia legendaria` : pt ? `${AI_PLAN_LIMITS.unlimited.daily} IA/dia · Emblema lendário` : de ? `${AI_PLAN_LIMITS.unlimited.daily} KI/Tag · Legendäres Abzeichen` : `${AI_PLAN_LIMITS.unlimited.daily} AI/day · Legendary Badge`
-                      : tr ? `Günde ${AI_PLAN_LIMITS.premium.daily} AI · Epik Rozet` : es ? `${AI_PLAN_LIMITS.premium.daily} IA/día · Insignia épica` : pt ? `${AI_PLAN_LIMITS.premium.daily} IA/dia · Emblema épico` : de ? `${AI_PLAN_LIMITS.premium.daily} KI/Tag · Episches Abzeichen` : `${AI_PLAN_LIMITS.premium.daily} AI/day · Epic Badge`}
+                      ? tr ? `${AI_PLAN_LIMITS.unlimited.daily} AI / gün · En geniş limitler` : es ? `${AI_PLAN_LIMITS.unlimited.daily} IA/día · Límites máximos` : pt ? `${AI_PLAN_LIMITS.unlimited.daily} IA/dia · Limites máximos` : de ? `${AI_PLAN_LIMITS.unlimited.daily} KI/Tag · Höchste Limits` : `${AI_PLAN_LIMITS.unlimited.daily} AI/day · Highest limits`
+                      : tr ? `${AI_PLAN_LIMITS.premium.daily} AI / gün · Dengeli seçenek` : es ? `${AI_PLAN_LIMITS.premium.daily} IA/día · Opción equilibrada` : pt ? `${AI_PLAN_LIMITS.premium.daily} IA/dia · Opção equilibrada` : de ? `${AI_PLAN_LIMITS.premium.daily} KI/Tag · Ausgewogene Wahl` : `${AI_PLAN_LIMITS.premium.daily} AI/day · Balanced choice`}
                   </Text>
                 </View>
               </Pressable>
             );
           })}
-        </View>
-
-        {/* Live Identity Badge Preview for selected tier */}
-        <View style={[styles.badgePreviewCard, { backgroundColor: C.card, borderColor: alpha(C.accent, 0.22) }]}>
-          <LinearGradient
-            colors={[alpha(C.accent, 0.12), "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0.8 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.badgePreviewLeft}>
-            <AppBadge
-              glyph={selectedIdentityBadge.glyph}
-              glyphSolid={selectedIdentityBadge.glyphSolid}
-              rarity={selectedIdentityBadge.rarity}
-              ornate={selectedIdentityBadge.ornate}
-              size={58}
-              accessibilityLabel={badgeLabel(selectedIdentityBadge, language)}
-            />
-          </View>
-          <View style={styles.badgePreviewRight}>
-            <View style={styles.badgePreviewHeader}>
-              <Text style={[styles.badgePreviewTitle, { color: C.text }]}>
-                {badgeLabel(selectedIdentityBadge, language)}
-              </Text>
-              <View
-                style={[
-                  styles.badgeRarityTag,
-                  {
-                    backgroundColor:
-                      selectedTier === PREMIUM_PLAN.UNLIMITED
-                        ? alpha("#F59E0B", 0.18)
-                        : C.accentDim,
-                  },
-                ]}
-              >
-                <AppIcon
-                  name={selectedTier === PREMIUM_PLAN.UNLIMITED ? "sparkles" : "diamond"}
-                  size={10}
-                  color={selectedTier === PREMIUM_PLAN.UNLIMITED ? "#D97706" : C.accent}
-                />
-                <Text
-                  style={[
-                    styles.badgeRarityText,
-                    {
-                      color:
-                        selectedTier === PREMIUM_PLAN.UNLIMITED
-                          ? "#D97706"
-                          : C.accent,
-                    },
-                  ]}
-                >
-                  {selectedTier === PREMIUM_PLAN.UNLIMITED
-                    ? tr ? "EFSANEVİ ROZET" : es ? "LEGENDARIA" : pt ? "LENDÁRIO" : de ? "LEGENDÄR" : "LEGENDARY"
-                    : tr ? "EPİK ROZET" : es ? "ÉPICA" : pt ? "ÉPICO" : de ? "EPISCH" : "EPIC"}
-                </Text>
-              </View>
-            </View>
-            <Text style={[styles.badgePreviewDesc, { color: C.muted }]}>
-              {tr ? "Profilinde ve arkadaşlarının gördüğü profil sayfanda statü sembolün olarak parıldar." : es ? "Se muestra en tu perfil y en la página de perfil que ven tus amigos." : pt ? "Aparece no seu perfil e na página de perfil que seus amigos veem." : de ? "Wird in deinem Profil und auf der Profilseite angezeigt, die deine Freunde sehen." : "Shown on your profile and on the profile page your friends see."}
-            </Text>
-          </View>
         </View>
 
         {/* DIRECT PRICING PACKAGES */}
@@ -790,10 +629,11 @@ export default function PremiumScreen() {
                 : C.border;
 
               return (
-                <Pressable
+                <GlassPressable
                   key={aPackage.identifier}
                   accessibilityRole="button"
                   accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`${getPremiumPlanDisplayName(selectedTier)}, ${packageTitle(aPackage, language)}, ${getPackageRegularPrice(aPackage).priceString}`}
                   onPress={() => handleSelectPackage(aPackage.identifier)}
                   style={[
                     styles.pricingCard,
@@ -802,28 +642,8 @@ export default function PremiumScreen() {
                       borderColor: cardBorderColor,
                     },
                     isSelected && styles.pricingCardSelected,
-                    isSelected && {
-                      shadowColor: isAnnual ? "#F59E0B" : C.accent,
-                      shadowOpacity: 0.3,
-                      shadowRadius: 12,
-                      shadowOffset: { width: 0, height: 6 },
-                      elevation: 6,
-                    },
                   ]}
                 >
-                  {isSelected && (
-                    <LinearGradient
-                      pointerEvents="none"
-                      colors={[
-                        alpha(isAnnual ? "#F59E0B" : C.accent, 0.16),
-                        "transparent",
-                      ]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={[StyleSheet.absoluteFill, { borderRadius: 19 }]}
-                    />
-                  )}
-
                   <View style={styles.pricingCardHeader}>
                     {isAnnual ? (
                       <View style={[styles.popularBadge, { backgroundColor: "#F59E0B" }]}>
@@ -949,7 +769,7 @@ export default function PremiumScreen() {
                       </Text>
                     </View>
                   )}
-                </Pressable>
+                </GlassPressable>
               );
             })}
           </View>
@@ -981,37 +801,6 @@ export default function PremiumScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.ctaGradient}
           >
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.ctaShimmerBar,
-                {
-                  transform: [
-                    {
-                      translateX: ctaShimmer.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-250, 420],
-                      }),
-                    },
-                    { rotate: "-20deg" },
-                  ],
-                },
-              ]}
-            >
-              <LinearGradient
-                colors={[
-                  "transparent",
-                  "rgba(255,255,255,0.06)",
-                  "rgba(255,255,255,0.38)",
-                  "rgba(255,255,255,0.06)",
-                  "transparent",
-                ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={StyleSheet.absoluteFill}
-              />
-            </Animated.View>
-
             {busyAction === "purchase" || busyAction === "customer-center" ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
@@ -1046,86 +835,77 @@ export default function PremiumScreen() {
           </LinearGradient>
         </Pressable>
 
-        {/* TRUST BADGES ROW */}
-        <View style={styles.trustBadgesRow}>
-          <View style={styles.trustBadgeItem}>
-            <AppIcon name="shield-checkmark" size={13} color={C.green} />
-            <Text style={[styles.trustBadgeText, { color: C.muted }]}>
-              {tr ? "Güvenli Ödeme" : es ? "Pago seguro" : pt ? "Pagamento seguro" : de ? "Sichere Zahlung" : "Secure Payment"}
-            </Text>
-          </View>
-          <View style={styles.trustBadgeItem}>
-            <AppIcon name="flash" size={13} color={C.accent} />
-            <Text style={[styles.trustBadgeText, { color: C.muted }]}>
-              {tr ? "Anında Aktivasyon" : es ? "Acceso inmediato" : pt ? "Acesso imediato" : de ? "Sofortiger Zugriff" : "Instant Access"}
-            </Text>
-          </View>
-          <View style={styles.trustBadgeItem}>
-            <AppIcon name="sync" size={13} color={C.purple} />
-            <Text style={[styles.trustBadgeText, { color: C.muted }]}>
-              {tr ? "Kolay İptal" : es ? "Cancelación fácil" : pt ? "Cancelamento fácil" : de ? "Einfach kündbar" : "Easy Cancel"}
-            </Text>
-          </View>
+        <View style={styles.purchaseNoteRow}>
+          <AppIcon name="shield-checkmark-outline" size={14} color={C.green} />
+          <Text style={[styles.purchaseNoteText, { color: C.muted }]}>
+            {tr ? "Ödeme mağaza hesabın üzerinden güvenle işlenir · İstediğin an iptal" : es ? "Pago seguro mediante tu cuenta de la tienda · Cancela cuando quieras" : pt ? "Pagamento seguro pela sua conta da loja · Cancele quando quiser" : de ? "Sichere Zahlung über dein Store-Konto · Jederzeit kündbar" : "Secure payment through your store account · Cancel anytime"}
+          </Text>
         </View>
       </View>
 
-      {/* 2X2 MODERN VALUE PROPOSITIONS GRID */}
+      {/* Seçili planın öne çıkanları — tek, sakin bir liste */}
       <View style={styles.featuresSection}>
         <View style={styles.sectionHeader}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={[styles.sectionBadgePill, { backgroundColor: alpha(C.accent, 0.14) }]}>
-              <AppIcon name="sparkles" size={11} color={C.accent} />
-              <Text style={[styles.sectionBadgeText, { color: C.accent }]}>
-                {tr ? "AYRICALIKLAR" : es ? "VENTAJAS" : pt ? "VANTAGENS" : de ? "HIGHLIGHTS" : "HIGHLIGHTS"}
-              </Text>
-            </View>
-          </View>
           <Text style={[styles.sectionTitle, { color: C.text }]}>
-            {tr ? "Neler Kazanacaksın?" : es ? "Qué conseguirás" : pt ? "O que você vai ter" : de ? "Das bekommst du" : "What You Will Get"}
+            {tr ? `${selectedPlanName} ile gelenler` : es ? `Incluido con ${selectedPlanName}` : pt ? `Incluído no ${selectedPlanName}` : de ? `In ${selectedPlanName} enthalten` : `Included with ${selectedPlanName}`}
           </Text>
           <Text style={[styles.sectionSubtitle, { color: C.muted }]}>
-            {tr ? "Seelogd Premium ile film ve dizi dünyanı bir üst seviyeye taşı." : es ? "Lleva tu recorrido cinéfilo más lejos con los privilegios de Seelogd Premium." : pt ? "Leve sua jornada cinéfila mais longe com os privilégios do Seelogd Premium." : de ? "Bring deine Kinoreise mit den Seelogd-Premium-Vorteilen auf ein neues Level." : "Elevate your cinema journey with Seelogd Premium privileges."}
+            {tr ? `${selectedBenefits.length} özelliğin tamamı` : es ? `Las ${selectedBenefits.length} funciones incluidas` : pt ? `Todos os ${selectedBenefits.length} recursos incluídos` : de ? `Alle ${selectedBenefits.length} enthaltenen Funktionen` : `All ${selectedBenefits.length} included features`}
           </Text>
         </View>
 
-        <View style={styles.valueProps2x2Grid}>
-          {highlights.map((prop) => (
-            <View
-              key={prop.id}
-              style={[
-                styles.valueProp2x2Card,
-                { backgroundColor: C.card, borderColor: alpha(prop.color, 0.28) },
-              ]}
-            >
-              <LinearGradient
-                colors={[alpha(prop.color, 0.12), "transparent"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0.9 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <View style={styles.valueProp2x2Top}>
-                <View style={[styles.valuePropIconWrap2x2, { backgroundColor: alpha(prop.color, 0.18) }]}>
-                  <AppIcon name={prop.icon} size={18} color={prop.color} />
+        <View style={styles.benefitGrid}>
+          {visibleBenefits.map((benefit) => (
+            <View key={benefit.id} style={[styles.benefitCard, { backgroundColor: C.card, borderColor: C.border }]}>
+              <View style={styles.benefitCardTop}>
+                <View style={[styles.benefitIcon, { backgroundColor: alpha(benefit.color, 0.13) }]}>
+                  <AppIcon name={benefit.icon} size={17} color={benefit.color} />
                 </View>
-                <View style={[styles.valuePropBadgeTag, { backgroundColor: alpha(prop.color, 0.16) }]}>
-                  <Text style={[styles.valuePropBadgeTagText, { color: prop.color }]}>
-                    {prop.badge}
-                  </Text>
-                </View>
+                <AppIcon name="checkmark-circle" size={17} color={C.green} />
               </View>
-
-              <Text style={[styles.valuePropTitle2x2, { color: C.text }]}>
-                {prop.title}
-              </Text>
-              <Text style={[styles.valuePropTagline2x2, { color: prop.color }]}>
-                {prop.tagline}
-              </Text>
-              <Text style={[styles.valuePropDesc2x2, { color: C.muted }]}>
-                {prop.desc}
-              </Text>
+              <View style={styles.benefitCopy}>
+                <Text numberOfLines={2} style={[styles.benefitTitle, { color: C.text }]}>
+                  {benefit.title}
+                </Text>
+                <Text numberOfLines={2} style={[styles.benefitValue, { color: benefit.color }]}>
+                  {benefit.value}
+                </Text>
+                <Text numberOfLines={1} style={[styles.benefitCategory, { color: C.muted }]}>
+                  {benefit.categoryTitle}
+                </Text>
+              </View>
             </View>
           ))}
         </View>
+        {selectedBenefits.length > 6 ? (
+          <GlassPressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showAllBenefits }}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setShowAllBenefits((current) => !current);
+            }}
+            style={({ pressed }) => [
+              styles.benefitToggle,
+              {
+                backgroundColor: C.card,
+                borderColor: C.border,
+                opacity: pressed ? 0.78 : 1,
+              },
+            ]}
+          >
+            <Text style={[styles.benefitToggleText, { color: C.accent }]}>
+              {showAllBenefits
+                ? tr ? "Daralt" : es ? "Ver menos" : pt ? "Ver menos" : de ? "Weniger anzeigen" : "Show less"
+                : tr ? `Tümünü göster (${selectedBenefits.length})` : es ? `Ver todo (${selectedBenefits.length})` : pt ? `Ver tudo (${selectedBenefits.length})` : de ? `Alle anzeigen (${selectedBenefits.length})` : `Show all (${selectedBenefits.length})`}
+            </Text>
+            <AppIcon
+              name={showAllBenefits ? "chevron-up" : "chevron-down"}
+              size={15}
+              color={C.accent}
+            />
+          </GlassPressable>
+        ) : null}
       </View>
 
       {/* EXPANDABLE CATEGORY BREAKDOWN */}
@@ -1392,7 +1172,7 @@ export default function PremiumScreen() {
             {referralCopy.redeem.entryTitle}
           </Text>
         </Pressable>
-        <Pressable disabled={busy} onPress={restore} style={styles.restoreBtn}>
+        <Pressable accessibilityRole="button" disabled={busy} onPress={restore} style={styles.restoreBtn}>
           {busyAction === "restore" ? (
             <ActivityIndicator size="small" color={C.accent} />
           ) : (
@@ -1469,13 +1249,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   heroCard: {
-    borderRadius: 24,
+    borderRadius: 20,
     borderWidth: 1,
     overflow: "hidden",
     marginBottom: 20,
   },
   heroGradient: {
-    padding: 18,
+    padding: 16,
   },
   heroTopRow: {
     flexDirection: "row",
@@ -1521,66 +1301,41 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   heroBody: {
-    marginTop: 14,
-    marginBottom: 16,
+    marginTop: 16,
+    marginBottom: 14,
   },
   heroTitle: {
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 21,
+    lineHeight: 26,
     fontWeight: "900",
     letterSpacing: -0.6,
   },
   heroSubtitle: {
-    fontSize: 11.5,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 18,
     marginTop: 6,
     fontWeight: "500",
   },
-  quickMetricsRow: {
+  heroBenefitsRow: {
     flexDirection: "row",
-    gap: 8,
+    flexWrap: "wrap",
+    gap: 7,
   },
-  quickMetricBox: {
-    flex: 1,
+  heroBenefitItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 9,
-    paddingVertical: 8,
+    gap: 5,
+    paddingRight: 6,
   },
-  quickMetricNum: {
-    fontSize: 11.5,
-    fontWeight: "900",
-  },
-  quickMetricLabel: {
-    fontSize: 7.5,
-    fontWeight: "600",
-    marginTop: 1,
+  heroBenefitText: {
+    fontSize: 10.5,
+    fontWeight: "700",
   },
   pricingSection: {
     marginBottom: 24,
   },
   sectionHeader: {
     marginBottom: 12,
-  },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    marginBottom: 5,
-  },
-  sectionBadgePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderRadius: 7,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  sectionBadgeText: {
-    fontSize: 8.5,
-    fontWeight: "900",
-    letterSpacing: 0.6,
   },
   sectionTitle: {
     fontSize: 17,
@@ -1599,7 +1354,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 4,
     gap: 4,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   tierSegmentTab: {
     flex: 1,
@@ -1645,52 +1400,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "600",
   },
-  badgePreviewCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    overflow: "hidden",
-    marginBottom: 14,
-  },
-  badgePreviewLeft: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgePreviewRight: {
-    flex: 1,
-  },
-  badgePreviewHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  badgePreviewTitle: {
-    fontSize: 13.5,
-    fontWeight: "900",
-  },
-  badgeRarityTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  badgeRarityText: {
-    fontSize: 7.5,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
-  badgePreviewDesc: {
-    fontSize: 9.5,
-    lineHeight: 14,
-    marginTop: 3,
-    fontWeight: "500",
-  },
   packagesLoader: {
     paddingVertical: 32,
     alignItems: "center",
@@ -1705,10 +1414,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   pricingCard: {
-    borderRadius: 20,
-    borderWidth: 1.5,
-    padding: 14,
-    overflow: "hidden",
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 13,
   },
   pricingCardSelected: {
     borderWidth: 2,
@@ -1842,14 +1550,14 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   ctaButton: {
-    borderRadius: 18,
+    borderRadius: 15,
     overflow: "hidden",
     marginTop: 16,
     shadowColor: "#000",
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 6,
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
   ctaGradient: {
     minHeight: 58,
@@ -1857,12 +1565,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-  },
-  ctaShimmerBar: {
-    position: "absolute",
-    top: -40,
-    bottom: -40,
-    width: 140,
   },
   ctaIconContainer: {
     width: 32,
@@ -1886,75 +1588,85 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 1,
   },
-  trustBadgesRow: {
+  purchaseNoteRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 14,
-    paddingHorizontal: 4,
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 8,
   },
-  trustBadgeItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  trustBadgeText: {
-    fontSize: 9.5,
+  purchaseNoteText: {
+    flexShrink: 1,
+    fontSize: 10,
     fontWeight: "600",
+    lineHeight: 14,
+    textAlign: "center",
   },
   featuresSection: {
     marginBottom: 24,
   },
-  valueProps2x2Grid: {
+  benefitGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 8,
   },
-  valueProp2x2Card: {
-    width: "48.4%",
-    borderRadius: 18,
+  benefitCard: {
+    width: "48.5%",
+    minHeight: 104,
+    borderRadius: 13,
     borderWidth: 1,
-    padding: 13,
-    overflow: "hidden",
+    padding: 10,
   },
-  valueProp2x2Top: {
+  benefitCardTop: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginBottom: 7,
   },
-  valuePropIconWrap2x2: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+  benefitIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  valuePropBadgeTag: {
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2.5,
+  benefitCopy: {
+    flex: 1,
+    minWidth: 0,
   },
-  valuePropBadgeTagText: {
-    fontSize: 7.5,
-    fontWeight: "900",
-    letterSpacing: 0.5,
-  },
-  valuePropTitle2x2: {
-    fontSize: 13.5,
-    fontWeight: "900",
-    letterSpacing: -0.2,
-  },
-  valuePropTagline2x2: {
-    fontSize: 9.5,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  valuePropDesc2x2: {
-    fontSize: 9.5,
+  benefitTitle: {
+    minHeight: 28,
+    fontSize: 11.5,
     lineHeight: 14,
-    marginTop: 4,
-    fontWeight: "500",
+    fontWeight: "800",
+  },
+  benefitValue: {
+    fontSize: 9.5,
+    lineHeight: 12,
+    marginTop: 2,
+    fontWeight: "800",
+  },
+  benefitCategory: {
+    fontSize: 8,
+    lineHeight: 10,
+    marginTop: 3,
+    fontWeight: "600",
+  },
+  benefitToggle: {
+    minHeight: 40,
+    marginTop: 9,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+  },
+  benefitToggleText: {
+    fontSize: 11,
+    fontWeight: "800",
   },
   detailedSection: {
     marginBottom: 24,
@@ -2162,11 +1874,15 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
   secondaryActions: {
-    gap: 8,
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 6,
     marginBottom: 20,
   },
   restoreBtn: {
-    minHeight: 42,
+    minHeight: 40,
+    paddingHorizontal: 10,
     alignItems: "center",
     justifyContent: "center",
   },

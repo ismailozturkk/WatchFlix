@@ -138,6 +138,8 @@ export default function useSettingsShare() {
         if (has("listsPosterRadius")) c.layout.changeListsPosterRadius(orDefault(values.listsPosterRadius, "listsPosterRadius"));
         if (has("seeAllPosterRadius")) c.layout.changeSeeAllPosterRadius(orDefault(values.seeAllPosterRadius, "seeAllPosterRadius"));
         if (has("railPosterRadius")) c.layout.changeRailPosterRadius(orDefault(values.railPosterRadius, "railPosterRadius"));
+        if (has("funPosterRadius")) c.layout.changeFunPosterRadius(orDefault(values.funPosterRadius, "funPosterRadius"));
+        if (has("libraryPosterRadius")) c.layout.changeLibraryPosterRadius(orDefault(values.libraryPosterRadius, "libraryPosterRadius"));
         if (has("railPosterSize")) c.layout.changeRailPosterSize(orDefault(values.railPosterSize, "railPosterSize"));
         if (has("postListPosterLayout")) {
           c.layout.changePostListPosterLayout(orDefault(values.postListPosterLayout, "postListPosterLayout"));

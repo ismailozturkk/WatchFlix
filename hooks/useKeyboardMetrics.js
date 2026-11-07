@@ -16,6 +16,12 @@
 //   • Android: keyboardDidShow (RN boy değişiminde de yeniden atar) + DidHide.
 //   Gizleme olayı iOS'ta iki yoldan dinlenir; biri kaçsa diğeri sayfayı eski
 //   boyda bırakmaz.
+//
+// ANDROID'DE ÖRTÜŞME: varsayılan, olayın `height`ıdır (API 30+'da gezinme çubuğu
+// DÜŞÜLMÜŞ: ime − systemBars). Kaplayıcısı ekranın EN ALTINA kadar uzanan (alt
+// güvenli alanı kendisi boşaltmayan) modallarda gerçek örtüşme gezinme çubuğu
+// kadar fazladır; onlar `overlapFromScreenY` ile klavyenin üst kenarından
+// (`screenY`, pencere = ekran koordinatı) ölçer. Bkz. CommentSheetModal.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dimensions, Keyboard, Platform } from "react-native";
 import { keyboardOverlap, nextBaseOverlay } from "@utils/sheetKeyboardFit";
@@ -29,6 +35,8 @@ const IS_IOS = Platform.OS === "ios";
  * @param {boolean} [options.track=true]
  *        false: klavye olayları dinlenmez (sayfanın kendi klavye çözümü var);
  *        kaplayıcı ölçümü yine yapılır.
+ * @param {boolean} [options.overlapFromScreenY=false]
+ *        Android'de örtüşmeyi `height` yerine `screenY`den ölç (yukarıdaki not).
  * @returns {{
  *   keyboardHeight: number,
  *   overlayHeight: number,
@@ -37,7 +45,10 @@ const IS_IOS = Platform.OS === "ios";
  *   onOverlayLayout: (event: any) => void,
  * }}
  */
-export default function useKeyboardMetrics(active, { track = true } = {}) {
+export default function useKeyboardMetrics(
+  active,
+  { track = true, overlapFromScreenY = false } = {},
+) {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const keyboardHeightRef = useRef(0);
   const [overlayHeight, setOverlayHeight] = useState(0);
@@ -64,7 +75,7 @@ export default function useKeyboardMetrics(active, { track = true } = {}) {
     } else {
       subs.push(
         Keyboard.addListener("keyboardDidShow", (event) =>
-          apply(keyboardOverlap(event?.endCoordinates, windowHeight(), false)),
+          apply(keyboardOverlap(event?.endCoordinates, windowHeight(), overlapFromScreenY)),
         ),
         Keyboard.addListener("keyboardDidHide", () => apply(0)),
       );
@@ -73,7 +84,7 @@ export default function useKeyboardMetrics(active, { track = true } = {}) {
       subs.forEach((sub) => sub.remove());
       apply(0);
     };
-  }, [active, track]);
+  }, [active, track, overlapFromScreenY]);
 
   useEffect(() => {
     if (active) return;

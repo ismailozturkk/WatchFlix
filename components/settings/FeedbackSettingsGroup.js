@@ -19,7 +19,7 @@ import { Chevron, SectionLabel, SettingRow, ui } from "../../screens/tabs/settin
 import { getFeedbackCopy } from "../../screens/tabs/settings/feedbackCopy";
 import GlassBox from "../common/GlassBox";
 
-export default function FeedbackSettingsGroup({ C }) {
+export default function FeedbackSettingsGroup({ C, hideLabel = false }) {
   const navigation = useNavigation();
   const { language } = useLanguage();
   const copy = useMemo(() => getFeedbackCopy(language), [language]);
@@ -44,7 +44,11 @@ export default function FeedbackSettingsGroup({ C }) {
 
   return (
     <>
-      <SectionLabel color={C.muted}>{copy.group.label.toLocaleUpperCase(intlLocaleOf(language))}</SectionLabel>
+      {hideLabel ? null : (
+        <SectionLabel color={C.muted}>
+          {copy.group.label.toLocaleUpperCase(intlLocaleOf(language))}
+        </SectionLabel>
+      )}
       <GlassBox role="card" style={[ui.card, { backgroundColor: C.card, borderColor: C.border }]}>
         <SettingRow
           colors={C}

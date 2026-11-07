@@ -30,7 +30,8 @@ export const SHEET_TOP_MARGIN = 8;
  *
  * @param {{screenY?: number, height?: number} | null | undefined} coords
  * @param {number} windowHeight
- * @param {boolean} ios  Platform.OS === "ios"
+ * @param {boolean} ios  Platform.OS === "ios" — ya da Android'de örtüşme `screenY`den
+ *        ölçülecekse (useKeyboardMetrics `overlapFromScreenY`).
  */
 export function keyboardOverlap(coords, windowHeight, ios) {
   if (!coords || !(windowHeight > 0)) return 0;

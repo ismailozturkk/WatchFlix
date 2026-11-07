@@ -89,6 +89,8 @@ const DISMISS_SETTLE_MS = 90;
  * @param {() => void} [props.onDismissed]
  *        Çıkış animasyonu bitip native pencere kalktıktan SONRA bir kez çağrılır.
  *        Ardından başka bir Modal açılacaksa o işi burada başlat.
+ * @param {React.ReactNode} [props.overlay]
+ *        Sayfanın üstünde, aynı pencerede çizilen tam ekran katman (ör. LeaveSheet).
  */
 export default function BottomSheetModal({
   visible,
@@ -104,6 +106,7 @@ export default function BottomSheetModal({
   shrinkToFit = false,
   onShow,
   onDismissed,
+  overlay,
   children,
 }) {
   const sheet = useSheetTransition(visible, { liftWithKeyboard });
@@ -180,6 +183,11 @@ export default function BottomSheetModal({
         >
           {children}
         </Animated.View>
+
+        {/* Sayfanın üstünde, AYNI native pencerede tam ekran katman (onay vb.).
+            Açık sayfadan `appAlert` çağırmak iOS'ta ikinci pencere ister ve
+            sunulamaz — bkz. modals/createPost/LeaveSheet.js. */}
+        {overlay || null}
 
         {/* Sayfanın üstünde: toast sayfa açıkken de görünsün. */}
         <ToastHost

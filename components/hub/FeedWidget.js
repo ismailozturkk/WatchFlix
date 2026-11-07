@@ -5,7 +5,7 @@
 // İki katman:
 //   1. Başlık  — feed'i açar. Son paylaşanların avatarları metnin yanında durur
 //                (kartın canlı olduğunu söyler); sağda beyaz "aç" düğmesi.
-//   2. Yazma   — "Ne paylaşmak istersin?" çubuğu + dört tür karosu. Karolar
+//   2. Yazma   — "Ne paylaşmak istersin?" çubuğu + beş tür karosu. Karolar
 //                feed'deki rozet dilini taşır (inceleme=mavi, liste=yeşil,
 //                anket=mor), böylece paylaşım türü ikondan okunur.
 //
@@ -25,7 +25,8 @@ import { useTheme } from "@context/ThemeContext";
 import { useAuth } from "@context/AuthContext";
 import { useProfileUi } from "@context/ProfileUiContext";
 import { usePosts, useLiveFeed } from "@context/PostsContext";
-import { getAvatarSource } from "@utils/avatars";
+import { useLanguage } from "@context/LanguageContext";
+import { avatarRenderPx, getAvatarSource } from "@utils/avatars";
 import { postTypeBadge } from "@utils/postComposer";
 import { i18nText } from "@utils/i18nText";
 
@@ -39,11 +40,15 @@ const getPostAvatar = (post, currentUid, currentAvatar) => {
   }
   return getAvatarSource(
     post?.authorAvatarIndex,
-    post?.authorPhotoURL || (typeof post?.authorAvatar === "string" ? post.authorAvatar : null)
+    post?.authorPhotoURL || (typeof post?.authorAvatar === "string" ? post.authorAvatar : null),
+    // 22 pt'lik yüz yığını: kişi (TMDB) fotoğrafında küçük kopya.
+    avatarRenderPx(22)
   );
 };
 
 function FeedWidget({ navigation }) {
+  // memo() props değişmeden çizmez; dil aboneliği olmadan metinler eski dilde kalıyordu.
+  useLanguage();
   const { theme } = useTheme();
   const { user } = useAuth();
   const { avatar } = useProfileUi();
@@ -65,6 +70,7 @@ function FeedWidget({ navigation }) {
     { key: "list", icon: "list", label: i18nText("autoI18n.liste_2", "Liste") },
     { key: "text", icon: "chatbubble-ellipses", label: i18nText("autoI18n.sohbet", "Sohbet") },
     { key: "poll", icon: "stats-chart", label: i18nText("autoI18n.anket", "Anket") },
+    { key: "tierlist", icon: "podium", label: i18nText("autoI18n.tier_list", "Tier list") },
   ];
 
   const recentAuthors = useMemo(

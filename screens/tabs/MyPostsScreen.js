@@ -31,7 +31,7 @@ import { useImageQualitySettings } from "@context/AppSettingsContext";
 import { fetchUserPosts } from "../../services/postsService";
 import { i18nText, percentText } from "../../utils/i18nText";
 import { formatTimeAgo } from "../../utils/postTime";
-import { postTypeBadge, tallyVotes } from "../../utils/postComposer";
+import { postPreviewPosters, postTypeBadge, tallyVotes } from "../../utils/postComposer";
 import { alpha } from "../../theme/colors";
 import ScreenDecor from "@components/ScreenDecor";
 import BackButton from "@components/BackButton";
@@ -53,7 +53,7 @@ function postPosterUris(post, getTmdbUrl) {
       : [];
   }
   if (post.type === "text") return [];
-  return (post.mediaList || []).map((m) => m?.poster).filter(Boolean);
+  return postPreviewPosters(post);
 }
 
 function MyPostCard({ post, theme, t, onMenu }) {
@@ -69,7 +69,7 @@ function MyPostCard({ post, theme, t, onMenu }) {
   const posterUris = postPosterUris(post, getTmdbUrl);
   // Poster bekleyen (review/list) ama görseli olmayan kayıt: tip ikonlu kutu.
   const hasVisual =
-    posterUris.length > 0 || post.type === "review" || post.type === "list";
+    posterUris.length > 0 || post.type === "review" || post.type === "list" || post.type === "tierlist";
   const visual =
     posterUris.length > 0 ? (
       <PosterStack uris={posterUris} theme={theme} />
@@ -565,9 +565,9 @@ export default function MyPostsScreen({ navigation }) {
                     // Kartla aynı görsel dil: medya anketinde seçenek
                     // posterleri, görselsiz text/poll'de rozet renkli ikon.
                     const pBadge = postTypeBadge(menuPost.type, theme.colors);
-                    let posters = (menuPost.mediaList || [])
-                      .filter((m) => m?.poster)
-                      .slice(0, 3);
+                    let posters = postPreviewPosters(menuPost)
+                      .slice(0, 3)
+                      .map((poster, i) => ({ id: i, poster }));
                     if (menuPost.type === "poll" && menuPost.poll?.type === "media") {
                       const optPosters = (menuPost.poll.options || [])
                         .filter((o) => o?.media?.poster_path)

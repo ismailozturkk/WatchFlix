@@ -6,6 +6,14 @@
 import React from "react";
 import { act, create } from "react-test-renderer";
 
+// Haftalık Lig bildirimi (services/leagueService → firebase) bu testin konusu değil.
+jest.mock("../services/leagueService", () => ({
+  awardGameXp: jest.fn(),
+  awardDailyXp: jest.fn(),
+  awardPollVoteXp: jest.fn(),
+  awardTop100VoteXp: jest.fn(),
+  awardWatchXp: jest.fn(),
+}));
 jest.mock("react-native", () => ({
   StyleSheet: { create: (s) => s, absoluteFill: {}, absoluteFillObject: {}, hairlineWidth: 1 },
   View: "View",

@@ -7,11 +7,11 @@
 //
 // AÇILIŞ STRATEJİSİ: manifest ~100 dosya, ama seçili üç rol en fazla üç aile
 // kullanır (varsayılan "system"da hiçbiri). Açılışta YALNIZ o dosyalar yüklenip
-// setFontsLoaded(true) denir; katalogdaki geri kalan dosyalara tek ihtiyaç
-// ayarlardaki font galerisi olduğundan onlar açılış penceresinin dışında, arka
-// planda yüklenir ve setCatalogFontsLoaded(true) ile duyurulur. Ayar ekranı
-// arka plan yüklemesinden önce açılırsa ensureCatalogFontsLoaded() ile kalanı
-// kendisi tetikler. Eskiden 105 dosyanın tamamı splash sırasında okunuyordu.
+// setFontsLoaded(true) denir. Katalogdaki geri kalan dosyalar (~90 dosya,
+// ~15 MB) YALNIZ isteyince yüklenir: font galerisi ve paylaşılan ayar
+// önizlemesi açılınca ensureCatalogFontsLoaded() çağırır, bitince
+// setCatalogFontsLoaded(true) duyurulur. Eskiden 105 dosyanın tamamı splash
+// sırasında, sonra her açılışta 5 sn'de arka planda okunuyordu.
 //
 // Buradaki manifest ile utils/typographyRoles.js'teki FONT_FAMILY_MAP birbirini
 // tutmak ZORUNDA: haritada olup burada yüklenmeyen bir aile hata vermez,
@@ -19,7 +19,6 @@
 // okuyup eşitliği doğrular — yeni bir aile eklerken iki tarafı da güncelle.
 import * as Font from "expo-font";
 import { useEffect } from "react";
-import { InteractionManager } from "react-native";
 import {
   getTypographyState,
   setCatalogFontsLoaded,
@@ -120,10 +119,6 @@ export const APP_FONT_MANIFEST = {
   Julee_400Regular: require("@expo-google-fonts/julee/400Regular").Julee_400Regular,
 };
 
-// Katalog yüklemesini açılış penceresinin dışına atan gecikme. ChatModal
-// 3,8 sn'de mount oluyor (App.js); katalog G/Ç'si onunla da yarışmasın.
-const KATALOG_ERTELEME_MS = 5000;
-
 /** Seçili rollerin (heading/body/numeric) kullandığı tüm aile adları. */
 const rolAileAdlari = (roller) => {
   const adlar = new Set();
@@ -212,16 +207,11 @@ export function TypographyProvider({ children }) {
       if (rolDegisti) rolFontlariniYukle();
     });
 
-    // Katalog: açılış animasyonları bitip uygulama oturduktan sonra.
-    let zamanlayici = null;
-    const gorev = InteractionManager.runAfterInteractions(() => {
-      zamanlayici = setTimeout(ensureCatalogFontsLoaded, KATALOG_ERTELEME_MS);
-    });
+    // Katalog burada YÜKLENMEZ: tek tüketicileri (font galerisi, paylaşılan
+    // ayar önizlemesi) açılınca ensureCatalogFontsLoaded() çağırıyor.
 
     return () => {
       birak();
-      gorev.cancel?.();
-      if (zamanlayici) clearTimeout(zamanlayici);
     };
   }, []);
 

@@ -21,7 +21,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import { clampAvatarIndex } from "../utils/avatars";
+import { identityAvatar } from "../utils/avatarPhotos";
 import { scopeWriteFields } from "../utils/commentScope";
 import { trackFirestoreWrite } from "./usageTrackerService";
 
@@ -62,14 +62,17 @@ export async function addMediaComment({
   const cid = String(mediaId);
   const scopeFields = mediaType === "tv" && scope ? scopeWriteFields(scope) : null;
   const kind = collectionName === "TvComment" ? "tv" : "movie";
+  // Fotoğraf yalnız fotoğraf avatarında taşınır (hazır avatarda Auth'un
+  // Google resmi kopyaya sızmasın) — utils/avatarPhotos.identityAvatar.
+  const snap = identityAvatar({ avatarIndex, photoURL: avatar });
 
   const newRef = await addDoc(collection(db, collectionName, cid, "comments"), {
     userId: uid,
     username: username || "Anonim",
     userHandle: userHandle || "",
-    avatar: avatar || null,
-    authorPhotoURL: avatar || null,
-    avatarIndex: clampAvatarIndex(avatarIndex),
+    avatar: snap.photoURL,
+    authorPhotoURL: snap.photoURL,
+    avatarIndex: snap.avatarIndex,
     text: trimmed,
     isSpoiler,
     parentId: null,

@@ -49,7 +49,7 @@ export const APP_LANGUAGES = Object.freeze([
     intlLocale: "en-US",
     tmdbLanguage: "en-US",
     tmdbRegion: "US",
-    tmdbImageLanguages: ["en", "tr"],
+    tmdbImageLanguages: ["en"],
     legalLang: "en",
     aiPromptName: "en",
   },
@@ -159,11 +159,17 @@ export const getAppLanguage = (language) => BY_CODE.get(normalizeAppLanguage(lan
 export const intlLocaleOf = (language) => getAppLanguage(language).intlLocale;
 export const tmdbLanguageOf = (language) => getAppLanguage(language).tmdbLanguage;
 export const tmdbRegionOf = (language) => getAppLanguage(language).tmdbRegion;
-/** Poster/arka plan dilleri: ["es", "en"] (öncelik sırası). */
-export const tmdbImageLanguagesOf = (language) => getAppLanguage(language).tmdbImageLanguages;
-/** TMDB `include_image_language` değeri: "es,en,null". */
-export const tmdbImageLanguageOrderOf = (language) =>
-  [...tmdbImageLanguagesOf(language), "null"].join(",");
+/**
+ * Poster/arka plan dilleri, öncelik sırasıyla: seçili dil → İngilizce → (verildiyse)
+ * yapımın özgün dili: tmdbImageLanguagesOf("es", "ko") = ["es", "en", "ko"].
+ */
+export const tmdbImageLanguagesOf = (language, originalLanguage) => {
+  const base = getAppLanguage(language).tmdbImageLanguages;
+  return originalLanguage && !base.includes(originalLanguage) ? [...base, originalLanguage] : base;
+};
+/** TMDB `include_image_language` değeri: "es,en,null" (özgün dil verildiyse "es,en,ko,null"). */
+export const tmdbImageLanguageOrderOf = (language, originalLanguage) =>
+  [...tmdbImageLanguagesOf(language, originalLanguage), "null"].join(",");
 export const legalLanguageOf = (language) => getAppLanguage(language).legalLang;
 export const aiPromptLanguageOf = (language) => getAppLanguage(language).aiPromptName;
 

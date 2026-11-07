@@ -43,6 +43,11 @@ const HARD_FLOOR = 220;
  * @param {number}  opts.minHeight   Piksel — boş listede hedeflenen yükseklik.
  * @param {number}  opts.maxHeight   Piksel — dolu listede hedeflenen tavan.
  * @param {number}  [opts.topInset]  Durum çubuğu vb. — tavan hesabından düşülür.
+ * @param {boolean} [opts.trackKeyboard=true]
+ *        false: klavye tavanı uygulanmaz. Klavye sığdırmasını düzen kendisi
+ *        yapıyorsa (CommentSheetModal Android: kök alt boşluğu + flexShrink) bu
+ *        yay animasyonu ona karşı çalışır, klavye inerken sayfa tepesi önce aşağı
+ *        düşüp sonra geri çıkar.
  * @returns {{ heightAnim: Animated.Value, keyboardHeight: number }}
  */
 export default function useAdaptiveSheetHeight({
@@ -51,13 +56,14 @@ export default function useAdaptiveSheetHeight({
   minHeight,
   maxHeight,
   topInset = 0,
+  trackKeyboard = true,
 }) {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const heightAnim = useRef(new Animated.Value(minHeight)).current;
   const lastTargetRef = useRef(minHeight);
 
   useEffect(() => {
-    if (!visible) return undefined;
+    if (!visible || !trackKeyboard) return undefined;
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
     const show = Keyboard.addListener(showEvent, (e) => {
@@ -69,7 +75,7 @@ export default function useAdaptiveSheetHeight({
       hide.remove();
       setKeyboardHeight(0);
     };
-  }, [visible]);
+  }, [visible, trackKeyboard]);
 
   useEffect(() => {
     if (!visible) return;

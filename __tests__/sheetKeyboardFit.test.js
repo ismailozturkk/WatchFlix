@@ -26,6 +26,14 @@ describe("keyboardOverlap", () => {
     expect(keyboardOverlap({ height: 0 }, 800, false)).toBe(0);
   });
 
+  it("Android screenY ölçümü gezinme çubuğunu da kapsar (yorum sayfası, emülatör değerleri)", () => {
+    // API 34: height = ime − gezinme çubuğu (24 dp); sayfa ekranın dibine uzandığı
+    // için gerçek örtüşme klavyenin üst kenarından: 914,3 − 578,7 ≈ 335,6.
+    const coords = { height: 311.6, screenY: 578.7 };
+    expect(keyboardOverlap(coords, 914.3, true)).toBeCloseTo(335.6, 1);
+    expect(keyboardOverlap(coords, 914.3, false)).toBeCloseTo(311.6, 1);
+  });
+
   it("eksik/bozuk veride 0", () => {
     expect(keyboardOverlap(null, 800, true)).toBe(0);
     expect(keyboardOverlap({ height: NaN }, 800, false)).toBe(0);

@@ -62,6 +62,7 @@ import {
 import ImportDataModal from "../../components/import/ImportDataModal";
 import { getSettingsShareCopy } from "../../utils/settingsShareCopy";
 import { getLibraryExportCopy } from "./settings/libraryExportCopy";
+import { getFeedbackCopy } from "./settings/feedbackCopy";
 import { getImportCopy } from "../../components/import/importCopy";
 import useAppLogo from "@hooks/useAppLogo";
 import {
@@ -123,19 +124,48 @@ function buildUiColors(theme) {
   };
 }
 
-function SectionLabel({ children, color, first, style }) {
+function SectionLabel({
+  children,
+  color,
+  first,
+  style,
+  subtitle,
+  iconName,
+  iconColor,
+  iconBg,
+}) {
   return (
-    <Text
-      allowFontScaling={false}
+    <View
       style={[
         s.sectionLabel,
-        { color },
         first && s.firstSectionLabel,
         style,
       ]}
     >
-      {children}
-    </Text>
+      {iconName ? (
+        <View style={[s.sectionIcon, { backgroundColor: iconBg }]}>
+          <AppIcon name={iconName} size={16} color={iconColor} />
+        </View>
+      ) : null}
+      <View style={s.sectionCopy}>
+        <Text
+          allowFontScaling={false}
+          accessibilityRole="header"
+          style={[s.sectionTitle, { color }]}
+        >
+          {children}
+        </Text>
+        {subtitle ? (
+          <Text
+            allowFontScaling={false}
+            numberOfLines={2}
+            style={[s.sectionSubtitle, { color }]}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+    </View>
   );
 }
 
@@ -343,9 +373,71 @@ export default function SettingsScreen() {
   const { t, language, toggleLanguage } = useLanguage();
   const copyExport = getLibraryExportCopy(language);
   const copyImport = getImportCopy(language);
+  const feedbackCopy = useMemo(() => getFeedbackCopy(language), [language]);
   const aiCopy = useMemo(() => getAiCopy(language), [language]);
   const referralCopy = useMemo(() => getReferralCopy(language), [language]);
   const shareLookCopy = useMemo(() => getSettingsShareCopy(language), [language]);
+  const sectionCopy = useMemo(
+    () => ({
+      premium: pickByLanguage(language, {
+        tr: "Planın, hakların ve üyelik avantajların",
+        en: "Your plan, allowances, and membership benefits",
+        es: "Tu plan, límites y ventajas de la membresía",
+        pt: "Seu plano, limites e benefícios da assinatura",
+        de: "Dein Plan, Kontingente und Mitgliedsvorteile",
+      }),
+      account: pickByLanguage(language, {
+        tr: "Giriş yöntemleri, gizlilik ve davetler",
+        en: "Sign-in methods, privacy, and invites",
+        es: "Métodos de acceso, privacidad e invitaciones",
+        pt: "Métodos de acesso, privacidade e convites",
+        de: "Anmeldung, Datenschutz und Einladungen",
+      }),
+      appearance: pickByLanguage(language, {
+        tr: "Tema, posterler ve uygulamanın görünümü",
+        en: "Theme, posters, and how the app looks",
+        es: "Tema, pósteres y apariencia de la app",
+        pt: "Tema, pôsteres e aparência do app",
+        de: "Design, Poster und App-Darstellung",
+      }),
+      content: pickByLanguage(language, {
+        tr: "Dil, platformlar ve izleme tercihleri",
+        en: "Language, services, and viewing preferences",
+        es: "Idioma, servicios y preferencias de contenido",
+        pt: "Idioma, serviços e preferências de conteúdo",
+        de: "Sprache, Dienste und Inhaltspräferenzen",
+      }),
+      notifications: pickByLanguage(language, {
+        tr: "Hatırlatmalar ve sosyal bildirimler",
+        en: "Reminders and social notifications",
+        es: "Recordatorios y notificaciones sociales",
+        pt: "Lembretes e notificações sociais",
+        de: "Erinnerungen und soziale Mitteilungen",
+      }),
+      data: pickByLanguage(language, {
+        tr: "Kalite, çevrimdışı kullanım ve aktarımlar",
+        en: "Quality, offline use, and transfers",
+        es: "Calidad, uso sin conexión y transferencias",
+        pt: "Qualidade, uso offline e transferências",
+        de: "Qualität, Offline-Nutzung und Übertragungen",
+      }),
+      support: pickByLanguage(language, {
+        tr: "Sorun bildir veya yeni bir fikir paylaş",
+        en: "Report a problem or share a new idea",
+        es: "Informa de un problema o comparte una idea",
+        pt: "Relate um problema ou compartilhe uma ideia",
+        de: "Problem melden oder eine Idee teilen",
+      }),
+      about: pickByLanguage(language, {
+        tr: "Sürüm, kaynaklar ve uygulama bilgileri",
+        en: "Version, sources, and app information",
+        es: "Versión, fuentes e información de la app",
+        pt: "Versão, fontes e informações do app",
+        de: "Version, Quellen und App-Informationen",
+      }),
+    }),
+    [language],
+  );
   const { prefs: aiPrefs } = useAiPrefs();
   const aiCustomCount = countCustomizedPrefs(aiPrefs);
   const { theme } = useTheme();
@@ -516,7 +608,16 @@ export default function SettingsScreen() {
   return (
     <SettingsSubScreen title={t.settings}>
         {/* ── Premium: abonelik vitrini en üstte ── */}
-        <SectionLabel color={C.muted} first>SEELOGD PREMIUM</SectionLabel>
+        <SectionLabel
+          color={C.muted}
+          first
+          subtitle={sectionCopy.premium}
+          iconName="diamond-outline"
+          iconColor={C.purple}
+          iconBg={C.iconPurple}
+        >
+          SEELOGD PREMIUM
+        </SectionLabel>
         <PremiumSettingsCard />
         {hasMemberBar ? null : (
           <GlassBox role="card"
@@ -542,31 +643,19 @@ export default function SettingsScreen() {
             />
           </GlassBox>
         )}
-        {/* Arkadaş daveti: abone olsun olmasın herkes için (kod paylaşımı + kod girişi) */}
-        <GlassBox role="card"
-          style={[
-            s.card,
-            s.cardStacked,
-            { backgroundColor: C.card, borderColor: C.border },
-          ]}
-        >
-          <SettingRow
-            colors={C}
-            iconBg={C.iconGreen}
-            iconColor={C.green}
-            iconName="gift-outline"
-            title={referralCopy.rowTitle}
-            subtitle={referralCopy.rowSubtitle}
-            onPress={() => navigation.navigate("ReferralScreen")}
-            right={<Chevron color={C.muted} />}
-            last
-          />
-        </GlassBox>
         {/* Yalnız geliştirme build'inde: premium kapılarını mağazasız dene */}
         {__DEV__ ? <DevPlanSimulatorCard /> : null}
 
         {/* ── Hesap: kimlik doğrulama yöntemleri ve gizlilik ── */}
-        <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_hesap", "Hesap").toUpperCase()}</SectionLabel>
+        <SectionLabel
+          color={C.muted}
+          subtitle={sectionCopy.account}
+          iconName="person-circle-outline"
+          iconColor={C.blue}
+          iconBg={C.iconBlue}
+        >
+          {i18nText("autoI18n.ayarlar_grup_hesap", "Hesap").toUpperCase()}
+        </SectionLabel>
         <GlassBox role="card"
           style={[
             s.card,
@@ -595,12 +684,31 @@ export default function SettingsScreen() {
             )}
             onPress={() => navigation.navigate("PrivacySettingsScreen")}
             right={<Chevron color={C.muted} />}
+          />
+          {/* Arkadaş daveti: plan bağımsız bir hesap/sosyal eylemidir. */}
+          <SettingRow
+            colors={C}
+            iconBg={C.iconGreen}
+            iconColor={C.green}
+            iconName="gift-outline"
+            title={referralCopy.rowTitle}
+            subtitle={referralCopy.rowSubtitle}
+            onPress={() => navigation.navigate("ReferralScreen")}
+            right={<Chevron color={C.muted} />}
             last
           />
         </GlassBox>
 
         {/* ── Görünüm: tema, kişiselleştirme, poster düzeni, widget'lar, dokunsal geri bildirim ── */}
-        <SectionLabel color={C.muted}>{t.appearance.toUpperCase()}</SectionLabel>
+        <SectionLabel
+          color={C.muted}
+          subtitle={sectionCopy.appearance}
+          iconName="color-palette-outline"
+          iconColor={C.teal}
+          iconBg={C.iconTeal}
+        >
+          {t.appearance.toUpperCase()}
+        </SectionLabel>
         <GlassBox role="card" style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           {/* Ayrı "Görünüm" başlık satırı yok — tema satırları (seçili olan vurgulu) bu görevi görüyor. */}
           <SettingsTheme />
@@ -620,7 +728,7 @@ export default function SettingsScreen() {
             title={t.personalization}
             subtitle={i18nText(
               "autoI18n.kisisellestirme_aciklama",
-              "Kar efekti, ikon arka planı ve pet",
+              "Uygulama simgesi, kar, ambiyans ve ikon arka planı",
             )}
             onPress={() => navigation.navigate("PersonalizationScreen")}
             right={<Chevron color={C.muted} />}
@@ -681,7 +789,15 @@ export default function SettingsScreen() {
         </GlassBox>
 
         {/* ── Dil ve içerik: uygulama dili, izleme platformları, içerik tercihleri ── */}
-        <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_dil_icerik", "Dil ve içerik").toUpperCase()}</SectionLabel>
+        <SectionLabel
+          color={C.muted}
+          subtitle={sectionCopy.content}
+          iconName="options-outline"
+          iconColor={C.purple}
+          iconBg={C.iconPurple}
+        >
+          {i18nText("autoI18n.ayarlar_grup_dil_icerik", "Dil ve içerik").toUpperCase()}
+        </SectionLabel>
         <GlassTouchable
           style={[s.langCard, { backgroundColor: C.card, borderColor: C.border }]}
           onPress={() => {
@@ -806,7 +922,15 @@ export default function SettingsScreen() {
         </GlassBox>
 
         {/* ── Bildirimler ── */}
-        <SectionLabel color={C.muted}>{t.notifications.toUpperCase()}</SectionLabel>
+        <SectionLabel
+          color={C.muted}
+          subtitle={sectionCopy.notifications}
+          iconName="notifications-outline"
+          iconColor={C.amber}
+          iconBg={C.iconAmber}
+        >
+          {t.notifications.toUpperCase()}
+        </SectionLabel>
         <GlassBox role="card"
           style={[
             s.card,
@@ -843,7 +967,15 @@ export default function SettingsScreen() {
         </GlassBox>
 
         {/* ── Veri ve depolama: görsel kalitesi, çevrimdışı veri, izinler, içe aktarma ── */}
-        <SectionLabel color={C.muted}>{i18nText("autoI18n.ayarlar_grup_veri_depolama", "Veri ve depolama").toUpperCase()}</SectionLabel>
+        <SectionLabel
+          color={C.muted}
+          subtitle={sectionCopy.data}
+          iconName="server-outline"
+          iconColor={C.blue}
+          iconBg={C.iconBlue}
+        >
+          {i18nText("autoI18n.ayarlar_grup_veri_depolama", "Veri ve depolama").toUpperCase()}
+        </SectionLabel>
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
           <View style={s.qualityHeader}>
             <View style={[s.iconWrap, { backgroundColor: C.iconPurple }]}>
@@ -983,11 +1115,28 @@ export default function SettingsScreen() {
         </GlassBox>
 
         {/* ── Destek ve geri bildirim: hata bildirimi (Free), özellik isteği (Max) ── */}
-        <FeedbackSettingsGroup C={C} />
+        <SectionLabel
+          color={C.muted}
+          subtitle={sectionCopy.support}
+          iconName="help-buoy-outline"
+          iconColor={C.amber}
+          iconBg={C.iconAmber}
+        >
+          {feedbackCopy.group.label.toLocaleUpperCase(intlLocaleOf(language))}
+        </SectionLabel>
+        <FeedbackSettingsGroup C={C} hideLabel />
 
         {/* ── Hakkında + hata ayıklama ── */}
         <SwipeCard>
-          <SectionLabel color={C.muted}>{t.about.toUpperCase()}</SectionLabel>
+          <SectionLabel
+            color={C.muted}
+            subtitle={sectionCopy.about}
+            iconName="information-circle-outline"
+            iconColor={C.green}
+            iconBg={C.iconGreen}
+          >
+            {t.about.toUpperCase()}
+          </SectionLabel>
 
           <TouchableOpacity
             activeOpacity={0.8}
@@ -1474,15 +1623,36 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   firstSectionLabel: {
-    marginTop: 8,
+    marginTop: 6,
   },
   sectionLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 9,
+    marginHorizontal: 2,
+    marginTop: 20,
+  },
+  sectionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  sectionCopy: { flex: 1 },
+  sectionTitle: {
     fontSize: 10.5,
-    fontWeight: "600",
-    letterSpacing: 1.2,
-    marginBottom: 10,
-    marginLeft: 4,
-    marginTop: 22,
+    lineHeight: 13,
+    fontWeight: "800",
+    letterSpacing: 1.05,
+  },
+  sectionSubtitle: {
+    fontSize: 10.5,
+    lineHeight: 14,
+    marginTop: 2,
+    opacity: 0.82,
   },
   card: {
     borderRadius: 18,
@@ -1492,7 +1662,7 @@ const s = StyleSheet.create({
   // Aynı grup etiketinin altında alt alta duran kartlar arası boşluk (dil kartı +
   // satır kartı, tema kartı + satır kartı, kalite kartı + satır kartı).
   cardStacked: {
-    marginTop: 10,
+    marginTop: 8,
   },
   debugCard: {
     marginTop: 12,
@@ -1501,7 +1671,8 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 13,
+    minHeight: 58,
+    paddingVertical: 11,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
   },

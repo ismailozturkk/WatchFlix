@@ -41,7 +41,8 @@ import Toast from "@components/AppToast";
 import { useWindowSafeAreaInsets } from "../../../context/ScreenInsetsContext";
 import { useTheme } from "../../../context/ThemeContext";
 import { useAuth } from "../../../context/AuthContext";
-import { getAvatarSource } from "../../../utils/avatars";
+import { getAvatarSource, isTmdbPhotoUrl } from "../../../utils/avatars";
+import { normalizePhotoPerson } from "../../../utils/avatarPhotos";
 import { useFriends } from "../../../context/FriendsContext";
 import ReportReasonSheet from "../../../components/moderation/ReportReasonSheet";
 import { reportUser } from "../../../services/reportService";
@@ -105,6 +106,7 @@ import GlassTouchable from "../../../components/common/GlassTouchable";
 import usePosterUri from "../../../hooks/usePosterUri";
 import { PosterChoicesScope } from "../../../context/PosterChoicesContext";
 import { useUserPosterChoices } from "../../../context/PosterChoicesProvider";
+import { localizeGenreName } from "../../../utils/genreDisplay";
 const PROTECTED_LISTS = ["watchedMovies", "watchedTv", "watchList", "favorites"];
 // Bu sayı ve üzeri içerikte liste modalı sabit yükseklik yerine ekranı
 // kaplayacak şekilde büyür (bkz. FriendProfileScreen liste modalı).
@@ -517,7 +519,8 @@ export default function FriendProfileScreen({ route, navigation }) {
     // Tür analizi: film başına 1, dizi başına izlenen bölüm sayısı kadar ağırlık
     const genreCounts = {};
     movies.forEach((m) =>
-      (m.genres || []).forEach((g) => {
+      (m.genres || []).forEach((raw) => {
+        const g = raw && localizeGenreName(raw, language);
         if (g) genreCounts[g] = (genreCounts[g] || 0) + 1;
       }),
     );
@@ -526,7 +529,8 @@ export default function FriendProfileScreen({ route, navigation }) {
         s.watchedEpisodeCount ??
         s.seasons?.reduce((sa, se) => sa + (se.episodes?.length || 0), 0) ??
         1;
-      (s.genres || []).forEach((g) => {
+      (s.genres || []).forEach((raw) => {
+        const g = raw && localizeGenreName(raw, language);
         if (g) genreCounts[g] = (genreCounts[g] || 0) + weight;
       });
     });
@@ -544,7 +548,7 @@ export default function FriendProfileScreen({ route, navigation }) {
       totalMinutes: movieMinutes + tvMinutes,
       topGenres,
     };
-  }, [canViewLists, allLists, subMovies, subShows]);
+  }, [canViewLists, allLists, subMovies, subShows, language]);
 
   // ── Görünür listeler: listVisible haritası + sabit liste sıralaması ──────
   // Dört öntanımlı liste VE özel listeler artık kendi alt koleksiyonlarında
@@ -1449,6 +1453,13 @@ export default function FriendProfileScreen({ route, navigation }) {
         onClose={() => setShowAvatarPreview(false)}
         source={getAvatarSource(profile.avatarIndex, profile.photoURL)}
         isCustomPhoto={profile.avatarIndex === -1}
+        // Avatar bir oyuncu/yönetmen fotoğrafıysa kimin olduğu + kişi sayfası.
+        person={
+          profile.avatarIndex === -1 && isTmdbPhotoUrl(profile.photoURL)
+            ? normalizePhotoPerson(profile.photoPerson)
+            : null
+        }
+        onPersonPress={(person) => navigation.navigate("ActorViewScreen", { personId: person.id })}
         displayName={displayName || profile.username || friendName}
         username={profile.username}
       />
