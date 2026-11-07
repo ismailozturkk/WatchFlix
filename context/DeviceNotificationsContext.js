@@ -32,6 +32,10 @@ import {
 import { useNotifications } from "./NotificationsContext";
 import { notificationInboxCopy } from "../utils/notificationInboxCopy";
 import { cineResultDestination } from "../utils/notificationInbox";
+import {
+  floatingNoticesPresenting,
+  requestFloatingNoticeFocus,
+} from "../services/floatingNoticeBus";
 import { useFriends } from "./FriendsContext";
 import { useUnreadMessages } from "./UnreadMessagesContext";
 import { useProfileReminders } from "./ProfileRemindersContext";
@@ -562,6 +566,15 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
       // gereksiz — mesajı zaten sohbette canlı görüyor.
       if (chatId && isChatActive(chatId)) return;
 
+      // Davet: yüzen bildirim katmanı görünürse kartı zaten üstte açıyor; sistem
+      // afişi ikinci kez çıkmasın. Katman gizli rotadaysa (oyun, sohbet…) afiş kalır.
+      if (
+        (item.type === "cineswipe_invite" || item.type === "game_challenge") &&
+        floatingNoticesPresenting()
+      ) {
+        return;
+      }
+
       const { title, body } = buildSocialContent(item, t, language);
       presentNow({
         title,
@@ -651,6 +664,16 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
   useEffect(() => {
     const sub = addNotificationResponseReceivedListener((response) => {
       const data = response?.notification?.request?.content?.data || {};
+      // Davet kartı her ekranda yüzen katmanda açılır (Kabul / Reddet orada); gidilecek
+      // ekran yok, navigasyon hazır olmasa da istek katman kurulunca alınır.
+      // Kimlik utils/floatingNotices.inviteNotices ile aynı.
+      if (
+        data.kind === "social" &&
+        (data.type === "cineswipe_invite" || data.type === "game_challenge")
+      ) {
+        requestFloatingNoticeFocus(data.notifId ? `invite:${data.notifId}` : "invite:");
+        return;
+      }
       const nav = navigationRef?.current;
       if (!nav?.isReady?.()) return;
       try {
@@ -668,8 +691,6 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
                 friendName: data.fromName || "",
               });
             }
-          } else if (data.type === "cineswipe_invite" || data.type === "game_challenge") {
-            nav.navigate("ProfileScreen");
           } else if (data.type === "cineswipe_result") {
             const target = cineResultDestination({ roomId: data.roomId });
             nav.navigate(target.name, target.params);

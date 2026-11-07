@@ -8,6 +8,8 @@ import Toast from "@components/AppToast";
 import { i18nText } from "../utils/i18nText";
 import { pickByLanguage } from "../utils/appLanguages";
 import { addTodoOnTop, toggleTodoItem } from "../utils/todoOrder";
+import { NOTE_TEXT_FEATURES, noteTextLimitsFor } from "../utils/noteTextLimits";
+import { reminderScheduleChanged } from "../utils/noteReminders";
 import { usePremiumGate } from "../hooks/usePremiumGate";
 import useUserDataDomain from "../hooks/useUserDataDomain";
 import { notesDomain } from "../services/userData";
@@ -33,7 +35,37 @@ export const ProfileNotesProvider = ({ children }) => {
 
   /** Bir notun GÜNCEL hâli (bayat kapanış riski yok: motorun senkron görünümü). */
   const currentNote = (noteId) => notesDomain.getSnapshot(uid).get("items", noteId);
-  const writeNote = (note) => notesDomain.apply(uid, [{ kind: "items", doc: note }]);
+
+  // Hatırlatıcı (gün + saat) Premium'a özel (registry: note_reminders). Kapı yalnız
+  // KURMAYI durdurur: yeni hatırlatıcı, gün/saat değişikliği, erteleme. Kaldırmak
+  // serbest; plan düşünce kurulu hatırlatıcılar silinmez, AYNEN çalmaya devam eder.
+  // `preview`: yükseltme sayfasındaki bildirim kartı (utils/premiumUpsellContent).
+  const reminderGate = usePremiumGate("note_reminders");
+  const canSetNoteReminder = reminderGate.allows();
+  const showNoteReminderUpsell = (preview) => reminderGate.showUpsell({ preview });
+
+  // TEK yazma kapısı: her not yazımı (saveNote, eski işleyiciler, madde işlemleri)
+  // buradan geçer. Hatırlatıcı kilitliyken yeni gün/saat taşıyan yazım REDDEDİLİR —
+  // ekranlar kurmayı zaten engeller; bu, atlanan bir yol kalmasın diye son hat.
+  // Toast: editör bir Modal, yükseltme sayfası buradan onun üstüne açılamaz.
+  /** Yazıldıysa true. */
+  const writeNote = (note) => {
+    if (!canSetNoteReminder && reminderScheduleChanged(note, currentNote(note.id))) {
+      Toast.show({
+        type: "warning",
+        text1: pickByLanguage(language, {
+          tr: "Hatırlatıcı kurmak Premium'a özel",
+          en: "Setting reminders is a Premium perk",
+          es: "Crear recordatorios es una ventaja Premium",
+          pt: "Criar lembretes é um benefício Premium",
+          de: "Erinnerungen zu setzen ist ein Premium-Vorteil",
+        }),
+      });
+      return false;
+    }
+    notesDomain.apply(uid, [{ kind: "items", doc: note }]);
+    return true;
+  };
 
   const [selectedNote,        setSelectedNote]        = useState(null);
   const [noteContent,         setNoteContent]         = useState("");
@@ -66,6 +98,16 @@ export const ProfileNotesProvider = ({ children }) => {
   /** Açılabilirse true; doluysa yükseltme sayfasını gösterip false döner. */
   const checkCanCreateNote = (type, options) =>
     gateFor(type).check(countFor(type), options);
+
+  // Tek notun metni ve tek yapılacak maddesi için HARF sınırı da plana bağlı
+  // (registry: note_length, todo_item_length). Editör sınırı `noteTextLimits`ten
+  // okur; sınıra dayanınca `showNoteTextLimit` yükseltme sayfasını açar — editör
+  // açıkken sayfa onun İÇİNDEKİ host'ta açılır (NoteEditorSheet).
+  const noteLengthGate = usePremiumGate(NOTE_TEXT_FEATURES.content);
+  const todoItemLengthGate = usePremiumGate(NOTE_TEXT_FEATURES.todoItem);
+  const noteTextLimits = useMemo(() => noteTextLimitsFor(notesGate.plan), [notesGate.plan]);
+  const showNoteTextLimit = (featureId, used) =>
+    (featureId === NOTE_TEXT_FEATURES.todoItem ? todoItemLengthGate : noteLengthGate).showUpsell({ used });
 
   const formatDate = (timestamp) => {
     if (!timestamp) return "";
@@ -102,7 +144,7 @@ export const ProfileNotesProvider = ({ children }) => {
 
       // Yerel kopya + kalıcı günlük ANINDA; buluta arka planda gider. Ağ
       // hatası artık kullanıcıya hata olarak yansımaz (çevrimdışıyken de kayıt çalışır).
-      writeNote(newNote);
+      if (!writeNote(newNote)) return;
       setMessage(""); setTodoTitle("");
       setTodoItems([{ id: Date.now().toString(), text: "", done: false }]);
       setScheduledDate(null); setModalVisibleNotesAdd(false);
@@ -123,7 +165,7 @@ export const ProfileNotesProvider = ({ children }) => {
     try {
       const note = currentNote(noteId);
       if (!note) return;
-      writeNote(applyToggle(note));
+      if (!writeNote(applyToggle(note))) return;
       setSelectedNote((prev) => prev && prev.id === noteId ? applyToggle(prev) : prev);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.todo_guncellenemedi", "Todo güncellenemedi") }); }
   };
@@ -140,7 +182,7 @@ export const ProfileNotesProvider = ({ children }) => {
     try {
       const note = currentNote(noteId);
       if (!note) return;
-      writeNote(applyAdd(note));
+      if (!writeNote(applyAdd(note))) return;
       setSelectedNote((prev) => prev && prev.id === noteId ? applyAdd(prev) : prev);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.madde_eklenemedi", "Madde eklenemedi") }); }
   };
@@ -154,7 +196,7 @@ export const ProfileNotesProvider = ({ children }) => {
     try {
       const note = currentNote(noteId);
       if (!note) return;
-      writeNote(applyDelete(note));
+      if (!writeNote(applyDelete(note))) return;
       setSelectedNote((prev) => prev && prev.id === noteId ? applyDelete(prev) : prev);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.madde_silinemedi", "Madde silinemedi") }); }
   };
@@ -174,7 +216,7 @@ export const ProfileNotesProvider = ({ children }) => {
 
     try {
       const note = currentNote(noteId);
-      if (note) writeNote(applyUpdate(note));
+      if (note && !writeNote(applyUpdate(note))) return;
       setSelectedNote((prev) => prev && prev.id === noteId ? applyUpdate(prev) : prev);
       setModalVisibleNotes(false); setIsEditable(false);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_guncellenemedi", "Not güncellenemedi") }); }
@@ -194,7 +236,7 @@ export const ProfileNotesProvider = ({ children }) => {
 
     try {
       const note = currentNote(noteId);
-      if (note) writeNote(applyUpdate(note));
+      if (note && !writeNote(applyUpdate(note))) return;
       setSelectedNote((prev) => prev && prev.id === noteId ? applyUpdate(prev) : prev);
       setModalVisibleNotes(false); setIsEditable(false);
     } catch (err) { Toast.show({ type: "error", text1: i18nText("autoI18n.not_guncellenemedi", "Not güncellenemedi") }); }
@@ -217,7 +259,7 @@ export const ProfileNotesProvider = ({ children }) => {
     const pinned = !current.pinned;
 
     try {
-      writeNote({ ...current, pinned });
+      if (!writeNote({ ...current, pinned })) return;
       setSelectedNote((prev) => (prev && prev.id === noteId ? { ...prev, pinned } : prev));
     } catch (err) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.not_guncellenemedi", "Not güncellenemedi") });
@@ -285,7 +327,9 @@ export const ProfileNotesProvider = ({ children }) => {
     };
 
     try {
-      writeNote(finalNote);
+      // Hatırlatıcı kapısı writeNote'ta (ör. Premium'dayken kalan bir liste
+      // taslağı yeni gün taşıyabilir): reddedilirse kayıt olmaz, editör açık kalır.
+      if (!writeNote(finalNote)) return false;
       setSelectedNote((prev) => (prev && prev.id === note.id ? finalNote : prev));
       return true;
     } catch (err) {
@@ -308,12 +352,16 @@ export const ProfileNotesProvider = ({ children }) => {
     handleToggleTodoItem, handleAddTodoItem, handleDeleteTodoItem, handleUpdateTodoNote,
     formatDate,
     noteCounts, canCreateNote, checkCanCreateNote,
+    noteTextLimits, showNoteTextLimit,
+    canSetNoteReminder, showNoteReminderUpsell,
   }), [
     notes, loadingNotes, selectedNote, noteContent, message,
     modalVisibleNotesAdd, modalVisibleNotes, isEditable,
     borderColorNotes, backgroundColorNotes,
     noteType, todoItems, todoTitle, scheduledDate, language, uid,
     noteCounts, notesGate, todosGate,
+    noteTextLimits, noteLengthGate, todoItemLengthGate,
+    reminderGate,
   ]);
 
   return (

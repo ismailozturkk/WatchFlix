@@ -11,6 +11,8 @@ import {
   markRemindersSeen,
   noteReminderAt,
   noteReminderDateValue,
+  noteReminderPreview,
+  reminderScheduleChanged,
   snoozedSchedule,
   suggestedReminderTime,
 } from "../utils/noteReminders";
@@ -67,6 +69,37 @@ describe("saat önerisi ve geçmiş denetimi", () => {
   test("erteleme dakikayı yukarı yuvarlar ve gün atlar", () => {
     expect(snoozedSchedule(60, new Date(2026, 9, 27, 13, 20, 30))).toEqual({ scheduledDate: "2026-10-27", scheduledTime: "14:21" });
     expect(snoozedSchedule(60, new Date(2026, 9, 27, 23, 30))).toEqual({ scheduledDate: "2026-10-28", scheduledTime: "00:30" });
+  });
+});
+
+describe("reminderScheduleChanged (Premium kapısı: kurmak mı?)", () => {
+  const base = { scheduledDate: "2026-10-28", scheduledTime: "14:30" };
+  test("yeni hatırlatıcı ve gün/saat değişikliği kurmak sayılır", () => {
+    expect(reminderScheduleChanged(base, null)).toBe(true);
+    expect(reminderScheduleChanged(base, { scheduledDate: null })).toBe(true);
+    expect(reminderScheduleChanged(base, { ...base, scheduledDate: "2026-10-29" })).toBe(true);
+    expect(reminderScheduleChanged(base, { ...base, scheduledTime: "09:00" })).toBe(true);
+    expect(reminderScheduleChanged(base, { scheduledDate: "2026-10-28" })).toBe(true); // saatsizdi → saatli
+  });
+  test("aynı hatırlatıcı, kaldırmak ve hiç olmaması kurmak sayılmaz", () => {
+    expect(reminderScheduleChanged({ ...base }, base)).toBe(false);
+    expect(reminderScheduleChanged({ scheduledDate: null, scheduledTime: null }, base)).toBe(false);
+    expect(reminderScheduleChanged({}, {})).toBe(false);
+    // Saatsiz eski kayıt aynen kaydedilir; geçersiz saat de "saatsiz" sayılır.
+    expect(reminderScheduleChanged({ scheduledDate: "2026-10-28", scheduledTime: null }, { scheduledDate: "2026-10-28" })).toBe(false);
+    expect(reminderScheduleChanged({ scheduledDate: "2026-10-28", scheduledTime: "99:99" }, { scheduledDate: "2026-10-28" })).toBe(false);
+  });
+});
+
+describe("noteReminderPreview (yükseltme sayfası bildirim kartı)", () => {
+  test("başlık yoksa notun ilk satırı; listede başlık yoksa boş (sayfa 'Başlıksız liste' der)", () => {
+    expect(noteReminderPreview({ type: "note", content: "Bilet al\nikinci", scheduledDate: "2026-11-01", scheduledTime: "10:00" })).toEqual({
+      kind: "reminder", noteType: "note", title: "Bilet al", scheduledDate: "2026-11-01", scheduledTime: "10:00",
+    });
+    expect(noteReminderPreview({ type: "todo", todos: [{ text: "süt" }] }).title).toBe("");
+    expect(noteReminderPreview({ type: "todo", title: " Market " }, { scheduledTime: "14:20" })).toMatchObject({
+      noteType: "todo", title: "Market", scheduledTime: "14:20",
+    });
   });
 });
 

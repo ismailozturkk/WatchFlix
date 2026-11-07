@@ -53,7 +53,7 @@ export const chatTargetKey = (chat) =>
   chat?.groupId ? `group:${chat.groupId}` : chat?.friendUid ? `dm:${chat.friendUid}` : null;
 
 /**
- * Inbox records of an invitation answered from its chat card, so the priority bar stops asking again.
+ * Inbox records of an invitation answered from its chat card, so the floating notice stops asking again.
  * Match: type + sender + room code / day (+ group). Records that name their chat message (`messageId`,
  * written with the invitation) must name THIS card; older records without it match by the fields alone.
  */

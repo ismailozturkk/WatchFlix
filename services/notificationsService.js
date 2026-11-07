@@ -122,7 +122,7 @@ export async function respondToInvitation(uid, notifId, response) {
 
 /**
  * An invitation accepted or declined from its chat card gets the same response on its inbox record, so
- * the priority bar on Profile (ImportantInvitesBar) stops asking. Reads only that sender's records (single
+ * the floating notice (components/floatingNotice) stops asking. Reads only that sender's records (single
  * equality query, no composite index); matching rule: utils/importantInvites.matchingInvitationIds.
  * @param {"accepted"|"declined"} response
  * @returns {Promise<number>} records answered

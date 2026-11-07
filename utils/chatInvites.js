@@ -45,7 +45,7 @@ export function cineInviteDone(done) {
 }
 
 const HOUR_MS = 60 * 60 * 1000;
-// Yanıtsız davet 24 saat açık (Profil çubuğu da aynı süreyi kullanır: utils/importantInvites). Kabul edilmiş
+// Yanıtsız davet 24 saat açık (yüzen davet kartı da aynı süreyi kullanır: utils/importantInvites). Kabul edilmiş
 // ama bitmemiş oda bir gün daha sürebilir: sırayla odada misafir katılınca süre yeniden 24 saat olur.
 export const CINE_INVITE_OPEN_MS = 24 * HOUR_MS;
 export const CINE_INVITE_ACCEPTED_MS = 48 * HOUR_MS;

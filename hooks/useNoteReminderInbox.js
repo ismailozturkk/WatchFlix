@@ -1,8 +1,8 @@
 // hooks/useNoteReminderInbox.js
 //
 // Vadesi gelmiş not hatırlatmaları — uygulama içi bildirim kutusu
-// (NotificationsScreen), profil başlığındaki bildirim rozeti ve profilin
-// üstündeki etkileşimli şerit (NoteRemindersBar) buradan okur.
+// (NotificationsScreen), profil başlığındaki bildirim rozeti ve tüm ekranlardaki
+// yüzen kalıcı bildirim katmanı (useFloatingNotices) buradan okur.
 //
 // Kayıtlar SUNUCUDA DEĞİL: notlar yerel-öncelikli veri (services/userData) ve
 // hatırlatma cihaz bildirimi olarak zaten burada çalıyor; kutu kaydı nottan

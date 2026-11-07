@@ -87,7 +87,7 @@ export function NotificationsProvider({ children }) {
     [uid, items],
   );
 
-  // Davete yanıt (Profil'deki önemli davetler çubuğu): önce bildirim kaydı (bir kez, cihazlar arası), sonra
+  // Davete yanıt (yüzen davet kartı, components/floatingNotice): önce bildirim kaydı (bir kez, cihazlar arası), sonra
   // aynı yanıt davetin sohbet kartına — iki tarafın kartı kabul/ret durumuna döner (utils/chatInvites).
   // Kayıtta mesaj kimliği yoksa (eski davet) kart değişmez; kart yazımı düşerse yanıt geri alınmaz.
   const respond = useCallback(async (notifId, decision) => {

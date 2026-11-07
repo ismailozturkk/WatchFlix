@@ -3,6 +3,8 @@ import Toast from "@components/AppToast";
 import { Platform } from "react-native";
 import { i18nText } from "./i18nText";
 import { Keys, get, set } from "../services/storage";
+import { getPremiumPlanSnapshot } from "../services/premiumState";
+import { canUseFeature } from "./premiumFeatures";
 
 const CALENDAR_NAME = "Seelogd";
 
@@ -43,10 +45,11 @@ function undoAddition(items, onSavedChange) {
 }
 
 // Silmeyi geri almak = silinenleri aynı kayıtla yeniden eklemek (yeni etkinlik
-// kimliğiyle; telefon takvimi silinen etkinliği geri getirmez).
+// kimliğiyle; telefon takvimi silinen etkinliği geri getirmez). `restore`: az önce
+// telefonda olanı geri koymak yeni ekleme değildir, not kapısına takılmaz.
 function undoRemoval(items, onSavedChange) {
   return async () => {
-    const res = await saveManyEventsToPhoneCalendar(items, { silent: true });
+    const res = await saveManyEventsToPhoneCalendar(items, { silent: true, restore: true });
     if (!res.addedKeys?.length) return;
     res.addedKeys.forEach((key) => onSavedChange(key, true));
     notifyUndone();
@@ -72,6 +75,17 @@ export function buildEventKey(item) {
     return `tv_${item.id}_${item.seasonNumber ?? 0}_${item.episodeNumber ?? 0}_${item.date}`;
   }
   return `etk_${item.id}_${item.date}`;
+}
+
+/**
+ * Not hatırlatıcısı Premium'a özel (registry: note_reminders). Bir notu telefon
+ * takvimine eklemek, alarmlı YENİ bir hatırlatma kurmaktır: Free'de reddedilir
+ * (`locked`), yükseltme sayfasını çağıran ekran açar. Eklenmiş olanlar kalır ve
+ * kaldırılabilir. Film/dizi hatırlatmaları bu kapıya girmez (telefon takvimi her
+ * planda açık). Plan React dışından okunur (services/premiumState).
+ */
+export function isPhoneCalendarItemLocked(item) {
+  return item?.eventType === "note" && !canUseFeature("note_reminders", getPremiumPlanSnapshot());
 }
 
 export async function loadSavedKeysSet() {
@@ -190,6 +204,8 @@ function buildEventPayload(item) {
 // alınınca ekranın kayıt kümesini güncellemek için çağrılır.
 export async function saveEventToPhoneCalendar(item, { onSavedChange, silent } = {}) {
   try {
+    // İzin istemeden ve takvim oluşturmadan önce: kapalı bir şey için telefona dokunma.
+    if (isPhoneCalendarItemLocked(item)) return { ok: false, locked: true };
     if (!(await hasCalendarPermission())) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.takvim_izni_reddedildi", "Takvim izni reddedildi") });
       return { ok: false };
@@ -229,12 +245,26 @@ export async function saveEventToPhoneCalendar(item, { onSavedChange, silent } =
   }
 }
 
-export async function saveManyEventsToPhoneCalendar(items, { onSavedChange, silent } = {}) {
+// `restore`: kaldırmanın "Geri Al"ı (aynı kaydı geri koyar, not kapısına takılmaz).
+// Dönüşteki `lockedItems`: Free'de atlanan, telefonda henüz olmayan not öğeleri
+// (isPhoneCalendarItemLocked) — yükseltme sayfasını çağıran açar.
+export async function saveManyEventsToPhoneCalendar(items, { onSavedChange, silent, restore } = {}) {
   if (!items || items.length === 0) {
     return { added: 0, skipped: 0, failed: 0, total: 0 };
   }
 
   try {
+    // Kapalı not öğeleri izin ve takvimden ÖNCE ayrılır: yalnız onlar varsa telefona
+    // hiç dokunulmaz. Telefonda zaten olan not "zaten vardı" sayılır, kapalı değil.
+    const savedBefore = restore ? {} : await getSavedMap();
+    const lockedItems = restore
+      ? []
+      : items.filter((item) => isPhoneCalendarItemLocked(item) && !savedBefore[buildEventKey(item)]);
+    const exportable = lockedItems.length ? items.filter((item) => !lockedItems.includes(item)) : items;
+    if (exportable.length === 0) {
+      return { added: 0, skipped: 0, failed: 0, total: items.length, addedKeys: [], lockedItems };
+    }
+
     if (!(await hasCalendarPermission())) {
       Toast.show({ type: "error", text1: i18nText("autoI18n.takvim_izni_reddedildi", "Takvim izni reddedildi") });
       return { added: 0, skipped: 0, failed: 0, total: items.length };
@@ -259,7 +289,7 @@ export async function saveManyEventsToPhoneCalendar(items, { onSavedChange, sile
     const addedKeys = [];
     const addedItems = [];
 
-    for (const item of items) {
+    for (const item of exportable) {
       const key = buildEventKey(item);
       if (map[key]) {
         skipped++;
@@ -290,14 +320,14 @@ export async function saveManyEventsToPhoneCalendar(items, { onSavedChange, sile
       text1:
         added > 0
           ? i18nText("autoI18n.telefon_takvimine_aktarildi", "Telefonun takvimine aktarıldı")
-          : skipped === items.length
+          : skipped === exportable.length
             ? i18nText("autoI18n.hepsi_zaten_ekliydi", "Hepsi zaten ekliydi")
             : i18nText("autoI18n.aktarim_tamamlandi", "Aktarım tamamlandı"),
       text2: parts.join(" • "),
       onUndo: added > 0 && onSavedChange ? undoAddition(addedItems, onSavedChange) : undefined,
     });
 
-    return { added, skipped, failed, total: items.length, addedKeys };
+    return { added, skipped, failed, total: items.length, addedKeys, lockedItems };
   } catch (err) {
     console.error("Bulk save error:", err);
     Toast.show({
