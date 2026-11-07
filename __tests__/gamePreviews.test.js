@@ -57,6 +57,7 @@ describe("önizleme gerçekleri", () => {
     const posters = [
       f.scene_guess.poster, f.poster_puzzle.poster, f.older.first.poster, f.older.second.poster,
       f.popular.winner, f.popular.loser, f.decade.poster, f.kind.poster, f.genre.poster,
+      f.rating.first.poster, f.rating.second.poster,
     ];
     // Bulunamayan kimlik kataloğun ilk afişine düşer → kopya olarak yakalanır.
     expect(new Set(posters.map((p) => `${p.mediaType}-${p.id}`)).size).toBe(posters.length);
@@ -70,6 +71,10 @@ describe("önizleme gerçekleri", () => {
     expect(f.kind.poster.mediaType).toBe(f.kind.correct);
     expect(f.genre.options).toContain(f.genre.correct);
     f.genre.options.forEach((g) => expect(QUICK_GENRES).toContain(g));
+    // Yüksek puanı bul: iki farklı afiş var; önizleme puan ya da cevap sızdırmaz.
+    expect(f.rating.first.poster.id).not.toBe(f.rating.second.poster.id);
+    expect(f.rating.first.poster.id).toBe(293660); // Deadpool
+    expect(f.rating.second.poster.id).toBe(278); // The Shawshank Redemption
   });
 });
 
@@ -91,6 +96,14 @@ describe("çizim", () => {
     act(() => { renderer = create(<GamePreview gameId="genre" height={72} />); });
     expect(texts()).toEqual(PREVIEW_FACTS.genre.options.map((g) => QUICK_COPY.de.genres[g]));
     expect(renderer.root.findAll((n) => n.type === "Icon" && n.props.name === "checkmark-circle")).toHaveLength(1);
+  });
+
+  test("yüksek puanı bul önizlemesi iki puanı da gizler", () => {
+    mockLang = "tr";
+    act(() => { renderer = create(<GamePreview gameId="rating" height={72} />); });
+    expect(texts()).toEqual([]);
+    expect(renderer.root.findAll((n) => n.type === "Icon" && n.props.name === "help")).toHaveLength(2);
+    expect(renderer.root.findAll((n) => n.type === "Icon" && n.props.name === "flash")).toHaveLength(1);
   });
 
   test("bilinmeyen oyun kimliği hiçbir şey çizmez", () => {

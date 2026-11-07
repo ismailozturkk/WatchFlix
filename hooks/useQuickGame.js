@@ -1,6 +1,6 @@
 // hooks/useQuickGame.js
 //
-// Hızlı oyunların (popular | decade | kind | genre | blur) ortak durum makinesi. Kurallar utils/quickGames.js'te
+// Hızlı oyunların (popular | decade | kind | genre | blur | rating) ortak durum makinesi. Kurallar utils/quickGames.js'te
 // (saf, testli); burada yalnız havuzun çekilmesi, can/skor akışı, gösterim süreleri ve cihaz-yerel kayıt.
 // "Önce hangisi?" (hooks/useOlderGame.js) aynı iskeletin ilk örneğidir ve kendi anahtarında kalır.
 //
@@ -13,6 +13,9 @@
 // yanlış sayılır (can gider). Skor = puan toplamı; doğru sayısı ayrıca kaydedilir (recordOlderRun `correct`).
 // Soru AĞDAN gelir: doğru cevabın YAZISIZ afişi aranır (services/quickGamePool buildTextlessBlurQuestion). Bekleme
 // hissedilmesin diye sıradaki soru cevap anında, 1,5 sn'lik gösterim sırasında hazırlanır ve afişi önceden indirilir.
+//
+// YÜKSEK PUANI BUL (rating): tek can (QUICK_GAME_META.lives → quickLivesOf); iki afişin puanı cevap anına kadar
+// gizlidir ve oyuncu doğrudan yüksek puanlı afişi seçer. Yetişkin içerik izni (utils/ageGate) her soruda okunur.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image } from "expo-image";
@@ -21,16 +24,18 @@ import { haptic } from "../services/hapticsService";
 import { ANALYTICS_EVENTS, trackEvent } from "../services/analytics";
 import { MIN_USABLE_POOL, buildTextlessBlurQuestion, loadQuickPool } from "../services/quickGamePool";
 import { saveQuickBoardEntry } from "../services/gameLeaderboards";
+import { awardGameXp } from "../services/leagueService";
 import { buildTmdbUrl } from "../utils/tmdbImageUtils";
+import { adultContentAllowed } from "../utils/ageGate";
 import {
   BLUR_ROUND_MS,
-  QUICK_LIVES,
   blurPoints,
   buildQuickQuestion,
   isTimedQuickGame,
   isQuickGame,
   judgeQuickAnswer,
   pushQuickRecent,
+  quickLivesOf,
   recordQuickRun,
   statsOfQuickGame,
   toStoredQuickStats,
@@ -67,9 +72,10 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
   const raw = useStored(Keys.quickGames, { uid });
   const stats = useMemo(() => statsOfQuickGame(raw, gameId), [raw, gameId]);
 
+  const maxLives = quickLivesOf(gameId);
   const [phase, setPhase] = useState("loading");
   const [question, setQuestion] = useState(null);
-  const [lives, setLives] = useState(QUICK_LIVES);
+  const [lives, setLives] = useState(maxLives);
   const [score, setScore] = useState(0);
   const [reveal, setReveal] = useState(null); // { chosenKey, correct, correctKey }
   const [summary, setSummary] = useState(null); // { newBest, previousBest }
@@ -78,7 +84,7 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
 
   const poolRef = useRef([]);
   const recentRef = useRef(new Set());
-  const runRef = useRef({ score: 0, correct: 0, answered: 0, lives: QUICK_LIVES });
+  const runRef = useRef({ score: 0, correct: 0, answered: 0, lives: maxLives });
   const timerRef = useRef(null);
   const roundRef = useRef({ startedAt: null, timer: null }); // zamanlı oyunun saati
   const chooseRef = useRef(null);
@@ -156,7 +162,12 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
   const nextQuestion = useCallback(
     (streak) => {
       if (!timed) {
-        const next = buildQuickQuestion(gameId, { pool: poolRef.current, streak, recent: recentRef.current });
+        const next = buildQuickQuestion(gameId, {
+          pool: poolRef.current,
+          streak,
+          recent: recentRef.current,
+          allowAdult: adultContentAllowed(),
+        });
         return next ? showQuestion(next) : false;
       }
       const run = generation.current;
@@ -181,9 +192,9 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
     pendingRef.current = null;
     advancingRef.current = false;
     rejectedRef.current = new Set(); // ağ hatasıyla elenenler "tekrar dene"de yeniden denensin
-    runRef.current = { score: 0, correct: 0, answered: 0, lives: QUICK_LIVES };
+    runRef.current = { score: 0, correct: 0, answered: 0, lives: maxLives };
     setScore(0);
-    setLives(QUICK_LIVES);
+    setLives(maxLives);
     setSummary(null);
     setReveal(null);
     setQuestion(null);
@@ -200,7 +211,7 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
     } catch {
       if (alive.current && run === generation.current) setPhase("error");
     }
-  }, [apiKey, gameId, language, nextQuestion, source]);
+  }, [apiKey, gameId, language, maxLives, nextQuestion, source]);
 
   useEffect(() => {
     start();
@@ -214,6 +225,7 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
     if (uid) {
       result = writeStats(uid, gameId, { score: finalScore, correct, answered });
       saveQuickBoardEntry(uid, gameId, result.stats, identity);
+      if (answered > 0) awardGameXp(`quick_${gameId}`);
     }
     trackEvent(ANALYTICS_EVENTS.QUICK_GAME_FINISHED, {
       game_id: gameId,
@@ -279,5 +291,5 @@ export default function useQuickGame({ gameId, apiKey, language, uid, source = "
   );
   chooseRef.current = choose;
 
-  return { phase, question, lives, score, reveal, summary, stats, choose, advance, restart: start, arm, roundStartedAt };
+  return { phase, question, lives, maxLives, score, reveal, summary, stats, choose, advance, restart: start, arm, roundStartedAt };
 }

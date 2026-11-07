@@ -120,6 +120,10 @@ function normalizeMediaItem(raw, sourceId) {
     // Oy sayisi "herkes izlemis mi"nin kalici gostergesi (popularity gunluk
     // dalgalanir); bilindik yapimlari one cikarmak icin (utils/gameSelection).
     voteCount: Number(raw.vote_count ?? raw.voteCount) || 0,
+    // TMDB puan ortalaması (0–10) — "Puan yukarı mı, aşağı mı?" hızlı oyunu (utils/ratingGame) kullanır.
+    voteAverage: Number(raw.vote_average ?? raw.voteAverage) || 0,
+    // Yetişkin işareti: önbellekteki havuz, ayar sonradan kapansa da süzülebilsin (utils/ageGate.adultContentAllowed).
+    adult: raw.adult === true,
     posterPath: raw.posterPath || raw.poster_path || raw.imagePath || null,
     backdropPath: raw.backdropPath || raw.backdrop_path || null,
     sourceIds: sourceId ? [sourceId] : [],

@@ -1,6 +1,7 @@
 // __tests__/quickGames.test.js
 //
-// Hızlı oyunların saf çekirdeği (utils/quickGames.js): beş oyunun soru üretimi, zorluk eğrileri, cevap
+// Hızlı oyunların saf çekirdeği (utils/quickGames.js): altı oyunun soru üretimi (Yüksek puanı bul ayrıntısı
+// __tests__/ratingGame.test.js'te), zorluk eğrileri, cevap
 // değerlendirmesi, tür eşlemesi ve oyun başına cihaz-yerel kayıt.
 
 const {
@@ -24,7 +25,7 @@ function seeded(seed) {
 
 const item = (id, year, extra = {}) => ({
   mediaKey: `${extra.type || "movie"}_${id}`, id, type: "movie", year: String(year), posterPath: `/p${id}.jpg`,
-  title: `Yapım ${id}`, voteCount: 1000 + id * 37, genreIds: [18], ...extra,
+  title: `Yapım ${id}`, voteCount: 1000 + id * 37, voteAverage: 4 + ((id * 7) % 50) / 10, genreIds: [18], ...extra,
 });
 const MAX_YEAR = 2026;
 // Karışık, gerçekçi havuz: film + dizi, 1950–2025, farklı oy sayıları ve türler.
@@ -44,12 +45,12 @@ const ask = (gameId, streak, seed, extra = {}) =>
   buildQuickQuestion(gameId, { pool: pool(), streak, rng: seeded(seed), maxYear: MAX_YEAR, ...extra });
 
 describe("kayıt defteri", () => {
-  test("beş oyun, her birinin düzeni ve rengi var; yalnız Bulanık Afiş zamanlı", () => {
-    expect(QUICK_GAME_IDS).toEqual(["popular", "decade", "kind", "genre", "blur"]);
+  test("altı oyun, her birinin düzeni ve rengi var; yalnız Bulanık Afiş zamanlı", () => {
+    expect(QUICK_GAME_IDS).toEqual(["popular", "decade", "kind", "genre", "blur", "rating"]);
     expect(QUICK_GAME_IDS.filter(isTimedQuickGame)).toEqual(["blur"]);
     QUICK_GAME_IDS.forEach((id) => {
       expect(isQuickGame(id)).toBe(true);
-      expect(["pair", "single", "blur"]).toContain(QUICK_GAME_META[id].layout);
+      expect(["pair", "single", "blur", "rating"]).toContain(QUICK_GAME_META[id].layout);
       expect(QUICK_GAME_META[id].colors).toHaveLength(2);
     });
     expect(isQuickGame("older")).toBe(false);

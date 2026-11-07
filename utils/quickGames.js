@@ -11,27 +11,31 @@
 //   blur    : bulanık afiş — HANGİ YAPIM? (dört başlık şıkkı). ZAMANLI: afiş %70 bulanık başlar, süre aktıkça
 //             netleşir; puan da aynı oranda düşer (erken bilen çok alır). Skor = puan TOPLAMI, doğru sayısı ayrı.
 //             Süre dolarsa yanlış sayılır (can gider).
+//   rating  : iki afiş — iki puan da gizliyken HANGİSİNİN PUANI DAHA YÜKSEK? TEK CAN (ilk yanlışta biter).
+//             Puanlar yalnız cevap verildikten sonra açılır. Kurallar utils/ratingGame.js'te.
 //
-// SORU KAYNAĞI: havuz öğelerinde yıl, oy SAYISI, tür kimlikleri ve film/dizi bilgisi var; oy ORTALAMASI ve oyuncu
-// kadrosu YOK. Bu yüzden "hangisinin puanı yüksek" ya da "baş rolde kim" soruları kasten yok (her başlığı TMDB'den
-// çekmek ağ + kota ister ve çevrimdışı bozulur).
+// SORU KAYNAĞI: havuz öğelerinde yıl, oy sayısı, oy ORTALAMASI (voteAverage; 5 Kas'tan önce diske yazılmış havuzda
+// yok → o öğeler `rating`de sorulmaz), tür kimlikleri ve film/dizi bilgisi var; oyuncu kadrosu YOK ("baş rolde kim"
+// sorusu kasten yok: her başlığı TMDB'den çekmek ağ + kota ister ve çevrimdışı bozulur).
 //
 // ZORLUK seriyle yükselir (her oyunda farklı kolu var): oy oranı küçülür, on yıl şıkları birbirine yaklaşır, türde
 // şıklar bilindik türlerden seçilir, "film mi dizi mi"de başlık gizlenir.
 //
-// Skor kaydı cihaz-yerel (Keys.quickGames); liderlik / XP / günlük hak YOK.
+// Skor kaydı cihaz-yerel (Keys.quickGames); oyun sonunda rekor liderlik tablosuna da yazılır (hooks/useQuickGame).
 
 import { OLDER_LIVES, isUsable, keyOfItem, normalizeOlderStats, recordOlderRun } from "./olderGame";
+import { buildRatingQuestion, judgeRatingAnswer } from "./ratingGame";
 import { shuffleWith } from "./seededRandom";
 
 export const QUICK_LIVES = OLDER_LIVES;
 export const QUICK_RECENT_WINDOW = 40;
-export const QUICK_GAME_IDS = Object.freeze(["popular", "decade", "kind", "genre", "blur"]);
+export const QUICK_GAME_IDS = Object.freeze(["popular", "decade", "kind", "genre", "blur", "rating"]);
 export const isQuickGame = (id) => QUICK_GAME_IDS.includes(id);
 
 /**
  * Ekran düzeni: pair = iki afiş yan yana, single = tek büyük afiş + şık düğmeleri, blur = netleşen afiş + başlık
- * şıkları. `timed`: soru başına geri sayım ve süreye bağlı puan (bkz. "Bulanık afiş" bölümü).
+ * şıkları, rating = iki puanı gizli afişten yüksek puanlı olana dokunma. `timed`: soru başına geri sayım ve
+ * süreye bağlı puan (bkz. "Bulanık afiş" bölümü). `lives`: can sayısı (yoksa QUICK_LIVES).
  */
 export const QUICK_GAME_META = Object.freeze({
   popular: { layout: "pair", icon: "people", colors: ["#F97316", "#C2410C"] },
@@ -39,8 +43,11 @@ export const QUICK_GAME_META = Object.freeze({
   kind: { layout: "single", icon: "film", colors: ["#EC4899", "#9D174D"] },
   genre: { layout: "single", icon: "pricetags", colors: ["#10B981", "#047857"] },
   blur: { layout: "blur", icon: "eye", colors: ["#A855F7", "#7E22CE"], timed: true },
+  rating: { layout: "rating", icon: "swap-vertical", colors: ["#EAB308", "#A16207"], lives: 1 },
 });
 export const isTimedQuickGame = (id) => !!QUICK_GAME_META[id]?.timed;
+/** Oyunun can sayısı (Yüksek puanı bul tek can: ilk yanlışta biter). */
+export const quickLivesOf = (id) => QUICK_GAME_META[id]?.lives || QUICK_LIVES;
 
 // ── Tür kimlikleri ───────────────────────────────────────────────────────────
 
@@ -291,21 +298,34 @@ function blurQuestion({ pool, streak, recent, rng, maxYear }) {
   };
 }
 
-const BUILDERS = { popular: popularQuestion, decade: decadeQuestion, kind: kindQuestion, genre: genreQuestion, blur: blurQuestion };
+const BUILDERS = {
+  popular: popularQuestion,
+  decade: decadeQuestion,
+  kind: kindQuestion,
+  genre: genreQuestion,
+  blur: blurQuestion,
+  rating: buildRatingQuestion,
+};
 
 /**
  * Bir sonraki soru. Havuz o oyun için yetersizse null (çağıran hata durumuna geçer).
+ * `allowAdult` (utils/ageGate.adultContentAllowed) yalnız `rating`de kullanılır.
  *
  * @param {string} gameId
- * @param {{ pool: Array, streak?: number, recent?: Set<string>, rng?: () => number, maxYear?: number }} p
+ * @param {{ pool: Array, streak?: number, recent?: Set<string>, rng?: () => number, maxYear?: number,
+ *           previous?: object|null, allowAdult?: boolean }} p
  */
-export function buildQuickQuestion(gameId, { pool, streak = 0, recent = new Set(), rng = Math.random, maxYear } = {}) {
+export function buildQuickQuestion(
+  gameId,
+  { pool, streak = 0, recent = new Set(), rng = Math.random, maxYear, previous = null, allowAdult = false } = {},
+) {
   const build = BUILDERS[gameId];
-  return build ? build({ pool, streak, recent, rng, maxYear }) : null;
+  return build ? build({ pool, streak, recent, rng, maxYear, previous, allowAdult }) : null;
 }
 
 /** @returns {{ correct: boolean, correctKey: string }} */
 export function judgeQuickAnswer(question, chosenKey) {
+  if (question?.gameId === "rating") return judgeRatingAnswer(question, chosenKey);
   return { correct: chosenKey === question.correctKey, correctKey: question.correctKey };
 }
 

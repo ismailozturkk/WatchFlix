@@ -389,6 +389,23 @@ describe("fetchTitlePool", () => {
     expect(pool.every((item) => item.backdropPath)).toBe(true);
     expect(pool.length).toBeGreaterThan(0);
   });
+
+  test("puan ortalaması ve yetişkin işareti taşınır (Yüksek puanı bul oyunu için)", async () => {
+    const { axios, service } = load();
+    axios.get.mockImplementation(async (_url, config) => {
+      const data = pageResponse(config.params.page);
+      data.results.forEach((r, i) => {
+        r.vote_average = 7.25;
+        r.adult = i === 0;
+      });
+      return { data };
+    });
+    const pool = await service.fetchTitlePool("key", "tr", "popular_movie");
+    expect(pool.length).toBeGreaterThan(1);
+    pool.forEach((item) => expect(item.voteAverage).toBe(7.25));
+    expect(pool.some((item) => item.adult === true)).toBe(true);
+    expect(pool.some((item) => item.adult === false)).toBe(true);
+  });
 });
 
 describe("normalizeMediaItem'a oy sayısı", () => {

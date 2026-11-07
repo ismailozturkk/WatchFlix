@@ -1,7 +1,7 @@
 // utils/quickGamesCopy.js
 //
 // Hızlı oyunların (utils/quickGames.js) oyuna özgü metinleri (tr / en / es / pt / de): başlık, kart ipucu, soru,
-// film/dizi etiketleri, on yıl biçimi, tür adları ve oy sayısı biçimi. Ortak metinler (can, rekor, yükleniyor, hata,
+// film/dizi etiketleri, on yıl biçimi, tür adları, oy sayısı biçimi ve puan biçimi ("Yüksek puanı bul"). Ortak metinler (can, rekor, yükleniyor, hata,
 // "tekrar oyna"…) "Önce hangisi?" tablosundan gelir (utils/olderGameCopy) — iki yerde yazılmasın.
 //
 // Saf veri — bkz. utils/socialLinksCopy.js. __tests__/copyTablesSpanish.test.js dillerin aynı şekle sahip olduğunu,
@@ -24,6 +24,7 @@ export const QUICK_COPY = {
       kind: { title: "Film mi, dizi mi?", hint: "Afişe bak: film mi dizi mi?", prompt: "Bu bir film mi, dizi mi?" },
       genre: { title: "Hangi tür?", hint: "Afişin türünü tahmin et", prompt: "Bunlardan hangisi bu yapımın türü?" },
       blur: { title: "Bulanık Afiş", hint: "Afiş netleşmeden bil, puanı kap", prompt: "Bu hangi yapım?" },
+      rating: { title: "Hangisinin puanı daha yüksek?", hint: "Yüksek TMDB puanlı afişi seç · Tek hata bitirir", prompt: "Hangisinin TMDB puanı daha yüksek?" },
     },
     blur: {
       scoreLabel: "Puan",
@@ -32,6 +33,10 @@ export const QUICK_COPY = {
       timeUp: "Süre doldu",
       secondsLeft: (n) => `${n} sn`,
       posterA11y: "Bulanık afiş",
+    },
+    rating: {
+      format: (r) => `★ ${r.toFixed(1).replace(".", ",")}`,
+      ratingA11y: (title, r) => `${title}, TMDB puanı ${r.toFixed(1).replace(".", ",")}`,
     },
     kind: { movie: "Film", tv: "Dizi" },
     decadeLabel: (d) => `${d}'lar`,
@@ -52,6 +57,7 @@ export const QUICK_COPY = {
       kind: { title: "Movie or series?", hint: "Look at the poster: movie or series?", prompt: "Is this a movie or a series?" },
       genre: { title: "Which genre?", hint: "Guess the genre from the poster", prompt: "Which of these is one of its genres?" },
       blur: { title: "Blurry Poster", hint: "Name it before it sharpens, grab the points", prompt: "What title is this?" },
+      rating: { title: "Which is rated higher?", hint: "Pick the higher-rated poster · One miss ends it", prompt: "Which title has the higher TMDB rating?" },
     },
     blur: {
       scoreLabel: "Points",
@@ -60,6 +66,10 @@ export const QUICK_COPY = {
       timeUp: "Time's up",
       secondsLeft: (n) => `${n}s`,
       posterA11y: "Blurred poster",
+    },
+    rating: {
+      format: (r) => `★ ${r.toFixed(1)}`,
+      ratingA11y: (title, r) => `${title}, TMDB rating ${r.toFixed(1)}`,
     },
     kind: { movie: "Movie", tv: "Series" },
     decadeLabel: (d) => `${d}s`,
@@ -80,6 +90,7 @@ export const QUICK_COPY = {
       kind: { title: "¿Película o serie?", hint: "Mira el cartel: ¿película o serie?", prompt: "¿Es una película o una serie?" },
       genre: { title: "¿Qué género?", hint: "Adivina el género por el cartel", prompt: "¿Cuál de estos es uno de sus géneros?" },
       blur: { title: "Cartel borroso", hint: "Adivínalo antes de que se aclare", prompt: "¿Qué título es este?" },
+      rating: { title: "¿Cuál tiene mejor nota?", hint: "Elige el cartel con mejor nota de TMDB · Un fallo y se acaba", prompt: "¿Cuál tiene la nota de TMDB más alta?" },
     },
     blur: {
       scoreLabel: "Puntos",
@@ -88,6 +99,10 @@ export const QUICK_COPY = {
       timeUp: "Se acabó el tiempo",
       secondsLeft: (n) => `${n} s`,
       posterA11y: "Cartel borroso",
+    },
+    rating: {
+      format: (r) => `★ ${r.toFixed(1).replace(".", ",")}`,
+      ratingA11y: (title, r) => `${title}, nota de TMDB ${r.toFixed(1).replace(".", ",")}`,
     },
     kind: { movie: "Película", tv: "Serie" },
     decadeLabel: (d) => `${d}s`,
@@ -108,6 +123,7 @@ export const QUICK_COPY = {
       kind: { title: "Filme ou série?", hint: "Veja o pôster: filme ou série?", prompt: "É um filme ou uma série?" },
       genre: { title: "Qual gênero?", hint: "Adivinhe o gênero pelo pôster", prompt: "Qual destes é um dos gêneros dele?" },
       blur: { title: "Pôster borrado", hint: "Acerte antes que fique nítido", prompt: "Que título é este?" },
+      rating: { title: "Qual tem a nota mais alta?", hint: "Escolha o pôster com a maior nota do TMDB · Um erro encerra", prompt: "Qual tem a maior nota no TMDB?" },
     },
     blur: {
       scoreLabel: "Pontos",
@@ -116,6 +132,10 @@ export const QUICK_COPY = {
       timeUp: "Tempo esgotado",
       secondsLeft: (n) => `${n} s`,
       posterA11y: "Pôster borrado",
+    },
+    rating: {
+      format: (r) => `★ ${r.toFixed(1).replace(".", ",")}`,
+      ratingA11y: (title, r) => `${title}, nota do TMDB ${r.toFixed(1).replace(".", ",")}`,
     },
     kind: { movie: "Filme", tv: "Série" },
     decadeLabel: (d) => `Anos ${d}`,
@@ -136,6 +156,7 @@ export const QUICK_COPY = {
       kind: { title: "Film oder Serie?", hint: "Schau aufs Poster: Film oder Serie?", prompt: "Ist das ein Film oder eine Serie?" },
       genre: { title: "Welches Genre?", hint: "Errate das Genre anhand des Posters", prompt: "Welches davon ist eines seiner Genres?" },
       blur: { title: "Unscharfes Poster", hint: "Errate es, bevor es scharf wird", prompt: "Welcher Titel ist das?" },
+      rating: { title: "Welcher ist höher bewertet?", hint: "Wähle das Poster mit der höheren TMDB-Wertung · Ein Fehler beendet das Spiel", prompt: "Welcher Titel hat die höhere TMDB-Wertung?" },
     },
     blur: {
       scoreLabel: "Punkte",
@@ -144,6 +165,10 @@ export const QUICK_COPY = {
       timeUp: "Zeit abgelaufen",
       secondsLeft: (n) => `${n} s`,
       posterA11y: "Unscharfes Poster",
+    },
+    rating: {
+      format: (r) => `★ ${r.toFixed(1).replace(".", ",")}`,
+      ratingA11y: (title, r) => `${title}, TMDB-Wertung ${r.toFixed(1).replace(".", ",")}`,
     },
     kind: { movie: "Film", tv: "Serie" },
     decadeLabel: (d) => `${d}er`,
@@ -162,8 +187,8 @@ export const QUICK_COPY = {
 export const getQuickCopy = (language) => QUICK_COPY[copyLanguage(language, Object.keys(QUICK_COPY))];
 
 /**
- * Bir şıkkın metni (oyuna göre): film/dizi etiketi, on yıl biçimi, tür adı. Pair oyunlarda şık afiştir (metin yok);
- * Bulanık Afiş'te şık yapımın kendi başlığıdır (`option.title`, çeviri yok).
+ * Bir şıkkın metni (oyuna göre): film/dizi etiketi, on yıl biçimi ve tür adı. Pair/rating oyunlarında
+ * şık afiştir (metin yok); Bulanık Afiş'te şık yapımın kendi başlığıdır (`option.title`, çeviri yok).
  */
 export function quickOptionLabel(copy, gameId, key) {
   if (gameId === "kind") return copy.kind[key] || key;

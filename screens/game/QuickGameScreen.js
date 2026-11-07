@@ -13,13 +13,15 @@
 //   blur  (Bulanık Afiş): netleşen afiş (components/game/BlurPoster) + geri sayım çubuğu + canlı puan + dört BAŞLIK
 //         şıkkı. Skor satırı "Puan" yazar, oyun sonu "n puan". Afişin erişilebilirlik etiketi başlığı SÖYLEMEZ
 //         (ekran okuyucu cevabı sızdırmasın).
+//   rating (Yüksek puanı bul): iki afiş yan yana ve iki puan da gizli; oyuncu puanı daha yüksek olan AFİŞE dokunur.
+//         Cevapta iki puan birlikte açılır. Tek can (başlıktaki tek kalp); afiş genişliği pencere yüksekliğinden türer.
 //
-// "Önce hangisi?" gibi: liderlik / XP / günlük hak yok, premium kapısı yok.
+// "Önce hangisi?" gibi: premium kapısı yok; rekor oyun sonunda liderlik tablosuna yazılır (hooks/useQuickGame).
 
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import AppIcon from "@components/AppIcon";
-import { EndCard, ErrorState, FeedbackStrip, Hearts, LoadingState, PosterCard, QUICK_BAD, QUICK_GOOD, StatRow } from "@components/game/QuickGameParts";
+import { EndCard, ErrorState, FeedbackStrip, Hearts, LoadingState, PosterCard, QuestionPrompt, QUICK_BAD, QUICK_GOOD, StatRow } from "@components/game/QuickGameParts";
 import BlurPoster from "@components/game/BlurPoster";
 import GameTimerBar from "@components/game/GameTimerBar";
 import { PressableScale } from "@components/game/ui";
@@ -103,6 +105,56 @@ function RoundClock({ startedAt, running, reveal, resetKey, accent, theme, copy 
   );
 }
 
+function AnswerOption({ label, state, disabled, onPress, accent, theme, glyph, icon, compact = false }) {
+  const correct = state === "correct";
+  const wrong = state === "wrong";
+  const tone = correct ? QUICK_GOOD : wrong ? QUICK_BAD : accent;
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      scaleTo={0.97}
+      style={[
+        styles.option,
+        compact && styles.titleOptionCard,
+        {
+          backgroundColor: correct ? `${QUICK_GOOD}22` : wrong ? `${QUICK_BAD}22` : theme.secondary,
+          borderColor: correct ? QUICK_GOOD : wrong ? QUICK_BAD : theme.border,
+          opacity: state === "dim" ? 0.5 : 1,
+          shadowColor: tone,
+        },
+      ]}
+    >
+      <View style={[styles.optionGlyph, { backgroundColor: `${tone}20`, borderColor: `${tone}55` }]}>
+        {icon ? (
+          <AppIcon family="Ionicons" name={icon} size={17} color={tone} />
+        ) : (
+          <Text style={[styles.optionGlyphText, { color: tone }]} allowFontScaling={false}>{glyph}</Text>
+        )}
+      </View>
+      <Text
+        style={[styles.optionText, compact && styles.titleOption, { color: theme.text.primary }]}
+        numberOfLines={compact ? 2 : 2}
+        adjustsFontSizeToFit
+        minimumFontScale={compact ? 0.7 : 0.75}
+      >
+        {label}
+      </Text>
+      {correct || wrong ? (
+        <AppIcon
+          family="Ionicons"
+          name={correct ? "checkmark-circle" : "close-circle"}
+          size={19}
+          color={tone}
+        />
+      ) : null}
+    </PressableScale>
+  );
+}
+
 export default function QuickGameScreen({ navigation, route }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
@@ -135,6 +187,8 @@ export default function QuickGameScreen({ navigation, route }) {
   // Bulanık Afiş'te ek olarak sayaç çubuğu + canlı puan satırı (~40 pt).
   const reserved = meta.layout === "blur" ? 510 : 470;
   const posterWidth = Math.round(Math.min(Math.max(((height || 700) - reserved) * (2 / 3), 110), (width || 360) * 0.55));
+  // Yüksek puanı bul: iki afiş yan yana; ayrı cevap düğmesi yok, afişlerin kendisi cevap.
+  const pairWidth = Math.round(Math.min(Math.max(((height || 700) - 440) * (2 / 3), 112), ((width || 360) - 44) / 2));
   const clockRunning = phase === "playing" && roundStartedAt != null;
 
   return (
@@ -142,7 +196,7 @@ export default function QuickGameScreen({ navigation, route }) {
       navigation={navigation}
       title={text.title}
       subtitle={text.hint}
-      headerRight={<Hearts lives={lives} theme={theme} copy={copy} />}
+      headerRight={<Hearts lives={lives} max={game.maxLives} theme={theme} copy={copy} />}
       scroll={false}
     >
       <StatRow theme={theme} copy={shared} score={score} best={best} accent={accent} />
@@ -152,7 +206,7 @@ export default function QuickGameScreen({ navigation, route }) {
 
       {playing && meta.layout === "pair" ? (
         <View style={styles.board}>
-          <Text style={[styles.prompt, { color: theme.text.primary }]}>{text.prompt}</Text>
+          <QuestionPrompt theme={theme} accent={accent} icon={meta.icon}>{text.prompt}</QuestionPrompt>
           <View style={styles.posters}>
             {question.items.map((item, index) => {
               const key = keyOfItem(item);
@@ -174,9 +228,38 @@ export default function QuickGameScreen({ navigation, route }) {
         </View>
       ) : null}
 
+      {playing && meta.layout === "rating" ? (
+        <View style={styles.board}>
+          <QuestionPrompt theme={theme} accent={accent} icon={meta.icon}>{text.prompt}</QuestionPrompt>
+          <View style={[styles.posters, styles.ratingPosters]}>
+            {question.items.map((item, index) => {
+              const key = keyOfItem(item);
+              const rating = question.facts.ratings[index];
+              return (
+                <PosterCard
+                  key={key}
+                  item={item}
+                  badge={reveal ? quick.rating.format(rating) : null}
+                  state={!reveal ? "idle" : key === reveal.correctKey ? "older" : key === reveal.chosenKey ? "wrong" : "other"}
+                  theme={theme}
+                  label={reveal ? quick.rating.ratingA11y(item.title, rating) : item.title}
+                  disabled={phase !== "playing"}
+                  onPress={() => game.choose(key)}
+                  style={[styles.ratingPoster, { width: pairWidth }]}
+                />
+              );
+            })}
+            <View pointerEvents="none" style={[styles.ratingVs, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+              <AppIcon family="Ionicons" name="flash" size={16} color={accent} />
+            </View>
+          </View>
+          <FeedbackStrip reveal={reveal} theme={theme} copy={copy} onPress={game.advance} />
+        </View>
+      ) : null}
+
       {playing && meta.layout === "single" ? (
         <View style={styles.board}>
-          <Text style={[styles.prompt, { color: theme.text.primary }]}>{text.prompt}</Text>
+          <QuestionPrompt theme={theme} accent={accent} icon={meta.icon}>{text.prompt}</QuestionPrompt>
           <View style={[styles.single, { width: posterWidth }]}>
             <PosterCard
               item={question.items[0]}
@@ -196,7 +279,7 @@ export default function QuickGameScreen({ navigation, route }) {
           ) : null}
 
           <View style={styles.options}>
-            {question.options.map((option) => {
+            {question.options.map((option, index) => {
               const state = !reveal
                 ? "idle"
                 : option.key === reveal.correctKey
@@ -205,29 +288,7 @@ export default function QuickGameScreen({ navigation, route }) {
                     ? "wrong"
                     : "dim";
               const label = quickOptionLabel(quick, gameId, option.key);
-              return (
-                <PressableScale
-                  key={option.key}
-                  accessibilityRole="button"
-                  accessibilityLabel={label}
-                  accessibilityState={{ disabled: phase !== "playing" }}
-                  disabled={phase !== "playing"}
-                  onPress={() => game.choose(option.key)}
-                  scaleTo={0.97}
-                  style={[
-                    styles.option,
-                    {
-                      backgroundColor: state === "correct" ? `${QUICK_GOOD}26` : state === "wrong" ? `${QUICK_BAD}26` : theme.secondary,
-                      borderColor: state === "correct" ? QUICK_GOOD : state === "wrong" ? QUICK_BAD : theme.border,
-                      opacity: state === "dim" ? 0.55 : 1,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.optionText, { color: theme.text.primary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
-                    {label}
-                  </Text>
-                </PressableScale>
-              );
+              return <AnswerOption key={option.key} label={label} state={state} disabled={phase !== "playing"} onPress={() => game.choose(option.key)} accent={accent} theme={theme} glyph={String.fromCharCode(65 + index)} />;
             })}
           </View>
           <FeedbackStrip reveal={reveal} theme={theme} copy={copy} onPress={game.advance} />
@@ -236,7 +297,7 @@ export default function QuickGameScreen({ navigation, route }) {
 
       {playing && meta.layout === "blur" ? (
         <View style={styles.board}>
-          <Text style={[styles.prompt, { color: theme.text.primary }]}>{text.prompt}</Text>
+          <QuestionPrompt theme={theme} accent={accent} icon={meta.icon}>{text.prompt}</QuestionPrompt>
           <RoundClock
             startedAt={roundStartedAt}
             running={clockRunning}
@@ -264,7 +325,7 @@ export default function QuickGameScreen({ navigation, route }) {
             />
           </View>
           <View style={styles.options}>
-            {question.options.map((option) => {
+            {question.options.map((option, index) => {
               const state = !reveal
                 ? "idle"
                 : option.key === reveal.correctKey
@@ -273,29 +334,7 @@ export default function QuickGameScreen({ navigation, route }) {
                     ? "wrong"
                     : "dim";
               const disabled = !clockRunning;
-              return (
-                <PressableScale
-                  key={option.key}
-                  accessibilityRole="button"
-                  accessibilityLabel={option.title}
-                  accessibilityState={{ disabled }}
-                  disabled={disabled}
-                  onPress={() => game.choose(option.key)}
-                  scaleTo={0.97}
-                  style={[
-                    styles.option,
-                    {
-                      backgroundColor: state === "correct" ? `${QUICK_GOOD}26` : state === "wrong" ? `${QUICK_BAD}26` : theme.secondary,
-                      borderColor: state === "correct" ? QUICK_GOOD : state === "wrong" ? QUICK_BAD : theme.border,
-                      opacity: state === "dim" ? 0.55 : 1,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.optionText, styles.titleOption, { color: theme.text.primary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
-                    {option.title}
-                  </Text>
-                </PressableScale>
-              );
+              return <AnswerOption key={option.key} label={option.title} state={state} disabled={disabled} onPress={() => game.choose(option.key)} accent={accent} theme={theme} glyph={String.fromCharCode(65 + index)} compact />;
             })}
           </View>
           <FeedbackStrip reveal={reveal} theme={theme} copy={copy} onPress={game.advance} />
@@ -320,17 +359,22 @@ export default function QuickGameScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  board: { flex: 1, gap: 10 },
-  prompt: { fontSize: 19, fontWeight: "900", textAlign: "center", marginTop: 4 },
+  board: { flex: 1, gap: 11 },
   posters: { flexDirection: "row", gap: 12 },
   single: { alignSelf: "center" },
   singlePoster: { flex: 0, alignSelf: "stretch" },
   genres: { fontSize: 13, fontWeight: "800", textAlign: "center" },
   options: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   // İki sütun: film/dizi tek satırda iki, on yıl/tür 2×2 (flexBasis %45 + büyüme).
-  option: { flexGrow: 1, flexBasis: "45%", minHeight: 52, borderRadius: 16, borderWidth: 1.5, alignItems: "center", justifyContent: "center", paddingHorizontal: 10, paddingVertical: 8 },
-  optionText: { fontSize: 15, fontWeight: "800", textAlign: "center" },
-  titleOption: { fontSize: 13.5 },
+  option: { flexGrow: 1, flexBasis: "45%", minHeight: 58, borderRadius: 18, borderWidth: 1.5, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 9, paddingVertical: 8, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 7, elevation: 2 },
+  optionGlyph: { width: 30, height: 30, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  optionGlyphText: { fontSize: 12, fontWeight: "900" },
+  optionText: { flex: 1, fontSize: 14, fontWeight: "850", textAlign: "left" },
+  ratingPosters: { justifyContent: "center" },
+  ratingPoster: { flex: 0 },
+  ratingVs: { position: "absolute", left: "50%", top: "38%", marginLeft: -19, width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: "center", justifyContent: "center", zIndex: 3, elevation: 7 },
+  titleOptionCard: { minHeight: 62 },
+  titleOption: { fontSize: 12.5 },
   clockRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   // GameTimerBar kendi yatay boşluğunu taşır (16); satırda kenara yaslansın.
   clockBar: { flex: 1, marginHorizontal: -16 },

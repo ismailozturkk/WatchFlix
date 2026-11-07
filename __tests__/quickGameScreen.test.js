@@ -3,11 +3,21 @@
 // Hızlı oyunların BAĞLANTISI: durum makinesi (hooks/useQuickGame.js) + ekran (screens/game/QuickGameScreen.js) +
 // Eğlence ızgarası (components/game/QuickGamesGrid.js), GERÇEK depo (bellek-içi MMKV) ve GERÇEK çekirdekle;
 // havuz kaynağı (TMDB) ve görsel parçalar taklit. Seri-skorlu dört oyun aynı senaryodan geçer; zamanlı Bulanık Afiş
-// (puan = kalan süre) kendi senaryosundan.
+// (puan = kalan süre) ve tek canlı, afiş seçmeli Yüksek puanı bul kendi senaryolarından.
 
 import React from "react";
 import { act, create } from "react-test-renderer";
 
+// Haftalık Lig bildirimi (services/leagueService → firebase) bu testin konusu değil.
+// Afiş köşesi (Ayarlar > Poster görünümü) burada sınanmıyor: taban köşe aynen döner.
+jest.mock("../hooks/usePosterCorner", () => () => (base) => base);
+jest.mock("../services/leagueService", () => ({
+  awardGameXp: jest.fn(),
+  awardDailyXp: jest.fn(),
+  awardPollVoteXp: jest.fn(),
+  awardTop100VoteXp: jest.fn(),
+  awardWatchXp: jest.fn(),
+}));
 jest.mock("react-native", () => ({
   StyleSheet: { create: (s) => s, absoluteFill: {}, absoluteFillObject: {}, hairlineWidth: 1 },
   View: "View",
@@ -94,7 +104,9 @@ const { OLDER_COPY } = require("../utils/olderGameCopy");
 const { FILM_CHAIN_COPY } = require("../utils/filmChainCopy");
 const { buildTextlessBlurQuestion, BLUR_PROBE_MAX } = require("../services/quickGamePool");
 const { BLUR_ROUND_MS, QUICK_GAME_IDS, QUICK_GAME_META, QUICK_GENRES, canonGenresOf, decadeOf } = require("../utils/quickGames");
-const STREAK_GAMES = QUICK_GAME_IDS.filter((id) => !QUICK_GAME_META[id].timed);
+const { ratingOf } = require("../utils/ratingGame");
+// Üç canlı, seri skorlu oyunlar (Bulanık Afiş zamanlı, Yüksek puanı bul tek canlı: kendi bölümlerinde).
+const STREAK_GAMES = QUICK_GAME_IDS.filter((id) => !QUICK_GAME_META[id].timed && !QUICK_GAME_META[id].lives);
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 const LANGS = ["tr", "en", "es", "pt", "de"];
@@ -107,7 +119,7 @@ const INFO = {}; // başlık → havuz öğesi
 const item = (id, year, extra = {}) => {
   const entry = {
     mediaKey: `${extra.type || "movie"}_${id}`, id, type: "movie", year: String(year), posterPath: `/p${id}.jpg`,
-    title: `Yapım ${id}`, voteCount: 1000, genreIds: [18], ...extra,
+    title: `Yapım ${id}`, voteCount: 1000, voteAverage: 4 + ((id * 37) % 50) / 10, genreIds: [18], ...extra,
   };
   INFO[entry.title] = entry;
   return entry;
@@ -456,6 +468,113 @@ describe("Bulanık Afiş (zamanlı)", () => {
   });
 });
 
+describe("Hangisinin puanı daha yüksek? (tek can, afiş seçimi)", () => {
+  const rating = () => QUICK_COPY[mockLang].rating;
+  const infoOf = (label) => Object.values(INFO).find((x) => label === x.title || label.startsWith(`${x.title},`));
+  // İki afiş doğrudan cevap düğmesidir; cevap öncesi erişilebilirlik etiketi puanı söylemez.
+  const posters = () => scales().filter((n) => !n.props.accessibilityState && infoOf(n.props.accessibilityLabel || ""));
+  const pair = () => posters().map((n) => infoOf(n.props.accessibilityLabel));
+  const higherIndex = () => {
+    const [a, b] = pair();
+    return ratingOf(b) > ratingOf(a) ? 1 : 0;
+  };
+  const pick = (index) => act(async () => { posters()[index].props.onPress(); });
+  const pickHigher = () => pick(higherIndex());
+  const pickLower = () => pick(higherIndex() === 0 ? 1 : 0);
+  const hearts = () => renderer.root.findAllByType("Icon").filter((n) => n.props.name === "heart" || n.props.name === "heart-outline");
+
+  test("iki afişin de puanı gizli; afişlerin kendisi cevap düğmesi; tek kalp", async () => {
+    await mount("rating");
+    expect(renderer.root.findByType("Shell").props.title).toBe(quick().games.rating.title);
+    expect(has(quick().games.rating.prompt)).toBe(true);
+    const [a, b] = pair();
+    expect(a).toBeDefined();
+    expect(b).toBeDefined();
+    expect(a.mediaKey).not.toBe(b.mediaKey);
+    expect(has(rating().format(ratingOf(a)))).toBe(false);
+    expect(has(rating().format(ratingOf(b)))).toBe(false);
+    expect(posters().map((n) => n.props.accessibilityLabel)).toEqual([a.title, b.title]); // ekran okuyucuya da puan sızmaz
+    expect(posters().every((n) => n.props.disabled === false)).toBe(true);
+    expect(hearts()).toHaveLength(1);
+    // Eşit puanlı çift gösterilmez; yeterli oy (≥ 300) ve puan var.
+    expect(ratingOf(a)).not.toBe(ratingOf(b));
+    [a, b].forEach((x) => expect(x.voteCount).toBeGreaterThanOrEqual(300));
+  });
+
+  test("yüksek puanlı afiş seçilince iki puan birlikte açılır; sonraki tur bağımsız çift gelir", async () => {
+    await mount("rating");
+    for (let round = 1; round <= 6; round += 1) {
+      const before = pair();
+      await pickHigher();
+      expect(has(common().correct)).toBe(true);
+      before.forEach((entry) => expect(has(rating().format(ratingOf(entry)))).toBe(true));
+      expect(texts()).toContain(String(round)); // skor = seri
+      await wait(QUICK_REVEAL_MS);
+      const [nextA, nextB] = pair();
+      expect(before.map((entry) => entry.mediaKey)).not.toContain(nextA.mediaKey);
+      expect(before.map((entry) => entry.mediaKey)).not.toContain(nextB.mediaKey);
+      expect(ratingOf(nextA)).not.toBe(ratingOf(nextB));
+    }
+    expect(hearts()).toHaveLength(1);
+  });
+
+  test("ilk yanlışta oyun biter: skor seri, kayıt + liderlik yalnız bu oyuna", async () => {
+    await mount("rating");
+    await pickHigher();
+    await wait(QUICK_REVEAL_MS);
+    await pickHigher();
+    await wait(QUICK_REVEAL_MS);
+    await pickLower();
+    expect(has(common().wrong)).toBe(true);
+    await wait(QUICK_REVEAL_MS);
+    expect(has(common().endTitle.toUpperCase())).toBe(true);
+    expect(has(common().endScore(2))).toBe(true);
+    expect(has(common().newBest)).toBe(true);
+    expect(stored()).toEqual({ rating: { best: 2, plays: 1, correct: 2, answered: 3 } });
+    expect(mockSaveBoard).toHaveBeenCalledWith("u1", "rating", { best: 2, plays: 1, correct: 2, answered: 3 }, expect.any(Object));
+    expect(mockTrack).toHaveBeenCalledWith("quick_game_finished", { game_id: "rating", score: 2, answered: 3, new_best: true, best: 2 });
+    // Tekrar oyna: yeni bağımsız çift, tek kalp dolu, skor 0.
+    const again = scales().find((n) => n.props.accessibilityLabel === common().playAgain);
+    await act(async () => { again.props.onPress(); });
+    expect(hearts().filter((n) => n.props.name === "heart")).toHaveLength(1);
+    expect(has(quick().games.rating.prompt)).toBe(true);
+    expect(texts()).toContain("0");
+  });
+
+  test("yetişkin içerik izni yoksa yetişkin yapım hiç gelmez", async () => {
+    // Havuzun yarısı yetişkin, üstelik en çok oylu (bilindiklik ağırlığı onları öne çekerdi).
+    Object.values(mockPools).flat().forEach((x, i) => { if (i % 2 === 0) Object.assign(x, { adult: true, voteCount: 90000 }); });
+    set(Keys.adultContent, false);
+    await mount("rating");
+    for (let round = 0; round < 8; round += 1) {
+      pair().forEach((x) => expect(x.adult).not.toBe(true));
+      await pickHigher();
+      await wait(QUICK_REVEAL_MS);
+    }
+  });
+
+  test("puansız eski havuz (voteAverage yok) soru kurmaz → hata durumu", async () => {
+    Object.values(mockPools).flat().forEach((x) => { delete x.voteAverage; });
+    await mount("rating");
+    expect(has(common().errorTitle)).toBe(true);
+  });
+
+  test.each(LANGS)("dil %s: soru o dilde, cevap öncesi puan sızıntısı yok", async (lang) => {
+    mockLang = lang;
+    await mount("rating");
+    expect(has(QUICK_COPY[lang].games.rating.prompt)).toBe(true);
+    pair().forEach((entry) => expect(has(QUICK_COPY[lang].rating.format(ratingOf(entry)))).toBe(false));
+    expect(texts().some((t) => /undefined|NaN|\[object/.test(t))).toBe(false);
+  });
+
+  test("puan biçimi: ondalık ayracı dile göre", () => {
+    expect(QUICK_COPY.tr.rating.format(7.8)).toBe("★ 7,8");
+    expect(QUICK_COPY.en.rating.format(7.8)).toBe("★ 7.8");
+    expect(QUICK_COPY.de.rating.format(8)).toBe("★ 8,0");
+    expect(QUICK_COPY.en.rating.ratingA11y("Heat", 8.3)).toBe("Heat, TMDB rating 8.3");
+  });
+});
+
 describe("yazısız afiş araması (buildTextlessBlurQuestion)", () => {
   const pool = () => [...mockPools.top_rated_movie, ...mockPools.popular_movie, ...mockPools.popular_tv];
 
@@ -493,7 +612,7 @@ describe("Eğlence ızgarası", () => {
 
   // Film Zinciri rayın başında; kartında rekor yerine günlük durum yazar ("Bugünün zinciri").
   const TILE_COUNT = 1 + QUICK_GAME_IDS.length;
-  test("altı kart (Önce hangisi? + beş oyun) tek yatay rayda, başlık ve 'Yeni'; her kartta önizleme", () => {
+  test("Film Zinciri + Önce hangisi? + hızlı oyunlar tek yatay rayda, başlık ve 'Yeni'; her kartta önizleme", () => {
     mountGrid();
     expect(has(quick().gridTitle)).toBe(true);
     const tiles = scales();
@@ -510,10 +629,11 @@ describe("Eğlence ızgarası", () => {
     tiles.forEach((tile) => expect(tile.findAllByType("Image").length).toBeGreaterThan(0));
   });
 
-  test("dokununca kare kimliğiyle açılır: older + beş hızlı oyun", () => {
+  test("dokununca kare kimliğiyle açılır: chain + older + hızlı oyunlar (Yüksek puanı bul dahil)", () => {
     const onOpen = mountGrid();
     scales().forEach((tile) => act(() => tile.props.onPress()));
     expect(onOpen.mock.calls.map(([id]) => id)).toEqual(["chain", "older", ...QUICK_GAME_IDS]);
+    expect(onOpen.mock.calls.map(([id]) => id)).toContain("rating");
   });
 
   test("her karede kendi rekoru görünür (Önce hangisi? ayrı anahtardan)", () => {
@@ -523,7 +643,7 @@ describe("Eğlence ızgarası", () => {
     expect(texts().filter((t) => t === OLDER_COPY.tr.cardBest(12))).toHaveLength(1);
     expect(has(OLDER_COPY.tr.cardBest(7))).toBe(true);
     expect(has(OLDER_COPY.tr.cardBest(4))).toBe(true);
-    expect(texts().filter((t) => t === OLDER_COPY.tr.cardNew)).toHaveLength(3); // popular + decade + blur
+    expect(texts().filter((t) => t === OLDER_COPY.tr.cardNew)).toHaveLength(4); // popular + decade + blur + rating
   });
 
   test.each(LANGS)("dil %s: başlıklar o dilde", (lang) => {

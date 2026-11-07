@@ -5,7 +5,7 @@
 // film-dizi / tür şıkları). Doğru şık işaretlidir — kart oyunu "oynanmış bir soru" gibi gösterir.
 //
 // AĞDAN BAĞIMSIZ: afişler uygulamayla paketlenen splash havuzundan (data/splashPosterCatalog) SABİT seçilir;
-// önizlemedeki doğru cevaplar o yapımların GERÇEK bilgisidir (yıl, film/dizi, tür, TMDB oy sayısı). Afiş
+// önizlemedeki doğru cevaplar o yapımların GERÇEK bilgisidir (yıl, film/dizi, tür, TMDB oy sayısı / puanı). Afiş
 // değiştirilirse cevap da değişmeli — PREVIEW_FACTS tek yer.
 //
 // Animasyon yok: Hub kaydırılırken yedi kart birden iş çıkarmasın (LevelRing ile aynı ilke).
@@ -39,6 +39,11 @@ export const PREVIEW_FACTS = Object.freeze({
   genre: { poster: posterOf("movie", 155), options: ["comedy", "action", "romance"], correct: "action" }, // The Dark Knight
   // Bulanık Afiş: şıklar yapım BAŞLIKLARI (çevrilmez); doğru olan afişin kendi adı.
   blur: { poster: posterOf("movie", 550), options: ["Se7en", "Fight Club", "Memento"], correct: "Fight Club", points: 70 },
+  // Yüksek puanı bul: gerçek puanlar önizlemede de gizli; yalnız karşılaştırma mekaniği gösterilir.
+  rating: {
+    first: { poster: posterOf("movie", 293660) }, // Deadpool
+    second: { poster: posterOf("movie", 278) }, // The Shawshank Redemption
+  },
   // Film Zinciri: iki oyuncu ortak filmle bağlanır (Tom Hanks — Forrest Gump — Robin Wright).
   chain: { from: "TH", poster: posterOf("movie", 13), to: "RW" },
 });
@@ -201,6 +206,30 @@ function BlurPreview({ height, compact, pointsLabel }) {
   );
 }
 
+/** Soldaki afişin puanı, ortada yukarı ok (doğru tahmin), sağdakinin açılmış puanı yeşil. */
+function RatingPreview({ height }) {
+  const { first, second } = PREVIEW_FACTS.rating;
+  const posterHeight = height - 10;
+  const hidden = () => (
+    <View style={styles.ratingHidden}>
+      <AppIcon family="Ionicons" name="help" size={9} color="#FFFFFF" />
+    </View>
+  );
+  return (
+    <View style={[styles.row, { height }]}>
+      <MiniPoster poster={first.poster} height={posterHeight}>
+        {hidden()}
+      </MiniPoster>
+      <View style={[styles.vs, styles.ratingArrow]}>
+        <AppIcon family="Ionicons" name="flash" size={11} color="#FFFFFF" />
+      </View>
+      <MiniPoster poster={second.poster} height={posterHeight} style={styles.posterRight}>
+        {hidden()}
+      </MiniPoster>
+    </View>
+  );
+}
+
 /** İki oyuncu (baş harfleri) ortadaki ortak filmle bağlanmış: oyuncu → film → oyuncu. */
 function ChainPreview({ height }) {
   const { from, poster, to } = PREVIEW_FACTS.chain;
@@ -277,6 +306,8 @@ function GamePreview({ gameId, height }) {
     }
     case "blur":
       return <BlurPreview height={height} compact={compact} pointsLabel={quick.blur.points} />;
+    case "rating":
+      return <RatingPreview height={height} />;
     case "chain":
       return <ChainPreview height={height} />;
     default:
@@ -372,6 +403,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.62)",
   },
   yearTagRight: { backgroundColor: "rgba(6,78,59,0.9)" },
+  ratingArrow: { backgroundColor: "rgba(6,78,59,0.9)", borderColor: GREEN },
+  ratingHidden: { position: "absolute", left: 4, right: 4, bottom: 4, height: 15, borderRadius: 6, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.68)", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   yearText: { color: "#FFFFFF", fontSize: 8.5, fontWeight: "900" },
 
   // Hangisi daha çok izlendi?

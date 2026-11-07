@@ -41,6 +41,8 @@ jest.mock("../components/common/UserAvatar", () => mockHost("Avatar"));
 jest.mock("../components/badges/AppBadge", () => mockHost("Badge"));
 jest.mock("../components/premium/PremiumPill", () => mockHost("PremiumPill"));
 jest.mock("../components/game/DailyChallengeCard", () => mockHost("DailyCard"));
+// Günün Karesi kartı kendi testinde (__tests__/dailyFrameScreen.test.js).
+jest.mock("../components/game/DailyFrameCard", () => mockHost("FrameCard"));
 jest.mock("../components/game/DuelSendButton", () => mockHost("Duel"));
 jest.mock("../components/game/PlayerStrip", () => ({ ...mockHost("PlayerStrip"), PlayerChip: mockHost("PlayerChip").default }));
 jest.mock("../components/game/ui", () => {
@@ -176,13 +178,13 @@ const mountModule = async () => {
 };
 
 describe("Eğlence > Oyunlar modülü", () => {
-  test("önce iki sahne oyunu kartı, sonra beş hızlı oyunluk ray; her kartta önizleme", async () => {
+  test("sahne oyunları Hızlı oyunlar rayının başında; her kartta önizleme", async () => {
     await mountModule();
     const grid = renderer.root.findAll((n) => n.type === "Scale" && typeof n.props.accessibilityLabel === "string");
     expect(grid.map((n) => n.props.accessibilityLabel).slice(0, 2)).toEqual(GAME_REGISTRY.map((g) => g.id));
     expect(grid).toHaveLength(2 + 2 + QUICK_GAME_IDS.length); // + Film Zinciri + Önce hangisi?
     const titles = renderer.root.findAllByType("Section").map((n) => n.props.title);
-    expect(titles).toEqual(["Oyunlar", "Hızlı oyunlar"]); // "Oyun Merkezi" kısayolu yok; giriş oyuncu çipi
+    expect(titles).toEqual(["Oyunlar", "Hızlı oyunlar"]); // Sahne oyunları da bu tek rayın içinde.
     grid.forEach((tile) => expect(tile.findAllByType("Image").length).toBeGreaterThan(0));
     // Günlük kart ince bant olarak çizilir.
     expect(renderer.root.findByType("DailyCard").props.compact).toBe(true);
