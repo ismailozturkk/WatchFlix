@@ -21,6 +21,13 @@
 // olmamalı (components/common/GlassSurface.js, kural 1) — geçiş anidir, anahtardaki
 // vurgu hapı yaylanarak kayar.
 //
+// TEK DEKOR (6 Kas): kar / ikon deseni / ambiyans iki sayfada AYRI ayrı kuruluyordu.
+// Gizli sayfa da kendini odakta sanıyordu (odak bilgisi sekmenin bağlı olduğu kök
+// rotadan geliyor), yani ikinci kar animasyonu ve ambiyans lekeleri boşuna dönüyordu.
+// Artık dekor burada BİR KEZ, sayfaların arkasında çizilir; Dizi ve Film sayfaları
+// saydam. Geçiş animasyonsuz (display), bu yüzden saydam sayfalar üst üste görünmez.
+// İkisi de aynı ayarları kullanıyordu (scope "home", ikon opaklığı 0.3).
+//
 // AÇILIŞ MALİYETİ AYNI: yalnız görünen bölüm kurulur; öteki bölüm eskiden diğer
 // sekmelerle aynı gecikmeyle (AdaptiveTabShell, ~6 sn sonra) arka planda ısıtılır,
 // yoksa ilk geçişte anahtar boş sayfa gösterirdi. Son seçilen bölüm saklanır
@@ -37,6 +44,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { withTiming } from "react-native-reanimated";
 import TvShowScreen from "./TvShowScreen";
 import MovieScreen from "./MovieScreen";
+import ScreenDecor from "../../components/ScreenDecor";
 import MediaTypeSwitch, { MEDIA_SWITCH_HEIGHT } from "../../components/home/MediaTypeSwitch";
 import DiscoverSearchAction, { discoverSearchActionSize } from "../../components/home/DiscoverSearchAction";
 import DiscoverExploreAction from "../../components/home/DiscoverExploreAction";
@@ -122,6 +130,8 @@ export default function DiscoverScreen({ navigation }) {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.primary }]}>
+      {/* TEK dekor katmanı iki sayfanın ARKASINDA (sayfalar saydam). */}
+      <ScreenDecor scope="home" iconOpacity={0.3} />
       {mounted.has("tv") && (
         <View style={mediaType === "tv" ? styles.page : styles.hidden} testID="discover-page-tv">
           <TvShowScreen navigation={navigation} headerTopOffset={DISCOVER_HEADER_OFFSET} />

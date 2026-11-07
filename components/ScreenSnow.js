@@ -21,33 +21,15 @@
 // Katman sırası: ekran arka plan rengi → ikon deseni → kar → içerik.
 
 import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  StyleSheet,
-  InteractionManager,
-  AppState,
-} from "react-native";
+import { View, StyleSheet, InteractionManager } from "react-native";
 import LottieView from "lottie-react-native";
 import { useSnowSettings } from "../context/AppSettingsContext";
 import useReduceMotion from "../hooks/useReduceMotion";
 import useScreenFocused from "../hooks/useScreenFocused";
+import useAppActive from "../hooks/useAppActive";
 
 // Sistem "Hareketi Azalt" ayarı hooks/useReduceMotion'da: ayarlardaki kar
 // önizlemesi de aynı kontrolü kullanıyor.
-
-// Uygulama ön planda mı — arka planda kar dönmesin.
-function useAppActive() {
-  const [active, setActive] = useState(() => AppState.currentState !== "background");
-
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (state) =>
-      setActive(state === "active"),
-    );
-    return () => sub.remove();
-  }, []);
-
-  return active;
-}
 
 function ScreenSnow() {
   const { showSnow } = useSnowSettings();

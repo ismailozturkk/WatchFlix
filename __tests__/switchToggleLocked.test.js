@@ -1,4 +1,4 @@
-// SwitchToggle `locked` kipi: Premium'a özel ayarlar (kar, ikon arka planı, pet)
+// SwitchToggle `locked` kipi: Premium'a özel ayarlar (kar, ikon arka planı, ambiyans)
 // Free'de anahtarı oynatmamalı. ESKİ HATA: anahtar iyimser animasyonu hemen
 // başlatıp sonra onValueChange çağırıyordu; ebeveyn değeri değiştirmeyip
 // yükseltme sayfasını açınca `value` aynı kaldığı için efekt tetiklenmiyor ve

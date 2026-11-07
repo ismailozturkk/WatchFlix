@@ -17,7 +17,6 @@ import MovieBests from "../movie/MovieBests";
 import MovieTrends from "../movie/MovieTrends";
 import MovieCollection from "../movie/MovieCollection";
 import { useMovie } from "../../context/MovieContex";
-import ScreenDecor from "../../components/ScreenDecor";
 import DiscoverHeaderSpacer from "../../components/home/DiscoverHeaderSpacer";
 import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import usePullToRefresh from "../../hooks/usePullToRefresh";
@@ -157,8 +156,9 @@ export default function MovieScreen({ navigation, headerTopOffset = 0 }) {
   );
 
   return (
-    <View style={[{ backgroundColor: theme.primary, flex: 1 }]}>
-      <ScreenDecor scope="home" iconOpacity={0.3} />
+    // Saydam: zemin ve dekor (kar/ikon/ambiyans) DiscoverScreen'de, iki sayfanın
+    // arkasında TEK kez çiziliyor. Bu ekran yalnız orada kullanılıyor.
+    <View style={styles.page}>
       <MarkedFlatList
         data={visibleSections}
         keyExtractor={(item) => item.key}
@@ -187,6 +187,7 @@ export default function MovieScreen({ navigation, headerTopOffset = 0 }) {
 }
 
 const styles = StyleSheet.create({
+  page: { flex: 1 },
   container: {
     paddingBottom: 75,
   },

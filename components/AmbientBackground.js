@@ -33,6 +33,13 @@ import { useEffectPreset } from "../services/effectSettings";
 import useAppActive from "../hooks/useAppActive";
 import useReduceMotion from "../hooks/useReduceMotion";
 import useScreenFocused from "../hooks/useScreenFocused";
+import { getDecorSeed, useDecorSeed } from "../services/decorSeed";
+import {
+  AMBIENT_SEED_SALT,
+  deriveSeed,
+  resolveAmbientBlobCount,
+  seededRandom,
+} from "../utils/decorLayout";
 import {
   AMBIENT_LOOP_MS,
   AMBIENT_MAX_BLOBS,
@@ -95,9 +102,20 @@ function acquireClock(ms) {
 // ── Ortak yerleşim ───────────────────────────────────────────────────────────
 
 let sharedBlobs = null;
-/** Oturum başına bir kez üretilir: ekranlar ve ayar önizlemesi aynı renkleri gösterir. */
-export function getSharedAmbientBlobs() {
-  if (!sharedBlobs) sharedBlobs = buildAmbientBlobs(Math.random, AMBIENT_MAX_BLOBS);
+let sharedBlobsSeed = 0;
+/**
+ * Cihazın desen tohumundan bir kez üretilir (bkz. services/decorSeed.js):
+ * ekranlar, ayar önizlemesi ve sonraki açılışlar AYNI renkleri gösterir.
+ * Leke sayısı yoğunluk ayarıyla değişince yalnız ön dilim değişir, renkler kalır.
+ */
+export function getSharedAmbientBlobs(seed = getDecorSeed()) {
+  if (!sharedBlobs || sharedBlobsSeed !== seed) {
+    sharedBlobs = buildAmbientBlobs(
+      seededRandom(deriveSeed(seed, AMBIENT_SEED_SALT)),
+      AMBIENT_MAX_BLOBS,
+    );
+    sharedBlobsSeed = seed;
+  }
   return sharedBlobs;
 }
 
@@ -215,16 +233,21 @@ export function AmbientBlobs({ width, height, blobs, playing, speed = 1, intensi
 // abonelikleri yalnız burada kurulur. Ayar KAPALIYKEN 46 ekranın hiçbiri bu
 // abonelikleri taşımaz.
 function AmbientLayer() {
-  const { ambientBlobCount, spriteFpsScale } = useEffectPreset();
+  const preset = useEffectPreset();
+  const { ambientDensity, ambientOpacity = 1 } = useAmbientBackgroundSettings();
+  const seed = useDecorSeed();
+  const blobCount = resolveAmbientBlobCount(ambientDensity, preset);
   const playing = useAmbientPlaying(true);
   // Ekran boyutu bir kez alınır, pencere değil `screen`: klavye açılınca pencere
   // küçülüyor (softwareKeyboardLayoutMode: resize) ve lekeler her seferinde
   // yeniden yerleşip zıplardı. Uygulama dikey kilitli; dönmeyi dinlemek gerekmez.
   const [{ width, height }] = useState(() => Dimensions.get("screen"));
   const blobs = useMemo(
-    () => getSharedAmbientBlobs().slice(0, ambientBlobCount),
-    [ambientBlobCount],
+    () => getSharedAmbientBlobs(seed).slice(0, blobCount),
+    [seed, blobCount],
   );
+  // Kaydırıcı sürüklenirken her ondalıkta degrade yeniden kurulmasın.
+  const intensity = Math.round(ambientOpacity * 20) / 20;
 
   return (
     <AmbientBlobs
@@ -232,7 +255,8 @@ function AmbientLayer() {
       height={height}
       blobs={blobs}
       playing={playing}
-      speed={spriteFpsScale}
+      speed={preset.spriteFpsScale}
+      intensity={intensity}
     />
   );
 }

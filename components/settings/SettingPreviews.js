@@ -18,6 +18,7 @@ import LottieView from "lottie-react-native";
 
 import useAppActive from "../../hooks/useAppActive";
 import useReduceMotion from "../../hooks/useReduceMotion";
+import { useDecorSeed } from "../../services/decorSeed";
 import {
   AmbientBlobs,
   getSharedAmbientBlobs,
@@ -83,7 +84,8 @@ export function SnowPreview({ opacity = 0.6 }) {
 export function AmbientPreview({ intensity = 0.7 }) {
   const [size, setSize] = useState(null);
   const playing = useAmbientPlaying(true);
-  const blobs = useMemo(() => getSharedAmbientBlobs().slice(0, 4), []);
+  const seed = useDecorSeed();
+  const blobs = useMemo(() => getSharedAmbientBlobs(seed).slice(0, 4), [seed]);
 
   return (
     <View

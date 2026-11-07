@@ -3,8 +3,14 @@ import React, { useMemo } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
 import { useIconBackgroundSettings } from "../context/AppSettingsContext";
 import { useEffectPreset } from "../services/effectSettings";
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+import { useDecorSeed } from "../services/decorSeed";
+import {
+  ICON_SEED_SALT,
+  buildIconLayout,
+  deriveSeed,
+  resolveIconGrid,
+  seededRandom,
+} from "../utils/decorLayout";
 
 // Desen görselleri ayrı modülde ve LAZY yükleniyor (bkz. iconBackgroundSources.js).
 // Bu dosya 10 ekrandan import edildiği için listeyi burada tutmak, ikon arka
@@ -26,134 +32,123 @@ export function getIconBackgroundSource(index) {
     : null;
 }
 
-// Izgara yoğunluğu EFEKT MODUNDAN gelir: "Tam"da 5x9 = 45 öğe, "Orta"/"Kapalı"da
-// 4x6 = 24 öğe (bkz. utils/deviceTier.js). Modül seviyesinde sabitlenmiyor —
-// kullanıcı ayarı çalışma anında değiştirebiliyor.
+// Izgara yoğunluğu kullanıcının "İçerik yoğunluğu" seçiminden gelir; "auto"
+// efekt modunu izler (Tam 4x7 = 28, Orta 3x6 = 18, Kapalı 3x4 = 12 — bkz.
+// utils/deviceTier.js). Saf yerleşim mantığı utils/decorLayout.js'te.
 //
-// Izgara (Grid) mantığı ile öğeleri dağıtır (üst üste binmeyi önler, boşlukları doldurur).
-// Her hücreyi baz alıp hücre içinde rastgele kaydırır; ardından sırayı karıştırır.
-function buildItems(COLS, ROWS) {
-  const cellWidth = SCREEN_WIDTH / COLS;
-  const cellHeight = SCREEN_HEIGHT / ROWS;
-  const generatedItems = [];
+// PERFORMANS NOTLARI
+//   • Paylaşımlı modda yerleşim cihazda saklanan TOHUMDAN türer: ilk açılışta
+//     bir kez rastgele üretilir, sonra her ekranda ve her açılışta aynı desen.
+//     Yerleşim + element ağacı (tohum, ızgara, opaklık) anahtarıyla modül
+//     önbelleğinde tek kez kurulur, her ekran aynı referansı kullanır.
+//   • Öğe başına sarmalayıcı View YOK: konum/boyut/opaklık doğrudan görselde.
+//     Ekran başına native görünüm sayısı yarıya indi (45 öğe = 90 → 45 görünüm).
+//   • Katman RASTERLEŞTİRİLMEZ (renderToHardwareTextureAndroid/shouldRasterizeIOS):
+//     tam ekran doku her karede ~2,6 MP harmanlar, 28 küçük ikon ~0,4 MP
+//     (hesap, cihazda ölçülmedi). Aynı sebeple "deseni tek bitmap'e çiz" fikri
+//     ancak bitmap ekran çözünürlüğünün altında tutulursa kazandırır.
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("screen");
 
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const size = Math.random() * 15 + 25; // 25px - 40px arası küçük, zarif boyutlar
-      const top = r * cellHeight + Math.random() * (cellHeight - size);
-      const left = c * cellWidth + Math.random() * (cellWidth - size);
-      const imgIndex = Math.floor(Math.random() * ICON_BACKGROUND_COUNT);
-      generatedItems.push({ top, left, size, imgIndex });
-    }
-  }
-  // Görsel sıralama tamamen rastgele görünsün diye karıştır.
-  return generatedItems.sort(() => Math.random() - 0.5);
+function buildItems(rand, cols, rows) {
+  return buildIconLayout(rand, {
+    cols,
+    rows,
+    width: SCREEN_W,
+    height: SCREEN_H,
+    iconCount: ICON_BACKGROUND_COUNT,
+  });
 }
 
-// Verilen öğe listesini desen View'larına dönüştürür.
+// Verilen öğe listesini desen görsellerine dönüştürür.
 function renderItems(items, opacity) {
   const sources = getSources();
   return (
     <View style={styles.background} pointerEvents="none">
       {items.map((item, index) => (
-        <View
+        <Image
           key={index}
-          style={[
-            styles.desen,
-            {
-              width: item.size,
-              height: item.size,
-              top: item.top,
-              left: item.left,
-              opacity,
-            },
-          ]}
-        >
-          <Image
-            source={sources[item.imgIndex]}
-            style={styles.fill}
-            contentFit="contain"
-          />
-        </View>
+          source={sources[item.imgIndex]}
+          contentFit="contain"
+          style={{
+            position: "absolute",
+            width: item.size,
+            height: item.size,
+            top: item.top,
+            left: item.left,
+            opacity,
+          }}
+        />
       ))}
     </View>
   );
 }
 
 // ── Paylaşımlı ("shared") mod ────────────────────────────────────────────────
-// Düzen UYGULAMA OTURUMUNDA BİR KEZ üretilir ve tüm ekranlarda AYNI kullanılır.
-// Ayrıca render edilen element ağacı opaklığa göre bir kez kurulup her ekranda
-// aynı referansla yeniden kullanılır → her ekran mount'unda 45 öğeyi yeniden
-// hesaplamak/kurmak yerine hazır ağaç paylaşılır (rastgele moddan daha hafif).
-// Cache'ler YOĞUNLUĞA göre anahtarlanır: efekt modu değişince ızgara 45↔24
-// öğeye geçiyor ve tek bir düzeni saklamak, mod değiştikten sonra eski öğe
-// sayısını göstermeye devam ederdi.
-const sharedItemsByDensity = new Map();
-const sharedElementCache = new Map();
+// Önbellekler küçük tutulur: tohum değişince (Yeniden oluştur) eskiler boşaltılır.
+const sharedItems = new Map();
+const sharedElements = new Map();
+let cachedSeed = 0;
 
-function getSharedElement(cols, rows, opacity) {
-  const yogunluk = `${cols}x${rows}`;
-  if (!sharedItemsByDensity.has(yogunluk)) {
-    sharedItemsByDensity.set(yogunluk, buildItems(cols, rows));
+export function getSharedIconLayout(seed, cols, rows) {
+  if (seed !== cachedSeed) {
+    sharedItems.clear();
+    sharedElements.clear();
+    cachedSeed = seed;
   }
-  // Saydamlığı 2 ondalığa yuvarla: sürüklenirken sonsuz farklı float değeriyle
-  // cache'in şişmesini engeller (fark görsel olarak belirsiz).
-  const yuvarlak = Math.round(opacity * 100) / 100;
-  const key = `${yogunluk}@${yuvarlak}`;
-  if (!sharedElementCache.has(key)) {
-    sharedElementCache.set(
-      key,
-      renderItems(sharedItemsByDensity.get(yogunluk), yuvarlak),
-    );
+  const key = `${cols}x${rows}`;
+  if (!sharedItems.has(key)) {
+    sharedItems.set(key, buildItems(seededRandom(deriveSeed(seed, ICON_SEED_SALT)), cols, rows));
   }
-  return sharedElementCache.get(key);
+  return sharedItems.get(key);
 }
 
-const IconBacground = React.memo(({ opacity = 0.5 }) => {
+function getSharedElement(seed, cols, rows, opacity) {
+  const items = getSharedIconLayout(seed, cols, rows);
+  // Saydamlığı 2 ondalığa yuvarla: sürüklenirken sonsuz farklı float değeriyle
+  // önbelleğin şişmesini engeller (fark görsel olarak belirsiz).
+  const yuvarlak = Math.round(opacity * 100) / 100;
+  const key = `${cols}x${rows}@${yuvarlak}`;
+  if (!sharedElements.has(key)) {
+    // Kaydırıcı sürüklenirken birikmesin: en fazla birkaç opaklık tutulur.
+    if (sharedElements.size > 8) sharedElements.clear();
+    sharedElements.set(key, renderItems(items, yuvarlak));
+  }
+  return sharedElements.get(key);
+}
+
+function IconPattern({ opacity }) {
   const {
-    showIconBackground,
     iconBackgroundMode,
     iconBackgroundOpacity = 1,
+    iconBackgroundDensity,
   } = useIconBackgroundSettings();
-  const { iconBackgroundCols, iconBackgroundRows } = useEffectPreset();
+  const preset = useEffectPreset();
+  const seed = useDecorSeed();
+  const { cols, rows } = resolveIconGrid(iconBackgroundDensity, preset);
 
   // Ekranın kendi opaklığı, kullanıcının saydamlık çarpanıyla ölçeklenir (çarpan 1 = değişiklik yok).
   const effectiveOpacity = opacity * iconBackgroundOpacity;
 
-  // Rastgele mod: bu ekran örneğine özel düzen (mevcut davranış — mount başına bir kez).
-  // `showIconBackground` de bağımlılık: desen kapalıyken her ekran mount'unda
-  // boşuna 45 öğe hesaplanmasın.
+  // Rastgele mod: bu ekran örneğine özel düzen (mount başına bir kez, Math.random).
   const randomItems = useMemo(
-    () =>
-      showIconBackground && iconBackgroundMode === "random"
-        ? buildItems(iconBackgroundCols, iconBackgroundRows)
-        : null,
-    [showIconBackground, iconBackgroundMode, iconBackgroundCols, iconBackgroundRows],
+    () => (iconBackgroundMode === "random" ? buildItems(Math.random, cols, rows) : null),
+    [iconBackgroundMode, cols, rows],
   );
 
-  if (!showIconBackground) {
-    return null;
-  }
+  if (randomItems) return renderItems(randomItems, effectiveOpacity);
+  return getSharedElement(seed, cols, rows, effectiveOpacity);
+}
 
-  if (iconBackgroundMode === "random") {
-    return renderItems(randomItems, effectiveOpacity);
-  }
-
-  // Paylaşımlı (varsayılan, performanslı): bir kez üretilmiş ortak element
-  // (yoğunluk + opaklığa göre cache'li).
-  return getSharedElement(iconBackgroundCols, iconBackgroundRows, effectiveOpacity);
+// Ayar KAPALIYKEN tohum/efekt modu abonelikleri hiç kurulmaz (57 ekran).
+const IconBacground = React.memo(({ opacity = 0.5 }) => {
+  const { showIconBackground } = useIconBackgroundSettings();
+  if (!showIconBackground) return null;
+  return <IconPattern opacity={opacity} />;
 });
 
 export default IconBacground;
 
 const styles = StyleSheet.create({
-  desen: {
-    position: "absolute",
-  },
-  fill: {
-    width: "100%",
-    height: "100%",
-  },
   background: {
     position: "absolute",
     top: 0,

@@ -38,24 +38,26 @@ export const EFFECT_MODES = ["full", "balanced", "off"];
 
 export const EFFECT_MODE_PRESETS = {
   full: {
-    iconBackgroundCols: 5,
-    iconBackgroundRows: 9,
+    // 4x7 = 28 desen öğesi. 6 Kas'a kadar 5x9 = 45'ti; kullanıcı yoğunluğu
+    // fazla buldu. Eski yoğunluk Kişiselleştirme > İçerik yoğunluğu > "Çok"ta.
+    iconBackgroundCols: 4,
+    iconBackgroundRows: 7,
     spriteFpsScale: 1,
     ambientBlobCount: 5,
     blurEnabled: true,
   },
   balanced: {
-    // 4x7 = 28 desen öğesi (tam modun ~%60'ı)
-    iconBackgroundCols: 4,
-    iconBackgroundRows: 7,
+    // 3x6 = 18 desen öğesi (tam modun ~%65'i)
+    iconBackgroundCols: 3,
+    iconBackgroundRows: 6,
     spriteFpsScale: 0.7,
     ambientBlobCount: 4,
     blurEnabled: true,
   },
   off: {
-    // 3x5 = 15 desen öğesi (tam modun üçte biri)
+    // 3x4 = 12 desen öğesi
     iconBackgroundCols: 3,
-    iconBackgroundRows: 5,
+    iconBackgroundRows: 4,
     spriteFpsScale: 0.5,
     ambientBlobCount: 3,
     blurEnabled: false,
@@ -64,9 +66,9 @@ export const EFFECT_MODE_PRESETS = {
 
 // HER BASAMAK GÖRÜNÜR OLMALI. İlk denemede "orta" ile "kapalı" aynı desen
 // yoğunluğunu paylaşıyordu; aradaki tek fark blur olunca "orta" seçeneği
-// varsayılan kurulumda (desen zaten kapalı, pet yoksa) hiçbir şeyi
+// varsayılan kurulumda (desen zaten kapalıyken) hiçbir şeyi
 // değiştirmiyordu — yani kullanıcıya yalan söyleyen bir seçenekti. Şimdi üç
-// mod da hem yoğunlukta hem kare hızında ayrışıyor: 45 → 28 → 15 öğe,
+// mod da hem yoğunlukta hem kare hızında ayrışıyor: 28 → 18 → 12 öğe,
 // %100 → %70 → %50 kare hızı, blur yalnız "kapalı"da gider.
 
 /** Bilinmeyen mod güvenli ortaya ("balanced") düşer. */

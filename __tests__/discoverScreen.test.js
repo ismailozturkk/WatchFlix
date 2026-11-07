@@ -53,6 +53,7 @@ jest.mock("../components/home/DiscoverSearchAction", () => ({
 }));
 jest.mock("../components/home/DiscoverExploreAction", () => ({ __esModule: true, default: "ExploreAction" }));
 jest.mock("../components/home/DiscoverHeaderSpacer", () => ({ DISCOVER_TOP_MIN: 50 }));
+jest.mock("../components/ScreenDecor", () => ({ __esModule: true, default: "ScreenDecor" }));
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -128,6 +129,17 @@ describe("DiscoverScreen", () => {
     render();
     expect(pageOf("tv")).toHaveLength(1);
     expect(pageOf("movie")).toHaveLength(0);
+  });
+
+  it("dekor (kar/ikon/ambiyans) iki sayfa için TEK kez, sayfaların arkasında çizilir", () => {
+    render();
+    select("movie");
+    const decors = renderer.root.findAllByType("ScreenDecor");
+    expect(decors).toHaveLength(1);
+    expect(decors[0].props).toMatchObject({ scope: "home", iconOpacity: 0.3 });
+    // Kökün İLK çocuğu: iki sayfa ondan sonra gelir, yani önünde durur.
+    const root = renderer.root.findByProps({ testID: "discover-page-tv" }).parent;
+    expect(root.children[0].type).toBe("ScreenDecor");
   });
 
   it("geçiş öteki bölümü kurar, öncekini SÖKMEDEN gizler ve seçimi saklar", () => {

@@ -124,22 +124,22 @@ describe("efekt modları (kullanıcı tercihi)", () => {
 
   test("preset DEĞERLERİ sabitlenir (sessiz kayma testte patlasın)", () => {
     expect(getEffectPreset("full")).toEqual({
-      iconBackgroundCols: 5,
-      iconBackgroundRows: 9,
+      iconBackgroundCols: 4,
+      iconBackgroundRows: 7,
       spriteFpsScale: 1,
       ambientBlobCount: 5,
       blurEnabled: true,
     });
     expect(getEffectPreset("balanced")).toEqual({
-      iconBackgroundCols: 4,
-      iconBackgroundRows: 7,
+      iconBackgroundCols: 3,
+      iconBackgroundRows: 6,
       spriteFpsScale: 0.7,
       ambientBlobCount: 4,
       blurEnabled: true,
     });
     expect(getEffectPreset("off")).toEqual({
       iconBackgroundCols: 3,
-      iconBackgroundRows: 5,
+      iconBackgroundRows: 4,
       spriteFpsScale: 0.5,
       ambientBlobCount: 3,
       blurEnabled: false,

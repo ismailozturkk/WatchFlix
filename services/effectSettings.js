@@ -2,9 +2,9 @@
 //
 // Görsel efekt modunun (Tam / Orta / Kapalı) TEK KAYNAĞI.
 //
-// NEDEN AYRI BİR STORE: efekt bütçesini okuyan üç yer de (AdaptiveBlurView,
-// IconBacground, SpritePet) render sırasında senkron bir değer istiyor ve
-// ikisi bunu eskiden MODÜL SEVİYESİNDE sabitliyordu — kullanıcı ayarı
+// NEDEN AYRI BİR STORE: efekt bütçesini okuyan yerler (AdaptiveBlurView,
+// IconBacground) render sırasında senkron bir değer istiyor ve bu değer
+// eskiden MODÜL SEVİYESİNDE sabitleniyordu — kullanıcı ayarı
 // değiştirdiğinde uygulamayı yeniden başlatmadan etkisi görünmezdi. Burada
 // değer bir abonelik kaynağı: `useEffectPreset()` ile okuyan bileşen mod
 // değişince yeniden çizilir.
