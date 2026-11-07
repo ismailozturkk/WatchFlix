@@ -431,6 +431,9 @@ export async function setAvatarIndex(uid, avatar, photoURL = null, { stampIdenti
     // fotoğrafa yapışıp senkronu yanlış yöne çekmesin.
     patch.photoSource = choice.photoSource || deleteField();
   }
+  // Kişi etiketi ({ id, name }) yalnız oyuncu/yönetmen fotoğrafında durur;
+  // başka bir seçimde eski kişinin adı önizlemede görünmesin diye silinir.
+  patch.photoPerson = choice.photoPerson || deleteField();
   await updateUserProfile(uid, patch, { stampIdentity });
   propagateProfileChange(uid, avatarSnapshot(choice)).catch(() => {});
 }

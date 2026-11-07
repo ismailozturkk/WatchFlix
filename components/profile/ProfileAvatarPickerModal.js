@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -21,20 +21,40 @@ import {
   AVATARS,
   AVATAR_COUNT,
   CUSTOM_AVATAR_INDEX,
+  avatarContentPosition,
+  avatarRenderPx,
   getAvatarSource,
 } from "@utils/avatars";
-import { buildAvatarChoices, sameAvatarChoice } from "@utils/avatarPhotos";
+import {
+  buildAvatarChoices,
+  isPersonPhotoSource,
+  PERSON_PHOTO_SOURCE,
+  sameAvatarChoice,
+} from "@utils/avatarPhotos";
 import { OWN_PHOTO_CHECK_TTL_MS } from "@utils/photoRevalidation";
 import { i18nText } from "@utils/i18nText";
 import useFreshPhotoSource from "../../hooks/useFreshPhotoSource";
+import PersonAvatarPanel from "./PersonAvatarPanel";
 
 const PROVIDER_ICON = {
   "google.com": "logo-google",
   "apple.com": "logo-apple",
+  [PERSON_PHOTO_SOURCE]: "film",
 };
 
-function photoLabel(photoSource) {
-  return photoSource === "google.com"
+// Seçicinin iki sekmesi: hazır avatarlar + bağlı hesap fotoğrafları |
+// oyuncu/yönetmen fotoğrafları (TMDB).
+const TABS = ["avatars", "people"];
+// Izgara hücresi ~70 pt (5 sütun): kişi fotoğrafında küçük kopya yeter.
+const CELL_PX = avatarRenderPx(72);
+
+function photoLabel(item) {
+  if (isPersonPhotoSource(item.photoSource)) {
+    return item.photoPerson?.name
+      ? i18nText("autoI18n.avatar_kisi_etiketi", "{{name}} fotoğrafı", { name: item.photoPerson.name })
+      : i18nText("autoI18n.avatar_kisi_fotografi", "Oyuncu fotoğrafı");
+  }
+  return item.photoSource === "google.com"
     ? i18nText("autoI18n.google_fotografi", "Google fotoğrafı")
     : i18nText("autoI18n.hesap_fotografi", "Hesap fotoğrafı");
 }
@@ -44,7 +64,7 @@ const AvatarCell = memo(function AvatarCell({ item, selected, accent, onSelect }
   // Bağlı hesap fotoğrafları kullanıcının kendisinin: seçici açılınca kısa
   // aralıkla denetlenir (Google'da değişen resim aynı adresten gelir).
   const avatarSource = useFreshPhotoSource(
-    getAvatarSource(item.avatarIndex, item.photoURL),
+    getAvatarSource(item.avatarIndex, item.photoURL, CELL_PX),
     isPhoto ? { maxAgeMs: OWN_PHOTO_CHECK_TTL_MS, priority: true } : undefined,
   );
 
@@ -60,7 +80,7 @@ const AvatarCell = memo(function AvatarCell({ item, selected, accent, onSelect }
       accessibilityState={{ selected }}
       accessibilityLabel={
         isPhoto
-          ? photoLabel(item.photoSource)
+          ? photoLabel(item)
           : i18nText("autoI18n.avatar_n", "Avatar {{n}}", { n: item.avatarIndex + 1 })
       }
     >
@@ -68,6 +88,7 @@ const AvatarCell = memo(function AvatarCell({ item, selected, accent, onSelect }
         source={avatarSource}
         style={styles.avatar}
         contentFit="cover"
+        contentPosition={avatarContentPosition(avatarSource)}
         cachePolicy="memory-disk"
         recyclingKey={item.key}
         // Süresi dolmuş sağlayıcı adresi boş hücre bırakmasın.
@@ -114,6 +135,14 @@ export default function ProfileAvatarPickerModal({
   const insets = useSafeAreaInsets();
 
   const current = selected || myAvatar;
+  // Açılışta seçili avatarın sekmesi: kişi fotoğrafıysa "Oyuncu & Yönetmen".
+  const tabFor = (choice) => (isPersonPhotoSource(choice?.photoSource) ? "people" : "avatars");
+  const [tab, setTab] = useState(() => tabFor(current));
+  useEffect(() => {
+    if (visible) setTab(tabFor(current));
+    // Yalnız açılışta; açıkken seçim değişince sekme zıplamasın.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
   const choices = useMemo(
     () => buildAvatarChoices({ linkedPhotos, current }),
     [linkedPhotos, current]
@@ -181,13 +210,15 @@ export default function ProfileAvatarPickerModal({
             {i18nText("autoI18n.avatar_sec", "Avatar seç")}
           </Text>
           <Text style={[styles.subtitle, { color: theme.text.muted }]}>
-            {photoCount > 0
-              ? i18nText("autoI18n.profil_fotografi_ve_n_avatar", "Profil fotoğrafın ve {{n}} avatar", {
-                  n: AVATAR_COUNT,
-                })
-              : i18nText("autoI18n.n_avatar", "{{n}} avatar", {
-                  n: AVATAR_COUNT,
-                })}
+            {tab === "people"
+              ? i18nText("autoI18n.avatar_kisi_altbaslik", "Oyuncu ve yönetmen fotoğrafları")
+              : photoCount > 0
+                ? i18nText("autoI18n.profil_fotografi_ve_n_avatar", "Profil fotoğrafın ve {{n}} avatar", {
+                    n: AVATAR_COUNT,
+                  })
+                : i18nText("autoI18n.n_avatar", "{{n}} avatar", {
+                    n: AVATAR_COUNT,
+                  })}
           </Text>
         </View>
         <GlassCloseButton
@@ -200,7 +231,41 @@ export default function ProfileAvatarPickerModal({
         />
       </View>
 
-      {hasGooglePhoto ? (
+      <View style={[styles.tabs, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+        {TABS.map((id) => {
+          const active = tab === id;
+          return (
+            <GlassTouchable
+              key={id}
+              activeOpacity={0.8}
+              onPress={() => setTab(id)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              style={[styles.tab, active && { backgroundColor: theme.accent }]}
+            >
+              <Ionicons
+                name={id === "people" ? "film-outline" : "happy-outline"}
+                size={14}
+                color={active ? "#fff" : theme.text.secondary}
+              />
+              <Text
+                numberOfLines={1}
+                style={[styles.tabText, { color: active ? "#fff" : theme.text.secondary }]}
+              >
+                {id === "people"
+                  ? i18nText("autoI18n.avatar_sekme_oyuncular", "Oyuncu & Yönetmen")
+                  : i18nText("autoI18n.avatar_sekme_avatarlar", "Avatarlar")}
+              </Text>
+            </GlassTouchable>
+          );
+        })}
+      </View>
+
+      {tab === "people" ? (
+        <PersonAvatarPanel current={current} onSelect={chooseAvatar} disabled={saving} />
+      ) : null}
+
+      {tab !== "avatars" ? null : hasGooglePhoto ? (
         <View style={[styles.hint, { backgroundColor: theme.accent + "12" }]}>
           <Ionicons name="sync-outline" size={14} color={theme.accent} />
           <Text style={[styles.hintText, { color: theme.text.secondary }]}>
@@ -229,6 +294,7 @@ export default function ProfileAvatarPickerModal({
         </GlassTouchable>
       ) : null}
 
+      {tab === "avatars" ? (
       <FlatList
         data={choices}
         extraData={current}
@@ -244,6 +310,7 @@ export default function ProfileAvatarPickerModal({
         windowSize={4}
         removeClippedSubviews={Platform.OS === "android"}
       />
+      ) : null}
 
       {saving && (
         <View style={styles.savingOverlay}>
@@ -330,6 +397,24 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
     zIndex: 2,
   },
+  tabs: {
+    flexDirection: "row",
+    gap: 4,
+    padding: 3,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 12,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    height: 34,
+    borderRadius: 11,
+  },
+  tabText: { fontSize: 12.5, fontWeight: "800", flexShrink: 1 },
   hint: {
     flexDirection: "row",
     alignItems: "center",

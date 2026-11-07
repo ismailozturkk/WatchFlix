@@ -15,6 +15,7 @@ import UserAvatar from "../common/UserAvatar";
 // düşürür (bkz. GlassPillButton kuralları) — düz hap düğme.
 import PillButton from "../friends/PillButton";
 import { useTheme } from "../../context/ThemeContext";
+import { i18nText } from "../../utils/i18nText";
 
 const { width } = Dimensions.get("window");
 const AVATAR_SIZE = Math.min(Math.round(width * 0.72), 280);
@@ -33,6 +34,10 @@ const AVATAR_SIZE = Math.min(Math.round(width * 0.72), 280);
  * @param {{ label: string, icon?: string, onPress: Function }} [props.action] -
  *   Kartin altindaki istege bagli dugme (kendi profilinde "Profilini gor").
  *   Modal TAMAMEN kapaninca calisir: hedef ekran modalin altina degil ustune gelir.
+ * @param {{ id: number, name: string } | null} [props.person] - Avatar bir
+ *   oyuncu/yonetmen fotografiysa kisi (Users.photoPerson). Kartta "X fotografi"
+ *   hapi cizilir; dokununca (modal kapaninca) onPersonPress(person) calisir.
+ * @param {Function} [props.onPersonPress]
  */
 export default function AvatarPreviewModal({
   visible,
@@ -42,6 +47,8 @@ export default function AvatarPreviewModal({
   displayName,
   username,
   action,
+  person = null,
+  onPersonPress,
 }) {
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(visible);
@@ -87,6 +94,11 @@ export default function AvatarPreviewModal({
     pendingActionRef.current = action?.onPress ?? null;
     handleClose();
   }, [action, handleClose]);
+
+  const handlePerson = useCallback(() => {
+    pendingActionRef.current = onPersonPress && person ? () => onPersonPress(person) : null;
+    handleClose();
+  }, [onPersonPress, person, handleClose]);
 
   useEffect(() => {
     if (visible) {
@@ -214,6 +226,21 @@ export default function AvatarPreviewModal({
               ) : null}
             </View>
           )}
+
+          {person?.name ? (
+            // Avatar bir oyuncu/yönetmen fotoğrafı: kimin olduğu + kişi sayfası.
+            <View style={styles.actionWrap} onTouchEnd={(e) => e.stopPropagation()}>
+              <PillButton
+                label={i18nText("autoI18n.avatar_kisi_etiketi", "{{name}} fotoğrafı", { name: person.name })}
+                icon="film-outline"
+                variant="soft"
+                size="sm"
+                onPress={onPersonPress ? handlePerson : undefined}
+                disabled={!onPersonPress}
+                style={styles.actionButton}
+              />
+            </View>
+          ) : null}
 
           {action?.label ? (
             // Zemin her dokunuşun sonunda (onTouchEnd) kapanır; düğmenin dokunuşu

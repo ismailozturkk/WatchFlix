@@ -10,17 +10,61 @@
 //                fotoğraf değişince ya da bağlantı kaldırılınca avatarın neye
 //                göre tazeleneceğini bu söyler. Eski hesaplarda yoktur;
 //                `inferPhotoSource` adresten çıkarır ve senkron geri yazar.
+//                "tmdb.person" (PERSON_PHOTO_SOURCE) = oyuncu/yönetmen
+//                fotoğrafı: bağlı hesap DEĞİL, senkron ona hiç dokunmaz.
+//   photoPerson  yalnız kişi fotoğrafında: { id, name } (TMDB kişi). Önizlemede
+//                "kimin fotoğrafı" etiketi ve kişi sayfasına geçiş için.
 //
 // Bir "avatar seçimi" her yerde aynı biçimdedir:
-//   { avatarIndex, photoURL, photoSource }
-// Hazır avatarda photoURL/photoSource null'dır.
+//   { avatarIndex, photoURL, photoSource, photoPerson? }
+// Hazır avatarda photoURL/photoSource null'dır; photoPerson yalnız kişi
+// fotoğrafında bulunur (anahtar başka seçimde hiç yoktur).
 
 import {
   AVATAR_COUNT,
   CUSTOM_AVATAR_INDEX,
   DEFAULT_AVATAR_INDEX,
   clampAvatarIndex,
+  isTmdbPhotoUrl,
+  tmdbPersonPhotoUrl,
+  tmdbPhotoFile,
 } from "./avatars";
+
+// Oyuncu / yönetmen fotoğrafı avatarının kaynak adı. Sağlayıcı kimliklerinden
+// ("google.com") ayrı tutulur: planAvatarPhotoSync bunu bağlı hesap sanıp
+// "hesap kaldırılmış" diye avatarı geri çevirmesin.
+export const PERSON_PHOTO_SOURCE = "tmdb.person";
+
+export const isPersonPhotoSource = (source) => source === PERSON_PHOTO_SOURCE;
+
+const PERSON_NAME_MAX = 120;
+
+/** { id, name } — geçerli TMDB kişisi değilse null. */
+export function normalizePhotoPerson(person) {
+  if (!person || typeof person !== "object") return null;
+  const id = Number(person.id);
+  const name = typeof person.name === "string" ? person.name.trim().slice(0, PERSON_NAME_MAX) : "";
+  if (!Number.isInteger(id) || id <= 0 || !name) return null;
+  return { id, name };
+}
+
+/**
+ * TMDB kişisinden (arama sonucu, favori oyuncu girişi, takip kaydı) avatar
+ * seçimi. Yetişkin işaretli ya da fotoğrafsız kişi avatar olamaz → null.
+ * Avatar herkese görünür: yetişkin içerik ayarı açık olsa bile süzülür.
+ */
+export function personAvatarChoice(person) {
+  if (!person || typeof person !== "object" || person.adult === true) return null;
+  const photoURL = tmdbPersonPhotoUrl(person.profile_path ?? person.photo ?? person.image ?? null);
+  const who = normalizePhotoPerson({ id: person.id, name: person.name ?? person.title });
+  if (!photoURL || !who) return null;
+  return {
+    avatarIndex: CUSTOM_AVATAR_INDEX,
+    photoURL,
+    photoSource: PERSON_PHOTO_SOURCE,
+    photoPerson: who,
+  };
+}
 
 // Fotoğraf verebilen sağlayıcılar, seçicide gösterim sırasıyla. Apple profil
 // fotoğrafı VERMEZ (Sign in with Apple yalnız ad + e-posta paylaşır); listede
@@ -64,6 +108,9 @@ export function isGooglePhotoUrl(url) {
 export function photoKey(url) {
   const clean = cleanUrl(url);
   if (!clean) return null;
+  // TMDB aynı resmi /w185/, /h632/ … boyutlarıyla verir; dosya adı kimliktir.
+  const tmdbFile = tmdbPhotoFile(clean);
+  if (tmdbFile) return `tmdb:${tmdbFile}`;
   if (!isGooglePhotoUrl(clean)) return clean;
   return clean
     .replace(/[?&]sz=\d+/i, "")
@@ -142,6 +189,7 @@ export function inferPhotoSource(profile, linkedPhotos = []) {
   }
   const url = profile?.photoURL;
   if (!cleanUrl(url)) return null;
+  if (isTmdbPhotoUrl(url)) return PERSON_PHOTO_SOURCE;
   const match = linkedPhotos.find((p) => samePhoto(p.uri, url));
   if (match) return match.providerId;
   if (isGooglePhotoUrl(url)) return "google.com";
@@ -171,6 +219,9 @@ export function planAvatarPhotoSync({ profile, providerIds = [], linkedPhotos = 
 
   const source = inferPhotoSource(profile, linkedPhotos);
   if (!source) return none;
+  // Oyuncu/yönetmen fotoğrafı kullanıcının bilinçli seçimi; hiçbir bağlı
+  // hesaba ait değil — tazelenecek ya da geri çevrilecek bir şey yok.
+  if (isPersonPhotoSource(source)) return none;
 
   // providerData boş geldiyse (oturum yarı kurulmuş) hiçbir şey bilinmiyor;
   // emin olmadan kullanıcının avatarını değiştirme.
@@ -208,14 +259,26 @@ export function toAvatarChoice(value, fallbackPhoto = null) {
       return { avatarIndex: index, photoURL: null, photoSource: null };
     }
     const own = cleanUrl(value.photoURL);
+    const from = own ? value : fallbackPhoto;
     const photoURL = own || cleanUrl(fallbackPhoto?.photoURL);
     if (!photoURL) {
       return { avatarIndex: DEFAULT_AVATAR_INDEX, photoURL: null, photoSource: null };
     }
+    // Kaynak adresle tutarlı olmalı: TMDB adresi her zaman kişi fotoğrafıdır;
+    // kişi kaynağı TMDB dışı bir adrese yapışmaz (senkron yanlış yöne gitmesin).
+    const declared = from?.photoSource ?? null;
+    const isPerson = isTmdbPhotoUrl(photoURL);
+    const photoSource = isPerson
+      ? PERSON_PHOTO_SOURCE
+      : isPersonPhotoSource(declared)
+        ? null
+        : declared;
+    const photoPerson = isPerson ? normalizePhotoPerson(from?.photoPerson) : null;
     return {
       avatarIndex: CUSTOM_AVATAR_INDEX,
       photoURL,
-      photoSource: (own ? value.photoSource : fallbackPhoto?.photoSource) ?? null,
+      photoSource,
+      ...(photoPerson ? { photoPerson } : {}),
     };
   }
   return toAvatarChoice({ avatarIndex: value }, fallbackPhoto);
@@ -242,6 +305,7 @@ export function profileAvatarChoice(profile, { fallbackIndex = DEFAULT_AVATAR_IN
       avatarIndex: index,
       photoURL: cleanUrl(profile?.photoURL) || cleanUrl(authPhotoURL),
       photoSource: profile?.photoSource ?? null,
+      photoPerson: profile?.photoPerson ?? null,
     },
   );
 }
@@ -257,6 +321,22 @@ export function avatarSnapshot(choice) {
     avatarIndex: c.avatarIndex,
     photoURL: c.avatarIndex === CUSTOM_AVATAR_INDEX ? c.photoURL || null : null,
   };
+}
+
+/**
+ * Serbest biçimli bir kimlikten ({ avatarIndex, photoURL } — arkadaş kaydı,
+ * üye bilgisi, profil belgesi) anlık kopyaya yazılacak avatar alanları.
+ * Servisler çağıranın ne geçtiğine güvenmeden bu kuralı uygular: hazır
+ * avatarda fotoğraf yazılmaz, fotoğraf avatarında adres taşınır, fotoğrafı
+ * olmayan -1 varsayılan avatara iner.
+ */
+export function identityAvatar(identity) {
+  return avatarSnapshot(
+    toAvatarChoice({
+      avatarIndex: identity?.avatarIndex,
+      photoURL: identity?.photoURL ?? null,
+    }),
+  );
 }
 
 /**
@@ -282,6 +362,7 @@ export function buildAvatarChoices({ linkedPhotos = [], current = null } = {}) {
       avatarIndex: CUSTOM_AVATAR_INDEX,
       photoURL: current.photoURL,
       photoSource: current.photoSource ?? null,
+      ...(current.photoPerson ? { photoPerson: current.photoPerson } : {}),
     });
   }
   const presets = Array.from({ length: AVATAR_COUNT }, (_, i) => ({

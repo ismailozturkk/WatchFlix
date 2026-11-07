@@ -33,6 +33,7 @@ import ScreenDecor from "../../components/ScreenDecor";
 import { LocalBlurTarget, useLocalBlurTarget } from "../../components/common/BlurTarget";
 
 import FollowPersonButton from "../../components/person/FollowPersonButton";
+import PersonAvatarButton from "../../components/person/PersonAvatarButton";
 import GlassTouchable from "../../components/common/GlassTouchable";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
 import usePosterUri from "../../hooks/usePosterUri";
@@ -446,7 +447,11 @@ const ActorViewScreen = ({ route, navigation }) => {
                 </View>
               )}
             </View>
-            <FollowPersonButton person={actor} style={styles.followBtn} />
+            <View style={styles.heroActions}>
+              <FollowPersonButton person={actor} />
+              {/* Kişinin fotoğrafını profil avatarı yap (onaylı; fotoğrafsızsa çizilmez). */}
+              <PersonAvatarButton person={actor} />
+            </View>
           </View>
         </View>
 
@@ -708,7 +713,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   popText: { color: "#f5c518", fontSize: 12, fontWeight: "700" },
-  followBtn: { marginTop: 12 },
+  heroActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
 
   // ── Info pills ────────────────────────────────────────────────────────────
   pillsRow: {

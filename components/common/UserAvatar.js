@@ -14,7 +14,14 @@
 import React, { memo, useCallback, useState } from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { Image } from "expo-image";
-import { getAvatarSource, CUSTOM_AVATAR_INDEX, DEFAULT_AVATAR_INDEX, AVATARS } from "@utils/avatars";
+import {
+  getAvatarSource,
+  CUSTOM_AVATAR_INDEX,
+  DEFAULT_AVATAR_INDEX,
+  AVATARS,
+  avatarContentPosition,
+  avatarRenderPx,
+} from "@utils/avatars";
 import useFreshPhotoSource from "../../hooks/useFreshPhotoSource";
 import Skeleton from "../Skeleton";
 
@@ -63,8 +70,9 @@ const UserAvatar = memo(function UserAvatar({
   const [failedUri, setFailedUri] = useState(null);
   // Google fotoğrafı adresi değişmeden yenilenir; önbellekteki eski kopya
   // arka planda denetlenir (bkz. utils/photoRevalidation.js).
+  // Boyut bilgisi: kişi (TMDB) fotoğrafında küçük avatar küçük kopyayı indirir.
   const candidate = useFreshPhotoSource(
-    source ?? getAvatarSource(avatarIndex, photoURL) ?? fallbackSource,
+    source ?? getAvatarSource(avatarIndex, photoURL, avatarRenderPx(size)) ?? fallbackSource,
   );
   const candidateUri = typeof candidate === "object" ? candidate?.uri || null : null;
   const handleError = useCallback(() => {
@@ -106,6 +114,8 @@ const UserAvatar = memo(function UserAvatar({
           imageStyle,
         ]}
         contentFit={cover ? "cover" : "contain"}
+        // Oyuncu/yönetmen portresi (2:3) kareye kırpılınca yüz üstte kalır.
+        contentPosition={avatarContentPosition(resolvedSource)}
         priority={priority}
         cachePolicy={cachePolicy}
         onError={candidateUri ? handleError : undefined}

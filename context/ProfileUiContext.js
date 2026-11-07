@@ -126,6 +126,10 @@ export const ProfileUiProvider = ({ children }) => {
     profile?.avatarIndex,
     profile?.photoURL,
     profile?.photoSource,
+    // Kişi fotoğrafı etiketi ({ id, name }): nesne her anlık görüntüde yeni
+    // gelir, alanlarına bağlanılır.
+    profile?.photoPerson?.id,
+    profile?.photoPerson?.name,
     cachedIndex,
     user?.photoURL,
     linkedPhotos,
