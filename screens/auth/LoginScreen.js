@@ -30,6 +30,7 @@ import Toast from "@components/AppToast";
 import { useLanguage } from "../../context/LanguageContext";
 import { Keys, get, set } from "../../services/storage";
 import * as SecureStore from "expo-secure-store";
+import AuthPosterField from "../../components/auth/AuthPosterField";
 import ScreenDecor from "../../components/ScreenDecor";
 import GlassPillButton from "../../components/common/GlassPillButton";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
@@ -73,8 +74,10 @@ const buzz = () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
 // Kayıtlı hesap çipleri: ekran genişliği - yatay padding - komşu çipin ucu.
 // Kaydırma çip genişliği + boşluk aralığına yapışır (snap).
 const { width: SCREEN_W } = Dimensions.get("window");
-const CHIP_GAP = 10;
-const CHIP_W = Math.min(SCREEN_W - 68, 400);
+const CHIP_GAP = 8;
+// Ekranda en az 3 çip tam görünür, dördüncünün ucu "kaydırılabilir" ipucu olarak
+// taşar (3,3 çip genişliği). Çip dikey: avatar üstte, ad altta.
+const CHIP_W = Math.floor((SCREEN_W - 44 - 2 * CHIP_GAP) / 3.3);
 
 // ── "Beni Hatırla" parolası ───────────────────────────────────────────────────
 // Parola AsyncStorage'da DÜZ METİN tutuluyordu; Android'de bu, uygulamanın
@@ -328,6 +331,7 @@ export default function LoginScreen({ navigation }) {
         translucent
         backgroundColor="transparent"
       />
+      <AuthPosterField surface={theme.primary} isLightTheme={isLightTheme} />
       <AuthBackdrop accent={accent} isLightTheme={isLightTheme} />
       <ScreenDecor scope="auth" iconOpacity={isLightTheme ? 0.05 : 0.08} />
 
@@ -384,6 +388,8 @@ export default function LoginScreen({ navigation }) {
                 {recentUsers.map((user) => (
                   <AuthPressable
                     key={user.email}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${i18nText("autoI18n.kayitli_hesap", "Kayıtlı hesap")}: ${user.email}`}
                     disabled={isloading}
                     onPress={() => handleUserPress(user)}
                     onLongPress={() => removeRecentUser(user)}
@@ -405,38 +411,29 @@ export default function LoginScreen({ navigation }) {
                       <Text style={[styles.savedAvatarText, { color: onAccent }]}>
                         {getInitials(user.email)}
                       </Text>
+                      <View
+                        style={[
+                          styles.savedAvatarDot,
+                          { backgroundColor: accent, borderColor: theme.primary },
+                        ]}
+                      />
                     </LinearGradient>
-                    <View style={styles.savedTextArea}>
-                      <Text
-                        allowFontScaling={false}
-                        style={[styles.savedLabel, { color: theme.text.muted }]}
-                      >
-                        {i18nText("autoI18n.kayitli_hesap", "Kayıtlı hesap")}
-                      </Text>
-                      <Text
-                        allowFontScaling={false}
-                        numberOfLines={1}
-                        style={[styles.savedName, { color: theme.text.primary }]}
-                      >
-                        {user.email.split("@")[0]}
-                      </Text>
-                    </View>
+                    <Text
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                      style={[styles.savedName, { color: theme.text.primary }]}
+                    >
+                      {user.email.split("@")[0]}
+                    </Text>
                     <TouchableOpacity
                       accessibilityRole="button"
+                      accessibilityLabel={i18nText("autoI18n.kaldir", "Kaldır")}
                       style={styles.savedRemove}
                       onPress={() => removeRecentUser(user)}
-                      hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Ionicons name="close-circle" size={18} color={theme.text.muted} />
+                      <Ionicons name="close" size={12} color={theme.text.muted} />
                     </TouchableOpacity>
-                    <LinearGradient
-                      colors={accentGradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.savedGo}
-                    >
-                      <Ionicons name="arrow-forward" size={16} color={onAccent} />
-                    </LinearGradient>
                   </AuthPressable>
                 ))}
               </ScrollView>
@@ -448,6 +445,8 @@ export default function LoginScreen({ navigation }) {
             <AuthCard theme={theme} accent={accent}>
               <AuthCardHeader
                 theme={theme}
+                accent={accent}
+                eyebrow={i18nText("autoI18n.guvenli_giris", "GÜVENLİ GİRİŞ")}
                 title={i18nText("autoI18n.giris_kart_baslik", "Tekrar hoş geldin")}
                 // Apple düğmesi yalnız destekleyen cihazda çiziliyor; alt başlık
                 // olmayan seçeneği saymasın (T3 B4).
@@ -577,6 +576,7 @@ export default function LoginScreen({ navigation }) {
                 {isAppleAvailable ? (
                   <AuthAppleButton
                     label={i18nText("autoI18n.apple_ile_giris_yap", "Apple ile giriş yap")}
+                    compact
                     theme={theme}
                     loading={isAppleLoading}
                     disabled={socialBusy}
@@ -590,6 +590,7 @@ export default function LoginScreen({ navigation }) {
                 {/* Google ile giriş */}
                 <AuthGoogleButton
                   label={i18nText("autoI18n.google_ile_giris_yap", "Google ile giriş yap")}
+                  compact
                   theme={theme}
                   loading={isGoogleLoading}
                   disabled={socialBusy}
@@ -676,48 +677,46 @@ const styles = StyleSheet.create({
   },
   savedChip: {
     width: CHIP_W,
-    minHeight: 62,
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
-    flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingLeft: 12,
-    paddingRight: 12,
-    paddingVertical: 10,
+    gap: 6,
+    paddingHorizontal: 6,
+    paddingTop: 10,
+    paddingBottom: 8,
   },
   savedAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
   savedAvatarText: {
-    fontSize: 17,
-    fontWeight: "800",
+    fontSize: 14,
+    fontWeight: "900",
   },
-  savedTextArea: {
-    flex: 1,
-    minWidth: 0,
-  },
-  savedLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.2,
+  savedAvatarDot: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    borderWidth: 2,
   },
   savedName: {
-    fontSize: 15,
-    fontWeight: "800",
-    marginTop: 1,
+    alignSelf: "stretch",
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: "700",
   },
   savedRemove: {
-    padding: 2,
-  },
-  savedGo: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -754,6 +753,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   socialStack: {
+    flexDirection: "row",
     gap: 10,
   },
 });

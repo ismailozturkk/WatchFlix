@@ -19,6 +19,7 @@ import Toast from "@components/AppToast";
 import { useLanguage } from "../../context/LanguageContext";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AuthPosterField from "../../components/auth/AuthPosterField";
 import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import {
@@ -99,6 +100,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         translucent
         backgroundColor="transparent"
       />
+      <AuthPosterField surface={theme.primary} isLightTheme={isLightTheme} />
       <AuthBackdrop accent={accent} isLightTheme={isLightTheme} />
       <ScreenDecor scope="auth" iconOpacity={isLightTheme ? 0.05 : 0.08} />
 
@@ -125,6 +127,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                       <Ionicons name="key-outline" size={30} color={accent} />
                     </AuthBadge>
                   }
+                  titleSize={32}
                   title={i18nText("autoI18n.hesap_erisimini_kurtar", "Hesap erişimini kurtar")}
                   subtitle={i18nText(
                     "autoI18n.sifre_sifirlama_baglantisi_epostana_gonderilecek",
@@ -194,7 +197,12 @@ export default function ForgotPasswordScreen({ navigation }) {
           ) : (
             /* Başarı durumu */
             <Reveal style={authColumn}>
-              <AuthCard theme={theme} accent={AUTH_SUCCESS} style={styles.successCard}>
+              <AuthCard
+                theme={theme}
+                accent={AUTH_SUCCESS}
+                variant="panel"
+                style={styles.successCard}
+              >
                 <AuthBadge accent={accent} tone={AUTH_SUCCESS} surface={theme.secondary}>
                   <Ionicons name="checkmark" size={38} color={AUTH_SUCCESS} />
                 </AuthBadge>

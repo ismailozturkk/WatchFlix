@@ -57,8 +57,8 @@ export const AUTH_WARN = "#f39c12";
 // Ekran içeriğinin ortak sütunu: dar telefonda tam genişlik, tablette ortada.
 export const authColumn = { width: "100%", maxWidth: 440, alignSelf: "center" };
 
-const FIELD_H = 58;
 const FIELD_RADIUS = 18;
+const ACTION_RADIUS = 20;
 
 // Sosyal giriş düğmeleri (Apple / Google) AYNI yükseklik, köşe, ikon yuvası ve
 // yazı boyutunu paylaşır: eskiden Apple'ın yerel düğmesi yazı boyutunu
@@ -153,6 +153,7 @@ export function AuthBackdrop({ accent, isLightTheme }) {
   // iki gradyan birbirine karışır; her örneğe ayrı id (bkz. AppBadge).
   const rid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const topId = `auth${rid}top`;
+  const sideId = `auth${rid}side`;
   const lowId = `auth${rid}low`;
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -172,6 +173,19 @@ export function AuthBackdrop({ accent, isLightTheme }) {
             <Stop offset="1" stopColor={accent} stopOpacity="0" />
           </RadialGradient>
           <RadialGradient
+            id={sideId}
+            cx="0%"
+            cy="48%"
+            fx="0%"
+            fy="48%"
+            rx="72%"
+            ry="34%"
+          >
+            <Stop offset="0" stopColor={accent} stopOpacity={isLightTheme ? 0.12 : 0.18} />
+            <Stop offset="0.7" stopColor={accent} stopOpacity="0.025" />
+            <Stop offset="1" stopColor={accent} stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient
             id={lowId}
             cx="100%"
             cy="100%"
@@ -185,6 +199,7 @@ export function AuthBackdrop({ accent, isLightTheme }) {
           </RadialGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${topId})`} />
+        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${sideId})`} />
         <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${lowId})`} />
       </Svg>
     </View>
@@ -200,28 +215,19 @@ export function AuthBackdrop({ accent, isLightTheme }) {
  */
 export function AuthBadge({ accent, surface, size = 76, tone, children }) {
   const color = tone || accent;
-  const ring = size + 26;
+  const frame = size + 12;
   return (
-    <View style={{ width: ring, height: ring, alignItems: "center", justifyContent: "center" }}>
+    <View style={{ width: frame, height: frame, alignItems: "center", justifyContent: "center" }}>
       <View
         style={{
           position: "absolute",
-          width: ring,
-          height: ring,
-          borderRadius: ring / 2,
-          backgroundColor: alpha(color, 0.07),
+          width: frame,
+          height: frame,
+          borderRadius: frame * 0.36,
+          backgroundColor: alpha(color, 0.1),
           borderWidth: 1,
-          borderColor: alpha(color, 0.14),
-        }}
-      />
-      <View
-        style={{
-          position: "absolute",
-          width: size + 12,
-          height: size + 12,
-          borderRadius: (size + 12) / 2,
-          borderWidth: 1,
-          borderColor: alpha(color, 0.1),
+          borderColor: alpha(color, 0.2),
+          transform: [{ rotate: "7deg" }],
         }}
       />
       <View
@@ -229,7 +235,7 @@ export function AuthBadge({ accent, surface, size = 76, tone, children }) {
           {
             width: size,
             height: size,
-            borderRadius: size * 0.32,
+            borderRadius: size * 0.3,
             backgroundColor: surface,
             shadowColor: color,
             shadowOffset: { width: 0, height: 10 },
@@ -240,13 +246,13 @@ export function AuthBadge({ accent, surface, size = 76, tone, children }) {
         ]}
       >
         <LinearGradient
-          colors={[alpha(color, 0.34), alpha(color, 0.08)]}
+          colors={[alpha(color, 0.42), alpha(color, 0.1)]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[
             StyleSheet.absoluteFill,
             {
-              borderRadius: size * 0.32,
+              borderRadius: size * 0.3,
               borderWidth: 1,
               borderColor: alpha(color, 0.42),
               alignItems: "center",
@@ -265,54 +271,66 @@ export function AuthHero({ theme, badge, title, subtitle, titleSize = 28 }) {
   return (
     <View style={styles.hero}>
       {badge}
-      <Text
-        allowFontScaling={false}
-        style={[
-          styles.heroTitle,
-          { color: theme.text.primary, fontSize: titleSize, lineHeight: titleSize + 6 },
-        ]}
-      >
-        {title}
-      </Text>
-      {subtitle ? (
+      <View style={styles.heroCopy}>
         <Text
           allowFontScaling={false}
-          style={[styles.heroSub, { color: theme.text.secondary }]}
+          style={[
+            styles.heroTitle,
+            { color: theme.text.primary, fontSize: titleSize, lineHeight: titleSize + 5 },
+          ]}
         >
-          {subtitle}
+          {title}
         </Text>
-      ) : null}
+        {subtitle ? (
+          <Text
+            allowFontScaling={false}
+            style={[styles.heroSub, { color: theme.text.secondary }]}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
 
 // ── Kart ──────────────────────────────────────────────────────────────────────
 
-export function AuthCard({ theme, accent, children, style }) {
+export function AuthCard({ theme, accent, children, style, variant = "form" }) {
+  const panel = variant === "panel";
   return (
     <View
       style={[
         styles.card,
-        { backgroundColor: theme.secondary, borderColor: theme.border },
+        panel
+          ? [styles.cardPanel, { backgroundColor: theme.secondary, borderColor: theme.border }]
+          : styles.cardForm,
         style,
       ]}
     >
-      {/* Üst kenarda ince vurgu çizgisi — kartı arka plan ışımasına bağlar */}
-      <LinearGradient
-        pointerEvents="none"
-        colors={[alpha(accent, 0), alpha(accent, 0.7), alpha(accent, 0)]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.cardLine}
-      />
+      {panel ? (
+        <LinearGradient
+          pointerEvents="none"
+          colors={[alpha(accent, 0), alpha(accent, 0.7), alpha(accent, 0)]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.cardLine}
+        />
+      ) : null}
       {children}
     </View>
   );
 }
 
-export function AuthCardHeader({ theme, title, subtitle }) {
+export function AuthCardHeader({ theme, accent, eyebrow, title, subtitle }) {
   return (
     <View style={styles.cardHeader}>
+      {eyebrow ? (
+        <View style={[styles.cardEyebrow, { backgroundColor: alpha(accent, 0.12) }]}>
+          <View style={[styles.cardEyebrowDot, { backgroundColor: accent }]} />
+          <Text style={[styles.cardEyebrowText, { color: accent }]}>{eyebrow}</Text>
+        </View>
+      ) : null}
       <Text allowFontScaling={false} style={[styles.cardTitle, { color: theme.text.primary }]}>
         {title}
       </Text>
@@ -324,10 +342,16 @@ export function AuthCardHeader({ theme, title, subtitle }) {
 }
 
 /** Kayıt formundaki bölüm başlığı: küçük büyük harfli etiket + uzayan çizgi. */
-export function AuthSectionLabel({ theme, accent, children }) {
+export function AuthSectionLabel({ theme, accent, index, children }) {
   return (
     <View style={styles.sectionRow}>
-      <View style={[styles.sectionDot, { backgroundColor: accent }]} />
+      {index ? (
+        <View style={[styles.sectionIndex, { backgroundColor: alpha(accent, 0.13) }]}>
+          <Text style={[styles.sectionIndexText, { color: accent }]}>{index}</Text>
+        </View>
+      ) : (
+        <View style={[styles.sectionDot, { backgroundColor: accent }]} />
+      )}
       <Text
         allowFontScaling={false}
         style={[styles.sectionText, { color: theme.text.muted }]}
@@ -359,6 +383,8 @@ export const AuthField = forwardRef(function AuthField(
     inputStyle,
     onFocus,
     onBlur,
+    placeholder: label,
+    accessibilityLabel,
     ...inputProps
   },
   ref,
@@ -401,28 +427,38 @@ export const AuthField = forwardRef(function AuthField(
           <Ionicons name={icon} size={18} color={iconColor} />
         </View>
       ) : null}
-      <TextInput
-        {...inputProps}
-        ref={ref}
-        allowFontScaling={false}
-        style={[
-          styles.fieldInput,
-          { color: theme.text.primary },
-          !icon && styles.fieldInputBare,
-          inputStyle,
-        ]}
-        placeholderTextColor={theme.text.muted}
-        selectionColor={accent}
-        cursorColor={accent}
-        onFocus={(e) => {
-          setFocused(true);
-          onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          onBlur?.(e);
-        }}
-      />
+      <View style={styles.fieldBody}>
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[styles.fieldLabel, { color: tone ?? theme.text.muted }]}
+        >
+          {label}
+        </Text>
+        <TextInput
+          {...inputProps}
+          ref={ref}
+          accessibilityLabel={accessibilityLabel ?? label}
+          allowFontScaling={false}
+          style={[
+            styles.fieldInput,
+            { color: theme.text.primary },
+            !icon && styles.fieldInputBare,
+            inputStyle,
+          ]}
+          placeholderTextColor={theme.text.muted}
+          selectionColor={accent}
+          cursorColor={accent}
+          onFocus={(e) => {
+            setFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
+        />
+      </View>
       {right}
     </Animated.View>
   );
@@ -490,7 +526,7 @@ export function AuthPrimaryButton({
             colors={gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[StyleSheet.absoluteFill, { borderRadius: FIELD_RADIUS }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: ACTION_RADIUS }]}
           />
           {/* Üstten inen ince parlama: düz degradeye hafif bir "cam" derinliği verir */}
           <LinearGradient
@@ -498,7 +534,7 @@ export function AuthPrimaryButton({
             colors={["rgba(255,255,255,0.2)", "rgba(255,255,255,0)"]}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 0.65 }}
-            style={[StyleSheet.absoluteFill, { borderRadius: FIELD_RADIUS }]}
+            style={[StyleSheet.absoluteFill, { borderRadius: ACTION_RADIUS }]}
           />
         </>
       )}
@@ -586,7 +622,7 @@ const GOOGLE_BUTTON = {
  * tek satır yazı, ortada. Yükleme sırasında yazı yerinde kalır, yalnız ikon
  * dönen göstergeye çevrilir — düğme boyu/genişliği oynamaz.
  */
-function SocialButton({ label, onPress, disabled, loading, palette, textStyle, children }) {
+function SocialButton({ label, shortLabel, compact, onPress, disabled, loading, palette, textStyle, children }) {
   return (
     <PressScale
       accessibilityRole="button"
@@ -596,8 +632,12 @@ function SocialButton({ label, onPress, disabled, loading, palette, textStyle, c
       disabled={disabled}
       pressedScale={0.98}
       glass={false}
+      // Yan yana düzende payı DIŞ Pressable almalı; flex yalnız iç görünümde kalırsa
+      // düğme içerik kadar daralır.
+      containerStyle={compact ? styles.socialCompactWrap : undefined}
       style={[
         styles.social,
+        compact && styles.socialCompact,
         { backgroundColor: palette.bg, borderColor: palette.border },
         disabled && !loading && { opacity: 0.6 },
       ]}
@@ -610,7 +650,7 @@ function SocialButton({ label, onPress, disabled, loading, palette, textStyle, c
         numberOfLines={1}
         style={[styles.socialText, { color: palette.fg }, textStyle]}
       >
-        {label}
+        {compact && shortLabel ? shortLabel : label}
       </Text>
     </PressScale>
   );
@@ -623,11 +663,13 @@ function SocialButton({ label, onPress, disabled, loading, palette, textStyle, c
  * Apple HIG'in özel düğme kuralları korunuyor: resmî Apple logosu, SF yazı
  * tipi, "Apple ile giriş yap/kayıt ol" metni, siyah/beyaz iki biçim.
  */
-export function AuthAppleButton({ label, onPress, disabled, loading, theme }) {
+export function AuthAppleButton({ label, compact, onPress, disabled, loading, theme }) {
   const palette = isLightSurface(theme.primary) ? APPLE_BUTTON.light : APPLE_BUTTON.dark;
   return (
     <SocialButton
       label={label}
+      shortLabel="Apple"
+      compact={compact}
       onPress={onPress}
       disabled={disabled}
       loading={loading}
@@ -639,11 +681,13 @@ export function AuthAppleButton({ label, onPress, disabled, loading, theme }) {
   );
 }
 
-export function AuthGoogleButton({ label, onPress, disabled, loading, theme }) {
+export function AuthGoogleButton({ label, compact, onPress, disabled, loading, theme }) {
   const palette = isLightSurface(theme.primary) ? GOOGLE_BUTTON.light : GOOGLE_BUTTON.dark;
   return (
     <SocialButton
       label={label}
+      shortLabel="Google"
+      compact={compact}
       onPress={onPress}
       disabled={disabled}
       loading={loading}
@@ -707,29 +751,40 @@ export function AuthFooterLink({ theme, accent, text, link, onPress }) {
 const styles = StyleSheet.create({
   // ── Başlık ──
   hero: {
+    width: "100%",
+    maxWidth: 440,
+    alignSelf: "center",
+    flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 14,
+  },
+  heroCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 5,
   },
   heroTitle: {
-    fontWeight: "800",
-    letterSpacing: -0.6,
-    textAlign: "center",
+    fontWeight: "900",
+    letterSpacing: -1,
   },
   heroSub: {
-    maxWidth: 320,
     fontSize: 14,
-    fontWeight: "600",
-    lineHeight: 21,
-    textAlign: "center",
+    fontWeight: "500",
+    lineHeight: 20,
   },
 
-  // ── Kart ──
+  // ── Form akışı / sonuç paneli ──
   card: {
     width: "100%",
+    gap: 14,
+  },
+  cardForm: {
+    paddingHorizontal: 0,
+  },
+  cardPanel: {
     borderRadius: 28,
     borderWidth: 1,
     padding: 20,
-    gap: 14,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.14,
@@ -745,13 +800,33 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   cardHeader: {
-    gap: 4,
-    marginBottom: 2,
+    alignItems: "flex-start",
+    gap: 5,
+    marginBottom: 4,
+  },
+  cardEyebrow: {
+    minHeight: 25,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 3,
+  },
+  cardEyebrowDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  cardEyebrowText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.7,
   },
   cardTitle: {
-    fontSize: 23,
-    fontWeight: "800",
-    letterSpacing: -0.4,
+    fontSize: 27,
+    fontWeight: "900",
+    letterSpacing: -0.8,
   },
   cardSub: {
     fontSize: 13.5,
@@ -764,12 +839,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginTop: 4,
+    marginTop: 8,
+    marginBottom: 2,
   },
   sectionDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
+  },
+  sectionIndex: {
+    width: 32,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionIndexText: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.3,
   },
   sectionText: {
     fontSize: 12,
@@ -784,10 +872,10 @@ const styles = StyleSheet.create({
 
   // ── Alan ──
   field: {
-    minHeight: FIELD_H,
+    minHeight: 68,
     borderWidth: 1,
     borderRadius: FIELD_RADIUS,
-    paddingLeft: 12,
+    paddingLeft: 13,
     paddingRight: 14,
     flexDirection: "row",
     alignItems: "center",
@@ -796,21 +884,34 @@ const styles = StyleSheet.create({
   // Cam katmanı saydam çerçeve payını da örter (styles.field borderWidth: 1).
   fieldGlass: { position: "absolute", top: -1, left: -1, right: -1, bottom: -1 },
   fieldIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-  fieldInput: {
+  fieldBody: {
     flex: 1,
     minWidth: 0,
-    fontSize: 16,
+    justifyContent: "center",
+    gap: 1,
+  },
+  fieldLabel: {
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 0.45,
+  },
+  fieldInput: {
+    width: "100%",
+    minWidth: 0,
+    fontSize: 16.5,
     fontWeight: "600",
-    paddingVertical: 12,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    minHeight: 25,
   },
   fieldInputBare: {
-    paddingLeft: 4,
+    paddingLeft: 0,
   },
   eye: {
     padding: 2,
@@ -818,8 +919,8 @@ const styles = StyleSheet.create({
 
   // ── Düğmeler ──
   primary: {
-    height: 56,
-    borderRadius: FIELD_RADIUS,
+    height: 60,
+    borderRadius: ACTION_RADIUS,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -836,8 +937,8 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   primaryText: {
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 16.5,
+    fontWeight: "900",
     letterSpacing: 0.1,
   },
   primaryArrow: {
@@ -866,14 +967,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   social: {
-    height: SOCIAL_H,
-    borderRadius: FIELD_RADIUS,
+    height: 56,
+    borderRadius: ACTION_RADIUS,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
     paddingHorizontal: 16,
+  },
+  // Yan yana düzen (giriş ekranı): iki düğme eşit pay alır, daha yuvarlak köşe.
+  socialCompactWrap: { flex: 1 },
+  socialCompact: {
+    width: "100%",
+    borderRadius: 28,
+    paddingHorizontal: 10,
   },
   socialIcon: {
     width: SOCIAL_ICON_SLOT,

@@ -22,6 +22,7 @@ jest.mock("@services/hapticsService", () => ({
 }));
 jest.mock("@components/AppToast", () => ({ __esModule: true, default: { show: jest.fn() } }));
 jest.mock("../components/ScreenDecor", () => ({ __esModule: true, default: "Decor" }));
+jest.mock("../components/auth/AuthPosterField", () => ({ __esModule: true, default: "PosterField" }));
 jest.mock("../components/auth/EmailSuffixRow", () => ({ __esModule: true, default: "SuffixRow" }));
 jest.mock("../components/auth/AuthKit", () => {
   const React = require("react");

@@ -36,6 +36,7 @@ import {
   normalizeUsername,
   UserProfileErrorCode,
 } from "../../services/userService";
+import AuthPosterField from "../../components/auth/AuthPosterField";
 import ScreenDecor from "../../components/ScreenDecor";
 import EmailSuffixRow from "../../components/auth/EmailSuffixRow";
 import BirthDateField from "../../components/auth/BirthDateField";
@@ -431,6 +432,7 @@ export default function RegisterScreen({ navigation }) {
         translucent
         backgroundColor="transparent"
       />
+      <AuthPosterField surface={theme.primary} isLightTheme={isLightTheme} />
       <AuthBackdrop accent={accent} isLightTheme={isLightTheme} />
       <ScreenDecor scope="auth" iconOpacity={isLightTheme ? 0.05 : 0.08} />
 
@@ -456,6 +458,7 @@ export default function RegisterScreen({ navigation }) {
                   <Ionicons name="person-add-outline" size={30} color={accent} />
                 </AuthBadge>
               }
+              titleSize={32}
               title={i18nText("autoI18n.yeni_hesap_olustur", "Yeni hesap oluştur")}
               subtitle={i18nText(
                 "autoI18n.profilini_olusturup_listelerine_basla",
@@ -468,7 +471,7 @@ export default function RegisterScreen({ navigation }) {
           <Reveal delay={90} style={authColumn}>
             <AuthCard theme={theme} accent={accent}>
               {/* ── Kişisel bilgiler ── */}
-              <AuthSectionLabel theme={theme} accent={accent}>
+              <AuthSectionLabel theme={theme} accent={accent} index="01">
                 {i18nText("autoI18n.kisisel_bilgiler", "KİŞİSEL BİLGİLER")}
               </AuthSectionLabel>
 
@@ -517,7 +520,7 @@ export default function RegisterScreen({ navigation }) {
               />
 
               {/* ── Hesap bilgileri ── */}
-              <AuthSectionLabel theme={theme} accent={accent}>
+              <AuthSectionLabel theme={theme} accent={accent} index="02">
                 {i18nText("autoI18n.hesap_bilgileri", "HESAP BİLGİLERİ")}
               </AuthSectionLabel>
 
@@ -609,7 +612,7 @@ export default function RegisterScreen({ navigation }) {
               />
 
               {/* ── Güvenlik ── */}
-              <AuthSectionLabel theme={theme} accent={accent}>
+              <AuthSectionLabel theme={theme} accent={accent} index="03">
                 {i18nText("autoI18n.kayit_bolum_guvenlik", "GÜVENLİK")}
               </AuthSectionLabel>
 
@@ -721,6 +724,7 @@ export default function RegisterScreen({ navigation }) {
                 {isAppleAvailable ? (
                   <AuthAppleButton
                     label={i18nText("autoI18n.apple_ile_kayit_ol", "Apple ile kayıt ol")}
+                    compact
                     theme={theme}
                     loading={isAppleLoading}
                     disabled={socialBusy}
@@ -734,6 +738,7 @@ export default function RegisterScreen({ navigation }) {
                 {/* Google ile kayıt */}
                 <AuthGoogleButton
                   label={i18nText("autoI18n.google_ile_kayit_ol", "Google ile kayıt ol")}
+                  compact
                   theme={theme}
                   loading={isGoogleLoading}
                   disabled={socialBusy}
@@ -780,7 +785,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   birthShell: {
-    minHeight: 58,
+    minHeight: 68,
     borderRadius: 18,
     paddingLeft: 12,
   },
@@ -813,6 +818,7 @@ const styles = StyleSheet.create({
     marginBottom: -10,
   },
   socialStack: {
+    flexDirection: "row",
     gap: 10,
   },
 });
