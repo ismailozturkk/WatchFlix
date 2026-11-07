@@ -83,18 +83,18 @@ tam jest** — hedefli test yetmez (geçmişte bu yüzden kırık commit atıld�
 ```bash
 npx jest
 ```
-Beklenen: **8.186 test / 432 takım**.
+Beklenen: **8.642 test / 461 takım** (7 Kas).
 
 ```bash
 export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" && export PATH="$JAVA_HOME/bin:$PATH" && npm run test:rules
 ```
-Beklenen: **368 test / 13 takım**. Emülatör **JDK 21** ister (Android Studio JBR). Emülatörü
+Beklenen: **387 test / 13 takım** (7 Kas). Emülatör **JDK 21** ister (Android Studio JBR). Emülatörü
 `emulators:exec` ile koş; süreci elle öldürmek 8085 portunu kilitli bırakıyor.
 
 ```bash
 cd functions && npm test
 ```
-Beklenen: **121 geçti / 0 başarısız** (39 emülatör testi atlanır).
+Beklenen: **128 geçti / 0 başarısız** (39 emülatör testi atlanır, 7 Kas).
 
 Üretim paketinin derlendiğini doğrulamak için (build öncesi iyi bir kontrol):
 ```bash
@@ -154,6 +154,9 @@ hepsi build'de** (yani EAS commit'lenmemiş çalışma ağacını da arşive alm
 
 ## 5. Projeye özgü tuzaklar
 
+- **`.claude/worktrees/` repo İÇİNDE.** Uygulamanın açtığı oturum worktree'leri projenin tam kopyası;
+  iki jest yapılandırması da `.claude/`'ı dışarıda bırakıyor (7 Kas). Kaldırılırsa testler 2-4 kez
+  koşar, kural testleri aynı emülatörde birbirini bozar (sahte FAIL).
 - **Satır sonları karışık (CRLF/LF).** Düzenleme betiği yazarken dosyanın kendi satır sonunu tespit
   edip kullan, yoksa "eşleşme yok" alırsın. Bkz. `docs/` içi notlar ve mevcut betik deseni.
 - **Kural deploy'u dosyanın TAMAMINI gönderir.** Deploy öncesi canlı kuralı salt-okunur çekip
