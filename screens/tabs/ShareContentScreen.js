@@ -13,11 +13,12 @@ import {
   StyleSheet,
   FlatList,
   RefreshControl,
-  ActivityIndicator,
   Modal,
 } from "react-native";
-import { Image } from "expo-image";
+import { LENS_REFRESH_COLORS } from "../../utils/lensLoaderMotion";
+import LensLoader from "../../components/LensLoader";
 import AppIcon from "../../components/AppIcon";
+import GlassIconButton from "../../components/common/GlassIconButton";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import { useNavigation } from "@react-navigation/native";
@@ -42,7 +43,6 @@ import BackButton from "@components/BackButton";
 import FeedPostCard from "@components/feed/FeedPostCard";
 import {
   FeedComposerCard,
-  MyPostsLink,
   FeedTrendingRail,
   FeedFilterBar,
   FeedSortBar,
@@ -371,26 +371,18 @@ export default function ShareContentScreen({ route }) {
               {ts.subtitle}
             </Text>
           </View>
-          {avatar ? (
-            <Image
-              source={avatar}
-              style={[mainStyles.headerAvatar, { borderColor: alpha(theme.accent, 0.5) }]}
-            />
-          ) : (
-            <View
-              style={[
-                mainStyles.headerAvatar,
-                {
-                  backgroundColor: theme.secondary,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <AppIcon family="Ionicons" name="person" size={22} color={theme.text.muted} />
-            </View>
-          )}
+          {/* Postlarım: eskiden composer altında satır kartıydı, avatarın yerine
+              başlıkta yuvarlak simge düğmesi oldu (avatar composer kartında zaten var). */}
+          <GlassIconButton
+            icon="albums-outline"
+            iconSize={20}
+            size={44}
+            fallbackRadius={22}
+            color={theme.accent}
+            onPress={handleOpenMyPosts}
+            accessibilityLabel={i18nText("autoI18n.postlarim", "Postlarım")}
+            style={mainStyles.headerAction}
+          />
         </View>
 
         {/* Create post composer + hızlı tip kutuları */}
@@ -400,14 +392,6 @@ export default function ShareContentScreen({ route }) {
           placeholder={ts.createPostPlaceholder}
           onOpen={handleOpenComposer}
           onCompose={handleComposeType}
-        />
-
-        {/* Postlarım */}
-        <MyPostsLink
-          theme={theme}
-          title={i18nText("autoI18n.postlarim", "Postlarım")}
-          subtitle={i18nText("autoI18n.paylastigin_gonderileri_gor", "Paylaştığın gönderileri gör")}
-          onPress={handleOpenMyPosts}
         />
 
         {/* Trending Rail */}
@@ -471,7 +455,7 @@ export default function ShareContentScreen({ route }) {
     if (loadingMore) {
       return (
         <View style={{ paddingVertical: 24 }}>
-          <ActivityIndicator color={theme.text.muted} />
+          <LensLoader color={theme.text.muted} />
         </View>
       );
     }
@@ -510,6 +494,7 @@ export default function ShareContentScreen({ route }) {
             refreshing={refreshing}
             onRefresh={refresh}
             tintColor={theme.text.muted}
+            colors={LENS_REFRESH_COLORS}
           />
         }
         onEndReached={loadMore}
@@ -571,13 +556,7 @@ const mainStyles = StyleSheet.create({
   },
   greeting: { fontSize: 24, fontWeight: "800", letterSpacing: -0.4 },
   greetingSub: { fontSize: 13, marginTop: 2 },
-  headerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginLeft: 12,
-    borderWidth: 2,
-  },
+  headerAction: { marginLeft: 12 },
 });
 
 const emptyStyles = StyleSheet.create({

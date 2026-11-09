@@ -1,7 +1,6 @@
 // components/feed/FeedHeaderSections.js
 //
-// Paylaşım akışının (ShareContentScreen) ÜST bölümü: composer kartı, "Postlarım"
-// bağlantısı, trend rayı, filtre ve sıralama çubukları. Hepsi saf sunum —
+// Paylaşım akışının (ShareContentScreen) ÜST bölümü: composer kartı, trend rayı, filtre ve sıralama çubukları. Hepsi saf sunum —
 // veri/durum ekranda kalır, buraya yalnız prop gelir. Yüzeyler tema
 // token'larından (secondary/primary/border/accent) kurulur; sabit renk yok,
 // bu yüzden açık ve koyu temalarda aynı kompozisyon çalışır.
@@ -167,60 +166,12 @@ export const FeedComposerCard = memo(function FeedComposerCard({
   );
 });
 
-// ─── Postlarım bağlantısı ────────────────────────────────────────────────────
-
-export const MyPostsLink = memo(function MyPostsLink({
-  theme,
-  title,
-  subtitle,
-  onPress,
-}) {
-  const accent = theme.accent;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      onPress={onPress}
-      style={({ pressed }) => [
-        s.linkCard,
-        {
-          backgroundColor: pressed ? alpha(accent, 0.1) : theme.secondary,
-          borderColor: pressed ? alpha(accent, 0.4) : theme.border,
-        },
-      ]}
-    >
-      <LinearGradient
-        colors={[accent, alpha(accent, 0.7)]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={s.linkIcon}
-      >
-        <AppIcon family="Ionicons" name="albums" size={19} color="#fff" />
-      </LinearGradient>
-      <View style={s.linkCopy}>
-        <Text style={[s.linkTitle, { color: theme.text.primary }]} numberOfLines={1}>
-          {title}
-        </Text>
-        <Text style={[s.linkSub, { color: theme.text.secondary }]} numberOfLines={1}>
-          {subtitle}
-        </Text>
-      </View>
-      <View style={[s.linkChevron, { backgroundColor: theme.primary }]}>
-        <AppIcon
-          family="Ionicons"
-          name="chevron-forward"
-          size={16}
-          color={theme.text.secondary}
-        />
-      </View>
-    </Pressable>
-  );
-});
-
 // ─── Trend rayı ──────────────────────────────────────────────────────────────
 
-const TREND_CARD_WIDTH = 124;
-const TREND_GAP = 12;
+// Kompakt: yalnız afiş (isim yok — erişilebilirlik etiketinde), 2:3 oran.
+const TREND_CARD_WIDTH = 88;
+const TREND_CARD_HEIGHT = 132;
+const TREND_GAP = 8;
 
 export const FeedTrendingRail = memo(function FeedTrendingRail({
   theme,
@@ -260,11 +211,6 @@ export const FeedTrendingRail = memo(function FeedTrendingRail({
             style={s.trendTopFade}
             pointerEvents="none"
           />
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.9)"]}
-            style={s.trendBottomFade}
-            pointerEvents="none"
-          />
           <View
             style={[
               s.trendRank,
@@ -277,13 +223,10 @@ export const FeedTrendingRail = memo(function FeedTrendingRail({
             <AppIcon
               family="Ionicons"
               name={item.media_type === "tv" ? "tv" : "film"}
-              size={11}
+              size={10}
               color="#fff"
             />
           </View>
-          <Text style={s.trendTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
         </Pressable>
       );
     },
@@ -540,37 +483,6 @@ const s = StyleSheet.create({
   },
   tileText: { fontSize: 11.5, fontWeight: "700" },
 
-  // Postlarım
-  linkCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginHorizontal: 14,
-    marginBottom: 18,
-    paddingVertical: 10,
-    paddingLeft: 10,
-    paddingRight: 12,
-    borderRadius: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  linkIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  linkCopy: { flex: 1, minWidth: 0 },
-  linkTitle: { fontSize: 15, fontWeight: "800" },
-  linkSub: { fontSize: 12, marginTop: 1 },
-  linkChevron: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
   // Trend rayı
   trendWrap: { marginBottom: 18 },
   trendHeader: {
@@ -578,7 +490,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   trendFire: {
     width: 30,
@@ -597,52 +509,35 @@ const s = StyleSheet.create({
   trendCaptionText: { fontSize: 11, fontWeight: "700" },
   trendCard: {
     width: TREND_CARD_WIDTH,
-    height: 184,
-    borderRadius: 18,
+    height: TREND_CARD_HEIGHT,
+    borderRadius: 12,
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
   },
   trendPoster: { width: "100%", height: "100%" },
-  trendTopFade: { position: "absolute", left: 0, right: 0, top: 0, height: 56 },
-  trendBottomFade: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: "58%",
-  },
+  trendTopFade: { position: "absolute", left: 0, right: 0, top: 0, height: 40 },
   trendRank: {
     position: "absolute",
-    top: 8,
-    left: 8,
-    minWidth: 24,
-    height: 24,
-    paddingHorizontal: 7,
-    borderRadius: 9,
+    top: 6,
+    left: 6,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    borderRadius: 7,
     alignItems: "center",
     justifyContent: "center",
   },
-  trendRankText: { color: "#fff", fontSize: 12, fontWeight: "900" },
+  trendRankText: { color: "#fff", fontSize: 11, fontWeight: "900" },
   trendKind: {
     position: "absolute",
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 9,
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 7,
     backgroundColor: "rgba(0,0,0,0.45)",
     alignItems: "center",
     justifyContent: "center",
-  },
-  trendTitle: {
-    position: "absolute",
-    bottom: 10,
-    left: 10,
-    right: 10,
-    color: "#fff",
-    fontSize: 12.5,
-    lineHeight: 16,
-    fontWeight: "800",
   },
 
   // Filtre

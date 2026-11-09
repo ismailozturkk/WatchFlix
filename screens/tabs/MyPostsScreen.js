@@ -5,11 +5,12 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
   Modal,
   Pressable,
 } from "react-native";
+import { LENS_REFRESH_COLORS } from "../../utils/lensLoaderMotion";
+import LensLoader from "../../components/LensLoader";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import ModalBlurBackdrop from "../../components/common/ModalBlurBackdrop";
@@ -500,6 +501,7 @@ export default function MyPostsScreen({ navigation }) {
               refreshing={refreshing}
               onRefresh={onRefresh}
               tintColor={theme.text.muted}
+              colors={LENS_REFRESH_COLORS}
             />
           }
           ListEmptyComponent={
@@ -531,7 +533,7 @@ export default function MyPostsScreen({ navigation }) {
           ListFooterComponent={
             loadingMore ? (
               <View style={{ paddingVertical: 20 }}>
-                <ActivityIndicator color={theme.text.muted} />
+                <LensLoader color={theme.text.muted} />
               </View>
             ) : null
           }
