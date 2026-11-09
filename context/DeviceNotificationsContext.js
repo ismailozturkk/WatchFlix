@@ -599,7 +599,7 @@ export function DeviceNotificationsProvider({ children, navigationRef }) {
 
   // ── 5b. Uygulama simgesi rozeti ──────────────────────────────────────────
   //
-  // Rozet = okunmamış 1-1 mesajlar + bekleyen gelen arkadaşlık istekleri
+  // Rozet = okunmamış 1-1 ve grup mesajları + bekleyen arkadaşlık istekleri
   // (tanım ve gerekçe: utils/appBadge.js). Sayı HER değiştiğinde mutlak değer
   // olarak yazılır; kullanıcı sohbeti okuyup isteği yanıtlayınca kendiliğinden
   // düşer. Uygulama kapalıyken aynı sayıyı sunucu push'unun `badge` alanı

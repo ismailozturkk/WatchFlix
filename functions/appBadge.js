@@ -9,7 +9,7 @@
 // zorunda; ayrışırlarsa uygulama açıkken görülen sayı ile kapalıyken bildirimin
 // taşıdığı sayı birbirini ezer.
 //
-// Rozet = okunmamış 1-1 mesajlar + bekleyen gelen arkadaşlık istekleri.
+// Rozet = okunmamış 1-1 ve grup mesajları + bekleyen arkadaşlık istekleri.
 // Neden böyle: bkz. utils/appBadge.js. Özeti — eski rozet, hiçbir ekranın
 // okundu işaretlemediği bildirim dokümanlarını sayıyordu ve yalnız büyüyordu;
 // ayrıca push'lar `badge` taşımadığından uygulama kapalıyken düzeltilemiyordu.
@@ -20,12 +20,36 @@ function toCount(value) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-/** conversations dokümanlarının unreadCount alanlarını toplar. */
-function sumUnreadMessages(conversationDocs) {
+/** Görünen conversations dokümanlarının unreadCount alanlarını toplar. */
+function sumUnreadMessages(conversationDocs, blockedIds = []) {
+  const blocked = new Set(blockedIds);
   let total = 0;
   for (const doc of conversationDocs || []) {
+    if (blocked.has(doc.id)) continue;
     const data = typeof doc?.data === "function" ? doc.data() : doc;
     total += toCount(data?.unreadCount);
+  }
+  return total;
+}
+
+/** Yalnız halen üye olunan grupların gelen kutusu sayaçlarını toplar. */
+function sumGroupUnread(inboxDocs, groupIds) {
+  const active = new Set(groupIds || []);
+  let total = 0;
+  for (const doc of inboxDocs || []) {
+    if (!active.has(doc.id)) continue;
+    const data = typeof doc.data === "function" ? doc.data() : doc;
+    total += toCount(data?.unread);
+  }
+  return total;
+}
+
+/** Eski istemcilerin grup belgesine yazdığı alıcıya özel okunmamış sayıları. */
+function sumLegacyGroupUnread(groupDocs, recipientUid) {
+  let total = 0;
+  for (const doc of groupDocs || []) {
+    const data = typeof doc.data === "function" ? doc.data() : doc;
+    total += toCount(data?.unread?.[recipientUid]);
   }
   return total;
 }
@@ -41,15 +65,14 @@ function computeAppBadge({ unreadMessages = 0, pendingRequests = 0 } = {}) {
 /**
  * Bu push'un taşıyacağı rozet.
  *
- * 1-1 mesajda en az 1: bildirim, alıcının sohbeti açık tutmadığı doğrulandıktan
+ * Mesajda en az 1: bildirim, alıcının sohbeti açık tutmadığı doğrulandıktan
  * SONRA gönderiliyor, yani mesaj kesin okunmamış. İstemcinin sayaç artışı
  * bildirimden geç yazılmışsa (eski istemci sürümleri bildirimi sayaçtan ÖNCE
  * yazıyordu) toplam yeni mesajı henüz içermeyebilir; taban bu yarışı kapatır.
  */
-function badgeForPush({ type, groupId }, counts) {
+function badgeForPush({ type }, counts) {
   const total = computeAppBadge(counts);
-  const isDirectMessage = type === "message" && !groupId;
-  return isDirectMessage ? Math.max(total, 1) : total;
+  return type === "message" ? Math.max(total, 1) : total;
 }
 
 /** 1-1 sohbet kimliği: iki uid, büyük olan başta (ChatScreen ile aynı formül). */
@@ -71,6 +94,8 @@ function chatIdForMessage(notification, recipientUid) {
 module.exports = {
   toCount,
   sumUnreadMessages,
+  sumGroupUnread,
+  sumLegacyGroupUnread,
   computeAppBadge,
   badgeForPush,
   pairChatId,

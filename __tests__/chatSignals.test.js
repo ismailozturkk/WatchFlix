@@ -287,4 +287,59 @@ describe("createChatSignals", () => {
     await flush();
     expect(writes).toHaveLength(2);
   });
+
+  test("sohbetten çıkış, gecikmiş giriş yazımından sonra son değer olarak uygulanır", async () => {
+    let finishOpen;
+    const writes = [];
+    const signals = createChatSignals({
+      session: {
+        getConnection: () => ({ uid: "me", connId: "c1" }),
+        subscribe: () => () => {},
+      },
+      adapter: {
+        writeInChat: (_chatId, _uid, value) => {
+          writes.push(value);
+          if (value === "c1") return new Promise((resolve) => { finishOpen = resolve; });
+          return Promise.resolve();
+        },
+        writeTyping: () => Promise.resolve(),
+      },
+    });
+
+    signals.enterChat("group:g1", "me");
+    await flush();
+    signals.leaveChat("group:g1", "me");
+    await flush();
+    expect(writes).toEqual(["c1"]);
+    finishOpen();
+    await flush();
+    expect(writes).toEqual(["c1", false]);
+  });
+
+  test("hızlı çıkıp yeniden girince eski kapatma yeni açık bayrağını ezmez", async () => {
+    let finishOpen;
+    const writes = [];
+    const signals = createChatSignals({
+      session: {
+        getConnection: () => ({ uid: "me", connId: "c1" }),
+        subscribe: () => () => {},
+      },
+      adapter: {
+        writeInChat: (_chatId, _uid, value) => {
+          writes.push(value);
+          if (writes.length === 1) return new Promise((resolve) => { finishOpen = resolve; });
+          return Promise.resolve();
+        },
+        writeTyping: () => Promise.resolve(),
+      },
+    });
+
+    signals.enterChat("group:g1", "me");
+    await flush();
+    signals.leaveChat("group:g1", "me");
+    signals.enterChat("group:g1", "me");
+    finishOpen();
+    await flush();
+    expect(writes.at(-1)).toBe("c1");
+  });
 });

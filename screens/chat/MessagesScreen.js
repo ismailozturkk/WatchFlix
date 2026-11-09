@@ -125,8 +125,8 @@ export default function MessagesScreen({ navigation }) {
   );
   const unreadTotal = useMemo(() => totalUnread(visibleConvs), [visibleConvs]);
   const groupUnreadTotal = useMemo(
-    () => totalGroupUnread(groups, groupInbox),
-    [groups, groupInbox],
+    () => totalGroupUnread(groups, groupInbox, user?.uid),
+    [groups, groupInbox, user?.uid],
   );
 
   const baseData = isDm ? visibleConvs : groups;
@@ -174,7 +174,7 @@ export default function MessagesScreen({ navigation }) {
     const last = item.lastMessage;
     const lastSenderName =
       item.memberInfo?.[last?.senderId]?.name || last?.senderName || "";
-    const unreadCount = groupUnreadCount(groupInbox, item.id);
+    const unreadCount = groupUnreadCount(groupInbox, item.id, item.unread?.[user?.uid]);
     const unread = unreadCount > 0;
     return (
       <PersonRow

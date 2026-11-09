@@ -78,7 +78,8 @@ export function createTypingController({
 export function createChatSignals({ session, adapter }) {
   const entries = new Map(); // chatId -> { uid, count } — ekranda açık sohbetler
   const typingWanted = new Map(); // chatId -> uid — "yazıyor" istendi
-  const written = { inChat: new Map(), typing: new Map() }; // chatId -> son yazılan
+  const written = { inChat: new Map(), typing: new Map() }; // chatId -> istenen son değer
+  const pending = { inChat: new Map(), typing: new Map() }; // chatId -> sıralı yazım
 
   const valueFor = (uid) => {
     const conn = session.getConnection();
@@ -90,12 +91,24 @@ export function createChatSignals({ session, adapter }) {
     if ((memo.get(chatId) ?? false) === value) return;
     memo.set(chatId, value);
     const write = kind === "inChat" ? adapter.writeInChat : adapter.writeTyping;
-    Promise.resolve()
-      .then(() => write(chatId, uid, value))
+    // Gir/çık ve arka plan/ön plan geçişleri ağda ters sırayla tamamlanırsa
+    // eski "açık" bayrağı yeniden canlanıp sonraki push'ları susturabilir.
+    // Aynı sohbetin yazımlarını sırala; henüz başlamamış ara değerleri atla.
+    const previous = pending[kind].get(chatId);
+    const task = Promise.resolve(previous)
+      .catch(() => {})
+      .then(() => {
+        if (memo.get(chatId) !== value) return;
+        return write(chatId, uid, value);
+      })
       .catch(() => {
         // Yazım başarısız: yeniden denenebilsin.
         if (memo.get(chatId) === value) memo.delete(chatId);
+      })
+      .finally(() => {
+        if (pending[kind].get(chatId) === task) pending[kind].delete(chatId);
       });
+    pending[kind].set(chatId, task);
   }
 
   function sync() {
@@ -147,6 +160,8 @@ export function createChatSignals({ session, adapter }) {
       typingWanted.clear();
       written.inChat.clear();
       written.typing.clear();
+      pending.inChat.clear();
+      pending.typing.clear();
     },
   };
 }

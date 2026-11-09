@@ -13,9 +13,8 @@ const {
 const { MIXED_PROJECTS_ERROR } = require("./expoSend");
 
 // ─── Sahteler ──────────────────────────────────────────────────────────────
-// Yol → veri haritasından Firestore. Sorgular yalnız rozet hesabının iki
-// sorgusunu taklit eder (conversations unreadCount>0 ve friendRequests count).
-function fakeDb(docs = {}, { unread = {}, pending = {} } = {}) {
+// Yol → veri haritasından Firestore; rozet sorgularını taklit eder.
+function fakeDb(docs = {}, { unread = {}, groupUnread = {}, groupIds = {}, blockedIds = {}, pending = {} } = {}) {
   const reads = [];
   return {
     reads,
@@ -40,7 +39,23 @@ function fakeDb(docs = {}, { unread = {}, pending = {} } = {}) {
         }),
         async get() {
           reads.push(`${path}#query`);
-          return { docs: (unread[path] || []).map((n) => ({ data: () => ({ unreadCount: n }) })) };
+          if (path === "groups") {
+            // Girdi "g1" ya da eski istemci sayacıyla { id, unread: { uid: n } }.
+            return { docs: (groupIds[path] || []).map((entry) => {
+              const { id, ...data } = typeof entry === "object" ? entry : { id: entry };
+              return { id, data: () => data };
+            }) };
+          }
+          if (path.endsWith("/groupInbox")) {
+            return { docs: Object.entries(groupUnread[path] || {}).map(([id, unread]) => ({ id, data: () => ({ unread }) })) };
+          }
+          if (path.endsWith("/blocked")) {
+            return { docs: (blockedIds[path] || []).map((id) => ({ id })) };
+          }
+          return { docs: (unread[path] || []).map((entry, index) => ({
+            id: typeof entry === "object" ? entry.id : String(index),
+            data: () => ({ unreadCount: typeof entry === "object" ? entry.unreadCount : entry }),
+          })) };
         },
       };
       return query;
@@ -103,10 +118,13 @@ function setup({
   rtdbData = {},
   dead = [],
   unread = {},
+  groupUnread = {},
+  groupIds = {},
+  blockedIds = {},
   pending = {},
   projectOf = {},
 } = {}) {
-  const db = fakeDb(docs, { unread, pending });
+  const db = fakeDb(docs, { unread, groupUnread, groupIds, blockedIds, pending });
   const expo = fakeExpo(dead, projectOf);
   const cleared = [];
   const contentCalls = [];
@@ -200,6 +218,8 @@ test("1-1: alıcıya tek push; ad KÖK belgeden, remoteOnly + messageId + çift 
     docs: directDocs,
     tokens: { veli: ["T1", "T2"] },
     unread: { "Users/veli/conversations": [2, 1] },
+    groupUnread: { "Users/veli/groupInbox": { g1: 3, old: 8 } },
+    groupIds: { groups: ["g1"] },
     pending: { "Users/veli/friendRequests": 1 },
   });
   await push.deliverMessagePush({
@@ -212,7 +232,7 @@ test("1-1: alıcıya tek push; ad KÖK belgeden, remoteOnly + messageId + çift 
   assert.deepEqual(messages.map((m) => m.to), ["T1", "T2"]);
   assert.equal(messages[0].title, "Ali Yılmaz");
   assert.equal(messages[0].body, "Dune izledin mi?");
-  assert.equal(messages[0].badge, 4);
+  assert.equal(messages[0].badge, 7);
   assert.equal(messages[0].data.type, "message");
   assert.equal(messages[0].data.remoteOnly, true);
   assert.equal(messages[0].data.messageId, "m1");
@@ -220,6 +240,35 @@ test("1-1: alıcıya tek push; ad KÖK belgeden, remoteOnly + messageId + çift 
   assert.equal(messages[0].data.chatId, "veli_ali");
   assert.equal(messages[0].data.fromUid, "ali");
   assert.equal(contentCalls[0].lang, "en");
+});
+
+test("rozet gizli engellenmiş sohbeti ve ayrılınmış grubu saymaz", async () => {
+  const { push, sent } = setup({
+    docs: directDocs, tokens: { veli: ["T1"] },
+    unread: { "Users/veli/conversations": [
+      { id: "ali", unreadCount: 1 },
+      { id: "blocked", unreadCount: 9 },
+    ] },
+    blockedIds: { "Users/veli/blocked": ["blocked"] },
+    groupUnread: { "Users/veli/groupInbox": { g1: 2, old: 7 } },
+    groupIds: { groups: ["g1"] },
+  });
+  await push.deliverMessagePush({ message: marked(), chatId: "veli_ali" });
+  assert.equal(sent()[0].badge, 3);
+});
+
+test("rozet eski istemcilerin groups.unread sayacını da sayar (yalnız alıcınınkini)", async () => {
+  const { push, sent } = setup({
+    docs: directDocs, tokens: { veli: ["T1"] },
+    unread: { "Users/veli/conversations": [1] },
+    groupUnread: { "Users/veli/groupInbox": { g1: 2 } },
+    groupIds: { groups: [
+      { id: "g1", unread: { veli: 3, ali: 9 } },
+      { id: "g2", unread: { ali: 4 } },
+    ] },
+  });
+  await push.deliverMessagePush({ message: marked(), chatId: "veli_ali" });
+  assert.equal(sent()[0].badge, 6);
 });
 
 test("1-1: alıcı göndereni engellediyse push yok", async () => {
@@ -291,6 +340,38 @@ test("grup: tüm alıcılar TEK gönderimde; engelleyen ve token'sız atlanır",
   // İçerik, gönderen adı + grup adıyla kurulur.
   assert.equal(contentCalls[0].n.fromName, "Ali");
   assert.equal(contentCalls[0].n.groupName, "Film Gecesi");
+});
+
+test("grup: yalnız açık olan grubun push'u bastırılır; diğer grup ve tekil sohbet gider", async () => {
+  const rtdbData = {
+    "groupChatMeta/g1/inChat/veli": "conn1",
+    "presence/veli/conns/conn1": 1,
+  };
+  const open = setup({ docs: groupDocs, tokens: { veli: ["V1"] }, rtdbData });
+  await open.push.deliverMessagePush({ message: marked(), groupId: "g1" });
+  assert.equal(open.sent().length, 0);
+
+  const other = setup({
+    docs: { ...groupDocs, "groups/g2": { name: "Başka grup", members: ["ali", "veli"] } },
+    tokens: { veli: ["V1"] }, rtdbData,
+    groupUnread: { "Users/veli/groupInbox": { g2: 2 } },
+    groupIds: { groups: ["g2"] },
+  });
+  await other.push.deliverMessagePush({ message: marked(), groupId: "g2" });
+  assert.equal(other.sent().length, 1);
+  assert.equal(other.sent()[0].badge, 2);
+  await other.push.deliverMessagePush({ message: marked(), chatId: "veli_ali" });
+  assert.equal(other.sent().length, 2);
+});
+
+test("grup: bağlantısı kopmuş açık işareti push'u bastırmaz", async () => {
+  const { push, sent } = setup({
+    docs: groupDocs, tokens: { veli: ["V1"] },
+    rtdbData: { "groupChatMeta/g1/inChat/veli": "old" },
+  });
+  await push.deliverMessagePush({ message: marked(), groupId: "g1" });
+  assert.equal(sent().length, 1);
+  assert.equal(sent()[0].badge, 1);
 });
 
 test("grup: gönderen üye değilse ya da grup yoksa push yok", async () => {
@@ -406,6 +487,25 @@ test("bildirim belgesi: eski istemcinin 1-1 mesaj bildirimi sohbetteyken susar",
   });
   const prepared = await push.prepare("veli", { type: "message", fromUid: "ali", text: "x" }, { notifId: "n2" });
   assert.equal(prepared, null);
+});
+
+test("bildirim belgesi: eski istemcinin grup mesajı yalnız o grup açıkken susar", async () => {
+  const { push } = setup({
+    docs: { "Users/veli": {} },
+    tokens: { veli: ["T1"] },
+    rtdbData: {
+      "groupChatMeta/g1/inChat/veli": "c1",
+      "presence/veli/conns/c1": 1,
+    },
+  });
+  const current = await push.prepare("veli", {
+    type: "message", fromUid: "ali", groupId: "g1", text: "x",
+  }, { notifId: "n3" });
+  const elsewhere = await push.prepare("veli", {
+    type: "message", fromUid: "ali", groupId: "g2", text: "x",
+  }, { notifId: "n4" });
+  assert.equal(current, null);
+  assert.equal(elsewhere.messages[0].data.chatId, "g2");
 });
 
 test("send: boş liste hiçbir şey göndermez", async () => {

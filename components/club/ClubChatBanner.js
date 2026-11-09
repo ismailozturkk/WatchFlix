@@ -1,6 +1,6 @@
 // components/club/ClubChatBanner.js
 //
-// Grup sohbetinin üstünde (sabitlenmiş mesaj şeridiyle aynı yerde) FİLM KULÜBÜ şeridi: kulüp açıkken ve açık bir
+// Grup sohbetinin üstünde (sabitlenmiş mesaj şeridiyle AYNI SATIRDA, yan yana) FİLM KULÜBÜ şeridi: kulüp açıkken ve açık bir
 // tur varken görünür — "Tur #3 · oylama sürüyor" / "İzleniyor: Dune". Dokununca kulüp ekranı.
 // Dinleyici yalnız kulüp açıkken kurulur (tek alanlı `status in` sorgusu; services/filmClubService).
 
@@ -10,12 +10,13 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import GlassTouchable from "@components/common/GlassTouchable";
 import { useLanguage } from "@context/LanguageContext";
 import { useTheme } from "@context/ThemeContext";
+import { alpha } from "../../theme/colors";
 import { subscribeOpenClubRounds } from "@services/filmClubService";
 import { activeRoundOf, hasWatched, myVoteOf } from "@utils/filmClub";
 import { getFilmClubCopy } from "@utils/filmClubCopy";
 import { CLUB_ACCENT } from "./ClubCandidatePicker";
 
-function ClubChatBanner({ groupId, enabled, uid, onPress }) {
+function ClubChatBanner({ groupId, enabled, uid, onPress, compact = false }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const copy = getFilmClubCopy(language);
@@ -33,36 +34,45 @@ function ClubChatBanner({ groupId, enabled, uid, onPress }) {
   const voting = round.status === "voting";
   const done = voting ? !!myVoteOf(round, uid) : hasWatched(round, uid);
   const text = voting ? copy.bannerVoting(round.number) : copy.bannerWatching(round.pick?.title || "");
+  const ctaLabel = voting ? copy.chatVote : copy.markWatched;
 
+  // Tek satırlık ince şerit. `compact` = sabitlenmiş mesaj şeridiyle yan yana (yarım genişlik): eylem yazısı
+  // yerine simgenin köşesinde nokta; yalnızken küçük "Oy ver / İzledim" hapı.
   return (
     <GlassTouchable
       onPress={() => onPress?.(round)}
       activeOpacity={0.82}
-      style={[styles.banner, { backgroundColor: theme.secondary, borderColor: theme.border }]}
+      style={[styles.banner, { backgroundColor: alpha(theme.secondary, 0.72), borderColor: theme.border }]}
       accessibilityRole="button"
-      accessibilityLabel={`${copy.title}. ${text}`}
+      accessibilityLabel={`${copy.title}. ${text}${done ? "" : `. ${ctaLabel}`}`}
       testID="club-chat-banner"
     >
       <View style={[styles.icon, { backgroundColor: `${CLUB_ACCENT}29` }]}>
-        <Ionicons name="ticket" size={15} color={CLUB_ACCENT} />
+        <Ionicons name="ticket" size={13} color={CLUB_ACCENT} />
+        {compact && !done ? (
+          <View style={[styles.dot, { backgroundColor: CLUB_ACCENT, borderColor: theme.secondary }]} />
+        ) : null}
       </View>
-      <View style={styles.copy}>
-        <Text style={[styles.title, { color: CLUB_ACCENT }]} numberOfLines={1}>
-          {copy.title}
-        </Text>
-        <Text style={[styles.text, { color: theme.text.secondary }]} numberOfLines={1}>
-          {text}
-        </Text>
-      </View>
-      <View style={[styles.cta, { backgroundColor: done ? theme.primary : CLUB_ACCENT }]}>
-        {done ? (
-          <Ionicons name="checkmark" size={14} color={CLUB_ACCENT} />
+      <Text style={[styles.text, { color: theme.text.primary }]} numberOfLines={1}>
+        {compact ? (
+          text
         ) : (
-          <Text style={styles.ctaText} allowFontScaling={false}>
-            {voting ? copy.chatVote : copy.markWatched}
-          </Text>
+          <>
+            <Text style={{ color: CLUB_ACCENT }}>{copy.title}</Text>
+            <Text style={{ color: theme.text.muted }}>{"  ·  "}</Text>
+            {text}
+          </>
         )}
-      </View>
+      </Text>
+      {done ? (
+        <Ionicons name="checkmark-circle" size={16} color={CLUB_ACCENT} />
+      ) : !compact ? (
+        <View style={[styles.cta, { backgroundColor: CLUB_ACCENT }]}>
+          <Text style={styles.ctaText} allowFontScaling={false}>
+            {ctaLabel}
+          </Text>
+        </View>
+      ) : null}
     </GlassTouchable>
   );
 }
@@ -71,21 +81,20 @@ export default memo(ClubChatBanner);
 
 const styles = StyleSheet.create({
   banner: {
-    minHeight: 52,
+    flex: 1,
+    minWidth: 0,
+    height: 38,
+    marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 12,
-    marginTop: 8,
-    marginBottom: 2,
-    paddingHorizontal: 10,
-    borderRadius: 16,
+    paddingLeft: 6,
+    paddingRight: 8,
+    borderRadius: 19,
     borderWidth: 1,
-    zIndex: 2,
   },
-  icon: { width: 32, height: 32, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  copy: { flex: 1, marginHorizontal: 9 },
-  title: { fontSize: 10.5, fontWeight: "800" },
-  text: { fontSize: 12.5, fontWeight: "700", marginTop: 2 },
-  cta: { minWidth: 28, height: 28, borderRadius: 14, paddingHorizontal: 10, alignItems: "center", justifyContent: "center" },
-  ctaText: { color: "#fff", fontSize: 11.5, fontWeight: "900" },
+  icon: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  dot: { position: "absolute", top: -1, right: -1, width: 9, height: 9, borderRadius: 5, borderWidth: 1.5 },
+  text: { flex: 1, fontSize: 12.5, fontWeight: "700", marginHorizontal: 7 },
+  cta: { height: 22, borderRadius: 11, paddingHorizontal: 9, alignItems: "center", justifyContent: "center" },
+  ctaText: { color: "#fff", fontSize: 11, fontWeight: "900" },
 });

@@ -8,6 +8,8 @@ const {
   computeAppBadge,
   pairChatId,
   sumUnreadMessages,
+  sumGroupUnread,
+  sumLegacyGroupUnread,
   toCount,
 } = require("./appBadge");
 
@@ -32,8 +34,33 @@ test("sumUnreadMessages dokümanlardaki unreadCount toplamını verir", () => {
   assert.equal(sumUnreadMessages(docs), 5);
   // düz nesne de kabul edilir (testlerde ve select() sonuçlarında kolaylık)
   assert.equal(sumUnreadMessages([{ unreadCount: 4 }, { unreadCount: 1 }]), 5);
+  assert.equal(sumUnreadMessages([
+    { id: "visible", unreadCount: 2 },
+    { id: "hidden", unreadCount: 9 },
+  ], ["hidden"]), 2);
   assert.equal(sumUnreadMessages([]), 0);
   assert.equal(sumUnreadMessages(undefined), 0);
+});
+
+test("sumGroupUnread yalnız üye olunan grupları sayar", () => {
+  const docs = [
+    { id: "g1", data: () => ({ unread: 3 }) },
+    { id: "old", data: () => ({ unread: 8 }) },
+    { id: "g2", data: () => ({ unread: -1 }) },
+  ];
+  assert.equal(sumGroupUnread(docs, ["g1", "g2"]), 3);
+});
+
+test("sumLegacyGroupUnread eski istemcilerin groups.unread sayacından yalnız alıcınınkini toplar", () => {
+  const docs = [
+    { id: "g1", data: () => ({ unread: { veli: 2, ali: 5 } }) },
+    { id: "g2", data: () => ({ unread: { veli: -3 } }) },
+    { id: "g3", data: () => ({}) },
+    { id: "g4", unread: { veli: 1 } },
+  ];
+  assert.equal(sumLegacyGroupUnread(docs, "veli"), 3);
+  assert.equal(sumLegacyGroupUnread(docs, "yok"), 0);
+  assert.equal(sumLegacyGroupUnread(undefined, "veli"), 0);
 });
 
 test("computeAppBadge istemcideki utils/appBadge.js ile aynı toplamı verir", () => {
@@ -54,10 +81,10 @@ test("1-1 mesaj push'u en az 1 rozet taşır (sayaç yarışına karşı taban)"
   );
 });
 
-test("grup mesajı ve diğer türlerde taban YOK (sayılmayan şey rozete yazılmaz)", () => {
+test("grup mesajında en az 1, diğer türlerde taban yok", () => {
   assert.equal(
     badgeForPush({ type: "message", groupId: "g1" }, { unreadMessages: 0, pendingRequests: 0 }),
-    0,
+    1,
   );
   assert.equal(
     badgeForPush({ type: "post_like" }, { unreadMessages: 0, pendingRequests: 0 }),

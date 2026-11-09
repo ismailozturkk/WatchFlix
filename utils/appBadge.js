@@ -9,17 +9,13 @@
 // taşımadığından uygulama kapalıyken sayı hiç düzeltilemiyordu.
 //
 // YENİ TANIM: rozet, kullanıcının GERÇEKTEN bekleyen işleri:
-//   okunmamış 1-1 mesajlar  (Users/{uid}/conversations/*.unreadCount toplamı)
+//   okunmamış 1-1 ve grup mesajları (conversations + groupInbox toplamı)
 // + bekleyen gelen arkadaşlık istekleri (Users/{uid}/friendRequests, pending)
 // Bunların ikisi de kullanıcı eyleminde (sohbeti açmak, isteği yanıtlamak)
 // kendiliğinden düşer — ayrı bir "okundu" bakımı gerekmez.
 //
 // Beğeni/yorum bildirimleri bilerek DAHİL DEĞİL: onları temizleyecek bir
-// bildirim ekranı yok, rozete eklenirlerse yine sıfırlanamaz olurlardı. Grup
-// mesajlarının okunmamış sayacı (Users/{uid}/groupInbox/{groupId}.unread)
-// Mesajlar ekranında gösterilir ama sayıma GİRMİYOR. Sayaç artık kullanıcının
-// kendi alt koleksiyonunda olduğu için sunucu tek sorguyla okuyabilir; rozete
-// katmak bir ürün kararı ve functions/appBadge.js ile birlikte yapılmalı.
+// bildirim ekranı yok, rozete eklenirlerse yine sıfırlanamaz olurlardı.
 //
 // AYNI MANTIK functions/appBadge.js içinde (CommonJS, sunucu push'una `badge`
 // yazar). İkisi birlikte güncellenmeli — iki taraf ayrışırsa uygulama açıkken

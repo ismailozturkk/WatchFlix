@@ -31,10 +31,10 @@ function connIdFromFlag(value) {
  * @param {{ ref: (path: string) => { get: () => Promise<{ val: () => any, exists: () => boolean }> } }} rtdb
  * @returns {Promise<boolean>}
  */
-async function isRecipientViewingChat(rtdb, chatId, recipientUid) {
+async function isRecipientViewingChat(rtdb, chatId, recipientUid, isGroup = false) {
   if (!rtdb || !chatId || !recipientUid) return false;
   const flagSnap = await rtdb
-    .ref(`chatMeta/${chatId}/inChat/${recipientUid}`)
+    .ref(`${isGroup ? "groupChatMeta" : "chatMeta"}/${chatId}/inChat/${recipientUid}`)
     .get();
   const connId = connIdFromFlag(flagSnap.val());
   if (!connId) return false;

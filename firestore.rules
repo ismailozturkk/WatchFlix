@@ -1313,8 +1313,10 @@ service cloud.firestore {
       //
       // `unread` = { uid: okunmamış sayısı }: ESKİ istemcilerin sayacı. Yeni
       // istemci sayacı üye başına gelen kutusunda tutar
-      // (Users/{uid}/groupInbox/{groupId}, aşağıda) ve bu alana yazmaz; dal,
-      // eski sürümlerin grup mesajı gönderebilmesi için duruyor — o sürümler
+      // (Users/{uid}/groupInbox/{groupId}, aşağıda); bu alana yalnız sohbeti
+      // açınca KENDİ eski sayacını 0'lamak için yazar ve okunmamış toplamına
+      // eski sayacı da ekler. Dal, eski sürümlerin grup mesajı gönderebilmesi
+      // ve bu sıfırlama için duruyor — o sürümler
       // emekliye ayrılınca 'unread' buradan kaldırılmalı. Kural yalnız
       // anahtarların MEVCUT ÜYELERE ait olmasını şart koşar.
       allow update: if isSignedIn()

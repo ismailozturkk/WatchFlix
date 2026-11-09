@@ -3,6 +3,7 @@
 // Sohbete özgü EPHEMERAL sinyaller (typing + inChat) Realtime Database'de:
 //   /chatMeta/{chatId}/typing/{uid} : bağlantı kimliği | (yok)
 //   /chatMeta/{chatId}/inChat/{uid} : bağlantı kimliği | (yok)
+//   /groupChatMeta/{groupId}/inChat/{uid} : grup sohbeti bağlantı kimliği | (yok)
 //
 // Mantık services/chatSignals.js'de (saf, testli); veri modeli ve "bayrak neden
 // takılı kalamaz" açıklaması services/presenceModel.js'de. Burası yalnızca RTDB
@@ -25,7 +26,11 @@ import { createChatSignals, resolveFriendSignals } from "./chatSignals";
 
 export { createTypingController } from "./chatSignals";
 
-const metaRef = (chatId, kind, uid) => ref(rtdb, `chatMeta/${chatId}/${kind}/${uid}`);
+const metaRef = (chatId, kind, uid) => {
+  const group = chatId.startsWith("group:");
+  const id = group ? chatId.slice(6) : chatId;
+  return ref(rtdb, `${group ? "groupChatMeta" : "chatMeta"}/${id}/${kind}/${uid}`);
+};
 
 // false → düğümü sil (boş bayrak artığı birikmesin).
 const flagValue = (value) => (value === false ? null : value);

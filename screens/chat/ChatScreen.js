@@ -34,8 +34,8 @@ import {
   LayoutAnimation,
   UIManager,
   Keyboard,
-  ActivityIndicator,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 
 // Compose tepsisi / başlık girişi geçişlerinde yumuşak yeniden-yerleşim için.
 if (
@@ -65,6 +65,7 @@ import {
   deleteField,
   increment,
   getDoc,
+  FieldPath,
 } from "firebase/firestore";
 import { trackFirestoreRead } from "../../services/usageTrackerService";
 import { useTheme } from "@context/ThemeContext";
@@ -479,6 +480,7 @@ export default function ChatScreen({ route, navigation }) {
   const [replyingTo, setReplyingTo] = useState(null);
   const [pinnedMessages, setPinnedMessages] = useState([]);
   const [pinnedModalVisible, setPinnedModalVisible] = useState(false);
+  const [topStripsHeight, setTopStripsHeight] = useState(0);
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
   const [busyPinId, setBusyPinId] = useState(null);
   const MAX_SELECT = 12;
@@ -846,15 +848,16 @@ export default function ChatScreen({ route, navigation }) {
   const appActive = useAppActive();
   const isViewing = isFocused && appActive;
 
-  // "Sohbette" bayrağı (RTDB inChat) yalnızca 1-1 modunda ve yalnız SUNUCU için:
+  // "Sohbette" bayrağı (RTDB inChat) hem grup hem 1-1 için SUNUCUYA iletilir:
   // push bu bayrağa bakıp açık sohbetin mesajını atlıyor (functions/index.js).
   // Çevrimiçi / Sohbette / yazıyor GÖSTERGELERİ 1 Kas 2026'da kaldırıldı (kullanıcı
   // kararı); bu yazım görünmez, bildirimi susturmak için kalıyor.
   useEffect(() => {
-    if (isGroup || !isViewing) return undefined;
-    enterChat(chatId, currentUser.uid);
+    if (!isViewing) return undefined;
+    const presenceId = isGroup ? `group:${chatId}` : chatId;
+    enterChat(presenceId, currentUser.uid);
     return () => {
-      leaveChat(chatId, currentUser.uid);
+      leaveChat(presenceId, currentUser.uid);
     };
   }, [isGroup, isViewing, chatId, currentUser.uid]);
 
@@ -915,6 +918,14 @@ export default function ChatScreen({ route, navigation }) {
     );
     return () => unsub();
   }, [isGroup, isViewing, currentUser.uid, groupId]);
+
+  // Eski istemciler grup okunmamışını groups/{id}.unread.{uid} içinde artırır.
+  // O sürümden gelen mesaj da bu sohbet açılınca okunmuş olmalı.
+  const legacyGroupUnread = groupData?.unread?.[currentUser.uid] || 0;
+  useEffect(() => {
+    if (!isGroup || !isViewing || !(Number(legacyGroupUnread) > 0)) return;
+    updateDoc(chatRef, new FieldPath("unread", currentUser.uid), 0).catch(() => {});
+  }, [isGroup, isViewing, legacyGroupUnread, chatRef, currentUser.uid]);
 
   // Sohbet açıkken ARKADAŞLIK bitti (karşı taraf seni çıkardı ya da sen başka yerden):
   // sohbet silinmiştir, ekranda kalıp mesaj yazmak boş bir sohbeti yeniden yaratırdı.
@@ -1410,17 +1421,16 @@ export default function ChatScreen({ route, navigation }) {
         throw error;
       }
       const { message, invitation } = prepareOutgoingMessage(messageData);
-      // Grup belgesi dinleyiciden henüz gelmediyse (sohbet yeni açıldı ya da
-      // dinleyici düştü) üyeler gönderim anında okunur; yoksa diğer üyelerin
-      // okunmamış sayacı bu mesajda artmazdı. Okuma düşerse eski davranış.
+      // Grup belgesi henüz gelmediyse üyeleri gönderim anında oku. Okuma da
+      // başarısızsa mesajı gönderme: diğer üyelerin okunmamış sayaçları eksik
+      // kalır ve bildirim/rozet akışı ayrışır.
       let groupMembers = groupData?.members;
       if (isGroup && !Array.isArray(groupMembers)) {
-        try {
-          const snap = await getDoc(chatRef);
-          groupMembers = snap.exists() ? snap.data()?.members : undefined;
-        } catch (error) {
-          if (__DEV__) console.warn("grup üyeleri okunamadı:", error?.message);
-        }
+        const snap = await getDoc(chatRef);
+        groupMembers = snap.exists() ? snap.data()?.members : undefined;
+      }
+      if (isGroup && (!Array.isArray(groupMembers) || !groupMembers.includes(currentUser.uid))) {
+        throw new Error("group-members-unavailable");
       }
       const batch = writeBatch(db);
       const messageRef = doc(messagesRef);
@@ -1429,7 +1439,7 @@ export default function ChatScreen({ route, navigation }) {
       await batch.commit();
       notifyInvitation(previewText, invitation, messageRef.id, groupMembers);
     },
-    [messagesRef, queueThreadWrites, notifyInvitation, isGroup, groupData, chatRef, groupSendLocked],
+    [messagesRef, queueThreadWrites, notifyInvitation, isGroup, groupData, chatRef, groupSendLocked, currentUser.uid],
   );
 
   // Mesajlar listesindeki önizlemeyi sohbetin GÜNCEL son mesajına eşitler (bkz.
@@ -2535,74 +2545,6 @@ export default function ChatScreen({ route, navigation }) {
         ]}
       >
           {/* ── MESAJ LİSTESİ ── */}
-          {isGroup && (
-            <ClubChatBanner
-              groupId={groupId}
-              enabled={groupData?.club?.enabled === true}
-              uid={currentUser.uid}
-              onPress={(round) => navigation.navigate("FilmClubScreen", { groupId, roundId: round.id })}
-            />
-          )}
-          {pinnedMessages.length > 0 && (
-            <GlassTouchable
-              onPress={() => setPinnedModalVisible(true)}
-              activeOpacity={0.82}
-              style={[
-                styles.pinnedBanner,
-                {
-                  backgroundColor: theme.secondary,
-                  borderColor: theme.border,
-                },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={i18nText("autoI18n.sabitlenmis_mesajlar", "Sabitlenmiş mesajlar")}
-            >
-              <View
-                style={[
-                  styles.pinnedBannerIcon,
-                  { backgroundColor: alpha(theme.accent, 0.16) },
-                ]}
-              >
-                <Ionicons name="pin" size={15} color={theme.accent} />
-              </View>
-              <View style={styles.pinnedBannerCopy}>
-                <Text
-                  style={[styles.pinnedBannerTitle, { color: theme.accent }]}
-                  numberOfLines={1}
-                >
-                  {pinnedMessages[0].senderName || i18nText("autoI18n.sohbet_mesaji", "Mesaj")}
-                </Text>
-                <Text
-                  style={[
-                    styles.pinnedBannerText,
-                    { color: theme.text.secondary },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {pinnedMessages[0].preview}
-                </Text>
-              </View>
-              {pinnedMessages.length > 1 && (
-                <View
-                  style={[
-                    styles.pinnedCountBadge,
-                    { backgroundColor: alpha(theme.accent, 0.18) },
-                  ]}
-                >
-                  <Text
-                    style={[styles.pinnedCountText, { color: theme.accent }]}
-                  >
-                    +{pinnedMessages.length - 1}
-                  </Text>
-                </View>
-              )}
-              <Ionicons
-                name="chevron-forward"
-                size={16}
-                color={theme.text.muted}
-              />
-            </GlassTouchable>
-          )}
           <View
             ref={messageViewportRef}
             style={styles.messageViewport}
@@ -2646,7 +2588,7 @@ export default function ChatScreen({ route, navigation }) {
             data={memoizedMessages}
             keyExtractor={(item) => item.clientId || item.id}
             renderItem={renderItem}
-            contentContainerStyle={[styles.listContent, { paddingTop: composerHeight + 14 }]}
+            contentContainerStyle={[styles.listContent, { paddingTop: composerHeight + 14, paddingBottom: 18 + topStripsHeight }]}
             inverted
             onScroll={handleMessageListScroll}
             scrollEventThrottle={32}
@@ -2662,6 +2604,72 @@ export default function ChatScreen({ route, navigation }) {
           />
 
           </ComposerBlurTarget>
+
+          {/* Kulüp + sabitlenmiş: mesaj listesinin ÜSTÜNDE YÜZEN tek satır (yan yana ince haplar).
+              Blur hedefinin KARDEŞİ (içinde değil) → Android buzlu cam / iOS 26 cam arkadaki mesajları
+              bulanıklaştırır; cam yoksa yarı saydam dolgu. Yüksekliği ölçülür, liste o kadar boşluk bırakır
+              (en eski mesaj şeridin altında kalmasın). Biri yoksa diğeri tam genişlik; ikisi yoksa 0. */}
+          <View
+            style={styles.topStrips}
+            pointerEvents="box-none"
+            onLayout={(event) => {
+              const next = Math.round(event.nativeEvent.layout.height);
+              setTopStripsHeight((prev) => (prev === next ? prev : next));
+            }}
+          >
+            {isGroup && (
+              <ClubChatBanner
+                groupId={groupId}
+                enabled={groupData?.club?.enabled === true}
+                uid={currentUser.uid}
+                compact={pinnedMessages.length > 0}
+                onPress={(round) => navigation.navigate("FilmClubScreen", { groupId, roundId: round.id })}
+              />
+            )}
+            {pinnedMessages.length > 0 && (
+              <GlassTouchable
+                onPress={() => setPinnedModalVisible(true)}
+                activeOpacity={0.82}
+                style={[
+                  styles.pinnedBanner,
+                  { backgroundColor: alpha(theme.secondary, 0.72), borderColor: theme.border },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${i18nText("autoI18n.sabitlenmis_mesajlar", "Sabitlenmiş mesajlar")}: ${pinnedMessages[0].preview || ""}`}
+              >
+                <View
+                  style={[
+                    styles.pinnedBannerIcon,
+                    { backgroundColor: alpha(theme.accent, 0.16) },
+                  ]}
+                >
+                  <Ionicons name="pin" size={13} color={theme.accent} />
+                </View>
+                <Text
+                  style={[styles.pinnedBannerText, { color: theme.text.secondary }]}
+                  numberOfLines={1}
+                >
+                  <Text style={[styles.pinnedBannerTitle, { color: theme.accent }]}>
+                    {pinnedMessages[0].senderName || i18nText("autoI18n.sohbet_mesaji", "Mesaj")}
+                    {": "}
+                  </Text>
+                  {pinnedMessages[0].preview}
+                </Text>
+                {pinnedMessages.length > 1 && (
+                  <View
+                    style={[
+                      styles.pinnedCountBadge,
+                      { backgroundColor: alpha(theme.accent, 0.18) },
+                    ]}
+                  >
+                    <Text style={[styles.pinnedCountText, { color: theme.accent }]}>
+                      +{pinnedMessages.length - 1}
+                    </Text>
+                  </View>
+                )}
+              </GlassTouchable>
+            )}
+          </View>
 
           {showLatestMessageButton && (
             <GlassIconButton
@@ -3069,7 +3077,7 @@ export default function ChatScreen({ route, navigation }) {
                       style={[styles.searchInput, { color: theme.text.primary }]}
                     />
                     {loadingSearch ? (
-                      <ActivityIndicator
+                      <LensLoader
                         size="small"
                         color={theme.accent}
                         style={styles.searchInputTrail}
@@ -3185,7 +3193,7 @@ export default function ChatScreen({ route, navigation }) {
                       />
                     ) : loadingSearch ? (
                       <View style={styles.searchEmpty}>
-                        <ActivityIndicator color={theme.accent} />
+                        <LensLoader color={theme.accent} />
                       </View>
                     ) : (() => {
                       // Aranmış ve boş döndüyse "sonuç yok"; aksi halde ilk yönlendirme.
@@ -3908,39 +3916,48 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
+  topStrips: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    zIndex: 6,
+    elevation: 6,
+  },
   pinnedBanner: {
-    minHeight: 56,
+    flex: 1,
+    minWidth: 0,
+    height: 38,
+    marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 12,
-    marginTop: 8,
-    marginBottom: 2,
-    paddingHorizontal: 10,
-    borderRadius: 16,
+    paddingLeft: 6,
+    paddingRight: 8,
+    borderRadius: 19,
     borderWidth: 1,
     borderColor: "rgba(108,99,255,0.22)",
     backgroundColor: "rgba(20,20,38,0.96)",
-    zIndex: 2,
   },
   pinnedBannerIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 11,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(108,99,255,0.16)",
   },
-  pinnedBannerCopy: { flex: 1, marginHorizontal: 9 },
-  pinnedBannerTitle: { color: "#B8B4FF", fontSize: 10.5, fontWeight: "800" },
-  pinnedBannerText: { color: "rgba(255,255,255,0.7)", fontSize: 12.5, marginTop: 2 },
+  pinnedBannerTitle: { color: "#B8B4FF", fontWeight: "800" },
+  pinnedBannerText: { flex: 1, color: "rgba(255,255,255,0.7)", fontSize: 12.5, marginHorizontal: 7 },
   pinnedCountBadge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
+    minWidth: 22,
+    height: 20,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 6,
-    marginRight: 5,
+    paddingHorizontal: 5,
     backgroundColor: "rgba(108,99,255,0.18)",
   },
   pinnedCountText: { color: "#C3C0FF", fontSize: 10.5, fontWeight: "800" },

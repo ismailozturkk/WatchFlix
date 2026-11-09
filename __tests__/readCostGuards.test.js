@@ -25,7 +25,7 @@ test("sohbet ekranı çevrimiçi / yazıyor sinyali okumuyor ve yazmıyor", () =
   const src = read("screens/chat/ChatScreen.js");
   expect(src).not.toMatch(/subscribeChatMeta|setTyping|createTypingController|isOnlineVisible/);
   // Push susturma bayrağı (görünmez) kalır.
-  expect(src).toMatch(/enterChat\(chatId, currentUser\.uid\)/);
+  expect(src).toMatch(/enterChat\(presenceId, currentUser\.uid\)/);
   const header = read("components/chat/ChatHeader.js");
   expect(header).not.toMatch(/formatLastSeen|TypingDots|chat_typing/);
 });

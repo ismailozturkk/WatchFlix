@@ -59,6 +59,21 @@ describe("chatMeta", () => {
   });
 });
 
+describe("groupChatMeta", () => {
+  const node = rules.groupChatMeta.$groupId;
+
+  test("yalnız kendi açık sohbet bayrağını okuyup yazabilir", () => {
+    expect(node[".read"]).toBeUndefined();
+    expect(node[".write"]).toBeUndefined();
+    expect(Object.keys(node)).toEqual(["inChat"]);
+    const flag = node.inChat.$uid;
+    expect(flag[".read"]).toBe("auth != null && auth.uid === $uid");
+    expect(flag[".write"]).toBe("auth != null && auth.uid === $uid");
+    expect(flag[".validate"]).toContain("newData.isString()");
+    expect(flag[".validate"]).toMatch(/length <= \d+/);
+  });
+});
+
 test("beklenmeyen üst düzey düğüm yok (yeni düğüm bilinçli eklenmeli)", () => {
-  expect(Object.keys(rules).sort()).toEqual(["chatMeta", "presence"]);
+  expect(Object.keys(rules).sort()).toEqual(["chatMeta", "groupChatMeta", "presence"]);
 });

@@ -23,7 +23,7 @@
 // Bağımlılıklar dışarıdan verilir (createSocialPush) — socialPush.test.js sahte
 // Firestore/RTDB/Expo ile sınar.
 
-const { badgeForPush, sumUnreadMessages, chatIdForMessage } = require("./appBadge");
+const { badgeForPush, sumUnreadMessages, sumGroupUnread, sumLegacyGroupUnread, chatIdForMessage } = require("./appBadge");
 const { isRecipientViewingChat } = require("./chatPresence");
 const { sendExpoPushes } = require("./expoSend");
 
@@ -166,15 +166,12 @@ function createSocialPush({
       }
     }
 
-    // Alıcı, gönderenle olan bu 1-1 sohbeti tam o an ekranda açık tutuyorsa
-    // push gereksiz. Yalnız 1-1: gruplarda inChat izlenmiyor (istemcinin ön plan
-    // süzgeci etkin sohbeti yine bastırır). Bayrak yalnız alıcının bağlantısı
-    // canlıysa geçerli (bkz. chatPresence.js).
-    if (rtdb && n.type === "message" && !n.groupId && n.fromUid) {
-      const pairId =
-        n.fromUid > recipientUid ? `${n.fromUid}_${recipientUid}` : `${recipientUid}_${n.fromUid}`;
+    // Yalnız alıcının canlı bağlantıyla ekranda tuttuğu sohbetin push'unu atla.
+    if (rtdb && n.type === "message" && (n.groupId || n.fromUid)) {
+      const pairId = n.groupId ||
+        (n.fromUid > recipientUid ? `${n.fromUid}_${recipientUid}` : `${recipientUid}_${n.fromUid}`);
       try {
-        if (await isRecipientViewingChat(rtdb, pairId, recipientUid)) {
+        if (await isRecipientViewingChat(rtdb, pairId, recipientUid, !!n.groupId)) {
           log.log(`Alıcı sohbette, push atlandı: ${recipientUid}`);
           return null;
         }
@@ -192,17 +189,24 @@ function createSocialPush({
     const lang = pickNotificationLang(userData.notificationLanguage);
     const { title, body } = buildContent(n, lang);
 
-    // Uygulama simgesi rozeti (iOS): MUTLAK sayı. Tanım: okunmamış 1-1 mesajlar
-    // + bekleyen gelen istekler (bkz. appBadge.js). Sorgu başarısızsa `badge`
+    // Uygulama simgesi rozeti (iOS): MUTLAK sayı. Sorgu başarısızsa `badge`
     // yazılmaz — OS mevcut sayıyı korur, yanlış sayı yazmaktan iyidir.
     let badge = null;
     try {
-      const [convSnap, requestsAgg] = await Promise.all([
+      const [convSnap, inboxSnap, groupsSnap, blockedSnap, requestsAgg] = await Promise.all([
         db
           .collection(`Users/${recipientUid}/conversations`)
           .where("unreadCount", ">", 0)
           .select("unreadCount")
           .get(),
+        db.collection(`Users/${recipientUid}/groupInbox`)
+          .where("unread", ">", 0)
+          .select("unread")
+          .get(),
+        db.collection("groups")
+          .where("members", "array-contains", recipientUid)
+          .get(),
+        db.collection(`Users/${recipientUid}/blocked`).get(),
         db
           .collection(`Users/${recipientUid}/friendRequests`)
           .where("status", "==", "pending")
@@ -210,7 +214,9 @@ function createSocialPush({
           .get(),
       ]);
       badge = badgeForPush(n, {
-        unreadMessages: sumUnreadMessages(convSnap.docs),
+        unreadMessages: sumUnreadMessages(convSnap.docs, blockedSnap.docs.map((d) => d.id)) +
+          sumGroupUnread(inboxSnap.docs, groupsSnap.docs.map((d) => d.id)) +
+          sumLegacyGroupUnread(groupsSnap.docs, recipientUid),
         pendingRequests: requestsAgg.data().count,
       });
     } catch (e) {
