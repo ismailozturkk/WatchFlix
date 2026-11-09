@@ -20,6 +20,8 @@ import {
 import { i18nText } from "../utils/i18nText";
 
 import { getSharedListAccent } from "../utils/listAppearance";
+import { alpha } from "../theme/colors";
+import { isLightSurface } from "../utils/colorUtils";
 import GlassTouchable from "./common/GlassTouchable";
 
 /**
@@ -38,6 +40,7 @@ import GlassTouchable from "./common/GlassTouchable";
 export default function SharedListsSection({ sharedItem, visible }) {
   const { theme } = useTheme();
   const ACCENT = getSharedListAccent(theme.primary);
+  const light = isLightSurface(theme.primary);
   const { user } = useAuth();
   const { displayName, username } = useUserProfile();
   // "Ekleyen" kopyasına kendi avatarım (fotoğraf avatarı dahil) yazılır.
@@ -207,8 +210,12 @@ export default function SharedListsSection({ sharedItem, visible }) {
               style={[
                 styles.card,
                 {
-                  backgroundColor: inList ? ACCENT + "15" : theme.primary,
-                  borderColor: inList ? ACCENT + "60" : theme.border,
+                  backgroundColor: inList
+                    ? alpha(ACCENT, light ? 0.13 : 0.16)
+                    : theme.primary,
+                  borderColor: inList
+                    ? alpha(ACCENT, light ? 0.45 : 0.55)
+                    : theme.border,
                   opacity: locked ? 0.55 : 1,
                 },
               ]}
@@ -217,17 +224,19 @@ export default function SharedListsSection({ sharedItem, visible }) {
                 style={[
                   styles.cardIcon,
                   {
-                    backgroundColor: inList ? ACCENT + "25" : theme.secondary,
+                    backgroundColor: inList
+                      ? alpha(ACCENT, light ? 0.18 : 0.24)
+                      : theme.secondary,
                   },
                 ]}
               >
                 <ListActionIcon
                   active={inList}
-                  activeName="checkmark-circle"
+                  activeName="people"
                   inactiveName={locked ? "lock-closed" : "people-outline"}
                   activeColor={ACCENT}
                   inactiveColor={theme.text.muted}
-                  size={20}
+                  size={18}
                 />
               </View>
               <View style={styles.cardCopy}>
@@ -236,7 +245,7 @@ export default function SharedListsSection({ sharedItem, visible }) {
                   numberOfLines={1}
                   style={[
                     styles.cardLabel,
-                    { color: inList ? ACCENT : theme.text.secondary },
+                    { color: inList ? ACCENT : theme.text.primary },
                   ]}
                 >
                   {list.name}
@@ -254,11 +263,24 @@ export default function SharedListsSection({ sharedItem, visible }) {
                   </Text>
                 )}
               </View>
-              <Ionicons
-                name={inList ? "checkmark-circle" : locked ? "lock-closed" : "add-circle-outline"}
-                size={18}
-                color={inList ? ACCENT : theme.text.muted}
-              />
+              <View
+                style={[
+                  styles.trailingOrb,
+                  {
+                    backgroundColor: inList
+                      ? ACCENT
+                      : locked
+                        ? alpha(theme.text.muted, 0.12)
+                        : alpha(theme.text.primary, light ? 0.055 : 0.075),
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={inList ? "checkmark" : locked ? "lock-closed" : "add"}
+                  size={inList ? 12 : locked ? 11 : 13}
+                  color={inList ? "#FFFFFF" : theme.text.muted}
+                />
+              </View>
             </GlassTouchable>
           );
         })}
@@ -302,9 +324,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cardLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
+    letterSpacing: -0.1,
   },
   cardCopy: { flex: 1, minWidth: 0 },
-  addedBy: { fontSize: 9, fontWeight: "600" },
+  addedBy: { fontSize: 9.5, fontWeight: "600", marginTop: 1 },
+  trailingOrb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

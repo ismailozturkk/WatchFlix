@@ -114,6 +114,9 @@ const LAYOUT_ICONS = {
   [LIST_LAYOUT.POLAROID]: "polaroid",
   [LIST_LAYOUT.DIAGONAL]: "view-parallel",
   [LIST_LAYOUT.WALL]: "view-quilt",
+  [LIST_LAYOUT.FOCUS]: "image-filter-center-focus",
+  [LIST_LAYOUT.SCATTER]: "cards-outline",
+  [LIST_LAYOUT.FLOW]: "disc",
 };
 
 // Seçicideki tek düzen kartı (kompakt, 3 sütunlu ızgarada). `variants`
@@ -129,9 +132,11 @@ const LayoutOption = ({
   icon,
   current,
   allCornersRounded,
+  layoutDirections,
   theme,
   scale,
   onSelect,
+  onDirectionChange,
 }) => {
   const familyIds = variants ? Object.values(variants) : [layout];
   const isActive = familyIds.includes(current);
@@ -139,6 +144,8 @@ const LayoutOption = ({
     ? Number(Object.keys(variants).find((n) => variants[n] === current) ?? defaultCount)
     : null;
   const shown = variants ? variants[activeCount] : layout;
+  const canReverse = [LIST_LAYOUT.SHOWCASE, LIST_LAYOUT.DIAGONAL, LIST_LAYOUT.WALL].includes(shown);
+  const direction = layoutDirections?.[shown] ?? "right";
   const realW = coverWidthAt(shown);
   const boxH = COVER_H * scale;
 
@@ -172,12 +179,38 @@ const LayoutOption = ({
               items={PREVIEW_SAMPLE_ITEMS}
               gridStyle={shown}
               allCornersRounded={allCornersRounded}
+              direction={direction}
               width={realW}
               height={COVER_H}
               theme={theme}
             />
           </View>
         </View>
+        {canReverse && ["left", "right"].map((side) => (
+          <TouchableOpacity
+            key={side}
+            accessibilityRole="button"
+            accessibilityLabel={`${label} ${side === "left"
+              ? i18nText("autoI18n.yon_sol", "Sol")
+              : i18nText("autoI18n.yon_sag", "Sağ")}`}
+            accessibilityState={{ selected: direction === side }}
+            onPress={(event) => {
+              event.stopPropagation?.();
+              onDirectionChange(shown, side);
+            }}
+            style={[
+              styles.directionChip,
+              side === "left" ? { left: 3 } : { right: 3 },
+              { backgroundColor: direction === side ? theme.colors.orange : theme.secondary },
+            ]}
+          >
+            <Text style={{ color: direction === side ? "#fff" : theme.text.primary, fontSize: 9, fontWeight: "700" }}>
+              {side === "left"
+                ? i18nText("autoI18n.yon_sol", "Sol")
+                : i18nText("autoI18n.yon_sag", "Sağ")}
+            </Text>
+          </TouchableOpacity>
+        ))}
         <View style={styles.pickerLabelRow}>
           {icon}
           <Text
@@ -234,7 +267,7 @@ export default function ProfileLists({ navigation }) {
   const { theme } = useTheme();
   const { lists, isLoading: isLoadingLists } = useProfileStats();
   const { user } = useAuth();
-  const { gridStyle, saveListGridStyle, allCornersRounded, saveAllCornersRounded } = useProfileUi();
+  const { gridStyle, saveListGridStyle, allCornersRounded, saveAllCornersRounded, listLayoutDirections, saveListLayoutDirection } = useProfileUi();
   const cardW = getCardWidth(gridStyle);
   // Seçici kartlarının ölçeği: 3 sütun, en geniş düzen (Büyük Kapaklar) kartın
   // iç genişliğine sığar; diğerleri aynı ölçekle küçülür.
@@ -251,6 +284,9 @@ export default function ProfileLists({ navigation }) {
     { key: "polaroid", layout: LIST_LAYOUT.POLAROID, label: i18nText("autoI18n.polaroid_gorunum", "Polaroid"), icon: <MaterialCommunityIcons name="polaroid" size={12} color={theme.colors.pink || "#f472b6"} /> },
     { key: "diagonal", layout: LIST_LAYOUT.DIAGONAL, label: i18nText("autoI18n.diyagonal_gorunum", "Diyagonal"), icon: <MaterialCommunityIcons name="view-parallel" size={12} color={theme.colors.teal || "#2dd4bf"} /> },
     { key: "wall", layout: LIST_LAYOUT.WALL, label: i18nText("autoI18n.afis_duvari_gorunum", "Afiş Duvarı"), icon: <MaterialCommunityIcons name="view-quilt" size={12} color={theme.colors.orange || "#fb923c"} /> },
+    { key: "focus", layout: LIST_LAYOUT.FOCUS, label: i18nText("autoI18n.odak_gorunum", "Odak"), icon: <MaterialCommunityIcons name="image-filter-center-focus" size={12} color={theme.colors.blue || "#60a5fa"} /> },
+    { key: "scatter", layout: LIST_LAYOUT.SCATTER, label: i18nText("autoI18n.daginik_gorunum", "Dağınık"), icon: <MaterialCommunityIcons name="cards-outline" size={12} color={theme.colors.green || "#4ade80"} /> },
+    { key: "flow", layout: LIST_LAYOUT.FLOW, label: i18nText("autoI18n.akis_gorunum", "DVD Kutuları"), icon: <MaterialCommunityIcons name="disc" size={12} color={theme.colors.pink || "#f472b6"} /> },
   ];
   const pickerRows = [];
   for (let i = 0; i < pickerOptions.length; i += PICKER_COLUMNS) {
@@ -260,11 +296,13 @@ export default function ProfileLists({ navigation }) {
     current: gridStyle,
     scale: pickerScale,
     allCornersRounded,
+    layoutDirections: listLayoutDirections,
     theme,
     onSelect: (layout, close) => {
       saveListGridStyle(layout);
       if (close) setLayoutModalVisible(false);
     },
+    onDirectionChange: saveListLayoutDirection,
   };
   const [layoutModalVisible, setLayoutModalVisible] = useState(false);
   const [createListVisible, setCreateListVisible] = useState(false);
@@ -484,6 +522,7 @@ export default function ProfileLists({ navigation }) {
                       items={orderedItems}
                       gridStyle={gridStyle}
                       allCornersRounded={allCornersRounded}
+                      direction={listLayoutDirections?.[gridStyle] ?? "right"}
                       width={cardW - CARD_PADDING * 2}
                       height={COVER_H}
                       getTmdbUrl={getTmdbUrl}
@@ -575,10 +614,10 @@ export default function ProfileLists({ navigation }) {
               {i18nText("autoI18n.liste_gorunumu_secin", "Liste Görünümü Seçin")}
             </Text>
 
-            {/* 10 düzen + köşe anahtarı küçük ekranda sığmaz: bölge küçülüp kayar. */}
+            {/* Düzenler + köşe anahtarı küçük ekranda sığmaz: bölge küçülüp kayar. */}
             <SheetScroll style={{ width: "100%" }} contentContainerStyle={{ paddingHorizontal: PICKER_SIDE, gap: PICKER_GAP }}>
-              {/* Kompakt 3 sütunlu ızgara: 3/5 seçimli aileler önde, yeni düzenler arkada.
-                  9 düzen = 3×3; ileride sayı değişip son satır eksik kalırsa boş hücreyle doldurulur (kartlar eşit genişlikte kalır). */}
+              {/* Kompakt 3 sütunlu ızgara: 3/5 seçimli aileler önde.
+                  Son satır eksik kalırsa boş hücreyle doldurulur. */}
               {pickerRows.map((row, r) => (
                 <View key={r} style={{ flexDirection: "row", gap: PICKER_GAP }}>
                   {row.map(({ key, ...opt }) => (
@@ -653,6 +692,17 @@ const styles = StyleSheet.create({
     gap: 2,
     borderRadius: 9,
     borderWidth: 1,
+  },
+  directionChip: {
+    position: "absolute",
+    top: 3,
+    zIndex: 10,
+    minWidth: 27,
+    height: 17,
+    paddingHorizontal: 3,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
   },
   countChip: {
     minWidth: 17,

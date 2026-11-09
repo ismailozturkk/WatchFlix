@@ -6,12 +6,12 @@ import {
   View,
   FlatList,
   TextInput,
-  ActivityIndicator,
   Keyboard,
   Animated,
   Dimensions,
   StatusBar,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { doc, getDoc, onSnapshot, writeBatch, collection, getDocs, limit, query } from "firebase/firestore";
 import { useTheme } from "@context/ThemeContext";
@@ -105,6 +105,7 @@ const ListCard = ({
   theme,
   gridStyle,
   allCornersRounded,
+  direction,
 }) => {
   const accent = getListAccent(listName, theme.secondary);
   const icon = getListIcon(listName);
@@ -185,6 +186,7 @@ const ListCard = ({
             items={items}
             gridStyle={gridStyle}
             allCornersRounded={allCornersRounded}
+            direction={direction}
             getTmdbUrl={getTmdbUrl}
             theme={theme}
           />
@@ -231,6 +233,7 @@ const SharedListCard = ({
   index,
   gridStyle,
   allCornersRounded,
+  direction,
 }) => {
   const SHARED_ACCENT = getSharedListAccent(theme.secondary);
   // Karışık/Yığın'da kart, küçültülmemiş afişlere göre TABAN'dan geniş olabilir.
@@ -287,6 +290,7 @@ const SharedListCard = ({
             items={previewItems}
             gridStyle={gridStyle}
             allCornersRounded={allCornersRounded}
+            direction={direction}
             getTmdbUrl={getTmdbUrl}
             theme={theme}
           />
@@ -338,7 +342,8 @@ export default function ListsViewScreen({ navigation }) {
   const sharedListsGate = usePremiumGate("shared_lists");
   // Kapak düzeni profil rayıyla ORTAK ayar: kullanıcı orada ne seçtiyse burada
   // da o çizilir (ProfileUiContext, cihazda kalıcı).
-  const { gridStyle, allCornersRounded } = useProfileUi();
+  const { gridStyle, allCornersRounded, listLayoutDirections } = useProfileUi();
+  const direction = listLayoutDirections?.[gridStyle] ?? "right";
   const [isLoading, setIsLoading] = useState(false);
 
   // Kök doc'tan gelen ham listeler (watchedTv burada artık boş — subcollection'a taşındı).
@@ -531,6 +536,7 @@ export default function ListsViewScreen({ navigation }) {
             theme={theme}
             gridStyle={gridStyle}
             allCornersRounded={allCornersRounded}
+            direction={direction}
             onPress={() => {
               Keyboard.dismiss();
               navigation.navigate("ListsScreen", { listName });
@@ -546,7 +552,7 @@ export default function ListsViewScreen({ navigation }) {
         </StaggerItem>
       );
     },
-    [getTmdbUrl, gridStyle, allCornersRounded, theme],
+    [getTmdbUrl, gridStyle, allCornersRounded, direction, theme],
   );
 
   return (
@@ -681,7 +687,7 @@ export default function ListsViewScreen({ navigation }) {
           disabled={isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator size="small" color="#000" />
+            <LensLoader tone="mono" size="small" color="#000" />
           ) : (
             <Ionicons
               name="arrow-forward"
@@ -761,6 +767,7 @@ export default function ListsViewScreen({ navigation }) {
                       theme={theme}
                       gridStyle={gridStyle}
                       allCornersRounded={allCornersRounded}
+                      direction={direction}
                       onPress={() => {
                         Keyboard.dismiss();
                         navigation.navigate("SharedListScreen", {

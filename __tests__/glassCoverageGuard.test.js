@@ -42,9 +42,11 @@ const RAW_TOUCHABLE_ALLOWED = {
   "components/tv/TvGraphGrid.js": 1, // yüzlerce bölüm hücresi
   "components/cineswipe/SwipeCard.js": 1, // kart içi bilgi düğmesi
   "components/badges/BadgeRail.js": 3, // kart gibi raf öğeleri
-  // Liste görünümü seçicisindeki önizleme kartının içindeki minik 3/5 sayı çipi
-  // (her kartta bir çift): kartın kendisi zaten dokunulur, cam iç içe kalabalık olur.
-  "screens/tabs/profile/ProfileLists.js": 1,
+  // Liste görünümü seçicisindeki önizleme kartının içindeki minik çipler: 3/5 sayı
+  // çipi + önizlemenin köşelerine oturan Sol/Sağ yön çipi (Vitrin/Diyagonal/Afiş
+  // Duvarı). Kartın kendisi zaten dokunulur, cam iç içe kalabalık olur ve seçili
+  // çipin turuncu tonunu bozar.
+  "screens/tabs/profile/ProfileLists.js": 2,
   "components/badges/BadgeShowcaseCard.js": 2, // kart gibi vitrin yuvası + yuvanın köşesindeki sil rozeti
   // Düğmenin KENDİSİ renk örneği / tema önizlemesi: cam tonu gösterdiği rengi bozar.
   "components/theme/ThemeShuffleDeck.js": 2,
@@ -63,6 +65,8 @@ const RAW_TOUCHABLE_ALLOWED = {
   "screens/onboarding/OnboardingFavorites.js": 1,
   // Marka renkli giriş düğmeleri (Apple / Google) — AuthKit'te glass={false}.
   "components/auth/AuthKit.js": 1,
+  // Vitrin rozeti seçici ızgara hücresi: seçili çerçeve nadirlik renginde, cam rengi ezerdi.
+  "components/badges/ShowcaseBadgePickerSheet.js": 1,
   // Hata sınırı sağlayıcıların DIŞINDA: cam bileşeni tema okuyup "useTheme must be used within a
   // ThemeProvider" ile asıl hatayı gizlerdi (bkz. __tests__/errorBoundaryStandalone.test.js).
   "components/ErrorBoundary.js": 1,
@@ -79,6 +83,10 @@ const RAW_INPUT_ALLOWED = {
   "components/profile/StatsComponents.js": 1,
   // Not kâğıdı alanları: kutu yok, cam olacak şey yok.
   "screens/tabs/profile/notes/NoteEditorSheet.js": 3,
+  // Profil düzenleme modu: okuma metniyle (ad / kullanıcı adı / hakkında / sosyal bağlantı)
+  // aynı stilde yerinde alanlar — "UI aynı kalsın" kararı; kutu yok, cam olacak şey yok.
+  "components/friends/FriendProfileSections.js": 3,
+  "components/profile/SocialLinksEditRow.js": 1,
   // Opaklığı animasyonlu atası olan alan (cam opaklıkla soldurulamaz).
   "screens/lists/ListsViewScreen.js": 1,
   // Yalnız geliştirici ekranları.

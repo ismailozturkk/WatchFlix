@@ -38,6 +38,13 @@ import { requestPhotoCheck } from "../services/photoRevalidation";
 import { OWN_PHOTO_CHECK_TTL_MS, revalidatedUriOf } from "../utils/photoRevalidation";
 import useFreshPhotoSource from "../hooks/useFreshPhotoSource";
 import { i18nText } from "../utils/i18nText";
+import { updateUserProfile } from "../services/userService";
+import {
+  LIST_COVER_STYLE_FIELD,
+  buildListCoverStyle,
+  readListCoverStyle,
+  sameListCoverStyle,
+} from "../utils/listCoverStyle";
 
 const ProfileUiContext = createContext();
 const NO_PHOTOS = [];
@@ -56,12 +63,25 @@ export const ProfileUiProvider = ({ children }) => {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [gridStyle, setGridStyle] = useState(() => get(Keys.listGridStyle));
+  const [listLayoutDirections, setListLayoutDirections] = useState(() =>
+    get(Keys.listLayoutDirections),
+  );
+  const listLayoutDirectionsRef = useRef(listLayoutDirections);
   const [allCornersRounded, setAllCornersRounded] = useState(() =>
     get(Keys.allCornersRounded),
   );
   // Görünüm tercihleri yukarıdaki useState başlangıç değerlerinde SENKRON
   // okunuyor; eski iki ayrı hidrasyon effect'i kalktı. "true"/"false" biçimli
   // eski kayıtların sayıya çevrilmesi göçün işi (registry: listGridStyle).
+
+  // Seçilen kapak düzeni profil belgesine de yazılır (Users/{uid}.listCoverStyle):
+  // arkadaş profili listeleri SAHİBİN düzeninde çizer. Yalnız kullanıcı bir
+  // tercihi değiştirdiğinde (ya da alan hiç yokken bir kez) yazılır — iki
+  // cihaz farklı yerel tercihle açıkken birbirini ezip durmasın.
+  const coverStyleDirtyRef = useRef(false);
+  const markCoverStyleDirty = () => {
+    coverStyleDirtyRef.current = true;
+  };
 
   const saveListGridStyle = async (styleId) => {
     if (!set(Keys.listGridStyle, styleId)) {
@@ -74,7 +94,17 @@ export const ProfileUiProvider = ({ children }) => {
       });
       return;
     }
+    markCoverStyleDirty();
     setGridStyle(styleId);
+  };
+
+  const saveListLayoutDirection = (styleId, direction) => {
+    if (![8, 10, 11].includes(styleId) || !["left", "right"].includes(direction)) return;
+    const next = { ...listLayoutDirectionsRef.current, [styleId]: direction };
+    if (!set(Keys.listLayoutDirections, next)) return;
+    listLayoutDirectionsRef.current = next;
+    markCoverStyleDirty();
+    setListLayoutDirections(next);
   };
 
   const saveAllCornersRounded = async (isRounded) => {
@@ -85,6 +115,7 @@ export const ProfileUiProvider = ({ children }) => {
       });
       return;
     }
+    markCoverStyleDirty();
     setAllCornersRounded(isRounded);
   };
 
@@ -142,6 +173,38 @@ export const ProfileUiProvider = ({ children }) => {
     if (!profileReady || typeof profile?.avatarIndex !== "number") return;
     set(Keys.avatarIndex, clampAvatarIndex(profile.avatarIndex), { uid });
   }, [profileReady, profile?.avatarIndex, uid]);
+
+  // Kapak düzenini profile yayınla (bkz. coverStyleDirtyRef). Kısa gecikme:
+  // modalda art arda yapılan seçimler tek yazıma iner.
+  const publishedCoverStyle = profileReady ? readListCoverStyle(profile) : null;
+  const hasPublishedCoverStyle = !!publishedCoverStyle;
+  useEffect(() => {
+    if (!profileReady) return undefined;
+    if (!coverStyleDirtyRef.current && hasPublishedCoverStyle) return undefined;
+    const next = buildListCoverStyle({ gridStyle, allCornersRounded, listLayoutDirections });
+    if (!next) return undefined;
+    if (sameListCoverStyle(next, publishedCoverStyle)) {
+      coverStyleDirtyRef.current = false;
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      coverStyleDirtyRef.current = false;
+      updateUserProfile(uid, { [LIST_COVER_STYLE_FIELD]: next }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+    // publishedCoverStyle her anlık görüntüde yeni nesne; alanlarına bağlı.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    profileReady,
+    uid,
+    gridStyle,
+    allCornersRounded,
+    listLayoutDirections,
+    hasPublishedCoverStyle,
+    publishedCoverStyle?.gridStyle,
+    publishedCoverStyle?.rounded,
+    publishedCoverStyle?.direction,
+  ]);
 
   // Tek kalıcı seçim yolu. Hazır avatar indeksi ya da seçim nesnesi
   // ({ avatarIndex, photoURL, photoSource }) alır; fotoğrafsız -1 gelirse ilk
@@ -273,6 +336,8 @@ export const ProfileUiProvider = ({ children }) => {
       gridStyle,
       setGridStyle,
       saveListGridStyle,
+      listLayoutDirections,
+      saveListLayoutDirection,
       allCornersRounded,
       setAllCornersRounded,
       saveAllCornersRounded,
@@ -286,6 +351,7 @@ export const ProfileUiProvider = ({ children }) => {
       isloadingAvatar,
       modalVisible,
       gridStyle,
+      listLayoutDirections,
       allCornersRounded,
       linkedPhotos,
     ]

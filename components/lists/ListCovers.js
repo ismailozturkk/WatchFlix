@@ -18,8 +18,11 @@
 //   9 → Polaroid         masaya saçılmış gibi hafif dönük 3 fotoğraf — 1 ile AYNI
 //  10 → Diyagonal        eğik kesilmiş 5 dilim, bitişik bir pano — 1 ile AYNI
 //  11 → Afiş Duvarı      yatırılmış, tuğla örgülü 4 sütunlu afiş duvarı — 1 ile AYNI
+//  12 → Odak             ortadaki tam boy afiş, iki yanda kısa afişler — 1 ile AYNI
+//  13 → Dağınık          açılışta rastgele yerleşen beş küçük afiş — 1 ile AYNI
+//  14 → DVD Kutuları     rafta duran üç 3B plastik DVD kutusu — 1 ile AYNI
 //
-// 5–11 sonradan eklendi; boyut hesabında bir "eş" düzen gibi davranırlar
+// 5–14 sonradan eklendi; boyut hesabında bir "eş" düzen gibi davranırlar
 // (bkz. getSizingStyle) — kart genişliği düzenler arasında zıplamaz.
 //
 // NEDEN ORTAK: seçim tek bir ayar ama iki yüzeyde çiziliyordu; kopya JSX
@@ -34,6 +37,7 @@
 import React, { useMemo } from "react";
 import { Image } from "expo-image";
 import { StyleSheet, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { sortItemsByListOrder } from "@utils/listOrder";
 import usePosterUri from "../../hooks/usePosterUri";
 import usePosterCorner from "@hooks/usePosterCorner";
@@ -80,6 +84,9 @@ export const LIST_LAYOUT = Object.freeze({
   POLAROID: 9,
   DIAGONAL: 10,
   WALL: 11,
+  FOCUS: 12,
+  SCATTER: 13,
+  FLOW: 14,
 });
 
 // Afiş sayısı seçilebilen düzen aileleri: { 3: id, 5: id }.
@@ -98,6 +105,9 @@ export function getSizingStyle(gridStyle) {
     case LIST_LAYOUT.POLAROID:
     case LIST_LAYOUT.DIAGONAL:
     case LIST_LAYOUT.WALL:
+    case LIST_LAYOUT.FOCUS:
+    case LIST_LAYOUT.SCATTER:
+    case LIST_LAYOUT.FLOW:
       return LIST_LAYOUT.BIG;
     case LIST_LAYOUT.STACK_3:
       return LIST_LAYOUT.STACK;
@@ -124,6 +134,13 @@ export function getNaturalCoverWidth(rawGridStyle, height) {
 // örnek afişleri, bkz. ProfileLists) — yer tutucu kenarlığı buna bakar.
 const hasPoster = (item) => !!(item?.imagePath || item?.localSource);
 
+// Üst üste binen düzenlerde (Dağınık, Polaroid, Vitrin, Yığın) afişi OLAN yuva her
+// zaman boş yuvaların ÜSTÜNDE çizilir: 2–3 içerikli listede boş kutu zaten az olan
+// afişlerin üstüne çıkmasın (kullanıcı kuralı, 9 Kas). Kendi aralarındaki sıra
+// (düzenin z değeri) korunur; yalnız afişliler bir kat yukarı alınır.
+const POSTER_Z_LIFT = 10;
+export const coverZ = (item, z) => (hasPoster(item) ? z + POSTER_Z_LIFT : z);
+
 const Cover = ({ item, width, height, corners, theme }) => {
   // Özel afiş: liste sahibinin (arkadaş profilinde PosterChoicesScope) ya da kendi seçimin.
   const posterUri = usePosterUri();
@@ -140,6 +157,350 @@ const Cover = ({ item, width, height, corners, theme }) => {
   return <View style={[...box, { backgroundColor: theme?.primary || "#1c1c1e" }]} />;
 };
 
+// Dağınık düzenin yerleşimi her açılışta bir kez üretilir (kullanıcı kuralı, 9 Kas):
+//   • blok yatayda 5 SÜTUNA bölünür; her afişin ORTASI kendi sütununda rastgele bir
+//     yere düşer (komşu sütuna en çok sütun genişliğinin %10'u kadar taşabilir),
+//   • dikeyde serbesttir (yukarı / aşağı rastgele),
+//   • afişler kartı boş bırakmayacak kadar büyüktür (blok yüksekliğinin ~%64'ü), kenarlıksız,
+//     boyları hafifçe farklıdır,
+//   • iki afiş birbirine küçük olanın alanının hedefte en çok %15'i, HİÇBİR ZAMAN
+//     %50'den fazlası kadar biner,
+//   • hafif açı ve rastgele üst-alt sırası doğallık katar.
+// Hangi afişin hangi sütuna düşeceği de karışıktır (ilk afiş hep solda kalmaz).
+export const SCATTER_COLUMNS = 5;
+export const SCATTER_TARGET_OVERLAP = 0.15; // küçük afişin alanına oranla
+export const SCATTER_MAX_OVERLAP = 0.5;
+export const SCATTER_COLUMN_SPILL = 0.1; // sütun genişliğine oranla
+const SCATTER_MARGIN = 7;
+const SCATTER_MAX_ANGLE = 9;
+const SCATTER_HEIGHT_SHARE = 0.64; // afiş boyu / kullanılabilir yükseklik
+const SCATTER_SCALE = [0.92, 1.06];
+
+const shuffled = (values, random) => {
+  const out = [...values];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+};
+const overlapArea = (a, b) =>
+  Math.max(0, Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left)) *
+  Math.max(0, Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top));
+
+// Sütunlar afişin kendisine değil ORTASINA göredir: ortaların gezebileceği alan
+// (kenardan yarım afiş içeride) beşe bölünür — böylece kenar sütunlarında da
+// oynama payı kalır ve komşular birbirinin üstüne yığılmaz.
+export function scatterColumns(width, height) {
+  const m = SCATTER_MARGIN;
+  const innerW = width - m * 2;
+  const innerH = height - m * 2;
+  // Taban boy yükseklikten; dar kartta 5 afiş yan yana sığacak kadarla sınırlı.
+  const baseH = Math.max(0, Math.min(innerH * SCATTER_HEIGHT_SHARE, (innerW / 3) * STACK_RATIO));
+  const baseW = baseH / STACK_RATIO;
+  const colW = Math.max(0, innerW - baseW) / SCATTER_COLUMNS;
+  return { baseH, centerStart: m + baseW / 2, colW, spill: colW * SCATTER_COLUMN_SPILL };
+}
+
+// Saf: verilen blok için beş afişin dikdörtgeni (afiş sırasıyla). Test edilir.
+export function createScatterLayout(width, height, random = Math.random) {
+  const m = SCATTER_MARGIN;
+  const innerH = height - m * 2;
+  const { baseH, centerStart, colW, spill } = scatterColumns(width, height);
+  const columns = shuffled([0, 1, 2, 3, 4], random);
+  const layers = shuffled([1, 2, 3, 4, 5], random);
+  const placed = [];
+  const byColumn = [];
+  const worstOverlap = (rect) =>
+    Math.max(
+      0,
+      ...placed.map((p) => overlapArea(rect, p) / (Math.min(rect.width * rect.height, p.width * p.height) || 1)),
+    );
+  for (let column = 0; column < SCATTER_COLUMNS; column++) {
+    const scale = SCATTER_SCALE[0] + random() * (SCATTER_SCALE[1] - SCATTER_SCALE[0]);
+    const posterH = Math.min(innerH, baseH * scale);
+    const posterW = posterH / STACK_RATIO;
+    // Afişin ORTASI bu aralıkta: kendi sütunu ± %10 taşma; afiş kartın dışına çıkmaz.
+    const minLeft = Math.max(m, centerStart + column * colW - spill - posterW / 2);
+    const maxLeft = Math.min(width - m - posterW, centerStart + (column + 1) * colW + spill - posterW / 2);
+    const maxTop = Math.max(0, innerH - posterH);
+    const rectAt = (u, v) => ({
+      left: minLeft + u * Math.max(0, maxLeft - minLeft),
+      top: m + v * maxTop,
+      width: posterW,
+      height: posterH,
+    });
+    // Rastgele adaylar: hedefin (%15) altında kalan ilk aday alınır.
+    let best = null;
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const rect = rectAt(random(), random());
+      const worst = worstOverlap(rect);
+      if (!best || worst < best.worst) best = { rect, worst };
+      if (worst <= SCATTER_TARGET_OVERLAP) break;
+    }
+    // Şanssız kalırsa ızgarada en az binen konum: %50 tavanı hiçbir zaman aşılmaz.
+    if (best.worst > SCATTER_MAX_OVERLAP) {
+      for (let gx = 0; gx <= 8; gx++) {
+        for (let gy = 0; gy <= 8; gy++) {
+          const rect = rectAt(gx / 8, gy / 8);
+          const worst = worstOverlap(rect);
+          if (worst < best.worst) best = { rect, worst };
+        }
+      }
+    }
+    placed.push(best.rect);
+    byColumn[column] = best.rect;
+  }
+  return columns.map((column, i) => ({
+    ...byColumn[column],
+    column,
+    angle: (random() * 2 - 1) * SCATTER_MAX_ANGLE,
+    z: layers[i],
+  }));
+}
+
+const scatterLayouts = new Map();
+const scatterLayoutFor = (ordered, width, height) => {
+  const key = `${Math.round(width)}x${Math.round(height)}|${ordered
+    .slice(0, 5)
+    .map((item) => `${item?.type ?? ""}:${item?.id ?? ""}:${item?.imagePath ?? ""}`)
+    .join("|")}`;
+  if (!scatterLayouts.has(key)) {
+    // Konumlar uygulama oturumunda aynı listeye dönünce korunur; sonraki açılışta yenilenir.
+    if (scatterLayouts.size >= 100) scatterLayouts.delete(scatterLayouts.keys().next().value);
+    scatterLayouts.set(key, createScatterLayout(width, height));
+  }
+  return scatterLayouts.get(key);
+};
+
+const ScatterCovers = ({ ordered, width, height, common, radius }) => {
+  const rects = scatterLayoutFor(ordered, width, height);
+  const corners = { borderRadius: radius(6) };
+  return (
+    <View style={{ width, height }}>
+      {rects.map((rect, i) => (
+        <View
+          key={i}
+          style={[
+            styles.scatterItem,
+            corners,
+            {
+              left: rect.left,
+              top: rect.top,
+              width: rect.width,
+              height: rect.height,
+              zIndex: coverZ(ordered[i], rect.z),
+              transform: [{ rotate: `${rect.angle.toFixed(1)}deg` }],
+            },
+          ]}
+        >
+          <Cover {...common} item={ordered[i]} width="100%" height="100%" corners={corners} />
+        </View>
+      ))}
+    </View>
+  );
+};
+
+// ── Akış → DVD KUTULARI ───────────────────────────────────────────────────────
+// Eski film DVD'lerinin plastik kutusu (Amaray tipi): 135×190 mm ön yüz, 14 mm
+// sırt, siyah polipropilen gövde, ön yüzde afişi tutan şeffaf kılıf ve sırt
+// tarafında menteşe oluğu. Üç kutu rafta durur gibi dizilir: ortada ilk afiş
+// hafif dönük, iki yandakiler daha çok dönük — soldakinin SIRTI (afişin dilimi
+// basılı), sağdakinin AÇILAN KENARI görünür.
+//
+// 3B: her kutu iki düz yüzdür (ön + sırt/kenar). İkisi de ORTAK KENARLARI
+// çevresinde (transformOrigin) perspective + rotateY ile döner; aynı noktadan
+// izdüşüldükleri için kenarda kusursuz birleşir, uzak kenar perspektifle kısalır.
+// rotateY işareti iki platformda aynıdır (Android MatrixMathHelper.applyRotateY ·
+// iOS CATransform3DRotate): + açıda başlangıç noktasının SAĞI uzaklaşır.
+const DVD_RATIO = 190 / 135; // yükseklik / ön yüz genişliği
+const DVD_DEPTH = 14 / 135; // sırt kalınlığı / ön yüz genişliği
+const DVD_PERSPECTIVE = 3.2; // göz uzaklığı, ön yüz genişliği cinsinden
+const DVD_SLOTS = [
+  // item: ordered dizini · angle: + sağa bakar (sırt solda görünür), − sola bakar (kenar sağda)
+  { item: 1, angle: 46, z: 1 },
+  { item: 0, angle: 18, z: 3 },
+  { item: 2, angle: -46, z: 2 },
+];
+
+// Kutunun ortak kenara göre ekrandaki yatay izdüşümü (W = 1 birim).
+// Yerel x'teki bir nokta α açısıyla döner: X = x·cosα / (1 + x·sinα / P).
+const dvdProjectX = (x, alphaDeg, P) => {
+  const a = (alphaDeg * Math.PI) / 180;
+  return (x * Math.cos(a)) / (1 + (x * Math.sin(a)) / P);
+};
+// Bir kutunun yüzleri: ön yüz ve yan yüz, ortak kenara göre (birim genişlikte).
+function dvdFaces(angle) {
+  const P = DVD_PERSPECTIVE;
+  const D = DVD_DEPTH;
+  if (angle >= 0) {
+    // Ortak kenar ön yüzün SOLU (menteşe/sırt).
+    return {
+      shared: "left",
+      sideKind: "spine",
+      sideAngle: angle - 90,
+      minX: dvdProjectX(-D, angle - 90, P),
+      maxX: dvdProjectX(1, angle, P),
+    };
+  }
+  // Ortak kenar ön yüzün SAĞI (açılan kenar).
+  return {
+    shared: "right",
+    sideKind: "edge",
+    sideAngle: angle + 90,
+    minX: dvdProjectX(-1, angle, P),
+    maxX: dvdProjectX(D, angle + 90, P),
+  };
+}
+
+// Verilen bloğa sığan üç kutunun ölçüsü ve yerleşimi (saf; test edilir).
+export function dvdShelfLayout(width, height) {
+  const margin = 4;
+  const minGap = 3;
+  const shadowPad = 5;
+  const faces = DVD_SLOTS.map((slot) => dvdFaces(slot.angle));
+  const unitW = faces.reduce((sum, f) => sum + (f.maxX - f.minX), 0);
+  const byWidth = (width - margin * 2 - minGap * (DVD_SLOTS.length - 1)) / unitW;
+  const byHeight = (height - shadowPad - margin) / DVD_RATIO;
+  const W = Math.max(0, Math.min(byWidth, byHeight));
+  const H = W * DVD_RATIO;
+  const D = W * DVD_DEPTH;
+  const P = W * DVD_PERSPECTIVE;
+  const spans = faces.map((f) => (f.maxX - f.minX) * W);
+  const lefts = [margin, (width - spans[1]) / 2, width - margin - spans[2]];
+  const top = height - shadowPad - H;
+  return DVD_SLOTS.map((slot, i) => {
+    const f = faces[i];
+    const edgeX = lefts[i] - f.minX * W; // ortak kenarın ekran x'i
+    const front = f.shared === "left"
+      ? { left: edgeX, origin: "left" }
+      : { left: edgeX - W, origin: "right" };
+    const side = f.shared === "left"
+      ? { left: edgeX - D, origin: "right" }
+      : { left: edgeX, origin: "left" };
+    return {
+      ...slot,
+      W,
+      H,
+      D,
+      P,
+      top,
+      edgeX,
+      spanLeft: lefts[i],
+      span: spans[i],
+      floorY: height - shadowPad,
+      front: { ...front, width: W, rotate: slot.angle },
+      side: { ...side, width: D, rotate: f.sideAngle, kind: f.sideKind },
+    };
+  });
+}
+
+// Kutunun tek yüzü: dışta döndürülen kap (kırpmaz), içte kırpan plastik gövde.
+// Gölge kabın içinde alt kenarın hemen ALTINDA durur — aynı dönüşü aldığı için
+// kutunun perspektifle eğilen alt kenarını birebir izler (düz bir çubuk gibi taşmaz).
+const DvdFace = ({ f, layout, testID, rounded, children }) => {
+  const { top, H, P, z } = layout;
+  return (
+    <View
+      testID={testID}
+      style={{
+        position: "absolute",
+        left: f.left,
+        top,
+        width: f.width,
+        height: H,
+        zIndex: z,
+        transformOrigin: `${f.origin} center`,
+        transform: [{ perspective: P }, { rotateY: `${f.rotate.toFixed(2)}deg` }],
+      }}
+    >
+      <LinearGradient
+        pointerEvents="none"
+        colors={["rgba(0,0,0,0.5)", "rgba(0,0,0,0)"]}
+        style={[styles.dvdContactShadow, { top: H - 0.5, height: Math.max(3, H * 0.05) }]}
+      />
+      <View style={[styles.dvdFace, { borderRadius: rounded }]}>{children}</View>
+    </View>
+  );
+};
+
+const DvdCase = ({ layout, item, common, radius }) => {
+  const { front, side, angle, H } = layout;
+  const turn = Math.abs(Math.sin((angle * Math.PI) / 180));
+  // Işık soldan: sağa bakan yüz aydınlık, sola bakan gölgede.
+  const frontShade = angle >= 0 ? 0.03 + 0.08 * turn : 0.1 + 0.24 * turn;
+  const lip = Math.max(1, H * 0.022);
+  const faceRadius = radius(2.5);
+  const Face = DvdFace;
+  return (
+    <>
+      <Face f={side} layout={layout} testID={side.kind === "spine" ? "dvd-spine" : "dvd-edge"} rounded={faceRadius / 2}>
+        {side.kind === "spine" ? (
+          // Sırt baskısı: afişin orta dilimi, koyu plastiğin altında; üstte ve altta plastik kapak.
+          <>
+            <Cover {...common} item={item} width="100%" height="100%" corners={null} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.5)" }]} />
+            <View style={[styles.dvdSpineCap, { top: 0, height: lip * 1.6 }]} />
+            <View style={[styles.dvdSpineCap, { bottom: 0, height: lip * 1.6 }]} />
+          </>
+        ) : (
+          // Açılan kenar: düz plastik, ortada kapanma oluğu.
+          <>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.35)" }]} />
+            <View style={[styles.dvdEdgeGroove, { left: "46%" }]} />
+          </>
+        )}
+        {/* Kılıfın şeffaf kenarı: ön yüzle birleşen köşede ince bir ışık. */}
+        <View style={[styles.dvdEdgeShine, side.kind === "spine" ? { right: 0 } : { left: 0 }]} />
+      </Face>
+      <Face f={front} layout={layout} testID="dvd-front" rounded={faceRadius}>
+        {/* Şeffaf kılıfın altındaki afiş: plastik dudak payı kadar içeride. */}
+        <View
+          style={{
+            position: "absolute",
+            top: lip,
+            bottom: lip,
+            left: lip * 0.6,
+            right: lip,
+            overflow: "hidden",
+            borderRadius: faceRadius / 2,
+          }}
+        >
+          <Cover {...common} item={item} width="100%" height="100%" corners={null} />
+        </View>
+        {/* Menteşe tarafındaki iki kalıp oluğu */}
+        <View style={[styles.dvdHinge, { left: "5%" }]} />
+        <View style={[styles.dvdHinge, { left: "8.5%" }]} />
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${frontShade.toFixed(3)})` }]}
+        />
+        {/* Kılıfın parlaması: köşeden çapraz bir ışık, karşı köşede hafif yansıma. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={["rgba(255,255,255,0.26)", "rgba(255,255,255,0.06)", "rgba(255,255,255,0)", "rgba(255,255,255,0.1)"]}
+          locations={[0, 0.32, 0.62, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.dvdRim, { borderRadius: faceRadius }]} />
+      </Face>
+    </>
+  );
+};
+
+const FlowCovers = ({ ordered, width, height, common, radius }) => {
+  const shelf = useMemo(() => dvdShelfLayout(width, height), [width, height]);
+  return (
+    <View style={{ width, height }}>
+      {shelf.map((layout) => (
+        <DvdCase key={layout.item} layout={layout} item={ordered[layout.item]} common={common} radius={radius} />
+      ))}
+    </View>
+  );
+};
+
 export default function ListCovers({
   items,
   gridStyle,
@@ -149,6 +510,7 @@ export default function ListCovers({
   getTmdbUrl,
   theme,
   style,
+  direction = "right",
 }) {
   const ordered = useMemo(() => sortItemsByListOrder(items), [items]);
   const common = { getTmdbUrl, theme };
@@ -184,6 +546,30 @@ export default function ListCovers({
         ))}
       </View>
     );
+  } else if (gridStyle === LIST_LAYOUT.FOCUS) {
+    // Ortadaki ilk afiş tam boy; yan afişler kısa ve biraz geride. Üçü de
+    // mevcut Büyük Kapaklar bloğunun içinde kalır.
+    const centerW = Math.min(height / STACK_RATIO, width * 0.44);
+    const sideH = height * 0.78;
+    const sideW = (width - centerW - GAP * 4) / 2;
+    const fullCorners = cornersOf(allCornersRounded, { tl: true, tr: true, bl: true, br: true });
+    content = (
+      <View style={[styles.row, { width, height, alignItems: "center", justifyContent: "center", gap: GAP * 2 }]}>
+        <View style={{ opacity: 0.76 }}>
+          <Cover {...common} item={ordered[1]} width={sideW} height={sideH} corners={fullCorners} />
+        </View>
+        <View style={[styles.focusCenter, { width: centerW, height, borderRadius: R }]}>
+          <Cover {...common} item={ordered[0]} width={centerW} height={height} corners={fullCorners} />
+        </View>
+        <View style={{ opacity: 0.76 }}>
+          <Cover {...common} item={ordered[2]} width={sideW} height={sideH} corners={fullCorners} />
+        </View>
+      </View>
+    );
+  } else if (gridStyle === LIST_LAYOUT.SCATTER) {
+    content = <ScatterCovers ordered={ordered} width={width} height={height} common={common} radius={corner} />;
+  } else if (gridStyle === LIST_LAYOUT.FLOW) {
+    content = <FlowCovers ordered={ordered} width={width} height={height} common={common} radius={corner} />;
   } else if (gridStyle === LIST_LAYOUT.FILMSTRIP) {
     // Film Şeridi: koyu bir şerit, üstte ve altta delik sırası, arada 3 kare.
     // Delikler kartın kendi rengiyle (theme.secondary) boyanır — şerit
@@ -237,15 +623,12 @@ export default function ListCovers({
       </View>
     );
   } else if (gridStyle === LIST_LAYOUT.SHOWCASE) {
-    // Vitrin: ilk afiş solda tam boy önde; sonrakiler sağa doğru adım adım
-    // küçülüp öncekinin ARKASINA dizilir, giderek koyulaşır — derinlik hissi.
-    // Son afiş bloğun sağ kenarına dayanır; adım bundan türetilir.
-    const SHRINK = 0.085;
-    const sizes = [0, 1, 2, 3, 4].map((i) => {
-      const h = height * (1 - SHRINK * i);
-      return { h, w: Math.min(h / STACK_RATIO, width * 0.45) };
-    });
-    const step = Math.max(0, (width - sizes[4].w) / 4);
+    // Vitrin: ilk afiş seçilen yönde önde; sonrakiler öncekinin ARKASINA dizilir
+    // ve giderek koyulaşır — derinlik hissi. Afişler KÜÇÜLMEZ (kullanıcı kararı,
+    // 9 Kas): beşi de tam boy. Son afiş bloğun karşı kenarına dayanır; adım bundan türetilir.
+    const posterW = Math.min(height / STACK_RATIO, width * 0.45);
+    const sizes = [0, 1, 2, 3, 4].map(() => ({ h: height, w: posterW }));
+    const step = Math.max(0, (width - posterW) / 4);
     const corners = cornersOf(allCornersRounded, {
       tl: true,
       tr: true,
@@ -261,11 +644,11 @@ export default function ListCovers({
               styles.showcaseItem,
               corners,
               {
-                left: i * step,
+                left: direction === "left" ? width - sizes[i].w - i * step : i * step,
                 top: (height - sizes[i].h) / 2,
                 width: sizes[i].w,
                 height: sizes[i].h,
-                zIndex: 5 - i,
+                zIndex: coverZ(ordered[i], 5 - i),
                 borderColor: theme.border,
                 borderWidth: hasPoster(ordered[i]) ? 0 : 1,
               },
@@ -316,7 +699,7 @@ export default function ListCovers({
                 padding: pad,
                 paddingBottom: bottomPad,
                 borderRadius: frameRadius,
-                zIndex: slot.z,
+                zIndex: coverZ(ordered[slot.item], slot.z),
                 transform: [{ rotate: `${slot.rotate}deg` }],
               },
             ]}
@@ -337,8 +720,8 @@ export default function ListCovers({
     // paralelkenar olur ve taşanı kırpar; içindeki afiş ters yönde eğilip düz
     // durur (kırpma `cover`la ortadan). Dış dilimler bloğun kenarından taşar,
     // bloğun kendi overflow'u keser — kenarlar dik kalır.
-    const SKEW = 12;
-    const extra = height * Math.tan((SKEW * Math.PI) / 180);
+    const SKEW = direction === "left" ? -12 : 12;
+    const extra = height * Math.tan((Math.abs(SKEW) * Math.PI) / 180);
     // +GAP: son dilimin eğik kenarı sağ köşede boşluk bırakmasın.
     const sliceW = (width + extra + GAP) / 5;
     content = (
@@ -358,7 +741,7 @@ export default function ListCovers({
                 left: -extra / 2 + i * sliceW,
                 width: sliceW - GAP,
                 height,
-                transform: [{ skewX: `-${SKEW}deg` }],
+                transform: [{ skewX: `${-SKEW}deg` }],
               },
             ]}
           >
@@ -371,7 +754,7 @@ export default function ListCovers({
             >
               <Cover
                 {...common}
-                item={ordered[i]}
+                item={ordered[direction === "left" ? 4 - i : i]}
                 width={sliceW - GAP + extra}
                 height={height}
                 corners={null}
@@ -387,8 +770,8 @@ export default function ListCovers({
     // diye bloktan büyük kurulur, bloğun overflow'u keser. Afişler ORTADAN
     // dışa doğru yerleşir (ilk afiş merkeze en yakın kutuda); liste kısaysa
     // kalan kutular diğer düzenlerdeki gibi aynı boyda boş yer tutucu kalır.
-    const TILT = 14;
-    const rad = (TILT * Math.PI) / 180;
+    const TILT = direction === "left" ? -14 : 14;
+    const rad = (Math.abs(TILT) * Math.PI) / 180;
     const cols = 4;
     const wallGap = 4;
     // 4 sütun, dönmüş bloğu yatayda örtecek kadar geniş afiş.
@@ -408,7 +791,8 @@ export default function ListCovers({
     for (let c = 0; c < cols; c++) {
       for (let r = 0; r < perCol; r++) {
         const x = (wallW - gridW) / 2 + c * (tileW + wallGap) + tileW / 2 - wallW / 2;
-        const y = (c % 2 ? -tileH / 2 : 0) + r * (tileH + wallGap) + tileH / 2 - wallH / 2;
+        const shifted = (c + (direction === "left" ? 1 : 0)) % 2 === 1;
+        const y = (shifted ? -tileH / 2 : 0) + r * (tileH + wallGap) + tileH / 2 - wallH / 2;
         slotOf.push({ c, r, d: x * x + y * y });
       }
     }
@@ -439,12 +823,12 @@ export default function ListCovers({
               left: (width - wallW) / 2,
               top: (height - wallH) / 2,
               justifyContent: "center",
-              transform: [{ rotate: `-${TILT}deg` }],
+              transform: [{ rotate: `${-TILT}deg` }],
             },
           ]}
         >
           {Array.from({ length: cols }, (_, c) => (
-            <View key={c} style={{ gap: wallGap, marginTop: c % 2 ? -tileH / 2 : 0 }}>
+            <View key={c} style={{ gap: wallGap, marginTop: (c + (direction === "left" ? 1 : 0)) % 2 ? -tileH / 2 : 0 }}>
               {Array.from({ length: perCol }, (_, r) => (
                 <Cover
                   key={r}
@@ -586,7 +970,7 @@ export default function ListCovers({
                   width: w,
                   height,
                   transform: [{ rotate: `${angles[i]}deg` }, { translateX: offsets[i] }],
-                  zIndex: zIndexes[i],
+                  zIndex: coverZ(ordered[i], zIndexes[i]),
                 },
               ]}
             >
@@ -609,6 +993,60 @@ const styles = StyleSheet.create({
   stackItem: {
     position: "absolute",
     overflow: "hidden",
+  },
+  focusCenter: {
+    overflow: "hidden",
+  },
+  scatterItem: {
+    position: "absolute",
+    overflow: "hidden",
+  },
+  dvdFace: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: "hidden",
+    backgroundColor: "#0c0c0e",
+  },
+  dvdContactShadow: {
+    position: "absolute",
+    left: "3%",
+    right: "3%",
+  },
+  dvdRim: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+  dvdHinge: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: "rgba(255,255,255,0.14)",
+  },
+  dvdSpineCap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    backgroundColor: "#0c0c0e",
+  },
+  dvdEdgeGroove: {
+    position: "absolute",
+    top: "6%",
+    bottom: "6%",
+    width: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  dvdEdgeShine: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.22)",
   },
   showcaseItem: {
     position: "absolute",
