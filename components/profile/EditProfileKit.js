@@ -11,7 +11,8 @@
 // silme modalı ortada bir kutuydu.
 
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -88,7 +89,7 @@ export function EditHeader({ theme, title, onBack, onSave, canSave, saving }) {
           />
         ) : null}
         {saving ? (
-          <ActivityIndicator size="small" color={fg} />
+          <LensLoader tone="mono" size="small" color={fg} />
         ) : (
           <Text
             allowFontScaling={false}
@@ -400,7 +401,7 @@ export function DeleteProgress({ theme, progress, copy }) {
                 {done ? (
                   <Ionicons name="checkmark-circle" size={20} color={theme.colors.green} />
                 ) : active ? (
-                  <ActivityIndicator size="small" color={red} />
+                  <LensLoader size="small" color={red} />
                 ) : (
                   <Ionicons name="ellipse-outline" size={18} color={alpha(theme.text.muted, 0.6)} />
                 )}
@@ -523,7 +524,7 @@ export function DeleteAccountSheet({
             ]}
           >
             {verifying ? (
-              <ActivityIndicator size="small" color={theme.text.primary} />
+              <LensLoader size="small" color={theme.text.primary} />
             ) : (
               <>
                 <Ionicons

@@ -1,37 +1,33 @@
+// screens/tabs/profile/EditProfileScreen.js
+//
+// "Hesap bilgileri": yalnız sahibine görünen hesap ayarları — doğum tarihi
+// (yetişkin içerik kapısı, bir kez yazılır) ve tehlikeli bölge (hesabı sıfırla /
+// sil). Ad, kullanıcı adı, hakkında, avatar, favoriler, sosyal hesaplar, vitrin
+// rozetleri ve listeler artık PROFİLDE yerinde düzenleniyor (Profil > kalem →
+// kendi profil önizlemen > kalem; hooks/useOwnProfileEditor.js). Rota adı geriye
+// dönük uyumluluk için aynı kaldı.
+//
+// Giriş: Ayarlar > Hesap > "Hesap bilgileri" ve profil düzenleme modundaki "Hesap".
+
 import { normalizeAppLanguage } from "../../../utils/appLanguages";
 import { isLightSurface } from "@utils/colorUtils";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   ScrollView,
   StyleSheet,
   StatusBar,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "@components/AppToast";
 import { useTheme } from "../../../context/ThemeContext";
 import { useLanguage } from "../../../context/LanguageContext";
-import { useAuth } from "../../../context/AuthContext";
 import { useUserProfile } from "../../../context/UserProfileContext";
-import { useProfileUi } from "../../../context/ProfileUiContext";
-import { CUSTOM_AVATAR_INDEX } from "../../../utils/avatars";
-import {
-  profileAvatarChoice,
-  sameAvatarChoice,
-  toAvatarChoice,
-} from "../../../utils/avatarPhotos";
-import {
-  formatUsernameInput,
-  isValidUsername,
-  isUsernameAvailable,
-  normalizeUsername,
-} from "../../../services/userService";
 import {
   DeleteAccountCode,
   deleteAccount,
@@ -47,22 +43,13 @@ import {
   AppleAuthCode,
   describeAppleAuthError,
 } from "../../../services/appleAuthService";
-import { propagateProfileChange } from "../../../services/profilePropagation";
 import { i18nText } from "../../../utils/i18nText";
 import ScreenDecor from "../../../components/ScreenDecor";
 import BirthDateField from "../../../components/auth/BirthDateField";
 import { MIN_ADULT_AGE, calculateAge, syncAgeRestriction } from "../../../utils/ageGate";
 import {
-  isNearLimit,
-  isProfileEditDirty,
-  usernameFieldState,
-} from "../../../utils/profileEdit";
-import {
-  AUTH_ERROR,
-  AUTH_SUCCESS,
   AUTH_WARN,
   AuthBackdrop,
-  AuthField,
   AuthSectionLabel,
   Reveal,
   authColumn,
@@ -75,37 +62,11 @@ import {
   FieldHint,
   FieldLabel,
   FormSection,
-  ProfileHero,
 } from "../../../components/profile/EditProfileKit";
-import ProfileAvatarPickerModal from "../../../components/profile/ProfileAvatarPickerModal";
-import FavoritesEditor from "../../../components/favorites/FavoritesEditor";
-import { getFavoritesCopy } from "../../../utils/favoritesCopy";
-import {
-  countFavorites,
-  emptyFavorites,
-  favoritesEqual,
-  readProfileFavorites,
-  toProfilePayload,
-} from "../../../utils/fourFavorites";
-import SocialLinksEditor from "../../../components/profile/SocialLinksEditor";
-import { saveSocialLinks } from "../../../services/socialLinksService";
-import { cooldownRemainingMs } from "../../../utils/profileIdentityCooldown";
-import { identityCooldownToast } from "../../../utils/profileIdentityCooldownCopy";
-import { SOCIAL_NAMES, getSocialCopy } from "../../../utils/socialLinksCopy";
 import { getDeleteAccountCopy } from "./deleteAccountCopy";
 import { getResetAccountCopy } from "./resetAccountCopy";
-import {
-  readProfileSocialLinks,
-  resolveSocialDraft,
-  socialLinksEqual,
-  toSocialPayload,
-} from "../../../utils/socialLinks";
-import { ANALYTICS_EVENTS, trackEvent } from "../../../services/analytics";
 
 
-const BIO_MAX = 160;
-const NAME_MAX = 40;
-const USERNAME_MAX = 20;
 // Geri alınamaz işlemlerin onay düğmesi bu kadar BASILI TUTULUNCA çalışır.
 const DELETE_HOLD_MS = 2500;
 const RESET_HOLD_MS = 2000;
@@ -118,49 +79,14 @@ export default function EditProfileScreen({ navigation }) {
   const es = normalizeAppLanguage(language) === "es";
   const pt = normalizeAppLanguage(language) === "pt";
   const de = normalizeAppLanguage(language) === "de";
-  const { user } = useAuth();
-  const { profile, loading, uid, updateField, changeUsername } = useUserProfile();
-  const { selectAvatarIndex, selectAvatar } = useProfileUi();
+  const { profile, loading, updateField } = useUserProfile();
 
-  // Kayıtlı avatar, seçim biçiminde ({ avatarIndex, photoURL, photoSource }).
-  // Formun başlangıcı, "değişti mi" hesabı ve Kaydet AYNI değeri kullanır;
-  // profilde avatarIndex yoksa cihazdaki seçili avatar.
-  const savedAvatar = useMemo(
-    () =>
-      profile
-        ? profileAvatarChoice(profile, {
-            fallbackIndex: selectAvatarIndex,
-            authPhotoURL: user?.photoURL,
-          })
-        : null,
-    [profile, selectAvatarIndex, user?.photoURL],
-  );
-
-  const [displayName, setDisplayName] = useState("");
-  const [username, setUsername] = useState("");
-  const [bio, setBio] = useState("");
   // Bu alan sonradan eklendi: eski hesaplarda boş gelir ve boş bırakılabilir —
   // kaydetmeyi zorunlu kılmak, yalnızca bio'sunu düzeltmek isteyeni kilitlerdi.
   const [birthDate, setBirthDate] = useState(null);
-  const [avatarChoice, setAvatarChoice] = useState(() => toAvatarChoice(0));
-  // Dört favori (film/dizi/oyuncu, her biri 0–4). Taslak burada; Kaydet ile
-  // Users/{uid}.fourFavorites'e yazılır (utils/fourFavorites.js).
-  const [favorites, setFavorites] = useState(emptyFavorites);
-  const favCopy = getFavoritesCopy(language);
-  // Sosyal hesaplar: platform → kullanıcının yazdığı ham metin. Kaydet'te
-  // kullanıcı adına çözülür (adres yapıştırmak serbest, utils/socialLinks.js).
-  const [socialDraft, setSocialDraft] = useState({});
-  const [socialInvalid, setSocialInvalid] = useState([]);
-  const socialCopy = getSocialCopy(language);
-  const [usernameStatus, setUsernameStatus] = useState("idle"); // idle|same|invalid|checking|available|taken
   const [saving, setSaving] = useState(false);
   // Form profilden doldurulana kadar "değişiklik var mı" hesabı yapılmaz.
   const [ready, setReady] = useState(false);
-  const [avatarSheet, setAvatarSheet] = useState(false);
-
-  // Klavyede "ileri" tuşu alanlar arasında gezdirir.
-  const usernameRef = useRef(null);
-  const bioRef = useRef(null);
 
   // Hesap silme. Onay sayfası ortak BottomSheetModal: şifre kutusu klavyeyi
   // açınca sayfa klavyenin üstüne çıkar ve içerik küçülüp kayar, Vazgeç / Hesabı
@@ -199,199 +125,27 @@ export default function EditProfileScreen({ navigation }) {
 
   const initRef = useRef(false);
 
-  // Profil yüklenince alanları doldur
+  // Profil yüklenince alanı doldur
   useEffect(() => {
     if (profile && !initRef.current) {
-      setDisplayName(profile.displayName || "");
-      setUsername(profile.username || "");
-      setBio(profile.bio || "");
       setBirthDate(profile.birthDate || null);
-      setFavorites(readProfileFavorites(profile));
-      setSocialDraft(readProfileSocialLinks(profile));
-      if (savedAvatar) setAvatarChoice(savedAvatar);
       initRef.current = true;
       setReady(true);
     }
-  }, [profile, savedAvatar]);
+  }, [profile]);
 
-  // Kullanıcı adı: format + müsaitlik (debounce)
-  useEffect(() => {
-    if (!initRef.current) return;
-    const u = normalizeUsername(username);
-    if (u === normalizeUsername(profile?.username || "")) {
-      setUsernameStatus("same");
-      return;
-    }
-    if (!isValidUsername(u)) {
-      setUsernameStatus("invalid");
-      return;
-    }
-    setUsernameStatus("checking");
-    const id = setTimeout(async () => {
-      try {
-        const ok = await isUsernameAvailable(u);
-        setUsernameStatus(ok ? "available" : "taken");
-      } catch {
-        setUsernameStatus("idle");
-      }
-    }, 500);
-    return () => clearTimeout(id);
-  }, [username, profile?.username]);
-
-  const usernameBlocked =
-    usernameStatus === "invalid" ||
-    usernameStatus === "taken" ||
-    usernameStatus === "checking";
-
-  // Kaydet yalnız değiştirilecek bir şey varken açılır. Başlangıç avatarı,
-  // formun profilden aldığı değerle AYNI formülle hesaplanır (yukarıdaki
-  // doldurma efekti) — profilde avatarIndex yoksa seçili avatar kullanılır.
-  const socialResolved = resolveSocialDraft(socialDraft);
-  const dirty = isProfileEditDirty({
-    ready,
-    saved: profile
-      ? {
-          displayName: profile.displayName || "",
-          username: normalizeUsername(profile.username || ""),
-          bio: profile.bio || "",
-          avatarIndex: savedAvatar.avatarIndex,
-          avatarPhotoURL: savedAvatar.photoURL,
-          birthDate: profile.birthDate || null,
-          fourFavorites: readProfileFavorites(profile),
-          socialLinks: readProfileSocialLinks(profile),
-        }
-      : null,
-    draft: {
-      displayName,
-      username: normalizeUsername(username),
-      bio,
-      avatarIndex: avatarChoice.avatarIndex,
-      avatarPhotoURL: avatarChoice.photoURL,
-      birthDate,
-      fourFavorites: favorites,
-      socialLinks: socialResolved.links,
-      socialInvalid: socialResolved.invalid,
-    },
-  });
-  const canSave = dirty && !usernameBlocked;
+  // Doğum tarihi bir kez yazılır (firestore.rules → birthDateKept): yalnız henüz
+  // kayıtlı değilken girilmesi bir değişikliktir.
+  const birthChanged = ready && !profile?.birthDate && !!birthDate;
+  const canSave = birthChanged && !saving;
 
   const onSave = async () => {
-    if (saving) return;
-    const dn = displayName.trim();
-    const un = normalizeUsername(username);
-    const bo = bio.trim();
-
-    if (!dn) {
-      Toast.show({ type: "error", text1: i18nText("autoI18n.isim_bos_olamaz", "İsim boş olamaz") });
-      return;
-    }
-    const usernameChanged =
-      un !== normalizeUsername(profile?.username || "");
-    if (usernameChanged && !isValidUsername(un)) {
-      const isAllDigits = /^[0-9]+$/.test(un);
-      Toast.show({
-        type: "error",
-        text1: isAllDigits
-          ? (tr ? "Kullanıcı adı sadece rakamlardan oluşamaz (en az bir harf içermelidir)." : es ? "El nombre de usuario no puede ser solo números (debe contener al menos una letra)." : pt ? "O nome de usuário não pode ser só números (deve conter pelo menos uma letra)." : de ? "Der Benutzername darf nicht nur aus Zahlen bestehen (mindestens ein Buchstabe ist nötig)." : "Username cannot consist only of numbers (must contain at least one letter).")
-          : i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "Geçersiz kullanıcı adı (3-20 karakter, en az bir harf, a-z 0-9 _)"),
-      });
-      return;
-    }
-    if (usernameChanged && usernameStatus !== "available") {
-      if (usernameStatus === "checking") {
-        Toast.show({
-          type: "info",
-          text1: tr ? "Kullanıcı adı kontrol ediliyor, lütfen bekleyin…" : es ? "Comprobando la disponibilidad del nombre de usuario, espera un momento…" : pt ? "Verificando a disponibilidade do nome de usuário, aguarde um instante…" : de ? "Verfügbarkeit des Benutzernamens wird geprüft, bitte warten…" : "Checking username availability, please wait…",
-        });
-        return;
-      }
-      if (usernameStatus === "taken") {
-        Toast.show({ type: "error", text1: i18nText("autoI18n.bu_kullanici_adi_alinmis_2", "Bu kullanıcı adı alınmış") });
-        return;
-      }
-      Toast.show({
-        type: "error",
-        text1: i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "Geçersiz kullanıcı adı (3-20 karakter, en az bir harf, a-z 0-9 _)"),
-      });
-      return;
-    }
-
-    // Geçersiz sosyal kullanıcı adı: kaydı durdur, hatalı alanları işaretle.
-    // (Yarım kayıt olmasın diye username değişiminden ÖNCE kontrol edilir.)
-    if (socialResolved.invalid.length) {
-      setSocialInvalid(socialResolved.invalid);
-      Toast.show({
-        type: "error",
-        text1: socialCopy.invalid(SOCIAL_NAMES[socialResolved.invalid[0]]),
-      });
-      return;
-    }
-
-    // Ad/avatar değişimi profil yayılımını tetikliyor (geçmişteki tüm kopyalar yeniden
-    // yazılıyor) — günde bir. Bio/kullanıcı adı/favoriler etkilenmez, onlar serbest.
-    const wantsNameChange = dn !== (profile?.displayName || "");
-    const wantsAvatarChange = !sameAvatarChoice(avatarChoice, savedAvatar);
-    if (wantsNameChange || wantsAvatarChange) {
-      const remaining = cooldownRemainingMs(profile?.identityChangedAt);
-      if (remaining > 0) {
-        Toast.show(identityCooldownToast(remaining));
-        return;
-      }
-    }
-
+    if (saving || !birthChanged) return;
     setSaving(true);
     try {
-      if (usernameChanged) {
-        await changeUsername(un);
-      }
-      const patch = {};
-      if (dn !== (profile?.displayName || "")) patch.displayName = dn;
-      if (bo !== (profile?.bio || "")) patch.bio = bo;
-      // Kayıtlı tarihi DEĞİŞTİRMEYE çalışma: kural reddeder ve tüm patch
-      // (isim/bio dahil) tek yazımda düşerdi. Alan zaten salt-okunur; bu
-      // kontrol bayat yerel duruma karşı ikinci kapı.
-      const birthChanged =
-        !profile?.birthDate && !!birthDate && birthDate !== (profile?.birthDate || null);
-      if (birthChanged) patch.birthDate = birthDate;
-      // Favoriler yalnız değiştiyse yazılır; hepsini kaldırmak da bir değişikliktir
-      // (boş yapı yazılır, alan silinmez — tanıtımdan gelen eski seçimler geri
-      // sızmasın diye "alan var" bilgisi korunur, bkz. adoptPendingFavorites).
-      if (!favoritesEqual(favorites, readProfileFavorites(profile))) {
-        patch.fourFavorites = toProfilePayload(favorites);
-      }
-      const socialLinksChanged = !socialLinksEqual(socialResolved.links, readProfileSocialLinks(profile));
-      if (Object.keys(patch).length) await updateField(patch, { stampIdentity: wantsNameChange });
-      if (socialLinksChanged) await saveSocialLinks(uid, toSocialPayload(socialResolved.links));
-      if (patch.fourFavorites) {
-        trackEvent(ANALYTICS_EVENTS.FOUR_FAVORITES_SAVED, {
-          movies: countFavorites(favorites, "movies"),
-          shows: countFavorites(favorites, "shows"),
-          people: countFavorites(favorites, "people"),
-          total: countFavorites(favorites),
-        });
-      }
-
-      // Yaş kısıtını BEKLETMEDEN tazele. Profil dinleyicisi zaten tetiklenecek
-      // ama bu yazma yetişkin içerik kapısını doğrudan etkiliyor; kullanıcı
-      // kaydeder kaydetmez doğru durumda olmalı.
-      if (birthChanged) syncAgeRestriction(birthDate);
-
-      // Avatar kopyalarını selectAvatar → userService.setAvatarIndex tazeler
-      // (fotoğraf adresiyle birlikte); aşağıdaki yayılım yalnız ad içindir.
-      if (wantsAvatarChange) {
-        await selectAvatar(avatarChoice);
-      }
-
-      // İstemcinin izinli oldugu kopyalari hemen tazele. Tum sosyal yuzeylerin
-      // yetkili fan-out'u Users/{uid} degisimini dinleyen Cloud Function'dadir.
-      const nameChanged = patch.displayName !== undefined;
-      if ((nameChanged || usernameChanged) && profile?.uid) {
-        propagateProfileChange(profile.uid, {
-          displayName: nameChanged ? dn : undefined,
-          username: usernameChanged ? un : undefined,
-        }).catch(() => {});
-      }
-
+      await updateField({ birthDate }, { stampIdentity: false });
+      // Yaş kısıtını BEKLETMEDEN tazele: yetişkin içerik kapısı bu yazımı bekliyor.
+      syncAgeRestriction(birthDate);
       Toast.show({ type: "success", text1: i18nText("autoI18n.profil_guncellendi", "Profil güncellendi") });
       navigation.goBack();
     } catch (e) {
@@ -563,37 +317,6 @@ export default function EditProfileScreen({ navigation }) {
     }
   };
 
-  const usernameHint = () => {
-    const un = normalizeUsername(username);
-    switch (usernameStatus) {
-      case "invalid":
-        if (un.length > 0 && un.length < 3) {
-          return {
-            text: i18nText("autoI18n.en_az_3_karakter_yalnizca_a_z_0_9", "En az 3 karakter · yalnızca a–z, 0–9, _"),
-            color: theme.colors.red,
-          };
-        }
-        if (un.length >= 3 && /^[0-9_]+$/.test(un)) {
-          return {
-            text: tr ? "Kullanıcı adı sadece rakamlardan veya alt çizgiden oluşamaz (en az bir harf içermelidir)." : es ? "El nombre de usuario no puede ser solo números o guiones bajos (debe contener al menos una letra)." : pt ? "O nome de usuário não pode ser só números ou sublinhados (deve conter pelo menos uma letra)." : de ? "Der Benutzername darf nicht nur aus Zahlen oder Unterstrichen bestehen (mindestens ein Buchstabe ist nötig)." : "Username cannot be only numbers or underscores (must contain at least one letter).",
-            color: theme.colors.red,
-          };
-        }
-        return {
-          text: i18nText("autoI18n.gecersiz_kullanici_adi_3_20_karakter_a_z_0_9", "3-20 karakter · yalnızca a-z, 0-9, _ (en az bir harf)"),
-          color: theme.colors.red,
-        };
-      case "checking":
-        return { text: i18nText("autoI18n.kontrol_ediliyor", "Kontrol ediliyor…"), color: theme.text.muted };
-      case "taken":
-        return { text: i18nText("autoI18n.bu_kullanici_adi_alinmis_2", "Bu kullanıcı adı alınmış"), color: theme.colors.red };
-      case "available":
-        return { text: i18nText("autoI18n.kullanilabilir", "Kullanılabilir"), color: theme.colors.green };
-      default:
-        return null;
-    }
-  };
-  const hint = usernameHint();
   const birthAge = calculateAge(birthDate);
   // Kayıtlı tarih varsa alan kilitli — kural ikinci yazımı zaten reddediyor.
   const birthLocked = !!profile?.birthDate;
@@ -601,7 +324,7 @@ export default function EditProfileScreen({ navigation }) {
   if (loading && !profile) {
     return (
       <View style={[styles.root, styles.center, { backgroundColor: theme.primary }]}>
-        <ActivityIndicator size="large" color={theme.accent} />
+        <LensLoader size="large" color={theme.accent} />
       </View>
     );
   }
@@ -609,31 +332,6 @@ export default function EditProfileScreen({ navigation }) {
   const accent = theme.accent;
   const lightTheme = isLightSurface(theme.primary);
   const fieldSurface = theme.between;
-  const socialSelected = avatarChoice.avatarIndex === CUSTOM_AVATAR_INDEX;
-
-  // Kullanıcı adı durum satırı: alanın kenar tonuyla (AuthField) aynı renkler.
-  const hintColor = hint
-    ? usernameStatus === "available"
-      ? AUTH_SUCCESS
-      : usernameStatus === "checking"
-        ? theme.text.muted
-        : AUTH_ERROR
-    : null;
-  const hintIcon =
-    usernameStatus === "available"
-      ? "checkmark-circle-outline"
-      : usernameStatus === "checking"
-        ? "time-outline"
-        : "alert-circle-outline";
-
-  const usernameRight =
-    usernameStatus === "checking" ? (
-      <ActivityIndicator size="small" color={theme.text.muted} />
-    ) : usernameStatus === "available" ? (
-      <Ionicons name="checkmark-circle" size={19} color={AUTH_SUCCESS} />
-    ) : usernameStatus === "taken" ? (
-      <Ionicons name="close-circle" size={19} color={AUTH_ERROR} />
-    ) : null;
 
   // Doğum tarihi alt satırı: kilitli / henüz girilmemiş / 18 altı / tamam.
   const birthHint = birthLocked
@@ -701,7 +399,7 @@ export default function EditProfileScreen({ navigation }) {
       <SafeAreaView style={styles.flex} edges={["top"]}>
         <EditHeader
           theme={theme}
-          title={i18nText("autoI18n.profili_duzenle", "Profili Düzenle")}
+          title={i18nText("autoI18n.hesap_bilgileri_baslik", "Hesap bilgileri")}
           onBack={() => navigation.goBack()}
           onSave={onSave}
           canSave={canSave}
@@ -718,146 +416,20 @@ export default function EditProfileScreen({ navigation }) {
             keyboardDismissMode="on-drag"
             contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
           >
-            {/* Avatar + canlı önizleme */}
-            <Reveal>
-              <ProfileHero
-                theme={theme}
-                avatarIndex={avatarChoice.avatarIndex}
-                photoURL={avatarChoice.photoURL}
-                name={displayName}
-                username={username}
-                social={socialSelected}
-                onPress={() => setAvatarSheet(true)}
-              />
-            </Reveal>
-
-            {/* Profil bilgileri */}
-            <Reveal delay={70} style={authColumn}>
-              <FormSection
-                theme={theme}
-                icon="person-circle-outline"
-                title={i18nText("autoI18n.profil_bilgileri", "Profil bilgileri")}
-              >
-                <FieldBlock>
-                  <FieldLabel
-                    theme={theme}
-                    label={i18nText("autoI18n.isim", "İsim")}
-                    counter={`${displayName.length}/${NAME_MAX}`}
-                  />
-                  <AuthField
-                    theme={theme}
-                    accent={accent}
-                    fieldSurface={fieldSurface}
-                    icon="person-outline"
-                    value={displayName}
-                    onChangeText={setDisplayName}
-                    placeholder={i18nText("autoI18n.adin", "Adın")}
-                    maxLength={NAME_MAX}
-                    returnKeyType="next"
-                    onSubmitEditing={() => usernameRef.current?.focus()}
-                    blurOnSubmit={false}
-                  />
-                </FieldBlock>
-
-                <FieldBlock>
-                  <FieldLabel
-                    theme={theme}
-                    label={i18nText("autoI18n.kullanici_adi_2", "Kullanıcı adı")}
-                    counter={`${username.length}/${USERNAME_MAX}`}
-                  />
-                  <AuthField
-                    ref={usernameRef}
-                    theme={theme}
-                    accent={accent}
-                    fieldSurface={fieldSurface}
-                    icon="at"
-                    state={usernameFieldState(usernameStatus)}
-                    value={username}
-                    onChangeText={(v) => setUsername(formatUsernameInput(v))}
-                    placeholder={i18nText("autoI18n.kullanici_adi_ornegi", "kullanici_adi")}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    maxLength={USERNAME_MAX}
-                    returnKeyType="next"
-                    onSubmitEditing={() => bioRef.current?.focus()}
-                    blurOnSubmit={false}
-                    right={usernameRight}
-                  />
-                  {hint ? (
-                    <FieldHint icon={hintIcon} color={hintColor}>
-                      {hint.text}
-                    </FieldHint>
-                  ) : null}
-                </FieldBlock>
-
-                <FieldBlock>
-                  <FieldLabel
-                    theme={theme}
-                    label={i18nText("autoI18n.hakkinda", "Hakkında")}
-                    counter={`${bio.length}/${BIO_MAX}`}
-                    warn={isNearLimit(bio.length, BIO_MAX)}
-                  />
-                  <AuthField
-                    ref={bioRef}
-                    theme={theme}
-                    accent={accent}
-                    fieldSurface={fieldSurface}
-                    icon="chatbubble-ellipses-outline"
-                    value={bio}
-                    onChangeText={(v) => setBio(v.slice(0, BIO_MAX))}
-                    placeholder={i18nText("autoI18n.kendinden_bahset", "Kendinden bahset…")}
-                    multiline
-                    maxLength={BIO_MAX}
-                    containerStyle={styles.bioShell}
-                    inputStyle={styles.bioInput}
-                  />
-                </FieldBlock>
-              </FormSection>
-            </Reveal>
-
-            {/* Dört favori: arkadaşların profilinde görünür, önerileri de besler. */}
-            <Reveal delay={100} style={authColumn}>
-              <FormSection
-                theme={theme}
-                icon="heart-circle-outline"
-                title={favCopy.section.title}
-              >
-                <FavoritesEditor value={favorites} onChange={setFavorites} />
-                <FieldHint icon="eye-outline" color={theme.text.muted}>
-                  {favCopy.section.hint}
-                </FieldHint>
-              </FormSection>
-            </Reveal>
-
-            {/* Sosyal hesaplar: profilde (kendi + arkadaşlarınki) ikon düğmesi olarak görünür. */}
-            <Reveal delay={115} style={authColumn}>
-              <FormSection
-                theme={theme}
-                icon="link-outline"
-                title={socialCopy.title}
-              >
-                <SocialLinksEditor
-                  draft={socialDraft}
-                  invalid={socialInvalid}
-                  onChange={(key, value) => {
-                    setSocialDraft((prev) => ({ ...prev, [key]: value }));
-                    setSocialInvalid((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : prev));
-                  }}
-                  theme={theme}
-                  accent={accent}
-                  fieldSurface={fieldSurface}
-                  language={language}
-                />
-                <FieldHint icon="eye-outline" color={theme.text.muted}>
-                  {socialCopy.hint}
-                </FieldHint>
-              </FormSection>
+            {/* Profil bilgileri artık profilde yerinde düzenleniyor: kısa yönlendirme. */}
+            <Reveal style={authColumn}>
+              <FieldHint icon="information-circle-outline" color={theme.text.muted}>
+                {i18nText(
+                  "autoI18n.hesap_bilgileri_profil_notu",
+                  "Ad, kullanıcı adı, favoriler ve sosyal hesaplar artık profilinde, düzenleme modunda değiştirilir.",
+                )}
+              </FieldHint>
             </Reveal>
 
             {/* Yalnız kullanıcıya görünen bilgi. Doğum tarihi yetişkin içerik
                 ayarının kapısı; kaydedilmişse salt-okunur (kural da tek yazıma
                 izin veriyor — firestore.rules → birthDateKept). */}
-            <Reveal delay={130} style={authColumn}>
+            <Reveal delay={60} style={authColumn}>
               <FormSection
                 theme={theme}
                 icon="lock-closed-outline"
@@ -884,7 +456,7 @@ export default function EditProfileScreen({ navigation }) {
             </Reveal>
 
             {/* Tehlikeli bölge */}
-            <Reveal delay={190} style={authColumn}>
+            <Reveal delay={110} style={authColumn}>
               <View style={styles.dangerBlock}>
                 <AuthSectionLabel theme={theme} accent={theme.colors.red}>
                   {i18nText("autoI18n.tehlikeli_bolge", "Tehlikeli bölge")}
@@ -910,18 +482,6 @@ export default function EditProfileScreen({ navigation }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-
-      {/* Avatar seçici: seçim yalnız forma yazılır, Kaydet ile kalıcı olur. */}
-      <ProfileAvatarPickerModal
-        visible={avatarSheet}
-        selected={avatarChoice}
-        saving={false}
-        onSelect={(choice) => {
-          setAvatarChoice(toAvatarChoice(choice));
-          setAvatarSheet(false);
-        }}
-        onClose={() => setAvatarSheet(false)}
-      />
 
       {/* Hesap silme / sıfırlama onayı: onay düğmesi BASILI TUTARAK çalışır */}
       <DeleteAccountSheet
@@ -965,13 +525,6 @@ const styles = StyleSheet.create({
   center: { justifyContent: "center", alignItems: "center" },
   content: { paddingHorizontal: 16, paddingTop: 4, gap: 14 },
 
-  bioShell: { alignItems: "flex-start", paddingTop: 12, paddingBottom: 6 },
-  bioInput: {
-    minHeight: 92,
-    maxHeight: 170,
-    textAlignVertical: "top",
-    paddingTop: 7,
-  },
   birthShell: { minHeight: 58, borderRadius: 18 },
   dangerBlock: { gap: 12 },
 });

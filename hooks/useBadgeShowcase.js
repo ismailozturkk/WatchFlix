@@ -125,10 +125,12 @@ export default function useBadgeShowcase() {
       showcaseCards,
       toggleBadge,
       removeBadge,
+      // Vitrini tek seferde değiştirir (profil düzenleme modu taslağı Kaydet'te yazar).
+      replaceShowcase: persistShowcase,
       isShowcased,
       canAddMore: showcaseIds.length < MAX_SHOWCASE_BADGES,
       maxSlots: MAX_SHOWCASE_BADGES,
     }),
-    [showcaseIds, showcaseCards, toggleBadge, removeBadge, isShowcased],
+    [showcaseIds, showcaseCards, toggleBadge, removeBadge, persistShowcase, isShowcased],
   );
 }

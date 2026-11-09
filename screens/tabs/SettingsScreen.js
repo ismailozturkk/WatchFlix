@@ -10,10 +10,10 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   Animated,
   InteractionManager,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import axios from "axios";
 import { useNavigation } from "@react-navigation/native";
 import { useLanguage } from "../../context/LanguageContext";
@@ -662,6 +662,17 @@ export default function SettingsScreen() {
             { backgroundColor: C.card, borderColor: C.border },
           ]}
         >
+          {/* Doğum tarihi + hesabı sıfırla / sil (profil bilgileri profilde yerinde düzenlenir). */}
+          <SettingRow
+            colors={C}
+            iconBg={C.iconBlue}
+            iconColor={C.blue}
+            iconName="id-card-outline"
+            title={i18nText("autoI18n.hesap_bilgileri_baslik", "Hesap bilgileri")}
+            subtitle={i18nText("autoI18n.hesap_bilgileri_aciklama", "Doğum tarihi, hesabı sıfırla veya sil")}
+            onPress={() => navigation.navigate("EditProfileScreen")}
+            right={<Chevron color={C.muted} />}
+          />
           <SettingRow
             colors={C}
             iconBg={C.iconBlue}
@@ -728,9 +739,19 @@ export default function SettingsScreen() {
             title={t.personalization}
             subtitle={i18nText(
               "autoI18n.kisisellestirme_aciklama",
-              "Uygulama simgesi, kar, ambiyans ve ikon arka planı",
+              "Uygulama simgesi, ambiyans ve ikon arka planı",
             )}
             onPress={() => navigation.navigate("PersonalizationScreen")}
+            right={<Chevron color={C.muted} />}
+          />
+          <SettingRow
+            colors={C}
+            iconBg={C.iconTeal}
+            iconColor={C.teal}
+            iconName="sparkles-outline"
+            title={t.snow}
+            subtitle={t.snowSubtitle}
+            onPress={() => navigation.navigate("AtmosphereScreen")}
             right={<Chevron color={C.muted} />}
           />
           <SettingRow
@@ -1275,7 +1296,7 @@ export default function SettingsScreen() {
               </View>
               {providerCatalogLoading ? (
                 <View style={s.providerLoading}>
-                  <ActivityIndicator size="small" color={C.accent} />
+                  <LensLoader size="small" color={C.accent} />
                 </View>
               ) : (
                 <FlatList

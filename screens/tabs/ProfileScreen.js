@@ -22,6 +22,8 @@ import ScreenDecor from "../../components/ScreenDecor";
 // (TabScreenNavigator), stack'e push edilmez — buton yalnızca üstteki ekrandan
 // dönerken "hayalet" olarak belirip kalıyordu.
 import StatisticsSection from "./profile/StatisticsSection";
+import RatingDistributionCard from "../../components/profile/RatingDistributionCard";
+import { useListStatusContext } from "../../context/ListStatusContext";
 import { useUserProfile } from "../../context/UserProfileContext";
 import * as Haptics from "../../services/hapticsService";
 import ProfileAvatarPickerModal from "../../components/profile/ProfileAvatarPickerModal";
@@ -128,6 +130,13 @@ const ProfileScreen = ({ navigation }) => {
     [navigation]
   );
   const acMeydanOkumalar = useCallback(() => navigation.navigate("ChallengesScreen"), [navigation]);
+  // Puan dağılımı: Lists/{uid}.activityIndex.ratings (ek okuma yok). Karta dokununca
+  // Aktivitelerim > Puanlamalar açılır.
+  const myRatings = useListStatusContext()?.activityIndex?.ratings ?? null;
+  const acPuanlamalar = useCallback(
+    () => navigation.navigate("MyActivityScreen", { initialTab: "ratings" }),
+    [navigation]
+  );
 
   // Rozet/Perde kutlaması ARTIK burada değil: WatchProgressProvider içinde, profil
   // sekmesi hiç açılmamış olsa da oynar (hooks/useBadgeCelebration.js).
@@ -157,22 +166,15 @@ const ProfileScreen = ({ navigation }) => {
     Math.min(Math.max(rawProgress, 0), 1).toFixed(3) * 100
   );
   const friendsState = useFriends();
-  const friendCount =
-    friendsState?.friends?.length ?? profile?.friendsCount ?? 0;
   const receivedCount =
     friendsState?.incomingRequests?.length ??
     profile?.pendingRequestsInCount ??
     0;
 
   // Mesajlar butonundaki okunmamış rozeti — gelen kutusu index'indeki
-  // unreadCount toplamı (ChatScreen sohbet açılınca sıfırlar). Tek listener
-  // context/UnreadMessagesContext'te; uygulama simgesi rozeti de oradan besleniyor.
+  // Tekil ve grup okunmamış toplamı; uygulama simgesi rozetiyle aynı kaynak.
   const { unreadMessages } = useUnreadMessages();
 
-  const goEditProfile = useCallback(
-    () => navigation.navigate("EditProfileScreen"),
-    [navigation]
-  );
   // Ayarlar artık sekme değil: bu dişli düğmesinden açılır (App.js "SettingsScreen").
   const goSettings = useCallback(
     () => navigation.navigate("SettingsScreen"),
@@ -213,22 +215,28 @@ const ProfileScreen = ({ navigation }) => {
   // bir arkadaşın gözünden açılır (gizlilik aynı kuraldan, bkz. utils/profileViewer.js).
   const ownUid = user?.uid;
   const ownName = profile?.displayName || user?.displayName || "";
+  // Profil düzenleme artık ayrı ekran değil: kimlik bloğundaki kalem de önizlemeyi açar,
+  // düzenleme orada, arkadaşın gördüğü düzenin üstünde yapılır (hooks/useOwnProfileEditor).
+  const goOwnProfilePreview = useCallback(() => {
+    if (!ownUid) return;
+    navigation.navigate("FriendProfileScreen", {
+      friendUid: ownUid,
+      friendName: ownName,
+      preview: PROFILE_PREVIEW.FRIEND,
+    });
+  }, [navigation, ownUid, ownName]);
   const viewOwnProfileAction = useMemo(
     () =>
       ownUid
         ? {
             label: i18nText("autoI18n.profilini_gor", "Profilini gör"),
             icon: "eye-outline",
-            onPress: () =>
-              navigation.navigate("FriendProfileScreen", {
-                friendUid: ownUid,
-                friendName: ownName,
-                preview: PROFILE_PREVIEW.FRIEND,
-              }),
+            onPress: goOwnProfilePreview,
           }
         : null,
     // Etiket dil değişince yeniden çözülsün.
-    [ownUid, ownName, navigation, language]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ownUid, goOwnProfilePreview, language]
   );
   const openAvatarPerson = useCallback(
     (person) => navigation.navigate("ActorViewScreen", { personId: person.id }),
@@ -300,7 +308,8 @@ const ProfileScreen = ({ navigation }) => {
                   : null
               }
               joinedAt={user?.metadata?.createdAt}
-              onEdit={goEditProfile}
+              onEdit={goOwnProfilePreview}
+              editLabel={i18nText("autoI18n.profilini_gor", "Profilini gör")}
               onShare={openStoryExport}
               // Ayarlar girişi: adın sağındaki dişli (App.js "SettingsScreen").
               onSettings={goSettings}
@@ -336,7 +345,6 @@ const ProfileScreen = ({ navigation }) => {
           {showSection("friends") && (
             <FriendsActionBar
               theme={theme}
-              friendCount={friendCount}
               unreadMessages={unreadMessages}
               incomingRequests={receivedCount}
               onSearch={goSearch}
@@ -375,6 +383,14 @@ const ProfileScreen = ({ navigation }) => {
           {/* Listeler, Hatırlatmalar ve Notlar Kütüphane sekmesine taşındı
               (screens/tabs/LibraryScreen.js). */}
           {showSection("activity") && <MyActivityButton navigation={navigation} />}
+          {/* Puan dağılımı: Aktivitelerim kartının hemen altında, aynı genişlikte. */}
+          {showSection("ratings") && (
+            <RatingDistributionCard
+              ratings={myRatings}
+              onPress={acPuanlamalar}
+              style={styles.ratingSpread}
+            />
+          )}
           {allSectionsHidden && (
             <SectionsHiddenNotice navigation={navigation} screen="profile" />
           )}
@@ -424,14 +440,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#000",
   },
-  editProfileButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    borderWidth: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   profilImage: {
     width: "100%",
     height: "100%",
@@ -473,6 +481,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   challengeMedals: { marginTop: 8 },
+  // MyActivityButton kartıyla aynı hiza (marginHorizontal 16) ve aralık.
+  ratingSpread: { alignSelf: "stretch", marginHorizontal: 16, marginBottom: 14 },
   section: {
     width: "90%",
     //marginBottom: 10,

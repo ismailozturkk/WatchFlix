@@ -13,7 +13,7 @@
 //     çubuklarıyla: her şey aynı yüzey/yarıçap ritminde.
 
 import React, { memo, useEffect, useMemo, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -23,6 +23,7 @@ import UserAvatar from "@components/common/UserAvatar";
 import GlassIconButton from "@components/common/GlassIconButton";
 import IdentityBadgesRow from "@components/badges/IdentityBadgesRow";
 import SocialLinksRow from "@components/profile/SocialLinksRow";
+import SocialLinksEditRow from "@components/profile/SocialLinksEditRow";
 import { hasAnySocialLinks, normalizeSocialLinks } from "@utils/socialLinks";
 import { useTheme } from "@context/ThemeContext";
 import { alpha } from "@theme/colors";
@@ -87,7 +88,7 @@ export function ProfileBackdrop({ scrollY }) {
 // ── Üst çubuk ────────────────────────────────────────────────────────────────
 // Geri · (kaydırınca beliren isim) · ⋯. `scrollY` verilmezse başlık hep görünür
 // (yükleniyor / bulunamadı durumlarında hero yok, isim üst çubukta kalmalı).
-export function ProfileTopBar({ title, scrollY, onMore, moreLabel }) {
+export function ProfileTopBar({ title, scrollY, onMore, moreLabel, leading = null, trailing = null }) {
   const { theme } = useTheme();
   const titleOpacity = scrollY
     ? scrollY.interpolate({
@@ -99,7 +100,7 @@ export function ProfileTopBar({ title, scrollY, onMore, moreLabel }) {
 
   return (
     <View style={styles.topBar}>
-      <BackButton absolute={false} />
+      {leading || <BackButton absolute={false} />}
       <Animated.View style={[styles.topTitleWrap, { opacity: titleOpacity }]}>
         <Text
           allowFontScaling={false}
@@ -109,7 +110,9 @@ export function ProfileTopBar({ title, scrollY, onMore, moreLabel }) {
           {title}
         </Text>
       </Animated.View>
-      {onMore ? (
+      {trailing ? (
+        trailing
+      ) : onMore ? (
         <GlassIconButton
           icon="ellipsis-horizontal"
           iconSize={18}
@@ -139,9 +142,23 @@ export const ProfileHero = memo(function ProfileHero({
   bio,
   socialLinks,
   memberSince,
+  // Düzenleme modu (kendi profil önizlemesi): verilirse ad / kullanıcı adı / hakkında
+  // AYNI yazı stilinde yazılabilir olur, sosyal şerit düzenleme hâline geçer.
+  // { name, onChangeName, namePlaceholder, nameMax, username, onChangeUsername,
+  //   usernamePlaceholder, usernameLabel, usernameMax, usernameHint: {text, tone},
+  //   bio, onChangeBio, bioPlaceholder, bioMax, socialDraft, socialInvalid,
+  //   onChangeSocial, avatarHint }
+  editor = null,
 }) {
   const { theme } = useTheme();
   const enter = useRef(new Animated.Value(0)).current;
+  const editLine = { borderBottomColor: alpha(theme.accent, 0.4) };
+  const hintColor =
+    editor?.usernameHint?.tone === "success"
+      ? theme.colors?.green ?? "#29b864"
+      : editor?.usernameHint?.tone === "error"
+        ? theme.colors?.red ?? "#e5484d"
+        : theme.text?.muted ?? "#666";
   // Başkasının yazdığı veri: her seferinde temizlenir (bilinmeyen/geçersiz atılır).
   const links = useMemo(() => normalizeSocialLinks(socialLinks), [socialLinks]);
 
@@ -183,20 +200,80 @@ export const ProfileHero = memo(function ProfileHero({
             />
           </View>
         </LinearGradient>
+        {/* Düzenleme modunda avatara dokununca seçici açılır: köşede küçük kalem. */}
+        {editor ? (
+          <View
+            pointerEvents="none"
+            accessibilityLabel={editor.avatarHint}
+            style={[styles.avatarEditDot, { backgroundColor: theme.accent, borderColor: theme.primary }]}
+          >
+            <Ionicons name="pencil" size={13} color="#fff" />
+          </View>
+        ) : null}
       </View>
 
-      <Text
-        allowFontScaling={false}
-        // Kullanıcının kendi yazdığı ad — ProfileScreen'deki eşiyle aynı
-        // gerekçeyle başlık fontuna girmez (bkz. utils/typographyRoles.js).
-        fontRole="body"
-        numberOfLines={2}
-        style={[styles.name, { color: theme.text?.primary ?? "#fff" }]}
-      >
-        {name}
-      </Text>
+      {editor ? (
+        <TextInput
+          testID="profile-edit-name"
+          value={editor.name}
+          onChangeText={editor.onChangeName}
+          placeholder={editor.namePlaceholder}
+          placeholderTextColor={alpha(theme.text?.muted ?? "#666", 0.8)}
+          maxLength={editor.nameMax}
+          allowFontScaling={false}
+          fontRole="body"
+          returnKeyType="done"
+          accessibilityLabel={editor.namePlaceholder}
+          style={[styles.name, styles.nameInput, editLine, { color: theme.text?.primary ?? "#fff" }]}
+        />
+      ) : (
+        <Text
+          allowFontScaling={false}
+          // Kullanıcının kendi yazdığı ad — ProfileScreen'deki eşiyle aynı
+          // gerekçeyle başlık fontuna girmez (bkz. utils/typographyRoles.js).
+          fontRole="body"
+          numberOfLines={2}
+          style={[styles.name, { color: theme.text?.primary ?? "#fff" }]}
+        >
+          {name}
+        </Text>
+      )}
 
-      {username ? (
+      {editor ? (
+        <>
+          <View style={styles.identityRow}>
+            <View style={[styles.usernameEdit, editLine]}>
+              <Text allowFontScaling={false} style={[styles.username, { color: theme.text?.secondary ?? "#aaa" }]}>
+                @
+              </Text>
+              <TextInput
+                testID="profile-edit-username"
+                value={editor.username}
+                onChangeText={editor.onChangeUsername}
+                placeholder={editor.usernamePlaceholder}
+                placeholderTextColor={alpha(theme.text?.muted ?? "#666", 0.8)}
+                maxLength={editor.usernameMax}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="off"
+                allowFontScaling={false}
+                accessibilityLabel={editor.usernameLabel}
+                style={[styles.username, styles.usernameInput, { color: theme.text?.secondary ?? "#aaa" }]}
+              />
+            </View>
+          </View>
+          {editor.usernameHint ? (
+            <Text
+              testID="profile-edit-username-hint"
+              allowFontScaling={false}
+              numberOfLines={2}
+              style={[styles.usernameHint, { color: hintColor }]}
+            >
+              {editor.usernameHint.text}
+            </Text>
+          ) : null}
+        </>
+      ) : username ? (
         <View style={styles.identityRow}>
           <Text
             allowFontScaling={false}
@@ -215,7 +292,19 @@ export const ProfileHero = memo(function ProfileHero({
         style={styles.badgesRow}
       />
 
-      {bio ? (
+      {editor ? (
+        <TextInput
+          testID="profile-edit-bio"
+          value={editor.bio}
+          onChangeText={editor.onChangeBio}
+          placeholder={editor.bioPlaceholder}
+          placeholderTextColor={alpha(theme.text?.muted ?? "#666", 0.8)}
+          maxLength={editor.bioMax}
+          multiline
+          accessibilityLabel={editor.bioPlaceholder}
+          style={[styles.bio, styles.bioInput, editLine, { color: theme.text?.secondary ?? "#aaa" }]}
+        />
+      ) : bio ? (
         <Text
           numberOfLines={3}
           style={[styles.bio, { color: theme.text?.secondary ?? "#aaa" }]}
@@ -224,7 +313,16 @@ export const ProfileHero = memo(function ProfileHero({
         </Text>
       ) : null}
 
-      {hasAnySocialLinks(links) ? (
+      {editor ? (
+        <SocialLinksEditRow
+          draft={editor.socialDraft}
+          invalid={editor.socialInvalid}
+          onChange={editor.onChangeSocial}
+          theme={theme}
+          language={language}
+          style={styles.socialRow}
+        />
+      ) : hasAnySocialLinks(links) ? (
         <SocialLinksRow
           links={links}
           theme={theme}
@@ -251,7 +349,8 @@ export const ProfileHero = memo(function ProfileHero({
 
 // ── Sayaç şeridi ─────────────────────────────────────────────────────────────
 // items: [{ key, icon, label, value, color }]. Tek kap, aralarında ince ayraç
-// (profil ekranındaki FriendsActionBar ile aynı ritim).
+// (profil ekranındaki FriendsActionBar 7 Kas'ta renkli ayrı hücrelere geçti;
+// bu şerit tek kap + ayraç düzeninde kaldı).
 export const ProfileStatStrip = memo(function ProfileStatStrip({ items }) {
   const { theme } = useTheme();
   return (
@@ -558,6 +657,8 @@ export const ProfilePreviewBanner = memo(function ProfilePreviewBanner({
   subtitle,
   actionLabel,
   onAction,
+  icon = "eye-outline",
+  actionIcon = "lock-closed-outline",
 }) {
   const { theme } = useTheme();
   return (
@@ -568,7 +669,7 @@ export const ProfilePreviewBanner = memo(function ProfilePreviewBanner({
       ]}
     >
       <View style={[styles.previewMedallion, { backgroundColor: alpha(theme.accent, 0.16) }]}>
-        <Ionicons name="eye-outline" size={18} color={theme.accent} />
+        <Ionicons name={icon} size={18} color={theme.accent} />
       </View>
       <View style={styles.previewTexts}>
         <Text
@@ -591,7 +692,7 @@ export const ProfilePreviewBanner = memo(function ProfilePreviewBanner({
       {actionLabel && onAction ? (
         <PillButton
           label={actionLabel}
-          icon="lock-closed-outline"
+          icon={actionIcon}
           size="sm"
           variant="soft"
           onPress={onAction}
@@ -662,6 +763,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   username: { fontSize: 14, fontWeight: "600", flexShrink: 1 },
+  // Düzenleme modu: aynı yazı stili, altında ince vurgu çizgisi (alanın yazılabilir olduğu okunsun).
+  avatarEditDot: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nameInput: {
+    alignSelf: "stretch",
+    marginHorizontal: 24,
+    paddingVertical: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth * 2,
+  },
+  usernameEdit: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth * 2,
+    paddingBottom: 1,
+  },
+  usernameInput: { minWidth: 90, paddingVertical: 0, paddingHorizontal: 0, flexShrink: 0 },
+  usernameHint: { marginTop: 5, fontSize: 12, fontWeight: "700", textAlign: "center", paddingHorizontal: 24 },
+  bioInput: {
+    alignSelf: "stretch",
+    marginHorizontal: 24,
+    paddingVertical: 4,
+    minHeight: 40,
+    maxHeight: 110,
+    textAlignVertical: "top",
+    borderBottomWidth: StyleSheet.hairlineWidth * 2,
+  },
   badgesRow: { justifyContent: "center", marginTop: 8, marginBottom: 0 },
   bio: {
     marginTop: 12,

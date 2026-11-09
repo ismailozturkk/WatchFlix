@@ -127,6 +127,8 @@ function ProfileIdentityBlock({
   verifyAction = null,
   joinedAt,
   onEdit,
+  // Kalem düğmesinin erişilebilirlik etiketi (profilde önizleme + düzenleme girişi).
+  editLabel: editLabelProp,
   onShare,
   onSettings,
   settingsLabel,
@@ -167,7 +169,7 @@ function ProfileIdentityBlock({
     : notificationsAction;
 
   const joinDate = joinedAt ? formatJoinDate(joinedAt, language) : null;
-  const editLabel = i18nText("autoI18n.profili_duzenle", "Profili Düzenle");
+  const editLabel = editLabelProp || i18nText("autoI18n.profili_duzenle", "Profili Düzenle");
 
   return (
     <View style={styles.root}>
@@ -298,7 +300,7 @@ function ProfileIdentityBlock({
       >
         <GlassIconButton
           testID="profile-edit-button"
-          icon="create-outline"
+          icon="person-circle-outline"
           iconSize={actionLayout.iconSize}
           size={actionLayout.size}
           fallbackRadius={actionLayout.radius}

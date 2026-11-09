@@ -65,3 +65,23 @@ export function usernameFieldState(status) {
 export function isNearLimit(length, max, margin = 20) {
   return length >= max - margin;
 }
+
+/** Vitrin rozeti dizileri aynı mı (sıra önemli: vitrin kullanıcının seçtiği sırayla çizilir). */
+export function showcaseIdsEqual(a, b) {
+  const x = Array.isArray(a) ? a : [];
+  const y = Array.isArray(b) ? b : [];
+  return x.length === y.length && x.every((id, index) => id === y[index]);
+}
+
+/**
+ * Profilde düzenleme modunda liste görünürlüğü: taslakta kayıtlıdan farklı olan
+ * bayraklar `{ ad: boolean }`. Kayıtlı haritada olmayan ad "kapalı" sayılır
+ * (FriendProfileScreen yalnız açıkça `true` olanı gösterir).
+ */
+export function listVisibilityChanges(saved, draft) {
+  const out = {};
+  Object.entries(draft || {}).forEach(([name, shown]) => {
+    if ((saved?.[name] === true) !== (shown === true)) out[name] = shown === true;
+  });
+  return out;
+}

@@ -8,17 +8,28 @@
 // uzatırdı).
 //
 // Bölüm başlığını çağıran verir (arkadaş profili SectionHeader kullanıyor).
-// Kendi profilde gösterilmez: favoriler yalnız Profili Düzenle'de düzenlenir.
+//
+// DÜZENLEME MODU (`editing` + `onChange`, kendi profil önizlemesi): aynı kart, aynı
+// satırlar; üç kategori de çizilir, dolu yuvanın köşesinde "×" (kaldır), boş yuvada
+// "+" — dokununca ortak seçici sayfası (FavoritePickerSheet) o kategoride açılır.
+// Bileşen kontrollüdür: kayıt yeri çağıranın (taslak, Kaydet ile yazılır).
 
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { alpha } from "../../theme/colors";
 import { getFavoritesCopy } from "../../utils/favoritesCopy";
-import { FAVORITE_KINDS, normalizeFavorites } from "../../utils/fourFavorites";
+import {
+  FAVORITE_KINDS,
+  normalizeFavorites,
+  removeFavorite,
+  toggleFavorite,
+} from "../../utils/fourFavorites";
+import * as Haptics from "../../services/hapticsService";
 import FavoriteSlots from "./FavoriteSlots";
+import FavoritePickerSheet from "./FavoritePickerSheet";
 import GlassBox from "../common/GlassBox";
 
 const ROUTE = { movies: "MovieDetails", shows: "TvShowsDetails", people: "ActorViewScreen" };
@@ -32,12 +43,30 @@ const THUMB_RADIUS = 10;
 const paramsFor = (kind, entry) =>
   kind === "people" ? { personId: entry.id } : { id: entry.id };
 
-function FavoritesShowcase({ favorites, navigation }) {
+function FavoritesShowcase({ favorites, navigation, editing = false, onChange }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const copy = getFavoritesCopy(language);
   const safe = normalizeFavorites(favorites);
-  const kinds = FAVORITE_KINDS.filter((kind) => safe[kind].length > 0);
+  const kinds = editing ? FAVORITE_KINDS : FAVORITE_KINDS.filter((kind) => safe[kind].length > 0);
+  const [pickerKind, setPickerKind] = useState(null);
+
+  // Peş peşe iki dokunuş aynı render'a düşerse ikincisi eski değeri görmesin.
+  const latest = useRef(safe);
+  latest.current = safe;
+  const commit = useCallback(
+    (next) => {
+      if (next === latest.current) return;
+      latest.current = next;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      onChange?.(next);
+    },
+    [onChange],
+  );
+  const onToggle = useCallback((kind, entry) => commit(toggleFavorite(latest.current, kind, entry)), [commit]);
+  const onRemove = useCallback((kind, entry) => commit(removeFavorite(latest.current, kind, entry.id)), [commit]);
+  const openPicker = useCallback((kind) => setPickerKind(kind), []);
+  const closePicker = useCallback(() => setPickerKind(null), []);
 
   const open = useCallback(
     (kind, entry) => {
@@ -51,6 +80,7 @@ function FavoritesShowcase({ favorites, navigation }) {
   if (!kinds.length) return null;
 
   return (
+    <>
     <GlassBox role="card" style={[styles.card, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
       {kinds.map((kind, index) => {
         const kindCopy = copy.kinds[kind];
@@ -82,21 +112,33 @@ function FavoritesShowcase({ favorites, navigation }) {
                 kind={kind}
                 items={safe[kind]}
                 theme={theme}
-                readOnly
+                readOnly={!editing}
                 showTitles={false}
                 gap={THUMB_GAP}
                 maxSlotWidth={THUMB_MAX_WIDTH}
                 radius={THUMB_RADIUS}
                 openLabel={copy.profile.open}
-                addLabel=""
+                addLabel={editing ? kindCopy.add : ""}
                 removeLabel={copy.picker.removeLabel}
                 onOpen={open}
+                onAdd={openPicker}
+                onRemove={onRemove}
               />
             </View>
           </View>
         );
       })}
     </GlassBox>
+    {editing ? (
+      <FavoritePickerSheet
+        visible={!!pickerKind}
+        kind={pickerKind}
+        favorites={safe}
+        onToggle={onToggle}
+        onClose={closePicker}
+      />
+    ) : null}
+    </>
   );
 }
 

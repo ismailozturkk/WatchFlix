@@ -21,11 +21,11 @@ import {
   Animated,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   Modal,
   Pressable,
   useWindowDimensions,
 } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import { Image } from "expo-image";
 import { doc, collection, onSnapshot, getDocs } from "firebase/firestore";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -35,6 +35,7 @@ import BottomSheetModal from "@components/common/BottomSheetModal";
 import ConfirmSheet from "@components/common/ConfirmSheet";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import GlassIconButton from "@components/common/GlassIconButton";
+import GlassPillButton from "@components/common/GlassPillButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { db } from "../../../firebase";
 import Toast from "@components/AppToast";
@@ -43,6 +44,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import { useAuth } from "../../../context/AuthContext";
 import { getAvatarSource, isTmdbPhotoUrl } from "../../../utils/avatars";
 import { normalizePhotoPerson } from "../../../utils/avatarPhotos";
+import { readListCoverStyle } from "../../../utils/listCoverStyle";
 import { useFriends } from "../../../context/FriendsContext";
 import ReportReasonSheet from "../../../components/moderation/ReportReasonSheet";
 import { reportUser } from "../../../services/reportService";
@@ -76,6 +78,7 @@ import {
   ProfileNoticeCard,
   ProfilePreviewBanner,
 } from "../../../components/friends/FriendProfileSections";
+import RatingDistributionCard from "../../../components/profile/RatingDistributionCard";
 import ProfileOptionsSheet from "../../../components/friends/ProfileOptionsSheet";
 import * as Haptics from "../../../services/hapticsService";
 import FavoritesShowcase from "../../../components/favorites/FavoritesShowcase";
@@ -98,6 +101,11 @@ import { buildTasteMatchShare, chatParamsForShare } from "../../../utils/chatSha
 import { trackEvent, ANALYTICS_EVENTS } from "../../../services/analytics";
 import { getTasteMatchCopy } from "../../../utils/tasteMatchCopy";
 import { resolveProfileAccess, resolveProfileViewer } from "../../../utils/profileViewer";
+import useOwnProfileEditor, { BIO_MAX, NAME_MAX, USERNAME_MAX } from "../../../hooks/useOwnProfileEditor";
+import ProfileAvatarPickerModal from "../../../components/profile/ProfileAvatarPickerModal";
+import ShowcaseBadgePickerSheet from "../../../components/badges/ShowcaseBadgePickerSheet";
+import { removeShowcaseBadge } from "../../../utils/badgeShowcase";
+import { useWatchProgressContext } from "../../../context/WatchProgressContext";
 
 
 import ModalToastHost from "@components/toast/ModalToastHost";
@@ -150,9 +158,8 @@ const formatMemberSince = (ts, language) => {
 };
 
 // Kapak düzeni (gridStyle/allCornersRounded) profil rayıyla (ProfileLists) ve
-// Listelerim ekranıyla (ListsViewScreen) BİREBİR aynı görünmek zorunda —
-// kullanıcı "Liste Görünümü Seçin" modalından tek bir tercih seçiyor, o tercih
-// burada da (arkadaş profilindeki paylaşılan listeler rayında) uygulanır.
+// Listelerim ekranıyla (ListsViewScreen) BİREBİR aynı çerçeveyi kullanır; burada
+// düzen profil SAHİBİNİN "Liste Görünümü Seçin" tercihidir (utils/listCoverStyle).
 const SharedListGridCard = memo(function SharedListGridCard({
   listName,
   items,
@@ -160,8 +167,13 @@ const SharedListGridCard = memo(function SharedListGridCard({
   getTmdbUrl,
   gridStyle,
   allCornersRounded,
+  direction,
   onPress,
   style,
+  // Düzenleme modu: kart dokununca profilde göster/gizle arasında geçer; gizli
+  // liste soluk çizilir, köşedeki göz işareti durumu söyler.
+  editing = false,
+  hidden = false,
 }) {
   // This memoized card must update even when its list props stay unchanged.
   useLanguage();
@@ -172,10 +184,22 @@ const SharedListGridCard = memo(function SharedListGridCard({
   const orderedItems = useMemo(() => sortItemsByListOrder(items), [items]);
   const cardW = getRailCardWidth(gridStyle);
   const Container = onPress ? TouchableOpacity : View;
-  const containerProps = onPress ? { activeOpacity: 0.8, onPress } : {};
+  const containerProps = onPress
+    ? {
+        activeOpacity: 0.8,
+        onPress,
+        ...(editing
+          ? {
+              accessibilityRole: "switch",
+              accessibilityState: { checked: !hidden },
+              accessibilityLabel: displayName,
+            }
+          : {}),
+      }
+    : {};
 
   return (
-    <Container {...containerProps} style={[{ paddingBottom: 4 }, style]}>
+    <Container {...containerProps} style={[{ paddingBottom: 4 }, editing && hidden && styles.railCardHidden, style]}>
       <View
         pointerEvents="none"
         style={[styles.railCardBg, { width: cardW, backgroundColor: theme.secondary }]}
@@ -189,6 +213,7 @@ const SharedListGridCard = memo(function SharedListGridCard({
           items={orderedItems}
           gridStyle={gridStyle}
           allCornersRounded={allCornersRounded}
+          direction={direction}
           width={cardW - RAIL_CARD_PADDING * 2}
           height={RAIL_COVER_H}
           getTmdbUrl={getTmdbUrl}
@@ -211,6 +236,20 @@ const SharedListGridCard = memo(function SharedListGridCard({
           </Text>
         </View>
       </View>
+      {editing ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.railVisibilityDot,
+            {
+              backgroundColor: hidden ? theme.secondary : theme.accent,
+              borderColor: hidden ? (theme.border ?? "rgba(255,255,255,0.08)") : theme.accent,
+            },
+          ]}
+        >
+          <Ionicons name={hidden ? "eye-off-outline" : "eye"} size={14} color={hidden ? theme.text?.muted ?? "#666" : "#fff"} />
+        </View>
+      ) : null}
     </Container>
   );
 });
@@ -278,7 +317,11 @@ export default function FriendProfileScreen({ route, navigation }) {
   const { theme } = useTheme();
   const { user: currentUser } = useAuth();
   const { language } = useLanguage();
-  const { gridStyle, allCornersRounded } = useProfileUi();
+  const {
+    gridStyle: myGridStyle,
+    allCornersRounded: myCornersRounded,
+    listLayoutDirections,
+  } = useProfileUi();
   const { getTmdbUrl } = useImageQualitySettings();
   const { posterBadges } = useListLayoutSettings();
   const { openQuickActions } = useMediaQuickActions();
@@ -349,6 +392,48 @@ export default function FriendProfileScreen({ route, navigation }) {
     preview,
   });
 
+  // ── Düzenleme modu (yalnız kendi profil önizlemende) ─────────────────────
+  // Eski "Profili Düzenle" ekranının yerine: arkadaşın gördüğü düzen AYNEN durur,
+  // üstteki kaleme basınca alanlar yerinde düzenlenir (hooks/useOwnProfileEditor).
+  const canEdit = isSelf && previewAsFriend;
+  const editor = useOwnProfileEditor({ enabled: canEdit });
+  const editing = canEdit && editor.editing;
+  const draft = editing ? editor.draft : null;
+  const [avatarSheet, setAvatarSheet] = useState(false);
+  const [badgeSheet, setBadgeSheet] = useState(false);
+  const [discardVisible, setDiscardVisible] = useState(false);
+  // Kaydedilmemiş değişiklikle ekrandan çıkılırken (geri / kaydırma) onay sorulur;
+  // onaylanınca bekletilen gezinme eylemi burada.
+  const pendingLeaveRef = useRef(null);
+  const ownKartlar = useWatchProgressContext()?.kartlar;
+  useEffect(() => {
+    if (!editing || !editor.dirty || !navigation?.addListener) return undefined;
+    return navigation.addListener("beforeRemove", (event) => {
+      event.preventDefault();
+      pendingLeaveRef.current = event.data?.action ?? null;
+      setDiscardVisible(true);
+    });
+  }, [editing, editor.dirty, navigation]);
+  const requestCancelEdit = useCallback(() => {
+    if (editor.dirty) {
+      pendingLeaveRef.current = null;
+      setDiscardVisible(true);
+    } else {
+      editor.cancel();
+    }
+  }, [editor]);
+  const confirmDiscard = useCallback(() => {
+    setDiscardVisible(false);
+    const action = pendingLeaveRef.current;
+    pendingLeaveRef.current = null;
+    editor.cancel();
+    // Dinleyici mod kapanınca söküldüğü için eylem bir sonraki karede engelsiz geçer.
+    if (action) setTimeout(() => navigation.dispatch(action), 0);
+  }, [editor, navigation]);
+  const startEdit = useCallback(() => {
+    if (editor.start()) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }, [editor]);
+
   // ── Profil dinleyicisi ────────────────────────────────────────────────────
   useEffect(() => {
     if (!friendUid) return;
@@ -362,6 +447,13 @@ export default function FriendProfileScreen({ route, navigation }) {
     );
     return () => unsub();
   }, [friendUid]);
+
+  // Liste kapak düzeni: profil SAHİBİNİN seçtiği (Users/{uid}.listCoverStyle).
+  // Alanı henüz yayınlanmamış (eski sürüm) profillerde bakanın kendi düzeni.
+  const ownerCoverStyle = readListCoverStyle(profile);
+  const gridStyle = ownerCoverStyle?.gridStyle ?? myGridStyle;
+  const allCornersRounded = ownerCoverStyle ? ownerCoverStyle.rounded : myCornersRounded;
+  const direction = ownerCoverStyle?.direction ?? listLayoutDirections?.[myGridStyle] ?? "right";
 
   // ── Gizlilik kuralları ────────────────────────────────────────────────────
   const privacy = { ...DEFAULT_PRIVACY, ...(profile?.privacy || {}) };
@@ -554,9 +646,11 @@ export default function FriendProfileScreen({ route, navigation }) {
   // Dört öntanımlı liste VE özel listeler artık kendi alt koleksiyonlarında
   // yaşıyor; kök dokümandaki eski array'lerle birleştirip TÜM listeleri
   // (boş olmayan + görünür işaretlenmiş) burada topluyoruz.
+  // Düzenleme modunda TÜM dolu listeler çizilir (gizliler soluk), görünürlük taslaktan.
+  const draftListVisible = draft?.listVisible ?? null;
   const visibleLists = useMemo(() => {
     if (!allLists || !profile) return [];
-    const rawVisible = profile.listVisible;
+    const rawVisible = draftListVisible ?? profile.listVisible;
     // Legacy array formatı da desteklenir (FriendsListScreen ile aynı mantık)
     const visibleNames = Array.isArray(rawVisible)
       ? rawVisible.filter((m) => Object.values(m)[0] === true).map((m) => Object.keys(m)[0])
@@ -596,7 +690,7 @@ export default function FriendProfileScreen({ route, navigation }) {
 
     const entries = [...predefinedEntries, ...customEntries, ...legacyCustomEntries].filter(
       ([name, items]) =>
-        visibleNames.includes(name) && Array.isArray(items) && items.length > 0,
+        (draftListVisible || visibleNames.includes(name)) && Array.isArray(items) && items.length > 0,
     );
     return [
       ...PROTECTED_LISTS.map((n) => entries.find(([ln]) => ln === n)).filter(Boolean),
@@ -604,11 +698,19 @@ export default function FriendProfileScreen({ route, navigation }) {
         .filter(([ln]) => !PROTECTED_LISTS.includes(ln))
         .sort((a, b) => a[0].localeCompare(b[0], intlLocaleOf(language))),
     ];
-  }, [allLists, profile, language, subMovies, subShows, subFavorites, subWatchList, subCustomItems]);
+  }, [allLists, profile, draftListVisible, language, subMovies, subShows, subFavorites, subWatchList, subCustomItems]);
 
+  const isListHiddenInDraft = useCallback(
+    (name) => !!draftListVisible && draftListVisible[name] !== true,
+    [draftListVisible],
+  );
+  // Sayaç arkadaşın gördüğünü sayar: düzenleme sırasında gizli listeler hariç.
   const totalItems = useMemo(
-    () => visibleLists.reduce((acc, [, items]) => acc + items.length, 0),
-    [visibleLists],
+    () =>
+      visibleLists
+        .filter(([name]) => !isListHiddenInDraft(name))
+        .reduce((acc, [, items]) => acc + items.length, 0),
+    [visibleLists, isListHiddenInDraft],
   );
 
   // ── Zevk uyumu + birlikte izleyelim ───────────────────────────────────────
@@ -769,7 +871,9 @@ export default function FriendProfileScreen({ route, navigation }) {
   const profileFavorites = useMemo(() => readProfileFavorites(profile), [profile]);
   // Kullanıcının vitrine seçtiği en fazla 4 rozet (Users/{uid}.showcaseBadges).
   const [selectedShowcaseBadge, setSelectedShowcaseBadge] = useState(null);
+  const draftShowcase = draft?.showcase ?? null;
   const profileShowcaseBadges = useMemo(() => {
+    if (draftShowcase) return resolveShowcaseBadges(draftShowcase, ownKartlar);
     const remoteIds = readProfileShowcaseBadges(profile);
     if (remoteIds.length > 0) return resolveShowcaseBadges(remoteIds);
     // Önizleme arkadaşın gördüğünü gösterir: o yalnız buluttaki seçimi okur.
@@ -778,7 +882,7 @@ export default function FriendProfileScreen({ route, navigation }) {
       return resolveShowcaseBadges(localIds);
     }
     return [];
-  }, [profile, isSelf, previewAsFriend, friendUid]);
+  }, [draftShowcase, ownKartlar, profile, isSelf, previewAsFriend, friendUid]);
   // Kimlik rozetleri arkadaşın SUNUCU alanlarından: istemci ne
   // entitlements'ı ne badges'ı yazabilir (firestore.rules), yani sahte rozet
   // gösterilemez.
@@ -879,7 +983,7 @@ export default function FriendProfileScreen({ route, navigation }) {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
         <ProfileTopBar title={friendName || i18nText("profile", "Profil")} />
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={theme.accent} />
+          <LensLoader size="large" color={theme.accent} />
         </View>
       </SafeAreaView>
     );
@@ -913,6 +1017,73 @@ export default function FriendProfileScreen({ route, navigation }) {
         scrollY={scrollY}
         onMore={isSelf ? undefined : openModerationMenu}
         moreLabel={i18nText("autoI18n.secenekler", "Seçenekler")}
+        // Düzenleme modunda sol uç "Vazgeç" (×), sağ uç "Kaydet" (✓).
+        leading={
+          editing ? (
+            <GlassIconButton
+              testID="profile-edit-cancel"
+              icon="close"
+              iconSize={20}
+              size={40}
+              fallbackRadius={12}
+              color={theme.text?.primary ?? "#fff"}
+              accessibilityLabel={i18nText("autoI18n.vazgec", "Vazgeç")}
+              onPress={requestCancelEdit}
+              disabled={editor.saving}
+            />
+          ) : null
+        }
+        trailing={
+          editing ? (
+            <GlassIconButton
+              testID="profile-edit-save"
+              icon="checkmark"
+              iconSize={21}
+              size={40}
+              fallbackRadius={12}
+              color="#fff"
+              tint={theme.accent}
+              fallbackStyle={{ backgroundColor: theme.accent, opacity: editor.canSave || !editor.dirty ? 1 : 0.5 }}
+              accessibilityLabel={i18nText("autoI18n.kaydet", "Kaydet")}
+              accessibilityState={{ busy: editor.saving, disabled: editor.saving }}
+              onPress={editor.save}
+              disabled={editor.saving}
+            >
+              {editor.saving ? <LensLoader tone="mono" size="small" color="#fff" /> : null}
+            </GlassIconButton>
+          ) : canEdit ? (
+            // Önizleme: eski geniş şerit yerine küçük "Gizlilik" hapı, kalemin yanında.
+            <View style={styles.previewActions}>
+              <GlassPillButton
+                label={i18nText("autoI18n.gizlilik", "Gizlilik")}
+                icon="lock-closed-outline"
+                iconSize={15}
+                height={40}
+                paddingHorizontal={12}
+                gap={5}
+                fontSize={13}
+                fallbackRadius={12}
+                color={theme.text?.primary ?? "#fff"}
+                fallbackStyle={{ backgroundColor: theme.secondary, borderColor: theme.border, borderWidth: 1 }}
+                accessibilityLabel={i18nText(
+                  "autoI18n.profil_onizleme_aciklama",
+                  "Neyin görüneceğini gizlilik ayarlarından seçebilirsin.",
+                )}
+                onPress={() => navigation.navigate("PrivacySettingsScreen")}
+              />
+              <GlassIconButton
+                testID="profile-edit-start"
+                icon="pencil"
+                iconSize={18}
+                size={40}
+                fallbackRadius={12}
+                color={theme.accent}
+                accessibilityLabel={i18nText("autoI18n.profili_duzenle", "Profili Düzenle")}
+                onPress={startEdit}
+              />
+            </View>
+          ) : null
+        }
       />
 
       <Animated.ScrollView
@@ -920,25 +1091,31 @@ export default function FriendProfileScreen({ route, navigation }) {
         contentContainerStyle={styles.scrollContent}
         onScroll={onScroll}
         scrollEventThrottle={16}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets
       >
         {/* ── Önizleme: kendi profilin, bir arkadaşın gözünden ────────────── */}
-        {previewAsFriend && (
-          <ProfilePreviewBanner
-            title={i18nText("autoI18n.profil_onizleme_baslik", "Arkadaşların profilini böyle görüyor")}
-            subtitle={i18nText(
-              "autoI18n.profil_onizleme_aciklama",
-              "Neyin görüneceğini gizlilik ayarlarından seçebilirsin.",
-            )}
-            actionLabel={i18nText("autoI18n.gizlilik", "Gizlilik")}
-            onAction={() => navigation.navigate("PrivacySettingsScreen")}
-          />
-        )}
+        {/* Düzenleme modunda yönlendirme şeridi; salt önizlemede gizlilik üst çubukta. */}
+        {previewAsFriend && editing ? (
+            <ProfilePreviewBanner
+              icon="pencil"
+              title={i18nText("autoI18n.profil_duzenleme_modu_baslik", "Düzenleme modu")}
+              subtitle={i18nText(
+                "autoI18n.profil_duzenleme_modu_aciklama",
+                "Değiştirmek istediğin yere dokun. ✓ ile kaydedince arkadaşların böyle görecek.",
+              )}
+              actionLabel={i18nText("autoI18n.hesap", "Hesap")}
+              actionIcon="person-circle-outline"
+              onAction={() => navigation.navigate("EditProfileScreen")}
+            />
+        ) : null}
 
         {/* ── Hero: avatar, ad, durum, rozetler, bio ───────────────────────── */}
         <ProfileHero
-          avatarIndex={profile.avatarIndex}
-          photoURL={profile.photoURL}
-          onAvatarPress={() => setShowAvatarPreview(true)}
+          avatarIndex={draft ? draft.avatar?.avatarIndex : profile.avatarIndex}
+          photoURL={draft ? draft.avatar?.photoURL : profile.photoURL}
+          onAvatarPress={() => (editing ? setAvatarSheet(true) : setShowAvatarPreview(true))}
           onAvatarLongPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             setShowAvatarPreview(true);
@@ -954,6 +1131,30 @@ export default function FriendProfileScreen({ route, navigation }) {
               ? i18nText("autoI18n.uye_tarihi_cumle", "{{date}} tarihinden beri üye", {
                   date: memberSince,
                 })
+              : null
+          }
+          editor={
+            draft
+              ? {
+                  name: draft.displayName,
+                  onChangeName: editor.setDisplayName,
+                  namePlaceholder: i18nText("autoI18n.adin", "Adın"),
+                  nameMax: NAME_MAX,
+                  username: draft.username,
+                  onChangeUsername: editor.setUsername,
+                  usernamePlaceholder: i18nText("autoI18n.kullanici_adi_ornegi", "kullanici_adi"),
+                  usernameLabel: i18nText("autoI18n.kullanici_adi_2", "Kullanıcı adı"),
+                  usernameMax: USERNAME_MAX,
+                  usernameHint: editor.usernameHint,
+                  bio: draft.bio,
+                  onChangeBio: editor.setBio,
+                  bioPlaceholder: i18nText("autoI18n.kendinden_bahset", "Kendinden bahset…"),
+                  bioMax: BIO_MAX,
+                  socialDraft: draft.social,
+                  socialInvalid: editor.socialInvalid,
+                  onChangeSocial: editor.setSocial,
+                  avatarHint: i18nText("autoI18n.avatari_degistir", "Avatarı değiştir"),
+                }
               : null
           }
         />
@@ -1012,7 +1213,8 @@ export default function FriendProfileScreen({ route, navigation }) {
         )}
 
         {/* ── Vitrin rozetleri: en fazla 4 rozet (varsa) ──────────────────── */}
-        {canViewProfile && profileShowcaseBadges.length > 0 && (
+        {/* Düzenleme modunda boş da olsa çizilir: dört yuva, boşlarda "+". */}
+        {(editing || (canViewProfile && profileShowcaseBadges.length > 0)) && (
           <>
             <SectionHeader
               title={getBadgeShowcaseCopy(language).profileTitle}
@@ -1020,16 +1222,24 @@ export default function FriendProfileScreen({ route, navigation }) {
             />
             <FriendBadgeShowcase
               badges={profileShowcaseBadges}
-              onPressBadge={setSelectedShowcaseBadge}
+              onPressBadge={editing ? () => setBadgeSheet(true) : setSelectedShowcaseBadge}
+              editing={editing}
+              onRemoveBadge={(badge) => editor.setShowcase(removeShowcaseBadge(draft?.showcase, badge))}
+              onPressEmpty={() => setBadgeSheet(true)}
             />
           </>
         )}
 
         {/* ── Favori seçimleri: film / dizi / oyuncu (varsa) ───────────────── */}
-        {canViewProfile && hasAnyFavorites(profileFavorites) && (
+        {(editing || (canViewProfile && hasAnyFavorites(profileFavorites))) && (
           <>
             <SectionHeader title={getFavoritesCopy(language).profile.title} />
-            <FavoritesShowcase favorites={profileFavorites} navigation={navigation} />
+            <FavoritesShowcase
+              favorites={draft ? draft.favorites : profileFavorites}
+              navigation={navigation}
+              editing={editing}
+              onChange={editor.setFavorites}
+            />
           </>
         )}
 
@@ -1054,7 +1264,7 @@ export default function FriendProfileScreen({ route, navigation }) {
             <SectionHeader title={i18nText("autoI18n.izleme_istatistikleri", "İzleme İstatistikleri")} />
 
             {stats === null ? (
-              <ActivityIndicator size="small" color={theme.accent} style={{ marginVertical: 24 }} />
+              <LensLoader size="small" color={theme.accent} style={{ marginVertical: 24 }} />
             ) : (
               <>
                 <WatchStatsCard
@@ -1116,6 +1326,13 @@ export default function FriendProfileScreen({ route, navigation }) {
               </>
             )}
 
+            {/* ── Puan dağılımı: aynı Lists belgesinden (ek okuma yok); puan yoksa gizli ── */}
+            <RatingDistributionCard
+              ratings={allLists?.activityIndex?.ratings}
+              hideWhenEmpty
+              style={styles.ratingSpread}
+            />
+
             {/* ── Zevk uyumu + birlikte izleyelim (kendi profilinde yok) ──────── */}
             {tasteMatch && together && !isSelf ? (
               <>
@@ -1135,7 +1352,7 @@ export default function FriendProfileScreen({ route, navigation }) {
 
             {/* ── Paylaşılan Listeler ─────────────────────────────────────── */}
             {allLists === null ? (
-              <ActivityIndicator size="small" color={theme.accent} style={{ marginTop: 30 }} />
+              <LensLoader size="small" color={theme.accent} style={{ marginTop: 30 }} />
             ) : visibleLists.length === 0 ? (
               <ProfileNoticeCard
                 icon="albums-outline"
@@ -1145,8 +1362,21 @@ export default function FriendProfileScreen({ route, navigation }) {
               <>
                 <SectionHeader
                   title={i18nText("autoI18n.listeler", "Listeler")}
-                  trailing={<CountChip value={visibleLists.length} icon="grid-outline" />}
+                  trailing={
+                    <CountChip
+                      value={visibleLists.filter(([name]) => !isListHiddenInDraft(name)).length}
+                      icon="grid-outline"
+                    />
+                  }
                 />
+                {editing ? (
+                  <Text allowFontScaling={false} style={[styles.editListHint, { color: theme.text?.muted ?? "#666" }]}>
+                    {i18nText(
+                      "autoI18n.profil_duzenleme_liste_ipucu",
+                      "Profilde göstermek ya da gizlemek için listeye dokun.",
+                    )}
+                  </Text>
+                ) : null}
 
                 <FlatList
                   horizontal
@@ -1155,6 +1385,7 @@ export default function FriendProfileScreen({ route, navigation }) {
                   showsHorizontalScrollIndicator={false}
                   style={styles.sharedListsRail}
                   contentContainerStyle={styles.sharedListsPreviewContent}
+                  extraData={draftListVisible}
                   renderItem={({ item: [listName, items] }) => (
                     <SharedListGridCard
                       listName={listName}
@@ -1163,7 +1394,12 @@ export default function FriendProfileScreen({ route, navigation }) {
                       getTmdbUrl={getTmdbUrl}
                       gridStyle={gridStyle}
                       allCornersRounded={allCornersRounded}
-                      onPress={() => setSelectedSharedList([listName, items])}
+                      direction={direction}
+                      editing={editing}
+                      hidden={isListHiddenInDraft(listName)}
+                      onPress={() =>
+                        editing ? editor.toggleList(listName) : setSelectedSharedList([listName, items])
+                      }
                     />
                   )}
                 />
@@ -1331,6 +1567,45 @@ export default function FriendProfileScreen({ route, navigation }) {
             )}
       </BottomSheetModal>
 
+      {canEdit ? (
+        <>
+          {/* Avatar seçici: seçim yalnız taslağa yazılır, ✓ ile kalıcı olur. */}
+          <ProfileAvatarPickerModal
+            visible={avatarSheet && editing}
+            selected={draft?.avatar}
+            saving={false}
+            onSelect={(choice) => {
+              editor.setAvatar(choice);
+              setAvatarSheet(false);
+            }}
+            onClose={() => setAvatarSheet(false)}
+          />
+          <ShowcaseBadgePickerSheet
+            visible={badgeSheet && editing}
+            value={draft?.showcase}
+            onChange={editor.setShowcase}
+            onClose={() => setBadgeSheet(false)}
+          />
+          <ConfirmSheet
+            visible={discardVisible}
+            onClose={() => {
+              pendingLeaveRef.current = null;
+              setDiscardVisible(false);
+            }}
+            onConfirm={confirmDiscard}
+            tone="danger"
+            icon="trash-outline"
+            title={i18nText("autoI18n.degisiklikler_kaydedilmedi", "Değişiklikler kaydedilmedi")}
+            message={i18nText(
+              "autoI18n.degisiklikler_kaydedilmedi_metin",
+              "Düzenleme modundan çıkarsan yaptığın değişiklikler silinir.",
+            )}
+            confirmLabel={i18nText("autoI18n.degisiklikleri_at", "Değişiklikleri at")}
+            cancelLabel={i18nText("autoI18n.duzenlemeye_don", "Düzenlemeye dön")}
+          />
+        </>
+      ) : null}
+
       <SaveSharedListModal
         visible={!!saveListPost}
         post={saveListPost}
@@ -1477,7 +1752,23 @@ export default function FriendProfileScreen({ route, navigation }) {
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
+  previewActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // Düzenleme modu: gizli liste soluk, köşede göz işareti.
+  railCardHidden: { opacity: 0.45 },
+  railVisibilityDot: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editListHint: { fontSize: 12.5, fontWeight: "700", marginTop: -4, marginBottom: 10, paddingHorizontal: 2 },
   container: { flex: 1 },
+  ratingSpread: { marginTop: 10 },
   centerContent: { flex: 1, justifyContent: "center", alignItems: "center", gap: 14 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   emptyText: { fontSize: 14, textAlign: "center" },

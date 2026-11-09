@@ -6,6 +6,8 @@
 //      veya detaya gitmeye izin verir.
 //   2. FriendBadgeShowcase     → Arkadaş profilinde (FriendProfileScreen) kullanıcının
 //      seçtiği 1–4 rozeti cam kart içinde sergiler; dokununca detay sayfası açılır.
+//      `editing` (kendi profil önizlemesinin düzenleme modu): aynı kart, 4 yuva —
+//      dolu yuvanın köşesinde "×", boş yuvada "+" (dokununca seçici açılır).
 
 import React, { memo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -269,12 +271,18 @@ export const BadgeShowcaseEditorCard = memo(function BadgeShowcaseEditorCard({
 export const FriendBadgeShowcase = memo(function FriendBadgeShowcase({
   badges = [],
   onPressBadge,
+  editing = false,
+  onRemoveBadge,
+  onPressEmpty,
 }) {
   const { theme } = useTheme();
   const { language } = useLanguage();
   const lang = copyLanguage(language, ["tr", "en", "es", "pt", "de"]);
+  const copy = getBadgeShowcaseCopy(lang);
+  const list = Array.isArray(badges) ? badges.slice(0, MAX_SHOWCASE_BADGES) : [];
 
-  if (!Array.isArray(badges) || badges.length === 0) return null;
+  if (!editing && list.length === 0) return null;
+  const emptyCount = editing ? MAX_SHOWCASE_BADGES - list.length : 0;
 
   return (
     <GlassBox
@@ -285,7 +293,7 @@ export const FriendBadgeShowcase = memo(function FriendBadgeShowcase({
       ]}
     >
       <View style={styles.friendRow}>
-        {badges.slice(0, MAX_SHOWCASE_BADGES).map((badge) => {
+        {list.map((badge) => {
           const nadirlik = rarityStyle(badge.rarity, theme);
           const sekil = kademeSekli(badge.tier, badge.aileToplam);
           const kadRenk = kademeRengi(sekil.kademe, theme);
@@ -315,6 +323,22 @@ export const FriendBadgeShowcase = memo(function FriendBadgeShowcase({
                 end={{ x: 0.5, y: 1 }}
                 style={styles.slotWash}
               />
+
+              {editing && onRemoveBadge ? (
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.removeSlotA11y(ad)}
+                  onPress={() => onRemoveBadge(badge)}
+                  style={[
+                    styles.removeBtn,
+                    styles.friendRemoveBtn,
+                    { backgroundColor: theme.secondary, borderColor: withAlpha(theme.border, 0.95) },
+                  ]}
+                >
+                  <AppIcon family="Ionicons" name="close" size={13} color={theme.text.primary} />
+                </TouchableOpacity>
+              ) : null}
 
               <AppBadge
                 glyph={badge.icon}
@@ -374,6 +398,49 @@ export const FriendBadgeShowcase = memo(function FriendBadgeShowcase({
             </TouchableOpacity>
           );
         })}
+        {Array.from({ length: emptyCount }, (_, idx) => (
+          <TouchableOpacity
+            key={`empty_${idx}`}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={copy.emptySlot}
+            onPress={onPressEmpty}
+            style={[
+              styles.friendTile,
+              styles.friendEmptyTile,
+              {
+                backgroundColor: withAlpha(theme.primary, 0.45),
+                borderColor: withAlpha(theme.accent, idx === 0 ? 0.55 : 0.28),
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.emptyHex,
+                {
+                  backgroundColor: withAlpha(theme.accent, idx === 0 ? 0.16 : 0.08),
+                  borderColor: withAlpha(theme.accent, idx === 0 ? 0.48 : 0.24),
+                },
+              ]}
+            >
+              <AppIcon
+                family="Ionicons"
+                name="add"
+                size={20}
+                color={idx === 0 ? theme.accent : theme.text.muted}
+              />
+            </View>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+              style={[styles.emptyLabel, { color: idx === 0 ? theme.accent : theme.text.muted }]}
+            >
+              {copy.emptySlot}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </GlassBox>
   );
@@ -542,6 +609,13 @@ const styles = StyleSheet.create({
     height: 3.5,
     borderRadius: 2,
   },
+  friendEmptyTile: {
+    borderStyle: "dashed",
+    justifyContent: "center",
+    gap: 7,
+    paddingTop: 9,
+  },
+  friendRemoveBtn: { width: 22, height: 22, borderRadius: 11 },
   friendBadgeTitle: {
     marginTop: 5,
     minHeight: 26,

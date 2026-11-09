@@ -149,18 +149,19 @@ async function render() {
   await act(() => { renderer = create(<EditProfileScreen navigation={navigation} />); });
 }
 const header = () => renderer.root.findByType("EditHeader");
-const field = (icon) => renderer.root.findAll((n) => n.type === "AuthField" && n.props.icon === icon)[0];
-const type = (icon, value) => act(() => field(icon).props.onChangeText(value));
-const flush = () => act(async () => { jest.advanceTimersByTime(600); await Promise.resolve(); });
 
+// Hesap bilgileri ekranı (rota adı EditProfileScreen kaldı): yalnız doğum tarihi +
+// hesabı sıfırla / sil. Ad, kullanıcı adı, avatar, favoriler ve sosyal hesaplar
+// profilde yerinde düzenleniyor — onların testi __tests__/useOwnProfileEditor.test.js.
 describe("EditProfileScreen", () => {
-  it("fills the form from the profile and leaves Save off until something changes", async () => {
+  it("shows only the account sections: no name / username / bio fields, Save off", async () => {
     await render();
-    expect(field("person-outline").props.value).toBe("Ali Veli");
-    expect(field("at").props.value).toBe("aliveli");
-    expect(field("chatbubble-ellipses-outline").props.value).toBe("Film delisi");
+    expect(renderer.root.findAllByType("AuthField")).toHaveLength(0);
+    expect(renderer.root.findAllByType("ProfileHero")).toHaveLength(0);
+    expect(renderer.root.findAllByType("FavoritesEditor")).toHaveLength(0);
+    expect(header().props.title).toBe("Hesap bilgileri");
     expect(header().props.canSave).toBe(false);
-    expect(header().props.saving).toBe(false);
+    expect(renderer.root.findAllByType("DangerRow")).toHaveLength(2);
   });
 
   it("shows only the spinner while the profile is still loading", async () => {
@@ -168,206 +169,6 @@ describe("EditProfileScreen", () => {
     await render();
     expect(renderer.root.findAllByType("EditHeader")).toHaveLength(0);
     expect(renderer.root.findAllByType("Spinner")).toHaveLength(1);
-  });
-
-  it("enables Save when a field changes and disables it again when changed back", async () => {
-    await render();
-    await type("person-outline", "Ali V.");
-    expect(header().props.canSave).toBe(true);
-    await type("person-outline", "Ali Veli");
-    expect(header().props.canSave).toBe(false);
-  });
-
-  it("mirrors the form into the hero preview as the user types", async () => {
-    await render();
-    await type("person-outline", "Yeni Ad");
-    const hero = renderer.root.findByType("ProfileHero");
-    expect(hero.props.name).toBe("Yeni Ad");
-    expect(hero.props.username).toBe("aliveli");
-    expect(hero.props.avatarIndex).toBe(4);
-  });
-
-  it("saves only what changed, then goes back", async () => {
-    await render();
-    await type("person-outline", "Ali V.");
-    await act(async () => { await header().props.onSave(); });
-    expect(mockUpdateField).toHaveBeenCalledWith({ displayName: "Ali V." }, { stampIdentity: true });
-    expect(mockChangeUsername).not.toHaveBeenCalled();
-    expect(mockSelectAvatar).not.toHaveBeenCalled();
-    expect(mockToast.show).toHaveBeenCalledWith(expect.objectContaining({ type: "success" }));
-    expect(navigation.goBack).toHaveBeenCalledTimes(1);
-  });
-
-  it("günde bir kez: ad değişimi beklemedeyken kaydedilmez, bio serbest kalır", async () => {
-    // Son kimlik değişikliği 2 saat önce → 22 saat bekleme kaldı.
-    mockProfileState = {
-      profile: { ...SAVED, identityChangedAt: Date.now() - 2 * 60 * 60 * 1000 },
-      loading: false,
-    };
-    await render();
-    await type("person-outline", "Ali V.");
-    await act(async () => { await header().props.onSave(); });
-    expect(mockUpdateField).not.toHaveBeenCalled();
-    expect(mockToast.show).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "info", text2: expect.stringContaining("saat") }),
-    );
-    expect(navigation.goBack).not.toHaveBeenCalled();
-  });
-
-  it("günde bir kez: beklemedeyken ad DIŞI alanlar kaydedilir", async () => {
-    mockProfileState = {
-      profile: { ...SAVED, identityChangedAt: Date.now() - 2 * 60 * 60 * 1000 },
-      loading: false,
-    };
-    await render();
-    await type("chatbubble-ellipses-outline", "Yeni bio");
-    await act(async () => { await header().props.onSave(); });
-    expect(mockUpdateField).toHaveBeenCalledWith({ bio: "Yeni bio" }, { stampIdentity: false });
-  });
-
-  it("refuses to save an empty name with a toast", async () => {
-    await render();
-    await type("person-outline", "   ");
-    await act(async () => { await header().props.onSave(); });
-    expect(mockUpdateField).not.toHaveBeenCalled();
-    expect(mockToast.show).toHaveBeenCalledWith(expect.objectContaining({ type: "error" }));
-    expect(navigation.goBack).not.toHaveBeenCalled();
-  });
-
-  describe("avatar", () => {
-    it("writes the pick into the form only and closes the sheet; Save makes it permanent", async () => {
-      await render();
-      expect(renderer.root.findByType("AvatarSheet").props.visible).toBe(false);
-      await act(() => renderer.root.findByType("ProfileHero").props.onPress());
-      expect(renderer.root.findByType("AvatarSheet").props.visible).toBe(true);
-
-      await act(() => renderer.root.findByType("AvatarSheet").props.onSelect(9));
-      expect(renderer.root.findByType("AvatarSheet").props.visible).toBe(false);
-      expect(renderer.root.findByType("ProfileHero").props.avatarIndex).toBe(9);
-      expect(mockSelectAvatar).not.toHaveBeenCalled(); // henüz kaydedilmedi
-      expect(header().props.canSave).toBe(true);
-
-      await act(async () => { await header().props.onSave(); });
-      expect(mockSelectAvatar).toHaveBeenCalledWith({ avatarIndex: 9, photoURL: null, photoSource: null });
-    });
-
-    it("a linked-account photo is passed through with its source and shown in the hero", async () => {
-      await render();
-      const google = {
-        avatarIndex: -1,
-        photoURL: "https://lh3.googleusercontent.com/a/NEW=s96-c",
-        photoSource: "google.com",
-      };
-      await act(() => renderer.root.findByType("AvatarSheet").props.onSelect(google));
-      const hero = renderer.root.findByType("ProfileHero");
-      expect(hero.props.avatarIndex).toBe(-1);
-      expect(hero.props.photoURL).toBe(google.photoURL);
-      expect(hero.props.social).toBe(true);
-
-      await act(async () => { await header().props.onSave(); });
-      expect(mockSelectAvatar).toHaveBeenCalledWith(google);
-    });
-
-    it("picking the avatar that is already saved is not a change", async () => {
-      await render();
-      await act(() => renderer.root.findByType("AvatarSheet").props.onSelect(9));
-      await act(() => renderer.root.findByType("AvatarSheet").props.onSelect(4));
-      expect(header().props.canSave).toBe(false);
-    });
-  });
-
-  describe("username", () => {
-    it("blocks Save while checking and while the name is taken", async () => {
-      mockIsAvailable.mockResolvedValueOnce(false);
-      await render();
-      await type("at", "baskasi");
-      expect(header().props.canSave).toBe(false); // kontrol ediliyor
-      await flush();
-      expect(field("at").props.state).toBe(false); // alınmış
-      expect(header().props.canSave).toBe(false);
-      expect(renderer.root.findAllByType("FieldHint").length).toBeGreaterThan(0);
-    });
-
-    it("allows Save once the new name is available and changes it", async () => {
-      await render();
-      await type("at", "yeniad");
-      await flush();
-      expect(field("at").props.state).toBe(true);
-      expect(header().props.canSave).toBe(true);
-      await act(async () => { await header().props.onSave(); });
-      expect(mockChangeUsername).toHaveBeenCalledWith("yeniad");
-    });
-
-    it("blocks Save for an invalid name", async () => {
-      await render();
-      await type("at", "ab");
-      await flush();
-      expect(field("at").props.state).toBe(false);
-      expect(header().props.canSave).toBe(false);
-    });
-  });
-
-  describe("four favorites", () => {
-    const film = (id) => ({ id, title: `Film ${id}`, image: `/f${id}.jpg` });
-    const favs = (ids) => ({ movies: ids.map(film), shows: [], people: [] });
-    const editor = () => renderer.root.findByType("FavoritesEditor");
-
-    it("starts empty for an older account and does not make the form dirty", async () => {
-      await render();
-      expect(editor().props.value).toEqual({ movies: [], shows: [], people: [] });
-      expect(header().props.canSave).toBe(false);
-    });
-
-    it("fills the editor from the saved profile", async () => {
-      mockProfileState = { profile: { ...SAVED, fourFavorites: favs([1, 2]) }, loading: false };
-      await render();
-      expect(editor().props.value.movies.map((m) => m.id)).toEqual([1, 2]);
-      expect(header().props.canSave).toBe(false);
-    });
-
-    it("turns Save on after a pick and off again when the pick is undone", async () => {
-      await render();
-      await act(() => editor().props.onChange(favs([7])));
-      expect(header().props.canSave).toBe(true);
-      await act(() => editor().props.onChange({ movies: [], shows: [], people: [] }));
-      expect(header().props.canSave).toBe(false);
-    });
-
-    it("saves the favourites together with other changes, normalized", async () => {
-      await render();
-      await type("person-outline", "Ali V.");
-      await act(() => editor().props.onChange(favs([7, 8])));
-      await act(async () => { await header().props.onSave(); });
-      expect(mockUpdateField).toHaveBeenCalledWith(
-        { displayName: "Ali V.", fourFavorites: favs([7, 8]) },
-        { stampIdentity: true },
-      );
-      expect(mockTrack).toHaveBeenCalledWith(
-        "four_favorites_saved",
-        { movies: 2, shows: 0, people: 0, total: 2 },
-      );
-    });
-
-    it("does not send favourites that did not change", async () => {
-      mockProfileState = { profile: { ...SAVED, fourFavorites: favs([1]) }, loading: false };
-      await render();
-      await type("person-outline", "Ali V.");
-      await act(async () => { await header().props.onSave(); });
-      expect(mockUpdateField).toHaveBeenCalledWith({ displayName: "Ali V." }, { stampIdentity: true });
-      expect(mockTrack).not.toHaveBeenCalled();
-    });
-
-    it("clearing every favourite is saved as an empty structure, not skipped", async () => {
-      mockProfileState = { profile: { ...SAVED, fourFavorites: favs([1, 2]) }, loading: false };
-      await render();
-      await act(() => editor().props.onChange({ movies: [], shows: [], people: [] }));
-      expect(header().props.canSave).toBe(true);
-      await act(async () => { await header().props.onSave(); });
-      expect(mockUpdateField).toHaveBeenCalledWith(
-        { fourFavorites: { movies: [], shows: [], people: [] } },
-        { stampIdentity: false },
-      );
-    });
   });
 
   describe("birth date", () => {

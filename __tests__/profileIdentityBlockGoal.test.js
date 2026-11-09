@@ -67,7 +67,7 @@ describe("eylem satırı", () => {
   test("Düzenle bir İKON düğmesidir (etiketli hap değil) ve erişilebilir adı durur", () => {
     render();
     expect(editButton().type).toBe("GlassButton");
-    expect(editButton().props.icon).toBe("create-outline");
+    expect(editButton().props.icon).toBe("person-circle-outline");
     expect(editButton().props.size).toBe(36);
     expect(editButton().props.accessibilityLabel).toBe("Profili Düzenle");
     expect(renderer.root.findAllByType("Pressable")).toHaveLength(0);
