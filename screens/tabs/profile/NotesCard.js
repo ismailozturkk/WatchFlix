@@ -2,7 +2,8 @@
  * NotesCard — ProfileScreen içindeki "Notlar" özet widget'ı.
  *
  * MyActivityButton / RemindersPreviewButton ile aynı görsel dil: degrade zemin,
- * degrade simge kutusu, sağda "aç" butonu. Profilde yalnızca özet gösterilir:
+ * degrade simge kutusu; sağda görünür "+" hızlı ekleme düğmesi + ok (9 Kas).
+ * Sayılar tek parça bölücülü şeritte. Profilde yalnızca özet gösterilir:
  * öne çıkan not (sabitlenen, yoksa en yeni), sayılar ve yapılacakların
  * tamamlanma oranı. Karta dokununca tüm yönetimin olduğu NotesScreen açılır;
  * BASILI TUTUNCA "Yeni not / Yeni liste" hızlı ekleme sayfası açılır ve seçilen
@@ -25,7 +26,8 @@ import { useProfileNotes } from "../../../context/ProfileNotesContext";
 import { useDeviceNotifications } from "../../../context/DeviceNotificationsContext";
 import * as Haptics from "../../../services/hapticsService";
 import { openPremiumScreen } from "../../../services/premiumUpsell";
-import { alpha } from "../../../theme/colors";
+import { alpha, applyRelative } from "../../../theme/colors";
+import { toHex } from "../../../utils/colorUtils";
 import { i18nCount, i18nText, percentText } from "../../../utils/i18nText";
 import { PRIME_HANDOFF_MS } from "../../../utils/notificationPriming";
 import { buildNoteColorPairs, sortNotes, todoStats } from "../../../utils/notesView";
@@ -84,10 +86,19 @@ const FeaturedNote = memo(function FeaturedNote({ note, theme, language }) {
     <View
       style={[
         styles.featured,
-        { backgroundColor: alpha(color, 0.12), borderColor: alpha(color, 0.28) },
+        { backgroundColor: alpha(color, 0.1), borderColor: alpha(color, 0.22) },
       ]}
     >
-      <View style={[styles.featuredBar, { backgroundColor: color }]} />
+      <LinearGradient
+        pointerEvents="none"
+        colors={[alpha(color, 0.16), "transparent"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[styles.featuredIcon, { backgroundColor: alpha(color, 0.2) }]}>
+        <Ionicons name={isTodo ? "checkbox" : "document-text"} size={16} color={color} />
+      </View>
       <View style={styles.featuredBody}>
         <View style={styles.featuredRow}>
           {note.pinned ? <Ionicons name="pin" size={12} color={color} /> : null}
@@ -146,10 +157,10 @@ const FeaturedNote = memo(function FeaturedNote({ note, theme, language }) {
   );
 });
 
-// ─── Sayı hücresi ────────────────────────────────────────────────────────────
-// `progress` (0..1) verilirse hücrenin alt kenarında ince bir ilerleme çizgisi çizer.
-const StatCell = memo(function StatCell({
-  icon,
+// ─── Sayı şeridi segmenti ────────────────────────────────────────────────────
+// Tek parça şeridin bir dilimi: renkli nokta + etiket üstte, büyük sayı altta.
+// `progress` (0..1) verilirse sayının yanında ince bir ilerleme çubuğu çizer.
+const StatSegment = memo(function StatSegment({
   color,
   value,
   label,
@@ -158,45 +169,36 @@ const StatCell = memo(function StatCell({
   progress,
 }) {
   return (
-    <View
-      style={[
-        styles.cell,
-        {
-          flex,
-          backgroundColor: alpha(color, 0.1),
-          borderColor: alpha(color, 0.22),
-        },
-      ]}
-    >
-      <View style={[styles.cellIcon, { backgroundColor: alpha(color, 0.18) }]}>
-        <Ionicons name={icon} size={13} color={color} />
-      </View>
-      <View style={styles.cellText}>
+    <View style={[styles.segment, { flex }]}>
+      <View style={styles.segmentHead}>
+        <View style={[styles.segmentDot, { backgroundColor: color }]} />
         <Text
           allowFontScaling={false}
           numberOfLines={1}
-          style={[styles.cellValue, { color: theme.text.primary }]}
-        >
-          {value}
-        </Text>
-        <Text
-          allowFontScaling={false}
-          numberOfLines={1}
-          style={[styles.cellLabel, { color: theme.text.muted }]}
+          style={[styles.segmentLabel, { color: theme.text.muted }]}
         >
           {label}
         </Text>
       </View>
-      {progress != null ? (
-        <View style={[styles.cellTrack, { backgroundColor: alpha(color, 0.18) }]}>
-          <View
-            style={[
-              styles.cellFill,
-              { backgroundColor: color, width: `${progress * 100}%` },
-            ]}
-          />
-        </View>
-      ) : null}
+      <View style={styles.segmentValueRow}>
+        <Text
+          allowFontScaling={false}
+          numberOfLines={1}
+          style={[styles.segmentValue, { color: theme.text.primary }]}
+        >
+          {value}
+        </Text>
+        {progress != null ? (
+          <View style={[styles.segmentTrack, { backgroundColor: alpha(color, 0.2) }]}>
+            <View
+              style={[
+                styles.segmentFill,
+                { backgroundColor: color, width: `${progress * 100}%` },
+              ]}
+            />
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 });
@@ -268,8 +270,16 @@ export default function NotesCard({ navigation }) {
   const accent = theme.accent;
   const green = theme.colors?.green ?? "#4ade80";
   const orange = theme.colors?.orange ?? "#FF7C25";
-  // Simge kutusunun ikinci rengi: not defterine yakışan sıcak ton.
-  const warm = theme.notesColor?.yellow ?? orange;
+  // Degradelerin ikinci rengi: accent'in KOMŞU tonu (renk çarkında hafif kaydırılmış,
+  // biraz açık). Eskiden not sarısıydı; accent→sarı geçişi ortada çamurlu/kahverengi
+  // bir ton üretiyordu. Tek aile içinde kalan geçiş her temada temiz görünür.
+  const accentShade = useMemo(() => {
+    try {
+      return applyRelative(toHex(accent), { h: 24, l: 10, s: 4 });
+    } catch {
+      return accent;
+    }
+  }, [accent]);
 
   const goToNotes = () => navigation?.navigate("NotesScreen");
 
@@ -390,7 +400,7 @@ export default function NotesCard({ navigation }) {
         >
           <LinearGradient
             pointerEvents="none"
-            colors={[alpha(accent, 0.2), alpha(warm, 0.07), "transparent"]}
+            colors={[alpha(accent, 0.16), alpha(accentShade, 0.06), "transparent"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
@@ -399,7 +409,7 @@ export default function NotesCard({ navigation }) {
           {/* ── Başlık satırı ── */}
           <View style={styles.headerRow}>
             <LinearGradient
-              colors={[accent, warm]}
+              colors={[accentShade, accent]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.iconWrap}
@@ -415,41 +425,51 @@ export default function NotesCard({ navigation }) {
               >
                 {headerTitle}
               </Text>
-              <Text
-                allowFontScaling={false}
-                numberOfLines={1}
-                style={[styles.subtitle, { color: theme.text.muted }]}
-              >
-                {i18nText("autoI18n.notlar_ve_yapilacaklar", "Notlar ve yapılacaklar")}
-              </Text>
-            </View>
-
-            {ready && pendingTodos > 0 && (
-              <View
-                style={[
-                  styles.pendingBadge,
-                  {
-                    backgroundColor: alpha(orange, 0.14),
-                    borderColor: alpha(orange, 0.32),
-                  },
-                ]}
-              >
-                <View style={[styles.pendingDot, { backgroundColor: orange }]} />
+              {/* Bekleyen madde varsa alt satır onu söyler (eski ayrı rozet başlığı
+                  daraltıyordu); yoksa sabit açıklama. */}
+              {ready && pendingTodos > 0 ? (
+                <View style={styles.subtitleRow}>
+                  <View style={[styles.pendingDot, { backgroundColor: orange }]} />
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    style={[styles.subtitle, styles.subtitleFlush, { color: orange }]}
+                  >
+                    {i18nText("autoI18n.bekliyor_count", "{{count}} bekliyor", {
+                      count: pendingTodos,
+                    })}
+                  </Text>
+                </View>
+              ) : (
                 <Text
                   allowFontScaling={false}
                   numberOfLines={1}
-                  style={[styles.pendingBadgeText, { color: orange }]}
+                  style={[styles.subtitle, { color: theme.text.muted }]}
                 >
-                  {i18nText("autoI18n.bekliyor_count", "{{count}} bekliyor", {
-                    count: pendingTodos,
-                  })}
+                  {i18nText("autoI18n.notlar_ve_yapilacaklar", "Notlar ve yapılacaklar")}
                 </Text>
-              </View>
-            )}
-
-            <View style={[styles.openButton, { backgroundColor: alpha(accent, 0.14) }]}>
-              <Ionicons name="arrow-forward" size={16} color={accent} />
+              )}
             </View>
+
+            {/* Görünür hızlı ekleme: basılı tutma keşfedilmesi zor bir hareketti;
+                aynı sayfayı (Yeni not / Yeni liste) tek dokunuşla açar. */}
+            <Pressable
+              onPress={openQuickAdd}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={i18nText("autoI18n.notes_hizli_ekle", "Hızlı ekle")}
+              style={({ pressed }) => [styles.addButtonWrap, pressed && styles.addButtonPressed]}
+            >
+              <LinearGradient
+                colors={[accentShade, accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.addButton}
+              >
+                <Ionicons name="add" size={20} color="#fff" />
+              </LinearGradient>
+            </Pressable>
+            <Ionicons name="chevron-forward" size={16} color={alpha(theme.text.muted, 0.8)} />
           </View>
 
           {/* ── Gövde ── */}
@@ -502,31 +522,40 @@ export default function NotesCard({ navigation }) {
                 <FeaturedNote note={featured} theme={theme} language={language} />
               ) : null}
 
-              <View style={styles.cellRow}>
-                <StatCell
-                  icon="document-text"
+              <View
+                style={[
+                  styles.statStrip,
+                  {
+                    backgroundColor: alpha(theme.text.primary, 0.045),
+                    borderColor: alpha(theme.text.primary, 0.08),
+                  },
+                ]}
+              >
+                <StatSegment
                   color={accent}
                   value={noteCount}
                   label={i18nText("autoI18n.not_lower", "not")}
                   theme={theme}
                 />
-                <StatCell
-                  icon="checkbox"
+                <View style={[styles.statDivider, { backgroundColor: alpha(theme.text.primary, 0.1) }]} />
+                <StatSegment
                   color={theme.notesColor?.blue ?? accent}
                   value={todoCount}
                   label={i18nText("autoI18n.liste_lower", "liste")}
                   theme={theme}
                 />
                 {totalTodos > 0 && (
-                  <StatCell
-                    icon="checkmark-done"
-                    color={green}
-                    value={percentText(progressPct)}
-                    label={i18nText("autoI18n.tamamlandi_lower", "tamamlandı")}
-                    theme={theme}
-                    flex={1.25}
-                    progress={progressPct / 100}
-                  />
+                  <>
+                    <View style={[styles.statDivider, { backgroundColor: alpha(theme.text.primary, 0.1) }]} />
+                    <StatSegment
+                      color={green}
+                      value={percentText(progressPct)}
+                      label={i18nText("autoI18n.tamamlandi_lower", "tamamlandı")}
+                      theme={theme}
+                      flex={1.4}
+                      progress={progressPct / 100}
+                    />
+                  </>
                 )}
               </View>
             </View>
@@ -611,22 +640,23 @@ const styles = StyleSheet.create({
   },
   headerText: { flex: 1, minWidth: 0 },
   title: { fontSize: 15.5, fontWeight: "800", letterSpacing: -0.1 },
-  subtitle: { fontSize: 10.5, fontWeight: "600", marginTop: 1 },
-  pendingBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
+  subtitle: { fontSize: 11, fontWeight: "600", marginTop: 2 },
+  subtitleRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
+  subtitleFlush: { marginTop: 0, fontWeight: "800", flexShrink: 1 },
   pendingDot: { width: 6, height: 6, borderRadius: 3 },
-  pendingBadgeText: { fontSize: 10.5, fontWeight: "800" },
-  openButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+  addButtonWrap: {
+    borderRadius: 17,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  addButtonPressed: { opacity: 0.85, transform: [{ scale: 0.92 }] },
+  addButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -639,18 +669,26 @@ const styles = StyleSheet.create({
   featured: {
     height: FEATURED_H,
     flexDirection: "row",
-    alignItems: "stretch",
-    borderRadius: 14,
+    alignItems: "center",
+    gap: 10,
+    paddingLeft: 9,
+    paddingRight: 11,
+    borderRadius: 16,
     borderWidth: 1,
     overflow: "hidden",
   },
-  featuredBar: { width: 4 },
+  featuredIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   featuredBody: {
     flex: 1,
     minWidth: 0,
     justifyContent: "center",
     gap: 3,
-    paddingHorizontal: 11,
   },
   featuredRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   featuredTitle: { flex: 1, fontSize: 14, lineHeight: 18, fontWeight: "800", letterSpacing: -0.2 },
@@ -661,30 +699,24 @@ const styles = StyleSheet.create({
   miniFill: { height: 4, borderRadius: 2 },
   featuredCount: { fontSize: 10.5, fontWeight: "900" },
 
-  // Sayı hücreleri
-  cellRow: { flexDirection: "row", gap: 6 },
-  cell: {
+  // Sayı şeridi — tek parça, ince bölücülü (eski üç ayrı kutu yerine).
+  statStrip: {
     height: CELL_H,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
-    paddingHorizontal: 9,
     borderRadius: 14,
     borderWidth: 1,
-    overflow: "hidden",
+    paddingHorizontal: 4,
   },
-  cellIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cellText: { flexShrink: 1, minWidth: 0 },
-  cellValue: { fontSize: 15, lineHeight: 18, fontWeight: "900", letterSpacing: -0.3 },
-  cellLabel: { fontSize: 10, lineHeight: 12, fontWeight: "700" },
-  cellTrack: { position: "absolute", left: 0, right: 0, bottom: 0, height: 3 },
-  cellFill: { height: 3 },
+  statDivider: { width: StyleSheet.hairlineWidth * 2, height: 24, borderRadius: 1 },
+  segment: { minWidth: 0, paddingHorizontal: 10, justifyContent: "center", gap: 2 },
+  segmentHead: { flexDirection: "row", alignItems: "center", gap: 5 },
+  segmentDot: { width: 6, height: 6, borderRadius: 3 },
+  segmentLabel: { fontSize: 10, lineHeight: 12, fontWeight: "700", flexShrink: 1 },
+  segmentValueRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  segmentValue: { fontSize: 16, lineHeight: 19, fontWeight: "900", letterSpacing: -0.4 },
+  segmentTrack: { flex: 1, height: 4, borderRadius: 2, overflow: "hidden" },
+  segmentFill: { height: 4, borderRadius: 2 },
 
   // Boş durum — gövde yüksekliğini dolu hâlle eşit tutar.
   emptyBox: {
