@@ -195,6 +195,8 @@ const LATEST_MESSAGE_BUTTON_THRESHOLD = 420;
 //     Mesaj alanının içine konunca üstte başlık, altta `paddingBottom` şeridi
 //     ambiyanssız kalıyor, lekeler de o kadar kırpılıyordu.
 //   • ikon deseni → mesaj hedefinin İÇİNDE (Android blur'ü onu da görsün).
+// Modül düzeyinde: her render'da yeni fonksiyon olmasın (FlatList PureComponent).
+const messageKeyExtractor = (item) => item.clientId || item.id;
 const AMBIENT_ONLY = ["ambient"];
 const ICON_ONLY = ["icon"];
 const AMBIENT_FRAME_HEIGHT = Dimensions.get("screen").height;
@@ -2135,6 +2137,15 @@ export default function ChatScreen({ route, navigation }) {
     ],
   );
 
+  // FlatList bir PureComponent: propları sabit kalırsa ekranın İLGİSİZ state
+  // değişimlerinde (en sık: composer'da her tuş vuruşu → setText) liste hiç
+  // yeniden çizilmez. Eskiden satır içi keyExtractor ve stil dizisi her render'da
+  // yeni nesneydi; her harfte tüm mesaj listesi yeniden işleniyordu.
+  const messageListContentStyle = useMemo(
+    () => [styles.listContent, { paddingTop: composerHeight + 14, paddingBottom: 18 + topStripsHeight }],
+    [composerHeight, topStripsHeight],
+  );
+
   const loadMoreMessages = useCallback(() => {
     pagerRef.current?.loadOlder();
   }, []);
@@ -2586,9 +2597,9 @@ export default function ChatScreen({ route, navigation }) {
             ref={flatListRef}
             style={styles.chatList}
             data={memoizedMessages}
-            keyExtractor={(item) => item.clientId || item.id}
+            keyExtractor={messageKeyExtractor}
             renderItem={renderItem}
-            contentContainerStyle={[styles.listContent, { paddingTop: composerHeight + 14, paddingBottom: 18 + topStripsHeight }]}
+            contentContainerStyle={messageListContentStyle}
             inverted
             onScroll={handleMessageListScroll}
             scrollEventThrottle={32}

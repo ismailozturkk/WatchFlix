@@ -15,7 +15,7 @@ import TvShowsTrends from "../tv/TvShowsTrends";
 import TvShowBests from "../tv/TvShowBests";
 import TvShowsEmmy from "../tv/TvShowsEmmy";
 import { useCallback, useMemo, useState, useEffect } from "react";
-import { useTvShow } from "../../context/TvShowContex";
+import { useTvShowFields } from "../../context/TvShowContex";
 import { DeviceEventEmitter } from "react-native";
 import DiscoverHeaderSpacer from "../../components/home/DiscoverHeaderSpacer";
 import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
@@ -61,7 +61,7 @@ export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
   );
   // Takip edilen kişi var mı? Yoksa raf bölüm listesine hiç girmez (boş bölüm sayacı şişirmesin).
   const { count: followedCount } = useFollowedPeople();
-  const { loadingTrend, refreshAllTvShows } = useTvShow();
+  const { loadingTrend, refreshAllTvShows } = useTvShowFields("loadingTrend", "refreshAllTvShows");
   const { refreshing, onScroll, handleRefresh } =
     usePullToRefresh(refreshAllTvShows);
   // Ayarlar > Kişiselleştirme > Ekran bölümleri'nde gizlenen raflar (utils/sectionVisibility.js).

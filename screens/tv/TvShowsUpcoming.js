@@ -14,7 +14,7 @@ import PaginatedRail from "../../components/PaginatedRail";
 import SectionHeader from "../../components/home/SectionHeader";
 import TvUpcomingRangeChips from "../../components/home/TvUpcomingRangeChips";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-import { useTvShow } from "../../context/TvShowContex";
+import { useTvShowFields } from "../../context/TvShowContex";
 import { useLanguage } from "../../context/LanguageContext";
 import ListBadges from "../../components/ListBadges";
 import { CountdownBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
@@ -92,7 +92,7 @@ export default function TvShowsUpcoming({ navigation }) {
     selectedUpcomingRange,
     setSelectedUpcomingRange,
     activateTvSection,
-  } = useTvShow();
+  } = useTvShowFields("seriesUpcoming", "pageUpcoming", "totalPagesUpcoming", "loadingUpcoming", "loadingMoreUpcoming", "loadMoreUpcoming", "selectedUpcomingRange", "setSelectedUpcomingRange", "activateTvSection");
 
   useEffect(() => {
     activateTvSection("upcoming");

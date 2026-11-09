@@ -14,7 +14,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
 import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
-import { useMovie } from "../../context/MovieContex";
+import { useMovieFields } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
 import SectionHeader from "../../components/home/SectionHeader";
@@ -89,7 +89,7 @@ export default function MovieNowPlaying({ navigation }) {
     loadingMoreNowPlaying,
     pageNowPlaying,
     totalPagesNowPlaying,
-  } = useMovie();
+  } = useMovieFields("moviesNowPlaying", "loadingNowPlaying", "activateMovieSection", "loadMoreNowPlaying", "loadingMoreNowPlaying", "pageNowPlaying", "totalPagesNowPlaying");
   const { getTmdbUrl } = useImageQualitySettings();
 
   useEffect(() => {

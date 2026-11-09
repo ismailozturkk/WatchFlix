@@ -14,7 +14,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 //import { API_KEY } from "@env";
-import { useTvShow } from "../../context/TvShowContex";
+import { useTvShowFields } from "../../context/TvShowContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge } from "../../components/PosterInfoBadges";
 import SectionHeader from "../../components/home/SectionHeader";
@@ -214,7 +214,7 @@ export default function TvShowsTrends({ navigation }) {
     loadingMoreTrend,
     pageTrend,
     totalPagesTrend,
-  } = useTvShow();
+  } = useTvShowFields("seriesTrend", "loadingTrend", "setSelectedCategoryTrend", "selectedCategoryTrend", "getCategoryTitleTrends", "categoriesTrends", "activateTvSection", "loadMoreTrend", "loadingMoreTrend", "pageTrend", "totalPagesTrend");
 
   useEffect(() => {
     activateTvSection("trends");

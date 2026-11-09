@@ -12,7 +12,7 @@ import { Image } from "expo-image";
 import { TrendRailSkeleton } from "../../components/Skeleton";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
-import { useMovie } from "../../context/MovieContex";
+import { useMovieFields } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge } from "../../components/PosterInfoBadges";
 import SectionHeader from "../../components/home/SectionHeader";
@@ -210,7 +210,7 @@ export default function MovieTrends({ navigation }) {
     loadingMoreTrends,
     pageTrends,
     totalPagesTrends,
-  } = useMovie();
+  } = useMovieFields("loadingTrends", "movieTrends", "selectedCategoryTrends", "setSelectedCategoryTrends", "getCategoryTitleTrends", "categoriesTrends", "activateMovieSection", "loadMoreTrends", "loadingMoreTrends", "pageTrends", "totalPagesTrends");
 
   // onEndReached'in mount'ta gereksiz tetiklenmesini engeller (PaginatedRail ile aynı mantık).
   const canTrigger = useRef(false);

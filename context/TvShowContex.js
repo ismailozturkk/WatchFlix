@@ -1,5 +1,6 @@
 import { tmdbLanguageOf, tmdbRegionOf } from "../utils/appLanguages";
 import { createContext, useContext, useCallback, useEffect, useState, useMemo, useRef } from "react";
+import { useFieldStore, useFields } from "../utils/fieldStore";
 import {
   useApiSettings,
   useStreamingProviderSettings,
@@ -30,6 +31,11 @@ import {
 
 const TvShowContext = createContext();
 export const useTvShow = () => useContext(TvShowContext);
+
+// Alan bazında abonelik (utils/fieldStore): raflar yalnız kendi alanları
+// değişince render eder. `useTvShow()` geriye dönük olarak çalışmaya devam eder.
+const TvShowContextFields = createContext(null);
+export const useTvShowFields = (...keys) => useFields(useContext(TvShowContextFields), keys);
 
 // `sameJson`/`setIfChanged` buradan utils/sameData.js'e taşındı: aynı iki satır
 // bu dosyada, MovieContex'te, ListStatusContext'te ve MediaActivityContext'te
@@ -986,9 +992,13 @@ export const TvShowProvider = ({ children }) => {
     adultContent,
   ]);
 
+  const fieldStore = useFieldStore(contextValue);
+
   return (
     <TvShowContext.Provider value={contextValue}>
+      <TvShowContextFields.Provider value={fieldStore}>
       {children}
+      </TvShowContextFields.Provider>
     </TvShowContext.Provider>
   );
 };

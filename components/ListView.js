@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import LottieView from "lottie-react-native";
+import LensLoader from "./LensLoader";
 import { useTheme } from "../context/ThemeContext";
 import GlassCloseButton from "./common/GlassCloseButton";
 import { useLanguage } from "../context/LanguageContext";
@@ -396,12 +396,7 @@ const ListView = ({
             />
           ) : /* Yükleme göstergesi YALNIZ henüz işaretlenmemişken çıkar. */
           isLoading && !getIsActive("watchedMovies") ? (
-            <LottieView
-              source={require("@lottie/loading15.json")}
-              style={{ width: iconSize, height: iconSize }}
-              autoPlay
-              loop
-            />
+            <LensLoader size={iconSize} />
           ) : (
             <ListActionIcon
               active={!!getIsActive("watchedMovies")}

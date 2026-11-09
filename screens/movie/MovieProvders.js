@@ -16,7 +16,7 @@ import {
   useListLayoutSettings,
   useStreamingProviderSettings,
 } from "../../context/AppSettingsContext";
-import { useMovie } from "../../context/MovieContex";
+import { useMovieFields } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import PaginatedRail from "../../components/PaginatedRail";
@@ -105,7 +105,7 @@ export default function MovieProviders({ navigation }) {
     loadingMoreProvider,
     pageProvider,
     totalPagesProvider,
-  } = useMovie();
+  } = useMovieFields("selectedProvider", "providers", "loadingProvider", "loadingMovieProvider", "moviesProvider", "fetchMoviesByProvider", "activateMovieSection", "loadMoreProvider", "loadingMoreProvider", "pageProvider", "totalPagesProvider");
 
   const displayedProviders = useMemo(
     () =>

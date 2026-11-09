@@ -51,7 +51,6 @@ import { useLiquidGlass } from "../services/liquidGlass";
 import UserAvatar from "./common/UserAvatar";
 import { MaterialCommunityIcons, Ionicons, Feather } from "@expo/vector-icons";
 import * as Haptics from "@services/hapticsService";
-import LottieView from "lottie-react-native";
 import appAlert from "./AppAlert";
 import Toast from "@components/AppToast";
 import { i18nText } from "../utils/i18nText";
@@ -1486,12 +1485,7 @@ const Comment = ({
             disabled={isSending}
           >
             {isSending ? (
-              <LottieView
-                source={require("@lottie/loading15.json")}
-                autoPlay
-                loop
-                style={{ width: 35, height: 35 }}
-              />
+              <LensLoader size={22} tone="mono" color="#fff" />
             ) : (
               <Feather name="arrow-up" size={22} color="#fff" />
             )}

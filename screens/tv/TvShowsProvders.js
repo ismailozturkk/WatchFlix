@@ -11,7 +11,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { ChipRowSkeleton, RailSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
-import { useTvShow } from "../../context/TvShowContex";
+import { useTvShowFields } from "../../context/TvShowContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import PaginatedRail from "../../components/PaginatedRail";
@@ -100,7 +100,7 @@ export default function TvShowsProvders({ navigation }) {
     loadingMoreProvider,
     pageProvider,
     totalPagesProvider,
-  } = useTvShow();
+  } = useTvShowFields("providers", "selectedProvider", "moviesProviders", "loadingMoviesByProvider", "loadingProvider", "fetchMoviesByProvider", "activateTvSection", "loadMoreProvider", "loadingMoreProvider", "pageProvider", "totalPagesProvider");
 
   const displayedProviders = useMemo(
     () =>

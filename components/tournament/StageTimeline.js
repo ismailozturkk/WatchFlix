@@ -15,7 +15,9 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  cancelAnimation,
 } from "react-native-reanimated";
+import useLoopActive from "../../hooks/useLoopActive";
 import AppIcon from "@components/AppIcon";
 import {
   ROUNDS,
@@ -54,7 +56,13 @@ const buildStages = (lang) => [
 // Aktif düğümün nabız halkası — reanimated, JS thread'e dokunmaz.
 const PulseRing = memo(() => {
   const p = useSharedValue(0);
+  const active = useLoopActive();
   useEffect(() => {
+    if (!active) {
+      cancelAnimation(p);
+      p.value = 0;
+      return undefined;
+    }
     p.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 900 }),
@@ -62,7 +70,8 @@ const PulseRing = memo(() => {
       ),
       -1,
     );
-  }, [p]);
+    return () => cancelAnimation(p);
+  }, [active, p]);
   const style = useAnimatedStyle(() => ({
     opacity: 0.55 * (1 - p.value),
     transform: [{ scale: 1 + p.value * 0.55 }],

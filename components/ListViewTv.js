@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import LottieView from "lottie-react-native";
+import LensLoader from "./LensLoader";
 import { useTheme } from "../context/ThemeContext";
 import GlassCloseButton from "./common/GlassCloseButton";
 import { useLanguage } from "../context/LanguageContext";
@@ -369,12 +369,7 @@ const ListViewTv = ({
             theme={theme}
           >
             {isLoading && !isWatchedActive ? (
-              <LottieView
-                source={require("@lottie/loading15.json")}
-                style={{ width: iconSize, height: iconSize }}
-                autoPlay
-                loop
-              />
+              <LensLoader size={iconSize} />
             ) : (
               // `pulseKey`: dizi 4 durumlu (izlenmedi / kısmen / tamamen …).
               // Kısmen → tamamen geçişinde ikon "eye" olarak AYNI kalır, yalnız

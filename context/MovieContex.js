@@ -1,5 +1,6 @@
 import { tmdbLanguageOf, tmdbRegionOf } from "../utils/appLanguages";
 import { createContext, useContext, useCallback, useEffect, useState, useMemo, useRef } from "react";
+import { useFieldStore, useFields } from "../utils/fieldStore";
 import {
   useApiSettings,
   useStreamingProviderSettings,
@@ -35,6 +36,11 @@ import {
 
 const MovieContext = createContext();
 export const useMovie = () => useContext(MovieContext);
+
+// Alan bazında abonelik (utils/fieldStore): raflar yalnız kendi alanları
+// değişince render eder. `useMovie()` geriye dönük olarak çalışmaya devam eder.
+const MovieContextFields = createContext(null);
+export const useMovieFields = (...keys) => useFields(useContext(MovieContextFields), keys);
 
 // `sameJson`/`setIfChanged` buradan utils/sameData.js'e taşındı: aynı iki satır
 // bu dosyada, TvShowContex'te, ListStatusContext'te ve MediaActivityContext'te
@@ -1050,9 +1056,13 @@ export const MovieProvider = ({ children }) => {
     adultContent,
   ]);
 
+  const fieldStore = useFieldStore(contextValue);
+
   return (
     <MovieContext.Provider value={contextValue}>
+      <MovieContextFields.Provider value={fieldStore}>
       {children}
+      </MovieContextFields.Provider>
     </MovieContext.Provider>
   );
 };

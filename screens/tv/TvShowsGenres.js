@@ -9,7 +9,7 @@ import {
 import PosterImage from "../../components/PosterImage";
 import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
-import { useTvShow } from "../../context/TvShowContex";
+import { useTvShowFields } from "../../context/TvShowContex";
 import { ChipRowSkeleton, RailSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
@@ -95,7 +95,7 @@ export default function TvShowsGenres({ navigation }) {
     loadingMoreGenres,
     setSelectedGenres,
     activateTvSection,
-  } = useTvShow();
+  } = useTvShowFields("selectedGenres", "pageGenres", "totalPagesGenres", "moviesGenres", "genres", "loadingGenres", "loadMoreGenres", "loadingMoreGenres", "setSelectedGenres", "activateTvSection");
 
   useEffect(() => {
     activateTvSection("genres");

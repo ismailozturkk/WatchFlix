@@ -71,7 +71,10 @@ jest.mock("../context/LanguageContext", () => ({
     },
   }),
 }));
-jest.mock("../context/TvShowContex", () => ({ useTvShow: () => mockCtx }));
+jest.mock("../context/TvShowContex", () => ({
+  useTvShow: () => mockCtx,
+  useTvShowFields: () => mockCtx,
+}));
 
 const TvShowsOnTheAir = require("../screens/tv/TvShowsOnTheAir").default;
 const TvShowsUpcoming = require("../screens/tv/TvShowsUpcoming").default;

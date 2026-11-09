@@ -15,8 +15,10 @@ import React, { memo, useCallback, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import Animated, {
   useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming, ReduceMotion,
+  cancelAnimation,
 } from "react-native-reanimated";
 import AppIcon from "@components/AppIcon";
+import useLoopActive from "../../hooks/useLoopActive";
 import { roundLabel } from "@services/tournamentEngine";
 import { i18nText } from "@utils/i18nText";
 import GlassPressable from "../common/GlassPressable";
@@ -29,13 +31,20 @@ const LIVE_RED = "#EF4444";
 // Canlı tur noktası: ortada sabit nokta, çevresinde genişleyip sönen halka.
 const LiveDot = memo(function LiveDot() {
   const p = useSharedValue(0);
+  const active = useLoopActive();
   useEffect(() => {
+    if (!active) {
+      cancelAnimation(p);
+      p.value = 0;
+      return undefined;
+    }
     const cfg = { reduceMotion: ReduceMotion.System };
     p.value = withRepeat(
       withSequence(withTiming(1, { duration: 1100, ...cfg }), withTiming(0, { duration: 0, ...cfg })),
       -1,
     );
-  }, [p]);
+    return () => cancelAnimation(p);
+  }, [active, p]);
   const ring = useAnimatedStyle(() => ({
     opacity: 0.45 * (1 - p.value),
     transform: [{ scale: 1 + p.value * 1.2 }],

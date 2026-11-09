@@ -15,7 +15,7 @@ import { MovieUpComingSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { useImageQualitySettings } from "../../context/AppSettingsContext";
-import { useMovie } from "../../context/MovieContex";
+import { useMovieFields } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { UpcomingPosterBadges } from "../../components/PosterInfoBadges";
 import SectionHeader from "../../components/home/SectionHeader";
@@ -89,7 +89,7 @@ export default function MovieUpcoming({ navigation }) {
     loadingMoreUpcoming,
     RelaseCount,
     activateMovieSection,
-  } = useMovie();
+  } = useMovieFields("moviesUpcoming", "loadingUpcoming", "pageUpcoming", "totalPagesUpcoming", "loadMoreUpcoming", "loadingMoreUpcoming", "RelaseCount", "activateMovieSection");
   const { getTmdbUrl } = useImageQualitySettings();
   const rp = useRailPosterStyle();
   const {

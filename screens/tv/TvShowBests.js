@@ -17,7 +17,7 @@ import { SectionChipRail } from "../../components/home/SectionChips";
 import DiscoverFilterChip from "../../components/home/DiscoverFilterChip";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
 import { i18nText } from "../../utils/i18nText";
-import { useTvShow } from "../../context/TvShowContex";
+import { useTvShowFields } from "../../context/TvShowContex";
 import { memo, useEffect, useRef } from "react";
 
 import ListBadges from "../../components/ListBadges";
@@ -96,7 +96,7 @@ export default function TvShowBests({ navigation }) {
     categoriesBest,
     getCategoryTitleBest,
     activateTvSection,
-  } = useTvShow();
+  } = useTvShowFields("seriesBest", "setSelectedCategoryBest", "selectedCategoryBest", "pageBest", "totalPagesBest", "loadingBest", "loadMoreBest", "loadingMoreBest", "categoriesBest", "getCategoryTitleBest", "activateTvSection");
 
   useEffect(() => {
     activateTvSection("best");

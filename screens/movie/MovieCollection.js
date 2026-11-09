@@ -14,7 +14,7 @@ import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { MovieCollectionSkeleton } from "../../components/Skeleton";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-import { useMovie } from "../../context/MovieContex";
+import { useMovieFields } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -33,7 +33,7 @@ export default function MovieCollection({ navigation }) {
     loadingCollection,
     errorCollection,
     activateMovieSection,
-  } = useMovie();
+  } = useMovieFields("moviesCollection", "loadingCollection", "errorCollection", "activateMovieSection");
   const rp = useRailPosterStyle();
 
   // Seçili koleksiyon (null → koleksiyon listesi, dolu → o serinin filmleri)

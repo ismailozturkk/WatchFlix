@@ -82,7 +82,6 @@
     "@react-native-firebase/app": "26.1.0",
     "@react-native-firebase/app-check": "26.1.0",
     "@react-native-google-signin/google-signin": "^16.1.4",
-    "@react-native-masked-view/masked-view": "0.3.2",
     "@react-navigation/native": "7.3.18",
     "@react-navigation/native-stack": "^7.2.0",
     "@sentry/react-native": "~7.11.0",
@@ -133,7 +132,6 @@
     "react-native-circular-progress-indicator": "^4.4.2",
     "react-native-country-flag": "^2.0.2",
     "react-native-gesture-handler": "~2.32.0",
-    "react-native-linear-gradient": "^2.8.3",
     "react-native-markdown-display": "^7.0.2",
     "react-native-mmkv": "^4.3.2",
     "react-native-nitro-modules": "^0.36.5",
@@ -142,7 +140,6 @@
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-skeleton-placeholder": "^5.2.4",
     "react-native-svg": "15.15.4",
     "react-native-view-shot": "5.1.0",
     "react-native-webview": "13.16.1",
@@ -167,9 +164,6 @@
   "overrides": {
     "liquid-glass-kit": {
       "expo-modules-core": "$expo-modules-core"
-    },
-    "react-native-skeleton-placeholder": {
-      "@react-native-masked-view/masked-view": "0.3.2"
     }
   },
   "private": true

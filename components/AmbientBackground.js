@@ -7,7 +7,8 @@
 //
 // TASARIM KARARLARI
 //
-//   • Leke = radyal degrade (SVG), blur filtresi YOK. Gerçek blur Android'de
+//   • Leke = radyal degrade (SVG), 1/4 çözünürlükte çizilip büyütülür (aşağıda
+//     BLOB_RASTER_DOWNSCALE), blur filtresi YOK. Gerçek blur Android'de
 //     BlurTargetView ister, hedefsizse sessizce düz katmana düşer ve her karede
 //     yeniden çizilir (bkz. blur-android-target). Yumuşak kenarlı degrade aynı
 //     görünümü bedavaya verir ve statik kalır.
@@ -48,6 +49,15 @@ import {
   buildAmbientBlobs,
   sampleAmbientPath,
 } from "../utils/ambientBackground";
+
+// ── Düşük çözünürlüklü çizim ────────────────────────────────────────────────
+//
+// react-native-svg her <Svg>'yi görünüm boyutunda bir bitmap'e çizer. Leke
+// ekranın ~yarısı kadar (3x yoğunlukta 1000-1500 px kare) → 5 leke ekran başına
+// onlarca MB ve her karede bu dev dokuların birleştirilmesi. Leke zaten keskin
+// kenarı olmayan yumuşak bir radyal degrade: 1/4 boyutta çizip GPU'da 4 kat
+// büyütmek (bilinear) gözle ayırt edilmez, bitmap belleği ~16 kat düşer.
+const BLOB_RASTER_DOWNSCALE = 4;
 
 // ── Ortak saat ───────────────────────────────────────────────────────────────
 
@@ -159,6 +169,7 @@ export function AmbientBlobs({ width, height, blobs, playing, speed = 1, intensi
         id: `amb${rid}${index}`,
         color: blob.color,
         d,
+        s: Math.max(8, Math.round(d / BLOB_RASTER_DOWNSCALE)),
         left: blob.cx * width - d / 2,
         top: blob.cy * height - d / 2,
         stops: ambientStops(blob.alpha * intensity),
@@ -198,7 +209,17 @@ export function AmbientBlobs({ width, height, blobs, playing, speed = 1, intensi
             ],
           }}
         >
-          <Svg width={layer.d} height={layer.d}>
+          <View
+            style={{
+              position: "absolute",
+              left: (layer.d - layer.s) / 2,
+              top: (layer.d - layer.s) / 2,
+              width: layer.s,
+              height: layer.s,
+              transform: [{ scale: layer.d / layer.s }],
+            }}
+          >
+          <Svg width={layer.s} height={layer.s}>
             <Defs>
               <RadialGradient
                 id={layer.id}
@@ -219,8 +240,9 @@ export function AmbientBlobs({ width, height, blobs, playing, speed = 1, intensi
                 ))}
               </RadialGradient>
             </Defs>
-            <Rect x="0" y="0" width={layer.d} height={layer.d} fill={`url(#${layer.id})`} />
+            <Rect x="0" y="0" width={layer.s} height={layer.s} fill={`url(#${layer.id})`} />
           </Svg>
+          </View>
         </Animated.View>
       ))}
     </View>

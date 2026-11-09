@@ -17,7 +17,7 @@ import { useTabBarLayout } from "../../context/TabBarLayoutContext";
 import MovieBests from "../movie/MovieBests";
 import MovieTrends from "../movie/MovieTrends";
 import MovieCollection from "../movie/MovieCollection";
-import { useMovie } from "../../context/MovieContex";
+import { useMovieFields } from "../../context/MovieContex";
 import DiscoverHeaderSpacer from "../../components/home/DiscoverHeaderSpacer";
 import SectionsHiddenNotice from "../../components/home/SectionsHiddenNotice";
 import usePullToRefresh from "../../hooks/usePullToRefresh";
@@ -48,7 +48,7 @@ const MarkedFlatList = markTabScroll(Animated.FlatList);
 export default function MovieScreen({ navigation, headerTopOffset = 0 }) {
   const { contentBottom } = useTabBarLayout();
   const { theme } = useTheme();
-  const { refreshAllMovies, loadingTrends } = useMovie();
+  const { refreshAllMovies, loadingTrends } = useMovieFields("refreshAllMovies", "loadingTrends");
 
   // Açılış ekranı (splash) APP_READY'yi bekler. Film/Dizi artık tek sekme ve açılışta
   // son seçilen bölüm (Film olabilir) çizilir; Dizi ekranı hiç kurulmayabileceği için

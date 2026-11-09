@@ -16,20 +16,29 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import AppIcon from "../AppIcon";
+import useLoopActive from "../../hooks/useLoopActive";
 import PressableScale from "./PressableScale";
 import { alpha } from "../../theme/colors";
 import { i18nText } from "../../utils/i18nText";
 
 function PulseRing({ color, delay }) {
   const progress = useSharedValue(0);
+  // Bekleme odası uzun süre açık kalabiliyor; üstüne ekran açılınca ya da
+  // uygulama arka plandayken halkalar UI thread'de dönmeye devam etmesin.
+  const active = useLoopActive();
 
   useEffect(() => {
+    if (!active) {
+      cancelAnimation(progress);
+      progress.value = 0;
+      return undefined;
+    }
     progress.value = withDelay(
       delay,
       withRepeat(withTiming(1, { duration: 2000, easing: Easing.out(Easing.quad) }), -1, false),
     );
     return () => cancelAnimation(progress);
-  }, [delay, progress]);
+  }, [active, delay, progress]);
 
   const style = useAnimatedStyle(() => ({
     opacity: 0.4 * (1 - progress.value),

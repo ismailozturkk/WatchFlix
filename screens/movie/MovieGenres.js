@@ -12,7 +12,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { ChipRowSkeleton, MovieSkeleton } from "../../components/Skeleton";
 //import { API_KEY } from "@env";
-import { useMovie } from "../../context/MovieContex";
+import { useMovieFields } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import { RatingBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
 import PaginatedRail from "../../components/PaginatedRail";
@@ -100,7 +100,7 @@ export default function MovieGenres({ navigation }) {
     loadingMoreGenres,
     selectedGenres,
     activateMovieSection,
-  } = useMovie();
+  } = useMovieFields("genres", "toggleGenre", "loadingGenres", "moviesGenres", "pageGenres", "totalPagesGenres", "loadMoreGenres", "loadingMoreGenres", "selectedGenres", "activateMovieSection");
 
   useEffect(() => {
     activateMovieSection("genres");

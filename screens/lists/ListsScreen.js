@@ -24,7 +24,7 @@ import { useTheme } from "@context/ThemeContext";
 import { useListStatusContext } from "@context/ListStatusContext";
 import { useLanguage } from "@context/LanguageContext";
 import { useAuth } from "@context/AuthContext";
-import SkeletonPlaceholder from "react-native-skeleton-placeholder";
+import Skeleton from "../../components/Skeleton";
 import { LinearGradient } from "expo-linear-gradient";
 import Toast from "@components/AppToast";
 import ListPosterCard from "@components/lists/ListPosterCard";
@@ -897,18 +897,19 @@ export default function ListsScreen({ route, navigation }) {
     [pendingMedia, runAdd],
   );
 
+  // Uygulamanın ortak <Skeleton /> nabzı (native sürücülü opaklık). Eskiden
+  // react-native-skeleton-placeholder'dı: MaskedView + kayan degrade Android'de
+  // ekran dışı çizim yapıyordu ve uygulamada yalnız burada kullanılıyordu.
   const renderSkeleton = () => (
-    <SkeletonPlaceholder>
-      <View style={{ flexDirection: "row", marginBottom: 10 }}>
-        {[...Array(3)].map((_, index) => (
-          <View key={index} style={{ marginRight: 10 }}>
-            <View style={styles.skeletonImage} />
-            <View style={styles.skeletonText} />
-            <View style={styles.skeletonTextSmall} />
-          </View>
-        ))}
-      </View>
-    </SkeletonPlaceholder>
+    <View style={{ flexDirection: "row", marginBottom: 10 }}>
+      {[...Array(3)].map((_, index) => (
+        <View key={index} style={{ marginRight: 10 }}>
+          <Skeleton style={styles.skeletonImage} />
+          <Skeleton style={styles.skeletonText} />
+          <Skeleton style={styles.skeletonTextSmall} />
+        </View>
+      ))}
+    </View>
   );
   // ── Sırala ve filtrele sayfasının içeriği ────────────────────────────────────
   const sortFilterCopy = getListSortFilterCopy(language);

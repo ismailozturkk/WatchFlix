@@ -12,7 +12,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 const { width } = Dimensions.get("window");
 import { MovieBestsSkeleton } from "../../components/Skeleton";
-import { useMovie } from "../../context/MovieContex";
+import { useMovieFields } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
 import PaginatedRail from "../../components/PaginatedRail";
 import SectionHeader from "../../components/home/SectionHeader";
@@ -95,7 +95,7 @@ export default function MovieBests({ navigation }) {
     loadMoreBests,
     loadingMoreBests,
     activateMovieSection,
-  } = useMovie();
+  } = useMovieFields("loadingBests", "movieBests", "categorieBests", "selectedCategoryBests", "setSelectedCategoryBests", "getCategoryTitleBests", "pageBest", "totalPagesBest", "loadMoreBests", "loadingMoreBests", "activateMovieSection");
 
   useEffect(() => {
     activateMovieSection("bests");
