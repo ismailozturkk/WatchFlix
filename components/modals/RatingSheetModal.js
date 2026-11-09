@@ -1,10 +1,11 @@
 // components/modals/RatingSheetModal.js
 //
 // Film / dizi için yıldız derecelendirme bottom-sheet'i.
-//   - Üstte HYBRID skor (TMDB + uygulama oyları, Bayesian) büyük gösterilir
-//   - TMDB puanı ve uygulama kullanıcı ortalaması ayrı rozetlerde
+//   - Kompakt düzen (9 Kas kullanıcı kararı): sayfa yüksekliği İÇERİĞE göre (eskiden
+//     ekranın %70'i sabit). HYBRID skor (TMDB + uygulama oyları), TMDB puanı ve
+//     kullanıcı ortalaması başlıkta afişin yanında tek blokta.
 //   - Kullanıcı kendi oyunu RatingInput ile 0-10 (yarım yıldız) verir
-//   - Kaydet / Oyumu kaldır
+//   - Kaydet / Oyumu kaldır (yalnız çöp simgesi)
 //
 // Kullanım (CommentSheetModal gibi, parent <Modal> ile sarmalanır):
 //   <Modal transparent visible={...} ...>
@@ -30,10 +31,11 @@ import {
   Dimensions,
   Platform,
   KeyboardAvoidingView,
-  ActivityIndicator,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Toast from "@components/AppToast";
 import { useTheme } from "@context/ThemeContext";
@@ -56,8 +58,7 @@ import {
 } from "@services/ratingsService";
 import GlassTouchable from "../common/GlassTouchable";
 
-const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get("window");
-const SHEET_RATIO = 0.7;
+const { height: SCREEN_H } = Dimensions.get("window");
 
 // Yayın tarihini kullanıcının cihaz diline göre okunur biçime çevirir.
 const formatReleaseDate = (str) => {
@@ -88,6 +89,7 @@ export default function RatingSheetModal({
   const { theme } = useTheme();
   const { user } = useAuth();
   const posterUri = usePosterUri();
+  const insets = useSafeAreaInsets();
 
   const key = mediaId != null ? mediaKey(mediaType, mediaId) : null;
 
@@ -97,7 +99,9 @@ export default function RatingSheetModal({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const SHEET_H = SCREEN_H * SHEET_RATIO;
+  // Yükseklik içeriğe göre değiştiği için sayfa giriş/çıkışta ekran boyu kadar kayar
+  // (her yükseklikte tamamen görünmez başlar).
+  const SHEET_H = SCREEN_H;
   const slideAnim = useRef(new Animated.Value(SHEET_H)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
@@ -260,23 +264,60 @@ export default function RatingSheetModal({
           <View style={styles.handle} />
         </View>
 
-        {/* Header */}
+        {/* Başlık: afiş + ad + genel puan + kaynak rozetleri */}
         <View style={styles.header}>
-          <View style={styles.mediaPill}>
-            {poster ? (
-              <Image source={{ uri: posterUri(mediaType, mediaId, poster) }} style={styles.poster} />
-            ) : (
-              <View style={styles.posterPlaceholder}>
-                <Ionicons name="film-outline" size={14} color="rgba(255,255,255,0.4)" />
-              </View>
-            )}
-            <Text allowFontScaling={false} style={[styles.mediaTitle, { color: theme.text.secondary }]} numberOfLines={1}>
+          {poster ? (
+            <Image source={{ uri: posterUri(mediaType, mediaId, poster) }} style={styles.poster} />
+          ) : (
+            <View style={styles.posterPlaceholder}>
+              <Ionicons name="film-outline" size={14} color="rgba(255,255,255,0.4)" />
+            </View>
+          )}
+          <View style={styles.headerCopy}>
+            <Text allowFontScaling={false} style={[styles.mediaTitle, { color: theme.text.primary }]} numberOfLines={1}>
               {title}
             </Text>
+            {loading ? (
+              <View style={styles.headerLoader}>
+                <LensLoader color={theme.text.muted} size="small" />
+              </View>
+            ) : (
+              <>
+                <View
+                  style={styles.hybridRow}
+                  accessibilityLabel={`${i18nText("autoI18n.genel_puan", "Genel Puan")} ${hybrid.toFixed(1)} / 10`}
+                >
+                  <Text allowFontScaling={false} style={[styles.hybridScore, { color: theme.colors.orange }]}>
+                    {hybrid.toFixed(1)}
+                  </Text>
+                  <Text allowFontScaling={false} style={[styles.hybridMax, { color: theme.text.muted }]}>/10</Text>
+                  <RatingStars rating={hybrid} max={10} size={12} color={theme.colors.orange} />
+                </View>
+                <View style={styles.sourcesRow}>
+                  <View style={styles.source}>
+                    <MaterialCommunityIcons name="movie-open-star-outline" size={12} color={theme.colors.blue} />
+                    <Text allowFontScaling={false} style={[styles.sourceLabel, { color: theme.text.muted }]}>TMDB</Text>
+                    <Text allowFontScaling={false} style={[styles.sourceValue, { color: theme.text.secondary }]}>
+                      {Number(tmdbAvg || 0).toFixed(1)}
+                    </Text>
+                  </View>
+                  <View style={[styles.sourceDot, { backgroundColor: theme.text.muted }]} />
+                  <View style={styles.source}>
+                    <Ionicons name="people-outline" size={12} color={theme.colors.green} />
+                    <Text allowFontScaling={false} style={[styles.sourceLabel, { color: theme.text.muted }]}>
+                      {i18nText("autoI18n.kullanicilar", "Kullanıcılar")}
+                    </Text>
+                    <Text allowFontScaling={false} style={[styles.sourceValue, { color: theme.text.secondary }]}>
+                      {appAvg != null ? `${appAvg.toFixed(1)} (${agg.count})` : "—"}
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
           <GlassCloseButton
-            size={32}
-            fallbackRadius={16}
+            size={30}
+            fallbackRadius={15}
             color={theme.text.secondary}
             backgroundColor={alpha(theme.text.primary, 0.07)}
             borderColor={theme.border}
@@ -285,56 +326,16 @@ export default function RatingSheetModal({
           />
         </View>
 
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={theme.text.muted} />
-          </View>
-        ) : (
-          <View style={styles.body}>
-            {/* Hybrid skor */}
-            <View style={styles.hybridBlock}>
-              <Text allowFontScaling={false} style={[styles.hybridLabel, { color: theme.text.muted }]}>
-                {i18nText("autoI18n.genel_puan", "Genel Puan")}
-              </Text>
-              <View style={styles.hybridScoreRow}>
-                <Text allowFontScaling={false} style={[styles.hybridScore, { color: theme.colors.orange }]}>
-                  {hybrid.toFixed(1)}
-                </Text>
-                <Text allowFontScaling={false} style={[styles.hybridMax, { color: theme.text.muted }]}>/10</Text>
-              </View>
-              <RatingStars rating={hybrid} max={10} size={20} color={theme.colors.orange} />
-            </View>
-
-            {/* Kaynak rozetleri */}
-            <View style={styles.badgesRow}>
-              <View style={[styles.badge, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-                <MaterialCommunityIcons name="movie-open-star-outline" size={15} color={theme.colors.blue} />
-                <Text allowFontScaling={false} style={[styles.badgeLabel, { color: theme.text.muted }]}>TMDB</Text>
-                <Text allowFontScaling={false} style={[styles.badgeValue, { color: theme.text.primary }]}>
-                  {Number(tmdbAvg || 0).toFixed(1)}
-                </Text>
-              </View>
-              <View style={[styles.badge, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-                <Ionicons name="people-outline" size={15} color={theme.colors.green} />
-                <Text allowFontScaling={false} style={[styles.badgeLabel, { color: theme.text.muted }]}>
-                  {i18nText("autoI18n.kullanicilar", "Kullanıcılar")}
-                </Text>
-                <Text allowFontScaling={false} style={[styles.badgeValue, { color: theme.text.primary }]}>
-                  {appAvg != null ? `${appAvg.toFixed(1)} (${agg.count})` : "—"}
-                </Text>
-              </View>
-            </View>
-
-            {/* Kendi oyun — yayınlanmadıysa kilitli bilgi kutusu */}
-            {locked ? (
-              <View style={[styles.rateBox, { backgroundColor: theme.primary, borderColor: theme.border }]}>
-                <Ionicons name="lock-closed" size={30} color={theme.text.muted} />
+        <View style={[styles.body, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
+          {/* Kendi oyun — yayınlanmadıysa kilitli bilgi satırı */}
+          {locked ? (
+            <View style={[styles.lockedBox, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+              <Ionicons name="lock-closed" size={20} color={theme.text.muted} />
+              <View style={styles.lockedCopy}>
                 <Text allowFontScaling={false} style={[styles.rateTitle, { color: theme.text.primary }]}>
                   {i18nText("autoI18n.henuz_yayinlanmadi", "Henüz yayınlanmadı")}
                 </Text>
-                <Text allowFontScaling={false} style={[styles.draftValue, { color: theme.text.secondary, textAlign: "center" }]}>
+                <Text allowFontScaling={false} style={[styles.draftValue, { color: theme.text.secondary }]}>
                   {relText
                     ? i18nText(
                         "autoI18n.puanlama_su_tarihte_acilir",
@@ -347,56 +348,60 @@ export default function RatingSheetModal({
                       )}
                 </Text>
               </View>
-            ) : (
-              <View style={[styles.rateBox, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+            </View>
+          ) : (
+            <View style={[styles.rateBox, { backgroundColor: theme.primary, borderColor: theme.border }]}>
+              <View style={styles.rateHead}>
                 <Text allowFontScaling={false} style={[styles.rateTitle, { color: theme.text.primary }]}>
                   {myRating != null
                     ? i18nText("autoI18n.puanin", "Puanın")
                     : i18nText("autoI18n.puan_ver", "Puan ver")}
                 </Text>
-                <RatingInput value={draft} onChange={setDraft} size={36} color={theme.colors.orange} />
-                <Text allowFontScaling={false} style={[styles.draftValue, { color: theme.text.secondary }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.draftValue, { color: draft > 0 ? theme.colors.orange : theme.text.muted }]}
+                >
                   {draft > 0 ? `${draft.toFixed(1)} / 10` : i18nText("autoI18n.yildizlara_dokun", "Yıldızlara dokun")}
                 </Text>
               </View>
-            )}
-
-            {/* Aksiyonlar */}
-            <View style={styles.actions}>
-              {myRating != null && (
-                <GlassTouchable
-                  style={[styles.removeBtn, { borderColor: theme.border }]}
-                  onPress={handleRemove}
-                  disabled={saving}
-                >
-                  <Ionicons name="trash-outline" size={16} color={theme.colors.red} />
-                  <Text allowFontScaling={false} style={[styles.removeBtnText, { color: theme.colors.red }]}>
-                    {i18nText("autoI18n.kaldir", "Kaldır")}
-                  </Text>
-                </GlassTouchable>
-              )}
-              <GlassTouchable
-                style={[
-                  styles.saveBtn,
-                  { backgroundColor: theme.accent },
-                  (draft <= 0 || saving || locked) && styles.saveBtnDisabled,
-                ]}
-                onPress={handleSave}
-                disabled={draft <= 0 || saving || locked}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text allowFontScaling={false} style={styles.saveBtnText}>
-                    {myRating != null
-                      ? i18nText("autoI18n.guncelle", "Güncelle")
-                      : i18nText("autoI18n.kaydet", "Kaydet")}
-                  </Text>
-                )}
-              </GlassTouchable>
+              <RatingInput value={draft} onChange={setDraft} size={34} color={theme.colors.orange} />
             </View>
+          )}
+
+          {/* Aksiyonlar: Kaldır yalnız simge, Kaydet geniş */}
+          <View style={styles.actions}>
+            {myRating != null && (
+              <GlassTouchable
+                style={[styles.removeBtn, { borderColor: theme.border }]}
+                onPress={handleRemove}
+                disabled={saving}
+                accessibilityRole="button"
+                accessibilityLabel={i18nText("autoI18n.kaldir", "Kaldır")}
+              >
+                <Ionicons name="trash-outline" size={18} color={theme.colors.red} />
+              </GlassTouchable>
+            )}
+            <GlassTouchable
+              style={[
+                styles.saveBtn,
+                { backgroundColor: theme.accent },
+                (draft <= 0 || saving || locked || loading) && styles.saveBtnDisabled,
+              ]}
+              onPress={handleSave}
+              disabled={draft <= 0 || saving || locked || loading}
+            >
+              {saving ? (
+                <LensLoader tone="mono" color="#fff" size="small" />
+              ) : (
+                <Text allowFontScaling={false} style={styles.saveBtnText}>
+                  {myRating != null
+                    ? i18nText("autoI18n.guncelle", "Güncelle")
+                    : i18nText("autoI18n.kaydet", "Kaydet")}
+                </Text>
+              )}
+            </GlassTouchable>
           </View>
-        )}
+        </View>
       </Animated.View>
     </KeyboardAvoidingView>
   );
@@ -405,17 +410,11 @@ export default function RatingSheetModal({
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: "flex-end" },
   backdrop: { ...StyleSheet.absoluteFill },
-  backdropTouchable: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: SCREEN_H * SHEET_RATIO,
-  },
+  // Sayfanın üstündeki her yer kapatır; sayfa bu katmanın üstünde çizilir.
+  backdropTouchable: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   sheet: {
-    height: SCREEN_H * SHEET_RATIO,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -8 },
@@ -432,89 +431,80 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     borderRadius: 1,
   },
-  handleWrapper: { alignItems: "center", paddingTop: 10, paddingBottom: 6 },
-  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.14)" },
+  handleWrapper: { alignItems: "center", paddingTop: 8, paddingBottom: 8 },
+  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.14)" },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingBottom: 12,
-    gap: 10,
+    gap: 12,
   },
-  mediaPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: 20,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    gap: 6,
-    flex: 1,
-    maxWidth: SCREEN_W * 0.6,
-  },
-  poster: { width: 26, height: 39, borderRadius: 5 },
+  poster: { width: 40, height: 60, borderRadius: 7 },
   posterPlaceholder: {
-    width: 26,
-    height: 39,
-    borderRadius: 5,
+    width: 40,
+    height: 60,
+    borderRadius: 7,
     backgroundColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
     alignItems: "center",
   },
-  mediaTitle: { flex: 1, fontSize: 12, fontWeight: "600" },
-  divider: { height: StyleSheet.hairlineWidth },
+  headerCopy: { flex: 1, minWidth: 0, gap: 2 },
+  headerLoader: { height: 36, justifyContent: "center", alignItems: "flex-start" },
+  mediaTitle: { fontSize: 15, lineHeight: 19, fontWeight: "800", letterSpacing: -0.2 },
+  hybridRow: { flexDirection: "row", alignItems: "center" },
+  hybridScore: { fontSize: 18, lineHeight: 22, fontWeight: "900", includeFontPadding: false },
+  hybridMax: { fontSize: 11, fontWeight: "700", marginLeft: 1, marginRight: 6, marginTop: 4 },
+  sourcesRow: { flexDirection: "row", alignItems: "center", gap: 7, flexWrap: "wrap" },
+  source: { flexDirection: "row", alignItems: "center", gap: 3 },
+  sourceLabel: { fontSize: 10.5, fontWeight: "600" },
+  sourceValue: { fontSize: 11, fontWeight: "800" },
+  sourceDot: { width: 3, height: 3, borderRadius: 2, opacity: 0.6 },
 
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  body: { flex: 1, padding: 20, gap: 18 },
-
-  hybridBlock: { alignItems: "center", gap: 6 },
-  hybridLabel: { fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
-  hybridScoreRow: { flexDirection: "row", alignItems: "flex-end" },
-  hybridScore: { fontSize: 48, fontWeight: "800", lineHeight: 52 },
-  hybridMax: { fontSize: 16, fontWeight: "600", marginBottom: 8, marginLeft: 2 },
-
-  badgesRow: { flexDirection: "row", gap: 12, justifyContent: "center" },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  badgeLabel: { fontSize: 11, fontWeight: "600" },
-  badgeValue: { fontSize: 13, fontWeight: "800" },
+  body: { paddingHorizontal: 16, gap: 12 },
 
   rateBox: {
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    borderRadius: 18,
+    gap: 8,
+    paddingTop: 10,
+    paddingBottom: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
     borderWidth: 1,
   },
-  rateTitle: { fontSize: 15, fontWeight: "700" },
-  draftValue: { fontSize: 13, fontWeight: "600" },
-
-  actions: { flexDirection: "row", gap: 12, marginTop: "auto" },
-  removeBtn: {
+  rateHead: {
+    alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  lockedBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 16,
     borderWidth: 1,
   },
-  removeBtnText: { fontSize: 14, fontWeight: "700" },
+  lockedCopy: { flex: 1, minWidth: 0, gap: 2 },
+  rateTitle: { fontSize: 13.5, fontWeight: "800" },
+  draftValue: { fontSize: 12.5, fontWeight: "700" },
+
+  actions: { flexDirection: "row", gap: 10 },
+  removeBtn: {
+    width: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+  },
   saveBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 13,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
   },

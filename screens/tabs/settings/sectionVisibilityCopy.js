@@ -103,6 +103,7 @@ const tr = {
       friends: ["Arkadaşlar", "Ara, arkadaşlar, mesajlar ve istekler. Gizlersen bunlara buradan ulaşamazsın"],
       stats: ["İstatistikler", "İzlediğin film ve dizi sayıları, toplam süreler"],
       activity: ["Aktivitelerim", "Puanlamaların, yorumların, postların ve taslakların"],
+      ratings: ["Puan dağılımı", "Verdiğin puanların ½ yıldızdan 5 yıldıza grafiği"],
     },
   },
 };
@@ -198,6 +199,7 @@ const en = {
       friends: ["Friends", "Search, friends, messages and requests. If you hide it you can't reach them from here"],
       stats: ["Statistics", "How many movies and shows you've watched, and total time"],
       activity: ["My Activity", "Your ratings, comments, posts and drafts"],
+      ratings: ["Rating spread", "A chart of your ratings from ½ to 5 stars"],
     },
   },
 };
@@ -293,6 +295,7 @@ const es = {
       friends: ["Amigos", "Buscar, amigos, mensajes y solicitudes. Si la ocultas no podrás acceder a ellos desde aquí"],
       stats: ["Estadísticas", "Cuántas películas y series has visto y el tiempo total"],
       activity: ["Mi actividad", "Tus valoraciones, comentarios, publicaciones y borradores"],
+      ratings: ["Distribución de puntuaciones", "Gráfico de tus puntuaciones de ½ a 5 estrellas"],
     },
   },
 };
@@ -388,6 +391,7 @@ const pt = {
       friends: ["Amigos", "Buscar, amigos, mensagens e pedidos. Se você ocultar, não conseguirá acessá-los por aqui"],
       stats: ["Estatísticas", "Quantos filmes e séries você assistiu e o tempo total"],
       activity: ["Minhas atividades", "Suas notas, comentários, publicações e rascunhos"],
+      ratings: ["Distribuição de notas", "Gráfico das suas notas de ½ a 5 estrelas"],
     },
   },
 };
@@ -483,6 +487,7 @@ const de = {
       friends: ["Freunde", "Suche, Freunde, Nachrichten und Anfragen. Wenn du sie ausblendest, erreichst du sie von hier aus nicht mehr"],
       stats: ["Statistik", "Wie viele Filme und Serien du gesehen hast, und die Gesamtzeit"],
       activity: ["Meine Aktivität", "Deine Bewertungen, Kommentare, Beiträge und Entwürfe"],
+      ratings: ["Bewertungsverteilung", "Diagramm deiner Bewertungen von ½ bis 5 Sternen"],
     },
   },
 };

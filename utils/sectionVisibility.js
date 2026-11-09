@@ -127,6 +127,8 @@ export const SECTION_SCREENS = Object.freeze(
         section("friends", "people-outline", "blue", { confirmHide: true }),
         section("stats", "stats-chart-outline", "green"),
         section("activity", "pulse-outline", "teal"),
+        // Puan dağılımı histogramı, Aktivitelerim'in altında (components/profile/RatingDistributionCard.js).
+        section("ratings", "star-half-outline", "amber"),
       ],
     },
   ].map((screen) =>
