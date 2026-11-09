@@ -22,11 +22,11 @@ import ListBadges from "../ListBadges";
 import PaginatedRail from "../PaginatedRail";
 import SectionHeader, { SectionIconAction } from "../home/SectionHeader";
 import { RailSkeleton } from "../Skeleton";
-import { CountdownBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../PosterInfoBadges";
+import { UpcomingPosterBadges } from "../PosterInfoBadges";
 import FollowedPeopleSheet from "./FollowedPeopleSheet";
 import { useTheme } from "../../context/ThemeContext";
 import { useLanguage } from "../../context/LanguageContext";
-import { useApiSettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import { useApiSettings } from "../../context/AppSettingsContext";
 import { useListStatusContext } from "../../context/ListStatusContext";
 import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import useFollowedPeople from "../../hooks/useFollowedPeople";
@@ -49,7 +49,6 @@ const VISIBLE_LIMIT = 24;
 
 const UpcomingCard = memo(function UpcomingCard({ item, mediaType, navigation, onOpen, saved, onToggleSave, copy }) {
   const { theme } = useTheme();
-  const { posterBadges } = useListLayoutSettings();
   const rail = useRailPosterStyle();
   const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
@@ -85,12 +84,7 @@ const UpcomingCard = memo(function UpcomingCard({ item, mediaType, navigation, o
           recyclingKey={`followed-upcoming-${mediaType}-${item.id}`}
           transition={120}
         />
-        {posterBadges?.countdown !== false && (
-          <CountdownBadge date={item._date} style={POSTER_BADGE_POS.topLeft} />
-        )}
-        {posterBadges?.releaseDate !== false && (
-          <ReleaseDateBadge date={item._date} style={POSTER_BADGE_POS.topRight} />
-        )}
+        <UpcomingPosterBadges date={item._date} />
         <ListBadges
           mediaId={item.id}
           mediaType={mediaType}
@@ -268,7 +262,8 @@ export default function FollowedUpcomingRail({ mediaType, navigation }) {
             <Ionicons name="notifications-outline" size={19} color={theme.accent} />
           </View>
           <View style={styles.quietText}>
-            <Text style={[styles.quietTitle, { color: theme.text.primary }]} numberOfLines={1}>
+            {/* İki satır: "Nothing upcoming from people you follow" 412 pt altında tek satıra sığmıyor (Yoga ölçümü, 7 Kas). */}
+            <Text style={[styles.quietTitle, { color: theme.text.primary }]} numberOfLines={2}>
               {copy.rail.quietTitle}
             </Text>
             <Text style={[styles.quietBody, { color: theme.text.muted }]} numberOfLines={1}>

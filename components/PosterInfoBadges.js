@@ -199,6 +199,21 @@ export function ReleaseDateBadge({ date, variant = "day", corner, style, scale, 
   );
 }
 
+// ── UpcomingPosterBadges ──────────────────────────────────────────────────────
+// Yaklaşan raflarında geri sayım (sol) + çıkış tarihi (sağ) TEK satırda. Eskiden ikisi ayrı köşelere
+// mutlak konumlanıyordu; dar posterde birbirine biniyorlardı (320 pt, İngilizce "Tomorrow" + "12 Dec":
+// Yoga ölçümü, 7 Kas). Artık sığmazsa tarih alt satıra iner ve `marginLeft: "auto"` ile sağda kalır.
+// Hangi dilde ya da poster boyutunda olursa olsun çakışmazlar. Rozet ayarları (countdown/releaseDate)
+// rozetlerin kendi içinde uygulanır.
+export function UpcomingPosterBadges({ date, style }) {
+  return (
+    <View style={[styles.upcomingRow, style]} pointerEvents="none">
+      <CountdownBadge date={date} />
+      <ReleaseDateBadge date={date} style={styles.pushRight} />
+    </View>
+  );
+}
+
 // ── PosterBadgeSkeleton ───────────────────────────────────────────────────────
 // Poster iskeletinin üzerinde gerçek rozetin YERİNİ tutar. Hap kutusu, köşe
 // konumu ve içerideki satır yüksekliği gerçek rozetle AYNI matematikten
@@ -257,4 +272,16 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0,0,0,0.18)",
   },
   solidText: { color: "#fff", fontWeight: "800", letterSpacing: 0.1 },
+  // POSTER_BADGE_POS.topLeft/topRight ile aynı 5 dp kenar payı.
+  upcomingRow: {
+    position: "absolute",
+    top: 5,
+    left: 5,
+    right: 5,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 3,
+    columnGap: 4,
+  },
+  pushRight: { marginLeft: "auto" },
 });

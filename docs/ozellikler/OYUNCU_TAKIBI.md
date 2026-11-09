@@ -57,6 +57,49 @@ Kaynak: `docs/planlama/GELISTIRME_ONERI_ADAYLARI_2026-10-17.md` 1. aday.
 - **Kişi başına poster altı etiket** (kimin işi olduğu): kartta yok, yalnız başlık altı özet + erişilebilirlik etiketi.
 - **Arkadaşın takip ettikleri** / paylaşım.
 
+## Yeniden doğrulama (7 Kasım)
+
+- Jest tam paket temiz: 349 dosya, 6782 test.
+- Çekirdekte (`utils/followedPeople.js`) bilinçli bozma: 7 bozmanın 7'si `followedPeople` + `followPersonButton` testlerinde yakalandı.
+  Denenen bozmalar: bugünü dışlamak, tarihsiz kaydı saymak, `adult` elemesini kapatmak, dizide `Creator`'ı düşürmek, sınırı `>` yapmak,
+  sırayı ters çevirmek, tür elemesini kapatmak.
+
+### Yoga yerleşim ölçümü (7 Kasım)
+
+Matris: 320 / 360 / 375 / 390 / 412 pt × tr / en / es × raf posteri normal / küçük. Ölçülenler: kişi hero'sunun alt bloğu ve hap
+(takipte değil / takipte, uzun adla), rafın poster durumu, rafın sessiz satırı, "Takip ettiklerim" alt sayfası.
+Bileşenler gerçek stilleriyle render edildi. Ağaç, RN'in Yoga ayarlarıyla (`yoga-layout` 3.2, `ERRATA_ALL`, @3x yuvarlama) ölçüldü.
+Denetimler: taşma, ekran dışı, kardeş çakışması, metin kesilmesi, sıfıra çökme.
+
+**Düzeltilenler:**
+- **Sessiz satır başlığı** `numberOfLines={1}` idi ve kesiliyordu: en'de 320–390, tr'de 320–360, es'te 320. Artık **iki satır**.
+- **Raf başlığı** ("Takip ettiklerinin yaklaşanları" / "Upcoming from people you follow") 320 pt'de iki simge eylemiyle iki satıra
+  sığmıyordu. `SectionHeader` artık iki satırlı başlıkta da `adjustsFontSizeToFit` kullanıyor (alt sınır %80); 320'de tr %85, en %95 küçülür.
+  İki satırlı başlığı yalnız bu raf kullanıyor, diğer raflar etkilenmez.
+- İkisi testle kilitli: `followedUpcomingRail.test.js` (yeni; üç durum + takvim düğmesi) ve `sectionHeader.test.js`. Bilinçli bozmada 5/5 yakalandı.
+- **Geri sayım + tarih rozeti çakışması** 320 pt'de İngilizcede vardı: "Tomorrow" sol üstte, tarih sağ üstte. Ortak bileşenle düzeltildi:
+  `components/PosterInfoBadges.js` → yeni `UpcomingPosterBadges`. İki rozet tek, sarmalı bir satırda; sığmazsa tarih alt satıra iner ve
+  `marginLeft: "auto"` ile sağda kalır. Sığan kartlarda konum eskisiyle aynı (üst, köşelerden 5 dp). Kullananlar: bu raf ve
+  `screens/movie/MovieUpcoming.js` (Yaklaşan Filmler, aynı çift). Testi `upcomingPosterBadges.test.js`. Bilinçli bozmada 4/4 yakalandı;
+  sarmalamanın kaldırılmasını ve rozetin köşeye geri dönmesini Yoga da yakaladı. Matriste çakışma kalmadı.
+
+**Bilerek bırakılanlar:**
+- **Uzun adlar "…" ile kısalır**: rafın alt başlığı tek satır, alt sayfada ad tek satır. Uzun adlı iki kişide alt başlığın sonundaki "+N" görünmeyebilir.
+  Tam liste erişilebilirlik etiketinde ve alt sayfada var.
+- Hero alt bloğu her genişlikte hero'nun içinde kalıyor (320'de üst kenar y=186, hero 352).
+
+**Harness'in sınırları:** Metin genişliği yaklaşık (karakter ≈ 0,52–0,58 em), gerçek yazı tipini kanıtlamaz. Hero, ekranın
+stilleri elle kopyalanarak kuruldu. Sıfıra çökme denetimi için pozitif kontrol kurulamadı: basit `flex:1` vakalarında Yoga çökmüyor.
+Ölçülen ağaçta riskli bir `flex:1` de yok. Kesilme, çakışma ve taşma denetimleri gerçek vakaları yakaladı. Bulgu sayısı düzeltme
+öncesi 68, sonrası 48; kalan 48'in tamamı yukarıdaki uzun ad kesilmeleri. Harness repoda değil, oturum scratchpad'inde.
+
+## Free plan sınırı önerisi (açık soru 2)
+
+**Aşama 1'de plan kapısı koyma.** Takip listesi cihazda duruyor ve maliyet yalnız istemcinin TMDB isteği (Firestore'a da functions'a da yük
+yok). Teknik 60 kişi sınırı yeterli. Kapı **aşama 2'de, takibe değil push'a konmalı**: `streaming_alerts` kalıbında bir `followed_alerts`
+özelliği (`kind: COUNT`, `enforcedBy: "server"`). Önerilen sınırlar Free 10 / Premium 60 / Max 60. Takip etmek ve raf herkes için açık
+kalır; yalnız bildirim alınan kişi sayısı plana bağlanır. Sunucu maliyeti kişi başına günlük TMDB taraması olduğu için sınır o noktada anlamlı.
+
 ## Cihazda henüz görülmedi
 
 Jest temiz (tam paket 256 dosya): çekirdek (kayıt, ayıklama, birleştirme, tarih sınırı), düğme + alt sayfa + kanca gerçek depoyla,

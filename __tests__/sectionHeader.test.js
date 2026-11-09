@@ -168,6 +168,15 @@ describe("SectionHeader — eylem", () => {
     const two = render(<SectionHeader section="followedPeople" mediaType="tv" title="B" titleLines={2} />);
     expect(two.root.findAllByType("Text")[0].props.numberOfLines).toBe(2);
   });
+
+  it("başlık tek satırda da iki satırda da '…' yerine %80'e kadar küçülür (320 pt Yoga ölçümü, 7 Kas)", () => {
+    for (const titleLines of [1, 2]) {
+      const tree = render(<SectionHeader section="followedPeople" mediaType="tv" title="B" titleLines={titleLines} />);
+      const title = tree.root.findAllByType("Text")[0];
+      expect(title.props.adjustsFontSizeToFit).toBe(true);
+      expect(title.props.minimumFontScale).toBe(0.8);
+    }
+  });
 });
 
 describe("SectionChips", () => {

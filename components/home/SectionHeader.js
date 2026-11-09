@@ -129,9 +129,10 @@ function SectionHeader({
             <Text
               allowFontScaling={false}
               numberOfLines={titleLines}
-              // Tek satırlı başlık uzunsa ("Emmy-Winning TV Shows" + "See all" düğmesi) "…" yerine
-              // %80'e kadar küçülür; iki satırlıda gerek yok.
-              adjustsFontSizeToFit={titleLines === 1}
+              // Başlık uzunsa ("Emmy-Winning TV Shows" + "See all" düğmesi) "…" yerine %80'e kadar küçülür.
+              // İki satırlıda da: "Takip ettiklerinin yaklaşanları" 320 pt'de iki simge eylemiyle iki satıra
+              // sığmıyordu (Yoga ölçümü, 7 Kas).
+              adjustsFontSizeToFit
               minimumFontScale={0.8}
               accessibilityRole="header"
               style={[styles.title, { color: theme.text.primary }]}

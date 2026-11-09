@@ -14,10 +14,10 @@ import { useMediaQuickActions } from "../../context/MediaQuickActionsContext";
 import { MovieUpComingSkeleton } from "../../components/Skeleton";
 import PaginatedRail from "../../components/PaginatedRail";
 import useRailPosterStyle from "../../hooks/useRailPosterStyle";
-import { useImageQualitySettings, useListLayoutSettings } from "../../context/AppSettingsContext";
+import { useImageQualitySettings } from "../../context/AppSettingsContext";
 import { useMovie } from "../../context/MovieContex";
 import ListBadges from "../../components/ListBadges";
-import { CountdownBadge, ReleaseDateBadge, POSTER_BADGE_POS } from "../../components/PosterInfoBadges";
+import { UpcomingPosterBadges } from "../../components/PosterInfoBadges";
 import SectionHeader from "../../components/home/SectionHeader";
 import UpcomingFilterChips from "../../components/home/UpcomingFilterChips";
 import UpcomingFilterSheet from "../../components/home/UpcomingFilterSheet";
@@ -31,7 +31,6 @@ const { width } = Dimensions.get("window");
 // Stable, module-scope item component → no remount → no flicker.
 const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, theme, getTmdbUrl, RelaseCount }) {
   const rp = useRailPosterStyle();
-  const { posterBadges } = useListLayoutSettings();
   const { openQuickActions } = useMediaQuickActions();
   const scale = useRef(new Animated.Value(1)).current;
   const onPressIn = () =>
@@ -66,12 +65,7 @@ const MovieUpcomingCard = memo(function MovieUpcomingCard({ item, navigation, th
           transition={120}
         />
 
-        {posterBadges?.countdown !== false && (
-          <CountdownBadge date={item.release_date} style={POSTER_BADGE_POS.topLeft} />
-        )}
-        {posterBadges?.releaseDate !== false && (
-          <ReleaseDateBadge date={item.release_date} style={POSTER_BADGE_POS.topRight} />
-        )}
+        <UpcomingPosterBadges date={item.release_date} />
         <ListBadges
           mediaId={item.id}
           mediaType="movie"
