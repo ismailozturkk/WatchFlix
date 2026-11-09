@@ -11,6 +11,13 @@
 //   • Orta poster ile üst/alt bulanık şeritler arasındaki sınırda keskin çizgi
 //     oluşmaması için kenarlarda kademeli (progressive) bulanıklık geçişi
 //     uygulanır.
+//
+// Oyuncu / yönetmen sayfası (screens/actor/ActorViewScreen.js) aynı yuvayı dikey
+// profil fotoğrafıyla kullanır: `bottomBandHeight` alt bulanık şeridi ad + rozet +
+// eylem haplarını taşıyacak kadar uzatır, `bottomBandTint` beyaz yazı okunsun diye
+// YALNIZ o şeridi koyulaştırır, `bottomFadeHeight` tema zeminine geçişi hapların
+// altına sıkıştırır (açık temada beyaz yazı açık zemine düşmesin). Üçü de verilmezse
+// film/dizi düzeni birebir aynı kalır.
 
 import React, { memo } from "react";
 import {
@@ -53,6 +60,7 @@ export function computeDetailHeroMetrics({
   width = DEFAULT_WIDTH,
   topInset = 0,
   imageHeight,
+  bottomBandHeight,
 } = {}) {
   const safeWidth = Number.isFinite(width) && width > 0 ? width : DEFAULT_WIDTH;
   const safeTopInset =
@@ -66,8 +74,11 @@ export function computeDetailHeroMetrics({
 
   // Bildirim çubuğu bölgesinde kompakt üst ambiyans şeridi.
   const topAmbientHeight = Math.max(Math.round(safeTopInset * 0.72), 20);
-  // Posterin hemen altında kısa ambiyans devamı.
-  const bottomAmbientHeight = Math.round(defaultBackdropHeight * 0.14);
+  // Posterin hemen altında kısa ambiyans devamı (oyuncu sayfası uzatır).
+  const bottomAmbientHeight =
+    Number.isFinite(bottomBandHeight) && bottomBandHeight > 0
+      ? Math.round(bottomBandHeight)
+      : Math.round(defaultBackdropHeight * 0.14);
   const stageHeight = topAmbientHeight + backdropHeight + bottomAmbientHeight;
   // Bilgi başlığı (küçük poster + başlık/tür/puan) alt ambiyans şeridini kapatıp
   // posterin alt kısmına hafifçe biner.
@@ -91,6 +102,12 @@ const DetailHeroStage = memo(function DetailHeroStage({
   topInset = 0,
   width = DEFAULT_WIDTH,
   imageHeight,
+  // Oyuncu sayfası ayarları (bkz. dosya başı); verilmezse film/dizi düzeni.
+  bottomBandHeight,
+  bottomBandTint,
+  bottomFadeHeight: bottomFadeOverride,
+  // "contain": görsel yuvaya kırpılmadan sığar (kenarlarda bulanık zemin görünür).
+  imageFit = "cover",
   placeholderIcon = "film-outline",
   placeholderSize = 64,
   // Dokunulunca net görselin PENCERE dikdörtgeniyle çağrılır (`onPress(rect)`):
@@ -130,10 +147,13 @@ const DetailHeroStage = memo(function DetailHeroStage({
     topAmbientHeight,
     bottomAmbientHeight,
     stageHeight,
-  } = computeDetailHeroMetrics({ width, topInset, imageHeight });
+  } = computeDetailHeroMetrics({ width, topInset, imageHeight, bottomBandHeight });
 
   const lightSurface = isLightSurface(theme.primary);
-  const bottomFadeHeight = bottomAmbientHeight + BOTTOM_FEATHER_INNER_H;
+  const bottomGradientHeight =
+    Number.isFinite(bottomFadeOverride) && bottomFadeOverride > 0
+      ? Math.round(bottomFadeOverride)
+      : bottomAmbientHeight + BOTTOM_FEATHER_INNER_H + 10;
 
   return (
     <View
@@ -203,6 +223,12 @@ const DetailHeroStage = memo(function DetailHeroStage({
               ]}
               resizeMode="cover"
             />
+            {bottomBandTint ? (
+              <View
+                testID="detail-hero-bottom-tint"
+                style={[styles.bandTint, { backgroundColor: bottomBandTint }]}
+              />
+            ) : null}
           </View>
 
           {/* 4) Ortada net arka plan görseli + kenar geçiş yumuşatması */}
@@ -231,7 +257,7 @@ const DetailHeroStage = memo(function DetailHeroStage({
                   testID="detail-hero-backdrop-image"
                   source={{ uri }}
                   style={styles.backdrop}
-                  resizeMode="cover"
+                  resizeMode={imageFit}
                 />
               </TouchableOpacity>
             ) : (
@@ -243,7 +269,7 @@ const DetailHeroStage = memo(function DetailHeroStage({
                   testID="detail-hero-backdrop-image"
                   source={{ uri }}
                   style={styles.backdrop}
-                  resizeMode="cover"
+                  resizeMode={imageFit}
                 />
               </View>
             )}
@@ -257,7 +283,7 @@ const DetailHeroStage = memo(function DetailHeroStage({
                 source={{ uri }}
                 blurRadius={EDGE_BLUR_INNER}
                 style={[styles.featherImageTop, { height: backdropHeight }]}
-                resizeMode="cover"
+                resizeMode={imageFit}
               />
             </View>
             <View
@@ -268,7 +294,7 @@ const DetailHeroStage = memo(function DetailHeroStage({
                 source={{ uri }}
                 blurRadius={EDGE_BLUR_OUTER}
                 style={[styles.featherImageTop, { height: backdropHeight }]}
-                resizeMode="cover"
+                resizeMode={imageFit}
               />
             </View>
 
@@ -284,7 +310,7 @@ const DetailHeroStage = memo(function DetailHeroStage({
                 source={{ uri }}
                 blurRadius={EDGE_BLUR_INNER}
                 style={[styles.featherImageBottom, { height: backdropHeight }]}
-                resizeMode="cover"
+                resizeMode={imageFit}
               />
             </View>
             <View
@@ -298,7 +324,7 @@ const DetailHeroStage = memo(function DetailHeroStage({
                 source={{ uri }}
                 blurRadius={EDGE_BLUR_OUTER}
                 style={[styles.featherImageBottom, { height: backdropHeight }]}
-                resizeMode="cover"
+                resizeMode={imageFit}
               />
             </View>
           </Animated.View>
@@ -339,7 +365,7 @@ const DetailHeroStage = memo(function DetailHeroStage({
           theme.primary,
         ]}
         locations={[0, 0.55, 1]}
-        style={[styles.bottomGradient, { height: bottomFadeHeight + 10 }]}
+        style={[styles.bottomGradient, { height: bottomGradientHeight }]}
         pointerEvents="none"
       />
 
@@ -380,6 +406,9 @@ const styles = StyleSheet.create({
     width: "100%",
     transform: [{ scaleY: -1 }, { scaleX: 1.05 }],
   },
+  bandTint: {
+    ...StyleSheet.absoluteFillObject,
+  },
   centerPosterSlot: {
     position: "absolute",
     left: 0,
@@ -394,7 +423,6 @@ const styles = StyleSheet.create({
   backdrop: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   topFeatherStrip: {
     position: "absolute",

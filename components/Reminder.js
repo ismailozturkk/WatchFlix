@@ -37,6 +37,7 @@ export default function Reminder({
   // Zil küçük bir dairenin içinde durduğunda (SeasonItem) dokunma alanını
   // dairenin tamamına yaymak için.
   hitSlop,
+  renderTrigger,
 }) {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -127,6 +128,10 @@ export default function Reminder({
       Toast.show({ type: "error", text1: i18nText("autoI18n.hatirlatma_eklenirken_bir_hata_olustu", "Hatırlatma eklenirken bir hata oluştu") });
     }
   };
+
+  if (typeof renderTrigger === "function") {
+    return renderTrigger({ isReminderSet, onPress: addReminder });
+  }
 
   return (
     <View>

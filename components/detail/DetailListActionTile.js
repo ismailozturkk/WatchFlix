@@ -1,11 +1,23 @@
 import React from "react";
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, StyleSheet, Text, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import GlassTouchable from "../common/GlassTouchable";
+import { alpha } from "@theme/colors";
+import { isLightSurface } from "@utils/colorUtils";
 
-// Film ve dizi detayındaki liste işlemlerinin ortak dokunma alanı.
+// Film ve dizi detayındaki liste işlemlerinin kompakt hücresi. Dört hücre TEK
+// yatay satırda yan yana durur (ListView / ListViewTv): üstte ikon yuvası,
+// altta tek satırlık etiket, sağ üst köşede küçük durum rozeti
+// (+ ekle · ✓ eklendi · ▶ kısmen · 🔒 kilitli · sayı = seçili liste).
+// `compact` kipi MediaQuickActionsSheet içinde (opaklığı animasyonlu üst katman)
+// kullanıldığı için GlassSurface kural 1 gereği cam yalnızca tam detay ekranında açılır.
 export default function DetailListActionTile({
   label,
   color,
   active = false,
+  locked = false,
+  kind = "toggle",
+  activeIcon = "checkmark",
   theme,
   compact = false,
   scale,
@@ -14,13 +26,97 @@ export default function DetailListActionTile({
   onPress,
   children,
 }) {
+  const tone = color || theme?.accent || "#3B82F6";
+  const light = isLightSurface(theme?.primary || "#000000");
+  const primaryText = theme?.text?.primary || "#FFFFFF";
+  const secondaryText = theme?.text?.secondary || primaryText;
+  const mutedText = theme?.text?.muted || "#888888";
+  const surface = theme?.secondary || "#181B22";
+  const border = theme?.border || "#303641";
+
+  const surfaceColor = locked
+    ? alpha(surface, light ? 0.72 : 0.56)
+    : active
+      ? alpha(tone, light ? 0.12 : 0.15)
+      : alpha(surface, light ? 0.94 : 0.78);
+
+  const borderColor = locked
+    ? alpha(border, 0.6)
+    : active
+      ? alpha(tone, light ? 0.42 : 0.5)
+      : alpha(border, 0.9);
+
+  const wellBg = locked
+    ? alpha(mutedText, 0.11)
+    : alpha(tone, active ? (light ? 0.18 : 0.24) : light ? 0.1 : 0.13);
+
+  const labelColor = locked ? mutedText : active ? tone : secondaryText;
+  const longLabel = typeof label === "string" && label.length > 15;
+
+  const renderCorner = () => {
+    const orbStyle = [styles.cornerOrb, compact && styles.cornerOrbCompact];
+
+    if (kind === "sheet") {
+      if (!(badge > 0)) return null;
+      return (
+        <View
+          style={[
+            styles.countPill,
+            compact && styles.countPillCompact,
+            { backgroundColor: tone },
+          ]}
+        >
+          <Text
+            allowFontScaling={false}
+            style={[styles.countText, compact && styles.countTextCompact]}
+          >
+            {badge}
+          </Text>
+        </View>
+      );
+    }
+
+    if (locked) {
+      return (
+        <View style={[orbStyle, { backgroundColor: alpha(mutedText, 0.16) }]}>
+          <Ionicons name="lock-closed" size={compact ? 7.5 : 8.5} color={mutedText} />
+        </View>
+      );
+    }
+
+    if (active) {
+      const isPlay = activeIcon === "play";
+      return (
+        <View style={[orbStyle, { backgroundColor: tone }]}>
+          <Ionicons
+            name={activeIcon}
+            size={isPlay ? (compact ? 7 : 8) : compact ? 8.5 : 9.5}
+            color="#FFFFFF"
+            style={isPlay ? styles.playNudge : null}
+          />
+        </View>
+      );
+    }
+
+    return (
+      <View
+        style={[
+          orbStyle,
+          { backgroundColor: alpha(primaryText, light ? 0.07 : 0.1) },
+        ]}
+      >
+        <Ionicons name="add" size={compact ? 9.5 : 10.5} color={mutedText} />
+      </View>
+    );
+  };
+
   const content = (
     <>
       <Animated.View
         style={[
           styles.iconWell,
           compact && styles.iconWellCompact,
-          { backgroundColor: color + (active ? "24" : "13") },
+          { backgroundColor: wellBg },
           {
             transform: [{ scale: scale || 1 }],
             opacity: opacity === undefined ? 1 : opacity,
@@ -28,48 +124,49 @@ export default function DetailListActionTile({
         ]}
       >
         {children}
-        {badge > 0 && (
-          <View style={[styles.badge, { backgroundColor: color, borderColor: theme.secondary }]}>
-            <Text allowFontScaling={false} style={styles.badgeText}>
-              {badge}
-            </Text>
-          </View>
-        )}
       </Animated.View>
+
       <Text
         allowFontScaling={false}
-        numberOfLines={2}
+        // Dört hücre ~75 dp: TR/EN etiketleri tek satırda küçülerek sığar;
+        // "Lista de seguimiento" (es/pt) gibi uzunlar iki satıra iner, satırdaki
+        // öteki hücreler `alignItems: stretch` ile aynı yüksekliğe uzar.
+        numberOfLines={longLabel ? 2 : 1}
+        adjustsFontSizeToFit
+        minimumFontScale={longLabel ? 0.86 : 0.74}
         style={[
           styles.label,
           compact && styles.labelCompact,
-          { color: active ? color : theme.text.secondary },
+          active && !locked && styles.labelActive,
+          { color: labelColor },
         ]}
       >
         {label}
       </Text>
+
+      {renderCorner()}
     </>
   );
+
   const tileStyle = [
     styles.tile,
     compact && styles.tileCompact,
-    {
-      backgroundColor: active ? color + "10" : theme.primary,
-      borderColor: active ? color + "55" : theme.border,
-    },
+    { backgroundColor: surfaceColor, borderColor },
   ];
 
   if (!onPress) return <View style={tileStyle}>{content}</View>;
   return (
-    <TouchableOpacity
+    <GlassTouchable
+      glass={!compact}
       onPress={onPress}
-      activeOpacity={0.78}
+      activeOpacity={0.82}
       style={tileStyle}
       accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ selected: active }}
+      accessibilityLabel={badge > 0 ? `${label} (${badge})` : label}
+      accessibilityState={{ selected: active, disabled: locked }}
     >
       {content}
-    </TouchableOpacity>
+    </GlassTouchable>
   );
 }
 
@@ -77,59 +174,96 @@ const styles = StyleSheet.create({
   tile: {
     flex: 1,
     minWidth: 0,
-    minHeight: 98,
-    paddingHorizontal: 3,
-    paddingTop: 11,
+    minHeight: 64,
+    paddingTop: 9,
     paddingBottom: 8,
+    paddingHorizontal: 5,
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
+    gap: 5,
     borderWidth: 1,
     borderRadius: 16,
   },
   tileCompact: {
-    minHeight: 76,
+    minHeight: 54,
     paddingTop: 7,
-    paddingBottom: 5,
+    paddingBottom: 6,
+    paddingHorizontal: 4,
     gap: 4,
-    borderRadius: 13,
+    borderRadius: 14,
   },
   iconWell: {
-    width: 43,
-    height: 43,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   iconWellCompact: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
+    width: 26,
+    height: 26,
+    borderRadius: 9,
   },
   label: {
-    minHeight: 27,
-    fontSize: 10,
-    lineHeight: 13,
-    fontWeight: "700",
+    alignSelf: "stretch",
     textAlign: "center",
-    textAlignVertical: "center",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "700",
+    letterSpacing: -0.15,
   },
   labelCompact: {
-    minHeight: 23,
-    fontSize: 9,
-    lineHeight: 11,
+    fontSize: 10,
+    lineHeight: 13,
   },
-  badge: {
+  labelActive: {
+    fontWeight: "800",
+  },
+  cornerOrb: {
     position: "absolute",
-    top: -5,
-    right: -7,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    top: 5,
+    right: 5,
+    width: 15,
+    height: 15,
+    borderRadius: 7.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cornerOrbCompact: {
+    top: 4,
+    right: 4,
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
+  },
+  playNudge: { marginLeft: 1 },
+  countPill: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    minWidth: 16,
+    height: 15,
+    borderRadius: 7.5,
     paddingHorizontal: 4,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
   },
-  badgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
+  countPillCompact: {
+    top: 4,
+    right: 4,
+    minWidth: 14,
+    height: 13,
+    borderRadius: 6.5,
+    paddingHorizontal: 3.5,
+  },
+  countText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: "800",
+  },
+  countTextCompact: {
+    fontSize: 8,
+    lineHeight: 10,
+  },
 });

@@ -30,6 +30,7 @@ jest.mock("react-native", () => ({
 }));
 
 jest.mock("@expo/vector-icons/Ionicons", () => "Ionicons");
+jest.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
 
 const DetailHeroStageModule = require("../components/detail/DetailHeroStage");
 const DetailHeroStage = DetailHeroStageModule.default;
@@ -204,12 +205,13 @@ describe("DetailHeroStage çizimi", () => {
     expect(placeholder).toBeTruthy();
   });
 
-  test("MovieDetail, TvShowsDetails, SeasonDetails ve EpisodeDetails ortak DetailHeroStage yuvasını kullanır", () => {
+  test("MovieDetail, TvShowsDetails, SeasonDetails, EpisodeDetails ve oyuncu sayfası ortak DetailHeroStage yuvasını kullanır", () => {
     for (const rel of [
       ["screens", "movie", "MovieDetail.js"],
       ["screens", "tv", "TvShowsDetails.js"],
       ["screens", "tv", "SeasonDetails.js"],
       ["screens", "tv", "EpisodeDetails.js"],
+      ["screens", "actor", "ActorViewScreen.js"],
     ]) {
       const src = fs.readFileSync(path.join(__dirname, "..", ...rel), "utf8");
       expect(src).toMatch(/<DetailHeroStage\b/);
@@ -243,5 +245,48 @@ describe("DetailHeroStage çizimi", () => {
       (n) => n.props?.testID === "season-badge",
     )[0];
     expect(badge).toBeTruthy();
+  });
+
+  test("oyuncu sayfası: uzun alt şerit yazıyı taşır, yalnız şerit koyulaşır, tema geçişi kısa kalır", () => {
+    const base = computeDetailHeroMetrics({ width: 390, topInset: 47, imageHeight: 390 });
+    const actor = computeDetailHeroMetrics({
+      width: 390,
+      topInset: 47,
+      imageHeight: 390,
+      bottomBandHeight: 136,
+    });
+    expect(actor.bottomAmbientHeight).toBe(136);
+    expect(actor.stageHeight).toBe(actor.topAmbientHeight + 390 + 136);
+    // Geçersiz değer film/dizi varsayılanına döner.
+    expect(
+      computeDetailHeroMetrics({ width: 390, topInset: 47, imageHeight: 390, bottomBandHeight: NaN }),
+    ).toEqual(base);
+
+    const render = (props) =>
+      renderTree(
+        React.createElement(DetailHeroStage, {
+          uri: "https://image.tmdb.org/t/p/h632/person.jpg",
+          theme: DARK_THEME,
+          topInset: 47,
+          width: 390,
+          imageHeight: 390,
+          ...props,
+        }),
+      );
+    const gradients = (tree) => collectNodes(tree, (n) => n.type === "LinearGradient");
+    const heightOf = (node) => Object.assign({}, ...[node.props.style].flat()).height;
+
+    const actorTree = render({ bottomBandHeight: 136, bottomBandTint: "rgba(0,0,0,0.34)", bottomFadeHeight: 30 });
+    const bottomSlot = collectNodes(actorTree, (n) => n.props?.testID === "detail-hero-ambient-bottom")[0];
+    expect(heightOf(bottomSlot)).toBe(136);
+    const tint = collectNodes(bottomSlot, (n) => n.props?.testID === "detail-hero-bottom-tint")[0];
+    expect(tint).toBeTruthy();
+    // Son degrade = tema zeminine geçiş.
+    expect(heightOf(gradients(actorTree).at(-1))).toBe(30);
+
+    // Film/dizi: koyulaştırma yok, geçiş eski formülle (alt şerit + 13 + 10).
+    const movieTree = render({});
+    expect(collectNodes(movieTree, (n) => n.props?.testID === "detail-hero-bottom-tint")).toHaveLength(0);
+    expect(heightOf(gradients(movieTree).at(-1))).toBe(base.bottomAmbientHeight + 13 + 10);
   });
 });
