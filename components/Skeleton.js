@@ -617,7 +617,8 @@ export const ActorSkeleton = () => {
   return (
     <View style={{ flex: 1, backgroundColor: theme.primary }}>
       {/* Hero görsel */}
-      <Skeleton width={width} height={width * 1.1} style={{ borderRadius: 0 }} />
+      {/* ≈ ActorViewScreen hero: üst bulanık şerit + kare fotoğraf + 136 dp alt şerit */}
+      <Skeleton width={width} height={width + 176} style={{ borderRadius: 0 }} />
       <View style={{ padding: 16, gap: 14 }}>
         {/* İsim + meta rozetleri */}
         <View style={{ flexDirection: "row", gap: 8 }}>

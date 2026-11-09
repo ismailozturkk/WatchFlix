@@ -11,19 +11,21 @@ import {
   StyleSheet,
     Dimensions,
   StatusBar,
-  Platform
+  Platform,
+  Image as RNImage,
 } from "react-native";
 import axios from "axios";
 import { useTheme } from "../../context/ThemeContext";
 import {
   useApiSettings,
   useImageQualitySettings,
+  useListLayoutSettings,
 } from "../../context/AppSettingsContext";
+import { posterSizeScale } from "../../utils/posterSizes";
 import { useLanguage } from "../../context/LanguageContext";
 import { LinearGradient } from "expo-linear-gradient";
 import GlassIconButton from "../../components/common/GlassIconButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import { usePremiumBannerOverlap } from "../../context/ScreenInsetsContext";
@@ -35,12 +37,40 @@ import { LocalBlurTarget, useLocalBlurTarget } from "../../components/common/Blu
 import FollowPersonButton from "../../components/person/FollowPersonButton";
 import PersonAvatarButton from "../../components/person/PersonAvatarButton";
 import GlassTouchable from "../../components/common/GlassTouchable";
+import GlassPressable from "../../components/common/GlassPressable";
+import DetailHeroStage, { computeDetailHeroMetrics } from "../../components/detail/DetailHeroStage";
+import NewConversationSheet from "../../components/chat/NewConversationSheet";
+import AIChatScreen from "../chat/AIChatScreen";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GLASS_PRESS_ROOM } from "../../utils/liquidGlass";
+import { buildPersonAiRequest, buildPersonChatMedia } from "../../utils/personDetailActions";
 import usePosterUri from "../../hooks/usePosterUri";
 
 
 const { width } = Dimensions.get("window");
-const HERO_HEIGHT = width * 1.1;
+// Hero = film/dizi detayındaki arka plan yuvası (components/detail/DetailHeroStage):
+// üstte durum çubuğu altında fotoğrafın yansıyan bulanık devamı, ortada NET fotoğraf
+// (artık ne durum çubuğu ne ad/haplar üstüne biner), altta ad + rozet + eylem haplarını
+// taşıyan uzun bulanık şerit. Orta yuva fotoğrafın GERÇEK oranına göre boylanır:
+// fotoğraf tam genişlikte, kırpılmadan görünür; bulanıklık yalnız üst/alt şeritlerde.
+// Oran ölçülene kadar TMDB profil varsayılanı (2:3) kullanılır. Aşırı uzun/basık
+// fotoğraflar sınırlara sıkıştırılır ve yuvaya "contain" ile sığar (yanlarda bulanık zemin).
+const HERO_DEFAULT_ASPECT = 1.5; // yükseklik / genişlik
+const HERO_MIN_ASPECT = 0.75;
+const HERO_MAX_ASPECT = 1.5;
+export const computeActorHeroPhoto = (aspect, screenWidth = width) => {
+  const ratio = Number.isFinite(aspect) && aspect > 0 ? aspect : HERO_DEFAULT_ASPECT;
+  const clamped = Math.min(HERO_MAX_ASPECT, Math.max(HERO_MIN_ASPECT, ratio));
+  return {
+    height: Math.round(screenWidth * clamped),
+    fit: Math.abs(clamped - ratio) > 0.01 ? "contain" : "cover",
+  };
+};
+const HERO_BAND_HEIGHT = 136;
+// Tema zeminine geçiş hapların ALTINDA kalır (heroBottom.bottom ile birlikte ayarlı).
+const HERO_FADE_HEIGHT = 30;
+// Beyaz yazı/haplar bulanık şeritte her fotoğrafta okunsun diye şerit koyulaştırılır.
+const HERO_BAND_TINT = "rgba(0,0,0,0.34)";
 
 // Etiketler çizim anında çözülür: modül yüklenirken dondurulursa dil değişince eski dilde kalır.
 const buildFilters = () => [
@@ -134,6 +164,9 @@ const FilterChips = ({ filters, active, onSelect, theme }) => (
 const MediaCard = ({ item, mediaType, onPress, theme, imageQuality }) => {
   const posterUri = usePosterUri();
   const scale = useRef(new Animated.Value(1)).current;
+  // Kart boyu Ayarlar > Poster görünümü > Poster boyutunu izler (utils/posterSizes).
+  const { railPosterSize } = useListLayoutSettings();
+  const sizeScale = posterSizeScale(railPosterSize);
   const rating = item.vote_average ?? 0;
   const ratingColor = getRatingColor(rating);
 
@@ -157,7 +190,10 @@ const MediaCard = ({ item, mediaType, onPress, theme, imageQuality }) => {
       onPress={onPress}
     >
       <Animated.View
-        style={[styles.mediaCard, { transform: [{ scale }] }]}
+        style={[
+          styles.mediaCard,
+          { width: 120 * sizeScale, height: 180 * sizeScale, transform: [{ scale }] },
+        ]}
       >
         {item.poster_path ? (
           <Image
@@ -231,6 +267,21 @@ const InfoPill = ({ icon, label, theme }) =>
     </View>
   ) : null;
 
+// ─── Hero yuvarlak eylem düğmesi ──────────────────────────────────────────────
+// "Takip et" / "Avatarım yap" haplarıyla AYNI cam dil ve yükseklik; yalnız simge
+// (dört düğme dar ekranda da tek satıra sığsın). Etiket erişilebilirlikte okunur.
+const HeroIconButton = ({ icon, label, onPress }) => (
+  <GlassPressable
+    onPress={onPress}
+    hitSlop={8}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    style={({ pressed }) => [styles.heroIconBtn, pressed && styles.heroIconBtnPressed]}
+  >
+    <Ionicons name={icon} size={16} color="#FFFFFF" />
+  </GlassPressable>
+);
+
 // ─── Filtre uygulama ──────────────────────────────────────────────────────────
 const applyFilter = (list, filter, type) => {
   if (!list) return [];
@@ -282,6 +333,66 @@ const ActorViewScreen = ({ route, navigation }) => {
   const [tvFilter, setTvFilter] = useState("popular");
 
   const scrollY = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
+  const heroUri = actor?.profile_path ? getTmdbUrl(actor.profile_path, "profile", width) : null;
+  const [heroAspect, setHeroAspect] = useState(null);
+  useEffect(() => {
+    setHeroAspect(null);
+    if (!heroUri || typeof RNImage?.getSize !== "function") return undefined;
+    let alive = true;
+    RNImage.getSize(
+      heroUri,
+      (w, h) => { if (alive && w > 0 && h > 0) setHeroAspect(h / w); },
+      () => {},
+    );
+    return () => { alive = false; };
+  }, [heroUri]);
+  const heroPhoto = computeActorHeroPhoto(heroAspect);
+  const heroHeight = computeDetailHeroMetrics({
+    width,
+    topInset: insets.top,
+    imageHeight: heroPhoto.height,
+    bottomBandHeight: HERO_BAND_HEIGHT,
+  }).stageHeight;
+
+  // Yapay Zeka: film/dizi detayındaki gibi panel açılır açılmaz kişi sorusunu gönderir.
+  // Panel ilk dokunuşta bağlanır (çoğu ziyarette hiç açılmaz; ağır bileşen boşuna kurulmasın).
+  const [aiMounted, setAiMounted] = useState(false);
+  const [aiVisible, setAiVisible] = useState(false);
+  const [sendVisible, setSendVisible] = useState(false);
+  const aiRequest = useMemo(() => buildPersonAiRequest(actor), [actor, language]);
+  const chatMedia = useMemo(() => buildPersonChatMedia(actor), [actor]);
+
+  const openAi = () => {
+    if (!aiRequest.prompt) return;
+    setAiMounted(true);
+    setAiVisible(true);
+  };
+
+  // Sohbete gönder: film/dizi detayındaki "Gönder" ile aynı yol — seçilen sohbet
+  // `initialMedia` ile açılır, ChatScreen kişi kartını kendisi gönderir.
+  const sendToRecipient = (recipient) => {
+    if (!chatMedia || !recipient) return;
+    const shared = {
+      initialMedia: chatMedia,
+      initialMediaKey: `person-${chatMedia.id}-${Date.now()}`,
+    };
+    if (recipient.recipientType === "group") {
+      navigation.navigate("ChatScreen", {
+        groupId: recipient.id,
+        groupName: recipient.name,
+        groupAvatarIndex: recipient.avatarIndex,
+        ...shared,
+      });
+      return;
+    }
+    navigation.navigate("ChatScreen", {
+      friendUid: recipient.uid,
+      friendName: recipient.name,
+      friendAvatarIndex: recipient.avatarIndex,
+      ...shared,
+    });
+  };
 
   useEffect(() => {
     // Aynı ekran örneği yeni personId ile yeniden kullanılabilir (oyuncu →
@@ -316,7 +427,7 @@ const ActorViewScreen = ({ route, navigation }) => {
   }, [personId, language]);
 
   const headerOpacity = scrollY.interpolate({
-    inputRange: [HERO_HEIGHT - 100, HERO_HEIGHT - 40],
+    inputRange: [heroHeight - 100, heroHeight - 40],
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
@@ -393,40 +504,21 @@ const ActorViewScreen = ({ route, navigation }) => {
         scrollEventThrottle={16}
       >
         {/* ── Hero ── */}
-        <View style={{ height: HERO_HEIGHT }}>
-          {actor.profile_path ? (
-            <Image
-              source={{ uri: getTmdbUrl(actor.profile_path, 'profile', 200) }}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-            />
-          ) : (
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  backgroundColor: theme.secondary,
-                  justifyContent: "center",
-                  alignItems: "center",
-                },
-              ]}
-            >
-              <FontAwesome
-                name="user"
-                size={80}
-                color={theme.text?.muted ?? "#444"}
-              />
-            </View>
-          )}
-
-          {/* Gradient overlay */}
-          <LinearGradient
-            colors={["rgba(0,0,0,0.08)", "rgba(0,0,0,0.3)", theme.primary]}
-            locations={[0, 0.55, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-
-          {/* Alt bilgi */}
+        <DetailHeroStage
+          // Tam genişlikte net çizildiği için ekran genişliğinde istenir (eski 200 bulanık kalırdı).
+          uri={heroUri}
+          theme={theme}
+          topInset={insets.top}
+          width={width}
+          imageHeight={heroPhoto.height}
+          imageFit={heroPhoto.fit}
+          bottomBandHeight={HERO_BAND_HEIGHT}
+          bottomBandTint={HERO_BAND_TINT}
+          bottomFadeHeight={HERO_FADE_HEIGHT}
+          placeholderIcon="person"
+          placeholderSize={80}
+        >
+          {/* Alt bilgi (alt bulanık şeridin üstünde) */}
           <View style={styles.heroBottom}>
             <Text style={styles.heroName}>{actor.name}</Text>
             <View style={styles.heroMeta}>
@@ -451,9 +543,23 @@ const ActorViewScreen = ({ route, navigation }) => {
               <FollowPersonButton person={actor} />
               {/* Kişinin fotoğrafını profil avatarı yap (onaylı; fotoğrafsızsa çizilmez). */}
               <PersonAvatarButton person={actor} />
+              {aiRequest.prompt ? (
+                <HeroIconButton
+                  icon="sparkles"
+                  label={i18nText("autoI18n.yapay_zeka", "Yapay Zeka")}
+                  onPress={openAi}
+                />
+              ) : null}
+              {chatMedia ? (
+                <HeroIconButton
+                  icon="paper-plane"
+                  label={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+                  onPress={() => setSendVisible(true)}
+                />
+              ) : null}
             </View>
           </View>
-        </View>
+        </DetailHeroStage>
 
         {/* ── Doğum Bilgileri Pill'leri ── */}
         <ScrollView
@@ -637,6 +743,23 @@ const ActorViewScreen = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
         />
       </SafeAreaView>
+
+      {aiMounted ? (
+        <AIChatScreen
+          visible={aiVisible}
+          onClose={() => setAiVisible(false)}
+          initialPrompt={aiRequest.prompt}
+          initialDisplay={aiRequest.display}
+        />
+      ) : null}
+      <NewConversationSheet
+        visible={sendVisible}
+        onClose={() => setSendVisible(false)}
+        onSelect={sendToRecipient}
+        includeGroups
+        title={i18nText("autoI18n.sohbete_gonder", "Sohbete gönder")}
+        subtitle={i18nText("autoI18n.gonderilecek_kisiyi_veya_grubu_sec", "Göndermek istediğin arkadaşını veya grubu seç")}
+      />
     </View>
   );
 };
@@ -674,9 +797,10 @@ const styles = StyleSheet.create({
   },
 
   // ── Hero ─────────────────────────────────────────────────────────────────
+  // Hapların altı tema geçişinin (HERO_FADE_HEIGHT) hemen üstünde biter.
   heroBottom: {
     position: "absolute",
-    bottom: 20,
+    bottom: HERO_FADE_HEIGHT - 4,
     left: 20,
     right: 20,
   },
@@ -713,7 +837,19 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   popText: { color: "#f5c518", fontSize: 12, fontWeight: "700" },
-  heroActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
+  heroActions: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 12 },
+  // Yükseklik haplarla aynı (8 + 16 + 8 dolgu + 2 çerçeve ≈ 34).
+  heroIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(255,255,255,0.35)",
+  },
+  heroIconBtnPressed: { opacity: 0.8 },
 
   // ── Info pills ────────────────────────────────────────────────────────────
   pillsRow: {
