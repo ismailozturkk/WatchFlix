@@ -22,6 +22,8 @@
 
 import { APP_ICON_IDS, DEFAULT_APP_ICON_ID } from "../../utils/appIcons";
 import { POSTER_CORNER_SCALES } from "../../utils/posterCorners";
+import { POSTER_SIZES } from "../../utils/posterSizes";
+import { WEATHER_CHOICES } from "../../utils/weatherParticles";
 import {
   DEFAULT_HAPTIC_INTENSITY,
   DEFAULT_HAPTIC_LEVEL,
@@ -156,6 +158,25 @@ const settingsKeys = {
     default: "auto",
     validate: oneOf("auto", "low", "medium", "high"),
   },
+  // Hava efektinin türü (aç/kapa `showSnow`'da kaldı — eski kayıtlar bozulmasın).
+  // "auto" = mevsime göre (bkz. utils/weatherParticles.js WEATHER_CHOICES).
+  weatherEffect: {
+    key: "weatherEffect",
+    type: TYPES.string,
+    default: "snow",
+    validate: oneOf(...WEATHER_CHOICES),
+  },
+  // Film/dizi/sezon/bölüm detayında atmosfer yapımın türlerinden gelir
+  // (aksiyon → kıvılcım, romantik → kalp...; bkz. weatherParticles GENRE_EFFECT).
+  // Kapalıysa detaylarda da seçili atmosfer çizilir.
+  atmosphereByGenre: { key: "atmosphereByGenre", type: TYPES.boolean, default: true },
+  // Hava efekti parçacık sayısı: "auto" efekt modunu izler.
+  weatherDensity: {
+    key: "weatherDensity",
+    type: TYPES.string,
+    default: "auto",
+    validate: oneOf("auto", "low", "medium", "high"),
+  },
   // Ambiyans saydamlık çarpanı (0.2–1); 1 = tasarlanan loşluk.
   ambientOpacity: {
     key: "ambientOpacity",
@@ -269,7 +290,7 @@ const settingsKeys = {
     key: "railPosterSize",
     type: TYPES.string,
     default: "normal",
-    validate: oneOf("normal", "small"),
+    validate: oneOf(...POSTER_SIZES),
   },
   railPosterRadius: {
     key: "railPosterRadius",
@@ -373,16 +394,24 @@ const settingsKeys = {
     key: "listGridStyle",
     type: TYPES.number,
     default: 1,
-    validate: oneOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+    validate: oneOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),
     // Anahtar iki kuşak gördü: önce boolean ("true"/"false" = 1/2 sütun),
-    // sonra sayı ("1".."4"; 5–11 sonradan eklendi, bkz. ListCovers.LIST_LAYOUT).
+    // sonra sayı ("1".."4"; 5–14 sonradan eklendi, bkz. ListCovers.LIST_LAYOUT).
     // İkisi de aynı fiziksel adı kullandığı için dönüşüm burada; okuma yolunda tolerans bırakmıyoruz.
     fromLegacy: (raw) => {
       if (raw === "true") return { ok: true, value: 1 };
       if (raw === "false") return { ok: true, value: 2 };
       const n = parseInt(raw, 10);
-      return n >= 1 && n <= 11 ? { ok: true, value: n } : { ok: false };
+      return n >= 1 && n <= 14 ? { ok: true, value: n } : { ok: false };
     },
+  },
+  listLayoutDirections: {
+    key: "listLayoutDirections",
+    type: TYPES.json,
+    default: { 8: "right", 10: "right", 11: "right" },
+    validate: (value) =>
+      plainObject(value) &&
+      [8, 10, 11].every((id) => value[id] === "left" || value[id] === "right"),
   },
   allCornersRounded: { key: "allCornersRounded", type: TYPES.boolean, default: false },
   statsCountMode: {

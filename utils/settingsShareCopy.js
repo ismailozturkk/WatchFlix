@@ -69,6 +69,7 @@ export const SETTINGS_SHARE_COPY = {
     radius: { sharp: "Keskin köşeler", subtle: "Hafif köşeler", normal: "Normal köşeler", soft: "Yumuşak köşeler", round: "Yuvarlak köşeler" },
     allRounded: "Tüm kartlar yuvarlak",
     smallPosters: "Küçük afişler",
+    xsmallPosters: "Daha küçük afişler",
     columns: (lists, seeAll) => `Listeler ${lists} sütun · Tümü ${seeAll} sütun`,
     badges: (n) => (n > 0 ? `${n} afiş rozeti` : "Afiş rozetleri kapalı"),
     hidden: (n) => (n > 0 ? `${n} bölüm gizli` : "Tüm bölümler görünür"),
@@ -128,6 +129,7 @@ export const SETTINGS_SHARE_COPY = {
     radius: { sharp: "Sharp corners", subtle: "Subtle corners", normal: "Normal corners", soft: "Soft corners", round: "Round corners" },
     allRounded: "All cards rounded",
     smallPosters: "Small posters",
+    xsmallPosters: "Smaller posters",
     columns: (lists, seeAll) => `Lists ${lists} columns · See all ${seeAll} columns`,
     badges: (n) => (n > 0 ? `${n} poster badge${n === 1 ? "" : "s"}` : "Poster badges off"),
     hidden: (n) => (n > 0 ? `${n} section${n === 1 ? "" : "s"} hidden` : "All sections visible"),
@@ -187,6 +189,7 @@ export const SETTINGS_SHARE_COPY = {
     radius: { sharp: "Esquinas rectas", subtle: "Esquinas leves", normal: "Esquinas normales", soft: "Esquinas suaves", round: "Esquinas redondas" },
     allRounded: "Todas las tarjetas redondeadas",
     smallPosters: "Pósteres pequeños",
+    xsmallPosters: "Pósteres más pequeños",
     columns: (lists, seeAll) => `Listas ${lists} columnas · Ver todo ${seeAll} columnas`,
     badges: (n) => (n > 0 ? `${n} insignia${n === 1 ? "" : "s"} de póster` : "Insignias desactivadas"),
     hidden: (n) => (n > 0 ? `${n} sección${n === 1 ? "" : "es"} oculta${n === 1 ? "" : "s"}` : "Todas las secciones visibles"),
@@ -246,6 +249,7 @@ export const SETTINGS_SHARE_COPY = {
     radius: { sharp: "Cantos retos", subtle: "Cantos leves", normal: "Cantos normais", soft: "Cantos suaves", round: "Cantos redondos" },
     allRounded: "Todos os cartões arredondados",
     smallPosters: "Pôsteres pequenos",
+    xsmallPosters: "Pôsteres menores",
     columns: (lists, seeAll) => `Listas ${lists} colunas · Ver tudo ${seeAll} colunas`,
     badges: (n) => (n > 0 ? `${n} selo${n === 1 ? "" : "s"} de pôster` : "Selos desligados"),
     hidden: (n) => (n > 0 ? `${n} seç${n === 1 ? "ão oculta" : "ões ocultas"}` : "Todas as seções visíveis"),
@@ -305,6 +309,7 @@ export const SETTINGS_SHARE_COPY = {
     radius: { sharp: "Eckige Ecken", subtle: "Leicht gerundete Ecken", normal: "Normale Ecken", soft: "Weiche Ecken", round: "Runde Ecken" },
     allRounded: "Alle Karten abgerundet",
     smallPosters: "Kleine Poster",
+    xsmallPosters: "Kleinere Poster",
     columns: (lists, seeAll) => `Listen ${lists} Spalten · Alle ${seeAll} Spalten`,
     badges: (n) => (n > 0 ? `${n} Poster-Abzeichen` : "Poster-Abzeichen aus"),
     hidden: (n) => (n > 0 ? `${n} Bereich${n === 1 ? "" : "e"} ausgeblendet` : "Alle Bereiche sichtbar"),
@@ -377,6 +382,7 @@ function postersSummary(values, copy) {
   if (bucket) parts.push(copy.radius[bucket]);
   if (values.allCornersRounded === true) parts.push(copy.allRounded);
   if (values.railPosterSize === "small") parts.push(copy.smallPosters);
+  else if (values.railPosterSize === "xsmall") parts.push(copy.xsmallPosters);
   return parts.join(" · ");
 }
 

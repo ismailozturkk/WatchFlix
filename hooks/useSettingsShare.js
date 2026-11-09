@@ -80,6 +80,8 @@ export default function useSettingsShare() {
         return !!c.profileUi?.allCornersRounded;
       case "listGridStyle":
         return c.profileUi?.gridStyle ?? get(Keys.listGridStyle);
+      case "listLayoutDirections":
+        return c.profileUi?.listLayoutDirections ?? get(Keys.listLayoutDirections);
       case "sectionVisibility":
         return normalizeSectionVisibility(get(Keys.sectionVisibility));
       default:
@@ -122,6 +124,9 @@ export default function useSettingsShare() {
       }
       case "effects": {
         if (has("showSnow")) c.snow.changeShowSnow(values.showSnow === true);
+        // Tür serbest (kapı aç/kapa bayrağında); depoya yazılır, katman useStored ile izler.
+        if (has("weatherEffect")) set(Keys.weatherEffect, orDefault(values.weatherEffect, "weatherEffect"));
+        if (has("atmosphereByGenre")) set(Keys.atmosphereByGenre, values.atmosphereByGenre !== false);
         if (has("showAmbientBackground")) c.ambient.changeShowAmbientBackground(values.showAmbientBackground === true);
         if (has("showIconBackground")) c.iconBackground.changeShowIconBackground(values.showIconBackground === true);
         if (has("iconBackgroundMode")) {
@@ -150,6 +155,11 @@ export default function useSettingsShare() {
         if (has("listsGridColumns")) c.layout.changeListsGridColumns(orDefault(values.listsGridColumns, "listsGridColumns"));
         if (has("seeAllGridColumns")) c.layout.changeSeeAllGridColumns(orDefault(values.seeAllGridColumns, "seeAllGridColumns"));
         if (has("listGridStyle")) c.profileUi?.saveListGridStyle?.(orDefault(values.listGridStyle, "listGridStyle"));
+        if (values.listLayoutDirections && typeof values.listLayoutDirections === "object") {
+          for (const id of [8, 10, 11]) {
+            c.profileUi?.saveListLayoutDirection?.(id, values.listLayoutDirections[id]);
+          }
+        }
         if (values.listPosterInfo && typeof values.listPosterInfo === "object") {
           // Bilinmeyen anahtarı context zaten yok sayar.
           for (const [key, value] of Object.entries(values.listPosterInfo)) c.layout.changeListPosterInfo(key, value === true);

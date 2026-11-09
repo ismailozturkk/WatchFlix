@@ -46,6 +46,8 @@ export const SETTINGS_SHARE_SECTIONS = Object.freeze([
     icon: "sparkles",
     keys: Object.freeze([
       "showSnow",
+      "weatherEffect",
+      "atmosphereByGenre",
       "showAmbientBackground",
       "showIconBackground",
       "iconBackgroundMode",
@@ -70,7 +72,7 @@ export const SETTINGS_SHARE_SECTIONS = Object.freeze([
   {
     id: "lists",
     icon: "grid",
-    keys: Object.freeze(["listsGridColumns", "seeAllGridColumns", "listGridStyle", "listPosterInfo", "posterBadges"]),
+    keys: Object.freeze(["listsGridColumns", "seeAllGridColumns", "listGridStyle", "listLayoutDirections", "listPosterInfo", "posterBadges"]),
   },
   { id: "home", icon: "layers", keys: Object.freeze(["sectionVisibility"]) },
 ]);
