@@ -1,14 +1,12 @@
-// Arkadaş şeridi modeli: rozet yalnız EYLEM bekleyen sayılar için; bilgi sayısı
-// (arkadaş sayısı) rozet olmaz, "Arkadaşlar" karosunda ikonun yerinde düz rakam olur.
+// Arkadaş şeridi modeli: rozet yalnız EYLEM bekleyen sayılar için. Mesajlar tekil +
+// grup toplamını TEK rozette taşır; arkadaş sayısı şeritte hiç gösterilmez.
 
 import fs from "fs";
 import path from "path";
 import {
   BADGE_CAP,
-  FRIEND_COUNT_CAP,
   buildFriendsBarModel,
   formatBadge,
-  formatFriendCount,
 } from "../utils/friendsBarModel";
 
 describe("formatBadge", () => {
@@ -31,39 +29,22 @@ describe("formatBadge", () => {
   });
 });
 
-// Arkadaşlar karosunda sayı İKONUN YERİNDE durur; 0 iken ikon kalır (boş durumda
-// "0" yazmak yerine ikon "arkadaş ekle" çağrısını taşır).
-describe("formatFriendCount", () => {
-  test("0 / geçersiz değer boş metin: çağıran ikonu çizer", () => {
-    expect(formatFriendCount(0)).toBe("");
-    expect(formatFriendCount(-2)).toBe("");
-    expect(formatFriendCount(NaN)).toBe("");
-    expect(formatFriendCount(undefined)).toBe("");
-  });
-
-  test("1..999 sayıyı olduğu gibi yazar", () => {
-    expect(formatFriendCount(1)).toBe("1");
-    expect(formatFriendCount(24)).toBe("24");
-    expect(formatFriendCount(FRIEND_COUNT_CAP)).toBe("999");
-  });
-
-  test("karoya sığması için 999 üstü 999+ olur", () => {
-    expect(formatFriendCount(1000)).toBe("999+");
-    expect(formatFriendCount(54321)).toBe("999+");
-  });
-});
-
 describe("buildFriendsBarModel", () => {
-  test("arkadaş sayısı ASLA rozet olmaz, count olarak döner", () => {
+  test("arkadaş sayısı şeride taşınmaz: ne rozet ne sayı", () => {
     const m = buildFriendsBarModel({ friendCount: 24 });
-    expect(m.friends.badge).toBe(0);
-    expect(m.friends.count).toBe(24);
+    expect(m.friends).toEqual({ badge: 0 });
+    expect(JSON.stringify(m)).not.toContain("24");
   });
 
   test("okunmamış mesaj ve gelen istek rozet olur", () => {
     const m = buildFriendsBarModel({ unreadMessages: 3, incomingRequests: 2 });
     expect(m.messages.badge).toBe(3);
     expect(m.requests.badge).toBe(2);
+  });
+
+  test("Mesajlar tek rozet taşır (tekil + grup toplamı ayrı alan değil)", () => {
+    const m = buildFriendsBarModel({ unreadMessages: 8 });
+    expect(m.messages).toEqual({ badge: 8 });
   });
 
   test("Ara ve Arkadaşlar hiçbir koşulda rozet taşımaz", () => {
@@ -76,7 +57,6 @@ describe("buildFriendsBarModel", () => {
     const m = buildFriendsBarModel({});
     expect(m.search.badge).toBe(0);
     expect(m.friends.badge).toBe(0);
-    expect(m.friends.count).toBe(0);
     expect(m.messages.badge).toBe(0);
     expect(m.requests.badge).toBe(0);
   });
@@ -84,11 +64,9 @@ describe("buildFriendsBarModel", () => {
   test("argümansız çağrı ve bozuk sayılar çökmez", () => {
     expect(() => buildFriendsBarModel()).not.toThrow();
     const m = buildFriendsBarModel({
-      friendCount: -5,
       unreadMessages: NaN,
       incomingRequests: undefined,
     });
-    expect(m.friends.count).toBe(0);
     expect(m.messages.badge).toBe(0);
     expect(m.requests.badge).toBe(0);
   });

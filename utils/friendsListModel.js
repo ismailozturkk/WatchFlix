@@ -124,19 +124,21 @@ export function totalUnread(conversations) {
  * sıfırlar — 1-1'deki `conversations.unreadCount`'un grup karşılığı. Bozuk/negatif
  * değer 0 sayılır.
  */
-export function groupUnreadCount(inbox, groupId) {
+export function groupUnreadCount(inbox, groupId, legacyUnread = 0) {
   if (!groupId) return 0;
   const n = Math.floor(Number(inbox?.[groupId]));
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  const old = Math.floor(Number(legacyUnread));
+  return (Number.isFinite(n) && n > 0 ? n : 0) +
+    (Number.isFinite(old) && old > 0 ? old : 0);
 }
 
 /**
  * ÜYESİ OLUNAN grupların okunmamış toplamı. Gelen kutusunda çıkarılınan grubun
  * bayat kaydı kalabilir; yalnız `groups` listesindekiler sayılır.
  */
-export function totalGroupUnread(groups, inbox) {
+export function totalGroupUnread(groups, inbox, uid) {
   let sum = 0;
-  for (const g of groups || []) sum += groupUnreadCount(inbox, g?.id);
+  for (const g of groups || []) sum += groupUnreadCount(inbox, g?.id, g?.unread?.[uid]);
   return sum;
 }
 

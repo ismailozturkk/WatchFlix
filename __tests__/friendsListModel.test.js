@@ -199,6 +199,26 @@ describe("grup okunmamış sayacı (gelen kutusu)", () => {
     expect(totalGroupUnread(undefined, inbox)).toBe(0);
     expect(totalGroupUnread(groups, undefined)).toBe(0);
   });
+
+  // Eski istemciler sayacı grup belgesinde (groups/{id}.unread.{uid}) artırır.
+  test("eski istemcinin grup belgesindeki sayacı gelen kutusuna eklenir", () => {
+    expect(groupUnreadCount(inbox, "g1", 2)).toBe(5);
+    expect(groupUnreadCount({}, "g1", 4)).toBe(4);
+    expect(groupUnreadCount(inbox, "g1", -1)).toBe(3);
+    expect(groupUnreadCount(inbox, "g1", "x")).toBe(3);
+    expect(groupUnreadCount(inbox, undefined, 4)).toBe(0);
+  });
+
+  test("toplam her grubun eski sayacından YALNIZ bu kullanıcınınkini alır", () => {
+    const groups = [
+      { id: "g1", unread: { veli: 2, ali: 7 } },
+      { id: "g5", unread: { veli: 1 } },
+      { id: "g3" },
+    ];
+    expect(totalGroupUnread(groups, inbox, "veli")).toBe(8);
+    expect(totalGroupUnread(groups, inbox, "ali")).toBe(12);
+    expect(totalGroupUnread(groups, inbox)).toBe(5);
+  });
 });
 
 describe("groupUnreadRecipients", () => {
