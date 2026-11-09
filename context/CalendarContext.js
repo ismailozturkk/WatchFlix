@@ -103,7 +103,7 @@ export const CalendarProvider = ({ children }) => {
       });
     });
     return rMap;
-  }, [movieReminderEvents, tvReminderEpisodes]);
+  }, [movieReminderEvents, tvReminderEpisodes, getTmdbUrl]);
 
   // Yerel kopya hazır değilken (yalnız yeni cihazda tek seferlik indirme sırasında)
   // yükleniyor görünür; normal açılışta hep false.
@@ -169,18 +169,21 @@ export const CalendarProvider = ({ children }) => {
     setTimeout(() => setFlash(false), 300);
   }, []);
 
+  const value = useMemo(
+    () => ({
+      noteEvents,
+      reminderEvents,
+      markedDates,
+      isLoadingEvents,
+      getEventsForDate,
+      upcomingItems,
+      refreshEvents,
+    }),
+    [noteEvents, reminderEvents, markedDates, isLoadingEvents, getEventsForDate, upcomingItems, refreshEvents],
+  );
+
   return (
-    <CalendarContext.Provider
-      value={{
-        noteEvents,
-        reminderEvents,
-        markedDates,
-        isLoadingEvents,
-        getEventsForDate,
-        upcomingItems,
-        refreshEvents,
-      }}
-    >
+    <CalendarContext.Provider value={value}>
       {children}
     </CalendarContext.Provider>
   );

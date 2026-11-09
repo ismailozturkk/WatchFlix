@@ -2,7 +2,6 @@ import { intlLocaleOf } from "../utils/appLanguages";
 import React, {
   createContext, useContext, useEffect, useState, useMemo, useRef, useCallback,
 } from "react";
-import { Animated } from "react-native";
 import { Keys, get, set, getActiveUser } from "../services/storage";
 import { useAuth } from "./AuthContext";
 import { useLanguage } from "./LanguageContext";
@@ -40,6 +39,31 @@ const formatTime = (minutes) => {
   const hours  = Math.floor((minutes % (24 * 60)) / 60);
   const mins   = minutes % 60;
   return { years, months, days, hours, minutes: mins };
+};
+
+const COUNTER_KEYS = [
+  "watchedMovieCount", "totalMinutesTime", "watchedTvCount", "totalSeasonsCount",
+  "totalEpisodesCount", "totalMinutesTimeTv", "uniqueMovieCount", "uniqueTvCount",
+  "uniqueSeasonsCount", "uniqueEpisodesCount",
+];
+
+/** Önbellek tohumundan sayaç nesnesi (eksik alan 0). */
+const countersFromSeed = (data = {}) => {
+  const out = {};
+  for (const k of COUNTER_KEYS) out[k] = data?.[k] ?? 0;
+  return out;
+};
+
+/** Yalnız değişen alan varsa yeni nesne döndürür; yoksa `prev` (render yok). */
+const mergeCounters = (prev, patch) => {
+  let next = null;
+  for (const k of Object.keys(patch)) {
+    if (prev[k] !== patch[k]) {
+      if (!next) next = { ...prev };
+      next[k] = patch[k];
+    }
+  }
+  return next || prev;
 };
 
 const parseDate = (date) => {
@@ -197,19 +221,19 @@ export const ProfileStatsProvider = ({ children }) => {
     [uid],
   );
 
-  const [watchedMovieCount,   setWatchedMovieCount]   = useState(statsSeed.watchedMovieCount ?? 0);
-  const [totalWatchedTime,    setTotalWatchedTime]     = useState(statsSeed.totalWatchedTime ?? {});
-  const [totalMinutesTime,    setTotalMinutesTime]     = useState(statsSeed.totalMinutesTime ?? 0);
-  const [watchedTvCount,      setWatchedTvCount]       = useState(statsSeed.watchedTvCount ?? 0);
-  const [totalSeasonsCount,   setTotalSeasonsCount]    = useState(statsSeed.totalSeasonsCount ?? 0);
-  const [totalEpisodesCount,  setTotalEpisodesCount]   = useState(statsSeed.totalEpisodesCount ?? 0);
-  const [totalWatchedTimeTv,  setTotalWatchedTimeTv]   = useState(statsSeed.totalWatchedTimeTv ?? {});
-  const [totalMinutesTimeTv,  setTotalMinutesTimeTv]   = useState(statsSeed.totalMinutesTimeTv ?? 0);
-
-  const [uniqueMovieCount,    setUniqueMovieCount]    = useState(statsSeed.uniqueMovieCount ?? 0);
-  const [uniqueTvCount,       setUniqueTvCount]       = useState(statsSeed.uniqueTvCount ?? 0);
-  const [uniqueSeasonsCount,  setUniqueSeasonsCount]  = useState(statsSeed.uniqueSeasonsCount ?? 0);
-  const [uniqueEpisodesCount, setUniqueEpisodesCount] = useState(statsSeed.uniqueEpisodesCount ?? 0);
+  // Sayaçlar TEK state nesnesinde: eskiden 12 ayrı useState vardı ve her izleme
+  // değişikliğinde effect'ler 4-8 ayrı setState çağırıyordu (art arda render
+  // dalgası). `mergeCounters` değer değişmediyse aynı nesneyi döndürür → hiç
+  // render olmaz. Süre nesneleri (yıl/ay/gün…) dakikadan türetilir, state'te
+  // tutulmaz.
+  const [counters, setCounters] = useState(() => countersFromSeed(statsSeed));
+  const {
+    watchedMovieCount, totalMinutesTime, watchedTvCount, totalSeasonsCount,
+    totalEpisodesCount, totalMinutesTimeTv, uniqueMovieCount, uniqueTvCount,
+    uniqueSeasonsCount, uniqueEpisodesCount,
+  } = counters;
+  const totalWatchedTime   = useMemo(() => formatTime(totalMinutesTime), [totalMinutesTime]);
+  const totalWatchedTimeTv = useMemo(() => formatTime(totalMinutesTimeTv), [totalMinutesTimeTv]);
 
   const [isLoading]          = useState(false);
   const [loadingTv,          setLoadingTv]          = useState(false);
@@ -222,7 +246,6 @@ export const ProfileStatsProvider = ({ children }) => {
   const [selectedDate,   setSelectedDate]   = useState(null);
   const [selectedDateTv, setSelectedDateTv] = useState(null);
   const [timeDisplayMode, setTimeDisplayMode] = useState("minutes");
-  const [scaleValues,     setScaleValues]     = useState({});
   const [statsCountMode,  setStatsCountMode]  = useState(() => get(Keys.statsCountMode));
 
   // ── HESAP DEĞİŞİMİNDE SAYAÇLARI SIFIRLA ──────────────────────────────────
@@ -238,21 +261,9 @@ export const ProfileStatsProvider = ({ children }) => {
     previousUidRef.current = uid;
     if (!previous || previous === uid) return;
     const fresh = (uid ? seed(cacheKeys.stats(uid)).data : null) || {};
-    setWatchedMovieCount(fresh.watchedMovieCount ?? 0);
-    setTotalWatchedTime(fresh.totalWatchedTime ?? {});
-    setTotalMinutesTime(fresh.totalMinutesTime ?? 0);
-    setWatchedTvCount(fresh.watchedTvCount ?? 0);
-    setTotalSeasonsCount(fresh.totalSeasonsCount ?? 0);
-    setTotalEpisodesCount(fresh.totalEpisodesCount ?? 0);
-    setTotalWatchedTimeTv(fresh.totalWatchedTimeTv ?? {});
-    setTotalMinutesTimeTv(fresh.totalMinutesTimeTv ?? 0);
-    setUniqueMovieCount(fresh.uniqueMovieCount ?? 0);
-    setUniqueTvCount(fresh.uniqueTvCount ?? 0);
-    setUniqueSeasonsCount(fresh.uniqueSeasonsCount ?? 0);
-    setUniqueEpisodesCount(fresh.uniqueEpisodesCount ?? 0);
+    setCounters(countersFromSeed(fresh));
     setSelectedDate(null);
     setSelectedDateTv(null);
-    setScaleValues({});
     lazyCacheRef.current = {};
   }, [uid]);
 
@@ -272,22 +283,22 @@ export const ProfileStatsProvider = ({ children }) => {
     }
 
     if (precomputedStats) {
+      const patch = {};
       if (precomputedStats.movies) {
-        setWatchedMovieCount(precomputedStats.movies.totalRewatchCount || 0);
-        setUniqueMovieCount(precomputedStats.movies.uniqueCount || 0);
-        setTotalMinutesTime(precomputedStats.movies.totalMinutes || 0);
-        setTotalWatchedTime(formatTime(precomputedStats.movies.totalMinutes || 0));
+        patch.watchedMovieCount = precomputedStats.movies.totalRewatchCount || 0;
+        patch.uniqueMovieCount = precomputedStats.movies.uniqueCount || 0;
+        patch.totalMinutesTime = precomputedStats.movies.totalMinutes || 0;
       }
       if (precomputedStats.tv) {
-        setWatchedTvCount(precomputedStats.tv.shows?.total || 0);
-        setUniqueTvCount(precomputedStats.tv.shows?.unique || 0);
-        setTotalSeasonsCount(precomputedStats.tv.seasons?.total || 0);
-        setUniqueSeasonsCount(precomputedStats.tv.seasons?.unique || 0);
-        setTotalEpisodesCount(precomputedStats.tv.episodes?.total || 0);
-        setUniqueEpisodesCount(precomputedStats.tv.episodes?.unique || 0);
-        setTotalMinutesTimeTv(precomputedStats.tv.totalMinutes || 0);
-        setTotalWatchedTimeTv(formatTime(precomputedStats.tv.totalMinutes || 0));
+        patch.watchedTvCount = precomputedStats.tv.shows?.total || 0;
+        patch.uniqueTvCount = precomputedStats.tv.shows?.unique || 0;
+        patch.totalSeasonsCount = precomputedStats.tv.seasons?.total || 0;
+        patch.uniqueSeasonsCount = precomputedStats.tv.seasons?.unique || 0;
+        patch.totalEpisodesCount = precomputedStats.tv.episodes?.total || 0;
+        patch.uniqueEpisodesCount = precomputedStats.tv.episodes?.unique || 0;
+        patch.totalMinutesTimeTv = precomputedStats.tv.totalMinutes || 0;
       }
+      setCounters((prev) => mergeCounters(prev, patch));
       setLoadingMovies(false);
       setLoadingTv(false);
     }
@@ -337,10 +348,11 @@ export const ProfileStatsProvider = ({ children }) => {
     }
     const totalMin = movieHistoryItems.reduce((acc, movie) => acc + (movie.minutes || 0), 0);
     const counts = countMovieWatchStats(movieHistoryItems);
-    setWatchedMovieCount(counts.total);
-    setUniqueMovieCount(counts.unique);
-    setTotalMinutesTime(totalMin);
-    setTotalWatchedTime(formatTime(totalMin));
+    setCounters((prev) => mergeCounters(prev, {
+      watchedMovieCount: counts.total,
+      uniqueMovieCount: counts.unique,
+      totalMinutesTime: totalMin,
+    }));
   }, [movieHistoryItems, precomputedStats, statsSeed]);
 
   // ── Dizi istatistikleri ─────────────────────────────────────────────────
@@ -358,14 +370,15 @@ export const ProfileStatsProvider = ({ children }) => {
       0,
     );
     const counts = countTvWatchStats(tvHistoryStates);
-    setWatchedTvCount(counts.shows.total);
-    setUniqueTvCount(counts.shows.unique);
-    setTotalSeasonsCount(counts.seasons.total);
-    setUniqueSeasonsCount(counts.seasons.unique);
-    setTotalEpisodesCount(counts.episodes.total);
-    setUniqueEpisodesCount(counts.episodes.unique);
-    setTotalMinutesTimeTv(totalMinTv);
-    setTotalWatchedTimeTv(formatTime(totalMinTv));
+    setCounters((prev) => mergeCounters(prev, {
+      watchedTvCount: counts.shows.total,
+      uniqueTvCount: counts.shows.unique,
+      totalSeasonsCount: counts.seasons.total,
+      uniqueSeasonsCount: counts.seasons.unique,
+      totalEpisodesCount: counts.episodes.total,
+      uniqueEpisodesCount: counts.episodes.unique,
+      totalMinutesTimeTv: totalMinTv,
+    }));
   }, [flatEpisodesTv, tvHistoryStates, precomputedStats, statsSeed]);
 
   // ── Sayaçları sonraki açılış için sakla ─────────────────────────────────
@@ -424,33 +437,6 @@ export const ProfileStatsProvider = ({ children }) => {
   const displayMovieCount    = uniqueMode ? uniqueMovieCount    : watchedMovieCount;
   const displayTvCount       = uniqueMode ? uniqueTvCount       : watchedTvCount;
   const displayEpisodesCount = uniqueMode ? uniqueEpisodesCount : totalEpisodesCount;
-
-  // ── Animation values for movie stats list ────────────────────────────────
-  // Only create new Animated.Values for new items — existing ones are preserved
-  useEffect(() => {
-    if (!movieHistoryItems?.length) return;
-    setScaleValues((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      movieHistoryItems.forEach((item) => {
-        const key = item.historyId || item.id;
-        if (!next[key]) {
-          next[key] = new Animated.Value(1);
-          changed = true;
-        }
-      });
-      return changed ? next : prev;
-    });
-  }, [movieHistoryItems]);
-
-  const onPressIn = (id) => {
-    if (!scaleValues[id]) return;
-    Animated.timing(scaleValues[id], { toValue: 0.9, duration: 200, useNativeDriver: true }).start();
-  };
-  const onPressOut = (id) => {
-    if (!scaleValues[id]) return;
-    Animated.timing(scaleValues[id], { toValue: 1, duration: 200, useNativeDriver: true }).start();
-  };
 
   const handleTimeClick = () =>
     setTimeDisplayMode((p) => p === "minutes" ? "hours" : p === "hours" ? "days" : "minutes");
@@ -657,7 +643,6 @@ export const ProfileStatsProvider = ({ children }) => {
       watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems, setListItems,
       movieHistoryItems,
       isloadingMovieInfo, loadingMovies, selectedDate, setSelectedDate,
-      scaleValues,
       // TV stats
       watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
       listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv,
@@ -668,7 +653,7 @@ export const ProfileStatsProvider = ({ children }) => {
       statsCountMode, toggleStatsCountMode,
       displayMovieCount, displayTvCount, displayEpisodesCount,
       // Shared helpers
-      timeDisplayMode, handleTimeClick, formatTotalDurationTime, formatDate, onPressIn, onPressOut,
+      timeDisplayMode, handleTimeClick, formatTotalDurationTime, formatDate,
       t,
       // Rank
       ...rankInfo,
@@ -701,7 +686,7 @@ export const ProfileStatsProvider = ({ children }) => {
     displayLists, isLoading,
     watchedMovieCount, totalWatchedTime, totalMinutesTime, listItems,
     movieHistoryItems,
-    isloadingMovieInfo, loadingMovies, selectedDate, scaleValues,
+    isloadingMovieInfo, loadingMovies, selectedDate,
     watchedTvCount, totalSeasonsCount, totalEpisodesCount, totalWatchedTimeTv, totalMinutesTimeTv,
     listItemsTv, loadingTv, isloadingShowInfo, flatEpisodesTv, tvHistoryStates,
     selectedDateTv,

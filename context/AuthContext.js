@@ -158,16 +158,15 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
+  // Memo: ~100 tüketici var; değer her render'da yeni nesne olursa sağlayıcının
+  // her yeniden çizimi hepsini yeniden çizdirir.
+  const value = useMemo(
+    () => ({ user, loading, initialRoute, needsProfileCompletion, markProfileCompleted }),
+    [user, loading, initialRoute, needsProfileCompletion, markProfileCompleted],
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        initialRoute,
-        needsProfileCompletion,
-        markProfileCompleted,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
