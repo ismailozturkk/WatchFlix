@@ -9,7 +9,8 @@
 //   tone              → soft/primary için renk (varsayılan: tema vurgusu)
 
 import React, { memo } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "@context/ThemeContext";
 import { alpha } from "@theme/colors";
@@ -73,7 +74,7 @@ function PillButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={foreground} />
+        <LensLoader tone="mono" size="small" color={foreground} />
       ) : (
         <View style={[styles.content, { gap: dim.gap }]}>
           {icon ? <Ionicons name={icon} size={dim.icon} color={foreground} /> : null}

@@ -4,7 +4,8 @@
 // veri indirme + önbellek yönetimi tek ekranda.
 
 import React, { useEffect, useState } from "react";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import PermissionsSection from "@components/PermissionsSection";
 import CacheManagerModal from "@components/CacheManagerModal";
 import { appAlert } from "@components/AppAlert";
@@ -184,7 +185,7 @@ export default function PermissionsDataScreen() {
           onPress={handleDownloadData}
           right={
             downloading ? (
-              <ActivityIndicator size="small" color={C.blue} />
+              <LensLoader size="small" color={C.blue} />
             ) : (
               <Chevron color={C.muted} />
             )

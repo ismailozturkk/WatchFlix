@@ -5,7 +5,8 @@
 // onun yerinde küçük bir dönen gösterge çıkar.
 
 import React, { memo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import LensLoader from "../LensLoader";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "@context/ThemeContext";
 import { alpha } from "@theme/colors";
@@ -71,7 +72,7 @@ function FriendsSearchField({
         style={[styles.input, { color: theme.text?.primary ?? "#fff" }]}
       />
       {loading ? (
-        <ActivityIndicator size="small" color={theme.accent} />
+        <LensLoader size="small" color={theme.accent} />
       ) : value.length > 0 ? (
         <Pressable
           onPress={clear}

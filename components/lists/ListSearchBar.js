@@ -18,13 +18,13 @@ import { alpha } from "@theme/colors";
 
 import React, { memo, useRef } from "react";
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { i18nText } from "@utils/i18nText";
@@ -129,7 +129,7 @@ function ListSearchBar({
             keyboardAppearance={scheme}
           />
           {globalLoading ? (
-            <ActivityIndicator size="small" color={accent} />
+            <LensLoader size="small" color={accent} />
           ) : query.length > 0 ? (
             <TouchableOpacity onPress={() => onQueryChange("")} hitSlop={10}>
               <Ionicons
@@ -187,7 +187,7 @@ function ListSearchBar({
           }
         >
           {filtering ? (
-            <ActivityIndicator size="small" color={accent} />
+            <LensLoader size="small" color={accent} />
           ) : (
             <Feather name="sliders" size={18} color={theme.text.primary} />
           )}

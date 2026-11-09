@@ -10,11 +10,11 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "@components/AppToast";
@@ -274,7 +274,7 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
                 ? ` · ${totals.unknown > 0 ? `${i18nText("autoI18n.en_az", "en az")} ` : ""}${formatMinutes(totals.total, durationLabels)}`
                 : ""}
             </Text>
-            {hydrating && <ActivityIndicator size="small" color={theme.text.muted} />}
+            {hydrating && <LensLoader size="small" color={theme.text.muted} />}
           </View>
 
           {/* Yarım veriyi tam gibi göstermemek için: kaç öğenin süresi hâlâ
@@ -316,7 +316,7 @@ export default function SaveSharedListModal({ visible, post, onClose, onSaved })
             ]}
           >
             {saving ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <LensLoader tone="mono" size="small" color="#fff" />
             ) : (
               <Ionicons name="download-outline" size={17} color="#fff" />
             )}

@@ -15,7 +15,6 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
@@ -23,6 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheetModal from "../common/BottomSheetModal";
 import { useTheme } from "../../context/ThemeContext";
@@ -228,7 +228,7 @@ export default function FavoritePickerSheet({ visible, kind, favorites, onToggle
 
   const empty = (() => {
     if (state.status === "loading" || state.status === "idle") {
-      return <ActivityIndicator style={styles.stateBox} color={accent} />;
+      return <LensLoader style={styles.stateBox} color={accent} />;
     }
     if (state.status === "error") {
       return (

@@ -22,7 +22,6 @@
 
 import React, { forwardRef, useId, useState } from "react";
 import {
-  ActivityIndicator,
   Platform,
   Pressable,
   StyleSheet,
@@ -30,6 +29,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import Animated, {
   FadeInDown,
   useAnimatedStyle,
@@ -643,7 +643,7 @@ function SocialButton({ label, shortLabel, compact, onPress, disabled, loading, 
       ]}
     >
       <View style={styles.socialIcon}>
-        {loading ? <ActivityIndicator size="small" color={palette.fg} /> : children}
+        {loading ? <LensLoader tone="mono" size="small" color={palette.fg} /> : children}
       </View>
       <Text
         allowFontScaling={false}

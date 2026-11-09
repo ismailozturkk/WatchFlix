@@ -9,7 +9,8 @@
 //   • Bu hafta henüz XP kazanmamış oyuncu tablo yerine katılma açıklamasını görür (grup ilk XP'de atanır).
 
 import React from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import GlassTouchable from "@components/common/GlassTouchable";
@@ -190,7 +191,7 @@ export default function LeagueScreen({ navigation }) {
   if (!user && status === "loading") {
     content = (
       <View style={styles.state}>
-        <ActivityIndicator color={theme.accent} />
+        <LensLoader color={theme.accent} />
         <Text style={[styles.stateText, { color: theme.text.muted }]}>{copy.loading}</Text>
       </View>
     );

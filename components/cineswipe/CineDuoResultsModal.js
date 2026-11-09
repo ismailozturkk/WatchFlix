@@ -7,7 +7,8 @@
 // açılabiliyordu (artık işlem sürerken/bitince pasif); eylemler durum gösterir
 // (kaydediliyor ✓); sonuçlar halka + karşılaştırma çubuklarıyla özetlenir.
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import AppIcon from "../AppIcon";
@@ -88,7 +89,7 @@ function ActionButton({ state, idleIcon, idleLabel, busyLabel, doneLabel, onPres
       ]}
     >
       {busy ? (
-        <ActivityIndicator size="small" color={tint} />
+        <LensLoader size="small" color={tint} />
       ) : (
         <AppIcon family="Ionicons" name={done ? "checkmark-circle" : idleIcon} size={19} color={tint} />
       )}

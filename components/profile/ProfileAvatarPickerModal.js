@@ -1,6 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Platform,
   StyleSheet,
@@ -8,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -314,7 +314,7 @@ export default function ProfileAvatarPickerModal({
 
       {saving && (
         <View style={styles.savingOverlay}>
-          <ActivityIndicator color={theme.accent} />
+          <LensLoader color={theme.accent} />
           <Text style={[styles.savingText, { color: theme.text.primary }]}>
             {i18nText("autoI18n.kaydediliyor", "Kaydediliyor...")}
           </Text>

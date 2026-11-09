@@ -5,11 +5,11 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   ScrollView,
   Keyboard,
   useWindowDimensions,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -554,7 +554,7 @@ export default function SharedListScreen({ route, navigation }) {
           { backgroundColor: theme.primary },
         ]}
       >
-        <ActivityIndicator size="large" color={ACCENT} />
+        <LensLoader size="large" color={ACCENT} />
       </SafeAreaView>
     );
   }

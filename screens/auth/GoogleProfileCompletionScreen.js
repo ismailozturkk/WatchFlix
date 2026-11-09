@@ -2,7 +2,6 @@ import { normalizeAppLanguage } from "../../utils/appLanguages";
 import { isLightSurface } from "../../utils/colorUtils";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { Keys, remove } from "../../services/storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { deleteUser, signOut, updateProfile } from "firebase/auth";
@@ -349,7 +349,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
                 onSubmitEditing={completeProfile}
               />
               {checking ? (
-                <ActivityIndicator size="small" color={theme.accent} />
+                <LensLoader size="small" color={theme.accent} />
               ) : available !== null ? (
                 <Ionicons
                   name={available ? "checkmark-circle" : "close-circle"}
@@ -399,7 +399,7 @@ export default function GoogleProfileCompletionScreen({ navigation }) {
               ]}
             >
               {saving ? (
-                <ActivityIndicator color="#fff" />
+                <LensLoader tone="mono" color="#fff" />
               ) : (
                 <>
                   <Text style={styles.primaryText}>

@@ -11,7 +11,6 @@
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   SectionList,
   StyleSheet,
   Text,
@@ -19,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import GlassBox from "@components/common/GlassBox";
@@ -231,7 +231,7 @@ export default function PersonAvatarPanel({ current, onSelect, disabled = false 
 
   let empty = null;
   if (searchState === "loading" || (searchState === "idle" && popularState === "loading" && !sections.length)) {
-    empty = <ActivityIndicator style={styles.state} color={theme.accent} />;
+    empty = <LensLoader style={styles.state} color={theme.accent} />;
   } else if (searchState === "error" || (searchState === "idle" && popularState === "error" && !sections.length)) {
     empty = (
       <View style={styles.state}>
@@ -270,7 +270,7 @@ export default function PersonAvatarPanel({ current, onSelect, disabled = false 
           editable={!disabled}
           style={[styles.searchInput, { color: theme.text.primary }]}
         />
-        {searching && results.length ? <ActivityIndicator size="small" color={theme.text.muted} /> : null}
+        {searching && results.length ? <LensLoader size="small" color={theme.text.muted} /> : null}
         {query ? (
           <Ionicons
             name="close-circle"

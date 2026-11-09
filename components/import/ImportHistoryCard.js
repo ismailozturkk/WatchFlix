@@ -6,7 +6,8 @@
 // Veri: services/import/importStats (Users/{uid}/private/importStats).
 
 import React from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import AppIcon from "../AppIcon";
 import GlassTouchable from "../common/GlassTouchable";
@@ -104,7 +105,7 @@ function SourceBlock({ source, stats, copy, theme, locale, resetState, onAskRese
       {mine && resetState.phase === "running" ? (
         <View style={styles.resetProgress}>
           <View style={styles.resetRow}>
-            <ActivityIndicator size="small" color={danger} />
+            <LensLoader size="small" color={danger} />
             <Text style={[styles.resetRunningText, { color: theme.text.primary }]}>{h.resetting}</Text>
             {resetState.total > 0 ? (
               <Text style={[styles.resetPercent, { color: danger }]}>
@@ -182,7 +183,7 @@ export default function ImportHistoryCard({
       </View>
       {loading && !stats ? (
         <View style={styles.loading}>
-          <ActivityIndicator size="small" color={theme.text.muted} />
+          <LensLoader size="small" color={theme.text.muted} />
           <Text style={[styles.emptyText, { color: theme.text.muted }]}>{h.loading}</Text>
         </View>
       ) : sources.length === 0 ? (

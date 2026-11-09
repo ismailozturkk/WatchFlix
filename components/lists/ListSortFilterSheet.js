@@ -19,7 +19,8 @@
 // Ortak alt sayfa kabuğu (BottomSheetModal: blur yerinde solar). Karar mantığı utils/listSortFilter.js (saf, testli).
 
 import React, { memo, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View, ActivityIndicator } from "react-native";
+import { Pressable, StyleSheet, Text, View} from "react-native";
+import LensLoader from "../LensLoader";
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -436,7 +437,7 @@ function ListSortFilterSheet({
           style={[styles.apply, { backgroundColor: accent }]}
         >
           {filtering ? (
-            <ActivityIndicator size="small" color={onAccent} />
+            <LensLoader tone="mono" size="small" color={onAccent} />
           ) : (
             <Text allowFontScaling={false} numberOfLines={1} style={[styles.applyText, { color: onAccent }]}>
               {fillSortFilterCopy(copy.showResults, resultCount)}

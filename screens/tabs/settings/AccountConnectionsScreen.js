@@ -1,7 +1,6 @@
 import { normalizeAppLanguage } from "../../../utils/appLanguages";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Platform,
   StyleSheet,
   Text,
@@ -9,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import Toast from "@components/AppToast";
 import { auth } from "../../../firebase";
 import AppIcon from "../../../components/AppIcon";
@@ -317,7 +317,7 @@ export default function AccountConnectionsScreen() {
 
   const statusPill = (linked, action, labels) =>
     busyAction === action ? (
-      <ActivityIndicator size="small" color={C.accent} />
+      <LensLoader size="small" color={C.accent} />
     ) : (
       <View
         style={[
@@ -518,7 +518,7 @@ export default function AccountConnectionsScreen() {
               ]}
             >
               {busyAction === "password" ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <LensLoader tone="mono" size="small" color="#fff" />
               ) : (
                 <>
                   <AppIcon family="Ionicons" name="key-outline" size={16} color="#fff" />

@@ -1,12 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import React from "react";
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import { i18nText } from "@utils/i18nText";
@@ -175,7 +175,7 @@ export function CalendarControls({
             accessibilityState={{ disabled: isBulkLoading, busy: isBulkLoading }}
           >
             {isBulkLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <LensLoader tone="mono" size="small" color="#fff" />
             ) : (
               <Text allowFontScaling={false} style={styles.bulkButtonText}>
                 {isFuture ? i18nText("autoI18n.aktar", "Aktar") : i18nText("autoI18n.sil", "Sil")}

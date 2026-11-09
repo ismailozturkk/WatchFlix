@@ -13,13 +13,13 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -430,7 +430,7 @@ export default function ListItemActionsSheet({
             disabled={moveDisabled}
             style={[styles.primaryButton, { backgroundColor: accent }, moveDisabled && styles.disabled]}
           >
-            {busy ? <ActivityIndicator size="small" color={onAccent} /> : <Feather name="corner-down-right" size={17} color={onAccent} />}
+            {busy ? <LensLoader tone="mono" size="small" color={onAccent} /> : <Feather name="corner-down-right" size={17} color={onAccent} />}
             <Text style={[styles.primaryText, { color: onAccent }]}>
               {busy
                 ? i18nText("autoI18n.tasiniyor", "Taşınıyor...")
@@ -489,7 +489,7 @@ export default function ListItemActionsSheet({
               disabled={busy}
               style={[styles.primaryButton, styles.buttonRowPrimary, { backgroundColor: DANGER }, busy && styles.disabled]}
             >
-              {busy ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="trash-outline" size={17} color="#fff" />}
+              {busy ? <LensLoader tone="mono" size="small" color="#fff" /> : <Ionicons name="trash-outline" size={17} color="#fff" />}
               <Text style={[styles.primaryText, { color: "#fff" }]}>
                 {busy ? i18nText("autoI18n.siliniyor", "Siliniyor...") : i18nText("autoI18n.kaldir", "Kaldır")}
               </Text>

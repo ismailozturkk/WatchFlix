@@ -19,9 +19,10 @@ import {
   SectionList,
   ScrollView,
   RefreshControl,
-  ActivityIndicator,
   StyleSheet,
 } from "react-native";
+import { LENS_REFRESH_COLORS } from "../../utils/lensLoaderMotion";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -136,7 +137,7 @@ function AIHistory({
       refreshing={refreshing}
       onRefresh={onRefresh}
       tintColor={theme.text.muted}
-      colors={[theme.accent]}
+      colors={LENS_REFRESH_COLORS}
     />
   ) : undefined;
 
@@ -153,7 +154,7 @@ function AIHistory({
       >
         <View style={s.emptyInner}>
           {loadingCloud ? (
-            <ActivityIndicator color={theme.text.muted} />
+            <LensLoader color={theme.text.muted} />
           ) : (
             <MaterialCommunityIcons
               name={waitingCloud ? "cloud-off-outline" : "message-off-outline"}

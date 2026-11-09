@@ -11,9 +11,9 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   StyleSheet,
   } from "react-native";
+import LensLoader from "./LensLoader";
 import AppIcon from "./AppIcon";
 import GlassIconButton from "./common/GlassIconButton";
 import { i18nText } from "../utils/i18nText";
@@ -162,7 +162,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
 
           {loading ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator color={C.blue} />
+              <LensLoader color={C.blue} />
               <Text allowFontScaling={false} style={[styles.loadingText, { color: C.muted }]}>
                 {i18nText("autoI18n.hesaplaniyor", "Hesaplanıyor…")}
               </Text>
@@ -213,7 +213,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
                       style={styles.trashBtn}
                     >
                       {busyId === cat.id ? (
-                        <ActivityIndicator size="small" color={C.muted} />
+                        <LensLoader size="small" color={C.muted} />
                       ) : (
                         <AppIcon
                           family="Ionicons"
@@ -244,7 +244,7 @@ export default function CacheManagerModal({ visible, onClose, colors: C }) {
             ]}
           >
             {clearingAll ? (
-              <ActivityIndicator size="small" color={C.danger} />
+              <LensLoader size="small" color={C.danger} />
             ) : (
               <>
                 <AppIcon family="Ionicons" name="trash-outline" size={16} color={C.danger} />

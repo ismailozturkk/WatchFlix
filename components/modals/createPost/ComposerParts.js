@@ -17,10 +17,10 @@ import {
   Pressable,
   TextInput,
   Animated,
-  ActivityIndicator,
   Switch,
   Platform,
 } from "react-native";
+import LensLoader from "../../LensLoader";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, Octicons } from "@expo/vector-icons";
@@ -214,7 +214,7 @@ const QuickButton = memo(function QuickButton({
         {label}
       </Text>
       {loading ? (
-        <ActivityIndicator size="small" color={accent} />
+        <LensLoader size="small" color={accent} />
       ) : done ? (
         <Ionicons name="checkmark-circle" size={17} color={accent} />
       ) : null}

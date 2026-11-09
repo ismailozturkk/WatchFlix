@@ -13,7 +13,8 @@
 // "Hareketi Azalt" açıkken hiçbir hareket oynamaz.
 
 import React, { memo, useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
 import Animated, {
   cancelAnimation,
@@ -394,7 +395,7 @@ export default function ImportProgressView({
             disabled={cancelling}
           >
             {cancelling ? (
-              <ActivityIndicator size="small" color={IMPORT_TONES.danger} />
+              <LensLoader size="small" color={IMPORT_TONES.danger} />
             ) : (
               <AppIcon family="Ionicons" name="pause" size={15} color={IMPORT_TONES.danger} />
             )}

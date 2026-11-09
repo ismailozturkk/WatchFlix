@@ -12,12 +12,12 @@
 
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import * as Clipboard from "expo-clipboard";
 import { haptic } from "@services/hapticsService";
 import { LinearGradient } from "expo-linear-gradient";
@@ -164,7 +164,7 @@ export default function ReferralScreen() {
       </LinearGradient>
 
       {loading && !data ? (
-        <ActivityIndicator style={st.loader} color={C.accent} />
+        <LensLoader style={st.loader} color={C.accent} />
       ) : null}
 
       {error && !data ? (

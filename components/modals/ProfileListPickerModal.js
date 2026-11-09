@@ -9,13 +9,13 @@
 
 import React, { useMemo } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -129,7 +129,7 @@ export default function ProfileListPickerModal({ visible, onClose, onSelect }) {
             ListEmptyComponent={
               <View style={styles.empty}>
                 {isLoading ? (
-                  <ActivityIndicator size="small" color={theme.accent} />
+                  <LensLoader size="small" color={theme.accent} />
                 ) : (
                   <Ionicons name="albums-outline" size={30} color={theme.text.muted} />
                 )}

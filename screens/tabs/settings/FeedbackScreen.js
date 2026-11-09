@@ -18,7 +18,6 @@
 import { intlLocaleOf } from "../../../utils/appLanguages";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -27,6 +26,7 @@ import {
   Text,
   View,
 } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Device from "expo-device";
@@ -430,7 +430,7 @@ export default function FeedbackScreen() {
             ))
           ) : history.status === "loading" ? (
             <View style={s.loading}>
-              <ActivityIndicator size="small" color={C.accent} />
+              <LensLoader size="small" color={C.accent} />
             </View>
           ) : history.status === "error" ? (
             <HistoryNotice

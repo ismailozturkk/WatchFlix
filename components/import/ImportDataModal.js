@@ -18,11 +18,11 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  ActivityIndicator,
   Animated,
   Dimensions,
   Platform,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -557,7 +557,7 @@ export default function ImportDataModal({ visible, onClose }) {
                   disabled={isProcessingFile}
                 >
                   {isProcessingFile ? (
-                    <ActivityIndicator size="small" color="#FFF" />
+                    <LensLoader tone="mono" size="small" color="#FFF" />
                   ) : (
                     <>
                       <AppIcon family="Ionicons" name="archive-outline" size={22} color="#FFF" />

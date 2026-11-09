@@ -12,7 +12,8 @@
 // paylaşıyorsa diğer kutu "Paylaşılmıyor" diye sönük gösterilir (puan uydurulmaz). Davet düğmesi yalnız arkadaşa
 // ve adayı olan kullanıcıya görünür.
 import React, { memo, useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -473,7 +474,7 @@ function TasteMatchCard({
                 accessibilityState={{ disabled: inviteBusy, busy: inviteBusy }}
                 style={({ pressed }) => [styles.action, { backgroundColor: theme.accent }, (pressed || inviteBusy) && styles.pressed]}
               >
-                {inviteBusy ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="paper-plane-outline" size={14} color="#FFFFFF" />}
+                {inviteBusy ? <LensLoader tone="mono" size="small" color="#FFFFFF" /> : <Ionicons name="paper-plane-outline" size={14} color="#FFFFFF" />}
                 <Text allowFontScaling={false} numberOfLines={1} style={styles.actionText}>
                   {copy.together.inviteLabel}
                 </Text>

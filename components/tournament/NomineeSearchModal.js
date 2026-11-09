@@ -20,8 +20,9 @@
 import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList, ActivityIndicator,
+  View, Text, StyleSheet, Modal, Pressable, TextInput, FlatList,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import AppIcon from "@components/AppIcon";
@@ -276,7 +277,7 @@ export default function NomineeSearchModal({
               returnKeyType="search"
             />
             {searching ? (
-              <ActivityIndicator size="small" color={theme.accent} />
+              <LensLoader size="small" color={theme.accent} />
             ) : q.length > 0 ? (
               <Pressable onPress={() => setQ("")}>
                 <AppIcon family="Ionicons" name="close-circle" size={16} color={theme.text.muted} />

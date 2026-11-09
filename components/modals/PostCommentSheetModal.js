@@ -35,8 +35,8 @@ import {
   Platform,
   KeyboardAvoidingView,
   FlatList,
-  ActivityIndicator,
 } from "react-native";
+import LensLoader from "../LensLoader";
 // Pencere kenarına çizilir: ekranın Premium şeridiyle büyütülmüş üst boşluğunu değil gerçeğini al.
 import { useWindowSafeAreaInsets } from "@context/ScreenInsetsContext";
 import ModalBlurBackdrop from "../common/ModalBlurBackdrop";
@@ -738,7 +738,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
           <ComposerBlurTarget attach={composerBlur.attach} backgroundColor={theme.primary} style={{ flex: 1 }}>
           {loading ? (
             <View style={styles.center}>
-              <ActivityIndicator color={theme.text.muted} />
+              <LensLoader color={theme.text.muted} />
             </View>
           ) : topLevelSorted.length === 0 ? (
             <View style={styles.center}>
@@ -807,7 +807,7 @@ export default function PostCommentSheetModal({ visible, post, onClose }) {
                 disabled={isSending || !input.text.trim()}
               >
                 {isSending ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <LensLoader tone="mono" color="#fff" size="small" />
                 ) : (
                   <Feather name="arrow-up" size={22} color="#fff" />
                 )}

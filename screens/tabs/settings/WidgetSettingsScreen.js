@@ -13,7 +13,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -22,6 +21,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import ConfirmSheet from "@components/common/ConfirmSheet";
@@ -283,7 +283,7 @@ export default function WidgetSettingsScreen() {
     return (
       <SettingsSubScreen title={title}>
         <View style={styles.loading}>
-          <ActivityIndicator color={C.accent} />
+          <LensLoader color={C.accent} />
         </View>
       </SettingsSubScreen>
     );

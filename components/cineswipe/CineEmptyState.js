@@ -3,7 +3,8 @@
 // CineSwipe'ın tüm "kart yok" durumlarının ortak yüzü: hata, sonuç yok, deste
 // bitti, kazanan, oda bitti… İkon yavaşça süzülür, içerik aşağıdan belirir.
 import React, { useEffect } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import Animated, {
   Easing,
   FadeInDown,
@@ -54,7 +55,7 @@ export default function CineEmptyState({
     <Animated.View entering={FadeInDown.duration(300)} style={[styles.wrap, style]}>
       <Animated.View style={[styles.iconCircle, { backgroundColor: alpha(color, 0.14) }, iconStyle]}>
         {loading ? (
-          <ActivityIndicator size="large" color={color} />
+          <LensLoader size="large" color={color} />
         ) : (
           <AppIcon family={iconFamily} name={icon} size={48} color={color} />
         )}

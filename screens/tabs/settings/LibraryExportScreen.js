@@ -8,7 +8,8 @@
 // kapısı yok). Biçim: utils/libraryExport.js, dosya G/Ç: services/libraryExportFiles.js.
 
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import AppIcon from "@components/AppIcon";
 import { toast } from "@components/AppToast";
 import * as Haptics from "@services/hapticsService";
@@ -115,7 +116,7 @@ export default function LibraryExportScreen() {
   const exportZip = () =>
     run("zip", () => exportLibraryZip(snapshot, { dialogTitle: copy.title, readme: copy.readme }));
 
-  const spinner = <ActivityIndicator size="small" color={C.accent} />;
+  const spinner = <LensLoader size="small" color={C.accent} />;
   const disabled = !ready || empty;
 
   return (

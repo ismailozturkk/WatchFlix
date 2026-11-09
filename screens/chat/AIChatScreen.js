@@ -34,10 +34,10 @@ import {
   StyleSheet,
   Platform,
   Keyboard,
-  ActivityIndicator,
   Modal,
   Animated,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
@@ -1152,7 +1152,7 @@ export default function AIChatScreen({
                     ]}
                   >
                     {loading ? (
-                      <ActivityIndicator color="#fff" size="small" />
+                      <LensLoader tone="mono" color="#fff" size="small" />
                     ) : (
                       <Ionicons name="arrow-up" size={20} color="#fff" />
                     )}

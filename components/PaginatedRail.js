@@ -1,5 +1,6 @@
 import React, { useCallback, useRef } from "react";
-import { FlatList, View, ActivityIndicator } from "react-native";
+import { FlatList, View} from "react-native";
+import LensLoader from "./LensLoader";
 import { useTheme } from "../context/ThemeContext";
 import { useHomeRenderKey } from "../hooks/useHomeContentSettings";
 
@@ -69,7 +70,7 @@ export default function PaginatedRail({
               alignItems: "center",
             }}
           >
-            <ActivityIndicator size="small" color={theme.accent} />
+            <LensLoader size="small" color={theme.accent} />
           </View>
         ) : null
       }

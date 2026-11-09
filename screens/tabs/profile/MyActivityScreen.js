@@ -18,11 +18,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   ScrollView,
   Dimensions,
   Modal,
 } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import { LinearGradient } from "expo-linear-gradient";
@@ -737,7 +737,7 @@ export default function MyActivityScreen({ navigation, route }) {
                   style={[st.editBtn, { borderColor: theme.accent }]}
                 >
                   {saving ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <LensLoader tone="mono" size="small" color="#fff" />
                   ) : (
                     <Text style={[st.editBtnText, { color: "#fff" }]}>
                       {i18nText("autoI18n.kaydet", "Kaydet")}

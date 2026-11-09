@@ -1,11 +1,11 @@
 import React, { memo, useMemo } from "react";
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
@@ -76,7 +76,7 @@ function StoryActionBarComponent({ busy, onShare, onShareSticker, onOpenSettings
           ]}
         >
           {busy ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <LensLoader tone="mono" color="#fff" size="small" />
           ) : (
             <Ionicons name="share-social" size={plan.icon >= 42 ? 22 : 20} color="#fff" />
           )}

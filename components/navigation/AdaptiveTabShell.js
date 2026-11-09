@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { ActivityIndicator, I18nManager, InteractionManager, Keyboard, Platform, StyleSheet, View, useWindowDimensions } from "react-native";
+import { I18nManager, InteractionManager, Keyboard, Platform, StyleSheet, View, useWindowDimensions } from "react-native";
+import LensLoader from "../LensLoader";
 import { Screen, ScreenContainer, Tabs } from "react-native-screens";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSharedValue, withTiming } from "react-native-reanimated";
@@ -207,7 +208,7 @@ export default function AdaptiveTabShell({ navigation, route, tabs, screens, the
                       tabBarItemTestID={`tab-${tab.name}`} specialEffects={NO_RESELECT_EFFECTS}
                       nativeContainerStyle={{ backgroundColor: theme.primary }}
                       ios={{ icon: { type: "sfSymbol", name: tab.sf }, selectedIcon: { type: "sfSymbol", name: tab.selectedSf }, standardAppearance: appearance, scrollEdgeAppearance: appearance, overrideScrollViewContentInsetAdjustmentBehavior: false }}>
-                      {state.mountedTabs.has(tab.name) ? screens[tab.name] : <View style={styles.loading}><ActivityIndicator color={theme.accent} /></View>}
+                      {state.mountedTabs.has(tab.name) ? screens[tab.name] : <View style={styles.loading}><LensLoader color={theme.accent} /></View>}
                     </Tabs.Screen>
                   ))}
                   {/* Yapay zeka: SON öğe (iOS 26'da sistemin ayrık yuvarlak cam düğmesi).

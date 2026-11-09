@@ -7,7 +7,8 @@
 // bulunur (sayfa bir ScrollView: binlerce afişi birden çizmesin). Arama 300 ms duraksayınca gider.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import LensLoader from "../LensLoader";
 import AppIcon from "@components/AppIcon";
 import GlassSegmentedControl from "@components/common/GlassSegmentedControl";
 import GlassTextInput from "@components/common/GlassTextInput";
@@ -105,7 +106,7 @@ export default function TierListAddSheet({ visible, copy, theme, language, exist
 
   let status = null;
   if (source === "search") {
-    if (search.status === "loading") status = <ActivityIndicator color={theme.accent} style={styles.status} />;
+    if (search.status === "loading") status = <LensLoader color={theme.accent} style={styles.status} />;
     else if (search.status === "error") status = <Text style={[styles.statusText, { color: theme.text.muted }]}>{copy.searchError}</Text>;
     else if (search.status === "idle") status = <Text style={[styles.statusText, { color: theme.text.muted }]}>{copy.searchHint}</Text>;
     else if (!items.length) status = <Text style={[styles.statusText, { color: theme.text.muted }]}>{copy.noResults}</Text>;

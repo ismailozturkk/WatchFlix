@@ -29,7 +29,6 @@
 import { normalizeAppLanguage } from "../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Easing,
   Pressable,
@@ -37,6 +36,7 @@ import {
   Text,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
@@ -341,7 +341,7 @@ function PremiumShowcase() {
                     {premiumName.toUpperCase()}
                   </Text>
                   {loading ? (
-                    <ActivityIndicator size="small" color={accent} />
+                    <LensLoader size="small" color={accent} />
                   ) : (
                     <View
                       style={[

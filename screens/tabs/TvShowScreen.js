@@ -3,6 +3,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { LENS_REFRESH_COLORS } from "../../utils/lensLoaderMotion";
 import Animated from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
 import { useTabBarLayout } from "../../context/TabBarLayoutContext";
@@ -171,7 +172,7 @@ export default function TvShowScreen({ navigation, headerTopOffset = 0 }) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={[theme.accent || "#E50914"]}
+            colors={LENS_REFRESH_COLORS}
             tintColor={theme.accent || "#E50914"}
           />
         }

@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Image,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import BottomSheetModal from "../common/BottomSheetModal";
@@ -168,7 +168,7 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
             onPress={handleDelete}
           >
             {deleting ? (
-              <ActivityIndicator size="small" color="#ef4444" />
+              <LensLoader size="small" color="#ef4444" />
             ) : (
               <Ionicons name="trash-outline" size={18} color="#ef4444" />
             )}
@@ -186,7 +186,7 @@ export default function MediaNoteSheet({ visible, onClose, type, mediaId, title,
           ]}
         >
           {submitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <LensLoader tone="mono" size="small" color="#FFFFFF" />
           ) : (
             <Ionicons name="checkmark-done" size={19} color="#FFFFFF" />
           )}

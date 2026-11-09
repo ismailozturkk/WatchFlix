@@ -18,7 +18,6 @@
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Keyboard,
   Platform,
@@ -31,6 +30,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import GlassIconButton from "../common/GlassIconButton";
@@ -703,7 +703,7 @@ export default function WrappedShareEditor({
                 accessibilityLabel={str.saveActionLabel}
               >
                 {busyAction === "save" ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <LensLoader tone="mono" size="small" color="#fff" />
                 ) : (
                   <>
                     <Ionicons name="download-outline" size={19} color="#fff" />
@@ -728,7 +728,7 @@ export default function WrappedShareEditor({
                   style={styles.shareBtnFill}
                 >
                   {busyAction === "share" || !ready ? (
-                    <ActivityIndicator size="small" color={onAccent} />
+                    <LensLoader tone="mono" size="small" color={onAccent} />
                   ) : (
                     <>
                       <Ionicons name="share-social" size={19} color={onAccent} />

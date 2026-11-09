@@ -19,7 +19,6 @@ import * as Haptics from "@services/hapticsService";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
-  ActivityIndicator,
   Animated,
   AppState,
   Easing,
@@ -29,6 +28,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
@@ -699,7 +699,7 @@ export default function SceneGuessGameScreen({ navigation, route }) {
                 {/* Görsel yüklenene kadar iskelet (Part 12.2) */}
                 {sceneImageUrl && !sceneImageReady && !imageLoadFailed ? (
                   <View style={[styles.sceneSkeleton, { backgroundColor: theme.secondary }]}>
-                    <ActivityIndicator color={theme.accent} />
+                    <LensLoader color={theme.accent} />
                   </View>
                 ) : null}
 

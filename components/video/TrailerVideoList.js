@@ -13,13 +13,13 @@
 // ekranda kalır (bkz. components/common/BottomSheetModal.js → SheetScroll).
 import React, { memo, useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -133,7 +133,7 @@ function VideoSkeleton({ theme }) {
   return (
     <View style={styles.skeleton}>
       <View style={[styles.featuredThumb, styles.skeletonHero, block]}>
-        <ActivityIndicator size="small" color={theme.accent} />
+        <LensLoader size="small" color={theme.accent} />
       </View>
       {[0, 1].map((index) => (
         <View key={index} style={[styles.row, styles.skeletonRow, block]} />

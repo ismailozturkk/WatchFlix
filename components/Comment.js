@@ -10,8 +10,8 @@ import {
   Platform,
   Animated,
   StyleSheet,
-  ActivityIndicator,
 } from "react-native";
+import LensLoader from "./LensLoader";
 import { db } from "../firebase";
 import {
   collection,
@@ -1262,7 +1262,7 @@ const Comment = ({
               {pageLoaded ? (
                 <Ionicons name="chevron-down" size={14} color={theme.accent} />
               ) : (
-                <ActivityIndicator size="small" color={theme.accent} />
+                <LensLoader size="small" color={theme.accent} />
               )}
               <Text allowFontScaling={false} style={styles.emptyStateActionText}>
                 {i18nText("autoI18n.daha_fazla_yorum", "Daha fazla yorum göster")}

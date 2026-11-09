@@ -11,11 +11,11 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -159,7 +159,7 @@ export default function RedeemCodeSheet({ visible, onClose, onRedeemed }) {
         ]}
       >
         {busy ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <LensLoader tone="mono" color="#FFFFFF" />
         ) : (
           <Text allowFontScaling={false} style={styles.buttonText}>
             {copy.redeem.apply}

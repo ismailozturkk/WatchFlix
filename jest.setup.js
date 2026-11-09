@@ -56,5 +56,17 @@ jest.mock("./components/common/GlassTextInput", () => ({
   },
 }));
 
+// Lens yükleme göstergesi ActivityIndicator'ın yerine geçer (aynı API). Tüketici
+// testleri react-native'i kendi taklidiyle değiştirip "ActivityIndicator"/"Spinner"
+// düğümünü sayar; gösterge varsayılan olarak o taklide eşlenir (tembel okuma, cam
+// sarmalayıcılarıyla aynı neden). Bileşenin KENDİ davranışı
+// __tests__/lensLoader.render.test.js'te (jest.unmock ile) sınanır.
+jest.mock("./components/LensLoader", () => ({
+  __esModule: true,
+  get default() {
+    return require("react-native").ActivityIndicator;
+  },
+}));
+
 // Marka ikonları (profil sosyal hesap şeridi): paket ESM; testte düz bileşen yeter.
 jest.mock("@expo/vector-icons/FontAwesome6", () => ({ __esModule: true, default: "FontAwesome6" }));

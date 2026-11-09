@@ -13,7 +13,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Easing,
   StyleSheet,
@@ -22,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
 import SwitchToggle from "@components/SwitchToggle";
@@ -355,7 +355,7 @@ export function SubmitButton({ C, tint, label, busy, disabled, hint, onPress }) 
           />
         )}
         {busy ? (
-          <ActivityIndicator size="small" color={WHITE} />
+          <LensLoader tone="mono" size="small" color={WHITE} />
         ) : (
           <AppIcon
             family="Ionicons"

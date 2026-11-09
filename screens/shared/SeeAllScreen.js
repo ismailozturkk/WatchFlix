@@ -29,9 +29,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  ActivityIndicator,
   Animated,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import axios from "axios";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
@@ -471,14 +471,14 @@ export function SeeAllGrid({
           ListEmptyComponent={
             emptyComponent ?? (
               <View style={styles.empty}>
-                <ActivityIndicator size="large" color={theme.accent} />
+                <LensLoader size="large" color={theme.accent} />
               </View>
             )
           }
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footer}>
-                <ActivityIndicator size="small" color={theme.accent} />
+                <LensLoader size="small" color={theme.accent} />
               </View>
             ) : null
           }

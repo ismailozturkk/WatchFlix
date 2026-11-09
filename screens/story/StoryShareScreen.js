@@ -15,9 +15,9 @@ import {
   Animated,
   PanResponder,
   Platform,
-  ActivityIndicator,
   BackHandler,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { useFocusEffect } from "@react-navigation/native";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
@@ -1785,7 +1785,7 @@ export default function StoryShareScreen({ route, navigation }) {
                   disabled={graphLoading}
                 >
                   {graphLoading ? (
-                    <ActivityIndicator size="small" color={theme.accent} />
+                    <LensLoader size="small" color={theme.accent} />
                   ) : (
                     <Ionicons name="grid" size={18} color={theme.accent} />
                   )}

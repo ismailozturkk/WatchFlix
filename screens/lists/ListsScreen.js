@@ -13,9 +13,9 @@ import {
   Dimensions,
   useWindowDimensions,
   Animated,
-    ActivityIndicator,
   Keyboard,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import BackButton from "../../components/BackButton";
@@ -2026,7 +2026,7 @@ export default function ListsScreen({ route, navigation }) {
                 ]}
               >
                 {isReordering ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <LensLoader tone="mono" size="small" color="#fff" />
                 ) : (
                   <Feather name="move" size={16} color="#fff" />
                 )}

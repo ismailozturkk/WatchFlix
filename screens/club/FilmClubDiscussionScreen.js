@@ -8,7 +8,8 @@
 // yöntem; KeyboardAvoidingView Android'de güvenilmez — bkz. hooks/useKeyboardInset.js).
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import AppIcon from "@components/AppIcon";
 import { appAlert } from "@components/AppAlert";
 import { toast } from "@components/AppToast";
@@ -126,7 +127,7 @@ export default function FilmClubDiscussionScreen({ navigation, route }) {
     return (
       <GameScreenShell navigation={navigation} title={copy.discussion} scroll={false}>
         <View style={styles.center}>
-          <ActivityIndicator color={CLUB_ACCENT} />
+          <LensLoader color={CLUB_ACCENT} />
         </View>
       </GameScreenShell>
     );
@@ -156,7 +157,7 @@ export default function FilmClubDiscussionScreen({ navigation, route }) {
         </View>
         {comments === null ? (
           <View style={styles.center}>
-            <ActivityIndicator color={CLUB_ACCENT} />
+            <LensLoader color={CLUB_ACCENT} />
           </View>
         ) : (
           <FlatList
@@ -226,7 +227,7 @@ export default function FilmClubDiscussionScreen({ navigation, route }) {
             ]}
           >
             {sending ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <LensLoader tone="mono" color="#fff" size="small" />
             ) : (
               <AppIcon family="Ionicons" name="arrow-up" size={20} color={ready ? "#fff" : theme.text.muted} />
             )}

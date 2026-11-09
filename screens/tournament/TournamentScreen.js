@@ -14,10 +14,10 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Pressable,
   Modal,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import { useNavigation } from "@react-navigation/native";
@@ -1121,7 +1121,7 @@ export default function TournamentScreen() {
   if (loading) {
     body = (
       <View style={styles.center}>
-        <ActivityIndicator color={theme.accent} size="large" />
+        <LensLoader color={theme.accent} size="large" />
         <Text style={[styles.muted, { color: theme.text.muted }]}>
           {i18nText("autoI18n.tournament_loading", "Turnuva hazırlanıyor…")}
         </Text>

@@ -22,12 +22,12 @@ import {
   FlatList,
   Modal,
   Pressable,
-  ActivityIndicator,
   ScrollView,
   Animated,
   Linking,
   useWindowDimensions,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import axios from "axios";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -202,7 +202,7 @@ function TrailerPlayerModal({ visible, video, onClose, theme }) {
               />
               <View style={styles.playerOverlayDim} />
               {playerState === "loading" ? (
-                <ActivityIndicator size="large" color="#fff" />
+                <LensLoader size="large" color="#fff" />
               ) : (
                 <View style={styles.playerErrorBox}>
                   <Ionicons name="cloud-offline-outline" size={30} color="#fff" />
@@ -517,7 +517,7 @@ export default function TrailerSection({
         />
       ) : loading ? (
         <View style={styles.stateBox}>
-          <ActivityIndicator size="small" color={theme.accent} />
+          <LensLoader size="small" color={theme.accent} />
         </View>
       ) : videos.length === 0 ? (
         <View style={styles.stateBox}>

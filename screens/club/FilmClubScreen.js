@@ -14,7 +14,8 @@
 // açsa da duyuru bir kez yazılır). Kurallar utils/filmClub.js, yetki firestore.rules.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
@@ -105,7 +106,7 @@ function PrimaryButton({ label, icon, onPress, busy, disabled, color = CLUB_ACCE
       ]}
     >
       {busy ? (
-        <ActivityIndicator color="#fff" />
+        <LensLoader tone="mono" color="#fff" />
       ) : (
         <>
           {icon ? <AppIcon family="Ionicons" name={icon} size={18} color="#fff" /> : null}
@@ -694,7 +695,7 @@ export default function FilmClubScreen({ navigation, route }) {
   if (loading) {
     body = (
       <View style={styles.center}>
-        <ActivityIndicator color={CLUB_ACCENT} />
+        <LensLoader color={CLUB_ACCENT} />
         <Text style={[styles.hint, { color: theme.text.muted }]}>{copy.loading}</Text>
       </View>
     );

@@ -12,13 +12,13 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -151,7 +151,7 @@ export default function BlockedUsersScreen({ navigation }) {
       </Text>
 
       {loading && blockedUsers.length > 0 ? (
-        <ActivityIndicator style={{ marginTop: 24 }} color={theme.accent} />
+        <LensLoader style={{ marginTop: 24 }} color={theme.accent} />
       ) : (
         <FlatList
           data={blockedUsers}

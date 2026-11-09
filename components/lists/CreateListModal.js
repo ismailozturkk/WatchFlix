@@ -13,13 +13,13 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { doc, getDoc, writeBatch } from "firebase/firestore";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import GlassCloseButton from "@components/common/GlassCloseButton";
@@ -203,7 +203,7 @@ export default function CreateListModal({
         ]}
       >
         {saving ? (
-          <ActivityIndicator size="small" color="#000" />
+          <LensLoader tone="mono" size="small" color="#000" />
         ) : (
           <Ionicons name="add" size={17} color="#000" />
         )}

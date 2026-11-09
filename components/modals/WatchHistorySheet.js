@@ -1,7 +1,6 @@
 import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   FlatList,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -159,7 +159,7 @@ function HistoryEventCard({
             style={[styles.deleteIconButton, { backgroundColor: alpha("#FB7185", 0.11) }]}
           >
             {deleting ? (
-              <ActivityIndicator size="small" color="#FB7185" />
+              <LensLoader size="small" color="#FB7185" />
             ) : (
               <Ionicons name="trash-outline" size={17} color="#FB7185" />
             )}
@@ -193,7 +193,7 @@ function HistoryEventCard({
                 style={[styles.confirmButton, styles.destructiveButton]}
               >
                 {deleting ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <LensLoader tone="mono" size="small" color="#FFFFFF" />
                 ) : (
                   <Ionicons name="trash" size={15} color="#FFFFFF" />
                 )}

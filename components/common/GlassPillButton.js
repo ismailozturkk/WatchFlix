@@ -14,7 +14,8 @@
 //   • RN gölgesi/elevation `fallbackStyle`a konur (cam kendi gölgesini çizer)
 //   • basma geri bildirimini cam kendi `interactive` animasyonuyla verir
 import React, { memo } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
+import LensLoader from "../LensLoader";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import GlassSurface from "./GlassSurface";
 import { useTheme } from "../../context/ThemeContext";
@@ -52,7 +53,7 @@ function GlassPillButton({
   const content =
     children ??
     (loading ? (
-      <ActivityIndicator color={contentColor} />
+      <LensLoader tone="mono" color={contentColor} />
     ) : (
       <>
         {icon ? <Ionicons name={icon} size={iconSize} color={contentColor} /> : null}

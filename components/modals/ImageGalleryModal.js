@@ -5,7 +5,6 @@ import {
   View,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Animated,
   // Kaynak görselin alt katmanı: detay ekranındakiyle AYNI bileşen ve URL, bellek
   // önbelleğinden anında çizilir (bkz. GalleryImageItem `underlayUri`).
@@ -15,6 +14,7 @@ import {
   UIManager,
   Text
 } from "react-native";
+import LensLoader from "../LensLoader";
 import GalleryFlier from "./gallery/GalleryFlier";
 import useGalleryTransition from "./gallery/useGalleryTransition";
 import {
@@ -296,7 +296,7 @@ const GalleryImageItem = ({ item, status, uri, viewSize, pageSize, underlayUri, 
             pointerEvents="none"
           >
             {isLoading ? (
-              <ActivityIndicator
+              <LensLoader tone="mono"
                 size="small"
                 color="#fff"
                 style={styles.hintSpinner}
@@ -853,7 +853,7 @@ const ImageGalleryModal = ({
               accessibilityLabel={i18nText("autoI18n.indir", "İndir")}
             >
               {downloading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <LensLoader tone="mono" size="small" color="#fff" />
               ) : (
                 <Ionicons name="download-outline" size={19} color="#fff" />
               )}
@@ -926,7 +926,7 @@ const ImageGalleryModal = ({
         pointerEvents="box-none"
       >
         {loading && !initialImage ? (
-          <ActivityIndicator size="large" color="#FFD700" />
+          <LensLoader size="large" color="#FFD700" />
         ) : (
           <>
             <Animated.FlatList

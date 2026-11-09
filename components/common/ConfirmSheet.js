@@ -9,7 +9,6 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Modal,
   StyleSheet,
@@ -17,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import ModalBlurBackdrop from "./ModalBlurBackdrop";
@@ -130,7 +130,7 @@ export default function ConfirmSheet({
               disabled={busy}
             >
               {busy ? (
-                <ActivityIndicator size="small" color={palette.on} />
+                <LensLoader tone="mono" size="small" color={palette.on} />
               ) : (
                 <>
                   <Ionicons name={icon} size={15} color={palette.on} />

@@ -25,8 +25,9 @@
 import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  View, Text, StyleSheet, ActivityIndicator, ScrollView, Pressable, LayoutAnimation,
+  View, Text, StyleSheet, ScrollView, Pressable, LayoutAnimation,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -575,7 +576,7 @@ function PodiumModal({ visible, onClose, periodId, theme, getTmdbUrl, lang = "tr
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 6 }}>
         {loading ? (
           <View style={[styles.skeleton, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-            <ActivityIndicator color={theme.accent} size="large" />
+            <LensLoader color={theme.accent} size="large" />
           </View>
         ) : !champion ? (
           <View style={[styles.emptyCard, { backgroundColor: theme.secondary, borderColor: theme.border }]}>

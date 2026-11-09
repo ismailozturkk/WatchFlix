@@ -18,7 +18,6 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Keyboard,
   Modal,
@@ -28,6 +27,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Toast from "@components/AppToast";
@@ -398,7 +398,7 @@ export default function ListManageSheet({
                   disabled={!target.canSave || busy}
                 >
                   {busy ? (
-                    <ActivityIndicator size="small" color="#000" />
+                    <LensLoader tone="mono" size="small" color="#000" />
                   ) : (
                     <>
                       <Ionicons name="checkmark" size={16} color="#000" />
@@ -453,7 +453,7 @@ export default function ListManageSheet({
                   disabled={busy}
                 >
                   {busy ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <LensLoader tone="mono" size="small" color="#fff" />
                   ) : (
                     <>
                       <Ionicons name="trash-outline" size={15} color="#fff" />

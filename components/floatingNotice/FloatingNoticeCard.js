@@ -15,7 +15,8 @@
 // Düğmeler bilerek cam DEĞİL: atanın opaklığı animasyonlu (cam opaklıkla soldurulamaz; ToastCards ile aynı).
 
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -359,7 +360,7 @@ function FloatingNoticeCardBase({
                 ]}
               >
                 {busy ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <LensLoader tone="mono" color="#FFFFFF" size="small" />
                 ) : (
                   <Text style={[styles.buttonText, { color: "#FFFFFF" }]} numberOfLines={1}>{text.primary}</Text>
                 )}

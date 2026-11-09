@@ -7,8 +7,8 @@ import {
   Dimensions,
   TouchableOpacity,
   Animated,
-  ActivityIndicator,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 import { i18nText } from "../../utils/i18nText";
 import PosterImage from "../../components/PosterImage";
@@ -375,7 +375,7 @@ export default function MovieOscar({ navigation }) {
     if (oscarMode !== "category" || !loadingMoreOscar) return null;
     return (
       <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#ffd700" />
+        <LensLoader size="small" color="#ffd700" />
       </View>
     );
   };

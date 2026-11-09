@@ -4,7 +4,6 @@ import { isLightSurface } from "../../utils/colorUtils";
 // etiketleriyle gruplanmış alanlar (kişisel / hesap / güvenlik) ve degrade ana
 // düğme. Doğrulama, Firebase ve klavye akışı değişmedi — yalnız görünüm.
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,6 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import React, { useEffect, useState, useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeContext";
@@ -550,7 +550,7 @@ export default function RegisterScreen({ navigation }) {
                 onSubmitEditing={() => emailRef.current?.focus()}
                 right={
                   <>
-                    {usernameChecking && <ActivityIndicator size="small" color={accent} />}
+                    {usernameChecking && <LensLoader size="small" color={accent} />}
                     {usernameAvailable === true && (
                       <Ionicons name="checkmark-circle" size={20} color={SUCCESS} />
                     )}

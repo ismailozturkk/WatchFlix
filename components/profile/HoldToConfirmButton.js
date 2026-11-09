@@ -15,7 +15,8 @@
 // dokunuş onay SAYILMAZ.
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import * as Haptics from "../../services/hapticsService";
 import { alpha } from "../../theme/colors";
 
@@ -158,7 +159,7 @@ export default function HoldToConfirmButton({
       <Animated.View pointerEvents="none" style={[styles.fill, { width: fillWidth, backgroundColor: color }]}>
         <View style={[styles.fillLabel, { width }]}>
           {busy ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <LensLoader tone="mono" size="small" color="#fff" />
           ) : (
             <Text allowFontScaling={false} numberOfLines={1} style={[styles.text, { color: "#fff" }]}>
               {idleText}
@@ -168,7 +169,7 @@ export default function HoldToConfirmButton({
       </Animated.View>
       <View pointerEvents="none" style={styles.label}>
         {busy ? (
-          <ActivityIndicator size="small" color={color} />
+          <LensLoader tone="mono" size="small" color={color} />
         ) : (
           <Text allowFontScaling={false} numberOfLines={1} style={[styles.text, { color }]}>
             {idleText}

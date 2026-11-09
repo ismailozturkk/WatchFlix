@@ -12,7 +12,8 @@
 //     açılır — ikinci sayfa birincinin onDismissed'ında (iOS iki Modal kuralı).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { FlatList, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
@@ -464,7 +465,7 @@ export default function Top100Screen({ navigation }) {
 
   const empty = busy ? (
     <View style={styles.state}>
-      <ActivityIndicator color={theme.accent} />
+      <LensLoader color={theme.accent} />
       <Text style={[styles.stateText, { color: theme.text.muted }]}>{searching ? copy.searching : copy.loading}</Text>
     </View>
   ) : failed ? (

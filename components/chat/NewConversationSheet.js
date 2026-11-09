@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import LensLoader from "../LensLoader";
 import { getAuth } from "firebase/auth";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import GlassCloseButton from "@components/common/GlassCloseButton";
@@ -175,7 +176,11 @@ export default function NewConversationSheet({
         contentContainerStyle={data.length ? styles.list : styles.emptyList}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Ionicons name="people-outline" size={42} color={theme.text.muted} />
+            {recipientType !== "group" && loading ? (
+              <LensLoader size="large" />
+            ) : (
+              <Ionicons name="people-outline" size={42} color={theme.text.muted} />
+            )}
             <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>
               {recipientType === "group"
                 ? i18nText("autoI18n.henuz_grup_yok", "Henüz bir grubun yok")

@@ -1,7 +1,6 @@
 import { intlLocaleOf } from "../../utils/appLanguages";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -571,7 +571,7 @@ export default function WatchedDateSheet({
           style={styles.confirmButton}
         >
           {isBusy ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <LensLoader tone="mono" size="small" color="#FFFFFF" />
           ) : (
             <Ionicons name="checkmark-done" size={20} color="#FFFFFF" />
           )}

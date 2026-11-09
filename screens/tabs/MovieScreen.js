@@ -4,6 +4,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { LENS_REFRESH_COLORS } from "../../utils/lensLoaderMotion";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Animated from "react-native-reanimated";
 import MovieOscar from "../movie/MovieOscar";
@@ -176,7 +177,7 @@ export default function MovieScreen({ navigation, headerTopOffset = 0 }) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={[theme.accent || "#E50914"]}
+            colors={LENS_REFRESH_COLORS}
             tintColor={theme.accent || "#E50914"}
           />
         }

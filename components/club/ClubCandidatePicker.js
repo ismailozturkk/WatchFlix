@@ -5,7 +5,8 @@
 // Seçim kapanınca SIFIRLANMAZ (BottomSheetModal çıkış penceresi); yalnız başarıyla gönderilince temizlenir.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import AppIcon from "@components/AppIcon";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -238,7 +239,7 @@ export default function ClubCandidatePicker({ visible, onClose, onSubmit, submit
           autoCorrect={false}
           returnKeyType="search"
         />
-        {searching ? <ActivityIndicator size="small" color={CLUB_ACCENT} /> : null}
+        {searching ? <LensLoader size="small" color={CLUB_ACCENT} /> : null}
       </GlassField>
 
       {!showingSearch && suggestions.length ? (
@@ -272,7 +273,7 @@ export default function ClubCandidatePicker({ visible, onClose, onSubmit, submit
         ]}
       >
         {submitting ? (
-          <ActivityIndicator color="#fff" />
+          <LensLoader tone="mono" color="#fff" />
         ) : (
           <>
             <Text style={[styles.submitText, { color: ready ? "#fff" : theme.text.muted }]}>{copy.startVoting}</Text>

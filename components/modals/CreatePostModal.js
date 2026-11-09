@@ -11,13 +11,13 @@ import {
   Platform,
   ScrollView,
   FlatList,
-  ActivityIndicator,
   TouchableWithoutFeedback,
   Animated,
   Keyboard,
   LayoutAnimation,
   UIManager,
 } from "react-native";
+import LensLoader from "../LensLoader";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -1732,7 +1732,7 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
 
                 {loadingSearch ? (
                   <View style={s.loadingWrap}>
-                    <ActivityIndicator size="large" color={currentAccent} />
+                    <LensLoader size="large" color={currentAccent} />
                   </View>
                 ) : (
                   <FlatList
@@ -1781,10 +1781,10 @@ export default function CreatePostModal({ visible, onClose, onSubmit, editingPos
                         <Text style={s.shareBtnText}>
                           {i18nText("autoI18n.bilgiler_aliniyor", "Bilgiler alınıyor")} {hydrating.done}/{hydrating.total}
                         </Text>
-                        <ActivityIndicator size="small" color="#fff" />
+                        <LensLoader tone="mono" size="small" color="#fff" />
                       </>
                     ) : submitting ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <LensLoader tone="mono" size="small" color="#fff" />
                     ) : (
                       <>
                         <Text style={s.shareBtnText}>

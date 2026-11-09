@@ -17,11 +17,11 @@ import {
   TouchableOpacity,
   ScrollView,
   FlatList,
-  ActivityIndicator,
   InteractionManager,
   Linking,
   StyleSheet,
 } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import GlassCloseButton from "@components/common/GlassCloseButton";
@@ -102,7 +102,7 @@ export default function OpenSourceLicensesScreen() {
     return (
       <SettingsSubScreen title={title}>
         <View style={s.loading}>
-          <ActivityIndicator size="small" color={C.accent} />
+          <LensLoader size="small" color={C.accent} />
         </View>
       </SettingsSubScreen>
     );

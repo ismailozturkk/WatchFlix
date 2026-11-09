@@ -21,13 +21,13 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Linking,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -89,7 +89,7 @@ function SheetButton({ C, label, icon, tone = "neutral", onPress, disabled, load
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={palette.fg} />
+        <LensLoader tone="mono" size="small" color={palette.fg} />
       ) : (
         <>
           {icon ? <AppIcon name={icon} size={17} color={palette.fg} /> : null}

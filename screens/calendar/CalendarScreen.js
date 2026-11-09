@@ -8,9 +8,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   StatusBar,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { Calendar, LocaleConfig } from "react-native-calendars";
 import { useFontFamilyForRole } from "@components/typography/AppText";
 import { useTheme } from "@context/ThemeContext";
@@ -683,7 +683,7 @@ export default function CalendarScreen({ navigation }) {
       >
         {isLoadingEvents && (
           <View style={styles.loadingOverlay} pointerEvents="none">
-            <ActivityIndicator color={theme.accent} />
+            <LensLoader color={theme.accent} />
           </View>
         )}
         <Calendar
@@ -820,7 +820,7 @@ export default function CalendarScreen({ navigation }) {
           disabled={isLoadingEvents}
           accessibilityLabel={pickByLanguage(language, { tr: "Takvimi yenile", en: "Refresh calendar", es: "Actualizar calendario", pt: "Atualizar calendário", de: "Kalender aktualisieren" })}
         >
-          {isLoadingEvents ? <ActivityIndicator size="small" color={theme.accent} /> : null}
+          {isLoadingEvents ? <LensLoader size="small" color={theme.accent} /> : null}
         </GlassIconButton>
       </SafeAreaView>
 

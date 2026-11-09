@@ -5,7 +5,8 @@
 // (DEV) tek cihazla arka plan push zincirini test eden buton da burada.
 
 import React, { useState } from "react";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import SwitchToggle from "@components/SwitchToggle";
 import AppIcon from "@components/AppIcon";
 import { appAlert } from "@components/AppAlert";
@@ -182,7 +183,7 @@ export default function SocialNotificationsScreen() {
             onPress={handleSendTestPush}
             right={
               sendingTestPush ? (
-                <ActivityIndicator size="small" color={C.blue} />
+                <LensLoader size="small" color={C.blue} />
               ) : (
                 <AppIcon name="chevron-forward" size={16} color={C.muted} />
               )

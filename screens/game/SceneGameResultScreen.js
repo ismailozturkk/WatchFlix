@@ -2,7 +2,8 @@ import { copyLanguage, normalizeAppLanguage } from "../../utils/appLanguages";
 import { Image } from "expo-image";
 import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 import { captureRef } from "react-native-view-shot";
 import AppIcon from "@components/AppIcon";
@@ -391,7 +392,7 @@ export default function SceneGameResultScreen({ navigation, route }) {
         </TouchableOpacity>
       ) : null}
       {result.saveStatus === "saving" ? (
-        <View style={styles.retry}><ActivityIndicator size="small" color={theme.accent} /><Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydediliyor..." : es ? "Guardando el resultado..." : pt ? "Salvando o resultado..." : de ? "Ergebnis wird gespeichert..." : "Saving result..."}</Text></View>
+        <View style={styles.retry}><LensLoader size="small" color={theme.accent} /><Text style={[styles.retryText, { color: theme.text.secondary }]}>{tr ? "Sonuç kaydediliyor..." : es ? "Guardando el resultado..." : pt ? "Salvando o resultado..." : de ? "Ergebnis wird gespeichert..." : "Saving result..."}</Text></View>
       ) : null}
 
       {/* Aksiyonlar (Part 13.3). Günlük tek deneme: "Tekrar Oyna" yerine sıralama. */}
@@ -501,7 +502,7 @@ function DetailItem({ icon, label, value, theme }) {
 function SecondaryAction({ icon, label, theme, onPress, loading }) {
   return (
     <GlassTouchable accessibilityRole="button" accessibilityLabel={label} activeOpacity={0.8} disabled={loading} onPress={onPress} style={[styles.secondaryAction, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      {loading ? <ActivityIndicator size="small" color={theme.accent} /> : <AppIcon family="Ionicons" name={icon} size={20} color={theme.accent} />}
+      {loading ? <LensLoader size="small" color={theme.accent} /> : <AppIcon family="Ionicons" name={icon} size={20} color={theme.accent} />}
       <Text style={[styles.secondaryActionText, { color: theme.text.secondary }]} numberOfLines={1}>{label}</Text>
     </GlassTouchable>
   );

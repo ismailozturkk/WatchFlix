@@ -33,7 +33,6 @@ import React, {
   useState,
 } from "react";
 import {
-  ActivityIndicator,
   Keyboard,
   Platform,
   Pressable,
@@ -44,6 +43,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 // Pencere kenarına çizilir: ekranın Premium şeridiyle büyütülmüş üst boşluğunu değil gerçeğini al.
 import { useWindowSafeAreaInsets } from "@context/ScreenInsetsContext";
@@ -1079,7 +1079,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
           ]}
         >
           {busy === "save" ? (
-            <ActivityIndicator size="small" color={theme.text.primary} />
+            <LensLoader size="small" color={theme.text.primary} />
           ) : (
             <AppIcon family="Ionicons" name="download-outline" size={22} color={theme.text.primary} />
           )}
@@ -1096,7 +1096,7 @@ function ProfileStoryEditor({ onClose, name, username, avatar, isCustomPhoto, ba
           ]}
         >
           {busy === "share" || !ready ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <LensLoader tone="mono" size="small" color="#FFFFFF" />
           ) : (
             <>
               <AppIcon family="Ionicons" name="logo-instagram" size={20} color="#FFFFFF" />

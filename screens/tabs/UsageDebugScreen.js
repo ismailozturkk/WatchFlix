@@ -13,11 +13,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   Modal,
   Platform,
   Animated,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
@@ -491,7 +491,7 @@ export default function UsageDebugScreen({ navigation }) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.primary }]}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={theme.accent} />
+          <LensLoader size="large" color={theme.accent} />
           <Text style={{ color: theme.text?.secondary || "#888", marginTop: 12 }}>
             İstatistikler yükleniyor...
           </Text>
@@ -601,7 +601,7 @@ export default function UsageDebugScreen({ navigation }) {
             style={[styles.headerBtn, { backgroundColor: theme.secondary, borderColor: theme.border }]}
           >
             {isRefreshing ? (
-              <ActivityIndicator size="small" color={theme.accent} />
+              <LensLoader size="small" color={theme.accent} />
             ) : (
               <AppIcon family="Ionicons" name="refresh" size={17} color={theme.accent} />
             )}
@@ -3643,7 +3643,7 @@ export default function UsageDebugScreen({ navigation }) {
               >
                 <View style={[styles.modalActionIconWrap, { backgroundColor: "#00BCD420" }]}>
                   {isExporting ? (
-                    <ActivityIndicator size="small" color="#00BCD4" />
+                    <LensLoader size="small" color="#00BCD4" />
                   ) : (
                     <AppIcon family="Ionicons" name="share-social" size={18} color="#00BCD4" />
                   )}

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, SectionList, StyleSheet, Text, View } from "react-native";
+import { SectionList, StyleSheet, Text, View } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 // Ekran kökü: Premium şeridi yüzerken üst boşluğu ona göre büyür.
 import SafeAreaView from "@components/common/ScreenSafeAreaView";
 import { useAuth } from "../../../context/AuthContext";
@@ -174,7 +175,7 @@ function Inbox({ uid, navigation }) {
             </View>
             <Text numberOfLines={1} style={[styles.preview, { color: theme.text.secondary }]}>{content.responseLabel || content.detail || content.action}</Text>
           </View>
-          {openingId === item.id ? <ActivityIndicator size="small" color={accent} /> : (
+          {openingId === item.id ? <LensLoader size="small" color={accent} /> : (
             <AppIcon family="Ionicons" name={expanded ? "chevron-up" : "chevron-down"} size={14} color={theme.text.secondary} />
           )}
         </View>
@@ -218,7 +219,7 @@ function Inbox({ uid, navigation }) {
           disabled={markingAll}
           onPress={markAllRead}
         >
-          {markingAll ? <ActivityIndicator size="small" color={accent} /> : undefined}
+          {markingAll ? <LensLoader size="small" color={accent} /> : undefined}
         </GlassIconButton>
       ) : null} />
       <View style={styles.filters}>
@@ -237,7 +238,7 @@ function Inbox({ uid, navigation }) {
           <Text style={{ color: theme.text.primary }}>{copy.retry}</Text>
         </GlassPressable>
       </View>}
-      {loading ? <ActivityIndicator testID="notifications-loading" style={styles.loading} color={accent} /> : (
+      {loading ? <LensLoader testID="notifications-loading" style={styles.loading} color={accent} /> : (
         <SectionList
           sections={sections}
           keyExtractor={(item) => item.id}
@@ -252,7 +253,7 @@ function Inbox({ uid, navigation }) {
           </View> : null}
           ListFooterComponent={<View style={styles.footer}>
             {pageError && <Text accessibilityRole="alert" style={[styles.error, { color: theme.text.primary }]}>{copy.error}</Text>}
-            {loadingMore ? <ActivityIndicator color={accent} /> : moreAvailable && (
+            {loadingMore ? <LensLoader color={accent} /> : moreAvailable && (
               <GlassPressable accessibilityRole="button" onPress={loadMore} style={[styles.more, { backgroundColor: theme.secondary }]}>
                 <Text style={[styles.filterText, { color: theme.text.primary }]}>{pageError ? copy.retry : copy.more}</Text>
               </GlassPressable>

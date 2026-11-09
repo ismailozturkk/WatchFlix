@@ -1,7 +1,6 @@
 import { normalizeAppLanguage } from "../../utils/appLanguages";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -10,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { LinearGradient } from "expo-linear-gradient";
 import Toast from "@components/AppToast";
 import AppIcon from "../../components/AppIcon";
@@ -606,7 +606,7 @@ export default function PremiumScreen() {
         {/* DIRECT PRICING PACKAGES */}
         {loading ? (
           <View style={styles.packagesLoader}>
-            <ActivityIndicator size="large" color={C.accent} />
+            <LensLoader size="large" color={C.accent} />
             <Text style={[styles.packagesLoaderText, { color: C.muted }]}>
               {tr ? "Mağaza fiyatları alınıyor…" : es ? "Cargando precios de la tienda…" : pt ? "Carregando preços da loja…" : de ? "Store-Preise werden geladen…" : "Loading store prices…"}
             </Text>
@@ -802,7 +802,7 @@ export default function PremiumScreen() {
             style={styles.ctaGradient}
           >
             {busyAction === "purchase" || busyAction === "customer-center" ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <LensLoader tone="mono" color="#fff" size="small" />
             ) : (
               <>
                 <View style={styles.ctaIconContainer}>
@@ -1174,7 +1174,7 @@ export default function PremiumScreen() {
         </Pressable>
         <Pressable accessibilityRole="button" disabled={busy} onPress={restore} style={styles.restoreBtn}>
           {busyAction === "restore" ? (
-            <ActivityIndicator size="small" color={C.accent} />
+            <LensLoader size="small" color={C.accent} />
           ) : (
             <Text style={[styles.restoreBtnText, { color: C.accent }]}>
               {tr ? "Önceki Satın Alımları Geri Yükle" : es ? "Restaurar compras anteriores" : pt ? "Restaurar compras anteriores" : de ? "Frühere Käufe wiederherstellen" : "Restore Previous Purchases"}

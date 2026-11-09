@@ -11,7 +11,8 @@
 
 import { intlLocaleOf } from "../../../utils/appLanguages";
 import React, { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import BottomSheetModal from "@components/common/BottomSheetModal";
@@ -234,7 +235,7 @@ export default function BackupSettingsScreen() {
     ]);
   };
 
-  const spinner = <ActivityIndicator size="small" color={C.accent} />;
+  const spinner = <LensLoader size="small" color={C.accent} />;
   const metaLine = plan
     ? [
         plan.meta.createdAt ? fmtDate(plan.meta.createdAt, locale) : "",
@@ -552,7 +553,7 @@ export default function BackupSettingsScreen() {
               style={[s.confirmBtn, { backgroundColor: C.accent, opacity: selectedPlan?.writes.length ? 1 : 0.5 }]}
             >
               {applying ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <LensLoader tone="mono" size="small" color="#FFFFFF" />
               ) : (
                 <AppIcon family="Ionicons" name="refresh" size={17} color="#FFFFFF" />
               )}

@@ -10,7 +10,8 @@
 // devam edince kalan süreyle sürer. Cevaplanınca kalan örtü yumuşakça kalkar.
 
 import React, { useEffect, useMemo, useRef } from "react";
-import { ActivityIndicator, Animated, Easing, StyleSheet, View } from "react-native";
+import { Animated, Easing, StyleSheet, View } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import { createRng, shuffleWith } from "@utils/seededRandom";
 import { alpha } from "../../theme/colors";
@@ -149,7 +150,7 @@ export default function PosterReveal({
 
       {uri && !ready && !failed ? (
         <View style={[StyleSheet.absoluteFill, styles.center, { backgroundColor: theme.secondary }]}>
-          <ActivityIndicator color={theme.accent} />
+          <LensLoader color={theme.accent} />
         </View>
       ) : null}
     </View>

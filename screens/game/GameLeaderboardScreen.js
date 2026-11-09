@@ -1,6 +1,7 @@
 import { copyLanguage, normalizeAppLanguage } from "../../utils/appLanguages";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppIcon from "@components/AppIcon";
 import GlassIconButton from "@components/common/GlassIconButton";
@@ -289,7 +290,7 @@ function Podium({ entries, currentUid, theme, tr, es, pt, de }) {
 function State({ icon, text, theme, loading, action, actionText }) {
   return (
     <View style={[styles.state, { backgroundColor: theme.secondary, borderColor: theme.border }]}>
-      {loading ? <ActivityIndicator color={theme.accent} /> : <AppIcon family="Ionicons" name={icon} size={35} color={theme.text.muted} />}
+      {loading ? <LensLoader color={theme.accent} /> : <AppIcon family="Ionicons" name={icon} size={35} color={theme.text.muted} />}
       <Text style={[styles.stateText, { color: theme.text.secondary }]}>{text}</Text>
       {action ? <GlassTouchable onPress={action} style={[styles.stateAction, { backgroundColor: theme.accent }]}><Text style={styles.stateActionText}>{actionText}</Text></GlassTouchable> : null}
     </View>

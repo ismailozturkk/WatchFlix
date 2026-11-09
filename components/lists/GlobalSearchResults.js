@@ -16,13 +16,13 @@
 
 import React, { memo, useCallback, useMemo } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import PosterImage from "@components/PosterImage";
@@ -226,7 +226,7 @@ const ResultRow = memo(function ResultRow({
           ]}
         >
           {adding ? (
-            <ActivityIndicator size="small" color={actionColor} />
+            <LensLoader size="small" color={actionColor} />
           ) : (
             <Feather
               name={addDisabled ? "lock" : addIcon}

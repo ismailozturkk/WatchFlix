@@ -19,10 +19,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  ActivityIndicator,
   Pressable,
   BackHandler,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import axios from "axios";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { alpha } from "../../theme/colors";
@@ -421,7 +421,7 @@ export default function CommentScopeSheet({
                       style={styles.expandButton}
                     >
                       {loadingSeason[sn] ? (
-                        <ActivityIndicator size="small" color={theme.text.muted} />
+                        <LensLoader size="small" color={theme.text.muted} />
                       ) : (
                         <Ionicons
                           name={isOpen ? "chevron-up" : "chevron-down"}

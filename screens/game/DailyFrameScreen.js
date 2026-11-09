@@ -18,7 +18,6 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Keyboard,
   ScrollView,
   Share,
@@ -28,6 +27,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import AppIcon from "@components/AppIcon";
@@ -257,7 +257,7 @@ function GuessBox({ apiKey, language, round, theme, copy, onGuess, onSkip }) {
             autoCorrect={false}
             keyboardAppearance={glassScheme}
           />
-          {loading ? <ActivityIndicator size="small" color={theme.text.muted} /> : null}
+          {loading ? <LensLoader size="small" color={theme.text.muted} /> : null}
         </GlassField>
         <GlassPressable
           onPress={() => {
@@ -623,7 +623,7 @@ function DailyFrameGame({ navigation }) {
       >
         {phase === "loading" ? (
           <View style={styles.center} accessibilityLabel={copy.loading}>
-            <ActivityIndicator size="large" color={FRAME_ACCENT} />
+            <LensLoader size="large" color={FRAME_ACCENT} />
             <Text style={[styles.note, { color: theme.text.secondary }]}>{copy.loading}</Text>
           </View>
         ) : null}

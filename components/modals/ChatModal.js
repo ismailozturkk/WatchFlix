@@ -16,7 +16,6 @@ import {
   Modal,
   TextInput,
   ScrollView,
-  ActivityIndicator,
   FlatList,
   Animated,
   KeyboardAvoidingView,
@@ -26,6 +25,7 @@ import {
   UIManager,
   Dimensions,
 } from "react-native";
+import LensLoader from "../LensLoader";
 
 if (Platform.OS === "android") {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -1162,7 +1162,7 @@ export const ChatModal = () => {
                       disabled={loading}
                     >
                       {loading ? (
-                        <ActivityIndicator color={theme.text.primary} size="small" />
+                        <LensLoader color={theme.text.primary} size="small" />
                       ) : (
                         <Ionicons
                           name="send"

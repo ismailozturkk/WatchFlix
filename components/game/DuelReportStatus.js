@@ -5,7 +5,8 @@
 // hata → "Yeniden dene". Düello yoksa (`status: "off"`) hiçbir şey çizilmez.
 
 import React, { memo } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import AppIcon from "@components/AppIcon";
 import GlassPressable from "@components/common/GlassPressable";
 import { useLanguage } from "@context/LanguageContext";
@@ -33,7 +34,7 @@ function DuelReportStatus({ status, chatName, onOpenChat, onRetry, theme, style 
       style={[styles.row, { backgroundColor: theme.secondary, borderColor: failed ? theme.border : sent ? DONE : AMBER }, style]}
     >
       {status === "sending" ? (
-        <ActivityIndicator size="small" color={AMBER} />
+        <LensLoader size="small" color={AMBER} />
       ) : (
         <AppIcon
           family="Ionicons"

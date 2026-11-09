@@ -8,7 +8,8 @@
 // basıldığında hiçbir görsel geri bildirim yoktu (artık "Eklendi ✓"); rastgele
 // seçimde "Başka birini seç" eklendi.
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import Animated, {
   Easing,
@@ -186,7 +187,7 @@ function MatchBody({
             ]}
           >
             {adding ? (
-              <ActivityIndicator size="small" color={colors.text} />
+              <LensLoader size="small" color={colors.text} />
             ) : (
               <AppIcon
                 family="Ionicons"

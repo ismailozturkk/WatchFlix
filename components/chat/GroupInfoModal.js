@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   SectionList,
   StyleSheet,
@@ -8,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { collection, onSnapshot } from "firebase/firestore";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -467,7 +467,7 @@ export default function GroupInfoModal({
           </Text>
         </View>
         {loading ? (
-          <ActivityIndicator size="small" color={groupData?.color || ACCENT} />
+          <LensLoader size="small" color={groupData?.color || ACCENT} />
         ) : adding ? (
           <TouchableOpacity
             onPress={(event) => {
@@ -719,7 +719,7 @@ export default function GroupInfoModal({
               </View>
               {canManage ? (
                 savingSendPolicy ? (
-                  <ActivityIndicator size="small" color={groupData?.color || ACCENT} />
+                  <LensLoader size="small" color={groupData?.color || ACCENT} />
                 ) : (
                   <SwitchToggle
                     value={adminsOnly}
@@ -838,13 +838,13 @@ export default function GroupInfoModal({
               />
               {savingAvatar && (
                 <View style={styles.avatarSavingOverlay}>
-                  <ActivityIndicator color={groupData?.color || ACCENT} />
+                  <LensLoader color={groupData?.color || ACCENT} />
                 </View>
               )}
             </View>
           ) : tab === "add" && loadingFriends ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator color={groupData?.color || ACCENT} />
+              <LensLoader color={groupData?.color || ACCENT} />
             </View>
           ) : tab === "members" ? (
             <SectionList

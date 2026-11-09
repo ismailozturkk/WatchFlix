@@ -1,6 +1,5 @@
 import React, { memo } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Modal,
   StyleSheet,
@@ -8,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import { useTheme } from "../../context/ThemeContext";
 import { i18nText } from "../../utils/i18nText";
 import useKeyboardInset from "../../hooks/useKeyboardInset";
@@ -73,7 +73,7 @@ function SaveDraftModalComponent({
               style={[styles.btn, styles.saveBtn, { backgroundColor: theme.accent, opacity: saving ? 0.7 : 1 }]}
             >
               {saving ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <LensLoader tone="mono" color="#fff" size="small" />
               ) : (
                 <Text allowFontScaling={false} style={[styles.btnText, { color: "#fff" }]}>
                   {isUpdate ? i18nText("autoI18n.guncelle", "Güncelle") : "Kaydet"}

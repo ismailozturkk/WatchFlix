@@ -12,7 +12,8 @@
 
 import { intlLocaleOf, normalizeAppLanguage } from "../../../utils/appLanguages";
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import LensLoader from "../../../components/LensLoader";
 import AppIcon from "@components/AppIcon";
 import Toast from "@components/AppToast";
 import PremiumPill from "@components/premium/PremiumPill";
@@ -295,7 +296,7 @@ export default function PremiumUsageScreen({ navigation }) {
             ]}
           >
             {managing ? (
-              <ActivityIndicator size="small" color={model.canUpgrade ? C.accent : "#FFFFFF"} />
+              <LensLoader tone="mono" size="small" color={model.canUpgrade ? C.accent : "#FFFFFF"} />
             ) : (
               <>
                 <AppIcon

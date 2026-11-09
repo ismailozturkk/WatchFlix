@@ -7,7 +7,8 @@
 // rekor ve oyun sonu davranışı tek yerde ve oyunlar arasında birebir aynı kalır.
 
 import React from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import AppIcon from "@components/AppIcon";
 import GlassPressable from "@components/common/GlassPressable";
@@ -86,7 +87,7 @@ export function QuestionPrompt({ children, theme, accent, icon = "help-circle-ou
 export function LoadingState({ theme, copy }) {
   return (
     <View style={styles.center} accessibilityLabel={copy.loading}>
-      <ActivityIndicator size="large" color={theme.accent} />
+      <LensLoader size="large" color={theme.accent} />
       <Text style={[styles.note, { color: theme.text.secondary }]}>{copy.loading}</Text>
     </View>
   );

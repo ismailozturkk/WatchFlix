@@ -19,7 +19,8 @@
 // o zaman çağrılır (saat o an başlar).
 
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Easing, Platform, StyleSheet, View } from "react-native";
+import { Animated, Easing, Platform, StyleSheet, View } from "react-native";
+import LensLoader from "../LensLoader";
 import { Image } from "expo-image";
 import { BLUR_START } from "@utils/quickGames";
 import usePosterCorner from "@hooks/usePosterCorner";
@@ -118,7 +119,7 @@ export default function BlurPoster({ uri, durationMs, running, revealed, resetKe
       </Animated.View>
       {!loaded && !revealed ? (
         <View style={[styles.fill, styles.center, { backgroundColor: theme.secondary }]} pointerEvents="none">
-          <ActivityIndicator color={theme.text.muted} />
+          <LensLoader color={theme.text.muted} />
         </View>
       ) : null}
       {children}

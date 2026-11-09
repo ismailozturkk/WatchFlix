@@ -30,8 +30,8 @@ import {
   StyleSheet,
   AppState,
   Linking,
-  ActivityIndicator,
 } from "react-native";
+import LensLoader from "./LensLoader";
 import * as Notifications from "expo-notifications";
 import * as MediaLibrary from "expo-media-library";
 import * as Calendar from "expo-calendar";
@@ -258,7 +258,7 @@ export default function PermissionsSection({ colors: C }) {
             disabled={refreshing || busyKey !== null}
           >
             {refreshing ? (
-              <ActivityIndicator size="small" color={C.accentStrong} />
+              <LensLoader size="small" color={C.accentStrong} />
             ) : (
               <AppIcon name="refresh" size={17} color={C.accentStrong} />
             )}
@@ -319,7 +319,7 @@ export default function PermissionsSection({ colors: C }) {
             </View>
             <View style={ps.rowAction}>
               {busy ? (
-                <ActivityIndicator size="small" color={C.accentStrong} />
+                <LensLoader size="small" color={C.accentStrong} />
               ) : (
                 <>
                   <StatusPill status={st.status} colors={C} t={t} />

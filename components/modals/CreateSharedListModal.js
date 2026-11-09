@@ -6,8 +6,8 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
 } from "react-native";
+import LensLoader from "../LensLoader";
 import BottomSheetModal from "@components/common/BottomSheetModal";
 import GlassCloseButton from "@components/common/GlassCloseButton";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -329,7 +329,7 @@ export default function CreateSharedListModal({
             ]}
           >
             {saving ? (
-              <ActivityIndicator size="small" color="#000" />
+              <LensLoader tone="mono" size="small" color="#000" />
             ) : (
               <Ionicons name={isAddMode ? "person-add" : "people"} size={16} color="#000" />
             )}

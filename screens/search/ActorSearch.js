@@ -8,12 +8,12 @@ import {
   TextInput,
   FlatList,
   Dimensions,
-  ActivityIndicator,
   TouchableOpacity,
   ScrollView,
   Animated,
   Keyboard
 } from "react-native";
+import LensLoader from "../../components/LensLoader";
 import axios from "axios";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -368,7 +368,7 @@ const DiscoverSection = memo(
         <View style={styles.discoverWrapper}>
           {chips}
           <View style={styles.discoverLoadingBox}>
-            <ActivityIndicator size="small" color={theme.text?.muted ?? "#666"} />
+            <LensLoader size="small" color={theme.text?.muted ?? "#666"} />
           </View>
         </View>
       );
@@ -702,7 +702,7 @@ export default function ActorSearch({ navigation, route, isUnified, unifiedQuery
             }
           />
           {loading ? (
-            <ActivityIndicator
+            <LensLoader
               size="small"
               color={theme.text?.muted ?? "#666"}
             />
